@@ -2861,7 +2861,7 @@ struct TupleType : StorageType {
     bool packed;
 };
 
-static const Type *Tuple(const std::vector<const Type *> &types, 
+static const Type *Tuple(const std::vector<const Type *> &types,
     bool packed = false, size_t alignment = 0) {
     static TypeFactory<TupleType> tuples;
     std::vector<Any> atypes;
@@ -8696,6 +8696,7 @@ struct SPIRVGenerator {
                     builder.getTypeId(then_value), cond,
                     then_value, else_value);
             } break;
+            case FN_Length:
             case OP_Sin:
             case OP_Cos:
             case OP_Tan:
@@ -8704,7 +8705,11 @@ struct SPIRVGenerator {
             case OP_Atan: {
                 READ_VALUE(val);
                 GLSLstd450 builtin = GLSLstd450Bad;
+                auto rtype = builder.getTypeId(val);
                 switch (enter.symbol.value()) {
+                case FN_Length:
+                    rtype = builder.getContainedTypeId(rtype);
+                    builtin = GLSLstd450Length; break;
                 case OP_Sin: builtin = GLSLstd450Sin; break;
                 case OP_Cos: builtin = GLSLstd450Cos; break;
                 case OP_Tan: builtin = GLSLstd450Tan; break;
@@ -8717,10 +8722,7 @@ struct SPIRVGenerator {
                     location_error(ss.str());
                 } break;
                 }
-                retvalue = builder.createBuiltinCall(
-                    builder.getTypeId(val),
-                    glsl_ext_inst, builtin,
-                    { val });
+                retvalue = builder.createBuiltinCall(rtype, glsl_ext_inst, builtin, { val });
             } break;
             case FN_Unconst: {
                 READ_VALUE(val);
@@ -16724,7 +16726,11 @@ static void f_load_library(const String *name) {
     }
     loaded_libs.push_back(handle);
 #else
-    LLVMLoadLibraryPermanently(name->data);
+    if (LLVMLoadLibraryPermanently(name->data)) {
+        StyledString ss;
+        ss.out << "error loading library " << name;
+        location_error(ss.str());
+    }
 #endif
 }
 
