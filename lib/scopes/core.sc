@@ -2918,6 +2918,17 @@ typefn Scope 'as (self destT)
                     fret key key value
             unconst (Any none)
 
+typefn list 'as (self destT)
+    if (destT == Generator)
+        Generator
+            label (fret fdone cell)
+                if (empty? cell)
+                    fdone;
+                else
+                    let at next = (decons cell)
+                    fret next at
+            unconst self
+
 fn range (a b c)
     let num-type = (typeof a)
     let step =
