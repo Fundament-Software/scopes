@@ -2,6 +2,7 @@ syntax: glob
 
 *.so
 *.so.1
+*.log
 *.o
 *.exe
 *.dll

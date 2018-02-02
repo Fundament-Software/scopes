@@ -6,76 +6,105 @@ using
     #include <unistd.h>
     #include <termios.h>
     #include <fcntl.h>
+    #include <signal.h>
     " '()
+
+let tty-file =
+    fopen "/dev/tty" "w"
+setvbuf tty-file null _IONBF 0
+let tty-fd =
+    fileno tty-file
+freopen "test_tty.log" "a+" stdout
+setvbuf stdout null _IONBF 0
+freopen "test_tty.log" "a+" stderr
+setvbuf stderr null _IONBF 0
+
+fn countof-utf8str (s)
+    "counts the codepoints of any value that is convertible to a
+     zero-terminated rawstring in UTF-8 encoding"
+    let s = (s as rawstring)
+    let loop (i j) = 0 0
+    if ((s @ i) != 0:i8)
+        loop (i + 1)
+            ? (((s @ i) & 0xc0:i8) != 0x80:i8) (j + 1) j
+    else
+        j
+
+fn writescr (...)
+    fprintf tty-file ...
 
 fn window-size ()
     var w = (winsize)
-    ioctl STDOUT_FILENO TIOCGWINSZ w
+    ioctl tty-fd TIOCGWINSZ w
     return
-        i32 w.ws_row
         i32 w.ws_col
+        i32 w.ws_row
 
 var terminal-settings = (termios)
 fn init-terminal ()
     var d = (termios)
-    tcgetattr STDOUT_FILENO d
+    tcgetattr tty-fd d
     terminal-settings = (load d)
     cfmakeraw d
-    tcsetattr STDOUT_FILENO TCSAFLUSH d
+    tcsetattr tty-fd TCSAFLUSH d
     fcntl STDIN_FILENO F_SETFL
         (fcntl STDIN_FILENO F_GETFL) | O_NONBLOCK
 
 fn exit-terminal ()
-    tcsetattr STDOUT_FILENO TCSAFLUSH terminal-settings
+    tcsetattr tty-fd TCSAFLUSH terminal-settings
 
 fn reset ()
-    printf "\x1b[0m"
+    writescr "\x1b[0m"
 
 fn fgcolor (r g b)
-    printf "\x1b[38;2;%i;%i;%im"
+    writescr "\x1b[38;2;%i;%i;%im"
         i32 r; i32 g; i32 b
 
 fn bgcolor (r g b)
-    printf "\x1b[48;2;%i;%i;%im"
+    writescr "\x1b[48;2;%i;%i;%im"
         i32 r; i32 g; i32 b
 
 fn save-cursor ()
-    printf "\x1b7"
+    writescr "\x1b7"
 
 fn restore-cursor ()
-    printf "\x1b8"
+    writescr "\x1b8"
 
 fn locate (row column)
-    printf "\x1b[%i;%iH" (i32 row) (i32 column)
+    writescr "\x1b[%i;%iH" (i32 row) (i32 column)
 
 fn scroll-up (n)
-    printf "\x1b[%iS" (i32 n)
+    writescr "\x1b[%iS" (i32 n)
 
 fn scroll-down (n)
-    printf "\x1b[3T" (i32 n)
+    writescr "\x1b[%iT" (i32 n)
+
+fn scroll-region (a1 a2)
+    writescr "\x1b[%i;%ir" (i32 a1) (i32 a2)
 
 fn clear-screen ()
-    printf "\x1b[2J"
+    writescr "\x1b[2J"
 fn clear-below ()
-    printf "\x1b[0J"
+    writescr "\x1b[0J"
 fn clear-above ()
-    printf "\x1b[1J"
+    writescr "\x1b[1J"
 fn clear-right ()
-    printf "\x1b[0K"
+    writescr "\x1b[0K"
 fn clear-left ()
-    printf "\x1b[1K"
+    writescr "\x1b[1K"
 fn clear-line ()
-    printf "\x1b[2K"
+    writescr "\x1b[2K"
 
 fn cursor-on ()
-    printf "\x1b[?25h"
+    writescr "\x1b[?25h"
 fn cursor-off ()
-    printf "\x1b[?25l"
+    writescr "\x1b[?25l"
 
 fn mouse-on ()
-    printf "\x1b[?1003h"
+    writescr "\x1b[?1003h"
 fn mouse-off ()
-    printf "\x1b[?1003l"
+    writescr "\x1b[?1003l"
+
 
 fn hexrgb (code)
     return
@@ -84,22 +113,49 @@ fn hexrgb (code)
         code & 0xff
 
 init-terminal;
+
+global window-size-changed = false
+fn on-sigwinch (k)
+    window-size-changed = true
+    return;
+
 do
-    locate 1 1
-    bgcolor
-        hexrgb 0x202020
-    clear-screen;
-    mouse-on;
-    cursor-off;
-    fgcolor
-        hexrgb 0xa0a0a0
+    signal SIGWINCH on-sigwinch
 
-    printf "test\r\n"
+    let w h = (window-size)
+    printf "window size: %i x %i\n"
+        i32 w; i32 h
+    var width = w
+    var height = h
+    var frame = 0
 
-    printf "console size: %i %i\r\n"
-        window-size;
+    fn reset-screen ()
+        locate 1 1
+        bgcolor
+            hexrgb 0x202020
+        clear-screen;
+        mouse-on;
+        cursor-off;
+        fgcolor
+            hexrgb 0xa0a0a0
 
-    print "done."
+    fn on-idle ()
+        usleep (1000 * 16)
+        if (load window-size-changed)
+            let w h = (window-size)
+            window-size-changed = false
+            width = w
+            height = h
+            reset-screen;
+        locate 2 1
+        writescr "console size: %i x %i" (i32 width) (i32 height)
+        locate 3 1
+        writescr "frame: %i" (i32 frame)
+        #printf "frame: %i\n" (i32 frame)
+        clear-right;
+        frame = frame + 1
+
+    reset-screen;
     while true
         let c =
             getchar;
@@ -109,7 +165,6 @@ do
             if (c != 0x5b)
                 break;
             let c = (getchar)
-            locate 1 1
             if (c == 0x4d)
                 let s y x =
                     (getchar) - 32
@@ -121,33 +176,31 @@ do
                 let dragging = ((s & 32) == 32)
                 let scrolling = ((s & 64) == 64)
                 let s = (s ^ (s & 124))
-                printf "button=%i %i %i %s%s%s%s%s" s x y
+                printf "button=%i %i %i %s%s%s%s%s\n" s x y
                     (? shiftdown "shift " "") as rawstring
                     (? altdown "alt " "") as rawstring
                     (? ctrldown "ctrl " "") as rawstring
                     (? dragging "drag " "") as rawstring
                     (? scrolling "scroll" "") as rawstring
-                clear-right;
-                locate x y
             else
                 while true
                     let c =
                         getchar;
                     if (c == -1)
                         break;
-                    printf "%i " c
-                clear-right;
+                    printf "^ %i " c
+                printf "\n"
         elseif (c == -1)
+            on-idle;
         else
-            locate 1 1
-            printf "%i " c
+            printf "key %i " c
             while true
                 let c =
                     getchar;
                 if (c == -1)
                     break;
                 printf "%i " c
-            clear-right;
+            printf "\n"
 
 
 reset;
