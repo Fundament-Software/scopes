@@ -2927,7 +2927,7 @@ typefn list 'as (self destT)
                 else
                     let at next = (decons cell)
                     fret next at
-            unconst self
+            self
 
 fn range (a b c)
     let num-type = (typeof a)
