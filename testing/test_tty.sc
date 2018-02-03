@@ -19,6 +19,52 @@ setvbuf stdout null _IONBF 0
 freopen "test_tty.log" "a+" stderr
 setvbuf stderr null _IONBF 0
 
+# reserve enough space to serve a 6x6 font at 3840 pixels × 2160, which is 640x360
+let MAX_WIDTH = 640:usize
+let MAX_HEIGHT = 360:usize
+# page 0: character, page 1: character color, page 2: background color
+let NUM_PAGES = 3:usize
+let NUM_BUFFERS = 2:usize
+
+fn PageType (T)
+    array
+        array T
+            usize MAX_WIDTH
+        usize MAX_HEIGHT
+
+fn hexrgb (code)
+    return
+        (code >> 16) & 0xff
+        (code >> 8) & 0xff
+        code & 0xff
+
+fn rgbhex (r g b)
+    | r
+        g << 8
+        b << 16
+
+struct Framebuffer
+    glyph : (PageType (array i8 4:usize))
+    fg : (PageType i32)
+    bg : (PageType i32)
+
+    method 'clear (self)
+        let loop (y x) = (unconst 0) (unconst 0)
+        if (y < MAX_HEIGHT)
+            if (x < MAX_WIDTH)
+                self.glyph @ y @ x = (arrayof i8 32 0 0 0)
+                self.fg @ y @ x = 0xffffff
+                self.bg @ y @ x = (rgbhex (i32 x) (i32 y) 0)
+                loop y (x + 1)
+            else
+                loop (y + 1) (unconst 0)
+
+let buffers =
+    (malloc (array Framebuffer (usize NUM_BUFFERS))) @ 0
+
+for i in (range 2)
+    'clear (buffers @ i)
+
 fn countof-utf8str (s)
     "counts the codepoints of any value that is convertible to a
      zero-terminated rawstring in UTF-8 encoding"
@@ -30,6 +76,8 @@ fn countof-utf8str (s)
     else
         j
 
+fn writech (x)
+    fputc (i32 x) tty-file
 fn writescr (...)
     fprintf tty-file ...
 
@@ -105,12 +153,29 @@ fn mouse-on ()
 fn mouse-off ()
     writescr "\x1b[?1003l"
 
+fn render-buffer (b)
+    let w h = (window-size)
+    locate 1 1
+    let loop (y x fg bg) = (unconst 0) (unconst 0) 0xffffff 0x000000
+    if (y < h)
+        if (x < w)
+            let glyph p-fg p-bg =
+                load (b.glyph @ y @ x)
+                load (b.fg @ y @ x)
+                load (b.bg @ y @ x)
+            if (p-fg != fg)
+                fgcolor (hexrgb p-fg)
+            if (p-bg != bg)
+                bgcolor (hexrgb p-bg)
+            for i in (range 4)
+                let ch = (glyph @ i)
+                if (ch == 0:i8)
+                    break
+                writech ch
+            loop y (x + 1) p-fg p-bg
+        else
+            loop (y + 1) (unconst 0) fg bg
 
-fn hexrgb (code)
-    return
-        (code >> 16) & 0xff
-        (code >> 8) & 0xff
-        code & 0xff
 
 init-terminal;
 
@@ -130,14 +195,9 @@ do
     var frame = 0
 
     fn reset-screen ()
-        locate 1 1
-        bgcolor
-            hexrgb 0x202020
         clear-screen;
         mouse-on;
         cursor-off;
-        fgcolor
-            hexrgb 0xa0a0a0
 
     fn on-idle ()
         usleep (1000 * 16)
@@ -147,12 +207,11 @@ do
             width = w
             height = h
             reset-screen;
+        render-buffer (buffers @ 0)
         locate 2 1
-        writescr "console size: %i x %i" (i32 width) (i32 height)
+        writescr "console size: %i x %i (aspect %f)" (i32 width) (i32 height) (width / height)
         locate 3 1
         writescr "frame: %i" (i32 frame)
-        #printf "frame: %i\n" (i32 frame)
-        clear-right;
         frame = frame + 1
 
     reset-screen;
