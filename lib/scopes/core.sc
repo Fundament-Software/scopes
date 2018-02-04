@@ -2835,9 +2835,10 @@ define-scope-macro struct
             ((superof (T as type)) == superT))
             T as type
         else
-            typename (name as string)
-    set-typename-super! T superT
-    set-scope-symbol! syntax-scope name T
+            let T = (typename (name as string))
+            set-typename-super! T superT
+            set-scope-symbol! syntax-scope name T
+            T
     return
         if (empty? body)
             # forward declaration
