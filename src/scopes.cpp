@@ -551,7 +551,7 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
 #define B_GLOBALS() \
     T(FN_Branch) T(KW_Fn) T(KW_Label) T(KW_SyntaxApplyBlock) T(KW_Quote) \
     T(KW_Call) T(KW_RawCall) T(KW_CCCall) T(SYM_QuoteForm) T(FN_Dump) T(KW_Do) \
-    T(FN_FunctionType) T(FN_TupleType) T(FN_Alloca) T(FN_AllocaOf) T(FN_Malloc) \
+    T(FN_FunctionType) T(FN_TupleType) T(FN_UnionType) T(FN_Alloca) T(FN_AllocaOf) T(FN_Malloc) \
     T(FN_AllocaArray) T(FN_MallocArray) T(FN_ReturnLabelType) T(KW_DoIn) \
     T(FN_AnyExtract) T(FN_AnyWrap) T(FN_IsConstant) T(FN_Free) \
     T(OP_ICmpEQ) T(OP_ICmpNE) T(FN_Sample) T(FN_ImageRead) T(FN_ImageWrite) \
@@ -903,6 +903,7 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(FN_FunctionType, "function-type") \
     T(FN_FunctionTypeIsVariadic, "function-type-variadic?") \
     T(FN_TupleType, "tuple-type") \
+    T(FN_UnionType, "union-type") \
     T(FN_ReturnLabelType, "ReturnLabel-type") \
     T(FN_ArrayType, "array-type") T(FN_ImageType, "Image-type") \
     T(FN_SampledImageType, "SampledImage-type") \
@@ -13620,6 +13621,14 @@ struct Solver {
                 types.push_back(args[i].value);
             }
             RETARGS(Tuple(types));
+        } break;
+        case FN_UnionType: {
+            CHECKARGS(0, -1);
+            std::vector<const Type *> types;
+            for (size_t i = 1; i < args.size(); ++i) {
+                types.push_back(args[i].value);
+            }
+            RETARGS(Union(types));
         } break;
         case FN_ReturnLabelType: {
             CHECKARGS(0, -1);

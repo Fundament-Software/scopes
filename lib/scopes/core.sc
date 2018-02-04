@@ -1010,7 +1010,7 @@ syntax-extend
     set-type-symbol! tuple 'apply-type
         fn (cls ...)
             tuple-type ...
-    #set-type-symbol! union 'apply-type
+    set-type-symbol! union 'apply-type
         fn (cls ...)
             union-type ...
     set-type-symbol! typename 'apply-type

@@ -91,6 +91,8 @@
         "__tree": "cpp",
         "optional": "cpp",
         "regexp.c": "cpp",
-        "fstream": "cpp"
+        "fstream": "cpp",
+        "*.gen": "cpp",
+        "__memory": "cpp"
     }
 }
