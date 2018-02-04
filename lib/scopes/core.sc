@@ -2816,10 +2816,16 @@ define-scope-macro struct
         set-typename-fields! T (field-names begin-arg)
         T
 
-    let name body = (decons args)
-    let name = (name as Syntax as Symbol)
+    let head body = (decons args)
+    let head = (head as Syntax as Symbol)
+    let superT name body =
+        if (head == 'union)
+            let head body = (decons body)
+            _ CUnion (head as Syntax as Symbol) body
+        else
+            _ CStruct head body
     let T = (typename (name as string))
-    set-typename-super! T CStruct
+    set-typename-super! T superT
     set-scope-symbol! syntax-scope name T
     return
         cons do
