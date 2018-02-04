@@ -57,3 +57,34 @@ assert
         q.y == 0
         q.z == 4
 
+do
+    # direct self reference
+    struct Cell
+        at : i32
+        next : (pointer Cell)
+
+    var cell3 = (Cell 3 null)
+    var cell2 = (Cell 2 cell3)
+    var cell1 = (Cell 1 cell2)
+
+    assert
+        cell1.next.next.at == 3
+
+do
+    # forward declaration
+    struct Cell
+
+    let CellPtr =
+        pointer Cell
+
+    struct Cell
+        at : i32
+        next : CellPtr
+
+    var cell3 = (Cell 3 null)
+    var cell2 = (Cell 2 cell3)
+    var cell1 = (Cell 1 cell2)
+
+    assert
+        cell1.next.next.at == 3
+

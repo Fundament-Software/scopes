@@ -2824,19 +2824,35 @@ define-scope-macro struct
             _ CUnion (head as Syntax as Symbol) body
         else
             _ CStruct head body
-    let T = (typename (name as string))
+    # see if we can find a forward declaration in the local scope
+    let T ok = (Scope-local@ syntax-scope name)
+    let TT = ('typeof T)
+    let T =
+        if (and ok
+            (type? TT)
+            (typename-type? (T as type))
+            (opaque? (T as type))
+            ((superof (T as type)) == superT))
+            T as type
+        else
+            typename (name as string)
     set-typename-super! T superT
     set-scope-symbol! syntax-scope name T
     return
-        cons do
-            list using struct-dsl
-            list define 'this-struct T
-            list let 'field-names '= end-args
-            list let 'field-types '= end-args
-            ..
-                cons do body
-                list
-                    list finalize-struct T 'field-names 'field-types
+        if (empty? body)
+            # forward declaration
+            unconst
+                list do
+        else
+            cons do
+                list using struct-dsl
+                list define 'this-struct T
+                list let 'field-names '= end-args
+                list let 'field-types '= end-args
+                ..
+                    cons do body
+                    list
+                        list finalize-struct T 'field-names 'field-types
         syntax-scope
 
 #-------------------------------------------------------------------------------

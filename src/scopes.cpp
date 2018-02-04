@@ -915,6 +915,7 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(FN_Range, "range") T(FN_RefNew, "ref-new") T(FN_RefAt, "ref@") \
     T(FN_Repeat, "repeat") T(FN_Repr, "Any-repr") T(FN_AnyString, "Any-string") \
     T(FN_Require, "require") T(FN_ScopeOf, "scopeof") T(FN_ScopeAt, "Scope@") \
+    T(FN_ScopeLocalAt, "Scope-local@") \
     T(FN_ScopeEq, "Scope==") \
     T(FN_ScopeNew, "Scope-new") \
     T(FN_ScopeCopy, "Scope-clone") \
@@ -927,6 +928,7 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(FN_StringCountOf, "string-countof") T(FN_StringNew, "string-new") \
     T(FN_StringJoin, "string-join") T(FN_StringSlice, "string-slice") \
     T(FN_StructOf, "structof") T(FN_TypeStorage, "storageof") \
+    T(FN_IsOpaque, "opaque?") \
     T(FN_SymbolEq, "Symbol==") T(FN_SymbolNew, "string->Symbol") \
     T(FN_StringToRawstring, "string->rawstring") \
     T(FN_IsSymbol, "symbol?") \
@@ -3336,10 +3338,14 @@ struct TypenameType : Type {
 
     void finalize(const Type *_type) {
         if (finalized()) {
-            location_error(String::from("typename is already final"));
+            StyledString ss;
+            ss.out << "typename " << _type << " is already final";
+            location_error(ss.str());
         }
         if (isa<TypenameType>(_type)) {
-            location_error(String::from("cannot use typename as storage type"));
+            StyledString ss;
+            ss.out << "cannot use typename " << _type << " as storage type";
+            location_error(ss.str());
         }
         storage_type = _type;
     }
@@ -16288,6 +16294,12 @@ static AnyBoolPair f_scope_at(Scope *scope, Symbol key) {
     return { result, ok };
 }
 
+static AnyBoolPair f_scope_local_at(Scope *scope, Symbol key) {
+    Any result = none;
+    bool ok = scope->lookup_local(key, result);
+    return { result, ok };
+}
+
 static Symbol f_symbol_new(const String *str) {
     return Symbol(str);
 }
@@ -16821,6 +16833,7 @@ static void init_globals(int argc, char *argv[]) {
 
     DEFINE_PURE_C_FUNCTION(FN_ImportC, f_import_c, TYPE_Scope, TYPE_String, TYPE_String, TYPE_List);
     DEFINE_PURE_C_FUNCTION(FN_ScopeAt, f_scope_at, Tuple({TYPE_Any,TYPE_Bool}), TYPE_Scope, TYPE_Symbol);
+    DEFINE_PURE_C_FUNCTION(FN_ScopeLocalAt, f_scope_local_at, Tuple({TYPE_Any,TYPE_Bool}), TYPE_Scope, TYPE_Symbol);
     DEFINE_PURE_C_FUNCTION(FN_SymbolNew, f_symbol_new, TYPE_Symbol, TYPE_String);
     DEFINE_PURE_C_FUNCTION(FN_Repr, f_repr, TYPE_String, TYPE_Any);
     DEFINE_PURE_C_FUNCTION(FN_AnyString, f_any_string, TYPE_String, TYPE_Any);
@@ -16839,6 +16852,7 @@ static void init_globals(int argc, char *argv[]) {
     DEFINE_PURE_C_FUNCTION(FN_BitCountOf, f_bitcountof, TYPE_I32, TYPE_Type);
     DEFINE_PURE_C_FUNCTION(FN_IsSigned, f_issigned, TYPE_Bool, TYPE_Type);
     DEFINE_PURE_C_FUNCTION(FN_TypeStorage, f_type_storage, TYPE_Type, TYPE_Type);
+    DEFINE_PURE_C_FUNCTION(FN_IsOpaque, is_opaque, TYPE_Bool, TYPE_Type);
     DEFINE_PURE_C_FUNCTION(FN_IntegerType, f_integer_type, TYPE_Type, TYPE_I32, TYPE_Bool);
     DEFINE_PURE_C_FUNCTION(FN_CompilerVersion, f_compiler_version, Tuple({TYPE_I32, TYPE_I32, TYPE_I32}));
     DEFINE_PURE_C_FUNCTION(FN_TypeName, f_type_name, TYPE_String, TYPE_Type);
