@@ -2668,6 +2668,11 @@ typefn CUnion 'getattr& (self name)
         ('from-pointer-type reference newPT)
             bitcast self newPT
 
+typefn CUnion 'getattr (self name)
+    let idx = (typename-field-index (typeof self) name)
+    if (icmp>=s idx 0)
+        extractvalue self idx
+
 # extern call attempts to cast arguments to correct type
 typefn extern 'call (self ...)
     label docall (dest ET)
