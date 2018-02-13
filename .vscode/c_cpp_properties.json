@@ -5,7 +5,11 @@
             "includePath": [
                 "/usr/include",
                 "/usr/local/include",
-                "${workspaceRoot}"
+                "${workspaceRoot}",
+                "${workspaceRoot}/external",
+                "${workspaceRoot}/libffi/include",
+                "${workspaceRoot}/SPIRV-Tools/include",
+                "${workspaceRoot}/lib/clang/include"
             ],
             "defines": [],
             "intelliSenseMode": "clang-x64",
@@ -13,7 +17,11 @@
                 "path": [
                     "/usr/include",
                     "/usr/local/include",
-                    "${workspaceRoot}"
+                    "${workspaceRoot}",
+                    "${workspaceRoot}/external",
+                    "${workspaceRoot}/libffi/include",
+                    "${workspaceRoot}/SPIRV-Tools/include",
+                    "${workspaceRoot}/lib/clang/include"
                 ],
                 "limitSymbolsToIncludedHeaders": true,
                 "databaseFilename": ""
@@ -28,7 +36,11 @@
             "includePath": [
                 "/usr/include",
                 "/usr/local/include",
-                "${workspaceRoot}"
+                "${workspaceRoot}",
+                "${workspaceRoot}/external",
+                "${workspaceRoot}/libffi/include",
+                "${workspaceRoot}/SPIRV-Tools/include",
+                "${workspaceRoot}/lib/clang/include"
             ],
             "defines": [],
             "intelliSenseMode": "clang-x64",
@@ -36,7 +48,11 @@
                 "path": [
                     "/usr/include",
                     "/usr/local/include",
-                    "${workspaceRoot}"
+                    "${workspaceRoot}",
+                    "${workspaceRoot}/external",
+                    "${workspaceRoot}/libffi/include",
+                    "${workspaceRoot}/SPIRV-Tools/include",
+                    "${workspaceRoot}/lib/clang/include"
                 ],
                 "limitSymbolsToIncludedHeaders": true,
                 "databaseFilename": ""
@@ -53,7 +69,10 @@
                 "C:/msys64/mingw64/include",
                 "C:/msys64/mingw64/lib/libffi-3.2.1/include",
                 "${workspaceRoot}",
-                "${workspaceRoot}/win32"
+                "${workspaceRoot}/win32",
+                "${workspaceRoot}/external",
+                "${workspaceRoot}/libffi/include",
+                "${workspaceRoot}/SPIRV-Tools/include"
             ],
             "defines": [
                 "_DEBUG",
@@ -82,7 +101,10 @@
                     "C:/msys64/mingw64/include",
                     "C:/msys64/mingw64/lib/libffi-3.2.1/include",
                     "${workspaceRoot}",
-                    "${workspaceRoot}/win32"
+                    "${workspaceRoot}/win32",
+                    "${workspaceRoot}/external",
+                    "${workspaceRoot}/libffi/include",
+                    "${workspaceRoot}/SPIRV-Tools/include"
                 ],
                 "limitSymbolsToIncludedHeaders": true,
                 "databaseFilename": ""
