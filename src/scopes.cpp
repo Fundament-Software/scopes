@@ -9764,6 +9764,14 @@ static void *local_aware_dlsym(const char *name) {
 }
 
 struct LLVMIRGenerator {
+    enum Intrinsic {
+        llvm_sin_f32,
+        llvm_sin_f64,
+        llvm_fabs_f32,
+        llvm_fabs_f64,
+        NumIntrinsics,
+    };
+
     struct HashFuncLabelPair {
         size_t operator ()(const std::pair<LLVMValueRef, Label *> &value) const {
             return
@@ -9816,6 +9824,7 @@ struct LLVMIRGenerator {
     static LLVMAttributeRef attr_byval;
     static LLVMAttributeRef attr_sret;
     static LLVMAttributeRef attr_nonnull;
+    LLVMValueRef intrinsics[NumIntrinsics];
 
     Label *active_function;
     LLVMValueRef active_function_value;
@@ -9836,6 +9845,9 @@ struct LLVMIRGenerator {
         use_debug_info(true),
         inline_pointers(true) {
         static_init();
+        for (int i = 0; i < NumIntrinsics; ++i) {
+            intrinsics[i] = nullptr;
+        }
     }
 
     LLVMValueRef source_file_to_scope(SourceFile *sf) {
@@ -9911,6 +9923,28 @@ struct LLVMIRGenerator {
         fprintf(stderr, "LLVM %s: %s\n", severity, str);
         LLVMDisposeMessage(str);
         //LLVMDiagnosticSeverity LLVMGetDiagInfoSeverity(LLVMDiagnosticInfoRef DI);
+    }
+
+    LLVMValueRef get_intrinsic(Intrinsic op) {
+        if (!intrinsics[op]) {
+            LLVMValueRef result = nullptr;
+            switch(op) {
+#define LLVM_INTRINSIC_IMPL(ENUMVAL, RETTYPE, STRNAME, ...) \
+    case ENUMVAL: { \
+        LLVMTypeRef argtypes[] = {__VA_ARGS__}; \
+        result = LLVMAddFunction(module, STRNAME, LLVMFunctionType(RETTYPE, argtypes, sizeof(argtypes) / sizeof(LLVMTypeRef), false)); \
+    } break;
+            LLVM_INTRINSIC_IMPL(llvm_sin_f32, f32T, "llvm.sin.f32", f32T)
+            LLVM_INTRINSIC_IMPL(llvm_sin_f64, f64T, "llvm.sin.f64", f64T)
+
+            LLVM_INTRINSIC_IMPL(llvm_fabs_f32, f32T, "llvm.fabs.f32", f32T)
+            LLVM_INTRINSIC_IMPL(llvm_fabs_f64, f64T, "llvm.fabs.f64", f64T)
+#undef LLVM_INTRINSIC_IMPL
+            default: assert(false); break;
+            }
+            intrinsics[op] = result;
+        }
+        return intrinsics[op];
     }
 
     static void static_init() {
@@ -10664,6 +10698,36 @@ struct LLVMIRGenerator {
                 retvalue = LLVMBuildFDiv(builder, a, b, ""); } break;
             case OP_FRem: { READ_VALUE(a); READ_VALUE(b);
                 retvalue = LLVMBuildFRem(builder, a, b, ""); } break;
+            case OP_Sin:
+            case OP_FAbs: { READ_VALUE(x);
+                auto T = LLVMTypeOf(x);
+                auto ET = T;
+                if (LLVMGetTypeKind(T) == LLVMVectorTypeKind) {
+                    ET = LLVMGetElementType(T);
+                }
+                LLVMValueRef func = nullptr;
+                Intrinsic op = NumIntrinsics;
+                switch(enter.builtin.value()) {
+                case OP_Sin: { op = (ET == f64T)?llvm_sin_f64:llvm_sin_f32; } break;
+                case OP_FAbs: { op = (ET == f64T)?llvm_fabs_f64:llvm_fabs_f32; } break;
+                default: break;
+                }
+                func = get_intrinsic(op);
+                assert(func);
+                if (LLVMGetTypeKind(T) == LLVMVectorTypeKind) {
+                    auto count = LLVMGetVectorSize(T);
+                    retvalue = LLVMGetUndef(T);
+                    for (unsigned i = 0; i < count; ++i) {
+                        LLVMValueRef idx = LLVMConstInt(i32T, i, false);
+                        LLVMValueRef values[] = { LLVMBuildExtractElement(builder, x, idx, "") };
+                        LLVMValueRef eltval = LLVMBuildCall(builder, func, values, 1, "");
+                        retvalue = LLVMBuildInsertElement(builder, retvalue, eltval, idx, "");
+                    }
+                } else {
+                    LLVMValueRef values[] = { x };
+                    retvalue = LLVMBuildCall(builder, func, values, 1, "");
+                }
+            } break;
             case SFXFN_Unreachable:
                 retvalue = LLVMBuildUnreachable(builder); break;
             default: {
