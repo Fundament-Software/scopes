@@ -586,7 +586,7 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(OP_Tertiary) T(KW_SyntaxLog) \
     T(OP_Mix) T(OP_Step) T(OP_SmoothStep) \
     T(FN_Round) T(FN_RoundEven) T(FN_Trunc) \
-    T(OP_FAbs) T(OP_SAbs) T(FN_FSign) T(FN_SSign) \
+    T(OP_FAbs) T(OP_SAbs) T(OP_FSign) T(OP_SSign) \
     T(FN_Floor) T(FN_Ceil) T(FN_Fract) \
     T(OP_Radians) T(OP_Degrees) \
     T(OP_Sin) T(OP_Cos) T(OP_Tan) \
@@ -791,7 +791,7 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(FN_AnchorSource, "Anchor-source") \
     T(OP_Mix, "mix") T(OP_Step, "step") T(OP_SmoothStep, "smoothstep") \
     T(FN_Round, "round") T(FN_RoundEven, "roundeven") T(FN_Trunc, "trunc") \
-    T(OP_FAbs, "fabs") T(OP_SAbs, "sabs") T(FN_FSign, "fsign") T(FN_SSign, "ssign") \
+    T(OP_FAbs, "fabs") T(OP_SAbs, "sabs") T(OP_FSign, "fsign") T(OP_SSign, "ssign") \
     T(FN_Floor, "floor") T(FN_Ceil, "ceil") T(FN_Fract, "fract") \
     T(OP_Radians, "radians") T(OP_Degrees, "degrees") \
     T(OP_Sin, "sin") T(OP_Cos, "cos") T(OP_Tan, "tan") \
@@ -11680,6 +11680,11 @@ static bool abs(bool x) {
 PUNOP_TEMPLATE(FAbs, std::abs)
 PUNOP_TEMPLATE(SAbs, std::abs)
 
+template <typename T>
+static T sgn(T val) {
+    return T((T(0) < val) - (val < T(0)));
+}
+
 template<typename T>
 static T radians(T x) {
     return x * T(M_PI / 180.0);
@@ -11695,6 +11700,8 @@ static T inversesqrt(T x) {
     return T(1.0) / std::sqrt(x);
 }
 
+PUNOP_TEMPLATE(FSign, sgn)
+PUNOP_TEMPLATE(SSign, sgn)
 PUNOP_TEMPLATE(Radians, radians)
 PUNOP_TEMPLATE(Degrees, degrees)
 PUNOP_TEMPLATE(Sin, std::sin)
@@ -11998,6 +12005,9 @@ static Any smear(Any value, size_t count) {
         \
         IUN_OP(SAbs, i) \
         FUN_OP(FAbs) \
+        \
+        IUN_OP(SSign, i) \
+        FUN_OP(FSign) \
         \
         FUN_OP(Radians) FUN_OP(Degrees) \
         FUN_OP(Sin) FUN_OP(Cos) FUN_OP(Tan) \

@@ -1307,6 +1307,15 @@ fn compile-flags (opts...)
             else
                 compiler-error!
                     .. "illegal flag: " (repr flag)
+                        ". try one of"
+                        \ " " (repr 'dump-disassembly)
+                        \ " " (repr 'dump-module)
+                        \ " " (repr 'dump-function)
+                        \ " " (repr 'dump-time)
+                        \ " " (repr 'no-debug-info)
+                        \ " " (repr 'O1)
+                        \ " " (repr 'O2)
+                        \ " " (repr 'O3)
 
 fn compile (f opts...)
     __compile f
