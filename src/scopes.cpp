@@ -585,7 +585,7 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(OP_FAdd) T(OP_FSub) T(OP_FMul) T(OP_FDiv) T(OP_FRem) \
     T(OP_Tertiary) T(KW_SyntaxLog) \
     T(OP_Mix) T(OP_Step) T(OP_SmoothStep) \
-    T(FN_Round) T(FN_RoundEven) T(FN_Trunc) \
+    T(FN_Round) T(FN_RoundEven) T(OP_Trunc) \
     T(OP_FAbs) T(OP_SAbs) T(OP_FSign) T(OP_SSign) \
     T(FN_Floor) T(FN_Ceil) T(FN_Fract) \
     T(OP_Radians) T(OP_Degrees) \
@@ -790,7 +790,7 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(FN_AnchorColumn, "Anchor-column") T(FN_AnchorOffset, "Anchor-offset") \
     T(FN_AnchorSource, "Anchor-source") \
     T(OP_Mix, "mix") T(OP_Step, "step") T(OP_SmoothStep, "smoothstep") \
-    T(FN_Round, "round") T(FN_RoundEven, "roundeven") T(FN_Trunc, "trunc") \
+    T(FN_Round, "round") T(FN_RoundEven, "roundeven") T(OP_Trunc, "trunc") \
     T(OP_FAbs, "fabs") T(OP_SAbs, "sabs") T(OP_FSign, "fsign") T(OP_SSign, "ssign") \
     T(FN_Floor, "floor") T(FN_Ceil, "ceil") T(FN_Fract, "fract") \
     T(OP_Radians, "radians") T(OP_Degrees, "degrees") \
@@ -9773,6 +9773,8 @@ struct LLVMIRGenerator {
         llvm_sqrt_f64,
         llvm_fabs_f32,
         llvm_fabs_f64,
+        llvm_trunc_f32,
+        llvm_trunc_f64,
         llvm_pow_f32,
         llvm_pow_f64,
         custom_fsign_f32,
@@ -9963,6 +9965,8 @@ struct LLVMIRGenerator {
             LLVM_INTRINSIC_IMPL(llvm_sqrt_f64, f64T, "llvm.sqrt.f64", f64T)
             LLVM_INTRINSIC_IMPL(llvm_fabs_f32, f32T, "llvm.fabs.f32", f32T)
             LLVM_INTRINSIC_IMPL(llvm_fabs_f64, f64T, "llvm.fabs.f64", f64T)
+            LLVM_INTRINSIC_IMPL(llvm_trunc_f32, f32T, "llvm.trunc.f32", f32T)
+            LLVM_INTRINSIC_IMPL(llvm_trunc_f64, f64T, "llvm.trunc.f64", f64T)
             LLVM_INTRINSIC_IMPL(llvm_pow_f32, f32T, "llvm.pow.f32", f32T, f32T)
             LLVM_INTRINSIC_IMPL(llvm_pow_f64, f64T, "llvm.pow.f64", f64T, f64T)
             LLVM_INTRINSIC_IMPL_BEGIN(custom_fsign_f32, f32T, "custom.fsign.f32", f32T)
@@ -10812,7 +10816,8 @@ struct LLVMIRGenerator {
             case OP_Cos:
             case OP_Sqrt:
             case OP_FAbs:
-            case OP_FSign: { READ_VALUE(x);
+            case OP_FSign:
+            case OP_Trunc: { READ_VALUE(x);
                 auto T = LLVMTypeOf(x);
                 auto ET = T;
                 if (LLVMGetTypeKind(T) == LLVMVectorTypeKind) {
@@ -10825,6 +10830,7 @@ struct LLVMIRGenerator {
                 case OP_Cos: { op = (ET == f64T)?llvm_cos_f64:llvm_cos_f32; } break;
                 case OP_Sqrt: { op = (ET == f64T)?llvm_sqrt_f64:llvm_sqrt_f32; } break;
                 case OP_FAbs: { op = (ET == f64T)?llvm_fabs_f64:llvm_fabs_f32; } break;
+                case OP_Trunc: { op = (ET == f64T)?llvm_trunc_f64:llvm_trunc_f32; } break;
                 case OP_FSign: { op = (ET == f64T)?custom_fsign_f64:custom_fsign_f32; } break;
                 default: break;
                 }
@@ -11896,6 +11902,7 @@ PUNOP_TEMPLATE(Log, std::log)
 PUNOP_TEMPLATE(Exp2, std::exp2)
 PUNOP_TEMPLATE(Log2, std::log2)
 PUNOP_TEMPLATE(Sqrt, std::sqrt)
+PUNOP_TEMPLATE(Trunc, std::trunc)
 PUNOP_TEMPLATE(InverseSqrt, inversesqrt)
 PFXOP_TEMPLATE(Pow, std::pow)
 
@@ -12193,6 +12200,7 @@ static Any smear(Any value, size_t count) {
         FUN_OP(Sin) FUN_OP(Cos) FUN_OP(Tan) \
         FUN_OP(Asin) FUN_OP(Acos) FUN_OP(Atan) FARITH_OP(Atan2) \
         FUN_OP(Exp) FUN_OP(Log) FUN_OP(Exp2) FUN_OP(Log2) \
+        FUN_OP(Trunc) \
         FARITH_OP(Pow) FUN_OP(Sqrt) FUN_OP(InverseSqrt)
 
 static Label *expand_module(Any expr, Scope *scope = nullptr);

@@ -17,6 +17,11 @@ assert
     2.0 ** (unconst 4.0) == 16.0
 
 assert
+    (trunc 3.5) == 3.0
+assert
+    (trunc (unconst 3.5)) == 3.0
+
+assert
     (abs -3.5) == 3.5
 assert
     (abs (unconst -3.5)) == 3.5
