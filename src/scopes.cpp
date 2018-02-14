@@ -9769,6 +9769,8 @@ struct LLVMIRGenerator {
         llvm_sin_f64,
         llvm_cos_f32,
         llvm_cos_f64,
+        llvm_sqrt_f32,
+        llvm_sqrt_f64,
         llvm_fabs_f32,
         llvm_fabs_f64,
         custom_fsign_f32,
@@ -9955,6 +9957,8 @@ struct LLVMIRGenerator {
             LLVM_INTRINSIC_IMPL(llvm_cos_f32, f32T, "llvm.cos.f32", f32T)
             LLVM_INTRINSIC_IMPL(llvm_cos_f64, f64T, "llvm.cos.f64", f64T)
 
+            LLVM_INTRINSIC_IMPL(llvm_sqrt_f32, f32T, "llvm.sqrt.f32", f32T)
+            LLVM_INTRINSIC_IMPL(llvm_sqrt_f64, f64T, "llvm.sqrt.f64", f64T)
             LLVM_INTRINSIC_IMPL(llvm_fabs_f32, f32T, "llvm.fabs.f32", f32T)
             LLVM_INTRINSIC_IMPL(llvm_fabs_f64, f64T, "llvm.fabs.f64", f64T)
             LLVM_INTRINSIC_IMPL_BEGIN(custom_fsign_f32, f32T, "custom.fsign.f32", f32T)
@@ -10738,8 +10742,36 @@ struct LLVMIRGenerator {
                 retvalue = LLVMBuildFDiv(builder, a, b, ""); } break;
             case OP_FRem: { READ_VALUE(a); READ_VALUE(b);
                 retvalue = LLVMBuildFRem(builder, a, b, ""); } break;
+            case FN_Length: {
+                READ_VALUE(x);
+                auto T = LLVMTypeOf(x);
+                if (LLVMGetTypeKind(T) == LLVMVectorTypeKind) {
+                    auto ET = LLVMGetElementType(T);
+                    LLVMValueRef func_sqrt = get_intrinsic((ET == f64T)?llvm_sqrt_f64:llvm_sqrt_f32);
+                    assert(func_sqrt);
+                    auto count = LLVMGetVectorSize(T);
+                    LLVMValueRef src = LLVMBuildFMul(builder, x, x, "");
+                    for (unsigned i = 0; i < count; ++i) {
+                        LLVMValueRef idx = LLVMConstInt(i32T, i, false);
+                        LLVMValueRef val = LLVMBuildExtractElement(builder, src, idx, "");
+                        if (i == 0) {
+                            retvalue = val;
+                        } else {
+                            retvalue = LLVMBuildFAdd(builder, retvalue, val, "");
+                        }
+                    }
+                    LLVMValueRef values[] = { retvalue };
+                    retvalue = LLVMBuildCall(builder, func_sqrt, values, 1, "");
+                } else {
+                    LLVMValueRef func_fabs = get_intrinsic((T == f64T)?llvm_fabs_f64:llvm_fabs_f32);
+                    assert(func_fabs);
+                    LLVMValueRef values[] = { x };
+                    retvalue = LLVMBuildCall(builder, func_fabs, values, 1, "");
+                }
+            } break;
             case OP_Sin:
             case OP_Cos:
+            case OP_Sqrt:
             case OP_FAbs:
             case OP_FSign: { READ_VALUE(x);
                 auto T = LLVMTypeOf(x);
@@ -10752,6 +10784,7 @@ struct LLVMIRGenerator {
                 switch(enter.builtin.value()) {
                 case OP_Sin: { op = (ET == f64T)?llvm_sin_f64:llvm_sin_f32; } break;
                 case OP_Cos: { op = (ET == f64T)?llvm_cos_f64:llvm_cos_f32; } break;
+                case OP_Sqrt: { op = (ET == f64T)?llvm_sqrt_f64:llvm_sqrt_f32; } break;
                 case OP_FAbs: { op = (ET == f64T)?llvm_fabs_f64:llvm_fabs_f32; } break;
                 case OP_FSign: { op = (ET == f64T)?custom_fsign_f64:custom_fsign_f32; } break;
                 default: break;

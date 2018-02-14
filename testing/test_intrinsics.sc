@@ -25,5 +25,14 @@ assert
 assert
     (sign (unconst 0.0)) == 0.0
 
+assert
+    (sqrt 9.0) == 3.0
+assert
+    (sqrt (unconst 9.0)) == 3.0
 
+assert
+    (length (vectorof f32 2.0 6.0 9.0)) == 11.0
+
+assert
+    (length (unconst (vectorof f32 2.0 6.0 9.0))) == 11.0
 
