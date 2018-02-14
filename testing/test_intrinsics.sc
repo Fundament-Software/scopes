@@ -12,6 +12,11 @@ assert
     (cos (unconst 0.0)) == 1.0
 
 assert
+    2.0 ** 4.0 == 16.0
+assert
+    2.0 ** (unconst 4.0) == 16.0
+
+assert
     (abs -3.5) == 3.5
 assert
     (abs (unconst -3.5)) == 3.5

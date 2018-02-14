@@ -9773,6 +9773,8 @@ struct LLVMIRGenerator {
         llvm_sqrt_f64,
         llvm_fabs_f32,
         llvm_fabs_f64,
+        llvm_pow_f32,
+        llvm_pow_f64,
         custom_fsign_f32,
         custom_fsign_f64,
         NumIntrinsics,
@@ -9961,6 +9963,8 @@ struct LLVMIRGenerator {
             LLVM_INTRINSIC_IMPL(llvm_sqrt_f64, f64T, "llvm.sqrt.f64", f64T)
             LLVM_INTRINSIC_IMPL(llvm_fabs_f32, f32T, "llvm.fabs.f32", f32T)
             LLVM_INTRINSIC_IMPL(llvm_fabs_f64, f64T, "llvm.fabs.f64", f64T)
+            LLVM_INTRINSIC_IMPL(llvm_pow_f32, f32T, "llvm.pow.f32", f32T, f32T)
+            LLVM_INTRINSIC_IMPL(llvm_pow_f64, f64T, "llvm.pow.f64", f64T, f64T)
             LLVM_INTRINSIC_IMPL_BEGIN(custom_fsign_f32, f32T, "custom.fsign.f32", f32T)
                 // (0 < val) - (val < 0)
                 LLVMValueRef val = LLVMGetParam(result, 0);
@@ -10769,6 +10773,41 @@ struct LLVMIRGenerator {
                     retvalue = LLVMBuildCall(builder, func_fabs, values, 1, "");
                 }
             } break;
+            // binops
+            case OP_Pow: {
+                READ_VALUE(a);
+                READ_VALUE(b);
+                auto T = LLVMTypeOf(a);
+                auto ET = T;
+                if (LLVMGetTypeKind(T) == LLVMVectorTypeKind) {
+                    ET = LLVMGetElementType(T);
+                }
+                LLVMValueRef func = nullptr;
+                Intrinsic op = NumIntrinsics;
+                switch(enter.builtin.value()) {
+                case OP_Pow: { op = (ET == f64T)?llvm_pow_f64:llvm_pow_f32; } break;
+                default: break;
+                }
+                func = get_intrinsic(op);
+                assert(func);
+                if (LLVMGetTypeKind(T) == LLVMVectorTypeKind) {
+                    auto count = LLVMGetVectorSize(T);
+                    retvalue = LLVMGetUndef(T);
+                    for (unsigned i = 0; i < count; ++i) {
+                        LLVMValueRef idx = LLVMConstInt(i32T, i, false);
+                        LLVMValueRef values[] = {
+                            LLVMBuildExtractElement(builder, a, idx, ""),
+                            LLVMBuildExtractElement(builder, b, idx, "")
+                        };
+                        LLVMValueRef eltval = LLVMBuildCall(builder, func, values, 2, "");
+                        retvalue = LLVMBuildInsertElement(builder, retvalue, eltval, idx, "");
+                    }
+                } else {
+                    LLVMValueRef values[] = { a, b };
+                    retvalue = LLVMBuildCall(builder, func, values, 2, "");
+                }
+            } break;
+            // unops
             case OP_Sin:
             case OP_Cos:
             case OP_Sqrt:
