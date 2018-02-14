@@ -9767,8 +9767,12 @@ struct LLVMIRGenerator {
     enum Intrinsic {
         llvm_sin_f32,
         llvm_sin_f64,
+        llvm_cos_f32,
+        llvm_cos_f64,
         llvm_fabs_f32,
         llvm_fabs_f64,
+        custom_fsign_f32,
+        custom_fsign_f64,
         NumIntrinsics,
     };
 
@@ -9934,12 +9938,48 @@ struct LLVMIRGenerator {
         LLVMTypeRef argtypes[] = {__VA_ARGS__}; \
         result = LLVMAddFunction(module, STRNAME, LLVMFunctionType(RETTYPE, argtypes, sizeof(argtypes) / sizeof(LLVMTypeRef), false)); \
     } break;
+#define LLVM_INTRINSIC_IMPL_BEGIN(ENUMVAL, RETTYPE, STRNAME, ...) \
+    case ENUMVAL: { \
+        LLVMTypeRef argtypes[] = { __VA_ARGS__ }; \
+        result = LLVMAddFunction(module, STRNAME, \
+            LLVMFunctionType(f32T, argtypes, sizeof(argtypes) / sizeof(LLVMTypeRef), false)); \
+        LLVMSetLinkage(result, LLVMPrivateLinkage); \
+        auto bb = LLVMAppendBasicBlock(result, ""); \
+        auto oldbb = LLVMGetInsertBlock(builder); \
+        LLVMPositionBuilderAtEnd(builder, bb);
+#define LLVM_INTRINSIC_IMPL_END() \
+        LLVMPositionBuilderAtEnd(builder, oldbb); \
+    } break;
             LLVM_INTRINSIC_IMPL(llvm_sin_f32, f32T, "llvm.sin.f32", f32T)
             LLVM_INTRINSIC_IMPL(llvm_sin_f64, f64T, "llvm.sin.f64", f64T)
+            LLVM_INTRINSIC_IMPL(llvm_cos_f32, f32T, "llvm.cos.f32", f32T)
+            LLVM_INTRINSIC_IMPL(llvm_cos_f64, f64T, "llvm.cos.f64", f64T)
 
             LLVM_INTRINSIC_IMPL(llvm_fabs_f32, f32T, "llvm.fabs.f32", f32T)
             LLVM_INTRINSIC_IMPL(llvm_fabs_f64, f64T, "llvm.fabs.f64", f64T)
+            LLVM_INTRINSIC_IMPL_BEGIN(custom_fsign_f32, f32T, "custom.fsign.f32", f32T)
+                // (0 < val) - (val < 0)
+                LLVMValueRef val = LLVMGetParam(result, 0);
+                LLVMValueRef zero = LLVMConstReal(f32T, 0.0);
+                LLVMValueRef a = LLVMBuildZExt(builder, LLVMBuildFCmp(builder, LLVMRealOLT, zero, val, ""), i8T, "");
+                LLVMValueRef b = LLVMBuildZExt(builder, LLVMBuildFCmp(builder, LLVMRealOLT, val, zero, ""), i8T, "");
+                val = LLVMBuildSub(builder, a, b, "");
+                val = LLVMBuildSIToFP(builder, val, f32T, "");
+                LLVMBuildRet(builder, val);
+            LLVM_INTRINSIC_IMPL_END()
+            LLVM_INTRINSIC_IMPL_BEGIN(custom_fsign_f64, f64T, "custom.fsign.f64", f64T)
+                // (0 < val) - (val < 0)
+                LLVMValueRef val = LLVMGetParam(result, 0);
+                LLVMValueRef zero = LLVMConstReal(f64T, 0.0);
+                LLVMValueRef a = LLVMBuildZExt(builder, LLVMBuildFCmp(builder, LLVMRealOLT, zero, val, ""), i8T, "");
+                LLVMValueRef b = LLVMBuildZExt(builder, LLVMBuildFCmp(builder, LLVMRealOLT, val, zero, ""), i8T, "");
+                val = LLVMBuildSub(builder, a, b, "");
+                val = LLVMBuildSIToFP(builder, val, f64T, "");
+                LLVMBuildRet(builder, val);
+            LLVM_INTRINSIC_IMPL_END()
 #undef LLVM_INTRINSIC_IMPL
+#undef LLVM_INTRINSIC_IMPL_BEGIN
+#undef LLVM_INTRINSIC_IMPL_END
             default: assert(false); break;
             }
             intrinsics[op] = result;
@@ -10699,7 +10739,9 @@ struct LLVMIRGenerator {
             case OP_FRem: { READ_VALUE(a); READ_VALUE(b);
                 retvalue = LLVMBuildFRem(builder, a, b, ""); } break;
             case OP_Sin:
-            case OP_FAbs: { READ_VALUE(x);
+            case OP_Cos:
+            case OP_FAbs:
+            case OP_FSign: { READ_VALUE(x);
                 auto T = LLVMTypeOf(x);
                 auto ET = T;
                 if (LLVMGetTypeKind(T) == LLVMVectorTypeKind) {
@@ -10709,7 +10751,9 @@ struct LLVMIRGenerator {
                 Intrinsic op = NumIntrinsics;
                 switch(enter.builtin.value()) {
                 case OP_Sin: { op = (ET == f64T)?llvm_sin_f64:llvm_sin_f32; } break;
+                case OP_Cos: { op = (ET == f64T)?llvm_cos_f64:llvm_cos_f32; } break;
                 case OP_FAbs: { op = (ET == f64T)?llvm_fabs_f64:llvm_fabs_f32; } break;
+                case OP_FSign: { op = (ET == f64T)?custom_fsign_f64:custom_fsign_f32; } break;
                 default: break;
                 }
                 func = get_intrinsic(op);
