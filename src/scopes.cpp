@@ -8710,7 +8710,8 @@ struct SPIRVGenerator {
             case OP_Asin:
             case OP_Acos:
             case OP_Atan:
-            case OP_Trunc: {
+            case OP_Trunc:
+            case OP_FAbs: {
                 READ_VALUE(val);
                 GLSLstd450 builtin = GLSLstd450Bad;
                 auto rtype = builder.getTypeId(val);
@@ -8725,13 +8726,32 @@ struct SPIRVGenerator {
                 case OP_Acos: builtin = GLSLstd450Acos; break;
                 case OP_Atan: builtin = GLSLstd450Atan; break;
                 case OP_Trunc: builtin = GLSLstd450Trunc; break;
+                case OP_FAbs: builtin = GLSLstd450FAbs; break;
                 default: {
                     StyledString ss;
-                    ss.out << "IL->SPIR: unsupported intrinsic " << enter << " encountered";
+                    ss.out << "IL->SPIR: unsupported unary intrinsic " << enter << " encountered";
                     location_error(ss.str());
                 } break;
                 }
                 retvalue = builder.createBuiltinCall(rtype, glsl_ext_inst, builtin, { val });
+            } break;
+            case OP_Pow: {
+                READ_VALUE(a);
+                READ_VALUE(b);
+                GLSLstd450 builtin = GLSLstd450Bad;
+                auto rtype = builder.getTypeId(a);
+                switch (enter.symbol.value()) {
+                case FN_Length:
+                    rtype = builder.getContainedTypeId(rtype);
+                    builtin = GLSLstd450Length; break;
+                case OP_Pow: builtin = GLSLstd450Pow; break;
+                default: {
+                    StyledString ss;
+                    ss.out << "IL->SPIR: unsupported binary intrinsic " << enter << " encountered";
+                    location_error(ss.str());
+                } break;
+                }
+                retvalue = builder.createBuiltinCall(rtype, glsl_ext_inst, builtin, { a, b });
             } break;
             case FN_Unconst: {
                 READ_VALUE(val);
