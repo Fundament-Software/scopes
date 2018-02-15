@@ -1074,10 +1074,10 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(SYM_Pure, "pure") \
     \
     /* compile targets */ \
-    T(SYM_TargetVertex, "vertex-stage") \
-    T(SYM_TargetFragment, "fragment-stage") \
-    T(SYM_TargetGeometry, "geometry-stage") \
-    T(SYM_TargetCompute, "compute-stage") \
+    T(SYM_TargetVertex, "vertex") \
+    T(SYM_TargetFragment, "fragment") \
+    T(SYM_TargetGeometry, "geometry") \
+    T(SYM_TargetCompute, "compute") \
     \
     /* extern attributes */ \
     T(SYM_Location, "location") \
@@ -9619,7 +9619,11 @@ struct SPIRVGenerator {
         } break;
         default: {
             StyledString ss;
-            ss.out << "IL->SPIR: unsupported target: " << target;
+            ss.out << "IL->SPIR: unsupported target: " << target << ", try one of "
+                << Symbol(SYM_TargetVertex) << " "
+                << Symbol(SYM_TargetFragment) << " "
+                << Symbol(SYM_TargetGeometry) << " "
+                << Symbol(SYM_TargetCompute);
             location_error(ss.str());
         } break;
         }
