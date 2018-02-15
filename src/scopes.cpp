@@ -8709,7 +8709,8 @@ struct SPIRVGenerator {
             case OP_Tan:
             case OP_Asin:
             case OP_Acos:
-            case OP_Atan: {
+            case OP_Atan:
+            case OP_Trunc: {
                 READ_VALUE(val);
                 GLSLstd450 builtin = GLSLstd450Bad;
                 auto rtype = builder.getTypeId(val);
@@ -8723,6 +8724,7 @@ struct SPIRVGenerator {
                 case OP_Asin: builtin = GLSLstd450Asin; break;
                 case OP_Acos: builtin = GLSLstd450Acos; break;
                 case OP_Atan: builtin = GLSLstd450Atan; break;
+                case OP_Trunc: builtin = GLSLstd450Trunc; break;
                 default: {
                     StyledString ss;
                     ss.out << "IL->SPIR: unsupported intrinsic " << enter << " encountered";
