@@ -37,18 +37,26 @@
                 "/usr/include",
                 "/usr/local/include",
                 "${workspaceRoot}",
+                "${workspaceRoot}/clang/include",
+                "${workspaceRoot}/clang/include/c++/v1",
                 "${workspaceRoot}/external",
                 "${workspaceRoot}/libffi/include",
                 "${workspaceRoot}/SPIRV-Tools/include",
                 "${workspaceRoot}/lib/clang/include"
             ],
-            "defines": [],
+            "defines": [
+                "SCOPES_CPP_IMPL",
+                "SCOPES_MAIN_CPP_IMPL",
+                "SCOPES_DEBUG"
+            ],
             "intelliSenseMode": "clang-x64",
             "browse": {
                 "path": [
                     "/usr/include",
                     "/usr/local/include",
                     "${workspaceRoot}",
+                    "${workspaceRoot}/clang/include",
+                    "${workspaceRoot}/clang/include/c++/v1",
                     "${workspaceRoot}/external",
                     "${workspaceRoot}/libffi/include",
                     "${workspaceRoot}/SPIRV-Tools/include",
