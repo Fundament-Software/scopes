@@ -587,7 +587,7 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(OP_Mix) T(OP_Step) T(OP_SmoothStep) \
     T(FN_Round) T(FN_RoundEven) T(OP_Trunc) \
     T(OP_FAbs) T(OP_SAbs) T(OP_FSign) T(OP_SSign) \
-    T(FN_Floor) T(FN_Ceil) T(FN_Fract) \
+    T(OP_Floor) T(FN_Ceil) T(FN_Fract) \
     T(OP_Radians) T(OP_Degrees) \
     T(OP_Sin) T(OP_Cos) T(OP_Tan) \
     T(OP_Asin) T(OP_Acos) T(OP_Atan) T(OP_Atan2) \
@@ -792,7 +792,7 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(OP_Mix, "mix") T(OP_Step, "step") T(OP_SmoothStep, "smoothstep") \
     T(FN_Round, "round") T(FN_RoundEven, "roundeven") T(OP_Trunc, "trunc") \
     T(OP_FAbs, "fabs") T(OP_SAbs, "sabs") T(OP_FSign, "fsign") T(OP_SSign, "ssign") \
-    T(FN_Floor, "floor") T(FN_Ceil, "ceil") T(FN_Fract, "fract") \
+    T(OP_Floor, "floor") T(FN_Ceil, "ceil") T(FN_Fract, "fract") \
     T(OP_Radians, "radians") T(OP_Degrees, "degrees") \
     T(OP_Sin, "sin") T(OP_Cos, "cos") T(OP_Tan, "tan") \
     T(OP_Asin, "asin") T(OP_Acos, "acos") T(OP_Atan, "atan") T(OP_Atan2, "atan2") \
@@ -8711,7 +8711,9 @@ struct SPIRVGenerator {
             case OP_Acos:
             case OP_Atan:
             case OP_Trunc:
-            case OP_FAbs: {
+            case OP_Floor:
+            case OP_FAbs:
+            case OP_FSign: {
                 READ_VALUE(val);
                 GLSLstd450 builtin = GLSLstd450Bad;
                 auto rtype = builder.getTypeId(val);
@@ -8726,7 +8728,9 @@ struct SPIRVGenerator {
                 case OP_Acos: builtin = GLSLstd450Acos; break;
                 case OP_Atan: builtin = GLSLstd450Atan; break;
                 case OP_Trunc: builtin = GLSLstd450Trunc; break;
+                case OP_Floor: builtin = GLSLstd450Floor; break;
                 case OP_FAbs: builtin = GLSLstd450FAbs; break;
+                case OP_FSign: builtin = GLSLstd450FSign; break;
                 default: {
                     StyledString ss;
                     ss.out << "IL->SPIR: unsupported unary intrinsic " << enter << " encountered";
@@ -8735,15 +8739,14 @@ struct SPIRVGenerator {
                 }
                 retvalue = builder.createBuiltinCall(rtype, glsl_ext_inst, builtin, { val });
             } break;
+            case OP_Step:
             case OP_Pow: {
                 READ_VALUE(a);
                 READ_VALUE(b);
                 GLSLstd450 builtin = GLSLstd450Bad;
                 auto rtype = builder.getTypeId(a);
                 switch (enter.symbol.value()) {
-                case FN_Length:
-                    rtype = builder.getContainedTypeId(rtype);
-                    builtin = GLSLstd450Length; break;
+                case OP_Step: builtin = GLSLstd450Step; break;
                 case OP_Pow: builtin = GLSLstd450Pow; break;
                 default: {
                     StyledString ss;
@@ -9807,6 +9810,8 @@ struct LLVMIRGenerator {
         llvm_fabs_f64,
         llvm_trunc_f32,
         llvm_trunc_f64,
+        llvm_floor_f32,
+        llvm_floor_f64,
         llvm_pow_f32,
         llvm_pow_f64,
         custom_fsign_f32,
@@ -9999,6 +10004,8 @@ struct LLVMIRGenerator {
             LLVM_INTRINSIC_IMPL(llvm_fabs_f64, f64T, "llvm.fabs.f64", f64T)
             LLVM_INTRINSIC_IMPL(llvm_trunc_f32, f32T, "llvm.trunc.f32", f32T)
             LLVM_INTRINSIC_IMPL(llvm_trunc_f64, f64T, "llvm.trunc.f64", f64T)
+            LLVM_INTRINSIC_IMPL(llvm_floor_f32, f32T, "llvm.floor.f32", f32T)
+            LLVM_INTRINSIC_IMPL(llvm_floor_f64, f64T, "llvm.floor.f64", f64T)
             LLVM_INTRINSIC_IMPL(llvm_pow_f32, f32T, "llvm.pow.f32", f32T, f32T)
             LLVM_INTRINSIC_IMPL(llvm_pow_f64, f64T, "llvm.pow.f64", f64T, f64T)
             LLVM_INTRINSIC_IMPL_BEGIN(custom_fsign_f32, f32T, "custom.fsign.f32", f32T)
@@ -10849,7 +10856,8 @@ struct LLVMIRGenerator {
             case OP_Sqrt:
             case OP_FAbs:
             case OP_FSign:
-            case OP_Trunc: { READ_VALUE(x);
+            case OP_Trunc:
+            case OP_Floor: { READ_VALUE(x);
                 auto T = LLVMTypeOf(x);
                 auto ET = T;
                 if (LLVMGetTypeKind(T) == LLVMVectorTypeKind) {
@@ -10863,6 +10871,7 @@ struct LLVMIRGenerator {
                 case OP_Sqrt: { op = (ET == f64T)?llvm_sqrt_f64:llvm_sqrt_f32; } break;
                 case OP_FAbs: { op = (ET == f64T)?llvm_fabs_f64:llvm_fabs_f32; } break;
                 case OP_Trunc: { op = (ET == f64T)?llvm_trunc_f64:llvm_trunc_f32; } break;
+                case OP_Floor: { op = (ET == f64T)?llvm_floor_f64:llvm_floor_f32; } break;
                 case OP_FSign: { op = (ET == f64T)?custom_fsign_f64:custom_fsign_f32; } break;
                 default: break;
                 }
@@ -11918,6 +11927,11 @@ static T inversesqrt(T x) {
     return T(1.0) / std::sqrt(x);
 }
 
+template<typename T>
+static T step(T edge, T x) {
+    return T(x >= edge);
+}
+
 PUNOP_TEMPLATE(FSign, sgn)
 PUNOP_TEMPLATE(SSign, sgn)
 PUNOP_TEMPLATE(Radians, radians)
@@ -11935,8 +11949,10 @@ PUNOP_TEMPLATE(Exp2, std::exp2)
 PUNOP_TEMPLATE(Log2, std::log2)
 PUNOP_TEMPLATE(Sqrt, std::sqrt)
 PUNOP_TEMPLATE(Trunc, std::trunc)
+PUNOP_TEMPLATE(Floor, std::floor)
 PUNOP_TEMPLATE(InverseSqrt, inversesqrt)
 PFXOP_TEMPLATE(Pow, std::pow)
+PFXOP_TEMPLATE(Step, step)
 
 template<typename T> struct op_Cross {
     typedef T rtype;
@@ -12232,7 +12248,7 @@ static Any smear(Any value, size_t count) {
         FUN_OP(Sin) FUN_OP(Cos) FUN_OP(Tan) \
         FUN_OP(Asin) FUN_OP(Acos) FUN_OP(Atan) FARITH_OP(Atan2) \
         FUN_OP(Exp) FUN_OP(Log) FUN_OP(Exp2) FUN_OP(Log2) \
-        FUN_OP(Trunc) \
+        FUN_OP(Trunc) FUN_OP(Floor) FARITH_OP(Step) \
         FARITH_OP(Pow) FUN_OP(Sqrt) FUN_OP(InverseSqrt)
 
 static Label *expand_module(Any expr, Scope *scope = nullptr);

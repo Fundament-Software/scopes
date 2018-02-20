@@ -167,6 +167,10 @@ project "scopes"
         }
 
         linkoptions {
+            --"-Wl,--stack,8388608"
+            --"-Wl,--stack,16777216"
+        }
+        linkoptions {
             --"-Wl,--whole-archive",
             --"-l...",
             --"-Wl,--no-whole-archive",
@@ -263,7 +267,7 @@ project "scopes"
 
         linkoptions {
             "-Wl,--stack,8388608"
-        }        
+        }
         linkoptions {
             THISDIR .. "/SPIRV-Tools/build/source/libSPIRV-Tools.a",
             THISDIR .. "/SPIRV-Tools/build/source/opt/libSPIRV-Tools-opt.a",
