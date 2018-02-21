@@ -35,7 +35,7 @@ let vertex-code =
             typify vertex-shader
 
         let code =
-            compile-glsl 'vertex-stage
+            compile-glsl 'vertex
                 typify vertex-shader
                 #'dump-disassembly
                 #'no-opts
@@ -81,7 +81,7 @@ let fragment-code =
             typify fragment-shader
 
         let code =
-            compile-glsl 'fragment-stage
+            compile-glsl 'fragment
                 typify fragment-shader
                 #'dump-disassembly
                 #'no-opts
