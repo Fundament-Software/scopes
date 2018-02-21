@@ -8991,7 +8991,7 @@ struct SPIRVGenerator {
                 auto T = builder.getTypeId(a);
                 if (builder.isVectorType(T)) {
                     T = builder.makeVectorType(builder.makeBoolType(),
-                        builder.getNumComponents(T));
+                        builder.getNumTypeComponents(T));
                 } else {
                     T = builder.makeBoolType();
                 }
