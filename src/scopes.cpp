@@ -27,7 +27,7 @@ BEWARE: If you build this with anything else but a recent enough clang,
 */
 
 #define SCOPES_VERSION_MAJOR 0
-#define SCOPES_VERSION_MINOR 10
+#define SCOPES_VERSION_MINOR 11
 #define SCOPES_VERSION_PATCH 0
 
 // trace partial evaluation and code generation
