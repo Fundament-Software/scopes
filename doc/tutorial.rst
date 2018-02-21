@@ -2,8 +2,8 @@ The Scopes Tutorial
 ===================
 
 This tutorial does not attempt to cover every single feature, but focuses
-on Scopes' most noteworthy features to give you a good idea of the 
-language’s flavor and style. After reading it, you will be able to read and 
+on Scopes' most noteworthy features to give you a good idea of the
+language’s flavor and style. After reading it, you will be able to read and
 write Scopes modules and programs.
 
 Using the Scopes Live Compiler
@@ -40,12 +40,12 @@ read-eval-print loop (REPL), also called a console. Here's an example:
     ///  \\\  Scopes 0.7 (debug build, Jul 22 2017, 10:51:02)
     $0 ▶
 
-Simple expressions can be written on a single line, followed by hitting the 
+Simple expressions can be written on a single line, followed by hitting the
 return key::
 
     $0 ▶ print "hello world"
     hello world
-    $0 ▶ 
+    $0 ▶
 
 Multiline expressions can be entered by trailing the first line with a space
 character, and exited by entering nothing on the last line::
@@ -55,9 +55,9 @@ character, and exited by entering nothing on the last line::
     ....     "this"
     ....     "is"
     ....     "dog"
-    ....     
+    ....
     yes this is dog
-    $0 ▶ 
+    $0 ▶
 
 Entering a value binds it to the name indicated by the prompt, and can then
 be reused::
@@ -66,7 +66,7 @@ be reused::
     $0 = 3
     $1 ▶ print $0
     3
-    $1 ▶ 
+    $1 ▶
 
 A special keyboard shortcut (``Control-D`` on Unix, ``Control-Z`` on Windows)
 at the prompt exits the program. You can also exit the program by typing
@@ -75,8 +75,8 @@ at the prompt exits the program. You can also exit the program by typing
 Launcher
 ````````
 
-Most of the time you would like to use Scopes to compile and execute your own 
-written Scopes programs. This is simply done by appending the name of the 
+Most of the time you would like to use Scopes to compile and execute your own
+written Scopes programs. This is simply done by appending the name of the
 Scopes file you would like to launch to the executable::
 
     $ scopes path/to/my/program.sc
@@ -85,8 +85,8 @@ A Fistful of Scopes
 -------------------
 
 Many of the examples in this tutorial include comments, even those entered at
-the console. Comments in Scopes start with a hash character ``#`` and extend 
-to the first line starting with a character at a lower indentation.
+the console. Comments in Scopes start with a hash character ``#`` and extend
+to the first line starting with a character at a lower or equal indentation.
 
 Some examples::
 
@@ -98,7 +98,7 @@ Some examples::
 Using Scopes as a Calculator
 ````````````````````````````
 
-Scopes is not only a fully-fledged compiler infrastructure, but also works 
+Scopes is not only a fully-fledged compiler infrastructure, but also works
 nicely as a comfy calculator::
 
     $0 ▶ 1 + 2 + 3
@@ -114,7 +114,7 @@ Integer numbers like ``6`` or ``65`` have type `i32`, real numbers with a
 fractional part like ``13.0`` or ``1.6`` have type `f32`.
 
 Division always returns a real number. On the off-chance that you want an
-integer result without the fractional part, use the floor division operator 
+integer result without the fractional part, use the floor division operator
 `//`::
 
     $0 ▶ 23 / 3 # regular division returns a real
@@ -137,7 +137,7 @@ console to bind any result to a name for reuse. But we can also make use of
     $0 ▶ define height 42
     $0 ▶ width * height
     $0 = 966
-    
+
 On a side note: `define` does not bind to free variables, which is not a problem
 in interactive mode. Scopes' main mechanism to bind computation results to names
 is `let`, which on the console can only be used in contiguous blocks::
@@ -145,7 +145,7 @@ is `let`, which on the console can only be used in contiguous blocks::
     $0 ▶ let width = 23#don't forget to enter space here
     .... let height = 42
     .... width * height
-    .... 
+    ....
     $0 = 966
 
 If a name isn't bound to anything, using it will give you an error, which is
@@ -158,7 +158,7 @@ useful when you've just mistyped it::
 Strings
 ```````
 
-Life can be tedious and boring at times. Why not perform some string operations 
+Life can be tedious and boring at times. Why not perform some string operations
 to pass the time? We start with some light declarations of string literals::
 
     $0 ▶ "make it so" # every string is wrapped in double quotes
@@ -167,12 +167,12 @@ to pass the time? We start with some light declarations of string literals::
     $1 = "\"make it so!\", he said"
     $2 ▶ "'make it so!', he said" # single quotes are no problem though
     $2 = "'make it so!', he said"
-    $3 ▶ "1. make it so 
+    $3 ▶ "1. make it so
     .... 2. ???
     .... 3. profit!" # defining a multi-line string
-    .... 
+    ....
     $3 = "1. make it so\n2. ???\n3. profit!"
-    
+
 In the interactive console output, the output string is enclosed in quotes and
 special characters are escaped with backslashes, to match the way the string
 has been declared. Sometimes this might look a little different from the input,
@@ -183,14 +183,14 @@ output that produces the intended look::
     make it so
     $0 ▶ print "\"make it so!\", he said"
     "make it so!", he said
-    $0 ▶ print "1. make it so 
+    $0 ▶ print "1. make it so
     .... 2. ???
     .... 3. profit!"
-    .... 
+    ....
     1. make it so
     2. ???
     3. profit!
-    
+
 Sometimes it's necessary to join several strings into one. Strings can be
 joined with the `..` operator::
 
@@ -215,9 +215,9 @@ operation::
     $5 ▶ slice $0 2 3 # get the center character
     $5 = "o"
 
-One way to remember how slices work is to think of the indices as pointing 
+One way to remember how slices work is to think of the indices as pointing
 *between* characters, with the left edge of the first character numbered 0. Then
-the right edge of the last character of a string of *n* characters has index *n*, 
+the right edge of the last character of a string of *n* characters has index *n*,
 for example:
 
 ..  code-block:: none
@@ -226,7 +226,7 @@ for example:
      | S | c | o | p | e | s |
      +---+---+---+---+---+---+
      0   1   2   3   4   5   6
-    -6  -5  -4  -3  -2  -1    
+    -6  -5  -4  -3  -2  -1
 
 If we're interested in the byte value of a single character from a string, we
 can use the `@` operator, also called the at-operator, to extract it::
@@ -256,11 +256,11 @@ Many calculations require repeating an operation several times, and of course
 Scopes can also do that. For instance, here is one of the typical examples
 for such a task, computing the first few numbers of the fibonacci sequence::
 
-    $0 ▶ let loop (a b) = 0 1 
+    $0 ▶ let loop (a b) = 0 1
     .... if (b < 10)
     ....     print b
     ....     loop b (a + b)
-    ....     
+    ....
     1
     1
     2
@@ -271,26 +271,26 @@ for such a task, computing the first few numbers of the fibonacci sequence::
 This example introduces several new features.
 
 * The first line performs a *named* assignment, which assigns a label to it
-  (in this example, named ``loop``, but any name is fine) so we can jump back 
-  (see the fourth line), bind new values to those names, and perform the same 
-  following operations again: in short, to build a loop. 
+  (in this example, named ``loop``, but any name is fine) so we can jump back
+  (see the fourth line), bind new values to those names, and perform the same
+  following operations again: in short, to build a loop.
 * The first line also performs multiple assignments at the same time. ``a`` is
   initially bound to ``0``, while ``b`` is initialized to ``1``. When we jump
   to this assignment again in line four, ``a`` will be bound to ``b``, while
   ``b`` will be bound to the result of calculating ``(a + b)``.
-* In the second line, we perform a *conditional operation*. That is, the 
-  indented block formed by lines three and four is only executed if the 
+* In the second line, we perform a *conditional operation*. That is, the
+  indented block formed by lines three and four is only executed if the
   expression ``(b < 10)`` evaluates to `true`. In other words: we are going
   to be performing the loop as long as ``b`` is smaller than ``10``.
-* Scopes offers a set of comparison operators for all basic types. You can 
-  compare any two numbers using `<` (less than), `>` (greater than), 
+* Scopes offers a set of comparison operators for all basic types. You can
+  compare any two numbers using `<` (less than), `>` (greater than),
   `==` (equal to), `<=` (less than or equal to), `>=` (greater than or equal to)
   and `\!=` (not equal to).
 * The body of the conditional block is indented: indentation is Scopes' way of
-  grouping statements. At the console, you have to type a tab or four spaces for 
-  each indented line. In practice you will prepare more complicated input for 
-  Scopes with a text editor; all decent text editors have an auto-indent 
-  facility. Note that each line within a basic block must be indented by the 
+  grouping statements. At the console, you have to type a tab or four spaces for
+  each indented line. In practice you will prepare more complicated input for
+  Scopes with a text editor; all decent text editors have an auto-indent
+  facility. Note that each line within a basic block must be indented by the
   same amount.
 
 Controlling Flow
@@ -308,7 +308,7 @@ Another example::
     $0 ▶ prompt "please enter a word: "
     please enter a word: bang
     $0 = "bang"
-    $1 ▶ if ($0 < "n") 
+    $1 ▶ if ($0 < "n")
     ....     print "early in the dictionary, good choice!"
     .... elseif ($0 == "scopes")
     ....     print "oh, a very good word!"
@@ -316,17 +316,17 @@ Another example::
     ....     print "that's no word at all!"
     .... else
     ....     print "late in the dictionary, nice!"
-    ....     
+    ....
     early in the dictionary, good choice!
 
 You can also use `if` to decide on an expression::
 
-    $0 ▶ print "you chose" 
+    $0 ▶ print "you chose"
     ....     if true
     ....         "poorly"
     ....     else
     ....         "wisely"
-    ....         
+    ....
     you chose poorly
 
 Defining Functions
@@ -342,10 +342,10 @@ write numbers from the fibonacci sequence up to an arbitrary boundary::
     ....         io-write! " "
     ....         repeat b (a + b)
     ....     io-write! "\n"
-    ....     
+    ....
     $0 = fib(n)▶?:Label
     $1 ▶ fib 2000 # call the function we just defined
-    0 1 1 2 3 5 8 13 21 34 55 89 144 233 377 610 987 1597 
+    0 1 1 2 3 5 8 13 21 34 55 89 144 233 377 610 987 1597
 
 The keyword `fn` introduces a function definition. It must be followed by an
 optional name and a list of formal parameters. All expressions that follow
@@ -384,23 +384,23 @@ expressions wherever they occur, which can become a problem with loops that run
 for many iterations or have non-constant exit conditions. Let's see what happens
 when we remove `unconst` from ``fib``::
 
-    $0 ▶ fn fib (n) 
+    $0 ▶ fn fib (n)
     ....     let repeat (a b) = 0 1
     ....     if (a < n)
     ....         io-write! (repr a)
     ....         io-write! " "
     ....         repeat b (a + b)
     ....     io-write! "\n"
-    ....     
+    ....
     $0 = fib(n)▶?:Label
     $1 ▶ fib 2000 # this one still works
-    0 1 1 2 3 5 8 13 21 34 55 89 144 233 377 610 987 1597 
+    0 1 1 2 3 5 8 13 21 34 55 89 144 233 377 610 987 1597
     $2 ▶ fib 2147483647 # but look here
     <string>:1:1: in <string>
         fib 2147483647
     <string>:4:19: in anonymous function
         io-write! (repr a)
-    /home/lritter/devel/duangle/scopes/core.sc:96:1: error: instance limit reached 
+    /home/lritter/devel/duangle/scopes/core.sc:96:1: error: instance limit reached
         while unrolling named recursive function. Use less constant arguments.
 
 we see that `unconst` regulates which expressions are evaluated at compile time
