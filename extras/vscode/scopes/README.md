@@ -8,6 +8,11 @@ This is an early release. Right now, only basic syntax highlighting is available
 
 ## Release Notes
 
+### 0.29.0
+
+* Added more keywords.
+* Fixed parse failure on negative numbers.
+
 ### 0.28.0
 
 * Added more keywords.

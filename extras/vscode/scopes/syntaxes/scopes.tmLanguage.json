@@ -62,37 +62,37 @@
                 {
                     "comment": "Floating point literal (fraction)",
                     "name": "constant.numeric.float.scopes",
-                    "match": "\\b[0-9][0-9_]*\\.[0-9][0-9_]*([eE][+-]?[0-9_]+)?(\\:f32|\\:f64)?\\b"
+                    "match": "[\\-\\+]?[0-9][0-9_]*\\.[0-9][0-9_]*([eE][+-]?[0-9_]+)?(\\:f32|\\:f64)?(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
                 },
                 {
                     "comment": "Floating point literal (exponent)",
                     "name": "constant.numeric.float.scopes",
-                    "match": "\\b[0-9][0-9_]*(\\.[0-9][0-9_]*)?[eE][+-]?[0-9_]+(\\:f32|\\:f64)?\\b"
+                    "match": "[\\-\\+]?[0-9][0-9_]*(\\.[0-9][0-9_]*)?[eE][+-]?[0-9_]+(\\:f32|\\:f64)?(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
                 },
                 {
                     "comment": "Floating point literal (typed)",
                     "name": "constant.numeric.float.scopes",
-                    "match": "\\b[0-9][0-9_]*(\\.[0-9][0-9_]*)?([eE][+-]?[0-9_]+)?(\\:f32|\\:f64)\\b"
+                    "match": "[\\-\\+]?[0-9][0-9_]*(\\.[0-9][0-9_]*)?([eE][+-]?[0-9_]+)?(\\:f32|\\:f64)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
                 },
                 {
                     "comment": "Integer literal (decimal)",
                     "name": "constant.numeric.integer.decimal.scopes",
-                    "match": "\\b[0-9][0-9_]*(\\:[ui](8|16|32|64|128|s|size))?\\b"
+                    "match": "[\\-\\+]?[0-9][0-9_]*(\\:[ui](8|16|32|64|128|s|size))?(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
                 },
                 {
                     "comment": "Integer literal (hexadecimal)",
                     "name": "constant.numeric.integer.hexadecimal.scopes",
-                    "match": "\\b0x[a-fA-F0-9_]+(\\:[ui](8|16|32|64|128|s|size))?\\b"
+                    "match": "[\\-\\+]?0x[a-fA-F0-9_]+(\\:[ui](8|16|32|64|128|s|size))?(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
                 },
                 {
                     "comment": "Integer literal (octal)",
                     "name": "constant.numeric.integer.octal.scopes",
-                    "match": "\\b0o[0-7_]+(\\:[ui](8|16|32|64|128|s|size))?\\b"
+                    "match": "[\\-\\+]?0o[0-7_]+(\\:[ui](8|16|32|64|128|s|size))?(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
                 },
                 {
                     "comment": "Integer literal (binary)",
                     "name": "constant.numeric.integer.binary.scopes",
-                    "match": "\\b0b[01_]+(\\:[ui](8|16|32|64|128|s|size))?\\b"
+                    "match": "[\\-\\+]?0b[01_]+(\\:[ui](8|16|32|64|128|s|size))?(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
                 }
             ]
 		},
@@ -100,7 +100,7 @@
             "patterns":[
                 {
                     "name": "support.type.builtin.scopes",
-                    "match": "(void|bool|usize|u8|u16|u32|u64|i8|i16|i32|i64|f32|f64|type|list|string|integer|real|pointer|array|vector|tuple|union|typename|function|(Sampled)?Image|Sampler|Symbol|Unknown|Label|Closure|Frame|Any|Parameter|Syntax|Nothing|Scope|Anchor|Builtin|Exception|ReturnLabel|extern)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
+                    "match": "(void|bool|usize|u8|u16|u32|u64|i8|i16|i32|i64|f32|f64|type|list|string|integer|real|pointer|array|vector|tuple|union|typename|function|immutable|(Sampled)?Image|Sampler|Symbol|Unknown|Label|Closure|Frame|Any|Parameter|Syntax|Nothing|Scope|Anchor|Builtin|Exception|ReturnLabel|extern)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
                 },
                 {
                     "name": "support.type.library.scopes",
