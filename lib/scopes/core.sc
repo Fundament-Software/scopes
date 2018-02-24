@@ -891,8 +891,8 @@ fn string-compare (a b)
     let ca = (string-countof a)
     let cb = (string-countof b)
     let cc =
-        if (< ca cb) ca
-        else cb
+        if (< ca cb) (tie-const cb ca)
+        else (tie-const ca cb)
     let pa pb =
         bitcast (getelementptr a 0 1 0) (pointer i8)
         bitcast (getelementptr b 0 1 0) (pointer i8)
