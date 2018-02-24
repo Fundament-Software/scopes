@@ -24,6 +24,8 @@ assert (0 - v == (vec4 0 -1 -2 -3))
 
 assert ((max (vec2 1.0 2.0) (vec2 4.0 0.0)) == (vec2 4.0 2.0))
 
+
+
 #compile
     typify
         fn (a b)
