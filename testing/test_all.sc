@@ -14,6 +14,7 @@ let modules =
         .test_folding
         .test_fwdecl
         .test_glsl
+        .test_glm
         .test_intrinsics
         .test_iter2
         #.test_iterator
