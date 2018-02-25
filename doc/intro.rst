@@ -37,7 +37,7 @@ Scopes only supports the mingw64 toolchain for the foreseeable future.
 * In the base directory, run ``genie gmake`` once to generate the project Makefiles.
 * To build in debug mode, run ``make -C build``. For release mode, use
   ``make -C build config=release``.
-* There should now be a ``scopes.exe`` executable in the repo root folder.
+* There should now be a ``scopes.exe`` executable in the `bin` folder.
 * For the clang bridge to work properly, copy or link `clang/lib/clang/4.0.x/include`
   to `scopes-repo/lib/clang/include`.
 * For a fresh rebuild, just remove the ``build`` directory before running make.
@@ -45,7 +45,7 @@ Scopes only supports the mingw64 toolchain for the foreseeable future.
 Building Scopes on Linux
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-* You need build-essentials, clang, libclang and LLVM 4.0.x installed - preferably
+* You need build-essentials, clang, libclang and LLVM 5.0.x installed - preferably
   locally:
 * Put ``clang++`` and ``llvm-config`` in your path **OR** extract the clang distro into
   the repo folder and rename it to ``clang``.
@@ -56,7 +56,7 @@ Building Scopes on Linux
 * Lastly, you need a build of `GENie <https://github.com/bkaradzic/GENie>`_ (binaries
   available on the page).
 * Build libffi using ``./configure --enable-shared=no --enable-static=yes && make`` and
-  softlink or copy the generated build folder (e.g. ``x86_64-unknown-linux-gnu``)
+  softlink (no copy) the generated build folder (e.g. ``x86_64-unknown-linux-gnu``)
   as ``libffi`` in the repo folder.
 * Check SPIRV-Tools build instructions to verify that its dependency on SPIRV headers
   is satisfied. Build SPIRV-Tools using
@@ -66,7 +66,7 @@ Building Scopes on Linux
 * In the base directory, run ``genie gmake`` once to generate the project Makefiles.
 * To build in debug mode, run ``make -C build``. For release mode, use
   ``make -C build config=release``.
-* There should now be a ``scopes`` executable in the repo root folder.
-* For the clang bridge to work properly, copy or link `clang/lib/clang/4.0.x/include`
+* There should now be a ``scopes`` executable in the `bin` folder.
+* For the clang bridge to work properly, copy or link `clang/lib/clang/5.0.x/include`
   to `scopes-repo/lib/clang/include`.
 * For a fresh rebuild, just remove the ``build`` directory before running make.
