@@ -9524,12 +9524,7 @@ struct SPIRVGenerator {
             std::vector<std::vector<spv::Decoration>> decorations;
 
             auto func = builder.makeFunctionEntry(
-                spv::NoPrecision, rettype,
-                // there's a bug in SPIRV-Cross that permits multiple functions
-                // to use the same name regardless of signature, which
-                // produces GLSL compiler errors
-                //name,
-                "",
+                spv::NoPrecision, rettype, name,
                 paramtypes, decorations, &bb);
             //LLVMSetLinkage(func, LLVMPrivateLinkage);
 
