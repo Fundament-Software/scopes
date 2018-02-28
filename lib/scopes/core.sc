@@ -1182,6 +1182,15 @@ syntax-extend
             if (type== destT rawstring)
                 getelementptr self 0 1 0
 
+    set-type-symbol! string 'from-cstr
+        fn (value)
+            let loop (i) = (unconst 0:usize)
+            let c = (load (getelementptr value i))
+            if (icmp== c 0:i8)
+                string-new value i
+            else
+                loop (add i 1:usize)
+
     set-type-symbol! string 'countof string-countof
     set-type-symbol! string '@
         fn string-at (s i)
