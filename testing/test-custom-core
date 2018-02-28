@@ -1,4 +1,4 @@
-cp ../scopes myscopes &&
+cp ../bin/scopes myscopes &&
 cat mycore.sc >> myscopes &&
 echo "(core-size " >> myscopes &&
 wc -c < mycore.sc >> myscopes &&
