@@ -10235,6 +10235,10 @@ struct LLVMIRGenerator {
         }
     }
 
+    static void fatal_error_handler(const char *Reason) {
+        location_error(String::from_cstr(Reason));
+    }
+
     LLVMValueRef argument_to_value(Any value) {
         if (value.type == TYPE_Parameter) {
             auto it = param2value.find({active_function_value, value.parameter});
@@ -10304,7 +10308,12 @@ struct LLVMIRGenerator {
                     void *pptr = local_aware_dlsym(name);
                     uint64_t ptr = *(uint64_t*)&pptr;
                     if (!ptr) {
+                        LLVMInstallFatalErrorHandler(fatal_error_handler);
+                        SCOPES_TRY()
                         ptr = LLVMGetGlobalValueAddress(ee, name);
+                        SCOPES_CATCH(e)
+                        SCOPES_TRY_END()
+                        LLVMResetFatalErrorHandler();
                     }
                     if (!ptr) {
                         StyledString ss;
@@ -11503,6 +11512,11 @@ static Any compile(Label *fn, uint64_t flags) {
 
     std::pair<LLVMModuleRef, LLVMValueRef> result;
     {
+        /*
+        A note on debugging "LLVM ERROR:" messages that seem to give no plausible
+        point of origin: you can either set a breakpoint at llvm::report_fatal_error
+        or at exit if the llvm symbols are missing, and then look at the stack trace.
+        */
         Timer generate_timer(TIMER_Generate);
         result = ctx.generate(fn);
     }
