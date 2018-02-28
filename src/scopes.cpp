@@ -124,28 +124,6 @@ extern "C" {
 #define CAT(a, ...) PRIMITIVE_CAT(a, __VA_ARGS__)
 #define PRIMITIVE_CAT(a, ...) a ## __VA_ARGS__
 
-#define EXPORT_DEFINES \
-    T(ERANGE) \
-    \
-    T(O_RDONLY) \
-    \
-    T(SEEK_SET) \
-    T(SEEK_CUR) \
-    T(SEEK_END) \
-    \
-    T(PROT_READ) \
-    \
-    T(MAP_PRIVATE)
-
-// make sure ffi.cdef() can see C defines we care about
-enum {
-#define T(NAME) \
-    SCOPES_ ## NAME = NAME,
-EXPORT_DEFINES
-#undef T
-#undef EXPORT_DEFINES
-};
-
 const char *scopes_compiler_path;
 const char *scopes_compiler_dir;
 const char *scopes_clang_include_dir;
