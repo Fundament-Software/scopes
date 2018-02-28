@@ -5,7 +5,7 @@
     ///  \\\
 
     Scopes Compiler
-    Copyright (c) 2016, 2017 Leonard Ritter
+    Copyright (c) 2016, 2017, 2018 Leonard Ritter
 
     Permission is hereby granted, free of charge, to any person obtaining a copy
     of this software and associated documentation files (the "Software"), to
