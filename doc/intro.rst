@@ -24,23 +24,23 @@ Scopes only supports the mingw64 toolchain for the foreseeable future.
   ``mingw64/mingw-w64-x86_64-libffi``, ``mingw64/mingw-w64-x86_64-cmake``
   and ``make``.
 * Nice to have: ``mingw-w64-x86_64-gdb``
-* You also need github checkouts of
+* You also need the latest source distributions of
   `SPIRV-Tools <https://github.com/KhronosGroup/SPIRV-Tools>`_ and
   `SPIRV-Cross <https://github.com/KhronosGroup/SPIRV-Cross>`_ (into the workspace folder).
 * Lastly, you need a build of `GENie <https://github.com/bkaradzic/GENie>`_ (binaries
   available on the page).
-* Check SPIRV-Tools build instructions to verify that its dependency on SPIRV headers
+* Check SPIRV-Tools' build instructions to verify that its dependency on SPIRV headers
   is satisfied. Build SPIRV-Tools using
   ``mkdir build && cd build && cmake .. -G "MSYS Makefiles" -DCMAKE_BUILD_TYPE=Release && make``
   in ``scopes-repo/SPIRV-Tools``.
 * SPIRV-Cross does not have to be built.
-* In the base directory, run ``genie gmake`` once to generate the project Makefiles.
+* In the workspace folder, run ``genie gmake`` once to generate the project Makefiles.
 * To build in debug mode, run ``make -C build``. For release mode, use
   ``make -C build config=release``.
 * There should now be a ``scopes.exe`` executable in the `bin` folder.
 * For the clang bridge to work properly, copy or link `clang/lib/clang/4.0.x/include`
   to `scopes-repo/lib/clang/include`.
-* For a fresh rebuild, just remove the ``build`` directory before running make.
+* For a fresh rebuild, just remove the `build` directory before running ``make`` again.
 
 Building Scopes on Linux
 ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -48,7 +48,7 @@ Building Scopes on Linux
 * You need build-essentials, clang, libclang and LLVM 5.0.x installed - preferably
   locally:
 * Put ``clang++`` and ``llvm-config`` in your path **OR** extract the clang distro into
-  the repo folder and rename it to ``clang``.
+  the workspace folder and rename it to ``clang``.
 * You also need the latest source distributions of
   `libffi <https://sourceware.org/libffi/>`_ and github checkouts of
   `SPIRV-Tools <https://github.com/KhronosGroup/SPIRV-Tools>`_ and
@@ -57,19 +57,19 @@ Building Scopes on Linux
   available on the page).
 * Build libffi using ``./configure --enable-shared=no --enable-static=yes && make`` and
   softlink (no copy) the generated build folder (e.g. ``x86_64-unknown-linux-gnu``)
-  as ``libffi`` in the repo folder.
-* Check SPIRV-Tools build instructions to verify that its dependency on SPIRV headers
+  as ``libffi`` in the workspace folder.
+* Check SPIRV-Tools' build instructions to verify that its dependency on SPIRV headers
   is satisfied. Build SPIRV-Tools using
   ``mkdir build && cd build && cmake .. -DCMAKE_BUILD_TYPE=Release && make``
   in ``scopes-repo/SPIRV-Tools/build``.
 * SPIRV-Cross does not have to be built.
-* In the base directory, run ``genie gmake`` once to generate the project Makefiles.
+* In the workspace folder, run ``genie gmake`` once to generate the project Makefiles.
 * To build in debug mode, run ``make -C build``. For release mode, use
   ``make -C build config=release``.
 * There should now be a ``scopes`` executable in the `bin` folder.
 * For the clang bridge to work properly, copy or link `clang/lib/clang/5.0.x/include`
   to `scopes-repo/lib/clang/include`.
-* For a fresh rebuild, just remove the ``build`` directory before running make.
+* For a fresh rebuild, just remove the `build` directory before running ``make`` again.
 
 Building Scopes on macOS
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -90,7 +90,7 @@ Building Scopes on macOS
   ``mkdir build && cd build && cmake .. -DCMAKE_BUILD_TYPE=Release && make``
   in ``scopes-repo/SPIRV-Tools/build``.
 * SPIRV-Cross does not have to be built.
-* In the base directory, run ``genie gmake`` once to generate the project Makefiles.
+* In the workspace folder, run ``genie gmake`` once to generate the project Makefiles.
 * To build in debug mode, run ``make -C build``. For release mode, use
   ``make -C build config=release``.
 * There should now be a ``scopes`` executable in the `bin` folder.
