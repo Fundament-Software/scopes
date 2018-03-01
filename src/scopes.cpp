@@ -17454,9 +17454,9 @@ int main(int argc, char *argv[]) {
             scopes_compiler_path = strdup("");
         }
 
-        char *compilerdir = dirname(strdup(scopes_compiler_path));
-        scopes_compiler_dir = format("%s/..", compilerdir)->data;
-        free(compilerdir);
+        char *path_copy = strdup(scopes_compiler_path);
+        scopes_compiler_dir = format("%s/..", dirname(path_copy))->data;
+        free(path_copy);
         scopes_clang_include_dir = format("%s/lib/clang/include", scopes_compiler_dir)->data;
         scopes_include_dir = format("%s/include", scopes_compiler_dir)->data;
     }
