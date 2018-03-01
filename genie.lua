@@ -9,7 +9,7 @@ if os.is("linux") then
 elseif os.is("windows") then
     CLANG_PATH = MINGW_BASE_PATH .. "/bin"
 elseif os.is("macosx") then
-	CLANG_PATH = THISDIR .. "/clang/bin:/usr/local/opt/llvm/bin:/usr/local/bin:/usr/bin"
+    CLANG_PATH = THISDIR .. "/clang/bin:/usr/local/opt/llvm/bin:/usr/local/bin:/usr/bin"
 else
     error("unsupported os")
 end
