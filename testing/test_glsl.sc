@@ -1,84 +1,59 @@
 
-let vec2 = (vector f32 2:usize)
-let vec4 = (vector f32 4:usize)
-
-let gl_Position =
-    extern 'spirv.Position vec4
-        storage = 'Output
-let gl_VertexID =
-    extern 'spirv.VertexId i32
-        storage = 'Input
+using import glm
+using import glsl
 
 fn set-vertex-position ()
     let screen-tri-vertices =
         arrayof vec2
-            vectorof f32 -1 -1
-            vectorof f32  3 -1
-            vectorof f32 -1  3
+            vec2 -1 -1
+            vec2  3 -1
+            vec2 -1  3
     let pos = (screen-tri-vertices @ gl_VertexID)
-    gl_Position = (vectorof f32 (pos @ 0) (pos @ 1) 0 1)
+    gl_Position = (vec4 pos.x pos.y 0 1)
     pos
+
+let LOC_UV = 0
+let U_PHASE = 1
 
 let vertex-code =
     do
-        let uv =
-            extern 'uv vec2
-                storage = 'Output
-                location = 0
-        fn vertex-shader ()
-            let half = (vectorof f32 0.5 0.5)
-            uv =
-                ((set-vertex-position) * half) + half
-            return;
+        xvar out uv : vec2
+            location = LOC_UV
 
-        #dump-label
-            typify vertex-shader
+        fn vertex-shader ()
+            let half = (vec2 0.5 0.5)
+            let pos = (set-vertex-position)
+            uv =
+                (pos * half) + half
+            return;
 
         let code =
             compile-glsl 'vertex
                 typify vertex-shader
                 #'dump-disassembly
+                #'dump-module
                 #'no-opts
         print code
         code
 
 let fragment-code =
     do
-        let uv =
-            extern 'uv vec2
-                storage = 'Input
-                location = 0
-        let out_Color =
-            extern 'out_Color vec4
-                storage = 'Output
-        let phase =
-            extern 'phase f32
-                storage = 'UniformConstant
-                location = 0
-        let tex =
-            extern 'tex
-                SampledImage-type
-                    Image-type vec4 '2D 0 0 0 1 'Unknown unnamed
-                storage = 'UniformConstant
-                location = 1
+        xvar in uv : vec2
+            location = LOC_UV
+
+        xvar out out_Color : vec4
+
+        xvar uniform phase : f32
+            location = U_PHASE
+
         fn make-phase ()
-            #if ((load phase) < 0.5)
-                unconst 0.0
-            #else
-                unconst 1.0
             (sin (phase as immutable)) * 0.5 + 0.5
+
         fn fragment-shader ()
-            let uv = (load uv)
-            let color = (vectorof f32 (uv @ 0) (uv @ 1) (make-phase) 1)
-            let s = (sample (load tex) uv)
-            let s = (? (unconst true) (vectorof f32 0 0 0 0) s)
-            out_Color = (fmul color s)
+            let uv = (uv as immutable)
+            let color = (vec4 uv.xy (make-phase) 1)
+            out_Color = color
             return;
-
-        #dump-label (Closure-label fragment-shader)
-
-        #dump-label
-            typify fragment-shader
 
         let code =
             compile-glsl 'fragment
