@@ -70,3 +70,30 @@ Building Scopes on Linux
 * For the clang bridge to work properly, copy or link `clang/lib/clang/5.0.x/include`
   to `scopes-repo/lib/clang/include`.
 * For a fresh rebuild, just remove the ``build`` directory before running make.
+
+Building Scopes on macOS
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+* You'll need the following packages from `brew <https://brew.sh/>`_: `llvm` and `libffi`.
+  Scopes' build system respects brew's standard installation paths.:
+* You'll also need an installation of the Xcode Command Line Tools:
+  ``xcode-select --install``.
+* You also need the latest source distributions of
+  `SPIRV-Tools <https://github.com/KhronosGroup/SPIRV-Tools>`_ and
+  `SPIRV-Cross <https://github.com/KhronosGroup/SPIRV-Cross>`_ (into the workspace folder).
+* Softlink `libffi` into your Scopes workspace: ``mkdir libffi && cd libffi &&``
+  ``ln -s /usr/local/opt/libffi/lib/libffi-3.2.1/include; ln -s /usr/local/opt/libffi/lib``
+* Lastly, you need a build of `GENie <https://github.com/bkaradzic/GENie>`_ (binaries
+  available on the page).
+* Check SPIRV-Tools' build instructions to verify that its dependency on SPIRV-Headers
+  is satisfied. Build SPIRV-Tools using
+  ``mkdir build && cd build && cmake .. -DCMAKE_BUILD_TYPE=Release && make``
+  in ``scopes-repo/SPIRV-Tools/build``.
+* SPIRV-Cross does not have to be built.
+* In the base directory, run ``genie gmake`` once to generate the project Makefiles.
+* To build in debug mode, run ``make -C build``. For release mode, use
+  ``make -C build config=release``.
+* There should now be a ``scopes`` executable in the `bin` folder.
+* For the clang bridge to work properly, copy or link `clang/lib/clang/5.0.x/include`
+  to `scopes-repo/lib/clang/include`.
+* For a fresh rebuild, just remove the `build` directory before running ``make`` again.
