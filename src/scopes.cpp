@@ -17445,6 +17445,8 @@ int main(int argc, char *argv[]) {
 
     scopes_compiler_path = nullptr;
     scopes_compiler_dir = nullptr;
+    scopes_clang_include_dir = nullptr;
+    scopes_include_dir = nullptr;
     if (argv) {
         if (argv[0]) {
             std::string loader = GetExecutablePath(argv[0]);
