@@ -8,6 +8,8 @@ if os.is("linux") then
     CLANG_PATH = THISDIR .. "/clang/bin:/usr/local/bin:/usr/bin"
 elseif os.is("windows") then
     CLANG_PATH = MINGW_BASE_PATH .. "/bin"
+elseif os.is("macosx") then
+	CLANG_PATH = THISDIR .. "/clang/bin:/usr/local/opt/llvm/bin:/usr/local/bin:/usr/bin"
 else
     error("unsupported os")
 end
@@ -298,6 +300,74 @@ project "scopes"
                 CP .. " -v " .. dllpath("libwinpthread-1") .. " " .. BINDIR,
             }
         end
+
+        postbuildcommands {
+            -- BINDIR .. "/scopes " .. THISDIR .. "/testing/test_all.sc"
+        }
+
+    configuration { "macosx" }
+        defines { "SCOPES_MACOSX" }
+
+        includedirs {
+            "clang/include",
+            "/usr/local/opt/llvm/include"
+        }
+
+        buildoptions_cpp {
+            "-std=c++11",
+            "-fno-rtti",
+            "-fno-exceptions",
+            "-ferror-limit=1",
+            "-pedantic",
+            "-Wall",
+            "-Wno-keyword-macro",
+            "-Wno-gnu-redeclared-enum",
+        }
+
+        if USE_ASAN_UBSAN then
+            local opts = {
+                "-fsanitize=address",
+                "-fsanitize-address-use-after-scope",
+                "-fno-omit-frame-pointer",
+                "-fsanitize=undefined",
+                "-fno-common",
+            }
+            buildoptions_cpp(opts)
+            buildoptions_c(opts)
+            linkoptions(opts)
+        end
+
+        files {
+            "external/minilibs/regexp.c"
+        }
+
+        links {
+            "pthread", "m", "ncurses", "dl", "z",
+        }
+
+        linkoptions {
+            THISDIR .. "/libffi/lib/libffi.a",
+            THISDIR .. "/SPIRV-Tools/build/source/libSPIRV-Tools.a",
+            THISDIR .. "/SPIRV-Tools/build/source/opt/libSPIRV-Tools-opt.a",
+        }
+
+        linkoptions(LLVM_LDFLAGS)
+
+        linkoptions {
+            "-lclangFrontend",
+            "-lclangDriver",
+            "-lclangSerialization",
+            "-lclangCodeGen",
+            "-lclangParse",
+            "-lclangSema",
+            "-lclangAnalysis",
+            "-lclangEdit",
+            "-lclangAST",
+            "-lclangLex",
+            "-lclangBasic"
+        }
+
+        linkoptions(LLVM_LIBS)
 
         postbuildcommands {
             -- BINDIR .. "/scopes " .. THISDIR .. "/testing/test_all.sc"
