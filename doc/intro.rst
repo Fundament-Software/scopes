@@ -74,8 +74,8 @@ Building Scopes on Linux
 Building Scopes on macOS
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-* You'll need the following packages from `brew <https://brew.sh/>`_: `llvm` and `libffi`.
-  Scopes' build system respects brew's standard installation paths.:
+* You'll need the following packages from `brew <https://brew.sh/>`_: `llvm`, `libffi`
+  and `cmake`. Scopes' build system respects brew's standard installation paths.
 * You'll also need an installation of the Xcode Command Line Tools:
   ``xcode-select --install``.
 * You also need the latest source distributions of
