@@ -4279,6 +4279,7 @@ static StyledStream& operator<<(StyledStream& ost, const Syntax *value) {
     T(curly_open, '{') \
     T(curly_close, '}') \
     T(string, '"') \
+    T(block_string, 'B') \
     T(quote, '\'') \
     T(symbol, 'S') \
     T(escape, '\\') \
@@ -4367,6 +4368,10 @@ struct LexerParser {
         return c;
     }
 
+    size_t chars_left() {
+        return eof - next_cursor;
+    }
+
     bool is_eof() {
         return next_cursor == eof;
     }
@@ -4429,7 +4434,7 @@ struct LexerParser {
         select_string();
     }
 
-    void read_comment() {
+    void read_block() {
         int col = column();
         while (true) {
             if (is_eof()) {
@@ -4444,6 +4449,15 @@ struct LexerParser {
                 break;
             }
         }
+    }
+
+    void read_block_string() {
+        read_block();    
+        select_string();
+    }
+
+    void read_comment() {
+        read_block();    
     }
 
     template<unsigned N>
@@ -4615,7 +4629,17 @@ struct LexerParser {
         else if (c == '{') { token = tok_curly_open; }
         else if (c == '}') { token = tok_curly_close; }
         else if (c == '\\') { token = tok_escape; }
-        else if (c == '"') { token = tok_string; read_string(c); }
+        else if (c == '"') {
+            if ((chars_left() >= 2)
+                && (next_cursor[0] == '"')
+                && (next_cursor[1] == '"')) {
+                token = tok_block_string;
+                read_block_string();
+            } else {
+                token = tok_string; 
+                read_string(c); 
+            }
+        }
         else if (c == ';') { token = tok_statement; }
         else if (c == '\'') { token = tok_quote; }
         else if (c == ',') { token = tok_symbol; read_single_symbol(); }
@@ -4640,6 +4664,37 @@ struct LexerParser {
         auto size = unescape_string(dest);
         return String::from(dest, size);
     }
+    Any get_block_string() {
+        int strip_col = column() + 4;
+        auto len = string_len - 3;
+        char dest[len + 1];
+        const char *start = string + 3;
+        const char *end = start + len;
+        // strip trailing whitespace up to the first LF after content
+        const char *last_lf = end;
+        while (end != start) {
+            char c = *(end - 1);
+            if (!isspace(c)) break;
+            if (c == '\n')
+                last_lf = end;
+            end--;
+        }
+        end = last_lf;
+        char *p = dest;
+        while (start != end) {
+            char c = *start++;
+            *p++ = c;
+            if (c == '\n') {
+                // strip leftside column
+                for (int i = 1; i < strip_col; ++i) {
+                    if (start == end) break;
+                    if ((*start != ' ') && (*start != '\t')) break;
+                    start++;
+                }
+            }
+        }
+        return String::from(dest, p - dest);
+    }
     Any get_number() {
         return value;
     }
@@ -4650,6 +4705,8 @@ struct LexerParser {
             return get_symbol();
         } else if (token == tok_string) {
             return get_string();
+        } else if (token == tok_block_string) {
+            return get_block_string();
         } else {
             return none;
         }
@@ -4745,6 +4802,8 @@ struct LexerParser {
             location_error(String::from("stray closing bracket"));
         } else if (this->token == tok_string) {
             return Syntax::from(anchor, get_string());
+        } else if (this->token == tok_block_string) {
+            return Syntax::from(anchor, get_block_string());
         } else if (this->token == tok_symbol) {
             return Syntax::from(anchor, get_symbol());
         } else if (this->token == tok_number) {
