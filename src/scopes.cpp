@@ -2172,6 +2172,9 @@ struct Any {
     Any(uint16_t x) : type(TYPE_U16), u64(0) { u16 = x; }
     Any(uint32_t x) : type(TYPE_U32), u64(0) { u32 = x; }
     Any(uint64_t x) : type(TYPE_U64), u64(x) {}
+#ifdef SCOPES_MACOSX
+    Any(unsigned long x) : type(TYPE_U64), u64(x) {}
+#endif
     Any(float x) : type(TYPE_F32), u64(0) { f32 = x; }
     Any(double x) : type(TYPE_F64), f64(x) {}
     Any(const String *x) : type(TYPE_String), string(x) {}
