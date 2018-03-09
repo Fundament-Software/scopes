@@ -1,3 +1,4 @@
+
 /*
 Scopes Compiler
 Copyright (c) 2016, 2017, 2018 Leonard Ritter
@@ -2484,8 +2485,7 @@ struct IntegerType : Type {
     IntegerType(size_t _width, bool _issigned)
         : Type(TK_Integer), width(_width), issigned(_issigned) {
         std::stringstream ss;
-        if (_width == 1) {
-            assert(!_issigned);
+        if ((_width == 1) && !_issigned) {
             ss << "bool";
         } else {
             if (issigned) {
