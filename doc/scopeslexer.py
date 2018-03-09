@@ -13,6 +13,7 @@ class TOK:
     curly_open = '{'
     curly_close = '}'
     string = '"'
+    block_string = 'B'
     quote = '\''
     symbol = 'S'
     escape = '\\'
@@ -27,12 +28,12 @@ string list Symbol Syntax Nothing type Any
 keywords = set("""fn let if elseif else label return syntax-extend
 """.strip().split())
 builtins = set("""print import-from branch icmp== icmp!= icmp<s icmp<=s icmp>s
-icmp>=s icmp<u icmp<=u icmp>u icmp>=u 
+icmp>=s icmp<u icmp<=u icmp>u icmp>=u
 fcmp==o fcmp!=o fcmp<o fcmp<=o fcmp>o fcmp>=o
 fcmp==u fcmp!=u fcmp<u fcmp<=u fcmp>u fcmp>=u
 extractvalue insertvalue compiler-error! io-write abort! unreachable! undef
 ptrtoint inttoptr bitcast typeof string-join va-countof va@ type@ Scope@
-set-type-symbol! set-scope-symbol! 
+set-type-symbol! set-scope-symbol!
 band bor bxor add sub mul udiv sdiv urem srem zext sext trunc shl ashr lshr
 fadd fsub fmul fdiv frem fpext fptrunc
 fptosi fptoui sitofp uitofp signed? bitcountof getelementptr
@@ -66,8 +67,18 @@ class ScopesLexer(Lexer):
         state.next_lineno = 1
         state.line = 0
         state.next_line = 0
+
+        def column():
+            return state.cursor - state.line + 1
+        def next_column():
+            return state.next_cursor - state.next_line + 1
+        def location_error(msg):
+            print text
+            raise Exception("%i:%i: error: %s" % (state.lineno,column(),msg))
         def is_eof():
             return state.next_cursor == len(text)
+        def chars_left():
+            return len(text) - state.next_cursor
         def next():
             x = text[state.next_cursor]
             state.next_cursor = state.next_cursor + 1
@@ -163,11 +174,15 @@ class ScopesLexer(Lexer):
             escape = False
             while True:
                 if is_eof():
-                    raise Exception("unterminated sequence")
+                    location_error("unterminated sequence")
                     break
                 c = next()
                 if c == '\n':
-                    newline()
+                    # 0.10
+                    # newline()
+                    # 0.11
+                    location_error("unexpected line break in string")
+                    break
                 if escape:
                     escape = False
                 elif c == '\\':
@@ -175,11 +190,7 @@ class ScopesLexer(Lexer):
                 elif c == terminator:
                     break
             select_string()
-        def column():
-            return state.cursor - state.line + 1
-        def next_column():
-            return state.next_cursor - state.next_line + 1
-        def read_comment():
+        def read_block():
             col = column()
             while True:
                 if is_eof():
@@ -192,6 +203,10 @@ class ScopesLexer(Lexer):
                     state.next_cursor = state.next_cursor - 1
                     break
             select_string()
+        def read_block_string():
+            read_block()
+        def read_comment():
+            read_block()
         def read_whitespace():
             while True:
                 if is_eof():
@@ -238,9 +253,14 @@ class ScopesLexer(Lexer):
             elif c == '\\':
                 token = Token.Punctuation.Escape
                 select_string()
-            elif c == '"': 
+            elif c == '"':
                 token = Token.String
-                read_string(c)
+                if ((chars_left() >= 2)
+                    and (text[state.next_cursor+0] == '"')
+                    and (text[state.next_cursor+1] == '"')):
+                    read_block_string()
+                else:
+                    read_string(c)
             elif c == ';':
                 token = Token.Punctuation.Statement.Separator
                 select_string()

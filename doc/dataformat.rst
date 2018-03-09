@@ -11,7 +11,7 @@ YAML, XML or JSON. It has been optimized for simplicity and terseness.
 
 SLN files do not have to contain code on their own. They're more likely to
 store configuration or metadata. Therefore, the examples in this document are
-schema free and do only contain arbitrary data. They're not necessarily valid 
+schema free and do only contain arbitrary data. They're not necessarily valid
 Scopes source code.
 
 At a Glance
@@ -25,7 +25,7 @@ example that gives you an overview of all notation aspects::
     # a naked list of five 32-bit signed integers
     1 2 3 4 5
 
-    # a list that begins with a symbol 'float-values:' and contains a braced 
+    # a list that begins with a symbol 'float-values:' and contains a braced
     # sublist of floats.
     float-values: (1.0 2.0 3.1 4.2 5.5:f64 inf nan)
 
@@ -34,9 +34,13 @@ example that gives you an overview of all notation aspects::
     ==string-values==
         "A" "B" "NCC-1701\n" "\xFFD\xFF" "\"E\""
 
-    # a single top-level element, a multi-line string
-    "Ma'am is acceptable in a crunch, but I prefer Captain.
-                                        -- Kathryn Janeway"
+    # a single top-level element, a single-line string
+    "I am Locutus of Borg."
+
+    # a raw block string
+    """
+        Ma'am is acceptable in a crunch, but I prefer Captain.
+                                        -- Kathryn Janeway
 
     # a list of pairs (also lists), arranged horizontally
     (1 x) (2 y) (3 z)
@@ -58,18 +62,18 @@ example that gives you an overview of all notation aspects::
     # appending values to the parent list in the next line
     symbol-values one two three four five \
         six seven-of-nine ten
-    
+
     # line continuation can also begin at the start of the next line
     ::typed-integers:: 0:u8 1:i8 2:i16 3:u16
         \ 4:u32 5:i32 6:u64 7:i64
-    
+
     # which comes in handy when we want to continue the parent list
     people like
         jim kirk
         commander spock
         hikari sulu
         \ and many more
-    
+
     # a list with a symbol header and two entries
     address-list
         # a list with a header and three more lists of two values each
@@ -85,8 +89,8 @@ example that gives you an overview of all notation aspects::
             name: "Natasha Yar"
             age: 27
             address: natasha.yar@enterprise.org
-        
-    # the same list with braced notation; within braced lists, 
+
+    # the same list with braced notation; within braced lists,
       indentation is meaningless.
     (address-list
         # a list with a header and three more lists of two values each
@@ -94,15 +98,15 @@ example that gives you an overview of all notation aspects::
             (name: "Jean-Luc Picard")
             (age: 59)
             (address: picard@enterprise.org))
-        (entry (name: "Worf, Son of Mogh") (age: 24) 
+        (entry (name: "Worf, Son of Mogh") (age: 24)
             (address: worf@house-of-mogh.co.klingon)))
-    
+
     # a list of comma separated values - a comma is always recorded as
       a separate symbol, so the list has nine entries
     1, 2, 3,4, 5
 
-    # a list of options beginning with a symbol in a list with 
-      square brace style 
+    # a list of options beginning with a symbol in a list with
+      square brace style
     [task]
         cmd = "bash"
         # the last element is a symbol in a list with curly brace style
@@ -115,7 +119,7 @@ Formatting Rules
 
 SLN files are always assumed to be encoded as UTF-8.
 
-Whitespace controls scoping in the SLN format. Therefore, to avoid possible 
+Whitespace controls scoping in the SLN format. Therefore, to avoid possible
 ambiguities, SLN files must always use spaces, and one indentation level equals
 four spaces.
 
@@ -141,7 +145,7 @@ or lower indentation. Some examples for valid comments::
     # a line comment
     not a comment
     # a block comment that continues
-      in the next line because the line has 
+      in the next line because the line has
       a higher indentation level. Note, that
             comments do not need to respect
         indentation rules
@@ -150,30 +154,43 @@ or lower indentation. Some examples for valid comments::
 Strings
 ^^^^^^^
 
-Strings describe sequences of unsigned 8-bit characters in the range of 0-255. 
+Strings describe sequences of unsigned 8-bit characters in the range of 0-255.
 A string begins and ends with ``"`` (double quotes).  The ``\`` escape character
-can be used to include quotes in a string and describe unprintable control 
-characters such as ``\\n`` (return) and ``\\t`` (tab). Other unprintable 
-characters can be encoded via ``\\xNN``, where ``NN`` is the character's 
-hexadecimal code. Strings are parsed as-is, so UTF-8 encoded strings will be 
-copied over verbatim, and return characters will be preserved, allowing strings
-to span multiple lines.
+can be used to include quotes in a string and describe unprintable control
+characters such as ``\\n`` (return) and ``\\t`` (tab). Other unprintable
+characters can be encoded via ``\\xNN``, where ``NN`` is the character's
+hexadecimal code. Strings are parsed as-is, so UTF-8 encoded strings will be
+copied over verbatim.
 
 Here are some examples for valid strings::
 
     "a single-line string in double quotations"
-    "a multi-
-    line
-    string"
     "return: \n, tab: \t, backslash: \\, double quote: \", nbsp: \xFF."
+
+Raw Block Strings
+^^^^^^^^^^^^^^^^^
+
+Raw block strings provide a way to quote multiple lines of text with characters
+that should not be escaped. Similar to block comments, a raw block string spans
+from its first character to the last line return before the first non-whitespace
+character with equal or lower indentation.
+
+Here are some examples for valid raw block strings::
+
+    """a single-line string as a block string
+    """
+        #include <stdio.h>
+        void a_function_in_c() {
+            printf("hello world\n");
+        }
 
 Symbols
 ^^^^^^^
 
 Like strings, a symbol describes a sequence of 8-bit characters, but acts as a
-label or bindable name. Symbols may contain any character from the UTF-8 
-character set and terminate when encountering any character from the set 
-``#;()[]{},``. A symbol always terminates when one of these characters is 
+label or bindable name. Symbols may contain any character from the UTF-8
+character set and terminate when encountering any character from the set
+``#;()[]{},``. A symbol always terminates when one of these characters is
 encountered. Any symbol that parses as a number is also excluded. Two symbols
 sharing the same sequence of characters always map to the same value.
 
@@ -215,7 +232,7 @@ Here are some examples for valid numbers::
     1.234e+24 -1e-12
     # special reals
     +inf -inf nan
-    # zero as unsigned 64-bit integer and as signed 8-bit integer 
+    # zero as unsigned 64-bit integer and as signed 8-bit integer
     0:u64 0:i8
     # a floating-point number with double precision
     1.0:f64
@@ -223,10 +240,10 @@ Here are some examples for valid numbers::
 Lists
 ^^^^^
 
-Lists are the only nesting type, and can be either scoped by braces or 
+Lists are the only nesting type, and can be either scoped by braces or
 indentation. For braces, ``()``, ``[]`` and ``{}`` are accepted.
 
-Lists can be empty or contain a virtually unlimited number of elements, 
+Lists can be empty or contain a virtually unlimited number of elements,
 only separated by whitespace. They typically describe expressions in Scopes.
 
 Here are some examples for valid lists::
@@ -250,8 +267,8 @@ to what `Lisp <http://en.wikipedia.org/wiki/Lisp_(programming_language)>`_ and
 `Scheme <http://en.wikipedia.org/wiki/Scheme_(programming_language)>`_ users
 know as *restricted* `S-expressions <https://en.wikipedia.org/wiki/S-expression>`_::
 
-    (print 
-        (.. "Hello" "World") 
+    (print
+        (.. "Hello" "World")
         303 606 909)
 
 As a modern alternative, Scopes offers a *naked notation* where the scope of
@@ -264,7 +281,7 @@ other languages.
 
 This source parses as the same list in the previous, braced example::
 
-    # The same list as above, but in naked format. 
+    # The same list as above, but in naked format.
         A sub-paragraph continues the list.
     print
         # elements on a single line with or without sub-paragraph are wrapped
@@ -314,7 +331,7 @@ braced notation, while code examples make ample use of naked notation.
 Brace Styles
 ------------
 
-In addition to regular curvy braces ``()``, SLN parses curly ``{}`` and 
+In addition to regular curvy braces ``()``, SLN parses curly ``{}`` and
 square ``[]`` brace styles. They are merely meant for providing variety for
 writing SLN based formats, and are expanded to simple lists during parsing.
 Some examples::
