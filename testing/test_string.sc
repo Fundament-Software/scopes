@@ -27,6 +27,14 @@ assert
             hi everyone
         "\nhi everyone\n"
 
+# nested use of string block token has no effect
+assert
+    ==
+        "\"\"\"\n\"\"\"\n    \"\"\"\n"
+        """"""
+            """
+                """
+
 # multiline block with indented lines
 assert
     ==
@@ -35,8 +43,10 @@ assert
 
             third "line"
                 fourth line
-            fifth line
-                sixth line
 
-        # we're doing static compare of a string with more than 32 characters, do it at runtime
-        unconst "first line\nsecond line\n\nthird \"line\"\n    fourth line\nfifth line\n    sixth line\n"
+        # we're doing static compare of a string with
+            more than 32 characters, so do it at runtime.
+        unconst "first line\nsecond line\n\nthird \"line\"\n    fourth line\n"
+
+
+

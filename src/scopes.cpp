@@ -4421,7 +4421,11 @@ struct LexerParser {
             }
             char c = next();
             if (c == '\n') {
-                newline();
+                // 0.10
+                //newline();
+                // 0.11
+                location_error(String::from("unexpected line break in string"));
+                break;
             }
             if (escape) {
                 escape = false;
@@ -4452,12 +4456,12 @@ struct LexerParser {
     }
 
     void read_block_string() {
-        read_block();    
+        read_block();
         select_string();
     }
 
     void read_comment() {
-        read_block();    
+        read_block();
     }
 
     template<unsigned N>
@@ -4636,8 +4640,8 @@ struct LexerParser {
                 token = tok_block_string;
                 read_block_string();
             } else {
-                token = tok_string; 
-                read_string(c); 
+                token = tok_string;
+                read_string(c);
             }
         }
         else if (c == ';') { token = tok_statement; }
