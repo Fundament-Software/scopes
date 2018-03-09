@@ -1334,6 +1334,10 @@ fn compile-object (path table opts...)
     __compile-object path table
         compile-flags opts...
 
+fn compile-spirv (f target opts...)
+    __compile-spirv f target
+        compile-flags opts...
+
 fn compile-glsl (f target opts...)
     __compile-glsl f target
         compile-flags opts...
