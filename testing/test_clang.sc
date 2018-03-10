@@ -4,8 +4,7 @@
     x * y
 let lib =
     import-c "lib.c"
-        """
-            int testfunc (int x, int y) {
+        """"int testfunc (int x, int y) {
                 return x * y;
             }
         '()

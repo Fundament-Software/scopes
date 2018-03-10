@@ -3388,13 +3388,13 @@ fn read-eval-print-loop ()
 
 fn print-help (exename)
     print "usage:" exename
-        """[option [...]] [filename]
+        """"[option [...]] [filename]
 
             Options:
             -h, --help                  print this text and exit.
             -v, --version               print program version and exit.
             -s, --signal-abort          raise SIGABRT when calling `abort!`.
-            --                          terminate option list."
+            --                          terminate option list.
     exit 0
     unreachable!;
 

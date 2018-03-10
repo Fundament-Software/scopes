@@ -8,6 +8,10 @@ This is an early release. Right now, only basic syntax highlighting is available
 
 ## Release Notes
 
+### 0.32.0
+
+* Updated to new syntax rules for raw block strings.
+
 ### 0.31.0
 
 * Support for 0.11 raw block strings.

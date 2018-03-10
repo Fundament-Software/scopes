@@ -190,8 +190,8 @@ class ScopesLexer(Lexer):
                 elif c == terminator:
                     break
             select_string()
-        def read_block():
-            col = column()
+        def read_block(indent):
+            col = column() + indent
             while True:
                 if is_eof():
                     break
@@ -204,9 +204,12 @@ class ScopesLexer(Lexer):
                     break
             select_string()
         def read_block_string():
-            read_block()
+            next()
+            next()
+            next()
+            read_block(3)
         def read_comment():
-            read_block()
+            read_block(0)
         def read_whitespace():
             while True:
                 if is_eof():
@@ -255,9 +258,10 @@ class ScopesLexer(Lexer):
                 select_string()
             elif c == '"':
                 token = Token.String
-                if ((chars_left() >= 2)
+                if ((chars_left() >= 3)
                     and (text[state.next_cursor+0] == '"')
-                    and (text[state.next_cursor+1] == '"')):
+                    and (text[state.next_cursor+1] == '"')
+                    and (text[state.next_cursor+2] == '"')):
                     read_block_string()
                 else:
                     read_string(c)

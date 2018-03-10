@@ -1,6 +1,6 @@
 
 fn testfun (x y)
-    """testfun x y
+    """"testfun x y
 
         does nothing in particular
         x:  a value that meaning nothing

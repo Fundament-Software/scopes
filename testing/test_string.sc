@@ -4,41 +4,41 @@
 
 # keeps first trailing LF
 assert
-    "hello world\n" == """hello world
+    "hello world\n" == """"hello world
 
 # doesn't escape anything
 assert
-    "hello \"world\"\\n\n" == """hello "world"\n
+    "hello \"world\"\\n\n" == """"hello "world"\n
 
-# sub 4-space indentation is trimmed
-assert
-    "hello world\nwhat's up\n" == """hello world
-                                   what's up
+# sub 4-space indentation is illegal
+#assert
+    "hello world\nwhat's up\n" == """"hello world
+                                     what's up
 
 # all indentation up to 4-spaces is trimmed
 assert
-    "hello world\n  what's up\n" == """hello world
+    "hello world\n  what's up\n" == """"hello world
                                           what's up
 
 # empty first line isn't trimmed
 assert
     ==
-        """
+        """"
             hi everyone
         "\nhi everyone\n"
 
 # nested use of string block token has no effect
 assert
     ==
-        "\"\"\"\n\"\"\"\n    \"\"\"\n"
-        """"""
-            """
-                """
+        "\"\"\"\"\n\"\"\"\"\n    \"\"\"\"\n"
+        """"""""
+            """"
+                """"
 
 # multiline block with indented lines
 assert
     ==
-        """first line
+        """"first line
             second line
 
             third "line"

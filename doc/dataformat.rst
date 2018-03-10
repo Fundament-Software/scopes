@@ -38,7 +38,7 @@ example that gives you an overview of all notation aspects::
     "I am Locutus of Borg."
 
     # a raw block string
-    """
+    """"
         Ma'am is acceptable in a crunch, but I prefer Captain.
                                         -- Kathryn Janeway
 
@@ -171,14 +171,15 @@ Raw Block Strings
 ^^^^^^^^^^^^^^^^^
 
 Raw block strings provide a way to quote multiple lines of text with characters
-that should not be escaped. Similar to block comments, a raw block string spans
-from its first character to the last line return before the first non-whitespace
-character with equal or lower indentation.
+that should not be escaped. A raw block string begins with ``""""`` (four
+double quotes). A raw block string ends at the first newline before a printable
+character that has a lower indentation.
 
 Here are some examples for valid raw block strings::
 
-    """a single-line string as a block string
-    """
+    """"a single-line string as a block string
+    # commented line inbetween
+    """"// a multi-line string that describes a valid C function
         #include <stdio.h>
         void a_function_in_c() {
             printf("hello world\n");

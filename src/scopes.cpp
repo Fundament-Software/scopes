@@ -4441,8 +4441,8 @@ struct LexerParser {
         select_string();
     }
 
-    void read_block() {
-        int col = column();
+    void read_block(int indent) {
+        int col = column() + indent;
         while (true) {
             if (is_eof()) {
                 break;
@@ -4459,12 +4459,13 @@ struct LexerParser {
     }
 
     void read_block_string() {
-        read_block();
+        next();next();next();
+        read_block(3);
         select_string();
     }
 
     void read_comment() {
-        read_block();
+        read_block(0);
     }
 
     template<unsigned N>
@@ -4637,9 +4638,10 @@ struct LexerParser {
         else if (c == '}') { token = tok_curly_close; }
         else if (c == '\\') { token = tok_escape; }
         else if (c == '"') {
-            if ((chars_left() >= 2)
+            if ((chars_left() >= 3)
                 && (next_cursor[0] == '"')
-                && (next_cursor[1] == '"')) {
+                && (next_cursor[1] == '"')
+                && (next_cursor[2] == '"')) {
                 token = tok_block_string;
                 read_block_string();
             } else {
@@ -4673,9 +4675,10 @@ struct LexerParser {
     }
     Any get_block_string() {
         int strip_col = column() + 4;
-        auto len = string_len - 3;
+        auto len = string_len - 4;
+        assert(len >= 0);
         char dest[len + 1];
-        const char *start = string + 3;
+        const char *start = string + 4;
         const char *end = start + len;
         // strip trailing whitespace up to the first LF after content
         const char *last_lf = end;
