@@ -17,8 +17,8 @@ assert
 
 # all indentation up to 4-spaces is trimmed
 assert
-    "hello world\n  what's up\n" == """"hello world
-                                          what's up
+    "hello world\nwhat's up\n" == """"hello world
+                                      what's up
 
 # empty first line isn't trimmed
 assert

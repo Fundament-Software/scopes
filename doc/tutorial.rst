@@ -167,7 +167,7 @@ to pass the time? We start with some light declarations of string literals::
     $1 = "\"make it so!\", he said"
     $2 ▶ "'make it so!', he said" # single quotes are no problem though
     $2 = "'make it so!', he said"
-    $3 ▶ """1. make it so
+    $3 ▶ """"1. make it so
              2. ???
              3. profit!
     ....
@@ -183,7 +183,7 @@ output that produces the intended look::
     make it so
     $0 ▶ print "\"make it so!\", he said"
     "make it so!", he said
-    $0 ▶ print """1. "make it so!", he said
+    $0 ▶ print """"1. "make it so!", he said
                    2. ???
                    3. profit!"
     ....
