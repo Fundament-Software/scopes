@@ -40,7 +40,7 @@ Scopes only supports the mingw64 toolchain for the foreseeable future.
 * There should now be a ``scopes.exe`` executable in the `bin` folder.
 * For the clang bridge to work properly, copy or link `clang/lib/clang/4.0.x/include`
   to `scopes-repo/lib/clang/include`.
-* For a fresh rebuild, just remove the `build` directory before running ``make`` again.
+* For a fresh rebuild, just remove the ``build`` directory before running ``make`` again.
 
 Building Scopes on Linux
 ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -69,7 +69,7 @@ Building Scopes on Linux
 * There should now be a ``scopes`` executable in the `bin` folder.
 * For the clang bridge to work properly, copy or link `clang/lib/clang/5.0.x/include`
   to `scopes-repo/lib/clang/include`.
-* For a fresh rebuild, just remove the `build` directory before running ``make`` again.
+* For a fresh rebuild, just remove the ``build`` directory before running ``make`` again.
 
 Building Scopes on macOS
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -96,4 +96,4 @@ Building Scopes on macOS
 * There should now be a ``scopes`` executable in the `bin` folder.
 * For the clang bridge to work properly, copy or link `clang/lib/clang/5.0.x/include`
   to `scopes-repo/lib/clang/include`.
-* For a fresh rebuild, just remove the `build` directory before running ``make`` again.
+* For a fresh rebuild, just remove the ``build`` directory before running ``make`` again.
