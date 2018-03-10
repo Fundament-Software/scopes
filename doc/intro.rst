@@ -71,8 +71,8 @@ Building Scopes on Linux
   to `scopes-repo/lib/clang/include`.
 * For a fresh rebuild, just remove the ``build`` directory before running ``make`` again.
 
-Building Scopes on macOS
-~~~~~~~~~~~~~~~~~~~~~~~~
+Building Scopes on MacOS
+^^^^^^^^^^^^^^^^^^^^^^^^
 
 * You'll need the following packages from `brew <https://brew.sh/>`_: `llvm`, `libffi`
   and `cmake`. Scopes' build system respects brew's standard installation paths.
