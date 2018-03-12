@@ -930,6 +930,7 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(FN_Typify, "__typify") \
     T(FN_TypeEq, "type==") T(FN_IsType, "type?") T(FN_TypeOf, "typeof") \
     T(FN_TypeKind, "type-kind") \
+    T(FN_TypeDebugABI, "type-debug-abi") \
     T(FN_TypeAt, "type@") \
     T(FN_Undef, "undef") T(FN_NullOf, "nullof") T(FN_Alloca, "alloca") \
     T(FN_AllocaOf, "allocaof") \
@@ -7774,34 +7775,53 @@ static T cast_number(const Any &value) {
 // support in the front-end, particularly whether an argument is passed by
 // value or not.
 
+// based on x86-64 PS ABI
+#define DEF_ABI_CLASS_NAMES \
+    /* This class consists of integral types that fit into one of the general */ \
+    /* purpose registers. */ \
+    T(INTEGER) \
+    T(INTEGERSI) \
+    /* The class consists of types that fit into a vector register. */ \
+    T(SSE) \
+    T(SSESF) \
+    T(SSEDF) \
+    /* The class consists of types that fit into a vector register and can be */ \
+    /* passed and returned in the upper bytes of it. */ \
+    T(SSEUP) \
+    /* These classes consists of types that will be returned via the x87 FPU */ \
+    T(X87) \
+    T(X87UP) \
+    /* This class consists of types that will be returned via the x87 FPU */ \
+    T(COMPLEX_X87) \
+    /* This class is used as initializer in the algorithms. It will be used for */ \
+    /* padding and empty structures and unions. */ \
+    T(NO_CLASS) \
+    /* This class consists of types that will be passed and returned in memory */ \
+    /* via the stack. */ \
+    T(MEMORY)
+
+enum ABIClass {
+#define T(X) ABI_CLASS_ ## X,
+    DEF_ABI_CLASS_NAMES
+#undef T
+};
+
+static const char *abi_class_to_string(ABIClass class_) {
+    switch(class_) {
+    #define T(X) case ABI_CLASS_ ## X: return #X;
+    DEF_ABI_CLASS_NAMES
+    #undef T
+    default: return "?";
+    }
+}
+
+#undef DEF_ABI_CLASS_NAMES
+
+const size_t MAX_ABI_CLASSES = 4;
+
 #ifdef SCOPES_WIN32
 #else
 // x86-64 PS ABI based on https://www.uclibc.org/docs/psABI-x86_64.pdf
-
-enum ABIClass {
-    // This class consists of integral types that fit into one of the general
-    // purpose registers.
-    ABI_CLASS_INTEGER,
-    ABI_CLASS_INTEGERSI,
-    // The class consists of types that fit into a vector register.
-    ABI_CLASS_SSE,
-    ABI_CLASS_SSESF,
-    ABI_CLASS_SSEDF,
-    // The class consists of types that fit into a vector register and can be
-    // passed and returned in the upper bytes of it.
-    ABI_CLASS_SSEUP,
-    // These classes consists of types that will be returned via the x87 FPU
-    ABI_CLASS_X87,
-    ABI_CLASS_X87UP,
-    // This class consists of types that will be returned via the x87 FPU
-    ABI_CLASS_COMPLEX_X87,
-    // This class is used as initializer in the algorithms. It will be used for
-    // padding and empty structures and unions.
-    ABI_CLASS_NO_CLASS,
-    // This class consists of types that will be passed and returned in memory
-    // via the stack.
-    ABI_CLASS_MEMORY,
-};
 
 static ABIClass merge_abi_classes(ABIClass class1, ABIClass class2) {
     if (class1 == class2)
@@ -7833,7 +7853,6 @@ static ABIClass merge_abi_classes(ABIClass class1, ABIClass class2) {
     return ABI_CLASS_SSE;
 }
 
-const size_t MAX_ABI_CLASSES = 4;
 static size_t classify(const Type *T, ABIClass *classes, size_t offset);
 
 static size_t classify_array_like(size_t size,
@@ -8021,21 +8040,37 @@ static size_t classify(const Type *T, ABIClass *classes, size_t offset) {
 }
 #endif // SCOPES_WIN32
 
-static bool is_memory_class(const Type *T) {
+static size_t abi_classify(const Type *T, ABIClass *classes) {
 #ifdef SCOPES_WIN32
     if (T->kind() == TK_ReturnLabel) {
         T = cast<ReturnLabelType>(T)->return_type;
     }
+    classes[0] = ABI_CLASS_NO_CLASS;
     if (T == TYPE_Void)
-        return false;
+        return 1;
     if (size_of(T) > 8)
-        return true;
+        return 0;
     else
-        return false;
+        return 1;
 #else
-    ABIClass subclasses[MAX_ABI_CLASSES];
-    return !classify(T, subclasses, 0);
+    size_t sz = classify(T, classes, 0);
+#if 0
+    if (sz) {
+        StyledStream ss(std::cout);
+        ss << T << " -> " << sz;
+        for (int i = 0; i < sz; ++i) {
+            ss << " " << abi_class_to_string(classes[i]);
+        }
+        ss << std::endl;
+    }
 #endif
+    return sz;
+#endif
+}
+
+static bool is_memory_class(const Type *T) {
+    ABIClass classes[MAX_ABI_CLASSES];
+    return !classify(T, classes, 0);
 }
 
 //------------------------------------------------------------------------------
@@ -10119,6 +10154,187 @@ struct LLVMIRGenerator {
         return true;
     }
 
+    // unpack the types of a composite type
+    static void unpack_types(const Type *T, std::vector<const Type *> &types) {
+        switch(T->kind()) {
+        case TK_Integer:
+        case TK_Extern:
+        case TK_Pointer:
+        case TK_Real: {
+            types.push_back(T);
+        } break;
+        case TK_ReturnLabel:
+        case TK_Typename: {
+            if (is_opaque(T)) {
+                types.push_back(T);
+            } else {
+                unpack_types(storage_type(T), types);
+            }
+        } break;
+        case TK_Vector: {
+            auto tt = cast<VectorType>(T);
+            for (size_t i = 0; i < tt->count; ++i) {
+                unpack_types(tt->element_type, types);
+            }
+        } break;
+        case TK_Array: {
+            auto tt = cast<ArrayType>(T);
+            for (size_t i = 0; i < tt->count; ++i) {
+                unpack_types(tt->element_type, types);
+            }
+        } break;
+        case TK_Union: {
+            auto ut = cast<UnionType>(T);
+            unpack_types(ut->types[ut->largest_field], types);
+        } break;
+        case TK_Tuple: {
+            auto tt = cast<TupleType>(T);
+            for (size_t i = 0; i < tt->types.size(); ++i) {
+                unpack_types(tt->types[i], types);
+            }
+        } break;
+        default: {
+            assert(false && "not supported in ABI");
+        } break;
+        }
+    }
+
+    // unpack the values of a composite value
+    void unpack_values(LLVMValueRef value,
+        const Type *T, std::vector<LLVMValueRef> &values) {
+        switch(T->kind()) {
+        case TK_Integer:
+        case TK_Extern:
+        case TK_Pointer:
+        case TK_Real: {
+            values.push_back(value);
+        } break;
+        case TK_ReturnLabel:
+        case TK_Typename: {
+            if (is_opaque(T)) {
+                values.push_back(value);
+            } else {
+                unpack_values(value, storage_type(T), values);
+            }
+        } break;
+        case TK_Vector: {
+            auto tt = cast<VectorType>(T);
+            for (size_t i = 0; i < tt->count; ++i) {
+                unpack_values(
+                    LLVMBuildExtractElement(builder, value, LLVMConstInt(i32T,i,false), ""),
+                    tt->element_type, values);
+            }
+        } break;
+        case TK_Array: {
+            auto tt = cast<ArrayType>(T);
+            for (size_t i = 0; i < tt->count; ++i) {
+                unpack_values(
+                    LLVMBuildExtractValue(builder, value, i, ""),
+                    tt->element_type, values);
+            }
+        } break;
+        case TK_Union: {
+            auto ut = cast<UnionType>(T);
+            unpack_values(value,
+                ut->types[ut->largest_field], values);
+        } break;
+        case TK_Tuple: {
+            auto tt = cast<TupleType>(T);
+            for (size_t i = 0; i < tt->types.size(); ++i) {
+                unpack_values(
+                    LLVMBuildExtractValue(builder, value, i, ""),
+                    tt->types[i], values);
+            }
+        } break;
+        default: {
+            assert(false && "not supported in ABI");
+        } break;
+        }
+    }
+
+    void abi_transform_argument(LLVMValueRef val, const Type *AT,
+        std::vector<LLVMValueRef> &values, std::vector<size_t> &memptrs) {
+        ABIClass classes[MAX_ABI_CLASSES];
+        size_t sz = abi_classify(AT, classes);
+        if (!sz) {
+            LLVMValueRef ptrval = LLVMBuildAlloca(builder,
+                _type_to_llvm_type(AT), "");
+            LLVMBuildStore(builder, val, ptrval);
+            val = ptrval;
+            memptrs.push_back(values.size());
+        } else {
+#ifdef SCOPES_WIN32
+            values.push_back(val);
+#else
+            std::vector<LLVMValueRef> flatvals;
+            unpack_values(val, AT, flatvals);
+            int k = 0;
+            for (size_t i = 0; i < sz; ++i) {
+                ABIClass cls = classes[i];
+                switch(cls) {
+                case ABI_CLASS_SSE: {
+                    LLVMValueRef val1 = flatvals[k++];
+                    LLVMValueRef val2 = flatvals[k++];
+                    LLVMValueRef retval = LLVMGetUndef(LLVMVectorType(f32T, 2));
+                    retval = LLVMBuildInsertElement(builder, retval, val1,
+                        LLVMConstInt(i32T,0,false), "");
+                    retval = LLVMBuildInsertElement(builder, retval, val2,
+                        LLVMConstInt(i32T,1,false), "");
+                    values.push_back(retval);
+                } break;
+                case ABI_CLASS_SSESF: {
+                    values.push_back(flatvals[k++]);
+                } break;
+                case ABI_CLASS_SSEDF: {
+                    values.push_back(flatvals[k++]);
+                } break;
+                default: break; // do nothing
+                }
+            }
+            if (!k) {
+                values.push_back(val);
+            }
+#endif
+        }
+    }
+
+    static void abi_transform_parameter(const Type *AT, std::vector<const Type *> &params) {
+        ABIClass classes[MAX_ABI_CLASSES];
+        size_t sz = classify(AT, classes, 0);
+        if (!sz) {
+            params.push_back(Pointer(AT, PTF_NonWritable, SYM_Unnamed));
+        } else {
+    #ifdef SCOPES_WIN32
+            params.push_back(AT);
+    #elif 1
+            std::vector<const Type *> types;
+            unpack_types(AT, types);
+            int k = 0;
+            for (size_t i = 0; i < sz; ++i) {
+                ABIClass cls = classes[i];
+                switch(cls) {
+                case ABI_CLASS_SSE: {
+                    params.push_back(Vector(TYPE_F32, 2));
+                    k++; k++;
+                } break;
+                case ABI_CLASS_SSESF: {
+                    params.push_back(TYPE_F32);
+                    k++;
+                } break;
+                case ABI_CLASS_SSEDF: {
+                    params.push_back(TYPE_F64);
+                    k++;
+                } break;
+                default: break; // do nothing
+                }
+            }
+            if (!k) {
+                params.push_back(AT);
+            }
+    #endif
+        }
+    }
+
     static LLVMTypeRef create_llvm_type(const Type *type) {
         switch(type->kind()) {
         case TK_Integer:
@@ -10192,7 +10408,15 @@ struct LLVMIRGenerator {
             if (use_sret) {
                 offset = 1;
             }
-            LLVMTypeRef elements[count + offset];
+
+            std::vector<const Type *> outtypes;
+            outtypes.reserve(count + offset);
+            for (size_t i = 0; i < count; ++i) {
+                auto AT = fi->argument_types[i];
+                abi_transform_parameter(AT, outtypes);
+            }
+            size_t element_size = outtypes.size() + offset;
+            LLVMTypeRef elements[element_size];
             LLVMTypeRef rettype;
             if (use_sret) {
                 elements[0] = LLVMPointerType(_type_to_llvm_type(fi->return_type), 0);
@@ -10200,15 +10424,11 @@ struct LLVMIRGenerator {
             } else {
                 rettype = _type_to_llvm_type(fi->return_type);
             }
-            for (size_t i = 0; i < count; ++i) {
-                auto AT = fi->argument_types[i];
-                if (is_memory_class(AT)) {
-                    AT = Pointer(AT, PTF_NonWritable, SYM_Unnamed);
-                }
-                elements[i + offset] = _type_to_llvm_type(AT);
+            for (size_t i = 0; i < outtypes.size(); ++i) {
+                elements[i + offset] = _type_to_llvm_type(outtypes[i]);
             }
             return LLVMFunctionType(rettype,
-                elements, count + offset, fi->vararg());
+                elements, element_size, fi->vararg());
         } break;
         case TK_SampledImage: {
             location_error(String::from(
@@ -10506,30 +10726,19 @@ struct LLVMIRGenerator {
 
         bool use_sret = is_memory_class(fi->return_type);
 
-        size_t valuecount = argcount;
-        size_t offset = 0;
+        std::vector<LLVMValueRef> values;
+        values.reserve(argcount + 1);
+
         if (use_sret) {
-            valuecount++;
-            offset = 1;
-        }
-        LLVMValueRef values[valuecount];
-        if (use_sret) {
-            values[0] = LLVMBuildAlloca(builder,
-                _type_to_llvm_type(fi->return_type), "");
+            values.push_back(LLVMBuildAlloca(builder,
+                _type_to_llvm_type(fi->return_type), ""));
         }
         std::vector<size_t> memptrs;
         for (size_t i = 0; i < argcount; ++i) {
             auto &&arg = args[i + 1];
             LLVMValueRef val = argument_to_value(arg.value);
             auto AT = arg.value.indirect_type();
-            if (is_memory_class(AT)) {
-                LLVMValueRef ptrval = LLVMBuildAlloca(builder,
-                    _type_to_llvm_type(AT), "");
-                LLVMBuildStore(builder, val, ptrval);
-                val = ptrval;
-                memptrs.push_back(i + offset + 1);
-            }
-            values[i + offset] = val;
+            abi_transform_argument(val, AT, values, memptrs);
         }
 
         size_t fargcount = fi->argument_types.size();
@@ -10545,10 +10754,11 @@ struct LLVMIRGenerator {
             }
         }
 
-        auto ret = LLVMBuildCall(builder, func, values, valuecount, "");
+        auto ret = LLVMBuildCall(builder, func, &values[0], values.size(), "");
         for (auto idx : memptrs) {
-            LLVMAddCallSiteAttribute(ret, idx, attr_byval);
-            LLVMAddCallSiteAttribute(ret, idx, attr_nonnull);
+            auto i = idx + 1;
+            LLVMAddCallSiteAttribute(ret, i, attr_byval);
+            LLVMAddCallSiteAttribute(ret, i, attr_nonnull);
         }
         auto rlt = cast<ReturnLabelType>(fi->return_type);
         multiple_return_values = rlt->has_multiple_return_values();
@@ -16703,6 +16913,17 @@ static int32_t f_type_kind(const Type *T) {
     return T->kind();
 }
 
+static void f_type_debug_abi(const Type *T) {
+    ABIClass classes[MAX_ABI_CLASSES];
+    size_t sz = classify(T, classes, 0);
+    StyledStream ss(std::cout);
+    ss << T << " -> " << sz;
+    for (int i = 0; i < sz; ++i) {
+        ss << " " << abi_class_to_string(classes[i]);
+    }
+    ss << std::endl;
+}
+
 static int32_t f_bitcountof(const Type *T) {
     T = storage_type(T);
     switch(T->kind()) {
@@ -17153,6 +17374,7 @@ static void init_globals(int argc, char *argv[]) {
     DEFINE_PURE_C_FUNCTION(FN_PointerSetElementType, f_pointer_type_set_element_type, TYPE_Type, TYPE_Type, TYPE_Type);
     DEFINE_PURE_C_FUNCTION(FN_ListCons, f_list_cons, TYPE_List, TYPE_Any, TYPE_List);
     DEFINE_PURE_C_FUNCTION(FN_TypeKind, f_type_kind, TYPE_I32, TYPE_Type);
+    DEFINE_PURE_C_FUNCTION(FN_TypeDebugABI, f_type_debug_abi, TYPE_Void, TYPE_Type);
     DEFINE_PURE_C_FUNCTION(FN_BitCountOf, f_bitcountof, TYPE_I32, TYPE_Type);
     DEFINE_PURE_C_FUNCTION(FN_IsSigned, f_issigned, TYPE_Bool, TYPE_Type);
     DEFINE_PURE_C_FUNCTION(FN_TypeStorage, f_type_storage, TYPE_Type, TYPE_Type);
