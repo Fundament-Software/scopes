@@ -7775,12 +7775,15 @@ static T cast_number(const Any &value) {
 // support in the front-end, particularly whether an argument is passed by
 // value or not.
 
-// based on x86-64 PS ABI
+// based on x86-64 PS ABI (SystemV)
 #define DEF_ABI_CLASS_NAMES \
     /* This class consists of integral types that fit into one of the general */ \
     /* purpose registers. */ \
     T(INTEGER) \
     T(INTEGERSI) \
+    /* special types for windows, not used anywhere else */ \
+    T(INTEGERSI16) \
+    T(INTEGERSI8) \
     /* The class consists of types that fit into a vector register. */ \
     T(SSE) \
     T(SSESF) \
@@ -8046,12 +8049,35 @@ static size_t abi_classify(const Type *T, ABIClass *classes) {
         T = cast<ReturnLabelType>(T)->return_type;
     }
     classes[0] = ABI_CLASS_NO_CLASS;
-    if (T == TYPE_Void)
+    if (is_opaque(T))
         return 1;
-    if (size_of(T) > 8)
+    T = storage_type(T);
+    size_t sz = size_of(T);
+    if (sz > 8)
         return 0;
-    else
+    switch(T->kind()) {
+    case TK_Array:
+    case TK_Union:
+    case TK_Tuple:
+        if (sz <= 1)
+            classes[0] = ABI_CLASS_INTEGERSI8;
+        else if (sz <= 2)
+            classes[0] = ABI_CLASS_INTEGERSI16;
+        else if (sz <= 4)
+            classes[0] = ABI_CLASS_INTEGERSI;
+        else
+            classes[0] = ABI_CLASS_INTEGER;
         return 1;
+    case TK_Integer:
+    case TK_Extern:
+    case TK_Pointer:
+    case TK_Real:
+    case TK_ReturnLabel:
+    case TK_Typename:
+    case TK_Vector:
+    default:
+        return 1;
+    }
 #else
     size_t sz = classify(T, classes, 0);
 #if 0
@@ -8070,7 +8096,7 @@ static size_t abi_classify(const Type *T, ABIClass *classes) {
 
 static bool is_memory_class(const Type *T) {
     ABIClass classes[MAX_ABI_CLASSES];
-    return !classify(T, classes, 0);
+    return !abi_classify(T, classes);
 }
 
 //------------------------------------------------------------------------------
@@ -10158,7 +10184,7 @@ struct LLVMIRGenerator {
 
     static LLVMTypeRef abi_struct_type(const ABIClass *classes, size_t sz) {
         LLVMTypeRef types[sz];
-        int k = 0;
+        size_t k = 0;
         for (size_t i = 0; i < sz; ++i) {
             ABIClass cls = classes[i];
             switch(cls) {
@@ -10176,6 +10202,12 @@ struct LLVMIRGenerator {
             } break;
             case ABI_CLASS_INTEGERSI: {
                 types[i] = i32T; k++;
+            } break;
+            case ABI_CLASS_INTEGERSI16: {
+                types[i] = i16T; k++;
+            } break;
+            case ABI_CLASS_INTEGERSI8: {
+                types[i] = i8T; k++;
             } break;
             default: {
                 // do nothing
@@ -10198,8 +10230,6 @@ struct LLVMIRGenerator {
             LLVMValueRef val = LLVMGetParam(func, k++);
             return LLVMBuildLoad(builder, val, "");
         }
-#ifdef SCOPES_WIN32
-#else
         LLVMTypeRef T = type_to_llvm_type(param->type);
         auto tk = LLVMGetTypeKind(T);
         if (tk == LLVMStructTypeKind) {
@@ -10219,7 +10249,6 @@ struct LLVMIRGenerator {
                 return LLVMBuildLoad(builder, ptr, "");
             }
         }
-#endif
         LLVMValueRef val = LLVMGetParam(func, k++);
         return val;
     }
@@ -10234,64 +10263,52 @@ struct LLVMIRGenerator {
             LLVMBuildStore(builder, val, ptrval);
             val = ptrval;
             memptrs.push_back(values.size());
-        } else {
-#ifdef SCOPES_WIN32
             values.push_back(val);
-#else
-            auto tk = LLVMGetTypeKind(LLVMTypeOf(val));
-            if (tk == LLVMStructTypeKind) {
-                auto ST = abi_struct_type(classes, sz);
-                if (!ST) {
-                    // as-is
-                    values.push_back(val);
-                } else {
-                    // break into argument-sized bits
-                    auto ptr = LLVMBuildAlloca(builder, LLVMTypeOf(val), "");
-                    auto zero = LLVMConstInt(i32T,0,false);
-                    LLVMBuildStore(builder, val, ptr);
-                    ptr = LLVMBuildBitCast(builder, ptr, LLVMPointerType(ST, 0), "");
-                    for (size_t i = 0; i < sz; ++i) {
-                        LLVMValueRef indices[] = {
-                            zero, LLVMConstInt(i32T,i,false),
-                        };
-                        auto val = LLVMBuildGEP(builder, ptr, indices, 2, "");
-                        val = LLVMBuildLoad(builder, val, "");
-                        values.push_back(val);
-                    }
-                }
-            } else {
-                values.push_back(val);
-            }
-#endif
+            return;
         }
+        auto tk = LLVMGetTypeKind(LLVMTypeOf(val));
+        if (tk == LLVMStructTypeKind) {
+            auto ST = abi_struct_type(classes, sz);
+            if (ST) {
+                // break into argument-sized bits
+                auto ptr = LLVMBuildAlloca(builder, LLVMTypeOf(val), "");
+                auto zero = LLVMConstInt(i32T,0,false);
+                LLVMBuildStore(builder, val, ptr);
+                ptr = LLVMBuildBitCast(builder, ptr, LLVMPointerType(ST, 0), "");
+                for (size_t i = 0; i < sz; ++i) {
+                    LLVMValueRef indices[] = {
+                        zero, LLVMConstInt(i32T,i,false),
+                    };
+                    auto val = LLVMBuildGEP(builder, ptr, indices, 2, "");
+                    val = LLVMBuildLoad(builder, val, "");
+                    values.push_back(val);
+                }
+                return;
+            }
+        }
+        values.push_back(val);
     }
 
     static void abi_transform_parameter(const Type *AT,
         std::vector<LLVMTypeRef> &params) {
         ABIClass classes[MAX_ABI_CLASSES];
-        size_t sz = classify(AT, classes, 0);
+        size_t sz = abi_classify(AT, classes);
         auto T = type_to_llvm_type(AT);
         if (!sz) {
             params.push_back(LLVMPointerType(T, 0));
-        } else {
-    #ifdef SCOPES_WIN32
-            params.push_back(T);
-    #elif 1
-            auto tk = LLVMGetTypeKind(T);
-            if (tk == LLVMStructTypeKind) {
-                auto ST = abi_struct_type(classes, sz);
-                if (!ST) {
-                    params.push_back(T);
-                } else {
-                    for (size_t i = 0; i < sz; ++i) {
-                        params.push_back(LLVMStructGetTypeAtIndex(ST, i));
-                    }
-                }
-            } else {
-                params.push_back(T);
-            }
-    #endif
+            return;
         }
+        auto tk = LLVMGetTypeKind(T);
+        if (tk == LLVMStructTypeKind) {
+            auto ST = abi_struct_type(classes, sz);
+            if (ST) {
+                for (size_t i = 0; i < sz; ++i) {
+                    params.push_back(LLVMStructGetTypeAtIndex(ST, i));
+                }
+                return;
+            }
+        }
+        params.push_back(T);        
     }
 
     static LLVMTypeRef create_llvm_type(const Type *type) {
@@ -10708,8 +10725,12 @@ struct LLVMIRGenerator {
         auto ret = LLVMBuildCall(builder, func, &values[0], values.size(), "");
         for (auto idx : memptrs) {
             auto i = idx + 1;
+#ifdef SCOPES_WIN32
+            LLVMAddCallSiteAttribute(ret, i, attr_nonnull);
+#else
             LLVMAddCallSiteAttribute(ret, i, attr_byval);
             LLVMAddCallSiteAttribute(ret, i, attr_nonnull);
+#endif
         }
         auto rlt = cast<ReturnLabelType>(fi->return_type);
         multiple_return_values = rlt->has_multiple_return_values();
@@ -16863,10 +16884,10 @@ static int32_t f_type_kind(const Type *T) {
 
 static void f_type_debug_abi(const Type *T) {
     ABIClass classes[MAX_ABI_CLASSES];
-    size_t sz = classify(T, classes, 0);
+    size_t sz = abi_classify(T, classes);
     StyledStream ss(std::cout);
     ss << T << " -> " << sz;
-    for (int i = 0; i < sz; ++i) {
+    for (size_t i = 0; i < sz; ++i) {
         ss << " " << abi_class_to_string(classes[i]);
     }
     ss << std::endl;
