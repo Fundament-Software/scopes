@@ -10,6 +10,9 @@ let lib =
             typedef struct _Vec2 {
                 float x,y;
             } Vec2;
+            typedef struct _Vec3 {
+                float x,y,z;
+            } Vec3;
             typedef struct _Vec4 {
                 float x,y,z,w;
             } Vec4;
@@ -29,6 +32,14 @@ let lib =
                 return
                     (a.x == 1) && (a.y == 2)
                     && (b.x == 3) && (b.y == 4);
+            }
+
+            int testfunc_vec3_vec3 (Vec3 a, Vec3 b) {
+                printf("a.x = %f, a.y = %f, a.z = %f\n", a.x, a.y, a.z);
+                printf("b.x = %f, b.y = %f, b.z = %f\n", b.x, b.y, b.z);
+                return
+                    (a.x == 1) && (a.y == 2) && (a.z == 3)
+                    && (b.x == 4) && (b.y == 5) && (b.z == 6);
             }
 
             int testfunc_vec2_vec2_vec4_vec4 (Vec2 a, Vec2 b, Vec4 c, Vec4 d) {
@@ -69,11 +80,16 @@ fn testf3 ()
             lib.Vec2 1.0 2.0
             lib.Vec2 3.0 4.0
 
-dump "going once..."
-compile
-    typify testf2
+fn testf4 ()
+    lib.testfunc_vec3_vec3
+        lib.Vec3 1.0 2.0 3.0
+        lib.Vec3 4.0 5.0 6.0
+
+#compile
+    typify testf4
     'dump-module
 
+assert (1 == (testf4))
 assert (1 == (testf3))
 assert (1 == (testf2))
 assert (1 == (testf1))
