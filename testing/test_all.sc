@@ -7,6 +7,7 @@ let modules =
         .test_call_override
         .test_clang
         .test_closure
+        .test_conversion
         .test_dispatch
         .test_docstring
         .test_dots

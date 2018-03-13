@@ -416,6 +416,27 @@ syntax-extend
                     elseif (icmp>s destw valw)
                         fpext val destT
 
+        # more aggressive cast that converts from all numerical types
+        set-type-symbol! T 'as
+            fn hardcast (val destT)
+                let vT = (typeof val)
+                let destST =
+                    if (type== destT usize) (storageof destT)
+                    else destT
+                if (real-type? destST)
+                    let valw destw = (bitcountof vT) (bitcountof destST)
+                    if (icmp== destw valw)
+                        bitcast val destT
+                    elseif (icmp>s destw valw)
+                        fpext val destT
+                    else
+                        fptrunc val destT
+                elseif (integer-type? destST)
+                    if (signed? destST)
+                        fptosi val destT
+                    else
+                        fptoui val destT
+
         set-type-symbol! T 'apply-type
             fn (destT val)
                 as val destT
