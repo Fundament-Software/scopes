@@ -2173,7 +2173,7 @@ struct Any {
     Any(uint16_t x) : type(TYPE_U16), u64(0) { u16 = x; }
     Any(uint32_t x) : type(TYPE_U32), u64(0) { u32 = x; }
     Any(uint64_t x) : type(TYPE_U64), u64(x) {}
-#ifdef SCOPES_MACOSX
+#ifdef SCOPES_MACOS
     Any(unsigned long x) : type(TYPE_U64), u64(x) {}
 #endif
     Any(float x) : type(TYPE_F32), u64(0) { f32 = x; }
@@ -17427,7 +17427,7 @@ static void init_globals(int argc, char *argv[]) {
 
     DEFINE_C_FUNCTION(Symbol("set-exception-pad"), f_set_exception_pad,
         p_exception_pad_type, p_exception_pad_type);
-    #if SCOPES_WIN32
+    #ifdef SCOPES_WIN32
     DEFINE_C_FUNCTION(Symbol("catch-exception"), _setjmpex, TYPE_I32,
         p_exception_pad_type, NativeROPointer(TYPE_I8));
     #else
@@ -17465,11 +17465,21 @@ static void init_globals(int argc, char *argv[]) {
         }
     }
 
-#if SCOPES_WIN32
-    globals->bind(Symbol("operating-system"), Symbol("windows"));
+#ifdef SCOPES_WIN32
+#define SCOPES_SYM_OS "windows"
 #else
-    globals->bind(Symbol("operating-system"), Symbol("unix"));
+#ifdef SCOPES_MACOS
+#define SCOPES_SYM_OS "macos"
+#else
+#ifdef SCOPES_LINUX
+#define SCOPES_SYM_OS "linux"
+#else
+#define SCOPES_SYM_OS "unknown"
 #endif
+#endif
+#endif
+    globals->bind(Symbol("operating-system"), Symbol(SCOPES_SYM_OS));
+#undef SCOPES_SYM_OS
 
     globals->bind(KW_True, true);
     globals->bind(KW_False, false);

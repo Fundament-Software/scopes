@@ -128,6 +128,8 @@ project "scopes"
     }
 
     configuration { "linux" }
+        defines { "SCOPES_LINUX" }
+
         includedirs {
             "clang/include"
         }
@@ -306,7 +308,7 @@ project "scopes"
         }
 
     configuration { "macosx" }
-        defines { "SCOPES_MACOSX" }
+        defines { "SCOPES_MACOS" }
 
         includedirs {
             "clang/include",
