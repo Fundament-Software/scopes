@@ -3337,7 +3337,7 @@ fn read-eval-print-loop ()
     let idstr = (make-idstr counter)
     let promptstr =
         .. idstr " "
-            default-styler style-comment "▶"
+            default-styler style-comment "►"
     let promptlen = ((countof idstr) + 2:usize)
     let cmd success =
         prompt
