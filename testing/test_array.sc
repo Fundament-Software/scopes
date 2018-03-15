@@ -16,6 +16,24 @@ fn check-array (vals)
         assert ((vals @ k) == k)
 
 do
+    # an array without an array, encoded as a function that returns
+      multiple return values.
+    fn vals ()
+        return 0 1 2 3
+    # bind to vararg name
+    let vals... = (vals)
+    for k in (range 4)
+        assert ((va@ vals... k) == k)
+    # unpack to individual values directly
+    let a b c d = (vals)
+    assert
+        and
+            a == 0
+            b == 1
+            c == 2
+            d == 3
+
+do
     # array from constants
     let vals = (arrayof i32 0 1 2 3)
     # check that it contains indeed 4 elements
