@@ -3,6 +3,7 @@ let modules =
     quote
         .test_abi
         .test_ansi_colors
+        .test_array
         .test_assorted
         .test_call_override
         .test_clang
