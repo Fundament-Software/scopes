@@ -9,4 +9,9 @@ syntax-extend
         loop key
     syntax-scope
 
-
+let loop (scope) = (globals)
+if (scope != null)
+    for k v in scope
+        # print k "=" v
+        assert ((typeof (k as Symbol)) == Symbol)
+    loop (Scope-parent scope)
