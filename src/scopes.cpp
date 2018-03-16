@@ -565,7 +565,7 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(OP_Tertiary) T(KW_SyntaxLog) \
     T(OP_Mix) T(OP_Step) T(OP_SmoothStep) \
     T(FN_Round) T(FN_RoundEven) T(OP_Trunc) \
-    T(OP_FAbs) T(OP_SAbs) T(OP_FSign) T(OP_SSign) \
+    T(OP_FAbs) T(OP_FSign) T(OP_SSign) \
     T(OP_Floor) T(FN_Ceil) T(FN_Fract) \
     T(OP_Radians) T(OP_Degrees) \
     T(OP_Sin) T(OP_Cos) T(OP_Tan) \
@@ -770,7 +770,7 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(FN_AnchorSource, "Anchor-source") \
     T(OP_Mix, "mix") T(OP_Step, "step") T(OP_SmoothStep, "smoothstep") \
     T(FN_Round, "round") T(FN_RoundEven, "roundeven") T(OP_Trunc, "trunc") \
-    T(OP_FAbs, "fabs") T(OP_SAbs, "sabs") T(OP_FSign, "fsign") T(OP_SSign, "ssign") \
+    T(OP_FAbs, "fabs") T(OP_FSign, "fsign") T(OP_SSign, "ssign") \
     T(OP_Floor, "floor") T(FN_Ceil, "ceil") T(FN_Fract, "fract") \
     T(OP_Radians, "radians") T(OP_Degrees, "degrees") \
     T(OP_Sin, "sin") T(OP_Cos, "cos") T(OP_Tan, "tan") \
@@ -12142,7 +12142,6 @@ static bool abs(bool x) {
 } namespace scopes {
 
 PUNOP_TEMPLATE(FAbs, std::abs)
-PUNOP_TEMPLATE(SAbs, std::abs)
 
 template <typename T>
 static T sgn(T val) {
@@ -12475,7 +12474,6 @@ static Any smear(Any value, size_t count) {
         FARITH_OP(FDiv) \
         FARITH_OP(FRem) \
         \
-        IUN_OP(SAbs, i) \
         FUN_OP(FAbs) \
         \
         IUN_OP(SSign, i) \

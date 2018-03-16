@@ -672,6 +672,10 @@ fn select-op (T sop fop)
     else
         compiler-error! "invalid argument type; integer or real vector or scalar expected"
 
+fn sabs (x)
+    let zero = ((typeof x) 0)
+    ? (icmp<s x zero) (sub zero x) x
+
 fn abs (x)
     (select-op (typeof x) sabs fabs) x
 
