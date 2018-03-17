@@ -1738,9 +1738,6 @@ define-infix< 50 =
 #define-infix> 70 :
 define-infix> 100 or
 define-infix> 200 and
-define-infix> 240 |
-define-infix> 250 ^
-define-infix> 260 &
 
 define-infix> 300 <
 define-infix> 300 >
@@ -1750,8 +1747,10 @@ define-infix> 300 !=
 define-infix> 300 ==
 
 define-infix> 300 <:
-#define-infix> 300 <>
-#define-infix> 300 is
+
+define-infix> 340 |
+define-infix> 350 ^
+define-infix> 360 &
 
 define-infix< 400 ..
 define-infix> 450 <<
