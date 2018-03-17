@@ -15,6 +15,14 @@ fn check-array (vals)
     for k in (range 4)
         assert ((vals @ k) == k)
 
+fn check-vals (a b c d)
+    assert
+        and
+            a == 0
+            b == 1
+            c == 2
+            d == 3
+
 do
     # an array without an array, encoded as a function that returns
       multiple return values.
@@ -26,12 +34,7 @@ do
         assert ((va@ vals... k) == k)
     # unpack to individual values directly
     let a b c d = (vals)
-    assert
-        and
-            a == 0
-            b == 1
-            c == 2
-            d == 3
+    check-vals a b c d
 
 do
     # array from constants
@@ -39,6 +42,12 @@ do
     # check that it contains indeed 4 elements
     assert ((countof vals) == 4:usize)
     check-array vals
+    # unpack array
+    do
+        let a b c d = (unpack vals)
+        check-vals a b c d
+        let a b c d = (unpack (unconst vals))
+        check-vals a b c d
 
 do
     # uninitialized mutable array on stack with constant length
@@ -63,5 +72,7 @@ do
     check-array vals
     # don't forget to free
     free vals
+
+
 
 none

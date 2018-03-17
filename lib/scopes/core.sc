@@ -2942,6 +2942,16 @@ fn tupleof (...)
 typefn array 'countof (self)
     countof (typeof self)
 
+typefn array 'unpack (v)
+    let count = (type-countof (typeof v))
+    let loop (i result...) = count
+    if (i == 0:usize) result...
+    else
+        let i = (sub i 1:usize)
+        loop i
+            extractvalue v i
+            result...
+
 typefn array '@ (self at)
     let val = (at as integer)
     if (constant? val)
