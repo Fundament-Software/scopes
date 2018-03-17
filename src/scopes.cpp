@@ -28,7 +28,7 @@ BEWARE: If you build this with anything else but a recent enough clang,
 */
 
 #define SCOPES_VERSION_MAJOR 0
-#define SCOPES_VERSION_MINOR 11
+#define SCOPES_VERSION_MINOR 12
 #define SCOPES_VERSION_PATCH 0
 
 // trace partial evaluation and code generation
@@ -565,7 +565,7 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(OP_Tertiary) T(KW_SyntaxLog) \
     T(OP_Mix) T(OP_Step) T(OP_SmoothStep) \
     T(FN_Round) T(FN_RoundEven) T(OP_Trunc) \
-    T(OP_FAbs) T(OP_SAbs) T(OP_FSign) T(OP_SSign) \
+    T(OP_FAbs) T(OP_FSign) T(OP_SSign) \
     T(OP_Floor) T(FN_Ceil) T(FN_Fract) \
     T(OP_Radians) T(OP_Degrees) \
     T(OP_Sin) T(OP_Cos) T(OP_Tan) \
@@ -770,7 +770,7 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(FN_AnchorSource, "Anchor-source") \
     T(OP_Mix, "mix") T(OP_Step, "step") T(OP_SmoothStep, "smoothstep") \
     T(FN_Round, "round") T(FN_RoundEven, "roundeven") T(OP_Trunc, "trunc") \
-    T(OP_FAbs, "fabs") T(OP_SAbs, "sabs") T(OP_FSign, "fsign") T(OP_SSign, "ssign") \
+    T(OP_FAbs, "fabs") T(OP_FSign, "fsign") T(OP_SSign, "ssign") \
     T(OP_Floor, "floor") T(FN_Ceil, "ceil") T(FN_Fract, "fract") \
     T(OP_Radians, "radians") T(OP_Degrees, "degrees") \
     T(OP_Sin, "sin") T(OP_Cos, "cos") T(OP_Tan, "tan") \
@@ -2173,7 +2173,7 @@ struct Any {
     Any(uint16_t x) : type(TYPE_U16), u64(0) { u16 = x; }
     Any(uint32_t x) : type(TYPE_U32), u64(0) { u32 = x; }
     Any(uint64_t x) : type(TYPE_U64), u64(x) {}
-#ifdef SCOPES_MACOSX
+#ifdef SCOPES_MACOS
     Any(unsigned long x) : type(TYPE_U64), u64(x) {}
 #endif
     Any(float x) : type(TYPE_F32), u64(0) { f32 = x; }
@@ -10308,7 +10308,7 @@ struct LLVMIRGenerator {
                 return;
             }
         }
-        params.push_back(T);        
+        params.push_back(T);
     }
 
     static LLVMTypeRef create_llvm_type(const Type *type) {
@@ -12142,7 +12142,6 @@ static bool abs(bool x) {
 } namespace scopes {
 
 PUNOP_TEMPLATE(FAbs, std::abs)
-PUNOP_TEMPLATE(SAbs, std::abs)
 
 template <typename T>
 static T sgn(T val) {
@@ -12475,7 +12474,6 @@ static Any smear(Any value, size_t count) {
         FARITH_OP(FDiv) \
         FARITH_OP(FRem) \
         \
-        IUN_OP(SAbs, i) \
         FUN_OP(FAbs) \
         \
         IUN_OP(SSign, i) \
@@ -17427,7 +17425,7 @@ static void init_globals(int argc, char *argv[]) {
 
     DEFINE_C_FUNCTION(Symbol("set-exception-pad"), f_set_exception_pad,
         p_exception_pad_type, p_exception_pad_type);
-    #if SCOPES_WIN32
+    #ifdef SCOPES_WIN32
     DEFINE_C_FUNCTION(Symbol("catch-exception"), _setjmpex, TYPE_I32,
         p_exception_pad_type, NativeROPointer(TYPE_I8));
     #else
@@ -17465,11 +17463,21 @@ static void init_globals(int argc, char *argv[]) {
         }
     }
 
-#if SCOPES_WIN32
-    globals->bind(Symbol("operating-system"), Symbol("windows"));
+#ifdef SCOPES_WIN32
+#define SCOPES_SYM_OS "windows"
 #else
-    globals->bind(Symbol("operating-system"), Symbol("unix"));
+#ifdef SCOPES_MACOS
+#define SCOPES_SYM_OS "macos"
+#else
+#ifdef SCOPES_LINUX
+#define SCOPES_SYM_OS "linux"
+#else
+#define SCOPES_SYM_OS "unknown"
 #endif
+#endif
+#endif
+    globals->bind(Symbol("operating-system"), Symbol(SCOPES_SYM_OS));
+#undef SCOPES_SYM_OS
 
     globals->bind(KW_True, true);
     globals->bind(KW_False, false);

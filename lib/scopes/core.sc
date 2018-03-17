@@ -672,6 +672,10 @@ fn select-op (T sop fop)
     else
         compiler-error! "invalid argument type; integer or real vector or scalar expected"
 
+fn sabs (x)
+    let zero = ((typeof x) 0)
+    ? (icmp<s x zero) (sub zero x) x
+
 fn abs (x)
     (select-op (typeof x) sabs fabs) x
 
@@ -3336,7 +3340,7 @@ fn read-eval-print-loop ()
     let idstr = (make-idstr counter)
     let promptstr =
         .. idstr " "
-            default-styler style-comment "▶"
+            default-styler style-comment "►"
     let promptlen = ((countof idstr) + 2:usize)
     let cmd success =
         prompt
