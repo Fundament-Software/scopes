@@ -17221,13 +17221,10 @@ static bool f_string_match(const String *pattern, const String *text) {
 }
 
 static void f_load_library(const String *name) {
-#if 0
-    dlerror();
 #ifdef SCOPES_WIN32
+    // try to load library through regular interface first
+    dlerror();
     void *handle = dlopen(name->data, RTLD_LAZY);
-#else
-    void *handle = dlopen(name->data, RTLD_LAZY | RTLD_DEEPBIND);
-#endif
     if (!handle) {
         StyledString ss;
         ss.out << "error loading library " << name;
@@ -17237,14 +17234,12 @@ static void f_load_library(const String *name) {
         }
         location_error(ss.str());
     }
-    loaded_libs.push_back(handle);
-#else
+#endif
     if (LLVMLoadLibraryPermanently(name->data)) {
         StyledString ss;
         ss.out << "error loading library " << name;
         location_error(ss.str());
     }
-#endif
 }
 
 static const String *f_type_name(const Type *T) {
