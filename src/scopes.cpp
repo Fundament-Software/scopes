@@ -10725,12 +10725,7 @@ struct LLVMIRGenerator {
         auto ret = LLVMBuildCall(builder, func, &values[0], values.size(), "");
         for (auto idx : memptrs) {
             auto i = idx + 1;
-#ifdef SCOPES_WIN32
             LLVMAddCallSiteAttribute(ret, i, attr_nonnull);
-#else
-            LLVMAddCallSiteAttribute(ret, i, attr_byval);
-            LLVMAddCallSiteAttribute(ret, i, attr_nonnull);
-#endif
         }
         auto rlt = cast<ReturnLabelType>(fi->return_type);
         multiple_return_values = rlt->has_multiple_return_values();
