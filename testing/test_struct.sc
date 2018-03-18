@@ -88,3 +88,21 @@ do
     assert
         cell1.next.next.at == 3
 
+
+# using a struct on the heap
+struct Val
+    x : i32
+    y : i32
+fn new (val)
+    let mval = (malloc (typeof val))
+    let mval = (('from-pointer-type reference (typeof mval)) mval)
+    mval = val
+    mval
+
+let testval =
+    new (Val 1 2)
+assert (testval.x == 1)
+assert (testval.y == 2)
+
+
+none
