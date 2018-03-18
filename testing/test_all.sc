@@ -39,6 +39,7 @@ let modules =
         #.test_tableof
         #.test_tuple_array
         #.test_xlet
+        .test_typename
         .test_union
         .test_using
         .test_while

@@ -1039,9 +1039,9 @@ syntax-extend
     set-type-symbol! union 'apply-type
         fn (cls ...)
             union-type ...
-    set-type-symbol! typename 'apply-type
-        fn (cls ...)
-            typename-type ...
+    #set-type-symbol! typename 'apply-type
+        fn (cls name ...)
+            typename-type name
     set-type-symbol! function 'apply-type
         fn (cls ...)
             function-type ...
@@ -1386,7 +1386,7 @@ syntax-extend
                 if (type== a b) true
                 else (<: b a)
 
-    let Macro = (typename "Macro")
+    let Macro = (typename-type "Macro")
     let BlockScopeFunction =
         pointer
             function
@@ -1932,7 +1932,7 @@ define-macro fn...
 #-------------------------------------------------------------------------------
 
 define reference
-    typename "reference"
+    typename-type "reference"
 
 fn pointer-type-imply? (src dest)
     or
@@ -2002,7 +2002,7 @@ do
 
     fn make-reference-type (PT)
         #let ET = (element-type PT 0)
-        let T = (typename (.. "&" (type-name PT)))
+        let T = (typename-type (.. "&" (type-name PT)))
         set-typename-super! T reference
         set-typename-storage! T PT
         T
@@ -2125,9 +2125,9 @@ define-macro typefn
 # compile time function chaining
 #-------------------------------------------------------------------------------
 
-define fnchain (typename "fnchain")
-typefn fnchain 'apply-type (cls name)
-    let T = (typename name)
+define fnchain (typename-type "fnchain")
+typefn fnchain 'apply-type (cls name ...)
+    let T = (typename-type name)
     set-typename-super! T cls
     typefn T 'apply-type (cls args...)
     typefn T 'append (self f)
@@ -2259,7 +2259,7 @@ syntax-extend
             let package = (unconst package)
             package.path as list
 
-    let incomplete = (typename "incomplete")
+    let incomplete = (typename-type "incomplete")
     fn require-from (base-dir name)
         let name = (unconst name)
         let package = (unconst package)
@@ -2523,7 +2523,7 @@ typefn Closure 'imply (self destT)
 
 # a nullptr type that casts to whatever null pointer is required
 syntax-extend
-    let NullType = (typename "NullType")
+    let NullType = (typename-type "NullType")
     set-typename-storage! NullType (pointer void)
     set-type-symbol! NullType 'imply
         fn (self destT)
@@ -2679,7 +2679,7 @@ typefn CStruct 'structof (cls args...)
 typefn CStruct 'apply-type (cls args...)
     if (cls == CStruct)
         let name fields... = args...
-        let T = (typename name)
+        let T = (typename-type name)
         set-typename-super! T CStruct
         set-typename-storage! T (tuple (va-values fields...))
         let types... = (va-keys fields...)
@@ -2891,7 +2891,7 @@ define-scope-macro struct
             ((superof (T as type)) == superT))
             T as type
         else
-            let T = (typename (name as string))
+            let T = (typename-type (name as string))
             set-typename-super! T superT
             set-scope-symbol! syntax-scope name T
             T
@@ -2983,7 +2983,7 @@ fn arrayof (T ...)
 #-------------------------------------------------------------------------------
 
 define Generator
-    typename "Generator"
+    typename-type "Generator"
 set-typename-storage! Generator (storageof Closure)
 typefn Generator 'apply-type (cls iter init)
     fn get-iter-init ()
