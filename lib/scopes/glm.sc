@@ -1,6 +1,6 @@
 
-let vec-type = (typename-type "vec-type")
-let mat-type = (typename-type "mat-type")
+let vec-type = (typename "vec-type")
+let mat-type = (typename "mat-type")
 set-typename-super! vec-type immutable
 set-typename-super! mat-type immutable
 
@@ -18,7 +18,7 @@ fn construct-vec-type (element-type size)
     assert (size > 1:usize)
     let prefix = (element-prefix element-type)
     let T =
-        typename-type
+        typename
             .. prefix "vec" (Any-string (Any (i32 size)))
     set-typename-super! T vec-type
     set-typename-storage! T (vector element-type size)
@@ -29,7 +29,7 @@ fn construct-mat-type (element-type cols rows)
     assert (rows > 1:usize)
     let prefix = (element-prefix element-type)
     let T =
-        typename-type
+        typename
             .. prefix "mat"
                 Any-string (Any (i32 cols))
                 "x"

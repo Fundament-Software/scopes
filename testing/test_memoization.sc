@@ -1,9 +1,9 @@
 
 fn memoized ()
-    typename-type "bang"
+    typename "bang"
 
 fn memoized2 (x)
-    typename-type x
+    typename x
 
 assert
     (memoized) == (memoized)

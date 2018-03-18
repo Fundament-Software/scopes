@@ -34,7 +34,7 @@ syntax-extend
         f "2DMS"        '2D     0       1   2
         f "2DMSArray"   '2D     1       1   3
 
-    let sampler = (typename-type "sampler")
+    let sampler = (typename "sampler")
 
     fn coord-type (ET coords)
         if (coords == 1) ET
@@ -42,7 +42,7 @@ syntax-extend
             construct-vec-type ET (usize coords)
 
     fn make-gsampler (postfix dim arrayed ms coords)
-        let T = (typename-type (.. "gsampler" postfix))
+        let T = (typename (.. "gsampler" postfix))
         set-typename-super! T sampler
         let icoordT = (coord-type i32 coords)
         let fcoordT = (coord-type f32 coords)
@@ -67,7 +67,7 @@ syntax-extend
         T
 
     fn make-sampler (prefix return-type postfix dim arrayed ms coords)
-        let T = (typename-type (.. prefix "sampler" postfix))
+        let T = (typename (.. prefix "sampler" postfix))
         set-typename-super! T (make-gsampler postfix dim arrayed ms coords)
         set-typename-storage! T
             SampledImage-type
@@ -93,7 +93,7 @@ syntax-extend
                         samplerT
     syntax-scope
 
-let XVarType = (typename-type "xvar")
+let XVarType = (typename "xvar")
 set-typename-super! XVarType extern
 
 define-macro xvar
