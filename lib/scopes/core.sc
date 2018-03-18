@@ -1040,8 +1040,8 @@ syntax-extend
         fn (cls ...)
             union-type ...
     set-type-symbol! typename 'apply-type
-        fn (cls ...)
-            typename-type ...
+        fn (cls name ...)
+            typename-type name
     set-type-symbol! function 'apply-type
         fn (cls ...)
             function-type ...
@@ -2126,8 +2126,8 @@ define-macro typefn
 #-------------------------------------------------------------------------------
 
 define fnchain (typename "fnchain")
-typefn fnchain 'apply-type (cls name)
-    let T = (typename name)
+typefn fnchain 'apply-type (cls name ...)
+    let T = (typename (.. "<fnchain " name ">") ...)
     set-typename-super! T cls
     typefn T 'apply-type (cls args...)
     typefn T 'append (self f)
