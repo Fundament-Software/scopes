@@ -2593,7 +2593,8 @@ typefn extern 'imply (self destT)
         forward-imply (load self) destT
 
 typefn extern 'getattr (self name)
-    let pET = (element-type (typeof self) 0)
+    let T = (typeof self)
+    let pET = (element-type T 0)
     let ET = (element-type pET 0)
     let op success = (type@ ET 'getattr&)
     if success
@@ -2601,7 +2602,10 @@ typefn extern 'getattr (self name)
         if (icmp== (va-countof result...) 0)
         else
             return result...
-    getattr (load self) name
+    let val ok = (type@ T name)
+    if ok val
+    else
+        getattr (load self) name
 
 typefn extern 'as (self destT)
     forward-as (load self) destT

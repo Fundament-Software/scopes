@@ -16865,11 +16865,13 @@ static const Symbol f_pointer_type_storage_class(const Type *T) {
 }
 
 static int32_t f_extern_type_location(const Type *T) {
+    T = storage_type(T);
     verify_kind<TK_Extern>(T);
     return cast<ExternType>(T)->location;
 }
 
 static int32_t f_extern_type_binding(const Type *T) {
+    T = storage_type(T);
     verify_kind<TK_Extern>(T);
     return cast<ExternType>(T)->binding;
 }

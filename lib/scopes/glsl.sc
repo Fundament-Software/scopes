@@ -93,6 +93,9 @@ syntax-extend
                         samplerT
     syntax-scope
 
+let XVarType = (typename "xvar")
+set-typename-super! XVarType extern
+
 define-macro xvar
     fn match-storage (storage)
         match storage
@@ -102,22 +105,42 @@ define-macro xvar
                 compiler-error!
                     .. "unsupported storage type: " (repr storage)
     fn xvar-extern (storage name T params...)
-        if (storage == 'buffer)
-            extern name T
-                storage = 'Uniform
-                'buffer
-                params...
-        elseif (storage == 'uniform)
-            extern name T
-                storage =
-                    do
-                        if ((storageof T) <: tuple) 'Uniform
-                        else 'UniformConstant
-                params...
-        else
-            extern name T
-                storage = (match-storage storage)
-                params...
+        let ET =
+            if (storage == 'buffer)
+                extern name T
+                    storage = 'Uniform
+                    'buffer
+                    params...
+            elseif (storage == 'uniform)
+                extern name T
+                    storage =
+                        do
+                            if ((storageof T) <: tuple) 'Uniform
+                            else 'UniformConstant
+                    params...
+            else
+                extern name T
+                    storage = (match-storage storage)
+                    params...
+        let ETT = (typeof ET)
+        let loc = (extern-type-location ETT)
+        let bind = (extern-type-binding ETT)
+        let tname =
+            .. "<xvar "
+                storage as string
+                " "
+                name as string
+                " : "
+                type-name T
+                if (loc < 0) ""
+                else (.. " location=" (string-repr loc))
+                if (bind < 0) ""
+                else (.. " binding=" (string-repr bind))
+                ">"
+        let TN = (typename-type tname)
+        set-typename-super! TN XVarType
+        set-typename-storage! TN ETT
+        bitcast ET TN
 
     fn quote-if-symbol (sxarg)
         if (('typeof (sxarg as Syntax as Any)) == Symbol)
