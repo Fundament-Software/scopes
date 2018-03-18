@@ -36,15 +36,21 @@ let vertex-code =
         print code
         code
 
+xvar uniform phase : f32
+    location = U_PHASE
+dump
+    pointer-type-storage-class
+        element-type (typeof phase) 0
+dump
+    extern-type-location (typeof phase)
+    extern-type-binding (typeof phase)
+
 let fragment-code =
     do
         xvar in uv : vec2
             location = LOC_UV
 
         xvar out out_Color : vec4
-
-        xvar uniform phase : f32
-            location = U_PHASE
 
         fn make-phase ()
             (sin (phase as immutable)) * 0.5 + 0.5

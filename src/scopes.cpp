@@ -879,6 +879,8 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(FN_PointerStorageClass, "pointer-type-storage-class") \
     T(FN_PointerSetStorageClass, "pointer-type-set-storage-class") \
     T(FN_PointerSetElementType, "pointer-type-set-element-type") \
+    T(FN_ExternLocation, "extern-type-location") \
+    T(FN_ExternBinding, "extern-type-binding") \
     T(FN_FunctionType, "function-type") \
     T(FN_FunctionTypeIsVariadic, "function-type-variadic?") \
     T(FN_TupleType, "tuple-type") \
@@ -2956,7 +2958,14 @@ struct ExternType : Type {
         location(_location),
         binding(_binding) {
         std::stringstream ss;
-        ss << "<extern " <<  _type->name()->data << ">";
+        ss << "<extern " <<  _type->name()->data;
+        if (storage_class != SYM_Unnamed)
+            ss << " storage=" << storage_class.name()->data;
+        if (location >= 0)
+            ss << " location=" << location;
+        if (binding >= 0)
+            ss << " binding=" << binding;
+        ss << ">";
         _name = String::from_stdstring(ss.str());
         if ((_storage_class == SYM_SPIRV_StorageClassUniform)
             && !(flags & EF_BufferBlock)) {
@@ -16855,6 +16864,16 @@ static const Symbol f_pointer_type_storage_class(const Type *T) {
     return cast<PointerType>(T)->storage_class;
 }
 
+static int32_t f_extern_type_location(const Type *T) {
+    verify_kind<TK_Extern>(T);
+    return cast<ExternType>(T)->location;
+}
+
+static int32_t f_extern_type_binding(const Type *T) {
+    verify_kind<TK_Extern>(T);
+    return cast<ExternType>(T)->binding;
+}
+
 static const Type *f_pointer_type_set_storage_class(const Type *T, Symbol storage_class) {
     verify_kind<TK_Pointer>(T);
     auto pt = cast<PointerType>(T);
@@ -17329,6 +17348,8 @@ static void init_globals(int argc, char *argv[]) {
     DEFINE_PURE_C_FUNCTION(FN_PointerStorageClass, f_pointer_type_storage_class, TYPE_Symbol, TYPE_Type);
     DEFINE_PURE_C_FUNCTION(FN_PointerSetStorageClass, f_pointer_type_set_storage_class, TYPE_Type, TYPE_Type, TYPE_Symbol);
     DEFINE_PURE_C_FUNCTION(FN_PointerSetElementType, f_pointer_type_set_element_type, TYPE_Type, TYPE_Type, TYPE_Type);
+    DEFINE_PURE_C_FUNCTION(FN_ExternLocation, f_extern_type_location, TYPE_I32, TYPE_Type);
+    DEFINE_PURE_C_FUNCTION(FN_ExternBinding, f_extern_type_binding, TYPE_I32, TYPE_Type);
     DEFINE_PURE_C_FUNCTION(FN_ListCons, f_list_cons, TYPE_List, TYPE_Any, TYPE_List);
     DEFINE_PURE_C_FUNCTION(FN_TypeKind, f_type_kind, TYPE_I32, TYPE_Type);
     DEFINE_PURE_C_FUNCTION(FN_TypeDebugABI, f_type_debug_abi, TYPE_Void, TYPE_Type);
