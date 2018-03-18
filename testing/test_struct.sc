@@ -93,16 +93,20 @@ do
 struct Val
     x : i32
     y : i32
+
 fn new (val)
     let mval = (malloc (typeof val))
     let mval = (('from-pointer-type reference (typeof mval)) mval)
     mval = val
     mval
 
+fn delete (val)
+    free (bitcast val (storageof (typeof val)))
+
 let testval =
     new (Val 1 2)
 assert (testval.x == 1)
 assert (testval.y == 2)
-
+delete testval
 
 none
