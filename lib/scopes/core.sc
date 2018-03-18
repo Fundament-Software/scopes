@@ -477,6 +477,7 @@ syntax-extend
     setup-int-type u64
 
     setup-int-type usize
+    set-typename-super! usize integer
 
     setup-real-type f32
     setup-real-type f64
