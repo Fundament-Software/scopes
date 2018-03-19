@@ -108,7 +108,7 @@ typefn XVarBridgeType '= (self value)
     self.out = value
     true
 
-typefn extern '@ (self value)
+typefn XVarBridgeType '@ (self value)
     @ self.in value
 
 define-macro xvar
