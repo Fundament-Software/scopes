@@ -314,6 +314,9 @@ syntax-extend
         set-type-symbol! T '& (gen-type-op2 band)
         set-type-symbol! T '| (gen-type-op2 bor)
         set-type-symbol! T '^ (gen-type-op2 bxor)
+        set-type-symbol! T '~
+            fn (x)
+                bxor x ((typeof x) -1)
 
         # more aggressive cast that converts from all numerical types
             and usize.
@@ -581,6 +584,7 @@ fn % (a b) ((op2-dispatch-bidi '%) a b)
 fn & (a b) ((op2-dispatch-bidi '&) a b)
 fn | (...) ((op2-ltr-multiop (op2-dispatch-bidi '|)) ...)
 fn ^ (a b) ((op2-dispatch-bidi '^) a b)
+fn ~ (x) ((opN-dispatch '~) x)
 fn << (a b) ((op2-dispatch-bidi '<<) a b)
 fn >> (a b) ((op2-dispatch-bidi '>>) a b)
 fn .. (...) ((op2-ltr-multiop (op2-dispatch-bidi '..)) ...)
@@ -2611,7 +2615,7 @@ typefn extern 'getattr (self name)
     let ET = (element-type pET 0)
     let op success = (type@ ET 'getattr&)
     if success
-        let result... = (op (unconst self) name)
+        let result... = (op (unconst (bitcast self (storageof T))) name)
         if (icmp== (va-countof result...) 0)
         else
             return result...
