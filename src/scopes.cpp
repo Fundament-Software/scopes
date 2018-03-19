@@ -5432,6 +5432,9 @@ enum LabelFlags {
     LF_Template = (1 << 0),
     // label has been discovered to be reentrant; should not be inlined
     LF_Reentrant = (1 << 1),
+    // repeatedly calling this label with the same arguments will yield
+    // different results
+    LF_Impure = (1 << 2),
 };
 
 struct Label {
@@ -5462,6 +5465,14 @@ public:
 
     void set_reentrant() {
         flags |= LF_Reentrant;
+    }
+
+    void set_impure() {
+        flags |= LF_Impure;
+    }
+
+    bool is_impure() const {
+        return flags & LF_Impure;
     }
 
     bool is_reentrant() const {
@@ -5950,6 +5961,7 @@ public:
         Label *result = new Label(label->anchor, label->name, 0);
         result->original = label;
         result->uid = label->next_instanceid++;
+        result->flags |= label->flags & LF_Impure;
         return result;
     }
 
@@ -6576,9 +6588,11 @@ static Label *fold_type_label(Label::UserMap &um, Label *label, const Args &args
     Label::Args la;
     la.args = args;
     auto &&instances = label->instances;
-    auto it = instances.find(la);
-    if (it != instances.end())
-        return it->second;
+    if (!label->is_impure()) {
+        auto it = instances.find(la);
+        if (it != instances.end())
+            return it->second;
+    }
     assert(!label->params.empty());
 
     MangleParamMap map;
@@ -6643,7 +6657,9 @@ static Label *fold_type_label(Label::UserMap &um, Label *label, const Args &args
         }
     }
     Label *newlabel = mangle(um, label, newparams, map);//, Mangle_Verbose);
-    instances.insert({la, newlabel});
+    if (!label->is_impure()) {
+        instances.insert({la, newlabel});
+    }
     return newlabel;
 }
 
