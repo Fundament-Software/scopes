@@ -11315,7 +11315,10 @@ struct LLVMIRGenerator {
             }
         } else if (contarg.type == TYPE_Nothing) {
         } else {
-            assert(false && "todo: continuing with unexpected value");
+            StyledStream ss(std::cerr);
+            stream_label(ss, label, StreamLabelFormat::debug_single());
+            location_error(String::from("IL->IR: continuation is of invalid type"));
+            //assert(false && "todo: continuing with unexpected value");
         }
 
         LLVMSetCurrentDebugLocation(builder, nullptr);
@@ -13143,9 +13146,9 @@ struct Solver {
 
                     // as long as we don't have to pass on the result,
                     // that's not a problem though
-                    if (is_continuing_to_label(l)) {
+                    if (is_continuing_to_label(l) || is_continuing_to_closure(l)) {
                         location_error(String::from(
-                            "attempt to use return value of recursive function"
+                            "attempt to continue from call to recursive function"
                             " before it has been typed; place exit condition before recursive call"));
                     }
                 } else {

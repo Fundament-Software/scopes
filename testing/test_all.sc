@@ -27,6 +27,7 @@ let modules =
         .test_memoization
         .test_overload
         .test_quality
+        .test_recursion
         .test_reference
         .test_regexp
         .test_scope
