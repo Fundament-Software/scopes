@@ -700,6 +700,18 @@ fn getattr (self name)
                 string-join " in value of type "
                     Any-repr (Any-wrap T)
 
+fn forward-getattr (self name)
+    let T = (typeof self)
+    let op success = (type@ T 'getattr)
+    if success
+        let result... = (op self name)
+        if (icmp== (va-countof result...) 0)
+        else
+            return result...
+    let result success = (type@ T name)
+    if success
+        return result
+
 fn empty? (x)
     == (countof x) 0:usize
 
@@ -1768,6 +1780,7 @@ define-infix> 600 //
 define-infix> 600 *
 define-infix< 700 **
 define-infix> 750 as
+define-infix> 750 : imply
 define-infix> 800 .
 define-infix> 800 @
 #define-infix> 800 .=
@@ -2619,6 +2632,29 @@ typefn extern '= (self value)
 # support @ for extern
 typefn extern '@ (self value)
     @ (unconst self) value
+
+do
+    fn get-op (self op)
+        let self = (load self)
+        let op ok = (type@ (typeof self) op)
+        return self op ok
+    fn forward-op (op)
+        typefn extern op (a b flipped)
+            let a b op ok =
+                if flipped
+                    _ a (get-op b op)
+                else
+                    let a op ok = (get-op a op)
+                    _ a b op ok
+            if ok
+                op a b flipped
+    let ops... = '* '/ '// '+ '- '**
+    let loop (i) = (va-countof ops...)
+    if (i > 0)
+        let i = (i - 1)
+        forward-op
+            va@ i ops...
+        loop i
 
 do
     fn unenum (val)

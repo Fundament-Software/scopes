@@ -104,6 +104,30 @@ typefn XVarBridgeType 'imply (self destT)
 typefn XVarBridgeType 'as (self destT)
     forward-as self.in destT
 
+do
+    fn forward-op (op f)
+        typefn XVarBridgeType op (a b flipped)
+            if flipped
+                let b ok = (type@ (typeof b) 'in)
+                if ok
+                    f a b
+            else
+                let a ok = (type@ (typeof a) 'in)
+                if ok
+                    f a b
+    forward-op '* *
+    forward-op '/ /
+    forward-op '// //
+    forward-op '+ +
+    forward-op '- -
+
+typefn XVarBridgeType 'getattr (self name)
+    let T = (typeof self)
+    let val success = (type@ T name)
+    if success
+        return val
+    forward-getattr (type@ T 'in) name
+
 typefn XVarBridgeType '= (self value)
     self.out = value
     true
