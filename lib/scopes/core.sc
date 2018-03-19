@@ -1014,6 +1014,11 @@ syntax-extend
         fn (cls ET)
             pointer-type-set-flags cls
                 bor (pointer-type-flags cls) pointer-flag-non-writable
+    set-type-symbol! pointer 'mutable
+        fn (cls ET)
+            pointer-type-set-flags cls
+                band (pointer-type-flags cls)
+                    bxor pointer-flag-non-writable -1:u64
     set-type-symbol! pointer 'strip-storage
         fn (cls ET)
             pointer-type-set-storage-class cls unnamed
@@ -1951,8 +1956,11 @@ define-macro fn...
 define reference
     typename "reference"
 
+let voidstar = (pointer void)
+
 fn pointer-type-imply? (src dest)
     or
+        type== dest voidstar
         type== dest ('strip-storage src)
         type== dest ('immutable src)
         type== dest ('strip-storage ('immutable src))
