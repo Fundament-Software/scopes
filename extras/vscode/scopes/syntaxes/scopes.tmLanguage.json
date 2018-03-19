@@ -26,7 +26,7 @@
                 },
                 {
                     "name": "keyword.control.glsl.scopes",
-                    "match": "(uniform|buffer|in|out|varying|xvar|coherent|volatile|restrict|readonly|writeonly)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
+                    "match": "(uniform|buffer|in|out|inout|varying|xvar|coherent|volatile|restrict|readonly|writeonly)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
                 }
             ]
 		},

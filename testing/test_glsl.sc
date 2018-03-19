@@ -12,14 +12,19 @@ fn set-vertex-position ()
     gl_Position = (vec4 pos.x pos.y 0 1)
     pos
 
-let LOC_UV = 0
-let U_PHASE = 1
+xvar inout uv : vec2
+    location = 0
+xvar uniform phase : f32
+    location = 1
+dump
+    pointer-type-storage-class
+        element-type (typeof phase) 0
+dump
+    extern-type-location (typeof phase)
+    extern-type-binding (typeof phase)
 
 let vertex-code =
     do
-        xvar out uv : vec2
-            location = LOC_UV
-
         fn vertex-shader ()
             let half = (vec2 0.5 0.5)
             let pos = (set-vertex-position)
@@ -36,20 +41,8 @@ let vertex-code =
         print code
         code
 
-xvar uniform phase : f32
-    location = U_PHASE
-dump
-    pointer-type-storage-class
-        element-type (typeof phase) 0
-dump
-    extern-type-location (typeof phase)
-    extern-type-binding (typeof phase)
-
 let fragment-code =
     do
-        xvar in uv : vec2
-            location = LOC_UV
-
         xvar out out_Color : vec4
 
         fn make-phase ()

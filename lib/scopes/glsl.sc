@@ -96,6 +96,21 @@ syntax-extend
 let XVarType = (typename "xvar")
 set-typename-super! XVarType extern
 
+let XVarBridgeType = (typename "xvar-bridge")
+
+typefn XVarBridgeType 'imply (self destT)
+    forward-imply self.in destT
+
+typefn XVarBridgeType 'as (self destT)
+    forward-as self.in destT
+
+typefn XVarBridgeType '= (self value)
+    self.out = value
+    true
+
+typefn extern '@ (self value)
+    @ self.in value
+
 define-macro xvar
     fn match-storage (storage)
         match storage
@@ -105,42 +120,55 @@ define-macro xvar
                 compiler-error!
                     .. "unsupported storage type: " (repr storage)
     fn xvar-extern (storage name T params...)
-        let ET =
-            if (storage == 'buffer)
-                extern name T
-                    storage = 'Uniform
-                    'buffer
-                    params...
-            elseif (storage == 'uniform)
-                extern name T
-                    storage =
-                        do
-                            if ((storageof T) <: tuple) 'Uniform
-                            else 'UniformConstant
-                    params...
-            else
-                extern name T
-                    storage = (match-storage storage)
-                    params...
-        let ETT = (typeof ET)
-        let loc = (extern-type-location ETT)
-        let bind = (extern-type-binding ETT)
-        let tname =
-            .. "<xvar "
-                storage as string
-                " "
-                name as string
-                " : "
-                type-name T
-                if (loc < 0) ""
-                else (.. " location=" (string-repr loc))
-                if (bind < 0) ""
-                else (.. " binding=" (string-repr bind))
-                ">"
-        let TN = (typename-type tname)
-        set-typename-super! TN XVarType
-        set-typename-storage! TN ETT
-        bitcast ET TN
+        if (storage == 'inout)
+            let tname =
+                .. "<xvar-bridge "
+                    name as string
+                    " : "
+                    type-name T
+                    ">"
+            let TN = (typename-type tname)
+            set-typename-super! TN XVarBridgeType
+            set-type-symbol! TN 'in (xvar-extern 'in name T params...)
+            set-type-symbol! TN 'out (xvar-extern 'out name T params...)
+            bitcast none TN
+        else
+            let ET =
+                if (storage == 'buffer)
+                    extern name T
+                        storage = 'Uniform
+                        'buffer
+                        params...
+                elseif (storage == 'uniform)
+                    extern name T
+                        storage =
+                            do
+                                if ((storageof T) <: tuple) 'Uniform
+                                else 'UniformConstant
+                        params...
+                else
+                    extern name T
+                        storage = (match-storage storage)
+                        params...
+            let ETT = (typeof ET)
+            let loc = (extern-type-location ETT)
+            let bind = (extern-type-binding ETT)
+            let tname =
+                .. "<xvar "
+                    storage as string
+                    " "
+                    name as string
+                    " : "
+                    type-name T
+                    if (loc < 0) ""
+                    else (.. " location=" (string-repr loc))
+                    if (bind < 0) ""
+                    else (.. " binding=" (string-repr bind))
+                    ">"
+            let TN = (typename-type tname)
+            set-typename-super! TN XVarType
+            set-typename-storage! TN ETT
+            bitcast ET TN
 
     fn quote-if-symbol (sxarg)
         if (('typeof (sxarg as Syntax as Any)) == Symbol)
