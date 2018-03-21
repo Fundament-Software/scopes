@@ -1718,6 +1718,15 @@ define-macro define-block-scope-macro
         list block-scope-macro
             cons fn '(expr next-expr syntax-scope) body
 
+define-block-scope-macro defer
+    let head f rest = (decons expr 2)
+    return
+        list
+            list f
+                list
+                    cons fn (list) next-expr
+        syntax-scope
+
 define-macro assert
     fn assertion-error! (constant anchor msg)
         let assert-msg =

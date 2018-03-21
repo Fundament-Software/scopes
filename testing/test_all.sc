@@ -9,6 +9,7 @@ let modules =
         .test_clang
         .test_closure
         .test_conversion
+        .test_defer
         .test_dispatch
         .test_docstring
         .test_dots
