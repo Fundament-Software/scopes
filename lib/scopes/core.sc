@@ -1720,11 +1720,18 @@ define-macro define-block-scope-macro
 
 define-block-scope-macro defer
     let head f rest = (decons expr 2)
-    return
+    let oldf = (@ syntax-scope 'return)
+    let expr =
         list
             list f
                 list
-                    cons fn (list) next-expr
+                    cons fn (list)
+                        list label 'return (list '...)
+                            list oldf
+                                list f '...
+                        none
+                        next-expr
+    return expr
         syntax-scope
 
 define-macro assert

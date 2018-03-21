@@ -4,15 +4,27 @@ fn do-some-stuff (use-branch)
       arguments to this function
     defer
         fn (...)
-            print "do-some-stuff returned " ...
+            print "[5] do-some-stuff returned " ...
             # pass through return arguments
             ...
-    print "do-some-stuff called"
-    print "returning from do-some-stuff"
+    print "[1] do-some-stuff called with argument" use-branch
+    do
+        # defer in subscope defers until end of subscope
+        defer
+            fn (...)
+                print "[2] do-some-stuff subscope exited"
+    print "[3] returning from do-some-stuff"
+    # defers can be chained
+    defer
+        fn (...)
+            print "[4] do-some-stuff returned " ...
+            # pass through return arguments
+            ...
     # try to exit through multiple paths
     if use-branch
         return (unconst 2)
-    unconst 1
+    do
+        unconst 1
 
 # and of course we can use defer in the module itself
 defer
@@ -22,3 +34,22 @@ defer
         true
 assert ((do-some-stuff (unconst false)) == 1)
 assert ((do-some-stuff (unconst true)) == 2)
+
+fn do-some-other-stuff ()
+    do
+        # can return from subscope, and chain multiple defers
+        defer
+            fn (...)
+                print "[2] do-some-other-stuff returned " ...
+                # pass through return arguments
+                ...
+        defer
+            fn (...)
+                print "[1] do-some-other-stuff returned " ...
+                # pass through return arguments
+                ...
+        return (unconst 303)
+    error! "should never get here"
+    return (unconst 1)
+
+assert ((do-some-other-stuff) == 303)
