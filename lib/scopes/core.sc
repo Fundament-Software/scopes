@@ -2049,7 +2049,7 @@ do
         T
 
     set-type-symbol! reference 'from-pointer-type
-        fn "reference-apply-type" (cls PT)
+        fn "reference-from-pointer-type" (cls PT)
             # due to auto-memoization, we'll always get the same type back
                 provided the element type is a constant
             assert (constant? PT)
@@ -2059,6 +2059,10 @@ do
                     .. "cannot create reference type of reference type "
                         repr PT
             make-reference-type PT
+
+    set-type-symbol! reference 'from-pointer
+        fn "reference-from-pointer" (cls value)
+            ('from-pointer-type reference (typeof value)) value
 
     set-type-symbol! reference 'apply-type
         fn "reference-apply-type" (cls element)

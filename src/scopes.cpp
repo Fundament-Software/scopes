@@ -10888,7 +10888,8 @@ struct LLVMIRGenerator {
             case FN_MallocArray: { READ_TYPE(ty); READ_VALUE(val);
                 retvalue = LLVMBuildArrayMalloc(builder, ty, val, ""); } break;
             case FN_Free: { READ_VALUE(val);
-                retvalue = LLVMBuildFree(builder, val); } break;
+                LLVMBuildFree(builder, val);
+                retvalue = nullptr; } break;
             case FN_GetElementPtr: {
                 READ_VALUE(pointer);
                 assert(argcount > 1);
@@ -10933,6 +10934,7 @@ struct LLVMIRGenerator {
             case FN_Store: { READ_VALUE(val); READ_VALUE(ptr);
                 retvalue = LLVMBuildStore(builder, val, ptr);
                 if (enter.builtin.value() == FN_VolatileStore) { LLVMSetVolatile(retvalue, true); }
+                retvalue = nullptr;
             } break;
             case OP_ICmpEQ:
             case OP_ICmpNE:
