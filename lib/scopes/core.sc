@@ -44,6 +44,10 @@ fn pointer== (a b)
     rawcall icmp== (rawcall ptrtoint a usize) (rawcall ptrtoint b usize)
 
 fn type? (T)
+    """".. function:: (type? T)
+
+           returns `true` if ``T`` is a value of type `type`, otherwise
+           `false`.
     rawcall icmp== (rawcall ptrtoint type usize) (rawcall ptrtoint (rawcall typeof T) usize)
 
 fn assert-type (T)
@@ -2938,44 +2942,63 @@ define-scope-macro struct
         T
 
     let head body = (decons args)
-    let head = (head as Syntax as Symbol)
+    let head = (head as Syntax)
+    let any-head = (head as Any)
     let superT name body =
-        if (head == 'union)
+        if (('typeof any-head) == Symbol and any-head as Symbol == 'union)
             let head body = (decons body)
-            _ CUnion (head as Syntax as Symbol) body
+            _ CUnion (head as Syntax) body
         else
             _ CStruct head body
-    # see if we can find a forward declaration in the local scope
-    let T ok = (Scope-local@ syntax-scope name)
-    let TT = ('typeof T)
-    let T =
-        if (and ok
-            (type? TT)
-            (typename-type? (T as type))
-            (opaque? (T as type))
-            ((superof (T as type)) == superT))
-            T as type
-        else
-            let T = (typename (name as string))
-            set-typename-super! T superT
-            set-scope-symbol! syntax-scope name T
-            T
-    return
-        if (empty? body)
-            # forward declaration
-            unconst
-                list do
-        else
+    if (('typeof (name as Any)) == Symbol)
+        # constant
+        let name = (name as Any as Symbol)
+        # see if we can find a forward declaration in the local scope
+        let T ok = (Scope-local@ syntax-scope name)
+        let TT = ('typeof T)
+        let T =
+            if (and ok
+                (type? TT)
+                (typename-type? (T as type))
+                (opaque? (T as type))
+                ((superof (T as type)) == superT))
+                T as type
+            else
+                let T = (typename (name as string))
+                set-typename-super! T superT
+                set-scope-symbol! syntax-scope name T
+                T
+        return
+            if (empty? body)
+                # forward declaration
+                unconst
+                    list do
+            else
+                cons do
+                    list using struct-dsl
+                    list define 'this-struct T
+                    list let 'field-names '= end-args
+                    list let 'field-types '= end-args
+                    ..
+                        cons do body
+                        list
+                            list finalize-struct T 'field-names 'field-types
+            syntax-scope
+    else
+        # expression
+        return
             cons do
                 list using struct-dsl
-                list define 'this-struct T
+                list let 'this-struct '=
+                    list typename-type
+                        list (do as) name string
                 list let 'field-names '= end-args
                 list let 'field-types '= end-args
                 ..
                     cons do body
                     list
-                        list finalize-struct T 'field-names 'field-types
-        syntax-scope
+                        list finalize-struct 'this-struct 'field-names 'field-types
+            syntax-scope
 
 #-------------------------------------------------------------------------------
 # tuples
@@ -3415,7 +3438,7 @@ fn read-eval-print-loop ()
         unconst 0
     #dump "loop"
     fn make-idstr (counter)
-        .. "$" (Any-string (Any counter))
+        .. "$" (string-repr counter)
 
     let idstr = (make-idstr counter)
     let promptstr =

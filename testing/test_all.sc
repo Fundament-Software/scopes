@@ -26,6 +26,7 @@ let modules =
         .test_locals
         .test_loop
         .test_memoization
+        .test_mutarray
         .test_overload
         .test_quality
         .test_recursion

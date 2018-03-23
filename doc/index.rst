@@ -29,7 +29,7 @@ Contents:
    meta
    lang
    capi
-   scopes-ref
+   reference
 
 Indices and tables
 ==================

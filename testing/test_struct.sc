@@ -31,6 +31,16 @@ let val = (append-val val 3)
 
 print (val begin-arg)
 
+do
+    # a struct with name expression
+    let T =
+        struct (.. "my" "struct")
+            x : i32
+            y : i32
+    assert (constant? T)
+    assert (type? T)
+    dump T
+
 struct AnotherStruct
     x : i32
     y : i32
