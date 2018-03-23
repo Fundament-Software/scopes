@@ -17213,24 +17213,24 @@ static Symbol f_typename_field_name(const Type *type, int index) {
 }
 
 typedef struct { Any _0; Any _1; } AnyAnyPair;
-static AnyAnyPair f_scope_next(Scope *scope, Any key) {
+typedef struct { Symbol _0; Any _1; } SymbolAnyPair;
+static SymbolAnyPair f_scope_next(Scope *scope, Symbol key) {
     auto &&map = *scope->map;
-    if (key.type == TYPE_Nothing) {
+    if (key == SYM_Unnamed) {
         if (map.empty()) {
-            return { none, none };
+            return { SYM_Unnamed, none };
         } else {
             auto it = map.begin();
             return { it->first, it->second };
         }
     } else {
-        key.verify(TYPE_Symbol);
-        auto it = map.find(key.symbol);
+        auto it = map.find(key);
         if (it == map.end()) {
-            return { none, none };
+            return { SYM_Unnamed, none };
         } else {
             it++;
             if (it == map.end()) {
-                return { none, none };
+                return { SYM_Unnamed, none };
             } else {
                 return { it->first, it->second };
             }
@@ -17404,7 +17404,7 @@ static void init_globals(int argc, char *argv[]) {
     DEFINE_PURE_C_FUNCTION(FN_SymbolToString, f_symbol_to_string, TYPE_String, TYPE_Symbol);
     DEFINE_PURE_C_FUNCTION(Symbol("Any=="), f_any_eq, TYPE_Bool, TYPE_Any, TYPE_Any);
     DEFINE_PURE_C_FUNCTION(FN_ListJoin, f_list_join, TYPE_List, TYPE_List, TYPE_List);
-    DEFINE_PURE_C_FUNCTION(FN_ScopeNext, f_scope_next, Tuple({TYPE_Any, TYPE_Any}), TYPE_Scope, TYPE_Any);
+    DEFINE_PURE_C_FUNCTION(FN_ScopeNext, f_scope_next, Tuple({TYPE_Symbol, TYPE_Any}), TYPE_Scope, TYPE_Symbol);
     DEFINE_PURE_C_FUNCTION(FN_TypenameFieldIndex, f_typename_field_index, TYPE_I32, TYPE_Type, TYPE_Symbol);
     DEFINE_PURE_C_FUNCTION(FN_TypenameFieldName, f_typename_field_name, TYPE_Symbol, TYPE_Type, TYPE_I32);
     DEFINE_PURE_C_FUNCTION(FN_StringMatch, f_string_match, TYPE_Bool, TYPE_String, TYPE_String);

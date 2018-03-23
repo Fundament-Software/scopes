@@ -2363,10 +2363,10 @@ define-scope-macro locals
         ones.
     let constant-scope = (Scope)
     let tmp = (Parameter 'tmp)
-    let loop (last-key result) = (unconst none) (unconst (list tmp))
+    let loop (last-key result) = (unconst unnamed) (unconst (list tmp))
     let key value =
-        Scope-next syntax-scope (Any last-key)
-    if (('typeof key) == Nothing)
+        Scope-next syntax-scope last-key
+    if (key == unnamed)
         return
             cons do
                 list let tmp '= (list Scope constant-scope)
@@ -2374,8 +2374,10 @@ define-scope-macro locals
             syntax-scope
     else
         loop (unconst key)
-            if (('typeof key) == Symbol)
-                let key = (key as Symbol)
+            if (key == unnamed)
+                # skip
+                result
+            else
                 let keyT = ('typeof value)
                 if ((keyT == Parameter) or (keyT == Label))
                     cons
@@ -2384,9 +2386,6 @@ define-scope-macro locals
                 else
                     set-scope-symbol! constant-scope key value
                     result
-            else
-                # skip
-                result
 
 define-macro import
     fn resolve-scope (scope namestr start)
@@ -2831,19 +2830,17 @@ fn merge-scope-symbols (source target filter)
             if (parent == null) target
             else
                 filter-contents parent target filter
-        let loop (last-key) = (unconst none)
+        let loop (last-key) = (unconst unnamed)
         let key value =
-            Scope-next source (Any last-key)
-        if (not (('typeof key) == Nothing))
-            if (('typeof key) == Symbol)
-                let key = (key as Symbol)
-                if
-                    or
-                        none? filter
-                        do
-                            let keystr = (key as string)
-                            string-match? filter keystr
-                    set-scope-symbol! target key value
+            Scope-next source last-key
+        if (key != unnamed)
+            if
+                or
+                    none? filter
+                    do
+                        let keystr = (key as string)
+                        string-match? filter keystr
+                set-scope-symbol! target key value
             loop key
         else
             target
@@ -3069,11 +3066,11 @@ typefn Scope 'as (self destT)
             label (fret fdone key)
                 let key value =
                     Scope-next self key
-                if (('typeof key) == Nothing)
+                if (key == unnamed)
                     fdone;
                 else
                     fret key key value
-            unconst (Any none)
+            unconst unnamed
 
 typefn list 'as (self destT)
     if (destT == Generator)
