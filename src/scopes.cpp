@@ -13349,7 +13349,29 @@ struct Solver {
             // todo: verify source and dest type are non-aggregate
             // also, both must be of same category
             args[2].value.verify(TYPE_Type);
+            const Type *SrcT = args[1].value.indirect_type();
+            const Type *SSrcT = storage_type(SrcT);
             const Type *DestT = args[2].value.typeref;
+            const Type *SDestT = storage_type(DestT);
+            if (SSrcT->kind() != SDestT->kind()) {
+                StyledString ss;
+                ss.out << "can not bitcast value of type " << SrcT
+                    << " to type " << DestT
+                    << " because storage types are not of same category";
+                location_error(ss.str());
+            }
+            switch (SDestT->kind()) {
+            case TK_Array:
+            //case TK_Vector:
+            case TK_Tuple:
+            case TK_Union: {
+                StyledString ss;
+                ss.out << "can not bitcast to type " << DestT
+                    << " with aggregate storage type " << SDestT;
+                location_error(ss.str());
+            } break;
+            default: break;
+            }
             if (args[1].value.is_const()) {
                 Any result = args[1].value;
                 result.type = DestT;
@@ -14013,8 +14035,10 @@ struct Solver {
             const Type *T = args[1].value;
             Any value = none;
             value.type = T;
-            void *ptr = get_pointer(T, value, true);
-            memset(ptr, 0, size_of(T));
+            if (!is_opaque(T)) {
+                void *ptr = get_pointer(T, value, true);
+                memset(ptr, 0, size_of(T));
+            }
             RETARGS(value);
         } break;
         case FN_ExternSymbol: {

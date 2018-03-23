@@ -2020,6 +2020,18 @@ do
                     return result...
             @ (load (bitcast self T)) key
 
+    set-type-symbol! reference 'countof
+        fn (self)
+            let T = (storageof (typeof self))
+            let ET = (element-type T 0)
+            let op success = (type@ ET 'countof&)
+            if success
+                let result... = (op (bitcast self T))
+                if (icmp== (va-countof result...) 0)
+                else
+                    return result...
+            countof (load self)
+
     set-type-symbol! reference 'repr
         fn (self)
             forward-repr (load self)
@@ -2992,6 +3004,7 @@ define-scope-macro struct
                 list let 'this-struct '=
                     list typename-type
                         list (do as) name string
+                list set-typename-super! 'this-struct superT
                 list let 'field-names '= end-args
                 list let 'field-types '= end-args
                 ..

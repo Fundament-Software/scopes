@@ -155,7 +155,7 @@ define-macro xvar
             set-typename-super! TN XVarBridgeType
             set-type-symbol! TN 'in (xvar-extern 'in name T params...)
             set-type-symbol! TN 'out (xvar-extern 'out name T params...)
-            bitcast none TN
+            nullof TN
         else
             let ET =
                 if (storage == 'buffer)
