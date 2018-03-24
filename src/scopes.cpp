@@ -1076,6 +1076,7 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(SYM_C, "c") \
     T(SYM_Skip, "skip") \
     T(SYM_Original, "original") \
+    T(SYM_Help, "help") \
     \
     /* timer names */ \
     T(TIMER_Compile, "compile()") \
@@ -15192,8 +15193,13 @@ struct Solver {
                                 o = o->original;
                             }
                         } break;
+                        case SYM_Help: {
+                            ss_cout << "Available commands:" << std::endl;
+                            ss_cout << "c(ontinue) help original skip" << std::endl;
+                            ss_cout << "An empty line continues to the next label." << std::endl;
+                        } break;
                         default: {
-                            location_error(String::from("unknown command"));
+                            location_error(String::from("unknown command. try 'help'."));
                         }break;
                         }
                         stmts = stmts->next;
