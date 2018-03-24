@@ -2,6 +2,47 @@
 fn assert-reference (self)
     assert ((typeof self) < reference) "array must be reference"
 
+fn define-common-array-methods (T)
+    typefn T 'delete (self)
+        assert-reference self
+        let items = (load self.items)
+        #do
+            # TODO: call destructor on all items
+            let count =
+                self.count as immutable
+            let loop (i) = (unconst 0:usize)
+            if (i < count)
+                let ptr = (getelementptr items i)
+                # delete ptr
+                loop (i + 1:usize)
+        free items
+
+    typefn T 'as& (self T)
+        if (T == Generator)
+            Generator
+                label (fret fdone i)
+                    if (i >= self.count)
+                        fdone;
+                    else
+                        fret (i + 1:usize) (self @ i)
+                unconst 0:usize
+        else
+            return;
+
+    typefn T 'countof (self)
+        self.count
+
+    typefn T 'countof& (self)
+        self.count as immutable
+
+    typefn T '@& (self index)
+        let index = (index as usize)
+        assert ((index < self.count) & (index >= 0:usize)) "index out of bounds"
+        'from-pointer reference
+            getelementptr (load self.items) index
+    return;
+
+
 fn FixedMutableArray (element-type capacity)
     let arrayT =
         pointer element-type 'mutable
@@ -15,25 +56,12 @@ fn FixedMutableArray (element-type capacity)
         count : usize
         items : arrayT
 
+        define-common-array-methods this-struct
+
         method 'apply-type (cls)
             CStruct.apply-type cls
                 count = 0:usize
                 items = (malloc-array element-type capacity)
-
-        method 'delete (self)
-            assert-reference self
-            free (load self.items)
-
-        method 'countof (self)
-            self.count
-
-        method 'countof& (self)
-            self.count as immutable
-
-        method '@& (self index)
-            assert ((index < self.count) & (index >= 0:usize)) "index out of bounds"
-            'from-pointer reference
-                getelementptr (load self.items) index
 
         method 'append (self value)
             assert-reference self
@@ -78,6 +106,8 @@ fn VariableMutableArray (element-type)
         count : usize
         items : arrayT
 
+        define-common-array-methods this-struct
+
         method 'apply-type (cls capacity)
             let capacity =
                 if (none? capacity) DEFAULT_CAPACITY
@@ -86,21 +116,6 @@ fn VariableMutableArray (element-type)
                 capacity = capacity
                 count = 0:usize
                 items = (malloc-array element-type capacity)
-
-        method 'delete (self)
-            assert-reference self
-            free (load self.items)
-
-        method 'countof (self)
-            self.count
-
-        method 'countof& (self)
-            self.count as immutable
-
-        method '@& (self index)
-            assert ((index < self.count) & (index >= 0:usize)) "index out of bounds"
-            'from-pointer reference
-                getelementptr (load self.items) index
 
         method 'append (self value)
             assert-reference self

@@ -1,7 +1,7 @@
 
 import MutableArray
 
-let TESTSIZE = (1 << 16)
+let TESTSIZE = (1:usize << 16:usize)
 
 fn autodelete (x)
     fn (...)
@@ -10,22 +10,30 @@ fn autodelete (x)
 
 do
     # mutable array with fixed upper capacity
-    var a = ((MutableArray i32 TESTSIZE))
+    let i32Arrayx65536 = (MutableArray i32 TESTSIZE)
+    var a = (i32Arrayx65536)
     defer (autodelete a)
     for i in (range TESTSIZE)
-        assert ((countof a) == (usize i))
-        'append a i
+        assert ((countof a) == i)
+        'append a (i32 i)
     for i in (range TESTSIZE)
+        assert ((a @ i) == (i32 i))
+    # generator support
+    for i k in (enumerate a)
         assert ((a @ i) == i)
 
 do
     # mutable array with dynamic capacity
-    var a = ((MutableArray i32) 12)
+    let i32Array = (MutableArray i32)
+    var a = (i32Array 12)
     defer (autodelete a)
     assert (a.capacity == 12:usize)
     for i in (range TESTSIZE)
-        assert ((countof a) == (usize i))
-        'append a i
+        assert ((countof a) == i)
+        'append a (i32 i)
     for i in (range TESTSIZE)
+        assert ((a @ i) == (i32 i))
+    # generator support
+    for i k in (enumerate a)
         assert ((a @ i) == i)
 

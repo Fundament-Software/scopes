@@ -2036,6 +2036,18 @@ do
         fn (self)
             forward-repr (load self)
 
+    set-type-symbol! reference 'as
+        fn (self destT)
+            let T = (storageof (typeof self))
+            let ET = (element-type T 0)
+            let op success = (type@ ET 'as&)
+            if success
+                let result... = (op self destT)
+                if (icmp== (va-countof result...) 0)
+                else
+                    return result...
+            forward-as (load self) destT
+
     set-type-symbol! reference 'imply
         fn (self destT)
             let ptrtype = (storageof (typeof self))
@@ -2049,7 +2061,7 @@ do
                 let aptrtype = (pointer ET)
                 if (type== destT aptrtype)
                     return (bitcast self aptrtype)
-            (load (bitcast self ptrtype)) as destT
+            forward-imply (load (bitcast self ptrtype)) destT
 
     set-type-symbol! reference '=
         fn (self value)
@@ -3157,6 +3169,11 @@ fn zip (a b)
                         \ fdone b
                 \ fdone a
         tupleof init-a init-b
+
+fn enumerate (x)
+    zip
+        range 0x7fffffff
+        x as Generator
 
 define-macro for
     let loop (it params) = args (unconst '())
