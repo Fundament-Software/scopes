@@ -2006,7 +2006,7 @@ do
     passthru-overload '.. ..; passthru-overload '.. ..
     set-type-symbol! reference 'getattr
         fn "reference-getattr" (self name)
-            getattr (bitcast self (storageof (typeof self))) name
+            forward-getattr (bitcast self (storageof (typeof self))) name
 
     set-type-symbol! reference '@
         fn "reference-@" (self key)
@@ -2026,7 +2026,7 @@ do
             let ET = (element-type T 0)
             let op success = (type@ ET 'countof&)
             if success
-                let result... = (op (bitcast self T))
+                let result... = (op self)
                 if (icmp== (va-countof result...) 0)
                 else
                     return result...
@@ -2034,6 +2034,14 @@ do
 
     set-type-symbol! reference 'repr
         fn (self)
+            let T = (storageof (typeof self))
+            let ET = (element-type T 0)
+            let op success = (type@ ET 'repr&)
+            if success
+                let result... = (op self)
+                if (icmp== (va-countof result...) 0)
+                else
+                    return result...
             forward-repr (load self)
 
     set-type-symbol! reference 'as
@@ -2647,7 +2655,7 @@ typefn pointer 'getattr (self name)
         if (icmp== (va-countof result...) 0)
         else
             return result...
-    getattr (load self) name
+    forward-getattr (load self) name
 
 # support @
 typefn pointer '@ (self index)

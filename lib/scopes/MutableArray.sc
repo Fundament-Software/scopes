@@ -2,19 +2,27 @@
 fn assert-reference (self)
     assert ((typeof self) < reference) "array must be reference"
 
-fn define-common-array-methods (T)
-    typefn T 'delete (self)
-        assert-reference self
-        let items = (load self.items)
-        #do
-            # TODO: call destructor on all items
+fn gen-element-destructor (element-type)
+    let element-destructor = (type@ element-type 'delete)
+    if (none? element-destructor)
+        fn "MutableArray-destructor" (self items)
+    else
+        fn "MutableArray-destructor" (self items)
             let count =
                 self.count as immutable
             let loop (i) = (unconst 0:usize)
             if (i < count)
-                let ptr = (getelementptr items i)
-                # delete ptr
+                let ptr = (items @ i)
+                element-destructor ptr
                 loop (i + 1:usize)
+
+fn define-common-array-methods (T element-type ensure-capacity)
+    let destructor = (gen-element-destructor element-type)
+
+    typefn T 'delete (self)
+        assert-reference self
+        let items = (load self.items)
+        destructor self items
         free items
 
     typefn T 'as& (self T)
@@ -40,6 +48,31 @@ fn define-common-array-methods (T)
         assert ((index < self.count) & (index >= 0:usize)) "index out of bounds"
         'from-pointer reference
             getelementptr (load self.items) index
+
+    fn append-slot (self)
+        assert-reference self
+        let count = self.count
+        ensure-capacity self count
+        let idx = (count as immutable)
+        count = count + 1
+        return
+            'from-pointer reference
+                getelementptr (load self.items) idx
+
+    typefn T 'emplace-append (self args...)
+        let dest = (append-slot self)
+        store
+            element-type args...
+            dest
+        dest
+
+    typefn T 'append (self value)
+        let dest = (append-slot self)
+        store
+            value as immutable
+            dest
+        dest
+
     return;
 
 
@@ -56,23 +89,22 @@ fn FixedMutableArray (element-type capacity)
         count : usize
         items : arrayT
 
-        define-common-array-methods this-struct
+        define-common-array-methods this-struct element-type
+            fn "ensure-capacity" (self count)
+                assert (count < capacity) "capacity exceeded"
+
+        method 'repr (self)
+            ..
+                "[count="
+                repr self.count
+                " items="
+                repr self.items
+                "]"
 
         method 'apply-type (cls)
             CStruct.apply-type cls
                 count = 0:usize
                 items = (malloc-array element-type capacity)
-
-        method 'append (self value)
-            assert-reference self
-            let count = self.count
-            assert (count < capacity) "capacity exceeded"
-            store
-                value as immutable
-                getelementptr (load self.items) (count as immutable)
-            count = count + 1
-            return;
-
 
 let DEFAULT_CAPACITY = (1:usize << 4:usize)
 fn VariableMutableArray (element-type)
@@ -106,7 +138,20 @@ fn VariableMutableArray (element-type)
         count : usize
         items : arrayT
 
-        define-common-array-methods this-struct
+        define-common-array-methods this-struct element-type
+            fn "ensure-capacity" (self count)
+                if (count == self.capacity)
+                    grow self
+
+        method 'repr (self)
+            ..
+                "[count="
+                repr self.count
+                " capacity="
+                repr self.capacity
+                " items="
+                repr self.items
+                "]"
 
         method 'apply-type (cls capacity)
             let capacity =
@@ -116,17 +161,6 @@ fn VariableMutableArray (element-type)
                 capacity = capacity
                 count = 0:usize
                 items = (malloc-array element-type capacity)
-
-        method 'append (self value)
-            assert-reference self
-            let count = self.count
-            if (count == self.capacity)
-                grow self
-            store
-                value as immutable
-                getelementptr (load self.items) (count as immutable)
-            count = count + 1
-            return;
 
 fn MutableArray (element-type capacity)
     """"Construct a mutable array type of ``element-type`` with a variable or
