@@ -106,7 +106,7 @@ struct Val
 
 fn new (val)
     let mval = (malloc (typeof val))
-    let mval = (('from-pointer-type reference (typeof mval)) mval)
+    let mval = (reference.from-pointer mval)
     mval = val
     mval
 

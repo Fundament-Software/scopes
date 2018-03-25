@@ -2085,7 +2085,7 @@ do
         T
 
     set-type-symbol! reference 'from-pointer-type
-        fn "reference-from-pointer-type" (cls PT)
+        fn "reference-from-pointer-type" (PT)
             # due to auto-memoization, we'll always get the same type back
                 provided the element type is a constant
             assert (constant? PT)
@@ -2097,8 +2097,8 @@ do
             make-reference-type PT
 
     set-type-symbol! reference 'from-pointer
-        fn "reference-from-pointer" (cls value)
-            ('from-pointer-type reference (typeof value)) value
+        fn "reference-from-pointer" (value)
+            (reference.from-pointer-type (typeof value)) value
 
     set-type-symbol! reference 'apply-type
         fn "reference-apply-type" (cls element)
@@ -2120,7 +2120,7 @@ define-block-scope-macro var
             if (T <: reference)
                 storageof T
             else (typeof dest)
-        let ref = (('from-pointer-type reference PT) dest)
+        let ref = ((reference.from-pointer-type PT) dest)
         = ref value
         ref
 
@@ -2165,7 +2165,7 @@ define-macro global
             if (T <: reference)
                 storageof T
             else (typeof dest)
-        let ref = (('from-pointer-type reference PT) dest)
+        let ref = ((reference.from-pointer-type PT) dest)
         = ref value
         ref
 
@@ -2662,7 +2662,7 @@ typefn pointer '@ (self index)
     let index =
         if (none? index) 0:usize # simple dereference
         else index
-    ('from-pointer-type reference (typeof self)) (getelementptr self (usize index))
+    (reference.from-pointer-type (typeof self)) (getelementptr self (usize index))
 
 # extern cast to element type/pointer executes load/unconst
 typefn extern 'imply (self destT)
@@ -2799,7 +2799,7 @@ typefn CStruct 'getattr& (self name)
     if (icmp>=s idx 0)
         # cast result to reference
         let val = (getelementptr self 0 idx)
-        ('from-pointer-type reference (typeof val)) val
+        (reference.from-pointer-type (typeof val)) val
 
 typefn CStruct 'getattr (self name)
     let idx = (typename-field-index (typeof self) name)
@@ -2819,7 +2819,7 @@ typefn CUnion 'getattr& (self name)
         let newPT =
             'set-element-type (typeof self) FT
         # cast pointer to reference to alternative type
-        ('from-pointer-type reference newPT)
+        (reference.from-pointer-type newPT)
             bitcast self newPT
 
 typefn CUnion 'getattr (self name)
@@ -3088,7 +3088,7 @@ typefn array '@ (self at)
 typefn array '@& (self at)
     let val = (at as integer)
     let newptr = (getelementptr self 0 val)
-    ('from-pointer-type reference (typeof newptr)) newptr
+    (reference.from-pointer-type (typeof newptr)) newptr
 
 fn arrayof (T ...)
     let count = (va-countof ...)

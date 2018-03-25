@@ -46,7 +46,7 @@ fn define-common-array-methods (T element-type ensure-capacity)
     typefn T '@& (self index)
         let index = (index as usize)
         assert ((index < self.count) & (index >= 0:usize)) "index out of bounds"
-        'from-pointer reference
+        reference.from-pointer
             getelementptr (load self.items) index
 
     fn append-slot (self)
@@ -56,7 +56,7 @@ fn define-common-array-methods (T element-type ensure-capacity)
         let idx = (count as immutable)
         count = count + 1
         return
-            'from-pointer reference
+            reference.from-pointer
                 getelementptr (load self.items) idx
 
     typefn T 'emplace-append (self args...)
