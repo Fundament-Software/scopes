@@ -13250,6 +13250,13 @@ struct Solver {
         }
     }
 
+    // reduce typekind to compatible 
+    static TypeKind canonical_typekind(TypeKind k) {
+        if (k == TK_Real)
+            return TK_Integer;
+        return k;
+    }
+
 #define CHECKARGS(MINARGS, MAXARGS) \
     checkargs<MINARGS, MAXARGS>(args.size())
 
@@ -13354,11 +13361,14 @@ struct Solver {
             const Type *SSrcT = storage_type(SrcT);
             const Type *DestT = args[2].value.typeref;
             const Type *SDestT = storage_type(DestT);
-            if (SSrcT->kind() != SDestT->kind()) {
+
+            
+            if (canonical_typekind(SSrcT->kind()) 
+                    != canonical_typekind(SDestT->kind())) {
                 StyledString ss;
                 ss.out << "can not bitcast value of type " << SrcT
                     << " to type " << DestT
-                    << " because storage types are not of same category";
+                    << " because storage types are not of compatible category";
                 location_error(ss.str());
             }
             switch (SDestT->kind()) {
