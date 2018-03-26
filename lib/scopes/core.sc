@@ -3139,6 +3139,16 @@ typefn list 'as (self destT)
                     fret next at
             self
 
+fn va-each (values...)
+    let count = (va-countof values...)
+    Generator
+        label (fret fdone i)
+            if (i == count)
+                fdone;
+            else
+                fret (add i 1) (va@ i values...)
+        0
+
 fn range (a b c)
     let num-type = (typeof a)
     let step =
@@ -3158,7 +3168,10 @@ fn range (a b c)
                 f (x + step) x
             else
                 fdone;
-        unconst from
+        if (& (constant? to) (constant? from) (constant? step))
+            from
+        else
+            unconst from
 
 fn zip (a b)
     let iter-a init-a = ((a as Generator))

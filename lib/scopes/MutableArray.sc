@@ -49,6 +49,37 @@ fn define-common-array-methods (T element-type ensure-capacity)
         reference.from-pointer
             getelementptr (load self.items) index
 
+    typefn T 'sort (self key)
+        let count = (self.count as immutable)
+        let items = (load self.items)
+        let outer () =
+        let inner (i swapped) = (unconst 1:usize) (unconst false)
+        if (i < count)
+            let a =
+                reference.from-pointer
+                    getelementptr items (sub i 1:usize)
+            let b =
+                reference.from-pointer
+                    getelementptr items i
+            let a-key =
+                if (none? key) a
+                else (key a)
+            let b-key =
+                if (none? key) b
+                else (key b)
+            let swapped =
+                if (a-key > b-key)
+                    var t = b
+                    b = a
+                    a = t
+                    true
+                else
+                    swapped
+            inner (add i 1:usize) swapped
+        elseif swapped
+            outer;
+        return;
+
     fn append-slot (self)
         assert-reference self
         let count = self.count

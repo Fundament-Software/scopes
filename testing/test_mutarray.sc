@@ -2,6 +2,7 @@
 import MutableArray
 
 let TESTSIZE = (1:usize << 16:usize)
+let fullrange = (range (unconst TESTSIZE))
 
 fn autodelete (x)
     fn (...)
@@ -13,10 +14,10 @@ do
     let i32Arrayx65536 = (MutableArray i32 TESTSIZE)
     var a = (i32Arrayx65536)
     defer (autodelete a)
-    for i in (range TESTSIZE)
+    for i in fullrange
         assert ((countof a) == i)
         'append a (i32 i)
-    for i in (range TESTSIZE)
+    for i in fullrange
         assert ((a @ i) == (i32 i))
     # generator support
     for i k in (enumerate a)
@@ -28,10 +29,10 @@ do
     var a = (i32Array 12)
     defer (autodelete a)
     assert (a.capacity == 12:usize)
-    for i in (range TESTSIZE)
+    for i in fullrange
         assert ((countof a) == i)
         'append a (i32 i)
-    for i in (range TESTSIZE)
+    for i in fullrange
         assert ((a @ i) == (i32 i))
     # generator support
     for i k in (enumerate a)
@@ -55,3 +56,32 @@ do
         print b
         for y n in (enumerate b)
             assert ((x * 16 + y) == n)
+
+do
+    # sorting a mutable array
+    let T = (MutableArray i32 32)
+    var a = (T)
+    defer (autodelete a)
+    for k in (va-each 3 1 9 5 0 7 12 3 99 -20)
+        'append a k
+    'sort a
+    for i k in (enumerate (va-each -20 0 1 3 3 5 7 9 12 99))
+        assert ((a @ i) == k)
+    # custom sorting key
+    'sort a
+        fn (x)
+            - x
+    for i k in (enumerate (va-each 99 12 9 7 5 3 3 1 0 -20))
+        assert ((a @ i) == k)
+
+#
+    'append T 3
+    'append T 1
+    'append T 9
+    'append T 5
+    'append T 0
+    'append T 7
+    'append T 12
+    'append T 3
+    'append T 99
+    'append T -20
