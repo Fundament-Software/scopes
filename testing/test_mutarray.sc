@@ -73,15 +73,3 @@ do
             - x
     for i k in (enumerate (va-each 99 12 9 7 5 3 3 1 0 -20))
         assert ((a @ i) == k)
-
-#
-    'append T 3
-    'append T 1
-    'append T 9
-    'append T 5
-    'append T 0
-    'append T 7
-    'append T 12
-    'append T 3
-    'append T 99
-    'append T -20

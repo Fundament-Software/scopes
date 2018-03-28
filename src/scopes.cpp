@@ -5460,9 +5460,6 @@ public:
     LabelTag tag;
     Label *paired;
     uint64_t flags;
-    // if return_constants are specified, the continuation must be inlined
-    // with these arguments
-    std::vector<Any> return_constants;
 
     void set_reentrant() {
         flags |= LF_Reentrant;
@@ -13250,7 +13247,7 @@ struct Solver {
         }
     }
 
-    // reduce typekind to compatible 
+    // reduce typekind to compatible
     static TypeKind canonical_typekind(TypeKind k) {
         if (k == TK_Real)
             return TK_Integer;
@@ -13362,8 +13359,8 @@ struct Solver {
             const Type *DestT = args[2].value.typeref;
             const Type *SDestT = storage_type(DestT);
 
-            
-            if (canonical_typekind(SSrcT->kind()) 
+
+            if (canonical_typekind(SSrcT->kind())
                     != canonical_typekind(SDestT->kind())) {
                 StyledString ss;
                 ss.out << "can not bitcast value of type " << SrcT
