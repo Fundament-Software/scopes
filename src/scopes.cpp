@@ -5602,7 +5602,7 @@ public:
     };
 
     struct Args {
-        const Frame *frame;
+        Frame *frame;
         scopes::Args args;
 
         Args() : frame(nullptr) {}
@@ -5621,7 +5621,7 @@ public:
 
         struct Hash {
             std::size_t operator()(const Args& s) const {
-                std::size_t h = std::hash<const Frame *>{}(s.frame);
+                std::size_t h = std::hash<Frame *>{}(s.frame);
                 for (auto &&arg : s.args) {
                     h = HashLen16(h, arg.hash());
                 }
@@ -6013,7 +6013,7 @@ StyledStream &Parameter::stream(StyledStream &ss) const {
 struct Closure {
 protected:
 
-    Closure(Label *_label, const Frame *_frame) :
+    Closure(Label *_label, Frame *_frame) :
         label(_label), frame(_frame) {}
 
 public:
@@ -6022,7 +6022,7 @@ public:
         std::size_t operator()(const Closure &k) const {
             return HashLen16(
                 std::hash<Label *>{}(k.label),
-                std::hash<const Frame *>{}(k.frame));
+                std::hash<Frame *>{}(k.frame));
         }
     };
 
@@ -6034,9 +6034,9 @@ public:
     static std::unordered_map<Closure, const Closure *, Closure::Hash> map;
 
     Label *label;
-    const Frame *frame;
+    Frame *frame;
 
-    static const Closure *from(Label *label, const Frame *frame) {
+    static const Closure *from(Label *label, Frame *frame) {
         assert (label->is_template());
         Closure cl(label, frame);
         auto it = map.find(cl);
@@ -6068,19 +6068,19 @@ static StyledStream& operator<<(StyledStream& ss, const Closure *closure) {
 //------------------------------------------------------------------------------
 
 struct Frame {
-    Frame(const Frame *_parent, Label *_label, Label *_instance, size_t _loop_count = 0) :
+    Frame(Frame *_parent, Label *_label, Label *_instance, size_t _loop_count = 0) :
         parent(_parent), label(_label), instance(_instance), loop_count(_loop_count) {
         args.reserve(_label->params.size());
     }
 
     Args args;
-    const Frame *parent;
+    Frame *parent;
     Label *label;
     Label *instance;
     size_t loop_count;
 
-    const Frame *find_frame(Label *label) const {
-        const Frame *top = this;
+    Frame *find_frame(Label *label) {
+        Frame *top = this;
         while (top) {
             if (top->label == label) {
                 return top;
@@ -6090,7 +6090,7 @@ struct Frame {
         return nullptr;
     }
 
-    static Frame *from(const Frame *parent, Label *label, Label *instance, size_t loop_count) {
+    static Frame *from(Frame *parent, Label *label, Label *instance, size_t loop_count) {
         return new Frame(parent, label, instance, loop_count);
     }
 
@@ -6422,7 +6422,7 @@ static void mangle_remap_body(Label::UserMap &um, Label *ll, Label *entry, Mangl
     ll->insert_into_usermap(um);
 }
 
-void evaluate(const Frame *frame, Argument arg, Args &dest, bool last_param = false) {
+void evaluate(Frame *frame, Argument arg, Args &dest, bool last_param = false) {
     if (arg.value.type == TYPE_Label) {
         // do not wrap labels in closures that have been solved
         if (arg.value.label->body.is_complete()) {
@@ -6430,7 +6430,7 @@ void evaluate(const Frame *frame, Argument arg, Args &dest, bool last_param = fa
         } else {
             Label *label = arg.value.label;
             if (frame) {
-                const Frame *top = frame->find_frame(label);
+                Frame *top = frame->find_frame(label);
                 if (top) {
                     frame = top;
                 } else if (label->body.scope_label) {
@@ -6487,7 +6487,7 @@ void evaluate(const Frame *frame, Argument arg, Args &dest, bool last_param = fa
     }
 }
 
-static void evaluate_body(const Frame *frame, Label *dest, Label *source) {
+static void evaluate_body(Frame *frame, Label *dest, Label *source) {
     Args &args = source->body.args;
     Args &body = dest->body.args;
     Args ret;
@@ -6693,11 +6693,11 @@ static void map_constant_arguments(Frame *frame, Label *label, const Args &args)
 // TYPE_Unknown = type the parameter
 //      type as TYPE_Unknown = leave the parameter as-is
 // any other = inline the argument and remove the parameter
-static Label *fold_type_label_single(const Frame *parent, Label *label, const Args &args) {
+static Label *fold_type_label_single(Frame *parent, Label *label, const Args &args) {
     assert(!label->body.is_complete());
     size_t loop_count = 0;
     if (parent && (parent->label == label)) {
-        const Frame *top = parent;
+        Frame *top = parent;
         parent = top->parent;
         loop_count = top->loop_count + 1;
         if (loop_count > SCOPES_MAX_RECURSIONS) {
@@ -6790,7 +6790,7 @@ static Label *fold_type_label_single(const Frame *parent, Label *label, const Ar
 
 typedef std::vector<const Type *> ArgTypes;
 
-static Label *typify_single(const Frame *frame, Label *label, const ArgTypes &argtypes) {
+static Label *typify_single(Frame *frame, Label *label, const ArgTypes &argtypes) {
     assert(!label->params.empty());
 
     Args args;
@@ -6803,7 +6803,7 @@ static Label *typify_single(const Frame *frame, Label *label, const ArgTypes &ar
     return fold_type_label_single(frame, label, args);
 }
 
-static Label *fold_typify_single(const Frame *frame, Label *label, const Args &values) {
+static Label *fold_typify_single(Frame *frame, Label *label, const Args &values) {
     assert(!label->params.empty());
 
     Args args;
@@ -12999,7 +12999,7 @@ struct Solver {
 
         auto &&enter = l->body.enter;
         assert(enter.type == TYPE_Closure);
-        const Frame *enter_frame = enter.closure->frame;
+        Frame *enter_frame = enter.closure->frame;
         Label *enter_label = enter.closure->label;
 
         // inline constant arguments
@@ -13039,7 +13039,7 @@ struct Solver {
         bool reentrant = newl->is_reentrant();
         if (!reentrant) {
             // has this instance been used earlier in the stack?
-            const Frame *top_frame = enter_frame->find_frame(enter_label);
+            Frame *top_frame = enter_frame->find_frame(enter_label);
             reentrant = (top_frame && top_frame->instance == newl);
             // mark this function as reentrant for the solver further up in the stack
             if (reentrant) {
@@ -16819,7 +16819,7 @@ static void f_dump_label(Label *label) {
     stream_label(ss, label, StreamLabelFormat::debug_all());
 }
 
-static void f_dump_frame(const Frame *frame) {
+static void f_dump_frame(Frame *frame) {
     StyledStream ss(std::cerr);
     stream_frame(ss, frame, StreamFrameFormat::single());
 }
@@ -17353,7 +17353,7 @@ static Label *f_closure_label(const Closure *closure) {
     return closure->label;
 }
 
-static const Frame *f_closure_frame(const Closure *closure) {
+static Frame *f_closure_frame(const Closure *closure) {
     return closure->frame;
 }
 
