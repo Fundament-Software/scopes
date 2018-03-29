@@ -3001,21 +3001,21 @@ static const Type *Extern(const Type *type,
 // TYPED LABEL TYPE
 //------------------------------------------------------------------------------
 
-struct KeyAny {
+struct Argument {
     Symbol key;
     Any value;
 
-    KeyAny() : key(SYM_Unnamed), value(none) {}
-    KeyAny(Any _value) : key(SYM_Unnamed), value(_value) {}
-    KeyAny(Symbol _key, Any _value) : key(_key), value(_value) {}
+    Argument() : key(SYM_Unnamed), value(none) {}
+    Argument(Any _value) : key(SYM_Unnamed), value(_value) {}
+    Argument(Symbol _key, Any _value) : key(_key), value(_value) {}
     template<typename T>
-    KeyAny(const T &x) : key(SYM_Unnamed), value(x) {}
+    Argument(const T &x) : key(SYM_Unnamed), value(x) {}
 
-    bool operator ==(const KeyAny &other) const {
+    bool operator ==(const Argument &other) const {
         return (key == other.key) && (value == other.value);
     }
 
-    bool operator !=(const KeyAny &other) const {
+    bool operator !=(const Argument &other) const {
         return (key != other.key) || (value != other.value);
     }
 
@@ -3024,7 +3024,7 @@ struct KeyAny {
     }
 };
 
-static StyledStream& operator<<(StyledStream& ost, KeyAny value) {
+static StyledStream& operator<<(StyledStream& ost, Argument value) {
     if (value.key != SYM_Unnamed) {
         ost << value.key << Style_Operator << "=" << Style_None;
     }
@@ -3032,7 +3032,7 @@ static StyledStream& operator<<(StyledStream& ost, KeyAny value) {
     return ost;
 }
 
-typedef std::vector<KeyAny> Args;
+typedef std::vector<Argument> Args;
 
 static void stream_args(StyledStream &ss, const Args &args, size_t start = 1) {
     for (size_t i = start; i < args.size(); ++i) {
@@ -3046,8 +3046,8 @@ static void stream_args(StyledStream &ss, const Args &args, size_t start = 1) {
     ss << std::endl;
 }
 
-static KeyAny first(const Args &values) {
-    return values.empty()?KeyAny():values.front();
+static Argument first(const Args &values) {
+    return values.empty()?Argument():values.front();
 }
 
 struct ReturnLabelType : Type {
@@ -6197,7 +6197,7 @@ struct StreamLabel : StreamAnchors {
         }
     }
 
-    void stream_argument(KeyAny arg, Label *alabel) {
+    void stream_argument(Argument arg, Label *alabel) {
         if (arg.key != SYM_Unnamed) {
             ss << arg.key << Style_Operator << "=" << Style_None;
         }
@@ -6397,7 +6397,7 @@ static void mangle_remap_body(Label::UserMap &um, Label *ll, Label *entry, Mangl
 
     size_t lasti = (args.size() - 1);
     for (size_t i = 0; i < args.size(); ++i) {
-        KeyAny arg = args[i];
+        Argument arg = args[i];
         if (arg.value.type == TYPE_Label) {
             auto it = lmap.find(arg.value.label);
             if (it != lmap.end()) {
@@ -6422,11 +6422,11 @@ static void mangle_remap_body(Label::UserMap &um, Label *ll, Label *entry, Mangl
     ll->insert_into_usermap(um);
 }
 
-void evaluate(const Frame *frame, KeyAny arg, Args &dest, bool last_param = false) {
+void evaluate(const Frame *frame, Argument arg, Args &dest, bool last_param = false) {
     if (arg.value.type == TYPE_Label) {
         // do not wrap labels in closures that have been solved
         if (arg.value.label->body.is_complete()) {
-            dest.push_back(KeyAny(arg.key, arg.value.label));
+            dest.push_back(Argument(arg.key, arg.value.label));
         } else {
             Label *label = arg.value.label;
             if (frame) {
@@ -6446,7 +6446,7 @@ void evaluate(const Frame *frame, KeyAny arg, Args &dest, bool last_param = fals
                     }
                 }
             }
-            dest.push_back(KeyAny(arg.key, Closure::from(label, frame)));
+            dest.push_back(Argument(arg.key, Closure::from(label, frame)));
         }
     } else if (arg.value.type == TYPE_Parameter
         && arg.value.parameter->label) {
@@ -6462,7 +6462,7 @@ void evaluate(const Frame *frame, KeyAny arg, Args &dest, bool last_param = fals
                 dest.push_back(frame->args[i]);
             }
         } else if ((size_t)param->index < frame->args.size()) {
-            dest.push_back(KeyAny(arg.key, frame->args[param->index].value));
+            dest.push_back(Argument(arg.key, frame->args[param->index].value));
         } else {
             if (!param->is_vararg()) {
 #if SCOPES_DEBUG_CODEGEN
@@ -6480,7 +6480,7 @@ void evaluate(const Frame *frame, KeyAny arg, Args &dest, bool last_param = fals
                     << param->index << " >= " << (int)frame->args.size() << ")";
                 location_error(ss.str());
             }
-            dest.push_back(KeyAny(arg.key, none));
+            dest.push_back(Argument(arg.key, none));
         }
     } else {
         dest.push_back(arg);
@@ -6524,7 +6524,7 @@ static Label *mangle(Label::UserMap &um, Label *entry,
         ll->params.reserve(l->params.size());
         for (auto &&param : l->params) {
             Parameter *pparam = Parameter::from(param);
-            pmap.insert({ param, {KeyAny(Any(pparam))}});
+            pmap.insert({ param, {Argument(Any(pparam))}});
             ll->append(pparam);
         }
     }
@@ -6606,14 +6606,14 @@ static Label *fold_type_label(Label::UserMap &um, Label *label, const Args &args
                 ncount -= srci;
                 Args vargs;
                 for (size_t k = 0; k < ncount; ++k) {
-                    KeyAny value = args[srci + k];
+                    Argument value = args[srci + k];
                     if (value.value.type == TYPE_Unknown) {
                         Parameter *newparam = Parameter::from(param);
                         newparam->kind = PK_Regular;
                         newparam->type = value.value.typeref;
                         newparam->name = Symbol(SYM_Unnamed);
                         newparams.push_back(newparam);
-                        vargs.push_back(KeyAny(value.key, newparam));
+                        vargs.push_back(Argument(value.key, newparam));
                     } else {
                         vargs.push_back(value);
                     }
@@ -6624,7 +6624,7 @@ static Label *fold_type_label(Label::UserMap &um, Label *label, const Args &args
                 map[param] = {};
             }
         } else if (srci < args.size()) {
-            KeyAny value = args[srci];
+            Argument value = args[srci];
             if (is_unknown(value.value)) {
                 Parameter *newparam = Parameter::from(param);
                 if (is_typed(value.value)) {
@@ -6639,7 +6639,7 @@ static Label *fold_type_label(Label::UserMap &um, Label *label, const Args &args
                     }
                 }
                 newparams.push_back(newparam);
-                map[param] = {KeyAny(value.key, newparam)};
+                map[param] = {Argument(value.key, newparam)};
             } else {
                 if (!srci) {
                     Parameter *newparam = Parameter::from(param);
@@ -6650,7 +6650,7 @@ static Label *fold_type_label(Label::UserMap &um, Label *label, const Args &args
             }
             srci++;
         } else {
-            map[param] = {KeyAny()};
+            map[param] = {Argument()};
             srci++;
         }
     }
@@ -6670,13 +6670,13 @@ static void map_constant_arguments(Frame *frame, Label *label, const Args &args)
             assert(i == lasti);
             size_t ncount = args.size();
             while (srci < ncount) {
-                KeyAny value = args[srci];
+                Argument value = args[srci];
                 assert(!is_unknown(value.value));
                 frame->args.push_back(value);
                 srci++;
             }
         } else if (srci < args.size()) {
-            KeyAny value = args[srci];
+            Argument value = args[srci];
             assert(!is_unknown(value.value));
             frame->args.push_back(value);
             srci++;
@@ -6738,21 +6738,21 @@ static Label *fold_type_label_single(const Frame *parent, Label *label, const Ar
             assert(i == lasti);
             size_t ncount = args.size();
             while (srci < ncount) {
-                KeyAny value = args[srci];
+                Argument value = args[srci];
                 if (is_unknown(value.value)) {
                     Parameter *newparam = Parameter::from(param);
                     newparam->kind = PK_Regular;
                     newparam->type = value.value.typeref;
                     newparam->name = Symbol(SYM_Unnamed);
                     newlabel->append(newparam);
-                    frame->args.push_back(KeyAny(value.key, newparam));
+                    frame->args.push_back(Argument(value.key, newparam));
                 } else {
                     frame->args.push_back(value);
                 }
                 srci++;
             }
         } else if (srci < args.size()) {
-            KeyAny value = args[srci];
+            Argument value = args[srci];
             if (is_unknown(value.value)) {
                 Parameter *newparam = Parameter::from(param);
                 if (is_typed(value.value)) {
@@ -6767,7 +6767,7 @@ static Label *fold_type_label_single(const Frame *parent, Label *label, const Ar
                     }
                 }
                 newlabel->append(newparam);
-                frame->args.push_back(KeyAny(value.key, newparam));
+                frame->args.push_back(Argument(value.key, newparam));
             } else {
                 if (!srci) {
                     Parameter *newparam = Parameter::from(param);
@@ -6795,9 +6795,9 @@ static Label *typify_single(const Frame *frame, Label *label, const ArgTypes &ar
 
     Args args;
     args.reserve(argtypes.size() + 1);
-    args = { KeyAny(untyped()) };
+    args = { Argument(untyped()) };
     for (size_t i = 0; i < argtypes.size(); ++i) {
-        args.push_back(KeyAny(unknown_of(argtypes[i])));
+        args.push_back(Argument(unknown_of(argtypes[i])));
     }
 
     return fold_type_label_single(frame, label, args);
@@ -6808,7 +6808,7 @@ static Label *fold_typify_single(const Frame *frame, Label *label, const Args &v
 
     Args args;
     args.reserve(values.size() + 1);
-    args = { KeyAny(untyped()) };
+    args = { Argument(untyped()) };
     for (size_t i = 0; i < values.size(); ++i) {
         args.push_back(values[i]);
     }
@@ -12775,7 +12775,7 @@ struct Solver {
 
         size_t fargcount = fi->argument_types.size();
         for (size_t i = 1; i < args.size(); ++i) {
-            KeyAny &arg = args[i];
+            Argument &arg = args[i];
             size_t k = i - 1;
             const Type *argT = arg.value.indirect_type();
             if (k < fargcount) {
@@ -12821,10 +12821,10 @@ struct Solver {
             Args cargs;
             cargs.reserve(argcount);
             for (size_t i = 0; i < argcount; ++i) {
-                KeyAny &srcarg = args[i + 1];
+                Argument &srcarg = args[i + 1];
                 if (i >= fi->argument_types.size()) {
                     if (srcarg.value.type == TYPE_F32) {
-                        cargs.push_back(KeyAny(srcarg.key, (double)srcarg.value.f32));
+                        cargs.push_back(Argument(srcarg.key, (double)srcarg.value.f32));
                         continue;
                     }
                 }
@@ -12836,7 +12836,7 @@ struct Solver {
         }
 
         enter = args[0].value;
-        args = { KeyAny() };
+        args = { Argument() };
         auto rlt = cast<ReturnLabelType>(fi->return_type);
         if (rlt->return_type != TYPE_Void) {
             if (isa<TupleType>(rlt->return_type)) {
@@ -12844,10 +12844,10 @@ struct Solver {
                 auto ti = cast<TupleType>(rlt->return_type);
                 size_t count = ti->types.size();
                 for (size_t i = 0; i < count; ++i) {
-                    args.push_back(KeyAny(ti->unpack(result.pointer, i)));
+                    args.push_back(Argument(ti->unpack(result.pointer, i)));
                 }
             } else {
-                args.push_back(KeyAny(result));
+                args.push_back(Argument(result));
             }
         }
     }
@@ -13008,7 +13008,7 @@ struct Solver {
         auto &&args = l->body.args;
         {
             callargs.push_back(args[0]);
-            keys.push_back(KeyAny(untyped()));
+            keys.push_back(Argument(untyped()));
             for (size_t i = 1; i < args.size(); ++i) {
                 auto &&arg = args[i];
                 if (arg.value.is_const()) {
@@ -13016,7 +13016,7 @@ struct Solver {
                 } else if (is_return_parameter(arg.value)) {
                     keys.push_back(arg);
                 } else {
-                    keys.push_back(KeyAny(arg.key,
+                    keys.push_back(Argument(arg.key,
                         unknown_of(arg.value.indirect_type())));
                     callargs.push_back(arg);
                 }
@@ -13716,7 +13716,7 @@ struct Solver {
                                 location_error(ss.str());
                             }
                             // rewrite field
-                            arg = KeyAny(arg.key, Any((int)idx));
+                            arg = Argument(arg.key, Any((int)idx));
                         } else {
                             idx = cast_number<size_t>(arg.value);
                         }
@@ -13952,7 +13952,7 @@ struct Solver {
         Any value = none;
         bool result = T->lookup_call_handler(value);
         assert(result);
-        args.insert(args.begin() + 1, KeyAny(enter));
+        args.insert(args.begin() + 1, Argument(enter));
         enter = value;
     }
 
@@ -14182,7 +14182,7 @@ struct Solver {
                     values.push_back(args[i]);
                 } else {
                     values.push_back(
-                        KeyAny(args[i].key,
+                        Argument(args[i].key,
                             unknown_of(args[i].value.indirect_type())));
                 }
             }
@@ -15077,7 +15077,7 @@ struct Solver {
             if (args[i].value.is_const()) {
                 values.push_back(args[i]);
             } else {
-                values.push_back(KeyAny(
+                values.push_back(Argument(
                     args[i].key,
                     unknown_of(args[i].value.indirect_type())));
                 newargs.push_back(args[i]);
@@ -15700,7 +15700,7 @@ struct Solver {
         }
     }
 
-    Any run_ffi_function(Any enter, KeyAny *args, size_t argcount) {
+    Any run_ffi_function(Any enter, Argument *args, size_t argcount) {
         auto pi = cast<PointerType>(enter.type);
         auto fi = cast<FunctionType>(pi->element_type);
 
@@ -15712,7 +15712,7 @@ struct Solver {
         ffi_type *argtypes[argcount];
         void *avalues[argcount];
         for (size_t i = 0; i < argcount; ++i) {
-            KeyAny &arg = args[i];
+            Argument &arg = args[i];
             argtypes[i] = get_ffi_type(arg.value.type);
             avalues[i] = get_pointer(arg.value.type, arg.value);
         }
@@ -16348,7 +16348,7 @@ struct Expander {
         return result;
     }
 
-    static bool get_kwargs(Any it, KeyAny &value) {
+    static bool get_kwargs(Any it, Argument &value) {
         it = unsyntax(it);
         if (it.type != TYPE_List) return false;
         auto l = it.list;
@@ -16414,7 +16414,7 @@ struct Expander {
         it = subexp.next;
         while (it) {
             subexp.next = it->next;
-            KeyAny value;
+            Argument value;
             set_active_anchor(((const Syntax *)it->at)->anchor);
             if (get_kwargs(it->at, value)) {
                 value.value = subexp.expand(
