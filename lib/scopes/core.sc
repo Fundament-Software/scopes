@@ -1725,15 +1725,19 @@ define-macro define-block-scope-macro
 define-block-scope-macro defer
     let head f rest = (decons expr 2)
     let oldf = (@ syntax-scope 'return)
+    let anchor = (Syntax-anchor (as f Syntax))
+    let tmp =
+        Parameter-new anchor 'tmp Unknown
     let expr =
         list
-            list f
+            list let tmp '= f
+            list tmp
                 list
-                    cons fn (list)
+                    cons fn "defer-wrapper" (list)
                         list label 'return (list '...)
                             list oldf
-                                list f '...
-                        none
+                                list tmp '...
+                        list _
                         next-expr
     return expr
         syntax-scope

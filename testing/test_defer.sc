@@ -53,3 +53,25 @@ fn do-some-other-stuff ()
     return (unconst 1)
 
 assert ((do-some-other-stuff) == 303)
+
+do
+    #   a case that failed with SCOPES_TRUNCATE_FORWARDING_CONTINUATIONS
+        enabled.
+    fn source-ui (sxitem level)
+        #print "enter" level
+        defer
+            fn (...)
+                #print "exit" level
+                ...
+        let item = (sxitem as Any)
+        let T = ('typeof item)
+        if (T == list)
+            return;
+        elseif (T == Symbol)
+            _ (unconst true)
+        else
+            _;
+        return;
+    typify source-ui Any i32
+
+true

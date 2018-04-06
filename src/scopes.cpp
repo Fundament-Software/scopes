@@ -12562,15 +12562,29 @@ struct Solver {
             auto enter_label = dest.closure->label;
             Label *newl = fold_typify_single(enter_frame, enter_label, values);
 #if SCOPES_TRUNCATE_FORWARDING_CONTINUATIONS
+#if 0
+            bool cond1 = is_jumping(newl);
+            bool cond2 = is_calling_continuation(newl);
+            bool cond3 = truncates_args(enter_label, values.size());
+            bool cond4 = is_calling_closure(newl);
+            bool cond5 = forwards_all_args(enter_label);
+            StyledStream ss;
+            ss  << "is_jumping=" << cond1
+                << " is_calling_continuation=" << cond2
+                << " truncates_args=" << cond3
+                << " is_calling_closure=" << cond4
+                << " forwards_all_args=" << cond5
+                << " values.size()=" << values.size()
+                << std::endl;
+#endif
             if (is_jumping(newl)
-                && ((is_calling_continuation(newl)
-                        && !truncates_args(enter_label, values.size()))
-                    || is_calling_closure(newl))
-                && forwards_all_args(enter_label)
-                /*&& !enter_frame->find_frame(enter_label)*/) {
-                /*
+                && (is_calling_continuation(newl) || is_calling_closure(newl))
+                && !truncates_args(enter_label, values.size())
+                && forwards_all_args(enter_label)) {
+#if 0
                 StyledStream ss;
-                stream_label(ss, newl, StreamLabelFormat::single());*/
+                stream_label(ss, newl, StreamLabelFormat::single());
+#endif
                 dest = newl->body.enter;
                 goto repeat;
             } else
