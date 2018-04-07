@@ -12565,26 +12565,23 @@ struct Solver {
 #if 0
             bool cond1 = is_jumping(newl);
             bool cond2 = is_calling_continuation(newl);
-            bool cond3 = truncates_args(enter_label, values.size());
+            bool cond3 = matches_arg_count(enter_label, values.size());
             bool cond4 = is_calling_closure(newl);
             bool cond5 = forwards_all_args(enter_label);
             StyledStream ss;
             ss  << "is_jumping=" << cond1
                 << " is_calling_continuation=" << cond2
-                << " truncates_args=" << cond3
+                << " matches_arg_count=" << cond3
                 << " is_calling_closure=" << cond4
                 << " forwards_all_args=" << cond5
                 << " values.size()=" << values.size()
                 << std::endl;
+            stream_label(ss, newl, StreamLabelFormat::single());
 #endif
             if (is_jumping(newl)
                 && (is_calling_continuation(newl) || is_calling_closure(newl))
-                && !truncates_args(enter_label, values.size())
-                && forwards_all_args(enter_label)) {
-#if 0
-                StyledStream ss;
-                stream_label(ss, newl, StreamLabelFormat::single());
-#endif
+                && matches_arg_count(newl, values.size())
+                && forwards_all_args(newl)) {
                 dest = newl->body.enter;
                 goto repeat;
             } else
@@ -14956,17 +14953,11 @@ struct Solver {
         return false;
     }
 
-    static bool truncates_args(Label *l, size_t inargs) {
+    static bool matches_arg_count(Label *l, size_t inargs) {
+        // works only on instantiated labels, as we're
+        // assuming no parameter is variadic at this point
         auto &&params = l->params;
-        size_t captured = 0;
-        for (size_t i = 1; i < params.size(); ++i) {
-            auto &&param = params[i];
-            if (param->is_vararg())
-                return false;
-            else
-                captured++;
-        }
-        return captured < inargs;
+        return ((inargs + 1) == std::max(size_t(1), params.size()));
     }
 
     static bool forwards_all_args(Label *l) {
