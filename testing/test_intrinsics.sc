@@ -51,3 +51,11 @@ assert
 
 assert
     (length (normalize (unconst (vectorof f32 2.0 6.0 9.0)))) == 1.0
+
+assert
+    all?
+        (cross (vectorof f32 0 0 1) (vectorof f32 0 1 0)) == (vectorof f32 -1 0 0)
+assert
+    all?
+        (cross (unconst (vectorof f32 0 0 1)) (unconst (vectorof f32 0 1 0))) == (vectorof f32 -1 0 0)
+

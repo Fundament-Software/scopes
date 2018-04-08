@@ -8874,6 +8874,7 @@ struct SPIRVGenerator {
                 }
                 retvalue = builder.createBuiltinCall(rtype, glsl_ext_inst, builtin, { val });
             } break;
+            case FN_Cross:
             case OP_Step:
             case OP_Pow: {
                 READ_VALUE(a);
@@ -8883,6 +8884,7 @@ struct SPIRVGenerator {
                 switch (enter.symbol.value()) {
                 case OP_Step: builtin = GLSLstd450Step; break;
                 case OP_Pow: builtin = GLSLstd450Pow; break;
+                case FN_Cross: builtin = GLSLstd450Cross; break;
                 default: {
                     StyledString ss;
                     ss.out << "IL->SPIR: unsupported binary intrinsic " << enter << " encountered";
@@ -11100,6 +11102,25 @@ struct LLVMIRGenerator {
                 } else {
                     retvalue = LLVMConstReal(T, 1.0);
                 }
+            } break;
+            case FN_Cross: {
+                READ_VALUE(a);
+                READ_VALUE(b);
+                auto T = LLVMTypeOf(a);
+                assert (LLVMGetTypeKind(T) == LLVMVectorTypeKind);
+                auto ET = LLVMGetElementType(T);
+                retvalue = LLVMGetUndef(T);
+                LLVMValueRef i0 = LLVMConstInt(i32T, 0, false);
+                LLVMValueRef i1 = LLVMConstInt(i32T, 1, false);
+                LLVMValueRef i2 = LLVMConstInt(i32T, 2, false);
+                LLVMValueRef i120[] = { i1, i2, i0 };
+                LLVMValueRef v120 = LLVMConstVector(i120, 3);
+                LLVMValueRef a120 = LLVMBuildShuffleVector(builder, a, a, v120, "");
+                LLVMValueRef b120 = LLVMBuildShuffleVector(builder, b, b, v120, "");
+                retvalue = LLVMBuildFSub(builder,
+                    LLVMBuildFMul(builder, a, b120, ""),
+                    LLVMBuildFMul(builder, b, a120, ""), "");
+                retvalue = LLVMBuildShuffleVector(builder, retvalue, retvalue, v120, "");
             } break;
             // binops
             case OP_Pow: {
