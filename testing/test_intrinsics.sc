@@ -46,3 +46,8 @@ assert
 assert
     (length (unconst (vectorof f32 2.0 6.0 9.0))) == 11.0
 
+assert
+    (length (normalize (vectorof f32 2.0 6.0 9.0))) == 1.0
+
+assert
+    (length (normalize (unconst (vectorof f32 2.0 6.0 9.0)))) == 1.0

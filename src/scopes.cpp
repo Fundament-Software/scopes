@@ -8835,6 +8835,7 @@ struct SPIRVGenerator {
                     then_value, else_value);
             } break;
             case FN_Length:
+            case FN_Normalize:
             case OP_Sin:
             case OP_Cos:
             case OP_Tan:
@@ -8853,6 +8854,7 @@ struct SPIRVGenerator {
                 case FN_Length:
                     rtype = builder.getContainedTypeId(rtype);
                     builtin = GLSLstd450Length; break;
+                case FN_Normalize: builtin = GLSLstd450Normalize; break;
                 case OP_Sin: builtin = GLSLstd450Sin; break;
                 case OP_Cos: builtin = GLSLstd450Cos; break;
                 case OP_Tan: builtin = GLSLstd450Tan; break;
@@ -10769,6 +10771,27 @@ struct LLVMIRGenerator {
         return diloc;
     }
 
+    LLVMValueRef build_length_op(LLVMValueRef x) {
+        auto T = LLVMTypeOf(x);
+        auto ET = LLVMGetElementType(T);
+        LLVMValueRef func_sqrt = get_intrinsic((ET == f64T)?llvm_sqrt_f64:llvm_sqrt_f32);
+        assert(func_sqrt);
+        auto count = LLVMGetVectorSize(T);
+        LLVMValueRef src = LLVMBuildFMul(builder, x, x, "");
+        LLVMValueRef retvalue = nullptr;
+        for (unsigned i = 0; i < count; ++i) {
+            LLVMValueRef idx = LLVMConstInt(i32T, i, false);
+            LLVMValueRef val = LLVMBuildExtractElement(builder, src, idx, "");
+            if (i == 0) {
+                retvalue = val;
+            } else {
+                retvalue = LLVMBuildFAdd(builder, retvalue, val, "");
+            }
+        }
+        LLVMValueRef values[] = { retvalue };
+        return LLVMBuildCall(builder, func_sqrt, values, 1, "");
+    }
+
     void write_label_body(Label *label) {
     repeat:
         if (!label->body.is_complete()) {
@@ -11048,27 +11071,34 @@ struct LLVMIRGenerator {
                 READ_VALUE(x);
                 auto T = LLVMTypeOf(x);
                 if (LLVMGetTypeKind(T) == LLVMVectorTypeKind) {
-                    auto ET = LLVMGetElementType(T);
-                    LLVMValueRef func_sqrt = get_intrinsic((ET == f64T)?llvm_sqrt_f64:llvm_sqrt_f32);
-                    assert(func_sqrt);
-                    auto count = LLVMGetVectorSize(T);
-                    LLVMValueRef src = LLVMBuildFMul(builder, x, x, "");
-                    for (unsigned i = 0; i < count; ++i) {
-                        LLVMValueRef idx = LLVMConstInt(i32T, i, false);
-                        LLVMValueRef val = LLVMBuildExtractElement(builder, src, idx, "");
-                        if (i == 0) {
-                            retvalue = val;
-                        } else {
-                            retvalue = LLVMBuildFAdd(builder, retvalue, val, "");
-                        }
-                    }
-                    LLVMValueRef values[] = { retvalue };
-                    retvalue = LLVMBuildCall(builder, func_sqrt, values, 1, "");
+                    retvalue = build_length_op(x);
                 } else {
                     LLVMValueRef func_fabs = get_intrinsic((T == f64T)?llvm_fabs_f64:llvm_fabs_f32);
                     assert(func_fabs);
                     LLVMValueRef values[] = { x };
                     retvalue = LLVMBuildCall(builder, func_fabs, values, 1, "");
+                }
+            } break;
+            case FN_Normalize: {
+                READ_VALUE(x);
+                auto T = LLVMTypeOf(x);
+                if (LLVMGetTypeKind(T) == LLVMVectorTypeKind) {
+                    auto count = LLVMGetVectorSize(T);
+                    auto ET = LLVMGetElementType(T);
+                    LLVMValueRef l = build_length_op(x);
+                    l = LLVMBuildInsertElement(builder,
+                        LLVMGetUndef(LLVMVectorType(ET, 1)), l,
+                        LLVMConstInt(i32T, 0, false),
+                        "");
+                    LLVMValueRef mask[count];
+                    for (int i = 0; i < count; ++i) {
+                        mask[i] = 0;
+                    }
+                    l = LLVMBuildShuffleVector(builder, l, l,
+                        LLVMConstNull(LLVMVectorType(i32T, count)), "");
+                    retvalue = LLVMBuildFDiv(builder, x, l, "");
+                } else {
+                    retvalue = LLVMConstReal(T, 1.0);
                 }
             } break;
             // binops
@@ -13787,7 +13817,7 @@ struct Solver {
         } break;
         case FN_Normalize: {
             CHECKARGS(1, 1);
-            verify_real_ops(args[1].value.indirect_type());
+            verify_real_ops(args[1].value);
             RETARGTYPES(args[1].value.indirect_type());
         } break;
         case FN_Length: {
@@ -13802,9 +13832,7 @@ struct Solver {
         } break;
         case FN_Distance: {
             CHECKARGS(2, 2);
-            verify_real_ops(
-                args[1].value.indirect_type(),
-                args[2].value.indirect_type());
+            verify_real_ops(args[1].value, args[2].value);
             const Type *T = storage_type(args[1].value.indirect_type());
             if (T->kind() == TK_Vector) {
                 RETARGTYPES(cast<VectorType>(T)->element_type);
