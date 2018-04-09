@@ -5525,6 +5525,10 @@ public:
         return params.size() > 1;
     }
 
+    bool is_variadic() const {
+        return (!params.empty() && params.back()->is_vararg());
+    }
+
     bool is_valid() const {
         return !params.empty() && body.anchor && !body.args.empty();
     }
@@ -11108,8 +11112,6 @@ struct LLVMIRGenerator {
                 READ_VALUE(b);
                 auto T = LLVMTypeOf(a);
                 assert (LLVMGetTypeKind(T) == LLVMVectorTypeKind);
-                auto ET = LLVMGetElementType(T);
-                retvalue = LLVMGetUndef(T);
                 LLVMValueRef i0 = LLVMConstInt(i32T, 0, false);
                 LLVMValueRef i1 = LLVMConstInt(i32T, 1, false);
                 LLVMValueRef i2 = LLVMConstInt(i32T, 2, false);
@@ -16221,12 +16223,19 @@ struct Expander {
             env->bind(labelname, nextstate);
         }
 
+        size_t numparams = 0;
         Scope *orig_env = env;
         env = Scope::from();
         // read parameter names
         while (it != endit) {
             nextstate->append(expand_parameter(it->at));
+            numparams++;
             it = it->next;
+        }
+
+        if (nextstate->is_variadic()) {
+            // accepts maximum number of arguments
+            numparams = (size_t)-1;
         }
 
         it = values;
@@ -16239,7 +16248,15 @@ struct Expander {
 
         // read init values
         Expander subexp(state, orig_env);
+        size_t numvalues = 0;
         while (it) {
+            numvalues++;
+            if (numvalues > numparams) {
+                set_active_anchor(((const Syntax *)it->at)->anchor);
+                StyledString ss;
+                ss.out << "excess argument is not bound to any name";
+                location_error(ss.str());
+            }
             subexp.next = it->next;
             args.push_back(subexp.expand(it->at, Symbol(SYM_Unnamed), longdest));
             it = subexp.next;
