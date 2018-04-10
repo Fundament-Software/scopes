@@ -972,7 +972,7 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     \
     /* builtin operator functions that can also be used as infix */ \
     T(OP_NotEq, "!=") T(OP_Mod, "%") T(OP_InMod, "%=") T(OP_BitAnd, "&") T(OP_InBitAnd, "&=") \
-    T(OP_IFXMul, "*") T(OP_Pow, "**") T(OP_InMul, "*=") T(OP_IFXAdd, "+") T(OP_Incr, "++") \
+    T(OP_IFXMul, "*") T(OP_Pow, "powf") T(OP_InMul, "*=") T(OP_IFXAdd, "+") T(OP_Incr, "++") \
     T(OP_InAdd, "+=") T(OP_Comma, ",") T(OP_IFXSub, "-") T(OP_Decr, "--") T(OP_InSub, "-=") \
     T(OP_Dot, ".") T(OP_Join, "..") T(OP_Div, "/") T(OP_InDiv, "/=") \
     T(OP_Colon, ":") T(OP_Let, ":=") T(OP_Less, "<") T(OP_LeftArrow, "<-") T(OP_Subtype, "<:") \

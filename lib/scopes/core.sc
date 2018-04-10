@@ -691,6 +691,30 @@ fn abs (x)
 fn sign (x)
     (select-op (typeof x) ssign fsign) x
 
+fn powi (base exponent)
+    assert-typeof base i32
+    assert-typeof exponent i32
+    # special case for constant base 2
+    if (constant? base)
+        if (icmp== base 2)
+            return
+                shl 1 exponent
+    let loop (result cur exponent) =
+        tie-const exponent 1
+        tie-const exponent base
+        exponent
+    if (icmp== exponent 0) result
+    else
+        loop
+            if (icmp== (band exponent 1) 0) result
+            else
+                mul result cur
+            mul cur cur
+            lshr exponent 1
+
+fn pow (x y)
+    (select-op (typeof x) powi powf) x y
+
 fn getattr (self name)
     let T = (typeof self)
     let op success = (type@ T 'getattr)
@@ -1274,22 +1298,6 @@ fn maybe-unsyntax (val)
         extractvalue (load (as val Syntax)) 1
     else val
 
-fn powi (base exponent)
-    assert-typeof base i32
-    assert-typeof exponent i32
-    let loop (result cur exponent) =
-        tie-const exponent 1
-        tie-const exponent base
-        exponent
-    if (icmp== exponent 0) result
-    else
-        loop
-            if (icmp== (band exponent 1) 0) result
-            else
-                mul result cur
-            mul cur cur
-            lshr exponent 1
-
 # print function
 fn print (...)
     fn print-element (val)
@@ -1811,7 +1819,7 @@ define-infix> 600 %
 define-infix> 600 /
 define-infix> 600 //
 define-infix> 600 *
-define-infix< 700 **
+define-infix< 700 ** pow
 define-infix> 750 as
 define-infix> 750 : imply
 define-infix> 800 .
