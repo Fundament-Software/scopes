@@ -3539,34 +3539,45 @@ fn read-eval-print-loop ()
         else (leading-spaces cmd)
     if (not terminated?)
         loop (unconst preload) cmdlist counter
+
+    define-scope-macro set-scope!
+        let scope rest = (decons args)
+        return
+            none
+            scope as Syntax as Scope
+
+    fn handle-retargs (eval-scope counter vals...)
+        let count = (va-countof vals...)
+        let loop (i) = 0
+        if (i < count)
+            let x = (va@ i vals...)
+            let k = (counter + i)
+            let idstr = (make-idstr k)
+            set-scope-symbol! eval-scope (Symbol idstr) x
+            print idstr "=" (Any x)
+            loop (add i 1)
+        unconst count
+
     xpcall
         label ()
             let expr = (list-parse cmdlist)
             let expr-anchor = (Syntax-anchor expr)
-            let f = (compile (eval expr eval-scope))
-            let rettype =
-                element-type (element-type ('typeof f) 0) 0
-            let ModuleFunctionType = (pointer (function (ReturnLabel (unknownof Any))))
-            let fptr =
-                if (rettype == Any)
-                    f as ModuleFunctionType
-                else
-                    # build a wrapper
-                    let expr =
+            let expr =
+                Syntax-wrap expr-anchor
+                    Any
                         list
-                            list let 'tmp '= (list f)
-                            list unconst (list Any-new 'tmp)
-                    let expr = ((Syntax-wrap expr-anchor (Any expr) false) as Syntax)
-                    let f = (compile (eval expr global-scope))
-                    f as ModuleFunctionType
+                            list handle-retargs eval-scope counter
+                                cons do
+                                    list set-scope! eval-scope
+                                    expr as list
+                    false
+            let f = (compile (eval (expr : Syntax) eval-scope))
+            let fptr =
+                f as
+                    pointer (function (ReturnLabel (unknownof i32)))
             set-anchor! expr-anchor
-            let result = (fptr)
-            if (('typeof result) != Nothing)
-                set-scope-symbol! eval-scope (Symbol idstr) result
-                print idstr "=" result
-                loop (unconst "") (unconst "") (counter + 1)
-            else
-                loop (unconst "") (unconst "") counter
+            let count = (fptr)
+            loop (unconst "") (unconst "") (counter + count)
         label (exc)
             io-write!
                 format-exception exc
