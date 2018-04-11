@@ -16,12 +16,13 @@ do
     assert (y == 2)
     assert (z == 3)
 
-# let as last statement in a body
+# let as last statement in a body returns none
 assert
     ==
         call
             fn ()
                 let x = 5
-        5
+        none
+
 
 

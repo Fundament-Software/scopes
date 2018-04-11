@@ -15886,7 +15886,21 @@ struct Expander {
         return (val.type == TYPE_Parameter) || (val.type == TYPE_Label);
     }
 
-    Any write_dest(const Any &value, const Any &dest) {
+    Any write_dest(const Any &dest) {
+        if (dest.type == TYPE_Symbol) {
+            return none;
+        } else if (is_parameter_or_label(dest)) {
+            if (last_expression()) {
+                br(dest, { none });
+            }
+            return none;
+        } else {
+            assert(false && "illegal dest type");
+        }
+        return none;
+    }
+
+    Any write_dest(const Any &dest, const Any &value) {
         if (dest.type == TYPE_Symbol) {
             return value;
         } else if (is_parameter_or_label(dest)) {
@@ -16037,7 +16051,7 @@ struct Expander {
                     :String::from("forward declared function must be named"));
             }
 
-            return write_dest(none, dest);
+            return write_dest(dest);
         }
 
         const Syntax *sxplist = it->at;
@@ -16077,7 +16091,7 @@ struct Expander {
         }
 
         set_active_anchor(_anchor);
-        return write_dest(func, dest);
+        return write_dest(dest, func);
     }
 
     bool is_return_parameter(Any val) {
@@ -16212,7 +16226,7 @@ struct Expander {
                 state = nextstate;
             }
 
-            return write_dest(none, dest);
+            return write_dest(dest);
         }
 
         nextstate = Label::continuation_from(_anchor, labelname);
@@ -16273,11 +16287,7 @@ struct Expander {
         br(nextstate, args);
         state = nextstate;
 
-        if (nextstate->params.size() > 1) {
-            return write_dest(nextstate->params[1], dest);
-        } else {
-            return write_dest(none, dest);
-        }
+        return write_dest(dest);
     }
 
     // quote <value> ...
@@ -16293,7 +16303,7 @@ struct Expander {
         } else {
             result = it;
         }
-        return write_dest(strip_syntax(result), dest);
+        return write_dest(dest, strip_syntax(result));
     }
 
     Any expand_syntax_log(const List *it, const Any &dest, Any longdest) {
@@ -16314,7 +16324,7 @@ struct Expander {
             // ignore
         }
 
-        return write_dest(none, dest);
+        return write_dest(dest);
     }
 
     // (if cond body ...)
@@ -16439,7 +16449,7 @@ struct Expander {
 
     Any expand_call(const List *it, const Any &dest, Any longdest, bool rawcall = false) {
         if (it == EOL)
-            return write_dest(it, dest);
+            return write_dest(dest, it);
         auto _anchor = get_active_anchor();
         Expander subexp(state, env, it->next);
 
@@ -16550,7 +16560,7 @@ struct Expander {
                 stream_expr(ss, sx, StreamExprFormat::debug_digest());
             }
             // return as-is
-            return write_dest(sx->datum, dest);
+            return write_dest(dest, sx->datum);
         }
         Any expr = sx->datum;
         if (expr.type == TYPE_List) {
@@ -16671,14 +16681,14 @@ struct Expander {
                 }
                 location_error(ss.str());
             }
-            return write_dest(result, dest);
+            return write_dest(dest, result);
         } else {
             if (verbose) {
                 StyledStream ss(std::cerr);
                 ss << "ignoring ";
                 stream_expr(ss, sx, StreamExprFormat::debug_digest());
             }
-            return write_dest(expr, dest);
+            return write_dest(dest, expr);
         }
     }
 
