@@ -15885,12 +15885,22 @@ struct Expander {
     bool is_parameter_or_label(Any val) {
         return (val.type == TYPE_Parameter) || (val.type == TYPE_Label);
     }
+    bool is_parameter_or_label_or_none(Any val) {
+        return is_parameter_or_label(val) || (val.type == TYPE_Nothing);
+    }
+
+    void verify_dest_not_none(Any dest) {
+        if (dest.type == TYPE_Nothing) {
+            location_error(String::from("attempting to implicitly return from label"));
+        }
+    }
 
     Any write_dest(const Any &dest) {
         if (dest.type == TYPE_Symbol) {
             return none;
-        } else if (is_parameter_or_label(dest)) {
+        } else if (is_parameter_or_label_or_none(dest)) {
             if (last_expression()) {
+                verify_dest_not_none(dest);
                 br(dest, { none });
             }
             return none;
@@ -15903,8 +15913,9 @@ struct Expander {
     Any write_dest(const Any &dest, const Any &value) {
         if (dest.type == TYPE_Symbol) {
             return value;
-        } else if (is_parameter_or_label(dest)) {
+        } else if (is_parameter_or_label_or_none(dest)) {
             if (last_expression()) {
+                verify_dest_not_none(dest);
                 br(dest, { none, value });
             }
             return value;
@@ -15914,7 +15925,20 @@ struct Expander {
         return none;
     }
 
-    Any expand_syntax_extend(const List *it, const Any &dest, const Any &) {
+    void expand_block(const List *it, const Any &dest) {
+        assert(is_parameter_or_label_or_none(dest));
+        if (it == EOL) {
+            br(dest, { none });
+        } else {
+            while (it) {
+                next = it->next;
+                expand(it->at, dest);
+                it = next;
+            }
+        }
+    }
+
+    Any expand_syntax_extend(const List *it, const Any &dest) {
         auto _anchor = get_active_anchor();
 
         verify_list_parameter_count(it, 1, -1);
@@ -15935,7 +15959,7 @@ struct Expander {
 
         Expander subexpr(func, subenv);
 
-        subexpr.expand_function_body(it, retparam);
+        subexpr.expand_block(it, retparam);
 
         set_active_anchor(_anchor);
 
@@ -15949,7 +15973,7 @@ struct Expander {
             nextstate->append(param);
             args.push_back(nextstate);
             result = param;
-        } else if (is_parameter_or_label(dest)) {
+        } else if (is_parameter_or_label_or_none(dest)) {
             args.push_back(dest);
         } else {
             assert(false && "syntax extend: illegal dest type");
@@ -15963,18 +15987,6 @@ struct Expander {
         state = nextstate;
         next = EOL;
         return result;
-    }
-
-    void expand_function_body(const List *it, const Any &dest) {
-        if (it == EOL) {
-            br(dest, { none });
-        } else {
-            while (it) {
-                next = it->next;
-                expand(it->at, dest, dest);
-                it = next;
-            }
-        }
     }
 
     Parameter *expand_parameter(Any value) {
@@ -15998,7 +16010,7 @@ struct Expander {
         }
     }
 
-    Any expand_fn(const List *it, const Any &dest, const Any &longdest, bool label) {
+    Any expand_fn(const List *it, const Any &dest, bool label) {
         auto _anchor = get_active_anchor();
 
         verify_list_parameter_count(it, 1, -1);
@@ -16062,9 +16074,11 @@ struct Expander {
         Scope *subenv = Scope::from(env);
         // hidden self-binding for subsequent macros
         subenv->bind(SYM_ThisFnCC, func);
+        Any subdest = none;
         if (!label) {
             subenv->bind(KW_Recur, func);
             subenv->bind(KW_Return, retparam);
+            subdest = retparam;
         }
         // ensure the local scope does not contain special symbols
         subenv = Scope::from(subenv);
@@ -16084,7 +16098,7 @@ struct Expander {
             }
         }
 
-        subexpr.expand_function_body(it, label?longdest:Any(func->params[0]));
+        subexpr.expand_block(it, subdest);
 
         if (state) {
             func->body.scope_label = state;
@@ -16102,7 +16116,7 @@ struct Expander {
         return next == EOL;
     }
 
-    Any expand_do(const List *it, const Any &dest, const Any &, bool new_scope) {
+    Any expand_do(const List *it, const Any &dest, bool new_scope) {
         auto _anchor = get_active_anchor();
 
         it = it->next;
@@ -16120,7 +16134,7 @@ struct Expander {
             }
             subdest = nextstate;
             result = param;
-        } else if (is_parameter_or_label(dest)) {
+        } else if (is_parameter_or_label_or_none(dest)) {
             if (dest.type == TYPE_Parameter) {
                 assert(dest.parameter->type != TYPE_Nothing);
             }
@@ -16141,7 +16155,7 @@ struct Expander {
             subenv = Scope::from(env);
         }
         Expander subexpr(func, subenv);
-        subexpr.expand_function_body(it, subdest);
+        subexpr.expand_block(it, subdest);
 
         set_active_anchor(_anchor);
         br(func, { none });
@@ -16156,7 +16170,7 @@ struct Expander {
     // (let x ... [= args ...])
     // (let name ([x ...]) [= args ...])
     // ...
-    Any expand_let(const List *it, const Any &dest, const Any &longdest) {
+    Any expand_let(const List *it, const Any &dest) {
 
         verify_list_parameter_count(it, 1, -1);
         it = it->next;
@@ -16273,7 +16287,7 @@ struct Expander {
                 location_error(ss.str());
             }
             subexp.next = it->next;
-            args.push_back(subexp.expand(it->at, Symbol(SYM_Unnamed), longdest));
+            args.push_back(subexp.expand(it->at, Symbol(SYM_Unnamed)));
             it = subexp.next;
         }
 
@@ -16292,7 +16306,7 @@ struct Expander {
     }
 
     // quote <value> ...
-    Any expand_quote(const List *it, const Any &dest, const Any &) {
+    Any expand_quote(const List *it, const Any &dest) {
         //auto _anchor = get_active_anchor();
 
         verify_list_parameter_count(it, 1, -1);
@@ -16307,7 +16321,7 @@ struct Expander {
         return write_dest(dest, strip_syntax(result));
     }
 
-    Any expand_syntax_log(const List *it, const Any &dest, const Any &) {
+    Any expand_syntax_log(const List *it, const Any &dest) {
         //auto _anchor = get_active_anchor();
 
         verify_list_parameter_count(it, 1, 1);
@@ -16331,7 +16345,7 @@ struct Expander {
     // (if cond body ...)
     // [(elseif cond body ...)]
     // [(else body ...)]
-    Any expand_if(const List *it, const Any &dest, const Any &) {
+    Any expand_if(const List *it, const Any &dest) {
         auto _anchor = get_active_anchor();
 
         std::vector<const List *> branches;
@@ -16379,7 +16393,7 @@ struct Expander {
             }
             subdest = nextstate;
             result = param;
-        } else if (is_parameter_or_label(dest)) {
+        } else if (is_parameter_or_label_or_none(dest)) {
             if (dest.type == TYPE_Parameter) {
                 assert(dest.parameter->type != TYPE_Nothing);
             }
@@ -16401,7 +16415,7 @@ struct Expander {
 
             Expander subexp(state, env);
             subexp.next = it->next;
-            Any cond = subexp.expand(it->at, Symbol(SYM_Unnamed), subdest);
+            Any cond = subexp.expand(it->at, Symbol(SYM_Unnamed));
             it = subexp.next;
 
             Label *thenstate = Label::continuation_from(_anchor, Symbol(SYM_Unnamed));
@@ -16413,7 +16427,7 @@ struct Expander {
 
             subexp.env = Scope::from(env);
             subexp.state = thenstate;
-            subexp.expand_function_body(it, subdest);
+            subexp.expand_block(it, subdest);
 
             state = elsestate;
         }
@@ -16422,7 +16436,7 @@ struct Expander {
         if (it != EOL) {
             it = it->next;
             Expander subexp(state, Scope::from(env));
-            subexp.expand_function_body(it, subdest);
+            subexp.expand_block(it, subdest);
         } else {
             br(subdest, { none });
         }
@@ -16449,7 +16463,7 @@ struct Expander {
         return true;
     }
 
-    Any expand_call(const List *it, const Any &dest, const Any &, bool rawcall = false) {
+    Any expand_call(const List *it, const Any &dest, bool rawcall = false) {
         if (it == EOL)
             return write_dest(dest, it);
         auto _anchor = get_active_anchor();
@@ -16460,15 +16474,13 @@ struct Expander {
 
         Label *nextstate = nullptr;
         Any result = none;
-        Any subdest = dest;
         if (dest.type == TYPE_Symbol) {
             nextstate = Label::continuation_from(_anchor, Symbol(SYM_Unnamed));
             Parameter *param = Parameter::variadic_from(_anchor, Symbol(SYM_Unnamed), TYPE_Unknown);
             nextstate->append(param);
             args.push_back(nextstate);
-            subdest = nextstate;
             result = param;
-        } else if (is_parameter_or_label(dest)) {
+        } else if (is_parameter_or_label_or_none(dest)) {
             if (dest.type == TYPE_Parameter) {
                 assert(dest.parameter->type != TYPE_Nothing);
             }
@@ -16477,13 +16489,12 @@ struct Expander {
             } else {
                 nextstate = Label::continuation_from(_anchor, Symbol(SYM_Unnamed));
                 args.push_back(nextstate);
-                subdest = nextstate;
             }
         } else {
             assert(false && "illegal dest type");
         }
 
-        Any enter = subexp.expand(it->at, Symbol(SYM_Unnamed), subdest);
+        Any enter = subexp.expand(it->at, Symbol(SYM_Unnamed));
         if (is_return_parameter(enter)) {
             assert(enter.parameter->type != TYPE_Nothing);
             args[0] = none;
@@ -16502,9 +16513,9 @@ struct Expander {
             set_active_anchor(((const Syntax *)it->at)->anchor);
             if (get_kwargs(it->at, value)) {
                 value.value = subexp.expand(
-                    value.value, Symbol(SYM_Unnamed), subdest);
+                    value.value, Symbol(SYM_Unnamed));
             } else {
-                value = subexp.expand(it->at, Symbol(SYM_Unnamed), subdest);
+                value = subexp.expand(it->at, Symbol(SYM_Unnamed));
             }
             args.push_back(value);
             it = subexp.next;
@@ -16517,7 +16528,7 @@ struct Expander {
         return result;
     }
 
-    Any expand(const Syntax *sx, const Any &dest, const Any &longdest) {
+    Any expand(const Syntax *sx, const Any &dest) {
     expand_again:
         set_active_anchor(sx->anchor);
         if (sx->quoted) {
@@ -16552,21 +16563,21 @@ struct Expander {
             if (head.type == TYPE_Builtin) {
                 Builtin func = head.builtin;
                 switch(func.value()) {
-                case KW_SyntaxLog: return expand_syntax_log(list, dest, longdest);
-                case KW_Fn: return expand_fn(list, dest, longdest, false);
-                case KW_Label: return expand_fn(list, dest, longdest, true);
-                case KW_SyntaxExtend: return expand_syntax_extend(list, dest, longdest);
-                case KW_Let: return expand_let(list, dest, longdest);
-                case KW_If: return expand_if(list, dest, longdest);
-                case KW_Quote: return expand_quote(list, dest, longdest);
-                case KW_Do: return expand_do(list, dest, longdest, true);
-                case KW_DoIn: return expand_do(list, dest, longdest, false);
+                case KW_SyntaxLog: return expand_syntax_log(list, dest);
+                case KW_Fn: return expand_fn(list, dest, false);
+                case KW_Label: return expand_fn(list, dest, true);
+                case KW_SyntaxExtend: return expand_syntax_extend(list, dest);
+                case KW_Let: return expand_let(list, dest);
+                case KW_If: return expand_if(list, dest);
+                case KW_Quote: return expand_quote(list, dest);
+                case KW_Do: return expand_do(list, dest, true);
+                case KW_DoIn: return expand_do(list, dest, false);
                 case KW_RawCall:
                 case KW_Call: {
                     verify_list_parameter_count(list, 1, -1);
                     list = list->next;
                     assert(list != EOL);
-                    return expand_call(list, dest, longdest, func.value() == KW_RawCall);
+                    return expand_call(list, dest, func.value() == KW_RawCall);
                 } break;
                 default: break;
                 }
@@ -16596,7 +16607,7 @@ struct Expander {
                     ss << "ignored by list handler" << std::endl;
                 }
             }
-            return expand_call(list, dest, longdest);
+            return expand_call(list, dest);
         } else if (expr.type == TYPE_Symbol) {
             if (verbose) {
                 StyledStream ss(std::cerr);
@@ -16674,7 +16685,7 @@ static Label *expand_module(Any expr, Scope *scope) {
     Label *mainfunc = Label::function_from(anchor, anchor->path());
 
     Expander subexpr(mainfunc, scope?scope:globals);
-    subexpr.expand_function_body(expr, mainfunc->params[0]);
+    subexpr.expand_block(expr, mainfunc->params[0]);
 
     return mainfunc;
 }

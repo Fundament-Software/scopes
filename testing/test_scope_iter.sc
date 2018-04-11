@@ -12,6 +12,6 @@ syntax-extend
 let loop (scope) = (globals)
 if (scope != null)
     for k v in scope
-        # print k "=" v
+        #print k "=" v
         assert ((typeof k) == Symbol)
     loop (Scope-parent scope)

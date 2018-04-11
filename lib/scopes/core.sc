@@ -128,14 +128,14 @@ fn Any-new (val)
         Any-wrap val
     else
         let T = (storageof (typeof val))
-        let val =
-            if (tuple-type? T) val
-            else
-                bitcast val T
         fn wrap-error ()
             compiler-error!
                 string-join "unable to wrap value of storage type "
                     Any-repr (Any-wrap T)
+        let val =
+            if (tuple-type? T) val
+            else
+                bitcast val T
         if (pointer-type? T)
             #compiler-message "wrapping pointer"
             construct
@@ -2847,7 +2847,8 @@ typefn extern 'call (self ...)
         let variadic = (rawcall function-type-variadic? ET)
         let loop (i args...) = sz
         if (icmp== i 0)
-            rawcall dest args...
+            return
+                rawcall dest args...
         else
             let i-1 = (sub i 1)
             let arg = (va@ i-1 ...)
@@ -3208,6 +3209,17 @@ fn enumerate (x)
         range 0x7fffffff
         x as Generator
 
+define-macro breakable-block
+    let old-return ok = (syntax-scope @ 'return)
+    list
+        cons fn '()
+            list let 'break '= 'return
+            if ok
+                cons
+                    list let 'return '= old-return
+                    args
+            else args
+
 define-macro for
     let loop (it params) = args (unconst '())
     if (empty? it)
@@ -3222,9 +3234,8 @@ define-macro for
     let start = (Parameter 'start)
     let next = (Parameter 'next)
     let loop = (Symbol "#loop")
-    list do
+    list breakable-block
         list let iter start '= (list (list (do as) generator-expr Generator))
-        list label 'break '()
         list iter
             list label loop (cons next params)
                 list label 'continue '()
@@ -3235,8 +3246,7 @@ define-macro for
 
 define-macro while
     let cond-expr body = (decons args)
-    list do
-        list label 'break '()
+    list breakable-block
         list let 'continue '()
         list if cond-expr
             cons do body

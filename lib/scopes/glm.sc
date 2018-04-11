@@ -122,9 +122,10 @@ fn vec-type-binop (f)
     fn (a b flipped)
         let T1 T2 = (typeof a) (typeof b)
         label compute (a b)
-            if (type== (typeof a) (typeof b))
-                let ET = (@ (typeof a))
-                f ET a b
+            return
+                if (type== (typeof a) (typeof b))
+                    let ET = (@ (typeof a))
+                    f ET a b
         if flipped
             let ET = (@ T2)
             if (T1 <: vec-type)
