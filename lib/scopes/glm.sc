@@ -200,8 +200,13 @@ set-vector-cmp-binop! '> fcmp>o icmp>s icmp>u
 set-vector-cmp-binop! '<= fcmp<=o icmp<=s icmp<=u
 set-vector-cmp-binop! '>= fcmp>=o icmp>=s icmp>=u
 
+set-type-symbol! vec-type 'repr
+    fn "vec-type-repr" (self)
+        repr
+            bitcast self (storageof (typeof self))
+
 set-type-symbol! vec-type 'getattr
-    fn vec-type-getattr (self name)
+    fn "vec-type-getattr" (self name)
         let s = (name as string)
         let set =
             if (string-match? element-set-xyzw s) "xyzw"

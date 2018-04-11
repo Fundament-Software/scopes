@@ -3516,10 +3516,11 @@ fn read-eval-print-loop ()
     let global-scope = (globals)
     let eval-scope = (Scope global-scope)
     set-scope-symbol! eval-scope 'module-dir cwd
-    let loop (preload cmdlist counter) =
+    let loop (preload cmdlist counter eval-scope) =
         unconst ""
         unconst ""
         unconst 0
+        unconst eval-scope
     #dump "loop"
     fn make-idstr (counter)
         .. "$" (string-repr counter)
@@ -3559,7 +3560,7 @@ fn read-eval-print-loop ()
         if terminated? (unconst "")
         else (leading-spaces cmd)
     if (not terminated?)
-        loop (unconst preload) cmdlist counter
+        loop (unconst preload) cmdlist counter eval-scope
 
     define-scope-macro set-scope!
         let scope rest = (decons args)
@@ -3567,7 +3568,12 @@ fn read-eval-print-loop ()
             none
             scope as Syntax as Scope
 
-    fn handle-retargs (eval-scope counter local-scope vals...)
+    define-scope-macro get-scope
+        return
+            syntax-scope
+            syntax-scope
+
+    fn handle-retargs (counter eval-scope local-scope vals...)
         # copy over values from local-scope
         for k v in local-scope
             set-scope-symbol! eval-scope k v
@@ -3578,9 +3584,12 @@ fn read-eval-print-loop ()
             let k = (counter + i)
             let idstr = (make-idstr k)
             set-scope-symbol! eval-scope (Symbol idstr) x
-            print idstr "=" (Any x)
+            print idstr "="
+                repr x
             loop (add i 1)
-        unconst count
+        return
+            unconst eval-scope
+            unconst count
 
     xpcall
         label ()
@@ -3591,24 +3600,24 @@ fn read-eval-print-loop ()
                 Syntax-wrap expr-anchor
                     Any
                         list
-                            list handle-retargs eval-scope counter
+                            list handle-retargs counter
                                 cons do
                                     list set-scope! eval-scope
                                     list __defer (list tmp)
-                                        list _ (list locals) tmp
+                                        list _ (list get-scope) (list locals) tmp
                                     expr as list
                     false
             let f = (compile (eval (expr : Syntax) eval-scope))
             let fptr =
                 f as
-                    pointer (function (ReturnLabel (unknownof i32)))
+                    pointer (function (ReturnLabel (unknownof Scope) (unknownof i32)))
             set-anchor! expr-anchor
-            let count = (fptr)
-            loop (unconst "") (unconst "") (counter + count)
+            let eval-scope count = (fptr)
+            loop (unconst "") (unconst "") (counter + count) eval-scope
         label (exc)
             io-write!
                 format-exception exc
-            loop (unconst "") (unconst "") counter
+            loop (unconst "") (unconst "") counter eval-scope
 
 #-------------------------------------------------------------------------------
 # main
