@@ -528,7 +528,7 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
 
 // list of symbols to be exposed as builtins to the default global namespace
 #define B_GLOBALS() \
-    T(FN_Branch) T(KW_Fn) T(KW_Label) T(KW_SyntaxApplyBlock) T(KW_Quote) \
+    T(FN_Branch) T(KW_Fn) T(KW_Label) T(KW_Quote) \
     T(KW_Call) T(KW_RawCall) T(KW_CCCall) T(SYM_QuoteForm) T(FN_Dump) T(KW_Do) \
     T(FN_FunctionType) T(FN_TupleType) T(FN_UnionType) T(FN_Alloca) T(FN_AllocaOf) T(FN_Malloc) \
     T(FN_AllocaArray) T(FN_MallocArray) T(FN_ReturnLabelType) T(KW_DoIn) \
@@ -757,7 +757,7 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(KW_LoopFor, "loop-for") T(KW_None, "none") T(KW_Null, "null") \
     T(KW_QQuoteSyntax, "qquote-syntax") T(KW_Quote, "quote") \
     T(KW_QuoteSyntax, "quote-syntax") T(KW_Raise, "raise") T(KW_Recur, "recur") \
-    T(KW_Return, "return") T(KW_Splice, "splice") T(KW_SyntaxApplyBlock, "syntax-apply-block") \
+    T(KW_Return, "return") T(KW_Splice, "splice") \
     T(KW_SyntaxExtend, "syntax-extend") T(KW_True, "true") T(KW_Try, "try") \
     T(KW_Unquote, "unquote") T(KW_UnquoteSplice, "unquote-splice") T(KW_ListEmpty, "eol") \
     T(KW_With, "with") T(KW_XFn, "xfn") T(KW_XLet, "xlet") T(KW_Yield, "yield") \
@@ -15914,7 +15914,7 @@ struct Expander {
         return none;
     }
 
-    Any expand_syntax_extend(const List *it, const Any &dest, const Any &longdest) {
+    Any expand_syntax_extend(const List *it, const Any &dest, const Any &) {
         auto _anchor = get_active_anchor();
 
         verify_list_parameter_count(it, 1, -1);
@@ -15965,13 +15965,13 @@ struct Expander {
         return result;
     }
 
-    void expand_function_body(const List *it, const Any &longdest) {
+    void expand_function_body(const List *it, const Any &dest) {
         if (it == EOL) {
-            br(longdest, { none });
+            br(dest, { none });
         } else {
             while (it) {
                 next = it->next;
-                expand(it->at, longdest, longdest);
+                expand(it->at, dest, dest);
                 it = next;
             }
         }
@@ -16102,13 +16102,14 @@ struct Expander {
         return next == EOL;
     }
 
-    Any expand_do(const List *it, const Any &dest, Any longdest, bool new_scope) {
+    Any expand_do(const List *it, const Any &dest, const Any &, bool new_scope) {
         auto _anchor = get_active_anchor();
 
         it = it->next;
 
         Label *nextstate = nullptr;
         Any result = none;
+        Any subdest = dest;
         if (dest.type == TYPE_Symbol) {
             nextstate = Label::continuation_from(_anchor, Symbol(SYM_Unnamed));
             Parameter *param = Parameter::variadic_from(_anchor,
@@ -16117,7 +16118,7 @@ struct Expander {
             if (state) {
                 nextstate->body.scope_label = state;
             }
-            longdest = nextstate;
+            subdest = nextstate;
             result = param;
         } else if (is_parameter_or_label(dest)) {
             if (dest.type == TYPE_Parameter) {
@@ -16128,7 +16129,7 @@ struct Expander {
                 if (state) {
                     nextstate->body.scope_label = state;
                 }
-                longdest = nextstate;
+                subdest = nextstate;
             }
         } else {
             assert(false && "illegal dest type");
@@ -16140,7 +16141,7 @@ struct Expander {
             subenv = Scope::from(env);
         }
         Expander subexpr(func, subenv);
-        subexpr.expand_function_body(it, longdest);
+        subexpr.expand_function_body(it, subdest);
 
         set_active_anchor(_anchor);
         br(func, { none });
@@ -16291,7 +16292,7 @@ struct Expander {
     }
 
     // quote <value> ...
-    Any expand_quote(const List *it, const Any &dest, Any longdest) {
+    Any expand_quote(const List *it, const Any &dest, const Any &) {
         //auto _anchor = get_active_anchor();
 
         verify_list_parameter_count(it, 1, -1);
@@ -16306,7 +16307,7 @@ struct Expander {
         return write_dest(dest, strip_syntax(result));
     }
 
-    Any expand_syntax_log(const List *it, const Any &dest, Any longdest) {
+    Any expand_syntax_log(const List *it, const Any &dest, const Any &) {
         //auto _anchor = get_active_anchor();
 
         verify_list_parameter_count(it, 1, 1);
@@ -16330,7 +16331,7 @@ struct Expander {
     // (if cond body ...)
     // [(elseif cond body ...)]
     // [(else body ...)]
-    Any expand_if(const List *it, const Any &dest, Any longdest) {
+    Any expand_if(const List *it, const Any &dest, const Any &) {
         auto _anchor = get_active_anchor();
 
         std::vector<const List *> branches;
@@ -16368,6 +16369,7 @@ struct Expander {
 
         Label *nextstate = nullptr;
         Any result = none;
+        Any subdest = dest;
         if (dest.type == TYPE_Symbol) {
             nextstate = Label::continuation_from(_anchor, Symbol(SYM_Unnamed));
             Parameter *param = Parameter::variadic_from(_anchor, Symbol(SYM_Unnamed), TYPE_Unknown);
@@ -16375,7 +16377,7 @@ struct Expander {
             if (state) {
                 nextstate->body.scope_label = state;
             }
-            longdest = nextstate;
+            subdest = nextstate;
             result = param;
         } else if (is_parameter_or_label(dest)) {
             if (dest.type == TYPE_Parameter) {
@@ -16386,7 +16388,7 @@ struct Expander {
                 if (state) {
                     nextstate->body.scope_label = state;
                 }
-                longdest = nextstate;
+                subdest = nextstate;
             }
         } else {
             assert(false && "illegal dest type");
@@ -16399,7 +16401,7 @@ struct Expander {
 
             Expander subexp(state, env);
             subexp.next = it->next;
-            Any cond = subexp.expand(it->at, Symbol(SYM_Unnamed), longdest);
+            Any cond = subexp.expand(it->at, Symbol(SYM_Unnamed), subdest);
             it = subexp.next;
 
             Label *thenstate = Label::continuation_from(_anchor, Symbol(SYM_Unnamed));
@@ -16411,7 +16413,7 @@ struct Expander {
 
             subexp.env = Scope::from(env);
             subexp.state = thenstate;
-            subexp.expand_function_body(it, longdest);
+            subexp.expand_function_body(it, subdest);
 
             state = elsestate;
         }
@@ -16420,9 +16422,9 @@ struct Expander {
         if (it != EOL) {
             it = it->next;
             Expander subexp(state, Scope::from(env));
-            subexp.expand_function_body(it, longdest);
+            subexp.expand_function_body(it, subdest);
         } else {
-            br(longdest, { none });
+            br(subdest, { none });
         }
 
         state = nextstate;
@@ -16447,7 +16449,7 @@ struct Expander {
         return true;
     }
 
-    Any expand_call(const List *it, const Any &dest, Any longdest, bool rawcall = false) {
+    Any expand_call(const List *it, const Any &dest, const Any &, bool rawcall = false) {
         if (it == EOL)
             return write_dest(dest, it);
         auto _anchor = get_active_anchor();
@@ -16458,12 +16460,13 @@ struct Expander {
 
         Label *nextstate = nullptr;
         Any result = none;
+        Any subdest = dest;
         if (dest.type == TYPE_Symbol) {
             nextstate = Label::continuation_from(_anchor, Symbol(SYM_Unnamed));
             Parameter *param = Parameter::variadic_from(_anchor, Symbol(SYM_Unnamed), TYPE_Unknown);
             nextstate->append(param);
             args.push_back(nextstate);
-            longdest = nextstate;
+            subdest = nextstate;
             result = param;
         } else if (is_parameter_or_label(dest)) {
             if (dest.type == TYPE_Parameter) {
@@ -16474,13 +16477,13 @@ struct Expander {
             } else {
                 nextstate = Label::continuation_from(_anchor, Symbol(SYM_Unnamed));
                 args.push_back(nextstate);
-                longdest = nextstate;
+                subdest = nextstate;
             }
         } else {
             assert(false && "illegal dest type");
         }
 
-        Any enter = subexp.expand(it->at, Symbol(SYM_Unnamed), longdest);
+        Any enter = subexp.expand(it->at, Symbol(SYM_Unnamed), subdest);
         if (is_return_parameter(enter)) {
             assert(enter.parameter->type != TYPE_Nothing);
             args[0] = none;
@@ -16499,9 +16502,9 @@ struct Expander {
             set_active_anchor(((const Syntax *)it->at)->anchor);
             if (get_kwargs(it->at, value)) {
                 value.value = subexp.expand(
-                    value.value, Symbol(SYM_Unnamed), longdest);
+                    value.value, Symbol(SYM_Unnamed), subdest);
             } else {
-                value = subexp.expand(it->at, Symbol(SYM_Unnamed), longdest);
+                value = subexp.expand(it->at, Symbol(SYM_Unnamed), subdest);
             }
             args.push_back(value);
             it = subexp.next;
@@ -16511,42 +16514,6 @@ struct Expander {
         set_active_anchor(_anchor);
         br(enter, args, rawcall?LBF_RawCall:0);
         state = nextstate;
-        return result;
-    }
-
-    Any expand_syntax_apply_block(const List *it, const Any &dest, const Any &longdest) {
-        auto _anchor = get_active_anchor();
-        verify_list_parameter_count(it, 1, 1);
-
-        it = it->next;
-
-        Expander subexp(state, env, it->next);
-        Label *func = subexp.expand(it->at, Symbol(SYM_Unnamed), longdest);
-        it = subexp.next;
-
-        Args args;
-        args.reserve(((it == EOL)?0:(it->count)) + 1);
-        Label *nextstate = nullptr;
-        Any result = none;
-        if (dest.type == TYPE_Symbol) {
-            nextstate = Label::continuation_from(_anchor, Symbol(SYM_Unnamed));
-            Parameter *param = Parameter::variadic_from(_anchor, Symbol(SYM_Unnamed), TYPE_Unknown);
-            nextstate->append(param);
-            args.push_back(nextstate);
-            result = param;
-        } else if (dest.type == TYPE_Parameter) {
-            args.push_back(dest);
-        } else {
-            assert(false && "illegal dest type");
-        }
-        args.push_back(_anchor);
-        args.push_back(next);
-        args.push_back(env);
-        state = subexp.state;
-        set_active_anchor(_anchor);
-        br(func, args);
-        state = nextstate;
-        next = EOL;
         return result;
     }
 
@@ -16588,7 +16555,6 @@ struct Expander {
                 case KW_SyntaxLog: return expand_syntax_log(list, dest, longdest);
                 case KW_Fn: return expand_fn(list, dest, longdest, false);
                 case KW_Label: return expand_fn(list, dest, longdest, true);
-                case KW_SyntaxApplyBlock: return expand_syntax_apply_block(list, dest, longdest);
                 case KW_SyntaxExtend: return expand_syntax_extend(list, dest, longdest);
                 case KW_Let: return expand_let(list, dest, longdest);
                 case KW_If: return expand_if(list, dest, longdest);
