@@ -3209,16 +3209,27 @@ fn enumerate (x)
         range 0x7fffffff
         x as Generator
 
+define-scope-macro del
+    let loop (args)
+    let head rest = (decons args)
+    let head = (head as Syntax as Symbol)
+    delete-scope-symbol! syntax-scope head
+    if (empty? rest)
+        return none syntax-scope
+    else
+        loop rest
+
 define-macro breakable-block
     let old-return ok = (syntax-scope @ 'return)
     list
         cons fn '()
             list let 'break '= 'return
-            if ok
-                cons
+            cons
+                if ok
                     list let 'return '= old-return
-                    args
-            else args
+                else
+                    list del 'return
+                args
 
 define-macro for
     let loop (it params) = args (unconst '())
