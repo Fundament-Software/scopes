@@ -3567,7 +3567,10 @@ fn read-eval-print-loop ()
             none
             scope as Syntax as Scope
 
-    fn handle-retargs (eval-scope counter vals...)
+    fn handle-retargs (eval-scope counter local-scope vals...)
+        # copy over values from local-scope
+        for k v in local-scope
+            set-scope-symbol! eval-scope k v
         let count = (va-countof vals...)
         let loop (i) = 0
         if (i < count)
@@ -3583,6 +3586,7 @@ fn read-eval-print-loop ()
         label ()
             let expr = (list-parse cmdlist)
             let expr-anchor = (Syntax-anchor expr)
+            let tmp = (Parameter 'vals...)
             let expr =
                 Syntax-wrap expr-anchor
                     Any
@@ -3590,6 +3594,8 @@ fn read-eval-print-loop ()
                             list handle-retargs eval-scope counter
                                 cons do
                                     list set-scope! eval-scope
+                                    list __defer (list tmp)
+                                        list _ (list locals) tmp
                                     expr as list
                     false
             let f = (compile (eval (expr : Syntax) eval-scope))

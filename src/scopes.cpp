@@ -532,7 +532,7 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(KW_Call) T(KW_RawCall) T(KW_CCCall) T(SYM_QuoteForm) T(FN_Dump) T(KW_Do) \
     T(FN_FunctionType) T(FN_TupleType) T(FN_UnionType) T(FN_Alloca) T(FN_AllocaOf) T(FN_Malloc) \
     T(FN_AllocaArray) T(FN_MallocArray) T(FN_ReturnLabelType) T(KW_DoIn) \
-    T(FN_AnyExtract) T(FN_AnyWrap) T(FN_IsConstant) T(FN_Free) \
+    T(FN_AnyExtract) T(FN_AnyWrap) T(FN_IsConstant) T(FN_Free) T(KW_Defer) \
     T(OP_ICmpEQ) T(OP_ICmpNE) T(FN_Sample) T(FN_ImageRead) T(FN_ImageWrite) \
     T(OP_ICmpUGT) T(OP_ICmpUGE) T(OP_ICmpULT) T(OP_ICmpULE) \
     T(OP_ICmpSGT) T(OP_ICmpSGE) T(OP_ICmpSLT) T(OP_ICmpSLE) \
@@ -745,7 +745,7 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     \
     /* keywords and macros */ \
     T(KW_CatRest, "::*") T(KW_CatOne, "::@") \
-    T(KW_SyntaxLog, "syntax-log") T(KW_DoIn, "do-in") \
+    T(KW_SyntaxLog, "syntax-log") T(KW_DoIn, "do-in") T(KW_Defer, "__defer") \
     T(KW_Assert, "assert") T(KW_Break, "break") T(KW_Label, "label") \
     T(KW_Call, "call") T(KW_RawCall, "rawcall") T(KW_CCCall, "cc/call") T(KW_Continue, "continue") \
     T(KW_Define, "define") T(KW_Do, "do") T(KW_DumpSyntax, "dump-syntax") \
@@ -16116,14 +16116,10 @@ struct Expander {
         return next == EOL;
     }
 
-    Any expand_do(const List *it, const Any &dest, bool new_scope) {
+    Label *make_nextstate(const Any &dest, Any &result, Any &subdest) {
         auto _anchor = get_active_anchor();
-
-        it = it->next;
-
         Label *nextstate = nullptr;
-        Any result = none;
-        Any subdest = dest;
+        subdest = dest;
         if (dest.type == TYPE_Symbol) {
             nextstate = Label::continuation_from(_anchor, Symbol(SYM_Unnamed));
             Parameter *param = Parameter::variadic_from(_anchor,
@@ -16148,6 +16144,39 @@ struct Expander {
         } else {
             assert(false && "illegal dest type");
         }
+        return nextstate;
+    }
+
+    Any expand_defer(const List *it, const Any &dest) {
+        auto _anchor = get_active_anchor();
+
+        it = it->next;
+        const List *body = it;
+        const List *block = next;
+        next = EOL;
+
+        Label *nextstate = Label::continuation_from(_anchor, Symbol(SYM_Unnamed));
+
+        expand_block(block, nextstate);
+
+        state = nextstate;
+        // read parameter names
+        it = unsyntax(it->at);
+        while (it != EOL) {
+            nextstate->append(expand_parameter(it->at));
+            it = it->next;
+        }
+        return expand_do(body, dest, false);
+    }
+
+    Any expand_do(const List *it, const Any &dest, bool new_scope) {
+        auto _anchor = get_active_anchor();
+
+        it = it->next;
+
+        Any result = none;
+        Any subdest = none;
+        Label *nextstate = make_nextstate(dest, result, subdest);
 
         Label *func = Label::continuation_from(_anchor, Symbol(SYM_Unnamed));
         Scope *subenv = env;
@@ -16381,32 +16410,9 @@ struct Expander {
             branches.push_back(EOL);
         }
 
-        Label *nextstate = nullptr;
         Any result = none;
-        Any subdest = dest;
-        if (dest.type == TYPE_Symbol) {
-            nextstate = Label::continuation_from(_anchor, Symbol(SYM_Unnamed));
-            Parameter *param = Parameter::variadic_from(_anchor, Symbol(SYM_Unnamed), TYPE_Unknown);
-            nextstate->append(param);
-            if (state) {
-                nextstate->body.scope_label = state;
-            }
-            subdest = nextstate;
-            result = param;
-        } else if (is_parameter_or_label_or_none(dest)) {
-            if (dest.type == TYPE_Parameter) {
-                assert(dest.parameter->type != TYPE_Nothing);
-            }
-            if (!last_expression()) {
-                nextstate = Label::continuation_from(_anchor, Symbol(SYM_Unnamed));
-                if (state) {
-                    nextstate->body.scope_label = state;
-                }
-                subdest = nextstate;
-            }
-        } else {
-            assert(false && "illegal dest type");
-        }
+        Any subdest = none;
+        Label *nextstate = make_nextstate(dest, result, subdest);
 
         int lastidx = (int)branches.size() - 1;
         for (int idx = 0; idx < lastidx; ++idx) {
@@ -16472,27 +16478,10 @@ struct Expander {
         Args args;
         args.reserve(it->count);
 
-        Label *nextstate = nullptr;
         Any result = none;
-        if (dest.type == TYPE_Symbol) {
-            nextstate = Label::continuation_from(_anchor, Symbol(SYM_Unnamed));
-            Parameter *param = Parameter::variadic_from(_anchor, Symbol(SYM_Unnamed), TYPE_Unknown);
-            nextstate->append(param);
-            args.push_back(nextstate);
-            result = param;
-        } else if (is_parameter_or_label_or_none(dest)) {
-            if (dest.type == TYPE_Parameter) {
-                assert(dest.parameter->type != TYPE_Nothing);
-            }
-            if (last_expression()) {
-                args.push_back(dest);
-            } else {
-                nextstate = Label::continuation_from(_anchor, Symbol(SYM_Unnamed));
-                args.push_back(nextstate);
-            }
-        } else {
-            assert(false && "illegal dest type");
-        }
+        Any subdest = none;
+        Label *nextstate = make_nextstate(dest, result, subdest);
+        args.push_back(subdest);
 
         Any enter = subexp.expand(it->at, Symbol(SYM_Unnamed));
         if (is_return_parameter(enter)) {
@@ -16570,6 +16559,7 @@ struct Expander {
                 case KW_Let: return expand_let(list, dest);
                 case KW_If: return expand_if(list, dest);
                 case KW_Quote: return expand_quote(list, dest);
+                case KW_Defer: return expand_defer(list, dest);
                 case KW_Do: return expand_do(list, dest, true);
                 case KW_DoIn: return expand_do(list, dest, false);
                 case KW_RawCall:
