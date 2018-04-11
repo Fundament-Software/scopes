@@ -3215,7 +3215,7 @@ define-scope-macro del
     let head = (head as Syntax as Symbol)
     delete-scope-symbol! syntax-scope head
     if (empty? rest)
-        return none syntax-scope
+        return (list _) syntax-scope
     else
         loop rest
 
