@@ -3204,6 +3204,17 @@ fn zip (a b)
                 \ fdone a
         tupleof init-a init-b
 
+fn map (x f)
+    let iter init = ((x as Generator))
+    Generator
+        label (fret fdone value)
+            iter
+                label (next values...)
+                    fret next (f values...)
+                fdone
+                value
+        init
+
 fn enumerate (x)
     zip
         range 0x7fffffff
