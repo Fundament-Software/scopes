@@ -3209,6 +3209,18 @@ fn enumerate (x)
         range 0x7fffffff
         x as Generator
 
+fn fold (init gen f)
+    let iter start = ((gen as Generator))
+    let loop (result next) = init start
+    label break ()
+        return result
+    iter
+        label (next args...)
+            loop
+                f result args...
+                next
+        \ break next
+
 define-scope-macro del
     let loop (args)
     let head rest = (decons args)
