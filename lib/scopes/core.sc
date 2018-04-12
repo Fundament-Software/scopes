@@ -3208,9 +3208,14 @@ fn map (x f)
     let iter init = ((x as Generator))
     Generator
         label (fret fdone value)
+            let skip (value) = value
             iter
                 label (next values...)
-                    fret next (f values...)
+                    let result... = (f values...)
+                    if (va-empty? result...)
+                        skip next
+                    else
+                        fret next result...
                 fdone
                 value
         init
@@ -3227,9 +3232,13 @@ fn fold (init gen f)
         return result
     iter
         label (next args...)
-            loop
-                f result args...
-                next
+            let result... = (f result args...)
+            if (va-empty? result...)
+                break;
+            else
+                loop
+                    result...
+                    next
         \ break next
 
 define-scope-macro del
