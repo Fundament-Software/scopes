@@ -1821,7 +1821,6 @@ define-infix> 600 //
 define-infix> 600 *
 define-infix< 700 ** pow
 define-infix> 750 as
-define-infix> 750 : imply
 define-infix> 800 .
 define-infix> 800 @
 #define-infix> 800 .=
@@ -3211,11 +3210,11 @@ fn map (x f)
             let skip (value) = value
             iter
                 label (next values...)
-                    let result... = (f values...)
-                    if (va-empty? result...)
-                        skip next
-                    else
-                        fret next result...
+                    fret next
+                        f
+                            label ()
+                                skip next
+                            values...
                 fdone
                 value
         init
@@ -3232,13 +3231,9 @@ fn fold (init gen f)
         return result
     iter
         label (next args...)
-            let result... = (f result args...)
-            if (va-empty? result...)
-                break;
-            else
-                loop
-                    result...
-                    next
+            loop
+                f break result args...
+                next
         \ break next
 
 define-scope-macro del
@@ -3639,7 +3634,7 @@ fn read-eval-print-loop ()
                                         list _ (list get-scope) (list locals) tmp
                                     expr as list
                     false
-            let f = (compile (eval (expr : Syntax) eval-scope))
+            let f = (compile (eval (expr as Syntax) eval-scope))
             let fptr =
                 f as
                     pointer (function (ReturnLabel (unknownof Scope) (unknownof i32)))
