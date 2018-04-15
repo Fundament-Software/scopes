@@ -3046,6 +3046,55 @@ define-scope-macro struct
             syntax-scope
 
 #-------------------------------------------------------------------------------
+# enum declaration
+#-------------------------------------------------------------------------------
+
+define-scope-macro enum
+    fn make-enum (T vals...)
+        set-typename-super! T CEnum
+        set-typename-storage! T i32
+        let count = (va-countof vals...)
+        let keys... = (va-keys vals...)
+        let loop (i nextval) = 0 0
+        if (i < count)
+            let key = (va@ i keys...)
+            let val = (va@ i vals...)
+            if (not (constant? val))
+                compiler-error! "all enum values must be constant"
+            loop (i + 1)
+                if (key == unnamed)
+                    # auto-numerical
+                    set-type-symbol! T val (bitcast (imply nextval i32) T)
+                    nextval + 1
+                else
+                    set-type-symbol! T key (bitcast (imply val i32) T)
+                    val + 1
+        T
+
+    fn convert-body (body)
+        let expr body = (decons body)
+        let anyexpr = (expr as Syntax as Any)
+        cons
+            if (('typeof anyexpr) == Symbol)
+                list quote expr
+            else expr
+            if (empty? body) '()
+            else
+                convert-body body
+
+    let name body = (decons args)
+    let anyname = (name as Syntax as Any)
+    let newbody = (convert-body body)
+    return
+        if (('typeof anyname) == Symbol)
+            let namestr = (anyname as Symbol as string)
+            list let name '=
+                cons make-enum (list typename-type namestr) newbody
+        else
+            cons make-enum (list typename-type (list (do as) name string)) newbody
+        syntax-scope
+
+#-------------------------------------------------------------------------------
 # tuples
 #-------------------------------------------------------------------------------
 
@@ -3368,6 +3417,18 @@ set-type-symbol! vector '<= (vector-op2-dispatch 'vector<=)
 
 typefn vector 'countof (self)
     type-countof (typeof self)
+
+typefn vector 'repr (self)
+    let count = (type-countof (typeof self))
+    let loop (i result) = 0:usize ""
+    if (i < count)
+        loop (i + 1:usize)
+            .. result
+                if (i == 0:usize) "<"
+                else " "
+                repr (extractelement self i)
+    else
+        .. result ">"
 
 typefn vector 'unpack (v)
     let count = (type-countof (typeof v))

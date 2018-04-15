@@ -13,6 +13,7 @@ let modules =
         .test_dispatch
         .test_docstring
         .test_dots
+        .test_enums
         .test_extraparams
         .test_frame
         .test_folding
