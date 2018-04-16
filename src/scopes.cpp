@@ -2767,39 +2767,76 @@ static void verify_vector_sizes(const Type *type1, const Type *type2) {
 // TUPLE TYPE
 //------------------------------------------------------------------------------
 
+struct Argument {
+    Symbol key;
+    Any value;
+
+    Argument() : key(SYM_Unnamed), value(none) {}
+    Argument(Any _value) : key(SYM_Unnamed), value(_value) {}
+    Argument(Symbol _key, Any _value) : key(_key), value(_value) {}
+    template<typename T>
+    Argument(const T &x) : key(SYM_Unnamed), value(x) {}
+
+    bool operator ==(const Argument &other) const {
+        return (key == other.key) && (value == other.value);
+    }
+
+    bool operator !=(const Argument &other) const {
+        return (key != other.key) || (value != other.value);
+    }
+
+    uint64_t hash() const {
+        return HashLen16(std::hash<uint64_t>{}(key.value()), value.hash());
+    }
+};
+
+static StyledStream& operator<<(StyledStream& ost, Argument value) {
+    if (value.key != SYM_Unnamed) {
+        ost << value.key << Style_Operator << "=" << Style_None;
+    }
+    ost << value.value;
+    return ost;
+}
+
+typedef std::vector<Argument> Args;
+
 struct TupleType : StorageType {
     static bool classof(const Type *T) {
         return T->kind() == TK_Tuple;
     }
 
-    TupleType(const std::vector<Any> &_types)
-        : StorageType(TK_Tuple) {
-        packed = _types.back().i1;
-        size_t explicit_alignment = _types[_types.size()-2].sizeval;
-        size_t tcount = _types.size() - 2;
+    TupleType(const Args &_values, bool _packed, size_t _alignment)
+        : StorageType(TK_Tuple), values(_values), packed(_packed) {
+        StyledString ss = StyledString::plain();
+        if (_alignment) {
+            ss.out << "[align:" << _alignment << "]";
+        }
+        if (packed) {
+            ss.out << "<";
+        }
+        ss.out << "{";
+        size_t tcount = values.size();
         types.reserve(tcount);
-        for (size_t i = 0; i < tcount; ++i) {
-            types.push_back(_types[i]);
-        }
-        std::stringstream ss;
-        if (explicit_alignment) {
-            ss << "[align:" << explicit_alignment << "]";
-        }
-        if (packed) {
-            ss << "<";
-        }
-        ss << "{";
-        for (size_t i = 0; i < types.size(); ++i) {
+        for (size_t i = 0; i < values.size(); ++i) {
             if (i > 0) {
-                ss << " ";
+                ss.out << " ";
             }
-            ss << types[i]->name()->data;
+            if (values[i].key != SYM_Unnamed) {
+                ss.out << values[i].key.name()->data << "=";
+            }
+            if (is_unknown(values[i].value)) {
+                ss.out << values[i].value.typeref->name()->data;
+                types.push_back(values[i].value.typeref);
+            } else {
+                ss.out << "!" << values[i].value.type;
+                types.push_back(values[i].value.type);
+            }
         }
-        ss << "}";
+        ss.out << "}";
         if (packed) {
-            ss << ">";
+            ss.out << ">";
         }
-        _name = String::from_stdstring(ss.str());
+        _name = ss.str();
 
         offsets.resize(types.size());
         size_t sz = 0;
@@ -2824,8 +2861,8 @@ struct TupleType : StorageType {
             size = ::align(sz, al);
             align = al;
         }
-        if (explicit_alignment) {
-            align = explicit_alignment;
+        if (_alignment) {
+            align = _alignment;
             size = ::align(sz, align);
         }
     }
@@ -2844,22 +2881,77 @@ struct TupleType : StorageType {
         return types[i];
     }
 
+    Args values;
+    bool packed;
     std::vector<const Type *> types;
     std::vector<size_t> offsets;
-    bool packed;
 };
+
+static const Type *MixedTuple(const Args &values,
+    bool packed = false, size_t alignment = 0) {
+    struct TypeArgs {
+        Args args;
+        bool packed;
+        size_t alignment;
+
+        TypeArgs() {}
+        TypeArgs(const Args &_args, bool _packed, size_t _alignment)
+            : args(_args), packed(_packed), alignment(_alignment) {}
+
+        bool operator==(const TypeArgs &other) const {
+            if (packed != other.packed) return false;
+            if (alignment != other.alignment) return false;
+            if (args.size() != other.args.size()) return false;
+            for (size_t i = 0; i < args.size(); ++i) {
+                auto &&a = args[i];
+                auto &&b = other.args[i];
+                if (a != b)
+                    return false;
+            }
+            return true;
+        }
+
+        struct Hash {
+            std::size_t operator()(const TypeArgs& s) const {
+                std::size_t h = std::hash<bool>{}(s.packed);
+                h = HashLen16(h, std::hash<size_t>{}(s.alignment));
+                for (auto &&arg : s.args) {
+                    h = HashLen16(h, arg.hash());
+                }
+                return h;
+            }
+        };
+    };
+
+    typedef std::unordered_map<TypeArgs, TupleType *, typename TypeArgs::Hash> ArgMap;
+
+    static ArgMap map;
+
+#ifdef SCOPES_DEBUG
+    for (size_t i = 0; i < values.size(); ++i) {
+        assert(values[i].value.is_const());
+    }
+#endif
+
+    TypeArgs ta(values, packed, alignment);
+    typename ArgMap::iterator it = map.find(ta);
+    if (it == map.end()) {
+        TupleType *t = new TupleType(values, packed, alignment);
+        map.insert({ta, t});
+        return t;
+    } else {
+        return it->second;
+    }
+}
 
 static const Type *Tuple(const std::vector<const Type *> &types,
     bool packed = false, size_t alignment = 0) {
-    static TypeFactory<TupleType> tuples;
-    std::vector<Any> atypes;
-    atypes.reserve(types.size() + 1);
-    for (auto &&arg : types) {
-        atypes.push_back(arg);
+    Args args;
+    args.reserve(types.size());
+    for (size_t i = 0; i < types.size(); ++i) {
+        args.push_back(unknown_of(types[i]));
     }
-    atypes.push_back(alignment);
-    atypes.push_back(packed);
-    return tuples.insert(atypes);
+    return MixedTuple(args, packed, alignment);
 }
 
 //------------------------------------------------------------------------------
@@ -3000,39 +3092,6 @@ static const Type *Extern(const Type *type,
 //------------------------------------------------------------------------------
 // TYPED LABEL TYPE
 //------------------------------------------------------------------------------
-
-struct Argument {
-    Symbol key;
-    Any value;
-
-    Argument() : key(SYM_Unnamed), value(none) {}
-    Argument(Any _value) : key(SYM_Unnamed), value(_value) {}
-    Argument(Symbol _key, Any _value) : key(_key), value(_value) {}
-    template<typename T>
-    Argument(const T &x) : key(SYM_Unnamed), value(x) {}
-
-    bool operator ==(const Argument &other) const {
-        return (key == other.key) && (value == other.value);
-    }
-
-    bool operator !=(const Argument &other) const {
-        return (key != other.key) || (value != other.value);
-    }
-
-    uint64_t hash() const {
-        return HashLen16(std::hash<uint64_t>{}(key.value()), value.hash());
-    }
-};
-
-static StyledStream& operator<<(StyledStream& ost, Argument value) {
-    if (value.key != SYM_Unnamed) {
-        ost << value.key << Style_Operator << "=" << Style_None;
-    }
-    ost << value.value;
-    return ost;
-}
-
-typedef std::vector<Argument> Args;
 
 static void stream_args(StyledStream &ss, const Args &args, size_t start = 1) {
     for (size_t i = start; i < args.size(); ++i) {
