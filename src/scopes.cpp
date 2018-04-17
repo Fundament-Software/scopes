@@ -13491,17 +13491,19 @@ struct Solver {
                     << " because storage types are not of compatible category";
                 location_error(ss.str());
             }
-            switch (SDestT->kind()) {
-            case TK_Array:
-            //case TK_Vector:
-            case TK_Tuple:
-            case TK_Union: {
-                StyledString ss;
-                ss.out << "can not bitcast to type " << DestT
-                    << " with aggregate storage type " << SDestT;
-                location_error(ss.str());
-            } break;
-            default: break;
+            if (SSrcT != SDestT) {
+                switch (SDestT->kind()) {
+                case TK_Array:
+                //case TK_Vector:
+                case TK_Tuple:
+                case TK_Union: {
+                    StyledString ss;
+                    ss.out << "can not bitcast to type " << DestT
+                        << " with aggregate storage type " << SDestT;
+                    location_error(ss.str());
+                } break;
+                default: break;
+                }
             }
             if (args[1].value.is_const()) {
                 Any result = args[1].value;
