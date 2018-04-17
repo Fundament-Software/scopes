@@ -1,4 +1,3 @@
-
 fn begin-arg ()
 let val =
     fn (f)
@@ -83,25 +82,24 @@ do
     assert
         cell1.next.next.at == 3
 
+    # using a struct on the heap
+    struct Val
+        x : i32
+        y : i32
 
-# using a struct on the heap
-struct Val
-    x : i32
-    y : i32
+    fn new (val)
+        let mval = (malloc (typeof val))
+        let mval = (reference.from-pointer mval)
+        mval = val
+        mval
 
-fn new (val)
-    let mval = (malloc (typeof val))
-    let mval = (reference.from-pointer mval)
-    mval = val
-    mval
+    fn delete (val)
+        free (bitcast val (storageof (typeof val)))
 
-fn delete (val)
-    free (bitcast val (storageof (typeof val)))
+    let testval =
+        new (Val 1 2)
+    assert (testval.x == 1)
+    assert (testval.y == 2)
+    delete testval
 
-let testval =
-    new (Val 1 2)
-assert (testval.x == 1)
-assert (testval.y == 2)
-delete testval
-
-none
+    none

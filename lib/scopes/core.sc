@@ -1088,6 +1088,7 @@ syntax-extend
     set-type-symbol! union 'apply-type
         fn (cls ...)
             union-type ...
+
     set-type-symbol! typename 'apply-type
         fn (cls name args...)
             #   calling typename from different modules with the same string
@@ -1098,6 +1099,7 @@ syntax-extend
                 compiler-error!
                     "typename constructor must be invoked with one or more unique tokens"
             typename-type name
+
     set-type-symbol! function 'apply-type
         fn (cls ...)
             function-type ...
@@ -1454,12 +1456,12 @@ syntax-extend
                 BlockScopeFunction
     fn scope-macro (f)
         block-scope-macro
-            fn (at next scope)
+            fn "block-scope-macro" (at next scope)
                 let at scope = (f (list-next at) scope)
                 return (cons at next) scope
     fn macro (f)
         block-scope-macro
-            fn (at next scope)
+            fn "block-scope-macro" (at next scope)
                 return (cons (f (list-next at)) next) scope
 
     # dotted symbol expander
@@ -2994,39 +2996,47 @@ define-scope-macro struct
             _ CUnion (head as Syntax) body
         else
             _ CStruct head body
+    fn complete-declaration ()
     if (('typeof (name as Any)) == Symbol)
         # constant
-        let name = (name as Any as Symbol)
+        let symname = (name as Any as Symbol)
         # see if we can find a forward declaration in the local scope
-        let T ok = (Scope-local@ syntax-scope name)
-        let TT = ('typeof T)
-        let T =
-            if (and ok
-                (type? TT)
-                (typename-type? (T as type))
-                (opaque? (T as type))
-                ((superof (T as type)) == superT))
-                T as type
-            else
-                let T = (typename (name as string) (fn ()))
-                set-typename-super! T superT
-                set-scope-symbol! syntax-scope name T
-                T
+        let T ok = (Scope-local@ syntax-scope symname)
+        fn completable-type? (T)
+            and
+                (typeof T) == type
+                typename-type? T
+                opaque? T
+                (superof T) == typename
+
         return
             if (empty? body)
                 # forward declaration
-                unconst
+                list let name '=
                     list do
+                        list using struct-dsl
+                        list let 'this-struct '=
+                            list typename-type
+                                symname as string
+                        'this-struct
             else
-                cons do
-                    list using struct-dsl
-                    list let 'this-struct '= T
-                    list let 'field-names '= end-args
-                    list let 'field-types '= end-args
-                    ..
-                        cons do body
-                        list
-                            list finalize-struct T 'field-names 'field-types
+                # body declaration
+                list let name '=
+                    cons do
+                        list using struct-dsl
+                        list let 'this-struct '=
+                            list if (list completable-type? T) T
+                            list 'else
+                                list typename-type
+                                    symname as string
+                        list let name '= 'this-struct
+                        list set-typename-super! 'this-struct superT
+                        list let 'field-names '= end-args
+                        list let 'field-types '= end-args
+                        ..
+                            cons do body
+                            list
+                                list finalize-struct 'this-struct 'field-names 'field-types
             syntax-scope
     else
         # expression
