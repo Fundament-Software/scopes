@@ -16,6 +16,7 @@ let modules =
         .test_enums
         .test_extraparams
         .test_frame
+        .test_from
         .test_folding
         .test_fwdecl
         .test_glsl

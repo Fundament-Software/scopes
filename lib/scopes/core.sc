@@ -2948,6 +2948,35 @@ define-scope-macro using
             cons merge-scope-symbols name 'syntax-scope pattern
         syntax-scope
 
+define-macro from
+    fn load-from (src keys...)
+        let loop (i result...) = (va-countof keys...)
+        if (i == 0)
+            result...
+        else
+            let i = (i - 1)
+            let key = (va@ i keys...)
+            loop i
+                src @ key
+                result...
+    let src kw params = (decons args 2)
+    if ((kw as Syntax as Symbol) != 'let)
+        syntax-error! kw "`let` keyword expected"
+    fn quotify (params)
+        if (empty? params)
+            unconst '()
+        else
+            let entry rest = (decons params)
+            entry as Syntax as Symbol
+            cons
+                list quote entry
+                quotify rest
+    cons let
+        .. params
+            list '=
+                cons load-from src
+                    quotify params
+
 #-------------------------------------------------------------------------------
 # struct declaration
 #-------------------------------------------------------------------------------
