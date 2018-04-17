@@ -1089,7 +1089,14 @@ syntax-extend
         fn (cls ...)
             union-type ...
     set-type-symbol! typename 'apply-type
-        fn (cls name ...)
+        fn (cls name args...)
+            #   calling typename from different modules with the same string
+                will return the same type due to memoization; passing extra,
+                ideally unique tokens, e.g. a new, empty function, will ensure
+                that the memoization is sufficiently unique.
+            if (va-empty? args...)
+                compiler-error!
+                    "typename constructor must be invoked with one or more unique tokens"
             typename-type name
     set-type-symbol! function 'apply-type
         fn (cls ...)
@@ -1419,7 +1426,7 @@ syntax-extend
                 if (type== a b) true
                 else (<: b a)
 
-    let Macro = (typename "Macro")
+    let Macro = (typename "Macro" (fn ()))
     let BlockScopeFunction =
         pointer
             function
@@ -1985,7 +1992,7 @@ define-macro fn...
 #-------------------------------------------------------------------------------
 
 define reference
-    typename "reference"
+    typename "reference" (fn ())
 
 let voidstar = (pointer void)
 
@@ -2090,7 +2097,7 @@ do
 
     fn make-reference-type (PT)
         #let ET = (element-type PT 0)
-        let T = (typename (.. "&" (type-name PT)))
+        let T = (typename (.. "&" (type-name PT)) (fn ()))
         set-typename-super! T reference
         set-typename-storage! T PT
         T
@@ -2217,7 +2224,7 @@ define-macro typefn
 # compile time function chaining
 #-------------------------------------------------------------------------------
 
-define fnchain (typename "fnchain")
+define fnchain (typename "fnchain" (fn ()))
 typefn fnchain 'apply-type (cls name ...)
     let T = (typename (.. "<fnchain " name ">") ...)
     set-typename-super! T cls
@@ -2351,7 +2358,7 @@ syntax-extend
             let package = (unconst package)
             package.path as list
 
-    let incomplete = (typename "incomplete")
+    let incomplete = (typename "incomplete" (fn ()))
     fn require-from (base-dir name)
         let name = (unconst name)
         let package = (unconst package)
@@ -2614,7 +2621,7 @@ typefn Closure 'imply (self destT)
 
 # a nullptr type that casts to whatever null pointer is required
 syntax-extend
-    let NullType = (typename "NullType")
+    let NullType = (typename "NullType" (fn ()))
     set-typename-storage! NullType (pointer void)
     set-type-symbol! NullType 'imply
         fn (self destT)
@@ -2792,14 +2799,7 @@ typefn CStruct 'structof (cls args...)
 # support for C struct initializers
 typefn CStruct 'apply-type (cls args...)
     if (cls == CStruct)
-        let name fields... = args...
-        let T = (typename name)
-        set-typename-super! T CStruct
-        set-typename-storage! T (tuple (va-values fields...))
-        let types... = (va-keys fields...)
-        if (not (va-empty? types...))
-            set-typename-fields! T types...
-        T
+        compiler-error! "CStruct type constructor is deprecated"
     else
         'structof cls args...
 
@@ -3008,7 +3008,7 @@ define-scope-macro struct
                 ((superof (T as type)) == superT))
                 T as type
             else
-                let T = (typename (name as string))
+                let T = (typename (name as string) (fn ()))
                 set-typename-super! T superT
                 set-scope-symbol! syntax-scope name T
                 T
@@ -3020,7 +3020,7 @@ define-scope-macro struct
             else
                 cons do
                     list using struct-dsl
-                    list define 'this-struct T
+                    list let 'this-struct '= T
                     list let 'field-names '= end-args
                     list let 'field-types '= end-args
                     ..
@@ -3164,8 +3164,7 @@ fn arrayof (T ...)
 # iterators
 #-------------------------------------------------------------------------------
 
-define Generator
-    typename "Generator"
+let Generator = (typename "Generator" (fn ()))
 set-typename-storage! Generator (storageof Closure)
 typefn Generator 'apply-type (cls iter init)
     fn get-iter-init ()
