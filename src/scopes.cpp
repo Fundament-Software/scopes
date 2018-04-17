@@ -852,7 +852,7 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(FN_LabelEq, "Label==") \
     T(FN_LabelNew, "Label-new") T(FN_LabelParameters, "Label-parameters") \
     T(FN_LabelAnchor, "Label-anchor") \
-    T(FN_ClosureEq, "Closure==") \
+    T(FN_ClosureEq, "Closure==") T(FN_CheckStack, "verify-stack!") \
     T(FN_ListAtom, "list-atom?") T(FN_ListCountOf, "list-countof") \
     T(FN_ListLoad, "list-load") T(FN_ListJoin, "list-join") \
     T(FN_ListParse, "list-parse") T(FN_IsList, "list?") T(FN_Load, "load") \
@@ -13498,7 +13498,8 @@ struct Solver {
                 case TK_Tuple:
                 case TK_Union: {
                     StyledString ss;
-                    ss.out << "can not bitcast to type " << DestT
+                    ss.out << "can not bitcast value of type " << SrcT
+                        << " to type " << DestT
                         << " with aggregate storage type " << SDestT;
                     location_error(ss.str());
                 } break;
@@ -17476,12 +17477,20 @@ static void f_enter_solver_cli () {
     Solver::enable_step_debugger = true;
 }
 
-const String *f_label_docstring(Label *label) {
+static const String *f_label_docstring(Label *label) {
     if (label->docstring) {
         return label->docstring;
     } else {
         return Symbol(SYM_Unnamed).name();
     }
+}
+
+static size_t f_verify_stack () {
+    size_t ssz = memory_stack_size();
+    if (ssz >= SCOPES_MAX_STACK_SIZE) {
+        location_error(String::from("verify-stack!: stack overflow"));
+    }
+    return ssz;
 }
 
 static void init_globals(int argc, char *argv[]) {
@@ -17598,6 +17607,8 @@ static void init_globals(int argc, char *argv[]) {
     DEFINE_C_FUNCTION(SFXFN_Raise, f_raise, TYPE_Void, TYPE_Any);
     DEFINE_C_FUNCTION(SFXFN_Abort, f_abort, TYPE_Void);
     DEFINE_C_FUNCTION(FN_Exit, f_exit, TYPE_Void, TYPE_I32);
+    DEFINE_C_FUNCTION(FN_CheckStack, f_verify_stack, TYPE_USize);
+
     //DEFINE_C_FUNCTION(FN_Malloc, malloc, NativePointer(TYPE_I8), TYPE_USize);
 
     const Type *exception_pad_type = Array(TYPE_U8, sizeof(ExceptionPad));
