@@ -820,27 +820,51 @@ fn imply (value dest-type)
                 string-join " to "
                     Any-repr (Any-wrap dest-type)
 
+let hash = (typename-type "hash")
+set-typename-storage! hash u64
+
 fn forward-hash (value)
     let T = (typeof value)
+    if (type== T hash)
+        return value
     let f ok = (type@ T 'hash)
     if ok
-        f value
-    else
-        let T =
-            if (opaque? T) T
-            else (storageof T)
-        if (integer-type? T)
+        let result = (f value)
+        if (type== (typeof result) hash)
+            return result
+        else
+            compiler-error!
+                string-join "value of type "
+                    string-join (Any-repr (Any-wrap T))
+                        string-join "did not hash to type"
+                            Any-repr (Any-wrap hash)
+    let T =
+        if (opaque? T) T
+        else (storageof T)
+    if (integer-type? T)
+        bitcast
             __hash
                 zext (bitcast value T) u64
                 sizeof T
-        elseif (type== T f32)
+            hash
+    elseif (pointer-type? T)
+        bitcast
+            __hash
+                ptrtoint value u64
+                sizeof T
+            hash
+    elseif (type== T f32)
+        bitcast
             __hash
                 zext (bitcast value u32) u64
                 sizeof T
-        elseif (type== T f64)
+            hash
+    elseif (type== T f64)
+        bitcast
             __hash
                 bitcast value u64
                 sizeof T
+            hash
 
 fn hash1 (value)
     let result... = (forward-hash value)
@@ -853,15 +877,23 @@ fn hash1 (value)
 let hash2 =
     op2-ltr-multiop
         fn "hash2" (a b)
-            __hash2x64
-                hash1 a
-                hash1 b
+            bitcast
+                __hash2x64
+                    bitcast (hash1 a) u64
+                    bitcast (hash1 b) u64
+                hash
 
-fn hash (values...)
-    if (icmp<s (va-countof values...) 2)
-        hash1 values...
-    else
-        hash2 values...
+set-type-symbol! hash 'imply
+    fn "hash-imply" (self T)
+        if (type== T u64)
+            bitcast self u64
+
+set-type-symbol! hash 'apply-type
+    fn "hash" (cls values...)
+        if (icmp<s (va-countof values...) 2)
+            hash1 values...
+        else
+            hash2 values...
 
 fn Any-extract (val T)
     assert-typeof val Any
@@ -1308,6 +1340,14 @@ syntax-extend
         fn (self destT)
             if (type== destT rawstring)
                 getelementptr self 0 1 0
+
+    set-type-symbol! string 'hash
+        fn (self)
+            bitcast
+                __hashbytes
+                    getelementptr self 0 1 0
+                    string-countof self
+                hash
 
     set-type-symbol! string 'from-cstr
         fn (value)
@@ -2106,6 +2146,18 @@ do
                 else
                     return result...
             forward-repr (load self)
+
+    set-type-symbol! reference 'hash
+        fn (self)
+            let T = (storageof (typeof self))
+            let ET = (element-type T 0)
+            let op success = (type@ ET 'hash&)
+            if success
+                let result... = (op self)
+                if (va-empty? result...)
+                else
+                    return result...
+            forward-hash (load self)
 
     set-type-symbol! reference 'as
         fn (self destT)
@@ -3177,8 +3229,26 @@ define-scope-macro enum
         syntax-scope
 
 #-------------------------------------------------------------------------------
+# none
+#-------------------------------------------------------------------------------
+
+typefn Nothing 'hash (self)
+    hash Nothing 0
+
+#-------------------------------------------------------------------------------
 # tuples
 #-------------------------------------------------------------------------------
+
+typefn tuple 'hash (self)
+    # hash all tuple values
+    let T = (typeof self)
+    let count = (type-countof T)
+    let loop (i result) = 0:usize (hash tuple)
+    if (icmp<s i count)
+        loop (i + 1:usize)
+            hash result (extractvalue self i)
+    else
+        result
 
 typefn tuple 'countof (self)
     countof (typeof self)
@@ -3618,6 +3688,10 @@ let e = e:f32
 #-------------------------------------------------------------------------------
 # apply locals as globals
 #-------------------------------------------------------------------------------
+
+# cleanup
+del hash1
+del hash2
 
 set-globals!
     clone-scope-symbols (locals) (globals)

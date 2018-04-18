@@ -105,7 +105,7 @@
                 },
                 {
                     "name": "support.type.library.scopes",
-                    "match": "(Generator|Macro|rawstring|reference|fnchain)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
+                    "match": "(Generator|Macro|rawstring|reference|fnchain|hash)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
                 },
                 {
                     "name": "support.type.contextual.scopes",
