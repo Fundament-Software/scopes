@@ -1879,7 +1879,7 @@ static int cleanupCtrl(int c) {
 }
 
 // break characters that may precede items to be completed
-static const char breakChars[] = " =+-/\\*?\"'`&<>;|@{([])}";
+static const char breakChars[] = " =+/\\*?\"'`&<>;|@{([])}";
 
 // maximum number of completions to display without asking
 static const size_t completionCountCutoff = 100;
@@ -2512,14 +2512,7 @@ int InputBuffer::getInputLine(PromptBase& pi) {
     }
 
     // ctrl-I/tab, command completion, needs to be before switch statement
-    if (c == ctrlChar('I') && completionCallback) {
-      if (pos == 0)  // SERVER-4967 -- in earlier versions, you could paste
-                     // previous output
-        continue;    //  back into the shell ... this output may have leading
-                     //  tabs.
-      // This hack (i.e. what the old code did) prevents command completion
-      //  on an empty line but lets users paste text with leading tabs.
-
+    if (c == ctrlChar('I') && completionCallback && pos != 0) {
       killRing.lastAction = KillRing::actionOther;
       historyRecallMostRecent = false;
 

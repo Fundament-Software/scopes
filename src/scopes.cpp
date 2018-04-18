@@ -894,6 +894,7 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(FN_Write, "io-write!") \
     T(FN_Flush, "io-flush") \
     T(FN_Product, "product") T(FN_Prompt, "__prompt") T(FN_Qualify, "qualify") \
+    T(FN_SetAutocompleteScope, "set-autocomplete-scope!") \
     T(FN_Range, "range") T(FN_RefNew, "ref-new") T(FN_RefAt, "ref@") \
     T(FN_Repeat, "repeat") T(FN_Repr, "Any-repr") T(FN_AnyString, "Any-string") \
     T(FN_Require, "require") T(FN_ScopeOf, "scopeof") T(FN_ScopeAt, "Scope@") \
@@ -4115,6 +4116,30 @@ public:
         } while (self);
         std::sort(best_syms.begin(), best_syms.end());
         return best_syms;
+    }
+
+    std::vector<Symbol> find_elongations(Symbol name) const {
+        const String *s = name.name();
+
+        std::unordered_set<Symbol, Symbol::Hash> done;
+        std::vector<Symbol> found;
+        const Scope *self = this;
+        do {
+            auto &&map = *self->map;
+            for (auto &&k : map) {
+                Symbol sym = k.first;
+                if (done.count(sym))
+                    continue;
+                else if (sym.name()->count >= s->count &&
+                        *sym.name()->substr(0, s->count) == *s)
+                    found.push_back(sym);
+                done.insert(sym);
+            }
+            self = self->parent;
+        } while (self);
+        std::sort(found.begin(), found.end(), [](Symbol a, Symbol b){
+                  return a.name()->count < b.name()->count; });
+        return found;
     }
 
     bool lookup(Symbol name, Any &dest) const {
@@ -17310,6 +17335,24 @@ static StringBoolPair f_prompt(const String *s, const String *pre) {
     return { String::from_cstr(r), true };
 }
 
+static const Scope *autocomplete_scope = nullptr;
+static void f_set_autocomplete_scope(const Scope* scope) {
+    autocomplete_scope = scope;
+}
+static void prompt_completion_cb(const char *buf, linenoiseCompletions *lc) {
+    // Tab on an empty string gives an indentation
+    if (*buf == 0) {
+        linenoiseAddCompletion(lc, "    ");
+        return;
+    }
+
+    const String* name = String::from_cstr(buf);
+    Symbol sym(name);
+    const Scope *scope = autocomplete_scope ? autocomplete_scope : globals;
+    for (const auto& m : scope->find_elongations(sym))
+        linenoiseAddCompletion(lc, m.name()->data);
+}
+
 static const String *f_format_message(const Anchor *anchor, const String *message) {
     StyledString ss;
     if (anchor) {
@@ -17593,6 +17636,7 @@ static void init_globals(int argc, char *argv[]) {
     DEFINE_PURE_C_FUNCTION(FN_CompileGLSL, f_compile_glsl, TYPE_String, TYPE_Symbol, TYPE_Label, TYPE_U64);
     DEFINE_PURE_C_FUNCTION(FN_CompileObject, f_compile_object, TYPE_Void, TYPE_String, TYPE_Scope, TYPE_U64);
     DEFINE_C_FUNCTION(FN_Prompt, f_prompt, Tuple({TYPE_String, TYPE_Bool}), TYPE_String, TYPE_String);
+    DEFINE_C_FUNCTION(FN_SetAutocompleteScope, f_set_autocomplete_scope, TYPE_Void, TYPE_Scope);
     DEFINE_C_FUNCTION(FN_LoadLibrary, f_load_library, TYPE_Void, TYPE_String);
 
     DEFINE_C_FUNCTION(FN_IsFile, f_is_file, TYPE_Bool, TYPE_String);
@@ -17940,6 +17984,8 @@ int main(int argc, char *argv[]) {
 
     init_types();
     init_globals(argc, argv);
+
+    linenoiseSetCompletionCallback(prompt_completion_cb);
 
     Any expr = load_custom_core(scopes_compiler_path);
     if (expr != none) {

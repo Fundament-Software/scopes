@@ -3684,6 +3684,8 @@ fn read-eval-print-loop ()
 
     let global-scope = (globals)
     let eval-scope = (Scope global-scope)
+    set-autocomplete-scope! eval-scope
+
     set-scope-symbol! eval-scope 'module-dir cwd
     let loop (preload cmdlist counter eval-scope) =
         unconst ""
