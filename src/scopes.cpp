@@ -10722,12 +10722,18 @@ struct LLVMIRGenerator {
                 }
                 LLVMValueRef basevalue = nullptr;
                 auto it = ptr2global.find(baseptr);
+
+                auto pi = cast<PointerType>(value.type);
+                bool writable = pi->is_writable();
+
                 if (it == ptr2global.end()) {
                     auto data = LLVMConstString((const char *)baseptr, alloc_size, true);
                     basevalue = LLVMAddGlobal(module, LLVMTypeOf(data), "");
                     ptr2global.insert({ baseptr, basevalue });
                     LLVMSetInitializer(basevalue, data);
-                    LLVMSetGlobalConstant(basevalue, true);
+                    if (!writable) {
+                        LLVMSetGlobalConstant(basevalue, true);
+                    }
                 } else {
                     basevalue = it->second;
                 }

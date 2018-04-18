@@ -2288,22 +2288,27 @@ define-macro global
     let token = (token as Syntax as Symbol)
     if (token == '=)
         let value rest = (decons rest)
-        let tmp = (Parameter 'tmp)
         list define name
-            list let tmp '= value
-            list let name '= (list make-reference (list malloc (list element-typeof tmp)) tmp)
-            # wrapping this prevents a crash on windows.
-                right now, no idea what causes this, difficult to debug.
-            list do name
+            list do
+                list let 'value '= value
+                list let 'ET '= (list element-typeof 'value)
+                list make-reference
+                    list bitcast
+                        list allocaof (list nullof 'ET)
+                        list pointer 'ET (list quote 'mutable)
+                    'value
             #name
     elseif (token == '@)
         let size token rest = (decons rest 2)
         let token = (token as Syntax as Symbol)
         if (token == ':)
             let deftype rest = (decons rest)
-            list define name
-                list let name '= (list malloc-array deftype (list usize size))
-                name
+            list let name '=
+                list do
+                    list let 'ET '= deftype
+                    list bitcast
+                        list allocaof (list nullof (list array 'ET (list usize size)))
+                        list pointer 'ET (list quote 'mutable)
         else
             syntax-error! (active-anchor)
                 "syntax: global <name> @ <size> : <type>"
