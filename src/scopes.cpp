@@ -820,7 +820,8 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(FN_FFISymbol, "ffi-symbol") T(FN_FFICall, "ffi-call") \
     T(FN_FrameEq, "Frame==") T(FN_Free, "free") \
     T(FN_GetExceptionHandler, "get-exception-handler") \
-    T(FN_GetScopeSymbol, "get-scope-symbol") T(FN_Hash, "hash") \
+    T(FN_GetScopeSymbol, "get-scope-symbol") T(FN_Hash, "__hash") \
+    T(FN_Hash2x64, "__hash2x64") T(FN_HashBytes, "__hashbytes") \
     T(FN_Sample, "sample") \
     T(FN_ImageRead, "Image-read") T(FN_ImageWrite, "Image-write") \
     T(FN_RealPath, "realpath") \
@@ -17493,6 +17494,18 @@ static size_t f_verify_stack () {
     return ssz;
 }
 
+static uint64_t f_hash (uint64_t data, size_t size) {
+    return CityHash64((const char *)&data, (size > 8)?8:size);
+}
+
+static uint64_t f_hash2x64(uint64_t a, uint64_t b) {
+    return HashLen16(a, b);
+}
+
+static uint64_t f_hashbytes (const char *data, size_t size) {
+    return CityHash64(data, size);
+}
+
 static void init_globals(int argc, char *argv[]) {
 
 #define DEFINE_C_FUNCTION(SYMBOL, FUNC, RETTYPE, ...) \
@@ -17608,6 +17621,9 @@ static void init_globals(int argc, char *argv[]) {
     DEFINE_C_FUNCTION(SFXFN_Abort, f_abort, TYPE_Void);
     DEFINE_C_FUNCTION(FN_Exit, f_exit, TYPE_Void, TYPE_I32);
     DEFINE_C_FUNCTION(FN_CheckStack, f_verify_stack, TYPE_USize);
+    DEFINE_PURE_C_FUNCTION(FN_Hash, f_hash, TYPE_U64, TYPE_U64, TYPE_USize);
+    DEFINE_PURE_C_FUNCTION(FN_Hash2x64, f_hash2x64, TYPE_U64, TYPE_U64, TYPE_U64);
+    DEFINE_PURE_C_FUNCTION(FN_HashBytes, f_hashbytes, TYPE_U64, NativeROPointer(TYPE_I8), TYPE_USize);
 
     //DEFINE_C_FUNCTION(FN_Malloc, malloc, NativePointer(TYPE_I8), TYPE_USize);
 

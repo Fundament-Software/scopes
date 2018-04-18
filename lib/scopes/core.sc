@@ -820,6 +820,49 @@ fn imply (value dest-type)
                 string-join " to "
                     Any-repr (Any-wrap dest-type)
 
+fn forward-hash (value)
+    let T = (typeof value)
+    let f ok = (type@ T 'hash)
+    if ok
+        f value
+    else
+        let T =
+            if (opaque? T) T
+            else (storageof T)
+        if (integer-type? T)
+            __hash
+                zext (bitcast value T) u64
+                sizeof T
+        elseif (type== T f32)
+            __hash
+                zext (bitcast value u32) u64
+                sizeof T
+        elseif (type== T f64)
+            __hash
+                bitcast value u64
+                sizeof T
+
+fn hash1 (value)
+    let result... = (forward-hash value)
+    if (va-empty? result...)
+        compiler-error!
+            string-join "cannot hash value of type "
+                Any-repr (Any-wrap (typeof value))
+    result...
+
+let hash2 =
+    op2-ltr-multiop
+        fn "hash2" (a b)
+            __hash2x64
+                hash1 a
+                hash1 b
+
+fn hash (values...)
+    if (icmp<s (va-countof values...) 2)
+        hash1 values...
+    else
+        hash2 values...
+
 fn Any-extract (val T)
     assert-typeof val Any
     let valT = (Any-typeof val)
