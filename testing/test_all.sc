@@ -15,56 +15,61 @@ let modules =
         .test_dots
         .test_enums
         .test_extraparams
+        .test_folding
         .test_frame
         .test_from
-        .test_folding
         .test_fwdecl
-        .test_glsl
         .test_glm
+        .test_glsl
         .test_intrinsics
         .test_iter2
-        #.test_iterator
         .test_let
         .test_locals
         .test_loop
+        .test_match
         .test_memoization
         .test_mutarray
+        .test_namedargs
+        .test_object
         .test_overload
         .test_quality
         .test_recursion
         .test_reference
         .test_regexp
-        .test_scope
         .test_scope_iter
+        .test_scope
+        .test_semicolon
         .test_string
         .test_struct
         .test_submod
-        .test_semicolon
-        #.test_structof
-        #.test_tableof
-        #.test_tuple_array
-        #.test_xlet
+        .test_tuple_array
         .test_union
         .test_using
-        .test_while
         .test_varargs
         .test_vector
+        .test_while
 
 fn run-tests ()
     let total =
         i32 (countof modules)
 
-    let loop (modules failed) = (unconst modules) (unconst 0)
+    let loop (modules failed-modules) = (unconst modules) (unconst '())
     if (empty? modules)
-        print
+        let failed = (i32 (countof failed-modules))
+        if (failed > 0)
+            print;
+            print "List of failed modules"
+            print "======================"
+            for m in failed-modules
+                print "*" (m as Symbol as string)
+        print;
         print total "tests executed," (total - failed) "succeeded," failed "failed."
         print "done."
         return;
 
     let module modules = (decons modules)
     let module = (module as Symbol)
-    print
-    print "* running:" module
+    print "* running" (module as string)
     print "***********************************************"
     let ok =
         xpcall
@@ -76,6 +81,9 @@ fn run-tests ()
                     format-exception exc
                 unconst false
     loop modules
-        ? ok failed (failed + 1)
+        if ok
+            failed-modules
+        else
+            cons module failed-modules
 
 run-tests;

@@ -7,8 +7,14 @@ fn somefunc(first? second? third? unmapped fourth?)
     assert (none? unmapped)
     return first? second? third? fourth?
 
-print
+let x y z w =
     somefunc 1 2
         fourth? = 4
         third? = 3
 
+assert
+    and
+        x == 1
+        y == 2
+        z == 3
+        w == 4

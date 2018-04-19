@@ -1,13 +1,14 @@
 
 using
-    import-c "tty.c" "
-    #include <sys/ioctl.h>
-    #include <stdio.h>
-    #include <unistd.h>
-    #include <termios.h>
-    #include <fcntl.h>
-    #include <signal.h>
-    " '()
+    import-c "tty.c"
+        """"
+            #include <sys/ioctl.h>
+            #include <stdio.h>
+            #include <unistd.h>
+            #include <termios.h>
+            #include <fcntl.h>
+            #include <signal.h>
+        '()
 
 let tty-file =
     fopen "/dev/tty" "w"
@@ -66,8 +67,8 @@ for i in (range 2)
     'clear (buffers @ i)
 
 fn countof-utf8str (s)
-    "counts the codepoints of any value that is convertible to a
-     zero-terminated rawstring in UTF-8 encoding"
+    """"counts the codepoints of any value that is convertible to a
+        zero-terminated rawstring in UTF-8 encoding
     let s = (s as rawstring)
     let loop (i j) = 0 0
     if ((s @ i) != 0:i8)

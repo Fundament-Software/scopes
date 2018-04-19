@@ -1,8 +1,8 @@
 
 assert
     ==
-        require-from module-dir '.test_module2
-        require-from module-dir '.test_module2
+        require-from module-dir '.module2
+        require-from module-dir '.module2
 
 assert ((min integer i8) == i8)
 assert ((max 3 4 5) == 5)
@@ -23,7 +23,7 @@ do
             let m =
                 eval
                     list-load
-                        .. compiler-dir "/testing/test_module.sc"
+                        .. compiler-dir "/testing/module.sc"
                     \ sc
             set-scope-symbol! sc 'm m
             sc
