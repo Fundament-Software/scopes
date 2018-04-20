@@ -3841,33 +3841,35 @@ fn read-eval-print-loop ()
             unconst eval-scope
             unconst count
 
-    xpcall
-        label ()
-            let expr = (list-parse cmdlist)
-            let expr-anchor = (Syntax-anchor expr)
-            let tmp = (Parameter 'vals...)
-            let expr =
-                Syntax-wrap expr-anchor
-                    Any
-                        list
-                            list handle-retargs counter
-                                cons do
-                                    list set-scope! eval-scope
-                                    list __defer (list tmp)
-                                        list _ (list get-scope) (list locals) tmp
-                                    expr as list
-                    false
-            let f = (compile (eval (expr as Syntax) eval-scope))
-            let fptr =
-                f as
-                    pointer (function (ReturnLabel (unknownof Scope) (unknownof i32)))
-            set-anchor! expr-anchor
-            let eval-scope count = (fptr)
-            loop (unconst "") (unconst "") (counter + count) eval-scope
-        label (exc)
-            io-write!
-                format-exception exc
-            loop (unconst "") (unconst "") counter eval-scope
+    let eval-scope count =
+        xpcall
+            fn ()
+                let expr = (list-parse cmdlist)
+                let expr-anchor = (Syntax-anchor expr)
+                let tmp = (Parameter 'vals...)
+                let expr =
+                    Syntax-wrap expr-anchor
+                        Any
+                            list
+                                list handle-retargs counter
+                                    cons do
+                                        list set-scope! eval-scope
+                                        list __defer (list tmp)
+                                            list _ (list get-scope) (list locals) tmp
+                                        expr as list
+                        false
+                let f = (compile (eval (expr as Syntax) eval-scope))
+                let fptr =
+                    f as
+                        pointer (function (ReturnLabel (unknownof Scope) (unknownof i32)))
+                set-anchor! expr-anchor
+                return (fptr)
+            fn (exc)
+                io-write!
+                    format-exception exc
+                return eval-scope (unconst 0)
+    loop (unconst "") (unconst "") (counter + count) eval-scope
+    
 
 #-------------------------------------------------------------------------------
 # main

@@ -48,6 +48,7 @@ let modules =
         .test_varargs
         .test_vector
         .test_while
+        .test_xpcall
 
 fn run-tests ()
     let total =

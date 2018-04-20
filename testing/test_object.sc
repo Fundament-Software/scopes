@@ -9,11 +9,13 @@ let C =
         list;
 
 global x @ 10 : i32
+global y = 1
 #setting x here won't have any effect because the code isn't executed at compile time
 #x = 10
 fn main (argc argv)
     x @ 0 = 6
-    C.printf "hello world %i\n" (load (x @ 0))
+    y = 7
+    C.printf "hello world %i %i\n" (load (x @ 0)) (load y)
     return 0
 
 let main = (typify main i32 (pointer rawstring))
@@ -25,7 +27,7 @@ compile-object
     'dump-module
 
 # execute with
-    scopes test_object.sc && gcc -o test test.o && ./test
+    scopes test_object.sc && gcc -o test[.exe] test.o && ./test
 
     output will be
 
