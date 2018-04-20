@@ -13501,11 +13501,11 @@ struct Solver {
             if (et) {
                 RETARGTYPES(et->pointer_type);
             } else if (args[1].value.type == TYPE_Label) {
-                    Label *fn = args[1].value;
-                    fn->verify_compilable();
-                    const Type *functype = Pointer(
-                        fn->get_function_type(), PTF_NonWritable, SYM_Unnamed);
-                    RETARGTYPES(functype);                    
+                Label *fn = args[1].value;
+                fn->verify_compilable();
+                const Type *functype = Pointer(
+                    fn->get_function_type(), PTF_NonWritable, SYM_Unnamed);
+                RETARGTYPES(functype);                    
             } else {
                 RETARGTYPES(T);
             }
