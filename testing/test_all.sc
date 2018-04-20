@@ -6,6 +6,7 @@ let modules =
         .test_array
         .test_assorted
         .test_call_override
+        .test_callback
         .test_clang
         .test_closure
         .test_conversion
