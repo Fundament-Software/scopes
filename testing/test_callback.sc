@@ -3,13 +3,11 @@ fn main ()
     fn testf (a b)
         + a b
 
-    let f = (typify testf i32 i32)
-    assert ((f (unconst 2) (unconst 3)) == 5)
+    let f = (unconst (typify testf i32 i32))
+    assert ((f 2 3) == 5)
 
 main;
 
-#fn testfunc (x y)
-    x * y
 let lib =
     import-c "callback.c"
         """"
@@ -22,7 +20,7 @@ let lib =
 fn testf (x y)
     + x y
 
-let z = 
+let z =
     lib.call_testfunc testf 2 3
 print z
 assert (z == 5)

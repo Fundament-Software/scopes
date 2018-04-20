@@ -2711,12 +2711,12 @@ typefn Closure 'imply (self destT)
         let loop (i args...) = sz
         if (icmp== i 1)
             let result =
-                compile (typify self args...)
-            if (destT != ('typeof result))
+                unconst (typify self args...)
+            if (destT != (typeof result))
                 syntax-error! (Label-anchor (Closure-label self))
                     .. "function does not compile to type " (repr destT)
-                        \ " but has type " (repr ('typeof result))
-            return (imply result destT)
+                        \ " but has type " (repr (typeof result))
+            return result
         else
             let i-1 = (sub i 1)
             loop i-1 (rawcall element-type ET i-1) args...
@@ -3869,7 +3869,7 @@ fn read-eval-print-loop ()
                     format-exception exc
                 return eval-scope (unconst 0)
     loop (unconst "") (unconst "") (counter + count) eval-scope
-    
+
 
 #-------------------------------------------------------------------------------
 # main

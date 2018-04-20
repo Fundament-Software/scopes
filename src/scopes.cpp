@@ -10947,8 +10947,12 @@ struct LLVMIRGenerator {
                     builder, cond, then_value, else_value, "");
             } break;
             case FN_Unconst: {
-                READ_VALUE(val);
-                retvalue = val;
+                READ_ANY(val);
+                if (val.type == TYPE_Label) {
+                    retvalue = label_to_function(val);
+                } else {
+                    retvalue = argument_to_value(val);
+                }
             } break;
             case FN_ExtractValue: {
                 READ_VALUE(val);
@@ -13505,7 +13509,7 @@ struct Solver {
                 fn->verify_compilable();
                 const Type *functype = Pointer(
                     fn->get_function_type(), PTF_NonWritable, SYM_Unnamed);
-                RETARGTYPES(functype);                    
+                RETARGTYPES(functype);
             } else {
                 RETARGTYPES(T);
             }
