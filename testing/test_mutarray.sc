@@ -6,7 +6,7 @@ let fullrange = (range (unconst TESTSIZE))
 
 fn autodelete (x)
     fn (...)
-        'delete x
+        delete x
         ...
 
 do

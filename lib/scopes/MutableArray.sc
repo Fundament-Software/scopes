@@ -3,7 +3,7 @@ fn assert-reference (self)
     assert ((typeof self) < reference) "array must be reference"
 
 fn gen-element-destructor (element-type)
-    let element-destructor = (type@ element-type 'delete)
+    let element-destructor = (type@ element-type 'delete&)
     if (none? element-destructor)
         fn "MutableArray-destructor" (self items)
     else
@@ -19,11 +19,9 @@ fn gen-element-destructor (element-type)
 fn define-common-array-methods (T element-type ensure-capacity)
     let destructor = (gen-element-destructor element-type)
 
-    typefn T 'delete (self)
-        assert-reference self
-        let items = (load self.items)
-        destructor self items
-        free items
+    typefn T 'delete& (self)
+        destructor self self.items
+        free (load self.items)
 
     typefn T 'as& (self T)
         if (T == Generator)

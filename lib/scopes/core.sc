@@ -2341,11 +2341,19 @@ fn new (cls args...)
 fn delete (self)
     let T = (typeof self)
     assert (T < reference) "reference expected"
-    let T = (element-type (storageof T) 0)
+    let ptrT = (storageof T)
+    let T = (element-type ptrT 0)
     let op ok = (type@ T 'delete&)
     if ok
         op self
-    free self
+    let class = (pointer-type-storage-class ptrT)
+    if (class == 'Function)
+            # do nothing
+    elseif (class == unnamed)
+        free (bitcast self ptrT)
+    else
+        compiler-error!
+            .. "cannot delete value of pointer type " (repr ptrT)
     return;
 
 #-------------------------------------------------------------------------------
