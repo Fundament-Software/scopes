@@ -2323,6 +2323,32 @@ define-macro typefn
         cons fn params body
 
 #-------------------------------------------------------------------------------
+# new/delete
+#-------------------------------------------------------------------------------
+
+fn new (cls args...)
+    let self =
+        reference.from-pointer (malloc cls)
+    let op ok = (type@ cls 'new&)
+    if ok
+        op self args...
+    else
+        # try immutable initializer
+        self =
+            cls args...
+    self
+
+fn delete (self)
+    let T = (typeof self)
+    assert (T < reference) "reference expected"
+    let T = (element-type (storageof T) 0)
+    let op ok = (type@ T 'delete&)
+    if ok
+        op self
+    free self
+    return;
+
+#-------------------------------------------------------------------------------
 # compile time function chaining
 #-------------------------------------------------------------------------------
 
