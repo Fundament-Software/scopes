@@ -3146,7 +3146,13 @@ define-scope-macro struct
         locals;
 
     fn finalize-struct (T field-names field-types)
-        set-typename-storage! T (tuple (field-types begin-arg))
+        set-typename-storage! T
+            call
+                if (T < CStruct)
+                    tuple
+                else
+                    union
+                field-types begin-arg
         set-typename-fields! T (field-names begin-arg)
         T
 
