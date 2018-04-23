@@ -8,6 +8,11 @@ This is an early release. Right now, only basic syntax highlighting is available
 
 ## Release Notes
 
+### 0.35.0
+
+* Added more keywords.
+* Removed `var` keyword.
+
 ### 0.34.0
 
 * Added more keywords.
