@@ -373,7 +373,10 @@ syntax-extend
         # general constructor
         set-type-symbol! T 'apply-type
             fn (destT val)
-                as val destT
+                if (none? val)
+                    nullof destT
+                else
+                    as val destT
 
         fn ufdiv(a b)
             let Ta Tb = (typeof a) (typeof b)
@@ -446,7 +449,10 @@ syntax-extend
 
         set-type-symbol! T 'apply-type
             fn (destT val)
-                as val destT
+                if (none? val)
+                    nullof destT
+                else
+                    as val destT
 
         set-type-symbol! T '== (gen-type-op2 fcmp==o)
         set-type-symbol! T '!= (gen-type-op2 fcmp!=u)
@@ -2223,50 +2229,7 @@ do
                 let ET = (storageof cls)
                 bitcast (imply element ET) cls
 
-define-block-scope-macro var
-    fn element-typeof (value)
-        let T = (typeof value)
-        if (T <: reference)
-            element-type (storageof T) 0
-        else T
-    fn make-reference (dest value)
-        let T = (typeof value)
-        let PT =
-            if (T <: reference)
-                storageof T
-            else (typeof dest)
-        let ref = ((reference.from-pointer-type PT) dest)
-        = ref value
-        ref
-
-    let args = (list-next expr)
-    let name token rest = (decons args 2)
-    let token = (token as Syntax as Symbol)
-    if (token == '=)
-        let value rest = (decons rest)
-        let tmp = (Parameter 'tmp)
-        return
-            cons
-                list let tmp '= value
-                list let name '= (list make-reference (list alloca (list element-typeof tmp)) tmp)
-                next-expr
-            syntax-scope
-    elseif (token == '@)
-        let size token rest = (decons rest 2)
-        let token = (token as Syntax as Symbol)
-        if (token == ':)
-            let deftype rest = (decons rest)
-            return
-                cons
-                    list let name '= (list alloca-array deftype (list usize size))
-                    next-expr
-                syntax-scope
-        else
-            syntax-error! (active-anchor)
-                "syntax: var <name> @ <size> : <type>"
-    else
-        syntax-error! (active-anchor)
-            "syntax: var <name> = <value> | <name> @ <size> : <type>"
+#var has been removed
 
 define-macro global
     fn element-typeof (value)
@@ -2323,20 +2286,27 @@ define-macro typefn
         cons fn params body
 
 #-------------------------------------------------------------------------------
-# new/delete
+# alloca/new/delete
 #-------------------------------------------------------------------------------
 
+fn constructor (f)
+    fn (cls args...)
+        let self =
+            reference.from-pointer (f cls)
+        let op ok = (type@ cls 'new&)
+        if ok
+            op self args...
+        else
+            # try immutable initializer
+            self =
+                cls args...
+        self
+
+fn local (cls args...)
+    (constructor alloca) cls args...
+
 fn new (cls args...)
-    let self =
-        reference.from-pointer (malloc cls)
-    let op ok = (type@ cls 'new&)
-    if ok
-        op self args...
-    else
-        # try immutable initializer
-        self =
-            cls args...
-    self
+    (constructor malloc) cls args...
 
 fn delete (self)
     let T = (typeof self)
@@ -3761,6 +3731,7 @@ let e = e:f32
 # cleanup
 del hash1
 del hash2
+del constructor
 
 set-globals!
     clone-scope-symbols (locals) (globals)
