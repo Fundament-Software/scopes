@@ -13882,12 +13882,17 @@ struct Solver {
             CHECKARGS(1, 1);
             RETARGTYPES(LocalROPointer(args[1].value.indirect_type()));
         } break;
-        case FN_MallocArray:
-        case FN_AllocaArray: {
+        case FN_MallocArray: {
             CHECKARGS(2, 2);
             args[1].value.verify(TYPE_Type);
             verify_integer(storage_type(args[2].value.indirect_type()));
             RETARGTYPES(NativePointer(args[1].value.typeref));
+        } break;
+        case FN_AllocaArray: {
+            CHECKARGS(2, 2);
+            args[1].value.verify(TYPE_Type);
+            verify_integer(storage_type(args[2].value.indirect_type()));
+            RETARGTYPES(LocalPointer(args[1].value.typeref));
         } break;
         case FN_Free: {
             CHECKARGS(1, 1);

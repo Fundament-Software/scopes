@@ -3296,6 +3296,33 @@ typefn tuple 'countof (self)
 typefn tuple '@ (self at)
     extractvalue self (usize at)
 
+typefn tuple 'unpack (self)
+    let T = (typeof self)
+    let count = (type-countof T)
+    let loop (i result...) = count
+    if (i == 0:usize) result...
+    else
+        let i = (sub i 1:usize)
+        loop i
+            va-key
+                element-name T (i32 i)
+                extractvalue self i
+            result...
+
+# access reference to struct element from pointer/reference
+typefn tuple 'getattr& (self name)
+    let ET = (element-type (typeof self) 0)
+    let idx = (element-index ET name)
+    if (icmp>=s idx 0)
+        # cast result to reference
+        let val = (getelementptr self 0 idx)
+        (reference.from-pointer-type (typeof val)) val
+
+typefn tuple 'getattr (self name)
+    let idx = (element-index (typeof self) name)
+    if (icmp>=s idx 0)
+        extractvalue self idx
+
 fn tupleof (...)
     let sz = (va-countof ...)
     let keys... = (va-keys ...)
