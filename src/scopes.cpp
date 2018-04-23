@@ -548,7 +548,7 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(FN_GetElementPtr) T(FN_OffsetOf) T(SFXFN_CompilerError) T(FN_VaCountOf) T(FN_VaAt) \
     T(FN_VaKeys) T(FN_VaValues) T(FN_CompilerMessage) T(FN_Undef) T(FN_NullOf) T(KW_Let) \
     T(KW_If) T(SFXFN_SetTypeSymbol) T(SFXFN_DelTypeSymbol) T(FN_ExternSymbol) \
-    T(SFXFN_SetTypenameStorage) T(SFXFN_SetTypenameFields) T(FN_ExternNew) \
+    T(SFXFN_SetTypenameStorage) T(FN_ExternNew) \
     T(SFXFN_Discard) \
     T(FN_TypeAt) T(KW_SyntaxExtend) T(FN_Location) T(SFXFN_Unreachable) \
     T(FN_FPTrunc) T(FN_FPExt) T(FN_ScopeOf) \
@@ -792,8 +792,10 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(FN_Compile, "__compile") T(FN_CompileSPIRV, "__compile-spirv") \
     T(FN_CompileGLSL, "__compile-glsl") \
     T(FN_CompileObject, "__compile-object") \
-    T(FN_TypenameFieldIndex, "typename-field-index") \
-    T(FN_TypenameFieldName, "typename-field-name") \
+    T(FN_TupleFieldIndex, "tuple-type-field-index") \
+    T(FN_TupleFieldName, "tuple-type-field-name") \
+    T(FN_UnionFieldIndex, "union-type-field-index") \
+    T(FN_UnionFieldName, "union-type-field-name") \
     T(FN_CompilerMessage, "compiler-message") \
     T(FN_CStr, "cstr") T(FN_DatumToSyntax, "datum->syntax") \
     T(FN_DatumToQuotedSyntax, "datum->quoted-syntax") \
@@ -968,7 +970,6 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(SFXFN_SetTypeSymbol, "set-type-symbol!") \
     T(SFXFN_DelTypeSymbol, "delete-type-symbol!") \
     T(SFXFN_SetTypenameStorage, "set-typename-storage!") \
-    T(SFXFN_SetTypenameFields, "set-typename-fields!") \
     T(SFXFN_ExecutionMode, "set-execution-mode!") \
     T(SFXFN_TranslateLabelBody, "translate-label-body!") \
     \
@@ -2883,6 +2884,19 @@ struct TupleType : StorageType {
         return types[i];
     }
 
+    size_t field_index(Symbol name) const {
+        for (size_t i = 0; i < values.size(); ++i) {
+            if (name == values[i].key)
+                return i;
+        }
+        return (size_t)-1;
+    }
+
+    Symbol field_name(size_t i) const {
+        verify_range(i, values.size());
+        return values[i].key;
+    }
+
     Args values;
     bool packed;
     std::vector<const Type *> types;
@@ -2965,22 +2979,29 @@ struct UnionType : StorageType {
         return T->kind() == TK_Union;
     }
 
-    UnionType(const std::vector<Any> &_types)
-        : StorageType(TK_Union) {
-        types.reserve(_types.size());
-        for (auto &&arg : _types) {
-            types.push_back(arg);
-        }
-        std::stringstream ss;
-        ss << "{";
-        for (size_t i = 0; i < types.size(); ++i) {
+    UnionType(const Args &_values)
+        : StorageType(TK_Union), values(_values) {
+        StyledString ss = StyledString::plain();
+        ss.out << "{";
+        size_t tcount = values.size();
+        types.reserve(tcount);
+        for (size_t i = 0; i < values.size(); ++i) {
             if (i > 0) {
-                ss << " | ";
+                ss.out << " | ";
             }
-            ss << types[i]->name()->data;
+            if (values[i].key != SYM_Unnamed) {
+                ss.out << values[i].key.name()->data << "=";
+            }
+            if (is_unknown(values[i].value)) {
+                ss.out << values[i].value.typeref->name()->data;
+                types.push_back(values[i].value.typeref);
+            } else {
+                ss.out << "!" << values[i].value.type;
+                types.push_back(values[i].value.type);
+            }
         }
-        ss << "}";
-        _name = String::from_stdstring(ss.str());
+        ss.out << "}";
+        _name = ss.str();
 
         size_t sz = 0;
         size_t al = 1;
@@ -3008,19 +3029,77 @@ struct UnionType : StorageType {
         return types[i];
     }
 
+    size_t field_index(Symbol name) const {
+        for (size_t i = 0; i < values.size(); ++i) {
+            if (name == values[i].key)
+                return i;
+        }
+        return (size_t)-1;
+    }
+
+    Symbol field_name(size_t i) const {
+        verify_range(i, values.size());
+        return values[i].key;
+    }
+
+    Args values;
     std::vector<const Type *> types;
     size_t largest_field;
     const Type *tuple_type;
 };
 
-static const Type *Union(const std::vector<const Type *> &types) {
-    static TypeFactory<UnionType> unions;
-    std::vector<Any> atypes;
-    atypes.reserve(types.size());
-    for (auto &&arg : types) {
-        atypes.push_back(arg);
+static const Type *MixedUnion(const Args &values) {
+    struct TypeArgs {
+        Args args;
+
+        TypeArgs() {}
+        TypeArgs(const Args &_args)
+            : args(_args) {}
+
+        bool operator==(const TypeArgs &other) const {
+            if (args.size() != other.args.size()) return false;
+            for (size_t i = 0; i < args.size(); ++i) {
+                auto &&a = args[i];
+                auto &&b = other.args[i];
+                if (a != b)
+                    return false;
+            }
+            return true;
+        }
+
+        struct Hash {
+            std::size_t operator()(const TypeArgs& s) const {
+                std::size_t h = 0;
+                for (auto &&arg : s.args) {
+                    h = HashLen16(h, arg.hash());
+                }
+                return h;
+            }
+        };
+    };
+
+    typedef std::unordered_map<TypeArgs, UnionType *, typename TypeArgs::Hash> ArgMap;
+
+    static ArgMap map;
+
+    TypeArgs ta(values);
+    typename ArgMap::iterator it = map.find(ta);
+    if (it == map.end()) {
+        UnionType *t = new UnionType(values);
+        map.insert({ta, t});
+        return t;
+    } else {
+        return it->second;
     }
-    return unions.insert(atypes);
+}
+
+static const Type *Union(const std::vector<const Type *> &types) {
+    Args args;
+    args.reserve(types.size());
+    for (size_t i = 0; i < types.size(); ++i) {
+        args.push_back(unknown_of(types[i]));
+    }
+    return MixedUnion(args);
 }
 
 //------------------------------------------------------------------------------
@@ -3362,19 +3441,6 @@ struct TypenameType : Type {
         return T->kind() == TK_Typename;
     }
 
-    size_t field_index(Symbol name) const {
-        for (size_t i = 0; i < field_names.size(); ++i) {
-            if (name == field_names[i])
-                return i;
-        }
-        return (size_t)-1;
-    }
-
-    Symbol field_name(size_t i) const {
-        verify_range(i, field_names.size());
-        return field_names[i];
-    }
-
     TypenameType(const String *name)
         : Type(TK_Typename), storage_type(nullptr), super_type(nullptr) {
         auto newname = Symbol(name);
@@ -3412,7 +3478,6 @@ struct TypenameType : Type {
 
     const Type *storage_type;
     const Type *super_type;
-    std::vector<Symbol> field_names;
 };
 
 std::unordered_set<Symbol, Symbol::Hash> TypenameType::used_names;
@@ -6967,8 +7032,7 @@ public:
             tni->super_type = TYPE_CStruct;
         }
 
-        std::vector<Symbol> names;
-        std::vector<const Type *> types;
+        std::vector<Argument> args;
         //auto anchors = new std::vector<Anchor>();
         //StyledStream ss;
         const Type *ST = tni;
@@ -7012,8 +7076,8 @@ public:
                     //ss << "offset mismatch " << newsz << " != " << offset << std::endl;
                     if (newsz < offset) {
                         size_t pad = offset - newsz;
-                        names.push_back(Symbol("#"));
-                        types.push_back(Array(TYPE_U8, pad));
+                        args.push_back(Argument(SYM_Unnamed,
+                            Array(TYPE_U8, pad)));
                     } else {
                         // our computed offset is later than the real one
                         // structure is likely packed
@@ -7026,8 +7090,7 @@ public:
                 al = std::max(al, align_of(fieldtype));
             }
 
-            names.push_back(name);
-            types.push_back(fieldtype);
+            args.push_back(Argument(name, unknown_of(fieldtype)));
         }
         if (packed) {
             al = 1;
@@ -7063,8 +7126,7 @@ public:
             }
         }
 
-        tni->finalize(is_union?Union(types):Tuple(types, packed, explicit_alignment?al:0));
-        tni->field_names = names;
+        tni->finalize(is_union?MixedUnion(args):MixedTuple(args, packed, explicit_alignment?al:0));
     }
 
     const Type *get_typename(Symbol name, NamespaceMap &map) {
@@ -9524,9 +9586,7 @@ struct SPIRVGenerator {
             builder.addDecoration(id, spv::DecorationBlock);
         }
         for (size_t i = 0; i < count; ++i) {
-            if (tname) {
-                builder.addMemberName(id, i, tname->field_name(i).name()->data);
-            }
+            builder.addMemberName(id, i, ti->values[i].key.name()->data);
             if (flags & EF_Volatile) {
                 builder.addMemberDecoration(id, i, spv::DecorationVolatile);
             }
@@ -13341,6 +13401,8 @@ struct Solver {
         case FN_ExternNew:
         case FN_ExternSymbol:
         case FN_ReturnLabelType:
+        case FN_TupleType:
+        case FN_UnionType:
             return true;
         default: return false;
         }
@@ -13356,6 +13418,8 @@ struct Solver {
         case FN_ExternNew:
         case FN_ReturnLabelType:
         case FN_ScopeOf:
+        case FN_TupleType:
+        case FN_UnionType:
             return true;
         default: return false;
         }
@@ -13837,11 +13901,11 @@ struct Solver {
                     case TK_Tuple: {
                         auto ti = cast<TupleType>(ST);
                         size_t idx = 0;
-                        if ((T->kind() == TK_Typename) && (arg.type == TYPE_Symbol)) {
-                            idx = cast<TypenameType>(T)->field_index(arg.symbol);
+                        if (arg.type == TYPE_Symbol) {
+                            idx = ti->field_index(arg.symbol);
                             if (idx == (size_t)-1) {
                                 StyledString ss;
-                                ss.out << "no such field " << arg.symbol << " in typename " << T;
+                                ss.out << "no such field " << arg.symbol << " in storage type " << ST;
                                 location_error(ss.str());
                             }
                             // rewrite field
@@ -13876,11 +13940,11 @@ struct Solver {
                     case TK_Tuple: {
                         auto ti = cast<TupleType>(ST);
                         size_t idx = 0;
-                        if ((T->kind() == TK_Typename) && (arg.value.type == TYPE_Symbol)) {
-                            idx = cast<TypenameType>(T)->field_index(arg.value.symbol);
+                        if (arg.value.type == TYPE_Symbol) {
+                            idx = ti->field_index(arg.value.symbol);
                             if (idx == (size_t)-1) {
                                 StyledString ss;
-                                ss.out << "no such field " << arg.value.symbol << " in typename " << T;
+                                ss.out << "no such field " << arg.value.symbol << " in storage type " << ST;
                                 location_error(ss.str());
                             }
                             // rewrite field
@@ -14326,19 +14390,32 @@ struct Solver {
         } break;
         case FN_TupleType: {
             CHECKARGS(0, -1);
-            std::vector<const Type *> types;
+            Args values;
             for (size_t i = 1; i < args.size(); ++i) {
-                types.push_back(args[i].value);
+                if (args[i].value.is_const()) {
+                    values.push_back(args[i]);
+                } else {
+                    values.push_back(
+                        Argument(args[i].key,
+                            unknown_of(args[i].value.indirect_type())));
+                }
             }
-            RETARGS(Tuple(types));
+            RETARGS(MixedTuple(values));
         } break;
         case FN_UnionType: {
             CHECKARGS(0, -1);
-            std::vector<const Type *> types;
+            Args values;
             for (size_t i = 1; i < args.size(); ++i) {
-                types.push_back(args[i].value);
+                if (args[i].value.is_const()) {
+                    location_error(String::from("all union type arguments must be non-constant"));
+                    //values.push_back(args[i]);
+                } else {
+                    values.push_back(
+                        Argument(args[i].key,
+                            unknown_of(args[i].value.indirect_type())));
+                }
             }
-            RETARGS(Union(types));
+            RETARGS(MixedUnion(values));
         } break;
         case FN_ReturnLabelType: {
             CHECKARGS(0, -1);
@@ -14364,19 +14441,6 @@ struct Solver {
             const Type *T2 = args[2].value;
             verify_kind<TK_Typename>(T);
             cast<TypenameType>(const_cast<Type *>(T))->finalize(T2);
-            RETARGS();
-        } break;
-        case SFXFN_SetTypenameFields: {
-            CHECKARGS(1, -1);
-            const Type *T = args[1].value;
-            std::vector<Symbol> fields;
-            for (size_t i = 2; i < args.size(); ++i) {
-                auto &&arg = args[i].value;
-                arg.verify(TYPE_Symbol);
-                fields.push_back(arg.symbol);
-            }
-            verify_kind<TK_Typename>(T);
-            cast<TypenameType>(const_cast<Type *>(T))->field_names = fields;
             RETARGS();
         } break;
         case SFXFN_SetTypeSymbol: {
@@ -14453,11 +14517,14 @@ struct Solver {
             const Type *T = args[1].value;
             auto &&arg = args[2].value;
             size_t idx = 0;
-            if ((T->kind() == TK_Typename) && (arg.type == TYPE_Symbol)) {
-                idx = cast<TypenameType>(T)->field_index(arg.symbol);
+            T = storage_type(T);
+            verify_kind<TK_Tuple>(T);
+            auto ti = cast<TupleType>(T);
+            if (arg.type == TYPE_Symbol) {
+                idx = ti->field_index(arg.symbol);
                 if (idx == (size_t)-1) {
                     StyledString ss;
-                    ss.out << "no such field " << arg.symbol << " in typename " << T;
+                    ss.out << "no such field " << arg.symbol << " in storage type " << T;
                     location_error(ss.str());
                 }
                 // rewrite field
@@ -14465,9 +14532,6 @@ struct Solver {
             } else {
                 idx = cast_number<size_t>(arg);
             }
-            T = storage_type(T);
-            verify_kind<TK_Tuple>(T);
-            auto ti = cast<TupleType>(T);
             verify_range(idx, ti->offsets.size());
             RETARGS(ti->offsets[idx]);
         } break;
@@ -17407,16 +17471,28 @@ static const List *f_list_join(List *a, List *b) {
     return List::join(a, b);
 }
 
-static int f_typename_field_index(const Type *type, Symbol name) {
-    verify_kind<TK_Typename>(type);
-    auto tn = cast<TypenameType>(type);
-    return tn->field_index(name);
+static int f_tuple_field_index(const Type *type, Symbol name) {
+    verify_kind<TK_Tuple>(type);
+    auto ti = cast<TupleType>(type);
+    return ti->field_index(name);
 }
 
-static Symbol f_typename_field_name(const Type *type, int index) {
-    verify_kind<TK_Typename>(type);
-    auto tn = cast<TypenameType>(type);
-    return tn->field_name(index);
+static Symbol f_tuple_field_name(const Type *type, int index) {
+    verify_kind<TK_Tuple>(type);
+    auto ti = cast<TupleType>(type);
+    return ti->field_name(index);
+}
+
+static int f_union_field_index(const Type *type, Symbol name) {
+    verify_kind<TK_Union>(type);
+    auto tu = cast<UnionType>(type);
+    return tu->field_index(name);
+}
+
+static Symbol f_union_field_name(const Type *type, int index) {
+    verify_kind<TK_Union>(type);
+    auto tu = cast<UnionType>(type);
+    return tu->field_name(index);
 }
 
 typedef struct { Any _0; Any _1; } AnyAnyPair;
@@ -17632,8 +17708,10 @@ static void init_globals(int argc, char *argv[]) {
     DEFINE_PURE_C_FUNCTION(Symbol("Any=="), f_any_eq, TYPE_Bool, TYPE_Any, TYPE_Any);
     DEFINE_PURE_C_FUNCTION(FN_ListJoin, f_list_join, TYPE_List, TYPE_List, TYPE_List);
     DEFINE_PURE_C_FUNCTION(FN_ScopeNext, f_scope_next, Tuple({TYPE_Symbol, TYPE_Any}), TYPE_Scope, TYPE_Symbol);
-    DEFINE_PURE_C_FUNCTION(FN_TypenameFieldIndex, f_typename_field_index, TYPE_I32, TYPE_Type, TYPE_Symbol);
-    DEFINE_PURE_C_FUNCTION(FN_TypenameFieldName, f_typename_field_name, TYPE_Symbol, TYPE_Type, TYPE_I32);
+    DEFINE_PURE_C_FUNCTION(FN_TupleFieldIndex, f_tuple_field_index, TYPE_I32, TYPE_Type, TYPE_Symbol);
+    DEFINE_PURE_C_FUNCTION(FN_TupleFieldName, f_tuple_field_name, TYPE_Symbol, TYPE_Type, TYPE_I32);
+    DEFINE_PURE_C_FUNCTION(FN_UnionFieldIndex, f_union_field_index, TYPE_I32, TYPE_Type, TYPE_Symbol);
+    DEFINE_PURE_C_FUNCTION(FN_UnionFieldName, f_union_field_name, TYPE_Symbol, TYPE_Type, TYPE_I32);
     DEFINE_PURE_C_FUNCTION(FN_StringMatch, f_string_match, TYPE_Bool, TYPE_String, TYPE_String);
     DEFINE_PURE_C_FUNCTION(SFXFN_SetTypenameSuper, f_set_typename_super, TYPE_Void, TYPE_Type, TYPE_Type);
     DEFINE_PURE_C_FUNCTION(FN_SuperOf, superof, TYPE_Type, TYPE_Type);
