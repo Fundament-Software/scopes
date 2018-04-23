@@ -546,7 +546,7 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(FN_ExtractElement) T(FN_InsertElement) T(FN_ShuffleVector) \
     T(FN_ExtractValue) T(FN_InsertValue) T(FN_ITrunc) T(FN_ZExt) T(FN_SExt) \
     T(FN_GetElementPtr) T(FN_OffsetOf) T(SFXFN_CompilerError) T(FN_VaCountOf) T(FN_VaAt) \
-    T(FN_VaKeys) T(FN_VaValues) T(FN_CompilerMessage) T(FN_Undef) T(FN_NullOf) T(KW_Let) \
+    T(FN_VaKeys) T(FN_VaKey) T(FN_VaValues) T(FN_CompilerMessage) T(FN_Undef) T(FN_NullOf) T(KW_Let) \
     T(KW_If) T(SFXFN_SetTypeSymbol) T(SFXFN_DelTypeSymbol) T(FN_ExternSymbol) \
     T(SFXFN_SetTypenameStorage) T(FN_ExternNew) \
     T(SFXFN_Discard) \
@@ -943,6 +943,7 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(FN_ExternNew, "extern-new") \
     T(FN_VaCountOf, "va-countof") T(FN_VaKeys, "va-keys") \
     T(FN_VaValues, "va-values") T(FN_VaAt, "va@") \
+    T(FN_VaKey, "va-key") \
     T(FN_VectorOf, "vectorof") T(FN_XPCall, "xpcall") T(FN_Zip, "zip") \
     T(FN_VectorType, "vector-type") \
     T(FN_ZipFill, "zip-fill") \
@@ -13420,6 +13421,7 @@ struct Solver {
         case FN_IsConstant:
         case FN_VaCountOf:
         case FN_VaKeys:
+        case FN_VaKey:
         case FN_VaValues:
         case FN_VaAt:
         case FN_Location:
@@ -14518,6 +14520,12 @@ struct Solver {
             }
             enter = args[0].value;
             args = result;
+        } break;
+        case FN_VaKey: {
+            CHECKARGS(2, 2);
+            args[1].value.verify(TYPE_Symbol);
+            enter = args[0].value;
+            args = { none, Argument(args[1].value.symbol, args[2].value) };
         } break;
         case FN_VaAt: {
             CHECKARGS(1, -1);

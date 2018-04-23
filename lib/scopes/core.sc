@@ -3298,12 +3298,14 @@ typefn tuple '@ (self at)
 
 fn tupleof (...)
     let sz = (va-countof ...)
+    let keys... = (va-keys ...)
     # build tuple type
     let loop (i result...) = sz
     if (icmp>s i 0)
         let i = (sub i 1)
         let T = (va@ i ...)
-        loop i (unknownof (typeof T)) result...
+        let key = (va@ i keys...)
+        loop i (va-key key (unknownof (typeof T))) result...
     else
         # build tuple
         let loop (i result) = 0 (nullof (tuple result...))
