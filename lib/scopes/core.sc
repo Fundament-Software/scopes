@@ -2925,7 +2925,7 @@ typefn CStruct 'structof (cls args...)
             let k =
                 if (key == unnamed) i
                 else
-                    typename-field-index cls key
+                    element-index T key
             let ET = (element-type T k)
             loop (add i 1)
                 insertvalue instance (imply arg ET) k
@@ -2942,14 +2942,14 @@ typefn CStruct 'apply-type (cls args...)
 # access reference to struct element from pointer/reference
 typefn CStruct 'getattr& (self name)
     let ET = (element-type (typeof self) 0)
-    let idx = (typename-field-index ET name)
+    let idx = (element-index ET name)
     if (icmp>=s idx 0)
         # cast result to reference
         let val = (getelementptr self 0 idx)
         (reference.from-pointer-type (typeof val)) val
 
 typefn CStruct 'getattr (self name)
-    let idx = (typename-field-index (typeof self) name)
+    let idx = (element-index (typeof self) name)
     if (icmp>=s idx 0)
         extractvalue self idx
 
@@ -2960,7 +2960,7 @@ typefn CUnion 'apply-type (cls)
 # access reference to union element from pointer/reference
 typefn CUnion 'getattr& (self name)
     let ET = (element-type (typeof self) 0)
-    let idx = (typename-field-index ET name)
+    let idx = (element-index ET name)
     if (icmp>=s idx 0)
         let FT = (element-type ET idx)
         let newPT =
@@ -2970,7 +2970,7 @@ typefn CUnion 'getattr& (self name)
             bitcast self newPT
 
 typefn CUnion 'getattr (self name)
-    let idx = (typename-field-index (typeof self) name)
+    let idx = (element-index (typeof self) name)
     if (icmp>=s idx 0)
         extractvalue self idx
 
@@ -3118,23 +3118,21 @@ define-macro from
 define-scope-macro struct
     fn begin-arg ()
     fn end-args (f) (f)
-    fn append-arg (prevf x)
+    fn append-arg (prevf x...)
         fn (f)
             prevf
                 fn ()
-                    return x (f)
+                    return x... (f)
 
     define struct-dsl
         define-block-scope-macro :
             let args = (list-next expr)
             let lhs rhs = (decons args 2)
-            let lhs = (lhs as Syntax as Symbol)
+            lhs as Syntax as Symbol
             return
                 cons
-                    list let 'field-names '=
-                        list append-arg 'field-names (list quote lhs)
                     list let 'field-types '=
-                        list append-arg 'field-types rhs
+                        list append-arg 'field-types (list lhs '= (list unknownof rhs))
                     next-expr
                 syntax-scope
         define-macro method
@@ -3145,7 +3143,7 @@ define-scope-macro struct
         define-infix> 70 :
         locals;
 
-    fn finalize-struct (T field-names field-types)
+    fn finalize-struct (T field-types)
         set-typename-storage! T
             call
                 if (T < CStruct)
@@ -3153,7 +3151,6 @@ define-scope-macro struct
                 else
                     union
                 field-types begin-arg
-        set-typename-fields! T (field-names begin-arg)
         T
 
     let head body = (decons args)
@@ -3200,12 +3197,11 @@ define-scope-macro struct
                                     symname as string
                         list let name '= 'this-struct
                         list set-typename-super! 'this-struct superT
-                        list let 'field-names '= end-args
                         list let 'field-types '= end-args
                         ..
                             cons do body
                             list
-                                list finalize-struct 'this-struct 'field-names 'field-types
+                                list finalize-struct 'this-struct 'field-types
             syntax-scope
     else
         # expression
@@ -3216,12 +3212,11 @@ define-scope-macro struct
                     list typename-type
                         list (do as) name string
                 list set-typename-super! 'this-struct superT
-                list let 'field-names '= end-args
                 list let 'field-types '= end-args
                 ..
                     cons do body
                     list
-                        list finalize-struct 'this-struct 'field-names 'field-types
+                        list finalize-struct 'this-struct 'field-types
             syntax-scope
 
 #-------------------------------------------------------------------------------
@@ -3308,7 +3303,7 @@ fn tupleof (...)
     if (icmp>s i 0)
         let i = (sub i 1)
         let T = (va@ i ...)
-        loop i (typeof T) result...
+        loop i (unknownof (typeof T)) result...
     else
         # build tuple
         let loop (i result) = 0 (nullof (tuple result...))

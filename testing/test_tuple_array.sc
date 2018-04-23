@@ -10,7 +10,7 @@ do
 
 do
     let k =
-        arrayof (tuple i8 i32)
+        arrayof (tuple (unknownof i8) (unknownof i32))
             tupleof (i8 1) 4
             tupleof (i8 2) 5
             tupleof (i8 3) 6

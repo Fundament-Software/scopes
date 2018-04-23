@@ -40,3 +40,32 @@ test-kwva-keys
 test-kwva-keys (x = 5) (y = 0) (z = 1) 2 3 (w = 4)
 test-kwva-keys 5 0 (z = 1) 2 3 (w = 4)
 
+do
+    # verify that trailing keyed arguments persist even for unknown arguments
+
+    fn test (args...)
+        let k = (va@ 'x args...)
+        assert ((typeof k) == i32)
+        return;
+
+    test
+        x = 0
+    test
+        x = (unconst 0)
+
+do
+    # verify that single keyed arguments can be forwarded
+
+    fn test2 (args...)
+        let x = (va@ 'x args...)
+        let y = (va@ 'y args...)
+        assert ((typeof x) == i32)
+        assert ((typeof y) == i32)
+        return;
+
+    fn test (x...)
+        test2 x...
+            y = (unconst 2)
+    test
+        x = (unconst 1)
+

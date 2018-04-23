@@ -792,10 +792,8 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(FN_Compile, "__compile") T(FN_CompileSPIRV, "__compile-spirv") \
     T(FN_CompileGLSL, "__compile-glsl") \
     T(FN_CompileObject, "__compile-object") \
-    T(FN_TupleFieldIndex, "tuple-type-field-index") \
-    T(FN_TupleFieldName, "tuple-type-field-name") \
-    T(FN_UnionFieldIndex, "union-type-field-index") \
-    T(FN_UnionFieldName, "union-type-field-name") \
+    T(FN_ElementIndex, "element-index") \
+    T(FN_ElementName, "element-name") \
     T(FN_CompilerMessage, "compiler-message") \
     T(FN_CStr, "cstr") T(FN_DatumToSyntax, "datum->syntax") \
     T(FN_DatumToQuotedSyntax, "datum->quoted-syntax") \
@@ -2779,6 +2777,10 @@ struct Argument {
     Argument(Symbol _key, Any _value) : key(_key), value(_value) {}
     template<typename T>
     Argument(const T &x) : key(SYM_Unnamed), value(x) {}
+
+    bool is_keyed() const {
+        return key != SYM_Unnamed;
+    }
 
     bool operator ==(const Argument &other) const {
         return (key == other.key) && (value == other.value);
@@ -6611,12 +6613,36 @@ void evaluate(Frame *frame, Argument arg, Args &dest, bool last_param = false) {
             ss.out << "parameter " << param << " is unbound";
             location_error(ss.str());
         }
-        if (last_param && param->is_vararg()) {
+        // special situation: we're forwarding varargs, but assigning
+        // it to a new argument key; since keys can only be mapped to
+        // individual varargs, and must not be duplicated, we have these
+        // options to resolve the conflict:
+        // 1. the vararg keys override the new explicit key; this was the
+        //    old behavior and made it possible for implicit vararg return
+        //    values to override explicit reassignments, which was
+        //    always surprising and unwanted, i.e. a bug.
+        // 2. re-assign only the first vararg key, keeping remaining keys
+        //    as they are.
+        // 3. produce a compiler error when an explicit key is set, but
+        //    the vararg set is larger than 1.
+        // 4. treat a keyed argument in last place like any previous argument,
+        //    causing only a single vararg result to be forwarded.
+        // we use option 4, as it is most consistent with existing behavior,
+        // and seems to be the least surprising choice.
+        if (last_param && param->is_vararg() && !arg.is_keyed()) {
+            // forward as-is, with keys
             for (size_t i = (size_t)param->index; i < frame->args.size(); ++i) {
                 dest.push_back(frame->args[i]);
             }
         } else if ((size_t)param->index < frame->args.size()) {
-            dest.push_back(Argument(arg.key, frame->args[param->index].value));
+            auto &&srcarg = frame->args[param->index];
+            // when forwarding a vararg and the arg is not re-keyed,
+            // forward the vararg key as well.
+            if (param->is_vararg() && !arg.is_keyed()) {
+                dest.push_back(srcarg);
+            } else {
+                dest.push_back(Argument(arg.key, srcarg.value));
+            }
         } else {
             if (!param->is_vararg()) {
 #if SCOPES_DEBUG_CODEGEN
@@ -17111,11 +17137,39 @@ static const Type *f_elementtype(const Type *T, int i) {
     case TK_SampledImage: return cast<SampledImageType>(T)->type;
     default: {
         StyledString ss;
-        ss.out << "type " << T << " has no elements" << std::endl;
+        ss.out << "storage type " << T << " has no elements" << std::endl;
         location_error(ss.str());
     } break;
     }
     return nullptr;
+}
+
+static int f_elementindex(const Type *T, Symbol name) {
+    T = storage_type(T);
+    switch(T->kind()) {
+    case TK_Tuple: return cast<TupleType>(T)->field_index(name);
+    case TK_Union: return cast<UnionType>(T)->field_index(name);
+    default: {
+        StyledString ss;
+        ss.out << "storage type " << T << " has no named elements" << std::endl;
+        location_error(ss.str());
+    } break;
+    }
+    return -1;
+}
+
+static Symbol f_elementname(const Type *T, int index) {
+    T = storage_type(T);
+    switch(T->kind()) {
+    case TK_Tuple: return cast<TupleType>(T)->field_name(index);
+    case TK_Union: return cast<UnionType>(T)->field_name(index);
+    default: {
+        StyledString ss;
+        ss.out << "storage type " << T << " has no named elements" << std::endl;
+        location_error(ss.str());
+    } break;
+    }
+    return SYM_Unnamed;
 }
 
 static const Type *f_pointertype(const Type *T, uint64_t flags, Symbol storage_class) {
@@ -17471,30 +17525,6 @@ static const List *f_list_join(List *a, List *b) {
     return List::join(a, b);
 }
 
-static int f_tuple_field_index(const Type *type, Symbol name) {
-    verify_kind<TK_Tuple>(type);
-    auto ti = cast<TupleType>(type);
-    return ti->field_index(name);
-}
-
-static Symbol f_tuple_field_name(const Type *type, int index) {
-    verify_kind<TK_Tuple>(type);
-    auto ti = cast<TupleType>(type);
-    return ti->field_name(index);
-}
-
-static int f_union_field_index(const Type *type, Symbol name) {
-    verify_kind<TK_Union>(type);
-    auto tu = cast<UnionType>(type);
-    return tu->field_index(name);
-}
-
-static Symbol f_union_field_name(const Type *type, int index) {
-    verify_kind<TK_Union>(type);
-    auto tu = cast<UnionType>(type);
-    return tu->field_name(index);
-}
-
 typedef struct { Any _0; Any _1; } AnyAnyPair;
 typedef struct { Symbol _0; Any _1; } SymbolAnyPair;
 static SymbolAnyPair f_scope_next(Scope *scope, Symbol key) {
@@ -17666,6 +17696,8 @@ static void init_globals(int argc, char *argv[]) {
     DEFINE_PURE_C_FUNCTION(FN_AnyString, f_any_string, TYPE_String, TYPE_Any);
     DEFINE_PURE_C_FUNCTION(FN_StringJoin, f_string_join, TYPE_String, TYPE_String, TYPE_String);
     DEFINE_PURE_C_FUNCTION(FN_ElementType, f_elementtype, TYPE_Type, TYPE_Type, TYPE_I32);
+    DEFINE_PURE_C_FUNCTION(FN_ElementIndex, f_elementindex, TYPE_I32, TYPE_Type, TYPE_Symbol);
+    DEFINE_PURE_C_FUNCTION(FN_ElementName, f_elementname, TYPE_Symbol, TYPE_Type, TYPE_I32);
     DEFINE_PURE_C_FUNCTION(FN_SizeOf, f_sizeof, TYPE_USize, TYPE_Type);
     DEFINE_PURE_C_FUNCTION(FN_Alignof, f_alignof, TYPE_USize, TYPE_Type);
     DEFINE_PURE_C_FUNCTION(FN_PointerType, f_pointertype, TYPE_Type, TYPE_Type, TYPE_U64, TYPE_Symbol);
@@ -17708,10 +17740,6 @@ static void init_globals(int argc, char *argv[]) {
     DEFINE_PURE_C_FUNCTION(Symbol("Any=="), f_any_eq, TYPE_Bool, TYPE_Any, TYPE_Any);
     DEFINE_PURE_C_FUNCTION(FN_ListJoin, f_list_join, TYPE_List, TYPE_List, TYPE_List);
     DEFINE_PURE_C_FUNCTION(FN_ScopeNext, f_scope_next, Tuple({TYPE_Symbol, TYPE_Any}), TYPE_Scope, TYPE_Symbol);
-    DEFINE_PURE_C_FUNCTION(FN_TupleFieldIndex, f_tuple_field_index, TYPE_I32, TYPE_Type, TYPE_Symbol);
-    DEFINE_PURE_C_FUNCTION(FN_TupleFieldName, f_tuple_field_name, TYPE_Symbol, TYPE_Type, TYPE_I32);
-    DEFINE_PURE_C_FUNCTION(FN_UnionFieldIndex, f_union_field_index, TYPE_I32, TYPE_Type, TYPE_Symbol);
-    DEFINE_PURE_C_FUNCTION(FN_UnionFieldName, f_union_field_name, TYPE_Symbol, TYPE_Type, TYPE_I32);
     DEFINE_PURE_C_FUNCTION(FN_StringMatch, f_string_match, TYPE_Bool, TYPE_String, TYPE_String);
     DEFINE_PURE_C_FUNCTION(SFXFN_SetTypenameSuper, f_set_typename_super, TYPE_Void, TYPE_Type, TYPE_Type);
     DEFINE_PURE_C_FUNCTION(FN_SuperOf, superof, TYPE_Type, TYPE_Type);
