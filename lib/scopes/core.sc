@@ -3305,7 +3305,7 @@ fn tupleof (...)
         let i = (sub i 1)
         let T = (va@ i ...)
         let key = (va@ i keys...)
-        loop i (va-key key (unknownof (typeof T))) result...
+        loop i (va-key key (unconst T)) result...
     else
         # build tuple
         let loop (i result) = 0 (nullof (tuple result...))
