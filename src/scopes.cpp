@@ -10439,7 +10439,7 @@ struct LLVMIRGenerator {
             auto ST = abi_struct_type(classes, sz);
             if (ST) {
                 // reassemble from argument-sized bits
-                auto ptr = LLVMBuildAlloca(builder, ST, "");
+                auto ptr = safe_alloca(ST);
                 auto zero = LLVMConstInt(i32T,0,false);
                 for (size_t i = 0; i < sz; ++i) {
                     LLVMValueRef indices[] = {
@@ -10461,8 +10461,7 @@ struct LLVMIRGenerator {
         ABIClass classes[MAX_ABI_CLASSES];
         size_t sz = abi_classify(AT, classes);
         if (!sz) {
-            LLVMValueRef ptrval = LLVMBuildAlloca(builder,
-                type_to_llvm_type(AT), "");
+            LLVMValueRef ptrval = safe_alloca(type_to_llvm_type(AT));
             LLVMBuildStore(builder, val, ptrval);
             val = ptrval;
             memptrs.push_back(values.size());
@@ -10474,7 +10473,7 @@ struct LLVMIRGenerator {
             auto ST = abi_struct_type(classes, sz);
             if (ST) {
                 // break into argument-sized bits
-                auto ptr = LLVMBuildAlloca(builder, LLVMTypeOf(val), "");
+                auto ptr = safe_alloca(LLVMTypeOf(val));
                 auto zero = LLVMConstInt(i32T,0,false);
                 LLVMBuildStore(builder, val, ptr);
                 ptr = LLVMBuildBitCast(builder, ptr, LLVMPointerType(ST, 0), "");
@@ -10907,8 +10906,7 @@ struct LLVMIRGenerator {
         values.reserve(argcount + 1);
 
         if (use_sret) {
-            values.push_back(LLVMBuildAlloca(builder,
-                _type_to_llvm_type(fi->return_type), ""));
+            values.push_back(safe_alloca(_type_to_llvm_type(fi->return_type)));
         }
         std::vector<size_t> memptrs;
         for (size_t i = 0; i < argcount; ++i) {
@@ -10974,6 +10972,25 @@ struct LLVMIRGenerator {
         }
         LLVMValueRef values[] = { retvalue };
         return LLVMBuildCall(builder, func_sqrt, values, 1, "");
+    }
+
+    LLVMValueRef safe_alloca(LLVMTypeRef ty, LLVMValueRef val = nullptr) {
+        auto oldbb = LLVMGetInsertBlock(builder);
+        auto entry = LLVMGetEntryBasicBlock(active_function_value);
+        auto term = LLVMGetBasicBlockTerminator(entry);
+        if (term) {
+            LLVMPositionBuilderBefore(builder, term);
+        } else {
+            LLVMPositionBuilderAtEnd(builder, entry);
+        }
+        LLVMValueRef result;
+        if (val) {
+            result = LLVMBuildArrayAlloca(builder, ty, val, "");
+        } else {
+            result = LLVMBuildAlloca(builder, ty, "");
+        }
+        LLVMPositionBuilderAtEnd(builder, oldbb);
+        return result;
     }
 
     void write_label_body(Label *label) {
@@ -11074,22 +11091,13 @@ struct LLVMIRGenerator {
             case FN_Undef: { READ_TYPE(ty);
                 retvalue = LLVMGetUndef(ty); } break;
             case FN_Alloca: { READ_TYPE(ty);
-                auto oldbb = LLVMGetInsertBlock(builder);
-                auto entry = LLVMGetEntryBasicBlock(active_function_value);
-                auto term = LLVMGetBasicBlockTerminator(entry);
-                if (term) {
-                    LLVMPositionBuilderBefore(builder, term);
-                } else {
-                    LLVMPositionBuilderAtEnd(builder, entry);
-                }
-                retvalue = LLVMBuildAlloca(builder, ty, "");
-                LLVMPositionBuilderAtEnd(builder, oldbb);
+                retvalue = safe_alloca(ty);
             } break;
             case FN_AllocaArray: { READ_TYPE(ty); READ_VALUE(val);
-                retvalue = LLVMBuildArrayAlloca(builder, ty, val, ""); } break;
+                retvalue = safe_alloca(ty, val); } break;
             case FN_AllocaOf: {
                 READ_VALUE(val);
-                retvalue = LLVMBuildAlloca(builder, LLVMTypeOf(val), "");
+                retvalue = safe_alloca(LLVMTypeOf(val));
                 LLVMBuildStore(builder, val, retvalue);
             } break;
             case FN_Malloc: { READ_TYPE(ty);
