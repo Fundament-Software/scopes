@@ -22,7 +22,7 @@
                 },
                 {
                     "name": "keyword.control.library.scopes",
-                    "match": "(fn\\.\\.\\.|method|struct|enum|typefn|while|break|continue|for|in|match|from|using|filter|\\:|var|global|try|except|locals|import|defer|assert|define(((-block)?-scope)?-macro|-infix[\\<\\>])?)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
+                    "match": "(fn\\.\\.\\.|method|struct|enum|typefn|while|break|continue|for|in|match|from|using|filter|\\:|global|try|except|locals|import|defer|assert|define(((-block)?-scope)?-macro|-infix[\\<\\>])?)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
                 },
                 {
                     "name": "keyword.control.glsl.scopes",
@@ -129,7 +129,7 @@
                 },
                 {
                     "name": "support.function.library.scopes",
-				    "match": "(_|new|delete|sign|abs|range|zip|enumerate|unpack|(tuple|vector|array)of|unknownof|va-(empty\\?|types)|imply|forward-imply|forward-as|xpcall|require-from|char|getattr|(de)?cons|slice|(scope-|block-scope-)?macro|print|min|max|clamp|(tie|cond)-const|repr|(none|symbol|list|empty|type|integer|real|pointer|array|tuple|typename|Symbol|function-pointer)\\?|(integer|real|pointer|function|array|tuple|function-pointer|typename)-type\\?)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
+				    "match": "(_|new|local|delete|sign|abs|range|zip|enumerate|unpack|(tuple|vector|array)of|unknownof|va-(empty\\?|types)|imply|forward-imply|forward-as|xpcall|require-from|char|getattr|(de)?cons|slice|(scope-|block-scope-)?macro|print|min|max|clamp|(tie|cond)-const|repr|(none|symbol|list|empty|type|integer|real|pointer|array|tuple|typename|Symbol|function-pointer)\\?|(integer|real|pointer|function|array|tuple|function-pointer|typename)-type\\?)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
                 },
                 {
                     "name": "support.function.sfx.builtin.scopes",

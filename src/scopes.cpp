@@ -10975,22 +10975,27 @@ struct LLVMIRGenerator {
     }
 
     LLVMValueRef safe_alloca(LLVMTypeRef ty, LLVMValueRef val = nullptr) {
-        auto oldbb = LLVMGetInsertBlock(builder);
-        auto entry = LLVMGetEntryBasicBlock(active_function_value);
-        auto term = LLVMGetBasicBlockTerminator(entry);
-        if (term) {
-            LLVMPositionBuilderBefore(builder, term);
+        if (val && !LLVMIsConstant(val)) {
+            // for stack arrays with dynamic size, build the array locally
+            return LLVMBuildArrayAlloca(builder, ty, val, "");
         } else {
-            LLVMPositionBuilderAtEnd(builder, entry);
+            auto oldbb = LLVMGetInsertBlock(builder);
+            auto entry = LLVMGetEntryBasicBlock(active_function_value);
+            auto term = LLVMGetBasicBlockTerminator(entry);
+            if (term) {
+                LLVMPositionBuilderBefore(builder, term);
+            } else {
+                LLVMPositionBuilderAtEnd(builder, entry);
+            }
+            LLVMValueRef result;
+            if (val) {
+                result = LLVMBuildArrayAlloca(builder, ty, val, "");
+            } else {
+                result = LLVMBuildAlloca(builder, ty, "");
+            }
+            LLVMPositionBuilderAtEnd(builder, oldbb);
+            return result;
         }
-        LLVMValueRef result;
-        if (val) {
-            result = LLVMBuildArrayAlloca(builder, ty, val, "");
-        } else {
-            result = LLVMBuildAlloca(builder, ty, "");
-        }
-        LLVMPositionBuilderAtEnd(builder, oldbb);
-        return result;
     }
 
     void write_label_body(Label *label) {

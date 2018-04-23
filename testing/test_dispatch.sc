@@ -15,7 +15,7 @@ do
                 fn (a b c)
                     .. a b c
 
-    var x = 1
+    let x = (local 'copy 1)
     assert ((m x 2 3) == 6)
     assert ((m 1.0 2.0 3.0) == 6.0)
     assert ((m "a" "b" "c") == "abc")
@@ -29,7 +29,7 @@ do
         (a : string, b : string, c : string)
             string-join a (string-join b c)
 
-    var x = 1 # reference type will be implicitly converted to value type
+    let x = (local 'copy 1) # reference type will be implicitly converted to value type
     assert ((add3 x 2 3) == 6)
     assert ((add3 1.0 2.0 3.0) == 6.0)
     assert ((add3 "a" "b" "c") == "abc")

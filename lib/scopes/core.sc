@@ -1172,14 +1172,18 @@ syntax-extend
 
     set-type-symbol! typename 'apply-type
         fn (cls name args...)
-            #   calling typename from different modules with the same string
-                will return the same type due to memoization; passing extra,
-                ideally unique tokens, e.g. a new, empty function, will ensure
-                that the memoization is sufficiently unique.
-            if (va-empty? args...)
-                compiler-error!
-                    "typename constructor must be invoked with one or more unique tokens"
-            typename-type name
+            if (type== cls typename)
+                #   calling typename from different modules with the same string
+                    will return the same type due to memoization; passing extra,
+                    ideally unique tokens, e.g. a new, empty function, will ensure
+                    that the memoization is sufficiently unique.
+                if (va-empty? args...)
+                    compiler-error!
+                        "typename constructor must be invoked with one or more unique tokens"
+                typename-type name
+            else
+                # invoke default constructor for type
+                nullof cls
 
     set-type-symbol! function 'apply-type
         fn (cls ...)
@@ -2291,16 +2295,33 @@ define-macro typefn
 
 fn constructor (f)
     fn (cls args...)
-        let self =
-            reference.from-pointer (f cls)
-        let op ok = (type@ cls 'new&)
-        if ok
-            op self args...
-        else
-            # try immutable initializer
-            self =
-                cls args...
-        self
+        if (((typeof cls) == Symbol) and (cls == 'copy))
+            let value = args...
+            let T = (typeof value)
+            let cls =
+                if (T < reference)
+                    element-type (storageof T) 0
+                else T
+            let self =
+                reference.from-pointer (f cls)
+            let op ok = (type@ cls 'copy&)
+            if ok
+                op self value
+            else
+                # try immutable copy
+                self = value
+            self
+        else cls
+            let self =
+                reference.from-pointer (f cls)
+            let op ok = (type@ cls 'new&)
+            if ok
+                op self args...
+            else
+                # try immutable initializer
+                self =
+                    cls args...
+            self
 
 fn local (cls args...)
     (constructor alloca) cls args...

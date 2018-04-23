@@ -57,9 +57,9 @@ do
         at : i32
         next : (pointer Cell)
 
-    var cell3 = (Cell 3 null)
-    var cell2 = (Cell 2 cell3)
-    var cell1 = (Cell 1 cell2)
+    let cell3 = (local Cell 3 null)
+    let cell2 = (local Cell 2 cell3)
+    let cell1 = (local Cell 1 cell2)
 
     assert
         cell1.next.next.at == 3
@@ -75,9 +75,9 @@ do
         at : i32
         next : CellPtr
 
-    var cell3 = (Cell 3 null)
-    var cell2 = (Cell 2 cell3)
-    var cell1 = (Cell 1 cell2)
+    let cell3 = (local Cell 3 null)
+    let cell2 = (local Cell 2 cell3)
+    let cell1 = (local Cell 1 cell2)
 
     assert
         cell1.next.next.at == 3
@@ -87,17 +87,8 @@ do
         x : i32
         y : i32
 
-    fn new (val)
-        let mval = (malloc (typeof val))
-        let mval = (reference.from-pointer mval)
-        mval = val
-        mval
-
-    fn delete (val)
-        free (bitcast val (storageof (typeof val)))
-
     let testval =
-        new (Val 1 2)
+        new Val 1 2
     assert (testval.x == 1)
     assert (testval.y == 2)
     delete testval

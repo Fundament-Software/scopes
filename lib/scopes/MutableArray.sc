@@ -67,7 +67,7 @@ fn define-common-array-methods (T element-type ensure-capacity)
                 else (key b)
             let swapped =
                 if (a-key > b-key)
-                    var t = b
+                    let t = (local 'copy b)
                     b = a
                     a = t
                     true

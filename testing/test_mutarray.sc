@@ -12,7 +12,7 @@ fn autodelete (x)
 do
     # mutable array with fixed upper capacity
     let i32Arrayx65536 = (MutableArray i32 TESTSIZE)
-    var a = (i32Arrayx65536)
+    let a = (local i32Arrayx65536)
     defer (autodelete a)
     for i in fullrange
         assert ((countof a) == i)
@@ -26,7 +26,7 @@ do
 do
     # mutable array with dynamic capacity
     let i32Array = (MutableArray i32)
-    var a = (i32Array 12)
+    let a = (local i32Array 12)
     defer (autodelete a)
     assert (a.capacity == 12:usize)
     for i in fullrange
@@ -42,7 +42,7 @@ do
     # array of array
     let i32Array = (MutableArray i32 16)
     let i32ArrayArray = (MutableArray i32Array)
-    var a = (i32ArrayArray)
+    let a = (local i32ArrayArray)
     # will also delete the nested array
     defer (autodelete a)
     for x in (range 16)
@@ -60,7 +60,7 @@ do
 do
     # sorting a mutable array
     let T = (MutableArray i32 32)
-    var a = (T)
+    let a = (local T)
     defer (autodelete a)
     for k in (va-each 3 1 9 5 0 7 12 3 99 -20)
         'append a k

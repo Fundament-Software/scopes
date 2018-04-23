@@ -23,7 +23,7 @@ do
 
 fn test2 ()
     global quit = false
-    var event = 1
+    let event = (local 'copy 1)
     fn handle_events ()
         if (event != 0)
             if (event == 1)

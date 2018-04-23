@@ -51,7 +51,7 @@ do
 
 do
     # uninitialized mutable array on stack with constant length
-    var vals @ 4 : i32
+    let vals = (alloca-array i32 4)
     # init the array
     init-array vals
     # then check the values
@@ -60,7 +60,7 @@ do
 do
     # uninitialized mutable array on stack with dynamic length
     let count = (unconst 4) # simulate a runtime value
-    var vals @ count : i32
+    let vals = (alloca-array i32 count)
     init-array vals
     check-array vals
 

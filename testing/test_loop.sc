@@ -7,7 +7,7 @@ let x =
         else i
 assert (x == 10)
 
-var i = 10
+let i = (local 'copy 10)
 while (i != 0)
     i = i - 1
     if (i == 3)
