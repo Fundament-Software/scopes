@@ -1,13 +1,13 @@
-#do
+do
     let ok =
         xpcall
             fn ()
                 print 1
                 error! "runtime error"
                 print 2
-                unconst true            
+                unconst true
             fn (exc)
-                #io-write!
+                io-write!
                     format-exception exc
                 unconst false
 
@@ -18,16 +18,21 @@ fn test-loop-xp ()
     if (counter == 10)
         return;
     xpcall
-        label ()
+        fn ()
             if (counter == 5)
                 error! "loop error"
-            print "success" counter
-            loop (counter + 1)
-        label (exc)
-            print "fail"
-            loop (counter + 1)
+            print "success branch" counter
+            return;
+        fn (exc)
+            print "fail branch" counter exc
+            io-write!
+                format-exception exc
+            assert (counter == 5)
+            return;
+    loop (counter + 1)
 
-let f =
+test-loop-xp;
+#let f =
     as
         compile
             typify test-loop-xp
@@ -36,5 +41,4 @@ let f =
         pointer
             function void
 
-dump "hi"
-f;
+#f;

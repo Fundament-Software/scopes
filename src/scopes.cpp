@@ -4027,7 +4027,7 @@ struct Exception {
 };
 
 struct ExceptionPad {
-    intptr_t retaddr[5];
+    void *retaddr[5];
     Any value;
 
     ExceptionPad() : value(none) {
