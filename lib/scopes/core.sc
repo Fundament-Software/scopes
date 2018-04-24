@@ -1878,6 +1878,16 @@ define-macro assert
                     list (repr (Syntax->datum sxcond))
                 else body
 
+define-scope-macro del
+    let loop (args)
+    let head rest = (decons args)
+    let head = (as (as head Syntax) Symbol)
+    delete-scope-symbol! syntax-scope head
+    if (empty? rest)
+        return (list _) syntax-scope
+    else
+        loop rest
+
 # (. value symbol ...)
 define-macro .
     fn op (a b)
@@ -2590,29 +2600,32 @@ define-macro import
                 list quote name
         'syntax-scope
 
-#define llvm_eh_sjlj_setjmp
-    extern 'llvm.eh.sjlj.setjmp (function i32 (pointer i8))
+let i8* = (pointer i8 'mutable)
+let llvm.eh.sjlj.setjmp =
+    extern 'llvm.eh.sjlj.setjmp (function i32 i8*)
+let llvm.eh.sjlj.longjmp =
+    extern 'llvm.eh.sjlj.longjmp (function void i8*)
+let llvm.frameaddress =
+    extern 'llvm.frameaddress (function i8* i32)
+let llvm.stacksave =
+    extern 'llvm.stacksave (function i8*)
 
 fn xpcall (f errorf)
     let pad = (alloca exception-pad-type)
     let old-pad =
         set-exception-pad pad
-    if (== operating-system 'windows)
-        if ((catch-exception pad (inttoptr 0 (pointer i8))) != 0)
-            set-exception-pad old-pad
-            errorf (exception-value pad)
-        else
-            let result... = (f)
-            set-exception-pad old-pad
-            result...
+    let pad-target = (bitcast pad (pointer i8* 'mutable))
+    store (llvm.frameaddress 0) pad-target
+    store (llvm.stacksave) (getelementptr pad-target 2)
+    if ((llvm.eh.sjlj.setjmp (bitcast pad-target i8*)) != 0)
+        set-exception-pad old-pad
+        errorf (exception-value pad)
     else
-        if ((catch-exception pad) != 0)
-            set-exception-pad old-pad
-            errorf (exception-value pad)
-        else
-            let result... = (f)
-            set-exception-pad old-pad
-            result...
+        let result... = (f)
+        set-exception-pad old-pad
+        result...
+
+del i8*
 
 fn format-exception (exc)
     if (('typeof exc) == Exception)
@@ -3495,16 +3508,6 @@ fn fold (init gen f)
                 f break result args...
                 next
         \ break next
-
-define-scope-macro del
-    let loop (args)
-    let head rest = (decons args)
-    let head = (head as Syntax as Symbol)
-    delete-scope-symbol! syntax-scope head
-    if (empty? rest)
-        return (list _) syntax-scope
-    else
-        loop rest
 
 define-macro breakable-block
     let old-return ok = (syntax-scope @ 'return)

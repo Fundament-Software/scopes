@@ -229,12 +229,6 @@ extern "C" {
 #pragma GCC diagnostic ignored "-Wdate-time"
 #pragma GCC diagnostic ignored "-Wabsolute-value"
 
-#ifdef SCOPES_WIN32
-#include <setjmpex.h>
-#else
-#include <setjmp.h>
-#endif
-
 #include "cityhash/city.cpp"
 
 //------------------------------------------------------------------------------
@@ -4033,7 +4027,7 @@ struct Exception {
 };
 
 struct ExceptionPad {
-    jmp_buf retaddr;
+    intptr_t retaddr[5];
     Any value;
 
     ExceptionPad() : value(none) {
@@ -4041,23 +4035,15 @@ struct ExceptionPad {
 
     void invoke(const Any &value) {
         this->value = value;
-        longjmp(retaddr, 1);
+        __builtin_longjmp(retaddr, 1);
     }
 };
 
-#ifdef SCOPES_WIN32
 #define SCOPES_TRY() \
     ExceptionPad exc_pad; \
     ExceptionPad *_last_exc_pad = _exc_pad; \
     _exc_pad = &exc_pad; \
-    if (!_setjmpex(exc_pad.retaddr, nullptr)) {
-#else
-#define SCOPES_TRY() \
-    ExceptionPad exc_pad; \
-    ExceptionPad *_last_exc_pad = _exc_pad; \
-    _exc_pad = &exc_pad; \
-    if (!setjmp(exc_pad.retaddr)) {
-#endif
+    if (!__builtin_setjmp(exc_pad.retaddr)) {
 
 #define SCOPES_CATCH(EXCNAME) \
         _exc_pad = _last_exc_pad; \
@@ -10979,6 +10965,8 @@ struct LLVMIRGenerator {
             // for stack arrays with dynamic size, build the array locally
             return LLVMBuildArrayAlloca(builder, ty, val, "");
         } else {
+#if 0
+            // add allocas at the tail
             auto oldbb = LLVMGetInsertBlock(builder);
             auto entry = LLVMGetEntryBasicBlock(active_function_value);
             auto term = LLVMGetBasicBlockTerminator(entry);
@@ -10995,6 +10983,35 @@ struct LLVMIRGenerator {
             }
             LLVMPositionBuilderAtEnd(builder, oldbb);
             return result;
+#elif 1
+            // add allocas to the front
+            auto oldbb = LLVMGetInsertBlock(builder);
+            auto entry = LLVMGetEntryBasicBlock(active_function_value);
+            auto instr = LLVMGetFirstInstruction(entry);
+            if (instr) {
+                LLVMPositionBuilderBefore(builder, instr);
+            } else {
+                LLVMPositionBuilderAtEnd(builder, entry);
+            }
+            LLVMValueRef result;
+            if (val) {
+                result = LLVMBuildArrayAlloca(builder, ty, val, "");
+            } else {
+                result = LLVMBuildAlloca(builder, ty, "");
+                //LLVMSetAlignment(result, 16);
+            }
+            LLVMPositionBuilderAtEnd(builder, oldbb);
+            return result;
+#else
+            // add allocas locally
+            LLVMValueRef result;
+            if (val) {
+                result = LLVMBuildArrayAlloca(builder, ty, val, "");
+            } else {
+                result = LLVMBuildAlloca(builder, ty, "");
+            }
+            return result;
+#endif
         }
     }
 
@@ -17824,13 +17841,6 @@ static void init_globals(int argc, char *argv[]) {
 
     DEFINE_C_FUNCTION(Symbol("set-exception-pad"), f_set_exception_pad,
         p_exception_pad_type, p_exception_pad_type);
-    #ifdef SCOPES_WIN32
-    DEFINE_C_FUNCTION(Symbol("catch-exception"), _setjmpex, TYPE_I32,
-        p_exception_pad_type, NativeROPointer(TYPE_I8));
-    #else
-    DEFINE_C_FUNCTION(Symbol("catch-exception"), setjmp, TYPE_I32,
-        p_exception_pad_type);
-    #endif
     DEFINE_C_FUNCTION(Symbol("exception-value"), f_exception_value,
         TYPE_Any, p_exception_pad_type);
     DEFINE_C_FUNCTION(Symbol("set-signal-abort!"), f_set_signal_abort,
