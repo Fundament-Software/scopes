@@ -142,7 +142,7 @@ project "scopes"
             "-pedantic",
             "-Wall",
             "-Wno-keyword-macro",
-            "-Wno-gnu-redeclared-enum",
+            "-Wno-gnu-redeclared-enum"
         }
 
         if USE_ASAN_UBSAN then

@@ -2600,7 +2600,7 @@ define-macro import
                 list quote name
         'syntax-scope
 
-let i8* = (pointer i8 'mutable)
+let i8* = (pointer i8)
 let llvm.eh.sjlj.setjmp =
     extern 'llvm.eh.sjlj.setjmp (function i32 i8*)
 let llvm.eh.sjlj.longjmp =
@@ -2611,6 +2611,27 @@ let llvm.stacksave =
     extern 'llvm.stacksave (function i8*)
 
 fn xpcall (f errorf)
+    let pad = (alloca-exception-pad)
+    let old-pad =
+        set-exception-pad pad
+    if (== operating-system 'windows)
+        if ((catch-exception pad (nullof i8*)) != 0)
+            set-exception-pad old-pad
+            errorf (exception-value pad)
+        else
+            let result... = (f)
+            set-exception-pad old-pad
+            result...
+    else
+        if ((catch-exception pad) != 0)
+            set-exception-pad old-pad
+            errorf (exception-value pad)
+        else
+            let result... = (f)
+            set-exception-pad old-pad
+            result...
+
+#fn xpcall (f errorf)
     let pad = (alloca exception-pad-type)
     let old-pad =
         set-exception-pad pad
@@ -2687,7 +2708,7 @@ define-macro match
                             list '== (list typeof src) list
                             process-list-args anchor src rest
                     elseif (head == 'or)
-                        if ((countof rest) < 2)
+                        if ((countof rest) < 2)                            
                             error! "'or' needs two arguments"
                         fn process-or-args (src rest)
                             let a rest = (decons rest)

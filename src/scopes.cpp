@@ -229,6 +229,12 @@ extern "C" {
 #pragma GCC diagnostic ignored "-Wdate-time"
 #pragma GCC diagnostic ignored "-Wabsolute-value"
 
+#ifdef SCOPES_WIN32
+#include <setjmpex.h>
+#else
+#include <setjmp.h>
+#endif
+
 #include "cityhash/city.cpp"
 
 //------------------------------------------------------------------------------
@@ -525,7 +531,7 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(FN_Branch) T(KW_Fn) T(KW_Label) T(KW_Quote) \
     T(KW_Call) T(KW_RawCall) T(KW_CCCall) T(SYM_QuoteForm) T(FN_Dump) T(KW_Do) \
     T(FN_FunctionType) T(FN_TupleType) T(FN_UnionType) T(FN_Alloca) T(FN_AllocaOf) T(FN_Malloc) \
-    T(FN_AllocaArray) T(FN_MallocArray) T(FN_ReturnLabelType) T(KW_DoIn) \
+    T(FN_AllocaArray) T(FN_MallocArray) T(FN_ReturnLabelType) T(KW_DoIn) T(FN_AllocaExceptionPad) \
     T(FN_AnyExtract) T(FN_AnyWrap) T(FN_IsConstant) T(FN_Free) T(KW_Defer) \
     T(OP_ICmpEQ) T(OP_ICmpNE) T(FN_Sample) T(FN_ImageRead) T(FN_ImageWrite) \
     T(OP_ICmpUGT) T(OP_ICmpUGE) T(OP_ICmpULT) T(OP_ICmpULE) \
@@ -931,6 +937,7 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(FN_TypeDebugABI, "type-debug-abi") \
     T(FN_TypeAt, "type@") \
     T(FN_Undef, "undef") T(FN_NullOf, "nullof") T(FN_Alloca, "alloca") \
+    T(FN_AllocaExceptionPad, "alloca-exception-pad") \
     T(FN_AllocaOf, "allocaof") \
     T(FN_AllocaArray, "alloca-array") \
     T(FN_Location, "compiler-anchor") \
@@ -4027,7 +4034,7 @@ struct Exception {
 };
 
 struct ExceptionPad {
-    void *retaddr[5];
+    jmp_buf retaddr;
     Any value;
 
     ExceptionPad() : value(none) {
@@ -4035,7 +4042,7 @@ struct ExceptionPad {
 
     void invoke(const Any &value) {
         this->value = value;
-        __builtin_longjmp(retaddr, 1);
+        longjmp(retaddr, 1);
     }
 };
 
@@ -4043,7 +4050,7 @@ struct ExceptionPad {
     ExceptionPad exc_pad; \
     ExceptionPad *_last_exc_pad = _exc_pad; \
     _exc_pad = &exc_pad; \
-    if (!__builtin_setjmp(exc_pad.retaddr)) {
+    if (!setjmp(exc_pad.retaddr)) {
 
 #define SCOPES_CATCH(EXCNAME) \
         _exc_pad = _last_exc_pad; \
@@ -11115,6 +11122,14 @@ struct LLVMIRGenerator {
             case FN_Alloca: { READ_TYPE(ty);
                 retvalue = safe_alloca(ty);
             } break;
+            case FN_AllocaExceptionPad: {
+                LLVMTypeRef ty = type_to_llvm_type(Array(TYPE_U8, sizeof(ExceptionPad)));                
+#ifdef SCOPES_WIN32
+                retvalue = LLVMBuildAlloca(builder, ty, "");
+#else
+                retvalue = safe_alloca(ty);
+#endif
+            } break;
             case FN_AllocaArray: { READ_TYPE(ty); READ_VALUE(val);
                 retvalue = safe_alloca(ty, val); } break;
             case FN_AllocaOf: {
@@ -13489,6 +13504,7 @@ struct Solver {
         case FN_Unconst:
         case FN_Undef:
         case FN_Alloca:
+        case FN_AllocaExceptionPad:
         case FN_AllocaArray:
         case FN_Malloc:
         case FN_MallocArray:
@@ -13899,6 +13915,10 @@ struct Solver {
             CHECKARGS(1, 1);
             args[1].value.verify(TYPE_Type);
             RETARGTYPES(LocalPointer(args[1].value.typeref));
+        } break;
+        case FN_AllocaExceptionPad: {
+            CHECKARGS(0, 0);            
+            RETARGTYPES(LocalPointer(Array(TYPE_U8, sizeof(ExceptionPad))));
         } break;
         case FN_AllocaOf: {
             CHECKARGS(1, 1);
@@ -17841,6 +17861,13 @@ static void init_globals(int argc, char *argv[]) {
 
     DEFINE_C_FUNCTION(Symbol("set-exception-pad"), f_set_exception_pad,
         p_exception_pad_type, p_exception_pad_type);
+    #ifdef SCOPES_WIN32
+    DEFINE_C_FUNCTION(Symbol("catch-exception"), _setjmpex, TYPE_I32,
+        p_exception_pad_type, NativeROPointer(TYPE_I8));
+    #else
+    DEFINE_C_FUNCTION(Symbol("catch-exception"), setjmp, TYPE_I32,
+        p_exception_pad_type);
+    #endif        
     DEFINE_C_FUNCTION(Symbol("exception-value"), f_exception_value,
         TYPE_Any, p_exception_pad_type);
     DEFINE_C_FUNCTION(Symbol("set-signal-abort!"), f_set_signal_abort,
