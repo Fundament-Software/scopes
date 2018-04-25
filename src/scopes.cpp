@@ -4046,11 +4046,19 @@ struct ExceptionPad {
     }
 };
 
+#ifdef SCOPES_WIN32
+#define SCOPES_TRY() \
+    ExceptionPad exc_pad; \
+    ExceptionPad *_last_exc_pad = _exc_pad; \
+    _exc_pad = &exc_pad; \
+    if (!_setjmpex(exc_pad.retaddr, nullptr)) {
+#else
 #define SCOPES_TRY() \
     ExceptionPad exc_pad; \
     ExceptionPad *_last_exc_pad = _exc_pad; \
     _exc_pad = &exc_pad; \
     if (!setjmp(exc_pad.retaddr)) {
+#endif
 
 #define SCOPES_CATCH(EXCNAME) \
         _exc_pad = _last_exc_pad; \
