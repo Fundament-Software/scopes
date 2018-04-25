@@ -158,10 +158,6 @@ project "scopes"
             linkoptions(opts)
         end
 
-        files {
-            "external/minilibs/regexp.c"
-        }
-
         defines {
             --"_GLIBCXX_USE_CXX11_ABI=0",
         }
@@ -251,7 +247,6 @@ project "scopes"
         }
 
         files {
-            "external/minilibs/regexp.c",
             "src/win32/mman.c",
             "src/win32/realpath.c",
             "src/win32/dlfcn.c",
@@ -338,10 +333,6 @@ project "scopes"
             buildoptions_c(opts)
             linkoptions(opts)
         end
-
-        files {
-            "external/minilibs/regexp.c"
-        }
 
         links {
             "pthread", "m", "ncurses", "dl", "z",

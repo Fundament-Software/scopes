@@ -213,7 +213,7 @@ const char *scopes_compile_time_date();
 #define STB_SPRINTF_IMPLEMENTATION
 #include "stb_sprintf.h"
 extern "C" {
-#include "minilibs/regexp.h"
+#include "minilibs/regexp.c"
 }
 
 #pragma GCC diagnostic ignored "-Wvla-extension"
@@ -11131,7 +11131,7 @@ struct LLVMIRGenerator {
                 retvalue = safe_alloca(ty);
             } break;
             case FN_AllocaExceptionPad: {
-                LLVMTypeRef ty = type_to_llvm_type(Array(TYPE_U8, sizeof(ExceptionPad)));                
+                LLVMTypeRef ty = type_to_llvm_type(Array(TYPE_U8, sizeof(ExceptionPad)));
 #ifdef SCOPES_WIN32
                 retvalue = LLVMBuildAlloca(builder, ty, "");
 #else
@@ -13925,7 +13925,7 @@ struct Solver {
             RETARGTYPES(LocalPointer(args[1].value.typeref));
         } break;
         case FN_AllocaExceptionPad: {
-            CHECKARGS(0, 0);            
+            CHECKARGS(0, 0);
             RETARGTYPES(LocalPointer(Array(TYPE_U8, sizeof(ExceptionPad))));
         } break;
         case FN_AllocaOf: {
@@ -17875,7 +17875,7 @@ static void init_globals(int argc, char *argv[]) {
     #else
     DEFINE_C_FUNCTION(Symbol("catch-exception"), setjmp, TYPE_I32,
         p_exception_pad_type);
-    #endif        
+    #endif
     DEFINE_C_FUNCTION(Symbol("exception-value"), f_exception_value,
         TYPE_Any, p_exception_pad_type);
     DEFINE_C_FUNCTION(Symbol("set-signal-abort!"), f_set_signal_abort,

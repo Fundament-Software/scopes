@@ -6,7 +6,34 @@
 #include <setjmp.h>
 #include <stdio.h>
 
-#include "regexp.h"
+extern "C" {
+
+typedef struct Reprog Reprog;
+typedef struct Resub Resub;
+
+static Reprog *regcomp(const char *pattern, int cflags, const char **errorp);
+static int regexec(Reprog *prog, const char *string, Resub *sub, int eflags);
+static void regfree(Reprog *prog);
+
+enum {
+	/* regcomp flags */
+	REG_ICASE = 1,
+	REG_NEWLINE = 2,
+
+	/* regexec flags */
+	REG_NOTBOL = 4,
+
+	/* limits */
+	REG_MAXSUB = 16
+};
+
+struct Resub {
+	unsigned int nsub;
+	struct {
+		const char *sp;
+		const char *ep;
+	} sub[REG_MAXSUB];
+};
 
 #define nelem(a) (sizeof (a) / sizeof (a)[0])
 
@@ -830,8 +857,8 @@ Reprog *regcomp(const char *pattern, int cflags, const char **errorp)
 	Reinst *split, *jump;
 	int i;
 
-	g.prog = malloc(sizeof (Reprog));
-	g.pstart = g.pend = malloc(sizeof (Renode) * strlen(pattern) * 2);
+	g.prog = (Reprog *)malloc(sizeof (Reprog));
+	g.pstart = g.pend = (Renode *)malloc(sizeof (Renode) * strlen(pattern) * 2);
 
 	if (setjmp(g.kaboom)) {
 		if (errorp) *errorp = g.error;
@@ -856,7 +883,7 @@ Reprog *regcomp(const char *pattern, int cflags, const char **errorp)
 		die("syntax error");
 
 	g.prog->nsub = g.nsub;
-	g.prog->start = g.prog->end = malloc((count(node) + 6) * sizeof (Reinst));
+	g.prog->start = g.prog->end = (Reinst *)malloc((count(node) + 6) * sizeof (Reinst));
 
 	split = emit(g.prog, I_SPLIT);
 	split->x = split + 3;
@@ -1155,3 +1182,5 @@ int main(int argc, char **argv)
 	return 0;
 }
 #endif
+
+}
