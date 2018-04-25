@@ -1,25 +1,12 @@
 
-
-
-fn store-value (x y)
-    let T = (typename-type "CClosure")
-    let EV =
-        tupleof
-            x = x
-            y = y
-    let TT = (typeof EV)
-    set-typename-storage! T TT
-    set-type-symbol! T 'call
-        fn (self)
-            let x y = (unpack (bitcast self TT))
-            print x y
-    bitcast EV T
-
+let a = (unconst 10)
+let b = (unconst 20)
 let f =
     local 'copy
-        store-value (unconst 25) (unconst "hello")
-
+        capture [a b] (u v)
+            print a b u v
+            + a b u v
 
 dump f
-print "done"
-print (f)
+assert ((f 1 2) == (+ 10 20 1 2))
+

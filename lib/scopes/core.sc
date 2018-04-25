@@ -2182,14 +2182,14 @@ do
             countof (load self)
 
     set-type-symbol! reference 'call
-        fn (self)
+        fn (self args...)
             let T = (storageof (typeof self))
             let ET = (element-type T 0)
             let op success = (type@ ET 'call&)
             if success
-                return (op self)
+                return (op self args...)
             else
-                call (load self)
+                call (load self) args...
 
     set-type-symbol! reference 'repr
         fn (self)
@@ -3397,6 +3397,52 @@ fn tupleof (...)
                 insertvalue result T i
         else
             result
+
+#-------------------------------------------------------------------------------
+# compile time closures
+#-------------------------------------------------------------------------------
+
+let Capture = (typename "Capture" (fn ()))
+
+define-macro capture
+    fn make-typename (TT arg)
+        let T =
+            typename
+                .. "Capture"
+                    string-repr TT
+                arg
+        set-typename-storage! T TT
+        set-typename-super! T Capture
+        T
+    fn convert (self TT)
+        unpack (bitcast self TT)
+
+    let args params body = (decons args 2)
+    let arglist = (args as Syntax as Any as list)
+    let head arglist = (decons arglist)
+    if
+        or (('typeof (head as Syntax as Any)) != Symbol)
+            ((head as Syntax as Symbol) != 'square-list)
+        syntax-error! head "square brackets expected"
+    let params = (params as Syntax as list)
+    let T = (Parameter 'T)
+    let EV = (Parameter 'EV)
+    let TT = (Parameter 'TT)
+    let self = (Parameter 'self)
+    list do
+        list let EV '=
+            cons tupleof arglist
+        list let TT '= (list typeof EV)
+        list let T '=
+            list make-typename TT
+                list fn '()
+        list set-type-symbol! T (list quote 'call)
+            cons fn (cons self params)
+                cons let
+                    .. arglist
+                        list '= (list convert self TT)
+                body
+        list bitcast EV T
 
 #-------------------------------------------------------------------------------
 # arrays

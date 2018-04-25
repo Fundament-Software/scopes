@@ -4965,11 +4965,11 @@ struct LexerParser {
             return Syntax::from(anchor, parse_list(tok_close));
         } else if (this->token == tok_square_open) {
             return Syntax::from(anchor,
-                List::from(Symbol(SYM_SquareList),
+                List::from(Syntax::from(anchor,Symbol(SYM_SquareList)),
                     parse_list(tok_square_close)));
         } else if (this->token == tok_curly_open) {
             return Syntax::from(anchor,
-                List::from(Symbol(SYM_CurlyList),
+                List::from(Syntax::from(anchor,Symbol(SYM_CurlyList)),
                     parse_list(tok_curly_close)));
         } else if ((this->token == tok_close)
             || (this->token == tok_square_close)
