@@ -2708,7 +2708,7 @@ define-macro match
                             list '== (list typeof src) list
                             process-list-args anchor src rest
                     elseif (head == 'or)
-                        if ((countof rest) < 2)                            
+                        if ((countof rest) < 2)
                             error! "'or' needs two arguments"
                         fn process-or-args (src rest)
                             let a rest = (decons rest)
@@ -2925,7 +2925,7 @@ do
     fn passthru-overload (sym func)
         set-type-symbol! CEnum sym (fn (a b flipped) (func (unenum a) (unenum b)))
 
-    passthru-overload '!= ==; passthru-overload '== ==
+    passthru-overload '!= !=; passthru-overload '== ==
     passthru-overload '< <; passthru-overload '<= <=
     passthru-overload '> >; passthru-overload '>= >=
     passthru-overload '+ +; passthru-overload '- -

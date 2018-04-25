@@ -19,6 +19,18 @@ do
     assert (test-enum.Q == 26)
     assert (test-enum.R == 27)
 
+    assert ((test-enum.R != test-enum.R) == false)
+    assert ((test-enum.R == test-enum.R) == true)
+    assert (not (test-enum.X == test-enum.Y))
+    assert (test-enum.X != test-enum.Y)
+
+    assert (((unconst test-enum.R) == (unconst test-enum.R)) == true)
+    assert (not ((unconst test-enum.X) == (unconst test-enum.Y)))
+    assert ((unconst test-enum.X) != (unconst test-enum.Y))
+    assert (((unconst test-enum.R) != (unconst test-enum.R)) == false)
+
+
+
 do
     let T =
         enum (do "test-enum") X
