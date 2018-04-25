@@ -3474,10 +3474,31 @@ fn range (a b c)
                 f (x + step) x
             else
                 fdone;
-        if (& (constant? to) (constant? from) (constant? step))
-            from
-        else
-            unconst from
+        unconst from
+
+fn unroll-range (a b c)
+    let num-type = (typeof a)
+    let step =
+        if (c == none)
+            num-type 1
+        else c
+    let from =
+        if (b == none)
+            num-type 0
+        else a
+    let to =
+        if (b == none) a
+        else b
+    assert (constant? to)
+    assert (constant? from)
+    assert (constant? step)
+    Generator
+        label (f fdone x)
+            if (x < to)
+                f (x + step) x
+            else
+                fdone;
+        from
 
 fn zip (a b)
     let iter-a init-a = ((a as Generator))
@@ -3515,7 +3536,7 @@ fn map (x f)
 
 fn enumerate (x)
     zip
-        range 0x7fffffff
+        unroll-range 0x7fffffff
         x as Generator
 
 fn fold (init gen f)
