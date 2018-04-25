@@ -2181,6 +2181,16 @@ do
                     return result...
             countof (load self)
 
+    set-type-symbol! reference 'call
+        fn (self)
+            let T = (storageof (typeof self))
+            let ET = (element-type T 0)
+            let op success = (type@ ET 'call&)
+            if success
+                return (op self)
+            else
+                call (load self)
+
     set-type-symbol! reference 'repr
         fn (self)
             let T = (storageof (typeof self))

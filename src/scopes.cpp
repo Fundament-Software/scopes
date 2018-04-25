@@ -11163,7 +11163,18 @@ struct LLVMIRGenerator {
                 retvalue = LLVMBuildGEP(builder, pointer, indices, count, "");
             } break;
             case FN_Bitcast: { READ_VALUE(val); READ_TYPE(ty);
-                retvalue = LLVMBuildBitCast(builder, val, ty, "");
+                auto T = LLVMTypeOf(val);
+                if (T == ty) {
+                    retvalue = val;
+                } else if (LLVMGetTypeKind(ty) == LLVMStructTypeKind) {
+                    // completely braindead, but what can you do
+                    LLVMValueRef ptr = safe_alloca(T);
+                    LLVMBuildStore(builder, val, ptr);
+                    ptr = LLVMBuildBitCast(builder, ptr, LLVMPointerType(ty,0), "");
+                    retvalue = LLVMBuildLoad(builder, ptr, "");
+                } else {
+                    retvalue = LLVMBuildBitCast(builder, val, ty, "");
+                }
             } break;
             case FN_IntToPtr: { READ_VALUE(val); READ_TYPE(ty);
                 retvalue = LLVMBuildIntToPtr(builder, val, ty, ""); } break;
@@ -13670,40 +13681,43 @@ struct Solver {
             // also, both must be of same category
             args[2].value.verify(TYPE_Type);
             const Type *SrcT = args[1].value.indirect_type();
-            const Type *SSrcT = storage_type(SrcT);
             const Type *DestT = args[2].value.typeref;
-            const Type *SDestT = storage_type(DestT);
+            if (SrcT == DestT) {
+                RETARGS(args[1].value);
+            } else {
+                const Type *SSrcT = storage_type(SrcT);
+                const Type *SDestT = storage_type(DestT);
 
-
-            if (canonical_typekind(SSrcT->kind())
-                    != canonical_typekind(SDestT->kind())) {
-                StyledString ss;
-                ss.out << "can not bitcast value of type " << SrcT
-                    << " to type " << DestT
-                    << " because storage types are not of compatible category";
-                location_error(ss.str());
-            }
-            if (SSrcT != SDestT) {
-                switch (SDestT->kind()) {
-                case TK_Array:
-                //case TK_Vector:
-                case TK_Tuple:
-                case TK_Union: {
+                if (canonical_typekind(SSrcT->kind())
+                        != canonical_typekind(SDestT->kind())) {
                     StyledString ss;
                     ss.out << "can not bitcast value of type " << SrcT
                         << " to type " << DestT
-                        << " with aggregate storage type " << SDestT;
+                        << " because storage types are not of compatible category";
                     location_error(ss.str());
-                } break;
-                default: break;
                 }
-            }
-            if (args[1].value.is_const()) {
-                Any result = args[1].value;
-                result.type = DestT;
-                RETARGS(result);
-            } else {
-                RETARGTYPES(DestT);
+                if (SSrcT != SDestT) {
+                    switch (SDestT->kind()) {
+                    case TK_Array:
+                    //case TK_Vector:
+                    case TK_Tuple:
+                    case TK_Union: {
+                        StyledString ss;
+                        ss.out << "can not bitcast value of type " << SrcT
+                            << " to type " << DestT
+                            << " with aggregate storage type " << SDestT;
+                        location_error(ss.str());
+                    } break;
+                    default: break;
+                    }
+                }
+                if (args[1].value.is_const()) {
+                    Any result = args[1].value;
+                    result.type = DestT;
+                    RETARGS(result);
+                } else {
+                    RETARGTYPES(DestT);
+                }
             }
         } break;
         case FN_IntToPtr: {
