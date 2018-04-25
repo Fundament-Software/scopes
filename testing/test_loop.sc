@@ -1,11 +1,21 @@
 
+# explicit, unrollable form
 let x =
     do
-        let loop (i k) = (unconst 0) (unconst 10)
+        let aloop (i k) = (unconst 0) (unconst 10)
         if (i < k)
-            loop (i + 1) k
+            aloop (i + 1) k
         else i
 assert (x == 10)
+
+# non-unrolled form
+let x =
+    do
+        loop (i k) = 0 64
+        if (i < k)
+            repeat (i + 1) k
+        else i
+assert (x == 64)
 
 let i = (local 'copy 10)
 while (i != 0)
