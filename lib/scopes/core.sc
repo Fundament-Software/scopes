@@ -32,6 +32,15 @@
 fn _ (...)
     return ...
 
+fn unconst-all (args...)
+    let loop (i result...) = (va-countof args...)
+    if (icmp== i 0)
+        result...
+    else
+        let i = (sub i 1)
+        let arg = (va@ i args...)
+        loop i (unconst arg) result...
+
 fn tie-const (a b)
     if (constant? a) b
     else (unconst b)
@@ -2045,13 +2054,30 @@ fn fn-dispatch-error-handler (msgf get-types...)
 fn fn-dispatcher (args...)
     (chain-fn-dispatch args...) fn-dispatch-error-handler
 
+# a safe immutable loop construct that never unrolls
+define-block-scope-macro loop
+    let head params sep args = (decons expr 3)
+    if ((sep as Syntax as Symbol) != '=)
+        syntax-error! sep "syntax: (loop (param ...) = arg ...)"
+    return
+        cons
+            list 'let 'repeat params '=
+                cons unconst-all args
+            quote
+                let repeat =
+                    label (...)
+                        repeat
+                            unconst-all ...
+            next-expr
+        syntax-scope
+
 # sugar for fn-dispatcher
 define-macro fn...
     let sxname defs = (decons args)
     let name = (sxname as Syntax as Symbol)
     fn handle-argdef (argdef)
         let argdef = (argdef as Syntax as list)
-        let loop (i indefs argtypes argnames) = (unconst 0) argdef (unconst '()) (unconst '())
+        loop (i indefs argtypes argnames) = 0 argdef '() '()
         if (empty? indefs)
             return (list-reverse argtypes) (list-reverse argnames)
         else
@@ -2067,7 +2093,7 @@ define-macro fn...
             argname as Syntax as Symbol # verify argname is a symbol
             if ((sep as Syntax as Symbol) != ':)
                 syntax-error! sep "syntax: (name : type, ...)"
-            loop (i + 1) indefs
+            repeat (i + 1) indefs
                 cons (list argname '= argtype) argtypes
                 cons argname argnames
     fn handle-def (def)
@@ -2076,7 +2102,7 @@ define-macro fn...
         list
             cons type-matcher argtypes
             cons fn argnames body
-    let loop (indefs outdefs) = defs (unconst '())
+    loop (indefs outdefs) = defs '()
     if (empty? indefs)
         let args = (Parameter (Syntax-anchor (sxname as Syntax)) 'args...)
         list fn name (list args)
@@ -2087,7 +2113,7 @@ define-macro fn...
     else
         let def indefs = (decons indefs)
         let def = (def as Syntax as list)
-        loop indefs
+        repeat indefs
             cons
                 handle-def def
                 outdefs
@@ -2407,16 +2433,13 @@ define package
 syntax-extend
     fn make-module-path (base-dir pattern name)
         let sz = (countof pattern)
-        let loop (i start result) =
-            unconst 0:usize
-            unconst 0:usize
-            unconst ""
+        loop (i start result) = 0:usize 0:usize ""
         if (i == sz)
             return (.. result (slice pattern start))
         if ((@ pattern i) != (char "?"))
-            loop (i + 1:usize) start result
+            repeat (i + 1:usize) start result
         else
-            loop (i + 1:usize) (i + 1:usize)
+            repeat (i + 1:usize) (i + 1:usize)
                 .. result (slice pattern start i) name
 
     fn exec-module (expr eval-scope)
@@ -2441,10 +2464,7 @@ syntax-extend
 
     fn dots-to-slashes (pattern)
         let sz = (countof pattern)
-        let loop (i start result) =
-            unconst 0:usize
-            unconst 0:usize
-            unconst ""
+        loop (i start result) = 0:usize 0:usize ""
         if (i == sz)
             return (.. result (slice pattern start))
         let c = (@ pattern i)
@@ -2455,16 +2475,16 @@ syntax-extend
             error!
                 .. "no slashes permitted in module name: " pattern
         elseif (c != (char "."))
-            loop (i + 1:usize) start result
+            repeat (i + 1:usize) start result
         elseif (icmp== (i + 1:usize) sz)
             error!
                 .. "invalid dot at ending of module '" pattern "'"
         else
             if (icmp== i start)
                 if (icmp>u start 0:usize)
-                    loop (i + 1:usize) (i + 1:usize)
+                    repeat (i + 1:usize) (i + 1:usize)
                         .. result (slice pattern start i) "../"
-            loop (i + 1:usize) (i + 1:usize)
+            repeat (i + 1:usize) (i + 1:usize)
                 .. result (slice pattern start i) "/"
 
     fn load-module (module-path main-module?)
@@ -2554,7 +2574,7 @@ define-scope-macro locals
         ones.
     let constant-scope = (Scope)
     let tmp = (Parameter 'tmp)
-    let loop (last-key result) = (unconst unnamed) (unconst (list tmp))
+    loop (last-key result) = unnamed (list tmp)
     let key value =
         Scope-next syntax-scope last-key
     if (key == unnamed)
@@ -2564,7 +2584,7 @@ define-scope-macro locals
                 result
             syntax-scope
     else
-        loop (unconst key)
+        repeat key
             if (key == unnamed)
                 # skip
                 result
@@ -2581,13 +2601,13 @@ define-scope-macro locals
 define-macro import
     fn resolve-scope (scope namestr start)
         let sz = (countof namestr)
-        let loop (i start scope) = (unconst start) (unconst start) (unconst scope)
+        loop (i start scope) = start start scope
         if (i == sz)
             return scope (Symbol (slice namestr start i))
         if ((@ namestr i) == (char "."))
             if (i == start)
-                loop (add i 1:usize) (add i 1:usize) scope
-        loop (add i 1:usize) start scope
+                repeat (add i 1:usize) (add i 1:usize) scope
+        repeat (add i 1:usize) start scope
 
     let sxname rest = (decons args)
     let name = (sxname as Syntax as Symbol)
@@ -3564,25 +3584,25 @@ define-macro breakable-block
                 args
 
 define-macro for
-    let loop (it params) = args (unconst '())
+    loop (it params) = args '()
     if (empty? it)
         error! "'in' expected"
     let sxat it = (decons it)
     let at = (sxat as Syntax as Symbol)
     if (at != 'in)
-        loop it (cons sxat params)
+        repeat it (cons sxat params)
     let generator-expr body = (decons it)
     let params = (list-reverse params)
     let iter = (Parameter 'iter)
     let start = (Parameter 'start)
     let next = (Parameter 'next)
-    let loop = (Symbol "#loop")
+    let loopsym = (Symbol "#loop")
     list breakable-block
         list let iter start '= (list (list (do as) generator-expr Generator))
         list iter
-            list label loop (cons next params)
+            list label loopsym (cons next params)
                 list label 'continue '()
-                    list iter loop 'break next
+                    list iter loopsym 'break next
                 cons do body
                 list 'continue
             \ 'break start
@@ -3867,11 +3887,7 @@ fn read-eval-print-loop ()
     set-autocomplete-scope! eval-scope
 
     set-scope-symbol! eval-scope 'module-dir cwd
-    let loop (preload cmdlist counter eval-scope) =
-        unconst ""
-        unconst ""
-        unconst 0
-        unconst eval-scope
+    loop (preload cmdlist counter eval-scope) = "" "" 0 eval-scope
     #dump "loop"
     fn make-idstr (counter)
         .. "$" (string-repr counter)
@@ -3911,7 +3927,7 @@ fn read-eval-print-loop ()
         if terminated? (unconst "")
         else (leading-spaces cmd)
     if (not terminated?)
-        loop (unconst preload) cmdlist counter eval-scope
+        repeat preload cmdlist counter eval-scope
 
     define-scope-macro set-scope!
         let scope rest = (decons args)
@@ -3969,7 +3985,7 @@ fn read-eval-print-loop ()
                 io-write!
                     format-exception exc
                 return eval-scope (unconst 0)
-    loop (unconst "") (unconst "") (counter + count) eval-scope
+    repeat "" "" (counter + count) eval-scope
 
 
 #-------------------------------------------------------------------------------

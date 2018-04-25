@@ -28,7 +28,7 @@ BEWARE: If you build this with anything else but a recent enough clang,
 */
 
 #define SCOPES_VERSION_MAJOR 0
-#define SCOPES_VERSION_MINOR 12
+#define SCOPES_VERSION_MINOR 13
 #define SCOPES_VERSION_PATCH 0
 
 // trace partial evaluation and code generation
@@ -13646,18 +13646,22 @@ struct Solver {
         } break;
         case FN_Unconst: {
             CHECKARGS(1, 1);
-            auto T = args[1].value.indirect_type();
-            auto et = dyn_cast<ExternType>(T);
-            if (et) {
-                RETARGTYPES(et->pointer_type);
-            } else if (args[1].value.type == TYPE_Label) {
-                Label *fn = args[1].value;
-                fn->verify_compilable();
-                const Type *functype = Pointer(
-                    fn->get_function_type(), PTF_NonWritable, SYM_Unnamed);
-                RETARGTYPES(functype);
+            if (!args[1].value.is_const()) {
+                RETARGS(args[1]);
             } else {
-                RETARGTYPES(T);
+                auto T = args[1].value.indirect_type();
+                auto et = dyn_cast<ExternType>(T);
+                if (et) {
+                    RETARGTYPES(et->pointer_type);
+                } else if (args[1].value.type == TYPE_Label) {
+                    Label *fn = args[1].value;
+                    fn->verify_compilable();
+                    const Type *functype = Pointer(
+                        fn->get_function_type(), PTF_NonWritable, SYM_Unnamed);
+                    RETARGTYPES(functype);
+                } else {
+                    RETARGTYPES(T);
+                }
             }
         } break;
         case FN_Bitcast: {
