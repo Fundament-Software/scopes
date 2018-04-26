@@ -188,6 +188,14 @@ fn va-types (params...)
     let arg = (va@ i params...)
     loop i (typeof arg) result...
 
+fn va-join (a...)
+    fn (out...)
+        let loop (i out...) = (va-countof a...) out...
+        if (icmp!= i 0)
+            let i = (sub i 1)
+            loop i (va@ i a...) out...
+        out...
+
 fn cons (...)
     let i = (va-countof ...)
     if (icmp<s i 2)
@@ -3531,6 +3539,17 @@ fn va-each (values...)
                 fret (add i 1) (va@ i values...)
         0
 
+fn va-each-reversed (values...)
+    let count = (va-countof values...)
+    Generator
+        label (fret fdone i)
+            if (i == 0)
+                fdone;
+            else
+                let i = (sub i 1)
+                fret i (va@ i values...)
+        count
+
 fn range (a b c)
     let num-type = (typeof a)
     let step =
@@ -3595,6 +3614,10 @@ fn zip (a b)
         tupleof init-a init-b
 
 fn map (x f)
+    """"Maps function `f (skip values...)` to elements of iterable `x`.
+
+        `skip` is a function that can be called to purge the active element
+        from the output (allowing map to also act as a filter).
     let iter init = ((x as Generator))
     Generator
         label (fret fdone value)

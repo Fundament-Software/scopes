@@ -23,6 +23,8 @@ fn construct-vec-type (element-type size)
             fn ()
     set-typename-super! T vec-type
     set-typename-storage! T (vector element-type size)
+    set-type-symbol! T 'ElementType element-type
+    set-type-symbol! T 'Count size
     T
 
 fn construct-mat-type (element-type cols rows)
@@ -40,27 +42,46 @@ fn construct-mat-type (element-type cols rows)
         construct-vec-type element-type rows
     set-typename-super! T mat-type
     set-typename-storage! T (array vecT cols)
+    set-type-symbol! T 'ElementType element-type
+    set-type-symbol! T 'VectorType vecT
+    set-type-symbol! T 'Columns cols
+    set-type-symbol! T 'Rows rows
     T
 
-let vec2 = (construct-vec-type f32 2:usize)
-let vec3 = (construct-vec-type f32 3:usize)
-let vec4 = (construct-vec-type f32 4:usize)
-let dvec2 = (construct-vec-type f64 2:usize)
-let dvec3 = (construct-vec-type f64 3:usize)
-let dvec4 = (construct-vec-type f64 4:usize)
-let ivec2 = (construct-vec-type i32 2:usize)
-let ivec3 = (construct-vec-type i32 3:usize)
-let ivec4 = (construct-vec-type i32 4:usize)
-let uvec2 = (construct-vec-type u32 2:usize)
-let uvec3 = (construct-vec-type u32 3:usize)
-let uvec4 = (construct-vec-type u32 4:usize)
-let bvec2 = (construct-vec-type bool 2:usize)
-let bvec3 = (construct-vec-type bool 3:usize)
-let bvec4 = (construct-vec-type bool 4:usize)
+fn construct-vec-types (count)
+    return
+        construct-vec-type f32 count
+        construct-vec-type f64 count
+        construct-vec-type i32 count
+        construct-vec-type u32 count
+        construct-vec-type bool count
 
-let mat2 = (construct-mat-type f32 2:usize 2:usize)
-let mat3 = (construct-mat-type f32 3:usize 3:usize)
-let mat4 = (construct-mat-type f32 4:usize 4:usize)
+let vec2 dvec2 ivec2 uvec2 bvec2 = (construct-vec-types 2:usize)
+let vec3 dvec3 ivec3 uvec3 bvec3 = (construct-vec-types 3:usize)
+let vec4 dvec4 ivec4 uvec4 bvec4 = (construct-vec-types 4:usize)
+
+fn construct-mat-types (cols rows)
+    return
+        construct-mat-type f32 cols rows
+        construct-mat-type f64 cols rows
+        construct-mat-type i32 cols rows
+        construct-mat-type u32 cols rows
+        construct-mat-type bool cols rows
+
+let mat2x2 dmat2x2 imat2x2 umat2x2 bmat2x2 = (construct-mat-types 2:usize 2:usize)
+let mat2x3 dmat2x3 imat2x3 umat2x3 bmat2x3 = (construct-mat-types 2:usize 3:usize)
+let mat2x4 dmat2x4 imat2x4 umat2x4 bmat2x4 = (construct-mat-types 2:usize 4:usize)
+let mat2 dmat2 imat2 umat2 bmat2 = mat2x2 dmat2x2 imat2x2 umat2x2 bmat2x2
+
+let mat3x2 dmat3x2 imat3x2 umat3x2 bmat3x2 = (construct-mat-types 3:usize 2:usize)
+let mat3x3 dmat3x3 imat3x3 umat3x3 bmat3x3 = (construct-mat-types 3:usize 3:usize)
+let mat3x4 dmat3x4 imat3x4 umat3x4 bmat3x4 = (construct-mat-types 3:usize 4:usize)
+let mat3 dmat3 imat3 umat3 bmat3 = mat3x3 dmat3x3 imat3x3 umat3x3 bmat3x3
+
+let mat4x2 dmat4x2 imat4x2 umat4x2 bmat4x2 = (construct-mat-types 4:usize 2:usize)
+let mat4x3 dmat4x3 imat4x3 umat4x3 bmat4x3 = (construct-mat-types 4:usize 3:usize)
+let mat4x4 dmat4x4 imat4x4 umat4x4 bmat4x4 = (construct-mat-types 4:usize 4:usize)
+let mat4 dmat4 imat4 umat4 bmat4 = mat4x4 dmat4x4 imat4x4 umat4x4 bmat4x4
 
 let element-set-xyzw = "^[xyzw]{1,4}$"
 let element-set-rgba = "^[rgba]{1,4}$"
@@ -76,6 +97,20 @@ set-type-symbol! vec-type 'as
         let ST = (storageof (typeof self))
         if ((destT == vector) or (destT == ST))
             bitcast self ST
+        elseif (destT == Generator)
+            let count = (countof ST)
+            Generator
+                label (fret fdone index)
+                    if (index == count)
+                        fdone;
+                    else
+                        fret (index + 1:usize) (extractelement self index)
+                0:usize
+
+set-type-symbol! vec-type 'unpack
+    fn "vec-type-unpack" (self)
+        unpack
+            bitcast self (storageof (typeof self))
 
 set-type-symbol! vec-type 'apply-type
     fn vec-type-new (self ...)
@@ -233,7 +268,219 @@ set-type-symbol! vec-type 'getattr
 
 #-------------------------------------------------------------------------------
 
-fn sum (v)
+set-type-symbol! mat-type 'unpack
+    fn "mat-type-unpack" (self)
+        unpack
+            bitcast self (storageof (typeof self))
+
+set-type-symbol! mat-type 'as
+    fn "mat-type-as" (self destT)
+        let ST = (storageof (typeof self))
+        if ((destT == array) or (destT == ST))
+            bitcast self ST
+        elseif (destT == Generator)
+            let count = (countof ST)
+            Generator
+                label (fret fdone index)
+                    if (index == count)
+                        fdone;
+                    else
+                        fret (index + 1:usize) (extractvalue self index)
+                0:usize
+
+fn make-diagonal-vector (VT i)
+    insertelement (nullof VT) (VT.ElementType 1) i
+fn empty-value (T)
+    nullof T
+
+set-type-symbol! mat-type 'apply-type
+    fn "mat-type-new" (cls ...)
+        let VT = cls.VectorType
+        let argsz = (va-countof ...)
+        if (argsz == 0)
+            fold
+                empty-value cls
+                unroll-range cls.Columns
+                fn (break self i)
+                    insertvalue self
+                        make-diagonal-vector VT i
+                        i
+        elseif (argsz == 1)
+            # construct from scalar or matrix
+            let arg = (va@ 0 ...)
+            let argT = (typeof arg)
+            if (argT < mat-type)
+                # construct from matrix
+                if (argT == cls)
+                    # same matrix type, just return the argument
+                    arg
+                else
+                    # build a matrix that is bigger or smaller
+                    let can-copy-vectors? = (argT.VectorType == VT)
+                    fold
+                        empty-value cls
+                        unroll-range cls.Columns
+                        fn (break self i)
+                            if (i < argT.Columns)
+                                if can-copy-vectors?
+                                    insertvalue self
+                                        extractvalue arg i
+                                        i
+                                else
+                                    let ET = cls.ElementType
+                                    let argvec = (extractvalue arg i)
+                                    insertvalue self
+                                        # element-wise construction
+                                        fold
+                                            # start off with default diagonal vector
+                                            make-diagonal-vector VT i
+                                            unroll-range (min cls.Rows argT.Rows)
+                                            fn (break vec j)
+                                                insertelement vec ((extractelement argvec j) as ET) j
+                                        i
+                            else
+                                # build default diagonal vector
+                                insertvalue self (make-diagonal-vector VT i) i
+            elseif (argT < vec-type)
+                compiler-error!
+                    .. (repr (i32 cls.Columns)) " column vectors required"
+            else
+                # build a matrix with diagonal elements set to arg
+                let arg = (arg as cls.ElementType)
+                fold
+                    empty-value cls
+                    unroll-range cls.Columns
+                    fn (break self i)
+                        insertvalue self (insertelement (empty-value VT) arg i) i
+        else
+            # construct from arbitrary composition of vectors and elements,
+                which must nevertheless align to vector boundary size
+            # unpack all elements and count offsets as we go
+            let f =
+                fold
+                    fn ()
+                        return (empty-value cls) (empty-value VT) 0:usize 0:usize
+                    va-each ...
+                    fn (break f arg)
+                        let self vec col row = (f)
+                        let argT = (typeof arg)
+                        let rows = cls.Rows
+                        let is-vector? = (argT < vec-type)
+                        let nextrow =
+                            + row
+                                if is-vector? argT.Count
+                                else 1:usize
+                        if (nextrow > rows)
+                            compiler-error! "too many arguments for column"
+                        let vec =
+                            if is-vector?
+                                if (argT == VT)
+                                    # same vector type
+                                    arg
+                                else
+                                    # insert values bit by bit
+                                    fold vec
+                                        enumerate arg
+                                        fn (break vec j value)
+                                            insertelement vec (value as cls.ElementType) (row + j)
+                            else
+                                # assume element type
+                                insertelement vec (arg as cls.ElementType) row
+                        if (nextrow == rows) # end of column
+                            fn ()
+                                return
+                                    insertvalue self vec col
+                                    empty-value VT
+                                    col + 1:usize
+                                    0:usize
+                        else # not arrived yet
+                            fn ()
+                                return self vec col nextrow
+            let self vec col row = (f)
+            if (row != 0:usize)
+                compiler-error!
+                    .. "number of provided elements for last row (" (repr (i32 row))
+                        \ ") doesn't match number of elements required (" (repr (i32 cls.Rows)) ")"
+            if (col != cls.Columns)
+                compiler-error!
+                    .. "number of provided columns (" (repr (i32 col))
+                        \ ") doesn't match number of columns required (" (repr (i32 cls.Columns)) ")"
+            self
+
+set-type-symbol! mat-type '==
+    fn "mat-type==" (self other flipped)
+        let T = (typeof self)
+        if (type== T (typeof other))
+            all?
+                fold
+                    empty-value (vector bool T.Columns)
+                    unroll-range T.Columns
+                    fn (break vec i)
+                        insertelement vec
+                            (extractvalue self i) == (extractvalue other i)
+                            i
+
+#
+        let loop (i args...) = argsz
+        if (i != 0)
+            let i = (i - 1)
+            let arg = (va@ i ...)
+            let arg = (imply arg immutable)
+            let argT = (typeof arg)
+            if (argT < mat-type)
+                let argET argvecsz = (@ argT) ((countof argT) as i32)
+                let flatten-loop (k args...) = argvecsz args...
+                if (k != 0)
+                    let k = (k - 1)
+                    flatten-loop k (VT (extractvalue arg k)) args...
+                loop i args...
+            elseif ((argT < vec-type) or (argsz == 1))
+                loop i (VT arg) args...
+            else
+                loop i (VT arg) args...
+        let argsz = (va-countof args...)
+        let vecsz = (self.Columns as i32)
+        let rowsz = (self.Rows as i32)
+        if (argsz == 1)
+            # diagonal init
+            let arg = (va@ 0 args...)
+            let loop (i value) = 0 (nullof self)
+            if (i < vecsz)
+                let build-vector-loop (j vals...) = rowsz
+                if (j != 0)
+                    let j = (j - 1)
+                    build-vector-loop j
+                        if (j == i)
+                            extractelement arg i
+                        else
+                            nullof self.ElementType
+                        vals...
+                loop (i + 1) (insertvalue value (VT vals...) i)
+            value
+        elseif (argsz == vecsz)
+            let loop (i value) = 0 (nullof self)
+            if (i < vecsz)
+                let arg = (va@ i args...)
+                loop (i + 1) (insertvalue value arg i)
+            value
+        else
+            compiler-error!
+                .. "number of arguments (" (repr argsz)
+                    \ ") doesn't match number of columns (" (repr vecsz) ")"
+
+set-type-symbol! mat-type 'repr
+    fn "mat-type-repr" (self)
+        let sz = (i32 ((typeof self) . Columns))
+        let loop (i result...) = sz "]"
+        if (i != 0)
+            let i = (i - 1)
+            loop i
+                ? (i == 0) "" " "
+                repr ((extractvalue self i) as vector)
+                result...
+        .. "[" result...
+
+#-------------------------------------------------------------------------------
 
 fn dot (u v)
     let w = (u * v)
@@ -247,12 +494,25 @@ if main-module?
                 vec4 4 5 6 7
 
 do
-    let vec2 vec3 vec4 \
-        dvec2 dvec3 dvec4 \
-        ivec2 ivec3 ivec4 \
-        uvec2 uvec3 uvec4 \
-        bvec2 bvec3 bvec4
-    let mat2 mat3 mat4
+    let vec2 dvec2 ivec2 uvec2 bvec2
+    let vec3 dvec3 ivec3 uvec3 bvec3
+    let vec4 dvec4 ivec4 uvec4 bvec4
+
+    let mat2x2 dmat2x2 imat2x2 umat2x2 bmat2x2
+    let mat2x3 dmat2x3 imat2x3 umat2x3 bmat2x3
+    let mat2x4 dmat2x4 imat2x4 umat2x4 bmat2x4
+    let mat2 dmat2 imat2 umat2 bmat2
+
+    let mat3x2 dmat3x2 imat3x2 umat3x2 bmat3x2
+    let mat3x3 dmat3x3 imat3x3 umat3x3 bmat3x3
+    let mat3x4 dmat3x4 imat3x4 umat3x4 bmat3x4
+    let mat3 dmat3 imat3 umat3 bmat3
+
+    let mat4x2 dmat4x2 imat4x2 umat4x2 bmat4x2
+    let mat4x3 dmat4x3 imat4x3 umat4x3 bmat4x3
+    let mat4x4 dmat4x4 imat4x4 umat4x4 bmat4x4
+    let mat4 dmat4 imat4 umat4 bmat4
+
     let dot
     let construct-vec-type
     locals;
