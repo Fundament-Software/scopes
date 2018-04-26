@@ -49,6 +49,7 @@ fn construct-mat-type (element-type cols rows)
     T
 
 fn construct-vec-types (count)
+    let count = (usize count)
     return
         construct-vec-type f32 count
         construct-vec-type f64 count
@@ -56,11 +57,9 @@ fn construct-vec-types (count)
         construct-vec-type u32 count
         construct-vec-type bool count
 
-let vec2 dvec2 ivec2 uvec2 bvec2 = (construct-vec-types 2:usize)
-let vec3 dvec3 ivec3 uvec3 bvec3 = (construct-vec-types 3:usize)
-let vec4 dvec4 ivec4 uvec4 bvec4 = (construct-vec-types 4:usize)
-
 fn construct-mat-types (cols rows)
+    let cols = (usize cols)
+    let rows = (usize rows)
     return
         construct-mat-type f32 cols rows
         construct-mat-type f64 cols rows
@@ -68,19 +67,23 @@ fn construct-mat-types (cols rows)
         construct-mat-type u32 cols rows
         construct-mat-type bool cols rows
 
-let mat2x2 dmat2x2 imat2x2 umat2x2 bmat2x2 = (construct-mat-types 2:usize 2:usize)
-let mat2x3 dmat2x3 imat2x3 umat2x3 bmat2x3 = (construct-mat-types 2:usize 3:usize)
-let mat2x4 dmat2x4 imat2x4 umat2x4 bmat2x4 = (construct-mat-types 2:usize 4:usize)
+let vec2 dvec2 ivec2 uvec2 bvec2 = (construct-vec-types 2)
+let vec3 dvec3 ivec3 uvec3 bvec3 = (construct-vec-types 3)
+let vec4 dvec4 ivec4 uvec4 bvec4 = (construct-vec-types 4)
+
+let mat2x2 dmat2x2 imat2x2 umat2x2 bmat2x2 = (construct-mat-types 2 2)
+let mat2x3 dmat2x3 imat2x3 umat2x3 bmat2x3 = (construct-mat-types 2 3)
+let mat2x4 dmat2x4 imat2x4 umat2x4 bmat2x4 = (construct-mat-types 2 4)
 let mat2 dmat2 imat2 umat2 bmat2 = mat2x2 dmat2x2 imat2x2 umat2x2 bmat2x2
 
-let mat3x2 dmat3x2 imat3x2 umat3x2 bmat3x2 = (construct-mat-types 3:usize 2:usize)
-let mat3x3 dmat3x3 imat3x3 umat3x3 bmat3x3 = (construct-mat-types 3:usize 3:usize)
-let mat3x4 dmat3x4 imat3x4 umat3x4 bmat3x4 = (construct-mat-types 3:usize 4:usize)
+let mat3x2 dmat3x2 imat3x2 umat3x2 bmat3x2 = (construct-mat-types 3 2)
+let mat3x3 dmat3x3 imat3x3 umat3x3 bmat3x3 = (construct-mat-types 3 3)
+let mat3x4 dmat3x4 imat3x4 umat3x4 bmat3x4 = (construct-mat-types 3 4)
 let mat3 dmat3 imat3 umat3 bmat3 = mat3x3 dmat3x3 imat3x3 umat3x3 bmat3x3
 
-let mat4x2 dmat4x2 imat4x2 umat4x2 bmat4x2 = (construct-mat-types 4:usize 2:usize)
-let mat4x3 dmat4x3 imat4x3 umat4x3 bmat4x3 = (construct-mat-types 4:usize 3:usize)
-let mat4x4 dmat4x4 imat4x4 umat4x4 bmat4x4 = (construct-mat-types 4:usize 4:usize)
+let mat4x2 dmat4x2 imat4x2 umat4x2 bmat4x2 = (construct-mat-types 4 2)
+let mat4x3 dmat4x3 imat4x3 umat4x3 bmat4x3 = (construct-mat-types 4 3)
+let mat4x4 dmat4x4 imat4x4 umat4x4 bmat4x4 = (construct-mat-types 4 4)
 let mat4 dmat4 imat4 umat4 bmat4 = mat4x4 dmat4x4 imat4x4 umat4x4 bmat4x4
 
 let element-set-xyzw = "^[xyzw]{1,4}$"
