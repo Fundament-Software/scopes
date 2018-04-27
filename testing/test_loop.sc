@@ -23,3 +23,48 @@ while (i != 0)
     if (i == 3)
         continue;
     print i
+
+fn test_2d_loops ()
+    let w h = 4 4
+
+    # method 1: two nested loops using generators
+    for y in (range h)
+        for x in (range w)
+            print x y
+
+    print;
+
+    # method 2: two basic nested loops (permitting immutable state changes)
+    loop (y) = 0
+    if (y < h)
+        do
+            loop (x) = 0
+            if (x < w)
+                print x y
+                repeat (x + 1)
+        repeat (y + 1)
+
+    print;
+
+    # method 3: single loop, two counters
+    if (h <= 0)
+        return;
+    let y1 = (h - 1)
+    loop (x y) = 0 0
+    if (x < w)
+        print x y
+        repeat (x + 1) y
+    elseif (y < y1)
+        repeat 0 (y + 1)
+
+    print;
+
+    # method 4: single loop, one counter
+    let size = (w * h)
+    loop (i) = 0
+    if (i < size)
+        let x y = (i % w) (i // h)
+        print x y
+        repeat (i + 1)
+
+test_2d_loops;

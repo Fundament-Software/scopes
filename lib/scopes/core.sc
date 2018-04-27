@@ -1150,10 +1150,10 @@ syntax-extend
             pointer-type-set-storage-class cls unnamed
     set-type-symbol! pointer 'readable?
         fn (cls)
-            ((pointer-type-flags cls) & pointer-flag-non-readable) == 0:u64
+            == (& (pointer-type-flags cls) pointer-flag-non-readable) 0:u64
     set-type-symbol! pointer 'writable?
         fn (cls)
-            ((pointer-type-flags cls) & pointer-flag-non-writable) == 0:u64
+            == (& (pointer-type-flags cls) pointer-flag-non-writable) 0:u64
     set-type-symbol! pointer 'apply-type
         fn (cls T opt)
             let flags =
@@ -2137,6 +2137,9 @@ let voidstar = (pointer void)
 
 fn pointer-type-imply? (src dest)
     or
+        and
+            type== dest ('mutable voidstar)
+            'writable? src
         type== dest voidstar
         type== dest ('strip-storage src)
         type== dest ('immutable src)
@@ -2164,6 +2167,27 @@ do
     set-type-symbol! reference 'getattr
         fn "reference-getattr" (self name)
             forward-getattr (bitcast self (storageof (typeof self))) name
+
+    set-type-symbol! reference 'delete
+        fn "reference-delete" (self)
+            let T = (typeof self)
+            let ptrT = (storageof T)
+            let T = (element-type ptrT 0)
+            let op ok = (type@ T 'delete&)
+            if ok
+                op self
+            else
+                let op ok = (type@ T 'delete)
+                if ok
+                    op (load self)
+            let class = (pointer-type-storage-class ptrT)
+            if (class == 'Function)
+                    # do nothing
+            elseif (class == unnamed)
+                free (bitcast self ptrT)
+            else
+                compiler-error!
+                    .. "cannot delete reference value of pointer type " (repr ptrT)
 
     set-type-symbol! reference '@
         fn "reference-@" (self key)
@@ -2385,21 +2409,12 @@ fn new (cls args...)
 
 fn delete (self)
     let T = (typeof self)
-    assert (T < reference) "reference expected"
-    let ptrT = (storageof T)
-    let T = (element-type ptrT 0)
-    let op ok = (type@ T 'delete&)
+    let op ok = (type@ T 'delete)
     if ok
         op self
-    let class = (pointer-type-storage-class ptrT)
-    if (class == 'Function)
-            # do nothing
-    elseif (class == unnamed)
-        free (bitcast self ptrT)
-    else
-        compiler-error!
-            .. "cannot delete value of pointer type " (repr ptrT)
-    return;
+        return;
+    compiler-error!
+        .. "cannot delete value of type " (repr T)
 
 #-------------------------------------------------------------------------------
 # compile time function chaining
