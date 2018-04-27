@@ -8960,6 +8960,7 @@ struct SPIRVGenerator {
         spv::Id NAME = type_to_spirv_type(args[argn++].value.typeref);
 
         spv::Id retvalue = 0;
+        bool multiple_return_values = false;
         if (enter.type == TYPE_Builtin) {
             switch(enter.builtin.value()) {
             case FN_Sample: {
@@ -9415,7 +9416,9 @@ struct SPIRVGenerator {
                     LLVMSetCurrentDebugLocation(builder, diloc);
                 }*/
                 auto func = label_to_function(enter.label);
-                retvalue = build_call(enter.label->get_function_type(), func, args);
+                retvalue = build_call(
+                    enter.label->get_function_type(),
+                    func, args, multiple_return_values);
             }
         } else if (enter.type == TYPE_Closure) {
             StyledString ss;
@@ -9435,9 +9438,14 @@ struct SPIRVGenerator {
 
             //Label *label = enter.parameter->label;
             if (argcount > 1) {
-                location_error(
-                    String::from(
-                        "IL->SPIR: multiple return values not supported"));
+                auto ilfunctype = cast<FunctionType>(active_function->get_function_type());
+                auto rettype = type_to_spirv_type(ilfunctype->return_type);
+                auto id = builder.createUndefined(rettype);
+                for (size_t i = 0; i < values.size(); ++i) {
+                    id = builder.createCompositeInsert(
+                        values[i], id, rettype, i);
+                }
+                builder.makeReturn(true, id);
             } else if (argcount == 1) {
                 builder.makeReturn(true, values[0]);
             } else {
@@ -9470,19 +9478,19 @@ struct SPIRVGenerator {
                     auto bbfrom = builder.getBuildPoint();
                     // assign phi nodes
                     auto &&params = contarg.label->params;
+                    auto rtype = builder.getTypeId(retvalue);
                     for (size_t i = 1; i < params.size(); ++i) {
                         Parameter *param = params[i];
                         auto phinode = argument_to_value(param);
                         spv::Id incoval = 0;
-                        if (params.size() == 2) {
-                            // single argument
-                            incoval = retvalue;
+                        if (multiple_return_values) {
+                            incoval = builder.createCompositeExtract(
+                                retvalue,
+                                builder.getContainedTypeId(rtype, i - 1),
+                                i - 1);
                         } else {
-                            // multiple arguments
-                            // incoval = LLVMBuildExtractValue(builder, retvalue, i - 1, "");
-                            location_error(
-                                String::from(
-                                    "IL->SPIR: multiple return values not supported"));
+                            assert(params.size() == 2);
+                            incoval = retvalue;
                         }
                         auto op = builder.getInstruction(phinode);
                         assert(op);
@@ -9496,18 +9504,18 @@ struct SPIRVGenerator {
                 if (retvalue) {
                     // no basic block - just add assignments and continue
                     auto &&params = contarg.label->params;
+                    auto rtype = builder.getTypeId(retvalue);
                     for (size_t i = 1; i < params.size(); ++i) {
                         Parameter *param = params[i];
                         spv::Id pvalue = 0;
-                        if (params.size() == 2) {
-                            // single argument
-                            pvalue = retvalue;
+                        if (multiple_return_values) {
+                            pvalue = builder.createCompositeExtract(
+                                retvalue,
+                                builder.getContainedTypeId(rtype, i - 1),
+                                i - 1);
                         } else {
-                            // multiple arguments
-                            // pvalue = LLVMBuildExtractValue(builder, retvalue, i - 1, "");
-                            location_error(
-                                String::from(
-                                    "IL->SPIR: multiple return values not supported"));
+                            assert(params.size() == 2);
+                            pvalue = retvalue;
                         }
                         param2value[{active_function_value,param}] = pvalue;
                     }
@@ -9528,7 +9536,8 @@ struct SPIRVGenerator {
     #undef READ_LABEL_BLOCK
     #undef HANDLE_LOOP_MERGE
 
-    spv::Id build_call(const Type *functype, spv::Function* func, Args &args) {
+    spv::Id build_call(const Type *functype, spv::Function* func, Args &args,
+        bool &multiple_return_values) {
         size_t argcount = args.size() - 1;
 
         auto fi = cast<FunctionType>(functype);
@@ -9546,8 +9555,9 @@ struct SPIRVGenerator {
         }
 
         auto ret = builder.createFunctionCall(func, values);
-
-        if (cast<ReturnLabelType>(fi->return_type)->return_type == TYPE_Void) {
+        auto rlt = cast<ReturnLabelType>(fi->return_type);
+        multiple_return_values = rlt->has_multiple_return_values();
+        if (rlt->return_type == TYPE_Void) {
             return 0;
         } else {
             return ret;
