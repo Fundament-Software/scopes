@@ -9079,9 +9079,10 @@ struct SPIRVGenerator {
             case FN_ExtractValue: {
                 READ_VALUE(val);
                 READ_ANY(index);
+                int i = cast_number<unsigned>(index);
                 retvalue = builder.createCompositeExtract(val,
-                    builder.getContainedTypeId(builder.getTypeId(val)),
-                    cast_number<unsigned>(index));
+                    builder.getContainedTypeId(builder.getTypeId(val), i),
+                    i);
             } break;
             case FN_InsertValue: {
                 READ_VALUE(val);
@@ -9095,9 +9096,10 @@ struct SPIRVGenerator {
                 READ_VALUE(val);
                 READ_VALUE(index);
                 if (_index.is_const()) {
+                    int i = cast_number<unsigned>(_index);
                     retvalue = builder.createCompositeExtract(val,
-                        builder.getContainedTypeId(builder.getTypeId(val)),
-                        cast_number<unsigned>(_index));
+                        builder.getContainedTypeId(builder.getTypeId(val), i),
+                        i);
                 } else {
                     retvalue = builder.createVectorExtractDynamic(val,
                         builder.getContainedTypeId(builder.getTypeId(val)),
