@@ -145,7 +145,7 @@
                 },
                 {
                     "name": "support.function.glm.scopes",
-				    "match": "(dot)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
+				    "match": "(dot|transpose)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
                 }
             ]
 		},

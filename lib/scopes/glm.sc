@@ -43,9 +43,17 @@ fn construct-mat-type (element-type cols rows)
     set-typename-super! T mat-type
     set-typename-storage! T (array vecT cols)
     set-type-symbol! T 'ElementType element-type
-    set-type-symbol! T 'VectorType vecT
+    set-type-symbol! T 'ColumnType vecT
+    set-type-symbol! T 'RowType
+        construct-vec-type element-type cols
     set-type-symbol! T 'Columns cols
     set-type-symbol! T 'Rows rows
+    if (cols == rows)
+        set-type-symbol! T 'TransposedType T
+    elseif (cols < rows)
+        let TT = (construct-mat-type element-type rows cols)
+        set-type-symbol! T 'TransposedType TT
+        set-type-symbol! TT 'TransposedType T
     T
 
 fn construct-vec-types (count)
@@ -94,6 +102,10 @@ let element-set-any = "^([xyzw]|[stpq]|[rgba]){1,4}$"
 set-type-symbol! vec-type 'repr
     fn vec-type-repr (self)
         repr (self as vector)
+
+set-type-symbol! vec-type '@
+    fn "vec-type@" (self i)
+        extractelement self i
 
 set-type-symbol! vec-type 'as
     fn vec-type-as (self destT)
@@ -158,6 +170,9 @@ set-type-symbol! vec-type '==
         if (type== (typeof self) (typeof other))
             all? ((self as vector) == (other as vector))
 
+fn valid-element-type? (T)
+    (T < integer) or (T < real)
+
 fn vec-type-binop (f)
     fn (a b flipped)
         let T1 T2 = (typeof a) (typeof b)
@@ -167,16 +182,14 @@ fn vec-type-binop (f)
                     let ET = (@ (typeof a))
                     f ET a b
         if flipped
-            let ET = (@ T2)
-            if (T1 <: vec-type)
+            if (T1 < vec-type)
                 compute a b
-            else
+            elseif (valid-element-type? T1)
                 compute ((typeof b) a) b
         else
-            let ET = (@ T1)
-            if (T2 <: vec-type)
+            if (T2 < vec-type)
                 compute a b
-            else
+            elseif (valid-element-type? T2)
                 compute a ((typeof a) b)
 
 set-type-symbol! vec-type '+
@@ -276,6 +289,10 @@ set-type-symbol! mat-type 'unpack
         unpack
             bitcast self (storageof (typeof self))
 
+set-type-symbol! mat-type '@
+    fn "mat-type@" (self i)
+        extractvalue self i
+
 set-type-symbol! mat-type 'as
     fn "mat-type-as" (self destT)
         let ST = (storageof (typeof self))
@@ -291,14 +308,17 @@ set-type-symbol! mat-type 'as
                         fret (index + 1:usize) (extractvalue self index)
                 0:usize
 
-fn make-diagonal-vector (VT i)
-    insertelement (nullof VT) (VT.ElementType 1) i
 fn empty-value (T)
     nullof T
+fn make-diagonal-vector (VT i)
+    let vec = (empty-value VT)
+    if (i < VT.Count)
+        insertelement vec (VT.ElementType 1) i
+    else vec
 
 set-type-symbol! mat-type 'apply-type
     fn "mat-type-new" (cls ...)
-        let VT = cls.VectorType
+        let VT = cls.ColumnType
         let argsz = (va-countof ...)
         if (argsz == 0)
             fold
@@ -319,7 +339,7 @@ set-type-symbol! mat-type 'apply-type
                     arg
                 else
                     # build a matrix that is bigger or smaller
-                    let can-copy-vectors? = (argT.VectorType == VT)
+                    let can-copy-vectors? = (argT.ColumnType == VT)
                     fold
                         empty-value cls
                         unroll-range cls.Columns
@@ -423,53 +443,72 @@ set-type-symbol! mat-type '==
                             (extractvalue self i) == (extractvalue other i)
                             i
 
-#
-        let loop (i args...) = argsz
-        if (i != 0)
-            let i = (i - 1)
-            let arg = (va@ i ...)
-            let arg = (imply arg immutable)
-            let argT = (typeof arg)
-            if (argT < mat-type)
-                let argET argvecsz = (@ argT) ((countof argT) as i32)
-                let flatten-loop (k args...) = argvecsz args...
-                if (k != 0)
-                    let k = (k - 1)
-                    flatten-loop k (VT (extractvalue arg k)) args...
-                loop i args...
-            elseif ((argT < vec-type) or (argsz == 1))
-                loop i (VT arg) args...
-            else
-                loop i (VT arg) args...
-        let argsz = (va-countof args...)
-        let vecsz = (self.Columns as i32)
-        let rowsz = (self.Rows as i32)
-        if (argsz == 1)
-            # diagonal init
-            let arg = (va@ 0 args...)
-            let loop (i value) = 0 (nullof self)
-            if (i < vecsz)
-                let build-vector-loop (j vals...) = rowsz
-                if (j != 0)
-                    let j = (j - 1)
-                    build-vector-loop j
-                        if (j == i)
-                            extractelement arg i
-                        else
-                            nullof self.ElementType
-                        vals...
-                loop (i + 1) (insertvalue value (VT vals...) i)
-            value
-        elseif (argsz == vecsz)
-            let loop (i value) = 0 (nullof self)
-            if (i < vecsz)
-                let arg = (va@ i args...)
-                loop (i + 1) (insertvalue value arg i)
-            value
-        else
-            compiler-error!
-                .. "number of arguments (" (repr argsz)
-                    \ ") doesn't match number of columns (" (repr vecsz) ")"
+fn mat-row (mat i)
+    let T = (typeof mat)
+    fold
+        nullof T.RowType
+        unroll-range T.Columns
+        fn (break vec j)
+            insertelement vec (extractelement (extractvalue mat j) i) j
+
+set-type-symbol! mat-type 'row mat-row
+
+fn dot (u v)
+    let w = (u * v)
+    vector-reduce (do +) (w as (storageof (typeof w)))
+
+fn transpose (m)
+    let T = (typeof m)
+    let TT = T.TransposedType
+    fold
+        nullof TT
+        unroll-range T.Rows
+        fn (break self i)
+            insertvalue self
+                mat-row m i
+                i
+
+set-type-symbol! mat-type '*
+    fn "mat-type*" (a b flipped)
+        let Ta = (typeof a)
+        let Tb = (typeof b)
+        if ((Ta < mat-type) and (Tb < mat-type) and (Ta == Tb.TransposedType))
+            # mat(i,j) * mat(j,i) -> mat(j,j)
+            let sz = Ta.Rows
+            let destT = (construct-mat-type Ta.ElementType sz sz)
+            let VT = Ta.ColumnType
+            fold
+                nullof destT
+                unroll-range sz
+                fn (break mat i)
+                    let row = (mat-row a i)
+                    insertvalue mat
+                        fold
+                            nullof VT
+                            unroll-range sz
+                            fn (break vec j)
+                                insertelement vec
+                                    dot row (extractvalue b j)
+                                    j
+                        i
+        elseif (flipped and (Ta == Tb.ColumnType))
+            # vec(j) * mat(i,j) -> vec(i)
+            fold
+                nullof Tb.RowType
+                unroll-range Tb.Columns
+                fn (break vec i)
+                    insertelement vec
+                        dot a (extractvalue b i)
+                        i
+        elseif (Tb == Ta.RowType)
+            # mat(i,j) * vec(i) -> vec(j)
+            fold
+                nullof Ta.ColumnType
+                unroll-range Ta.Rows
+                fn (break vec i)
+                    insertelement vec
+                        dot (mat-row a i) b
+                        i
 
 set-type-symbol! mat-type 'repr
     fn "mat-type-repr" (self)
@@ -484,10 +523,6 @@ set-type-symbol! mat-type 'repr
         .. "[" result...
 
 #-------------------------------------------------------------------------------
-
-fn dot (u v)
-    let w = (u * v)
-    vector-reduce (do +) (w as (storageof (typeof w)))
 
 if main-module?
     assert
@@ -516,6 +551,6 @@ do
     let mat4x4 dmat4x4 imat4x4 umat4x4 bmat4x4
     let mat4 dmat4 imat4 umat4 bmat4
 
-    let dot
+    let dot transpose
     let construct-vec-type
     locals;
