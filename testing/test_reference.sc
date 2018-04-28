@@ -9,6 +9,8 @@ let y = (local 'copy 2)
 let z = (local 'copy 12)
 assert ((x + y) == z) # references pass-through overloadable operators
 
+assert ((typeof (@ y)) == i32)
+
 # bind same reference to different name via let
 let w = y
 # copy by value to a new, independent reference

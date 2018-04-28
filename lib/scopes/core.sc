@@ -2228,7 +2228,11 @@ do
                 if (icmp== (va-countof result...) 0)
                 else
                     return result...
-            @ (load (bitcast self T)) key
+            let op ok = (type@ ET '@)
+            if ok
+                @ (load self) key
+            elseif (none? key)
+                load self
 
     set-type-symbol! reference 'countof
         fn (self)
