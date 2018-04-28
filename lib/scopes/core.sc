@@ -244,7 +244,7 @@ fn gen-type-op2 (f)
 
 syntax-extend
     set-type-symbol! type '__call
-        fn (cls ...)
+        fn! (cls ...)
             let val ok = (type@ cls '__apply-type)
             if ok
                 call val cls ...
@@ -1207,15 +1207,8 @@ syntax-extend
                 nullof cls
 
     set-type-symbol! typename '__apply-type
-        fn (cls name args...)
+        fn! (cls name)
             if (type== cls typename)
-                #   calling typename from different modules with the same string
-                    will return the same type due to memoization; passing extra,
-                    ideally unique tokens, e.g. a new, empty function, will ensure
-                    that the memoization is sufficiently unique.
-                if (va-empty? args...)
-                    compiler-error!
-                        "typename constructor must be invoked with one or more unique tokens"
                 typename-type name
             else
                 # invoke default constructor for type
@@ -2348,11 +2341,15 @@ do
 
 #global has been removed; use `static`
 
-# (typefn type 'symbol (params) body ...)
+# (typefn[!] type 'symbol (params) body ...)
 define-macro typefn
     let ty name params body = (decons args 3)
     list set-type-symbol! ty name
         cons fn params body
+define-macro typefn!
+    let ty name params body = (decons args 3)
+    list set-type-symbol! ty name
+        cons fn! params body
 
 #-------------------------------------------------------------------------------
 # alloca/new/delete
@@ -2411,8 +2408,8 @@ fn delete (self)
 #-------------------------------------------------------------------------------
 
 define fnchain (typename "fnchain" (fn ()))
-typefn fnchain '__apply-type (cls name ...)
-    let T = (typename (.. "<fnchain " name ">") ...)
+typefn! fnchain '__apply-type (cls name)
+    let T = (typename (.. "<fnchain " name ">"))
     set-typename-super! T cls
     typefn T '__apply-type (cls args...)
     typefn T 'append (self f)

@@ -1,15 +1,15 @@
 
 fn memoized ()
-    typename "bang" (fn ())
+    typename "bang"
 
 fn memoized-clone ()
-    typename "bang" (fn ())
+    typename "bang"
 
 fn memoized2 (x)
-    typename x (fn ())
+    typename x
 
 fn! not-memoized ()
-    typename-type "T"
+    typename "T"
 
 assert
     (not-memoized) != (not-memoized)
@@ -22,3 +22,6 @@ assert
 assert
     (memoized2 "test") == (memoized2 "test")
 
+let chain1 = (fnchain "test")
+let chain2 = (fnchain "test")
+assert (chain1 != chain2)
