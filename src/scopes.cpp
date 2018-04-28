@@ -526,7 +526,7 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
 
 // list of symbols to be exposed as builtins to the default global namespace
 #define B_GLOBALS() \
-    T(FN_Branch) T(KW_Fn) T(KW_Label) T(KW_Quote) \
+    T(FN_Branch) T(KW_Fn) T(KW_ImpureFn) T(KW_Label) T(KW_Quote) \
     T(KW_Call) T(KW_RawCall) T(KW_CCCall) T(SYM_QuoteForm) T(FN_Dump) T(KW_Do) \
     T(FN_FunctionType) T(FN_TupleType) T(FN_UnionType) T(FN_Alloca) T(FN_AllocaOf) T(FN_Malloc) \
     T(FN_AllocaArray) T(FN_MallocArray) T(FN_ReturnLabelType) T(KW_DoIn) T(FN_AllocaExceptionPad) \
@@ -750,7 +750,7 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(KW_Define, "define") T(KW_Do, "do") T(KW_DumpSyntax, "dump-syntax") \
     T(KW_Else, "else") T(KW_ElseIf, "elseif") T(KW_EmptyList, "empty-list") \
     T(KW_EmptyTuple, "empty-tuple") T(KW_Escape, "escape") \
-    T(KW_Except, "except") T(KW_False, "false") T(KW_Fn, "fn") \
+    T(KW_Except, "except") T(KW_False, "false") T(KW_Fn, "fn") T(KW_ImpureFn, "fn!") \
     T(KW_FnTypes, "fn-types") T(KW_FnCC, "fn/cc") T(KW_Globals, "globals") \
     T(KW_If, "if") T(KW_In, "in") T(KW_Let, "let") T(KW_Loop, "loop") \
     T(KW_LoopFor, "loop-for") T(KW_None, "none") T(KW_Null, "null") \
@@ -5633,6 +5633,10 @@ public:
         return flags & LF_Impure;
     }
 
+    bool is_memoized() const {
+        return !(is_impure() && is_template());
+    }
+
     bool is_reentrant() const {
         return flags & LF_Reentrant;
     }
@@ -6082,6 +6086,9 @@ public:
             } else {
                 stream_id(ps);
             }
+        }
+        if (is_impure()) {
+            ss << Style_Keyword << "!";
         }
         ss << Style_None;
         return ss;
@@ -6774,7 +6781,7 @@ static Label *fold_type_label(Label::UserMap &um, Label *label, const Args &args
     Label::Args la;
     la.args = args;
     auto &&instances = label->instances;
-    if (!label->is_impure()) {
+    if (label->is_memoized()) {
         auto it = instances.find(la);
         if (it != instances.end())
             return it->second;
@@ -6843,7 +6850,7 @@ static Label *fold_type_label(Label::UserMap &um, Label *label, const Args &args
         }
     }
     Label *newlabel = mangle(um, label, newparams, map);//, Mangle_Verbose);
-    if (!label->is_impure()) {
+    if (label->is_memoized()) {
         instances.insert({la, newlabel});
     }
     return newlabel;
@@ -6901,9 +6908,11 @@ static Label *fold_type_label_single(Frame *parent, Label *label, const Args &ar
     la.frame = parent;
     la.args = args;
     auto &&instances = label->instances;
-    auto it = instances.find(la);
-    if (it != instances.end())
-        return it->second;
+    if (label->is_memoized()) {
+        auto it = instances.find(la);
+        if (it != instances.end())
+            return it->second;
+    }
     assert(!label->params.empty());
 
     Label *newlabel = Label::from(label);
@@ -6914,7 +6923,9 @@ static Label *fold_type_label_single(Frame *parent, Label *label, const Args &ar
         stream_label(ss, label, StreamLabelFormat::debug_single());
     }
 #endif
-    instances.insert({la, newlabel});
+    if (label->is_memoized()) {
+        instances.insert({la, newlabel});
+    }
 
     Frame *frame = Frame::from(parent, label, newlabel, loop_count);
 
@@ -16318,7 +16329,7 @@ struct Expander {
         }
     }
 
-    Any expand_fn(const List *it, const Any &dest, bool label) {
+    Any expand_fn(const List *it, const Any &dest, bool label, bool impure) {
         auto _anchor = get_active_anchor();
 
         verify_list_parameter_count(it, 1, -1);
@@ -16353,6 +16364,8 @@ struct Expander {
             // unnamed lambda
             func = Label::from(_anchor, Symbol(SYM_Unnamed));
         }
+        if (impure)
+            func->set_impure();
 
         Parameter *retparam = nullptr;
         if (continuing) {
@@ -16861,8 +16874,9 @@ struct Expander {
                 Builtin func = head.builtin;
                 switch(func.value()) {
                 case KW_SyntaxLog: return expand_syntax_log(list, dest);
-                case KW_Fn: return expand_fn(list, dest, false);
-                case KW_Label: return expand_fn(list, dest, true);
+                case KW_Fn: return expand_fn(list, dest, false, false);
+                case KW_ImpureFn: return expand_fn(list, dest, false, true);
+                case KW_Label: return expand_fn(list, dest, true, false);
                 case KW_SyntaxExtend: return expand_syntax_extend(list, dest);
                 case KW_Let: return expand_let(list, dest);
                 case KW_If: return expand_if(list, dest);

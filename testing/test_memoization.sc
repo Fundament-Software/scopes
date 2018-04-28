@@ -8,6 +8,12 @@ fn memoized-clone ()
 fn memoized2 (x)
     typename x (fn ())
 
+fn! not-memoized ()
+    typename-type "T"
+
+assert
+    (not-memoized) != (not-memoized)
+
 assert
     (memoized) == (memoized)
 assert
@@ -15,3 +21,4 @@ assert
 
 assert
     (memoized2 "test") == (memoized2 "test")
+

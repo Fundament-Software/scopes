@@ -2394,7 +2394,7 @@ fn local (cls args...)
 fn new (cls args...)
     (constructor malloc) cls args...
 
-fn static (cls args...)
+fn! static (cls args...)
     (constructor static-alloc) cls args...
 
 fn delete (self)

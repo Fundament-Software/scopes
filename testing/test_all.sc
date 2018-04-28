@@ -41,6 +41,7 @@ test-modules
     .test_scope_iter
     .test_scope
     .test_semicolon
+    .test_static
     .test_string
     .test_struct
     .test_submod
