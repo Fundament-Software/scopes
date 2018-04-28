@@ -532,6 +532,7 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(KW_Call) T(KW_RawCall) T(KW_CCCall) T(SYM_QuoteForm) T(FN_Dump) T(KW_Do) \
     T(FN_FunctionType) T(FN_TupleType) T(FN_UnionType) T(FN_Alloca) T(FN_AllocaOf) T(FN_Malloc) \
     T(FN_AllocaArray) T(FN_MallocArray) T(FN_ReturnLabelType) T(KW_DoIn) T(FN_AllocaExceptionPad) \
+    T(FN_StaticAlloc) \
     T(FN_AnyExtract) T(FN_AnyWrap) T(FN_IsConstant) T(FN_Free) T(KW_Defer) \
     T(OP_ICmpEQ) T(OP_ICmpNE) T(FN_Sample) T(FN_ImageRead) T(FN_ImageWrite) \
     T(OP_ICmpUGT) T(OP_ICmpUGE) T(OP_ICmpULT) T(OP_ICmpULE) \
@@ -940,6 +941,7 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(FN_AllocaExceptionPad, "alloca-exception-pad") \
     T(FN_AllocaOf, "allocaof") \
     T(FN_AllocaArray, "alloca-array") \
+    T(FN_StaticAlloc, "static-alloc") \
     T(FN_Location, "compiler-anchor") \
     T(FN_ExternNew, "extern-new") \
     T(FN_VaCountOf, "va-countof") T(FN_VaKeys, "va-keys") \
@@ -2622,6 +2624,10 @@ static const Type *LocalROPointer(const Type *element_type) {
 
 static const Type *LocalPointer(const Type *element_type) {
     return Pointer(element_type, 0, SYM_SPIRV_StorageClassFunction);
+}
+
+static const Type *StaticPointer(const Type *element_type) {
+    return Pointer(element_type, 0, SYM_SPIRV_StorageClassPrivate);
 }
 
 //------------------------------------------------------------------------------
@@ -13508,6 +13514,7 @@ struct Solver {
         case FN_ReturnLabelType:
         case FN_TupleType:
         case FN_UnionType:
+        case FN_StaticAlloc:
             return true;
         default: return false;
         }
@@ -14389,6 +14396,12 @@ struct Solver {
             void *dst = tracked_malloc(size_of(T));
             memcpy(dst, src, size_of(T));
             RETARGS(Any::from_pointer(NativeROPointer(T), dst));
+        } break;
+        case FN_StaticAlloc: {
+            CHECKARGS(1, 1);
+            const Type *T = args[1].value;
+            void *dst = tracked_malloc(size_of(T));
+            RETARGS(Any::from_pointer(StaticPointer(T), dst));
         } break;
         case FN_NullOf: {
             CHECKARGS(1, 1);

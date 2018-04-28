@@ -2181,10 +2181,12 @@ do
                 if ok
                     op (load self)
             let class = (pointer-type-storage-class ptrT)
-            if (class == 'Function)
-                    # do nothing
-            elseif (class == unnamed)
+            if (class == unnamed)
                 free (bitcast self ptrT)
+            elseif (class == 'Function)
+                    # do nothing
+            elseif (class == 'Private)
+                    # do nothing
             else
                 compiler-error!
                     .. "cannot delete reference value of pointer type " (repr ptrT)
@@ -2406,6 +2408,9 @@ fn local (cls args...)
 
 fn new (cls args...)
     (constructor malloc) cls args...
+
+fn static (cls args...)
+    (constructor static-alloc) cls args...
 
 fn delete (self)
     let T = (typeof self)

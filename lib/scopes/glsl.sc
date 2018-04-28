@@ -204,7 +204,7 @@ define-macro xvar
     let sep = (sxsep as Syntax as Symbol)
 
     if (sep != ':)
-        syntax-error! sxsep "syntax: (uniform name : type ...)"
+        syntax-error! sxsep "syntax: (xvar in|inout|uniform|buffer name : type [location = i] [binding = i])"
     let loop (rest params) = rest (unconst '())
     if (not (empty? rest))
         let sxarg rest = (decons rest)
