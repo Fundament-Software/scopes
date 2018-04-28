@@ -8,6 +8,11 @@ This is an early release. Right now, only basic syntax highlighting is available
 
 ## Release Notes
 
+### 0.38.0
+
+* Added more keywords.
+* Removed `global` keyword.
+
 ### 0.37.0
 
 * Added more keywords.
