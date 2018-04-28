@@ -3610,6 +3610,7 @@ template<TypeKind tk>
 static void verify_kind(const Type *T) {
     if (T->kind() != tk) {
         StyledString ss;
+        ss.out << "value of ";
         switch(tk) {
         case TK_Integer: ss.out << "integer"; break;
         case TK_Real: ss.out << "real"; break;
@@ -3625,7 +3626,7 @@ static void verify_kind(const Type *T) {
         case TK_Image: ss.out << "image"; break;
         case TK_SampledImage: ss.out << "sampled image"; break;
         }
-        ss.out << " expected, got " << T;
+        ss.out << " kind expected, got " << T;
         location_error(ss.str());
     }
 }
@@ -8970,9 +8971,9 @@ struct SPIRVGenerator {
                 memset(&params, 0, sizeof(params));
                 params.sampler = sampler;
                 params.coords = coords;
-                auto ST = _sampler.indirect_type();
+                auto ST = storage_type(_sampler.indirect_type());
                 if (ST->kind() == TK_SampledImage) {
-                    ST = cast<SampledImageType>(ST)->type;
+                    ST = storage_type(cast<SampledImageType>(ST)->type);
                 }
                 auto resultType = type_to_spirv_type(cast<ImageType>(ST)->type);
                 bool sparse = false;
@@ -13606,10 +13607,10 @@ struct Solver {
         switch(enter.builtin.value()) {
         case FN_Sample: {
             CHECKARGS(2, -1);
-            auto ST = args[1].value.indirect_type();
+            auto ST = storage_type(args[1].value.indirect_type());
             if (ST->kind() == TK_SampledImage) {
                 auto sit = cast<SampledImageType>(ST);
-                ST = sit->type;
+                ST = storage_type(sit->type);
             }
             verify_kind<TK_Image>(ST);
             auto it = cast<ImageType>(ST);
@@ -13617,7 +13618,7 @@ struct Solver {
         } break;
         case FN_ImageRead: {
             CHECKARGS(2, 2);
-            auto ST = args[1].value.indirect_type();
+            auto ST = storage_type(args[1].value.indirect_type());
             verify_kind<TK_Image>(ST);
             auto it = cast<ImageType>(ST);
             RETARGTYPES(it->type);

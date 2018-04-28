@@ -35,6 +35,7 @@ syntax-extend
         f "2DMSArray"   '2D     1       1   3
 
     let sampler = (typename "sampler" (fn ()))
+    set-scope-symbol! syntax-scope 'sampler sampler
 
     fn coord-type (ET coords)
         if (coords == 1) ET
