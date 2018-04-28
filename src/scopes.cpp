@@ -212,9 +212,6 @@ const char *scopes_compile_time_date();
 
 #define STB_SPRINTF_IMPLEMENTATION
 #include "stb_sprintf.h"
-extern "C" {
-#include "minilibs/regexp.c"
-}
 
 #pragma GCC diagnostic ignored "-Wvla-extension"
 #pragma GCC diagnostic ignored "-Wzero-length-array"
@@ -234,6 +231,7 @@ extern "C" {
 #else
 #include <setjmp.h>
 #endif
+#include "minilibs/regexp.cpp"
 
 #include "cityhash/city.cpp"
 
@@ -17666,23 +17664,23 @@ static SymbolAnyPair f_scope_next(Scope *scope, Symbol key) {
     }
 }
 
-static std::unordered_map<const String *, Reprog *> pattern_cache;
+static std::unordered_map<const String *, regexp::Reprog *> pattern_cache;
 static bool f_string_match(const String *pattern, const String *text) {
     auto it = pattern_cache.find(pattern);
-    Reprog *m = nullptr;
+    regexp::Reprog *m = nullptr;
     if (it == pattern_cache.end()) {
         const char *error = nullptr;
-        m = regcomp(pattern->data, 0, &error);
+        m = regexp::regcomp(pattern->data, 0, &error);
         if (error) {
             const String *err = String::from_cstr(error);
-            regfree(m);
+            regexp::regfree(m);
             location_error(err);
         }
         pattern_cache.insert({ pattern, m });
     } else {
         m = it->second;
     }
-    return (regexec(m, text->data, nullptr, 0) == 0);
+    return (regexp::regexec(m, text->data, nullptr, 0) == 0);
 }
 
 static void f_load_library(const String *name) {

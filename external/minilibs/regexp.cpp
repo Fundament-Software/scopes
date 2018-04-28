@@ -3,10 +3,9 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include <setjmp.h>
 #include <stdio.h>
 
-extern "C" {
+namespace regexp {
 
 typedef struct Reprog Reprog;
 typedef struct Resub Resub;
@@ -1146,41 +1145,10 @@ int regexec(Reprog *prog, const char *sp, Resub *sub, int eflags)
 	return !match(prog->start, sp, sp, prog->flags | eflags, sub);
 }
 
-#ifdef TEST
-int main(int argc, char **argv)
-{
-	const char *error;
-	const char *s;
-	Reprog *p;
-	Resub m;
-	unsigned int i;
+#undef nelem
+#undef REPINF
+#undef MAXTHREAD
+#undef MAXSUB
+#undef ESCAPES
 
-	if (argc > 1) {
-		p = regcomp(argv[1], 0, &error);
-		if (!p) {
-			fprintf(stderr, "regcomp: %s\n", error);
-			return 1;
-		}
-
-		if (argc > 2) {
-			s = argv[2];
-			printf("nsub = %d\n", p->nsub);
-			if (!regexec(p, s, &m, 0)) {
-				for (i = 0; i < m.nsub; ++i) {
-					int n = m.sub[i].ep - m.sub[i].sp;
-					if (n > 0)
-						printf("match %d: s=%d e=%d n=%d '%.*s'\n", i, (int)(m.sub[i].sp - s), (int)(m.sub[i].ep - s), n, n, m.sub[i].sp);
-					else
-						printf("match %d: n=0 ''\n", i);
-				}
-			} else {
-				printf("no match\n");
-			}
-		}
-	}
-
-	return 0;
-}
-#endif
-
-}
+} // namespace regexp

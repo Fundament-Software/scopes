@@ -2136,11 +2136,19 @@ define reference
 let voidstar = (pointer void)
 
 fn pointer-type-imply? (src dest)
+    let ET = (element-type src 0)
+    let ET =
+        if (opaque? ET) ET
+        else (storageof ET)
     or
-        and
-            type== dest ('mutable voidstar)
-            'writable? src
-        type== dest voidstar
+        # casts to voidstar are only permitted if we are not holding
+        # a reference to another pointer
+        and (not (pointer-type? ET))
+            or
+                and
+                    type== dest ('mutable voidstar)
+                    'writable? src
+                type== dest voidstar
         type== dest ('strip-storage src)
         type== dest ('immutable src)
         type== dest ('strip-storage ('immutable src))
