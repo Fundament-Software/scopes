@@ -3,7 +3,7 @@ fn assert-reference (self)
     assert ((typeof self) < reference) "array must be reference"
 
 fn gen-element-destructor (element-type)
-    let element-destructor = (type@ element-type 'delete&)
+    let element-destructor = (type@ element-type '__delete&)
     if (none? element-destructor)
         fn "MutableArray-destructor" (self items)
     else
@@ -19,11 +19,11 @@ fn gen-element-destructor (element-type)
 fn define-common-array-methods (T element-type ensure-capacity)
     let destructor = (gen-element-destructor element-type)
 
-    typefn T 'delete& (self)
+    typefn T '__delete& (self)
         destructor self self.items
         free (load self.items)
 
-    typefn T 'as& (self T)
+    typefn T '__as& (self T)
         if (T == Generator)
             Generator
                 label (fret fdone i)
@@ -35,13 +35,13 @@ fn define-common-array-methods (T element-type ensure-capacity)
         else
             return;
 
-    typefn T 'countof (self)
+    typefn T '__countof (self)
         self.count
 
-    typefn T 'countof& (self)
+    typefn T '__countof& (self)
         self.count as immutable
 
-    typefn T '@& (self index)
+    typefn T '__@& (self index)
         let index = (index as usize)
         assert ((index < self.count) & (index >= 0:usize)) "index out of bounds"
         reference.from-pointer
@@ -122,7 +122,7 @@ fn FixedMutableArray (element-type capacity)
             fn "ensure-capacity" (self count)
                 assert (count < capacity) "capacity exceeded"
 
-        method 'repr (self)
+        method '__repr (self)
             ..
                 "[count="
                 repr self.count
@@ -130,8 +130,8 @@ fn FixedMutableArray (element-type capacity)
                 repr self.items
                 "]"
 
-        method 'apply-type (cls)
-            CStruct.apply-type cls
+        method '__apply-type (cls)
+            CStruct.__apply-type cls
                 count = 0:usize
                 items = (malloc-array element-type capacity)
 
@@ -172,7 +172,7 @@ fn VariableMutableArray (element-type)
                 if (count == self.capacity)
                     grow self
 
-        method 'repr (self)
+        method '__repr (self)
             ..
                 "[count="
                 repr self.count
@@ -182,11 +182,11 @@ fn VariableMutableArray (element-type)
                 repr self.items
                 "]"
 
-        method 'apply-type (cls capacity)
+        method '__apply-type (cls capacity)
             let capacity =
                 if (none? capacity) DEFAULT_CAPACITY
                 else capacity
-            CStruct.apply-type cls
+            CStruct.__apply-type cls
                 capacity = capacity
                 count = 0:usize
                 items = (malloc-array element-type capacity)

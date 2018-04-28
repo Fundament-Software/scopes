@@ -243,9 +243,9 @@ fn gen-type-op2 (f)
                 f a result...
 
 syntax-extend
-    set-type-symbol! type 'call
+    set-type-symbol! type '__call
         fn (cls ...)
-            let val ok = (type@ cls 'apply-type)
+            let val ok = (type@ cls '__apply-type)
             if ok
                 call val cls ...
             else
@@ -255,19 +255,19 @@ syntax-extend
                             Any-repr (Any-wrap cls)
                             " has no apply-type attribute"
 
-    set-type-symbol! list 'apply-type
+    set-type-symbol! list '__apply-type
         fn (cls ...)
             list-new ...
-    set-type-symbol! extern 'apply-type
+    set-type-symbol! extern '__apply-type
         fn (cls ...)
             extern-new ...
-    set-type-symbol! Any 'apply-type
+    set-type-symbol! Any '__apply-type
         fn (cls value)
             Any-new value
-    set-type-symbol! Symbol 'apply-type
+    set-type-symbol! Symbol '__apply-type
         fn (cls value)
             string->Symbol value
-    set-type-symbol! Scope 'apply-type
+    set-type-symbol! Scope '__apply-type
         fn (cls parent clone)
             let new? = (type== (typeof clone) Nothing)
             if (type== (typeof parent) Nothing)
@@ -281,16 +281,16 @@ syntax-extend
                 else
                     Scope-clone-expand parent clone
 
-    set-type-symbol! type '== (gen-type-op2 type==)
-    set-type-symbol! Any '== (gen-type-op2 Any==)
-    set-type-symbol! Closure '== (gen-type-op2 pointer==)
-    set-type-symbol! Label '== (gen-type-op2 pointer==)
-    set-type-symbol! Frame '== (gen-type-op2 pointer==)
+    set-type-symbol! type '__== (gen-type-op2 type==)
+    set-type-symbol! Any '__== (gen-type-op2 Any==)
+    set-type-symbol! Closure '__== (gen-type-op2 pointer==)
+    set-type-symbol! Label '__== (gen-type-op2 pointer==)
+    set-type-symbol! Frame '__== (gen-type-op2 pointer==)
 
-    set-type-symbol! string '.. (gen-type-op2 string-join)
-    set-type-symbol! list '.. (gen-type-op2 list-join)
+    set-type-symbol! string '__.. (gen-type-op2 string-join)
+    set-type-symbol! list '__.. (gen-type-op2 list-join)
 
-    set-type-symbol! type 'getattr
+    set-type-symbol! type '__getattr
         fn (cls name)
             let val ok = (type@ cls name)
             if ok
@@ -298,50 +298,50 @@ syntax-extend
             else
                 return;
 
-    set-type-symbol! Symbol 'as
+    set-type-symbol! Symbol '__as
         fn (self destT)
             if (type== destT string)
                 Symbol->string self
 
-    set-type-symbol! Symbol '==
+    set-type-symbol! Symbol '__==
         gen-type-op2
             fn (a b)
                 icmp== (bitcast a u64) (bitcast b u64)
-    set-type-symbol! Builtin '==
+    set-type-symbol! Builtin '__==
         gen-type-op2
             fn (a b)
                 icmp== (bitcast a u64) (bitcast b u64)
 
-    set-type-symbol! Nothing '==
+    set-type-symbol! Nothing '__==
         fn (a b flipped)
             type== (typeof a) (typeof b)
-    set-type-symbol! Nothing '!=
+    set-type-symbol! Nothing '__!=
         fn (a b flipped)
             bxor (type== (typeof a) (typeof b)) true
 
     fn setup-int-type (T)
-        set-type-symbol! T '== (gen-type-op2 icmp==)
-        set-type-symbol! T '!= (gen-type-op2 icmp!=)
-        set-type-symbol! T '+ (gen-type-op2 add)
-        set-type-symbol! T '-
+        set-type-symbol! T '__== (gen-type-op2 icmp==)
+        set-type-symbol! T '__!= (gen-type-op2 icmp!=)
+        set-type-symbol! T '__+ (gen-type-op2 add)
+        set-type-symbol! T '__-
             fn (a b flipped)
                 let Ta Tb = (typeof a) (typeof b)
                 if (type== Ta Tb)
                     sub a b
                 elseif (type== Tb Nothing)
                     sub (Ta 0) a
-        set-type-symbol! T '* (gen-type-op2 mul)
-        set-type-symbol! T '<< (gen-type-op2 shl)
-        set-type-symbol! T '& (gen-type-op2 band)
-        set-type-symbol! T '| (gen-type-op2 bor)
-        set-type-symbol! T '^ (gen-type-op2 bxor)
-        set-type-symbol! T '~
+        set-type-symbol! T '__* (gen-type-op2 mul)
+        set-type-symbol! T '__<< (gen-type-op2 shl)
+        set-type-symbol! T '__& (gen-type-op2 band)
+        set-type-symbol! T '__| (gen-type-op2 bor)
+        set-type-symbol! T '__^ (gen-type-op2 bxor)
+        set-type-symbol! T '__~
             fn (x)
                 bxor x ((typeof x) -1)
 
         # more aggressive cast that converts from all numerical types
             and usize.
-        set-type-symbol! T 'as
+        set-type-symbol! T '__as
             fn hardcast (val destT)
                 let vT = (typeof val)
                 let destST =
@@ -366,7 +366,7 @@ syntax-extend
 
         # only perform safe casts i.e. integer / usize conversions that expand width
         # unless the value is constant
-        set-type-symbol! T 'imply
+        set-type-symbol! T '__imply
             fn (val destT)
                 if (constant? val)
                     hardcast val destT
@@ -388,7 +388,7 @@ syntax-extend
                                     zext val destT
 
         # general constructor
-        set-type-symbol! T 'apply-type
+        set-type-symbol! T '__apply-type
             fn (destT val)
                 if (none? val)
                     nullof destT
@@ -410,30 +410,30 @@ syntax-extend
                 fdiv 1.0 (sitofp a f32)
 
         if (signed? (storageof T))
-            set-type-symbol! T '> (gen-type-op2 icmp>s)
-            set-type-symbol! T '>= (gen-type-op2 icmp>=s)
-            set-type-symbol! T '< (gen-type-op2 icmp<s)
-            set-type-symbol! T '<= (gen-type-op2 icmp<=s)
-            set-type-symbol! T '// (gen-type-op2 sdiv)
-            set-type-symbol! T '/ sfdiv
-            set-type-symbol! T '% (gen-type-op2 srem)
-            set-type-symbol! T '>> (gen-type-op2 ashr)
+            set-type-symbol! T '__> (gen-type-op2 icmp>s)
+            set-type-symbol! T '__>= (gen-type-op2 icmp>=s)
+            set-type-symbol! T '__< (gen-type-op2 icmp<s)
+            set-type-symbol! T '__<= (gen-type-op2 icmp<=s)
+            set-type-symbol! T '__// (gen-type-op2 sdiv)
+            set-type-symbol! T '__/ sfdiv
+            set-type-symbol! T '__% (gen-type-op2 srem)
+            set-type-symbol! T '__>> (gen-type-op2 ashr)
         else
-            set-type-symbol! T '> (gen-type-op2 icmp>u)
-            set-type-symbol! T '>= (gen-type-op2 icmp>=u)
-            set-type-symbol! T '< (gen-type-op2 icmp<u)
-            set-type-symbol! T '<= (gen-type-op2 icmp<=u)
-            set-type-symbol! T '// (gen-type-op2 udiv)
-            set-type-symbol! T '/ ufdiv
-            set-type-symbol! T '% (gen-type-op2 urem)
-            set-type-symbol! T '>> (gen-type-op2 lshr)
+            set-type-symbol! T '__> (gen-type-op2 icmp>u)
+            set-type-symbol! T '__>= (gen-type-op2 icmp>=u)
+            set-type-symbol! T '__< (gen-type-op2 icmp<u)
+            set-type-symbol! T '__<= (gen-type-op2 icmp<=u)
+            set-type-symbol! T '__// (gen-type-op2 udiv)
+            set-type-symbol! T '__/ ufdiv
+            set-type-symbol! T '__% (gen-type-op2 urem)
+            set-type-symbol! T '__>> (gen-type-op2 lshr)
 
     fn setup-real-type (T)
         fn floordiv (a b)
             sdiv (fptosi a i32) (fptosi b i32)
 
         # only perform safe casts: i.e. float to double
-        set-type-symbol! T 'imply
+        set-type-symbol! T '__imply
             fn (val destT)
                 let vT = (typeof val)
                 if (real-type? destT)
@@ -444,7 +444,7 @@ syntax-extend
                         fpext val destT
 
         # more aggressive cast that converts from all numerical types
-        set-type-symbol! T 'as
+        set-type-symbol! T '__as
             fn hardcast (val destT)
                 let vT = (typeof val)
                 let destST =
@@ -464,37 +464,37 @@ syntax-extend
                     else
                         fptoui val destT
 
-        set-type-symbol! T 'apply-type
+        set-type-symbol! T '__apply-type
             fn (destT val)
                 if (none? val)
                     nullof destT
                 else
                     as val destT
 
-        set-type-symbol! T '== (gen-type-op2 fcmp==o)
-        set-type-symbol! T '!= (gen-type-op2 fcmp!=u)
-        set-type-symbol! T '> (gen-type-op2 fcmp>o)
-        set-type-symbol! T '>= (gen-type-op2 fcmp>=o)
-        set-type-symbol! T '< (gen-type-op2 fcmp<o)
-        set-type-symbol! T '<= (gen-type-op2 fcmp<=o)
-        set-type-symbol! T '+ (gen-type-op2 fadd)
-        set-type-symbol! T '-
+        set-type-symbol! T '__== (gen-type-op2 fcmp==o)
+        set-type-symbol! T '__!= (gen-type-op2 fcmp!=u)
+        set-type-symbol! T '__> (gen-type-op2 fcmp>o)
+        set-type-symbol! T '__>= (gen-type-op2 fcmp>=o)
+        set-type-symbol! T '__< (gen-type-op2 fcmp<o)
+        set-type-symbol! T '__<= (gen-type-op2 fcmp<=o)
+        set-type-symbol! T '__+ (gen-type-op2 fadd)
+        set-type-symbol! T '__-
             fn (a b flipped)
                 let Ta Tb = (typeof a) (typeof b)
                 if (type== Ta Tb)
                     fsub a b
                 elseif (type== Tb Nothing)
                     fsub (Ta 0) a
-        set-type-symbol! T '* (gen-type-op2 fmul)
-        set-type-symbol! T '/
+        set-type-symbol! T '__* (gen-type-op2 fmul)
+        set-type-symbol! T '__/
             fn (a b flipped)
                 let Ta Tb = (typeof a) (typeof b)
                 if (type== Ta Tb)
                     fdiv a b
                 elseif (type== Tb Nothing)
                     fdiv (Ta 1) a
-        set-type-symbol! T '// (gen-type-op2 floordiv)
-        set-type-symbol! T '% (gen-type-op2 frem)
+        set-type-symbol! T '__// (gen-type-op2 floordiv)
+        set-type-symbol! T '__% (gen-type-op2 frem)
 
     setup-int-type bool
     setup-int-type i8
@@ -591,35 +591,35 @@ fn op2-rtl-multiop (f)
             loop i (f x result...)
         else result...
 
-fn == (a b) ((op2-dispatch-bidi '==) a b)
+fn == (a b) ((op2-dispatch-bidi '__==) a b)
 fn != (a b)
     call
-        op2-dispatch-bidi '!=
+        op2-dispatch-bidi '__!=
             fn (a b)
                 bxor true (== a b)
         \ a b
-fn > (a b) ((op2-dispatch-bidi '>) a b)
-fn >= (a b) ((op2-dispatch-bidi '>=) a b)
-fn < (a b) ((op2-dispatch-bidi '<) a b)
-fn <= (a b) ((op2-dispatch-bidi '<=) a b)
-fn + (...) ((op2-ltr-multiop (op2-dispatch-bidi '+)) ...)
-fn - (a b) ((op2-dispatch-bidi '-) a b)
-fn * (...) ((op2-ltr-multiop (op2-dispatch-bidi '*)) ...)
-fn / (a b) ((op2-dispatch-bidi '/) a b)
-fn // (a b) ((op2-dispatch-bidi '//) a b)
-fn % (a b) ((op2-dispatch-bidi '%) a b)
-fn & (a b) ((op2-dispatch-bidi '&) a b)
-fn | (...) ((op2-ltr-multiop (op2-dispatch-bidi '|)) ...)
-fn ^ (a b) ((op2-dispatch-bidi '^) a b)
-fn ~ (x) ((opN-dispatch '~) x)
-fn << (a b) ((op2-dispatch-bidi '<<) a b)
-fn >> (a b) ((op2-dispatch-bidi '>>) a b)
-fn .. (...) ((op2-ltr-multiop (op2-dispatch-bidi '..)) ...)
-fn countof (x) ((opN-dispatch 'countof) x)
-fn unpack (x) ((opN-dispatch 'unpack) x)
+fn > (a b) ((op2-dispatch-bidi '__>) a b)
+fn >= (a b) ((op2-dispatch-bidi '__>=) a b)
+fn < (a b) ((op2-dispatch-bidi '__<) a b)
+fn <= (a b) ((op2-dispatch-bidi '__<=) a b)
+fn + (...) ((op2-ltr-multiop (op2-dispatch-bidi '__+)) ...)
+fn - (a b) ((op2-dispatch-bidi '__-) a b)
+fn * (...) ((op2-ltr-multiop (op2-dispatch-bidi '__*)) ...)
+fn / (a b) ((op2-dispatch-bidi '__/) a b)
+fn // (a b) ((op2-dispatch-bidi '__//) a b)
+fn % (a b) ((op2-dispatch-bidi '__%) a b)
+fn & (a b) ((op2-dispatch-bidi '__&) a b)
+fn | (...) ((op2-ltr-multiop (op2-dispatch-bidi '__|)) ...)
+fn ^ (a b) ((op2-dispatch-bidi '__^) a b)
+fn ~ (x) ((opN-dispatch '__~) x)
+fn << (a b) ((op2-dispatch-bidi '__<<) a b)
+fn >> (a b) ((op2-dispatch-bidi '__>>) a b)
+fn .. (...) ((op2-ltr-multiop (op2-dispatch-bidi '__..)) ...)
+fn countof (x) ((opN-dispatch '__countof) x)
+fn unpack (x) ((opN-dispatch '__unpack) x)
 fn @ (...)
     fn at (obj key)
-        (op2-dispatch '@) obj
+        (op2-dispatch '__@) obj
             if (constant? key)
                 if (integer? key)
                     if (signed? (typeof key))
@@ -651,7 +651,7 @@ fn Any-payload (val)
     extractvalue val 1
 
 fn forward-repr (value)
-    let op success = (type@ (typeof value) 'repr)
+    let op success = (type@ (typeof value) '__repr)
     if success
         op value
     else
@@ -680,7 +680,7 @@ fn repr (value)
                 elseif (type== ET f32) false
                 else true
             else true
-    let op success = (type@ T 'repr)
+    let op success = (type@ T '__repr)
     let text =
         if success
             op value
@@ -740,7 +740,7 @@ fn pow (x y)
 
 fn getattr (self name)
     let T = (typeof self)
-    let op success = (type@ T 'getattr)
+    let op success = (type@ T '__getattr)
     if success
         let result... = (op self name)
         if (icmp== (va-countof result...) 0)
@@ -757,7 +757,7 @@ fn getattr (self name)
 
 fn forward-getattr (self name)
     let T = (typeof self)
-    let op success = (type@ T 'getattr)
+    let op success = (type@ T '__getattr)
     if success
         let result... = (op self name)
         if (icmp== (va-countof result...) 0)
@@ -787,12 +787,12 @@ fn forward-as (value dest-type)
     let T = (typeof value)
     if (type<= T dest-type)
         return value
-    let f ok = (type@ T 'imply)
+    let f ok = (type@ T '__imply)
     if ok
         let result... = (f value dest-type)
         if (icmp!= (va-countof result...) 0)
             return result...
-    let f ok = (type@ T 'as)
+    let f ok = (type@ T '__as)
     if ok
         let result... = (f value dest-type)
         if (icmp!= (va-countof result...) 0)
@@ -802,12 +802,12 @@ fn as (value dest-type)
     let T = (typeof value)
     if (type<= T dest-type)
         return value
-    let f ok = (type@ T 'imply)
+    let f ok = (type@ T '__imply)
     if ok
         let result... = (f value dest-type)
         if (icmp!= (va-countof result...) 0)
             return result...
-    let f ok = (type@ T 'as)
+    let f ok = (type@ T '__as)
     if ok
         let result... = (f value dest-type)
         if (icmp!= (va-countof result...) 0)
@@ -822,7 +822,7 @@ fn forward-imply (value dest-type)
     let T = (typeof value)
     if (type<= T dest-type)
         return value
-    let f ok = (type@ T 'imply)
+    let f ok = (type@ T '__imply)
     if ok
         let result... = (f value dest-type)
         if (icmp!= (va-countof result...) 0)
@@ -832,7 +832,7 @@ fn imply (value dest-type)
     let T = (typeof value)
     if (type<= T dest-type)
         return value
-    let f ok = (type@ T 'imply)
+    let f ok = (type@ T '__imply)
     if ok
         let result... = (f value dest-type)
         if (icmp!= (va-countof result...) 0)
@@ -850,7 +850,7 @@ fn forward-hash (value)
     let T = (typeof value)
     if (type== T hash)
         return value
-    let f ok = (type@ T 'hash)
+    let f ok = (type@ T '__hash)
     if ok
         let result = (f value)
         if (type== (typeof result) hash)
@@ -906,12 +906,12 @@ let hash2 =
                     bitcast (hash1 b) u64
                 hash
 
-set-type-symbol! hash 'imply
+set-type-symbol! hash '__imply
     fn "hash-imply" (self T)
         if (type== T u64)
             bitcast self u64
 
-set-type-symbol! hash 'apply-type
+set-type-symbol! hash '__apply-type
     fn "hash" (cls values...)
         if (icmp<s (va-countof values...) 2)
             hash1 values...
@@ -1051,7 +1051,7 @@ fn slice (obj start-index end-index)
         max i0
             if (>= i1 zero) i1
             else (+ i1 count)
-    (opN-dispatch 'slice) obj (usize i0) (usize i1)
+    (opN-dispatch '__slice) obj (usize i0) (usize i1)
 
 fn string-compare (a b)
     assert-typeof a string
@@ -1127,10 +1127,10 @@ syntax-extend
     set-typename-super! vector immutable
     set-typename-super! tuple immutable
 
-    set-type-symbol! integer 'apply-type
+    set-type-symbol! integer '__apply-type
         fn (cls ...)
             integer-type ...
-    #set-type-symbol! real 'apply-type
+    #set-type-symbol! real '__apply-type
         fn (cls ...)
             real-type ...
     set-type-symbol! pointer 'set-element-type
@@ -1154,7 +1154,7 @@ syntax-extend
     set-type-symbol! pointer 'writable?
         fn (cls)
             == (& (pointer-type-flags cls) pointer-flag-non-writable) 0:u64
-    set-type-symbol! pointer 'apply-type
+    set-type-symbol! pointer '__apply-type
         fn (cls T opt)
             let flags =
                 if (none? opt)
@@ -1174,31 +1174,31 @@ syntax-extend
     fn assert-no-arguments (...)
         if (icmp!= (va-countof ...) 0)
             compiler-error! "default constructor takes no arguments"
-    set-type-symbol! array 'apply-type
+    set-type-symbol! array '__apply-type
         fn (cls ...)
             if (type== cls array)
                 array-type ...
             else
                 assert-no-arguments ...
                 nullof cls
-    set-type-symbol! vector 'apply-type
+    set-type-symbol! vector '__apply-type
         fn (cls ...)
             if (type== cls vector)
                 vector-type ...
             else
                 assert-no-arguments ...
                 nullof cls
-    set-type-symbol! ReturnLabel 'apply-type
+    set-type-symbol! ReturnLabel '__apply-type
         fn (cls ...)
             ReturnLabel-type ...
-    set-type-symbol! tuple 'apply-type
+    set-type-symbol! tuple '__apply-type
         fn (cls ...)
             if (type== cls tuple)
                 tuple-type ...
             else
                 assert-no-arguments ...
                 nullof cls
-    set-type-symbol! union 'apply-type
+    set-type-symbol! union '__apply-type
         fn (cls ...)
             if (type== cls union)
                 union-type ...
@@ -1206,7 +1206,7 @@ syntax-extend
                 assert-no-arguments ...
                 nullof cls
 
-    set-type-symbol! typename 'apply-type
+    set-type-symbol! typename '__apply-type
         fn (cls name args...)
             if (type== cls typename)
                 #   calling typename from different modules with the same string
@@ -1221,17 +1221,17 @@ syntax-extend
                 # invoke default constructor for type
                 nullof cls
 
-    set-type-symbol! function 'apply-type
+    set-type-symbol! function '__apply-type
         fn (cls ...)
             function-type ...
 
     set-type-symbol! Any 'typeof Any-typeof
 
-    set-type-symbol! Any 'imply
+    set-type-symbol! Any '__imply
         fn (src destT)
             Any-extract src destT
 
-    set-type-symbol! Syntax 'imply
+    set-type-symbol! Syntax '__imply
         fn (src destT)
             if (type== destT Any)
                 Syntax->datum src
@@ -1246,7 +1246,7 @@ syntax-extend
                     syntax-error! (Syntax-anchor src)
                         .. (repr destT) " expected, not " (repr anyT)
 
-    set-type-symbol! type '@
+    set-type-symbol! type '__@
         fn (self key)
             let keyT = (typeof key)
             if (type== keyT Symbol)
@@ -1255,11 +1255,11 @@ syntax-extend
                 element-type self key
             elseif (type== keyT Nothing)
                 element-type self 0
-    set-type-symbol! type 'countof type-countof
+    set-type-symbol! type '__countof type-countof
 
     let empty-symbol = (Symbol "")
 
-    set-type-symbol! Parameter 'apply-type
+    set-type-symbol! Parameter '__apply-type
         fn (cls params...)
             let param1 param2 param3 = params...
             let TT = (tuple (typeof param1) (typeof param2) (typeof param3))
@@ -1278,11 +1278,11 @@ syntax-extend
         fn (self)
             icmp== (Parameter-index self) 0
 
-    set-type-symbol! Symbol 'call
+    set-type-symbol! Symbol '__call
         fn (name self ...)
             (getattr self name) self ...
 
-    set-type-symbol! Scope 'getattr
+    set-type-symbol! Scope '__getattr
         fn (self key)
             if (constant? self)
                 let value success = (Scope@ self key)
@@ -1292,7 +1292,7 @@ syntax-extend
                 let value = (Scope@ self key)
                 return value
 
-    set-type-symbol! Scope '@
+    set-type-symbol! Scope '__@
         fn (self key)
             let value success = (Scope@ self key)
             return
@@ -1301,8 +1301,8 @@ syntax-extend
                 else value
                 success
 
-    set-type-symbol! list 'countof list-countof
-    set-type-symbol! list 'getattr
+    set-type-symbol! list '__countof list-countof
+    set-type-symbol! list '__getattr
         fn (self name)
             if (== name 'at)
                 list-at self
@@ -1310,7 +1310,7 @@ syntax-extend
                 list-next self
             elseif (== name 'count)
                 list-countof self
-    set-type-symbol! list '@
+    set-type-symbol! list '__@
         fn (self i)
             let loop (x i) = (tie-const i self) (i32 i)
             if (< i 0)
@@ -1319,7 +1319,7 @@ syntax-extend
                 list-at x
             else
                 loop (list-next x) (- i 1)
-    set-type-symbol! list 'slice
+    set-type-symbol! list '__slice
         fn (self i0 i1)
             # todo: use isize
             let i0 i1 = (i64 i0) (i64 i1)
@@ -1363,7 +1363,7 @@ syntax-extend
         else
             xreturn false
 
-    set-type-symbol! list '==
+    set-type-symbol! list '__==
         fn (a b flipped)
             if (type== (typeof a) (typeof b))
                 list== a b
@@ -1373,21 +1373,21 @@ syntax-extend
             if (type== (typeof a) (typeof b))
                 op (string-compare a b) 0
 
-    set-type-symbol! string '== (gen-string-cmp ==)
-    set-type-symbol! string '!= (gen-string-cmp !=)
-    set-type-symbol! string '< (gen-string-cmp <)
-    set-type-symbol! string '<= (gen-string-cmp <=)
-    set-type-symbol! string '> (gen-string-cmp >)
-    set-type-symbol! string '>= (gen-string-cmp >=)
+    set-type-symbol! string '__== (gen-string-cmp ==)
+    set-type-symbol! string '__!= (gen-string-cmp !=)
+    set-type-symbol! string '__< (gen-string-cmp <)
+    set-type-symbol! string '__<= (gen-string-cmp <=)
+    set-type-symbol! string '__> (gen-string-cmp >)
+    set-type-symbol! string '__>= (gen-string-cmp >=)
 
     let rawstring = (pointer i8)
     set-scope-symbol! syntax-scope 'rawstring (pointer i8)
-    set-type-symbol! string 'imply
+    set-type-symbol! string '__imply
         fn (self destT)
             if (type== destT rawstring)
                 getelementptr self 0 1 0
 
-    set-type-symbol! string 'hash
+    set-type-symbol! string '__hash
         fn (self)
             bitcast
                 __hashbytes
@@ -1404,8 +1404,8 @@ syntax-extend
             else
                 loop (add i 1:usize)
 
-    set-type-symbol! string 'countof string-countof
-    set-type-symbol! string '@
+    set-type-symbol! string '__countof string-countof
+    set-type-symbol! string '__@
         fn string-at (s i)
             assert-typeof s string
             let i = (i64 i)
@@ -1416,7 +1416,7 @@ syntax-extend
                 return (tie-const (tie-const len i) 0:i8)
             let s = (bitcast (getelementptr s 0 1 0) (pointer i8))
             load (getelementptr s i)
-    set-type-symbol! string 'slice
+    set-type-symbol! string '__slice
         fn (self i0 i1)
             string-new
                 getelementptr (string->rawstring self) i0
@@ -1544,14 +1544,14 @@ syntax-extend
         fn (a b flipped)
             if (type== (typeof a) (typeof b))
                 op a b
-    set-type-symbol! type '< (gen-type-op2 <:)
-    set-type-symbol! type '<=
+    set-type-symbol! type '__< (gen-type-op2 <:)
+    set-type-symbol! type '__<=
         gen-type-op2
             fn (a b)
                 if (type== a b) true
                 else (<: a b)
-    set-type-symbol! type '> (gen-type-op2 (fn (a b) (<: b a)))
-    set-type-symbol! type '>=
+    set-type-symbol! type '__> (gen-type-op2 (fn (a b) (<: b a)))
+    set-type-symbol! type '__>=
         gen-type-op2
             fn (a b)
                 if (type== a b) true
@@ -1564,18 +1564,18 @@ syntax-extend
                 ReturnLabel (unknownof list) (unknownof Scope)
                 \ list list Scope
     set-typename-storage! Macro BlockScopeFunction
-    set-type-symbol! Macro 'apply-type
+    set-type-symbol! Macro '__apply-type
         fn (cls f)
             assert-typeof f BlockScopeFunction
             bitcast f Macro
-    set-type-symbol! Macro 'as
+    set-type-symbol! Macro '__as
         fn (self destT)
             if (type== destT function)
                 bitcast self BlockScopeFunction
             elseif (type== destT BlockScopeFunction)
                 bitcast self BlockScopeFunction
     # support for calling macro functions directly
-    set-type-symbol! Macro 'call
+    set-type-symbol! Macro '__call
         fn (self at next scope)
             (bitcast self BlockScopeFunction) at next scope
 
@@ -1937,7 +1937,7 @@ define-macro .
         loop rest (op result c)
 
 fn = (obj value)
-    (op2-dispatch '=) obj value
+    (op2-dispatch '__=) obj value
     return;
 
 define-infix< 50 =
@@ -2181,30 +2181,30 @@ do
 
     fn passthru-overload (sym func)
         set-type-symbol! reference sym (fn (a b flipped) (func (deref a) (deref b)))
-    passthru-overload '== ==; passthru-overload '!= !=
-    passthru-overload '< <; passthru-overload '<= <=
-    passthru-overload '> >; passthru-overload '>= >=
-    passthru-overload '& &; passthru-overload '| |; passthru-overload '^ ^
-    passthru-overload '+ +; passthru-overload '- -
-    passthru-overload '/ /; passthru-overload '/ /
-    passthru-overload '// //; passthru-overload '// //
-    passthru-overload '% %
-    passthru-overload '<< <<; passthru-overload '>> >>
-    passthru-overload '.. ..; passthru-overload '.. ..
-    set-type-symbol! reference 'getattr
+    passthru-overload '__== ==; passthru-overload '__!= !=
+    passthru-overload '__< <; passthru-overload '__<= <=
+    passthru-overload '__> >; passthru-overload '__>= >=
+    passthru-overload '__& &; passthru-overload '__| |; passthru-overload '__^ ^
+    passthru-overload '__+ +; passthru-overload '__- -
+    passthru-overload '__/ /; passthru-overload '__/ /
+    passthru-overload '__// //; passthru-overload '__// //
+    passthru-overload '__% %
+    passthru-overload '__<< <<; passthru-overload '__>> >>
+    passthru-overload '__.. ..; passthru-overload '__.. ..
+    set-type-symbol! reference '__getattr
         fn "reference-getattr" (self name)
             forward-getattr (bitcast self (storageof (typeof self))) name
 
-    set-type-symbol! reference 'delete
+    set-type-symbol! reference '__delete
         fn "reference-delete" (self)
             let T = (typeof self)
             let ptrT = (storageof T)
             let T = (element-type ptrT 0)
-            let op ok = (type@ T 'delete&)
+            let op ok = (type@ T '__delete&)
             if ok
                 op self
             else
-                let op ok = (type@ T 'delete)
+                let op ok = (type@ T '__delete)
                 if ok
                     op (load self)
             let class = (pointer-type-storage-class ptrT)
@@ -2218,27 +2218,27 @@ do
                 compiler-error!
                     .. "cannot delete reference value of pointer type " (repr ptrT)
 
-    set-type-symbol! reference '@
+    set-type-symbol! reference '__@
         fn "reference-@" (self key)
             let T = (storageof (typeof self))
             let ET = (element-type T 0)
-            let op success = (type@ ET '@&)
+            let op success = (type@ ET '__@&)
             if success
                 let result... = (op (bitcast self T) key)
                 if (icmp== (va-countof result...) 0)
                 else
                     return result...
-            let op ok = (type@ ET '@)
+            let op ok = (type@ ET '__@)
             if ok
                 @ (load self) key
             elseif (none? key)
                 load self
 
-    set-type-symbol! reference 'countof
+    set-type-symbol! reference '__countof
         fn (self)
             let T = (storageof (typeof self))
             let ET = (element-type T 0)
-            let op success = (type@ ET 'countof&)
+            let op success = (type@ ET '__countof&)
             if success
                 let result... = (op self)
                 if (icmp== (va-countof result...) 0)
@@ -2246,21 +2246,21 @@ do
                     return result...
             countof (load self)
 
-    set-type-symbol! reference 'call
+    set-type-symbol! reference '__call
         fn (self args...)
             let T = (storageof (typeof self))
             let ET = (element-type T 0)
-            let op success = (type@ ET 'call&)
+            let op success = (type@ ET '__call&)
             if success
                 return (op self args...)
             else
                 call (load self) args...
 
-    set-type-symbol! reference 'repr
+    set-type-symbol! reference '__repr
         fn (self)
             let T = (storageof (typeof self))
             let ET = (element-type T 0)
-            let op success = (type@ ET 'repr&)
+            let op success = (type@ ET '__repr&)
             if success
                 let result... = (op self)
                 if (icmp== (va-countof result...) 0)
@@ -2268,11 +2268,11 @@ do
                     return result...
             forward-repr (load self)
 
-    set-type-symbol! reference 'hash
+    set-type-symbol! reference '__hash
         fn (self)
             let T = (storageof (typeof self))
             let ET = (element-type T 0)
-            let op success = (type@ ET 'hash&)
+            let op success = (type@ ET '__hash&)
             if success
                 let result... = (op self)
                 if (va-empty? result...)
@@ -2280,11 +2280,11 @@ do
                     return result...
             forward-hash (load self)
 
-    set-type-symbol! reference 'as
+    set-type-symbol! reference '__as
         fn (self destT)
             let T = (storageof (typeof self))
             let ET = (element-type T 0)
-            let op success = (type@ ET 'as&)
+            let op success = (type@ ET '__as&)
             if success
                 let result... = (op self destT)
                 if (icmp== (va-countof result...) 0)
@@ -2292,7 +2292,7 @@ do
                     return result...
             forward-as (load self) destT
 
-    set-type-symbol! reference 'imply
+    set-type-symbol! reference '__imply
         fn (self destT)
             let ptrtype = (storageof (typeof self))
             if (type== destT ptrtype)
@@ -2307,7 +2307,7 @@ do
                     return (bitcast self aptrtype)
             forward-imply (load (bitcast self ptrtype)) destT
 
-    set-type-symbol! reference '=
+    set-type-symbol! reference '__=
         fn (self value)
             let ET = (element-type (storageof (typeof self)) 0)
             store (imply value ET) self
@@ -2336,7 +2336,7 @@ do
         fn "reference-from-pointer" (value)
             (reference.from-pointer-type (typeof value)) value
 
-    set-type-symbol! reference 'apply-type
+    set-type-symbol! reference '__apply-type
         fn "reference-apply-type" (cls element)
             if (type== cls reference)
                 compiler-error! "reference constructor deleted; use 'from-pointer-type"
@@ -2369,7 +2369,7 @@ fn constructor (f)
                 else T
             let self =
                 reference.from-pointer (f cls)
-            let op ok = (type@ cls 'copy&)
+            let op ok = (type@ cls '__copy&)
             if ok
                 op self value
             else
@@ -2379,7 +2379,7 @@ fn constructor (f)
         else cls
             let self =
                 reference.from-pointer (f cls)
-            let op ok = (type@ cls 'new&)
+            let op ok = (type@ cls '__new&)
             if ok
                 op self args...
             else
@@ -2399,7 +2399,7 @@ fn static (cls args...)
 
 fn delete (self)
     let T = (typeof self)
-    let op ok = (type@ T 'delete)
+    let op ok = (type@ T '__delete)
     if ok
         op self
         return;
@@ -2411,23 +2411,23 @@ fn delete (self)
 #-------------------------------------------------------------------------------
 
 define fnchain (typename "fnchain" (fn ()))
-typefn fnchain 'apply-type (cls name ...)
+typefn fnchain '__apply-type (cls name ...)
     let T = (typename (.. "<fnchain " name ">") ...)
     set-typename-super! T cls
-    typefn T 'apply-type (cls args...)
+    typefn T '__apply-type (cls args...)
     typefn T 'append (self f)
         assert (constant? f)
         assert (constant? self)
-        let oldfn = self.apply-type
-        typefn self 'apply-type (self args...)
+        let oldfn = self.__apply-type
+        typefn self '__apply-type (self args...)
             oldfn self args...
             f args...
         self
     typefn T 'prepend (self f)
         assert (constant? f)
         assert (constant? self)
-        let oldfn = self.apply-type
-        typefn self 'apply-type (self args...)
+        let oldfn = self.__apply-type
+        typefn self '__apply-type (self args...)
             f args...
             oldfn self args...
         self
@@ -2804,7 +2804,7 @@ define-macro match
 #-------------------------------------------------------------------------------
 
 # labels safecast to function pointers
-typefn Closure 'imply (self destT)
+typefn Closure '__imply (self destT)
     if (function-pointer-type? destT)
         let ET = (rawcall element-type destT 0)
         let sz = (itrunc (rawcall type-countof ET) i32)
@@ -2827,11 +2827,11 @@ typefn Closure 'imply (self destT)
 syntax-extend
     let NullType = (typename "NullType" (fn ()))
     set-typename-storage! NullType (pointer void)
-    set-type-symbol! NullType 'imply
+    set-type-symbol! NullType '__imply
         fn (self destT)
             if (pointer-type? destT)
                 nullof destT
-    set-type-symbol! NullType '==
+    set-type-symbol! NullType '__==
         fn (a b flipped)
             if flipped
                 if (pointer-type? (storageof (typeof a)))
@@ -2845,33 +2845,33 @@ syntax-extend
     syntax-scope
 
 # support assignment syntax
-typefn pointer '= (self value)
+typefn pointer '__= (self value)
     store
         value as (element-type (typeof self) 0)
         self
     true
 
 # pointer comparisons
-typefn pointer '== (a b flipped)
+typefn pointer '__== (a b flipped)
     if flipped
         icmp== (ptrtoint (a as (typeof b)) usize) (ptrtoint b usize)
     else
         icmp== (ptrtoint a usize) (ptrtoint (b as (typeof a)) usize)
 
 # pointer cast to element type executes load
-typefn pointer 'as (self destT)
+typefn pointer '__as (self destT)
     if (type== destT (element-type (typeof self) 0))
         load self
 
 # also supports mutable pointer safecast to immutable pointer
-typefn pointer 'imply (self destT)
+typefn pointer '__imply (self destT)
     if (pointer-type-imply? (typeof self) destT)
         bitcast self destT
 
 # support getattr syntax
-typefn pointer 'getattr (self name)
+typefn pointer '__getattr (self name)
     let ET = (element-type (typeof self) 0)
-    let op success = (type@ ET 'getattr&)
+    let op success = (type@ ET '__getattr&)
     if success
         let result... = (op self name)
         if (icmp== (va-countof result...) 0)
@@ -2880,25 +2880,25 @@ typefn pointer 'getattr (self name)
     forward-getattr (load self) name
 
 # support @
-typefn pointer '@ (self index)
+typefn pointer '__@ (self index)
     let index =
         if (none? index) 0:usize # simple dereference
         else index
     (reference.from-pointer-type (typeof self)) (getelementptr self (usize index))
 
 # extern cast to element type/pointer executes load/unconst
-typefn extern 'imply (self destT)
+typefn extern '__imply (self destT)
     let ET = (element-type (typeof self) 0)
     if (type== destT ET)
         unconst self
     else
         forward-imply (load self) destT
 
-typefn extern 'getattr (self name)
+typefn extern '__getattr (self name)
     let T = (typeof self)
     let pET = (element-type T 0)
     let ET = (element-type pET 0)
-    let op success = (type@ ET 'getattr&)
+    let op success = (type@ ET '__getattr&)
     if success
         let result... = (op (unconst (bitcast self (storageof T))) name)
         if (icmp== (va-countof result...) 0)
@@ -2909,17 +2909,17 @@ typefn extern 'getattr (self name)
     else
         getattr (load self) name
 
-typefn extern 'as (self destT)
+typefn extern '__as (self destT)
     forward-as (load self) destT
 
 # support assignment syntax for extern
-typefn extern '= (self value)
+typefn extern '__= (self value)
     let ET = (element-type (element-type (typeof self) 0) 0)
     store (imply value ET) self
     true
 
 # support @ for extern
-typefn extern '@ (self value)
+typefn extern '__@ (self value)
     @ (unconst self) value
 
 do
@@ -2937,7 +2937,7 @@ do
                     _ a b op ok
             if ok
                 op a b flipped
-    let ops... = '* '/ '// '+ '- '**
+    let ops... = '__* '__/ '__// '__+ '__- '__**
     let loop (i) = (va-countof ops...)
     if (i > 0)
         let i = (i - 1)
@@ -2953,14 +2953,14 @@ do
         else val
 
     # support for downcast
-    typefn CEnum 'imply (self destT)
+    typefn CEnum '__imply (self destT)
         let ST = (storageof (typeof self))
         if (type== destT ST)
             bitcast self ST
         elseif (type== destT i32)
             bitcast self i32
 
-    typefn CEnum 'as (self destT)
+    typefn CEnum '__as (self destT)
         let ST = (storageof (typeof self))
         if (type== destT integer)
             bitcast self ST
@@ -2968,16 +2968,16 @@ do
     fn passthru-overload (sym func)
         set-type-symbol! CEnum sym (fn (a b flipped) (func (unenum a) (unenum b)))
 
-    passthru-overload '!= !=; passthru-overload '== ==
-    passthru-overload '< <; passthru-overload '<= <=
-    passthru-overload '> >; passthru-overload '>= >=
-    passthru-overload '+ +; passthru-overload '- -
-    passthru-overload '* *; passthru-overload '/ /
-    passthru-overload '// //; passthru-overload '% %
-    passthru-overload '<< <<; passthru-overload '>> >>
-    passthru-overload '| |
-    passthru-overload '^ ^
-    passthru-overload '& &
+    passthru-overload '__!= !=; passthru-overload '__== ==
+    passthru-overload '__< <; passthru-overload '__<= <=
+    passthru-overload '__> >; passthru-overload '__>= >=
+    passthru-overload '__+ +; passthru-overload '__- -
+    passthru-overload '__* *; passthru-overload '__/ /
+    passthru-overload '__// //; passthru-overload '__% %
+    passthru-overload '__<< <<; passthru-overload '__>> >>
+    passthru-overload '__| |
+    passthru-overload '__^ ^
+    passthru-overload '__& &
 
 typefn CStruct 'structof (cls args...)
     let sz = (va-countof args...)
@@ -3001,14 +3001,14 @@ typefn CStruct 'structof (cls args...)
             instance
 
 # support for C struct initializers
-typefn CStruct 'apply-type (cls args...)
+typefn CStruct '__apply-type (cls args...)
     if (cls == CStruct)
         compiler-error! "CStruct type constructor is deprecated"
     else
         'structof cls args...
 
 # access reference to struct element from pointer/reference
-typefn CStruct 'getattr& (self name)
+typefn CStruct '__getattr& (self name)
     let ET = (element-type (typeof self) 0)
     let idx = (element-index ET name)
     if (icmp>=s idx 0)
@@ -3016,17 +3016,17 @@ typefn CStruct 'getattr& (self name)
         let val = (getelementptr self 0 idx)
         (reference.from-pointer-type (typeof val)) val
 
-typefn CStruct 'getattr (self name)
+typefn CStruct '__getattr (self name)
     let idx = (element-index (typeof self) name)
     if (icmp>=s idx 0)
         extractvalue self idx
 
 # support for basic C union initializer
-typefn CUnion 'apply-type (cls)
+typefn CUnion '__apply-type (cls)
     nullof cls
 
 # access reference to union element from pointer/reference
-typefn CUnion 'getattr& (self name)
+typefn CUnion '__getattr& (self name)
     let ET = (element-type (typeof self) 0)
     let idx = (element-index ET name)
     if (icmp>=s idx 0)
@@ -3037,13 +3037,13 @@ typefn CUnion 'getattr& (self name)
         (reference.from-pointer-type newPT)
             bitcast self newPT
 
-typefn CUnion 'getattr (self name)
+typefn CUnion '__getattr (self name)
     let idx = (element-index (typeof self) name)
     if (icmp>=s idx 0)
         extractvalue self idx
 
 # extern call attempts to cast arguments to correct type
-typefn extern 'call (self ...)
+typefn extern '__call (self ...)
     label docall (dest ET)
         let sz = (va-countof ...)
         let count = (itrunc (rawcall type-countof ET) i32)
@@ -3340,14 +3340,14 @@ define-scope-macro enum
 # none
 #-------------------------------------------------------------------------------
 
-typefn Nothing 'hash (self)
+typefn Nothing '__hash (self)
     hash Nothing 0
 
 #-------------------------------------------------------------------------------
 # tuples
 #-------------------------------------------------------------------------------
 
-typefn tuple 'hash (self)
+typefn tuple '__hash (self)
     # hash all tuple values
     let T = (typeof self)
     let count = (type-countof T)
@@ -3358,13 +3358,13 @@ typefn tuple 'hash (self)
     else
         result
 
-typefn tuple 'countof (self)
+typefn tuple '__countof (self)
     countof (typeof self)
 
-typefn tuple '@ (self at)
+typefn tuple '__@ (self at)
     extractvalue self (usize at)
 
-typefn tuple 'unpack (self)
+typefn tuple '__unpack (self)
     let T = (typeof self)
     let count = (type-countof T)
     let loop (i result...) = count
@@ -3378,7 +3378,7 @@ typefn tuple 'unpack (self)
             result...
 
 # access reference to struct element from pointer/reference
-typefn tuple 'getattr& (self name)
+typefn tuple '__getattr& (self name)
     let ET = (element-type (typeof self) 0)
     let idx = (element-index ET name)
     if (icmp>=s idx 0)
@@ -3386,7 +3386,7 @@ typefn tuple 'getattr& (self name)
         let val = (getelementptr self 0 idx)
         (reference.from-pointer-type (typeof val)) val
 
-typefn tuple 'getattr (self name)
+typefn tuple '__getattr (self name)
     let idx = (element-index (typeof self) name)
     if (icmp>=s idx 0)
         extractvalue self idx
@@ -3449,7 +3449,7 @@ define-macro capture
         list let T '=
             list make-typename TT
                 list fn '()
-        list set-type-symbol! T (list quote 'call)
+        list set-type-symbol! T (list quote '__call)
             cons fn (cons self params)
                 cons let
                     .. arglist
@@ -3461,10 +3461,10 @@ define-macro capture
 # arrays
 #-------------------------------------------------------------------------------
 
-typefn array 'countof (self)
+typefn array '__countof (self)
     countof (typeof self)
 
-typefn array 'unpack (v)
+typefn array '__unpack (v)
     let count = (type-countof (typeof v))
     let loop (i result...) = count
     if (i == 0:usize) result...
@@ -3474,14 +3474,14 @@ typefn array 'unpack (v)
             extractvalue v i
             result...
 
-typefn array '@ (self at)
+typefn array '__@ (self at)
     let val = (at as integer)
     if (constant? val)
         extractvalue self val
     else
         load (getelementptr (allocaof self) 0 val)
 
-typefn array '@& (self at)
+typefn array '__@& (self at)
     let val = (at as integer)
     let newptr = (getelementptr self 0 val)
     (reference.from-pointer-type (typeof newptr)) newptr
@@ -3501,17 +3501,17 @@ fn arrayof (T ...)
 
 let Generator = (typename "Generator" (fn ()))
 set-typename-storage! Generator (storageof Closure)
-typefn Generator 'apply-type (cls iter init)
+typefn Generator '__apply-type (cls iter init)
     fn get-iter-init ()
         return iter init
     bitcast get-iter-init Generator
-typefn Generator 'call (self)
+typefn Generator '__call (self)
     if (not (constant? self))
         compiler-error! "Generator must be constant"
     let f = (bitcast self Closure)
     call f
 
-typefn Scope 'as (self destT)
+typefn Scope '__as (self destT)
     if (destT == Generator)
         Generator
             label (fret fdone key)
@@ -3523,7 +3523,7 @@ typefn Scope 'as (self destT)
                     fret key key value
             unconst unnamed
 
-typefn list 'as (self destT)
+typefn list '__as (self destT)
     if (destT == Generator)
         Generator
             label (fret fdone cell)
@@ -3719,34 +3719,34 @@ fn vector-signed-dispatch (fsigned funsigned)
         else
             funsigned a b
 
-set-type-symbol! integer 'vector+ add
-set-type-symbol! integer 'vector- sub
-set-type-symbol! integer 'vector* mul
-set-type-symbol! integer 'vector// (vector-signed-dispatch sdiv udiv)
-set-type-symbol! integer 'vector% (vector-signed-dispatch srem urem)
-set-type-symbol! integer 'vector& band
-set-type-symbol! integer 'vector| bor
-set-type-symbol! integer 'vector^ bxor
-set-type-symbol! integer 'vector<< shl
-set-type-symbol! integer 'vector>> (vector-signed-dispatch ashr lshr)
-set-type-symbol! integer 'vector== icmp==
-set-type-symbol! integer 'vector!= icmp!=
-set-type-symbol! integer 'vector> (vector-signed-dispatch icmp>s icmp>u)
-set-type-symbol! integer 'vector>= (vector-signed-dispatch icmp>s icmp>=u)
-set-type-symbol! integer 'vector< (vector-signed-dispatch icmp<s icmp<u)
-set-type-symbol! integer 'vector<= (vector-signed-dispatch icmp<=s icmp<=u)
+set-type-symbol! integer '__vector+ add
+set-type-symbol! integer '__vector- sub
+set-type-symbol! integer '__vector* mul
+set-type-symbol! integer '__vector// (vector-signed-dispatch sdiv udiv)
+set-type-symbol! integer '__vector% (vector-signed-dispatch srem urem)
+set-type-symbol! integer '__vector& band
+set-type-symbol! integer '__vector| bor
+set-type-symbol! integer '__vector^ bxor
+set-type-symbol! integer '__vector<< shl
+set-type-symbol! integer '__vector>> (vector-signed-dispatch ashr lshr)
+set-type-symbol! integer '__vector== icmp==
+set-type-symbol! integer '__vector!= icmp!=
+set-type-symbol! integer '__vector> (vector-signed-dispatch icmp>s icmp>u)
+set-type-symbol! integer '__vector>= (vector-signed-dispatch icmp>s icmp>=u)
+set-type-symbol! integer '__vector< (vector-signed-dispatch icmp<s icmp<u)
+set-type-symbol! integer '__vector<= (vector-signed-dispatch icmp<=s icmp<=u)
 
-set-type-symbol! real 'vector+ fadd
-set-type-symbol! real 'vector- fsub
-set-type-symbol! real 'vector* fmul
-set-type-symbol! real 'vector/ fdiv
-set-type-symbol! real 'vector% frem
-set-type-symbol! real 'vector== fcmp==o
-set-type-symbol! real 'vector!= fcmp!=u
-set-type-symbol! real 'vector> fcmp>o
-set-type-symbol! real 'vector>= fcmp>=o
-set-type-symbol! real 'vector< fcmp<o
-set-type-symbol! real 'vector<= fcmp<=o
+set-type-symbol! real '__vector+ fadd
+set-type-symbol! real '__vector- fsub
+set-type-symbol! real '__vector* fmul
+set-type-symbol! real '__vector/ fdiv
+set-type-symbol! real '__vector% frem
+set-type-symbol! real '__vector== fcmp==o
+set-type-symbol! real '__vector!= fcmp!=u
+set-type-symbol! real '__vector> fcmp>o
+set-type-symbol! real '__vector>= fcmp>=o
+set-type-symbol! real '__vector< fcmp<o
+set-type-symbol! real '__vector<= fcmp<=o
 
 fn vector-op2-dispatch (symbol)
     fn (a b flipped)
@@ -3759,26 +3759,26 @@ fn vector-op2-dispatch (symbol)
                 else
                     return result...
 
-set-type-symbol! vector '+ (vector-op2-dispatch 'vector+)
-set-type-symbol! vector '- (vector-op2-dispatch 'vector-)
-set-type-symbol! vector '* (vector-op2-dispatch 'vector*)
-set-type-symbol! vector '/ (vector-op2-dispatch 'vector/)
-set-type-symbol! vector '// (vector-op2-dispatch 'vector//)
-set-type-symbol! vector '% (vector-op2-dispatch 'vector%)
-set-type-symbol! vector '& (vector-op2-dispatch 'vector&)
-set-type-symbol! vector '| (vector-op2-dispatch 'vector|)
-set-type-symbol! vector '^ (vector-op2-dispatch 'vector^)
-set-type-symbol! vector '== (vector-op2-dispatch 'vector==)
-set-type-symbol! vector '!= (vector-op2-dispatch 'vector!=)
-set-type-symbol! vector '> (vector-op2-dispatch 'vector>)
-set-type-symbol! vector '>= (vector-op2-dispatch 'vector>=)
-set-type-symbol! vector '< (vector-op2-dispatch 'vector<)
-set-type-symbol! vector '<= (vector-op2-dispatch 'vector<=)
+set-type-symbol! vector '__+ (vector-op2-dispatch '__vector+)
+set-type-symbol! vector '__- (vector-op2-dispatch '__vector-)
+set-type-symbol! vector '__* (vector-op2-dispatch '__vector*)
+set-type-symbol! vector '__/ (vector-op2-dispatch '__vector/)
+set-type-symbol! vector '__// (vector-op2-dispatch '__vector//)
+set-type-symbol! vector '__% (vector-op2-dispatch '__vector%)
+set-type-symbol! vector '__& (vector-op2-dispatch '__vector&)
+set-type-symbol! vector '__| (vector-op2-dispatch '__vector|)
+set-type-symbol! vector '__^ (vector-op2-dispatch '__vector^)
+set-type-symbol! vector '__== (vector-op2-dispatch '__vector==)
+set-type-symbol! vector '__!= (vector-op2-dispatch '__vector!=)
+set-type-symbol! vector '__> (vector-op2-dispatch '__vector>)
+set-type-symbol! vector '__>= (vector-op2-dispatch '__vector>=)
+set-type-symbol! vector '__< (vector-op2-dispatch '__vector<)
+set-type-symbol! vector '__<= (vector-op2-dispatch '__vector<=)
 
-typefn vector 'countof (self)
+typefn vector '__countof (self)
     type-countof (typeof self)
 
-typefn vector 'repr (self)
+typefn vector '__repr (self)
     let count = (type-countof (typeof self))
     let loop (i result) = 0:usize ""
     if (i < count)
@@ -3790,7 +3790,7 @@ typefn vector 'repr (self)
     else
         .. result ">"
 
-typefn vector 'unpack (v)
+typefn vector '__unpack (v)
     let count = (type-countof (typeof v))
     let loop (i result...) = count
     if (i == 0:usize) result...
@@ -3800,11 +3800,11 @@ typefn vector 'unpack (v)
             extractelement v i
             result...
 
-typefn vector '@ (self x)
+typefn vector '__@ (self x)
     if (integer? x)
         extractelement self x
 
-typefn vector 'slice (self i0 i1)
+typefn vector '__slice (self i0 i1)
     if ((constant? i0) and (constant? i1))
         let usz = (sub i1 i0)
         let loop (i mask) = i0 (nullof (vector i32 usz))
@@ -3853,7 +3853,7 @@ fn any? (v)
 fn all? (v)
     vector-reduce band v
 
-typefn vector '.. (a b flipped)
+typefn vector '__.. (a b flipped)
     let Ta Tb = (typeof a) (typeof b)
     if (not (vector-type? Ta))
         return;

@@ -99,15 +99,15 @@ let element-set-rgba = "^[rgba]{1,4}$"
 let element-set-stpq = "^[stpq]{1,4}$"
 let element-set-any = "^([xyzw]|[stpq]|[rgba]){1,4}$"
 
-set-type-symbol! vec-type 'repr
+set-type-symbol! vec-type '__repr
     fn vec-type-repr (self)
         repr (self as vector)
 
-set-type-symbol! vec-type '@
+set-type-symbol! vec-type '__@
     fn "vec-type@" (self i)
         extractelement self i
 
-set-type-symbol! vec-type 'as
+set-type-symbol! vec-type '__as
     fn vec-type-as (self destT)
         let ST = (storageof (typeof self))
         if ((destT == vector) or (destT == ST))
@@ -122,12 +122,12 @@ set-type-symbol! vec-type 'as
                         fret (index + 1:usize) (extractelement self index)
                 0:usize
 
-set-type-symbol! vec-type 'unpack
+set-type-symbol! vec-type '__unpack
     fn "vec-type-unpack" (self)
         unpack
             bitcast self (storageof (typeof self))
 
-set-type-symbol! vec-type 'apply-type
+set-type-symbol! vec-type '__apply-type
     fn vec-type-new (self ...)
         let ET = (@ self)
         let argsz = (va-countof ...)
@@ -165,7 +165,7 @@ set-type-symbol! vec-type 'apply-type
                 .. "number of arguments (" (repr argsz)
                     \ ") doesn't match number of elements (" (repr vecsz) ")"
 
-set-type-symbol! vec-type '==
+set-type-symbol! vec-type '__==
     fn vec-type== (self other flipped)
         if (type== (typeof self) (typeof other))
             all? ((self as vector) == (other as vector))
@@ -192,33 +192,33 @@ fn vec-type-binop (f)
             elseif (valid-element-type? T2)
                 compute a ((typeof a) b)
 
-set-type-symbol! vec-type '+
+set-type-symbol! vec-type '__+
     vec-type-binop
         fn (ET a b)
             if (ET <: real)
                 fadd a b
             elseif (ET <: integer)
                 add a b
-set-type-symbol! vec-type '-
+set-type-symbol! vec-type '__-
     vec-type-binop
         fn (ET a b)
             if (ET <: real)
                 fsub a b
             elseif (ET <: integer)
                 sub a b
-set-type-symbol! vec-type '*
+set-type-symbol! vec-type '__*
     vec-type-binop
         fn (ET a b)
             if (ET <: real)
                 fmul a b
             elseif (ET <: integer)
                 mul a b
-set-type-symbol! vec-type '/
+set-type-symbol! vec-type '__/
     vec-type-binop
         fn (ET a b)
             if (ET <: real)
                 fdiv a b
-set-type-symbol! vec-type '//
+set-type-symbol! vec-type '__//
     vec-type-binop
         fn (ET a b)
             if (ET <: integer)
@@ -226,7 +226,7 @@ set-type-symbol! vec-type '//
                     sdiv a b
                 else
                     udiv a b
-set-type-symbol! vec-type '%
+set-type-symbol! vec-type '__%
     vec-type-binop
         fn (ET a b)
             if (ET <: real)
@@ -248,12 +248,12 @@ fn set-vector-cmp-binop! (op ff fs fu)
                         fs a b
                     else
                         fu a b
-set-vector-cmp-binop! '< fcmp<o icmp<s icmp<u
-set-vector-cmp-binop! '> fcmp>o icmp>s icmp>u
-set-vector-cmp-binop! '<= fcmp<=o icmp<=s icmp<=u
-set-vector-cmp-binop! '>= fcmp>=o icmp>=s icmp>=u
+set-vector-cmp-binop! '__< fcmp<o icmp<s icmp<u
+set-vector-cmp-binop! '__> fcmp>o icmp>s icmp>u
+set-vector-cmp-binop! '__<= fcmp<=o icmp<=s icmp<=u
+set-vector-cmp-binop! '__>= fcmp>=o icmp>=s icmp>=u
 
-set-type-symbol! vec-type 'getattr
+set-type-symbol! vec-type '__getattr
     fn "vec-type-getattr" (self name)
         let s = (name as string)
         let set =
@@ -284,16 +284,16 @@ set-type-symbol! vec-type 'getattr
 
 #-------------------------------------------------------------------------------
 
-set-type-symbol! mat-type 'unpack
+set-type-symbol! mat-type '__unpack
     fn "mat-type-unpack" (self)
         unpack
             bitcast self (storageof (typeof self))
 
-set-type-symbol! mat-type '@
+set-type-symbol! mat-type '__@
     fn "mat-type@" (self i)
         extractvalue self i
 
-set-type-symbol! mat-type 'as
+set-type-symbol! mat-type '__as
     fn "mat-type-as" (self destT)
         let ST = (storageof (typeof self))
         if ((destT == array) or (destT == ST))
@@ -316,7 +316,7 @@ fn make-diagonal-vector (VT i)
         insertelement vec (VT.ElementType 1) i
     else vec
 
-set-type-symbol! mat-type 'apply-type
+set-type-symbol! mat-type '__apply-type
     fn "mat-type-new" (cls ...)
         let VT = cls.ColumnType
         let argsz = (va-countof ...)
@@ -430,7 +430,7 @@ set-type-symbol! mat-type 'apply-type
                         \ ") doesn't match number of columns required (" (repr (i32 cls.Columns)) ")"
             self
 
-set-type-symbol! mat-type '==
+set-type-symbol! mat-type '__==
     fn "mat-type==" (self other flipped)
         let T = (typeof self)
         if (type== T (typeof other))
@@ -468,7 +468,7 @@ fn transpose (m)
                 mat-row m i
                 i
 
-set-type-symbol! mat-type '*
+set-type-symbol! mat-type '__*
     fn "mat-type*" (a b flipped)
         let Ta = (typeof a)
         let Tb = (typeof b)
@@ -510,7 +510,7 @@ set-type-symbol! mat-type '*
                         dot (mat-row a i) b
                         i
 
-set-type-symbol! mat-type 'repr
+set-type-symbol! mat-type '__repr
     fn "mat-type-repr" (self)
         let sz = (i32 ((typeof self) . Columns))
         let loop (i result...) = sz "]"

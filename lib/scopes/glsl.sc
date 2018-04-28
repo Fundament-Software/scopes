@@ -99,10 +99,10 @@ set-typename-super! XVarType extern
 
 let XVarBridgeType = (typename "xvar-bridge" (fn ()))
 
-typefn XVarBridgeType 'imply (self destT)
+typefn XVarBridgeType '__imply (self destT)
     forward-imply self.in destT
 
-typefn XVarBridgeType 'as (self destT)
+typefn XVarBridgeType '__as (self destT)
     forward-as self.in destT
 
 do
@@ -116,24 +116,24 @@ do
                 let a ok = (type@ (typeof a) 'in)
                 if ok
                     f a b
-    forward-op '* *
-    forward-op '/ /
-    forward-op '// //
-    forward-op '+ +
-    forward-op '- -
+    forward-op '__* *
+    forward-op '__/ /
+    forward-op '__// //
+    forward-op '__+ +
+    forward-op '__- -
 
-typefn XVarBridgeType 'getattr (self name)
+typefn XVarBridgeType '__getattr (self name)
     let T = (typeof self)
     let val success = (type@ T name)
     if success
         return val
     forward-getattr (type@ T 'in) name
 
-typefn XVarBridgeType '= (self value)
+typefn XVarBridgeType '__= (self value)
     self.out = value
     true
 
-typefn XVarBridgeType '@ (self value)
+typefn XVarBridgeType '__@ (self value)
     @ self.in value
 
 define-macro xvar

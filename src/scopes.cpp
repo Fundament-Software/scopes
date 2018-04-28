@@ -1022,6 +1022,7 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(SYM_QuoteForm, "form-quote") \
     T(SYM_DoForm, "form-do") \
     T(SYM_SyntaxScope, "syntax-scope") \
+    T(SYM_CallHandler, "__call") \
     \
     /* varargs */ \
     T(SYM_Parenthesis, "...") \
@@ -2353,7 +2354,7 @@ struct Type {
     }
 
     bool lookup_call_handler(Any &dest) const {
-        return lookup(KW_Call, dest);
+        return lookup(SYM_CallHandler, dest);
     }
 
 private:
