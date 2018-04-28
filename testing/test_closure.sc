@@ -22,7 +22,8 @@ do
     assert ((q) == 5)
 
 fn test2 ()
-    global quit = false
+    let quit =
+        static 'copy false
     let event = (local 'copy 1)
     fn handle_events ()
         if (event != 0)

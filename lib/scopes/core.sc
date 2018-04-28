@@ -1171,21 +1171,40 @@ syntax-extend
                     nullof cls
             else
                 pointer-type T flags unnamed
+    fn assert-no-arguments (...)
+        if (icmp!= (va-countof ...) 0)
+            compiler-error! "default constructor takes no arguments"
     set-type-symbol! array 'apply-type
         fn (cls ...)
-            array-type ...
+            if (type== cls array)
+                array-type ...
+            else
+                assert-no-arguments ...
+                nullof cls
     set-type-symbol! vector 'apply-type
         fn (cls ...)
-            vector-type ...
+            if (type== cls vector)
+                vector-type ...
+            else
+                assert-no-arguments ...
+                nullof cls
     set-type-symbol! ReturnLabel 'apply-type
         fn (cls ...)
             ReturnLabel-type ...
     set-type-symbol! tuple 'apply-type
         fn (cls ...)
-            tuple-type ...
+            if (type== cls tuple)
+                tuple-type ...
+            else
+                assert-no-arguments ...
+                nullof cls
     set-type-symbol! union 'apply-type
         fn (cls ...)
-            union-type ...
+            if (type== cls union)
+                union-type ...
+            else
+                assert-no-arguments ...
+                nullof cls
 
     set-type-symbol! typename 'apply-type
         fn (cls name args...)
@@ -2321,55 +2340,9 @@ do
                 let ET = (storageof cls)
                 bitcast (imply element ET) cls
 
-#var has been removed
+#var has been removed; use `local`
 
-define-macro global
-    fn element-typeof (value)
-        let T = (typeof value)
-        if (T <: reference)
-            element-type (storageof T) 0
-        else T
-    fn make-reference (dest value)
-        let T = (typeof value)
-        let PT =
-            if (T <: reference)
-                storageof T
-            else (typeof dest)
-        let ref = ((reference.from-pointer-type PT) dest)
-        = ref value
-        ref
-
-    let name token rest = (decons args 2)
-    let token = (token as Syntax as Symbol)
-    if (token == '=)
-        let value rest = (decons rest)
-        list define name
-            list do
-                list let 'value '= value
-                list let 'ET '= (list element-typeof 'value)
-                list make-reference
-                    list bitcast
-                        list allocaof (list nullof 'ET)
-                        list pointer 'ET (list quote 'mutable)
-                    'value
-            #name
-    elseif (token == '@)
-        let size token rest = (decons rest 2)
-        let token = (token as Syntax as Symbol)
-        if (token == ':)
-            let deftype rest = (decons rest)
-            list let name '=
-                list do
-                    list let 'ET '= deftype
-                    list bitcast
-                        list allocaof (list nullof (list array 'ET (list usize size)))
-                        list pointer 'ET (list quote 'mutable)
-        else
-            syntax-error! (active-anchor)
-                "syntax: global <name> @ <size> : <type>"
-    else
-        syntax-error! (active-anchor)
-            "syntax: global <name> = <value> | <name> @ <size> : <type>"
+#global has been removed; use `static`
 
 # (typefn type 'symbol (params) body ...)
 define-macro typefn

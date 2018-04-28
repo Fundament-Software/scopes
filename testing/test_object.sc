@@ -8,8 +8,10 @@ let C =
             #include <stdio.h>
         list;
 
-global x @ 10 : i32
-global y = 1
+define x
+    static (array i32 10:usize)
+define y
+    static i32 1
 #setting x here won't have any effect because the code isn't executed at compile time
 #x = 10
 fn main (argc argv)
