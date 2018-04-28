@@ -41,7 +41,8 @@ fn __test-modules (module-dir modules)
 define-macro test-modules
     let expr =
         list __test-modules 'module-dir
-            cons quote args
+            list quote
+                args
     print expr
     expr
 
