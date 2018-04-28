@@ -2404,33 +2404,6 @@ fn delete (self)
         .. "cannot delete value of type " (repr T)
 
 #-------------------------------------------------------------------------------
-# compile time function chaining
-#-------------------------------------------------------------------------------
-
-define fnchain (typename "fnchain" (fn ()))
-typefn! fnchain '__apply-type (cls name)
-    let T = (typename (.. "<fnchain " name ">"))
-    set-typename-super! T cls
-    typefn T '__apply-type (cls args...)
-    typefn T 'append (self f)
-        assert (constant? f)
-        assert (constant? self)
-        let oldfn = self.__apply-type
-        typefn self '__apply-type (self args...)
-            oldfn self args...
-            f args...
-        self
-    typefn T 'prepend (self f)
-        assert (constant? f)
-        assert (constant? self)
-        let oldfn = self.__apply-type
-        typefn self '__apply-type (self args...)
-            f args...
-            oldfn self args...
-        self
-    T
-
-#-------------------------------------------------------------------------------
 # docstrings
 #-------------------------------------------------------------------------------
 

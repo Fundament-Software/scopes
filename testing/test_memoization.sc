@@ -1,4 +1,6 @@
 
+import fnchain
+
 fn memoized ()
     typename "bang"
 

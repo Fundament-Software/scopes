@@ -17,6 +17,7 @@ test-modules
     .test_dots
     .test_enums
     .test_extraparams
+    .test_fnchain
     .test_folding
     .test_frame
     .test_from
