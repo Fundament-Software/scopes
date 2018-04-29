@@ -38,7 +38,7 @@
                 },
                 {
                     "name": "constant.language.library.scopes",
-                    "match": "(package|main-module\\?|module-(dir|path))(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
+                    "match": "(package|main-module\\?|module-(dir|path|name))(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
                 },
                 {
                     "name": "constant.language.glsl.scopes",

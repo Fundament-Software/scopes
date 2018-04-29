@@ -2518,7 +2518,7 @@ syntax-extend
             repeat (i + 1:usize) (i + 1:usize)
                 .. result (slice pattern start i) "/"
 
-    fn load-module (module-path main-module?)
+    fn load-module (module-name module-path main-module?)
         if (not (file? module-path))
             error!
                 .. "no such module: " module-path
@@ -2531,6 +2531,7 @@ syntax-extend
             else main-module?
         set-scope-symbol! eval-scope 'module-path module-path
         set-scope-symbol! eval-scope 'module-dir module-dir
+        set-scope-symbol! eval-scope 'module-name module-name
         let content = (exec-module expr (Scope eval-scope))
         return content (unconst true)
 
@@ -2575,7 +2576,7 @@ syntax-extend
             if (not (file? module-path))
                 loop patterns
             set-scope-symbol! modules module-path-sym incomplete
-            let content ok = (load-module module-path)
+            let content ok = (load-module (name as string) module-path)
             set-scope-symbol! modules module-path-sym content
             return content ok
         let content ok = (load-module-from-symbol name)
@@ -4141,7 +4142,7 @@ fn run-main (args...)
     if (sourcepath == none)
         read-eval-print-loop;
     else
-        load-module sourcepath
+        load-module "" sourcepath
             main-module? = true
         exit 0
         unreachable!;

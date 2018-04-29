@@ -37,7 +37,12 @@ typefn! FunctionChain '__apply-type (cls name)
 
 define-macro fnchain
     let name = (decons args)
-    list let name '= (list FunctionChain (name as Syntax as Symbol as string))
+    list let name '=
+        list FunctionChain
+            list (do ..)
+                'module-name
+                "."
+                name as Syntax as Symbol as string
 
 do
     let FunctionChain fnchain
