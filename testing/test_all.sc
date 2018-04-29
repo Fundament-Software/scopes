@@ -29,6 +29,7 @@ test-modules
     .test_let
     .test_locals
     .test_loop
+    .test_macro
     .test_match
     .test_memoization
     .test_mutarray

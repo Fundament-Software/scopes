@@ -936,6 +936,7 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(FN_TypeDebugABI, "type-debug-abi") \
     T(FN_TypeAt, "type@") \
     T(FN_TypeLocalAt, "type-local@") \
+    T(FN_RuntimeTypeAt, "runtime-type@") \
     T(FN_Undef, "undef") T(FN_NullOf, "nullof") T(FN_Alloca, "alloca") \
     T(FN_AllocaExceptionPad, "alloca-exception-pad") \
     T(FN_AllocaOf, "allocaof") \
@@ -17225,6 +17226,12 @@ static AnyBoolPair f_scope_local_at(Scope *scope, Symbol key) {
     return { result, ok };
 }
 
+static AnyBoolPair f_type_at(const Type *T, Symbol key) {
+    Any result = none;
+    bool ok = T->lookup(key, result);
+    return { result, ok };
+}
+
 static Symbol f_symbol_new(const String *str) {
     return Symbol(str);
 }
@@ -17831,6 +17838,7 @@ static void init_globals(int argc, char *argv[]) {
     DEFINE_PURE_C_FUNCTION(FN_ImportC, f_import_c, TYPE_Scope, TYPE_String, TYPE_String, TYPE_List);
     DEFINE_PURE_C_FUNCTION(FN_ScopeAt, f_scope_at, Tuple({TYPE_Any,TYPE_Bool}), TYPE_Scope, TYPE_Symbol);
     DEFINE_PURE_C_FUNCTION(FN_ScopeLocalAt, f_scope_local_at, Tuple({TYPE_Any,TYPE_Bool}), TYPE_Scope, TYPE_Symbol);
+    DEFINE_PURE_C_FUNCTION(FN_RuntimeTypeAt, f_type_at, Tuple({TYPE_Any,TYPE_Bool}), TYPE_Type, TYPE_Symbol);
     DEFINE_PURE_C_FUNCTION(FN_SymbolNew, f_symbol_new, TYPE_Symbol, TYPE_String);
     DEFINE_PURE_C_FUNCTION(FN_Repr, f_repr, TYPE_String, TYPE_Any);
     DEFINE_PURE_C_FUNCTION(FN_AnyString, f_any_string, TYPE_String, TYPE_Any);

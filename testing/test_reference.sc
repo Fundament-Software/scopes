@@ -65,3 +65,4 @@ let q = (local T)
 assert (('value q) == 0)
 assert (('value ('inc q)) == 1)
 assert (('value q) == 1)
+

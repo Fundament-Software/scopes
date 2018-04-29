@@ -1763,6 +1763,12 @@ syntax-extend
                 if success head
                 else head-key
             else head-key
+        let head =
+            if (== ('typeof head) type)
+                let attr ok = (runtime-type@ (as head type) '__macro)
+                if ok attr
+                else head
+            else head
         if (== ('typeof head) Macro)
             let head = (as head Macro)
             let next = (list-next topexpr)
