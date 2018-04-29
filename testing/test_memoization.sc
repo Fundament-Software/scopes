@@ -1,5 +1,5 @@
 
-import fnchain
+using import FunctionChain
 
 fn memoized ()
     typename "bang"
@@ -24,6 +24,6 @@ assert
 assert
     (memoized2 "test") == (memoized2 "test")
 
-let chain1 = (fnchain "test")
-let chain2 = (fnchain "test")
+let chain1 = (FunctionChain "test")
+let chain2 = (FunctionChain "test")
 assert (chain1 != chain2)

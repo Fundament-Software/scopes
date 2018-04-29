@@ -22,7 +22,7 @@
                 },
                 {
                     "name": "keyword.control.library.scopes",
-                    "match": "(fn\\.\\.\\.|method(\\&)?|loop|repeat|capture|struct|enum|typefn(\\!)?(\\&)?|while|break|continue|for|in|match|from|using|filter|\\:|try|except|locals|import|defer|assert|define(((-block)?-scope)?-macro|-infix[\\<\\>])?)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
+                    "match": "(fn\\.\\.\\.|method(\\&)?|loop|repeat|capture|struct|fnchain|enum|typefn(\\!)?(\\&)?|while|break|continue|for|in|match|from|using|filter|\\:|try|except|locals|import|defer|assert|define(((-block)?-scope)?-macro|-infix[\\<\\>])?)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
                 },
                 {
                     "name": "keyword.control.glsl.scopes",
@@ -105,7 +105,7 @@
                 },
                 {
                     "name": "support.type.library.scopes",
-                    "match": "((Fixed|Growing)?Array|Generator|Capture|Macro|rawstring|reference|fnchain|hash)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
+                    "match": "((Fixed|Growing)?Array|Generator|Capture|Macro|FunctionChain|rawstring|reference|hash)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
                 },
                 {
                     "name": "support.type.contextual.scopes",

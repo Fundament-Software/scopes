@@ -1,7 +1,7 @@
 
-import fnchain
+using import FunctionChain
 
-let f = (fnchain "thefunc")
+fnchain f
 
 let g_x = (static i32)
 

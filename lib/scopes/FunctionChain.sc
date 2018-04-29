@@ -3,15 +3,15 @@
 # compile time function chaining
 #-------------------------------------------------------------------------------
 
-define fnchain (typename "fnchain" (fn ()))
+let FunctionChain = (typename "FunctionChain")
 
-typefn fnchain 'clear (self)
-    assert (not (type== self fnchain))
+typefn FunctionChain 'clear (self)
+    assert (not (type== self FunctionChain))
     assert (constant? self)
     typefn self '__apply-type (self args...)
     self
-typefn fnchain 'append (self f)
-    assert (not (type== self fnchain))
+typefn FunctionChain 'append (self f)
+    assert (not (type== self FunctionChain))
     assert (constant? f)
     assert (constant? self)
     let oldfn = self.__apply-type
@@ -19,8 +19,8 @@ typefn fnchain 'append (self f)
         oldfn self args...
         f args...
     self
-typefn fnchain 'prepend (self f)
-    assert (not (type== self fnchain))
+typefn FunctionChain 'prepend (self f)
+    assert (not (type== self FunctionChain))
     assert (constant? f)
     assert (constant? self)
     let oldfn = self.__apply-type
@@ -29,10 +29,16 @@ typefn fnchain 'prepend (self f)
         oldfn self args...
     self
 
-typefn! fnchain '__apply-type (cls name)
-    let T = (typename (.. "<fnchain " name ">"))
+typefn! FunctionChain '__apply-type (cls name)
+    let T = (typename (.. "<FunctionChain " name ">"))
     set-typename-super! T cls
     typefn T '__apply-type (cls args...)
     T
 
-fnchain
+define-macro fnchain
+    let name = (decons args)
+    list let name '= (list FunctionChain (name as Syntax as Symbol as string))
+
+do
+    let FunctionChain fnchain
+    locals;
