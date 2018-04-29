@@ -39,12 +39,9 @@ fn __test-modules (module-dir modules)
 
 # (test-modules module ...)
 define-macro test-modules
-    let expr =
-        list __test-modules 'module-dir
-            list quote
-                args
-    print expr
-    expr
+    list __test-modules 'module-dir
+        list quote
+            args
 
 define-macro assert-error
     fn test-function (f)
