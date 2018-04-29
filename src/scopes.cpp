@@ -549,7 +549,7 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(KW_If) T(SFXFN_SetTypeSymbol) T(SFXFN_DelTypeSymbol) T(FN_ExternSymbol) \
     T(SFXFN_SetTypenameStorage) T(FN_ExternNew) \
     T(SFXFN_Discard) \
-    T(FN_TypeAt) T(KW_SyntaxExtend) T(FN_Location) T(SFXFN_Unreachable) \
+    T(FN_TypeAt) T(FN_TypeLocalAt) T(KW_SyntaxExtend) T(FN_Location) T(SFXFN_Unreachable) \
     T(FN_FPTrunc) T(FN_FPExt) T(FN_ScopeOf) \
     T(FN_FPToUI) T(FN_FPToSI) \
     T(FN_UIToFP) T(FN_SIToFP) \
@@ -935,6 +935,7 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(FN_TypeKind, "type-kind") \
     T(FN_TypeDebugABI, "type-debug-abi") \
     T(FN_TypeAt, "type@") \
+    T(FN_TypeLocalAt, "type-local@") \
     T(FN_Undef, "undef") T(FN_NullOf, "nullof") T(FN_Alloca, "alloca") \
     T(FN_AllocaExceptionPad, "alloca-exception-pad") \
     T(FN_AllocaOf, "allocaof") \
@@ -14608,6 +14609,17 @@ struct Solver {
             args[2].value.verify(TYPE_Symbol);
             Any result = none;
             if (!T->lookup(args[2].value.symbol, result)) {
+                RETARGS(none, false);
+            } else {
+                RETARGS(result, true);
+            }
+        } break;
+        case FN_TypeLocalAt: {
+            CHECKARGS(2, 2);
+            const Type *T = args[1].value;
+            args[2].value.verify(TYPE_Symbol);
+            Any result = none;
+            if (!T->lookup_local(args[2].value.symbol, result)) {
                 RETARGS(none, false);
             } else {
                 RETARGS(result, true);

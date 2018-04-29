@@ -6,11 +6,8 @@ let GrowingArray = (typename "GrowingArray")
 set-typename-super! FixedArray Array
 set-typename-super! GrowingArray Array
 
-fn assert-reference (self)
-    assert ((typeof self) < reference) "array must be reference"
-
 fn gen-element-destructor (element-type)
-    let element-destructor = (type@ element-type '__delete&)
+    let element-destructor = (type@& element-type '__delete)
     if (none? element-destructor)
         fn "MutableArray-destructor" (self items)
     else
@@ -24,14 +21,15 @@ fn gen-element-destructor (element-type)
                 loop (i + 1:usize)
 
 fn define-common-array-methods (T element-type ensure-capacity)
+    dump "define-common-array-methods" T element-type ensure-capacity
 
     let destructor = (gen-element-destructor element-type)
 
-    typefn T '__delete& (self)
+    typefn& T '__delete (self)
         destructor self self.items
         free (load self.items)
 
-    typefn T '__as& (self T)
+    typefn& T '__as (self T)
         if (T == Generator)
             Generator
                 label (fret fdone i)
@@ -43,13 +41,10 @@ fn define-common-array-methods (T element-type ensure-capacity)
         else
             return;
 
-    typefn T '__countof (self)
-        self.count
-
-    typefn T '__countof& (self)
+    typefn& T '__countof (self)
         self.count as immutable
 
-    typefn T '__@& (self index)
+    typefn& T '__@ (self index)
         let index = (index as usize)
         assert ((index < self.count) & (index >= 0:usize)) "index out of bounds"
         reference.from-pointer
@@ -87,7 +82,6 @@ fn define-common-array-methods (T element-type ensure-capacity)
         return;
 
     fn append-slot (self)
-        assert-reference self
         let count = self.count
         ensure-capacity self count
         let idx = (count as immutable)
@@ -110,7 +104,6 @@ fn define-common-array-methods (T element-type ensure-capacity)
 
     return;
 
-
 fn FixedMutableArray (element-type capacity)
     let arrayT =
         pointer element-type 'mutable
@@ -127,7 +120,7 @@ fn FixedMutableArray (element-type capacity)
         set-typename-super! this-struct FixedArray
 
         define-common-array-methods this-struct element-type
-            fn "ensure-capacity" (self count)
+            fn "ensure-fixed-capacity" (self count)
                 assert (count < capacity) "capacity exceeded"
 
         method '__repr (self)
@@ -178,7 +171,7 @@ fn VariableMutableArray (element-type)
         set-typename-super! this-struct GrowingArray
 
         define-common-array-methods this-struct element-type
-            fn "ensure-capacity" (self count)
+            fn "ensure-variable-capacity" (self count)
                 if (count == self.capacity)
                     grow self
 

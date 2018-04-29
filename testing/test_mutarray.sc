@@ -9,7 +9,7 @@ fn autodelete (x)
         delete x
         ...
 
-do
+#do
     # mutable array with fixed upper capacity
     let i32Arrayx65536 = (Array i32 TESTSIZE)
     let a = (local i32Arrayx65536)
@@ -23,7 +23,7 @@ do
     for i k in (enumerate a)
         assert ((a @ i) == i)
 
-do
+#do
     # mutable array with dynamic capacity
     let i32Array = (Array i32)
     let a = (local i32Array 12)
@@ -57,7 +57,7 @@ do
         for y n in (enumerate b)
             assert ((x * 16 + y) == n)
 
-do
+#do
     # sorting a mutable array
     let T = (Array i32 32)
     let a = (local T)

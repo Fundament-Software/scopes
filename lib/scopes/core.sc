@@ -1280,7 +1280,7 @@ syntax-extend
             icmp== (Parameter-index self) 0
 
     set-type-symbol! Symbol '__call
-        fn (name self ...)
+        fn "methodcall" (name self ...)
             let T = (typeof self)
             let T =
                 if (type== T type) self
@@ -2185,11 +2185,14 @@ fn type@& (T name)
         return none ok
 
 fn set-type-symbol!& (T name value)
-    let attrs ok = (type@ T reference-attribs-key)
+    let attrs ok = (type-local@ T reference-attribs-key)
     let attrs =
         if ok attrs
         else
             let attrs = (typename (Symbol->string reference-attribs-key))
+            let super-attrs ok = (type@ (superof T) reference-attribs-key)
+            if ok
+                set-typename-super! attrs super-attrs
             set-type-symbol! T reference-attribs-key attrs
             attrs
     set-type-symbol! attrs name value
@@ -2214,6 +2217,34 @@ do
     passthru-overload '__<< <<; passthru-overload '__>> >>
     passthru-overload '__.. ..; passthru-overload '__.. ..
 
+    fn define-reference-forward (failedf methodname)
+        set-type-symbol! reference methodname
+            fn (self args...)
+                let T = (storageof (typeof self))
+                let ET = (element-type T 0)
+                let op success = (type@& ET methodname)
+                if success
+                    return (op self args...)
+                failedf (load self) args...
+
+    fn define-reference-forward-failable (failedf methodname)
+        set-type-symbol! reference methodname
+            fn (self args...)
+                let T = (storageof (typeof self))
+                let ET = (element-type T 0)
+                let op success = (type@& ET methodname)
+                if success
+                    let result... = (op self args...)
+                    if (not (va-empty? result...))
+                        return result...
+                failedf (load self) args...
+
+    define-reference-forward countof '__countof
+    define-reference-forward forward-repr '__repr
+    define-reference-forward forward-hash '__hash
+    define-reference-forward-failable forward-as '__as
+    define-reference-forward-failable forward-getattr '__getattr
+
     set-type-symbol! reference '__typeattr
         fn "reference-typeattr" (cls name)
             let T = (storageof cls)
@@ -2221,42 +2252,26 @@ do
             let value success = (type@& ET name)
             if success
                 return value
-            let op success = (type@ ET '__typeattr&)
+            let op success = (type@& ET '__typeattr)
             if success
                 let result... = (op ET name)
                 if (va-empty? result...)
                 else
                     return result...
 
-    set-type-symbol! reference '__getattr
-        fn "reference-getattr" (self name)
-            let T = (storageof (typeof self))
-            let ET = (element-type T 0)
-            let value success = (type@& ET name)
-            if success
-                return value
-            let op success = (type@ ET '__getattr&)
-            if success
-                let result... = (op self name)
-                if (va-empty? result...)
-                else
-                    return result...
-            # we can't return any attributes from the element directly
-                without the elements explicit permission
-
     set-type-symbol! reference '__delete
         fn "reference-delete" (self)
             let T = (typeof self)
             let ptrT = (storageof T)
             let T = (element-type ptrT 0)
-            let op ok = (type@ T '__delete&)
+            let op ok = (type@& T '__delete)
             if ok
                 op self
             else
                 let op ok = (type@ T '__delete)
                 if ok
                     op (load self)
-            let class = (pointer-type-storage-class ptrT)
+            let class = ('storage ptrT)
             if (class == unnamed)
                 free (bitcast self ptrT)
             elseif (class == 'Function)
@@ -2265,81 +2280,30 @@ do
                     # do nothing
             else
                 compiler-error!
-                    .. "cannot delete reference value of pointer type " (repr ptrT)
+                    .. "cannot delete reference value of type " (repr T)
 
     set-type-symbol! reference '__@
         fn "reference-@" (self key)
             let T = (storageof (typeof self))
             let ET = (element-type T 0)
-            let op success = (type@ ET '__@&)
+            let op success = (type@& ET '__@)
             if success
-                let result... = (op (bitcast self T) key)
-                if (icmp== (va-countof result...) 0)
-                else
-                    return result...
+                return (op self key)
             let op ok = (type@ ET '__@)
             if ok
                 @ (load self) key
             elseif (none? key)
                 load self
 
-    set-type-symbol! reference '__countof
-        fn (self)
-            let T = (storageof (typeof self))
-            let ET = (element-type T 0)
-            let op success = (type@ ET '__countof&)
-            if success
-                let result... = (op self)
-                if (icmp== (va-countof result...) 0)
-                else
-                    return result...
-            countof (load self)
-
     set-type-symbol! reference '__call
         fn (self args...)
             let T = (storageof (typeof self))
             let ET = (element-type T 0)
-            let op success = (type@ ET '__call&)
+            let op success = (type@& ET '__call)
             if success
                 return (op self args...)
             else
                 call (load self) args...
-
-    set-type-symbol! reference '__repr
-        fn (self)
-            let T = (storageof (typeof self))
-            let ET = (element-type T 0)
-            let op success = (type@ ET '__repr&)
-            if success
-                let result... = (op self)
-                if (icmp== (va-countof result...) 0)
-                else
-                    return result...
-            forward-repr (load self)
-
-    set-type-symbol! reference '__hash
-        fn (self)
-            let T = (storageof (typeof self))
-            let ET = (element-type T 0)
-            let op success = (type@ ET '__hash&)
-            if success
-                let result... = (op self)
-                if (va-empty? result...)
-                else
-                    return result...
-            forward-hash (load self)
-
-    set-type-symbol! reference '__as
-        fn (self destT)
-            let T = (storageof (typeof self))
-            let ET = (element-type T 0)
-            let op success = (type@ ET '__as&)
-            if success
-                let result... = (op self destT)
-                if (icmp== (va-countof result...) 0)
-                else
-                    return result...
-            forward-as (load self) destT
 
     set-type-symbol! reference '__imply
         fn (self destT)
@@ -2440,7 +2404,7 @@ fn constructor (f)
                 else T
             let self =
                 reference.from-pointer (f cls)
-            let op ok = (type@ cls '__copy&)
+            let op ok = (type@& cls '__copy)
             if ok
                 op self value
             else
@@ -2450,7 +2414,7 @@ fn constructor (f)
         else cls
             let self =
                 reference.from-pointer (f cls)
-            let op ok = (type@ cls '__new&)
+            let op ok = (type@& cls '__new)
             if ok
                 op self args...
             else
@@ -2915,7 +2879,7 @@ typefn pointer '__imply (self destT)
 # support getattr syntax
 typefn pointer '__getattr (self name)
     let ET = (element-type (typeof self) 0)
-    let op success = (type@ ET '__getattr&)
+    let op success = (type@& ET '__getattr)
     if success
         let result... = (op (reference.from-pointer self) name)
         if (va-empty? result...)
@@ -2923,7 +2887,7 @@ typefn pointer '__getattr (self name)
             return result...
     forward-getattr (load self) name
 
-typefn pointer '__getattr& (self name)
+typefn& pointer '__getattr (self name)
     '__getattr (deref self) name
 
 # support @
@@ -2945,16 +2909,13 @@ typefn extern '__getattr (self name)
     let T = (typeof self)
     let pET = (element-type T 0)
     let ET = (element-type pET 0)
-    let op success = (type@ ET '__getattr&)
+    let op success = (type@& ET '__getattr)
     if success
         let result... = (op (unconst (bitcast self (storageof T))) name)
-        if (icmp== (va-countof result...) 0)
+        if (va-empty? result...)
         else
             return result...
-    let val ok = (type@ T name)
-    if ok val
-    else
-        getattr (load self) name
+    forward-getattr (load self) name
 
 typefn extern '__as (self destT)
     forward-as (load self) destT
@@ -3055,7 +3016,7 @@ typefn CStruct '__apply-type (cls args...)
         'structof cls args...
 
 # access reference to struct element from pointer/reference
-typefn CStruct '__getattr& (self name)
+typefn& CStruct '__getattr (self name)
     let ET = (element-type (typeof self) 0)
     let idx = (element-index ET name)
     if (icmp>=s idx 0)
@@ -3073,7 +3034,7 @@ typefn CUnion '__apply-type (cls)
     nullof cls
 
 # access reference to union element from pointer/reference
-typefn CUnion '__getattr& (self name)
+typefn& CUnion '__getattr (self name)
     let ET = (element-type (typeof self) 0)
     let idx = (element-index ET name)
     if (icmp>=s idx 0)
@@ -3429,7 +3390,7 @@ typefn tuple '__unpack (self)
             result...
 
 # access reference to struct element from pointer/reference
-typefn tuple '__getattr& (self name)
+typefn& tuple '__getattr (self name)
     let ET = (element-type (typeof self) 0)
     let idx = (element-index ET name)
     if (icmp>=s idx 0)
@@ -3532,7 +3493,7 @@ typefn array '__@ (self at)
     else
         load (getelementptr (allocaof self) 0 val)
 
-typefn array '__@& (self at)
+typefn& array '__@ (self at)
     let val = (at as integer)
     let newptr = (getelementptr self 0 val)
     (reference.from-pointer-type (typeof newptr)) newptr
