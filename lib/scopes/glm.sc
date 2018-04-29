@@ -137,7 +137,7 @@ set-type-symbol! vec-type '__apply-type
             let arg = (va@ i ...)
             let arg = (imply arg immutable)
             let argT = (typeof arg)
-            if (argT <: vec-type)
+            if (argT < vec-type)
                 let argET argvecsz = (@ argT) ((countof argT) as i32)
                 let flatten-loop (k args...) = argvecsz args...
                 if (k != 0)
@@ -195,33 +195,33 @@ fn vec-type-binop (f)
 set-type-symbol! vec-type '__+
     vec-type-binop
         fn (ET a b)
-            if (ET <: real)
+            if (ET < real)
                 fadd a b
-            elseif (ET <: integer)
+            elseif (ET < integer)
                 add a b
 set-type-symbol! vec-type '__-
     vec-type-binop
         fn (ET a b)
-            if (ET <: real)
+            if (ET < real)
                 fsub a b
-            elseif (ET <: integer)
+            elseif (ET < integer)
                 sub a b
 set-type-symbol! vec-type '__*
     vec-type-binop
         fn (ET a b)
-            if (ET <: real)
+            if (ET < real)
                 fmul a b
-            elseif (ET <: integer)
+            elseif (ET < integer)
                 mul a b
 set-type-symbol! vec-type '__/
     vec-type-binop
         fn (ET a b)
-            if (ET <: real)
+            if (ET < real)
                 fdiv a b
 set-type-symbol! vec-type '__//
     vec-type-binop
         fn (ET a b)
-            if (ET <: integer)
+            if (ET < integer)
                 if (signed? ET)
                     sdiv a b
                 else
@@ -229,9 +229,9 @@ set-type-symbol! vec-type '__//
 set-type-symbol! vec-type '__%
     vec-type-binop
         fn (ET a b)
-            if (ET <: real)
+            if (ET < real)
                 frem a b
-            elseif (ET <: integer)
+            elseif (ET < integer)
                 if (signed? ET)
                     srem a b
                 else
@@ -241,9 +241,9 @@ fn set-vector-cmp-binop! (op ff fs fu)
     set-type-symbol! vec-type op
         vec-type-binop
             fn (ET a b)
-                if (ET <: real)
+                if (ET < real)
                     ff a b
-                elseif (ET <: integer)
+                elseif (ET < integer)
                     if (signed? ET)
                         fs a b
                     else

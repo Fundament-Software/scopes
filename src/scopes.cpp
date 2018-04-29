@@ -2563,9 +2563,6 @@ struct PointerType : Type {
             flags(_flags),
             storage_class(_storage_class) {
         std::stringstream ss;
-        if (storage_class != SYM_Unnamed) {
-            ss << "<storage=" << storage_class.name()->data << ">";
-        }
         ss << element_type->name()->data;
         if (is_writable() && is_readable()) {
             ss << "*";
@@ -2573,6 +2570,9 @@ struct PointerType : Type {
             ss << "(*)";
         } else {
             ss << "*!";
+        }
+        if (storage_class != SYM_Unnamed) {
+            ss << "[" << storage_class.name()->data << "]";
         }
         _name = String::from_stdstring(ss.str());
     }

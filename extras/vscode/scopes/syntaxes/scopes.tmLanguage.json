@@ -22,7 +22,7 @@
                 },
                 {
                     "name": "keyword.control.library.scopes",
-                    "match": "(fn\\.\\.\\.|method|loop|repeat|capture|struct|enum|typefn(\\!)?|while|break|continue|for|in|match|from|using|filter|\\:|try|except|locals|import|defer|assert|define(((-block)?-scope)?-macro|-infix[\\<\\>])?)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
+                    "match": "(fn\\.\\.\\.|method(\\&)?|loop|repeat|capture|struct|enum|typefn(\\!)?(\\&)?|while|break|continue|for|in|match|from|using|filter|\\:|try|except|locals|import|defer|assert|define(((-block)?-scope)?-macro|-infix[\\<\\>])?)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
                 },
                 {
                     "name": "keyword.control.glsl.scopes",
@@ -105,7 +105,7 @@
                 },
                 {
                     "name": "support.type.library.scopes",
-                    "match": "(Generator|Capture|Macro|rawstring|reference|fnchain|hash)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
+                    "match": "((Fixed|Growing)?Array|Generator|Capture|Macro|rawstring|reference|fnchain|hash)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
                 },
                 {
                     "name": "support.type.contextual.scopes",
@@ -125,15 +125,15 @@
 			"patterns": [
                 {
                     "name": "support.function.builtin.scopes",
-				    "match": "(pow|mix|step|smoothstep|floor|ceil|fract|(f|s)(abs|sign)|round|roundeven|trunc|fma|frexp|ldexp|(inverse)?sqrt|exp(2)?|log(2)?|radians|degrees|sin|cos|tan|asin|acos|atan|atan2|cross|normalize|length|distance|scopeof|offsetof|Image-(read|write)|sizeof|sample|mutable\\?|type-name|superof|string-match\\?|(file|directory)\\?|exit|compiler-version|load-library|prompt|countof|static-alloc|malloc(-array)?|free|alloca(-array|of)?|eval|list-load|globals|((mutable-)?pointer|integer|real|function|tuple|ReturnLabel|array|vector|typename|extern|(Sampled)?Image)-type|dump|dump-(label|list|frame)|Any-(extract-constant|repr|wrap)|branch|string-join|getelementptr|(volatile-)?(load|store)|storageof|import-c|(type|Scope)\\@|ptrtoint|inttoptr|(insert|extract)(value|element)|shufflevector|unconst(-all)?|compile(-glsl|-spirv|-object)?|typify|purify|(constant|signed)\\?|va(-keys|-values|-countof|\\@)|type-kind|nullof|undef|(type|bitcount)of|icmp[\\=\\!]\\=|icmp[\\<\\>]\\=?[su]|fcmp[\\=\\!]\\=[ou]|fcmp[\\<\\>]\\=?[ou]|bitcast|(fp|i)trunc|([sz]|fp)ext|fpto[su]i|[su]itofp|b(and|x?or)|f?add|f?sub|f?mul|[suf](div|rem)|shl|[al]shr)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
+				    "match": "(pow|mix|step|smoothstep|floor|ceil|fract|(f|s)(abs|sign)|round|roundeven|trunc|fma|frexp|ldexp|(inverse)?sqrt|exp(2)?|log(2)?|radians|degrees|sin|cos|tan|asin|acos|atan|atan2|cross|normalize|length|distance|scopeof|offsetof|Image-(read|write)|sizeof|sample|mutable\\?|type-name|superof|string-match\\?|(file|directory)\\?|exit|compiler-version|load-library|prompt|countof|static-alloc|malloc(-array)?|free|alloca(-array|of)?|eval|list-load|globals|((mutable-)?pointer|integer|real|function|tuple|ReturnLabel|array|vector|typename|extern|(Sampled)?Image)-type|dump|dump-(label|list|frame)|Any-(extract-constant|repr|wrap)|branch|string-join|getelementptr|(volatile-)?(load|store)|storageof|import-c|type\\@(\\&)?|Scope\\@|ptrtoint|inttoptr|(insert|extract)(value|element)|shufflevector|unconst(-all)?|compile(-glsl|-spirv|-object)?|typify|purify|(constant|signed)\\?|va(-keys|-values|-countof|\\@)|type-kind|nullof|undef|(type|bitcount)of|icmp[\\=\\!]\\=|icmp[\\<\\>]\\=?[su]|fcmp[\\=\\!]\\=[ou]|fcmp[\\<\\>]\\=?[ou]|bitcast|(fp|i)trunc|([sz]|fp)ext|fpto[su]i|[su]itofp|b(and|x?or)|f?add|f?sub|f?mul|[suf](div|rem)|shl|[al]shr)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
                 },
                 {
                     "name": "support.function.library.scopes",
-				    "match": "(_|new|local|static|delete|sign|abs|(unroll-)?range|fold|map|zip|enumerate|unpack|(tuple|vector|array)of|unknownof|va-(empty\\?|types|join|each|each-reversed|key)|imply|forward-imply|forward-as|xpcall|require-from|char|getattr|(de)?cons|slice|(scope-|block-scope-)?macro|print|min|max|clamp|(tie|cond)-const|repr|(none|symbol|list|empty|type|integer|real|pointer|array|tuple|typename|Symbol|function-pointer)\\?|(integer|real|pointer|function|array|tuple|function-pointer|typename)-type\\?)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
+				    "match": "(_|deref|new|local|static|delete|sign|abs|(unroll-)?range|fold|map|zip|enumerate|unpack|(tuple|vector|array)of|unknownof|va-(empty\\?|types|join|each|each-reversed|key)|imply|forward-imply|forward-as|xpcall|require-from|char|getattr|typeattr|(de)?cons|slice|(scope-|block-scope-)?macro|print|min|max|clamp|(tie|cond)-const|repr|(none|symbol|list|empty|type|integer|real|pointer|array|tuple|typename|Symbol|function-pointer)\\?|(integer|real|pointer|function|array|tuple|function-pointer|typename)-type\\?)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
                 },
                 {
                     "name": "support.function.sfx.builtin.scopes",
-				    "match": "((enter-solver-cli|set-execution-mode|io-write|set-anchor|set-globals|set-typename(-storage|-super|-fields)|compiler-error|abort|discard|unreachable|set-signal-abort|(set|delete)-(type|scope)-symbol)!)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
+				    "match": "((enter-solver-cli|set-execution-mode|io-write|set-anchor|set-globals|set-typename(-storage|-super|-fields)|compiler-error|abort|discard|unreachable|set-signal-abort|(set|delete)-(type|scope)-symbol)!(\\&)?)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
                 },
                 {
                     "name": "support.function.sfx.library.scopes",

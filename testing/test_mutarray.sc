@@ -1,5 +1,5 @@
 
-import MutableArray
+using import Array
 
 let TESTSIZE = (1:usize << 16:usize)
 let fullrange = (range (unconst TESTSIZE))
@@ -11,7 +11,7 @@ fn autodelete (x)
 
 do
     # mutable array with fixed upper capacity
-    let i32Arrayx65536 = (MutableArray i32 TESTSIZE)
+    let i32Arrayx65536 = (Array i32 TESTSIZE)
     let a = (local i32Arrayx65536)
     defer (autodelete a)
     for i in fullrange
@@ -25,7 +25,7 @@ do
 
 do
     # mutable array with dynamic capacity
-    let i32Array = (MutableArray i32)
+    let i32Array = (Array i32)
     let a = (local i32Array 12)
     defer (autodelete a)
     assert (a.capacity == 12:usize)
@@ -40,8 +40,8 @@ do
 
 do
     # array of array
-    let i32Array = (MutableArray i32 16)
-    let i32ArrayArray = (MutableArray i32Array)
+    let i32Array = (Array i32 16)
+    let i32ArrayArray = (Array i32Array)
     let a = (local i32ArrayArray)
     # will also delete the nested array
     defer (autodelete a)
@@ -59,7 +59,7 @@ do
 
 do
     # sorting a mutable array
-    let T = (MutableArray i32 32)
+    let T = (Array i32 32)
     let a = (local T)
     defer (autodelete a)
     for k in (va-each 3 1 9 5 0 7 12 3 99 -20)

@@ -38,5 +38,30 @@ x @ 3 = x @ 2 + 1
 x @ 4 = x @ 3 + 1
 assert ((x @ 4) == 5)
 
+let T = (typename "refable")
+set-typename-storage! T i32
 
+typefn T 'value (self)
+    bitcast self (storageof T)
 
+typefn& T 'value (self)
+    bitcast (load self) (storageof T)
+
+typefn T 'inc (self)
+    bitcast
+        (bitcast self (storageof T)) + 1
+        T
+
+typefn& T 'inc (self)
+    self =
+        'inc (deref self)
+    self
+
+let q = (T)
+assert (('value q) == 0)
+assert (('value ('inc q)) == 1)
+assert (('value q) == 0)
+let q = (local T)
+assert (('value q) == 0)
+assert (('value ('inc q)) == 1)
+assert (('value q) == 1)

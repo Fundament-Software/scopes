@@ -168,7 +168,7 @@ define-macro xvar
                     extern name T
                         storage =
                             do
-                                if ((storageof T) <: tuple) 'Uniform
+                                if ((storageof T) < tuple) 'Uniform
                                 else 'UniformConstant
                         params...
                 else

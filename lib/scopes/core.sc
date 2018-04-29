@@ -738,39 +738,44 @@ fn powi (base exponent)
 fn pow (x y)
     (select-op (typeof x) powi powf) x y
 
-fn getattr (self name)
-    let T = (typeof self)
-    let op success = (type@ T '__getattr)
+fn forward-typeattr (T name)
+    let value success = (type@ T name)
     if success
-        let result... = (op self name)
-        if (icmp== (va-countof result...) 0)
-        else
-            return result...
-    let result success = (type@ T name)
+        return value success
+    let op success = (type@ T '__typeattr)
     if success
-        return result
-    compiler-error!
-        string-join "no such attribute "
-            string-join (Any-repr (Any-wrap name))
-                string-join " in value of type "
-                    Any-repr (Any-wrap T)
+        return (op T name)
 
 fn forward-getattr (self name)
     let T = (typeof self)
     let op success = (type@ T '__getattr)
     if success
-        let result... = (op self name)
-        if (icmp== (va-countof result...) 0)
-        else
-            return result...
-    let result success = (type@ T name)
-    if success
-        return result
+        return (op self name)
+
+fn typeattr (T name)
+    let result... = (forward-typeattr T name)
+    if (va-empty? result...)
+        compiler-error!
+            string-join "no such attribute "
+                string-join (Any-repr (Any-wrap name))
+                    string-join " in type "
+                        Any-repr (Any-wrap T)
+    else result...
+
+fn getattr (self name)
+    let result... = (forward-getattr self name)
+    if (va-empty? result...)
+        compiler-error!
+            string-join "no such attribute "
+                string-join (Any-repr (Any-wrap name))
+                    string-join " in value of type "
+                        Any-repr (Any-wrap (typeof self))
+    else result...
 
 fn empty? (x)
     == (countof x) 0:usize
 
-fn <: (T superT)
+fn type< (T superT)
     let loop (T) = T
     let value = (superof T)
     if (type== value superT) true
@@ -781,7 +786,7 @@ fn <: (T superT)
 fn type<= (T superT)
     if (type== T superT)
         return true
-    <: T superT
+    type< T superT
 
 fn forward-as (value dest-type)
     let T = (typeof value)
@@ -1148,6 +1153,9 @@ syntax-extend
     set-type-symbol! pointer 'strip-storage
         fn (cls ET)
             pointer-type-set-storage-class cls unnamed
+    set-type-symbol! pointer 'storage
+        fn (cls)
+            pointer-type-storage-class cls
     set-type-symbol! pointer 'readable?
         fn (cls)
             == (& (pointer-type-flags cls) pointer-flag-non-readable) 0:u64
@@ -1273,7 +1281,11 @@ syntax-extend
 
     set-type-symbol! Symbol '__call
         fn (name self ...)
-            (getattr self name) self ...
+            let T = (typeof self)
+            let T =
+                if (type== T type) self
+                else T
+            (typeattr T name) self ...
 
     set-type-symbol! Scope '__getattr
         fn (self key)
@@ -1537,18 +1549,18 @@ syntax-extend
         fn (a b flipped)
             if (type== (typeof a) (typeof b))
                 op a b
-    set-type-symbol! type '__< (gen-type-op2 <:)
+    set-type-symbol! type '__< (gen-type-op2 type<)
     set-type-symbol! type '__<=
         gen-type-op2
             fn (a b)
                 if (type== a b) true
-                else (<: a b)
-    set-type-symbol! type '__> (gen-type-op2 (fn (a b) (<: b a)))
+                else (type< a b)
+    set-type-symbol! type '__> (gen-type-op2 (fn (a b) (type< b a)))
     set-type-symbol! type '__>=
         gen-type-op2
             fn (a b)
                 if (type== a b) true
-                else (<: b a)
+                else (type< b a)
 
     let Macro = (typename "Macro" (fn ()))
     let BlockScopeFunction =
@@ -1945,8 +1957,6 @@ define-infix> 300 >=
 define-infix> 300 !=
 define-infix> 300 ==
 
-define-infix> 300 <:
-
 define-infix> 340 |
 define-infix> 350 ^
 define-infix> 360 &
@@ -2165,13 +2175,32 @@ fn pointer-type-imply? (src dest)
         type== dest ('immutable src)
         type== dest ('strip-storage ('immutable src))
 
-do
-    fn deref (val)
-        let T = (typeof val)
-        if (T <: reference)
-            load (bitcast val (storageof T))
-        else val
+let reference-attribs-key = '__refattrs
 
+fn type@& (T name)
+    let attrs ok = (type@ T reference-attribs-key)
+    if ok
+        type@ attrs name
+    else
+        return none ok
+
+fn set-type-symbol!& (T name value)
+    let attrs ok = (type@ T reference-attribs-key)
+    let attrs =
+        if ok attrs
+        else
+            let attrs = (typename (Symbol->string reference-attribs-key))
+            set-type-symbol! T reference-attribs-key attrs
+            attrs
+    set-type-symbol! attrs name value
+
+fn deref (val)
+    let T = (typeof val)
+    if (T < reference)
+        load val
+    else val
+
+do
     fn passthru-overload (sym func)
         set-type-symbol! reference sym (fn (a b flipped) (func (deref a) (deref b)))
     passthru-overload '__== ==; passthru-overload '__!= !=
@@ -2184,9 +2213,36 @@ do
     passthru-overload '__% %
     passthru-overload '__<< <<; passthru-overload '__>> >>
     passthru-overload '__.. ..; passthru-overload '__.. ..
+
+    set-type-symbol! reference '__typeattr
+        fn "reference-typeattr" (cls name)
+            let T = (storageof cls)
+            let ET = (element-type T 0)
+            let value success = (type@& ET name)
+            if success
+                return value
+            let op success = (type@ ET '__typeattr&)
+            if success
+                let result... = (op ET name)
+                if (va-empty? result...)
+                else
+                    return result...
+
     set-type-symbol! reference '__getattr
         fn "reference-getattr" (self name)
-            forward-getattr (bitcast self (storageof (typeof self))) name
+            let T = (storageof (typeof self))
+            let ET = (element-type T 0)
+            let value success = (type@& ET name)
+            if success
+                return value
+            let op success = (type@ ET '__getattr&)
+            if success
+                let result... = (op self name)
+                if (va-empty? result...)
+                else
+                    return result...
+            # we can't return any attributes from the element directly
+                without the elements explicit permission
 
     set-type-symbol! reference '__delete
         fn "reference-delete" (self)
@@ -2307,10 +2363,20 @@ do
             true
 
     fn make-reference-type (PT)
-        #let ET = (element-type PT 0)
-        let T = (typename (.. "&" (type-name PT)) (fn ()))
+        let ET = (element-type PT 0)
+        let class = ('storage PT)
+        let T =
+            typename
+                ..
+                    if ('writable? PT) "&"
+                    else "(&)"
+                    if (class != unnamed)
+                        .. "[" (Symbol->string class) "]"
+                    else ""
+                    type-name ET
         set-typename-super! T reference
         set-typename-storage! T PT
+        set-type-symbol! T 'ElementType ET
         T
 
     set-type-symbol! reference 'from-pointer-type
@@ -2319,7 +2385,7 @@ do
                 provided the element type is a constant
             assert (constant? PT)
             assert-typeof PT type
-            if (PT <: reference)
+            if (PT < reference)
                 compiler-error!
                     .. "cannot create reference type of reference type "
                         repr PT
@@ -2341,14 +2407,22 @@ do
 
 #global has been removed; use `static`
 
-# (typefn[!] type 'symbol (params) body ...)
+# (typefn[!][&] type 'symbol (params) body ...)
 define-macro typefn
     let ty name params body = (decons args 3)
     list set-type-symbol! ty name
         cons fn params body
+define-macro typefn&
+    let ty name params body = (decons args 3)
+    list set-type-symbol!& ty name
+        cons fn params body
 define-macro typefn!
     let ty name params body = (decons args 3)
     list set-type-symbol! ty name
+        cons fn! params body
+define-macro typefn!&
+    let ty name params body = (decons args 3)
+    list set-type-symbol!& ty name
         cons fn! params body
 
 #-------------------------------------------------------------------------------
@@ -2843,11 +2917,14 @@ typefn pointer '__getattr (self name)
     let ET = (element-type (typeof self) 0)
     let op success = (type@ ET '__getattr&)
     if success
-        let result... = (op self name)
-        if (icmp== (va-countof result...) 0)
+        let result... = (op (reference.from-pointer self) name)
+        if (va-empty? result...)
         else
             return result...
     forward-getattr (load self) name
+
+typefn pointer '__getattr& (self name)
+    '__getattr (deref self) name
 
 # support @
 typefn pointer '__@ (self index)
@@ -2918,7 +2995,7 @@ do
 do
     fn unenum (val)
         let T = (typeof val)
-        if (T <: CEnum)
+        if (T < CEnum)
             bitcast val (storageof T)
         else val
 
@@ -3002,7 +3079,7 @@ typefn CUnion '__getattr& (self name)
     if (icmp>=s idx 0)
         let FT = (element-type ET idx)
         let newPT =
-            'set-element-type (typeof self) FT
+            'set-element-type (storageof (typeof self)) FT
         # cast pointer to reference to alternative type
         (reference.from-pointer-type newPT)
             bitcast self newPT
@@ -3176,6 +3253,10 @@ define-scope-macro struct
         define-macro method
             let name params body = (decons args 2)
             list set-type-symbol! 'this-struct name
+                cons fn params body
+        define-macro method&
+            let name params body = (decons args 2)
+            list set-type-symbol!& 'this-struct name
                 cons fn params body
 
         define-infix> 70 :
