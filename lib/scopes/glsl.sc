@@ -34,7 +34,7 @@ syntax-extend
         f "2DMS"        '2D     0       1   2
         f "2DMSArray"   '2D     1       1   3
 
-    let sampler = (typename "sampler" (fn ()))
+    let sampler = (typename "sampler")
     set-scope-symbol! syntax-scope 'sampler sampler
 
     fn coord-type (ET coords)
@@ -43,8 +43,7 @@ syntax-extend
             construct-vec-type ET (usize coords)
 
     fn make-gsampler (postfix dim arrayed ms coords)
-        let T = (typename (.. "gsampler" postfix) (fn ()))
-        set-typename-super! T sampler
+        let T = (typename (.. "gsampler" postfix) sampler)
         let icoordT = (coord-type i32 coords)
         let fcoordT = (coord-type f32 coords)
         let fetch-has-lod-arg =
@@ -68,11 +67,13 @@ syntax-extend
         T
 
     fn make-sampler (prefix return-type postfix dim arrayed ms coords)
-        let T = (typename (.. prefix "sampler" postfix) (fn ()))
-        set-typename-super! T (make-gsampler postfix dim arrayed ms coords)
-        set-typename-storage! T
-            SampledImage-type
-                Image-type return-type dim 0 arrayed ms 1 'Unknown unnamed
+        let T =
+            typename (.. prefix "sampler" postfix)
+                super =
+                    make-gsampler postfix dim arrayed ms coords
+                storage =
+                    SampledImage-type
+                        Image-type return-type dim 0 arrayed ms 1 'Unknown unnamed
         T
 
     build-dims
@@ -94,10 +95,8 @@ syntax-extend
                         samplerT
     syntax-scope
 
-let XVarType = (typename "xvar" (fn ()))
-set-typename-super! XVarType extern
-
-let XVarBridgeType = (typename "xvar-bridge" (fn ()))
+let XVarType = (typename "xvar" extern)
+let XVarBridgeType = (typename "xvar-bridge")
 
 typefn XVarBridgeType '__imply (self destT)
     forward-imply self.in destT
@@ -152,8 +151,7 @@ define-macro xvar
                     " : "
                     type-name T
                     ">"
-            let TN = (typename-type tname)
-            set-typename-super! TN XVarBridgeType
+            let TN = (typename tname XVarBridgeType)
             set-type-symbol! TN 'in (xvar-extern 'in name T params...)
             set-type-symbol! TN 'out (xvar-extern 'out name T params...)
             nullof TN

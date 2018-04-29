@@ -1215,10 +1215,18 @@ syntax-extend
                 nullof cls
 
     set-type-symbol! typename '__apply-type
-        fn! (cls name)
+        fn! (cls args...)
             if (type== cls typename)
-                typename-type name
+                let name super storage = args...
+                let T = (typename-type name)
+                if (not (none? super))
+                    set-typename-super! T super
+                if (not (none? storage))
+                    set-typename-storage! T storage
+                T
             else
+                if (not (va-empty? args...))
+                    compiler-error! "default typename constructor takes no arguments"
                 # invoke default constructor for type
                 nullof cls
 
@@ -1562,7 +1570,7 @@ syntax-extend
                 if (type== a b) true
                 else (type< b a)
 
-    let Macro = (typename "Macro" (fn ()))
+    let Macro = (typename "Macro")
     let BlockScopeFunction =
         pointer
             function
@@ -2152,8 +2160,7 @@ define-macro fn...
 # references
 #-------------------------------------------------------------------------------
 
-define reference
-    typename "reference" (fn ())
+let reference = (typename "reference")
 
 let voidstar = (pointer void)
 
@@ -2547,7 +2554,7 @@ syntax-extend
             let package = (unconst package)
             package.path as list
 
-    let incomplete = (typename "incomplete" (fn ()))
+    let incomplete = (typename "incomplete")
     fn require-from (base-dir name)
         let name = (unconst name)
         let package = (unconst package)
@@ -2834,7 +2841,7 @@ typefn Closure '__imply (self destT)
 
 # a nullptr type that casts to whatever null pointer is required
 syntax-extend
-    let NullType = (typename "NullType" (fn ()))
+    let NullType = (typename "NullType")
     set-typename-storage! NullType (pointer void)
     set-type-symbol! NullType '__imply
         fn (self destT)
@@ -3428,7 +3435,7 @@ fn tupleof (...)
 # compile time closures
 #-------------------------------------------------------------------------------
 
-let Capture = (typename "Capture" (fn ()))
+let Capture = (typename "Capture")
 
 define-macro capture
     fn make-typename (TT arg)
@@ -3512,7 +3519,7 @@ fn arrayof (T ...)
 # iterators
 #-------------------------------------------------------------------------------
 
-let Generator = (typename "Generator" (fn ()))
+let Generator = (typename "Generator")
 set-typename-storage! Generator (storageof Closure)
 typefn Generator '__apply-type (cls iter init)
     fn get-iter-init ()
