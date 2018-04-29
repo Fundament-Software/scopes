@@ -97,8 +97,10 @@ fn define-common-array-methods (T element-type ensure-capacity)
 
     typefn T 'append (self value)
         let dest = (append-slot self)
-        store
-            value as immutable
+        let value =
+            if ((typeof value) < reference) (load value)
+            else value
+        store value
             dest
         dest
 
