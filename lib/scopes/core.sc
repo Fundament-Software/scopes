@@ -25,7 +25,8 @@
     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
     DEALINGS IN THE SOFTWARE.
 
-    This is the scopes boot script. It implements the remaining standard
+##############
+#   This is the scopes boot script. It implements the remaining standard
     functions and macros, parses the command-line and optionally enters
     the REPL.
 

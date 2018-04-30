@@ -25,6 +25,8 @@ SOFTWARE.
 /*
 BEWARE: If you build this with anything else but a recent enough clang,
         you will have a bad time.
+
+        an exception is windows where with mingw64, only gcc will work.
 */
 
 #define SCOPES_VERSION_MAJOR 0
