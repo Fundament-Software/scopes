@@ -77,7 +77,7 @@ class ScopesObject(ObjectDescription):
         # first try the function pointer signature regex, it's more specific
         expr = parser.compile(sig, "<signature>").strip()
 
-        def parse_arg(plist, e, i):
+        def parse_arg(plist, e):
             type_ = parser.ast_type(e)
             if type_ == "list":
                 head = e and e[0]
@@ -89,7 +89,6 @@ class ScopesObject(ObjectDescription):
                         parse_arg(paramlist, arg)
                     plist += paramlist
                 elif head == "<splice>":
-                    print "YES"
                     for arg in e[1:]:
                         parse_arg(plist, arg)
                 elif head == "|":
@@ -139,7 +138,7 @@ class ScopesObject(ObjectDescription):
             name = expr[0]
             signode += addnodes.desc_name(name, name + ' ')
             for i,arg in enumerate(expr[1:]):
-                parse_arg(paramlist, arg, i)
+                parse_arg(paramlist, arg)
             signode += paramlist
 
         return name, self.objtype

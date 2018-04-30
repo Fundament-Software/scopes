@@ -1,6 +1,8 @@
 Scopes Language Reference
 =========================
 
+The global module for Scopes.
+
 .. define:: args
 .. define:: compile-flag-O1
 .. define:: compile-flag-O2
@@ -15,15 +17,25 @@ Scopes Language Reference
 .. define:: compiler-timestamp
 .. define:: debug-build?
 .. define:: e
+   
+   Euler's number, also known as Napier's constant. Explicitly type-annotated
+   versions of the constant are available as `e:f32` and `e:f64`
 .. define:: e:f32
 .. define:: e:f64
 .. define:: eol
 .. define:: false
 .. define:: none
 .. define:: null
+   
+   A pointer constant of type `NullType` that is always zero and casts to
+   any pointer type.
 .. define:: operating-system
 .. define:: package
 .. define:: pi
+   
+   The number π, the ratio of a circle's circumference C to its diameter d.
+   Explicitly type-annotated versions of the constant are available as `pi:f32`
+   and `pi:f64`.
 .. define:: pi:f32
 .. define:: pi:f64
 .. define:: pointer-flag-non-readable
@@ -76,6 +88,8 @@ Scopes Language Reference
 .. type:: Macro
 .. type:: Nothing
 .. type:: NullType
+   
+   The type of the `null` constant. This type is uninstantiable.
 .. type:: Parameter
 .. type:: ReturnLabel
 .. type:: SampledImage
@@ -131,6 +145,10 @@ Scopes Language Reference
 .. fn:: (> a b)
 .. fn:: (@ ...)
 .. fn:: (^ a b)
+.. fn:: (_ ...)
+   
+   A pass-through function that allows expressions to evaluate to multiple
+   arguments.
 .. fn:: (| ...)
 .. fn:: (~ x)
 .. fn:: (!= a b)
@@ -289,6 +307,7 @@ Scopes Language Reference
 
    returns `true` if ``T`` is a value of type `type`, otherwise
    `false`.
+
 .. fn:: (type@& T name)
 .. fn:: (typeattr T name)
 .. fn:: (typename-type? T)
@@ -320,6 +339,7 @@ Scopes Language Reference
 .. macro:: (defer ...)
 .. macro:: (define ...)
 .. macro:: (define-block-scope-macro ...)
+.. macro:: (define-doc ...)
 .. macro:: (define-infix< ...)
 .. macro:: (define-infix> ...)
 .. macro:: (define-macro ...)
@@ -331,6 +351,10 @@ Scopes Language Reference
 .. macro:: (from ...)
 .. macro:: (import ...)
 .. macro:: (locals ...)
+   
+   export locals as a chain of two new scopes: a scope that contains
+   all the constant values in the immediate scope, and a scope that contains
+   the runtime values.
 .. macro:: (loop ...)
 .. macro:: (match ...)
 .. macro:: (or ...)
@@ -440,7 +464,24 @@ Scopes Language Reference
 .. builtin:: (label ...)
 .. builtin:: (ldexp ...)
 .. builtin:: (length ...)
-.. builtin:: (let ...)
+.. macro:: (let name ... _:= value ...)
+
+Binds a list of constants and variables specified on the right-hand
+side to parameter names defined on the left-hand side.
+
+.. macro:: (let label-name (name ...) _:= value ...)
+
+Performs the same function as the regular `let`, but associates the
+entry point with a labelname that can be called to effectively produce
+a tail-recursive loop. When some of the arguments on the right hand
+side are not constant, the loop will be unrolled.
+
+.. macro:: (let name ...)
+
+Rebinds names already defined in the parent scope to the local scope.
+This becomes useful in conjunction with `locals`, when exporting
+modules.
+
 .. builtin:: (load ...)
 .. builtin:: (log ...)
 .. builtin:: (log2 ...)

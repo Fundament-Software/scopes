@@ -1059,6 +1059,8 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(SYM_ListWildcard, "#list") \
     T(SYM_SymbolWildcard, "#symbol") \
     T(SYM_ThisFnCC, "#this-fn/cc") \
+    T(SYM_ModuleDocstring, "#moduledoc") \
+    T(SYM_DocstringPrefix, "#doc:") \
     \
     T(SYM_Compare, "compare") \
     T(SYM_Size, "size") \
@@ -4136,13 +4138,30 @@ protected:
     Scope(Scope *_parent = nullptr, Map *_map = nullptr) :
         parent(_parent),
         map(_map?_map:(new Map())),
-        borrowed(_map?true:false) {
+        borrowed(_map?true:false),
+        doc(nullptr),
+        next_doc(nullptr) {
     }
 
 public:
     Scope *parent;
     Map *map;
     bool borrowed;
+    const String *doc;
+    const String *next_doc;
+
+    void set_doc(const String *str) {
+        if (!doc) {
+            doc = str;
+            _bind(SYM_ModuleDocstring, str);
+        } else {
+            next_doc = str;
+        }
+    }
+
+    static Symbol dockey(Symbol name) {
+        return Symbol(String::join(Symbol(SYM_DocstringPrefix).name(), name.name()));
+    }
 
     size_t count() const {
         return map->size();
@@ -4175,15 +4194,23 @@ public:
         borrowed = false;
     }
 
-    void bind(KnownSymbol name, const Any &value) {
-        bind(Symbol(name), value);
-    }
-
-    void bind(Symbol name, const Any &value) {
+    void _bind(Symbol name, const Any &value) {
         ensure_not_borrowed();
         auto ret = map->insert({name, value});
         if (!ret.second) {
             ret.first->second = value;
+        }
+    }
+
+    void bind(KnownSymbol name, const Any &value) {
+        _bind(Symbol(name), value);
+    }
+
+    void bind(Symbol name, const Any &value) {
+        _bind(name, value);
+        if (next_doc) {
+            _bind(dockey(name), next_doc);
+            next_doc = nullptr;
         }
     }
 
@@ -16295,6 +16322,11 @@ struct Expander {
         } else {
             while (it) {
                 next = it->next;
+                const Syntax *sx = it->at;
+                Any expr = sx->datum;
+                if (!last_expression() && (expr.type == TYPE_String)) {
+                    env->set_doc(expr);
+                }
                 expand(it->at, dest);
                 it = next;
             }
@@ -16626,7 +16658,11 @@ struct Expander {
                     ss.out << "no such name bound in parent scope: " << name;
                     location_error(ss.str());
                 }
-                env->bind(name.symbol, value);
+                env->_bind(name.symbol, value);
+                Symbol dockey = Scope::dockey(name.symbol);
+                if (env->lookup(dockey, value)) {
+                    env->_bind(dockey, value);
+                }
                 it = it->next;
             }
 
@@ -17570,6 +17606,7 @@ static Scope *f_scope_new_subscope(Scope *scope) {
 static Scope *f_scope_clone_subscope(Scope *scope, Scope *clone) {
     return Scope::from(scope, clone);
 }
+
 static Scope *f_scope_parent(Scope *scope) {
     return scope->parent;
 }

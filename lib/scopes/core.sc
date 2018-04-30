@@ -30,6 +30,10 @@
     functions and macros, parses the command-line and optionally enters
     the REPL.
 
+""""The global module for Scopes.
+
+""""A pass-through function that allows expressions to evaluate to multiple
+    arguments.
 fn _ (...)
     return ...
 
@@ -1888,6 +1892,19 @@ define-macro define-block-scope-macro
         list block-scope-macro
             cons fn '(expr next-expr syntax-scope) body
 
+# (define-doc symbol string)
+define-scope-macro define-doc
+    let sxsym str = (decons args 2)
+    let sym = (as (as sxsym Syntax) Symbol)
+    let str = (as (as str Syntax) string)
+    let _ ok = (@ syntax-scope sym)
+    if ok
+        set-scope-symbol! syntax-scope (Symbol (.. "#doc:" (as sym string))) str
+    else
+        syntax-error! sxsym "cannot document unbound name"
+    return none
+        syntax-scope
+
 define-block-scope-macro defer
     let head f rest = (decons expr 2)
     let oldf = (@ syntax-scope 'return)
@@ -2016,6 +2033,29 @@ define-infix> 800 @
 #define-infix> 800 .=
 #define-infix> 800 @=
 #define-infix> 800 =@
+
+#-------------------------------------------------------------------------------
+# documentation for builtin forms
+#-------------------------------------------------------------------------------
+
+define-doc let
+    """".. macro:: (let name ... _:= value ...)
+
+        Binds a list of constants and variables specified on the right-hand
+        side to parameter names defined on the left-hand side.
+
+        .. macro:: (let label-name (name ...) _:= value ...)
+
+        Performs the same function as the regular `let`, but associates the
+        entry point with a labelname that can be called to effectively produce
+        a tail-recursive loop. When some of the arguments on the right hand
+        side are not constant, the loop will be unrolled.
+
+        .. macro:: (let name ...)
+
+        Rebinds names already defined in the parent scope to the local scope.
+        This becomes useful in conjunction with `locals`, when exporting
+        modules.
 
 #-------------------------------------------------------------------------------
 # type based function dispatch
@@ -2649,10 +2689,10 @@ syntax-extend
     set-scope-symbol! syntax-scope 'load-module load-module
     syntax-scope
 
+""""export locals as a chain of two new scopes: a scope that contains
+    all the constant values in the immediate scope, and a scope that contains
+    the runtime values.
 define-scope-macro locals
-    # export locals as a chain of two scopes: a scope that contains
-        all the constant symbols, and a scope that contains the dynamic
-        ones.
     let constant-scope = (Scope)
     let tmp = (Parameter 'tmp)
     loop (last-key result) = unnamed (list tmp)
@@ -2881,26 +2921,25 @@ typefn Closure '__imply (self destT)
             let i-1 = (sub i 1)
             loop i-1 (rawcall element-type ET i-1) args...
 
-# a nullptr type that casts to whatever null pointer is required
-syntax-extend
-    let NullType = (typename "NullType")
-    set-typename-storage! NullType (pointer void)
-    set-type-symbol! NullType '__imply
-        fn (self destT)
-            if (pointer-type? destT)
-                nullof destT
-    set-type-symbol! NullType '__==
-        fn (a b flipped)
-            if flipped
-                if (pointer-type? (storageof (typeof a)))
-                    icmp== (ptrtoint a usize) 0:usize
-            else
-                if (pointer-type? (storageof (typeof b)))
-                    icmp== (ptrtoint b usize) 0:usize
-    let null = (nullof NullType)
-    set-scope-symbol! syntax-scope 'NullType NullType
-    set-scope-symbol! syntax-scope 'null null
-    syntax-scope
+""""The type of the `null` constant. This type is uninstantiable.
+let NullType = (typename "NullType")
+set-typename-storage! NullType (pointer void)
+set-type-symbol! NullType '__imply
+    fn (self destT)
+        if (pointer-type? destT)
+            nullof destT
+set-type-symbol! NullType '__==
+    fn (a b flipped)
+        if flipped
+            if (pointer-type? (storageof (typeof a)))
+                icmp== (ptrtoint a usize) 0:usize
+        else
+            if (pointer-type? (storageof (typeof b)))
+                icmp== (ptrtoint b usize) 0:usize
+
+""""A pointer constant of type `NullType` that is always zero and casts to
+    any pointer type.
+let null = (nullof NullType)
 
 # support assignment syntax
 typefn pointer '__= (self value)
@@ -3965,9 +4004,15 @@ typefn vector '__.. (a b flipped)
 
 let pi:f32 = 3.141592653589793:f32
 let pi:f64 = 3.141592653589793:f64
+""""The number π, the ratio of a circle's circumference C to its diameter d.
+    Explicitly type-annotated versions of the constant are available as `pi:f32`
+    and `pi:f64`.
 let pi = pi:f32
+
 let e:f32 = 2.718281828459045:f32
 let e:f64 = 2.718281828459045:f64
+""""Euler's number, also known as Napier's constant. Explicitly type-annotated
+    versions of the constant are available as `e:f32` and `e:f64`
 let e = e:f32
 
 #-------------------------------------------------------------------------------

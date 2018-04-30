@@ -10,7 +10,9 @@ fn starts-with-letter (s)
 let EntryT = (tuple (unknownof Symbol) (unknownof Any))
 let objs = (local (Array EntryT))
 
-loop (scope) = (globals)
+let module = (globals)
+
+loop (scope) = module
 if (scope != null)
     let a b = (Scope-parent scope)
     for k v in scope
@@ -60,22 +62,39 @@ fn write-docstring (str)
 print
     """"Scopes Language Reference
         =========================
+
+let moduledoc ok = (module @ (Symbol "#moduledoc"))
+if ok
+    io-write! (moduledoc as string)
+    io-write! "\n"
+
 for entry in objs
     let key entry = (unpack entry)
-    let T = ('typeof entry)
     let key = (key as string)
-    let prefix = (slice key 0 1)
-    if (prefix == "#")
+    let prefix1 = (slice key 0 1)
+    let prefix2 = (slice key 0 2)
+    if (prefix1 == "#")
         continue;
-    elseif (prefix == "_")
+    elseif (prefix2 == "__")
         continue;
-    elseif (T == Closure)
+    let T = ('typeof entry)
+    let dockey = (Symbol (.. "#doc:" key))
+    let docstr has-docstr = (module @ dockey)
+    let docstr =
+        if has-docstr (docstr as string)
+        else (unconst "")
+    if (docstring-is-complete docstr)
+        io-write! docstr
+        io-write! "\n"
+        continue;
+    if (T == Closure)
         let func = (entry as Closure)
         let docstr = (docstring func)
         let label =
             Closure-label func
         if (docstring-is-complete docstr)
             io-write! docstr
+            io-write! "\n"
         else
             io-write! ".. fn:: ("
             io-write! key
@@ -113,6 +132,4 @@ for entry in objs
         io-write! ".. define:: "
         io-write! key
         io-write! "\n"
-        #for i param in (enumerate ('parameters label))
-            print i param
-
+    write-docstring docstr
