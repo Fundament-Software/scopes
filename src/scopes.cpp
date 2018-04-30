@@ -48,6 +48,9 @@ BEWARE: If you build this with anything else but a recent enough clang,
 #define SCOPES_PRINT_TIMERS 0
 
 // maximum number of recursions permitted during partial evaluation
+// if you think you need more, ask yourself if ad-hoc compiling a pure C function
+// that you can then use at compile time isn't the better choice;
+// 100% of the time, the answer is yes because the performance is much better.
 #define SCOPES_MAX_RECURSIONS 32
 
 // maximum number of jump skips permitted
@@ -18021,6 +18024,7 @@ static void init_globals(int argc, char *argv[]) {
     globals->bind(Symbol("operating-system"), Symbol(SCOPES_SYM_OS));
 #undef SCOPES_SYM_OS
 
+    globals->bind(Symbol("unroll-limit"), SCOPES_MAX_RECURSIONS);
     globals->bind(KW_True, true);
     globals->bind(KW_False, false);
     globals->bind(KW_ListEmpty, EOL);
