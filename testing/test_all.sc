@@ -37,6 +37,7 @@ test-modules
     .test_namedargs
     .test_object
     .test_overload
+    .test_parser
     .test_quality
     .test_recursion
     .test_reference

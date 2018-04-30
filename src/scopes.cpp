@@ -242,11 +242,32 @@ const char *scopes_compile_time_date();
 void scopes_strtod(double *v, const char *str, char **str_end, int base ) {
     *v = std::strtod(str, str_end);
 }
-void scopes_strtoll(int64_t *v, const char* str, char** endptr, int base) {
-    *v = std::strtoll(str, endptr, base);
+const char *skip_0b_prefix(const char *str, bool is_signed) {
+    if (str[0]) {
+        if (is_signed && (str[0] == '-') && str[1]) {
+            str++;
+        }
+        if ((str[0] == '0') && str[1] && (str[1] == 'b')) {
+            return str + 2;
+        }
+    }
+    return nullptr;
 }
-void scopes_strtoull(uint64_t *v, const char* str, char** endptr, int base) {
-    *v = std::strtoull(str, endptr, base);
+void scopes_strtoll(int64_t *v, const char* str, char** endptr) {
+    const char *binstr = skip_0b_prefix(str, true);
+    if (binstr) {
+        *v = std::strtoll(binstr, endptr, 2);
+    } else {
+        *v = std::strtoll(str, endptr, 0);
+    }
+}
+void scopes_strtoull(uint64_t *v, const char* str, char** endptr) {
+    const char *binstr = skip_0b_prefix(str, false);
+    if (binstr) {
+        *v = std::strtoull(str, endptr, 2);
+    } else {
+        *v = std::strtoull(str, endptr, 0);
+    }
 }
 
 static size_t align(size_t offset, size_t align) {
@@ -4656,11 +4677,11 @@ struct LexerParser {
     };
 
     template<typename T>
-    int read_integer(void (*strton)(T *, const char*, char**, int)) {
+    int read_integer(void (*strton)(T *, const char*, char**)) {
         char *cend;
         errno = 0;
         T srcval;
-        strton(&srcval, cursor, &cend, 0);
+        strton(&srcval, cursor, &cend);
         if ((cend == cursor)
             || (errno == ERANGE)
             || (cend > eof)) {
