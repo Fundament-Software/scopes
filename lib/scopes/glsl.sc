@@ -1,3 +1,8 @@
+""""glsl
+    ====
+
+    The `glsl` module exports bridge symbols that make it possible to define
+    and access external variables for shader programs.
 
 using import glm
 

@@ -1,3 +1,8 @@
+""""testing
+    =======
+
+    The testing module simplifies writing and running tests in an ad-hoc
+    fashion.
 
 fn __test-modules (module-dir modules)
     let total =

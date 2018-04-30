@@ -1,3 +1,9 @@
+""""glm
+    ===
+
+    The `glm` module exports the basic vector and matrix types as well as
+    related arithmetic operations which mimic the features available to shaders
+    written in the GL shader language.
 
 let vec-type = (typename "vec-type" immutable)
 let mat-type = (typename "mat-type" immutable)

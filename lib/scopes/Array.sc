@@ -1,4 +1,10 @@
 
+""""Array
+    =====
+
+    Exports a configurable type for a mutable array that stores its elements
+    on the heap rather than in registers or the stack.
+
 let Array = (typename "Array")
 set-typename-super! Array CStruct
 let FixedArray = (typename "FixedArray")

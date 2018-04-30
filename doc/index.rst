@@ -21,7 +21,7 @@ Contents:
    intro
    tutorial
    dataformat
-   scopes-ref
+   modules
 
 ..
    architecture

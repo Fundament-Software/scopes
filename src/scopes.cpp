@@ -928,6 +928,8 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(FN_ScopeEq, "Scope==") \
     T(FN_ScopeNew, "Scope-new") \
     T(FN_ScopeCopy, "Scope-clone") \
+    T(FN_ScopeDocString, "Scope-docstring") \
+    T(FN_SetScopeDocString, "set-scope-docstring!") \
     T(FN_ScopeNewSubscope, "Scope-new-expand") \
     T(FN_ScopeCopySubscope, "Scope-clone-expand") \
     T(FN_ScopeParent, "Scope-parent") \
@@ -1059,7 +1061,6 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(SYM_ListWildcard, "#list") \
     T(SYM_SymbolWildcard, "#symbol") \
     T(SYM_ThisFnCC, "#this-fn/cc") \
-    T(SYM_ModuleDocstring, "#moduledoc") \
     T(SYM_DocstringPrefix, "#doc:") \
     \
     T(SYM_Compare, "compare") \
@@ -4141,6 +4142,8 @@ protected:
         borrowed(_map?true:false),
         doc(nullptr),
         next_doc(nullptr) {
+        if (_parent)
+            doc = _parent->doc;
     }
 
 public:
@@ -4153,7 +4156,7 @@ public:
     void set_doc(const String *str) {
         if (!doc) {
             doc = str;
-            _bind(SYM_ModuleDocstring, str);
+            next_doc = nullptr;
         } else {
             next_doc = str;
         }
@@ -4194,24 +4197,21 @@ public:
         borrowed = false;
     }
 
-    void _bind(Symbol name, const Any &value) {
+    void bind(Symbol name, const Any &value) {
         ensure_not_borrowed();
         auto ret = map->insert({name, value});
         if (!ret.second) {
             ret.first->second = value;
         }
+        if (next_doc) {
+            const String *doc = next_doc;
+            next_doc = nullptr;
+            bind(dockey(name), doc);
+        }
     }
 
     void bind(KnownSymbol name, const Any &value) {
-        _bind(Symbol(name), value);
-    }
-
-    void bind(Symbol name, const Any &value) {
-        _bind(name, value);
-        if (next_doc) {
-            _bind(dockey(name), next_doc);
-            next_doc = nullptr;
-        }
+        bind(Symbol(name), value);
     }
 
     void del(Symbol name) {
@@ -16658,10 +16658,10 @@ struct Expander {
                     ss.out << "no such name bound in parent scope: " << name;
                     location_error(ss.str());
                 }
-                env->_bind(name.symbol, value);
+                env->bind(name.symbol, value);
                 Symbol dockey = Scope::dockey(name.symbol);
                 if (env->lookup(dockey, value)) {
-                    env->_bind(dockey, value);
+                    env->bind(dockey, value);
                 }
                 it = it->next;
             }
@@ -17299,6 +17299,17 @@ static AnyBoolPair f_type_at(const Type *T, Symbol key) {
     return { result, ok };
 }
 
+static const String *f_scope_docstring(Scope *scope) {
+    const String *doc = scope->doc;
+    if (!doc)
+        return Symbol(SYM_Unnamed).name();
+    return doc;
+}
+
+static void f_scope_set_docstring(Scope *scope, const String *str) {
+    scope->doc = str;
+}
+
 static Symbol f_symbol_new(const String *str) {
     return Symbol(str);
 }
@@ -17923,6 +17934,7 @@ static void init_globals(int argc, char *argv[]) {
     DEFINE_PURE_C_FUNCTION(FN_ImportC, f_import_c, TYPE_Scope, TYPE_String, TYPE_String, TYPE_List);
     DEFINE_PURE_C_FUNCTION(FN_ScopeAt, f_scope_at, Tuple({TYPE_Any,TYPE_Bool}), TYPE_Scope, TYPE_Symbol);
     DEFINE_PURE_C_FUNCTION(FN_ScopeLocalAt, f_scope_local_at, Tuple({TYPE_Any,TYPE_Bool}), TYPE_Scope, TYPE_Symbol);
+    DEFINE_PURE_C_FUNCTION(FN_ScopeDocString, f_scope_docstring, TYPE_String, TYPE_Scope);
     DEFINE_PURE_C_FUNCTION(FN_RuntimeTypeAt, f_type_at, Tuple({TYPE_Any,TYPE_Bool}), TYPE_Type, TYPE_Symbol);
     DEFINE_PURE_C_FUNCTION(FN_SymbolNew, f_symbol_new, TYPE_Symbol, TYPE_String);
     DEFINE_PURE_C_FUNCTION(FN_Repr, f_repr, TYPE_String, TYPE_Any);
@@ -18011,6 +18023,7 @@ static void init_globals(int argc, char *argv[]) {
     DEFINE_C_FUNCTION(SFXFN_SetGlobals, f_set_globals, TYPE_Void, TYPE_Scope);
     DEFINE_C_FUNCTION(SFXFN_SetScopeSymbol, f_set_scope_symbol, TYPE_Void, TYPE_Scope, TYPE_Symbol, TYPE_Any);
     DEFINE_C_FUNCTION(SFXFN_DelScopeSymbol, f_del_scope_symbol, TYPE_Void, TYPE_Scope, TYPE_Symbol);
+    DEFINE_C_FUNCTION(FN_SetScopeDocString, f_scope_set_docstring, TYPE_Void, TYPE_Scope, TYPE_String);
     DEFINE_C_FUNCTION(FN_RealPath, f_realpath, TYPE_String, TYPE_String);
     DEFINE_C_FUNCTION(FN_DirName, f_dirname, TYPE_String, TYPE_String);
     DEFINE_C_FUNCTION(FN_BaseName, f_basename, TYPE_String, TYPE_String);

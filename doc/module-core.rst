@@ -1,7 +1,12 @@
-Scopes Language Reference
-=========================
+globals
+=======
 
-The global module for Scopes.
+These names are bound in every fresh module and main program by default.
+Essential symbols are created by the compiler, and subsequent utility
+functions, macros and types are defined and documented in `core.sc`.
+
+The core module implements the remaining standard functions and macros,
+parses the command-line and optionally enters the REPL.
 
 .. define:: args
 .. define:: compile-flag-O1
@@ -243,7 +248,7 @@ The global module for Scopes.
 .. fn:: (list-next l)
 .. fn:: (list-reverse l tail)
 .. fn:: (list? val)
-.. fn:: (load-module module-name module-path main-module?)
+.. fn:: (load-module module-name module-path opts...)
 .. fn:: (local cls args...)
 .. fn:: (macro f)
 .. fn:: (map x f)
@@ -601,6 +606,9 @@ modules.
 .. compiledfn:: (Scope-clone-expand ...)
 
    ``λ(Scope)<-(Scope Scope)``
+.. compiledfn:: (Scope-docstring ...)
+
+   ``λ(string)<~(Scope)``
 .. compiledfn:: (Scope-local@ ...)
 
    ``λ(Any bool)<~(Scope Symbol)``
@@ -778,6 +786,9 @@ modules.
 .. compiledfn:: (set-globals! ...)
 
    ``λ()<-(Scope)``
+.. compiledfn:: (set-scope-docstring! ...)
+
+   ``λ()<-(Scope string)``
 .. compiledfn:: (set-signal-abort! ...)
 
    ``λ()<-(bool)``

@@ -1,6 +1,15 @@
 #!/usr/bin/env scopes
 using import Array
 
+let scriptpath modulepath = (args)
+let module =
+    if (none? modulepath)
+        Any (globals)
+    else
+        load-module "" modulepath
+
+let module = (module as Scope)
+
 fn starts-with-letter (s)
     let c = (s @ 0)
     or
@@ -10,18 +19,11 @@ fn starts-with-letter (s)
 let EntryT = (tuple (unknownof Symbol) (unknownof Any))
 let objs = (local (Array EntryT))
 
-let module = (globals)
-
 loop (scope) = module
 if (scope != null)
     let a b = (Scope-parent scope)
     for k v in scope
         let T = ('typeof v)
-        #if
-            or
-                T == Closure
-                T == Builtin
-                T == Macro
         'append objs
             tupleof k v
     repeat (Scope-parent scope)
@@ -59,12 +61,17 @@ fn write-docstring (str)
             if ((s == "\n") and ((i + 1) != c))
                 io-write! "   "
 
-print
-    """"Scopes Language Reference
-        =========================
+fn repeat-string (n c)
+    let loop (i s) =
+        tie-const n (usize 0)
+        tie-const n ""
+    if (i == n)
+        return s
+    loop (i + (usize 1))
+        .. s c
 
-let moduledoc ok = (module @ (Symbol "#moduledoc"))
-if ok
+let moduledoc = (Scope-docstring module)
+if (not (empty? moduledoc))
     io-write! (moduledoc as string)
     io-write! "\n"
 

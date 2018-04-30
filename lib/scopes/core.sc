@@ -25,12 +25,16 @@
     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
     DEALINGS IN THE SOFTWARE.
 
-##############
-#   This is the scopes boot script. It implements the remaining standard
-    functions and macros, parses the command-line and optionally enters
-    the REPL.
+""""globals
+    =======
 
-""""The global module for Scopes.
+    These names are bound in every fresh module and main program by default.
+    Essential symbols are created by the compiler, and subsequent utility
+    functions, macros and types are defined and documented in `core.sc`.
+
+    The core module implements the remaining standard functions and macros,
+    parses the command-line and optionally enters the REPL.
+
 
 """"A pass-through function that allows expressions to evaluate to multiple
     arguments.
@@ -2535,7 +2539,37 @@ fn delete (self)
 #-------------------------------------------------------------------------------
 
 fn docstring (f)
-    Label-docstring (Closure-label f)
+    let T = (typeof f)
+    if (T == Closure)
+        Label-docstring (Closure-label f)
+    elseif (T == Scope)
+        Scope-docstring f
+    else
+        compiler-error! "this type does have a docstring"
+
+#-------------------------------------------------------------------------------
+# null type
+#-------------------------------------------------------------------------------
+
+""""The type of the `null` constant. This type is uninstantiable.
+let NullType = (typename "NullType")
+set-typename-storage! NullType (pointer void)
+set-type-symbol! NullType '__imply
+    fn (self destT)
+        if (pointer-type? destT)
+            nullof destT
+set-type-symbol! NullType '__==
+    fn (a b flipped)
+        if flipped
+            if (pointer-type? (storageof (typeof a)))
+                icmp== (ptrtoint a usize) 0:usize
+        else
+            if (pointer-type? (storageof (typeof b)))
+                icmp== (ptrtoint b usize) 0:usize
+
+""""A pointer constant of type `NullType` that is always zero and casts to
+    any pointer type.
+let null = (nullof NullType)
 
 #-------------------------------------------------------------------------------
 # module loading
@@ -2549,6 +2583,16 @@ define package
             .. compiler-dir "/lib/scopes/?/init.sc"
     set-scope-symbol! package 'modules (Scope)
     package
+
+fn clone-scope-symbols (source target)
+    fn clone-contents (source target)
+        let parent = (Scope-parent source)
+        let target =
+            if (parent == null) target
+            else
+                clone-contents parent target
+        Scope target source
+    clone-contents (unconst source) (unconst target)
 
 syntax-extend
     fn make-module-path (base-dir pattern name)
@@ -2607,14 +2651,19 @@ syntax-extend
             repeat (i + 1:usize) (i + 1:usize)
                 .. result (slice pattern start i) "/"
 
-    fn load-module (module-name module-path main-module?)
+    fn load-module (module-name module-path opts...)
         if (not (file? module-path))
             error!
                 .. "no such module: " module-path
         let module-path = (realpath module-path)
         let module-dir = (dirname module-path)
         let expr = (list-load module-path)
-        let eval-scope = (Scope (globals))
+        let eval-scope = (va@ 'scope opts...)
+        let eval-scope =
+            if (none? eval-scope)
+                clone-scope-symbols (globals) (Scope)
+            else eval-scope
+        let main-module? = (va@ 'main-module? opts...)
         set-scope-symbol! eval-scope 'main-module?
             if (none? main-module?) false
             else main-module?
@@ -2693,7 +2742,10 @@ syntax-extend
     all the constant values in the immediate scope, and a scope that contains
     the runtime values.
 define-scope-macro locals
+    let docstr = (Scope-docstring syntax-scope)
     let constant-scope = (Scope)
+    if (not (empty? docstr))
+        set-scope-docstring! constant-scope docstr
     let tmp = (Parameter 'tmp)
     loop (last-key result) = unnamed (list tmp)
     let key value =
@@ -2920,26 +2972,6 @@ typefn Closure '__imply (self destT)
         else
             let i-1 = (sub i 1)
             loop i-1 (rawcall element-type ET i-1) args...
-
-""""The type of the `null` constant. This type is uninstantiable.
-let NullType = (typename "NullType")
-set-typename-storage! NullType (pointer void)
-set-type-symbol! NullType '__imply
-    fn (self destT)
-        if (pointer-type? destT)
-            nullof destT
-set-type-symbol! NullType '__==
-    fn (a b flipped)
-        if flipped
-            if (pointer-type? (storageof (typeof a)))
-                icmp== (ptrtoint a usize) 0:usize
-        else
-            if (pointer-type? (storageof (typeof b)))
-                icmp== (ptrtoint b usize) 0:usize
-
-""""A pointer constant of type `NullType` that is always zero and casts to
-    any pointer type.
-let null = (nullof NullType)
 
 # support assignment syntax
 typefn pointer '__= (self value)
@@ -3194,16 +3226,6 @@ fn merge-scope-symbols (source target filter)
         else
             target
     filter-contents (unconst source) (unconst target) filter
-
-fn clone-scope-symbols (source target)
-    fn clone-contents (source target)
-        let parent = (Scope-parent source)
-        let target =
-            if (parent == null) target
-            else
-                clone-contents parent target
-        Scope target source
-    clone-contents (unconst source) (unconst target)
 
 define-scope-macro using
     let name rest = (decons args)
@@ -4025,7 +4047,7 @@ del hash2
 del constructor
 
 set-globals!
-    clone-scope-symbols (locals) (globals)
+    clone-scope-symbols (globals) (locals)
 
 #-------------------------------------------------------------------------------
 # REPL
@@ -4240,17 +4262,23 @@ fn run-main (args...)
                 unreachable!;
         elseif (sourcepath == none)
             loop k arg parse-options
-        else
+        # remainder is passed on to script
+        #else
             print
                 .. "unrecognized argument: " arg
                     \ ". Try --help for help."
             exit 1
             unreachable!;
-
     if (sourcepath == none)
         read-eval-print-loop;
     else
+        let scope =
+            clone-scope-symbols (globals) (Scope)
+        set-scope-symbol! scope 'args
+            fn ()
+                return sourcepath (va@ i args...)
         load-module "" sourcepath
+            scope = scope
             main-module? = true
         exit 0
         unreachable!;

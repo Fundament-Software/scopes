@@ -1,2 +1,6 @@
-./build_reference.sc > scopes-ref.rst
-
+./build_reference.sc > module-core.rst \
+    && ./build_reference.sc ../lib/scopes/glm.sc > module-glm.rst \
+    && ./build_reference.sc ../lib/scopes/Array.sc > module-Array.rst \
+    && ./build_reference.sc ../lib/scopes/FunctionChain.sc > module-FunctionChain.rst \
+    && ./build_reference.sc ../lib/scopes/glsl.sc > module-glsl.rst \
+    && ./build_reference.sc ../lib/scopes/testing.sc > module-testing.rst
