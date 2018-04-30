@@ -294,46 +294,60 @@ fn construct-getter-type (vecrefT mask)
             super = reference
             storage = storageT
     let sz = (countof mask)
-    let lhsz = vecT.Count
-    let rhvecT = (construct-vec-type ET sz)
-    let loop (i mask...) = lhsz
-    if (i > 0:usize)
-        let i = (i - 1:usize)
-        loop i ((i % sz) as i32) mask...
-    let expandmask = (vectorof i32 mask...)
-    let loop (i mask...) = lhsz
-    if (i > 0:usize)
-        let i = (i - 1:usize)
-        loop i (i as i32) mask...
-    let loop (i assignmask) = 0:usize (vectorof i32 mask...)
-    if (i < sz)
-        loop (i + 1:usize)
-            insertelement assignmask ((lhsz + i) as i32) (mask @ i)
-    typefn& T '__load (self)
-        let self = (load self)
-        bitcast
-            shufflevector self self mask
-            rhvecT
-    typefn T '__imply (self destT)
-        if (destT == rhvecT)
-            deref self
-    if (sz == lhsz)
+    if (sz == 1:usize)
+        let index = (mask @ 0)
+        typefn& T '__load (self)
+            extractelement (load self) index
+        typefn T '__imply (self destT)
+            if (destT == ET)
+                deref self
         typefn T '__= (self other)
-            let other = (imply other rhvecT)
+            let other = (imply other ET)
             store
-                shufflevector (load self) other assignmask
+                insertelement (load self) other index
                 self
             true
     else
-        typefn T '__= (self other)
-            let other = (imply other rhvecT)
-            # expand or contract
-            let other =
-                shufflevector other other expandmask
-            store
-                shufflevector (load self) other assignmask
-                self
-            true
+        let lhsz = vecT.Count
+        let rhvecT = (construct-vec-type ET sz)
+        let loop (i mask...) = lhsz
+        if (i > 0:usize)
+            let i = (i - 1:usize)
+            loop i ((i % sz) as i32) mask...
+        let expandmask = (vectorof i32 mask...)
+        let loop (i mask...) = lhsz
+        if (i > 0:usize)
+            let i = (i - 1:usize)
+            loop i (i as i32) mask...
+        let loop (i assignmask) = 0:usize (vectorof i32 mask...)
+        if (i < sz)
+            loop (i + 1:usize)
+                insertelement assignmask ((lhsz + i) as i32) (mask @ i)
+        typefn& T '__load (self)
+            let self = (load self)
+            bitcast
+                shufflevector self self mask
+                rhvecT
+        typefn T '__imply (self destT)
+            if (destT == rhvecT)
+                deref self
+        if (sz == lhsz)
+            typefn T '__= (self other)
+                let other = (imply other rhvecT)
+                store
+                    shufflevector (load self) other assignmask
+                    self
+                true
+        else
+            typefn T '__= (self other)
+                let other = (imply other rhvecT)
+                # expand or contract
+                let other =
+                    shufflevector other other expandmask
+                store
+                    shufflevector (load self) other assignmask
+                    self
+                true
     T
 
 typefn& vec-type '__getattr (self name)

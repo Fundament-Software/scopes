@@ -6,6 +6,13 @@ do
     assert (v.yw == (vec2 2 4))
     v.xz = (vec2 10 20)
     assert (v == (vec4 10 2 20 4))
+    assert ((v.xz + v.yw) == (vec2 12 24))
+
+    let v = (local vec2 4 3)
+    assert (v.yyxx == (vec4 3 3 4 4))
+    assert (v.y == 3)
+    v.y = 2
+    assert (v == (vec2 4 2))
 
 assert ((vec4 1 2 3 4) == (vec4 1 2 3 4))
 assert ((vec4 1 (vec2 2 3) 4) == (vec4 1 2 3 4))
