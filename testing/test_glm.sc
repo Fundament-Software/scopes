@@ -1,6 +1,12 @@
 
 using import glm
 
+do
+    let v = (local vec4 1 2 3 4)
+    assert (v.yw == (vec2 2 4))
+    v.xz = (vec2 10 20)
+    assert (v == (vec4 10 2 20 4))
+
 assert ((vec4 1 2 3 4) == (vec4 1 2 3 4))
 assert ((vec4 1 (vec2 2 3) 4) == (vec4 1 2 3 4))
 assert ((vec4 (vec3 0) 1) == (vec4 0 0 0 1))

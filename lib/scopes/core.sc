@@ -2213,7 +2213,11 @@ fn set-type-symbol!& (T name value)
 fn deref (val)
     let T = (typeof val)
     if (T < reference)
-        load val
+        let op ok = (type@& T '__load)
+        if ok
+            op val
+        else
+            load val
     else val
 
 do
@@ -2238,7 +2242,7 @@ do
                 let op success = (type@& ET methodname)
                 if success
                     return (op self args...)
-                failedf (load self) args...
+                failedf (deref self) args...
 
     fn define-reference-forward-failable (failedf methodname)
         set-type-symbol! reference methodname
@@ -2250,7 +2254,7 @@ do
                     let result... = (op self args...)
                     if (not (va-empty? result...))
                         return result...
-                failedf (load self) args...
+                failedf (deref self) args...
 
     define-reference-forward countof '__countof
     define-reference-forward forward-repr '__repr
@@ -2283,7 +2287,7 @@ do
             else
                 let op ok = (type@ T '__delete)
                 if ok
-                    op (load self)
+                    op (deref self)
             let class = ('storage ptrT)
             if (class == unnamed)
                 free (bitcast self ptrT)
@@ -2304,9 +2308,9 @@ do
                 return (op self key)
             let op ok = (type@ ET '__@)
             if ok
-                @ (load self) key
+                @ (deref self) key
             elseif (none? key)
-                load self
+                deref self
 
     set-type-symbol! reference '__call
         fn (self args...)
@@ -2316,7 +2320,7 @@ do
             if success
                 return (op self args...)
             else
-                call (load self) args...
+                call (deref self) args...
 
     set-type-symbol! reference '__imply
         fn (self destT)
@@ -2331,7 +2335,7 @@ do
                 let aptrtype = (pointer ET)
                 if (type== destT aptrtype)
                     return (bitcast self aptrtype)
-            forward-imply (load (bitcast self ptrtype)) destT
+            forward-imply (deref (bitcast self ptrtype)) destT
 
     set-type-symbol! reference '__=
         fn (self value)
@@ -2351,8 +2355,8 @@ do
                         .. "[" (Symbol->string class) "]"
                     else ""
                     type-name ET
-        set-typename-super! T reference
-        set-typename-storage! T PT
+                reference
+                PT
         set-type-symbol! T 'ElementType ET
         T
 
@@ -3827,7 +3831,7 @@ typefn vector '__unpack (v)
             result...
 
 typefn vector '__@ (self x)
-    if (integer? x)
+    if ((typeof x) < integer)
         extractelement self x
 
 typefn vector '__slice (self i0 i1)

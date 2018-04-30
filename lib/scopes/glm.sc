@@ -249,34 +249,99 @@ set-vector-cmp-binop! '__> fcmp>o icmp>s icmp>u
 set-vector-cmp-binop! '__<= fcmp<=o icmp<=s icmp<=u
 set-vector-cmp-binop! '__>= fcmp>=o icmp>=s icmp>=u
 
-set-type-symbol! vec-type '__getattr
-    fn "vec-type-getattr" (self name)
-        let s = (name as string)
-        let set =
-            if (string-match? element-set-xyzw s) "xyzw"
-            elseif (string-match? element-set-rgba s) "rgba"
-            elseif (string-match? element-set-stpq s) "stpq"
-            else
-                return;
-        fn find-index (set c)
-            let setloop (k) = 0
-            let sc = (set @ k)
-            if (c != sc)
-                setloop (k + 1)
-            k
-        let sz = (countof s)
-        if (sz == 1)
-            let k = (find-index set (s @ 0))
-            extractelement self k
-        elseif (sz <= 4:usize)
-            let loop (i mask) = 0:usize (nullof (vector i32 sz))
-            if (i < sz)
-                let k = (find-index set (s @ i))
-                loop (i + 1)
-                    insertelement mask k i
-            bitcast
-                shufflevector self self mask
-                construct-vec-type (@ (typeof self)) sz
+fn build-access-mask (name)
+    let s = (name as string)
+    let set =
+        if (string-match? element-set-xyzw s) "xyzw"
+        elseif (string-match? element-set-rgba s) "rgba"
+        elseif (string-match? element-set-stpq s) "stpq"
+        else
+            return;
+    fn find-index (set c)
+        let setloop (k) = 0
+        let sc = (set @ k)
+        if (c != sc)
+            setloop (k + 1)
+        k
+    let sz = (countof s)
+    if (sz <= 4:usize)
+        let loop (i mask) = 0:usize (nullof (vector i32 sz))
+        if (i < sz)
+            let k = (find-index set (s @ i))
+            loop (i + 1)
+                insertelement mask k i
+        return sz mask
+
+typefn vec-type '__getattr (self name)
+    let sz mask = (build-access-mask name)
+    if (none? sz)
+        return;
+    if (sz == 1)
+        extractelement self (mask @ 0)
+    elseif (sz <= 4:usize)
+        bitcast
+            shufflevector self self mask
+            construct-vec-type (@ (typeof self)) sz
+
+fn construct-getter-type (vecrefT mask)
+    let vecT = vecrefT.ElementType
+    let ET = vecT.ElementType
+    let storageT = (storageof vecrefT)
+    let T =
+        typename
+            .. (type-name vecrefT)
+                string-repr mask
+            super = reference
+            storage = storageT
+    let sz = (countof mask)
+    let lhsz = vecT.Count
+    let rhvecT = (construct-vec-type ET sz)
+    let loop (i mask...) = lhsz
+    if (i > 0:usize)
+        let i = (i - 1:usize)
+        loop i ((i % sz) as i32) mask...
+    let expandmask = (vectorof i32 mask...)
+    let loop (i mask...) = lhsz
+    if (i > 0:usize)
+        let i = (i - 1:usize)
+        loop i (i as i32) mask...
+    let loop (i assignmask) = 0:usize (vectorof i32 mask...)
+    if (i < sz)
+        loop (i + 1:usize)
+            insertelement assignmask ((lhsz + i) as i32) (mask @ i)
+    typefn& T '__load (self)
+        let self = (load self)
+        bitcast
+            shufflevector self self mask
+            rhvecT
+    typefn T '__imply (self destT)
+        if (destT == rhvecT)
+            deref self
+    if (sz == lhsz)
+        typefn T '__= (self other)
+            let other = (imply other rhvecT)
+            store
+                shufflevector (load self) other assignmask
+                self
+            true
+    else
+        typefn T '__= (self other)
+            let other = (imply other rhvecT)
+            # expand or contract
+            let other =
+                shufflevector other other expandmask
+            store
+                shufflevector (load self) other assignmask
+                self
+            true
+    T
+
+typefn& vec-type '__getattr (self name)
+    let sz mask = (build-access-mask name)
+    if (none? sz)
+        return;
+    bitcast self
+        construct-getter-type (typeof self) mask
 
 #-------------------------------------------------------------------------------
 
