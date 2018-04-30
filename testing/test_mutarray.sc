@@ -73,3 +73,12 @@ do
             - x
     for i k in (enumerate (va-each 99 12 9 7 5 3 3 1 0 -20))
         assert ((a @ i) == k)
+
+do
+    let a = (local (Array string))
+    defer (autodelete a)
+    for k in (va-each "yes" "this" "is" "dog" "")
+        'append a k
+    'sort a
+    for i k in (enumerate (va-each "" "dog" "is" "this" "yes"))
+        assert ((a @ i) == k)

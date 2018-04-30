@@ -876,8 +876,9 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(FN_Iter, "iter") T(FN_FormatMessage, "format-message") \
     T(FN_IsIterator, "iterator?") T(FN_IsLabel, "label?") \
     T(FN_LabelEq, "Label==") \
-    T(FN_LabelNew, "Label-new") T(FN_LabelParameters, "Label-parameters") \
-    T(FN_LabelAnchor, "Label-anchor") T(FN_LabelPrettyName, "Label-prettyname") \
+    T(FN_LabelNew, "Label-new") T(FN_LabelParameterCount, "Label-parameter-count") \
+    T(FN_LabelParameter, "Label-parameter") \
+    T(FN_LabelAnchor, "Label-anchor") T(FN_LabelName, "Label-name") \
     T(FN_ClosureEq, "Closure==") T(FN_CheckStack, "verify-stack!") \
     T(FN_ListAtom, "list-atom?") T(FN_ListCountOf, "list-countof") \
     T(FN_ListLoad, "list-load") T(FN_ListJoin, "list-join") \
@@ -17510,6 +17511,10 @@ static int f_parameter_index(const Parameter *param) {
     return param->index;
 }
 
+static Symbol f_parameter_name(const Parameter *param) {
+    return param->name;
+}
+
 static const String *f_string_new(const char *ptr, size_t count) {
     return String::from(ptr, count);
 }
@@ -17802,8 +17807,17 @@ static const Anchor *f_label_anchor(Label *label) {
     return label->anchor;
 }
 
-static const String *f_label_prettyname(Label *label) {
-    return label->name.name();
+static Symbol f_label_name(Label *label) {
+    return label->name;
+}
+
+static size_t f_label_parameter_count(Label *label) {
+    return label->params.size();
+}
+
+static Parameter *f_label_parameter(Label *label, size_t index) {
+    verify_range(index, label->params.size());
+    return label->params[index];
 }
 
 static Label *f_closure_label(const Closure *closure) {
@@ -17906,6 +17920,7 @@ static void init_globals(int argc, char *argv[]) {
     DEFINE_PURE_C_FUNCTION(FN_SyntaxStrip, strip_syntax, TYPE_Any, TYPE_Any);
     DEFINE_PURE_C_FUNCTION(FN_ParameterNew, f_parameter_new, TYPE_Parameter, TYPE_Anchor, TYPE_Symbol, TYPE_Type);
     DEFINE_PURE_C_FUNCTION(FN_ParameterIndex, f_parameter_index, TYPE_I32, TYPE_Parameter);
+    DEFINE_PURE_C_FUNCTION(FN_ParameterName, f_parameter_name, TYPE_Symbol, TYPE_Parameter);
     DEFINE_PURE_C_FUNCTION(FN_StringNew, f_string_new, TYPE_String, NativeROPointer(TYPE_I8), TYPE_USize);
     DEFINE_PURE_C_FUNCTION(FN_DumpLabel, f_dump_label, TYPE_Void, TYPE_Label);
     DEFINE_PURE_C_FUNCTION(FN_DumpList, f_dump_list, TYPE_List, TYPE_List);
@@ -17927,7 +17942,9 @@ static void init_globals(int argc, char *argv[]) {
     DEFINE_PURE_C_FUNCTION(FN_SuperOf, superof, TYPE_Type, TYPE_Type);
     DEFINE_PURE_C_FUNCTION(FN_FunctionTypeIsVariadic, f_function_type_is_variadic, TYPE_Bool, TYPE_Type);
     DEFINE_PURE_C_FUNCTION(FN_LabelAnchor, f_label_anchor, TYPE_Anchor, TYPE_Label);
-    DEFINE_PURE_C_FUNCTION(FN_LabelPrettyName, f_label_prettyname, TYPE_String, TYPE_Label);
+    DEFINE_PURE_C_FUNCTION(FN_LabelParameterCount, f_label_parameter_count, TYPE_USize, TYPE_Label);
+    DEFINE_PURE_C_FUNCTION(FN_LabelParameter, f_label_parameter, TYPE_Parameter, TYPE_Label, TYPE_USize);
+    DEFINE_PURE_C_FUNCTION(FN_LabelName, f_label_name, TYPE_Symbol, TYPE_Label);
     DEFINE_PURE_C_FUNCTION(FN_ClosureLabel, f_closure_label, TYPE_Label, TYPE_Closure);
     DEFINE_PURE_C_FUNCTION(FN_ClosureFrame, f_closure_frame, TYPE_Frame, TYPE_Closure);
     DEFINE_PURE_C_FUNCTION(FN_LabelCountOfReachable, f_label_countof_reachable, TYPE_USize, TYPE_Label);

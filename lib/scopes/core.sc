@@ -3761,6 +3761,20 @@ define-macro while
             list 'continue
 
 #-------------------------------------------------------------------------------
+# label utilities
+#-------------------------------------------------------------------------------
+
+typefn Label 'parameters (self)
+    let count = (Label-parameter-count self)
+    Generator
+        label (fret fdone x)
+            if (x == count)
+                fdone;
+            else
+                fret (x + 1) (Label-parameter self x)
+        tie-const self 0:usize
+
+#-------------------------------------------------------------------------------
 # vectors
 #-------------------------------------------------------------------------------
 
