@@ -264,24 +264,49 @@ fn build-access-mask (name)
             setloop (k + 1)
         k
     let sz = (countof s)
-    if (sz <= 4:usize)
-        let loop (i mask) = 0:usize (nullof (vector i32 sz))
-        if (i < sz)
+    if (sz == 1:usize)
+        return sz (find-index set (s @ 0))
+    elseif (sz <= 4:usize)
+        let loop (i mask...) = sz
+        if (i > 0:usize)
+            let i = (i - 1:usize)
             let k = (find-index set (s @ i))
-            loop (i + 1)
-                insertelement mask k i
-        return sz mask
+            loop i k
+                mask...
+        return sz (vectorof i32 mask...)
 
 typefn vec-type '__getattr (self name)
     let sz mask = (build-access-mask name)
     if (none? sz)
         return;
     if (sz == 1)
-        extractelement self (mask @ 0)
+        extractelement self mask
     elseif (sz <= 4:usize)
         bitcast
             shufflevector self self mask
             construct-vec-type (@ (typeof self)) sz
+
+fn expand-mask (lhsz rhsz)
+    let loop (i mask...) = lhsz
+    if (i > 0:usize)
+        let i = (i - 1:usize)
+        loop i ((i % rhsz) as i32) mask...
+    vectorof i32 mask...
+
+fn range-mask (sz)
+    let loop (i mask...) = sz
+    if (i > 0:usize)
+        let i = (i - 1:usize)
+        loop i (i as i32) mask...
+    vectorof i32 mask...
+
+fn assign-mask (lhsz mask)
+    let sz = (countof mask)
+    let loop (i assignmask) = 0:usize (range-mask lhsz)
+    if (i < sz)
+        loop (i + 1:usize)
+            insertelement assignmask ((lhsz + i) as i32) (mask @ i)
+    assignmask
 
 fn construct-getter-type (vecrefT mask)
     let vecT = vecrefT.ElementType
@@ -293,9 +318,8 @@ fn construct-getter-type (vecrefT mask)
                 string-repr mask
             super = reference
             storage = storageT
-    let sz = (countof mask)
-    if (sz == 1:usize)
-        let index = (mask @ 0)
+    if ((typeof mask) == i32)
+        let index = mask
         typefn& T '__load (self)
             extractelement (load self) index
         typefn T '__imply (self destT)
@@ -308,21 +332,11 @@ fn construct-getter-type (vecrefT mask)
                 self
             true
     else
+        let sz = (countof mask)
         let lhsz = vecT.Count
         let rhvecT = (construct-vec-type ET sz)
-        let loop (i mask...) = lhsz
-        if (i > 0:usize)
-            let i = (i - 1:usize)
-            loop i ((i % sz) as i32) mask...
-        let expandmask = (vectorof i32 mask...)
-        let loop (i mask...) = lhsz
-        if (i > 0:usize)
-            let i = (i - 1:usize)
-            loop i (i as i32) mask...
-        let loop (i assignmask) = 0:usize (vectorof i32 mask...)
-        if (i < sz)
-            loop (i + 1:usize)
-                insertelement assignmask ((lhsz + i) as i32) (mask @ i)
+        let expandmask = (expand-mask lhsz sz)
+        let assignmask = (assign-mask lhsz mask)
         typefn& T '__load (self)
             let self = (load self)
             bitcast
