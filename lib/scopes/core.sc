@@ -1959,7 +1959,31 @@ fn = (obj value)
     (op2-dispatch '__=) obj value
     return;
 
+fn += (x y) (= x (+ x y))
+fn -= (x y) (= x (- x y))
+fn *= (x y) (= x (* x y))
+fn /= (x y) (= x (/ x y))
+fn //= (x y) (= x (// x y))
+fn %= (x y) (= x (% x y))
+fn >>= (x y) (= x (>> x y))
+fn <<= (x y) (= x (<< x y))
+fn &= (x y) (= x (& x y))
+fn |= (x y) (= x (| x y))
+fn ^= (x y) (= x (^ x y))
+
+define-infix< 50 +=
+define-infix< 50 -=
+define-infix< 50 *=
+define-infix< 50 /=
+define-infix< 50 //=
+define-infix< 50 %=
+define-infix< 50 >>=
+define-infix< 50 <<=
+define-infix< 50 &=
+define-infix< 50 |=
+define-infix< 50 ^=
 define-infix< 50 =
+
 #define-infix> 70 :
 define-infix> 100 or
 define-infix> 200 and
@@ -2335,7 +2359,7 @@ do
                 let aptrtype = (pointer ET)
                 if (type== destT aptrtype)
                     return (bitcast self aptrtype)
-            forward-imply (deref (bitcast self ptrtype)) destT
+            forward-imply (load (bitcast self ptrtype)) destT
 
     set-type-symbol! reference '__=
         fn (self value)
