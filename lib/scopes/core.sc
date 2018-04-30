@@ -2342,8 +2342,6 @@ do
             let op ok = (type@ ET '__@)
             if ok
                 @ (deref self) key
-            elseif (none? key)
-                deref self
 
     set-type-symbol! reference '__call
         fn (self args...)

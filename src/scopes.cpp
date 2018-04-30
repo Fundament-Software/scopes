@@ -877,7 +877,7 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(FN_IsIterator, "iterator?") T(FN_IsLabel, "label?") \
     T(FN_LabelEq, "Label==") \
     T(FN_LabelNew, "Label-new") T(FN_LabelParameters, "Label-parameters") \
-    T(FN_LabelAnchor, "Label-anchor") \
+    T(FN_LabelAnchor, "Label-anchor") T(FN_LabelPrettyName, "Label-prettyname") \
     T(FN_ClosureEq, "Closure==") T(FN_CheckStack, "verify-stack!") \
     T(FN_ListAtom, "list-atom?") T(FN_ListCountOf, "list-countof") \
     T(FN_ListLoad, "list-load") T(FN_ListJoin, "list-join") \
@@ -17802,6 +17802,10 @@ static const Anchor *f_label_anchor(Label *label) {
     return label->anchor;
 }
 
+static const String *f_label_prettyname(Label *label) {
+    return label->name.name();
+}
+
 static Label *f_closure_label(const Closure *closure) {
     return closure->label;
 }
@@ -17923,6 +17927,7 @@ static void init_globals(int argc, char *argv[]) {
     DEFINE_PURE_C_FUNCTION(FN_SuperOf, superof, TYPE_Type, TYPE_Type);
     DEFINE_PURE_C_FUNCTION(FN_FunctionTypeIsVariadic, f_function_type_is_variadic, TYPE_Bool, TYPE_Type);
     DEFINE_PURE_C_FUNCTION(FN_LabelAnchor, f_label_anchor, TYPE_Anchor, TYPE_Label);
+    DEFINE_PURE_C_FUNCTION(FN_LabelPrettyName, f_label_prettyname, TYPE_String, TYPE_Label);
     DEFINE_PURE_C_FUNCTION(FN_ClosureLabel, f_closure_label, TYPE_Label, TYPE_Closure);
     DEFINE_PURE_C_FUNCTION(FN_ClosureFrame, f_closure_frame, TYPE_Frame, TYPE_Closure);
     DEFINE_PURE_C_FUNCTION(FN_LabelCountOfReachable, f_label_countof_reachable, TYPE_USize, TYPE_Label);
