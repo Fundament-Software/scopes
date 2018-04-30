@@ -7910,19 +7910,23 @@ static void apply_type_error(const Any &enter) {
 }
 
 template<int mincount, int maxcount>
-inline int checkargs(size_t argsize) {
+inline int checkargs(size_t argsize, bool allow_overshoot = false) {
     int count = (int)argsize - 1;
     if ((mincount <= 0) && (maxcount == -1)) {
         return count;
     }
 
-    // arguments can overshoot, then we just truncate the count
     if ((maxcount >= 0) && (count > maxcount)) {
-        count = maxcount;
+        if (allow_overshoot) {
+            count = maxcount;
+        } else {
+            location_error(
+                format("at most %i argument(s) expected, got %i", maxcount, count));
+        }
     }
     if ((mincount >= 0) && (count < mincount)) {
         location_error(
-            format("at least %i arguments expected, got %i", mincount, count));
+            format("at least %i argument(s) expected, got %i", mincount, count));
     }
     return count;
 }
