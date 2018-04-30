@@ -3401,7 +3401,7 @@ struct FunctionType : Type {
     const Type *type_at_index(size_t i) const {
         verify_range(i, argument_types.size() + 1);
         if (i == 0)
-            return return_type;
+            return cast<ReturnLabelType>(return_type)->return_type;
         else
             return argument_types[i - 1];
     }
@@ -17309,7 +17309,7 @@ static const Type *f_elementtype(const Type *T, int i) {
     case TK_Vector: return cast<VectorType>(T)->element_type;
     case TK_Tuple: return cast<TupleType>(T)->type_at_index(i);
     case TK_Union: return cast<UnionType>(T)->type_at_index(i);
-    case TK_Function:  return cast<FunctionType>(T)->type_at_index(i);
+    case TK_Function: return cast<FunctionType>(T)->type_at_index(i);
     case TK_Extern: return cast<ExternType>(T)->pointer_type;
     case TK_Image: return cast<ImageType>(T)->type;
     case TK_SampledImage: return cast<SampledImageType>(T)->type;

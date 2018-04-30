@@ -54,7 +54,7 @@ fn pointer== (a b)
     rawcall icmp== (rawcall ptrtoint a usize) (rawcall ptrtoint b usize)
 
 fn type? (T)
-    """".. function:: (type? T)
+    """".. fn:: (type? T)
 
            returns `true` if ``T`` is a value of type `type`, otherwise
            `false`.
@@ -779,8 +779,8 @@ fn empty? (x)
 fn type< (T superT)
     let loop (T) = T
     let value = (superof T)
-    if (type== value superT) true
-    elseif (type== value typename) false
+    if (type== value superT) (tie-const T true)
+    elseif (type== value typename) (tie-const T false)
     else
         loop value
 
@@ -2290,6 +2290,7 @@ do
                 failedf (deref self) args...
 
     define-reference-forward countof '__countof
+    define-reference-forward unpack '__unpack
     define-reference-forward forward-repr '__repr
     define-reference-forward forward-hash '__hash
     define-reference-forward-failable forward-as '__as

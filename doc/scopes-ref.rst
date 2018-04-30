@@ -1,229 +1,790 @@
 Scopes Language Reference
 =========================
 
-Built-in Constants
-------------------
-
-.. define:: none
-.. define:: true
+.. define:: args
+.. define:: compile-flag-O1
+.. define:: compile-flag-O2
+.. define:: compile-flag-O3
+.. define:: compile-flag-dump-disassembly
+.. define:: compile-flag-dump-function
+.. define:: compile-flag-dump-module
+.. define:: compile-flag-dump-time
+.. define:: compile-flag-no-debug-info
+.. define:: compiler-dir
+.. define:: compiler-path
+.. define:: compiler-timestamp
+.. define:: debug-build?
+.. define:: e
+.. define:: e:f32
+.. define:: e:f64
+.. define:: eol
 .. define:: false
-
-Runtime Constants
------------------
-
-.. define:: empty-list
-.. define:: empty-tuple
-
-Built-in Types
---------------
-
-.. type:: closure
-.. type:: flow
-.. type:: frame
-.. type:: half
-.. type:: list
-.. type:: parameter
-.. type:: rawstring
-.. type:: ssize_t
-.. type:: string
-.. type:: table
-.. type:: usize_t
-.. type:: void
-
-Runtime Types
--------------
-
-.. type:: bool
-.. type:: double
-.. type:: float
-.. type:: int
-.. type:: int8
-.. type:: int16
-.. type:: int32
-.. type:: int64
-.. type:: real16
-.. type:: real32
-.. type:: real64
-.. type:: size_t
-.. type:: uint
-.. type:: uint8
-.. type:: uint16
-.. type:: uint32
-.. type:: uint64
-
-Built-in Supertypes
--------------------
-
+.. define:: none
+.. define:: null
+.. define:: operating-system
+.. define:: package
+.. define:: pi
+.. define:: pi:f32
+.. define:: pi:f64
+.. define:: pointer-flag-non-readable
+.. define:: pointer-flag-non-writable
+.. define:: reference-attribs-key
+.. define:: style-comment
+.. define:: style-error
+.. define:: style-function
+.. define:: style-instruction
+.. define:: style-keyword
+.. define:: style-location
+.. define:: style-none
+.. define:: style-number
+.. define:: style-operator
+.. define:: style-sfxfunction
+.. define:: style-string
+.. define:: style-symbol
+.. define:: style-type
+.. define:: style-warning
+.. define:: tmp
+.. define:: true
+.. define:: type-kind-array
+.. define:: type-kind-extern
+.. define:: type-kind-function
+.. define:: type-kind-image
+.. define:: type-kind-integer
+.. define:: type-kind-pointer
+.. define:: type-kind-real
+.. define:: type-kind-return-label
+.. define:: type-kind-sampled-image
+.. define:: type-kind-tuple
+.. define:: type-kind-typename
+.. define:: type-kind-union
+.. define:: type-kind-vector
+.. define:: unnamed
+.. define:: unroll-limit
+.. type:: Anchor
+.. type:: Any
+.. type:: Builtin
+.. type:: CEnum
+.. type:: CStruct
+.. type:: CUnion
+.. type:: Capture
+.. type:: Closure
+.. type:: Exception
+.. type:: Frame
+.. type:: Generator
+.. type:: Image
+.. type:: Label
+.. type:: Macro
+.. type:: Nothing
+.. type:: NullType
+.. type:: Parameter
+.. type:: ReturnLabel
+.. type:: SampledImage
+.. type:: Sampler
+.. type:: Scope
+.. type:: SourceFile
+.. type:: Symbol
+.. type:: Syntax
+.. type:: Unknown
 .. type:: array
-.. type:: cfunction
-.. type:: enum
+.. type:: bool
+.. type:: constant
+.. type:: exception-pad-type
+.. type:: extern
+.. type:: f16
+.. type:: f32
+.. type:: f64
+.. type:: f80
+.. type:: function
+.. type:: hash
+.. type:: i16
+.. type:: i32
+.. type:: i64
+.. type:: i8
+.. type:: immutable
 .. type:: integer
+.. type:: list
 .. type:: pointer
-.. type:: qualifier
+.. type:: rawstring
 .. type:: real
-.. type:: tag
+.. type:: reference
+.. type:: string
 .. type:: tuple
-.. type:: struct
-.. type:: symbol
+.. type:: type
+.. type:: typename
+.. type:: u16
+.. type:: u32
+.. type:: u64
+.. type:: u8
+.. type:: union
+.. type:: usize
 .. type:: vector
+.. type:: void
+.. type:: voidstar
+.. fn:: (% a b)
+.. fn:: (& a b)
+.. fn:: (* ...)
+.. fn:: (+ ...)
+.. fn:: (- a b)
+.. fn:: (/ a b)
+.. fn:: (< a b)
+.. fn:: (= obj value)
+.. fn:: (> a b)
+.. fn:: (@ ...)
+.. fn:: (^ a b)
+.. fn:: (| ...)
+.. fn:: (~ x)
+.. fn:: (!= a b)
+.. fn:: (%= x y)
+.. fn:: (&= x y)
+.. fn:: (*= x y)
+.. fn:: (+= x y)
+.. fn:: (-= x y)
+.. fn:: (.. ...)
+.. fn:: (// a b)
+.. fn:: (//= x y)
+.. fn:: (/= x y)
+.. fn:: (<< a b)
+.. fn:: (<<= x y)
+.. fn:: (<= a b)
+.. fn:: (== a b)
+.. fn:: (>= a b)
+.. fn:: (>> a b)
+.. fn:: (>>= x y)
+.. fn:: (^= x y)
+.. fn:: (|= x y)
+.. fn:: (Anchor-column x)
+.. fn:: (Anchor-file x)
+.. fn:: (Anchor-lineno x)
+.. fn:: (Any-extract val T)
+.. fn:: (Any-list? val)
+.. fn:: (Any-new val)
+.. fn:: (Any-payload val)
+.. fn:: (Any-typeof val)
+.. fn:: (Exception-anchor sx)
+.. fn:: (Exception-message sx)
+.. fn:: (Symbol? val)
+.. fn:: (Syntax->datum sx)
+.. fn:: (Syntax-anchor sx)
+.. fn:: (Syntax-quoted? sx)
+.. fn:: (abs x)
+.. fn:: (all? v)
+.. fn:: (any? v)
+.. fn:: (array-type? T)
+.. fn:: (array? val)
+.. fn:: (arrayof T ...)
+.. fn:: (as value dest-type)
+.. fn:: (assert-type T)
+.. fn:: (assert-typeof a T)
+.. fn:: (block-scope-macro f)
+.. fn:: (chain-fn-dispatch ...)
+.. fn:: (chain-fn-dispatch2 f1 f2)
+.. fn:: (char s)
+.. fn:: (clamp x mn mx)
+.. fn:: (clone-scope-symbols source target)
+.. fn:: (compile f opts...)
+.. fn:: (compile-flags opts...)
+.. fn:: (compile-glsl f target opts...)
+.. fn:: (compile-object path table opts...)
+.. fn:: (compile-spirv f target opts...)
+.. fn:: (cond-const a b)
+.. fn:: (cons ...)
+.. fn:: (countof x)
+.. fn:: (decons val count)
+.. fn:: (delete self)
+.. fn:: (deref val)
+.. fn:: (docstring f)
+.. fn:: (empty? x)
+.. fn:: (enumerate x)
+.. fn:: (error! msg)
+.. fn:: (extern-type? T)
+.. fn:: (extern? val)
+.. fn:: (fn-dispatch-error-handler msgf get-types...)
+.. fn:: (fn-dispatcher args...)
+.. fn:: (fold init gen f)
+.. fn:: (format-exception exc)
+.. fn:: (format-type-signature types...)
+.. fn:: (forward-as value dest-type)
+.. fn:: (forward-getattr self name)
+.. fn:: (forward-hash value)
+.. fn:: (forward-imply value dest-type)
+.. fn:: (forward-repr value)
+.. fn:: (forward-typeattr T name)
+.. fn:: (function-pointer-type? T)
+.. fn:: (function-pointer? val)
+.. fn:: (function-type? T)
+.. fn:: (gen-type-op2 f)
+.. fn:: (getattr self name)
+.. fn:: (imply value dest-type)
+.. fn:: (integer-type? T)
+.. fn:: (integer? val)
+.. fn:: (list-at l)
+.. fn:: (list-at-next l)
+.. fn:: (list-countof l)
+.. fn:: (list-empty? l)
+.. fn:: (list-new ...)
+.. fn:: (list-next l)
+.. fn:: (list-reverse l tail)
+.. fn:: (list? val)
+.. fn:: (load-module module-name module-path main-module?)
+.. fn:: (local cls args...)
+.. fn:: (macro f)
+.. fn:: (map x f)
+   
+   Maps function `f (skip values...)` to elements of iterable `x`.
+   
+   `skip` is a function that can be called to purge the active element
+   from the output (allowing map to also act as a filter).
+.. fn:: (max a b ...)
+.. fn:: (maybe-unsyntax val)
+.. fn:: (merge-scope-symbols source target filter)
+.. fn:: (min a b ...)
+.. fn:: (new cls args...)
+.. fn:: (none? val)
+.. fn:: (not x)
+.. fn:: (op2-dispatch symbol)
+.. fn:: (op2-dispatch-bidi symbol fallback)
+.. fn:: (op2-ltr-multiop f)
+.. fn:: (op2-rtl-multiop f)
+.. fn:: (opN-dispatch symbol)
+.. fn:: (pointer-type-imply? src dest)
+.. fn:: (pointer-type? T)
+.. fn:: (pointer== a b)
+.. fn:: (pointer? val)
+.. fn:: (pow x y)
+.. fn:: (powi base exponent)
+.. fn:: (print ...)
+.. fn:: (print-spaces depth)
+.. fn:: (prompt prefix preload)
+.. fn:: (raise! value)
+.. fn:: (range a b c)
+.. fn:: (real-type? T)
+.. fn:: (real? val)
+.. fn:: (repr value)
+.. fn:: (require-from base-dir name)
+.. fn:: (sabs x)
+.. fn:: (scalar-type T)
+.. fn:: (scope-macro f)
+.. fn:: (select-op T sop fop)
+.. fn:: (set-scope-symbol! scope sym value)
+.. fn:: (set-type-symbol!& T name value)
+.. fn:: (sign x)
+.. fn:: (slice obj start-index end-index)
+.. fn:: (static cls args...)
+.. fn:: (string->rawstring s)
+.. fn:: (string-compare a b)
+.. fn:: (string-countof s)
+.. fn:: (string-repr val)
+.. fn:: (syntax-error! anchor msg)
+.. fn:: (tie-const a b)
+.. fn:: (todo! msg)
+.. fn:: (tuple-type? T)
+.. fn:: (tuple? val)
+.. fn:: (tupleof ...)
+.. fn:: (type-matcher types...)
+.. fn:: (type-mismatch-string want-T have-T)
+.. fn:: (type< T superT)
+.. fn:: (type<= T superT)
+.. fn:: (type== a b)
+.. fn:: (type? T)
 
-Runtime Supertypes
-------------------
+   returns `true` if ``T`` is a value of type `type`, otherwise
+   `false`.
+.. fn:: (type@& T name)
+.. fn:: (typeattr T name)
+.. fn:: (typename-type? T)
+.. fn:: (typename? val)
+.. fn:: (typify f types...)
+.. fn:: (unconst-all args...)
+.. fn:: (unknownof T)
+.. fn:: (unpack x)
+.. fn:: (unroll-range a b c)
+.. fn:: (va-each values...)
+.. fn:: (va-each-reversed values...)
+.. fn:: (va-empty? ...)
+.. fn:: (va-join a...)
+.. fn:: (va-types params...)
+.. fn:: (vector-op2-dispatch symbol)
+.. fn:: (vector-reduce f v)
+.. fn:: (vector-signed-dispatch fsigned funsigned)
+.. fn:: (vector-type? T)
+.. fn:: (vector? T)
+.. fn:: (vectorof T ...)
+.. fn:: (walk-list on-leaf l depth)
+.. fn:: (xpcall f errorf)
+.. fn:: (zip a b)
+.. macro:: (. ...)
+.. macro:: (and ...)
+.. macro:: (assert ...)
+.. macro:: (breakable-block ...)
+.. macro:: (capture ...)
+.. macro:: (defer ...)
+.. macro:: (define ...)
+.. macro:: (define-block-scope-macro ...)
+.. macro:: (define-infix< ...)
+.. macro:: (define-infix> ...)
+.. macro:: (define-macro ...)
+.. macro:: (define-scope-macro ...)
+.. macro:: (del ...)
+.. macro:: (enum ...)
+.. macro:: (fn... ...)
+.. macro:: (for ...)
+.. macro:: (from ...)
+.. macro:: (import ...)
+.. macro:: (locals ...)
+.. macro:: (loop ...)
+.. macro:: (match ...)
+.. macro:: (or ...)
+.. macro:: (struct ...)
+.. macro:: (typefn ...)
+.. macro:: (typefn! ...)
+.. macro:: (typefn!& ...)
+.. macro:: (typefn& ...)
+.. macro:: (using ...)
+.. macro:: (while ...)
+.. builtin:: (? ...)
+.. builtin:: (Any-extract-constant ...)
+.. builtin:: (Any-wrap ...)
+.. builtin:: (Image-read ...)
+.. builtin:: (Image-write ...)
+.. builtin:: (ReturnLabel-type ...)
+.. builtin:: (acos ...)
+.. builtin:: (add ...)
+.. builtin:: (add-nsw ...)
+.. builtin:: (add-nuw ...)
+.. builtin:: (alloca ...)
+.. builtin:: (alloca-array ...)
+.. builtin:: (alloca-exception-pad ...)
+.. builtin:: (allocaof ...)
+.. builtin:: (ashr ...)
+.. builtin:: (asin ...)
+.. builtin:: (atan ...)
+.. builtin:: (atan2 ...)
+.. builtin:: (band ...)
+.. builtin:: (bitcast ...)
+.. builtin:: (bor ...)
+.. builtin:: (branch ...)
+.. builtin:: (bxor ...)
+.. builtin:: (call ...)
+.. builtin:: (cc/call ...)
+.. builtin:: (ceil ...)
+.. builtin:: (compiler-anchor ...)
+.. builtin:: (compiler-error! ...)
+.. builtin:: (compiler-message ...)
+.. builtin:: (constant? ...)
+.. builtin:: (cos ...)
+.. builtin:: (cross ...)
+.. builtin:: (degrees ...)
+.. builtin:: (delete-type-symbol! ...)
+.. builtin:: (discard! ...)
+.. builtin:: (distance ...)
+.. builtin:: (do ...)
+.. builtin:: (do-in ...)
+.. builtin:: (dump ...)
+.. builtin:: (exp ...)
+.. builtin:: (exp2 ...)
+.. builtin:: (extern-new ...)
+.. builtin:: (extern-symbol ...)
+.. builtin:: (extractelement ...)
+.. builtin:: (extractvalue ...)
+.. builtin:: (fabs ...)
+.. builtin:: (fadd ...)
+.. builtin:: (fcmp!=o ...)
+.. builtin:: (fcmp!=u ...)
+.. builtin:: (fcmp-ord ...)
+.. builtin:: (fcmp-uno ...)
+.. builtin:: (fcmp<=o ...)
+.. builtin:: (fcmp<=u ...)
+.. builtin:: (fcmp<o ...)
+.. builtin:: (fcmp<u ...)
+.. builtin:: (fcmp==o ...)
+.. builtin:: (fcmp==u ...)
+.. builtin:: (fcmp>=o ...)
+.. builtin:: (fcmp>=u ...)
+.. builtin:: (fcmp>o ...)
+.. builtin:: (fcmp>u ...)
+.. builtin:: (fdiv ...)
+.. builtin:: (floor ...)
+.. builtin:: (fma ...)
+.. builtin:: (fmul ...)
+.. builtin:: (fn ...)
+.. builtin:: (fn! ...)
+.. builtin:: (form-quote ...)
+.. builtin:: (fpext ...)
+.. builtin:: (fptosi ...)
+.. builtin:: (fptoui ...)
+.. builtin:: (fptrunc ...)
+.. builtin:: (fract ...)
+.. builtin:: (free ...)
+.. builtin:: (frem ...)
+.. builtin:: (frexp ...)
+.. builtin:: (fsign ...)
+.. builtin:: (fsub ...)
+.. builtin:: (function-type ...)
+.. builtin:: (getelementptr ...)
+.. builtin:: (icmp!= ...)
+.. builtin:: (icmp<=s ...)
+.. builtin:: (icmp<=u ...)
+.. builtin:: (icmp<s ...)
+.. builtin:: (icmp<u ...)
+.. builtin:: (icmp== ...)
+.. builtin:: (icmp>=s ...)
+.. builtin:: (icmp>=u ...)
+.. builtin:: (icmp>s ...)
+.. builtin:: (icmp>u ...)
+.. builtin:: (if ...)
+.. builtin:: (insertelement ...)
+.. builtin:: (insertvalue ...)
+.. builtin:: (inttoptr ...)
+.. builtin:: (inversesqrt ...)
+.. builtin:: (itrunc ...)
+.. builtin:: (label ...)
+.. builtin:: (ldexp ...)
+.. builtin:: (length ...)
+.. builtin:: (let ...)
+.. builtin:: (load ...)
+.. builtin:: (log ...)
+.. builtin:: (log2 ...)
+.. builtin:: (lshr ...)
+.. builtin:: (malloc ...)
+.. builtin:: (malloc-array ...)
+.. builtin:: (mix ...)
+.. builtin:: (mul ...)
+.. builtin:: (mul-nsw ...)
+.. builtin:: (mul-nuw ...)
+.. builtin:: (normalize ...)
+.. builtin:: (nullof ...)
+.. builtin:: (offsetof ...)
+.. builtin:: (powf ...)
+.. builtin:: (ptrtoint ...)
+.. builtin:: (purify ...)
+.. builtin:: (quote ...)
+.. builtin:: (radians ...)
+.. builtin:: (rawcall ...)
+.. builtin:: (round ...)
+.. builtin:: (roundeven ...)
+.. builtin:: (sample ...)
+.. builtin:: (scopeof ...)
+.. builtin:: (sdiv ...)
+.. builtin:: (set-execution-mode! ...)
+.. builtin:: (set-type-symbol! ...)
+.. builtin:: (set-typename-storage! ...)
+.. builtin:: (sext ...)
+.. builtin:: (shl ...)
+.. builtin:: (shufflevector ...)
+.. builtin:: (sin ...)
+.. builtin:: (sitofp ...)
+.. builtin:: (smoothstep ...)
+.. builtin:: (sqrt ...)
+.. builtin:: (srem ...)
+.. builtin:: (ssign ...)
+.. builtin:: (static-alloc ...)
+.. builtin:: (step ...)
+.. builtin:: (store ...)
+.. builtin:: (sub ...)
+.. builtin:: (sub-nsw ...)
+.. builtin:: (sub-nuw ...)
+.. builtin:: (syntax-extend ...)
+.. builtin:: (syntax-log ...)
+.. builtin:: (tan ...)
+.. builtin:: (trunc ...)
+.. builtin:: (tuple-type ...)
+.. builtin:: (type-local@ ...)
+.. builtin:: (type@ ...)
+.. builtin:: (typeof ...)
+.. builtin:: (udiv ...)
+.. builtin:: (uitofp ...)
+.. builtin:: (unconst ...)
+.. builtin:: (undef ...)
+.. builtin:: (union-type ...)
+.. builtin:: (unreachable! ...)
+.. builtin:: (urem ...)
+.. builtin:: (va-countof ...)
+.. builtin:: (va-key ...)
+.. builtin:: (va-keys ...)
+.. builtin:: (va-values ...)
+.. builtin:: (va@ ...)
+.. builtin:: (volatile-load ...)
+.. builtin:: (volatile-store ...)
+.. builtin:: (zext ...)
+.. compiledfn:: (Any-repr ...)
 
-.. type:: iterator
+   ``λ(string)<~(Any)``
+.. compiledfn:: (Any-string ...)
 
-Built-in Type Factories
------------------------
+   ``λ(string)<~(Any)``
+.. compiledfn:: (Any== ...)
 
-.. type-factory:: (array type count)
-.. type-factory:: (cfunction return-type parameter-tuple-type varargs?)
-.. type-factory:: (integer bit-width signed?)
-.. type-factory:: (pointer type)
-.. type-factory:: (real bit-width)
-.. type-factory:: (struct name-symbol)
-.. type-factory:: (symbol name-string)
-.. type-factory:: (tag name-symbol)
-.. type-factory:: (tuple (? element-type ...))
-.. type-factory:: (vector type count)
+   ``λ(bool)<~(Any Any)``
+.. compiledfn:: (Closure-frame ...)
 
-Builtin-in Special Forms
-------------------------
+   ``λ(Frame)<~(Closure)``
+.. compiledfn:: (Closure-label ...)
 
-.. special:: (call callable (? expression ...))
-.. special:: (cc/call return-callable callable (? expression ...))
-.. special:: (do (? expression ...) return-expression)
-.. special:: (form:fn/cc (? name) ((? parameter-name ...)) (? expression ...) return-expression)
-.. special:: (splice expression)
+   ``λ(Label)<~(Closure)``
+.. compiledfn:: (Image-type ...)
 
-Built-in Macros
----------------
+   ``λ(type)<~(type Symbol i32 i32 i32 i32 Symbol Symbol)``
+.. compiledfn:: (Label-anchor ...)
 
-.. macro:: (fn/cc (? name) ((? parameter-name ...)) (? expression ...) return-expression)
-.. macro:: (syntax-extend (? name) (return-callable scope-table) (? expression ...) scope-expression)
+   ``λ(Anchor)<~(Label)``
+.. compiledfn:: (Label-countof-reachable ...)
 
-Runtime Macros
---------------
+   ``λ(usize)<~(Label)``
+.. compiledfn:: (Label-docstring ...)
 
-.. macro:: (::@ expression)
-.. macro:: (::* expression)
-.. macro:: (: name (? value))
-.. macro:: (. value name)
-.. macro:: (? condition-bool then-expression else-expression)
-.. macro:: (and first-expression second-expression ...)
-.. macro:: (assert expression (? error-message))
-.. macro:: (define name compile-time-expression ...)
-.. macro:: (dump-syntax expression (? ...))
-.. macro:: (fn (? name) ((? parameter-name ...)) (? expression ...) return-expression)
-.. macro:: (if condition-bool ... expression)
-.. macro:: (elseif condition-bool ... expression)
-.. macro:: (else expression ...)
-.. macro:: (for name ... _:in iterable (? (_:with (name _:= value ...) ...)) body-expression ...)
-.. macro:: (else expression ...)
-.. macro:: (let name ... _:= expression ...)
-.. macro:: (let (name ... _:= expression ...) ...)
-.. macro:: (loop (| ((? name ...)) (_:with (name _:= value ...) ...)) body-expression ...)
-.. macro:: (max first-expression second-expression ...)
-.. macro:: (min first-expression second-expression ...)
-.. macro:: (or first-expression second-expression ...)
-.. macro:: (qquote value (? value ...))
-.. macro:: (quote value (? value ...))
-.. macro:: (set! parameter value)
-.. macro:: (try expression ...)
-.. macro:: (except (parameter) expression ...)
-.. macro:: (xlet name _:= expression ...)
-.. macro:: (xlet (name _:= expression ...) ...)
+   ``λ(string)<~(Label)``
+.. compiledfn:: (Label-name ...)
 
-Built-in Functions
-------------------
+   ``λ(Symbol)<~(Label)``
+.. compiledfn:: (Label-parameter ...)
 
-.. function:: (bitcast type value)
-.. function:: (block-scope-macro closure)
-.. function:: (branch condition-bool true-continuation false-continuation)
-.. function:: (cons head (? list ...))
-.. function:: (countof container-value)
-.. function:: (cstr value-rawstring)
-.. function:: (dump expression)
-.. function:: (element-type type)
-.. function:: (error message-string)
-.. function:: (escape expression)
-.. function:: (eval expression (? globals-table))
-.. function:: (exit (? code))
-.. function:: (expand expression-block-list scope-table)
-.. function:: (external name-symbol cfunction-type)
-.. function:: (get-exception-handler)
-.. function:: (globals)
-.. function:: (import-c path-string option-tuple)
-.. function:: (list-load path-string)
-.. function:: (list-parse expression-string)
-.. function:: (next-key table key)
-.. function:: (print (? expression ...))
-.. function:: (prompt prompt-string (? prepend-string))
-.. function:: (repr expression)
-.. function:: (raise error-value)
-.. function:: (set-exception-handler! closure)
-.. function:: (set-globals! globals-table)
-.. function:: (set-key! table key value)
-.. function:: (structof (? key-value-tuple ...))
-.. function:: (tableof (? key-value-tuple ...))
-.. function:: (tupleof (? expression ...))
-.. function:: (typeof expression)
-.. function:: (va-arg index vararg-parameter...)
-.. function:: (va-countof vararg-parameter...)
+   ``λ(Parameter)<~(Label usize)``
+.. compiledfn:: (Label-parameter-count ...)
 
-Runtime Functions
------------------
+   ``λ(usize)<~(Label)``
+.. compiledfn:: (Parameter-index ...)
 
-.. function:: (block-macro function)
-.. function:: (disqualify tag-type value)
-.. function:: (empty? countable-value)
-.. function:: (enumerate iterable (? from (? step)))
-.. function:: (iter iterable-value)
-.. function:: (iterator? value)
-.. function:: (key? table key)
-.. function:: (list-atom? value)
-.. function:: (list-head? list symbol)
-.. function:: (list? value)
-.. function:: (load table key)
-.. function:: (macro function)
-.. function:: (none? value)
-.. function:: (qualify tag-type value)
-.. function:: (range count)
-.. function:: (range start stop (? step))
-.. function:: (require module-name-string)
-.. function:: (symbol? value)
-.. function:: (xpcall callable exception-callable)
-.. function:: (zip left-iterable right-iterable)
+   ``λ(i32)<~(Parameter)``
+.. compiledfn:: (Parameter-name ...)
 
-Built-in Operators
-------------------
+   ``λ(Symbol)<~(Parameter)``
+.. compiledfn:: (Parameter-new ...)
 
-.. function:: (== first-value second-value)
-.. function:: (!= first-value second-value)
-.. function:: (> first-value second-value)
-.. function:: (>= first-value second-value)
-.. function:: (< first-value second-value)
-.. function:: (<= first-value second-value)
-.. function:: (.. first-value second-value)
-.. function:: (+ first-value second-value (? ...))
-.. function:: (- first-value (? second-value))
-.. function:: (* first-value second-value (? ...))
-.. function:: (** base-number exponent-number)
-.. function:: (/ first-value (? second-value))
-.. function:: (// first-value second-value)
-.. function:: (% first-value second-value)
-.. function:: (| first-value second-value (? ...))
-.. function:: (& first-value second-value)
-.. function:: (^ first-value second-value)
-.. function:: (~ expression)
-.. function:: (<< value offset)
-.. function:: (>> value offset)
-.. function:: (@ container-value (| index-value name-symbol))
-.. function:: (hash expression)
-.. function:: (not expression)
-.. function:: (slice expression start-index (? end-index))
-.. function:: (string expression)
+   ``λ(Parameter)<~(Anchor Symbol type)``
+.. compiledfn:: (SampledImage-type ...)
 
-Runtime Operators
------------------
+   ``λ(type)<~(type)``
+.. compiledfn:: (Scope-clone ...)
 
-.. function:: (@ container-value (| index-value name-symbol) ...)
+   ``λ(Scope)<-(Scope)``
+.. compiledfn:: (Scope-clone-expand ...)
+
+   ``λ(Scope)<-(Scope Scope)``
+.. compiledfn:: (Scope-local@ ...)
+
+   ``λ(Any bool)<~(Scope Symbol)``
+.. compiledfn:: (Scope-new ...)
+
+   ``λ(Scope)<-()``
+.. compiledfn:: (Scope-new-expand ...)
+
+   ``λ(Scope)<-(Scope)``
+.. compiledfn:: (Scope-next ...)
+
+   ``λ(Symbol Any)<~(Scope Symbol)``
+.. compiledfn:: (Scope-parent ...)
+
+   ``λ(Scope)<-(Scope)``
+.. compiledfn:: (Scope@ ...)
+
+   ``λ(Any bool)<~(Scope Symbol)``
+.. compiledfn:: (Symbol->string ...)
+
+   ``λ(string)<~(Symbol)``
+.. compiledfn:: (Syntax-new ...)
+
+   ``λ(Syntax)<~(Anchor Any bool)``
+.. compiledfn:: (Syntax-strip ...)
+
+   ``λ(Any)<~(Any)``
+.. compiledfn:: (Syntax-wrap ...)
+
+   ``λ(Any)<~(Anchor Any bool)``
+.. compiledfn:: (abort! ...)
+
+   ``λ()<-()``
+.. compiledfn:: (active-anchor ...)
+
+   ``λ(Anchor)<-()``
+.. compiledfn:: (alignof ...)
+
+   ``λ(usize)<~(type)``
+.. compiledfn:: (array-type ...)
+
+   ``λ(type)<~(type usize)``
+.. compiledfn:: (basename ...)
+
+   ``λ(string)<-(string)``
+.. compiledfn:: (bitcountof ...)
+
+   ``λ(i32)<~(type)``
+.. compiledfn:: (catch-exception ...)
+
+   ``λ(i32)<-([u8 x 216]*)``
+.. compiledfn:: (compiler-version ...)
+
+   ``λ(i32 i32 i32)<~()``
+.. compiledfn:: (default-styler ...)
+
+   ``λ(string)<~(Symbol string)``
+.. compiledfn:: (delete-scope-symbol! ...)
+
+   ``λ()<-(Scope Symbol)``
+.. compiledfn:: (directory? ...)
+
+   ``λ(bool)<-(string)``
+.. compiledfn:: (dirname ...)
+
+   ``λ(string)<-(string)``
+.. compiledfn:: (dump-frame ...)
+
+   ``λ()<~(Frame)``
+.. compiledfn:: (dump-label ...)
+
+   ``λ()<~(Label)``
+.. compiledfn:: (dump-list ...)
+
+   ``λ(list)<~(list)``
+.. compiledfn:: (element-index ...)
+
+   ``λ(i32)<~(type Symbol)``
+.. compiledfn:: (element-name ...)
+
+   ``λ(Symbol)<~(type i32)``
+.. compiledfn:: (element-type ...)
+
+   ``λ(type)<~(type i32)``
+.. compiledfn:: (enter-solver-cli! ...)
+
+   ``λ()<~()``
+.. compiledfn:: (eval ...)
+
+   ``λ(Label)<~(Syntax Scope)``
+.. compiledfn:: (exception-value ...)
+
+   ``λ(Any)<-([u8 x 216]*)``
+.. compiledfn:: (exit ...)
+
+   ``λ()<-(i32)``
+.. compiledfn:: (extern-type-binding ...)
+
+   ``λ(i32)<~(type)``
+.. compiledfn:: (extern-type-location ...)
+
+   ``λ(i32)<~(type)``
+.. compiledfn:: (file? ...)
+
+   ``λ(bool)<-(string)``
+.. compiledfn:: (format-message ...)
+
+   ``λ(string)<-(Anchor string)``
+.. compiledfn:: (function-type-variadic? ...)
+
+   ``λ(bool)<~(type)``
+.. compiledfn:: (globals ...)
+
+   ``λ(Scope)<-()``
+.. compiledfn:: (import-c ...)
+
+   ``λ(Scope)<~(string string list)``
+.. compiledfn:: (integer-type ...)
+
+   ``λ(type)<~(i32 bool)``
+.. compiledfn:: (io-write! ...)
+
+   ``λ()<-(string)``
+.. compiledfn:: (list-cons ...)
+
+   ``λ(list)<~(Any list)``
+.. compiledfn:: (list-join ...)
+
+   ``λ(list)<~(list list)``
+.. compiledfn:: (list-load ...)
+
+   ``λ(Syntax)<-(string)``
+.. compiledfn:: (list-parse ...)
+
+   ``λ(Syntax)<-(string)``
+.. compiledfn:: (load-library ...)
+
+   ``λ()<-(string)``
+.. compiledfn:: (opaque? ...)
+
+   ``λ(bool)<~(type)``
+.. compiledfn:: (pointer-type ...)
+
+   ``λ(type)<~(type u64 Symbol)``
+.. compiledfn:: (pointer-type-flags ...)
+
+   ``λ(u64)<~(type)``
+.. compiledfn:: (pointer-type-set-element-type ...)
+
+   ``λ(type)<~(type type)``
+.. compiledfn:: (pointer-type-set-flags ...)
+
+   ``λ(type)<~(type u64)``
+.. compiledfn:: (pointer-type-set-storage-class ...)
+
+   ``λ(type)<~(type Symbol)``
+.. compiledfn:: (pointer-type-storage-class ...)
+
+   ``λ(Symbol)<~(type)``
+.. compiledfn:: (realpath ...)
+
+   ``λ(string)<-(string)``
+.. compiledfn:: (runtime-type@ ...)
+
+   ``λ(Any bool)<~(type Symbol)``
+.. compiledfn:: (set-anchor! ...)
+
+   ``λ()<-(Anchor)``
+.. compiledfn:: (set-autocomplete-scope! ...)
+
+   ``λ()<-(Scope)``
+.. compiledfn:: (set-exception-pad ...)
+
+   ``λ([u8 x 216]*)<-([u8 x 216]*)``
+.. compiledfn:: (set-globals! ...)
+
+   ``λ()<-(Scope)``
+.. compiledfn:: (set-signal-abort! ...)
+
+   ``λ()<-(bool)``
+.. compiledfn:: (set-typename-super! ...)
+
+   ``λ()<~(type type)``
+.. compiledfn:: (signed? ...)
+
+   ``λ(bool)<~(type)``
+.. compiledfn:: (sizeof ...)
+
+   ``λ(usize)<~(type)``
+.. compiledfn:: (storageof ...)
+
+   ``λ(type)<~(type)``
+.. compiledfn:: (string->Symbol ...)
+
+   ``λ(Symbol)<~(string)``
+.. compiledfn:: (string-join ...)
+
+   ``λ(string)<~(string string)``
+.. compiledfn:: (string-match? ...)
+
+   ``λ(bool)<~(string string)``
+.. compiledfn:: (string-new ...)
+
+   ``λ(string)<~(i8(*) usize)``
+.. compiledfn:: (superof ...)
+
+   ``λ(type)<~(type)``
+.. compiledfn:: (type-countof ...)
+
+   ``λ(usize)<~(type)``
+.. compiledfn:: (type-debug-abi ...)
+
+   ``λ()<~(type)``
+.. compiledfn:: (type-kind ...)
+
+   ``λ(i32)<~(type)``
+.. compiledfn:: (type-name ...)
+
+   ``λ(string)<~(type)``
+.. compiledfn:: (typename-type ...)
+
+   ``λ(type)<~(string)``
+.. compiledfn:: (vector-type ...)
+
+   ``λ(type)<~(type usize)``
+.. compiledfn:: (verify-stack! ...)
+
+   ``λ(usize)<-()``

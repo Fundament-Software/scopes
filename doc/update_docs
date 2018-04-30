@@ -1,0 +1,2 @@
+./build_reference.sc > scopes-ref.rst
+

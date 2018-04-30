@@ -77,7 +77,7 @@ class ScopesObject(ObjectDescription):
         # first try the function pointer signature regex, it's more specific
         expr = parser.compile(sig, "<signature>").strip()
 
-        def parse_arg(plist, e):
+        def parse_arg(plist, e, i):
             type_ = parser.ast_type(e)
             if type_ == "list":
                 head = e and e[0]
@@ -106,36 +106,41 @@ class ScopesObject(ObjectDescription):
             elif type_ == "symbol":
                 if e.startswith('_:'):
                     e = e[2:]
-                    plist += addnodes.desc_name(e, " " + e + " ")
+                    plist += addnodes.desc_name(e, e)
                 else:
-                    plist += addnodes.desc_parameter(e, " " + e + " ")
+                    plist += addnodes.desc_parameter(e, e)
             else:
                 e = repr(e)
                 plist += addnodes.desc_parameter(e, e)
 
         signode += addnodes.desc_annotation(self.objtype, self.objtype + ' ')
 
-        paramlist = addnodes.desc_parameterlist()
-        paramlist.child_text_separator = ' '
         if self.objtype in ('infix-macro',):
+            paramlist = addnodes.desc_parameterlist()
+            paramlist.child_text_separator = ' '
             name = expr[1]
             parse_arg(paramlist, expr[0])
             paramlist += addnodes.desc_name(name, ' ' + name)
             parse_arg(paramlist, expr[2])
+            signode += paramlist
         elif self.objtype in ('symbol-prefix',):
             name = expr[0]
             rest = expr[1]
             signode += addnodes.desc_name(name, name)
             paramlist = addnodes.desc_parameter(rest, rest)
+            signode += paramlist
         elif self.objtype in ('define','type'):
             name = expr
             paramlist = addnodes.desc_name(name, name)
+            signode += paramlist
         else:
+            paramlist = addnodes.desc_parameterlist()
+            paramlist.child_text_separator = ' '
             name = expr[0]
-            paramlist += addnodes.desc_name(name, ' ' + name + ' ')
-            for arg in expr[1:]:
-                parse_arg(paramlist, arg)
-        signode += paramlist
+            signode += addnodes.desc_name(name, name + ' ')
+            for i,arg in enumerate(expr[1:]):
+                parse_arg(paramlist, arg, i)
+            signode += paramlist
 
         return name, self.objtype
 
@@ -190,29 +195,32 @@ class ScopesDomain(Domain):
     name = domain_name
     label = 'Scopes'
     object_types = {
-        'special': ObjType(l_('special'), 'special'),
+        'builtin': ObjType(l_('builtin'), 'builtin'),
         'macro':    ObjType(l_('macro'),    'macro'),
         'infix-macro':    ObjType(l_('infix-macro'), 'infix-macro'),
         'symbol-prefix':    ObjType(l_('symbol-prefix'), 'symbol-prefix'),
-        'function': ObjType(l_('function'), 'function'),
+        'fn': ObjType(l_('fn'), 'fn'),
+        'compiledfn': ObjType(l_('compiledfn'), 'compiledfn'),
         'define': ObjType(l_('define'), 'define'),
         'type': ObjType(l_('type'), 'type'),
         'type-factory': ObjType(l_('type-factory'), 'type-factory'),
     }
 
     directives = {
-        'special': ScopesObject,
+        'builtin': ScopesObject,
         'macro':    ScopesObject,
         'infix-macro':    ScopesObject,
         'symbol-prefix':    ScopesObject,
-        'function': ScopesObject,
+        'fn': ScopesObject,
+        'compiledfn': ScopesObject,
         'define': ScopesObject,
         'type': ScopesObject,
         'type-factory': ScopesObject,
     }
     roles = {
-        'func' :  ScopesXRefRole(),
-        'special' :  ScopesXRefRole(),
+        'fn' :  ScopesXRefRole(),
+        'compiledfn' :  ScopesXRefRole(),
+        'builtin' :  ScopesXRefRole(),
         'macro' :  ScopesXRefRole(),
         'infix-macro' :  ScopesXRefRole(),
         'symbol-prefix':    ScopesXRefRole(),
@@ -222,16 +230,16 @@ class ScopesDomain(Domain):
         'type-factory':    ScopesXRefRole(),
     }
 
-    role_map = {
-        'func' : 'function',
-    }
+    #role_map = {
+    #    'func' : 'fn',
+    #}
 
     search_roles = [
         'define',
         'macro',
         'infix-macro',
-        'function',
-        'special',
+        'fn',
+        'builtin',
         'type',
         'type-factory',
     ]
