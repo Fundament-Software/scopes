@@ -2245,6 +2245,14 @@ fn deref (val)
             load val
     else val
 
+set-type-symbol!& Any 'typeof
+    fn (self)
+        Any-typeof (deref self)
+
+set-type-symbol!& Any '__imply
+    fn (src destT)
+        Any-extract (deref src) destT
+
 do
     fn passthru-overload (sym func)
         set-type-symbol! reference sym (fn (a b flipped) (func (deref a) (deref b)))

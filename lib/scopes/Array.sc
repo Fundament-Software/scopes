@@ -21,8 +21,6 @@ fn gen-element-destructor (element-type)
                 loop (i + 1:usize)
 
 fn define-common-array-methods (T element-type ensure-capacity)
-    dump "define-common-array-methods" T element-type ensure-capacity
-
     let destructor = (gen-element-destructor element-type)
 
     typefn& T '__delete (self)

@@ -1,7 +1,7 @@
-import MutableArray
+using import Array
 
 let loop (scope) = (globals)
-let objs = (local (MutableArray Any))
+let objs = (local (Array Any))
 if (scope != null)
     let a b = (Scope-parent scope)
     for k v in scope
