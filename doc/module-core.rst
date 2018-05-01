@@ -79,80 +79,120 @@ parses the command-line and optionally enters the REPL.
 .. define:: unroll-limit
 .. type:: Anchor
 .. type:: Any
+.. typefn:: (Any '__apply-type cls value)
 .. typefn:: (Any 'typeof val)
+.. reftypefn:: (Any 'typeof self)
 .. type:: Builtin
 .. type:: CEnum
 .. type:: CStruct
+.. typefn:: (CStruct '__apply-type cls args...)
 .. typefn:: (CStruct 'structof cls args...)
 .. type:: CUnion
+.. typefn:: (CUnion '__apply-type cls)
 .. type:: Capture
 .. type:: Closure
 .. type:: Exception
 .. type:: Frame
 .. type:: Generator
+.. typefn:: (Generator '__call self)
+.. typefn:: (Generator '__apply-type cls iter init)
 .. type:: Image
 .. type:: Label
 .. typefn:: (Label 'parameters self)
 .. type:: Macro
+.. typefn:: (Macro '__call self at next scope)
+.. typefn:: (Macro '__apply-type cls f)
 .. type:: Nothing
 .. type:: NullType
    
    The type of the `null` constant. This type is uninstantiable.
 .. type:: Parameter
 .. typefn:: (Parameter 'return-label? self)
+.. typefn:: (Parameter '__apply-type cls params...)
 .. type:: ReturnLabel
+.. typefn:: (ReturnLabel '__apply-type cls ...)
 .. type:: SampledImage
 .. type:: Sampler
 .. type:: Scope
+.. typefn:: (Scope '__apply-type cls parent clone)
 .. type:: SourceFile
 .. type:: Symbol
+.. typefn:: (Symbol '__call name self ...)
+.. typefn:: (Symbol '__apply-type cls value)
 .. type:: Syntax
 .. type:: Unknown
 .. type:: array
+.. typefn:: (array '__apply-type cls ...)
 .. type:: bool
+.. typefn:: (bool '__apply-type destT val)
 .. type:: constant
 .. type:: exception-pad-type
 .. type:: extern
+.. typefn:: (extern '__call self ...)
+.. typefn:: (extern '__apply-type cls ...)
 .. type:: f16
 .. type:: f32
+.. typefn:: (f32 '__apply-type destT val)
 .. type:: f64
+.. typefn:: (f64 '__apply-type destT val)
 .. type:: f80
 .. type:: function
+.. typefn:: (function '__apply-type cls ...)
 .. type:: hash
+.. typefn:: (hash '__apply-type cls values...)
 .. type:: i16
+.. typefn:: (i16 '__apply-type destT val)
 .. type:: i32
+.. typefn:: (i32 '__apply-type destT val)
 .. type:: i64
+.. typefn:: (i64 '__apply-type destT val)
 .. type:: i8
+.. typefn:: (i8 '__apply-type destT val)
 .. type:: immutable
 .. type:: integer
+.. typefn:: (integer '__apply-type cls ...)
 .. type:: list
+.. typefn:: (list '__apply-type cls ...)
 .. type:: pointer
 .. typefn:: (pointer 'mutable cls ET)
 .. typefn:: (pointer 'immutable cls ET)
 .. typefn:: (pointer 'storage cls)
 .. typefn:: (pointer 'readable? cls)
+.. typefn:: (pointer '__apply-type cls T opt)
 .. typefn:: (pointer 'writable? cls)
 .. typefn:: (pointer 'set-element-type cls ET)
 .. typefn:: (pointer 'strip-storage cls ET)
 .. type:: rawstring
 .. type:: real
 .. type:: reference
+.. typefn:: (reference '__apply-type cls element)
 .. typefn:: (reference 'from-pointer value)
+.. typefn:: (reference '__call self args...)
 .. typefn:: (reference 'from-pointer-type PT)
 .. type:: string
 .. typefn:: (string 'from-cstr value)
 .. type:: tuple
+.. typefn:: (tuple '__apply-type cls ...)
 .. type:: type
+.. typefn:: (type '__call cls ...)
 .. type:: typename
 .. typefn:: (typename 'elements self)
 .. typefn:: (typename 'symbols self)
+.. typefn:: (typename '__apply-type cls args...)
 .. type:: u16
+.. typefn:: (u16 '__apply-type destT val)
 .. type:: u32
+.. typefn:: (u32 '__apply-type destT val)
 .. type:: u64
+.. typefn:: (u64 '__apply-type destT val)
 .. type:: u8
+.. typefn:: (u8 '__apply-type destT val)
 .. type:: union
+.. typefn:: (union '__apply-type cls ...)
 .. type:: usize
+.. typefn:: (usize '__apply-type destT val)
 .. type:: vector
+.. typefn:: (vector '__apply-type cls ...)
 .. type:: void
 .. type:: voidstar
 .. fn:: (% a b)

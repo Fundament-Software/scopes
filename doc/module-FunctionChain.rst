@@ -5,6 +5,7 @@ A function chain implements a compile-time observer pattern that allows
 a module to call back into dependent modules in a decoupled way.
 
 .. type:: FunctionChain
+.. typefn:: (FunctionChain '__apply-type cls name)
 .. typefn:: (FunctionChain 'prepend self f)
    
    Prepend function `f` to function chain. When the function chain is called,
@@ -17,4 +18,9 @@ a module to call back into dependent modules in a decoupled way.
    
    Clear the function chain. When the function chain is applied next,
    no functions will be called.
-.. macro:: (fnchain ...)
+.. macro:: (fnchain name)
+
+   Binds a new unique and empty function chain to identifier `name`. The
+   function chain's typename is going to incorporate the name of the module
+   in which it was declared.
+

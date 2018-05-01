@@ -70,16 +70,29 @@ fn repeat-string (n c)
     loop (i + (usize 1))
         .. s c
 
-fn print-entry (parent key entry parent-name)
+fn print-entry (parent key entry parent-name opts...)
+    let typemember? = ((typeof parent) == type)
+    let sym = key
     let key = (key as string)
     let prefix1 = (slice key 0 1)
     let prefix2 = (slice key 0 2)
     if (prefix1 == "#")
         return;
-    elseif (prefix2 == "__")
+    elseif
+        and (prefix2 == "__")
+            not
+                and typemember?
+                    or
+                        sym == '__new
+                        sym == '__apply-type
+                        sym == '__call
         return;
     let T = ('typeof entry)
-    let typemember? = ((typeof parent) == type)
+    fn getopt (name defvalue)
+        let val = (va@ name opts...)
+        if (none? val) defvalue
+        else val
+    let referenced? = (getopt 'referenced false)
     let docstr has-docstr =
         if typemember?
             unconst-all "" false
@@ -102,7 +115,10 @@ fn print-entry (parent key entry parent-name)
             io-write! "\n"
         else
             if typemember?
-                io-write! ".. typefn:: ("
+                if referenced?
+                    io-write! ".. reftypefn:: ("
+                else
+                    io-write! ".. typefn:: ("
                 io-write! parent-name
                 io-write! " '"
             else
@@ -139,7 +155,12 @@ fn print-entry (parent key entry parent-name)
             let ty = (entry as type)
             for k v in (typename.symbols ty)
                 print-entry ty k v key
-                #print k v
+            let refty = (runtime-type@ ty reference-attribs-key)
+            if (('typeof refty) == type)
+                let refty = (refty as type)
+                for k v in (typename.symbols refty)
+                    print-entry ty k v key (referenced = true)
+
     elseif (function-pointer-type? T)
         let fntype = (@ T)
         let params = (countof fntype)

@@ -112,7 +112,11 @@ class ScopesObject(ObjectDescription):
                 e = repr(e)
                 plist += addnodes.desc_parameter(e, e)
 
-        signode += addnodes.desc_annotation(self.objtype, self.objtype + ' ')
+        locname = self.objtype
+        if locname == 'reftypefn':
+            locname = 'typefn&'
+
+        signode += addnodes.desc_annotation(self.objtype, locname)
 
         if self.objtype in ('infix-macro',):
             paramlist = addnodes.desc_parameterlist()
@@ -132,7 +136,7 @@ class ScopesObject(ObjectDescription):
             name = expr
             paramlist = addnodes.desc_name(name, name)
             signode += paramlist
-        elif self.objtype in ('typefn',):
+        elif self.objtype in ('typefn','reftypefn'):
             paramlist = addnodes.desc_parameterlist()
             paramlist.child_text_separator = ' '
             typename = expr[0]
@@ -140,6 +144,15 @@ class ScopesObject(ObjectDescription):
             name = typename + "." + member[1:]
             signode += addnodes.desc_name(name, typename + " " + member + ' ')
             for i,arg in enumerate(expr[2:]):
+                parse_arg(paramlist, arg)
+            signode += paramlist
+        elif self.objtype in ('macro',):
+            paramlist = addnodes.desc_parameterlist()
+            paramlist.child_text_separator = ' '
+            name = expr[0]
+            signode += addnodes.desc_name(name, '')
+            paramlist += addnodes.desc_name(name, name + ' ')
+            for i,arg in enumerate(expr[1:]):
                 parse_arg(paramlist, arg)
             signode += paramlist
         else:
@@ -210,6 +223,7 @@ class ScopesDomain(Domain):
         'symbol-prefix':    ObjType(l_('symbol-prefix'), 'symbol-prefix'),
         'fn': ObjType(l_('fn'), 'fn'),
         'typefn': ObjType(l_('typefn'), 'typefn'),
+        'reftypefn': ObjType(l_('reftypefn'), 'reftypefn'),
         'compiledfn': ObjType(l_('compiledfn'), 'compiledfn'),
         'define': ObjType(l_('define'), 'define'),
         'type': ObjType(l_('type'), 'type'),
@@ -223,6 +237,7 @@ class ScopesDomain(Domain):
         'symbol-prefix':    ScopesObject,
         'fn': ScopesObject,
         'typefn': ScopesObject,
+        'reftypefn': ScopesObject,
         'compiledfn': ScopesObject,
         'define': ScopesObject,
         'type': ScopesObject,
@@ -231,6 +246,7 @@ class ScopesDomain(Domain):
     roles = {
         'fn' :  ScopesXRefRole(),
         'typefn' :  ScopesXRefRole(),
+        'reftypefn' :  ScopesXRefRole(),
         'compiledfn' :  ScopesXRefRole(),
         'builtin' :  ScopesXRefRole(),
         'macro' :  ScopesXRefRole(),
@@ -254,6 +270,8 @@ class ScopesDomain(Domain):
         'builtin',
         'type',
         'type-factory',
+        'typefn',
+        'reftypefn',
     ]
 
     initial_data = {
