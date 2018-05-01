@@ -256,10 +256,10 @@ Many calculations require repeating an operation several times, and of course
 Scopes can also do that. For instance, here is one of the typical examples
 for such a task, computing the first few numbers of the fibonacci sequence::
 
-    $0 ▶ let loop (a b) = 0 1
+    $0 ▶ loop (a b) = 0 1
     .... if (b < 10)
     ....     print b
-    ....     loop b (a + b)
+    ....     repeat b (a + b)
     ....
     1
     1
@@ -270,10 +270,9 @@ for such a task, computing the first few numbers of the fibonacci sequence::
 
 This example introduces several new features.
 
-* The first line performs a *named* assignment, which assigns a label to it
-  (in this example, named ``loop``, but any name is fine) so we can jump back
-  (see the fourth line), bind new values to those names, and perform the same
-  following operations again: in short, to build a loop.
+* The first line declares the entry point of a loop so we can jump back
+  (see the fourth line), bind new values to ``a`` and ``b``, and perform the same
+  operations again.
 * The first line also performs multiple assignments at the same time. ``a`` is
   initially bound to ``0``, while ``b`` is initialized to ``1``. When we jump
   to this assignment again in line four, ``a`` will be bound to ``b``, while
@@ -336,7 +335,7 @@ Let's generalize the fibonacci example from earlier to a function that can
 write numbers from the fibonacci sequence up to an arbitrary boundary::
 
     $0 ▶ fn fib (n) # write Fibonacci series up to n
-    ....     let repeat (a b) = 0 (unconst 1)
+    ....     loop (a b) = 0 1
     ....     if (a < n)
     ....         io-write! (repr a)
     ....         io-write! " "
@@ -358,56 +357,4 @@ argument standing in.
 In this example, ``n`` is bound to ``2000``, all instances of ``n`` in the body
 of ``fib`` are replaced with ``2000``, and therefore the loop is executed until
 the condition ``a < 2000`` is `true`.
-
-You may notice a small change to the loop variables here, passing ``(unconst 1)``
-instead of simply ``1``. Conceptually, `unconst` seems to have no effect when
-examined::
-
-    $0 ▶ 23
-    $0 = 23
-    $1 ▶ unconst 23
-    $1 = 23
-
-But when we use the `dump` operation to look at values as they appear to the
-compiler as it *proves* that expressions are properly typed and folds constant
-expressions, we see a significant difference::
-
-    $0 ▶ dump 23
-    <string>:1:1: dump: 23
-    $0 = 23
-    $1 ▶ dump (unconst 23)
-    <string>:1:1: dump: <unknown>:i32
-    $1 = 23
-
-The Scopes compiler is guaranteed to inline constant values and fold constant
-expressions wherever they occur, which can become a problem with loops that run
-for many iterations or have non-constant exit conditions. Let's see what happens
-when we remove `unconst` from ``fib``::
-
-    $0 ▶ fn fib (n)
-    ....     let repeat (a b) = 0 1
-    ....     if (a < n)
-    ....         io-write! (repr a)
-    ....         io-write! " "
-    ....         repeat b (a + b)
-    ....     io-write! "\n"
-    ....
-    $0 = fib(n)▶?:Label
-    $1 ▶ fib 2000 # this one still works
-    0 1 1 2 3 5 8 13 21 34 55 89 144 233 377 610 987 1597
-    $2 ▶ fib 2147483647 # but look here
-    <string>:1:1: in <string>
-        fib 2147483647
-    <string>:4:19: in anonymous function
-        io-write! (repr a)
-    /home/lritter/devel/duangle/scopes/core.sc:96:1: error: instance limit reached
-        while unrolling named recursive function. Use less constant arguments.
-
-we see that `unconst` regulates which expressions are evaluated at compile time
-and which aren't.
-
-
-
-
-
 

@@ -25,7 +25,8 @@ TOKEN_TERMINATORS = "()[]{}\"';#,"
 types = set("""bool i8 i16 i32 i64 u8 u16 u32 u64 f32 f64 Scope Label Parameter
 string list Symbol Syntax Nothing type Any
 """.strip().split())
-keywords = set("""fn let if elseif else label return syntax-extend
+keywords = set("""fn let if elseif else label return syntax-extend loop repeat
+while for in
 """.strip().split())
 builtins = set("""print import-from branch icmp== icmp!= icmp<s icmp<=s icmp>s
 icmp>=s icmp<u icmp<=u icmp>u icmp>=u
