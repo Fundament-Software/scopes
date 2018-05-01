@@ -7,16 +7,27 @@ and access external variables for shader programs.
 .. type:: XVarBridgeType
 .. type:: XVarType
 .. type:: gsampler1D
+.. typefn:: (gsampler1D 'fetch args...)
 .. type:: gsampler1DArray
+.. typefn:: (gsampler1DArray 'fetch args...)
 .. type:: gsampler2D
+.. typefn:: (gsampler2D 'fetch args...)
 .. type:: gsampler2DArray
+.. typefn:: (gsampler2DArray 'fetch args...)
 .. type:: gsampler2DMS
+.. typefn:: (gsampler2DMS 'fetch args...)
 .. type:: gsampler2DMSArray
+.. typefn:: (gsampler2DMSArray 'fetch args...)
 .. type:: gsampler2DRect
+.. typefn:: (gsampler2DRect 'fetch args...)
 .. type:: gsampler3D
+.. typefn:: (gsampler3D 'fetch args...)
 .. type:: gsamplerBuffer
+.. typefn:: (gsamplerBuffer 'fetch args...)
 .. type:: gsamplerCube
+.. typefn:: (gsamplerCube 'fetch args...)
 .. type:: gsamplerCubeArray
+.. typefn:: (gsamplerCubeArray 'fetch args...)
 .. type:: isampler1D
 .. type:: isampler1DArray
 .. type:: isampler2D

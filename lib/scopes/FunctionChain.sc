@@ -11,11 +11,15 @@
 let FunctionChain = (typename "FunctionChain")
 
 typefn FunctionChain 'clear (self)
+    """"Clear the function chain. When the function chain is applied next,
+        no functions will be called.
     assert (not (type== self FunctionChain))
     assert (constant? self)
     typefn self '__apply-type (self args...)
     self
 typefn FunctionChain 'append (self f)
+    """"Append function `f` to function chain. When the function chain is called,
+        `f` will be called last. The return value of `f` will be ignored.
     assert (not (type== self FunctionChain))
     assert (constant? f)
     assert (constant? self)
@@ -25,6 +29,8 @@ typefn FunctionChain 'append (self f)
         f args...
     self
 typefn FunctionChain 'prepend (self f)
+    """"Prepend function `f` to function chain. When the function chain is called,
+        `f` will be called first. The return value of `f` will be ignored.
     assert (not (type== self FunctionChain))
     assert (constant? f)
     assert (constant? self)

@@ -70,30 +70,28 @@ fn repeat-string (n c)
     loop (i + (usize 1))
         .. s c
 
-let moduledoc = (Scope-docstring module)
-if (not (empty? moduledoc))
-    io-write! (moduledoc as string)
-    io-write! "\n"
-
-for entry in objs
-    let key entry = (unpack entry)
+fn print-entry (parent key entry parent-name)
     let key = (key as string)
     let prefix1 = (slice key 0 1)
     let prefix2 = (slice key 0 2)
     if (prefix1 == "#")
-        continue;
+        return;
     elseif (prefix2 == "__")
-        continue;
+        return;
     let T = ('typeof entry)
-    let dockey = (Symbol (.. "#doc:" key))
-    let docstr has-docstr = (module @ dockey)
+    let typemember? = ((typeof parent) == type)
+    let docstr has-docstr =
+        if typemember?
+            unconst-all "" false
+        else
+            parent @ (Symbol (.. "#doc:" key))
     let docstr =
         if has-docstr (docstr as string)
         else (unconst "")
     if (docstring-is-complete docstr)
         io-write! docstr
         io-write! "\n"
-        continue;
+        return;
     if (T == Closure)
         let func = (entry as Closure)
         let docstr = (docstring func)
@@ -103,7 +101,12 @@ for entry in objs
             io-write! docstr
             io-write! "\n"
         else
-            io-write! ".. fn:: ("
+            if typemember?
+                io-write! ".. typefn:: ("
+                io-write! parent-name
+                io-write! " '"
+            else
+                io-write! ".. fn:: ("
             io-write! key
             for i param in (enumerate ('parameters label))
                 if (i > 0)
@@ -114,29 +117,57 @@ for entry in objs
             write-docstring docstr
     elseif (T == Builtin)
         io-write! ".. builtin:: ("
+        if typemember?
+            io-write! parent-name; io-write! "."
         io-write! key
         io-write! " ...)\n"
     elseif (T == Macro)
         io-write! ".. macro:: ("
+        if typemember?
+            io-write! parent-name; io-write! "."
         io-write! key
         io-write! " ...)\n"
     elseif (T == type)
+        if (typemember? and (not has-docstr))
+            return;
         io-write! ".. type:: "
+        if typemember?
+            io-write! parent-name; io-write! "."
         io-write! key
         io-write! "\n"
+        if (not typemember?)
+            let ty = (entry as type)
+            for k v in (typename.symbols ty)
+                print-entry ty k v key
+                #print k v
     elseif (function-pointer-type? T)
         let fntype = (@ T)
         let params = (countof fntype)
         io-write! ".. compiledfn:: ("
+        if typemember?
+            io-write! parent-name; io-write! "."
         io-write! key
         io-write! " ...)\n\n"
         io-write! "   ``"
         io-write! (string-repr fntype)
         io-write! "``\n"
     elseif (T < extern)
-        continue;
+        return;
     else
+        if (typemember? and (not has-docstr))
+            return;
         io-write! ".. define:: "
+        if typemember?
+            io-write! parent-name; io-write! "."
         io-write! key
         io-write! "\n"
     write-docstring docstr
+
+let moduledoc = (Scope-docstring module)
+if (not (empty? moduledoc))
+    io-write! (moduledoc as string)
+    io-write! "\n"
+
+for entry in objs
+    let key entry = (unpack entry)
+    print-entry module key entry

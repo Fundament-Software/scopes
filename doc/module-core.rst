@@ -79,9 +79,11 @@ parses the command-line and optionally enters the REPL.
 .. define:: unroll-limit
 .. type:: Anchor
 .. type:: Any
+.. typefn:: (Any 'typeof val)
 .. type:: Builtin
 .. type:: CEnum
 .. type:: CStruct
+.. typefn:: (CStruct 'structof cls args...)
 .. type:: CUnion
 .. type:: Capture
 .. type:: Closure
@@ -90,12 +92,14 @@ parses the command-line and optionally enters the REPL.
 .. type:: Generator
 .. type:: Image
 .. type:: Label
+.. typefn:: (Label 'parameters self)
 .. type:: Macro
 .. type:: Nothing
 .. type:: NullType
    
    The type of the `null` constant. This type is uninstantiable.
 .. type:: Parameter
+.. typefn:: (Parameter 'return-label? self)
 .. type:: ReturnLabel
 .. type:: SampledImage
 .. type:: Sampler
@@ -123,13 +127,25 @@ parses the command-line and optionally enters the REPL.
 .. type:: integer
 .. type:: list
 .. type:: pointer
+.. typefn:: (pointer 'mutable cls ET)
+.. typefn:: (pointer 'immutable cls ET)
+.. typefn:: (pointer 'storage cls)
+.. typefn:: (pointer 'readable? cls)
+.. typefn:: (pointer 'writable? cls)
+.. typefn:: (pointer 'set-element-type cls ET)
+.. typefn:: (pointer 'strip-storage cls ET)
 .. type:: rawstring
 .. type:: real
 .. type:: reference
+.. typefn:: (reference 'from-pointer value)
+.. typefn:: (reference 'from-pointer-type PT)
 .. type:: string
+.. typefn:: (string 'from-cstr value)
 .. type:: tuple
 .. type:: type
 .. type:: typename
+.. typefn:: (typename 'elements self)
+.. typefn:: (typename 'symbols self)
 .. type:: u16
 .. type:: u32
 .. type:: u64
@@ -831,6 +847,9 @@ modules.
 .. compiledfn:: (type-name ...)
 
    ``λ(string)<~(type)``
+.. compiledfn:: (type-next ...)
+
+   ``λ(Symbol Any)<~(type Symbol)``
 .. compiledfn:: (typename-type ...)
 
    ``λ(type)<~(string)``

@@ -132,6 +132,16 @@ class ScopesObject(ObjectDescription):
             name = expr
             paramlist = addnodes.desc_name(name, name)
             signode += paramlist
+        elif self.objtype in ('typefn',):
+            paramlist = addnodes.desc_parameterlist()
+            paramlist.child_text_separator = ' '
+            typename = expr[0]
+            member = expr[1]
+            name = typename + "." + member[1:]
+            signode += addnodes.desc_name(name, typename + " " + member + ' ')
+            for i,arg in enumerate(expr[2:]):
+                parse_arg(paramlist, arg)
+            signode += paramlist
         else:
             paramlist = addnodes.desc_parameterlist()
             paramlist.child_text_separator = ' '
@@ -199,6 +209,7 @@ class ScopesDomain(Domain):
         'infix-macro':    ObjType(l_('infix-macro'), 'infix-macro'),
         'symbol-prefix':    ObjType(l_('symbol-prefix'), 'symbol-prefix'),
         'fn': ObjType(l_('fn'), 'fn'),
+        'typefn': ObjType(l_('typefn'), 'typefn'),
         'compiledfn': ObjType(l_('compiledfn'), 'compiledfn'),
         'define': ObjType(l_('define'), 'define'),
         'type': ObjType(l_('type'), 'type'),
@@ -211,6 +222,7 @@ class ScopesDomain(Domain):
         'infix-macro':    ScopesObject,
         'symbol-prefix':    ScopesObject,
         'fn': ScopesObject,
+        'typefn': ScopesObject,
         'compiledfn': ScopesObject,
         'define': ScopesObject,
         'type': ScopesObject,
@@ -218,6 +230,7 @@ class ScopesDomain(Domain):
     }
     roles = {
         'fn' :  ScopesXRefRole(),
+        'typefn' :  ScopesXRefRole(),
         'compiledfn' :  ScopesXRefRole(),
         'builtin' :  ScopesXRefRole(),
         'macro' :  ScopesXRefRole(),

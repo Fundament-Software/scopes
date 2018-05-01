@@ -934,6 +934,7 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(FN_ScopeCopySubscope, "Scope-clone-expand") \
     T(FN_ScopeParent, "Scope-parent") \
     T(FN_ScopeNext, "Scope-next") T(FN_SizeOf, "sizeof") \
+    T(FN_TypeNext, "type-next") \
     T(FN_Slice, "slice") T(FN_Store, "store") \
     T(FN_StringAt, "string@") T(FN_StringCmp, "string-compare") \
     T(FN_StringCountOf, "string-countof") T(FN_StringNew, "string-new") \
@@ -2387,6 +2388,10 @@ struct Type {
 
     bool lookup_call_handler(Any &dest) const {
         return lookup(SYM_CallHandler, dest);
+    }
+
+    const std::unordered_map<Symbol, Any, Symbol::Hash> &get_symbols() const {
+        return symbols;
     }
 
 private:
@@ -17781,6 +17786,30 @@ static SymbolAnyPair f_scope_next(Scope *scope, Symbol key) {
     }
 }
 
+static SymbolAnyPair f_type_next(const Type *type, Symbol key) {
+    auto &&map = type->get_symbols();
+    if (key == SYM_Unnamed) {
+        if (map.empty()) {
+            return { SYM_Unnamed, none };
+        } else {
+            auto it = map.begin();
+            return { it->first, it->second };
+        }
+    } else {
+        auto it = map.find(key);
+        if (it == map.end()) {
+            return { SYM_Unnamed, none };
+        } else {
+            it++;
+            if (it == map.end()) {
+                return { SYM_Unnamed, none };
+            } else {
+                return { it->first, it->second };
+            }
+        }
+    }
+}
+
 static std::unordered_map<const String *, regexp::Reprog *> pattern_cache;
 static bool f_string_match(const String *pattern, const String *text) {
     auto it = pattern_cache.find(pattern);
@@ -17986,6 +18015,7 @@ static void init_globals(int argc, char *argv[]) {
     DEFINE_PURE_C_FUNCTION(Symbol("Any=="), f_any_eq, TYPE_Bool, TYPE_Any, TYPE_Any);
     DEFINE_PURE_C_FUNCTION(FN_ListJoin, f_list_join, TYPE_List, TYPE_List, TYPE_List);
     DEFINE_PURE_C_FUNCTION(FN_ScopeNext, f_scope_next, Tuple({TYPE_Symbol, TYPE_Any}), TYPE_Scope, TYPE_Symbol);
+    DEFINE_PURE_C_FUNCTION(FN_TypeNext, f_type_next, Tuple({TYPE_Symbol, TYPE_Any}), TYPE_Type, TYPE_Symbol);
     DEFINE_PURE_C_FUNCTION(FN_StringMatch, f_string_match, TYPE_Bool, TYPE_String, TYPE_String);
     DEFINE_PURE_C_FUNCTION(SFXFN_SetTypenameSuper, f_set_typename_super, TYPE_Void, TYPE_Type, TYPE_Type);
     DEFINE_PURE_C_FUNCTION(FN_SuperOf, superof, TYPE_Type, TYPE_Type);

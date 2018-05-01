@@ -3634,6 +3634,28 @@ typefn Generator '__call (self)
     let f = (bitcast self Closure)
     call f
 
+typefn typename 'symbols (self)
+    Generator
+        label (fret fdone key)
+            let key value =
+                type-next self key
+            if (key == unnamed)
+                fdone;
+            else
+                fret key key value
+        unconst unnamed
+
+typefn typename 'elements (self)
+    let count =
+        type-countof self
+    Generator
+        label (fret fdone i)
+            if (i == count)
+                fdone;
+            else
+                fret (i + 1) (element-type self i)
+        tie-const self 0
+
 typefn Scope '__as (self destT)
     if (destT == Generator)
         Generator
