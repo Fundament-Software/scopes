@@ -3,4 +3,6 @@
     && ./build_reference.sc ../lib/scopes/Array.sc > module-Array.rst \
     && ./build_reference.sc ../lib/scopes/FunctionChain.sc > module-FunctionChain.rst \
     && ./build_reference.sc ../lib/scopes/glsl.sc > module-glsl.rst \
-    && ./build_reference.sc ../lib/scopes/testing.sc > module-testing.rst
+    && ./build_reference.sc ../lib/scopes/testing.sc > module-testing.rst \
+    && make clean && make html
+

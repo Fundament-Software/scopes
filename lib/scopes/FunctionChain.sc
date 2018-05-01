@@ -4,6 +4,45 @@
     A function chain implements a compile-time observer pattern that allows
     a module to call back into dependent modules in a decoupled way.
 
+    See following example::
+
+        using import FunctionChain
+
+        # declare new function chain
+        fnchain activate
+
+        fn handler (x)
+            print "handler activated with argument" x
+
+        'append activate handler
+
+        'append activate
+            fn (x)
+                print "last handler activated with argument" x
+
+        'prepend activate
+            fn (x)
+                print "first handler activated with argument" x
+
+        activate 1
+        activate 2
+        'clear activate
+        'append activate handler
+        activate 3
+
+    Running this program will output:
+
+    ..  code-block:: none
+
+        first handler activated with argument 1
+        handler activated with argument 1
+        last handler activated with argument 1
+        first handler activated with argument 2
+        handler activated with argument 2
+        last handler activated with argument 2
+        handler activated with argument 3
+
+
 let FunctionChain = (typename "FunctionChain")
 
 typefn FunctionChain 'clear (self)

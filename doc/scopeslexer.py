@@ -41,7 +41,7 @@ Closure function NullType voidstar void Macro hash Builtin Frame
 keywords = set("""fn let if elseif else label return syntax-extend loop repeat
 while for in del break continue call using import define-infix> define-infix<
 define-macro define-scope-macro define-block-scope-macro define struct match
-quote assert fn... defer define-doc
+quote assert fn... defer define-doc fnchain
 """.strip().split())
 builtins = set("""print import-from branch icmp== icmp!= icmp<s icmp<=s icmp>s
 icmp>=s icmp<u icmp<=u icmp>u icmp>=u
