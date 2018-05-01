@@ -105,9 +105,9 @@ class ScopesObject(ObjectDescription):
             elif type_ == "symbol":
                 if e.startswith('_:'):
                     e = e[2:]
-                    plist += addnodes.desc_name(e, e)
+                    plist += addnodes.desc_name(e, ' ' + e + ' ')
                 else:
-                    plist += addnodes.desc_parameter(e, e)
+                    plist += addnodes.desc_parameter(e, ' ' + e + ' ')
             else:
                 e = repr(e)
                 plist += addnodes.desc_parameter(e, e)
