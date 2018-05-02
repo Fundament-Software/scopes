@@ -3561,14 +3561,13 @@ fn tupleof (...)
 let Capture = (typename "Capture")
 
 define-macro capture
-    fn make-typename (TT arg)
+    fn make-typename (TT)
         let T =
             typename
                 .. "Capture"
                     string-repr TT
-                arg
-        set-typename-storage! T TT
-        set-typename-super! T Capture
+                super = Capture
+                storage = TT
         T
     fn convert (self TT)
         unpack (bitcast self TT)
@@ -4092,7 +4091,6 @@ let e = e:f32
 # cleanup
 del hash1
 del hash2
-del constructor
 
 set-globals!
     clone-scope-symbols (globals) (locals)
