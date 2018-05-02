@@ -2378,28 +2378,6 @@ do
                 else
                     return result...
 
-    set-type-symbol! reference '__delete
-        fn "reference-delete" (self)
-            let T = (typeof self)
-            let ptrT = (storageof T)
-            let T = (element-type ptrT 0)
-            let op ok = (type@& T '__delete)
-            if ok
-                op self
-            else
-                let op ok = (type@ T '__delete)
-                if ok
-                    op (deref self)
-            let class = ('storage ptrT)
-            if (class == unnamed)
-                # do nothing
-            elseif (class == 'Function)
-                    # do nothing
-            elseif (class == 'Private)
-                    # do nothing
-            else
-                .. "cannot delete reference value of type " (repr T)
-
     set-type-symbol! reference '__@
         fn "reference-@" (self key)
             let T = (storageof (typeof self))
@@ -2509,36 +2487,99 @@ define-macro typefn!&
 # default memory allocators
 #-------------------------------------------------------------------------------
 
+fn copy-construct (value source)
+    """"invokes the copy constructor for `value` of reference-like type if
+        present, passing `source` as the reference or immutable value from
+        which to copy.
+    let T = (typeof value)
+    let op ok = (type@& T '__copy)
+    if ok
+        op value source
+    else
+        # try immutable copy
+        value = source
+    return;
+
+fn construct (value args...)
+    """"invokes the constructor for `value` of reference-like type if present,
+        passing along optional argument set `args...`.
+    let T = (typeof value)
+    let op ok = (type@& T '__new)
+    if ok
+        op value args...
+    else
+        let ET =
+            element-type (storageof T) 0
+        # try default constructor
+        value = (ET args...)
+    return;
+
+fn destruct (value)
+    """"invokes the destructor for `value` of reference-like type if present.
+    let T = (typeof value)
+    let op ok = (type@& T '__delete)
+    if ok
+        op value
+        return;
+
 let Memory = (typename "Memory")
+typefn! Memory '__typecall (cls T args...)
+    if (((typeof T) == Symbol) and (T == 'copy))
+        if ((va-countof args...) > 1)
+            compiler-error! "copy constructor only takes one argument"
+        (type@ cls 'copy) cls args...
+    else cls
+        (type@ cls 'new) cls T args...
+
+typefn Memory 'delete (cls value)
+    destruct value
+    (type@ cls 'free) cls value
+
+typefn! Memory 'copy (cls value)
+    let T = (typeof value)
+    let ET =
+        if (T < reference)
+            element-type (storageof T) 0
+        else T
+    let self =
+        reference.from-pointer ((type@ cls 'allocate) cls ET)
+    copy-construct self value
+    self
+
+typefn! Memory 'new (cls T args...)
+    let self =
+        reference.from-pointer ((type@ cls 'allocate) cls T)
+    construct self args...
+    self
 
 let HeapMemory = (typename "HeapMemory" (super = Memory))
-typefn HeapMemory 'alloc (cls T)
+typefn HeapMemory 'allocate (cls T)
     malloc T
 typefn HeapMemory 'free (cls value)
     free value
     return;
-typefn HeapMemory 'alloc-array (cls T count)
+typefn HeapMemory 'allocate-array (cls T count)
     malloc-array T count
 typefn HeapMemory 'free-array (cls value count)
     free value
     return;
 
 let FunctionMemory = (typename "FunctionMemory" (super = Memory))
-typefn FunctionMemory 'alloc (cls T)
+typefn FunctionMemory 'allocate (cls T)
     alloca T
 typefn FunctionMemory 'free (cls value)
     return;
-typefn HeapMemory 'alloc-array (cls T count)
+typefn HeapMemory 'allocate-array (cls T count)
     alloca-array T count
 typefn HeapMemory 'free-array (cls value count)
     return;
 
 let GlobalMemory = (typename "GlobalMemory" (super = Memory))
-typefn! GlobalMemory 'alloc (cls T)
+typefn! GlobalMemory 'allocate (cls T)
     static-alloc T
 typefn GlobalMemory 'free (cls value)
     return;
-typefn! GlobalMemory 'alloc-array (cls T count)
+typefn! GlobalMemory 'allocate-array (cls T count)
     assert (constant? count) "count must be constant"
     bitcast
         static-alloc
@@ -2547,65 +2588,34 @@ typefn! GlobalMemory 'alloc-array (cls T count)
 typefn GlobalMemory 'free-array (cls value count)
     return;
 
+fn delete (self)
+    """"destructs and frees `value` of reference-like type. The free method
+        must also invoke the destructor.
+    let T = (typeof self)
+    assert (T < reference) "value must be of reference type"
+    let ptrT = (storageof T)
+    let class = ('storage ptrT)
+    if (class == unnamed)
+        'delete HeapMemory self
+    elseif (class == 'Function)
+        'delete FunctionMemory self
+    elseif (class == 'Private)
+        'delete GlobalMemory self
+    else
+        .. "cannot delete value of type " (repr T)
+
 #-------------------------------------------------------------------------------
 # default value constructors
 #-------------------------------------------------------------------------------
 
-fn constructor (memory)
-    fn (cls args...)
-        # make sure we're not memoizing the result
-        let alloc =
-            if ((typeof memory) == type)
-                type@ memory 'alloc
-            else
-                getattr memory 'alloc
-        if (((typeof cls) == Symbol) and (cls == 'copy))
-            if ((va-countof args...) > 1)
-                compiler-error! "copy constructor only takes one argument"
-            let value = args...
-            let T = (typeof value)
-            let cls =
-                if (T < reference)
-                    element-type (storageof T) 0
-                else T
-            let self =
-                reference.from-pointer (alloc memory cls)
-            let op ok = (type@& cls '__copy)
-            if ok
-                op self value
-            else
-                # try immutable copy
-                self = value
-            self
-        else cls
-            let self =
-                reference.from-pointer (alloc memory cls)
-            let op ok = (type@& cls '__new)
-            if ok
-                op self args...
-            else
-                # try immutable initializer
-                self =
-                    cls args...
-            self
+fn local (T args...)
+    FunctionMemory T args...
 
-fn local (cls args...)
-    (constructor FunctionMemory) cls args...
+fn new (T args...)
+    HeapMemory T args...
 
-fn new (cls args...)
-    (constructor HeapMemory) cls args...
-
-fn! static (cls args...)
-    (constructor GlobalMemory) cls args...
-
-fn delete (self)
-    let T = (typeof self)
-    let op ok = (type@ T '__delete)
-    if ok
-        op self
-        return;
-    compiler-error!
-        .. "cannot delete value of type " (repr T)
+fn! static (T args...)
+    GlobalMemory T args...
 
 #-------------------------------------------------------------------------------
 # docstrings

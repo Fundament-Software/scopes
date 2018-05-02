@@ -14059,7 +14059,7 @@ struct Solver {
         } break;
         case FN_Free: {
             CHECKARGS(1, 1);
-            const Type *T = args[1].value.indirect_type();
+            const Type *T = storage_type(args[1].value.indirect_type());
             verify_kind<TK_Pointer>(T);
             verify_writable(T);
             if (cast<PointerType>(T)->storage_class != SYM_Unnamed) {
