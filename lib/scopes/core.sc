@@ -1150,6 +1150,9 @@ syntax-extend
     set-type-symbol! pointer 'set-element-type
         fn (cls ET)
             pointer-type-set-element-type cls ET
+    set-type-symbol! pointer 'set-storage
+        fn (cls storage)
+            pointer-type-set-storage-class cls storage
     set-type-symbol! pointer 'immutable
         fn (cls ET)
             pointer-type-set-flags cls
@@ -2503,11 +2506,59 @@ define-macro typefn!&
         cons fn! params body
 
 #-------------------------------------------------------------------------------
-# alloca/new/delete
+# default memory allocators
 #-------------------------------------------------------------------------------
 
-fn constructor (f)
+let Memory = (typename "Memory")
+
+let HeapMemory = (typename "HeapMemory" (super = Memory))
+typefn HeapMemory 'alloc (cls T)
+    malloc T
+typefn HeapMemory 'free (cls value)
+    free value
+    return;
+typefn HeapMemory 'alloc-array (cls T count)
+    malloc-array T count
+typefn HeapMemory 'free-array (cls value count)
+    free value
+    return;
+
+let FunctionMemory = (typename "FunctionMemory" (super = Memory))
+typefn FunctionMemory 'alloc (cls T)
+    alloca T
+typefn FunctionMemory 'free (cls value)
+    return;
+typefn HeapMemory 'alloc-array (cls T count)
+    alloca-array T count
+typefn HeapMemory 'free-array (cls value count)
+    return;
+
+let GlobalMemory = (typename "GlobalMemory" (super = Memory))
+typefn! GlobalMemory 'alloc (cls T)
+    static-alloc T
+typefn GlobalMemory 'free (cls value)
+    return;
+typefn! GlobalMemory 'alloc-array (cls T count)
+    assert (constant? count) "count must be constant"
+    bitcast
+        static-alloc
+            array T count
+        'set-storage (pointer T 'mutable) 'Private
+typefn GlobalMemory 'free-array (cls value count)
+    return;
+
+#-------------------------------------------------------------------------------
+# default value constructors
+#-------------------------------------------------------------------------------
+
+fn constructor (memory)
     fn (cls args...)
+        # make sure we're not memoizing the result
+        let alloc =
+            if ((typeof memory) == type)
+                type@ memory 'alloc
+            else
+                getattr memory 'alloc
         if (((typeof cls) == Symbol) and (cls == 'copy))
             let value = args...
             let T = (typeof value)
@@ -2516,7 +2567,7 @@ fn constructor (f)
                     element-type (storageof T) 0
                 else T
             let self =
-                reference.from-pointer (f cls)
+                reference.from-pointer (alloc memory cls)
             let op ok = (type@& cls '__copy)
             if ok
                 op self value
@@ -2526,7 +2577,7 @@ fn constructor (f)
             self
         else cls
             let self =
-                reference.from-pointer (f cls)
+                reference.from-pointer (alloc memory cls)
             let op ok = (type@& cls '__new)
             if ok
                 op self args...
@@ -2537,13 +2588,13 @@ fn constructor (f)
             self
 
 fn local (cls args...)
-    (constructor alloca) cls args...
+    (constructor FunctionMemory) cls args...
 
 fn new (cls args...)
-    (constructor malloc) cls args...
+    (constructor HeapMemory) cls args...
 
 fn! static (cls args...)
-    (constructor static-alloc) cls args...
+    (constructor GlobalMemory) cls args...
 
 fn delete (self)
     let T = (typeof self)

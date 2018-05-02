@@ -26,7 +26,7 @@ do
 do
     # mutable array with dynamic capacity
     let i32Array = (Array i32)
-    let a = (local i32Array 12)
+    let a = (local i32Array (capacity = 12))
     defer (autodelete a)
     assert (a.capacity == 12:usize)
     for i in fullrange

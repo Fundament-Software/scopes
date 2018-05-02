@@ -105,7 +105,7 @@
                 },
                 {
                     "name": "support.type.library.scopes",
-                    "match": "((Fixed|Growing)?Array|Generator|Capture|Macro|FunctionChain|rawstring|reference|hash)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
+                    "match": "((Fixed|Growing)?Array|(Heap|Stack|Global)?Memory|Generator|Capture|Macro|FunctionChain|rawstring|reference|hash)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
                 },
                 {
                     "name": "support.type.contextual.scopes",

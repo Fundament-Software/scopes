@@ -168,7 +168,7 @@ fn FixedMutableArray (element-type capacity)
                 count = 0:usize
                 items = (malloc-array element-type capacity)
 
-let DEFAULT_CAPACITY = (1:usize << 4:usize)
+let DEFAULT_CAPACITY = (1:usize << 2:usize)
 fn VariableMutableArray (element-type)
     let arrayT =
         pointer element-type 'mutable
@@ -194,7 +194,8 @@ fn VariableMutableArray (element-type)
                 repr self.items
                 "]"
 
-        method '__typecall (cls capacity)
+        method '__typecall (cls opts...)
+            let capacity = (va@ 'capacity opts...)
             let capacity =
                 if (none? capacity) DEFAULT_CAPACITY
                 else capacity
