@@ -129,7 +129,7 @@ set-type-symbol! vec-type '__unpack
         unpack
             bitcast self (storageof (typeof self))
 
-set-type-symbol! vec-type '__apply-type
+set-type-symbol! vec-type '__typecall
     fn vec-type-new (self ...)
         let ET = (@ self)
         let argsz = (va-countof ...)
@@ -411,7 +411,7 @@ fn make-diagonal-vector (VT i)
         insertelement vec (VT.ElementType 1) i
     else vec
 
-set-type-symbol! mat-type '__apply-type
+set-type-symbol! mat-type '__typecall
     fn "mat-type-new" (cls ...)
         let VT = cls.ColumnType
         let argsz = (va-countof ...)

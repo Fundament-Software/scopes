@@ -163,8 +163,8 @@ fn FixedMutableArray (element-type capacity)
                 repr self.items
                 "]"
 
-        method '__apply-type (cls)
-            CStruct.__apply-type cls
+        method '__typecall (cls)
+            CStruct.__typecall cls
                 count = 0:usize
                 items = (malloc-array element-type capacity)
 
@@ -194,16 +194,16 @@ fn VariableMutableArray (element-type)
                 repr self.items
                 "]"
 
-        method '__apply-type (cls capacity)
+        method '__typecall (cls capacity)
             let capacity =
                 if (none? capacity) DEFAULT_CAPACITY
                 else capacity
-            CStruct.__apply-type cls
+            CStruct.__typecall cls
                 capacity = capacity
                 count = 0:usize
                 items = (malloc-array element-type capacity)
 
-typefn Array '__apply-type (cls element-type capacity)
+typefn Array '__typecall (cls element-type capacity)
     """"Construct a mutable array type of ``element-type`` with a variable or
         fixed maximum capacity.
 

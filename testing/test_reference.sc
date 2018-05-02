@@ -41,6 +41,9 @@ assert ((x @ 4) == 5)
 let T = (typename "refable")
 set-typename-storage! T i32
 
+typefn T '__typecall (cls)
+    nullof cls
+
 typefn T 'value (self)
     bitcast self (storageof T)
 

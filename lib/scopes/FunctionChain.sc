@@ -50,7 +50,7 @@ typefn FunctionChain 'clear (self)
         no functions will be called.
     assert (not (type== self FunctionChain))
     assert (constant? self)
-    typefn self '__apply-type (self args...)
+    typefn self '__typecall (self args...)
     self
 typefn FunctionChain 'append (self f)
     """"Append function `f` to function chain. When the function chain is called,
@@ -58,8 +58,8 @@ typefn FunctionChain 'append (self f)
     assert (not (type== self FunctionChain))
     assert (constant? f)
     assert (constant? self)
-    let oldfn = self.__apply-type
-    typefn self '__apply-type (self args...)
+    let oldfn = self.__typecall
+    typefn self '__typecall (self args...)
         oldfn self args...
         f args...
     self
@@ -69,16 +69,16 @@ typefn FunctionChain 'prepend (self f)
     assert (not (type== self FunctionChain))
     assert (constant? f)
     assert (constant? self)
-    let oldfn = self.__apply-type
-    typefn self '__apply-type (self args...)
+    let oldfn = self.__typecall
+    typefn self '__typecall (self args...)
         f args...
         oldfn self args...
     self
 
-typefn! FunctionChain '__apply-type (cls name)
+typefn! FunctionChain '__typecall (cls name)
     let T = (typename (.. "<FunctionChain " name ">"))
     set-typename-super! T cls
-    typefn T '__apply-type (cls args...)
+    typefn T '__typecall (cls args...)
     T
 
 """".. macro:: (fnchain name)

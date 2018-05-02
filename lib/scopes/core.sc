@@ -254,7 +254,7 @@ fn gen-type-op2 (f)
 syntax-extend
     set-type-symbol! type '__call
         fn! (cls ...)
-            let val ok = (type@ cls '__apply-type)
+            let val ok = (type@ cls '__typecall)
             if ok
                 call val cls ...
             else
@@ -264,19 +264,19 @@ syntax-extend
                             Any-repr (Any-wrap cls)
                             " has no apply-type attribute"
 
-    set-type-symbol! list '__apply-type
+    set-type-symbol! list '__typecall
         fn (cls ...)
             list-new ...
-    set-type-symbol! extern '__apply-type
+    set-type-symbol! extern '__typecall
         fn (cls ...)
             extern-new ...
-    set-type-symbol! Any '__apply-type
+    set-type-symbol! Any '__typecall
         fn (cls value)
             Any-new value
-    set-type-symbol! Symbol '__apply-type
+    set-type-symbol! Symbol '__typecall
         fn (cls value)
             string->Symbol value
-    set-type-symbol! Scope '__apply-type
+    set-type-symbol! Scope '__typecall
         fn (cls parent clone)
             let new? = (type== (typeof clone) Nothing)
             if (type== (typeof parent) Nothing)
@@ -397,7 +397,7 @@ syntax-extend
                                     zext val destT
 
         # general constructor
-        set-type-symbol! T '__apply-type
+        set-type-symbol! T '__typecall
             fn (destT val)
                 if (none? val)
                     nullof destT
@@ -473,7 +473,7 @@ syntax-extend
                     else
                         fptoui val destT
 
-        set-type-symbol! T '__apply-type
+        set-type-symbol! T '__typecall
             fn (destT val)
                 if (none? val)
                     nullof destT
@@ -925,7 +925,7 @@ set-type-symbol! hash '__imply
         if (type== T u64)
             bitcast self u64
 
-set-type-symbol! hash '__apply-type
+set-type-symbol! hash '__typecall
     fn "hash" (cls values...)
         if (icmp<s (va-countof values...) 2)
             hash1 values...
@@ -1141,10 +1141,10 @@ syntax-extend
     set-typename-super! vector immutable
     set-typename-super! tuple immutable
 
-    set-type-symbol! integer '__apply-type
+    set-type-symbol! integer '__typecall
         fn (cls ...)
             integer-type ...
-    #set-type-symbol! real '__apply-type
+    #set-type-symbol! real '__typecall
         fn (cls ...)
             real-type ...
     set-type-symbol! pointer 'set-element-type
@@ -1171,7 +1171,7 @@ syntax-extend
     set-type-symbol! pointer 'writable?
         fn (cls)
             == (& (pointer-type-flags cls) pointer-flag-non-writable) 0:u64
-    set-type-symbol! pointer '__apply-type
+    set-type-symbol! pointer '__typecall
         fn (cls T opt)
             let flags =
                 if (none? opt)
@@ -1191,7 +1191,7 @@ syntax-extend
     fn assert-no-arguments (...)
         if (icmp!= (va-countof ...) 0)
             compiler-error! "default constructor takes no arguments"
-    set-type-symbol! array '__apply-type
+    set-type-symbol! array '__typecall
         fn (cls ...)
             if (type== cls array)
                 let T size = ...
@@ -1199,7 +1199,7 @@ syntax-extend
             else
                 assert-no-arguments ...
                 nullof cls
-    set-type-symbol! vector '__apply-type
+    set-type-symbol! vector '__typecall
         fn (cls ...)
             if (type== cls vector)
                 let T size = ...
@@ -1207,17 +1207,17 @@ syntax-extend
             else
                 assert-no-arguments ...
                 nullof cls
-    set-type-symbol! ReturnLabel '__apply-type
+    set-type-symbol! ReturnLabel '__typecall
         fn (cls ...)
             ReturnLabel-type ...
-    set-type-symbol! tuple '__apply-type
+    set-type-symbol! tuple '__typecall
         fn (cls ...)
             if (type== cls tuple)
                 tuple-type ...
             else
                 assert-no-arguments ...
                 nullof cls
-    set-type-symbol! union '__apply-type
+    set-type-symbol! union '__typecall
         fn (cls ...)
             if (type== cls union)
                 union-type ...
@@ -1225,7 +1225,7 @@ syntax-extend
                 assert-no-arguments ...
                 nullof cls
 
-    set-type-symbol! typename '__apply-type
+    set-type-symbol! typename '__typecall
         fn! (cls args...)
             if (type== cls typename)
                 let name super storage = args...
@@ -1236,12 +1236,12 @@ syntax-extend
                     set-typename-storage! T storage
                 T
             else
-                if (not (va-empty? args...))
-                    compiler-error! "default typename constructor takes no arguments"
-                # invoke default constructor for type
-                nullof cls
+                compiler-error!
+                    string-join "typename "
+                        string-join (repr cls)
+                            " has no constructor"
 
-    set-type-symbol! function '__apply-type
+    set-type-symbol! function '__typecall
         fn (cls ...)
             function-type ...
 
@@ -1279,7 +1279,7 @@ syntax-extend
 
     let empty-symbol = (Symbol "")
 
-    set-type-symbol! Parameter '__apply-type
+    set-type-symbol! Parameter '__typecall
         fn (cls params...)
             let param1 param2 param3 = params...
             let TT = (tuple (typeof param1) (typeof param2) (typeof param3))
@@ -1588,7 +1588,7 @@ syntax-extend
                 ReturnLabel (unknownof list) (unknownof Scope)
                 \ list list Scope
     set-typename-storage! Macro BlockScopeFunction
-    set-type-symbol! Macro '__apply-type
+    set-type-symbol! Macro '__typecall
         fn (cls f)
             assert-typeof f BlockScopeFunction
             bitcast f Macro
@@ -2454,7 +2454,7 @@ do
         fn "reference-from-pointer" (value)
             (reference.from-pointer-type (typeof value)) value
 
-    set-type-symbol! reference '__apply-type
+    set-type-symbol! reference '__typecall
         fn "reference-apply-type" (cls element)
             if (type== cls reference)
                 compiler-error! "reference constructor deleted; use 'from-pointer-type"
@@ -3132,7 +3132,7 @@ typefn CStruct 'structof (cls args...)
             instance
 
 # support for C struct initializers
-typefn CStruct '__apply-type (cls args...)
+typefn CStruct '__typecall (cls args...)
     if (cls == CStruct)
         compiler-error! "CStruct type constructor is deprecated"
     else
@@ -3153,7 +3153,7 @@ typefn CStruct '__getattr (self name)
         extractvalue self idx
 
 # support for basic C union initializer
-typefn CUnion '__apply-type (cls)
+typefn CUnion '__typecall (cls)
     nullof cls
 
 # access reference to union element from pointer/reference
@@ -3626,7 +3626,7 @@ fn arrayof (T ...)
 
 let Generator = (typename "Generator")
 set-typename-storage! Generator (storageof Closure)
-typefn Generator '__apply-type (cls iter init)
+typefn Generator '__typecall (cls iter init)
     fn get-iter-init ()
         return iter init
     bitcast get-iter-init Generator
