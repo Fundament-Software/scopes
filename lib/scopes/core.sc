@@ -1959,11 +1959,15 @@ define-macro assert
 
 define-scope-macro del
     let loop (args)
-    let head rest = (decons args)
-    let head = (as (as head Syntax) Symbol)
+    let sxhead rest = (decons args)
+    let head = (as (as sxhead Syntax) Symbol)
+    let oldsym ok = (@ syntax-scope head)
+    if (not ok)
+        syntax-error! sxhead
+            .. "no such symbol in scope: " (repr head)
     delete-scope-symbol! syntax-scope head
     if (empty? rest)
-        return (list _) syntax-scope
+        return none syntax-scope
     else
         loop rest
 
@@ -3816,17 +3820,23 @@ fn fold (init gen f)
                 next
         \ break next
 
-define-macro breakable-block
-    let old-return ok = (syntax-scope @ 'return)
-    list
-        cons fn '()
-            list let 'break '= 'return
-            cons
+define-scope-macro breakable-block
+    let old-recur recur-ok = (@ syntax-scope 'recur)
+    let old-return ok = (@ syntax-scope 'return)
+    return
+        list
+            cons fn "breakable-block" '()
+                list let 'break '= 'return
+                if ok
+                    list let 'recur '= old-recur
+                else
+                    list del 'recur
                 if ok
                     list let 'return '= old-return
                 else
                     list del 'return
                 args
+        syntax-scope
 
 define-macro for
     loop (it params) = args '()

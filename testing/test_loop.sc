@@ -86,3 +86,12 @@ fn test_2d_loops ()
         repeat (i + 1)
 
 test_2d_loops;
+
+# returning from an inner loop
+fn looper ()
+    for i in (range 32)
+        if (i == 5)
+            return (unconst false)
+    unconst true
+
+assert (not (looper))
