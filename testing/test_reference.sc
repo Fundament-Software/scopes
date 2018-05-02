@@ -38,8 +38,7 @@ x @ 3 = x @ 2 + 1
 x @ 4 = x @ 3 + 1
 assert ((x @ 4) == 5)
 
-let T = (typename "refable")
-set-typename-storage! T i32
+let T = (typename "refable" (storage = i32))
 
 typefn T '__typecall (cls)
     nullof cls
@@ -68,4 +67,3 @@ let q = (local T)
 assert (('value q) == 0)
 assert (('value ('inc q)) == 1)
 assert (('value q) == 1)
-

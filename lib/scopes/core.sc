@@ -2171,20 +2171,35 @@ fn fn-dispatcher (args...)
 
 # a safe immutable loop construct that never unrolls
 define-block-scope-macro loop
-    let head params sep args = (decons expr 3)
-    if ((sep as Syntax as Symbol) != '=)
-        syntax-error! sep "syntax: (loop (param ...) = arg ...)"
-    return
-        cons
-            list 'let 'repeat params '=
-                cons unconst-all args
-            quote
-                let repeat =
-                    label (...)
-                        repeat
-                            unconst-all ...
-            next-expr
-        syntax-scope
+    let syntaxmsg = "syntax: (loop (param ...) = arg ...)"
+    if ((countof expr) == 1)
+        return
+            cons
+                list 'let 'repeat '() '=
+                next-expr
+            syntax-scope
+    do
+        let head params sep args = (decons expr 3)
+        if ((countof expr) < 3)
+            syntax-error! head syntaxmsg
+        params as Syntax as list
+        if ((sep as Syntax as Symbol) != '=)
+            syntax-error! sep syntaxmsg
+        return
+            cons
+                cons 'let 'repeat params '=
+                    if (empty? args)
+                        unconst (list)
+                    else
+                        list
+                            cons unconst-all args
+                quote
+                    let repeat =
+                        label (...)
+                            repeat
+                                unconst-all ...
+                next-expr
+            syntax-scope
 
 # sugar for fn-dispatcher
 define-macro fn...
@@ -2370,14 +2385,13 @@ do
                     op (deref self)
             let class = ('storage ptrT)
             if (class == unnamed)
-                free (bitcast self ptrT)
+                # do nothing
             elseif (class == 'Function)
                     # do nothing
             elseif (class == 'Private)
                     # do nothing
             else
-                compiler-error!
-                    .. "cannot delete reference value of type " (repr T)
+                .. "cannot delete reference value of type " (repr T)
 
     set-type-symbol! reference '__@
         fn "reference-@" (self key)

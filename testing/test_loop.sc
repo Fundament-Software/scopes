@@ -24,6 +24,24 @@ while (i != 0)
         continue;
     print i
 
+# infinite loop
+do
+    let x =
+        local i32 0
+    loop () =
+    if (x < 100)
+        x += 1
+        repeat;
+
+# infinite loop, even shorter form
+do
+    let x =
+        local i32 0
+    loop;
+    if (x < 100)
+        x += 1
+        repeat;
+
 fn test_2d_loops ()
     let w h = 4 4
 

@@ -16718,7 +16718,8 @@ struct Expander {
             if (numvalues > numparams) {
                 set_active_anchor(((const Syntax *)it->at)->anchor);
                 StyledString ss;
-                ss.out << "excess argument is not bound to any name";
+                ss.out << "number of arguments exceeds number of defined names ("
+                    << numvalues << " > " << numparams << ")";
                 location_error(ss.str());
             }
             subexp.next = it->next;
