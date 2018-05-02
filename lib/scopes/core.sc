@@ -2560,6 +2560,8 @@ fn constructor (memory)
             else
                 getattr memory 'alloc
         if (((typeof cls) == Symbol) and (cls == 'copy))
+            if ((va-countof args...) > 1)
+                compiler-error! "copy constructor only takes one argument"
             let value = args...
             let T = (typeof value)
             let cls =
