@@ -148,8 +148,8 @@ fn FixedMutableArray (element-type capacity)
             " x "
             string-repr (i32 capacity)
             ">"
-        count : usize
         items : arrayT
+        count : usize
 
         set-type-symbol! this-struct 'ElementType element-type
         set-type-symbol! this-struct 'capacity capacity
@@ -177,9 +177,9 @@ fn VariableMutableArray (element-type)
         .. "<Array "
             string-repr element-type
             ">"
-        capacity : usize
-        count : usize
         items : arrayT
+        count : usize
+        capacity : usize
 
         set-type-symbol! this-struct 'ElementType element-type
         set-typename-super! this-struct GrowingArray
