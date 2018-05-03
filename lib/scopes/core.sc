@@ -2329,11 +2329,8 @@ fn set-type-symbol!& (T name value)
 fn deref (val)
     let T = (typeof val)
     if (T < ref)
-        let op ok = (type@& T '__load)
-        if ok
-            op val
-        else
-            load val
+        let op = (type@ T '__deref)
+        op val
     else val
 
 set-type-symbol!& Any 'typeof
@@ -2361,8 +2358,7 @@ do
     fn define-ref-forward (failedf methodname)
         set-type-symbol! ref methodname
             fn (self args...)
-                let T = (storageof (typeof self))
-                let ET = (element-type T 0)
+                let ET = (typeof& self)
                 let op success = (type@& ET methodname)
                 if success
                     return (op self args...)
@@ -2371,8 +2367,7 @@ do
     fn define-ref-forward-failable (failedf methodname)
         set-type-symbol! ref methodname
             fn (self args...)
-                let T = (storageof (typeof self))
-                let ET = (element-type T 0)
+                let ET = (typeof& self)
                 let op success = (type@& ET methodname)
                 if success
                     let result... = (op self args...)
@@ -2386,6 +2381,16 @@ do
     define-ref-forward forward-hash '__hash
     define-ref-forward-failable forward-as '__as
     define-ref-forward-failable forward-getattr '__getattr
+
+    set-type-symbol! ref '__deref
+        fn "ref-deref" (self)
+            let ET = (typeof& self)
+            let op ok = (type@& ET '__deref)
+            if ok
+                op self
+            else
+                compiler-error!
+                    .. "cannot dereference value of type " (repr ET)
 
     set-type-symbol! ref '__typeattr
         fn "ref-typeattr" (cls name)
@@ -2403,8 +2408,7 @@ do
 
     set-type-symbol! ref '__@
         fn "ref-@" (self key)
-            let T = (storageof (typeof self))
-            let ET = (element-type T 0)
+            let ET = (typeof& self)
             let op success = (type@& ET '__@)
             if success
                 return (op self key)
@@ -2413,9 +2417,8 @@ do
                 @ (deref self) key
 
     set-type-symbol! ref '__call
-        fn (self args...)
-            let T = (storageof (typeof self))
-            let ET = (element-type T 0)
+        fn "ref-call" (self args...)
+            let ET = (typeof& self)
             let op success = (type@& ET '__call)
             if success
                 return (op self args...)
@@ -2423,7 +2426,7 @@ do
                 call (deref self) args...
 
     set-type-symbol! ref '__imply
-        fn (self destT)
+        fn "ref-imply" (self destT)
             let ptrtype = (storageof (typeof self))
             if (type== destT ptrtype)
                 return (bitcast self ptrtype)
@@ -2435,12 +2438,21 @@ do
                 let aptrtype = (pointer ET)
                 if (type== destT aptrtype)
                     return (bitcast self aptrtype)
-            forward-imply (load (bitcast self ptrtype)) destT
+            # try to ask target type for implicit refcast
+            let op ok = (type@& ET '__imply)
+            if ok
+                let result... = (op self destT)
+                if (not (va-empty? result...))
+                    return result...
+            # dereference if target type can implicitly cast
+            let op ok = (type@& ET '__deref)
+            if ok
+                return
+                    forward-imply (deref self) destT
 
     set-type-symbol! ref '__=
-        fn (self value)
-            let T = (storageof (typeof self))
-            let ET = (element-type T 0)
+        fn "ref=" (self value)
+            let ET = (typeof& self)
             let op ok = (type@& ET '__=)
             if ok
                 let result... = (op self value)
@@ -2709,15 +2721,20 @@ do
         let ET = (typeof& self)
         store (imply other ET) self
 
+    fn simple-load (self)
+        load self
+
     fn setup-simple-type (T)
         set-type-symbol!& T '__new simple-new
         set-type-symbol!& T '__delete simple-delete
         set-type-symbol!& T '__copy simple-copy
         set-type-symbol!& T '__move simple-copy
+        set-type-symbol!& T '__deref simple-load
 
     setup-simple-type immutable
     setup-simple-type pointer
 
+    set-type-symbol!& opaquepointer '__deref simple-load
     set-type-symbol!& opaquepointer '__copy simple-copy
     set-type-symbol!& opaquepointer '__move simple-copy
     set-type-symbol!& opaquepointer '__delete

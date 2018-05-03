@@ -326,7 +326,7 @@ fn construct-getter-type (vecrefT mask)
             storage = storageT
     if ((typeof mask) == i32)
         let index = mask
-        typefn& T '__load (self)
+        typefn T '__deref (self)
             extractelement (load self) index
         typefn T '__imply (self destT)
             if (destT == ET)
@@ -343,7 +343,7 @@ fn construct-getter-type (vecrefT mask)
         let rhvecT = (construct-vec-type ET sz)
         let expandmask = (expand-mask lhsz sz)
         let assignmask = (assign-mask lhsz mask)
-        typefn& T '__load (self)
+        typefn T '__deref (self)
             let self = (load self)
             bitcast
                 shufflevector self self mask

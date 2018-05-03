@@ -74,24 +74,12 @@ do
     for i k in (enumerate (va-each 99 12 9 7 5 3 3 1 0 -20))
         assert ((a @ i) == k)
 
-fn insert-stuff ()
-    let a = (local (Array string))
-    defer (autodelete a)
-    for k in (va-each "yes" "this" "is" "dog" "")
-        'append a k
-    assert ((countof a) == 5)
-
-#compile
-    typify insert-stuff
-    'no-debug-info
-    'dump-module
-    'O3
-
 do
 
     let a = (local (Array string))
     defer (autodelete a)
-    for k in (va-each "yes" "this" "is" "dog" "")
+    let word = "yes"
+    for k in (va-each word "this" "is" "dog" "")
         'append a k
     assert ((countof a) == 5)
     for i k in (enumerate (va-each "yes" "this" "is" "dog" ""))
