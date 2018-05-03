@@ -38,16 +38,13 @@ x @ 3 = x @ 2 + 1
 x @ 4 = x @ 3 + 1
 assert ((x @ 4) == 5)
 
-let T = (typename "refable" (storage = i32))
+let T = (typename "refable" (storage = i32) (super = integer))
 
 typefn T '__typecall (cls)
     nullof cls
 
 typefn& T '__new (self)
-    (type@& integer '__new) self
-
-typefn& T '__= (self other)
-    (type@& integer '__=) self other
+    supercall '__new self
 
 typefn T 'value (self)
     bitcast self (storageof T)

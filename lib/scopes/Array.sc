@@ -148,10 +148,10 @@ typefn& GrowingArray 'reserve (self count)
     let new-capacity =
         self.capacity * 27:usize // 10:usize
     let count = (deref self.count)
-    let old-items = (deref self.items)
+    let old-items = ((deref self.items) as ref)
     let new-items =
-        'allocate-array memory element-type new-capacity
-    move-construct count old-items new-items
+        ('allocate-array memory element-type new-capacity) as ref
+    move-construct-array count old-items new-items
     self.items = new-items
     self.capacity = new-capacity
     'free memory old-items

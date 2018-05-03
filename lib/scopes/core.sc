@@ -1149,6 +1149,10 @@ syntax-extend
     set-typename-super! array aggregate
     set-typename-super! tuple aggregate
 
+    let opaquepointer = (typename-type "opaquepointer")
+    set-scope-symbol! syntax-scope 'opaquepointer opaquepointer
+    set-typename-super! string opaquepointer
+
     set-type-symbol! integer '__typecall
         fn (cls ...)
             integer-type ...
@@ -2274,6 +2278,12 @@ fn move-construct
 
 let ref = (typename "ref")
 
+fn typeof& (self)
+    let T = (typeof self)
+    assert (T < ref)
+        .. "argument must be of reference type, but is of type " (repr T)
+    element-type T 0
+
 let voidstar = (pointer void)
 
 fn pointer-type-imply? (src dest)
@@ -2436,6 +2446,9 @@ do
                 let result... = (op self value)
                 if (not (va-empty? result...))
                     return result...
+            destruct self
+            copy-construct self value
+            true
 
     fn make-ref-type (PT)
         let ET = (element-type PT 0)
@@ -2496,7 +2509,7 @@ fn pointer-each (n op value args...)
     else
         # unroll only if <= 4 elements
         let loop (i) =
-            if (n <= 4:usize) 0:usize
+            if ((constant? n) and (n <= 4:usize)) 0:usize
             else (unconst 0:usize)
         if (i < n)
             op
@@ -2512,7 +2525,7 @@ fn pointer-each2 (n op value other)
     else
         # unroll only if <= 4 elements
         let loop (i) =
-            if (n <= 4:usize) 0:usize
+            if ((constant? n) and (n <= 4:usize)) 0:usize
             else (unconst 0:usize)
         if (i < n)
             op
@@ -2521,35 +2534,65 @@ fn pointer-each2 (n op value other)
             loop (i + 1:usize)
     return;
 
-fn construct (n value args...)
-    """"invokes the constructor for `value` of reference-like type if present,
+fn construct (value args...)
+    """"Invokes the constructor for `value` of reference-like type,
         passing along optional argument set `args...`.
-    let T = (typeof value)
-    let ET =
-        element-type (storageof T) 0
+    let ET = (typeof& value)
+    let op ok = (type@& ET '__new)
+    if (not ok)
+        compiler-error!
+            .. "type " (repr ET) " has no constructor"
+    pointer-each 1 op value args...
+
+fn construct-array (n value args...)
+    """"Invokes the constructor for an array `value` of reference-like type,
+        assuming that value is a pointer to an array element, passing along
+        optional argument set `args...`.
+    let ET = (typeof& value)
     let op ok = (type@& ET '__new)
     if (not ok)
         compiler-error!
             .. "type " (repr ET) " has no constructor"
     pointer-each n op value args...
 
-fn destruct (n value)
-    """"invokes the destructor for `value` of reference-like type if present.
-    let T = (typeof value)
-    let ET =
-        element-type (storageof T) 0
+fn destruct (value)
+    """"Invokes the destructor for `value` of reference-like type.
+    let ET = (typeof& value)
+    let op ok = (type@& ET '__delete)
+    if (not ok)
+        compiler-error!
+            .. "type " (repr ET) " has no destructor"
+    pointer-each 1 op value
+
+fn destruct-array (n value)
+    """"Invokes the destructor for an array `value` of reference-like type,
+        assuming that value is a pointer to an array element.
+    let ET = (typeof& value)
     let op ok = (type@& ET '__delete)
     if (not ok)
         compiler-error!
             .. "type " (repr ET) " has no destructor"
     pointer-each n op value
 
-fn copy-construct (n value source)
-    """"invokes the copy constructor for `value` of reference-like type if
-        present, passing `source` as the reference from which to copy.
-    let T = (typeof value)
-    let ET =
-        element-type (storageof T) 0
+fn copy-construct (value source)
+    """"Invokes the copy constructor for `value` of reference-like type if
+        present, passing `source` as a value from which to copy.
+
+        `source` does not have to be of reference type, but can also be of
+        immutable element type.
+    let ET = (typeof& value)
+    let op ok = (type@& ET '__copy)
+    if (not ok)
+        compiler-error!
+            .. "type " (repr ET) " has no copy constructor"
+    pointer-each 1 op value source
+
+fn copy-construct-array (n value source)
+    """"Invokes the copy constructor for an array `value` of reference-like type,
+        passing `source` as a value from which to copy.
+
+        `source` has to be the first (referenced) element of an array too.
+    let ET = (typeof& value)
     let op ok = (type@& ET '__copy)
     if (not ok)
         compiler-error!
@@ -2557,19 +2600,29 @@ fn copy-construct (n value source)
     assert ((typeof source) < ref)
     pointer-each2 n op value source
 
-fn move-construct (n value source)
-    """"invokes the move constructor for `value` of reference-like type if
-        present, passing `source` as the reference from which to move.
-    let T = (typeof value)
-    let ET =
-        element-type (storageof T) 0
+fn move-construct (value source)
+    """"Invokes the move constructor for `value` of reference-like type,
+        passing `source` as the reference from which to move.
+    let ET = (typeof& value)
+    let op ok = (type@& ET '__move)
+    if ok
+        pointer-each2 1 op value source
+    else
+        # try copy, then destruct source
+        copy-construct value source
+        destruct source
+
+fn move-construct-array (n value source)
+    """"Invokes the move constructor for an array `value` of reference-like type,
+        passing `source` as the reference from which to move.
+    let ET = (typeof& value)
     let op ok = (type@& ET '__move)
     if ok
         pointer-each2 n op value source
     else
         # try copy, then destruct source
-        copy-construct n value source
-        destruct n source
+        copy-construct-array n value source
+        destruct-array n source
 
 let Memory = (typename "Memory")
 typefn! Memory '__typecall (cls T args...)
@@ -2581,7 +2634,7 @@ typefn! Memory '__typecall (cls T args...)
         (type@ cls 'new) cls T args...
 
 typefn Memory 'delete (cls value)
-    destruct 1 value
+    destruct value
     (type@ cls 'free) cls value
 
 typefn! Memory 'copy (cls value)
@@ -2592,15 +2645,13 @@ typefn! Memory 'copy (cls value)
         else T
     let self =
         ((type@ cls 'allocate) cls ET) as ref
-    # not optimal, but safe
-    construct 1 self
-    self = value
+    copy-construct self value
     self
 
 typefn! Memory 'new (cls T args...)
     let self =
         ((type@ cls 'allocate) cls T) as ref
-    construct 1 self args...
+    construct self args...
     self
 
 let HeapMemory = (typename "HeapMemory" (super = Memory))
@@ -2645,7 +2696,7 @@ typefn GlobalMemory 'free-array (cls value count)
 
 do
     fn simple-new (self args...)
-        let ET = (@ (typeof self))
+        let ET = (typeof& self)
         if (va-empty? args...)
             store (nullof ET) self
         else
@@ -2655,63 +2706,54 @@ do
         # todo: init value to deadbeef-style noise in debug mode?
 
     fn simple-copy (self other)
-        let ET = (@ (typeof self))
+        let ET = (typeof& self)
         store (imply other ET) self
-
-    fn simple= (self other)
-        let ET = (@ (typeof self))
-        store (imply other ET) self
-        true
 
     fn setup-simple-type (T)
         set-type-symbol!& T '__new simple-new
         set-type-symbol!& T '__delete simple-delete
         set-type-symbol!& T '__copy simple-copy
         set-type-symbol!& T '__move simple-copy
-        set-type-symbol!& T '__= simple=
 
     setup-simple-type immutable
     setup-simple-type pointer
 
-    fn aggregate= (self other)
-        let ET = (@ (typeof self))
-        # copy-construct insists that both sides are references, so if
-            the right side is an immutable value, we need to assign by field/element
-        if ((typeof other) < ref)
-            destruct 1 self
-            copy-construct 1 self other
-        else
-            let other = (imply other ET)
-            let count = (type-countof ET)
-            let loop (i) = 0:usize
-            if (icmp<s i count)
-                =
-                    (getelementptr self 0 i) as ref
-                    extractvalue other i
-                loop (i + 1:usize)
-        true
-
-    set-type-symbol!& aggregate '__= aggregate=
+    set-type-symbol!& opaquepointer '__copy simple-copy
+    set-type-symbol!& opaquepointer '__move simple-copy
+    set-type-symbol!& opaquepointer '__delete
+        fn (self)
+            # do nothing
 
     fn tuple-each (f)
         fn (self)
-            let ET = (@ (typeof self))
+            let ET = (typeof& self)
             let count = (i32 (type-countof ET))
             let loop (i) = 0
             if (icmp<s i count)
-                f 1 ((getelementptr self 0 i) as ref)
+                f ((getelementptr self 0 i) as ref)
                 loop (i + 1)
 
     fn tuple-each2 (f)
         fn (self other)
-            let ET = (@ (typeof self))
+            let ET = (typeof& self)
             let count = (i32 (type-countof ET))
-            let loop (i) = 0
-            if (icmp<s i count)
-                f 1
-                    (getelementptr self 0 i) as ref
-                    (getelementptr other 0 i) as ref
-                loop (i + 1)
+            if ((typeof other) < ref)
+                assert ((typeof& other) == ET)
+                let loop (i) = 0
+                if (icmp<s i count)
+                    f
+                        (getelementptr self 0 i) as ref
+                        (getelementptr other 0 i) as ref
+                    loop (i + 1)
+            else
+                # copy right-hand side by element
+                let other = (imply other ET)
+                let loop (i) = 0
+                if (icmp<s i count)
+                    f
+                        (getelementptr self 0 i) as ref
+                        extractvalue other i
+                    loop (i + 1)
 
     set-type-symbol!& tuple '__new (tuple-each construct)
     set-type-symbol!& tuple '__delete (tuple-each destruct)
@@ -2720,22 +2762,50 @@ do
 
     fn array-each (f)
         fn (self)
-            let ET = (@ (typeof self))
+            let ET = (typeof& self)
             let count = (type-countof ET)
             f count ((getelementptr self 0 0) as ref)
 
-    fn array-each2 (f)
+    fn array-each2 (fsingle fmany)
         fn (self other)
-            let ET = (@ (typeof self))
+            let ET = (typeof& self)
             let count = (type-countof ET)
-            f count
-                (getelementptr self 0 0) as ref
-                (getelementptr other 0 0) as ref
+            if ((typeof other) < ref)
+                assert ((typeof& other) == ET)
+                fmany count
+                    (getelementptr self 0 0) as ref
+                    (getelementptr other 0 0) as ref
+            else
+                # copy right-hand side by element
+                let other = (imply other ET)
+                let loop (i) = 0:usize
+                if (icmp<s i count)
+                    fsingle
+                        (getelementptr self 0 i) as ref
+                        extractvalue other i
+                    loop (i + 1:usize)
 
-    set-type-symbol!& array '__new (array-each construct)
-    set-type-symbol!& array '__delete (array-each destruct)
-    set-type-symbol!& array '__copy (array-each2 copy-construct)
-    set-type-symbol!& array '__move (array-each2 move-construct)
+    set-type-symbol!& array '__new (array-each construct-array)
+    set-type-symbol!& array '__delete (array-each destruct-array)
+    set-type-symbol!& array '__copy (array-each2 copy-construct copy-construct-array)
+    set-type-symbol!& array '__move (array-each2 move-construct move-construct-array)
+
+#-------------------------------------------------------------------------------
+
+fn supercall (methodname self args...)
+    let T = (typeof self)
+    if (T < ref)
+        let ET = (typeof& self)
+        let superT = (superof ET)
+        let f ok = (type@& superT methodname)
+        if (not ok)
+            compiler-error!
+                .. "supertype " (repr superT) " of type " (repr ET)
+                    \ " does not have a reference method " (repr methodname)
+        f self args...
+    else
+        let superT = (superof T)
+        (typeattr superT methodname) self args...
 
 #-------------------------------------------------------------------------------
 # default value constructors
@@ -3368,7 +3438,7 @@ typefn& CStruct '__new (self args...)
     let self = (CStruct->tuple self)
     let T = (@ (typeof self))
     # construct as tuple
-    construct 1 self
+    construct self
     if (icmp>s sz 0)
         # todo: do a bit more efficient initialization, as right now we're first
             default-initing, and then rewriting some of the values anyways
@@ -3387,7 +3457,7 @@ typefn& CStruct '__new (self args...)
             loop (i + 1)
 
 typefn& CStruct '__delete (self)
-    destruct 1
+    destruct
         CStruct->tuple self
 
 # support for C struct initializers

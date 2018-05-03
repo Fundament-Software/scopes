@@ -32,13 +32,13 @@ do
     for i in fullrange
         assert ((countof a) == i)
         'append a (i32 i)
-    for i in fullrange
+    #for i in fullrange
         assert ((a @ i) == (i32 i))
     # generator support
-    for i k in (enumerate a)
+    #for i k in (enumerate a)
         assert ((a @ i) == i)
 
-do
+#do
     # array of array
     let i32Array = (Array i32 16)
     let i32ArrayArray = (Array i32Array)
@@ -74,11 +74,28 @@ do
     for i k in (enumerate (va-each 99 12 9 7 5 3 3 1 0 -20))
         assert ((a @ i) == k)
 
-do
+fn insert-stuff ()
     let a = (local (Array string))
     defer (autodelete a)
     for k in (va-each "yes" "this" "is" "dog" "")
         'append a k
+    assert ((countof a) == 5)
+
+#compile
+    typify insert-stuff
+    'no-debug-info
+    'dump-module
+    'O3
+
+do
+
+    let a = (local (Array string))
+    defer (autodelete a)
+    for k in (va-each "yes" "this" "is" "dog" "")
+        'append a k
+    assert ((countof a) == 5)
+    for i k in (enumerate (va-each "yes" "this" "is" "dog" ""))
+        assert ((a @ i) == k)
     'sort a
     for i k in (enumerate (va-each "" "dog" "is" "this" "yes"))
         assert ((a @ i) == k)
