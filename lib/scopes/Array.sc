@@ -49,7 +49,7 @@ fn define-common-array-methods (T ensure-capacity)
     typefn& T '__@ (self index)
         let index = (index as usize)
         assert ((index < self.count) & (index >= 0:usize)) "index out of bounds"
-        reference.from-pointer
+        ref
             getelementptr (load self.items) index
 
     typefn& T 'sort (self key)
@@ -59,10 +59,10 @@ fn define-common-array-methods (T ensure-capacity)
         let inner (i swapped) = (unconst 1:usize) (unconst false)
         if (i < count)
             let a =
-                reference.from-pointer
+                ref
                     getelementptr items (sub i 1:usize)
             let b =
-                reference.from-pointer
+                ref
                     getelementptr items i
             let a-key =
                 if (none? key) a
@@ -89,7 +89,7 @@ fn define-common-array-methods (T ensure-capacity)
         let idx = (count as immutable)
         count = count + 1
         return
-            reference.from-pointer
+            ref
                 getelementptr (load self.items) idx
 
     typefn& T 'emplace-append (self args...)
@@ -138,7 +138,7 @@ define-common-array-methods GrowingArray
         if (count == self.capacity)
             grow self
 
-fn FixedMutableArray (element-type capacity)
+fn FixedMutableArray (element-type capacity memory)
     let arrayT =
         pointer element-type 'mutable
 
@@ -169,7 +169,7 @@ fn FixedMutableArray (element-type capacity)
                 items = (malloc-array element-type capacity)
 
 let DEFAULT_CAPACITY = (1:usize << 2:usize)
-fn VariableMutableArray (element-type)
+fn VariableMutableArray (element-type memory)
     let arrayT =
         pointer element-type 'mutable
 
@@ -204,7 +204,7 @@ fn VariableMutableArray (element-type)
                 count = 0:usize
                 items = (malloc-array element-type capacity)
 
-typefn Array '__typecall (cls element-type capacity)
+typefn Array '__typecall (cls element-type capacity opts...)
     """"Construct a mutable array type of ``element-type`` with a variable or
         fixed maximum capacity.
 
@@ -212,11 +212,16 @@ typefn Array '__typecall (cls element-type capacity)
         of array elements permitted. If it is undefined, then an initial
         capacity of 16 elements is assumed, which is doubled whenever
         it is exceeded, allowing for an indefinite number of elements.
+    let memory =
+        va@ 'memory opts...
+    let memory =
+        if (none? memory) HeapMemory
+        else memory
     if (none? capacity)
-        VariableMutableArray element-type
+        VariableMutableArray element-type memory
     else
         assert (constant? capacity) "capacity must be constant"
-        FixedMutableArray element-type (capacity as usize)
+        FixedMutableArray element-type (capacity as usize) memory
 
 do
     let Array FixedArray GrowingArray

@@ -2437,29 +2437,28 @@ do
         set-type-symbol! T 'ElementType ET
         T
 
-    set-type-symbol! reference 'from-pointer-type
-        fn "reference-from-pointer-type" (PT)
-            # due to auto-memoization, we'll always get the same type back
-                provided the element type is a constant
-            assert (constant? PT)
-            assert-typeof PT type
-            if (PT < reference)
-                compiler-error!
-                    .. "cannot create reference type of reference type "
-                        repr PT
-            make-reference-type PT
-
-    set-type-symbol! reference 'from-pointer
-        fn "reference-from-pointer" (value)
-            (reference.from-pointer-type (typeof value)) value
-
     set-type-symbol! reference '__typecall
-        fn "reference-apply-type" (cls element)
+        fn "reference-typecall" (cls element)
             if (type== cls reference)
-                compiler-error! "reference constructor deleted; use 'from-pointer-type"
+                let T = element
+                assert-typeof T type
+                if (T < reference)
+                    compiler-error!
+                        .. "cannot create reference type of reference type "
+                            repr T
+                make-reference-type T
             else
                 let ET = (storageof cls)
                 bitcast (imply element ET) cls
+
+fn ref (value)
+    let T = (typeof value)
+    if (T < reference) value
+    if (pointer-type? T)
+        (reference T) value
+    else
+        compiler-error!
+            .. "cannot create reference of value of type " (repr T)
 
 #var has been removed; use `local`
 
@@ -2492,7 +2491,9 @@ fn copy-construct (value source)
         present, passing `source` as the reference or immutable value from
         which to copy.
     let T = (typeof value)
-    let op ok = (type@& T '__copy)
+    let ET =
+        element-type (storageof T) 0
+    let op ok = (type@& ET '__copy)
     if ok
         op value source
     else
@@ -2504,12 +2505,12 @@ fn construct (value args...)
     """"invokes the constructor for `value` of reference-like type if present,
         passing along optional argument set `args...`.
     let T = (typeof value)
-    let op ok = (type@& T '__new)
+    let ET =
+        element-type (storageof T) 0
+    let op ok = (type@& ET '__new)
     if ok
         op value args...
     else
-        let ET =
-            element-type (storageof T) 0
         # try default constructor
         value = (ET args...)
     return;
@@ -2517,7 +2518,9 @@ fn construct (value args...)
 fn destruct (value)
     """"invokes the destructor for `value` of reference-like type if present.
     let T = (typeof value)
-    let op ok = (type@& T '__delete)
+    let ET =
+        element-type (storageof T) 0
+    let op ok = (type@& ET '__delete)
     if ok
         op value
         return;
@@ -2542,13 +2545,13 @@ typefn! Memory 'copy (cls value)
             element-type (storageof T) 0
         else T
     let self =
-        reference.from-pointer ((type@ cls 'allocate) cls ET)
+        ref ((type@ cls 'allocate) cls ET)
     copy-construct self value
     self
 
 typefn! Memory 'new (cls T args...)
     let self =
-        reference.from-pointer ((type@ cls 'allocate) cls T)
+        ref ((type@ cls 'allocate) cls T)
     construct self args...
     self
 
@@ -2588,6 +2591,19 @@ typefn! GlobalMemory 'allocate-array (cls T count)
 typefn GlobalMemory 'free-array (cls value count)
     return;
 
+#-------------------------------------------------------------------------------
+# default value constructors
+#-------------------------------------------------------------------------------
+
+fn local (T args...)
+    FunctionMemory T args...
+
+fn new (T args...)
+    HeapMemory T args...
+
+fn! static (T args...)
+    GlobalMemory T args...
+
 fn delete (self)
     """"destructs and frees `value` of reference-like type. The free method
         must also invoke the destructor.
@@ -2603,19 +2619,6 @@ fn delete (self)
         'delete GlobalMemory self
     else
         .. "cannot delete value of type " (repr T)
-
-#-------------------------------------------------------------------------------
-# default value constructors
-#-------------------------------------------------------------------------------
-
-fn local (T args...)
-    FunctionMemory T args...
-
-fn new (T args...)
-    HeapMemory T args...
-
-fn! static (T args...)
-    GlobalMemory T args...
 
 #-------------------------------------------------------------------------------
 # docstrings
@@ -3085,7 +3088,7 @@ typefn pointer '__getattr (self name)
     let ET = (element-type (typeof self) 0)
     let op success = (type@& ET '__getattr)
     if success
-        let result... = (op (reference.from-pointer self) name)
+        let result... = (op (ref self) name)
         if (va-empty? result...)
         else
             return result...
@@ -3099,7 +3102,7 @@ typefn pointer '__@ (self index)
     let index =
         if (none? index) 0:usize # simple dereference
         else index
-    (reference.from-pointer-type (typeof self)) (getelementptr self (usize index))
+    ref (getelementptr self (usize index))
 
 # extern cast to element type/pointer executes load/unconst
 typefn extern '__imply (self destT)
@@ -3226,7 +3229,7 @@ typefn& CStruct '__getattr (self name)
     if (icmp>=s idx 0)
         # cast result to reference
         let val = (getelementptr self 0 idx)
-        (reference.from-pointer-type (typeof val)) val
+        ref val
 
 typefn CStruct '__getattr (self name)
     let idx = (element-index (typeof self) name)
@@ -3246,8 +3249,7 @@ typefn& CUnion '__getattr (self name)
         let newPT =
             'set-element-type (storageof (typeof self)) FT
         # cast pointer to reference to alternative type
-        (reference.from-pointer-type newPT)
-            bitcast self newPT
+        ref (bitcast self newPT)
 
 typefn CUnion '__getattr (self name)
     let idx = (element-index (typeof self) name)
@@ -3590,7 +3592,7 @@ typefn& tuple '__getattr (self name)
     if (icmp>=s idx 0)
         # cast result to reference
         let val = (getelementptr self 0 idx)
-        (reference.from-pointer-type (typeof val)) val
+        ref val
 
 typefn tuple '__getattr (self name)
     let idx = (element-index (typeof self) name)
@@ -3689,7 +3691,7 @@ typefn array '__@ (self at)
 typefn& array '__@ (self at)
     let val = (at as integer)
     let newptr = (getelementptr self 0 val)
-    (reference.from-pointer-type (typeof newptr)) newptr
+    ref newptr
 
 fn arrayof (T ...)
     let count = (va-countof ...)

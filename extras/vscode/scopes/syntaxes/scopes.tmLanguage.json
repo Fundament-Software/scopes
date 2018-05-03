@@ -129,7 +129,7 @@
                 },
                 {
                     "name": "support.function.library.scopes",
-				    "match": "(_|deref|new|local|static|delete|sign|abs|(unroll-)?range|fold|map|zip|enumerate|unpack|(tuple|vector|array)of|unknownof|va-(empty\\?|types|join|each|each-reversed|key)|imply|forward-imply|forward-as|xpcall|require-from|char|getattr|typeattr|(de)?cons|slice|(scope-|block-scope-)?macro|print|min|max|clamp|(tie|cond)-const|repr|(none|symbol|list|empty|type|integer|real|pointer|array|tuple|typename|Symbol|function-pointer)\\?|(integer|real|pointer|function|array|tuple|function-pointer|typename)-type\\?)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
+				    "match": "(_|(de)?ref|new|local|static|delete|(copy-)?construct|destruct|sign|abs|(unroll-)?range|fold|map|zip|enumerate|unpack|(tuple|vector|array)of|unknownof|va-(empty\\?|types|join|each|each-reversed|key)|imply|forward-imply|forward-as|xpcall|require-from|char|getattr|typeattr|(de)?cons|slice|(scope-|block-scope-)?macro|print|min|max|clamp|(tie|cond)-const|repr|(none|symbol|list|empty|type|integer|real|pointer|array|tuple|typename|Symbol|function-pointer)\\?|(integer|real|pointer|function|array|tuple|function-pointer|typename)-type\\?)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
                 },
                 {
                     "name": "support.function.sfx.builtin.scopes",
