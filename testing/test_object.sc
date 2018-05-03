@@ -8,6 +8,14 @@ let C =
             #include <stdio.h>
         list;
 
+fn static-array-init ()
+    static (array i32 10:usize)
+
+compile
+    typify static-array-init
+    'dump-module
+    'no-debug-info
+
 define x
     static (array i32 10:usize)
 define y
@@ -15,9 +23,9 @@ define y
 #setting x here won't have any effect because the code isn't executed at compile time
 #x = 10
 fn main (argc argv)
-    x @ 0 = 6
+    x @ 3 = 6
     y = 7
-    C.printf "hello world %i %i\n" (load (x @ 0)) (load y)
+    C.printf "hello world %i %i\n" (load (x @ 3)) (load y)
     return 0
 
 let main = (typify main i32 (pointer rawstring))

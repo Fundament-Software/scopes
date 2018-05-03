@@ -12,25 +12,7 @@ let GrowingArray = (typename "GrowingArray")
 set-typename-super! FixedArray Array
 set-typename-super! GrowingArray Array
 
-fn define-common-array-methods (T ensure-capacity)
-    fn destructor (self items)
-        let T = (@ (typeof self))
-        let element-type = T.ElementType
-        let element-destructor = (type@& element-type '__delete)
-        if (none? element-destructor)
-            return;
-        let count =
-            self.count as immutable
-        let loop (i) = (unconst 0:usize)
-        if (i < count)
-            let ptr = (items @ i)
-            element-destructor ptr
-            loop (i + 1:usize)
-
-    typefn& T '__delete (self)
-        destructor self self.items
-        free (load self.items)
-
+fn define-common-array-methods (T)
     typefn& T '__as (self T)
         if (T == Generator)
             Generator
@@ -82,10 +64,10 @@ fn define-common-array-methods (T ensure-capacity)
 
     fn append-slot (self)
         let count = self.count
-        ensure-capacity self count
         let idx = (count as immutable)
-        count = count + 1
-        (getelementptr (load self.items) idx) as ref
+        count += 1
+        'reserve self (deref count)
+        (getelementptr (deref self.items) idx) as ref
 
     typefn& T 'emplace-append (self args...)
         let element-type = ((@ (typeof self)) . ElementType)
@@ -103,35 +85,23 @@ fn define-common-array-methods (T ensure-capacity)
     return;
 
 define-common-array-methods FixedArray
-    fn "ensure-fixed-capacity" (self count)
-        let T = (@ (typeof self))
-        assert (count < T.capacity) "capacity exceeded"
+typefn& FixedArray 'reserve (self count)
+    let T = (@ (typeof self))
+    assert (count <= T.capacity) "capacity exceeded"
 
-fn grow (self)
+fn destructor (self items)
     let T = (@ (typeof self))
     let element-type = T.ElementType
-    let new-capacity =
-        self.capacity << 1:usize
+    let element-destructor ok = (type@& element-type '__delete)
+    if (not ok)
+        return;
     let count =
         self.count as immutable
-    let old-items = (load self.items)
-    let new-items =
-        malloc-array element-type new-capacity
     let loop (i) = (unconst 0:usize)
     if (i < count)
-        let sptr = (getelementptr old-items i)
-        let dptr = (getelementptr new-items i)
-        store (load sptr) dptr
+        let ptr = (items @ i)
+        element-destructor ptr
         loop (i + 1:usize)
-    self.items = new-items
-    self.capacity = new-capacity
-    free old-items
-    return;
-
-define-common-array-methods GrowingArray
-    fn "ensure-variable-capacity" (self count)
-        if (count == self.capacity)
-            grow self
 
 fn FixedMutableArray (element-type capacity memory)
     let arrayT =
@@ -149,6 +119,7 @@ fn FixedMutableArray (element-type capacity memory)
         set-type-symbol! this-struct 'ElementType element-type
         set-type-symbol! this-struct 'capacity capacity
         set-typename-super! this-struct FixedArray
+        set-type-symbol! this-struct 'Memory memory
 
         method '__repr (self)
             ..
@@ -158,10 +129,33 @@ fn FixedMutableArray (element-type capacity memory)
                 repr self.items
                 "]"
 
-        method '__typecall (cls)
-            CStruct.__typecall cls
-                count = 0:usize
-                items = (malloc-array element-type capacity)
+        method& '__new (self)
+            self.items = ('allocate-array memory element-type capacity)
+            self.count = 0:usize
+
+        method& '__delete (self)
+            destructor self self.items
+            'free memory (deref self.items)
+
+define-common-array-methods GrowingArray
+typefn& GrowingArray 'reserve (self count)
+    if (count < self.capacity)
+        return;
+    let T = (@ (typeof self))
+    let memory = T.Memory
+    let element-type = T.ElementType
+    # multiply capacity by 2.7 (roughly e)
+    let new-capacity =
+        self.capacity * 27:usize // 10:usize
+    let count = (deref self.count)
+    let old-items = (deref self.items)
+    let new-items =
+        'allocate-array memory element-type new-capacity
+    move-construct count old-items new-items
+    self.items = new-items
+    self.capacity = new-capacity
+    'free memory old-items
+    return;
 
 let DEFAULT_CAPACITY = (1:usize << 2:usize)
 fn VariableMutableArray (element-type memory)
@@ -178,6 +172,7 @@ fn VariableMutableArray (element-type memory)
 
         set-type-symbol! this-struct 'ElementType element-type
         set-typename-super! this-struct GrowingArray
+        set-type-symbol! this-struct 'Memory memory
 
         method '__repr (self)
             ..
@@ -189,15 +184,18 @@ fn VariableMutableArray (element-type memory)
                 repr self.items
                 "]"
 
-        method '__typecall (cls opts...)
+        method& '__new (self opts...)
             let capacity = (va@ 'capacity opts...)
             let capacity =
                 if (none? capacity) DEFAULT_CAPACITY
                 else capacity
-            CStruct.__typecall cls
-                capacity = capacity
-                count = 0:usize
-                items = (malloc-array element-type capacity)
+            self.items = ('allocate-array memory element-type capacity)
+            self.count = 0:usize
+            self.capacity = capacity
+
+        method& '__delete (self)
+            destructor self self.items
+            'free memory (deref self.items)
 
 typefn Array '__typecall (cls element-type capacity opts...)
     """"Construct a mutable array type of ``element-type`` with a variable or

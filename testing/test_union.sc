@@ -11,9 +11,8 @@ do
         x.key == 0xd0c0b0a0:u32
 
     let x = (K)
-    dump x.key
-    dump
-        x.vals @ 0
+    assert (x.key == 0)
+    assert ((x.vals @ 0) == 0)
 
 do
     # union within a struct

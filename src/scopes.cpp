@@ -891,7 +891,7 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(FN_IsListEmpty, "list-empty?") \
     T(FN_Malloc, "malloc") T(FN_MallocArray, "malloc-array") T(FN_Unconst, "unconst") \
     T(FN_Macro, "macro") T(FN_Max, "max") T(FN_Min, "min") \
-    T(FN_MemCpy, "memcpy") \
+    T(FN_MemCopy, "memcopy") \
     T(FN_IsMutable, "mutable?") \
     T(FN_IsNone, "none?") \
     T(FN_IsNull, "null?") T(FN_OrderedBranch, "ordered-branch") \
@@ -17345,11 +17345,7 @@ size_t f_type_countof(const Type *T) {
     case TK_Tuple: return cast<TupleType>(T)->types.size();
     case TK_Union: return cast<UnionType>(T)->types.size();
     case TK_Function:  return cast<FunctionType>(T)->argument_types.size() + 1;
-    default: {
-        StyledString ss;
-        ss.out << "type " << T << " has no count" << std::endl;
-        location_error(ss.str());
-    } break;
+    default:  break;
     }
     return 0;
 }
@@ -18011,7 +18007,7 @@ static void init_globals(int argc, char *argv[]) {
         TYPE_Type, TYPE_Symbol, TYPE_I32, TYPE_I32, TYPE_I32, TYPE_I32, TYPE_Symbol, TYPE_Symbol);
     DEFINE_PURE_C_FUNCTION(FN_SampledImageType, SampledImage, TYPE_Type, TYPE_Type);
     DEFINE_PURE_C_FUNCTION(FN_VectorType, f_vector_type, TYPE_Type, TYPE_Type, TYPE_USize);
-    DEFINE_PURE_C_FUNCTION(FN_TypeCountOf, f_type_countof, TYPE_USize, TYPE_Type);
+    DEFINE_PURE_C_FUNCTION(FN_TypeCountOf, f_type_countof, TYPE_I32, TYPE_Type);
     DEFINE_PURE_C_FUNCTION(FN_SymbolToString, f_symbol_to_string, TYPE_String, TYPE_Symbol);
     DEFINE_PURE_C_FUNCTION(Symbol("Any=="), f_any_eq, TYPE_Bool, TYPE_Any, TYPE_Any);
     DEFINE_PURE_C_FUNCTION(FN_ListJoin, f_list_join, TYPE_List, TYPE_List, TYPE_List);

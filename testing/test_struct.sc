@@ -14,7 +14,6 @@ let val = (append-val val 2)
 let val = (append-val val 3)
 
 print (val begin-arg)
-
 do
     # a struct with name expression
     let T =
@@ -30,7 +29,7 @@ struct AnotherStruct
     y : i32
     z : i32
 
-    method 'apply-type (cls x y z)
+    method '__typecall (cls x z y)
         'structof cls
             x = x
             y = y
@@ -40,7 +39,9 @@ struct AnotherStruct
         + self.x self.y self.z
 
 let q =
-    AnotherStruct 3 0 4
+    AnotherStruct 3 4 0
+
+dump q
 
 assert
     ('sum q) == 7
@@ -51,7 +52,7 @@ assert
         q.y == 0
         q.z == 4
 
-do
+fn test-direct-self-reference ()
     # direct self reference
     struct Cell
         at : i32
@@ -63,6 +64,8 @@ do
 
     assert
         cell1.next.next.at == 3
+
+test-direct-self-reference;
 
 do
     # forward declaration
@@ -93,4 +96,4 @@ do
     assert (testval.y == 2)
     delete testval
 
-    none
+none

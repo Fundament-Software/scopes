@@ -526,6 +526,12 @@ syntax-extend
 fn string-repr (val)
     Any-string (Any val)
 
+fn op-prettyname (symbol)
+    if (icmp== symbol '__=) "assignment operator ="
+    else
+        string-join "operation "
+            string-join (Any-repr (Any-wrap symbol))
+
 fn opN-dispatch (symbol)
     fn (self ...)
         let T = (typeof self)
@@ -533,10 +539,9 @@ fn opN-dispatch (symbol)
         if success
             return (op self ...)
         compiler-error!
-            string-join "operation "
-                string-join (Any-repr (Any-wrap symbol))
-                    string-join " does not apply to value of type "
-                        Any-repr (Any-wrap T)
+            string-join (op-prettyname symbol)
+                string-join " can not be used with value of type "
+                    Any-repr (Any-wrap T)
 
 fn op2-dispatch (symbol)
     fn (a b)
@@ -548,11 +553,12 @@ fn op2-dispatch (symbol)
             else
                 return result...
         compiler-error!
-            string-join "operation does not apply to values of type "
-                string-join
-                    Any-repr (Any-wrap Ta)
-                    string-join " and "
-                        Any-repr (Any-wrap Tb)
+            string-join (op-prettyname symbol)
+                string-join " can not be used with values of type "
+                    string-join
+                        Any-repr (Any-wrap Ta)
+                        string-join " and "
+                            Any-repr (Any-wrap Tb)
 
 fn op2-dispatch-bidi (symbol fallback)
     fn (a b)
@@ -1134,12 +1140,14 @@ syntax-extend
     # a supertype to be used for conversions
     let immutable = (typename-type "immutable")
     set-scope-symbol! syntax-scope 'immutable immutable
-
     set-typename-super! integer immutable
     set-typename-super! real immutable
-    set-typename-super! array immutable
     set-typename-super! vector immutable
-    set-typename-super! tuple immutable
+
+    let aggregate = (typename-type "aggregate")
+    set-scope-symbol! syntax-scope 'aggregate aggregate
+    set-typename-super! array aggregate
+    set-typename-super! tuple aggregate
 
     set-type-symbol! integer '__typecall
         fn (cls ...)
@@ -2259,6 +2267,11 @@ define-macro fn...
 # references
 #-------------------------------------------------------------------------------
 
+fn construct
+fn copy-construct
+fn destruct
+fn move-construct
+
 let ref = (typename "ref")
 
 let voidstar = (pointer void)
@@ -2416,9 +2429,13 @@ do
 
     set-type-symbol! ref '__=
         fn (self value)
-            let ET = (element-type (storageof (typeof self)) 0)
-            store (imply value ET) self
-            true
+            let T = (storageof (typeof self))
+            let ET = (element-type T 0)
+            let op ok = (type@& ET '__=)
+            if ok
+                let result... = (op self value)
+                if (not (va-empty? result...))
+                    return result...
 
     fn make-ref-type (PT)
         let ET = (element-type PT 0)
@@ -2472,44 +2489,87 @@ define-macro typefn!&
 # default memory allocators
 #-------------------------------------------------------------------------------
 
-fn copy-construct (value source)
-    """"invokes the copy constructor for `value` of reference-like type if
-        present, passing `source` as the reference or immutable value from
-        which to copy.
-    let T = (typeof value)
-    let ET =
-        element-type (storageof T) 0
-    let op ok = (type@& ET '__copy)
-    if ok
-        op value source
+fn pointer-each (n op value args...)
+    let n = (imply n usize)
+    if (n == 1:usize)
+        op (value as ref) args...
     else
-        # try immutable copy
-        value = source
+        # unroll only if <= 4 elements
+        let loop (i) =
+            if (n <= 4:usize) 0:usize
+            else (unconst 0:usize)
+        if (i < n)
+            op
+                (getelementptr value i) as ref
+                args...
+            loop (i + 1:usize)
     return;
 
-fn construct (value args...)
+fn pointer-each2 (n op value other)
+    let n = (imply n usize)
+    if (n == 1:usize)
+        op (value as ref) (other as ref)
+    else
+        # unroll only if <= 4 elements
+        let loop (i) =
+            if (n <= 4:usize) 0:usize
+            else (unconst 0:usize)
+        if (i < n)
+            op
+                (getelementptr value i) as ref
+                (getelementptr other i) as ref
+            loop (i + 1:usize)
+    return;
+
+fn construct (n value args...)
     """"invokes the constructor for `value` of reference-like type if present,
         passing along optional argument set `args...`.
     let T = (typeof value)
     let ET =
         element-type (storageof T) 0
     let op ok = (type@& ET '__new)
-    if ok
-        op value args...
-    else
-        # try default constructor
-        value = (ET args...)
-    return;
+    if (not ok)
+        compiler-error!
+            .. "type " (repr ET) " has no constructor"
+    pointer-each n op value args...
 
-fn destruct (value)
+fn destruct (n value)
     """"invokes the destructor for `value` of reference-like type if present.
     let T = (typeof value)
     let ET =
         element-type (storageof T) 0
     let op ok = (type@& ET '__delete)
+    if (not ok)
+        compiler-error!
+            .. "type " (repr ET) " has no destructor"
+    pointer-each n op value
+
+fn copy-construct (n value source)
+    """"invokes the copy constructor for `value` of reference-like type if
+        present, passing `source` as the reference from which to copy.
+    let T = (typeof value)
+    let ET =
+        element-type (storageof T) 0
+    let op ok = (type@& ET '__copy)
+    if (not ok)
+        compiler-error!
+            .. "type " (repr ET) " has no copy constructor"
+    assert ((typeof source) < ref)
+    pointer-each2 n op value source
+
+fn move-construct (n value source)
+    """"invokes the move constructor for `value` of reference-like type if
+        present, passing `source` as the reference from which to move.
+    let T = (typeof value)
+    let ET =
+        element-type (storageof T) 0
+    let op ok = (type@& ET '__move)
     if ok
-        op value
-        return;
+        pointer-each2 n op value source
+    else
+        # try copy, then destruct source
+        copy-construct n value source
+        destruct n source
 
 let Memory = (typename "Memory")
 typefn! Memory '__typecall (cls T args...)
@@ -2521,7 +2581,7 @@ typefn! Memory '__typecall (cls T args...)
         (type@ cls 'new) cls T args...
 
 typefn Memory 'delete (cls value)
-    destruct value
+    destruct 1 value
     (type@ cls 'free) cls value
 
 typefn! Memory 'copy (cls value)
@@ -2532,13 +2592,15 @@ typefn! Memory 'copy (cls value)
         else T
     let self =
         ((type@ cls 'allocate) cls ET) as ref
-    copy-construct self value
+    # not optimal, but safe
+    construct 1 self
+    self = value
     self
 
 typefn! Memory 'new (cls T args...)
     let self =
         ((type@ cls 'allocate) cls T) as ref
-    construct self args...
+    construct 1 self args...
     self
 
 let HeapMemory = (typename "HeapMemory" (super = Memory))
@@ -2558,9 +2620,9 @@ typefn FunctionMemory 'allocate (cls T)
     alloca T
 typefn FunctionMemory 'free (cls value)
     return;
-typefn HeapMemory 'allocate-array (cls T count)
+typefn FunctionMemory 'allocate-array (cls T count)
     alloca-array T count
-typefn HeapMemory 'free-array (cls value count)
+typefn FunctionMemory 'free-array (cls value count)
     return;
 
 let GlobalMemory = (typename "GlobalMemory" (super = Memory))
@@ -2576,6 +2638,104 @@ typefn! GlobalMemory 'allocate-array (cls T count)
         'set-storage (pointer T 'mutable) 'Private
 typefn GlobalMemory 'free-array (cls value count)
     return;
+
+#-------------------------------------------------------------------------------
+# default constructors and destructors for basic types
+#-------------------------------------------------------------------------------
+
+do
+    fn simple-new (self args...)
+        let ET = (@ (typeof self))
+        if (va-empty? args...)
+            store (nullof ET) self
+        else
+            store (ET args...) self
+
+    fn simple-delete (self)
+        # todo: init value to deadbeef-style noise in debug mode?
+
+    fn simple-copy (self other)
+        let ET = (@ (typeof self))
+        store (imply other ET) self
+
+    fn simple= (self other)
+        let ET = (@ (typeof self))
+        store (imply other ET) self
+        true
+
+    fn setup-simple-type (T)
+        set-type-symbol!& T '__new simple-new
+        set-type-symbol!& T '__delete simple-delete
+        set-type-symbol!& T '__copy simple-copy
+        set-type-symbol!& T '__move simple-copy
+        set-type-symbol!& T '__= simple=
+
+    setup-simple-type immutable
+    setup-simple-type pointer
+
+    fn aggregate= (self other)
+        let ET = (@ (typeof self))
+        # copy-construct insists that both sides are references, so if
+            the right side is an immutable value, we need to assign by field/element
+        if ((typeof other) < ref)
+            destruct 1 self
+            copy-construct 1 self other
+        else
+            let other = (imply other ET)
+            let count = (type-countof ET)
+            let loop (i) = 0:usize
+            if (icmp<s i count)
+                =
+                    (getelementptr self 0 i) as ref
+                    extractvalue other i
+                loop (i + 1:usize)
+        true
+
+    set-type-symbol!& aggregate '__= aggregate=
+
+    fn tuple-each (f)
+        fn (self)
+            let ET = (@ (typeof self))
+            let count = (i32 (type-countof ET))
+            let loop (i) = 0
+            if (icmp<s i count)
+                f 1 ((getelementptr self 0 i) as ref)
+                loop (i + 1)
+
+    fn tuple-each2 (f)
+        fn (self other)
+            let ET = (@ (typeof self))
+            let count = (i32 (type-countof ET))
+            let loop (i) = 0
+            if (icmp<s i count)
+                f 1
+                    (getelementptr self 0 i) as ref
+                    (getelementptr other 0 i) as ref
+                loop (i + 1)
+
+    set-type-symbol!& tuple '__new (tuple-each construct)
+    set-type-symbol!& tuple '__delete (tuple-each destruct)
+    set-type-symbol!& tuple '__copy (tuple-each2 copy-construct)
+    set-type-symbol!& tuple '__move (tuple-each2 move-construct)
+
+    fn array-each (f)
+        fn (self)
+            let ET = (@ (typeof self))
+            let count = (type-countof ET)
+            f count ((getelementptr self 0 0) as ref)
+
+    fn array-each2 (f)
+        fn (self other)
+            let ET = (@ (typeof self))
+            let count = (type-countof ET)
+            f count
+                (getelementptr self 0 0) as ref
+                (getelementptr other 0 0) as ref
+
+    set-type-symbol!& array '__new (array-each construct)
+    set-type-symbol!& array '__delete (array-each destruct)
+    set-type-symbol!& array '__copy (array-each2 copy-construct)
+    set-type-symbol!& array '__move (array-each2 move-construct)
 
 #-------------------------------------------------------------------------------
 # default value constructors
@@ -3045,13 +3205,6 @@ typefn Closure '__imply (self destT)
             let i-1 = (sub i 1)
             loop i-1 (rawcall element-type ET i-1) args...
 
-# support assignment syntax
-typefn pointer '__= (self value)
-    store
-        value as (element-type (typeof self) 0)
-        self
-    true
-
 # pointer comparisons
 typefn pointer '__== (a b flipped)
     if flipped
@@ -3203,6 +3356,40 @@ typefn CStruct 'structof (cls args...)
         else
             instance
 
+fn CStruct->tuple (self)
+    let T = (typeof self)
+    let ST = (storageof T)
+    let ET = (storageof (@ ST))
+    (bitcast self ('set-element-type ST ET)) as ref
+
+typefn& CStruct '__new (self args...)
+    let sz = (va-countof args...)
+    # lower to tuple
+    let self = (CStruct->tuple self)
+    let T = (@ (typeof self))
+    # construct as tuple
+    construct 1 self
+    if (icmp>s sz 0)
+        # todo: do a bit more efficient initialization, as right now we're first
+            default-initing, and then rewriting some of the values anyways
+        let keys... = (va-keys args...)
+        let loop (i) = 0
+        if (icmp<s i sz)
+            let key = (va@ i keys...)
+            let arg = (va@ i args...)
+            let k =
+                if (key == unnamed) i
+                else
+                    element-index T key
+            =
+                (getelementptr self 0 k) as ref
+                arg
+            loop (i + 1)
+
+typefn& CStruct '__delete (self)
+    destruct 1
+        CStruct->tuple self
+
 # support for C struct initializers
 typefn CStruct '__typecall (cls args...)
     if (cls == CStruct)
@@ -3223,9 +3410,15 @@ typefn CStruct '__getattr (self name)
     if (icmp>=s idx 0)
         extractvalue self idx
 
+#-------------------------------------------------------------------------------
+
 # support for basic C union initializer
 typefn CUnion '__typecall (cls)
     nullof cls
+
+typefn& CUnion '__new (self)
+    let cls = (@ (typeof self))
+    store (nullof cls) self
 
 # access reference to union element from pointer/reference
 typefn& CUnion '__getattr (self name)
