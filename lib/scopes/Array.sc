@@ -49,8 +49,7 @@ fn define-common-array-methods (T ensure-capacity)
     typefn& T '__@ (self index)
         let index = (index as usize)
         assert ((index < self.count) & (index >= 0:usize)) "index out of bounds"
-        ref
-            getelementptr (load self.items) index
+        (getelementptr (load self.items) index) as ref
 
     typefn& T 'sort (self key)
         let count = (self.count as immutable)
@@ -59,11 +58,9 @@ fn define-common-array-methods (T ensure-capacity)
         let inner (i swapped) = (unconst 1:usize) (unconst false)
         if (i < count)
             let a =
-                ref
-                    getelementptr items (sub i 1:usize)
+                (getelementptr items (sub i 1:usize)) as ref
             let b =
-                ref
-                    getelementptr items i
+                (getelementptr items i) as ref
             let a-key =
                 if (none? key) a
                 else (key a)
@@ -88,9 +85,7 @@ fn define-common-array-methods (T ensure-capacity)
         ensure-capacity self count
         let idx = (count as immutable)
         count = count + 1
-        return
-            ref
-                getelementptr (load self.items) idx
+        (getelementptr (load self.items) idx) as ref
 
     typefn& T 'emplace-append (self args...)
         let element-type = ((@ (typeof self)) . ElementType)

@@ -322,7 +322,7 @@ fn construct-getter-type (vecrefT mask)
         typename
             .. (type-name vecrefT)
                 string-repr mask
-            super = reference
+            super = ref
             storage = storageT
     if ((typeof mask) == i32)
         let index = mask

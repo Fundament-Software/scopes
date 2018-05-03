@@ -2259,7 +2259,7 @@ define-macro fn...
 # references
 #-------------------------------------------------------------------------------
 
-let reference = (typename "reference")
+let ref = (typename "ref")
 
 let voidstar = (pointer void)
 
@@ -2270,7 +2270,7 @@ fn pointer-type-imply? (src dest)
         else (storageof ET)
     or
         # casts to voidstar are only permitted if we are not holding
-        # a reference to another pointer
+        # a ref to another pointer
         and (not (pointer-type? ET))
             or
                 and
@@ -2281,31 +2281,31 @@ fn pointer-type-imply? (src dest)
         type== dest ('immutable src)
         type== dest ('strip-storage ('immutable src))
 
-let reference-attribs-key = '__refattrs
+let ref-attribs-key = '__refattrs
 
 fn type@& (T name)
-    let attrs ok = (type@ T reference-attribs-key)
+    let attrs ok = (type@ T ref-attribs-key)
     if ok
         type@ attrs name
     else
         return none ok
 
 fn set-type-symbol!& (T name value)
-    let attrs ok = (type-local@ T reference-attribs-key)
+    let attrs ok = (type-local@ T ref-attribs-key)
     let attrs =
         if ok attrs
         else
-            let attrs = (typename (Symbol->string reference-attribs-key))
-            let super-attrs ok = (type@ (superof T) reference-attribs-key)
+            let attrs = (typename (Symbol->string ref-attribs-key))
+            let super-attrs ok = (type@ (superof T) ref-attribs-key)
             if ok
                 set-typename-super! attrs super-attrs
-            set-type-symbol! T reference-attribs-key attrs
+            set-type-symbol! T ref-attribs-key attrs
             attrs
     set-type-symbol! attrs name value
 
 fn deref (val)
     let T = (typeof val)
-    if (T < reference)
+    if (T < ref)
         let op ok = (type@& T '__load)
         if ok
             op val
@@ -2323,7 +2323,7 @@ set-type-symbol!& Any '__imply
 
 do
     fn passthru-overload (sym func)
-        set-type-symbol! reference sym (fn (a b flipped) (func (deref a) (deref b)))
+        set-type-symbol! ref sym (fn (a b flipped) (func (deref a) (deref b)))
     passthru-overload '__== ==; passthru-overload '__!= !=
     passthru-overload '__< <; passthru-overload '__<= <=
     passthru-overload '__> >; passthru-overload '__>= >=
@@ -2335,8 +2335,8 @@ do
     passthru-overload '__<< <<; passthru-overload '__>> >>
     passthru-overload '__.. ..; passthru-overload '__.. ..
 
-    fn define-reference-forward (failedf methodname)
-        set-type-symbol! reference methodname
+    fn define-ref-forward (failedf methodname)
+        set-type-symbol! ref methodname
             fn (self args...)
                 let T = (storageof (typeof self))
                 let ET = (element-type T 0)
@@ -2345,8 +2345,8 @@ do
                     return (op self args...)
                 failedf (deref self) args...
 
-    fn define-reference-forward-failable (failedf methodname)
-        set-type-symbol! reference methodname
+    fn define-ref-forward-failable (failedf methodname)
+        set-type-symbol! ref methodname
             fn (self args...)
                 let T = (storageof (typeof self))
                 let ET = (element-type T 0)
@@ -2357,15 +2357,15 @@ do
                         return result...
                 failedf (deref self) args...
 
-    define-reference-forward countof '__countof
-    define-reference-forward unpack '__unpack
-    define-reference-forward forward-repr '__repr
-    define-reference-forward forward-hash '__hash
-    define-reference-forward-failable forward-as '__as
-    define-reference-forward-failable forward-getattr '__getattr
+    define-ref-forward countof '__countof
+    define-ref-forward unpack '__unpack
+    define-ref-forward forward-repr '__repr
+    define-ref-forward forward-hash '__hash
+    define-ref-forward-failable forward-as '__as
+    define-ref-forward-failable forward-getattr '__getattr
 
-    set-type-symbol! reference '__typeattr
-        fn "reference-typeattr" (cls name)
+    set-type-symbol! ref '__typeattr
+        fn "ref-typeattr" (cls name)
             let T = (storageof cls)
             let ET = (element-type T 0)
             let value success = (type@& ET name)
@@ -2378,8 +2378,8 @@ do
                 else
                     return result...
 
-    set-type-symbol! reference '__@
-        fn "reference-@" (self key)
+    set-type-symbol! ref '__@
+        fn "ref-@" (self key)
             let T = (storageof (typeof self))
             let ET = (element-type T 0)
             let op success = (type@& ET '__@)
@@ -2389,7 +2389,7 @@ do
             if ok
                 @ (deref self) key
 
-    set-type-symbol! reference '__call
+    set-type-symbol! ref '__call
         fn (self args...)
             let T = (storageof (typeof self))
             let ET = (element-type T 0)
@@ -2399,7 +2399,7 @@ do
             else
                 call (deref self) args...
 
-    set-type-symbol! reference '__imply
+    set-type-symbol! ref '__imply
         fn (self destT)
             let ptrtype = (storageof (typeof self))
             if (type== destT ptrtype)
@@ -2414,13 +2414,13 @@ do
                     return (bitcast self aptrtype)
             forward-imply (load (bitcast self ptrtype)) destT
 
-    set-type-symbol! reference '__=
+    set-type-symbol! ref '__=
         fn (self value)
             let ET = (element-type (storageof (typeof self)) 0)
             store (imply value ET) self
             true
 
-    fn make-reference-type (PT)
+    fn make-ref-type (PT)
         let ET = (element-type PT 0)
         let class = ('storage PT)
         let T =
@@ -2432,33 +2432,19 @@ do
                         .. "[" (Symbol->string class) "]"
                     else ""
                     type-name ET
-                reference
+                ref
                 PT
         set-type-symbol! T 'ElementType ET
         T
 
-    set-type-symbol! reference '__typecall
-        fn "reference-typecall" (cls element)
-            if (type== cls reference)
-                let T = element
-                assert-typeof T type
-                if (T < reference)
-                    compiler-error!
-                        .. "cannot create reference type of reference type "
-                            repr T
-                make-reference-type T
-            else
-                let ET = (storageof cls)
-                bitcast (imply element ET) cls
-
-fn ref (value)
-    let T = (typeof value)
-    if (T < reference) value
-    if (pointer-type? T)
-        (reference T) value
-    else
-        compiler-error!
-            .. "cannot create reference of value of type " (repr T)
+    set-type-symbol! ref '__typecall
+        fn "ref-typecall" (cls T)
+            assert-typeof T type
+            if (T < ref)
+                compiler-error!
+                    .. "cannot create reference type of reference type "
+                        repr T
+            make-ref-type T
 
 #var has been removed; use `local`
 
@@ -2541,17 +2527,17 @@ typefn Memory 'delete (cls value)
 typefn! Memory 'copy (cls value)
     let T = (typeof value)
     let ET =
-        if (T < reference)
+        if (T < ref)
             element-type (storageof T) 0
         else T
     let self =
-        ref ((type@ cls 'allocate) cls ET)
+        ((type@ cls 'allocate) cls ET) as ref
     copy-construct self value
     self
 
 typefn! Memory 'new (cls T args...)
     let self =
-        ref ((type@ cls 'allocate) cls T)
+        ((type@ cls 'allocate) cls T) as ref
     construct self args...
     self
 
@@ -2608,7 +2594,7 @@ fn delete (self)
     """"destructs and frees `value` of reference-like type. The free method
         must also invoke the destructor.
     let T = (typeof self)
-    assert (T < reference) "value must be of reference type"
+    assert (T < ref) "value must be of ref type"
     let ptrT = (storageof T)
     let class = ('storage ptrT)
     if (class == unnamed)
@@ -3080,7 +3066,9 @@ typefn pointer '__as (self destT)
 
 # also supports mutable pointer safecast to immutable pointer
 typefn pointer '__imply (self destT)
-    if (pointer-type-imply? (typeof self) destT)
+    if (type== destT ref)
+        bitcast self (ref (typeof self))
+    elseif (pointer-type-imply? (typeof self) destT)
         bitcast self destT
 
 # support getattr syntax
@@ -3088,7 +3076,7 @@ typefn pointer '__getattr (self name)
     let ET = (element-type (typeof self) 0)
     let op success = (type@& ET '__getattr)
     if success
-        let result... = (op (ref self) name)
+        let result... = (op (self as ref) name)
         if (va-empty? result...)
         else
             return result...
@@ -3102,7 +3090,7 @@ typefn pointer '__@ (self index)
     let index =
         if (none? index) 0:usize # simple dereference
         else index
-    ref (getelementptr self (usize index))
+    (getelementptr self (usize index)) as ref
 
 # extern cast to element type/pointer executes load/unconst
 typefn extern '__imply (self destT)
@@ -3228,8 +3216,7 @@ typefn& CStruct '__getattr (self name)
     let idx = (element-index ET name)
     if (icmp>=s idx 0)
         # cast result to reference
-        let val = (getelementptr self 0 idx)
-        ref val
+        (getelementptr self 0 idx) as ref
 
 typefn CStruct '__getattr (self name)
     let idx = (element-index (typeof self) name)
@@ -3249,7 +3236,7 @@ typefn& CUnion '__getattr (self name)
         let newPT =
             'set-element-type (storageof (typeof self)) FT
         # cast pointer to reference to alternative type
-        ref (bitcast self newPT)
+        (bitcast self newPT) as ref
 
 typefn CUnion '__getattr (self name)
     let idx = (element-index (typeof self) name)
@@ -3691,7 +3678,7 @@ typefn array '__@ (self at)
 typefn& array '__@ (self at)
     let val = (at as integer)
     let newptr = (getelementptr self 0 val)
-    ref newptr
+    newptr as ref
 
 fn arrayof (T ...)
     let count = (va-countof ...)
