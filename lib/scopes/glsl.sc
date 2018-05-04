@@ -45,7 +45,7 @@ syntax-extend
     fn coord-type (ET coords)
         if (coords == 1) ET
         else
-            construct-vec-type ET (usize coords)
+            construct-vec-type ET coords
 
     fn make-gsampler (postfix dim arrayed ms coords)
         let T = (typename (.. "gsampler" postfix) sampler)

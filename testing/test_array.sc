@@ -12,7 +12,7 @@ fn init-array (vals)
 fn check-array (vals)
     """"checks whether the array-like `vals` is carrying four integer elements
         defined as 0 1 2 and 3
-    for k in (range 4)
+    for k in (unroll-range 4)
         assert ((vals @ k) == k)
 
 fn check-vals (a b c d)

@@ -4,13 +4,14 @@ using import glsl
 
 fn set-vertex-position ()
     let screen-tri-vertices =
-        arrayof vec2
-            vec2 -1 -1
-            vec2  3 -1
-            vec2 -1  3
+        local 'copy
+            arrayof vec2
+                vec2 -1 -1
+                vec2  3 -1
+                vec2 -1  3
     let pos = (screen-tri-vertices @ gl_VertexID)
     gl_Position = (vec4 pos.x pos.y 0 1)
-    pos
+    deref pos
 
 xvar inout uv : vec2
     location = 0

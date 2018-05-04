@@ -530,6 +530,17 @@ fn op-prettyname (symbol)
     if (icmp== symbol '__=) "assignment"
     elseif (icmp== symbol '__unpack) "unpacking"
     elseif (icmp== symbol '__countof) "counting"
+    elseif (icmp== symbol '__+) "addition"
+    elseif (icmp== symbol '__-) "subtraction"
+    elseif (icmp== symbol '__*) "multiplication"
+    elseif (icmp== symbol '__/) "division"
+    elseif (icmp== symbol '__//) "integer division"
+    elseif (icmp== symbol '__==) "equal comparison"
+    elseif (icmp== symbol '__!=) "inequality comparison"
+    elseif (icmp== symbol '__>=) "greater-than/equal comparison"
+    elseif (icmp== symbol '__<=) "less-than/equal comparison"
+    elseif (icmp== symbol '__>) "greater-than comparison"
+    elseif (icmp== symbol '__<) "less-than comparison"
     else
         string-join
             Any-repr (Any-wrap symbol)
@@ -582,11 +593,12 @@ fn op2-dispatch-bidi (symbol fallback)
         else
             return (fallback a b)
         compiler-error!
-            string-join "operation does not apply to values of type "
-                string-join
-                    Any-repr (Any-wrap Ta)
-                    string-join " and "
-                        Any-repr (Any-wrap Tb)
+            string-join (op-prettyname symbol)
+                string-join " does not apply to values of type "
+                    string-join
+                        Any-repr (Any-wrap Ta)
+                        string-join " and "
+                            Any-repr (Any-wrap Tb)
 
 fn op2-ltr-multiop (f)
     fn (a b ...)
@@ -2826,12 +2838,12 @@ do
             else
                 # copy right-hand side by element
                 let other = (imply other ET)
-                let loop (i) = 0:usize
+                let loop (i) = 0
                 if (icmp<s i count)
                     fsingle
                         (getelementptr self 0 i) as ref
                         extractvalue other i
-                    loop (i + 1:usize)
+                    loop (i + 1)
 
     set-type-symbol!& array '__new (array-each construct-array)
     set-type-symbol!& array '__delete (array-each destruct-array)
@@ -2845,7 +2857,7 @@ fn supercall (cls methodname self args...)
     let methodname = (imply methodname Symbol)
     let T = (typeof self)
     if (T < ref)
-        assert ((typeof& self) < cls)
+        assert ((typeof& self) <= cls)
         let superT = (superof cls)
         let f ok = (type@& superT methodname)
         if (not ok)
@@ -2854,7 +2866,7 @@ fn supercall (cls methodname self args...)
                     \ " does not have a reference method " (repr methodname)
         f self args...
     else
-        assert (T < cls)
+        assert (T <= cls)
         let superT = (superof cls)
         (typeattr superT methodname) self args...
 
@@ -3989,9 +4001,9 @@ typefn array '__countof (self)
 typefn array '__unpack (self)
     let count = (type-countof (typeof self))
     let loop (i result...) = count
-    if (i == 0:usize) result...
+    if (i == 0) result...
     else
-        let i = (sub i 1:usize)
+        let i = (sub i 1)
         loop i
             extractvalue self i
             result...
@@ -3999,9 +4011,9 @@ typefn array '__unpack (self)
 typefn& array '__unpack (self)
     let count = (type-countof (typeof& self))
     let loop (i result...) = count
-    if (i == 0:usize) result...
+    if (i == 0) result...
     else
-        let i = (sub i 1:usize)
+        let i = (sub i 1)
         loop i
             self @ i
             result...
@@ -4366,9 +4378,9 @@ typefn vector '__repr (self)
 typefn vector '__unpack (v)
     let count = (type-countof (typeof v))
     let loop (i result...) = count
-    if (i == 0:usize) result...
+    if (i == 0) result...
     else
-        let i = (sub i 1:usize)
+        let i = (sub i 1)
         loop i
             extractelement v i
             result...

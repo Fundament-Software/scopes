@@ -19,11 +19,12 @@ fn element-prefix (element-type)
             compiler-error! "illegal element type"
 
 fn construct-vec-type (element-type size)
-    assert (size > 1:usize)
+    assert ((typeof size) == i32)
+    assert (size > 1)
     let prefix = (element-prefix element-type)
     let T =
         typename
-            .. prefix "vec" (Any-string (Any (i32 size)))
+            .. prefix "vec" (string-repr size)
             vec-type
             vector element-type size
     set-type-symbol! T 'ElementType element-type
@@ -31,17 +32,19 @@ fn construct-vec-type (element-type size)
     T
 
 fn construct-mat-type (element-type cols rows)
-    assert (cols > 1:usize)
-    assert (rows > 1:usize)
+    assert ((typeof cols) == i32)
+    assert ((typeof rows) == i32)
+    assert (cols > 1)
+    assert (rows > 1)
     let prefix = (element-prefix element-type)
     let vecT =
         construct-vec-type element-type rows
     let T =
         typename
             .. prefix "mat"
-                Any-string (Any (i32 cols))
+                string-repr cols
                 "x"
-                Any-string (Any (i32 rows))
+                string-repr rows
             mat-type
             array vecT cols
     set-type-symbol! T 'ElementType element-type
@@ -59,7 +62,7 @@ fn construct-mat-type (element-type cols rows)
     T
 
 fn construct-vec-types (count)
-    let count = (usize count)
+    let count = (i32 count)
     return
         construct-vec-type f32 count
         construct-vec-type f64 count
@@ -68,8 +71,8 @@ fn construct-vec-types (count)
         construct-vec-type bool count
 
 fn construct-mat-types (cols rows)
-    let cols = (usize cols)
-    let rows = (usize rows)
+    let cols = (i32 cols)
+    let rows = (i32 rows)
     return
         construct-mat-type f32 cols rows
         construct-mat-type f64 cols rows
@@ -137,7 +140,7 @@ set-type-symbol! vec-type '__typecall
         if (i != 0)
             let i = (i - 1)
             let arg = (va@ i ...)
-            let arg = (imply arg immutable)
+            let arg = (deref arg)
             let argT = (typeof arg)
             if (argT < vec-type)
                 let argET argvecsz = (@ argT) ((countof argT) as i32)
@@ -271,7 +274,7 @@ fn build-access-mask (name)
         k
     let sz = (countof s)
     if (sz == 1:usize)
-        return sz (find-index set (s @ 0))
+        return (sz as i32) (find-index set (s @ 0))
     elseif (sz <= 4:usize)
         let loop (i mask...) = sz
         if (i > 0:usize)
@@ -279,7 +282,7 @@ fn build-access-mask (name)
             let k = (find-index set (s @ i))
             loop i k
                 mask...
-        return sz (vectorof i32 mask...)
+        return (sz as i32) (vectorof i32 mask...)
 
 typefn vec-type '__getattr (self name)
     let sz mask = (build-access-mask name)
@@ -287,23 +290,23 @@ typefn vec-type '__getattr (self name)
         return;
     if (sz == 1)
         extractelement self mask
-    elseif (sz <= 4:usize)
+    elseif (sz <= 4)
         bitcast
             shufflevector self self mask
             construct-vec-type (@ (typeof self)) sz
 
 fn expand-mask (lhsz rhsz)
     let loop (i mask...) = lhsz
-    if (i > 0:usize)
-        let i = (i - 1:usize)
-        loop i ((i % rhsz) as i32) mask...
+    if (i > 0)
+        let i = (i - 1)
+        loop i (i % rhsz) mask...
     vectorof i32 mask...
 
 fn range-mask (sz)
     let loop (i mask...) = sz
-    if (i > 0:usize)
-        let i = (i - 1:usize)
-        loop i (i as i32) mask...
+    if (i > 0)
+        let i = (i - 1)
+        loop i i mask...
     vectorof i32 mask...
 
 fn assign-mask (lhsz mask)

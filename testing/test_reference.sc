@@ -44,7 +44,7 @@ typefn T '__typecall (cls)
     nullof cls
 
 typefn& T '__new (self)
-    supercall '__new self
+    supercall T '__new self
 
 typefn T 'value (self)
     bitcast self (storageof T)
