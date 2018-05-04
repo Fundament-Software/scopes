@@ -527,10 +527,13 @@ fn string-repr (val)
     Any-string (Any val)
 
 fn op-prettyname (symbol)
-    if (icmp== symbol '__=) "assignment operator ="
+    if (icmp== symbol '__=) "assignment"
+    elseif (icmp== symbol '__unpack) "unpacking"
+    elseif (icmp== symbol '__countof) "counting"
     else
-        string-join "operation "
+        string-join
             Any-repr (Any-wrap symbol)
+            " operation"
 
 fn opN-dispatch (symbol)
     fn (self ...)
@@ -2827,19 +2830,22 @@ do
 
 #-------------------------------------------------------------------------------
 
-fn supercall (methodname self args...)
+fn supercall (cls methodname self args...)
+    let cls = (imply cls type)
+    let methodname = (imply methodname Symbol)
     let T = (typeof self)
     if (T < ref)
-        let ET = (typeof& self)
-        let superT = (superof ET)
+        assert ((typeof& self) < cls)
+        let superT = (superof cls)
         let f ok = (type@& superT methodname)
         if (not ok)
             compiler-error!
-                .. "supertype " (repr superT) " of type " (repr ET)
+                .. "supertype " (repr superT) " of type " (repr cls)
                     \ " does not have a reference method " (repr methodname)
         f self args...
     else
-        let superT = (superof T)
+        assert (T < cls)
+        let superT = (superof cls)
         (typeattr superT methodname) self args...
 
 #-------------------------------------------------------------------------------
@@ -3469,11 +3475,10 @@ fn CStruct->tuple (self)
 
 typefn& CStruct '__new (self args...)
     let sz = (va-countof args...)
-    # lower to tuple
-    let self = (CStruct->tuple self)
-    let T = (@ (typeof self))
+    let T = (typeof& self)
     # construct as tuple
-    construct self
+    construct
+        CStruct->tuple self
     if (icmp>s sz 0)
         # todo: do a bit more efficient initialization, as right now we're first
             default-initing, and then rewriting some of the values anyways
@@ -3490,6 +3495,21 @@ typefn& CStruct '__new (self args...)
                 (getelementptr self 0 k) as ref
                 arg
             loop (i + 1)
+
+typefn& CStruct '__copy (self other)
+    let ET = (typeof& self)
+    let self = (CStruct->tuple self)
+    let otherT = (typeof other)
+    let other =
+        if (otherT == ET)
+            bitcast other (storageof ET)
+        elseif (otherT < ref and (typeof& other) == ET)
+            CStruct->tuple other
+        else
+            compiler-error!
+                .. "can't copy-construct " (repr ET)
+                    \ " from type " (repr (typeof other))
+    copy-construct self other
 
 typefn& CStruct '__delete (self)
     destruct
@@ -3956,14 +3976,24 @@ define-macro capture
 typefn array '__countof (self)
     countof (typeof self)
 
-typefn array '__unpack (v)
-    let count = (type-countof (typeof v))
+typefn array '__unpack (self)
+    let count = (type-countof (typeof self))
     let loop (i result...) = count
     if (i == 0:usize) result...
     else
         let i = (sub i 1:usize)
         loop i
-            extractvalue v i
+            extractvalue self i
+            result...
+
+typefn& array '__unpack (self)
+    let count = (type-countof (typeof& self))
+    let loop (i result...) = count
+    if (i == 0:usize) result...
+    else
+        let i = (sub i 1:usize)
+        loop i
+            self @ i
             result...
 
 typefn array '__@ (self at)
@@ -3971,12 +4001,11 @@ typefn array '__@ (self at)
     if (constant? val)
         extractvalue self val
     else
-        load (getelementptr (allocaof self) 0 val)
+        compiler-error! "index into immutable array must be constant"
 
 typefn& array '__@ (self at)
     let val = (at as integer)
-    let newptr = (getelementptr self 0 val)
-    newptr as ref
+    (getelementptr self 0 val) as ref
 
 fn arrayof (T ...)
     let count = (va-countof ...)

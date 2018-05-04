@@ -52,6 +52,24 @@ assert
         q.y == 0
         q.z == 4
 
+# init struct reference from immutable
+let qq =
+    local 'copy q
+assert
+    and
+        qq.x == 3
+        qq.y == 0
+        qq.z == 4
+
+# init struct reference from other struct reference
+let qqq =
+    local 'copy qq
+assert
+    and
+        qqq.x == 3
+        qqq.y == 0
+        qqq.z == 4
+
 fn test-direct-self-reference ()
     # direct self reference
     struct Cell
