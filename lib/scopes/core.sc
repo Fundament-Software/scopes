@@ -2329,12 +2329,22 @@ fn set-type-symbol!& (T name value)
             attrs
     set-type-symbol! attrs name value
 
-fn deref (val)
-    let T = (typeof val)
+fn deref1 (value)
+    let T = (typeof value)
     if (T < ref)
         let op = (type@ T '__deref)
-        op val
-    else val
+        op value
+    else value
+
+fn deref (values...)
+    let repeat (i result...) = (va-countof values...)
+    if (i > 0)
+        let i = (i - 1)
+        let value = (va@ i values...)
+        repeat i
+            deref1 value
+            result...
+    result...
 
 set-type-symbol!& Any 'typeof
     fn (self)
