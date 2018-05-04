@@ -155,6 +155,11 @@ fn FixedMutableArray (element-type capacity memory)
                 (deref other._items) as ref
             return;
 
+        method& '__move (self other)
+            assert ((typeof& self) == (typeof& other))
+            self._items = other._items
+            self._count = other._count
+
         method& '__delete (self)
             destructor self self._items
             'free memory (deref self._items)
@@ -229,6 +234,12 @@ fn VariableMutableArray (element-type memory)
                 (deref self._items) as ref
                 (deref other._items) as ref
             return;
+
+        method& '__move (self other)
+            assert ((typeof& self) == (typeof& other))
+            self._items = other._items
+            self._count = other._count
+            self._capacity = other._capacity
 
         method& '__delete (self)
             destructor self self._items
