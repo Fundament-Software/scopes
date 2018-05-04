@@ -1062,7 +1062,6 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(SYM_ListWildcard, "#list") \
     T(SYM_SymbolWildcard, "#symbol") \
     T(SYM_ThisFnCC, "#this-fn/cc") \
-    T(SYM_DocstringPrefix, "#doc:") \
     \
     T(SYM_Compare, "compare") \
     T(SYM_Size, "size") \
@@ -2332,6 +2331,8 @@ static Any untyped() {
 static const Type *superof(const Type *T);
 
 struct Type {
+    typedef std::unordered_map<Symbol, Any, Symbol::Hash> Map;
+
     TypeKind kind() const { return _kind; } // for this codebase
 
     Type(TypeKind kind) : _kind(kind), _name(Symbol(SYM_Unnamed).name()) {}
@@ -2390,7 +2391,7 @@ struct Type {
         return lookup(SYM_CallHandler, dest);
     }
 
-    const std::unordered_map<Symbol, Any, Symbol::Hash> &get_symbols() const {
+    const Map &get_symbols() const {
         return symbols;
     }
 
@@ -2400,7 +2401,7 @@ private:
 protected:
     const String *_name;
 
-    std::unordered_map<Symbol, Any, Symbol::Hash> symbols;
+    Map symbols;
 };
 
 static StyledStream& operator<<(StyledStream& ost, const Type *type) {
@@ -4137,9 +4138,14 @@ static void location_error(const String *msg) {
 // SCOPE
 //------------------------------------------------------------------------------
 
+struct AnyDoc {
+    Any value;
+    const String *doc;
+};
+
 struct Scope {
 public:
-    typedef std::unordered_map<Symbol, Any, Symbol::Hash> Map;
+    typedef std::unordered_map<Symbol, AnyDoc, Symbol::Hash> Map;
 protected:
     Scope(Scope *_parent = nullptr, Map *_map = nullptr) :
         parent(_parent),
@@ -4167,12 +4173,19 @@ public:
         }
     }
 
-    static Symbol dockey(Symbol name) {
-        return Symbol(String::join(Symbol(SYM_DocstringPrefix).name(), name.name()));
-    }
-
     size_t count() const {
+#if 0
         return map->size();
+#else
+        size_t count = 0;
+        auto &&_map = *map;
+        for (auto &&k : _map) {
+            if (!is_typed(k.second.value))
+                continue;
+            count++;
+        }
+        return count;
+#endif
     }
 
     size_t totalcount() const {
@@ -4202,28 +4215,43 @@ public:
         borrowed = false;
     }
 
-    void bind(Symbol name, const Any &value) {
+    void bind_with_doc(Symbol name, const AnyDoc &entry) {
         ensure_not_borrowed();
-        auto ret = map->insert({name, value});
+        auto ret = map->insert({name, entry});
         if (!ret.second) {
-            ret.first->second = value;
-        }
-        if (next_doc) {
-            const String *doc = next_doc;
-            next_doc = nullptr;
-            bind(dockey(name), doc);
+            ret.first->second = entry;
         }
     }
 
+    void bind(Symbol name, const Any &value) {
+        if (next_doc) {
+            StyledStream ss;
+            ss << name << "<-" << next_doc << std::endl;
+        }
+        AnyDoc entry = { value, next_doc };
+        bind_with_doc(name, entry);
+        next_doc = nullptr;
+    }
+
     void bind(KnownSymbol name, const Any &value) {
-        bind(Symbol(name), value);
+        AnyDoc entry = { value, nullptr };
+        bind_with_doc(Symbol(name), entry);
     }
 
     void del(Symbol name) {
         ensure_not_borrowed();
         auto it = map->find(name);
         if (it != map->end()) {
+            // if in local map, we can delete it directly
             map->erase(it);
+        } else {
+            // otherwise check if it's contained at all
+            Any dest = none;
+            if (lookup(name, dest)) {
+                AnyDoc entry = { untyped(), nullptr };
+                // if yes, bind to unknown unknown to mark it as deleted
+                bind_with_doc(name, entry);
+            }
         }
     }
 
@@ -4239,12 +4267,14 @@ public:
                 Symbol sym = k.first;
                 if (done.count(sym))
                     continue;
-                size_t dist = distance(s, sym.name());
-                if (dist == best_dist) {
-                    best_syms.push_back(sym);
-                } else if (dist < best_dist) {
-                    best_dist = dist;
-                    best_syms = { sym };
+                if (is_typed(k.second.value)) {
+                    size_t dist = distance(s, sym.name());
+                    if (dist == best_dist) {
+                        best_syms.push_back(sym);
+                    } else if (dist < best_dist) {
+                        best_dist = dist;
+                        best_syms = { sym };
+                    }
                 }
                 done.insert(sym);
             }
@@ -4266,9 +4296,11 @@ public:
                 Symbol sym = k.first;
                 if (done.count(sym))
                     continue;
-                else if (sym.name()->count >= s->count &&
-                        *sym.name()->substr(0, s->count) == *s)
-                    found.push_back(sym);
+                if (is_typed(k.second.value)) {
+                    if (sym.name()->count >= s->count &&
+                            *sym.name()->substr(0, s->count) == *s)
+                        found.push_back(sym);
+                }
                 done.insert(sym);
             }
             self = self->parent;
@@ -4278,26 +4310,41 @@ public:
         return found;
     }
 
-    bool lookup(Symbol name, Any &dest) const {
+    bool lookup(Symbol name, AnyDoc &dest, size_t depth = -1) const {
         const Scope *self = this;
         do {
             auto it = self->map->find(name);
             if (it != self->map->end()) {
-                dest = it->second;
-                return true;
+                if (is_typed(it->second.value)) {
+                    dest = it->second;
+                    return true;
+                } else {
+                    return false;
+                }
             }
+            if (!depth)
+                break;
+            depth = depth - 1;
             self = self->parent;
         } while (self);
         return false;
     }
 
-    bool lookup_local(Symbol name, Any &dest) const {
-        auto it = map->find(name);
-        if (it != map->end()) {
-            dest = it->second;
+    bool lookup(Symbol name, Any &dest, size_t depth = -1) const {
+        AnyDoc entry = { none, nullptr };
+        if (lookup(name, entry, depth)) {
+            dest = entry.value;
             return true;
         }
         return false;
+    }
+
+    bool lookup_local(Symbol name, AnyDoc &dest) const {
+        return lookup(name, dest, 0);
+    }
+
+    bool lookup_local(Symbol name, Any &dest) const {
+        return lookup(name, dest, 0);
     }
 
     StyledStream &stream(StyledStream &ss) {
@@ -11928,7 +11975,7 @@ struct LLVMIRGenerator {
             Scope *t = table;
             while (t) {
                 for (auto it = t->map->begin(); it != t->map->end(); ++it) {
-                    Label *fn = it->second;
+                    Label *fn = it->second.value;
 
                     fn->verify_compilable();
                     fn->build_reachable(visited, &labels);
@@ -11947,7 +11994,7 @@ struct LLVMIRGenerator {
             for (auto it = t->map->begin(); it != t->map->end(); ++it) {
 
                 Symbol name = it->first;
-                Label *fn = it->second;
+                Label *fn = it->second.value;
 
                 auto func = label_to_function(fn, true, name);
                 LLVMSetLinkage(func, LLVMExternalLinkage);
@@ -16657,17 +16704,13 @@ struct Expander {
             while (it != endit) {
                 auto name = unsyntax(it->at);
                 name.verify(TYPE_Symbol);
-                Any value = none;
-                if (!env->lookup(name.symbol, value)) {
+                AnyDoc entry = { none, nullptr };
+                if (!env->lookup(name.symbol, entry)) {
                     StyledString ss;
                     ss.out << "no such name bound in parent scope: " << name;
                     location_error(ss.str());
                 }
-                env->bind(name.symbol, value);
-                Symbol dockey = Scope::dockey(name.symbol);
-                if (env->lookup(dockey, value)) {
-                    env->bind(dockey, value);
-                }
+                env->bind_with_doc(name.symbol, entry);
                 it = it->next;
             }
 
@@ -16688,6 +16731,7 @@ struct Expander {
         }
 
         size_t numparams = 0;
+        // bind to fresh env so the rhs expressions don't see the symbols yet
         Scope *orig_env = env;
         env = Scope::from();
         // read parameter names
@@ -16727,10 +16771,10 @@ struct Expander {
             it = subexp.next;
         }
 
+        //
         for (auto kv = env->map->begin(); kv != env->map->end(); ++kv) {
-            orig_env->bind(kv->first, kv->second);
+            orig_env->bind(kv->first, kv->second.value);
         }
-        //delete env;
         env = orig_env;
 
         set_active_anchor(_anchor);
@@ -17305,11 +17349,16 @@ static AnyBoolPair f_type_at(const Type *T, Symbol key) {
     return { result, ok };
 }
 
-static const String *f_scope_docstring(Scope *scope) {
-    const String *doc = scope->doc;
-    if (!doc)
-        return Symbol(SYM_Unnamed).name();
-    return doc;
+static const String *f_scope_docstring(Scope *scope, Symbol key) {
+    if (key == SYM_Unnamed) {
+        if (scope->doc) return scope->doc;
+    } else {
+        AnyDoc entry = { none, nullptr };
+        if (scope->lookup(key, entry) && entry.doc) {
+            return entry.doc;
+        }
+    }
+    return Symbol(SYM_Unnamed).name();
 }
 
 static void f_scope_set_docstring(Scope *scope, const String *str) {
@@ -17761,50 +17810,35 @@ typedef struct { Any _0; Any _1; } AnyAnyPair;
 typedef struct { Symbol _0; Any _1; } SymbolAnyPair;
 static SymbolAnyPair f_scope_next(Scope *scope, Symbol key) {
     auto &&map = *scope->map;
+    Scope::Map::const_iterator it;
     if (key == SYM_Unnamed) {
-        if (map.empty()) {
-            return { SYM_Unnamed, none };
-        } else {
-            auto it = map.begin();
-            return { it->first, it->second };
-        }
+        it = map.begin();
     } else {
-        auto it = map.find(key);
-        if (it == map.end()) {
-            return { SYM_Unnamed, none };
-        } else {
-            it++;
-            if (it == map.end()) {
-                return { SYM_Unnamed, none };
-            } else {
-                return { it->first, it->second };
-            }
-        }
+        it = map.find(key);
+        if (it != map.end()) it++;
     }
+    while (it != map.end()) {
+        if (is_typed(it->second.value)) {
+            return { it->first, it->second.value };
+        }
+        it++;
+    }
+    return { SYM_Unnamed, none };
 }
 
 static SymbolAnyPair f_type_next(const Type *type, Symbol key) {
     auto &&map = type->get_symbols();
+    Type::Map::const_iterator it;
     if (key == SYM_Unnamed) {
-        if (map.empty()) {
-            return { SYM_Unnamed, none };
-        } else {
-            auto it = map.begin();
-            return { it->first, it->second };
-        }
+        it = map.begin();
     } else {
-        auto it = map.find(key);
-        if (it == map.end()) {
-            return { SYM_Unnamed, none };
-        } else {
-            it++;
-            if (it == map.end()) {
-                return { SYM_Unnamed, none };
-            } else {
-                return { it->first, it->second };
-            }
-        }
+        it = map.find(key);
+        if (it != map.end()) it++;
     }
+    if (it != map.end()) {
+        return { it->first, it->second };
+    }
+    return { SYM_Unnamed, none };
 }
 
 static std::unordered_map<const String *, regexp::Reprog *> pattern_cache;
@@ -17960,7 +17994,7 @@ static void init_globals(int argc, char *argv[]) {
     DEFINE_PURE_C_FUNCTION(FN_ImportC, f_import_c, TYPE_Scope, TYPE_String, TYPE_String, TYPE_List);
     DEFINE_PURE_C_FUNCTION(FN_ScopeAt, f_scope_at, Tuple({TYPE_Any,TYPE_Bool}), TYPE_Scope, TYPE_Symbol);
     DEFINE_PURE_C_FUNCTION(FN_ScopeLocalAt, f_scope_local_at, Tuple({TYPE_Any,TYPE_Bool}), TYPE_Scope, TYPE_Symbol);
-    DEFINE_PURE_C_FUNCTION(FN_ScopeDocString, f_scope_docstring, TYPE_String, TYPE_Scope);
+    DEFINE_PURE_C_FUNCTION(FN_ScopeDocString, f_scope_docstring, TYPE_String, TYPE_Scope, TYPE_Symbol);
     DEFINE_PURE_C_FUNCTION(FN_RuntimeTypeAt, f_type_at, Tuple({TYPE_Any,TYPE_Bool}), TYPE_Type, TYPE_Symbol);
     DEFINE_PURE_C_FUNCTION(FN_SymbolNew, f_symbol_new, TYPE_Symbol, TYPE_String);
     DEFINE_PURE_C_FUNCTION(FN_Repr, f_repr, TYPE_String, TYPE_Any);

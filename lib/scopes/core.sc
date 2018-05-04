@@ -2721,7 +2721,7 @@ do
         let ET = (typeof& self)
         store (imply other ET) self
 
-    fn simple-load (self)
+    fn simple-deref (self)
         load self
 
     fn setup-simple-type (T)
@@ -2729,17 +2729,15 @@ do
         set-type-symbol!& T '__delete simple-delete
         set-type-symbol!& T '__copy simple-copy
         set-type-symbol!& T '__move simple-copy
-        set-type-symbol!& T '__deref simple-load
+        set-type-symbol!& T '__deref simple-deref
 
     setup-simple-type immutable
     setup-simple-type pointer
 
-    set-type-symbol!& opaquepointer '__deref simple-load
+    set-type-symbol!& opaquepointer '__delete simple-delete
     set-type-symbol!& opaquepointer '__copy simple-copy
     set-type-symbol!& opaquepointer '__move simple-copy
-    set-type-symbol!& opaquepointer '__delete
-        fn (self)
-            # do nothing
+    set-type-symbol!& opaquepointer '__deref simple-deref
 
     fn tuple-each (f)
         fn (self)
@@ -3061,7 +3059,7 @@ syntax-extend
     all the constant values in the immediate scope, and a scope that contains
     the runtime values.
 define-scope-macro locals
-    let docstr = (Scope-docstring syntax-scope)
+    let docstr = (Scope-docstring syntax-scope unnamed)
     let constant-scope = (Scope)
     if (not (empty? docstr))
         set-scope-docstring! constant-scope docstr
