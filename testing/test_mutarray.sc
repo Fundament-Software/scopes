@@ -64,6 +64,8 @@ fn test-sort-array (T)
     defer (autodelete a)
     for k in (va-each 3 1 9 5 0 7 12 3 99 -20)
         'append a k
+    for i k in (enumerate (va-each 3 1 9 5 0 7 12 3 99 -20))
+        assert ((a @ i) == k)
     'sort a
     for i k in (enumerate (va-each -20 0 1 3 3 5 7 9 12 99))
         assert ((a @ i) == k)
