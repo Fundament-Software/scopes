@@ -15150,22 +15150,24 @@ struct Solver {
         case FN_Dump: {
             CHECKARGS(1, -1);
             StyledStream ss(std::cerr);
-            ss << l->body.anchor << " dump: ";
+            ss << l->body.anchor << " dump:";
             for (size_t i = 1; i < args.size(); ++i) {
+                ss << " ";
                 if (args[i].key != SYM_Unnamed) {
                     ss << args[i].key << " " << Style_Operator << "=" << Style_None << " ";
                 }
+
                 if (args[i].value.is_const()) {
-                    stream_expr(ss, args[i].value, StreamExprFormat());
+                    stream_expr(ss, args[i].value, StreamExprFormat::singleline());
                 } else {
                     /*
                     ss << "<unknown>"
                         << Style_Operator << ":" << Style_None
                         << args[i].value.indirect_type() << std::endl;*/
                     args[i].value.stream(ss, false);
-                    ss << std::endl;
                 }
             }
+            ss << std::endl;
             enter = args[0].value;
             args[0].value = none;
         } break;

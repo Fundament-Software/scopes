@@ -57,9 +57,9 @@ do
         for y n in (enumerate b)
             assert ((x * 16 + y) == n)
 
-do
-    # sorting a mutable array
-    let T = (Array i32 32)
+fn test-sort-array (T)
+    dump "testing sorting" T
+    # sorting a fixed mutable array
     let a = (local T)
     defer (autodelete a)
     for k in (va-each 3 1 9 5 0 7 12 3 99 -20)
@@ -73,6 +73,9 @@ do
             - x
     for i k in (enumerate (va-each 99 12 9 7 5 3 3 1 0 -20))
         assert ((a @ i) == k)
+
+test-sort-array (Array i32 32)
+test-sort-array (Array i32)
 
 do
 
