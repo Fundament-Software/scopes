@@ -530,7 +530,7 @@ fn op-prettyname (symbol)
     if (icmp== symbol '__=) "assignment operator ="
     else
         string-join "operation "
-            string-join (Any-repr (Any-wrap symbol))
+            Any-repr (Any-wrap symbol)
 
 fn opN-dispatch (symbol)
     fn (self ...)
@@ -2362,6 +2362,12 @@ do
                 let op success = (type@& ET methodname)
                 if success
                     return (op self args...)
+                let op ok = (type@& ET '__deref)
+                if (not ok)
+                    compiler-error!
+                        .. (op-prettyname methodname)
+                            \ " not supported by value of type " (repr ET)
+                    return;
                 failedf (deref self) args...
 
     fn define-ref-forward-failable (failedf methodname)
@@ -2373,14 +2379,29 @@ do
                     let result... = (op self args...)
                     if (not (va-empty? result...))
                         return result...
+                let op ok = (type@& ET '__deref)
+                if (not ok)
+                    return;
                 failedf (deref self) args...
 
     define-ref-forward countof '__countof
     define-ref-forward unpack '__unpack
-    define-ref-forward forward-repr '__repr
     define-ref-forward forward-hash '__hash
     define-ref-forward-failable forward-as '__as
     define-ref-forward-failable forward-getattr '__getattr
+
+    set-type-symbol! ref '__repr
+        fn (self)
+            let ET = (typeof& self)
+            let op ok = (type@& ET '__repr)
+            if ok
+                return (op self)
+            let op ok = (type@& ET '__deref)
+            if ok
+                forward-repr (deref self)
+            else
+                string-repr
+                    bitcast self (storageof (typeof self))
 
     set-type-symbol! ref '__deref
         fn "ref-deref" (self)
@@ -2625,14 +2646,13 @@ fn move-construct (value source)
         destruct source
 
 fn move-construct-array (n value source)
-    """"Invokes the move constructor for an array `value` of reference-like type,
-        passing `source` as the reference from which to move.
+    """"Invokes the move constructor for an array of pointers `value`
+        passing `source` as an array of pointers from which to move.
     let ET = (typeof& value)
     let op ok = (type@& ET '__move)
     if ok
         pointer-each2 n op value source
     else
-        # try copy, then destruct source
         copy-construct-array n value source
         destruct-array n source
 

@@ -9,10 +9,37 @@ fn autodelete (x)
         delete x
         ...
 
+fn test-array-of-array (x y)
+    dump "test-array-of-array" x y
+    print "test-array-of-array" x y
+    # array of array
+    let i32Array = (Array i32 y)
+    let i32ArrayArray = (Array i32Array x)
+    let a = (local i32ArrayArray)
+    # will also delete the nested array
+    defer (autodelete a)
+    for x in (range 16)
+        let b =
+            'emplace-append a
+        assert ((countof b) == 0)
+        for y in (range 16)
+            'append b (x * 16 + y)
+    print a
+    for x b in (enumerate a)
+        print b
+        for y n in (enumerate b)
+            assert ((x * 16 + y) == n)
+
+test-array-of-array (x = 16) (y = 16)
+test-array-of-array (y = 16)
+test-array-of-array (x = 16)
+test-array-of-array;
+
 do
     # mutable array with fixed upper capacity
     let i32Arrayx65536 = (Array i32 TESTSIZE)
     let a = (local i32Arrayx65536)
+    assert (('capacity a) == TESTSIZE)
     defer (autodelete a)
     for i in fullrange
         assert ((countof a) == i)
@@ -27,8 +54,8 @@ do
     # mutable array with dynamic capacity
     let i32Array = (Array i32)
     let a = (local i32Array (capacity = 12))
+    assert (('capacity a) == 12:usize)
     defer (autodelete a)
-    assert (a.capacity == 12:usize)
     for i in fullrange
         assert ((countof a) == i)
         'append a (i32 i)
@@ -37,25 +64,6 @@ do
     # generator support
     #for i k in (enumerate a)
         assert ((a @ i) == i)
-
-#do
-    # array of array
-    let i32Array = (Array i32 16)
-    let i32ArrayArray = (Array i32Array)
-    let a = (local i32ArrayArray)
-    # will also delete the nested array
-    defer (autodelete a)
-    for x in (range 16)
-        let b =
-            'emplace-append a
-        for y in (range 16)
-            'append b (x * 16 + y)
-    #
-    print a
-    for x b in (enumerate a)
-        print b
-        for y n in (enumerate b)
-            assert ((x * 16 + y) == n)
 
 fn test-sort-array (T)
     dump "testing sorting" T
