@@ -17359,8 +17359,18 @@ static const String *f_scope_docstring(Scope *scope, Symbol key) {
     return Symbol(SYM_Unnamed).name();
 }
 
-static void f_scope_set_docstring(Scope *scope, const String *str) {
-    scope->doc = str;
+static void f_scope_set_docstring(Scope *scope, Symbol key, const String *str) {
+    if (key == SYM_Unnamed) {
+        scope->doc = str;
+    } else {
+        AnyDoc entry = { none, nullptr };
+        if (!scope->lookup_local(key, entry)) {
+            location_error(
+                String::from("attempting to set a docstring for a non-local name"));
+        }
+        entry.doc = str;
+        scope->bind_with_doc(key, entry);
+    }
 }
 
 static Symbol f_symbol_new(const String *str) {
@@ -18082,7 +18092,7 @@ static void init_globals(int argc, char *argv[]) {
     DEFINE_C_FUNCTION(SFXFN_SetGlobals, f_set_globals, TYPE_Void, TYPE_Scope);
     DEFINE_C_FUNCTION(SFXFN_SetScopeSymbol, f_set_scope_symbol, TYPE_Void, TYPE_Scope, TYPE_Symbol, TYPE_Any);
     DEFINE_C_FUNCTION(SFXFN_DelScopeSymbol, f_del_scope_symbol, TYPE_Void, TYPE_Scope, TYPE_Symbol);
-    DEFINE_C_FUNCTION(FN_SetScopeDocString, f_scope_set_docstring, TYPE_Void, TYPE_Scope, TYPE_String);
+    DEFINE_C_FUNCTION(FN_SetScopeDocString, f_scope_set_docstring, TYPE_Void, TYPE_Scope, TYPE_Symbol, TYPE_String);
     DEFINE_C_FUNCTION(FN_RealPath, f_realpath, TYPE_String, TYPE_String);
     DEFINE_C_FUNCTION(FN_DirName, f_dirname, TYPE_String, TYPE_String);
     DEFINE_C_FUNCTION(FN_BaseName, f_basename, TYPE_String, TYPE_String);

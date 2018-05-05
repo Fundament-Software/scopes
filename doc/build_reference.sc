@@ -84,7 +84,7 @@ fn print-entry (parent key entry parent-name opts...)
                 and typemember?
                     or
                         sym == '__new
-                        sym == '__apply-type
+                        sym == '__typecall
                         sym == '__call
         return;
     let T = ('typeof entry)
@@ -93,11 +93,13 @@ fn print-entry (parent key entry parent-name opts...)
         if (none? val) defvalue
         else val
     let referenced? = (getopt 'referenced false)
-    let docstr has-docstr =
+    let docstr =
         if typemember?
-            unconst-all "" false
+            unconst ""
         else
-            parent @ (Symbol (.. "#doc:" key))
+            Scope-docstring module sym
+            #parent @ (Symbol (.. "#doc:" key))
+    let has-docstr = (not (empty? docstr))
     let docstr =
         if has-docstr (docstr as string)
         else (unconst "")
@@ -155,7 +157,7 @@ fn print-entry (parent key entry parent-name opts...)
             let ty = (entry as type)
             for k v in (typename.symbols ty)
                 print-entry ty k v key
-            let refty = (runtime-type@ ty reference-attribs-key)
+            let refty = (runtime-type@ ty ref-attribs-key)
             if (('typeof refty) == type)
                 let refty = (refty as type)
                 for k v in (typename.symbols refty)
@@ -184,11 +186,11 @@ fn print-entry (parent key entry parent-name opts...)
         io-write! "\n"
     write-docstring docstr
 
-let moduledoc = (Scope-docstring module)
+let moduledoc = (Scope-docstring module unnamed)
 if (not (empty? moduledoc))
     io-write! (moduledoc as string)
     io-write! "\n"
 
 for entry in objs
     let key entry = (unpack entry)
-    print-entry module key entry
+    print-entry module (deref key) (deref entry)

@@ -137,6 +137,21 @@ fn list? (val)
 fn none? (val)
     type== (typeof val) Nothing
 
+fn gen-get-option (opts...)
+    """"Given a variadic list of keyed arguments, generate a function
+        ``(get-option name default)`` that either returns an option with the
+        given key from ``opts...`` or ``default`` if no such key exists.
+
+        If ``default`` is a function, then the function will be evaluated
+        and the result returned.
+    fn "get-option" (name default)
+        let val = (va@ name opts...)
+        if (none? val)
+            if (type== (typeof default) Closure)
+                default;
+            else default
+        else val
+
 fn Any-new (val)
     fn construct (outval)
         insertvalue (insertvalue (undef Any) (typeof val) 0) outval 1
@@ -537,6 +552,8 @@ fn op-prettyname (symbol)
     if (icmp== symbol '__=) "assignment"
     elseif (icmp== symbol '__unpack) "unpacking"
     elseif (icmp== symbol '__countof) "counting"
+    elseif (icmp== symbol '__@) "indexing"
+    elseif (icmp== symbol '__slice) "slicing"
     elseif (icmp== symbol '__+) "addition"
     elseif (icmp== symbol '__-) "subtraction"
     elseif (icmp== symbol '__*) "multiplication"
@@ -654,18 +671,18 @@ fn >> (a b) ((op2-dispatch-bidi '__>>) a b)
 fn .. (...) ((op2-ltr-multiop (op2-dispatch-bidi '__..)) ...)
 fn countof (x) ((opN-dispatch '__countof) x)
 fn unpack (x) ((opN-dispatch '__unpack) x)
-fn @ (...)
-    fn at (obj key)
-        (op2-dispatch '__@) obj
-            if (constant? key)
-                if (integer? key)
-                    if (signed? (typeof key))
-                        if (icmp<s key 0)
-                            add (i64 (countof obj)) (i64 key)
-                        else key
+fn at (obj key)
+    (op2-dispatch '__@) obj
+        if (constant? key)
+            if (integer? key)
+                if (signed? (typeof key))
+                    if (icmp<s key 0)
+                        add (i64 (countof obj)) (i64 key)
                     else key
                 else key
             else key
+        else key
+fn @ (...)
     (op2-ltr-multiop at) ...
 
 fn repr
@@ -1170,15 +1187,18 @@ syntax-extend
     set-typename-super! integer immutable
     set-typename-super! real immutable
     set-typename-super! vector immutable
+    set-typename-super! Symbol immutable
 
     let aggregate = (typename-type "aggregate")
     set-scope-symbol! syntax-scope 'aggregate aggregate
     set-typename-super! array aggregate
     set-typename-super! tuple aggregate
+    set-typename-super! Any tuple
 
     let opaquepointer = (typename-type "opaquepointer")
     set-scope-symbol! syntax-scope 'opaquepointer opaquepointer
     set-typename-super! string opaquepointer
+    set-typename-super! type opaquepointer
 
     set-type-symbol! integer '__typecall
         fn (cls ...)
@@ -2334,11 +2354,15 @@ fn pointer-type-imply? (src dest)
 let ref-attribs-key = '__refattrs
 
 fn type@& (T name)
-    let attrs ok = (type@ T ref-attribs-key)
+    let repeat (T) = T
+    let attrs ok = (type-local@ T ref-attribs-key)
     if ok
-        type@ attrs name
-    else
-        return none ok
+        let val ok = (type@ attrs name)
+        if ok
+            return val ok
+    if (type== T typename)
+        return (tie-const T none) (tie-const T false)
+    repeat (superof T)
 
 fn set-type-symbol!& (T name value)
     let attrs ok = (type-local@ T ref-attribs-key)
@@ -2346,9 +2370,6 @@ fn set-type-symbol!& (T name value)
         if ok attrs
         else
             let attrs = (typename (Symbol->string ref-attribs-key))
-            let super-attrs ok = (type@ (superof T) ref-attribs-key)
-            if ok
-                set-typename-super! attrs super-attrs
             set-type-symbol! T ref-attribs-key attrs
             attrs
     set-type-symbol! attrs name value
@@ -2403,7 +2424,7 @@ do
                 if (not ok)
                     compiler-error!
                         .. (op-prettyname methodname)
-                            \ " not supported by value of type " (repr ET)
+                            \ " of reference not supported by value of type " (repr ET)
                     return;
                 failedf (deref self) args...
 
@@ -2424,6 +2445,7 @@ do
     define-ref-forward countof '__countof
     define-ref-forward unpack '__unpack
     define-ref-forward forward-hash '__hash
+    define-ref-forward (do @) '__@
     define-ref-forward-failable forward-as '__as
     define-ref-forward-failable forward-getattr '__getattr
 
@@ -2463,16 +2485,6 @@ do
                 if (va-empty? result...)
                 else
                     return result...
-
-    set-type-symbol! ref '__@
-        fn "ref-@" (self key)
-            let ET = (typeof& self)
-            let op success = (type@& ET '__@)
-            if success
-                return (op self key)
-            let op ok = (type@ ET '__@)
-            if ok
-                @ (deref self) key
 
     set-type-symbol! ref '__call
         fn "ref-call" (self args...)
@@ -2809,72 +2821,6 @@ do
     set-type-symbol!& opaquepointer '__move simple-copy
     set-type-symbol!& opaquepointer '__deref simple-deref
 
-    fn tuple-each (f)
-        fn (self)
-            let ET = (typeof& self)
-            let count = (i32 (type-countof ET))
-            let loop (i) = 0
-            if (icmp<s i count)
-                f ((getelementptr self 0 i) as ref)
-                loop (i + 1)
-
-    fn tuple-each2 (f)
-        fn (self other)
-            let ET = (typeof& self)
-            let count = (i32 (type-countof ET))
-            if ((typeof other) < ref)
-                assert ((typeof& other) == ET)
-                let loop (i) = 0
-                if (icmp<s i count)
-                    f
-                        (getelementptr self 0 i) as ref
-                        (getelementptr other 0 i) as ref
-                    loop (i + 1)
-            else
-                # copy right-hand side by element
-                let other = (imply other ET)
-                let loop (i) = 0
-                if (icmp<s i count)
-                    f
-                        (getelementptr self 0 i) as ref
-                        extractvalue other i
-                    loop (i + 1)
-
-    set-type-symbol!& tuple '__new (tuple-each construct)
-    set-type-symbol!& tuple '__delete (tuple-each destruct)
-    set-type-symbol!& tuple '__copy (tuple-each2 copy-construct)
-    set-type-symbol!& tuple '__move (tuple-each2 move-construct)
-
-    fn array-each (f)
-        fn (self)
-            let ET = (typeof& self)
-            let count = (type-countof ET)
-            f count ((getelementptr self 0 0) as ref)
-
-    fn array-each2 (fsingle fmany)
-        fn (self other)
-            let ET = (typeof& self)
-            let count = (type-countof ET)
-            if ((typeof other) < ref)
-                assert ((typeof& other) == ET)
-                fmany count
-                    (getelementptr self 0 0) as ref
-                    (getelementptr other 0 0) as ref
-            else
-                # copy right-hand side by element
-                let other = (imply other ET)
-                let loop (i) = 0
-                if (icmp<s i count)
-                    fsingle
-                        (getelementptr self 0 i) as ref
-                        extractvalue other i
-                    loop (i + 1)
-
-    set-type-symbol!& array '__new (array-each construct-array)
-    set-type-symbol!& array '__delete (array-each destruct-array)
-    set-type-symbol!& array '__copy (array-each2 copy-construct copy-construct-array)
-    set-type-symbol!& array '__move (array-each2 move-construct move-construct-array)
-
 #-------------------------------------------------------------------------------
 
 fn supercall (cls methodname self args...)
@@ -3130,7 +3076,7 @@ define-scope-macro locals
     let docstr = (Scope-docstring syntax-scope unnamed)
     let constant-scope = (Scope)
     if (not (empty? docstr))
-        set-scope-docstring! constant-scope docstr
+        set-scope-docstring! constant-scope unnamed docstr
     let tmp = (Parameter 'tmp)
     loop (last-key result) = unnamed (list tmp)
     let key value =
@@ -3142,6 +3088,8 @@ define-scope-macro locals
                 result
             syntax-scope
     else
+        let keydocstr =
+            Scope-docstring syntax-scope key
         repeat key
             if (key == unnamed)
                 # skip
@@ -3151,9 +3099,11 @@ define-scope-macro locals
                 if ((keyT == Parameter) or (keyT == Label))
                     cons
                         list set-scope-symbol! tmp (list quote key) value
+                        list set-scope-docstring! tmp (list quote key) keydocstr
                         result
                 else
                     set-scope-symbol! constant-scope key value
+                    set-scope-docstring! constant-scope key keydocstr
                     result
 
 define-macro import
@@ -3899,8 +3849,52 @@ typefn Nothing '__hash (self)
     hash Nothing 0
 
 #-------------------------------------------------------------------------------
+# aggregate
+#-------------------------------------------------------------------------------
+
+typefn& aggregate '__deref (self)
+    load self
+
+#-------------------------------------------------------------------------------
 # tuples
 #-------------------------------------------------------------------------------
+
+do
+    fn tuple-each (f)
+        fn (self)
+            let ET = (typeof& self)
+            let count = (i32 (type-countof ET))
+            let loop (i) = 0
+            if (icmp<s i count)
+                f ((getelementptr self 0 i) as ref)
+                loop (i + 1)
+
+    fn tuple-each2 (f)
+        fn (self other)
+            let ET = (typeof& self)
+            let count = (i32 (type-countof ET))
+            if ((typeof other) < ref)
+                assert ((typeof& other) == ET)
+                let loop (i) = 0
+                if (icmp<s i count)
+                    f
+                        (getelementptr self 0 i) as ref
+                        (getelementptr other 0 i) as ref
+                    loop (i + 1)
+            else
+                # copy right-hand side by element
+                let other = (imply other ET)
+                let loop (i) = 0
+                if (icmp<s i count)
+                    f
+                        (getelementptr self 0 i) as ref
+                        extractvalue other i
+                    loop (i + 1)
+
+    set-type-symbol!& tuple '__new (tuple-each construct)
+    set-type-symbol!& tuple '__delete (tuple-each destruct)
+    set-type-symbol!& tuple '__copy (tuple-each2 copy-construct)
+    set-type-symbol!& tuple '__move (tuple-each2 move-construct)
 
 typefn tuple '__hash (self)
     # hash all tuple values
@@ -3917,19 +3911,37 @@ typefn tuple '__countof (self)
     countof (typeof self)
 
 typefn tuple '__@ (self at)
-    extractvalue self (usize at)
+    let val = (at as integer)
+    extractvalue self val
+
+typefn& tuple '__@ (self at)
+    let val = (at as integer)
+    (getelementptr self 0 val) as ref
 
 typefn tuple '__unpack (self)
     let T = (typeof self)
     let count = (type-countof T)
     let loop (i result...) = count
-    if (i == 0:usize) result...
+    if (i == 0) result...
     else
-        let i = (sub i 1:usize)
+        let i = (sub i 1)
         loop i
             va-key
-                element-name T (i32 i)
+                element-name T i
                 extractvalue self i
+            result...
+
+typefn& tuple '__unpack (self)
+    let T = (typeof& self)
+    let count = (type-countof T)
+    let loop (i result...) = count
+    if (i == 0) result...
+    else
+        let i = (sub i 1)
+        loop i
+            va-key
+                element-name T i
+                self @ i
             result...
 
 # access reference to struct element from pointer/reference
@@ -4014,6 +4026,37 @@ define-macro capture
 #-------------------------------------------------------------------------------
 # arrays
 #-------------------------------------------------------------------------------
+
+do
+    fn array-each (f)
+        fn (self)
+            let ET = (typeof& self)
+            let count = (type-countof ET)
+            f count ((getelementptr self 0 0) as ref)
+
+    fn array-each2 (fsingle fmany)
+        fn (self other)
+            let ET = (typeof& self)
+            let count = (type-countof ET)
+            if ((typeof other) < ref)
+                assert ((typeof& other) == ET)
+                fmany count
+                    (getelementptr self 0 0) as ref
+                    (getelementptr other 0 0) as ref
+            else
+                # copy right-hand side by element
+                let other = (imply other ET)
+                let loop (i) = 0
+                if (icmp<s i count)
+                    fsingle
+                        (getelementptr self 0 i) as ref
+                        extractvalue other i
+                    loop (i + 1)
+
+    set-type-symbol!& array '__new (array-each construct-array)
+    set-type-symbol!& array '__delete (array-each destruct-array)
+    set-type-symbol!& array '__copy (array-each2 copy-construct copy-construct-array)
+    set-type-symbol!& array '__move (array-each2 move-construct move-construct-array)
 
 typefn array '__countof (self)
     countof (typeof self)
@@ -4512,6 +4555,7 @@ let e = e:f32
 # cleanup
 del hash1
 del hash2
+del at
 
 set-globals!
     clone-scope-symbols (globals) (locals)
