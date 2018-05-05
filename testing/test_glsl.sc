@@ -17,6 +17,8 @@ xvar inout uv : vec2
     location = 0
 xvar uniform phase : f32
     location = 1
+xvar uniform smp : sampler2D
+    location = 2
 dump
     pointer-type-storage-class
         element-type (typeof phase) 0
@@ -52,13 +54,18 @@ let fragment-code =
         fn fragment-shader ()
             let uv = (uv as immutable)
             let color = (vec4 uv.xy (make-phase) 1)
-            out_Color = color
+            out_Color =
+                color *
+                    sample (load smp) uv (Lod = 1.0)
             return;
+
+        dump-label
+            typify fragment-shader
 
         let code =
             compile-glsl 'fragment
                 typify fragment-shader
-                #'dump-disassembly
+                'dump-disassembly
                 #'no-opts
         print code
         code

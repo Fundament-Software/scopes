@@ -765,6 +765,22 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(ContractionOff) \
     T(PostDepthCoverage)
 
+#define B_SPIRV_IMAGE_OPERAND() \
+    T(Bias) \
+    T(Lod) \
+    T(Grad) \
+    T(ConstOffset) \
+    T(Offset) \
+    T(ConstOffsets) \
+    T(Sample) \
+    T(MinLod) \
+    /* extra operands not part of mask */ \
+    T(Dref) \
+    T(Proj) \
+    T(Fetch) \
+    T(Gather) \
+    T(Sparse)
+
 #define B_MAP_SYMBOLS() \
     T(SYM_Unnamed, "") \
     \
@@ -1170,6 +1186,10 @@ SYM_SPIRV_StorageClass ## NAME,
     SYM_SPIRV_ImageFormat ## NAME,
     B_SPIRV_IMAGE_FORMAT()
 #undef T
+#define T(NAME) \
+    SYM_SPIRV_ImageOperand ## NAME,
+    B_SPIRV_IMAGE_OPERAND()
+#undef T
     SYM_Count,
 };
 
@@ -1224,6 +1244,10 @@ B_SPIRV_DIM()
 #define T(NAME) \
     case SYM_SPIRV_ImageFormat ## NAME: return "SYM_SPIRV_ImageFormat" #NAME;
 B_SPIRV_IMAGE_FORMAT()
+#undef T
+#define T(NAME) \
+    case SYM_SPIRV_ImageOperand ## NAME: return "SYM_SPIRV_ImageOperand" #NAME;
+B_SPIRV_IMAGE_OPERAND()
 #undef T
 case SYM_Count: return "SYM_Count";
     }
@@ -1781,6 +1805,10 @@ public:
     #define T(NAME) \
         map_known_symbol(SYM_SPIRV_ImageFormat ## NAME, String::from(#NAME));
         B_SPIRV_IMAGE_FORMAT()
+    #undef T
+    #define T(NAME) \
+        map_known_symbol(SYM_SPIRV_ImageOperand ## NAME, String::from(#NAME));
+        B_SPIRV_IMAGE_OPERAND()
     #undef T
     }
 
@@ -7260,7 +7288,7 @@ public:
             bool align_ok = (al == needalign);
             bool size_ok = (sz == needsize);
             if (!(align_ok && size_ok)) {
-#ifdef SCOPES_DEBUG                
+#ifdef SCOPES_DEBUG
                 StyledStream ss;
                 auto anchor = anchorFromLocation(rd->getSourceRange().getBegin());
                 if (al != needalign) {
@@ -9075,7 +9103,8 @@ struct SPIRVGenerator {
         Any &NAME = args[argn++].value;
 #define READ_VALUE(NAME) \
         assert(argn <= argcount); \
-        auto && _ ## NAME = args[argn++].value; \
+        auto && _arg_ ## NAME = args[argn++]; \
+        auto && _ ## NAME = _arg_ ## NAME .value; \
         spv::Id NAME = argument_to_value(_ ## NAME);
 #define READ_LABEL_BLOCK(NAME) \
         assert(argn <= argcount); \
@@ -9107,6 +9136,32 @@ struct SPIRVGenerator {
                 bool proj = false;
                 bool gather = false;
                 bool explicitLod = false;
+                while (argn <= argcount) {
+                    READ_VALUE(value);
+                    switch (_arg_value.key.value()) {
+                        case SYM_SPIRV_ImageOperandLod: {
+                            params.lod = value;
+                            explicitLod = true;
+                        } break;
+                        case SYM_SPIRV_ImageOperandDref: {
+                            params.Dref = value;
+                        } break;
+                        case SYM_SPIRV_ImageOperandProj: {
+                            proj = true;
+                        } break;
+                        case SYM_SPIRV_ImageOperandFetch: {
+                            fetch = true;
+                        } break;
+                        case SYM_SPIRV_ImageOperandGather: {
+                            params.component = value;
+                            gather = true;
+                        } break;
+                        case SYM_SPIRV_ImageOperandSparse: {
+                            sparse = true;
+                        } break;
+                        default: break;
+                    }
+                }
                 retvalue = builder.createTextureCall(
                     spv::NoPrecision, resultType, sparse, fetch, proj, gather,
                     explicitLod, params);
@@ -13652,6 +13707,7 @@ struct Solver {
         case FN_ScopeOf:
         case FN_TupleType:
         case FN_UnionType:
+        case FN_Sample:
             return true;
         default: return false;
         }
