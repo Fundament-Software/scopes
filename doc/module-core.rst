@@ -45,7 +45,7 @@ parses the command-line and optionally enters the REPL.
 .. define:: pi:f64
 .. define:: pointer-flag-non-readable
 .. define:: pointer-flag-non-writable
-.. define:: reference-attribs-key
+.. define:: ref-attribs-key
 .. define:: style-comment
 .. define:: style-error
 .. define:: style-function
@@ -79,122 +79,170 @@ parses the command-line and optionally enters the REPL.
 .. define:: unroll-limit
 .. type:: Anchor
 .. type:: Any
-.. typefn:: (Any '__apply-type cls value)
+.. typefn:: (Any '__typecall cls value)
 .. typefn:: (Any 'typeof val)
 .. reftypefn:: (Any 'typeof self)
 .. type:: Builtin
 .. type:: CEnum
 .. type:: CStruct
-.. typefn:: (CStruct '__apply-type cls args...)
+.. typefn:: (CStruct '__typecall cls args...)
 .. typefn:: (CStruct 'structof cls args...)
+.. reftypefn:: (CStruct '__new self args...)
 .. type:: CUnion
-.. typefn:: (CUnion '__apply-type cls)
+.. typefn:: (CUnion '__typecall cls)
+.. reftypefn:: (CUnion '__new self)
 .. type:: Capture
 .. type:: Closure
 .. type:: Exception
 .. type:: Frame
+.. type:: FunctionMemory
+.. typefn:: (FunctionMemory 'free-array cls value count)
+.. typefn:: (FunctionMemory 'allocate-array cls T count)
+.. typefn:: (FunctionMemory 'free cls value)
+.. typefn:: (FunctionMemory 'allocate cls T)
 .. type:: Generator
 .. typefn:: (Generator '__call self)
-.. typefn:: (Generator '__apply-type cls iter init)
+.. typefn:: (Generator '__typecall cls iter init)
+.. type:: GlobalMemory
+.. typefn:: (GlobalMemory 'free-array cls value count)
+.. typefn:: (GlobalMemory 'allocate-array cls T count)
+.. typefn:: (GlobalMemory 'free cls value)
+.. typefn:: (GlobalMemory 'allocate cls T)
+.. type:: HeapMemory
+.. typefn:: (HeapMemory 'free-array cls value count)
+.. typefn:: (HeapMemory 'allocate-array cls T count)
+.. typefn:: (HeapMemory 'free cls value)
+.. typefn:: (HeapMemory 'allocate cls T)
 .. type:: Image
 .. type:: Label
 .. typefn:: (Label 'parameters self)
 .. type:: Macro
 .. typefn:: (Macro '__call self at next scope)
-.. typefn:: (Macro '__apply-type cls f)
+.. typefn:: (Macro '__typecall cls f)
+.. type:: Memory
+.. typefn:: (Memory 'new cls T args...)
+.. typefn:: (Memory 'delete cls value)
+.. typefn:: (Memory 'copy cls value)
+.. typefn:: (Memory '__typecall cls T args...)
 .. type:: Nothing
 .. type:: NullType
    
    The type of the `null` constant. This type is uninstantiable.
 .. type:: Parameter
 .. typefn:: (Parameter 'return-label? self)
-.. typefn:: (Parameter '__apply-type cls params...)
+.. typefn:: (Parameter '__typecall cls params...)
 .. type:: ReturnLabel
-.. typefn:: (ReturnLabel '__apply-type cls ...)
+.. typefn:: (ReturnLabel '__typecall cls ...)
 .. type:: SampledImage
 .. type:: Sampler
 .. type:: Scope
-.. typefn:: (Scope '__apply-type cls parent clone)
+.. typefn:: (Scope '__typecall cls parent clone)
 .. type:: SourceFile
 .. type:: Symbol
 .. typefn:: (Symbol '__call name self ...)
-.. typefn:: (Symbol '__apply-type cls value)
+.. typefn:: (Symbol '__typecall cls value)
+.. reftypefn:: (Symbol '__new self args...)
 .. type:: Syntax
 .. type:: Unknown
+.. type:: aggregate
 .. type:: array
-.. typefn:: (array '__apply-type cls ...)
+.. typefn:: (array '__typecall cls ...)
+.. reftypefn:: (array '__new self)
 .. type:: bool
-.. typefn:: (bool '__apply-type destT val)
+.. typefn:: (bool '__typecall destT val)
+.. reftypefn:: (bool '__new self args...)
 .. type:: constant
 .. type:: exception-pad-type
+.. reftypefn:: (exception-pad-type '__new self)
 .. type:: extern
 .. typefn:: (extern '__call self ...)
-.. typefn:: (extern '__apply-type cls ...)
+.. typefn:: (extern '__typecall cls ...)
 .. type:: f16
+.. reftypefn:: (f16 '__new self args...)
 .. type:: f32
-.. typefn:: (f32 '__apply-type destT val)
+.. typefn:: (f32 '__typecall destT val)
+.. reftypefn:: (f32 '__new self args...)
 .. type:: f64
-.. typefn:: (f64 '__apply-type destT val)
+.. typefn:: (f64 '__typecall destT val)
+.. reftypefn:: (f64 '__new self args...)
 .. type:: f80
+.. reftypefn:: (f80 '__new self args...)
 .. type:: function
-.. typefn:: (function '__apply-type cls ...)
+.. typefn:: (function '__typecall cls ...)
 .. type:: hash
-.. typefn:: (hash '__apply-type cls values...)
+.. typefn:: (hash '__typecall cls values...)
 .. type:: i16
-.. typefn:: (i16 '__apply-type destT val)
+.. typefn:: (i16 '__typecall destT val)
+.. reftypefn:: (i16 '__new self args...)
 .. type:: i32
-.. typefn:: (i32 '__apply-type destT val)
+.. typefn:: (i32 '__typecall destT val)
+.. reftypefn:: (i32 '__new self args...)
 .. type:: i64
-.. typefn:: (i64 '__apply-type destT val)
+.. typefn:: (i64 '__typecall destT val)
+.. reftypefn:: (i64 '__new self args...)
 .. type:: i8
-.. typefn:: (i8 '__apply-type destT val)
+.. typefn:: (i8 '__typecall destT val)
+.. reftypefn:: (i8 '__new self args...)
 .. type:: immutable
+.. reftypefn:: (immutable '__new self args...)
 .. type:: integer
-.. typefn:: (integer '__apply-type cls ...)
+.. typefn:: (integer '__typecall cls ...)
+.. reftypefn:: (integer '__new self args...)
 .. type:: list
-.. typefn:: (list '__apply-type cls ...)
+.. typefn:: (list '__typecall cls ...)
+.. type:: opaquepointer
 .. type:: pointer
-.. typefn:: (pointer 'mutable cls ET)
 .. typefn:: (pointer 'immutable cls ET)
-.. typefn:: (pointer 'storage cls)
-.. typefn:: (pointer 'readable? cls)
-.. typefn:: (pointer '__apply-type cls T opt)
-.. typefn:: (pointer 'writable? cls)
+.. typefn:: (pointer 'set-storage cls storage)
+.. typefn:: (pointer '__typecall cls T opt)
 .. typefn:: (pointer 'set-element-type cls ET)
 .. typefn:: (pointer 'strip-storage cls ET)
+.. typefn:: (pointer 'writable? cls)
+.. typefn:: (pointer 'storage cls)
+.. typefn:: (pointer 'readable? cls)
+.. typefn:: (pointer 'mutable cls ET)
+.. reftypefn:: (pointer '__new self args...)
 .. type:: rawstring
+.. reftypefn:: (rawstring '__new self args...)
 .. type:: real
-.. type:: reference
-.. typefn:: (reference '__apply-type cls element)
-.. typefn:: (reference 'from-pointer value)
-.. typefn:: (reference '__call self args...)
-.. typefn:: (reference 'from-pointer-type PT)
+.. reftypefn:: (real '__new self args...)
+.. type:: ref
+.. typefn:: (ref '__typecall cls T)
+.. typefn:: (ref '__call self args...)
 .. type:: string
 .. typefn:: (string 'from-cstr value)
 .. type:: tuple
-.. typefn:: (tuple '__apply-type cls ...)
+.. typefn:: (tuple '__typecall cls ...)
+.. reftypefn:: (tuple '__new self)
 .. type:: type
 .. typefn:: (type '__call cls ...)
 .. type:: typename
 .. typefn:: (typename 'elements self)
 .. typefn:: (typename 'symbols self)
-.. typefn:: (typename '__apply-type cls args...)
+.. typefn:: (typename '__typecall cls args...)
 .. type:: u16
-.. typefn:: (u16 '__apply-type destT val)
+.. typefn:: (u16 '__typecall destT val)
+.. reftypefn:: (u16 '__new self args...)
 .. type:: u32
-.. typefn:: (u32 '__apply-type destT val)
+.. typefn:: (u32 '__typecall destT val)
+.. reftypefn:: (u32 '__new self args...)
 .. type:: u64
-.. typefn:: (u64 '__apply-type destT val)
+.. typefn:: (u64 '__typecall destT val)
+.. reftypefn:: (u64 '__new self args...)
 .. type:: u8
-.. typefn:: (u8 '__apply-type destT val)
+.. typefn:: (u8 '__typecall destT val)
+.. reftypefn:: (u8 '__new self args...)
 .. type:: union
-.. typefn:: (union '__apply-type cls ...)
+.. typefn:: (union '__typecall cls ...)
 .. type:: usize
-.. typefn:: (usize '__apply-type destT val)
+.. typefn:: (usize '__typecall destT val)
+.. reftypefn:: (usize '__new self args...)
 .. type:: vector
-.. typefn:: (vector '__apply-type cls ...)
+.. typefn:: (vector '__typecall cls ...)
+.. reftypefn:: (vector '__new self args...)
 .. type:: void
 .. type:: voidstar
+.. reftypefn:: (voidstar '__new self args...)
 .. fn:: (% a b)
 .. fn:: (& a b)
 .. fn:: (* ...)
@@ -239,6 +287,7 @@ parses the command-line and optionally enters the REPL.
 .. fn:: (Any-new val)
 .. fn:: (Any-payload val)
 .. fn:: (Any-typeof val)
+.. fn:: (CStruct->tuple self)
 .. fn:: (Exception-anchor sx)
 .. fn:: (Exception-message sx)
 .. fn:: (Symbol? val)
@@ -267,10 +316,43 @@ parses the command-line and optionally enters the REPL.
 .. fn:: (compile-spirv f target opts...)
 .. fn:: (cond-const a b)
 .. fn:: (cons ...)
+.. fn:: (construct value args...)
+   
+   Invokes the constructor for `value` of reference-like type,
+   passing along optional argument set `args...`.
+.. fn:: (construct-array n value args...)
+   
+   Invokes the constructor for an array `value` of reference-like type,
+   assuming that value is a pointer to an array element, passing along
+   optional argument set `args...`.
+.. fn:: (copy-construct value source)
+   
+   Invokes the copy constructor for `value` of reference-like type if
+   present, passing `source` as a value from which to copy.
+   
+   `source` does not have to be of reference type, but can also be of
+   immutable element type.
+.. fn:: (copy-construct-array n value source)
+   
+   Invokes the copy constructor for an array `value` of reference-like type,
+   passing `source` as a value from which to copy.
+   
+   `source` has to be the first (referenced) element of an array too.
 .. fn:: (countof x)
 .. fn:: (decons val count)
 .. fn:: (delete self)
-.. fn:: (deref val)
+   
+   destructs and frees `value` of types that have the `__delete` method
+   implemented. The free method must also invoke the destructor.
+.. fn:: (deref values...)
+.. fn:: (deref1 value)
+.. fn:: (destruct value)
+   
+   Invokes the destructor for `value` of reference-like type.
+.. fn:: (destruct-array n value)
+   
+   Invokes the destructor for an array `value` of reference-like type,
+   assuming that value is a pointer to an array element.
 .. fn:: (docstring f)
 .. fn:: (empty? x)
 .. fn:: (enumerate x)
@@ -291,6 +373,14 @@ parses the command-line and optionally enters the REPL.
 .. fn:: (function-pointer-type? T)
 .. fn:: (function-pointer? val)
 .. fn:: (function-type? T)
+.. fn:: (gen-get-option opts...)
+   
+   Given a variadic list of keyed arguments, generate a function
+   ``(get-option name default)`` that either returns an option with the
+   given key from ``opts...`` or ``default`` if no such key exists.
+   
+   If ``default`` is a function, then the function will be evaluated
+   and the result returned.
 .. fn:: (gen-type-op2 f)
 .. fn:: (getattr self name)
 .. fn:: (imply value dest-type)
@@ -305,7 +395,7 @@ parses the command-line and optionally enters the REPL.
 .. fn:: (list-reverse l tail)
 .. fn:: (list? val)
 .. fn:: (load-module module-name module-path opts...)
-.. fn:: (local cls args...)
+.. fn:: (local T args...)
 .. fn:: (macro f)
 .. fn:: (map x f)
    
@@ -317,14 +407,25 @@ parses the command-line and optionally enters the REPL.
 .. fn:: (maybe-unsyntax val)
 .. fn:: (merge-scope-symbols source target filter)
 .. fn:: (min a b ...)
-.. fn:: (new cls args...)
+.. fn:: (move-construct value source)
+   
+   Invokes the move constructor for `value` of reference-like type,
+   passing `source` as the reference from which to move.
+.. fn:: (move-construct-array n value source)
+   
+   Invokes the move constructor for an array of pointers `value`
+   passing `source` as an array of pointers from which to move.
+.. fn:: (new T args...)
 .. fn:: (none? val)
 .. fn:: (not x)
+.. fn:: (op-prettyname symbol)
 .. fn:: (op2-dispatch symbol)
 .. fn:: (op2-dispatch-bidi symbol fallback)
 .. fn:: (op2-ltr-multiop f)
 .. fn:: (op2-rtl-multiop f)
 .. fn:: (opN-dispatch symbol)
+.. fn:: (pointer-each n op value args...)
+.. fn:: (pointer-each2 n op value other)
 .. fn:: (pointer-type-imply? src dest)
 .. fn:: (pointer-type? T)
 .. fn:: (pointer== a b)
@@ -348,11 +449,12 @@ parses the command-line and optionally enters the REPL.
 .. fn:: (set-type-symbol!& T name value)
 .. fn:: (sign x)
 .. fn:: (slice obj start-index end-index)
-.. fn:: (static cls args...)
+.. fn:: (static T args...)
 .. fn:: (string->rawstring s)
 .. fn:: (string-compare a b)
 .. fn:: (string-countof s)
 .. fn:: (string-repr val)
+.. fn:: (supercall cls methodname self args...)
 .. fn:: (syntax-error! anchor msg)
 .. fn:: (tie-const a b)
 .. fn:: (todo! msg)
@@ -373,6 +475,7 @@ parses the command-line and optionally enters the REPL.
 .. fn:: (typeattr T name)
 .. fn:: (typename-type? T)
 .. fn:: (typename? val)
+.. fn:: (typeof& self)
 .. fn:: (typify f types...)
 .. fn:: (unconst-all args...)
 .. fn:: (unknownof T)
@@ -525,24 +628,7 @@ parses the command-line and optionally enters the REPL.
 .. builtin:: (label ...)
 .. builtin:: (ldexp ...)
 .. builtin:: (length ...)
-.. macro:: (let name ... _:= value ...)
-
-Binds a list of constants and variables specified on the right-hand
-side to parameter names defined on the left-hand side.
-
-.. macro:: (let label-name (name ...) _:= value ...)
-
-Performs the same function as the regular `let`, but associates the
-entry point with a labelname that can be called to effectively produce
-a tail-recursive loop. When some of the arguments on the right hand
-side are not constant, the loop will be unrolled.
-
-.. macro:: (let name ...)
-
-Rebinds names already defined in the parent scope to the local scope.
-This becomes useful in conjunction with `locals`, when exporting
-modules.
-
+.. builtin:: (let ...)
 .. builtin:: (load ...)
 .. builtin:: (log ...)
 .. builtin:: (log2 ...)
@@ -664,7 +750,7 @@ modules.
    ``λ(Scope)<-(Scope Scope)``
 .. compiledfn:: (Scope-docstring ...)
 
-   ``λ(string)<~(Scope)``
+   ``λ(string)<~(Scope Symbol)``
 .. compiledfn:: (Scope-local@ ...)
 
    ``λ(Any bool)<~(Scope Symbol)``
@@ -844,7 +930,7 @@ modules.
    ``λ()<-(Scope)``
 .. compiledfn:: (set-scope-docstring! ...)
 
-   ``λ()<-(Scope string)``
+   ``λ()<-(Scope Symbol string)``
 .. compiledfn:: (set-signal-abort! ...)
 
    ``λ()<-(bool)``
@@ -877,7 +963,7 @@ modules.
    ``λ(type)<~(type)``
 .. compiledfn:: (type-countof ...)
 
-   ``λ(usize)<~(type)``
+   ``λ(i32)<~(type)``
 .. compiledfn:: (type-debug-abi ...)
 
    ``λ()<~(type)``

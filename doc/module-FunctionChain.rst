@@ -43,7 +43,7 @@ Running this program will output:
     handler activated with argument 3
 
 .. type:: FunctionChain
-.. typefn:: (FunctionChain '__apply-type cls name)
+.. typefn:: (FunctionChain '__typecall cls name)
 .. typefn:: (FunctionChain 'prepend self f)
    
    Prepend function `f` to function chain. When the function chain is called,
