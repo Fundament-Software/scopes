@@ -2759,6 +2759,19 @@ typefn! GlobalMemory 'allocate-array (cls T count)
 typefn GlobalMemory 'free-array (cls value count)
     return;
 
+typefn ref '__delete (self)
+    let T = (typeof self)
+    let ptrT = (storageof T)
+    let class = ('storage ptrT)
+    if (class == unnamed)
+        'delete HeapMemory self
+    elseif (class == 'Function)
+        'delete FunctionMemory self
+    elseif (class == 'Private)
+        'delete GlobalMemory self
+    else
+        .. "cannot delete reference of type " (repr T)
+
 #-------------------------------------------------------------------------------
 # default constructors and destructors for basic types
 #-------------------------------------------------------------------------------
@@ -2896,18 +2909,13 @@ fn! static (T args...)
     GlobalMemory T args...
 
 fn delete (self)
-    """"destructs and frees `value` of reference-like type. The free method
-        must also invoke the destructor.
+    """"destructs and frees `value` of types that have the `__delete` method
+        implemented. The free method must also invoke the destructor.
     let T = (typeof self)
-    assert (T < ref) "value must be of ref type"
-    let ptrT = (storageof T)
-    let class = ('storage ptrT)
-    if (class == unnamed)
-        'delete HeapMemory self
-    elseif (class == 'Function)
-        'delete FunctionMemory self
-    elseif (class == 'Private)
-        'delete GlobalMemory self
+    let op ok = (type@ T '__delete)
+    if ok
+        op self
+        return;
     else
         .. "cannot delete value of type " (repr T)
 
