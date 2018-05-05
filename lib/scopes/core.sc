@@ -146,6 +146,10 @@ fn Any-new (val)
         Any-wrap val
     else
         let T = (storageof (typeof val))
+        fn new-static-pointer ()
+            let ptr = (static-alloc T)
+            store val ptr
+            construct (ptrtoint ptr u64)
         fn wrap-error ()
             compiler-error!
                 string-join "unable to wrap value of storage type "
@@ -160,17 +164,20 @@ fn Any-new (val)
                 ptrtoint val u64
         elseif (extern-type? T)
             Any-new (unconst val)
-        elseif (tuple-type? T)
-            if (icmp== (type-countof T) 0:usize)
+        elseif (bor (tuple-type? T) (array-type? T))
+            let count = (type-countof T)
+            if (icmp== count 0)
                 construct 0:u64
             else
-                wrap-error;
+                new-static-pointer;
         elseif (integer-type? T)
             construct
                 if (signed? (typeof val))
                     sext val u64
                 else
                     zext val u64
+        elseif (vector-type? T)
+            new-static-pointer;
         elseif (real-type? T)
             if (type== T f32)
                 construct
@@ -970,6 +977,11 @@ fn Any-extract (val T)
                 bitcast
                     itrunc payload (integer-type (bitcountof storageT) false)
                     T
+            elseif (bor (tuple-type? storageT) (array-type? storageT))
+                let count = (type-countof storageT)
+                load
+                    inttoptr payload
+                        pointer-type T pointer-flag-non-writable unnamed
             else
                 compiler-error!
                     .. "unable to extract value of type " (Any-repr (Any-wrap T))

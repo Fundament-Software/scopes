@@ -4,6 +4,7 @@ using import testing
 test-modules
     .test_abi
     .test_ansi_colors
+    .test_any
     .test_array
     .test_assorted
     .test_call_override
