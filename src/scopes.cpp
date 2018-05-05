@@ -768,7 +768,8 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
 #define B_SPIRV_IMAGE_OPERAND() \
     T(Bias) \
     T(Lod) \
-    T(Grad) \
+    T(GradX) \
+    T(GradY) \
     T(ConstOffset) \
     T(Offset) \
     T(ConstOffsets) \
@@ -9139,24 +9140,23 @@ struct SPIRVGenerator {
                 while (argn <= argcount) {
                     READ_VALUE(value);
                     switch (_arg_value.key.value()) {
-                        case SYM_SPIRV_ImageOperandLod: {
-                            params.lod = value;
-                            explicitLod = true;
-                        } break;
-                        case SYM_SPIRV_ImageOperandDref: {
-                            params.Dref = value;
-                        } break;
-                        case SYM_SPIRV_ImageOperandProj: {
-                            proj = true;
-                        } break;
-                        case SYM_SPIRV_ImageOperandFetch: {
-                            fetch = true;
-                        } break;
+                        case SYM_SPIRV_ImageOperandLod: params.lod = value; break;
+                        case SYM_SPIRV_ImageOperandBias: params.bias = value; break;
+                        case SYM_SPIRV_ImageOperandDref: params.Dref = value; break;
+                        case SYM_SPIRV_ImageOperandProj: proj = true; break;
+                        case SYM_SPIRV_ImageOperandFetch: fetch = true; break;
+                        case SYM_SPIRV_ImageOperandGradX: params.gradX = value; break;
+                        case SYM_SPIRV_ImageOperandGradY: params.gradY = value; break;
+                        case SYM_SPIRV_ImageOperandOffset: params.offset = value; break;
+                        case SYM_SPIRV_ImageOperandConstOffsets: params.offsets = value; break;
+                        case SYM_SPIRV_ImageOperandMinLod: params.lodClamp = value; break;
+                        case SYM_SPIRV_ImageOperandSample: params.sample = value; break;
                         case SYM_SPIRV_ImageOperandGather: {
                             params.component = value;
                             gather = true;
                         } break;
                         case SYM_SPIRV_ImageOperandSparse: {
+                            params.texelOut = value;
                             sparse = true;
                         } break;
                         default: break;

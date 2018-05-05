@@ -56,7 +56,10 @@ let fragment-code =
             let color = (vec4 uv.xy (make-phase) 1)
             out_Color =
                 color *
-                    sample (load smp) uv (Lod = 1.0)
+                    sample (load smp) uv
+                        #Lod = 1.0
+                        GradX = 0.5
+                        GradY = 0.5
             return;
 
         dump-label
