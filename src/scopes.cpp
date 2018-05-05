@@ -7260,6 +7260,7 @@ public:
             bool align_ok = (al == needalign);
             bool size_ok = (sz == needsize);
             if (!(align_ok && size_ok)) {
+#ifdef SCOPES_DEBUG                
                 StyledStream ss;
                 auto anchor = anchorFromLocation(rd->getSourceRange().getBegin());
                 if (al != needalign) {
@@ -7272,6 +7273,7 @@ public:
                 set_active_anchor(anchor);
                 location_error(String::from("clang-bridge: imported record doesn't fit"));
                 #endif
+#endif
             }
         }
 
