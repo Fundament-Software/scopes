@@ -39,8 +39,8 @@ syntax-extend
         f "2DMS"        '2D     0       1   2
         f "2DMSArray"   '2D     1       1   3
 
-    let sampler = (typename "sampler")
-    set-scope-symbol! syntax-scope 'sampler sampler
+    let gsampler = (typename "gsampler")
+    set-scope-symbol! syntax-scope 'gsampler gsampler
 
     fn coord-type (ET coords)
         if (coords == 1) ET
@@ -48,27 +48,70 @@ syntax-extend
             construct-vec-type ET coords
 
     fn make-gsampler (postfix dim arrayed ms coords)
-        let T = (typename (.. "gsampler" postfix) sampler)
+        let T = (typename (.. "gsampler" postfix) gsampler)
         let icoordT = (coord-type i32 coords)
         let fcoordT = (coord-type f32 coords)
+        let fcoordProjT = (coord-type f32 (coords + 1))
         let fetch-has-lod-arg =
             match dim
                 (or '1D '2D '3D)
                     ms == 0
                 else false
+        set-type-symbol! T 'texture
+            fn... texture
+                (sampler : T, P : fcoordT)
+                    sample sampler P
+                (sampler : T, P : fcoordT, bias : f32)
+                    sample sampler P
+                        Bias = bias
+        set-type-symbol! T 'texture-offset
+            fn... texture-offset
+                (sampler : T, P : fcoordT, offset : icoordT)
+                    sample sampler P
+                        Offset = offset
+                (sampler : T, P : fcoordT, offset : icoordT, bias : f32)
+                    sample sampler P
+                        Offset = offset
+                        Bias = bias
+        set-type-symbol! T 'texture-proj
+            fn... texture-proj
+                (sampler : T, P : fcoordProjT)
+                    sample sampler P
+                        Proj = true
+                (sampler : T, P : fcoordProjT, bias : f32)
+                    sample sampler P
+                        Proj = true
+                        Bias = bias
+        set-type-symbol! T 'texture-lod
+            fn... texture-lod
+                (sampler : T, P : fcoordT, lod : f32)
+                    sample sampler P
+                        Lod = lod
         set-type-symbol! T 'fetch
             if fetch-has-lod-arg
                 fn... fetch
                     (sampler : T, P : icoordT, lod : i32)
                         sample sampler P
+                            Fetch = true
+                            Lod = lod
             elseif (ms == 1)
                 fn... fetch
                     (sampler : T, P : icoordT, sampleid : i32)
                         sample sampler P
+                            Fetch = true
+                            Sample = sampleid
             else
                 fn... fetch
                     (sampler : T, P : icoordT)
                         sample sampler P
+                            Fetch = true
+        set-type-symbol! T 'fetch-offset
+            fn... fetch-offset
+                (sampler : T, P : icoordT, lod : i32, offset : icoordT)
+                    sample sampler P
+                        Fetch = true
+                        Lod = lod
+                        Offset = offset
         T
 
     fn make-sampler (prefix return-type postfix dim arrayed ms coords)
@@ -218,8 +261,23 @@ define-macro xvar
     list let name '=
         cons xvar-extern (quote-if-symbol sxstorage) (quote-if-symbol name) type params
 
-fn texelFetch (sampler ...)
-    'fetch sampler ...
+fn texelFetch (sampler P ...)
+    'fetch (sampler as gsampler) P ...
+
+fn texelFetchOffset (sampler P lod offset)
+    'fetch-offset (sampler as gsampler) P lod offset
+
+fn texture (sampler P ...)
+    'texture (sampler as gsampler) P ...
+
+fn textureProj (sampler P ...)
+    'texture-proj (sampler as gsampler) P ...
+
+fn textureLod (sampler P lod)
+    'texture-lod (sampler as gsampler) P lod
+
+fn textureOffset (sampler P offset ...)
+    'texture-offset (sampler as gsampler) P offset ...
 
 fn imageLoad (image coord)
     Image-read (image as Image) coord

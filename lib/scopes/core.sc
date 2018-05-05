@@ -2150,7 +2150,7 @@ fn type-matcher (types...)
                     return
                         f-error
                             fn ()
-                                .. "argument mismatch (expected "
+                                .. "could not resolve overloaded function from number of arguments (expected "
                                     repr typesz
                                     " but got "
                                     repr sz
@@ -2168,7 +2168,9 @@ fn type-matcher (types...)
                     return
                         f-error
                             fn ()
-                                .. "couldn't convert argument type from "
+                                .. "couldn't convert type of argument "
+                                    repr (i + 1)
+                                    " from "
                                     repr (typeof arg)
                                     " to parameter type "
                                     repr T
@@ -2221,15 +2223,18 @@ define chain-fn-dispatch (op2-rtl-multiop chain-fn-dispatch2)
 # a default error handling function that prints all type signatures and
     produces a compiler error
 fn fn-dispatch-error-handler (msgf get-types...)
-    compiler-message "expected one of"
+    let msg =
+        .. (msgf) "\n"
+            "    Expected one of"
     let sz = (va-countof get-types...)
-    let loop (i) = 0
+    let loop (i msg) = 0 msg
     if (icmp== i sz)
-        compiler-error! (msgf)
+        compiler-error! msg
     else
         let get-types = (va@ i get-types...)
-        compiler-message (format-type-signature (get-types))
         loop (add i 1)
+            .. msg "\n        "
+                format-type-signature (get-types)
 
 # composes multiple target-bound type matchers into a single function
 fn fn-dispatcher (args...)

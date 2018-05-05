@@ -117,7 +117,7 @@
                 },
                 {
                     "name": "support.type.glsl.scopes",
-                    "match": "(sampler|(i|u|g)?sampler(1D|2D|3D|Cube|2DRect|(1D|2D|Cube)Array|Buffer|2DMS(Array)?))(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
+                    "match": "(gsampler|(i|u|g)?sampler(1D|2D|3D|Cube|2DRect|(1D|2D|Cube)Array|Buffer|2DMS(Array)?))(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
                 }
             ]
 		},
@@ -141,7 +141,7 @@
                 },
                 {
                     "name": "support.function.glsl.scopes",
-				    "match": "(texelFetch|local_size|imageLoad|imageStore|(i|u)?image(1D|2D|3D|Cube|2DRect|(1D|2D|Cube)Array|Buffer|2DMS(Array)?))(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
+				    "match": "(texelFetch(Offset)?|texture(Proj|Lod|Offset)?|local_size|imageLoad|imageStore|(i|u)?image(1D|2D|3D|Cube|2DRect|(1D|2D|Cube)Array|Buffer|2DMS(Array)?))(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
                 },
                 {
                     "name": "support.function.glm.scopes",
