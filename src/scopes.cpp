@@ -16701,6 +16701,22 @@ struct Expander {
         return (name.type == TYPE_Symbol) && (name.symbol == OP_Set);
     }
 
+    void print_name_suggestions(Symbol name, StyledStream &ss) {
+        auto syms = env->find_closest_match(name);
+        if (!syms.empty()) {
+            ss << "Did you mean '" << syms[0].name()->data << "'";
+            for (size_t i = 1; i < syms.size(); ++i) {
+                if ((i + 1) == syms.size()) {
+                    ss << " or ";
+                } else {
+                    ss << ", ";
+                }
+                ss << "'" << syms[i].name()->data << "'";
+            }
+            ss << "?";
+        }
+    }
+
     // (let x ... [= args ...])
     // (let name ([x ...]) [= args ...])
     // ...
@@ -16763,7 +16779,9 @@ struct Expander {
                 AnyDoc entry = { none, nullptr };
                 if (!env->lookup(name.symbol, entry)) {
                     StyledString ss;
-                    ss.out << "no such name bound in parent scope: " << name;
+                    ss.out << "no such name bound in parent scope: '"
+                        << name.symbol.name()->data << "'. ";
+                    print_name_suggestions(name.symbol, ss.out);
                     location_error(ss.str());
                 }
                 env->bind_with_doc(name.symbol, entry);
@@ -17140,20 +17158,8 @@ struct Expander {
                 }
 
                 StyledString ss;
-                ss.out << "use of undeclared identifier '" << name.name()->data << "'.";
-                auto syms = env->find_closest_match(name);
-                if (!syms.empty()) {
-                    ss.out << " Did you mean '" << syms[0].name()->data << "'";
-                    for (size_t i = 1; i < syms.size(); ++i) {
-                        if ((i + 1) == syms.size()) {
-                            ss.out << " or ";
-                        } else {
-                            ss.out << ", ";
-                        }
-                        ss.out << "'" << syms[i].name()->data << "'";
-                    }
-                    ss.out << "?";
-                }
+                ss.out << "use of undeclared identifier '" << name.name()->data << "'. ";
+                print_name_suggestions(name, ss.out);
                 location_error(ss.str());
             }
             return write_dest(dest, result);
