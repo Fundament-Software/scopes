@@ -82,6 +82,14 @@ syntax-extend
                     sample sampler P
                         Proj = true
                         Bias = bias
+        set-type-symbol! T 'texture-gather
+            fn... texture-gather
+                (sampler : T, P : fcoordT)
+                    sample sampler P
+                        Gather = 0
+                (sampler : T, P : fcoordT, comp : i32)
+                    sample sampler P
+                        Gather = comp
         set-type-symbol! T 'texture-lod
             fn... texture-lod
                 (sampler : T, P : fcoordT, lod : f32)
@@ -278,6 +286,9 @@ fn textureLod (sampler P lod)
 
 fn textureOffset (sampler P offset ...)
     'texture-offset (sampler as gsampler) P offset ...
+
+fn textureGather (sampler P ...)
+    'texture-gather (sampler as gsampler) P ...
 
 fn imageLoad (image coord)
     Image-read (image as Image) coord
