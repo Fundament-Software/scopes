@@ -37,6 +37,7 @@ test-modules
     .test_mutarray
     .test_namedargs
     .test_object
+    .test_operators
     .test_overload
     .test_parser
     .test_quality

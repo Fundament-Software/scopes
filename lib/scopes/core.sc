@@ -354,13 +354,10 @@ syntax-extend
         set-type-symbol! T '__== (gen-type-op2 icmp==)
         set-type-symbol! T '__!= (gen-type-op2 icmp!=)
         set-type-symbol! T '__+ (gen-type-op2 add)
-        set-type-symbol! T '__-
-            fn (a b flipped)
-                let Ta Tb = (typeof a) (typeof b)
-                if (type== Ta Tb)
-                    sub a b
-                elseif (type== Tb Nothing)
-                    sub (Ta 0) a
+        set-type-symbol! T '__- (gen-type-op2 sub)
+        set-type-symbol! T '__neg
+            fn (self)
+                sub (nullof (typeof self)) self
         set-type-symbol! T '__* (gen-type-op2 mul)
         set-type-symbol! T '__<< (gen-type-op2 shl)
         set-type-symbol! T '__& (gen-type-op2 band)
@@ -426,19 +423,17 @@ syntax-extend
                 else
                     as val destT
 
-        fn ufdiv(a b)
-            let Ta Tb = (typeof a) (typeof b)
-            if (type== Ta Tb)
-                fdiv (uitofp a f32) (uitofp b f32)
-            elseif (type== Tb Nothing)
-                fdiv 1.0 (uitofp a f32)
+        fn ufdiv (a b)
+            fdiv (uitofp a f32) (uitofp b f32)
 
-        fn sfdiv(a b)
-            let Ta Tb = (typeof a) (typeof b)
-            if (type== Ta Tb)
-                fdiv (sitofp a f32) (sitofp b f32)
-            elseif (type== Tb Nothing)
-                fdiv 1.0 (sitofp a f32)
+        fn ufrcp (self)
+            fdiv 1.0 (uitofp self f32)
+
+        fn sfdiv (a b)
+            fdiv (sitofp a f32) (sitofp b f32)
+
+        fn sfrcp (self)
+            fdiv 1.0 (sitofp self f32)
 
         if (signed? (storageof T))
             set-type-symbol! T '__> (gen-type-op2 icmp>s)
@@ -447,6 +442,7 @@ syntax-extend
             set-type-symbol! T '__<= (gen-type-op2 icmp<=s)
             set-type-symbol! T '__// (gen-type-op2 sdiv)
             set-type-symbol! T '__/ sfdiv
+            set-type-symbol! T '__rcp sfrcp
             set-type-symbol! T '__% (gen-type-op2 srem)
             set-type-symbol! T '__>> (gen-type-op2 ashr)
         else
@@ -456,6 +452,7 @@ syntax-extend
             set-type-symbol! T '__<= (gen-type-op2 icmp<=u)
             set-type-symbol! T '__// (gen-type-op2 udiv)
             set-type-symbol! T '__/ ufdiv
+            set-type-symbol! T '__rcp ufrcp
             set-type-symbol! T '__% (gen-type-op2 urem)
             set-type-symbol! T '__>> (gen-type-op2 lshr)
 
@@ -509,21 +506,15 @@ syntax-extend
         set-type-symbol! T '__< (gen-type-op2 fcmp<o)
         set-type-symbol! T '__<= (gen-type-op2 fcmp<=o)
         set-type-symbol! T '__+ (gen-type-op2 fadd)
-        set-type-symbol! T '__-
-            fn (a b flipped)
-                let Ta Tb = (typeof a) (typeof b)
-                if (type== Ta Tb)
-                    fsub a b
-                elseif (type== Tb Nothing)
-                    fsub (Ta 0) a
+        set-type-symbol! T '__- (gen-type-op2 fsub)
+        set-type-symbol! T '__neg
+            fn (self)
+                fsub (nullof (typeof self)) self
         set-type-symbol! T '__* (gen-type-op2 fmul)
-        set-type-symbol! T '__/
-            fn (a b flipped)
-                let Ta Tb = (typeof a) (typeof b)
-                if (type== Ta Tb)
-                    fdiv a b
-                elseif (type== Tb Nothing)
-                    fdiv (Ta 1) a
+        set-type-symbol! T '__/ (gen-type-op2 fdiv)
+        set-type-symbol! T '__rcp
+            fn (self)
+                fdiv (imply 1 (typeof self)) self
         set-type-symbol! T '__// (gen-type-op2 floordiv)
         set-type-symbol! T '__% (gen-type-op2 frem)
 
@@ -554,10 +545,13 @@ fn op-prettyname (symbol)
     elseif (icmp== symbol '__countof) "counting"
     elseif (icmp== symbol '__@) "indexing"
     elseif (icmp== symbol '__slice) "slicing"
+    elseif (icmp== symbol '__..) "joining"
     elseif (icmp== symbol '__+) "addition"
     elseif (icmp== symbol '__-) "subtraction"
     elseif (icmp== symbol '__*) "multiplication"
     elseif (icmp== symbol '__/) "division"
+    elseif (icmp== symbol '__neg) "negation"
+    elseif (icmp== symbol '__rcp) "reciprocal"
     elseif (icmp== symbol '__//) "integer division"
     elseif (icmp== symbol '__==) "equal comparison"
     elseif (icmp== symbol '__!=) "inequality comparison"
@@ -570,16 +564,44 @@ fn op-prettyname (symbol)
             Any-repr (Any-wrap symbol)
             " operation"
 
-fn opN-dispatch (symbol)
-    fn (self ...)
+fn opN-dispatch (symbol mincount maxcount)
+    let verify-argument-count =
+        if (none? mincount)
+            fn ()
+        else
+            fn (c)
+                if (icmp<s c mincount)
+                    compiler-error!
+                        string-join (op-prettyname symbol)
+                            string-join " requires at least "
+                                string-join (Any-repr (Any-wrap mincount))
+                                    string-join " arguments but got "
+                                        Any-repr (Any-wrap c)
+    let verify-argument-count =
+        if (none? maxcount) verify-argument-count
+        else
+            fn (c)
+                if (icmp>s c maxcount)
+                    compiler-error!
+                        string-join (op-prettyname symbol)
+                            string-join " accepts at most "
+                                string-join (Any-repr (Any-wrap maxcount))
+                                    string-join " arguments but got "
+                                        Any-repr (Any-wrap c)
+    fn (...)
+        verify-argument-count (va-countof ...)
+        let self ... = ...
         let T = (typeof self)
         let op success = (type@ T symbol)
         if success
             return (op self ...)
         compiler-error!
             string-join (op-prettyname symbol)
-                string-join " can not be used with value of type "
+                string-join " does not apply to value of type "
                     Any-repr (Any-wrap T)
+
+fn op1-dispatch (symbol)
+    opN-dispatch symbol 1 1
 
 fn op2-dispatch (symbol)
     fn (a b)
@@ -592,14 +614,19 @@ fn op2-dispatch (symbol)
                 return result...
         compiler-error!
             string-join (op-prettyname symbol)
-                string-join " can not be used with values of type "
+                string-join " does not apply to values of type "
                     string-join
                         Any-repr (Any-wrap Ta)
                         string-join " and "
                             Any-repr (Any-wrap Tb)
 
 fn op2-dispatch-bidi (symbol fallback)
-    fn (a b)
+    fn (...)
+        if (icmp<s (va-countof ...) 2)
+            compiler-error!
+                string-join (op-prettyname symbol)
+                    " requires at least two arguments"
+        let a b = ...
         let Ta Tb = (typeof a) (typeof b)
         let op success = (type@ Ta symbol)
         if success
@@ -624,8 +651,19 @@ fn op2-dispatch-bidi (symbol fallback)
                         string-join " and "
                             Any-repr (Any-wrap Tb)
 
+fn dispatch-unop-binop (f1 f2)
+    fn (...)
+        if (icmp<s (va-countof ...) 2)
+            f1 ...
+        else
+            f2 ...
+
 fn op2-ltr-multiop (f)
-    fn (a b ...)
+    fn (...)
+        if (icmp<=s (va-countof ...) 2)
+            return
+                f ...
+        let a b ... = ...
         let sz = (va-countof ...)
         let loop (i result...) = 0 (f a b)
         if (icmp<s i sz)
@@ -636,6 +674,9 @@ fn op2-ltr-multiop (f)
 fn op2-rtl-multiop (f)
     fn (...)
         let sz = (va-countof ...)
+        if (icmp<=s sz 2)
+            return
+                f ...
         let i = (sub sz 1)
         let x = (va@ i ...)
         let loop (i result...) = i x
@@ -645,32 +686,36 @@ fn op2-rtl-multiop (f)
             loop i (f x result...)
         else result...
 
-fn == (a b) ((op2-dispatch-bidi '__==) a b)
-fn != (a b)
-    call
-        op2-dispatch-bidi '__!=
-            fn (a b)
-                bxor true (== a b)
-        \ a b
-fn > (a b) ((op2-dispatch-bidi '__>) a b)
-fn >= (a b) ((op2-dispatch-bidi '__>=) a b)
-fn < (a b) ((op2-dispatch-bidi '__<) a b)
-fn <= (a b) ((op2-dispatch-bidi '__<=) a b)
-fn + (...) ((op2-ltr-multiop (op2-dispatch-bidi '__+)) ...)
-fn - (a b) ((op2-dispatch-bidi '__-) a b)
-fn * (...) ((op2-ltr-multiop (op2-dispatch-bidi '__*)) ...)
-fn / (a b) ((op2-dispatch-bidi '__/) a b)
-fn // (a b) ((op2-dispatch-bidi '__//) a b)
-fn % (a b) ((op2-dispatch-bidi '__%) a b)
-fn & (a b) ((op2-dispatch-bidi '__&) a b)
-fn | (...) ((op2-ltr-multiop (op2-dispatch-bidi '__|)) ...)
-fn ^ (a b) ((op2-dispatch-bidi '__^) a b)
-fn ~ (x) ((opN-dispatch '__~) x)
-fn << (a b) ((op2-dispatch-bidi '__<<) a b)
-fn >> (a b) ((op2-dispatch-bidi '__>>) a b)
-fn .. (...) ((op2-ltr-multiop (op2-dispatch-bidi '__..)) ...)
-fn countof (x) ((opN-dispatch '__countof) x)
-fn unpack (x) ((opN-dispatch '__unpack) x)
+let == = (op2-dispatch-bidi '__==)
+let != =
+    op2-dispatch-bidi '__!=
+        fn (...)
+            bxor true (== ...)
+let > = (op2-dispatch-bidi '__>)
+let >= = (op2-dispatch-bidi '__>=)
+let < = (op2-dispatch-bidi '__<)
+let <= = (op2-dispatch-bidi '__<=)
+let + = (op2-ltr-multiop (op2-dispatch-bidi '__+))
+let - =
+    dispatch-unop-binop
+        op1-dispatch '__neg
+        op2-dispatch-bidi '__-
+let * = (op2-ltr-multiop (op2-dispatch-bidi '__*))
+let / =
+    dispatch-unop-binop
+        op1-dispatch '__rcp
+        op2-dispatch-bidi '__/
+let // = (op2-dispatch-bidi '__//)
+let % = (op2-dispatch-bidi '__%)
+let & = (op2-dispatch-bidi '__&)
+let | = (op2-ltr-multiop (op2-dispatch-bidi '__|))
+let ^ = (op2-dispatch-bidi '__^)
+let ~ = (op1-dispatch '__~)
+let << = (op2-dispatch-bidi '__<<)
+let >> = (op2-dispatch-bidi '__>>)
+let .. = (op2-ltr-multiop (op2-dispatch-bidi '__..))
+let countof = (op1-dispatch '__countof)
+let unpack = (op1-dispatch '__unpack)
 fn at (obj key)
     (op2-dispatch '__@) obj
         if (constant? key)
@@ -682,8 +727,7 @@ fn at (obj key)
                 else key
             else key
         else key
-fn @ (...)
-    (op2-ltr-multiop at) ...
+let @ = (op2-ltr-multiop at)
 
 fn repr
 
@@ -2447,6 +2491,8 @@ do
                     return;
                 failedf (deref self) args...
 
+    define-ref-forward (do -) '__neg
+    define-ref-forward (do /) '__rcp
     define-ref-forward countof '__countof
     define-ref-forward unpack '__unpack
     define-ref-forward forward-hash '__hash
@@ -3431,6 +3477,8 @@ do
 
     fn passthru-overload (sym func)
         set-type-symbol! CEnum sym (fn (a b flipped) (func (unenum a) (unenum b)))
+    fn passthru-overload1 (sym func)
+        set-type-symbol! CEnum sym (fn (self) (func (unenum self)))
 
     passthru-overload '__!= !=; passthru-overload '__== ==
     passthru-overload '__< <; passthru-overload '__<= <=
@@ -3442,6 +3490,9 @@ do
     passthru-overload '__| |
     passthru-overload '__^ ^
     passthru-overload '__& &
+    passthru-overload1 '__~ ~
+    passthru-overload1 '__rcp /
+    passthru-overload1 '__neg -
 
 typefn CStruct 'structof (cls args...)
     let sz = (va-countof args...)

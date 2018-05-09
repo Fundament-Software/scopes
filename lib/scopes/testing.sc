@@ -55,6 +55,7 @@ define-macro assert-error
                 f;
                 unconst false
             fn (exc)
+                io-write! "ASSERT OK: "
                 io-write!
                     format-exception exc
                 unconst true
@@ -93,6 +94,7 @@ define-macro assert-compiler-error
                 typify (unconst f)
                 unconst false
             fn (exc)
+                io-write! "ASSERT OK: "
                 io-write!
                     format-exception exc
                 unconst true

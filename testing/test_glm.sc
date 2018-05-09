@@ -35,6 +35,11 @@ assert (v + 1 == (vec4 1 2 3 4))
 assert (1 + v == (vec4 1 2 3 4))
 assert (v * v / 2 == (vec4 0 0.5 2 4.5))
 assert (0 - v == (vec4 0 -1 -2 -3))
+assert ((- v) == (vec4 0 -1 -2 -3))
+
+assert ((- (ivec4 1 2 3 4)) == (ivec4 -1 -2 -3 -4))
+
+assert ((/ (vec4 2 4 2 4)) == (vec4 0.5 0.25 0.5 0.25))
 
 assert ((max (vec2 1.0 2.0) (vec2 4.0 0.0)) == (vec2 4.0 2.0))
 

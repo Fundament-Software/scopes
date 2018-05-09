@@ -30,7 +30,7 @@ BEWARE: If you build this with anything else but a recent enough clang,
 */
 
 #define SCOPES_VERSION_MAJOR 0
-#define SCOPES_VERSION_MINOR 13
+#define SCOPES_VERSION_MINOR 14
 #define SCOPES_VERSION_PATCH 0
 
 // trace partial evaluation and code generation
@@ -15206,7 +15206,7 @@ struct Solver {
             RETARGS();
         } break;
         case FN_Dump: {
-            CHECKARGS(1, -1);
+            CHECKARGS(0, -1);
             StyledStream ss(std::cerr);
             ss << l->body.anchor << " dump:";
             for (size_t i = 1; i < args.size(); ++i) {

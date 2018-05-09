@@ -206,29 +206,20 @@ set-type-symbol! vec-type '__+
                 add a b
 
 set-type-symbol! vec-type '__-
-    fn (a b flipped)
-        let T1 T2 = (typeof a) (typeof b)
-        label compute (a b)
-            return
-                if (type== (typeof a) (typeof b))
-                    let ET = (@ (typeof a))
-                    if (ET < real)
-                        fsub a b
-                    elseif (ET < integer)
-                        sub a b
-        if flipped
-            if (T1 < vec-type)
-                compute a b
-            elseif (valid-element-type? T1)
-                compute ((typeof b) a) b
-        else
-            if (T2 == Nothing)
-                # negation
-                compute (nullof (typeof a)) a
-            elseif (T2 < vec-type)
-                compute a b
-            elseif (valid-element-type? T2)
-                compute a ((typeof a) b)
+    vec-type-binop
+        fn (ET a b)
+            if (ET < real)
+                fsub a b
+            elseif (ET < integer)
+                sub a b
+
+set-type-symbol! vec-type '__neg
+    fn (self)
+        - ((typeof self) 0) self
+
+set-type-symbol! vec-type '__rcp
+    fn (self)
+        / ((typeof self) 1) self
 
 set-type-symbol! vec-type '__*
     vec-type-binop
