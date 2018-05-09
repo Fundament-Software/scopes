@@ -53,6 +53,8 @@ let fragment-code =
 
         fn fragment-shader ()
             let uv = (uv as immutable)
+            let size = (textureSize smp 0)
+            assert ((typeof size) == ivec2)
             let color = (vec4 uv.xy (make-phase) 1)
             out_Color =
                 color *

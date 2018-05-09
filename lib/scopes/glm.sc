@@ -134,41 +134,45 @@ set-type-symbol! vec-type '__unpack
 
 set-type-symbol! vec-type '__typecall
     fn vec-type-new (self ...)
-        let ET = (@ self)
-        let argsz = (va-countof ...)
-        let loop (i args...) = argsz
-        if (i != 0)
-            let i = (i - 1)
-            let arg = (va@ i ...)
-            let arg = (deref arg)
-            let argT = (typeof arg)
-            if (argT < vec-type)
-                let argET argvecsz = (@ argT) ((countof argT) as i32)
-                let flatten-loop (k args...) = argvecsz args...
-                if (k != 0)
-                    let k = (k - 1)
-                    flatten-loop k ((extractelement arg k) as ET) args...
-                loop i args...
-            loop i (arg as ET) args...
-        let argsz = (va-countof args...)
-        let vecsz = ((countof self) as i32)
-        if (argsz == 1)
-            # init all components with the same value
-            let arg = (va@ 0 args...)
-            let loop (i value) = 0 (nullof self)
-            if (i < vecsz)
-                loop (i + 1) (insertelement value arg i)
-            value
-        elseif (argsz == vecsz)
-            let loop (i value) = 0 (nullof self)
-            if (i < vecsz)
-                let arg = (va@ i args...)
-                loop (i + 1) (insertelement value arg i)
-            value
+        if (self == vec-type)
+            let ET size = ...
+            construct-vec-type (imply ET type) (imply size i32)
         else
-            compiler-error!
-                .. "number of arguments (" (repr argsz)
-                    \ ") doesn't match number of elements (" (repr vecsz) ")"
+            let ET = (@ self)
+            let argsz = (va-countof ...)
+            let loop (i args...) = argsz
+            if (i != 0)
+                let i = (i - 1)
+                let arg = (va@ i ...)
+                let arg = (deref arg)
+                let argT = (typeof arg)
+                if (argT < vec-type)
+                    let argET argvecsz = (@ argT) ((countof argT) as i32)
+                    let flatten-loop (k args...) = argvecsz args...
+                    if (k != 0)
+                        let k = (k - 1)
+                        flatten-loop k ((extractelement arg k) as ET) args...
+                    loop i args...
+                loop i (arg as ET) args...
+            let argsz = (va-countof args...)
+            let vecsz = ((countof self) as i32)
+            if (argsz == 1)
+                # init all components with the same value
+                let arg = (va@ 0 args...)
+                let loop (i value) = 0 (nullof self)
+                if (i < vecsz)
+                    loop (i + 1) (insertelement value arg i)
+                value
+            elseif (argsz == vecsz)
+                let loop (i value) = 0 (nullof self)
+                if (i < vecsz)
+                    let arg = (va@ i args...)
+                    loop (i + 1) (insertelement value arg i)
+                value
+            else
+                compiler-error!
+                    .. "number of arguments (" (repr argsz)
+                        \ ") doesn't match number of elements (" (repr vecsz) ")"
 
 set-type-symbol! vec-type '__==
     fn vec-type== (self other flipped)
@@ -426,6 +430,13 @@ fn make-diagonal-vector (VT i)
 
 set-type-symbol! mat-type '__typecall
     fn "mat-type-new" (cls ...)
+        if (cls == mat-type)
+            let ET cols rows = ...
+            return
+                construct-mat-type
+                    imply ET type
+                    imply cols i32
+                    imply rows i32
         let VT = cls.ColumnType
         let argsz = (va-countof ...)
         if (argsz == 0)
@@ -640,6 +651,8 @@ if main-module?
                 vec4 4 5 6 7
 
 do
+    let vec-type mat-type
+
     let vec2 dvec2 ivec2 uvec2 bvec2
     let vec3 dvec3 ivec3 uvec3 bvec3
     let vec4 dvec4 ivec4 uvec4 bvec4
@@ -660,5 +673,4 @@ do
     let mat4 dmat4 imat4 umat4 bmat4
 
     let dot transpose
-    let construct-vec-type
     locals;

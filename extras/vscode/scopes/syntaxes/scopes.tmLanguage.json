@@ -113,7 +113,7 @@
                 },
                 {
                     "name": "support.type.glm.scopes",
-                    "match": "((i|u|d|b)?vec(2|3|4)|(i|u|d|b)?mat(2|3|4)(x(2|3|4))?)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
+                    "match": "((vec|mat)-type|(i|u|d|b)?vec(2|3|4)|(i|u|d|b)?mat(2|3|4)(x(2|3|4))?)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
                 },
                 {
                     "name": "support.type.glsl.scopes",
@@ -141,7 +141,7 @@
                 },
                 {
                     "name": "support.function.glsl.scopes",
-				    "match": "(texelFetch(Offset)?|texture(Proj|Lod|Offset)?|local_size|imageLoad|imageStore|(i|u)?image(1D|2D|3D|Cube|2DRect|(1D|2D|Cube)Array|Buffer|2DMS(Array)?))(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
+				    "match": "(texelFetch(Offset)?|texture(Proj|Lod|Offset|Samples|QueryLevels|QueryLod|Size)?|local_size|imageLoad|imageStore|(i|u)?image(1D|2D|3D|Cube|2DRect|(1D|2D|Cube)Array|Buffer|2DMS(Array)?))(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
                 },
                 {
                     "name": "support.function.glm.scopes",

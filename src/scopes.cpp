@@ -559,6 +559,7 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(FN_StaticAlloc) \
     T(FN_AnyExtract) T(FN_AnyWrap) T(FN_IsConstant) T(FN_Free) T(KW_Defer) \
     T(OP_ICmpEQ) T(OP_ICmpNE) T(FN_Sample) T(FN_ImageRead) T(FN_ImageWrite) \
+    T(FN_ImageQuerySize) T(FN_ImageQueryLod) T(FN_ImageQueryLevels) T(FN_ImageQuerySamples) \
     T(OP_ICmpUGT) T(OP_ICmpUGE) T(OP_ICmpULT) T(OP_ICmpULE) \
     T(OP_ICmpSGT) T(OP_ICmpSGE) T(OP_ICmpSLT) T(OP_ICmpSLE) \
     T(OP_FCmpOEQ) T(OP_FCmpONE) T(OP_FCmpORD) \
@@ -866,6 +867,10 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(FN_Hash2x64, "__hash2x64") T(FN_HashBytes, "__hashbytes") \
     T(FN_Sample, "sample") \
     T(FN_ImageRead, "Image-read") T(FN_ImageWrite, "Image-write") \
+    T(FN_ImageQuerySize, "Image-query-size") \
+    T(FN_ImageQueryLod, "Image-query-lod") \
+    T(FN_ImageQueryLevels, "Image-query-levels") \
+    T(FN_ImageQuerySamples, "Image-query-samples") \
     T(FN_RealPath, "realpath") \
     T(FN_DirName, "dirname") T(FN_BaseName, "basename") \
     T(OP_ICmpEQ, "icmp==") T(OP_ICmpNE, "icmp!=") \
@@ -8703,7 +8708,7 @@ struct SPIRVGenerator {
 
     }
 
-    spv::Dim dim_from_symbol(Symbol sym) {
+    static spv::Dim dim_from_symbol(Symbol sym) {
         switch(sym.value()) {
         #define T(NAME) \
             case SYM_SPIRV_Dim ## NAME: return spv::Dim ## NAME;
@@ -9165,6 +9170,54 @@ struct SPIRVGenerator {
                 retvalue = builder.createTextureCall(
                     spv::NoPrecision, resultType, sparse, fetch, proj, gather,
                     explicitLod, params);
+            } break;
+            case FN_ImageQuerySize: {
+                READ_VALUE(sampler);
+                spv::Builder::TextureParameters params;
+                memset(&params, 0, sizeof(params));
+                params.sampler = sampler;
+                spv::Op op = spv::OpImageQuerySize;
+                while (argn <= argcount) {
+                    READ_VALUE(value);
+                    switch (_arg_value.key.value()) {
+                        case SYM_SPIRV_ImageOperandLod:
+                            op = spv::OpImageQuerySizeLod;
+                            params.lod = value; break;
+                        default: break;
+                    }
+                }
+                auto ST = storage_type(_sampler.indirect_type());
+                if ((ST->kind() == TK_SampledImage) && (params.lod == 0)) {
+                    op = spv::OpImageQuerySizeLod;
+                    params.lod = builder.makeIntConstant(0);
+                }
+                retvalue = builder.createTextureQueryCall(op, params, false);
+            } break;
+            case FN_ImageQueryLod: {
+                READ_VALUE(sampler);
+                READ_VALUE(coords);
+                spv::Builder::TextureParameters params;
+                memset(&params, 0, sizeof(params));
+                params.sampler = sampler;
+                params.coords = coords;
+                retvalue = builder.createTextureQueryCall(
+                    spv::OpImageQueryLod, params, false);
+            } break;
+            case FN_ImageQueryLevels: {
+                READ_VALUE(sampler);
+                spv::Builder::TextureParameters params;
+                memset(&params, 0, sizeof(params));
+                params.sampler = sampler;
+                retvalue = builder.createTextureQueryCall(
+                    spv::OpImageQueryLevels, params, false);
+            } break;
+            case FN_ImageQuerySamples: {
+                READ_VALUE(sampler);
+                spv::Builder::TextureParameters params;
+                memset(&params, 0, sizeof(params));
+                params.sampler = sampler;
+                retvalue = builder.createTextureQueryCall(
+                    spv::OpImageQuerySamples, params, false);
             } break;
             case FN_ImageRead: {
                 READ_VALUE(image);
@@ -13708,6 +13761,7 @@ struct Solver {
         case FN_TupleType:
         case FN_UnionType:
         case FN_Sample:
+        case FN_ImageQuerySize:
             return true;
         default: return false;
         }
@@ -13731,6 +13785,10 @@ struct Solver {
         case FN_Load:
         case FN_Sample:
         case FN_ImageRead:
+        case FN_ImageQuerySize:
+        case FN_ImageQueryLod:
+        case FN_ImageQueryLevels:
+        case FN_ImageQuerySamples:
         case FN_GetElementPtr:
         case SFXFN_ExecutionMode:
         case OP_Tertiary:
@@ -13798,6 +13856,63 @@ struct Solver {
             verify_kind<TK_Image>(ST);
             auto it = cast<ImageType>(ST);
             RETARGTYPES(it->type);
+        } break;
+        case FN_ImageQuerySize: {
+            CHECKARGS(1, -1);
+            auto ST = storage_type(args[1].value.indirect_type());
+            if (ST->kind() == TK_SampledImage) {
+                auto sit = cast<SampledImageType>(ST);
+                ST = storage_type(sit->type);
+            }
+            verify_kind<TK_Image>(ST);
+            auto it = cast<ImageType>(ST);
+            spv::Dim dim = SPIRVGenerator::dim_from_symbol(it->dim);
+            int comps = 0;
+            switch(dim) {
+            case spv::Dim1D:
+            case spv::DimBuffer:
+                comps = 1;
+                break;
+            case spv::Dim2D:
+            case spv::DimCube:
+            case spv::DimRect:
+            case spv::DimSubpassData:
+                comps = 2;
+                break;
+            case spv::Dim3D:
+                comps = 3;
+                break;
+            default: break;
+            }
+            if (it->arrayed) {
+                comps++;
+            }
+            if (comps == 1) {
+                RETARGTYPES(TYPE_I32);
+            } else {
+                RETARGTYPES(Vector(TYPE_I32, comps));
+            }
+        } break;
+        case FN_ImageQueryLod: {
+            CHECKARGS(2, 2);
+            auto ST = storage_type(args[1].value.indirect_type());
+            if (ST->kind() == TK_SampledImage) {
+                auto sit = cast<SampledImageType>(ST);
+                ST = storage_type(sit->type);
+            }
+            verify_kind<TK_Image>(ST);
+            RETARGTYPES(Vector(TYPE_F32, 2));
+        } break;
+        case FN_ImageQueryLevels:
+        case FN_ImageQuerySamples: {
+            CHECKARGS(1, 1);
+            auto ST = storage_type(args[1].value.indirect_type());
+            if (ST->kind() == TK_SampledImage) {
+                auto sit = cast<SampledImageType>(ST);
+                ST = storage_type(sit->type);
+            }
+            verify_kind<TK_Image>(ST);
+            RETARGTYPES(TYPE_I32);
         } break;
         case FN_ImageRead: {
             CHECKARGS(2, 2);

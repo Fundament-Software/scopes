@@ -45,7 +45,12 @@ syntax-extend
     fn coord-type (ET coords)
         if (coords == 1) ET
         else
-            construct-vec-type ET coords
+            vec-type ET coords
+
+    fn vector->vec-type (v)
+        let T = (typeof v)
+        bitcast v
+            vec-type (@ T) (countof T)
 
     fn make-gsampler (postfix dim arrayed ms coords)
         let T = (typename (.. "gsampler" postfix) gsampler)
@@ -95,6 +100,22 @@ syntax-extend
                 (sampler : T, P : fcoordT, lod : f32)
                     sample sampler P
                         Lod = lod
+        set-type-symbol! T 'texture-size
+            fn... texture-size
+                (sampler : T)
+                    vector->vec-type
+                        Image-query-size sampler
+                (sampler : T, lod : i32)
+                    vector->vec-type
+                        Image-query-size sampler
+                            Lod = lod
+        set-type-symbol! T 'texture-query-lod
+            fn... texture-query-lod
+                (sampler : T, P : fcoordT)
+                    vector->vec-type
+                        Image-query-lod sampler P
+        set-type-symbol! T 'texture-levels Image-query-levels
+        set-type-symbol! T 'texture-samples Image-query-samples
         set-type-symbol! T 'fetch
             if fetch-has-lod-arg
                 fn... fetch
@@ -289,6 +310,18 @@ fn textureOffset (sampler P offset ...)
 
 fn textureGather (sampler P ...)
     'texture-gather (sampler as gsampler) P ...
+
+fn textureSize (sampler ...)
+    'texture-size (sampler as gsampler) ...
+
+fn textureQueryLod (sampler P)
+    'texture-query-lod (sampler as gsampler) P
+
+fn textureQueryLevels (sampler)
+    'texture-query-levels (sampler as gsampler)
+
+fn textureSamples (sampler)
+    'texture-samples (sampler as gsampler)
 
 fn imageLoad (image coord)
     Image-read (image as Image) coord
