@@ -22,7 +22,7 @@
                 },
                 {
                     "name": "keyword.control.library.scopes",
-                    "match": "(fn\\.\\.\\.|method(\\&)?|loop|repeat|capture|struct|fnchain|enum|typefn(\\!)?(\\&)?|while|break|continue|for|in|match|from|using|filter|\\:|try|except|locals|import|defer|assert|define(((-block)?-scope)?-macro|-infix[\\<\\>]|-doc)?)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
+                    "match": "(fn\\.\\.\\.|method(\\&)?|loop|repeat|capture(\\&)?|struct|fnchain|enum|typefn(\\!)?(\\&)?|while|break|continue|for|in|match|from|using|filter|\\:|try|except|locals|import|defer|assert|define(((-block)?-scope)?-macro|-infix[\\<\\>]|-doc)?)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
                 },
                 {
                     "name": "keyword.control.glsl.scopes",
@@ -105,7 +105,7 @@
                 },
                 {
                     "name": "support.type.library.scopes",
-                    "match": "((Fixed|Growing)?Array|(Heap|Stack|Global)?Memory|Generator|Capture|Macro|FunctionChain|opaquepointer|immutable|rawstring|ref|hash|aggregate)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
+                    "match": "((Fixed|Growing)?Array|(Heap|Stack|Global)?Memory|Generator|(Mutable)?Capture|Macro|FunctionChain|opaquepointer|immutable|rawstring|ref|hash|aggregate)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
                 },
                 {
                     "name": "support.type.contextual.scopes",
@@ -125,7 +125,7 @@
 			"patterns": [
                 {
                     "name": "support.function.builtin.scopes",
-				    "match": "(pow|mix|step|smoothstep|floor|ceil|fract|(f|s)(abs|sign)|round|roundeven|trunc|fma|frexp|ldexp|(inverse)?sqrt|exp(2)?|log(2)?|radians|degrees|sin|cos|tan|asin|acos|atan|atan2|cross|normalize|length|distance|scopeof|offsetof|Image-(read|write)|sizeof|sample|mutable\\?|type-name|supercall|superof|string-match\\?|(file|directory)\\?|exit|compiler-version|load-library|prompt|countof|static-alloc|malloc(-array)?|free|alloca(-array|of)?|eval|list-load|globals|((mutable-)?pointer|integer|real|function|tuple|ReturnLabel|array|vector|typename|extern|(Sampled)?Image)-type|dump|dump-(label|list|frame)|Any-(extract-constant|repr|wrap)|branch|string-join|getelementptr|(volatile-)?(load|store)|storageof|import-c|type\\@(\\&)?|Scope\\@|ptrtoint|inttoptr|(insert|extract)(value|element)|shufflevector|unconst(-all)?|compile(-glsl|-spirv|-object)?|typify|purify|(constant|signed)\\?|va(-keys|-values|-countof|\\@)|type-kind|nullof|undef|typeof(\\&)?|bitcountof|icmp[\\=\\!]\\=|icmp[\\<\\>]\\=?[su]|fcmp[\\=\\!]\\=[ou]|fcmp[\\<\\>]\\=?[ou]|bitcast|(fp|i)trunc|([sz]|fp)ext|fpto[su]i|[su]itofp|b(and|x?or)|f?add|f?sub|f?mul|[suf](div|rem)|shl|[al]shr)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
+				    "match": "(pow|mix|step|smoothstep|floor|ceil|fract|(f|s)(abs|sign)|round|roundeven|trunc|fma|frexp|ldexp|(inverse)?sqrt|exp(2)?|log(2)?|radians|degrees|sin|cos|tan|asin|acos|atan|atan2|cross|normalize|length|distance|scopeof|offsetof|Image-(read|write)|sizeof|sample|mutable\\?|type-name|supercall|superof|string-match\\?|(file|directory)\\?|exit|compiler-version|load-library|prompt|countof|static-alloc|malloc(-array)?|free|alloca(-array|of)?|eval|list-load|globals|((mutable-)?pointer|integer|real|function|tuple|ReturnLabel|array|vector|typename|extern|(Sampled)?Image)-type|dump|dump-(label|list|frame)|Any-(extract-constant|repr|wrap)|branch|string-join|getelementptr|(volatile-)?(load|store)|storageof|import-c|type\\@(\\&)?|Scope\\@|ptrtoint|inttoptr|(insert|extract)(value|element)|shufflevector|unconst(-all)?|compile(-glsl|-spirv|-object)?|typify|purify|(constant|signed)\\?|va(-keys|-values|-countof|\\@)|type-kind|nullof|undef|typeof(\\&)?|bitcountof|icmp[\\=\\!]\\=|icmp[\\<\\>]\\=?[su]|fcmp[\\=\\!]\\=[ou]|fcmp[\\<\\>]\\=?[ou]|bitcast(\\&)?|(fp|i)trunc|([sz]|fp)ext|fpto[su]i|[su]itofp|b(and|x?or)|f?add|f?sub|f?mul|[suf](div|rem)|shl|[al]shr)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
                 },
                 {
                     "name": "support.function.library.scopes",
