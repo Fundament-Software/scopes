@@ -589,7 +589,7 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(OP_BAnd) T(OP_BOr) T(OP_BXor) \
     T(OP_FAdd) T(OP_FSub) T(OP_FMul) T(OP_FDiv) T(OP_FRem) \
     T(OP_Tertiary) T(KW_SyntaxLog) \
-    T(OP_Mix) T(OP_Step) T(OP_SmoothStep) \
+    T(OP_FMix) T(OP_Step) T(OP_SmoothStep) \
     T(FN_Round) T(FN_RoundEven) T(OP_Trunc) \
     T(OP_FAbs) T(OP_FSign) T(OP_SSign) \
     T(OP_Floor) T(FN_Ceil) T(FN_Fract) \
@@ -811,7 +811,7 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(FN_AnchorPath, "Anchor-path") T(FN_AnchorLineNumber, "Anchor-line-number") \
     T(FN_AnchorColumn, "Anchor-column") T(FN_AnchorOffset, "Anchor-offset") \
     T(FN_AnchorSource, "Anchor-source") \
-    T(OP_Mix, "mix") T(OP_Step, "step") T(OP_SmoothStep, "smoothstep") \
+    T(OP_FMix, "fmix") T(OP_Step, "step") T(OP_SmoothStep, "smoothstep") \
     T(FN_Round, "round") T(FN_RoundEven, "roundeven") T(OP_Trunc, "trunc") \
     T(OP_FAbs, "fabs") T(OP_FSign, "fsign") T(OP_SSign, "ssign") \
     T(OP_Floor, "floor") T(FN_Ceil, "ceil") T(FN_Fract, "fract") \
@@ -9249,6 +9249,14 @@ struct SPIRVGenerator {
                     builder.getTypeId(then_value), cond,
                     then_value, else_value);
             } break;
+            case OP_FMix: {
+                READ_VALUE(a);
+                READ_VALUE(b);
+                READ_VALUE(x);
+                retvalue = builder.createBuiltinCall(
+                    builder.getTypeId(a),
+                    glsl_ext_inst, GLSLstd450FMix, { a, b, x });
+            } break;
             case FN_Length:
             case FN_Normalize:
             case OP_Sin:
@@ -11566,6 +11574,30 @@ struct LLVMIRGenerator {
                 retvalue = LLVMBuildFDiv(builder, a, b, ""); } break;
             case OP_FRem: { READ_VALUE(a); READ_VALUE(b);
                 retvalue = LLVMBuildFRem(builder, a, b, ""); } break;
+            case OP_FMix: {
+                READ_VALUE(a);
+                READ_VALUE(b);
+                READ_VALUE(x);
+                auto T = LLVMTypeOf(a);
+                LLVMValueRef one;
+                if (LLVMGetTypeKind(T) == LLVMVectorTypeKind) {
+                    unsigned count = LLVMGetVectorSize(T);
+                    auto ET = LLVMGetElementType(T);
+                    one = LLVMConstReal(ET, 1.0);
+                    LLVMValueRef values[count];
+                    for (unsigned i = 0; i < count; ++i) {
+                        values[i] = one;
+                    }
+                    one = LLVMConstVector(values, count);
+                } else {
+                    one = LLVMConstReal(T, 1.0);
+                }
+                auto invx = LLVMBuildFSub(builder, one, x, "");
+                retvalue = LLVMBuildFAdd(builder,
+                    LLVMBuildFMul(builder, a, invx, ""),
+                    LLVMBuildFMul(builder, b, x, ""),
+                    "");
+            } break;
             case FN_Length: {
                 READ_VALUE(x);
                 auto T = LLVMTypeOf(x);
@@ -12773,6 +12805,20 @@ template<typename T> struct op_Cross {
     }
 };
 
+template<typename T> struct op_FMix {
+    typedef T rtype;
+    static bool reductive() { return false; }
+    void operator()(void **srcptrs, void *destptr, size_t count) {
+        auto x = (T *)(srcptrs[0]);
+        auto y = (T *)(srcptrs[1]);
+        auto a = (T *)(srcptrs[2]);
+        auto ret = (rtype *)destptr;
+        for (size_t i = 0; i < count; ++i) {
+            ret[i] = x[i] * (T(1.0) - a[i]) + y[i] * a[i];
+        }
+    }
+};
+
 template<typename T> struct op_Normalize {
     typedef T rtype;
     static bool reductive() { return false; }
@@ -13002,6 +13048,12 @@ static Any apply_real_op(Any a, Any b) {
     return apply_op< DispatchReal<OpT> >(args, 2);
 }
 
+template<template<typename T> class OpT>
+static Any apply_real_op(Any a, Any b, Any c) {
+    Any args[] = { a, b, c };
+    return apply_op< DispatchReal<OpT> >(args, 3);
+}
+
 //------------------------------------------------------------------------------
 // NORMALIZE
 //------------------------------------------------------------------------------
@@ -13053,7 +13105,9 @@ static Any smear(Any value, size_t count) {
         FUN_OP(Asin) FUN_OP(Acos) FUN_OP(Atan) FARITH_OP(Atan2) \
         FUN_OP(Exp) FUN_OP(Log) FUN_OP(Exp2) FUN_OP(Log2) \
         FUN_OP(Trunc) FUN_OP(Floor) FARITH_OP(Step) \
-        FARITH_OP(Pow) FUN_OP(Sqrt) FUN_OP(InverseSqrt)
+        FARITH_OP(Pow) FUN_OP(Sqrt) FUN_OP(InverseSqrt) \
+        \
+        FTRI_OP(FMix)
 
 static Label *expand_module(Any expr, Scope *scope = nullptr);
 
@@ -13172,6 +13226,12 @@ struct Solver {
     static void verify_real_ops(Any a, Any b) {
         verify_real_vector(storage_type(a.indirect_type()));
         verify(a.indirect_type(), b.indirect_type());
+    }
+
+    static void verify_real_ops(Any a, Any b, Any c) {
+        verify_real_vector(storage_type(a.indirect_type()));
+        verify(a.indirect_type(), b.indirect_type());
+        verify(a.indirect_type(), c.indirect_type());
     }
 
     static bool has_keyed_args(Label *l) {
@@ -14505,6 +14565,12 @@ struct Solver {
         verify_real_ops(args[1].value, args[2].value); \
         RETARGTYPES(args[1].value.indirect_type()); \
     } break;
+#define FTRI_OP(NAME) \
+    case OP_ ## NAME: { \
+        CHECKARGS(3, 3); \
+        verify_real_ops(args[1].value, args[2].value, args[3].value); \
+        RETARGTYPES(args[1].value.indirect_type()); \
+    } break;
 #define IUN_OP(NAME, PFX) \
     case OP_ ## NAME: { \
         CHECKARGS(1, 1); \
@@ -14524,6 +14590,7 @@ struct Solver {
 #undef FARITH_OP
 #undef IUN_OP
 #undef FUN_OP
+#undef FTRI_OP
         default: {
             StyledString ss;
             ss.out << "can not type builtin " << enter.builtin;
@@ -15419,6 +15486,8 @@ struct Solver {
     result = apply_real_op<op_ ## OP>(args[1].value);
 #define B_FLOAT_OP2(OP) \
     result = apply_real_op<op_ ## OP>(args[1].value, args[2].value);
+#define B_FLOAT_OP3(OP) \
+    result = apply_real_op<op_ ## OP>(args[1].value, args[2].value, args[3].value);
             Any result = false;
             switch(enter.builtin.value()) {
             case OP_FCmpOEQ: B_FLOAT_OP2(OEqual); break;
@@ -15470,6 +15539,14 @@ struct Solver {
         verify_real_ops(args[1].value, args[2].value); \
         Any result = none; \
         B_FLOAT_OP2(NAME); \
+        RETARGS(result); \
+    } break;
+#define FTRI_OP(NAME) \
+    case OP_ ## NAME: { \
+        CHECKARGS(3, 3); \
+        verify_real_ops(args[1].value, args[2].value, args[3].value); \
+        Any result = none; \
+        B_FLOAT_OP3(NAME); \
         RETARGS(result); \
     } break;
 #define IUN_OP(NAME, PFX) \
@@ -15524,12 +15601,14 @@ struct Solver {
 #undef FARITH_OPF
 #undef B_INT_OP2
 #undef B_INT_OP1
+#undef B_FLOAT_OP3
 #undef B_FLOAT_OP2
 #undef B_FLOAT_OP1
 #undef CHECKARGS
 #undef RETARGS
 #undef IUN_OP
 #undef FUN_OP
+#undef FTRI_OP
 
     /*
     void inline_single_label(Label *dest, Label *source) {

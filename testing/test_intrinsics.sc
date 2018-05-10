@@ -59,3 +59,14 @@ assert
     all?
         (cross (unconst (vectorof f32 0 0 1)) (unconst (vectorof f32 0 1 0))) == (vectorof f32 -1 0 0)
 
+assert ((fmix -1.0 1.0 0.75) == 0.5)
+
+assert
+    all?
+        ((fmix (vectorof f32 1.0 -1.0) (vectorof f32 -1.0 1.0) (vectorof f32 0.75 0.75)) == (vectorof f32 -0.5 0.5))
+
+assert ((fmix -1.0 1.0 (unconst 0.75)) == 0.5)
+
+assert
+    all?
+        ((fmix (vectorof f32 1.0 -1.0) (vectorof f32 -1.0 1.0) (unconst (vectorof f32 0.75 0.75))) == (vectorof f32 -0.5 0.5))

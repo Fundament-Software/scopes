@@ -587,6 +587,17 @@ fn transpose (m)
                 mat-row m i
                 i
 
+fn mix (a b x)
+    let Ta = (typeof a)
+    let Tx = (typeof x)
+    if ((Tx == bool) or ((Tx < vec-type) and ((@ Tx) == bool)))
+        ? x b a
+    else
+        fmix a b
+            if (Tx < vec-type) x
+            else
+                Ta x
+
 set-type-symbol! mat-type '__*
     fn "mat-type*" (a b flipped)
         let Ta = (typeof a)
@@ -672,5 +683,5 @@ do
     let mat4x4 dmat4x4 imat4x4 umat4x4 bmat4x4
     let mat4 dmat4 imat4 umat4 bmat4
 
-    let dot transpose
+    let dot transpose mix
     locals;
