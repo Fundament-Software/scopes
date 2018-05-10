@@ -10378,6 +10378,14 @@ struct LLVMIRGenerator {
         llvm_floor_f64,
         llvm_pow_f32,
         llvm_pow_f64,
+        llvm_exp_f32,
+        llvm_exp_f64,
+        llvm_log_f32,
+        llvm_log_f64,
+        llvm_exp2_f32,
+        llvm_exp2_f64,
+        llvm_log2_f32,
+        llvm_log2_f64,
         custom_fsign_f32,
         custom_fsign_f64,
         NumIntrinsics,
@@ -10573,6 +10581,14 @@ struct LLVMIRGenerator {
             LLVM_INTRINSIC_IMPL(llvm_floor_f64, f64T, "llvm.floor.f64", f64T)
             LLVM_INTRINSIC_IMPL(llvm_pow_f32, f32T, "llvm.pow.f32", f32T, f32T)
             LLVM_INTRINSIC_IMPL(llvm_pow_f64, f64T, "llvm.pow.f64", f64T, f64T)
+            LLVM_INTRINSIC_IMPL(llvm_exp_f32, f32T, "llvm.exp.f32", f32T)
+            LLVM_INTRINSIC_IMPL(llvm_exp_f64, f64T, "llvm.exp.f64", f64T)
+            LLVM_INTRINSIC_IMPL(llvm_log_f32, f32T, "llvm.log.f32", f32T)
+            LLVM_INTRINSIC_IMPL(llvm_log_f64, f64T, "llvm.log.f64", f64T)
+            LLVM_INTRINSIC_IMPL(llvm_exp2_f32, f32T, "llvm.exp2.f32", f32T)
+            LLVM_INTRINSIC_IMPL(llvm_exp2_f64, f64T, "llvm.exp2.f64", f64T)
+            LLVM_INTRINSIC_IMPL(llvm_log2_f32, f32T, "llvm.log2.f32", f32T)
+            LLVM_INTRINSIC_IMPL(llvm_log2_f64, f64T, "llvm.log2.f64", f64T)
             LLVM_INTRINSIC_IMPL_BEGIN(custom_fsign_f32, f32T, "custom.fsign.f32", f32T)
                 // (0 < val) - (val < 0)
                 LLVMValueRef val = LLVMGetParam(result, 0);
@@ -11690,6 +11706,10 @@ struct LLVMIRGenerator {
             case OP_FAbs:
             case OP_FSign:
             case OP_Trunc:
+            case OP_Exp:
+            case OP_Log:
+            case OP_Exp2:
+            case OP_Log2:
             case OP_Floor: { READ_VALUE(x);
                 auto T = LLVMTypeOf(x);
                 auto ET = T;
@@ -11705,6 +11725,10 @@ struct LLVMIRGenerator {
                 case OP_FAbs: { op = (ET == f64T)?llvm_fabs_f64:llvm_fabs_f32; } break;
                 case OP_Trunc: { op = (ET == f64T)?llvm_trunc_f64:llvm_trunc_f32; } break;
                 case OP_Floor: { op = (ET == f64T)?llvm_floor_f64:llvm_floor_f32; } break;
+                case OP_Exp: { op = (ET == f64T)?llvm_exp_f64:llvm_exp_f32; } break;
+                case OP_Log: { op = (ET == f64T)?llvm_log_f64:llvm_log_f32; } break;
+                case OP_Exp2: { op = (ET == f64T)?llvm_exp2_f64:llvm_exp2_f32; } break;
+                case OP_Log2: { op = (ET == f64T)?llvm_log2_f64:llvm_log2_f32; } break;
                 case OP_FSign: { op = (ET == f64T)?custom_fsign_f64:custom_fsign_f32; } break;
                 default: break;
                 }

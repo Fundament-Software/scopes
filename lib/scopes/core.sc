@@ -1232,6 +1232,7 @@ syntax-extend
     set-typename-super! real immutable
     set-typename-super! vector immutable
     set-typename-super! Symbol immutable
+    set-typename-super! CEnum immutable
 
     let aggregate = (typename-type "aggregate")
     set-scope-symbol! syntax-scope 'aggregate aggregate
