@@ -3643,6 +3643,14 @@ typefn& CUnion '__new (self)
     let cls = (@ (typeof self))
     store (nullof cls) self
 
+typefn& CUnion '__copy (self other)
+    let other =
+        if ((typeof other) < ref) (load other)
+        else other
+    store other self
+
+typefn& CUnion '__delete (self)
+
 # access reference to union element from pointer/reference
 typefn& CUnion '__getattr (self name)
     let ET = (element-type (typeof self) 0)
@@ -4233,6 +4241,11 @@ typefn& array '__unpack (self)
             self @ i
             result...
 
+typefn& array '__imply (self destT)
+    let ET = (@ (typeof& self))
+    if ((destT < pointer) and ((@ destT) == ET))
+        bitcast self destT
+
 typefn array '__@ (self at)
     let val = (at as integer)
     if (constant? val)
@@ -4481,7 +4494,7 @@ define-macro while
     let cond-expr body = (decons args)
     list breakable-block
         list let 'continue '()
-        list if cond-expr
+        list if (list unconst cond-expr)
             cons do body
             list 'continue
 
