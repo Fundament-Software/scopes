@@ -550,15 +550,32 @@ fn op-prettyname (symbol)
     elseif (icmp== symbol '__-) "subtraction"
     elseif (icmp== symbol '__*) "multiplication"
     elseif (icmp== symbol '__/) "division"
+    elseif (icmp== symbol '__%) "modulo operation"
     elseif (icmp== symbol '__neg) "negation"
     elseif (icmp== symbol '__rcp) "reciprocal"
     elseif (icmp== symbol '__//) "integer division"
+    elseif (icmp== symbol '__>>) "right shift"
+    elseif (icmp== symbol '__<<) "left shift"
+    elseif (icmp== symbol '__&) "bitwise and"
+    elseif (icmp== symbol '__|) "bitwise or"
+    elseif (icmp== symbol '__^) "bitwise xor"
     elseif (icmp== symbol '__==) "equal comparison"
     elseif (icmp== symbol '__!=) "inequality comparison"
     elseif (icmp== symbol '__>=) "greater-than/equal comparison"
     elseif (icmp== symbol '__<=) "less-than/equal comparison"
     elseif (icmp== symbol '__>) "greater-than comparison"
     elseif (icmp== symbol '__<) "less-than comparison"
+    elseif (icmp== symbol '__+=) "in-place addition"
+    elseif (icmp== symbol '__-=) "in-place subtraction"
+    elseif (icmp== symbol '__*=) "in-place multiplication"
+    elseif (icmp== symbol '__/=) "in-place division"
+    elseif (icmp== symbol '__//=) "in-place integer division"
+    elseif (icmp== symbol '__%=) "in-place modulo operation"
+    elseif (icmp== symbol '__>>=) "in-place right shift"
+    elseif (icmp== symbol '__<<=) "in-place left shift"
+    elseif (icmp== symbol '__&=) "in-place bitwise and"
+    elseif (icmp== symbol '__|=) "in-place bitwise or"
+    elseif (icmp== symbol '__^=) "in-place bitwise xor"
     else
         string-join
             Any-repr (Any-wrap symbol)
@@ -728,6 +745,18 @@ fn at (obj key)
             else key
         else key
 let @ = (op2-ltr-multiop at)
+
+let += = (op2-dispatch '__+=)
+let -= = (op2-dispatch '__-=)
+let *= = (op2-dispatch '__*=)
+let /= = (op2-dispatch '__/=)
+let //= = (op2-dispatch '__//=)
+let %= = (op2-dispatch '__%=)
+let >>= = (op2-dispatch '__>>=)
+let <<= = (op2-dispatch '__<<=)
+let &= = (op2-dispatch '__&=)
+let |= = (op2-dispatch '__|=)
+let ^= = (op2-dispatch '__^=)
 
 fn repr
 
@@ -2094,18 +2123,6 @@ fn = (obj value)
     (op2-dispatch '__=) obj value
     return;
 
-fn += (x y) (= x (+ x y))
-fn -= (x y) (= x (- x y))
-fn *= (x y) (= x (* x y))
-fn /= (x y) (= x (/ x y))
-fn //= (x y) (= x (// x y))
-fn %= (x y) (= x (% x y))
-fn >>= (x y) (= x (>> x y))
-fn <<= (x y) (= x (<< x y))
-fn &= (x y) (= x (& x y))
-fn |= (x y) (= x (| x y))
-fn ^= (x y) (= x (^ x y))
-
 define-infix< 50 +=
 define-infix< 50 -=
 define-infix< 50 *=
@@ -2462,6 +2479,34 @@ do
     passthru-overload '__% %
     passthru-overload '__<< <<; passthru-overload '__>> >>
     passthru-overload '__.. ..; passthru-overload '__.. ..
+
+    fn passthru-inplace-overload (methodname fallback)
+        set-type-symbol! ref methodname
+            fn (a b)
+                let ET = (typeof& a)
+                let op ok = (type@& ET methodname)
+                if ok
+                    return (op a b)
+                let op ok = (type@& ET '__deref)
+                if (not ok)
+                    compiler-error!
+                        .. (op-prettyname methodname)
+                            \ " of reference not supported by value of type " (repr ET)
+                    return;
+                = a (fallback a b)
+                true
+
+    passthru-inplace-overload '__+= +
+    passthru-inplace-overload '__-= -
+    passthru-inplace-overload '__*= *
+    passthru-inplace-overload '__/= /
+    passthru-inplace-overload '__//= //
+    passthru-inplace-overload '__%= %
+    passthru-inplace-overload '__>>= >>
+    passthru-inplace-overload '__<<= <<
+    passthru-inplace-overload '__&= &
+    passthru-inplace-overload '__|= |
+    passthru-inplace-overload '__^= ^
 
     fn define-ref-forward (failedf methodname)
         set-type-symbol! ref methodname
