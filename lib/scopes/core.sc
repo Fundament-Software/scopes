@@ -4518,6 +4518,27 @@ define-macro while
             list 'continue
 
 #-------------------------------------------------------------------------------
+# search utilities
+#-------------------------------------------------------------------------------
+
+fn bsearch (arr value)
+    """"binary-search array-like value `arr` for `value`
+    let count = (countof arr)
+    let T = (typeof count)
+    let one = (T 1)
+    loop (lo hi) = (T 0) (count - one)
+    let med = ((lo + hi) >> one)
+    if (lo > hi)
+        return med (unconst false)
+    let at = (arr @ med)
+    if (at == value)
+        return med (unconst true)
+    elseif (value > at)
+        repeat (med + one) hi
+    else
+        repeat lo (med - one)
+
+#-------------------------------------------------------------------------------
 # label utilities
 #-------------------------------------------------------------------------------
 
