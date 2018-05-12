@@ -4369,6 +4369,25 @@ fn range (a b c)
                 fdone;
         unconst from
 
+fn multirange (size...)
+    let dims = (va-countof size...)
+    let size = (* size...)
+    let ET = (typeof size)
+    let one = (ET 1)
+    Generator
+        label (fret fdone x)
+            if (x == size)
+                fdone;
+            else
+                let repeat (i k result...) = 0 x
+                if (i < dims)
+                    let D = (va@ i size...)
+                    let u = (k % D)
+                    repeat (i + 1) ((k - u) // D) ((va-join result...) u)
+                fret (x + one) result...
+        unconst
+            ET 0
+
 fn unroll-range (a b c)
     let num-type = (typeof a)
     let step =
