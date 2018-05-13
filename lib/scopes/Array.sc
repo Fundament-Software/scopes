@@ -253,16 +253,19 @@ typefn Array '__typecall (cls element-type capacity opts...)
         of array elements permitted. If it is undefined, then an initial
         capacity of 16 elements is assumed, which is doubled whenever
         it is exceeded, allowing for an indefinite number of elements.
-    let memory =
-        va@ 'memory opts...
-    let memory =
-        if (none? memory) HeapMemory
-        else memory
-    if (none? capacity)
-        VariableMutableArray element-type memory
+    if (cls == Array)
+        let memory =
+            va@ 'memory opts...
+        let memory =
+            if (none? memory) HeapMemory
+            else memory
+        if (none? capacity)
+            VariableMutableArray element-type memory
+        else
+            assert (constant? capacity) "capacity must be constant"
+            FixedMutableArray element-type (capacity as usize) memory
     else
-        assert (constant? capacity) "capacity must be constant"
-        FixedMutableArray element-type (capacity as usize) memory
+        compiler-error! "arrays can not be constructed as immutable"
 
 do
     let Array FixedArray GrowingArray

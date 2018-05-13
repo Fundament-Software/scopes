@@ -1,6 +1,7 @@
 
 fn do_something ()
-    assert false
+    # cause a runtime error
+    assert (unconst false)
 
 fn mul-zero-aware (a b)
     if (((constant? a) and (a == 0)) or ((constant? b) and (b == 0)))
