@@ -3815,7 +3815,7 @@ define-scope-macro struct
             return
                 cons
                     list let 'field-types '=
-                        list append-arg 'field-types (list lhs '= (list unknownof rhs))
+                        list append-arg 'field-types (list lhs '= rhs)
                     next-expr
                 syntax-scope
         define-macro method
@@ -4081,7 +4081,7 @@ fn tupleof (...)
         let i = (sub i 1)
         let T = (va@ i ...)
         let key = (va@ i keys...)
-        loop i (va-key key (unconst T)) result...
+        loop i (va-key key (typeof T)) result...
     else
         # build tuple
         let loop (i result) = 0 (nullof (tuple result...))

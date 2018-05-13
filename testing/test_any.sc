@@ -8,7 +8,7 @@ do
                 unconst 2
                 3
     let tupleT =
-        tuple (unknownof i32) (unknownof i32) (unknownof i32)
+        tuple i32 i32 i32
     assert (('typeof val) == tupleT)
     let val = (val as tupleT)
     assert ((val @ 0) == 1)

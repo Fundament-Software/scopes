@@ -2883,6 +2883,7 @@ static StyledStream& operator<<(StyledStream& ost, Argument value) {
 }
 
 typedef std::vector<Argument> Args;
+typedef std::vector<const Type *> ArgTypes;
 
 struct TupleType : StorageType {
     static bool classof(const Type *T) {
@@ -2979,8 +2980,8 @@ struct TupleType : StorageType {
     }
 
     Args values;
+    ArgTypes types;
     bool packed;
-    std::vector<const Type *> types;
     std::vector<size_t> offsets;
 };
 
@@ -3041,7 +3042,7 @@ static const Type *MixedTuple(const Args &values,
     }
 }
 
-static const Type *Tuple(const std::vector<const Type *> &types,
+static const Type *Tuple(const ArgTypes &types,
     bool packed = false, size_t alignment = 0) {
     Args args;
     args.reserve(types.size());
@@ -3124,7 +3125,7 @@ struct UnionType : StorageType {
     }
 
     Args values;
-    std::vector<const Type *> types;
+    ArgTypes types;
     size_t largest_field;
     const Type *tuple_type;
 };
@@ -3174,7 +3175,7 @@ static const Type *MixedUnion(const Args &values) {
     }
 }
 
-static const Type *Union(const std::vector<const Type *> &types) {
+static const Type *Union(const ArgTypes &types) {
     Args args;
     args.reserve(types.size());
     for (size_t i = 0; i < types.size(); ++i) {
@@ -3299,7 +3300,7 @@ struct ReturnLabelType : Type {
         _name = ss.str();
 
         {
-            std::vector<const Type *> rettypes;
+            ArgTypes rettypes;
             // prune constants
             for (size_t i = 0; i < values.size(); ++i) {
                 if (is_unknown(values[i].value)) {
@@ -3450,12 +3451,12 @@ struct FunctionType : Type {
     }
 
     const Type *return_type;
-    std::vector<const Type *> argument_types;
+    ArgTypes argument_types;
     uint32_t flags;
 };
 
 static const Type *Function(const Type *return_type,
-    const std::vector<const Type *> &argument_types, uint32_t flags = 0) {
+    const ArgTypes &argument_types, uint32_t flags = 0) {
     static TypeFactory<FunctionType> functions;
     if (return_type->kind() != TK_ReturnLabel) {
         if (return_type == TYPE_Void) {
@@ -5999,7 +6000,7 @@ public:
             }
         }
 
-        std::vector<const Type *> argtypes;
+        ArgTypes argtypes;
         for (size_t i = 1; i < params.size(); ++i) {
             auto T = params[i]->type;
             if (T == TYPE_Unknown) {
@@ -6025,7 +6026,7 @@ public:
 
     const Type *get_function_type() const {
 
-        std::vector<const Type *> argtypes;
+        ArgTypes argtypes;
         for (size_t i = 1; i < params.size(); ++i) {
             argtypes.push_back(params[i]->type);
         }
@@ -7125,8 +7126,6 @@ static Label *fold_type_label_single(Frame *parent, Label *label, const Args &ar
     return newlabel;
 }
 
-typedef std::vector<const Type *> ArgTypes;
-
 static Label *typify_single(Frame *frame, Label *label, const ArgTypes &argtypes) {
     assert(!label->params.empty());
 
@@ -7529,7 +7528,7 @@ public:
         sz = (sz + 7) / 8;
         al = (al + 7) / 8;
         assert (sz > al);
-        std::vector<const Type *> fields;
+        ArgTypes fields;
         const Type *TB = Integer(al * 8, false);
         fields.push_back(TB);
         size_t pad = sz - al;
@@ -7687,7 +7686,7 @@ public:
 
         uint64_t flags = 0;
 
-        std::vector<const Type *> argtypes;
+        ArgTypes argtypes;
 
         const clang::FunctionProtoType * proto = f->getAs<clang::FunctionProtoType>();
         if(proto) {
@@ -10418,7 +10417,7 @@ struct LLVMIRGenerator {
     std::unordered_map<SourceFile *, LLVMValueRef> file2value;
     std::unordered_map< ParamKey, LLVMValueRef, HashFuncParamPair> param2value;
     static std::unordered_map<const Type *, LLVMTypeRef> type_cache;
-    static std::vector<const Type *> type_todo;
+    static ArgTypes type_todo;
 
     std::unordered_map<Any, LLVMValueRef, Any::Hash> extern2global;
     std::unordered_map<void *, LLVMValueRef> ptr2global;
@@ -12196,7 +12195,7 @@ struct LLVMIRGenerator {
 };
 
 std::unordered_map<const Type *, LLVMTypeRef> LLVMIRGenerator::type_cache;
-std::vector<const Type *> LLVMIRGenerator::type_todo;
+ArgTypes LLVMIRGenerator::type_todo;
 LLVMTypeRef LLVMIRGenerator::voidT = nullptr;
 LLVMTypeRef LLVMIRGenerator::i1T = nullptr;
 LLVMTypeRef LLVMIRGenerator::i8T = nullptr;
@@ -14877,7 +14876,7 @@ struct Solver {
         } break;
         case FN_FunctionType: {
             CHECKARGS(1, -1);
-            std::vector<const Type *> types;
+            ArgTypes types;
             size_t k = 2;
             while (k < args.size()) {
                 if (args[k].value.type != TYPE_Type)
@@ -14909,6 +14908,7 @@ struct Solver {
             CHECKARGS(0, -1);
             Args values;
             for (size_t i = 1; i < args.size(); ++i) {
+#if 0
                 if (args[i].value.is_const()) {
                     values.push_back(args[i]);
                 } else {
@@ -14916,6 +14916,11 @@ struct Solver {
                         Argument(args[i].key,
                             unknown_of(args[i].value.indirect_type())));
                 }
+#else
+                values.push_back(
+                    Argument(args[i].key,
+                        unknown_of(args[i].value)));
+#endif
             }
             RETARGS(MixedTuple(values));
         } break;
@@ -14923,6 +14928,7 @@ struct Solver {
             CHECKARGS(0, -1);
             Args values;
             for (size_t i = 1; i < args.size(); ++i) {
+#if 0
                 if (args[i].value.is_const()) {
                     location_error(String::from("all union type arguments must be non-constant"));
                     //values.push_back(args[i]);
@@ -14931,6 +14937,11 @@ struct Solver {
                         Argument(args[i].key,
                             unknown_of(args[i].value.indirect_type())));
                 }
+#else
+                values.push_back(
+                    Argument(args[i].key,
+                        unknown_of(args[i].value)));
+#endif
             }
             RETARGS(MixedUnion(values));
         } break;
@@ -17985,7 +17996,7 @@ static void f_del_scope_symbol(Scope *scope, Symbol sym) {
 }
 
 static Label *f_typify(Closure *srcl, int numtypes, const Type **typeargs) {
-    std::vector<const Type *> types;
+    ArgTypes types;
     for (int i = 0; i < numtypes; ++i) {
         types.push_back(typeargs[i]);
 
