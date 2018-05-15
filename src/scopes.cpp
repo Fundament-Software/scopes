@@ -11304,6 +11304,22 @@ struct LLVMIRGenerator {
         }
     }
 
+    LLVMValueRef build_matching_constant_real_vector(LLVMValueRef value, double c) {
+        auto T = LLVMTypeOf(value);
+        if (LLVMGetTypeKind(T) == LLVMVectorTypeKind) {
+            unsigned count = LLVMGetVectorSize(T);
+            auto ET = LLVMGetElementType(T);
+            LLVMValueRef one = LLVMConstReal(ET, c);
+            LLVMValueRef values[count];
+            for (unsigned i = 0; i < count; ++i) {
+                values[i] = one;
+            }
+            return LLVMConstVector(values, count);
+        } else {
+            return LLVMConstReal(T, c);
+        }
+    }
+
     void write_label_body(Label *label) {
     repeat:
         if (!label->body.is_complete()) {
@@ -11597,20 +11613,7 @@ struct LLVMIRGenerator {
                 READ_VALUE(a);
                 READ_VALUE(b);
                 READ_VALUE(x);
-                auto T = LLVMTypeOf(a);
-                LLVMValueRef one;
-                if (LLVMGetTypeKind(T) == LLVMVectorTypeKind) {
-                    unsigned count = LLVMGetVectorSize(T);
-                    auto ET = LLVMGetElementType(T);
-                    one = LLVMConstReal(ET, 1.0);
-                    LLVMValueRef values[count];
-                    for (unsigned i = 0; i < count; ++i) {
-                        values[i] = one;
-                    }
-                    one = LLVMConstVector(values, count);
-                } else {
-                    one = LLVMConstReal(T, 1.0);
-                }
+                LLVMValueRef one = build_matching_constant_real_vector(a, 1.0);
                 auto invx = LLVMBuildFSub(builder, one, x, "");
                 retvalue = LLVMBuildFAdd(builder,
                     LLVMBuildFMul(builder, a, invx, ""),
@@ -11667,6 +11670,17 @@ struct LLVMIRGenerator {
                     LLVMBuildFMul(builder, a, b120, ""),
                     LLVMBuildFMul(builder, b, a120, ""), "");
                 retvalue = LLVMBuildShuffleVector(builder, retvalue, retvalue, v120, "");
+            } break;
+            case OP_Step: {
+                // select (lhs < rhs) (T 1) (T 0)
+                READ_VALUE(a);
+                READ_VALUE(b);
+                LLVMValueRef one = build_matching_constant_real_vector(a, 1.0);
+                LLVMValueRef zero = build_matching_constant_real_vector(b, 0.0);
+                retvalue = LLVMBuildSelect(
+                    builder,
+                    LLVMBuildFCmp(builder, LLVMRealOLT, a, b, ""),
+                    one, zero, "");
             } break;
             // binops
             case OP_Pow: {

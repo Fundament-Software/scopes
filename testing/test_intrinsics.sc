@@ -70,3 +70,14 @@ assert ((fmix -1.0 1.0 (unconst 0.75)) == 0.5)
 assert
     all?
         ((fmix (vectorof f32 1.0 -1.0) (vectorof f32 -1.0 1.0) (unconst (vectorof f32 0.75 0.75))) == (vectorof f32 -0.5 0.5))
+
+assert ((step 0.0 0.5) == 1.0)
+assert
+    all?
+        ((step (vectorof f32 0.0 1.0) (vectorof f32 0.5 0.5)) == (vectorof f32 1.0 0.0))
+
+assert ((step (unconst 0.0) 0.5) == 1.0)
+assert
+    all?
+        ((step (vectorof f32 (unconst 0.0) 1.0) (vectorof f32 0.5 0.5)) == (vectorof f32 1.0 0.0))
+
