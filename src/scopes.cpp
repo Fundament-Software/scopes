@@ -3666,13 +3666,13 @@ struct SampledImageType : Type {
     }
 
     SampledImageType(const Type *_type) :
-        Type(TK_SampledImage), type(_type) {
+        Type(TK_SampledImage), type(cast<ImageType>(_type)) {
         auto ss = StyledString::plain();
         ss.out << "<SampledImage " <<  _type->name()->data << ">";
         _name = ss.str();
     }
 
-    const Type *type; // image type
+    const ImageType *type; // image type
 };
 
 static const Type *SampledImage(const Type *_type) {
@@ -9073,6 +9073,15 @@ struct SPIRVGenerator {
         return true;
     }
 
+    spv::Id build_extract_image(spv::Id value) {
+        spv::Id typeId = builder.getTypeId(value);
+        if (builder.isSampledImageType(typeId)) {
+            spv::Id imgtypeId = builder.getImageType(value);
+            return builder.createUnaryOp(spv::OpImage, imgtypeId, value);
+        }
+        return value;
+    }
+
     void write_label_body(Label *label) {
     repeat:
         assert(label->body.is_complete());
@@ -9174,7 +9183,7 @@ struct SPIRVGenerator {
                 READ_VALUE(sampler);
                 spv::Builder::TextureParameters params;
                 memset(&params, 0, sizeof(params));
-                params.sampler = sampler;
+                params.sampler = build_extract_image(sampler);
                 spv::Op op = spv::OpImageQuerySize;
                 while (argn <= argcount) {
                     READ_VALUE(value);
@@ -9184,11 +9193,6 @@ struct SPIRVGenerator {
                             params.lod = value; break;
                         default: break;
                     }
-                }
-                auto ST = storage_type(_sampler.indirect_type());
-                if ((ST->kind() == TK_SampledImage) && (params.lod == 0)) {
-                    op = spv::OpImageQuerySizeLod;
-                    params.lod = builder.makeIntConstant(0);
                 }
                 retvalue = builder.createTextureQueryCall(op, params, false);
             } break;
@@ -9206,7 +9210,7 @@ struct SPIRVGenerator {
                 READ_VALUE(sampler);
                 spv::Builder::TextureParameters params;
                 memset(&params, 0, sizeof(params));
-                params.sampler = sampler;
+                params.sampler = build_extract_image(sampler);
                 retvalue = builder.createTextureQueryCall(
                     spv::OpImageQueryLevels, params, false);
             } break;
@@ -9214,7 +9218,7 @@ struct SPIRVGenerator {
                 READ_VALUE(sampler);
                 spv::Builder::TextureParameters params;
                 memset(&params, 0, sizeof(params));
-                params.sampler = sampler;
+                params.sampler = build_extract_image(sampler);
                 retvalue = builder.createTextureQueryCall(
                     spv::OpImageQuerySamples, params, false);
             } break;

@@ -2263,22 +2263,36 @@ fn format-type-signature (types...)
     an error message to the error function, along with all previously attempted
     type signature constructors to the error function.
 fn chain-fn-dispatch2 (f1 f2)
-    fn "with-error-fn" (f-error)
-        fn (args...)
-            call
-                f1
-                    fn (msgf get-types1)
-                        call
-                            f2
-                                fn (msgf get-types...)
-                                    f-error
-                                        fn ()
-                                            .. "could not match arguments of types "
-                                                format-type-signature (va-types args...)
-                                                "to function"
-                                        \ get-types1 get-types...
-                            args...
-                args...
+    if (none? f2)
+        fn "with-error-fn" (f-error)
+            fn (args...)
+                call
+                    f1
+                        fn (msgf get-types...)
+                            f-error
+                                fn ()
+                                    .. "could not match arguments of types "
+                                        format-type-signature (va-types args...)
+                                        "to function"
+                                \ get-types...
+                    args...
+    else
+        fn "with-error-fn" (f-error)
+            fn (args...)
+                call
+                    f1
+                        fn (msgf get-types1)
+                            call
+                                f2
+                                    fn (msgf get-types...)
+                                        f-error
+                                            fn ()
+                                                .. "could not match arguments of types "
+                                                    format-type-signature (va-types args...)
+                                                    "to function"
+                                            \ get-types1 get-types...
+                                args...
+                    args...
 # same as the previous function, but takes an arbitrary number of arguments
 define chain-fn-dispatch (op2-rtl-multiop chain-fn-dispatch2)
 

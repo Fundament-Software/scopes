@@ -49,8 +49,10 @@ syntax-extend
 
     fn vector->vec-type (v)
         let T = (typeof v)
-        bitcast v
-            vec-type (@ T) (countof T)
+        if (T < vector)
+            bitcast v
+                vec-type (@ T) (countof T)
+        else v
 
     fn make-gsampler (postfix dim arrayed ms coords)
         let T = (typename (.. "gsampler" postfix) gsampler)
@@ -101,14 +103,17 @@ syntax-extend
                     sample sampler P
                         Lod = lod
         set-type-symbol! T 'texture-size
-            fn... texture-size
-                (sampler : T)
-                    vector->vec-type
-                        Image-query-size sampler
-                (sampler : T, lod : i32)
-                    vector->vec-type
-                        Image-query-size sampler
-                            Lod = lod
+            if fetch-has-lod-arg
+                fn... texture-size
+                    (sampler : T, lod : i32)
+                        vector->vec-type
+                            Image-query-size sampler
+                                Lod = lod
+            else
+                fn... texture-size
+                    (sampler : T)
+                        vector->vec-type
+                            Image-query-size sampler
         set-type-symbol! T 'texture-query-lod
             fn... texture-query-lod
                 (sampler : T, P : fcoordT)
