@@ -11672,15 +11672,15 @@ struct LLVMIRGenerator {
                 retvalue = LLVMBuildShuffleVector(builder, retvalue, retvalue, v120, "");
             } break;
             case OP_Step: {
-                // select (lhs < rhs) (T 1) (T 0)
+                // select (lhs > rhs) (T 0) (T 1)
                 READ_VALUE(a);
                 READ_VALUE(b);
                 LLVMValueRef one = build_matching_constant_real_vector(a, 1.0);
                 LLVMValueRef zero = build_matching_constant_real_vector(b, 0.0);
                 retvalue = LLVMBuildSelect(
                     builder,
-                    LLVMBuildFCmp(builder, LLVMRealOLT, a, b, ""),
-                    one, zero, "");
+                    LLVMBuildFCmp(builder, LLVMRealOGT, a, b, ""),
+                    zero, one, "");
             } break;
             // binops
             case OP_Pow: {
