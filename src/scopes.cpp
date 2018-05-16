@@ -9272,6 +9272,10 @@ struct SPIRVGenerator {
             case OP_Floor:
             case OP_FAbs:
             case OP_FSign:
+            case OP_Log:
+            case OP_Log2:
+            case OP_Exp:
+            case OP_Exp2:
             case OP_Sqrt: {
                 READ_VALUE(val);
                 GLSLstd450 builtin = GLSLstd450Bad;
@@ -9292,6 +9296,10 @@ struct SPIRVGenerator {
                 case OP_FAbs: builtin = GLSLstd450FAbs; break;
                 case OP_FSign: builtin = GLSLstd450FSign; break;
                 case OP_Sqrt: builtin = GLSLstd450Sqrt; break;
+                case OP_Log: builtin = GLSLstd450Log; break;
+                case OP_Log2: builtin = GLSLstd450Log2; break;
+                case OP_Exp: builtin = GLSLstd450Exp; break;
+                case OP_Exp2: builtin = GLSLstd450Exp2; break;
                 default: {
                     StyledString ss;
                     ss.out << "IL->SPIR: unsupported unary intrinsic " << enter << " encountered";
