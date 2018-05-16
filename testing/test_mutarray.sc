@@ -100,3 +100,19 @@ do
     'sort a
     for i k in (enumerate (va-each "" "dog" "is" "this" "yes"))
         assert ((a @ i) == k)
+
+
+fn test-sort ()
+    let a = (local (Array i32))
+    let N = 30000
+    for i in (range N)
+        'append a
+            if ((i % 2) == 0)
+                i
+            else
+                N - i
+    print "sorting big array..."
+    'sort a
+    print "done."
+
+test-sort;

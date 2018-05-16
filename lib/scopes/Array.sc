@@ -12,6 +12,14 @@ let GrowingArray = (typename "GrowingArray")
 set-typename-super! FixedArray Array
 set-typename-super! GrowingArray Array
 
+fn swap (a b)
+    let t =
+        (alloca (typeof& b)) as ref
+    move-construct t b
+    move-construct b a
+    move-construct a t
+    return;
+
 fn define-common-array-methods (T)
     typefn& T '__as (self T)
         if (T == Generator)
@@ -34,33 +42,44 @@ fn define-common-array-methods (T)
         (getelementptr (deref self._items) index) as ref
 
     typefn& T 'sort (self key)
-        let count = (deref self._count)
-        let items = (deref self._items)
-        let outer () =
-        let inner (i swapped) = (unconst 1:usize) (unconst false)
-        if (i < count)
-            let a =
-                (getelementptr items (sub i 1:usize)) as ref
-            let b =
-                (getelementptr items i) as ref
-            let a-key =
-                if (none? key) a
-                else (key a)
-            let b-key =
-                if (none? key) b
-                else (key b)
-            let swapped =
-                if (a-key > b-key)
-                    let t = (local 'copy b)
-                    b = a
-                    a = t
-                    true
-                else
-                    swapped
-            inner (add i 1:usize) swapped
-        elseif swapped
-            outer;
-        return;
+        let key =
+            if (none? key)
+                fn (x) x
+            else key
+
+        fn partition (self lo hi)
+            let items = (deref self._items)
+            let pivot =
+                (getelementptr items hi) as ref
+            let pivot-key = (key pivot)
+            let i =
+                local 'copy (sub lo 1:i64)
+            loop (j) = lo
+            if (j < hi)
+                let o_j =
+                    (getelementptr items j) as ref
+                if ((key o_j) < pivot-key)
+                    i += 1:i64
+                    let o_i =
+                        (getelementptr items (deref i)) as ref
+                    swap o_i o_j
+                repeat (j + 1:i64)
+            let o_i =
+                (getelementptr items (i + 1:i64)) as ref
+            let o_j =
+                (getelementptr items hi) as ref
+            swap o_i o_j
+            i + 1:i64
+
+        fn quicksort (self lo hi)
+            if (lo >= hi)
+                return;
+            let p =
+                partition self lo hi
+            quicksort self lo (p - 1:i64)
+            quicksort self (p + 1:i64) hi
+
+        quicksort self 0:i64 ((deref self._count) as i64 - 1:i64)
 
     fn append-slots (self n)
         let idx = (deref self._count)
