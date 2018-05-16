@@ -20,6 +20,14 @@ fn swap (a b)
     move-construct a t
     return;
 
+fn iParent (i)
+    (i - 1:i64) // 2
+
+fn iLeftChild (i)
+    2:i64 * i + 1:i64
+fn iRightChild (i)
+    2:i64 * i + 2:i64
+
 fn define-common-array-methods (T)
     typefn& T '__as (self T)
         if (T == Generator)
@@ -46,40 +54,55 @@ fn define-common-array-methods (T)
             if (none? key)
                 fn (x) x
             else key
+        assert (constant? key)
 
-        fn partition (self lo hi)
-            let items = (deref self._items)
-            let pivot =
-                (getelementptr items hi) as ref
-            let pivot-key = (key pivot)
-            let i =
-                local 'copy (sub lo 1:i64)
-            loop (j) = lo
-            if (j < hi)
-                let o_j =
-                    (getelementptr items j) as ref
-                if ((key o_j) < pivot-key)
-                    i += 1:i64
-                    let o_i =
-                        (getelementptr items (deref i)) as ref
-                    swap o_i o_j
-                repeat (j + 1:i64)
-            let o_i =
-                (getelementptr items (i + 1:i64)) as ref
-            let o_j =
-                (getelementptr items hi) as ref
-            swap o_i o_j
-            i + 1:i64
+        let count = ((deref self._count) as i64)
+        let items = (deref self._items)
 
-        fn quicksort (self lo hi)
-            if (lo >= hi)
-                return;
-            let p =
-                partition self lo hi
-            quicksort self lo (p - 1:i64)
-            quicksort self (p + 1:i64) hi
+        fn siftDown (start end)
+            loop (root) = start
+            if ((iLeftChild root) <= end)
+                let child = (iLeftChild root)
+                let v_root = ((getelementptr items root) as ref)
+                let k_root = (key v_root)
+                let v_child = ((getelementptr items child) as ref)
+                let k_child = (key v_child)
+                label step2 (iswap v_swap k_swap)
+                    if (iswap == root)
+                        return;
+                    swap v_root v_swap
+                    repeat iswap
+                label step1 (iswap v_swap k_swap)
+                    let child1 = (child + 1:i64)
+                    if (child1 <= end)
+                        let v_child1 = ((getelementptr items child1) as ref)
+                        let k_child1 = (key v_child1)
+                        if (k_swap < k_child1)
+                            step2 child1 v_child1 k_child1
+                    step2 iswap v_swap k_swap
+                if (k_root < k_child)
+                    step1 child v_child k_child
+                else
+                    step1 root v_root k_root
 
-        quicksort self 0:i64 ((deref self._count) as i64 - 1:i64)
+        let count-1 = (count - 1:i64)
+
+        fn heapify ()
+            loop (start) =
+                iParent count-1
+            if (start >= 0:i64)
+                siftDown start count-1
+                repeat (start - 1:i64)
+
+        heapify;
+        loop (end) = count-1
+        if (end > 0:i64)
+            let v_0 = ((getelementptr items 0) as ref)
+            let v_end = ((getelementptr items end) as ref)
+            swap v_0 v_end
+            let end = (end - 1:i64)
+            siftDown 0:i64 end
+            repeat end
 
     fn append-slots (self n)
         let idx = (deref self._count)

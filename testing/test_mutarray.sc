@@ -104,7 +104,7 @@ do
 
 fn test-sort ()
     let a = (local (Array i32))
-    let N = 30000
+    let N = 1000000
     for i in (range N)
         'append a
             if ((i % 2) == 0)
@@ -114,5 +114,12 @@ fn test-sort ()
     print "sorting big array..."
     'sort a
     print "done."
+    # verify the array is sorted
+    let x =
+        local 'copy (deref (a @ 0))
+    for k in a
+        let x1 = (deref k)
+        assert (x1 >= x)
+        x = x1
 
 test-sort;
