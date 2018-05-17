@@ -245,6 +245,21 @@ set-type-symbol! vec-type '__//
                     sdiv a b
                 else
                     udiv a b
+set-type-symbol! vec-type '__&
+    vec-type-binop
+        fn (ET a b)
+            if (ET < integer)
+                band a b
+set-type-symbol! vec-type '__|
+    vec-type-binop
+        fn (ET a b)
+            if (ET < integer)
+                bor a b
+set-type-symbol! vec-type '__^
+    vec-type-binop
+        fn (ET a b)
+            if (ET < integer)
+                bxor a b
 set-type-symbol! vec-type '__%
     vec-type-binop
         fn (ET a b)
