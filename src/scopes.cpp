@@ -8986,6 +8986,56 @@ struct SPIRVGenerator {
     // set of processed SCC groups
     std::unordered_set<size_t> handled_loops;
 
+    Label *lowest_common_ancestor(Label *a, Label *b, bool verbose = false) {
+        // walk both labels simultaneously and stop as soon as we find a
+        // collision with the other label's set
+        std::unordered_set<Label *> done[2];
+        Label *labels[2] = { a, b };
+        while (labels[0] || labels[1]) {
+            for (int i = 0; i < 2; ++i) {
+                Label *l = labels[i];
+                if (!l)
+                    continue;
+                if (!done[i].count(l)) {
+                    if (verbose) {
+                        StyledStream ss;
+                        ss << "argument " << i << std::endl;
+                        StreamLabelFormat fmt = StreamLabelFormat::single();
+                        fmt.anchors = StreamLabelFormat::Line;
+                        stream_label(ss, l, fmt);
+                    }
+                    if (done[(i+1)&1].count(l)) {
+                        return l;
+                    }
+                    done[i].insert(l);
+                    assert (l->is_basic_block_like());
+                    auto &&enter = l->body.enter;
+                    auto &&args = l->body.args;
+                    if ((enter.type == TYPE_Builtin)
+                        && (enter.builtin.value() == FN_Branch)) {
+                        assert(args.size() >= 4);
+                        Label *then_label = args[2].value;
+                        //Label *else_label = args[3].value;
+                        labels[i] = then_label;
+                        continue;
+                    } else if (!l->is_jumping()) {
+                        Any arg = l->body.args[0].value;
+                        if (arg.type == TYPE_Label) {
+                            labels[i] = arg;
+                            continue;
+                        }
+                    } else if (enter.type == TYPE_Label) {
+                        labels[i] = enter;
+                        continue;
+                    }
+                }
+                labels[i] = nullptr;
+            }
+        }
+
+        return nullptr;
+    }
+
     bool handle_loop_label (Label *label,
         Label *&continue_label,
         Label *&break_label) {
@@ -9002,6 +9052,7 @@ struct SPIRVGenerator {
         Label *header_label = label;
         continue_label = nullptr;
         break_label = nullptr;
+        std::unordered_set<Label *> break_labels;
         size_t count = labels.size();
         for (size_t i = 0; i < count; ++i) {
             Label *l = labels[i];
@@ -9026,33 +9077,59 @@ struct SPIRVGenerator {
                 assert(args.size() >= 4);
                 Label *then_label = args[2].value;
                 Label *else_label = args[3].value;
-                Label *result = nullptr;
                 if (scc.group_id(then_label) != group.index) {
-                    result = then_label;
+                    break_labels.insert(then_label);
                 } else if (scc.group_id(else_label) != group.index) {
-                    result = else_label;
-                }
-                if (result) {
-                    if (break_label && (break_label != result)) {
-                        StyledStream ss;
-                        ss << header_label->anchor << " for this loop" << std::endl;
-                        ss << break_label->anchor << " previous break is here" << std::endl;
-                        //stream_label(ss, break_label, StreamLabelFormat::debug_single());
-                        //stream_label(ss, result, StreamLabelFormat::debug_single());
-                        set_active_anchor(result->anchor);
-                        location_error(String::from(
-                            "IL->SPIR: duplicate break label found. only one break label is permitted per loop"));
-                    }
-                    break_label = result;
+                    break_labels.insert(else_label);
                 }
             }
         }
         assert(continue_label);
         assert(continue_label->is_basic_block_like());
-        if (!break_label) {
+        if (break_labels.empty()) {
             location_error(String::from(
                 "IL->SPIR: loop is infinite"));
         }
+
+        if (break_labels.size() > 1) {
+            Label *lca = nullptr;
+            for (auto label : break_labels) {
+                if (!lca) {
+                    lca = label;
+                } else {
+                    lca = lowest_common_ancestor(lca, label);
+                    if (!lca)
+                        break;
+                }
+            }
+            if (!lca) {
+                StyledStream ss;
+                ss << header_label->anchor << " for this loop" << std::endl;
+                for (auto label : break_labels) {
+                    ss << label->anchor << " found exit point" << std::endl;
+                    label->anchor->stream_source_line(ss);
+                    if (!lca) {
+                        lca = label;
+                    } else {
+                        Label *old_lca = lca;
+                        lca = lowest_common_ancestor(lca, label);
+                        if (lca) {
+                            ss << lca->anchor << " found merge candidate" << std::endl;
+                            lca->anchor->stream_source_line(ss);
+                        } else {
+                            ss << label->anchor << " but exits function" << std::endl;
+                            lca = old_lca;
+                        }
+                    }
+                }
+                location_error(String::from(
+                    "IL->SPIR: cannot merge multiple loop exit points."));
+            }
+            break_label = lca;
+        } else {
+            break_label = *break_labels.begin();
+        }
+
         assert(break_label->is_basic_block_like());
         #if 0
         StyledStream ss;
