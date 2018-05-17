@@ -829,7 +829,10 @@ fn select-op (T sop fop)
     if (type== (superof T) integer) sop
     elseif (type== (superof T) real) fop
     else
-        compiler-error! "invalid argument type; integer or real vector or scalar expected"
+        compiler-error!
+            string-join "invalid argument type: "
+                string-join (Any-repr (Any-wrap T))
+                    ". integer or real vector or scalar expected"
 
 fn sabs (x)
     let zero = ((typeof x) 0)
