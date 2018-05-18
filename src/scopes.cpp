@@ -2839,7 +2839,7 @@ static void verify_vector_sizes(const Type *type1, const Type *type2) {
         }
     }
     StyledString ss;
-    ss.out << "operands must be vector of same size or scalar";
+    ss.out << "operands must be of scalar type or vector type of equal size";
     location_error(ss.str());
 }
 
@@ -9328,6 +9328,14 @@ struct SPIRVGenerator {
                 READ_VALUE(cond);
                 READ_VALUE(then_value);
                 READ_VALUE(else_value);
+                if (builder.isScalar(cond) && builder.isVector(then_value)) {
+                    // emulate LLVM's behavior for selecting full vectors with single booleans
+                    spv::Id elementT = builder.getTypeId(cond);
+                    spv::Id vectorT = builder.getTypeId(then_value);
+
+                    cond = builder.smearScalar(spv::NoPrecision, cond,
+                        builder.makeVectorType(elementT, builder.getNumTypeComponents(vectorT)));
+                }
                 retvalue = builder.createTriOp(spv::OpSelect,
                     builder.getTypeId(then_value), cond,
                     then_value, else_value);
@@ -14147,11 +14155,12 @@ struct Solver {
             } else {
                 auto T1 = storage_type(args[1].value.indirect_type());
                 auto T2 = storage_type(args[2].value.indirect_type());
+                auto T3 = storage_type(args[3].value.indirect_type());
                 verify_bool_vector(T1);
                 if (T1->kind() == TK_Vector) {
                     verify_vector_sizes(T1, T2);
                 }
-                verify(args[2].value.indirect_type(), args[3].value.indirect_type());
+                verify(T2, T3);
                 RETARGTYPES(args[2].value.indirect_type());
             }
         } break;
