@@ -9252,6 +9252,9 @@ struct SPIRVGenerator {
                         default: break;
                     }
                 }
+                if (fetch) {
+                    params.sampler = build_extract_image(sampler);
+                }
                 retvalue = builder.createTextureCall(
                     spv::NoPrecision, resultType, sparse, fetch, proj, gather,
                     explicitLod, params);
