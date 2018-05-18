@@ -180,8 +180,8 @@ project "scopes"
             --"-rdynamic",
 
             THISDIR .. "/libffi/.libs/libffi.a",
-            THISDIR .. "/SPIRV-Tools/build/source/libSPIRV-Tools.a",
             THISDIR .. "/SPIRV-Tools/build/source/opt/libSPIRV-Tools-opt.a",
+            THISDIR .. "/SPIRV-Tools/build/source/libSPIRV-Tools.a"
         }
         linkoptions(LLVM_LDFLAGS)
         linkoptions {
@@ -268,8 +268,8 @@ project "scopes"
             "-Wl,--stack,8388608"
         }
         linkoptions {
-            THISDIR .. "/SPIRV-Tools/build/source/libSPIRV-Tools.a",
             THISDIR .. "/SPIRV-Tools/build/source/opt/libSPIRV-Tools-opt.a",
+            THISDIR .. "/SPIRV-Tools/build/source/libSPIRV-Tools.a"
         }
         linkoptions(LLVM_LDFLAGS)
         linkoptions {
@@ -340,8 +340,8 @@ project "scopes"
 
         linkoptions {
             THISDIR .. "/libffi/lib/libffi.a",
-            THISDIR .. "/SPIRV-Tools/build/source/libSPIRV-Tools.a",
             THISDIR .. "/SPIRV-Tools/build/source/opt/libSPIRV-Tools-opt.a",
+            THISDIR .. "/SPIRV-Tools/build/source/libSPIRV-Tools.a"
         }
 
         linkoptions(LLVM_LDFLAGS)
