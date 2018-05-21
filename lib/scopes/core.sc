@@ -2491,11 +2491,12 @@ do
     passthru-overload '__> >; passthru-overload '__>= >=
     passthru-overload '__& &; passthru-overload '__| |; passthru-overload '__^ ^
     passthru-overload '__+ +; passthru-overload '__- -
-    passthru-overload '__/ /; passthru-overload '__/ /
-    passthru-overload '__// //; passthru-overload '__// //
+    passthru-overload '__* *; passthru-overload '__/ /
+    passthru-overload '__** **
+    passthru-overload '__// //
     passthru-overload '__% %
     passthru-overload '__<< <<; passthru-overload '__>> >>
-    passthru-overload '__.. ..; passthru-overload '__.. ..
+    passthru-overload '__.. ..
 
     fn passthru-inplace-overload (methodname fallback)
         set-type-symbol! ref methodname

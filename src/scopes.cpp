@@ -8773,6 +8773,10 @@ struct SPIRVGenerator {
         return spv::StorageClassMax;
     }
 
+    bool parameter_is_bound(Parameter *param) {
+        return param2value.find({active_function_value, param}) != param2value.end();
+    }
+
     spv::Id argument_to_value(Any value) {
         if (value.type == TYPE_Parameter) {
             auto it = param2value.find({active_function_value, value.parameter});
@@ -9086,9 +9090,20 @@ struct SPIRVGenerator {
         }
         assert(continue_label);
         assert(continue_label->is_basic_block_like());
+
         if (break_labels.empty()) {
             location_error(String::from(
                 "IL->SPIR: loop is infinite"));
+        }
+
+        // as long as the continue label is dominated by a single predecessor, the
+        // predecessor becomes the continue label; that way we move as much
+        // unconditional code as possible into the continue section
+        while (true) {
+            Label *label = get_single_caller(continue_label);
+            if (!label)
+                break;
+            continue_label = label;
         }
 
         if (break_labels.size() > 1) {
@@ -9173,19 +9188,18 @@ struct SPIRVGenerator {
 
         Label *continue_label = nullptr;
         Label *break_label = nullptr;
-        bool is_loop_header = handle_loop_label(label, continue_label, break_label);
-        spv::Block *bb_continue = nullptr;
-        spv::Block *bb_merge = nullptr;
-        unsigned int control = spv::LoopControlMaskNone;
-        if (is_loop_header) {
+        if (handle_loop_label(label, continue_label, break_label)) {
+            spv::Block *bb_continue = nullptr;
+            spv::Block *bb_merge = nullptr;
+            unsigned int control = spv::LoopControlMaskNone;
             bb_continue = label_to_basic_block(continue_label, true);
             bb_merge = label_to_basic_block(break_label, true);
+            builder.createLoopMerge(bb_merge, bb_continue, control);
+            auto bb = &builder.makeNewBlock();
+            builder.createBranch(bb);
+            builder.setBuildPoint(bb);
         }
 
-#define HANDLE_LOOP_MERGE() \
-    if (is_loop_header) { \
-        builder.createLoopMerge(bb_merge, bb_continue, control); \
-    }
         assert(!args.empty());
         size_t argcount = args.size() - 1;
         size_t argn = 1;
@@ -9199,7 +9213,7 @@ struct SPIRVGenerator {
         spv::Id NAME = argument_to_value(_ ## NAME);
 #define READ_LABEL_BLOCK(NAME) \
         assert(argn <= argcount); \
-        spv::Block *NAME = label_to_basic_block(args[argn++].value, is_loop_header); \
+        spv::Block *NAME = label_to_basic_block(args[argn++].value); \
         assert(NAME);
 #define READ_TYPE(NAME) \
         assert(argn <= argcount); \
@@ -9320,7 +9334,6 @@ struct SPIRVGenerator {
                 READ_VALUE(cond);
                 READ_LABEL_BLOCK(then_block);
                 READ_LABEL_BLOCK(else_block);
-                HANDLE_LOOP_MERGE();
                 builder.createConditionalBranch(cond, then_block, else_block);
                 terminated = true;
             } break;
@@ -9726,7 +9739,7 @@ struct SPIRVGenerator {
             }
         } else if (enter.type == TYPE_Label) {
             if (enter.label->is_basic_block_like()) {
-                auto block = label_to_basic_block(enter.label, is_loop_header);
+                auto block = label_to_basic_block(enter.label);
                 if (!block) {
                     // no basic block was generated - just generate assignments
                     auto &&params = enter.label->params;
@@ -9740,16 +9753,21 @@ struct SPIRVGenerator {
                     auto bbfrom = builder.getBuildPoint();
                     // assign phi nodes
                     auto &&params = enter.label->params;
+                    bool single_caller = has_single_caller(enter.label);
                     for (size_t i = 1; i < params.size(); ++i) {
                         Parameter *param = params[i];
                         auto value = argument_to_value(args[i].value);
-                        auto phinode = argument_to_value(param);
-                        auto op = builder.getInstruction(phinode);
-                        assert(op);
-                        op->addIdOperand(value);
-                        op->addIdOperand(bbfrom->getId());
+                        if (single_caller) {
+                            assert(!parameter_is_bound(param));
+                            param2value[{active_function_value,param}] = value;
+                        } else {
+                            auto phinode = argument_to_value(param);
+                            auto op = builder.getInstruction(phinode);
+                            assert(op);
+                            op->addIdOperand(value);
+                            op->addIdOperand(bbfrom->getId());
+                        }
                     }
-                    HANDLE_LOOP_MERGE();
                     builder.createBranch(block);
                     terminated = true;
                 }
@@ -9814,16 +9832,17 @@ struct SPIRVGenerator {
                 builder.makeReturn(true, 0);
             }
         } else if (contarg.type == TYPE_Label) {
-            auto bb = label_to_basic_block(contarg.label, is_loop_header);
+            auto bb = label_to_basic_block(contarg.label);
             if (bb) {
                 if (retvalue) {
                     auto bbfrom = builder.getBuildPoint();
                     // assign phi nodes
                     auto &&params = contarg.label->params;
                     auto rtype = builder.getTypeId(retvalue);
+
+                    bool single_caller = has_single_caller(contarg.label);
                     for (size_t i = 1; i < params.size(); ++i) {
                         Parameter *param = params[i];
-                        auto phinode = argument_to_value(param);
                         spv::Id incoval = 0;
                         if (multiple_return_values) {
                             incoval = builder.createCompositeExtract(
@@ -9834,13 +9853,18 @@ struct SPIRVGenerator {
                             assert(params.size() == 2);
                             incoval = retvalue;
                         }
-                        auto op = builder.getInstruction(phinode);
-                        assert(op);
-                        op->addIdOperand(incoval);
-                        op->addIdOperand(bbfrom->getId());
+                        if (single_caller) {
+                            assert(!parameter_is_bound(param));
+                            param2value[{active_function_value,param}] = incoval;
+                        } else {
+                            auto phinode = argument_to_value(param);
+                            auto op = builder.getInstruction(phinode);
+                            assert(op);
+                            op->addIdOperand(incoval);
+                            op->addIdOperand(bbfrom->getId());
+                        }
                     }
                 }
-                HANDLE_LOOP_MERGE();
                 builder.createBranch(bb);
             } else {
                 if (retvalue) {
@@ -9876,7 +9900,6 @@ struct SPIRVGenerator {
     #undef READ_VALUE
     #undef READ_TYPE
     #undef READ_LABEL_BLOCK
-    #undef HANDLE_LOOP_MERGE
 
     spv::Id build_call(const Type *functype, spv::Function* func, Args &args,
         bool &multiple_return_values) {
@@ -9934,18 +9957,23 @@ struct SPIRVGenerator {
         }
     }
 
-    bool has_single_caller(Label *l) {
+    Label *get_single_caller(Label *l) {
         auto it = user_map.label_map.find(l);
         assert(it != user_map.label_map.end());
         auto &&users = it->second;
         if (users.size() != 1)
-            return false;
+            return nullptr;
         Label *userl = *users.begin();
         if (userl->body.enter == Any(l))
-            return true;
+            return userl;
         if (userl->body.args[0] == Any(l))
-            return true;
-        return false;
+            return userl;
+        return nullptr;
+    }
+
+    bool has_single_caller(Label *l) {
+        Label *userl = get_single_caller(l);
+        return (userl != nullptr);
     }
 
     spv::Id create_struct_type(const Type *type, uint64_t flags,
@@ -10119,7 +10147,8 @@ struct SPIRVGenerator {
         auto func = &old_bb->getParent();
         auto it = label2bb.find({func, label});
         if (it == label2bb.end()) {
-            if (has_single_caller(label) && !force) {
+            bool single_caller = has_single_caller(label);
+            if (single_caller && !force) {
                 // not generating basic blocks for single user labels
                 return nullptr;
             }
@@ -10135,11 +10164,13 @@ struct SPIRVGenerator {
                 for (size_t i = 0; i < paramcount; ++i) {
                     Parameter *param = params[i + 1];
                     auto ptype = type_to_spirv_type(param->type);
-                    auto op = new spv::Instruction(
-                        builder.getUniqueId(), ptype, spv::OpPhi);
-                    builder.addName(op->getResultId(), param->name.name()->data);
-                    param2value[{active_function_value,param}] = op->getResultId();
-                    bb->addInstruction(std::unique_ptr<spv::Instruction>(op));
+                    if (!single_caller) {
+                        auto op = new spv::Instruction(
+                            builder.getUniqueId(), ptype, spv::OpPhi);
+                        builder.addName(op->getResultId(), param->name.name()->data);
+                        param2value[{active_function_value,param}] = op->getResultId();
+                        bb->addInstruction(std::unique_ptr<spv::Instruction>(op));
+                    }
                 }
             }
 

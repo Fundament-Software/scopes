@@ -1,8 +1,8 @@
 
 fn main ()
-    let loop (i) = (unconst 0)
-    if (icmp<s i 16)
-        loop (add i 1)
+    loop (i) = 0
+    if (i < 16)
+        repeat (i + 1)
     return;
 
 
