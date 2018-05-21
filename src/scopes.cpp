@@ -13927,6 +13927,10 @@ struct Solver {
             #endif
         }
 
+#if 0
+        bool is_function_entry = !enter_label->is_basic_block_like();
+#endif
+
         Label *newl = fold_type_label_single(
             enter_frame, enter_label, keys);
         bool reentrant = newl->is_reentrant();
@@ -13949,6 +13953,29 @@ struct Solver {
             location_error(String::from("label or function forms an infinite but empty loop"));
         }
 
+#if 0
+        // labels that aren't entry points do not need to be entered
+        if (!is_function_entry && newl->is_basic_block_like()) {
+            enter = newl;
+            args = callargs;
+            clear_continuation_arg(l);
+            fold_useless_labels(l);
+            return FR_Pass;
+        }
+
+        // we need to solve body, return type and reentrant flags for the
+        // section that follows
+        normalize_label(newl);
+        if (newl->is_basic_block_like()) {
+            enter = newl;
+            args = callargs;
+            clear_continuation_arg(l);
+            fold_useless_labels(l);
+            l->body.set_complete();
+            return FR_Break;
+        }
+#else
+        // labels points do not need to be entered
         if (newl->is_basic_block_like()) {
             enter = newl;
             args = callargs;
@@ -13961,9 +13988,8 @@ struct Solver {
         // section that follows
         normalize_label(newl);
         assert(!newl->is_basic_block_like());
-#if 0
+        /*
         if (newl->is_basic_block_like()) {
-            assert(false);
             enter = newl;
             args = callargs;
             clear_continuation_arg(l);
@@ -13971,6 +13997,7 @@ struct Solver {
             l->body.set_complete();
             return FR_Break;
         }
+        */
 #endif
 
         // newl is a function
@@ -14855,7 +14882,13 @@ struct Solver {
     static void print_traceback_entry(StyledStream &ss, Label *last_head, Label *last_loc) {
         if (!last_head) return;
         assert(last_loc);
-        ss << last_loc->body.anchor << " in ";
+        const Anchor *anchor = nullptr;
+        if (last_head->is_basic_block_like()) {
+            anchor = last_loc->body.anchor;
+        } else {
+            anchor = last_head->anchor;
+        }
+        ss << anchor << " in ";
         if (last_head->name == SYM_Unnamed) {
             if (last_head->is_basic_block_like()) {
                 ss << "unnamed label";
@@ -14866,7 +14899,7 @@ struct Solver {
             ss << Style_Function << last_head->name.name()->data << Style_None;
         }
         ss << std::endl;
-        last_loc->body.anchor->stream_source_line(ss);
+        anchor->stream_source_line(ss);
         //stream_label(ss, last_head->get_original(), StreamLabelFormat::debug_single());
         //stream_label(ss, last_loc->get_original(), StreamLabelFormat::debug_single());
     }
@@ -16204,6 +16237,7 @@ struct Solver {
     void normalize_label(Label *l) {
         if (l->body.is_complete())
             return;
+        Label *entry_label = l;
         SCOPES_TRY()
 
         size_t ssz = memory_stack_size();
@@ -16332,6 +16366,8 @@ struct Solver {
 
         SCOPES_CATCH(exc)
             traceback.push_back(l);
+            if (entry_label != l)
+                traceback.push_back(entry_label);
             error(exc);
         SCOPES_TRY_END()
     }
