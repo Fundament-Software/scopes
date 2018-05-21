@@ -43,13 +43,13 @@ let T = (typename "refable" (storage = i32) (super = integer))
 typefn T '__typecall (cls)
     nullof cls
 
-typefn& T '__new (self)
+inline typefn& T '__new (self)
     supercall T '__new self
 
 typefn T 'value (self)
     bitcast self (storageof T)
 
-typefn& T 'value (self)
+inline typefn& T 'value (self)
     bitcast (load self) (storageof T)
 
 typefn T 'inc (self)
@@ -57,7 +57,7 @@ typefn T 'inc (self)
         (bitcast self (storageof T)) + 1
         T
 
-typefn& T 'inc (self)
+inline typefn& T 'inc (self)
     self =
         'inc (deref self)
     self

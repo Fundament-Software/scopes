@@ -38,10 +38,10 @@
 
 """"A pass-through function that allows expressions to evaluate to multiple
     arguments.
-fn _ (...)
+inline fn _ (...)
     return ...
 
-fn unconst-all (args...)
+inline fn unconst-all (args...)
     let loop (i result...) = (va-countof args...)
     if (icmp== i 0)
         result...
@@ -50,94 +50,94 @@ fn unconst-all (args...)
         let arg = (va@ i args...)
         loop i (unconst arg) result...
 
-fn tie-const (a b)
+inline fn tie-const (a b)
     if (constant? a) b
     else (unconst b)
 
-fn cond-const (a b)
+inline fn cond-const (a b)
     if a b
     else (unconst b)
 
-fn pointer== (a b)
+inline fn pointer== (a b)
     rawcall icmp== (rawcall ptrtoint a usize) (rawcall ptrtoint b usize)
 
-fn type? (T)
+inline fn type? (T)
     """".. fn:: (type? T)
 
            returns `true` if ``T`` is a value of type `type`, otherwise
            `false`.
     rawcall icmp== (rawcall ptrtoint type usize) (rawcall ptrtoint (rawcall typeof T) usize)
 
-fn assert-type (T)
+inline fn assert-type (T)
     if (type? T)
     else
         rawcall compiler-error!
             rawcall string-join "type expected, not " (rawcall Any-repr (rawcall Any-wrap T))
-fn type== (a b)
+inline fn type== (a b)
     assert-type a
     assert-type b
     rawcall icmp== (rawcall ptrtoint a usize) (rawcall ptrtoint b usize)
 
-fn unknownof (T)
+inline fn unknownof (T)
     assert-type T
     bitcast T Unknown
 
-fn todo! (msg)
+inline fn todo! (msg)
     compiler-error!
         string-join "TODO: " msg
 
-fn error! (msg)
+inline fn error! (msg)
     __error! msg
     unreachable!;
 
-fn typename-type? (T)
+inline fn typename-type? (T)
     icmp== (type-kind T) type-kind-typename
-fn integer-type? (T)
+inline fn integer-type? (T)
     icmp== (type-kind T) type-kind-integer
-fn real-type? (T)
+inline fn real-type? (T)
     icmp== (type-kind T) type-kind-real
-fn pointer-type? (T)
+inline fn pointer-type? (T)
     icmp== (type-kind T) type-kind-pointer
-fn function-type? (T)
+inline fn function-type? (T)
     icmp== (type-kind T) type-kind-function
-fn tuple-type? (T)
+inline fn tuple-type? (T)
     icmp== (type-kind T) type-kind-tuple
-fn array-type? (T)
+inline fn array-type? (T)
     icmp== (type-kind T) type-kind-array
-fn vector-type? (T)
+inline fn vector-type? (T)
     icmp== (type-kind T) type-kind-vector
-fn extern-type? (T)
+inline fn extern-type? (T)
     icmp== (type-kind T) type-kind-extern
-fn function-pointer-type? (T)
+inline fn function-pointer-type? (T)
     if (pointer-type? T)
         function-type? (element-type T 0)
     else (tie-const T false)
-fn typename? (val)
+inline fn typename? (val)
     typename-type? (typeof val)
-fn integer? (val)
+inline fn integer? (val)
     integer-type? (typeof val)
-fn real? (val)
+inline fn real? (val)
     real-type? (typeof val)
-fn pointer? (val)
+inline fn pointer? (val)
     pointer-type? (typeof val)
-fn array? (val)
+inline fn array? (val)
     array-type? (typeof val)
-fn vector? (T)
+inline fn vector? (T)
     vector-type? (typeof T)
-fn tuple? (val)
+inline fn tuple? (val)
     tuple-type? (typeof val)
-fn extern? (val)
+inline fn extern? (val)
     extern? (typeof val)
-fn function-pointer? (val)
+inline fn function-pointer? (val)
     function-pointer-type? (typeof val)
-fn Symbol? (val)
+inline fn Symbol? (val)
     type== (typeof val) Symbol
-fn list? (val)
+inline fn list? (val)
     type== (typeof val) list
-fn none? (val)
+inline fn none? (val)
     type== (typeof val) Nothing
 
-fn gen-get-option (opts...)
+inline fn gen-get-option (opts...)
     """"Given a variadic list of keyed arguments, generate a function
         ``(get-option name default)`` that either returns an option with the
         given key from ``opts...`` or ``default`` if no such key exists.
@@ -152,8 +152,8 @@ fn gen-get-option (opts...)
             else default
         else val
 
-fn Any-new (val)
-    fn construct (outval)
+inline fn Any-new (val)
+    inline fn construct (outval)
         insertvalue (insertvalue (undef Any) (typeof val) 0) outval 1
 
     if (type== (typeof val) Any) val
@@ -161,7 +161,7 @@ fn Any-new (val)
         Any-wrap val
     else
         let T = (storageof (typeof val))
-        fn new-static-pointer ()
+        inline fn new-static-pointer ()
             let ptr = (static-alloc T)
             store val ptr
             construct (ptrtoint ptr u64)
@@ -203,14 +203,14 @@ fn Any-new (val)
         else
             wrap-error;
 
-fn raise! (value)
+inline fn raise! (value)
     __raise! (Any-new value)
     unreachable!;
 
-fn va-empty? (...)
+inline fn va-empty? (...)
     icmp== (va-countof ...) 0
 
-fn va-types (params...)
+inline fn va-types (params...)
     let sz = (va-countof params...)
     let loop (i result...) = sz
     if (icmp== i 0)
@@ -219,15 +219,15 @@ fn va-types (params...)
     let arg = (va@ i params...)
     loop i (typeof arg) result...
 
-fn va-join (a...)
-    fn (out...)
+inline fn va-join (a...)
+    inline fn (out...)
         let loop (i out...) = (va-countof a...) out...
         if (icmp!= i 0)
             let i = (sub i 1)
             loop i (va@ i a...) out...
         out...
 
-fn cons (...)
+inline fn cons (...)
     let i = (va-countof ...)
     if (icmp<s i 2)
         compiler-error! "at least two parameters expected"
@@ -240,8 +240,8 @@ fn cons (...)
         loop i (va@ i ...)
             list-cons (Any at) tail
 
-fn list-new (...)
-    fn loop (i tail)
+inline fn list-new (...)
+    inline fn loop (i tail)
         if (icmp== i 0) tail
         else
             let val = (va@ (sub i 1) ...)
@@ -250,16 +250,16 @@ fn list-new (...)
     loop (va-countof ...) eol
 
 # forward decl
-fn as
-fn forward-as
-fn imply
-fn forward-imply
+inline fn as
+inline fn forward-as
+inline fn imply
+inline fn forward-imply
 
-fn not (x)
+inline fn not (x)
     bxor (imply x bool) true
 
-fn gen-type-op2 (f)
-    fn (a b flipped)
+inline fn gen-type-op2 (f)
+    inline fn (a b flipped)
         if (type== (typeof a) (typeof b))
             f a b
         elseif flipped
@@ -275,7 +275,7 @@ fn gen-type-op2 (f)
 
 syntax-extend
     set-type-symbol! type '__call
-        fn! (cls ...)
+        inline fn (cls ...)
             let val ok = (type@ cls '__typecall)
             if ok
                 call val cls ...
@@ -287,19 +287,29 @@ syntax-extend
                             " has no apply-type attribute"
 
     set-type-symbol! list '__typecall
-        fn (cls ...)
+        inline fn (cls ...)
             list-new ...
     set-type-symbol! extern '__typecall
-        fn (cls ...)
+        inline fn (cls ...)
             extern-new ...
     set-type-symbol! Any '__typecall
-        fn (cls value)
+        inline fn (cls value)
             Any-new value
     set-type-symbol! Symbol '__typecall
-        fn (cls value)
+        inline fn (cls value)
             string->Symbol value
     set-type-symbol! Scope '__typecall
-        fn (cls parent clone)
+        inline fn (cls parent clone)
+            """"There are four ways to create a new Scope:
+                ``Scope``
+                    creates an empty scope without parent
+                ``Scope parent``
+                    creates an empty scope descending from ``parent``
+                ``Scope none clone``
+                    duplicate ``clone`` without a parent
+                ``Scope parent clone``
+                    duplicate ``clone``, but descending from ``parent`` instead
+
             let new? = (type== (typeof clone) Nothing)
             if (type== (typeof parent) Nothing)
                 if new?
@@ -311,6 +321,7 @@ syntax-extend
                     Scope-new-expand parent
                 else
                     Scope-clone-expand parent clone
+    set-type-symbol! Scope 'parent Scope-parent
 
     set-type-symbol! type '__== (gen-type-op2 type==)
     set-type-symbol! Any '__== (gen-type-op2 Any==)
@@ -322,7 +333,7 @@ syntax-extend
     set-type-symbol! list '__.. (gen-type-op2 list-join)
 
     set-type-symbol! type '__getattr
-        fn (cls name)
+        inline fn (cls name)
             let val ok = (type@ cls name)
             if ok
                 return val
@@ -330,33 +341,33 @@ syntax-extend
                 return;
 
     set-type-symbol! Symbol '__as
-        fn (self destT)
+        inline fn (self destT)
             if (type== destT string)
                 Symbol->string self
 
     set-type-symbol! Symbol '__==
         gen-type-op2
-            fn (a b)
+            inline fn (a b)
                 icmp== (bitcast a u64) (bitcast b u64)
     set-type-symbol! Builtin '__==
         gen-type-op2
-            fn (a b)
+            inline fn (a b)
                 icmp== (bitcast a u64) (bitcast b u64)
 
     set-type-symbol! Nothing '__==
-        fn (a b flipped)
+        inline fn (a b flipped)
             type== (typeof a) (typeof b)
     set-type-symbol! Nothing '__!=
-        fn (a b flipped)
+        inline fn (a b flipped)
             bxor (type== (typeof a) (typeof b)) true
 
-    fn setup-int-type (T)
+    inline fn setup-int-type (T)
         set-type-symbol! T '__== (gen-type-op2 icmp==)
         set-type-symbol! T '__!= (gen-type-op2 icmp!=)
         set-type-symbol! T '__+ (gen-type-op2 add)
         set-type-symbol! T '__- (gen-type-op2 sub)
         set-type-symbol! T '__neg
-            fn (self)
+            inline fn (self)
                 sub (nullof (typeof self)) self
         set-type-symbol! T '__* (gen-type-op2 mul)
         set-type-symbol! T '__<< (gen-type-op2 shl)
@@ -364,13 +375,13 @@ syntax-extend
         set-type-symbol! T '__| (gen-type-op2 bor)
         set-type-symbol! T '__^ (gen-type-op2 bxor)
         set-type-symbol! T '__~
-            fn (x)
+            inline fn (x)
                 bxor x ((typeof x) -1)
 
         # more aggressive cast that converts from all numerical types
             and usize.
         set-type-symbol! T '__as
-            fn hardcast (val destT)
+            inline fn hardcast (val destT)
                 let vT = (typeof val)
                 let destST =
                     if (type== destT usize) (storageof destT)
@@ -395,7 +406,7 @@ syntax-extend
         # only perform safe casts i.e. integer / usize conversions that expand width
         # unless the value is constant
         set-type-symbol! T '__imply
-            fn (val destT)
+            inline fn (val destT)
                 if (constant? val)
                     hardcast val destT
                 else
@@ -417,22 +428,22 @@ syntax-extend
 
         # general constructor
         set-type-symbol! T '__typecall
-            fn (destT val)
+            inline fn (destT val)
                 if (none? val)
                     nullof destT
                 else
                     as val destT
 
-        fn ufdiv (a b)
+        inline fn ufdiv (a b)
             fdiv (uitofp a f32) (uitofp b f32)
 
-        fn ufrcp (self)
+        inline fn ufrcp (self)
             fdiv 1.0 (uitofp self f32)
 
-        fn sfdiv (a b)
+        inline fn sfdiv (a b)
             fdiv (sitofp a f32) (sitofp b f32)
 
-        fn sfrcp (self)
+        inline fn sfrcp (self)
             fdiv 1.0 (sitofp self f32)
 
         if (signed? (storageof T))
@@ -456,13 +467,13 @@ syntax-extend
             set-type-symbol! T '__% (gen-type-op2 urem)
             set-type-symbol! T '__>> (gen-type-op2 lshr)
 
-    fn setup-real-type (T)
-        fn floordiv (a b)
+    inline fn setup-real-type (T)
+        inline fn floordiv (a b)
             sdiv (fptosi a i32) (fptosi b i32)
 
         # only perform safe casts: i.e. float to double
         set-type-symbol! T '__imply
-            fn (val destT)
+            inline fn (val destT)
                 let vT = (typeof val)
                 if (real-type? destT)
                     let valw destw = (bitcountof vT) (bitcountof destT)
@@ -473,7 +484,7 @@ syntax-extend
 
         # more aggressive cast that converts from all numerical types
         set-type-symbol! T '__as
-            fn hardcast (val destT)
+            inline fn hardcast (val destT)
                 let vT = (typeof val)
                 let destST =
                     if (type== destT usize) (storageof destT)
@@ -493,7 +504,7 @@ syntax-extend
                         fptoui val destT
 
         set-type-symbol! T '__typecall
-            fn (destT val)
+            inline fn (destT val)
                 if (none? val)
                     nullof destT
                 else
@@ -508,12 +519,12 @@ syntax-extend
         set-type-symbol! T '__+ (gen-type-op2 fadd)
         set-type-symbol! T '__- (gen-type-op2 fsub)
         set-type-symbol! T '__neg
-            fn (self)
+            inline fn (self)
                 fsub (nullof (typeof self)) self
         set-type-symbol! T '__* (gen-type-op2 fmul)
         set-type-symbol! T '__/ (gen-type-op2 fdiv)
         set-type-symbol! T '__rcp
-            fn (self)
+            inline fn (self)
                 fdiv (imply 1 (typeof self)) self
         set-type-symbol! T '__// (gen-type-op2 floordiv)
         set-type-symbol! T '__% (gen-type-op2 frem)
@@ -536,7 +547,7 @@ syntax-extend
 
     syntax-scope
 
-fn string-repr (val)
+inline fn string-repr (val)
     Any-string (Any val)
 
 fn op-prettyname (symbol)
@@ -581,12 +592,12 @@ fn op-prettyname (symbol)
             Any-repr (Any-wrap symbol)
             " operation"
 
-fn opN-dispatch (symbol mincount maxcount)
+inline fn opN-dispatch (symbol mincount maxcount)
     let verify-argument-count =
         if (none? mincount)
-            fn ()
+            inline fn ()
         else
-            fn (c)
+            inline fn (c)
                 if (icmp<s c mincount)
                     compiler-error!
                         string-join (op-prettyname symbol)
@@ -597,7 +608,7 @@ fn opN-dispatch (symbol mincount maxcount)
     let verify-argument-count =
         if (none? maxcount) verify-argument-count
         else
-            fn (c)
+            inline fn (c)
                 if (icmp>s c maxcount)
                     compiler-error!
                         string-join (op-prettyname symbol)
@@ -605,7 +616,7 @@ fn opN-dispatch (symbol mincount maxcount)
                                 string-join (Any-repr (Any-wrap maxcount))
                                     string-join " arguments but got "
                                         Any-repr (Any-wrap c)
-    fn (...)
+    inline fn (...)
         verify-argument-count (va-countof ...)
         let self ... = ...
         let T = (typeof self)
@@ -617,11 +628,11 @@ fn opN-dispatch (symbol mincount maxcount)
                 string-join " does not apply to value of type "
                     Any-repr (Any-wrap T)
 
-fn op1-dispatch (symbol)
+inline fn op1-dispatch (symbol)
     opN-dispatch symbol 1 1
 
-fn op2-dispatch (symbol)
-    fn (a b)
+inline fn op2-dispatch (symbol)
+    inline fn (a b)
         let Ta Tb = (typeof a) (typeof b)
         let op success = (type@ Ta symbol)
         if success
@@ -637,8 +648,8 @@ fn op2-dispatch (symbol)
                         string-join " and "
                             Any-repr (Any-wrap Tb)
 
-fn op2-dispatch-bidi (symbol fallback)
-    fn (...)
+inline fn op2-dispatch-bidi (symbol fallback)
+    inline fn (...)
         if (icmp<s (va-countof ...) 2)
             compiler-error!
                 string-join (op-prettyname symbol)
@@ -668,15 +679,15 @@ fn op2-dispatch-bidi (symbol fallback)
                         string-join " and "
                             Any-repr (Any-wrap Tb)
 
-fn dispatch-unop-binop (f1 f2)
-    fn (...)
+inline fn dispatch-unop-binop (f1 f2)
+    inline fn (...)
         if (icmp<s (va-countof ...) 2)
             f1 ...
         else
             f2 ...
 
-fn op2-ltr-multiop (f)
-    fn (...)
+inline fn op2-ltr-multiop (f)
+    inline fn (...)
         if (icmp<=s (va-countof ...) 2)
             return
                 f ...
@@ -688,8 +699,8 @@ fn op2-ltr-multiop (f)
             loop (add i 1) (f result... x)
         else result...
 
-fn op2-rtl-multiop (f)
-    fn (...)
+inline fn op2-rtl-multiop (f)
+    inline fn (...)
         let sz = (va-countof ...)
         if (icmp<=s sz 2)
             return
@@ -706,7 +717,7 @@ fn op2-rtl-multiop (f)
 let == = (op2-dispatch-bidi '__==)
 let != =
     op2-dispatch-bidi '__!=
-        fn (...)
+        inline fn (...)
             bxor true (== ...)
 let > = (op2-dispatch-bidi '__>)
 let >= = (op2-dispatch-bidi '__>=)
@@ -733,7 +744,7 @@ let >> = (op2-dispatch-bidi '__>>)
 let .. = (op2-ltr-multiop (op2-dispatch-bidi '__..))
 let countof = (op1-dispatch '__countof)
 let unpack = (op1-dispatch '__unpack)
-fn at (obj key)
+inline fn at (obj key)
     (op2-dispatch '__@) obj
         if (constant? key)
             if (integer? key)
@@ -763,21 +774,21 @@ fn repr
 fn type-mismatch-string (want-T have-T)
     .. "type " (repr want-T) " expected, not " (repr have-T)
 
-fn assert-typeof (a T)
+inline fn assert-typeof (a T)
     if (type== T (typeof a))
     else
         compiler-error!
             type-mismatch-string T (typeof a)
 
-fn Any-typeof (val)
+inline fn Any-typeof (val)
     assert-typeof val Any
     extractvalue val 0
 
-fn Any-payload (val)
+inline fn Any-payload (val)
     assert-typeof val Any
     extractvalue val 1
 
-fn forward-repr (value)
+inline fn forward-repr (value)
     let op success = (type@ (typeof value) '__repr)
     if success
         op value
@@ -790,7 +801,7 @@ fn repr (value)
         if (type== T Any)
             Any-typeof value
         else T
-    fn append-type? ()
+    inline fn append-type? ()
         tie-const CT
             if (type== CT i32) false
             elseif (type== CT bool) false
@@ -819,12 +830,12 @@ fn repr (value)
             default-styler style-type (type-name CT)
     else text
 
-fn scalar-type (T)
+inline fn scalar-type (T)
     let ST = (storageof T)
     if (type== (superof ST) vector)
         element-type ST 0
     else ST
-fn select-op (T sop fop)
+inline fn select-op (T sop fop)
     let T = (scalar-type T)
     if (type== (superof T) integer) sop
     elseif (type== (superof T) real) fop
@@ -834,17 +845,17 @@ fn select-op (T sop fop)
                 string-join (Any-repr (Any-wrap T))
                     ". integer or real vector or scalar expected"
 
-fn sabs (x)
+inline fn sabs (x)
     let zero = ((typeof x) 0)
     ? (icmp<s x zero) (sub zero x) x
 
-fn abs (x)
+inline fn abs (x)
     (select-op (typeof x) sabs fabs) x
 
-fn sign (x)
+inline fn sign (x)
     (select-op (typeof x) ssign fsign) x
 
-fn powi (base exponent)
+inline fn powi (base exponent)
     assert-typeof base i32
     assert-typeof exponent i32
     # special case for constant base 2
@@ -865,10 +876,10 @@ fn powi (base exponent)
             mul cur cur
             lshr exponent 1
 
-fn pow (x y)
+inline fn pow (x y)
     (select-op (typeof x) powi powf) x y
 
-fn forward-typeattr (T name)
+inline fn forward-typeattr (T name)
     let value success = (type@ T name)
     if success
         return value success
@@ -876,13 +887,13 @@ fn forward-typeattr (T name)
     if success
         return (op T name)
 
-fn forward-getattr (self name)
+inline fn forward-getattr (self name)
     let T = (typeof self)
     let op success = (type@ T '__getattr)
     if success
         return (op self name)
 
-fn typeattr (T name)
+inline fn typeattr (T name)
     let result... = (forward-typeattr T name)
     if (va-empty? result...)
         compiler-error!
@@ -892,7 +903,7 @@ fn typeattr (T name)
                         Any-repr (Any-wrap T)
     else result...
 
-fn getattr (self name)
+inline fn getattr (self name)
     let result... = (forward-getattr self name)
     if (va-empty? result...)
         compiler-error!
@@ -902,10 +913,10 @@ fn getattr (self name)
                         Any-repr (Any-wrap (typeof self))
     else result...
 
-fn empty? (x)
+inline fn empty? (x)
     == (countof x) 0:usize
 
-fn type< (T superT)
+inline fn type< (T superT)
     let loop (T) = T
     let value = (superof T)
     if (type== value superT) (tie-const T true)
@@ -913,12 +924,12 @@ fn type< (T superT)
     else
         loop value
 
-fn type<= (T superT)
+inline fn type<= (T superT)
     if (type== T superT)
         return true
     type< T superT
 
-fn forward-as (value dest-type)
+inline fn forward-as (value dest-type)
     let T = (typeof value)
     if (type<= T dest-type)
         return value
@@ -933,7 +944,7 @@ fn forward-as (value dest-type)
         if (icmp!= (va-countof result...) 0)
             return result...
 
-fn as (value dest-type)
+inline fn as (value dest-type)
     let T = (typeof value)
     if (type<= T dest-type)
         return value
@@ -953,7 +964,7 @@ fn as (value dest-type)
                 string-join " to "
                     Any-repr (Any-wrap dest-type)
 
-fn forward-imply (value dest-type)
+inline fn forward-imply (value dest-type)
     let T = (typeof value)
     if (type<= T dest-type)
         return value
@@ -963,7 +974,7 @@ fn forward-imply (value dest-type)
         if (icmp!= (va-countof result...) 0)
             return result...
 
-fn imply (value dest-type)
+inline fn imply (value dest-type)
     let T = (typeof value)
     if (type<= T dest-type)
         return value
@@ -981,7 +992,7 @@ fn imply (value dest-type)
 let hash = (typename-type "hash")
 set-typename-storage! hash u64
 
-fn forward-hash (value)
+inline fn forward-hash (value)
     let T = (typeof value)
     if (type== T hash)
         return value
@@ -1024,7 +1035,7 @@ fn forward-hash (value)
                 sizeof T
             hash
 
-fn hash1 (value)
+inline fn hash1 (value)
     let result... = (forward-hash value)
     if (va-empty? result...)
         compiler-error!
@@ -1034,7 +1045,7 @@ fn hash1 (value)
 
 let hash2 =
     op2-ltr-multiop
-        fn "hash2" (a b)
+        inline fn "hash2" (a b)
             bitcast
                 __hash2x64
                     bitcast (hash1 a) u64
@@ -1042,18 +1053,18 @@ let hash2 =
                 hash
 
 set-type-symbol! hash '__imply
-    fn "hash-imply" (self T)
+    inline fn "hash-imply" (self T)
         if (type== T u64)
             bitcast self u64
 
 set-type-symbol! hash '__typecall
-    fn "hash" (cls values...)
+    inline fn "hash" (cls values...)
         if (icmp<s (va-countof values...) 2)
             hash1 values...
         else
             hash2 values...
 
-fn Any-extract (val T)
+inline fn Any-extract (val T)
     assert-typeof val Any
     let valT = (Any-typeof val)
     if (== valT T)
@@ -1086,58 +1097,58 @@ fn Any-extract (val T)
             .. "while extracting from Any at runtime: "
                 type-mismatch-string T valT
 
-fn string->rawstring (s)
+inline fn string->rawstring (s)
     assert-typeof s string
     getelementptr s 0 1 0
-fn char (s)
+inline fn char (s)
     load (string->rawstring s)
 
-fn Syntax-anchor (sx)
+inline fn Syntax-anchor (sx)
     assert-typeof sx Syntax
     extractvalue (load sx) 0
-fn Syntax->datum (sx)
+inline fn Syntax->datum (sx)
     assert-typeof sx Syntax
     extractvalue (load sx) 1
-fn Syntax-quoted? (sx)
+inline fn Syntax-quoted? (sx)
     assert-typeof sx Syntax
     extractvalue (load sx) 2
 
-fn Anchor-file (x)
+inline fn Anchor-file (x)
     assert-typeof x Anchor
     extractvalue (load x) 0
-fn Anchor-lineno (x)
+inline fn Anchor-lineno (x)
     assert-typeof x Anchor
     extractvalue (load x) 1
-fn Anchor-column (x)
+inline fn Anchor-column (x)
     assert-typeof x Anchor
     extractvalue (load x) 2
 
-fn Exception-anchor (sx)
+inline fn Exception-anchor (sx)
     assert-typeof sx Exception
     extractvalue (load sx) 0
-fn Exception-message (sx)
+inline fn Exception-message (sx)
     assert-typeof sx Exception
     extractvalue (load sx) 1
 
-fn list-empty? (l)
+inline fn list-empty? (l)
     assert-typeof l list
     icmp== (ptrtoint l usize) 0:usize
 
-fn list-at (l)
+inline fn list-at (l)
     assert-typeof l list
     if (list-empty? l)
         tie-const l (Any-wrap none)
     else
         extractvalue (load l) 0
 
-fn list-next (l)
+inline fn list-next (l)
     assert-typeof l list
     if (list-empty? l)
         tie-const l eol
     else
         bitcast (extractvalue (load l) 1) list
 
-fn list-at-next (l)
+inline fn list-at-next (l)
     assert-typeof l list
     if (list-empty? l)
         return
@@ -1148,7 +1159,7 @@ fn list-at-next (l)
             extractvalue (load l) 0
             bitcast (extractvalue (load l) 1) list
 
-fn decons (val count)
+inline fn decons (val count)
     let at next = (list-at-next val)
     if (type== (typeof count) Nothing)
         return at next
@@ -1158,7 +1169,7 @@ fn decons (val count)
         return at
             decons next (sub count 1)
 
-fn list-countof (l)
+inline fn list-countof (l)
     assert-typeof l list
     if (list-empty? l) (tie-const l 0:usize)
     else
@@ -1168,17 +1179,17 @@ fn string-countof (s)
     assert-typeof s string
     extractvalue (load s) 0
 
-fn min (a b)
+inline fn min (a b)
     ? (<= a b) a b
 
-fn max (a b)
+inline fn max (a b)
     ? (>= a b) a b
 
-fn clamp (x mn mx)
+inline fn clamp (x mn mx)
     ? (> x mx) mx
         ? (< x mn) mn x
 
-fn slice (obj start-index end-index)
+inline fn slice (obj start-index end-index)
     # todo: this should be isize
     let zero count i0 = (i64 0) (i64 (countof obj)) (i64 start-index)
     let i0 =
@@ -1365,7 +1376,7 @@ syntax-extend
                 nullof cls
 
     set-type-symbol! typename '__typecall
-        fn! (cls args...)
+        inline fn (cls args...)
             if (type== cls typename)
                 let name super storage = args...
                 let T = (typename-type name)
@@ -1406,7 +1417,7 @@ syntax-extend
                         .. (repr destT) " expected, not " (repr anyT)
 
     set-type-symbol! type '__@
-        fn (self key)
+        inline fn (self key)
             let keyT = (typeof key)
             if (type== keyT Symbol)
                 type@ self key
@@ -1438,7 +1449,7 @@ syntax-extend
             icmp== (Parameter-index self) 0
 
     set-type-symbol! Symbol '__call
-        fn "methodcall" (name self ...)
+        inline fn "methodcall" (name self ...)
             let T = (typeof self)
             let T =
                 if (type== T type) self
@@ -1446,7 +1457,7 @@ syntax-extend
             (typeattr T name) self ...
 
     set-type-symbol! Scope '__getattr
-        fn (self key)
+        inline fn (self key)
             if (constant? self)
                 let value success = (Scope@ self key)
                 if success
@@ -1531,7 +1542,7 @@ syntax-extend
             if (type== (typeof a) (typeof b))
                 list== a b
 
-    fn gen-string-cmp (op)
+    inline fn gen-string-cmp (op)
         fn (a b flipped)
             if (type== (typeof a) (typeof b))
                 op (string-compare a b) 0
@@ -1703,7 +1714,7 @@ fn compile-glsl (f target opts...)
         compile-flags opts...
 
 syntax-extend
-    fn gen-type-op2 (op)
+    inline fn gen-type-op2 (op)
         fn (a b flipped)
             if (type== (typeof a) (typeof b))
                 op a b
@@ -1800,7 +1811,7 @@ syntax-extend
     fn get-ifx-symbol (name)
         Symbol (.. "#ifx:" (Symbol->string name))
 
-    fn make-expand-define-infix (order)
+    inline fn make-expand-define-infix (order)
         fn expand-define-infix (args scope)
             let prec token func = (decons args 3)
             let prec =
@@ -1956,7 +1967,6 @@ syntax-extend
     set-scope-symbol! syntax-scope 'macro macro
     set-scope-symbol! syntax-scope (Symbol "#list")
         compile (typify list-handler list Scope)
-        #compile (typify list-handler list Scope)
     set-scope-symbol! syntax-scope (Symbol "#symbol")
         compile (typify symbol-handler list Scope)
 
@@ -1970,7 +1980,7 @@ syntax-extend
                 cons do content
             'syntax-scope
 
-    fn make-expand-and-or (flip)
+    inline fn make-expand-and-or (flip)
         fn (expr)
             if (list-empty? expr)
                 syntax-error! "at least one argument expected"
@@ -2122,7 +2132,7 @@ define-macro .
         let c rest = (decons rest)
         loop rest (op result c)
 
-fn = (obj value)
+inline fn = (obj value)
     (op2-dispatch '__=) obj value
     return;
 
@@ -2203,18 +2213,18 @@ define-doc let
     if all arguments could be implicitly converted to the destination type,
     otherwise it calls the error function with a function that returns an
     error message, and a function that returns the original type arguments used.
-fn type-matcher (types...)
-    fn get-types ()
+inline fn type-matcher (types...)
+    inline fn get-types ()
         types...
     let typesz = (va-countof types...)
-    fn "with-target" (f)
-        fn "with-error-fn" (f-error)
-            fn (args...)
+    inline fn "with-target" (f)
+        inline fn "with-error-fn" (f-error)
+            inline fn (args...)
                 let sz = (va-countof args...)
                 if (icmp!= sz typesz)
                     return
                         f-error
-                            fn ()
+                            inline fn ()
                                 .. "could not resolve overloaded function from number of arguments (expected "
                                     repr typesz
                                     " but got "
@@ -2232,7 +2242,7 @@ fn type-matcher (types...)
                 if (va-empty? result...)
                     return
                         f-error
-                            fn ()
+                            inline fn ()
                                 .. "couldn't convert type of argument "
                                     repr (i + 1)
                                     " from "
@@ -2265,31 +2275,31 @@ fn format-type-signature (types...)
     target, which tries to match f1 first, then f2, and otherwise passes
     an error message to the error function, along with all previously attempted
     type signature constructors to the error function.
-fn chain-fn-dispatch2 (f1 f2)
+inline fn chain-fn-dispatch2 (f1 f2)
     if (none? f2)
-        fn "with-error-fn" (f-error)
+        inline fn "with-error-fn" (f-error)
             fn (args...)
                 call
                     f1
-                        fn (msgf get-types...)
+                        inline fn (msgf get-types...)
                             f-error
-                                fn ()
+                                inline fn ()
                                     .. "could not match arguments of types "
                                         format-type-signature (va-types args...)
                                         "to function"
                                 \ get-types...
                     args...
     else
-        fn "with-error-fn" (f-error)
-            fn (args...)
+        inline fn "with-error-fn" (f-error)
+            inline fn (args...)
                 call
                     f1
-                        fn (msgf get-types1)
+                        inline fn (msgf get-types1)
                             call
                                 f2
-                                    fn (msgf get-types...)
+                                    inline fn (msgf get-types...)
                                         f-error
-                                            fn ()
+                                            inline fn ()
                                                 .. "could not match arguments of types "
                                                     format-type-signature (va-types args...)
                                                     "to function"
@@ -2316,7 +2326,7 @@ fn fn-dispatch-error-handler (msgf get-types...)
                 format-type-signature (get-types)
 
 # composes multiple target-bound type matchers into a single function
-fn fn-dispatcher (args...)
+inline fn fn-dispatcher (args...)
     (chain-fn-dispatch args...) fn-dispatch-error-handler
 
 # a safe immutable loop construct that never unrolls
@@ -2437,7 +2447,7 @@ fn pointer-type-imply? (src dest)
 
 let ref-attribs-key = '__refattrs
 
-fn type@& (T name)
+inline fn type@& (T name)
     let repeat (T) = T
     let attrs ok = (type-local@ T ref-attribs-key)
     if ok
@@ -2448,7 +2458,7 @@ fn type@& (T name)
         return (tie-const T none) (tie-const T false)
     repeat (superof T)
 
-fn set-type-symbol!& (T name value)
+inline fn set-type-symbol!& (T name value)
     let attrs ok = (type-local@ T ref-attribs-key)
     let attrs =
         if ok attrs
@@ -2458,14 +2468,14 @@ fn set-type-symbol!& (T name value)
             attrs
     set-type-symbol! attrs name value
 
-fn deref1 (value)
+inline fn deref1 (value)
     let T = (typeof value)
     if (T < ref)
         let op = (type@ T '__deref)
         op value
     else value
 
-fn deref (values...)
+inline fn deref (values...)
     let repeat (i result...) = (va-countof values...)
     if (i > 0)
         let i = (i - 1)
@@ -2476,15 +2486,15 @@ fn deref (values...)
     result...
 
 set-type-symbol!& Any 'typeof
-    fn (self)
+    inline fn (self)
         Any-typeof (deref self)
 
 set-type-symbol!& Any '__imply
-    fn (src destT)
+    inline fn (src destT)
         Any-extract (deref src) destT
 
 do
-    fn passthru-overload (sym func)
+    inline fn passthru-overload (sym func)
         set-type-symbol! ref sym (fn (a b flipped) (func (deref a) (deref b)))
     passthru-overload '__== ==; passthru-overload '__!= !=
     passthru-overload '__< <; passthru-overload '__<= <=
@@ -2492,7 +2502,7 @@ do
     passthru-overload '__& &; passthru-overload '__| |; passthru-overload '__^ ^
     passthru-overload '__+ +; passthru-overload '__- -
     passthru-overload '__* *; passthru-overload '__/ /
-    passthru-overload '__** **
+    passthru-overload '__** pow
     passthru-overload '__// //
     passthru-overload '__% %
     passthru-overload '__<< <<; passthru-overload '__>> >>
@@ -2500,7 +2510,7 @@ do
 
     fn passthru-inplace-overload (methodname fallback)
         set-type-symbol! ref methodname
-            fn (a b)
+            inline fn (a b)
                 let ET = (typeof& a)
                 let op ok = (type@& ET methodname)
                 if ok
@@ -2528,7 +2538,7 @@ do
 
     fn define-ref-forward (failedf methodname)
         set-type-symbol! ref methodname
-            fn (self args...)
+            inline fn (self args...)
                 let ET = (typeof& self)
                 let op success = (type@& ET methodname)
                 if success
@@ -2543,7 +2553,7 @@ do
 
     fn define-ref-forward-failable (failedf methodname)
         set-type-symbol! ref methodname
-            fn (self args...)
+            inline fn (self args...)
                 let ET = (typeof& self)
                 let op success = (type@& ET methodname)
                 if success
@@ -2578,7 +2588,7 @@ do
                     bitcast self (storageof (typeof self))
 
     set-type-symbol! ref '__deref
-        fn "ref-deref" (self)
+        inline fn "ref-deref" (self)
             let ET = (typeof& self)
             let op ok = (type@& ET '__deref)
             if ok
@@ -2588,7 +2598,7 @@ do
                     .. "cannot dereference value of type " (repr ET)
 
     set-type-symbol! ref '__typeattr
-        fn "ref-typeattr" (cls name)
+        inline fn "ref-typeattr" (cls name)
             let T = (storageof cls)
             let ET = (element-type T 0)
             let value success = (type@& ET name)
@@ -2602,7 +2612,7 @@ do
                     return result...
 
     set-type-symbol! ref '__call
-        fn "ref-call" (self args...)
+        inline fn "ref-call" (self args...)
             let ET = (typeof& self)
             let op success = (type@& ET '__call)
             if success
@@ -2611,7 +2621,7 @@ do
                 call (deref self) args...
 
     set-type-symbol! ref '__imply
-        fn "ref-imply" (self destT)
+        inline fn "ref-imply" (self destT)
             let ptrtype = (storageof (typeof self))
             if (type== destT ptrtype)
                 return (bitcast self ptrtype)
@@ -2636,7 +2646,7 @@ do
                     forward-imply (deref self) destT
 
     set-type-symbol! ref '__=
-        fn "ref=" (self value)
+        inline fn "ref=" (self value)
             let ET = (typeof& self)
             let op ok = (type@& ET '__=)
             if ok
@@ -2665,7 +2675,7 @@ do
         T
 
     set-type-symbol! ref '__typecall
-        fn "ref-typecall" (cls T)
+        inline fn "ref-typecall" (cls T)
             assert-typeof T type
             if (T < ref)
                 compiler-error!
@@ -2686,16 +2696,24 @@ define-macro typefn&
     let ty name params body = (decons args 3)
     list set-type-symbol!& ty name
         cons fn params body
-define-macro typefn!
-    let ty name params body = (decons args 3)
-    list set-type-symbol! ty name
-        cons fn! params body
-define-macro typefn!&
-    let ty name params body = (decons args 3)
-    list set-type-symbol!& ty name
-        cons fn! params body
 
-fn bitcast& (self destT)
+# extend inline to support typefn
+define-macro inline
+    let kw rest = (decons args)
+    let kw =
+        kw as Syntax as Symbol
+    if (kw == 'typefn)
+        let ty name params body = (decons rest 3)
+        list set-type-symbol! ty name
+            cons inline fn params body
+    elseif (kw == 'typefn&)
+        let ty name params body = (decons rest 3)
+        list set-type-symbol!& ty name
+            cons inline fn params body
+    else
+        cons inline args
+
+inline fn bitcast& (self destT)
     let T = (typeof self)
     assert (T < ref) "argument must be of reference type"
     let ST = (storageof T)
@@ -2828,7 +2846,7 @@ fn move-construct-array (n value source)
         destruct-array n source
 
 let Memory = (typename "Memory")
-typefn! Memory '__typecall (cls T args...)
+inline typefn Memory '__typecall (cls T args...)
     if (((typeof T) == Symbol) and (T == 'copy))
         if ((va-countof args...) > 1)
             compiler-error! "copy constructor only takes one argument"
@@ -2836,11 +2854,11 @@ typefn! Memory '__typecall (cls T args...)
     else cls
         (type@ cls 'new) cls T args...
 
-typefn Memory 'delete (cls value)
+inline typefn Memory 'delete (cls value)
     destruct value
     (type@ cls 'free) cls value
 
-typefn! Memory 'copy (cls value)
+inline typefn Memory 'copy (cls value)
     let T = (typeof value)
     let ET =
         if (T < ref)
@@ -2851,46 +2869,46 @@ typefn! Memory 'copy (cls value)
     copy-construct self value
     self
 
-typefn! Memory 'new (cls T args...)
+inline typefn Memory 'new (cls T args...)
     let self =
         ((type@ cls 'allocate) cls T) as ref
     construct self args...
     self
 
 let HeapMemory = (typename "HeapMemory" (super = Memory))
-typefn HeapMemory 'allocate (cls T)
+inline typefn HeapMemory 'allocate (cls T)
     malloc T
-typefn HeapMemory 'free (cls value)
+inline typefn HeapMemory 'free (cls value)
     free value
     return;
-typefn HeapMemory 'allocate-array (cls T count)
+inline typefn HeapMemory 'allocate-array (cls T count)
     malloc-array T count
-typefn HeapMemory 'free-array (cls value count)
+inline typefn HeapMemory 'free-array (cls value count)
     free value
     return;
 
 let FunctionMemory = (typename "FunctionMemory" (super = Memory))
-typefn FunctionMemory 'allocate (cls T)
+inline typefn FunctionMemory 'allocate (cls T)
     alloca T
-typefn FunctionMemory 'free (cls value)
+inline typefn FunctionMemory 'free (cls value)
     return;
-typefn FunctionMemory 'allocate-array (cls T count)
+inline typefn FunctionMemory 'allocate-array (cls T count)
     alloca-array T count
-typefn FunctionMemory 'free-array (cls value count)
+inline typefn FunctionMemory 'free-array (cls value count)
     return;
 
 let GlobalMemory = (typename "GlobalMemory" (super = Memory))
-typefn! GlobalMemory 'allocate (cls T)
+inline typefn GlobalMemory 'allocate (cls T)
     static-alloc T
-typefn GlobalMemory 'free (cls value)
+inline typefn GlobalMemory 'free (cls value)
     return;
-typefn! GlobalMemory 'allocate-array (cls T count)
+inline typefn GlobalMemory 'allocate-array (cls T count)
     assert (constant? count) "count must be constant"
     bitcast
         static-alloc
             array T count
         'set-storage (pointer T 'mutable) 'Private
-typefn GlobalMemory 'free-array (cls value count)
+inline typefn GlobalMemory 'free-array (cls value count)
     return;
 
 typefn ref '__delete (self)
@@ -2945,7 +2963,7 @@ do
 
 #-------------------------------------------------------------------------------
 
-fn supercall (cls methodname self args...)
+inline fn supercall (cls methodname self args...)
     let cls = (imply cls type)
     let methodname = (imply methodname Symbol)
     let T = (typeof self)
@@ -2967,16 +2985,16 @@ fn supercall (cls methodname self args...)
 # default value constructors
 #-------------------------------------------------------------------------------
 
-fn local (T args...)
+inline fn local (T args...)
     FunctionMemory T args...
 
-fn new (T args...)
+inline fn new (T args...)
     HeapMemory T args...
 
-fn! static (T args...)
+inline fn static (T args...)
     GlobalMemory T args...
 
-fn delete (self)
+inline fn delete (self)
     """"destructs and frees `value` of types that have the `__delete` method
         implemented. The free method must also invoke the destructor.
     let T = (typeof self)
@@ -3037,15 +3055,20 @@ define package
     set-scope-symbol! package 'modules (Scope)
     package
 
-fn clone-scope-symbols (source target)
-    fn clone-contents (source target)
-        let parent = (Scope-parent source)
-        let target =
-            if (parent == null) target
-            else
-                clone-contents parent target
-        Scope target source
-    clone-contents (unconst source) (unconst target)
+set-type-symbol! Scope '__..
+    inline fn "Scope-join" (a b)
+        """"Join two scopes ``a`` and ``b`` into a new scope so that the
+            root of ``a`` descends from ``b``.
+        fn clone-contents (a b)
+            # search first upwards for the root scope of a, then clone a
+                piecewise with the cloned scopes as parents
+            let parent = (Scope-parent a)
+            let b =
+                if (parent == null) b
+                else
+                    clone-contents parent b
+            Scope b a
+        clone-contents (unconst a) (unconst b)
 
 syntax-extend
     fn make-module-path (base-dir pattern name)
@@ -3114,7 +3137,7 @@ syntax-extend
         let eval-scope = (va@ 'scope opts...)
         let eval-scope =
             if (none? eval-scope)
-                clone-scope-symbols (globals) (Scope)
+                Scope (globals)
             else eval-scope
         let main-module? = (va@ 'main-module? opts...)
         set-scope-symbol! eval-scope 'main-module?
@@ -3260,7 +3283,7 @@ let llvm.frameaddress =
 let llvm.stacksave =
     extern 'llvm.stacksave (function i8*)
 
-fn xpcall (f errorf)
+inline fn xpcall (f errorf)
     let pad = (alloca-exception-pad)
     let old-pad =
         set-exception-pad pad
@@ -3431,19 +3454,19 @@ typefn Closure '__imply (self destT)
             loop i-1 (rawcall element-type ET i-1) args...
 
 # pointer comparisons
-typefn pointer '__== (a b flipped)
+inline typefn pointer '__== (a b flipped)
     if flipped
         icmp== (ptrtoint (a as (typeof b)) usize) (ptrtoint b usize)
     else
         icmp== (ptrtoint a usize) (ptrtoint (b as (typeof a)) usize)
 
 # pointer cast to element type executes load
-typefn pointer '__as (self destT)
+inline typefn pointer '__as (self destT)
     if (type== destT (element-type (typeof self) 0))
         load self
 
 # also supports mutable pointer safecast to immutable pointer
-typefn pointer '__imply (self destT)
+inline typefn pointer '__imply (self destT)
     if (type== destT ref)
         bitcast self (ref (typeof self))
     elseif (pointer-type-imply? (typeof self) destT)
@@ -3464,21 +3487,21 @@ typefn& pointer '__getattr (self name)
     '__getattr (deref self) name
 
 # support @
-typefn pointer '__@ (self index)
+inline typefn pointer '__@ (self index)
     let index =
         if (none? index) 0:usize # simple dereference
         else index
     (getelementptr self (usize index)) as ref
 
 # extern cast to element type/pointer executes load/unconst
-typefn extern '__imply (self destT)
+inline typefn extern '__imply (self destT)
     let ET = (element-type (typeof self) 0)
     if (type== destT ET)
         unconst self
     else
         forward-imply (load self) destT
 
-typefn extern '__getattr (self name)
+inline typefn extern '__getattr (self name)
     let T = (typeof self)
     let pET = (element-type T 0)
     let ET = (element-type pET 0)
@@ -3490,17 +3513,17 @@ typefn extern '__getattr (self name)
             return result...
     forward-getattr (load self) name
 
-typefn extern '__as (self destT)
+inline typefn extern '__as (self destT)
     forward-as (load self) destT
 
 # support assignment syntax for extern
-typefn extern '__= (self value)
+inline typefn extern '__= (self value)
     let ET = (element-type (element-type (typeof self) 0) 0)
     store (imply value ET) self
     true
 
 # support @ for extern
-typefn extern '__@ (self value)
+inline typefn extern '__@ (self value)
     @ (unconst self) value
 
 do
@@ -3586,7 +3609,7 @@ typefn CStruct 'structof (cls args...)
         else
             instance
 
-fn CStruct->tuple (self)
+inline fn CStruct->tuple (self)
     bitcast& self (storageof (@ (typeof self)))
 
 typefn& CStruct '__new (self args...)
@@ -3627,26 +3650,26 @@ typefn& CStruct '__copy (self other)
                     \ " from type " (repr (typeof other))
     copy-construct self other
 
-typefn& CStruct '__delete (self)
+inline typefn& CStruct '__delete (self)
     destruct
         CStruct->tuple self
 
 # support for C struct initializers
-typefn CStruct '__typecall (cls args...)
+inline typefn CStruct '__typecall (cls args...)
     if (cls == CStruct)
         compiler-error! "CStruct type constructor is deprecated"
     else
         'structof cls args...
 
 # access reference to struct element from pointer/reference
-typefn& CStruct '__getattr (self name)
+inline typefn& CStruct '__getattr (self name)
     let ET = (element-type (typeof self) 0)
     let idx = (element-index ET name)
     if (icmp>=s idx 0)
         # cast result to reference
         (getelementptr self 0 idx) as ref
 
-typefn CStruct '__getattr (self name)
+inline typefn CStruct '__getattr (self name)
     let idx = (element-index (typeof self) name)
     if (icmp>=s idx 0)
         extractvalue self idx
@@ -3670,7 +3693,7 @@ typefn& CUnion '__copy (self other)
 typefn& CUnion '__delete (self)
 
 # access reference to union element from pointer/reference
-typefn& CUnion '__getattr (self name)
+inline typefn& CUnion '__getattr (self name)
     let ET = (element-type (typeof self) 0)
     let idx = (element-index ET name)
     if (icmp>=s idx 0)
@@ -3680,7 +3703,7 @@ typefn& CUnion '__getattr (self name)
         # cast pointer to reference to alternative type
         (bitcast self newPT) as ref
 
-typefn CUnion '__getattr (self name)
+inline typefn CUnion '__getattr (self name)
     let idx = (element-index (typeof self) name)
     if (icmp>=s idx 0)
         extractvalue self idx
@@ -3753,7 +3776,7 @@ define-scope-macro using
         let name = (name as Syntax as Symbol)
         let module = ((require-from module-dir name) as Scope)
         return (unconst (list do))
-            clone-scope-symbols module syntax-scope
+            .. module syntax-scope
     let pattern =
         if (empty? rest) '()
         else
@@ -3784,7 +3807,7 @@ define-scope-macro using
         syntax-scope
 
 define-macro from
-    fn load-from (src keys...)
+    inline fn load-from (src keys...)
         let loop (i result...) = (va-countof keys...)
         if (i == 0)
             result...
@@ -3817,12 +3840,12 @@ define-macro from
 #-------------------------------------------------------------------------------
 
 define-scope-macro struct
-    fn begin-arg ()
-    fn end-args (f) (f)
-    fn append-arg (prevf x...)
-        fn (f)
+    inline fn begin-arg ()
+    inline fn end-args (f) (f)
+    inline fn append-arg (prevf x...)
+        inline fn (f)
             prevf
-                fn ()
+                inline fn ()
                     return x... (f)
 
     define struct-dsl
@@ -3992,7 +4015,7 @@ typefn& aggregate '__deref (self)
 #-------------------------------------------------------------------------------
 
 do
-    fn tuple-each (f)
+    inline fn tuple-each (f)
         fn (self)
             let ET = (typeof& self)
             let count = (i32 (type-countof ET))
@@ -4001,7 +4024,7 @@ do
                 f ((getelementptr self 0 i) as ref)
                 loop (i + 1)
 
-    fn tuple-each2 (f)
+    inline fn tuple-each2 (f)
         fn (self other)
             let ET = (typeof& self)
             let count = (i32 (type-countof ET))
@@ -4046,7 +4069,7 @@ typefn tuple '__@ (self at)
     let val = (at as integer)
     extractvalue self val
 
-typefn& tuple '__@ (self at)
+inline typefn& tuple '__@ (self at)
     let val = (at as integer)
     (getelementptr self 0 val) as ref
 
@@ -4063,7 +4086,7 @@ typefn tuple '__unpack (self)
                 extractvalue self i
             result...
 
-typefn& tuple '__unpack (self)
+inline typefn& tuple '__unpack (self)
     let T = (typeof& self)
     let count = (type-countof T)
     let loop (i result...) = count
@@ -4170,7 +4193,7 @@ define-macro capture&
                 super = MutableCapture
                 storage = TT
         T
-    fn convert& (self TT)
+    inline fn convert& (self TT)
         unpack (bitcast& self TT)
 
     let args params body = (decons args 2)
@@ -4206,13 +4229,13 @@ define-macro capture&
 #-------------------------------------------------------------------------------
 
 do
-    fn array-each (f)
+    inline fn array-each (f)
         fn (self)
             let ET = (typeof& self)
             let count = (type-countof ET)
             f count ((getelementptr self 0 0) as ref)
 
-    fn array-each2 (fsingle fmany)
+    inline fn array-each2 (fsingle fmany)
         fn (self other)
             let ET = (typeof& self)
             let count = (type-countof ET)
@@ -4271,7 +4294,7 @@ typefn array '__@ (self at)
     else
         compiler-error! "index into immutable array must be constant"
 
-typefn& array '__@ (self at)
+inline typefn& array '__@ (self at)
     let val = (at as integer)
     (getelementptr self 0 val) as ref
 
@@ -4290,17 +4313,17 @@ fn arrayof (T ...)
 
 let Generator = (typename "Generator")
 set-typename-storage! Generator (storageof Closure)
-typefn Generator '__typecall (cls iter init)
-    fn get-iter-init ()
+inline typefn Generator '__typecall (cls iter init)
+    inline fn get-iter-init ()
         return iter init
     bitcast get-iter-init Generator
-typefn Generator '__call (self)
+inline typefn Generator '__call (self)
     if (not (constant? self))
         compiler-error! "Generator must be constant"
     let f = (bitcast self Closure)
     call f
 
-typefn typename 'symbols (self)
+inline typefn typename 'symbols (self)
     Generator
         label (fret fdone key)
             let key value =
@@ -4311,7 +4334,7 @@ typefn typename 'symbols (self)
                 fret key key value
         unconst unnamed
 
-typefn typename 'elements (self)
+inline typefn typename 'elements (self)
     let count =
         type-countof self
     Generator
@@ -4322,7 +4345,7 @@ typefn typename 'elements (self)
                 fret (i + 1) (element-type self i)
         tie-const self 0
 
-typefn Scope '__as (self destT)
+inline typefn Scope '__as (self destT)
     if (destT == Generator)
         Generator
             label (fret fdone key)
@@ -4334,7 +4357,7 @@ typefn Scope '__as (self destT)
                     fret key key value
             unconst unnamed
 
-typefn list '__as (self destT)
+inline typefn list '__as (self destT)
     if (destT == Generator)
         Generator
             label (fret fdone cell)
@@ -4345,7 +4368,7 @@ typefn list '__as (self destT)
                     fret next at
             self
 
-fn va-each (values...)
+inline fn va-each (values...)
     let count = (va-countof values...)
     Generator
         label (fret fdone i)
@@ -4355,7 +4378,7 @@ fn va-each (values...)
                 fret (add i 1) (va@ i values...)
         0
 
-fn va-each-reversed (values...)
+inline fn va-each-reversed (values...)
     let count = (va-countof values...)
     Generator
         label (fret fdone i)
@@ -4366,7 +4389,7 @@ fn va-each-reversed (values...)
                 fret i (va@ i values...)
         count
 
-fn range (a b c)
+inline fn range (a b c)
     let num-type = (typeof a)
     let step =
         if (c == none)
@@ -4387,7 +4410,7 @@ fn range (a b c)
                 fdone;
         unconst from
 
-fn multirange (size...)
+inline fn multirange (size...)
     let dims = (va-countof size...)
     let size = (* size...)
     let ET = (typeof size)
@@ -4406,7 +4429,7 @@ fn multirange (size...)
         unconst
             ET 0
 
-fn unroll-range (a b c)
+inline fn unroll-range (a b c)
     let num-type = (typeof a)
     let step =
         if (c == none)
@@ -4430,7 +4453,7 @@ fn unroll-range (a b c)
                 fdone;
         from
 
-fn zip (a b)
+inline fn zip (a b)
     let iter-a init-a = ((a as Generator))
     let iter-b init-b = ((b as Generator))
     Generator
@@ -4448,7 +4471,7 @@ fn zip (a b)
                 \ fdone a
         tupleof init-a init-b
 
-fn map (x f)
+inline fn map (x f)
     """"Maps function `f (skip values...)` to elements of iterable `x`.
 
         `skip` is a function that can be called to purge the active element
@@ -4468,12 +4491,12 @@ fn map (x f)
                 value
         init
 
-fn enumerate (x)
+inline fn enumerate (x)
     zip
         unroll-range 0x7fffffff
         x as Generator
 
-fn fold (init gen f)
+inline fn fold (init gen f)
     let iter start = ((gen as Generator))
     let loop (result next) = init start
     label break ()
@@ -4583,7 +4606,7 @@ fn vectorof (T ...)
             insertelement result (imply element T) i
     else result
 
-fn vector-signed-dispatch (fsigned funsigned)
+inline fn vector-signed-dispatch (fsigned funsigned)
     fn (a b)
         if (signed? (element-type (typeof a) 0))
             fsigned a b
@@ -4619,7 +4642,7 @@ set-type-symbol! real '__vector>= fcmp>=o
 set-type-symbol! real '__vector< fcmp<o
 set-type-symbol! real '__vector<= fcmp<=o
 
-fn vector-op2-dispatch (symbol)
+inline fn vector-op2-dispatch (symbol)
     fn (a b flipped)
         if (type== (typeof a) (typeof b))
             let Ta = (element-type (typeof a) 0)
@@ -4781,7 +4804,7 @@ del hash2
 del at
 
 set-globals!
-    clone-scope-symbols (globals) (locals)
+    .. (locals) (globals)
 
 #-------------------------------------------------------------------------------
 # REPL
@@ -5007,7 +5030,7 @@ fn run-main (args...)
         read-eval-print-loop;
     else
         let scope =
-            clone-scope-symbols (globals) (Scope)
+            Scope (globals)
         set-scope-symbol! scope 'args
             fn ()
                 return sourcepath (va@ i args...)

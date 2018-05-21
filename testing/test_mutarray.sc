@@ -4,7 +4,7 @@ using import Array
 let TESTSIZE = (1:usize << 16:usize)
 let fullrange = (range (unconst TESTSIZE))
 
-fn autodelete (x)
+inline fn autodelete (x)
     fn (...)
         delete x
         ...
@@ -87,8 +87,9 @@ fn test-sort-array (T)
 test-sort-array (Array i32 32)
 test-sort-array (Array i32)
 
-do
+dump "sorting a bunch of values"
 
+do
     let a = (local (Array string))
     defer (autodelete a)
     let word = "yes"
@@ -101,6 +102,8 @@ do
     for i k in (enumerate (va-each "" "dog" "is" "this" "yes"))
         assert ((a @ i) == k)
 
+dump "sorting big array"
+print "big sort"
 
 fn test-sort ()
     let a = (local (Array i32))

@@ -113,7 +113,7 @@ set-type-symbol! vec-type '__@
         extractelement self i
 
 set-type-symbol! vec-type '__as
-    fn vec-type-as (self destT)
+    inline fn vec-type-as (self destT)
         let ST = (storageof (typeof self))
         if ((destT == vector) or (destT == ST))
             bitcast self ST
@@ -182,7 +182,7 @@ set-type-symbol! vec-type '__==
 fn valid-element-type? (T)
     (T < integer) or (T < real)
 
-fn vec-type-binop (f)
+inline fn vec-type-binop (f)
     fn (a b flipped)
         let T1 T2 = (typeof a) (typeof b)
         label compute (a b)
@@ -402,7 +402,7 @@ fn construct-getter-type (vecrefT mask)
                 true
     T
 
-typefn& vec-type '__getattr (self name)
+inline typefn& vec-type '__getattr (self name)
     let sz mask = (build-access-mask name)
     if (none? sz)
         return;
@@ -518,7 +518,7 @@ set-type-symbol! mat-type '__typecall
                     fn ()
                         return (empty-value cls) (empty-value VT) 0:usize 0:usize
                     va-each ...
-                    fn (break f arg)
+                    inline fn (break f arg)
                         let self vec col row = (f)
                         let argT = (typeof arg)
                         let rows = cls.Rows

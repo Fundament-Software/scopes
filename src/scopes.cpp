@@ -47,7 +47,7 @@ BEWARE: If you build this with anything else but a recent enough clang,
 #define SCOPES_EARLY_ABORT 0
 
 // print a list of cumulative timers on program exit
-#define SCOPES_PRINT_TIMERS 0
+#define SCOPES_PRINT_TIMERS 1
 
 // maximum number of recursions permitted during partial evaluation
 // if you think you need more, ask yourself if ad-hoc compiling a pure C function
@@ -74,7 +74,8 @@ BEWARE: If you build this with anything else but a recent enough clang,
 
 // cleanup useless labels after lower2cff
 // improves LLVM optimization time
-#define SCOPES_CLEANUP_LABELS 1
+// TODO: turn this back on when we don't generate so much garbage anymore
+#define SCOPES_CLEANUP_LABELS 0
 
 #ifndef SCOPES_WIN32
 #   ifdef _WIN32
@@ -552,7 +553,7 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
 
 // list of symbols to be exposed as builtins to the default global namespace
 #define B_GLOBALS() \
-    T(FN_Branch) T(KW_Fn) T(KW_ImpureFn) T(KW_Label) T(KW_Quote) \
+    T(FN_Branch) T(KW_Fn) T(KW_Label) T(KW_Quote) T(KW_Inline) \
     T(KW_Call) T(KW_RawCall) T(KW_CCCall) T(SYM_QuoteForm) T(FN_Dump) T(KW_Do) \
     T(FN_FunctionType) T(FN_TupleType) T(FN_UnionType) T(FN_Alloca) T(FN_AllocaOf) T(FN_Malloc) \
     T(FN_AllocaArray) T(FN_MallocArray) T(FN_ReturnLabelType) T(KW_DoIn) T(FN_AllocaExceptionPad) \
@@ -794,11 +795,11 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(KW_Define, "define") T(KW_Do, "do") T(KW_DumpSyntax, "dump-syntax") \
     T(KW_Else, "else") T(KW_ElseIf, "elseif") T(KW_EmptyList, "empty-list") \
     T(KW_EmptyTuple, "empty-tuple") T(KW_Escape, "escape") \
-    T(KW_Except, "except") T(KW_False, "false") T(KW_Fn, "fn") T(KW_ImpureFn, "fn!") \
+    T(KW_Except, "except") T(KW_False, "false") T(KW_Fn, "fn") \
     T(KW_FnTypes, "fn-types") T(KW_FnCC, "fn/cc") T(KW_Globals, "globals") \
     T(KW_If, "if") T(KW_In, "in") T(KW_Let, "let") T(KW_Loop, "loop") \
     T(KW_LoopFor, "loop-for") T(KW_None, "none") T(KW_Null, "null") \
-    T(KW_QQuoteSyntax, "qquote-syntax") T(KW_Quote, "quote") \
+    T(KW_QQuoteSyntax, "qquote-syntax") T(KW_Quote, "quote") T(KW_Inline, "inline") \
     T(KW_QuoteSyntax, "quote-syntax") T(KW_Raise, "raise") T(KW_Recur, "recur") \
     T(KW_Return, "return") T(KW_Splice, "splice") \
     T(KW_SyntaxExtend, "syntax-extend") T(KW_True, "true") T(KW_Try, "try") \
@@ -841,6 +842,7 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(FN_CStr, "cstr") T(FN_DatumToSyntax, "datum->syntax") \
     T(FN_DatumToQuotedSyntax, "datum->quoted-syntax") \
     T(FN_LabelDocString, "Label-docstring") \
+    T(FN_LabelSetInline, "Label-set-inline!") \
     T(FN_DefaultStyler, "default-styler") T(FN_StyleToString, "style->string") \
     T(FN_Disqualify, "disqualify") T(FN_Dump, "dump") \
     T(FN_DumpLabel, "dump-label") \
@@ -2748,6 +2750,12 @@ struct ArrayType : SizedStorageType {
 
     ArrayType(const Type *_element_type, size_t _count)
         : SizedStorageType(TK_Array, _element_type, _count) {
+        if (is_opaque(_element_type)) {
+            StyledString ss;
+            ss.out << "can not construct array type for values of opaque type "
+                << _element_type;
+            location_error(ss.str());
+        }
         std::stringstream ss;
         ss << "[" << element_type->name()->data << " x " << count << "]";
         _name = String::from_stdstring(ss.str());
@@ -2770,6 +2778,12 @@ struct VectorType : SizedStorageType {
 
     VectorType(const Type *_element_type, size_t _count)
         : SizedStorageType(TK_Vector, _element_type, _count) {
+        if (is_opaque(_element_type)) {
+            StyledString ss;
+            ss.out << "can not construct vector type for values of opaque type "
+                << _element_type;
+            location_error(ss.str());
+        }
         std::stringstream ss;
         ss << "<" << element_type->name()->data << " x " << count << ">";
         _name = String::from_stdstring(ss.str());
@@ -2909,14 +2923,23 @@ struct TupleType : StorageType {
             if (values[i].key != SYM_Unnamed) {
                 ss.out << values[i].key.name()->data << "=";
             }
+            const Type *T = nullptr;
             if (is_unknown(values[i].value)) {
                 ss.out << values[i].value.typeref->name()->data;
-                types.push_back(values[i].value.typeref);
+                T = values[i].value.typeref;
             } else {
                 ss.out << "!" << values[i].value.type;
-                types.push_back(values[i].value.type);
+                T = values[i].value.type;
             }
+            if (is_opaque(T)) {
+                StyledString ss;
+                ss.out << "can not construct tuple type with field of opaque type "
+                    << T;
+                location_error(ss.str());
+            }
+            types.push_back(T);
         }
+
         ss.out << "}";
         if (packed) {
             ss.out << ">";
@@ -3030,7 +3053,6 @@ static const Type *MixedTuple(const Args &values,
         assert(values[i].value.is_const());
     }
 #endif
-
     TypeArgs ta(values, packed, alignment);
     typename ArgMap::iterator it = map.find(ta);
     if (it == map.end()) {
@@ -3074,13 +3096,21 @@ struct UnionType : StorageType {
             if (values[i].key != SYM_Unnamed) {
                 ss.out << values[i].key.name()->data << "=";
             }
+            const Type *T = nullptr;
             if (is_unknown(values[i].value)) {
                 ss.out << values[i].value.typeref->name()->data;
-                types.push_back(values[i].value.typeref);
+                T = values[i].value.typeref;
             } else {
                 ss.out << "!" << values[i].value.type;
-                types.push_back(values[i].value.type);
+                T = values[i].value.type;
             }
+            if (is_opaque(T)) {
+                StyledString ss;
+                ss.out << "can not construct union type with field of opaque type "
+                    << T;
+                location_error(ss.str());
+            }
+            types.push_back(T);
         }
         ss.out << "}";
         _name = ss.str();
@@ -3399,10 +3429,10 @@ struct FunctionType : Type {
     }
 
     FunctionType(
-        const Type *_return_type, const Type *_argument_types, uint32_t _flags) :
+        const Type *_return_type, const ArgTypes &_argument_types, uint32_t _flags) :
         Type(TK_Function),
         return_type(_return_type),
-        argument_types(llvm::cast<TupleType>(_argument_types)->types),
+        argument_types(_argument_types),
         flags(_flags) {
 
         assert(!(flags & FF_Divergent) || argument_types.empty());
@@ -3457,7 +3487,48 @@ struct FunctionType : Type {
 
 static const Type *Function(const Type *return_type,
     const ArgTypes &argument_types, uint32_t flags = 0) {
-    static TypeFactory<FunctionType> functions;
+
+    struct TypeArgs {
+        const Type *return_type;
+        ArgTypes argtypes;
+        uint32_t flags;
+
+        TypeArgs() {}
+        TypeArgs(const Type *_return_type,
+            const ArgTypes &_argument_types,
+            uint32_t _flags = 0) :
+            return_type(_return_type),
+            argtypes(_argument_types),
+            flags(_flags)
+        {}
+
+        bool operator==(const TypeArgs &other) const {
+            if (return_type != other.return_type) return false;
+            if (flags != other.flags) return false;
+            if (argtypes.size() != other.argtypes.size()) return false;
+            for (size_t i = 0; i < argtypes.size(); ++i) {
+                if (argtypes[i] != other.argtypes[i])
+                    return false;
+            }
+            return true;
+        }
+
+        struct Hash {
+            std::size_t operator()(const TypeArgs& s) const {
+                std::size_t h = hash<const Type *>{}(s.return_type);
+                h = HashLen16(h, hash<uint32_t>{}(s.flags));
+                for (auto arg : s.argtypes) {
+                    h = HashLen16(h, hash<const Type *>{}(arg));
+                }
+                return h;
+            }
+        };
+    };
+
+    typedef std::unordered_map<TypeArgs, FunctionType *, typename TypeArgs::Hash> ArgMap;
+
+    static ArgMap map;
+
     if (return_type->kind() != TK_ReturnLabel) {
         if (return_type == TYPE_Void) {
             return_type = ReturnLabel({});
@@ -3472,7 +3543,16 @@ static const Type *Function(const Type *return_type,
             return_type = ReturnLabel({unknown_of(return_type)});
         }
     }
-    return functions.insert(return_type, Tuple(argument_types), flags);
+
+    TypeArgs ta(return_type, argument_types, flags);
+    typename ArgMap::iterator it = map.find(ta);
+    if (it == map.end()) {
+        FunctionType *t = new FunctionType(return_type, argument_types, flags);
+        map.insert({ta, t});
+        return t;
+    } else {
+        return it->second;
+    }
 }
 
 static bool is_function_pointer(const Type *type) {
@@ -3730,6 +3810,28 @@ static bool is_opaque(const Type *T) {
     case TK_ReturnLabel: {
         const ReturnLabelType *rlt = cast<ReturnLabelType>(T);
         return is_opaque(rlt->return_type);
+    } break;
+    case TK_Image:
+    case TK_SampledImage:
+    case TK_Function: return true;
+    default: break;
+    }
+    return false;
+}
+
+static bool is_invalid_argument_type(const Type *T) {
+    switch(T->kind()) {
+    case TK_Typename: {
+        const TypenameType *tt = cast<TypenameType>(T);
+        if (!tt->finalized()) {
+            return true;
+        } else {
+            return is_invalid_argument_type(tt->storage_type);
+        }
+    } break;
+    case TK_ReturnLabel: {
+        const ReturnLabelType *rlt = cast<ReturnLabelType>(T);
+        return is_invalid_argument_type(rlt->return_type);
     } break;
     case TK_Function: return true;
     default: break;
@@ -5730,11 +5832,11 @@ typedef Tag<Label> LabelTag;
 
 enum LabelFlags {
     LF_Template = (1 << 0),
-    // label has been discovered to be reentrant; should not be inlined
+    // label has been discovered to be reentrant; should not be inlined or
+    // folded
     LF_Reentrant = (1 << 1),
-    // repeatedly calling this label with the same arguments will yield
-    // different results
-    LF_Impure = (1 << 2),
+    // this label will always be inlined
+    LF_Inline = (1 << 3),
 };
 
 struct Label {
@@ -5764,16 +5866,16 @@ public:
         flags |= LF_Reentrant;
     }
 
-    void set_impure() {
-        flags |= LF_Impure;
+    void set_inline() {
+        flags |= LF_Inline;
     }
 
-    bool is_impure() const {
-        return flags & LF_Impure;
+    bool is_inline() const {
+        return flags & LF_Inline;
     }
 
     bool is_memoized() const {
-        return !(is_impure() && is_template());
+        return true;
     }
 
     bool is_reentrant() const {
@@ -6006,7 +6108,7 @@ public:
             if (T == TYPE_Unknown) {
                 set_active_anchor(anchor);
                 location_error(String::from("cannot compile function with untyped argument"));
-            } else if (is_opaque(T)) {
+            } else if (is_invalid_argument_type(T)) {
                 set_active_anchor(anchor);
                 StyledString ss;
                 ss.out << "cannot compile function with opaque argument of type "
@@ -6226,9 +6328,6 @@ public:
                 stream_id(ps);
             }
         }
-        if (is_impure()) {
-            ss << Style_Keyword << "!";
-        }
         ss << Style_None;
         return ss;
     }
@@ -6269,7 +6368,6 @@ public:
         Label *result = new Label(label->anchor, label->name, 0);
         result->original = label;
         result->uid = label->next_instanceid++;
-        result->flags |= label->flags & LF_Impure;
         return result;
     }
 
@@ -6529,6 +6627,10 @@ struct StreamLabel : StreamAnchors {
         visited.insert(alabel);
         if (line_anchors) {
             stream_anchor(alabel->anchor);
+        }
+        if (alabel->is_inline()) {
+            ss << Style_Keyword << "inline" << Style_None;
+            ss << " ";
         }
         if (alabel->is_reentrant()) {
             ss << Style_Keyword << "R" << Style_None;
@@ -8060,6 +8162,13 @@ void f_exit(int c) {
     exit(c);
 }
 
+static void location_message(const Anchor *anchor, const String* str) {
+    assert(anchor);
+    auto cerr = StyledStream(std::cerr);
+    cerr << anchor << str->data << std::endl;
+    anchor->stream_source_line(cerr);
+}
+
 static void print_exception(const Any &value) {
     auto cerr = StyledStream(std::cerr);
     if (value.type == TYPE_Exception) {
@@ -8782,8 +8891,11 @@ struct SPIRVGenerator {
             auto it = param2value.find({active_function_value, value.parameter});
             if (it == param2value.end()) {
                 assert(active_function_value);
+                if (value.parameter->label) {
+                    location_message(value.parameter->label->anchor, String::from("declared here"));
+                }
                 StyledString ss;
-                ss.out << "IL->SPIR: can't translate free variable " << value.parameter;
+                ss.out << "IL->SPIR: can't access free variable " << value.parameter;
                 location_error(ss.str());
             }
             return it->second;
@@ -11105,20 +11217,11 @@ struct LLVMIRGenerator {
             auto it = param2value.find({active_function_value, value.parameter});
             if (it == param2value.end()) {
                 assert(active_function_value);
-#if 0
-                {
-                    StyledStream ss(std::cerr);
-                    ss << "function context:" << std::endl;
-                    stream_label(ss, active_function, StreamLabelFormat::debug_scope());
-                }
                 if (value.parameter->label) {
-                    StyledStream ss(std::cerr);
-                    ss << "parameter context:" << std::endl;
-                    stream_label(ss, value.parameter->label, StreamLabelFormat::debug_scope());
+                    location_message(value.parameter->label->anchor, String::from("declared here"));
                 }
-#endif
                 StyledString ss;
-                ss.out << "IL->IR: can't translate free variable " << value.parameter;
+                ss.out << "IL->IR: can't access free variable " << value.parameter;
                 location_error(ss.str());
             }
             return it->second;
@@ -13717,42 +13820,43 @@ struct Solver {
         return false;
     }
 
-    bool label_returns_unreturnable_types(Label *l) {
+    void validate_label_return_types(Label *l) {
         if (l->is_basic_block_like())
-            return false;
+            return;
         if (!l->is_return_param_typed())
-            return false;
+            return;
         const ReturnLabelType *rlt = cast<ReturnLabelType>(l->params[0]->type);
         for (size_t i = 0; i < rlt->values.size(); ++i) {
             auto &&val = rlt->values[i].value;
-            if (is_unknown(val)) {
+            bool needs_inline = false;
+            const char *name = nullptr;
+            const Type *displayT = nullptr;
+            if (is_indirect_closure_type(val.type)) {
+                needs_inline = true;
+                name = "closure";
+                displayT = val.type;
+            } else if (is_unknown(val)) {
                 auto T = val.typeref;
                 if (!is_opaque(T)) {
                     T = storage_type(T);
                     if (T->kind() == TK_Pointer) {
                         auto pt = cast<PointerType>(T);
                         if (pt->storage_class != SYM_Unnamed) {
-                            return true;
+                            needs_inline = true;
+                            name = "pointer";
+                            displayT = val.typeref;
                         }
                     }
                 }
             }
+            if (needs_inline) {
+                StyledString ss;
+                set_active_anchor(l->anchor);
+                ss.out << "return argument #" << i << " is of non-returnable " << name << " type "
+                    << displayT << " but function is not being inlined" << std::endl;
+                location_error(ss.str());
+            }
         }
-        return false;
-    }
-
-    bool label_returns_closures(Label *l) {
-        if (l->is_basic_block_like())
-            return false;
-        if (!l->is_return_param_typed())
-            return false;
-        const ReturnLabelType *rlt = cast<ReturnLabelType>(l->params[0]->type);
-        for (size_t i = 0; i < rlt->values.size(); ++i) {
-            auto &&val = rlt->values[i];
-            if (is_indirect_closure_type(val.value.type))
-                return true;
-        }
-        return false;
     }
 
     bool frame_args_match_keys(const Args &args, const Args &keys) const {
@@ -13791,6 +13895,15 @@ struct Solver {
         Args callargs;
         Args keys;
         auto &&args = l->body.args;
+#if 1
+        if (enter_label->is_inline()) {
+            callargs.push_back(none);
+            keys.push_back(args[0]);
+            for (size_t i = 1; i < args.size(); ++i) {
+                keys.push_back(args[i]);
+            }
+        } else
+#endif
         {
             callargs.push_back(args[0]);
             keys.push_back(Argument(untyped()));
@@ -13806,13 +13919,8 @@ struct Solver {
                     callargs.push_back(arg);
                 }
             }
-
-            // we can't perform this optimization because it breaks memoization
-            // of non-closure returning functions
             #if 0
-            bool is_bb = enter_label->is_basic_block_like();
-            if (!is_bb /* && !recursive */ && (callargs.size() == 1)) {
-                // generated function will have only constant arguments, inline
+            if (enter_label->is_inline()) {
                 callargs[0] = none;
                 keys[0] = args[0];
             }
@@ -13828,6 +13936,11 @@ struct Solver {
             reentrant = (top_frame && top_frame->instance == newl);
             // mark this function as reentrant for the solver further up in the stack
             if (reentrant) {
+                /*
+                if (newl->is_inline()) {
+                    location_error(String::from("reentrant label has been previously marked as inline"));
+                }
+                */
                 newl->set_reentrant();
             }
         }
@@ -13835,10 +13948,22 @@ struct Solver {
         if (newl == l) {
             location_error(String::from("label or function forms an infinite but empty loop"));
         }
+
+        if (newl->is_basic_block_like()) {
+            enter = newl;
+            args = callargs;
+            clear_continuation_arg(l);
+            fold_useless_labels(l);
+            return FR_Pass;
+        }
+
         // we need to solve body, return type and reentrant flags for the
         // section that follows
         normalize_label(newl);
+        assert(!newl->is_basic_block_like());
+#if 0
         if (newl->is_basic_block_like()) {
+            assert(false);
             enter = newl;
             args = callargs;
             clear_continuation_arg(l);
@@ -13846,109 +13971,60 @@ struct Solver {
             l->body.set_complete();
             return FR_Break;
         }
+#endif
+
+        // newl is a function
 
         assert(!newl->params.empty());
+        validate_label_return_types(newl);
+
         bool has_return_type = newl->is_return_param_typed();
-        bool returns_closures = label_returns_closures(newl);
-        bool returns_unreturnable_types = label_returns_unreturnable_types(newl);
 
-        if (has_return_type
-            && (returns_closures
-                || returns_unreturnable_types
-                || (!reentrant
-                    && is_trivial_function(newl)))) {
-            // need to inline the function
-            if (SCOPES_INLINE_FUNCTION_FROM_TEMPLATE
-                || returns_closures /* && !recursive */) {
-                callargs.clear();
-                keys.clear();
-                callargs.push_back(none);
-                keys.push_back(args[0]);
-                for (size_t i = 1; i < args.size(); ++i) {
-                    keys.push_back(args[i]);
-                }
-                newl = fold_type_label_single(
-                    enter_frame, enter_label, keys);
-                enter = newl;
-                args = callargs;
-                return FR_Pass;
-            } else {
-                /*
-                mangle solved function to include explicit return continuation.
+        enter = newl;
+        args = callargs;
 
-                problem with this method:
-                if closures escape the function, the closure's frames
-                still map template parameters to labels used before the mangling.
-
-                so for those cases, we fold the function again (see branch above)
-                */
-                Parameter *cont_param = newl->params[0];
-                const Type *cont_type = cont_param->type;
-                assert(isa<ReturnLabelType>(cont_type));
-                auto tli = cast<ReturnLabelType>(cont_type);
-                Any cont = fold_type_return(args[0].value, tli->values);
-                assert(cont.type != TYPE_Closure);
-                keys.clear();
-                keys.push_back(cont);
-                for (size_t i = 1; i < callargs.size(); ++i) {
-                    keys.push_back(callargs[i]);
+        assert(newl->body.is_complete());
+        if (has_return_type) {
+            // function is now typed
+            type_continuation_from_label_return_type(l);
+            if (is_empty_function(newl)) {
+#if 1
+                if (enable_step_debugger) {
+                    StyledStream ss(std::cerr);
+                    ss << "folding call to empty function:" << std::endl;
+                    stream_label(ss, newl, StreamLabelFormat::debug_scope());
                 }
-                assert(!callargs.empty());
-                callargs[0] = { none };
-                std::unordered_set<Label *> visited;
-                std::vector<Label *> labels;
-                newl->build_reachable(visited, &labels);
-                Label::UserMap um;
-                for (auto it = labels.begin(); it != labels.end(); ++it) {
-                    (*it)->insert_into_usermap(um);
-                }
-                Label *newll = fold_type_label(um, newl, keys);
-                enter = newll;
-                args = callargs;
+#endif
+                // function performs no work, fold
+                enter = args[0].value;
+                args = { none };
                 fold_useless_labels(l);
-                l->body.set_complete();
-                if (cont.type == TYPE_Label
-                    /*&& !cont.label->body.is_complete()*/) {
-                    l = cont.label;
-                    assert(all_params_typed(l));
-                    return FR_Continue;
-                }
-                return FR_Break;
             }
         } else {
-            enter = newl;
-            args = callargs;
+            if (reentrant) {
+                // possible recursion - entry label has already been
+                // processed, but not exited yet, so we don't have the
+                // continuation type yet.
 
-            assert(newl->body.is_complete());
-            if (has_return_type) {
-                // function is now typed
-                type_continuation_from_label_return_type(l);
-            } else {
-                if (reentrant) {
-                    // possible recursion - entry label has already been
-                    // processed, but not exited yet, so we don't have the
-                    // continuation type yet.
-
-                    // as long as we don't have to pass on the result,
-                    // that's not a problem though
-                    if (is_continuing_to_label(l) || is_continuing_to_closure(l)) {
-                        location_error(String::from(
-                            "attempt to continue from call to recursive function"
-                            " before it has been typed; place exit condition before recursive call"));
-                    }
-                } else {
-                    // apparently we returned from this label, but
-                    // its continuation has not been typed,
-                    // which means that it's functioning more like
-                    // a basic block
-                    // cut it
-                    delete_continuation(newl);
-                    clear_continuation_arg(l);
-                    fold_useless_labels(l);
+                // as long as we don't have to pass on the result,
+                // that's not a problem though
+                if (is_continuing_to_label(l) || is_continuing_to_closure(l)) {
+                    location_error(String::from(
+                        "attempt to continue from call to recursive function"
+                        " before it has been typed; place exit condition before recursive call"));
                 }
+            } else {
+                // apparently we returned from this label, but
+                // its continuation has not been typed,
+                // which means that it's functioning more like
+                // a basic block
+                // cut it
+                delete_continuation(newl);
+                clear_continuation_arg(l);
+                fold_useless_labels(l);
             }
-            return FR_Pass;
         }
+        return FR_Pass;
     }
 
     // returns true if the builtin folds regardless of whether the arguments are
@@ -15818,26 +15894,27 @@ struct Solver {
     }
 
     // label targets count as calls, all other as ops
-    static void count_instructions(Label *l, int &callcount, int &opcount) {
-        callcount = 0;
-        opcount = 0;
+    static bool is_empty_function(Label *l) {
+        assert(!l->params.empty());
+        auto rtype = l->params[0]->type;
+        if (rtype->kind() != TK_ReturnLabel)
+            return false;
+        const ReturnLabelType *rlt = cast<ReturnLabelType>(rtype);
+        if (rlt->return_type != TYPE_Void)
+            return false;
         assert(!l->params.empty());
         std::unordered_set<Label *> visited;
-        while (!is_exiting(l) && !visited.count(l)) {
+        while (!visited.count(l)) {
             visited.insert(l);
             if (jumps_immediately(l)) {
                 l = l->body.enter.label;
                 continue;
             }
-            if (is_calling_label(l) || is_calling_closure(l)) {
-                callcount++;
-            } else {
-                opcount++;
+            if (!is_calling_continuation(l)) {
+                return false;
             }
-            if (is_continuing_to_label(l)) {
-                l = l->body.args[0].value.label;
-                continue;
-            } else if (l->body.args[0].value.type == TYPE_Nothing) {
+            assert(!is_continuing_to_label(l));
+            if (l->body.args[0].value.type == TYPE_Nothing) {
                 // branch, unreachable, etc.
                 break;
             } else {
@@ -15848,33 +15925,7 @@ struct Solver {
                 break;
             }
         }
-    }
-
-    static bool is_trivial_function(Label *l) {
-        assert(!l->params.empty());
-        if (!isa<ReturnLabelType>(l->params[0]->type))
-            return false;
-        if (l->params.size() == 1) {
-            // doesn't take any arguments
-            return true;
-        }
-#if 1
-        int callcount, opcount;
-        count_instructions(l, callcount, opcount);
-        return (callcount <= 4) && (opcount <= 1);
-#else
-        assert(!l->params.empty());
-        l = skip_jumps(l);
-        if (is_exiting(l))
-            return true;
-        if (is_continuing_to_label(l)) {
-            l = l->body.args[0].value.label;
-            l = skip_jumps(l);
-            if (is_exiting(l))
-                return true;
-        }
-#endif
-        return false;
+        return true;
     }
 
     static bool matches_arg_count(Label *l, size_t inargs) {
@@ -16888,7 +16939,17 @@ struct Expander {
         }
     }
 
-    Any expand_fn(const List *it, const Any &dest, bool label, bool impure) {
+    struct ExpandFnSetup {
+        bool label;
+        bool inlined;
+
+        ExpandFnSetup() {
+            label = false;
+            inlined = false;
+        };
+    };
+
+    Any expand_fn(const List *it, const Any &dest, const ExpandFnSetup &setup) {
         auto _anchor = get_active_anchor();
 
         verify_list_parameter_count(it, 1, -1);
@@ -16923,22 +16984,22 @@ struct Expander {
             // unnamed lambda
             func = Label::from(_anchor, Symbol(SYM_Unnamed));
         }
-        if (impure)
-            func->set_impure();
+        if (setup.inlined)
+            func->set_inline();
 
         Parameter *retparam = nullptr;
         if (continuing) {
             assert(!func->params.empty());
             retparam = func->params[0];
         } else {
-            retparam = Parameter::from(_anchor, Symbol(SYM_Unnamed), label?TYPE_Nothing:TYPE_Unknown);
+            retparam = Parameter::from(_anchor, Symbol(SYM_Unnamed), setup.label?TYPE_Nothing:TYPE_Unknown);
             func->append(retparam);
         }
 
         if (it == EOL) {
             // forward declaration
             if (tryfunc_name.type != TYPE_Symbol) {
-                location_error(label?
+                location_error(setup.label?
                     String::from("forward declared label must be named")
                     :String::from("forward declared function must be named"));
             }
@@ -16955,7 +17016,7 @@ struct Expander {
         // hidden self-binding for subsequent macros
         subenv->bind(SYM_ThisFnCC, func);
         Any subdest = none;
-        if (!label) {
+        if (!setup.label) {
             subenv->bind(KW_Recur, func);
             subenv->bind(KW_Return, retparam);
             subdest = retparam;
@@ -17438,6 +17499,8 @@ struct Expander {
             }
 
             const List *list = expr.list;
+            ExpandFnSetup setup;
+        skip_head:
             if (list == EOL) {
                 location_error(String::from("expression is empty"));
             }
@@ -17453,9 +17516,16 @@ struct Expander {
                 Builtin func = head.builtin;
                 switch(func.value()) {
                 case KW_SyntaxLog: return expand_syntax_log(list, dest);
-                case KW_Fn: return expand_fn(list, dest, false, false);
-                case KW_ImpureFn: return expand_fn(list, dest, false, true);
-                case KW_Label: return expand_fn(list, dest, true, false);
+                case KW_Fn: return expand_fn(list, dest, setup);
+                case KW_Inline: {
+                    setup.inlined = true;
+                    list = list->next;
+                    goto skip_head;
+                }
+                case KW_Label: {
+                    setup.label = true;
+                    return expand_fn(list, dest, setup);
+                }
                 case KW_SyntaxExtend: return expand_syntax_extend(list, dest);
                 case KW_Let: return expand_let(list, dest);
                 case KW_If: return expand_if(list, dest);
@@ -18142,6 +18212,9 @@ static void f_del_scope_symbol(Scope *scope, Symbol sym) {
 }
 
 static Label *f_typify(Closure *srcl, int numtypes, const Type **typeargs) {
+    if (srcl->label->is_inline()) {
+        location_error(String::from("cannot typify inline function"));
+    }
     ArgTypes types;
     for (int i = 0; i < numtypes; ++i) {
         types.push_back(typeargs[i]);
@@ -18393,6 +18466,13 @@ static void f_enter_solver_cli () {
     Solver::enable_step_debugger = true;
 }
 
+static void f_label_setinline (Label *label) {
+    if (label->is_reentrant()) {
+        location_error(String::from("Reentrant label can not be tagged as inline"));
+    }
+    label->set_inline();
+}
+
 static const String *f_label_docstring(Label *label) {
     if (label->docstring) {
         return label->docstring;
@@ -18507,6 +18587,7 @@ static void init_globals(int argc, char *argv[]) {
     DEFINE_PURE_C_FUNCTION(FN_LabelCountOfReachable, f_label_countof_reachable, TYPE_USize, TYPE_Label);
     DEFINE_PURE_C_FUNCTION(FN_EnterSolverCLI, f_enter_solver_cli, TYPE_Void);
     DEFINE_PURE_C_FUNCTION(FN_LabelDocString, f_label_docstring, TYPE_String, TYPE_Label);
+    DEFINE_PURE_C_FUNCTION(FN_LabelSetInline, f_label_setinline, TYPE_Void, TYPE_Label);
 
     DEFINE_PURE_C_FUNCTION(FN_DefaultStyler, f_default_styler, TYPE_String, TYPE_Symbol, TYPE_String);
 

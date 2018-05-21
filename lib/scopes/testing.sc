@@ -49,18 +49,18 @@ define-macro test-modules
             args
 
 define-macro assert-error
-    fn test-function (f)
+    inline fn test-function (f)
         xpcall
-            fn ()
+            inline fn ()
                 f;
                 unconst false
-            fn (exc)
+            inline fn (exc)
                 io-write! "ASSERT OK: "
                 io-write!
                     format-exception exc
                 unconst true
 
-    fn assertion-error! (constant anchor msg)
+    inline fn assertion-error! (constant anchor msg)
         let assert-msg =
             .. "error assertion failed: "
                 if (== (typeof msg) string) msg
@@ -88,18 +88,19 @@ define-macro assert-error
                 else body
 
 define-macro assert-compiler-error
-    fn test-function (f)
+    inline fn test-function (f)
         xpcall
-            fn ()
-                typify (unconst f)
+            inline fn ()
+                compile
+                    typify (unconst f)
                 unconst false
-            fn (exc)
+            inline fn (exc)
                 io-write! "ASSERT OK: "
                 io-write!
                     format-exception exc
                 unconst true
 
-    fn assertion-error! (constant anchor msg)
+    inline fn assertion-error! (constant anchor msg)
         let assert-msg =
             .. "compiler error assertion failed: "
                 if (== (typeof msg) string) msg

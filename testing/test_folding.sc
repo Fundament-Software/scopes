@@ -1,5 +1,7 @@
 
-fn print_stuff (x)
+using import testing
+
+inline fn print_stuff (x)
     print "line"
     fn ()
         print x
@@ -13,8 +15,7 @@ fn main ()
 
 main;
 
-# this case is illegal
-#do
+do
     define ascope (Scope)
     syntax-extend
         fn print_stuff2 (x)
@@ -28,6 +29,8 @@ main;
         main2;
         syntax-scope
 
-    ascope.somefunc;
+    # this case is illegal
+    assert-compiler-error
+        ascope.somefunc;
 
 true

@@ -1,6 +1,6 @@
 
 do
-    fn f (x)
+    inline fn f (x)
         fn ff (y)
             add x y
 
@@ -10,7 +10,7 @@ do
     assert ((q) == 5)
 
 do
-    fn f (x)
+    inline fn f (x)
         let x = (unconst x)
         fn ff (y)
             let y = (unconst y)

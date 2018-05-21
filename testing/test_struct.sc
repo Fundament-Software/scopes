@@ -3,7 +3,7 @@ let val =
     fn (f)
         f;
 
-fn append-val (prevf x)
+inline fn append-val (prevf x)
     fn (f)
         prevf
             fn ()

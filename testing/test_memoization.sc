@@ -10,7 +10,7 @@ fn memoized-clone ()
 fn memoized2 (x)
     typename x
 
-fn! not-memoized ()
+inline fn not-memoized ()
     typename "T"
 
 assert

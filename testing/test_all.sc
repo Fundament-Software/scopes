@@ -26,6 +26,7 @@ test-modules
     .test_fwdecl
     .test_glm
     .test_glsl
+    .test_inline
     .test_inplace_arithmetic
     .test_intrinsics
     .test_iter2
