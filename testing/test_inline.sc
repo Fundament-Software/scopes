@@ -6,19 +6,20 @@ fn test (...)
     print "------------------"
     print ...
     print "------------------"
+# programmatically changing a function to inline
 Label-set-inline! (Closure-label test)
 
-# error: function returns closure
 fn gen-function ()
     fn () true
 
+# error: function returns closure
 assert-compiler-error
     gen-function;
 
-# fine: inline returns closure
 inline gen-function2 ()
     fn () true
 
+# ok: inline returns closure
 assert (((gen-function2)) == true)
 
 inline gen-function3 (x)
@@ -36,3 +37,36 @@ inline gen-function4 (x)
 
 # ok: inline captures variable outside scope
 assert (((gen-function4 (unconst true))) == true)
+
+fn rebuild (x)
+    if (list-empty? x)
+        tie-const x '()
+    else
+        let at rest = (decons x)
+        cons (at as i32 + 1)
+            rebuild rest
+
+let l = (quote 1 2 3 4 5)
+let m = (rebuild l)
+assert (constant? m)
+# compile time recursion fine
+assert (m == '(2 3 4 5 6))
+# run time recursion fine
+assert ((rebuild (unconst l)) == '(2 3 4 5 6))
+
+inline rebuild2 (x)
+    if (list-empty? x)
+        tie-const x '()
+    else
+        let at rest = (decons x)
+        cons (at as i32 + 1)
+            rebuild2 rest
+
+let m = (rebuild2 l)
+assert (constant? m)
+# compile time recursion fine
+assert (m == '(2 3 4 5 6))
+# error: non-tail recursion not possible with inlines
+assert-compiler-error
+    assert ((rebuild2 (unconst l)) == '(2 3 4 5 6))
+
