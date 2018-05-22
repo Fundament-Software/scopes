@@ -1,4 +1,6 @@
 
+using import testing
+
 do
     inline f (x)
         fn ff (y)
@@ -26,15 +28,17 @@ fn test2 ()
         static 'copy false
     let event = (local 'copy 1)
     inline handle_events ()
+        loop;
         if (event != 0)
             if (event == 1)
                 quit = true
         else
-            handle_events;
+            repeat;
     inline mainloop ()
+        loop;
         if (not quit)
             handle_events;
-            mainloop;
+            repeat;
     mainloop;
 
 fn test3 ()
@@ -45,12 +49,7 @@ fn test3 ()
             handle_events;
     handle_events;
 
-#dump-label
-    Closure-label test3
-
 dump-label
-    typify test3
-#compile
     typify test3
 
 test2;

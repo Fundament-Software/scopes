@@ -6,6 +6,7 @@ test-modules
     .test_ansi_colors
     .test_any
     .test_array
+    .test_branch
     .test_assorted
     .test_call_override
     .test_callback

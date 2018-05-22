@@ -78,10 +78,6 @@ inline type== (a b)
     assert-type b
     rawcall icmp== (rawcall ptrtoint a usize) (rawcall ptrtoint b usize)
 
-inline unknownof (T)
-    assert-type T
-    bitcast T Unknown
-
 inline todo! (msg)
     compiler-error!
         string-join "TODO: " msg
@@ -274,6 +270,7 @@ inline gen-type-op2 (f)
                 f a result...
 
 syntax-extend
+
     set-type-symbol! type '__call
         inline (cls ...)
             let val ok = (type@ cls '__typecall)
@@ -1620,8 +1617,8 @@ fn maybe-unsyntax (val)
     else val
 
 # print function
-fn print (...)
-    fn print-element (val)
+inline print (...)
+    inline print-element (val)
         let T = (typeof val)
         if (== T string)
             io-write! val
@@ -1744,7 +1741,7 @@ syntax-extend
     let BlockScopeFunction =
         pointer
             function
-                ReturnLabel (unknownof list) (unknownof Scope)
+                ReturnLabel list Scope
                 \ list list Scope
     set-typename-storage! Macro BlockScopeFunction
     set-type-symbol! Macro '__typecall
@@ -3089,7 +3086,7 @@ syntax-extend
         let f = (compile (eval expr eval-scope))
         let rettype =
             element-type (element-type ('typeof f) 0) 0
-        let ModuleFunctionType = (pointer (function (ReturnLabel (unknownof Any))))
+        let ModuleFunctionType = (pointer (function (ReturnLabel Any)))
         let fptr =
             if (rettype == Any)
                 f as ModuleFunctionType
@@ -4975,7 +4972,7 @@ fn read-eval-print-loop ()
                 let f = (compile (eval (expr as Syntax) eval-scope))
                 let fptr =
                     f as
-                        pointer (function (ReturnLabel (unknownof Scope) (unknownof i32)))
+                        pointer (function (ReturnLabel Scope i32))
                 set-anchor! expr-anchor
                 return (fptr)
             inline (exc)
