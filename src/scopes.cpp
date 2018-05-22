@@ -5874,10 +5874,6 @@ public:
         return flags & LF_Inline;
     }
 
-    bool is_memoized() const {
-        return true;
-    }
-
     bool is_reentrant() const {
         return flags & LF_Reentrant;
     }
@@ -6009,39 +6005,6 @@ public:
             if (it != param_map.end()) stream_users(it->second, ss);
         }
     };
-
-    struct Args {
-        Frame *frame;
-        scopes::Args args;
-
-        Args() : frame(nullptr) {}
-
-        bool operator==(const Args &other) const {
-            if (frame != other.frame) return false;
-            if (args.size() != other.args.size()) return false;
-            for (size_t i = 0; i < args.size(); ++i) {
-                auto &&a = args[i];
-                auto &&b = other.args[i];
-                if (a != b)
-                    return false;
-            }
-            return true;
-        }
-
-        struct Hash {
-            std::size_t operator()(const Args& s) const {
-                std::size_t h = std::hash<Frame *>{}(s.frame);
-                for (auto &&arg : s.args) {
-                    h = HashLen16(h, arg.hash());
-                }
-                return h;
-            }
-        };
-
-    };
-
-    // inlined instances of this label
-    std::unordered_map<Args, Label *, Args::Hash> instances;
 
     Label *get_label_enter() const {
         assert(body.enter.type == TYPE_Label);
@@ -6476,8 +6439,17 @@ static StyledStream& operator<<(StyledStream& ss, const Closure *closure) {
 //------------------------------------------------------------------------------
 
 struct Frame {
+    Frame() :
+        parent(nullptr),
+        label(nullptr),
+        instance(nullptr),
+        loop_count(0) {
+    }
     Frame(Frame *_parent, Label *_label, Label *_instance, size_t _loop_count = 0) :
         parent(_parent), label(_label), instance(_instance), loop_count(_loop_count) {
+        assert(parent);
+        assert(label);
+        assert(instance);
         args.reserve(_label->params.size());
     }
 
@@ -6511,7 +6483,44 @@ struct Frame {
         }
         return true;
     }
+
+    struct ArgsKey {
+        Label *label;
+        scopes::Args args;
+
+        ArgsKey() : label(nullptr) {}
+
+        bool operator==(const ArgsKey &other) const {
+            if (label != other.label) return false;
+            if (args.size() != other.args.size()) return false;
+            for (size_t i = 0; i < args.size(); ++i) {
+                auto &&a = args[i];
+                auto &&b = other.args[i];
+                if (a != b)
+                    return false;
+            }
+            return true;
+        }
+
+        struct Hash {
+            std::size_t operator()(const ArgsKey& s) const {
+                std::size_t h = std::hash<Label *>{}(s.label);
+                for (auto &&arg : s.args) {
+                    h = HashLen16(h, arg.hash());
+                }
+                return h;
+            }
+        };
+
+    };
+
+    // inlined instances of this label
+    std::unordered_map<ArgsKey, Label *, ArgsKey::Hash> instances;
+
+    static Frame *root;
 };
+
+Frame *Frame::root = nullptr;
 
 //------------------------------------------------------------------------------
 // IL PRINTER
@@ -7019,14 +7028,13 @@ static void fold_useless_labels(Label *l) {
 //      type as TYPE_Unknown = leave the parameter as-is
 // any other = inline the argument and remove the parameter
 static Label *fold_type_label(Label::UserMap &um, Label *label, const Args &args) {
-    Label::Args la;
+    Frame::ArgsKey la;
+    la.label = label;
     la.args = args;
-    auto &&instances = label->instances;
-    if (label->is_memoized()) {
-        auto it = instances.find(la);
-        if (it != instances.end())
-            return it->second;
-    }
+    auto &&instances = Frame::root->instances;
+    auto it = instances.find(la);
+    if (it != instances.end())
+        return it->second;
     assert(!label->params.empty());
 
     MangleParamMap map;
@@ -7090,10 +7098,8 @@ static Label *fold_type_label(Label::UserMap &um, Label *label, const Args &args
             srci++;
         }
     }
-    Label *newlabel = mangle(um, label, newparams, map);//, Mangle_Verbose);
-    if (label->is_memoized()) {
-        instances.insert({la, newlabel});
-    }
+    Label *newlabel = mangle(um, label, newparams, map);
+    instances.insert({la, newlabel});
     return newlabel;
 }
 
@@ -7130,6 +7136,8 @@ static void map_constant_arguments(Frame *frame, Label *label, const Args &args)
 //      type as TYPE_Unknown = leave the parameter as-is
 // any other = inline the argument and remove the parameter
 static Label *fold_type_label_single(Frame *parent, Label *label, const Args &args) {
+    assert(parent);
+    assert(label);
     assert(!label->body.is_complete());
     size_t loop_count = 0;
     if (parent && (parent->label == label)) {
@@ -7145,15 +7153,13 @@ static Label *fold_type_label_single(Frame *parent, Label *label, const Args &ar
         }
     }
 
-    Label::Args la;
-    la.frame = parent;
+    Frame::ArgsKey la;
+    la.label = label;
     la.args = args;
-    auto &&instances = label->instances;
-    if (label->is_memoized()) {
-        auto it = instances.find(la);
-        if (it != instances.end())
-            return it->second;
-    }
+    auto &&instances = parent->instances;
+    auto it = instances.find(la);
+    if (it != instances.end())
+        return it->second;
     assert(!label->params.empty());
 
     Label *newlabel = Label::from(label);
@@ -7164,9 +7170,7 @@ static Label *fold_type_label_single(Frame *parent, Label *label, const Args &ar
         stream_label(ss, label, StreamLabelFormat::debug_single());
     }
 #endif
-    if (label->is_memoized()) {
-        instances.insert({la, newlabel});
-    }
+    instances.insert({la, newlabel});
 
     Frame *frame = Frame::from(parent, label, newlabel, loop_count);
 
@@ -7229,6 +7233,7 @@ static Label *fold_type_label_single(Frame *parent, Label *label, const Args &ar
 }
 
 static Label *typify_single(Frame *frame, Label *label, const ArgTypes &argtypes) {
+    assert(frame);
     assert(!label->params.empty());
 
     Args args;
@@ -7242,6 +7247,7 @@ static Label *typify_single(Frame *frame, Label *label, const ArgTypes &argtypes
 }
 
 static Label *fold_typify_single(Frame *frame, Label *label, const Args &values) {
+    assert(frame);
     assert(!label->params.empty());
 
     Args args;
@@ -18147,7 +18153,7 @@ static void f_set_globals(Scope *s) {
 
 static Label *f_eval(const Syntax *expr, Scope *scope) {
     Solver solver;
-    return solver.solve(typify_single(nullptr, expand_module(expr, scope), {}));
+    return solver.solve(typify_single(Frame::root, expand_module(expr, scope), {}));
 }
 
 static void f_set_scope_symbol(Scope *scope, Symbol sym, Any value) {
@@ -18862,6 +18868,8 @@ int main(int argc, char *argv[]) {
     uint64_t c = 0;
     g_stack_start = (char *)&c;
 
+    Frame::root = new Frame();
+
     Symbol::_init_symbols();
     init_llvm();
 
@@ -18932,7 +18940,7 @@ skip_regular_load:
 #endif
 
     Solver solver;
-    fn = solver.solve(typify_single(nullptr, fn, {}));
+    fn = solver.solve(typify_single(Frame::root, fn, {}));
 #if SCOPES_DEBUG_CODEGEN
     std::cout << "normalized:" << std::endl;
     stream_label(ss, fn, StreamLabelFormat::debug_all());
