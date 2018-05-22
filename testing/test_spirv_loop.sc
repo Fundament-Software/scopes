@@ -5,6 +5,8 @@ fn main ()
         repeat (i + 1)
     return;
 
+'dump main
+
 compile-glsl 'fragment
     typify main
     'dump-module

@@ -329,6 +329,13 @@ syntax-extend
     set-type-symbol! Label '__== (gen-type-op2 pointer==)
     set-type-symbol! Frame '__== (gen-type-op2 pointer==)
 
+    set-type-symbol! Label 'dump
+        inline (self)
+            dump-label self
+    set-type-symbol! Closure 'dump
+        inline (self)
+            'dump (Closure-label self)
+
     set-type-symbol! string '__.. (gen-type-op2 string-join)
     set-type-symbol! list '__.. (gen-type-op2 list-join)
 
@@ -802,22 +809,24 @@ fn repr (value)
             Any-typeof value
         else T
     inline append-type? ()
-        tie-const CT
-            if (type== CT i32) false
-            elseif (type== CT bool) false
-            elseif (type== CT Nothing) false
-            elseif (type== CT f32) false
-            elseif (type== CT string) false
-            elseif (type== CT list) false
-            elseif (type== CT Symbol) false
-            elseif (type== CT type) false
-            elseif (vector-type? CT)
-                let ET = (element-type CT 0)
-                if (type== ET i32) false
-                elseif (type== ET bool) false
-                elseif (type== ET f32) false
-                else true
-            else true
+        label ret (value)
+            return
+                tie-const CT value
+        if (type== CT i32) (ret false)
+        elseif (type== CT bool) (ret false)
+        elseif (type== CT Nothing) (ret false)
+        elseif (type== CT f32) (ret false)
+        elseif (type== CT string) (ret false)
+        elseif (type== CT list) (ret false)
+        elseif (type== CT Symbol) (ret false)
+        elseif (type== CT type) (ret false)
+        elseif (vector-type? CT)
+            let ET = (element-type CT 0)
+            if (type== ET i32) (ret false)
+            elseif (type== ET bool) (ret false)
+            elseif (type== ET f32) (ret false)
+            else (ret true)
+        else (ret true)
     let op success = (type@ T '__repr)
     let text =
         if success
@@ -1781,6 +1790,7 @@ syntax-extend
         loop (+ i 1:usize)
 
     fn split-dotted-symbol (head start end tail)
+        let tail = (unconst tail)
         let s = (Symbol->string head)
         let loop (i) = (unconst start)
         if (== i end)
@@ -3770,7 +3780,8 @@ define-scope-macro using
         return (unconst (list do))
             .. module syntax-scope
     let pattern =
-        if (empty? rest) '()
+        if (empty? rest)
+            unconst '()
         else
             let token pattern rest = (decons rest 2)
             let token = (token as Syntax as Symbol)
@@ -3884,68 +3895,69 @@ define-scope-macro struct
     let head body = (decons args)
     let head = (head as Syntax)
     let any-head = (head as Any)
-    let superT name body =
-        if (('typeof any-head) == Symbol and any-head as Symbol == 'union)
-            let head body = (decons body)
-            _ CUnion (head as Syntax) body
-        else
-            _ CStruct head body
     fn complete-declaration ()
-    if (('typeof (name as Any)) == Symbol)
-        # constant
-        let symname = (name as Any as Symbol)
-        # see if we can find a forward declaration in the local scope
-        let T ok = (Scope-local@ syntax-scope symname)
-        fn completable-type? (T)
-            and
-                (typeof T) == type
-                typename-type? T
-                opaque? T
-                (superof T) == typename
+    inline generate-expression (superT name body)
+        if (('typeof (name as Any)) == Symbol)
+            # constant
+            let symname = (name as Any as Symbol)
+            # see if we can find a forward declaration in the local scope
+            let T ok = (Scope-local@ syntax-scope symname)
+            fn completable-type? (T)
+                and
+                    (typeof T) == type
+                    typename-type? T
+                    opaque? T
+                    (superof T) == typename
 
-        return
-            if (empty? body)
-                # forward declaration
-                list let name '=
-                    list do
-                        list using struct-dsl
-                        list let 'this-struct '=
-                            list typename-type
-                                symname as string
-                        'this-struct
-            else
-                # body declaration
-                list let name '=
-                    cons do
-                        list using struct-dsl
-                        list let 'this-struct '=
-                            list if (list completable-type? T) T
-                            list 'else
+            return
+                if (empty? body)
+                    # forward declaration
+                    list let name '=
+                        list do
+                            list using struct-dsl
+                            list let 'this-struct '=
                                 list typename-type
                                     symname as string
-                        list let name '= 'this-struct
-                        list set-typename-super! 'this-struct superT
-                        list let 'field-types '= end-args
-                        ..
-                            cons do body
-                            list
-                                list finalize-struct 'this-struct 'field-types
-            syntax-scope
+                            'this-struct
+                else
+                    # body declaration
+                    list let name '=
+                        cons do
+                            list using struct-dsl
+                            list let 'this-struct '=
+                                list if (list completable-type? T) T
+                                list 'else
+                                    list typename-type
+                                        symname as string
+                            list let name '= 'this-struct
+                            list set-typename-super! 'this-struct superT
+                            list let 'field-types '= end-args
+                            ..
+                                cons do body
+                                list
+                                    list finalize-struct 'this-struct 'field-types
+                syntax-scope
+        else
+            # expression
+            return
+                cons do
+                    list using struct-dsl
+                    list let 'this-struct '=
+                        list typename-type
+                            list (do as) name string
+                    list set-typename-super! 'this-struct superT
+                    list let 'field-types '= end-args
+                    ..
+                        cons do body
+                        list
+                            list finalize-struct 'this-struct 'field-types
+                syntax-scope
+
+    if (('typeof any-head) == Symbol and any-head as Symbol == 'union)
+        let head body = (decons body)
+        generate-expression CUnion (head as Syntax) body
     else
-        # expression
-        return
-            cons do
-                list using struct-dsl
-                list let 'this-struct '=
-                    list typename-type
-                        list (do as) name string
-                list set-typename-super! 'this-struct superT
-                list let 'field-types '= end-args
-                ..
-                    cons do body
-                    list
-                        list finalize-struct 'this-struct 'field-types
-            syntax-scope
+        generate-expression CStruct head body
 
 #-------------------------------------------------------------------------------
 # enum declaration
@@ -3978,9 +3990,10 @@ define-scope-macro enum
         let anyexpr = (expr as Syntax as Any)
         cons
             if (('typeof anyexpr) == Symbol)
-                list quote expr
+                Any (list quote expr)
             else expr
-            if (empty? body) '()
+            if (empty? body)
+                unconst '()
             else
                 convert-body body
 
@@ -4518,11 +4531,11 @@ define-scope-macro breakable-block
                 if ok
                     list let 'recur '= old-recur
                 else
-                    list del 'recur
+                    unconst (list del 'recur)
                 if ok
                     list let 'return '= old-return
                 else
-                    list del 'return
+                    unconst (list del 'return)
                 args
         syntax-scope
 

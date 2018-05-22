@@ -68,10 +68,9 @@ do
         if (T == list)
             return;
         elseif (T == Symbol)
-            _ (unconst true)
+            _;
         else
             _;
-        return;
     typify source-ui Any i32
 
 true

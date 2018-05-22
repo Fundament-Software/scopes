@@ -2042,6 +2042,7 @@ static StyledStream& operator<<(StyledStream& ost, const Anchor *anchor) {
 //------------------------------------------------------------------------------
 
 static void location_error(const String *msg);
+static void location_message(const Anchor *anchor, const String* str);
 
 #define B_TYPE_KIND() \
     T(TK_Integer, "type-kind-integer") \
@@ -5826,8 +5827,11 @@ enum LabelFlags {
     // label has been discovered to be reentrant; should not be inlined or
     // folded
     LF_Reentrant = (1 << 1),
-    // this label will always be inlined
-    LF_Inline = (1 << 3),
+    // this label is an inline
+    LF_Inline = (1 << 2),
+    // this label can not be instantiated more than once per frame and forces
+    // all callers to use the same arguments
+    LF_Merge = (1 << 3),
 };
 
 struct Label {
@@ -5853,12 +5857,20 @@ public:
     Label *paired;
     uint64_t flags;
 
+    void set_merge() {
+        flags |= LF_Merge;
+    }
+
     void set_reentrant() {
         flags |= LF_Reentrant;
     }
 
     void set_inline() {
         flags |= LF_Inline;
+    }
+
+    bool is_merge() const {
+        return flags & LF_Merge;
     }
 
     bool is_inline() const {
@@ -6505,10 +6517,31 @@ struct Frame {
 
     };
 
-    // inlined instances of this label
-    std::unordered_map<ArgsKey, Label *, ArgsKey::Hash> instances;
+    Label *find_instance(const ArgsKey &key) const {
+        auto it = instances.find(key);
+        if (it != instances.end())
+            return it->second;
+        return nullptr;
+    }
+
+    Label *find_any_instance(Label *label, ArgsKey &key) const {
+        for (auto &&it : instances) {
+            if (it.first.label == label) {
+                key = it.first;
+                return it.second;
+            }
+        }
+        return nullptr;
+    }
+
+    void insert_instance(const ArgsKey &key, Label *newlabel) {
+        instances.insert({key, newlabel});
+    }
 
     static Frame *root;
+protected:
+    // inlined instances of this label
+    std::unordered_map<ArgsKey, Label *, ArgsKey::Hash> instances;
 };
 
 Frame *Frame::root = nullptr;
@@ -6634,6 +6667,10 @@ struct StreamLabel : StreamAnchors {
         }
         if (alabel->is_reentrant()) {
             ss << Style_Keyword << "R" << Style_None;
+            ss << " ";
+        }
+        if (alabel->is_merge()) {
+            ss << Style_Keyword << "M" << Style_None;
             ss << " ";
         }
         alabel->stream(ss, fmt.show_users);
@@ -6964,11 +7001,10 @@ static Label *fold_type_label_single(Frame *parent, Label *label, const Args &ar
     Frame::ArgsKey la;
     la.label = label;
     la.args = args;
-    auto &&instances = parent->instances;
-    auto it = instances.find(la);
-    if (it != instances.end())
-        return it->second;
-    assert(!label->params.empty());
+    {
+        Label *result = parent->find_instance(la);
+        if (result) return result;
+    }
 
     Label *newlabel = Label::from(label);
 #if SCOPES_DEBUG_CODEGEN
@@ -6978,7 +7014,26 @@ static Label *fold_type_label_single(Frame *parent, Label *label, const Args &ar
         stream_label(ss, label, StreamLabelFormat::debug_single());
     }
 #endif
-    instances.insert({la, newlabel});
+    if (label->is_merge()) {
+        Frame::ArgsKey key;
+        Label *result = parent->find_any_instance(label, key);
+        if (result && !(la == key)) {
+            {
+                const Type *T = ReturnLabel(key.args);
+                StyledString ss;
+                ss.out << "first typed here as " << T;
+                location_message(key.label->anchor, ss.str());
+            }
+            {
+                const Type *T = ReturnLabel(la.args);
+                StyledString ss;
+                ss.out << "attempting to retype branching expression as " << T;
+                set_active_anchor(label->anchor);
+                location_error(ss.str());
+            }
+        }
+    }
+    parent->insert_instance(la, newlabel);
 
     Frame *frame = Frame::from(parent, label, newlabel, loop_count);
 
@@ -13237,7 +13292,7 @@ struct Solver {
                     }
                     {
                         StyledString ss;
-                        ss.out << "return continuation retyped as " << T;
+                        ss.out << "attempting to retype return continuation as " << T;
                         location_error(ss.str());
                     }
                 }
@@ -13285,7 +13340,7 @@ struct Solver {
                 }
                 {
                     StyledString ss;
-                    ss.out << "label retyped as " << TL;
+                    ss.out << "attempting to retype label as " << TL;
                     location_error(ss.str());
                 }
             }
@@ -17049,6 +17104,9 @@ struct Expander {
         Any result = none;
         Any subdest = none;
         Label *nextstate = make_nextstate(dest, result, subdest);
+        if (nextstate) {
+            nextstate->set_merge();
+        }
 
         int lastidx = (int)branches.size() - 1;
         for (int idx = 0; idx < lastidx; ++idx) {
