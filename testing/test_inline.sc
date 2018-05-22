@@ -8,14 +8,31 @@ fn test (...)
     print "------------------"
 Label-set-inline! (Closure-label test)
 
-fn main ()
-    test (unconst 1) (unconst 2) (unconst 3)
-    test (unconst 1) (unconst 2) (unconst 3)
+# error: function returns closure
+fn gen-function ()
+    fn () true
 
-#print
-    dump-label
-        Closure-label test
+assert-compiler-error
+    gen-function;
 
-print
-    dump-label
-        typify main
+# fine: inline returns closure
+inline gen-function2 ()
+    fn () true
+
+assert (((gen-function2)) == true)
+
+inline gen-function3 (x)
+    fn () x
+
+# ok: function captures constant outside scope
+assert (((gen-function3 true)) == true)
+
+# error: function captures variable outside scope
+assert-compiler-error
+    ((gen-function3 (unconst true))) == true
+
+inline gen-function4 (x)
+    inline () x
+
+# ok: inline captures variable outside scope
+assert (((gen-function4 (unconst true))) == true)

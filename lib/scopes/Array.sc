@@ -29,7 +29,7 @@ fn iRightChild (i)
     2:i64 * i + 2:i64
 
 fn define-common-array-methods (T)
-    inline typefn& T '__as (self T)
+    typeinline& T '__as (self T)
         if (T == Generator)
             Generator
                 label (fret fdone i)
@@ -41,10 +41,10 @@ fn define-common-array-methods (T)
         else
             return;
 
-    inline typefn& T '__countof (self)
+    typeinline& T '__countof (self)
         deref self._count
 
-    inline typefn& T '__@ (self index)
+    typeinline& T '__@ (self index)
         let index = (index as usize)
         assert ((index < self._count) & (index >= 0:usize)) "index out of bounds"
         (getelementptr (deref self._items) index) as ref
@@ -59,7 +59,7 @@ fn define-common-array-methods (T)
         let count = ((deref self._count) as i64)
         let items = (deref self._items)
 
-        fn siftDown (start end)
+        inline siftDown (start end)
             loop (root) = start
             if ((iLeftChild root) <= end)
                 let child = (iLeftChild root)
@@ -87,7 +87,7 @@ fn define-common-array-methods (T)
 
         let count-1 = (count - 1:i64)
 
-        inline fn heapify ()
+        inline heapify ()
             loop (start) =
                 iParent count-1
             if (start >= 0:i64)
@@ -104,7 +104,7 @@ fn define-common-array-methods (T)
             siftDown 0:i64 end
             repeat end
 
-    inline fn append-slots (self n)
+    inline append-slots (self n)
         let idx = (deref self._count)
         let new-count =
             idx +

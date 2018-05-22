@@ -18,12 +18,12 @@ fn test-loop-xp ()
     if (counter == 10)
         return;
     xpcall
-        fn ()
+        inline fn ()
             if (counter == 5)
                 error! "loop error"
             print "success branch" counter
             return;
-        fn (exc)
+        inline fn (exc)
             print "fail branch" counter exc
             io-write!
                 format-exception exc

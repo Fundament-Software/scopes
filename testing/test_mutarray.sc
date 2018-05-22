@@ -4,8 +4,8 @@ using import Array
 let TESTSIZE = (1:usize << 16:usize)
 let fullrange = (range (unconst TESTSIZE))
 
-inline fn autodelete (x)
-    fn (...)
+inline autodelete (x)
+    inline (...)
         delete x
         ...
 

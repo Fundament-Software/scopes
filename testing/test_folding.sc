@@ -1,9 +1,9 @@
 
 using import testing
 
-inline fn print_stuff (x)
+inline print_stuff (x)
     print "line"
-    fn ()
+    inline ()
         print x
 
 fn main ()

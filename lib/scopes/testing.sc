@@ -28,10 +28,10 @@ fn __test-modules (module-dir modules)
     print "***********************************************"
     let ok =
         xpcall
-            fn ()
+            inline fn ()
                 require-from module-dir module
                 unconst true
-            fn (exc)
+            inline fn (exc)
                 io-write!
                     format-exception exc
                 unconst false
@@ -49,7 +49,7 @@ define-macro test-modules
             args
 
 define-macro assert-error
-    inline fn test-function (f)
+    inline test-function (f)
         xpcall
             inline fn ()
                 f;
@@ -60,7 +60,7 @@ define-macro assert-error
                     format-exception exc
                 unconst true
 
-    inline fn assertion-error! (constant anchor msg)
+    inline assertion-error! (constant anchor msg)
         let assert-msg =
             .. "error assertion failed: "
                 if (== (typeof msg) string) msg
@@ -88,7 +88,7 @@ define-macro assert-error
                 else body
 
 define-macro assert-compiler-error
-    inline fn test-function (f)
+    inline test-function (f)
         xpcall
             inline fn ()
                 compile
@@ -100,7 +100,7 @@ define-macro assert-compiler-error
                     format-exception exc
                 unconst true
 
-    inline fn assertion-error! (constant anchor msg)
+    inline assertion-error! (constant anchor msg)
         let assert-msg =
             .. "compiler error assertion failed: "
                 if (== (typeof msg) string) msg

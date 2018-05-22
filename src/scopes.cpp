@@ -72,7 +72,7 @@ BEWARE: If you build this with anything else but a recent enough clang,
 // leaving this off improves LLVM optimization time
 #define SCOPES_INLINE_FUNCTION_FROM_TEMPLATE 0
 
-// cleanup useless labels after lower2cff
+// cleanup useless labels after validate_scope
 // improves LLVM optimization time
 // TODO: turn this back on when we don't generate so much garbage anymore
 #define SCOPES_CLEANUP_LABELS 0
@@ -1145,7 +1145,7 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(TIMER_GenerateSPIRV, "generate_spirv()") \
     T(TIMER_Optimize, "build_and_run_opt_passes()") \
     T(TIMER_MCJIT, "mcjit()") \
-    T(TIMER_Lower2CFF, "lower2cff()") \
+    T(TIMER_ValidateScope, "validate_scope()") \
     T(TIMER_CleanupLabels, "cleanup_labels()") \
     \
     /* ad-hoc builtin names */ \
@@ -16127,7 +16127,7 @@ struct Solver {
         if (dec_solve_ref()) {
             traceback.clear();
         }
-        lower2cff(entry);
+        validate_scope(entry);
 #if SCOPES_CLEANUP_LABELS
         cleanup_labels(entry);
 #endif
@@ -16447,125 +16447,35 @@ struct Solver {
 #endif
     }
 
-    Label *lower2cff(Label *entry) {
-        Timer lower2cff_timer(TIMER_Lower2CFF);
+    Label *validate_scope(Label *entry) {
+        Timer validate_scope_timer(TIMER_ValidateScope);
 
-        size_t numchanges = 0;
-        size_t iterations = 0;
-        do {
-            numchanges = 0;
-            iterations++;
-            if (iterations > 256) {
-                location_error(String::from(
-                    "free variable elimination not "
-                    "terminated after 256 iterations"));
+        std::unordered_set<Label *> visited;
+        std::vector<Label *> labels;
+        entry->build_reachable(visited, &labels);
+
+        Label::UserMap um;
+        for (auto it = labels.begin(); it != labels.end(); ++it) {
+            (*it)->insert_into_usermap(um);
+        }
+
+        for (auto it = labels.begin(); it != labels.end(); ++it) {
+            Label *l = *it;
+            if (l->is_basic_block_like()) {
+                continue;
             }
-
-            std::unordered_set<Label *> visited;
-            std::vector<Label *> labels;
-            entry->build_reachable(visited, &labels);
-
-            Label::UserMap um;
-            for (auto it = labels.begin(); it != labels.end(); ++it) {
-                (*it)->insert_into_usermap(um);
-            }
-
-            std::unordered_set<Label *> illegal;
-            std::unordered_set<Label *> has_illegals;
-            for (auto it = labels.begin(); it != labels.end(); ++it) {
-                Label *l = *it;
-                if (l->is_basic_block_like()) {
-                    continue;
-                }
-                std::vector<Label *> scope;
-                l->build_scope(um, scope);
-                bool found = false;
-                for (size_t i = 0; i < scope.size(); ++i) {
-                    Label *subl = scope[i];
-                    if (!subl->is_basic_block_like()) {
-                        illegal.insert(subl);
-                        found = true;
-                    }
-                }
-                if (found) {
-                    has_illegals.insert(l);
+            std::vector<Label *> scope;
+            l->build_scope(um, scope);
+            for (size_t i = 0; i < scope.size(); ++i) {
+                Label *subl = scope[i];
+                if (!subl->is_basic_block_like()) {
+                    assert(!subl->is_inline());
+                    location_message(l->anchor, String::from("depends on this scope"));
+                    set_active_anchor(subl->anchor);
+                    location_error(String::from("only inlines may depend on variables in exterior scopes"));
                 }
             }
-
-            for (auto it = illegal.begin(); it != illegal.end(); ++it) {
-                Label *l = *it;
-                // always process deepest illegal labels
-                if (has_illegals.count(l))
-                    continue;
-#if SCOPES_DEBUG_CODEGEN
-                ss_cout << "invalid: ";
-                stream_label(ss_cout, l, StreamLabelFormat::debug_single());
-#endif
-
-                auto umit = um.label_map.find(l);
-                if (umit != um.label_map.end()) {
-                    auto users = umit->second;
-                    // continuation must be eliminated
-                    for (auto kv = users.begin(); kv != users.end(); ++kv) {
-                        Label *user = *kv;
-                        auto &&enter = user->body.enter;
-                        auto &&args = user->body.args;
-                        if ((enter.type == TYPE_Label) && (enter.label == l)) {
-                            assert(!args.empty());
-
-                            auto &&cont = args[0];
-                            if ((cont.value.type == TYPE_Parameter)
-                                && (cont.value.parameter->label == l)) {
-#if SCOPES_DEBUG_CODEGEN
-                                ss_cout << "skipping recursive call" << std::endl;
-#endif
-                            } else {
-                                Args newargs = { cont };
-                                for (size_t i = 1; i < l->params.size(); ++i) {
-                                    newargs.push_back(untyped());
-                                }
-                                Label *newl = fold_type_label(um, l, newargs);
-
-#if SCOPES_DEBUG_CODEGEN
-                                ss_cout << l << "(" << cont.value << ") -> " << newl << std::endl;
-#endif
-                                user->remove_from_usermap(um);
-                                cont = none;
-                                enter = newl;
-                                user->insert_into_usermap(um);
-                                numchanges++;
-                            }
-                        } else {
-#if SCOPES_DEBUG_CODEGEN
-                            ss_cout << "warning: invalidated user encountered" << std::endl;
-#endif
-                        }
-                    }
-                }
-            }
-
-            if (!numchanges) {
-                if (!has_illegals.empty() || !illegal.empty()) {
-                    StyledStream ss(std::cerr);
-                    ss << "could not eliminate closures:" << std::endl;
-                    for (auto it = illegal.begin(); it != illegal.end(); ++it) {
-                        stream_label(ss, *it, StreamLabelFormat::debug_single());
-                    }
-                    ss << "within these functions:" << std::endl;
-                    for (auto it = has_illegals.begin(); it != has_illegals.end(); ++it) {
-                        stream_label(ss, *it, StreamLabelFormat::debug_scope());
-                        ss << "----" << std::endl;
-                    }
-                    location_error(String::from("closure elimination failed"));
-
-                }
-            }
-
-        } while (numchanges);
-
-#if SCOPES_DEBUG_CODEGEN
-        ss_cout << "lowered to CFF in " << iterations << " steps" << std::endl;
-#endif
+        }
 
         return entry;
     }
@@ -17535,8 +17445,6 @@ struct Expander {
             }
 
             const List *list = expr.list;
-            ExpandFnSetup setup;
-        skip_head:
             if (list == EOL) {
                 location_error(String::from("expression is empty"));
             }
@@ -17552,13 +17460,16 @@ struct Expander {
                 Builtin func = head.builtin;
                 switch(func.value()) {
                 case KW_SyntaxLog: return expand_syntax_log(list, dest);
-                case KW_Fn: return expand_fn(list, dest, setup);
+                case KW_Fn: {
+                    return expand_fn(list, dest, ExpandFnSetup());
+                }
                 case KW_Inline: {
+                    ExpandFnSetup setup;
                     setup.inlined = true;
-                    list = list->next;
-                    goto skip_head;
+                    return expand_fn(list, dest, setup);
                 }
                 case KW_Label: {
+                    ExpandFnSetup setup;
                     setup.label = true;
                     return expand_fn(list, dest, setup);
                 }

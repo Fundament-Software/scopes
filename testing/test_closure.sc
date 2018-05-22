@@ -1,6 +1,6 @@
 
 do
-    inline fn f (x)
+    inline f (x)
         fn ff (y)
             add x y
 
@@ -10,9 +10,9 @@ do
     assert ((q) == 5)
 
 do
-    inline fn f (x)
+    inline f (x)
         let x = (unconst x)
-        fn ff (y)
+        inline ff (y)
             let y = (unconst y)
             add x y
 
@@ -25,13 +25,13 @@ fn test2 ()
     let quit =
         static 'copy false
     let event = (local 'copy 1)
-    fn handle_events ()
+    inline handle_events ()
         if (event != 0)
             if (event == 1)
                 quit = true
         else
             handle_events;
-    fn mainloop ()
+    inline mainloop ()
         if (not quit)
             handle_events;
             mainloop;

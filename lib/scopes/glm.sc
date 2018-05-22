@@ -113,7 +113,7 @@ set-type-symbol! vec-type '__@
         extractelement self i
 
 set-type-symbol! vec-type '__as
-    inline fn vec-type-as (self destT)
+    inline vec-type-as (self destT)
         let ST = (storageof (typeof self))
         if ((destT == vector) or (destT == ST))
             bitcast self ST
@@ -182,7 +182,7 @@ set-type-symbol! vec-type '__==
 fn valid-element-type? (T)
     (T < integer) or (T < real)
 
-inline fn vec-type-binop (f)
+inline vec-type-binop (f)
     fn (a b flipped)
         let T1 T2 = (typeof a) (typeof b)
         label compute (a b)
@@ -402,7 +402,7 @@ fn construct-getter-type (vecrefT mask)
                 true
     T
 
-inline typefn& vec-type '__getattr (self name)
+typeinline& vec-type '__getattr (self name)
     let sz mask = (build-access-mask name)
     if (none? sz)
         return;
@@ -507,7 +507,7 @@ set-type-symbol! mat-type '__typecall
                 fold
                     empty-value cls
                     unroll-range cls.Columns
-                    fn (break self i)
+                    inline (break self i)
                         insertvalue self (insertelement (empty-value VT) arg i) i
         else
             # construct from arbitrary composition of vectors and elements,
@@ -518,7 +518,7 @@ set-type-symbol! mat-type '__typecall
                     fn ()
                         return (empty-value cls) (empty-value VT) 0:usize 0:usize
                     va-each ...
-                    inline fn (break f arg)
+                    inline (break f arg)
                         let self vec col row = (f)
                         let argT = (typeof arg)
                         let rows = cls.Rows
@@ -572,7 +572,7 @@ set-type-symbol! mat-type '__==
                 fold
                     empty-value (vector bool T.Columns)
                     unroll-range T.Columns
-                    fn (break vec i)
+                    inline (break vec i)
                         insertelement vec
                             (extractvalue self i) == (extractvalue other i)
                             i

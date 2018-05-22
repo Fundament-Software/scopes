@@ -75,7 +75,7 @@ typefn FunctionChain 'prepend (self f)
         oldfn self args...
     self
 
-inline typefn FunctionChain '__typecall (cls name)
+typeinline FunctionChain '__typecall (cls name)
     let T = (typename (.. "<FunctionChain " name ">"))
     set-typename-super! T cls
     typefn T '__typecall (cls args...)
