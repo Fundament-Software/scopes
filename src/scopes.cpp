@@ -72,11 +72,6 @@ BEWARE: If you build this with anything else but a recent enough clang,
 // leaving this off improves LLVM optimization time
 #define SCOPES_INLINE_FUNCTION_FROM_TEMPLATE 0
 
-// cleanup useless labels after validate_scope
-// improves LLVM optimization time
-// TODO: turn this back on when we don't generate so much garbage anymore
-#define SCOPES_CLEANUP_LABELS 0
-
 #ifndef SCOPES_WIN32
 #   ifdef _WIN32
 #   define SCOPES_WIN32
@@ -1146,7 +1141,6 @@ static std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     T(TIMER_Optimize, "build_and_run_opt_passes()") \
     T(TIMER_MCJIT, "mcjit()") \
     T(TIMER_ValidateScope, "validate_scope()") \
-    T(TIMER_CleanupLabels, "cleanup_labels()") \
     \
     /* ad-hoc builtin names */ \
     T(SYM_ExecuteReturn, "execute-return") \
@@ -5656,7 +5650,7 @@ static StyledStream& operator<<(StyledStream& ost, const List *list) {
 // IL OBJECTS
 //------------------------------------------------------------------------------
 
-// IL form inspired by and partially implemented after
+// IL form inspired by
 // Leissa et al., Graph-Based Higher-Order Intermediate Representation
 // http://compilers.cs.uni-saarland.de/papers/lkh15_cgo.pdf
 
@@ -5667,9 +5661,6 @@ enum {
     PARAM_Cont = 0,
     PARAM_Arg0 = 1,
 };
-
-typedef std::unordered_map<Parameter *, Args > MangleParamMap;
-typedef std::unordered_map<Label *, Label *> MangleLabelMap;
 
 enum ParameterKind {
     PK_Regular = 0,
@@ -6794,54 +6785,8 @@ static void stream_frame(
 }
 
 //------------------------------------------------------------------------------
-// IL MANGLING
+// IL EVAL/APPLY
 //------------------------------------------------------------------------------
-
-static void mangle_remap_body(Label::UserMap &um, Label *ll, Label *entry, MangleLabelMap &lmap, MangleParamMap &pmap) {
-    Any enter = entry->body.enter;
-    Args &args = entry->body.args;
-    Args &body = ll->body.args;
-    if (enter.type == TYPE_Label) {
-        auto it = lmap.find(enter.label);
-        if (it != lmap.end()) {
-            enter = it->second;
-        }
-    } else if (enter.type == TYPE_Parameter) {
-        auto it = pmap.find(enter.parameter);
-        if (it != pmap.end()) {
-            enter = first(it->second).value;
-        }
-    }
-    ll->flags = entry->flags & LF_Reentrant;
-    ll->body.copy_traits_from(entry->body);
-    ll->body.enter = enter;
-
-    size_t lasti = (args.size() - 1);
-    for (size_t i = 0; i < args.size(); ++i) {
-        Argument arg = args[i];
-        if (arg.value.type == TYPE_Label) {
-            auto it = lmap.find(arg.value.label);
-            if (it != lmap.end()) {
-                arg.value = it->second;
-            }
-        } else if (arg.value.type == TYPE_Parameter) {
-            auto it = pmap.find(arg.value.parameter);
-            if (it != pmap.end()) {
-                if ((i == lasti) && arg.value.parameter->is_vararg()) {
-                    for (auto subit = it->second.begin(); subit != it->second.end(); ++subit) {
-                        body.push_back(*subit);
-                    }
-                    continue;
-                } else {
-                    arg.value = first(it->second).value;
-                }
-            }
-        }
-        body.push_back(arg);
-    }
-
-    ll->insert_into_usermap(um);
-}
 
 void evaluate(Frame *frame, Argument arg, Args &dest, bool last_param = false) {
     if (arg.value.type == TYPE_Label) {
@@ -6947,61 +6892,6 @@ static void evaluate_body(Frame *frame, Label *dest, Label *source) {
     }
 }
 
-enum MangleFlag {
-    Mangle_Verbose = (1<<0),
-};
-
-static Label *mangle(Label::UserMap &um, Label *entry,
-    std::vector<Parameter *> params, MangleParamMap &pmap, int verbose = 0) {
-    MangleLabelMap lmap;
-
-    std::vector<Label *> entry_scope;
-    entry->build_scope(um, entry_scope);
-
-    // remap entry point
-    Label *le = Label::from(entry);
-    le->set_parameters(params);
-    // create new labels and map new parameters
-    for (auto &&l : entry_scope) {
-        Label *ll = Label::from(l);
-        l->paired = ll;
-        lmap.insert({l, ll});
-        ll->params.reserve(l->params.size());
-        for (auto &&param : l->params) {
-            Parameter *pparam = Parameter::from(param);
-            pmap.insert({ param, {Argument(Any(pparam))}});
-            ll->append(pparam);
-        }
-    }
-
-    // remap label bodies
-    for (auto &&l : entry_scope) {
-        Label *ll = l->paired;
-        l->paired = nullptr;
-        mangle_remap_body(um, ll, l, lmap, pmap);
-    }
-    mangle_remap_body(um, le, entry, lmap, pmap);
-
-    if (verbose & Mangle_Verbose) {
-    StyledStream ss(std::cout);
-    ss << "IN[\n";
-    stream_label(ss, entry, StreamLabelFormat::debug_single());
-    for (auto && l : entry_scope) {
-        stream_label(ss, l, StreamLabelFormat::debug_single());
-    }
-    ss << "]IN\n";
-    ss << "OUT[\n";
-    stream_label(ss, le, StreamLabelFormat::debug_single());
-    for (auto && l : entry_scope) {
-        auto it = lmap.find(l);
-        stream_label(ss, it->second, StreamLabelFormat::debug_single());
-    }
-    ss << "]OUT\n";
-    }
-
-    return le;
-}
-
 static void fold_useless_labels(Label *l) {
     auto &&enter = l->body.enter;
     if (enter.type != TYPE_Label)
@@ -7019,88 +6909,6 @@ static void fold_useless_labels(Label *l) {
             break;
         newl = enter.label;
     }
-}
-
-// inlining the arguments of an untyped scope (including continuation)
-// folds arguments and types parameters
-// arguments are treated as follows:
-// TYPE_Unknown = type the parameter
-//      type as TYPE_Unknown = leave the parameter as-is
-// any other = inline the argument and remove the parameter
-static Label *fold_type_label(Label::UserMap &um, Label *label, const Args &args) {
-    Frame::ArgsKey la;
-    la.label = label;
-    la.args = args;
-    auto &&instances = Frame::root->instances;
-    auto it = instances.find(la);
-    if (it != instances.end())
-        return it->second;
-    assert(!label->params.empty());
-
-    MangleParamMap map;
-    std::vector<Parameter *> newparams;
-    size_t lasti = label->params.size() - 1;
-    size_t srci = 0;
-    for (size_t i = 0; i < label->params.size(); ++i) {
-        Parameter *param = label->params[i];
-        if (param->is_vararg()) {
-            assert(i == lasti);
-            size_t ncount = args.size();
-            if (srci < ncount) {
-                ncount -= srci;
-                Args vargs;
-                for (size_t k = 0; k < ncount; ++k) {
-                    Argument value = args[srci + k];
-                    if (value.value.type == TYPE_Unknown) {
-                        Parameter *newparam = Parameter::from(param);
-                        newparam->kind = PK_Regular;
-                        newparam->type = value.value.typeref;
-                        newparam->name = Symbol(SYM_Unnamed);
-                        newparams.push_back(newparam);
-                        vargs.push_back(Argument(value.key, newparam));
-                    } else {
-                        vargs.push_back(value);
-                    }
-                }
-                map[param] = vargs;
-                srci = ncount;
-            } else {
-                map[param] = {};
-            }
-        } else if (srci < args.size()) {
-            Argument value = args[srci];
-            if (is_unknown(value.value)) {
-                Parameter *newparam = Parameter::from(param);
-                if (is_typed(value.value)) {
-                    if (newparam->is_typed()
-                        && (newparam->type != value.value.typeref)) {
-                        StyledString ss;
-                        ss.out << "attempting to retype parameter of type "
-                            << newparam->type << " as " << value.value.typeref;
-                        location_error(ss.str());
-                    } else {
-                        newparam->type = value.value.typeref;
-                    }
-                }
-                newparams.push_back(newparam);
-                map[param] = {Argument(value.key, newparam)};
-            } else {
-                if (!srci) {
-                    Parameter *newparam = Parameter::from(param);
-                    newparam->type = TYPE_Nothing;
-                    newparams.push_back(newparam);
-                }
-                map[param] = {value};
-            }
-            srci++;
-        } else {
-            map[param] = {Argument()};
-            srci++;
-        }
-    }
-    Label *newlabel = mangle(um, label, newparams, map);
-    instances.insert({la, newlabel});
-    return newlabel;
 }
 
 static void map_constant_arguments(Frame *frame, Label *label, const Args &args) {
@@ -7140,7 +6948,7 @@ static Label *fold_type_label_single(Frame *parent, Label *label, const Args &ar
     assert(label);
     assert(!label->body.is_complete());
     size_t loop_count = 0;
-    if (parent && (parent->label == label)) {
+    if ((parent != Frame::root) && (parent->label == label)) {
         Frame *top = parent;
         parent = top->parent;
         loop_count = top->loop_count + 1;
@@ -15906,13 +15714,6 @@ struct Solver {
 #undef FUN_OP
 #undef FTRI_OP
 
-    /*
-    void inline_single_label(Label *dest, Label *source) {
-        Frame frame(nullptr, source);
-        map_constant_arguments(&frame, source, dest->body.args);
-        evaluate_body(&frame, dest, source);
-    }*/
-
     static Label *skip_jumps(Label *l) {
         size_t counter = 0;
         while (jumps_immediately(l)) {
@@ -16134,9 +15935,6 @@ struct Solver {
             traceback.clear();
         }
         validate_scope(entry);
-#if SCOPES_CLEANUP_LABELS
-        cleanup_labels(entry);
-#endif
         return entry;
     }
 
@@ -16376,81 +16174,6 @@ struct Solver {
                 traceback.push_back(entry_label);
             error(exc);
         SCOPES_TRY_END()
-    }
-
-    // eliminate single user labels
-    void cleanup_labels(Label *entry) {
-        Timer cleanup_timer(TIMER_CleanupLabels);
-
-        size_t count = 0;
-        size_t total_processed = 0;
-        while (true) {
-            std::unordered_set<Label *> visited;
-            std::vector<Label *> labels;
-            entry->build_reachable(visited, &labels);
-
-            Label::UserMap um;
-            for (auto it = labels.begin(); it != labels.end(); ++it) {
-                (*it)->insert_into_usermap(um);
-            }
-
-            std::unordered_set<Label *> deleted;
-            size_t processed = 0;
-            for (auto it = labels.begin(); it != labels.end(); ++it) {
-                Label *l = *it;
-                if (!l->is_basic_block_like())
-                    continue;
-                auto umit = um.label_map.find(l);
-                if (umit == um.label_map.end())
-                    continue;
-                auto &&users = umit->second;
-                if (users.size() != 1)
-                    continue;
-                Label *user = *users.begin();
-                if (deleted.count(user))
-                    continue;
-                if (user->body.enter.type != TYPE_Label)
-                    continue;
-                if (user->body.enter.label != l)
-                    continue;
-                auto &&args = user->body.args;
-                bool ok = true;
-                for (size_t i = 1; i < user->body.args.size(); ++i) {
-                    if (is_unknown(args[i].value)) {
-                        ok = false;
-                        break;
-                    }
-                }
-                if (!ok) continue;
-                processed++;
-                deleted.insert(l);
-                Label *newl = l;
-                StyledStream ss;
-                if (l->params.size() > 1) {
-                    // inline parameters into scope
-                    Args newargs = { none };
-                    for (size_t i = 1; i < user->body.args.size(); ++i) {
-                        newargs.push_back(args[i]);
-                    }
-                    newl = fold_type_label(um, l, newargs);
-                }
-                l->remove_from_usermap(um);
-                user->remove_from_usermap(um);
-                user->body = newl->body;
-                user->insert_into_usermap(um);
-            }
-
-            if (!processed) break;
-
-            total_processed += processed;
-            count++;
-        }
-#if 0
-        if (total_processed)
-            std::cout << "eliminated "
-                << total_processed << " labels in "
-                << count << " passes" << std::endl;
-#endif
     }
 
     Label *validate_scope(Label *entry) {
