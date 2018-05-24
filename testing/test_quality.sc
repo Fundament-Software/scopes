@@ -1,12 +1,15 @@
 
+# we used to assert that the complexity wasn't bigger than x, but now we
+    track any change, better or worse, as changes are suspicious.
+
 fn assert-depth (n f types...)
     let typed-f =
         typify f types...
     let c = (Label-countof-reachable typed-f)
-    if (c > n)
+    if (c != n)
         'dump typed-f
         syntax-error! (Label-anchor typed-f)
-            .. "label too complex: " (repr c) " != " (repr n)
+            .. "label complexity mismatch: " (repr c) " != " (repr n)
 
 assert-depth 2:usize
     fn (a b)
