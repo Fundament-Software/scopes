@@ -45,53 +45,53 @@ do
     # unpack array
     do
         let a b c d = (unpack vals)
-        check-vals a b c d
-        let a b c d = (unpack (unconst vals))
-        check-vals a b c d
+        #check-vals a b c d
+        #let a b c d = (unpack (unconst vals))
+        #check-vals a b c d
+#
+    do
+        # array using memory interface
+        let vals = (local (array u8 4:usize))
+        assert ((vals @ 0) == 0)
+        assert ((vals @ 1) == 0)
+        assert ((vals @ 2) == 0)
+        assert ((vals @ 3) == 0)
+        vals = (arrayof u8 0xa0 0xb0 0xc0 0xd0)
+        assert ((vals @ 0) == 0xa0)
+        assert ((vals @ 1) == 0xb0)
+        assert ((vals @ 2) == 0xc0)
+        assert ((vals @ 3) == 0xd0)
 
-do
-    # array using memory interface
-    let vals = (local (array u8 4:usize))
-    assert ((vals @ 0) == 0)
-    assert ((vals @ 1) == 0)
-    assert ((vals @ 2) == 0)
-    assert ((vals @ 3) == 0)
-    vals = (arrayof u8 0xa0 0xb0 0xc0 0xd0)
-    assert ((vals @ 0) == 0xa0)
-    assert ((vals @ 1) == 0xb0)
-    assert ((vals @ 2) == 0xc0)
-    assert ((vals @ 3) == 0xd0)
+        let vals2 = (local (array u8 4:usize))
+        vals2 = vals
+        assert ((vals2 @ 0) == 0xa0)
+        assert ((vals2 @ 1) == 0xb0)
+        assert ((vals2 @ 2) == 0xc0)
+        assert ((vals2 @ 3) == 0xd0)
 
-    let vals2 = (local (array u8 4:usize))
-    vals2 = vals
-    assert ((vals2 @ 0) == 0xa0)
-    assert ((vals2 @ 1) == 0xb0)
-    assert ((vals2 @ 2) == 0xc0)
-    assert ((vals2 @ 3) == 0xd0)
+    do
+        # uninitialized mutable array on stack with constant length
+        let vals = (alloca-array i32 4)
+        # init the array
+        init-array vals
+        # then check the values
+        check-array vals
 
-do
-    # uninitialized mutable array on stack with constant length
-    let vals = (alloca-array i32 4)
-    # init the array
-    init-array vals
-    # then check the values
-    check-array vals
+    do
+        # uninitialized mutable array on stack with dynamic length
+        let count = (unconst 4) # simulate a runtime value
+        let vals = (alloca-array i32 count)
+        init-array vals
+        check-array vals
 
-do
-    # uninitialized mutable array on stack with dynamic length
-    let count = (unconst 4) # simulate a runtime value
-    let vals = (alloca-array i32 count)
-    init-array vals
-    check-array vals
-
-do
-    # uninitialized mutable array on heap with dynamic length
-    let count = (unconst 4) # simulate a runtime value
-    let vals = (malloc-array i32 count)
-    init-array vals
-    check-array vals
-    # don't forget to free
-    free vals
+    do
+        # uninitialized mutable array on heap with dynamic length
+        let count = (unconst 4) # simulate a runtime value
+        let vals = (malloc-array i32 count)
+        init-array vals
+        check-array vals
+        # don't forget to free
+        free vals
 
 
 

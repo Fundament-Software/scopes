@@ -2883,6 +2883,7 @@ static StyledStream& operator<<(StyledStream& ost, Argument value) {
 typedef std::vector<Argument> Args;
 typedef std::vector<const Type *> ArgTypes;
 typedef std::vector<Label *> Labels;
+typedef std::vector<Parameter *> Parameters;
 
 struct TupleType : StorageType {
     static bool classof(const Type *T) {
@@ -3288,51 +3289,72 @@ static Argument first(const Args &values) {
 }
 
 struct ReturnLabelType : Type {
+    enum Mode {
+        Return,
+        NoReturn,
+    };
+
     static bool classof(const Type *T) {
         return T->kind() == TK_ReturnLabel;
     }
 
-    ReturnLabelType(const Args &_values)
+    bool is_returning() const {
+        return mode != NoReturn;
+    }
+
+    ReturnLabelType(Mode _mode, const Args &_values)
         : Type(TK_ReturnLabel) {
         values = _values;
+        mode = _mode;
 
-        StyledString ss = StyledString::plain();
-        ss.out << "λ(";
-        for (size_t i = 0; i < values.size(); ++i) {
-            if (i > 0) {
-                ss.out << " ";
-            }
-            if (values[i].key != SYM_Unnamed) {
-                ss.out << values[i].key.name()->data << "=";
-            }
-            if (is_unknown(values[i].value)) {
-                ss.out << values[i].value.typeref->name()->data;
-            } else {
-                ss.out << "!" << values[i].value.type;
-            }
-        }
-        ss.out << ")";
-        _name = ss.str();
-
-        {
-            ArgTypes rettypes;
-            // prune constants
+        switch(mode) {
+        case Return: {
+            StyledString ss = StyledString::plain();
+            ss.out << "λ(";
             for (size_t i = 0; i < values.size(); ++i) {
+                if (i > 0) {
+                    ss.out << " ";
+                }
+                if (values[i].key != SYM_Unnamed) {
+                    ss.out << values[i].key.name()->data << "=";
+                }
                 if (is_unknown(values[i].value)) {
-                    rettypes.push_back(values[i].value.typeref);
+                    ss.out << values[i].value.typeref->name()->data;
+                } else {
+                    ss.out << "!" << values[i].value.type;
                 }
             }
+            ss.out << ")";
+            _name = ss.str();
 
-            if (rettypes.size() == 1) {
-                return_type = rettypes[0];
-                has_mrv = false;
-            } else if (!rettypes.empty()) {
-                return_type = Tuple(rettypes);
-                has_mrv = true;
-            } else {
-                return_type = TYPE_Void;
-                has_mrv = false;
+            {
+                ArgTypes rettypes;
+                // prune constants
+                for (size_t i = 0; i < values.size(); ++i) {
+                    if (is_unknown(values[i].value)) {
+                        rettypes.push_back(values[i].value.typeref);
+                    }
+                }
+
+                if (rettypes.size() == 1) {
+                    return_type = rettypes[0];
+                    has_mrv = false;
+                } else if (!rettypes.empty()) {
+                    return_type = Tuple(rettypes);
+                    has_mrv = true;
+                } else {
+                    return_type = TYPE_Void;
+                    has_mrv = false;
+                }
             }
+        } break;
+        case NoReturn: {
+            _name = String::from("λ<noreturn>");
+            return_type = TYPE_Void;
+            has_mrv = false;
+        } break;
+        default:
+            assert(false);
         }
     }
 
@@ -3342,17 +3364,20 @@ struct ReturnLabelType : Type {
 
     Args values;
     const Type *return_type;
+    Mode mode;
     bool has_mrv;
 };
 
-static const Type *ReturnLabel(const Args &values) {
+static const Type *ReturnLabel(ReturnLabelType::Mode mode, const Args &values) {
     struct TypeArgs {
+        ReturnLabelType::Mode mode;
         Args args;
 
         TypeArgs() {}
-        TypeArgs(const Args &_args) : args(_args) {}
+        TypeArgs(ReturnLabelType::Mode _mode, const Args &_args) : mode(_mode), args(_args) {}
 
         bool operator==(const TypeArgs &other) const {
+            if (mode != other.mode) return false;
             if (args.size() != other.args.size()) return false;
             for (size_t i = 0; i < args.size(); ++i) {
                 auto &&a = args[i];
@@ -3365,7 +3390,7 @@ static const Type *ReturnLabel(const Args &values) {
 
         struct Hash {
             std::size_t operator()(const TypeArgs& s) const {
-                std::size_t h = 0;
+                std::size_t h = std::hash<int32_t>{}((int32_t)s.mode);
                 for (auto &&arg : s.args) {
                     h = HashLen16(h, arg.hash());
                 }
@@ -3384,15 +3409,23 @@ static const Type *ReturnLabel(const Args &values) {
     }
 #endif
 
-    TypeArgs ta(values);
+    TypeArgs ta(mode, values);
     typename ArgMap::iterator it = map.find(ta);
     if (it == map.end()) {
-        ReturnLabelType *t = new ReturnLabelType(values);
+        ReturnLabelType *t = new ReturnLabelType(mode, values);
         map.insert({ta, t});
         return t;
     } else {
         return it->second;
     }
+}
+
+static const Type *ReturnLabel(const Args &values) {
+    return ReturnLabel(ReturnLabelType::Return, values);
+}
+
+static const Type *NoReturnLabel() {
+    return ReturnLabel(ReturnLabelType::NoReturn, {});
 }
 
 //------------------------------------------------------------------------------
@@ -5814,9 +5847,6 @@ typedef Tag<Label> LabelTag;
 
 enum LabelFlags {
     LF_Template = (1 << 0),
-    // label has been discovered to be reentrant; should not be inlined or
-    // folded
-    LF_Reentrant = (1 << 1),
     // this label is an inline
     LF_Inline = (1 << 2),
     // this label can not be instantiated more than once per frame and forces
@@ -5841,7 +5871,7 @@ public:
     size_t next_instanceid;
     const Anchor *anchor;
     Symbol name;
-    std::vector<Parameter *> params;
+    Parameters params;
     Body body;
     LabelTag tag;
     Label *paired;
@@ -5849,10 +5879,6 @@ public:
 
     void set_merge() {
         flags |= LF_Merge;
-    }
-
-    void set_reentrant() {
-        flags |= LF_Reentrant;
     }
 
     void set_inline() {
@@ -5867,12 +5893,8 @@ public:
         return flags & LF_Inline;
     }
 
-    bool is_reentrant() const {
-        return flags & LF_Reentrant;
-    }
-
     bool is_important() const {
-        return flags & (LF_Merge | LF_Reentrant);
+        return flags & LF_Merge;
     }
 
     bool is_template() const {
@@ -6139,7 +6161,7 @@ public:
         params.push_back(param);
     }
 
-    void set_parameters(const std::vector<Parameter *> &_params) {
+    void set_parameters(const Parameters &_params) {
         assert(params.empty());
         params = _params;
         for (size_t i = 0; i < params.size(); ++i) {
@@ -6156,10 +6178,21 @@ public:
         labels.insert(this);
         if (ordered_labels)
             ordered_labels->push_back(this);
-        Labels stack = { this };
-        while (!stack.empty()) {
-            Label *parent = stack.back();
-            stack.pop_back();
+        Labels foreign_stack = { this };
+        Labels stack = {};
+        while (true) {
+            Label *parent = nullptr;
+            if (!stack.empty()) {
+                parent = stack.back();
+                stack.pop_back();
+            } else if (!foreign_stack.empty()) {
+                parent = foreign_stack.back();
+                foreign_stack.pop_back();
+                if (ordered_labels)
+                    ordered_labels->push_back(parent);
+            } else {
+                 break;
+            }
 
             int size = (int)parent->body.args.size();
             for (int i = -1; i < size; ++i) {
@@ -6174,9 +6207,13 @@ public:
                     Label *label = arg.label;
                     if (!labels.count(label)) {
                         labels.insert(label);
-                        if (ordered_labels)
-                            ordered_labels->push_back(label);
-                        stack.push_back(label);
+                        if (label->is_basic_block_like()) {
+                            if (ordered_labels)
+                                ordered_labels->push_back(label);
+                            stack.push_back(label);
+                        } else {
+                            foreign_stack.push_back(label);
+                        }
                     }
                 }
             }
@@ -6449,28 +6486,63 @@ static StyledStream& operator<<(StyledStream& ss, const Closure *closure) {
 
 //------------------------------------------------------------------------------
 
+enum FrameFlags {
+    // frame has been discovered to be reentrant
+    FF_Reentrant = (1 << 0),
+};
+
 struct Frame {
     Frame() :
         parent(nullptr),
         label(nullptr),
-        instance(nullptr),
-        loop_count(0) {
-    }
-    Frame(Frame *_parent, Label *_label, Label *_instance, size_t _loop_count = 0) :
-        parent(_parent), label(_label), instance(_instance), loop_count(_loop_count) {
+        loop_count(0),
+        flags(0),
+        instance(nullptr)
+    {}
+    Frame(Frame *_parent, Label *_label, Label *_instance = nullptr, size_t _loop_count = 0) :
+        parent(_parent), label(_label), loop_count(_loop_count), flags(0), instance(_instance) {
         assert(parent);
         assert(label);
-        assert(instance);
         args.reserve(_label->params.size());
     }
 
     Args args;
     Frame *parent;
     Label *label;
-    Label *instance;
     size_t loop_count;
+    uint32_t flags;
 
-    Frame *find_frame(Label *label) {
+    void set_reentrant() {
+        flags |= FF_Reentrant;
+    }
+
+    bool is_reentrant() const {
+        return flags & FF_Reentrant;
+    }
+
+    bool is_important() const {
+        return flags & FF_Reentrant;
+    }
+
+    bool is_basic_block_like() const {
+        bool result;
+        if (label->is_basic_block_like()) {
+            result = true;
+        } else if (label->is_inline() && !label->is_important() && !is_important()) {
+            result = true;
+        } else {
+            result = false;
+        }
+        #if 1
+        if (result != instance->is_basic_block_like()) {
+            StyledStream ss;
+            ss << "is_basic_block_like mismatch:" << args[0] << " " << label << " " << instance << std::endl;
+        }
+        #endif
+        return result;
+    }
+
+    Frame *find_parent_frame(Label *label) {
         Frame *top = this;
         while (top) {
             if (top->label == label) {
@@ -6525,15 +6597,15 @@ struct Frame {
 
     };
 
-    Label *find_instance(const ArgsKey &key) const {
-        auto it = instances.find(key);
-        if (it != instances.end())
+    Frame *find_frame(const ArgsKey &key) const {
+        auto it = frames.find(key);
+        if (it != frames.end())
             return it->second;
         return nullptr;
     }
 
-    Label *find_any_instance(Label *label, ArgsKey &key) const {
-        for (auto &&it : instances) {
+    Frame *find_any_frame(Label *label, ArgsKey &key) const {
+        for (auto &&it : frames) {
             if (it.first.label == label) {
                 key = it.first;
                 return it.second;
@@ -6542,14 +6614,18 @@ struct Frame {
         return nullptr;
     }
 
-    void insert_instance(const ArgsKey &key, Label *newlabel) {
-        instances.insert({key, newlabel});
+    void insert_frame(const ArgsKey &key, Frame *frame) {
+        frames.insert({key, frame});
+    }
+
+    Label *get_instance() const {
+        return instance;
     }
 
     static Frame *root;
 protected:
-    // inlined instances of this label
-    std::unordered_map<ArgsKey, Label *, ArgsKey::Hash> instances;
+    std::unordered_map<ArgsKey, Frame *, ArgsKey::Hash> frames;
+    Label *instance;
 };
 
 Frame *Frame::root = nullptr;
@@ -6673,10 +6749,12 @@ struct StreamLabel : StreamAnchors {
             ss << Style_Keyword << "inline" << Style_None;
             ss << " ";
         }
+#if 0
         if (alabel->is_reentrant()) {
             ss << Style_Keyword << "reentrant" << Style_None;
             ss << " ";
         }
+#endif
         if (alabel->is_merge()) {
             ss << Style_Keyword << "merge" << Style_None;
             ss << " ";
@@ -6809,7 +6887,7 @@ struct StreamFrame : StreamAnchors {
             ss << " [loop=" << frame->loop_count << "]" << std::endl;
         }
         ss << std::endl;
-        ss << "    instance = " << frame->instance << std::endl;
+        //ss << "    instance = " << frame->instance << std::endl;
         ss << "    original label = " << frame->label << std::endl;
         auto &&args = frame->args;
         for (size_t i = 0; i < args.size(); ++i) {
@@ -6832,286 +6910,6 @@ static void stream_frame(
 //------------------------------------------------------------------------------
 // IL EVAL/APPLY
 //------------------------------------------------------------------------------
-
-static void evaluate(Frame *frame, Argument arg, Args &dest, bool last_param = false) {
-    if (arg.value.type == TYPE_Label) {
-        // do not wrap labels in closures that have been solved
-        if (arg.value.label->body.is_complete()) {
-            dest.push_back(Argument(arg.key, arg.value.label));
-        } else {
-            Label *label = arg.value.label;
-            if (frame) {
-                Frame *top = frame->find_frame(label);
-                if (top) {
-                    frame = top;
-                } else if (label->body.scope_label) {
-                    top = frame->find_frame(label->body.scope_label);
-                    if (top) {
-                        frame = top;
-                    } else {
-                        #if 0
-                        StyledStream ss(std::cerr);
-                        stream_frame(ss, frame, StreamFrameFormat());
-                        ss << "warning: can't find scope label " << label->body.scope_label << " for " << label << std::endl;
-                        #endif
-                    }
-                }
-            }
-            dest.push_back(Argument(arg.key, Closure::from(label, frame)));
-        }
-    } else if (arg.value.type == TYPE_Parameter
-        && arg.value.parameter->label) {
-        auto param = arg.value.parameter;
-        frame = frame->find_frame(param->label);
-        if (!frame) {
-            StyledString ss;
-            ss.out << "parameter " << param << " is unbound";
-            location_error(ss.str());
-        }
-        // special situation: we're forwarding varargs, but assigning
-        // it to a new argument key; since keys can only be mapped to
-        // individual varargs, and must not be duplicated, we have these
-        // options to resolve the conflict:
-        // 1. the vararg keys override the new explicit key; this was the
-        //    old behavior and made it possible for implicit vararg return
-        //    values to override explicit reassignments, which was
-        //    always surprising and unwanted, i.e. a bug.
-        // 2. re-assign only the first vararg key, keeping remaining keys
-        //    as they are.
-        // 3. produce a compiler error when an explicit key is set, but
-        //    the vararg set is larger than 1.
-        // 4. treat a keyed argument in last place like any previous argument,
-        //    causing only a single vararg result to be forwarded.
-        // we use option 4, as it is most consistent with existing behavior,
-        // and seems to be the least surprising choice.
-        if (last_param && param->is_vararg() && !arg.is_keyed()) {
-            // forward as-is, with keys
-            for (size_t i = (size_t)param->index; i < frame->args.size(); ++i) {
-                dest.push_back(frame->args[i]);
-            }
-        } else if ((size_t)param->index < frame->args.size()) {
-            auto &&srcarg = frame->args[param->index];
-            // when forwarding a vararg and the arg is not re-keyed,
-            // forward the vararg key as well.
-            if (param->is_vararg() && !arg.is_keyed()) {
-                dest.push_back(srcarg);
-            } else {
-                dest.push_back(Argument(arg.key, srcarg.value));
-            }
-        } else {
-            if (!param->is_vararg()) {
-#if SCOPES_DEBUG_CODEGEN
-                {
-                    StyledStream ss;
-                    ss << frame << " " << frame->label;
-                    for (size_t i = 0; i < frame->args.size(); ++i) {
-                        ss << " " << frame->args[i];
-                    }
-                    ss << std::endl;
-                }
-#endif
-                StyledString ss;
-                ss.out << "parameter " << param << " is out of bounds ("
-                    << param->index << " >= " << (int)frame->args.size() << ")";
-                location_error(ss.str());
-            }
-            dest.push_back(Argument(arg.key, none));
-        }
-    } else {
-        dest.push_back(arg);
-    }
-}
-
-static void evaluate_body(Frame *frame, Label *dest, Label *source) {
-    Args &args = source->body.args;
-    Args &body = dest->body.args;
-    Args ret;
-    dest->body.copy_traits_from(source->body);
-    evaluate(frame, source->body.enter, ret);
-    dest->body.enter = first(ret).value;
-    body.clear();
-
-    size_t lasti = (args.size() - 1);
-    for (size_t i = 0; i < args.size(); ++i) {
-        evaluate(frame, args[i], body, (i == lasti));
-    }
-}
-
-static void map_constant_arguments(Frame *frame, Label *label, const Args &args) {
-    size_t lasti = label->params.size() - 1;
-    size_t srci = 0;
-    for (size_t i = 0; i < label->params.size(); ++i) {
-        Parameter *param = label->params[i];
-        if (param->is_vararg()) {
-            assert(i == lasti);
-            size_t ncount = args.size();
-            while (srci < ncount) {
-                Argument value = args[srci];
-                assert(!is_unknown(value.value));
-                frame->args.push_back(value);
-                srci++;
-            }
-        } else if (srci < args.size()) {
-            Argument value = args[srci];
-            assert(!is_unknown(value.value));
-            frame->args.push_back(value);
-            srci++;
-        } else {
-            frame->args.push_back(none);
-            srci++;
-        }
-    }
-}
-
-// inlining the arguments of an untyped scope (including continuation)
-// folds arguments and types parameters
-// arguments are treated as follows:
-// TYPE_Unknown = type the parameter
-//      type as TYPE_Unknown = leave the parameter as-is
-// any other = inline the argument and remove the parameter
-static Label *fold_type_label_single(Frame *parent, Label *label, const Args &args) {
-    assert(parent);
-    assert(label);
-    assert(!label->body.is_complete());
-    size_t loop_count = 0;
-    if ((parent != Frame::root) && (parent->label == label)) {
-        Frame *top = parent;
-        parent = top->parent;
-        loop_count = top->loop_count + 1;
-        if (loop_count > SCOPES_MAX_RECURSIONS) {
-            StyledString ss;
-            ss.out << "maximum number of recursions exceeded during"
-            " compile time evaluation (" << SCOPES_MAX_RECURSIONS << ")."
-            " Use 'unconst' to prevent constant propagation.";
-            location_error(ss.str());
-        }
-    }
-
-    Frame::ArgsKey la;
-    la.label = label;
-    la.args = args;
-    {
-        Label *result = parent->find_instance(la);
-        if (result) return result;
-    }
-
-    Label *newlabel = Label::from(label);
-#if SCOPES_DEBUG_CODEGEN
-    {
-        StyledStream ss;
-        ss << "fold-type-label-single " << label << " -> " << newlabel << std::endl;
-        stream_label(ss, label, StreamLabelFormat::debug_single());
-    }
-#endif
-    if (label->is_merge()) {
-        Frame::ArgsKey key;
-        Label *result = parent->find_any_instance(label, key);
-        if (result && !(la == key)) {
-            {
-                // should work since parameters may not be inlined
-                const Type *T = ReturnLabel(key.args);
-                StyledString ss;
-                ss.out << "first typed here as " << T;
-                location_message(key.label->anchor, ss.str());
-            }
-            {
-                const Type *T = ReturnLabel(la.args);
-                StyledString ss;
-                ss.out << "attempting to retype branching expression as " << T;
-                set_active_anchor(label->anchor);
-                location_error(ss.str());
-            }
-        }
-    }
-    parent->insert_instance(la, newlabel);
-
-    Frame *frame = Frame::from(parent, label, newlabel, loop_count);
-
-    size_t lasti = label->params.size() - 1;
-    size_t srci = 0;
-    for (size_t i = 0; i < label->params.size(); ++i) {
-        Parameter *param = label->params[i];
-        if (param->is_vararg()) {
-            assert(i == lasti);
-            size_t ncount = args.size();
-            while (srci < ncount) {
-                Argument value = args[srci];
-                if (is_unknown(value.value)) {
-                    Parameter *newparam = Parameter::from(param);
-                    newparam->kind = PK_Regular;
-                    newparam->type = value.value.typeref;
-                    newparam->name = Symbol(SYM_Unnamed);
-                    newlabel->append(newparam);
-                    frame->args.push_back(Argument(value.key, newparam));
-                } else {
-                    frame->args.push_back(value);
-                }
-                srci++;
-            }
-        } else if (srci < args.size()) {
-            Argument value = args[srci];
-            if (is_unknown(value.value)) {
-                Parameter *newparam = Parameter::from(param);
-                if (is_typed(value.value)) {
-                    if (newparam->is_typed()
-                        && (newparam->type != value.value.typeref)) {
-                        StyledString ss;
-                        ss.out << "attempting to retype parameter of type "
-                            << newparam->type << " as " << value.value.typeref;
-                        location_error(ss.str());
-                    } else {
-                        newparam->type = value.value.typeref;
-                    }
-                }
-                newlabel->append(newparam);
-                frame->args.push_back(Argument(value.key, newparam));
-            } else {
-                if (!srci) {
-                    Parameter *newparam = Parameter::from(param);
-                    newparam->type = TYPE_Nothing;
-                    newlabel->append(newparam);
-                }
-                frame->args.push_back(value);
-            }
-            srci++;
-        } else {
-            frame->args.push_back(none);
-            srci++;
-        }
-    }
-
-    evaluate_body(frame, newlabel, label);
-
-    return newlabel;
-}
-
-static Label *typify_single(Frame *frame, Label *label, const ArgTypes &argtypes) {
-    assert(frame);
-    assert(!label->params.empty());
-
-    Args args;
-    args.reserve(argtypes.size() + 1);
-    args = { Argument(untyped()) };
-    for (size_t i = 0; i < argtypes.size(); ++i) {
-        args.push_back(Argument(unknown_of(argtypes[i])));
-    }
-
-    return fold_type_label_single(frame, label, args);
-}
-
-static Label *fold_typify_single(Frame *frame, Label *label, const Args &values) {
-    assert(frame);
-    assert(!label->params.empty());
-
-    Args args;
-    args.reserve(values.size() + 1);
-    args = { Argument(untyped()) };
-    for (size_t i = 0; i < values.size(); ++i) {
-        args.push_back(values[i]);
-    }
-
-    return fold_type_label_single(frame, label, args);
-}
 
 //------------------------------------------------------------------------------
 // C BRIDGE (CLANG)
@@ -9020,9 +8818,6 @@ struct SPIRVGenerator {
         if (handled_loops.count(group.index))
             return false;
         handled_loops.insert(group.index);
-        if (!label->is_basic_block_like()) {
-
-        }
         auto &&labels = group.labels;
         Label *header_label = label;
         continue_label = nullptr;
@@ -11272,8 +11067,17 @@ struct LLVMIRGenerator {
         return nullptr;
     }
 
+    struct ReturnTraits {
+        bool multiple_return_values;
+        bool terminated;
+
+        ReturnTraits() :
+            multiple_return_values(false),
+            terminated(false) {}
+    };
+
     LLVMValueRef build_call(const Type *functype, LLVMValueRef func, Args &args,
-        bool &multiple_return_values) {
+        ReturnTraits &traits) {
         size_t argcount = args.size() - 1;
 
         auto fi = cast<FunctionType>(functype);
@@ -11313,10 +11117,14 @@ struct LLVMIRGenerator {
             LLVMAddCallSiteAttribute(ret, i, attr_nonnull);
         }
         auto rlt = cast<ReturnLabelType>(fi->return_type);
-        multiple_return_values = rlt->has_multiple_return_values();
+        traits.multiple_return_values = rlt->has_multiple_return_values();
         if (use_sret) {
             LLVMAddCallSiteAttribute(ret, 1, attr_sret);
             return LLVMBuildLoad(builder, values[0], "");
+        } else if (!rlt->is_returning()) {
+            LLVMBuildUnreachable(builder);
+            traits.terminated = true;
+            return nullptr;
         } else if (rlt->return_type == TYPE_Void) {
             return nullptr;
         } else {
@@ -11437,7 +11245,6 @@ struct LLVMIRGenerator {
             std::cout << std::endl;
         }
 #endif
-        bool terminated = false;
         auto &&body = label->body;
         auto &&enter = body.enter;
         auto &&args = body.args;
@@ -11468,7 +11275,7 @@ struct LLVMIRGenerator {
         LLVMTypeRef NAME = type_to_llvm_type(args[argn++].value.typeref);
 
         LLVMValueRef retvalue = nullptr;
-        bool multiple_return_values = false;
+        ReturnTraits rtraits;
         if (enter.type == TYPE_Builtin) {
             switch(enter.builtin.value()) {
             case FN_Branch: {
@@ -11480,6 +11287,7 @@ struct LLVMIRGenerator {
                 LLVMBuildCondBr(builder, cond,
                     LLVMValueAsBasicBlock(then_block),
                     LLVMValueAsBasicBlock(else_block));
+                rtraits.terminated = true;
             } break;
             case OP_Tertiary: {
                 READ_VALUE(cond);
@@ -11877,7 +11685,9 @@ struct LLVMIRGenerator {
                 }
             } break;
             case SFXFN_Unreachable:
-                retvalue = LLVMBuildUnreachable(builder); break;
+                retvalue = LLVMBuildUnreachable(builder);
+                rtraits.terminated = true;
+                break;
             default: {
                 StyledString ss;
                 ss.out << "IL->IR: unsupported builtin " << enter.builtin << " encountered";
@@ -11912,14 +11722,14 @@ struct LLVMIRGenerator {
                     LLVMAddIncoming(phinode, incovals, incobbs, 1);
                 }
                 LLVMBuildBr(builder, LLVMValueAsBasicBlock(value));
-                terminated = true;
+                rtraits.terminated = true;
             } else {
                 if (use_debug_info) {
                     LLVMSetCurrentDebugLocation(builder, diloc);
                 }
                 retvalue = build_call(
                     enter.label->get_function_type(),
-                    value, args, multiple_return_values);
+                    value, args, rtraits);
             }
         } else if (enter.type == TYPE_Closure) {
             StyledString ss;
@@ -11927,7 +11737,7 @@ struct LLVMIRGenerator {
             location_error(ss.str());
         } else if (is_function_pointer(enter.indirect_type())) {
             retvalue = build_call(extract_function_type(enter.indirect_type()),
-                argument_to_value(enter), args, multiple_return_values);
+                argument_to_value(enter), args, rtraits);
         } else if (enter.type == TYPE_Parameter) {
             assert (enter.parameter->type != TYPE_Nothing);
             assert(enter.parameter->type != TYPE_Unknown);
@@ -11968,6 +11778,7 @@ struct LLVMIRGenerator {
                     LLVMBuildRetVoid(builder);
                 }
             }
+            rtraits.terminated = true;
         } else {
             StyledString ss;
             ss.out << "IL->IR: cannot translate call to " << enter;
@@ -11975,7 +11786,7 @@ struct LLVMIRGenerator {
         }
 
         Any contarg = args[0].value;
-        if (terminated) {
+        if (rtraits.terminated) {
             // write nothing
         } else if ((contarg.type == TYPE_Parameter)
             && (contarg.parameter->type != TYPE_Nothing)) {
@@ -12009,7 +11820,7 @@ struct LLVMIRGenerator {
                         Parameter *param = params[i];
                         LLVMValueRef phinode = argument_to_value(param);
                         LLVMValueRef incoval = nullptr;
-                        if (multiple_return_values) {
+                        if (rtraits.multiple_return_values) {
                             incoval = LLVMBuildExtractValue(builder, retvalue, i - 1, "");
                         } else {
                             assert(params.size() == 2);
@@ -12027,7 +11838,7 @@ struct LLVMIRGenerator {
                     for (size_t i = 1; i < params.size(); ++i) {
                         Parameter *param = params[i];
                         LLVMValueRef pvalue = nullptr;
-                        if (multiple_return_values) {
+                        if (rtraits.multiple_return_values) {
                             pvalue = LLVMBuildExtractValue(builder, retvalue, i - 1, "");
                         } else {
                             assert(params.size() == 2);
@@ -12040,11 +11851,13 @@ struct LLVMIRGenerator {
                 goto repeat;
             }
         } else if (contarg.type == TYPE_Nothing) {
+            StyledStream ss(std::cerr);
+            stream_label(ss, label, StreamLabelFormat::debug_single());
+            location_error(String::from("IL->IR: unexpected end of function"));
         } else {
             StyledStream ss(std::cerr);
             stream_label(ss, label, StreamLabelFormat::debug_single());
             location_error(String::from("IL->IR: continuation is of invalid type"));
-            //assert(false && "todo: continuing with unexpected value");
         }
 
         LLVMSetCurrentDebugLocation(builder, nullptr);
@@ -13259,21 +13072,366 @@ static Any smear(Any value, size_t count) {
 
 static Label *expand_module(Any expr, Scope *scope = nullptr);
 
-struct Solver {
+struct Specializer {
     enum CLICmd {
         CmdNone,
         CmdSkip,
     };
 
+    struct Trace {
+        const Anchor *anchor;
+        Symbol name;
+
+        Trace(const Anchor *_anchor, Symbol _name) :
+            anchor(_anchor), name(_name) {
+            assert(anchor);
+            }
+    };
+
+    typedef std::vector<Trace> Traces;
+
     StyledStream ss_cout;
-    static Labels traceback;
+    static Traces traceback;
     static int solve_refs;
     static bool enable_step_debugger;
     static CLICmd clicmd;
+    Args tmp_args;
+    Parameters tmp_params;
 
-    Solver()
+    /*
+        the new solver works more like a specializer VM, in that it executes
+        template labels and returns a residual program as specialized labels.
+
+        the specializer nests each time the program branches, and returns when
+        branches merge.
+
+        each run operates on a single contiguous non-branching chain of commands.
+
+        when a function is encountered that has not been specialized yet, it is
+        specialized.
+
+        when an inline is encountered, a new nesting level is entered until the
+        inline has returned.
+
+        when a branch is encountered, each branch is specialized, and the
+        resulting types merged. only then does specialization continue.
+
+        when a possible loop entry point is encountered, it is necessary to run
+        the loop in a new nesting to discover whether the loop is reentrant.
+
+        for non-tail recursive functions, it becomes difficult to type the
+        function when it has not returned yet. in this case, execution needs
+        to suspend until all other branches have been mapped out.
+
+        additional care has to be taken to optimize continuation arguments of
+        residual instructions and branches only when the next residual
+        instruction is known, so that useless continuation calls can be
+        purged before they are even created.
+    */
+
+#if 0
+    Label *specialize_function(Frame *frame, Label *l, const Args &args) {
+        assert(frame);
+        assert(l);
+
+        assert(l->is_template());
+
+
+
+    }
+#endif
+
+    Specializer()
         : ss_cout(std::cout)
     {}
+
+    static void evaluate(Frame *frame, Argument arg, Args &dest, bool last_param = false) {
+        if (arg.value.type == TYPE_Label) {
+            // do not wrap labels in closures that have been solved
+            if (arg.value.label->body.is_complete()) {
+                dest.push_back(Argument(arg.key, arg.value.label));
+            } else {
+                Label *label = arg.value.label;
+                if (frame) {
+                    Frame *top = frame->find_parent_frame(label);
+                    if (top) {
+                        frame = top;
+                    } else if (label->body.scope_label) {
+                        top = frame->find_parent_frame(label->body.scope_label);
+                        if (top) {
+                            frame = top;
+                        } else {
+                            #if 0
+                            StyledStream ss(std::cerr);
+                            stream_frame(ss, frame, StreamFrameFormat());
+                            ss << "warning: can't find scope label " << label->body.scope_label << " for " << label << std::endl;
+                            #endif
+                        }
+                    }
+                }
+                dest.push_back(Argument(arg.key, Closure::from(label, frame)));
+            }
+        } else if (arg.value.type == TYPE_Parameter
+            && arg.value.parameter->label) {
+            auto param = arg.value.parameter;
+            frame = frame->find_parent_frame(param->label);
+            if (!frame) {
+                StyledString ss;
+                ss.out << "parameter " << param << " is unbound";
+                location_error(ss.str());
+            }
+            // special situation: we're forwarding varargs, but assigning
+            // it to a new argument key; since keys can only be mapped to
+            // individual varargs, and must not be duplicated, we have these
+            // options to resolve the conflict:
+            // 1. the vararg keys override the new explicit key; this was the
+            //    old behavior and made it possible for implicit vararg return
+            //    values to override explicit reassignments, which was
+            //    always surprising and unwanted, i.e. a bug.
+            // 2. re-assign only the first vararg key, keeping remaining keys
+            //    as they are.
+            // 3. produce a compiler error when an explicit key is set, but
+            //    the vararg set is larger than 1.
+            // 4. treat a keyed argument in last place like any previous argument,
+            //    causing only a single vararg result to be forwarded.
+            // we use option 4, as it is most consistent with existing behavior,
+            // and seems to be the least surprising choice.
+            if (last_param && param->is_vararg() && !arg.is_keyed()) {
+                // forward as-is, with keys
+                for (size_t i = (size_t)param->index; i < frame->args.size(); ++i) {
+                    dest.push_back(frame->args[i]);
+                }
+            } else if ((size_t)param->index < frame->args.size()) {
+                auto &&srcarg = frame->args[param->index];
+                // when forwarding a vararg and the arg is not re-keyed,
+                // forward the vararg key as well.
+                if (param->is_vararg() && !arg.is_keyed()) {
+                    dest.push_back(srcarg);
+                } else {
+                    dest.push_back(Argument(arg.key, srcarg.value));
+                }
+            } else {
+                if (!param->is_vararg()) {
+    #if SCOPES_DEBUG_CODEGEN
+                    {
+                        StyledStream ss;
+                        ss << frame << " " << frame->label;
+                        for (size_t i = 0; i < frame->args.size(); ++i) {
+                            ss << " " << frame->args[i];
+                        }
+                        ss << std::endl;
+                    }
+    #endif
+                    StyledString ss;
+                    ss.out << "parameter " << param << " is out of bounds ("
+                        << param->index << " >= " << (int)frame->args.size() << ")";
+                    location_error(ss.str());
+                }
+                dest.push_back(Argument(arg.key, none));
+            }
+        } else {
+            dest.push_back(arg);
+        }
+    }
+
+    void evaluate_body(Frame *frame, Body &dest, const Body &source) {
+        auto &&args = source.args;
+        Args &body = dest.args;
+        tmp_args.clear();
+        dest.copy_traits_from(source);
+        evaluate(frame, source.enter, tmp_args);
+        dest.enter = first(tmp_args).value;
+        body.clear();
+
+        size_t lasti = (args.size() - 1);
+        for (size_t i = 0; i < args.size(); ++i) {
+            evaluate(frame, args[i], body, (i == lasti));
+        }
+    }
+
+    static void map_constant_arguments(Frame *frame, Label *label, const Args &args) {
+        size_t lasti = label->params.size() - 1;
+        size_t srci = 0;
+        for (size_t i = 0; i < label->params.size(); ++i) {
+            Parameter *param = label->params[i];
+            if (param->is_vararg()) {
+                assert(i == lasti);
+                size_t ncount = args.size();
+                while (srci < ncount) {
+                    Argument value = args[srci];
+                    assert(!is_unknown(value.value));
+                    frame->args.push_back(value);
+                    srci++;
+                }
+            } else if (srci < args.size()) {
+                Argument value = args[srci];
+                assert(!is_unknown(value.value));
+                frame->args.push_back(value);
+                srci++;
+            } else {
+                frame->args.push_back(none);
+                srci++;
+            }
+        }
+    }
+
+    Label *fold_type_label_single(Frame *parent, Label *label, const Args &args) {
+        return fold_type_label_single_frame(parent, label, args)->get_instance();
+    }
+
+    // inlining the arguments of an untyped scope (including continuation)
+    // folds arguments and types parameters
+    // arguments are treated as follows:
+    // TYPE_Unknown = type the parameter
+    //      type as TYPE_Unknown = leave the parameter as-is
+    // any other = inline the argument and remove the parameter
+    Frame *fold_type_label_single_frame(Frame *parent, Label *label, const Args &args) {
+        assert(parent);
+        assert(label);
+        assert(!label->body.is_complete());
+        size_t loop_count = 0;
+        if ((parent != Frame::root) && (parent->label == label)) {
+            Frame *top = parent;
+            parent = top->parent;
+            loop_count = top->loop_count + 1;
+            if (loop_count > SCOPES_MAX_RECURSIONS) {
+                StyledString ss;
+                ss.out << "maximum number of recursions exceeded during"
+                " compile time evaluation (" << SCOPES_MAX_RECURSIONS << ")."
+                " Use 'unconst' to prevent constant propagation.";
+                location_error(ss.str());
+            }
+        }
+
+        const Anchor *caller_anchor = parent->label?parent->label->body.anchor:label->anchor;
+
+        tmp_args.clear();
+
+        size_t numparams = label->params.size();
+        size_t numargs = args.size();
+
+        size_t lasti = numparams - 1;
+        size_t srci = 0;
+        for (size_t i = 0; i < numparams; ++i) {
+            Parameter *param = label->params[i];
+            if (param->is_vararg()) {
+                while (srci < numargs) {
+                    tmp_args.push_back(args[srci]);
+                    srci++;
+                }
+            } else {
+                tmp_args.push_back((srci < numargs)?(args[srci]):none);
+                srci++;
+            }
+        }
+
+        Frame::ArgsKey la;
+        la.label = label;
+        la.args = tmp_args;
+        {
+            Frame *result = parent->find_frame(la);
+            if (result) return result;
+        }
+
+        if (label->is_merge()) {
+            for (int i = 1; i < tmp_args.size(); ++i) {
+                // verify that all keys are unknown
+                auto &&val = tmp_args[i].value;
+                if (is_unknown(val)) {
+                } else if (val.is_const()) {
+                    StyledString ss;
+                    ss.out << "attempting to return from branch, but returned argument #"
+                        << i << " of type " << val.type << " is constant";
+                    set_active_anchor(caller_anchor);
+                    location_error(ss.str());
+                } else {
+                    // should not happen
+                    assert(false);
+                }
+            }
+            Frame::ArgsKey key;
+            Frame *result_frame = parent->find_any_frame(label, key);
+            if (result_frame && !(la == key)) {
+                if ((key.args.size() > 1) && !is_unknown(key.args[0].value)) {
+                    // ugh, label has been inlined before :C
+                    location_message(key.label->anchor, String::from("internal error: first inlined here"));
+                } else {
+                    // should work since parameters may not be inlined
+                    const Type *T = ReturnLabel(key.args);
+                    StyledString ss;
+                    ss.out << "first typed here as " << T;
+                    location_message(key.label->anchor, ss.str());
+                }
+                {
+                    const Type *T = ReturnLabel(la.args);
+                    StyledString ss;
+                    ss.out << "attempting to retype branching expression as " << T;
+                    set_active_anchor(caller_anchor);
+                    location_error(ss.str());
+                }
+            }
+        }
+
+        tmp_params.clear();
+
+        srci = 0;
+        for (size_t i = 0; i < label->params.size(); ++i) {
+            Parameter *param = label->params[i];
+            if (param->is_vararg()) {
+                assert(i == lasti);
+                size_t ncount = args.size();
+                while (srci < ncount) {
+                    auto &&value = tmp_args[srci];
+                    if (is_unknown(value.value)) {
+                        Parameter *newparam = Parameter::from(param);
+                        tmp_params.push_back(newparam);
+                        newparam->kind = PK_Regular;
+                        newparam->type = value.value.typeref;
+                        newparam->name = Symbol(SYM_Unnamed);
+                        tmp_args[srci] = Argument(value.key, newparam);
+                    }
+                    srci++;
+                }
+            } else {
+                if (srci < args.size()) {
+                    auto &&value = tmp_args[srci];
+                    if (is_unknown(value.value)) {
+                        Parameter *newparam = Parameter::from(param);
+                        tmp_params.push_back(newparam);
+                        if (is_typed(value.value)) {
+                            if (newparam->is_typed()
+                                && (newparam->type != value.value.typeref)) {
+                                StyledString ss;
+                                ss.out << "attempting to retype parameter of type "
+                                    << newparam->type << " as " << value.value.typeref;
+                                location_error(ss.str());
+                            } else {
+                                newparam->type = value.value.typeref;
+                            }
+                        }
+                        tmp_args[srci] = Argument(value.key, newparam);
+                    } else if (!srci) {
+                        Parameter *newparam = Parameter::from(param);
+                        tmp_params.push_back(newparam);
+                        newparam->type = TYPE_Nothing;
+                    }
+                }
+                srci++;
+            }
+        }
+
+        Label *newlabel = Label::from(label);
+        newlabel->set_parameters(tmp_params);
+
+        Frame *frame = Frame::from(parent, label, newlabel, loop_count);
+        frame->args = tmp_args;
+
+        parent->insert_frame(la, frame);
+
+        evaluate_body(frame, newlabel->body, label->body);
+
+        return frame;
+    }
 
     // inlining the continuation of a branch label without arguments
     void verify_branch_continuation(const Closure *closure) {
@@ -13284,19 +13442,18 @@ struct Solver {
         location_error(ss.str());
     }
 
-    Any fold_type_return(Any dest, const Args &values) {
+    Any fold_type_return(Any dest, const Type *return_label) {
         //ss_cout << "type_return: " << dest << std::endl;
-    repeat:
         if (dest.type == TYPE_Parameter) {
             Parameter *param = dest.parameter;
             if (param->is_none()) {
-                location_error(String::from("attempting to call none continuation"));
+                location_error(String::from("attempting to type return continuation of non-returning label"));
             } else if (!param->is_typed()) {
-                param->type = ReturnLabel(values);
+                param->type = return_label;
                 param->anchor = get_active_anchor();
             } else {
-                const Type *T = ReturnLabel(values);
-                if (T != param->type) {
+                if (return_label != param->type) {
+                    //if (return_label == NoReturnLabel())
                     {
                         StyledStream cerr(std::cerr);
                         cerr << param->anchor << " first typed here as " << param->type << std::endl;
@@ -13304,29 +13461,30 @@ struct Solver {
                     }
                     {
                         StyledString ss;
-                        ss.out << "attempting to retype return continuation as " << T;
+                        ss.out << "attempting to retype return continuation as " << return_label;
                         location_error(ss.str());
                     }
                 }
             }
         } else if (dest.type == TYPE_Closure) {
+            assert(return_label->kind() == TK_ReturnLabel);
+            const ReturnLabelType *rlt = cast<ReturnLabelType>(return_label);
+            if (!rlt->is_returning()) {
+                return none;
+            }
+            auto &&values = rlt->values;
             auto enter_frame = dest.closure->frame;
             auto enter_label = dest.closure->label;
-            Label *newl = fold_typify_single(enter_frame, enter_label, values);
-            // truncate continuations
-            if (is_jumping(newl)
-                && (is_calling_continuation(newl) || is_calling_closure(newl))
-                && matches_arg_count(newl, values.size())
-                && forwards_all_args(newl)) {
-                dest = newl->body.enter;
-                goto repeat;
-            } else {
-                dest = newl;
+            Args args;
+            args.reserve(values.size() + 1);
+            args = { Argument(untyped()) };
+            for (size_t i = 0; i < values.size(); ++i) {
+                args.push_back(values[i]);
             }
+            dest = fold_type_label_single(enter_frame, enter_label, args);
         } else if (dest.type == TYPE_Label) {
-            auto TL = ReturnLabel(values);
             auto TR = dest.label->get_params_as_return_label_type();
-            if (TL != TR) {
+            if (return_label != TR) {
                 {
                     StyledStream cerr(std::cerr);
                     cerr << dest.label->anchor << " typed as " << TR << std::endl;
@@ -13334,7 +13492,7 @@ struct Solver {
                 }
                 {
                     StyledString ss;
-                    ss.out << "attempting to retype label as " << TL;
+                    ss.out << "attempting to retype label as " << return_label;
                     location_error(ss.str());
                 }
             }
@@ -13684,10 +13842,8 @@ struct Solver {
     }
 
     void validate_label_return_types(Label *l) {
-        if (l->is_basic_block_like())
-            return;
-        if (!l->is_return_param_typed())
-            return;
+        assert(!l->is_basic_block_like());
+        assert(l->is_return_param_typed());
         const ReturnLabelType *rlt = cast<ReturnLabelType>(l->params[0]->type);
         for (size_t i = 0; i < rlt->values.size(); ++i) {
             auto &&val = rlt->values[i].value;
@@ -13738,7 +13894,7 @@ struct Solver {
         return true;
     }
 
-    void fold_closure_call(Label *&l) {
+    void fold_closure_call(Label *l) {
 #if SCOPES_DEBUG_CODEGEN
         ss_cout << "folding & typing arguments in " << l << std::endl;
 #endif
@@ -13762,11 +13918,13 @@ struct Solver {
         } else
 #endif
         {
+            bool inline_const = (!enter_label->is_merge());
+
             callargs.push_back(args[0]);
             keys.push_back(Argument(untyped()));
             for (size_t i = 1; i < args.size(); ++i) {
                 auto &&arg = args[i];
-                if (arg.value.is_const()) {
+                if (arg.value.is_const() && inline_const) {
                     keys.push_back(arg);
                 } else if (is_return_parameter(arg.value)) {
                     keys.push_back(arg);
@@ -13788,67 +13946,49 @@ struct Solver {
         bool is_function_entry = !enter_label->is_basic_block_like();
 #endif
 
-        Label *newl = fold_type_label_single(
+        Frame *newf = fold_type_label_single_frame(
             enter_frame, enter_label, keys);
-        bool reentrant = newl->is_reentrant();
+        bool reentrant = newf->is_reentrant();
         if (!reentrant) {
             // has this instance been used earlier in the stack?
-            Frame *top_frame = enter_frame->find_frame(enter_label);
-            reentrant = (top_frame && top_frame->instance == newl);
+            Frame *top_frame = enter_frame->find_parent_frame(enter_label);
+            reentrant = (top_frame == newf);
             // mark this function as reentrant for the solver further up in the stack
             if (reentrant) {
-                /*
-                if (newl->is_inline()) {
-                    location_error(String::from("reentrant label has been previously marked as inline"));
-                }
-                */
-                newl->set_reentrant();
+                newf->set_reentrant();
             }
         }
 
-        if (newl == l) {
+        Label *newl = newf->get_instance();
+
+#if 0
+        if (newf == enter_frame) {
             location_error(String::from("label or function forms an infinite but empty loop"));
         }
+#endif
 
         // labels points do not need to be entered
-        if (newl->is_basic_block_like()) {
+        if (newf->is_basic_block_like()) {
             enter = newl;
             args = callargs;
             clear_continuation_arg(l);
             return;
         }
 
+        // newl is a function
+
         // we need to solve body, return type and reentrant flags for the
         // section that follows
         normalize_function(newl);
 
-        // newl is a function
-
         assert(!newl->params.empty());
-        validate_label_return_types(newl);
-
-        bool has_return_type = newl->is_return_param_typed();
+        assert(newl->body.is_complete());
 
         enter = newl;
         args = callargs;
 
-        assert(newl->body.is_complete());
-        if (has_return_type) {
-            // function is now typed
-            type_continuation_from_label_return_type(l);
-            if (is_empty_function(newl)) {
-#if 1
-                if (enable_step_debugger) {
-                    StyledStream ss(std::cerr);
-                    ss << "folding call to empty function:" << std::endl;
-                    stream_label(ss, newl, StreamLabelFormat::debug_scope());
-                }
-#endif
-                // function performs no work, fold
-                enter = args[0].value;
-                args = { none };
-            }
-        } else {
+        // function is done, but not typed
+        if (!newl->is_return_param_typed()) {
             if (reentrant) {
                 // possible recursion - entry label has already been
                 // processed, but not exited yet, so we don't have the
@@ -13862,14 +14002,26 @@ struct Solver {
                         " before it has been typed; place exit condition before recursive call"));
                 }
             } else {
-                // apparently we returned from this label, but
-                // its continuation has not been typed,
-                // which means that it's functioning more like
-                // a basic block
-                // cut it
-                delete_continuation(newl);
-                clear_continuation_arg(l);
+                // all return paths are unreachable
+                fold_type_return(newl->params[0], NoReturnLabel());
             }
+        }
+
+        validate_label_return_types(newl);
+
+        // function is now typed
+        type_continuation_from_label_return_type(l);
+        if (is_empty_function(newl)) {
+#if 1
+            if (enable_step_debugger) {
+                StyledStream ss(std::cerr);
+                ss << "folding call to empty function:" << std::endl;
+                stream_label(ss, newl, StreamLabelFormat::debug_scope());
+            }
+#endif
+            // function performs no work, fold
+            enter = args[0].value;
+            args = { none };
         }
         return;
     }
@@ -14698,29 +14850,16 @@ struct Solver {
     enter = args[0].value; \
     args = { none, __VA_ARGS__ };
 
-    static void print_traceback_entry(StyledStream &ss, Label *last_head, Label *last_loc) {
-        if (!last_head) return;
-        assert(last_loc);
-        const Anchor *anchor = nullptr;
-        if (last_head->is_basic_block_like()) {
-            anchor = last_loc->body.anchor;
+
+    static void print_traceback_entry(StyledStream &ss, const Trace &trace) {
+        ss << trace.anchor << " in ";
+        if (trace.name == SYM_Unnamed) {
+            ss << "unnamed";
         } else {
-            anchor = last_head->anchor;
-        }
-        ss << anchor << " in ";
-        if (last_head->name == SYM_Unnamed) {
-            if (last_head->is_basic_block_like()) {
-                ss << "unnamed label";
-            } else {
-                ss << "unnamed function";
-            }
-        } else {
-            ss << Style_Function << last_head->name.name()->data << Style_None;
+            ss << Style_Function << trace.name.name()->data << Style_None;
         }
         ss << std::endl;
-        anchor->stream_source_line(ss);
-        //stream_label(ss, last_head->get_original(), StreamLabelFormat::debug_single());
-        //stream_label(ss, last_loc->get_original(), StreamLabelFormat::debug_single());
+        trace.anchor->stream_source_line(ss);
     }
 
     static void print_traceback() {
@@ -14729,6 +14868,7 @@ struct Solver {
         ss << "Traceback (most recent call last):" << std::endl;
 
         size_t sz = traceback.size();
+    #if 0
         size_t lasti = sz - 1;
         size_t i = 0;
         Label *l = traceback[lasti - i];
@@ -14752,6 +14892,25 @@ struct Solver {
             }
         }
         print_traceback_entry(ss, last_head, last_loc);
+    #else
+        std::unordered_set<const Anchor *> visited;
+        size_t i = sz;
+        size_t capped = 0;
+        while (i != 0) {
+            i--;
+            auto &&trace = traceback[i];
+            if (!visited.count(trace.anchor)) {
+                if (capped) {
+                    ss << "<...>" << std::endl;
+                    capped = 0;
+                }
+                visited.insert(trace.anchor);
+                print_traceback_entry(ss, trace);
+            } else {
+                capped++;
+            }
+        }
+    #endif
     }
 
     void fold_callable_call(Label *l) {
@@ -14784,10 +14943,8 @@ struct Solver {
             const Closure *cl = args[1].value;
             const Syntax *sx = args[2].value;
             Scope *env = args[3].value;
-            Label *metafunc = fold_type_label_single(cl->frame, cl->label,
-                { untyped(), env });
-            Solver solver;
-            solver.solve(metafunc);
+            Specializer solver;
+            Label *metafunc = solver.solve_inline(cl->frame, cl->label, { untyped(), env });
             auto rlt = metafunc->verify_return_label();
             //const Type *functype = metafunc->get_function_type();
             if (rlt->values.size() != 1)
@@ -15694,14 +15851,17 @@ struct Solver {
         auto &&args = l->body.args;
         CHECKARGS(3, 3);
         args[1].value.verify_indirect(TYPE_Bool);
+        if (args[0].value.type == TYPE_Closure) {
+            // not a great solution, as we are modifying a template label
+            args[0].value.closure->label->set_merge();
+        } else {
+            StyledStream ss;
+            ss << "not a closure :-( " << args[0].value << std::endl;
+        }
         const Closure *then_br = args[2].value;
         const Closure *else_br = args[3].value;
         verify_branch_continuation(then_br);
         verify_branch_continuation(else_br);
-        if (args[0].value.type == TYPE_Closure) {
-            // not a great solution, as we are modifying a template label
-            args[0].value.closure->label->set_merge();
-        }
         args[2].value = fold_type_label_single(then_br->frame, then_br->label, { args[0] });
         args[3].value = fold_type_label_single(else_br->frame, else_br->label, { args[0] });
         args[0].value = none;
@@ -15840,8 +16000,7 @@ struct Solver {
         const Type *cont_type = cont_param->type;
 
         if (isa<ReturnLabelType>(cont_type)) {
-            auto tli = cast<ReturnLabelType>(cont_type);
-            args[0] = fold_type_return(args[0].value, tli->values);
+            args[0] = fold_type_return(args[0].value, cont_type);
         } else {
 #if SCOPES_DEBUG_CODEGEN
             ss_cout << "unexpected return type: " << cont_type << std::endl;
@@ -15871,7 +16030,7 @@ struct Solver {
                 }
                 return true;
             } else {
-                args[0] = fold_type_return(args[0].value, values);
+                args[0] = fold_type_return(args[0].value, ReturnLabel(values));
             }
         }
 
@@ -15887,8 +16046,7 @@ struct Solver {
         const FunctionType *fi = extract_function_type(enter.indirect_type());
         verify_function_argument_signature(fi, l);
         auto &&args = l->body.args;
-        auto rlt = cast<ReturnLabelType>(fi->return_type);
-        args[0] = fold_type_return(args[0].value, rlt->values);
+        args[0] = fold_type_return(args[0].value, fi->return_type);
     }
 
     void type_continuation_call(Label *l) {
@@ -15911,7 +16069,7 @@ struct Solver {
                 newargs.push_back(args[i]);
             }
         }
-        fold_type_return(l->body.enter, values);
+        fold_type_return(l->body.enter, ReturnLabel(values));
         args = newargs;
     }
 
@@ -15925,7 +16083,9 @@ struct Solver {
         return solve_refs == 0;
     }
 
-    Label *solve(Label *entry) {
+    Label *solve_inline(Frame *frame, Label *label, const Args &values) {
+        Label *entry = fold_type_label_single(frame, label, values);
+
         inc_solve_ref();
         SCOPES_TRY()
 
@@ -15944,6 +16104,28 @@ struct Solver {
         }
         validate_scope(entry);
         return entry;
+    }
+
+    Label *typify(Frame *frame, Label *label, const ArgTypes &argtypes) {
+        Args args;
+        args.reserve(argtypes.size() + 1);
+        args = { Argument(untyped()) };
+        for (size_t i = 0; i < argtypes.size(); ++i) {
+            args.push_back(Argument(unknown_of(argtypes[i])));
+        }
+        return solve_inline(frame, label, args);
+    }
+
+    Label *solve(Frame *frame, Label *label, const Args &values) {
+        assert(frame);
+        assert(!label->params.empty());
+        Args args;
+        args.reserve(values.size() + 1);
+        args = { Argument(untyped()) };
+        for (size_t i = 0; i < values.size(); ++i) {
+            args.push_back(values[i]);
+        }
+        return solve_inline(frame, label, values);
     }
 
     void complete_existing_label_continuation (Label *l) {
@@ -16059,7 +16241,9 @@ struct Solver {
             }
         }
         if (l != startl) {
+            const Anchor *saveanchor = startl->body.anchor;
             startl->body = l->body;
+            startl->body.anchor = saveanchor;
             return true;
         }
         return false;
@@ -16073,81 +16257,88 @@ struct Solver {
     }
 
     // fold body of single label as far as possible
-    void fold_label_body(Label *l, Labels &todo) {
-    repeat:
+    void fold_label_body(Label *l, Labels &todo, Traces &traces) {
         if (l->body.is_complete())
             return;
-        on_label_processing(l);
-        assert(!l->is_template());
-        l->verify_valid();
-        assert(all_params_typed(l));
 
-        set_active_anchor(l->body.anchor);
+        while (true) {
+            on_label_processing(l);
+            assert(!l->is_template());
+            l->verify_valid();
+            assert(all_params_typed(l));
 
-        if (!all_args_typed(l)) {
-            size_t idx = find_untyped_arg(l);
-            StyledString ss;
-            ss.out << "parameter " << l->body.args[idx].value.parameter
-                << " passed as argument " << idx << " has not been typed yet";
-            location_error(ss.str());
-        }
+            //traces.push_back(Trace(l->body.anchor, l->name));
+            set_active_anchor(l->body.anchor);
 
-        if (is_calling_label(l)) {
-            if (!l->get_label_enter()->body.is_complete()) {
-                location_error(String::from("failed to propagate return type from untyped label"));
+            if (!all_args_typed(l)) {
+                size_t idx = find_untyped_arg(l);
+                StyledString ss;
+                ss.out << "parameter " << l->body.args[idx].value.parameter
+                    << " passed as argument " << idx << " has not been typed yet";
+                location_error(ss.str());
             }
-            complete_existing_label_continuation(l);
-        } else if (is_calling_callable(l)) {
-            fold_callable_call(l);
-            goto repeat;
-        } else if (is_calling_function(l)) {
-            verify_no_keyed_args(l);
-            if (is_calling_pure_function(l)
-                && all_args_constant(l)) {
-                fold_pure_function_call(l);
-                goto repeat;
-            } else {
-                type_continuation_from_function_call(l);
-            }
-        } else if (is_calling_builtin(l)) {
-            auto builtin = l->get_builtin_enter();
-            if (!builtin_has_keyed_args(builtin))
-                verify_no_keyed_args(l);
-            if (builtin_always_folds(builtin)
-                || (!builtin_never_folds(builtin) && all_args_constant(l))) {
-                if (fold_builtin_call(l)) {
-                    goto repeat;
+
+            if (is_calling_label(l)) {
+                if (!l->get_label_enter()->body.is_complete()) {
+                    location_error(String::from("failed to propagate return type from untyped label"));
                 }
-            } else if (builtin == FN_Branch) {
-                type_branch_continuations(l);
-                auto &&args = l->body.args;
-                todo.push_back(args[3].value);
-                todo.push_back(args[2].value);
-            } else if (type_continuation_from_builtin_call(l)) {
-                goto repeat;
-            }
-        } else if (is_calling_closure(l)) {
-            if (has_keyed_args(l)) {
-                solve_keyed_args(l);
-            }
-            fold_closure_call(l);
-        } else if (is_calling_continuation(l)) {
-            type_continuation_call(l);
-        } else {
-            StyledString ss;
-            auto &&enter = l->body.enter;
-            if (!enter.is_const()) {
-                ss.out << "unable to call variable of type " << enter.indirect_type();
+                complete_existing_label_continuation(l);
+            } else if (is_calling_callable(l)) {
+                fold_callable_call(l);
+                continue;
+            } else if (is_calling_function(l)) {
+                verify_no_keyed_args(l);
+                if (is_calling_pure_function(l)
+                    && all_args_constant(l)) {
+                    fold_pure_function_call(l);
+                    continue;
+                } else {
+                    type_continuation_from_function_call(l);
+                }
+            } else if (is_calling_builtin(l)) {
+                auto builtin = l->get_builtin_enter();
+                if (!builtin_has_keyed_args(builtin))
+                    verify_no_keyed_args(l);
+                if (builtin_always_folds(builtin)
+                    || (!builtin_never_folds(builtin) && all_args_constant(l))) {
+                    if (fold_builtin_call(l)) {
+                        continue;
+                    }
+                } else if (builtin == FN_Branch) {
+                    type_branch_continuations(l);
+                    auto &&args = l->body.args;
+                    todo.push_back(args[3].value);
+                    todo.push_back(args[2].value);
+                } else if (type_continuation_from_builtin_call(l)) {
+                    continue;
+                }
+            } else if (is_calling_closure(l)) {
+                if (has_keyed_args(l)) {
+                    solve_keyed_args(l);
+                }
+                fold_closure_call(l);
+            } else if (is_calling_continuation(l)) {
+                type_continuation_call(l);
             } else {
-                ss.out << "unable to call constant of type " << enter.type;
+                StyledString ss;
+                auto &&enter = l->body.enter;
+                if (!enter.is_const()) {
+                    ss.out << "unable to call variable of type " << enter.indirect_type();
+                } else {
+                    ss.out << "unable to call constant of type " << enter.type;
+                }
+                location_error(ss.str());
             }
-            location_error(ss.str());
-        }
 
-        l->body.set_complete();
+            l->body.set_complete();
 
-        if (fold_useless_labels(l)) {
-            goto repeat;
+#if 0
+            if (fold_useless_labels(l)) {
+                continue;
+            }
+#endif
+
+            break;
         }
     }
 
@@ -16158,33 +16349,26 @@ struct Solver {
         verify_stack_size();
         assert(!l->is_basic_block_like());
         Label *entry_label = l;
+        Labels todo;
+        todo.push_back(l);
+        Traces traces;
+
         SCOPES_TRY()
 
-        Labels todo;
-
-        todo.push_back(l);
         while (!todo.empty()) {
             l = todo.back();
             todo.pop_back();
             if(l->body.is_complete())
                 continue;
 
-            fold_label_body(l, todo);
+            fold_label_body(l, todo, traces);
 
             /*
-                problem: to delete all useless labels, we need to fold the
-                body of the next label if incomplete to decide whether it can be
-                skipped:
+                some thoughts:
 
-                a label body is useless if, after folding, it jumps directly to
-                another label but the next label isn't merging or reentrant.
-
-                the next label can only be called with constants and parameters;
-                thus all of these could be inlined, and the body of the next
-                label integrated into the current label.
-
-
-
+                it's better to skip labels when continuing rather than copying
+                over bodies, because we overwrite the anchor information
+                (not sure if that's relevant tho)
 
             */
 
@@ -16204,9 +16388,18 @@ struct Solver {
         }
 
         SCOPES_CATCH(exc)
-            traceback.push_back(l);
-            if (entry_label != l)
-                traceback.push_back(entry_label);
+        #if 1
+            traceback.push_back(Trace(l->body.anchor, l->name));
+            if (entry_label != l) {
+                traceback.push_back(Trace(entry_label->anchor, entry_label->name));
+            }
+        #else
+            size_t i = traces.size();
+            while (i > 0) {
+                i--;
+                traceback.push_back(traces[i]);
+            }
+        #endif
             error(exc);
         SCOPES_TRY_END()
     }
@@ -16424,10 +16617,10 @@ struct Solver {
 
 };
 
-Labels Solver::traceback;
-int Solver::solve_refs = 0;
-bool Solver::enable_step_debugger = false;
-Solver::CLICmd Solver::clicmd = CmdNone;
+Specializer::Traces Specializer::traceback;
+int Specializer::solve_refs = 0;
+bool Specializer::enable_step_debugger = false;
+Specializer::CLICmd Specializer::clicmd = CmdNone;
 
 //------------------------------------------------------------------------------
 // MACRO EXPANDER
@@ -17086,6 +17279,20 @@ struct Expander {
         Any subdest = none;
         Label *nextstate = make_nextstate(dest, result, subdest);
 
+        Any merge_result = none;
+        Any merge_subdest = none;
+        Label *mergestate = nullptr;
+        if (!nextstate) {
+            mergestate = make_nextstate(Symbol(SYM_Unnamed), merge_result, merge_subdest);
+            assert(mergestate);
+            mergestate->set_inline();
+            //mergestate->set_merge();
+        } else {
+            merge_result = result;
+            merge_subdest = subdest;
+            //nextstate->set_merge();
+        }
+
         int lastidx = (int)branches.size() - 1;
         for (int idx = 0; idx < lastidx; ++idx) {
             it = branches[idx];
@@ -17106,7 +17313,7 @@ struct Expander {
             set_active_anchor(_anchor);
             state = subexp.state;
 
-            br(Builtin(FN_Branch), { subdest, cond, thenstate, elsestate });
+            br(Builtin(FN_Branch), { merge_subdest, cond, thenstate, elsestate });
 
             subexp.env = Scope::from(env);
             subexp.state = thenstate;
@@ -17115,16 +17322,24 @@ struct Expander {
             state = elsestate;
         }
 
+        assert(!state->is_basic_block_like());
+
         it = branches[lastidx];
         if (it != EOL) {
             it = it->next;
             Expander subexp(state, Scope::from(env));
-            subexp.expand_block(it, subdest);
+            subexp.expand_block(it, state->params[0]);
         } else {
-            br(subdest, { none });
+            br(state->params[0], { none });
+        }
+
+        if (mergestate) {
+            state = mergestate;
+            br(subdest, { none, mergestate->params[1] });
         }
 
         state = nextstate;
+
         return result;
     }
 
@@ -17916,8 +18131,8 @@ static void f_set_globals(Scope *s) {
 }
 
 static Label *f_eval(const Syntax *expr, Scope *scope) {
-    Solver solver;
-    return solver.solve(typify_single(Frame::root, expand_module(expr, scope), {}));
+    Specializer solver;
+    return solver.typify(Frame::root, expand_module(expr, scope), {});
 }
 
 static void f_set_scope_symbol(Scope *scope, Symbol sym, Any value) {
@@ -17937,8 +18152,8 @@ static Label *f_typify(Closure *srcl, int numtypes, const Type **typeargs) {
         types.push_back(typeargs[i]);
 
     }
-    Solver solver;
-    return solver.solve(typify_single(srcl->frame, srcl->label, types));
+    Specializer solver;
+    return solver.typify(srcl->frame, srcl->label, types);
 }
 
 static Any f_compile(Label *srcl, uint64_t flags) {
@@ -18180,13 +18395,10 @@ size_t f_label_countof_reachable(Label *label) {
 }
 
 static void f_enter_solver_cli () {
-    Solver::enable_step_debugger = true;
+    Specializer::enable_step_debugger = true;
 }
 
 static void f_label_setinline (Label *label) {
-    if (label->is_reentrant()) {
-        location_error(String::from("Reentrant label can not be tagged as inline"));
-    }
     label->set_inline();
 }
 
@@ -18703,8 +18915,8 @@ skip_regular_load:
     std::cout << std::endl;
 #endif
 
-    Solver solver;
-    fn = solver.solve(typify_single(Frame::root, fn, {}));
+    Specializer solver;
+    fn = solver.typify(Frame::root, fn, {});
 #if SCOPES_DEBUG_CODEGEN
     std::cout << "normalized:" << std::endl;
     stream_label(ss, fn, StreamLabelFormat::debug_all());

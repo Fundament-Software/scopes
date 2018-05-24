@@ -805,36 +805,36 @@ fn repr (value)
         if (type== T Any)
             Any-typeof value
         else T
-    inline append-type? ()
-        label ret (value)
-            return
-                tie-const CT value
-        if (type== CT i32) (ret false)
-        elseif (type== CT bool) (ret false)
-        elseif (type== CT Nothing) (ret false)
-        elseif (type== CT f32) (ret false)
-        elseif (type== CT string) (ret false)
-        elseif (type== CT list) (ret false)
-        elseif (type== CT Symbol) (ret false)
-        elseif (type== CT type) (ret false)
+    inline append-type? (truef falsef)
+        if (type== CT i32) (falsef)
+        elseif (type== CT bool) (falsef)
+        elseif (type== CT Nothing) (falsef)
+        elseif (type== CT f32) (falsef)
+        elseif (type== CT string) (falsef)
+        elseif (type== CT list) (falsef)
+        elseif (type== CT Symbol) (falsef)
+        elseif (type== CT type) (falsef)
         elseif (vector-type? CT)
             let ET = (element-type CT 0)
-            if (type== ET i32) (ret false)
-            elseif (type== ET bool) (ret false)
-            elseif (type== ET f32) (ret false)
-            else (ret true)
-        else (ret true)
+            if (type== ET i32) (falsef)
+            elseif (type== ET bool) (falsef)
+            elseif (type== ET f32) (falsef)
+            else (truef)
+        else (truef)
     let op success = (type@ T '__repr)
     let text =
         if success
             op value
         else
             Any-repr (Any value)
-    if (append-type?)
-        .. text
-            default-styler style-operator ":"
-            default-styler style-type (type-name CT)
-    else text
+    append-type?
+        label ()
+            return
+                .. text
+                    default-styler style-operator ":"
+                    default-styler style-type (type-name CT)
+        inline ()
+            text
 
 inline scalar-type (T)
     let ST = (storageof T)
@@ -1177,9 +1177,12 @@ inline decons (val count)
 
 inline list-countof (l)
     assert-typeof l list
-    if (list-empty? l) (tie-const l 0:usize)
+    if (list-empty? l)
+        return
+            tie-const l 0:usize
     else
-        extractvalue (load l) 2
+        return
+            extractvalue (load l) 2
 
 fn string-countof (s)
     assert-typeof s string
@@ -1521,27 +1524,28 @@ syntax-extend
                 build-slice (list-next l) (list-cons (list-at l) next) (+ i 1:i64)
 
     fn list== (a b)
-        label xreturn (value)
-            return (tie-const (tie-const a b) value)
-        if (icmp!= (list-countof a) (list-countof b))
-            xreturn false
-        let loop (a b) = (tie-const b a) (tie-const a b)
-        if (list-empty? a)
-            xreturn true
-        let u v = (list-at a) (list-at b)
-        let uT vT = ('typeof u) ('typeof v)
-        if (not (type== uT vT))
-            xreturn false
-        let un vn = (list-next a) (list-next b)
-        if (type== uT list)
-            if (list== (imply u list) (imply v list))
-                loop un vn
-            else
-                xreturn false
-        elseif (Any== u v)
-            loop un vn
+        dump a b
+        label xreturn (value m)
+            let k = (tie-const (tie-const a b) value)
+            dump return m value a b (constant? a) (constant? b) (constant? k)
+            return k
+        if (icmp!= (list-countof a) (list-countof b)) false
         else
-            xreturn false
+            let loop (a b) = (tie-const b a) (tie-const a b)
+            if (list-empty? a) true
+            else
+                let u v = (list-at a) (list-at b)
+                let uT vT = ('typeof u) ('typeof v)
+                if (not (type== uT vT)) false
+                else
+                    let un vn = (list-next a) (list-next b)
+                    if (type== uT list)
+                        if (list== (imply u list) (imply v list))
+                            loop un vn
+                        else false
+                    elseif (Any== u v)
+                        loop un vn
+                    else false
 
     set-type-symbol! list '__==
         fn (a b flipped)
@@ -4072,10 +4076,10 @@ typefn tuple '__hash (self)
     else
         result
 
-typefn tuple '__countof (self)
+typeinline tuple '__countof (self)
     countof (typeof self)
 
-typefn tuple '__@ (self at)
+typeinline tuple '__@ (self at)
     let val = (at as integer)
     extractvalue self val
 
@@ -4083,7 +4087,7 @@ typeinline& tuple '__@ (self at)
     let val = (at as integer)
     (getelementptr self 0 val) as ref
 
-typefn tuple '__unpack (self)
+typeinline tuple '__unpack (self)
     let T = (typeof self)
     let count = (type-countof T)
     let loop (i result...) = count
@@ -4110,7 +4114,7 @@ typeinline& tuple '__unpack (self)
             result...
 
 # access reference to struct element from pointer/reference
-typefn& tuple '__getattr (self name)
+typeinline& tuple '__getattr (self name)
     let ET = (element-type (typeof self) 0)
     let idx = (element-index ET name)
     if (icmp>=s idx 0)
@@ -4118,12 +4122,12 @@ typefn& tuple '__getattr (self name)
         let val = (getelementptr self 0 idx)
         ref val
 
-typefn tuple '__getattr (self name)
+typeinline tuple '__getattr (self name)
     let idx = (element-index (typeof self) name)
     if (icmp>=s idx 0)
         extractvalue self idx
 
-fn tupleof (...)
+inline tupleof (...)
     let sz = (va-countof ...)
     let keys... = (va-keys ...)
     # build tuple type
@@ -4162,9 +4166,9 @@ define-macro capture
                 super = Capture
                 storage = TT
         T
-    fn convert (self TT)
+    inline convert (self TT)
         unpack (bitcast self TT)
-    fn convert& (self TT)
+    inline convert& (self TT)
         unpack (bitcast& self TT)
 
     let args params body = (decons args 2)
@@ -4282,7 +4286,7 @@ typefn array '__unpack (self)
             extractvalue self i
             result...
 
-typefn& array '__unpack (self)
+typeinline& array '__unpack (self)
     let count = (type-countof (typeof& self))
     let loop (i result...) = count
     if (i == 0) result...
@@ -4292,7 +4296,7 @@ typefn& array '__unpack (self)
             self @ i
             result...
 
-typefn& array '__imply (self destT)
+typeinline& array '__imply (self destT)
     let ET = (@ (typeof& self))
     if ((destT < pointer) and ((@ destT) == ET))
         bitcast self destT

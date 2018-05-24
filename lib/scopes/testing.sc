@@ -8,7 +8,7 @@ fn __test-modules (module-dir modules)
     let total =
         i32 (countof modules)
 
-    let loop (modules failed-modules) = (unconst modules) (unconst '())
+    loop (modules failed-modules) = modules '()
     if (empty? modules)
         let failed = (i32 (countof failed-modules))
         if (failed > 0)
@@ -35,7 +35,7 @@ fn __test-modules (module-dir modules)
                 io-write!
                     format-exception exc
                 unconst false
-    loop modules
+    repeat modules
         if ok
             failed-modules
         else

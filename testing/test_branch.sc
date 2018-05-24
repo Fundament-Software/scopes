@@ -35,3 +35,11 @@ assert-compiler-error
                     1
 
         test (unconst true)
+
+let k =
+    branch (unconst true)
+        inline ()
+            unconst 1
+        inline ()
+            unconst 2
+assert (k == 1)
