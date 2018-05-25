@@ -43,4 +43,28 @@ assert-compiler-error
             finite-loop (unconst 100)
         test-inline-loop;
 
+fn test-late-head-recursion (x)
+    if (x == 24) (unconst 1)
+    else
+        (test-late-head-recursion (x + 1)) * 2
 
+assert ((test-late-head-recursion (unconst 0)) == 16777216)
+
+fn test-early-head-recursion (x)
+    if (x != 24)
+        (test-early-head-recursion (x + 1)) * 2
+    else (unconst 1)
+
+assert ((test-early-head-recursion (unconst 0)) == 16777216)
+
+fn test-hidden-infinite-recursion (x)
+    if (x != 24)
+        (test-hidden-infinite-recursion (x + 1)) * 2
+    elseif (x != 36)
+        (test-hidden-infinite-recursion (x + 1)) * 2
+    else
+        (test-hidden-infinite-recursion (x + 1)) * 2
+
+# recursive function never returns
+assert-compiler-error
+    test-hidden-infinite-recursion (unconst 0)

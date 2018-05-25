@@ -2883,6 +2883,7 @@ static StyledStream& operator<<(StyledStream& ost, Argument value) {
 typedef std::vector<Argument> Args;
 typedef std::vector<const Type *> ArgTypes;
 typedef std::vector<Label *> Labels;
+typedef std::deque<Label *> LabelQueue;
 typedef std::vector<Parameter *> Parameters;
 
 struct TupleType : StorageType {
@@ -3369,37 +3370,25 @@ struct ReturnLabelType : Type {
 };
 
 static const Type *ReturnLabel(ReturnLabelType::Mode mode, const Args &values) {
-    struct TypeArgs {
-        ReturnLabelType::Mode mode;
-        Args args;
-
-        TypeArgs() {}
-        TypeArgs(ReturnLabelType::Mode _mode, const Args &_args) : mode(_mode), args(_args) {}
-
-        bool operator==(const TypeArgs &other) const {
-            if (mode != other.mode) return false;
-            if (args.size() != other.args.size()) return false;
-            for (size_t i = 0; i < args.size(); ++i) {
-                auto &&a = args[i];
-                auto &&b = other.args[i];
-                if (a != b)
-                    return false;
-            }
-            return true;
+    struct Equal {
+        bool operator()( const ReturnLabelType *lhs, const ReturnLabelType *rhs ) const {
+            return
+                (lhs->mode == rhs->mode)
+                && (lhs->values == rhs->values);
         }
-
-        struct Hash {
-            std::size_t operator()(const TypeArgs& s) const {
-                std::size_t h = std::hash<int32_t>{}((int32_t)s.mode);
-                for (auto &&arg : s.args) {
-                    h = HashLen16(h, arg.hash());
-                }
-                return h;
-            }
-        };
     };
 
-    typedef std::unordered_map<TypeArgs, ReturnLabelType *, typename TypeArgs::Hash> ArgMap;
+    struct Hash {
+        std::size_t operator()(const ReturnLabelType *s) const {
+            std::size_t h = std::hash<int32_t>{}((int32_t)s->mode);
+            for (auto &&arg : s->values) {
+                h = HashLen16(h, arg.hash());
+            }
+            return h;
+        }
+    };
+
+    typedef std::unordered_set<ReturnLabelType *, Hash, Equal> ArgMap;
 
     static ArgMap map;
 
@@ -3409,14 +3398,15 @@ static const Type *ReturnLabel(ReturnLabelType::Mode mode, const Args &values) {
     }
 #endif
 
-    TypeArgs ta(mode, values);
-    typename ArgMap::iterator it = map.find(ta);
+    ReturnLabelType key(mode, values);
+
+    typename ArgMap::iterator it = map.find(&key);
     if (it == map.end()) {
         ReturnLabelType *t = new ReturnLabelType(mode, values);
-        map.insert({ta, t});
+        map.insert(t);
         return t;
     } else {
-        return it->second;
+        return *it;
     }
 }
 
@@ -13894,7 +13884,7 @@ struct Specializer {
         return true;
     }
 
-    void fold_closure_call(Label *l) {
+    const Type *fold_closure_call(Label *l, bool &recursive) {
 #if SCOPES_DEBUG_CODEGEN
         ss_cout << "folding & typing arguments in " << l << std::endl;
 #endif
@@ -13971,29 +13961,28 @@ struct Specializer {
         if (newf->is_basic_block_like()) {
             enter = newl;
             args = callargs;
-            clear_continuation_arg(l);
-            return;
-        }
+            //clear_continuation_arg(l);
+            return nullptr;
+        } else {
+            // newl is a function
 
-        // newl is a function
+            // we need to solve body, return type and reentrant flags for the
+            // section that follows
+            normalize_function(newf);
 
-        // we need to solve body, return type and reentrant flags for the
-        // section that follows
-        normalize_function(newl);
+            // function is done, but not typed
+            if (!newl->is_return_param_typed()) {
+                // two possible reasons for this:
+                // 2. all return paths are unreachable, because the function
+                //    never returns.
+                //    but this is not the case, because the function has not been
+                //    typed yet as not returning.
 
-        assert(!newl->params.empty());
-        assert(newl->body.is_complete());
-
-        enter = newl;
-        args = callargs;
-
-        // function is done, but not typed
-        if (!newl->is_return_param_typed()) {
-            if (reentrant) {
-                // possible recursion - entry label has already been
-                // processed, but not exited yet, so we don't have the
-                // continuation type yet.
-
+                // 1. recursion - entry label has already been
+                //    processed, but not exited yet, so we don't have the
+                //    continuation type yet.
+                assert(newf->is_reentrant());
+    #if 0
                 // as long as we don't have to pass on the result,
                 // that's not a problem though
                 if (is_continuing_to_label(l) || is_continuing_to_closure(l)) {
@@ -14001,29 +13990,33 @@ struct Specializer {
                         "attempt to continue from call to recursive function"
                         " before it has been typed; place exit condition before recursive call"));
                 }
+    #else
+                // try again when all outstanding branches have been processed
+                recursive = true;
+                return nullptr;
+    #endif
             } else {
-                // all return paths are unreachable
-                fold_type_return(newl->params[0], NoReturnLabel());
+                validate_label_return_types(newl);
             }
-        }
 
-        validate_label_return_types(newl);
-
-        // function is now typed
-        type_continuation_from_label_return_type(l);
-        if (is_empty_function(newl)) {
-#if 1
-            if (enable_step_debugger) {
-                StyledStream ss(std::cerr);
-                ss << "folding call to empty function:" << std::endl;
-                stream_label(ss, newl, StreamLabelFormat::debug_scope());
+            const Type *rtype = newl->get_return_type();
+            if (is_empty_function(newl)) {
+    #if 1
+                if (enable_step_debugger) {
+                    StyledStream ss(std::cerr);
+                    ss << "folding call to empty function:" << std::endl;
+                    stream_label(ss, newl, StreamLabelFormat::debug_scope());
+                }
+    #endif
+                // function performs no work, fold
+                enter = args[0].value;
+                args = { none };
+            } else {
+                enter = newl;
+                args = callargs;
             }
-#endif
-            // function performs no work, fold
-            enter = args[0].value;
-            args = { none };
+            return rtype;
         }
-        return;
     }
 
     // returns true if the builtin folds regardless of whether the arguments are
@@ -15851,6 +15844,7 @@ struct Specializer {
         auto &&args = l->body.args;
         CHECKARGS(3, 3);
         args[1].value.verify_indirect(TYPE_Bool);
+        #if 0
         if (args[0].value.type == TYPE_Closure) {
             // not a great solution, as we are modifying a template label
             args[0].value.closure->label->set_merge();
@@ -15858,6 +15852,7 @@ struct Specializer {
             StyledStream ss;
             ss << "not a closure :-( " << args[0].value << std::endl;
         }
+        #endif
         const Closure *then_br = args[2].value;
         const Closure *else_br = args[3].value;
         verify_branch_continuation(then_br);
@@ -15986,58 +15981,7 @@ struct Specializer {
         }
     }
 
-    void type_continuation_from_label_return_type(Label *l) {
-#if SCOPES_DEBUG_CODEGEN
-        ss_cout << "typing continuation from label return type in " << l << std::endl;
-#endif
-        auto &&enter = l->body.enter;
-        auto &&args = l->body.args;
-        assert(enter.type == TYPE_Label);
-        Label *enter_label = enter.label;
-        assert(!args.empty());
-        assert(!enter_label->params.empty());
-        Parameter *cont_param = enter_label->params[0];
-        const Type *cont_type = cont_param->type;
-
-        if (isa<ReturnLabelType>(cont_type)) {
-            args[0] = fold_type_return(args[0].value, cont_type);
-        } else {
-#if SCOPES_DEBUG_CODEGEN
-            ss_cout << "unexpected return type: " << cont_type << std::endl;
-#endif
-            assert(false && "todo: unexpected return type");
-        }
-    }
-
-    bool type_continuation_from_builtin_call(Label *l) {
-#if SCOPES_DEBUG_CODEGEN
-        ss_cout << "typing continuation from builtin call in " << l << std::endl;
-#endif
-        auto &&enter = l->body.enter;
-        assert(enter.type == TYPE_Builtin);
-        auto &&args = l->body.args;
-        if ((enter.builtin == SFXFN_Unreachable)
-            || (enter.builtin == SFXFN_Discard)) {
-            args[0] = none;
-        } else {
-            Args values;
-            bool fold = values_from_builtin_call(l, values);
-            if (fold) {
-                enter = args[0].value;
-                args = { none };
-                for (size_t i = 0; i < values.size(); ++i) {
-                    args.push_back(values[i]);
-                }
-                return true;
-            } else {
-                args[0] = fold_type_return(args[0].value, ReturnLabel(values));
-            }
-        }
-
-        return false;
-    }
-
-    void type_continuation_from_function_call(Label *l) {
+    const Type *get_return_type_from_function_call(Label *l) {
 #if SCOPES_DEBUG_CODEGEN
         ss_cout << "typing continuation from function call in " << l << std::endl;
 #endif
@@ -16045,11 +15989,10 @@ struct Specializer {
 
         const FunctionType *fi = extract_function_type(enter.indirect_type());
         verify_function_argument_signature(fi, l);
-        auto &&args = l->body.args;
-        args[0] = fold_type_return(args[0].value, fi->return_type);
+        return fi->return_type;
     }
 
-    void type_continuation_call(Label *l) {
+    const Type *get_return_type_from_call_arguments(Label *l) {
 #if SCOPES_DEBUG_CODEGEN
         ss_cout << "typing continuation call in " << l << std::endl;
 #endif
@@ -16069,8 +16012,8 @@ struct Specializer {
                 newargs.push_back(args[i]);
             }
         }
-        fold_type_return(l->body.enter, ReturnLabel(values));
         args = newargs;
+        return ReturnLabel(values);
     }
 
     static void inc_solve_ref() {
@@ -16084,12 +16027,12 @@ struct Specializer {
     }
 
     Label *solve_inline(Frame *frame, Label *label, const Args &values) {
-        Label *entry = fold_type_label_single(frame, label, values);
+        Frame *entryf = fold_type_label_single_frame(frame, label, values);
 
         inc_solve_ref();
         SCOPES_TRY()
 
-        normalize_function(entry);
+        normalize_function(entryf);
 
         SCOPES_CATCH(exc)
             if (dec_solve_ref()) {
@@ -16102,6 +16045,8 @@ struct Specializer {
         if (dec_solve_ref()) {
             traceback.clear();
         }
+
+        Label *entry = entryf->get_instance();
         validate_scope(entry);
         return entry;
     }
@@ -16128,13 +16073,14 @@ struct Specializer {
         return solve_inline(frame, label, values);
     }
 
-    void complete_existing_label_continuation (Label *l) {
+    const Type *complete_existing_label_continuation (Label *l) {
         Label *enter_label = l->get_label_enter();
         if (!enter_label->is_basic_block_like()) {
             assert(enter_label->body.is_complete());
             assert(enter_label->is_return_param_typed());
-            type_continuation_from_label_return_type(l);
+            return enter_label->get_return_type();
         }
+        return nullptr;
     }
 
     void on_label_processing(Label *l, const char *task = nullptr) {
@@ -16257,9 +16203,9 @@ struct Specializer {
     }
 
     // fold body of single label as far as possible
-    void fold_label_body(Label *l, Labels &todo, Traces &traces) {
+    bool fold_label_body(Label *l, LabelQueue &todo, LabelQueue &recursions, Traces &traces) {
         if (l->body.is_complete())
-            return;
+            return true;
 
         while (true) {
             on_label_processing(l);
@@ -16278,11 +16224,12 @@ struct Specializer {
                 location_error(ss.str());
             }
 
+            const Type *rtype = nullptr;
             if (is_calling_label(l)) {
                 if (!l->get_label_enter()->body.is_complete()) {
                     location_error(String::from("failed to propagate return type from untyped label"));
                 }
-                complete_existing_label_continuation(l);
+                rtype = complete_existing_label_continuation(l);
             } else if (is_calling_callable(l)) {
                 fold_callable_call(l);
                 continue;
@@ -16293,7 +16240,7 @@ struct Specializer {
                     fold_pure_function_call(l);
                     continue;
                 } else {
-                    type_continuation_from_function_call(l);
+                    rtype = get_return_type_from_function_call(l);
                 }
             } else if (is_calling_builtin(l)) {
                 auto builtin = l->get_builtin_enter();
@@ -16309,16 +16256,41 @@ struct Specializer {
                     auto &&args = l->body.args;
                     todo.push_back(args[3].value);
                     todo.push_back(args[2].value);
-                } else if (type_continuation_from_builtin_call(l)) {
-                    continue;
+                } else {
+                    auto &&enter = l->body.enter;
+                    auto &&args = l->body.args;
+                    assert(enter.type == TYPE_Builtin);
+                    if ((enter.builtin == SFXFN_Unreachable)
+                        || (enter.builtin == SFXFN_Discard)) {
+                        args[0] = none;
+                    } else {
+                        Args values;
+                        bool fold = values_from_builtin_call(l, values);
+                        if (fold) {
+                            enter = args[0].value;
+                            args = { none };
+                            for (size_t i = 0; i < values.size(); ++i) {
+                                args.push_back(values[i]);
+                            }
+                            continue;
+                        } else {
+                            rtype = ReturnLabel(values);
+                        }
+                    }
                 }
             } else if (is_calling_closure(l)) {
                 if (has_keyed_args(l)) {
                     solve_keyed_args(l);
                 }
-                fold_closure_call(l);
+                bool recursive = false;
+                rtype = fold_closure_call(l, recursive);
+                if (recursive) {
+                    // try again later
+                    recursions.push_front(l);
+                    return false;
+                }
             } else if (is_calling_continuation(l)) {
-                type_continuation_call(l);
+                rtype = get_return_type_from_call_arguments(l);
             } else {
                 StyledString ss;
                 auto &&enter = l->body.enter;
@@ -16330,9 +16302,18 @@ struct Specializer {
                 location_error(ss.str());
             }
 
+            if (rtype) {
+                if (is_jumping(l)) {
+                    l->body.enter = fold_type_return(l->body.enter, rtype);
+                } else {
+                    assert(!l->body.args.empty());
+                    l->body.args[0] = fold_type_return(l->body.args[0].value, rtype);
+                }
+            }
+
             l->body.set_complete();
 
-#if 0
+#if 1
             if (fold_useless_labels(l)) {
                 continue;
             }
@@ -16340,28 +16321,47 @@ struct Specializer {
 
             break;
         }
+
+        return true;
     }
 
     // normalize all labels in the scope of a function with entry point l
-    void normalize_function(Label *l) {
+    void normalize_function(Frame *f) {
+        Label *l = f->get_instance();
         if (l->body.is_complete())
             return;
         verify_stack_size();
         assert(!l->is_basic_block_like());
         Label *entry_label = l;
-        Labels todo;
+        // second stack of recursive calls that can't be typed yet
+        LabelQueue recursions;
+        LabelQueue todo;
         todo.push_back(l);
         Traces traces;
 
         SCOPES_TRY()
 
-        while (!todo.empty()) {
+        while (true) {
+            if (todo.empty()) {
+                if (recursions.empty())
+                    break;
+                // all directly reachable branches have been processed
+                // check that entry_label is typed at this point
+                // if it is not, we are recursing infinitely
+                if (!entry_label->is_return_param_typed()) {
+                    set_active_anchor(entry_label->anchor);
+                    location_error(String::from("recursive function never returns"));
+                }
+                todo = recursions;
+                recursions.clear();
+            }
             l = todo.back();
             todo.pop_back();
             if(l->body.is_complete())
                 continue;
 
-            fold_label_body(l, todo, traces);
+            if (!fold_label_body(l, todo, recursions, traces))
+                continue;
 
             /*
                 some thoughts:
@@ -16402,6 +16402,24 @@ struct Specializer {
         #endif
             error(exc);
         SCOPES_TRY_END()
+
+        assert(!entry_label->params.empty());
+        assert(entry_label->body.is_complete());
+
+        // function is done, but not typed
+        if (!entry_label->is_return_param_typed()) {
+            // two possible reasons for this:
+            // 1. recursion - entry label has already been
+            //    processed, but not exited yet, so we don't have the
+            //    continuation type yet.
+            //    -- but in that case, we're never arriving here!
+            //if (f->is_reentrant())
+            // 2. all return paths are unreachable, because the function
+            //    never returns.
+            fold_type_return(entry_label->params[0], NoReturnLabel());
+        } else {
+            validate_label_return_types(entry_label);
+        }
     }
 
     Label *validate_scope(Label *entry) {
