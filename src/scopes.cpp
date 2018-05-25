@@ -3289,27 +3289,49 @@ static Argument first(const Args &values) {
     return values.empty()?Argument():values.front();
 }
 
-struct ReturnLabelType : Type {
-    enum Mode {
-        Return,
-        NoReturn,
-    };
+enum ReturnLabelMode {
+    RLM_Return,
+    RLM_NoReturn,
+};
 
+static const Type *ReturnLabel(const Args &values);
+
+struct ReturnLabelType : Type {
     static bool classof(const Type *T) {
         return T->kind() == TK_ReturnLabel;
     }
 
     bool is_returning() const {
-        return mode != NoReturn;
+        return mode != RLM_NoReturn;
     }
 
-    ReturnLabelType(Mode _mode, const Args &_values)
+    const Type *to_unconst() const {
+        if (!has_const)
+            return this;
+        // unconst all constant types
+        Args rvalues;
+        for (size_t i = 0; i < values.size(); ++i) {
+            if (is_unknown(values[i].value)) {
+                rvalues.push_back(values[i].value);
+            } else {
+                rvalues.push_back(
+                    Argument(
+                        values[i].key,
+                        unknown_of(values[i].value.type)));
+            }
+        }
+        return ReturnLabel(rvalues);
+    }
+
+    ReturnLabelType(ReturnLabelMode _mode, const Args &_values)
         : Type(TK_ReturnLabel) {
         values = _values;
         mode = _mode;
 
+        has_const = false;
+        has_vars = false;
         switch(mode) {
-        case Return: {
+        case RLM_Return: {
             StyledString ss = StyledString::plain();
             ss.out << "λ(";
             for (size_t i = 0; i < values.size(); ++i) {
@@ -3321,8 +3343,10 @@ struct ReturnLabelType : Type {
                 }
                 if (is_unknown(values[i].value)) {
                     ss.out << values[i].value.typeref->name()->data;
+                    has_vars = true;
                 } else {
                     ss.out << "!" << values[i].value.type;
+                    has_const = true;
                 }
             }
             ss.out << ")";
@@ -3330,10 +3354,11 @@ struct ReturnLabelType : Type {
 
             {
                 ArgTypes rettypes;
-                // prune constants
                 for (size_t i = 0; i < values.size(); ++i) {
                     if (is_unknown(values[i].value)) {
                         rettypes.push_back(values[i].value.typeref);
+                    } else {
+                        rettypes.push_back(values[i].value.type);
                     }
                 }
 
@@ -3349,7 +3374,7 @@ struct ReturnLabelType : Type {
                 }
             }
         } break;
-        case NoReturn: {
+        case RLM_NoReturn: {
             _name = String::from("λ<noreturn>");
             return_type = TYPE_Void;
             has_mrv = false;
@@ -3359,21 +3384,31 @@ struct ReturnLabelType : Type {
         }
     }
 
+    bool has_constants() const {
+        return has_const;
+    }
+
+    bool has_variables() const {
+        return has_vars;
+    }
+
     bool has_multiple_return_values() const {
         return has_mrv;
     }
 
     Args values;
     const Type *return_type;
-    Mode mode;
+    ReturnLabelMode mode;
+protected:
     bool has_mrv;
+    bool has_const;
+    bool has_vars;
 };
 
-static const Type *ReturnLabel(ReturnLabelType::Mode mode, const Args &values) {
+const Type *ReturnLabel(ReturnLabelMode mode, const Args &values) {
     struct Equal {
         bool operator()( const ReturnLabelType *lhs, const ReturnLabelType *rhs ) const {
-            return
-                (lhs->mode == rhs->mode)
+            return (lhs->mode == rhs->mode)
                 && (lhs->values == rhs->values);
         }
     };
@@ -3411,11 +3446,11 @@ static const Type *ReturnLabel(ReturnLabelType::Mode mode, const Args &values) {
 }
 
 static const Type *ReturnLabel(const Args &values) {
-    return ReturnLabel(ReturnLabelType::Return, values);
+    return ReturnLabel(RLM_Return, values);
 }
 
 static const Type *NoReturnLabel() {
-    return ReturnLabel(ReturnLabelType::NoReturn, {});
+    return ReturnLabel(RLM_NoReturn, {});
 }
 
 //------------------------------------------------------------------------------
@@ -5837,6 +5872,8 @@ typedef Tag<Label> LabelTag;
 
 enum LabelFlags {
     LF_Template = (1 << 0),
+    // label is reentrant
+    LF_Reentrant = (1 << 1),
     // this label is an inline
     LF_Inline = (1 << 2),
     // this label can not be instantiated more than once per frame and forces
@@ -5867,12 +5904,24 @@ public:
     Label *paired;
     uint64_t flags;
 
+    void set_reentrant() {
+        flags |= LF_Reentrant;
+    }
+
+    bool is_reentrant() const {
+        return flags & LF_Reentrant;
+    }
+
     void set_merge() {
         flags |= LF_Merge;
     }
 
     void set_inline() {
         flags |= LF_Inline;
+    }
+
+    void unset_inline() {
+        flags &= ~LF_Inline;
     }
 
     bool is_merge() const {
@@ -5884,7 +5933,7 @@ public:
     }
 
     bool is_important() const {
-        return flags & LF_Merge;
+        return flags & (LF_Merge | LF_Reentrant);
     }
 
     bool is_template() const {
@@ -6476,21 +6525,15 @@ static StyledStream& operator<<(StyledStream& ss, const Closure *closure) {
 
 //------------------------------------------------------------------------------
 
-enum FrameFlags {
-    // frame has been discovered to be reentrant
-    FF_Reentrant = (1 << 0),
-};
-
 struct Frame {
     Frame() :
         parent(nullptr),
         label(nullptr),
         loop_count(0),
-        flags(0),
         instance(nullptr)
     {}
     Frame(Frame *_parent, Label *_label, Label *_instance = nullptr, size_t _loop_count = 0) :
-        parent(_parent), label(_label), loop_count(_loop_count), flags(0), instance(_instance) {
+        parent(_parent), label(_label), loop_count(_loop_count), instance(_instance) {
         assert(parent);
         assert(label);
         args.reserve(_label->params.size());
@@ -6500,37 +6543,6 @@ struct Frame {
     Frame *parent;
     Label *label;
     size_t loop_count;
-    uint32_t flags;
-
-    void set_reentrant() {
-        flags |= FF_Reentrant;
-    }
-
-    bool is_reentrant() const {
-        return flags & FF_Reentrant;
-    }
-
-    bool is_important() const {
-        return flags & FF_Reentrant;
-    }
-
-    bool is_basic_block_like() const {
-        bool result;
-        if (label->is_basic_block_like()) {
-            result = true;
-        } else if (label->is_inline() && !label->is_important() && !is_important()) {
-            result = true;
-        } else {
-            result = false;
-        }
-        #if 1
-        if (result != instance->is_basic_block_like()) {
-            StyledStream ss;
-            ss << "is_basic_block_like mismatch:" << args[0] << " " << label << " " << instance << std::endl;
-        }
-        #endif
-        return result;
-    }
 
     Frame *find_parent_frame(Label *label) {
         Frame *top = this;
@@ -6739,12 +6751,10 @@ struct StreamLabel : StreamAnchors {
             ss << Style_Keyword << "inline" << Style_None;
             ss << " ";
         }
-#if 0
         if (alabel->is_reentrant()) {
             ss << Style_Keyword << "reentrant" << Style_None;
             ss << " ";
         }
-#endif
         if (alabel->is_merge()) {
             ss << Style_Keyword << "merge" << Style_None;
             ss << " ";
@@ -11060,10 +11070,12 @@ struct LLVMIRGenerator {
     struct ReturnTraits {
         bool multiple_return_values;
         bool terminated;
+        const ReturnLabelType *rtype;
 
         ReturnTraits() :
             multiple_return_values(false),
-            terminated(false) {}
+            terminated(false),
+            rtype(nullptr) {}
     };
 
     LLVMValueRef build_call(const Type *functype, LLVMValueRef func, Args &args,
@@ -11107,6 +11119,7 @@ struct LLVMIRGenerator {
             LLVMAddCallSiteAttribute(ret, i, attr_nonnull);
         }
         auto rlt = cast<ReturnLabelType>(fi->return_type);
+        traits.rtype = rlt;
         traits.multiple_return_values = rlt->has_multiple_return_values();
         if (use_sret) {
             LLVMAddCallSiteAttribute(ret, 1, attr_sret);
@@ -11803,43 +11816,51 @@ struct LLVMIRGenerator {
             if (bb) {
                 if (retvalue) {
                     auto bbfrom = LLVMGetInsertBlock(builder);
-                    // assign phi nodes
-                    auto &&params = contarg.label->params;
                     LLVMBasicBlockRef incobbs[] = { bbfrom };
-                    for (size_t i = 1; i < params.size(); ++i) {
-                        Parameter *param = params[i];
-                        LLVMValueRef phinode = argument_to_value(param);
-                        LLVMValueRef incoval = nullptr;
-                        if (rtraits.multiple_return_values) {
-                            incoval = LLVMBuildExtractValue(builder, retvalue, i - 1, "");
-                        } else {
-                            assert(params.size() == 2);
-                            incoval = retvalue;
-                        }
-                        LLVMAddIncoming(phinode, &incoval, incobbs, 1);
-                    }
+
+#define UNPACK_RET_ARGS() \
+    if (rtraits.multiple_return_values) { \
+        assert(rtraits.rtype); \
+        auto &&values = rtraits.rtype->values; \
+        auto &&params = contarg.label->params; \
+        size_t pi = 1; \
+        for (size_t i = 0; i < values.size(); ++i) { \
+            if (pi >= params.size()) \
+                break; \
+            Parameter *param = params[pi]; \
+            auto &&arg = values[i]; \
+            if (is_unknown(arg.value)) { \
+                LLVMValueRef incoval = LLVMBuildExtractValue(builder, retvalue, i, ""); \
+                T(param, incoval); \
+                pi++; \
+            } \
+        } \
+    } else { \
+        auto &&params = contarg.label->params; \
+        if (params.size() > 1) { \
+            assert(params.size() == 2); \
+            Parameter *param = params[1]; \
+            T(param, retvalue); \
+        } \
+    }
+                    #define T(PARAM, VALUE) \
+                        LLVMAddIncoming(argument_to_value(PARAM), &VALUE, incobbs, 1);
+                    UNPACK_RET_ARGS()
+                    #undef T
                 }
 
                 LLVMBuildBr(builder, bb);
             } else {
                 if (retvalue) {
-                    // no basic block - just add assignments and continue
-                    auto &&params = contarg.label->params;
-                    for (size_t i = 1; i < params.size(); ++i) {
-                        Parameter *param = params[i];
-                        LLVMValueRef pvalue = nullptr;
-                        if (rtraits.multiple_return_values) {
-                            pvalue = LLVMBuildExtractValue(builder, retvalue, i - 1, "");
-                        } else {
-                            assert(params.size() == 2);
-                            pvalue = retvalue;
-                        }
-                        bind_parameter(param, pvalue);
-                    }
+                    #define T(PARAM, VALUE) \
+                        bind_parameter(PARAM, VALUE);
+                    UNPACK_RET_ARGS()
+                    #undef T
                 }
                 label = contarg.label;
                 goto repeat;
             }
+#undef UNPACK_RET_ARGS
         } else if (contarg.type == TYPE_Nothing) {
             StyledStream ss(std::cerr);
             stream_label(ss, label, StreamLabelFormat::debug_single());
@@ -13442,17 +13463,25 @@ struct Specializer {
                 param->type = return_label;
                 param->anchor = get_active_anchor();
             } else {
-                if (return_label != param->type) {
-                    //if (return_label == NoReturnLabel())
-                    {
-                        StyledStream cerr(std::cerr);
-                        cerr << param->anchor << " first typed here as " << param->type << std::endl;
-                        param->anchor->stream_source_line(cerr);
-                    }
-                    {
-                        StyledString ss;
-                        ss.out << "attempting to retype return continuation as " << return_label;
-                        location_error(ss.str());
+                const Type *ptype = param->type;
+                if (return_label != ptype) {
+                    // try to get a fit by unconsting types
+                    return_label = cast<ReturnLabelType>(return_label)->to_unconst();
+                    ptype = cast<ReturnLabelType>(ptype)->to_unconst();
+                    if (return_label == ptype) {
+                        param->type = return_label;
+                        param->anchor = get_active_anchor();
+                    } else {
+                        {
+                            StyledStream cerr(std::cerr);
+                            cerr << param->anchor << " first typed here as " << ptype << std::endl;
+                            param->anchor->stream_source_line(cerr);
+                        }
+                        {
+                            StyledString ss;
+                            ss.out << "attempting to retype return continuation as " << return_label;
+                            location_error(ss.str());
+                        }
                     }
                 }
             }
@@ -13898,7 +13927,7 @@ struct Specializer {
         Args callargs;
         Args keys;
         auto &&args = l->body.args;
-#if 1
+#if 0
         if (enter_label->is_inline() && !enter_label->is_important()) {
             callargs.push_back(none);
             keys.push_back(args[0]);
@@ -13924,7 +13953,7 @@ struct Specializer {
                     callargs.push_back(arg);
                 }
             }
-            #if 0
+            #if 1
             if (enter_label->is_inline()) {
                 callargs[0] = none;
                 keys[0] = args[0];
@@ -13938,17 +13967,6 @@ struct Specializer {
 
         Frame *newf = fold_type_label_single_frame(
             enter_frame, enter_label, keys);
-        bool reentrant = newf->is_reentrant();
-        if (!reentrant) {
-            // has this instance been used earlier in the stack?
-            Frame *top_frame = enter_frame->find_parent_frame(enter_label);
-            reentrant = (top_frame == newf);
-            // mark this function as reentrant for the solver further up in the stack
-            if (reentrant) {
-                newf->set_reentrant();
-            }
-        }
-
         Label *newl = newf->get_instance();
 
 #if 0
@@ -13958,7 +13976,7 @@ struct Specializer {
 #endif
 
         // labels points do not need to be entered
-        if (newf->is_basic_block_like()) {
+        if (newl->is_basic_block_like()) {
             enter = newl;
             args = callargs;
             //clear_continuation_arg(l);
@@ -13981,20 +13999,9 @@ struct Specializer {
                 // 1. recursion - entry label has already been
                 //    processed, but not exited yet, so we don't have the
                 //    continuation type yet.
-                assert(newf->is_reentrant());
-    #if 0
-                // as long as we don't have to pass on the result,
-                // that's not a problem though
-                if (is_continuing_to_label(l) || is_continuing_to_closure(l)) {
-                    location_error(String::from(
-                        "attempt to continue from call to recursive function"
-                        " before it has been typed; place exit condition before recursive call"));
-                }
-    #else
                 // try again when all outstanding branches have been processed
                 recursive = true;
                 return nullptr;
-    #endif
             } else {
                 validate_label_return_types(newl);
             }
@@ -14011,9 +14018,19 @@ struct Specializer {
                 // function performs no work, fold
                 enter = args[0].value;
                 args = { none };
+                const ReturnLabelType *rlt = cast<ReturnLabelType>(rtype);
+                auto &&values = rlt->values;
+                for (size_t i = 0; i < values.size(); ++i) {
+                    auto &&arg = values[i];
+                    assert(!is_unknown(arg.value));
+                    args.push_back(arg);
+                }
             } else {
                 enter = newl;
                 args = callargs;
+                if (rtype == NoReturnLabel()) {
+                    rtype = nullptr;
+                }
             }
             return rtype;
         }
@@ -15903,7 +15920,7 @@ struct Specializer {
         if (rtype->kind() != TK_ReturnLabel)
             return false;
         const ReturnLabelType *rlt = cast<ReturnLabelType>(rtype);
-        if (rlt->return_type != TYPE_Void)
+        if (rlt->has_variables() || !rlt->is_returning())
             return false;
         assert(!l->params.empty());
         std::unordered_set<Label *> visited;
@@ -15997,11 +16014,8 @@ struct Specializer {
         ss_cout << "typing continuation call in " << l << std::endl;
 #endif
         auto &&args = l->body.args;
-        Args newargs;
         Args values;
         values.reserve(args.size());
-        newargs.reserve(args.size());
-        newargs.push_back(none);
         for (size_t i = 1; i < args.size(); ++i) {
             if (args[i].value.is_const()) {
                 values.push_back(args[i]);
@@ -16009,10 +16023,9 @@ struct Specializer {
                 values.push_back(Argument(
                     args[i].key,
                     unknown_of(args[i].value.indirect_type())));
-                newargs.push_back(args[i]);
             }
         }
-        args = newargs;
+        clear_continuation_arg(l);
         return ReturnLabel(values);
     }
 
@@ -16084,12 +16097,14 @@ struct Specializer {
     }
 
     void on_label_processing(Label *l, const char *task = nullptr) {
-        if (clicmd == CmdSkip) {
-            enable_step_debugger = true;
+        if (!enable_step_debugger) {
+            if (clicmd == CmdSkip) {
+                enable_step_debugger = true;
+                clicmd = CmdNone;
+            }
+            return;
         }
         clicmd = CmdNone;
-        if (!enable_step_debugger)
-            return;
         auto slfmt = StreamLabelFormat::debug_single();
         slfmt.anchors = StreamLabelFormat::Line;
         if (task) {
@@ -16345,6 +16360,7 @@ struct Specializer {
             if (todo.empty()) {
                 if (recursions.empty())
                     break;
+                entry_label->set_reentrant();
                 // all directly reachable branches have been processed
                 // check that entry_label is typed at this point
                 // if it is not, we are recursing infinitely
@@ -17296,20 +17312,8 @@ struct Expander {
         Any result = none;
         Any subdest = none;
         Label *nextstate = make_nextstate(dest, result, subdest);
-
-        Any merge_result = none;
-        Any merge_subdest = none;
-        Label *mergestate = nullptr;
-        if (!nextstate) {
-            mergestate = make_nextstate(Symbol(SYM_Unnamed), merge_result, merge_subdest);
-            assert(mergestate);
-            mergestate->set_inline();
-            //mergestate->set_merge();
-        } else {
-            merge_result = result;
-            merge_subdest = subdest;
-            //nextstate->set_merge();
-        }
+        if (nextstate)
+            nextstate->unset_inline();
 
         int lastidx = (int)branches.size() - 1;
         for (int idx = 0; idx < lastidx; ++idx) {
@@ -17331,7 +17335,7 @@ struct Expander {
             set_active_anchor(_anchor);
             state = subexp.state;
 
-            br(Builtin(FN_Branch), { merge_subdest, cond, thenstate, elsestate });
+            br(Builtin(FN_Branch), { subdest, cond, thenstate, elsestate });
 
             subexp.env = Scope::from(env);
             subexp.state = thenstate;
@@ -17349,11 +17353,6 @@ struct Expander {
             subexp.expand_block(it, state->params[0]);
         } else {
             br(state->params[0], { none });
-        }
-
-        if (mergestate) {
-            state = mergestate;
-            br(subdest, { none, mergestate->params[1] });
         }
 
         state = nextstate;

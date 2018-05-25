@@ -1769,12 +1769,12 @@ syntax-extend
                 BlockScopeFunction
     fn scope-macro (f)
         block-scope-macro
-            fn "block-scope-macro" (at next scope)
+            fn (at next scope)
                 let at scope = (f (list-next at) scope)
                 return (cons at next) scope
     fn macro (f)
         block-scope-macro
-            fn "block-scope-macro" (at next scope)
+            fn (at next scope)
                 return (cons (f (list-next at)) next) scope
 
     # dotted symbol expander
@@ -2727,7 +2727,7 @@ inline bitcast& (self destT)
 # default memory allocators
 #-------------------------------------------------------------------------------
 
-fn pointer-each (n op value args...)
+inline pointer-each (n op value args...)
     let n = (imply n usize)
     if (n == 1:usize)
         op (value as ref) args...
@@ -2743,7 +2743,7 @@ fn pointer-each (n op value args...)
             loop (i + 1:usize)
     return;
 
-fn pointer-each2 (n op value other)
+inline pointer-each2 (n op value other)
     let n = (imply n usize)
     if (n == 1:usize)
         op (value as ref) (other as ref)
@@ -2759,7 +2759,7 @@ fn pointer-each2 (n op value other)
             loop (i + 1:usize)
     return;
 
-fn construct (value args...)
+inline construct (value args...)
     """"Invokes the constructor for `value` of reference-like type,
         passing along optional argument set `args...`.
     let ET = (typeof& value)
@@ -2769,7 +2769,7 @@ fn construct (value args...)
             .. "type " (repr ET) " has no constructor"
     pointer-each 1 op value args...
 
-fn construct-array (n value args...)
+inline construct-array (n value args...)
     """"Invokes the constructor for an array `value` of reference-like type,
         assuming that value is a pointer to an array element, passing along
         optional argument set `args...`.
@@ -2780,7 +2780,7 @@ fn construct-array (n value args...)
             .. "type " (repr ET) " has no constructor"
     pointer-each n op value args...
 
-fn destruct (value)
+inline destruct (value)
     """"Invokes the destructor for `value` of reference-like type.
     let ET = (typeof& value)
     let op ok = (type@& ET '__delete)
@@ -2789,7 +2789,7 @@ fn destruct (value)
             .. "type " (repr ET) " has no destructor"
     pointer-each 1 op value
 
-fn destruct-array (n value)
+inline destruct-array (n value)
     """"Invokes the destructor for an array `value` of reference-like type,
         assuming that value is a pointer to an array element.
     let ET = (typeof& value)
@@ -2799,7 +2799,7 @@ fn destruct-array (n value)
             .. "type " (repr ET) " has no destructor"
     pointer-each n op value
 
-fn copy-construct (value source)
+inline copy-construct (value source)
     """"Invokes the copy constructor for `value` of reference-like type if
         present, passing `source` as a value from which to copy.
 
@@ -2812,7 +2812,7 @@ fn copy-construct (value source)
             .. "type " (repr ET) " has no copy constructor"
     pointer-each 1 op value source
 
-fn copy-construct-array (n value source)
+inline copy-construct-array (n value source)
     """"Invokes the copy constructor for an array `value` of reference-like type,
         passing `source` as a value from which to copy.
 
@@ -2825,7 +2825,7 @@ fn copy-construct-array (n value source)
     assert ((typeof source) < ref)
     pointer-each2 n op value source
 
-fn move-construct (value source)
+inline move-construct (value source)
     """"Invokes the move constructor for `value` of reference-like type,
         passing `source` as the reference from which to move.
     let ET = (typeof& value)
@@ -2837,7 +2837,7 @@ fn move-construct (value source)
         copy-construct value source
         destruct source
 
-fn move-construct-array (n value source)
+inline move-construct-array (n value source)
     """"Invokes the move constructor for an array of pointers `value`
         passing `source` as an array of pointers from which to move.
     let ET = (typeof& value)
@@ -2932,21 +2932,21 @@ typefn ref '__delete (self)
 #-------------------------------------------------------------------------------
 
 do
-    fn simple-new (self args...)
+    inline simple-new (self args...)
         let ET = (typeof& self)
         if (va-empty? args...)
             store (nullof ET) self
         else
             store (ET args...) self
 
-    fn simple-delete (self)
+    inline simple-delete (self)
         # todo: init value to deadbeef-style noise in debug mode?
 
-    fn simple-copy (self other)
+    inline simple-copy (self other)
         let ET = (typeof& self)
         store (imply other ET) self
 
-    fn simple-deref (self)
+    inline simple-deref (self)
         load self
 
     fn setup-simple-type (T)
