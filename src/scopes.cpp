@@ -3518,7 +3518,7 @@ struct FunctionType : Type {
     const Type *type_at_index(size_t i) const {
         verify_range(i, argument_types.size() + 1);
         if (i == 0)
-            return cast<ReturnLabelType>(return_type)->return_type;
+            return return_type;
         else
             return argument_types[i - 1];
     }
@@ -5879,6 +5879,8 @@ enum LabelFlags {
     // this label can not be instantiated more than once per frame and forces
     // all callers to use the same arguments
     LF_Merge = (1 << 3),
+    // when this label is processed, output some information to screen
+    LF_Debug = (1 << 4),
 };
 
 struct Label {
@@ -5910,6 +5912,14 @@ public:
 
     bool is_reentrant() const {
         return flags & LF_Reentrant;
+    }
+
+    bool is_debug() const {
+        return flags & LF_Debug;
+    }
+
+    void set_debug() {
+        flags |= LF_Debug;
     }
 
     void set_merge() {
@@ -6404,7 +6414,7 @@ public:
         Label *result = new Label(label->anchor, label->name, 0);
         result->original = label;
         result->uid = label->next_instanceid++;
-        result->flags |= label->flags & LF_Merge;
+        result->flags |= label->flags & (LF_Merge | LF_Debug);
         return result;
     }
 
@@ -6675,6 +6685,7 @@ struct StreamLabelFormat {
         StreamLabelFormat fmt;
         fmt.follow = None;
         fmt.show_users = true;
+        fmt.anchors = Line;
         return fmt;
     }
 
@@ -13159,31 +13170,37 @@ struct Specializer {
     static void evaluate(Frame *frame, Argument arg, Args &dest, bool last_param = false) {
         if (arg.value.type == TYPE_Label) {
             // do not wrap labels in closures that have been solved
-            if (arg.value.label->body.is_complete()) {
+            if (!arg.value.label->is_template()) {
                 dest.push_back(Argument(arg.key, arg.value.label));
             } else {
                 Label *label = arg.value.label;
-                if (frame) {
-                    Frame *top = frame->find_parent_frame(label);
+                assert(frame);
+                Frame *top = frame->find_parent_frame(label);
+                if (top) {
+                    frame = top;
+                } else if (label->body.scope_label) {
+                    top = frame->find_parent_frame(label->body.scope_label);
                     if (top) {
                         frame = top;
-                    } else if (label->body.scope_label) {
-                        top = frame->find_parent_frame(label->body.scope_label);
-                        if (top) {
-                            frame = top;
-                        } else {
-                            #if 0
+                    } else {
+                        if (label->is_debug()) {
                             StyledStream ss(std::cerr);
-                            stream_frame(ss, frame, StreamFrameFormat());
-                            ss << "warning: can't find scope label " << label->body.scope_label << " for " << label << std::endl;
-                            #endif
+                            ss << "frame " <<  frame <<  ": can't find scope label for closure" << std::endl;
+                            stream_label(ss, label, StreamLabelFormat::debug_single());
                         }
+                    }
+                } else {
+                    if (label->is_debug()) {
+                        StyledStream ss(std::cerr);
+                        ss << "frame " <<  frame <<  ": label has no scope label for closure" << std::endl;
+                        stream_label(ss, label, StreamLabelFormat::debug_single());
                     }
                 }
                 dest.push_back(Argument(arg.key, Closure::from(label, frame)));
             }
         } else if (arg.value.type == TYPE_Parameter
-            && arg.value.parameter->label) {
+            && arg.value.parameter->label
+            && arg.value.parameter->label->is_template()) {
             auto param = arg.value.parameter;
             frame = frame->find_parent_frame(param->label);
             if (!frame) {
@@ -13290,6 +13307,18 @@ struct Specializer {
         return fold_type_label_single_frame(parent, label, args)->get_instance();
     }
 
+    void stream_arg_types(StyledStream &ss, const Args &args) {
+        if (args.size() <= 1) {
+            ss << TYPE_Void << " ";
+            return;
+        }
+        for (int i = 1; i < args.size(); ++i) {
+            auto &&arg = args[i];
+            assert(is_unknown(arg.value));
+            ss << arg.value.typeref << " ";
+        }
+    }
+
     // inlining the arguments of an untyped scope (including continuation)
     // folds arguments and types parameters
     // arguments are treated as follows:
@@ -13336,12 +13365,42 @@ struct Specializer {
             }
         }
 
+        if (label->is_debug()) {
+            StyledStream ss(std::cerr);
+            ss << "frame " << parent <<  ": instantiating label" << std::endl;
+            stream_label(ss, label, StreamLabelFormat::debug_single());
+            ss << "with key ";
+            for (size_t i = 0; i < tmp_args.size(); ++i) {
+                if (is_unknown(tmp_args[i].value)) {
+                    ss << "?" << tmp_args[i].value.typeref << " ";
+                } else {
+                    ss << tmp_args[i] << " ";
+                }
+            }
+            ss << std::endl;
+        }
+
         Frame::ArgsKey la;
         la.label = label;
         la.args = tmp_args;
         {
             Frame *result = parent->find_frame(la);
-            if (result) return result;
+            if (label->is_debug()) {
+                StyledStream ss(std::cerr);
+                if (result) {
+                    ss << " and the label already exists (frame " << result << ")";
+                    if (!result->get_instance()->body.is_complete()) {
+                        ss << " but is incomplete:" << std::endl;
+                        stream_label(ss, result->get_instance(), StreamLabelFormat::debug_single());
+                    } else {
+                        ss << std::endl;
+                    }
+                } else {
+                    ss << " and the label is new" << std::endl;
+                }
+            }
+            if (result)
+                return result;
         }
 
         if (label->is_merge()) {
@@ -13367,16 +13426,17 @@ struct Specializer {
                     // ugh, label has been inlined before :C
                     location_message(key.label->anchor, String::from("internal error: first inlined here"));
                 } else {
-                    // should work since parameters may not be inlined
-                    const Type *T = ReturnLabel(key.args);
                     StyledString ss;
-                    ss.out << "first typed here as " << T;
+                    ss.out << "previously returned ";
+                    stream_arg_types(ss.out, key.args);
                     location_message(key.label->anchor, ss.str());
                 }
                 {
-                    const Type *T = ReturnLabel(la.args);
                     StyledString ss;
-                    ss.out << "attempting to retype branching expression as " << T;
+                    ss.out << "cannot merge conditional branches returning ";
+                    stream_arg_types(ss.out, key.args);
+                    ss.out << "and ";
+                    stream_arg_types(ss.out, la.args);
                     set_active_anchor(caller_anchor);
                     location_error(ss.str());
                 }
@@ -13436,6 +13496,11 @@ struct Specializer {
 
         Frame *frame = Frame::from(parent, label, newlabel, loop_count);
         frame->args = tmp_args;
+
+        if (label->is_debug()) {
+            StyledStream ss(std::cerr);
+            ss << "the label is contained in frame " << frame << std::endl;
+        }
 
         parent->insert_frame(la, frame);
 
@@ -15853,6 +15918,31 @@ struct Specializer {
         return true;
     }
 
+    bool requires_mergelabel(const Any &cont) {
+        if (cont.type == TYPE_Closure) {
+            const Closure *cl = cont.closure;
+            if (cl->label->is_merge()) {
+                return false;
+            }
+            #if 0
+            if (!cl->label->has_params()) {
+                return false;
+            }
+            #endif
+        }
+        return true;
+    }
+
+    bool mergelabel_has_params(const Any &cont) {
+        if (cont.type == TYPE_Closure) {
+            const Closure *cl = cont.closure;
+            if (!cl->label->has_params()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     void type_branch_continuations(Label *l) {
 #if SCOPES_DEBUG_CODEGEN
         ss_cout << "inlining branch continuations in " << l << std::endl;
@@ -15860,22 +15950,32 @@ struct Specializer {
         assert(!l->body.is_complete());
         auto &&args = l->body.args;
         CHECKARGS(3, 3);
+
         args[1].value.verify_indirect(TYPE_Bool);
-        #if 0
-        if (args[0].value.type == TYPE_Closure) {
-            // not a great solution, as we are modifying a template label
-            args[0].value.closure->label->set_merge();
-        } else {
-            StyledStream ss;
-            ss << "not a closure :-( " << args[0].value << std::endl;
-        }
-        #endif
         const Closure *then_br = args[2].value;
         const Closure *else_br = args[3].value;
         verify_branch_continuation(then_br);
         verify_branch_continuation(else_br);
-        args[2].value = fold_type_label_single(then_br->frame, then_br->label, { args[0] });
-        args[3].value = fold_type_label_single(else_br->frame, else_br->label, { args[0] });
+
+        Any cont = args[0].value;
+        if (requires_mergelabel(cont)) {
+            // build merge label that forces all values to coalesce and forwards its arguments
+            Label *mergelabel = Label::continuation_from(l->body.anchor, Symbol(SYM_Unnamed));
+            mergelabel->set_merge();
+            mergelabel->body.enter = cont;
+            mergelabel->body.anchor = l->body.anchor;
+            if (mergelabel_has_params(cont)) {
+                Parameter *param = Parameter::variadic_from(l->body.anchor, Symbol(SYM_Unnamed), TYPE_Unknown);
+                mergelabel->append(param);
+                mergelabel->body.args = { none, param };
+            } else {
+                mergelabel->body.args = { none };
+            }
+            cont = Closure::from(mergelabel, then_br->frame);
+        }
+
+        args[2].value = fold_type_label_single(then_br->frame, then_br->label, { cont });
+        args[3].value = fold_type_label_single(else_br->frame, else_br->label, { cont });
         args[0].value = none;
     }
 
@@ -17312,8 +17412,6 @@ struct Expander {
         Any result = none;
         Any subdest = none;
         Label *nextstate = make_nextstate(dest, result, subdest);
-        if (nextstate)
-            nextstate->unset_inline();
 
         int lastidx = (int)branches.size() - 1;
         for (int idx = 0; idx < lastidx; ++idx) {
@@ -18640,6 +18738,7 @@ static void init_globals(int argc, char *argv[]) {
     globals->bind(Symbol("unroll-limit"), SCOPES_MAX_RECURSIONS);
     globals->bind(KW_True, true);
     globals->bind(KW_False, false);
+    globals->bind(Symbol("noreturn"), NoReturnLabel());
     globals->bind(KW_ListEmpty, EOL);
     globals->bind(KW_None, none);
     globals->bind(Symbol("unnamed"), Symbol(SYM_Unnamed));

@@ -8,7 +8,8 @@ fn assert-depth (n f types...)
     let c = (Label-countof-reachable typed-f)
     if (c != n)
         'dump typed-f
-        syntax-error! (Label-anchor typed-f)
+        let anchor = (Label-anchor typed-f)
+        syntax-error! anchor
             .. "label complexity mismatch: " (repr c) " != " (repr n)
 
 assert-depth 2:usize

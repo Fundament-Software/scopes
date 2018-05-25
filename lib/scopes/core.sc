@@ -1276,6 +1276,25 @@ fn syntax-error! (anchor msg)
     __anchor-error! msg
     unreachable!;
 
+fn syntax-error! (anchor msg)
+    let T = (typeof anchor)
+    if (== T string)
+        if (none? msg)
+            __error! anchor
+            unreachable!;
+    set-anchor!
+        if (== T Any)
+            let T = (Any-typeof anchor)
+            if (== T Syntax)
+                Syntax-anchor (as anchor Syntax)
+            else
+                as anchor Anchor
+        elseif (== T Syntax)
+            Syntax-anchor anchor
+        else anchor
+    __anchor-error! msg
+    unreachable!;
+
 syntax-extend
     # a supertype to be used for conversions
     let immutable = (typename-type "immutable")
@@ -3090,10 +3109,16 @@ syntax-extend
         let f = (compile (eval expr eval-scope))
         let rettype =
             element-type (element-type ('typeof f) 0) 0
-        let ModuleFunctionType = (pointer (function (ReturnLabel Any)))
+        let wanted-rettype = (ReturnLabel Any)
+        let ModuleFunctionType = (pointer (function wanted-rettype))
         let fptr =
-            if (rettype == Any)
+            if (rettype == wanted-rettype)
                 f as ModuleFunctionType
+            elseif (rettype == noreturn)
+                # module will exit program
+                let fptr = (f as (pointer (function noreturn)))
+                fptr;
+                unreachable!;
             else
                 # build a wrapper
                 let expr =

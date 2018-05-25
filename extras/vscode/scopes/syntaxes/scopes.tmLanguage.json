@@ -101,7 +101,7 @@
             "patterns":[
                 {
                     "name": "support.type.builtin.scopes",
-                    "match": "(void|bool|usize|u8|u16|u32|u64|i8|i16|i32|i64|f32|f64|type|list|string|integer|real|pointer|array|vector|tuple|union|typename|function|(Sampled)?Image|Sampler|Symbol|Unknown|Label|Closure|Frame|Any|Parameter|Syntax|Nothing|Scope|Anchor|Builtin|Exception|ReturnLabel|extern)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
+                    "match": "(noreturn|void|bool|usize|u8|u16|u32|u64|i8|i16|i32|i64|f32|f64|type|list|string|integer|real|pointer|array|vector|tuple|union|typename|function|(Sampled)?Image|Sampler|Symbol|Unknown|Label|Closure|Frame|Any|Parameter|Syntax|Nothing|Scope|Anchor|Builtin|Exception|ReturnLabel|extern)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
                 },
                 {
                     "name": "support.type.library.scopes",
