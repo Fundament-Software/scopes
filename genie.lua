@@ -93,7 +93,9 @@ project "scopes"
     kind "ConsoleApp"
     language "C++"
     files {
+        "src/globalsyms.c",
         "src/scopes.cpp",
+        "src/utils.cpp",
         "external/linenoise-ng/src/linenoise.cpp",
         "external/linenoise-ng/src/ConvertUTF.cpp",
         "external/linenoise-ng/src/wcwidth.cpp",
@@ -111,6 +113,7 @@ project "scopes"
         "external",
         "libffi/include",
         "SPIRV-Tools/include",
+        "include",
         "."
     }
     libdirs {

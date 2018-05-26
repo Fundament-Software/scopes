@@ -1,4 +1,3 @@
-
 /*
 Scopes Compiler
 Copyright (c) 2016, 2017, 2018 Leonard Ritter
@@ -29,62 +28,6 @@ BEWARE: If you build this with anything else but a recent enough clang,
         an exception is windows where with mingw64, only gcc will work.
 */
 
-#define SCOPES_VERSION_MAJOR 0
-#define SCOPES_VERSION_MINOR 14
-#define SCOPES_VERSION_PATCH 0
-
-// trace partial evaluation and code generation
-// produces a firehose of information
-#define SCOPES_DEBUG_CODEGEN 0
-
-// run LLVM optimization passes
-// turning this on is detrimental to startup time
-// scopes output is typically clean enough to provide fairly good performance
-// on its own.
-#define SCOPES_OPTIMIZE_ASSEMBLY 0
-
-// any exception aborts immediately and can not be caught
-#define SCOPES_EARLY_ABORT 0
-
-// print a list of cumulative timers on program exit
-#define SCOPES_PRINT_TIMERS 1
-
-// maximum number of recursions permitted during partial evaluation
-// if you think you need more, ask yourself if ad-hoc compiling a pure C function
-// that you can then use at compile time isn't the better choice;
-// 100% of the time, the answer is yes because the performance is much better.
-#define SCOPES_MAX_RECURSIONS 32
-
-// maximum number of jump skips permitted
-#define SCOPES_MAX_SKIP_JUMPS 256
-
-// compile native code with debug info if not otherwise specified
-#define SCOPES_COMPILE_WITH_DEBUG_INFO 1
-
-#ifndef SCOPES_WIN32
-#   ifdef _WIN32
-#   define SCOPES_WIN32
-#   endif
-#endif
-
-// maximum size of process stack
-#ifdef SCOPES_WIN32
-// on windows, we only get 1 MB of stack
-// #define SCOPES_MAX_STACK_SIZE ((1 << 10) * 768)
-// but we build with "-Wl,--stack,8388608"
-#define SCOPES_MAX_STACK_SIZE ((1 << 20) * 7)
-#else
-// on linux, the system typically gives us 8 MB
-#define SCOPES_MAX_STACK_SIZE ((1 << 20) * 7)
-#endif
-
-#ifndef SCOPES_CPP
-#define SCOPES_CPP
-
-//------------------------------------------------------------------------------
-// C HEADER
-//------------------------------------------------------------------------------
-
 #include <sys/types.h>
 #ifdef SCOPES_WIN32
 #include "mman.h"
@@ -108,38 +51,7 @@ BEWARE: If you build this with anything else but a recent enough clang,
 
 #include <ffi.h>
 
-#if defined __cplusplus
-extern "C" {
-#endif
-
-#define CAT(a, ...) PRIMITIVE_CAT(a, __VA_ARGS__)
-#define PRIMITIVE_CAT(a, ...) a ## __VA_ARGS__
-
-const char *scopes_compiler_path;
-const char *scopes_compiler_dir;
-const char *scopes_clang_include_dir;
-const char *scopes_include_dir;
-size_t scopes_argc;
-char **scopes_argv;
-
-// C namespace exports
-int unescape_string(char *buf);
-int escape_string(char *buf, const char *str, int strcount, const char *quote_chars);
-
-void scopes_strtod(double *v, const char *str, char **str_end, int base );
-void scopes_strtoll(int64_t *v, const char* str, char** endptr, int base);
-void scopes_strtoull(uint64_t *v, const char* str, char** endptr, int base);
-
-bool scopes_is_debug();
-
-const char *scopes_compile_time_date();
-
-#if defined __cplusplus
-}
-#endif
-
-#endif // SCOPES_CPP
-#ifdef SCOPES_CPP_IMPL
+#include "scopes.h"
 
 //#define SCOPES_DEBUG_IL
 
@@ -225,259 +137,7 @@ const char *scopes_compile_time_date();
 
 #include "cityhash/city.cpp"
 
-//------------------------------------------------------------------------------
-// UTILITIES
-//------------------------------------------------------------------------------
-
-void scopes_strtod(double *v, const char *str, char **str_end, int base ) {
-    *v = std::strtod(str, str_end);
-}
-const char *skip_0b_prefix(const char *str, bool is_signed) {
-    if (str[0]) {
-        if (is_signed && (str[0] == '-') && str[1]) {
-            str++;
-        }
-        if ((str[0] == '0') && str[1] && (str[1] == 'b')) {
-            return str + 2;
-        }
-    }
-    return nullptr;
-}
-void scopes_strtoll(int64_t *v, const char* str, char** endptr) {
-    const char *binstr = skip_0b_prefix(str, true);
-    if (binstr) {
-        *v = std::strtoll(binstr, endptr, 2);
-    } else {
-        *v = std::strtoll(str, endptr, 0);
-    }
-}
-void scopes_strtoull(uint64_t *v, const char* str, char** endptr) {
-    const char *binstr = skip_0b_prefix(str, false);
-    if (binstr) {
-        *v = std::strtoull(str, endptr, 2);
-    } else {
-        *v = std::strtoull(str, endptr, 0);
-    }
-}
-
-static size_t align(size_t offset, size_t align) {
-    return (offset + align - 1) & ~(align - 1);
-}
-
-static char parse_hexchar(char c) {
-    if ((c >= '0') && (c <= '9')) {
-        return c - '0';
-    } else if ((c >= 'a') && (c <= 'f')) {
-        return c - 'a' + 10;
-    } else if ((c >= 'A') && (c <= 'F')) {
-        return c - 'A' + 10;
-    }
-    return -1;
-}
-
-int unescape_string(char *buf) {
-    char *dst = buf;
-    char *src = buf;
-    while (*src) {
-        if (*src == '\\') {
-            src++;
-            if (*src == 0) {
-                break;
-            } if (*src == 'n') {
-                *dst = '\n';
-            } else if (*src == 't') {
-                *dst = '\t';
-            } else if (*src == 'r') {
-                *dst = '\r';
-            } else if (*src == 'x') {
-                char c0 = parse_hexchar(*(src + 1));
-                char c1 = parse_hexchar(*(src + 2));
-                if ((c0 >= 0) && (c1 >= 0)) {
-                    *dst = (c0 << 4) | c1;
-                    src += 2;
-                } else {
-                    src--;
-                    *dst = *src;
-                }
-            } else {
-                *dst = *src;
-            }
-        } else {
-            *dst = *src;
-        }
-        src++;
-        dst++;
-    }
-    // terminate
-    *dst = 0;
-    return dst - buf;
-}
-
-#define B_SNFORMAT 512 // how many characters per callback
-typedef char *(*vsformatcb_t)(const char *buf, void *user, int len);
-
-struct vsformat_cb_ctx {
-    int count;
-    char *dest;
-    char tmp[B_SNFORMAT];
-};
-
-static char *vsformat_cb(const char *buf, void *user, int len) {
-    vsformat_cb_ctx *ctx = (vsformat_cb_ctx *)user;
-    if (buf != ctx->dest) {
-        char *d = ctx->dest;
-        char *e = d + len;
-        while (d != e) {
-            *d++ = *buf++;
-        }
-    }
-    ctx->dest += len;
-    return ctx->tmp;
-}
-
-static char *vsformat_cb_null(const char *buf, void *user, int len) {
-    vsformat_cb_ctx *ctx = (vsformat_cb_ctx *)user;
-    ctx->count += len;
-    return ctx->tmp;
-}
-
-static int escapestrcb(vsformatcb_t cb, void *user, char *buf,
-    const char *str, int strcount,
-    const char *quote_chars = nullptr) {
-    assert(buf);
-    const char *fmt_start = str;
-    const char *fmt = fmt_start;
-    char *p = buf;
-#define VSFCB_CHECKWRITE(N) \
-    if (((p - buf) + (N)) > B_SNFORMAT) { buf = p = cb(buf, user, p - buf); }
-#define VSFCB_PRINT(MAXCOUNT, FMT, SRC) { \
-        VSFCB_CHECKWRITE(MAXCOUNT+1); \
-        p += snprintf(p, B_SNFORMAT - (p - buf), FMT, SRC); }
-    for(;;) {
-        char c = *fmt;
-        switch(c) {
-        case '\n': VSFCB_CHECKWRITE(2); *p++ = '\\'; *p++ = 'n'; break;
-        case '\r': VSFCB_CHECKWRITE(2); *p++ = '\\'; *p++ = 'r'; break;
-        case '\t': VSFCB_CHECKWRITE(2); *p++ = '\\'; *p++ = 't'; break;
-        case 0: if ((fmt - fmt_start) == strcount) goto done;
-            // otherwise, fall through
-        default:
-            if ((c < 32) || (c >= 127)) {
-                VSFCB_PRINT(4, "\\x%02x", (unsigned char)c);
-            } else {
-                if ((c == '\\') || (quote_chars && strchr(quote_chars, c))) {
-                    VSFCB_CHECKWRITE(1);
-                    *p++ = '\\';
-                }
-                *p++ = c;
-            }
-            break;
-        }
-        fmt++;
-    }
-done:
-    VSFCB_CHECKWRITE(B_SNFORMAT); // force flush if non-empty
-    return 0;
-#undef VSFCB_CHECKWRITE
-#undef VSFCB_PRINT
-}
-
-int escape_string(char *buf, const char *str, int strcount, const char *quote_chars) {
-    vsformat_cb_ctx ctx;
-    if (buf) {
-        ctx.dest = buf;
-        escapestrcb(vsformat_cb, &ctx, ctx.tmp, str, strcount, quote_chars);
-        int l = ctx.dest - buf;
-        buf[l] = 0;
-        return l;
-    } else {
-        ctx.count = 0;
-        escapestrcb(vsformat_cb_null, &ctx, ctx.tmp, str, strcount, quote_chars);
-        return ctx.count + 1;
-    }
-}
-
-extern "C" {
-// used in test_assorted.sc
-#pragma GCC visibility push(default)
-extern int scopes_test_add(int a, int b) { return a + b; }
-#pragma GCC visibility pop
-}
-
-float powimpl(float a, float b) { return std::pow(a, b); }
-double powimpl(double a, double b) { return std::pow(a, b); }
-// thx to fabian for this one
-template<typename T>
-inline T powimpl(T base, T exponent) {
-    T result = 1, cur = base;
-    while (exponent) {
-        if (exponent & 1) result *= cur;
-        cur *= cur;
-        exponent >>= 1;
-    }
-    return result;
-}
-
-bool scopes_is_debug() {
-#ifdef SCOPES_DEBUG
-        return true;
-#else
-        return false;
-#endif
-}
-
-const char *scopes_compile_time_date() {
-    return __DATE__ ", " __TIME__;
-}
-
-// This function isn't referenced outside its translation unit, but it
-// can't use the "static" keyword because its address is used for
-// GetMainExecutable (since some platforms don't support taking the
-// address of main, and some platforms can't implement GetMainExecutable
-// without being given the address of a function in the main executable).
-std::string GetExecutablePath(const char *Argv0) {
-  // This just needs to be some symbol in the binary; C++ doesn't
-  // allow taking the address of ::main however.
-  void *MainAddr = (void*) (intptr_t) GetExecutablePath;
-  return llvm::sys::fs::getMainExecutable(Argv0, MainAddr);
-}
-
-typedef struct stb_printf_ctx {
-    FILE *dest;
-    char tmp[STB_SPRINTF_MIN];
-} stb_printf_ctx;
-
-static char *_printf_cb(char * buf, void * user, int len) {
-    stb_printf_ctx *ctx = (stb_printf_ctx *)user;
-    fwrite (buf, 1, len, ctx->dest);
-    return ctx->tmp;
-}
-static int stb_vprintf(const char *fmt, va_list va) {
-    stb_printf_ctx ctx;
-    ctx.dest = stdout;
-    return stb_vsprintfcb(_printf_cb, &ctx, ctx.tmp, fmt, va);
-}
-extern "C" {
-int stb_printf(const char *fmt, ...) {
-    stb_printf_ctx ctx;
-    ctx.dest = stdout;
-    va_list va;
-    va_start(va, fmt);
-    int c = stb_vsprintfcb(_printf_cb, &ctx, ctx.tmp, fmt, va);
-    va_end(va);
-    return c;
-}
-}
-
-static int stb_fprintf(FILE *out, const char *fmt, ...) {
-    stb_printf_ctx ctx;
-    ctx.dest = out;
-    va_list va;
-    va_start(va, fmt);
-    int c = stb_vsprintfcb(_printf_cb, &ctx, ctx.tmp, fmt, va);
-    va_end(va);
-    return c;
-}
+#include "utils.hpp"
 
 namespace scopes {
 
@@ -10996,6 +10656,7 @@ struct LLVMIRGenerator {
                         SCOPES_TRY()
                         ptr = LLVMGetGlobalValueAddress(ee, name);
                         SCOPES_CATCH(e)
+                        (void)e; // shut up unused variable warning
                         SCOPES_TRY_END()
                         LLVMResetFatalErrorHandler();
                     }
@@ -18989,6 +18650,18 @@ static void crash_handler(int sig) {
 }
 #endif
 
+// This function isn't referenced outside its translation unit, but it
+// can't use the "static" keyword because its address is used for
+// GetMainExecutable (since some platforms don't support taking the
+// address of main, and some platforms can't implement GetMainExecutable
+// without being given the address of a function in the main executable).
+std::string GetExecutablePath(const char *Argv0) {
+  // This just needs to be some symbol in the binary; C++ doesn't
+  // allow taking the address of ::main however.
+  void *MainAddr = (void*) (intptr_t) GetExecutablePath;
+  return llvm::sys::fs::getMainExecutable(Argv0, MainAddr);
+}
+
 int main(int argc, char *argv[]) {
     using namespace scopes;
     uint64_t c = 0;
@@ -19079,5 +18752,3 @@ skip_regular_load:
 
     return 0;
 }
-
-#endif // SCOPES_CPP_IMPL
