@@ -21,54 +21,37 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#ifndef SCOPES_FUNCTION_HPP
-#define SCOPES_FUNCTION_HPP
+#include "typefactory.hpp"
+#include "sampledimage.hpp"
+#include "image.hpp"
 
-#include "type.hpp"
+#include "llvm/Support/Casting.h"
 
 namespace scopes {
 
+using llvm::isa;
+using llvm::cast;
+using llvm::dyn_cast;
+
 //------------------------------------------------------------------------------
-// FUNCTION TYPE
+// SAMPLED IMAGE TYPE
 //------------------------------------------------------------------------------
 
-enum {
-    // takes variable number of arguments
-    FF_Variadic = (1 << 0),
-    // can be evaluated at compile time
-    FF_Pure = (1 << 1),
-    // never returns
-    FF_Divergent = (1 << 2),
-};
+bool SampledImageType::classof(const Type *T) {
+    return T->kind() == TK_SampledImage;
+}
 
-struct FunctionType : Type {
-    static bool classof(const Type *T);
+SampledImageType::SampledImageType(const Type *_type) :
+    Type(TK_SampledImage), type(cast<ImageType>(_type)) {
+    auto ss = StyledString::plain();
+    ss.out << "<SampledImage " <<  _type->name()->data << ">";
+    _name = ss.str();
+}
 
-    FunctionType(
-        const Type *_return_type, const ArgTypes &_argument_types, uint32_t _flags);
+const Type *SampledImage(const Type *_type) {
+    static TypeFactory<SampledImageType> sampled_images;
+    return sampled_images.insert(_type);
+}
 
-    bool vararg() const;
-    bool pure() const;
-    bool divergent() const;
-
-    const Type *type_at_index(size_t i) const;
-
-    const Type *return_type;
-    ArgTypes argument_types;
-    uint32_t flags;
-};
-
-const Type *Function(const Type *return_type,
-    const ArgTypes &argument_types, uint32_t flags = 0);
-
-bool is_function_pointer(const Type *type);
-
-bool is_pure_function_pointer(const Type *type);
-
-const FunctionType *extract_function_type(const Type *T);
-
-void verify_function_pointer(const Type *type);
 
 } // namespace scopes
-
-#endif // SCOPES_FUNCTION_HPP

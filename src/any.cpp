@@ -25,10 +25,23 @@ SOFTWARE.
 
 #include "type.hpp"
 #include "error.hpp"
+#include "vector.hpp"
+#include "integer.hpp"
+#include "real.hpp"
+#include "array.hpp"
+#include "tuple.hpp"
 
 #include <memory.h>
 
+#include "cityhash/city.h"
+
+#include "llvm/Support/Casting.h"
+
 namespace scopes {
+
+using llvm::isa;
+using llvm::cast;
+using llvm::dyn_cast;
 
 //------------------------------------------------------------------------------
 // ANY
@@ -115,6 +128,193 @@ bool Any::operator !=(const Any &other) const {
 
 void Any::verify(const Type *T) const {
     scopes::verify(T, type);
+}
+
+StyledStream& Any::stream(StyledStream& ost, bool annotate_type) const {
+    AnyStreamer as(ost, type, annotate_type);
+    if (type == TYPE_Nothing) { as.naked(none); }
+    else if (type == TYPE_Type) { as.naked(typeref); }
+    else if (type == TYPE_Bool) { as.naked(i1); }
+    else if (type == TYPE_I8) { as.typed(i8); }
+    else if (type == TYPE_I16) { as.typed(i16); }
+    else if (type == TYPE_I32) { as.naked(i32); }
+    else if (type == TYPE_I64) { as.typed(i64); }
+    else if (type == TYPE_U8) { as.typed(u8); }
+    else if (type == TYPE_U16) { as.typed(u16); }
+    else if (type == TYPE_U32) { as.typed(u32); }
+    else if (type == TYPE_U64) { as.typed(u64); }
+    else if (type == TYPE_USize) { as.typed(u64); }
+    else if (type == TYPE_F32) { as.naked(f32); }
+    else if (type == TYPE_F64) { as.typed(f64); }
+    else if (type == TYPE_String) { as.naked(string); }
+    else if (type == TYPE_Symbol) { as.naked(symbol); }
+    else if (type == TYPE_Syntax) { as.naked(syntax); }
+    else if (type == TYPE_Anchor) { as.typed(anchor); }
+    else if (type == TYPE_List) { as.naked(list); }
+    else if (type == TYPE_Builtin) { as.typed(builtin); }
+    else if (type == TYPE_Label) { as.typed(label); }
+    else if (type == TYPE_Parameter) { as.typed(parameter); }
+    else if (type == TYPE_Scope) { as.typed(scope); }
+    else if (type == TYPE_Frame) { as.typed(frame); }
+    else if (type == TYPE_Closure) { as.typed(closure); }
+    else if (type == TYPE_Any) {
+        ost << Style_Operator << "[" << Style_None;
+        ((Any *)pointer)->stream(ost);
+        ost << Style_Operator << "]" << Style_None;
+        as.stream_type_suffix();
+    } else if (type->kind() == TK_Extern) {
+        ost << symbol;
+        as.stream_type_suffix();
+    } else if (type->kind() == TK_Vector) {
+        auto vt = cast<VectorType>(type);
+        ost << Style_Operator << "<" << Style_None;
+        for (size_t i = 0; i < vt->count; ++i) {
+            if (i != 0) {
+                ost << " ";
+            }
+            vt->unpack(pointer, i).stream(ost, false);
+        }
+        ost << Style_Operator << ">" << Style_None;
+        auto ET = vt->element_type;
+        if (!((ET == TYPE_Bool)
+            || (ET == TYPE_I32)
+            || (ET == TYPE_F32)
+            ))
+            as.stream_type_suffix();
+    } else { as.typed(pointer); }
+    return ost;
+}
+
+size_t Any::hash() const {
+    if (type == TYPE_String) {
+        if (!string) return 0; // can happen with nullof
+        return CityHash64(string->data, string->count);
+    }
+    if (is_opaque(type))
+        return 0;
+    const Type *T = storage_type(type);
+    switch(T->kind()) {
+    case TK_Integer: {
+        switch(cast<IntegerType>(T)->width) {
+        case 1: return std::hash<bool>{}(i1);
+        case 8: return std::hash<uint8_t>{}(u8);
+        case 16: return std::hash<uint16_t>{}(u16);
+        case 32: return std::hash<uint32_t>{}(u32);
+        case 64: return std::hash<uint64_t>{}(u64);
+        default: break;
+        }
+    } break;
+    case TK_Real: {
+        switch(cast<RealType>(T)->width) {
+        case 32: return std::hash<float>{}(f32);
+        case 64: return std::hash<double>{}(f64);
+        default: break;
+        }
+    } break;
+    case TK_Extern: {
+        return std::hash<uint64_t>{}(u64);
+    } break;
+    case TK_Pointer: return std::hash<void *>{}(pointer);
+    case TK_Array: {
+        auto ai = cast<ArrayType>(T);
+        size_t h = 0;
+        for (size_t i = 0; i < ai->count; ++i) {
+            h = HashLen16(h, ai->unpack(pointer, i).hash());
+        }
+        return h;
+    } break;
+    case TK_Vector: {
+        auto vi = cast<VectorType>(T);
+        size_t h = 0;
+        for (size_t i = 0; i < vi->count; ++i) {
+            h = HashLen16(h, vi->unpack(pointer, i).hash());
+        }
+        return h;
+    } break;
+    case TK_Tuple: {
+        auto ti = cast<TupleType>(T);
+        size_t h = 0;
+        for (size_t i = 0; i < ti->types.size(); ++i) {
+            h = HashLen16(h, ti->unpack(pointer, i).hash());
+        }
+        return h;
+    } break;
+    case TK_Union:
+        return CityHash64((const char *)pointer, size_of(T));
+    default: break;
+    }
+
+    StyledStream ss(std::cout);
+    ss << "unhashable value: " << T << std::endl;
+    assert(false && "unhashable value");
+    return 0;
+}
+
+bool Any::operator ==(const Any &other) const {
+    if (type != other.type) return false;
+    if (type == TYPE_String) {
+        if (string == other.string) return true;
+        if (!string || !other.string) return false;
+        if (string->count != other.string->count)
+            return false;
+        return !memcmp(string->data, other.string->data, string->count);
+    }
+    if (is_opaque(type))
+        return true;
+    const Type *T = storage_type(type);
+    switch(T->kind()) {
+    case TK_Integer: {
+        switch(cast<IntegerType>(T)->width) {
+        case 1: return (i1 == other.i1);
+        case 8: return (u8 == other.u8);
+        case 16: return (u16 == other.u16);
+        case 32: return (u32 == other.u32);
+        case 64: return (u64 == other.u64);
+        default: break;
+        }
+    } break;
+    case TK_Real: {
+        switch(cast<RealType>(T)->width) {
+        case 32: return (f32 == other.f32);
+        case 64: return (f64 == other.f64);
+        default: break;
+        }
+    } break;
+    case TK_Extern: return symbol == other.symbol;
+    case TK_Pointer: return pointer == other.pointer;
+    case TK_Array: {
+        auto ai = cast<ArrayType>(T);
+        for (size_t i = 0; i < ai->count; ++i) {
+            if (ai->unpack(pointer, i) != ai->unpack(other.pointer, i))
+                return false;
+        }
+        return true;
+    } break;
+    case TK_Vector: {
+        auto vi = cast<VectorType>(T);
+        for (size_t i = 0; i < vi->count; ++i) {
+            if (vi->unpack(pointer, i) != vi->unpack(other.pointer, i))
+                return false;
+        }
+        return true;
+    } break;
+    case TK_Tuple: {
+        auto ti = cast<TupleType>(T);
+        for (size_t i = 0; i < ti->types.size(); ++i) {
+            if (ti->unpack(pointer, i) != ti->unpack(other.pointer, i))
+                return false;
+        }
+        return true;
+    } break;
+    case TK_Union:
+        return !memcmp(pointer, other.pointer, size_of(T));
+    default: break;
+    }
+
+    StyledStream ss(std::cout);
+    ss << "incomparable value: " << T << std::endl;
+    assert(false && "incomparable value");
+    return false;
 }
 
 //------------------------------------------------------------------------------

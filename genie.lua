@@ -123,6 +123,8 @@ project "scopes"
         "src/function.cpp",
         "src/typename.cpp",
         "src/typefactory.cpp",
+        "src/image.cpp",
+        "src/sampledimage.cpp",
         "external/cityhash/city.cpp",
         "external/linenoise-ng/src/linenoise.cpp",
         "external/linenoise-ng/src/ConvertUTF.cpp",

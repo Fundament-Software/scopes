@@ -21,54 +21,50 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#ifndef SCOPES_FUNCTION_HPP
-#define SCOPES_FUNCTION_HPP
+#ifndef SCOPES_IMAGE_HPP
+#define SCOPES_IMAGE_HPP
 
 #include "type.hpp"
 
 namespace scopes {
 
 //------------------------------------------------------------------------------
-// FUNCTION TYPE
+// IMAGE TYPE
 //------------------------------------------------------------------------------
 
-enum {
-    // takes variable number of arguments
-    FF_Variadic = (1 << 0),
-    // can be evaluated at compile time
-    FF_Pure = (1 << 1),
-    // never returns
-    FF_Divergent = (1 << 2),
-};
-
-struct FunctionType : Type {
+struct ImageType : Type {
     static bool classof(const Type *T);
 
-    FunctionType(
-        const Type *_return_type, const ArgTypes &_argument_types, uint32_t _flags);
+    ImageType(
+        const Type *_type,
+        Symbol _dim,
+        int _depth,
+        int _arrayed,
+        int _multisampled,
+        int _sampled,
+        Symbol _format,
+        Symbol _access);
 
-    bool vararg() const;
-    bool pure() const;
-    bool divergent() const;
-
-    const Type *type_at_index(size_t i) const;
-
-    const Type *return_type;
-    ArgTypes argument_types;
-    uint32_t flags;
+    const Type *type; // sampled type
+    Symbol dim; // resolved to spv::Dim
+    int depth; // 0 = not a depth image, 1 = depth image, 2 = undefined
+    int arrayed; // 1 = array image
+    int multisampled; // 1 = multisampled content
+    int sampled; // 0 = runtime dependent, 1 = sampled, 2 = storage image
+    Symbol format; // resolved to spv::ImageFormat
+    Symbol access; // resolved to spv::AccessQualifier
 };
 
-const Type *Function(const Type *return_type,
-    const ArgTypes &argument_types, uint32_t flags = 0);
-
-bool is_function_pointer(const Type *type);
-
-bool is_pure_function_pointer(const Type *type);
-
-const FunctionType *extract_function_type(const Type *T);
-
-void verify_function_pointer(const Type *type);
+const Type *Image(
+    const Type *_type,
+    Symbol _dim,
+    int _depth,
+    int _arrayed,
+    int _multisampled,
+    int _sampled,
+    Symbol _format,
+    Symbol _access);
 
 } // namespace scopes
 
-#endif // SCOPES_FUNCTION_HPP
+#endif // SCOPES_IMAGE_HPP

@@ -26,6 +26,7 @@ SOFTWARE.
 #include "tuple.hpp"
 #include "pointer.hpp"
 #include "extern.hpp"
+#include "error.hpp"
 
 #include <assert.h>
 
@@ -210,5 +211,12 @@ const FunctionType *extract_function_type(const Type *T) {
     }
 }
 
+void verify_function_pointer(const Type *type) {
+    if (!is_function_pointer(type)) {
+        StyledString ss;
+        ss.out << "function pointer expected, got " << type;
+        location_error(ss.str());
+    }
+}
 
 } // namespace scopes

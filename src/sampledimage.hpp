@@ -21,54 +21,29 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#ifndef SCOPES_FUNCTION_HPP
-#define SCOPES_FUNCTION_HPP
+#ifndef SCOPES_SAMPLEDIMAGE_HPP
+#define SCOPES_SAMPLEDIMAGE_HPP
 
 #include "type.hpp"
 
 namespace scopes {
 
+struct ImageType;
+
 //------------------------------------------------------------------------------
-// FUNCTION TYPE
+// SAMPLED IMAGE TYPE
 //------------------------------------------------------------------------------
 
-enum {
-    // takes variable number of arguments
-    FF_Variadic = (1 << 0),
-    // can be evaluated at compile time
-    FF_Pure = (1 << 1),
-    // never returns
-    FF_Divergent = (1 << 2),
-};
-
-struct FunctionType : Type {
+struct SampledImageType : Type {
     static bool classof(const Type *T);
 
-    FunctionType(
-        const Type *_return_type, const ArgTypes &_argument_types, uint32_t _flags);
+    SampledImageType(const Type *_type);
 
-    bool vararg() const;
-    bool pure() const;
-    bool divergent() const;
-
-    const Type *type_at_index(size_t i) const;
-
-    const Type *return_type;
-    ArgTypes argument_types;
-    uint32_t flags;
+    const ImageType *type; // image type
 };
 
-const Type *Function(const Type *return_type,
-    const ArgTypes &argument_types, uint32_t flags = 0);
-
-bool is_function_pointer(const Type *type);
-
-bool is_pure_function_pointer(const Type *type);
-
-const FunctionType *extract_function_type(const Type *T);
-
-void verify_function_pointer(const Type *type);
+const Type *SampledImage(const Type *_type);
 
 } // namespace scopes
 
-#endif // SCOPES_FUNCTION_HPP
+#endif // SCOPES_SAMPLEDIMAGE_HPP
