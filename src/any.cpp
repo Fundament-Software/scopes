@@ -24,6 +24,9 @@ SOFTWARE.
 #include "any.hpp"
 
 #include "type.hpp"
+#include "error.hpp"
+
+#include <memory.h>
 
 namespace scopes {
 
@@ -108,6 +111,10 @@ Any::operator Frame *() const { verify(TYPE_Frame); return frame; }
 
 bool Any::operator !=(const Any &other) const {
     return !(*this == other);
+}
+
+void Any::verify(const Type *T) const {
+    scopes::verify(T, type);
 }
 
 //------------------------------------------------------------------------------

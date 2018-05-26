@@ -24,7 +24,13 @@ SOFTWARE.
 #ifndef SCOPES_TYPE_HPP
 #define SCOPES_TYPE_HPP
 
+#include "symbol.hpp"
+#include "any.hpp"
+
 #include <stddef.h>
+
+#include <unordered_map>
+#include <vector>
 
 namespace scopes {
 
@@ -58,7 +64,42 @@ enum TypeKind {
 
 //------------------------------------------------------------------------------
 
-struct Type;
+struct Type {
+    typedef std::unordered_map<Symbol, Any, Symbol::Hash> Map;
+
+    TypeKind kind() const;
+
+    Type(TypeKind kind);
+    Type(const Type &other) = delete;
+
+    const String *name() const;
+
+    StyledStream& stream(StyledStream& ost) const;
+
+    void bind(Symbol name, const Any &value);
+
+    void del(Symbol name);
+
+    bool lookup(Symbol name, Any &dest) const;
+
+    bool lookup_local(Symbol name, Any &dest) const;
+
+    bool lookup_call_handler(Any &dest) const;
+
+    const Map &get_symbols() const;
+
+private:
+    const TypeKind _kind;
+
+protected:
+    const String *_name;
+
+    Map symbols;
+};
+
+StyledStream& operator<<(StyledStream& ost, const Type *type);
+
+typedef std::vector<const Type *> ArgTypes;
 
 //------------------------------------------------------------------------------
 
@@ -139,6 +180,20 @@ size_t size_of(const Type *T);
 size_t align_of(const Type *T);
 const Type *storage_type(const Type *T);
 StyledStream& operator<<(StyledStream& ost, const Type *type);
+const Type *superof(const Type *T);
+bool is_invalid_argument_type(const Type *T);
+
+Any wrap_pointer(const Type *type, void *ptr);
+void *get_pointer(const Type *type, Any &value, bool create = false);
+
+//------------------------------------------------------------------------------
+// TYPE CHECK PREDICATES
+//------------------------------------------------------------------------------
+
+void verify(const Type *typea, const Type *typeb);
+void verify_integer(const Type *type);
+void verify_real(const Type *type);
+void verify_range(size_t idx, size_t count);
 
 } // namespace scopes
 
