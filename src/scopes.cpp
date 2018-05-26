@@ -14010,7 +14010,7 @@ struct Specializer {
         Args callargs;
         Args keys;
         auto &&args = l->body.args;
-#if 1
+#if 0
         if (enter_label->is_inline() && inline_const) {
             callargs.push_back(none);
             keys.push_back(args[0]);
@@ -14034,7 +14034,7 @@ struct Specializer {
                     callargs.push_back(arg);
                 }
             }
-            #if 0
+            #if 1
             if (enter_label->is_inline()) {
                 callargs[0] = none;
                 keys[0] = args[0];
