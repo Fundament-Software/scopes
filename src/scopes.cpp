@@ -8961,11 +8961,15 @@ struct SPIRVGenerator {
         return value;
     }
 
+    void bind_parameter(Parameter *param, spv::Id value) {
+        assert(value);
+        param2value[{active_function_value, param}] = value;
+    }
+
     void write_label_body(Label *label) {
     repeat:
         assert(label->body.is_complete());
 
-        bool terminated = false;
         auto &&body = label->body;
         auto &&enter = body.enter;
         auto &&args = body.args;
@@ -9009,7 +9013,7 @@ struct SPIRVGenerator {
         spv::Id NAME = type_to_spirv_type(args[argn++].value.typeref);
 
         spv::Id retvalue = 0;
-        bool multiple_return_values = false;
+        ReturnTraits rtraits;
         if (enter.type == TYPE_Builtin) {
             switch(enter.builtin.value()) {
             case FN_Sample: {
@@ -9123,7 +9127,7 @@ struct SPIRVGenerator {
                 READ_LABEL_BLOCK(then_block);
                 READ_LABEL_BLOCK(else_block);
                 builder.createConditionalBranch(cond, then_block, else_block);
-                terminated = true;
+                rtraits.terminated = true;
             } break;
             case OP_Tertiary: {
                 READ_VALUE(cond);
@@ -9515,10 +9519,10 @@ struct SPIRVGenerator {
                     builder.getTypeId(a), a, b); } break;
             case SFXFN_Unreachable:
                 builder.makeUnreachable();
-                terminated = true; break;
+                rtraits.terminated = true; break;
             case SFXFN_Discard:
                 builder.makeDiscard();
-                terminated = true; break;
+                rtraits.terminated = true; break;
             default: {
                 StyledString ss;
                 ss.out << "IL->SPIR: unsupported builtin " << enter.builtin << " encountered";
@@ -9532,8 +9536,7 @@ struct SPIRVGenerator {
                     // no basic block was generated - just generate assignments
                     auto &&params = enter.label->params;
                     for (size_t i = 1; i < params.size(); ++i) {
-                        param2value[{active_function_value, params[i]}] =
-                            argument_to_value(args[i].value);
+                        bind_parameter(params[i], argument_to_value(args[i].value));
                     }
                     label = enter.label;
                     goto repeat;
@@ -9547,7 +9550,7 @@ struct SPIRVGenerator {
                         auto value = argument_to_value(args[i].value);
                         if (single_caller) {
                             assert(!parameter_is_bound(param));
-                            param2value[{active_function_value,param}] = value;
+                            bind_parameter(param, value);
                         } else {
                             auto phinode = argument_to_value(param);
                             auto op = builder.getInstruction(phinode);
@@ -9557,7 +9560,7 @@ struct SPIRVGenerator {
                         }
                     }
                     builder.createBranch(block);
-                    terminated = true;
+                    rtraits.terminated = true;
                 }
             } else {
                 /*if (use_debug_info) {
@@ -9566,7 +9569,7 @@ struct SPIRVGenerator {
                 auto func = label_to_function(enter.label);
                 retvalue = build_call(
                     enter.label->get_function_type(),
-                    func, args, multiple_return_values);
+                    func, args, rtraits);
             }
         } else if (enter.type == TYPE_Closure) {
             StyledString ss;
@@ -9599,6 +9602,7 @@ struct SPIRVGenerator {
             } else {
                 builder.makeReturn(true, 0);
             }
+            rtraits.terminated = true;
         } else {
             StyledString ss;
             ss.out << "IL->SPIR: cannot translate call to " << enter;
@@ -9606,7 +9610,7 @@ struct SPIRVGenerator {
         }
 
         Any contarg = args[0].value;
-        if (terminated) {
+        if (rtraits.terminated) {
             // write nothing
         } else if ((contarg.type == TYPE_Parameter)
             && (contarg.parameter->type != TYPE_Nothing)) {
@@ -9621,65 +9625,76 @@ struct SPIRVGenerator {
             }
         } else if (contarg.type == TYPE_Label) {
             auto bb = label_to_basic_block(contarg.label);
+#define UNPACK_RET_ARGS() \
+    if (rtraits.multiple_return_values) { \
+        assert(rtraits.rtype); \
+        auto &&values = rtraits.rtype->values; \
+        auto &&params = contarg.label->params; \
+        size_t pi = 1; \
+        for (size_t i = 0; i < values.size(); ++i) { \
+            if (pi >= params.size()) \
+                break; \
+            Parameter *param = params[pi]; \
+            auto &&arg = values[i]; \
+            if (is_unknown(arg.value)) { \
+                spv::Id incoval = builder.createCompositeExtract( \
+                    retvalue, \
+                    builder.getContainedTypeId(rtype, i), i); \
+                T(param, incoval); \
+                pi++; \
+            } \
+        } \
+    } else { \
+        auto &&params = contarg.label->params; \
+        if (params.size() > 1) { \
+            assert(params.size() == 2); \
+            Parameter *param = params[1]; \
+            T(param, retvalue); \
+        } \
+    }
             if (bb) {
                 if (retvalue) {
                     auto bbfrom = builder.getBuildPoint();
                     // assign phi nodes
-                    auto &&params = contarg.label->params;
                     auto rtype = builder.getTypeId(retvalue);
 
                     bool single_caller = has_single_caller(contarg.label);
-                    for (size_t i = 1; i < params.size(); ++i) {
-                        Parameter *param = params[i];
-                        spv::Id incoval = 0;
-                        if (multiple_return_values) {
-                            incoval = builder.createCompositeExtract(
-                                retvalue,
-                                builder.getContainedTypeId(rtype, i - 1),
-                                i - 1);
-                        } else {
-                            assert(params.size() == 2);
-                            incoval = retvalue;
+                    #define T(PARAM, VALUE) \
+                        if (single_caller) { \
+                            assert(!parameter_is_bound(PARAM)); \
+                            bind_parameter(PARAM, VALUE); \
+                        } else { \
+                            auto phinode = argument_to_value(PARAM); \
+                            auto op = builder.getInstruction(phinode); \
+                            assert(op); \
+                            op->addIdOperand(VALUE); \
+                            op->addIdOperand(bbfrom->getId()); \
                         }
-                        if (single_caller) {
-                            assert(!parameter_is_bound(param));
-                            param2value[{active_function_value,param}] = incoval;
-                        } else {
-                            auto phinode = argument_to_value(param);
-                            auto op = builder.getInstruction(phinode);
-                            assert(op);
-                            op->addIdOperand(incoval);
-                            op->addIdOperand(bbfrom->getId());
-                        }
-                    }
+                    UNPACK_RET_ARGS()
+                    #undef T
                 }
                 builder.createBranch(bb);
             } else {
                 if (retvalue) {
                     // no basic block - just add assignments and continue
-                    auto &&params = contarg.label->params;
                     auto rtype = builder.getTypeId(retvalue);
-                    for (size_t i = 1; i < params.size(); ++i) {
-                        Parameter *param = params[i];
-                        spv::Id pvalue = 0;
-                        if (multiple_return_values) {
-                            pvalue = builder.createCompositeExtract(
-                                retvalue,
-                                builder.getContainedTypeId(rtype, i - 1),
-                                i - 1);
-                        } else {
-                            assert(params.size() == 2);
-                            pvalue = retvalue;
-                        }
-                        param2value[{active_function_value,param}] = pvalue;
-                    }
+                    #define T(PARAM, VALUE) \
+                        bind_parameter(PARAM, VALUE);
+                    UNPACK_RET_ARGS()
+                    #undef T
                 }
                 label = contarg.label;
                 goto repeat;
             }
+#undef UNPACK_RET_ARGS
         } else if (contarg.type == TYPE_Nothing) {
+            StyledStream ss(std::cerr);
+            stream_label(ss, label, StreamLabelFormat::debug_single());
+            location_error(String::from("IL->SPIR: unexpected end of function"));
         } else {
-            assert(false && "todo: continuing with unexpected value");
+            StyledStream ss(std::cerr);
+            stream_label(ss, label, StreamLabelFormat::debug_single());
+            location_error(String::from("IL->SPIR: continuation is of invalid type"));
         }
 
         //LLVMSetCurrentDebugLocation(builder, nullptr);
@@ -9689,8 +9704,19 @@ struct SPIRVGenerator {
     #undef READ_TYPE
     #undef READ_LABEL_BLOCK
 
+    struct ReturnTraits {
+        bool multiple_return_values;
+        bool terminated;
+        const ReturnLabelType *rtype;
+
+        ReturnTraits() :
+            multiple_return_values(false),
+            terminated(false),
+            rtype(nullptr) {}
+    };
+
     spv::Id build_call(const Type *functype, spv::Function* func, Args &args,
-        bool &multiple_return_values) {
+        ReturnTraits &traits) {
         size_t argcount = args.size() - 1;
 
         auto fi = cast<FunctionType>(functype);
@@ -9709,8 +9735,13 @@ struct SPIRVGenerator {
 
         auto ret = builder.createFunctionCall(func, values);
         auto rlt = cast<ReturnLabelType>(fi->return_type);
-        multiple_return_values = rlt->has_multiple_return_values();
+        traits.rtype = rlt;
+        traits.multiple_return_values = rlt->has_multiple_return_values();
         if (rlt->return_type == TYPE_Void) {
+            return 0;
+        } else if (!rlt->is_returning()) {
+            builder.makeUnreachable();
+            traits.terminated = true;
             return 0;
         } else {
             return ret;
@@ -9956,7 +9987,7 @@ struct SPIRVGenerator {
                         auto op = new spv::Instruction(
                             builder.getUniqueId(), ptype, spv::OpPhi);
                         builder.addName(op->getResultId(), param->name.name()->data);
-                        param2value[{active_function_value,param}] = op->getResultId();
+                        bind_parameter(param, op->getResultId());
                         bb->addInstruction(std::unique_ptr<spv::Instruction>(op));
                     }
                 }
@@ -10028,7 +10059,7 @@ struct SPIRVGenerator {
             for (size_t i = 0; i < paramcount; ++i) {
                 Parameter *param = params[i + 1];
                 auto val = func->getParamId(i);
-                param2value[{active_function_value,param}] = val;
+                bind_parameter(param, val);
             }
 
             write_label_body(label);
