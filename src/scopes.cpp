@@ -78,6 +78,9 @@ BEWARE: If you build this with anything else but a recent enough clang,
 #include <unordered_set>
 #include <deque>
 #include <csignal>
+#include <utility>
+#include <algorithm>
+#include <functional>
 
 #include <llvm-c/Core.h>
 #include <llvm-c/ExecutionEngine.h>
@@ -135,191 +138,18 @@ BEWARE: If you build this with anything else but a recent enough clang,
 #endif
 #include "minilibs/regexp.cpp"
 
-#include "cityhash/city.cpp"
-
 #include "utils.hpp"
 #include "gc.hpp"
 #include "symbol_enum.hpp"
 #include "styled_stream.hpp"
+#include "none.hpp"
+#include "string.hpp"
 
 namespace scopes {
 
 using llvm::isa;
 using llvm::cast;
 using llvm::dyn_cast;
-
-//------------------------------------------------------------------------------
-// NONE
-//------------------------------------------------------------------------------
-
-struct Nothing {
-};
-
-static Nothing none;
-
-static StyledStream& operator<<(StyledStream& ost, const Nothing &value) {
-    ost << Style_Keyword << "none" << Style_None;
-    return ost;
-}
-
-//------------------------------------------------------------------------------
-// STRING
-//------------------------------------------------------------------------------
-
-struct String {
-    struct Hash {
-        std::size_t operator()(const String *s) const {
-            return CityHash64(s->data, s->count);
-        }
-    };
-
-    size_t count;
-    char data[1];
-
-    bool operator ==(const String &other) const {
-        if (count == other.count) {
-            return !memcmp(data, other.data, count);
-        }
-        return false;
-    }
-
-    static String *alloc(size_t count) {
-        String *str = (String *)tracked_malloc(
-            sizeof(size_t) + sizeof(char) * (count + 1));
-        str->count = count;
-        return str;
-    }
-
-    static const String *from(const char *s, size_t count) {
-        String *str = (String *)tracked_malloc(
-            sizeof(size_t) + sizeof(char) * (count + 1));
-        str->count = count;
-        memcpy(str->data, s, sizeof(char) * count);
-        str->data[count] = 0;
-        return str;
-    }
-
-    static const String *from_cstr(const char *s) {
-        return from(s, strlen(s));
-    }
-
-    static const String *join(const String *a, const String *b) {
-        size_t ac = a->count;
-        size_t bc = b->count;
-        size_t cc = ac + bc;
-        String *str = alloc(cc);
-        memcpy(str->data, a->data, sizeof(char) * ac);
-        memcpy(str->data + ac, b->data, sizeof(char) * bc);
-        str->data[cc] = 0;
-        return str;
-    }
-
-    template<unsigned N>
-    static const String *from(const char (&s)[N]) {
-        return from(s, N - 1);
-    }
-
-    static const String *from_stdstring(const std::string &s) {
-        return from(s.c_str(), s.size());
-    }
-
-    StyledStream& stream(StyledStream& ost, const char *escape_chars) const {
-        auto c = escape_string(nullptr, data, count, escape_chars);
-        char deststr[c + 1];
-        escape_string(deststr, data, count, escape_chars);
-        ost << deststr;
-        return ost;
-    }
-
-    const String *substr(int64_t i0, int64_t i1) const {
-        assert(i1 >= i0);
-        return from(data + i0, (size_t)(i1 - i0));
-    }
-};
-
-static StyledStream& operator<<(StyledStream& ost, const String *s) {
-    ost << Style_String << "\"";
-    s->stream(ost, "\"");
-    ost << "\"" << Style_None;
-    return ost;
-}
-
-struct StyledString {
-    std::stringstream _ss;
-    StyledStream out;
-
-    StyledString() :
-        out(_ss) {
-    }
-
-    StyledString(StreamStyleFunction ssf) :
-        out(_ss, ssf) {
-    }
-
-    static StyledString plain() {
-        return StyledString(stream_plain_style);
-    }
-
-    const String *str() const {
-        return String::from_stdstring(_ss.str());
-    }
-};
-
-static const String *vformat( const char *fmt, va_list va ) {
-    va_list va2;
-    va_copy(va2, va);
-    size_t size = stb_vsnprintf( nullptr, 0, fmt, va2 );
-    va_end(va2);
-    String *str = String::alloc(size);
-    stb_vsnprintf( str->data, size + 1, fmt, va );
-    return str;
-}
-
-static const String *format( const char *fmt, ...) {
-    va_list va;
-    va_start(va, fmt);
-    const String *result = vformat(fmt, va);
-    va_end(va);
-    return result;
-}
-
-// computes the levenshtein distance between two strings
-static size_t distance(const String *_s, const String *_t) {
-    const char *s = _s->data;
-    const char *t = _t->data;
-    const size_t n = _s->count;
-    const size_t m = _t->count;
-    if (!m) return n;
-    if (!n) return m;
-
-    size_t _v0[m + 1];
-    size_t _v1[m + 1];
-
-    size_t *v0 = _v0;
-    size_t *v1 = _v1;
-    for (size_t i = 0; i <= m; ++i) {
-        v0[i] = i;
-    }
-
-    for (size_t i = 0; i < n; ++i) {
-        v1[0] = i + 1;
-
-        for (size_t j = 0; j < m; ++j) {
-            size_t cost = (s[i] == t[j])?0:1;
-            v1[j + 1] = std::min(v1[j] + 1,
-                std::min(v0[j + 1] + 1, v0[j] + cost));
-        }
-
-        size_t *tmp = v0;
-        v0 = v1;
-        v1 = tmp;
-    }
-
-    //std::cout << "lev(" << s << ", " << t << ") = " << v0[m] << std::endl;
-
-    return v0[m];
-}
-
 
 //------------------------------------------------------------------------------
 // SYMBOL
@@ -1652,17 +1482,17 @@ struct TupleType : StorageType {
             for (size_t i = 0; i < types.size(); ++i) {
                 const Type *ET = types[i];
                 size_t etal = align_of(ET);
-                sz = ::align(sz, etal);
+                sz = scopes::align(sz, etal);
                 offsets[i] = sz;
                 al = std::max(al, etal);
                 sz += size_of(ET);
             }
-            size = ::align(sz, al);
+            size = scopes::align(sz, al);
             align = al;
         }
         if (_alignment) {
             align = _alignment;
-            size = ::align(sz, align);
+            size = scopes::align(sz, align);
         }
     }
 
@@ -1818,7 +1648,7 @@ struct UnionType : StorageType {
             }
             al = std::max(al, align_of(ET));
         }
-        size = ::align(sz, al);
+        size = scopes::align(sz, al);
         align = al;
         tuple_type = Tuple({types[largest_field]});
     }
@@ -2262,10 +2092,10 @@ static const Type *Function(const Type *return_type,
 
         struct Hash {
             std::size_t operator()(const TypeArgs& s) const {
-                std::size_t h = hash<const Type *>{}(s.return_type);
-                h = HashLen16(h, hash<uint32_t>{}(s.flags));
+                std::size_t h = std::hash<const Type *>{}(s.return_type);
+                h = HashLen16(h, std::hash<uint32_t>{}(s.flags));
                 for (auto arg : s.argtypes) {
-                    h = HashLen16(h, hash<const Type *>{}(arg));
+                    h = HashLen16(h, std::hash<const Type *>{}(arg));
                 }
                 return h;
             }
@@ -5735,7 +5565,7 @@ public:
                 size_t newsz = sz;
                 if (!packed) {
                     size_t etal = align_of(fieldtype);
-                    newsz = ::align(sz, etal);
+                    newsz = scopes::align(sz, etal);
                     al = std::max(al, etal);
                 }
                 if (newsz != offset) {
@@ -5773,7 +5603,7 @@ public:
                 explicit_alignment = true;
             }
             #endif
-            sz = ::align(sz, al);
+            sz = scopes::align(sz, al);
             bool align_ok = (al == needalign);
             bool size_ok = (sz == needsize);
             if (!(align_ok && size_ok)) {
@@ -11607,7 +11437,7 @@ static void *aligned_alloc(size_t sz, size_t al) {
     assert(sz);
     assert(al);
     return reinterpret_cast<void *>(
-        ::align(reinterpret_cast<uintptr_t>(tracked_malloc(sz + al - 1)), al));
+        scopes::align(reinterpret_cast<uintptr_t>(tracked_malloc(sz + al - 1)), al));
 }
 
 static void *alloc_storage(const Type *T) {

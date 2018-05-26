@@ -91,10 +91,6 @@ extern const char *scopes_include_dir;
 extern size_t scopes_argc;
 extern char **scopes_argv;
 
-// C namespace exports
-int unescape_string(char *buf);
-int escape_string(char *buf, const char *str, int strcount, const char *quote_chars);
-
 void scopes_strtod(double *v, const char *str, char **str_end, int base );
 void scopes_strtoll(int64_t *v, const char* str, char** endptr);
 void scopes_strtoull(uint64_t *v, const char* str, char** endptr);

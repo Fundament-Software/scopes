@@ -67,6 +67,7 @@ extern "C" {
 #endif
 
 #include <stdint.h>
+#include <stddef.h>
 
 typedef uint8_t uint8;
 typedef uint32_t uint32;

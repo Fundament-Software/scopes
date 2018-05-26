@@ -71,139 +71,6 @@ void scopes_strtoull(uint64_t *v, const char* str, char** endptr) {
     }
 }
 
-static char parse_hexchar(char c) {
-    if ((c >= '0') && (c <= '9')) {
-        return c - '0';
-    } else if ((c >= 'a') && (c <= 'f')) {
-        return c - 'a' + 10;
-    } else if ((c >= 'A') && (c <= 'F')) {
-        return c - 'A' + 10;
-    }
-    return -1;
-}
-
-int unescape_string(char *buf) {
-    char *dst = buf;
-    char *src = buf;
-    while (*src) {
-        if (*src == '\\') {
-            src++;
-            if (*src == 0) {
-                break;
-            } if (*src == 'n') {
-                *dst = '\n';
-            } else if (*src == 't') {
-                *dst = '\t';
-            } else if (*src == 'r') {
-                *dst = '\r';
-            } else if (*src == 'x') {
-                char c0 = parse_hexchar(*(src + 1));
-                char c1 = parse_hexchar(*(src + 2));
-                if ((c0 >= 0) && (c1 >= 0)) {
-                    *dst = (c0 << 4) | c1;
-                    src += 2;
-                } else {
-                    src--;
-                    *dst = *src;
-                }
-            } else {
-                *dst = *src;
-            }
-        } else {
-            *dst = *src;
-        }
-        src++;
-        dst++;
-    }
-    // terminate
-    *dst = 0;
-    return dst - buf;
-}
-
-#define B_SNFORMAT 512 // how many characters per callback
-typedef char *(*vsformatcb_t)(const char *buf, void *user, int len);
-
-struct vsformat_cb_ctx {
-    int count;
-    char *dest;
-    char tmp[B_SNFORMAT];
-};
-
-static char *vsformat_cb(const char *buf, void *user, int len) {
-    vsformat_cb_ctx *ctx = (vsformat_cb_ctx *)user;
-    if (buf != ctx->dest) {
-        char *d = ctx->dest;
-        char *e = d + len;
-        while (d != e) {
-            *d++ = *buf++;
-        }
-    }
-    ctx->dest += len;
-    return ctx->tmp;
-}
-
-static char *vsformat_cb_null(const char *buf, void *user, int len) {
-    vsformat_cb_ctx *ctx = (vsformat_cb_ctx *)user;
-    ctx->count += len;
-    return ctx->tmp;
-}
-
-static int escapestrcb(vsformatcb_t cb, void *user, char *buf,
-    const char *str, int strcount,
-    const char *quote_chars = nullptr) {
-    assert(buf);
-    const char *fmt_start = str;
-    const char *fmt = fmt_start;
-    char *p = buf;
-#define VSFCB_CHECKWRITE(N) \
-    if (((p - buf) + (N)) > B_SNFORMAT) { buf = p = cb(buf, user, p - buf); }
-#define VSFCB_PRINT(MAXCOUNT, FMT, SRC) { \
-        VSFCB_CHECKWRITE(MAXCOUNT+1); \
-        p += snprintf(p, B_SNFORMAT - (p - buf), FMT, SRC); }
-    for(;;) {
-        char c = *fmt;
-        switch(c) {
-        case '\n': VSFCB_CHECKWRITE(2); *p++ = '\\'; *p++ = 'n'; break;
-        case '\r': VSFCB_CHECKWRITE(2); *p++ = '\\'; *p++ = 'r'; break;
-        case '\t': VSFCB_CHECKWRITE(2); *p++ = '\\'; *p++ = 't'; break;
-        case 0: if ((fmt - fmt_start) == strcount) goto done;
-            // otherwise, fall through
-        default:
-            if ((c < 32) || (c >= 127)) {
-                VSFCB_PRINT(4, "\\x%02x", (unsigned char)c);
-            } else {
-                if ((c == '\\') || (quote_chars && strchr(quote_chars, c))) {
-                    VSFCB_CHECKWRITE(1);
-                    *p++ = '\\';
-                }
-                *p++ = c;
-            }
-            break;
-        }
-        fmt++;
-    }
-done:
-    VSFCB_CHECKWRITE(B_SNFORMAT); // force flush if non-empty
-    return 0;
-#undef VSFCB_CHECKWRITE
-#undef VSFCB_PRINT
-}
-
-int escape_string(char *buf, const char *str, int strcount, const char *quote_chars) {
-    vsformat_cb_ctx ctx;
-    if (buf) {
-        ctx.dest = buf;
-        escapestrcb(vsformat_cb, &ctx, ctx.tmp, str, strcount, quote_chars);
-        int l = ctx.dest - buf;
-        buf[l] = 0;
-        return l;
-    } else {
-        ctx.count = 0;
-        escapestrcb(vsformat_cb_null, &ctx, ctx.tmp, str, strcount, quote_chars);
-        return ctx.count + 1;
-    }
-}
-
 extern "C" {
 // used in test_assorted.sc
 #pragma GCC visibility push(default)
@@ -256,7 +123,8 @@ int stb_vprintf(const char *fmt, va_list va) {
 }
 #endif
 
-extern "C" {
+namespace scopes {
+
 int stb_printf(const char *fmt, ...) {
     stb_printf_ctx ctx;
     ctx.dest = stdout;
@@ -265,7 +133,6 @@ int stb_printf(const char *fmt, ...) {
     int c = stb_vsprintfcb(_printf_cb, &ctx, ctx.tmp, fmt, va);
     va_end(va);
     return c;
-}
 }
 
 int stb_fprintf(FILE *out, const char *fmt, ...) {
@@ -277,3 +144,5 @@ int stb_fprintf(FILE *out, const char *fmt, ...) {
     va_end(va);
     return c;
 }
+
+} // namespace scopes
