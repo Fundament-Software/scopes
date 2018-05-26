@@ -134,6 +134,8 @@ project "scopes"
         "src/parameter.cpp",
         "src/body.cpp",
         "src/label.cpp",
+        "src/closure.cpp",
+        "src/frame.cpp",
         "external/cityhash/city.cpp",
         "external/linenoise-ng/src/linenoise.cpp",
         "external/linenoise-ng/src/ConvertUTF.cpp",

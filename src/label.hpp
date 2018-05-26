@@ -78,6 +78,10 @@ enum LabelFlags {
     LF_Debug = (1 << 4),
 };
 
+// IL form inspired by
+// Leissa et al., Graph-Based Higher-Order Intermediate Representation
+// http://compilers.cs.uni-saarland.de/papers/lkh15_cgo.pdf
+
 struct Label {
 protected:
     static uint64_t next_uid;
