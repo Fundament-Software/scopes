@@ -30,6 +30,7 @@ SOFTWARE.
 #include "real.hpp"
 #include "array.hpp"
 #include "tuple.hpp"
+#include "parameter.hpp"
 
 #include <memory.h>
 
@@ -315,6 +316,22 @@ bool Any::operator ==(const Any &other) const {
     ss << "incomparable value: " << T << std::endl;
     assert(false && "incomparable value");
     return false;
+}
+
+void Any::verify_indirect(const Type *T) const {
+    scopes::verify(T, indirect_type());
+}
+
+bool Any::is_const() const {
+    return !((type == TYPE_Parameter) && parameter->label);
+}
+
+const Type *Any::indirect_type() const {
+    if (!is_const()) {
+        return parameter->type;
+    } else {
+        return type;
+    }
 }
 
 //------------------------------------------------------------------------------
