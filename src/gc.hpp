@@ -21,39 +21,24 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#ifndef SCOPES_UTILS_HPP
-#define SCOPES_UTILS_HPP
+#ifndef SCOPES_GC_HPP
+#define SCOPES_GC_HPP
 
 #include <stddef.h>
-#include <stdio.h>
-
-#include <functional>
-#include <map>
-
-inline size_t align(size_t offset, size_t align) {
-    return (offset + align - 1) & ~(align - 1);
-}
-
-int stb_fprintf(FILE *out, const char *fmt, ...);
 
 namespace scopes {
 
-template <typename R, typename... Args>
-inline std::function<R (Args...)> memoize(R (*fn)(Args...)) {
-    std::map<std::tuple<Args...>, R> table;
-    return [fn, table](Args... args) mutable -> R {
-        auto argt = std::make_tuple(args...);
-        auto memoized = table.find(argt);
-        if(memoized == table.end()) {
-            auto result = fn(args...);
-            table[argt] = result;
-            return result;
-        } else {
-            return memoized->second;
-        }
-    };
-}
+extern char *g_stack_start;
+extern size_t g_largest_stack_size;
 
-}
+size_t memory_stack_size();
 
-#endif // SCOPES_UTILS_HPP
+// for allocated pointers, register the size of the range
+void track(void *ptr, size_t size);
+
+void *tracked_malloc(size_t size);
+bool find_allocation(void *srcptr,  void *&start, size_t &size);
+
+} // namespace scopes
+
+#endif // SCOPES_GC_HPP

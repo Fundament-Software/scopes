@@ -21,39 +21,44 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#ifndef SCOPES_UTILS_HPP
-#define SCOPES_UTILS_HPP
+#include "gc.hpp"
 
-#include <stddef.h>
-#include <stdio.h>
-
-#include <functional>
+#include <algorithm>
 #include <map>
-
-inline size_t align(size_t offset, size_t align) {
-    return (offset + align - 1) & ~(align - 1);
-}
-
-int stb_fprintf(FILE *out, const char *fmt, ...);
 
 namespace scopes {
 
-template <typename R, typename... Args>
-inline std::function<R (Args...)> memoize(R (*fn)(Args...)) {
-    std::map<std::tuple<Args...>, R> table;
-    return [fn, table](Args... args) mutable -> R {
-        auto argt = std::make_tuple(args...);
-        auto memoized = table.find(argt);
-        if(memoized == table.end()) {
-            auto result = fn(args...);
-            table[argt] = result;
-            return result;
-        } else {
-            return memoized->second;
-        }
-    };
+char *g_stack_start;
+size_t g_largest_stack_size = 0;
+
+size_t memory_stack_size() {
+    char c; char *_stack_addr = &c;
+    size_t ss = (size_t)(g_stack_start - _stack_addr);
+    g_largest_stack_size = std::max(ss, g_largest_stack_size);
+    return ss;
 }
 
+// for allocated pointers, register the size of the range
+static std::map<void *, size_t> tracked_allocations;
+
+void track(void *ptr, size_t size) {
+    tracked_allocations.insert({ptr,size});
 }
 
-#endif // SCOPES_UTILS_HPP
+void *tracked_malloc(size_t size) {
+    void *ptr = malloc(size);
+    track(ptr, size);
+    return ptr;
+}
+
+bool find_allocation(void *srcptr,  void *&start, size_t &size) {
+    auto it = tracked_allocations.upper_bound(srcptr);
+    if (it == tracked_allocations.begin())
+        return false;
+    it--;
+    start = it->first;
+    size = it->second;
+    return (srcptr >= start)&&((uint8_t*)srcptr < ((uint8_t*)start + size));
+}
+
+} // namespace scopes
