@@ -36,10 +36,27 @@ assert-compiler-error
 
         test (unconst true)
 
-let k =
-    branch (unconst true)
-        inline ()
-            unconst 1
-        inline ()
-            unconst 2
-assert (k == 1)
+# attempting to return polymorphic results from runtime-conditional branches
+assert-compiler-error
+    do
+        fn test ()
+            let k =
+                if (unconst false)
+                    dump "one"
+                    (unconst 1)
+                elseif (unconst true)
+                    dump "two"
+                    (unconst none)
+                elseif (unconst false)
+                    dump "three"
+                    3
+                else
+                    dump "four"
+                    4
+            dump k
+            return;
+
+        test;
+        true
+
+true

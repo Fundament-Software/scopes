@@ -5926,6 +5926,10 @@ public:
         flags |= LF_Merge;
     }
 
+    void unset_merge() {
+        flags &= ~LF_Merge;
+    }
+
     void set_inline() {
         flags |= LF_Inline;
     }
@@ -6540,10 +6544,15 @@ struct Frame {
         parent(nullptr),
         label(nullptr),
         loop_count(0),
+        inline_merge(false),
         instance(nullptr)
     {}
     Frame(Frame *_parent, Label *_label, Label *_instance = nullptr, size_t _loop_count = 0) :
-        parent(_parent), label(_label), loop_count(_loop_count), instance(_instance) {
+        parent(_parent),
+        label(_label),
+        loop_count(_loop_count),
+        inline_merge(false),
+        instance(_instance) {
         assert(parent);
         assert(label);
         args.reserve(_label->params.size());
@@ -6553,6 +6562,7 @@ struct Frame {
     Frame *parent;
     Label *label;
     size_t loop_count;
+    bool inline_merge;
 
     Frame *find_parent_frame(Label *label) {
         Frame *top = this;
@@ -13377,6 +13387,9 @@ struct Specializer {
                     ss << tmp_args[i] << " ";
                 }
             }
+            if (parent->inline_merge) {
+                ss << "and merge inlined";
+            }
             ss << std::endl;
         }
 
@@ -13403,7 +13416,7 @@ struct Specializer {
                 return result;
         }
 
-        if (label->is_merge()) {
+        if (label->is_merge() && !parent->inline_merge) {
             for (int i = 1; i < tmp_args.size(); ++i) {
                 // verify that all keys are unknown
                 auto &&val = tmp_args[i].value;
@@ -13493,6 +13506,9 @@ struct Specializer {
 
         Label *newlabel = Label::from(label);
         newlabel->set_parameters(tmp_params);
+        if (parent->inline_merge) {
+            newlabel->unset_merge();
+        }
 
         Frame *frame = Frame::from(parent, label, newlabel, loop_count);
         frame->args = tmp_args;
@@ -13988,12 +14004,14 @@ struct Specializer {
         Frame *enter_frame = enter.closure->frame;
         Label *enter_label = enter.closure->label;
 
+        bool inline_const = (!enter_label->is_merge()) || enter_frame->inline_merge;
+
         // inline constant arguments
         Args callargs;
         Args keys;
         auto &&args = l->body.args;
-#if 0
-        if (enter_label->is_inline() && !enter_label->is_important()) {
+#if 1
+        if (enter_label->is_inline() && inline_const) {
             callargs.push_back(none);
             keys.push_back(args[0]);
             for (size_t i = 1; i < args.size(); ++i) {
@@ -14002,8 +14020,6 @@ struct Specializer {
         } else
 #endif
         {
-            bool inline_const = (!enter_label->is_merge());
-
             callargs.push_back(args[0]);
             keys.push_back(Argument(untyped()));
             for (size_t i = 1; i < args.size(); ++i) {
@@ -14018,7 +14034,7 @@ struct Specializer {
                     callargs.push_back(arg);
                 }
             }
-            #if 1
+            #if 0
             if (enter_label->is_inline()) {
                 callargs[0] = none;
                 keys[0] = args[0];
@@ -15395,9 +15411,12 @@ struct Specializer {
                 newl = args[3].value;
             }
             verify_branch_continuation(newl);
-            auto retarg = args[0];
+            Any cont = args[0].value;
+            if (cont.type == TYPE_Closure) {
+                cont.closure->frame->inline_merge = true;
+            }
             enter = newl;
-            args = { retarg };
+            args = { cont };
         } break;
         case FN_IntToPtr: {
             CHECKARGS(2, 2);
@@ -15924,11 +15943,6 @@ struct Specializer {
             if (cl->label->is_merge()) {
                 return false;
             }
-            #if 0
-            if (!cl->label->has_params()) {
-                return false;
-            }
-            #endif
         }
         return true;
     }
@@ -15958,22 +15972,6 @@ struct Specializer {
         verify_branch_continuation(else_br);
 
         Any cont = args[0].value;
-        if (requires_mergelabel(cont)) {
-            // build merge label that forces all values to coalesce and forwards its arguments
-            Label *mergelabel = Label::continuation_from(l->body.anchor, Symbol(SYM_Unnamed));
-            mergelabel->set_merge();
-            mergelabel->body.enter = cont;
-            mergelabel->body.anchor = l->body.anchor;
-            if (mergelabel_has_params(cont)) {
-                Parameter *param = Parameter::variadic_from(l->body.anchor, Symbol(SYM_Unnamed), TYPE_Unknown);
-                mergelabel->append(param);
-                mergelabel->body.args = { none, param };
-            } else {
-                mergelabel->body.args = { none };
-            }
-            cont = Closure::from(mergelabel, then_br->frame);
-        }
-
         args[2].value = fold_type_label_single(then_br->frame, then_br->label, { cont });
         args[3].value = fold_type_label_single(else_br->frame, else_br->label, { cont });
         args[0].value = none;
@@ -17412,6 +17410,11 @@ struct Expander {
         Any result = none;
         Any subdest = none;
         Label *nextstate = make_nextstate(dest, result, subdest);
+
+        if (subdest.type == TYPE_Label) {
+            subdest.label->unset_inline();
+            subdest.label->set_merge();
+        }
 
         int lastidx = (int)branches.size() - 1;
         for (int idx = 0; idx < lastidx; ++idx) {
