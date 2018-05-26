@@ -21,31 +21,11 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+#ifndef SCOPES_GEN_LLVM_HPP
+#define SCOPES_GEN_LLVM_HPP
+
 namespace scopes {
 
-template<TypeKind tk>
-inline void verify_kind(const Type *T) {
-    if (T->kind() != tk) {
-        StyledString ss;
-        ss.out << "value of ";
-        switch(tk) {
-        case TK_Integer: ss.out << "integer"; break;
-        case TK_Real: ss.out << "real"; break;
-        case TK_Pointer: ss.out << "pointer"; break;
-        case TK_Array: ss.out << "array"; break;
-        case TK_Vector: ss.out << "vector"; break;
-        case TK_Tuple: ss.out << "tuple"; break;
-        case TK_Union: ss.out << "union"; break;
-        case TK_Typename: ss.out << "typename"; break;
-        case TK_ReturnLabel: ss.out << "return label"; break;
-        case TK_Function: ss.out << "function"; break;
-        case TK_Extern: ss.out << "extern"; break;
-        case TK_Image: ss.out << "image"; break;
-        case TK_SampledImage: ss.out << "sampled image"; break;
-        }
-        ss.out << " kind expected, got " << T;
-        location_error(ss.str());
-    }
-}
-
 } // namespace scopes
+
+#endif // SCOPES_GEN_LLVM_HPP

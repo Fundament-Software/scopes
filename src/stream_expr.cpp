@@ -105,38 +105,6 @@ StreamExprFormat StreamExprFormat::singleline_digest() {
 
 //------------------------------------------------------------------------------
 
-StreamAnchors::StreamAnchors(StyledStream &_ss) :
-    ss(_ss), last_anchor(nullptr) {
-}
-
-void StreamAnchors::stream_anchor(const Anchor *anchor, bool quoted) {
-    if (anchor) {
-        ss << Style_Location;
-        auto rss = StyledStream::plain(ss);
-        // ss << path.name()->data << ":" << lineno << ":" << column << ":";
-        if (!last_anchor || (last_anchor->path() != anchor->path())) {
-            rss << anchor->path().name()->data
-                << ":" << anchor->lineno
-                << ":" << anchor->column
-                << ":";
-        } else if (!last_anchor || (last_anchor->lineno != anchor->lineno)) {
-            rss << ":" << anchor->lineno
-                << ":" << anchor->column
-                << ":";
-        } else if (!last_anchor || (last_anchor->column != anchor->column)) {
-            rss << "::" << anchor->column
-                << ":";
-        } else {
-            rss << ":::";
-        }
-        if (quoted) { rss << "'"; }
-        ss << Style_None;
-        last_anchor = anchor;
-    }
-}
-
-//------------------------------------------------------------------------------
-
 StreamExpr::StreamExpr(StyledStream &_ss, const StreamExprFormat &_fmt) :
     StreamAnchors(_ss), fmt(_fmt) {
     line_anchors = (fmt.anchors == StreamExprFormat::Line);

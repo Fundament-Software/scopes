@@ -21,80 +21,78 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#ifndef SCOPES_STREAM_EXPR_HPP
-#define SCOPES_STREAM_EXPR_HPP
+#ifndef SCOPES_STREAM_LABEL_HPP
+#define SCOPES_STREAM_LABEL_HPP
 
-#include "styled_stream.hpp"
-#include "symbol.hpp"
 #include "stream_anchors.hpp"
+#include "argument.hpp"
+
+#include <unordered_set>
 
 namespace scopes {
 
-struct Anchor;
-struct Any;
-struct List;
+struct Label;
+struct Parameter;
 
 //------------------------------------------------------------------------------
-// EXPRESSION PRINTER
+// IL PRINTER
 //------------------------------------------------------------------------------
 
-const char INDENT_SEP[] = "⁞";
-
-Style default_symbol_styler(Symbol name);
-
-struct StreamExprFormat {
+struct StreamLabelFormat {
     enum Tagging {
         All,
         Line,
+        Scope,
         None,
     };
 
-    bool naked;
     Tagging anchors;
-    int maxdepth;
-    int maxlength;
-    Style (*symbol_styler)(Symbol);
-    int depth;
+    Tagging follow;
+    bool show_users;
+    bool show_scope;
 
-    StreamExprFormat();
+    StreamLabelFormat();
 
-    static StreamExprFormat debug();
+    static StreamLabelFormat debug_all();
 
-    static StreamExprFormat debug_digest();
+    static StreamLabelFormat debug_scope();
 
-    static StreamExprFormat debug_singleline();
+    static StreamLabelFormat debug_single();
 
-    static StreamExprFormat singleline();
+    static StreamLabelFormat single();
 
-    static StreamExprFormat digest();
-
-    static StreamExprFormat singleline_digest();
-
+    static StreamLabelFormat scope();
 };
 
-struct StreamExpr : StreamAnchors {
-    StreamExprFormat fmt;
+struct StreamLabel : StreamAnchors {
+    StreamLabelFormat fmt;
     bool line_anchors;
     bool atom_anchors;
+    bool follow_labels;
+    bool follow_scope;
+    std::unordered_set<Label *> visited;
 
-    StreamExpr(StyledStream &_ss, const StreamExprFormat &_fmt);
+    StreamLabel(StyledStream &_ss, const StreamLabelFormat &_fmt);
 
-    void stream_indent(int depth = 0);
+    void stream_label_label(Label *alabel);
 
-    static bool is_nested(const Any &_e);
+    void stream_label_label_user(Label *alabel);
 
-    static bool is_list (const Any &_value);
+    void stream_param_label(Parameter *param, Label *alabel);
 
-    void walk(Any e, int depth, int maxdepth, bool naked);
+    void stream_argument(Argument arg, Label *alabel);
 
-    void stream(const Any &e);
+    void stream_label (Label *alabel);
+
+    void stream_any(const Any &afunc);
+
+    void stream(Label *label);
+
 };
 
-void stream_expr(
-    StyledStream &_ss, const Any &e, const StreamExprFormat &_fmt);
-
-StyledStream& operator<<(StyledStream& ost, const List *list);
+void stream_label(
+    StyledStream &_ss, Label *label, const StreamLabelFormat &_fmt);
 
 } // namespace scopes
 
-#endif // SCOPES_STREAM_EXPR_HPP
+#endif // SCOPES_STREAM_LABEL_HPP

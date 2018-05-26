@@ -21,30 +21,22 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#ifndef SCOPES_INTEGER_HPP
-#define SCOPES_INTEGER_HPP
+#ifndef SCOPES_GEN_SPIRV_HPP
+#define SCOPES_GEN_SPIRV_HPP
 
-#include "type.hpp"
+#include "symbol.hpp"
+
+#include <vector>
 
 namespace scopes {
 
-//------------------------------------------------------------------------------
-// INTEGER TYPE
-//------------------------------------------------------------------------------
+struct Label;
+struct String;
 
-struct IntegerType : Type {
-    static bool classof(const Type *T);
-
-    IntegerType(size_t _width, bool _issigned);
-
-    size_t width;
-    bool issigned;
-};
-
-const Type *Integer(size_t _width, bool _issigned);
-
-int integer_type_bit_size(const Type *T);
+void optimize_spirv(std::vector<unsigned int> &result, int opt_level);
+const String *compile_spirv(Symbol target, Label *fn, uint64_t flags);
+const String *compile_glsl(Symbol target, Label *fn, uint64_t flags);
 
 } // namespace scopes
 
-#endif // SCOPES_INTEGER_HPP
+#endif // SCOPES_GEN_SPIRV_HPP

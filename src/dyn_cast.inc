@@ -21,8 +21,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#include "integer.hpp"
-#include "utils.hpp"
+#ifndef SCOPES_DYN_CAST_INC
+#define SCOPES_DYN_CAST_INC
 
 #include "llvm/Support/Casting.h"
 
@@ -32,42 +32,6 @@ using llvm::isa;
 using llvm::cast;
 using llvm::dyn_cast;
 
-//------------------------------------------------------------------------------
-// INTEGER TYPE
-//------------------------------------------------------------------------------
-
-bool IntegerType::classof(const Type *T) {
-    return T->kind() == TK_Integer;
 }
 
-IntegerType::IntegerType(size_t _width, bool _issigned)
-    : Type(TK_Integer), width(_width), issigned(_issigned) {
-    std::stringstream ss;
-    if ((_width == 1) && !_issigned) {
-        ss << "bool";
-    } else {
-        if (issigned) {
-            ss << "i";
-        } else {
-            ss << "u";
-        }
-        ss << width;
-    }
-    _name = String::from_stdstring(ss.str());
-}
-
-static const Type *_Integer(size_t _width, bool _issigned) {
-    return new IntegerType(_width, _issigned);
-}
-static auto m_Integer = memoize(_Integer);
-
-const Type *Integer(size_t _width, bool _issigned) {
-    return m_Integer(_width, _issigned);
-}
-
-int integer_type_bit_size(const Type *T) {
-    return (int)cast<IntegerType>(T)->width;
-}
-
-} // namespace scopes
-
+#endif // SCOPES_DYN_CAST_INC

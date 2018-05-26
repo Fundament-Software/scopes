@@ -21,53 +21,52 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#include "integer.hpp"
-#include "utils.hpp"
+#ifndef SCOPES_SCC_HPP
+#define SCOPES_SCC_HPP
 
-#include "llvm/Support/Casting.h"
+#include "label.hpp"
+
+#include <stddef.h>
 
 namespace scopes {
 
-using llvm::isa;
-using llvm::cast;
-using llvm::dyn_cast;
-
 //------------------------------------------------------------------------------
-// INTEGER TYPE
+// SCC
 //------------------------------------------------------------------------------
 
-bool IntegerType::classof(const Type *T) {
-    return T->kind() == TK_Integer;
-}
+// build strongly connected component map of label graph
+// uses Dijkstra's Path-based strong component algorithm
+struct SCCBuilder {
+    struct Group {
+        size_t index;
+        Labels labels;
+    };
 
-IntegerType::IntegerType(size_t _width, bool _issigned)
-    : Type(TK_Integer), width(_width), issigned(_issigned) {
-    std::stringstream ss;
-    if ((_width == 1) && !_issigned) {
-        ss << "bool";
-    } else {
-        if (issigned) {
-            ss << "i";
-        } else {
-            ss << "u";
-        }
-        ss << width;
-    }
-    _name = String::from_stdstring(ss.str());
-}
+    Labels S;
+    Labels P;
+    std::unordered_map<Label *, size_t> Cmap;
+    std::vector<Group> groups;
+    std::unordered_map<Label *, size_t> SCCmap;
+    size_t C;
 
-static const Type *_Integer(size_t _width, bool _issigned) {
-    return new IntegerType(_width, _issigned);
-}
-static auto m_Integer = memoize(_Integer);
+    SCCBuilder();
 
-const Type *Integer(size_t _width, bool _issigned) {
-    return m_Integer(_width, _issigned);
-}
+    SCCBuilder(Label *top);
 
-int integer_type_bit_size(const Type *T) {
-    return (int)cast<IntegerType>(T)->width;
-}
+    void stream_group(StyledStream &ss, const Group &group);
+
+    bool is_recursive(Label *l);
+
+    bool contains(Label *l);
+
+    size_t group_id(Label *l);
+
+    Group &group(Label *l);
+
+    void walk(Label *obj);
+};
+
 
 } // namespace scopes
 
+#endif // SCOPES_SCC_HPP

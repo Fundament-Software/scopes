@@ -26,6 +26,7 @@ SOFTWARE.
 #include "error.hpp"
 #include "return.hpp"
 #include "function.hpp"
+#include "stream_label.hpp"
 
 #include <assert.h>
 
@@ -544,6 +545,23 @@ StyledStream &Label::stream(StyledStream &ss, bool users) const {
         }
     }
     return ss;
+}
+
+const ReturnLabelType *Label::verify_return_label() {
+    if (!params.empty()) {
+        const ReturnLabelType *rt = dyn_cast<ReturnLabelType>(params[0]->type);
+        if (rt)
+            return rt;
+    }
+#if SCOPES_DEBUG_CODEGEN
+    {
+        StyledStream ss;
+        stream_label(ss, this, StreamLabelFormat::debug_all());
+    }
+#endif
+    set_active_anchor(anchor);
+    location_error(String::from("label is not a function"));
+    return nullptr;
 }
 
 Label *Label::from(const Anchor *_anchor, Symbol _name) {

@@ -21,53 +21,27 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#include "integer.hpp"
-#include "utils.hpp"
+#include "execution.hpp"
 
-#include "llvm/Support/Casting.h"
+#include <llvm-c/Core.h>
+#include <llvm-c/ExecutionEngine.h>
+#include <llvm-c/Analysis.h>
+#include <llvm-c/Transforms/PassManagerBuilder.h>
+#include <llvm-c/Disassembler.h>
+#include <llvm-c/Support.h>
 
 namespace scopes {
 
-using llvm::isa;
-using llvm::cast;
-using llvm::dyn_cast;
+LLVMExecutionEngineRef ee = nullptr;
 
-//------------------------------------------------------------------------------
-// INTEGER TYPE
-//------------------------------------------------------------------------------
-
-bool IntegerType::classof(const Type *T) {
-    return T->kind() == TK_Integer;
-}
-
-IntegerType::IntegerType(size_t _width, bool _issigned)
-    : Type(TK_Integer), width(_width), issigned(_issigned) {
-    std::stringstream ss;
-    if ((_width == 1) && !_issigned) {
-        ss << "bool";
-    } else {
-        if (issigned) {
-            ss << "i";
-        } else {
-            ss << "u";
-        }
-        ss << width;
-    }
-    _name = String::from_stdstring(ss.str());
-}
-
-static const Type *_Integer(size_t _width, bool _issigned) {
-    return new IntegerType(_width, _issigned);
-}
-static auto m_Integer = memoize(_Integer);
-
-const Type *Integer(size_t _width, bool _issigned) {
-    return m_Integer(_width, _issigned);
-}
-
-int integer_type_bit_size(const Type *T) {
-    return (int)cast<IntegerType>(T)->width;
+void init_llvm() {
+    LLVMEnablePrettyStackTrace();
+    LLVMLinkInMCJIT();
+    //LLVMLinkInInterpreter();
+    LLVMInitializeNativeTarget();
+    LLVMInitializeNativeAsmParser();
+    LLVMInitializeNativeAsmPrinter();
+    LLVMInitializeNativeDisassembler();
 }
 
 } // namespace scopes
-

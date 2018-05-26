@@ -21,53 +21,42 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#include "integer.hpp"
-#include "utils.hpp"
-
-#include "llvm/Support/Casting.h"
+#include "stream_anchors.hpp"
+#include "styled_stream.hpp"
+#include "anchor.hpp"
 
 namespace scopes {
 
-using llvm::isa;
-using llvm::cast;
-using llvm::dyn_cast;
-
-//------------------------------------------------------------------------------
-// INTEGER TYPE
 //------------------------------------------------------------------------------
 
-bool IntegerType::classof(const Type *T) {
-    return T->kind() == TK_Integer;
+StreamAnchors::StreamAnchors(StyledStream &_ss) :
+    ss(_ss), last_anchor(nullptr) {
 }
 
-IntegerType::IntegerType(size_t _width, bool _issigned)
-    : Type(TK_Integer), width(_width), issigned(_issigned) {
-    std::stringstream ss;
-    if ((_width == 1) && !_issigned) {
-        ss << "bool";
-    } else {
-        if (issigned) {
-            ss << "i";
+void StreamAnchors::stream_anchor(const Anchor *anchor, bool quoted) {
+    if (anchor) {
+        ss << Style_Location;
+        auto rss = StyledStream::plain(ss);
+        // ss << path.name()->data << ":" << lineno << ":" << column << ":";
+        if (!last_anchor || (last_anchor->path() != anchor->path())) {
+            rss << anchor->path().name()->data
+                << ":" << anchor->lineno
+                << ":" << anchor->column
+                << ":";
+        } else if (!last_anchor || (last_anchor->lineno != anchor->lineno)) {
+            rss << ":" << anchor->lineno
+                << ":" << anchor->column
+                << ":";
+        } else if (!last_anchor || (last_anchor->column != anchor->column)) {
+            rss << "::" << anchor->column
+                << ":";
         } else {
-            ss << "u";
+            rss << ":::";
         }
-        ss << width;
+        if (quoted) { rss << "'"; }
+        ss << Style_None;
+        last_anchor = anchor;
     }
-    _name = String::from_stdstring(ss.str());
-}
-
-static const Type *_Integer(size_t _width, bool _issigned) {
-    return new IntegerType(_width, _issigned);
-}
-static auto m_Integer = memoize(_Integer);
-
-const Type *Integer(size_t _width, bool _issigned) {
-    return m_Integer(_width, _issigned);
-}
-
-int integer_type_bit_size(const Type *T) {
-    return (int)cast<IntegerType>(T)->width;
 }
 
 } // namespace scopes
-
