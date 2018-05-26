@@ -148,6 +148,9 @@ BEWARE: If you build this with anything else but a recent enough clang,
 #include "timer.hpp"
 #include "source_file.hpp"
 #include "anchor.hpp"
+#include "type.hpp"
+#include "builtin.hpp"
+#include "any.hpp"
 
 namespace scopes {
 
@@ -155,324 +158,8 @@ using llvm::isa;
 using llvm::cast;
 using llvm::dyn_cast;
 
-//------------------------------------------------------------------------------
-// TYPE
-//------------------------------------------------------------------------------
-
 static void location_error(const String *msg);
 static void location_message(const Anchor *anchor, const String* str);
-
-#define B_TYPE_KIND() \
-    T(TK_Integer, "type-kind-integer") \
-    T(TK_Real, "type-kind-real") \
-    T(TK_Pointer, "type-kind-pointer") \
-    T(TK_Array, "type-kind-array") \
-    T(TK_Vector, "type-kind-vector") \
-    T(TK_Tuple, "type-kind-tuple") \
-    T(TK_Union, "type-kind-union") \
-    T(TK_Typename, "type-kind-typename") \
-    T(TK_ReturnLabel, "type-kind-return-label") \
-    T(TK_Function, "type-kind-function") \
-    T(TK_Extern, "type-kind-extern") \
-    T(TK_Image, "type-kind-image") \
-    T(TK_SampledImage, "type-kind-sampled-image")
-
-enum TypeKind {
-#define T(NAME, BNAME) \
-    NAME,
-    B_TYPE_KIND()
-#undef T
-};
-
-struct Type;
-
-static bool is_opaque(const Type *T);
-static size_t size_of(const Type *T);
-static size_t align_of(const Type *T);
-static const Type *storage_type(const Type *T);
-static StyledStream& operator<<(StyledStream& ost, const Type *type);
-
-#define B_TYPES() \
-    /* types */ \
-    T(TYPE_Void, "void") \
-    T(TYPE_Nothing, "Nothing") \
-    T(TYPE_Any, "Any") \
-    \
-    T(TYPE_Type, "type") \
-    T(TYPE_Unknown, "Unknown") \
-    T(TYPE_Symbol, "Symbol") \
-    T(TYPE_Builtin, "Builtin") \
-    \
-    T(TYPE_Bool, "bool") \
-    \
-    T(TYPE_I8, "i8") \
-    T(TYPE_I16, "i16") \
-    T(TYPE_I32, "i32") \
-    T(TYPE_I64, "i64") \
-    \
-    T(TYPE_U8, "u8") \
-    T(TYPE_U16, "u16") \
-    T(TYPE_U32, "u32") \
-    T(TYPE_U64, "u64") \
-    \
-    T(TYPE_F16, "f16") \
-    T(TYPE_F32, "f32") \
-    T(TYPE_F64, "f64") \
-    T(TYPE_F80, "f80") \
-    \
-    T(TYPE_List, "list") \
-    T(TYPE_Syntax, "Syntax") \
-    T(TYPE_Anchor, "Anchor") \
-    T(TYPE_String, "string") \
-    \
-    T(TYPE_Scope, "Scope") \
-    T(TYPE_SourceFile, "SourceFile") \
-    T(TYPE_Exception, "Exception") \
-    \
-    T(TYPE_Parameter, "Parameter") \
-    T(TYPE_Label, "Label") \
-    T(TYPE_Frame, "Frame") \
-    T(TYPE_Closure, "Closure") \
-    \
-    T(TYPE_USize, "usize") \
-    \
-    T(TYPE_Sampler, "Sampler") \
-    \
-    /* supertypes */ \
-    T(TYPE_Integer, "integer") \
-    T(TYPE_Real, "real") \
-    T(TYPE_Pointer, "pointer") \
-    T(TYPE_Array, "array") \
-    T(TYPE_Vector, "vector") \
-    T(TYPE_Tuple, "tuple") \
-    T(TYPE_Union, "union") \
-    T(TYPE_Typename, "typename") \
-    T(TYPE_ReturnLabel, "ReturnLabel") \
-    T(TYPE_Function, "function") \
-    T(TYPE_Constant, "constant") \
-    T(TYPE_Extern, "extern") \
-    T(TYPE_Image, "Image") \
-    T(TYPE_SampledImage, "SampledImage") \
-    T(TYPE_CStruct, "CStruct") \
-    T(TYPE_CUnion, "CUnion") \
-    T(TYPE_CEnum, "CEnum")
-
-#define T(TYPE, TYPENAME) \
-    static const Type *TYPE = nullptr;
-B_TYPES()
-#undef T
-
-//------------------------------------------------------------------------------
-// BUILTIN
-//------------------------------------------------------------------------------
-
-struct Builtin {
-    typedef KnownSymbol EnumT;
-protected:
-    Symbol _name;
-
-public:
-    Builtin(EnumT name) :
-        _name(name) {
-    }
-
-    EnumT value() const {
-        return _name.known_value();
-    }
-
-    bool operator < (Builtin b) const { return _name < b._name; }
-    bool operator ==(Builtin b) const { return _name == b._name; }
-    bool operator !=(Builtin b) const { return _name != b._name; }
-    bool operator ==(EnumT b) const { return _name == b; }
-    bool operator !=(EnumT b) const { return _name != b; }
-    std::size_t hash() const { return _name.hash(); }
-    Symbol name() const { return _name; }
-
-    StyledStream& stream(StyledStream& ost) const {
-        ost << Style_Function; name().name()->stream(ost, ""); ost << Style_None;
-        return ost;
-    }
-};
-
-static StyledStream& operator<<(StyledStream& ost, Builtin builtin) {
-    return builtin.stream(ost);
-}
-
-//------------------------------------------------------------------------------
-// ANY
-//------------------------------------------------------------------------------
-
-struct Syntax;
-struct List;
-struct Label;
-struct Parameter;
-struct Scope;
-struct Exception;
-struct Frame;
-struct Closure;
-
-struct Any {
-    struct Hash {
-        std::size_t operator()(const Any & s) const {
-            return s.hash();
-        }
-    };
-
-    const Type *type;
-    union {
-        char content[8];
-        bool i1;
-        int8_t i8;
-        int16_t i16;
-        int32_t i32;
-        int64_t i64;
-        uint8_t u8;
-        uint16_t u16;
-        uint32_t u32;
-        uint64_t u64;
-        size_t sizeval;
-        float f32;
-        double f64;
-        const Type *typeref;
-        const String *string;
-        Symbol symbol;
-        const Syntax *syntax;
-        const Anchor *anchor;
-        const List *list;
-        Label *label;
-        Parameter *parameter;
-        Builtin builtin;
-        Scope *scope;
-        Any *ref;
-        void *pointer;
-        const Exception *exception;
-        Frame *frame;
-        const Closure *closure;
-    };
-
-    Any(Nothing x) : type(TYPE_Nothing), u64(0) {}
-    Any(const Type *x) : type(TYPE_Type), typeref(x) {}
-    Any(bool x) : type(TYPE_Bool), u64(0) { i1 = x; }
-    Any(int8_t x) : type(TYPE_I8), u64(0) { i8 = x; }
-    Any(int16_t x) : type(TYPE_I16), u64(0) { i16 = x; }
-    Any(int32_t x) : type(TYPE_I32), u64(0) { i32 = x; }
-    Any(int64_t x) : type(TYPE_I64), i64(x) {}
-    Any(uint8_t x) : type(TYPE_U8), u64(0) { u8 = x; }
-    Any(uint16_t x) : type(TYPE_U16), u64(0) { u16 = x; }
-    Any(uint32_t x) : type(TYPE_U32), u64(0) { u32 = x; }
-    Any(uint64_t x) : type(TYPE_U64), u64(x) {}
-#ifdef SCOPES_MACOS
-    Any(unsigned long x) : type(TYPE_U64), u64(x) {}
-#endif
-    Any(float x) : type(TYPE_F32), u64(0) { f32 = x; }
-    Any(double x) : type(TYPE_F64), f64(x) {}
-    Any(const String *x) : type(TYPE_String), string(x) {}
-    Any(Symbol x) : type(TYPE_Symbol), symbol(x) {}
-    Any(const Syntax *x) : type(TYPE_Syntax), syntax(x) {}
-    Any(const Anchor *x) : type(TYPE_Anchor), anchor(x) {}
-    Any(const List *x) : type(TYPE_List), list(x) {}
-    Any(const Exception *x) : type(TYPE_Exception), exception(x) {}
-    Any(Label *x) : type(TYPE_Label), label(x) {}
-    Any(Parameter *x) : type(TYPE_Parameter), parameter(x) {}
-    Any(Builtin x) : type(TYPE_Builtin), builtin(x) {}
-    Any(Scope *x) : type(TYPE_Scope), scope(x) {}
-    Any(Frame *x) : type(TYPE_Frame), frame(x) {}
-    Any(const Closure *x) : type(TYPE_Closure), closure(x) {}
-    template<unsigned N>
-    Any(const char (&str)[N]) : type(TYPE_String), string(String::from(str)) {}
-    // a catch-all for unsupported types
-    template<typename T>
-    Any(const T &x);
-
-    Any toref() {
-        return from_pointer(TYPE_Any, new Any(*this));
-    }
-
-    static Any from_opaque(const Type *type) {
-        Any val = none;
-        val.type = type;
-        return val;
-    }
-
-    static Any from_pointer(const Type *type, void *ptr) {
-        Any val = none;
-        val.type = type;
-        val.pointer = ptr;
-        return val;
-    }
-
-    void verify(const Type *T) const;
-    void verify_indirect(const Type *T) const;
-    const Type *indirect_type() const;
-    bool is_const() const;
-
-    operator const Type *() const { verify(TYPE_Type); return typeref; }
-    operator const List *() const { verify(TYPE_List); return list; }
-    operator const Syntax *() const { verify(TYPE_Syntax); return syntax; }
-    operator const Anchor *() const { verify(TYPE_Anchor); return anchor; }
-    operator const String *() const { verify(TYPE_String); return string; }
-    operator const Exception *() const { verify(TYPE_Exception); return exception; }
-    operator Label *() const { verify(TYPE_Label); return label; }
-    operator Scope *() const { verify(TYPE_Scope); return scope; }
-    operator Parameter *() const { verify(TYPE_Parameter); return parameter; }
-    operator const Closure *() const { verify(TYPE_Closure); return closure; }
-    operator Frame *() const { verify(TYPE_Frame); return frame; }
-
-    struct AnyStreamer {
-        StyledStream& ost;
-        const Type *type;
-        bool annotate_type;
-        AnyStreamer(StyledStream& _ost, const Type *_type, bool _annotate_type) :
-            ost(_ost), type(_type), annotate_type(_annotate_type) {}
-        void stream_type_suffix() const {
-            if (annotate_type) {
-                ost << Style_Operator << ":" << Style_None;
-                ost << type;
-            }
-        }
-        template<typename T>
-        void naked(const T &x) const {
-            ost << x;
-        }
-        template<typename T>
-        void typed(const T &x) const {
-            ost << x;
-            stream_type_suffix();
-        }
-    };
-
-    StyledStream& stream(StyledStream& ost, bool annotate_type = true) const;
-
-    bool operator ==(const Any &other) const;
-
-    bool operator !=(const Any &other) const {
-        return !(*this == other);
-    }
-
-    size_t hash() const;
-};
-
-static StyledStream& operator<<(StyledStream& ost, Any value) {
-    return value.stream(ost);
-}
-
-static bool is_unknown(const Any &value) {
-    return value.type == TYPE_Unknown;
-}
-
-static bool is_typed(const Any &value) {
-    return (value.type != TYPE_Unknown) || (value.typeref != TYPE_Unknown);
-}
-
-static Any unknown_of(const Type *T) {
-    Any result(T);
-    result.type = TYPE_Unknown;
-    return result;
-}
-
-static Any untyped() {
-    return unknown_of(TYPE_Unknown);
-}
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
@@ -553,7 +240,7 @@ protected:
     Map symbols;
 };
 
-static StyledStream& operator<<(StyledStream& ost, const Type *type) {
+StyledStream& operator<<(StyledStream& ost, const Type *type) {
     if (!type) {
         ost << Style_Error;
         ost << "<null type>";
@@ -1821,7 +1508,7 @@ static const Type *Typename(const String *name) {
     return new TypenameType(name);
 }
 
-static const Type *storage_type(const Type *T) {
+const Type *storage_type(const Type *T) {
     switch(T->kind()) {
     case TK_Typename: {
         const TypenameType *tt = cast<TypenameType>(T);
@@ -1969,7 +1656,7 @@ static void verify_function_pointer(const Type *type) {
     }
 }
 
-static bool is_opaque(const Type *T) {
+bool is_opaque(const Type *T) {
     switch(T->kind()) {
     case TK_Typename: {
         const TypenameType *tt = cast<TypenameType>(T);
@@ -2011,7 +1698,7 @@ static bool is_invalid_argument_type(const Type *T) {
     return false;
 }
 
-static size_t size_of(const Type *T) {
+size_t size_of(const Type *T) {
     switch(T->kind()) {
     case TK_Integer: {
         const IntegerType *it = cast<IntegerType>(T);
@@ -2040,7 +1727,7 @@ static size_t size_of(const Type *T) {
     return -1;
 }
 
-static size_t align_of(const Type *T) {
+size_t align_of(const Type *T) {
     switch(T->kind()) {
     case TK_Integer: {
         const IntegerType *it = cast<IntegerType>(T);
