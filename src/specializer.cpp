@@ -45,6 +45,19 @@
 
 #define SCOPE_INLINE_PARAMETERS 1
 
+/*
+one mechanism to optimize labels by skipping:
+
+outer loop iterates labels that will definitely be used; the function entry
+point for example is a definite label. (definite loop)
+
+inner loop iterates possible labels. if a label folds, the next possible label
+will be evaluated, until a definite label is encountered. the definite label
+is then returned to the outer loop.
+
+the outer loop then moves on to the next definite label and continues the task.
+*/
+
 namespace scopes {
 
 static void apply_type_error(const Any &enter) {
