@@ -10,18 +10,12 @@
 #include "pointer.hpp"
 #include "extern.hpp"
 #include "error.hpp"
+#include "dyn_cast.inc"
+#include "hash.hpp"
 
 #include <assert.h>
 
-#include "cityhash/city.h"
-
-#include "llvm/Support/Casting.h"
-
 namespace scopes {
-
-using llvm::isa;
-using llvm::cast;
-using llvm::dyn_cast;
 
 //------------------------------------------------------------------------------
 // FUNCTION TYPE
@@ -116,9 +110,9 @@ const Type *Function(const Type *return_type,
         struct Hash {
             std::size_t operator()(const TypeArgs& s) const {
                 std::size_t h = std::hash<const Type *>{}(s.return_type);
-                h = HashLen16(h, std::hash<uint32_t>{}(s.flags));
+                h = hash2(h, std::hash<uint32_t>{}(s.flags));
                 for (auto arg : s.argtypes) {
-                    h = HashLen16(h, std::hash<const Type *>{}(arg));
+                    h = hash2(h, std::hash<const Type *>{}(arg));
                 }
                 return h;
             }

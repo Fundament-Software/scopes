@@ -7,14 +7,9 @@
 #include "typefactory.hpp"
 #include "sampledimage.hpp"
 #include "image.hpp"
-
-#include "llvm/Support/Casting.h"
+#include "dyn_cast.inc"
 
 namespace scopes {
-
-using llvm::isa;
-using llvm::cast;
-using llvm::dyn_cast;
 
 //------------------------------------------------------------------------------
 // SAMPLED IMAGE TYPE

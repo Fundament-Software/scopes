@@ -9,25 +9,12 @@
 #include "string.hpp"
 #include "error.hpp"
 #include "scc.hpp"
-#include "typename.hpp"
-#include "integer.hpp"
-#include "real.hpp"
-#include "function.hpp"
-#include "pointer.hpp"
-#include "array.hpp"
-#include "vector.hpp"
-#include "tuple.hpp"
-#include "union.hpp"
-#include "extern.hpp"
+#include "types.hpp"
 #include "anchor.hpp"
 #include "stream_label.hpp"
-#include "sampledimage.hpp"
-#include "image.hpp"
-#include "return.hpp"
 #include "timer.hpp"
 #include "compiler_flags.hpp"
-
-#include "cityhash/city.h"
+#include "hash.hpp"
 
 #include "glslang/SpvBuilder.h"
 #include "glslang/disassemble.h"
@@ -126,7 +113,7 @@ struct SPIRVGenerator {
     struct HashFuncLabelPair {
         size_t operator ()(const std::pair<spv::Function *, Label *> &value) const {
             return
-                HashLen16(std::hash<spv::Function *>()(value.first),
+                hash2(std::hash<spv::Function *>()(value.first),
                     std::hash<Label *>()(value.second));
         }
     };
@@ -135,7 +122,7 @@ struct SPIRVGenerator {
     struct HashFuncParamPair {
         size_t operator ()(const ParamKey &value) const {
             return
-                HashLen16(std::hash<spv::Function *>()(value.first),
+                hash2(std::hash<spv::Function *>()(value.first),
                     std::hash<Parameter *>()(value.second));
         }
     };
@@ -144,7 +131,7 @@ struct SPIRVGenerator {
     struct HashTypeFlagsPair {
         size_t operator ()(const TypeKey &value) const {
             return
-                HashLen16(std::hash<const Type *>{}(value.first),
+                hash2(std::hash<const Type *>{}(value.first),
                     std::hash<uint64_t>{}(value.second));
         }
     };

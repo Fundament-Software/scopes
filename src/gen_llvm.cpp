@@ -6,21 +6,10 @@
 
 #include "gen_llvm.hpp"
 #include "source_file.hpp"
-#include "type.hpp"
+#include "types.hpp"
 #include "label.hpp"
 #include "platform_abi.hpp"
 #include "anchor.hpp"
-#include "integer.hpp"
-#include "real.hpp"
-#include "array.hpp"
-#include "tuple.hpp"
-#include "extern.hpp"
-#include "pointer.hpp"
-#include "function.hpp"
-#include "return.hpp"
-#include "vector.hpp"
-#include "union.hpp"
-#include "typename.hpp"
 #include "error.hpp"
 #include "execution.hpp"
 #include "gc.hpp"
@@ -28,6 +17,7 @@
 #include "scope.hpp"
 #include "timer.hpp"
 #include "compiler_flags.hpp"
+#include "hash.hpp"
 
 #include "verify_tools.inc"
 
@@ -35,8 +25,6 @@
 #include "stdlib_ex.h"
 #endif
 #include <libgen.h>
-
-#include "cityhash/city.h"
 
 #include <llvm-c/Core.h>
 //#include <llvm-c/ExecutionEngine.h>
@@ -245,7 +233,7 @@ struct LLVMIRGenerator {
     struct HashFuncLabelPair {
         size_t operator ()(const std::pair<LLVMValueRef, Label *> &value) const {
             return
-                HashLen16(std::hash<LLVMValueRef>()(value.first),
+                hash2(std::hash<LLVMValueRef>()(value.first),
                     std::hash<Label *>()(value.second));
         }
     };
@@ -255,7 +243,7 @@ struct LLVMIRGenerator {
     struct HashFuncParamPair {
         size_t operator ()(const ParamKey &value) const {
             return
-                HashLen16(std::hash<LLVMValueRef>()(value.first),
+                hash2(std::hash<LLVMValueRef>()(value.first),
                     std::hash<Parameter *>()(value.second));
         }
     };

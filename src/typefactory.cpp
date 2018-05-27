@@ -5,8 +5,7 @@
 */
 
 #include "typefactory.hpp"
-
-#include "cityhash/city.h"
+#include "hash.hpp"
 
 namespace scopes {
 
@@ -27,7 +26,7 @@ bool TypeFactoryArgs::operator==(const TypeFactoryArgs &other) const {
 std::size_t TypeFactoryArgs::Hash::operator()(const TypeFactoryArgs& s) const {
     std::size_t h = 0;
     for (auto &&arg : s.args) {
-        h = HashLen16(h, arg.hash());
+        h = hash2(h, arg.hash());
     }
     return h;
 }

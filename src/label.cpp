@@ -10,16 +10,11 @@
 #include "return.hpp"
 #include "function.hpp"
 #include "stream_label.hpp"
+#include "dyn_cast.inc"
 
 #include <assert.h>
 
-#include "llvm/Support/Casting.h"
-
 namespace scopes {
-
-using llvm::isa;
-using llvm::cast;
-using llvm::dyn_cast;
 
 template<typename T>
 uint64_t Tag<T>::active_gen = 0;

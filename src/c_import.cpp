@@ -24,12 +24,12 @@
 #include "function.hpp"
 #include "extern.hpp"
 #include "execution.hpp"
+#include "dyn_cast.inc"
 
 #include "scopes.h"
 
 #include <llvm-c/Core.h>
 
-#include "llvm/Support/Casting.h"
 #include "llvm/IR/Module.h"
 
 #include "clang/Frontend/CompilerInstance.h"
@@ -42,10 +42,6 @@
 #include "clang/Lex/LiteralSupport.h"
 
 namespace scopes {
-
-using llvm::isa;
-using llvm::cast;
-using llvm::dyn_cast;
 
 //------------------------------------------------------------------------------
 // C BRIDGE (CLANG)

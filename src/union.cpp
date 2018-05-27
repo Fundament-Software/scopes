@@ -8,8 +8,7 @@
 #include "error.hpp"
 #include "utils.hpp"
 #include "tuple.hpp"
-
-#include "cityhash/city.h"
+#include "hash.hpp"
 
 namespace scopes {
 
@@ -117,7 +116,7 @@ const Type *MixedUnion(const Args &values) {
             std::size_t operator()(const TypeArgs& s) const {
                 std::size_t h = 0;
                 for (auto &&arg : s.args) {
-                    h = HashLen16(h, arg.hash());
+                    h = hash2(h, arg.hash());
                 }
                 return h;
             }

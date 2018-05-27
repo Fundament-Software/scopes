@@ -8,27 +8,15 @@
 #include "string.hpp"
 #include "any.hpp"
 #include "list.hpp"
-#include "type.hpp"
+#include "types.hpp"
 #include "c_import.hpp"
 #include "stream_label.hpp"
 #include "stream_frame.hpp"
 #include "stream_expr.hpp"
 #include "scope.hpp"
 #include "error.hpp"
-#include "array.hpp"
-#include "vector.hpp"
-#include "tuple.hpp"
-#include "union.hpp"
-#include "function.hpp"
-#include "pointer.hpp"
-#include "extern.hpp"
-#include "image.hpp"
-#include "sampledimage.hpp"
 #include "globals.hpp"
-#include "integer.hpp"
-#include "real.hpp"
 #include "platform_abi.hpp"
-#include "typename.hpp"
 #include "syntax.hpp"
 #include "parameter.hpp"
 #include "source_file.hpp"
@@ -43,8 +31,8 @@
 #include "anchor.hpp"
 #include "main.hpp"
 #include "gc.hpp"
-#include "return.hpp"
 #include "compiler_flags.hpp"
+#include "hash.hpp"
 
 #include "scopes.h"
 
@@ -55,7 +43,6 @@
 
 #include <vector>
 
-#include "cityhash/city.h"
 #include "linenoise-ng/include/linenoise.h"
 #include "minilibs/regexp.cpp"
 
@@ -768,15 +755,15 @@ static size_t f_verify_stack () {
 }
 
 static uint64_t f_hash (uint64_t data, size_t size) {
-    return CityHash64((const char *)&data, (size > 8)?8:size);
+    return hash_bytes((const char *)&data, (size > 8)?8:size);
 }
 
 static uint64_t f_hash2x64(uint64_t a, uint64_t b) {
-    return HashLen16(a, b);
+    return hash2(a, b);
 }
 
 static uint64_t f_hashbytes (const char *data, size_t size) {
-    return CityHash64(data, size);
+    return hash_bytes(data, size);
 }
 
 void init_globals(int argc, char *argv[]) {

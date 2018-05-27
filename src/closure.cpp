@@ -6,8 +6,7 @@
 
 #include "closure.hpp"
 #include "label.hpp"
-
-#include "cityhash/city.h"
+#include "hash.hpp"
 
 #include <assert.h>
 
@@ -19,7 +18,7 @@ Closure::Closure(Label *_label, Frame *_frame) :
     label(_label), frame(_frame) {}
 
 std::size_t Closure::Hash::operator()(const Closure &k) const {
-    return HashLen16(
+    return hash2(
         std::hash<Label *>{}(k.label),
         std::hash<Frame *>{}(k.frame));
 }

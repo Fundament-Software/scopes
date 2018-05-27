@@ -4,32 +4,17 @@
     See LICENSE.md for details.
 */
 
-#include "type.hpp"
-#include "typename.hpp"
-#include "return.hpp"
-#include "integer.hpp"
-#include "real.hpp"
-#include "pointer.hpp"
-#include "array.hpp"
-#include "vector.hpp"
-#include "tuple.hpp"
-#include "union.hpp"
+#include "types.hpp"
 #include "error.hpp"
 #include "gc.hpp"
-
 #include "anchor.hpp"
 #include "list.hpp"
 #include "syntax.hpp"
-
-#include "llvm/Support/Casting.h"
+#include "dyn_cast.inc"
 
 #include <memory.h>
 
 namespace scopes {
-
-using llvm::isa;
-using llvm::cast;
-using llvm::dyn_cast;
 
 //------------------------------------------------------------------------------
 

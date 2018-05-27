@@ -6,14 +6,9 @@
 
 #include "integer.hpp"
 #include "utils.hpp"
-
-#include "llvm/Support/Casting.h"
+#include "dyn_cast.inc"
 
 namespace scopes {
-
-using llvm::isa;
-using llvm::cast;
-using llvm::dyn_cast;
 
 //------------------------------------------------------------------------------
 // INTEGER TYPE

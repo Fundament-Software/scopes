@@ -5,7 +5,7 @@
 */
 
 #include "argument.hpp"
-#include "cityhash/city.h"
+#include "hash.hpp"
 
 namespace scopes {
 
@@ -26,7 +26,7 @@ bool Argument::operator !=(const Argument &other) const {
 }
 
 uint64_t Argument::hash() const {
-    return HashLen16(std::hash<uint64_t>{}(key.value()), value.hash());
+    return hash2(std::hash<uint64_t>{}(key.value()), value.hash());
 }
 
 //------------------------------------------------------------------------------

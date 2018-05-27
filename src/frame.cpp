@@ -6,10 +6,9 @@
 
 #include "frame.hpp"
 #include "label.hpp"
+#include "hash.hpp"
 
 #include <assert.h>
-
-#include "cityhash/city.h"
 
 namespace scopes {
 
@@ -73,7 +72,7 @@ bool Frame::ArgsKey::operator==(const ArgsKey &other) const {
 std::size_t Frame::ArgsKey::Hash::operator()(const ArgsKey& s) const {
     std::size_t h = std::hash<Label *>{}(s.label);
     for (auto &&arg : s.args) {
-        h = HashLen16(h, arg.hash());
+        h = hash2(h, arg.hash());
     }
     return h;
 }

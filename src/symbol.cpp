@@ -5,8 +5,7 @@
 */
 
 #include "symbol.hpp"
-
-#include "cityhash/city.h"
+#include "hash.hpp"
 
 #include <memory.h>
 #include <assert.h>
@@ -24,7 +23,7 @@ std::size_t Symbol::Hash::operator()(const scopes::Symbol & s) const {
 //------------------------------------------------------------------------------
 
 std::size_t Symbol::StringKey::Hash::operator()(const StringKey &s) const {
-    return CityHash64(s.str->data, s.str->count);
+    return hash_bytes(s.str->data, s.str->count);
 }
 
 bool Symbol::StringKey::operator ==(const StringKey &rhs) const {

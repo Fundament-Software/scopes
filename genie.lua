@@ -147,6 +147,7 @@ project "scopes"
         "src/gen_llvm.cpp",
         "src/expander.cpp",
         "src/globals.cpp",
+        "src/hash.cpp",
         "external/cityhash/city.cpp",
         "external/linenoise-ng/src/linenoise.cpp",
         "external/linenoise-ng/src/ConvertUTF.cpp",

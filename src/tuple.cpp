@@ -7,8 +7,7 @@
 #include "tuple.hpp"
 #include "error.hpp"
 #include "utils.hpp"
-
-#include "cityhash/city.h"
+#include "hash.hpp"
 
 #include <assert.h>
 
@@ -149,9 +148,9 @@ const Type *MixedTuple(const Args &values,
         struct Hash {
             std::size_t operator()(const TypeArgs& s) const {
                 std::size_t h = std::hash<bool>{}(s.packed);
-                h = HashLen16(h, std::hash<size_t>{}(s.alignment));
+                h = hash2(h, std::hash<size_t>{}(s.alignment));
                 for (auto &&arg : s.args) {
-                    h = HashLen16(h, arg.hash());
+                    h = hash2(h, arg.hash());
                 }
                 return h;
             }

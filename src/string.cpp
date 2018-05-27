@@ -7,8 +7,8 @@
 #include "string.hpp"
 #include "gc.hpp"
 #include "utils.hpp"
+#include "hash.hpp"
 
-#include "cityhash/city.h"
 #define STB_SPRINTF_DECORATE(name) stb_##name
 #define STB_SPRINTF_NOUNALIGNED
 #include "stb_sprintf.h"
@@ -158,7 +158,7 @@ int escape_string(char *buf, const char *str, int strcount, const char *quote_ch
 //------------------------------------------------------------------------------
 
 std::size_t String::Hash::operator()(const String *s) const {
-    return CityHash64(s->data, s->count);
+    return hash_bytes(s->data, s->count);
 }
 
 //------------------------------------------------------------------------------

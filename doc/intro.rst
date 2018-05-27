@@ -36,7 +36,7 @@ Scopes only supports the mingw64 toolchain for the foreseeable future.
 * SPIRV-Cross does not have to be built.
 * In the workspace folder, run ``genie gmake`` once to generate the project Makefiles.
 * To build in debug mode, run ``make -C build``. For release mode, use
-  ``make -C build config=release``.
+  ``make -C build config=release``. Use the option ``-j4`` to speed up the build on a multicore machine.
 * There should now be a ``scopes.exe`` executable in the `bin` folder.
 * For the clang bridge to work properly, copy or link `clang/lib/clang/4.0.x/include`
   to `scopes-repo/lib/clang/include`.
@@ -65,7 +65,7 @@ Building Scopes on Linux
 * SPIRV-Cross does not have to be built.
 * In the workspace folder, run ``genie gmake`` once to generate the project Makefiles.
 * To build in debug mode, run ``make -C build``. For release mode, use
-  ``make -C build config=release``.
+  ``make -C build config=release``. Use the option ``-j4`` to speed up the build on a multicore machine.
 * There should now be a ``scopes`` executable in the `bin` folder.
 * For the clang bridge to work properly, copy or link `clang/lib/clang/5.0.x/include`
   to `scopes-repo/lib/clang/include`.
@@ -92,7 +92,7 @@ Building Scopes on MacOS
 * SPIRV-Cross does not have to be built.
 * In the workspace folder, run ``genie gmake`` once to generate the project Makefiles.
 * To build in debug mode, run ``make -C build``. For release mode, use
-  ``make -C build config=release``.
+  ``make -C build config=release``. Use the option ``-j4`` to speed up the build on a multicore machine.
 * There should now be a ``scopes`` executable in the `bin` folder.
 * For the clang bridge to work properly, copy or link `clang/lib/clang/5.0.x/include`
   to `scopes-repo/lib/clang/include`.

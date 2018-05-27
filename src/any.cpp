@@ -14,18 +14,12 @@
 #include "array.hpp"
 #include "tuple.hpp"
 #include "parameter.hpp"
+#include "hash.hpp"
+#include "dyn_cast.inc"
 
 #include <memory.h>
 
-#include "cityhash/city.h"
-
-#include "llvm/Support/Casting.h"
-
 namespace scopes {
-
-using llvm::isa;
-using llvm::cast;
-using llvm::dyn_cast;
 
 //------------------------------------------------------------------------------
 // ANY
@@ -172,7 +166,7 @@ StyledStream& Any::stream(StyledStream& ost, bool annotate_type) const {
 size_t Any::hash() const {
     if (type == TYPE_String) {
         if (!string) return 0; // can happen with nullof
-        return CityHash64(string->data, string->count);
+        return hash_bytes(string->data, string->count);
     }
     if (is_opaque(type))
         return 0;
@@ -203,7 +197,7 @@ size_t Any::hash() const {
         auto ai = cast<ArrayType>(T);
         size_t h = 0;
         for (size_t i = 0; i < ai->count; ++i) {
-            h = HashLen16(h, ai->unpack(pointer, i).hash());
+            h = hash2(h, ai->unpack(pointer, i).hash());
         }
         return h;
     } break;
@@ -211,7 +205,7 @@ size_t Any::hash() const {
         auto vi = cast<VectorType>(T);
         size_t h = 0;
         for (size_t i = 0; i < vi->count; ++i) {
-            h = HashLen16(h, vi->unpack(pointer, i).hash());
+            h = hash2(h, vi->unpack(pointer, i).hash());
         }
         return h;
     } break;
@@ -219,12 +213,12 @@ size_t Any::hash() const {
         auto ti = cast<TupleType>(T);
         size_t h = 0;
         for (size_t i = 0; i < ti->types.size(); ++i) {
-            h = HashLen16(h, ti->unpack(pointer, i).hash());
+            h = hash2(h, ti->unpack(pointer, i).hash());
         }
         return h;
     } break;
     case TK_Union:
-        return CityHash64((const char *)pointer, size_of(T));
+        return hash_bytes((const char *)pointer, size_of(T));
     default: break;
     }
 

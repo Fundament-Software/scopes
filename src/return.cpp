@@ -6,8 +6,7 @@
 
 #include "return.hpp"
 #include "tuple.hpp"
-
-#include "cityhash/city.h"
+#include "hash.hpp"
 
 #include <assert.h>
 
@@ -132,7 +131,7 @@ const Type *ReturnLabel(ReturnLabelMode mode, const Args &values) {
         std::size_t operator()(const ReturnLabelType *s) const {
             std::size_t h = std::hash<int32_t>{}((int32_t)s->mode);
             for (auto &&arg : s->values) {
-                h = HashLen16(h, arg.hash());
+                h = hash2(h, arg.hash());
             }
             return h;
         }
