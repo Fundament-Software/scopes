@@ -34,11 +34,12 @@ namespace scopes {
 // IL->SPIR-V GENERATOR
 //------------------------------------------------------------------------------
 
-static void disassemble_spirv(std::vector<unsigned int> &contents) {
+static void disassemble_spirv(std::vector<unsigned int> &contents, bool debug = false) {
     spv_context context = spvContextCreate(SPV_ENV_UNIVERSAL_1_2);
     uint32_t options = SPV_BINARY_TO_TEXT_OPTION_PRINT;
     options |= SPV_BINARY_TO_TEXT_OPTION_INDENT;
-    options |= SPV_BINARY_TO_TEXT_OPTION_FRIENDLY_NAMES;
+    if (!debug)
+        options |= SPV_BINARY_TO_TEXT_OPTION_FRIENDLY_NAMES;
     //options |= SPV_BINARY_TO_TEXT_OPTION_SHOW_BYTE_OFFSET;
     if (stream_default_style == stream_ansi_style) {
         options |= SPV_BINARY_TO_TEXT_OPTION_COLOR;
@@ -102,7 +103,7 @@ static void verify_spirv(std::vector<unsigned int> &contents) {
 
     bool succeed = tools.Validate(contents);
     if (!succeed) {
-        disassemble_spirv(contents);
+        disassemble_spirv(contents, true);
         std::cerr << ss._ss.str();
         location_error(String::from("SPIR-V validation found errors"));
     }
