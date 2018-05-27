@@ -118,6 +118,8 @@ public:
 
 StyledStream& operator<<(StyledStream& ost, Symbol sym);
 
+bool ends_with_parenthesis(Symbol sym);
+
 } // namespace scopes
 
 #endif // SCOPES_SYMBOL_HPP

@@ -208,4 +208,14 @@ StyledStream& operator<<(StyledStream& ost, Symbol sym) {
     return sym.stream(ost);
 }
 
+bool ends_with_parenthesis(Symbol sym) {
+    if (sym == SYM_Parenthesis)
+        return true;
+    const String *str = sym.name();
+    if (str->count < 3)
+        return false;
+    const char *dot = str->data + str->count - 3;
+    return !strcmp(dot, "...");
+}
+
 } // namespace scopes

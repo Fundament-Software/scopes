@@ -93,7 +93,6 @@ project "scopes"
     kind "ConsoleApp"
     language "C++"
     files {
-        "src/scopes.cpp",
         "src/globalsyms.c",
         "src/gc.cpp",
         "src/symbol_enum.cpp",
@@ -146,6 +145,8 @@ project "scopes"
         "src/scc.cpp",
         "src/gen_spirv.cpp",
         "src/gen_llvm.cpp",
+        "src/expander.cpp",
+        "src/globals.cpp",
         "external/cityhash/city.cpp",
         "external/linenoise-ng/src/linenoise.cpp",
         "external/linenoise-ng/src/ConvertUTF.cpp",

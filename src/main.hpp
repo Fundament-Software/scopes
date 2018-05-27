@@ -34,4 +34,6 @@ void f_exit(int c);
 
 } // namespace scopes
 
+int main(int argc, char *argv[]);
+
 #endif // SCOPES_MAIN_HPP

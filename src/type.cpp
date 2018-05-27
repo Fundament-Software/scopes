@@ -34,6 +34,10 @@ SOFTWARE.
 #include "error.hpp"
 #include "gc.hpp"
 
+#include "anchor.hpp"
+#include "list.hpp"
+#include "syntax.hpp"
+
 #include "llvm/Support/Casting.h"
 
 #include <memory.h>
@@ -366,6 +370,154 @@ void verify_range(size_t idx, size_t count) {
         location_error(ss.str());
     }
 }
+
+//------------------------------------------------------------------------------
+
+#define DEFINE_TYPENAME(NAME, T) \
+    T = Typename(String::from(NAME));
+
+#define DEFINE_BASIC_TYPE(NAME, CT, T, BODY) { \
+        T = Typename(String::from(NAME)); \
+        auto tn = cast<TypenameType>(const_cast<Type *>(T)); \
+        tn->finalize(BODY); \
+        assert(sizeof(CT) == size_of(T)); \
+    }
+
+#define DEFINE_STRUCT_TYPE(NAME, CT, T, ...) { \
+        T = Typename(String::from(NAME)); \
+        auto tn = cast<TypenameType>(const_cast<Type *>(T)); \
+        tn->finalize(Tuple({ __VA_ARGS__ })); \
+        assert(sizeof(CT) == size_of(T)); \
+    }
+
+#define DEFINE_STRUCT_HANDLE_TYPE(NAME, CT, T, ...) { \
+        T = Typename(String::from(NAME)); \
+        auto tn = cast<TypenameType>(const_cast<Type *>(T)); \
+        auto ET = Tuple({ __VA_ARGS__ }); \
+        assert(sizeof(CT) == size_of(ET)); \
+        tn->finalize(NativeROPointer(ET)); \
+    }
+
+#define DEFINE_OPAQUE_HANDLE_TYPE(NAME, CT, T) { \
+        T = Typename(String::from(NAME)); \
+        auto tn = cast<TypenameType>(const_cast<Type *>(T)); \
+        tn->finalize(NativeROPointer(Typename(String::from("_" NAME)))); \
+    }
+
+void init_types() {
+    DEFINE_TYPENAME("typename", TYPE_Typename);
+
+    DEFINE_TYPENAME("void", TYPE_Void);
+    DEFINE_TYPENAME("Nothing", TYPE_Nothing);
+
+    DEFINE_TYPENAME("Sampler", TYPE_Sampler);
+
+    DEFINE_TYPENAME("integer", TYPE_Integer);
+    DEFINE_TYPENAME("real", TYPE_Real);
+    DEFINE_TYPENAME("pointer", TYPE_Pointer);
+    DEFINE_TYPENAME("array", TYPE_Array);
+    DEFINE_TYPENAME("vector", TYPE_Vector);
+    DEFINE_TYPENAME("tuple", TYPE_Tuple);
+    DEFINE_TYPENAME("union", TYPE_Union);
+    DEFINE_TYPENAME("ReturnLabel", TYPE_ReturnLabel);
+    DEFINE_TYPENAME("constant", TYPE_Constant);
+    DEFINE_TYPENAME("function", TYPE_Function);
+    DEFINE_TYPENAME("extern", TYPE_Extern);
+    DEFINE_TYPENAME("Image", TYPE_Image);
+    DEFINE_TYPENAME("SampledImage", TYPE_SampledImage);
+    DEFINE_TYPENAME("CStruct", TYPE_CStruct);
+    DEFINE_TYPENAME("CUnion", TYPE_CUnion);
+    DEFINE_TYPENAME("CEnum", TYPE_CEnum);
+
+    TYPE_Bool = Integer(1, false);
+
+    TYPE_I8 = Integer(8, true);
+    TYPE_I16 = Integer(16, true);
+    TYPE_I32 = Integer(32, true);
+    TYPE_I64 = Integer(64, true);
+
+    TYPE_U8 = Integer(8, false);
+    TYPE_U16 = Integer(16, false);
+    TYPE_U32 = Integer(32, false);
+    TYPE_U64 = Integer(64, false);
+
+    TYPE_F16 = Real(16);
+    TYPE_F32 = Real(32);
+    TYPE_F64 = Real(64);
+    TYPE_F80 = Real(80);
+
+    DEFINE_BASIC_TYPE("usize", size_t, TYPE_USize, TYPE_U64);
+
+    TYPE_Type = Typename(String::from("type"));
+    TYPE_Unknown = Typename(String::from("Unknown"));
+    const Type *_TypePtr = NativeROPointer(Typename(String::from("_type")));
+    cast<TypenameType>(const_cast<Type *>(TYPE_Type))->finalize(_TypePtr);
+    cast<TypenameType>(const_cast<Type *>(TYPE_Unknown))->finalize(_TypePtr);
+
+    cast<TypenameType>(const_cast<Type *>(TYPE_Nothing))->finalize(Tuple({}));
+
+    DEFINE_BASIC_TYPE("Symbol", Symbol, TYPE_Symbol, TYPE_U64);
+    DEFINE_BASIC_TYPE("Builtin", Builtin, TYPE_Builtin, TYPE_U64);
+
+    DEFINE_STRUCT_TYPE("Any", Any, TYPE_Any,
+        TYPE_Type,
+        TYPE_U64
+    );
+
+    DEFINE_OPAQUE_HANDLE_TYPE("SourceFile", SourceFile, TYPE_SourceFile);
+    DEFINE_OPAQUE_HANDLE_TYPE("Label", Label, TYPE_Label);
+    DEFINE_OPAQUE_HANDLE_TYPE("Parameter", Parameter, TYPE_Parameter);
+    DEFINE_OPAQUE_HANDLE_TYPE("Scope", Scope, TYPE_Scope);
+    DEFINE_OPAQUE_HANDLE_TYPE("Frame", Frame, TYPE_Frame);
+    DEFINE_OPAQUE_HANDLE_TYPE("Closure", Closure, TYPE_Closure);
+
+    DEFINE_STRUCT_HANDLE_TYPE("Anchor", Anchor, TYPE_Anchor,
+        NativeROPointer(TYPE_SourceFile),
+        TYPE_I32,
+        TYPE_I32,
+        TYPE_I32
+    );
+
+    {
+        TYPE_List = Typename(String::from("list"));
+
+        const Type *cellT = Typename(String::from("_list"));
+        auto tn = cast<TypenameType>(const_cast<Type *>(cellT));
+        auto ET = Tuple({ TYPE_Any,
+            NativeROPointer(cellT), TYPE_USize });
+        assert(sizeof(List) == size_of(ET));
+        tn->finalize(ET);
+
+        cast<TypenameType>(const_cast<Type *>(TYPE_List))
+            ->finalize(NativeROPointer(cellT));
+    }
+
+    DEFINE_STRUCT_HANDLE_TYPE("Syntax", Syntax, TYPE_Syntax,
+        TYPE_Anchor,
+        TYPE_Any,
+        TYPE_Bool);
+
+    DEFINE_STRUCT_HANDLE_TYPE("string", String, TYPE_String,
+        TYPE_USize,
+        Array(TYPE_I8, 1)
+    );
+
+    DEFINE_STRUCT_HANDLE_TYPE("Exception", Exception, TYPE_Exception,
+        TYPE_Anchor,
+        TYPE_String);
+
+#define T(TYPE, TYPENAME) \
+    assert(TYPE);
+    B_TYPES()
+#undef T
+}
+
+#undef DEFINE_TYPENAME
+#undef DEFINE_BASIC_TYPE
+#undef DEFINE_STRUCT_TYPE
+#undef DEFINE_STRUCT_HANDLE_TYPE
+#undef DEFINE_OPAQUE_HANDLE_TYPE
+#undef DEFINE_STRUCT_TYPE
 
 } // namespace scopes
 

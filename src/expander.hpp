@@ -21,23 +21,18 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#include "execution.hpp"
+#ifndef SCOPES_EXPANDER_HPP
+#define SCOPES_EXPANDER_HPP
 
-#include <llvm-c/Core.h>
-#include <llvm-c/ExecutionEngine.h>
+#include "any.hpp"
 
 namespace scopes {
 
-LLVMExecutionEngineRef ee = nullptr;
+struct Scope;
+struct Label;
 
-void init_llvm() {
-    LLVMEnablePrettyStackTrace();
-    LLVMLinkInMCJIT();
-    //LLVMLinkInInterpreter();
-    LLVMInitializeNativeTarget();
-    LLVMInitializeNativeAsmParser();
-    LLVMInitializeNativeAsmPrinter();
-    LLVMInitializeNativeDisassembler();
-}
+Label *expand_module(Any expr, Scope *scope = nullptr);
 
 } // namespace scopes
+
+#endif // SCOPES_EXPANDER_HPP

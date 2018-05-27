@@ -195,6 +195,10 @@ void verify_integer(const Type *type);
 void verify_real(const Type *type);
 void verify_range(size_t idx, size_t count);
 
+//------------------------------------------------------------------------------
+
+void init_types();
+
 } // namespace scopes
 
 #endif // SCOPES_TYPE_HPP

@@ -30,6 +30,7 @@ SOFTWARE.
 #include <string.h>
 #define STB_SPRINTF_DECORATE(name) stb_##name
 #define STB_SPRINTF_NOUNALIGNED
+#define STB_SPRINTF_IMPLEMENTATION
 #include "stb_sprintf.h"
 
 #include <cstdlib>

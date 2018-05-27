@@ -24,7 +24,15 @@ SOFTWARE.
 #ifndef SCOPES_SPECIALIZER_HPP
 #define SCOPES_SPECIALIZER_HPP
 
+#include "type.hpp"
+
 namespace scopes {
+
+struct Frame;
+struct Label;
+
+Label *specialize(Frame *frame, Label *label, const ArgTypes &argtypes);
+void enable_specializer_step_debugger();
 
 } // namespace scopes
 
