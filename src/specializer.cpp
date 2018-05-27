@@ -43,6 +43,8 @@
 #pragma GCC diagnostic ignored "-Wzero-length-array"
 #pragma GCC diagnostic ignored "-Wvla-extension"
 
+#define SCOPE_INLINE_PARAMETERS 1
+
 namespace scopes {
 
 static void apply_type_error(const Any &enter) {
@@ -1458,7 +1460,7 @@ struct Specializer {
         Args callargs;
         Args keys;
         auto &&args = l->body.args;
-#if 0
+#if SCOPE_INLINE_PARAMETERS
         if (enter_label->is_inline() && inline_const) {
             callargs.push_back(none);
             keys.push_back(args[0]);
@@ -1482,7 +1484,7 @@ struct Specializer {
                     callargs.push_back(arg);
                 }
             }
-            #if 1
+            #if !SCOPE_INLINE_PARAMETERS
             if (enter_label->is_inline()) {
                 callargs[0] = none;
                 keys[0] = args[0];

@@ -2427,7 +2427,7 @@ fn move-construct
 
 let ref = (typename "ref")
 
-fn typeof& (self)
+inline typeof& (self)
     let T = (typeof self)
     assert (T < ref)
         .. "argument must be of reference type, but is of type " (repr T)
