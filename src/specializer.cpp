@@ -998,6 +998,7 @@ struct Specializer {
     }
 
     Any fold_type_return(Any dest, const Type *return_label) {
+    repeat:
         //ss_cout << "type_return: " << dest << std::endl;
         if (dest.type == TYPE_Parameter) {
             Parameter *param = dest.parameter;
@@ -1044,7 +1045,17 @@ struct Specializer {
             for (size_t i = 0; i < values.size(); ++i) {
                 args.push_back(values[i]);
             }
-            dest = fold_type_label_single(enter_frame, enter_label, args);
+            Label *newl = fold_type_label_single(enter_frame, enter_label, args);
+            if (is_jumping(newl)
+                && !newl->is_important()
+                && (is_calling_continuation(newl) || is_calling_closure(newl))
+                && matches_arg_count(newl, values.size())
+                && forwards_all_args(newl)) {
+                dest = newl->body.enter;
+                goto repeat;
+            } else {
+                dest = newl;
+            }
         } else if (dest.type == TYPE_Label) {
             auto TR = dest.label->get_params_as_return_label_type();
             if (return_label != TR) {
