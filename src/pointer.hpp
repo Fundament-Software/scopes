@@ -53,6 +53,8 @@ const Type *LocalPointer(const Type *element_type);
 
 const Type *StaticPointer(const Type *element_type);
 
+uint64_t required_flags_for_storage_class(Symbol storage_class);
+
 } // namespace scopes
 
 #endif // SCOPES_POINTER_HPP

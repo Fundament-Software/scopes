@@ -40,7 +40,7 @@ ExternType::ExternType(const Type *_type,
         && !(flags & EF_BufferBlock)) {
         flags |= EF_Block;
     }
-    size_t ptrflags = 0;
+    size_t ptrflags = required_flags_for_storage_class(storage_class);
     if (flags & EF_NonWritable)
         ptrflags |= PTF_NonWritable;
     else if (flags & EF_NonReadable)

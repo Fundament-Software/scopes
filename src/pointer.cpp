@@ -66,6 +66,8 @@ const Type *Pointer(const Type *element_type, uint64_t flags,
     Symbol storage_class) {
     static TypeFactory<PointerType> pointers;
     assert(element_type->kind() != TK_ReturnLabel);
+    uint64_t required_flags = required_flags_for_storage_class(storage_class);
+    assert((flags & required_flags) == required_flags);
     return pointers.insert(element_type, flags, storage_class);
 }
 
@@ -88,5 +90,30 @@ const Type *LocalPointer(const Type *element_type) {
 const Type *StaticPointer(const Type *element_type) {
     return Pointer(element_type, 0, SYM_SPIRV_StorageClassPrivate);
 }
+
+//------------------------------------------------------------------------------
+
+uint64_t required_flags_for_storage_class(Symbol storage_class) {
+    switch (storage_class.value()) {
+    case SYM_Unnamed: return 0;
+    case SYM_SPIRV_StorageClassUniformConstant: return PTF_NonWritable;
+    case SYM_SPIRV_StorageClassInput: return PTF_NonWritable;
+    case SYM_SPIRV_StorageClassUniform: return PTF_NonWritable;
+    case SYM_SPIRV_StorageClassOutput: return PTF_NonReadable;
+    case SYM_SPIRV_StorageClassWorkgroup: return 0;
+    case SYM_SPIRV_StorageClassCrossWorkgroup: return 0;
+    case SYM_SPIRV_StorageClassPrivate: return 0;
+    case SYM_SPIRV_StorageClassFunction: return 0;
+    case SYM_SPIRV_StorageClassGeneric: return 0;
+    case SYM_SPIRV_StorageClassPushConstant: return PTF_NonWritable;
+    case SYM_SPIRV_StorageClassAtomicCounter: return 0;
+    case SYM_SPIRV_StorageClassImage: return 0;
+    case SYM_SPIRV_StorageClassStorageBuffer: return 0; // ??
+    default: break;
+    }
+    return PTF_NonWritable | PTF_NonReadable;
+}
+
+//------------------------------------------------------------------------------
 
 } // namespace scopes

@@ -241,19 +241,24 @@ struct SPIRVGenerator {
         return param2value.find({active_function_value, param}) != param2value.end();
     }
 
+    spv::Id resolve_parameter(Parameter *param) {
+        auto it = param2value.find({active_function_value, param});
+        if (it == param2value.end()) {
+            assert(active_function_value);
+            if (param->label) {
+                location_message(param->label->anchor, String::from("declared here"));
+            }
+            StyledString ss;
+            ss.out << "IL->SPIR: can't access free variable " << param;
+            location_error(ss.str());
+        }
+        assert(it->second);
+        return it->second;
+    }
+
     spv::Id argument_to_value(Any value) {
         if (value.type == TYPE_Parameter) {
-            auto it = param2value.find({active_function_value, value.parameter});
-            if (it == param2value.end()) {
-                assert(active_function_value);
-                if (value.parameter->label) {
-                    location_message(value.parameter->label->anchor, String::from("declared here"));
-                }
-                StyledString ss;
-                ss.out << "IL->SPIR: can't access free variable " << value.parameter;
-                location_error(ss.str());
-            }
-            return it->second;
+            return resolve_parameter(value.parameter);
         }
         if (value.type != TYPE_String) {
             switch(value.type->kind()) {
