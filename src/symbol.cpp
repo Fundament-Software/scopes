@@ -8,6 +8,7 @@
 #include "hash.hpp"
 
 #include <memory.h>
+#include <string.h>
 #include <assert.h>
 
 namespace scopes {

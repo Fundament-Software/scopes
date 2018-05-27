@@ -39,6 +39,10 @@
 #include <limits.h>
 #include <string.h>
 #include <sys/stat.h>
+#ifdef SCOPES_WIN32
+#include "stdlib_ex.h"
+#include "dlfcn.h"
+#endif
 #include <libgen.h>
 
 #include <vector>

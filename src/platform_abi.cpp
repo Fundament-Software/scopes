@@ -11,6 +11,7 @@
 #include "array.hpp"
 #include "union.hpp"
 #include "tuple.hpp"
+#include "return.hpp"
 #include "dyn_cast.inc"
 
 #include <assert.h>

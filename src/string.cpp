@@ -15,6 +15,7 @@
 
 #include <assert.h>
 #include <memory.h>
+#include <string.h>
 
 #pragma GCC diagnostic ignored "-Wvla-extension"
 

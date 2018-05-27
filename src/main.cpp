@@ -28,10 +28,11 @@
 #ifdef SCOPES_WIN32
 #include "stdlib_ex.h"
 #include "dlfcn.h"
+#include <windows.h>
 #else
-#include <unistd.h>
 #include <dlfcn.h>
 #endif
+#include <unistd.h>
 #include <libgen.h>
 
 #include "llvm/ExecutionEngine/SectionMemoryManager.h"
