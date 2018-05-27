@@ -21,6 +21,14 @@ void Body::unset_complete() {
     flags &= ~LBF_Complete;
 }
 
+bool Body::is_optimized() const {
+    return flags & LBF_Optimized;
+}
+
+void Body::set_optimized() {
+    flags |= LBF_Optimized;
+}
+
 bool Body::is_rawcall() {
     return (flags & LBF_RawCall) == LBF_RawCall;
 }

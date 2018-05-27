@@ -1114,6 +1114,11 @@ struct Specializer {
         return args[0].value.type == TYPE_Nothing;
     }
 
+    static bool is_branching(Label *l) {
+        auto &&enter = l->body.enter;
+        return enter.type == TYPE_Builtin && enter.builtin == FN_Branch;
+    }
+
     static bool is_continuing_to_label(Label *l) {
         auto &&args = l->body.args;
         assert(!args.empty());
@@ -3787,127 +3792,150 @@ struct Specializer {
         }
     }
 
-    // fold body of single label as far as possible
-    bool fold_label_body(Label *l, LabelQueue &todo, LabelQueue &recursions, Traces &traces) {
-        if (l->body.is_complete())
-            return true;
+    // fold body of single label if possible
+    // returns either the completed label if definite, or the next incomplete
+    // or complete possible label, or null if completed label is recursive
+    Label *fold_label_body(Label *l) {
+    repeat:
+        assert(!l->body.is_complete());
+        on_label_processing(l);
+        assert(!l->is_template());
+        l->verify_valid();
+        assert(all_params_typed(l));
 
-        while (true) {
-            on_label_processing(l);
-            assert(!l->is_template());
-            l->verify_valid();
-            assert(all_params_typed(l));
+        set_active_anchor(l->body.anchor);
 
-            //traces.push_back(Trace(l->body.anchor, l->name));
-            set_active_anchor(l->body.anchor);
-
-            if (!all_args_typed(l)) {
-                size_t idx = find_untyped_arg(l);
-                StyledString ss;
-                ss.out << "parameter " << l->body.args[idx].value.parameter
-                    << " passed as argument " << idx << " has not been typed yet";
-                location_error(ss.str());
-            }
-
-            const Type *rtype = nullptr;
-            if (is_calling_label(l)) {
-                if (!l->get_label_enter()->body.is_complete()) {
-                    location_error(String::from("failed to propagate return type from untyped label"));
-                }
-                rtype = complete_existing_label_continuation(l);
-            } else if (is_calling_callable(l)) {
-                fold_callable_call(l);
-                continue;
-            } else if (is_calling_function(l)) {
-                verify_no_keyed_args(l);
-                if (is_calling_pure_function(l)
-                    && all_args_constant(l)) {
-                    fold_pure_function_call(l);
-                    continue;
-                } else {
-                    rtype = get_return_type_from_function_call(l);
-                }
-            } else if (is_calling_builtin(l)) {
-                auto builtin = l->get_builtin_enter();
-                if (!builtin_has_keyed_args(builtin))
-                    verify_no_keyed_args(l);
-                if (builtin_always_folds(builtin)
-                    || (!builtin_never_folds(builtin) && all_args_constant(l))) {
-                    if (fold_builtin_call(l)) {
-                        continue;
-                    }
-                } else if (builtin == FN_Branch) {
-                    type_branch_continuations(l);
-                    auto &&args = l->body.args;
-                    todo.push_back(args[3].value);
-                    todo.push_back(args[2].value);
-                } else {
-                    auto &&enter = l->body.enter;
-                    auto &&args = l->body.args;
-                    assert(enter.type == TYPE_Builtin);
-                    if ((enter.builtin == SFXFN_Unreachable)
-                        || (enter.builtin == SFXFN_Discard)) {
-                        args[0] = none;
-                    } else {
-                        Args values;
-                        bool fold = values_from_builtin_call(l, values);
-                        if (fold) {
-                            enter = args[0].value;
-                            args = { none };
-                            for (size_t i = 0; i < values.size(); ++i) {
-                                args.push_back(values[i]);
-                            }
-                            continue;
-                        } else {
-                            rtype = ReturnLabel(values);
-                        }
-                    }
-                }
-            } else if (is_calling_closure(l)) {
-                if (has_keyed_args(l)) {
-                    solve_keyed_args(l);
-                }
-                bool recursive = false;
-                rtype = fold_closure_call(l, recursive);
-                if (recursive) {
-                    // try again later
-                    recursions.push_front(l);
-                    return false;
-                }
-            } else if (is_calling_continuation(l)) {
-                rtype = get_return_type_from_call_arguments(l);
-            } else {
-                StyledString ss;
-                auto &&enter = l->body.enter;
-                if (!enter.is_const()) {
-                    ss.out << "unable to call variable of type " << enter.indirect_type();
-                } else {
-                    ss.out << "unable to call constant of type " << enter.type;
-                }
-                location_error(ss.str());
-            }
-
-            if (rtype) {
-                if (is_jumping(l)) {
-                    l->body.enter = fold_type_return(l->body.enter, rtype);
-                } else {
-                    assert(!l->body.args.empty());
-                    l->body.args[0] = fold_type_return(l->body.args[0].value, rtype);
-                }
-            }
-
-            l->body.set_complete();
-
-#if 1
-            if (fold_useless_labels(l)) {
-                continue;
-            }
-#endif
-
-            break;
+        if (!all_args_typed(l)) {
+            size_t idx = find_untyped_arg(l);
+            StyledString ss;
+            ss.out << "parameter " << l->body.args[idx].value.parameter
+                << " passed as argument " << idx << " has not been typed yet";
+            location_error(ss.str());
         }
 
-        return true;
+        const Type *rtype = nullptr;
+        if (is_calling_label(l)) {
+            if (!l->get_label_enter()->body.is_complete()) {
+                location_error(String::from("failed to propagate return type from untyped label"));
+            }
+            rtype = complete_existing_label_continuation(l);
+        } else if (is_calling_callable(l)) {
+            fold_callable_call(l);
+            goto repeat;
+        } else if (is_calling_function(l)) {
+            verify_no_keyed_args(l);
+            if (is_calling_pure_function(l)
+                && all_args_constant(l)) {
+                fold_pure_function_call(l);
+                goto repeat;
+            } else {
+                rtype = get_return_type_from_function_call(l);
+            }
+        } else if (is_calling_builtin(l)) {
+            auto builtin = l->get_builtin_enter();
+            if (!builtin_has_keyed_args(builtin))
+                verify_no_keyed_args(l);
+            if (builtin_always_folds(builtin)
+                || (!builtin_never_folds(builtin) && all_args_constant(l))) {
+                if (fold_builtin_call(l)) {
+                    goto repeat;
+                }
+            } else if (builtin == FN_Branch) {
+                type_branch_continuations(l);
+                l->body.set_complete();
+                // todo: process branches
+                return l;
+            } else {
+                auto &&enter = l->body.enter;
+                auto &&args = l->body.args;
+                assert(enter.type == TYPE_Builtin);
+                if ((enter.builtin == SFXFN_Unreachable)
+                    || (enter.builtin == SFXFN_Discard)) {
+                    args[0] = none;
+                } else {
+                    Args values;
+                    bool fold = values_from_builtin_call(l, values);
+                    if (fold) {
+                        enter = args[0].value;
+                        args = { none };
+                        for (size_t i = 0; i < values.size(); ++i) {
+                            args.push_back(values[i]);
+                        }
+                        goto repeat;
+                    } else {
+                        rtype = ReturnLabel(values);
+                    }
+                }
+            }
+        } else if (is_calling_closure(l)) {
+            if (has_keyed_args(l)) {
+                solve_keyed_args(l);
+            }
+            bool recursive = false;
+            rtype = fold_closure_call(l, recursive);
+            if (recursive) {
+                return nullptr;
+            }
+        } else if (is_calling_continuation(l)) {
+            rtype = get_return_type_from_call_arguments(l);
+        } else {
+            StyledString ss;
+            auto &&enter = l->body.enter;
+            if (!enter.is_const()) {
+                ss.out << "unable to call variable of type " << enter.indirect_type();
+            } else {
+                ss.out << "unable to call constant of type " << enter.type;
+            }
+            location_error(ss.str());
+        }
+
+        if (rtype) {
+            if (is_jumping(l)) {
+                l->body.enter = fold_type_return(l->body.enter, rtype);
+            } else {
+                assert(!l->body.args.empty());
+                l->body.args[0] = fold_type_return(l->body.args[0].value, rtype);
+            }
+        }
+
+        l->body.set_complete();
+
+        if (fold_useless_labels(l)) {
+            goto repeat;
+        }
+
+        bool is_jumping = jumps_immediately(l);
+        if (is_jumping) {
+            clear_continuation_arg(l);
+        }
+        if (!l->is_important() && l->is_basic_block_like()) {
+            if (is_jumping) {
+                Label *nextl = l->body.enter;
+                if (!l->has_params() && !nextl->has_params())
+                    return nextl;
+            }
+        }
+        return l;
+    }
+
+    Label *skip_useless_labels(Label *l, LabelQueue &todo, LabelQueue &recursions) {
+    repeat:
+        if(l->body.is_complete())
+            return l;
+        Label *nextl = fold_label_body(l);
+        if (!nextl) { // recursive, try again later
+            recursions.push_front(l);
+            return l;
+        }
+        if (nextl == l) {
+            if (!l->body.is_optimized()) {
+                todo.push_back(l);
+            }
+            return l;
+        } else {
+            l = nextl;
+            goto repeat;
+        }
     }
 
     // normalize all labels in the scope of a function with entry point l
@@ -3922,7 +3950,6 @@ struct Specializer {
         LabelQueue recursions;
         LabelQueue todo;
         todo.push_back(l);
-        Traces traces;
 
         SCOPES_TRY()
 
@@ -3943,49 +3970,30 @@ struct Specializer {
             }
             l = todo.back();
             todo.pop_back();
-            if(l->body.is_complete())
-                continue;
-
-            if (!fold_label_body(l, todo, recursions, traces))
-                continue;
-
-            /*
-                some thoughts:
-
-                it's better to skip labels when continuing rather than copying
-                over bodies, because we overwrite the anchor information
-                (not sure if that's relevant tho)
-
-            */
-
-            if (jumps_immediately(l)) {
-                Label *enter_label = l->get_label_enter();
-                clear_continuation_arg(l);
-                todo.push_back(enter_label);
-            } else if (is_continuing_to_label(l)) {
-                Label *nextl = l->body.args[0].value.label;
-                if (!all_params_typed(nextl)) {
-                    StyledStream ss(std::cerr);
-                    stream_label(ss, l, StreamLabelFormat::debug_single());
-                    location_error(String::from("failed to type continuation"));
+            if(!l->body.is_complete()) {
+                if (!fold_label_body(l)) {
+                    recursions.push_front(l);
+                    continue;
                 }
-                todo.push_back(nextl);
+            }
+            if (!l->body.is_optimized()) {
+                l->body.set_optimized();
+                if (jumps_immediately(l)) {
+                    l->body.enter = skip_useless_labels(l->body.enter, todo, recursions);
+                } else if (is_continuing_to_label(l)) {
+                    l->body.args[0].value = skip_useless_labels(l->body.args[0].value, todo, recursions);
+                } else if (is_branching(l)) {
+                    l->body.args[2].value = skip_useless_labels(l->body.args[2].value, todo, recursions);
+                    l->body.args[3].value = skip_useless_labels(l->body.args[3].value, todo, recursions);
+                }
             }
         }
 
         SCOPES_CATCH(exc)
-        #if 1
             traceback.push_back(Trace(l->body.anchor, l->name));
             if (entry_label != l) {
                 traceback.push_back(Trace(entry_label->anchor, entry_label->name));
             }
-        #else
-            size_t i = traces.size();
-            while (i > 0) {
-                i--;
-                traceback.push_back(traces[i]);
-            }
-        #endif
             error(exc);
         SCOPES_TRY_END()
 

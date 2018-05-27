@@ -17,7 +17,8 @@ struct Label;
 
 enum LabelBodyFlags {
     LBF_RawCall = (1 << 0),
-    LBF_Complete = (1 << 1)
+    LBF_Complete = (1 << 1),
+    LBF_Optimized = (1 << 2),
 };
 
 struct Body {
@@ -35,6 +36,9 @@ struct Body {
     bool is_complete() const;
     void set_complete();
     void unset_complete();
+
+    bool is_optimized() const;
+    void set_optimized();
 
     bool is_rawcall();
 

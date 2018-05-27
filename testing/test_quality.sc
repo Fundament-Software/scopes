@@ -21,7 +21,7 @@ assert-depth 2:usize
     fn ()
         print "hello world"
 
-assert-depth 11:usize
+assert-depth 10:usize
     fn ()
         loop (i) = 0
         if (i < 16)
