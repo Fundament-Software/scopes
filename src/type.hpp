@@ -80,8 +80,6 @@ protected:
     Map symbols;
 };
 
-StyledStream& operator<<(StyledStream& ost, const Type *type);
-
 typedef std::vector<const Type *> ArgTypes;
 
 //------------------------------------------------------------------------------
@@ -162,7 +160,6 @@ bool is_opaque(const Type *T);
 size_t size_of(const Type *T);
 size_t align_of(const Type *T);
 const Type *storage_type(const Type *T);
-StyledStream& operator<<(StyledStream& ost, const Type *type);
 const Type *superof(const Type *T);
 bool is_invalid_argument_type(const Type *T);
 

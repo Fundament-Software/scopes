@@ -9,6 +9,7 @@
 #include "error.hpp"
 #include "return.hpp"
 #include "function.hpp"
+#include "closure.hpp"
 #include "stream_label.hpp"
 #include "dyn_cast.inc"
 
@@ -143,6 +144,10 @@ void Label::verify_valid () {
 }
 
 //------------------------------------------------------------------------------
+
+bool Label::UserMap::empty() {
+    return label_map.empty() && param_map.empty();
+}
 
 void Label::UserMap::clear() {
     label_map.clear();
@@ -344,7 +349,7 @@ void Label::set_parameters(const Parameters &_params) {
 }
 
 void Label::build_reachable(std::unordered_set<Label *> &labels,
-    Labels *ordered_labels) {
+    Labels *ordered_labels, bool include_closures) {
     labels.clear();
     labels.insert(this);
     if (ordered_labels)
@@ -374,8 +379,14 @@ void Label::build_reachable(std::unordered_set<Label *> &labels,
                 arg = parent->body.args[i].value;
             }
 
-            if (arg.type == TYPE_Label) {
-                Label *label = arg.label;
+            Label *label = nullptr;
+            const Type *T = arg.type;
+            if (T == TYPE_Label) {
+                label = arg.label;
+            } else if (include_closures && (T == TYPE_Closure)) {
+                label = arg.closure->label;
+            }
+            if (label) {
                 if (!labels.count(label)) {
                     labels.insert(label);
                     if (label->is_basic_block_like()) {

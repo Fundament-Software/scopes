@@ -57,8 +57,6 @@ public:
     static Parameter *variadic_from(const Anchor *_anchor, Symbol _name, const Type *_type);
 };
 
-StyledStream& operator<<(StyledStream& ss, Parameter *param);
-
 typedef std::vector<Parameter *> Parameters;
 
 } // namespace scopes

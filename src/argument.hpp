@@ -33,8 +33,6 @@ struct Argument {
     uint64_t hash() const;
 };
 
-StyledStream& operator<<(StyledStream& ost, Argument value);
-
 typedef std::vector<Argument> Args;
 
 Argument first(const Args &values);

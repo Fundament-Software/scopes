@@ -1776,9 +1776,9 @@ struct SPIRVGenerator {
 
         {
             std::unordered_set<Label *> visited;
-            Labels labels;
-            entry->build_reachable(visited, &labels);
-            for (auto it = labels.begin(); it != labels.end(); ++it) {
+            //Labels labels;
+            entry->build_reachable(visited, nullptr);
+            for (auto it = visited.begin(); it != visited.end(); ++it) {
                 (*it)->insert_into_usermap(user_map);
             }
         }

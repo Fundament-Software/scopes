@@ -38,8 +38,6 @@ public:
     StyledStream &stream_source_line(StyledStream &ost, const char *indent = "    ") const;
 };
 
-StyledStream& operator<<(StyledStream& ost, const Anchor *anchor);
-
 } // namespace scopes
 
 #endif // SCOPES_ANCHOR_HPP

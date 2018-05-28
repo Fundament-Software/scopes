@@ -12,7 +12,7 @@ fn assert-depth (n f types...)
         syntax-error! anchor
             .. "label complexity mismatch: " (repr c) " != " (repr n)
 
-assert-depth 2:usize
+#assert-depth 2:usize
     fn (a b)
         a + b
     \ i32 i32

@@ -313,7 +313,11 @@ const Type *Any::indirect_type() const {
 
 //------------------------------------------------------------------------------
 
-StyledStream& operator<<(StyledStream& ost, Any value) {
+StyledStream& operator<<(StyledStream& ost, Any &value) {
+    return value.stream(ost);
+}
+
+StyledStream& operator<<(StyledStream& ost, const Any &value) {
     return value.stream(ost);
 }
 

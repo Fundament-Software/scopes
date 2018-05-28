@@ -40,8 +40,6 @@ public:
     StyledStream &stream(StyledStream &ost) const;
 };
 
-StyledStream& operator<<(StyledStream& ss, const Closure *closure);
-
 } // namespace scopes
 
 #endif // SCOPES_CLOSURE_HPP

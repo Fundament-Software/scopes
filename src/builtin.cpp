@@ -35,7 +35,11 @@ StyledStream& Builtin::stream(StyledStream& ost) const {
 
 //------------------------------------------------------------------------------
 
-StyledStream& operator<<(StyledStream& ost, Builtin builtin) {
+StyledStream& operator<<(StyledStream& ost, Builtin &builtin) {
+    return builtin.stream(ost);
+}
+
+StyledStream& operator<<(StyledStream& ost, const Builtin &builtin) {
     return builtin.stream(ost);
 }
 

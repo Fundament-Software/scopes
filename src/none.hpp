@@ -18,9 +18,6 @@ struct Nothing {
 
 extern Nothing none;
 
-struct StyledStream;
-StyledStream& operator<<(StyledStream& ost, const Nothing &value);
-
 } // namespace scopes
 
 #endif // SCOPES_NONE_HPP

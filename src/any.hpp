@@ -158,8 +158,6 @@ struct Any {
     size_t hash() const;
 };
 
-StyledStream& operator<<(StyledStream& ost, Any value);
-
 bool is_unknown(const Any &value);
 
 bool is_typed(const Any &value);

@@ -31,7 +31,15 @@ uint64_t Argument::hash() const {
 
 //------------------------------------------------------------------------------
 
-StyledStream& operator<<(StyledStream& ost, Argument value) {
+StyledStream& operator<<(StyledStream& ost, Argument &value) {
+    if (value.key != SYM_Unnamed) {
+        ost << value.key << Style_Operator << "=" << Style_None;
+    }
+    ost << value.value;
+    return ost;
+}
+
+StyledStream& operator<<(StyledStream& ost, const Argument &value) {
     if (value.key != SYM_Unnamed) {
         ost << value.key << Style_Operator << "=" << Style_None;
     }

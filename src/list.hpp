@@ -45,8 +45,6 @@ const List * const EOL = nullptr;
 const List *reverse_list_inplace(
     const List *l, const List *eol = EOL, const List *cat_to = EOL);
 
-StyledStream& operator<<(StyledStream& ost, const List *list);
-
 } // namespace scopes
 
 #endif // SCOPES_LIST_HPP

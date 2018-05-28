@@ -132,6 +132,7 @@ public:
         std::unordered_map<Label *, std::unordered_set<Label *> > label_map;
         std::unordered_map<Parameter *, std::unordered_set<Label *> > param_map;
 
+        bool empty();
         void clear();
 
         void insert(Label *source, Label *dest);
@@ -181,7 +182,8 @@ public:
     void set_parameters(const Parameters &_params);
 
     void build_reachable(std::unordered_set<Label *> &labels,
-        Labels *ordered_labels = nullptr);
+        Labels *ordered_labels = nullptr,
+        bool include_closures = false);
 
     void build_scope(UserMap &um, Labels &tempscope);
 
@@ -209,10 +211,6 @@ public:
     static Label *function_from(const Anchor *_anchor, Symbol _name);
 
 };
-
-StyledStream& operator<<(StyledStream& ss, Label *label);
-
-StyledStream& operator<<(StyledStream& ss, const Label *label);
 
 } // namespace scopes
 

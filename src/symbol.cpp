@@ -187,7 +187,11 @@ uint64_t Symbol::next_symbol_id = SYM_Count;
 
 //------------------------------------------------------------------------------
 
-StyledStream& operator<<(StyledStream& ost, Symbol sym) {
+StyledStream& operator<<(StyledStream& ost, Symbol &sym) {
+    return sym.stream(ost);
+}
+
+StyledStream& operator<<(StyledStream& ost, const Symbol &sym) {
     return sym.stream(ost);
 }
 

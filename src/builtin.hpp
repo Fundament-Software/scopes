@@ -38,8 +38,6 @@ public:
     StyledStream& stream(StyledStream& ost) const;
 };
 
-StyledStream& operator<<(StyledStream& ost, Builtin builtin);
-
 } // namespace scopes
 
 #endif // SCOPES_BUILTIN_HPP

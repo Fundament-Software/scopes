@@ -43,8 +43,6 @@ struct String {
     const String *substr(int64_t i0, int64_t i1) const;
 };
 
-StyledStream& operator<<(StyledStream& ost, const String *s);
-
 struct StyledString {
     std::stringstream _ss;
     StyledStream out;

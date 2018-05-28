@@ -592,6 +592,7 @@ struct Specializer {
     static CLICmd clicmd;
     Args tmp_args;
     Parameters tmp_params;
+    Label::UserMap user_map;
 
     /*
         the new solver works more like a specializer VM, in that it executes
@@ -1473,6 +1474,22 @@ struct Specializer {
         return true;
     }
 
+#if 0
+    bool has_single_user(Label *l) {
+        assert(!user_map.empty());
+        auto it = user_map.label_map.find(l);
+        if (it == user_map.label_map.end()) {
+            // possibly indirectly referenced through a closure, scope, type
+            return false;
+        }
+        assert(it != user_map.label_map.end());
+        auto &&users = it->second;
+        if (users.size() >= 1)
+            return false;
+        return true;
+    }
+#endif
+
     const Type *fold_closure_call(Label *l, bool &recursive) {
 #if SCOPES_DEBUG_CODEGEN
         ss_cout << "folding & typing arguments in " << l << std::endl;
@@ -1485,12 +1502,15 @@ struct Specializer {
 
         bool inline_const = (!enter_label->is_merge()) || enter_frame->inline_merge;
 
+        bool want_inline = enter_label->is_inline();
+            //|| (enter_label->is_basic_block_like() && has_single_user(enter_label))
+
         // inline constant arguments
         Args callargs;
         Args keys;
         auto &&args = l->body.args;
 #if SCOPE_INLINE_PARAMETERS
-        if (enter_label->is_inline() && inline_const) {
+        if (want_inline && inline_const) {
             callargs.push_back(none);
             keys.push_back(args[0]);
             for (size_t i = 1; i < args.size(); ++i) {
@@ -3626,6 +3646,17 @@ struct Specializer {
     }
 
     Label *solve_inline(Frame *frame, Label *label, const Args &values) {
+        #if 0
+        {
+            assert(user_map.empty());
+            std::unordered_set<Label *> visited;
+            label->build_reachable(visited, nullptr, true);
+            for (auto it = visited.begin(); it != visited.end(); ++it) {
+                (*it)->insert_into_usermap(user_map);
+            }
+        }
+        #endif
+
         Frame *entryf = fold_type_label_single_frame(frame, label, values);
 
         inc_solve_ref();
@@ -3651,6 +3682,7 @@ struct Specializer {
     }
 
     Label *typify(Frame *frame, Label *label, const ArgTypes &argtypes) {
+
         Args args;
         args.reserve(argtypes.size() + 1);
         args = { Argument(untyped()) };
@@ -3660,6 +3692,7 @@ struct Specializer {
         return solve_inline(frame, label, args);
     }
 
+#if 0
     Label *solve(Frame *frame, Label *label, const Args &values) {
         assert(frame);
         assert(!label->params.empty());
@@ -3671,6 +3704,7 @@ struct Specializer {
         }
         return solve_inline(frame, label, values);
     }
+#endif
 
     const Type *complete_existing_label_continuation (Label *l) {
         Label *enter_label = l->get_label_enter();

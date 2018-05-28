@@ -73,8 +73,6 @@ public:
 
 extern Scope *globals;
 
-StyledStream& operator<<(StyledStream& ost, Scope *scope);
-
 } // namespace scopes
 
 #endif // SCOPES_SCOPE_HPP

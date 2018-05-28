@@ -39,8 +39,6 @@ Any strip_syntax(Any e);
 
 Any wrap_syntax(const Anchor *anchor, Any e, bool quoted = false);
 
-StyledStream& operator<<(StyledStream& ost, const Syntax *value);
-
 } // namespace scopes
 
 #endif // SCOPES_SYNTAX_HPP

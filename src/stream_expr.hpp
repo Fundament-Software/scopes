@@ -76,8 +76,6 @@ struct StreamExpr : StreamAnchors {
 void stream_expr(
     StyledStream &_ss, const Any &e, const StreamExprFormat &_fmt);
 
-StyledStream& operator<<(StyledStream& ost, const List *list);
-
 } // namespace scopes
 
 #endif // SCOPES_STREAM_EXPR_HPP
