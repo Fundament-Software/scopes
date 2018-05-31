@@ -594,52 +594,187 @@ struct Specializer {
     Parameters tmp_params;
     Label::UserMap user_map;
 
-    /*
-        the new solver works more like a specializer VM, in that it executes
-        template labels and returns a residual program as specialized labels.
-
-        the specializer nests each time the program branches, and returns when
-        branches merge.
-
-        each run operates on a single contiguous non-branching chain of commands.
-
-        when a function is encountered that has not been specialized yet, it is
-        specialized.
-
-        when an inline is encountered, a new nesting level is entered until the
-        inline has returned.
-
-        when a branch is encountered, each branch is specialized, and the
-        resulting types merged. only then does specialization continue.
-
-        when a possible loop entry point is encountered, it is necessary to run
-        the loop in a new nesting to discover whether the loop is reentrant.
-
-        for non-tail recursive functions, it becomes difficult to type the
-        function when it has not returned yet. in this case, execution needs
-        to suspend until all other branches have been mapped out.
-
-        additional care has to be taken to optimize continuation arguments of
-        residual instructions and branches only when the next residual
-        instruction is known, so that useless continuation calls can be
-        purged before they are even created.
-    */
-
-#if 0
-    Label *specialize_function(Frame *frame, Label *l, const Args &args) {
-        assert(frame);
-        assert(l);
-
-        assert(l->is_template());
-
-
-
-    }
-#endif
-
     Specializer()
         : ss_cout(std::cout)
     {}
+
+    typedef std::unordered_map<Parameter *, Args > MangleParamMap;
+    typedef std::unordered_map<Label *, Label *> MangleLabelMap;
+
+    static void mangle_remap_body(Label::UserMap &um, Label *ll, Label *entry, MangleLabelMap &lmap, MangleParamMap &pmap) {
+        Any enter = entry->body.enter;
+        Args &args = entry->body.args;
+        Args &body = ll->body.args;
+        if (enter.type == TYPE_Label) {
+            auto it = lmap.find(enter.label);
+            if (it != lmap.end()) {
+                enter = it->second;
+            }
+        } else if (enter.type == TYPE_Parameter) {
+            auto it = pmap.find(enter.parameter);
+            if (it != pmap.end()) {
+                enter = first(it->second).value;
+            }
+        }
+        ll->flags = entry->flags & LF_Reentrant;
+        ll->body.copy_traits_from(entry->body);
+        ll->body.unset_optimized();
+        ll->body.enter = enter;
+
+        size_t lasti = (args.size() - 1);
+        for (size_t i = 0; i < args.size(); ++i) {
+            Argument arg = args[i];
+            if (arg.value.type == TYPE_Label) {
+                auto it = lmap.find(arg.value.label);
+                if (it != lmap.end()) {
+                    arg.value = it->second;
+                }
+            } else if (arg.value.type == TYPE_Parameter) {
+                auto it = pmap.find(arg.value.parameter);
+                if (it != pmap.end()) {
+                    if ((i == lasti) && arg.value.parameter->is_vararg()) {
+                        for (auto subit = it->second.begin(); subit != it->second.end(); ++subit) {
+                            body.push_back(*subit);
+                        }
+                        continue;
+                    } else {
+                        arg.value = first(it->second).value;
+                    }
+                }
+            }
+            body.push_back(arg);
+        }
+
+        ll->insert_into_usermap(um);
+    }
+
+    enum MangleFlag {
+        Mangle_Verbose = (1<<0),
+    };
+
+    static Label *mangle(Label::UserMap &um, Label *entry,
+        std::vector<Parameter *> params, MangleParamMap &pmap, int verbose = 0) {
+        MangleLabelMap lmap;
+
+        std::vector<Label *> entry_scope;
+        entry->build_scope(um, entry_scope);
+
+        // remap entry point
+        Label *le = Label::from(entry);
+        le->set_parameters(params);
+        // create new labels and map new parameters
+        for (auto &&l : entry_scope) {
+            Label *ll = Label::from(l);
+            l->paired = ll;
+            lmap.insert({l, ll});
+            ll->params.reserve(l->params.size());
+            for (auto &&param : l->params) {
+                Parameter *pparam = Parameter::from(param);
+                pmap.insert({ param, {Argument(Any(pparam))}});
+                ll->append(pparam);
+            }
+        }
+
+        // remap label bodies
+        for (auto &&l : entry_scope) {
+            Label *ll = l->paired;
+            l->paired = nullptr;
+            mangle_remap_body(um, ll, l, lmap, pmap);
+        }
+        mangle_remap_body(um, le, entry, lmap, pmap);
+
+        if (verbose & Mangle_Verbose) {
+        StyledStream ss(std::cout);
+        ss << "IN[\n";
+        stream_label(ss, entry, StreamLabelFormat::debug_single());
+        for (auto && l : entry_scope) {
+            stream_label(ss, l, StreamLabelFormat::debug_single());
+        }
+        ss << "]IN\n";
+        ss << "OUT[\n";
+        stream_label(ss, le, StreamLabelFormat::debug_single());
+        for (auto && l : entry_scope) {
+            auto it = lmap.find(l);
+            stream_label(ss, it->second, StreamLabelFormat::debug_single());
+        }
+        ss << "]OUT\n";
+        }
+
+        return le;
+    }
+
+    // inlining the arguments of an untyped scope (including continuation)
+    // folds arguments and types parameters
+    // arguments are treated as follows:
+    // TYPE_Unknown = type the parameter
+    //      type as TYPE_Unknown = leave the parameter as-is
+    // any other = inline the argument and remove the parameter
+    static Label *fold_type_label(Label::UserMap &um, Label *label, const Args &args) {
+        assert(!label->params.empty());
+
+        MangleParamMap map;
+        std::vector<Parameter *> newparams;
+        size_t lasti = label->params.size() - 1;
+        size_t srci = 0;
+        for (size_t i = 0; i < label->params.size(); ++i) {
+            Parameter *param = label->params[i];
+            if (param->is_vararg()) {
+                assert(i == lasti);
+                size_t ncount = args.size();
+                if (srci < ncount) {
+                    ncount -= srci;
+                    Args vargs;
+                    for (size_t k = 0; k < ncount; ++k) {
+                        Argument value = args[srci + k];
+                        if (value.value.type == TYPE_Unknown) {
+                            Parameter *newparam = Parameter::from(param);
+                            newparam->kind = PK_Regular;
+                            newparam->type = value.value.typeref;
+                            newparam->name = Symbol(SYM_Unnamed);
+                            newparams.push_back(newparam);
+                            vargs.push_back(Argument(value.key, newparam));
+                        } else {
+                            vargs.push_back(value);
+                        }
+                    }
+                    map[param] = vargs;
+                    srci = ncount;
+                } else {
+                    map[param] = {};
+                }
+            } else if (srci < args.size()) {
+                Argument value = args[srci];
+                if (is_unknown(value.value)) {
+                    Parameter *newparam = Parameter::from(param);
+                    if (is_typed(value.value)) {
+                        if (newparam->is_typed()
+                            && (newparam->type != value.value.typeref)) {
+                            StyledString ss;
+                            ss.out << "attempting to retype parameter of type "
+                                << newparam->type << " as " << value.value.typeref;
+                            location_error(ss.str());
+                        } else {
+                            newparam->type = value.value.typeref;
+                        }
+                    }
+                    newparams.push_back(newparam);
+                    map[param] = {Argument(value.key, newparam)};
+                } else {
+                    if (!srci) {
+                        Parameter *newparam = Parameter::from(param);
+                        newparam->type = TYPE_Nothing;
+                        newparams.push_back(newparam);
+                    }
+                    map[param] = {value};
+                }
+                srci++;
+            } else {
+                map[param] = {Argument()};
+                srci++;
+            }
+        }
+        return mangle(um, label, newparams, map);//, Mangle_Verbose);
+    }
 
     static void evaluate(Frame *frame, Argument arg, Args &dest, bool last_param = false) {
         if (arg.value.type == TYPE_Label) {
@@ -1430,11 +1565,14 @@ struct Specializer {
             bool needs_inline = false;
             const char *name = nullptr;
             const Type *displayT = nullptr;
+            #if 0
             if (is_indirect_closure_type(val.type)) {
                 needs_inline = true;
                 name = "closure";
                 displayT = val.type;
-            } else if (is_unknown(val)) {
+            } else
+            #endif
+            if (is_unknown(val)) {
                 auto T = val.typeref;
                 if (!is_opaque(T)) {
                     T = storage_type(T);
@@ -1490,7 +1628,7 @@ struct Specializer {
     }
 #endif
 
-    const Type *fold_closure_call(Label *l, bool &recursive) {
+    const Type *fold_closure_call(Label *l, bool &recursive, bool &inlined) {
 #if SCOPES_DEBUG_CODEGEN
         ss_cout << "folding & typing arguments in " << l << std::endl;
 #endif
@@ -1503,6 +1641,7 @@ struct Specializer {
         bool inline_const = (!enter_label->is_merge()) || enter_frame->inline_merge;
 
         bool want_inline = enter_label->is_inline();
+            //&& enter_label->is_basic_block_like();
             //|| (enter_label->is_basic_block_like() && has_single_user(enter_label))
 
         // inline constant arguments
@@ -1608,9 +1747,49 @@ struct Specializer {
             } else {
                 enter = newl;
                 args = callargs;
-                if (rtype == NoReturnLabel()) {
+                auto nrl = NoReturnLabel();
+                if (rtype == nrl) {
                     rtype = nullptr;
                 }
+
+#if 0
+                if (newl->is_inline()) {
+                    /*
+                    mangle solved function to include explicit return continuation.
+
+                    problem with this method:
+                    if closures escape the function, the closure's frames
+                    still map template parameters to labels used before the mangling.
+                    */
+                    Parameter *cont_param = newl->params[0];
+                    const Type *cont_type = cont_param->type;
+                    assert(isa<ReturnLabelType>(cont_type));
+                    Any cont = none;
+                    if (cont_type != nrl) {
+                        cont = fold_type_return(args[0].value, cont_type);
+                        assert(cont.type != TYPE_Closure);
+                    }
+                    keys.clear();
+                    keys.push_back(cont);
+                    for (size_t i = 1; i < callargs.size(); ++i) {
+                        keys.push_back(args[i]);
+                    }
+                    args = { none };
+                    std::unordered_set<Label *> visited;
+                    std::vector<Label *> labels;
+                    newl->build_reachable(visited, &labels);
+                    Label::UserMap um;
+                    for (auto it = labels.begin(); it != labels.end(); ++it) {
+                        (*it)->insert_into_usermap(um);
+                    }
+                    Label *newll = fold_type_label(um, newl, keys);
+                    enter = newll;
+                    l->body.set_complete();
+                    fold_useless_labels(l);
+                    inlined = true;
+                    return nullptr;
+                }
+#endif
             }
             return rtype;
         }
@@ -3917,9 +4096,13 @@ struct Specializer {
                 solve_keyed_args(l);
             }
             bool recursive = false;
-            rtype = fold_closure_call(l, recursive);
+            bool inlined = false;
+            rtype = fold_closure_call(l, recursive, inlined);
             if (recursive) {
                 return nullptr;
+            }
+            if (inlined) {
+                return l;
             }
         } else if (is_calling_continuation(l)) {
             rtype = get_return_type_from_call_arguments(l);
@@ -3965,12 +4148,13 @@ struct Specializer {
 
     Label *skip_useless_labels(Label *l, LabelQueue &todo, LabelQueue &recursions) {
     repeat:
-        if(l->body.is_complete())
-            return l;
-        Label *nextl = fold_label_body(l);
-        if (!nextl) { // recursive, try again later
-            recursions.push_front(l);
-            return l;
+        Label *nextl = l;
+        if(!l->body.is_complete()) {
+            nextl = fold_label_body(l);
+            if (!nextl) { // recursive, try again later
+                recursions.push_front(l);
+                return l;
+            }
         }
         if (nextl == l) {
             if (!l->body.is_optimized()) {
@@ -4086,7 +4270,7 @@ struct Specializer {
                     assert(!subl->is_inline());
                     location_message(l->anchor, String::from("depends on this scope"));
                     set_active_anchor(subl->anchor);
-                    location_error(String::from("only inlines may depend on variables in exterior scopes"));
+                    location_error(String::from("expression using variable in exterior scope as well as provider of variable must be inline"));
                 }
             }
         }

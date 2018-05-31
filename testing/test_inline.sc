@@ -12,9 +12,8 @@ Label-set-inline! (Closure-label test)
 fn gen-function ()
     fn () true
 
-# error: function returns closure
-assert-compiler-error
-    gen-function;
+# ok: function returns closure
+assert (((gen-function)) == true)
 
 inline gen-function2 ()
     fn () true
@@ -25,10 +24,10 @@ assert (((gen-function2)) == true)
 inline gen-function3 (x)
     fn () x
 
-# ok: function captures constant outside scope
+# ok: function in inline captures constant outside scope
 assert (((gen-function3 true)) == true)
 
-# error: function captures variable outside scope
+# error: function in inline captures variable outside scope
 assert-compiler-error
     ((gen-function3 (unconst true))) == true
 
@@ -37,6 +36,17 @@ inline gen-function4 (x)
 
 # ok: inline captures variable outside scope
 assert (((gen-function4 (unconst true))) == true)
+
+fn gen-function5 (x)
+    fn () x
+
+# ok: function in inline captures constant outside scope
+assert (((gen-function5 true)) == true)
+
+# error: function in inline captures variable outside scope
+assert-compiler-error
+    ((gen-function5 (unconst true))) == true
+
 
 fn rebuild (x)
     if (list-empty? x)

@@ -354,18 +354,24 @@ void Label::build_reachable(std::unordered_set<Label *> &labels,
     labels.insert(this);
     if (ordered_labels)
         ordered_labels->push_back(this);
+#if 0
     Labels foreign_stack = { this };
     Labels stack = {};
+#else
+    Labels stack = {this};
+#endif
     while (true) {
         Label *parent = nullptr;
         if (!stack.empty()) {
             parent = stack.back();
             stack.pop_back();
+        #if 0
         } else if (!foreign_stack.empty()) {
             parent = foreign_stack.back();
             foreign_stack.pop_back();
             if (ordered_labels)
                 ordered_labels->push_back(parent);
+        #endif
         } else {
                 break;
         }
@@ -389,6 +395,7 @@ void Label::build_reachable(std::unordered_set<Label *> &labels,
             if (label) {
                 if (!labels.count(label)) {
                     labels.insert(label);
+                    #if 0
                     if (label->is_basic_block_like()) {
                         if (ordered_labels)
                             ordered_labels->push_back(label);
@@ -396,6 +403,11 @@ void Label::build_reachable(std::unordered_set<Label *> &labels,
                     } else {
                         foreign_stack.push_back(label);
                     }
+                    #else
+                        if (ordered_labels)
+                            ordered_labels->push_back(label);
+                        stack.push_back(label);
+                    #endif
                 }
             }
         }

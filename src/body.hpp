@@ -39,6 +39,7 @@ struct Body {
 
     bool is_optimized() const;
     void set_optimized();
+    void unset_optimized();
 
     bool is_rawcall();
 

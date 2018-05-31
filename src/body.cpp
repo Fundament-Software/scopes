@@ -29,6 +29,10 @@ void Body::set_optimized() {
     flags |= LBF_Optimized;
 }
 
+void Body::unset_optimized() {
+    flags &= ~LBF_Optimized;
+}
+
 bool Body::is_rawcall() {
     return (flags & LBF_RawCall) == LBF_RawCall;
 }
