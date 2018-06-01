@@ -22,6 +22,7 @@
 #include "expander.hpp"
 #include "specializer.hpp"
 #include "gen_llvm.hpp"
+#include "profiler.hpp"
 
 #include "scopes.h"
 
@@ -41,6 +42,7 @@ namespace scopes {
 
 void on_shutdown() {
 #if SCOPES_PRINT_TIMERS
+    print_profiler_info();
     Timer::print_timers();
     std::cerr << "largest recorded stack size: " << g_largest_stack_size << std::endl;
 #endif

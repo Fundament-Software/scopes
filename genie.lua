@@ -111,6 +111,7 @@ project "scopes"
         "src/integer.cpp",
         "src/real.cpp",
         "src/pointer.cpp",
+        "src/profiler.cpp",
         "src/sized_storage.cpp",
         "src/array.cpp",
         "src/vector.cpp",

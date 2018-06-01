@@ -27,6 +27,7 @@
 #include "list.hpp"
 #include "timer.hpp"
 #include "expander.hpp"
+#include "profiler.hpp"
 
 #include "scopes.h"
 
@@ -1654,6 +1655,9 @@ struct Specializer {
             keys.push_back(args[0]);
             for (size_t i = 1; i < args.size(); ++i) {
                 keys.push_back(args[i]);
+            }
+            if (!enter_label->is_basic_block_like()) {
+                on_label_specialized(enter_label);
             }
         } else
 #endif

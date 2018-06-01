@@ -33,7 +33,7 @@ extern "C" {
 #define SCOPES_EARLY_ABORT 0
 
 // print a list of cumulative timers on program exit
-#define SCOPES_PRINT_TIMERS 1
+#define SCOPES_PRINT_TIMERS 0
 
 // maximum number of recursions permitted during partial evaluation
 // if you think you need more, ask yourself if ad-hoc compiling a pure C function
