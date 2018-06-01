@@ -46,7 +46,7 @@ inline type? (T)
            `false`.
     rawcall icmp== (rawcall ptrtoint type usize) (rawcall ptrtoint (rawcall typeof T) usize)
 
-inline assert-type (T)
+fn assert-type (T)
     if (type? T)
     else
         rawcall compiler-error!
@@ -126,7 +126,7 @@ inline gen-get-option (opts...)
             else default
         else val
 
-inline Any-new (val)
+fn Any-new (val)
     inline construct (outval)
         insertvalue (insertvalue (undef Any) (typeof val) 0) outval 1
 
