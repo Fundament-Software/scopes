@@ -16,8 +16,6 @@
 
 """"A pass-through function that allows expressions to evaluate to multiple
     arguments.
-inline _ (...)
-    return ...
 
 inline unconst-all (args...)
     let loop (i result...) = (va-countof args...)

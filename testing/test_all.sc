@@ -22,6 +22,7 @@ test-modules
     .test_extraparams
     .test_fnchain
     .test_folding
+    .test_forward
     .test_frame
     .test_from
     .test_fwdecl

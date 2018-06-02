@@ -1818,6 +1818,7 @@ struct Specializer {
         case FN_TupleType:
         case FN_UnionType:
         case FN_StaticAlloc:
+        case KW_Forward:
             return true;
         default: return false;
         }
@@ -3020,6 +3021,15 @@ struct Specializer {
         case FN_IsConstant: {
             CHECKARGS(1, 1);
             RETARGS(args[1].value.is_const());
+        } break;
+        case KW_Forward: {
+            CHECKARGS(0, -1);
+            Args result = { none };
+            for (size_t i = 1; i < args.size(); ++i) {
+                result.push_back(args[i]);
+            }
+            enter = args[0].value;
+            args = result;
         } break;
         case FN_VaCountOf: {
             RETARGS((int)(args.size()-1));
