@@ -935,9 +935,19 @@ Label *expand_module(Any expr, Scope *scope) {
     expr.verify(TYPE_List);
     assert(anchor);
     Label *mainfunc = Label::function_from(anchor, anchor->path());
+    Any retparam = mainfunc->params[0];
 
-    Expander subexpr(mainfunc, scope?scope:globals);
-    subexpr.expand_block(expr, mainfunc->params[0]);
+    Scope *subenv = scope?scope:globals;
+    // can't insert the block below because it interplays badly with syntax-extend
+    #if 0
+    subenv = Scope::from(subenv);
+    //subenv->bind(KW_Return, retparam);
+    // ensure the local scope does not contain special symbols
+    subenv = Scope::from(subenv);
+    #endif
+
+    Expander subexpr(mainfunc, subenv);
+    subexpr.expand_block(expr, retparam);
 
     return mainfunc;
 }
