@@ -602,7 +602,7 @@ fn transpose (m)
     fold
         nullof TT
         unroll-range T.Rows
-        fn (break self i)
+        inline (break self i)
             insertvalue self
                 mat-row m i
                 i
@@ -630,13 +630,13 @@ set-type-symbol! mat-type '__*
             fold
                 nullof destT
                 unroll-range sz
-                fn (break mat i)
+                inline (break mat i)
                     let row = (mat-row a i)
                     insertvalue mat
                         fold
                             nullof VT
                             unroll-range sz
-                            fn (break vec j)
+                            inline (break vec j)
                                 insertelement vec
                                     dot row (extractvalue b j)
                                     j
@@ -646,7 +646,7 @@ set-type-symbol! mat-type '__*
             fold
                 nullof Tb.RowType
                 unroll-range Tb.Columns
-                fn (break vec i)
+                inline (break vec i)
                     insertelement vec
                         dot a (extractvalue b i)
                         i
@@ -655,7 +655,7 @@ set-type-symbol! mat-type '__*
             fold
                 nullof Ta.ColumnType
                 unroll-range Ta.Rows
-                fn (break vec i)
+                inline (break vec i)
                     insertelement vec
                         dot (mat-row a i) b
                         i
