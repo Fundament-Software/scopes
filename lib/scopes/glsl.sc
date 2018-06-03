@@ -185,10 +185,10 @@ syntax-extend
 let XVarType = (typename "xvar" extern)
 let XVarBridgeType = (typename "xvar-bridge")
 
-typefn XVarBridgeType '__imply (self destT)
+typeinline XVarBridgeType '__imply (self destT)
     forward-imply self.in destT
 
-typefn XVarBridgeType '__as (self destT)
+typeinline XVarBridgeType '__as (self destT)
     forward-as self.in destT
 
 do
@@ -208,18 +208,18 @@ do
     forward-op '__+ +
     forward-op '__- -
 
-typefn XVarBridgeType '__getattr (self name)
+typeinline XVarBridgeType '__getattr (self name)
     let T = (typeof self)
     let val success = (type@ T name)
     if success
         return val
     forward-getattr (type@ T 'in) name
 
-typefn XVarBridgeType '__= (self value)
+typeinline XVarBridgeType '__= (self value)
     self.out = value
     true
 
-typefn XVarBridgeType '__@ (self value)
+typeinline XVarBridgeType '__@ (self value)
     @ self.in value
 
 define-macro xvar
@@ -300,46 +300,46 @@ define-macro xvar
     list let name '=
         cons xvar-extern (quote-if-symbol sxstorage) (quote-if-symbol name) type params
 
-fn texelFetch (sampler P ...)
+inline texelFetch (sampler P ...)
     'fetch (sampler as gsampler) P ...
 
-fn texelFetchOffset (sampler P lod offset)
+inline texelFetchOffset (sampler P lod offset)
     'fetch-offset (sampler as gsampler) P lod offset
 
-fn texture (sampler P ...)
+inline texture (sampler P ...)
     'texture (sampler as gsampler) P ...
 
-fn textureProj (sampler P ...)
+inline textureProj (sampler P ...)
     'texture-proj (sampler as gsampler) P ...
 
-fn textureLod (sampler P lod)
+inline textureLod (sampler P lod)
     'texture-lod (sampler as gsampler) P lod
 
-fn textureOffset (sampler P offset ...)
+inline textureOffset (sampler P offset ...)
     'texture-offset (sampler as gsampler) P offset ...
 
-fn textureGather (sampler P ...)
+inline textureGather (sampler P ...)
     'texture-gather (sampler as gsampler) P ...
 
-fn textureSize (sampler ...)
+inline textureSize (sampler ...)
     'texture-size (sampler as gsampler) ...
 
-fn textureQueryLod (sampler P)
+inline textureQueryLod (sampler P)
     'texture-query-lod (sampler as gsampler) P
 
-fn textureQueryLevels (sampler)
+inline textureQueryLevels (sampler)
     'texture-query-levels (sampler as gsampler)
 
-fn textureSamples (sampler)
+inline textureSamples (sampler)
     'texture-samples (sampler as gsampler)
 
-fn imageLoad (image coord)
+inline imageLoad (image coord)
     Image-read (image as Image) coord
 
-fn imageStore (image coord data)
+inline imageStore (image coord data)
     Image-write (image as Image) coord data
 
-fn local_size (x y z)
+inline local_size (x y z)
     set-execution-mode! 'LocalSize x y z
 
 let packHalf2x16 = (extern 'glsl.std.450.PackHalf2x16 (function u32 vec2))
