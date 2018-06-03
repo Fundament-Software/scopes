@@ -7,7 +7,7 @@
 #include "error.hpp"
 #include "anchor.hpp"
 #include "type.hpp"
-#include "main.hpp"
+#include "boot.hpp"
 
 #include "scopes.h"
 

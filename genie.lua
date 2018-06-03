@@ -89,8 +89,8 @@ solution "scopes"
     configurations { "debug", "release" }
     platforms { "native", "x64" }
 
-project "scopes"
-    kind "ConsoleApp"
+project "scopesrt"
+    kind "SharedLib"
     language "C++"
     files {
         "src/globalsyms.c",
@@ -110,6 +110,7 @@ project "scopes"
         "src/error.cpp",
         "src/integer.cpp",
         "src/real.cpp",
+        "src/boot.cpp",
         "src/pointer.cpp",
         "src/profiler.cpp",
         "src/sized_storage.cpp",
@@ -125,7 +126,6 @@ project "scopes"
         "src/typefactory.cpp",
         "src/image.cpp",
         "src/sampledimage.cpp",
-        "src/main.cpp",
         "src/scope.cpp",
         "src/list.cpp",
         "src/syntax.cpp",
@@ -178,8 +178,6 @@ project "scopes"
     }
     targetdir "bin"
     defines {
-        "SCOPES_CPP_IMPL",
-        "SCOPES_MAIN_CPP_IMPL",
         "SPIRV_CROSS_EXCEPTIONS_TO_ASSERTIONS",
     }
 
@@ -434,4 +432,145 @@ project "scopes"
         defines { "NDEBUG" }
         flags { "Optimize" }
 
+project "scopes"
+    kind "ConsoleApp"
+    language "C++"
+    files {
+        "src/main.cpp",
+    }
+    includedirs {
+        "include",
+    }
+    links {
+        "scopesrt",
+    }
+    targetdir "bin"
+    configuration { "linux" }
+        defines { "SCOPES_LINUX" }
 
+        includedirs {
+        }
+
+        buildoptions_cpp {
+            "-std=c++11",
+            "-fno-rtti",
+            "-fno-exceptions",
+            "-ferror-limit=1",
+            "-pedantic",
+            "-Wall",
+            "-Wno-keyword-macro",
+            "-Wno-gnu-redeclared-enum"
+        }
+
+        defines {
+            --"_GLIBCXX_USE_CXX11_ABI=0",
+        }
+
+        links {
+        }
+
+        linkoptions {
+            --"-Wl,--stack,8388608"
+            --"-Wl,--stack,16777216"
+        }
+        linkoptions {
+        }
+
+        postbuildcommands {
+        }
+
+    configuration { "windows" }
+        buildoptions_cpp {
+            "-D_GNU_SOURCE",
+            "-Wa,-mbig-obj",
+            "-std=gnu++11",
+            "-fno-exceptions",
+            "-fno-rtti",
+            "-fno-strict-aliasing",
+            "-D__STDC_CONSTANT_MACROS",
+            "-D__STDC_FORMAT_MACROS",
+            "-D__STDC_LIMIT_MACROS",
+        }
+
+        buildoptions_cpp {
+            "-Wall",
+        }
+
+        -- gcc-only options
+        buildoptions_cpp {
+            "-Wno-error=date-time",
+            "-fmax-errors=1",
+            "-Wno-vla",
+            "-Wno-enum-compare",
+            "-Wno-comment",
+            "-Wno-misleading-indentation",
+            "-Wno-pragmas",
+            "-Wno-return-type",
+            "-Wno-variadic-macros",
+            "-Wno-int-in-bool-context"
+        }
+
+        buildoptions_cpp {
+            "-Wno-unused-variable",
+            "-Wno-unused-function",
+        }
+
+        includedirs {
+            "src/win32",
+        }
+
+        files {
+            --"src/win32/mman.c",
+            "src/win32/realpath.c",
+            --"src/win32/dlfcn.c",
+        }
+
+        defines {
+            "SCOPES_WIN32",
+        }
+
+        buildoptions_c {
+            "-Wno-shift-count-overflow"
+        }
+
+        links {
+        }
+
+        linkoptions {
+            "-Wl,--stack,8388608"
+        }
+
+        postbuildcommands {
+        }
+
+    configuration { "macosx" }
+        defines { "SCOPES_MACOS" }
+
+        includedirs {
+        }
+
+        buildoptions_cpp {
+            "-std=c++11",
+            "-fno-rtti",
+            "-fno-exceptions",
+            "-ferror-limit=1",
+            "-pedantic",
+            "-Wall",
+            "-Wno-keyword-macro",
+            "-Wno-gnu-redeclared-enum",
+        }
+
+        postbuildcommands {
+        }
+
+    configuration "debug"
+        defines { "SCOPES_DEBUG" }
+        flags { "Symbols" }
+
+        buildoptions_cpp {
+            "-O0"
+        }
+
+    configuration "release"
+        defines { "NDEBUG" }
+        flags { "Optimize" }

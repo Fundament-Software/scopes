@@ -29,7 +29,7 @@
 #include "gen_llvm.hpp"
 #include "gen_spirv.hpp"
 #include "anchor.hpp"
-#include "main.hpp"
+#include "boot.hpp"
 #include "gc.hpp"
 #include "compiler_flags.hpp"
 #include "hash.hpp"
