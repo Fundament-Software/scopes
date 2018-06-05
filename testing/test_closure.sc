@@ -49,7 +49,7 @@ fn test3 ()
             handle_events;
     handle_events;
 
-dump-label
+'dump
     typify test3
 
 test2;

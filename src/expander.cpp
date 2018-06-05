@@ -519,6 +519,23 @@ struct Expander {
             return write_dest(dest);
         }
 
+        // small hack to simplify simple aliasing
+        if (labelname == SYM_Unnamed) {
+            // label is implicit
+            if ((it->count == 3) && (values->count == 2)) {
+                // single simple value is being assigned (k = v)
+                auto key = unsyntax(it->at);
+                auto val = unsyntax(values->next->at);
+                if ((key.type == TYPE_Symbol) && (val.type == TYPE_Symbol)) {
+                    Any value = none;
+                    if (env->lookup(val.symbol, value)) {
+                        env->bind(key.symbol, value);
+                        return write_dest(dest);
+                    }
+                }
+            }
+        }
+
         nextstate = Label::continuation_from(_anchor, labelname);
         if (state) {
             nextstate->body.scope_label = state;

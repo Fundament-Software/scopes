@@ -23,6 +23,9 @@
 
 #ifdef SCOPES_WIN32
 #include "stdlib_ex.h"
+#include "dlfcn.h"
+#else
+#include <dlfcn.h>
 #endif
 #include <libgen.h>
 
@@ -48,6 +51,8 @@
 #pragma GCC diagnostic ignored "-Wvla-extension"
 
 namespace scopes {
+
+void *global_c_namespace = nullptr;
 
 //------------------------------------------------------------------------------
 // IL->LLVM IR GENERATOR
@@ -185,9 +190,22 @@ static LLVMValueRef LLVMDIBuilderCreateFile(
 }
 
 //static std::vector<void *> loaded_libs;
-void *local_aware_dlsym(const char *name) {
+static std::unordered_map<Symbol, void *, Symbol::Hash> cached_dlsyms;
+void *local_aware_dlsym(Symbol name) {
 #if 1
-    return LLVMSearchForAddressOfSymbol(name);
+    //auto it = cached_dlsyms.find(name);
+    //if (it == cached_dlsyms.end()) {
+        void *ptr = LLVMSearchForAddressOfSymbol(name.name()->data);
+        if (!ptr) {
+            ptr = dlsym(global_c_namespace, name.name()->data);
+        }
+        if (ptr) {
+            cached_dlsyms.insert({name, ptr});
+        }
+        return ptr;
+    //} else {
+    //    return it->second;
+    //}
 #else
     size_t i = loaded_libs.size();
     while (i--) {
@@ -879,7 +897,7 @@ struct LLVMIRGenerator {
                 if ((namestr->count > 5) && !strncmp(name, "llvm.", 5)) {
                     result = LLVMAddFunction(module, name, LLT);
                 } else {
-                    void *pptr = local_aware_dlsym(name);
+                    void *pptr = local_aware_dlsym(value.symbol);
                     uint64_t ptr = *(uint64_t*)&pptr;
                     if (!ptr) {
                         LLVMInstallFatalErrorHandler(fatal_error_handler);

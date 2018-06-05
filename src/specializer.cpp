@@ -4440,7 +4440,7 @@ struct Specializer {
     void *extract_compile_time_pointer(Any value) {
         switch(value.type->kind()) {
         case TK_Extern: {
-            void *ptr = local_aware_dlsym(value.symbol.name()->data);
+            void *ptr = local_aware_dlsym(value.symbol);
             if (!ptr) {
                 StyledString ss;
                 ss.out << "could not resolve external at compile time: " << value;

@@ -8,7 +8,7 @@ fn main ()
     assert ((f 2 3) == 5)
     unconst true
 
-dump-label
+'dump
     typify main
 
 
@@ -26,7 +26,7 @@ let lib =
 fn testf (x y)
     + x y
 
-let z = 
+let z =
     lib.call_testfunc testf 2 3
 print z
 assert (z == 5)

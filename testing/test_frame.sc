@@ -5,7 +5,7 @@ fn test ()
     fn join (a b)
         string-join a b
 
-    dump-frame (Closure-frame join)
+    'dump (Closure-frame join)
     let a = join
     let b = join
     # ensure function has a fixed scope label

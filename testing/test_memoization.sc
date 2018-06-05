@@ -11,7 +11,7 @@ fn memoized2 (x)
     typename x
 
 inline not-memoized ()
-    typename "T"
+    typename-type "T"
 
 assert
     (not-memoized) != (not-memoized)

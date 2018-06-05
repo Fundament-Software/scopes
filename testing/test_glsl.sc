@@ -61,7 +61,7 @@ let fragment-code =
                     texture smp uv
             return;
 
-        dump-label
+        'dump
             typify fragment-shader
 
         let code =

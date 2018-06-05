@@ -17,6 +17,49 @@
 """"A pass-through function that allows expressions to evaluate to multiple
     arguments.
 
+let __typify = sc_typify
+let __compile = sc_compile
+let __compile-object = sc_compile_object
+let __compile-spirv = sc_compile_spirv
+let __compile-glsl = sc_compile_glsl
+let eval = sc_eval
+let compiler-version = sc_compiler_version
+let verify-stack! = sc_verify_stack
+let enter-solver-cli! = sc_enter_solver_cli
+
+let default-styler = sc_default_styler
+let io-write! = sc_write
+let format-message = sc_format_message
+let __prompt = sc_prompt
+let set-autocomplete-scope! = sc_set_autocomplete_scope
+
+let file? = sc_is_file
+let directory? = sc_is_directory
+let realpath = sc_realpath
+let dirname = sc_dirname
+let basename = sc_basename
+
+let globals = sc_get_globals
+let set-globals! = sc_set_globals
+
+let __error! = sc_error
+let __raise! = sc_raise
+let __anchor-error! = sc_anchor_error
+let set-exception-pad = sc_set_exception_pad
+let exception-value = sc_exception_value
+let exit = sc_exit
+let set-signal-abort! = sc_set_signal_abort
+
+let __hash = sc_hash
+let __hash2x64 = sc_hash2x64
+let __hashbytes = sc_hashbytes
+
+let set-anchor! = sc_set_active_anchor
+let active-anchor = sc_get_active_anchor
+
+let import-c = sc_import_c
+let load-library = sc_load_library
+
 let Scope@ = sc_scope_at
 let Scope-local@ = sc_scope_local_at
 let Scope-docstring = sc_scope_get_docstring
@@ -28,8 +71,85 @@ let Scope-clone-expand = sc_scope_clone_subscope
 let Scope-parent = sc_scope_get_parent
 let delete-scope-symbol! = sc_scope_del_symbol
 let Scope-next = sc_scope_next
+
 let string->Symbol = sc_symbol_new
 let Symbol->string = sc_symbol_to_string
+
+let string-join = sc_string_join
+let string-new = sc_string_new
+let string-match? = sc_string_match
+
+let Any-repr = sc_any_repr
+let Any-string = sc_any_string
+let Any== = sc_any_eq
+
+let list-cons = sc_list_cons
+let list-join = sc_list_join
+let list-dump = sc_list_dump
+
+let Syntax-new = sc_syntax_new
+let Syntax-wrap = sc_syntax_wrap
+let Syntax-strip = sc_syntax_strip
+let list-load = sc_syntax_from_path
+let list-parse = sc_syntax_from_string
+
+let element-type = sc_type_element_at
+let type-countof = sc_type_countof
+let sizeof = sc_type_sizeof
+let runtime-type@ = sc_type_at
+let element-index = sc_type_field_index
+let element-name = sc_type_field_name
+let type-kind = sc_type_kind
+let storageof = sc_type_storage
+let opaque? = sc_type_is_opaque
+let type-name = sc_type_string
+let type-next = sc_type_next
+
+let pointer-type = sc_pointer_type
+let pointer-type-set-element-type = sc_pointer_type_set_element_type
+let pointer-type-set-storage-class = sc_pointer_type_set_storage_class
+let pointer-type-set-flags = sc_pointer_type_set_flags
+let pointer-type-flags = sc_pointer_type_get_flags
+let pointer-type-set-storage-class = sc_pointer_type_set_storage_class
+let pointer-type-storage-class = sc_pointer_type_get_storage_class
+
+let extern-type-location = sc_extern_type_location
+let extern-type-binding = sc_extern_type_binding
+
+let bitcountof = sc_type_bitcountof
+
+let integer-type = sc_integer_type
+let signed? = sc_integer_type_is_signed
+
+let typename-type = sc_typename_type
+let set-typename-super! = sc_typename_type_set_super
+let superof = sc_typename_type_get_super
+
+let array-type = sc_array_type
+let vector-type = sc_vector_type
+
+let function-type-variadic? = sc_function_type_is_variadic
+
+let Image-type = sc_image_type
+let SampledImage-type = sc_sampled_image_type
+
+let Parameter-new = sc_parameter_new
+let Parameter-index = sc_parameter_index
+let Parameter-name = sc_parameter_name
+
+let Label-dump = sc_label_dump
+let Label-docstring = sc_label_docstring
+let Label-anchor = sc_label_anchor
+let Label-parameter-count = sc_label_parameter_count
+let Label-parameter = sc_label_parameter
+let Label-name = sc_label_name
+let Label-countof-reachable = sc_label_countof_reachable
+let Label-set-inline! = sc_label_set_inline
+
+let Frame-dump = sc_frame_dump
+
+let Closure-label = sc_closure_label
+let Closure-frame = sc_closure_frame
 
 inline unconst-all (args...)
     let loop (i result...) = (va-countof args...)
@@ -316,9 +436,12 @@ syntax-extend
     set-type-symbol! Label '__== (gen-type-op2 pointer==)
     set-type-symbol! Frame '__== (gen-type-op2 pointer==)
 
+    set-type-symbol! Frame 'dump
+        inline (self)
+            Frame-dump self
     set-type-symbol! Label 'dump
         inline (self)
-            dump-label self
+            Label-dump self
     set-type-symbol! Closure 'dump
         inline (self)
             'dump (Closure-label self)
@@ -3727,7 +3850,7 @@ typeinline CUnion '__getattr (self name)
         extractvalue self idx
 
 # extern call attempts to cast arguments to correct type
-typefn extern '__call (self ...)
+typeinline extern '__call (self ...)
     label docall (dest ET)
         let sz = (va-countof ...)
         let count = (itrunc (rawcall type-countof ET) i32)
@@ -4167,7 +4290,7 @@ inline tupleof (...)
 #-------------------------------------------------------------------------------
 
 let Capture = (typename "Capture")
-let MutableCapture = (typename "Capture" Capture)
+let MutableCapture = (typename "MutableCapture" Capture)
 
 typefn& MutableCapture '__copy (self other)
     (type@& tuple '__copy) self other

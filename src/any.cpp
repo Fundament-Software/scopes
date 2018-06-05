@@ -35,7 +35,7 @@ struct Frame;
 struct Closure;
 
 std::size_t Any::Hash::operator()(const Any & s) const {
-    return s.hash();
+    return hash2(std::hash<const Type *>{}(s.type), s.hash());
 }
 
 Any::Any(Nothing x) : type(TYPE_Nothing), u64(0) {}
