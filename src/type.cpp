@@ -474,6 +474,14 @@ void init_types() {
         TYPE_Anchor,
         TYPE_String);
 
+    DEFINE_TYPENAME("LabelMacro", TYPE_LabelMacro);
+    {
+        cast<TypenameType>(const_cast<Type *>(TYPE_LabelMacro))
+            ->finalize(
+                Pointer(Function(TYPE_Void, { TYPE_Label }),
+                    PTF_NonWritable, SYM_Unnamed));
+    }
+
 #define T(TYPE, TYPENAME) \
     assert(TYPE);
     B_TYPES()

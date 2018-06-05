@@ -223,6 +223,7 @@ project "scopesrt"
         linkoptions {
             --"-Wl,--stack,8388608"
             --"-Wl,--stack,16777216"
+            "-Wl,-soname,libscopesrt.so"
         }
         linkoptions {
             --"-Wl,--whole-archive",
@@ -449,6 +450,7 @@ project "scopes"
         defines { "SCOPES_LINUX" }
 
         includedirs {
+            "clang/include"
         }
 
         buildoptions_cpp {
@@ -467,13 +469,13 @@ project "scopes"
         }
 
         links {
+            "dl"
         }
 
         linkoptions {
             --"-Wl,--stack,8388608"
             --"-Wl,--stack,16777216"
-        }
-        linkoptions {
+            "-Wl,-rpath=\\$$ORIGIN"
         }
 
         postbuildcommands {

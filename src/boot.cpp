@@ -16,6 +16,7 @@
 #endif
 #include <unistd.h>
 #include <libgen.h>
+#include <cstdlib>
 
 namespace scopes {
 

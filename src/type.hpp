@@ -125,6 +125,7 @@ typedef std::vector<const Type *> ArgTypes;
     T(TYPE_Label, "Label") \
     T(TYPE_Frame, "Frame") \
     T(TYPE_Closure, "Closure") \
+    T(TYPE_LabelMacro, "LabelMacro") \
     \
     T(TYPE_USize, "usize") \
     \

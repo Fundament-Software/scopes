@@ -55,7 +55,7 @@ Building Scopes on Linux
   `SPIRV-Cross <https://github.com/KhronosGroup/SPIRV-Cross>`_ (into the workspace folder).
 * Lastly, you need a build of `GENie <https://github.com/bkaradzic/GENie>`_ (binaries
   available on the page).
-* Build libffi using ``./configure --enable-shared=no --enable-static=yes && make`` and
+* Build libffi using ``./configure CFLAGS="-fPIC" --enable-shared=no --enable-static=yes && make`` and
   softlink (no copy) the generated build folder (e.g. ``x86_64-unknown-linux-gnu``)
   as ``libffi`` in the workspace folder.
 * Check SPIRV-Tools' build instructions to verify that its dependency on SPIRV headers
