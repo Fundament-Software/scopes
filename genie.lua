@@ -179,6 +179,7 @@ project "scopesrt"
     targetdir "bin"
     defines {
         "SPIRV_CROSS_EXCEPTIONS_TO_ASSERTIONS",
+        "SCOPESRT_IMPL"
     }
 
     configuration { "linux" }

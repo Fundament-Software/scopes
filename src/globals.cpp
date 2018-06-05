@@ -57,6 +57,109 @@
 
 #pragma GCC diagnostic ignored "-Wgnu-zero-variadic-macro-arguments"
 
+extern "C" {
+
+// Scope
+////////////////////////////////////////////////////////////////////////////////
+
+void sc_scope_set_symbol(sc_scope_t *scope, sc_symbol_t sym, sc_any_t value) {
+    scope->bind(sym, value);
+}
+
+sc_any_bool_tuple_t sc_scope_at(sc_scope_t *scope, sc_symbol_t key) {
+    using namespace scopes;
+    Any result = none;
+    bool ok = scope->lookup(key, result);
+    return { result, ok };
+}
+
+sc_any_bool_tuple_t sc_scope_local_at(sc_scope_t *scope, sc_symbol_t key) {
+    using namespace scopes;
+    Any result = none;
+    bool ok = scope->lookup_local(key, result);
+    return { result, ok };
+}
+
+const sc_string_t *sc_scope_get_docstring(sc_scope_t *scope, sc_symbol_t key) {
+    using namespace scopes;
+    if (key == SYM_Unnamed) {
+        if (scope->doc) return scope->doc;
+    } else {
+        AnyDoc entry = { none, nullptr };
+        if (scope->lookup(key, entry) && entry.doc) {
+            return entry.doc;
+        }
+    }
+    return Symbol(SYM_Unnamed).name();
+}
+
+void sc_scope_set_docstring(sc_scope_t *scope, sc_symbol_t key, const sc_string_t *str) {
+    using namespace scopes;
+    if (key == SYM_Unnamed) {
+        scope->doc = str;
+    } else {
+        AnyDoc entry = { none, nullptr };
+        if (!scope->lookup_local(key, entry)) {
+            location_error(
+                String::from("attempting to set a docstring for a non-local name"));
+        }
+        entry.doc = str;
+        scope->bind_with_doc(key, entry);
+    }
+}
+
+sc_scope_t *sc_scope_new() {
+    using namespace scopes;
+    return Scope::from();
+}
+
+sc_scope_t *sc_scope_clone(sc_scope_t *clone) {
+    using namespace scopes;
+    return Scope::from(nullptr, clone);
+}
+
+sc_scope_t *sc_scope_new_subscope(sc_scope_t *scope) {
+    using namespace scopes;
+    return Scope::from(scope);
+}
+
+sc_scope_t *sc_scope_clone_subscope(sc_scope_t *scope, sc_scope_t *clone) {
+    using namespace scopes;
+    return Scope::from(scope, clone);
+}
+
+sc_scope_t *sc_scope_get_parent(sc_scope_t *scope) {
+    using namespace scopes;
+    return scope->parent;
+}
+
+void sc_scope_del_symbol(sc_scope_t *scope, sc_symbol_t sym) {
+    using namespace scopes;
+    scope->del(sym);
+}
+
+sc_symbol_any_tuple_t sc_scope_next(sc_scope_t *scope, sc_symbol_t key) {
+    using namespace scopes;
+    auto &&map = *scope->map;
+    Scope::Map::const_iterator it;
+    if (key == SYM_Unnamed) {
+        it = map.begin();
+    } else {
+        it = map.find(key);
+        if (it != map.end()) it++;
+    }
+    while (it != map.end()) {
+        if (is_typed(it->second.value)) {
+            return { it->first, it->second.value };
+        }
+        it++;
+    }
+    return { SYM_Unnamed, none };
+}
+
+
+}
+
 namespace scopes {
 
 //------------------------------------------------------------------------------
@@ -112,48 +215,11 @@ static const List *f_dump_list(const List *l) {
 }
 
 typedef struct { Any result; bool ok; } AnyBoolPair;
-static AnyBoolPair f_scope_at(Scope *scope, Symbol key) {
-    Any result = none;
-    bool ok = scope->lookup(key, result);
-    return { result, ok };
-}
-
-static AnyBoolPair f_scope_local_at(Scope *scope, Symbol key) {
-    Any result = none;
-    bool ok = scope->lookup_local(key, result);
-    return { result, ok };
-}
 
 static AnyBoolPair f_type_at(const Type *T, Symbol key) {
     Any result = none;
     bool ok = T->lookup(key, result);
     return { result, ok };
-}
-
-static const String *f_scope_docstring(Scope *scope, Symbol key) {
-    if (key == SYM_Unnamed) {
-        if (scope->doc) return scope->doc;
-    } else {
-        AnyDoc entry = { none, nullptr };
-        if (scope->lookup(key, entry) && entry.doc) {
-            return entry.doc;
-        }
-    }
-    return Symbol(SYM_Unnamed).name();
-}
-
-static void f_scope_set_docstring(Scope *scope, Symbol key, const String *str) {
-    if (key == SYM_Unnamed) {
-        scope->doc = str;
-    } else {
-        AnyDoc entry = { none, nullptr };
-        if (!scope->lookup_local(key, entry)) {
-            location_error(
-                String::from("attempting to set a docstring for a non-local name"));
-        }
-        entry.doc = str;
-        scope->bind_with_doc(key, entry);
-    }
 }
 
 static Symbol f_symbol_new(const String *str) {
@@ -447,23 +513,6 @@ static const Syntax *f_list_parse(const String *str) {
     return parser.parse();
 }
 
-static Scope *f_scope_new() {
-    return Scope::from();
-}
-static Scope *f_scope_clone(Scope *clone) {
-    return Scope::from(nullptr, clone);
-}
-static Scope *f_scope_new_subscope(Scope *scope) {
-    return Scope::from(scope);
-}
-static Scope *f_scope_clone_subscope(Scope *scope, Scope *clone) {
-    return Scope::from(scope, clone);
-}
-
-static Scope *f_scope_parent(Scope *scope) {
-    return scope->parent;
-}
-
 static Scope *f_globals() {
     return globals;
 }
@@ -474,14 +523,6 @@ static void f_set_globals(Scope *s) {
 
 static Label *f_eval(const Syntax *expr, Scope *scope) {
     return specialize(Frame::root, expand_module(expr, scope), {});
-}
-
-static void f_set_scope_symbol(Scope *scope, Symbol sym, Any value) {
-    scope->bind(sym, value);
-}
-
-static void f_del_scope_symbol(Scope *scope, Symbol sym) {
-    scope->del(sym);
 }
 
 static Label *f_typify(Closure *srcl, int numtypes, const Type **typeargs) {
@@ -598,26 +639,7 @@ static const List *f_list_join(List *a, List *b) {
     return List::join(a, b);
 }
 
-typedef struct { Any _0; Any _1; } AnyAnyPair;
 typedef struct { Symbol _0; Any _1; } SymbolAnyPair;
-static SymbolAnyPair f_scope_next(Scope *scope, Symbol key) {
-    auto &&map = *scope->map;
-    Scope::Map::const_iterator it;
-    if (key == SYM_Unnamed) {
-        it = map.begin();
-    } else {
-        it = map.find(key);
-        if (it != map.end()) it++;
-    }
-    while (it != map.end()) {
-        if (is_typed(it->second.value)) {
-            return { it->first, it->second.value };
-        }
-        it++;
-    }
-    return { SYM_Unnamed, none };
-}
-
 static SymbolAnyPair f_type_next(const Type *type, Symbol key) {
     auto &&map = type->get_symbols();
     Type::Map::const_iterator it;
@@ -770,6 +792,12 @@ static uint64_t f_hashbytes (const char *data, size_t size) {
     return hash_bytes(data, size);
 }
 
+static void bind_extern(Symbol sym, const Type *T) {
+    Any value(sym);
+    value.type = T;
+    globals->bind(sym, value);
+}
+
 void init_globals(int argc, char *argv[]) {
 
 #define DEFINE_C_FUNCTION(SYMBOL, FUNC, RETTYPE, ...) \
@@ -784,13 +812,32 @@ void init_globals(int argc, char *argv[]) {
     globals->bind(SYMBOL, \
         Any::from_pointer(Pointer(Function(RETTYPE, { __VA_ARGS__ }, FF_Pure), \
             PTF_NonWritable, SYM_Unnamed), (void *)FUNC));
+#define DEFINE_EXTERN_C_FUNCTION(FUNC, RETTYPE, ...) \
+    (void)FUNC; /* ensure that the symbol is there */ \
+    bind_extern(Symbol(#FUNC), \
+        Extern(Function(RETTYPE, { __VA_ARGS__ }), EF_NonWritable));
+#define DEFINE_EXTERN_PURE_C_FUNCTION(FUNC, RETTYPE, ...) \
+    (void)FUNC; /* ensure that the symbol is there */ \
+    bind_extern(Symbol(#FUNC), \
+        Extern(Function(RETTYPE, { __VA_ARGS__ }, FF_Pure), EF_NonWritable));
 
     //const Type *rawstring = Pointer(TYPE_I8);
 
     DEFINE_PURE_C_FUNCTION(FN_ImportC, f_import_c, TYPE_Scope, TYPE_String, TYPE_String, TYPE_List);
-    DEFINE_PURE_C_FUNCTION(FN_ScopeAt, f_scope_at, Tuple({TYPE_Any,TYPE_Bool}), TYPE_Scope, TYPE_Symbol);
-    DEFINE_PURE_C_FUNCTION(FN_ScopeLocalAt, f_scope_local_at, Tuple({TYPE_Any,TYPE_Bool}), TYPE_Scope, TYPE_Symbol);
-    DEFINE_PURE_C_FUNCTION(FN_ScopeDocString, f_scope_docstring, TYPE_String, TYPE_Scope, TYPE_Symbol);
+
+    DEFINE_EXTERN_PURE_C_FUNCTION(sc_scope_at, Tuple({TYPE_Any,TYPE_Bool}), TYPE_Scope, TYPE_Symbol);
+    DEFINE_EXTERN_PURE_C_FUNCTION(sc_scope_local_at, Tuple({TYPE_Any,TYPE_Bool}), TYPE_Scope, TYPE_Symbol);
+    DEFINE_EXTERN_PURE_C_FUNCTION(sc_scope_get_docstring, TYPE_String, TYPE_Scope, TYPE_Symbol);
+    DEFINE_EXTERN_C_FUNCTION(sc_scope_set_docstring, TYPE_Void, TYPE_Scope, TYPE_Symbol, TYPE_String);
+    DEFINE_EXTERN_C_FUNCTION(sc_scope_set_symbol, TYPE_Void, TYPE_Scope, TYPE_Symbol, TYPE_Any);
+    DEFINE_EXTERN_C_FUNCTION(sc_scope_new, TYPE_Scope);
+    DEFINE_EXTERN_C_FUNCTION(sc_scope_clone, TYPE_Scope, TYPE_Scope);
+    DEFINE_EXTERN_C_FUNCTION(sc_scope_new_subscope, TYPE_Scope, TYPE_Scope);
+    DEFINE_EXTERN_C_FUNCTION(sc_scope_clone_subscope, TYPE_Scope, TYPE_Scope, TYPE_Scope);
+    DEFINE_EXTERN_C_FUNCTION(sc_scope_get_parent, TYPE_Scope, TYPE_Scope);
+    DEFINE_EXTERN_C_FUNCTION(sc_scope_del_symbol, TYPE_Void, TYPE_Scope, TYPE_Symbol);
+    DEFINE_EXTERN_PURE_C_FUNCTION(sc_scope_next, Tuple({TYPE_Symbol, TYPE_Any}), TYPE_Scope, TYPE_Symbol);
+
     DEFINE_PURE_C_FUNCTION(FN_RuntimeTypeAt, f_type_at, Tuple({TYPE_Any,TYPE_Bool}), TYPE_Type, TYPE_Symbol);
     DEFINE_PURE_C_FUNCTION(FN_SymbolNew, f_symbol_new, TYPE_Symbol, TYPE_String);
     DEFINE_PURE_C_FUNCTION(FN_Repr, f_repr, TYPE_String, TYPE_Any);
@@ -841,7 +888,6 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_PURE_C_FUNCTION(FN_SymbolToString, f_symbol_to_string, TYPE_String, TYPE_Symbol);
     DEFINE_PURE_C_FUNCTION(Symbol("Any=="), f_any_eq, TYPE_Bool, TYPE_Any, TYPE_Any);
     DEFINE_PURE_C_FUNCTION(FN_ListJoin, f_list_join, TYPE_List, TYPE_List, TYPE_List);
-    DEFINE_PURE_C_FUNCTION(FN_ScopeNext, f_scope_next, Tuple({TYPE_Symbol, TYPE_Any}), TYPE_Scope, TYPE_Symbol);
     DEFINE_PURE_C_FUNCTION(FN_TypeNext, f_type_next, Tuple({TYPE_Symbol, TYPE_Any}), TYPE_Type, TYPE_Symbol);
     DEFINE_PURE_C_FUNCTION(FN_StringMatch, f_string_match, TYPE_Bool, TYPE_String, TYPE_String);
     DEFINE_PURE_C_FUNCTION(SFXFN_SetTypenameSuper, f_set_typename_super, TYPE_Void, TYPE_Type, TYPE_Type);
@@ -872,16 +918,8 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_C_FUNCTION(FN_IsDirectory, f_is_directory, TYPE_Bool, TYPE_String);
     DEFINE_C_FUNCTION(FN_ListLoad, f_list_load, TYPE_Syntax, TYPE_String);
     DEFINE_C_FUNCTION(FN_ListParse, f_list_parse, TYPE_Syntax, TYPE_String);
-    DEFINE_C_FUNCTION(FN_ScopeNew, f_scope_new, TYPE_Scope);
-    DEFINE_C_FUNCTION(FN_ScopeCopy, f_scope_clone, TYPE_Scope, TYPE_Scope);
-    DEFINE_C_FUNCTION(FN_ScopeNewSubscope, f_scope_new_subscope, TYPE_Scope, TYPE_Scope);
-    DEFINE_C_FUNCTION(FN_ScopeCopySubscope, f_scope_clone_subscope, TYPE_Scope, TYPE_Scope, TYPE_Scope);
-    DEFINE_C_FUNCTION(FN_ScopeParent, f_scope_parent, TYPE_Scope, TYPE_Scope);
     DEFINE_C_FUNCTION(KW_Globals, f_globals, TYPE_Scope);
     DEFINE_C_FUNCTION(SFXFN_SetGlobals, f_set_globals, TYPE_Void, TYPE_Scope);
-    DEFINE_C_FUNCTION(SFXFN_SetScopeSymbol, f_set_scope_symbol, TYPE_Void, TYPE_Scope, TYPE_Symbol, TYPE_Any);
-    DEFINE_C_FUNCTION(SFXFN_DelScopeSymbol, f_del_scope_symbol, TYPE_Void, TYPE_Scope, TYPE_Symbol);
-    DEFINE_C_FUNCTION(FN_SetScopeDocString, f_scope_set_docstring, TYPE_Void, TYPE_Scope, TYPE_Symbol, TYPE_String);
     DEFINE_C_FUNCTION(FN_RealPath, f_realpath, TYPE_String, TYPE_String);
     DEFINE_C_FUNCTION(FN_DirName, f_dirname, TYPE_String, TYPE_String);
     DEFINE_C_FUNCTION(FN_BaseName, f_basename, TYPE_String, TYPE_String);

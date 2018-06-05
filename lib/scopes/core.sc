@@ -17,6 +17,18 @@
 """"A pass-through function that allows expressions to evaluate to multiple
     arguments.
 
+let Scope@ = sc_scope_at
+let Scope-local@ = sc_scope_local_at
+let Scope-docstring = sc_scope_get_docstring
+let set-scope-docstring! = sc_scope_set_docstring
+let Scope-new = sc_scope_new
+let Scope-clone = sc_scope_clone
+let Scope-new-expand = sc_scope_new_subscope
+let Scope-clone-expand = sc_scope_clone_subscope
+let Scope-parent = sc_scope_get_parent
+let delete-scope-symbol! = sc_scope_del_symbol
+let Scope-next = sc_scope_next
+
 inline unconst-all (args...)
     let loop (i result...) = (va-countof args...)
     if (icmp== i 0)
@@ -1231,7 +1243,7 @@ fn list-reverse (l tail)
         loop (list-next l) (list-cons (list-at l) next)
 
 fn set-scope-symbol! (scope sym value)
-    __set-scope-symbol! scope sym (Any value)
+    sc_scope_set_symbol scope sym (Any value)
 
 fn syntax-error! (anchor msg)
     let T = (typeof anchor)

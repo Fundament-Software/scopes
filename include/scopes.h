@@ -11,6 +11,10 @@
 #include <stddef.h>
 #include <stdbool.h>
 
+#if defined(SCOPESRT_IMPL) && defined(__cplusplus)
+#include "../src/any.hpp"
+#endif
+
 #if defined __cplusplus
 extern "C" {
 #endif
@@ -81,6 +85,67 @@ void scopes_strtoull(uint64_t *v, const char* str, char** endptr);
 bool scopes_is_debug();
 
 const char *scopes_compile_time_date();
+
+#if defined(SCOPESRT_IMPL) && defined(__cplusplus)
+} // extern "C"
+
+namespace scopes {
+    struct Type;
+    struct Scope;
+    struct Any;
+    struct Symbol;
+    struct String;
+}
+
+extern "C" {
+
+typedef scopes::Type sc_type_t;
+typedef scopes::Scope sc_scope_t;
+typedef scopes::Symbol sc_symbol_t;
+typedef scopes::Any sc_any_t;
+typedef scopes::String sc_string_t;
+
+// some of the return types are technically illegal in C, but we take care
+// that the alignment is correct
+#pragma GCC diagnostic ignored "-Wreturn-type-c-linkage"
+
+#else
+
+typedef struct sc_type_ sc_type_t;
+typedef struct sc_scope_ sc_scope_t;
+typedef struct sc_string_ sc_string_t;
+
+typedef uint64_t sc_symbol_t;
+
+typedef struct sc_any_ {
+    sc_type_t *type;
+    uint64_t payload;
+} sc_any_t;
+
+#endif
+
+typedef struct sc_any_bool_tuple_ {
+    sc_any_t _0;
+    bool _1;
+} sc_any_bool_tuple_t;
+
+typedef struct sc_symbol_any_tuple_ {
+    sc_symbol_t _0;
+    sc_any_t _1;
+} sc_symbol_any_tuple_t;
+
+void sc_scope_set_symbol(sc_scope_t *scope, sc_symbol_t sym, sc_any_t value);
+sc_any_bool_tuple_t sc_scope_at(sc_scope_t *scope, sc_symbol_t key);
+sc_any_bool_tuple_t sc_scope_local_at(sc_scope_t *scope, sc_symbol_t key);
+const sc_string_t *sc_scope_get_docstring(sc_scope_t *scope, sc_symbol_t key);
+void sc_scope_set_docstring(sc_scope_t *scope, sc_symbol_t key, const sc_string_t *str);
+sc_scope_t *sc_scope_new();
+sc_scope_t *sc_scope_clone(sc_scope_t *clone);
+sc_scope_t *sc_scope_new_subscope(sc_scope_t *scope);
+sc_scope_t *sc_scope_clone_subscope(sc_scope_t *scope, sc_scope_t *clone);
+sc_scope_t *sc_scope_get_parent(sc_scope_t *scope);
+void sc_scope_del_symbol(sc_scope_t *scope, sc_symbol_t sym);
+sc_symbol_any_tuple_t sc_scope_next(sc_scope_t *scope, sc_symbol_t key);
 
 #if defined __cplusplus
 }
