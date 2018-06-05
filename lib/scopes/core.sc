@@ -3429,7 +3429,7 @@ inline xpcall (f errorf)
     let old-pad =
         set-exception-pad pad
     if (== operating-system 'windows)
-        if ((catch-exception pad (nullof i8*)) != 0)
+        if ((sc_setjmp pad (nullof i8*)) != 0)
             set-exception-pad old-pad
             errorf (exception-value pad)
         else
@@ -3437,7 +3437,7 @@ inline xpcall (f errorf)
             set-exception-pad old-pad
             result...
     else
-        if ((catch-exception pad) != 0)
+        if ((sc_setjmp pad) != 0)
             set-exception-pad old-pad
             errorf (exception-value pad)
         else

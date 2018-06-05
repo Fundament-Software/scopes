@@ -1020,10 +1020,14 @@ namespace scopes {
 // GLOBALS
 //------------------------------------------------------------------------------
 
-static void bind_extern(Symbol sym, const Type *T) {
-    Any value(sym);
+static void bind_extern(Symbol globalsym, Symbol externsym, const Type *T) {
+    Any value(externsym);
     value.type = T;
-    globals->bind(sym, value);
+    globals->bind(globalsym, value);
+}
+
+static void bind_extern(Symbol sym, const Type *T) {
+    bind_extern(sym, sym, T);
 }
 
 void init_globals(int argc, char *argv[]) {
@@ -1040,6 +1044,10 @@ void init_globals(int argc, char *argv[]) {
     globals->bind(SYMBOL, \
         Any::from_pointer(Pointer(Function(RETTYPE, { __VA_ARGS__ }, FF_Pure), \
             PTF_NonWritable, SYM_Unnamed), (void *)FUNC));
+#define DEFINE_RENAME_EXTERN_C_FUNCTION(NAME, FUNC, RETTYPE, ...) \
+    (void)FUNC; /* ensure that the symbol is there */ \
+    bind_extern(Symbol(#NAME), Symbol(#FUNC), \
+        Extern(Function(RETTYPE, { __VA_ARGS__ }), EF_NonWritable));
 #define DEFINE_EXTERN_C_FUNCTION(FUNC, RETTYPE, ...) \
     (void)FUNC; /* ensure that the symbol is there */ \
     bind_extern(Symbol(#FUNC), \
@@ -1088,10 +1096,10 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_set_exception_pad,
         p_exception_pad_type, p_exception_pad_type);
     #ifdef SCOPES_WIN32
-    DEFINE_C_FUNCTION(Symbol("catch-exception"), _setjmpex, TYPE_I32,
+    DEFINE_RENAME_EXTERN_C_FUNCTION(sc_setjmp, _setjmpex, TYPE_I32,
         p_exception_pad_type, NativeROPointer(TYPE_I8));
     #else
-    DEFINE_C_FUNCTION(Symbol("catch-exception"), setjmp, TYPE_I32,
+    DEFINE_RENAME_EXTERN_C_FUNCTION(sc_setjmp, setjmp, TYPE_I32,
         p_exception_pad_type);
     #endif
     DEFINE_EXTERN_C_FUNCTION(sc_exception_value,
