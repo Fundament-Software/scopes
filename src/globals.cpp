@@ -157,6 +157,19 @@ sc_symbol_any_tuple_t sc_scope_next(sc_scope_t *scope, sc_symbol_t key) {
     return { SYM_Unnamed, none };
 }
 
+// Symbol
+////////////////////////////////////////////////////////////////////////////////
+
+sc_symbol_t sc_symbol_new(const sc_string_t *str) {
+    using namespace scopes;
+    return Symbol(str);
+}
+
+const sc_string_t *sc_symbol_to_string(sc_symbol_t sym) {
+    using namespace scopes;
+    return sym.name();
+}
+
 
 }
 
@@ -220,10 +233,6 @@ static AnyBoolPair f_type_at(const Type *T, Symbol key) {
     Any result = none;
     bool ok = T->lookup(key, result);
     return { result, ok };
-}
-
-static Symbol f_symbol_new(const String *str) {
-    return Symbol(str);
 }
 
 static const String *f_string_join(const String *a, const String *b) {
@@ -613,10 +622,6 @@ static const String *f_format_message(const Anchor *anchor, const String *messag
     return ss.str();
 }
 
-static const String *f_symbol_to_string(Symbol sym) {
-    return sym.name();
-}
-
 static void f_set_signal_abort(bool value) {
     signal_abort = value;
 }
@@ -838,8 +843,10 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_scope_del_symbol, TYPE_Void, TYPE_Scope, TYPE_Symbol);
     DEFINE_EXTERN_PURE_C_FUNCTION(sc_scope_next, Tuple({TYPE_Symbol, TYPE_Any}), TYPE_Scope, TYPE_Symbol);
 
+    DEFINE_EXTERN_PURE_C_FUNCTION(sc_symbol_new, TYPE_Symbol, TYPE_String);
+    DEFINE_EXTERN_PURE_C_FUNCTION(sc_symbol_to_string, TYPE_String, TYPE_Symbol);
+
     DEFINE_PURE_C_FUNCTION(FN_RuntimeTypeAt, f_type_at, Tuple({TYPE_Any,TYPE_Bool}), TYPE_Type, TYPE_Symbol);
-    DEFINE_PURE_C_FUNCTION(FN_SymbolNew, f_symbol_new, TYPE_Symbol, TYPE_String);
     DEFINE_PURE_C_FUNCTION(FN_Repr, f_repr, TYPE_String, TYPE_Any);
     DEFINE_PURE_C_FUNCTION(FN_AnyString, f_any_string, TYPE_String, TYPE_Any);
     DEFINE_PURE_C_FUNCTION(FN_StringJoin, f_string_join, TYPE_String, TYPE_String, TYPE_String);
@@ -885,7 +892,6 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_PURE_C_FUNCTION(FN_SampledImageType, SampledImage, TYPE_Type, TYPE_Type);
     DEFINE_PURE_C_FUNCTION(FN_VectorType, f_vector_type, TYPE_Type, TYPE_Type, TYPE_USize);
     DEFINE_PURE_C_FUNCTION(FN_TypeCountOf, f_type_countof, TYPE_I32, TYPE_Type);
-    DEFINE_PURE_C_FUNCTION(FN_SymbolToString, f_symbol_to_string, TYPE_String, TYPE_Symbol);
     DEFINE_PURE_C_FUNCTION(Symbol("Any=="), f_any_eq, TYPE_Bool, TYPE_Any, TYPE_Any);
     DEFINE_PURE_C_FUNCTION(FN_ListJoin, f_list_join, TYPE_List, TYPE_List, TYPE_List);
     DEFINE_PURE_C_FUNCTION(FN_TypeNext, f_type_next, Tuple({TYPE_Symbol, TYPE_Any}), TYPE_Type, TYPE_Symbol);

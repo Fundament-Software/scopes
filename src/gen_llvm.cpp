@@ -184,8 +184,8 @@ static LLVMValueRef LLVMDIBuilderCreateFile(
   return mdnode_to_value(Builder->createFile(Filename, Directory));
 }
 
-static std::vector<void *> loaded_libs;
-static void *local_aware_dlsym(const char *name) {
+//static std::vector<void *> loaded_libs;
+void *local_aware_dlsym(const char *name) {
 #if 1
     return LLVMSearchForAddressOfSymbol(name);
 #else

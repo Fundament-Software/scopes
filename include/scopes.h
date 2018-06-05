@@ -134,6 +134,8 @@ typedef struct sc_symbol_any_tuple_ {
     sc_any_t _1;
 } sc_symbol_any_tuple_t;
 
+// lexical scopes
+
 void sc_scope_set_symbol(sc_scope_t *scope, sc_symbol_t sym, sc_any_t value);
 sc_any_bool_tuple_t sc_scope_at(sc_scope_t *scope, sc_symbol_t key);
 sc_any_bool_tuple_t sc_scope_local_at(sc_scope_t *scope, sc_symbol_t key);
@@ -146,6 +148,12 @@ sc_scope_t *sc_scope_clone_subscope(sc_scope_t *scope, sc_scope_t *clone);
 sc_scope_t *sc_scope_get_parent(sc_scope_t *scope);
 void sc_scope_del_symbol(sc_scope_t *scope, sc_symbol_t sym);
 sc_symbol_any_tuple_t sc_scope_next(sc_scope_t *scope, sc_symbol_t key);
+
+// symbols
+
+sc_symbol_t sc_symbol_new(const sc_string_t *str);
+const sc_string_t *sc_symbol_to_string(sc_symbol_t sym);
+
 
 #if defined __cplusplus
 }

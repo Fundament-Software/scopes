@@ -1432,8 +1432,7 @@ struct Specializer {
         auto &&enter = l->body.enter;
         auto &&args = l->body.args;
 
-        auto pi = cast<PointerType>(enter.type);
-        auto fi = cast<FunctionType>(pi->element_type);
+        const FunctionType *fi = extract_function_type(enter.type);
 
         verify_function_argument_signature(fi, l);
 
@@ -4438,9 +4437,27 @@ struct Specializer {
         }
     }
 
+    void *extract_compile_time_pointer(Any value) {
+        switch(value.type->kind()) {
+        case TK_Extern: {
+            void *ptr = local_aware_dlsym(value.symbol.name()->data);
+            if (!ptr) {
+                StyledString ss;
+                ss.out << "could not resolve external at compile time: " << value;
+                location_error(ss.str());
+            }
+            return ptr;
+        } break;
+        case TK_Pointer: {
+            return value.pointer;
+        } break;
+        default: assert(false && "unexpected pointer type");
+            return nullptr;
+        }
+    }
+
     Any run_ffi_function(Any enter, Argument *args, size_t argcount) {
-        auto pi = cast<PointerType>(enter.type);
-        auto fi = cast<FunctionType>(pi->element_type);
+        auto fi = extract_function_type(enter.type);
 
         size_t fargcount = fi->argument_types.size();
 
@@ -4465,7 +4482,8 @@ struct Specializer {
         assert(prep_result == FFI_OK);
 
         Any result = Any::from_pointer(rettype, nullptr);
-        ffi_call(&cif, FFI_FN(enter.pointer),
+        void *ptr = extract_compile_time_pointer(enter);
+        ffi_call(&cif, FFI_FN(ptr),
             get_pointer(result.type, result, true), avalues);
         return result;
     }

@@ -28,6 +28,8 @@ let Scope-clone-expand = sc_scope_clone_subscope
 let Scope-parent = sc_scope_get_parent
 let delete-scope-symbol! = sc_scope_del_symbol
 let Scope-next = sc_scope_next
+let string->Symbol = sc_symbol_new
+let Symbol->string = sc_symbol_to_string
 
 inline unconst-all (args...)
     let loop (i result...) = (va-countof args...)

@@ -166,9 +166,18 @@ bool is_function_pointer(const Type *type) {
 }
 
 bool is_pure_function_pointer(const Type *type) {
-    const PointerType *ptype = dyn_cast<PointerType>(type);
-    if (!ptype) return false;
-    const FunctionType *ftype = dyn_cast<FunctionType>(ptype->element_type);
+    const FunctionType *ftype = nullptr;
+    switch (type->kind()) {
+    case TK_Pointer: {
+        const PointerType *ptype = cast<PointerType>(type);
+        ftype = dyn_cast<FunctionType>(ptype->element_type);
+    } break;
+    case TK_Extern: {
+        const ExternType *etype = cast<ExternType>(type);
+        ftype = dyn_cast<FunctionType>(etype->type);
+    } break;
+    default: return false;
+    }
     if (!ftype) return false;
     return ftype->flags & FF_Pure;
 }
