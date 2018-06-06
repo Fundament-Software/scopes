@@ -4,12 +4,14 @@ fn test (l)
         print k v
     print ('continuation l)
     'return! l 4 5 6
-    return;
+    l
 
 syntax-extend
     set-scope-symbol! syntax-scope 'test
         compile (typify test Label)
     syntax-scope
+
+assert ((storageof LabelMacro) == (typeof test))
 
 let test =
     bitcast test

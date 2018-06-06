@@ -4748,8 +4748,8 @@ set-type-symbol! Label 'argument@ Label-argument
 
 typeinline Label 'return! (self args...)
     let k v = (Label-argument self 0:usize)
-    Label-set-enter! self v
-    'set-arguments! self none args...
+    Label-set-enter! self (Any _)
+    'set-arguments! self v args...
 
 typeinline Label 'set-arguments! (self args...)
     Label-clear-arguments! self

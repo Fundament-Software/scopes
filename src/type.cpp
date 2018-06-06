@@ -478,7 +478,7 @@ void init_types() {
     {
         cast<TypenameType>(const_cast<Type *>(TYPE_LabelMacro))
             ->finalize(
-                Pointer(Function(TYPE_Void, { TYPE_Label }),
+                Pointer(Function(TYPE_Label, { TYPE_Label }),
                     PTF_NonWritable, SYM_Unnamed));
     }
 

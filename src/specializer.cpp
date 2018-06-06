@@ -2700,13 +2700,13 @@ struct Specializer {
     #endif
     }
 
-    void fold_label_macro_call(Label *l) {
+    Label *fold_label_macro_call(Label *l) {
         auto &&enter = l->body.enter;
 
-        typedef void (*label_macro_handler)(Label *);
+        typedef Label *(*label_macro_handler)(Label *);
 
         label_macro_handler handler = (label_macro_handler)enter.pointer;
-        handler(l);
+        return handler(l);
     }
 
     void fold_callable_call(Label *l) {
@@ -4076,7 +4076,8 @@ struct Specializer {
             if (l->body.enter == enter) {
                 location_error(String::from("label macro call failed to fold"));
             }
-            goto repeat;
+            if (!l->body.is_complete())
+                goto repeat;
         } else if (is_calling_callable(l)) {
             fold_callable_call(l);
             goto repeat;
