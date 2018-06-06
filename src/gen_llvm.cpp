@@ -506,8 +506,8 @@ struct LLVMIRGenerator {
         for (auto &&param : label->params) {
             if (param->kind != PK_Regular)
                 return false;
-            if ((param->type == TYPE_Type) || (param->type == TYPE_Label))
-                return false;
+            //if ((param->type == TYPE_Type) || (param->type == TYPE_Label))
+            //    return false;
             if (isa<ReturnLabelType>(param->type) && (param->index != 0))
                 return false;
         }

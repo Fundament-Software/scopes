@@ -103,6 +103,7 @@ namespace scopes {
     struct Frame;
     struct Closure;
     struct ExceptionPad;
+    struct Argument;
 }
 
 extern "C" {
@@ -355,6 +356,12 @@ size_t sc_label_parameter_count(sc_label_t *label);
 sc_parameter_t *sc_label_parameter(sc_label_t *label, size_t index);
 size_t sc_label_countof_reachable(sc_label_t *label);
 const sc_string_t *sc_label_docstring(sc_label_t *label);
+sc_any_t sc_label_get_enter(sc_label_t *label);
+void sc_label_set_enter(sc_label_t *label, sc_any_t value);
+size_t sc_label_argument_count(sc_label_t *label);
+sc_symbol_any_tuple_t sc_label_argument(sc_label_t *label, size_t index);
+void sc_label_clear_arguments(sc_label_t *label);
+void sc_label_append_argument(sc_label_t *label, sc_symbol_t key, sc_any_t value);
 
 // frames
 

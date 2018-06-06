@@ -145,6 +145,12 @@ let Label-parameter = sc_label_parameter
 let Label-name = sc_label_name
 let Label-countof-reachable = sc_label_countof_reachable
 let Label-set-inline! = sc_label_set_inline
+let Label-enter = sc_label_get_enter
+let Label-set-enter! = sc_label_set_enter
+let Label-argument-count = sc_label_argument_count
+let Label-argument = sc_label_argument
+let Label-clear-arguments! = sc_label_clear_arguments
+let Label-append-argument! = sc_label_append_argument
 
 let Frame-dump = sc_frame_dump
 
@@ -4735,7 +4741,30 @@ fn bsearch (arr value)
 # label utilities
 #-------------------------------------------------------------------------------
 
-typefn Label 'parameters (self)
+set-type-symbol! Label 'clear-arguments! Label-clear-arguments!
+set-type-symbol! Label 'enter Label-enter
+set-type-symbol! Label 'set-enter! Label-set-enter!
+set-type-symbol! Label 'argument@ Label-argument
+
+typeinline Label 'return! (self args...)
+    let k v = (Label-argument self 0:usize)
+    Label-set-enter! self v
+    'set-arguments! self none args...
+
+typeinline Label 'set-arguments! (self args...)
+    Label-clear-arguments! self
+    let keys... = (va-keys args...)
+    let values... = (va-values args...)
+    for i in (unroll-range (va-countof args...))
+        let k = (va@ i keys...)
+        let v = (va@ i values...)
+        Label-append-argument! self k (Any v)
+
+typeinline Label 'continuation (self)
+    let k v = (Label-argument self 0:usize)
+    v
+
+typeinline Label 'parameters (self)
     let count = (Label-parameter-count self)
     Generator
         label (fret fdone x)
@@ -4743,6 +4772,16 @@ typefn Label 'parameters (self)
                 fdone;
             else
                 fret (x + 1) (Label-parameter self x)
+        tie-const self 0:usize
+
+typeinline Label 'arguments (self)
+    let count = (Label-argument-count self)
+    Generator
+        label (fret fdone x)
+            if (x == count)
+                fdone;
+            else
+                fret (x + 1) (Label-argument self x)
         tie-const self 0:usize
 
 #-------------------------------------------------------------------------------

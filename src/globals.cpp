@@ -988,6 +988,38 @@ const sc_string_t *sc_label_docstring(sc_label_t *label) {
     }
 }
 
+sc_any_t sc_label_get_enter(sc_label_t *label) {
+    using namespace scopes;
+    return label->body.enter;
+}
+
+void sc_label_set_enter(sc_label_t *label, sc_any_t value) {
+    using namespace scopes;
+    label->body.enter = value;
+}
+
+size_t sc_label_argument_count(sc_label_t *label) {
+    using namespace scopes;
+    return label->body.args.size();
+}
+
+sc_symbol_any_tuple_t sc_label_argument(sc_label_t *label, size_t index) {
+    using namespace scopes;
+    verify_range(index, label->body.args.size());
+    auto &&arg = label->body.args[index];
+    return {arg.key, arg.value};
+}
+
+void sc_label_clear_arguments(sc_label_t *label) {
+    using namespace scopes;
+    label->body.args.clear();
+}
+
+void sc_label_append_argument(sc_label_t *label, sc_symbol_t key, sc_any_t value) {
+    using namespace scopes;
+    label->body.args.push_back(Argument(key, value));
+}
+
 // Label
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -1207,6 +1239,12 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_PURE_C_FUNCTION(sc_label_docstring, TYPE_String, TYPE_Label);
     DEFINE_EXTERN_PURE_C_FUNCTION(sc_label_set_inline, TYPE_Void, TYPE_Label);
     DEFINE_EXTERN_PURE_C_FUNCTION(sc_label_countof_reachable, TYPE_USize, TYPE_Label);
+    DEFINE_EXTERN_C_FUNCTION(sc_label_get_enter, TYPE_Any, TYPE_Label);
+    DEFINE_EXTERN_C_FUNCTION(sc_label_set_enter, TYPE_Void, TYPE_Label, TYPE_Any);
+    DEFINE_EXTERN_C_FUNCTION(sc_label_argument_count, TYPE_USize, TYPE_Label);
+    DEFINE_EXTERN_C_FUNCTION(sc_label_argument, Tuple({TYPE_Symbol, TYPE_Any}), TYPE_Label, TYPE_USize);
+    DEFINE_EXTERN_C_FUNCTION(sc_label_clear_arguments, TYPE_Void, TYPE_Label);
+    DEFINE_EXTERN_C_FUNCTION(sc_label_append_argument, TYPE_Void, TYPE_Label, TYPE_Symbol, TYPE_Any);
 
     DEFINE_EXTERN_PURE_C_FUNCTION(sc_frame_dump, TYPE_Void, TYPE_Frame);
 

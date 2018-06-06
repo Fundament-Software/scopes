@@ -1318,6 +1318,11 @@ struct Specializer {
         return T->lookup_call_handler(value);
     }
 
+    static bool is_calling_label_macro(Label *l) {
+        auto &&enter = l->body.enter;
+        return enter.type == TYPE_LabelMacro;
+    }
+
     static bool is_calling_function(Label *l) {
         auto &&enter = l->body.enter;
         return is_function_pointer(enter.indirect_type());
@@ -2695,6 +2700,15 @@ struct Specializer {
     #endif
     }
 
+    void fold_label_macro_call(Label *l) {
+        auto &&enter = l->body.enter;
+
+        typedef void (*label_macro_handler)(Label *);
+
+        label_macro_handler handler = (label_macro_handler)enter.pointer;
+        handler(l);
+    }
+
     void fold_callable_call(Label *l) {
 #if SCOPES_DEBUG_CODEGEN
         ss_cout << "folding callable call in " << l << std::endl;
@@ -4056,6 +4070,13 @@ struct Specializer {
                 location_error(String::from("failed to propagate return type from untyped label"));
             }
             rtype = complete_existing_label_continuation(l);
+        } else if (is_calling_label_macro(l)) {
+            Any enter = l->body.enter;
+            fold_label_macro_call(l);
+            if (l->body.enter == enter) {
+                location_error(String::from("label macro call failed to fold"));
+            }
+            goto repeat;
         } else if (is_calling_callable(l)) {
             fold_callable_call(l);
             goto repeat;
