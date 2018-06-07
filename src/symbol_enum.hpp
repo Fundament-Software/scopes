@@ -36,8 +36,8 @@ namespace scopes {
     T(FN_ExtractValue) T(FN_InsertValue) T(FN_ITrunc) T(FN_ZExt) T(FN_SExt) \
     T(FN_GetElementPtr) T(FN_OffsetOf) T(SFXFN_CompilerError) T(FN_VaCountOf) T(FN_VaAt) \
     T(FN_VaKeys) T(FN_VaKey) T(FN_VaValues) T(FN_CompilerMessage) T(FN_Undef) T(FN_NullOf) T(KW_Let) \
-    T(KW_If) T(SFXFN_SetTypeSymbol) T(SFXFN_DelTypeSymbol) T(FN_ExternSymbol) \
-    T(SFXFN_SetTypenameStorage) T(FN_ExternNew) \
+    T(KW_If) T(SFXFN_DelTypeSymbol) T(FN_ExternSymbol) \
+    T(FN_ExternNew) \
     T(SFXFN_Discard) \
     T(FN_TypeAt) T(FN_TypeLocalAt) T(KW_SyntaxExtend) T(FN_Location) T(SFXFN_Unreachable) \
     T(FN_FPTrunc) T(FN_FPExt) T(FN_ScopeOf) \
@@ -485,9 +485,7 @@ namespace scopes {
     T(SFXFN_SetGlobalApplyFallback, "set-global-apply-fallback!") \
     T(SFXFN_SetScopeSymbol, "__set-scope-symbol!") \
     T(SFXFN_DelScopeSymbol, "delete-scope-symbol!") \
-    T(SFXFN_SetTypeSymbol, "set-type-symbol!") \
     T(SFXFN_DelTypeSymbol, "delete-type-symbol!") \
-    T(SFXFN_SetTypenameStorage, "set-typename-storage!") \
     T(SFXFN_ExecutionMode, "set-execution-mode!") \
     T(SFXFN_TranslateLabelBody, "translate-label-body!") \
     \

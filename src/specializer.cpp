@@ -1328,11 +1328,6 @@ struct Specializer {
         return is_function_pointer(enter.indirect_type());
     }
 
-    static bool is_calling_pure_function(Label *l) {
-        auto &&enter = l->body.enter;
-        return is_pure_function_pointer(enter.type);
-    }
-
     static bool all_params_typed(Label *l) {
         auto &&params = l->params;
         for (size_t i = 1; i < params.size(); ++i) {
@@ -1671,7 +1666,10 @@ struct Specializer {
             for (size_t i = 1; i < args.size(); ++i) {
                 auto &&arg = args[i];
                 if (arg.value.is_const() && inline_const) {
-                    keys.push_back(arg);
+                    keys.push_back(Argument(arg.key,
+                        unknown_of(arg.value.indirect_type())));
+                    callargs.push_back(arg);
+                    //keys.push_back(arg);
                 } else if (is_return_parameter(arg.value)) {
                     keys.push_back(arg);
                 } else {
@@ -2919,7 +2917,6 @@ struct Specializer {
                 uint64_t flag = 0;
                 switch(sym.value()) {
                 case SYM_Variadic: flag = FF_Variadic; break;
-                case SYM_Pure: flag = FF_Pure; break;
                 default: {
                     StyledString ss;
                     ss.out << "illegal option: " << sym;
@@ -2986,21 +2983,6 @@ struct Specializer {
         case FN_Location: {
             CHECKARGS(0, 0);
             RETARGS(l->body.anchor);
-        } break;
-        case SFXFN_SetTypenameStorage: {
-            CHECKARGS(2, 2);
-            const Type *T = args[1].value;
-            const Type *T2 = args[2].value;
-            verify_kind<TK_Typename>(T);
-            cast<TypenameType>(const_cast<Type *>(T))->finalize(T2);
-            RETARGS();
-        } break;
-        case SFXFN_SetTypeSymbol: {
-            CHECKARGS(3, 3);
-            const Type *T = args[1].value;
-            args[2].value.verify(TYPE_Symbol);
-            const_cast<Type *>(T)->bind(args[2].value.symbol, args[3].value);
-            RETARGS();
         } break;
         case SFXFN_DelTypeSymbol: {
             CHECKARGS(2, 2);
@@ -3431,21 +3413,6 @@ struct Specializer {
         case FN_AnyWrap: {
             CHECKARGS(1, 1);
             RETARGS(args[1].value.toref());
-        } break;
-        case FN_Purify: {
-            CHECKARGS(1, 1);
-            Any arg = args[1].value;
-            verify_function_pointer(arg.type);
-            auto pi = cast<PointerType>(arg.type);
-            auto fi = cast<FunctionType>(pi->element_type);
-            if (fi->flags & FF_Pure) {
-                RETARGS(args[1]);
-            } else {
-                arg.type = Pointer(Function(
-                    fi->return_type, fi->argument_types, fi->flags | FF_Pure),
-                    pi->flags, pi->storage_class);
-                RETARGS(arg);
-            }
         } break;
         case SFXFN_CompilerError: {
             CHECKARGS(1, 1);
@@ -4083,13 +4050,7 @@ struct Specializer {
             goto repeat;
         } else if (is_calling_function(l)) {
             verify_no_keyed_args(l);
-            if (is_calling_pure_function(l)
-                && all_args_constant(l)) {
-                fold_pure_function_call(l);
-                goto repeat;
-            } else {
-                rtype = get_return_type_from_function_call(l);
-            }
+            rtype = get_return_type_from_function_call(l);
         } else if (is_calling_builtin(l)) {
             auto builtin = l->get_builtin_enter();
             if (!builtin_has_keyed_args(builtin))

@@ -37,7 +37,7 @@ extern "C" {
 #define SCOPES_EARLY_ABORT 0
 
 // print a list of cumulative timers on program exit
-#define SCOPES_PRINT_TIMERS 0
+#define SCOPES_PRINT_TIMERS 1
 
 // maximum number of recursions permitted during partial evaluation
 // if you think you need more, ask yourself if ad-hoc compiling a pure C function
@@ -288,6 +288,7 @@ const sc_type_t *sc_type_storage(const sc_type_t *T);
 bool sc_type_is_opaque(const sc_type_t *T);
 const sc_string_t *sc_type_string(const sc_type_t *T);
 sc_symbol_any_tuple_t sc_type_next(const sc_type_t *type, sc_symbol_t key);
+void sc_type_set_symbol(sc_type_t *T, sc_symbol_t sym, sc_any_t value);
 
 // pointer types
 
@@ -317,6 +318,7 @@ bool sc_integer_type_is_signed(const sc_type_t *T);
 const sc_type_t *sc_typename_type(const sc_string_t *str);
 void sc_typename_type_set_super(const sc_type_t *T, const sc_type_t *ST);
 const sc_type_t *sc_typename_type_get_super(const sc_type_t *T);
+void sc_typename_type_set_storage(const sc_type_t *T, const sc_type_t *T2);
 
 // array types
 
@@ -345,23 +347,28 @@ const sc_type_t *sc_sampled_image_type(const sc_type_t *_type);
 sc_parameter_t *sc_parameter_new(const sc_anchor_t *anchor, sc_symbol_t symbol, const sc_type_t *type);
 int sc_parameter_index(const sc_parameter_t *param);
 sc_symbol_t sc_parameter_name(const sc_parameter_t *param);
+const sc_type_t *sc_parameter_type(const sc_parameter_t *param);
 
 // labels
 
 void sc_label_dump(sc_label_t *label);
 void sc_label_set_inline (sc_label_t *label);
 const sc_anchor_t *sc_label_anchor(sc_label_t *label);
+const sc_anchor_t *sc_label_body_anchor(sc_label_t *label);
 sc_symbol_t sc_label_name(sc_label_t *label);
-size_t sc_label_parameter_count(sc_label_t *label);
-sc_parameter_t *sc_label_parameter(sc_label_t *label, size_t index);
+int32_t sc_label_parameter_count(sc_label_t *label);
+sc_parameter_t *sc_label_parameter(sc_label_t *label, int32_t index);
 size_t sc_label_countof_reachable(sc_label_t *label);
 const sc_string_t *sc_label_docstring(sc_label_t *label);
 sc_any_t sc_label_get_enter(sc_label_t *label);
 void sc_label_set_enter(sc_label_t *label, sc_any_t value);
-size_t sc_label_argument_count(sc_label_t *label);
-sc_symbol_any_tuple_t sc_label_argument(sc_label_t *label, size_t index);
+int32_t sc_label_argument_count(sc_label_t *label);
+sc_symbol_any_tuple_t sc_label_argument(sc_label_t *label, int32_t index);
 void sc_label_clear_arguments(sc_label_t *label);
 void sc_label_append_argument(sc_label_t *label, sc_symbol_t key, sc_any_t value);
+void sc_label_remove_argument(sc_label_t *label, int32_t index);
+void sc_label_insert_argument(sc_label_t *label, int32_t index, sc_symbol_t key, sc_any_t value);
+void sc_label_set_argument(sc_label_t *label, int32_t index, sc_symbol_t key, sc_any_t value);
 
 // frames
 

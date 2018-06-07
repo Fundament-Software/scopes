@@ -39,11 +39,7 @@ FunctionType::FunctionType(
         ss << "?<-";
     } else {
         ss <<  return_type->name()->data;
-        if (pure()) {
-            ss << "<~";
-        } else {
-            ss << "<-";
-        }
+        ss << "<-";
     }
     ss << "(";
     for (size_t i = 0; i < argument_types.size(); ++i) {
@@ -61,9 +57,6 @@ FunctionType::FunctionType(
 
 bool FunctionType::vararg() const {
     return flags & FF_Variadic;
-}
-bool FunctionType::pure() const {
-    return flags & FF_Pure;
 }
 bool FunctionType::divergent() const {
     return flags & FF_Divergent;
@@ -163,23 +156,6 @@ bool is_function_pointer(const Type *type) {
     } break;
     default: return false;
     }
-}
-
-bool is_pure_function_pointer(const Type *type) {
-    const FunctionType *ftype = nullptr;
-    switch (type->kind()) {
-    case TK_Pointer: {
-        const PointerType *ptype = cast<PointerType>(type);
-        ftype = dyn_cast<FunctionType>(ptype->element_type);
-    } break;
-    case TK_Extern: {
-        const ExternType *etype = cast<ExternType>(type);
-        ftype = dyn_cast<FunctionType>(etype->type);
-    } break;
-    default: return false;
-    }
-    if (!ftype) return false;
-    return ftype->flags & FF_Pure;
 }
 
 const FunctionType *extract_function_type(const Type *T) {
