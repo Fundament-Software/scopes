@@ -23,9 +23,7 @@
 
 #ifdef SCOPES_WIN32
 #include "stdlib_ex.h"
-#include "dlfcn.h"
 #else
-#include <dlfcn.h>
 #endif
 #include <libgen.h>
 
@@ -51,8 +49,6 @@
 #pragma GCC diagnostic ignored "-Wvla-extension"
 
 namespace scopes {
-
-void *global_c_namespace = nullptr;
 
 //------------------------------------------------------------------------------
 // IL->LLVM IR GENERATOR
@@ -187,36 +183,6 @@ static LLVMValueRef LLVMDIBuilderCreateFile(
     LLVMDIBuilderRef Builder, const char *Filename,
                             const char *Directory) {
   return mdnode_to_value(Builder->createFile(Filename, Directory));
-}
-
-//static std::vector<void *> loaded_libs;
-static std::unordered_map<Symbol, void *, Symbol::Hash> cached_dlsyms;
-void *local_aware_dlsym(Symbol name) {
-#if 1
-    //auto it = cached_dlsyms.find(name);
-    //if (it == cached_dlsyms.end()) {
-        void *ptr = LLVMSearchForAddressOfSymbol(name.name()->data);
-        if (!ptr) {
-            ptr = dlsym(global_c_namespace, name.name()->data);
-        }
-        if (ptr) {
-            cached_dlsyms.insert({name, ptr});
-        }
-        return ptr;
-    //} else {
-    //    return it->second;
-    //}
-#else
-    size_t i = loaded_libs.size();
-    while (i--) {
-        void *ptr = dlsym(loaded_libs[i], name);
-        if (ptr) {
-            LLVMAddSymbol(name, ptr);
-            return ptr;
-        }
-    }
-    return dlsym(global_c_namespace, name);
-#endif
 }
 
 struct LLVMIRGenerator {
@@ -902,7 +868,7 @@ struct LLVMIRGenerator {
                     if (!ptr) {
                         LLVMInstallFatalErrorHandler(fatal_error_handler);
                         SCOPES_TRY()
-                        ptr = LLVMGetGlobalValueAddress(ee, name);
+                        ptr = get_orc_address(name);
                         SCOPES_CATCH(e)
                         (void)e; // shut up unused variable warning
                         SCOPES_TRY_END()
@@ -1934,8 +1900,16 @@ struct LLVMIRGenerator {
             }
 
             const char *name;
-            if (root_function && (funcname == SYM_Unnamed)) {
-                name = "unnamed";
+            if (root_function) {
+                if (funcname == SYM_Unnamed) {
+                    name = "unnamed";
+                } else {
+                    name = funcname.name()->data;
+                }
+                size_t mangled_name_size = strlen(name) + 32;
+                char *mangled_name = new char[mangled_name_size];
+                snprintf(mangled_name, mangled_name_size, "_scopes_jit_%s_%p", name, (void *)label);
+                name = mangled_name;
             } else {
                 name = funcname.name()->data;
             }
@@ -2248,12 +2222,11 @@ void compile_object(const String *path, Scope *scope, uint64_t flags) {
         LLVMDumpModule(module);
     }
 
-    assert(ee);
-    auto tm = LLVMGetExecutionEngineTargetMachine(ee);
+    assert(target_machine);
 
     char *errormsg = nullptr;
     char *path_cstr = strdup(path->data);
-    if (LLVMTargetMachineEmitToFile(tm, module, path_cstr,
+    if (LLVMTargetMachineEmitToFile(target_machine, module, path_cstr,
         LLVMObjectFile, &errormsg)) {
         location_error(String::from_cstr(errormsg));
     }
@@ -2295,27 +2268,16 @@ Any compile(Label *fn, uint64_t flags) {
     auto func = result.second;
     assert(func);
 
-    if (!ee) {
-        char *errormsg = nullptr;
+    init_orc();
+    add_orc_module(module);
 
-        LLVMMCJITCompilerOptions opts;
-        LLVMInitializeMCJITCompilerOptions(&opts, sizeof(opts));
-        opts.OptLevel = 0;
-        opts.NoFramePointerElim = true;
-
-        if (LLVMCreateMCJITCompilerForModule(&ee, module, &opts,
-            sizeof(opts), &errormsg)) {
-            location_error(String::from_cstr(errormsg));
-        }
-    } else {
-        LLVMAddModule(ee, module);
-    }
-
+#if 0
     if (!disassembly_listener && (flags & CF_DumpDisassembly)) {
         llvm::ExecutionEngine *pEE = reinterpret_cast<llvm::ExecutionEngine*>(ee);
         disassembly_listener = new DisassemblyListener(pEE);
         pEE->RegisterJITEventListener(disassembly_listener);
     }
+#endif
 
     if (flags & CF_O3) {
         Timer optimize_timer(TIMER_Optimize);
@@ -2334,23 +2296,20 @@ Any compile(Label *fn, uint64_t flags) {
         LLVMDumpValue(func);
     }
 
-    void *pfunc;
-    {
-        Timer mcjit_timer(TIMER_MCJIT);
-        pfunc = LLVMGetPointerToGlobal(ee, func);
-    }
+    void *pfunc = get_orc_pointer_to_global(func);
+#if 0
     if (flags & CF_DumpDisassembly) {
         assert(disassembly_listener);
         //auto td = LLVMGetExecutionEngineTargetData(ee);
-        auto tm = LLVMGetExecutionEngineTargetMachine(ee);
         auto it = disassembly_listener->sizes.find(pfunc);
         if (it != disassembly_listener->sizes.end()) {
             std::cout << "disassembly:\n";
-            do_disassemble(tm, pfunc, it->second);
+            do_disassemble(target_machine, pfunc, it->second);
         } else {
             std::cout << "no disassembly available\n";
         }
     }
+#endif
 
     return Any::from_pointer(functype, pfunc);
 }

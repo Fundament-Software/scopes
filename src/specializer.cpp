@@ -28,6 +28,7 @@
 #include "timer.hpp"
 #include "expander.hpp"
 #include "profiler.hpp"
+#include "execution.hpp"
 
 #include "scopes.h"
 

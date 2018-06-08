@@ -15,9 +15,6 @@ struct Label;
 
 void compile_object(const String *path, Scope *scope, uint64_t flags);
 Any compile(Label *fn, uint64_t flags);
-void *local_aware_dlsym(Symbol name);
-
-extern void *global_c_namespace;
 
 } // namespace scopes
 

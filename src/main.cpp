@@ -223,8 +223,6 @@ int main(int argc, char *argv[]) {
     scopes_argc = argc;
     scopes_argv = argv;
 
-    scopes::global_c_namespace = dlopen(NULL, RTLD_LAZY);
-
     scopes_compiler_path = nullptr;
     scopes_compiler_dir = nullptr;
     scopes_clang_include_dir = nullptr;

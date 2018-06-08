@@ -604,7 +604,6 @@ namespace scopes {
     T(TIMER_Generate, "generate()") \
     T(TIMER_GenerateSPIRV, "generate_spirv()") \
     T(TIMER_Optimize, "build_and_run_opt_passes()") \
-    T(TIMER_MCJIT, "mcjit()") \
     T(TIMER_ValidateScope, "validate_scope()") \
     \
     /* ad-hoc builtin names */ \
