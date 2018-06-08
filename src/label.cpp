@@ -230,7 +230,8 @@ Label *Label::get_label_cont() const {
 
 const Type *Label::get_return_type() const {
     assert(params.size());
-    assert(!is_basic_block_like());
+    if (is_basic_block_like())
+        return NoReturnLabel();
     if (!params[0]->is_typed())
         return TYPE_Void;
     // verify that the return type is the one we expect

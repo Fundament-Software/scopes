@@ -3893,6 +3893,9 @@ struct Specializer {
     const Type *complete_existing_label_continuation (Label *l) {
         Label *enter_label = l->get_label_enter();
         if (!enter_label->is_basic_block_like()) {
+            const FunctionType *fi = cast<FunctionType>(enter_label->get_function_type());
+            verify_function_argument_signature(fi, l);
+
             assert(enter_label->body.is_complete());
             assert(enter_label->is_return_param_typed());
             return enter_label->get_return_type();
@@ -4047,6 +4050,7 @@ struct Specializer {
             if (!l->get_label_enter()->body.is_complete()) {
                 location_error(String::from("failed to propagate return type from untyped label"));
             }
+            assert(all_params_typed(l));
             rtype = complete_existing_label_continuation(l);
         } else if (is_calling_label_macro(l)) {
             Any enter = l->body.enter;

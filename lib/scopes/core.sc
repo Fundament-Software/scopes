@@ -83,21 +83,21 @@ fn verify-argument-count (l mincount maxcount)
                             sc_any_repr (box-i32 count)
     return;
 
-fn indirect-typeof (value)
+fn Any-indirect-typeof (value)
     let T = (extractvalue value 0)
     if (ptrcmp!= T Parameter) T
     else
         sc_parameter_type (unbox-pointer value Parameter)
 
-fn any-constant? (value)
+fn Any-constant? (value)
     let T = (extractvalue value 0)
     ptrcmp!= T Parameter
 
-fn any-none? (value)
+fn Any-none? (value)
     let T = (extractvalue value 0)
     ptrcmp== T Nothing
 
-fn any-none ()
+fn Any-none ()
     let val = (nullof Any)
     let val = (insertvalue val Nothing 0)
     val
@@ -150,11 +150,16 @@ syntax-extend
 
     syntax-scope
 
+let function->LabelMacro =
+    typify
+        fn "function->LabelMacro" (f)
+            bitcast f LabelMacro
+        LabelMacroFunctionType
+
 # take closure l, typify and compile it and return an Any of LabelMacro type
 inline label-macro (l)
     let l = (typify l Label)
-    # todo: verify return function signature is correct
-    bitcast (unconst l) LabelMacro
+    function->LabelMacro (unconst l)
 
 inline box-label-macro (l)
     box-pointer (label-macro l)
@@ -167,7 +172,7 @@ syntax-extend
                 verify-argument-count l 2 -1
                 let k sym = (sc_label_argument l 1)
                 let k self = (sc_label_argument l 2)
-                let T = (indirect-typeof self)
+                let T = (Any-indirect-typeof self)
                 let f ok = (sc_type_at T (unbox-symbol sym Symbol))
                 if ok
                     sc_label_remove_argument l 1
@@ -208,7 +213,7 @@ syntax-extend
                                 sc_string_join (sc_any_repr (box-i32 i))
                                     " because it has no key"
                     loop (add i 1)
-                        if (any-constant? v)
+                        if (Any-constant? v)
                             fset T k v
                             active-l
                         else
@@ -219,14 +224,14 @@ syntax-extend
                                         _ cont (nullof Label) false
                                     else
                                         let nextl = (sc_label_new_cont)
-                                        sc_label_append_argument nextl unnamed (any-none)
+                                        sc_label_append_argument nextl unnamed (Any-none)
                                         _ (box-pointer nextl) nextl true
                             sc_label_set_enter active-l (Any-wrap fset)
                             sc_label_clear_arguments active-l
                             sc_label_append_argument active-l unnamed lcont
                             sc_label_append_argument active-l unnamed self
                             sc_label_append_argument active-l unnamed (box-symbol k)
-                            if (ptrcmp!= (indirect-typeof v) Any)
+                            if (ptrcmp!= (Any-indirect-typeof v) Any)
                                 sc_anchor_error
                                     sc_string_join "cannot set symbol "
                                         sc_string_join (sc_any_repr (box-symbol k))
@@ -244,6 +249,12 @@ syntax-extend
 
     syntax-scope
 
+'set-symbols Any
+    constant? = (typify Any-constant? Any)
+    none? = (typify Any-none? Any)
+    __repr = sc_any_repr
+    indirect-typeof = (typify Any-indirect-typeof Any)
+
 'set-symbols Scope
     set-symbol = sc_scope_set_symbol
 
@@ -258,7 +269,7 @@ syntax-extend
     set-argument = sc_label_set_argument
     enter = sc_label_get_enter
     set-enter = sc_label_set_enter
-    return = Label-return
+    return = (typify Label-return Label)
 
 'set-symbols type
     bitcount = sc_type_bitcountof
@@ -275,7 +286,7 @@ syntax-extend
                     let k fallback = ('argument l 1)
                     let k value = ('argument l 2)
                     let k T = ('argument l 3)
-                    let vT = (indirect-typeof value)
+                    let vT = ('indirect-typeof value)
                     let T = (unbox-pointer T type)
                     let T =
                         if (ptrcmp== T usize) (sc_type_storage T)
@@ -305,7 +316,7 @@ syntax-extend
                     let k fallback = ('argument l 1)
                     let k value = ('argument l 2)
                     let k T = ('argument l 3)
-                    let vT = (indirect-typeof value)
+                    let vT = ('indirect-typeof value)
                     let T = (unbox-pointer T type)
                     let T =
                         if (ptrcmp== T usize) (sc_type_storage T)
@@ -340,14 +351,14 @@ syntax-extend
                 'verify-argument-count l 3 3
                 let k value = ('argument l 2)
                 let k T = ('argument l 3)
-                let vT = (indirect-typeof value)
+                let vT = ('indirect-typeof value)
                 let T = (unbox-pointer T type)
                 sc_anchor_error
                     sc_string_join intro-string
                         sc_string_join
-                            sc_any_repr (box-pointer vT)
+                            '__repr (box-pointer vT)
                             sc_string_join " to type "
-                                sc_any_repr (box-pointer T)
+                                '__repr (box-pointer T)
                 l
 
     inline gen-cast-dispatch (symbol error-msg)
@@ -357,10 +368,10 @@ syntax-extend
                 let k fallback = ('argument l 1)
                 let k value = ('argument l 2)
                 let k T = ('argument l 3)
-                let vT = (indirect-typeof value)
+                let vT = ('indirect-typeof value)
                 let T = (unbox-pointer T type)
                 let fallback =
-                    if (any-none? fallback)
+                    if ('none? fallback)
                         let error-func =
                             gen-cast-error error-msg
                         let f = (box-pointer error-func)
