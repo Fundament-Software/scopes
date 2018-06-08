@@ -9,6 +9,7 @@
 
 namespace scopes {
 
+void on_startup();
 void on_shutdown();
 
 extern bool signal_abort;

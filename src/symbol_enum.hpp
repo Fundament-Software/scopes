@@ -605,6 +605,7 @@ namespace scopes {
     T(TIMER_GenerateSPIRV, "generate_spirv()") \
     T(TIMER_Optimize, "build_and_run_opt_passes()") \
     T(TIMER_ValidateScope, "validate_scope()") \
+    T(TIMER_Main, "main()") \
     \
     /* ad-hoc builtin names */ \
     T(SYM_ExecuteReturn, "execute-return") \

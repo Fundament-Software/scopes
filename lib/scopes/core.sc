@@ -106,17 +106,6 @@ syntax-extend
         box-pointer (sc_type_storage LabelMacro)
     syntax-scope
 
-# take closure l, typify and compile it and return an Any of LabelMacro type
-fn label-macro (l)
-    let types = (alloca-array type 1:usize)
-    store Label (getelementptr types 0)
-    let types = (bitcast types type-array)
-    let result = (sc_compile (sc_typify l 1 types) 0:u64)
-    let result-type = (extractvalue result 0)
-    if (ptrcmp!= result-type LabelMacroFunctionType)
-        sc_anchor_error "label macro must return label"
-    insertvalue result LabelMacro 0
-
 fn Label-return (l)
     let k cont = (sc_label_argument l 0)
     sc_label_set_enter l (box-symbol _)
@@ -124,22 +113,51 @@ fn Label-return (l)
     sc_label_append_argument l unnamed cont
 
 syntax-extend
-    # turn label-macro itself into a label macro
-    sc_scope_set_symbol syntax-scope 'const-label-macro
-        label-macro
-            fn "label-macro" (l)
-                verify-argument-count l 1 1
-                let k src_label = (sc_label_argument l 1)
-                let src_label = (unbox-pointer src_label Closure)
-                let func =
-                    label-macro src_label
-                Label-return l
-                sc_label_append_argument l unnamed func
-                l
+    fn typify (l)
+        verify-argument-count l 1 -1
+        let count = (sc_label_argument_count l)
+        let k src_label = (sc_label_argument l 1)
+        let src_label = (unbox-pointer src_label Closure)
+        let pcount = (sub count 2)
+        let types = (alloca-array type pcount)
+        let loop (i j) = 2 0
+        if (icmp<s i count)
+            let k ty = (sc_label_argument l i)
+            store (unbox-pointer ty type) (getelementptr types j)
+            loop (add i 1) (add j 1)
+        let func =
+            sc_typify src_label pcount (bitcast types type-array)
+        Label-return l
+        sc_label_append_argument l unnamed (box-pointer func)
+        l
 
+    do
+        let types = (alloca-array type 1:usize)
+        store Label (getelementptr types 0)
+        let types = (bitcast types type-array)
+        let result = (sc_compile (sc_typify typify 1 types) 0:u64)
+        let result-type = (extractvalue result 0)
+        if (ptrcmp!= result-type LabelMacroFunctionType)
+            sc_anchor_error "label macro must return label"
+        let result =
+            insertvalue result LabelMacro 0
+        sc_scope_set_symbol syntax-scope 'typify result
+
+    syntax-scope
+
+# take closure l, typify and compile it and return an Any of LabelMacro type
+inline label-macro (l)
+    let l = (typify l Label)
+    # todo: verify return function signature is correct
+    bitcast (unconst l) LabelMacro
+
+inline box-label-macro (l)
+    box-pointer (label-macro l)
+
+syntax-extend
     # method call syntax
     sc_type_set_symbol Symbol '__call
-        label-macro
+        box-label-macro
             fn "symbol-call" (l)
                 verify-argument-count l 2 -1
                 let k sym = (sc_label_argument l 1)
@@ -159,7 +177,7 @@ syntax-extend
 
     # quick assignment of type attributes
     sc_type_set_symbol type 'set-symbols
-        label-macro
+        box-label-macro
             fn "type-set" (l)
                 verify-argument-count l 1 -1
                 let k self = (sc_label_argument l 1)
@@ -186,6 +204,12 @@ syntax-extend
 
     syntax-scope
 
+'set-symbols Scope
+    set-symbol = sc_scope_set_symbol
+
+'set-symbols type
+    set-symbol = sc_type_set_symbol
+
 # label accessors
 'set-symbols Label
     verify-argument-count = verify-argument-count
@@ -199,10 +223,11 @@ syntax-extend
     set-enter = sc_label_set_enter
     return = Label-return
 
-# integer casting
-'set-symbols integer
-    __imply =
-        const-label-macro
+syntax-extend
+    # integer casting
+
+    'set-symbol integer '__imply
+        box-label-macro
             fn "integer-imply" (l)
                 'verify-argument-count l 3 3
                 let k fallback = ('argument l 1)
@@ -231,8 +256,9 @@ syntax-extend
                                 select-op zext
                 'set-enter l fallback
                 return l
-    __as =
-        const-label-macro
+
+    'set-symbol integer '__as
+        box-label-macro
             fn "integer-as" (l)
                 'verify-argument-count l 3 3
                 let k fallback = ('argument l 1)
@@ -267,87 +293,69 @@ syntax-extend
                 sc_label_set_enter l fallback
                 return l
 
-inline gen-cast-error (intro-string)
-    const-label-macro
-        fn "cast-error" (l)
-            'verify-argument-count l 3 3
-            let k value = ('argument l 2)
-            let k T = ('argument l 3)
-            let vT = (indirect-typeof value)
-            let T = (unbox-pointer T type)
-            sc_anchor_error
-                sc_string_join intro-string
-                    sc_string_join
-                        sc_any_repr (box-pointer vT)
-                        sc_string_join " to type "
-                            sc_any_repr (box-pointer T)
-            l
+    inline gen-cast-error (intro-string)
+        label-macro
+            fn "cast-error" (l)
+                'verify-argument-count l 3 3
+                let k value = ('argument l 2)
+                let k T = ('argument l 3)
+                let vT = (indirect-typeof value)
+                let T = (unbox-pointer T type)
+                sc_anchor_error
+                    sc_string_join intro-string
+                        sc_string_join
+                            sc_any_repr (box-pointer vT)
+                            sc_string_join " to type "
+                                sc_any_repr (box-pointer T)
+                l
 
-inline gen-cast-dispatch (symbol error-func)
-    const-label-macro
-        fn "cast-dispatch" (l)
-            'verify-argument-count l 3 3
-            let k fallback = ('argument l 1)
-            let k value = ('argument l 2)
-            let k T = ('argument l 3)
-            let vT = (indirect-typeof value)
-            let T = (unbox-pointer T type)
-            let fallback =
-                if (any-none? fallback)
-                    let f = (box-pointer error-func)
-                    'set-argument l 1 unnamed f
-                    f
-                else fallback
-            if (ptrcmp!= vT T)
-                let f ok = (sc_type_at vT symbol)
-                if ok
-                    'set-enter l f
+    inline gen-cast-dispatch (symbol error-msg)
+        box-label-macro
+            fn "cast-dispatch" (l)
+                'verify-argument-count l 3 3
+                let k fallback = ('argument l 1)
+                let k value = ('argument l 2)
+                let k T = ('argument l 3)
+                let vT = (indirect-typeof value)
+                let T = (unbox-pointer T type)
+                let fallback =
+                    if (any-none? fallback)
+                        let error-func =
+                            gen-cast-error error-msg
+                        let f = (box-pointer error-func)
+                        'set-argument l 1 unnamed f
+                        f
+                    else fallback
+                if (ptrcmp!= vT T)
+                    let f ok = (sc_type_at vT symbol)
+                    if ok
+                        'set-enter l f
+                    else
+                        'set-enter l fallback
                 else
-                    'set-enter l fallback
-            else
-                'return l
-                'append-argument l unnamed value
-            l
+                    'return l
+                    'append-argument l unnamed value
+                l
 
-let forward-imply =
-    gen-cast-dispatch '__imply
-        gen-cast-error "can't implicitly cast value of type "
+    'set-symbol syntax-scope 'forward-imply
+        gen-cast-dispatch '__imply "can't implicitly cast value of type "
+
+    'set-symbol syntax-scope '__forward-as
+        gen-cast-dispatch '__as "can't cast value of type "
+
+    syntax-scope
+
+inline forward-as (fallback value destT)
+    forward-imply
+        inline ()
+            __forward-as fallback value destT
+        \ value destT
+
 inline imply (value destT)
     forward-imply none value destT
 
-let forward-as =
-    do
-        let __forward-as =
-            gen-cast-dispatch '__as
-                gen-cast-error "can't cast value of type "
-
-        inline forward-as (fallback value destT)
-            forward-imply
-                inline ()
-                    __forward-as fallback value destT
-                \ value destT
 inline as (value destT)
     forward-as none value destT
-
-let typify =
-    const-label-macro
-        fn "typify" (l)
-            'verify-argument-count l 1 -1
-            let count = ('argument-count l)
-            let k src_label = ('argument l 1)
-            let src_label = (unbox-pointer src_label Closure)
-            let pcount = (sub count 2)
-            let types = (alloca-array type pcount)
-            let loop (i j) = 2 0
-            if (icmp<s i count)
-                let k ty = ('argument l i)
-                store (unbox-pointer ty type) (getelementptr types j)
-                loop (add i 1) (add j 1)
-            let func =
-                sc_typify src_label pcount (bitcast types type-array)
-            'return l
-            'append-argument l unnamed (box-pointer func)
-            l
 
 let k =
     as 5 f32

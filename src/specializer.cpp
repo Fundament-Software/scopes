@@ -4403,19 +4403,21 @@ struct Specializer {
 
     void verify_function_argument_count(const FunctionType *fi, size_t argcount) {
 
+        const Type *T = fi;
+
         size_t fargcount = fi->argument_types.size();
         if (fi->flags & FF_Variadic) {
             if (argcount < fargcount) {
                 StyledString ss;
-                ss.out << "argument count mismatch (need at least "
-                    << fargcount << ", got " << argcount << ")";
+                ss.out << "argument count mismatch for call to function of type "
+                    << T << " (need at least " << fargcount << ", got " << argcount << ")";
                 location_error(ss.str());
             }
         } else {
             if (argcount != fargcount) {
                 StyledString ss;
-                ss.out << "argument count mismatch (need "
-                    << fargcount << ", got " << argcount << ")";
+                ss.out << "argument count mismatch for call to function of type "
+                    << T << " (need " << fargcount << ", got " << argcount << ")";
                 location_error(ss.str());
             }
         }

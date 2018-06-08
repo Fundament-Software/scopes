@@ -23,7 +23,13 @@
 
 namespace scopes {
 
+static Timer *main_compile_time = nullptr;
+void on_startup() {
+    main_compile_time = new Timer(TIMER_Main);
+}
+
 void on_shutdown() {
+    delete main_compile_time;
 #if SCOPES_PRINT_TIMERS
     //print_profiler_info();
     Timer::print_timers();

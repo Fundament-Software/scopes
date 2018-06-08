@@ -214,6 +214,8 @@ int main(int argc, char *argv[]) {
     uint64_t c = 0;
     g_stack_start = (char *)&c;
 
+    on_startup();
+
     Frame::root = new Frame();
 
     Symbol::_init_symbols();

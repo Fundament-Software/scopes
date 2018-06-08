@@ -2099,6 +2099,7 @@ LLVMAttributeRef LLVMIRGenerator::attr_nonnull = nullptr;
 // IL COMPILER
 //------------------------------------------------------------------------------
 
+#if 0
 static void pprint(int pos, unsigned char *buf, int len, const char *disasm) {
   int i;
   printf("%04x:  ", pos);
@@ -2184,6 +2185,7 @@ public:
         }
     }
 };
+#endif
 
 void compile_object(const String *path, Scope *scope, uint64_t flags) {
     Timer sum_compile_time(TIMER_Compile);
@@ -2233,7 +2235,10 @@ void compile_object(const String *path, Scope *scope, uint64_t flags) {
     free(path_cstr);
 }
 
+#if 0
 static DisassemblyListener *disassembly_listener = nullptr;
+#endif
+
 Any compile(Label *fn, uint64_t flags) {
     Timer sum_compile_time(TIMER_Compile);
 #if SCOPES_COMPILE_WITH_DEBUG_INFO
