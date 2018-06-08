@@ -89,6 +89,9 @@ fn Any-indirect-typeof (value)
     else
         sc_parameter_type (unbox-pointer value Parameter)
 
+fn Any-typeof (value)
+    extractvalue value 0
+
 fn Any-constant? (value)
     let T = (extractvalue value 0)
     ptrcmp!= T Parameter
@@ -118,6 +121,19 @@ fn Label-return (l)
     sc_label_append_argument l unnamed cont
 
 syntax-extend
+    do
+        let types = (alloca-array type 2)
+        store Any (getelementptr types 0)
+        store bool (getelementptr types 1)
+        let rtype = (sc_tuple_type 2 (bitcast types type-array))
+        store type (getelementptr types 0)
+        store type (getelementptr types 1)
+        let ftype = (sc_function_type rtype 2 (bitcast types type-array))
+        sc_scope_set_symbol syntax-scope 'DispatchCastFunctionType (box-pointer ftype)
+        sc_scope_set_symbol syntax-scope 'DispatchCastFunctionPointerType
+            box-pointer (sc_pointer_type ftype pointer-flag-non-writable unnamed)
+
+
     fn typify (l)
         verify-argument-count l 1 -1
         let count = (sc_label_argument_count l)
@@ -254,6 +270,7 @@ syntax-extend
     none? = (typify Any-none? Any)
     __repr = sc_any_repr
     indirect-typeof = (typify Any-indirect-typeof Any)
+    typeof = (typify Any-typeof Any)
 
 'set-symbols Scope
     set-symbol = sc_scope_set_symbol
@@ -269,81 +286,64 @@ syntax-extend
     set-argument = sc_label_set_argument
     enter = sc_label_get_enter
     set-enter = sc_label_set_enter
+    function-type = sc_label_function_type
     return = (typify Label-return Label)
 
 'set-symbols type
     bitcount = sc_type_bitcountof
     signed? = sc_integer_type_is_signed
+    element@ = sc_type_element_at
+    element-count = sc_type_countof
 
 syntax-extend
     # integer casting
 
+    fn integer-imply (vT T)
+        let T =
+            if (ptrcmp== T usize) (sc_type_storage T)
+            else T
+        if (icmp== (sc_type_kind T) type-kind-integer)
+            let valw = ('bitcount vT)
+            let destw = ('bitcount T)
+            # must have same signed bit
+            if (icmp== ('signed? vT) ('signed? T))
+                if (icmp== destw valw)
+                    return (box-symbol bitcast) true
+                elseif (icmp>s destw valw)
+                    if ('signed? vT)
+                        return (box-symbol sext) true
+                    else
+                        return (box-symbol zext) true
+        return (Any-none) false
+
+    fn integer-as (vT T)
+        let T =
+            if (ptrcmp== T usize) (sc_type_storage T)
+            else T
+        if (icmp== (sc_type_kind T) type-kind-integer)
+            let valw = ('bitcount vT)
+            let destw = ('bitcount T)
+            if (icmp== destw valw)
+                return (box-symbol bitcast) true
+            elseif (icmp>s destw valw)
+                if ('signed? vT)
+                    return (box-symbol sext) true
+                else
+                    return (box-symbol zext) true
+            else
+                return (box-symbol itrunc) true
+        elseif (icmp== (sc_type_kind T) type-kind-real)
+            if ('signed? vT)
+                return (box-symbol sitofp) true
+            else
+                return (box-symbol uitofp) true
+        return (Any-none) false
+
     'set-symbols integer
         __imply =
-            box-label-macro
-                fn "integer-imply" (l)
-                    'verify-argument-count l 3 3
-                    let k fallback = ('argument l 1)
-                    let k value = ('argument l 2)
-                    let k T = ('argument l 3)
-                    let vT = ('indirect-typeof value)
-                    let T = (unbox-pointer T type)
-                    let T =
-                        if (ptrcmp== T usize) (sc_type_storage T)
-                        else T
-                    label select-op (op)
-                        'remove-argument l 1
-                        'set-enter l (box-symbol op)
-                        return l
-                    if (icmp== (sc_type_kind T) type-kind-integer)
-                        let valw = ('bitcount vT)
-                        let destw = ('bitcount T)
-                        # must have same signed bit
-                        if (icmp== ('signed? vT) ('signed? T))
-                            if (icmp== destw valw)
-                                select-op bitcast
-                            elseif (icmp>s destw valw)
-                                if ('signed? vT)
-                                    select-op sext
-                                else
-                                    select-op zext
-                    'set-enter l fallback
-                    return l
+            box-pointer (unconst (typify integer-imply type type))
         __as =
-            box-label-macro
-                fn "integer-as" (l)
-                    'verify-argument-count l 3 3
-                    let k fallback = ('argument l 1)
-                    let k value = ('argument l 2)
-                    let k T = ('argument l 3)
-                    let vT = ('indirect-typeof value)
-                    let T = (unbox-pointer T type)
-                    let T =
-                        if (ptrcmp== T usize) (sc_type_storage T)
-                        else T
-                    label select-op (op)
-                        'remove-argument l 1
-                        'set-enter l (box-symbol op)
-                        return l
-                    if (icmp== (sc_type_kind T) type-kind-integer)
-                        let valw = ('bitcount vT)
-                        let destw = ('bitcount T)
-                        if (icmp== destw valw)
-                            select-op bitcast
-                        elseif (icmp>s destw valw)
-                            if ('signed? vT)
-                                select-op sext
-                            else
-                                select-op zext
-                        else
-                            select-op itrunc
-                    elseif (icmp== (sc_type_kind T) type-kind-real)
-                        if ('signed? vT)
-                            select-op sitofp
-                        else
-                            select-op uitofp
-                    'set-enter l fallback
-                    return l
+            box-pointer (unconst (typify integer-as type type))
 
     inline gen-cast-error (intro-string)
         label-macro
@@ -361,43 +361,119 @@ syntax-extend
                                 '__repr (box-pointer T)
                 l
 
-    inline gen-cast-dispatch (symbol error-msg)
-        box-label-macro
-            fn "cast-dispatch" (l)
-                'verify-argument-count l 3 3
-                let k fallback = ('argument l 1)
-                let k value = ('argument l 2)
-                let k T = ('argument l 3)
-                let vT = ('indirect-typeof value)
-                let T = (unbox-pointer T type)
-                let fallback =
-                    if ('none? fallback)
-                        let error-func =
-                            gen-cast-error error-msg
-                        let f = (box-pointer error-func)
-                        'set-argument l 1 unnamed f
-                        f
-                    else fallback
-                if (ptrcmp!= vT T)
-                    let f ok = (sc_type_at vT symbol)
-                    if ok
-                        'set-enter l f
-                    else
-                        'set-enter l fallback
-                else
-                    'return l
-                    'append-argument l unnamed value
-                l
+    fn get-cast-dispatcher (symbol vT T)
+        let anyf ok = (sc_type_at vT symbol)
+        if ok
+            let f = (unbox-pointer anyf DispatchCastFunctionPointerType)
+            return (f vT T)
+        return (Any-none) false
 
     'set-symbols syntax-scope
         forward-imply =
-            gen-cast-dispatch '__imply "can't implicitly cast value of type "
-        __forward-as =
-            gen-cast-dispatch '__as "can't cast value of type "
+            box-label-macro
+                fn "imply-dispatch" (l)
+                    'verify-argument-count l 3 3
+                    let k fallback = ('argument l 1)
+                    let k value = ('argument l 2)
+                    let k T = ('argument l 3)
+                    let vT = ('indirect-typeof value)
+                    let T = (unbox-pointer T type)
+                    let fallback =
+                        if ('none? fallback)
+                            let error-func =
+                                gen-cast-error "can't implicitly cast value of type "
+                            let f = (box-pointer error-func)
+                            'set-argument l 1 unnamed f
+                            f
+                        else fallback
+                    if (ptrcmp!= vT T)
+                        let f ok = (get-cast-dispatcher '__imply vT T)
+                        if ok
+                            'remove-argument l 1
+                            'set-enter l f
+                            return l
+                        'set-enter l fallback
+                    else
+                        'return l
+                        'append-argument l unnamed value
+                    l
+        forward-as =
+            box-label-macro
+                fn "as-dispatch" (l)
+                    'verify-argument-count l 3 3
+                    let k fallback = ('argument l 1)
+                    let k value = ('argument l 2)
+                    let k T = ('argument l 3)
+                    let vT = ('indirect-typeof value)
+                    let T = (unbox-pointer T type)
+                    let fallback =
+                        if ('none? fallback)
+                            let error-func =
+                                gen-cast-error "can't cast value of type "
+                            let f = (box-pointer error-func)
+                            'set-argument l 1 unnamed f
+                            f
+                        else fallback
+                    if (ptrcmp!= vT T)
+                        let f ok =
+                            do
+                                # try implicit cast first
+                                let f ok = (get-cast-dispatcher '__imply vT T)
+                                if ok (_ f ok)
+                                else
+                                    # then try explicit cast
+                                    get-cast-dispatcher '__as vT T
+                        if ok
+                            'remove-argument l 1
+                            'set-enter l f
+                            return l
+                        'set-enter l fallback
+                    else
+                        'return l
+                        'append-argument l unnamed value
+                    l
+        #trycall =
+            box-label-macro
+                fn "trycall" (l)
+                    'verify-argument-count l 2 -1
+                    let k fallback = ('argument l 1)
+                    let k func = ('argument l 2)
+                    let vT = ('indirect-typeof func)
+                    if (ptrcmp== vT Label)
+                        let func = (unbox-pointer func Label)
+                        let functype = ('function-type func)
+                        let lcount = (sub ('argument-count l) 2)
+                        let rcount = ('element-count functype)
+                        if (icmp!= lcount rcount)
+                            'set-enter l fallback
+                        else
+                            let loop (i j) = 3 1
+                            if (icmp<s j rcount)
+                                let k lval = ('argument l i)
+                                let ltype = ('indirect-typeof lval)
+                                let rtype = ('element@ functype j)
+                                sc_write ('__repr (box-pointer ltype))
+                                sc_write " "
+                                sc_write ('__repr (box-pointer rtype))
+                                sc_write "\n"
+
+
+
+                        #sc_write ('__repr (box-pointer (sc_type_element_at functype 3)))
+
+                    #let k T = ('argument l 3)
+                    #let T = (unbox-pointer T type)
+                    #sc_anchor_error
+                        sc_string_join intro-string
+                            sc_string_join
+                                '__repr (box-pointer vT)
+                                sc_string_join " to type "
+                                    '__repr (box-pointer T)
+                    l
 
     syntax-scope
 
-inline forward-as (fallback value destT)
+#inline forward-as (fallback value destT)
     forward-imply
         inline ()
             __forward-as fallback value destT
@@ -410,7 +486,20 @@ inline as (value destT)
     forward-as none value destT
 
 let k =
-    as 5 f32
+    as 5 u64
 dump k
+
+let test =
+    typify
+        fn (a b)
+            add a b
+        \ i32 i32
+
+#do
+    trycall
+        inline ()
+            dump "failed!"
+        \ test 1 2
+
 
 sc_exit 0

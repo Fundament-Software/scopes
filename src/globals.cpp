@@ -892,6 +892,19 @@ const sc_type_t *sc_vector_type(const sc_type_t *element_type, size_t count) {
     return Vector(element_type, count);
 }
 
+// Tuple Type
+////////////////////////////////////////////////////////////////////////////////
+
+const sc_type_t *sc_tuple_type(int numtypes, const sc_type_t **typeargs) {
+    using namespace scopes;
+    ArgTypes types;
+    types.reserve(numtypes);
+    for (int i = 0; i < numtypes; ++i) {
+        types.push_back(typeargs[i]);
+    }
+    return Tuple(types);
+}
+
 // Function Type
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -900,6 +913,17 @@ bool sc_function_type_is_variadic(const sc_type_t *T) {
     verify_kind<TK_Function>(T);
     auto ft = cast<FunctionType>(T);
     return ft->flags & FF_Variadic;
+}
+
+const sc_type_t *sc_function_type(const sc_type_t *return_type,
+    int numtypes, const sc_type_t **typeargs) {
+    using namespace scopes;
+    ArgTypes types;
+    types.reserve(numtypes);
+    for (int i = 0; i < numtypes; ++i) {
+        types.push_back(typeargs[i]);
+    }
+    return Function(return_type, types);
 }
 
 // Image Type
@@ -1086,6 +1110,11 @@ void sc_label_append_parameter(sc_label_t *label, sc_parameter_t *param) {
         location_error(String::from("attempting to append parameter that's already owned by another label"));
     }
     label->append(param);
+}
+
+const sc_type_t *sc_label_function_type(sc_label_t *label) {
+    using namespace scopes;
+    return label->get_function_type();
 }
 
 // Label
@@ -1282,12 +1311,15 @@ void init_globals(int argc, char *argv[]) {
 
     DEFINE_EXTERN_C_FUNCTION(sc_vector_type, TYPE_Type, TYPE_Type, TYPE_USize);
 
+    DEFINE_EXTERN_C_FUNCTION(sc_tuple_type, TYPE_Type, TYPE_I32, NativeROPointer(TYPE_Type));
+
     DEFINE_EXTERN_C_FUNCTION(sc_image_type, TYPE_Type,
         TYPE_Type, TYPE_Symbol, TYPE_I32, TYPE_I32, TYPE_I32, TYPE_I32, TYPE_Symbol, TYPE_Symbol);
 
     DEFINE_EXTERN_C_FUNCTION(sc_sampled_image_type, TYPE_Type, TYPE_Type);
 
     DEFINE_EXTERN_C_FUNCTION(sc_function_type_is_variadic, TYPE_Bool, TYPE_Type);
+    DEFINE_EXTERN_C_FUNCTION(sc_function_type, TYPE_Type, TYPE_Type, TYPE_I32, NativeROPointer(TYPE_Type));
 
     DEFINE_EXTERN_C_FUNCTION(sc_list_cons, TYPE_List, TYPE_Any, TYPE_List);
     DEFINE_EXTERN_C_FUNCTION(sc_list_dump, TYPE_List, TYPE_List);
@@ -1325,6 +1357,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_label_new_cont, TYPE_Label);
     DEFINE_EXTERN_C_FUNCTION(sc_label_set_complete, TYPE_Void, TYPE_Label);
     DEFINE_EXTERN_C_FUNCTION(sc_label_append_parameter, TYPE_Void, TYPE_Label, TYPE_Parameter);
+    DEFINE_EXTERN_C_FUNCTION(sc_label_function_type, TYPE_Type, TYPE_Label);
 
     DEFINE_EXTERN_C_FUNCTION(sc_frame_dump, TYPE_Void, TYPE_Frame);
     DEFINE_EXTERN_C_FUNCTION(sc_frame_root, TYPE_Frame);

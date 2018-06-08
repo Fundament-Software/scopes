@@ -328,9 +328,15 @@ const sc_type_t *sc_array_type(const sc_type_t *element_type, size_t count);
 
 const sc_type_t *sc_vector_type(const sc_type_t *element_type, size_t count);
 
+// tuple types
+
+const sc_type_t *sc_tuple_type(int numtypes, const sc_type_t **types);
+
 // function types
 
 bool sc_function_type_is_variadic(const sc_type_t *T);
+const sc_type_t *sc_function_type(const sc_type_t *return_type,
+    int numtypes, const sc_type_t **typeargs);
 
 // image types
 
@@ -372,6 +378,7 @@ void sc_label_set_argument(sc_label_t *label, int32_t index, sc_symbol_t key, sc
 sc_label_t *sc_label_new_cont();
 void sc_label_set_complete(sc_label_t *label);
 void sc_label_append_parameter(sc_label_t *label, sc_parameter_t *param);
+const sc_type_t *sc_label_function_type(sc_label_t *label);
 
 // frames
 
