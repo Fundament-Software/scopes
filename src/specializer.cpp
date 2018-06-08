@@ -1806,6 +1806,8 @@ struct Specializer {
     // constant
     bool builtin_always_folds(Builtin builtin) {
         switch(builtin.value()) {
+        case FN_AnyWrap:
+        case KW_SyntaxExtend:
         case FN_TypeOf:
         case FN_NullOf:
         case FN_IsConstant:
@@ -2724,6 +2726,12 @@ struct Specializer {
         enter = value;
     }
 
+    void verify_all_args_constant(Label *l) {
+        if (!all_args_constant(l)) {
+            location_error(String::from("all arguments must be constants"));
+        }
+    }
+
     bool fold_builtin_call(Label *l) {
 #if SCOPES_DEBUG_CODEGEN
         ss_cout << "folding builtin call in " << l << std::endl;
@@ -2735,6 +2743,7 @@ struct Specializer {
         switch(enter.builtin.value()) {
         case KW_SyntaxExtend: {
             CHECKARGS(3, 3);
+            verify_all_args_constant(l);
             const Closure *cl = args[1].value;
             const Syntax *sx = args[2].value;
             Scope *env = args[3].value;
@@ -3413,6 +3422,7 @@ struct Specializer {
         } break;
         case FN_AnyWrap: {
             CHECKARGS(1, 1);
+            verify_all_args_constant(l);
             RETARGS(args[1].value.toref());
         } break;
         case SFXFN_CompilerError: {
@@ -4056,8 +4066,7 @@ struct Specializer {
             auto builtin = l->get_builtin_enter();
             if (!builtin_has_keyed_args(builtin))
                 verify_no_keyed_args(l);
-            if (builtin_always_folds(builtin)
-                || (!builtin_never_folds(builtin) && all_args_constant(l))) {
+            if (builtin_always_folds(builtin)) {
                 if (fold_builtin_call(l)) {
                     goto repeat;
                 }

@@ -93,7 +93,9 @@
         "regexp.c": "cpp",
         "fstream": "cpp",
         "*.gen": "cpp",
-        "__memory": "cpp"
+        "__memory": "cpp",
+        "forward_list": "cpp",
+        "numeric": "cpp"
     },
     "C_Cpp.intelliSenseEngine": "Tag Parser"
 }

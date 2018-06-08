@@ -60,6 +60,10 @@ void Label::unset_inline() {
     flags &= ~LF_Inline;
 }
 
+void Label::unset_template() {
+    flags &= ~LF_Template;
+}
+
 bool Label::is_merge() const {
     return flags & LF_Merge;
 }

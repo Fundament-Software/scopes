@@ -1067,6 +1067,27 @@ void sc_label_set_argument(sc_label_t *label, int32_t index, sc_symbol_t key, sc
     label->body.args[index] = Argument(key, value);
 }
 
+sc_label_t *sc_label_new_cont() {
+    using namespace scopes;
+    Label *label = Label::continuation_from(get_active_anchor(), SYM_Unnamed);
+    label->unset_template();
+    label->set_inline();
+    label->body.anchor = label->anchor;
+    return label;
+}
+
+void sc_label_set_complete(sc_label_t *label) {
+    label->body.set_complete();
+}
+
+void sc_label_append_parameter(sc_label_t *label, sc_parameter_t *param) {
+    using namespace scopes;
+    if (param->label) {
+        location_error(String::from("attempting to append parameter that's already owned by another label"));
+    }
+    label->append(param);
+}
+
 // Label
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -1076,8 +1097,18 @@ void sc_frame_dump(sc_frame_t *frame) {
     stream_frame(ss, frame, StreamFrameFormat::single());
 }
 
+sc_frame_t *sc_frame_root() {
+    using namespace scopes;
+    return Frame::root;
+}
+
 // Closure
 ////////////////////////////////////////////////////////////////////////////////
+
+const sc_closure_t *sc_closure_new(sc_label_t *label, sc_frame_t *frame) {
+    using namespace scopes;
+    return Closure::from(label, frame);
+}
 
 sc_label_t *sc_closure_label(const sc_closure_t *closure) {
     using namespace scopes;
@@ -1291,12 +1322,16 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_label_remove_argument, TYPE_Void, TYPE_Label, TYPE_I32);
     DEFINE_EXTERN_C_FUNCTION(sc_label_insert_argument, TYPE_Void, TYPE_Label, TYPE_I32, TYPE_Symbol, TYPE_Any);
     DEFINE_EXTERN_C_FUNCTION(sc_label_set_argument, TYPE_Void, TYPE_Label, TYPE_I32, TYPE_Symbol, TYPE_Any);
+    DEFINE_EXTERN_C_FUNCTION(sc_label_new_cont, TYPE_Label);
+    DEFINE_EXTERN_C_FUNCTION(sc_label_set_complete, TYPE_Void, TYPE_Label);
+    DEFINE_EXTERN_C_FUNCTION(sc_label_append_parameter, TYPE_Void, TYPE_Label, TYPE_Parameter);
 
     DEFINE_EXTERN_C_FUNCTION(sc_frame_dump, TYPE_Void, TYPE_Frame);
+    DEFINE_EXTERN_C_FUNCTION(sc_frame_root, TYPE_Frame);
 
+    DEFINE_EXTERN_C_FUNCTION(sc_closure_new, TYPE_Closure, TYPE_Label, TYPE_Frame);
     DEFINE_EXTERN_C_FUNCTION(sc_closure_label, TYPE_Label, TYPE_Closure);
     DEFINE_EXTERN_C_FUNCTION(sc_closure_frame, TYPE_Frame, TYPE_Closure);
-
 
 #undef DEFINE_EXTERN_C_FUNCTION
 

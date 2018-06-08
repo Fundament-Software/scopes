@@ -85,10 +85,18 @@ void init_orc() {
     assert(LLVMTargetHasJIT(target));
     assert(LLVMTargetHasTargetMachine(target));
 
+    auto optlevel =
+        LLVMCodeGenLevelNone;
+        //LLVMCodeGenLevelLess;
+        //LLVMCodeGenLevelDefault;
+        //LLVMCodeGenLevelAggressive;
+
     const char *CPU = nullptr;
     const char *Features = nullptr;
     target_machine = LLVMCreateTargetMachine(target, triple, CPU, Features,
-        LLVMCodeGenLevelDefault, LLVMRelocDefault, LLVMCodeModelJITDefault);
+        optlevel,
+        LLVMRelocDefault,
+        LLVMCodeModelJITDefault);
     assert(target_machine);
     orc = LLVMOrcCreateInstance(target_machine);
     assert(orc);

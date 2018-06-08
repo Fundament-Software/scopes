@@ -369,13 +369,18 @@ void sc_label_append_argument(sc_label_t *label, sc_symbol_t key, sc_any_t value
 void sc_label_remove_argument(sc_label_t *label, int32_t index);
 void sc_label_insert_argument(sc_label_t *label, int32_t index, sc_symbol_t key, sc_any_t value);
 void sc_label_set_argument(sc_label_t *label, int32_t index, sc_symbol_t key, sc_any_t value);
+sc_label_t *sc_label_new_cont();
+void sc_label_set_complete(sc_label_t *label);
+void sc_label_append_parameter(sc_label_t *label, sc_parameter_t *param);
 
 // frames
 
 void sc_frame_dump(sc_frame_t *frame);
+sc_frame_t *sc_frame_root();
 
 // closures
 
+const sc_closure_t *sc_closure_new(sc_label_t *label, sc_frame_t *frame);
 sc_label_t *sc_closure_label(const sc_closure_t *closure);
 sc_frame_t *sc_closure_frame(const sc_closure_t *closure);
 

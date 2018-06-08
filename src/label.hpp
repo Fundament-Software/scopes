@@ -100,6 +100,8 @@ public:
 
     void unset_inline();
 
+    void unset_template();
+
     bool is_merge() const;
 
     bool is_inline() const;

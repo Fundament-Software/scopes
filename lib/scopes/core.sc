@@ -97,6 +97,11 @@ fn any-none? (value)
     let T = (extractvalue value 0)
     ptrcmp== T Nothing
 
+fn any-none ()
+    let val = (nullof Any)
+    let val = (insertvalue val Nothing 0)
+    val
+
 # we don't have typedef or anything, so we need to open a new compiler context
 # to alias the pointer type that we need (pointer to types) so it's constant
 syntax-extend
@@ -175,40 +180,72 @@ syntax-extend
                                     sc_any_repr (box-pointer T)
                 l
 
-    # quick assignment of type attributes
-    sc_type_set_symbol type 'set-symbols
+    inline gen-key-any-set (selftype fset)
         box-label-macro
-            fn "type-set" (l)
+            fn "set-symbols" (l)
                 verify-argument-count l 1 -1
+                let k cont = (sc_label_argument l 0)
                 let k self = (sc_label_argument l 1)
-                let T = (unbox-pointer self type)
+                let T = (unbox-pointer self selftype)
                 let count = (sc_label_argument_count l)
-                let loop (i) = 2
+                let numentries = (sub count 2)
+                let keys = (alloca-array Symbol numentries)
+                let values = (alloca-array Any numentries)
+                let loop (i j) = 2 0
                 if (icmp<s i count)
                     let k v = (sc_label_argument l i)
+                    store k (getelementptr keys j)
+                    store v (getelementptr values j)
+                    loop (add i 1) (add j 1)
+                Label-return l
+                let loop (i active-l) = 0 l
+                if (icmp<s i numentries)
+                    let k = (load (getelementptr keys i))
+                    let v = (load (getelementptr values i))
                     if (icmp== k unnamed)
                         sc_anchor_error
-                            sc_string_join "cannot set type symbol from argument "
+                            sc_string_join "cannot set symbol from argument "
                                 sc_string_join (sc_any_repr (box-i32 i))
                                     " because it has no key"
-                    if (any-constant? v)
-                        sc_type_set_symbol T k v
-                    else
-                        sc_anchor_error
-                            sc_string_join "cannot set type symbol "
-                                sc_string_join (sc_any_repr (box-symbol k))
-                                    " because it is not a constant"
                     loop (add i 1)
-                Label-return l
+                        if (any-constant? v)
+                            fset T k v
+                            active-l
+                        else
+                            let lcont nextl complete =
+                                do
+                                    # last entry
+                                    if (icmp== (add i 1) numentries)
+                                        _ cont (nullof Label) false
+                                    else
+                                        let nextl = (sc_label_new_cont)
+                                        sc_label_append_argument nextl unnamed (any-none)
+                                        _ (box-pointer nextl) nextl true
+                            sc_label_set_enter active-l (Any-wrap fset)
+                            sc_label_clear_arguments active-l
+                            sc_label_append_argument active-l unnamed lcont
+                            sc_label_append_argument active-l unnamed self
+                            sc_label_append_argument active-l unnamed (box-symbol k)
+                            if (ptrcmp!= (indirect-typeof v) Any)
+                                sc_anchor_error
+                                    sc_string_join "cannot set symbol "
+                                        sc_string_join (sc_any_repr (box-symbol k))
+                                            sc_string_join " because variable is not of type "
+                                                sc_any_repr (box-pointer Any)
+                            sc_label_append_argument active-l unnamed v
+                            if complete
+                                sc_label_set_complete active-l
+                            nextl
                 l
+
+    # quick assignment of type attributes
+    sc_type_set_symbol type 'set-symbols (gen-key-any-set type sc_type_set_symbol)
+    sc_type_set_symbol Scope 'set-symbols (gen-key-any-set Scope sc_scope_set_symbol)
 
     syntax-scope
 
 'set-symbols Scope
     set-symbol = sc_scope_set_symbol
-
-'set-symbols type
-    set-symbol = sc_type_set_symbol
 
 # label accessors
 'set-symbols Label
@@ -223,75 +260,79 @@ syntax-extend
     set-enter = sc_label_set_enter
     return = Label-return
 
+'set-symbols type
+    bitcount = sc_type_bitcountof
+    signed? = sc_integer_type_is_signed
+
 syntax-extend
     # integer casting
 
-    'set-symbol integer '__imply
-        box-label-macro
-            fn "integer-imply" (l)
-                'verify-argument-count l 3 3
-                let k fallback = ('argument l 1)
-                let k value = ('argument l 2)
-                let k T = ('argument l 3)
-                let vT = (indirect-typeof value)
-                let T = (unbox-pointer T type)
-                let T =
-                    if (ptrcmp== T usize) (sc_type_storage T)
-                    else T
-                label select-op (op)
-                    'remove-argument l 1
-                    'set-enter l (box-symbol op)
+    'set-symbols integer
+        __imply =
+            box-label-macro
+                fn "integer-imply" (l)
+                    'verify-argument-count l 3 3
+                    let k fallback = ('argument l 1)
+                    let k value = ('argument l 2)
+                    let k T = ('argument l 3)
+                    let vT = (indirect-typeof value)
+                    let T = (unbox-pointer T type)
+                    let T =
+                        if (ptrcmp== T usize) (sc_type_storage T)
+                        else T
+                    label select-op (op)
+                        'remove-argument l 1
+                        'set-enter l (box-symbol op)
+                        return l
+                    if (icmp== (sc_type_kind T) type-kind-integer)
+                        let valw = ('bitcount vT)
+                        let destw = ('bitcount T)
+                        # must have same signed bit
+                        if (icmp== ('signed? vT) ('signed? T))
+                            if (icmp== destw valw)
+                                select-op bitcast
+                            elseif (icmp>s destw valw)
+                                if ('signed? vT)
+                                    select-op sext
+                                else
+                                    select-op zext
+                    'set-enter l fallback
                     return l
-                if (icmp== (sc_type_kind T) type-kind-integer)
-                    let valw = (sc_type_bitcountof vT)
-                    let destw = (sc_type_bitcountof T)
-                    # must have same signed bit
-                    if (icmp== (sc_integer_type_is_signed vT) (sc_integer_type_is_signed T))
+        __as =
+            box-label-macro
+                fn "integer-as" (l)
+                    'verify-argument-count l 3 3
+                    let k fallback = ('argument l 1)
+                    let k value = ('argument l 2)
+                    let k T = ('argument l 3)
+                    let vT = (indirect-typeof value)
+                    let T = (unbox-pointer T type)
+                    let T =
+                        if (ptrcmp== T usize) (sc_type_storage T)
+                        else T
+                    label select-op (op)
+                        'remove-argument l 1
+                        'set-enter l (box-symbol op)
+                        return l
+                    if (icmp== (sc_type_kind T) type-kind-integer)
+                        let valw = ('bitcount vT)
+                        let destw = ('bitcount T)
                         if (icmp== destw valw)
                             select-op bitcast
                         elseif (icmp>s destw valw)
-                            if (sc_integer_type_is_signed vT)
+                            if ('signed? vT)
                                 select-op sext
                             else
                                 select-op zext
-                'set-enter l fallback
-                return l
-
-    'set-symbol integer '__as
-        box-label-macro
-            fn "integer-as" (l)
-                'verify-argument-count l 3 3
-                let k fallback = ('argument l 1)
-                let k value = ('argument l 2)
-                let k T = ('argument l 3)
-                let vT = (indirect-typeof value)
-                let T = (unbox-pointer T type)
-                let T =
-                    if (ptrcmp== T usize) (sc_type_storage T)
-                    else T
-                label select-op (op)
-                    'remove-argument l 1
-                    'set-enter l (box-symbol op)
-                    return l
-                if (icmp== (sc_type_kind T) type-kind-integer)
-                    let valw = (sc_type_bitcountof vT)
-                    let destw = (sc_type_bitcountof T)
-                    if (icmp== destw valw)
-                        select-op bitcast
-                    elseif (icmp>s destw valw)
-                        if (sc_integer_type_is_signed vT)
-                            select-op sext
                         else
-                            select-op zext
-                    else
-                        select-op itrunc
-                elseif (icmp== (sc_type_kind T) type-kind-real)
-                    if (sc_integer_type_is_signed vT)
-                        select-op sitofp
-                    else
-                        select-op uitofp
-                sc_label_set_enter l fallback
-                return l
+                            select-op itrunc
+                    elseif (icmp== (sc_type_kind T) type-kind-real)
+                        if ('signed? vT)
+                            select-op sitofp
+                        else
+                            select-op uitofp
+                    'set-enter l fallback
+                    return l
 
     inline gen-cast-error (intro-string)
         label-macro
@@ -337,11 +378,11 @@ syntax-extend
                     'append-argument l unnamed value
                 l
 
-    'set-symbol syntax-scope 'forward-imply
-        gen-cast-dispatch '__imply "can't implicitly cast value of type "
-
-    'set-symbol syntax-scope '__forward-as
-        gen-cast-dispatch '__as "can't cast value of type "
+    'set-symbols syntax-scope
+        forward-imply =
+            gen-cast-dispatch '__imply "can't implicitly cast value of type "
+        __forward-as =
+            gen-cast-dispatch '__as "can't cast value of type "
 
     syntax-scope
 
