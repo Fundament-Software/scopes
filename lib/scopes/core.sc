@@ -44,25 +44,22 @@ fn box-pointer (value)
     val
 
 # print an unboxing error given two types
-fn unbox-error (haveT wantT)
-    sc_anchor_error
-        sc_string_join "can't unbox value of type "
-            sc_string_join
-                sc_any_repr (box-pointer haveT)
-                sc_string_join " as value of type "
-                    sc_any_repr (box-pointer wantT)
+fn unbox-verify (haveT wantT)
+    if (ptrcmp!= haveT wantT)
+        sc_anchor_error
+            sc_string_join "can't unbox value of type "
+                sc_string_join
+                    sc_any_repr (box-pointer haveT)
+                    sc_string_join " as value of type "
+                        sc_any_repr (box-pointer wantT)
 
 inline unbox-symbol (value T)
-    let valueT = (extractvalue value 0)
-    if (ptrcmp!= valueT T)
-        unbox-error valueT T
+    unbox-verify (extractvalue value 0) T
     bitcast (extractvalue value 1) T
 
 # turn an Any back into a pointer
 inline unbox-pointer (value T)
-    let valueT = (extractvalue value 0)
-    if (ptrcmp!= valueT T)
-        unbox-error valueT T
+    unbox-verify (extractvalue value 0) T
     inttoptr (extractvalue value 1) T
 
 fn verify-argument-count (l mincount maxcount)
@@ -121,8 +118,8 @@ fn Label-return (l)
     sc_label_append_argument l unnamed cont
 
 syntax-extend
+    let types = (alloca-array type 3)
     do
-        let types = (alloca-array type 2)
         store Any (getelementptr types 0)
         store bool (getelementptr types 1)
         let rtype = (sc_tuple_type 2 (bitcast types type-array))
@@ -133,6 +130,18 @@ syntax-extend
         sc_scope_set_symbol syntax-scope 'DispatchCastFunctionPointerType
             box-pointer (sc_pointer_type ftype pointer-flag-non-writable unnamed)
 
+    do
+        let SyntaxMacro = (sc_typename_type "SyntaxMacro")
+        store list (getelementptr types 0)
+        store Scope (getelementptr types 1)
+        let rtype = (sc_tuple_type 2 (bitcast types type-array))
+        store list (getelementptr types 0)
+        store list (getelementptr types 1)
+        store Scope (getelementptr types 2)
+        let ftype = (sc_function_type rtype 3 (bitcast types type-array))
+        sc_typename_type_set_storage SyntaxMacro ftype
+        sc_scope_set_symbol syntax-scope 'SyntaxMacro (box-pointer SyntaxMacro)
+        sc_scope_set_symbol syntax-scope 'SyntaxMacroFunctionType (box-pointer ftype)
 
     fn typify (l)
         verify-argument-count l 1 -1
@@ -166,6 +175,12 @@ syntax-extend
 
     syntax-scope
 
+let function->SyntaxMacro =
+    typify
+        fn "function->SyntaxMacro" (f)
+            bitcast f SyntaxMacro
+        SyntaxMacroFunctionType
+
 let function->LabelMacro =
     typify
         fn "function->LabelMacro" (f)
@@ -181,6 +196,13 @@ inline box-label-macro (l)
     box-pointer (label-macro l)
 
 syntax-extend
+    fn list-handler (topexpr env)
+        #sc_write "yup\n"
+        return topexpr env
+
+    sc_scope_set_symbol syntax-scope (sc_symbol_new "#list")
+        box-pointer (unconst (typify list-handler list Scope))
+
     # method call syntax
     sc_type_set_symbol Symbol '__call
         box-label-macro
@@ -263,6 +285,18 @@ syntax-extend
     sc_type_set_symbol type 'set-symbols (gen-key-any-set type sc_type_set_symbol)
     sc_type_set_symbol Scope 'set-symbols (gen-key-any-set Scope sc_scope_set_symbol)
 
+    sc_type_set_symbol type 'pointer
+        box-label-macro
+            fn "type-pointer" (l)
+                verify-argument-count l 1 1
+                let k self = (sc_label_argument l 1)
+                let T = (unbox-pointer self type)
+                Label-return l
+                sc_label_append_argument l unnamed
+                    box-pointer
+                        sc_pointer_type T pointer-flag-non-writable unnamed
+                l
+
     syntax-scope
 
 'set-symbols Any
@@ -294,15 +328,55 @@ syntax-extend
     signed? = sc_integer_type_is_signed
     element@ = sc_type_element_at
     element-count = sc_type_countof
+    storage = sc_type_storage
+    kind = sc_type_kind
 
 syntax-extend
+    # any extraction
+
+    inline unbox-integer (value T)
+        unbox-verify (extractvalue value 0) T
+        itrunc (extractvalue value 1) T
+
+    inline unbox-u32 (value T)
+        unbox-verify (extractvalue value 0) T
+        bitcast (itrunc (extractvalue value 1) u32) T
+
+    inline unbox-bitcast (value T)
+        unbox-verify (extractvalue value 0) T
+        bitcast (extractvalue value 1) T
+
+    inline unbox-hidden-pointer (value T)
+        unbox-verify (extractvalue value 0) T
+        load (inttoptr (extractvalue value 1) ('pointer T))
+
+    fn any-imply (vT T)
+        let storageT = ('storage T)
+        let kind = ('kind storageT)
+        if (icmp== kind type-kind-pointer)
+            return (box-pointer unbox-pointer) true
+        elseif (icmp== kind type-kind-integer)
+            return (box-pointer unbox-integer) true
+        elseif (icmp== kind type-kind-real)
+            if (ptrcmp== storageT f32)
+                return (box-pointer unbox-u32) true
+            elseif (ptrcmp== storageT f64)
+                return (box-pointer unbox-bitcast) true
+        elseif (bor (icmp== kind type-kind-tuple) (icmp== kind type-kind-array))
+            return (box-pointer unbox-hidden-pointer) true
+        return (Any-none) false
+
+    'set-symbols Any
+        __imply =
+            box-pointer (unconst (typify any-imply type type))
+
     # integer casting
 
     fn integer-imply (vT T)
         let T =
-            if (ptrcmp== T usize) (sc_type_storage T)
+            if (ptrcmp== T usize) ('storage T)
             else T
-        if (icmp== (sc_type_kind T) type-kind-integer)
+        if (icmp== ('kind T) type-kind-integer)
             let valw = ('bitcount vT)
             let destw = ('bitcount T)
             # must have same signed bit
@@ -318,9 +392,9 @@ syntax-extend
 
     fn integer-as (vT T)
         let T =
-            if (ptrcmp== T usize) (sc_type_storage T)
+            if (ptrcmp== T usize) ('storage T)
             else T
-        if (icmp== (sc_type_kind T) type-kind-integer)
+        if (icmp== ('kind T) type-kind-integer)
             let valw = ('bitcount vT)
             let destw = ('bitcount T)
             if (icmp== destw valw)
@@ -332,7 +406,7 @@ syntax-extend
                     return (box-symbol zext) true
             else
                 return (box-symbol itrunc) true
-        elseif (icmp== (sc_type_kind T) type-kind-real)
+        elseif (icmp== ('kind T) type-kind-real)
             if ('signed? vT)
                 return (box-symbol sitofp) true
             else
@@ -368,8 +442,17 @@ syntax-extend
             return (f vT T)
         return (Any-none) false
 
+    fn implyfn (vT T)
+        get-cast-dispatcher '__imply vT T
+    fn asfn (vT T)
+        get-cast-dispatcher '__as vT T
+
     'set-symbols syntax-scope
-        forward-imply =
+        implyfn = (typify implyfn type type)
+        asfn = (typify asfn type type)
+
+    'set-symbols syntax-scope
+        try-imply =
             box-label-macro
                 fn "imply-dispatch" (l)
                     'verify-argument-count l 3 3
@@ -387,7 +470,7 @@ syntax-extend
                             f
                         else fallback
                     if (ptrcmp!= vT T)
-                        let f ok = (get-cast-dispatcher '__imply vT T)
+                        let f ok = (implyfn vT T)
                         if ok
                             'remove-argument l 1
                             'set-enter l f
@@ -397,7 +480,7 @@ syntax-extend
                         'return l
                         'append-argument l unnamed value
                     l
-        forward-as =
+        try-as =
             box-label-macro
                 fn "as-dispatch" (l)
                     'verify-argument-count l 3 3
@@ -418,11 +501,11 @@ syntax-extend
                         let f ok =
                             do
                                 # try implicit cast first
-                                let f ok = (get-cast-dispatcher '__imply vT T)
+                                let f ok = (implyfn vT T)
                                 if ok (_ f ok)
                                 else
                                     # then try explicit cast
-                                    get-cast-dispatcher '__as vT T
+                                    asfn vT T
                         if ok
                             'remove-argument l 1
                             'set-enter l f
@@ -473,27 +556,24 @@ syntax-extend
 
     syntax-scope
 
-#inline forward-as (fallback value destT)
-    forward-imply
-        inline ()
-            __forward-as fallback value destT
-        \ value destT
-
 inline imply (value destT)
-    forward-imply none value destT
+    try-imply none value destT
 
 inline as (value destT)
-    forward-as none value destT
+    try-as none value destT
 
-let k =
-    as 5 u64
-dump k
+#
+    let k =
+        as 5 u64
+    dump k
 
-let test =
-    typify
-        fn (a b)
-            add a b
-        \ i32 i32
+    let test =
+        typify
+            fn (a b)
+                add a b
+            \ i32 i32
+
+#dump (imply (box-i32 5) i32)
 
 #do
     trycall
