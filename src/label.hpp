@@ -73,6 +73,7 @@ protected:
 
 public:
     Label *original;
+    Frame *frame;
     const String *docstring;
     size_t uid;
     size_t next_instanceid;

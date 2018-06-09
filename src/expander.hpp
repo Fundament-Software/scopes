@@ -15,6 +15,7 @@ struct Scope;
 struct Label;
 
 Label *expand_module(Any expr, Scope *scope = nullptr);
+Label *expand_inline(Any expr, Scope *scope = nullptr);
 
 } // namespace scopes
 

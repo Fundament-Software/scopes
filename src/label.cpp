@@ -23,7 +23,7 @@ uint64_t Tag<T>::active_gen = 0;
 //------------------------------------------------------------------------------
 
 Label::Label(const Anchor *_anchor, Symbol _name, uint64_t _flags) :
-    original(nullptr), docstring(nullptr),
+    original(nullptr), frame(nullptr), docstring(nullptr),
     uid(0), next_instanceid(1), anchor(_anchor), name(_name),
     paired(nullptr), flags(_flags)
     {}

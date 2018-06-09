@@ -942,6 +942,27 @@ struct Expander {
 
 bool Expander::verbose = false;
 
+Label *expand_inline(Any expr, Scope *scope) {
+    const Anchor *anchor = get_active_anchor();
+    if (expr.type == TYPE_Syntax) {
+        anchor = expr.syntax->anchor;
+        set_active_anchor(anchor);
+        expr = expr.syntax->datum;
+    }
+    expr.verify(TYPE_List);
+    assert(anchor);
+    Label *mainfunc = Label::function_from(anchor, SYM_Unnamed);
+    mainfunc->set_inline();
+    Any retparam = mainfunc->params[0];
+
+    Scope *subenv = scope?scope:globals;
+
+    Expander subexpr(mainfunc, subenv);
+    subexpr.expand_block(expr, retparam);
+
+    return mainfunc;
+}
+
 Label *expand_module(Any expr, Scope *scope) {
     const Anchor *anchor = get_active_anchor();
     if (expr.type == TYPE_Syntax) {

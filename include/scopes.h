@@ -179,6 +179,7 @@ const sc_string_t *sc_compile_glsl(sc_symbol_t target, sc_label_t *srcl, uint64_
 void sc_compile_object(const sc_string_t *path, sc_scope_t *table, uint64_t flags);
 void sc_enter_solver_cli ();
 size_t sc_verify_stack ();
+sc_label_t *sc_eval_inline(const sc_list_t *expr, sc_scope_t *scope);
 
 // stdin/out
 
@@ -379,6 +380,8 @@ sc_label_t *sc_label_new_cont();
 void sc_label_set_complete(sc_label_t *label);
 void sc_label_append_parameter(sc_label_t *label, sc_parameter_t *param);
 const sc_type_t *sc_label_function_type(sc_label_t *label);
+void sc_label_set_rawcall(sc_label_t *label);
+sc_frame_t *sc_label_frame(sc_label_t *label);
 
 // frames
 

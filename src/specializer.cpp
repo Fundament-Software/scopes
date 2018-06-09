@@ -1113,6 +1113,7 @@ struct Specializer {
 
         Frame *frame = Frame::from(parent, label, newlabel, loop_count);
         frame->args = tmp_args;
+        newlabel->frame = frame;
 
         if (label->is_debug()) {
             StyledStream ss(std::cerr);

@@ -23,10 +23,10 @@ fn ptrcmp!= (t1 t2)
 fn ptrcmp== (t1 t2)
     icmp== (ptrtoint t1 intptr) (ptrtoint t2 intptr)
 
-fn box-i32 (value)
+fn box-integer (value)
     let val = (undef Any)
     let val = (insertvalue val (typeof value) 0)
-    let val = (insertvalue val (sext value u64) 1)
+    let val = (insertvalue val (zext value u64) 1)
     val
 
 # turn a symbol-like value (storage type u64) to an Any
@@ -68,16 +68,16 @@ fn verify-argument-count (l mincount maxcount)
         if (icmp<s count mincount)
             sc_anchor_error
                 sc_string_join "at least "
-                    sc_string_join (sc_any_repr (box-i32 mincount))
+                    sc_string_join (sc_any_repr (box-integer mincount))
                         sc_string_join " argument(s) expected, got "
-                            sc_any_repr (box-i32 count)
+                            sc_any_repr (box-integer count)
     if (icmp>=s maxcount 0)
         if (icmp>s count maxcount)
             sc_anchor_error
                 sc_string_join "at most "
-                    sc_string_join (sc_any_repr (box-i32 maxcount))
+                    sc_string_join (sc_any_repr (box-integer maxcount))
                         sc_string_join " argument(s) expected, got "
-                            sc_any_repr (box-i32 count)
+                            sc_any_repr (box-integer count)
     return;
 
 fn Any-indirect-typeof (value)
@@ -248,7 +248,7 @@ syntax-extend
                     if (icmp== k unnamed)
                         sc_anchor_error
                             sc_string_join "cannot set symbol from argument "
-                                sc_string_join (sc_any_repr (box-i32 i))
+                                sc_string_join (sc_any_repr (box-integer i))
                                     " because it has no key"
                     loop (add i 1)
                         if (Any-constant? v)
@@ -308,6 +308,22 @@ syntax-extend
 
 'set-symbols Scope
     set-symbol = sc_scope_set_symbol
+    @ = sc_scope_at
+
+'set-symbols string
+    join = sc_string_join
+
+let cons = sc_list_cons
+
+'set-symbols list
+    join = sc_list_join
+    decons =
+        typify
+            fn (l)
+                return
+                    load (getelementptr l 0 0)
+                    load (getelementptr l 0 1)
+            list
 
 # label accessors
 'set-symbols Label
@@ -320,7 +336,9 @@ syntax-extend
     set-argument = sc_label_set_argument
     enter = sc_label_get_enter
     set-enter = sc_label_set_enter
+    dump = sc_label_dump
     function-type = sc_label_function_type
+    set-rawcall = sc_label_set_rawcall
     return = (typify Label-return Label)
 
 'set-symbols type
@@ -330,6 +348,7 @@ syntax-extend
     element-count = sc_type_countof
     storage = sc_type_storage
     kind = sc_type_kind
+    @ = sc_type_at
 
 syntax-extend
     # any extraction
@@ -369,6 +388,77 @@ syntax-extend
     'set-symbols Any
         __imply =
             box-pointer (unconst (typify any-imply type type))
+        __typecall =
+            box-label-macro
+                fn (l)
+                    'verify-argument-count l 2 2
+                    let k arg = ('argument l 2)
+                    let T = ('indirect-typeof arg)
+                    if (ptrcmp== T Any)
+                        'return l
+                        'append-argument l unnamed arg
+                    else
+                        'remove-argument l 1
+                        if ('constant? arg)
+                            'set-enter l (Any-wrap Any-wrap)
+                        else
+                            let storageT = ('storage T)
+                            let kind = ('kind storageT)
+                            if (icmp== kind type-kind-pointer)
+                                'set-enter l (box-pointer box-pointer)
+                            elseif (icmp== kind type-kind-integer)
+                                'set-enter l (box-pointer box-integer)
+                            else
+                                sc_anchor_error
+                                    'join "can't box value of type "
+                                        '__repr (box-pointer T)
+                    l
+
+    # typecall
+
+    'set-symbols type
+        __call =
+            box-label-macro
+                fn (l)
+                    let k self = ('argument l 1)
+                    let T = (unbox-pointer self type)
+                    let f ok = ('@ T '__typecall)
+                    if ok
+                        'set-enter l f
+                        return l
+                    sc_anchor_error
+                        'join "no type constructor available for type "
+                            '__repr (box-pointer T)
+                    l
+
+    # list constructor
+
+    'set-symbols list
+        __typecall =
+            box-label-macro
+                fn (l)
+                    let k self = ('argument l 1)
+                    let count = ('argument-count l)
+                    let loop (i tail) = count
+                        cons (Any-wrap quote)
+                            cons (Any-wrap '()) '()
+                    if (icmp>s i 2)
+                        let i = (sub i 1)
+                        let k arg = ('argument l i)
+                        loop i
+                            cons (Any-wrap cons)
+                                cons
+                                    box-pointer
+                                        cons (Any-wrap Any)
+                                            cons arg '()
+                                    cons (box-pointer tail) '()
+                    let tail = (cons (box-pointer tail) '())
+                    let genl = (sc_eval_inline tail (nullof Scope))
+                    'return l
+                    'set-enter l
+                        box-pointer
+                            sc_closure_new genl (sc_label_frame l)
+                    l
 
     # integer casting
 
@@ -436,7 +526,7 @@ syntax-extend
                 l
 
     fn get-cast-dispatcher (symbol vT T)
-        let anyf ok = (sc_type_at vT symbol)
+        let anyf ok = ('@ vT symbol)
         if ok
             let f = (unbox-pointer anyf DispatchCastFunctionPointerType)
             return (f vT T)
@@ -515,6 +605,19 @@ syntax-extend
                         'return l
                         'append-argument l unnamed value
                     l
+
+        # automatic value casting for externs
+
+        'set-symbols extern
+            __call =
+                box-label-macro
+                    fn (l)
+                        let k f = ('argument l 1)
+                        'set-enter l f
+                        'set-rawcall l
+                        'remove-argument l 1
+                        l
+
         #trycall =
             box-label-macro
                 fn "trycall" (l)
@@ -562,6 +665,8 @@ inline imply (value destT)
 inline as (value destT)
     try-as none value destT
 
+list 1 (add 2 3) 3
+
 #
     let k =
         as 5 u64
@@ -573,7 +678,7 @@ inline as (value destT)
                 add a b
             \ i32 i32
 
-#dump (imply (box-i32 5) i32)
+#dump (imply (box-integer 5) i32)
 
 #do
     trycall

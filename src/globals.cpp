@@ -75,6 +75,12 @@ sc_label_t *sc_eval(const sc_syntax_t *expr, sc_scope_t *scope) {
     return specialize(Frame::root, expand_module(expr, scope), {});
 }
 
+sc_label_t *sc_eval_inline(const sc_list_t *expr, sc_scope_t *scope) {
+    using namespace scopes;
+    const Syntax *sxexpr = wrap_syntax(get_active_anchor(), expr, false);
+    return expand_inline(sxexpr, nullptr);
+}
+
 sc_label_t *sc_typify(sc_closure_t *srcl, int numtypes, const sc_type_t **typeargs) {
     using namespace scopes;
     if (srcl->label->is_inline()) {
@@ -1117,6 +1123,17 @@ const sc_type_t *sc_label_function_type(sc_label_t *label) {
     return label->get_function_type();
 }
 
+void sc_label_set_rawcall(sc_label_t *label) {
+    using namespace scopes;
+    label->body.set_rawcall();
+}
+
+sc_frame_t *sc_label_frame(sc_label_t *label) {
+    using namespace scopes;
+    auto frame = label->frame;
+    return frame?frame:Frame::root;
+}
+
 // Label
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -1192,6 +1209,7 @@ void init_globals(int argc, char *argv[]) {
 
     DEFINE_EXTERN_C_FUNCTION(sc_compiler_version, Tuple({TYPE_I32, TYPE_I32, TYPE_I32}));
     DEFINE_EXTERN_C_FUNCTION(sc_eval, TYPE_Label, TYPE_Syntax, TYPE_Scope);
+    DEFINE_EXTERN_C_FUNCTION(sc_eval_inline, TYPE_Label, TYPE_List, TYPE_Scope);
     DEFINE_EXTERN_C_FUNCTION(sc_typify, TYPE_Label, TYPE_Closure, TYPE_I32, NativeROPointer(TYPE_Type));
     DEFINE_EXTERN_C_FUNCTION(sc_compile, TYPE_Any, TYPE_Label, TYPE_U64);
     DEFINE_EXTERN_C_FUNCTION(sc_compile_spirv, TYPE_String, TYPE_Symbol, TYPE_Label, TYPE_U64);
@@ -1358,6 +1376,8 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_label_set_complete, TYPE_Void, TYPE_Label);
     DEFINE_EXTERN_C_FUNCTION(sc_label_append_parameter, TYPE_Void, TYPE_Label, TYPE_Parameter);
     DEFINE_EXTERN_C_FUNCTION(sc_label_function_type, TYPE_Type, TYPE_Label);
+    DEFINE_EXTERN_C_FUNCTION(sc_label_set_rawcall, TYPE_Void, TYPE_Label);
+    DEFINE_EXTERN_C_FUNCTION(sc_label_frame, TYPE_Frame, TYPE_Label);
 
     DEFINE_EXTERN_C_FUNCTION(sc_frame_dump, TYPE_Void, TYPE_Frame);
     DEFINE_EXTERN_C_FUNCTION(sc_frame_root, TYPE_Frame);
