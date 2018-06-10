@@ -102,8 +102,6 @@ fn Any-none ()
     let val = (insertvalue val Nothing 0)
     val
 
-# we don't have typedef or anything, so we need to open a new compiler context
-# to alias the pointer type that we need (pointer to types) so it's constant
 syntax-extend
     let val = (box-pointer (sc_pointer_type type pointer-flag-non-writable unnamed))
     sc_scope_set_symbol syntax-scope 'type-array val
@@ -129,19 +127,6 @@ syntax-extend
         sc_scope_set_symbol syntax-scope 'DispatchCastFunctionType (box-pointer ftype)
         sc_scope_set_symbol syntax-scope 'DispatchCastFunctionPointerType
             box-pointer (sc_pointer_type ftype pointer-flag-non-writable unnamed)
-
-    do
-        let SyntaxMacro = (sc_typename_type "SyntaxMacro")
-        store list (getelementptr types 0)
-        store Scope (getelementptr types 1)
-        let rtype = (sc_tuple_type 2 (bitcast types type-array))
-        store list (getelementptr types 0)
-        store list (getelementptr types 1)
-        store Scope (getelementptr types 2)
-        let ftype = (sc_function_type rtype 3 (bitcast types type-array))
-        sc_typename_type_set_storage SyntaxMacro ftype
-        sc_scope_set_symbol syntax-scope 'SyntaxMacro (box-pointer SyntaxMacro)
-        sc_scope_set_symbol syntax-scope 'SyntaxMacroFunctionType (box-pointer ftype)
 
     fn typify (l)
         verify-argument-count l 1 -1
@@ -175,12 +160,6 @@ syntax-extend
 
     syntax-scope
 
-let function->SyntaxMacro =
-    typify
-        fn "function->SyntaxMacro" (f)
-            bitcast f SyntaxMacro
-        SyntaxMacroFunctionType
-
 let function->LabelMacro =
     typify
         fn "function->LabelMacro" (f)
@@ -189,19 +168,49 @@ let function->LabelMacro =
 
 # take closure l, typify and compile it and return an Any of LabelMacro type
 inline label-macro (l)
-    let l = (typify l Label)
-    function->LabelMacro (unconst l)
+    function->LabelMacro (unconst (typify l Label))
 
 inline box-label-macro (l)
     box-pointer (label-macro l)
 
 syntax-extend
-    fn list-handler (topexpr env)
-        #sc_write "yup\n"
-        return topexpr env
+    # tuple type constructor
+    sc_type_set_symbol tuple '__typecall
+        box-label-macro
+            fn "tuple" (l)
+                verify-argument-count l 1 -1
+                let pcount = (sub (sc_label_argument_count l) 2)
+                let types = (alloca-array type pcount)
+                let loop (i j) = 0 2
+                if (icmp<s i pcount)
+                    let k arg = (sc_label_argument l j)
+                    let T = (unbox-pointer arg type)
+                    store T (getelementptr types i)
+                    loop (add i 1) (add j 1)
+                let ttype = (sc_tuple_type pcount (bitcast types type-array))
+                Label-return l
+                sc_label_append_argument l unnamed (box-pointer ttype)
+                l
 
-    sc_scope_set_symbol syntax-scope (sc_symbol_new "#list")
-        box-pointer (unconst (typify list-handler list Scope))
+    # function pointer type constructor
+    sc_type_set_symbol function '__typecall
+        box-label-macro
+            fn "function" (l)
+                verify-argument-count l 2 -1
+                let k rtype = (sc_label_argument l 2)
+                let rtype = (unbox-pointer rtype type)
+                let pcount = (sub (sc_label_argument_count l) 3)
+                let types = (alloca-array type pcount)
+                let loop (i j) = 0 3
+                if (icmp<s i pcount)
+                    let k arg = (sc_label_argument l j)
+                    let T = (unbox-pointer arg type)
+                    store T (getelementptr types i)
+                    loop (add i 1) (add j 1)
+                let ftype = (sc_function_type rtype pcount (bitcast types type-array))
+                Label-return l
+                sc_label_append_argument l unnamed (box-pointer ftype)
+                l
 
     # method call syntax
     sc_type_set_symbol Symbol '__call
@@ -229,7 +238,12 @@ syntax-extend
                 verify-argument-count l 1 -1
                 let k cont = (sc_label_argument l 0)
                 let k self = (sc_label_argument l 1)
-                let T = (unbox-pointer self selftype)
+                let self-constant? = (Any-constant? self)
+                let T =
+                    if self-constant?
+                        unbox-pointer self selftype
+                    else
+                        nullof selftype
                 let count = (sc_label_argument_count l)
                 let numentries = (sub count 2)
                 let keys = (alloca-array Symbol numentries)
@@ -251,7 +265,7 @@ syntax-extend
                                 sc_string_join (sc_any_repr (box-integer i))
                                     " because it has no key"
                     loop (add i 1)
-                        if (Any-constant? v)
+                        if (band self-constant? (Any-constant? v))
                             fset T k v
                             active-l
                         else
@@ -297,6 +311,34 @@ syntax-extend
                         sc_pointer_type T pointer-flag-non-writable unnamed
                 l
 
+    # typecall
+
+    sc_type_set_symbol type '__call
+        box-label-macro
+            fn "type-call" (l)
+                let k self = (sc_label_argument l 1)
+                let T = (unbox-pointer self type)
+                let f ok = (sc_type_at T '__typecall)
+                if ok
+                    sc_label_set_enter l f
+                    return l
+                sc_anchor_error
+                    sc_string_join "no type constructor available for type "
+                        sc_any_repr self
+                l
+
+    # closure constructor
+    sc_type_set_symbol Closure '__typecall
+        box-pointer
+            inline (cls label frame)
+                sc_closure_new label frame
+
+    # symbol constructor
+    sc_type_set_symbol Symbol '__typecall
+        box-pointer
+            inline (cls string)
+                sc_symbol_new string
+
     syntax-scope
 
 'set-symbols Any
@@ -305,6 +347,8 @@ syntax-extend
     __repr = sc_any_repr
     indirect-typeof = (typify Any-indirect-typeof Any)
     typeof = (typify Any-typeof Any)
+
+let Syntax-wrap = sc_syntax_wrap
 
 'set-symbols Scope
     set-symbol = sc_scope_set_symbol
@@ -339,6 +383,7 @@ let cons = sc_list_cons
     dump = sc_label_dump
     function-type = sc_label_function_type
     set-rawcall = sc_label_set_rawcall
+    frame = sc_label_frame
     return = (typify Label-return Label)
 
 'set-symbols type
@@ -350,7 +395,17 @@ let cons = sc_list_cons
     kind = sc_type_kind
     @ = sc_type_at
 
+inline imply
+
 syntax-extend
+    # syntax macro type
+    let SyntaxMacro = (sc_typename_type "SyntaxMacro")
+    let SyntaxMacroFunctionType =
+        'pointer (function (tuple list Scope) list list Scope)
+    sc_typename_type_set_storage SyntaxMacro SyntaxMacroFunctionType
+    sc_scope_set_symbol syntax-scope 'SyntaxMacro (box-pointer SyntaxMacro)
+    sc_scope_set_symbol syntax-scope 'SyntaxMacroFunctionType (box-pointer SyntaxMacroFunctionType)
+
     # any extraction
 
     inline unbox-integer (value T)
@@ -383,6 +438,7 @@ syntax-extend
                 return (box-pointer unbox-bitcast) true
         elseif (bor (icmp== kind type-kind-tuple) (icmp== kind type-kind-array))
             return (box-pointer unbox-hidden-pointer) true
+        sc_write ('__repr (box-pointer storageT))
         return (Any-none) false
 
     'set-symbols Any
@@ -408,27 +464,15 @@ syntax-extend
                                 'set-enter l (box-pointer box-pointer)
                             elseif (icmp== kind type-kind-integer)
                                 'set-enter l (box-pointer box-integer)
+                            elseif (icmp== kind type-kind-extern)
+                                'set-enter l (box-pointer box-symbol)
+                            #elseif (bor (icmp== kind type-kind-tuple) (icmp== kind type-kind-array))
+                            #elseif (icmp== kind type-kind-vector)
+                            #elseif (icmp== kind type-kind-real)
                             else
                                 sc_anchor_error
                                     'join "can't box value of type "
                                         '__repr (box-pointer T)
-                    l
-
-    # typecall
-
-    'set-symbols type
-        __call =
-            box-label-macro
-                fn (l)
-                    let k self = ('argument l 1)
-                    let T = (unbox-pointer self type)
-                    let f ok = ('@ T '__typecall)
-                    if ok
-                        'set-enter l f
-                        return l
-                    sc_anchor_error
-                        'join "no type constructor available for type "
-                            '__repr (box-pointer T)
                     l
 
     # list constructor
@@ -439,9 +483,7 @@ syntax-extend
                 fn (l)
                     let k self = ('argument l 1)
                     let count = ('argument-count l)
-                    let loop (i tail) = count
-                        cons (Any-wrap quote)
-                            cons (Any-wrap '()) '()
+                    let loop (i tail) = count '(quote ())
                     if (icmp>s i 2)
                         let i = (sub i 1)
                         let k arg = ('argument l i)
@@ -457,7 +499,7 @@ syntax-extend
                     'return l
                     'set-enter l
                         box-pointer
-                            sc_closure_new genl (sc_label_frame l)
+                            Closure genl ('frame l)
                     l
 
     # integer casting
@@ -541,35 +583,37 @@ syntax-extend
         implyfn = (typify implyfn type type)
         asfn = (typify asfn type type)
 
+    let try-imply =
+        box-label-macro
+            fn "imply-dispatch" (l)
+                'verify-argument-count l 3 3
+                let k fallback = ('argument l 1)
+                let k value = ('argument l 2)
+                let k T = ('argument l 3)
+                let vT = ('indirect-typeof value)
+                let T = (unbox-pointer T type)
+                let fallback =
+                    if ('none? fallback)
+                        let error-func =
+                            gen-cast-error "can't implicitly cast value of type "
+                        let f = (box-pointer error-func)
+                        'set-argument l 1 unnamed f
+                        f
+                    else fallback
+                if (ptrcmp!= vT T)
+                    let f ok = (implyfn vT T)
+                    if ok
+                        'remove-argument l 1
+                        'set-enter l f
+                        return l
+                    'set-enter l fallback
+                else
+                    'return l
+                    'append-argument l unnamed value
+                l
+
     'set-symbols syntax-scope
-        try-imply =
-            box-label-macro
-                fn "imply-dispatch" (l)
-                    'verify-argument-count l 3 3
-                    let k fallback = ('argument l 1)
-                    let k value = ('argument l 2)
-                    let k T = ('argument l 3)
-                    let vT = ('indirect-typeof value)
-                    let T = (unbox-pointer T type)
-                    let fallback =
-                        if ('none? fallback)
-                            let error-func =
-                                gen-cast-error "can't implicitly cast value of type "
-                            let f = (box-pointer error-func)
-                            'set-argument l 1 unnamed f
-                            f
-                        else fallback
-                    if (ptrcmp!= vT T)
-                        let f ok = (implyfn vT T)
-                        if ok
-                            'remove-argument l 1
-                            'set-enter l f
-                            return l
-                        'set-enter l fallback
-                    else
-                        'return l
-                        'append-argument l unnamed value
-                    l
+        try-imply = try-imply
         try-as =
             box-label-macro
                 fn "as-dispatch" (l)
@@ -606,56 +650,76 @@ syntax-extend
                         'append-argument l unnamed value
                     l
 
-        # automatic value casting for externs
+    #fn get-op2-dispatcher (symbol lhsT rhsT)
+        let anyf ok = ('@ lhsT symbol)
+        if ok
+            let f = (unbox-pointer anyf DispatchCastFunctionPointerType)
+            return (f vT T)
+        return (Any-none) false
 
-        'set-symbols extern
-            __call =
-                box-label-macro
-                    fn (l)
-                        let k f = ('argument l 1)
-                        'set-enter l f
-                        'set-rawcall l
+    #inline make-op2-dispatch (symbol)
+        box-label-macro
+            fn (l)
+                'verify-argument-count l 3 3
+                let k fallback = ('argument l 1)
+                let k lhs = ('argument l 2)
+                let k rhs = ('argument l 3)
+                let lhsT = ('indirect-typeof lhs)
+                let rhsT = ('indirect-typeof rhs)
+                let fallback =
+                    if ('none? fallback)
+                        let error-func =
+                            gen-cast-error "can't implicitly cast value of type "
+                        let f = (box-pointer error-func)
+                        'set-argument l 1 unnamed f
+                        f
+                    else fallback
+                if (ptrcmp!= vT T)
+                    let f ok = (implyfn vT T)
+                    if ok
                         'remove-argument l 1
-                        l
+                        'set-enter l f
+                        return l
+                    'set-enter l fallback
+                else
+                    'return l
+                    'append-argument l unnamed value
+                l
 
-        #trycall =
-            box-label-macro
-                fn "trycall" (l)
-                    'verify-argument-count l 2 -1
-                    let k fallback = ('argument l 1)
-                    let k func = ('argument l 2)
-                    let vT = ('indirect-typeof func)
-                    if (ptrcmp== vT Label)
-                        let func = (unbox-pointer func Label)
-                        let functype = ('function-type func)
-                        let lcount = (sub ('argument-count l) 2)
-                        let rcount = ('element-count functype)
-                        if (icmp!= lcount rcount)
-                            'set-enter l fallback
-                        else
-                            let loop (i j) = 3 1
-                            if (icmp<s j rcount)
-                                let k lval = ('argument l i)
-                                let ltype = ('indirect-typeof lval)
-                                let rtype = ('element@ functype j)
-                                sc_write ('__repr (box-pointer ltype))
-                                sc_write " "
-                                sc_write ('__repr (box-pointer rtype))
-                                sc_write "\n"
+    let Syntax-anchor =
+        typify
+            fn "Syntax-anchor" (sx)
+                extractvalue (load sx) 0
+            Syntax
+    let Syntax-datum =
+        typify
+            fn "Syntax-datum" (sx)
+                extractvalue (load sx) 1
+            Syntax
 
+    inline Syntax-unbox (self destT)
+        imply (Syntax-datum self) destT
 
+    'set-symbols Syntax
+        anchor = Syntax-anchor
+        datum = Syntax-datum
+        __imply =
+            box-pointer
+                unconst
+                    typify
+                        fn "syntax-imply" (vT T)
+                            if (ptrcmp== T Any)
+                                return (box-pointer Syntax-datum) true
+                            else
+                                return (box-pointer Syntax-unbox) true
+                        \ type type
 
-                        #sc_write ('__repr (box-pointer (sc_type_element_at functype 3)))
-
-                    #let k T = ('argument l 3)
-                    #let T = (unbox-pointer T type)
-                    #sc_anchor_error
-                        sc_string_join intro-string
-                            sc_string_join
-                                '__repr (box-pointer vT)
-                                sc_string_join " to type "
-                                    '__repr (box-pointer T)
-                    l
+    # support for calling macro functions directly
+    'set-symbols SyntaxMacro
+        __call =
+            box-pointer
+                inline (self at next scope)
+                    (bitcast self SyntaxMacroFunctionType) at next scope
 
     syntax-scope
 
@@ -665,7 +729,68 @@ inline imply (value destT)
 inline as (value destT)
     try-as none value destT
 
-list 1 (add 2 3) 3
+let function->SyntaxMacro =
+    typify
+        fn "function->SyntaxMacro" (f)
+            bitcast f SyntaxMacro
+        SyntaxMacroFunctionType
+
+inline syntax-block-scope-macro (l)
+    function->SyntaxMacro (unconst (typify l list list Scope))
+
+syntax-extend
+
+
+
+    # install basic list hook for this scope
+    # is called for every list the expander would otherwise consider a call
+    fn list-handler (topexpr env)
+        let topexpr-at topexpr-next = ('decons topexpr)
+        let sxexpr = (as topexpr-at Syntax)
+        let expr expr-anchor = ('datum sxexpr) ('anchor sxexpr)
+        if (ptrcmp!= ('typeof expr) list)
+            return topexpr env
+        let expr = (as expr list)
+        let expr-at expr-next = ('decons expr)
+        let head-key = ('datum (as expr-at Syntax))
+        let head =
+            if (ptrcmp== ('typeof head-key) Symbol)
+                let head success = ('@ env (as head-key Symbol))
+                if success head
+                else head-key
+            else head-key
+        let head =
+            if (ptrcmp== ('typeof head) type)
+                let attr ok = ('@ (as head type) '__macro)
+                if ok attr
+                else head
+            else head
+        if (ptrcmp== ('typeof head) SyntaxMacro)
+            let head = (as head SyntaxMacro)
+            let expr env = (head expr topexpr-next env)
+            let expr = (Syntax-wrap expr-anchor (Any expr) false)
+            return (as (as expr Syntax) list) env
+        #elseif (has-infix-ops? env expr)
+            let at next = (decons expr)
+            let expr =
+                parse-infix-expr env at next (unconst 0)
+            let next = (list-next topexpr)
+            let expr = (Syntax-wrap expr-anchor expr false)
+            return (list-cons expr next) env
+        else
+            return topexpr env
+
+    sc_scope_set_symbol syntax-scope (Symbol "#list")
+        Any (unconst (typify list-handler list Scope))
+
+    'set-symbol syntax-scope 'test
+        Any
+            syntax-block-scope-macro
+                fn (expr next scope)
+                    sc_write "hello\n"
+                    return next scope
+
+    syntax-scope
 
 #
     let k =

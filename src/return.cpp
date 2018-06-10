@@ -144,6 +144,7 @@ const Type *ReturnLabel(ReturnLabelMode mode, const Args &values) {
 #ifdef SCOPES_DEBUG
     for (size_t i = 0; i < values.size(); ++i) {
         assert(values[i].value.is_const());
+        assert(is_unknown(values[i].value));
     }
 #endif
 

@@ -3808,13 +3808,9 @@ struct Specializer {
         Args values;
         values.reserve(args.size());
         for (size_t i = 1; i < args.size(); ++i) {
-            if (args[i].value.is_const()) {
-                values.push_back(args[i]);
-            } else {
-                values.push_back(Argument(
-                    args[i].key,
-                    unknown_of(args[i].value.indirect_type())));
-            }
+            values.push_back(Argument(
+                args[i].key,
+                unknown_of(args[i].value.indirect_type())));
         }
         clear_continuation_arg(l);
         return ReturnLabel(values);
