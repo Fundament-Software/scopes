@@ -17,6 +17,7 @@
 #include "scope.hpp"
 #include "stream_expr.hpp"
 #include "anchor.hpp"
+#include "scopes.h"
 
 #include <assert.h>
 
@@ -799,6 +800,7 @@ struct Expander {
 
     Any expand(const Syntax *sx, const Any &dest) {
     expand_again:
+        sc_verify_stack();
         set_active_anchor(sx->anchor);
         if (sx->quoted) {
             if (verbose) {

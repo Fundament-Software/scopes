@@ -154,6 +154,11 @@ typedef struct sc_any_bool_tuple_ {
     bool _1;
 } sc_any_bool_tuple_t;
 
+typedef struct sc_any_list_tuple_ {
+    sc_any_t _0;
+    const sc_list_t *_1;
+} sc_any_list_tuple_t;
+
 typedef struct sc_symbol_any_tuple_ {
     sc_symbol_t _0;
     sc_any_t _1;
@@ -253,6 +258,9 @@ const sc_string_t *sc_symbol_to_string(sc_symbol_t sym);
 const sc_string_t *sc_string_new(const char *ptr, size_t count);
 const sc_string_t *sc_string_join(const sc_string_t *a, const sc_string_t *b);
 bool sc_string_match(const sc_string_t *pattern, const sc_string_t *text);
+size_t sc_string_count(sc_string_t *str);
+const sc_string_t *sc_string_lslice(sc_string_t *str, size_t offset);
+const sc_string_t *sc_string_rslice(sc_string_t *str, size_t offset);
 
 // any
 
@@ -265,6 +273,7 @@ bool sc_any_eq(sc_any_t a, sc_any_t b);
 const sc_list_t *sc_list_cons(sc_any_t at, const sc_list_t *next);
 const sc_list_t *sc_list_join(const sc_list_t *a, const sc_list_t *b);
 const sc_list_t *sc_list_dump(const sc_list_t *l);
+sc_any_list_tuple_t sc_list_decons(const sc_list_t *l);
 
 // syntax objects
 

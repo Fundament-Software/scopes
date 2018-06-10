@@ -526,6 +526,26 @@ bool sc_string_match(const sc_string_t *pattern, const sc_string_t *text) {
     return (regexp::regexec(m, text->data, nullptr, 0) == 0);
 }
 
+size_t sc_string_count(sc_string_t *str) {
+    using namespace scopes;
+    return str->count;
+}
+
+const sc_string_t *sc_string_lslice(sc_string_t *str, size_t offset) {
+    using namespace scopes;
+    if (!offset) return str;
+    if (offset >= str->count)
+        return Symbol(SYM_Unnamed).name();
+    return String::from(str->data + offset, str->count - offset);
+}
+
+const sc_string_t *sc_string_rslice(sc_string_t *str, size_t offset) {
+    using namespace scopes;
+    if (!offset) return Symbol(SYM_Unnamed).name();
+    if (offset >= str->count) return str;
+    return String::from(str->data, offset);
+}
+
 // Any
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -566,6 +586,14 @@ const sc_list_t *sc_list_dump(const sc_list_t *l) {
     StyledStream ss(std::cerr);
     stream_expr(ss, l, StreamExprFormat());
     return l;
+}
+
+sc_any_list_tuple_t sc_list_decons(const sc_list_t *l) {
+    using namespace scopes;
+    if (l)
+        return { l->at, l->next };
+    else
+        return { none, nullptr };
 }
 
 // Syntax
@@ -1285,6 +1313,9 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_string_new, TYPE_String, NativeROPointer(TYPE_I8), TYPE_USize);
     DEFINE_EXTERN_C_FUNCTION(sc_string_join, TYPE_String, TYPE_String, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_string_match, TYPE_Bool, TYPE_String, TYPE_String);
+    DEFINE_EXTERN_C_FUNCTION(sc_string_count, TYPE_USize, TYPE_String);
+    DEFINE_EXTERN_C_FUNCTION(sc_string_lslice, TYPE_String, TYPE_String, TYPE_USize);
+    DEFINE_EXTERN_C_FUNCTION(sc_string_rslice, TYPE_String, TYPE_String, TYPE_USize);
 
     DEFINE_EXTERN_C_FUNCTION(sc_any_repr, TYPE_String, TYPE_Any);
     DEFINE_EXTERN_C_FUNCTION(sc_any_string, TYPE_String, TYPE_Any);
@@ -1342,6 +1373,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_list_cons, TYPE_List, TYPE_Any, TYPE_List);
     DEFINE_EXTERN_C_FUNCTION(sc_list_dump, TYPE_List, TYPE_List);
     DEFINE_EXTERN_C_FUNCTION(sc_list_join, TYPE_List, TYPE_List, TYPE_List);
+    DEFINE_EXTERN_C_FUNCTION(sc_list_decons, Tuple({TYPE_Any, TYPE_List}), TYPE_List);
 
     DEFINE_EXTERN_C_FUNCTION(sc_syntax_from_path, TYPE_Syntax, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_syntax_from_string, TYPE_Syntax, TYPE_String);
