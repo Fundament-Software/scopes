@@ -2702,10 +2702,10 @@ struct Specializer {
     #endif
     }
 
-    Label *fold_label_macro_call(Label *l) {
+    void fold_label_macro_call(Label *l) {
         auto &&enter = l->body.enter;
 
-        typedef Label *(*label_macro_handler)(Label *);
+        typedef void (*label_macro_handler)(Label *);
 
         label_macro_handler handler = (label_macro_handler)enter.pointer;
         return handler(l);

@@ -133,7 +133,6 @@ syntax-extend
             sc_typify src_label pcount (bitcast types type-array)
         Label-return l
         sc_label_append_argument l unnamed (box-pointer func)
-        l
 
     do
         let types = (alloca-array type 1:usize)
@@ -142,7 +141,7 @@ syntax-extend
         let result = (sc_compile (sc_typify typify 1 types) 0:u64)
         let result-type = (extractvalue result 0)
         if (ptrcmp!= result-type LabelMacroFunctionType)
-            __anchor-error! "label macro must return label"
+            __anchor-error! "label macro must return void"
         let result =
             insertvalue result LabelMacro 0
         sc_scope_set_symbol syntax-scope 'typify result
@@ -179,7 +178,6 @@ syntax-extend
                 let ttype = (sc_tuple_type pcount (bitcast types type-array))
                 Label-return l
                 sc_label_append_argument l unnamed (box-pointer ttype)
-                l
 
     # function pointer type constructor
     sc_type_set_symbol function '__typecall
@@ -199,7 +197,6 @@ syntax-extend
                 let ftype = (sc_function_type rtype pcount (bitcast types type-array))
                 Label-return l
                 sc_label_append_argument l unnamed (box-pointer ftype)
-                l
 
     # method call syntax
     sc_type_set_symbol Symbol '__call
@@ -219,7 +216,6 @@ syntax-extend
                             sc_string_join (sc_any_repr sym)
                                 sc_string_join " in value of type "
                                     sc_any_repr (box-pointer T)
-                l
 
     inline gen-key-any-set (selftype fset)
         box-label-macro
@@ -275,7 +271,6 @@ syntax-extend
                             sc_label_append_argument active-l unnamed v
                             sc_label_set_complete active-l
                             nextl
-                l
 
     # quick assignment of type attributes
     sc_type_set_symbol type 'set-symbols (gen-key-any-set type sc_type_set_symbol)
@@ -291,7 +286,6 @@ syntax-extend
                 sc_label_append_argument l unnamed
                     box-pointer
                         sc_pointer_type T pointer-flag-non-writable unnamed
-                l
 
     # typecall
 
@@ -303,11 +297,10 @@ syntax-extend
                 let f ok = (sc_type_at T '__typecall)
                 if ok
                     sc_label_set_enter l f
-                    return l
+                    return;
                 __anchor-error!
                     sc_string_join "no type constructor available for type "
                         sc_any_repr self
-                l
 
     # closure constructor
     sc_type_set_symbol Closure '__typecall
@@ -489,7 +482,6 @@ syntax-extend
                                 __anchor-error!
                                     'join "can't box value of type "
                                         '__repr (box-pointer T)
-                    l
 
     # integer casting
 
@@ -559,7 +551,6 @@ syntax-extend
                             '__repr (box-pointer vT)
                             sc_string_join " to type "
                                 '__repr (box-pointer T)
-                l
 
     let DispatchCastFunctionType =
         'pointer (function (tuple Any bool) type type)
@@ -598,12 +589,11 @@ syntax-extend
                     if ok
                         'remove-argument l 1
                         'set-enter l f
-                        return l
+                        return;
                     'set-enter l fallback
                 else
                     'return l
                     'append-argument l unnamed value
-                l
 
     let try-as =
         box-label-macro
@@ -634,12 +624,11 @@ syntax-extend
                     if ok
                         'remove-argument l 1
                         'set-enter l f
-                        return l
+                        return;
                     'set-enter l fallback
                 else
                     'return l
                     'append-argument l unnamed value
-                l
 
     let UnaryOpFunctionType =
         'pointer (function (tuple Any bool) type)
@@ -680,7 +669,7 @@ syntax-extend
         let f ok = (get-binary-op-dispatcher symbol lhsT rhsT)
         if ok
             'set-enter l f
-            return l
+            return;
         # if types are unequal, we can try other options
         if (ptrcmp!= lhsT rhsT)
             # try reverse version next
@@ -689,7 +678,7 @@ syntax-extend
                 'set-argument l 1 rhsk rhs
                 'set-argument l 2 lhsk lhs
                 'set-enter l f
-                return l
+                return;
         # we give up
         __anchor-error!
             'join "can't "
@@ -699,7 +688,6 @@ syntax-extend
                             '__repr (box-pointer lhsT)
                             'join " and "
                                 '__repr (box-pointer rhsT)
-        l
 
     # both types are typically the same
     fn sym-binary-op-label-macro (l symbol rsymbol friendly-op-name)
@@ -712,7 +700,7 @@ syntax-extend
         let f ok = (get-binary-op-dispatcher symbol lhsT rhsT)
         if ok
             'set-enter l f
-            return l
+            return;
         # if types are unequal, we can try other options
         if (ptrcmp!= lhsT rhsT)
             # try reverse version next
@@ -721,7 +709,7 @@ syntax-extend
                 'set-argument l 1 rhsk rhs
                 'set-argument l 2 lhsk lhs
                 'set-enter l f
-                return l
+                return;
             # can the operation be performed on the lhs type?
             let f ok = (get-binary-op-dispatcher symbol lhsT lhsT)
             if ok
@@ -732,7 +720,7 @@ syntax-extend
                         binary-op-label-cast-then-macro l f castf lhsT rhs
                     'append-argument lcont lhsk lhs
                     'append-argument lcont rhsk (box-pointer param)
-                    return l
+                    return;
             # can the operation be performed on the rhs type?
             let f ok = (get-binary-op-dispatcher symbol rhsT rhsT)
             if ok
@@ -743,7 +731,7 @@ syntax-extend
                         binary-op-label-cast-then-macro l f castf rhsT lhs
                     'append-argument lcont lhsk (box-pointer param)
                     'append-argument lcont rhsk rhs
-                    return l
+                    return;
         # we give up
         __anchor-error!
             'join "can't "
@@ -753,7 +741,6 @@ syntax-extend
                             '__repr (box-pointer lhsT)
                             'join " and "
                                 '__repr (box-pointer rhsT)
-        l
 
     # right hand has fixed type
     fn asym-binary-op-label-macro (l symbol rtype friendly-op-name)
@@ -766,7 +753,7 @@ syntax-extend
         if ok
             if (ptrcmp== rhsT rtype)
                 'set-enter l f
-                return l
+                return;
             # can we cast rhsT to rtype?
             let castf ok = (implyfn rhsT rtype)
             if ok
@@ -774,7 +761,7 @@ syntax-extend
                     binary-op-label-cast-then-macro l f castf rtype rhs
                 'append-argument lcont lhsk lhs
                 'append-argument lcont rhsk (box-pointer param)
-                return l
+                return;
         # we give up
         __anchor-error!
             'join "can't "
@@ -784,7 +771,6 @@ syntax-extend
                             '__repr (box-pointer lhsT)
                             'join " and "
                                 '__repr (box-pointer rhsT)
-        l
 
     fn unary-op-label-macro (l symbol friendly-op-name)
         'verify-argument-count l 1 1
@@ -793,13 +779,12 @@ syntax-extend
         let f ok = ('@ lhsT symbol)
         if ok
             'set-enter l f
-            return l
+            return;
         __anchor-error!
             'join "can't "
                 'join friendly-op-name
                     'join " value of type "
                         '__repr (box-pointer lhsT)
-        l
 
     inline make-unary-op-dispatch (symbol friendly-op-name)
         box-label-macro (fn (l) (unary-op-label-macro l symbol friendly-op-name))
@@ -870,7 +855,7 @@ syntax-extend
         __rslice = sc_string_rslice
 
     'set-symbols list
-        __typecall =
+        #__typecall =
             box-label-macro
                 fn (l)
                     let k self = ('argument l 1)
@@ -891,8 +876,7 @@ syntax-extend
                     'return l
                     'set-enter l
                         box-pointer
-                            Closure genl ('frame l)
-                    l
+                            Closure genl ('frame l)                    l
         __.. = (box-binary-op-dispatch (single-binary-op-dispatch sc_list_join))
         __repr =
             inline "list-repr" (self)
@@ -1129,6 +1113,12 @@ syntax-extend
                 "unexpected token in infix expression"
             unreachable!;
 
+    fn list2 (_0 _1 _2)
+        cons (Any _0) (cons (Any _1) '())
+
+    fn list3 (_0 _1 _2)
+        cons (Any _0) (cons (Any _1) (cons (Any _2) '()))
+
     fn parse-infix-expr (infix-table lhs state mprec)
         let loop (lhs state) = lhs state
         if (empty? state)
@@ -1140,7 +1130,7 @@ syntax-extend
         let op-prec op-order op-name = (unpack-infix-op op)
         let rhs-loop (rhs state) = ('decons next-state)
         if (empty? state)
-            loop (Any (list op-name lhs rhs)) state
+            loop (Any (list3 op-name lhs rhs)) state
         let ra __ = ('decons state)
         let lop = (infix-op-gt infix-table ra op-prec)
         let nextop =
@@ -1148,7 +1138,7 @@ syntax-extend
                 rtl-infix-op-eq infix-table ra op-prec
             else lop
         if (== ('typeof nextop) Nothing)
-            loop (Any (list op-name lhs rhs)) state
+            loop (Any (list3 op-name lhs rhs)) state
         let nextop-prec = (unpack-infix-op nextop)
         let next-rhs next-state =
             parse-infix-expr infix-table rhs state nextop-prec
@@ -1226,7 +1216,7 @@ syntax-extend
                     fn (args)
                         fn op (a b)
                             let sym = (as (as b Syntax) Symbol)
-                            list getattr a (list quote sym)
+                            list3 getattr a (list2 quote sym)
                         let a rest = ('decons args)
                         let b rest = ('decons rest)
                         let loop (rest result) = rest (op a b)
