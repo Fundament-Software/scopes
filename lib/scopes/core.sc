@@ -116,18 +116,6 @@ fn Label-return (l)
     sc_label_append_argument l unnamed cont
 
 syntax-extend
-    let types = (alloca-array type 3)
-    do
-        store Any (getelementptr types 0)
-        store bool (getelementptr types 1)
-        let rtype = (sc_tuple_type 2 (bitcast types type-array))
-        store type (getelementptr types 0)
-        store type (getelementptr types 1)
-        let ftype = (sc_function_type rtype 2 (bitcast types type-array))
-        sc_scope_set_symbol syntax-scope 'DispatchCastFunctionType (box-pointer ftype)
-        sc_scope_set_symbol syntax-scope 'DispatchCastFunctionPointerType
-            box-pointer (sc_pointer_type ftype pointer-flag-non-writable unnamed)
-
     fn typify (l)
         verify-argument-count l 1 -1
         let count = (sc_label_argument_count l)
@@ -378,12 +366,14 @@ let cons = sc_list_cons
     append-argument = sc_label_append_argument
     insert-argument = sc_label_insert_argument
     set-argument = sc_label_set_argument
+    clear-arguments = sc_label_clear_arguments
     enter = sc_label_get_enter
     set-enter = sc_label_set_enter
     dump = sc_label_dump
     function-type = sc_label_function_type
     set-rawcall = sc_label_set_rawcall
     frame = sc_label_frame
+    append-parameter = sc_label_append_parameter
     return = (typify Label-return Label)
 
 'set-symbols type
@@ -403,8 +393,6 @@ syntax-extend
     let SyntaxMacroFunctionType =
         'pointer (function (tuple list Scope) list list Scope)
     sc_typename_type_set_storage SyntaxMacro SyntaxMacroFunctionType
-    sc_scope_set_symbol syntax-scope 'SyntaxMacro (box-pointer SyntaxMacro)
-    sc_scope_set_symbol syntax-scope 'SyntaxMacroFunctionType (box-pointer SyntaxMacroFunctionType)
 
     # any extraction
 
@@ -545,11 +533,19 @@ syntax-extend
                 return (box-symbol uitofp) true
         return (Any-none) false
 
+    inline box-binary-op-dispatch (f)
+        box-pointer (unconst (typify f type type))
+    inline single-binary-op-dispatch (destf)
+        fn (lhsT rhsT)
+            if (ptrcmp== lhsT rhsT)
+                return (Any-wrap destf) true
+            return (Any-none) false
+
     'set-symbols integer
-        __imply =
-            box-pointer (unconst (typify integer-imply type type))
-        __as =
-            box-pointer (unconst (typify integer-as type type))
+        __imply = (box-pointer (unconst (typify integer-imply type type)))
+        __as = (box-pointer (unconst (typify integer-as type type)))
+        __+ = (box-binary-op-dispatch (single-binary-op-dispatch add))
+        __- = (box-binary-op-dispatch (single-binary-op-dispatch sub))
 
     inline gen-cast-error (intro-string)
         label-macro
@@ -567,10 +563,13 @@ syntax-extend
                                 '__repr (box-pointer T)
                 l
 
+    let DispatchCastFunctionType =
+        'pointer (function (tuple Any bool) type type)
+
     fn get-cast-dispatcher (symbol vT T)
         let anyf ok = ('@ vT symbol)
         if ok
-            let f = (unbox-pointer anyf DispatchCastFunctionPointerType)
+            let f = (unbox-pointer anyf DispatchCastFunctionType)
             return (f vT T)
         return (Any-none) false
 
@@ -578,10 +577,6 @@ syntax-extend
         get-cast-dispatcher '__imply vT T
     fn asfn (vT T)
         get-cast-dispatcher '__as vT T
-
-    'set-symbols syntax-scope
-        implyfn = (typify implyfn type type)
-        asfn = (typify asfn type type)
 
     let try-imply =
         box-label-macro
@@ -612,70 +607,32 @@ syntax-extend
                     'append-argument l unnamed value
                 l
 
-    'set-symbols syntax-scope
-        try-imply = try-imply
-        try-as =
-            box-label-macro
-                fn "as-dispatch" (l)
-                    'verify-argument-count l 3 3
-                    let k fallback = ('argument l 1)
-                    let k value = ('argument l 2)
-                    let k T = ('argument l 3)
-                    let vT = ('indirect-typeof value)
-                    let T = (unbox-pointer T type)
-                    let fallback =
-                        if ('none? fallback)
-                            let error-func =
-                                gen-cast-error "can't cast value of type "
-                            let f = (box-pointer error-func)
-                            'set-argument l 1 unnamed f
-                            f
-                        else fallback
-                    if (ptrcmp!= vT T)
-                        let f ok =
-                            do
-                                # try implicit cast first
-                                let f ok = (implyfn vT T)
-                                if ok (_ f ok)
-                                else
-                                    # then try explicit cast
-                                    asfn vT T
-                        if ok
-                            'remove-argument l 1
-                            'set-enter l f
-                            return l
-                        'set-enter l fallback
-                    else
-                        'return l
-                        'append-argument l unnamed value
-                    l
-
-    #fn get-op2-dispatcher (symbol lhsT rhsT)
-        let anyf ok = ('@ lhsT symbol)
-        if ok
-            let f = (unbox-pointer anyf DispatchCastFunctionPointerType)
-            return (f vT T)
-        return (Any-none) false
-
-    #inline make-op2-dispatch (symbol)
+    let try-as =
         box-label-macro
-            fn (l)
+            fn "as-dispatch" (l)
                 'verify-argument-count l 3 3
                 let k fallback = ('argument l 1)
-                let k lhs = ('argument l 2)
-                let k rhs = ('argument l 3)
-                let lhsT = ('indirect-typeof lhs)
-                let rhsT = ('indirect-typeof rhs)
+                let k value = ('argument l 2)
+                let k T = ('argument l 3)
+                let vT = ('indirect-typeof value)
+                let T = (unbox-pointer T type)
                 let fallback =
                     if ('none? fallback)
                         let error-func =
-                            gen-cast-error "can't implicitly cast value of type "
+                            gen-cast-error "can't cast value of type "
                         let f = (box-pointer error-func)
                         'set-argument l 1 unnamed f
                         f
                     else fallback
                 if (ptrcmp!= vT T)
-                    let f ok = (implyfn vT T)
+                    let f ok =
+                        do
+                            # try implicit cast first
+                            let f ok = (implyfn vT T)
+                            if ok (_ f ok)
+                            else
+                                # then try explicit cast
+                                asfn vT T
                     if ok
                         'remove-argument l 1
                         'set-enter l f
@@ -685,6 +642,178 @@ syntax-extend
                     'return l
                     'append-argument l unnamed value
                 l
+
+    let UnaryOpFunctionType =
+        'pointer (function (tuple Any bool) type)
+
+    let BinaryOpFunctionType =
+        'pointer (function (tuple Any bool) type type)
+
+    fn get-binary-op-dispatcher (symbol lhsT rhsT)
+        let anyf ok = ('@ lhsT symbol)
+        if ok
+            let f = (unbox-pointer anyf BinaryOpFunctionType)
+            return (f lhsT rhsT)
+        return (Any-none) false
+
+    fn binary-op-label-cast-then-macro (l f castf lhsT rhs)
+        let k cont = ('argument l 0)
+        # next label
+        let lcont = (sc_label_new_cont)
+        let param = (sc_parameter_new (sc_get_active_anchor) unnamed lhsT)
+        'append-parameter lcont param
+        # need to generate cast
+        'clear-arguments l
+        'set-enter l castf
+        'append-argument l unnamed (box-pointer lcont)
+        'append-argument l unnamed rhs
+        'append-argument l unnamed (box-pointer lhsT)
+        'set-enter lcont f
+        'append-argument lcont unnamed cont
+        return lcont param
+
+    fn binary-op-label-macro (l symbol rsymbol friendly-op-name)
+        'verify-argument-count l 2 2
+        let lhsk lhs = ('argument l 1)
+        let rhsk rhs = ('argument l 2)
+        let lhsT = ('indirect-typeof lhs)
+        let rhsT = ('indirect-typeof rhs)
+        # try direct version first
+        let f ok = (get-binary-op-dispatcher symbol lhsT rhsT)
+        if ok
+            'set-enter l f
+            return l
+        # if types are unequal, we can try other options
+        if (ptrcmp!= lhsT rhsT)
+            # try reverse version next
+            let f ok = (get-binary-op-dispatcher rsymbol rhsT lhsT)
+            if ok
+                'set-argument l 1 rhsk rhs
+                'set-argument l 2 lhsk lhs
+                'set-enter l f
+                return l
+        # we give up
+        sc_anchor_error
+            'join "can't "
+                'join friendly-op-name
+                    'join " values of types "
+                        'join
+                            '__repr (box-pointer lhsT)
+                            'join " and "
+                                '__repr (box-pointer rhsT)
+        l
+
+    # both types are typically the same
+    fn sym-binary-op-label-macro (l symbol rsymbol friendly-op-name)
+        'verify-argument-count l 2 2
+        let lhsk lhs = ('argument l 1)
+        let rhsk rhs = ('argument l 2)
+        let lhsT = ('indirect-typeof lhs)
+        let rhsT = ('indirect-typeof rhs)
+        # try direct version first
+        let f ok = (get-binary-op-dispatcher symbol lhsT rhsT)
+        if ok
+            'set-enter l f
+            return l
+        # if types are unequal, we can try other options
+        if (ptrcmp!= lhsT rhsT)
+            # try reverse version next
+            let f ok = (get-binary-op-dispatcher rsymbol rhsT lhsT)
+            if ok
+                'set-argument l 1 rhsk rhs
+                'set-argument l 2 lhsk lhs
+                'set-enter l f
+                return l
+            # can the operation be performed on the lhs type?
+            let f ok = (get-binary-op-dispatcher symbol lhsT lhsT)
+            if ok
+                # can we cast rhsT to lhsT?
+                let castf ok = (implyfn rhsT lhsT)
+                if ok
+                    let lcont param =
+                        binary-op-label-cast-then-macro l f castf lhsT rhs
+                    'append-argument lcont lhsk lhs
+                    'append-argument lcont rhsk (box-pointer param)
+                    return l
+            # can the operation be performed on the rhs type?
+            let f ok = (get-binary-op-dispatcher symbol rhsT rhsT)
+            if ok
+                # can we cast lhsT to rhsT?
+                let castf ok = (implyfn lhsT rhsT)
+                if ok
+                    let lcont param =
+                        binary-op-label-cast-then-macro l f castf rhsT lhs
+                    'append-argument lcont lhsk (box-pointer param)
+                    'append-argument lcont rhsk rhs
+                    return l
+        # we give up
+        sc_anchor_error
+            'join "can't "
+                'join friendly-op-name
+                    'join " values of types "
+                        'join
+                            '__repr (box-pointer lhsT)
+                            'join " and "
+                                '__repr (box-pointer rhsT)
+        l
+
+    # right hand has fixed type
+    fn asym-binary-op-label-macro (l symbol rtype friendly-op-name)
+        'verify-argument-count l 2 2
+        let lhsk lhs = ('argument l 1)
+        let rhsk rhs = ('argument l 2)
+        let lhsT = ('indirect-typeof lhs)
+        let rhsT = ('indirect-typeof rhs)
+        let f ok = ('@ lhsT symbol)
+        if ok
+            if (ptrcmp== rhsT rtype)
+                'set-enter l f
+                return l
+            # can we cast rhsT to rtype?
+            let castf ok = (implyfn rhsT rtype)
+            if ok
+                let lcont param =
+                    binary-op-label-cast-then-macro l f castf rtype rhs
+                'append-argument lcont lhsk lhs
+                'append-argument lcont rhsk (box-pointer param)
+                return l
+        # we give up
+        sc_anchor_error
+            'join "can't "
+                'join friendly-op-name
+                    'join " values of types "
+                        'join
+                            '__repr (box-pointer lhsT)
+                            'join " and "
+                                '__repr (box-pointer rhsT)
+        l
+
+    fn unary-op-label-macro (l symbol friendly-op-name)
+        'verify-argument-count l 1 1
+        let lhsk lhs = ('argument l 1)
+        let lhsT = ('indirect-typeof lhs)
+        let f ok = ('@ lhsT symbol)
+        if ok
+            'set-enter l f
+            return l
+        sc_anchor_error
+            'join "can't "
+                'join friendly-op-name
+                    'join " value of type "
+                        '__repr (box-pointer lhsT)
+        l
+
+    inline make-unary-op-dispatch (symbol friendly-op-name)
+        box-label-macro (fn (l) (unary-op-label-macro l symbol friendly-op-name))
+
+    inline make-binary-op-dispatch (symbol rsymbol friendly-op-name)
+        box-label-macro (fn (l) (binary-op-label-macro l symbol rsymbol friendly-op-name))
+
+    inline make-sym-binary-op-dispatch (symbol rsymbol friendly-op-name)
+        box-label-macro (fn (l) (sym-binary-op-label-macro l symbol rsymbol friendly-op-name))
+
+    inline make-asym-binary-op-dispatch (symbol rtype friendly-op-name)
+        box-label-macro (fn (l) (asym-binary-op-label-macro l symbol rtype friendly-op-name))
 
     let Syntax-anchor =
         typify
@@ -721,6 +850,57 @@ syntax-extend
                 inline (self at next scope)
                     (bitcast self SyntaxMacroFunctionType) at next scope
 
+    # comparisons for type
+    'set-symbols type
+        __== = (box-binary-op-dispatch (single-binary-op-dispatch (typify ptrcmp== type type)))
+        __!= = (box-binary-op-dispatch (single-binary-op-dispatch (typify ptrcmp!= type type)))
+        __@ =
+            box-binary-op-dispatch
+                fn (lhsT rhsT)
+                    if (ptrcmp== rhsT i32)
+                        return (Any-wrap sc_type_element_at) true
+                    elseif (ptrcmp== rhsT Symbol)
+                        return (Any-wrap sc_type_at) true
+                    return (Any-none) false
+
+    'set-symbols Scope
+        __@ =
+            box-binary-op-dispatch
+                fn (lhsT rhsT)
+                    if (ptrcmp== rhsT Symbol)
+                        return (Any-wrap sc_scope_at) true
+                    return (Any-none) false
+
+    'set-symbols syntax-scope
+        SyntaxMacro = (box-pointer SyntaxMacro)
+        SyntaxMacroFunctionType = (box-pointer SyntaxMacroFunctionType)
+        DispatchCastFunctionType = (box-pointer DispatchCastFunctionType)
+        BinaryOpFunctionType = (box-pointer BinaryOpFunctionType)
+        implyfn = (typify implyfn type type)
+        asfn = (typify asfn type type)
+        try-imply = try-imply
+        try-as = try-as
+        countof = (make-unary-op-dispatch '__countof "count")
+        not = (make-unary-op-dispatch '__not "negate")
+        ~ = (make-unary-op-dispatch '__~ "bitwise-negate")
+        == = (make-sym-binary-op-dispatch '__== '__r== "compare")
+        != = (make-sym-binary-op-dispatch '__!= '__r!= "compare")
+        < = (make-sym-binary-op-dispatch '__< '__r< "compare")
+        <= = (make-sym-binary-op-dispatch '__<= '__r<= "compare")
+        > = (make-sym-binary-op-dispatch '__> '__r> "compare")
+        >= = (make-sym-binary-op-dispatch '__>= '__r>= "compare")
+        + = (make-sym-binary-op-dispatch '__+ '__r+ "add")
+        - = (make-sym-binary-op-dispatch '__- '__r- "subtract")
+        * = (make-sym-binary-op-dispatch '__* '__r* "multiply")
+        / = (make-sym-binary-op-dispatch '__/ '__r/ "divide")
+        % = (make-sym-binary-op-dispatch '__% '__r% "modulate")
+        & = (make-sym-binary-op-dispatch '__& '__r& "apply bitwise-and to")
+        | = (make-sym-binary-op-dispatch '__| '__r| "apply bitwise-or to")
+        ^ = (make-sym-binary-op-dispatch '__^ '__r^ "apply bitwise-xor to")
+        .. = (make-sym-binary-op-dispatch '__.. '__r.. "join")
+        @ = (make-binary-op-dispatch '__@ '__r@ "apply subscript operator with")
+        lslice = (make-asym-binary-op-dispatch '__lslice usize "apply left-slice operator with")
+        rslice = (make-asym-binary-op-dispatch '__rslice usize "apply right-slice operator with")
     syntax-scope
 
 inline imply (value destT)
@@ -739,33 +919,30 @@ inline syntax-block-scope-macro (l)
     function->SyntaxMacro (unconst (typify l list list Scope))
 
 syntax-extend
-
-
-
     # install basic list hook for this scope
     # is called for every list the expander would otherwise consider a call
     fn list-handler (topexpr env)
         let topexpr-at topexpr-next = ('decons topexpr)
         let sxexpr = (as topexpr-at Syntax)
         let expr expr-anchor = ('datum sxexpr) ('anchor sxexpr)
-        if (ptrcmp!= ('typeof expr) list)
+        if (!= ('typeof expr) list)
             return topexpr env
         let expr = (as expr list)
         let expr-at expr-next = ('decons expr)
         let head-key = ('datum (as expr-at Syntax))
         let head =
-            if (ptrcmp== ('typeof head-key) Symbol)
-                let head success = ('@ env (as head-key Symbol))
+            if (== ('typeof head-key) Symbol)
+                let head success = (@ env (as head-key Symbol))
                 if success head
                 else head-key
             else head-key
         let head =
-            if (ptrcmp== ('typeof head) type)
-                let attr ok = ('@ (as head type) '__macro)
+            if (== ('typeof head) type)
+                let attr ok = (@ (as head type) '__macro)
                 if ok attr
                 else head
             else head
-        if (ptrcmp== ('typeof head) SyntaxMacro)
+        if (== ('typeof head) SyntaxMacro)
             let head = (as head SyntaxMacro)
             let expr env = (head expr topexpr-next env)
             let expr = (Syntax-wrap expr-anchor (Any expr) false)
