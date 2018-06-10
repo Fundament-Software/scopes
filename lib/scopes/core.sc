@@ -97,11 +97,6 @@ fn Any-none? (value)
     let T = (extractvalue value 0)
     ptrcmp== T Nothing
 
-fn Any-none ()
-    let val = (nullof Any)
-    let val = (insertvalue val Nothing 0)
-    val
-
 syntax-extend
     let val = (box-pointer (sc_pointer_type type pointer-flag-non-writable unnamed))
     sc_scope_set_symbol syntax-scope 'type-array val
@@ -264,7 +259,7 @@ syntax-extend
                                         _ cont (nullof Label) false
                                     else
                                         let nextl = (sc_label_new_cont)
-                                        sc_label_append_argument nextl unnamed (Any-none)
+                                        sc_label_append_argument nextl unnamed (Any-wrap none)
                                         _ (box-pointer nextl) nextl true
                             sc_label_set_enter active-l (Any-wrap fset)
                             sc_label_clear_arguments active-l
@@ -427,7 +422,7 @@ syntax-extend
         elseif (bor (icmp== kind type-kind-tuple) (icmp== kind type-kind-array))
             return (box-pointer unbox-hidden-pointer) true
         sc_write ('__repr (box-pointer storageT))
-        return (Any-none) false
+        return (Any-wrap none) false
 
     'set-symbols Any
         __imply =
@@ -508,7 +503,7 @@ syntax-extend
                         return (box-symbol sext) true
                     else
                         return (box-symbol zext) true
-        return (Any-none) false
+        return (Any-wrap none) false
 
     fn integer-as (vT T)
         let T =
@@ -531,7 +526,7 @@ syntax-extend
                 return (box-symbol sitofp) true
             else
                 return (box-symbol uitofp) true
-        return (Any-none) false
+        return (Any-wrap none) false
 
     inline box-binary-op-dispatch (f)
         box-pointer (unconst (typify f type type))
@@ -539,7 +534,7 @@ syntax-extend
         fn (lhsT rhsT)
             if (ptrcmp== lhsT rhsT)
                 return (Any-wrap destf) true
-            return (Any-none) false
+            return (Any-wrap none) false
 
     'set-symbols integer
         __imply = (box-pointer (unconst (typify integer-imply type type)))
@@ -571,7 +566,7 @@ syntax-extend
         if ok
             let f = (unbox-pointer anyf DispatchCastFunctionType)
             return (f vT T)
-        return (Any-none) false
+        return (Any-wrap none) false
 
     fn implyfn (vT T)
         get-cast-dispatcher '__imply vT T
@@ -654,7 +649,7 @@ syntax-extend
         if ok
             let f = (unbox-pointer anyf BinaryOpFunctionType)
             return (f lhsT rhsT)
-        return (Any-none) false
+        return (Any-wrap none) false
 
     fn binary-op-label-cast-then-macro (l f castf lhsT rhs)
         let k cont = ('argument l 0)
@@ -850,7 +845,12 @@ syntax-extend
                 inline (self at next scope)
                     (bitcast self SyntaxMacroFunctionType) at next scope
 
-    # comparisons for type
+    'set-symbols string
+        __.. = (box-binary-op-dispatch (single-binary-op-dispatch sc_string_join))
+
+    'set-symbols list
+        __.. = (box-binary-op-dispatch (single-binary-op-dispatch sc_list_join))
+
     'set-symbols type
         __== = (box-binary-op-dispatch (single-binary-op-dispatch (typify ptrcmp== type type)))
         __!= = (box-binary-op-dispatch (single-binary-op-dispatch (typify ptrcmp!= type type)))
@@ -861,7 +861,7 @@ syntax-extend
                         return (Any-wrap sc_type_element_at) true
                     elseif (ptrcmp== rhsT Symbol)
                         return (Any-wrap sc_type_at) true
-                    return (Any-none) false
+                    return (Any-wrap none) false
 
     'set-symbols Scope
         __@ =
@@ -869,7 +869,7 @@ syntax-extend
                 fn (lhsT rhsT)
                     if (ptrcmp== rhsT Symbol)
                         return (Any-wrap sc_scope_at) true
-                    return (Any-none) false
+                    return (Any-wrap none) false
 
     'set-symbols syntax-scope
         SyntaxMacro = (box-pointer SyntaxMacro)
@@ -883,6 +883,8 @@ syntax-extend
         countof = (make-unary-op-dispatch '__countof "count")
         not = (make-unary-op-dispatch '__not "negate")
         ~ = (make-unary-op-dispatch '__~ "bitwise-negate")
+        repr = (make-unary-op-dispatch '__repr "get representational string of")
+        tostring = (make-unary-op-dispatch '__tostring "get string of")
         == = (make-sym-binary-op-dispatch '__== '__r== "compare")
         != = (make-sym-binary-op-dispatch '__!= '__r!= "compare")
         < = (make-sym-binary-op-dispatch '__< '__r< "compare")
