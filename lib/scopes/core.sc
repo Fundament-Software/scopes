@@ -15,6 +15,8 @@
 
 let set-anchor! = sc_set_active_anchor
 let __anchor-error! = sc_anchor_error
+let default-styler = sc_default_styler
+let io-write! = sc_write
 
 # first we alias u64 to the integer type that can hold a pointer
 let intptr = u64
@@ -108,6 +110,7 @@ syntax-extend
     sc_scope_set_symbol syntax-scope 'type-array val
     sc_scope_set_symbol syntax-scope 'LabelMacroFunctionType
         box-pointer (sc_type_storage LabelMacro)
+    sc_scope_set_symbol syntax-scope 'ellipsis-symbol (box-symbol (sc_symbol_new "..."))
     syntax-scope
 
 fn Label-return (l)
@@ -160,10 +163,6 @@ inline label-macro (l)
 
 inline box-label-macro (l)
     box-pointer (label-macro l)
-
-syntax-extend
-    sc_scope_set_symbol syntax-scope 'ellipsis-symbol (box-symbol (sc_symbol_new "..."))
-    syntax-scope
 
 syntax-extend
     fn va-fold (l use-indices)
@@ -251,9 +250,36 @@ syntax-extend
     sc_scope_set_symbol syntax-scope 'va-rfold (box-label-macro (fn "va-rfold" (l) (va-rfold l false)))
     sc_scope_set_symbol syntax-scope 'va-rifold (box-label-macro (fn "va-rifold" (l) (va-rfold l true)))
 
-    syntax-scope
+    sc_scope_set_symbol syntax-scope 'type==
+        box-label-macro
+            fn "type==" (l)
+                verify-argument-count l 2 2
+                let k a = (sc_label_argument l 1)
+                let k b = (sc_label_argument l 2)
+                if (Any-constant? a)
+                    if (Any-constant? b)
+                        Label-return l
+                        sc_label_append_argument l unnamed
+                            box-integer
+                                ptrcmp== (unbox-pointer a type) (unbox-pointer b type)
+                        return;
+                sc_label_set_enter l (box-pointer (unconst (typify ptrcmp== type type)))
 
-syntax-extend
+    sc_scope_set_symbol syntax-scope 'type!=
+        box-label-macro
+            fn "type!=" (l)
+                verify-argument-count l 2 2
+                let k a = (sc_label_argument l 1)
+                let k b = (sc_label_argument l 2)
+                if (Any-constant? a)
+                    if (Any-constant? b)
+                        Label-return l
+                        sc_label_append_argument l unnamed
+                            box-integer
+                                ptrcmp!= (unbox-pointer a type) (unbox-pointer b type)
+                        return;
+                sc_label_set_enter l (box-pointer (unconst (typify ptrcmp!= type type)))
+
     # tuple type constructor
     sc_type_set_symbol tuple '__typecall
         box-label-macro
@@ -380,8 +406,8 @@ syntax-extend
 
 inline set-symbols (self values...)
     va-lfold
-        inline (values...)
-            'set-symbol self values...
+        inline (value...)
+            'set-symbol self value...
         values...
 
 'set-symbol type 'set-symbols set-symbols
@@ -454,6 +480,7 @@ let cons = sc_list_cons
     kind = sc_type_kind
     @ = sc_type_at
     opaque? = sc_type_is_opaque
+    string = sc_type_string
 
 inline imply
 
@@ -979,8 +1006,8 @@ syntax-extend
         __>= = (box-binary-op-dispatch (single-signed-binary-op-dispatch icmp>=s icmp>=u))
 
     'set-symbols type
-        __== = (box-binary-op-dispatch (single-binary-op-dispatch (typify ptrcmp== type type)))
-        __!= = (box-binary-op-dispatch (single-binary-op-dispatch (typify ptrcmp!= type type)))
+        __== = (box-binary-op-dispatch (single-binary-op-dispatch type==))
+        __!= = (box-binary-op-dispatch (single-binary-op-dispatch type!=))
         __@ = sc_type_element_at
         __getattr =
             box-label-macro
@@ -1016,7 +1043,6 @@ syntax-extend
         try-as = try-as
         countof = (make-unary-op-dispatch '__countof "count")
         ~ = (make-unary-op-dispatch '__~ "bitwise-negate")
-        repr = (make-unary-op-dispatch '__repr "get representational string of")
         tostring = (make-unary-op-dispatch '__tostring "get string of")
         == = (make-sym-binary-op-dispatch '__== '__r== "compare")
         != = (make-sym-binary-op-dispatch '__!= '__r!= "compare")
@@ -1075,9 +1101,57 @@ fn empty? (value)
 fn cons (at next)
     sc_list_cons (Any at) next
 
+fn type-repr-needs-suffix? (CT)
+    if (== CT i32) false
+    elseif (== CT bool) false
+    elseif (== CT Nothing) false
+    elseif (== CT f32) false
+    elseif (== CT string) false
+    elseif (== CT list) false
+    elseif (== CT Symbol) false
+    elseif (== CT type) false
+    elseif (== ('kind CT) type-kind-vector)
+        let ET = ('element@ CT 0)
+        if (== ET i32) false
+        elseif (== ET bool) false
+        elseif (== ET f32) false
+        else true
+    else true
+
+fn repr (value)
+    let T = (typeof value)
+    let f ok = (getattr T '__repr)
+    let s =
+        constbranch ok
+            inline ()
+                f value
+            inline ()
+                sc_any_repr (Any value)
+    if (type-repr-needs-suffix? T)
+        .. s
+            ..
+                default-styler style-operator ":"
+                default-styler style-type ('string T)
+
+    else s
+
+let print =
+    do
+        fn print-element (i value)
+            if (!= i 0)
+                io-write! " "
+            constbranch (== (typeof value) string)
+                inline ()
+                    io-write! value
+                inline ()
+                    io-write! (repr value)
+
+        fn print (values...)
+            va-lifold print-element values...
+            io-write! "\n"
+            values...
+
 syntax-extend
-
-
     # dotted symbol expander
     # --------------------------------------------------------------------------
 
@@ -1422,9 +1496,7 @@ define-infix> 750 as
 define-infix> 800 .
 define-infix> 800 @
 
-dump type.kind
-
-syntax-extend
+#syntax-extend
     'set-symbols syntax-scope
         block-macro =
             Any
@@ -1445,18 +1517,16 @@ syntax-extend
                         arg as list
     syntax-scope
 
-syntax-extend
+#syntax-extend
     'set-symbols syntax-scope
         hello =
             Any
                 block-macro
                     let k arg = ('argument source-label 1)
                     quote-inline
-                        sc_write "hello "
-                        sc_write (unquote arg)
-                        sc_write "\n"
+                        io-write! "hello "
+                        io-write! (unquote arg)
+                        io-write! "\n"
     syntax-scope
-
-hello "world!"
 
 sc_exit 0
