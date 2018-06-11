@@ -78,7 +78,7 @@ sc_label_t *sc_eval(const sc_syntax_t *expr, sc_scope_t *scope) {
 sc_label_t *sc_eval_inline(const sc_list_t *expr, sc_scope_t *scope) {
     using namespace scopes;
     const Syntax *sxexpr = wrap_syntax(get_active_anchor(), expr, false);
-    return expand_inline(sxexpr, nullptr);
+    return expand_inline(sxexpr, scope);
 }
 
 sc_label_t *sc_typify(sc_closure_t *srcl, int numtypes, const sc_type_t **typeargs) {
@@ -1134,6 +1134,21 @@ sc_label_t *sc_label_new_cont() {
     return label;
 }
 
+sc_label_t *sc_label_new_cont_template() {
+    using namespace scopes;
+    Label *label = Label::continuation_from(get_active_anchor(), SYM_Unnamed);
+    label->set_inline();
+    label->body.anchor = label->anchor;
+    return label;
+}
+
+sc_label_t *sc_label_new_function_template() {
+    using namespace scopes;
+    Label *label = Label::function_from(get_active_anchor(), SYM_Unnamed);
+    label->body.anchor = label->anchor;
+    return label;
+}
+
 void sc_label_set_complete(sc_label_t *label) {
     label->body.set_complete();
 }
@@ -1405,6 +1420,8 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_label_insert_argument, TYPE_Void, TYPE_Label, TYPE_I32, TYPE_Symbol, TYPE_Any);
     DEFINE_EXTERN_C_FUNCTION(sc_label_set_argument, TYPE_Void, TYPE_Label, TYPE_I32, TYPE_Symbol, TYPE_Any);
     DEFINE_EXTERN_C_FUNCTION(sc_label_new_cont, TYPE_Label);
+    DEFINE_EXTERN_C_FUNCTION(sc_label_new_cont_template, TYPE_Label);
+    DEFINE_EXTERN_C_FUNCTION(sc_label_new_function_template, TYPE_Label);
     DEFINE_EXTERN_C_FUNCTION(sc_label_set_complete, TYPE_Void, TYPE_Label);
     DEFINE_EXTERN_C_FUNCTION(sc_label_append_parameter, TYPE_Void, TYPE_Label, TYPE_Parameter);
     DEFINE_EXTERN_C_FUNCTION(sc_label_function_type, TYPE_Type, TYPE_Label);

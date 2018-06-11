@@ -386,6 +386,8 @@ void sc_label_remove_argument(sc_label_t *label, int32_t index);
 void sc_label_insert_argument(sc_label_t *label, int32_t index, sc_symbol_t key, sc_any_t value);
 void sc_label_set_argument(sc_label_t *label, int32_t index, sc_symbol_t key, sc_any_t value);
 sc_label_t *sc_label_new_cont();
+sc_label_t *sc_label_new_cont_template();
+sc_label_t *sc_label_new_function_template();
 void sc_label_set_complete(sc_label_t *label);
 void sc_label_append_parameter(sc_label_t *label, sc_parameter_t *param);
 const sc_type_t *sc_label_function_type(sc_label_t *label);

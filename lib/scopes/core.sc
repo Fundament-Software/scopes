@@ -162,6 +162,98 @@ inline box-label-macro (l)
     box-pointer (label-macro l)
 
 syntax-extend
+    sc_scope_set_symbol syntax-scope 'ellipsis-symbol (box-symbol (sc_symbol_new "..."))
+    syntax-scope
+
+syntax-extend
+    fn va-fold (l use-indices)
+        verify-argument-count l 1 -1
+        let k cont = (sc_label_argument l 0)
+        let k f = (sc_label_argument l 1)
+        let count = (sc_label_argument_count l)
+        let numentries = (sub count 2)
+        let frame = (sc_label_frame l)
+        let keys = (alloca-array Symbol numentries)
+        let values = (alloca-array Any numentries)
+        let loop (i j) = 2 0
+        if (icmp<s i count)
+            let k v = (sc_label_argument l i)
+            store k (getelementptr keys j)
+            store v (getelementptr values j)
+            loop (add i 1) (add j 1)
+        let anchor = (sc_label_anchor l)
+        let loop (i active-l last-param) = 0 l (Any-wrap none)
+        if (icmp<s i numentries)
+            let k = (load (getelementptr keys i))
+            let v = (load (getelementptr values i))
+            loop (add i 1)
+                do
+                    let nextl = (sc_label_new_cont_template)
+                    let param = (sc_parameter_new anchor ellipsis-symbol Unknown)
+                    sc_label_append_parameter nextl param
+                    sc_label_set_enter nextl (Any-wrap _)
+                    sc_label_append_argument nextl unnamed cont
+                    sc_label_set_enter active-l f
+                    sc_label_clear_arguments active-l
+                    sc_label_append_argument active-l unnamed
+                        box-pointer
+                            sc_closure_new nextl frame
+                    if use-indices
+                        sc_label_append_argument active-l unnamed (box-integer i)
+                    sc_label_append_argument active-l k v
+                    if (icmp>s i 0)
+                        sc_label_append_argument active-l unnamed last-param
+                    _ nextl (box-pointer param)
+
+    fn va-rfold (l use-indices)
+        verify-argument-count l 1 -1
+        let k cont = (sc_label_argument l 0)
+        let k f = (sc_label_argument l 1)
+        let count = (sc_label_argument_count l)
+        let numentries = (sub count 2)
+        let frame = (sc_label_frame l)
+        let keys = (alloca-array Symbol numentries)
+        let values = (alloca-array Any numentries)
+        let loop (i j) = 2 0
+        if (icmp<s i count)
+            let k v = (sc_label_argument l i)
+            store k (getelementptr keys j)
+            store v (getelementptr values j)
+            loop (add i 1) (add j 1)
+        let anchor = (sc_label_anchor l)
+        let loop (i active-l last-param) = numentries l (Any-wrap none)
+        if (icmp>s i 0)
+            let not-first? = (icmp!= i numentries)
+            let i = (sub i 1)
+            let k = (load (getelementptr keys i))
+            let v = (load (getelementptr values i))
+            loop i
+                do
+                    let nextl = (sc_label_new_cont_template)
+                    let param = (sc_parameter_new anchor ellipsis-symbol Unknown)
+                    sc_label_append_parameter nextl param
+                    sc_label_set_enter nextl (Any-wrap _)
+                    sc_label_append_argument nextl unnamed cont
+                    sc_label_set_enter active-l f
+                    sc_label_clear_arguments active-l
+                    sc_label_append_argument active-l unnamed
+                        box-pointer
+                            sc_closure_new nextl frame
+                    if use-indices
+                        sc_label_append_argument active-l unnamed (box-integer i)
+                    sc_label_append_argument active-l k v
+                    if not-first?
+                        sc_label_append_argument active-l unnamed last-param
+                    _ nextl (box-pointer param)
+
+    sc_scope_set_symbol syntax-scope 'va-lfold (box-label-macro (fn "va-lfold" (l) (va-fold l false)))
+    sc_scope_set_symbol syntax-scope 'va-lifold (box-label-macro (fn "va-ilfold" (l) (va-fold l true)))
+    sc_scope_set_symbol syntax-scope 'va-rfold (box-label-macro (fn "va-rfold" (l) (va-rfold l false)))
+    sc_scope_set_symbol syntax-scope 'va-rifold (box-label-macro (fn "va-rifold" (l) (va-rfold l true)))
+
+    syntax-scope
+
+syntax-extend
     # tuple type constructor
     sc_type_set_symbol tuple '__typecall
         box-label-macro
@@ -219,62 +311,32 @@ syntax-extend
 
     inline gen-key-any-set (selftype fset)
         box-label-macro
-            fn "set-symbols" (l)
-                verify-argument-count l 1 -1
-                let k cont = (sc_label_argument l 0)
+            fn "set-symbol" (l)
+                verify-argument-count l 2 3
                 let k self = (sc_label_argument l 1)
-                let self-constant? = (Any-constant? self)
-                let T =
-                    if self-constant?
-                        unbox-pointer self selftype
+                let key value =
+                    if (icmp== (sc_label_argument_count l) 4)
+                        let k key = (sc_label_argument l 2)
+                        let k value = (sc_label_argument l 3)
+                        _ key value
                     else
-                        nullof selftype
-                let count = (sc_label_argument_count l)
-                let numentries = (sub count 2)
-                let keys = (alloca-array Symbol numentries)
-                let values = (alloca-array Any numentries)
-                let loop (i j) = 2 0
-                if (icmp<s i count)
-                    let k v = (sc_label_argument l i)
-                    store k (getelementptr keys j)
-                    store v (getelementptr values j)
-                    loop (add i 1) (add j 1)
-                Label-return l
-                let loop (i active-l) = 0 l
-                if (icmp<s i numentries)
-                    let k = (load (getelementptr keys i))
-                    let v = (load (getelementptr values i))
-                    if (icmp== k unnamed)
-                        __anchor-error!
-                            sc_string_join "cannot set symbol from argument "
-                                sc_string_join (sc_any_repr (box-integer i))
-                                    " because it has no key"
-                    loop (add i 1)
-                        if (band self-constant? (Any-constant? v))
-                            fset T k v
-                            active-l
-                        else
-                            let nextl = (sc_label_new_cont)
-                            sc_label_set_enter nextl (Any-wrap _)
-                            sc_label_append_argument nextl unnamed cont
-                            sc_label_set_enter active-l (Any-wrap fset)
-                            sc_label_clear_arguments active-l
-                            sc_label_append_argument active-l unnamed (box-pointer nextl)
-                            sc_label_append_argument active-l unnamed self
-                            sc_label_append_argument active-l unnamed (box-symbol k)
-                            if (ptrcmp!= (Any-indirect-typeof v) Any)
-                                __anchor-error!
-                                    sc_string_join "cannot set symbol "
-                                        sc_string_join (sc_any_repr (box-symbol k))
-                                            sc_string_join " because variable is not of type "
-                                                sc_any_repr (box-pointer Any)
-                            sc_label_append_argument active-l unnamed v
-                            sc_label_set_complete active-l
-                            nextl
+                        let key value = (sc_label_argument l 2)
+                        _ (box-symbol key) value
+                if (Any-constant? self)
+                    if (Any-constant? key)
+                        if (Any-constant? value)
+                            let self = (unbox-pointer self selftype)
+                            let key = (unbox-symbol key Symbol)
+                            fset self key value
+                            Label-return l
+                            return;
+                sc_label_set_enter l (Any-wrap fset)
+                sc_label_set_argument l 2 unnamed key
+                sc_label_set_argument l 3 unnamed value
 
     # quick assignment of type attributes
-    sc_type_set_symbol type 'set-symbols (gen-key-any-set type sc_type_set_symbol)
-    sc_type_set_symbol Scope 'set-symbols (gen-key-any-set Scope sc_scope_set_symbol)
+    sc_type_set_symbol type 'set-symbol (gen-key-any-set type sc_type_set_symbol)
+    sc_type_set_symbol Scope 'set-symbol (gen-key-any-set Scope sc_scope_set_symbol)
 
     sc_type_set_symbol type 'pointer
         box-label-macro
@@ -316,6 +378,15 @@ syntax-extend
 
     syntax-scope
 
+inline set-symbols (self values...)
+    va-lfold
+        inline (values...)
+            'set-symbol self values...
+        values...
+
+'set-symbol type 'set-symbols set-symbols
+'set-symbol Scope 'set-symbols set-symbols
+
 'set-symbols Any
     constant? = (typify Any-constant? Any)
     none? = (typify Any-none? Any)
@@ -326,7 +397,6 @@ syntax-extend
 let Syntax-wrap = sc_syntax_wrap
 
 'set-symbols Scope
-    set-symbol = sc_scope_set_symbol
     @ = sc_scope_at
 
 'set-symbols string
@@ -372,6 +442,7 @@ let cons = sc_list_cons
     set-rawcall = sc_label_set_rawcall
     frame = sc_label_frame
     append-parameter = sc_label_append_parameter
+    parameter = sc_label_parameter
     return = (typify Label-return Label)
 
 'set-symbols type
@@ -646,13 +717,13 @@ syntax-extend
     fn binary-op-label-cast-then-macro (l f castf lhsT rhs)
         let k cont = ('argument l 0)
         # next label
-        let lcont = (sc_label_new_cont)
-        let param = (sc_parameter_new (sc_get_active_anchor) unnamed lhsT)
+        let lcont = (sc_label_new_cont_template)
+        let param = (sc_parameter_new (sc_get_active_anchor) unnamed Unknown)
         'append-parameter lcont param
         # need to generate cast
         'clear-arguments l
         'set-enter l castf
-        'append-argument l unnamed (box-pointer lcont)
+        'append-argument l unnamed (box-pointer (Closure lcont ('frame l)))
         'append-argument l unnamed rhs
         'append-argument l unnamed (box-pointer lhsT)
         'set-enter lcont f
@@ -798,6 +869,22 @@ syntax-extend
     inline make-asym-binary-op-dispatch (symbol rtype friendly-op-name)
         box-label-macro (fn (l) (asym-binary-op-label-macro l symbol rtype friendly-op-name))
 
+    let constbranch =
+        box-label-macro
+            fn (l)
+                'verify-argument-count l 3 3
+                let k cond = ('argument l 1)
+                let thenk thenf = ('argument l 2)
+                let elsek elsef = ('argument l 3)
+                if (Any-constant? cond)
+                else
+                    sc_anchor_error "condition must be constant"
+                let value = (unbox-integer cond bool)
+                'return l
+                'set-enter l
+                    if value thenf
+                    else elsef
+
     let Syntax-anchor =
         typify
             fn "Syntax-anchor" (sx)
@@ -854,29 +941,17 @@ syntax-extend
         __lslice = sc_string_lslice
         __rslice = sc_string_rslice
 
+    fn make-list (args...)
+        let count = (va-countof args...)
+        if (icmp== 0 count) '()
+        else
+            let arg = (va@ 0 args...)
+            cons (Any arg) (make-list (va@ 1 args...))
+
     'set-symbols list
-        #__typecall =
-            box-label-macro
-                fn (l)
-                    let k self = ('argument l 1)
-                    let count = ('argument-count l)
-                    let loop (i tail) = count '(quote ())
-                    if (icmp>s i 2)
-                        let i = (sub i 1)
-                        let k arg = ('argument l i)
-                        loop i
-                            cons (Any-wrap cons)
-                                cons
-                                    box-pointer
-                                        cons (Any-wrap Any)
-                                            cons arg '()
-                                    cons (box-pointer tail) '()
-                    let tail = (cons (box-pointer tail) '())
-                    let genl = (sc_eval_inline tail (nullof Scope))
-                    'return l
-                    'set-enter l
-                        box-pointer
-                            Closure genl ('frame l)                    l
+        __typecall =
+            fn (self args...)
+                make-list args...
         __.. = (box-binary-op-dispatch (single-binary-op-dispatch sc_list_join))
         __repr =
             inline "list-repr" (self)
@@ -907,7 +982,22 @@ syntax-extend
         __== = (box-binary-op-dispatch (single-binary-op-dispatch (typify ptrcmp== type type)))
         __!= = (box-binary-op-dispatch (single-binary-op-dispatch (typify ptrcmp!= type type)))
         __@ = sc_type_element_at
-        __getattr = sc_type_at
+        __getattr =
+            box-label-macro
+                fn "type-getattr" (l)
+                    'verify-argument-count l 2 2
+                    let k self = ('argument l 1)
+                    let k key = ('argument l 2)
+                    if (Any-constant? self)
+                        if (Any-constant? key)
+                            let self = (unbox-pointer self type)
+                            let key = (unbox-symbol key Symbol)
+                            let result ok = (sc_type_at self key)
+                            'return l
+                            'append-argument l unnamed result
+                            'append-argument l unnamed (box-integer ok)
+                            return;
+                    'set-enter l (Any-wrap sc_type_at)
 
     'set-symbols Scope
         __getattr = sc_scope_at
@@ -925,7 +1015,6 @@ syntax-extend
         try-imply = try-imply
         try-as = try-as
         countof = (make-unary-op-dispatch '__countof "count")
-        not = (make-unary-op-dispatch '__not "negate")
         ~ = (make-unary-op-dispatch '__~ "bitwise-negate")
         repr = (make-unary-op-dispatch '__repr "get representational string of")
         tostring = (make-unary-op-dispatch '__tostring "get string of")
@@ -948,6 +1037,7 @@ syntax-extend
         getattr = (make-asym-binary-op-dispatch '__getattr Symbol "get attribute from")
         lslice = (make-asym-binary-op-dispatch '__lslice usize "apply left-slice operator with")
         rslice = (make-asym-binary-op-dispatch '__rslice usize "apply right-slice operator with")
+        constbranch = constbranch
     syntax-scope
 
 inline imply (value destT)
@@ -955,6 +1045,9 @@ inline imply (value destT)
 
 inline as (value destT)
     try-as none value destT
+
+inline not (value)
+    bxor (imply value bool) true
 
 let function->SyntaxMacro =
     typify
@@ -979,7 +1072,12 @@ inline syntax-macro (f)
 fn empty? (value)
     == (countof value) 0:usize
 
+fn cons (at next)
+    sc_list_cons (Any at) next
+
 syntax-extend
+
+
     # dotted symbol expander
     # --------------------------------------------------------------------------
 
@@ -1004,16 +1102,16 @@ syntax-extend
         if (== i end)
             # did not find a dot
             if (== start 0:usize)
-                return (cons (Any head) tail)
+                return (cons head tail)
             else
-                return (cons (Any (Symbol (lslice s start))) tail)
+                return (cons (Symbol (lslice s start)) tail)
         if (== (@ s i) dot-char)
             let tail =
                 # no remainder after dot
                 if (== i (- end 1:usize)) tail
                 else # remainder after dot, split the rest first
                     split-dotted-symbol head (+ i 1:usize) end tail
-            let result = (cons (Any dot-sym) tail)
+            let result = (cons dot-sym tail)
             if (== i 0:usize)
                 # no prefix before dot
                 return result
@@ -1021,7 +1119,7 @@ syntax-extend
                 # prefix before dot
                 let size = (- i start)
                 return
-                    cons (Any (Symbol (rslice (lslice s start) size))) result
+                    cons (Symbol (rslice (lslice s start) size)) result
         loop (+ i 1:usize)
 
     # infix notation support
@@ -1043,10 +1141,7 @@ syntax-extend
             else
                 as (as func Syntax) Symbol
         'set-symbol scope (get-ifx-symbol token)
-            Any
-                cons (Any prec)
-                    cons (Any order)
-                        cons (Any func) '()
+            Any (cons prec (cons order (cons func '())))
         return none scope
 
     inline make-expand-define-infix (order)
@@ -1113,12 +1208,6 @@ syntax-extend
                 "unexpected token in infix expression"
             unreachable!;
 
-    fn list2 (_0 _1 _2)
-        cons (Any _0) (cons (Any _1) '())
-
-    fn list3 (_0 _1 _2)
-        cons (Any _0) (cons (Any _1) (cons (Any _2) '()))
-
     fn parse-infix-expr (infix-table lhs state mprec)
         let loop (lhs state) = lhs state
         if (empty? state)
@@ -1130,7 +1219,7 @@ syntax-extend
         let op-prec op-order op-name = (unpack-infix-op op)
         let rhs-loop (rhs state) = ('decons next-state)
         if (empty? state)
-            loop (Any (list3 op-name lhs rhs)) state
+            loop (Any (list op-name lhs rhs)) state
         let ra __ = ('decons state)
         let lop = (infix-op-gt infix-table ra op-prec)
         let nextop =
@@ -1138,7 +1227,7 @@ syntax-extend
                 rtl-infix-op-eq infix-table ra op-prec
             else lop
         if (== ('typeof nextop) Nothing)
-            loop (Any (list3 op-name lhs rhs)) state
+            loop (Any (list op-name lhs rhs)) state
         let nextop-prec = (unpack-infix-op nextop)
         let next-rhs next-state =
             parse-infix-expr infix-table rhs state nextop-prec
@@ -1207,16 +1296,78 @@ syntax-extend
     'set-symbol syntax-scope (Symbol "#symbol")
         Any (unconst (typify symbol-handler list Scope))
 
+    fn unwrap-syntax (x)
+        if (== ('typeof x) Syntax)
+            'datum (as x Syntax)
+        else x
+
+    fn backquote-list (x)
+        inline backquote-any (ox)
+            let x = (unwrap-syntax ox)
+            let T = ('typeof x)
+            if (== T list)
+                backquote-list (as x list)
+            else
+                cons quote (cons ox '())
+        if (empty? x)
+            return (cons quote (cons x '()))
+        let aat next = ('decons x)
+        let at = (unwrap-syntax aat)
+        let T = ('typeof at)
+        if (== T list)
+            let at = (as at list)
+            if (not (empty? at))
+                let at-at at-next = ('decons at)
+                let at-at = (unwrap-syntax at-at)
+                if (== ('typeof at-at) Symbol)
+                    let at-at = (as at-at Symbol)
+                    if (== at-at 'unquote-splice)
+                        return
+                            cons (Any-wrap sc_list_join)
+                                cons (cons do at-next)
+                                    cons (backquote-list next) '()
+        elseif (== T Symbol)
+            let at = (as at Symbol)
+            if (== at 'unquote)
+                return (cons do next)
+            elseif (== at 'backquote)
+                return (backquote-list (backquote-list next))
+        return
+            cons cons
+                cons (backquote-any aat)
+                    cons (backquote-list next) '()
+
+    fn quote-label (expr scope)
+        let arg = (sc_syntax_wrap (sc_get_active_anchor) (Any expr) false)
+        let arg = (as ('datum (as arg Syntax)) list)
+        sc_eval_inline arg scope
+
     # dot macro
     # (. value symbol ...)
     'set-symbols syntax-scope
+        backquote-list = backquote-list
+        backquote =
+            Any
+                syntax-macro
+                    fn (args)
+                        backquote-list args
+        #quote-label = quote-label
+        quote-inline =
+            Any
+                syntax-scope-macro
+                    fn (args scope)
+                        return
+                            cons quote-label
+                                cons (backquote-list args)
+                                    cons scope '()
+                            scope
         . =
             Any
                 syntax-macro
                     fn (args)
                         fn op (a b)
                             let sym = (as (as b Syntax) Symbol)
-                            list3 getattr a (list2 quote sym)
+                            list getattr a (list quote sym)
                         let a rest = ('decons args)
                         let b rest = ('decons rest)
                         let loop (rest result) = rest (op a b)
@@ -1271,5 +1422,41 @@ define-infix> 750 as
 define-infix> 800 .
 define-infix> 800 @
 
+dump type.kind
+
+syntax-extend
+    'set-symbols syntax-scope
+        block-macro =
+            Any
+                syntax-macro
+                    fn (args)
+                        let arg =
+                            backquote
+                                label-macro
+                                    fn (source-label)
+                                        let enter =
+                                            Closure
+                                                unquote
+                                                    cons do args
+                                                'frame source-label
+                                        'return source-label
+                                        'set-enter source-label (Any enter)
+                        let arg = ('decons arg)
+                        arg as list
+    syntax-scope
+
+syntax-extend
+    'set-symbols syntax-scope
+        hello =
+            Any
+                block-macro
+                    let k arg = ('argument source-label 1)
+                    quote-inline
+                        sc_write "hello "
+                        sc_write (unquote arg)
+                        sc_write "\n"
+    syntax-scope
+
+hello "world!"
 
 sc_exit 0
