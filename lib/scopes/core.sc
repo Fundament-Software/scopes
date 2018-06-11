@@ -250,35 +250,45 @@ syntax-extend
     sc_scope_set_symbol syntax-scope 'va-rfold (box-label-macro (fn "va-rfold" (l) (va-rfold l false)))
     sc_scope_set_symbol syntax-scope 'va-rifold (box-label-macro (fn "va-rifold" (l) (va-rfold l true)))
 
-    sc_scope_set_symbol syntax-scope 'type==
-        box-label-macro
-            fn "type==" (l)
-                verify-argument-count l 2 2
-                let k a = (sc_label_argument l 1)
-                let k b = (sc_label_argument l 2)
-                if (Any-constant? a)
-                    if (Any-constant? b)
-                        Label-return l
-                        sc_label_append_argument l unnamed
-                            box-integer
-                                ptrcmp== (unbox-pointer a type) (unbox-pointer b type)
-                        return;
-                sc_label_set_enter l (box-pointer (unconst (typify ptrcmp== type type)))
+    fn type< (T superT)
+        let loop (T) = T
+        let value = (sc_typename_type_get_super T)
+        if (ptrcmp== value superT) true
+        elseif (ptrcmp== value typename) false
+        else (loop value)
 
-    sc_scope_set_symbol syntax-scope 'type!=
-        box-label-macro
-            fn "type!=" (l)
-                verify-argument-count l 2 2
-                let k a = (sc_label_argument l 1)
-                let k b = (sc_label_argument l 2)
-                if (Any-constant? a)
-                    if (Any-constant? b)
-                        Label-return l
-                        sc_label_append_argument l unnamed
-                            box-integer
-                                ptrcmp!= (unbox-pointer a type) (unbox-pointer b type)
-                        return;
-                sc_label_set_enter l (box-pointer (unconst (typify ptrcmp!= type type)))
+    fn type<= (T superT)
+        if (ptrcmp== T superT) true
+        else (type< T superT)
+
+    fn type> (superT T)
+        bxor (type<= T superT) true
+
+    fn type>= (superT T)
+        bxor (type< T superT) true
+
+    fn compare-type (l f)
+        verify-argument-count l 2 2
+        let k a = (sc_label_argument l 1)
+        let k b = (sc_label_argument l 2)
+        if (Any-constant? a)
+            if (Any-constant? b)
+                Label-return l
+                sc_label_append_argument l unnamed
+                    box-integer
+                        f (unbox-pointer a type) (unbox-pointer b type)
+                return;
+        sc_label_set_enter l (box-pointer f)
+
+    inline type-comparison-func (f)
+        fn (l) (compare-type l (unconst (typify f type type)))
+
+    sc_scope_set_symbol syntax-scope 'type== (box-label-macro (type-comparison-func ptrcmp==))
+    sc_scope_set_symbol syntax-scope 'type!= (box-label-macro (type-comparison-func ptrcmp!=))
+    sc_scope_set_symbol syntax-scope 'type< (box-label-macro (type-comparison-func type<))
+    sc_scope_set_symbol syntax-scope 'type<= (box-label-macro (type-comparison-func type<=))
+    sc_scope_set_symbol syntax-scope 'type> (box-label-macro (type-comparison-func type>))
+    sc_scope_set_symbol syntax-scope 'type>= (box-label-macro (type-comparison-func type>=))
 
     # tuple type constructor
     sc_type_set_symbol tuple '__typecall
@@ -481,6 +491,9 @@ let cons = sc_list_cons
     @ = sc_type_at
     opaque? = sc_type_is_opaque
     string = sc_type_string
+    super = sc_typename_type_get_super
+    set-super = sc_typename_type_set_super
+    set-storage = sc_typename_type_set_storage
 
 inline imply
 
@@ -1008,6 +1021,10 @@ syntax-extend
     'set-symbols type
         __== = (box-binary-op-dispatch (single-binary-op-dispatch type==))
         __!= = (box-binary-op-dispatch (single-binary-op-dispatch type!=))
+        __< = (box-binary-op-dispatch (single-binary-op-dispatch type<))
+        __<= = (box-binary-op-dispatch (single-binary-op-dispatch type<=))
+        __> = (box-binary-op-dispatch (single-binary-op-dispatch type>))
+        __>= = (box-binary-op-dispatch (single-binary-op-dispatch type>=))
         __@ = sc_type_element_at
         __getattr =
             box-label-macro
