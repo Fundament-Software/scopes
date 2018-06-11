@@ -40,8 +40,6 @@
 #include <cmath>
 #include <memory.h>
 
-#include <ffi.h>
-
 #pragma GCC diagnostic ignored "-Wzero-length-array"
 #pragma GCC diagnostic ignored "-Wvla-extension"
 
@@ -1422,58 +1420,6 @@ struct Specializer {
                 StyledString ss;
                 ss.out << "argument of type " << ft << " expected, got " << argT;
                 location_error(ss.str());
-            }
-        }
-    }
-
-    void fold_pure_function_call(Label *l) {
-#if SCOPES_DEBUG_CODEGEN
-        ss_cout << "folding pure function call in " << l << std::endl;
-#endif
-
-        auto &&enter = l->body.enter;
-        auto &&args = l->body.args;
-
-        const FunctionType *fi = extract_function_type(enter.type);
-
-        verify_function_argument_signature(fi, l);
-
-        assert(!args.empty());
-        Any result = none;
-
-        if (fi->flags & FF_Variadic) {
-            // convert C types
-            size_t argcount = args.size() - 1;
-            Args cargs;
-            cargs.reserve(argcount);
-            for (size_t i = 0; i < argcount; ++i) {
-                Argument &srcarg = args[i + 1];
-                if (i >= fi->argument_types.size()) {
-                    if (srcarg.value.type == TYPE_F32) {
-                        cargs.push_back(Argument(srcarg.key, (double)srcarg.value.f32));
-                        continue;
-                    }
-                }
-                cargs.push_back(srcarg);
-            }
-            result = run_ffi_function(enter, &cargs[0], cargs.size());
-        } else {
-            result = run_ffi_function(enter, &args[1], args.size() - 1);
-        }
-
-        enter = args[0].value;
-        args = { Argument() };
-        auto rlt = cast<ReturnLabelType>(fi->return_type);
-        if (rlt->return_type != TYPE_Void) {
-            if (isa<TupleType>(rlt->return_type)) {
-                // unpack
-                auto ti = cast<TupleType>(rlt->return_type);
-                size_t count = ti->types.size();
-                for (size_t i = 0; i < count; ++i) {
-                    args.push_back(Argument(ti->unpack(result.pointer, i)));
-                }
-            } else {
-                args.push_back(Argument(result));
             }
         }
     }
@@ -4285,132 +4231,6 @@ struct Specializer {
         return entry;
     }
 
-    std::unordered_map<const Type *, ffi_type *> ffi_types;
-
-    ffi_type *new_type() {
-        ffi_type *result = (ffi_type *)malloc(sizeof(ffi_type));
-        memset(result, 0, sizeof(ffi_type));
-        return result;
-    }
-
-    ffi_type *create_ffi_type(const Type *type) {
-        if (type == TYPE_Void) return &ffi_type_void;
-        if (type == TYPE_Nothing) return &ffi_type_void;
-
-        switch(type->kind()) {
-        case TK_Integer: {
-            auto it = cast<IntegerType>(type);
-            if (it->issigned) {
-                switch (it->width) {
-                case 8: return &ffi_type_sint8;
-                case 16: return &ffi_type_sint16;
-                case 32: return &ffi_type_sint32;
-                case 64: return &ffi_type_sint64;
-                default: break;
-                }
-            } else {
-                switch (it->width) {
-                case 1: return &ffi_type_uint8;
-                case 8: return &ffi_type_uint8;
-                case 16: return &ffi_type_uint16;
-                case 32: return &ffi_type_uint32;
-                case 64: return &ffi_type_uint64;
-                default: break;
-                }
-            }
-        } break;
-        case TK_Real: {
-            switch(cast<RealType>(type)->width) {
-            case 32: return &ffi_type_float;
-            case 64: return &ffi_type_double;
-            default: break;
-            }
-        } break;
-        case TK_Pointer: return &ffi_type_pointer;
-        case TK_Typename: {
-            return get_ffi_type(storage_type(type));
-        } break;
-        case TK_Array: {
-            auto ai = cast<ArrayType>(type);
-            size_t count = ai->count;
-            ffi_type *ty = (ffi_type *)malloc(sizeof(ffi_type));
-            ty->size = 0;
-            ty->alignment = 0;
-            ty->type = FFI_TYPE_STRUCT;
-            ty->elements = (ffi_type **)malloc(sizeof(ffi_type*) * (count + 1));
-            ffi_type *element_type = get_ffi_type(ai->element_type);
-            for (size_t i = 0; i < count; ++i) {
-                ty->elements[i] = element_type;
-            }
-            ty->elements[count] = nullptr;
-            return ty;
-        } break;
-        case TK_Tuple: {
-            auto ti = cast<TupleType>(type);
-            size_t count = ti->types.size();
-            ffi_type *ty = (ffi_type *)malloc(sizeof(ffi_type));
-            ty->size = 0;
-            ty->alignment = 0;
-            ty->type = FFI_TYPE_STRUCT;
-            ty->elements = (ffi_type **)malloc(sizeof(ffi_type*) * (count + 1));
-            for (size_t i = 0; i < count; ++i) {
-                ty->elements[i] = get_ffi_type(ti->types[i]);
-            }
-            ty->elements[count] = nullptr;
-            return ty;
-        } break;
-        case TK_Union: {
-            auto ui = cast<UnionType>(type);
-            size_t count = ui->types.size();
-            size_t sz = ui->size;
-            size_t al = ui->align;
-            ffi_type *ty = (ffi_type *)malloc(sizeof(ffi_type));
-            ty->size = 0;
-            ty->alignment = 0;
-            ty->type = FFI_TYPE_STRUCT;
-            // find member with the same alignment
-            for (size_t i = 0; i < count; ++i) {
-                const Type *ET = ui->types[i];
-                size_t etal = align_of(ET);
-                if (etal == al) {
-                    size_t remsz = sz - size_of(ET);
-                    ffi_type *tvalue = get_ffi_type(ET);
-                    if (remsz) {
-                        ty->elements = (ffi_type **)malloc(sizeof(ffi_type*) * 3);
-                        ty->elements[0] = tvalue;
-                        ty->elements[1] = get_ffi_type(Array(TYPE_I8, remsz));
-                        ty->elements[2] = nullptr;
-                    } else {
-                        ty->elements = (ffi_type **)malloc(sizeof(ffi_type*) * 2);
-                        ty->elements[0] = tvalue;
-                        ty->elements[1] = nullptr;
-                    }
-                    return ty;
-                }
-            }
-            // should never get here
-            assert(false);
-        } break;
-        default: break;
-        };
-
-        StyledString ss;
-        ss.out << "FFI: cannot convert argument of type " << type;
-        location_error(ss.str());
-        return nullptr;
-    }
-
-    ffi_type *get_ffi_type(const Type *type) {
-        auto it = ffi_types.find(type);
-        if (it == ffi_types.end()) {
-            auto result = create_ffi_type(type);
-            ffi_types[type] = result;
-            return result;
-        } else {
-            return it->second;
-        }
-    }
-
     void verify_function_argument_count(const FunctionType *fi, size_t argcount) {
 
         const Type *T = fi;
@@ -4450,38 +4270,6 @@ struct Specializer {
         default: assert(false && "unexpected pointer type");
             return nullptr;
         }
-    }
-
-    Any run_ffi_function(Any enter, Argument *args, size_t argcount) {
-        auto fi = extract_function_type(enter.type);
-
-        size_t fargcount = fi->argument_types.size();
-
-        const Type *rettype = cast<ReturnLabelType>(fi->return_type)->return_type;
-
-        ffi_cif cif;
-        ffi_type *argtypes[argcount];
-        void *avalues[argcount];
-        for (size_t i = 0; i < argcount; ++i) {
-            Argument &arg = args[i];
-            argtypes[i] = get_ffi_type(arg.value.type);
-            avalues[i] = get_pointer(arg.value.type, arg.value);
-        }
-        ffi_status prep_result;
-        if (fi->flags & FF_Variadic) {
-            prep_result = ffi_prep_cif_var(
-                &cif, FFI_DEFAULT_ABI, fargcount, argcount, get_ffi_type(rettype), argtypes);
-        } else {
-            prep_result = ffi_prep_cif(
-                &cif, FFI_DEFAULT_ABI, argcount, get_ffi_type(rettype), argtypes);
-        }
-        assert(prep_result == FFI_OK);
-
-        Any result = Any::from_pointer(rettype, nullptr);
-        void *ptr = extract_compile_time_pointer(enter);
-        ffi_call(&cif, FFI_FN(ptr),
-            get_pointer(result.type, result, true), avalues);
-        return result;
     }
 
 };

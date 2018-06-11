@@ -164,7 +164,6 @@ project "scopesrt"
     includedirs {
         "external/linenoise-ng/include",
         "external",
-        "libffi/include",
         "SPIRV-Tools/include",
         "include",
         "."
@@ -235,7 +234,6 @@ project "scopesrt"
             --"-Wl,--export-dynamic",
             --"-rdynamic",
 
-            THISDIR .. "/libffi/.libs/libffi.a",
             THISDIR .. "/SPIRV-Tools/build/source/opt/libSPIRV-Tools-opt.a",
             THISDIR .. "/SPIRV-Tools/build/source/libSPIRV-Tools.a"
         }
@@ -298,8 +296,7 @@ project "scopesrt"
         }
 
         includedirs {
-            "src/win32",
-            MINGW_BASE_PATH .. "/lib/libffi-3.2.1/include"
+            "src/win32"
         }
 
         files {
@@ -317,7 +314,7 @@ project "scopesrt"
         }
 
         links {
-            "ffi", "uuid", "ole32", "psapi", "version", "stdc++",
+            "uuid", "ole32", "psapi", "version", "stdc++",
         }
 
         linkoptions {
@@ -347,7 +344,6 @@ project "scopesrt"
             local CP = toolpath("cp", MSYS_BIN_PATH)
 
             postbuildcommands {
-                CP .. " -v " .. dllpath("libffi-6") .. " " .. BINDIR,
                 CP .. " -v " .. dllpath("libgcc_s_seh-1") .. " " .. BINDIR,
                 CP .. " -v " .. dllpath("libstdc++-6") .. " " .. BINDIR,
                 CP .. " -v " .. dllpath("libwinpthread-1") .. " " .. BINDIR,
@@ -395,7 +391,6 @@ project "scopesrt"
         }
 
         linkoptions {
-            THISDIR .. "/libffi/lib/libffi.a",
             THISDIR .. "/SPIRV-Tools/build/source/opt/libSPIRV-Tools-opt.a",
             THISDIR .. "/SPIRV-Tools/build/source/libSPIRV-Tools.a"
         }
