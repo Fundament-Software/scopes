@@ -14,6 +14,7 @@
     parses the command-line and optionally enters the REPL.
 
 let set-anchor! = sc_set_active_anchor
+let __error! = sc_error
 let __anchor-error! = sc_anchor_error
 let default-styler = sc_default_styler
 let io-write! = sc_write
@@ -1006,6 +1007,31 @@ syntax-extend
                     return (Any-wrap uf) true
             return (Any-wrap none) false
 
+    fn dispatch-and-or (l flip)
+        'verify-argument-count l 2 2
+        let k cont = ('argument l 0)
+        let k cond = ('argument l 1)
+        let elsek elsef = ('argument l 2)
+        if (Any-constant? cond)
+            let value = (unbox-integer cond bool)
+            'return l
+            if (bxor value flip)
+                'append-argument l k cond
+            else
+                'set-enter l elsef
+            return;
+        'set-enter l (Any-wrap branch)
+        let nextl = (sc_label_new_inline_template)
+        'set-enter nextl (Any-wrap _)
+        'append-argument nextl unnamed (box-pointer ('parameter nextl 0))
+        'append-argument nextl unnamed cond
+        'set-argument l 1 unnamed cond
+        let i0 i1 =
+            if flip (_ 3 2)
+            else (_ 2 3)
+        'set-argument l i0 unnamed (box-pointer (Closure nextl ('frame l)))
+        'set-argument l i1 unnamed elsef
+
     'set-symbols integer
         __imply = (box-cast-dispatch integer-imply)
         __as = (box-cast-dispatch integer-as)
@@ -1047,6 +1073,8 @@ syntax-extend
         __getattr = sc_scope_at
 
     'set-symbols syntax-scope
+        and-branch = (box-label-macro (fn (l) (dispatch-and-or l true)))
+        or-branch = (box-label-macro (fn (l) (dispatch-and-or l false)))
         immutable = (box-pointer immutable)
         aggregate = (box-pointer aggregate)
         opaquepointer = (box-pointer opaquepointer)
@@ -1167,6 +1195,18 @@ let print =
             va-lifold print-element values...
             io-write! "\n"
             values...
+
+'set-symbol list
+    reverse =
+        fn "list-reverse" (l tail)
+            let loop (l next) = l
+                constbranch (== (typeof tail) Nothing)
+                    inline () '()
+                    inline () tail
+            if (empty? l) next
+            else
+                let l-at l-next = ('decons l)
+                loop l-next (cons l-at next)
 
 syntax-extend
     # dotted symbol expander
@@ -1433,6 +1473,22 @@ syntax-extend
         let arg = (as ('datum (as arg Syntax)) list)
         sc_eval_inline arg scope
 
+    fn expand-and-or (expr f)
+        if (empty? expr)
+            __error! "at least one argument expected"
+        elseif (== (countof expr) 1:usize)
+            return ('@ expr)
+        let expr = ('reverse expr)
+        let loop (result head) = ('decons expr)
+        if (empty? head)
+            return result
+        let at next = ('decons head)
+        loop (Any (list f at (list inline '() result))) next
+
+    inline make-expand-and-or (f)
+        fn (expr)
+            expand-and-or expr f
+
     # dot macro
     # (. value symbol ...)
     'set-symbols syntax-scope
@@ -1467,6 +1523,8 @@ syntax-extend
                         else
                             let c rest = ('decons rest)
                             loop rest (op result c)
+        and = (Any (syntax-macro (make-expand-and-or and-branch)))
+        or = (Any (syntax-macro (make-expand-and-or or-branch)))
         define-infix> = (Any (syntax-scope-macro (make-expand-define-infix '>)))
         define-infix< = (Any (syntax-scope-macro (make-expand-define-infix '<)))
 

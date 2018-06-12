@@ -1149,6 +1149,14 @@ sc_label_t *sc_label_new_function_template() {
     return label;
 }
 
+sc_label_t *sc_label_new_inline_template() {
+    using namespace scopes;
+    Label *label = Label::function_from(get_active_anchor(), SYM_Unnamed);
+    label->set_inline();
+    label->body.anchor = label->anchor;
+    return label;
+}
+
 void sc_label_set_complete(sc_label_t *label) {
     label->body.set_complete();
 }
@@ -1422,6 +1430,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_label_new_cont, TYPE_Label);
     DEFINE_EXTERN_C_FUNCTION(sc_label_new_cont_template, TYPE_Label);
     DEFINE_EXTERN_C_FUNCTION(sc_label_new_function_template, TYPE_Label);
+    DEFINE_EXTERN_C_FUNCTION(sc_label_new_inline_template, TYPE_Label);
     DEFINE_EXTERN_C_FUNCTION(sc_label_set_complete, TYPE_Void, TYPE_Label);
     DEFINE_EXTERN_C_FUNCTION(sc_label_append_parameter, TYPE_Void, TYPE_Label, TYPE_Parameter);
     DEFINE_EXTERN_C_FUNCTION(sc_label_function_type, TYPE_Type, TYPE_Label);
