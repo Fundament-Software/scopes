@@ -66,7 +66,7 @@ Any strip_syntax(Any e) {
                 dst = List::from(strip_syntax(l->at), dst);
                 l = l->next;
             }
-            return reverse_list_inplace(dst);
+            return reverse_list(dst);
         }
     }
     return e;
@@ -91,7 +91,7 @@ Any wrap_syntax(const Anchor *anchor, Any e, bool quoted) {
                 dst = List::from(wrap_syntax(anchor, l->at, quoted), dst);
                 l = l->next;
             }
-            l = reverse_list_inplace(dst);
+            l = reverse_list(dst);
         }
         return Syntax::from(anchor, l, quoted);
     } else if (e.type != TYPE_Syntax) {

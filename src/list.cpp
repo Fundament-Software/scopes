@@ -5,12 +5,31 @@
 */
 
 #include "list.hpp"
+#include "hash.hpp"
+
+#include <unordered_set>
 
 namespace scopes {
 
 //------------------------------------------------------------------------------
 // LIST
 //------------------------------------------------------------------------------
+
+struct ListKeyEqual {
+    bool operator()( const List *lhs, const List *rhs ) const {
+        if (lhs->next != rhs->next)
+            return false;
+        return lhs->at == rhs->at;
+    }
+};
+
+struct ListHash {
+    std::size_t operator()(const List *l) const {
+        return hash2(l->at.hash(), std::hash<const List *>{}(l->next));
+    }
+};
+
+static std::unordered_set<const List *, ListHash, ListKeyEqual> list_map;
 
 List::List(const Any &_at, const List *_next, size_t _count) :
     at(_at),
@@ -26,7 +45,14 @@ Any List::first() const {
 }
 
 const List *List::from(const Any &_at, const List *_next) {
-    return new List(_at, _next, (_next != EOL)?(_next->count + 1):1);
+    List list(_at, _next, 0);
+    auto it = list_map.find(&list);
+    if (it != list_map.end()) {
+        return *it;
+    }
+    const List *l = new List(_at, _next, (_next != EOL)?(_next->count + 1):1);
+    list_map.insert(l);
+    return l;
 }
 
 const List *List::from(const Any *values, int N) {
@@ -43,11 +69,13 @@ const List *List::join(const List *la, const List *lb) {
         l = List::from(la->at, l);
         la = la->next;
     }
-    return reverse_list_inplace(l, lb, lb);
+    //return reverse_list_inplace(l, lb, lb);
+    return reverse_list(l, lb, lb);
 }
 
 //------------------------------------------------------------------------------
 
+#if 0
 // (a . (b . (c . (d . NIL)))) -> (d . (c . (b . (a . NIL))))
 // this is the mutating version; input lists are modified, direction is inverted
 const List *reverse_list_inplace(
@@ -64,6 +92,17 @@ const List *reverse_list_inplace(
         const_cast<List *>(l)->count = count;
         next = l;
         l = iternext;
+    }
+    return next;
+}
+#endif
+
+const List *reverse_list(
+    const List *l, const List *eol, const List *cat_to) {
+    const List *next = cat_to;
+    while (l != eol) {
+        next = List::from(l->at, next);
+        l = l->next;
     }
     return next;
 }

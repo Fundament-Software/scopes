@@ -159,6 +159,11 @@ typedef struct sc_any_list_tuple_ {
     const sc_list_t *_1;
 } sc_any_list_tuple_t;
 
+typedef struct sc_list_bool_tuple_ {
+    const sc_list_t *_0;
+    bool _1;
+} sc_list_bool_tuple_t;
+
 typedef struct sc_symbol_any_tuple_ {
     sc_symbol_t _0;
     sc_any_t _1;
@@ -215,6 +220,11 @@ void sc_raise(sc_any_t value);
 void sc_set_signal_abort(bool value);
 sc_exception_pad_t *sc_set_exception_pad(sc_exception_pad_t *pad);
 sc_any_t sc_exception_value(sc_exception_pad_t *pad);
+
+// memoization
+
+sc_list_bool_tuple_t sc_map_load(const sc_list_t *key);
+void sc_map_store(const sc_list_t *key, const sc_list_t *value);
 
 // hashing
 
@@ -380,6 +390,8 @@ sc_any_t sc_label_get_enter(sc_label_t *label);
 void sc_label_set_enter(sc_label_t *label, sc_any_t value);
 int32_t sc_label_argument_count(sc_label_t *label);
 sc_symbol_any_tuple_t sc_label_argument(sc_label_t *label, int32_t index);
+const sc_list_t *sc_label_argument_list(sc_label_t *label);
+const sc_list_t *sc_label_parameter_list(sc_label_t *label);
 void sc_label_clear_arguments(sc_label_t *label);
 void sc_label_append_argument(sc_label_t *label, sc_symbol_t key, sc_any_t value);
 void sc_label_remove_argument(sc_label_t *label, int32_t index);

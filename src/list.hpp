@@ -40,9 +40,13 @@ public:
 
 const List * const EOL = nullptr;
 
+#if 0
 // (a . (b . (c . (d . NIL)))) -> (d . (c . (b . (a . NIL))))
 // this is the mutating version; input lists are modified, direction is inverted
 const List *reverse_list_inplace(
+    const List *l, const List *eol = EOL, const List *cat_to = EOL);
+#endif
+const List *reverse_list(
     const List *l, const List *eol = EOL, const List *cat_to = EOL);
 
 } // namespace scopes

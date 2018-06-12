@@ -458,12 +458,12 @@ void LexerParser::ListBuilder::split(const Anchor *anchor) {
     // reverse what we have, up to last split point and wrap result
     // in cell
     prev = List::from(
-        Syntax::from(anchor,reverse_list_inplace(prev, eol)), eol);
+        Syntax::from(anchor,reverse_list(prev, eol)), eol);
     reset_start();
 }
 
 const List *LexerParser::ListBuilder::get_result() {
-    return reverse_list_inplace(prev);
+    return reverse_list(prev);
 }
 
 //////////////////////////////

@@ -309,6 +309,69 @@ void sc_exit(int c) {
     f_exit(c);
 }
 
+// Memoization
+////////////////////////////////////////////////////////////////////////////////
+
+namespace scopes {
+struct MemoArgs {
+
+    const List *args;
+
+    MemoArgs() {}
+    MemoArgs(const List *_args)
+        : args(_args) {}
+
+    bool operator==(const MemoArgs &other) const {
+        const List *a = args;
+        const List *b = other.args;
+        size_t a_count = (a?a->count:0);
+        size_t b_count = (b?b->count:0);
+        if (a_count != b_count)
+            return false;
+        while (a) {
+            if (a->at != b->at)
+                return false;
+            a = a->next;
+            b = b->next;
+        }
+        return true;
+    }
+
+    struct Hash {
+        std::size_t operator()(const MemoArgs& s) const {
+            std::size_t h = 0;
+            const List *l = s.args;
+            while (l) {
+                h = hash2(h, l->at.hash());
+                l = l->next;
+            }
+            return h;
+        }
+    };
+};
+
+typedef std::unordered_map<MemoArgs, const List *, typename MemoArgs::Hash> MemoMap;
+static MemoMap memo_map;
+}
+
+sc_list_bool_tuple_t sc_map_load(const sc_list_t *key) {
+    using namespace scopes;
+    auto it = memo_map.find(MemoArgs(key));
+    if (it != memo_map.end()) {
+        return {it->second, true };
+    } else {
+        return {nullptr, false };
+    }
+}
+
+void sc_map_store(const sc_list_t *key, const sc_list_t *value) {
+    using namespace scopes;
+    auto ret = memo_map.insert({MemoArgs(key), value});
+    if (!ret.second) {
+        ret.first->second = value;
+    }
+}
+
 // Hashing
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -1092,6 +1155,30 @@ sc_symbol_any_tuple_t sc_label_argument(sc_label_t *label, int32_t index) {
     }
 }
 
+const sc_list_t *sc_label_argument_list(sc_label_t *label) {
+    using namespace scopes;
+    const List *result = EOL;
+    size_t i = label->body.args.size();
+    while (i) {
+        i--;
+        auto &&arg = label->body.args[i];
+        result = List::from(List::from({arg.key, arg.value}), result);
+    }
+    return result;
+}
+
+const sc_list_t *sc_label_parameter_list(sc_label_t *label) {
+    using namespace scopes;
+    const List *result = EOL;
+    size_t i = label->params.size();
+    while (i) {
+        i--;
+        auto &&arg = label->params[i];
+        result = List::from(arg, result);
+    }
+    return result;
+}
+
 void sc_label_clear_arguments(sc_label_t *label) {
     using namespace scopes;
     label->body.args.clear();
@@ -1307,6 +1394,9 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_set_signal_abort,
         TYPE_Void, TYPE_Bool);
 
+    DEFINE_EXTERN_C_FUNCTION(sc_map_load, Tuple({TYPE_List, TYPE_Bool}), TYPE_List);
+    DEFINE_EXTERN_C_FUNCTION(sc_map_store, TYPE_Void, TYPE_List, TYPE_List);
+
     DEFINE_EXTERN_C_FUNCTION(sc_hash, TYPE_U64, TYPE_U64, TYPE_USize);
     DEFINE_EXTERN_C_FUNCTION(sc_hash2x64, TYPE_U64, TYPE_U64, TYPE_U64);
     DEFINE_EXTERN_C_FUNCTION(sc_hashbytes, TYPE_U64, NativeROPointer(TYPE_I8), TYPE_USize);
@@ -1422,6 +1512,8 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_label_set_enter, TYPE_Void, TYPE_Label, TYPE_Any);
     DEFINE_EXTERN_C_FUNCTION(sc_label_argument_count, TYPE_I32, TYPE_Label);
     DEFINE_EXTERN_C_FUNCTION(sc_label_argument, Tuple({TYPE_Symbol, TYPE_Any}), TYPE_Label, TYPE_I32);
+    DEFINE_EXTERN_C_FUNCTION(sc_label_argument_list, TYPE_List, TYPE_Label);
+    DEFINE_EXTERN_C_FUNCTION(sc_label_parameter_list, TYPE_List, TYPE_Label);
     DEFINE_EXTERN_C_FUNCTION(sc_label_clear_arguments, TYPE_Void, TYPE_Label);
     DEFINE_EXTERN_C_FUNCTION(sc_label_append_argument, TYPE_Void, TYPE_Label, TYPE_Symbol, TYPE_Any);
     DEFINE_EXTERN_C_FUNCTION(sc_label_remove_argument, TYPE_Void, TYPE_Label, TYPE_I32);

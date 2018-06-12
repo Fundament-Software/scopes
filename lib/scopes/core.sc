@@ -466,6 +466,8 @@ let cons = sc_list_cons
 'set-symbols Label
     verify-argument-count = verify-argument-count
     argument = sc_label_argument
+    argument-list = sc_label_argument_list
+    parameter-list = sc_label_parameter_list
     argument-count = sc_label_argument_count
     remove-argument = sc_label_remove_argument
     append-argument = sc_label_append_argument
@@ -495,6 +497,10 @@ let cons = sc_list_cons
     super = sc_typename_type_get_super
     set-super = sc_typename_type_set_super
     set-storage = sc_typename_type_set_storage
+
+'set-symbols Closure
+    frame = sc_closure_frame
+    label = sc_closure_label
 
 inline imply
 
@@ -1570,6 +1576,27 @@ define-infix< 700 ** pow
 define-infix> 750 as
 define-infix> 800 .
 define-infix> 800 @
+
+dump "hello"
+
+print
+    sc_map_load '(1 (2) (2 3))
+sc_map_store '(1 (2) (2 3)) '(4 5 6)
+print
+    sc_map_load '(1 (2) (2 3))
+sc_map_store '(1 (2) (2 3)) '(7 8 9)
+print
+    sc_map_load '(1 (2) (2 3))
+
+'dump ('label cons)
+
+print
+    'parameter-list
+        'label cons
+print
+    'argument-list
+        'label cons
+
 
 #syntax-extend
     'set-symbols syntax-scope
