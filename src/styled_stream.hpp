@@ -8,6 +8,7 @@
 #define SCOPES_STYLED_STREAM_HPP
 
 #include "symbol_enum.hpp"
+#include "scopes/config.h"
 
 #include <iostream>
 
@@ -18,29 +19,40 @@ namespace scopes {
 //------------------------------------------------------------------------------
 
 typedef KnownSymbol Style;
+#if SCOPES_USE_WCHAR
+
+typedef std::wostream OStream;
+
+#define SCOPES_COUT std::wcout
+#define SCOPES_CERR std::wcerr
+#else
+typedef std::ostream OStream;
+#define SCOPES_COUT std::cout
+#define SCOPES_CERR std::cerr
+#endif
 
 // support 24-bit ANSI colors (ISO-8613-3)
 // works on most bash shells as well as windows 10
-void ansi_from_style(std::ostream &ost, Style style);
+void ansi_from_style(OStream &ost, Style style);
 
-typedef void (*StreamStyleFunction)(std::ostream &, Style);
+typedef void (*StreamStyleFunction)(OStream &, Style);
 
-void stream_ansi_style(std::ostream &ost, Style style);
+void stream_ansi_style(OStream &ost, Style style);
 
-void stream_plain_style(std::ostream &ost, Style style);
+void stream_plain_style(OStream &ost, Style style);
 
 extern StreamStyleFunction stream_default_style;
 
 struct StyledStream {
     StreamStyleFunction _ssf;
-    std::ostream &_ost;
+    OStream &_ost;
 
-    StyledStream(std::ostream &ost, StreamStyleFunction ssf);
-    StyledStream(std::ostream &ost);
+    StyledStream(OStream &ost, StreamStyleFunction ssf);
+    StyledStream(OStream &ost);
 
     StyledStream();
 
-    static StyledStream plain(std::ostream &ost);
+    static StyledStream plain(OStream &ost);
     static StyledStream plain(StyledStream &ost);
 
     template<typename T>
@@ -50,11 +62,16 @@ struct StyledStream {
     template<typename T>
     StyledStream& operator<<(T &o) { _ost << o; return *this; }
 
-    StyledStream& operator<<(std::ostream &(*o)(std::ostream&));
+    StyledStream& operator<<(OStream &(*o)(OStream&));
 
     StyledStream& operator<<(Style s);
 
     StyledStream& operator<<(bool s);
+
+#if SCOPES_USE_WCHAR
+    StyledStream& operator<<(const char * const s);
+    
+#endif
 
     StyledStream& stream_number(int8_t x);
     StyledStream& stream_number(uint8_t x);

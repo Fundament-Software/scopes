@@ -1789,11 +1789,11 @@ struct LLVMIRGenerator {
             }
 #undef UNPACK_RET_ARGS
         } else if (contarg.type == TYPE_Nothing) {
-            StyledStream ss(std::cerr);
+            StyledStream ss(SCOPES_CERR);
             stream_label(ss, label, StreamLabelFormat::debug_single());
             location_error(String::from("IL->IR: unexpected end of function"));
         } else {
-            StyledStream ss(std::cerr);
+            StyledStream ss(SCOPES_CERR);
             stream_label(ss, label, StreamLabelFormat::debug_single());
             location_error(String::from("IL->IR: continuation is of invalid type"));
         }
@@ -1998,7 +1998,7 @@ struct LLVMIRGenerator {
 #endif
         char *errmsg = NULL;
         if (LLVMVerifyModule(module, LLVMReturnStatusAction, &errmsg)) {
-            StyledStream ss(std::cerr);
+            StyledStream ss(SCOPES_CERR);
             if (entry) {
                 stream_label(ss, entry, StreamLabelFormat());
             }

@@ -12,7 +12,7 @@
 #include "list.hpp"
 #include "syntax.hpp"
 
-#include "scopes.h"
+#include "scopes/scopes.h"
 
 #include <string.h>
 #include <assert.h>

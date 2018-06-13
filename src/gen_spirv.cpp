@@ -52,9 +52,16 @@ static void disassemble_spirv(std::vector<unsigned int> &contents, bool debug = 
     if (error) {
         spvDiagnosticPrint(diagnostic);
         spvDiagnosticDestroy(diagnostic);
-        std::cerr << "error while pretty-printing disassembly, falling back to"
+        StyledStream ss(SCOPES_CERR);
+        ss << "error while pretty-printing disassembly, falling back to"
             " failsafe disassembly" << std::endl;
+        #if SCOPES_USE_WCHAR
+        std::stringstream stdss;
+        spv::Disassemble(stdss, contents);
+        ss << String::from_stdstring(stdss.str());
+        #else
         spv::Disassemble(std::cerr, contents);
+        #endif
     }
 }
 
@@ -104,7 +111,7 @@ static void verify_spirv(std::vector<unsigned int> &contents) {
     bool succeed = tools.Validate(contents);
     if (!succeed) {
         disassemble_spirv(contents, true);
-        std::cerr << ss._ss.str();
+        SCOPES_CERR << ss._ss.str();
         location_error(String::from("SPIR-V validation found errors"));
     }
 }
@@ -1371,11 +1378,11 @@ struct SPIRVGenerator {
             }
 #undef UNPACK_RET_ARGS
         } else if (contarg.type == TYPE_Nothing) {
-            StyledStream ss(std::cerr);
+            StyledStream ss(SCOPES_CERR);
             stream_label(ss, label, StreamLabelFormat::debug_single());
             location_error(String::from("IL->SPIR: unexpected end of function"));
         } else {
-            StyledStream ss(std::cerr);
+            StyledStream ss(SCOPES_CERR);
             stream_label(ss, label, StreamLabelFormat::debug_single());
             location_error(String::from("IL->SPIR: continuation is of invalid type"));
         }
@@ -1852,10 +1859,10 @@ void optimize_spirv(std::vector<unsigned int> &result, int opt_level) {
     optimizer.SetMessageConsumer([](spv_message_level_t level, const char* source,
         const spv_position_t& position,
         const char* message) {
-    std::cerr << StringifyMessage(level, source, position, message)
+    SCOPES_CERR << StringifyMessage(level, source, position, message)
     << std::endl;
     });*/
-    StyledStream ss(std::cerr);
+    StyledStream ss(SCOPES_CERR);
     optimizer.SetMessageConsumer([&ss](spv_message_level_t level, const char*,
         const spv_position_t& position,
         const char* message) {

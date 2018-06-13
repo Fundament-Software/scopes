@@ -8,7 +8,7 @@
 #include "profiler.hpp"
 #include "timer.hpp"
 #include "gc.hpp"
-#include "scopes.h"
+#include "scopes/config.h"
 
 #ifdef SCOPES_WIN32
 #include "stdlib_ex.h"
@@ -33,7 +33,8 @@ void on_shutdown() {
 #if SCOPES_PRINT_TIMERS
     //print_profiler_info();
     Timer::print_timers();
-    std::cerr << "largest recorded stack size: " << g_largest_stack_size << std::endl;
+    StyledStream ss(SCOPES_CERR);
+    ss << "largest recorded stack size: " << g_largest_stack_size << std::endl;
 #endif
 }
 

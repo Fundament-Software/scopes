@@ -8,7 +8,7 @@
 #include "styled_stream.hpp"
 #include "label.hpp"
 #include "anchor.hpp"
-#include "scopes.h"
+#include "scopes/config.h"
 
 #include <unordered_map>
 #include <vector>

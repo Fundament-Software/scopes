@@ -30,7 +30,7 @@
 #include "profiler.hpp"
 #include "execution.hpp"
 
-#include "scopes.h"
+#include "scopes/config.h"
 
 #include "dyn_cast.inc"
 #include "verify_tools.inc"
@@ -595,7 +595,7 @@ struct Specializer {
     Label::UserMap user_map;
 
     Specializer()
-        : ss_cout(std::cout)
+        : ss_cout(SCOPES_COUT)
     {}
 
     typedef std::unordered_map<Parameter *, Args > MangleParamMap;
@@ -684,7 +684,7 @@ struct Specializer {
         mangle_remap_body(um, le, entry, lmap, pmap);
 
         if (verbose & Mangle_Verbose) {
-        StyledStream ss(std::cout);
+        StyledStream ss(SCOPES_COUT);
         ss << "IN[\n";
         stream_label(ss, entry, StreamLabelFormat::debug_single());
         for (auto && l : entry_scope) {
@@ -793,14 +793,14 @@ struct Specializer {
                         frame = top;
                     } else {
                         if (label->is_debug()) {
-                            StyledStream ss(std::cerr);
+                            StyledStream ss(SCOPES_CERR);
                             ss << "frame " <<  frame <<  ": can't find scope label for closure" << std::endl;
                             stream_label(ss, label, StreamLabelFormat::debug_single());
                         }
                     }
                 } else {
                     if (label->is_debug()) {
-                        StyledStream ss(std::cerr);
+                        StyledStream ss(SCOPES_CERR);
                         ss << "frame " <<  frame <<  ": label has no scope label for closure" << std::endl;
                         stream_label(ss, label, StreamLabelFormat::debug_single());
                     }
@@ -975,7 +975,7 @@ struct Specializer {
         }
 
         if (label->is_debug()) {
-            StyledStream ss(std::cerr);
+            StyledStream ss(SCOPES_CERR);
             ss << "frame " << parent <<  ": instantiating label" << std::endl;
             stream_label(ss, label, StreamLabelFormat::debug_single());
             ss << "with key ";
@@ -998,7 +998,7 @@ struct Specializer {
         {
             Frame *result = parent->find_frame(la);
             if (label->is_debug()) {
-                StyledStream ss(std::cerr);
+                StyledStream ss(SCOPES_CERR);
                 if (result) {
                     ss << " and the label already exists (frame " << result << ")";
                     if (!result->get_instance()->body.is_complete()) {
@@ -1114,7 +1114,7 @@ struct Specializer {
         newlabel->frame = frame;
 
         if (label->is_debug()) {
-            StyledStream ss(std::cerr);
+            StyledStream ss(SCOPES_CERR);
             ss << "the label is contained in frame " << frame << std::endl;
         }
 
@@ -1155,7 +1155,7 @@ struct Specializer {
                         param->anchor = get_active_anchor();
                     } else {
                         {
-                            StyledStream cerr(std::cerr);
+                            StyledStream cerr(SCOPES_CERR);
                             cerr << param->anchor << " first typed here as " << ptype << std::endl;
                             param->anchor->stream_source_line(cerr);
                         }
@@ -1197,7 +1197,7 @@ struct Specializer {
             auto TR = dest.label->get_params_as_return_label_type();
             if (return_label != TR) {
                 {
-                    StyledStream cerr(std::cerr);
+                    StyledStream cerr(SCOPES_CERR);
                     cerr << dest.label->anchor << " typed as " << TR << std::endl;
                     dest.label->anchor->stream_source_line(cerr);
                 }
@@ -1683,7 +1683,7 @@ struct Specializer {
             if (is_empty_function(newl)) {
     #if 1
                 if (enable_step_debugger) {
-                    StyledStream ss(std::cerr);
+                    StyledStream ss(SCOPES_CERR);
                     ss << "folding call to empty function:" << std::endl;
                     stream_label(ss, newl, StreamLabelFormat::debug_scope());
                 }
@@ -2599,7 +2599,7 @@ struct Specializer {
 
     static void print_traceback() {
         if (traceback.empty()) return;
-        StyledStream ss(std::cerr);
+        StyledStream ss(SCOPES_CERR);
         ss << "Traceback (most recent call last):" << std::endl;
 
         size_t sz = traceback.size();
@@ -3382,12 +3382,12 @@ struct Specializer {
             args[1].value.verify(TYPE_String);
             StyledString ss;
             ss.out << l->body.anchor << " message: " << args[1].value.string->data << std::endl;
-            std::cout << ss.str()->data;
+            SCOPES_COUT << ss.str()->data;
             RETARGS();
         } break;
         case FN_Dump: {
             CHECKARGS(0, -1);
-            StyledStream ss(std::cerr);
+            StyledStream ss(SCOPES_CERR);
             ss << l->body.anchor << " dump:";
             for (size_t i = 1; i < args.size(); ++i) {
                 ss << " ";
@@ -3637,7 +3637,7 @@ struct Specializer {
             l = l->body.enter.label;
             counter++;
             if (counter == SCOPES_MAX_SKIP_JUMPS) {
-                std::cerr
+                SCOPES_CERR
                     << "internal warning: max iterations exceeded"
                         " during jump skip check" << std::endl;
                 break;
@@ -3675,7 +3675,7 @@ struct Specializer {
                 // branch, unreachable, etc.
                 break;
             } else {
-                StyledStream ss(std::cerr);
+                StyledStream ss(SCOPES_CERR);
                 ss << "internal warning: unexpected continuation type "
                     << l->body.args[0].value.type
                     << " encountered while counting instructions" << std::endl;

@@ -24,7 +24,7 @@
 #include "gen_llvm.hpp"
 #include "profiler.hpp"
 
-#include "scopes.h"
+#include "scopes/scopes.h"
 
 #ifdef SCOPES_WIN32
 #include "stdlib_ex.h"
@@ -35,8 +35,20 @@
 #endif
 #include <unistd.h>
 #include <libgen.h>
+#include <fcntl.h>
+
+#if SCOPES_USE_WCHAR
+#include <codecvt>
+#endif
 
 #include "llvm/ExecutionEngine/SectionMemoryManager.h"
+
+#include <iostream>
+#include <string>
+#include <vector>
+#include <algorithm>
+#include <ostream>
+#include <iterator>
 
 namespace scopes {
 
@@ -173,7 +185,17 @@ static void setup_stdio() {
         SetConsoleMode(hStdErr, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
         setbuf(stdout, 0);
         setbuf(stderr, 0);
-        SetConsoleOutputCP(65001);
+#if SCOPES_USE_WCHAR
+        _setmode(_fileno(stdout), _O_U16TEXT);
+        _setmode(_fileno(stderr), _O_U16TEXT);
+        //std::wcout.imbue(std::locale(std::locale("C"), new std::codecvt_utf8<wchar_t>));
+        //std::wcerr.imbue(std::locale(std::locale("C"), new std::codecvt_utf8<wchar_t>));
+#else        
+        SetConsoleOutputCP(CP_UTF8);
+        _setmode(_fileno(stdout), _O_BINARY);
+        _setmode(_fileno(stderr), _O_BINARY);        
+        //fcntl(_fileno(stdout), F_SETFL, fcntl(_fileno(stdout), F_GETFL) | O_NONBLOCK);
+#endif
         #endif
     }
 }

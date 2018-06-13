@@ -18,7 +18,7 @@
 
 namespace scopes {
 
-const char CONT_SEP[] = "▶";
+const char CONT_SEP[] = "►";
 
 struct Label;
 struct Anchor;

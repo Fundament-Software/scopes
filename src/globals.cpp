@@ -34,7 +34,7 @@
 #include "compiler_flags.hpp"
 #include "hash.hpp"
 
-#include "scopes.h"
+#include "scopes/scopes.h"
 
 #include <limits.h>
 #include <string.h>
@@ -194,7 +194,12 @@ const sc_string_t *sc_format_message(const sc_anchor_t *anchor, const sc_string_
 
 void sc_write(const sc_string_t *value) {
     using namespace scopes;
+#if SCOPES_USE_WCHAR
+    StyledStream ss(SCOPES_COUT);
+    ss << value->data;
+#else
     fputs(value->data, stdout);
+#endif
 }
 
 // file i/o
@@ -611,7 +616,7 @@ const sc_list_t *sc_list_join(const sc_list_t *a, const sc_list_t *b) {
 
 const sc_list_t *sc_list_dump(const sc_list_t *l) {
     using namespace scopes;
-    StyledStream ss(std::cerr);
+    StyledStream ss(SCOPES_CERR);
     stream_expr(ss, l, StreamExprFormat());
     return l;
 }
@@ -781,7 +786,7 @@ void sc_type_debug_abi(const sc_type_t *T) {
     using namespace scopes;
     ABIClass classes[MAX_ABI_CLASSES];
     size_t sz = abi_classify(T, classes);
-    StyledStream ss(std::cout);
+    StyledStream ss(SCOPES_COUT);
     ss << T << " -> " << sz;
     for (size_t i = 0; i < sz; ++i) {
         ss << " " << abi_class_to_string(classes[i]);
@@ -1063,7 +1068,7 @@ const sc_type_t *sc_parameter_type(const sc_parameter_t *param) {
 
 void sc_label_dump(sc_label_t *label) {
     using namespace scopes;
-    StyledStream ss(std::cerr);
+    StyledStream ss(SCOPES_CERR);
     stream_label(ss, label, StreamLabelFormat::debug_all());
 }
 
@@ -1155,7 +1160,7 @@ const sc_list_t *sc_label_get_keyed(sc_label_t *label) {
     while (i) {
         i--;
         auto &&arg = label->body.args[i];
-        result = List::from(List::from({arg.key, arg.value}), result);
+        result = List::from(List::from({Any(arg.key), arg.value}), result);
     }
     return result;
 }
@@ -1258,7 +1263,7 @@ sc_frame_t *sc_label_frame(sc_label_t *label) {
 
 void sc_frame_dump(sc_frame_t *frame) {
     using namespace scopes;
-    StyledStream ss(std::cerr);
+    StyledStream ss(SCOPES_CERR);
     stream_frame(ss, frame, StreamFrameFormat::single());
 }
 

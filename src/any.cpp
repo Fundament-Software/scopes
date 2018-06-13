@@ -222,7 +222,7 @@ size_t Any::hash() const {
     default: break;
     }
 
-    StyledStream ss(std::cout);
+    StyledStream ss(SCOPES_COUT);
     ss << "unhashable value: " << T << std::endl;
     assert(false && "unhashable value");
     return 0;
@@ -289,7 +289,7 @@ bool Any::operator ==(const Any &other) const {
     default: break;
     }
 
-    StyledStream ss(std::cout);
+    StyledStream ss(SCOPES_COUT);
     ss << "incomparable value: " << T << std::endl;
     assert(false && "incomparable value");
     return false;

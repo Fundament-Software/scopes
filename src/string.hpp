@@ -10,6 +10,7 @@
 #include <stddef.h>
 
 #include "styled_stream.hpp"
+#include "scopes/config.h"
 
 #include <sstream>
 
@@ -18,6 +19,12 @@ namespace scopes {
 //------------------------------------------------------------------------------
 // STRING
 //------------------------------------------------------------------------------
+
+#if SCOPES_USE_WCHAR
+typedef std::wstringstream StringStream;
+#else
+typedef std::stringstream StringStream;
+#endif
 
 struct String {
     struct Hash {
@@ -39,12 +46,13 @@ struct String {
     }
 
     static const String *from_stdstring(const std::string &s);
+    static const String *from_stdstring(const std::wstring &ws);
     StyledStream& stream(StyledStream& ost, const char *escape_chars) const;
     const String *substr(int64_t i0, int64_t i1) const;
 };
 
 struct StyledString {
-    std::stringstream _ss;
+    StringStream _ss;
     StyledStream out;
 
     StyledString();

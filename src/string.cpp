@@ -17,6 +17,9 @@
 #include <memory.h>
 #include <string.h>
 
+#include <locale>
+#include <codecvt>
+
 #pragma GCC diagnostic ignored "-Wvla-extension"
 
 namespace scopes {
@@ -204,6 +207,13 @@ const String *String::join(const String *a, const String *b) {
 
 const String *String::from_stdstring(const std::string &s) {
     return from(s.c_str(), s.size());
+}
+
+const String *String::from_stdstring(const std::wstring &ws) {
+    using convert_type = std::codecvt_utf8<wchar_t>;
+    std::wstring_convert<convert_type, wchar_t> converter;
+    std::string s = converter.to_bytes(ws);
+    return from_stdstring(s);
 }
 
 StyledStream& String::stream(StyledStream& ost, const char *escape_chars) const {

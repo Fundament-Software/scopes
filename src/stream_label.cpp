@@ -181,7 +181,7 @@ void StreamLabel::stream(Label *label) {
 
 void stream_label(
     StyledStream &_ss, Label *label, const StreamLabelFormat &_fmt) {
-    StreamLabel streamer(_ss, _fmt);
+    StreamLabel streamer(_ss, _fmt);    
     streamer.stream(label);
 }
 

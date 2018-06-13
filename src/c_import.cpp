@@ -26,7 +26,7 @@
 #include "execution.hpp"
 #include "dyn_cast.inc"
 
-#include "scopes.h"
+#include "scopes/scopes.h"
 
 #include <llvm-c/Core.h>
 

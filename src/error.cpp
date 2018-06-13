@@ -9,7 +9,7 @@
 #include "type.hpp"
 #include "boot.hpp"
 
-#include "scopes.h"
+#include "scopes/config.h"
 
 #include <assert.h>
 
@@ -56,13 +56,13 @@ ExceptionPad *_exc_pad = nullptr;
 
 void location_message(const Anchor *anchor, const String* str) {
     assert(anchor);
-    auto cerr = StyledStream(std::cerr);
+    auto cerr = StyledStream(SCOPES_CERR);
     cerr << anchor << str->data << std::endl;
     anchor->stream_source_line(cerr);
 }
 
 void print_exception(const Any &value) {
-    auto cerr = StyledStream(std::cerr);
+    auto cerr = StyledStream(SCOPES_CERR);
     if (value.type == TYPE_Exception) {
         const Exception *exc = value;
         if (exc->anchor) {

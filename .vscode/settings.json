@@ -95,7 +95,8 @@
         "*.gen": "cpp",
         "__memory": "cpp",
         "forward_list": "cpp",
-        "numeric": "cpp"
+        "numeric": "cpp",
+        "codecvt": "cpp"
     },
     "C_Cpp.intelliSenseEngine": "Tag Parser"
 }

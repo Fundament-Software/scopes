@@ -17,7 +17,7 @@
 #include "scope.hpp"
 #include "stream_expr.hpp"
 #include "anchor.hpp"
-#include "scopes.h"
+#include "scopes/scopes.h"
 
 #include <assert.h>
 
@@ -804,7 +804,7 @@ struct Expander {
         set_active_anchor(sx->anchor);
         if (sx->quoted) {
             if (verbose) {
-                StyledStream ss(std::cerr);
+                StyledStream ss(SCOPES_CERR);
                 ss << "quoting ";
                 stream_expr(ss, sx, StreamExprFormat::debug_digest());
             }
@@ -814,7 +814,7 @@ struct Expander {
         Any expr = sx->datum;
         if (expr.type == TYPE_List) {
             if (verbose) {
-                StyledStream ss(std::cerr);
+                StyledStream ss(SCOPES_CERR);
                 ss << "expanding list ";
                 stream_expr(ss, sx, StreamExprFormat::debug_digest());
             }
@@ -886,14 +886,14 @@ struct Expander {
                     env = result.env;
                     goto expand_again;
                 } else if (verbose) {
-                    StyledStream ss(std::cerr);
+                    StyledStream ss(SCOPES_CERR);
                     ss << "ignored by list handler" << std::endl;
                 }
             }
             return expand_call(list, dest);
         } else if (expr.type == TYPE_Symbol) {
             if (verbose) {
-                StyledStream ss(std::cerr);
+                StyledStream ss(SCOPES_CERR);
                 ss << "expanding symbol ";
                 stream_expr(ss, sx, StreamExprFormat::debug_digest());
             }
@@ -932,7 +932,7 @@ struct Expander {
             return write_dest(dest, result);
         } else {
             if (verbose) {
-                StyledStream ss(std::cerr);
+                StyledStream ss(SCOPES_CERR);
                 ss << "ignoring ";
                 stream_expr(ss, sx, StreamExprFormat::debug_digest());
             }

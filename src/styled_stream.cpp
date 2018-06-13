@@ -12,6 +12,11 @@
 
 #pragma GCC diagnostic ignored "-Wvla-extension"
 
+#if SCOPES_USE_WCHAR
+#include <locale>
+#include <windows.h>
+#endif
+
 namespace scopes {
 
 //------------------------------------------------------------------------------
@@ -46,18 +51,18 @@ static const char COLOR_XCYAN[]     = "\033[36;1m";
 static const char COLOR_WHITE[]     = "\033[37;1m";
 #endif
 
-static void COLOR_RGB(std::ostream &ost, const char prefix[], int hexcode) {
+static void COLOR_RGB(OStream &ost, const char prefix[], int hexcode) {
     ost << prefix
         << ((hexcode >> 16) & 0xff) << ";"
         << ((hexcode >> 8) & 0xff) << ";"
         << (hexcode & 0xff) << "m";
 }
 
-static void COLOR_RGB_FG(std::ostream &ost, int hexcode) {
+static void COLOR_RGB_FG(OStream &ost, int hexcode) {
     return COLOR_RGB(ost, "\033[38;2;", hexcode);
 }
 #if 0
-static void COLOR_RGB_BG(std::ostream &ost, int hexcode) {
+static void COLOR_RGB_BG(OStream &ost, int hexcode) {
     return COLOR_RGB(ost, "\033[48;2;", hexcode);
 }
 #endif
@@ -66,7 +71,7 @@ static void COLOR_RGB_BG(std::ostream &ost, int hexcode) {
 
 // support 24-bit ANSI colors (ISO-8613-3)
 // works on most bash shells as well as windows 10
-void ansi_from_style(std::ostream &ost, Style style) {
+void ansi_from_style(OStream &ost, Style style) {
     switch(style) {
 #ifdef RGBCOLORS
     case Style_None: ost << ANSI::RESET; break;
@@ -104,31 +109,31 @@ void ansi_from_style(std::ostream &ost, Style style) {
 }
 #undef RGBCOLORS
 
-void stream_ansi_style(std::ostream &ost, Style style) {
+void stream_ansi_style(OStream &ost, Style style) {
     ansi_from_style(ost, style);
 }
 
-void stream_plain_style(std::ostream &ost, Style style) {
+void stream_plain_style(OStream &ost, Style style) {
 }
 
 StreamStyleFunction stream_default_style = stream_plain_style;
 
-StyledStream::StyledStream(std::ostream &ost, StreamStyleFunction ssf) :
+StyledStream::StyledStream(OStream &ost, StreamStyleFunction ssf) :
     _ssf(ssf),
     _ost(ost)
 {}
 
-StyledStream::StyledStream(std::ostream &ost) :
+StyledStream::StyledStream(OStream &ost) :
     _ssf(stream_default_style),
     _ost(ost)
 {}
 
 StyledStream::StyledStream() :
     _ssf(stream_default_style),
-    _ost(std::cerr)
+    _ost(SCOPES_CERR)
 {}
 
-StyledStream StyledStream::plain(std::ostream &ost) {
+StyledStream StyledStream::plain(OStream &ost) {
     return StyledStream(ost, stream_plain_style);
 }
 
@@ -136,7 +141,7 @@ StyledStream StyledStream::plain(StyledStream &ost) {
     return StyledStream(ost._ost, stream_plain_style);
 }
 
-StyledStream& StyledStream::operator<<(std::ostream &(*o)(std::ostream&)) {
+StyledStream& StyledStream::operator<<(OStream &(*o)(OStream&)) {
     _ost << o; return *this; }
 
 StyledStream& StyledStream::operator<<(Style s) {
@@ -172,5 +177,18 @@ StyledStream& StyledStream::stream_number(double x) {
 StyledStream& StyledStream::stream_number(float x) {
     return stream_number((double)x);
 }
+
+#if SCOPES_USE_WCHAR
+StyledStream& StyledStream::operator<<(const char * const s) {
+    int sz = MultiByteToWideChar(CP_UTF8, 0, s, -1, nullptr, 0);
+    if (sz) {
+        wchar_t buf[sz];
+        MultiByteToWideChar(CP_UTF8, 0, s, -1, buf, sz);
+        _ost << buf;
+    }
+    return *this;
+}
+    
+#endif
 
 } // namespace scopes
