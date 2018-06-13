@@ -15,21 +15,17 @@ namespace scopes {
 // LIST
 //------------------------------------------------------------------------------
 
-struct ListKeyEqual {
-    bool operator()( const List *lhs, const List *rhs ) const {
-        if (lhs->next != rhs->next)
-            return false;
-        return lhs->at == rhs->at;
-    }
-};
+bool List::KeyEqual::operator()( const List *lhs, const List *rhs ) const {
+    if (lhs->next != rhs->next)
+        return false;
+    return lhs->at == rhs->at;
+}
 
-struct ListHash {
-    std::size_t operator()(const List *l) const {
-        return hash2(l->at.hash(), std::hash<const List *>{}(l->next));
-    }
-};
+std::size_t List::Hash::operator()(const List *l) const {
+    return hash2(l->at.hash(), std::hash<const List *>{}(l->next));
+}
 
-static std::unordered_set<const List *, ListHash, ListKeyEqual> list_map;
+static std::unordered_set<const List *, List::Hash, List::KeyEqual> list_map;
 
 List::List(const Any &_at, const List *_next, size_t _count) :
     at(_at),

@@ -15,9 +15,14 @@
 #include <dlfcn.h>
 #endif
 
+#define SCOPES_USE_ORCJIT 0
+
 #include <llvm-c/Core.h>
 #include <llvm-c/TargetMachine.h>
 #include <llvm-c/Support.h>
+#if !SCOPES_USE_ORCJIT
+#include <llvm-c/ExecutionEngine.h>
+#endif
 
 #include <stdio.h>
 #include <assert.h>
@@ -26,12 +31,6 @@
 namespace scopes {
 
 static void *global_c_namespace = nullptr;
-
-LLVMOrcJITStackRef orc = nullptr;
-LLVMTargetMachineRef target_machine = nullptr;
-
-//static std::vector<void *> loaded_libs;
-static std::unordered_map<Symbol, void *, Symbol::Hash> cached_dlsyms;
 
 static void *retrieve_symbol(const char *name) {
 #if 1
@@ -67,12 +66,24 @@ void *local_aware_dlsym(Symbol name) {
     return retrieve_symbol(name.name()->data);
 }
 
+#if SCOPES_USE_ORCJIT
+
+LLVMOrcJITStackRef orc = nullptr;
+LLVMTargetMachineRef target_machine = nullptr;
+
+//static std::vector<void *> loaded_libs;
+static std::unordered_map<Symbol, void *, Symbol::Hash> cached_dlsyms;
+
+LLVMTargetMachineRef get_target_machine() {
+    return target_machine;
+}
+
 uint64_t lazy_compile_callback(LLVMOrcJITStackRef orc, void *ctx) {
     printf("lazy_compile_callback ???\n");
     return 0;
 }
 
-void init_orc() {
+void init_execution() {
     if (orc) return;
     char *triple = LLVMGetDefaultTargetTriple();
     //printf("triple: %s\n", triple);
@@ -91,12 +102,24 @@ void init_orc() {
         //LLVMCodeGenLevelDefault;
         //LLVMCodeGenLevelAggressive;
 
+    auto reloc =
+        LLVMRelocDefault;
+        //LLVMRelocStatic;
+        //LLVMRelocPIC;
+        //LLVMRelocDynamicNoPic;
+
+    auto codemodel =
+        //LLVMCodeModelDefault;
+        LLVMCodeModelJITDefault;
+        //LLVMCodeModelSmall;
+        //LLVMCodeModelKernel;
+        //LLVMCodeModelMedium;
+        //LLVMCodeModelLarge;
+
     const char *CPU = nullptr;
     const char *Features = nullptr;
     target_machine = LLVMCreateTargetMachine(target, triple, CPU, Features,
-        optlevel,
-        LLVMRelocDefault,
-        LLVMCodeModelJITDefault);
+        optlevel, reloc, codemodel);
     assert(target_machine);
     orc = LLVMOrcCreateInstance(target_machine);
     assert(orc);
@@ -116,7 +139,7 @@ static uint64_t orc_symbol_resolver(const char *name, void *ctx) {
 }
 
 static std::vector<LLVMOrcModuleHandle *> module_handles;
-void add_orc_module(LLVMModuleRef module) {
+void add_module(LLVMModuleRef module) {
     //LLVMDumpModule(module);
     LLVMSharedModuleRef smod = LLVMOrcMakeSharedModule(module);
     assert(smod);
@@ -126,12 +149,12 @@ void add_orc_module(LLVMModuleRef module) {
     assert(err == LLVMOrcErrSuccess);
 }
 
-uint64_t get_orc_address(const char *name) {
+uint64_t get_address(const char *name) {
     assert(false);
     return 0;
 }
 
-void *get_orc_pointer_to_global(LLVMValueRef g) {
+void *get_pointer_to_global(LLVMValueRef g) {
     const char *sym_name = LLVMGetValueName(g);
 #if 0
     char *mangled_sym_name = nullptr;
@@ -146,12 +169,53 @@ void *get_orc_pointer_to_global(LLVMValueRef g) {
     return reinterpret_cast<void *>(addr);
 }
 
+#else // !SCOPES_USE_ORCJIT
+
+LLVMExecutionEngineRef ee = nullptr;
+
+void init_execution() {
+}
+
+void add_module(LLVMModuleRef module) {
+    if (!ee) {
+        char *errormsg = nullptr;
+
+        LLVMMCJITCompilerOptions opts;
+        LLVMInitializeMCJITCompilerOptions(&opts, sizeof(opts));
+        opts.OptLevel = 0;
+        opts.NoFramePointerElim = true;
+
+        if (LLVMCreateMCJITCompilerForModule(&ee, module, &opts,
+            sizeof(opts), &errormsg)) {
+            location_error(String::from_cstr(errormsg));
+        }
+    }
+    LLVMAddModule(ee, module);
+}
+
+uint64_t get_address(const char *name) {
+    return LLVMGetGlobalValueAddress(ee, name);
+}
+
+void *get_pointer_to_global(LLVMValueRef g) {
+    return LLVMGetPointerToGlobal(ee, g);
+}
+
+LLVMTargetMachineRef get_target_machine() {
+    assert(ee);
+    return LLVMGetExecutionEngineTargetMachine(ee);
+}
+
+#endif // !SCOPES_USE_ORCJIT
+
 void init_llvm() {
     global_c_namespace = dlopen(NULL, RTLD_LAZY);
 
     LLVMEnablePrettyStackTrace();
-    //LLVMLinkInMCJIT();
-    //LLVMLinkInInterpreter();
+    #if !SCOPES_USE_ORCJIT
+        LLVMLinkInMCJIT();
+        //LLVMLinkInInterpreter();
+    #endif
     LLVMInitializeNativeTarget();
     LLVMInitializeNativeAsmParser();
     LLVMInitializeNativeAsmPrinter();

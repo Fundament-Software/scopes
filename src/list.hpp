@@ -36,6 +36,17 @@ public:
     }
 
     static const List *join(const List *a, const List *b);
+
+    // these only work with lists that aren't EOL
+
+    struct KeyEqual {
+        bool operator()( const List *lhs, const List *rhs ) const;
+    };
+
+    struct Hash {
+        std::size_t operator()(const List *l) const;
+    };
+
 };
 
 const List * const EOL = nullptr;

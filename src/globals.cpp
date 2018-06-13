@@ -313,60 +313,25 @@ void sc_exit(int c) {
 ////////////////////////////////////////////////////////////////////////////////
 
 namespace scopes {
-struct MemoArgs {
 
-    const List *args;
-
-    MemoArgs() {}
-    MemoArgs(const List *_args)
-        : args(_args) {}
-
-    bool operator==(const MemoArgs &other) const {
-        const List *a = args;
-        const List *b = other.args;
-        size_t a_count = (a?a->count:0);
-        size_t b_count = (b?b->count:0);
-        if (a_count != b_count)
-            return false;
-        while (a) {
-            if (a->at != b->at)
-                return false;
-            a = a->next;
-            b = b->next;
-        }
-        return true;
-    }
-
-    struct Hash {
-        std::size_t operator()(const MemoArgs& s) const {
-            std::size_t h = 0;
-            const List *l = s.args;
-            while (l) {
-                h = hash2(h, l->at.hash());
-                l = l->next;
-            }
-            return h;
-        }
-    };
-};
-
-typedef std::unordered_map<MemoArgs, const List *, typename MemoArgs::Hash> MemoMap;
+typedef std::unordered_map<const List *, const List *> MemoMap;
 static MemoMap memo_map;
+
 }
 
 sc_list_bool_tuple_t sc_map_load(const sc_list_t *key) {
     using namespace scopes;
-    auto it = memo_map.find(MemoArgs(key));
+    auto it = memo_map.find(key);
     if (it != memo_map.end()) {
         return {it->second, true };
     } else {
-        return {nullptr, false };
+        return {EOL, false };
     }
 }
 
 void sc_map_store(const sc_list_t *key, const sc_list_t *value) {
     using namespace scopes;
-    auto ret = memo_map.insert({MemoArgs(key), value});
+    auto ret = memo_map.insert({key, value});
     if (!ret.second) {
         ret.first->second = value;
     }
@@ -657,6 +622,25 @@ sc_any_list_tuple_t sc_list_decons(const sc_list_t *l) {
         return { l->at, l->next };
     else
         return { none, nullptr };
+}
+
+size_t sc_list_count(const sc_list_t *l) {
+    using namespace scopes;
+    return l?l->count:0;
+}
+
+sc_any_t sc_list_at(const sc_list_t *l) {
+    using namespace scopes;
+    return l?l->at:none;
+}
+
+const sc_list_t *sc_list_next(const sc_list_t *l) {
+    using namespace scopes;
+    return l?l->next:EOL;
+}
+
+const sc_list_t *sc_list_reverse(const sc_list_t *l) {
+    return reverse_list(l);
 }
 
 // Syntax
@@ -1140,22 +1124,31 @@ void sc_label_set_enter(sc_label_t *label, sc_any_t value) {
     label->body.enter = value;
 }
 
-int32_t sc_label_argument_count(sc_label_t *label) {
+const sc_list_t *sc_label_get_arguments(sc_label_t *label) {
     using namespace scopes;
-    return label->body.args.size();
+    const List *result = EOL;
+    size_t i = label->body.args.size();
+    while (i) {
+        i--;
+        auto &&arg = label->body.args[i];
+        result = List::from(arg.value, result);
+    }
+    return result;
 }
 
-sc_symbol_any_tuple_t sc_label_argument(sc_label_t *label, int32_t index) {
+void sc_label_set_arguments(sc_label_t *label, const sc_list_t *list) {
     using namespace scopes;
-    if (index < label->body.args.size()) {
-        auto &&arg = label->body.args[index];
-        return {arg.key, arg.value};
-    } else {
-        return {SYM_Unnamed, none};
+    label->body.args.clear();
+    if (!list)
+        return;
+    label->body.args.reserve(list->count);
+    while (list) {
+        label->body.args.push_back({SYM_Unnamed, list->at});
+        list = list->next;
     }
 }
 
-const sc_list_t *sc_label_argument_list(sc_label_t *label) {
+const sc_list_t *sc_label_get_keyed(sc_label_t *label) {
     using namespace scopes;
     const List *result = EOL;
     size_t i = label->body.args.size();
@@ -1167,7 +1160,28 @@ const sc_list_t *sc_label_argument_list(sc_label_t *label) {
     return result;
 }
 
-const sc_list_t *sc_label_parameter_list(sc_label_t *label) {
+void sc_label_set_keyed(sc_label_t *label, const sc_list_t *list) {
+    using namespace scopes;
+    label->body.args.clear();
+    if (!list)
+        return;
+    label->body.args.reserve(list->count);
+    while (list) {
+        const List *pair = list->at;
+        Symbol key = SYM_Unnamed;
+        Any value = none;
+        if (pair->count != 2) {
+            location_error(String::from("each argument must be a key/value pair"));
+        }
+        pair->at.verify(TYPE_Symbol);
+        key = pair->at.symbol;
+        value = pair->next->at;
+        label->body.args.push_back({key, value});
+        list = list->next;
+    }
+}
+
+const sc_list_t *sc_label_get_parameters(sc_label_t *label) {
     using namespace scopes;
     const List *result = EOL;
     size_t i = label->params.size();
@@ -1177,39 +1191,6 @@ const sc_list_t *sc_label_parameter_list(sc_label_t *label) {
         result = List::from(arg, result);
     }
     return result;
-}
-
-void sc_label_clear_arguments(sc_label_t *label) {
-    using namespace scopes;
-    label->body.args.clear();
-}
-
-void sc_label_append_argument(sc_label_t *label, sc_symbol_t key, sc_any_t value) {
-    using namespace scopes;
-    label->body.args.push_back(Argument(key, value));
-}
-
-void sc_label_remove_argument(sc_label_t *label, int32_t index) {
-    using namespace scopes;
-    if (index < label->body.args.size()) {
-        label->body.args.erase(label->body.args.begin() + index);
-    }
-}
-
-void sc_label_insert_argument(sc_label_t *label, int32_t index, sc_symbol_t key, sc_any_t value) {
-    using namespace scopes;
-    while (index > label->body.args.size()) {
-        label->body.args.push_back(Argument(SYM_Unnamed, none));
-    }
-    label->body.args.insert(label->body.args.begin() + index, Argument(key, value));
-}
-
-void sc_label_set_argument(sc_label_t *label, int32_t index, sc_symbol_t key, sc_any_t value) {
-    using namespace scopes;
-    while (index >= label->body.args.size()) {
-        label->body.args.push_back(Argument(SYM_Unnamed, none));
-    }
-    label->body.args[index] = Argument(key, value);
 }
 
 sc_label_t *sc_label_new_cont() {
@@ -1487,6 +1468,10 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_list_dump, TYPE_List, TYPE_List);
     DEFINE_EXTERN_C_FUNCTION(sc_list_join, TYPE_List, TYPE_List, TYPE_List);
     DEFINE_EXTERN_C_FUNCTION(sc_list_decons, Tuple({TYPE_Any, TYPE_List}), TYPE_List);
+    DEFINE_EXTERN_C_FUNCTION(sc_list_count, TYPE_USize, TYPE_List);
+    DEFINE_EXTERN_C_FUNCTION(sc_list_at, TYPE_Any, TYPE_List);
+    DEFINE_EXTERN_C_FUNCTION(sc_list_next, TYPE_List, TYPE_List);
+    DEFINE_EXTERN_C_FUNCTION(sc_list_reverse, TYPE_List, TYPE_List);
 
     DEFINE_EXTERN_C_FUNCTION(sc_syntax_from_path, TYPE_Syntax, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_syntax_from_string, TYPE_Syntax, TYPE_String);
@@ -1510,15 +1495,11 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_label_countof_reachable, TYPE_USize, TYPE_Label);
     DEFINE_EXTERN_C_FUNCTION(sc_label_get_enter, TYPE_Any, TYPE_Label);
     DEFINE_EXTERN_C_FUNCTION(sc_label_set_enter, TYPE_Void, TYPE_Label, TYPE_Any);
-    DEFINE_EXTERN_C_FUNCTION(sc_label_argument_count, TYPE_I32, TYPE_Label);
-    DEFINE_EXTERN_C_FUNCTION(sc_label_argument, Tuple({TYPE_Symbol, TYPE_Any}), TYPE_Label, TYPE_I32);
-    DEFINE_EXTERN_C_FUNCTION(sc_label_argument_list, TYPE_List, TYPE_Label);
-    DEFINE_EXTERN_C_FUNCTION(sc_label_parameter_list, TYPE_List, TYPE_Label);
-    DEFINE_EXTERN_C_FUNCTION(sc_label_clear_arguments, TYPE_Void, TYPE_Label);
-    DEFINE_EXTERN_C_FUNCTION(sc_label_append_argument, TYPE_Void, TYPE_Label, TYPE_Symbol, TYPE_Any);
-    DEFINE_EXTERN_C_FUNCTION(sc_label_remove_argument, TYPE_Void, TYPE_Label, TYPE_I32);
-    DEFINE_EXTERN_C_FUNCTION(sc_label_insert_argument, TYPE_Void, TYPE_Label, TYPE_I32, TYPE_Symbol, TYPE_Any);
-    DEFINE_EXTERN_C_FUNCTION(sc_label_set_argument, TYPE_Void, TYPE_Label, TYPE_I32, TYPE_Symbol, TYPE_Any);
+    DEFINE_EXTERN_C_FUNCTION(sc_label_get_arguments, TYPE_List, TYPE_Label);
+    DEFINE_EXTERN_C_FUNCTION(sc_label_set_arguments, TYPE_Void, TYPE_Label, TYPE_List);
+    DEFINE_EXTERN_C_FUNCTION(sc_label_get_keyed, TYPE_List, TYPE_Label);
+    DEFINE_EXTERN_C_FUNCTION(sc_label_set_keyed, TYPE_Void, TYPE_Label, TYPE_List);
+    DEFINE_EXTERN_C_FUNCTION(sc_label_get_parameters, TYPE_List, TYPE_Label);
     DEFINE_EXTERN_C_FUNCTION(sc_label_new_cont, TYPE_Label);
     DEFINE_EXTERN_C_FUNCTION(sc_label_new_cont_template, TYPE_Label);
     DEFINE_EXTERN_C_FUNCTION(sc_label_new_function_template, TYPE_Label);

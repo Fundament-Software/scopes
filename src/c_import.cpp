@@ -879,7 +879,7 @@ Scope *import_c_module (
         M = (LLVMModuleRef)Act->takeModule().release();
         assert(M);
         llvm_c_modules.push_back(M);
-        add_orc_module(M);
+        add_module(M);
         return result;
     } else {
         location_error(String::from("compilation failed"));

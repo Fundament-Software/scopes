@@ -284,6 +284,10 @@ const sc_list_t *sc_list_cons(sc_any_t at, const sc_list_t *next);
 const sc_list_t *sc_list_join(const sc_list_t *a, const sc_list_t *b);
 const sc_list_t *sc_list_dump(const sc_list_t *l);
 sc_any_list_tuple_t sc_list_decons(const sc_list_t *l);
+size_t sc_list_count(const sc_list_t *l);
+sc_any_t sc_list_at(const sc_list_t *l);
+const sc_list_t *sc_list_next(const sc_list_t *l);
+const sc_list_t *sc_list_reverse(const sc_list_t *l);
 
 // syntax objects
 
@@ -388,15 +392,11 @@ size_t sc_label_countof_reachable(sc_label_t *label);
 const sc_string_t *sc_label_docstring(sc_label_t *label);
 sc_any_t sc_label_get_enter(sc_label_t *label);
 void sc_label_set_enter(sc_label_t *label, sc_any_t value);
-int32_t sc_label_argument_count(sc_label_t *label);
-sc_symbol_any_tuple_t sc_label_argument(sc_label_t *label, int32_t index);
-const sc_list_t *sc_label_argument_list(sc_label_t *label);
-const sc_list_t *sc_label_parameter_list(sc_label_t *label);
-void sc_label_clear_arguments(sc_label_t *label);
-void sc_label_append_argument(sc_label_t *label, sc_symbol_t key, sc_any_t value);
-void sc_label_remove_argument(sc_label_t *label, int32_t index);
-void sc_label_insert_argument(sc_label_t *label, int32_t index, sc_symbol_t key, sc_any_t value);
-void sc_label_set_argument(sc_label_t *label, int32_t index, sc_symbol_t key, sc_any_t value);
+const sc_list_t *sc_label_get_arguments(sc_label_t *label);
+void sc_label_set_arguments(sc_label_t *label, const sc_list_t *list);
+const sc_list_t *sc_label_get_keyed(sc_label_t *label);
+void sc_label_set_keyed(sc_label_t *label, const sc_list_t *list);
+const sc_list_t *sc_label_get_parameters(sc_label_t *label);
 sc_label_t *sc_label_new_cont();
 sc_label_t *sc_label_new_cont_template();
 sc_label_t *sc_label_new_function_template();

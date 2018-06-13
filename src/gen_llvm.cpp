@@ -868,7 +868,7 @@ struct LLVMIRGenerator {
                     if (!ptr) {
                         LLVMInstallFatalErrorHandler(fatal_error_handler);
                         SCOPES_TRY()
-                        ptr = get_orc_address(name);
+                        ptr = get_address(name);
                         SCOPES_CATCH(e)
                         (void)e; // shut up unused variable warning
                         SCOPES_TRY_END()
@@ -2224,6 +2224,7 @@ void compile_object(const String *path, Scope *scope, uint64_t flags) {
         LLVMDumpModule(module);
     }
 
+    auto target_machine = get_target_machine();
     assert(target_machine);
 
     char *errormsg = nullptr;
@@ -2273,8 +2274,8 @@ Any compile(Label *fn, uint64_t flags) {
     auto func = result.second;
     assert(func);
 
-    init_orc();
-    add_orc_module(module);
+    init_execution();
+    add_module(module);
 
 #if 0
     if (!disassembly_listener && (flags & CF_DumpDisassembly)) {
@@ -2301,7 +2302,7 @@ Any compile(Label *fn, uint64_t flags) {
         LLVMDumpValue(func);
     }
 
-    void *pfunc = get_orc_pointer_to_global(func);
+    void *pfunc = get_pointer_to_global(func);
 #if 0
     if (flags & CF_DumpDisassembly) {
         assert(disassembly_listener);

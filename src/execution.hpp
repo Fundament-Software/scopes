@@ -16,14 +16,15 @@ namespace scopes {
 
 struct Symbol;
 
-extern LLVMOrcJITStackRef orc;
-extern LLVMTargetMachineRef target_machine;
+//extern LLVMOrcJITStackRef orc;
+//extern LLVMTargetMachineRef target_machine;
 
-void init_orc();
-void add_orc_module(LLVMModuleRef module);
-uint64_t get_orc_address(const char *name);
-void *get_orc_pointer_to_global(LLVMValueRef g);
+void init_execution();
+void add_module(LLVMModuleRef module);
+uint64_t get_address(const char *name);
+void *get_pointer_to_global(LLVMValueRef g);
 void *local_aware_dlsym(Symbol name);
+LLVMTargetMachineRef get_target_machine();
 
 void init_llvm();
 
