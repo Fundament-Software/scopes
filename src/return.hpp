@@ -28,6 +28,7 @@ struct ReturnLabelType : Type {
 
     const Type *to_unconst() const;
 
+    void stream_name(StyledStream &ss) const;
     ReturnLabelType(ReturnLabelMode _mode, const Args &_values);
 
     bool has_constants() const;

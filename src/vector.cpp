@@ -41,6 +41,12 @@ bool VectorType::classof(const Type *T) {
     return T->kind() == TK_Vector;
 }
 
+void VectorType::stream_name(StyledStream &ss) const {
+    ss << "<";
+    stream_type_name(ss, element_type);
+    ss << " x " << count << ">";
+}
+
 VectorType::VectorType(const Type *_element_type, size_t _count)
     : SizedStorageType(TK_Vector, _element_type, _count) {
     if (is_opaque(_element_type)) {
@@ -49,9 +55,6 @@ VectorType::VectorType(const Type *_element_type, size_t _count)
             << _element_type;
         location_error(ss.str());
     }
-    std::stringstream ss;
-    ss << "<" << element_type->name()->data << " x " << count << ">";
-    _name = String::from_stdstring(ss.str());
 }
 
 const Type *Vector(const Type *element_type, size_t count) {

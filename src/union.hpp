@@ -19,6 +19,7 @@ namespace scopes {
 struct UnionType : StorageType {
     static bool classof(const Type *T);
 
+    void stream_name(StyledStream &ss) const;
     UnionType(const Args &_values);
 
     Any unpack(void *src, size_t i) const;

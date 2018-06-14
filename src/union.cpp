@@ -20,25 +20,35 @@ bool UnionType::classof(const Type *T) {
     return T->kind() == TK_Union;
 }
 
+
+void UnionType::stream_name(StyledStream &ss) const {
+    ss << "{";
+    for (size_t i = 0; i < values.size(); ++i) {
+        if (i > 0) {
+            ss << " | ";
+        }
+        if (values[i].key != SYM_Unnamed) {
+            ss << values[i].key.name()->data << "=";
+        }
+        if (is_unknown(values[i].value)) {
+            stream_type_name(ss, values[i].value.typeref);
+        } else {
+            ss << "!";
+            stream_type_name(ss, values[i].value.type);
+        }
+    }
+    ss << "}";
+}
+
 UnionType::UnionType(const Args &_values)
     : StorageType(TK_Union), values(_values) {
-    StyledString ss = StyledString::plain();
-    ss.out << "{";
     size_t tcount = values.size();
     types.reserve(tcount);
     for (size_t i = 0; i < values.size(); ++i) {
-        if (i > 0) {
-            ss.out << " | ";
-        }
-        if (values[i].key != SYM_Unnamed) {
-            ss.out << values[i].key.name()->data << "=";
-        }
         const Type *T = nullptr;
         if (is_unknown(values[i].value)) {
-            ss.out << values[i].value.typeref->name()->data;
             T = values[i].value.typeref;
         } else {
-            ss.out << "!" << values[i].value.type;
             T = values[i].value.type;
         }
         if (is_opaque(T)) {
@@ -49,8 +59,6 @@ UnionType::UnionType(const Args &_values)
         }
         types.push_back(T);
     }
-    ss.out << "}";
-    _name = ss.str();
 
     size_t sz = 0;
     size_t al = 1;

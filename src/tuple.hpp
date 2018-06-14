@@ -19,6 +19,7 @@ namespace scopes {
 struct TupleType : StorageType {
     static bool classof(const Type *T);
 
+    void stream_name(StyledStream &ss) const;
     TupleType(const Args &_values, bool _packed, size_t _alignment);
 
     void *getelementptr(void *src, size_t i) const;
@@ -34,6 +35,7 @@ struct TupleType : StorageType {
     Args values;
     ArgTypes types;
     bool packed;
+    bool explicit_alignment;
     std::vector<size_t> offsets;
 };
 

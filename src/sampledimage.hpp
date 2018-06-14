@@ -20,6 +20,7 @@ struct ImageType;
 struct SampledImageType : Type {
     static bool classof(const Type *T);
 
+    void stream_name(StyledStream &ss) const;
     SampledImageType(const ImageType *_type);
 
     const ImageType *type; // image type

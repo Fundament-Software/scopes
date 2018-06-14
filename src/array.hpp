@@ -18,6 +18,8 @@ namespace scopes {
 struct ArrayType : SizedStorageType {
     static bool classof(const Type *T);
 
+    void stream_name(StyledStream &ss) const;
+
     ArrayType(const Type *_element_type, size_t _count);
 };
 

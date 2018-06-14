@@ -667,7 +667,7 @@ struct LLVMIRGenerator {
                 }
             }
             return LLVMStructCreateNamed(
-                LLVMGetGlobalContext(), type->name()->data);
+                LLVMGetGlobalContext(), tn->name()->data);
         } break;
         case TK_ReturnLabel: {
             auto rlt = cast<ReturnLabelType>(type);

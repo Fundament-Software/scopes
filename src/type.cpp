@@ -20,15 +20,13 @@ namespace scopes {
 
 TypeKind Type::kind() const { return _kind; } // for this codebase
 
-Type::Type(TypeKind kind) : _kind(kind), _name(Symbol(SYM_Unnamed).name()) {}
-
-const String *Type::name() const {
-    return _name;
-}
+Type::Type(TypeKind kind) : _kind(kind) {}
 
 StyledStream& Type::stream(StyledStream& ost) const {
+    StyledString ss = StyledString::plain();
+    stream_type_name(ss.out, this);
     ost << Style_Type;
-    ost << name()->data;
+    ost << ss.str()->data;
     ost << Style_None;
     return ost;
 }
@@ -102,6 +100,17 @@ B_TYPES()
 //------------------------------------------------------------------------------
 // TYPE INQUIRIES
 //------------------------------------------------------------------------------
+
+void stream_type_name(StyledStream &ss, const Type *T) {
+    switch (T->kind()) {
+#define T(TYPE, TYPENAME, CLASS) \
+    case TYPE: cast<CLASS>(T)->stream_name(ss); break;
+B_TYPE_KIND()
+#undef T
+        default: assert(false);
+            ss << "???"; break;
+    }
+}
 
 bool is_invalid_argument_type(const Type *T) {
     switch(T->kind()) {

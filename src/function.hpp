@@ -28,6 +28,8 @@ struct FunctionType : Type {
     FunctionType(
         const Type *_return_type, const ArgTypes &_argument_types, uint32_t _flags);
 
+    void stream_name(StyledStream &ss) const;
+
     bool vararg() const;
     bool divergent() const;
 

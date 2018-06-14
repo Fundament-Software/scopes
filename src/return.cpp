@@ -44,6 +44,33 @@ const Type *ReturnLabelType::to_unconst() const {
     return ReturnLabel(rvalues);
 }
 
+void ReturnLabelType::stream_name(StyledStream &ss) const {
+    switch(mode) {
+    case RLM_Return: {
+        ss << "λ(";
+        for (size_t i = 0; i < values.size(); ++i) {
+            if (i > 0) {
+                ss << " ";
+            }
+            if (values[i].key != SYM_Unnamed) {
+                ss << values[i].key.name()->data << "=";
+            }
+            if (is_unknown(values[i].value)) {
+                stream_type_name(ss, values[i].value.typeref);
+            } else {
+                ss << "!";
+                stream_type_name(ss, values[i].value.type);
+            }
+        }
+        ss << ")";
+    } break;
+    case RLM_NoReturn: {
+        ss << "λ<noreturn>";
+    } break;
+    default: assert(false);
+    }
+}
+
 ReturnLabelType::ReturnLabelType(ReturnLabelMode _mode, const Args &_values)
     : Type(TK_ReturnLabel) {
     values = _values;
@@ -53,25 +80,13 @@ ReturnLabelType::ReturnLabelType(ReturnLabelMode _mode, const Args &_values)
     has_vars = false;
     switch(mode) {
     case RLM_Return: {
-        StyledString ss = StyledString::plain();
-        ss.out << "λ(";
         for (size_t i = 0; i < values.size(); ++i) {
-            if (i > 0) {
-                ss.out << " ";
-            }
-            if (values[i].key != SYM_Unnamed) {
-                ss.out << values[i].key.name()->data << "=";
-            }
             if (is_unknown(values[i].value)) {
-                ss.out << values[i].value.typeref->name()->data;
                 has_vars = true;
             } else {
-                ss.out << "!" << values[i].value.type;
                 has_const = true;
             }
         }
-        ss.out << ")";
-        _name = ss.str();
 
         {
             ArgTypes rettypes;
@@ -96,7 +111,6 @@ ReturnLabelType::ReturnLabelType(ReturnLabelMode _mode, const Args &_values)
         }
     } break;
     case RLM_NoReturn: {
-        _name = String::from("λ<noreturn>");
         return_type = TYPE_Void;
         has_mrv = false;
     } break;

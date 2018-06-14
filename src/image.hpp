@@ -18,6 +18,8 @@ namespace scopes {
 struct ImageType : Type {
     static bool classof(const Type *T);
 
+    void stream_name(StyledStream &ss) const;
+
     ImageType(
         const Type *_type,
         Symbol _dim,

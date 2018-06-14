@@ -25,6 +25,26 @@ bool FunctionType::classof(const Type *T) {
     return T->kind() == TK_Function;
 }
 
+void FunctionType::stream_name(StyledStream &ss) const {
+    if (divergent()) {
+        ss << "?<-";
+    } else {
+        stream_type_name(ss, return_type);
+        ss << "<-";
+    }
+    ss << "(";
+    for (size_t i = 0; i < argument_types.size(); ++i) {
+        if (i > 0) {
+            ss << " ";
+        }
+        stream_type_name(ss, argument_types[i]);
+    }
+    if (vararg()) {
+        ss << " ...";
+    }
+    ss << ")";
+}
+
 FunctionType::FunctionType(
     const Type *_return_type, const ArgTypes &_argument_types, uint32_t _flags) :
     Type(TK_Function),
@@ -33,26 +53,6 @@ FunctionType::FunctionType(
     flags(_flags) {
 
     assert(!(flags & FF_Divergent) || argument_types.empty());
-
-    std::stringstream ss;
-    if (divergent()) {
-        ss << "?<-";
-    } else {
-        ss <<  return_type->name()->data;
-        ss << "<-";
-    }
-    ss << "(";
-    for (size_t i = 0; i < argument_types.size(); ++i) {
-        if (i > 0) {
-            ss << " ";
-        }
-        ss << argument_types[i]->name()->data;
-    }
-    if (vararg()) {
-        ss << " ...";
-    }
-    ss << ")";
-    _name = String::from_stdstring(ss.str());
 }
 
 bool FunctionType::vararg() const {

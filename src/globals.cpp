@@ -811,7 +811,9 @@ bool sc_type_is_opaque(const sc_type_t *T) {
 
 const sc_string_t *sc_type_string(const sc_type_t *T) {
     using namespace scopes;
-    return T->name();
+    StyledString ss = StyledString::plain();
+    stream_type_name(ss.out, T);
+    return ss.str();
 }
 
 sc_symbol_any_tuple_t sc_type_next(const sc_type_t *type, sc_symbol_t key) {
@@ -1595,7 +1597,7 @@ void init_globals(int argc, char *argv[]) {
 B_TYPES()
 #undef T
 
-#define T(NAME, BNAME) \
+#define T(NAME, BNAME, CLASS) \
     globals->bind(Symbol(BNAME), (int32_t)NAME);
     B_TYPE_KIND()
 #undef T

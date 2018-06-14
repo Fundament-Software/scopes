@@ -46,6 +46,18 @@ bool ExternType::classof(const Type *T) {
     return T->kind() == TK_Extern;
 }
 
+void ExternType::stream_name(StyledStream &ss) const {
+    ss << "<extern ";
+    stream_type_name(ss, type);
+    if (storage_class != SYM_Unnamed)
+        ss << " storage=" << storage_class.name()->data;
+    if (location >= 0)
+        ss << " location=" << location;
+    if (binding >= 0)
+        ss << " binding=" << binding;
+    ss << ">";
+}
+
 ExternType::ExternType(const Type *_type,
     size_t _flags, Symbol _storage_class, int _location, int _binding) :
     Type(TK_Extern),
@@ -54,16 +66,6 @@ ExternType::ExternType(const Type *_type,
     storage_class(_storage_class),
     location(_location),
     binding(_binding) {
-    std::stringstream ss;
-    ss << "<extern " <<  _type->name()->data;
-    if (storage_class != SYM_Unnamed)
-        ss << " storage=" << storage_class.name()->data;
-    if (location >= 0)
-        ss << " location=" << location;
-    if (binding >= 0)
-        ss << " binding=" << binding;
-    ss << ">";
-    _name = String::from_stdstring(ss.str());
     if ((_storage_class == SYM_SPIRV_StorageClassUniform)
         && !(flags & EF_BufferBlock)) {
         flags |= EF_Block;

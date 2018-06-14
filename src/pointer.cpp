@@ -43,14 +43,8 @@ bool PointerType::classof(const Type *T) {
     return T->kind() == TK_Pointer;
 }
 
-PointerType::PointerType(const Type *_element_type,
-    uint64_t _flags, Symbol _storage_class)
-    : Type(TK_Pointer),
-        element_type(_element_type),
-        flags(_flags),
-        storage_class(_storage_class) {
-    std::stringstream ss;
-    ss << element_type->name()->data;
+void PointerType::stream_name(StyledStream &ss) const {
+    stream_type_name(ss, element_type);
     if (is_writable() && is_readable()) {
         ss << "*";
     } else if (is_readable()) {
@@ -61,7 +55,14 @@ PointerType::PointerType(const Type *_element_type,
     if (storage_class != SYM_Unnamed) {
         ss << "[" << storage_class.name()->data << "]";
     }
-    _name = String::from_stdstring(ss.str());
+}
+
+PointerType::PointerType(const Type *_element_type,
+    uint64_t _flags, Symbol _storage_class)
+    : Type(TK_Pointer),
+        element_type(_element_type),
+        flags(_flags),
+        storage_class(_storage_class) {
 }
 
 void *PointerType::getelementptr(void *src, size_t i) const {

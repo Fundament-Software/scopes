@@ -51,6 +51,28 @@ bool ImageType::classof(const Type *T) {
     return T->kind() == TK_Image;
 }
 
+void ImageType::stream_name(StyledStream &ss) const {
+    ss << "<Image ";
+    stream_type_name(ss, type);
+    ss << " " << dim;
+    if (depth == 1)
+        ss << " depth";
+    else if (depth == 2)
+        ss << " ?depth?";
+    if (arrayed)
+        ss << " array";
+    if (multisampled)
+        ss << " ms";
+    if (sampled == 0)
+        ss << " ?sampled?";
+    else if (sampled == 1)
+        ss << " sampled";
+    ss << " " << format;
+    if (access != SYM_Unnamed)
+        ss << " " << access;
+    ss << ">";
+}
+
 ImageType::ImageType(
     const Type *_type,
     Symbol _dim,
@@ -64,26 +86,6 @@ ImageType::ImageType(
     type(_type), dim(_dim), depth(_depth), arrayed(_arrayed),
     multisampled(_multisampled), sampled(_sampled),
     format(_format), access(_access) {
-    auto ss = StyledString::plain();
-    ss.out << "<Image " <<  _type->name()->data
-        << " " << _dim;
-    if (_depth == 1)
-        ss.out << " depth";
-    else if (_depth == 2)
-        ss.out << " ?depth?";
-    if (_arrayed)
-        ss.out << " array";
-    if (_multisampled)
-        ss.out << " ms";
-    if (_sampled == 0)
-        ss.out << " ?sampled?";
-    else if (_sampled == 1)
-        ss.out << " sampled";
-    ss.out << " " << _format;
-    if (access != SYM_Unnamed)
-        ss.out << " " << _access;
-    ss.out << ">";
-    _name = ss.str();
 }
 
 const Type *Image(

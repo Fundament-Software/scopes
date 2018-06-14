@@ -18,6 +18,7 @@ namespace scopes {
 struct VectorType : SizedStorageType {
     static bool classof(const Type *T);
 
+    void stream_name(StyledStream &ss) const;
     VectorType(const Type *_element_type, size_t _count);
 };
 

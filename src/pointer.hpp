@@ -26,6 +26,7 @@ struct PointerType : Type {
     PointerType(const Type *_element_type,
         uint64_t _flags, Symbol _storage_class);
 
+    void stream_name(StyledStream &ss) const;
     void *getelementptr(void *src, size_t i) const;
 
     Any unpack(void *src) const;

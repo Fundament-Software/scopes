@@ -20,6 +20,8 @@ namespace scopes {
 struct TypenameType : Type {
     static std::unordered_set<Symbol, Symbol::Hash> used_names;
 
+    void stream_name(StyledStream &ss) const;
+    const String *name() const;
     static bool classof(const Type *T);
 
     TypenameType(const String *name);
@@ -32,6 +34,7 @@ struct TypenameType : Type {
 
     const Type *storage_type;
     const Type *super_type;
+    const String *_name;
 };
 
 // always generates a new type

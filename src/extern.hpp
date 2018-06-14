@@ -31,6 +31,8 @@ enum ExternFlags {
 struct ExternType : Type {
     static bool classof(const Type *T);
 
+    void stream_name(StyledStream &ss) const;
+
     ExternType(const Type *_type,
         size_t _flags, Symbol _storage_class, int _location, int _binding);
 

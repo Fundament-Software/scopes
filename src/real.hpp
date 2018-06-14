@@ -18,6 +18,7 @@ namespace scopes {
 struct RealType : Type {
     static bool classof(const Type *T);
 
+    void stream_name(StyledStream &ss) const;
     RealType(size_t _width);
 
     size_t width;

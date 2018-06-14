@@ -17,11 +17,12 @@ bool RealType::classof(const Type *T) {
     return T->kind() == TK_Real;
 }
 
+void RealType::stream_name(StyledStream &ss) const {
+    ss << "f" << width;
+}
+
 RealType::RealType(size_t _width)
     : Type(TK_Real), width(_width) {
-    std::stringstream ss;
-    ss << "f" << width;
-    _name = String::from_stdstring(ss.str());
 }
 
 static const Type *_Real(size_t _width) {

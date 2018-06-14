@@ -18,10 +18,8 @@ bool IntegerType::classof(const Type *T) {
     return T->kind() == TK_Integer;
 }
 
-IntegerType::IntegerType(size_t _width, bool _issigned)
-    : Type(TK_Integer), width(_width), issigned(_issigned) {
-    std::stringstream ss;
-    if ((_width == 1) && !_issigned) {
+void IntegerType::stream_name(StyledStream &ss) const {
+    if ((width == 1) && !issigned) {
         ss << "bool";
     } else {
         if (issigned) {
@@ -31,7 +29,10 @@ IntegerType::IntegerType(size_t _width, bool _issigned)
         }
         ss << width;
     }
-    _name = String::from_stdstring(ss.str());
+}
+
+IntegerType::IntegerType(size_t _width, bool _issigned)
+    : Type(TK_Integer), width(_width), issigned(_issigned) {
 }
 
 static const Type *_Integer(size_t _width, bool _issigned) {

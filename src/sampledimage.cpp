@@ -37,11 +37,14 @@ bool SampledImageType::classof(const Type *T) {
     return T->kind() == TK_SampledImage;
 }
 
+void SampledImageType::stream_name(StyledStream &ss) const {
+    ss << "<SampledImage ";
+    stream_type_name(ss, type);
+    ss << ">";
+}
+
 SampledImageType::SampledImageType(const ImageType *_type) :
     Type(TK_SampledImage), type(_type) {
-    auto ss = StyledString::plain();
-    ss.out << "<SampledImage " <<  _type->name()->data << ">";
-    _name = ss.str();
 }
 
 const Type *SampledImage(const ImageType *_type) {

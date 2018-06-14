@@ -21,31 +21,43 @@ bool TupleType::classof(const Type *T) {
     return T->kind() == TK_Tuple;
 }
 
-TupleType::TupleType(const Args &_values, bool _packed, size_t _alignment)
-    : StorageType(TK_Tuple), values(_values), packed(_packed) {
-    StyledString ss = StyledString::plain();
-    if (_alignment) {
-        ss.out << "[align:" << _alignment << "]";
+void TupleType::stream_name(StyledStream &ss) const {
+    if (explicit_alignment) {
+        ss << "[align:" << align << "]";
     }
     if (packed) {
-        ss.out << "<";
+        ss << "<";
     }
-    ss.out << "{";
+    ss << "{";
+    for (size_t i = 0; i < values.size(); ++i) {
+        if (i > 0) {
+            ss << " ";
+        }
+        if (values[i].key != SYM_Unnamed) {
+            ss << values[i].key.name()->data << "=";
+        }
+        if (is_unknown(values[i].value)) {
+            stream_type_name(ss, values[i].value.typeref);
+        } else {
+            ss << "!";
+            stream_type_name(ss, values[i].value.type);
+        }
+    }
+    ss << "}";
+    if (packed) {
+        ss << ">";
+    }
+}
+
+TupleType::TupleType(const Args &_values, bool _packed, size_t _alignment)
+    : StorageType(TK_Tuple), values(_values), packed(_packed) {
     size_t tcount = values.size();
     types.reserve(tcount);
     for (size_t i = 0; i < values.size(); ++i) {
-        if (i > 0) {
-            ss.out << " ";
-        }
-        if (values[i].key != SYM_Unnamed) {
-            ss.out << values[i].key.name()->data << "=";
-        }
         const Type *T = nullptr;
         if (is_unknown(values[i].value)) {
-            ss.out << values[i].value.typeref->name()->data;
             T = values[i].value.typeref;
         } else {
-            ss.out << "!" << values[i].value.type;
             T = values[i].value.type;
         }
         if (is_opaque(T)) {
@@ -56,12 +68,6 @@ TupleType::TupleType(const Args &_values, bool _packed, size_t _alignment)
         }
         types.push_back(T);
     }
-
-    ss.out << "}";
-    if (packed) {
-        ss.out << ">";
-    }
-    _name = ss.str();
 
     offsets.resize(types.size());
     size_t sz = 0;
@@ -87,8 +93,11 @@ TupleType::TupleType(const Args &_values, bool _packed, size_t _alignment)
         align = al;
     }
     if (_alignment) {
+        explicit_alignment = true;
         align = _alignment;
         size = scopes::align(sz, align);
+    } else {
+        explicit_alignment = false;
     }
 }
 

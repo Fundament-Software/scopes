@@ -19,6 +19,14 @@ bool TypenameType::classof(const Type *T) {
     return T->kind() == TK_Typename;
 }
 
+const String *TypenameType::name() const {
+    return _name;
+}
+
+void TypenameType::stream_name(StyledStream &ss) const {
+    ss << _name->data;
+}
+
 TypenameType::TypenameType(const String *name)
     : Type(TK_Typename), storage_type(nullptr), super_type(nullptr) {
     auto newname = Symbol(name);

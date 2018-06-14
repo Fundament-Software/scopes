@@ -28,22 +28,22 @@ struct StyledStream;
 //------------------------------------------------------------------------------
 
 #define B_TYPE_KIND() \
-    T(TK_Integer, "type-kind-integer") \
-    T(TK_Real, "type-kind-real") \
-    T(TK_Pointer, "type-kind-pointer") \
-    T(TK_Array, "type-kind-array") \
-    T(TK_Vector, "type-kind-vector") \
-    T(TK_Tuple, "type-kind-tuple") \
-    T(TK_Union, "type-kind-union") \
-    T(TK_Typename, "type-kind-typename") \
-    T(TK_ReturnLabel, "type-kind-return-label") \
-    T(TK_Function, "type-kind-function") \
-    T(TK_Extern, "type-kind-extern") \
-    T(TK_Image, "type-kind-image") \
-    T(TK_SampledImage, "type-kind-sampled-image")
+    T(TK_Integer, "type-kind-integer", IntegerType) \
+    T(TK_Real, "type-kind-real", RealType) \
+    T(TK_Pointer, "type-kind-pointer", PointerType) \
+    T(TK_Array, "type-kind-array", ArrayType) \
+    T(TK_Vector, "type-kind-vector", VectorType) \
+    T(TK_Tuple, "type-kind-tuple", TupleType) \
+    T(TK_Union, "type-kind-union", UnionType) \
+    T(TK_Typename, "type-kind-typename", TypenameType) \
+    T(TK_ReturnLabel, "type-kind-return-label", ReturnLabelType) \
+    T(TK_Function, "type-kind-function", FunctionType) \
+    T(TK_Extern, "type-kind-extern", ExternType) \
+    T(TK_Image, "type-kind-image", ImageType) \
+    T(TK_SampledImage, "type-kind-sampled-image", SampledImageType)
 
 enum TypeKind {
-#define T(NAME, BNAME) \
+#define T(NAME, BNAME, CLASS) \
     NAME,
     B_TYPE_KIND()
 #undef T
@@ -58,8 +58,6 @@ struct Type {
 
     Type(TypeKind kind);
     Type(const Type &other) = delete;
-
-    const String *name() const;
 
     StyledStream& stream(StyledStream& ost) const;
 
@@ -79,8 +77,6 @@ private:
     const TypeKind _kind;
 
 protected:
-    const String *_name;
-
     Map symbols;
 };
 
@@ -167,6 +163,7 @@ size_t align_of(const Type *T);
 const Type *storage_type(const Type *T);
 const Type *superof(const Type *T);
 bool is_invalid_argument_type(const Type *T);
+void stream_type_name(StyledStream &ss, const Type *T);
 
 Any wrap_pointer(const Type *type, void *ptr);
 void *get_pointer(const Type *type, Any &value, bool create = false);

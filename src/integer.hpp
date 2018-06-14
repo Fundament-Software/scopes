@@ -18,6 +18,7 @@ namespace scopes {
 struct IntegerType : Type {
     static bool classof(const Type *T);
 
+    void stream_name(StyledStream &ss) const;
     IntegerType(size_t _width, bool _issigned);
 
     size_t width;
