@@ -1469,34 +1469,34 @@ syntax-extend
                 let cont self args = ('decons args 2)
                 let T = ('indirect-typeof self)
                 let fptrT =
-                    if (icmp== ('kind T) type-kind-extern) ('element@ T 0)
-                    elseif (type== T Label) ('function-type (unbox-pointer self Label))
+                    if (== ('kind T) type-kind-extern) ('element@ T 0)
+                    elseif (== T Label) ('function-type (as self Label))
                     else T
                 let fT = ('element@ fptrT 0)
                 #print fT args
                 let frame = ('frame l)
                 let anchor = ('body-anchor l)
-                let pcount = (sub ('element-count fT) 1)
-                let acount = (itrunc ('__countof args) i32)
-                if (icmp== pcount acount)
+                let pcount = (- ('element-count fT) 1)
+                let acount = (as (countof args) i32)
+                if (== pcount acount)
                     let loop (i inargs outargs l) = 1 args '() l
-                    if (icmp<=s i pcount)
+                    if (<= i pcount)
                         let arg inargs = ('decons inargs)
                         let argT = ('indirect-typeof arg)
                         let paramT = ('element@ fT i)
                         #print argT paramT
-                        loop (add i 1) inargs
-                            if (type== argT paramT) arg
+                        loop (+ i 1) inargs
+                            if (== argT paramT) arg
                                 _ (cons arg outargs) l
                             else
-                                # need to inject an implicit cast
+                                # need to generate an implicit cast
                                 let nextl = (sc_label_new_cont_template)
                                 let param = (sc_parameter_new anchor unnamed Unknown)
                                 'append-parameter nextl param
                                 'set-enter l (Any imply)
                                 'set-arguments l (list (Closure nextl frame) arg paramT)
                                 _ (cons (Any param) outargs) nextl
-                    # do the call with (possibly) modified parameters
+                    # do the call with (possibly) modified arguments
                     'set-enter l self
                     'set-arguments l (cons cont ('reverse outargs))
                     'set-rawcall l
