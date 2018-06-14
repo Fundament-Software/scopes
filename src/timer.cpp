@@ -10,22 +10,36 @@
 
 namespace scopes {
 
-static std::unordered_map<Symbol, double, Symbol::Hash> timers;
+struct TimerData {
+    double time;
+    int refcount;
+
+    TimerData() : time(0.0), refcount(0) {}
+};
+
+static std::unordered_map<Symbol, TimerData, Symbol::Hash> timers;
 
 //------------------------------------------------------------------------------
 // TIMER
 //------------------------------------------------------------------------------
 
-Timer::Timer(Symbol _name) : name(_name), start(std::chrono::high_resolution_clock::now()) {}
+Timer::Timer(Symbol _name) : name(_name), start(std::chrono::high_resolution_clock::now()) {
+    auto &&data = timers[name];
+    data.refcount++;
+}
 Timer::~Timer() {
     std::chrono::duration<double> diff = std::chrono::high_resolution_clock::now() - start;
-    timers[name] = timers[name] + (diff.count() * 1000.0);
+    auto &&data = timers[name];
+    data.refcount--;
+    if (!data.refcount) {
+        data.time += (diff.count() * 1000.0);
+    }
 }
 
 void Timer::print_timers() {
     StyledStream ss;
-    for (auto it = timers.begin(); it != timers.end(); ++it) {
-        ss << it->first.name()->data << ": " << it->second << "ms" << std::endl;
+    for (auto &&it : timers) {
+        ss << it.first.name()->data << ": " << it.second.time << "ms" << std::endl;
     }
 }
 

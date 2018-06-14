@@ -3787,9 +3787,13 @@ struct Specializer {
         Frame *entryf = fold_type_label_single_frame(frame, label, values);
 
         inc_solve_ref();
+
         SCOPES_TRY()
 
-        normalize_function(entryf);
+        {
+            Timer specialize_timer(TIMER_Specialize);
+            normalize_function(entryf);
+        }
 
         SCOPES_CATCH(exc)
             if (dec_solve_ref()) {
