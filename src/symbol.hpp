@@ -11,7 +11,6 @@
 #include "string.hpp"
 
 #include <cstddef>
-#include <unordered_map>
 
 namespace scopes {
 
@@ -36,20 +35,6 @@ struct Symbol {
     };
 
 protected:
-    struct StringKey {
-        struct Hash {
-            std::size_t operator()(const StringKey &s) const;
-        };
-
-        const String *str;
-
-        bool operator ==(const StringKey &rhs) const;
-    };
-
-    static std::unordered_map<Symbol, const String *, Hash> map_symbol_name;
-    static std::unordered_map<StringKey, Symbol, StringKey::Hash> map_name_symbol;
-    static uint64_t next_symbol_id;
-
     static void verify_unmapped(Symbol id, const String *name);
 
     static void map_symbol(Symbol id, const String *name);

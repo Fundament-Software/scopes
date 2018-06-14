@@ -11,6 +11,8 @@
 
 #include <stddef.h>
 
+#include <unordered_map>
+
 namespace scopes {
 
 struct Label;

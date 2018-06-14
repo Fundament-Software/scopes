@@ -18,7 +18,6 @@ namespace scopes {
 //------------------------------------------------------------------------------
 
 struct Timer {
-    static std::unordered_map<Symbol, double, Symbol::Hash> timers;
     Symbol name;
     std::chrono::time_point<std::chrono::high_resolution_clock> start;
     std::chrono::time_point<std::chrono::high_resolution_clock> end;

@@ -6,7 +6,11 @@
 
 #include "timer.hpp"
 
+#include <unordered_map>
+
 namespace scopes {
+
+static std::unordered_map<Symbol, double, Symbol::Hash> timers;
 
 //------------------------------------------------------------------------------
 // TIMER
@@ -24,7 +28,5 @@ void Timer::print_timers() {
         ss << it->first.name()->data << ": " << it->second << "ms" << std::endl;
     }
 }
-
-std::unordered_map<Symbol, double, Symbol::Hash> Timer::timers;
 
 } // namespace scopes

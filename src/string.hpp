@@ -27,15 +27,10 @@ typedef std::stringstream StringStream;
 #endif
 
 struct String {
-    struct Hash {
-        std::size_t operator()(const String *s) const;
-    };
+protected:
+    String(const char *_data, size_t _count);
 
-    size_t count;
-    char data[1];
-
-    bool operator ==(const String &other) const;
-    static String *alloc(size_t count);
+public:
     static const String *from(const char *s, size_t count);
     static const String *from_cstr(const char *s);
     static const String *join(const String *a, const String *b);
@@ -49,6 +44,19 @@ struct String {
     static const String *from_stdstring(const std::wstring &ws);
     StyledStream& stream(StyledStream& ost, const char *escape_chars) const;
     const String *substr(int64_t i0, int64_t i1) const;
+
+    std::size_t hash() const;
+
+    struct Hash {
+        std::size_t operator()(const String *s) const;
+    };
+
+    struct KeyEqual {
+        bool operator()( const String *lhs, const String *rhs ) const;
+    };
+
+    const char *data;
+    size_t count;
 };
 
 struct StyledString {

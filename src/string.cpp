@@ -19,6 +19,7 @@
 
 #include <locale>
 #include <codecvt>
+#include <unordered_set>
 
 #pragma GCC diagnostic ignored "-Wvla-extension"
 
@@ -161,32 +162,41 @@ int escape_string(char *buf, const char *str, int strcount, const char *quote_ch
 // STRING
 //------------------------------------------------------------------------------
 
-std::size_t String::Hash::operator()(const String *s) const {
-    return hash_bytes(s->data, s->count);
-}
+static std::unordered_set<const String *, String::Hash, String::KeyEqual> string_map;
 
 //------------------------------------------------------------------------------
 
-bool String::operator ==(const String &other) const {
-    if (count == other.count) {
-        return !memcmp(data, other.data, count);
+std::size_t String::Hash::operator()(const String *s) const {
+    return s->hash();
+}
+
+bool String::KeyEqual::operator()( const String *lhs, const String *rhs ) const {
+    if (lhs->count == rhs->count) {
+        return !memcmp(lhs->data, rhs->data, lhs->count);
     }
     return false;
 }
 
-String *String::alloc(size_t count) {
-    String *str = (String *)tracked_malloc(
-        sizeof(size_t) + sizeof(char) * (count + 1));
-    str->count = count;
-    return str;
+//------------------------------------------------------------------------------
+
+std::size_t String::hash() const {
+    return hash_bytes(data, count);
 }
 
-const String *String::from(const char *s, size_t count) {
-    String *str = (String *)tracked_malloc(
-        sizeof(size_t) + sizeof(char) * (count + 1));
-    str->count = count;
-    memcpy(str->data, s, sizeof(char) * count);
-    str->data[count] = 0;
+String::String(const char *_data, size_t _count)
+    : data(_data), count(_count) {}
+
+const String *String::from(const char *buf, size_t count) {
+    String key(buf, count);
+    auto it = string_map.find(&key);
+    if (it != string_map.end()) {
+        return *it;
+    }
+    char *s = (char *)tracked_malloc(sizeof(char) * (count + 1));
+    memcpy(s, buf, count * sizeof(char));
+    s[count] = 0;
+    const String *str = new String(s, count);
+    string_map.insert(str);
     return str;
 }
 
@@ -194,15 +204,25 @@ const String *String::from_cstr(const char *s) {
     return from(s, strlen(s));
 }
 
+// small strings on the stack, big strings on the heap
+#define SCOPES_BEGIN_TEMP_STRING(NAME, SIZE) \
+    bool NAME ## _use_stack = ((SIZE) < 1024); \
+    char stack ## NAME[NAME ## _use_stack?((SIZE)+1):1]; \
+    char *NAME = (NAME ## _use_stack?stack ## NAME:((char *)malloc(sizeof(char) * ((SIZE)+1))));
+
+#define SCOPES_END_TEMP_STRING(NAME) \
+    if (!NAME ## _use_stack) free(NAME);
+
 const String *String::join(const String *a, const String *b) {
     size_t ac = a->count;
     size_t bc = b->count;
     size_t cc = ac + bc;
-    String *str = alloc(cc);
-    memcpy(str->data, a->data, sizeof(char) * ac);
-    memcpy(str->data + ac, b->data, sizeof(char) * bc);
-    str->data[cc] = 0;
-    return str;
+    SCOPES_BEGIN_TEMP_STRING(tmp, cc);
+    memcpy(tmp, a->data, sizeof(char) * ac);
+    memcpy(tmp + ac, b->data, sizeof(char) * bc);
+    const String *result = String::from(tmp, cc);
+    SCOPES_END_TEMP_STRING(tmp);
+    return result;
 }
 
 const String *String::from_stdstring(const std::string &s) {
@@ -218,9 +238,10 @@ const String *String::from_stdstring(const std::wstring &ws) {
 
 StyledStream& String::stream(StyledStream& ost, const char *escape_chars) const {
     auto c = escape_string(nullptr, data, count, escape_chars);
-    char deststr[c + 1];
-    escape_string(deststr, data, count, escape_chars);
-    ost << deststr;
+    SCOPES_BEGIN_TEMP_STRING(tmp, c);
+    escape_string(tmp, data, count, escape_chars);
+    ost << tmp;
+    SCOPES_END_TEMP_STRING(tmp);
     return ost;
 }
 
@@ -261,9 +282,11 @@ const String *vformat( const char *fmt, va_list va ) {
     va_copy(va2, va);
     size_t size = stb_vsnprintf( nullptr, 0, fmt, va2 );
     va_end(va2);
-    String *str = String::alloc(size);
-    stb_vsnprintf( str->data, size + 1, fmt, va );
-    return str;
+    SCOPES_BEGIN_TEMP_STRING(tmp, size);
+    stb_vsnprintf( tmp, size + 1, fmt, va );
+    const String *result = String::from_cstr(tmp);
+    SCOPES_END_TEMP_STRING(tmp);
+    return result;
 }
 
 const String *format( const char *fmt, ...) {

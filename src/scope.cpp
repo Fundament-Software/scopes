@@ -155,7 +155,7 @@ std::vector<Symbol> Scope::find_elongations(Symbol name) const {
                 continue;
             if (is_typed(k.second.value)) {
                 if (sym.name()->count >= s->count &&
-                        *sym.name()->substr(0, s->count) == *s)
+                        (sym.name()->substr(0, s->count) == s))
                     found.push_back(sym);
             }
             done.insert(sym);
