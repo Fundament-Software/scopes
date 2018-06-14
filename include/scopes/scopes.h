@@ -148,6 +148,7 @@ void sc_compile_object(const sc_string_t *path, sc_scope_t *table, uint64_t flag
 void sc_enter_solver_cli ();
 size_t sc_verify_stack ();
 sc_label_t *sc_eval_inline(const sc_list_t *expr, sc_scope_t *scope);
+const sc_list_t *sc_launch_args();
 
 // stdin/out
 
@@ -224,6 +225,7 @@ const sc_string_t *sc_symbol_to_string(sc_symbol_t sym);
 // strings
 
 const sc_string_t *sc_string_new(const char *ptr, size_t count);
+const sc_string_t *sc_string_new_from_cstr(const char *ptr);
 const sc_string_t *sc_string_join(const sc_string_t *a, const sc_string_t *b);
 bool sc_string_match(const sc_string_t *pattern, const sc_string_t *text);
 size_t sc_string_count(sc_string_t *str);

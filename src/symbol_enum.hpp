@@ -270,7 +270,7 @@ namespace scopes {
     \
     /* builtin and global functions */ \
     T(FN_Alignof, "alignof") T(FN_OffsetOf, "offsetof") \
-    T(FN_Args, "args") T(FN_Alloc, "alloc") T(FN_Arrayof, "arrayof") \
+    T(FN_Alloc, "alloc") T(FN_Arrayof, "arrayof") \
     T(FN_AnchorPath, "Anchor-path") T(FN_AnchorLineNumber, "Anchor-line-number") \
     T(FN_AnchorColumn, "Anchor-column") T(FN_AnchorOffset, "Anchor-offset") \
     T(FN_AnchorSource, "Anchor-source") \

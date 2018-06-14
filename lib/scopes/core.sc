@@ -13,11 +13,144 @@
     The core module implements the remaining standard functions and macros,
     parses the command-line and optionally enters the REPL.
 
-let set-anchor! = sc_set_active_anchor
-let __error! = sc_error
-let __anchor-error! = sc_anchor_error
+let __typify = sc_typify
+let __compile = sc_compile
+let __compile-object = sc_compile_object
+let __compile-spirv = sc_compile_spirv
+let __compile-glsl = sc_compile_glsl
+let eval = sc_eval
+let compiler-version = sc_compiler_version
+let verify-stack! = sc_verify_stack
+let enter-solver-cli! = sc_enter_solver_cli
+let launch-args = sc_launch_args
+
 let default-styler = sc_default_styler
 let io-write! = sc_write
+let format-message = sc_format_message
+let __prompt = sc_prompt
+let set-autocomplete-scope! = sc_set_autocomplete_scope
+
+let file? = sc_is_file
+let directory? = sc_is_directory
+let realpath = sc_realpath
+let dirname = sc_dirname
+let basename = sc_basename
+
+let globals = sc_get_globals
+let set-globals! = sc_set_globals
+
+let __error! = sc_error
+let __raise! = sc_raise
+let __anchor-error! = sc_anchor_error
+let set-exception-pad = sc_set_exception_pad
+let exception-value = sc_exception_value
+let exit = sc_exit
+let set-signal-abort! = sc_set_signal_abort
+
+let __hash = sc_hash
+let __hash2x64 = sc_hash2x64
+let __hashbytes = sc_hashbytes
+
+let set-anchor! = sc_set_active_anchor
+let active-anchor = sc_get_active_anchor
+
+let import-c = sc_import_c
+let load-library = sc_load_library
+
+let Scope@ = sc_scope_at
+let Scope-local@ = sc_scope_local_at
+let Scope-docstring = sc_scope_get_docstring
+let set-scope-docstring! = sc_scope_set_docstring
+let Scope-new = sc_scope_new
+let Scope-clone = sc_scope_clone
+let Scope-new-expand = sc_scope_new_subscope
+let Scope-clone-expand = sc_scope_clone_subscope
+let Scope-parent = sc_scope_get_parent
+let delete-scope-symbol! = sc_scope_del_symbol
+let Scope-next = sc_scope_next
+
+let string->Symbol = sc_symbol_new
+let Symbol->string = sc_symbol_to_string
+
+let string-join = sc_string_join
+let string-new = sc_string_new
+let string-match? = sc_string_match
+
+let Any-repr = sc_any_repr
+let Any-string = sc_any_string
+let Any== = sc_any_eq
+
+let list-cons = sc_list_cons
+let list-join = sc_list_join
+let list-dump = sc_list_dump
+
+let Syntax-new = sc_syntax_new
+let Syntax-wrap = sc_syntax_wrap
+let Syntax-strip = sc_syntax_strip
+let list-load = sc_syntax_from_path
+let list-parse = sc_syntax_from_string
+
+let element-type = sc_type_element_at
+let type-countof = sc_type_countof
+let sizeof = sc_type_sizeof
+let runtime-type@ = sc_type_at
+let element-index = sc_type_field_index
+let element-name = sc_type_field_name
+let type-kind = sc_type_kind
+let storageof = sc_type_storage
+let opaque? = sc_type_is_opaque
+let type-name = sc_type_string
+let type-next = sc_type_next
+let set-type-symbol! = sc_type_set_symbol
+
+let pointer-type = sc_pointer_type
+let pointer-type-set-element-type = sc_pointer_type_set_element_type
+let pointer-type-set-storage-class = sc_pointer_type_set_storage_class
+let pointer-type-set-flags = sc_pointer_type_set_flags
+let pointer-type-flags = sc_pointer_type_get_flags
+let pointer-type-set-storage-class = sc_pointer_type_set_storage_class
+let pointer-type-storage-class = sc_pointer_type_get_storage_class
+
+let extern-type-location = sc_extern_type_location
+let extern-type-binding = sc_extern_type_binding
+
+let bitcountof = sc_type_bitcountof
+
+let integer-type = sc_integer_type
+let signed? = sc_integer_type_is_signed
+
+let typename-type = sc_typename_type
+let set-typename-super! = sc_typename_type_set_super
+let superof = sc_typename_type_get_super
+let set-typename-storage! = sc_typename_type_set_storage
+
+let array-type = sc_array_type
+let vector-type = sc_vector_type
+
+let function-type-variadic? = sc_function_type_is_variadic
+
+let Image-type = sc_image_type
+let SampledImage-type = sc_sampled_image_type
+
+let Parameter-new = sc_parameter_new
+let Parameter-index = sc_parameter_index
+let Parameter-name = sc_parameter_name
+
+let Label-dump = sc_label_dump
+let Label-docstring = sc_label_docstring
+let Label-anchor = sc_label_anchor
+let Label-parameter-count = sc_label_parameter_count
+let Label-parameter = sc_label_parameter
+let Label-name = sc_label_name
+let Label-countof-reachable = sc_label_countof_reachable
+let Label-set-inline! = sc_label_set_inline
+let Label-enter = sc_label_get_enter
+let Label-set-enter! = sc_label_set_enter
+
+let Frame-dump = sc_frame_dump
+
+let Closure-label = sc_closure_label
+let Closure-frame = sc_closure_frame
 
 # first we alias u64 to the integer type that can hold a pointer
 let intptr = u64
@@ -637,6 +770,8 @@ let Syntax-wrap = sc_syntax_wrap
     function-type = sc_label_function_type
     set-rawcall = sc_label_set_rawcall
     frame = sc_label_frame
+    anchor = sc_label_anchor
+    body-anchor = sc_label_body_anchor
     append-parameter = sc_label_append_parameter
     parameter = sc_label_parameter
     return-keyed = Label-return-keyed
@@ -659,6 +794,8 @@ let Syntax-wrap = sc_syntax_wrap
 'set-symbols Closure
     frame = sc_closure_frame
     label = sc_closure_label
+
+let rawstring = ('pointer i8)
 
 inline box-cast-dispatch (f)
     box-pointer (unconst (typify f type type))
@@ -721,9 +858,16 @@ syntax-extend
             return (box-pointer unbox-hidden-pointer) true
         return (Any-wrap none) false
 
+    inline Any-rimply (cls value)
+        Any value
+
     'set-symbols Any
         __imply =
             box-pointer (unconst (typify any-imply type type))
+        __rimply =
+            box-cast-dispatch
+                fn "syntax-imply" (T vT)
+                    return (Any-wrap Any-rimply) true
 
     # integer casting
 
@@ -793,29 +937,38 @@ syntax-extend
     let DispatchCastFunctionType =
         'pointer (function (tuple Any bool) type type)
 
-    fn get-cast-dispatcher (symbol vT T)
+    fn get-cast-dispatcher (symbol rsymbol vT T)
         let anyf ok = ('@ vT symbol)
         if ok
             let f = (unbox-pointer anyf DispatchCastFunctionType)
-            return (f vT T)
-        return (Any-wrap none) false
+            let f ok = (f vT T)
+            if ok
+                return f ok false
+        let anyf ok = ('@ T rsymbol)
+        if ok
+            let f = (unbox-pointer anyf DispatchCastFunctionType)
+            let f ok = (f T vT)
+            if ok
+                return f ok true
+        return (Any-wrap none) false false
 
     fn implyfn (vT T)
-        get-cast-dispatcher '__imply vT T
+        get-cast-dispatcher '__imply '__rimply vT T
     fn asfn (vT T)
-        get-cast-dispatcher '__as vT T
+        get-cast-dispatcher '__as '__ras vT T
 
     let imply =
         box-label-macro
             fn "imply-dispatch" (l)
                 let args = ('verify-argument-count l 2 2)
-                let cont value T = ('decons args 3)
+                let cont value anyT = ('decons args 3)
                 let vT = ('indirect-typeof value)
-                let T = (unbox-pointer T type)
+                let T = (unbox-pointer anyT type)
                 if (ptrcmp!= vT T)
-                    let f ok = (implyfn vT T)
+                    let f ok reverse = (implyfn vT T)
                     if ok
                         'set-enter l f
+                        if reverse ('set-arguments l (make-list cont anyT value))
                         return;
                     'set-enter l
                         box-pointer
@@ -827,20 +980,21 @@ syntax-extend
         box-label-macro
             fn "as-dispatch" (l)
                 let args = ('verify-argument-count l 2 2)
-                let cont value T = ('decons args 3)
+                let cont value anyT = ('decons args 3)
                 let vT = ('indirect-typeof value)
-                let T = (unbox-pointer T type)
+                let T = (unbox-pointer anyT type)
                 if (ptrcmp!= vT T)
-                    let f ok =
+                    let f ok reverse =
                         do
                             # try implicit cast first
-                            let f ok = (implyfn vT T)
-                            if ok (_ f ok)
+                            let f ok reverse = (implyfn vT T)
+                            if ok (_ f ok reverse)
                             else
                                 # then try explicit cast
                                 asfn vT T
                     if ok
                         'set-enter l f
+                        if reverse ('set-arguments l (make-list cont anyT value))
                         return;
                     'set-enter l
                         box-pointer
@@ -1037,6 +1191,8 @@ syntax-extend
         load (getelementptr s i)
 
     'set-symbols string
+        __== = (box-binary-op-dispatch (single-binary-op-dispatch ptrcmp==))
+        __!= = (box-binary-op-dispatch (single-binary-op-dispatch ptrcmp!=))
         __.. = (box-binary-op-dispatch (single-binary-op-dispatch sc_string_join))
         __countof = sc_string_count
         __@ = string@
@@ -1122,6 +1278,35 @@ syntax-extend
 
     'set-symbols Scope
         __getattr = sc_scope_at
+        __typecall =
+            box-label-macro
+                fn "scope-typecall" (l)
+                    """"There are four ways to create a new Scope:
+                        ``Scope``
+                            creates an empty scope without parent
+                        ``Scope parent``
+                            creates an empty scope descending from ``parent``
+                        ``Scope none clone``
+                            duplicate ``clone`` without a parent
+                        ``Scope parent clone``
+                            duplicate ``clone``, but descending from ``parent`` instead
+                    let args = ('verify-argument-count l 1 3)
+                    let cont cls parent clone = ('decons args 4)
+                    let new? = (type== ('indirect-typeof clone) Nothing)
+                    if (type== ('indirect-typeof parent) Nothing)
+                        if new?
+                            'return l
+                            'set-enter l (Any-wrap Scope-new)
+                        else
+                            'return l clone
+                            'set-enter l (Any-wrap Scope-clone)
+                    else
+                        if new?
+                            'return l parent
+                            'set-enter l (Any-wrap Scope-new-expand)
+                        else
+                            'return l parent clone
+                            'set-enter l (Any-wrap Scope-clone-expand)
 
     let Syntax-datum =
         typify
@@ -1160,7 +1345,6 @@ syntax-extend
         as = as
         countof = (make-unary-op-dispatch '__countof "count")
         ~ = (make-unary-op-dispatch '__~ "bitwise-negate")
-        tostring = (make-unary-op-dispatch '__tostring "get string of")
         == = (make-sym-binary-op-dispatch '__== '__r== "compare")
         != = (make-sym-binary-op-dispatch '__!= '__r!= "compare")
         < = (make-sym-binary-op-dispatch '__< '__r< "compare")
@@ -1232,6 +1416,15 @@ fn type-repr-needs-suffix? (CT)
         else true
     else true
 
+fn tostring (value)
+    let T = (typeof value)
+    let f ok = (getattr T '__tostring)
+    constbranch ok
+        inline ()
+            f value
+        inline ()
+            sc_any_repr (Any value)
+
 fn repr (value)
     let T = (typeof value)
     let f ok = (getattr T '__repr)
@@ -1266,6 +1459,62 @@ let print =
             values...
 
 syntax-extend
+    # implicit argument type coercion for functions, externs and typed labels
+    # --------------------------------------------------------------------------
+
+    let coerce-call-arguments =
+        box-label-macro
+            fn "coerce-call-arguments" (l)
+                let args = ('arguments l)
+                let cont self args = ('decons args 2)
+                let T = ('indirect-typeof self)
+                let fptrT =
+                    if (icmp== ('kind T) type-kind-extern) ('element@ T 0)
+                    elseif (type== T Label) ('function-type (unbox-pointer self Label))
+                    else T
+                let fT = ('element@ fptrT 0)
+                #print fT args
+                let frame = ('frame l)
+                let anchor = ('body-anchor l)
+                let pcount = (sub ('element-count fT) 1)
+                let acount = (itrunc ('__countof args) i32)
+                if (icmp== pcount acount)
+                    let loop (i inargs outargs l) = 1 args '() l
+                    if (icmp<=s i pcount)
+                        let arg inargs = ('decons inargs)
+                        let argT = ('indirect-typeof arg)
+                        let paramT = ('element@ fT i)
+                        #print argT paramT
+                        loop (add i 1) inargs
+                            if (type== argT paramT) arg
+                                _ (cons arg outargs) l
+                            else
+                                # need to inject an implicit cast
+                                let nextl = (sc_label_new_cont_template)
+                                let param = (sc_parameter_new anchor unnamed Unknown)
+                                'append-parameter nextl param
+                                'set-enter l (Any imply)
+                                'set-arguments l (list (Closure nextl frame) arg paramT)
+                                _ (cons (Any param) outargs) nextl
+                    # do the call with (possibly) modified parameters
+                    'set-enter l self
+                    'set-arguments l (cons cont ('reverse outargs))
+                    'set-rawcall l
+                else
+                    # is going to fail anyway, forward to compiler
+                    'set-enter l self
+                    'set-arguments l (cons cont args)
+                    'set-rawcall l
+
+    'set-symbols extern
+        __call = coerce-call-arguments
+
+    'set-symbols pointer
+        __call = coerce-call-arguments
+
+    'set-symbols Label
+        __call = coerce-call-arguments
+
     # dotted symbol expander
     # --------------------------------------------------------------------------
 
@@ -1628,26 +1877,8 @@ define-infix> 750 as
 define-infix> 800 .
 define-infix> 800 @
 
-dump "hello"
-
-print
-    sc_map_load '(1 (2) (2 3))
-sc_map_store '(1 (2) (2 3)) '(4 5 6)
-print
-    sc_map_load '(1 (2) (2 3))
-sc_map_store '(1 (2) (2 3)) '(7 8 9)
-print
-    sc_map_load '(1 (2) (2 3))
-
-'dump ('label cons)
-
-print
-    'parameters
-        'label cons
-print
-    'arguments
-        'label cons
-
+inline char (s)
+    load (s as rawstring)
 
 #syntax-extend
     'set-symbols syntax-scope
@@ -1682,4 +1913,242 @@ print
                         io-write! "\n"
     syntax-scope
 
-sc_exit 0
+#-------------------------------------------------------------------------------
+# REPL
+#-------------------------------------------------------------------------------
+
+fn compiler-version-string ()
+    let vmin vmaj vpatch = (compiler-version)
+    .. "Scopes " (tostring vmin) "." (tostring vmaj)
+        if (vpatch == 0) ""
+        else
+            .. "." (tostring vpatch)
+        " ("
+        if debug-build? "debug build, "
+        else ""
+        \ compiler-timestamp ")"
+
+fn print-logo ()
+    io-write! "  "; io-write! (default-styler style-string "\\\\\\"); io-write! "\n"
+    io-write! "   "; io-write! (default-styler style-number "\\\\\\"); io-write! "\n"
+    io-write! " "; io-write! (default-styler style-comment "///")
+    io-write! (default-styler style-sfxfunction "\\\\\\"); io-write! "\n"
+    io-write! (default-styler style-comment "///"); io-write! "  "
+    io-write! (default-styler style-function "\\\\\\")
+
+#fn read-eval-print-loop ()
+    fn repeat-string (n c)
+        let loop (i s) =
+            tie-const n (usize 0)
+            tie-const n ""
+        if (i == n)
+            return s
+        loop (i + (usize 1))
+            .. s c
+
+    fn leading-spaces (s)
+        let len = (i32 (countof s))
+        let loop (i) = (tie-const len 0)
+        if (i == len)
+            return s
+        let c = (@ s i)
+        if (c != (char " "))
+            return (string-new (string->rawstring s) (usize i))
+        loop (i + 1)
+
+    fn blank? (s)
+        let len = (i32 (countof s))
+        let loop (i) =
+            tie-const len 0
+        if (i == len)
+            return (unconst true)
+        if ((@ s i) != (char " "))
+            return (unconst false)
+        loop (i + 1)
+
+    let cwd =
+        realpath "."
+
+    print-logo;
+    print " "
+        compiler-version-string;
+
+    let global-scope = (globals)
+    let eval-scope = (Scope global-scope)
+    set-autocomplete-scope! eval-scope
+
+    set-scope-symbol! eval-scope 'module-dir cwd
+    loop (preload cmdlist counter eval-scope) = "" "" 0 eval-scope
+    #dump "loop"
+    fn make-idstr (counter)
+        .. "$" (string-repr counter)
+
+    let idstr = (make-idstr counter)
+    let promptstr =
+        .. idstr " "
+            default-styler style-comment "►"
+    let promptlen = ((countof idstr) + 2:usize)
+    let cmd success =
+        prompt
+            ..
+                if (empty? cmdlist) promptstr
+                else
+                    repeat-string promptlen "."
+                " "
+            preload
+    if (not success)
+        return;
+    fn endswith-blank (s)
+        let slen = (countof s)
+        if (slen == 0:usize) (unconst false)
+        else
+            (@ s (slen - 1:usize)) == (char " ")
+    let enter-multiline = (endswith-blank cmd)
+    #dump "loop 1"
+    let terminated? =
+        (blank? cmd) or
+            (empty? cmdlist) and (not enter-multiline)
+    let cmdlist =
+        .. cmdlist
+            if enter-multiline
+                slice cmd 0 -1
+            else cmd
+            "\n"
+    let preload =
+        if terminated? (unconst "")
+        else (leading-spaces cmd)
+    if (not terminated?)
+        repeat preload cmdlist counter eval-scope
+
+    define-scope-macro set-scope!
+        let scope rest = (decons args)
+        return
+            none
+            scope as Syntax as Scope
+
+    define-scope-macro get-scope
+        return
+            syntax-scope
+            syntax-scope
+
+    fn handle-retargs (counter eval-scope local-scope vals...)
+        # copy over values from local-scope
+        for k v in local-scope
+            set-scope-symbol! eval-scope k v
+        let count = (va-countof vals...)
+        let loop (i) = 0
+        if (i < count)
+            let x = (va@ i vals...)
+            let k = (counter + i)
+            let idstr = (make-idstr k)
+            set-scope-symbol! eval-scope (Symbol idstr) x
+            print idstr "="
+                repr x
+            loop (add i 1)
+        return
+            unconst eval-scope
+            unconst count
+
+    let eval-scope count =
+        xpcall
+            inline ()
+                let expr = (list-parse cmdlist)
+                let expr-anchor = (Syntax-anchor expr)
+                let tmp = (Parameter 'vals...)
+                let expr =
+                    Syntax-wrap expr-anchor
+                        Any
+                            list
+                                list handle-retargs counter
+                                    cons do
+                                        list set-scope! eval-scope
+                                        list __defer (list tmp)
+                                            list _ (list get-scope) (list locals) tmp
+                                        expr as list
+                        false
+                let f = (compile (eval (expr as Syntax) eval-scope))
+                let fptr =
+                    f as
+                        pointer (function (ReturnLabel Scope i32))
+                set-anchor! expr-anchor
+                return (fptr)
+            inline (exc)
+                io-write!
+                    format-exception exc
+                return eval-scope (unconst 0)
+    repeat "" "" (counter + count) eval-scope
+
+#-------------------------------------------------------------------------------
+# main
+#-------------------------------------------------------------------------------
+
+fn print-help (exename)
+    print "usage:" exename
+        """"[option [...]] [filename]
+
+            Options:
+            -h, --help                  print this text and exit.
+            -v, --version               print program version and exit.
+            -s, --signal-abort          raise SIGABRT when calling `abort!`.
+            --                          terminate option list.
+    exit 0
+    unreachable!;
+
+fn print-version ()
+    print
+        compiler-version-string;
+    print "Executable path:" compiler-path
+    exit 0
+    unreachable!;
+
+fn run-main ()
+    let args = (launch-args)
+    let exename args = ('decons args)
+    let exename = (exename as string)
+    let sourcepath = (alloca string)
+    let parse-options = (alloca bool)
+    store "" sourcepath
+    store true parse-options
+    let loop (args i) = args 1
+    if (not (empty? args))
+        let k = (i + 1)
+        let arg args = ('decons args)
+        let arg = (arg as string)
+        if ((load parse-options) and ((@ arg 0:usize) == (char "-")))
+            if ((arg == "--help") or (arg == "-h"))
+                print-help exename
+            elseif ((== arg "--version") or (== arg "-v"))
+                print-version;
+            elseif ((== arg "--signal-abort") or (== arg "-s"))
+                set-signal-abort! true
+            elseif (== arg "--")
+                store false parse-options
+            else
+                print
+                    .. "unrecognized option: " arg
+                        \ ". Try --help for help."
+                exit 1
+                unreachable!;
+        elseif ((load sourcepath) == "")
+            store arg sourcepath
+            loop args k arg parse-options
+        # remainder is passed on to script
+    let sourcepath = (load sourcepath)
+    if (sourcepath == "")
+        #read-eval-print-loop;
+    else
+        let scope =
+            Scope (globals)
+        'set-symbol scope
+            script-launch-args =
+                fn ()
+                    return sourcepath args
+        #load-module "" sourcepath
+            scope = scope
+            main-module? = true
+        exit 0
+        unreachable!;
+
+run-main;
+true
+

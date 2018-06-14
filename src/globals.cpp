@@ -70,6 +70,24 @@ sc_i32_i32_i32_tuple_t sc_compiler_version() {
         SCOPES_VERSION_PATCH };
 }
 
+const sc_list_t *sc_launch_args() {
+    using namespace scopes;
+    auto argc = scopes_argc;
+    auto argv = scopes_argv;
+    if (!argc || !argv) return EOL;
+    const sc_list_t *result = EOL;
+    while (argc > 0) {
+        argc--;
+        const char *s = argv[argc];
+        if (!s) {
+            result = List::from(Symbol(SYM_Unnamed).name(), result);
+        } else {
+            result = List::from(String::from_cstr(s), result);
+        }
+    }
+    return result;
+}
+
 sc_label_t *sc_eval(const sc_syntax_t *expr, sc_scope_t *scope) {
     using namespace scopes;
     return specialize(Frame::root, expand_module(expr, scope), {});
@@ -530,6 +548,11 @@ const sc_string_t *sc_symbol_to_string(sc_symbol_t sym) {
 const sc_string_t *sc_string_new(const char *ptr, size_t count) {
     using namespace scopes;
     return String::from(ptr, count);
+}
+
+const sc_string_t *sc_string_new_from_cstr(const char *ptr) {
+    using namespace scopes;
+    return String::from(ptr, strlen(ptr));
 }
 
 const sc_string_t *sc_string_join(const sc_string_t *a, const sc_string_t *b) {
@@ -1318,6 +1341,8 @@ static void bind_extern(Symbol sym, const Type *T) {
 }
 
 void init_globals(int argc, char *argv[]) {
+    scopes_argc = argc;
+    scopes_argv = argv;
 
 #define DEFINE_C_FUNCTION(SYMBOL, FUNC, RETTYPE, ...) \
     globals->bind(SYMBOL, \
@@ -1348,6 +1373,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_compile_object, TYPE_Void, TYPE_String, TYPE_Scope, TYPE_U64);
     DEFINE_EXTERN_C_FUNCTION(sc_enter_solver_cli, TYPE_Void);
     DEFINE_EXTERN_C_FUNCTION(sc_verify_stack, TYPE_USize);
+    DEFINE_EXTERN_C_FUNCTION(sc_launch_args, TYPE_List);
 
     DEFINE_EXTERN_C_FUNCTION(sc_prompt, Tuple({TYPE_String, TYPE_Bool}), TYPE_String, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_set_autocomplete_scope, TYPE_Void, TYPE_Scope);
@@ -1417,6 +1443,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_symbol_to_string, TYPE_String, TYPE_Symbol);
 
     DEFINE_EXTERN_C_FUNCTION(sc_string_new, TYPE_String, NativeROPointer(TYPE_I8), TYPE_USize);
+    DEFINE_EXTERN_C_FUNCTION(sc_string_new_from_cstr, TYPE_String, NativeROPointer(TYPE_I8));
     DEFINE_EXTERN_C_FUNCTION(sc_string_join, TYPE_String, TYPE_String, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_string_match, TYPE_Bool, TYPE_String, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_string_count, TYPE_USize, TYPE_String);
@@ -1534,25 +1561,6 @@ void init_globals(int argc, char *argv[]) {
 
     auto stub_file = SourceFile::from_string(Symbol("<internal>"), String::from_cstr(""));
     auto stub_anchor = Anchor::from(stub_file, 1, 1);
-
-    {
-        // launch arguments
-        // this is a function returning vararg constants
-        Label *fn = Label::function_from(stub_anchor, FN_Args);
-        fn->body.anchor = stub_anchor;
-        fn->body.enter = fn->params[0];
-        globals->bind(FN_Args, fn);
-        if (argv && argc) {
-            auto &&args = fn->body.args;
-            args.push_back(none);
-            for (int i = 0; i < argc; ++i) {
-                char *s = argv[i];
-                if (!s)
-                    break;
-                args.push_back(String::from_cstr(s));
-            }
-        }
-    }
 
 #ifdef SCOPES_WIN32
 #define SCOPES_SYM_OS "windows"
