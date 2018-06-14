@@ -5,9 +5,43 @@
 */
 
 #include "image.hpp"
-#include "typefactory.hpp"
+#include "hash.hpp"
+
+#include <unordered_set>
 
 namespace scopes {
+
+namespace ImageSet {
+    struct Hash {
+        std::size_t operator()(const ImageType *s) const {
+            size_t h = std::hash<const Type *>{}(s->type);
+            h = hash2(h, s->dim.hash());
+            h = hash2(h, std::hash<int>{}(s->depth));
+            h = hash2(h, std::hash<int>{}(s->arrayed));
+            h = hash2(h, std::hash<int>{}(s->multisampled));
+            h = hash2(h, std::hash<int>{}(s->sampled));
+            h = hash2(h, s->format.hash());
+            h = hash2(h, s->access.hash());
+            return h;
+        }
+    };
+
+    struct KeyEqual {
+        bool operator()( const ImageType *lhs, const ImageType *rhs ) const {
+            return
+                lhs->type == rhs->type
+                && lhs->dim == rhs->dim
+                && lhs->depth == rhs->depth
+                && lhs->arrayed == rhs->arrayed
+                && lhs->multisampled == rhs->multisampled
+                && lhs->sampled == rhs->sampled
+                && lhs->format == rhs->format
+                && lhs->access == rhs->access;
+        }
+    };
+} // namespace ImageSet
+
+static std::unordered_set<const ImageType *, ImageSet::Hash, ImageSet::KeyEqual> images;
 
 //------------------------------------------------------------------------------
 // IMAGE TYPE
@@ -61,10 +95,22 @@ const Type *Image(
     int _sampled,
     Symbol _format,
     Symbol _access) {
-    static TypeFactory<ImageType> images;
-    return images.insert(_type, _dim, _depth, _arrayed,
+    SCOPES_TYPE_KEY(ImageType, key);
+    key->type = _type;
+    key->dim = _dim;
+    key->depth = _depth;
+    key->arrayed = _arrayed;
+    key->multisampled = _multisampled;
+    key->sampled = _sampled;
+    key->format = _format;
+    key->access = _access;
+    auto it = images.find(key);
+    if (it != images.end())
+        return *it;
+    auto result = new ImageType(_type, _dim, _depth, _arrayed,
         _multisampled, _sampled, _format, _access);
+    images.insert(result);
+    return result;
 }
-
 
 } // namespace scopes

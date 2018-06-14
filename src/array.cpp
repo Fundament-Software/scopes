@@ -6,9 +6,31 @@
 
 #include "array.hpp"
 #include "error.hpp"
-#include "typefactory.hpp"
+#include "hash.hpp"
+
+#include <unordered_set>
 
 namespace scopes {
+
+namespace ArraySet {
+struct Hash {
+    std::size_t operator()(const ArrayType *s) const {
+        return
+            hash2(
+                std::hash<const Type *>{}(s->element_type),
+                std::hash<size_t>{}(s->count));
+    }
+};
+
+struct KeyEqual {
+    bool operator()( const ArrayType *lhs, const ArrayType *rhs ) const {
+        return lhs->element_type == rhs->element_type
+            && lhs->count == rhs->count;
+    }
+};
+} // namespace ArraySet
+
+static std::unordered_set<const ArrayType *, ArraySet::Hash, ArraySet::KeyEqual> arrays;
 
 //------------------------------------------------------------------------------
 // ARRAY TYPE
@@ -34,8 +56,15 @@ ArrayType::ArrayType(const Type *_element_type, size_t _count)
 //------------------------------------------------------------------------------
 
 const Type *Array(const Type *element_type, size_t count) {
-    static TypeFactory<ArrayType> arrays;
-    return arrays.insert(element_type, count);
+    SCOPES_TYPE_KEY(ArrayType, key);
+    key->element_type = element_type;
+    key->count = count;
+    auto it = arrays.find(key);
+    if (it != arrays.end())
+        return *it;
+    const ArrayType *result = new ArrayType(element_type, count);
+    arrays.insert(result);
+    return result;
 }
 
 } // namespace scopes

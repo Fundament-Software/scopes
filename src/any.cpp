@@ -164,10 +164,6 @@ StyledStream& Any::stream(StyledStream& ost, bool annotate_type) const {
 }
 
 size_t Any::hash() const {
-    if (type == TYPE_String) {
-        if (!string) return 0; // can happen with nullof
-        return hash_bytes(string->data, string->count);
-    }
     if (is_opaque(type))
         return 0;
     const Type *T = storage_type(type);
@@ -230,13 +226,6 @@ size_t Any::hash() const {
 
 bool Any::operator ==(const Any &other) const {
     if (type != other.type) return false;
-    if (type == TYPE_String) {
-        if (string == other.string) return true;
-        if (!string || !other.string) return false;
-        if (string->count != other.string->count)
-            return false;
-        return !memcmp(string->data, other.string->data, string->count);
-    }
     if (is_opaque(type))
         return true;
     const Type *T = storage_type(type);

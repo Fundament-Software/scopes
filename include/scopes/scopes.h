@@ -131,6 +131,11 @@ typedef struct sc_string_bool_tuple_ {
     bool _1;
 } sc_string_bool_tuple_t;
 
+typedef struct sc_rawstring_size_t_tuple_ {
+    const char *_0;
+    size_t _1;
+} sc_rawstring_size_t_tuple_t;
+
 // compiler
 
 sc_i32_i32_i32_tuple_t sc_compiler_version();
@@ -222,6 +227,7 @@ const sc_string_t *sc_string_new(const char *ptr, size_t count);
 const sc_string_t *sc_string_join(const sc_string_t *a, const sc_string_t *b);
 bool sc_string_match(const sc_string_t *pattern, const sc_string_t *text);
 size_t sc_string_count(sc_string_t *str);
+sc_rawstring_size_t_tuple_t sc_string_buffer(sc_string_t *str);
 const sc_string_t *sc_string_lslice(sc_string_t *str, size_t offset);
 const sc_string_t *sc_string_rslice(sc_string_t *str, size_t offset);
 

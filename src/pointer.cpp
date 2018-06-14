@@ -5,11 +5,35 @@
 */
 
 #include "pointer.hpp"
-#include "typefactory.hpp"
+#include "hash.hpp"
 
 #include <assert.h>
 
+#include <unordered_set>
+
 namespace scopes {
+
+namespace PointerSet {
+    struct Hash {
+        std::size_t operator()(const PointerType *s) const {
+            size_t h = std::hash<const Type *>{}(s->element_type);
+            h = hash2(h, std::hash<uint64_t>{}(s->flags));
+            h = hash2(h, s->storage_class.hash());
+            return h;
+        }
+    };
+
+    struct KeyEqual {
+        bool operator()( const PointerType *lhs, const PointerType *rhs ) const {
+            return
+                lhs->element_type == rhs->element_type
+                && lhs->flags == rhs->flags
+                && lhs->storage_class == rhs->storage_class;
+        }
+    };
+} // namespace PointerSet
+
+static std::unordered_set<const PointerType *, PointerSet::Hash, PointerSet::KeyEqual> pointers;
 
 //------------------------------------------------------------------------------
 // POINTER TYPE
@@ -64,11 +88,16 @@ bool PointerType::is_writable() const {
 
 const Type *Pointer(const Type *element_type, uint64_t flags,
     Symbol storage_class) {
-    static TypeFactory<PointerType> pointers;
-    assert(element_type->kind() != TK_ReturnLabel);
-    uint64_t required_flags = required_flags_for_storage_class(storage_class);
-    assert((flags & required_flags) == required_flags);
-    return pointers.insert(element_type, flags, storage_class);
+    SCOPES_TYPE_KEY(PointerType, key);
+    key->element_type = element_type;
+    key->flags = flags;
+    key->storage_class = storage_class;
+    auto it = pointers.find(key);
+    if (it != pointers.end())
+        return *it;
+    auto result = new PointerType(element_type, flags, storage_class);
+    pointers.insert(result);
+    return result;
 }
 
 const Type *NativeROPointer(const Type *element_type) {

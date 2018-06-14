@@ -438,6 +438,8 @@ void init_types() {
     DEFINE_OPAQUE_HANDLE_TYPE("Scope", Scope, TYPE_Scope);
     DEFINE_OPAQUE_HANDLE_TYPE("Frame", Frame, TYPE_Frame);
     DEFINE_OPAQUE_HANDLE_TYPE("Closure", Closure, TYPE_Closure);
+    DEFINE_OPAQUE_HANDLE_TYPE("String", String, TYPE_String);
+    DEFINE_OPAQUE_HANDLE_TYPE("List", List, TYPE_List);
 
     DEFINE_STRUCT_HANDLE_TYPE("Anchor", Anchor, TYPE_Anchor,
         NativeROPointer(TYPE_SourceFile),
@@ -446,29 +448,10 @@ void init_types() {
         TYPE_I32
     );
 
-    {
-        TYPE_List = Typename(String::from("list"));
-
-        const Type *cellT = Typename(String::from("_list"));
-        auto tn = cast<TypenameType>(const_cast<Type *>(cellT));
-        auto ET = Tuple({ TYPE_Any,
-            NativeROPointer(cellT), TYPE_USize });
-        assert(sizeof(List) == size_of(ET));
-        tn->finalize(ET);
-
-        cast<TypenameType>(const_cast<Type *>(TYPE_List))
-            ->finalize(NativeROPointer(cellT));
-    }
-
     DEFINE_STRUCT_HANDLE_TYPE("Syntax", Syntax, TYPE_Syntax,
         TYPE_Anchor,
         TYPE_Any,
         TYPE_Bool);
-
-    DEFINE_STRUCT_HANDLE_TYPE("string", String, TYPE_String,
-        TYPE_USize,
-        Array(TYPE_I8, 1)
-    );
 
     DEFINE_STRUCT_HANDLE_TYPE("Exception", Exception, TYPE_Exception,
         TYPE_Anchor,

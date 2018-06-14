@@ -6,10 +6,32 @@
 
 #include "vector.hpp"
 #include "error.hpp"
-#include "typefactory.hpp"
 #include "dyn_cast.inc"
+#include "hash.hpp"
+
+#include <unordered_set>
 
 namespace scopes {
+
+namespace VectorSet {
+struct Hash {
+    std::size_t operator()(const VectorType *s) const {
+        return
+            hash2(
+                std::hash<const Type *>{}(s->element_type),
+                std::hash<size_t>{}(s->count));
+    }
+};
+
+struct KeyEqual {
+    bool operator()( const VectorType *lhs, const VectorType *rhs ) const {
+        return lhs->element_type == rhs->element_type
+            && lhs->count == rhs->count;
+    }
+};
+} // namespace VectorSet
+
+static std::unordered_set<const VectorType *, VectorSet::Hash, VectorSet::KeyEqual> vectors;
 
 //------------------------------------------------------------------------------
 // VECTOR TYPE
@@ -33,8 +55,15 @@ VectorType::VectorType(const Type *_element_type, size_t _count)
 }
 
 const Type *Vector(const Type *element_type, size_t count) {
-    static TypeFactory<VectorType> vectors;
-    return vectors.insert(element_type, count);
+    SCOPES_TYPE_KEY(VectorType, key);
+    key->element_type = element_type;
+    key->count = count;
+    auto it = vectors.find(key);
+    if (it != vectors.end())
+        return *it;
+    auto result = new VectorType(element_type, count);
+    vectors.insert(result);
+    return result;
 }
 
 void verify_integer_vector(const Type *type) {

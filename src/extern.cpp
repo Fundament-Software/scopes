@@ -6,9 +6,37 @@
 
 #include "extern.hpp"
 #include "pointer.hpp"
-#include "typefactory.hpp"
+#include "hash.hpp"
+
+#include <unordered_set>
 
 namespace scopes {
+
+namespace ExternSet {
+    struct Hash {
+        std::size_t operator()(const ExternType *s) const {
+            size_t h = std::hash<const Type *>{}(s->type);
+            h = hash2(h, std::hash<size_t>{}(s->flags));
+            h = hash2(h, s->storage_class.hash());
+            h = hash2(h, std::hash<int>{}(s->location));
+            h = hash2(h, std::hash<int>{}(s->binding));
+            return h;
+        }
+    };
+
+    struct KeyEqual {
+        bool operator()( const ExternType *lhs, const ExternType *rhs ) const {
+            return
+                lhs->type == rhs->type
+                && lhs->flags == rhs->flags
+                && lhs->storage_class == rhs->storage_class
+                && lhs->location == rhs->location
+                && lhs->binding == rhs->binding;
+        }
+    };
+} // namespace ExternSet
+
+static std::unordered_set<const ExternType *, ExternSet::Hash, ExternSet::KeyEqual> externs;
 
 //------------------------------------------------------------------------------
 // EXTERN TYPE
@@ -55,8 +83,18 @@ const Type *Extern(const Type *type,
     Symbol storage_class,
     int location,
     int binding) {
-    static TypeFactory<ExternType> externs;
-    return externs.insert(type, flags, storage_class, location, binding);
+    SCOPES_TYPE_KEY(ExternType, key);
+    key->type = type;
+    key->flags = flags;
+    key->storage_class = storage_class;
+    key->location = location;
+    key->binding = binding;
+    auto it = externs.find(key);
+    if (it != externs.end())
+        return *it;
+    auto result = new ExternType(type, flags, storage_class, location, binding);
+    externs.insert(result);
+    return result;
 }
 
 

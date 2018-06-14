@@ -22,7 +22,6 @@ struct StorageType : Type {
 //------------------------------------------------------------------------------
 
 struct SizedStorageType : StorageType {
-
     SizedStorageType(TypeKind kind, const Type *_element_type, size_t _count);
 
     void *getelementptr(void *src, size_t i) const;

@@ -20,12 +20,12 @@ struct ImageType;
 struct SampledImageType : Type {
     static bool classof(const Type *T);
 
-    SampledImageType(const Type *_type);
+    SampledImageType(const ImageType *_type);
 
     const ImageType *type; // image type
 };
 
-const Type *SampledImage(const Type *_type);
+const Type *SampledImage(const ImageType *_type);
 
 } // namespace scopes
 

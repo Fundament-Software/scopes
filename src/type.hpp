@@ -19,6 +19,10 @@ namespace scopes {
 
 struct StyledStream;
 
+#define SCOPES_TYPE_KEY(T, NAME) \
+    char NAME ## _buf[sizeof(T)]; \
+    T *NAME = reinterpret_cast<T *>(NAME ## _buf);
+
 //------------------------------------------------------------------------------
 // TYPE
 //------------------------------------------------------------------------------

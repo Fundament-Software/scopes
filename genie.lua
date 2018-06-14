@@ -123,7 +123,6 @@ project "scopesrt"
         "src/return.cpp",
         "src/function.cpp",
         "src/typename.cpp",
-        "src/typefactory.cpp",
         "src/image.cpp",
         "src/sampledimage.cpp",
         "src/scope.cpp",

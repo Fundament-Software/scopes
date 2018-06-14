@@ -1033,7 +1033,7 @@ syntax-extend
                     return (Any-wrap none) true
 
     fn string@ (self i)
-        let s = (bitcast (getelementptr self 0 1 0) ('pointer i8))
+        let s = (sc_string_buffer self)
         load (getelementptr s i)
 
     'set-symbols string

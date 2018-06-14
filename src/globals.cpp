@@ -564,6 +564,11 @@ size_t sc_string_count(sc_string_t *str) {
     return str->count;
 }
 
+sc_rawstring_size_t_tuple_t sc_string_buffer(sc_string_t *str) {
+    using namespace scopes;
+    return {str->data, str->count};
+}
+
 const sc_string_t *sc_string_lslice(sc_string_t *str, size_t offset) {
     using namespace scopes;
     if (!offset) return str;
@@ -1033,7 +1038,7 @@ const sc_type_t *sc_image_type(
 
 const sc_type_t *sc_sampled_image_type(const sc_type_t *_type) {
     using namespace scopes;
-    return SampledImage(_type);
+    return SampledImage(cast<ImageType>(_type));
 }
 
 // Parameter
@@ -1329,7 +1334,7 @@ void init_globals(int argc, char *argv[]) {
     bind_extern(Symbol(#FUNC), \
         Extern(Function(RETTYPE, { __VA_ARGS__ }), EF_NonWritable));
 
-    //const Type *rawstring = Pointer(TYPE_I8);
+    const Type *rawstring = NativeROPointer(TYPE_I8);
 
     DEFINE_EXTERN_C_FUNCTION(sc_compiler_version, Tuple({TYPE_I32, TYPE_I32, TYPE_I32}));
     DEFINE_EXTERN_C_FUNCTION(sc_eval, TYPE_Label, TYPE_Syntax, TYPE_Scope);
@@ -1413,6 +1418,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_string_join, TYPE_String, TYPE_String, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_string_match, TYPE_Bool, TYPE_String, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_string_count, TYPE_USize, TYPE_String);
+    DEFINE_EXTERN_C_FUNCTION(sc_string_buffer, Tuple({rawstring, TYPE_USize}), TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_string_lslice, TYPE_String, TYPE_String, TYPE_USize);
     DEFINE_EXTERN_C_FUNCTION(sc_string_rslice, TYPE_String, TYPE_String, TYPE_USize);
 
