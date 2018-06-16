@@ -76,13 +76,13 @@ namespace scopes {
 
    */
 
-static Any load_custom_core(const char *executable_path) {
+static SCOPES_RESULT(Any) load_custom_core(const char *executable_path) {
+    SCOPES_RESULT_TYPE(Any);
     // attempt to read bootstrap expression from end of binary
     auto file = SourceFile::from_file(
         Symbol(String::from_cstr(executable_path)));
     if (!file) {
-        stb_fprintf(stderr, "could not open binary\n");
-        return none;
+        SCOPES_LOCATION_ERROR(String::from("could not open binary"));
     }
     auto ptr = file->strptr();
     auto size = file->size();
@@ -93,60 +93,51 @@ static Any load_custom_core(const char *executable_path) {
         // skip the trailing text formatting garbage
         // that win32 echo produces
         cursor--;
-        if (cursor < ptr) return none;
+        if (cursor < ptr) return Any(none);
     }
-    if (*cursor != ')') return none;
+    if (*cursor != ')') return Any(none);
     cursor--;
     // seek backwards to find beginning of expression
     while ((cursor >= ptr) && (*cursor != '('))
         cursor--;
 
     LexerParser footerParser(file, cursor - ptr);
-    auto expr = footerParser.parse();
+    auto expr = SCOPES_GET_RESULT(footerParser.parse());
     if (expr.type == TYPE_Nothing) {
-        stb_fprintf(stderr, "could not parse footer expression\n");
-        return none;
+        SCOPES_LOCATION_ERROR(String::from("could not parse footer expression"));
     }
     expr = strip_syntax(expr);
     if ((expr.type != TYPE_List) || (expr.list == EOL)) {
-        stb_fprintf(stderr, "footer parser returned illegal structure\n");
-        return none;
+        SCOPES_LOCATION_ERROR(String::from("footer parser returned illegal structure"));
     }
     expr = ((const List *)expr)->at;
     if (expr.type != TYPE_List)  {
-        stb_fprintf(stderr, "footer expression is not a symbolic list\n");
-        return none;
+        SCOPES_LOCATION_ERROR(String::from("footer expression is not a symbolic list"));
     }
     auto symlist = expr.list;
     auto it = symlist;
     if (it == EOL) {
-        stb_fprintf(stderr, "footer expression is empty\n");
-        return none;
+        SCOPES_LOCATION_ERROR(String::from("footer expression is empty"));
     }
     auto head = it->at;
     it = it->next;
     if (head.type != TYPE_Symbol)  {
-        stb_fprintf(stderr, "footer expression does not begin with symbol\n");
-        return none;
+        SCOPES_LOCATION_ERROR(String::from("footer expression does not begin with symbol"));
     }
     if (head != Any(Symbol("core-size")))  {
-        stb_fprintf(stderr, "footer expression does not begin with 'core-size'\n");
-        return none;
+        SCOPES_LOCATION_ERROR(String::from("footer expression does not begin with 'core-size'"));
     }
     if (it == EOL) {
-        stb_fprintf(stderr, "footer expression needs two arguments\n");
-        return none;
+        SCOPES_LOCATION_ERROR(String::from("footer expression needs two arguments"));
     }
     auto arg = it->at;
     it = it->next;
     if (arg.type != TYPE_I32)  {
-        stb_fprintf(stderr, "script-size argument is not of type i32\n");
-        return none;
+        SCOPES_LOCATION_ERROR(String::from("script-size argument is not of type i32"));
     }
     auto script_size = arg.i32;
     if (script_size <= 0) {
-        stb_fprintf(stderr, "script-size must be larger than zero\n");
-        return none;
+        SCOPES_LOCATION_ERROR(String::from("script-size must be larger than zero"));
     }
     LexerParser parser(file, cursor - script_size - ptr, script_size);
     return parser.parse();
@@ -190,10 +181,10 @@ static void setup_stdio() {
         _setmode(_fileno(stderr), _O_U16TEXT);
         //std::wcout.imbue(std::locale(std::locale("C"), new std::codecvt_utf8<wchar_t>));
         //std::wcerr.imbue(std::locale(std::locale("C"), new std::codecvt_utf8<wchar_t>));
-#else        
+#else
         SetConsoleOutputCP(CP_UTF8);
         _setmode(_fileno(stdout), _O_BINARY);
-        _setmode(_fileno(stderr), _O_BINARY);        
+        _setmode(_fileno(stderr), _O_BINARY);
         //fcntl(_fileno(stdout), F_SETFL, fcntl(_fileno(stdout), F_GETFL) | O_NONBLOCK);
 #endif
         #endif
@@ -231,7 +222,10 @@ std::string GetExecutablePath(const char *Argv0) {
   return llvm::sys::fs::getMainExecutable(Argv0, MainAddr);
 }
 
-int main(int argc, char *argv[]) {
+using scopes::Result;
+
+SCOPES_RESULT(int) try_main(int argc, char *argv[]) {
+    SCOPES_RESULT_TYPE(int);
     using namespace scopes;
     uint64_t c = 0;
     g_stack_start = (char *)&c;
@@ -270,7 +264,7 @@ int main(int argc, char *argv[]) {
     init_types();
     init_globals(argc, argv);
 
-    Any expr = load_custom_core(scopes_compiler_path);
+    Any expr = SCOPES_GET_RESULT(load_custom_core(scopes_compiler_path));
     if (expr != none) {
         goto skip_regular_load;
     }
@@ -289,14 +283,14 @@ int main(int argc, char *argv[]) {
 #endif
         sf = SourceFile::from_file(name);
         if (!sf) {
-            location_error(String::from("core missing\n"));
+            SCOPES_LOCATION_ERROR(String::from("core missing\n"));
         }
         LexerParser parser(sf);
-        expr = parser.parse();
+        expr = SCOPES_GET_RESULT(parser.parse());
     }
 
 skip_regular_load:
-    Label *fn = expand_module(expr, Scope::from(globals));
+    Label *fn = SCOPES_GET_RESULT(expand_module(expr, Scope::from(globals)));
 
 #if SCOPES_DEBUG_CODEGEN
     StyledStream ss(std::cout);
@@ -305,7 +299,7 @@ skip_regular_load:
     std::cout << std::endl;
 #endif
 
-    fn = specialize(Frame::root, fn, {});
+    fn = SCOPES_GET_RESULT(specialize(Frame::root, fn, {}));
 #if SCOPES_DEBUG_CODEGEN
     std::cout << "normalized:" << std::endl;
     stream_label(ss, fn, StreamLabelFormat::debug_all());
@@ -313,8 +307,18 @@ skip_regular_load:
 #endif
 
     typedef void (*MainFuncType)();
-    MainFuncType fptr = (MainFuncType)compile(fn, 0).pointer;
+    MainFuncType fptr = (MainFuncType)SCOPES_GET_RESULT(compile(fn, 0)).pointer;
     fptr();
 
     return 0;
+}
+
+int main(int argc, char *argv[]) {
+    using namespace scopes;
+    auto result = try_main(argc, argv);
+    if (!result.ok()) {
+        print_error(get_last_error());
+        return 1;
+    }
+    return result.assert_ok();
 }

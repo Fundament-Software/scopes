@@ -22,13 +22,13 @@ struct VectorType : SizedStorageType {
     VectorType(const Type *_element_type, size_t _count);
 };
 
-const Type *Vector(const Type *element_type, size_t count);
+SCOPES_RESULT(const Type *) Vector(const Type *element_type, size_t count);
 
-void verify_integer_vector(const Type *type);
-void verify_real_vector(const Type *type);
-void verify_bool_vector(const Type *type);
-void verify_real_vector(const Type *type, size_t fixedsz);
-void verify_vector_sizes(const Type *type1, const Type *type2);
+SCOPES_RESULT(void) verify_integer_vector(const Type *type);
+SCOPES_RESULT(void) verify_real_vector(const Type *type);
+SCOPES_RESULT(void) verify_bool_vector(const Type *type);
+SCOPES_RESULT(void) verify_real_vector(const Type *type, size_t fixedsz);
+SCOPES_RESULT(void) verify_vector_sizes(const Type *type1, const Type *type2);
 
 } // namespace scopes
 

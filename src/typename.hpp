@@ -8,6 +8,7 @@
 #define SCOPES_TYPENAME_HPP
 
 #include "type.hpp"
+#include "result.hpp"
 
 #include <unordered_set>
 
@@ -26,7 +27,7 @@ struct TypenameType : Type {
 
     TypenameType(const String *name);
 
-    void finalize(const Type *_type);
+    SCOPES_RESULT(void) finalize(const Type *_type);
 
     bool finalized() const;
 
@@ -40,7 +41,7 @@ struct TypenameType : Type {
 // always generates a new type
 const Type *Typename(const String *name);
 
-const Type *storage_type(const Type *T);
+SCOPES_RESULT(const Type *) storage_type(const Type *T);
 
 } // namespace scopes
 

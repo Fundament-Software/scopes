@@ -102,7 +102,7 @@ ReturnLabelType::ReturnLabelType(ReturnLabelMode _mode, const Args &_values)
                 return_type = rettypes[0];
                 has_mrv = false;
             } else if (!rettypes.empty()) {
-                return_type = Tuple(rettypes);
+                return_type = Tuple(rettypes).assert_ok();
                 has_mrv = true;
             } else {
                 return_type = TYPE_Void;

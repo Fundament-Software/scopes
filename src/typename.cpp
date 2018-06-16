@@ -41,18 +41,20 @@ TypenameType::TypenameType(const String *name)
     _name = newname.name();
 }
 
-void TypenameType::finalize(const Type *_type) {
+SCOPES_RESULT(void) TypenameType::finalize(const Type *_type) {
+    SCOPES_RESULT_TYPE(void);
     if (finalized()) {
         StyledString ss;
         ss.out << "typename " << _type << " is already final";
-        location_error(ss.str());
+        SCOPES_LOCATION_ERROR(ss.str());
     }
     if (isa<TypenameType>(_type)) {
         StyledString ss;
         ss.out << "cannot use typename " << _type << " as storage type";
-        location_error(ss.str());
+        SCOPES_LOCATION_ERROR(ss.str());
     }
     storage_type = _type;
+    return true;
 }
 
 bool TypenameType::finalized() const { return storage_type != nullptr; }
@@ -71,14 +73,15 @@ const Type *Typename(const String *name) {
     return new TypenameType(name);
 }
 
-const Type *storage_type(const Type *T) {
+SCOPES_RESULT(const Type *) storage_type(const Type *T) {
+    SCOPES_RESULT_TYPE(const Type *);
     switch(T->kind()) {
     case TK_Typename: {
         const TypenameType *tt = cast<TypenameType>(T);
         if (!tt->finalized()) {
             StyledString ss;
             ss.out << "type " << T << " is opaque";
-            location_error(ss.str());
+            SCOPES_LOCATION_ERROR(ss.str());
         }
         return tt->storage_type;
     } break;

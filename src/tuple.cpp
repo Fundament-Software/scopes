@@ -60,12 +60,6 @@ TupleType::TupleType(const Args &_values, bool _packed, size_t _alignment)
         } else {
             T = values[i].value.type;
         }
-        if (is_opaque(T)) {
-            StyledString ss;
-            ss.out << "can not construct tuple type with field of opaque type "
-                << T;
-            location_error(ss.str());
-        }
         types.push_back(T);
     }
 
@@ -75,7 +69,7 @@ TupleType::TupleType(const Args &_values, bool _packed, size_t _alignment)
         for (size_t i = 0; i < types.size(); ++i) {
             const Type *ET = types[i];
             offsets[i] = sz;
-            sz += size_of(ET);
+            sz += size_of(ET).assert_ok();
         }
         size = sz;
         align = 1;
@@ -83,11 +77,11 @@ TupleType::TupleType(const Args &_values, bool _packed, size_t _alignment)
         size_t al = 1;
         for (size_t i = 0; i < types.size(); ++i) {
             const Type *ET = types[i];
-            size_t etal = align_of(ET);
+            size_t etal = align_of(ET).assert_ok();
             sz = scopes::align(sz, etal);
             offsets[i] = sz;
             al = std::max(al, etal);
-            sz += size_of(ET);
+            sz += size_of(ET).assert_ok();
         }
         size = scopes::align(sz, al);
         align = al;
@@ -101,17 +95,20 @@ TupleType::TupleType(const Args &_values, bool _packed, size_t _alignment)
     }
 }
 
-void *TupleType::getelementptr(void *src, size_t i) const {
-    verify_range(i, offsets.size());
+SCOPES_RESULT(void *) TupleType::getelementptr(void *src, size_t i) const {
+    SCOPES_RESULT_TYPE(void *);
+    SCOPES_CHECK_RESULT(verify_range(i, offsets.size()));
     return (void *)((char *)src + offsets[i]);
 }
 
-Any TupleType::unpack(void *src, size_t i) const {
-    return wrap_pointer(type_at_index(i), getelementptr(src, i));
+SCOPES_RESULT(Any) TupleType::unpack(void *src, size_t i) const {
+    SCOPES_RESULT_TYPE(Any);
+    return wrap_pointer(SCOPES_GET_RESULT(type_at_index(i)), SCOPES_GET_RESULT(getelementptr(src, i)));
 }
 
-const Type *TupleType::type_at_index(size_t i) const {
-    verify_range(i, types.size());
+SCOPES_RESULT(const Type *) TupleType::type_at_index(size_t i) const {
+    SCOPES_RESULT_TYPE(const Type *);
+    SCOPES_CHECK_RESULT(verify_range(i, types.size()));
     return types[i];
 }
 
@@ -123,15 +120,17 @@ size_t TupleType::field_index(Symbol name) const {
     return (size_t)-1;
 }
 
-Symbol TupleType::field_name(size_t i) const {
-    verify_range(i, values.size());
+SCOPES_RESULT(Symbol) TupleType::field_name(size_t i) const {
+    SCOPES_RESULT_TYPE(Symbol);
+    SCOPES_CHECK_RESULT(verify_range(i, values.size()));
     return values[i].key;
 }
 
 //------------------------------------------------------------------------------
 
-const Type *MixedTuple(const Args &values,
+SCOPES_RESULT(const Type *) MixedTuple(const Args &values,
     bool packed, size_t alignment) {
+    SCOPES_RESULT_TYPE(const Type *);
     struct TypeArgs {
         Args args;
         bool packed;
@@ -170,11 +169,22 @@ const Type *MixedTuple(const Args &values,
 
     static ArgMap map;
 
-#ifdef SCOPES_DEBUG
     for (size_t i = 0; i < values.size(); ++i) {
         assert(values[i].value.is_const());
+        const Type *T = nullptr;
+        if (is_unknown(values[i].value)) {
+            T = values[i].value.typeref;
+        } else {
+            T = values[i].value.type;
+        }
+        if (is_opaque(T)) {
+            StyledString ss;
+            ss.out << "can not construct tuple type with field of opaque type "
+                << T;
+            SCOPES_LOCATION_ERROR(ss.str());
+        }
     }
-#endif
+
     TypeArgs ta(values, packed, alignment);
     typename ArgMap::iterator it = map.find(ta);
     if (it == map.end()) {
@@ -186,8 +196,9 @@ const Type *MixedTuple(const Args &values,
     }
 }
 
-const Type *Tuple(const ArgTypes &types,
+SCOPES_RESULT(const Type *) Tuple(const ArgTypes &types,
     bool packed, size_t alignment) {
+    //SCOPES_RESULT_TYPE(const Type *);
     Args args;
     args.reserve(types.size());
     for (size_t i = 0; i < types.size(); ++i) {

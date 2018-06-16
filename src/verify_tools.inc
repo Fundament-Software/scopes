@@ -8,11 +8,18 @@
 #define SCOPES_VERIFY_TOOLS_INC
 
 #include "dyn_cast.inc"
+#include "error.hpp"
 
 namespace scopes {
 
 template<TypeKind tk>
-inline void verify_kind(const Type *T) {
+inline bool is_kind(const Type *T) {
+    return (T->kind() == tk);
+}
+
+template<TypeKind tk>
+inline SCOPES_RESULT(void) verify_kind(const Type *T) {
+    SCOPES_RESULT_TYPE(void);
     if (T->kind() != tk) {
         StyledString ss;
         ss.out << "value of ";
@@ -32,13 +39,15 @@ inline void verify_kind(const Type *T) {
         case TK_SampledImage: ss.out << "sampled image"; break;
         }
         ss.out << " kind expected, got " << T;
-        location_error(ss.str());
+        SCOPES_LOCATION_ERROR(ss.str());
     }
+    return true;
 }
 
 template<typename T>
-static T cast_number(const Any &value) {
-    auto ST = storage_type(value.type);
+static SCOPES_RESULT(T) cast_number(const Any &value) {
+    SCOPES_RESULT_TYPE(T);
+    auto ST = SCOPES_GET_RESULT(storage_type(value.type));
     auto it = dyn_cast<IntegerType>(ST);
     if (it) {
         if (it->issigned) {
@@ -75,12 +84,12 @@ static T cast_number(const Any &value) {
     } else {
         ss.out << "variable of type " << value.indirect_type();
     }
-    location_error(ss.str());
-    return 0;
+    SCOPES_LOCATION_ERROR(ss.str());
 }
 
 template<int mincount, int maxcount>
-inline int checkargs(size_t argsize, bool allow_overshoot = false) {
+inline SCOPES_RESULT(int) checkargs(size_t argsize, bool allow_overshoot = false) {
+    SCOPES_RESULT_TYPE(int);
     int count = (int)argsize - 1;
     if ((mincount <= 0) && (maxcount == -1)) {
         return count;
@@ -90,12 +99,12 @@ inline int checkargs(size_t argsize, bool allow_overshoot = false) {
         if (allow_overshoot) {
             count = maxcount;
         } else {
-            location_error(
+            SCOPES_LOCATION_ERROR(
                 format("at most %i argument(s) expected, got %i", maxcount, count));
         }
     }
     if ((mincount >= 0) && (count < mincount)) {
-        location_error(
+        SCOPES_LOCATION_ERROR(
             format("at least %i argument(s) expected, got %i", mincount, count));
     }
     return count;

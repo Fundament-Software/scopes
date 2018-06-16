@@ -5,13 +5,8 @@
 */
 
 #include "platform_abi.hpp"
-#include "type.hpp"
+#include "types.hpp"
 #include "utils.hpp"
-#include "vector.hpp"
-#include "array.hpp"
-#include "union.hpp"
-#include "tuple.hpp"
-#include "return.hpp"
 #include "dyn_cast.inc"
 
 #include <assert.h>
@@ -88,8 +83,8 @@ static size_t classify_array_like(size_t size,
     }
     auto ET = element_type;
     ABIClass subclasses[MAX_ABI_CLASSES];
-    size_t alignment = align_of(ET);
-    size_t esize = size_of(ET);
+    size_t alignment = align_of(ET).assert_ok();
+    size_t esize = size_of(ET).assert_ok();
     for (size_t i = 0; i < count; ++i) {
         offset = align(offset, alignment);
         size_t num = classify(ET, subclasses, offset % 8);
@@ -136,7 +131,7 @@ static size_t classify(const Type *T, ABIClass *classes, size_t offset) {
     case TK_Integer:
     case TK_Extern:
     case TK_Pointer: {
-        size_t size = size_of(T) + offset;
+        size_t size = size_of(T).assert_ok() + offset;
         if (size <= 4) {
             classes[0] = ABI_CLASS_INTEGERSI;
             return 1;
@@ -156,7 +151,7 @@ static size_t classify(const Type *T, ABIClass *classes, size_t offset) {
         }
     } break;
     case TK_Real: {
-        size_t size = size_of(T);
+        size_t size = size_of(T).assert_ok();
         if (size == 4) {
             if (!(offset % 8))
                 classes[0] = ABI_CLASS_SSESF;
@@ -176,17 +171,17 @@ static size_t classify(const Type *T, ABIClass *classes, size_t offset) {
             classes[0] = ABI_CLASS_NO_CLASS;
             return 1;
         } else {
-            return classify(storage_type(T), classes, offset);
+            return classify(storage_type(T).assert_ok(), classes, offset);
         }
     } break;
     case TK_Vector: {
         auto tt = cast<VectorType>(T);
-        return classify_array_like(size_of(T),
+        return classify_array_like(size_of(T).assert_ok(),
             tt->element_type, tt->count, classes, offset);
     } break;
     case TK_Array: {
         auto tt = cast<ArrayType>(T);
-        return classify_array_like(size_of(T),
+        return classify_array_like(size_of(T).assert_ok(),
             tt->element_type, tt->count, classes, offset);
     } break;
     case TK_Union: {
@@ -195,7 +190,7 @@ static size_t classify(const Type *T, ABIClass *classes, size_t offset) {
     } break;
     case TK_Tuple: {
         const size_t UNITS_PER_WORD = 8;
-        size_t size = size_of(T);
+        size_t size = size_of(T).assert_ok();
 	    size_t words = (size + UNITS_PER_WORD - 1) / UNITS_PER_WORD;
         if (size > 32)
             return 0;
@@ -210,7 +205,7 @@ static size_t classify(const Type *T, ABIClass *classes, size_t offset) {
         for (size_t i = 0; i < tt->types.size(); ++i) {
             auto ET = tt->types[i];
             if (!tt->packed)
-                offset = align(offset, align_of(ET));
+                offset = align(offset, align_of(ET).assert_ok());
             size_t num = classify (ET, subclasses, offset % 8);
             if (!num) return 0;
             for (size_t k = 0; k < num; ++k) {
@@ -218,7 +213,7 @@ static size_t classify(const Type *T, ABIClass *classes, size_t offset) {
 		        classes[k + pos] =
 		            merge_abi_classes (subclasses[k], classes[k + pos]);
             }
-            offset += size_of(ET);
+            offset += size_of(ET).assert_ok();
         }
         if (words > 2) {
             if (classes[0] != ABI_CLASS_SSE)

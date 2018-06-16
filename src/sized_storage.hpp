@@ -24,11 +24,11 @@ struct StorageType : Type {
 struct SizedStorageType : StorageType {
     SizedStorageType(TypeKind kind, const Type *_element_type, size_t _count);
 
-    void *getelementptr(void *src, size_t i) const;
+    SCOPES_RESULT(void *) getelementptr(void *src, size_t i) const;
 
-    Any unpack(void *src, size_t i) const;
+    SCOPES_RESULT(Any) unpack(void *src, size_t i) const;
 
-    const Type *type_at_index(size_t i) const;
+    SCOPES_RESULT(const Type *) type_at_index(size_t i) const;
 
     const Type *element_type;
     size_t count;

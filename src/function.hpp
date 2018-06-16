@@ -8,6 +8,7 @@
 #define SCOPES_FUNCTION_HPP
 
 #include "type.hpp"
+#include "result.hpp"
 
 namespace scopes {
 
@@ -33,7 +34,7 @@ struct FunctionType : Type {
     bool vararg() const;
     bool divergent() const;
 
-    const Type *type_at_index(size_t i) const;
+    SCOPES_RESULT(const Type *) type_at_index(size_t i) const;
 
     const Type *return_type;
     ArgTypes argument_types;
@@ -47,7 +48,7 @@ bool is_function_pointer(const Type *type);
 
 const FunctionType *extract_function_type(const Type *T);
 
-void verify_function_pointer(const Type *type);
+SCOPES_RESULT(void) verify_function_pointer(const Type *type);
 
 } // namespace scopes
 

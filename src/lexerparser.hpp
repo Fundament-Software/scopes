@@ -8,6 +8,7 @@
 #define SCOPES_LEXERPARSER_HPP
 
 #include "any.hpp"
+#include "result.hpp"
 
 namespace scopes {
 
@@ -68,7 +69,7 @@ struct LexerParser {
     template<unsigned N>
     bool is_suffix(const char (&str)[N]);
 
-    void verify_good_taste(char c);
+    SCOPES_RESULT(void) verify_good_taste(char c);
 
     LexerParser(SourceFile *_file, size_t offset = 0, size_t length = 0);
 
@@ -80,7 +81,7 @@ struct LexerParser {
 
     const Anchor *anchor();
 
-    char next();
+    SCOPES_RESULT(char) next();
 
     size_t chars_left();
 
@@ -92,35 +93,35 @@ struct LexerParser {
 
     void read_single_symbol();
 
-    void read_symbol();
+    SCOPES_RESULT(void) read_symbol();
 
-    void read_string(char terminator);
+    SCOPES_RESULT(void) read_string(char terminator);
 
-    void read_block(int indent);
+    SCOPES_RESULT(void) read_block(int indent);
 
-    void read_block_string();
+    SCOPES_RESULT(void) read_block_string();
 
-    void read_comment();
-
-    template<typename T>
-    int read_integer(void (*strton)(T *, const char*, char**));
+    SCOPES_RESULT(void) read_comment();
 
     template<typename T>
-    int read_real(void (*strton)(T *, const char*, char**, int));
+    SCOPES_RESULT(int) read_integer(void (*strton)(T *, const char*, char**));
+
+    template<typename T>
+    SCOPES_RESULT(int) read_real(void (*strton)(T *, const char*, char**, int));
 
     bool has_suffix() const;
 
-    bool select_integer_suffix();
+    SCOPES_RESULT(bool) select_integer_suffix();
 
-    bool select_real_suffix();
+    SCOPES_RESULT(bool) select_real_suffix();
 
-    bool read_int64();
-    bool read_uint64();
-    bool read_real64();
+    SCOPES_RESULT(bool) read_int64();
+    SCOPES_RESULT(bool) read_uint64();
+    SCOPES_RESULT(bool) read_real64();
 
     void next_token();
 
-    Token read_token();
+    SCOPES_RESULT(Token) read_token();
 
     Any get_symbol();
     Any get_string();
@@ -129,15 +130,15 @@ struct LexerParser {
     Any get();
 
     // parses a list to its terminator and returns a handle to the first cell
-    const List *parse_list(Token end_token);
+    SCOPES_RESULT(const List *) parse_list(Token end_token);
 
     // parses the next sequence and returns it wrapped in a cell that points
     // to prev
-    Any parse_any();
+    SCOPES_RESULT(Any) parse_any();
 
-    Any parse_naked(int column, Token end_token);
+    SCOPES_RESULT(Any) parse_naked(int column, Token end_token);
 
-    Any parse();
+    SCOPES_RESULT(Any) parse();
 
     Token token;
     int base_offset;

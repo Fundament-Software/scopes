@@ -521,14 +521,15 @@ struct LLVMIRGenerator {
         return LLVMStructType(types, sz, false);
     }
 
-    LLVMValueRef abi_import_argument(Parameter *param, LLVMValueRef func, size_t &k) {
+    SCOPES_RESULT(LLVMValueRef) abi_import_argument(Parameter *param, LLVMValueRef func, size_t &k) {
+        SCOPES_RESULT_TYPE(LLVMValueRef);
         ABIClass classes[MAX_ABI_CLASSES];
         size_t sz = abi_classify(param->type, classes);
         if (!sz) {
             LLVMValueRef val = LLVMGetParam(func, k++);
             return LLVMBuildLoad(builder, val, "");
         }
-        LLVMTypeRef T = type_to_llvm_type(param->type);
+        LLVMTypeRef T = SCOPES_GET_RESULT(type_to_llvm_type(param->type));
         auto tk = LLVMGetTypeKind(T);
         if (tk == LLVMStructTypeKind) {
             auto ST = abi_struct_type(classes, sz);
@@ -551,17 +552,18 @@ struct LLVMIRGenerator {
         return val;
     }
 
-    void abi_export_argument(LLVMValueRef val, const Type *AT,
+    SCOPES_RESULT(void) abi_export_argument(LLVMValueRef val, const Type *AT,
         std::vector<LLVMValueRef> &values, std::vector<size_t> &memptrs) {
+        SCOPES_RESULT_TYPE(void);
         ABIClass classes[MAX_ABI_CLASSES];
         size_t sz = abi_classify(AT, classes);
         if (!sz) {
-            LLVMValueRef ptrval = safe_alloca(type_to_llvm_type(AT));
+            LLVMValueRef ptrval = safe_alloca(SCOPES_GET_RESULT(type_to_llvm_type(AT)));
             LLVMBuildStore(builder, val, ptrval);
             val = ptrval;
             memptrs.push_back(values.size());
             values.push_back(val);
-            return;
+            return true;
         }
         auto tk = LLVMGetTypeKind(LLVMTypeOf(val));
         if (tk == LLVMStructTypeKind) {
@@ -580,20 +582,22 @@ struct LLVMIRGenerator {
                     val = LLVMBuildLoad(builder, val, "");
                     values.push_back(val);
                 }
-                return;
+                return true;
             }
         }
         values.push_back(val);
+        return true;
     }
 
-    static void abi_transform_parameter(const Type *AT,
+    static SCOPES_RESULT(void) abi_transform_parameter(const Type *AT,
         std::vector<LLVMTypeRef> &params) {
+        SCOPES_RESULT_TYPE(void);
         ABIClass classes[MAX_ABI_CLASSES];
         size_t sz = abi_classify(AT, classes);
-        auto T = type_to_llvm_type(AT);
+        auto T = SCOPES_GET_RESULT(type_to_llvm_type(AT));
         if (!sz) {
             params.push_back(LLVMPointerType(T, 0));
-            return;
+            return true;
         }
         auto tk = LLVMGetTypeKind(T);
         if (tk == LLVMStructTypeKind) {
@@ -602,13 +606,15 @@ struct LLVMIRGenerator {
                 for (size_t i = 0; i < sz; ++i) {
                     params.push_back(LLVMStructGetTypeAtIndex(ST, i));
                 }
-                return;
+                return true;
             }
         }
         params.push_back(T);
+        return true;
     }
 
-    static LLVMTypeRef create_llvm_type(const Type *type) {
+    static SCOPES_RESULT(LLVMTypeRef) create_llvm_type(const Type *type) {
+        SCOPES_RESULT_TYPE(LLVMTypeRef);
         switch(type->kind()) {
         case TK_Integer:
             return LLVMIntType(cast<IntegerType>(type)->width);
@@ -621,25 +627,25 @@ struct LLVMIRGenerator {
             break;
         case TK_Extern: {
             return LLVMPointerType(
-                _type_to_llvm_type(cast<ExternType>(type)->type), 0);
+                SCOPES_GET_RESULT(_type_to_llvm_type(cast<ExternType>(type)->type)), 0);
         } break;
         case TK_Pointer:
             return LLVMPointerType(
-                _type_to_llvm_type(cast<PointerType>(type)->element_type), 0);
+                SCOPES_GET_RESULT(_type_to_llvm_type(cast<PointerType>(type)->element_type)), 0);
         case TK_Array: {
             auto ai = cast<ArrayType>(type);
-            return LLVMArrayType(_type_to_llvm_type(ai->element_type), ai->count);
+            return LLVMArrayType(SCOPES_GET_RESULT(_type_to_llvm_type(ai->element_type)), ai->count);
         } break;
         case TK_Vector: {
             auto vi = cast<VectorType>(type);
-            return LLVMVectorType(_type_to_llvm_type(vi->element_type), vi->count);
+            return LLVMVectorType(SCOPES_GET_RESULT(_type_to_llvm_type(vi->element_type)), vi->count);
         } break;
         case TK_Tuple: {
             auto ti = cast<TupleType>(type);
             size_t count = ti->types.size();
             LLVMTypeRef elements[count];
             for (size_t i = 0; i < count; ++i) {
-                elements[i] = _type_to_llvm_type(ti->types[i]);
+                elements[i] = SCOPES_GET_RESULT(_type_to_llvm_type(ti->types[i]));
             }
             return LLVMStructType(elements, count, ti->packed);
         } break;
@@ -651,7 +657,7 @@ struct LLVMIRGenerator {
             if (type == TYPE_Void)
                 return LLVMVoidType();
             else if (type == TYPE_Sampler) {
-                location_error(String::from(
+                SCOPES_LOCATION_ERROR(String::from(
                     "sampler type can not be used for native target"));
             }
             auto tn = cast<TypenameType>(type);
@@ -683,35 +689,35 @@ struct LLVMIRGenerator {
             LLVMTypeRef rettype;
             if (use_sret) {
                 elements.push_back(
-                    LLVMPointerType(_type_to_llvm_type(fi->return_type), 0));
+                    LLVMPointerType(SCOPES_GET_RESULT(_type_to_llvm_type(fi->return_type)), 0));
                 rettype = voidT;
             } else {
-                rettype = _type_to_llvm_type(fi->return_type);
+                rettype = SCOPES_GET_RESULT(_type_to_llvm_type(fi->return_type));
             }
             for (size_t i = 0; i < count; ++i) {
                 auto AT = fi->argument_types[i];
-                abi_transform_parameter(AT, elements);
+                SCOPES_CHECK_RESULT(abi_transform_parameter(AT, elements));
             }
             return LLVMFunctionType(rettype,
                 &elements[0], elements.size(), fi->vararg());
         } break;
         case TK_SampledImage: {
-            location_error(String::from(
+            SCOPES_LOCATION_ERROR(String::from(
                 "sampled image type can not be used for native target"));
         } break;
         case TK_Image: {
-            location_error(String::from(
+            SCOPES_LOCATION_ERROR(String::from(
                 "image type can not be used for native target"));
         } break;
         };
 
         StyledString ss;
         ss.out << "IL->IR: cannot convert type " << type;
-        location_error(ss.str());
-        return nullptr;
+        SCOPES_LOCATION_ERROR(ss.str());
     }
 
-    static size_t finalize_types() {
+    static SCOPES_RESULT(size_t) finalize_types() {
+        SCOPES_RESULT_TYPE(size_t);
         size_t result = type_todo.size();
         while (!type_todo.empty()) {
             const Type *T = type_todo.back();
@@ -719,7 +725,7 @@ struct LLVMIRGenerator {
             auto tn = cast<TypenameType>(T);
             if (!tn->finalized())
                 continue;
-            LLVMTypeRef LLT = _type_to_llvm_type(T);
+            LLVMTypeRef LLT = SCOPES_GET_RESULT(_type_to_llvm_type(T));
             const Type *ST = tn->storage_type;
             switch(ST->kind()) {
             case TK_Tuple: {
@@ -727,7 +733,7 @@ struct LLVMIRGenerator {
                 size_t count = ti->types.size();
                 LLVMTypeRef elements[count];
                 for (size_t i = 0; i < count; ++i) {
-                    elements[i] = _type_to_llvm_type(ti->types[i]);
+                    elements[i] = SCOPES_GET_RESULT(_type_to_llvm_type(ti->types[i]));
                 }
                 LLVMStructSetBody(LLT, elements, count, false);
             } break;
@@ -739,11 +745,11 @@ struct LLVMIRGenerator {
                 // find member with the same alignment
                 for (size_t i = 0; i < count; ++i) {
                     const Type *ET = ui->types[i];
-                    size_t etal = align_of(ET);
+                    size_t etal = SCOPES_GET_RESULT(align_of(ET));
                     if (etal == al) {
-                        size_t remsz = sz - size_of(ET);
+                        size_t remsz = sz - SCOPES_GET_RESULT(size_of(ET));
                         LLVMTypeRef values[2];
-                        values[0] = _type_to_llvm_type(ET);
+                        values[0] = SCOPES_GET_RESULT(_type_to_llvm_type(ET));
                         if (remsz) {
                             // too small, add padding
                             values[1] = LLVMArrayType(i8T, remsz);
@@ -761,10 +767,11 @@ struct LLVMIRGenerator {
         return result;
     }
 
-    static LLVMTypeRef _type_to_llvm_type(const Type *type) {
+    static SCOPES_RESULT(LLVMTypeRef) _type_to_llvm_type(const Type *type) {
+        SCOPES_RESULT_TYPE(LLVMTypeRef);
         auto it = type_cache.find(type);
         if (it == type_cache.end()) {
-            LLVMTypeRef result = create_llvm_type(type);
+            LLVMTypeRef result = SCOPES_GET_RESULT(create_llvm_type(type));
             type_cache.insert({type, result});
             return result;
         } else {
@@ -772,15 +779,17 @@ struct LLVMIRGenerator {
         }
     }
 
-    static LLVMTypeRef type_to_llvm_type(const Type *type) {
-        auto typeref = _type_to_llvm_type(type);
-        finalize_types();
+    static SCOPES_RESULT(LLVMTypeRef) type_to_llvm_type(const Type *type) {
+        SCOPES_RESULT_TYPE(LLVMTypeRef);
+        auto typeref = SCOPES_GET_RESULT(_type_to_llvm_type(type));
+        SCOPES_CHECK_RESULT(finalize_types());
         return typeref;
     }
 
-    LLVMValueRef label_to_value(Label *label) {
+    SCOPES_RESULT(LLVMValueRef) label_to_value(Label *label) {
+        SCOPES_RESULT_TYPE(LLVMValueRef);
         if (label->is_basic_block_like()) {
-            auto bb = label_to_basic_block(label);
+            auto bb = SCOPES_GET_RESULT(label_to_basic_block(label));
             if (!bb) return nullptr;
             else
                 return LLVMBasicBlockAsValue(bb);
@@ -789,8 +798,10 @@ struct LLVMIRGenerator {
         }
     }
 
+    static bool ok;
     static void fatal_error_handler(const char *Reason) {
-        location_error(String::from_cstr(Reason));
+        set_last_location_error(String::from_cstr(Reason));
+        ok = false;
     }
 
     void bind_parameter(Parameter *param, LLVMValueRef value) {
@@ -802,7 +813,8 @@ struct LLVMIRGenerator {
         return param2value.find({active_function_value, param}) != param2value.end();
     }
 
-    LLVMValueRef resolve_parameter(Parameter *param) {
+    SCOPES_RESULT(LLVMValueRef) resolve_parameter(Parameter *param) {
+        SCOPES_RESULT_TYPE(LLVMValueRef);
         auto it = param2value.find({active_function_value, param});
         if (it == param2value.end()) {
             assert(active_function_value);
@@ -811,13 +823,14 @@ struct LLVMIRGenerator {
             }
             StyledString ss;
             ss.out << "IL->IR: can't access free variable " << param;
-            location_error(ss.str());
+            SCOPES_LOCATION_ERROR(ss.str());
         }
         assert(it->second);
         return it->second;
     }
 
-    LLVMValueRef argument_to_value(Any value) {
+    SCOPES_RESULT(LLVMValueRef) argument_to_value(Any value) {
+        SCOPES_RESULT_TYPE(LLVMValueRef);
         if (value.type == TYPE_Parameter) {
             return resolve_parameter(value.parameter);
         }
@@ -858,7 +871,7 @@ struct LLVMIRGenerator {
                 const char *name = namestr->data;
                 assert(name);
                 auto et = cast<ExternType>(value.type);
-                LLVMTypeRef LLT = type_to_llvm_type(et->type);
+                LLVMTypeRef LLT = SCOPES_GET_RESULT(type_to_llvm_type(et->type));
                 LLVMValueRef result = nullptr;
                 if ((namestr->count > 5) && !strncmp(name, "llvm.", 5)) {
                     result = LLVMAddFunction(module, name, LLT);
@@ -866,18 +879,16 @@ struct LLVMIRGenerator {
                     void *pptr = local_aware_dlsym(value.symbol);
                     uint64_t ptr = *(uint64_t*)&pptr;
                     if (!ptr) {
+                        ok = true;
                         LLVMInstallFatalErrorHandler(fatal_error_handler);
-                        SCOPES_TRY()
                         ptr = get_address(name);
-                        SCOPES_CATCH(e)
-                        (void)e; // shut up unused variable warning
-                        SCOPES_TRY_END()
                         LLVMResetFatalErrorHandler();
+                        SCOPES_CHECK_OK(ok);
                     }
                     if (!ptr) {
                         StyledString ss;
                         ss.out << "could not resolve " << value;
-                        location_error(ss.str());
+                        SCOPES_LOCATION_ERROR(ss.str());
                     }
                     result = LLVMAddGlobal(module, LLT, name);
                 }
@@ -888,7 +899,7 @@ struct LLVMIRGenerator {
             }
         } break;
         case TK_Pointer: {
-            LLVMTypeRef LLT = type_to_llvm_type(value.type);
+            LLVMTypeRef LLT = SCOPES_GET_RESULT(type_to_llvm_type(value.type));
             if (!value.pointer) {
                 return LLVMConstPointerNull(LLT);
             } else if (inline_pointers) {
@@ -904,7 +915,7 @@ struct LLVMIRGenerator {
                     StyledString ss;
                     ss.out << "IL->IR: constant pointer of type " << value.type
                         << " points to unserializable memory";
-                    location_error(ss.str());
+                    SCOPES_LOCATION_ERROR(ss.str());
                 }
                 LLVMValueRef basevalue = nullptr;
                 auto it = ptr2global.find(baseptr);
@@ -932,7 +943,7 @@ struct LLVMIRGenerator {
             }
         } break;
         case TK_Typename: {
-            LLVMTypeRef LLT = type_to_llvm_type(value.type);
+            LLVMTypeRef LLT = SCOPES_GET_RESULT(type_to_llvm_type(value.type));
             auto tn = cast<TypenameType>(value.type);
             switch(tn->storage_type->kind()) {
             case TK_Tuple: {
@@ -940,14 +951,14 @@ struct LLVMIRGenerator {
                 size_t count = ti->types.size();
                 LLVMValueRef values[count];
                 for (size_t i = 0; i < count; ++i) {
-                    values[i] = argument_to_value(ti->unpack(value.pointer, i));
+                    values[i] = SCOPES_GET_RESULT(argument_to_value(SCOPES_GET_RESULT(ti->unpack(value.pointer, i))));
                 }
                 return LLVMConstNamedStruct(LLT, values, count);
             } break;
             default: {
                 Any storage_value = value;
                 storage_value.type = tn->storage_type;
-                LLVMValueRef val = argument_to_value(storage_value);
+                LLVMValueRef val = SCOPES_GET_RESULT(argument_to_value(storage_value));
                 return LLVMConstBitCast(val, LLT);
             } break;
             }
@@ -957,9 +968,9 @@ struct LLVMIRGenerator {
             size_t count = ai->count;
             LLVMValueRef values[count];
             for (size_t i = 0; i < count; ++i) {
-                values[i] = argument_to_value(ai->unpack(value.pointer, i));
+                values[i] = SCOPES_GET_RESULT(argument_to_value(SCOPES_GET_RESULT(ai->unpack(value.pointer, i))));
             }
-            return LLVMConstArray(type_to_llvm_type(ai->element_type),
+            return LLVMConstArray(SCOPES_GET_RESULT(type_to_llvm_type(ai->element_type)),
                 values, count);
         } break;
         case TK_Vector: {
@@ -967,7 +978,7 @@ struct LLVMIRGenerator {
             size_t count = vi->count;
             LLVMValueRef values[count];
             for (size_t i = 0; i < count; ++i) {
-                values[i] = argument_to_value(vi->unpack(value.pointer, i));
+                values[i] = SCOPES_GET_RESULT(argument_to_value(SCOPES_GET_RESULT(vi->unpack(value.pointer, i))));
             }
             return LLVMConstVector(values, count);
         } break;
@@ -976,22 +987,21 @@ struct LLVMIRGenerator {
             size_t count = ti->types.size();
             LLVMValueRef values[count];
             for (size_t i = 0; i < count; ++i) {
-                values[i] = argument_to_value(ti->unpack(value.pointer, i));
+                values[i] = SCOPES_GET_RESULT(argument_to_value(SCOPES_GET_RESULT(ti->unpack(value.pointer, i))));
             }
             return LLVMConstStruct(values, count, false);
         } break;
         case TK_Union: {
             auto ui = cast<UnionType>(value.type);
             value.type = ui->tuple_type;
-            return argument_to_value(value);
+            return SCOPES_GET_RESULT(argument_to_value(value));
         } break;
         default: break;
         };
 
         StyledString ss;
         ss.out << "IL->IR: cannot convert argument of type " << value.type;
-        location_error(ss.str());
-        return nullptr;
+        SCOPES_LOCATION_ERROR(ss.str());
     }
 
     struct ReturnTraits {
@@ -1005,8 +1015,9 @@ struct LLVMIRGenerator {
             rtype(nullptr) {}
     };
 
-    LLVMValueRef build_call(const Type *functype, LLVMValueRef func, Args &args,
+    SCOPES_RESULT(LLVMValueRef) build_call(const Type *functype, LLVMValueRef func, Args &args,
         ReturnTraits &traits) {
+        SCOPES_RESULT_TYPE(LLVMValueRef);
         size_t argcount = args.size() - 1;
 
         auto fi = cast<FunctionType>(functype);
@@ -1017,14 +1028,14 @@ struct LLVMIRGenerator {
         values.reserve(argcount + 1);
 
         if (use_sret) {
-            values.push_back(safe_alloca(_type_to_llvm_type(fi->return_type)));
+            values.push_back(safe_alloca(SCOPES_GET_RESULT(_type_to_llvm_type(fi->return_type))));
         }
         std::vector<size_t> memptrs;
         for (size_t i = 0; i < argcount; ++i) {
             auto &&arg = args[i + 1];
-            LLVMValueRef val = argument_to_value(arg.value);
+            LLVMValueRef val = SCOPES_GET_RESULT(argument_to_value(arg.value));
             auto AT = arg.value.indirect_type();
-            abi_export_argument(val, AT, values, memptrs);
+            SCOPES_GET_RESULT(abi_export_argument(val, AT, values, memptrs));
         }
 
         size_t fargcount = fi->argument_types.size();
@@ -1161,11 +1172,12 @@ struct LLVMIRGenerator {
         }
     }
 
-    void write_label_body(Label *label) {
+    SCOPES_RESULT(void) write_label_body(Label *label) {
     repeat:
+        SCOPES_RESULT_TYPE(void);
         if (!label->body.is_complete()) {
             set_active_anchor(label->body.anchor);
-            location_error(String::from("IL->IR: incomplete label body encountered"));
+            SCOPES_LOCATION_ERROR(String::from("IL->IR: incomplete label body encountered"));
         }
 #if SCOPES_DEBUG_CODEGEN
         {
@@ -1194,15 +1206,15 @@ struct LLVMIRGenerator {
         Any &NAME = args[argn++].value;
 #define READ_VALUE(NAME) \
         assert(argn <= argcount); \
-        LLVMValueRef NAME = argument_to_value(args[argn++].value);
+        LLVMValueRef NAME = SCOPES_GET_RESULT(argument_to_value(args[argn++].value));
 #define READ_LABEL_VALUE(NAME) \
         assert(argn <= argcount); \
-        LLVMValueRef NAME = label_to_value(args[argn++].value); \
+        LLVMValueRef NAME = SCOPES_GET_RESULT(label_to_value(args[argn++].value)); \
         assert(NAME);
 #define READ_TYPE(NAME) \
         assert(argn <= argcount); \
         assert(args[argn].value.type == TYPE_Type); \
-        LLVMTypeRef NAME = type_to_llvm_type(args[argn++].value.typeref);
+        LLVMTypeRef NAME = SCOPES_GET_RESULT(type_to_llvm_type(args[argn++].value.typeref));
 
         LLVMValueRef retvalue = nullptr;
         ReturnTraits rtraits;
@@ -1229,23 +1241,23 @@ struct LLVMIRGenerator {
             case FN_Unconst: {
                 READ_ANY(val);
                 if (val.type == TYPE_Label) {
-                    retvalue = label_to_function(val);
+                    retvalue = SCOPES_GET_RESULT(label_to_function(val));
                 } else {
-                    retvalue = argument_to_value(val);
+                    retvalue = SCOPES_GET_RESULT(argument_to_value(val));
                 }
             } break;
             case FN_ExtractValue: {
                 READ_VALUE(val);
                 READ_ANY(index);
                 retvalue = LLVMBuildExtractValue(
-                    builder, val, cast_number<int32_t>(index), "");
+                    builder, val, SCOPES_GET_RESULT(cast_number<int32_t>(index)), "");
             } break;
             case FN_InsertValue: {
                 READ_VALUE(val);
                 READ_VALUE(eltval);
                 READ_ANY(index);
                 retvalue = LLVMBuildInsertValue(
-                    builder, val, eltval, cast_number<int32_t>(index), "");
+                    builder, val, eltval, SCOPES_GET_RESULT(cast_number<int32_t>(index)), "");
             } break;
             case FN_ExtractElement: {
                 READ_VALUE(val);
@@ -1269,14 +1281,6 @@ struct LLVMIRGenerator {
             case FN_Alloca: { READ_TYPE(ty);
                 retvalue = safe_alloca(ty);
             } break;
-            case FN_AllocaExceptionPad: {
-                LLVMTypeRef ty = type_to_llvm_type(Array(TYPE_U8, sizeof(ExceptionPad)));
-#ifdef SCOPES_WIN32
-                retvalue = LLVMBuildAlloca(builder, ty, "");
-#else
-                retvalue = safe_alloca(ty);
-#endif
-            } break;
             case FN_AllocaArray: { READ_TYPE(ty); READ_VALUE(val);
                 retvalue = safe_alloca(ty, val); } break;
             case FN_AllocaOf: {
@@ -1297,7 +1301,7 @@ struct LLVMIRGenerator {
                 size_t count = argcount - 1;
                 LLVMValueRef indices[count];
                 for (size_t i = 0; i < count; ++i) {
-                    indices[i] = argument_to_value(args[argn + i].value);
+                    indices[i] = SCOPES_GET_RESULT(argument_to_value(args[argn + i].value));
                 }
                 retvalue = LLVMBuildGEP(builder, pointer, indices, count, "");
             } break;
@@ -1621,17 +1625,17 @@ struct LLVMIRGenerator {
             default: {
                 StyledString ss;
                 ss.out << "IL->IR: unsupported builtin " << enter.builtin << " encountered";
-                location_error(ss.str());
+                SCOPES_LOCATION_ERROR(ss.str());
             } break;
             }
         } else if (enter.type == TYPE_Label) {
-            LLVMValueRef value = label_to_value(enter);
+            LLVMValueRef value = SCOPES_GET_RESULT(label_to_value(enter));
             if (!value) {
                 // no basic block was generated - just generate assignments
                 auto &&params = enter.label->params;
                 for (size_t i = 1; i <= argcount; ++i) {
                     if (i < params.size()) {
-                        bind_parameter(params[i], argument_to_value(args[i].value));
+                        bind_parameter(params[i], SCOPES_GET_RESULT(argument_to_value(args[i].value)));
                     }
                 }
                 label = enter.label;
@@ -1639,7 +1643,7 @@ struct LLVMIRGenerator {
             } else if (LLVMValueIsBasicBlock(value)) {
                 LLVMValueRef values[argcount];
                 for (size_t i = 0; i < argcount; ++i) {
-                    values[i] = argument_to_value(args[i + 1].value);
+                    values[i] = SCOPES_GET_RESULT(argument_to_value(args[i + 1].value));
                 }
                 auto bbfrom = LLVMGetInsertBlock(builder);
                 // assign phi nodes
@@ -1647,7 +1651,7 @@ struct LLVMIRGenerator {
                 LLVMBasicBlockRef incobbs[] = { bbfrom };
                 for (size_t i = 1; i < params.size(); ++i) {
                     Parameter *param = params[i];
-                    LLVMValueRef phinode = argument_to_value(param);
+                    LLVMValueRef phinode = SCOPES_GET_RESULT(argument_to_value(param));
                     LLVMValueRef incovals[] = { values[i - 1] };
                     LLVMAddIncoming(phinode, incovals, incobbs, 1);
                 }
@@ -1657,23 +1661,23 @@ struct LLVMIRGenerator {
                 if (use_debug_info) {
                     LLVMSetCurrentDebugLocation(builder, diloc);
                 }
-                retvalue = build_call(
+                retvalue = SCOPES_GET_RESULT(build_call(
                     enter.label->get_function_type(),
-                    value, args, rtraits);
+                    value, args, rtraits));
             }
         } else if (enter.type == TYPE_Closure) {
             StyledString ss;
             ss.out << "IL->IR: invalid call of compile time closure at runtime";
-            location_error(ss.str());
+            SCOPES_LOCATION_ERROR(ss.str());
         } else if (is_function_pointer(enter.indirect_type())) {
-            retvalue = build_call(extract_function_type(enter.indirect_type()),
-                argument_to_value(enter), args, rtraits);
+            retvalue = SCOPES_GET_RESULT(build_call(extract_function_type(enter.indirect_type()),
+                SCOPES_GET_RESULT(argument_to_value(enter)), args, rtraits));
         } else if (enter.type == TYPE_Parameter) {
             assert (enter.parameter->type != TYPE_Nothing);
             assert(enter.parameter->type != TYPE_Unknown);
             LLVMValueRef values[argcount];
             for (size_t i = 0; i < argcount; ++i) {
-                values[i] = argument_to_value(args[i + 1].value);
+                values[i] = SCOPES_GET_RESULT(argument_to_value(args[i + 1].value));
             }
             // must be a return
             assert(enter.parameter->index == 0);
@@ -1683,7 +1687,7 @@ struct LLVMIRGenerator {
             Label *label = enter.parameter->label;
             bool use_sret = is_memory_class(label->get_return_type());
             if (use_sret) {
-                auto pval = resolve_parameter(enter.parameter);
+                auto pval = SCOPES_GET_RESULT(resolve_parameter(enter.parameter));
                 if (argcount > 1) {
                     LLVMTypeRef types[argcount];
                     for (size_t i = 0; i < argcount; ++i) {
@@ -1712,7 +1716,7 @@ struct LLVMIRGenerator {
         } else {
             StyledString ss;
             ss.out << "IL->IR: cannot translate call to " << enter;
-            location_error(ss.str());
+            SCOPES_LOCATION_ERROR(ss.str());
         }
 
         Any contarg = args[0].value;
@@ -1726,7 +1730,7 @@ struct LLVMIRGenerator {
             Label *label = contarg.parameter->label;
             bool use_sret = is_memory_class(label->get_return_type());
             if (use_sret) {
-                auto pval = resolve_parameter(contarg.parameter);
+                auto pval = SCOPES_GET_RESULT(resolve_parameter(contarg.parameter));
                 if (retvalue) {
                     LLVMBuildStore(builder, retvalue, pval);
                 }
@@ -1739,7 +1743,7 @@ struct LLVMIRGenerator {
                 }
             }
         } else if (contarg.type == TYPE_Label) {
-            auto bb = label_to_basic_block(contarg.label);
+            auto bb = SCOPES_GET_RESULT(label_to_basic_block(contarg.label));
             if (bb) {
                 if (retvalue) {
                     auto bbfrom = LLVMGetInsertBlock(builder);
@@ -1771,7 +1775,7 @@ struct LLVMIRGenerator {
         } \
     }
                     #define T(PARAM, VALUE) \
-                        LLVMAddIncoming(argument_to_value(PARAM), &VALUE, incobbs, 1);
+                        LLVMAddIncoming(SCOPES_GET_RESULT(argument_to_value(PARAM)), &VALUE, incobbs, 1);
                     UNPACK_RET_ARGS()
                     #undef T
                 }
@@ -1791,15 +1795,15 @@ struct LLVMIRGenerator {
         } else if (contarg.type == TYPE_Nothing) {
             StyledStream ss(SCOPES_CERR);
             stream_label(ss, label, StreamLabelFormat::debug_single());
-            location_error(String::from("IL->IR: unexpected end of function"));
+            SCOPES_LOCATION_ERROR(String::from("IL->IR: unexpected end of function"));
         } else {
             StyledStream ss(SCOPES_CERR);
             stream_label(ss, label, StreamLabelFormat::debug_single());
-            location_error(String::from("IL->IR: continuation is of invalid type"));
+            SCOPES_LOCATION_ERROR(String::from("IL->IR: continuation is of invalid type"));
         }
 
         LLVMSetCurrentDebugLocation(builder, nullptr);
-
+        return true;
     }
 #undef READ_ANY
 #undef READ_VALUE
@@ -1818,7 +1822,8 @@ struct LLVMIRGenerator {
         }
     }
 
-    void process_labels() {
+    SCOPES_RESULT(void) process_labels() {
+        SCOPES_RESULT_TYPE(void);
         while (!bb_label_todo.empty()) {
             auto it = bb_label_todo.back();
             set_active_function(it.first);
@@ -1830,8 +1835,9 @@ struct LLVMIRGenerator {
             LLVMBasicBlockRef bb = it2->second;
             LLVMPositionBuilderAtEnd(builder, bb);
 
-            write_label_body(label);
+            SCOPES_CHECK_RESULT(write_label_body(label));
         }
+        return true;
     }
 
     bool has_single_caller(Label *l) {
@@ -1848,7 +1854,8 @@ struct LLVMIRGenerator {
         return false;
     }
 
-    LLVMBasicBlockRef label_to_basic_block(Label *label) {
+    SCOPES_RESULT(LLVMBasicBlockRef) label_to_basic_block(Label *label) {
+        SCOPES_RESULT_TYPE(LLVMBasicBlockRef);
         auto old_bb = LLVMGetInsertBlock(builder);
         LLVMValueRef func = LLVMGetBasicBlockParent(old_bb);
         auto it = label2bb.find({func, label});
@@ -1870,7 +1877,7 @@ struct LLVMIRGenerator {
                 for (size_t i = 0; i < paramcount; ++i) {
                     Parameter *param = params[i + 1];
                     auto pvalue = LLVMBuildPhi(builder,
-                        type_to_llvm_type(param->type),
+                        SCOPES_GET_RESULT(type_to_llvm_type(param->type)),
                         param->name.name()->data);
                     bind_parameter(param, pvalue);
                 }
@@ -1883,9 +1890,10 @@ struct LLVMIRGenerator {
         }
     }
 
-    LLVMValueRef label_to_function(Label *label,
+    SCOPES_RESULT(LLVMValueRef) label_to_function(Label *label,
         bool root_function = false,
         Symbol funcname = SYM_Unnamed) {
+        SCOPES_RESULT_TYPE(LLVMValueRef);
         auto it = label2func.find(label);
         if (it == label2func.end()) {
 
@@ -1914,12 +1922,12 @@ struct LLVMIRGenerator {
                 name = funcname.name()->data;
             }
 
-            label->verify_compilable();
+            SCOPES_CHECK_RESULT(label->verify_compilable());
             auto ilfunctype = label->get_function_type();
             auto fi = cast<FunctionType>(ilfunctype);
             bool use_sret = is_memory_class(fi->return_type);
 
-            auto functype = type_to_llvm_type(ilfunctype);
+            auto functype = SCOPES_GET_RESULT(type_to_llvm_type(ilfunctype));
 
             auto func = LLVMAddFunction(module, name, functype);
             if (use_debug_info) {
@@ -1947,11 +1955,11 @@ struct LLVMIRGenerator {
             size_t k = offset;
             for (size_t i = 0; i < paramcount; ++i) {
                 Parameter *param = params[i + 1];
-                LLVMValueRef val = abi_import_argument(param, func, k);
+                LLVMValueRef val = SCOPES_GET_RESULT(abi_import_argument(param, func, k));
                 bind_parameter(param, val);
             }
 
-            write_label_body(label);
+            SCOPES_CHECK_RESULT(write_label_body(label));
 
             LLVMPositionBuilderAtEnd(builder, old_bb);
 
@@ -1984,10 +1992,11 @@ struct LLVMIRGenerator {
         }
     }
 
-    void teardown_generate(Label *entry = nullptr) {
-        process_labels();
+    SCOPES_RESULT(void) teardown_generate(Label *entry = nullptr) {
+        SCOPES_RESULT_TYPE(void);
+        SCOPES_CHECK_RESULT(process_labels());
 
-        size_t k = finalize_types();
+        size_t k = SCOPES_GET_RESULT(finalize_types());
         assert(!k);
 
         LLVMDisposeBuilder(builder);
@@ -2003,17 +2012,18 @@ struct LLVMIRGenerator {
                 stream_label(ss, entry, StreamLabelFormat());
             }
             LLVMDumpModule(module);
-            location_error(
+            SCOPES_LOCATION_ERROR(
                 String::join(
                     String::from("LLVM: "),
                     String::from_cstr(errmsg)));
         }
         LLVMDisposeMessage(errmsg);
+        return true;
     }
 
     // for generating object files
-    LLVMModuleRef generate(const String *name, Scope *table) {
-
+    SCOPES_RESULT(LLVMModuleRef) generate(const String *name, Scope *table) {
+        SCOPES_RESULT_TYPE(LLVMModuleRef);
         {
             std::unordered_set<Label *> visited;
             Labels labels;
@@ -2022,7 +2032,7 @@ struct LLVMIRGenerator {
                 for (auto it = t->map->begin(); it != t->map->end(); ++it) {
                     Label *fn = it->second.value;
 
-                    fn->verify_compilable();
+                    SCOPES_CHECK_RESULT(fn->verify_compilable());
                     fn->build_reachable(visited, &labels);
                 }
                 t = t->parent;
@@ -2041,18 +2051,21 @@ struct LLVMIRGenerator {
                 Symbol name = it->first;
                 Label *fn = it->second.value;
 
-                auto func = label_to_function(fn, true, name);
+                auto func = SCOPES_GET_RESULT(label_to_function(fn, true, name));
                 LLVMSetLinkage(func, LLVMExternalLinkage);
 
             }
             t = t->parent;
         }
 
-        teardown_generate();
+        SCOPES_CHECK_RESULT(teardown_generate());
         return module;
     }
 
-    std::pair<LLVMModuleRef, LLVMValueRef> generate(Label *entry) {
+    typedef std::pair<LLVMModuleRef, LLVMValueRef> ModuleValuePair;
+
+    SCOPES_RESULT(ModuleValuePair) generate(Label *entry) {
+        SCOPES_RESULT_TYPE(ModuleValuePair);
         assert(all_parameters_lowered(entry));
         assert(!entry->is_basic_block_like());
 
@@ -2067,16 +2080,17 @@ struct LLVMIRGenerator {
         const char *name = entry->name.name()->data;
         setup_generate(name);
 
-        auto func = label_to_function(entry, true);
+        auto func = SCOPES_GET_RESULT(label_to_function(entry, true));
         LLVMSetLinkage(func, LLVMExternalLinkage);
 
-        teardown_generate(entry);
+        SCOPES_CHECK_RESULT(teardown_generate(entry));
 
-        return std::pair<LLVMModuleRef, LLVMValueRef>(module, func);
+        return ModuleValuePair(module, func);
     }
 
 };
 
+bool LLVMIRGenerator::ok = true;
 std::unordered_map<const Type *, LLVMTypeRef> LLVMIRGenerator::type_cache;
 ArgTypes LLVMIRGenerator::type_todo;
 LLVMTypeRef LLVMIRGenerator::voidT = nullptr;
@@ -2187,7 +2201,8 @@ public:
 };
 #endif
 
-void compile_object(const String *path, Scope *scope, uint64_t flags) {
+SCOPES_RESULT(void) compile_object(const String *path, Scope *scope, uint64_t flags) {
+    SCOPES_RESULT_TYPE(void);
     Timer sum_compile_time(TIMER_Compile);
 #if SCOPES_COMPILE_WITH_DEBUG_INFO
 #else
@@ -2206,7 +2221,7 @@ void compile_object(const String *path, Scope *scope, uint64_t flags) {
     LLVMModuleRef module;
     {
         Timer generate_timer(TIMER_Generate);
-        module = ctx.generate(path, scope);
+        module = SCOPES_GET_RESULT(ctx.generate(path, scope));
     }
 
     if (flags & CF_O3) {
@@ -2231,16 +2246,18 @@ void compile_object(const String *path, Scope *scope, uint64_t flags) {
     char *path_cstr = strdup(path->data);
     if (LLVMTargetMachineEmitToFile(target_machine, module, path_cstr,
         LLVMObjectFile, &errormsg)) {
-        location_error(String::from_cstr(errormsg));
+        SCOPES_LOCATION_ERROR(String::from_cstr(errormsg));
     }
     free(path_cstr);
+    return true;
 }
 
 #if 0
 static DisassemblyListener *disassembly_listener = nullptr;
 #endif
 
-Any compile(Label *fn, uint64_t flags) {
+SCOPES_RESULT(Any) compile(Label *fn, uint64_t flags) {
+    SCOPES_RESULT_TYPE(Any);
     Timer sum_compile_time(TIMER_Compile);
 #if SCOPES_COMPILE_WITH_DEBUG_INFO
 #else
@@ -2250,7 +2267,7 @@ Any compile(Label *fn, uint64_t flags) {
     flags |= CF_O3;
 #endif
 
-    fn->verify_compilable();
+    SCOPES_CHECK_RESULT(fn->verify_compilable());
     const Type *functype = Pointer(
         fn->get_function_type(), PTF_NonWritable, SYM_Unnamed);
 
@@ -2259,7 +2276,7 @@ Any compile(Label *fn, uint64_t flags) {
         ctx.use_debug_info = false;
     }
 
-    std::pair<LLVMModuleRef, LLVMValueRef> result;
+    LLVMIRGenerator::ModuleValuePair result;
     {
         /*
         A note on debugging "LLVM ERROR:" messages that seem to give no plausible
@@ -2267,7 +2284,7 @@ Any compile(Label *fn, uint64_t flags) {
         or at exit if the llvm symbols are missing, and then look at the stack trace.
         */
         Timer generate_timer(TIMER_Generate);
-        result = ctx.generate(fn);
+        result = SCOPES_GET_RESULT(ctx.generate(fn));
     }
 
     auto module = result.first;
@@ -2275,7 +2292,7 @@ Any compile(Label *fn, uint64_t flags) {
     assert(func);
 
     init_execution();
-    add_module(module);
+    SCOPES_CHECK_RESULT(add_module(module));
 
 #if 0
     if (!disassembly_listener && (flags & CF_DumpDisassembly)) {

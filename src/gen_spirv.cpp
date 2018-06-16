@@ -76,7 +76,8 @@ static void format_spv_location(StyledStream &ss, const char* source,
     ss << ":" << Style_None << " ";
 }
 
-static void verify_spirv(std::vector<unsigned int> &contents) {
+static SCOPES_RESULT(void) verify_spirv(std::vector<unsigned int> &contents) {
+    SCOPES_RESULT_TYPE(void);
     spv_target_env target_env = SPV_ENV_UNIVERSAL_1_2;
     //spvtools::ValidatorOptions options;
 
@@ -112,8 +113,9 @@ static void verify_spirv(std::vector<unsigned int> &contents) {
     if (!succeed) {
         disassemble_spirv(contents, true);
         SCOPES_CERR << ss._ss.str();
-        location_error(String::from("SPIR-V validation found errors"));
+        SCOPES_LOCATION_ERROR(String::from("SPIR-V validation found errors"));
     }
+    return true;
 }
 
 
@@ -179,14 +181,15 @@ struct SPIRVGenerator {
 
     }
 
-    static spv::Dim dim_from_symbol(Symbol sym) {
+    static SCOPES_RESULT(spv::Dim) dim_from_symbol(Symbol sym) {
+        SCOPES_RESULT_TYPE(spv::Dim);
         switch(sym.value()) {
         #define T(NAME) \
             case SYM_SPIRV_Dim ## NAME: return spv::Dim ## NAME;
             B_SPIRV_DIM()
         #undef T
             default:
-                location_error(
+                SCOPES_LOCATION_ERROR(
                     String::from(
                         "IL->SPIR: unsupported dimensionality"));
                 break;
@@ -194,14 +197,15 @@ struct SPIRVGenerator {
         return spv::DimMax;
     }
 
-    spv::ImageFormat image_format_from_symbol(Symbol sym) {
+    SCOPES_RESULT(spv::ImageFormat) image_format_from_symbol(Symbol sym) {
+        SCOPES_RESULT_TYPE(spv::ImageFormat);
         switch(sym.value()) {
         #define T(NAME) \
             case SYM_SPIRV_ImageFormat ## NAME: return spv::ImageFormat ## NAME;
             B_SPIRV_IMAGE_FORMAT()
         #undef T
             default:
-                location_error(
+                SCOPES_LOCATION_ERROR(
                     String::from(
                         "IL->SPIR: unsupported image format"));
                 break;
@@ -209,14 +213,15 @@ struct SPIRVGenerator {
         return spv::ImageFormatMax;
     }
 
-    static spv::ExecutionMode execution_mode_from_symbol(Symbol sym) {
+    static SCOPES_RESULT(spv::ExecutionMode) execution_mode_from_symbol(Symbol sym) {
+        SCOPES_RESULT_TYPE(spv::ExecutionMode);
         switch(sym.value()) {
         #define T(NAME) \
             case SYM_SPIRV_ExecutionMode ## NAME: return spv::ExecutionMode ## NAME;
             B_SPIRV_EXECUTION_MODE()
         #undef T
             default:
-                location_error(
+                SCOPES_LOCATION_ERROR(
                     String::from(
                         "IL->SPIR: unsupported execution mode"));
                 break;
@@ -224,20 +229,21 @@ struct SPIRVGenerator {
         return spv::ExecutionModeMax;
     }
 
-    spv::StorageClass storage_class_from_extern_class(Symbol sym) {
+    SCOPES_RESULT(spv::StorageClass) storage_class_from_extern_class(Symbol sym) {
+        SCOPES_RESULT_TYPE(spv::StorageClass);
         switch(sym.value()) {
         #define T(NAME) \
             case SYM_SPIRV_StorageClass ## NAME: return spv::StorageClass ## NAME;
             B_SPIRV_STORAGE_CLASS()
         #undef T
             case SYM_Unnamed:
-                location_error(
+                SCOPES_LOCATION_ERROR(
                     String::from(
                         "IL->SPIR: pointers with C storage class"
                         " are unsupported"));
                 break;
             default:
-                location_error(
+                SCOPES_LOCATION_ERROR(
                     String::from(
                         "IL->SPIR: unsupported storage class for pointer"));
                 break;
@@ -249,7 +255,8 @@ struct SPIRVGenerator {
         return param2value.find({active_function_value, param}) != param2value.end();
     }
 
-    spv::Id resolve_parameter(Parameter *param) {
+    SCOPES_RESULT(spv::Id) resolve_parameter(Parameter *param) {
+        SCOPES_RESULT_TYPE(spv::Id);
         auto it = param2value.find({active_function_value, param});
         if (it == param2value.end()) {
             assert(active_function_value);
@@ -258,13 +265,14 @@ struct SPIRVGenerator {
             }
             StyledString ss;
             ss.out << "IL->SPIR: can't access free variable " << param;
-            location_error(ss.str());
+            SCOPES_LOCATION_ERROR(ss.str());
         }
         assert(it->second);
         return it->second;
     }
 
-    spv::Id argument_to_value(Any value) {
+    SCOPES_RESULT(spv::Id) argument_to_value(Any value) {
+        SCOPES_RESULT_TYPE(spv::Id);
         if (value.type == TYPE_Parameter) {
             return resolve_parameter(value.parameter);
         }
@@ -296,7 +304,7 @@ struct SPIRVGenerator {
                 }
                 StyledString ss;
                 ss.out << "IL->SPIR: unsupported integer constant type " << value.type;
-                location_error(ss.str());
+                SCOPES_LOCATION_ERROR(ss.str());
             } break;
             case TK_Real: {
                 auto rt = cast<RealType>(value.type);
@@ -307,16 +315,16 @@ struct SPIRVGenerator {
                 }
                 StyledString ss;
                 ss.out << "IL->SPIR: unsupported real constant type " << value.type;
-                location_error(ss.str());
+                SCOPES_LOCATION_ERROR(ss.str());
             } break;
             case TK_Pointer: {
                 if (is_function_pointer(value.type)) {
                     StyledString ss;
                     ss.out << "IL->SPIR: function pointer constants are unsupported";
-                    location_error(ss.str());
+                    SCOPES_LOCATION_ERROR(ss.str());
                 }
                 auto pt = cast<PointerType>(value.type);
-                auto val = argument_to_value(pt->unpack(value.pointer));
+                auto val = SCOPES_GET_RESULT(argument_to_value(SCOPES_GET_RESULT(pt->unpack(value.pointer))));
                 auto id = builder.createVariable(spv::StorageClassFunction,
                     builder.getTypeId(val), nullptr);
                 builder.getInstruction(id)->addIdOperand(val);
@@ -334,30 +342,30 @@ struct SPIRVGenerator {
                 size_t count = ai->count;
                 std::vector<spv::Id> values;
                 for (size_t i = 0; i < count; ++i) {
-                    values.push_back(argument_to_value(ai->unpack(value.pointer, i)));
+                    values.push_back(SCOPES_GET_RESULT(argument_to_value(SCOPES_GET_RESULT(ai->unpack(value.pointer, i)))));
                 }
                 return builder.makeCompositeConstant(
-                    type_to_spirv_type(value.type), values);
+                    SCOPES_GET_RESULT(type_to_spirv_type(value.type)), values);
             } break;
             case TK_Vector: {
                 auto vi = cast<VectorType>(value.type);
                 size_t count = vi->count;
                 std::vector<spv::Id> values;
                 for (size_t i = 0; i < count; ++i) {
-                    values.push_back(argument_to_value(vi->unpack(value.pointer, i)));
+                    values.push_back(SCOPES_GET_RESULT(argument_to_value(SCOPES_GET_RESULT(vi->unpack(value.pointer, i)))));
                 }
                 return builder.makeCompositeConstant(
-                    type_to_spirv_type(value.type), values);
+                    SCOPES_GET_RESULT(type_to_spirv_type(value.type)), values);
             } break;
             case TK_Tuple: {
                 auto ti = cast<TupleType>(value.type);
                 size_t count = ti->types.size();
                 std::vector<spv::Id> values;
                 for (size_t i = 0; i < count; ++i) {
-                    values.push_back(argument_to_value(ti->unpack(value.pointer, i)));
+                    values.push_back(SCOPES_GET_RESULT(argument_to_value(SCOPES_GET_RESULT(ti->unpack(value.pointer, i)))));
                 }
                 return builder.makeCompositeConstant(
-                    type_to_spirv_type(value.type), values);
+                    SCOPES_GET_RESULT(type_to_spirv_type(value.type)), values);
             } break;
             case TK_Union: {
                 auto ui = cast<UnionType>(value.type);
@@ -372,20 +380,21 @@ struct SPIRVGenerator {
         if (it != const_cache.end()) {
             return it->second;
         }
-        auto id = create_spirv_value(value);
+        auto id = SCOPES_GET_RESULT(create_spirv_value(value));
         const_cache.insert({ value, id });
         return id;
     }
 
-    spv::Id create_spirv_value(Any value) {
+    SCOPES_RESULT(spv::Id) create_spirv_value(Any value) {
+        SCOPES_RESULT_TYPE(spv::Id);
         if (value.type == TYPE_String) {
             return builder.createString(value.string->data);
         }
         switch(value.type->kind()) {
         case TK_Extern: {
             auto et = cast<ExternType>(value.type);
-            spv::StorageClass sc = storage_class_from_extern_class(
-                et->storage_class);
+            spv::StorageClass sc = SCOPES_GET_RESULT(storage_class_from_extern_class(
+                et->storage_class));
             const char *name = nullptr;
             spv::BuiltIn builtin = spv::BuiltInMax;
             switch(value.symbol.value()) {
@@ -398,7 +407,7 @@ struct SPIRVGenerator {
                     name = value.symbol.name()->data;
                     break;
             }
-            auto ty = type_to_spirv_type(et->type, et->flags);
+            auto ty = SCOPES_GET_RESULT(type_to_spirv_type(et->type, et->flags));
             auto id = builder.createVariable(sc, ty, name);
             if (builtin != spv::BuiltInMax) {
                 builder.addDecoration(id, spv::DecorationBuiltIn, builtin);
@@ -445,7 +454,7 @@ struct SPIRVGenerator {
 
         StyledString ss;
         ss.out << "IL->SPIR: cannot convert argument of type " << value.type;
-        location_error(ss.str());
+        SCOPES_LOCATION_ERROR(ss.str());
         return 0;
     }
 
@@ -457,14 +466,16 @@ struct SPIRVGenerator {
             || builder.isBoolType(T);
     }
 
-    void write_anchor(const Anchor *anchor) {
+    SCOPES_RESULT(void) write_anchor(const Anchor *anchor) {
+        SCOPES_RESULT_TYPE(void);
         assert(anchor);
         assert(anchor->file);
         if (use_debug_info) {
             builder.addLine(
-                argument_to_value(anchor->path().name()),
+                SCOPES_GET_RESULT(argument_to_value(anchor->path().name())),
                 anchor->lineno, anchor->column);
         }
+        return true;
     }
 
     // set of processed SCC groups
@@ -520,9 +531,10 @@ struct SPIRVGenerator {
         return nullptr;
     }
 
-    bool handle_loop_label (Label *label,
+    SCOPES_RESULT(bool) handle_loop_label (Label *label,
         Label *&continue_label,
         Label *&break_label) {
+        SCOPES_RESULT_TYPE(bool);
         auto &&group = scc.group(label);
         if (group.labels.size() <= 1)
             return false;
@@ -546,7 +558,7 @@ struct SPIRVGenerator {
                     //stream_label(ss, continue_label, StreamLabelFormat::debug_single());
                     //stream_label(ss, l, StreamLabelFormat::debug_single());
                     set_active_anchor(l->body.anchor);
-                    location_error(String::from(
+                    SCOPES_LOCATION_ERROR(String::from(
                         "IL->SPIR: duplicate continue label found. only one continue label is permitted per loop."));
                 }
                 continue_label = l;
@@ -569,7 +581,7 @@ struct SPIRVGenerator {
         assert(continue_label->is_basic_block_like());
 
         if (break_labels.empty()) {
-            location_error(String::from(
+            SCOPES_LOCATION_ERROR(String::from(
                 "IL->SPIR: loop is infinite"));
         }
 
@@ -614,7 +626,7 @@ struct SPIRVGenerator {
                         }
                     }
                 }
-                location_error(String::from(
+                SCOPES_LOCATION_ERROR(String::from(
                     "IL->SPIR: cannot merge multiple loop exit points."));
             }
             break_label = lca;
@@ -656,8 +668,9 @@ struct SPIRVGenerator {
         param2value[{active_function_value, param}] = value;
     }
 
-    void write_label_body(Label *label) {
+    SCOPES_RESULT(void) write_label_body(Label *label) {
     repeat:
+        SCOPES_RESULT_TYPE(void);
         assert(label->body.is_complete());
 
         auto &&body = label->body;
@@ -666,16 +679,16 @@ struct SPIRVGenerator {
 
         set_active_anchor(label->body.anchor);
 
-        write_anchor(label->body.anchor);
+        SCOPES_CHECK_RESULT(write_anchor(label->body.anchor));
 
         Label *continue_label = nullptr;
         Label *break_label = nullptr;
-        if (handle_loop_label(label, continue_label, break_label)) {
+        if (SCOPES_GET_RESULT(handle_loop_label(label, continue_label, break_label))) {
             spv::Block *bb_continue = nullptr;
             spv::Block *bb_merge = nullptr;
             unsigned int control = spv::LoopControlMaskNone;
-            bb_continue = label_to_basic_block(continue_label, true);
-            bb_merge = label_to_basic_block(break_label, true);
+            bb_continue = SCOPES_GET_RESULT(label_to_basic_block(continue_label, true));
+            bb_merge = SCOPES_GET_RESULT(label_to_basic_block(break_label, true));
             builder.createLoopMerge(bb_merge, bb_continue, control);
             auto bb = &builder.makeNewBlock();
             builder.createBranch(bb);
@@ -692,15 +705,15 @@ struct SPIRVGenerator {
         assert(argn <= argcount); \
         auto && _arg_ ## NAME = args[argn++]; \
         auto && _ ## NAME = _arg_ ## NAME .value; \
-        spv::Id NAME = argument_to_value(_ ## NAME);
+        spv::Id NAME = SCOPES_GET_RESULT(argument_to_value(_ ## NAME));
 #define READ_LABEL_BLOCK(NAME) \
         assert(argn <= argcount); \
-        spv::Block *NAME = label_to_basic_block(args[argn++].value); \
+        spv::Block *NAME = SCOPES_GET_RESULT(label_to_basic_block(args[argn++].value)); \
         assert(NAME);
 #define READ_TYPE(NAME) \
         assert(argn <= argcount); \
         assert(args[argn].value.type == TYPE_Type); \
-        spv::Id NAME = type_to_spirv_type(args[argn++].value.typeref);
+        spv::Id NAME = SCOPES_GET_RESULT(type_to_spirv_type(args[argn++].value.typeref));
 
         spv::Id retvalue = 0;
         ReturnTraits rtraits;
@@ -713,11 +726,11 @@ struct SPIRVGenerator {
                 memset(&params, 0, sizeof(params));
                 params.sampler = sampler;
                 params.coords = coords;
-                auto ST = storage_type(_sampler.indirect_type());
+                auto ST = SCOPES_GET_RESULT(storage_type(_sampler.indirect_type()));
                 if (ST->kind() == TK_SampledImage) {
-                    ST = storage_type(cast<SampledImageType>(ST)->type);
+                    ST = SCOPES_GET_RESULT(storage_type(cast<SampledImageType>(ST)->type));
                 }
-                auto resultType = type_to_spirv_type(cast<ImageType>(ST)->type);
+                auto resultType = SCOPES_GET_RESULT(type_to_spirv_type(cast<ImageType>(ST)->type));
                 bool sparse = false;
                 bool fetch = false;
                 bool proj = false;
@@ -802,7 +815,7 @@ struct SPIRVGenerator {
                 READ_VALUE(image);
                 READ_VALUE(coords);
                 auto ST = _image.indirect_type();
-                auto resultType = type_to_spirv_type(cast<ImageType>(ST)->type);
+                auto resultType = SCOPES_GET_RESULT(type_to_spirv_type(cast<ImageType>(ST)->type));
                 retvalue = builder.createBinOp(spv::OpImageRead,
                     resultType, image, coords);
             } break;
@@ -886,7 +899,7 @@ struct SPIRVGenerator {
                 default: {
                     StyledString ss;
                     ss.out << "IL->SPIR: unsupported unary intrinsic " << enter << " encountered";
-                    location_error(ss.str());
+                    SCOPES_LOCATION_ERROR(ss.str());
                 } break;
                 }
                 retvalue = builder.createBuiltinCall(rtype, glsl_ext_inst, builtin, { val });
@@ -905,7 +918,7 @@ struct SPIRVGenerator {
                 default: {
                     StyledString ss;
                     ss.out << "IL->SPIR: unsupported binary intrinsic " << enter << " encountered";
-                    location_error(ss.str());
+                    SCOPES_LOCATION_ERROR(ss.str());
                 } break;
                 }
                 retvalue = builder.createBuiltinCall(rtype, glsl_ext_inst, builtin, { a, b });
@@ -917,7 +930,7 @@ struct SPIRVGenerator {
             case FN_ExtractValue: {
                 READ_VALUE(val);
                 READ_ANY(index);
-                int i = cast_number<unsigned>(index);
+                int i = SCOPES_GET_RESULT(cast_number<unsigned>(index));
                 retvalue = builder.createCompositeExtract(val,
                     builder.getContainedTypeId(builder.getTypeId(val), i),
                     i);
@@ -928,13 +941,13 @@ struct SPIRVGenerator {
                 READ_ANY(index);
                 retvalue = builder.createCompositeInsert(eltval, val,
                     builder.getTypeId(val),
-                    cast_number<unsigned>(index));
+                    SCOPES_GET_RESULT(cast_number<unsigned>(index)));
             } break;
             case FN_ExtractElement: {
                 READ_VALUE(val);
                 READ_VALUE(index);
                 if (_index.is_const()) {
-                    int i = cast_number<unsigned>(_index);
+                    int i = SCOPES_GET_RESULT(cast_number<unsigned>(_index));
                     retvalue = builder.createCompositeExtract(val,
                         builder.getContainedTypeId(builder.getTypeId(val), i),
                         i);
@@ -951,7 +964,7 @@ struct SPIRVGenerator {
                 if (_index.is_const()) {
                     retvalue = builder.createCompositeInsert(eltval, val,
                         builder.getTypeId(val),
-                        cast_number<unsigned>(_index));
+                        SCOPES_GET_RESULT(cast_number<unsigned>(_index)));
                 } else {
                     retvalue = builder.createVectorInsertDynamic(val,
                         builder.getTypeId(val), eltval, index);
@@ -969,10 +982,10 @@ struct SPIRVGenerator {
                     spv::OpVectorShuffle);
                 op->addIdOperand(v1);
                 op->addIdOperand(v2);
-                auto vt = cast<VectorType>(storage_type(_mask.type));
+                auto vt = cast<VectorType>(SCOPES_GET_RESULT(storage_type(_mask.type)));
                 for (int i = 0; i < sz; ++i) {
                     op->addImmediateOperand(
-                        cast_number<unsigned int>(vt->unpack(_mask.pointer, i)));
+                        SCOPES_GET_RESULT(cast_number<unsigned int>(SCOPES_GET_RESULT(vt->unpack(_mask.pointer, i)))));
                 }
                 retvalue = op->getResultId();
                 builder.getBuildPoint()->addInstruction(
@@ -1004,12 +1017,12 @@ struct SPIRVGenerator {
             case SFXFN_ExecutionMode: {
                 assert(active_function_value);
                 READ_ANY(mode);
-                auto em = execution_mode_from_symbol(mode.symbol);
+                auto em = SCOPES_GET_RESULT(execution_mode_from_symbol(mode.symbol));
                 int values[3] = { -1, -1, -1 };
                 int c = 0;
                 while ((c < 3) && (argn <= argcount)) {
                     READ_ANY(val);
-                    values[c] = cast_number<int>(val);
+                    values[c] = SCOPES_GET_RESULT(cast_number<int>(val));
                     c++;
                 }
                 builder.addExecutionMode(active_function_value, em,
@@ -1021,7 +1034,7 @@ struct SPIRVGenerator {
                 size_t count = argcount - 1;
                 std::vector<spv::Id> indices;
                 for (size_t i = 1; i < count; ++i) {
-                    indices.push_back(argument_to_value(args[argn + i].value));
+                    indices.push_back(SCOPES_GET_RESULT(argument_to_value(args[argn + i].value)));
                 }
 
                 retvalue = builder.createAccessChain(
@@ -1216,17 +1229,17 @@ struct SPIRVGenerator {
             default: {
                 StyledString ss;
                 ss.out << "IL->SPIR: unsupported builtin " << enter.builtin << " encountered";
-                location_error(ss.str());
+                SCOPES_LOCATION_ERROR(ss.str());
             } break;
             }
         } else if (enter.type == TYPE_Label) {
             if (enter.label->is_basic_block_like()) {
-                auto block = label_to_basic_block(enter.label);
+                auto block = SCOPES_GET_RESULT(label_to_basic_block(enter.label));
                 if (!block) {
                     // no basic block was generated - just generate assignments
                     auto &&params = enter.label->params;
                     for (size_t i = 1; i < params.size(); ++i) {
-                        bind_parameter(params[i], argument_to_value(args[i].value));
+                        bind_parameter(params[i], SCOPES_GET_RESULT(argument_to_value(args[i].value)));
                     }
                     label = enter.label;
                     goto repeat;
@@ -1237,12 +1250,12 @@ struct SPIRVGenerator {
                     bool single_caller = has_single_caller(enter.label);
                     for (size_t i = 1; i < params.size(); ++i) {
                         Parameter *param = params[i];
-                        auto value = argument_to_value(args[i].value);
+                        auto value = SCOPES_GET_RESULT(argument_to_value(args[i].value));
                         if (single_caller) {
                             assert(!parameter_is_bound(param));
                             bind_parameter(param, value);
                         } else {
-                            auto phinode = argument_to_value(param);
+                            auto phinode = SCOPES_GET_RESULT(argument_to_value(param));
                             auto op = builder.getInstruction(phinode);
                             assert(op);
                             op->addIdOperand(value);
@@ -1256,21 +1269,21 @@ struct SPIRVGenerator {
                 /*if (use_debug_info) {
                     LLVMSetCurrentDebugLocation(builder, diloc);
                 }*/
-                auto func = label_to_function(enter.label);
-                retvalue = build_call(
+                auto func = SCOPES_GET_RESULT(label_to_function(enter.label));
+                retvalue = SCOPES_GET_RESULT(build_call(
                     enter.label->get_function_type(),
-                    func, args, rtraits);
+                    func, args, rtraits));
             }
         } else if (enter.type == TYPE_Closure) {
             StyledString ss;
             ss.out << "IL->SPIR: invalid call of compile time closure at runtime";
-            location_error(ss.str());
+            SCOPES_LOCATION_ERROR(ss.str());
         } else if (enter.type == TYPE_Parameter) {
             assert (enter.parameter->type != TYPE_Nothing);
             assert(enter.parameter->type != TYPE_Unknown);
             std::vector<spv::Id> values;
             for (size_t i = 0; i < argcount; ++i) {
-                values.push_back(argument_to_value(args[i + 1].value));
+                values.push_back(SCOPES_GET_RESULT(argument_to_value(args[i + 1].value)));
             }
             // must be a return
             assert(enter.parameter->index == 0);
@@ -1280,7 +1293,7 @@ struct SPIRVGenerator {
             //Label *label = enter.parameter->label;
             if (argcount > 1) {
                 auto ilfunctype = cast<FunctionType>(active_function->get_function_type());
-                auto rettype = type_to_spirv_type(ilfunctype->return_type);
+                auto rettype = SCOPES_GET_RESULT(type_to_spirv_type(ilfunctype->return_type));
                 auto id = builder.createUndefined(rettype);
                 for (size_t i = 0; i < values.size(); ++i) {
                     id = builder.createCompositeInsert(
@@ -1296,7 +1309,7 @@ struct SPIRVGenerator {
         } else {
             StyledString ss;
             ss.out << "IL->SPIR: cannot translate call to " << enter;
-            location_error(ss.str());
+            SCOPES_LOCATION_ERROR(ss.str());
         }
 
         Any contarg = args[0].value;
@@ -1314,7 +1327,7 @@ struct SPIRVGenerator {
                 builder.makeReturn(true, 0);
             }
         } else if (contarg.type == TYPE_Label) {
-            auto bb = label_to_basic_block(contarg.label);
+            auto bb = SCOPES_GET_RESULT(label_to_basic_block(contarg.label));
 #define UNPACK_RET_ARGS() \
     if (rtraits.multiple_return_values) { \
         assert(rtraits.rtype); \
@@ -1354,7 +1367,7 @@ struct SPIRVGenerator {
                             assert(!parameter_is_bound(PARAM)); \
                             bind_parameter(PARAM, VALUE); \
                         } else { \
-                            auto phinode = argument_to_value(PARAM); \
+                            auto phinode = SCOPES_GET_RESULT(argument_to_value(PARAM)); \
                             auto op = builder.getInstruction(phinode); \
                             assert(op); \
                             op->addIdOperand(VALUE); \
@@ -1380,14 +1393,15 @@ struct SPIRVGenerator {
         } else if (contarg.type == TYPE_Nothing) {
             StyledStream ss(SCOPES_CERR);
             stream_label(ss, label, StreamLabelFormat::debug_single());
-            location_error(String::from("IL->SPIR: unexpected end of function"));
+            SCOPES_LOCATION_ERROR(String::from("IL->SPIR: unexpected end of function"));
         } else {
             StyledStream ss(SCOPES_CERR);
             stream_label(ss, label, StreamLabelFormat::debug_single());
-            location_error(String::from("IL->SPIR: continuation is of invalid type"));
+            SCOPES_LOCATION_ERROR(String::from("IL->SPIR: continuation is of invalid type"));
         }
 
         //LLVMSetCurrentDebugLocation(builder, nullptr);
+        return true;
     }
     #undef READ_ANY
     #undef READ_VALUE
@@ -1405,8 +1419,9 @@ struct SPIRVGenerator {
             rtype(nullptr) {}
     };
 
-    spv::Id build_call(const Type *functype, spv::Function* func, Args &args,
+    SCOPES_RESULT(spv::Id) build_call(const Type *functype, spv::Function* func, Args &args,
         ReturnTraits &traits) {
+        SCOPES_RESULT_TYPE(spv::Id);
         size_t argcount = args.size() - 1;
 
         auto fi = cast<FunctionType>(functype);
@@ -1414,13 +1429,13 @@ struct SPIRVGenerator {
         std::vector<spv::Id> values;
         for (size_t i = 0; i < argcount; ++i) {
             auto &&arg = args[i + 1];
-            values.push_back(argument_to_value(arg.value));
+            values.push_back(SCOPES_GET_RESULT(argument_to_value(arg.value)));
         }
 
         size_t fargcount = fi->argument_types.size();
         assert(argcount >= fargcount);
         if (fi->flags & FF_Variadic) {
-            location_error(String::from("IL->SPIR: variadic calls not supported"));
+            SCOPES_LOCATION_ERROR(String::from("IL->SPIR: variadic calls not supported"));
         }
 
         auto ret = builder.createFunctionCall(func, values);
@@ -1450,7 +1465,8 @@ struct SPIRVGenerator {
         }
     }
 
-    void process_labels() {
+    SCOPES_RESULT(void) process_labels() {
+        SCOPES_RESULT_TYPE(void);
         while (!bb_label_todo.empty()) {
             auto it = bb_label_todo.back();
             set_active_function(it.first);
@@ -1462,8 +1478,9 @@ struct SPIRVGenerator {
             spv::Block *bb = it2->second;
             builder.setBuildPoint(bb);
 
-            write_label_body(label);
+            SCOPES_CHECK_RESULT(write_label_body(label));
         }
+        return true;
     }
 
     Label *get_single_caller(Label *l) {
@@ -1485,14 +1502,15 @@ struct SPIRVGenerator {
         return (userl != nullptr);
     }
 
-    spv::Id create_struct_type(const Type *type, uint64_t flags,
+    SCOPES_RESULT(spv::Id) create_struct_type(const Type *type, uint64_t flags,
         const TypenameType *tname = nullptr) {
+        SCOPES_RESULT_TYPE(spv::Id);
         // todo: packed tuples
         auto ti = cast<TupleType>(type);
         size_t count = ti->types.size();
         std::vector<spv::Id> members;
         for (size_t i = 0; i < count; ++i) {
-            members.push_back(type_to_spirv_type(ti->types[i]));
+            members.push_back(SCOPES_GET_RESULT(type_to_spirv_type(ti->types[i])));
         }
         const char *name = "tuple";
         if (tname) {
@@ -1526,7 +1544,8 @@ struct SPIRVGenerator {
         return id;
     }
 
-    spv::Id create_spirv_type(const Type *type, uint64_t flags) {
+    SCOPES_RESULT(spv::Id) create_spirv_type(const Type *type, uint64_t flags) {
+        SCOPES_RESULT_TYPE(spv::Id);
         switch(type->kind()) {
         case TK_Integer: {
             if (type == TYPE_Bool)
@@ -1541,12 +1560,12 @@ struct SPIRVGenerator {
         case TK_Pointer: {
             auto pt = cast<PointerType>(type);
             return builder.makePointer(
-                storage_class_from_extern_class(pt->storage_class),
-                type_to_spirv_type(pt->element_type));
+                SCOPES_GET_RESULT(storage_class_from_extern_class(pt->storage_class)),
+                SCOPES_GET_RESULT(type_to_spirv_type(pt->element_type)));
         } break;
         case TK_Array: {
             auto ai = cast<ArrayType>(type);
-            auto etype = type_to_spirv_type(ai->element_type);
+            auto etype = SCOPES_GET_RESULT(type_to_spirv_type(ai->element_type));
             spv::Id ty;
             if (!ai->count) {
                 ty = builder.makeRuntimeArray(etype);
@@ -1556,13 +1575,13 @@ struct SPIRVGenerator {
             }
             builder.addDecoration(ty,
                 spv::DecorationArrayStride,
-                size_of(ai->element_type));
+                SCOPES_GET_RESULT(size_of(ai->element_type)));
             return ty;
         } break;
         case TK_Vector: {
             auto vi = cast<VectorType>(type);
             return builder.makeVectorType(
-                type_to_spirv_type(vi->element_type),
+                SCOPES_GET_RESULT(type_to_spirv_type(vi->element_type)),
                 vi->count);
         } break;
         case TK_Tuple: {
@@ -1574,28 +1593,28 @@ struct SPIRVGenerator {
         } break;
         case TK_Extern: {
             auto et = cast<ExternType>(type);
-            spv::StorageClass sc = storage_class_from_extern_class(
-                et->storage_class);
-            auto ty = type_to_spirv_type(et->type, et->flags);
+            spv::StorageClass sc = SCOPES_GET_RESULT(storage_class_from_extern_class(
+                et->storage_class));
+            auto ty = SCOPES_GET_RESULT(type_to_spirv_type(et->type, et->flags));
             return builder.makePointer(sc, ty);
         } break;
         case TK_Image: {
             auto it = cast<ImageType>(type);
-            auto ty = type_to_spirv_type(it->type);
+            auto ty = SCOPES_GET_RESULT(type_to_spirv_type(it->type));
             if (builder.isVectorType(ty)) {
                 ty = builder.getContainedTypeId(ty);
             }
             return builder.makeImageType(ty,
-                dim_from_symbol(it->dim),
+                SCOPES_GET_RESULT(dim_from_symbol(it->dim)),
                 (it->depth == 1),
                 (it->arrayed == 1),
                 (it->multisampled == 1),
                 it->sampled,
-                image_format_from_symbol(it->format));
+                SCOPES_GET_RESULT(image_format_from_symbol(it->format)));
         } break;
         case TK_SampledImage: {
             auto sit = cast<SampledImageType>(type);
-            return builder.makeSampledImageType(type_to_spirv_type(sit->type));
+            return builder.makeSampledImageType(SCOPES_GET_RESULT(type_to_spirv_type(sit->type)));
         } break;
         case TK_Typename: {
             if (type == TYPE_Void)
@@ -1607,28 +1626,27 @@ struct SPIRVGenerator {
                 if (tn->storage_type->kind() == TK_Tuple) {
                     return create_struct_type(tn->storage_type, flags, tn);
                 } else {
-                    return type_to_spirv_type(tn->storage_type, flags);
+                    return SCOPES_GET_RESULT(type_to_spirv_type(tn->storage_type, flags));
                 }
             } else {
-                location_error(String::from("IL->SPIR: opaque types are not supported"));
-                return 0;
+                SCOPES_LOCATION_ERROR(String::from("IL->SPIR: opaque types are not supported"));
             }
         } break;
         case TK_ReturnLabel: {
             auto rlt = cast<ReturnLabelType>(type);
-            return type_to_spirv_type(rlt->return_type);
+            return SCOPES_GET_RESULT(type_to_spirv_type(rlt->return_type));
         } break;
         case TK_Function: {
             auto fi = cast<FunctionType>(type);
             if (fi->vararg()) {
-                location_error(String::from("IL->SPIR: vararg functions are not supported"));
+                SCOPES_LOCATION_ERROR(String::from("IL->SPIR: vararg functions are not supported"));
             }
             size_t count = fi->argument_types.size();
-            spv::Id rettype = type_to_spirv_type(fi->return_type);
+            spv::Id rettype = SCOPES_GET_RESULT(type_to_spirv_type(fi->return_type));
             std::vector<spv::Id> elements;
             for (size_t i = 0; i < count; ++i) {
                 auto AT = fi->argument_types[i];
-                elements.push_back(type_to_spirv_type(AT));
+                elements.push_back(SCOPES_GET_RESULT(type_to_spirv_type(AT)));
             }
             return builder.makeFunctionType(rettype, elements);
         } break;
@@ -1636,14 +1654,14 @@ struct SPIRVGenerator {
 
         StyledString ss;
         ss.out << "IL->SPIR: cannot convert type " << type;
-        location_error(ss.str());
-        return 0;
+        SCOPES_LOCATION_ERROR(ss.str());
     }
 
-    spv::Id type_to_spirv_type(const Type *type, uint64_t flags = 0) {
+    SCOPES_RESULT(spv::Id) type_to_spirv_type(const Type *type, uint64_t flags = 0) {
+        SCOPES_RESULT_TYPE(spv::Id);
         auto it = type_cache.find({type, flags});
         if (it == type_cache.end()) {
-            spv::Id result = create_spirv_type(type, flags);
+            spv::Id result = SCOPES_GET_RESULT(create_spirv_type(type, flags));
             type_cache.insert({ { type, flags }, result});
             return result;
         } else {
@@ -1651,7 +1669,8 @@ struct SPIRVGenerator {
         }
     }
 
-    spv::Block *label_to_basic_block(Label *label, bool force = false) {
+    SCOPES_RESULT(spv::Block *) label_to_basic_block(Label *label, bool force = false) {
+        SCOPES_RESULT_TYPE(spv::Block *);
         auto old_bb = builder.getBuildPoint();
         auto func = &old_bb->getParent();
         auto it = label2bb.find({func, label});
@@ -1672,7 +1691,7 @@ struct SPIRVGenerator {
                 size_t paramcount = label->params.size() - 1;
                 for (size_t i = 0; i < paramcount; ++i) {
                     Parameter *param = params[i + 1];
-                    auto ptype = type_to_spirv_type(param->type);
+                    auto ptype = SCOPES_GET_RESULT(type_to_spirv_type(param->type));
                     if (!single_caller) {
                         auto op = new spv::Instruction(
                             builder.getUniqueId(), ptype, spv::OpPhi);
@@ -1690,9 +1709,10 @@ struct SPIRVGenerator {
         }
     }
 
-    spv::Function *label_to_function(Label *label,
+    SCOPES_RESULT(spv::Function *) label_to_function(Label *label,
         bool root_function = false,
         Symbol funcname = SYM_Unnamed) {
+        SCOPES_RESULT_TYPE(spv::Function *);
         auto it = label2func.find(label);
         if (it == label2func.end()) {
 
@@ -1713,18 +1733,18 @@ struct SPIRVGenerator {
                 name = funcname.name()->data;
             }
 
-            label->verify_compilable();
+            SCOPES_CHECK_RESULT(label->verify_compilable());
             auto ilfunctype = cast<FunctionType>(label->get_function_type());
             //auto fi = cast<FunctionType>(ilfunctype);
 
-            auto rettype = type_to_spirv_type(ilfunctype->return_type);
+            auto rettype = SCOPES_GET_RESULT(type_to_spirv_type(ilfunctype->return_type));
 
             spv::Block* bb;
             std::vector<spv::Id> paramtypes;
 
             auto &&argtypes = ilfunctype->argument_types;
             for (auto it = argtypes.begin(); it != argtypes.end(); ++it) {
-                paramtypes.push_back(type_to_spirv_type(*it));
+                paramtypes.push_back(SCOPES_GET_RESULT(type_to_spirv_type(*it)));
             }
 
             std::vector<std::vector<spv::Decoration>> decorations;
@@ -1742,7 +1762,7 @@ struct SPIRVGenerator {
             }
 
             builder.setBuildPoint(bb);
-            write_anchor(label->anchor);
+            SCOPES_CHECK_RESULT(write_anchor(label->anchor));
 
             auto &&params = label->params;
             size_t paramcount = params.size() - 1;
@@ -1752,7 +1772,7 @@ struct SPIRVGenerator {
                 bind_parameter(param, val);
             }
 
-            write_label_body(label);
+            SCOPES_CHECK_RESULT(write_label_body(label));
 
             builder.setBuildPoint(old_bb);
 
@@ -1764,7 +1784,8 @@ struct SPIRVGenerator {
         }
     }
 
-    void generate(std::vector<unsigned int> &result, Symbol target, Label *entry) {
+    SCOPES_RESULT(void) generate(std::vector<unsigned int> &result, Symbol target, Label *entry) {
+        SCOPES_RESULT_TYPE(void);
         //assert(all_parameters_lowered(entry));
         assert(!entry->is_basic_block_like());
 
@@ -1778,7 +1799,7 @@ struct SPIRVGenerator {
             StyledString ss;
             ss.out << "Entry function must have type " << needfi
                 << " but has type " << hasfi;
-            location_error(ss.str());
+            SCOPES_LOCATION_ERROR(ss.str());
         }
 
         {
@@ -1810,7 +1831,7 @@ struct SPIRVGenerator {
                 false, "", 0, "", 0);*/
         }
 
-        auto func = label_to_function(entry, true);
+        auto func = SCOPES_GET_RESULT(label_to_function(entry, true));
 
         switch(target.value()) {
         case SYM_TargetVertex: {
@@ -1836,24 +1857,26 @@ struct SPIRVGenerator {
                 << Symbol(SYM_TargetFragment) << " "
                 << Symbol(SYM_TargetGeometry) << " "
                 << Symbol(SYM_TargetCompute);
-            location_error(ss.str());
+            SCOPES_LOCATION_ERROR(ss.str());
         } break;
         }
 
-        process_labels();
+        SCOPES_CHECK_RESULT(process_labels());
 
         //size_t k = finalize_types();
         //assert(!k);
 
         builder.dump(result);
 
-        verify_spirv(result);
+        SCOPES_CHECK_RESULT(verify_spirv(result));
+        return true;
     }
 };
 
 //------------------------------------------------------------------------------
 
-void optimize_spirv(std::vector<unsigned int> &result, int opt_level) {
+SCOPES_RESULT(void) optimize_spirv(std::vector<unsigned int> &result, int opt_level) {
+    SCOPES_RESULT_TYPE(void);
     spvtools::Optimizer optimizer(SPV_ENV_UNIVERSAL_1_2);
     /*
     optimizer.SetMessageConsumer([](spv_message_level_t level, const char* source,
@@ -1916,17 +1939,19 @@ void optimize_spirv(std::vector<unsigned int> &result, int opt_level) {
     std::vector<unsigned int> oldresult = result;
     result.clear();
     if (!optimizer.Run(oldresult.data(), oldresult.size(), &result)) {
-        location_error(String::from(
+        SCOPES_LOCATION_ERROR(String::from(
             "IL->SPIR: error while running optimization passes"));
     }
 
-    verify_spirv(result);
+    SCOPES_CHECK_RESULT(verify_spirv(result));
+    return true;
 }
 
-const String *compile_spirv(Symbol target, Label *fn, uint64_t flags) {
+SCOPES_RESULT(const String *) compile_spirv(Symbol target, Label *fn, uint64_t flags) {
+    SCOPES_RESULT_TYPE(const String *);
     Timer sum_compile_time(TIMER_CompileSPIRV);
 
-    fn->verify_compilable();
+    SCOPES_CHECK_RESULT(fn->verify_compilable());
 
     SPIRVGenerator ctx;
     if (flags & CF_NoDebugInfo) {
@@ -1936,7 +1961,7 @@ const String *compile_spirv(Symbol target, Label *fn, uint64_t flags) {
     std::vector<unsigned int> result;
     {
         Timer generate_timer(TIMER_GenerateSPIRV);
-        ctx.generate(result, target, fn);
+        SCOPES_CHECK_RESULT(ctx.generate(result, target, fn));
     }
 
     if (flags & CF_O3) {
@@ -1947,7 +1972,7 @@ const String *compile_spirv(Symbol target, Label *fn, uint64_t flags) {
             level = 2;
         else if ((flags & CF_O3) == CF_O3)
             level = 3;
-        optimize_spirv(result, level);
+        SCOPES_CHECK_RESULT(optimize_spirv(result, level));
     }
 
     if (flags & CF_DumpModule) {
@@ -1962,10 +1987,11 @@ const String *compile_spirv(Symbol target, Label *fn, uint64_t flags) {
     return String::from((char *)&result[0], bytesize);
 }
 
-const String *compile_glsl(Symbol target, Label *fn, uint64_t flags) {
+SCOPES_RESULT(const String *) compile_glsl(Symbol target, Label *fn, uint64_t flags) {
+    SCOPES_RESULT_TYPE(const String *);
     Timer sum_compile_time(TIMER_CompileSPIRV);
 
-    fn->verify_compilable();
+    SCOPES_CHECK_RESULT(fn->verify_compilable());
 
     SPIRVGenerator ctx;
     if (flags & CF_NoDebugInfo) {
@@ -1975,7 +2001,7 @@ const String *compile_glsl(Symbol target, Label *fn, uint64_t flags) {
     std::vector<unsigned int> result;
     {
         Timer generate_timer(TIMER_GenerateSPIRV);
-        ctx.generate(result, target, fn);
+        SCOPES_CHECK_RESULT(ctx.generate(result, target, fn));
     }
 
     if (flags & CF_O3) {
@@ -1986,7 +2012,7 @@ const String *compile_glsl(Symbol target, Label *fn, uint64_t flags) {
             level = 2;
         else if ((flags & CF_O3) == CF_O3)
             level = 3;
-        optimize_spirv(result, level);
+        SCOPES_CHECK_RESULT(optimize_spirv(result, level));
     }
 
     if (flags & CF_DumpDisassembly) {

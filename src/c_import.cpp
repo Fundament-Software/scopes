@@ -54,6 +54,7 @@ public:
 
     Scope *dest;
     clang::ASTContext *Context;
+    bool ok;
     std::unordered_map<clang::RecordDecl *, bool> record_defined;
     std::unordered_map<clang::EnumDecl *, bool> enum_defined;
     NamespaceMap named_structs;
@@ -62,10 +63,10 @@ public:
     NamespaceMap named_enums;
     NamespaceMap typedefs;
 
-    CVisitor() : dest(nullptr), Context(NULL) {
+    CVisitor() : dest(nullptr), Context(NULL), ok(true) {
         const Type *T = Typename(String::from("__builtin_va_list"));
         auto tnt = cast<TypenameType>(const_cast<Type*>(T));
-        tnt->finalize(Array(TYPE_I8, sizeof(va_list)));
+        tnt->finalize(Array(TYPE_I8, sizeof(va_list)).assert_ok()).assert_ok();
         typedefs.insert({Symbol("__builtin_va_list"), T });
     }
 
@@ -94,7 +95,8 @@ public:
         dest = _dest;
     }
 
-    void GetFields(TypenameType *tni, clang::RecordDecl * rd) {
+    SCOPES_RESULT(void) GetFields(TypenameType *tni, clang::RecordDecl * rd) {
+        SCOPES_RESULT_TYPE(void);
         auto &rl = Context->getASTRecordLayout(rd);
 
         bool is_union = rd->isUnion();
@@ -122,7 +124,7 @@ public:
             }
 
             clang::QualType FT = it->getType();
-            const Type *fieldtype = TranslateType(FT);
+            auto fieldtype = SCOPES_GET_RESULT(TranslateType(FT));
 
             if(it->isBitField()) {
                 has_bitfield = true;
@@ -141,7 +143,7 @@ public:
                 auto offset = rl.getFieldOffset(idx) / 8;
                 size_t newsz = sz;
                 if (!packed) {
-                    size_t etal = align_of(fieldtype);
+                    size_t etal = SCOPES_GET_RESULT(align_of(fieldtype));
                     newsz = scopes::align(sz, etal);
                     al = std::max(al, etal);
                 }
@@ -150,17 +152,17 @@ public:
                     if (newsz < offset) {
                         size_t pad = offset - newsz;
                         args.push_back(Argument(SYM_Unnamed,
-                            Array(TYPE_U8, pad)));
+                            Array(TYPE_U8, pad).assert_ok()));
                     } else {
                         // our computed offset is later than the real one
                         // structure is likely packed
                         packed = true;
                     }
                 }
-                sz = offset + size_of(fieldtype);
+                sz = offset + SCOPES_GET_RESULT(size_of(fieldtype));
             } else {
-                sz = std::max(sz, size_of(fieldtype));
-                al = std::max(al, align_of(fieldtype));
+                sz = std::max(sz, SCOPES_GET_RESULT(size_of(fieldtype)));
+                al = std::max(al, SCOPES_GET_RESULT(align_of(fieldtype)));
             }
 
             args.push_back(Argument(name, unknown_of(fieldtype)));
@@ -201,7 +203,9 @@ public:
             }
         }
 
-        tni->finalize(is_union?MixedUnion(args):MixedTuple(args, packed, explicit_alignment?al:0));
+        SCOPES_CHECK_RESULT(tni->finalize(is_union?SCOPES_GET_RESULT(MixedUnion(args)):
+            SCOPES_GET_RESULT(MixedTuple(args, packed, explicit_alignment?al:0))));
+        return true;
     }
 
     const Type *get_typename(Symbol name, NamespaceMap &map) {
@@ -218,7 +222,8 @@ public:
         return Typename(name.name());
     }
 
-    const Type *TranslateRecord(clang::RecordDecl *rd) {
+    SCOPES_RESULT(const Type *) TranslateRecord(clang::RecordDecl *rd) {
+        SCOPES_RESULT_TYPE(const Type *);
         Symbol name = SYM_Unnamed;
         if (rd->isAnonymousStructOrUnion()) {
             auto tdn = rd->getTypedefNameForAnonDecl();
@@ -240,7 +245,7 @@ public:
             set_active_anchor(anchorFromLocation(rd->getSourceRange().getBegin()));
             StyledString ss;
             ss.out << "clang-bridge: can't translate record of unuspported type " << name;
-            location_error(ss.str());
+            SCOPES_LOCATION_ERROR(ss.str());
         }
 
         clang::RecordDecl * defn = rd->getDefinition();
@@ -252,10 +257,10 @@ public:
                 set_active_anchor(anchorFromLocation(rd->getSourceRange().getBegin()));
                 StyledString ss;
                 ss.out << "clang-bridge: duplicate body defined for type " << struct_type;
-                location_error(ss.str());
+                SCOPES_LOCATION_ERROR(ss.str());
             }
 
-            GetFields(tni, defn);
+            SCOPES_CHECK_RESULT(GetFields(tni, defn));
 
             if (name != SYM_Unnamed) {
                 Any target = none;
@@ -290,7 +295,8 @@ public:
         }
     }
 
-    const Type *TranslateEnum(clang::EnumDecl *ed) {
+    SCOPES_RESULT(const Type *) TranslateEnum(clang::EnumDecl *ed) {
+        SCOPES_RESULT_TYPE(const Type *);
 
         Symbol name(String::from_stdstring(ed->getName()));
 
@@ -302,11 +308,11 @@ public:
         if (defn && !enum_defined[ed]) {
             enum_defined[ed] = true;
 
-            const Type *tag_type = TranslateType(ed->getIntegerType());
+            auto tag_type = SCOPES_GET_RESULT(TranslateType(ed->getIntegerType()));
 
             auto tni = cast<TypenameType>(const_cast<Type *>(enum_type));
             tni->super_type = TYPE_CEnum;
-            tni->finalize(tag_type);
+            SCOPES_CHECK_RESULT(tni->finalize(tag_type));
 
             for (auto it : ed->enumerators()) {
                 //const Anchor *anchor = anchorFromLocation(it->getSourceRange().getBegin());
@@ -410,7 +416,7 @@ public:
 
     // generate a storage type that matches alignment and size of the
     // original type; used for types that we can't translate
-    const Type *TranslateStorage(clang::QualType T) {
+    SCOPES_RESULT(const Type *) TranslateStorage(clang::QualType T) {
         // retype as a tuple of aligned integer and padding byte array
         size_t sz = Context->getTypeSize(T);
         size_t al = Context->getTypeAlign(T);
@@ -424,11 +430,12 @@ public:
         fields.push_back(TB);
         size_t pad = sz - al;
         if (pad)
-            fields.push_back(Array(TYPE_U8, pad));
+            fields.push_back(Array(TYPE_U8, pad).assert_ok());
         return Tuple(fields);
     }
 
-    const Type *TranslateType(clang::QualType T) {
+    SCOPES_RESULT(const Type *) TranslateType(clang::QualType T) {
+        SCOPES_RESULT_TYPE(const Type *);
         using namespace clang;
 
         const clang::Type *Ty = T.getTypePtr();
@@ -516,7 +523,7 @@ public:
             const clang::LValueReferenceType *PTy =
                 cast<clang::LValueReferenceType>(Ty);
             QualType ETy = PTy->getPointeeType();
-            return Pointer(TranslateType(ETy), PointerFlags(ETy), SYM_Unnamed);
+            return Pointer(SCOPES_GET_RESULT(TranslateType(ETy)), PointerFlags(ETy), SYM_Unnamed);
         } break;
         case clang::Type::RValueReference:
             break;
@@ -527,25 +534,25 @@ public:
         case clang::Type::Pointer: {
             const clang::PointerType *PTy = cast<clang::PointerType>(Ty);
             QualType ETy = PTy->getPointeeType();
-            return Pointer(TranslateType(ETy), PointerFlags(ETy), SYM_Unnamed);
+            return Pointer(SCOPES_GET_RESULT(TranslateType(ETy)), PointerFlags(ETy), SYM_Unnamed);
         } break;
         case clang::Type::VariableArray:
             break;
         case clang::Type::IncompleteArray: {
             const IncompleteArrayType *ATy = cast<IncompleteArrayType>(Ty);
             QualType ETy = ATy->getElementType();
-            return Pointer(TranslateType(ETy), PointerFlags(ETy), SYM_Unnamed);
+            return Pointer(SCOPES_GET_RESULT(TranslateType(ETy)), PointerFlags(ETy), SYM_Unnamed);
         } break;
         case clang::Type::ConstantArray: {
             const ConstantArrayType *ATy = cast<ConstantArrayType>(Ty);
-            const Type *at = TranslateType(ATy->getElementType());
+            const Type *at = SCOPES_GET_RESULT(TranslateType(ATy->getElementType()));
             uint64_t sz = ATy->getSize().getZExtValue();
             return Array(at, sz);
         } break;
         case clang::Type::ExtVector:
         case clang::Type::Vector: {
             const clang::VectorType *VT = cast<clang::VectorType>(T);
-            const Type *at = TranslateType(VT->getElementType());
+            const Type *at = SCOPES_GET_RESULT(TranslateType(VT->getElementType()));
             uint64_t n = VT->getNumElements();
             return Vector(at, n);
         } break;
@@ -563,17 +570,17 @@ public:
         default:
             break;
         }
-        location_error(format("clang-bridge: cannot convert type: %s (%s)",
+        SCOPES_LOCATION_ERROR(format("clang-bridge: cannot convert type: %s (%s)",
             T.getAsString().c_str(),
             Ty->getTypeClassName()));
-        return TYPE_Void;
     }
 
-    const Type *TranslateFuncType(const clang::FunctionType * f) {
+    SCOPES_RESULT(const Type *) TranslateFuncType(const clang::FunctionType * f) {
+        SCOPES_RESULT_TYPE(const Type *);
 
         clang::QualType RT = f->getReturnType();
 
-        const Type *returntype = TranslateType(RT);
+        const Type *returntype = SCOPES_GET_RESULT(TranslateType(RT));
 
         uint64_t flags = 0;
 
@@ -586,7 +593,7 @@ public:
             }
             for(size_t i = 0; i < proto->getNumParams(); i++) {
                 clang::QualType PT = proto->getParamType(i);
-                argtypes.push_back(TranslateType(PT));
+                argtypes.push_back(SCOPES_GET_RESULT(TranslateType(PT)));
             }
         }
 
@@ -605,26 +612,32 @@ public:
     }
 
     bool TraverseRecordDecl(clang::RecordDecl *rd) {
+        if (!ok) return false;
         if (rd->isFreeStanding()) {
-            TranslateRecord(rd);
+            ok = ok && TranslateRecord(rd).ok();
         }
         return true;
     }
 
     bool TraverseEnumDecl(clang::EnumDecl *ed) {
+        if (!ok) return false;
         if (ed->isFreeStanding()) {
-            TranslateEnum(ed);
+            ok = ok && TranslateEnum(ed).ok();
         }
         return true;
     }
 
     bool TraverseVarDecl(clang::VarDecl *vd) {
+        if (!ok) return false;
         if (vd->isExternC()) {
             const Anchor *anchor = anchorFromLocation(vd->getSourceRange().getBegin());
 
+            auto type = TranslateType(vd->getType());
+            ok = ok && type.ok();
+            if (!ok) return false;
             exportExtern(
                 String::from_stdstring(vd->getName().data()),
-                TranslateType(vd->getType()),
+                type.assert_ok(),
                 anchor);
         }
 
@@ -632,10 +645,14 @@ public:
     }
 
     bool TraverseTypedefDecl(clang::TypedefDecl *td) {
+        if (!ok) return false;
 
         //const Anchor *anchor = anchorFromLocation(td->getSourceRange().getBegin());
 
-        const Type *type = TranslateType(td->getUnderlyingType());
+        auto type_result = TranslateType(td->getUnderlyingType());
+        ok = ok && type_result.ok();
+        if (!ok) return false;
+        const Type *type = type_result.assert_ok();
 
         Symbol name = Symbol(String::from_stdstring(td->getName().data()));
 
@@ -646,6 +663,7 @@ public:
     }
 
     bool TraverseLinkageSpecDecl(clang::LinkageSpecDecl *ct) {
+        if (!ok) return false;
         if (ct->getLanguage() == clang::LinkageSpecDecl::lang_c) {
             return clang::RecursiveASTVisitor<CVisitor>::TraverseLinkageSpecDecl(ct);
         }
@@ -653,10 +671,13 @@ public:
     }
 
     bool TraverseClassTemplateDecl(clang::ClassTemplateDecl *ct) {
+        if (!ok) return false;
         return false;
     }
 
     bool TraverseFunctionDecl(clang::FunctionDecl *f) {
+        if (!ok) return false;
+
         clang::DeclarationName DeclName = f->getNameInfo().getName();
         std::string FuncName = DeclName.getAsString();
         const clang::FunctionType * fntyp = f->getType()->getAs<clang::FunctionType>();
@@ -668,7 +689,11 @@ public:
             return true;
         }
 
-        const Type *functype = TranslateFuncType(fntyp);
+        auto functype_result = TranslateFuncType(fntyp);
+        ok = ok && functype_result.ok();
+        if (!ok) return false;
+
+        const Type *functype = functype_result.assert_ok();
 
         std::string InternalName = FuncName;
         clang::AsmLabelAttr * asmlabel = f->getAttr<clang::AsmLabelAttr>();
@@ -693,9 +718,12 @@ class CodeGenProxy : public clang::ASTConsumer {
 public:
     Scope *dest;
 
+    static bool ok;
     CVisitor visitor;
 
-    CodeGenProxy(Scope *dest_) : dest(dest_) {}
+    CodeGenProxy(Scope *dest_) : dest(dest_) {
+        ok = true;
+    }
     virtual ~CodeGenProxy() {}
 
     virtual void Initialize(clang::ASTContext &Context) {
@@ -703,19 +731,25 @@ public:
     }
 
     virtual bool HandleTopLevelDecl(clang::DeclGroupRef D) {
-        for (clang::DeclGroupRef::iterator b = D.begin(), e = D.end(); b != e; ++b)
-            visitor.TraverseDecl(*b);
+        if (!ok) return false;
+        for (clang::DeclGroupRef::iterator b = D.begin(), e = D.end(); b != e; ++b) {
+            ok = ok && visitor.TraverseDecl(*b);
+            ok = ok && visitor.ok;
+            if (!ok) return false;
+        }
         return true;
     }
 };
 
+bool CodeGenProxy::ok = true;
+
 // see ASTConsumers.h for more utilities
-class BangEmitLLVMOnlyAction : public clang::EmitLLVMOnlyAction {
+class EmitLLVMOnlyAction : public clang::EmitLLVMOnlyAction {
 public:
     Scope *dest;
 
-    BangEmitLLVMOnlyAction(Scope *dest_) :
-        EmitLLVMOnlyAction((llvm::LLVMContext *)LLVMGetGlobalContext()),
+    EmitLLVMOnlyAction(Scope *dest_) :
+        clang::EmitLLVMOnlyAction((llvm::LLVMContext *)LLVMGetGlobalContext()),
         dest(dest_)
     {
     }
@@ -802,10 +836,11 @@ static void add_c_macro(clang::Preprocessor & PP,
     }
 }
 
-Scope *import_c_module (
+SCOPES_RESULT(Scope *) import_c_module (
     const std::string &path, const std::vector<std::string> &args,
     const char *buffer) {
     using namespace clang;
+    SCOPES_RESULT_TYPE(Scope *);
 
     std::vector<const char *> aargs;
     aargs.push_back("clang");
@@ -845,8 +880,9 @@ Scope *import_c_module (
     Scope *result = Scope::from();
 
     // Create and execute the frontend to generate an LLVM bitcode module.
-    std::unique_ptr<CodeGenAction> Act(new BangEmitLLVMOnlyAction(result));
+    std::unique_ptr<CodeGenAction> Act(new EmitLLVMOnlyAction(result));
     if (compiler.ExecuteAction(*Act)) {
+        SCOPES_CHECK_OK(CodeGenProxy::ok);
 
         clang::Preprocessor & PP = compiler.getPreprocessor();
         PP.getDiagnostics().setClient(new IgnoringDiagConsumer(), true);
@@ -879,13 +915,11 @@ Scope *import_c_module (
         M = (LLVMModuleRef)Act->takeModule().release();
         assert(M);
         llvm_c_modules.push_back(M);
-        add_module(M);
+        SCOPES_CHECK_RESULT(add_module(M));
         return result;
     } else {
-        location_error(String::from("compilation failed"));
+        SCOPES_LOCATION_ERROR(String::from("compilation failed"));
     }
-
-    return nullptr;
 }
 
 } // namespace scopes

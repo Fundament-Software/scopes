@@ -176,7 +176,8 @@ LLVMExecutionEngineRef ee = nullptr;
 void init_execution() {
 }
 
-void add_module(LLVMModuleRef module) {
+SCOPES_RESULT(void) add_module(LLVMModuleRef module) {
+    SCOPES_RESULT_TYPE(void);
     if (!ee) {
         char *errormsg = nullptr;
 
@@ -187,10 +188,11 @@ void add_module(LLVMModuleRef module) {
 
         if (LLVMCreateMCJITCompilerForModule(&ee, module, &opts,
             sizeof(opts), &errormsg)) {
-            location_error(String::from_cstr(errormsg));
+            SCOPES_LOCATION_ERROR(String::from_cstr(errormsg));
         }
     }
     LLVMAddModule(ee, module);
+    return true;
 }
 
 uint64_t get_address(const char *name) {

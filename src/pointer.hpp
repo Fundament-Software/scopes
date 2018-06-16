@@ -8,6 +8,7 @@
 #define SCOPES_POINTER_HPP
 
 #include "type.hpp"
+#include "result.hpp"
 
 namespace scopes {
 
@@ -27,9 +28,9 @@ struct PointerType : Type {
         uint64_t _flags, Symbol _storage_class);
 
     void stream_name(StyledStream &ss) const;
-    void *getelementptr(void *src, size_t i) const;
+    SCOPES_RESULT(void *) getelementptr(void *src, size_t i) const;
 
-    Any unpack(void *src) const;
+    SCOPES_RESULT(Any) unpack(void *src) const;
     static size_t size();
 
     bool is_readable() const;

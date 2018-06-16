@@ -51,12 +51,6 @@ UnionType::UnionType(const Args &_values)
         } else {
             T = values[i].value.type;
         }
-        if (is_opaque(T)) {
-            StyledString ss;
-            ss.out << "can not construct union type with field of opaque type "
-                << T;
-            location_error(ss.str());
-        }
         types.push_back(T);
     }
 
@@ -65,24 +59,26 @@ UnionType::UnionType(const Args &_values)
     largest_field = 0;
     for (size_t i = 0; i < types.size(); ++i) {
         const Type *ET = types[i];
-        auto newsz = size_of(ET);
+        auto newsz = size_of(ET).assert_ok();
         if (newsz > sz) {
             largest_field = i;
             sz = newsz;
         }
-        al = std::max(al, align_of(ET));
+        al = std::max(al, align_of(ET).assert_ok());
     }
     size = scopes::align(sz, al);
     align = al;
-    tuple_type = Tuple({types[largest_field]});
+    tuple_type = Tuple({types[largest_field]}).assert_ok();
 }
 
-Any UnionType::unpack(void *src, size_t i) const {
-    return wrap_pointer(type_at_index(i), src);
+SCOPES_RESULT(Any) UnionType::unpack(void *src, size_t i) const {
+    SCOPES_RESULT_TYPE(Any);
+    return wrap_pointer(SCOPES_GET_RESULT(type_at_index(i)), src);
 }
 
-const Type *UnionType::type_at_index(size_t i) const {
-    verify_range(i, types.size());
+SCOPES_RESULT(const Type *) UnionType::type_at_index(size_t i) const {
+    SCOPES_RESULT_TYPE(const Type *);
+    SCOPES_CHECK_RESULT(verify_range(i, types.size()));
     return types[i];
 }
 
@@ -94,14 +90,17 @@ size_t UnionType::field_index(Symbol name) const {
     return (size_t)-1;
 }
 
-Symbol UnionType::field_name(size_t i) const {
-    verify_range(i, values.size());
+SCOPES_RESULT(Symbol) UnionType::field_name(size_t i) const {
+    SCOPES_RESULT_TYPE(Symbol);
+    SCOPES_CHECK_RESULT(verify_range(i, values.size()));
     return values[i].key;
 }
 
 //------------------------------------------------------------------------------
 
-const Type *MixedUnion(const Args &values) {
+SCOPES_RESULT(const Type *) MixedUnion(const Args &values) {
+    SCOPES_RESULT_TYPE(const Type *);
+
     struct TypeArgs {
         Args args;
 
@@ -135,6 +134,21 @@ const Type *MixedUnion(const Args &values) {
 
     static ArgMap map;
 
+    for (size_t i = 0; i < values.size(); ++i) {
+        const Type *T = nullptr;
+        if (is_unknown(values[i].value)) {
+            T = values[i].value.typeref;
+        } else {
+            T = values[i].value.type;
+        }
+        if (is_opaque(T)) {
+            StyledString ss;
+            ss.out << "can not construct union type with field of opaque type "
+                << T;
+            SCOPES_LOCATION_ERROR(ss.str());
+        }
+    }
+
     TypeArgs ta(values);
     typename ArgMap::iterator it = map.find(ta);
     if (it == map.end()) {
@@ -146,7 +160,7 @@ const Type *MixedUnion(const Args &values) {
     }
 }
 
-const Type *Union(const ArgTypes &types) {
+SCOPES_RESULT(const Type *) Union(const ArgTypes &types) {
     Args args;
     args.reserve(types.size());
     for (size_t i = 0; i < types.size(); ++i) {

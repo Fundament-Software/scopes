@@ -52,7 +52,8 @@ ArrayType::ArrayType(const Type *_element_type, size_t _count)
 
 //------------------------------------------------------------------------------
 
-const Type *Array(const Type *element_type, size_t count) {
+SCOPES_RESULT(const Type *) Array(const Type *element_type, size_t count) {
+    SCOPES_RESULT_TYPE(const Type *);
     SCOPES_TYPE_KEY(ArrayType, key);
     key->element_type = element_type;
     key->count = count;
@@ -63,7 +64,7 @@ const Type *Array(const Type *element_type, size_t count) {
         StyledString ss;
         ss.out << "can not construct array type for values of opaque type "
             << element_type;
-        location_error(ss.str());
+        SCOPES_LOCATION_ERROR(ss.str());
     }
     const ArrayType *result = new ArrayType(element_type, count);
     arrays.insert(result);

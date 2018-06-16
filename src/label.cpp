@@ -132,7 +132,8 @@ bool Label::is_valid() const {
     return !params.empty() && body.anchor && !body.args.empty();
 }
 
-void Label::verify_valid () {
+SCOPES_RESULT(void) Label::verify_valid () {
+    SCOPES_RESULT_TYPE(void);
     const String *msg = nullptr;
     if (params.empty()) {
         msg = String::from("label corrupt: parameters are missing");
@@ -143,8 +144,9 @@ void Label::verify_valid () {
     }
     if (msg) {
         set_active_anchor(anchor);
-        location_error(msg);
+        SCOPES_LOCATION_ERROR(msg);
     }
+    return true;
 }
 
 //------------------------------------------------------------------------------
@@ -239,7 +241,8 @@ const Type *Label::get_return_type() const {
     return params[0]->type;
 }
 
-void Label::verify_compilable() const {
+SCOPES_RESULT(void) Label::verify_compilable() const {
+    SCOPES_RESULT_TYPE(void);
     if (params[0]->is_typed()
         && !params[0]->is_none()) {
         auto tl = dyn_cast<ReturnLabelType>(params[0]->type);
@@ -248,7 +251,7 @@ void Label::verify_compilable() const {
             StyledString ss;
             ss.out << "cannot compile function with return type "
                 << params[0]->type;
-            location_error(ss.str());
+            SCOPES_LOCATION_ERROR(ss.str());
         }
         for (size_t i = 0; i < tl->values.size(); ++i) {
             auto &&val = tl->values[i].value;
@@ -259,7 +262,7 @@ void Label::verify_compilable() const {
                     StyledString ss;
                     ss.out << "cannot compile function with opaque return argument of type "
                         << T;
-                    location_error(ss.str());
+                    SCOPES_LOCATION_ERROR(ss.str());
                 }
             }
         }
@@ -270,15 +273,16 @@ void Label::verify_compilable() const {
         auto T = params[i]->type;
         if (T == TYPE_Unknown) {
             set_active_anchor(anchor);
-            location_error(String::from("cannot compile function with untyped argument"));
+            SCOPES_LOCATION_ERROR(String::from("cannot compile function with untyped argument"));
         } else if (is_invalid_argument_type(T)) {
             set_active_anchor(anchor);
             StyledString ss;
             ss.out << "cannot compile function with opaque argument of type "
                 << T;
-            location_error(ss.str());
+            SCOPES_LOCATION_ERROR(ss.str());
         }
     }
+    return true;
 }
 
 const Type *Label::get_params_as_return_label_type() const {
@@ -553,7 +557,8 @@ StyledStream &Label::stream(StyledStream &ss, bool users) const {
     return ss;
 }
 
-const ReturnLabelType *Label::verify_return_label() {
+SCOPES_RESULT(const ReturnLabelType *) Label::verify_return_label() {
+    SCOPES_RESULT_TYPE(const ReturnLabelType *);
     if (!params.empty()) {
         const ReturnLabelType *rt = dyn_cast<ReturnLabelType>(params[0]->type);
         if (rt)
@@ -566,8 +571,7 @@ const ReturnLabelType *Label::verify_return_label() {
     }
 #endif
     set_active_anchor(anchor);
-    location_error(String::from("label is not a function"));
-    return nullptr;
+    SCOPES_LOCATION_ERROR(String::from("label is not a function"));
 }
 
 Label *Label::from(const Anchor *_anchor, Symbol _name) {

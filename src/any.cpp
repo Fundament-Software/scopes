@@ -7,12 +7,8 @@
 #include "any.hpp"
 
 #include "type.hpp"
+#include "types.hpp"
 #include "error.hpp"
-#include "vector.hpp"
-#include "integer.hpp"
-#include "real.hpp"
-#include "array.hpp"
-#include "tuple.hpp"
 #include "parameter.hpp"
 #include "hash.hpp"
 #include "dyn_cast.inc"
@@ -30,7 +26,7 @@ struct List;
 struct Label;
 struct Parameter;
 struct Scope;
-struct Exception;
+struct Error;
 struct Frame;
 struct Closure;
 
@@ -38,6 +34,7 @@ std::size_t Any::Hash::operator()(const Any & s) const {
     return hash2(std::hash<const Type *>{}(s.type), s.hash());
 }
 
+Any::Any() : type(TYPE_Nothing), u64(0) {}
 Any::Any(Nothing x) : type(TYPE_Nothing), u64(0) {}
 Any::Any(const Type *x) : type(TYPE_Type), typeref(x) {}
 Any::Any(bool x) : type(TYPE_Bool), u64(0) { i1 = x; }
@@ -59,7 +56,7 @@ Any::Any(Symbol x) : type(TYPE_Symbol), symbol(x) {}
 Any::Any(const Syntax *x) : type(TYPE_Syntax), syntax(x) {}
 Any::Any(const Anchor *x) : type(TYPE_Anchor), anchor(x) {}
 Any::Any(const List *x) : type(TYPE_List), list(x) {}
-Any::Any(const Exception *x) : type(TYPE_Exception), exception(x) {}
+Any::Any(const Error *x) : type(TYPE_Error), error(x) {}
 Any::Any(Label *x) : type(TYPE_Label), label(x) {}
 Any::Any(Parameter *x) : type(TYPE_Parameter), parameter(x) {}
 Any::Any(Builtin x) : type(TYPE_Builtin), builtin(x) {}
@@ -88,24 +85,33 @@ Any Any::from_pointer(const Type *type, void *ptr) {
     return val;
 }
 
-Any::operator const Type *() const { verify(TYPE_Type); return typeref; }
-Any::operator const List *() const { verify(TYPE_List); return list; }
-Any::operator const Syntax *() const { verify(TYPE_Syntax); return syntax; }
-Any::operator const Anchor *() const { verify(TYPE_Anchor); return anchor; }
-Any::operator const String *() const { verify(TYPE_String); return string; }
-Any::operator const Exception *() const { verify(TYPE_Exception); return exception; }
-Any::operator Label *() const { verify(TYPE_Label); return label; }
-Any::operator Scope *() const { verify(TYPE_Scope); return scope; }
-Any::operator Parameter *() const { verify(TYPE_Parameter); return parameter; }
-Any::operator const Closure *() const { verify(TYPE_Closure); return closure; }
-Any::operator Frame *() const { verify(TYPE_Frame); return frame; }
+#define SCOPES_RESULT_CAST_OPERATOR_IMPL(T, TYPE, MEMBER) \
+    Any::operator Result<T>() const { \
+        SCOPES_RESULT_TYPE(T); \
+        SCOPES_CHECK_RESULT(verify(TYPE)); \
+        return MEMBER; } \
+    Any::operator T() const { \
+        verify(TYPE).assert_ok(); \
+        return MEMBER; }
+
+SCOPES_RESULT_CAST_OPERATOR_IMPL(const Type *, TYPE_Type, typeref)
+SCOPES_RESULT_CAST_OPERATOR_IMPL(const List *, TYPE_List, list)
+SCOPES_RESULT_CAST_OPERATOR_IMPL(const Syntax *, TYPE_Syntax, syntax)
+SCOPES_RESULT_CAST_OPERATOR_IMPL(const Anchor *, TYPE_Anchor, anchor)
+SCOPES_RESULT_CAST_OPERATOR_IMPL(const String *, TYPE_String, string)
+SCOPES_RESULT_CAST_OPERATOR_IMPL(const Error *, TYPE_Error, error)
+SCOPES_RESULT_CAST_OPERATOR_IMPL(Label *, TYPE_Label, label)
+SCOPES_RESULT_CAST_OPERATOR_IMPL(Scope *, TYPE_Scope, scope)
+SCOPES_RESULT_CAST_OPERATOR_IMPL(Parameter *, TYPE_Parameter, parameter)
+SCOPES_RESULT_CAST_OPERATOR_IMPL(const Closure *, TYPE_Closure, closure)
+SCOPES_RESULT_CAST_OPERATOR_IMPL(Frame *, TYPE_Frame, frame)
 
 bool Any::operator !=(const Any &other) const {
     return !(*this == other);
 }
 
-void Any::verify(const Type *T) const {
-    scopes::verify(T, type);
+SCOPES_RESULT(void) Any::verify(const Type *T) const {
+    return scopes::verify(T, type);
 }
 
 StyledStream& Any::stream(StyledStream& ost, bool annotate_type) const {
@@ -150,7 +156,7 @@ StyledStream& Any::stream(StyledStream& ost, bool annotate_type) const {
             if (i != 0) {
                 ost << " ";
             }
-            vt->unpack(pointer, i).stream(ost, false);
+            vt->unpack(pointer, i).assert_ok().stream(ost, false);
         }
         ost << Style_Operator << ">" << Style_None;
         auto ET = vt->element_type;
@@ -166,7 +172,7 @@ StyledStream& Any::stream(StyledStream& ost, bool annotate_type) const {
 size_t Any::hash() const {
     if (is_opaque(type))
         return 0;
-    const Type *T = storage_type(type);
+    const Type *T = storage_type(type).assert_ok();
     switch(T->kind()) {
     case TK_Integer: {
         switch(cast<IntegerType>(T)->width) {
@@ -193,7 +199,7 @@ size_t Any::hash() const {
         auto ai = cast<ArrayType>(T);
         size_t h = 0;
         for (size_t i = 0; i < ai->count; ++i) {
-            h = hash2(h, ai->unpack(pointer, i).hash());
+            h = hash2(h, ai->unpack(pointer, i).assert_ok().hash());
         }
         return h;
     } break;
@@ -201,7 +207,7 @@ size_t Any::hash() const {
         auto vi = cast<VectorType>(T);
         size_t h = 0;
         for (size_t i = 0; i < vi->count; ++i) {
-            h = hash2(h, vi->unpack(pointer, i).hash());
+            h = hash2(h, vi->unpack(pointer, i).assert_ok().hash());
         }
         return h;
     } break;
@@ -209,12 +215,12 @@ size_t Any::hash() const {
         auto ti = cast<TupleType>(T);
         size_t h = 0;
         for (size_t i = 0; i < ti->types.size(); ++i) {
-            h = hash2(h, ti->unpack(pointer, i).hash());
+            h = hash2(h, ti->unpack(pointer, i).assert_ok().hash());
         }
         return h;
     } break;
     case TK_Union:
-        return hash_bytes((const char *)pointer, size_of(T));
+        return hash_bytes((const char *)pointer, size_of(T).assert_ok());
     default: break;
     }
 
@@ -228,7 +234,7 @@ bool Any::operator ==(const Any &other) const {
     if (type != other.type) return false;
     if (is_opaque(type))
         return true;
-    const Type *T = storage_type(type);
+    const Type *T = storage_type(type).assert_ok();
     switch(T->kind()) {
     case TK_Integer: {
         switch(cast<IntegerType>(T)->width) {
@@ -252,7 +258,7 @@ bool Any::operator ==(const Any &other) const {
     case TK_Array: {
         auto ai = cast<ArrayType>(T);
         for (size_t i = 0; i < ai->count; ++i) {
-            if (ai->unpack(pointer, i) != ai->unpack(other.pointer, i))
+            if (ai->unpack(pointer, i).assert_ok() != ai->unpack(other.pointer, i).assert_ok())
                 return false;
         }
         return true;
@@ -260,7 +266,7 @@ bool Any::operator ==(const Any &other) const {
     case TK_Vector: {
         auto vi = cast<VectorType>(T);
         for (size_t i = 0; i < vi->count; ++i) {
-            if (vi->unpack(pointer, i) != vi->unpack(other.pointer, i))
+            if (vi->unpack(pointer, i).assert_ok() != vi->unpack(other.pointer, i).assert_ok())
                 return false;
         }
         return true;
@@ -268,13 +274,13 @@ bool Any::operator ==(const Any &other) const {
     case TK_Tuple: {
         auto ti = cast<TupleType>(T);
         for (size_t i = 0; i < ti->types.size(); ++i) {
-            if (ti->unpack(pointer, i) != ti->unpack(other.pointer, i))
+            if (ti->unpack(pointer, i).assert_ok() != ti->unpack(other.pointer, i).assert_ok())
                 return false;
         }
         return true;
     } break;
     case TK_Union:
-        return !memcmp(pointer, other.pointer, size_of(T));
+        return !memcmp(pointer, other.pointer, size_of(T).assert_ok());
     default: break;
     }
 
@@ -284,8 +290,8 @@ bool Any::operator ==(const Any &other) const {
     return false;
 }
 
-void Any::verify_indirect(const Type *T) const {
-    scopes::verify(T, indirect_type());
+SCOPES_RESULT(void) Any::verify_indirect(const Type *T) const {
+    return scopes::verify(T, indirect_type());
 }
 
 bool Any::is_const() const {

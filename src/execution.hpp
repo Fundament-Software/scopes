@@ -12,6 +12,8 @@
 
 #include <stdint.h>
 
+#include "result.hpp"
+
 namespace scopes {
 
 struct Symbol;
@@ -20,7 +22,7 @@ struct Symbol;
 //extern LLVMTargetMachineRef target_machine;
 
 void init_execution();
-void add_module(LLVMModuleRef module);
+SCOPES_RESULT(void) add_module(LLVMModuleRef module);
 uint64_t get_address(const char *name);
 void *get_pointer_to_global(LLVMValueRef g);
 void *local_aware_dlsym(Symbol name);

@@ -41,7 +41,7 @@ void on_shutdown() {
 bool signal_abort = false;
 void f_abort() {
     on_shutdown();
-    if (SCOPES_EARLY_ABORT || signal_abort) {
+    if (signal_abort) {
         std::abort();
     } else {
         exit(1);

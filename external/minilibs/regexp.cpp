@@ -5,6 +5,12 @@
 #include <string.h>
 #include <stdio.h>
 
+#ifdef SCOPES_WIN32
+#include <setjmpex.h>
+#else
+#include <setjmp.h>
+#endif
+
 namespace regexp {
 
 typedef struct Reprog Reprog;

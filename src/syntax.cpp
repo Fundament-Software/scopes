@@ -33,8 +33,9 @@ const Syntax *Syntax::from_quoted(const Anchor *_anchor, const Any &_datum) {
 
 //------------------------------------------------------------------------------
 
-Any unsyntax(const Any &e) {
-    e.verify(TYPE_Syntax);
+SCOPES_RESULT(Any) unsyntax(const Any &e) {
+    SCOPES_RESULT_TYPE(Any);
+    SCOPES_CHECK_RESULT(e.verify(TYPE_Syntax));
     return e.syntax->datum;
 }
 

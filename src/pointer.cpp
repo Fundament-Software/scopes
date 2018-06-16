@@ -65,12 +65,14 @@ PointerType::PointerType(const Type *_element_type,
         storage_class(_storage_class) {
 }
 
-void *PointerType::getelementptr(void *src, size_t i) const {
-    size_t stride = size_of(element_type);
+SCOPES_RESULT(void *) PointerType::getelementptr(void *src, size_t i) const {
+    SCOPES_RESULT_TYPE(void *);
+    size_t stride = SCOPES_GET_RESULT(size_of(element_type));
     return (void *)((char *)src + stride * i);
 }
 
-Any PointerType::unpack(void *src) const {
+SCOPES_RESULT(Any) PointerType::unpack(void *src) const {
+    //SCOPES_RESULT_TYPE(Any);
     return wrap_pointer(element_type, src);
 }
 size_t PointerType::size() {

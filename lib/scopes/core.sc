@@ -39,11 +39,10 @@ let basename = sc_basename
 let globals = sc_get_globals
 let set-globals! = sc_set_globals
 
-let __error! = sc_error
-let __raise! = sc_raise
-let __anchor-error! = sc_anchor_error
-let set-exception-pad = sc_set_exception_pad
-let exception-value = sc_exception_value
+let set-error! = sc_set_last_error
+let set-location-error! = sc_set_last_location_error
+let set-runtime-error! = sc_set_last_runtime_error
+let get-error = sc_get_last_error
 let exit = sc_exit
 let set-signal-abort! = sc_set_signal_abort
 
@@ -139,8 +138,6 @@ let Parameter-name = sc_parameter_name
 let Label-dump = sc_label_dump
 let Label-docstring = sc_label_docstring
 let Label-anchor = sc_label_anchor
-let Label-parameter-count = sc_label_parameter_count
-let Label-parameter = sc_label_parameter
 let Label-name = sc_label_name
 let Label-countof-reachable = sc_label_countof_reachable
 let Label-set-inline! = sc_label_set_inline
@@ -185,42 +182,54 @@ fn box-pointer (value)
 # print an unboxing error given two types
 fn unbox-verify (haveT wantT)
     if (ptrcmp!= haveT wantT)
-        __anchor-error!
+        sc_set_last_location_error
             sc_string_join "can't unbox value of type "
                 sc_string_join
                     sc_any_repr (box-pointer haveT)
                     sc_string_join " as value of type "
                         sc_any_repr (box-pointer wantT)
+        false
+    else
+        true
 
 inline unbox-integer (value T)
-    unbox-verify (extractvalue value 0) T
-    itrunc (extractvalue value 1) T
+    if (unbox-verify (extractvalue value 0) T)
+        _ true (itrunc (extractvalue value 1) T)
+    else
+        _ false (undef T)
 
 inline unbox-symbol (value T)
-    unbox-verify (extractvalue value 0) T
-    bitcast (extractvalue value 1) T
+    if (unbox-verify (extractvalue value 0) T)
+        _ true (bitcast (extractvalue value 1) T)
+    else
+        _ false (undef T)
 
 # turn an Any back into a pointer
 inline unbox-pointer (value T)
-    unbox-verify (extractvalue value 0) T
-    inttoptr (extractvalue value 1) T
+    if (unbox-verify (extractvalue value 0) T)
+        _ true (inttoptr (extractvalue value 1) T)
+    else
+        _ false (undef T)
 
 fn verify-list-count (l mincount maxcount)
     let count = (itrunc (sc_list_count l) i32)
     if (icmp>=s mincount 0)
         if (icmp<s count mincount)
-            __anchor-error!
+            set-location-error!
                 sc_string_join "at least "
                     sc_string_join (sc_any_repr (box-integer mincount))
                         sc_string_join " argument(s) expected, got "
                             sc_any_repr (box-integer count)
+            return false
     if (icmp>=s maxcount 0)
         if (icmp>s count maxcount)
-            __anchor-error!
+            set-location-error!
                 sc_string_join "at most "
                     sc_string_join (sc_any_repr (box-integer maxcount))
                         sc_string_join " argument(s) expected, got "
                             sc_any_repr (box-integer count)
+            return false
+    return true
 
 fn verify-argument-count (l mincount maxcount)
     let original-args = (sc_label_get_arguments l)
@@ -254,10 +263,13 @@ fn Any-none? (value)
 syntax-extend
     let val = (box-pointer (sc_pointer_type type pointer-flag-non-writable unnamed))
     sc_scope_set_symbol syntax-scope 'type-array val
-    sc_scope_set_symbol syntax-scope 'LabelMacroFunctionType
-        box-pointer (sc_type_storage LabelMacro)
-    sc_scope_set_symbol syntax-scope 'ellipsis-symbol (box-symbol (sc_symbol_new "..."))
-    syntax-scope
+    let ok T = (sc_type_storage LabelMacro)
+    if ok
+        sc_scope_set_symbol syntax-scope 'LabelMacroFunctionType (box-pointer T)
+        sc_scope_set_symbol syntax-scope 'ellipsis-symbol (box-symbol (sc_symbol_new "..."))
+        _ true syntax-scope
+    else
+        _ false (undef Scope)
 
 fn Label-return-args (l arg)
     let args = (sc_label_get_keyed l)
@@ -314,7 +326,8 @@ syntax-extend
         let result = (sc_compile (sc_typify typify 1 types) 0:u64)
         let result-type = (extractvalue result 0)
         if (ptrcmp!= result-type LabelMacroFunctionType)
-            __anchor-error! "label macro must return void"
+            set-location-error! "label macro must return void"
+
         let result =
             insertvalue result LabelMacro 0
         sc_scope_set_symbol syntax-scope 'typify result

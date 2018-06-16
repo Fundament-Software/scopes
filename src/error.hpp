@@ -8,14 +8,12 @@
 #define SCOPES_ERROR_HPP
 
 #include "any.hpp"
-
-#ifdef SCOPES_WIN32
-#include <setjmpex.h>
-#else
-#include <setjmp.h>
-#endif
+#include "result.hpp"
+#include "scopes/config.h"
 
 namespace scopes {
+
+//------------------------------------------------------------------------------
 
 struct String;
 struct Anchor;
@@ -23,54 +21,39 @@ struct Anchor;
 void set_active_anchor(const Anchor *anchor);
 const Anchor *get_active_anchor();
 
-struct Exception {
+//------------------------------------------------------------------------------
+
+struct Error {
     const Anchor *anchor;
     const String *msg;
 
-    Exception();
+    Error();
 
-    Exception(const Anchor *_anchor, const String *_msg);
+    Error(const Anchor *_anchor, const String *_msg);
 };
 
-struct ExceptionPad {
-    jmp_buf retaddr;
-    Any value;
+//------------------------------------------------------------------------------
 
-    ExceptionPad();
+void set_last_error(const Any &err);
+Any get_last_error();
 
-    void invoke(const Any &value);
-};
+void print_error(const Any &value);
 
-#ifdef SCOPES_WIN32
-#define SCOPES_TRY() \
-    ExceptionPad exc_pad; \
-    ExceptionPad *_last_exc_pad = _exc_pad; \
-    _exc_pad = &exc_pad; \
-    if (!_setjmpex(exc_pad.retaddr, nullptr)) {
+void set_last_location_error(const String *msg);
+
+#if SCOPES_EARLY_ABORT
+#define SCOPES_LOCATION_ERROR(MSG) \
+    set_last_location_error((MSG)); \
+    assert(false); \
+    return Result<_result_type>();
 #else
-#define SCOPES_TRY() \
-    ExceptionPad exc_pad; \
-    ExceptionPad *_last_exc_pad = _exc_pad; \
-    _exc_pad = &exc_pad; \
-    if (!setjmp(exc_pad.retaddr)) {
+#define SCOPES_LOCATION_ERROR(MSG) \
+    set_last_location_error((MSG)); \
+    return Result<_result_type>();
 #endif
 
-#define SCOPES_CATCH(EXCNAME) \
-        _exc_pad = _last_exc_pad; \
-    } else { \
-        _exc_pad = _last_exc_pad; \
-        auto &&EXCNAME = exc_pad.value;
-
-#define SCOPES_TRY_END() \
-    }
-
-extern ExceptionPad *_exc_pad;
-
-void print_exception(const Any &value);
-void error(const Any &value);
-
-void location_error(const String *msg);
 void location_message(const Anchor *anchor, const String* str);
+
 } // namespace scopes
 
 #endif // SCOPES_ERROR_HPP

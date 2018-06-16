@@ -31,7 +31,7 @@ public:
     static const Syntax *from_quoted(const Anchor *_anchor, const Any &_datum);
 };
 
-Any unsyntax(const Any &e);
+SCOPES_RESULT(Any) unsyntax(const Any &e);
 
 Any maybe_unsyntax(const Any &e);
 

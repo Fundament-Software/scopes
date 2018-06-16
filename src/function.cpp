@@ -62,8 +62,9 @@ bool FunctionType::divergent() const {
     return flags & FF_Divergent;
 }
 
-const Type *FunctionType::type_at_index(size_t i) const {
-    verify_range(i, argument_types.size() + 1);
+SCOPES_RESULT(const Type *) FunctionType::type_at_index(size_t i) const {
+    SCOPES_RESULT_TYPE(const Type *);
+    SCOPES_CHECK_RESULT(verify_range(i, argument_types.size() + 1));
     if (i == 0)
         return return_type;
     else
@@ -173,12 +174,14 @@ const FunctionType *extract_function_type(const Type *T) {
     }
 }
 
-void verify_function_pointer(const Type *type) {
+SCOPES_RESULT(void) verify_function_pointer(const Type *type) {
+    SCOPES_RESULT_TYPE(void);
     if (!is_function_pointer(type)) {
         StyledString ss;
         ss.out << "function pointer expected, got " << type;
-        location_error(ss.str());
+        SCOPES_LOCATION_ERROR(ss.str());
     }
+    return true;
 }
 
 } // namespace scopes

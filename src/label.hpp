@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include "parameter.hpp"
 #include "body.hpp"
+#include "result.hpp"
 
 #include <vector>
 #include <deque>
@@ -129,7 +130,7 @@ public:
 
     bool is_valid() const;
 
-    void verify_valid ();
+    SCOPES_RESULT(void) verify_valid ();
 
     struct UserMap {
         std::unordered_map<Label *, std::unordered_set<Label *> > label_map;
@@ -162,11 +163,11 @@ public:
 
     Label *get_label_cont() const;
 
-    const ReturnLabelType *verify_return_label();
+    SCOPES_RESULT(const ReturnLabelType *) verify_return_label();
 
     const Type *get_return_type() const;
 
-    void verify_compilable() const;
+    SCOPES_RESULT(void) verify_compilable() const;
 
     const Type *get_params_as_return_label_type() const;
 

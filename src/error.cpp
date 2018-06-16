@@ -32,27 +32,29 @@ const Anchor *get_active_anchor() {
 
 //------------------------------------------------------------------------------
 
-Exception::Exception() :
+Error::Error() :
     anchor(nullptr),
     msg(nullptr) {}
 
-Exception::Exception(const Anchor *_anchor, const String *_msg) :
+Error::Error(const Anchor *_anchor, const String *_msg) :
     anchor(_anchor),
     msg(_msg) {}
 
 //------------------------------------------------------------------------------
 
-ExceptionPad::ExceptionPad() : value(none) {
+static Any _last_error = none;
+
+void set_last_error(const Any &err) {
+    _last_error = err;
 }
 
-void ExceptionPad::invoke(const Any &value) {
-    this->value = value;
-    longjmp(retaddr, 1);
+Any get_last_error() {
+    Any result = _last_error;
+    _last_error = none;
+    return result;
 }
 
 //------------------------------------------------------------------------------
-
-ExceptionPad *_exc_pad = nullptr;
 
 void location_message(const Anchor *anchor, const String* str) {
     assert(anchor);
@@ -61,10 +63,10 @@ void location_message(const Anchor *anchor, const String* str) {
     anchor->stream_source_line(cerr);
 }
 
-void print_exception(const Any &value) {
+void print_error(const Any &value) {
     auto cerr = StyledStream(SCOPES_CERR);
-    if (value.type == TYPE_Exception) {
-        const Exception *exc = value;
+    if (value.type == TYPE_Error) {
+        const Error *exc = value;
         if (exc->anchor) {
             cerr << exc->anchor << " ";
         }
@@ -78,26 +80,9 @@ void print_exception(const Any &value) {
     }
 }
 
-static void default_exception_handler(const Any &value) {
-    print_exception(value);
-    f_abort();
-}
-
-void error(const Any &value) {
-#if SCOPES_EARLY_ABORT
-    default_exception_handler(value);
-#else
-    if (!_exc_pad) {
-        default_exception_handler(value);
-    } else {
-        _exc_pad->invoke(value);
-    }
-#endif
-}
-
-void location_error(const String *msg) {
-    const Exception *exc = new Exception(_active_anchor, msg);
-    error(exc);
+void set_last_location_error(const String *msg) {
+    const Error *exc = new Error(_active_anchor, msg);
+    set_last_error(exc);
 }
 
 } // namespace scopes

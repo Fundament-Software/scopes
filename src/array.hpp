@@ -8,6 +8,7 @@
 #define SCOPES_ARRAY_HPP
 
 #include "sized_storage.hpp"
+#include "result.hpp"
 
 namespace scopes {
 
@@ -25,7 +26,7 @@ struct ArrayType : SizedStorageType {
 
 //------------------------------------------------------------------------------
 
-const Type *Array(const Type *element_type, size_t count);
+SCOPES_RESULT(const Type *) Array(const Type *element_type, size_t count);
 
 } // namespace scopes
 

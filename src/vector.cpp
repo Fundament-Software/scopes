@@ -49,86 +49,95 @@ void VectorType::stream_name(StyledStream &ss) const {
 
 VectorType::VectorType(const Type *_element_type, size_t _count)
     : SizedStorageType(TK_Vector, _element_type, _count) {
-    if (is_opaque(_element_type)) {
-        StyledString ss;
-        ss.out << "can not construct vector type for values of opaque type "
-            << _element_type;
-        location_error(ss.str());
-    }
 }
 
-const Type *Vector(const Type *element_type, size_t count) {
+SCOPES_RESULT(const Type *) Vector(const Type *element_type, size_t count) {
+    SCOPES_RESULT_TYPE(const Type *);
     SCOPES_TYPE_KEY(VectorType, key);
     key->element_type = element_type;
     key->count = count;
     auto it = vectors.find(key);
     if (it != vectors.end())
         return *it;
+    if (is_opaque(element_type)) {
+        StyledString ss;
+        ss.out << "can not construct vector type for values of opaque type "
+            << element_type;
+        SCOPES_LOCATION_ERROR(ss.str());
+    }
     auto result = new VectorType(element_type, count);
     vectors.insert(result);
     return result;
 }
 
-void verify_integer_vector(const Type *type) {
+SCOPES_RESULT(void) verify_integer_vector(const Type *type) {
+    SCOPES_RESULT_TYPE(void);
     if (type->kind() == TK_Vector) {
         type = cast<VectorType>(type)->element_type;
     }
     if (type->kind() != TK_Integer) {
         StyledString ss;
         ss.out << "integer scalar or vector type expected, got " << type;
-        location_error(ss.str());
+        SCOPES_LOCATION_ERROR(ss.str());
     }
+    return true;
 }
 
-void verify_real_vector(const Type *type) {
+SCOPES_RESULT(void) verify_real_vector(const Type *type) {
+    SCOPES_RESULT_TYPE(void);
     if (type->kind() == TK_Vector) {
         type = cast<VectorType>(type)->element_type;
     }
     if (type->kind() != TK_Real) {
         StyledString ss;
         ss.out << "real scalar or vector type expected, got " << type;
-        location_error(ss.str());
+        SCOPES_LOCATION_ERROR(ss.str());
     }
+    return true;
 }
 
-void verify_bool_vector(const Type *type) {
+SCOPES_RESULT(void) verify_bool_vector(const Type *type) {
+    SCOPES_RESULT_TYPE(void);
     if (type->kind() == TK_Vector) {
         type = cast<VectorType>(type)->element_type;
     }
     if (type != TYPE_Bool) {
         StyledString ss;
         ss.out << "bool value or vector type expected, got " << type;
-        location_error(ss.str());
+        SCOPES_LOCATION_ERROR(ss.str());
     }
+    return true;
 }
 
-void verify_real_vector(const Type *type, size_t fixedsz) {
+SCOPES_RESULT(void) verify_real_vector(const Type *type, size_t fixedsz) {
+    SCOPES_RESULT_TYPE(void);
     if (type->kind() == TK_Vector) {
         auto T = cast<VectorType>(type);
         if (T->count == fixedsz)
-            return;
+            return true;
     }
     StyledString ss;
     ss.out << "vector type of size " << fixedsz << " expected, got " << type;
-    location_error(ss.str());
+    SCOPES_LOCATION_ERROR(ss.str());
 }
 
-void verify_vector_sizes(const Type *type1, const Type *type2) {
+SCOPES_RESULT(void) verify_vector_sizes(const Type *type1, const Type *type2) {
+    SCOPES_RESULT_TYPE(void);
     bool type1v = (type1->kind() == TK_Vector);
     bool type2v = (type2->kind() == TK_Vector);
     if (type1v == type2v) {
         if (type1v) {
             if (cast<VectorType>(type1)->count
                     == cast<VectorType>(type2)->count) {
-                return;
+                return true;
             }
         } else {
-            return;
+            return true;
         }
     }
     StyledString ss;
     ss.out << "operands must be of scalar type or vector type of equal size";
-    location_error(ss.str());
+    SCOPES_LOCATION_ERROR(ss.str());
 }
 
 } // namespace scopes

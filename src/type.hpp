@@ -9,6 +9,7 @@
 
 #include "symbol.hpp"
 #include "any.hpp"
+#include "result.hpp"
 
 #include <stddef.h>
 
@@ -119,7 +120,7 @@ typedef std::vector<const Type *> ArgTypes;
     \
     T(TYPE_Scope, "Scope") \
     T(TYPE_SourceFile, "SourceFile") \
-    T(TYPE_Exception, "Exception") \
+    T(TYPE_Error, "Error") \
     \
     T(TYPE_Parameter, "Parameter") \
     T(TYPE_Label, "Label") \
@@ -158,24 +159,23 @@ B_TYPES()
 //------------------------------------------------------------------------------
 
 bool is_opaque(const Type *T);
-size_t size_of(const Type *T);
-size_t align_of(const Type *T);
-const Type *storage_type(const Type *T);
+SCOPES_RESULT(size_t) size_of(const Type *T);
+SCOPES_RESULT(size_t) align_of(const Type *T);
 const Type *superof(const Type *T);
 bool is_invalid_argument_type(const Type *T);
 void stream_type_name(StyledStream &ss, const Type *T);
 
-Any wrap_pointer(const Type *type, void *ptr);
-void *get_pointer(const Type *type, Any &value, bool create = false);
+SCOPES_RESULT(Any) wrap_pointer(const Type *type, void *ptr);
+SCOPES_RESULT(void *) get_pointer(const Type *type, Any &value, bool create = false);
 
 //------------------------------------------------------------------------------
 // TYPE CHECK PREDICATES
 //------------------------------------------------------------------------------
 
-void verify(const Type *typea, const Type *typeb);
-void verify_integer(const Type *type);
-void verify_real(const Type *type);
-void verify_range(size_t idx, size_t count);
+SCOPES_RESULT(void) verify(const Type *typea, const Type *typeb);
+SCOPES_RESULT(void) verify_integer(const Type *type);
+SCOPES_RESULT(void) verify_real(const Type *type);
+SCOPES_RESULT(void) verify_range(size_t idx, size_t count);
 
 //------------------------------------------------------------------------------
 

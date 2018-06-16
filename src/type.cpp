@@ -154,7 +154,8 @@ bool is_opaque(const Type *T) {
     return false;
 }
 
-size_t size_of(const Type *T) {
+SCOPES_RESULT(size_t) size_of(const Type *T) {
+    SCOPES_RESULT_TYPE(size_t);
     switch(T->kind()) {
     case TK_Integer: {
         const IntegerType *it = cast<IntegerType>(T);
@@ -173,17 +174,17 @@ size_t size_of(const Type *T) {
     case TK_ReturnLabel: {
         return size_of(cast<ReturnLabelType>(T)->return_type);
     } break;
-    case TK_Typename: return size_of(storage_type(cast<TypenameType>(T)));
+    case TK_Typename: return size_of(SCOPES_GET_RESULT(storage_type(cast<TypenameType>(T))));
     default: break;
     }
 
     StyledString ss;
     ss.out << "opaque type " << T << " has no size";
-    location_error(ss.str());
-    return -1;
+    SCOPES_LOCATION_ERROR(ss.str());
 }
 
-size_t align_of(const Type *T) {
+SCOPES_RESULT(size_t) align_of(const Type *T) {
+    SCOPES_RESULT_TYPE(size_t);
     switch(T->kind()) {
     case TK_Integer: {
         const IntegerType *it = cast<IntegerType>(T);
@@ -208,14 +209,13 @@ size_t align_of(const Type *T) {
     case TK_ReturnLabel: {
         return size_of(cast<ReturnLabelType>(T)->return_type);
     } break;
-    case TK_Typename: return align_of(storage_type(cast<TypenameType>(T)));
+    case TK_Typename: return align_of(SCOPES_GET_RESULT(storage_type(cast<TypenameType>(T))));
     default: break;
     }
 
     StyledString ss;
     ss.out << "opaque type " << T << " has no alignment";
-    location_error(ss.str());
-    return 1;
+    SCOPES_LOCATION_ERROR(ss.str());
 }
 
 const Type *superof(const Type *T) {
@@ -240,16 +240,17 @@ const Type *superof(const Type *T) {
 
 //------------------------------------------------------------------------------
 
-Any wrap_pointer(const Type *type, void *ptr) {
+SCOPES_RESULT(Any) wrap_pointer(const Type *type, void *ptr) {
+    SCOPES_RESULT_TYPE(Any);
     Any result = none;
     result.type = type;
 
-    type = storage_type(type);
+    type = SCOPES_GET_RESULT(storage_type(type));
     switch(type->kind()) {
     case TK_Integer:
     case TK_Real:
     case TK_Pointer:
-        memcpy(result.content, ptr, size_of(type));
+        memcpy(result.content, ptr, SCOPES_GET_RESULT(size_of(type)));
         return result;
     case TK_Array:
     case TK_Vector:
@@ -262,11 +263,11 @@ Any wrap_pointer(const Type *type, void *ptr) {
 
     StyledString ss;
     ss.out << "cannot wrap data of type " << type;
-    location_error(ss.str());
-    return none;
+    SCOPES_LOCATION_ERROR(ss.str());
 }
 
-void *get_pointer(const Type *type, Any &value, bool create) {
+SCOPES_RESULT(void *) get_pointer(const Type *type, Any &value, bool create) {
+    SCOPES_RESULT_TYPE(void *);
     if (type == TYPE_Void) {
         return value.content;
     }
@@ -292,14 +293,14 @@ void *get_pointer(const Type *type, Any &value, bool create) {
     } break;
     case TK_Pointer: return (void *)&value.pointer;
     case TK_Typename: {
-        return get_pointer(storage_type(type), value, create);
+        return get_pointer(SCOPES_GET_RESULT(storage_type(type)), value, create);
     } break;
     case TK_Array:
     case TK_Vector:
     case TK_Tuple:
     case TK_Union:
         if (create) {
-            value.pointer = tracked_malloc(size_of(type));
+            value.pointer = tracked_malloc(SCOPES_GET_RESULT(size_of(type)));
         }
         return value.pointer;
     default: break;
@@ -307,45 +308,52 @@ void *get_pointer(const Type *type, Any &value, bool create) {
 
     StyledString ss;
     ss.out << "cannot extract pointer from type " << type;
-    location_error(ss.str());
-    return nullptr;
+    SCOPES_LOCATION_ERROR(ss.str());
 }
 
 //------------------------------------------------------------------------------
 // TYPE CHECK PREDICATES
 //------------------------------------------------------------------------------
 
-void verify(const Type *typea, const Type *typeb) {
+SCOPES_RESULT(void) verify(const Type *typea, const Type *typeb) {
+    SCOPES_RESULT_TYPE(void);
     if (typea != typeb) {
         StyledString ss;
         ss.out << "type " << typea << " expected, got " << typeb;
-        location_error(ss.str());
+        SCOPES_LOCATION_ERROR(ss.str());
     }
+    return true;
 }
 
-void verify_integer(const Type *type) {
+SCOPES_RESULT(void) verify_integer(const Type *type) {
+    SCOPES_RESULT_TYPE(void);
     if (type->kind() != TK_Integer) {
         StyledString ss;
         ss.out << "integer type expected, got " << type;
-        location_error(ss.str());
+        SCOPES_LOCATION_ERROR(ss.str());
     }
+    return true;
 }
 
-void verify_real(const Type *type) {
+SCOPES_RESULT(void) verify_real(const Type *type) {
+    SCOPES_RESULT_TYPE(void);
     if (type->kind() != TK_Real) {
         StyledString ss;
         ss.out << "real type expected, got " << type;
-        location_error(ss.str());
+        SCOPES_LOCATION_ERROR(ss.str());
     }
+    return true;
 }
 
-void verify_range(size_t idx, size_t count) {
+SCOPES_RESULT(void) verify_range(size_t idx, size_t count) {
+    SCOPES_RESULT_TYPE(void);
     if (idx >= count) {
         StyledString ss;
         ss.out << "index out of range (" << idx
             << " >= " << count << ")";
-        location_error(ss.str());
+        SCOPES_LOCATION_ERROR(ss.str());
     }
+    return true;
 }
 
 //------------------------------------------------------------------------------
@@ -356,29 +364,29 @@ void verify_range(size_t idx, size_t count) {
 #define DEFINE_BASIC_TYPE(NAME, CT, T, BODY) { \
         T = Typename(String::from(NAME)); \
         auto tn = cast<TypenameType>(const_cast<Type *>(T)); \
-        tn->finalize(BODY); \
-        assert(sizeof(CT) == size_of(T)); \
+        tn->finalize(BODY).assert_ok(); \
+        assert(sizeof(CT) == size_of(T).assert_ok()); \
     }
 
 #define DEFINE_STRUCT_TYPE(NAME, CT, T, ...) { \
         T = Typename(String::from(NAME)); \
         auto tn = cast<TypenameType>(const_cast<Type *>(T)); \
-        tn->finalize(Tuple({ __VA_ARGS__ })); \
-        assert(sizeof(CT) == size_of(T)); \
+        tn->finalize(Tuple({ __VA_ARGS__ }).assert_ok()).assert_ok(); \
+        assert(sizeof(CT) == size_of(T).assert_ok()); \
     }
 
 #define DEFINE_STRUCT_HANDLE_TYPE(NAME, CT, T, ...) { \
         T = Typename(String::from(NAME)); \
         auto tn = cast<TypenameType>(const_cast<Type *>(T)); \
-        auto ET = Tuple({ __VA_ARGS__ }); \
-        assert(sizeof(CT) == size_of(ET)); \
-        tn->finalize(NativeROPointer(ET)); \
+        auto ET = Tuple({ __VA_ARGS__ }).assert_ok(); \
+        assert(sizeof(CT) == size_of(ET).assert_ok()); \
+        tn->finalize(NativeROPointer(ET)).assert_ok(); \
     }
 
 #define DEFINE_OPAQUE_HANDLE_TYPE(NAME, CT, T) { \
         T = Typename(String::from(NAME)); \
         auto tn = cast<TypenameType>(const_cast<Type *>(T)); \
-        tn->finalize(NativeROPointer(Typename(String::from("_" NAME)))); \
+        tn->finalize(NativeROPointer(Typename(String::from("_" NAME)))).assert_ok(); \
     }
 
 void init_types() {
@@ -428,10 +436,10 @@ void init_types() {
     TYPE_Type = Typename(String::from("type"));
     TYPE_Unknown = Typename(String::from("Unknown"));
     const Type *_TypePtr = NativeROPointer(Typename(String::from("_type")));
-    cast<TypenameType>(const_cast<Type *>(TYPE_Type))->finalize(_TypePtr);
-    cast<TypenameType>(const_cast<Type *>(TYPE_Unknown))->finalize(_TypePtr);
+    cast<TypenameType>(const_cast<Type *>(TYPE_Type))->finalize(_TypePtr).assert_ok();
+    cast<TypenameType>(const_cast<Type *>(TYPE_Unknown))->finalize(_TypePtr).assert_ok();
 
-    cast<TypenameType>(const_cast<Type *>(TYPE_Nothing))->finalize(Tuple({}));
+    cast<TypenameType>(const_cast<Type *>(TYPE_Nothing))->finalize(Tuple({}).assert_ok()).assert_ok();
 
     DEFINE_BASIC_TYPE("Symbol", Symbol, TYPE_Symbol, TYPE_U64);
     DEFINE_BASIC_TYPE("Builtin", Builtin, TYPE_Builtin, TYPE_U64);
@@ -462,7 +470,7 @@ void init_types() {
         TYPE_Any,
         TYPE_Bool);
 
-    DEFINE_STRUCT_HANDLE_TYPE("Exception", Exception, TYPE_Exception,
+    DEFINE_STRUCT_HANDLE_TYPE("Error", Error, TYPE_Error,
         TYPE_Anchor,
         TYPE_String);
 
@@ -471,7 +479,7 @@ void init_types() {
         cast<TypenameType>(const_cast<Type *>(TYPE_LabelMacro))
             ->finalize(
                 Pointer(Function(TYPE_Void, { TYPE_Label }),
-                    PTF_NonWritable, SYM_Unnamed));
+                    PTF_NonWritable, SYM_Unnamed)).assert_ok();
     }
 
 #define T(TYPE, TYPENAME) \

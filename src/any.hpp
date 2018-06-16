@@ -10,6 +10,7 @@
 #include "symbol.hpp"
 #include "builtin.hpp"
 #include "none.hpp"
+#include "result.hpp"
 
 #include <stdint.h>
 
@@ -27,11 +28,15 @@ struct List;
 struct Label;
 struct Parameter;
 struct Scope;
-struct Exception;
+struct Error;
 struct Frame;
 struct Closure;
 struct String;
 struct Anchor;
+
+#define SCOPES_RESULT_CAST_OPERATOR(T) \
+    operator Result<T>() const; \
+    operator T() const
 
 struct Any {
     struct Hash {
@@ -65,11 +70,12 @@ struct Any {
         Scope *scope;
         Any *ref;
         void *pointer;
-        const Exception *exception;
+        const Error *error;
         Frame *frame;
         const Closure *closure;
     };
 
+    Any();
     Any(Nothing x);
     Any(const Type *x);
     Any(bool x);
@@ -91,7 +97,7 @@ struct Any {
     Any(const Syntax *x);
     Any(const Anchor *x);
     Any(const List *x);
-    Any(const Exception *x);
+    Any(const Error *x);
     Any(Label *x);
     Any(Parameter *x);
     Any(Builtin x);
@@ -104,7 +110,8 @@ struct Any {
 #endif
     // a catch-all for unsupported types
     template<typename T>
-    Any(const T &x);
+    Any(const T &x) __attribute__((deprecated("illegal constructor")));
+
 
     Any toref();
 
@@ -112,22 +119,22 @@ struct Any {
 
     static Any from_pointer(const Type *type, void *ptr);
 
-    void verify(const Type *T) const;
-    void verify_indirect(const Type *T) const;
+    SCOPES_RESULT(void) verify(const Type *T) const;
+    SCOPES_RESULT(void) verify_indirect(const Type *T) const;
     const Type *indirect_type() const;
     bool is_const() const;
 
-    operator const Type *() const;
-    operator const List *() const;
-    operator const Syntax *() const;
-    operator const Anchor *() const;
-    operator const String *() const;
-    operator const Exception *() const;
-    operator Label *() const;
-    operator Scope *() const;
-    operator Parameter *() const;
-    operator const Closure *() const;
-    operator Frame *() const;
+    SCOPES_RESULT_CAST_OPERATOR(const Type *);
+    SCOPES_RESULT_CAST_OPERATOR(const List *);
+    SCOPES_RESULT_CAST_OPERATOR(const Syntax *);
+    SCOPES_RESULT_CAST_OPERATOR(const Anchor *);
+    SCOPES_RESULT_CAST_OPERATOR(const String *);
+    SCOPES_RESULT_CAST_OPERATOR(const Error *);
+    SCOPES_RESULT_CAST_OPERATOR(Label *);
+    SCOPES_RESULT_CAST_OPERATOR(Scope *);
+    SCOPES_RESULT_CAST_OPERATOR(Parameter *);
+    SCOPES_RESULT_CAST_OPERATOR(const Closure *);
+    SCOPES_RESULT_CAST_OPERATOR(Frame *);
 
     struct AnyStreamer {
         StyledStream& ost;

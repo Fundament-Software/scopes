@@ -9,6 +9,7 @@
 
 #include "sized_storage.hpp"
 #include "argument.hpp"
+#include "result.hpp"
 
 namespace scopes {
 
@@ -22,13 +23,13 @@ struct UnionType : StorageType {
     void stream_name(StyledStream &ss) const;
     UnionType(const Args &_values);
 
-    Any unpack(void *src, size_t i) const;
+    SCOPES_RESULT(Any) unpack(void *src, size_t i) const;
 
-    const Type *type_at_index(size_t i) const;
+    SCOPES_RESULT(const Type *) type_at_index(size_t i) const;
 
     size_t field_index(Symbol name) const;
 
-    Symbol field_name(size_t i) const;
+    SCOPES_RESULT(Symbol) field_name(size_t i) const;
 
     Args values;
     ArgTypes types;
@@ -36,9 +37,9 @@ struct UnionType : StorageType {
     const Type *tuple_type;
 };
 
-const Type *MixedUnion(const Args &values);
+SCOPES_RESULT(const Type *) MixedUnion(const Args &values);
 
-const Type *Union(const ArgTypes &types);
+SCOPES_RESULT(const Type *) Union(const ArgTypes &types);
 
 } // namespace scopes
 

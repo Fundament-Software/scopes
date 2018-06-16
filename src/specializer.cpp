@@ -30,7 +30,7 @@
 #include "profiler.hpp"
 #include "execution.hpp"
 
-#include "scopes/config.h"
+#include "scopes/scopes.h"
 
 #include "dyn_cast.inc"
 #include "verify_tools.inc"
@@ -60,20 +60,22 @@ the outer loop then moves on to the next definite label and continues the task.
 
 namespace scopes {
 
-static void apply_type_error(const Any &enter) {
+static SCOPES_RESULT(void) apply_type_error(const Any &enter) {
+    SCOPES_RESULT_TYPE(void);
     StyledString ss;
     ss.out << "don't know how to apply value of type " << enter.type;
-    location_error(ss.str());
+    SCOPES_LOCATION_ERROR(ss.str());
 }
 
 //------------------------------------------------------------------------------
 // COMMON ERRORS
 //------------------------------------------------------------------------------
 
-void invalid_op2_types_error(const Type *A, const Type *B) {
+static SCOPES_RESULT(void) invalid_op2_types_error(const Type *A, const Type *B) {
+    SCOPES_RESULT_TYPE(void);
     StyledString ss;
     ss.out << "invalid operand types " << A << " and " << B;
-    location_error(ss.str());
+    SCOPES_LOCATION_ERROR(ss.str());
 }
 
 //------------------------------------------------------------------------------
@@ -128,10 +130,10 @@ struct select_op_return_type {
 };
 
 static const Type *bool_op_return_type(const Type *T) {
-    T = storage_type(T);
+    T = storage_type(T).assert_ok();
     if (T->kind() == TK_Vector) {
         auto vi = cast<VectorType>(T);
-        return Vector(TYPE_Bool, vi->count);
+        return Vector(TYPE_Bool, vi->count).assert_ok();
     } else {
         return TYPE_Bool;
     }
@@ -332,6 +334,7 @@ template<typename T> struct op_Distance {
 #undef IFXOP_TEMPLATE
 #undef PFXOP_TEMPLATE
 
+#if 0
 static void *aligned_alloc(size_t sz, size_t al) {
     assert(sz);
     assert(al);
@@ -340,18 +343,19 @@ static void *aligned_alloc(size_t sz, size_t al) {
 }
 
 static void *alloc_storage(const Type *T) {
-    size_t sz = size_of(T);
-    size_t al = align_of(T);
+    size_t sz = size_of(T).assert_ok();
+    size_t al = align_of(T).assert_ok();
     return aligned_alloc(sz, al);
 }
 
 static void *copy_storage(const Type *T, void *ptr) {
-    size_t sz = size_of(T);
-    size_t al = align_of(T);
+    size_t sz = size_of(T).assert_ok();
+    size_t al = align_of(T).assert_ok();
     void *destptr = aligned_alloc(sz, al);
     memcpy(destptr, ptr, sz);
     return destptr;
 }
+#endif
 
 struct IntTypes_i {
     typedef bool i1;
@@ -376,8 +380,9 @@ struct DispatchInteger {
         assert(numargs >= 1);
         return select_op_return_type<rtype>{}(args[0].type);
     }
-    void operator ()(const Type *ET, void **srcptrs, void *destptr, size_t count,
+    SCOPES_RESULT(void) operator ()(const Type *ET, void **srcptrs, void *destptr, size_t count,
                         Any *args, size_t numargs) {
+        SCOPES_RESULT_TYPE(void);
         size_t width = cast<IntegerType>(ET)->width;
         switch(width) {
         case 1: OpT<typename IT::i1>{}(srcptrs, destptr, count); break;
@@ -388,9 +393,9 @@ struct DispatchInteger {
         default:
             StyledString ss;
             ss.out << "unsupported bitwidth (" << width << ") for integer operation";
-            location_error(ss.str());
-            break;
+            SCOPES_LOCATION_ERROR(ss.str());
         };
+        return true;
     }
 };
 
@@ -402,8 +407,9 @@ struct DispatchReal {
         assert(numargs >= 1);
         return select_op_return_type<rtype>{}(args[0].type);
     }
-    void operator ()(const Type *ET, void **srcptrs, void *destptr, size_t count,
+    SCOPES_RESULT(void) operator ()(const Type *ET, void **srcptrs, void *destptr, size_t count,
                         Any *args, size_t numargs) {
+        SCOPES_RESULT_TYPE(void);
         size_t width = cast<RealType>(ET)->width;
         switch(width) {
         case 32: OpT<float>{}(srcptrs, destptr, count); break;
@@ -411,9 +417,9 @@ struct DispatchReal {
         default:
             StyledString ss;
             ss.out << "unsupported bitwidth (" << width << ") for float operation";
-            location_error(ss.str());
-            break;
+            SCOPES_LOCATION_ERROR(ss.str());
         };
+        return true;
     }
 };
 
@@ -423,32 +429,35 @@ struct DispatchSelect {
         assert(numargs >= 1);
         return args[1].type;
     }
-    void operator ()(const Type *ET, void **srcptrs, void *destptr, size_t count,
+    SCOPES_RESULT(void) operator ()(const Type *ET, void **srcptrs, void *destptr, size_t count,
                         Any *args, size_t numargs) {
+        SCOPES_RESULT_TYPE(void);
         assert(numargs == 3);
         bool *cond = (bool *)srcptrs[0];
         void *x = srcptrs[1];
         void *y = srcptrs[2];
-        const Type *Tx = storage_type(args[1].type);
+        const Type *Tx = SCOPES_GET_RESULT(storage_type(args[1].type));
         if (Tx->kind() == TK_Vector) {
             auto VT = cast<VectorType>(Tx);
             auto stride = VT->stride;
             for (size_t i = 0; i < count; ++i) {
-                memcpy(VT->getelementptr(destptr, i),
-                    VT->getelementptr((cond[i] ? x : y), i),
+                memcpy(VT->getelementptr(destptr, i).assert_ok(),
+                    VT->getelementptr((cond[i] ? x : y), i).assert_ok(),
                     stride);
             }
         } else {
             assert(count == 1);
-            auto sz = size_of(Tx);
+            auto sz = SCOPES_GET_RESULT(size_of(Tx));
             memcpy(destptr, (cond[0] ? x : y), sz);
         }
+        return true;
     }
 };
 
 template<typename DispatchT>
-static Any apply_op(Any *args, size_t numargs) {
-    auto ST = storage_type(args[0].type);
+static SCOPES_RESULT(Any) apply_op(Any *args, size_t numargs) {
+    SCOPES_RESULT_TYPE(Any);
+    auto ST = SCOPES_GET_RESULT(storage_type(args[0].type));
     size_t count;
     void *srcptrs[numargs];
     void *destptr;
@@ -463,22 +472,22 @@ static Any apply_op(Any *args, size_t numargs) {
         }
         if (DispatchT::reductive()) {
             result.type = vi->element_type;
-            destptr = get_pointer(result.type, result);
+            destptr = SCOPES_GET_RESULT(get_pointer(result.type, result));
         } else {
             destptr = alloc_storage(RT);
             result = Any::from_pointer(RT, destptr);
         }
-        ET = storage_type(vi->element_type);
+        ET = SCOPES_GET_RESULT(storage_type(vi->element_type));
     } else {
         count = 1;
         for (size_t i = 0; i < numargs; ++i) {
-            srcptrs[i] = get_pointer(args[i].type, args[i]);
+            srcptrs[i] = SCOPES_GET_RESULT(get_pointer(args[i].type, args[i]));
         }
         result.type = RT;
-        destptr = get_pointer(result.type, result);
+        destptr = SCOPES_GET_RESULT(get_pointer(result.type, result));
         ET = ST;
     }
-    DispatchT{}(ET, srcptrs, destptr, count, args, numargs);
+    SCOPES_CHECK_RESULT(DispatchT{}(ET, srcptrs, destptr, count, args, numargs));
     return result;
 }
 
@@ -515,19 +524,6 @@ static Any apply_real_op(Any a, Any b, Any c) {
 //------------------------------------------------------------------------------
 // NORMALIZE
 //------------------------------------------------------------------------------
-
-// assuming that value is an elementary type that can be put in a vector
-static Any smear(Any value, size_t count) {
-    size_t sz = size_of(value.type);
-    void *psrc = get_pointer(value.type, value);
-    auto VT = cast<VectorType>(Vector(value.type, count));
-    void *pdest = alloc_storage(VT);
-    for (size_t i = 0; i < count; ++i) {
-        void *p = VT->getelementptr(pdest, i);
-        memcpy(p, psrc, sz);
-    }
-    return Any::from_pointer(VT, pdest);
-}
 
 #define B_ARITH_OPS() \
         IARITH_NUW_NSW_OPS(Add) \
@@ -709,7 +705,8 @@ struct Specializer {
     // TYPE_Unknown = type the parameter
     //      type as TYPE_Unknown = leave the parameter as-is
     // any other = inline the argument and remove the parameter
-    static Label *fold_type_label(Label::UserMap &um, Label *label, const Args &args) {
+    static SCOPES_RESULT(Label *) fold_type_label(Label::UserMap &um, Label *label, const Args &args) {
+        SCOPES_RESULT_TYPE(Label *);
         assert(!label->params.empty());
 
         MangleParamMap map;
@@ -752,7 +749,7 @@ struct Specializer {
                             StyledString ss;
                             ss.out << "attempting to retype parameter of type "
                                 << newparam->type << " as " << value.value.typeref;
-                            location_error(ss.str());
+                            SCOPES_LOCATION_ERROR(ss.str());
                         } else {
                             newparam->type = value.value.typeref;
                         }
@@ -776,7 +773,8 @@ struct Specializer {
         return mangle(um, label, newparams, map);//, Mangle_Verbose);
     }
 
-    static void evaluate(Frame *frame, Argument arg, Args &dest, bool last_param = false) {
+    static SCOPES_RESULT(void) evaluate(Frame *frame, Argument arg, Args &dest, bool last_param = false) {
+        SCOPES_RESULT_TYPE(void);
         if (arg.value.type == TYPE_Label) {
             // do not wrap labels in closures that have been solved
             if (!arg.value.label->is_template()) {
@@ -815,7 +813,7 @@ struct Specializer {
             if (!frame) {
                 StyledString ss;
                 ss.out << "parameter " << param << " is unbound";
-                location_error(ss.str());
+                SCOPES_LOCATION_ERROR(ss.str());
             }
             // special situation: we're forwarding varargs, but assigning
             // it to a new argument key; since keys can only be mapped to
@@ -862,28 +860,31 @@ struct Specializer {
                     StyledString ss;
                     ss.out << "parameter " << param << " is out of bounds ("
                         << param->index << " >= " << (int)frame->args.size() << ")";
-                    location_error(ss.str());
+                    SCOPES_LOCATION_ERROR(ss.str());
                 }
                 dest.push_back(Argument(arg.key, none));
             }
         } else {
             dest.push_back(arg);
         }
+        return true;
     }
 
-    void evaluate_body(Frame *frame, Body &dest, const Body &source) {
+    SCOPES_RESULT(void) evaluate_body(Frame *frame, Body &dest, const Body &source) {
+        SCOPES_RESULT_TYPE(void);
         auto &&args = source.args;
         Args &body = dest.args;
         tmp_args.clear();
         dest.copy_traits_from(source);
-        evaluate(frame, source.enter, tmp_args);
+        SCOPES_CHECK_RESULT(evaluate(frame, source.enter, tmp_args));
         dest.enter = first(tmp_args).value;
         body.clear();
 
         size_t lasti = (args.size() - 1);
         for (size_t i = 0; i < args.size(); ++i) {
-            evaluate(frame, args[i], body, (i == lasti));
+            SCOPES_CHECK_RESULT(evaluate(frame, args[i], body, (i == lasti)));
         }
+        return true;
     }
 
     static void map_constant_arguments(Frame *frame, Label *label, const Args &args) {
@@ -912,8 +913,9 @@ struct Specializer {
         }
     }
 
-    Label *fold_type_label_single(Frame *parent, Label *label, const Args &args) {
-        return fold_type_label_single_frame(parent, label, args)->get_instance();
+    SCOPES_RESULT(Label *) fold_type_label_single(Frame *parent, Label *label, const Args &args) {
+        SCOPES_RESULT_TYPE(Label *);
+        return SCOPES_GET_RESULT(fold_type_label_single_frame(parent, label, args))->get_instance();
     }
 
     void stream_arg_types(StyledStream &ss, const Args &args) {
@@ -934,7 +936,8 @@ struct Specializer {
     // TYPE_Unknown = type the parameter
     //      type as TYPE_Unknown = leave the parameter as-is
     // any other = inline the argument and remove the parameter
-    Frame *fold_type_label_single_frame(Frame *parent, Label *label, const Args &args) {
+    SCOPES_RESULT(Frame *) fold_type_label_single_frame(Frame *parent, Label *label, const Args &args) {
+        SCOPES_RESULT_TYPE(Frame *);
         assert(parent);
         assert(label);
         assert(!label->body.is_complete());
@@ -948,7 +951,7 @@ struct Specializer {
                 ss.out << "maximum number of recursions exceeded during"
                 " compile time evaluation (" << SCOPES_MAX_RECURSIONS << ")."
                 " Use 'unconst' to prevent constant propagation.";
-                location_error(ss.str());
+                SCOPES_LOCATION_ERROR(ss.str());
             }
         }
 
@@ -1025,7 +1028,7 @@ struct Specializer {
                     ss.out << "attempting to return from branch, but returned argument #"
                         << i << " of type " << val.type << " is constant";
                     set_active_anchor(caller_anchor);
-                    location_error(ss.str());
+                    SCOPES_LOCATION_ERROR(ss.str());
                 } else {
                     // should not happen
                     assert(false);
@@ -1050,7 +1053,7 @@ struct Specializer {
                     ss.out << "and ";
                     stream_arg_types(ss.out, la.args);
                     set_active_anchor(caller_anchor);
-                    location_error(ss.str());
+                    SCOPES_LOCATION_ERROR(ss.str());
                 }
             }
         }
@@ -1087,7 +1090,7 @@ struct Specializer {
                                 StyledString ss;
                                 ss.out << "attempting to retype parameter of type "
                                     << newparam->type << " as " << value.value.typeref;
-                                location_error(ss.str());
+                                SCOPES_LOCATION_ERROR(ss.str());
                             } else {
                                 newparam->type = value.value.typeref;
                             }
@@ -1120,27 +1123,29 @@ struct Specializer {
 
         parent->insert_frame(la, frame);
 
-        evaluate_body(frame, newlabel->body, label->body);
+        SCOPES_CHECK_RESULT(evaluate_body(frame, newlabel->body, label->body));
 
         return frame;
     }
 
     // inlining the continuation of a branch label without arguments
-    void verify_branch_continuation(const Closure *closure) {
+    SCOPES_RESULT(void) verify_branch_continuation(const Closure *closure) {
+        SCOPES_RESULT_TYPE(void);
         if (closure->label->is_inline())
-            return;
+            return true;
         StyledString ss;
         ss.out << "branch destination must be inline" << std::endl;
-        location_error(ss.str());
+        SCOPES_LOCATION_ERROR(ss.str());
     }
 
-    Any fold_type_return(Any dest, const Type *return_label) {
+    SCOPES_RESULT(Any) fold_type_return(Any dest, const Type *return_label) {
+        SCOPES_RESULT_TYPE(Any);
     repeat:
         //ss_cout << "type_return: " << dest << std::endl;
         if (dest.type == TYPE_Parameter) {
             Parameter *param = dest.parameter;
             if (param->is_none()) {
-                location_error(String::from("attempting to type return continuation of non-returning label"));
+                SCOPES_LOCATION_ERROR(String::from("attempting to type return continuation of non-returning label"));
             } else if (!param->is_typed()) {
                 param->type = return_label;
                 param->anchor = get_active_anchor();
@@ -1162,7 +1167,7 @@ struct Specializer {
                         {
                             StyledString ss;
                             ss.out << "attempting to retype return continuation as " << return_label;
-                            location_error(ss.str());
+                            SCOPES_LOCATION_ERROR(ss.str());
                         }
                     }
                 }
@@ -1171,7 +1176,7 @@ struct Specializer {
             assert(return_label->kind() == TK_ReturnLabel);
             const ReturnLabelType *rlt = cast<ReturnLabelType>(return_label);
             if (!rlt->is_returning()) {
-                return none;
+                return Any(none);
             }
             auto &&values = rlt->values;
             auto enter_frame = dest.closure->frame;
@@ -1182,7 +1187,7 @@ struct Specializer {
             for (size_t i = 0; i < values.size(); ++i) {
                 args.push_back(values[i]);
             }
-            Label *newl = fold_type_label_single(enter_frame, enter_label, args);
+            Label *newl = SCOPES_GET_RESULT(fold_type_label_single(enter_frame, enter_label, args));
             if (is_jumping(newl)
                 && !newl->is_important()
                 && (is_calling_continuation(newl) || is_calling_closure(newl))
@@ -1204,37 +1209,47 @@ struct Specializer {
                 {
                     StyledString ss;
                     ss.out << "attempting to retype label as " << return_label;
-                    location_error(ss.str());
+                    SCOPES_LOCATION_ERROR(ss.str());
                 }
             }
         } else {
-            apply_type_error(dest);
+            SCOPES_CHECK_RESULT(apply_type_error(dest));
         }
         return dest;
     }
 
-    static void verify_integer_ops(Any x) {
-        verify_integer_vector(storage_type(x.indirect_type()));
+    static SCOPES_RESULT(void) verify_integer_ops(Any x) {
+        SCOPES_RESULT_TYPE(void);
+        SCOPES_CHECK_RESULT(verify_integer_vector(SCOPES_GET_RESULT(storage_type(x.indirect_type()))));
+        return true;
     }
 
-    static void verify_real_ops(Any x) {
-        verify_real_vector(storage_type(x.indirect_type()));
+    static SCOPES_RESULT(void) verify_real_ops(Any x) {
+        SCOPES_RESULT_TYPE(void);
+        SCOPES_CHECK_RESULT(verify_real_vector(SCOPES_GET_RESULT(storage_type(x.indirect_type()))));
+        return true;
     }
 
-    static void verify_integer_ops(Any a, Any b) {
-        verify_integer_vector(storage_type(a.indirect_type()));
-        verify(a.indirect_type(), b.indirect_type());
+    static SCOPES_RESULT(void) verify_integer_ops(Any a, Any b) {
+        SCOPES_RESULT_TYPE(void);
+        SCOPES_CHECK_RESULT(verify_integer_vector(SCOPES_GET_RESULT(storage_type(a.indirect_type()))));
+        SCOPES_CHECK_RESULT(verify(a.indirect_type(), b.indirect_type()));
+        return true;
     }
 
-    static void verify_real_ops(Any a, Any b) {
-        verify_real_vector(storage_type(a.indirect_type()));
-        verify(a.indirect_type(), b.indirect_type());
+    static SCOPES_RESULT(void) verify_real_ops(Any a, Any b) {
+        SCOPES_RESULT_TYPE(void);
+        SCOPES_CHECK_RESULT(verify_real_vector(SCOPES_GET_RESULT(storage_type(a.indirect_type()))));
+        SCOPES_CHECK_RESULT(verify(a.indirect_type(), b.indirect_type()));
+        return true;
     }
 
-    static void verify_real_ops(Any a, Any b, Any c) {
-        verify_real_vector(storage_type(a.indirect_type()));
-        verify(a.indirect_type(), b.indirect_type());
-        verify(a.indirect_type(), c.indirect_type());
+    static SCOPES_RESULT(void) verify_real_ops(Any a, Any b, Any c) {
+        SCOPES_RESULT_TYPE(void);
+        SCOPES_CHECK_RESULT(verify_real_vector(SCOPES_GET_RESULT(storage_type(a.indirect_type()))));
+        SCOPES_CHECK_RESULT(verify(a.indirect_type(), b.indirect_type()));
+        SCOPES_CHECK_RESULT(verify(a.indirect_type(), c.indirect_type()));
+        return true;
     }
 
     static bool has_keyed_args(Label *l) {
@@ -1246,14 +1261,15 @@ struct Specializer {
         return false;
     }
 
-    static void verify_no_keyed_args(Label *l) {
+    static SCOPES_RESULT(void) verify_no_keyed_args(Label *l) {
+        SCOPES_RESULT_TYPE(void);
         auto &&args = l->body.args;
         for (size_t i = 1; i < args.size(); ++i) {
             if (args[i].key != SYM_Unnamed) {
-                location_error(String::from("unexpected keyed argument"));
+                SCOPES_LOCATION_ERROR(String::from("unexpected keyed argument"));
             }
         }
-
+        return true;
     }
 
     static bool is_jumping(Label *l) {
@@ -1394,9 +1410,10 @@ struct Specializer {
         return (args[0].value.type == TYPE_Parameter) && (args[0].value.parameter == callee);
     }
 
-    void verify_function_argument_signature(const FunctionType *fi, Label *l) {
+    SCOPES_RESULT(void) verify_function_argument_signature(const FunctionType *fi, Label *l) {
+        SCOPES_RESULT_TYPE(void);
         auto &&args = l->body.args;
-        verify_function_argument_count(fi, args.size() - 1);
+        SCOPES_CHECK_RESULT(verify_function_argument_count(fi, args.size() - 1));
 
         size_t fargcount = fi->argument_types.size();
         for (size_t i = 1; i < args.size(); ++i) {
@@ -1405,8 +1422,8 @@ struct Specializer {
             const Type *argT = arg.value.indirect_type();
             if (k < fargcount) {
                 const Type *ft = fi->argument_types[k];
-                const Type *A = storage_type(argT);
-                const Type *B = storage_type(ft);
+                const Type *A = SCOPES_GET_RESULT(storage_type(argT));
+                const Type *B = SCOPES_GET_RESULT(storage_type(ft));
                 if (A == B)
                     continue;
                 if ((A->kind() == TK_Pointer) && (B->kind() == TK_Pointer)) {
@@ -1419,12 +1436,14 @@ struct Specializer {
                 }
                 StyledString ss;
                 ss.out << "argument of type " << ft << " expected, got " << argT;
-                location_error(ss.str());
+                SCOPES_LOCATION_ERROR(ss.str());
             }
         }
+        return true;
     }
 
-    void solve_keyed_args(Label *l) {
+    SCOPES_RESULT(void) solve_keyed_args(Label *l) {
+        SCOPES_RESULT_TYPE(void);
         Label *enter = l->get_closure_enter()->label;
 
         auto &&args = l->body.args;
@@ -1463,7 +1482,7 @@ struct Specializer {
                     if (mapped[param->index]) {
                         StyledString ss;
                         ss.out << "duplicate binding to parameter " << arg.key;
-                        location_error(ss.str());
+                        SCOPES_LOCATION_ERROR(ss.str());
                     }
                     index = param->index;
                 } else if (vaparam) {
@@ -1492,19 +1511,21 @@ struct Specializer {
             }
         }
         args = newargs;
+        return true;
     }
 
     bool is_indirect_closure_type(const Type *T) {
         if (is_opaque(T)) return false;
         if (T == TYPE_Closure) return true;
-        T = storage_type(T);
-        const Type *ST = storage_type(TYPE_Closure);
+        T = storage_type(T).assert_ok();
+        const Type *ST = storage_type(TYPE_Closure).assert_ok();
         if (T == ST) return true;
         // TODO: detect closures in aggregate types
         return false;
     }
 
-    void validate_label_return_types(Label *l) {
+    SCOPES_RESULT(void) validate_label_return_types(Label *l) {
+        SCOPES_RESULT_TYPE(void);
         assert(!l->is_basic_block_like());
         assert(l->is_return_param_typed());
         const ReturnLabelType *rlt = cast<ReturnLabelType>(l->params[0]->type);
@@ -1523,7 +1544,7 @@ struct Specializer {
             if (is_unknown(val)) {
                 auto T = val.typeref;
                 if (!is_opaque(T)) {
-                    T = storage_type(T);
+                    T = storage_type(T).assert_ok();
                     if (T->kind() == TK_Pointer) {
                         auto pt = cast<PointerType>(T);
                         if (pt->storage_class != SYM_Unnamed) {
@@ -1539,9 +1560,10 @@ struct Specializer {
                 set_active_anchor(l->anchor);
                 ss.out << "return argument #" << i << " is of non-returnable " << name << " type "
                     << displayT << " but function is not being inlined" << std::endl;
-                location_error(ss.str());
+                SCOPES_LOCATION_ERROR(ss.str());
             }
         }
+        return true;
     }
 
     bool frame_args_match_keys(const Args &args, const Args &keys) const {
@@ -1576,7 +1598,8 @@ struct Specializer {
     }
 #endif
 
-    const Type *fold_closure_call(Label *l, bool &recursive, bool &inlined) {
+    SCOPES_RESULT(const Type *) fold_closure_call(Label *l, bool &recursive, bool &inlined) {
+        SCOPES_RESULT_TYPE(const Type *);
 #if SCOPES_DEBUG_CODEGEN
         ss_cout << "folding & typing arguments in " << l << std::endl;
 #endif
@@ -1638,13 +1661,13 @@ struct Specializer {
         bool is_function_entry = !enter_label->is_basic_block_like();
 #endif
 
-        Frame *newf = fold_type_label_single_frame(
-            enter_frame, enter_label, keys);
+        Frame *newf = SCOPES_GET_RESULT(fold_type_label_single_frame(
+            enter_frame, enter_label, keys));
         Label *newl = newf->get_instance();
 
 #if 0
         if (newf == enter_frame) {
-            location_error(String::from("label or function forms an infinite but empty loop"));
+            SCOPES_LOCATION_ERROR(String::from("label or function forms an infinite but empty loop"));
         }
 #endif
 
@@ -1659,7 +1682,7 @@ struct Specializer {
 
             // we need to solve body, return type and reentrant flags for the
             // section that follows
-            normalize_function(newf);
+            SCOPES_CHECK_RESULT(normalize_function(newf));
 
             // function is done, but not typed
             if (!newl->is_return_param_typed()) {
@@ -1676,7 +1699,7 @@ struct Specializer {
                 recursive = true;
                 return nullptr;
             } else {
-                validate_label_return_types(newl);
+                SCOPES_CHECK_RESULT(validate_label_return_types(newl));
             }
 
             const Type *rtype = newl->get_return_type();
@@ -1825,24 +1848,28 @@ struct Specializer {
         }
     }
 
-    void verify_readable(const Type *T) {
+    SCOPES_RESULT(void) verify_readable(const Type *T) {
+        SCOPES_RESULT_TYPE(void);
         auto pi = cast<PointerType>(T);
         if (!pi->is_readable()) {
             StyledString ss;
             ss.out << "can not load value from address of type " << T
                 << " because the target is non-readable";
-            location_error(ss.str());
+            SCOPES_LOCATION_ERROR(ss.str());
         }
+        return true;
     }
 
-    void verify_writable(const Type *T) {
+    SCOPES_RESULT(void) verify_writable(const Type *T) {
+        SCOPES_RESULT_TYPE(void);
         auto pi = cast<PointerType>(T);
         if (!pi->is_writable()) {
             StyledString ss;
             ss.out << "can not store value at address of type " << T
                 << " because the target is non-writable";
-            location_error(ss.str());
+            SCOPES_LOCATION_ERROR(ss.str());
         }
+        return true;
     }
 
     // reduce typekind to compatible
@@ -1853,7 +1880,7 @@ struct Specializer {
     }
 
 #define CHECKARGS(MINARGS, MAXARGS) \
-    checkargs<MINARGS, MAXARGS>(args.size())
+    SCOPES_CHECK_RESULT((checkargs<MINARGS, MAXARGS>(args.size())))
 
 #define RETARGTYPES(...) \
     { \
@@ -1869,30 +1896,31 @@ struct Specializer {
     return true;
 
     // returns true if the call can be eliminated
-    bool values_from_builtin_call(Label *l, Args &retvalues) {
+    SCOPES_RESULT(bool) values_from_builtin_call(Label *l, Args &retvalues) {
+        SCOPES_RESULT_TYPE(bool);
         auto &&enter = l->body.enter;
         auto &&args = l->body.args;
         assert(enter.type == TYPE_Builtin);
         switch(enter.builtin.value()) {
         case FN_Sample: {
             CHECKARGS(2, -1);
-            auto ST = storage_type(args[1].value.indirect_type());
+            auto ST = SCOPES_GET_RESULT(storage_type(args[1].value.indirect_type()));
             if (ST->kind() == TK_SampledImage) {
                 auto sit = cast<SampledImageType>(ST);
-                ST = storage_type(sit->type);
+                ST = SCOPES_GET_RESULT(storage_type(sit->type));
             }
-            verify_kind<TK_Image>(ST);
+            SCOPES_CHECK_RESULT(verify_kind<TK_Image>(ST));
             auto it = cast<ImageType>(ST);
             RETARGTYPES(it->type);
         } break;
         case FN_ImageQuerySize: {
             CHECKARGS(1, -1);
-            auto ST = storage_type(args[1].value.indirect_type());
+            auto ST = SCOPES_GET_RESULT(storage_type(args[1].value.indirect_type()));
             if (ST->kind() == TK_SampledImage) {
                 auto sit = cast<SampledImageType>(ST);
-                ST = storage_type(sit->type);
+                ST = SCOPES_GET_RESULT(storage_type(sit->type));
             }
-            verify_kind<TK_Image>(ST);
+            SCOPES_CHECK_RESULT(verify_kind<TK_Image>(ST));
             auto it = cast<ImageType>(ST);
             int comps = 0;
             switch(it->dim.value()) {
@@ -1910,7 +1938,7 @@ struct Specializer {
                 comps = 3;
                 break;
             default:
-                location_error(String::from("unsupported dimensionality"));
+                SCOPES_LOCATION_ERROR(String::from("unsupported dimensionality"));
                 break;
             }
             if (it->arrayed) {
@@ -1919,90 +1947,65 @@ struct Specializer {
             if (comps == 1) {
                 RETARGTYPES(TYPE_I32);
             } else {
-                RETARGTYPES(Vector(TYPE_I32, comps));
+                RETARGTYPES(Vector(TYPE_I32, comps).assert_ok());
             }
         } break;
         case FN_ImageQueryLod: {
             CHECKARGS(2, 2);
-            auto ST = storage_type(args[1].value.indirect_type());
+            auto ST = SCOPES_GET_RESULT(storage_type(args[1].value.indirect_type()));
             if (ST->kind() == TK_SampledImage) {
                 auto sit = cast<SampledImageType>(ST);
-                ST = storage_type(sit->type);
+                ST = SCOPES_GET_RESULT(storage_type(sit->type));
             }
-            verify_kind<TK_Image>(ST);
-            RETARGTYPES(Vector(TYPE_F32, 2));
+            SCOPES_CHECK_RESULT(verify_kind<TK_Image>(ST));
+            RETARGTYPES(Vector(TYPE_F32, 2).assert_ok());
         } break;
         case FN_ImageQueryLevels:
         case FN_ImageQuerySamples: {
             CHECKARGS(1, 1);
-            auto ST = storage_type(args[1].value.indirect_type());
+            auto ST = SCOPES_GET_RESULT(storage_type(args[1].value.indirect_type()));
             if (ST->kind() == TK_SampledImage) {
                 auto sit = cast<SampledImageType>(ST);
-                ST = storage_type(sit->type);
+                ST = SCOPES_GET_RESULT(storage_type(sit->type));
             }
-            verify_kind<TK_Image>(ST);
+            SCOPES_CHECK_RESULT(verify_kind<TK_Image>(ST));
             RETARGTYPES(TYPE_I32);
         } break;
         case FN_ImageRead: {
             CHECKARGS(2, 2);
-            auto ST = storage_type(args[1].value.indirect_type());
-            verify_kind<TK_Image>(ST);
+            auto ST = SCOPES_GET_RESULT(storage_type(args[1].value.indirect_type()));
+            SCOPES_CHECK_RESULT(verify_kind<TK_Image>(ST));
             auto it = cast<ImageType>(ST);
             RETARGTYPES(it->type);
         } break;
         case SFXFN_ExecutionMode: {
             CHECKARGS(1, 4);
-            args[1].value.verify(TYPE_Symbol);
+            SCOPES_CHECK_RESULT(args[1].value.verify(TYPE_Symbol));
             switch(args[1].value.symbol.value()) {
             #define T(NAME) \
                 case SYM_SPIRV_ExecutionMode ## NAME: break;
                 B_SPIRV_EXECUTION_MODE()
             #undef T
                 default:
-                    location_error(String::from("unsupported execution mode"));
+                    SCOPES_LOCATION_ERROR(String::from("unsupported execution mode"));
                     break;
             }
             for (size_t i = 2; i < args.size(); ++i) {
-                cast_number<int>(args[i].value);
+                SCOPES_CHECK_RESULT(cast_number<int>(args[i].value));
             }
             RETARGTYPES();
         } break;
         case OP_Tertiary: {
             CHECKARGS(3, 3);
-            auto &&cond = args[1].value;
-            if (cond.is_const() &&
-                ((cond.type == TYPE_Bool)
-                    || (args[2].value.is_const() && args[3].value.is_const()))) {
-                if (cond.type == TYPE_Bool) {
-                    if (cond.i1) {
-                        RETARGS(args[2].value);
-                    } else {
-                        RETARGS(args[3].value);
-                    }
-                } else {
-                    auto T1 = storage_type(cond.type);
-                    auto T2 = storage_type(args[2].value.type);
-                    verify_bool_vector(T1);
-                    verify(args[2].value.type, args[3].value.type);
-                    if (T1->kind() == TK_Vector) {
-                        verify_vector_sizes(T1, T2);
-                    } else if (T2->kind() == TK_Vector) {
-                        cond = smear(cond, cast<VectorType>(T2)->count);
-                    }
-                    Any fargs[] = { cond, args[2].value, args[3].value };
-                    RETARGS(apply_op< DispatchSelect >(fargs, 3));
-                }
-            } else {
-                auto T1 = storage_type(args[1].value.indirect_type());
-                auto T2 = storage_type(args[2].value.indirect_type());
-                auto T3 = storage_type(args[3].value.indirect_type());
-                verify_bool_vector(T1);
-                if (T1->kind() == TK_Vector) {
-                    verify_vector_sizes(T1, T2);
-                }
-                verify(T2, T3);
-                RETARGTYPES(args[2].value.indirect_type());
+            auto T1 = SCOPES_GET_RESULT(storage_type(args[1].value.indirect_type()));
+            auto T2 = SCOPES_GET_RESULT(storage_type(args[2].value.indirect_type()));
+            auto T3 = SCOPES_GET_RESULT(storage_type(args[3].value.indirect_type()));
+            SCOPES_CHECK_RESULT(verify_bool_vector(T1));
+            if (T1->kind() == TK_Vector) {
+                SCOPES_CHECK_RESULT(verify_vector_sizes(T1, T2));
             }
+            SCOPES_CHECK_RESULT(verify(T2, T3));
+            RETARGTYPES(args[2].value.indirect_type());
         } break;
         case FN_Unconst: {
             CHECKARGS(1, 1);
@@ -2015,7 +2018,7 @@ struct Specializer {
                     RETARGTYPES(et->pointer_type);
                 } else if (args[1].value.type == TYPE_Label) {
                     Label *fn = args[1].value;
-                    fn->verify_compilable();
+                    SCOPES_CHECK_RESULT(fn->verify_compilable());
                     const Type *functype = Pointer(
                         fn->get_function_type(), PTF_NonWritable, SYM_Unnamed);
                     RETARGTYPES(functype);
@@ -2028,14 +2031,14 @@ struct Specializer {
             CHECKARGS(2, 2);
             // todo: verify source and dest type are non-aggregate
             // also, both must be of same category
-            args[2].value.verify(TYPE_Type);
+            SCOPES_CHECK_RESULT(args[2].value.verify(TYPE_Type));
             const Type *SrcT = args[1].value.indirect_type();
             const Type *DestT = args[2].value.typeref;
             if (SrcT == DestT) {
                 RETARGS(args[1].value);
             } else {
-                const Type *SSrcT = storage_type(SrcT);
-                const Type *SDestT = storage_type(DestT);
+                const Type *SSrcT = SCOPES_GET_RESULT(storage_type(SrcT));
+                const Type *SDestT = SCOPES_GET_RESULT(storage_type(DestT));
 
                 if (canonical_typekind(SSrcT->kind())
                         != canonical_typekind(SDestT->kind())) {
@@ -2043,7 +2046,7 @@ struct Specializer {
                     ss.out << "can not bitcast value of type " << SrcT
                         << " to type " << DestT
                         << " because storage types are not of compatible category";
-                    location_error(ss.str());
+                    SCOPES_LOCATION_ERROR(ss.str());
                 }
                 if (SSrcT != SDestT) {
                     switch (SDestT->kind()) {
@@ -2055,7 +2058,7 @@ struct Specializer {
                         ss.out << "can not bitcast value of type " << SrcT
                             << " to type " << DestT
                             << " with aggregate storage type " << SDestT;
-                        location_error(ss.str());
+                        SCOPES_LOCATION_ERROR(ss.str());
                     } break;
                     default: break;
                     }
@@ -2071,229 +2074,225 @@ struct Specializer {
         } break;
         case FN_IntToPtr: {
             CHECKARGS(2, 2);
-            verify_integer(storage_type(args[1].value.indirect_type()));
-            args[2].value.verify(TYPE_Type);
+            SCOPES_CHECK_RESULT(verify_integer(SCOPES_GET_RESULT(storage_type(args[1].value.indirect_type()))));
+            SCOPES_CHECK_RESULT(args[2].value.verify(TYPE_Type));
             const Type *DestT = args[2].value.typeref;
-            verify_kind<TK_Pointer>(storage_type(DestT));
+            SCOPES_CHECK_RESULT(verify_kind<TK_Pointer>(SCOPES_GET_RESULT(storage_type(DestT))));
             RETARGTYPES(DestT);
         } break;
         case FN_PtrToInt: {
             CHECKARGS(2, 2);
-            verify_kind<TK_Pointer>(
-                storage_type(args[1].value.indirect_type()));
-            args[2].value.verify(TYPE_Type);
+            SCOPES_CHECK_RESULT(verify_kind<TK_Pointer>(
+                SCOPES_GET_RESULT(storage_type(args[1].value.indirect_type()))));
+            SCOPES_CHECK_RESULT(args[2].value.verify(TYPE_Type));
             const Type *DestT = args[2].value.typeref;
-            verify_integer(storage_type(DestT));
+            SCOPES_CHECK_RESULT(verify_integer(SCOPES_GET_RESULT(storage_type(DestT))));
             RETARGTYPES(DestT);
         } break;
         case FN_ITrunc: {
             CHECKARGS(2, 2);
             const Type *T = args[1].value.indirect_type();
-            verify_integer(storage_type(T));
-            args[2].value.verify(TYPE_Type);
+            SCOPES_CHECK_RESULT(verify_integer(SCOPES_GET_RESULT(storage_type(T))));
+            SCOPES_CHECK_RESULT(args[2].value.verify(TYPE_Type));
             const Type *DestT = args[2].value.typeref;
-            verify_integer(storage_type(DestT));
+            SCOPES_CHECK_RESULT(verify_integer(SCOPES_GET_RESULT(storage_type(DestT))));
             RETARGTYPES(DestT);
         } break;
         case FN_FPTrunc: {
             CHECKARGS(2, 2);
             const Type *T = args[1].value.indirect_type();
-            verify_real(T);
-            args[2].value.verify(TYPE_Type);
+            SCOPES_CHECK_RESULT(verify_real(T));
+            SCOPES_CHECK_RESULT(args[2].value.verify(TYPE_Type));
             const Type *DestT = args[2].value.typeref;
-            verify_real(DestT);
+            SCOPES_CHECK_RESULT(verify_real(DestT));
             if (cast<RealType>(T)->width >= cast<RealType>(DestT)->width) {
-            } else { invalid_op2_types_error(T, DestT); }
+            } else { SCOPES_CHECK_RESULT(invalid_op2_types_error(T, DestT)); }
             RETARGTYPES(DestT);
         } break;
         case FN_FPExt: {
             CHECKARGS(2, 2);
             const Type *T = args[1].value.indirect_type();
-            verify_real(T);
-            args[2].value.verify(TYPE_Type);
+            SCOPES_CHECK_RESULT(verify_real(T));
+            SCOPES_CHECK_RESULT(args[2].value.verify(TYPE_Type));
             const Type *DestT = args[2].value.typeref;
-            verify_real(DestT);
+            SCOPES_CHECK_RESULT(verify_real(DestT));
             if (cast<RealType>(T)->width <= cast<RealType>(DestT)->width) {
-            } else { invalid_op2_types_error(T, DestT); }
+            } else { SCOPES_CHECK_RESULT(invalid_op2_types_error(T, DestT)); }
             RETARGTYPES(DestT);
         } break;
         case FN_FPToUI: {
             CHECKARGS(2, 2);
             const Type *T = args[1].value.indirect_type();
-            verify_real(T);
-            args[2].value.verify(TYPE_Type);
+            SCOPES_CHECK_RESULT(verify_real(T));
+            SCOPES_CHECK_RESULT(args[2].value.verify(TYPE_Type));
             const Type *DestT = args[2].value.typeref;
-            verify_integer(DestT);
+            SCOPES_CHECK_RESULT(verify_integer(DestT));
             if ((T == TYPE_F32) || (T == TYPE_F64)) {
             } else {
-                invalid_op2_types_error(T, DestT);
+                SCOPES_CHECK_RESULT(invalid_op2_types_error(T, DestT));
             }
             RETARGTYPES(DestT);
         } break;
         case FN_FPToSI: {
             CHECKARGS(2, 2);
             const Type *T = args[1].value.indirect_type();
-            verify_real(T);
-            args[2].value.verify(TYPE_Type);
+            SCOPES_CHECK_RESULT(verify_real(T));
+            SCOPES_CHECK_RESULT(args[2].value.verify(TYPE_Type));
             const Type *DestT = args[2].value.typeref;
-            verify_integer(DestT);
+            SCOPES_CHECK_RESULT(verify_integer(DestT));
             if ((T == TYPE_F32) || (T == TYPE_F64)) {
             } else {
-                invalid_op2_types_error(T, DestT);
+                SCOPES_CHECK_RESULT(invalid_op2_types_error(T, DestT));
             }
             RETARGTYPES(DestT);
         } break;
         case FN_UIToFP: {
             CHECKARGS(2, 2);
             const Type *T = args[1].value.indirect_type();
-            verify_integer(T);
-            args[2].value.verify(TYPE_Type);
+            SCOPES_CHECK_RESULT(verify_integer(T));
+            SCOPES_CHECK_RESULT(args[2].value.verify(TYPE_Type));
             const Type *DestT = args[2].value.typeref;
-            verify_real(DestT);
+            SCOPES_CHECK_RESULT(verify_real(DestT));
             if ((DestT == TYPE_F32) || (DestT == TYPE_F64)) {
             } else {
-                invalid_op2_types_error(T, DestT);
+                SCOPES_CHECK_RESULT(invalid_op2_types_error(T, DestT));
             }
             RETARGTYPES(DestT);
         } break;
         case FN_SIToFP: {
             CHECKARGS(2, 2);
             const Type *T = args[1].value.indirect_type();
-            verify_integer(T);
-            args[2].value.verify(TYPE_Type);
+            SCOPES_CHECK_RESULT(verify_integer(T));
+            SCOPES_CHECK_RESULT(args[2].value.verify(TYPE_Type));
             const Type *DestT = args[2].value.typeref;
-            verify_real(DestT);
+            SCOPES_CHECK_RESULT(verify_real(DestT));
             if ((DestT == TYPE_F32) || (DestT == TYPE_F64)) {
             } else {
-                invalid_op2_types_error(T, DestT);
+                SCOPES_CHECK_RESULT(invalid_op2_types_error(T, DestT));
             }
             RETARGTYPES(DestT);
         } break;
         case FN_ZExt: {
             CHECKARGS(2, 2);
             const Type *T = args[1].value.indirect_type();
-            verify_integer(storage_type(T));
-            args[2].value.verify(TYPE_Type);
+            SCOPES_CHECK_RESULT(verify_integer(SCOPES_GET_RESULT(storage_type(T))));
+            SCOPES_CHECK_RESULT(args[2].value.verify(TYPE_Type));
             const Type *DestT = args[2].value.typeref;
-            verify_integer(storage_type(DestT));
+            SCOPES_CHECK_RESULT(verify_integer(SCOPES_GET_RESULT(storage_type(DestT))));
             RETARGTYPES(DestT);
         } break;
         case FN_SExt: {
             CHECKARGS(2, 2);
             const Type *T = args[1].value.indirect_type();
-            verify_integer(storage_type(T));
-            args[2].value.verify(TYPE_Type);
+            SCOPES_CHECK_RESULT(verify_integer(SCOPES_GET_RESULT(storage_type(T))));
+            SCOPES_CHECK_RESULT(args[2].value.verify(TYPE_Type));
             const Type *DestT = args[2].value.typeref;
-            verify_integer(storage_type(DestT));
+            SCOPES_CHECK_RESULT(verify_integer(SCOPES_GET_RESULT(storage_type(DestT))));
             RETARGTYPES(DestT);
         } break;
         case FN_ExtractElement: {
             CHECKARGS(2, 2);
-            const Type *T = storage_type(args[1].value.indirect_type());
-            verify_kind<TK_Vector>(T);
+            const Type *T = SCOPES_GET_RESULT(storage_type(args[1].value.indirect_type()));
+            SCOPES_CHECK_RESULT(verify_kind<TK_Vector>(T));
             auto vi = cast<VectorType>(T);
-            verify_integer(storage_type(args[2].value.indirect_type()));
+            SCOPES_CHECK_RESULT(verify_integer(SCOPES_GET_RESULT(storage_type(args[2].value.indirect_type()))));
             RETARGTYPES(vi->element_type);
         } break;
         case FN_InsertElement: {
             CHECKARGS(3, 3);
-            const Type *T = storage_type(args[1].value.indirect_type());
-            const Type *ET = storage_type(args[2].value.indirect_type());
-            verify_integer(storage_type(args[3].value.indirect_type()));
-            verify_kind<TK_Vector>(T);
+            const Type *T = SCOPES_GET_RESULT(storage_type(args[1].value.indirect_type()));
+            const Type *ET = SCOPES_GET_RESULT(storage_type(args[2].value.indirect_type()));
+            SCOPES_CHECK_RESULT(verify_integer(SCOPES_GET_RESULT(storage_type(args[3].value.indirect_type()))));
+            SCOPES_CHECK_RESULT(verify_kind<TK_Vector>(T));
             auto vi = cast<VectorType>(T);
-            verify(storage_type(vi->element_type), ET);
+            SCOPES_CHECK_RESULT(verify(SCOPES_GET_RESULT(storage_type(vi->element_type)), ET));
             RETARGTYPES(args[1].value.indirect_type());
         } break;
         case FN_ShuffleVector: {
             CHECKARGS(3, 3);
-            const Type *TV1 = storage_type(args[1].value.indirect_type());
-            const Type *TV2 = storage_type(args[2].value.indirect_type());
-            const Type *TMask = storage_type(args[3].value.type);
-            verify_kind<TK_Vector>(TV1);
-            verify_kind<TK_Vector>(TV2);
-            verify_kind<TK_Vector>(TMask);
-            verify(TV1, TV2);
+            const Type *TV1 = SCOPES_GET_RESULT(storage_type(args[1].value.indirect_type()));
+            const Type *TV2 = SCOPES_GET_RESULT(storage_type(args[2].value.indirect_type()));
+            const Type *TMask = SCOPES_GET_RESULT(storage_type(args[3].value.type));
+            SCOPES_CHECK_RESULT(verify_kind<TK_Vector>(TV1));
+            SCOPES_CHECK_RESULT(verify_kind<TK_Vector>(TV2));
+            SCOPES_CHECK_RESULT(verify_kind<TK_Vector>(TMask));
+            SCOPES_CHECK_RESULT(verify(TV1, TV2));
             auto vi = cast<VectorType>(TV1);
             auto mask_vi = cast<VectorType>(TMask);
-            verify(TYPE_I32, mask_vi->element_type);
+            SCOPES_CHECK_RESULT(verify(TYPE_I32, mask_vi->element_type));
             size_t incount = vi->count * 2;
             size_t outcount = mask_vi->count;
             for (size_t i = 0; i < outcount; ++i) {
-                verify_range(
-                    (size_t)mask_vi->unpack(args[3].value.pointer, i).i32,
-                    incount);
+                SCOPES_CHECK_RESULT(verify_range(
+                    (size_t)mask_vi->unpack(args[3].value.pointer, i).assert_ok().i32,
+                    incount));
             }
-            RETARGTYPES(Vector(vi->element_type, outcount));
+            RETARGTYPES(Vector(vi->element_type, outcount).assert_ok());
         } break;
         case FN_ExtractValue: {
             CHECKARGS(2, 2);
-            size_t idx = cast_number<size_t>(args[2].value);
-            const Type *T = storage_type(args[1].value.indirect_type());
+            size_t idx = SCOPES_GET_RESULT(cast_number<size_t>(args[2].value));
+            const Type *T = SCOPES_GET_RESULT(storage_type(args[1].value.indirect_type()));
             switch(T->kind()) {
             case TK_Array: {
                 auto ai = cast<ArrayType>(T);
-                RETARGTYPES(ai->type_at_index(idx));
+                RETARGTYPES(SCOPES_GET_RESULT(ai->type_at_index(idx)));
             } break;
             case TK_Tuple: {
                 auto ti = cast<TupleType>(T);
-                RETARGTYPES(ti->type_at_index(idx));
+                RETARGTYPES(SCOPES_GET_RESULT(ti->type_at_index(idx)));
             } break;
             case TK_Union: {
                 auto ui = cast<UnionType>(T);
-                RETARGTYPES(ui->type_at_index(idx));
+                RETARGTYPES(SCOPES_GET_RESULT(ui->type_at_index(idx)));
             } break;
             default: {
                 StyledString ss;
                 ss.out << "can not extract value from type " << T;
-                location_error(ss.str());
+                SCOPES_LOCATION_ERROR(ss.str());
             } break;
             }
         } break;
         case FN_InsertValue: {
             CHECKARGS(3, 3);
-            const Type *T = storage_type(args[1].value.indirect_type());
-            const Type *ET = storage_type(args[2].value.indirect_type());
-            size_t idx = cast_number<size_t>(args[3].value);
+            const Type *T = SCOPES_GET_RESULT(storage_type(args[1].value.indirect_type()));
+            const Type *ET = SCOPES_GET_RESULT(storage_type(args[2].value.indirect_type()));
+            size_t idx = SCOPES_GET_RESULT(cast_number<size_t>(args[3].value));
             switch(T->kind()) {
             case TK_Array: {
                 auto ai = cast<ArrayType>(T);
-                verify(storage_type(ai->type_at_index(idx)), ET);
+                SCOPES_CHECK_RESULT(verify(SCOPES_GET_RESULT(storage_type(SCOPES_GET_RESULT(ai->type_at_index(idx)))), ET));
             } break;
             case TK_Tuple: {
                 auto ti = cast<TupleType>(T);
-                verify(storage_type(ti->type_at_index(idx)), ET);
+                SCOPES_CHECK_RESULT(verify(SCOPES_GET_RESULT(storage_type(SCOPES_GET_RESULT(ti->type_at_index(idx)))), ET));
             } break;
             case TK_Union: {
                 auto ui = cast<UnionType>(T);
-                verify(storage_type(ui->type_at_index(idx)), ET);
+                SCOPES_CHECK_RESULT(verify(SCOPES_GET_RESULT(storage_type(SCOPES_GET_RESULT(ui->type_at_index(idx)))), ET));
             } break;
             default: {
                 StyledString ss;
                 ss.out << "can not insert value into type " << T;
-                location_error(ss.str());
+                SCOPES_LOCATION_ERROR(ss.str());
             } break;
             }
             RETARGTYPES(args[1].value.indirect_type());
         } break;
         case FN_Undef: {
             CHECKARGS(1, 1);
-            args[1].value.verify(TYPE_Type);
+            SCOPES_CHECK_RESULT(args[1].value.verify(TYPE_Type));
             RETARGTYPES(args[1].value.typeref);
         } break;
         case FN_Malloc: {
             CHECKARGS(1, 1);
-            args[1].value.verify(TYPE_Type);
+            SCOPES_CHECK_RESULT(args[1].value.verify(TYPE_Type));
             RETARGTYPES(NativePointer(args[1].value.typeref));
         } break;
         case FN_Alloca: {
             CHECKARGS(1, 1);
-            args[1].value.verify(TYPE_Type);
+            SCOPES_CHECK_RESULT(args[1].value.verify(TYPE_Type));
             RETARGTYPES(LocalPointer(args[1].value.typeref));
-        } break;
-        case FN_AllocaExceptionPad: {
-            CHECKARGS(0, 0);
-            RETARGTYPES(LocalPointer(Array(TYPE_U8, sizeof(ExceptionPad))));
         } break;
         case FN_AllocaOf: {
             CHECKARGS(1, 1);
@@ -2301,35 +2300,35 @@ struct Specializer {
         } break;
         case FN_MallocArray: {
             CHECKARGS(2, 2);
-            args[1].value.verify(TYPE_Type);
-            verify_integer(storage_type(args[2].value.indirect_type()));
+            SCOPES_CHECK_RESULT(args[1].value.verify(TYPE_Type));
+            SCOPES_CHECK_RESULT(verify_integer(SCOPES_GET_RESULT(storage_type(args[2].value.indirect_type()))));
             RETARGTYPES(NativePointer(args[1].value.typeref));
         } break;
         case FN_AllocaArray: {
             CHECKARGS(2, 2);
-            args[1].value.verify(TYPE_Type);
-            verify_integer(storage_type(args[2].value.indirect_type()));
+            SCOPES_CHECK_RESULT(args[1].value.verify(TYPE_Type));
+            SCOPES_CHECK_RESULT(verify_integer(SCOPES_GET_RESULT(storage_type(args[2].value.indirect_type()))));
             RETARGTYPES(LocalPointer(args[1].value.typeref));
         } break;
         case FN_Free: {
             CHECKARGS(1, 1);
-            const Type *T = storage_type(args[1].value.indirect_type());
-            verify_kind<TK_Pointer>(T);
-            verify_writable(T);
+            const Type *T = SCOPES_GET_RESULT(storage_type(args[1].value.indirect_type()));
+            SCOPES_CHECK_RESULT(verify_kind<TK_Pointer>(T));
+            SCOPES_CHECK_RESULT(verify_writable(T));
             if (cast<PointerType>(T)->storage_class != SYM_Unnamed) {
-                location_error(String::from(
+                SCOPES_LOCATION_ERROR(String::from(
                     "pointer is not a heap pointer"));
             }
             RETARGTYPES();
         } break;
         case FN_GetElementPtr: {
             CHECKARGS(2, -1);
-            const Type *T = storage_type(args[1].value.indirect_type());
+            const Type *T = SCOPES_GET_RESULT(storage_type(args[1].value.indirect_type()));
             bool is_extern = (T->kind() == TK_Extern);
             if (is_extern) {
                 T = cast<ExternType>(T)->pointer_type;
             }
-            verify_kind<TK_Pointer>(T);
+            SCOPES_GET_RESULT(verify_kind<TK_Pointer>(T));
             auto pi = cast<PointerType>(T);
             T = pi->element_type;
             bool all_const = args[1].value.is_const();
@@ -2343,18 +2342,18 @@ struct Specializer {
             }
             if (!is_extern && all_const) {
                 void *ptr = args[1].value.pointer;
-                size_t idx = cast_number<size_t>(args[2].value);
-                ptr = pi->getelementptr(ptr, idx);
+                size_t idx = SCOPES_GET_RESULT(cast_number<size_t>(args[2].value));
+                ptr = SCOPES_GET_RESULT(pi->getelementptr(ptr, idx));
 
                 for (size_t i = 3; i < args.size(); ++i) {
-                    const Type *ST = storage_type(T);
+                    const Type *ST = SCOPES_GET_RESULT(storage_type(T));
                     auto &&arg = args[i].value;
                     switch(ST->kind()) {
                     case TK_Array: {
                         auto ai = cast<ArrayType>(ST);
                         T = ai->element_type;
-                        size_t idx = cast_number<size_t>(arg);
-                        ptr = ai->getelementptr(ptr, idx);
+                        size_t idx = SCOPES_GET_RESULT(cast_number<size_t>(arg));
+                        ptr = SCOPES_GET_RESULT(ai->getelementptr(ptr, idx));
                     } break;
                     case TK_Tuple: {
                         auto ti = cast<TupleType>(ST);
@@ -2364,36 +2363,36 @@ struct Specializer {
                             if (idx == (size_t)-1) {
                                 StyledString ss;
                                 ss.out << "no such field " << arg.symbol << " in storage type " << ST;
-                                location_error(ss.str());
+                                SCOPES_LOCATION_ERROR(ss.str());
                             }
                             // rewrite field
                             arg = (int)idx;
                         } else {
-                            idx = cast_number<size_t>(arg);
+                            idx = SCOPES_GET_RESULT(cast_number<size_t>(arg));
                         }
-                        T = ti->type_at_index(idx);
-                        ptr = ti->getelementptr(ptr, idx);
+                        T = SCOPES_GET_RESULT(ti->type_at_index(idx));
+                        ptr = SCOPES_GET_RESULT(ti->getelementptr(ptr, idx));
                     } break;
                     default: {
                         StyledString ss;
                         ss.out << "can not get element pointer from type " << T;
-                        location_error(ss.str());
+                        SCOPES_LOCATION_ERROR(ss.str());
                     } break;
                     }
                 }
                 T = Pointer(T, pi->flags, pi->storage_class);
                 RETARGS(Any::from_pointer(T, ptr));
             } else {
-                verify_integer(storage_type(args[2].value.indirect_type()));
+                SCOPES_CHECK_RESULT(verify_integer(SCOPES_GET_RESULT(storage_type(args[2].value.indirect_type()))));
                 for (size_t i = 3; i < args.size(); ++i) {
 
-                    const Type *ST = storage_type(T);
+                    const Type *ST = SCOPES_GET_RESULT(storage_type(T));
                     auto &&arg = args[i];
                     switch(ST->kind()) {
                     case TK_Array: {
                         auto ai = cast<ArrayType>(ST);
                         T = ai->element_type;
-                        verify_integer(storage_type(arg.value.indirect_type()));
+                        SCOPES_CHECK_RESULT(verify_integer(SCOPES_GET_RESULT(storage_type(arg.value.indirect_type()))));
                     } break;
                     case TK_Tuple: {
                         auto ti = cast<TupleType>(ST);
@@ -2403,19 +2402,19 @@ struct Specializer {
                             if (idx == (size_t)-1) {
                                 StyledString ss;
                                 ss.out << "no such field " << arg.value.symbol << " in storage type " << ST;
-                                location_error(ss.str());
+                                SCOPES_LOCATION_ERROR(ss.str());
                             }
                             // rewrite field
                             arg = Argument(arg.key, Any((int)idx));
                         } else {
-                            idx = cast_number<size_t>(arg.value);
+                            idx = SCOPES_GET_RESULT(cast_number<size_t>(arg.value));
                         }
-                        T = ti->type_at_index(idx);
+                        T = SCOPES_GET_RESULT(ti->type_at_index(idx));
                     } break;
                     default: {
                         StyledString ss;
                         ss.out << "can not get element pointer from type " << T;
-                        location_error(ss.str());
+                        SCOPES_LOCATION_ERROR(ss.str());
                     } break;
                     }
                 }
@@ -2426,17 +2425,17 @@ struct Specializer {
         case FN_VolatileLoad:
         case FN_Load: {
             CHECKARGS(1, 1);
-            const Type *T = storage_type(args[1].value.indirect_type());
+            const Type *T = SCOPES_GET_RESULT(storage_type(args[1].value.indirect_type()));
             bool is_extern = (T->kind() == TK_Extern);
             if (is_extern) {
                 T = cast<ExternType>(T)->pointer_type;
             }
-            verify_kind<TK_Pointer>(T);
-            verify_readable(T);
+            SCOPES_GET_RESULT(verify_kind<TK_Pointer>(T));
+            SCOPES_GET_RESULT(verify_readable(T));
             auto pi = cast<PointerType>(T);
             if (!is_extern && args[1].value.is_const()
                 && !pi->is_writable()) {
-                RETARGS(pi->unpack(args[1].value.pointer));
+                RETARGS(SCOPES_GET_RESULT(pi->unpack(args[1].value.pointer)));
             } else {
                 RETARGTYPES(pi->element_type);
             }
@@ -2444,35 +2443,35 @@ struct Specializer {
         case FN_VolatileStore:
         case FN_Store: {
             CHECKARGS(2, 2);
-            const Type *T = storage_type(args[2].value.indirect_type());
+            const Type *T = SCOPES_GET_RESULT(storage_type(args[2].value.indirect_type()));
             bool is_extern = (T->kind() == TK_Extern);
             if (is_extern) {
                 T = cast<ExternType>(T)->pointer_type;
             }
-            verify_kind<TK_Pointer>(T);
-            verify_writable(T);
+            SCOPES_GET_RESULT(verify_kind<TK_Pointer>(T));
+            SCOPES_GET_RESULT(verify_writable(T));
             auto pi = cast<PointerType>(T);
-            verify(storage_type(pi->element_type),
-                storage_type(args[1].value.indirect_type()));
+            SCOPES_CHECK_RESULT(verify(SCOPES_GET_RESULT(storage_type(pi->element_type)),
+                SCOPES_GET_RESULT(storage_type(args[1].value.indirect_type()))));
             RETARGTYPES();
         } break;
         case FN_Cross: {
             CHECKARGS(2, 2);
-            const Type *Ta = storage_type(args[1].value.indirect_type());
-            const Type *Tb = storage_type(args[2].value.indirect_type());
-            verify_real_vector(Ta, 3);
-            verify(Ta, Tb);
+            const Type *Ta = SCOPES_GET_RESULT(storage_type(args[1].value.indirect_type()));
+            const Type *Tb = SCOPES_GET_RESULT(storage_type(args[2].value.indirect_type()));
+            SCOPES_CHECK_RESULT(verify_real_vector(Ta, 3));
+            SCOPES_CHECK_RESULT(verify(Ta, Tb));
             RETARGTYPES(args[1].value.indirect_type());
         } break;
         case FN_Normalize: {
             CHECKARGS(1, 1);
-            verify_real_ops(args[1].value);
+            SCOPES_CHECK_RESULT(verify_real_ops(args[1].value));
             RETARGTYPES(args[1].value.indirect_type());
         } break;
         case FN_Length: {
             CHECKARGS(1, 1);
-            const Type *T = storage_type(args[1].value.indirect_type());
-            verify_real_vector(T);
+            const Type *T = SCOPES_GET_RESULT(storage_type(args[1].value.indirect_type()));
+            SCOPES_CHECK_RESULT(verify_real_vector(T));
             if (T->kind() == TK_Vector) {
                 RETARGTYPES(cast<VectorType>(T)->element_type);
             } else {
@@ -2481,8 +2480,8 @@ struct Specializer {
         } break;
         case FN_Distance: {
             CHECKARGS(2, 2);
-            verify_real_ops(args[1].value, args[2].value);
-            const Type *T = storage_type(args[1].value.indirect_type());
+            SCOPES_CHECK_RESULT(verify_real_ops(args[1].value, args[2].value));
+            const Type *T = SCOPES_GET_RESULT(storage_type(args[1].value.indirect_type()));
             if (T->kind() == TK_Vector) {
                 RETARGTYPES(cast<VectorType>(T)->element_type);
             } else {
@@ -2500,7 +2499,7 @@ struct Specializer {
         case OP_ICmpSLT:
         case OP_ICmpSLE: {
             CHECKARGS(2, 2);
-            verify_integer_ops(args[1].value, args[2].value);
+            SCOPES_CHECK_RESULT(verify_integer_ops(args[1].value, args[2].value));
             RETARGTYPES(
                 bool_op_return_type(args[1].value.indirect_type()));
         } break;
@@ -2519,7 +2518,7 @@ struct Specializer {
         case OP_FCmpULT:
         case OP_FCmpULE: {
             CHECKARGS(2, 2);
-            verify_real_ops(args[1].value, args[2].value);
+            SCOPES_CHECK_RESULT(verify_real_ops(args[1].value, args[2].value));
             RETARGTYPES(
                 bool_op_return_type(args[1].value.indirect_type()));
         } break;
@@ -2528,37 +2527,37 @@ struct Specializer {
     case OP_ ## NAME ## NUW: \
     case OP_ ## NAME ## NSW: { \
         CHECKARGS(2, 2); \
-        verify_integer_ops(args[1].value, args[2].value); \
+        SCOPES_CHECK_RESULT(verify_integer_ops(args[1].value, args[2].value)); \
         RETARGTYPES(args[1].value.indirect_type()); \
     } break;
 #define IARITH_OP(NAME, PFX) \
     case OP_ ## NAME: { \
         CHECKARGS(2, 2); \
-        verify_integer_ops(args[1].value, args[2].value); \
+        SCOPES_CHECK_RESULT(verify_integer_ops(args[1].value, args[2].value)); \
         RETARGTYPES(args[1].value.indirect_type()); \
     } break;
 #define FARITH_OP(NAME) \
     case OP_ ## NAME: { \
         CHECKARGS(2, 2); \
-        verify_real_ops(args[1].value, args[2].value); \
+        SCOPES_CHECK_RESULT(verify_real_ops(args[1].value, args[2].value)); \
         RETARGTYPES(args[1].value.indirect_type()); \
     } break;
 #define FTRI_OP(NAME) \
     case OP_ ## NAME: { \
         CHECKARGS(3, 3); \
-        verify_real_ops(args[1].value, args[2].value, args[3].value); \
+        SCOPES_CHECK_RESULT(verify_real_ops(args[1].value, args[2].value, args[3].value)); \
         RETARGTYPES(args[1].value.indirect_type()); \
     } break;
 #define IUN_OP(NAME, PFX) \
     case OP_ ## NAME: { \
         CHECKARGS(1, 1); \
-        verify_integer_ops(args[1].value); \
+        SCOPES_CHECK_RESULT(verify_integer_ops(args[1].value)); \
         RETARGTYPES(args[1].value.indirect_type()); \
     } break;
 #define FUN_OP(NAME) \
     case OP_ ## NAME: { \
         CHECKARGS(1, 1); \
-        verify_real_ops(args[1].value); \
+        SCOPES_CHECK_RESULT(verify_real_ops(args[1].value)); \
         RETARGTYPES(args[1].value.indirect_type()); \
     } break;
             B_ARITH_OPS()
@@ -2572,7 +2571,7 @@ struct Specializer {
         default: {
             StyledString ss;
             ss.out << "can not type builtin " << enter.builtin;
-            location_error(ss.str());
+            SCOPES_LOCATION_ERROR(ss.str());
         } break;
         }
 
@@ -2673,13 +2672,16 @@ struct Specializer {
         enter = value;
     }
 
-    void verify_all_args_constant(Label *l) {
+    SCOPES_RESULT(void) verify_all_args_constant(Label *l) {
+        SCOPES_RESULT_TYPE(void);
         if (!all_args_constant(l)) {
-            location_error(String::from("all arguments must be constants"));
+            SCOPES_LOCATION_ERROR(String::from("all arguments must be constants"));
         }
+        return true;
     }
 
-    bool fold_builtin_call(Label *l) {
+    SCOPES_RESULT(bool) fold_builtin_call(Label *l) {
+        SCOPES_RESULT_TYPE(bool);
 #if SCOPES_DEBUG_CODEGEN
         ss_cout << "folding builtin call in " << l << std::endl;
 #endif
@@ -2690,36 +2692,35 @@ struct Specializer {
         switch(enter.builtin.value()) {
         case KW_SyntaxExtend: {
             CHECKARGS(3, 3);
-            verify_all_args_constant(l);
+            SCOPES_CHECK_RESULT(verify_all_args_constant(l));
             const Closure *cl = args[1].value;
             const Syntax *sx = args[2].value;
             Scope *env = args[3].value;
             Specializer solver;
-            Label *metafunc = solver.solve_inline(cl->frame, cl->label, { untyped(), env });
-            auto rlt = metafunc->verify_return_label();
+            Label *metafunc = SCOPES_GET_RESULT(solver.solve_inline(cl->frame, cl->label, { untyped(), env }));
+            auto rlt = SCOPES_GET_RESULT(metafunc->verify_return_label());
             //const Type *functype = metafunc->get_function_type();
-            if (rlt->values.size() != 1)
+            if (rlt->values.size() != 2)
                 goto failed;
             {
                 Scope *scope = nullptr;
-                Any compiled = compile(metafunc, 0);
-                if (rlt->values[0].value.type == TYPE_Scope) {
-                    // returns a constant scope
-                    typedef void (*FuncType)();
-                    FuncType fptr = (FuncType)compiled.pointer;
-                    fptr();
-                    scope = rlt->values[0].value.scope;
-                } else if ((rlt->values[0].value.type == TYPE_Unknown)
-                    && (rlt->values[0].value.typeref == TYPE_Scope)) {
+                Any compiled = SCOPES_GET_RESULT(compile(metafunc, 0));
+
+                if ((rlt->values[0].value.type == TYPE_Unknown)
+                    && (rlt->values[0].value.typeref == TYPE_Bool)
+                    && (rlt->values[1].value.type == TYPE_Unknown)
+                    && (rlt->values[1].value.typeref == TYPE_Scope)) {
                     // returns a variable scope
-                    typedef Scope *(*FuncType)();
+                    typedef sc_bool_scope_tuple_t (*FuncType)();
                     FuncType fptr = (FuncType)compiled.pointer;
-                    scope = fptr();
+                    auto result = fptr();
+                    if (!result._0) SCOPES_RETURN_ERROR();
+                    scope = result._1;
                 } else {
                     goto failed;
                 }
-                enter = fold_type_label_single(cl->frame,
-                    expand_module(sx, scope), { args[0] });
+                enter = SCOPES_GET_RESULT(fold_type_label_single(cl->frame,
+                    SCOPES_GET_RESULT(expand_module(sx, scope)), { args[0] }));
                 args = { none };
                 return false;
             }
@@ -2730,7 +2731,7 @@ struct Specializer {
             ss.out << "syntax-extend has wrong return type (expected "
                 << ReturnLabel({unknown_of(TYPE_Scope)}) << ", got "
                 << T << ")";
-            location_error(ss.str());
+            SCOPES_LOCATION_ERROR(ss.str());
         } break;
         case FN_ScopeOf: {
             CHECKARGS(0, -1);
@@ -2755,15 +2756,15 @@ struct Specializer {
         case FN_AllocaOf: {
             CHECKARGS(1, 1);
             const Type *T = args[1].value.type;
-            void *src = get_pointer(T, args[1].value);
-            void *dst = tracked_malloc(size_of(T));
-            memcpy(dst, src, size_of(T));
+            void *src = SCOPES_GET_RESULT(get_pointer(T, args[1].value));
+            void *dst = tracked_malloc(SCOPES_GET_RESULT(size_of(T)));
+            memcpy(dst, src, SCOPES_GET_RESULT(size_of(T)));
             RETARGS(Any::from_pointer(NativeROPointer(T), dst));
         } break;
         case FN_StaticAlloc: {
             CHECKARGS(1, 1);
             const Type *T = args[1].value;
-            void *dst = tracked_malloc(size_of(T));
+            void *dst = tracked_malloc(SCOPES_GET_RESULT(size_of(T)));
             RETARGS(Any::from_pointer(StaticPointer(T), dst));
         } break;
         case FN_NullOf: {
@@ -2772,19 +2773,19 @@ struct Specializer {
             Any value = none;
             value.type = T;
             if (!is_opaque(T)) {
-                void *ptr = get_pointer(T, value, true);
-                memset(ptr, 0, size_of(T));
+                void *ptr = SCOPES_GET_RESULT(get_pointer(T, value, true));
+                memset(ptr, 0, SCOPES_GET_RESULT(size_of(T)));
             }
             RETARGS(value);
         } break;
         case FN_ExternSymbol: {
             CHECKARGS(1, 1);
-            verify_kind<TK_Extern>(args[1].value);
+            SCOPES_CHECK_RESULT(verify_kind<TK_Extern>(args[1].value));
             RETARGS(args[1].value.symbol);
         } break;
         case FN_ExternNew: {
             CHECKARGS(2, -1);
-            args[1].value.verify(TYPE_Symbol);
+            SCOPES_CHECK_RESULT(args[1].value.verify(TYPE_Symbol));
             const Type *T = args[2].value;
             Any value(args[1].value.symbol);
             Symbol extern_storage_class = SYM_Unnamed;
@@ -2798,20 +2799,20 @@ struct Specializer {
                     switch(arg.key.value()) {
                     case SYM_Location: {
                         if (location == -1) {
-                            location = cast_number<int>(arg.value);
+                            location = SCOPES_GET_RESULT(cast_number<int>(arg.value));
                         } else {
-                            location_error(String::from("duplicate location"));
+                            SCOPES_LOCATION_ERROR(String::from("duplicate location"));
                         }
                     } break;
                     case SYM_Binding: {
                         if (binding == -1) {
-                            binding = cast_number<int>(arg.value);
+                            binding = SCOPES_GET_RESULT(cast_number<int>(arg.value));
                         } else {
-                            location_error(String::from("duplicate binding"));
+                            SCOPES_LOCATION_ERROR(String::from("duplicate binding"));
                         }
                     } break;
                     case SYM_Storage: {
-                        arg.value.verify(TYPE_Symbol);
+                        SCOPES_CHECK_RESULT(arg.value.verify(TYPE_Symbol));
 
                         if (extern_storage_class == SYM_Unnamed) {
                             switch(arg.value.symbol.value()) {
@@ -2821,15 +2822,15 @@ struct Specializer {
                             #undef T
                                 extern_storage_class = arg.value.symbol; break;
                             default: {
-                                location_error(String::from("illegal storage class"));
+                                SCOPES_LOCATION_ERROR(String::from("illegal storage class"));
                             } break;
                             }
                         } else {
-                            location_error(String::from("duplicate storage class"));
+                            SCOPES_LOCATION_ERROR(String::from("duplicate storage class"));
                         }
                     } break;
                     case SYM_Unnamed: {
-                        arg.value.verify(TYPE_Symbol);
+                        SCOPES_CHECK_RESULT(arg.value.verify(TYPE_Symbol));
 
                         switch(arg.value.symbol.value()) {
                         case SYM_Buffer: flags |= EF_BufferBlock; break;
@@ -2839,14 +2840,14 @@ struct Specializer {
                         case SYM_Restrict: flags |= EF_Restrict; break;
                         case SYM_Volatile: flags |= EF_Volatile; break;
                         default: {
-                            location_error(String::from("unknown flag"));
+                            SCOPES_LOCATION_ERROR(String::from("unknown flag"));
                         } break;
                         }
                     } break;
                     default: {
                         StyledString ss;
                         ss.out << "unexpected key: " << arg.key;
-                        location_error(ss.str());
+                        SCOPES_LOCATION_ERROR(ss.str());
                     } break;
                     }
 
@@ -2869,7 +2870,7 @@ struct Specializer {
             uint32_t flags = 0;
 
             while (k < args.size()) {
-                args[k].value.verify(TYPE_Symbol);
+                SCOPES_CHECK_RESULT(args[k].value.verify(TYPE_Symbol));
                 Symbol sym = args[k].value.symbol;
                 uint64_t flag = 0;
                 switch(sym.value()) {
@@ -2877,7 +2878,7 @@ struct Specializer {
                 default: {
                     StyledString ss;
                     ss.out << "illegal option: " << sym;
-                    location_error(ss.str());
+                    SCOPES_LOCATION_ERROR(ss.str());
                 } break;
                 }
                 flags |= flag;
@@ -2903,7 +2904,7 @@ struct Specializer {
                         unknown_of(args[i].value)));
 #endif
             }
-            RETARGS(MixedTuple(values));
+            RETARGS(SCOPES_GET_RESULT(MixedTuple(values)));
         } break;
         case FN_UnionType: {
             CHECKARGS(0, -1);
@@ -2911,7 +2912,7 @@ struct Specializer {
             for (size_t i = 1; i < args.size(); ++i) {
 #if 0
                 if (args[i].value.is_const()) {
-                    location_error(String::from("all union type arguments must be non-constant"));
+                    SCOPES_LOCATION_ERROR(String::from("all union type arguments must be non-constant"));
                     //values.push_back(args[i]);
                 } else {
                     values.push_back(
@@ -2924,7 +2925,7 @@ struct Specializer {
                         unknown_of(args[i].value)));
 #endif
             }
-            RETARGS(MixedUnion(values));
+            RETARGS(SCOPES_GET_RESULT(MixedUnion(values)));
         } break;
         case FN_ReturnLabelType: {
             CHECKARGS(0, -1);
@@ -2944,14 +2945,14 @@ struct Specializer {
         case SFXFN_DelTypeSymbol: {
             CHECKARGS(2, 2);
             const Type *T = args[1].value;
-            args[2].value.verify(TYPE_Symbol);
+            SCOPES_CHECK_RESULT(args[2].value.verify(TYPE_Symbol));
             const_cast<Type *>(T)->del(args[2].value.symbol);
             RETARGS();
         } break;
         case FN_TypeAt: {
             CHECKARGS(2, 2);
             const Type *T = args[1].value;
-            args[2].value.verify(TYPE_Symbol);
+            SCOPES_CHECK_RESULT(args[2].value.verify(TYPE_Symbol));
             Any result = none;
             if (!T->lookup(args[2].value.symbol, result)) {
                 RETARGS(none, false);
@@ -2962,7 +2963,7 @@ struct Specializer {
         case FN_TypeLocalAt: {
             CHECKARGS(2, 2);
             const Type *T = args[1].value;
-            args[2].value.verify(TYPE_Symbol);
+            SCOPES_CHECK_RESULT(args[2].value.verify(TYPE_Symbol));
             Any result = none;
             if (!T->lookup_local(args[2].value.symbol, result)) {
                 RETARGS(none, false);
@@ -3006,7 +3007,7 @@ struct Specializer {
         } break;
         case FN_VaKey: {
             CHECKARGS(2, 2);
-            args[1].value.verify(TYPE_Symbol);
+            SCOPES_CHECK_RESULT(args[1].value.verify(TYPE_Symbol));
             enter = args[0].value;
             args = { none, Argument(args[1].value.symbol, args[2].value) };
         } break;
@@ -3021,7 +3022,7 @@ struct Specializer {
                     }
                 }
             } else {
-                size_t idx = cast_number<size_t>(args[1].value);
+                size_t idx = SCOPES_GET_RESULT(cast_number<size_t>(args[1].value));
                 for (size_t i = (idx + 2); i < args.size(); ++i) {
                     result.push_back(args[i]);
                 }
@@ -3034,27 +3035,27 @@ struct Specializer {
             const Type *T = args[1].value;
             auto &&arg = args[2].value;
             size_t idx = 0;
-            T = storage_type(T);
-            verify_kind<TK_Tuple>(T);
+            T = SCOPES_GET_RESULT(storage_type(T));
+            SCOPES_CHECK_RESULT(verify_kind<TK_Tuple>(T));
             auto ti = cast<TupleType>(T);
             if (arg.type == TYPE_Symbol) {
                 idx = ti->field_index(arg.symbol);
                 if (idx == (size_t)-1) {
                     StyledString ss;
                     ss.out << "no such field " << arg.symbol << " in storage type " << T;
-                    location_error(ss.str());
+                    SCOPES_LOCATION_ERROR(ss.str());
                 }
                 // rewrite field
                 arg = (int)idx;
             } else {
-                idx = cast_number<size_t>(arg);
+                idx = SCOPES_GET_RESULT(cast_number<size_t>(arg));
             }
-            verify_range(idx, ti->offsets.size());
+            SCOPES_CHECK_RESULT(verify_range(idx, ti->offsets.size()));
             RETARGS(ti->offsets[idx]);
         } break;
         case FN_Branch: {
             CHECKARGS(3, 3);
-            args[1].value.verify(TYPE_Bool);
+            SCOPES_CHECK_RESULT(args[1].value.verify(TYPE_Bool));
             // either branch label is typed and binds no parameters,
             // so we can directly inline it
             const Closure *newl = nullptr;
@@ -3063,7 +3064,7 @@ struct Specializer {
             } else {
                 newl = args[3].value;
             }
-            verify_branch_continuation(newl);
+            SCOPES_CHECK_RESULT(verify_branch_continuation(newl));
             Any cont = args[0].value;
             if (cont.type == TYPE_Closure) {
                 cont.closure->frame->inline_merge = true;
@@ -3071,318 +3072,24 @@ struct Specializer {
             enter = newl;
             args = { cont };
         } break;
-        case FN_IntToPtr: {
-            CHECKARGS(2, 2);
-            verify_integer(storage_type(args[1].value.type));
-            args[2].value.verify(TYPE_Type);
-            const Type *DestT = args[2].value.typeref;
-            verify_kind<TK_Pointer>(storage_type(DestT));
-            Any result = args[1].value;
-            result.type = DestT;
-            RETARGS(result);
-        } break;
-        case FN_PtrToInt: {
-            CHECKARGS(2, 2);
-            verify_kind<TK_Pointer>(storage_type(args[1].value.type));
-            args[2].value.verify(TYPE_Type);
-            const Type *DestT = args[2].value.typeref;
-            verify_integer(storage_type(DestT));
-            Any result = args[1].value;
-            result.type = DestT;
-            RETARGS(result);
-        } break;
-        case FN_ITrunc: {
-            CHECKARGS(2, 2);
-            const Type *T = args[1].value.type;
-            verify_integer(storage_type(T));
-            args[2].value.verify(TYPE_Type);
-            const Type *DestT = args[2].value.typeref;
-            verify_integer(storage_type(DestT));
-            Any result = args[1].value;
-            result.type = DestT;
-            RETARGS(result);
-        } break;
-        case FN_FPTrunc: {
-            CHECKARGS(2, 2);
-            const Type *T = args[1].value.type;
-            verify_real(T);
-            args[2].value.verify(TYPE_Type);
-            const Type *DestT = args[2].value.typeref;
-            verify_real(DestT);
-            if ((T == TYPE_F64) && (DestT == TYPE_F32)) {
-                RETARGS((float)args[1].value.f64);
-            } else { invalid_op2_types_error(T, DestT); }
-        } break;
-        case FN_FPExt: {
-            CHECKARGS(2, 2);
-            const Type *T = args[1].value.type;
-            verify_real(T);
-            args[2].value.verify(TYPE_Type);
-            const Type *DestT = args[2].value.typeref;
-            verify_real(DestT);
-            if ((T == TYPE_F32) && (DestT == TYPE_F64)) {
-                RETARGS((double)args[1].value.f32);
-            } else { invalid_op2_types_error(T, DestT); }
-        } break;
-        case FN_FPToUI: {
-            CHECKARGS(2, 2);
-            const Type *T = args[1].value.type;
-            verify_real(T);
-            args[2].value.verify(TYPE_Type);
-            const Type *DestT = args[2].value.typeref;
-            verify_integer(DestT);
-            uint64_t val = 0;
-            if (T == TYPE_F32) {
-                val = (uint64_t)args[1].value.f32;
-            } else if (T == TYPE_F64) {
-                val = (uint64_t)args[1].value.f64;
-            } else {
-                invalid_op2_types_error(T, DestT);
-            }
-            Any result = val;
-            result.type = DestT;
-            RETARGS(result);
-        } break;
-        case FN_FPToSI: {
-            CHECKARGS(2, 2);
-            const Type *T = args[1].value.type;
-            verify_real(T);
-            args[2].value.verify(TYPE_Type);
-            const Type *DestT = args[2].value.typeref;
-            verify_integer(DestT);
-            int64_t val = 0;
-            if (T == TYPE_F32) {
-                val = (int64_t)args[1].value.f32;
-            } else if (T == TYPE_F64) {
-                val = (int64_t)args[1].value.f64;
-            } else {
-                invalid_op2_types_error(T, DestT);
-            }
-            Any result = val;
-            result.type = DestT;
-            RETARGS(result);
-        } break;
-        case FN_UIToFP: {
-            CHECKARGS(2, 2);
-            const Type *T = args[1].value.type;
-            verify_integer(T);
-            args[2].value.verify(TYPE_Type);
-            const Type *DestT = args[2].value.typeref;
-            verify_real(DestT);
-            uint64_t src = cast_number<uint64_t>(args[1].value);
-            Any result = none;
-            if (DestT == TYPE_F32) {
-                result = (float)src;
-            } else if (DestT == TYPE_F64) {
-                result = (double)src;
-            } else {
-                invalid_op2_types_error(T, DestT);
-            }
-            RETARGS(result);
-        } break;
-        case FN_SIToFP: {
-            CHECKARGS(2, 2);
-            const Type *T = args[1].value.type;
-            verify_integer(T);
-            args[2].value.verify(TYPE_Type);
-            const Type *DestT = args[2].value.typeref;
-            verify_real(DestT);
-            int64_t src = cast_number<int64_t>(args[1].value);
-            Any result = none;
-            if (DestT == TYPE_F32) {
-                result = (float)src;
-            } else if (DestT == TYPE_F64) {
-                result = (double)src;
-            } else {
-                invalid_op2_types_error(T, DestT);
-            }
-            RETARGS(result);
-        } break;
-        case FN_ZExt: {
-            CHECKARGS(2, 2);
-            const Type *T = args[1].value.type;
-            auto ST = storage_type(T);
-            verify_integer(ST);
-            args[2].value.verify(TYPE_Type);
-            const Type *DestT = args[2].value.typeref;
-            auto DestST = storage_type(DestT);
-            verify_integer(DestST);
-            Any result = args[1].value;
-            result.type = DestT;
-            int oldbitnum = integer_type_bit_size(ST);
-            int newbitnum = integer_type_bit_size(DestST);
-            for (int i = oldbitnum; i < newbitnum; ++i) {
-                result.u64 &= ~(1ull << i);
-            }
-            RETARGS(result);
-        } break;
-        case FN_SExt: {
-            CHECKARGS(2, 2);
-            const Type *T = args[1].value.type;
-            auto ST = storage_type(T);
-            verify_integer(ST);
-            args[2].value.verify(TYPE_Type);
-            const Type *DestT = args[2].value.typeref;
-            auto DestST = storage_type(DestT);
-            verify_integer(DestST);
-            Any result = args[1].value;
-            result.type = DestT;
-            int oldbitnum = integer_type_bit_size(ST);
-            int newbitnum = integer_type_bit_size(DestST);
-            uint64_t bit = (result.u64 >> (oldbitnum - 1)) & 1ull;
-            for (int i = oldbitnum; i < newbitnum; ++i) {
-                result.u64 &= ~(1ull << i);
-                result.u64 |= bit << i;
-            }
-            RETARGS(result);
-        } break;
         case FN_TypeOf: {
             CHECKARGS(1, 1);
             RETARGS(args[1].value.indirect_type());
         } break;
-        case FN_ExtractElement: {
-            CHECKARGS(2, 2);
-            const Type *T = storage_type(args[1].value.type);
-            verify_kind<TK_Vector>(T);
-            auto vi = cast<VectorType>(T);
-            size_t idx = cast_number<size_t>(args[2].value);
-            RETARGS(vi->unpack(args[1].value.pointer, idx));
-        } break;
-        case FN_InsertElement: {
-            CHECKARGS(3, 3);
-            const Type *T = storage_type(args[1].value.type);
-            const Type *ET = storage_type(args[2].value.type);
-            size_t idx = cast_number<size_t>(args[3].value);
-            void *destptr = args[1].value.pointer;
-            void *offsetptr = nullptr;
-            destptr = copy_storage(T, destptr);
-            auto vi = cast<VectorType>(T);
-            verify(storage_type(vi->type_at_index(idx)), ET);
-            offsetptr = vi->getelementptr(destptr, idx);
-            void *srcptr = get_pointer(ET, args[2].value);
-            memcpy(offsetptr, srcptr, size_of(ET));
-            RETARGS(Any::from_pointer(args[1].value.type, destptr));
-        } break;
-        case FN_ShuffleVector: {
-            CHECKARGS(3, 3);
-            const Type *TV1 = storage_type(args[1].value.type);
-            const Type *TV2 = storage_type(args[2].value.type);
-            const Type *TMask = storage_type(args[3].value.type);
-            verify_kind<TK_Vector>(TV1);
-            verify_kind<TK_Vector>(TV2);
-            verify_kind<TK_Vector>(TMask);
-            verify(TV1, TV2);
-            auto vi = cast<VectorType>(TV1);
-            auto mask_vi = cast<VectorType>(TMask);
-            verify(TYPE_I32, storage_type(mask_vi->element_type));
-            size_t halfcount = vi->count;
-            size_t incount = halfcount * 2;
-            size_t outcount = mask_vi->count;
-            const Type *T = Vector(vi->element_type, outcount);
-            void *srcptr_a = get_pointer(TV1, args[1].value);
-            void *srcptr_b = get_pointer(TV1, args[2].value);
-            void *destptr = alloc_storage(T);
-            auto out_vi = cast<VectorType>(T);
-            size_t esize = size_of(vi->element_type);
-            for (size_t i = 0; i < outcount; ++i) {
-                size_t idx = (size_t)mask_vi->unpack(args[3].value.pointer, i).i32;
-                verify_range(idx, incount);
-                void *srcptr;
-                if (idx < halfcount) {
-                    srcptr = srcptr_a;
-                } else {
-                    srcptr = srcptr_b;
-                    idx -= halfcount;
-                }
-                void *inp = vi->getelementptr(srcptr, idx);
-                void *outp = out_vi->getelementptr(destptr, i);
-                memcpy(outp, inp, esize);
-            }
-            RETARGS(Any::from_pointer(T, destptr));
-        } break;
-        case FN_ExtractValue: {
-            CHECKARGS(2, 2);
-            size_t idx = cast_number<size_t>(args[2].value);
-            const Type *T = storage_type(args[1].value.type);
-            switch(T->kind()) {
-            case TK_Array: {
-                auto ai = cast<ArrayType>(T);
-                RETARGS(ai->unpack(args[1].value.pointer, idx));
-            } break;
-            case TK_Tuple: {
-                auto ti = cast<TupleType>(T);
-                RETARGS(ti->unpack(args[1].value.pointer, idx));
-            } break;
-            case TK_Union: {
-                auto ui = cast<UnionType>(T);
-                RETARGS(ui->unpack(args[1].value.pointer, idx));
-            } break;
-            default: {
-                StyledString ss;
-                ss.out << "can not extract value from type " << T;
-                location_error(ss.str());
-            } break;
-            }
-        } break;
-        case FN_InsertValue: {
-            CHECKARGS(3, 3);
-            const Type *T = storage_type(args[1].value.type);
-            const Type *ET = storage_type(args[2].value.type);
-            size_t idx = cast_number<size_t>(args[3].value);
-
-            void *destptr = args[1].value.pointer;
-            void *offsetptr = nullptr;
-            switch(T->kind()) {
-            case TK_Array: {
-                destptr = copy_storage(T, destptr);
-                auto ai = cast<ArrayType>(T);
-                verify(storage_type(ai->type_at_index(idx)), ET);
-                offsetptr = ai->getelementptr(destptr, idx);
-            } break;
-            case TK_Tuple: {
-                destptr = copy_storage(T, destptr);
-                auto ti = cast<TupleType>(T);
-                verify(storage_type(ti->type_at_index(idx)), ET);
-                offsetptr = ti->getelementptr(destptr, idx);
-            } break;
-            case TK_Union: {
-                destptr = copy_storage(T, destptr);
-                auto ui = cast<UnionType>(T);
-                verify(storage_type(ui->type_at_index(idx)), ET);
-                offsetptr = destptr;
-            } break;
-            default: {
-                StyledString ss;
-                ss.out << "can not extract value from type " << T;
-                location_error(ss.str());
-            } break;
-            }
-            void *srcptr = get_pointer(ET, args[2].value);
-            memcpy(offsetptr, srcptr, size_of(ET));
-            RETARGS(Any::from_pointer(args[1].value.type, destptr));
-        } break;
         case FN_AnyExtract: {
             CHECKARGS(1, 1);
-            args[1].value.verify(TYPE_Any);
+            SCOPES_CHECK_RESULT(args[1].value.verify(TYPE_Any));
             Any arg = *args[1].value.ref;
             RETARGS(arg);
         } break;
         case FN_AnyWrap: {
             CHECKARGS(1, 1);
-            verify_all_args_constant(l);
+            SCOPES_CHECK_RESULT(verify_all_args_constant(l));
             RETARGS(args[1].value.toref());
         } break;
         case SFXFN_CompilerError: {
             CHECKARGS(1, 1);
-            location_error(args[1].value);
-            RETARGS();
-        } break;
-        case FN_CompilerMessage: {
-            CHECKARGS(1, 1);
-            args[1].value.verify(TYPE_String);
-            StyledString ss;
-            ss.out << l->body.anchor << " message: " << args[1].value.string->data << std::endl;
-            SCOPES_COUT << ss.str()->data;
+            SCOPES_LOCATION_ERROR(args[1].value);
             RETARGS();
         } break;
         case FN_Dump: {
@@ -3409,168 +3116,10 @@ struct Specializer {
             enter = args[0].value;
             args[0].value = none;
         } break;
-        case FN_Cross: {
-            CHECKARGS(2, 2);
-            const Type *Ta = storage_type(args[1].value.type);
-            const Type *Tb = storage_type(args[2].value.type);
-            verify_real_vector(Ta, 3);
-            verify(Ta, Tb);
-            RETARGS(apply_real_op<op_Cross>(args[1].value, args[2].value));
-        } break;
-        case FN_Normalize: {
-            CHECKARGS(1, 1);
-            verify_real_ops(args[1].value);
-            RETARGS(apply_real_op<op_Normalize>(args[1].value));
-        } break;
-        case FN_Length: {
-            CHECKARGS(1, 1);
-            verify_real_ops(args[1].value);
-            RETARGS(apply_real_op<op_Length>(args[1].value));
-        } break;
-        case FN_Distance: {
-            CHECKARGS(2, 2);
-            verify_real_ops(args[1].value, args[2].value);
-            RETARGS(apply_real_op<op_Distance>(args[1].value, args[2].value));
-        } break;
-        case OP_ICmpEQ:
-        case OP_ICmpNE:
-        case OP_ICmpUGT:
-        case OP_ICmpUGE:
-        case OP_ICmpULT:
-        case OP_ICmpULE:
-        case OP_ICmpSGT:
-        case OP_ICmpSGE:
-        case OP_ICmpSLT:
-        case OP_ICmpSLE: {
-            CHECKARGS(2, 2);
-            verify_integer_ops(args[1].value, args[2].value);
-#define B_INT_OP1(OP, N) \
-    result = apply_integer_op<IntTypes_ ## N, op_ ## OP>(args[1].value);
-#define B_INT_OP2(OP, N) \
-    result = apply_integer_op<IntTypes_ ## N, op_ ## OP>(args[1].value, args[2].value);
-            Any result = false;
-            switch(enter.builtin.value()) {
-            case OP_ICmpEQ: B_INT_OP2(Equal, u); break;
-            case OP_ICmpNE: B_INT_OP2(NotEqual, u); break;
-            case OP_ICmpUGT: B_INT_OP2(Greater, u); break;
-            case OP_ICmpUGE: B_INT_OP2(GreaterEqual, u); break;
-            case OP_ICmpULT: B_INT_OP2(Less, u); break;
-            case OP_ICmpULE: B_INT_OP2(LessEqual, u); break;
-            case OP_ICmpSGT: B_INT_OP2(Greater, i); break;
-            case OP_ICmpSGE: B_INT_OP2(GreaterEqual, i); break;
-            case OP_ICmpSLT: B_INT_OP2(Less, i); break;
-            case OP_ICmpSLE: B_INT_OP2(LessEqual, i); break;
-            default: assert(false); break;
-            }
-            RETARGS(result);
-        } break;
-        case OP_FCmpOEQ:
-        case OP_FCmpONE:
-        case OP_FCmpORD:
-        case OP_FCmpOGT:
-        case OP_FCmpOGE:
-        case OP_FCmpOLT:
-        case OP_FCmpOLE:
-        case OP_FCmpUEQ:
-        case OP_FCmpUNE:
-        case OP_FCmpUNO:
-        case OP_FCmpUGT:
-        case OP_FCmpUGE:
-        case OP_FCmpULT:
-        case OP_FCmpULE: {
-            CHECKARGS(2, 2);
-            verify_real_ops(args[1].value, args[2].value);
-#define B_FLOAT_OP1(OP) \
-    result = apply_real_op<op_ ## OP>(args[1].value);
-#define B_FLOAT_OP2(OP) \
-    result = apply_real_op<op_ ## OP>(args[1].value, args[2].value);
-#define B_FLOAT_OP3(OP) \
-    result = apply_real_op<op_ ## OP>(args[1].value, args[2].value, args[3].value);
-            Any result = false;
-            switch(enter.builtin.value()) {
-            case OP_FCmpOEQ: B_FLOAT_OP2(OEqual); break;
-            case OP_FCmpONE: B_FLOAT_OP2(ONotEqual); break;
-            case OP_FCmpORD: B_FLOAT_OP2(Ordered); break;
-            case OP_FCmpOGT: B_FLOAT_OP2(OGreater); break;
-            case OP_FCmpOGE: B_FLOAT_OP2(OGreaterEqual); break;
-            case OP_FCmpOLT: B_FLOAT_OP2(OLess); break;
-            case OP_FCmpOLE: B_FLOAT_OP2(OLessEqual); break;
-            case OP_FCmpUEQ: B_FLOAT_OP2(UEqual); break;
-            case OP_FCmpUNE: B_FLOAT_OP2(UNotEqual); break;
-            case OP_FCmpUNO: B_FLOAT_OP2(Unordered); break;
-            case OP_FCmpUGT: B_FLOAT_OP2(UGreater); break;
-            case OP_FCmpUGE: B_FLOAT_OP2(UGreaterEqual); break;
-            case OP_FCmpULT: B_FLOAT_OP2(ULess); break;
-            case OP_FCmpULE: B_FLOAT_OP2(ULessEqual); break;
-            default: assert(false); break;
-            }
-            RETARGS(result);
-        } break;
-#define IARITH_NUW_NSW_OPS(NAME) \
-    case OP_ ## NAME: \
-    case OP_ ## NAME ## NUW: \
-    case OP_ ## NAME ## NSW: { \
-        CHECKARGS(2, 2); \
-        verify_integer_ops(args[1].value, args[2].value); \
-        Any result = none; \
-        switch(enter.builtin.value()) { \
-        case OP_ ## NAME: B_INT_OP2(NAME, u); break; \
-        case OP_ ## NAME ## NUW: B_INT_OP2(NAME, u); break; \
-        case OP_ ## NAME ## NSW: B_INT_OP2(NAME, i); break; \
-        default: assert(false); break; \
-        } \
-        result.type = args[1].value.type; \
-        RETARGS(result); \
-    } break;
-#define IARITH_OP(NAME, PFX) \
-    case OP_ ## NAME: { \
-        CHECKARGS(2, 2); \
-        verify_integer_ops(args[1].value, args[2].value); \
-        Any result = none; \
-        B_INT_OP2(NAME, PFX); \
-        result.type = args[1].value.type; \
-        RETARGS(result); \
-    } break;
-#define FARITH_OP(NAME) \
-    case OP_ ## NAME: { \
-        CHECKARGS(2, 2); \
-        verify_real_ops(args[1].value, args[2].value); \
-        Any result = none; \
-        B_FLOAT_OP2(NAME); \
-        RETARGS(result); \
-    } break;
-#define FTRI_OP(NAME) \
-    case OP_ ## NAME: { \
-        CHECKARGS(3, 3); \
-        verify_real_ops(args[1].value, args[2].value, args[3].value); \
-        Any result = none; \
-        B_FLOAT_OP3(NAME); \
-        RETARGS(result); \
-    } break;
-#define IUN_OP(NAME, PFX) \
-    case OP_ ## NAME: { \
-        CHECKARGS(1, 1); \
-        verify_integer_ops(args[1].value); \
-        Any result = none; \
-        B_INT_OP1(NAME, PFX); \
-        result.type = args[1].value.type; \
-        RETARGS(result); \
-    } break;
-#define FUN_OP(NAME) \
-    case OP_ ## NAME: { \
-        CHECKARGS(1, 1); \
-        verify_real_ops(args[1].value); \
-        Any result = none; \
-        B_FLOAT_OP1(NAME); \
-        RETARGS(result); \
-    } break;
-
-        B_ARITH_OPS()
-
         default: {
             StyledString ss;
             ss.out << "can not fold constant expression using builtin " << enter.builtin;
-            location_error(ss.str());
+            SCOPES_LOCATION_ERROR(ss.str());
         } break;
         }
         return true;
@@ -3596,7 +3145,8 @@ struct Specializer {
         return true;
     }
 
-    void type_branch_continuations(Label *l) {
+    SCOPES_RESULT(void) type_branch_continuations(Label *l) {
+        SCOPES_RESULT_TYPE(void);
 #if SCOPES_DEBUG_CODEGEN
         ss_cout << "inlining branch continuations in " << l << std::endl;
 #endif
@@ -3604,16 +3154,17 @@ struct Specializer {
         auto &&args = l->body.args;
         CHECKARGS(3, 3);
 
-        args[1].value.verify_indirect(TYPE_Bool);
+        SCOPES_CHECK_RESULT(args[1].value.verify_indirect(TYPE_Bool));
         const Closure *then_br = args[2].value;
         const Closure *else_br = args[3].value;
-        verify_branch_continuation(then_br);
-        verify_branch_continuation(else_br);
+        SCOPES_CHECK_RESULT(verify_branch_continuation(then_br));
+        SCOPES_CHECK_RESULT(verify_branch_continuation(else_br));
 
         Any cont = args[0].value;
-        args[2].value = fold_type_label_single(then_br->frame, then_br->label, { cont });
-        args[3].value = fold_type_label_single(else_br->frame, else_br->label, { cont });
+        args[2].value = SCOPES_GET_RESULT(fold_type_label_single(then_br->frame, then_br->label, { cont }));
+        args[3].value = SCOPES_GET_RESULT(fold_type_label_single(else_br->frame, else_br->label, { cont }));
         args[0].value = none;
+        return true;
     }
 
 #undef IARITH_NUW_NSW_OPS
@@ -3735,14 +3286,15 @@ struct Specializer {
         }
     }
 
-    const Type *get_return_type_from_function_call(Label *l) {
+    SCOPES_RESULT(const Type *) get_return_type_from_function_call(Label *l) {
+        SCOPES_RESULT_TYPE(const Type *);
 #if SCOPES_DEBUG_CODEGEN
         ss_cout << "typing continuation from function call in " << l << std::endl;
 #endif
         auto &&enter = l->body.enter;
 
         const FunctionType *fi = extract_function_type(enter.indirect_type());
-        verify_function_argument_signature(fi, l);
+        SCOPES_CHECK_RESULT(verify_function_argument_signature(fi, l));
         return fi->return_type;
     }
 
@@ -3772,7 +3324,8 @@ struct Specializer {
         return solve_refs == 0;
     }
 
-    Label *solve_inline(Frame *frame, Label *label, const Args &values) {
+    SCOPES_RESULT(Label *) solve_inline(Frame *frame, Label *label, const Args &values) {
+        SCOPES_RESULT_TYPE(Label *);
         #if 0
         {
             assert(user_map.empty());
@@ -3784,36 +3337,37 @@ struct Specializer {
         }
         #endif
 
-        Frame *entryf = fold_type_label_single_frame(frame, label, values);
+        Frame *entryf = SCOPES_GET_RESULT(fold_type_label_single_frame(frame, label, values));
 
         inc_solve_ref();
 
-        SCOPES_TRY()
-
+        bool ok = true;
         {
             Timer specialize_timer(TIMER_Specialize);
-            normalize_function(entryf);
+            ok = ok && normalize_function(entryf).ok();
         }
 
-        SCOPES_CATCH(exc)
+        if (!ok) {
+            auto exc = get_last_error();
             if (dec_solve_ref()) {
                 print_traceback();
                 traceback.clear();
             }
-            error(exc);
-        SCOPES_TRY_END()
+            set_last_error(exc);
+            SCOPES_RETURN_ERROR();
+        }
 
         if (dec_solve_ref()) {
             traceback.clear();
         }
 
         Label *entry = entryf->get_instance();
-        validate_scope(entry);
+        SCOPES_CHECK_RESULT(validate_scope(entry));
         return entry;
     }
 
-    Label *typify(Frame *frame, Label *label, const ArgTypes &argtypes) {
-
+    SCOPES_RESULT(Label *) typify(Frame *frame, Label *label, const ArgTypes &argtypes) {
+        //SCOPES_RESULT_TYPE(Label *);
         Args args;
         args.reserve(argtypes.size() + 1);
         args = { Argument(untyped()) };
@@ -3837,11 +3391,12 @@ struct Specializer {
     }
 #endif
 
-    const Type *complete_existing_label_continuation (Label *l) {
+    SCOPES_RESULT(const Type *) complete_existing_label_continuation (Label *l) {
+        SCOPES_RESULT_TYPE(const Type *);
         Label *enter_label = l->get_label_enter();
         if (!enter_label->is_basic_block_like()) {
             const FunctionType *fi = cast<FunctionType>(enter_label->get_function_type());
-            verify_function_argument_signature(fi, l);
+            SCOPES_CHECK_RESULT(verify_function_argument_signature(fi, l));
 
             assert(enter_label->body.is_complete());
             assert(enter_label->is_return_param_typed());
@@ -3850,13 +3405,78 @@ struct Specializer {
         return nullptr;
     }
 
-    void on_label_processing(Label *l, const char *task = nullptr) {
+    SCOPES_RESULT(void) process_cli(char *r, bool &skip, Label *l, const StreamLabelFormat &slfmt) {
+        SCOPES_RESULT_TYPE(void);
+        auto file = SourceFile::from_string(Symbol("<string>"),
+            String::from_cstr(r));
+        LexerParser parser(file);
+        auto expr = SCOPES_GET_RESULT(parser.parse());
+        //stream_expr(ss_cout, expr, StreamExprFormat());
+        const List *stmts = SCOPES_GET_RESULT(unsyntax(expr));
+        if (stmts != EOL) {
+            while (stmts != EOL) {
+                set_active_anchor(stmts->at.syntax->anchor);
+                auto cmd = SCOPES_GET_RESULT(unsyntax(stmts->at));
+                Symbol head = SYM_Unnamed;
+                const List *arglist = nullptr;
+                if (cmd.type == TYPE_Symbol) {
+                    head = cmd.symbol;
+                } else if (cmd.type == TYPE_List) {
+                    arglist = cmd.list;
+                    if (arglist != EOL) {
+                        cmd = SCOPES_GET_RESULT(unsyntax(arglist->at));
+                        if (cmd.type == TYPE_Symbol) {
+                            head = cmd.symbol;
+                        }
+                        arglist = arglist->next;
+                    }
+                }
+                if (head == SYM_Unnamed) {
+                    SCOPES_LOCATION_ERROR(String::from("syntax error"));
+                }
+                switch(head.value()) {
+                case SYM_C:
+                case KW_Continue: {
+                    skip = true;
+                    enable_step_debugger = false;
+                } break;
+                case SYM_Skip: {
+                    skip = true;
+                    clicmd = CmdSkip;
+                    enable_step_debugger = false;
+                } break;
+                case SYM_Original: {
+                    Label *o = l->original;
+                    while (o) {
+                        stream_label(ss_cout, o, slfmt);
+                        o = o->original;
+                    }
+                } break;
+                case SYM_Help: {
+                    ss_cout << "Available commands:" << std::endl;
+                    ss_cout << "c(ontinue) help original skip" << std::endl;
+                    ss_cout << "An empty line continues to the next label." << std::endl;
+                } break;
+                default: {
+                    SCOPES_LOCATION_ERROR(String::from("unknown command. try 'help'."));
+                }break;
+                }
+                stmts = stmts->next;
+            }
+        } else {
+            skip = true;
+        }
+        return true;
+    }
+
+    SCOPES_RESULT(void) on_label_processing(Label *l, const char *task = nullptr) {
+        SCOPES_RESULT_TYPE(void);
         if (!enable_step_debugger) {
             if (clicmd == CmdSkip) {
                 enable_step_debugger = true;
                 clicmd = CmdNone;
             }
-            return;
+            return true;
         }
         clicmd = CmdNone;
         auto slfmt = StreamLabelFormat::debug_single();
@@ -3870,74 +3490,15 @@ struct Specializer {
             set_active_anchor(l->body.anchor);
             char *r = linenoise("solver> ");
             if (!r) {
-                location_error(String::from("aborted"));
+                SCOPES_LOCATION_ERROR(String::from("aborted"));
             }
 
             linenoiseHistoryAdd(r);
-            SCOPES_TRY()
-                auto file = SourceFile::from_string(Symbol("<string>"),
-                    String::from_cstr(r));
-                LexerParser parser(file);
-                auto expr = parser.parse();
-                //stream_expr(ss_cout, expr, StreamExprFormat());
-                const List *stmts = unsyntax(expr);
-                if (stmts != EOL) {
-                    while (stmts != EOL) {
-                        set_active_anchor(stmts->at.syntax->anchor);
-                        auto cmd = unsyntax(stmts->at);
-                        Symbol head = SYM_Unnamed;
-                        const List *arglist = nullptr;
-                        if (cmd.type == TYPE_Symbol) {
-                            head = cmd.symbol;
-                        } else if (cmd.type == TYPE_List) {
-                            arglist = cmd.list;
-                            if (arglist != EOL) {
-                                cmd = unsyntax(arglist->at);
-                                if (cmd.type == TYPE_Symbol) {
-                                    head = cmd.symbol;
-                                }
-                                arglist = arglist->next;
-                            }
-                        }
-                        if (head == SYM_Unnamed) {
-                            location_error(String::from("syntax error"));
-                        }
-                        switch(head.value()) {
-                        case SYM_C:
-                        case KW_Continue: {
-                            skip = true;
-                            enable_step_debugger = false;
-                        } break;
-                        case SYM_Skip: {
-                            skip = true;
-                            clicmd = CmdSkip;
-                            enable_step_debugger = false;
-                        } break;
-                        case SYM_Original: {
-                            Label *o = l->original;
-                            while (o) {
-                                stream_label(ss_cout, o, slfmt);
-                                o = o->original;
-                            }
-                        } break;
-                        case SYM_Help: {
-                            ss_cout << "Available commands:" << std::endl;
-                            ss_cout << "c(ontinue) help original skip" << std::endl;
-                            ss_cout << "An empty line continues to the next label." << std::endl;
-                        } break;
-                        default: {
-                            location_error(String::from("unknown command. try 'help'."));
-                        }break;
-                        }
-                        stmts = stmts->next;
-                    }
-                } else {
-                    skip = true;
-                }
-            SCOPES_CATCH(exc)
-                print_exception(exc);
-            SCOPES_TRY_END()
+            if (!process_cli(r, skip, l, slfmt).ok()) {
+                print_error(get_last_error());
+            }
         }
+        return true;
     }
 
     bool fold_useless_labels(Label *l) {
@@ -3964,22 +3525,25 @@ struct Specializer {
         return false;
     }
 
-    void verify_stack_size() {
+    SCOPES_RESULT(void) verify_stack_size() {
+        SCOPES_RESULT_TYPE(void);
         size_t ssz = memory_stack_size();
         if (ssz >= SCOPES_MAX_STACK_SIZE) {
-            location_error(String::from("stack overflow during partial evaluation"));
+            SCOPES_LOCATION_ERROR(String::from("stack overflow during partial evaluation"));
         }
+        return true;
     }
 
     // fold body of single label if possible
     // returns either the completed label if definite, or the next incomplete
     // or complete possible label, or null if completed label is recursive
-    Label *fold_label_body(Label *l) {
+    SCOPES_RESULT(Label *) fold_label_body(Label *l) {
+        SCOPES_RESULT_TYPE(Label *);
     repeat:
         assert(!l->body.is_complete());
-        on_label_processing(l);
+        SCOPES_CHECK_RESULT(on_label_processing(l));
         assert(!l->is_template());
-        l->verify_valid();
+        SCOPES_CHECK_RESULT(l->verify_valid());
         assert(all_params_typed(l));
 
         set_active_anchor(l->body.anchor);
@@ -3989,21 +3553,21 @@ struct Specializer {
             StyledString ss;
             ss.out << "parameter " << l->body.args[idx].value.parameter
                 << " passed as argument " << idx << " has not been typed yet";
-            location_error(ss.str());
+            SCOPES_LOCATION_ERROR(ss.str());
         }
 
         const Type *rtype = nullptr;
         if (is_calling_label(l)) {
             if (!l->get_label_enter()->body.is_complete()) {
-                location_error(String::from("failed to propagate return type from untyped label"));
+                SCOPES_LOCATION_ERROR(String::from("failed to propagate return type from untyped label"));
             }
             assert(all_params_typed(l));
-            rtype = complete_existing_label_continuation(l);
+            rtype = SCOPES_GET_RESULT(complete_existing_label_continuation(l));
         } else if (is_calling_label_macro(l)) {
             Any enter = l->body.enter;
             fold_label_macro_call(l);
             if (l->body.enter == enter) {
-                location_error(String::from("label macro call failed to fold"));
+                SCOPES_LOCATION_ERROR(String::from("label macro call failed to fold"));
             }
             if (!l->body.is_complete())
                 goto repeat;
@@ -4011,18 +3575,18 @@ struct Specializer {
             fold_callable_call(l);
             goto repeat;
         } else if (is_calling_function(l)) {
-            verify_no_keyed_args(l);
-            rtype = get_return_type_from_function_call(l);
+            SCOPES_CHECK_RESULT(verify_no_keyed_args(l));
+            rtype = SCOPES_GET_RESULT(get_return_type_from_function_call(l));
         } else if (is_calling_builtin(l)) {
             auto builtin = l->get_builtin_enter();
             if (!builtin_has_keyed_args(builtin))
-                verify_no_keyed_args(l);
+                SCOPES_CHECK_RESULT(verify_no_keyed_args(l));
             if (builtin_always_folds(builtin)) {
-                if (fold_builtin_call(l)) {
+                if (SCOPES_GET_RESULT(fold_builtin_call(l))) {
                     goto repeat;
                 }
             } else if (builtin == FN_Branch) {
-                type_branch_continuations(l);
+                SCOPES_CHECK_RESULT(type_branch_continuations(l));
                 l->body.set_complete();
                 // todo: process branches
                 return l;
@@ -4035,7 +3599,7 @@ struct Specializer {
                     args[0] = none;
                 } else {
                     Args values;
-                    bool fold = values_from_builtin_call(l, values);
+                    bool fold = SCOPES_GET_RESULT(values_from_builtin_call(l, values));
                     if (fold) {
                         enter = args[0].value;
                         args = { none };
@@ -4050,11 +3614,11 @@ struct Specializer {
             }
         } else if (is_calling_closure(l)) {
             if (has_keyed_args(l)) {
-                solve_keyed_args(l);
+                SCOPES_CHECK_RESULT(solve_keyed_args(l));
             }
             bool recursive = false;
             bool inlined = false;
-            rtype = fold_closure_call(l, recursive, inlined);
+            rtype = SCOPES_GET_RESULT(fold_closure_call(l, recursive, inlined));
             if (recursive) {
                 return nullptr;
             }
@@ -4071,15 +3635,15 @@ struct Specializer {
             } else {
                 ss.out << "unable to call constant of type " << enter.type;
             }
-            location_error(ss.str());
+            SCOPES_LOCATION_ERROR(ss.str());
         }
 
         if (rtype) {
             if (is_jumping(l)) {
-                l->body.enter = fold_type_return(l->body.enter, rtype);
+                l->body.enter = SCOPES_GET_RESULT(fold_type_return(l->body.enter, rtype));
             } else {
                 assert(!l->body.args.empty());
-                l->body.args[0] = fold_type_return(l->body.args[0].value, rtype);
+                l->body.args[0] = SCOPES_GET_RESULT(fold_type_return(l->body.args[0].value, rtype));
             }
         }
 
@@ -4103,11 +3667,12 @@ struct Specializer {
         return l;
     }
 
-    Label *skip_useless_labels(Label *l, LabelQueue &todo, LabelQueue &recursions) {
+    SCOPES_RESULT(Label *) skip_useless_labels(Label *l, LabelQueue &todo, LabelQueue &recursions) {
+        SCOPES_RESULT_TYPE(Label *);
     repeat:
         Label *nextl = l;
         if(!l->body.is_complete()) {
-            nextl = fold_label_body(l);
+            nextl = SCOPES_GET_RESULT(fold_label_body(l));
             if (!nextl) { // recursive, try again later
                 recursions.push_front(l);
                 return l;
@@ -4124,21 +3689,8 @@ struct Specializer {
         }
     }
 
-    // normalize all labels in the scope of a function with entry point l
-    void normalize_function(Frame *f) {
-        Label *l = f->get_instance();
-        if (l->body.is_complete())
-            return;
-        verify_stack_size();
-        assert(!l->is_basic_block_like());
-        Label *entry_label = l;
-        // second stack of recursive calls that can't be typed yet
-        LabelQueue recursions;
-        LabelQueue todo;
-        todo.push_back(l);
-
-        SCOPES_TRY()
-
+    SCOPES_RESULT(void) normalize_function_loop(Label *entry_label, Label *&l, LabelQueue &todo, LabelQueue &recursions) {
+        SCOPES_RESULT_TYPE(void);
         while (true) {
             if (todo.empty()) {
                 if (recursions.empty())
@@ -4149,7 +3701,7 @@ struct Specializer {
                 // if it is not, we are recursing infinitely
                 if (!entry_label->is_return_param_typed()) {
                     set_active_anchor(entry_label->anchor);
-                    location_error(String::from("recursive function never returns"));
+                    SCOPES_LOCATION_ERROR(String::from("recursive function never returns"));
                 }
                 todo = recursions;
                 recursions.clear();
@@ -4157,7 +3709,7 @@ struct Specializer {
             l = todo.back();
             todo.pop_back();
             if(!l->body.is_complete()) {
-                if (!fold_label_body(l)) {
+                if (!SCOPES_GET_RESULT(fold_label_body(l))) {
                     recursions.push_front(l);
                     continue;
                 }
@@ -4165,23 +3717,41 @@ struct Specializer {
             if (!l->body.is_optimized()) {
                 l->body.set_optimized();
                 if (jumps_immediately(l)) {
-                    l->body.enter = skip_useless_labels(l->body.enter, todo, recursions);
+                    l->body.enter = SCOPES_GET_RESULT(skip_useless_labels(l->body.enter, todo, recursions));
                 } else if (is_continuing_to_label(l)) {
-                    l->body.args[0].value = skip_useless_labels(l->body.args[0].value, todo, recursions);
+                    l->body.args[0].value = SCOPES_GET_RESULT(skip_useless_labels(l->body.args[0].value, todo, recursions));
                 } else if (is_branching(l)) {
-                    l->body.args[2].value = skip_useless_labels(l->body.args[2].value, todo, recursions);
-                    l->body.args[3].value = skip_useless_labels(l->body.args[3].value, todo, recursions);
+                    l->body.args[2].value = SCOPES_GET_RESULT(skip_useless_labels(l->body.args[2].value, todo, recursions));
+                    l->body.args[3].value = SCOPES_GET_RESULT(skip_useless_labels(l->body.args[3].value, todo, recursions));
                 }
             }
         }
+        return true;
+    }
 
-        SCOPES_CATCH(exc)
+    // normalize all labels in the scope of a function with entry point l
+    SCOPES_RESULT(void) normalize_function(Frame *f) {
+        SCOPES_RESULT_TYPE(void);
+        Label *l = f->get_instance();
+        if (l->body.is_complete())
+            return true;
+        SCOPES_CHECK_RESULT(verify_stack_size());
+        assert(!l->is_basic_block_like());
+        Label *entry_label = l;
+        // second stack of recursive calls that can't be typed yet
+        LabelQueue recursions;
+        LabelQueue todo;
+        todo.push_back(l);
+
+        if (!normalize_function_loop(entry_label, l, todo, recursions).ok()) {
+            auto exc = get_last_error();
             traceback.push_back(Trace(l->body.anchor, l->name));
             if (entry_label != l) {
                 traceback.push_back(Trace(entry_label->anchor, entry_label->name));
             }
-            error(exc);
-        SCOPES_TRY_END()
+            set_last_error(exc);
+            SCOPES_RETURN_ERROR();
+        }
 
         assert(!entry_label->params.empty());
         assert(entry_label->body.is_complete());
@@ -4196,13 +3766,15 @@ struct Specializer {
             //if (f->is_reentrant())
             // 2. all return paths are unreachable, because the function
             //    never returns.
-            fold_type_return(entry_label->params[0], NoReturnLabel());
+            SCOPES_CHECK_RESULT(fold_type_return(entry_label->params[0], NoReturnLabel()));
         } else {
-            validate_label_return_types(entry_label);
+            SCOPES_CHECK_RESULT(validate_label_return_types(entry_label));
         }
+        return true;
     }
 
-    Label *validate_scope(Label *entry) {
+    SCOPES_RESULT(Label *) validate_scope(Label *entry) {
+        SCOPES_RESULT_TYPE(Label *);
         Timer validate_scope_timer(TIMER_ValidateScope);
 
         std::unordered_set<Label *> visited;
@@ -4227,7 +3799,7 @@ struct Specializer {
                     assert(!subl->is_inline());
                     location_message(l->anchor, String::from("depends on this scope"));
                     set_active_anchor(subl->anchor);
-                    location_error(String::from("expression using variable in exterior scope as well as provider of variable must be inline"));
+                    SCOPES_LOCATION_ERROR(String::from("expression using variable in exterior scope as well as provider of variable must be inline"));
                 }
             }
         }
@@ -4235,7 +3807,8 @@ struct Specializer {
         return entry;
     }
 
-    void verify_function_argument_count(const FunctionType *fi, size_t argcount) {
+    SCOPES_RESULT(void) verify_function_argument_count(const FunctionType *fi, size_t argcount) {
+        SCOPES_RESULT_TYPE(void);
 
         const Type *T = fi;
 
@@ -4245,26 +3818,28 @@ struct Specializer {
                 StyledString ss;
                 ss.out << "argument count mismatch for call to function of type "
                     << T << " (need at least " << fargcount << ", got " << argcount << ")";
-                location_error(ss.str());
+                SCOPES_LOCATION_ERROR(ss.str());
             }
         } else {
             if (argcount != fargcount) {
                 StyledString ss;
                 ss.out << "argument count mismatch for call to function of type "
                     << T << " (need " << fargcount << ", got " << argcount << ")";
-                location_error(ss.str());
+                SCOPES_LOCATION_ERROR(ss.str());
             }
         }
+        return true;
     }
 
-    void *extract_compile_time_pointer(Any value) {
+    SCOPES_RESULT(void *) extract_compile_time_pointer(Any value) {
+        SCOPES_RESULT_TYPE(void *);
         switch(value.type->kind()) {
         case TK_Extern: {
             void *ptr = local_aware_dlsym(value.symbol);
             if (!ptr) {
                 StyledString ss;
                 ss.out << "could not resolve external at compile time: " << value;
-                location_error(ss.str());
+                SCOPES_LOCATION_ERROR(ss.str());
             }
             return ptr;
         } break;
@@ -4283,7 +3858,8 @@ int Specializer::solve_refs = 0;
 bool Specializer::enable_step_debugger = false;
 Specializer::CLICmd Specializer::clicmd = CmdNone;
 
-Label *specialize(Frame *frame, Label *label, const ArgTypes &argtypes) {
+SCOPES_RESULT(Label *) specialize(Frame *frame, Label *label, const ArgTypes &argtypes) {
+    //SCOPES_RESULT_TYPE(Label *);
     Specializer solver;
     return solver.typify(frame, label, argtypes);
 }

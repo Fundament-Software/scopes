@@ -21,7 +21,7 @@
 // on its own.
 #define SCOPES_OPTIMIZE_ASSEMBLY 0
 
-// any exception aborts immediately and can not be caught
+// any location error aborts immediately and can not be caught
 #define SCOPES_EARLY_ABORT 0
 
 // print a list of cumulative timers on program exit

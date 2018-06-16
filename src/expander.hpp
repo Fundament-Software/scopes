@@ -8,14 +8,15 @@
 #define SCOPES_EXPANDER_HPP
 
 #include "any.hpp"
+#include "result.hpp"
 
 namespace scopes {
 
 struct Scope;
 struct Label;
 
-Label *expand_module(Any expr, Scope *scope = nullptr);
-Label *expand_inline(Any expr, Scope *scope = nullptr);
+SCOPES_RESULT(Label *) expand_module(Any expr, Scope *scope = nullptr);
+SCOPES_RESULT(Label *) expand_inline(Any expr, Scope *scope = nullptr);
 
 } // namespace scopes
 
