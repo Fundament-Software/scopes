@@ -817,6 +817,10 @@ struct Expander {
         return result;
     }
 
+    struct ListScopePair { const List *topit; Scope *env; };
+    struct OKListScopePair { bool ok; ListScopePair pair; };
+    typedef OKListScopePair (*HandlerFuncType)(const List *, Scope *);
+
     SCOPES_RESULT(Any) expand(const Syntax *sx, const Any &dest) {
         SCOPES_RESULT_TYPE(Any);
     expand_again:
@@ -902,9 +906,6 @@ struct Expander {
                         << list_expander_func_type;
                     SCOPES_LOCATION_ERROR(ss.str());
                 }
-                struct ListScopePair { const List *topit; Scope *env; };
-                struct OKListScopePair { bool ok; ListScopePair pair; };
-                typedef OKListScopePair (*HandlerFuncType)(const List *, Scope *);
                 HandlerFuncType f = (HandlerFuncType)list_handler.pointer;
                 auto ok_result = f(List::from(sx, next), env);
                 if (!ok_result.ok) {
@@ -943,10 +944,12 @@ struct Expander {
                             << list_expander_func_type;
                         SCOPES_LOCATION_ERROR(ss.str());
                     }
-                    struct ListScopePair { const List *topit; Scope *env; };
-                    typedef ListScopePair (*HandlerFuncType)(const List *, Scope *);
                     HandlerFuncType f = (HandlerFuncType)symbol_handler.pointer;
-                    auto result = f(List::from(sx, next), env);
+                    auto ok_result = f(List::from(sx, next), env);
+                    if (!ok_result.ok) {
+                        SCOPES_RETURN_ERROR();
+                    }
+                    auto result = ok_result.pair;
                     const Syntax *newsx = result.topit->at;
                     if (newsx != sx) {
                         sx = newsx;

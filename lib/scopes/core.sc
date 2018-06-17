@@ -2177,7 +2177,6 @@ fn test-compiler-version ()
     return vmin vmaj vpatch
 
 fn run-main ()
-    dump org
     let args = (launch-args)
     let exename args = ('decons args)
     let exename = (exename as string)
