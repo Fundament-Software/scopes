@@ -1289,7 +1289,7 @@ syntax-extend
                             let self = (unbox-pointer self type)
                             let key = (unbox-symbol key Symbol)
                             let ok result = (sc_type_at self key)
-                            'return l result (box-integer ok)
+                            'return l (box-integer ok) result
                             return;
                     'set-enter l (Any-wrap sc_type_at)
 
@@ -1438,7 +1438,7 @@ fn type-repr-needs-suffix? (CT)
 
 fn tostring (value)
     let T = (typeof value)
-    let f ok = (getattr T '__tostring)
+    let ok f = (getattr T '__tostring)
     constbranch ok
         inline ()
             f value
@@ -1447,7 +1447,7 @@ fn tostring (value)
 
 fn repr (value)
     let T = (typeof value)
-    let f ok = (getattr T '__repr)
+    let ok f = (getattr T '__repr)
     let s =
         constbranch ok
             inline ()
@@ -1826,7 +1826,7 @@ syntax-extend
             let loop (lhs args l) = lhs args l
             if (not (empty? args))
                 let rhs args = ('decons args)
-                'set-enter l (Any target)
+                'set-enter l target
                 if (empty? args)
                     'set-arguments l (list cont lhs rhs)
                 else
@@ -1851,7 +1851,7 @@ syntax-extend
             let loop (rhs args l) = rhs args l
             if (not (empty? args))
                 let lhs args = ('decons args)
-                'set-enter l (Any target)
+                'set-enter l target
                 if (empty? args)
                     'set-arguments l (list cont lhs rhs)
                 else
