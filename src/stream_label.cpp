@@ -136,6 +136,9 @@ void StreamLabel::stream_label (Label *alabel) {
     if (alabel->body.is_rawcall()) {
         ss << Style_Keyword << "rawcall " << Style_None;
     }
+    if (alabel->body.is_trycall()) {
+        ss << Style_Keyword << "trycall " << Style_None;
+    }
     stream_argument(alabel->body.enter, alabel);
     for (size_t i=1; i < alabel->body.args.size(); ++i) {
         ss << " ";
@@ -181,7 +184,7 @@ void StreamLabel::stream(Label *label) {
 
 void stream_label(
     StyledStream &_ss, Label *label, const StreamLabelFormat &_fmt) {
-    StreamLabel streamer(_ss, _fmt);    
+    StreamLabel streamer(_ss, _fmt);
     streamer.stream(label);
 }
 

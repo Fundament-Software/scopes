@@ -246,6 +246,8 @@ struct LLVMIRGenerator {
     std::unordered_map<Any, LLVMValueRef, Any::Hash> extern2global;
     std::unordered_map<void *, LLVMValueRef> ptr2global;
 
+    std::unordered_map<LLVMValueRef, LLVMBasicBlockRef> func_fail_label;
+
     Label::UserMap user_map;
 
     LLVMModuleRef module;
@@ -264,6 +266,8 @@ struct LLVMIRGenerator {
     static LLVMTypeRef rawstringT;
     static LLVMTypeRef noneT;
     static LLVMValueRef noneV;
+    static LLVMValueRef falseV;
+    static LLVMValueRef trueV;
     static LLVMAttributeRef attr_byval;
     static LLVMAttributeRef attr_sret;
     static LLVMAttributeRef attr_nonnull;
@@ -456,6 +460,8 @@ struct LLVMIRGenerator {
         noneV = LLVMConstStruct(nullptr, 0, false);
         noneT = LLVMTypeOf(noneV);
         rawstringT = LLVMPointerType(LLVMInt8Type(), 0);
+        falseV = LLVMConstInt(i1T, 0, false);
+        trueV = LLVMConstInt(i1T, 1, false);
         attr_byval = get_attribute("byval");
         attr_sret = get_attribute("sret");
         attr_nonnull = get_attribute("nonnull");
@@ -677,7 +683,7 @@ struct LLVMIRGenerator {
         } break;
         case TK_ReturnLabel: {
             auto rlt = cast<ReturnLabelType>(type);
-            return _type_to_llvm_type(rlt->return_type);
+            return _type_to_llvm_type(rlt->ll_return_type);
         } break;
         case TK_Function: {
             auto fi = cast<FunctionType>(type);
@@ -1059,23 +1065,63 @@ struct LLVMIRGenerator {
         auto rlt = cast<ReturnLabelType>(fi->return_type);
         traits.rtype = rlt;
         traits.multiple_return_values = rlt->has_multiple_return_values();
+        LLVMValueRef ok = nullptr;
         if (use_sret) {
             LLVMAddCallSiteAttribute(ret, 1, attr_sret);
-            return LLVMBuildLoad(builder, values[0], "");
+            if (rlt->is_raising()) {
+                ret = values[0];
+                ok = LLVMBuildLoad(builder, LLVMBuildStructGEP(builder, ret, 0, ""), "");
+            } else {
+                ret = LLVMBuildLoad(builder, values[0], "");
+            }
         } else if (!rlt->is_returning()) {
-            LLVMBuildUnreachable(builder);
+            if (rlt->is_raising()) {
+                LLVMValueRef parentfunc = LLVMGetBasicBlockParent(LLVMGetInsertBlock(builder));
+                auto it = func_fail_label.find(parentfunc);
+                if (it == func_fail_label.end()) {
+                    SCOPES_LOCATION_ERROR(String::from("IL -> IR: illegal noreturn! inside non-raising function"));
+                }
+                LLVMBuildBr(builder, it->second);
+            } else {
+                LLVMBuildUnreachable(builder);
+            }
             traits.terminated = true;
-            return nullptr;
+            ret = nullptr;
         } else if (rlt->return_type == TYPE_Void) {
-            return nullptr;
+            if (rlt->is_raising()) {
+                ok = ret;
+            }
+            ret = nullptr;
         } else {
-            return ret;
+            if (rlt->is_raising()) {
+                ok = LLVMBuildExtractValue(builder, ret, 0, "");
+            }
         }
+        if (ok) {
+            auto old_bb = LLVMGetInsertBlock(builder);
+            LLVMValueRef parentfunc = LLVMGetBasicBlockParent(old_bb);
+            auto it = func_fail_label.find(parentfunc);
+            if (it == func_fail_label.end()) {
+                //LLVMDumpModule(module);
+                SCOPES_LOCATION_ERROR(String::from("IL -> IR: illegal call of raising function inside non-raising function"));
+            }
+            auto bbcont = LLVMAppendBasicBlock(parentfunc, "");
+            LLVMBuildCondBr(builder, ok, bbcont, it->second);
+            LLVMPositionBuilderAtEnd(builder, bbcont);
+            if (ret) {
+                if (use_sret) {
+                    ret = LLVMBuildLoad(builder, LLVMBuildStructGEP(builder, ret, 1, ""), "");
+                } else {
+                    ret = LLVMBuildExtractValue(builder, ret, 1, "");
+                }
+            }
+        }
+        return ret;
     }
 
-    LLVMValueRef set_debug_location(Label *label) {
+    LLVMValueRef set_debug_location(Label *label, bool header = true) {
         assert(use_debug_info);
-        LLVMValueRef diloc = anchor_to_location(label->body.anchor);
+        LLVMValueRef diloc = anchor_to_location(header?label->anchor:label->body.anchor);
         LLVMSetCurrentDebugLocation(builder, diloc);
         return diloc;
     }
@@ -1216,6 +1262,7 @@ struct LLVMIRGenerator {
         assert(args[argn].value.type == TYPE_Type); \
         LLVMTypeRef NAME = SCOPES_GET_RESULT(type_to_llvm_type(args[argn++].value.typeref));
 
+        Any contarg = args[0].value;
         LLVMValueRef retvalue = nullptr;
         ReturnTraits rtraits;
         if (enter.type == TYPE_Builtin) {
@@ -1622,6 +1669,15 @@ struct LLVMIRGenerator {
                 retvalue = LLVMBuildUnreachable(builder);
                 rtraits.terminated = true;
                 break;
+            case SFXFN_Raise: {
+                LLVMValueRef parentfunc = LLVMGetBasicBlockParent(LLVMGetInsertBlock(builder));
+                auto it = func_fail_label.find(parentfunc);
+                if (it == func_fail_label.end()) {
+                    SCOPES_LOCATION_ERROR(String::from("IL -> IR: illegal raise inside non-raising function"));
+                }
+                LLVMBuildBr(builder, it->second);
+                rtraits.terminated = true;
+            } break;
             default: {
                 StyledString ss;
                 ss.out << "IL->IR: unsupported builtin " << enter.builtin << " encountered";
@@ -1684,42 +1740,26 @@ struct LLVMIRGenerator {
             // must be returning from this function
             assert(enter.parameter->label == active_function);
 
-            Label *label = enter.parameter->label;
-            bool use_sret = is_memory_class(label->get_return_type());
-            if (use_sret) {
-                auto pval = SCOPES_GET_RESULT(resolve_parameter(enter.parameter));
-                if (argcount > 1) {
-                    LLVMTypeRef types[argcount];
-                    for (size_t i = 0; i < argcount; ++i) {
-                        types[i] = LLVMTypeOf(values[i]);
-                    }
+            if (argcount > 1) {
+                LLVMTypeRef types[argcount];
+                for (size_t i = 0; i < argcount; ++i) {
+                    types[i] = LLVMTypeOf(values[i]);
+                }
 
-                    LLVMValueRef val = LLVMGetUndef(LLVMStructType(types, argcount, false));
-                    for (size_t i = 0; i < argcount; ++i) {
-                        val = LLVMBuildInsertValue(builder, val, values[i], i, "");
-                    }
-                    LLVMBuildStore(builder, val, pval);
-                } else if (argcount == 1) {
-                    LLVMBuildStore(builder, values[0], pval);
+                retvalue = LLVMGetUndef(LLVMStructType(types, argcount, false));
+                for (size_t i = 0; i < argcount; ++i) {
+                    retvalue = LLVMBuildInsertValue(builder, retvalue, values[i], i, "");
                 }
-                LLVMBuildRetVoid(builder);
-            } else {
-                if (argcount > 1) {
-                    LLVMBuildAggregateRet(builder, values, argcount);
-                } else if (argcount == 1) {
-                    LLVMBuildRet(builder, values[0]);
-                } else {
-                    LLVMBuildRetVoid(builder);
-                }
+            } else if (argcount == 1) {
+                retvalue = values[0];
             }
-            rtraits.terminated = true;
+            contarg = enter;
         } else {
             StyledString ss;
             ss.out << "IL->IR: cannot translate call to " << enter;
             SCOPES_LOCATION_ERROR(ss.str());
         }
 
-        Any contarg = args[0].value;
         if (rtraits.terminated) {
             // write nothing
         } else if ((contarg.type == TYPE_Parameter)
@@ -1727,13 +1767,16 @@ struct LLVMIRGenerator {
             assert(contarg.parameter->type != TYPE_Unknown);
             assert(contarg.parameter->index == 0);
             assert(contarg.parameter->label == active_function);
+            auto rlt = cast<ReturnLabelType>(contarg.parameter->type);
+            if (rlt->is_raising()) {
+                retvalue = make_true_result(retvalue);
+            }
             Label *label = contarg.parameter->label;
             bool use_sret = is_memory_class(label->get_return_type());
             if (use_sret) {
                 auto pval = SCOPES_GET_RESULT(resolve_parameter(contarg.parameter));
-                if (retvalue) {
-                    LLVMBuildStore(builder, retvalue, pval);
-                }
+                assert(retvalue);
+                LLVMBuildStore(builder, retvalue, pval);
                 LLVMBuildRetVoid(builder);
             } else {
                 if (retvalue) {
@@ -1809,6 +1852,19 @@ struct LLVMIRGenerator {
 #undef READ_VALUE
 #undef READ_TYPE
 #undef READ_LABEL_VALUE
+
+    LLVMValueRef make_true_result(LLVMValueRef retvalue) {
+        if (retvalue) {
+            LLVMTypeRef types[2];
+            types[0] = i1T;
+            types[1] = LLVMTypeOf(retvalue);
+            LLVMValueRef tmp = LLVMGetUndef(LLVMStructType(types, 2, false));
+            tmp = LLVMBuildInsertValue(builder, tmp, trueV, 0, "");
+            return LLVMBuildInsertValue(builder, tmp, retvalue, 1, "");
+        } else {
+            return trueV;
+        }
+    }
 
     void set_active_function(Label *l) {
         if (active_function == l) return;
@@ -1938,6 +1994,27 @@ struct LLVMIRGenerator {
             set_active_function(label);
 
             auto bb = LLVMAppendBasicBlock(func, "");
+
+            auto rlt = cast<ReturnLabelType>(fi->return_type);
+            if (rlt->is_raising()) {
+                if (use_debug_info)
+                    set_debug_location(label, true);
+                auto bbfail = LLVMAppendBasicBlock(func, "raise");
+                func_fail_label.insert({func, bbfail});
+                LLVMPositionBuilderAtEnd(builder, bbfail);
+                if (use_sret) {
+                    auto pval = LLVMGetParam(func, 0);
+                    auto T = LLVMGetElementType(LLVMTypeOf(pval));
+                    LLVMBuildStore(builder, LLVMConstNull(T), pval);
+                    LLVMBuildRetVoid(builder);
+                } else if (rlt->is_returning()) {
+                    auto T = LLVMGetReturnType(LLVMGetElementType(LLVMTypeOf(func)));
+                    LLVMBuildRet(builder, LLVMConstNull(T));
+                } else {
+                    LLVMBuildRetVoid(builder);
+                }
+            }
+
             LLVMPositionBuilderAtEnd(builder, bb);
 
             auto &&params = label->params;
@@ -2105,6 +2182,8 @@ LLVMTypeRef LLVMIRGenerator::f64T = nullptr;
 LLVMTypeRef LLVMIRGenerator::rawstringT = nullptr;
 LLVMTypeRef LLVMIRGenerator::noneT = nullptr;
 LLVMValueRef LLVMIRGenerator::noneV = nullptr;
+LLVMValueRef LLVMIRGenerator::falseV = nullptr;
+LLVMValueRef LLVMIRGenerator::trueV = nullptr;
 LLVMAttributeRef LLVMIRGenerator::attr_byval = nullptr;
 LLVMAttributeRef LLVMIRGenerator::attr_sret = nullptr;
 LLVMAttributeRef LLVMIRGenerator::attr_nonnull = nullptr;
@@ -2276,6 +2355,15 @@ SCOPES_RESULT(Any) compile(Label *fn, uint64_t flags) {
         ctx.use_debug_info = false;
     }
 
+#if 0
+    {
+        StyledStream ss;
+        stream_label(ss, fn, StreamLabelFormat::debug_all());
+        ss << std::endl;
+        ss << std::endl;
+    }
+#endif
+
     LLVMIRGenerator::ModuleValuePair result;
     {
         /*
@@ -2319,6 +2407,7 @@ SCOPES_RESULT(Any) compile(Label *fn, uint64_t flags) {
         LLVMDumpValue(func);
     }
 
+    //LLVMDumpModule(module);
     void *pfunc = get_pointer_to_global(func);
 #if 0
     if (flags & CF_DumpDisassembly) {

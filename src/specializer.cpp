@@ -22,6 +22,7 @@
 #include "syntax.hpp"
 #include "scope.hpp"
 #include "stream_expr.hpp"
+#include "stream_frame.hpp"
 #include "source_file.hpp"
 #include "lexerparser.hpp"
 #include "list.hpp"
@@ -1138,15 +1139,27 @@ struct Specializer {
         SCOPES_LOCATION_ERROR(ss.str());
     }
 
-    SCOPES_RESULT(Any) fold_type_return(Any dest, const Type *return_label) {
+    SCOPES_RESULT(Any) fold_type_return(Label *entry_label, Any dest, const Type *return_label) {
         SCOPES_RESULT_TYPE(Any);
     repeat:
+        {
+            auto rlt = cast<ReturnLabelType>(return_label);
+            if (rlt->is_raising()) {
+                entry_label->set_raising();
+            }
+            if (!rlt->is_returning()) {
+                return Any(none);
+            }
+        }
         //ss_cout << "type_return: " << dest << std::endl;
         if (dest.type == TYPE_Parameter) {
             Parameter *param = dest.parameter;
             if (param->is_none()) {
                 SCOPES_LOCATION_ERROR(String::from("attempting to type return continuation of non-returning label"));
             } else if (!param->is_typed()) {
+                assert(param->label);
+                if (param->label->is_raising())
+                    return_label = cast<ReturnLabelType>(return_label)->to_raising();
                 param->type = return_label;
                 param->anchor = get_active_anchor();
             } else {
@@ -1155,29 +1168,32 @@ struct Specializer {
                     // try to get a fit by unconsting types
                     return_label = cast<ReturnLabelType>(return_label)->to_unconst();
                     ptype = cast<ReturnLabelType>(ptype)->to_unconst();
-                    if (return_label == ptype) {
-                        param->type = return_label;
-                        param->anchor = get_active_anchor();
-                    } else {
-                        {
-                            StyledStream cerr(SCOPES_CERR);
-                            cerr << param->anchor << " first typed here as " << ptype << std::endl;
-                            param->anchor->stream_source_line(cerr);
+                    if (return_label != ptype) {
+                        const Type *rl1 = cast<ReturnLabelType>(return_label)->to_raising();
+                        const Type *rl2 = cast<ReturnLabelType>(ptype)->to_raising();
+                        if (rl1 == rl2) {
+                            return_label = ptype = rl1;
                         }
-                        {
-                            StyledString ss;
-                            ss.out << "attempting to retype return continuation as " << return_label;
-                            SCOPES_LOCATION_ERROR(ss.str());
+                        if (return_label != ptype) {
+                            {
+                                StyledStream cerr(SCOPES_CERR);
+                                cerr << param->anchor << " first typed here as " << ptype << std::endl;
+                                param->anchor->stream_source_line(cerr);
+                            }
+                            {
+                                StyledString ss;
+                                ss.out << "attempting to retype return continuation as " << return_label;
+                                SCOPES_LOCATION_ERROR(ss.str());
+                            }
                         }
                     }
+                    param->type = return_label;
+                    param->anchor = get_active_anchor();
                 }
             }
         } else if (dest.type == TYPE_Closure) {
             assert(return_label->kind() == TK_ReturnLabel);
             const ReturnLabelType *rlt = cast<ReturnLabelType>(return_label);
-            if (!rlt->is_returning()) {
-                return Any(none);
-            }
             auto &&values = rlt->values;
             auto enter_frame = dest.closure->frame;
             auto enter_label = dest.closure->label;
@@ -1703,6 +1719,7 @@ struct Specializer {
             }
 
             const Type *rtype = newl->get_return_type();
+
             if (is_empty_function(newl)) {
     #if 1
                 if (enable_step_debugger) {
@@ -1724,10 +1741,6 @@ struct Specializer {
             } else {
                 enter = newl;
                 args = callargs;
-                auto nrl = NoReturnLabel();
-                if (rtype == nrl) {
-                    rtype = nullptr;
-                }
 
 #if 0
                 if (newl->is_inline()) {
@@ -2647,10 +2660,11 @@ struct Specializer {
     #endif
     }
 
-    void fold_label_macro_call(Label *l) {
+    SCOPES_RESULT(void) fold_label_macro_call(Label *l) {
+        //SCOPES_RESULT_TYPE(void);
         auto &&enter = l->body.enter;
 
-        typedef void (*label_macro_handler)(Label *);
+        typedef bool (*label_macro_handler)(Label *);
 
         label_macro_handler handler = (label_macro_handler)enter.pointer;
         return handler(l);
@@ -2700,22 +2714,26 @@ struct Specializer {
             Label *metafunc = SCOPES_GET_RESULT(solver.solve_inline(cl->frame, cl->label, { untyped(), env }));
             auto rlt = SCOPES_GET_RESULT(metafunc->verify_return_label());
             //const Type *functype = metafunc->get_function_type();
-            if (rlt->values.size() != 2)
+            if (rlt->values.size() != 1)
                 goto failed;
             {
                 Scope *scope = nullptr;
                 Any compiled = SCOPES_GET_RESULT(compile(metafunc, 0));
 
                 if ((rlt->values[0].value.type == TYPE_Unknown)
-                    && (rlt->values[0].value.typeref == TYPE_Bool)
-                    && (rlt->values[1].value.type == TYPE_Unknown)
-                    && (rlt->values[1].value.typeref == TYPE_Scope)) {
-                    // returns a variable scope
-                    typedef sc_bool_scope_tuple_t (*FuncType)();
-                    FuncType fptr = (FuncType)compiled.pointer;
-                    auto result = fptr();
-                    if (!result._0) SCOPES_RETURN_ERROR();
-                    scope = result._1;
+                    && (rlt->values[0].value.typeref == TYPE_Scope)) {
+                    set_active_anchor(metafunc->anchor);
+                    if (rlt->is_raising()) {
+                        typedef sc_bool_scope_tuple_t (*FuncType)();
+                        FuncType fptr = (FuncType)compiled.pointer;
+                        auto result = fptr();
+                        if (!result._0) SCOPES_RETURN_ERROR();
+                        scope = result._1;
+                    } else {
+                        typedef Scope *(*FuncType)();
+                        FuncType fptr = (FuncType)compiled.pointer;
+                        scope = fptr();
+                    }
                 } else {
                     goto failed;
                 }
@@ -2729,8 +2747,10 @@ struct Specializer {
             StyledString ss;
             const Type *T = rlt;
             ss.out << "syntax-extend has wrong return type (expected "
-                << ReturnLabel({unknown_of(TYPE_Scope)}) << ", got "
-                << T << ")";
+                << ReturnLabel({unknown_of(TYPE_Scope)})
+                << " or "
+                << ReturnLabel({unknown_of(TYPE_Scope)}, RLF_Raising)
+                << ", got " << T << ")";
             SCOPES_LOCATION_ERROR(ss.str());
         } break;
         case FN_ScopeOf: {
@@ -3537,7 +3557,7 @@ struct Specializer {
     // fold body of single label if possible
     // returns either the completed label if definite, or the next incomplete
     // or complete possible label, or null if completed label is recursive
-    SCOPES_RESULT(Label *) fold_label_body(Label *l) {
+    SCOPES_RESULT(Label *) fold_label_body(Label *entry_label, Label *l) {
         SCOPES_RESULT_TYPE(Label *);
     repeat:
         assert(!l->body.is_complete());
@@ -3556,6 +3576,7 @@ struct Specializer {
             SCOPES_LOCATION_ERROR(ss.str());
         }
 
+        bool trycall = l->body.is_trycall();
         const Type *rtype = nullptr;
         if (is_calling_label(l)) {
             if (!l->get_label_enter()->body.is_complete()) {
@@ -3565,7 +3586,7 @@ struct Specializer {
             rtype = SCOPES_GET_RESULT(complete_existing_label_continuation(l));
         } else if (is_calling_label_macro(l)) {
             Any enter = l->body.enter;
-            fold_label_macro_call(l);
+            SCOPES_CHECK_RESULT(fold_label_macro_call(l));
             if (l->body.enter == enter) {
                 SCOPES_LOCATION_ERROR(String::from("label macro call failed to fold"));
             }
@@ -3588,16 +3609,21 @@ struct Specializer {
             } else if (builtin == FN_Branch) {
                 SCOPES_CHECK_RESULT(type_branch_continuations(l));
                 l->body.set_complete();
-                // todo: process branches
                 return l;
             } else {
                 auto &&enter = l->body.enter;
                 auto &&args = l->body.args;
                 assert(enter.type == TYPE_Builtin);
-                if ((enter.builtin == SFXFN_Unreachable)
-                    || (enter.builtin == SFXFN_Discard)) {
+                switch(enter.builtin.value()) {
+                case SFXFN_Unreachable:
+                case SFXFN_Discard: {
                     args[0] = none;
-                } else {
+                } break;
+                case SFXFN_Raise: {
+                    entry_label->set_raising();
+                    args[0] = none;
+                } break;
+                default: {
                     Args values;
                     bool fold = SCOPES_GET_RESULT(values_from_builtin_call(l, values));
                     if (fold) {
@@ -3610,6 +3636,7 @@ struct Specializer {
                     } else {
                         rtype = ReturnLabel(values);
                     }
+                } break;
                 }
             }
         } else if (is_calling_closure(l)) {
@@ -3639,11 +3666,13 @@ struct Specializer {
         }
 
         if (rtype) {
+            if (trycall)
+                rtype = cast<ReturnLabelType>(rtype)->to_trycall();
             if (is_jumping(l)) {
-                l->body.enter = SCOPES_GET_RESULT(fold_type_return(l->body.enter, rtype));
+                l->body.enter = SCOPES_GET_RESULT(fold_type_return(entry_label, l->body.enter, rtype));
             } else {
                 assert(!l->body.args.empty());
-                l->body.args[0] = SCOPES_GET_RESULT(fold_type_return(l->body.args[0].value, rtype));
+                l->body.args[0] = SCOPES_GET_RESULT(fold_type_return(entry_label, l->body.args[0].value, rtype));
             }
         }
 
@@ -3667,12 +3696,12 @@ struct Specializer {
         return l;
     }
 
-    SCOPES_RESULT(Label *) skip_useless_labels(Label *l, LabelQueue &todo, LabelQueue &recursions) {
+    SCOPES_RESULT(Label *) skip_useless_labels(Label *entry_label, Label *l, LabelQueue &todo, LabelQueue &recursions) {
         SCOPES_RESULT_TYPE(Label *);
     repeat:
         Label *nextl = l;
         if(!l->body.is_complete()) {
-            nextl = SCOPES_GET_RESULT(fold_label_body(l));
+            nextl = SCOPES_GET_RESULT(fold_label_body(entry_label, l));
             if (!nextl) { // recursive, try again later
                 recursions.push_front(l);
                 return l;
@@ -3709,7 +3738,7 @@ struct Specializer {
             l = todo.back();
             todo.pop_back();
             if(!l->body.is_complete()) {
-                if (!SCOPES_GET_RESULT(fold_label_body(l))) {
+                if (!SCOPES_GET_RESULT(fold_label_body(entry_label, l))) {
                     recursions.push_front(l);
                     continue;
                 }
@@ -3717,12 +3746,12 @@ struct Specializer {
             if (!l->body.is_optimized()) {
                 l->body.set_optimized();
                 if (jumps_immediately(l)) {
-                    l->body.enter = SCOPES_GET_RESULT(skip_useless_labels(l->body.enter, todo, recursions));
+                    l->body.enter = SCOPES_GET_RESULT(skip_useless_labels(entry_label, l->body.enter, todo, recursions));
                 } else if (is_continuing_to_label(l)) {
-                    l->body.args[0].value = SCOPES_GET_RESULT(skip_useless_labels(l->body.args[0].value, todo, recursions));
+                    l->body.args[0].value = SCOPES_GET_RESULT(skip_useless_labels(entry_label, l->body.args[0].value, todo, recursions));
                 } else if (is_branching(l)) {
-                    l->body.args[2].value = SCOPES_GET_RESULT(skip_useless_labels(l->body.args[2].value, todo, recursions));
-                    l->body.args[3].value = SCOPES_GET_RESULT(skip_useless_labels(l->body.args[3].value, todo, recursions));
+                    l->body.args[2].value = SCOPES_GET_RESULT(skip_useless_labels(entry_label, l->body.args[2].value, todo, recursions));
+                    l->body.args[3].value = SCOPES_GET_RESULT(skip_useless_labels(entry_label, l->body.args[3].value, todo, recursions));
                 }
             }
         }
@@ -3766,7 +3795,12 @@ struct Specializer {
             //if (f->is_reentrant())
             // 2. all return paths are unreachable, because the function
             //    never returns.
-            SCOPES_CHECK_RESULT(fold_type_return(entry_label->params[0], NoReturnLabel()));
+            uint64_t flags = 0;
+            if (entry_label->is_raising()) {
+                // the function does only return via raising an error
+                flags |= RLF_Raising;
+            }
+            entry_label->params[0]->type = NoReturnLabel(flags);
         } else {
             SCOPES_CHECK_RESULT(validate_label_return_types(entry_label));
         }

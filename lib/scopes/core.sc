@@ -43,6 +43,8 @@ let set-error! = sc_set_last_error
 let set-location-error! = sc_set_last_location_error
 let set-runtime-error! = sc_set_last_runtime_error
 let get-error = sc_get_last_error
+let CompileError = sc_location_error_new
+let RuntimeError = sc_runtime_error_new
 let exit = sc_exit
 let set-signal-abort! = sc_set_signal_abort
 
@@ -179,57 +181,49 @@ fn box-pointer (value)
     let val = (insertvalue val (ptrtoint value u64) 1)
     val
 
+fn raise-compile-error! (value)
+    set-error! (CompileError value)
+    __raise!;
+
 # print an unboxing error given two types
 fn unbox-verify (haveT wantT)
     if (ptrcmp!= haveT wantT)
-        sc_set_last_location_error
+        raise-compile-error!
             sc_string_join "can't unbox value of type "
                 sc_string_join
                     sc_any_repr (box-pointer haveT)
                     sc_string_join " as value of type "
                         sc_any_repr (box-pointer wantT)
-        false
-    else
-        true
 
 inline unbox-integer (value T)
-    if (unbox-verify (extractvalue value 0) T)
-        _ true (itrunc (extractvalue value 1) T)
-    else
-        _ false (undef T)
+    unbox-verify (extractvalue value 0) T
+    itrunc (extractvalue value 1) T
 
 inline unbox-symbol (value T)
-    if (unbox-verify (extractvalue value 0) T)
-        _ true (bitcast (extractvalue value 1) T)
-    else
-        _ false (undef T)
+    unbox-verify (extractvalue value 0) T
+    bitcast (extractvalue value 1) T
 
 # turn an Any back into a pointer
 inline unbox-pointer (value T)
-    if (unbox-verify (extractvalue value 0) T)
-        _ true (inttoptr (extractvalue value 1) T)
-    else
-        _ false (undef T)
+    unbox-verify (extractvalue value 0) T
+    inttoptr (extractvalue value 1) T
 
 fn verify-list-count (l mincount maxcount)
     let count = (itrunc (sc_list_count l) i32)
     if (icmp>=s mincount 0)
         if (icmp<s count mincount)
-            set-location-error!
+            raise-compile-error!
                 sc_string_join "at least "
                     sc_string_join (sc_any_repr (box-integer mincount))
                         sc_string_join " argument(s) expected, got "
                             sc_any_repr (box-integer count)
-            return false
     if (icmp>=s maxcount 0)
         if (icmp>s count maxcount)
-            set-location-error!
+            raise-compile-error!
                 sc_string_join "at most "
                     sc_string_join (sc_any_repr (box-integer maxcount))
                         sc_string_join " argument(s) expected, got "
                             sc_any_repr (box-integer count)
-            return false
-    return true
 
 fn verify-argument-count (l mincount maxcount)
     let original-args = (sc_label_get_arguments l)
@@ -263,13 +257,10 @@ fn Any-none? (value)
 syntax-extend
     let val = (box-pointer (sc_pointer_type type pointer-flag-non-writable unnamed))
     sc_scope_set_symbol syntax-scope 'type-array val
-    let ok T = (sc_type_storage LabelMacro)
-    if ok
-        sc_scope_set_symbol syntax-scope 'LabelMacroFunctionType (box-pointer T)
-        sc_scope_set_symbol syntax-scope 'ellipsis-symbol (box-symbol (sc_symbol_new "..."))
-        _ true syntax-scope
-    else
-        _ false (undef Scope)
+    let T = (sc_type_storage LabelMacro)
+    sc_scope_set_symbol syntax-scope 'LabelMacroFunctionType (box-pointer T)
+    sc_scope_set_symbol syntax-scope 'ellipsis-symbol (box-symbol (sc_symbol_new "..."))
+    syntax-scope
 
 fn Label-return-args (l arg)
     let args = (sc_label_get_keyed l)
@@ -326,8 +317,9 @@ syntax-extend
         let result = (sc_compile (sc_typify typify 1 types) 0:u64)
         let result-type = (extractvalue result 0)
         if (ptrcmp!= result-type LabelMacroFunctionType)
-            set-location-error! "label macro must return void"
-
+            raise-compile-error!
+                sc_string_join "label macro must have type "
+                    sc_any_repr (box-pointer LabelMacroFunctionType)
         let result =
             insertvalue result LabelMacro 0
         sc_scope_set_symbol syntax-scope 'typify result
@@ -495,12 +487,12 @@ syntax-extend
                 let k sym = (unpack-symbol-value sym)
                 let k self = (unpack-symbol-value self)
                 let T = (Any-indirect-typeof self)
-                let f ok = (sc_type_at T (unbox-symbol sym Symbol))
+                let ok f = (sc_type_at T (unbox-symbol sym Symbol))
                 if ok
                     sc_label_set_keyed l (sc_list_cons cont retargs)
                     sc_label_set_enter l f
                 else
-                    __anchor-error!
+                    raise-compile-error!
                         sc_string_join "no method named "
                             sc_string_join (sc_any_repr sym)
                                 sc_string_join " in value of type "
@@ -553,6 +545,19 @@ syntax-extend
                         box-pointer
                             sc_pointer_type T pointer-flag-non-writable unnamed
 
+    sc_type_set_symbol type 'raising
+        box-label-macro
+            fn "type-raising" (l)
+                let args = (verify-keyed-count l 1 1)
+                let args = (sc_list_next args)
+                let self args = (sc_list_decons args)
+                let k self = (unpack-symbol-value self)
+                let T = (unbox-pointer self type)
+                Label-return1 l
+                    pack-symbol-value unnamed
+                        box-pointer
+                            sc_function_type_raising T
+
     # typecall
 
     sc_type_set_symbol type '__call
@@ -563,11 +568,11 @@ syntax-extend
                 let self args = (sc_list_decons args)
                 let k self = (unpack-symbol-value self)
                 let T = (unbox-pointer self type)
-                let f ok = (sc_type_at T '__typecall)
+                let ok f = (sc_type_at T '__typecall)
                 if ok
                     sc_label_set_enter l f
                     return;
-                __anchor-error!
+                raise-compile-error!
                     sc_string_join "no type constructor available for type "
                         sc_any_repr self
 
@@ -616,7 +621,7 @@ syntax-extend
                             pack-symbol-value unnamed
                                 box-integer (icmp<=s a b)
                         return;
-                sc_anchor_error "arguments must be constant"
+                raise-compile-error! "arguments must be constant"
 
     sc_scope_set_symbol syntax-scope 'const.add.i32.i32
         box-label-macro
@@ -630,7 +635,7 @@ syntax-extend
                             pack-symbol-value unnamed
                                 box-integer (add a b)
                         return;
-                sc_anchor_error "arguments must be constant"
+                raise-compile-error! "arguments must be constant"
 
     sc_scope_set_symbol syntax-scope 'constbranch
         box-label-macro
@@ -645,7 +650,7 @@ syntax-extend
                 let k elsef = (unpack-symbol-value elsef)
                 if (Any-constant? cond)
                 else
-                    sc_anchor_error "condition must be constant"
+                    raise-compile-error! "condition must be constant"
                 let value = (unbox-integer cond bool)
                 Label-return0 l
                 sc_label_set_enter l
@@ -680,7 +685,7 @@ syntax-extend
                         #elseif (icmp== kind type-kind-vector)
                         #elseif (icmp== kind type-kind-real)
                         else
-                            __anchor-error!
+                            raise-compile-error!
                                 sc_string_join "can't box value of type "
                                     sc_any_repr (box-pointer T)
 
@@ -786,7 +791,6 @@ let Syntax-wrap = sc_syntax_wrap
     anchor = sc_label_anchor
     body-anchor = sc_label_body_anchor
     append-parameter = sc_label_append_parameter
-    parameter = sc_label_parameter
     return-keyed = Label-return-keyed
     return = Label-return
 
@@ -838,7 +842,7 @@ syntax-extend
     # syntax macro type
     let SyntaxMacro = (sc_typename_type "SyntaxMacro")
     let SyntaxMacroFunctionType =
-        'pointer (function (tuple list Scope) list list Scope)
+        'pointer ('raising (function (tuple list Scope) list list Scope))
     sc_typename_type_set_storage SyntaxMacro SyntaxMacroFunctionType
 
     # any extraction
@@ -940,27 +944,30 @@ syntax-extend
                 let cont value T = ('decons args 3)
                 let vT = ('indirect-typeof value)
                 let T = (unbox-pointer T type)
-                __anchor-error!
-                    sc_string_join intro-string
-                        sc_string_join
-                            '__repr (box-pointer vT)
-                            sc_string_join " to type "
-                                '__repr (box-pointer T)
+                # create branch so we can trick the function into assuming
+                    there's another exit path
+                if true
+                    raise-compile-error!
+                        sc_string_join intro-string
+                            sc_string_join
+                                '__repr (box-pointer vT)
+                                sc_string_join " to type "
+                                    '__repr (box-pointer T)
 
     let DispatchCastFunctionType =
-        'pointer (function (tuple Any bool) type type)
+        'pointer ('raising (function Any type type))
 
     fn get-cast-dispatcher (symbol rsymbol vT T)
-        let anyf ok = ('@ vT symbol)
+        let ok anyf = ('@ vT symbol)
         if ok
             let f = (unbox-pointer anyf DispatchCastFunctionType)
-            let f ok = (f vT T)
+            let ok f = (trycall f vT T)
             if ok
                 return f ok false
-        let anyf ok = ('@ T rsymbol)
+        let ok anyf = ('@ T rsymbol)
         if ok
             let f = (unbox-pointer anyf DispatchCastFunctionType)
-            let f ok = (f T vT)
+            let ok f = (trycall f T vT)
             if ok
                 return f ok true
         return (Any-wrap none) false false
@@ -1016,17 +1023,18 @@ syntax-extend
                     'return l value
 
     let UnaryOpFunctionType =
-        'pointer (function (tuple Any bool) type)
+        'pointer ('raising (function Any type))
 
     let BinaryOpFunctionType =
-        'pointer (function (tuple Any bool) type type)
+        'pointer ('raising (function Any type type))
 
     fn get-binary-op-dispatcher (symbol lhsT rhsT)
-        let anyf ok = ('@ lhsT symbol)
+        let ok anyf = ('@ lhsT symbol)
         if ok
             let f = (unbox-pointer anyf BinaryOpFunctionType)
             return (f lhsT rhsT)
-        return (Any-wrap none) false
+        else
+            raise-compile-error! "no binary op dispatcher available"
 
     fn binary-op-label-cast-then-macro (l f castf lhsT rhs)
         # next label
@@ -1043,35 +1051,6 @@ syntax-extend
         'set-enter lcont f
         return lcont param
 
-    fn binary-op-label-macro (l symbol rsymbol friendly-op-name)
-        'verify-keyed-count l 2 2
-        let lhsk lhs = ('argument l 1)
-        let rhsk rhs = ('argument l 2)
-        let lhsT = ('indirect-typeof lhs)
-        let rhsT = ('indirect-typeof rhs)
-        # try direct version first
-        let f ok = (get-binary-op-dispatcher symbol lhsT rhsT)
-        if ok
-            'set-enter l f
-            return;
-        # if types are unequal, we can try other options
-        if (ptrcmp!= lhsT rhsT)
-            # try reverse version next
-            let f ok = (get-binary-op-dispatcher rsymbol rhsT lhsT)
-            if ok
-                'set-argument l 1 rhsk rhs
-                'set-argument l 2 lhsk lhs
-                'set-enter l f
-                return;
-        # we give up
-        __anchor-error!
-            'join "can't "
-                'join friendly-op-name
-                    'join " values of types "
-                        'join
-                            '__repr (box-pointer lhsT)
-                            'join " and "
-                                '__repr (box-pointer rhsT)
 
     # both types are typically the same
     fn sym-binary-op-label-macro (l symbol rsymbol friendly-op-name)
@@ -1115,7 +1094,7 @@ syntax-extend
                         list cont (box-pointer param) rhs
                     return;
         # we give up
-        __anchor-error!
+        raise-compile-error!
             'join "can't "
                 'join friendly-op-name
                     'join " values of types "
@@ -1130,7 +1109,7 @@ syntax-extend
         let cont lhs rhs = ('decons args 3)
         let lhsT = ('indirect-typeof lhs)
         let rhsT = ('indirect-typeof rhs)
-        let f ok = ('@ lhsT symbol)
+        let ok f = ('@ lhsT symbol)
         if ok
             if (ptrcmp== rhsT rtype)
                 'set-enter l f
@@ -1144,7 +1123,7 @@ syntax-extend
                     list cont lhs (box-pointer param)
                 return;
         # we give up
-        __anchor-error!
+        raise-compile-error!
             'join "can't "
                 'join friendly-op-name
                     'join " values of types "
@@ -1157,11 +1136,11 @@ syntax-extend
         let args = ('verify-argument-count l 1 1)
         let cont lhs = ('decons args 2)
         let lhsT = ('indirect-typeof lhs)
-        let f ok = ('@ lhsT symbol)
+        let ok f = ('@ lhsT symbol)
         if ok
             'set-enter l f
             return;
-        __anchor-error!
+        raise-compile-error!
             'join "can't "
                 'join friendly-op-name
                     'join " value of type "
@@ -1169,9 +1148,6 @@ syntax-extend
 
     inline make-unary-op-dispatch (symbol friendly-op-name)
         box-label-macro (fn (l) (unary-op-label-macro l symbol friendly-op-name))
-
-    inline make-binary-op-dispatch (symbol rsymbol friendly-op-name)
-        box-label-macro (fn (l) (binary-op-label-macro l symbol rsymbol friendly-op-name))
 
     inline make-sym-binary-op-dispatch (symbol rsymbol friendly-op-name)
         box-label-macro (fn (l) (sym-binary-op-label-macro l symbol rsymbol friendly-op-name))
@@ -1243,8 +1219,9 @@ syntax-extend
             return;
         let nextl = (sc_label_new_inline_template)
         'set-enter nextl (Any-wrap _)
+        let params = ('parameters nextl)
         'set-arguments nextl
-            list (box-pointer ('parameter nextl 0)) cond
+            list (box-pointer (unbox-pointer ('@ params) Parameter)) cond
         if flip
             'return l cond
                 elsef
@@ -1284,7 +1261,7 @@ syntax-extend
                         if (Any-constant? key)
                             let self = (unbox-pointer self type)
                             let key = (unbox-symbol key Symbol)
-                            let result ok = (sc_type_at self key)
+                            let ok result = (sc_type_at self key)
                             'return l result (box-integer ok)
                             return;
                     'set-enter l (Any-wrap sc_type_at)
@@ -1637,9 +1614,8 @@ syntax-extend
                 ? (pred op-prec prec) op (Any none)
             else
                 set-anchor! ('anchor (as token Syntax))
-                __anchor-error!
+                raise-compile-error!
                     "unexpected token in infix expression"
-                unreachable!;
     let infix-op-gt = (infix-op >)
     let infix-op-ge = (infix-op >=)
 
@@ -1654,9 +1630,8 @@ syntax-extend
                 Any none
         else
             set-anchor! ('anchor (as token Syntax))
-            __anchor-error!
+            raise-compile-error!
                 "unexpected token in infix expression"
-            unreachable!;
 
     fn parse-infix-expr (infix-table lhs state mprec)
         let loop (lhs state) = lhs state
@@ -1794,7 +1769,7 @@ syntax-extend
 
     fn expand-and-or (expr f)
         if (empty? expr)
-            __error! "at least one argument expected"
+            raise-compile-error! "at least one argument expected"
         elseif (== (countof expr) 1:usize)
             return ('@ expr)
         let expr = ('reverse expr)

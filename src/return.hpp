@@ -16,20 +16,28 @@ namespace scopes {
 // RETURN LABEL TYPE
 //------------------------------------------------------------------------------
 
-enum ReturnLabelMode {
-    RLM_Return,
-    RLM_NoReturn,
+enum {
+    RLF_NoReturn = (1 << 0),
+    // returns a hidden boolean in first position that indicates
+    // if the function raised an error; if true, the value of
+    // remaining arguments is undefined, and the caller
+    // must also raise an error -- thus, a raising function can only
+    // be called by other raising functions
+    RLF_Raising = (1 << 1),
 };
 
 struct ReturnLabelType : Type {
     static bool classof(const Type *T);
 
     bool is_returning() const;
+    bool is_raising() const;
 
     const Type *to_unconst() const;
+    const Type *to_raising() const;
+    const Type *to_trycall() const;
 
     void stream_name(StyledStream &ss) const;
-    ReturnLabelType(ReturnLabelMode _mode, const Args &_values);
+    ReturnLabelType(const Args &_values, uint64_t flags);
 
     bool has_constants() const;
 
@@ -39,18 +47,16 @@ struct ReturnLabelType : Type {
 
     Args values;
     const Type *return_type;
-    ReturnLabelMode mode;
+    const Type *ll_return_type;
+    uint64_t flags;
 protected:
     bool has_mrv;
     bool has_const;
     bool has_vars;
 };
 
-const Type *ReturnLabel(ReturnLabelMode mode, const Args &values);
-
-const Type *ReturnLabel(const Args &values);
-
-const Type *NoReturnLabel();
+const Type *ReturnLabel(const Args &values, uint64_t flags = 0);
+const Type *NoReturnLabel(uint64_t flags = 0);
 
 } // namespace scopes
 

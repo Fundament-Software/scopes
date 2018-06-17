@@ -45,6 +45,18 @@ void Body::set_rawcall(bool enable) {
     }
 }
 
+bool Body::is_trycall() {
+    return (flags & LBF_TryCall) == LBF_TryCall;
+}
+
+void Body::set_trycall(bool enable) {
+    if (enable) {
+        flags |= LBF_TryCall;
+    } else {
+        flags &= ~LBF_TryCall;
+    }
+}
+
 void Body::copy_traits_from(const Body &other) {
     flags = other.flags;
     anchor = other.anchor;

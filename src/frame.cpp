@@ -7,6 +7,8 @@
 #include "frame.hpp"
 #include "label.hpp"
 #include "hash.hpp"
+#include "type.hpp"
+#include "closure.hpp"
 
 #include <assert.h>
 

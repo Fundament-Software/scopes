@@ -256,7 +256,7 @@ static size_t classify(const Type *T, ABIClass *classes, size_t offset) {
 size_t abi_classify(const Type *T, ABIClass *classes) {
 #ifdef SCOPES_WIN32
     if (T->kind() == TK_ReturnLabel) {
-        T = cast<ReturnLabelType>(T)->return_type;
+        T = cast<ReturnLabelType>(T)->ll_return_type;
     }
     classes[0] = ABI_CLASS_NO_CLASS;
     if (is_opaque(T))

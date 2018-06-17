@@ -60,6 +60,8 @@ enum LabelFlags {
     LF_Merge = (1 << 3),
     // when this label is processed, output some information to screen
     LF_Debug = (1 << 4),
+    // when the return parameter is typed, type the function as raising
+    LF_Raising = (1 << 5),
 };
 
 // IL form inspired by
@@ -91,6 +93,9 @@ public:
     bool is_reentrant() const;
 
     bool is_debug() const;
+
+    void set_raising();
+    bool is_raising() const;
 
     void set_debug();
 

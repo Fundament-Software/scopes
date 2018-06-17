@@ -26,12 +26,8 @@ bool FunctionType::classof(const Type *T) {
 }
 
 void FunctionType::stream_name(StyledStream &ss) const {
-    if (divergent()) {
-        ss << "?<-";
-    } else {
-        stream_type_name(ss, return_type);
-        ss << "<-";
-    }
+    stream_type_name(ss, return_type);
+    ss << "<-";
     ss << "(";
     for (size_t i = 0; i < argument_types.size(); ++i) {
         if (i > 0) {
@@ -51,15 +47,10 @@ FunctionType::FunctionType(
     return_type(_return_type),
     argument_types(_argument_types),
     flags(_flags) {
-
-    assert(!(flags & FF_Divergent) || argument_types.empty());
 }
 
 bool FunctionType::vararg() const {
     return flags & FF_Variadic;
-}
-bool FunctionType::divergent() const {
-    return flags & FF_Divergent;
 }
 
 SCOPES_RESULT(const Type *) FunctionType::type_at_index(size_t i) const {

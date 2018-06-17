@@ -309,6 +309,14 @@ void sc_set_last_location_error(const sc_string_t *msg) {
     using namespace scopes;
     set_last_location_error(msg);
 }
+sc_any_t sc_location_error_new(const sc_string_t *msg) {
+    using namespace scopes;
+    return make_location_error(msg);
+}
+sc_any_t sc_runtime_error_new(const sc_string_t *msg) {
+    using namespace scopes;
+    return make_runtime_error(msg);
+}
 sc_any_t sc_get_last_error() {
     using namespace scopes;
     return get_last_error();
@@ -1074,6 +1082,16 @@ const sc_type_t *sc_function_type(const sc_type_t *return_type,
     return Function(return_type, types);
 }
 
+const sc_type_t *sc_function_type_raising(const sc_type_t *T) {
+    using namespace scopes;
+    if (is_kind<TK_Function>(T)) {
+        auto ft = cast<FunctionType>(T);
+        auto rlt = cast<ReturnLabelType>(ft->return_type);
+        return Function(rlt->to_raising(), ft->argument_types, ft->flags);
+    }
+    return T;
+}
+
 // Image Type
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -1371,22 +1389,18 @@ static const Type *result_tuple(const Type *rtype) {
     return Tuple({ TYPE_Bool, rtype}).assert_ok();
 }
 
+static const Type *raising() {
+    return ReturnLabel({}, RLF_Raising);
+}
+
+static const Type *raising(const Type *rtype) {
+    return ReturnLabel({unknown_of(rtype)}, RLF_Raising);
+}
+
 void init_globals(int argc, char *argv[]) {
     scopes_argc = argc;
     scopes_argv = argv;
 
-#define DEFINE_C_FUNCTION(SYMBOL, FUNC, RETTYPE, ...) \
-    globals->bind(SYMBOL, \
-        Any::from_pointer(Pointer(Function(RETTYPE, { __VA_ARGS__ }), \
-            PTF_NonWritable, SYM_Unnamed), (void *)FUNC));
-#define DEFINE_C_VARARG_FUNCTION(SYMBOL, FUNC, RETTYPE, ...) \
-    globals->bind(SYMBOL, \
-        Any::from_pointer(Pointer(Function(RETTYPE, { __VA_ARGS__ }, FF_Variadic), \
-            PTF_NonWritable, SYM_Unnamed), (void *)FUNC));
-#define DEFINE_RENAME_EXTERN_C_FUNCTION(NAME, FUNC, RETTYPE, ...) \
-    (void)FUNC; /* ensure that the symbol is there */ \
-    bind_extern(Symbol(#NAME), Symbol(#FUNC), \
-        Extern(Function(RETTYPE, { __VA_ARGS__ }), EF_NonWritable));
 #define DEFINE_EXTERN_C_FUNCTION(FUNC, RETTYPE, ...) \
     (void)FUNC; /* ensure that the symbol is there */ \
     bind_extern(Symbol(#FUNC), \
@@ -1395,15 +1409,15 @@ void init_globals(int argc, char *argv[]) {
     const Type *rawstring = NativeROPointer(TYPE_I8);
 
     DEFINE_EXTERN_C_FUNCTION(sc_compiler_version, Tuple({TYPE_I32, TYPE_I32, TYPE_I32}).assert_ok());
-    DEFINE_EXTERN_C_FUNCTION(sc_eval, result_tuple(TYPE_Label), TYPE_Syntax, TYPE_Scope);
-    DEFINE_EXTERN_C_FUNCTION(sc_eval_inline, result_tuple(TYPE_Label), TYPE_List, TYPE_Scope);
-    DEFINE_EXTERN_C_FUNCTION(sc_typify, result_tuple(TYPE_Label), TYPE_Closure, TYPE_I32, NativeROPointer(TYPE_Type));
-    DEFINE_EXTERN_C_FUNCTION(sc_compile, result_tuple(TYPE_Any), TYPE_Label, TYPE_U64);
-    DEFINE_EXTERN_C_FUNCTION(sc_compile_spirv, result_tuple(TYPE_String), TYPE_Symbol, TYPE_Label, TYPE_U64);
-    DEFINE_EXTERN_C_FUNCTION(sc_compile_glsl, result_tuple(TYPE_String), TYPE_Symbol, TYPE_Label, TYPE_U64);
-    DEFINE_EXTERN_C_FUNCTION(sc_compile_object, TYPE_Bool, TYPE_String, TYPE_Scope, TYPE_U64);
+    DEFINE_EXTERN_C_FUNCTION(sc_eval, raising(TYPE_Label), TYPE_Syntax, TYPE_Scope);
+    DEFINE_EXTERN_C_FUNCTION(sc_eval_inline, raising(TYPE_Label), TYPE_List, TYPE_Scope);
+    DEFINE_EXTERN_C_FUNCTION(sc_typify, raising(TYPE_Label), TYPE_Closure, TYPE_I32, NativeROPointer(TYPE_Type));
+    DEFINE_EXTERN_C_FUNCTION(sc_compile, raising(TYPE_Any), TYPE_Label, TYPE_U64);
+    DEFINE_EXTERN_C_FUNCTION(sc_compile_spirv, raising(TYPE_String), TYPE_Symbol, TYPE_Label, TYPE_U64);
+    DEFINE_EXTERN_C_FUNCTION(sc_compile_glsl, raising(TYPE_String), TYPE_Symbol, TYPE_Label, TYPE_U64);
+    DEFINE_EXTERN_C_FUNCTION(sc_compile_object, raising(), TYPE_String, TYPE_Scope, TYPE_U64);
     DEFINE_EXTERN_C_FUNCTION(sc_enter_solver_cli, TYPE_Void);
-    DEFINE_EXTERN_C_FUNCTION(sc_verify_stack, result_tuple(TYPE_USize));
+    DEFINE_EXTERN_C_FUNCTION(sc_verify_stack, raising(TYPE_USize));
     DEFINE_EXTERN_C_FUNCTION(sc_launch_args, TYPE_List);
 
     DEFINE_EXTERN_C_FUNCTION(sc_prompt, result_tuple(TYPE_String), TYPE_String, TYPE_String);
@@ -1424,6 +1438,8 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_set_last_error, TYPE_Void, TYPE_Any);
     DEFINE_EXTERN_C_FUNCTION(sc_set_last_runtime_error, TYPE_Void, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_set_last_location_error, TYPE_Void, TYPE_String);
+    DEFINE_EXTERN_C_FUNCTION(sc_location_error_new, TYPE_Any, TYPE_String);
+    DEFINE_EXTERN_C_FUNCTION(sc_runtime_error_new, TYPE_Any, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_get_last_error, TYPE_Any);
 
     DEFINE_EXTERN_C_FUNCTION(sc_abort, TYPE_Void);
@@ -1439,14 +1455,14 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_hash2x64, TYPE_U64, TYPE_U64, TYPE_U64);
     DEFINE_EXTERN_C_FUNCTION(sc_hashbytes, TYPE_U64, NativeROPointer(TYPE_I8), TYPE_USize);
 
-    DEFINE_EXTERN_C_FUNCTION(sc_import_c, result_tuple(TYPE_Scope), TYPE_String, TYPE_String, TYPE_List);
-    DEFINE_EXTERN_C_FUNCTION(sc_load_library, TYPE_Bool, TYPE_String);
+    DEFINE_EXTERN_C_FUNCTION(sc_import_c, raising(TYPE_Scope), TYPE_String, TYPE_String, TYPE_List);
+    DEFINE_EXTERN_C_FUNCTION(sc_load_library, raising(), TYPE_String);
 
     DEFINE_EXTERN_C_FUNCTION(sc_get_active_anchor, TYPE_Anchor);
     DEFINE_EXTERN_C_FUNCTION(sc_set_active_anchor, TYPE_Void, TYPE_Anchor);
 
-    DEFINE_EXTERN_C_FUNCTION(sc_scope_at, result_tuple(TYPE_Any), TYPE_Scope, TYPE_Symbol);
-    DEFINE_EXTERN_C_FUNCTION(sc_scope_local_at, result_tuple(TYPE_Any), TYPE_Scope, TYPE_Symbol);
+    DEFINE_EXTERN_C_FUNCTION(sc_scope_at, Tuple({TYPE_Bool, TYPE_Any}).assert_ok(), TYPE_Scope, TYPE_Symbol);
+    DEFINE_EXTERN_C_FUNCTION(sc_scope_local_at, Tuple({TYPE_Bool, TYPE_Any}).assert_ok(), TYPE_Scope, TYPE_Symbol);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_get_docstring, TYPE_String, TYPE_Scope, TYPE_Symbol);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_set_docstring, TYPE_Void, TYPE_Scope, TYPE_Symbol, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_set_symbol, TYPE_Void, TYPE_Scope, TYPE_Symbol, TYPE_Any);
@@ -1464,7 +1480,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_string_new, TYPE_String, NativeROPointer(TYPE_I8), TYPE_USize);
     DEFINE_EXTERN_C_FUNCTION(sc_string_new_from_cstr, TYPE_String, NativeROPointer(TYPE_I8));
     DEFINE_EXTERN_C_FUNCTION(sc_string_join, TYPE_String, TYPE_String, TYPE_String);
-    DEFINE_EXTERN_C_FUNCTION(sc_string_match, result_tuple(TYPE_Bool), TYPE_String, TYPE_String);
+    DEFINE_EXTERN_C_FUNCTION(sc_string_match, raising(TYPE_Bool), TYPE_String, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_string_count, TYPE_USize, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_string_buffer, Tuple({rawstring, TYPE_USize}).assert_ok(), TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_string_lslice, TYPE_String, TYPE_String, TYPE_USize);
@@ -1474,16 +1490,16 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_any_string, TYPE_String, TYPE_Any);
     DEFINE_EXTERN_C_FUNCTION(sc_any_eq, TYPE_Bool, TYPE_Any, TYPE_Any);
 
-    DEFINE_EXTERN_C_FUNCTION(sc_type_at, result_tuple(TYPE_Any), TYPE_Type, TYPE_Symbol);
-    DEFINE_EXTERN_C_FUNCTION(sc_type_element_at, result_tuple(TYPE_Type), TYPE_Type, TYPE_I32);
-    DEFINE_EXTERN_C_FUNCTION(sc_type_field_index, result_tuple(TYPE_I32), TYPE_Type, TYPE_Symbol);
-    DEFINE_EXTERN_C_FUNCTION(sc_type_field_name, result_tuple(TYPE_Symbol), TYPE_Type, TYPE_I32);
-    DEFINE_EXTERN_C_FUNCTION(sc_type_sizeof, result_tuple(TYPE_USize), TYPE_Type);
-    DEFINE_EXTERN_C_FUNCTION(sc_type_alignof, result_tuple(TYPE_USize), TYPE_Type);
-    DEFINE_EXTERN_C_FUNCTION(sc_type_countof, result_tuple(TYPE_I32), TYPE_Type);
+    DEFINE_EXTERN_C_FUNCTION(sc_type_at, Tuple({TYPE_Bool, TYPE_Any}).assert_ok(), TYPE_Type, TYPE_Symbol);
+    DEFINE_EXTERN_C_FUNCTION(sc_type_element_at, raising(TYPE_Type), TYPE_Type, TYPE_I32);
+    DEFINE_EXTERN_C_FUNCTION(sc_type_field_index, raising(TYPE_I32), TYPE_Type, TYPE_Symbol);
+    DEFINE_EXTERN_C_FUNCTION(sc_type_field_name, raising(TYPE_Symbol), TYPE_Type, TYPE_I32);
+    DEFINE_EXTERN_C_FUNCTION(sc_type_sizeof, raising(TYPE_USize), TYPE_Type);
+    DEFINE_EXTERN_C_FUNCTION(sc_type_alignof, raising(TYPE_USize), TYPE_Type);
+    DEFINE_EXTERN_C_FUNCTION(sc_type_countof, raising(TYPE_I32), TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_type_kind, TYPE_I32, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_type_debug_abi, TYPE_Void, TYPE_Type);
-    DEFINE_EXTERN_C_FUNCTION(sc_type_storage, result_tuple(TYPE_Type), TYPE_Type);
+    DEFINE_EXTERN_C_FUNCTION(sc_type_storage, raising(TYPE_Type), TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_type_is_opaque, TYPE_Bool, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_type_string, TYPE_String, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_type_next, Tuple({TYPE_Symbol, TYPE_Any}).assert_ok(), TYPE_Type, TYPE_Symbol);
@@ -1505,15 +1521,15 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_integer_type_is_signed, TYPE_Bool, TYPE_Type);
 
     DEFINE_EXTERN_C_FUNCTION(sc_typename_type, TYPE_Type, TYPE_String);
-    DEFINE_EXTERN_C_FUNCTION(sc_typename_type_set_super, TYPE_Bool, TYPE_Type, TYPE_Type);
+    DEFINE_EXTERN_C_FUNCTION(sc_typename_type_set_super, raising(), TYPE_Type, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_typename_type_get_super, TYPE_Type, TYPE_Type);
-    DEFINE_EXTERN_C_FUNCTION(sc_typename_type_set_storage, TYPE_Bool, TYPE_Type, TYPE_Type);
+    DEFINE_EXTERN_C_FUNCTION(sc_typename_type_set_storage, raising(), TYPE_Type, TYPE_Type);
 
-    DEFINE_EXTERN_C_FUNCTION(sc_array_type, result_tuple(TYPE_Type), TYPE_Type, TYPE_USize);
+    DEFINE_EXTERN_C_FUNCTION(sc_array_type, raising(TYPE_Type), TYPE_Type, TYPE_USize);
 
-    DEFINE_EXTERN_C_FUNCTION(sc_vector_type, result_tuple(TYPE_Type), TYPE_Type, TYPE_USize);
+    DEFINE_EXTERN_C_FUNCTION(sc_vector_type, raising(TYPE_Type), TYPE_Type, TYPE_USize);
 
-    DEFINE_EXTERN_C_FUNCTION(sc_tuple_type, result_tuple(TYPE_Type), TYPE_I32, NativeROPointer(TYPE_Type));
+    DEFINE_EXTERN_C_FUNCTION(sc_tuple_type, raising(TYPE_Type), TYPE_I32, NativeROPointer(TYPE_Type));
 
     DEFINE_EXTERN_C_FUNCTION(sc_image_type, TYPE_Type,
         TYPE_Type, TYPE_Symbol, TYPE_I32, TYPE_I32, TYPE_I32, TYPE_I32, TYPE_Symbol, TYPE_Symbol);
@@ -1522,6 +1538,7 @@ void init_globals(int argc, char *argv[]) {
 
     DEFINE_EXTERN_C_FUNCTION(sc_function_type_is_variadic, TYPE_Bool, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_function_type, TYPE_Type, TYPE_Type, TYPE_I32, NativeROPointer(TYPE_Type));
+    DEFINE_EXTERN_C_FUNCTION(sc_function_type_raising, TYPE_Type, TYPE_Type);
 
     DEFINE_EXTERN_C_FUNCTION(sc_list_cons, TYPE_List, TYPE_Any, TYPE_List);
     DEFINE_EXTERN_C_FUNCTION(sc_list_dump, TYPE_List, TYPE_List);
@@ -1532,8 +1549,8 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_list_next, TYPE_List, TYPE_List);
     DEFINE_EXTERN_C_FUNCTION(sc_list_reverse, TYPE_List, TYPE_List);
 
-    DEFINE_EXTERN_C_FUNCTION(sc_syntax_from_path, result_tuple(TYPE_Syntax), TYPE_String);
-    DEFINE_EXTERN_C_FUNCTION(sc_syntax_from_string, result_tuple(TYPE_Syntax), TYPE_String);
+    DEFINE_EXTERN_C_FUNCTION(sc_syntax_from_path, raising(TYPE_Syntax), TYPE_String);
+    DEFINE_EXTERN_C_FUNCTION(sc_syntax_from_string, raising(TYPE_Syntax), TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_syntax_new, TYPE_Syntax, TYPE_Anchor, TYPE_Any, TYPE_Bool);
     DEFINE_EXTERN_C_FUNCTION(sc_syntax_wrap, TYPE_Any, TYPE_Anchor, TYPE_Any, TYPE_Bool);
     DEFINE_EXTERN_C_FUNCTION(sc_syntax_strip, TYPE_Any, TYPE_Any);
@@ -1555,14 +1572,14 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_label_get_arguments, TYPE_List, TYPE_Label);
     DEFINE_EXTERN_C_FUNCTION(sc_label_set_arguments, TYPE_Void, TYPE_Label, TYPE_List);
     DEFINE_EXTERN_C_FUNCTION(sc_label_get_keyed, TYPE_List, TYPE_Label);
-    DEFINE_EXTERN_C_FUNCTION(sc_label_set_keyed, TYPE_Bool, TYPE_Label, TYPE_List);
+    DEFINE_EXTERN_C_FUNCTION(sc_label_set_keyed, raising(), TYPE_Label, TYPE_List);
     DEFINE_EXTERN_C_FUNCTION(sc_label_get_parameters, TYPE_List, TYPE_Label);
     DEFINE_EXTERN_C_FUNCTION(sc_label_new_cont, TYPE_Label);
     DEFINE_EXTERN_C_FUNCTION(sc_label_new_cont_template, TYPE_Label);
     DEFINE_EXTERN_C_FUNCTION(sc_label_new_function_template, TYPE_Label);
     DEFINE_EXTERN_C_FUNCTION(sc_label_new_inline_template, TYPE_Label);
     DEFINE_EXTERN_C_FUNCTION(sc_label_set_complete, TYPE_Void, TYPE_Label);
-    DEFINE_EXTERN_C_FUNCTION(sc_label_append_parameter, TYPE_Bool, TYPE_Label, TYPE_Parameter);
+    DEFINE_EXTERN_C_FUNCTION(sc_label_append_parameter, raising(), TYPE_Label, TYPE_Parameter);
     DEFINE_EXTERN_C_FUNCTION(sc_label_function_type, TYPE_Type, TYPE_Label);
     DEFINE_EXTERN_C_FUNCTION(sc_label_set_rawcall, TYPE_Void, TYPE_Label);
     DEFINE_EXTERN_C_FUNCTION(sc_label_frame, TYPE_Frame, TYPE_Label);

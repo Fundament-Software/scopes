@@ -19,8 +19,6 @@ namespace scopes {
 enum {
     // takes variable number of arguments
     FF_Variadic = (1 << 0),
-    // never returns
-    FF_Divergent = (1 << 2),
 };
 
 struct FunctionType : Type {
@@ -32,7 +30,6 @@ struct FunctionType : Type {
     void stream_name(StyledStream &ss) const;
 
     bool vararg() const;
-    bool divergent() const;
 
     SCOPES_RESULT(const Type *) type_at_index(size_t i) const;
 

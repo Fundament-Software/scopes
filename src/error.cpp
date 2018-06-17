@@ -80,9 +80,18 @@ void print_error(const Any &value) {
     }
 }
 
-void set_last_location_error(const String *msg) {
+Any make_location_error(const String *msg) {
     const Error *exc = new Error(_active_anchor, msg);
-    set_last_error(exc);
+    return exc;
+}
+
+Any make_runtime_error(const String *msg) {
+    const Error *exc = new Error(nullptr, msg);
+    return exc;
+}
+
+void set_last_location_error(const String *msg) {
+    set_last_error(make_location_error(msg));
 }
 
 } // namespace scopes

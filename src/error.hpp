@@ -40,6 +40,8 @@ Any get_last_error();
 void print_error(const Any &value);
 
 void set_last_location_error(const String *msg);
+Any make_location_error(const String *msg);
+Any make_runtime_error(const String *msg);
 
 #if SCOPES_EARLY_ABORT
 #define SCOPES_LOCATION_ERROR(MSG) \

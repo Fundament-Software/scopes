@@ -182,6 +182,7 @@ struct Expander {
 
         Scope *subenv = Scope::from(env);
         subenv->bind(Symbol(SYM_SyntaxScope), scopeparam);
+        subenv->bind(KW_Return, retparam);
 
         Expander subexpr(func, subenv);
 
@@ -767,7 +768,7 @@ struct Expander {
         return true;
     }
 
-    SCOPES_RESULT(Any) expand_call(const List *it, const Any &dest, bool rawcall = false) {
+    SCOPES_RESULT(Any) expand_call(const List *it, const Any &dest, uint64_t flags = 0) {
         SCOPES_RESULT_TYPE(Any);
         if (it == EOL)
             return write_dest(dest, it);
@@ -811,7 +812,7 @@ struct Expander {
 
         state = subexp.state;
         set_active_anchor(_anchor);
-        SCOPES_CHECK_RESULT(br(enter, args, rawcall?LBF_RawCall:0));
+        SCOPES_CHECK_RESULT(br(enter, args, flags));
         state = nextstate;
         return result;
     }
@@ -874,12 +875,19 @@ struct Expander {
                 case KW_Defer: return expand_defer(list, dest);
                 case KW_Do: return expand_do(list, dest, true);
                 case KW_DoIn: return expand_do(list, dest, false);
+                case KW_TryCall:
                 case KW_RawCall:
                 case KW_Call: {
                     SCOPES_CHECK_RESULT(verify_list_parameter_count(list, 1, -1));
                     list = list->next;
                     assert(list != EOL);
-                    return expand_call(list, dest, func.value() == KW_RawCall);
+                    uint64_t flags = 0;
+                    switch(func.value()) {
+                    case KW_RawCall: flags |= LBF_RawCall; break;
+                    case KW_TryCall: flags |= LBF_TryCall; break;
+                    default: break;
+                    }
+                    return expand_call(list, dest, flags);
                 } break;
                 default: break;
                 }

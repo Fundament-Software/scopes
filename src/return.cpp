@@ -14,6 +14,28 @@
 
 namespace scopes {
 
+namespace ReturnLabelSet {
+    struct Hash {
+        std::size_t operator()(const ReturnLabelType *s) const {
+            std::size_t h = std::hash<uint64_t>{}(s->flags);
+            for (auto &&arg : s->values) {
+                h = hash2(h, arg.hash());
+            }
+            return h;
+        }
+    };
+
+    struct KeyEqual {
+        bool operator()( const ReturnLabelType *lhs, const ReturnLabelType *rhs ) const {
+            return (lhs->flags == rhs->flags)
+                && (lhs->values == rhs->values);
+        }
+    };
+} // namespace ReturnLabelSet
+
+static std::unordered_set<const ReturnLabelType *, ReturnLabelSet::Hash, ReturnLabelSet::KeyEqual> return_labels;
+
+
 //------------------------------------------------------------------------------
 // RETURN LABEL TYPE
 //------------------------------------------------------------------------------
@@ -22,8 +44,12 @@ bool ReturnLabelType::classof(const Type *T) {
     return T->kind() == TK_ReturnLabel;
 }
 
+bool ReturnLabelType::is_raising() const {
+    return flags & RLF_Raising;
+}
+
 bool ReturnLabelType::is_returning() const {
-    return mode != RLM_NoReturn;
+    return !(flags & RLF_NoReturn);
 }
 
 const Type *ReturnLabelType::to_unconst() const {
@@ -41,12 +67,27 @@ const Type *ReturnLabelType::to_unconst() const {
                     unknown_of(values[i].value.type)));
         }
     }
-    return ReturnLabel(rvalues);
+    return ReturnLabel(rvalues, flags);
+}
+
+const Type *ReturnLabelType::to_trycall() const {
+    if (!is_raising())
+        return this;
+    if (return_type == TYPE_Void) {
+        return ReturnLabel({unknown_of(TYPE_Bool)}, flags & ~RLF_Raising);
+    } else {
+        return ReturnLabel({unknown_of(TYPE_Bool), unknown_of(return_type)}, flags & ~RLF_Raising);
+    }
+}
+
+const Type *ReturnLabelType::to_raising() const {
+    if (is_raising())
+        return this;
+    return ReturnLabel(values, flags | RLF_Raising);
 }
 
 void ReturnLabelType::stream_name(StyledStream &ss) const {
-    switch(mode) {
-    case RLM_Return: {
+    if (is_returning()) {
         ss << "λ(";
         for (size_t i = 0; i < values.size(); ++i) {
             if (i > 0) {
@@ -63,23 +104,22 @@ void ReturnLabelType::stream_name(StyledStream &ss) const {
             }
         }
         ss << ")";
-    } break;
-    case RLM_NoReturn: {
+    } else {
         ss << "λ<noreturn>";
-    } break;
-    default: assert(false);
+    }
+    if (is_raising()) {
+        ss << "!";
     }
 }
 
-ReturnLabelType::ReturnLabelType(ReturnLabelMode _mode, const Args &_values)
+ReturnLabelType::ReturnLabelType(const Args &_values, uint64_t _flags)
     : Type(TK_ReturnLabel) {
     values = _values;
-    mode = _mode;
+    flags = _flags;
 
     has_const = false;
     has_vars = false;
-    switch(mode) {
-    case RLM_Return: {
+    if (is_returning()) {
         for (size_t i = 0; i < values.size(); ++i) {
             if (is_unknown(values[i].value)) {
                 has_vars = true;
@@ -108,14 +148,20 @@ ReturnLabelType::ReturnLabelType(ReturnLabelMode _mode, const Args &_values)
                 return_type = TYPE_Void;
                 has_mrv = false;
             }
+            if (is_raising()) {
+                if (return_type == TYPE_Void) {
+                    ll_return_type = TYPE_Bool;
+                } else {
+                    ll_return_type = Tuple({TYPE_Bool, return_type}).assert_ok();
+                }
+            } else {
+                ll_return_type = return_type;
+            }
         }
-    } break;
-    case RLM_NoReturn: {
+    } else {
         return_type = TYPE_Void;
+        ll_return_type = return_type;
         has_mrv = false;
-    } break;
-    default:
-        assert(false);
     }
 }
 
@@ -133,27 +179,11 @@ bool ReturnLabelType::has_multiple_return_values() const {
 
 //------------------------------------------------------------------------------
 
-const Type *ReturnLabel(ReturnLabelMode mode, const Args &values) {
-    struct Equal {
-        bool operator()( const ReturnLabelType *lhs, const ReturnLabelType *rhs ) const {
-            return (lhs->mode == rhs->mode)
-                && (lhs->values == rhs->values);
-        }
-    };
-
-    struct Hash {
-        std::size_t operator()(const ReturnLabelType *s) const {
-            std::size_t h = std::hash<int32_t>{}((int32_t)s->mode);
-            for (auto &&arg : s->values) {
-                h = hash2(h, arg.hash());
-            }
-            return h;
-        }
-    };
-
-    typedef std::unordered_set<ReturnLabelType *, Hash, Equal> ArgMap;
-
-    static ArgMap map;
+const Type *ReturnLabel(const Args &values, uint64_t flags) {
+    ReturnLabelType key(values, flags);
+    auto it = return_labels.find(&key);
+    if (it != return_labels.end())
+        return *it;
 
 #ifdef SCOPES_DEBUG
     for (size_t i = 0; i < values.size(); ++i) {
@@ -162,24 +192,13 @@ const Type *ReturnLabel(ReturnLabelMode mode, const Args &values) {
     }
 #endif
 
-    ReturnLabelType key(mode, values);
-
-    typename ArgMap::iterator it = map.find(&key);
-    if (it == map.end()) {
-        ReturnLabelType *t = new ReturnLabelType(mode, values);
-        map.insert(t);
-        return t;
-    } else {
-        return *it;
-    }
+    auto result = new ReturnLabelType(values, flags);
+    return_labels.insert(result);
+    return result;
 }
 
-const Type *ReturnLabel(const Args &values) {
-    return ReturnLabel(RLM_Return, values);
-}
-
-const Type *NoReturnLabel() {
-    return ReturnLabel(RLM_NoReturn, {});
+const Type *NoReturnLabel(uint64_t flags) {
+    return ReturnLabel({}, flags | RLF_NoReturn);
 }
 
 } // namespace scopes

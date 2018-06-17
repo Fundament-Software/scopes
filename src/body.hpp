@@ -17,8 +17,9 @@ struct Label;
 
 enum LabelBodyFlags {
     LBF_RawCall = (1 << 0),
-    LBF_Complete = (1 << 1),
-    LBF_Optimized = (1 << 2),
+    LBF_TryCall = (1 << 1),
+    LBF_Complete = (1 << 2),
+    LBF_Optimized = (1 << 3),
 };
 
 struct Body {
@@ -42,8 +43,10 @@ struct Body {
     void unset_optimized();
 
     bool is_rawcall();
-
     void set_rawcall(bool enable = true);
+
+    bool is_trycall();
+    void set_trycall(bool enable = true);
 
     void copy_traits_from(const Body &other);
 };

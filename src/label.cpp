@@ -28,6 +28,20 @@ Label::Label(const Anchor *_anchor, Symbol _name, uint64_t _flags) :
     paired(nullptr), flags(_flags)
     {}
 
+void Label::set_raising() {
+    assert(!is_basic_block_like());
+    auto rparam = params[0];
+    if (rparam->is_typed()) {
+        rparam->type = cast<ReturnLabelType>(rparam->type)->to_raising();
+    } else {
+        flags |= LF_Raising;
+    }
+}
+
+bool Label::is_raising() const {
+    return flags & LF_Raising;
+}
+
 void Label::set_reentrant() {
     flags |= LF_Reentrant;
 }
@@ -301,9 +315,6 @@ const Type *Label::get_function_type() const {
     }
     uint64_t flags = 0;
     assert(params.size());
-    if (!params[0]->is_typed()) {
-        flags |= FF_Divergent;
-    }
     return Function(get_return_type(), argtypes, flags);
 }
 

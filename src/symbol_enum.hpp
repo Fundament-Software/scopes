@@ -19,7 +19,7 @@ namespace scopes {
     T(KW_Call) T(KW_RawCall) T(KW_CCCall) T(SYM_QuoteForm) T(FN_Dump) T(KW_Do) \
     T(FN_FunctionType) T(FN_TupleType) T(FN_UnionType) T(FN_Alloca) T(FN_AllocaOf) T(FN_Malloc) \
     T(FN_AllocaArray) T(FN_MallocArray) T(FN_ReturnLabelType) T(KW_DoIn) T(FN_AllocaExceptionPad) \
-    T(FN_StaticAlloc) \
+    T(FN_StaticAlloc) T(KW_TryCall) \
     T(FN_AnyExtract) T(FN_AnyWrap) T(FN_IsConstant) T(FN_Free) T(KW_Defer) \
     T(OP_ICmpEQ) T(OP_ICmpNE) T(FN_Sample) T(FN_ImageRead) T(FN_ImageWrite) \
     T(FN_ImageQuerySize) T(FN_ImageQueryLod) T(FN_ImageQueryLevels) T(FN_ImageQuerySamples) \
@@ -37,7 +37,7 @@ namespace scopes {
     T(FN_GetElementPtr) T(FN_OffsetOf) T(SFXFN_CompilerError) T(FN_VaCountOf) T(FN_VaAt) \
     T(FN_VaKeys) T(FN_VaKey) T(FN_VaValues) T(FN_CompilerMessage) T(FN_Undef) T(FN_NullOf) T(KW_Let) \
     T(KW_If) T(SFXFN_DelTypeSymbol) T(FN_ExternSymbol) \
-    T(FN_ExternNew) \
+    T(FN_ExternNew) T(SFXFN_Raise) \
     T(SFXFN_Discard) \
     T(FN_TypeAt) T(FN_TypeLocalAt) T(KW_SyntaxExtend) T(FN_Location) T(SFXFN_Unreachable) \
     T(FN_FPTrunc) T(FN_FPExt) T(FN_ScopeOf) \
@@ -254,6 +254,7 @@ namespace scopes {
     T(KW_SyntaxLog, "syntax-log") T(KW_DoIn, "do-in") T(KW_Defer, "__defer") \
     T(KW_Assert, "assert") T(KW_Break, "break") T(KW_Label, "label") \
     T(KW_Call, "call") T(KW_RawCall, "rawcall") T(KW_CCCall, "cc/call") T(KW_Continue, "continue") \
+    T(KW_TryCall, "trycall") \
     T(KW_Define, "define") T(KW_Do, "do") T(KW_DumpSyntax, "dump-syntax") \
     T(KW_Else, "else") T(KW_ElseIf, "elseif") T(KW_EmptyList, "empty-list") \
     T(KW_EmptyTuple, "empty-tuple") T(KW_Escape, "escape") \
@@ -262,7 +263,7 @@ namespace scopes {
     T(KW_If, "if") T(KW_In, "in") T(KW_Let, "let") T(KW_Loop, "loop") \
     T(KW_LoopFor, "loop-for") T(KW_None, "none") T(KW_Null, "null") \
     T(KW_QQuoteSyntax, "qquote-syntax") T(KW_Quote, "quote") T(KW_Inline, "inline") \
-    T(KW_QuoteSyntax, "quote-syntax") T(KW_Raise, "raise") T(KW_Recur, "recur") \
+    T(KW_QuoteSyntax, "quote-syntax") T(KW_Recur, "recur") \
     T(KW_Return, "return") T(KW_Splice, "splice") \
     T(KW_SyntaxExtend, "syntax-extend") T(KW_True, "true") T(KW_Try, "try") \
     T(KW_Unquote, "unquote") T(KW_UnquoteSplice, "unquote-splice") T(KW_ListEmpty, "eol") \

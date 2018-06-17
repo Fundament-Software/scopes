@@ -163,6 +163,8 @@ void sc_set_last_error(sc_any_t err);
 void sc_set_last_runtime_error(const sc_string_t *msg);
 void sc_set_last_location_error(const sc_string_t *msg);
 sc_any_t sc_get_last_error();
+sc_any_t sc_location_error_new(const sc_string_t *msg);
+sc_any_t sc_runtime_error_new(const sc_string_t *msg);
 void sc_set_signal_abort(bool value);
 void sc_abort();
 void sc_exit(int c);
@@ -309,6 +311,7 @@ sc_bool_type_tuple_t sc_tuple_type(int numtypes, const sc_type_t **types);
 bool sc_function_type_is_variadic(const sc_type_t *T);
 const sc_type_t *sc_function_type(const sc_type_t *return_type,
     int numtypes, const sc_type_t **typeargs);
+const sc_type_t *sc_function_type_raising(const sc_type_t *T);
 
 // image types
 
