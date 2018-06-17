@@ -1011,17 +1011,15 @@ struct LLVMIRGenerator {
     }
 
     struct ReturnTraits {
-        bool multiple_return_values;
         bool terminated;
         const ReturnLabelType *rtype;
 
         ReturnTraits() :
-            multiple_return_values(false),
             terminated(false),
             rtype(nullptr) {}
     };
 
-    SCOPES_RESULT(LLVMValueRef) build_call(const Type *functype, LLVMValueRef func, Args &args,
+    SCOPES_RESULT(LLVMValueRef) build_call(bool trycall, const Type *functype, LLVMValueRef func, Args &args,
         ReturnTraits &traits) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         size_t argcount = args.size() - 1;
@@ -1063,8 +1061,10 @@ struct LLVMIRGenerator {
             LLVMAddCallSiteAttribute(ret, i, attr_nonnull);
         }
         auto rlt = cast<ReturnLabelType>(fi->return_type);
+        if (rlt->is_raising() && trycall) {
+            rlt = cast<ReturnLabelType>(rlt->to_trycall());
+        }
         traits.rtype = rlt;
-        traits.multiple_return_values = rlt->has_multiple_return_values();
         LLVMValueRef ok = nullptr;
         if (use_sret) {
             LLVMAddCallSiteAttribute(ret, 1, attr_sret);
@@ -1092,17 +1092,14 @@ struct LLVMIRGenerator {
                 ok = ret;
             }
             ret = nullptr;
-        } else {
-            if (rlt->is_raising()) {
-                ok = LLVMBuildExtractValue(builder, ret, 0, "");
-            }
+        } else if (rlt->is_raising()) {
+            ok = LLVMBuildExtractValue(builder, ret, 0, "");
         }
         if (ok) {
             auto old_bb = LLVMGetInsertBlock(builder);
             LLVMValueRef parentfunc = LLVMGetBasicBlockParent(old_bb);
             auto it = func_fail_label.find(parentfunc);
             if (it == func_fail_label.end()) {
-                //LLVMDumpModule(module);
                 SCOPES_LOCATION_ERROR(String::from("IL -> IR: illegal call of raising function inside non-raising function"));
             }
             auto bbcont = LLVMAppendBasicBlock(parentfunc, "");
@@ -1262,6 +1259,7 @@ struct LLVMIRGenerator {
         assert(args[argn].value.type == TYPE_Type); \
         LLVMTypeRef NAME = SCOPES_GET_RESULT(type_to_llvm_type(args[argn++].value.typeref));
 
+        bool trycall = label->body.is_trycall();
         Any contarg = args[0].value;
         LLVMValueRef retvalue = nullptr;
         ReturnTraits rtraits;
@@ -1717,7 +1715,7 @@ struct LLVMIRGenerator {
                 if (use_debug_info) {
                     LLVMSetCurrentDebugLocation(builder, diloc);
                 }
-                retvalue = SCOPES_GET_RESULT(build_call(
+                retvalue = SCOPES_GET_RESULT(build_call(trycall,
                     enter.label->get_function_type(),
                     value, args, rtraits));
             }
@@ -1726,7 +1724,7 @@ struct LLVMIRGenerator {
             ss.out << "IL->IR: invalid call of compile time closure at runtime";
             SCOPES_LOCATION_ERROR(ss.str());
         } else if (is_function_pointer(enter.indirect_type())) {
-            retvalue = SCOPES_GET_RESULT(build_call(extract_function_type(enter.indirect_type()),
+            retvalue = SCOPES_GET_RESULT(build_call(trycall, extract_function_type(enter.indirect_type()),
                 SCOPES_GET_RESULT(argument_to_value(enter)), args, rtraits));
         } else if (enter.type == TYPE_Parameter) {
             assert (enter.parameter->type != TYPE_Nothing);
@@ -1793,8 +1791,7 @@ struct LLVMIRGenerator {
                     LLVMBasicBlockRef incobbs[] = { bbfrom };
 
 #define UNPACK_RET_ARGS() \
-    if (rtraits.multiple_return_values) { \
-        assert(rtraits.rtype); \
+    if (rtraits.rtype && rtraits.rtype->has_multiple_return_values()) { \
         auto &&values = rtraits.rtype->values; \
         auto &&params = contarg.label->params; \
         size_t pi = 1; \

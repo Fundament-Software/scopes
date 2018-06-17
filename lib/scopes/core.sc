@@ -963,14 +963,14 @@ syntax-extend
             let f = (unbox-pointer anyf DispatchCastFunctionType)
             let ok f = (trycall f vT T)
             if ok
-                return f ok false
+                return true f false
         let ok anyf = ('@ T rsymbol)
         if ok
             let f = (unbox-pointer anyf DispatchCastFunctionType)
             let ok f = (trycall f T vT)
             if ok
-                return f ok true
-        return (Any-wrap none) false false
+                return true f true
+        return false (Any-wrap none) false
 
     fn implyfn (vT T)
         get-cast-dispatcher '__imply '__rimply vT T
@@ -985,7 +985,7 @@ syntax-extend
                 let vT = ('indirect-typeof value)
                 let T = (unbox-pointer anyT type)
                 if (ptrcmp!= vT T)
-                    let f ok reverse = (implyfn vT T)
+                    let ok f reverse = (implyfn vT T)
                     if ok
                         'set-enter l f
                         if reverse ('set-arguments l (make-list cont anyT value))
@@ -1004,11 +1004,11 @@ syntax-extend
                 let vT = ('indirect-typeof value)
                 let T = (unbox-pointer anyT type)
                 if (ptrcmp!= vT T)
-                    let f ok reverse =
+                    let ok f reverse =
                         do
                             # try implicit cast first
-                            let f ok reverse = (implyfn vT T)
-                            if ok (_ f ok reverse)
+                            let ok f reverse = (implyfn vT T)
+                            if ok (_ ok f reverse)
                             else
                                 # then try explicit cast
                                 asfn vT T
@@ -1059,23 +1059,23 @@ syntax-extend
         let lhsT = ('indirect-typeof lhs)
         let rhsT = ('indirect-typeof rhs)
         # try direct version first
-        let f ok = (get-binary-op-dispatcher symbol lhsT rhsT)
+        let ok f = (trycall get-binary-op-dispatcher symbol lhsT rhsT)
         if ok
             'set-enter l f
             return;
         # if types are unequal, we can try other options
         if (ptrcmp!= lhsT rhsT)
             # try reverse version next
-            let f ok = (get-binary-op-dispatcher rsymbol rhsT lhsT)
+            let ok f = (trycall get-binary-op-dispatcher rsymbol rhsT lhsT)
             if ok
                 'return l rhs lhs
                 'set-enter l f
                 return;
             # can the operation be performed on the lhs type?
-            let f ok = (get-binary-op-dispatcher symbol lhsT lhsT)
+            let ok f = (trycall get-binary-op-dispatcher symbol lhsT lhsT)
             if ok
                 # can we cast rhsT to lhsT?
-                let castf ok = (implyfn rhsT lhsT)
+                let ok castf = (implyfn rhsT lhsT)
                 if ok
                     let lcont param =
                         binary-op-label-cast-then-macro l f castf lhsT rhs
@@ -1083,10 +1083,10 @@ syntax-extend
                         list cont lhs (box-pointer param)
                     return;
             # can the operation be performed on the rhs type?
-            let f ok = (get-binary-op-dispatcher symbol rhsT rhsT)
+            let ok f = (trycall get-binary-op-dispatcher symbol rhsT rhsT)
             if ok
                 # can we cast lhsT to rhsT?
-                let castf ok = (implyfn lhsT rhsT)
+                let ok castf = (implyfn lhsT rhsT)
                 if ok
                     let lcont param =
                         binary-op-label-cast-then-macro l f castf rhsT lhs
@@ -1115,7 +1115,7 @@ syntax-extend
                 'set-enter l f
                 return;
             # can we cast rhsT to rtype?
-            let castf ok = (implyfn rhsT rtype)
+            let ok castf = (implyfn rhsT rtype)
             if ok
                 let lcont param =
                     binary-op-label-cast-then-macro l f castf rtype rhs
