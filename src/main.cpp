@@ -318,7 +318,7 @@ int main(int argc, char *argv[]) {
     auto result = try_main(argc, argv);
     if (!result.ok()) {
         print_error(get_last_error());
-        return 1;
+        f_exit(1);
     }
     return result.assert_ok();
 }
