@@ -63,21 +63,34 @@ void location_message(const Anchor *anchor, const String* str) {
     anchor->stream_source_line(cerr);
 }
 
-void print_error(const Any &value) {
-    auto cerr = StyledStream(SCOPES_CERR);
+void stream_error_string(StyledStream &ss, const Any &value) {
+    if (value.type == TYPE_Error) {
+        const Error *exc = value;
+        ss << exc->msg->data;
+    } else {
+        ss << "exception raised: " << value;
+    }
+}
+
+void stream_error(StyledStream &ss, const Any &value) {
     if (value.type == TYPE_Error) {
         const Error *exc = value;
         if (exc->anchor) {
-            cerr << exc->anchor << " ";
+            ss << exc->anchor << " ";
         }
-        cerr << Style_Error << "error:" << Style_None << " "
+        ss << Style_Error << "error:" << Style_None << " "
             << exc->msg->data << std::endl;
         if (exc->anchor) {
-            exc->anchor->stream_source_line(cerr);
+            exc->anchor->stream_source_line(ss);
         }
     } else {
-        cerr << "exception raised: " << value << std::endl;
+        ss << "exception raised: " << value << std::endl;
     }
+}
+
+void print_error(const Any &value) {
+    auto cerr = StyledStream(SCOPES_CERR);
+    stream_error(cerr, value);
 }
 
 Any make_location_error(const String *msg) {

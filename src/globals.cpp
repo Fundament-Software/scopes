@@ -321,6 +321,12 @@ sc_any_t sc_get_last_error() {
     using namespace scopes;
     return get_last_error();
 }
+const sc_string_t *sc_format_error(sc_any_t err) {
+    using namespace scopes;
+    StyledString ss;
+    stream_error_string(ss.out, err);
+    return ss.str();
+}
 
 void sc_set_signal_abort(bool value) {
     using namespace scopes;
@@ -1441,6 +1447,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_location_error_new, TYPE_Any, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_runtime_error_new, TYPE_Any, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_get_last_error, TYPE_Any);
+    DEFINE_EXTERN_C_FUNCTION(sc_format_error, TYPE_String, TYPE_Any);
 
     DEFINE_EXTERN_C_FUNCTION(sc_abort, TYPE_Void);
     DEFINE_EXTERN_C_FUNCTION(sc_exit, TYPE_Void, TYPE_I32);

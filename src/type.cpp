@@ -107,7 +107,7 @@ void stream_type_name(StyledStream &ss, const Type *T) {
     case TYPE: cast<CLASS>(T)->stream_name(ss); break;
 B_TYPE_KIND()
 #undef T
-        default: assert(false);
+        default:
             ss << "???"; break;
     }
 }

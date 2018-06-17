@@ -17,6 +17,7 @@ namespace scopes {
 
 struct String;
 struct Anchor;
+struct StyledStream;
 
 void set_active_anchor(const Anchor *anchor);
 const Anchor *get_active_anchor();
@@ -38,6 +39,8 @@ void set_last_error(const Any &err);
 Any get_last_error();
 
 void print_error(const Any &value);
+void stream_error(StyledStream &ss, const Any &value);
+void stream_error_string(StyledStream &ss, const Any &value);
 
 void set_last_location_error(const String *msg);
 Any make_location_error(const String *msg);

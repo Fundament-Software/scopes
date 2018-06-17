@@ -160,6 +160,7 @@ void sc_set_globals(sc_scope_t *s);
 // error handling
 
 void sc_set_last_error(sc_any_t err);
+const sc_string_t *sc_format_error(sc_any_t err);
 void sc_set_last_runtime_error(const sc_string_t *msg);
 void sc_set_last_location_error(const sc_string_t *msg);
 sc_any_t sc_get_last_error();

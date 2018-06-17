@@ -63,7 +63,7 @@ struct Expander {
         next(_next),
         list_expander_func_type(nullptr) {
         list_expander_func_type = Pointer(Function(
-            ReturnLabel({unknown_of(TYPE_List), unknown_of(TYPE_Scope)}),
+            ReturnLabel({unknown_of(TYPE_List), unknown_of(TYPE_Scope)}, RLF_Raising),
             {TYPE_List, TYPE_Scope}), PTF_NonWritable, SYM_Unnamed);
     }
 
@@ -903,9 +903,14 @@ struct Expander {
                     SCOPES_LOCATION_ERROR(ss.str());
                 }
                 struct ListScopePair { const List *topit; Scope *env; };
-                typedef ListScopePair (*HandlerFuncType)(const List *, Scope *);
+                struct OKListScopePair { bool ok; ListScopePair pair; };
+                typedef OKListScopePair (*HandlerFuncType)(const List *, Scope *);
                 HandlerFuncType f = (HandlerFuncType)list_handler.pointer;
-                auto result = f(List::from(sx, next), env);
+                auto ok_result = f(List::from(sx, next), env);
+                if (!ok_result.ok) {
+                    SCOPES_RETURN_ERROR();
+                }
+                auto result = ok_result.pair;
                 const Syntax *newsx = result.topit->at;
                 if (newsx != sx) {
                     sx = newsx;

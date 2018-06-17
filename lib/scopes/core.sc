@@ -43,6 +43,7 @@ let set-error! = sc_set_last_error
 let set-location-error! = sc_set_last_location_error
 let set-runtime-error! = sc_set_last_runtime_error
 let get-error = sc_get_last_error
+let format-error = sc_format_error
 let CompileError = sc_location_error_new
 let RuntimeError = sc_runtime_error_new
 let exit = sc_exit
@@ -817,6 +818,9 @@ let rawstring = ('pointer i8)
 inline box-cast-dispatch (f)
     box-pointer (unconst (typify f type type))
 
+inline not (value)
+    bxor value true
+
 inline Syntax-unbox
 
 syntax-extend
@@ -863,17 +867,17 @@ syntax-extend
         let storageT = ('storage T)
         let kind = ('kind storageT)
         if (icmp== kind type-kind-pointer)
-            return (box-pointer unbox-pointer) true
+            return (box-pointer unbox-pointer)
         elseif (icmp== kind type-kind-integer)
-            return (box-pointer unbox-integer) true
+            return (box-pointer unbox-integer)
         elseif (icmp== kind type-kind-real)
             if (ptrcmp== storageT f32)
-                return (box-pointer unbox-u32) true
+                return (box-pointer unbox-u32)
             elseif (ptrcmp== storageT f64)
-                return (box-pointer unbox-bitcast) true
+                return (box-pointer unbox-bitcast)
         elseif (bor (icmp== kind type-kind-tuple) (icmp== kind type-kind-array))
-            return (box-pointer unbox-hidden-pointer) true
-        return (Any-wrap none) false
+            return (box-pointer unbox-hidden-pointer)
+        raise-compile-error! "unsupported type"
 
     inline Any-rimply (cls value)
         Any value
@@ -898,13 +902,13 @@ syntax-extend
             # must have same signed bit
             if (icmp== ('signed? vT) ('signed? T))
                 if (icmp== destw valw)
-                    return (box-symbol bitcast) true
+                    return (box-symbol bitcast)
                 elseif (icmp>s destw valw)
                     if ('signed? vT)
-                        return (box-symbol sext) true
+                        return (box-symbol sext)
                     else
-                        return (box-symbol zext) true
-        return (Any-wrap none) false
+                        return (box-symbol zext)
+        raise-compile-error! "unsupported type"
 
     fn integer-as (vT T)
         let T =
@@ -914,28 +918,28 @@ syntax-extend
             let valw = ('bitcount vT)
             let destw = ('bitcount T)
             if (icmp== destw valw)
-                return (box-symbol bitcast) true
+                return (box-symbol bitcast)
             elseif (icmp>s destw valw)
                 if ('signed? vT)
-                    return (box-symbol sext) true
+                    return (box-symbol sext)
                 else
-                    return (box-symbol zext) true
+                    return (box-symbol zext)
             else
-                return (box-symbol itrunc) true
+                return (box-symbol itrunc)
         elseif (icmp== ('kind T) type-kind-real)
             if ('signed? vT)
-                return (box-symbol sitofp) true
+                return (box-symbol sitofp)
             else
-                return (box-symbol uitofp) true
-        return (Any-wrap none) false
+                return (box-symbol uitofp)
+        raise-compile-error! "unsupported type"
 
     inline box-binary-op-dispatch (f)
         box-pointer (unconst (typify f type type))
     inline single-binary-op-dispatch (destf)
         fn (lhsT rhsT)
             if (ptrcmp== lhsT rhsT)
-                return (Any-wrap destf) true
-            return (Any-wrap none) false
+                return (Any-wrap destf)
+            raise-compile-error! "unsupported type"
 
     inline gen-cast-error (intro-string)
         label-macro
@@ -957,16 +961,32 @@ syntax-extend
     let DispatchCastFunctionType =
         'pointer ('raising (function Any type type))
 
+    fn unbox-dispatch-cast-function-type (anyf)
+        unbox-pointer anyf DispatchCastFunctionType
+
+    fn attribute-format-error! (T symbol err)
+        raise-compile-error!
+            'join "wrong format for attribute "
+                'join ('__repr (box-symbol symbol))
+                    'join " of type "
+                        'join ('__repr (box-pointer T))
+                            'join ": "
+                                format-error err
+
     fn get-cast-dispatcher (symbol rsymbol vT T)
         let ok anyf = ('@ vT symbol)
         if ok
-            let f = (unbox-pointer anyf DispatchCastFunctionType)
+            let ok f = (trycall unbox-dispatch-cast-function-type anyf)
+            if (not ok)
+                attribute-format-error! vT symbol (get-error)
             let ok f = (trycall f vT T)
             if ok
                 return true f false
         let ok anyf = ('@ T rsymbol)
         if ok
-            let f = (unbox-pointer anyf DispatchCastFunctionType)
+            let ok f = (trycall unbox-dispatch-cast-function-type anyf)
+            if (not ok)
+                attribute-format-error! vT symbol (get-error)
             let ok f = (trycall f T vT)
             if ok
                 return true f true
@@ -1028,13 +1048,17 @@ syntax-extend
     let BinaryOpFunctionType =
         'pointer ('raising (function Any type type))
 
+    fn unbox-binary-op-function-type (anyf)
+        unbox-pointer anyf BinaryOpFunctionType
+
     fn get-binary-op-dispatcher (symbol lhsT rhsT)
         let ok anyf = ('@ lhsT symbol)
         if ok
-            let f = (unbox-pointer anyf BinaryOpFunctionType)
-            return (f lhsT rhsT)
-        else
-            raise-compile-error! "no binary op dispatcher available"
+            let ok f = (trycall unbox-binary-op-function-type anyf)
+            if (not ok)
+                attribute-format-error! lhsT symbol (get-error)
+            return (trycall f lhsT rhsT)
+        return false (undef Any)
 
     fn binary-op-label-cast-then-macro (l f castf lhsT rhs)
         # next label
@@ -1059,20 +1083,20 @@ syntax-extend
         let lhsT = ('indirect-typeof lhs)
         let rhsT = ('indirect-typeof rhs)
         # try direct version first
-        let ok f = (trycall get-binary-op-dispatcher symbol lhsT rhsT)
+        let ok f = (get-binary-op-dispatcher symbol lhsT rhsT)
         if ok
             'set-enter l f
             return;
         # if types are unequal, we can try other options
         if (ptrcmp!= lhsT rhsT)
             # try reverse version next
-            let ok f = (trycall get-binary-op-dispatcher rsymbol rhsT lhsT)
+            let ok f = (get-binary-op-dispatcher rsymbol rhsT lhsT)
             if ok
                 'return l rhs lhs
                 'set-enter l f
                 return;
             # can the operation be performed on the lhs type?
-            let ok f = (trycall get-binary-op-dispatcher symbol lhsT lhsT)
+            let ok f = (get-binary-op-dispatcher symbol lhsT lhsT)
             if ok
                 # can we cast rhsT to lhsT?
                 let ok castf = (implyfn rhsT lhsT)
@@ -1083,7 +1107,7 @@ syntax-extend
                         list cont lhs (box-pointer param)
                     return;
             # can the operation be performed on the rhs type?
-            let ok f = (trycall get-binary-op-dispatcher symbol rhsT rhsT)
+            let ok f = (get-binary-op-dispatcher symbol rhsT rhsT)
             if ok
                 # can we cast lhsT to rhsT?
                 let ok castf = (implyfn lhsT rhsT)
@@ -1172,8 +1196,8 @@ syntax-extend
             box-cast-dispatch
                 fn "syntax-imply" (vT T)
                     if (ptrcmp== T string)
-                        return (Any-wrap symbol-imply) true
-                    return (Any-wrap none) true
+                        return (Any-wrap symbol-imply)
+                    raise-compile-error! "unsupported type"
 
     fn string@ (self i)
         let s = (sc_string_buffer self)
@@ -1201,10 +1225,10 @@ syntax-extend
         fn (lhsT rhsT)
             if (ptrcmp== lhsT rhsT)
                 if ('signed? lhsT)
-                    return (Any-wrap sf) true
+                    return (Any-wrap sf)
                 else
-                    return (Any-wrap uf) true
-            return (Any-wrap none) false
+                    return (Any-wrap uf)
+            raise-compile-error! "unsupported type"
 
     fn dispatch-and-or (l flip)
         let args = ('verify-argument-count l 2 2)
@@ -1315,9 +1339,12 @@ syntax-extend
             box-cast-dispatch
                 fn "syntax-imply" (vT T)
                     if (ptrcmp== T Any)
-                        return (box-pointer Syntax-datum) true
+                        return (box-pointer Syntax-datum)
+                    elseif false
+                        # force function to become raising
+                        raise-compile-error! "unsupported type"
                     else
-                        return (box-pointer Syntax-unbox) true
+                        return (box-pointer Syntax-unbox)
 
     'set-symbols syntax-scope
         and-branch = (box-label-macro (fn (l) (dispatch-and-or l true)))
@@ -1580,7 +1607,7 @@ syntax-extend
         if (== ('typeof sym) Symbol)
             getattr env (get-ifx-symbol (as sym Symbol))
         else
-            return (Any none) false
+            return false (Any none)
 
     fn has-infix-ops? (infix-table expr)
         # any expression of which one odd argument matches an infix operator
@@ -1590,7 +1617,7 @@ syntax-extend
             return false
         let __ expr = ('decons expr)
         let at next = ('decons expr)
-        let result ok = (get-ifx-op infix-table at)
+        let ok result = (get-ifx-op infix-table at)
         if ok
             return true
         loop expr
@@ -1607,7 +1634,7 @@ syntax-extend
 
     inline infix-op (pred)
         fn infix-op (infix-table token prec)
-            let op ok =
+            let ok op =
                 get-ifx-op infix-table token
             if ok
                 let op-prec = (unpack-infix-op op)
@@ -1620,7 +1647,7 @@ syntax-extend
     let infix-op-ge = (infix-op >=)
 
     fn rtl-infix-op-eq (infix-table token prec)
-        let op ok =
+        let ok op =
             get-ifx-op infix-table token
         if ok
             let op-prec op-order = (unpack-infix-op op)
@@ -1676,13 +1703,13 @@ syntax-extend
         let head-key = ('datum (as expr-at Syntax))
         let head =
             if (== ('typeof head-key) Symbol)
-                let head success = (getattr env (as head-key Symbol))
-                if success head
+                let ok head = (getattr env (as head-key Symbol))
+                if ok head
                 else head-key
             else head-key
         let head =
             if (== ('typeof head) type)
-                let attr ok = (getattr (as head type) '__macro)
+                let ok attr = (getattr (as head type) '__macro)
                 if ok attr
                 else head
             else head
@@ -2129,8 +2156,9 @@ fn run-main ()
             Scope (globals)
         'set-symbol scope
             script-launch-args =
-                fn ()
-                    return sourcepath args
+                Any
+                    fn ()
+                        return sourcepath args
         #load-module "" sourcepath
             scope = scope
             main-module? = true
