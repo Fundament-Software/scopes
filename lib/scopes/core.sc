@@ -1099,24 +1099,26 @@ syntax-extend
             let ok f = (get-binary-op-dispatcher symbol lhsT lhsT)
             if ok
                 # can we cast rhsT to lhsT?
-                let ok castf = (implyfn rhsT lhsT)
+                let ok castf reverse = (implyfn rhsT lhsT)
                 if ok
-                    let lcont param =
-                        binary-op-label-cast-then-macro l f castf lhsT rhs
-                    'set-arguments lcont
-                        list cont lhs (box-pointer param)
-                    return;
+                    if (not reverse)
+                        let lcont param =
+                            binary-op-label-cast-then-macro l f castf lhsT rhs
+                        'set-arguments lcont
+                            list cont lhs (box-pointer param)
+                        return;
             # can the operation be performed on the rhs type?
             let ok f = (get-binary-op-dispatcher symbol rhsT rhsT)
             if ok
                 # can we cast lhsT to rhsT?
-                let ok castf = (implyfn lhsT rhsT)
+                let ok castf reverse = (implyfn lhsT rhsT)
                 if ok
-                    let lcont param =
-                        binary-op-label-cast-then-macro l f castf rhsT lhs
-                    'set-arguments lcont
-                        list cont (box-pointer param) rhs
-                    return;
+                    if (not reverse)
+                        let lcont param =
+                            binary-op-label-cast-then-macro l f castf rhsT lhs
+                        'set-arguments lcont
+                            list cont (box-pointer param) rhs
+                        return;
         # we give up
         raise-compile-error!
             'join "can't "
@@ -1139,13 +1141,14 @@ syntax-extend
                 'set-enter l f
                 return;
             # can we cast rhsT to rtype?
-            let ok castf = (implyfn rhsT rtype)
+            let ok castf reverse = (implyfn rhsT rtype)
             if ok
-                let lcont param =
-                    binary-op-label-cast-then-macro l f castf rtype rhs
-                'set-arguments lcont
-                    list cont lhs (box-pointer param)
-                return;
+                if (not reverse)
+                    let lcont param =
+                        binary-op-label-cast-then-macro l f castf rtype rhs
+                    'set-arguments lcont
+                        list cont lhs (box-pointer param)
+                    return;
         # we give up
         raise-compile-error!
             'join "can't "
@@ -1440,7 +1443,7 @@ fn tostring (value)
         inline ()
             f value
         inline ()
-            sc_any_repr (Any value)
+            sc_any_string (Any value)
 
 fn repr (value)
     let T = (typeof value)
@@ -1810,6 +1813,55 @@ syntax-extend
         fn (expr)
             expand-and-or expr f
 
+    fn ltr-multiop (l target)
+        let args = ('verify-argument-count l 2 -1)
+        let cont args = ('decons args)
+        if (== (countof args) 2:usize)
+            'set-enter l target
+        else
+            let frame = ('frame l)
+            let anchor = (active-anchor)
+            # call for multiple args
+            let lhs args = ('decons args)
+            let loop (lhs args l) = lhs args l
+            if (not (empty? args))
+                let rhs args = ('decons args)
+                'set-enter l (Any target)
+                if (empty? args)
+                    'set-arguments l (list cont lhs rhs)
+                else
+                    let nextl = (sc_label_new_cont_template)
+                    let param = (sc_parameter_new anchor unnamed Unknown)
+                    'append-parameter nextl param
+                    'set-arguments l (list (Closure nextl frame) lhs rhs)
+                    loop (Any param) args nextl
+        return;
+
+    fn rtl-multiop (l target)
+        let args = ('verify-argument-count l 2 -1)
+        let cont args = ('decons args)
+        if (== (countof args) 2:usize)
+            'set-enter l target
+        else
+            let frame = ('frame l)
+            let anchor = (active-anchor)
+            # call for multiple args
+            let args = ('reverse args)
+            let rhs args = ('decons args)
+            let loop (rhs args l) = rhs args l
+            if (not (empty? args))
+                let lhs args = ('decons args)
+                'set-enter l (Any target)
+                if (empty? args)
+                    'set-arguments l (list cont lhs rhs)
+                else
+                    let nextl = (sc_label_new_cont_template)
+                    let param = (sc_parameter_new anchor unnamed Unknown)
+                    'append-parameter nextl param
+                    'set-arguments l (list (Closure nextl frame) lhs rhs)
+                    loop (Any param) args nextl
+        return;
+
     # dot macro
     # (. value symbol ...)
     'set-symbols syntax-scope
@@ -1848,6 +1900,9 @@ syntax-extend
         or = (Any (syntax-macro (make-expand-and-or or-branch)))
         define-infix> = (Any (syntax-scope-macro (make-expand-define-infix '>)))
         define-infix< = (Any (syntax-scope-macro (make-expand-define-infix '<)))
+        .. = (box-label-macro (fn (l) (rtl-multiop l (Any ..))))
+        + = (box-label-macro (fn (l) (ltr-multiop l (Any +))))
+        * = (box-label-macro (fn (l) (ltr-multiop l (Any *))))
 
     syntax-scope
 
@@ -1893,7 +1948,8 @@ define-infix> 800 .
 define-infix> 800 @
 
 inline char (s)
-    load (s as rawstring)
+    let s sz = (sc_string_buffer s)
+    load s
 
 #syntax-extend
     'set-symbols syntax-scope
@@ -2116,7 +2172,12 @@ fn print-version ()
     exit 0
     unreachable!;
 
+fn test-compiler-version ()
+    let vmin vmaj vpatch = (compiler-version)
+    return vmin vmaj vpatch
+
 fn run-main ()
+    dump org
     let args = (launch-args)
     let exename args = ('decons args)
     let exename = (exename as string)

@@ -527,15 +527,15 @@ struct LLVMIRGenerator {
         return LLVMStructType(types, sz, false);
     }
 
-    SCOPES_RESULT(LLVMValueRef) abi_import_argument(Parameter *param, LLVMValueRef func, size_t &k) {
+    SCOPES_RESULT(LLVMValueRef) abi_import_argument(const Type *param_type, LLVMValueRef func, size_t &k) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         ABIClass classes[MAX_ABI_CLASSES];
-        size_t sz = abi_classify(param->type, classes);
+        size_t sz = abi_classify(param_type, classes);
         if (!sz) {
             LLVMValueRef val = LLVMGetParam(func, k++);
             return LLVMBuildLoad(builder, val, "");
         }
-        LLVMTypeRef T = SCOPES_GET_RESULT(type_to_llvm_type(param->type));
+        LLVMTypeRef T = SCOPES_GET_RESULT(type_to_llvm_type(param_type));
         auto tk = LLVMGetTypeKind(T);
         if (tk == LLVMStructTypeKind) {
             auto ST = abi_struct_type(classes, sz);
@@ -698,7 +698,18 @@ struct LLVMIRGenerator {
                     LLVMPointerType(SCOPES_GET_RESULT(_type_to_llvm_type(fi->return_type)), 0));
                 rettype = voidT;
             } else {
-                rettype = SCOPES_GET_RESULT(_type_to_llvm_type(fi->return_type));
+                const Type *rtype = fi->return_type;
+                ABIClass classes[MAX_ABI_CLASSES];
+                size_t sz = abi_classify(rtype, classes);
+                LLVMTypeRef T = SCOPES_GET_RESULT(type_to_llvm_type(fi->return_type));
+                rettype = T;
+                if (sz) {
+                    auto tk = LLVMGetTypeKind(T);
+                    if (tk == LLVMStructTypeKind) {
+                        auto ST = abi_struct_type(classes, sz);
+                        if (ST) { rettype = ST; }
+                    }
+                }
             }
             for (size_t i = 0; i < count; ++i) {
                 auto AT = fi->argument_types[i];
@@ -1092,12 +1103,22 @@ struct LLVMIRGenerator {
                 ok = ret;
             }
             ret = nullptr;
-        } else if (rlt->is_raising()) {
-            ok = LLVMBuildExtractValue(builder, ret, 0, "");
+        } else {
+            // check if ABI needs something else and do a bitcast
+            LLVMTypeRef retT = SCOPES_GET_RESULT(type_to_llvm_type(rlt));
+            auto srcT = LLVMTypeOf(ret);
+            if (retT != srcT) {
+                LLVMValueRef dest = safe_alloca(srcT);
+                LLVMBuildStore(builder, ret, dest);
+                ret = LLVMBuildBitCast(builder, dest, LLVMPointerType(retT, 0), "");
+                ret = LLVMBuildLoad(builder, ret, "");
+            }
+            if (rlt->is_raising()) {
+                ok = LLVMBuildExtractValue(builder, ret, 0, "");
+            }
         }
         if (ok) {
-            auto old_bb = LLVMGetInsertBlock(builder);
-            LLVMValueRef parentfunc = LLVMGetBasicBlockParent(old_bb);
+            LLVMValueRef parentfunc = LLVMGetBasicBlockParent(LLVMGetInsertBlock(builder));
             auto it = func_fail_label.find(parentfunc);
             if (it == func_fail_label.end()) {
                 SCOPES_LOCATION_ERROR(String::from("IL -> IR: illegal call of raising function inside non-raising function"));
@@ -1778,6 +1799,16 @@ struct LLVMIRGenerator {
                 LLVMBuildRetVoid(builder);
             } else {
                 if (retvalue) {
+                    // check if ABI needs something else and do a bitcast
+                    LLVMValueRef parentfunc = LLVMGetBasicBlockParent(LLVMGetInsertBlock(builder));
+                    auto retT = LLVMGetReturnType(LLVMGetElementType(LLVMTypeOf(parentfunc)));
+                    auto srcT = LLVMTypeOf(retvalue);
+                    if (retT != srcT) {
+                        LLVMValueRef dest = safe_alloca(srcT);
+                        LLVMBuildStore(builder, retvalue, dest);
+                        retvalue = LLVMBuildBitCast(builder, dest, LLVMPointerType(retT, 0), "");
+                        retvalue = LLVMBuildLoad(builder, retvalue, "");
+                    }
                     LLVMBuildRet(builder, retvalue);
                 } else {
                     LLVMBuildRetVoid(builder);
@@ -2029,7 +2060,7 @@ struct LLVMIRGenerator {
             size_t k = offset;
             for (size_t i = 0; i < paramcount; ++i) {
                 Parameter *param = params[i + 1];
-                LLVMValueRef val = SCOPES_GET_RESULT(abi_import_argument(param, func, k));
+                LLVMValueRef val = SCOPES_GET_RESULT(abi_import_argument(param->type, func, k));
                 bind_parameter(param, val);
             }
 
