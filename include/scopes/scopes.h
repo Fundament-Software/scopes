@@ -57,6 +57,7 @@ namespace scopes {
     struct Closure;
     struct ExceptionPad;
     struct Argument;
+    struct ASTNode;
 }
 
 extern "C" {
@@ -74,6 +75,7 @@ typedef scopes::Label sc_label_t;
 typedef scopes::Frame sc_frame_t;
 typedef scopes::Closure sc_closure_t;
 typedef scopes::ExceptionPad sc_exception_pad_t;
+typedef scopes::ASTNode sc_ast_t;
 
 // some of the return types are technically illegal in C, but we take care
 // that the alignment is correct
@@ -92,6 +94,7 @@ typedef struct sc_label_ sc_label_t;
 typedef struct sc_frame_ sc_frame_t;
 typedef struct sc_closure_ sc_closure_t;
 typedef struct sc_exception_pad_ sc_exception_pad_t;
+typedef struct sc_ast_ sc_ast_t;
 
 typedef uint64_t sc_symbol_t;
 
@@ -113,10 +116,12 @@ typedef struct sc_bool_syntax_tuple_ { bool _0; const sc_syntax_t *_1; } sc_bool
 typedef struct sc_bool_type_tuple_ { bool _0; const sc_type_t *_1; } sc_bool_type_tuple_t;
 typedef struct sc_bool_symbol_tuple_ { bool _0; sc_symbol_t _1; } sc_bool_symbol_tuple_t;
 typedef struct sc_bool_int_tuple_ { bool _0; int32_t _1; } sc_bool_int_tuple_t;
+typedef struct sc_bool_ast_tuple_ { bool _0; sc_ast_t *_1; } sc_bool_ast_tuple_t;
 
 typedef struct sc_any_list_tuple_ { sc_any_t _0; const sc_list_t *_1; } sc_any_list_tuple_t;
 
 typedef struct sc_symbol_any_tuple_ { sc_symbol_t _0; sc_any_t _1; } sc_symbol_any_tuple_t;
+typedef struct sc_symbol_ast_tuple_ { sc_symbol_t _0; sc_ast_t *_1; } sc_symbol_ast_tuple_t;
 
 typedef struct sc_i32_i32_i32_tuple_ { int32_t _0, _1, _2; } sc_i32_i32_i32_tuple_t;
 
@@ -195,8 +200,8 @@ const sc_anchor_t *sc_get_active_anchor();
 // lexical scopes
 
 void sc_scope_set_symbol(sc_scope_t *scope, sc_symbol_t sym, sc_any_t value);
-sc_bool_any_tuple_t sc_scope_at(sc_scope_t *scope, sc_symbol_t key);
-sc_bool_any_tuple_t sc_scope_local_at(sc_scope_t *scope, sc_symbol_t key);
+sc_bool_ast_tuple_t sc_scope_at(sc_scope_t *scope, sc_symbol_t key);
+sc_bool_ast_tuple_t sc_scope_local_at(sc_scope_t *scope, sc_symbol_t key);
 const sc_string_t *sc_scope_get_docstring(sc_scope_t *scope, sc_symbol_t key);
 void sc_scope_set_docstring(sc_scope_t *scope, sc_symbol_t key, const sc_string_t *str);
 sc_scope_t *sc_scope_new();
@@ -205,7 +210,7 @@ sc_scope_t *sc_scope_new_subscope(sc_scope_t *scope);
 sc_scope_t *sc_scope_clone_subscope(sc_scope_t *scope, sc_scope_t *clone);
 sc_scope_t *sc_scope_get_parent(sc_scope_t *scope);
 void sc_scope_del_symbol(sc_scope_t *scope, sc_symbol_t sym);
-sc_symbol_any_tuple_t sc_scope_next(sc_scope_t *scope, sc_symbol_t key);
+sc_symbol_ast_tuple_t sc_scope_next(sc_scope_t *scope, sc_symbol_t key);
 
 // symbols
 

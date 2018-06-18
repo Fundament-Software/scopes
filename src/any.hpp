@@ -33,6 +33,7 @@ struct Frame;
 struct Closure;
 struct String;
 struct Anchor;
+struct ASTNode;
 
 #define SCOPES_RESULT_CAST_OPERATOR(T) \
     operator Result<T>() const; \
@@ -73,6 +74,7 @@ struct Any {
         const Error *error;
         Frame *frame;
         const Closure *closure;
+        ASTNode *astnode;
     };
 
     Any();
@@ -104,6 +106,7 @@ struct Any {
     Any(Scope *x);
     Any(Frame *x);
     Any(const Closure *x);
+    Any(ASTNode *x);
 #if 0
     template<unsigned N>
     Any(const char (&str)[N]) : type(TYPE_String), string(String::from(str)) {}
@@ -135,6 +138,7 @@ struct Any {
     SCOPES_RESULT_CAST_OPERATOR(Parameter *);
     SCOPES_RESULT_CAST_OPERATOR(const Closure *);
     SCOPES_RESULT_CAST_OPERATOR(Frame *);
+    SCOPES_RESULT_CAST_OPERATOR(ASTNode *);
 
     struct AnyStreamer {
         StyledStream& ost;

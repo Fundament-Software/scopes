@@ -5,6 +5,8 @@
 */
 
 #include "scope.hpp"
+#include "ast.hpp"
+#include "error.hpp"
 
 #include <algorithm>
 #include <unordered_set>
@@ -41,7 +43,7 @@ size_t Scope::count() const {
     size_t count = 0;
     auto &&_map = *map;
     for (auto &&k : _map) {
-        if (!is_typed(k.second.value))
+        if (!k.second.expr)
             continue;
         count++;
     }
@@ -76,7 +78,7 @@ void Scope::ensure_not_borrowed() {
     borrowed = false;
 }
 
-void Scope::bind_with_doc(Symbol name, const AnyDoc &entry) {
+void Scope::bind_with_doc(Symbol name, const ScopeEntry &entry) {
     ensure_not_borrowed();
     auto ret = map->insert({name, entry});
     if (!ret.second) {
@@ -84,15 +86,17 @@ void Scope::bind_with_doc(Symbol name, const AnyDoc &entry) {
     }
 }
 
-void Scope::bind(Symbol name, const Any &value) {
-    AnyDoc entry = { value, next_doc };
+void Scope::bind(Symbol name, ASTNode *value) {
+    assert(value);
+    ScopeEntry entry = { value, next_doc };
     bind_with_doc(name, entry);
     next_doc = nullptr;
 }
 
-void Scope::bind(KnownSymbol name, const Any &value) {
-    AnyDoc entry = { value, nullptr };
-    bind_with_doc(Symbol(name), entry);
+void Scope::bind_internal(Symbol name, Any value) {
+    assert(get_active_anchor());
+    ScopeEntry entry = { Const::from(get_active_anchor(), value), nullptr };
+    bind_with_doc(name, entry);
 }
 
 void Scope::del(Symbol name) {
@@ -103,10 +107,10 @@ void Scope::del(Symbol name) {
         map->erase(it);
     } else {
         // otherwise check if it's contained at all
-        Any dest = none;
+        ASTNode *dest = nullptr;
         if (lookup(name, dest)) {
-            AnyDoc entry = { untyped(), nullptr };
-            // if yes, bind to unknown unknown to mark it as deleted
+            ScopeEntry entry = { nullptr, nullptr };
+            // if yes, bind to nullpointer to mark it as deleted
             bind_with_doc(name, entry);
         }
     }
@@ -124,7 +128,7 @@ std::vector<Symbol> Scope::find_closest_match(Symbol name) const {
             Symbol sym = k.first;
             if (done.count(sym))
                 continue;
-            if (is_typed(k.second.value)) {
+            if (k.second.expr) {
                 size_t dist = distance(s, sym.name());
                 if (dist == best_dist) {
                     best_syms.push_back(sym);
@@ -153,7 +157,7 @@ std::vector<Symbol> Scope::find_elongations(Symbol name) const {
             Symbol sym = k.first;
             if (done.count(sym))
                 continue;
-            if (is_typed(k.second.value)) {
+            if (k.second.expr) {
                 if (sym.name()->count >= s->count &&
                         (sym.name()->substr(0, s->count) == s))
                     found.push_back(sym);
@@ -167,12 +171,12 @@ std::vector<Symbol> Scope::find_elongations(Symbol name) const {
     return found;
 }
 
-bool Scope::lookup(Symbol name, AnyDoc &dest, size_t depth) const {
+bool Scope::lookup(Symbol name, ScopeEntry &dest, size_t depth) const {
     const Scope *self = this;
     do {
         auto it = self->map->find(name);
         if (it != self->map->end()) {
-            if (is_typed(it->second.value)) {
+            if (it->second.expr) {
                 dest = it->second;
                 return true;
             } else {
@@ -187,20 +191,20 @@ bool Scope::lookup(Symbol name, AnyDoc &dest, size_t depth) const {
     return false;
 }
 
-bool Scope::lookup(Symbol name, Any &dest, size_t depth) const {
-    AnyDoc entry = { none, nullptr };
+bool Scope::lookup(Symbol name, ASTNode *&dest, size_t depth) const {
+    ScopeEntry entry;
     if (lookup(name, entry, depth)) {
-        dest = entry.value;
+        dest = entry.expr;
         return true;
     }
     return false;
 }
 
-bool Scope::lookup_local(Symbol name, AnyDoc &dest) const {
+bool Scope::lookup_local(Symbol name, ScopeEntry &dest) const {
     return lookup(name, dest, 0);
 }
 
-bool Scope::lookup_local(Symbol name, Any &dest) const {
+bool Scope::lookup_local(Symbol name, ASTNode *&dest) const {
     return lookup(name, dest, 0);
 }
 

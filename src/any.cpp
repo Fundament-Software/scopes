@@ -63,6 +63,7 @@ Any::Any(Builtin x) : type(TYPE_Builtin), builtin(x) {}
 Any::Any(Scope *x) : type(TYPE_Scope), scope(x) {}
 Any::Any(Frame *x) : type(TYPE_Frame), frame(x) {}
 Any::Any(const Closure *x) : type(TYPE_Closure), closure(x) {}
+Any::Any(ASTNode *x) : type(TYPE_ASTNode), astnode(x) {}
 #if 0
 template<unsigned N>
 Any(const char (&str)[N]) : type(TYPE_String), string(String::from(str)) {}
@@ -105,6 +106,7 @@ SCOPES_RESULT_CAST_OPERATOR_IMPL(Scope *, TYPE_Scope, scope)
 SCOPES_RESULT_CAST_OPERATOR_IMPL(Parameter *, TYPE_Parameter, parameter)
 SCOPES_RESULT_CAST_OPERATOR_IMPL(const Closure *, TYPE_Closure, closure)
 SCOPES_RESULT_CAST_OPERATOR_IMPL(Frame *, TYPE_Frame, frame)
+SCOPES_RESULT_CAST_OPERATOR_IMPL(ASTNode *, TYPE_ASTNode, astnode)
 
 bool Any::operator !=(const Any &other) const {
     return !(*this == other);

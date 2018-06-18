@@ -23,6 +23,8 @@
 #include "specializer.hpp"
 #include "gen_llvm.hpp"
 #include "profiler.hpp"
+#include "stream_ast.hpp"
+#include "ast.hpp"
 
 #include "scopes/scopes.h"
 
@@ -290,7 +292,13 @@ SCOPES_RESULT(int) try_main(int argc, char *argv[]) {
     }
 
 skip_regular_load:
-    Label *fn = SCOPES_GET_RESULT(expand_module(expr, Scope::from(globals)));
+    ASTFunction *fn = SCOPES_GET_RESULT(expand_module(expr, Scope::from(globals)));
+
+    StyledStream ss;
+    stream_ast(ss, fn, StreamASTFormat());
+
+#if 0
+    // TODO
 
 #if SCOPES_DEBUG_CODEGEN
     StyledStream ss(std::cout);
@@ -309,6 +317,7 @@ skip_regular_load:
     typedef void (*MainFuncType)();
     MainFuncType fptr = (MainFuncType)SCOPES_GET_RESULT(compile(fn, 0)).pointer;
     fptr();
+#endif
 
     return 0;
 }

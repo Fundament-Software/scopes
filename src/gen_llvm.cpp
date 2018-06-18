@@ -2126,6 +2126,8 @@ struct LLVMIRGenerator {
         return true;
     }
 
+#if 0
+    // TODO
     // for generating object files
     SCOPES_RESULT(LLVMModuleRef) generate(const String *name, Scope *table) {
         SCOPES_RESULT_TYPE(LLVMModuleRef);
@@ -2166,6 +2168,7 @@ struct LLVMIRGenerator {
         SCOPES_CHECK_RESULT(teardown_generate());
         return module;
     }
+#endif
 
     typedef std::pair<LLVMModuleRef, LLVMValueRef> ModuleValuePair;
 
@@ -2310,6 +2313,7 @@ public:
 
 SCOPES_RESULT(void) compile_object(const String *path, Scope *scope, uint64_t flags) {
     SCOPES_RESULT_TYPE(void);
+#if 0 // TODO
     Timer sum_compile_time(TIMER_Compile);
 #if SCOPES_COMPILE_WITH_DEBUG_INFO
 #else
@@ -2356,6 +2360,7 @@ SCOPES_RESULT(void) compile_object(const String *path, Scope *scope, uint64_t fl
         SCOPES_LOCATION_ERROR(String::from_cstr(errormsg));
     }
     free(path_cstr);
+#endif
     return true;
 }
 

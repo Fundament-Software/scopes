@@ -95,13 +95,23 @@ sc_bool_label_tuple_t sc_eval(const sc_syntax_t *expr, sc_scope_t *scope) {
     using namespace scopes;
     auto module_result = expand_module(expr, scope);
     if (!module_result.ok()) return { false, nullptr };
+    assert(false); // todo
+#if 0
     RETURN_RESULT(specialize(Frame::root, module_result.assert_ok(), {}));
+#else
+    return { false, nullptr };
+#endif
 }
 
 sc_bool_label_tuple_t sc_eval_inline(const sc_list_t *expr, sc_scope_t *scope) {
     using namespace scopes;
     const Syntax *sxexpr = wrap_syntax(get_active_anchor(), expr, false);
+    assert(false); // todo
+#if 0
     RETURN_RESULT(expand_inline(sxexpr, scope));
+#else
+    return { false, nullptr };
+#endif
 }
 
 sc_bool_label_tuple_t sc_typify(sc_closure_t *srcl, int numtypes, const sc_type_t **typeargs) {
@@ -452,16 +462,16 @@ void sc_scope_set_symbol(sc_scope_t *scope, sc_symbol_t sym, sc_any_t value) {
     scope->bind(sym, value);
 }
 
-sc_bool_any_tuple_t sc_scope_at(sc_scope_t *scope, sc_symbol_t key) {
+sc_bool_ast_tuple_t sc_scope_at(sc_scope_t *scope, sc_symbol_t key) {
     using namespace scopes;
-    Any result = none;
+    ASTNode *result = nullptr;
     bool ok = scope->lookup(key, result);
     return { ok, result };
 }
 
-sc_bool_any_tuple_t sc_scope_local_at(sc_scope_t *scope, sc_symbol_t key) {
+sc_bool_ast_tuple_t sc_scope_local_at(sc_scope_t *scope, sc_symbol_t key) {
     using namespace scopes;
-    Any result = none;
+    ASTNode *result = nullptr;
     bool ok = scope->lookup_local(key, result);
     return { ok, result };
 }
@@ -471,7 +481,7 @@ const sc_string_t *sc_scope_get_docstring(sc_scope_t *scope, sc_symbol_t key) {
     if (key == SYM_Unnamed) {
         if (scope->doc) return scope->doc;
     } else {
-        AnyDoc entry = { none, nullptr };
+        ScopeEntry entry;
         if (scope->lookup(key, entry) && entry.doc) {
             return entry.doc;
         }
@@ -484,7 +494,7 @@ void sc_scope_set_docstring(sc_scope_t *scope, sc_symbol_t key, const sc_string_
     if (key == SYM_Unnamed) {
         scope->doc = str;
     } else {
-        AnyDoc entry = { none, nullptr };
+        ScopeEntry entry;
         if (!scope->lookup_local(key, entry)) {
             return;
             /*
@@ -527,7 +537,7 @@ void sc_scope_del_symbol(sc_scope_t *scope, sc_symbol_t sym) {
     scope->del(sym);
 }
 
-sc_symbol_any_tuple_t sc_scope_next(sc_scope_t *scope, sc_symbol_t key) {
+sc_symbol_ast_tuple_t sc_scope_next(sc_scope_t *scope, sc_symbol_t key) {
     using namespace scopes;
     auto &&map = *scope->map;
     Scope::Map::const_iterator it;
@@ -538,12 +548,12 @@ sc_symbol_any_tuple_t sc_scope_next(sc_scope_t *scope, sc_symbol_t key) {
         if (it != map.end()) it++;
     }
     while (it != map.end()) {
-        if (is_typed(it->second.value)) {
-            return { it->first, it->second.value };
+        if (it->second.expr) {
+            return { it->first, it->second.expr };
         }
         it++;
     }
-    return { SYM_Unnamed, none };
+    return { SYM_Unnamed, nullptr };
 }
 
 // Symbol
@@ -1389,7 +1399,7 @@ namespace scopes {
 static void bind_extern(Symbol globalsym, Symbol externsym, const Type *T) {
     Any value(externsym);
     value.type = T;
-    globals->bind(globalsym, value);
+    globals->bind_internal(globalsym, value);
 }
 
 static void bind_extern(Symbol sym, const Type *T) {
@@ -1416,6 +1426,11 @@ void init_globals(int argc, char *argv[]) {
     (void)FUNC; /* ensure that the symbol is there */ \
     bind_extern(Symbol(#FUNC), \
         Extern(Function(RETTYPE, { __VA_ARGS__ }), EF_NonWritable));
+
+    auto stub_file = SourceFile::from_string(Symbol("<internal>"), String::from_cstr(""));
+    auto stub_anchor = Anchor::from(stub_file, 1, 1);
+    set_active_anchor(stub_anchor);
+
 
     const Type *rawstring = NativeROPointer(TYPE_I8);
 
@@ -1473,8 +1488,8 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_get_active_anchor, TYPE_Anchor);
     DEFINE_EXTERN_C_FUNCTION(sc_set_active_anchor, TYPE_Void, TYPE_Anchor);
 
-    DEFINE_EXTERN_C_FUNCTION(sc_scope_at, Tuple({TYPE_Bool, TYPE_Any}).assert_ok(), TYPE_Scope, TYPE_Symbol);
-    DEFINE_EXTERN_C_FUNCTION(sc_scope_local_at, Tuple({TYPE_Bool, TYPE_Any}).assert_ok(), TYPE_Scope, TYPE_Symbol);
+    DEFINE_EXTERN_C_FUNCTION(sc_scope_at, Tuple({TYPE_Bool, TYPE_ASTNode}).assert_ok(), TYPE_Scope, TYPE_Symbol);
+    DEFINE_EXTERN_C_FUNCTION(sc_scope_local_at, Tuple({TYPE_Bool, TYPE_ASTNode}).assert_ok(), TYPE_Scope, TYPE_Symbol);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_get_docstring, TYPE_String, TYPE_Scope, TYPE_Symbol);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_set_docstring, TYPE_Void, TYPE_Scope, TYPE_Symbol, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_set_symbol, TYPE_Void, TYPE_Scope, TYPE_Symbol, TYPE_Any);
@@ -1484,7 +1499,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_scope_clone_subscope, TYPE_Scope, TYPE_Scope, TYPE_Scope);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_get_parent, TYPE_Scope, TYPE_Scope);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_del_symbol, TYPE_Void, TYPE_Scope, TYPE_Symbol);
-    DEFINE_EXTERN_C_FUNCTION(sc_scope_next, Tuple({TYPE_Symbol, TYPE_Any}).assert_ok(), TYPE_Scope, TYPE_Symbol);
+    DEFINE_EXTERN_C_FUNCTION(sc_scope_next, Tuple({TYPE_Symbol, TYPE_ASTNode}).assert_ok(), TYPE_Scope, TYPE_Symbol);
 
     DEFINE_EXTERN_C_FUNCTION(sc_symbol_new, TYPE_Symbol, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_symbol_to_string, TYPE_String, TYPE_Symbol);
@@ -1606,9 +1621,6 @@ void init_globals(int argc, char *argv[]) {
 
 #undef DEFINE_EXTERN_C_FUNCTION
 
-    //auto stub_file = SourceFile::from_string(Symbol("<internal>"), String::from_cstr(""));
-    //auto stub_anchor = Anchor::from(stub_file, 1, 1);
-
 #ifdef SCOPES_WIN32
 #define SCOPES_SYM_OS "windows"
 #else
@@ -1622,57 +1634,57 @@ void init_globals(int argc, char *argv[]) {
 #endif
 #endif
 #endif
-    globals->bind(Symbol("operating-system"), Symbol(SCOPES_SYM_OS));
+    globals->bind_internal(Symbol("operating-system"), Symbol(SCOPES_SYM_OS));
 #undef SCOPES_SYM_OS
 
-    globals->bind(Symbol("unroll-limit"), SCOPES_MAX_RECURSIONS);
-    globals->bind(KW_True, true);
-    globals->bind(KW_False, false);
-    globals->bind(Symbol("noreturn"), NoReturnLabel());
-    globals->bind(KW_ListEmpty, EOL);
-    globals->bind(KW_None, none);
-    globals->bind(Symbol("unnamed"), Symbol(SYM_Unnamed));
-    globals->bind(SYM_CompilerDir,
+    globals->bind_internal(Symbol("unroll-limit"), SCOPES_MAX_RECURSIONS);
+    globals->bind_internal(KW_True, true);
+    globals->bind_internal(KW_False, false);
+    globals->bind_internal(Symbol("noreturn"), NoReturnLabel());
+    globals->bind_internal(KW_ListEmpty, EOL);
+    globals->bind_internal(KW_None, none);
+    globals->bind_internal(Symbol("unnamed"), Symbol(SYM_Unnamed));
+    globals->bind_internal(SYM_CompilerDir,
         String::from(scopes_compiler_dir, strlen(scopes_compiler_dir)));
-    globals->bind(SYM_CompilerPath,
+    globals->bind_internal(SYM_CompilerPath,
         String::from(scopes_compiler_path, strlen(scopes_compiler_path)));
-    globals->bind(SYM_DebugBuild, scopes_is_debug());
-    globals->bind(SYM_CompilerTimestamp,
+    globals->bind_internal(SYM_DebugBuild, scopes_is_debug());
+    globals->bind_internal(SYM_CompilerTimestamp,
         String::from_cstr(scopes_compile_time_date()));
 
     for (uint64_t i = STYLE_FIRST; i <= STYLE_LAST; ++i) {
         Symbol sym = Symbol((KnownSymbol)i);
-        globals->bind(sym, sym);
+        globals->bind_internal(sym, sym);
     }
 
 #define T(TYPE, NAME) \
-    globals->bind(Symbol(NAME), TYPE);
+    globals->bind_internal(Symbol(NAME), TYPE);
 B_TYPES()
 #undef T
 
 #define T(NAME, BNAME, CLASS) \
-    globals->bind(Symbol(BNAME), (int32_t)NAME);
+    globals->bind_internal(Symbol(BNAME), (int32_t)NAME);
     B_TYPE_KIND()
 #undef T
 
-    globals->bind(Symbol("pointer-flag-non-readable"), (uint64_t)PTF_NonReadable);
-    globals->bind(Symbol("pointer-flag-non-writable"), (uint64_t)PTF_NonWritable);
+    globals->bind_internal(Symbol("pointer-flag-non-readable"), (uint64_t)PTF_NonReadable);
+    globals->bind_internal(Symbol("pointer-flag-non-writable"), (uint64_t)PTF_NonWritable);
 
-    globals->bind(Symbol(SYM_DumpDisassembly), (uint64_t)CF_DumpDisassembly);
-    globals->bind(Symbol(SYM_DumpModule), (uint64_t)CF_DumpModule);
-    globals->bind(Symbol(SYM_DumpFunction), (uint64_t)CF_DumpFunction);
-    globals->bind(Symbol(SYM_DumpTime), (uint64_t)CF_DumpTime);
-    globals->bind(Symbol(SYM_NoDebugInfo), (uint64_t)CF_NoDebugInfo);
-    globals->bind(Symbol(SYM_O1), (uint64_t)CF_O1);
-    globals->bind(Symbol(SYM_O2), (uint64_t)CF_O2);
-    globals->bind(Symbol(SYM_O3), (uint64_t)CF_O3);
+    globals->bind_internal(Symbol(SYM_DumpDisassembly), (uint64_t)CF_DumpDisassembly);
+    globals->bind_internal(Symbol(SYM_DumpModule), (uint64_t)CF_DumpModule);
+    globals->bind_internal(Symbol(SYM_DumpFunction), (uint64_t)CF_DumpFunction);
+    globals->bind_internal(Symbol(SYM_DumpTime), (uint64_t)CF_DumpTime);
+    globals->bind_internal(Symbol(SYM_NoDebugInfo), (uint64_t)CF_NoDebugInfo);
+    globals->bind_internal(Symbol(SYM_O1), (uint64_t)CF_O1);
+    globals->bind_internal(Symbol(SYM_O2), (uint64_t)CF_O2);
+    globals->bind_internal(Symbol(SYM_O3), (uint64_t)CF_O3);
 
-#define T(NAME) globals->bind(NAME, Builtin(NAME));
-#define T0(NAME, STR) globals->bind(NAME, Builtin(NAME));
+#define T(NAME) globals->bind_internal(NAME, Builtin(NAME));
+#define T0(NAME, STR) globals->bind_internal(NAME, Builtin(NAME));
 #define T1 T2
 #define T2T T2
 #define T2(UNAME, LNAME, PFIX, OP) \
-    globals->bind(FN_ ## UNAME ## PFIX, Builtin(FN_ ## UNAME ## PFIX));
+    globals->bind_internal(FN_ ## UNAME ## PFIX, Builtin(FN_ ## UNAME ## PFIX));
     B_GLOBALS()
 #undef T
 #undef T0

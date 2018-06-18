@@ -13,10 +13,10 @@
 namespace scopes {
 
 struct Scope;
-struct Label;
+struct ASTFunction;
 
-SCOPES_RESULT(Label *) expand_module(Any expr, Scope *scope = nullptr);
-SCOPES_RESULT(Label *) expand_inline(Any expr, Scope *scope = nullptr);
+SCOPES_RESULT(ASTFunction *) expand_module(Any expr, Scope *scope = nullptr);
+SCOPES_RESULT(ASTFunction *) expand_inline(Any expr, Scope *scope = nullptr);
 
 } // namespace scopes
 

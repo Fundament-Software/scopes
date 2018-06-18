@@ -97,6 +97,7 @@ typedef std::vector<const Type *> ArgTypes;
     T(TYPE_Unknown, "Unknown") \
     T(TYPE_Symbol, "Symbol") \
     T(TYPE_Builtin, "Builtin") \
+    T(TYPE_ASTNode, "ASTNode") \
     \
     T(TYPE_Bool, "bool") \
     \

@@ -94,6 +94,7 @@ project "scopesrt"
     language "C++"
     files {
         "src/globalsyms.c",
+        "src/ast.cpp",
         "src/gc.cpp",
         "src/symbol_enum.cpp",
         "src/none.cpp",
@@ -138,6 +139,7 @@ project "scopesrt"
         "src/frame.cpp",
         "src/stream_label.cpp",
         "src/stream_frame.cpp",
+        "src/stream_ast.cpp",
         "src/c_import.cpp",
         "src/execution.cpp",
         "src/specializer.cpp",
@@ -195,7 +197,8 @@ project "scopesrt"
             "-pedantic",
             "-Wall",
             "-Wno-keyword-macro",
-            "-Wno-gnu-redeclared-enum"
+            "-Wno-gnu-redeclared-enum",
+            "-fdiagnostics-absolute-paths"
         }
 
         if USE_ASAN_UBSAN then
@@ -456,7 +459,8 @@ project "scopes"
             "-pedantic",
             "-Wall",
             "-Wno-keyword-macro",
-            "-Wno-gnu-redeclared-enum"
+            "-Wno-gnu-redeclared-enum",
+            "-fdiagnostics-absolute-paths"
         }
 
         defines {

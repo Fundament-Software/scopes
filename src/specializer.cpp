@@ -2767,9 +2767,12 @@ struct Specializer {
                 } else {
                     goto failed;
                 }
+                assert(false); // todo
+                #if 0
                 enter = SCOPES_GET_RESULT(fold_type_label_single(cl->frame,
                     SCOPES_GET_RESULT(expand_module(sx, scope)), { args[0] }));
                 args = { none };
+                #endif
                 return false;
             }
         failed:

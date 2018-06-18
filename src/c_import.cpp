@@ -24,6 +24,7 @@
 #include "function.hpp"
 #include "extern.hpp"
 #include "execution.hpp"
+#include "ast.hpp"
 #include "dyn_cast.inc"
 
 #include "scopes/scopes.h"
@@ -46,6 +47,24 @@ namespace scopes {
 //------------------------------------------------------------------------------
 // C BRIDGE (CLANG)
 //------------------------------------------------------------------------------
+
+static const Anchor *anchor_from_location(clang::SourceManager &SM, clang::SourceLocation loc) {
+    auto PLoc = SM.getPresumedLoc(loc);
+
+    if (PLoc.isValid()) {
+        auto fname = PLoc.getFilename();
+        const String *strpath = String::from_cstr(fname);
+        Symbol key(strpath);
+        SourceFile *sf = SourceFile::from_file(key);
+        if (!sf) {
+            sf = SourceFile::from_string(key, Symbol(SYM_Unnamed).name());
+        }
+        return Anchor::from(sf, PLoc.getLine(), PLoc.getColumn(),
+            SM.getFileOffset(loc));
+    }
+
+    return get_active_anchor();
+}
 
 class CVisitor : public clang::RecursiveASTVisitor<CVisitor> {
 public:
@@ -72,22 +91,7 @@ public:
 
     const Anchor *anchorFromLocation(clang::SourceLocation loc) {
         auto &SM = Context->getSourceManager();
-
-        auto PLoc = SM.getPresumedLoc(loc);
-
-        if (PLoc.isValid()) {
-            auto fname = PLoc.getFilename();
-            const String *strpath = String::from_cstr(fname);
-            Symbol key(strpath);
-            SourceFile *sf = SourceFile::from_file(key);
-            if (!sf) {
-                sf = SourceFile::from_string(key, Symbol(SYM_Unnamed).name());
-            }
-            return Anchor::from(sf, PLoc.getLine(), PLoc.getColumn(),
-                SM.getFileOffset(loc));
-        }
-
-        return get_active_anchor();
+        return anchor_from_location(SM, loc);
     }
 
     void SetContext(clang::ASTContext * ctx, Scope *_dest) {
@@ -263,10 +267,11 @@ public:
             SCOPES_CHECK_RESULT(GetFields(tni, defn));
 
             if (name != SYM_Unnamed) {
-                Any target = none;
+                const Anchor *anchor = anchorFromLocation(rd->getSourceRange().getBegin());
+                ScopeEntry target;
                 // don't overwrite names already bound
                 if (!dest->lookup(name, target)) {
-                    dest->bind(name, struct_type);
+                    dest->bind(name, Const::from(anchor, struct_type));
                 }
             }
         }
@@ -302,8 +307,6 @@ public:
 
         const Type *enum_type = get_typename(name, named_enums);
 
-        //const Anchor *anchor = anchorFromLocation(ed->getIntegerTypeRange().getBegin());
-
         clang::EnumDecl * defn = ed->getDefinition();
         if (defn && !enum_defined[ed]) {
             enum_defined[ed] = true;
@@ -322,8 +325,10 @@ public:
                 auto value = make_integer(tag_type, val.getExtValue());
                 value.type = enum_type;
 
+                const Anchor *anchor = anchorFromLocation(it->getSourceRange().getBegin());
+
                 tni->bind(name, value);
-                dest->bind(name, value);
+                dest->bind(name, Const::from(anchor, value));
             }
         }
 
@@ -600,15 +605,14 @@ public:
         return Function(returntype, argtypes, flags);
     }
 
-    void exportType(Symbol name, const Type *type) {
-        dest->bind(name, type);
+    void exportType(Symbol name, const Type *type, const Anchor *anchor) {
+        dest->bind(name, Const::from(anchor, type));
     }
 
-    void exportExtern(Symbol name, const Type *type,
-        const Anchor *anchor) {
+    void exportExtern(Symbol name, const Type *type, const Anchor *anchor) {
         Any value(name);
         value.type = Extern(type);
-        dest->bind(name, value);
+        dest->bind(name, Const::from(anchor, value));
     }
 
     bool TraverseRecordDecl(clang::RecordDecl *rd) {
@@ -655,9 +659,10 @@ public:
         const Type *type = type_result.assert_ok();
 
         Symbol name = Symbol(String::from_stdstring(td->getName().data()));
+        const Anchor *anchor = anchorFromLocation(td->getSourceRange().getBegin());
 
         typedefs.insert({name, type});
-        exportType(name, type);
+        exportType(name, type, anchor);
 
         return true;
     }
@@ -800,7 +805,9 @@ static void add_c_macro(clang::Preprocessor & PP,
         const String *name = String::from_cstr(II->getName().str().c_str());
         std::string svalue = Literal.GetString();
         const String *value = String::from(svalue.c_str(), svalue.size());
-        scope->bind(Symbol(name), value);
+        const Anchor *anchor = anchor_from_location(PP.getSourceManager(),
+            MI->getDefinitionLoc());
+        scope->bind(Symbol(name), Const::from(anchor, value));
         return;
     }
 
@@ -819,20 +826,22 @@ static void add_c_macro(clang::Preprocessor & PP,
         suffix = Literal.getUDSuffix();
         std::cout << "TODO: macro literal suffix: " << suffix << std::endl;
     }
+    const Anchor *anchor = anchor_from_location(PP.getSourceManager(),
+        MI->getDefinitionLoc());
     if(Literal.isFloatingLiteral()) {
         llvm::APFloat Result(0.0);
         Literal.GetFloatValue(Result);
         double V = Result.convertToDouble();
         if (negate)
             V = -V;
-        scope->bind(Symbol(name), V);
+        scope->bind(Symbol(name), Const::from(anchor, V));
     } else {
         llvm::APInt Result(64,0);
         Literal.GetIntegerValue(Result);
         int64_t i = Result.getSExtValue();
         if (negate)
             i = -i;
-        scope->bind(Symbol(name), i);
+        scope->bind(Symbol(name), Const::from(anchor, i));
     }
 }
 
@@ -899,7 +908,7 @@ SCOPES_RESULT(Scope *) import_c_module (
         while (!todo.empty()) {
             auto sz = todo.size();
             for (auto it = todo.begin(); it != todo.end();) {
-                Any value = none;
+                ASTNode *value;
                 if (result->lookup(it->second, value)) {
                     result->bind(it->first, value);
                     auto oldit = it++;

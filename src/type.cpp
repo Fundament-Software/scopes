@@ -453,6 +453,8 @@ void init_types() {
         TYPE_U64
     );
 
+    DEFINE_OPAQUE_HANDLE_TYPE("ASTNode", ASTNode, TYPE_ASTNode);
+
     DEFINE_OPAQUE_HANDLE_TYPE("SourceFile", SourceFile, TYPE_SourceFile);
     DEFINE_OPAQUE_HANDLE_TYPE("Label", Label, TYPE_Label);
     DEFINE_OPAQUE_HANDLE_TYPE("Parameter", Parameter, TYPE_Parameter);

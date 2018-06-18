@@ -21,8 +21,6 @@ struct List;
 // EXPRESSION PRINTER
 //------------------------------------------------------------------------------
 
-const char INDENT_SEP[] = "⁞";
-
 Style default_symbol_styler(Symbol name);
 
 struct StreamExprFormat {
