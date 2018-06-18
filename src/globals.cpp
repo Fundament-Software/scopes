@@ -348,12 +348,12 @@ void sc_exit(int c) {
 
 namespace scopes {
 
-typedef std::unordered_map<const List *, const List *> MemoMap;
+typedef std::unordered_map<Any, Any, Any::Hash> MemoMap;
 static MemoMap memo_map;
 
 }
 
-sc_bool_list_tuple_t sc_map_load(const sc_list_t *key) {
+sc_bool_any_tuple_t sc_map_load(sc_any_t key) {
     using namespace scopes;
     auto it = memo_map.find(key);
     if (it != memo_map.end()) {
@@ -363,7 +363,7 @@ sc_bool_list_tuple_t sc_map_load(const sc_list_t *key) {
     }
 }
 
-void sc_map_store(const sc_list_t *key, const sc_list_t *value) {
+void sc_map_store(sc_any_t value, sc_any_t key) {
     using namespace scopes;
     auto ret = memo_map.insert({key, value});
     if (!ret.second) {
@@ -1333,6 +1333,11 @@ void sc_label_set_rawcall(sc_label_t *label) {
     label->body.set_rawcall();
 }
 
+void sc_label_set_rawcont(sc_label_t *label) {
+    using namespace scopes;
+    label->body.set_rawcont();
+}
+
 sc_frame_t *sc_label_frame(sc_label_t *label) {
     using namespace scopes;
     auto frame = label->frame;
@@ -1455,8 +1460,8 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_set_signal_abort,
         TYPE_Void, TYPE_Bool);
 
-    DEFINE_EXTERN_C_FUNCTION(sc_map_load, result_tuple(TYPE_List), TYPE_List);
-    DEFINE_EXTERN_C_FUNCTION(sc_map_store, TYPE_Void, TYPE_List, TYPE_List);
+    DEFINE_EXTERN_C_FUNCTION(sc_map_load, Tuple({TYPE_Bool, TYPE_Any}).assert_ok(), TYPE_Any);
+    DEFINE_EXTERN_C_FUNCTION(sc_map_store, TYPE_Void, TYPE_Any, TYPE_Any);
 
     DEFINE_EXTERN_C_FUNCTION(sc_hash, TYPE_U64, TYPE_U64, TYPE_USize);
     DEFINE_EXTERN_C_FUNCTION(sc_hash2x64, TYPE_U64, TYPE_U64, TYPE_U64);
@@ -1589,6 +1594,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_label_append_parameter, raising(), TYPE_Label, TYPE_Parameter);
     DEFINE_EXTERN_C_FUNCTION(sc_label_function_type, TYPE_Type, TYPE_Label);
     DEFINE_EXTERN_C_FUNCTION(sc_label_set_rawcall, TYPE_Void, TYPE_Label);
+    DEFINE_EXTERN_C_FUNCTION(sc_label_set_rawcont, TYPE_Void, TYPE_Label);
     DEFINE_EXTERN_C_FUNCTION(sc_label_frame, TYPE_Frame, TYPE_Label);
 
     DEFINE_EXTERN_C_FUNCTION(sc_frame_dump, TYPE_Void, TYPE_Frame);

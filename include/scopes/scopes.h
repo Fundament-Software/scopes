@@ -172,8 +172,8 @@ void sc_exit(int c);
 
 // memoization
 
-sc_bool_list_tuple_t sc_map_load(const sc_list_t *key);
-void sc_map_store(const sc_list_t *key, const sc_list_t *value);
+sc_bool_any_tuple_t sc_map_load(sc_any_t key);
+void sc_map_store(sc_any_t value, sc_any_t key);
 
 // hashing
 
@@ -355,6 +355,7 @@ void sc_label_set_complete(sc_label_t *label);
 bool sc_label_append_parameter(sc_label_t *label, sc_parameter_t *param);
 const sc_type_t *sc_label_function_type(sc_label_t *label);
 void sc_label_set_rawcall(sc_label_t *label);
+void sc_label_set_rawcont(sc_label_t *label);
 sc_frame_t *sc_label_frame(sc_label_t *label);
 
 // frames

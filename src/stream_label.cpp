@@ -133,6 +133,9 @@ void StreamLabel::stream_label (Label *alabel) {
     if (!alabel->body.is_complete()) {
         ss << Style_Keyword << "T " << Style_None;
     }
+    if (alabel->body.is_rawcont()) {
+        ss << Style_Keyword << "rawcont " << Style_None;
+    }
     if (alabel->body.is_rawcall()) {
         ss << Style_Keyword << "rawcall " << Style_None;
     }

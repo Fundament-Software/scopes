@@ -20,6 +20,7 @@ enum LabelBodyFlags {
     LBF_TryCall = (1 << 1),
     LBF_Complete = (1 << 2),
     LBF_Optimized = (1 << 3),
+    LBF_RawCont = (1 << 4),
 };
 
 struct Body {
@@ -44,6 +45,9 @@ struct Body {
 
     bool is_rawcall();
     void set_rawcall(bool enable = true);
+
+    bool is_rawcont();
+    void set_rawcont(bool enable = true);
 
     bool is_trycall();
     void set_trycall(bool enable = true);

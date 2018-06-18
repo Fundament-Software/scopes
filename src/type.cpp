@@ -73,6 +73,10 @@ bool Type::lookup_call_handler(Any &dest) const {
     return lookup(SYM_CallHandler, dest);
 }
 
+bool Type::lookup_return_handler(Any &dest) const {
+    return lookup(SYM_ReturnHandler, dest);
+}
+
 const Type::Map &Type::get_symbols() const {
     return symbols;
 }

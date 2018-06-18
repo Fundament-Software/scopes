@@ -540,6 +540,7 @@ namespace scopes {
     T(SYM_DoForm, "form-do") \
     T(SYM_SyntaxScope, "syntax-scope") \
     T(SYM_CallHandler, "__call") \
+    T(SYM_ReturnHandler, "__return") \
     \
     /* varargs */ \
     T(SYM_Parenthesis, "...") \

@@ -788,6 +788,7 @@ let Syntax-wrap = sc_syntax_wrap
     dump = sc_label_dump
     function-type = sc_label_function_type
     set-rawcall = sc_label_set_rawcall
+    set-rawcont = sc_label_set_rawcont
     frame = sc_label_frame
     anchor = sc_label_anchor
     body-anchor = sc_label_body_anchor
@@ -888,7 +889,9 @@ syntax-extend
         __rimply =
             box-cast-dispatch
                 fn "syntax-imply" (T vT)
-                    return (Any-wrap Any-rimply) true
+                    if true
+                        return (Any-wrap Any-rimply)
+                    raise-compile-error! "unsupported type"
 
     # integer casting
 
@@ -986,7 +989,7 @@ syntax-extend
         if ok
             let ok f = (trycall unbox-dispatch-cast-function-type anyf)
             if (not ok)
-                attribute-format-error! vT symbol (get-error)
+                attribute-format-error! T rsymbol (get-error)
             let ok f = (trycall f T vT)
             if ok
                 return true f true
@@ -2171,10 +2174,6 @@ fn print-version ()
     print "Executable path:" compiler-path
     exit 0
     unreachable!;
-
-fn test-compiler-version ()
-    let vmin vmaj vpatch = (compiler-version)
-    return vmin vmaj vpatch
 
 fn run-main ()
     let args = (launch-args)

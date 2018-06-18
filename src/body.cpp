@@ -45,6 +45,18 @@ void Body::set_rawcall(bool enable) {
     }
 }
 
+bool Body::is_rawcont() {
+    return (flags & LBF_RawCont) == LBF_RawCont;
+}
+
+void Body::set_rawcont(bool enable) {
+    if (enable) {
+        flags |= LBF_RawCont;
+    } else {
+        flags &= ~LBF_RawCont;
+    }
+}
+
 bool Body::is_trycall() {
     return (flags & LBF_TryCall) == LBF_TryCall;
 }

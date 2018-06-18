@@ -1341,13 +1341,27 @@ struct Specializer {
         return enter.type == TYPE_Builtin;
     }
 
+    static const Type *get_callable_type(Any val) {
+        if (is_return_parameter(val))
+            return val.type;
+        return val.indirect_type();
+    }
+
     static bool is_calling_callable(Label *l) {
         if (l->body.is_rawcall())
             return false;
         auto &&enter = l->body.enter;
-        const Type *T = enter.indirect_type();
+        const Type *T = get_callable_type(enter);
         Any value = none;
         return T->lookup_call_handler(value);
+    }
+
+    static bool is_returning_to_returnable(Label *l) {
+        if (l->body.is_rawcont())
+            return false;
+        const Type *T = get_callable_type(l->body.args[0].value);
+        Any value = none;
+        return T->lookup_return_handler(value);
     }
 
     static bool is_calling_label_macro(Label *l) {
@@ -2677,10 +2691,26 @@ struct Specializer {
 
         auto &&enter = l->body.enter;
         auto &&args = l->body.args;
-        const Type *T = enter.indirect_type();
+        const Type *T = get_callable_type(enter);
 
         Any value = none;
         bool result = T->lookup_call_handler(value);
+        assert(result);
+        args.insert(args.begin() + 1, Argument(enter));
+        enter = value;
+    }
+
+    void fold_returnable_return(Label *l) {
+#if SCOPES_DEBUG_CODEGEN
+        ss_cout << "folding returnable return in " << l << std::endl;
+#endif
+
+        auto &&enter = l->body.enter;
+        auto &&args = l->body.args;
+        const Type *T = get_callable_type(l->body.args[0].value);
+
+        Any value = none;
+        bool result = T->lookup_return_handler(value);
         assert(result);
         args.insert(args.begin() + 1, Argument(enter));
         enter = value;
@@ -3578,13 +3608,7 @@ struct Specializer {
 
         bool trycall = l->body.is_trycall();
         const Type *rtype = nullptr;
-        if (is_calling_label(l)) {
-            if (!l->get_label_enter()->body.is_complete()) {
-                SCOPES_LOCATION_ERROR(String::from("failed to propagate return type from untyped label"));
-            }
-            assert(all_params_typed(l));
-            rtype = SCOPES_GET_RESULT(complete_existing_label_continuation(l));
-        } else if (is_calling_label_macro(l)) {
+        if (is_calling_label_macro(l)) {
             Any enter = l->body.enter;
             SCOPES_CHECK_RESULT(fold_label_macro_call(l));
             if (l->body.enter == enter) {
@@ -3592,9 +3616,18 @@ struct Specializer {
             }
             if (!l->body.is_complete())
                 goto repeat;
+        } else if (is_returning_to_returnable(l)) {
+            fold_returnable_return(l);
+            goto repeat;
         } else if (is_calling_callable(l)) {
             fold_callable_call(l);
             goto repeat;
+        } else if (is_calling_label(l)) {
+            if (!l->get_label_enter()->body.is_complete()) {
+                SCOPES_LOCATION_ERROR(String::from("failed to propagate return type from untyped label"));
+            }
+            assert(all_params_typed(l));
+            rtype = SCOPES_GET_RESULT(complete_existing_label_continuation(l));
         } else if (is_calling_function(l)) {
             SCOPES_CHECK_RESULT(verify_no_keyed_args(l));
             rtype = SCOPES_GET_RESULT(get_return_type_from_function_call(l));

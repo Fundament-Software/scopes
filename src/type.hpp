@@ -72,6 +72,8 @@ struct Type {
 
     bool lookup_call_handler(Any &dest) const;
 
+    bool lookup_return_handler(Any &dest) const;
+
     const Map &get_symbols() const;
 
 private:
