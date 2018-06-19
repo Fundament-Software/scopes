@@ -908,7 +908,7 @@ SCOPES_RESULT(Scope *) import_c_module (
         while (!todo.empty()) {
             auto sz = todo.size();
             for (auto it = todo.begin(); it != todo.end();) {
-                ASTNode *value;
+                ASTValue *value;
                 if (result->lookup(it->second, value)) {
                     result->bind(it->first, value);
                     auto oldit = it++;

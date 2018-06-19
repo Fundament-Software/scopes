@@ -86,7 +86,7 @@ void Scope::bind_with_doc(Symbol name, const ScopeEntry &entry) {
     }
 }
 
-void Scope::bind(Symbol name, ASTNode *value) {
+void Scope::bind(Symbol name, ASTValue *value) {
     assert(value);
     ScopeEntry entry = { value, next_doc };
     bind_with_doc(name, entry);
@@ -107,7 +107,7 @@ void Scope::del(Symbol name) {
         map->erase(it);
     } else {
         // otherwise check if it's contained at all
-        ASTNode *dest = nullptr;
+        ASTValue *dest = nullptr;
         if (lookup(name, dest)) {
             ScopeEntry entry = { nullptr, nullptr };
             // if yes, bind to nullpointer to mark it as deleted
@@ -191,7 +191,7 @@ bool Scope::lookup(Symbol name, ScopeEntry &dest, size_t depth) const {
     return false;
 }
 
-bool Scope::lookup(Symbol name, ASTNode *&dest, size_t depth) const {
+bool Scope::lookup(Symbol name, ASTValue *&dest, size_t depth) const {
     ScopeEntry entry;
     if (lookup(name, entry, depth)) {
         dest = entry.expr;
@@ -204,7 +204,7 @@ bool Scope::lookup_local(Symbol name, ScopeEntry &dest) const {
     return lookup(name, dest, 0);
 }
 
-bool Scope::lookup_local(Symbol name, ASTNode *&dest) const {
+bool Scope::lookup_local(Symbol name, ASTValue *&dest) const {
     return lookup(name, dest, 0);
 }
 

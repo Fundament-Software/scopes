@@ -15,6 +15,7 @@ namespace scopes {
 
 struct Anchor;
 struct ASTNode;
+struct CallLike;
 
 //------------------------------------------------------------------------------
 // AST PRINTER
@@ -31,20 +32,6 @@ struct StreamASTFormat {
     int depth;
 
     StreamASTFormat();
-};
-
-struct StreamAST : StreamAnchors {
-    StreamASTFormat fmt;
-    bool line_anchors;
-    bool atom_anchors;
-
-    StreamAST(StyledStream &_ss, const StreamASTFormat &_fmt);
-
-    void stream_indent(int depth = 0);
-
-    void walk(ASTNode *node, int depth, int maxdepth, bool naked);
-
-    void stream(ASTNode *node);
 };
 
 void stream_ast(

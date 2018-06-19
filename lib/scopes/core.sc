@@ -152,6 +152,13 @@ let Frame-dump = sc_frame_dump
 let Closure-label = sc_closure_label
 let Closure-frame = sc_closure_frame
 
+fn test-loop ()
+    loop (x) = 1
+    if (icmp<s x 10)
+        repeat (add x 1)
+    else
+        break;
+
 # first we alias u64 to the integer type that can hold a pointer
 let intptr = u64
 

@@ -33,6 +33,7 @@
 #include "gc.hpp"
 #include "compiler_flags.hpp"
 #include "hash.hpp"
+#include "ast.hpp"
 
 #include "scopes/scopes.h"
 
@@ -458,20 +459,21 @@ const sc_anchor_t *sc_get_active_anchor() {
 // Scope
 ////////////////////////////////////////////////////////////////////////////////
 
-void sc_scope_set_symbol(sc_scope_t *scope, sc_symbol_t sym, sc_any_t value) {
-    scope->bind(sym, value);
+void sc_scope_set_symbol(sc_scope_t *scope, sc_symbol_t sym, sc_ast_t *value) {
+    using namespace scopes;
+    scope->bind(sym, cast<ASTValue>(value));
 }
 
 sc_bool_ast_tuple_t sc_scope_at(sc_scope_t *scope, sc_symbol_t key) {
     using namespace scopes;
-    ASTNode *result = nullptr;
+    ASTValue *result = nullptr;
     bool ok = scope->lookup(key, result);
     return { ok, result };
 }
 
 sc_bool_ast_tuple_t sc_scope_local_at(sc_scope_t *scope, sc_symbol_t key) {
     using namespace scopes;
-    ASTNode *result = nullptr;
+    ASTValue *result = nullptr;
     bool ok = scope->lookup_local(key, result);
     return { ok, result };
 }
@@ -1492,7 +1494,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_scope_local_at, Tuple({TYPE_Bool, TYPE_ASTNode}).assert_ok(), TYPE_Scope, TYPE_Symbol);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_get_docstring, TYPE_String, TYPE_Scope, TYPE_Symbol);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_set_docstring, TYPE_Void, TYPE_Scope, TYPE_Symbol, TYPE_String);
-    DEFINE_EXTERN_C_FUNCTION(sc_scope_set_symbol, TYPE_Void, TYPE_Scope, TYPE_Symbol, TYPE_Any);
+    DEFINE_EXTERN_C_FUNCTION(sc_scope_set_symbol, TYPE_Void, TYPE_Scope, TYPE_Symbol, TYPE_ASTNode);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_new, TYPE_Scope);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_clone, TYPE_Scope, TYPE_Scope);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_new_subscope, TYPE_Scope, TYPE_Scope);

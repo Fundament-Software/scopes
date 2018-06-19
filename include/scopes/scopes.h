@@ -199,7 +199,7 @@ const sc_anchor_t *sc_get_active_anchor();
 
 // lexical scopes
 
-void sc_scope_set_symbol(sc_scope_t *scope, sc_symbol_t sym, sc_any_t value);
+void sc_scope_set_symbol(sc_scope_t *scope, sc_symbol_t sym, sc_ast_t *value);
 sc_bool_ast_tuple_t sc_scope_at(sc_scope_t *scope, sc_symbol_t key);
 sc_bool_ast_tuple_t sc_scope_local_at(sc_scope_t *scope, sc_symbol_t key);
 const sc_string_t *sc_scope_get_docstring(sc_scope_t *scope, sc_symbol_t key);

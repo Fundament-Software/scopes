@@ -18,11 +18,11 @@ namespace scopes {
 // SCOPE
 //------------------------------------------------------------------------------
 
-struct ASTNode;
+struct ASTValue;
 struct String;
 
 struct ScopeEntry {
-    ASTNode *expr;
+    ASTValue *expr;
     const String *doc;
 };
 
@@ -51,7 +51,7 @@ public:
 
     void bind_with_doc(Symbol name, const ScopeEntry &entry);
 
-    void bind(Symbol name, ASTNode *value);
+    void bind(Symbol name, ASTValue *value);
 
     void bind_internal(Symbol name, Any value);
 
@@ -63,11 +63,11 @@ public:
 
     bool lookup(Symbol name, ScopeEntry &dest, size_t depth = -1) const;
 
-    bool lookup(Symbol name, ASTNode *&dest, size_t depth = -1) const;
+    bool lookup(Symbol name, ASTValue *&dest, size_t depth = -1) const;
 
     bool lookup_local(Symbol name, ScopeEntry &dest) const;
 
-    bool lookup_local(Symbol name, ASTNode *&dest) const;
+    bool lookup_local(Symbol name, ASTValue *&dest) const;
 
     StyledStream &stream(StyledStream &ss);
 

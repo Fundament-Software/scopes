@@ -2786,26 +2786,6 @@ struct Specializer {
                 << ", got " << T << ")";
             SCOPES_LOCATION_ERROR(ss.str());
         } break;
-        case FN_ScopeOf: {
-            CHECKARGS(0, -1);
-            Scope *scope = nullptr;
-            size_t start = 1;
-            if ((args.size() > 1) && (args[1].key == SYM_Unnamed)) {
-                start = 2;
-                scope = Scope::from(args[1].value);
-            } else {
-                scope = Scope::from();
-            }
-            for (size_t i = start; i < args.size(); ++i) {
-                auto &&arg = args[i];
-                if (arg.key == SYM_Unnamed) {
-                    scope = Scope::from(scope, arg.value);
-                } else {
-                    scope->bind(arg.key, arg.value);
-                }
-            }
-            RETARGS(scope);
-        } break;
         case FN_AllocaOf: {
             CHECKARGS(1, 1);
             const Type *T = args[1].value.type;

@@ -27,7 +27,7 @@ namespace scopes {
 //------------------------------------------------------------------------------
 // MACRO EXPANDER
 //------------------------------------------------------------------------------
-// expands macros and generates the IL
+// expands macros and generates the AST
 
 static SCOPES_RESULT(void) verify_list_parameter_count(const char *context, const List *expr, int mincount, int maxcount) {
     SCOPES_RESULT_TYPE(void);
@@ -71,98 +71,20 @@ struct Expander {
 
     ~Expander() {}
 
-#if 0
-    bool is_goto_label(Any enter) {
-        return (enter.type == TYPE_Label)
-            && (enter.label->params[0]->type == TYPE_Nothing);
-    }
-
-    // arguments must include continuation
-    // enter and args must be passed with syntax object removed
-    SCOPES_RESULT(void) br(Any enter, const Args &args, uint64_t flags = 0) {
-        SCOPES_RESULT_TYPE(void);
-        assert(!args.empty());
-        const Anchor *anchor = get_active_anchor();
-        assert(anchor);
-        if (!state) {
-            set_active_anchor(anchor);
-            SCOPES_LOCATION_ERROR(
-                String::from("can not define body: continuation already exited."));
-        }
-        assert(!is_goto_label(enter) || (args[0].value.type == TYPE_Nothing));
-        assert(state->body.enter.type == TYPE_Nothing);
-        assert(state->body.args.empty());
-        state->body.flags = flags;
-        state->body.enter = enter;
-        state->body.args = args;
-        state->body.anchor = anchor;
-        state = nullptr;
-        return true;
-    }
-
-    bool is_instanced_dest(Any val) {
-        return (val.type == TYPE_Parameter)
-            || (val.type == TYPE_Label)
-            || (val.type == TYPE_Nothing);
-    }
-
-    SCOPES_RESULT(void) verify_dest_not_none(Any dest) {
-        SCOPES_RESULT_TYPE(void);
-        if (dest.type == TYPE_Nothing) {
-            SCOPES_LOCATION_ERROR(String::from("attempting to implicitly return from label"));
-        }
-        return true;
-    }
-
-    SCOPES_RESULT(Any) write_dest(const Any &dest) {
-        SCOPES_RESULT_TYPE(Any);
-        if (dest.type == TYPE_Symbol) {
-            return Any(none);
-        } else if (is_instanced_dest(dest)) {
-            if (last_expression()) {
-                SCOPES_CHECK_RESULT(verify_dest_not_none(dest));
-                SCOPES_CHECK_RESULT(br(dest, { none }));
-            }
-            return Any(none);
-        } else {
-            assert(false && "illegal dest type");
-        }
-        return Any(none);
-    }
-
-    SCOPES_RESULT(Any) write_dest(const Any &dest, const Any &value) {
-        SCOPES_RESULT_TYPE(Any);
-        if (dest.type == TYPE_Symbol) {
-            return value;
-        } else if (is_instanced_dest(dest)) {
-            if (last_expression()) {
-                SCOPES_CHECK_RESULT(verify_dest_not_none(dest));
-                SCOPES_CHECK_RESULT(br(dest, { none, value }));
-            }
-            return value;
-        } else {
-            assert(false && "illegal dest type");
-        }
-        return Any(none);
-    }
-#endif
-
     SCOPES_RESULT(void) expand_block(Block *block, const List *it) {
         SCOPES_RESULT_TYPE(void);
-        if (it == EOL) {
-            return true;
-        } else {
-            while (it) {
-                next = it->next;
-                const Syntax *sx = it->at;
-                Any expr = sx->datum;
-                if (!last_expression() && (expr.type == TYPE_String)) {
-                    env->set_doc(expr);
-                }
-                block->append(SCOPES_GET_RESULT(expand(it->at)));
-                it = next;
+        while (it) {
+            next = it->next;
+            const Syntax *sx = it->at;
+            Any expr = sx->datum;
+            if (!last_expression() && (expr.type == TYPE_String)) {
+                env->set_doc(expr);
             }
+            block->append(SCOPES_GET_RESULT(expand(it->at)));
+            it = next;
         }
+        block->strip_constants();
+        block->flatten();
         return true;
     }
 
@@ -187,13 +109,9 @@ struct Expander {
 
         set_active_anchor(_anchor);
 
-        auto call = Call::from(_anchor, Const::from(_anchor, Builtin(KW_SyntaxExtend)),
-            {
-                { SYM_Unnamed, func },
-                { SYM_Unnamed, Const::from(_anchor, Syntax::from(_anchor, next)) },
-                { SYM_Unnamed, Const::from(_anchor, env) } });
+        auto node = SyntaxExtend::from(_anchor, func, next, env);
         next = EOL;
-        return call;
+        return node;
     }
 
     SCOPES_RESULT(ASTSymbol *) expand_parameter(Any value) {
@@ -238,11 +156,12 @@ struct Expander {
 
         bool continuing = false;
         ASTFunction *func = nullptr;
+        ASTNode *result = nullptr;
         Any tryfunc_name = SCOPES_GET_RESULT(unsyntax(it->at));
         if (tryfunc_name.type == TYPE_Symbol) {
             // named self-binding
             // see if we can find a forward declaration in the local scope
-            ASTNode *result = nullptr;
+            ASTValue *result = nullptr;
             if (env->lookup_local(tryfunc_name.symbol, result)
                 && isa<ASTFunction>(result)
                 && cast<ASTFunction>(result)->is_forward_decl()) {
@@ -256,10 +175,12 @@ struct Expander {
         } else if (tryfunc_name.type == TYPE_String) {
             // named lambda
             func = ASTFunction::from(_anchor, Symbol(tryfunc_name.string));
+            result = func;
             it = it->next;
         } else {
             // unnamed lambda
             func = ASTFunction::from(_anchor, Symbol(SYM_Unnamed));
+            result = func;
         }
         if (setup.inlined)
             func->set_inline();
@@ -308,46 +229,9 @@ struct Expander {
         return func;
     }
 
-#if 0
-    bool is_return_parameter(Any val) {
-        return (val.type == TYPE_Parameter) && (val.parameter->index == 0);
-    }
-#endif
-
     bool last_expression() {
         return next == EOL;
     }
-
-#if 0
-    Label *make_nextstate(const Any &dest, Any &result, Any &subdest) {
-        auto _anchor = get_active_anchor();
-        Label *nextstate = nullptr;
-        subdest = dest;
-        if (dest.type == TYPE_Symbol) {
-            nextstate = Label::continuation_from(_anchor, Symbol(SYM_Unnamed));
-            Parameter *param = Parameter::variadic_from(_anchor,
-                Symbol(SYM_Unnamed), TYPE_Unknown);
-            nextstate->append(param);
-            nextstate->set_inline();
-            if (state) {
-                nextstate->body.scope_label = state;
-            }
-            subdest = nextstate;
-            result = param;
-        } else if (is_instanced_dest(dest)) {
-            if (!last_expression()) {
-                nextstate = Label::continuation_from(_anchor, Symbol(SYM_Unnamed));
-                if (state) {
-                    nextstate->body.scope_label = state;
-                }
-                subdest = nextstate;
-            }
-        } else {
-            assert(false && "illegal dest type");
-        }
-        return nextstate;
-    }
-#endif
 
 #if 0
     SCOPES_RESULT(Any) expand_defer(const List *it, const Any &dest) {
@@ -407,165 +291,56 @@ struct Expander {
         }
     }
 
-#if 0
-    // (let x ... [= args ...])
-    // (let name ([x ...]) [= args ...])
-    // ...
-    SCOPES_RESULT(ASTNode *) expand_let(const List *it) {
+    // (loop ([x ...]) [= args ...] body ...)
+    SCOPES_RESULT(ASTNode *) expand_loop(const List *it) {
         SCOPES_RESULT_TYPE(ASTNode *);
 
-        SCOPES_CHECK_RESULT(verify_list_parameter_count("let", it, 1, -1));
+        SCOPES_CHECK_RESULT(verify_list_parameter_count("loop", it, 1, -1));
         it = it->next;
 
         auto _anchor = get_active_anchor();
 
-        Symbol labelname = Symbol(SYM_Unnamed);
-        const List *params = nullptr;
+        auto val = SCOPES_GET_RESULT(unsyntax(it->at));
+        const List *params = val;
         const List *values = nullptr;
-
-        if (it) {
-            auto name = SCOPES_GET_RESULT(unsyntax(it->at));
+        {
             auto nextit = it->next;
-            if ((name.type == TYPE_Symbol) && nextit) {
-                auto val = SCOPES_GET_RESULT(unsyntax(nextit->at));
-                if (val.type == TYPE_List) {
-                    labelname = name.symbol;
-                    params = val.list;
-                    nextit = nextit->next;
-                    it = params;
-                    if (nextit != EOL) {
-                        if (!is_equal_token(SCOPES_GET_RESULT(unsyntax(nextit->at)))) {
-                            SCOPES_LOCATION_ERROR(String::from("equal sign (=) expected"));
-                        }
-                        values = nextit;
-                    }
+            if (nextit != EOL) {
+                if (!is_equal_token(SCOPES_GET_RESULT(unsyntax(nextit->at)))) {
+                    SCOPES_LOCATION_ERROR(String::from("equal sign (=) expected"));
                 }
+                values = nextit->next;
             }
         }
 
-        auto endit = EOL;
-        if (!params) {
-            endit = it;
-            // read parameter names
-            while (endit) {
-                auto name = SCOPES_GET_RESULT(unsyntax(endit->at));
-                if (is_equal_token(name))
-                    break;
-                endit = endit->next;
-            }
-            if (endit != EOL)
-                values = endit;
-        }
+        auto loop = Loop::from(_anchor);
 
-        if (!values) {
-            // no assignments, reimport parameter names into local scope
-            ASTNode *last_entry = nullptr;
-            while (it != endit) {
-                auto name = SCOPES_GET_RESULT(unsyntax(it->at));
-                SCOPES_CHECK_RESULT(name.verify(TYPE_Symbol));
-                ScopeEntry entry;
-                if (!env->lookup(name.symbol, entry)) {
-                    StyledString ss;
-                    ss.out << "no such name bound in parent scope: '"
-                        << name.symbol.name()->data << "'. ";
-                    print_name_suggestions(name.symbol, ss.out);
-                    SCOPES_LOCATION_ERROR(ss.str());
-                }
-                env->bind_with_doc(name.symbol, entry);
-                last_entry = entry.expr;
-                it = it->next;
-            }
-            if (!last_entry) {
-                last_entry = Const::from(_anchor, none);
-            }
-            return last_entry;
-        }
-
-        // small hack to simplify simple aliasing
-        if (labelname == SYM_Unnamed) {
-            // label is implicit
-            if ((it->count == 3) && (values->count == 2)) {
-                // single simple value is being assigned (k = v)
-                auto key = SCOPES_GET_RESULT(unsyntax(it->at));
-                auto val = SCOPES_GET_RESULT(unsyntax(values->next->at));
-                if ((key.type == TYPE_Symbol) && (val.type == TYPE_Symbol)) {
-                    ScopeEntry entry;
-                    if (env->lookup(val.symbol, entry)) {
-                        env->bind_with_doc(key.symbol, entry);
-                        return entry.expr;
-                    }
-                }
-            }
-        }
-
-        nextstate = Label::continuation_from(_anchor, labelname);
-        if (state) {
-            nextstate->body.scope_label = state;
-        }
-        if (labelname != SYM_Unnamed) {
-            env->bind(labelname, nextstate);
-        } else {
-            nextstate->set_inline();
-        }
-
-        size_t numparams = 0;
-        // bind to fresh env so the rhs expressions don't see the symbols yet
-        Scope *orig_env = env;
-        env = Scope::from();
-        // read parameter names
-        while (it != endit) {
-            nextstate->append(SCOPES_GET_RESULT(expand_parameter(it->at)));
-            numparams++;
-            it = it->next;
-        }
-
-        if (nextstate->is_variadic()) {
-            // accepts maximum number of arguments
-            numparams = (size_t)-1;
-        }
+        ASTSymbols syms;
+        ASTNodes exprs;
 
         it = values;
-
-        Args args;
-        args.reserve(it->count);
-        args.push_back(none);
-
-        it = it->next;
-
         // read init values
-        Expander subexp(state, orig_env);
-        size_t numvalues = 0;
+        Expander subexp(env);
         while (it) {
-            numvalues++;
-            if (numvalues > numparams) {
-                set_active_anchor(((const Syntax *)it->at)->anchor);
-                StyledString ss;
-                ss.out << "number of arguments exceeds number of defined names ("
-                    << numvalues << " > " << numparams << ")";
-                SCOPES_LOCATION_ERROR(ss.str());
-            }
             subexp.next = it->next;
-            args.push_back(SCOPES_GET_RESULT(subexp.expand(it->at, Symbol(SYM_Unnamed))));
+            exprs.push_back(SCOPES_GET_RESULT(subexp.expand(it->at)));
             it = subexp.next;
         }
 
-        //
-        for (auto kv = env->map->begin(); kv != env->map->end(); ++kv) {
-            orig_env->bind(kv->first, kv->second.value);
+        it = params;
+        // read parameter names
+        while (it != EOL) {
+            syms.push_back(SCOPES_GET_RESULT(expand_parameter(it->at)));
+            it = it->next;
         }
-        env = orig_env;
 
-        set_active_anchor(_anchor);
-        state = subexp.state;
-        SCOPES_CHECK_RESULT(br(nextstate, args));
-        state = nextstate;
+        SCOPES_CHECK_RESULT(loop->map(syms, exprs));
 
-        return write_dest(dest);
+        SCOPES_CHECK_RESULT(expand_block(loop->ensure_body(), next));
+        return loop;
     }
-#endif
 
     // (let x ... [= args ...])
-    // (let name ([x ...]) [= args ...])
     // ...
     SCOPES_RESULT(ASTNode *) expand_let(const List *it) {
         SCOPES_RESULT_TYPE(ASTNode *);
@@ -616,40 +391,38 @@ struct Expander {
 
         const List *params = it;
 
+        ASTSymbols syms;
+        ASTNodes exprs;
+
         it = values;
         it = it->next;
         // read init values
-        size_t numvalues = 0;
         Expander subexp(env);
         while (it) {
-            numvalues++;
             subexp.next = it->next;
-            let->append_expr(SCOPES_GET_RESULT(subexp.expand(it->at)));
+            exprs.push_back(SCOPES_GET_RESULT(subexp.expand(it->at)));
             it = subexp.next;
         }
 
         it = params;
-        size_t numparams = 0;
         // read parameter names
         while (it != endit) {
-            let->append_symbol(SCOPES_GET_RESULT(expand_parameter(it->at)));
-            numparams++;
+            syms.push_back(SCOPES_GET_RESULT(expand_parameter(it->at)));
             it = it->next;
         }
-        if (let->is_variadic()) {
-            // accepts maximum number of arguments
-            numparams = (size_t)-1;
-        }
 
-        if (numvalues > numparams) {
-            set_active_anchor(let->exprs[numparams]->get_anchor());
-            StyledString ss;
-            ss.out << "number of arguments exceeds number of defined names ("
-                << numvalues << " > " << numparams << ")";
-            SCOPES_LOCATION_ERROR(ss.str());
-        }
+        SCOPES_CHECK_RESULT(let->map(syms, exprs));
+        let->move_constants_to_scope(env);
 
-        return let;
+        SCOPES_CHECK_RESULT(expand_block(let->ensure_body(), next));
+
+        let->flatten();
+
+        if (let->has_assignments()) {
+            return let;
+        } else {
+            return let->body;
+        }
     }
 
     // quote <value> ...
@@ -749,7 +522,7 @@ struct Expander {
             subexp.env = Scope::from(env);
             SCOPES_CHECK_RESULT(subexp.expand_block(thenblock, it));
 
-            ifexpr->append_expr(cond, thenblock);
+            ifexpr->append(cond, thenblock);
         }
 
         it = branches[lastidx];
@@ -760,7 +533,7 @@ struct Expander {
 
             Block *elseblock = Block::from(anchor);
             SCOPES_CHECK_RESULT(subexp.expand_block(elseblock, it));
-            ifexpr->append_expr(elseblock);
+            ifexpr->append(elseblock);
         }
 
         return ifexpr;
@@ -785,6 +558,63 @@ struct Expander {
         return true;
     }
 
+    SCOPES_RESULT(void) expand_arguments(CallLike *calllike, const List *it) {
+        SCOPES_RESULT_TYPE(void);
+        while (it) {
+            next = it->next;
+            Symbol key = SYM_Unnamed;
+            Any value;
+            set_active_anchor(((const Syntax *)it->at)->anchor);
+            if (SCOPES_GET_RESULT(get_kwargs(it->at, key, value))) {
+                calllike->append(key,
+                    SCOPES_GET_RESULT(expand(value)));
+            } else {
+                calllike->append(SCOPES_GET_RESULT(expand(it->at)));
+            }
+            it = next;
+        }
+        return true;
+    }
+
+    SCOPES_RESULT(ASTNode *) expand_return(const List *it) {
+        SCOPES_RESULT_TYPE(ASTNode *);
+        auto _anchor = get_active_anchor();
+        SCOPES_CHECK_RESULT(verify_list_parameter_count("return", it, 0, -1));
+        it = it->next;
+        auto ret = Return::from(_anchor);
+        if (it) {
+            Expander subexp(env, it->next);
+            SCOPES_CHECK_RESULT(subexp.expand_arguments(ret, it));
+        }
+        return ret;
+    }
+
+    SCOPES_RESULT(ASTNode *) expand_break(const List *it) {
+        SCOPES_RESULT_TYPE(ASTNode *);
+        auto _anchor = get_active_anchor();
+        SCOPES_CHECK_RESULT(verify_list_parameter_count("break", it, 0, -1));
+        it = it->next;
+        auto br = Break::from(_anchor);
+        if (it) {
+            Expander subexp(env, it->next);
+            SCOPES_CHECK_RESULT(subexp.expand_arguments(br, it));
+        }
+        return br;
+    }
+
+    SCOPES_RESULT(ASTNode *) expand_repeat(const List *it) {
+        SCOPES_RESULT_TYPE(ASTNode *);
+        auto _anchor = get_active_anchor();
+        SCOPES_CHECK_RESULT(verify_list_parameter_count("repeat", it, 0, -1));
+        it = it->next;
+        auto rep = Repeat::from(_anchor);
+        if (it) {
+            Expander subexp(env, it->next);
+            SCOPES_CHECK_RESULT(subexp.expand_arguments(rep, it));
+        }
+        return rep;
+    }
+
     SCOPES_RESULT(ASTNode *) expand_call(const List *it, uint32_t flags = 0) {
         SCOPES_RESULT_TYPE(ASTNode *);
 
@@ -797,19 +627,7 @@ struct Expander {
         call->flags = flags;
 
         it = subexp.next;
-        while (it) {
-            subexp.next = it->next;
-            Symbol key = SYM_Unnamed;
-            Any value;
-            set_active_anchor(((const Syntax *)it->at)->anchor);
-            if (SCOPES_GET_RESULT(get_kwargs(it->at, key, value))) {
-                call->append(key,
-                    SCOPES_GET_RESULT(subexp.expand(value)));
-            } else {
-                call->append(SCOPES_GET_RESULT(subexp.expand(it->at)));
-            }
-            it = subexp.next;
-        }
+        SCOPES_CHECK_RESULT(subexp.expand_arguments(call, it));
         return call;
     }
 
@@ -847,7 +665,7 @@ struct Expander {
             Any head = SCOPES_GET_RESULT(unsyntax(list->at));
             // resolve symbol
             if (head.type == TYPE_Symbol) {
-                ASTNode *headnode = nullptr;
+                ASTValue *headnode = nullptr;
                 if (env->lookup(head.symbol, headnode)) {
                     if (isa<Const>(headnode)) {
                         head = cast<Const>(headnode)->value;
@@ -869,8 +687,12 @@ struct Expander {
                 }
                 case KW_SyntaxExtend: return expand_syntax_extend(list);
                 case KW_Let: return expand_let(list);
+                case KW_Loop: return expand_loop(list);
                 case KW_If: return expand_if(list);
                 case KW_Quote: return expand_quote(list);
+                case KW_Return: return expand_return(list);
+                case KW_Break: return expand_break(list);
+                case KW_Repeat: return expand_repeat(list);
                 //case KW_Defer: return expand_defer(list);
                 case KW_Do: return expand_do(list);
                 case KW_TryCall:
@@ -891,9 +713,9 @@ struct Expander {
                 }
             }
 
-            ASTNode *list_handler_node;
+            ASTValue *list_handler_node;
             if (env->lookup(Symbol(SYM_ListWildcard), list_handler_node)) {
-                Any list_handler = list_handler_node;
+                Any list_handler = static_cast<ASTNode *>(list_handler_node);
                 if (isa<Const>(list_handler_node))
                     list_handler = cast<Const>(list_handler_node)->value;
                 if (list_handler.type != list_expander_func_type) {
@@ -931,11 +753,11 @@ struct Expander {
 
             Symbol name = expr.symbol;
 
-            ASTNode *result = nullptr;
+            ASTValue *result = nullptr;
             if (!env->lookup(name, result)) {
-                ASTNode *symbol_handler_node;
+                ASTValue *symbol_handler_node;
                 if (env->lookup(Symbol(SYM_SymbolWildcard), symbol_handler_node)) {
-                    Any symbol_handler = symbol_handler_node;
+                    Any symbol_handler = static_cast<ASTNode *>(symbol_handler_node);
                     if (isa<Const>(symbol_handler_node))
                         symbol_handler = cast<Const>(symbol_handler_node)->value;
                     if (symbol_handler.type != list_expander_func_type) {
