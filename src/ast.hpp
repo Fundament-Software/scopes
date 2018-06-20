@@ -12,6 +12,7 @@
 #include "result.hpp"
 
 #include <vector>
+#include <unordered_map>
 
 namespace scopes {
 
@@ -24,6 +25,7 @@ struct Scope;
     T(ASTK_Block, "ast-kind-block", Block) \
     T(ASTK_If, "ast-kind-if", If) \
     T(ASTK_Symbol, "ast-kind-symbol", ASTSymbol) \
+    T(ASTK_ArgumentList, "ast-kind-argumentlist", ASTArgumentList) \
     T(ASTK_Call, "ast-kind-call", Call) \
     T(ASTK_Let, "ast-kind-let", Let) \
     T(ASTK_Loop, "ast-kind-loop", Loop) \
@@ -46,10 +48,30 @@ enum ASTKind {
 #undef T
 
 struct ASTNode;
+struct ASTValue;
 
 typedef std::vector<ASTSymbol *> ASTSymbols;
 typedef std::vector<ASTNode *> ASTNodes;
+typedef std::vector<ASTValue *> ASTValues;
 typedef std::vector<Block *> Blocks;
+
+//------------------------------------------------------------------------------
+/*
+    each ast node can have several ways to continue flow, which are not
+    mutually exclusive, and each flow method can have its own type:
+
+    1. continue: the continue type is forwarded to whatever
+        node needs to process it; if there's no continue type, the expression
+        always returns
+
+        for loops, the break statement defines the continue type.
+
+    2. return: the return type leaves the function and types the function's
+        continue type; if there's no return type, the expression always
+        continues
+
+
+*/
 
 //------------------------------------------------------------------------------
 
@@ -60,7 +82,10 @@ struct ASTNode {
     ASTNode(const ASTNode &other) = delete;
 
     const Anchor *anchor() const;
+    bool is_empty() const;
 
+    const Type *get_type() const;
+    const Type *get_value_type() const;
 private:
     const ASTKind _kind;
 
@@ -78,6 +103,23 @@ struct ASTValue : ASTNode {
 
 //------------------------------------------------------------------------------
 
+struct ASTArgumentList : ASTValue {
+    static bool classof(const ASTNode *T);
+
+    ASTArgumentList(const Anchor *anchor, const ASTNodes &values);
+    const Type *get_value_type() const;
+
+    void append(Symbol key, ASTNode *node);
+    void append(ASTNode *node);
+    void flatten();
+
+    static ASTArgumentList *from(const Anchor *anchor, const ASTNodes &values = {});
+
+    ASTNodes values;
+};
+
+//------------------------------------------------------------------------------
+
 struct ASTFunction : ASTValue {
     static bool classof(const ASTNode *T);
 
@@ -88,6 +130,8 @@ struct ASTFunction : ASTValue {
     bool is_inline() const;
     void append_param(ASTSymbol *sym);
     Block *ensure_body();
+    SCOPES_RESULT(ASTNode *) resolve_symbol(ASTSymbol *sym) const;
+    const Type *get_value_type() const;
 
     static ASTFunction *from(
         const Anchor *anchor, Symbol name,
@@ -98,6 +142,11 @@ struct ASTFunction : ASTValue {
     Block *body;
     bool _inline;
     const String *docstring;
+    const Type *return_type;
+    ASTFunction *scope;
+
+    std::unordered_map<const List *, ASTFunction *> instances;
+    std::unordered_map<ASTSymbol *, ASTNode *> map;
 };
 
 //------------------------------------------------------------------------------
@@ -107,6 +156,7 @@ struct Block : ASTNode {
 
     Block(const Anchor *anchor, const ASTNodes &nodes);
     void append(ASTNode *node);
+    const Type *get_value_type() const;
 
     static Block *from(const Anchor *anchor, const ASTNodes &nodes = {});
 
@@ -129,6 +179,8 @@ struct If : ASTNode {
     static bool classof(const ASTNode *T);
 
     If(const Anchor *anchor, const Clauses &clauses);
+    const Type *get_value_type() const;
+
     static If *from(const Anchor *anchor, const Clauses &clauses = {});
 
     ASTNode *get_else_clause() const;
@@ -146,6 +198,7 @@ struct ASTSymbol : ASTValue {
     ASTSymbol(const Anchor *anchor, Symbol name, const Type *type, bool variadic);
     static ASTSymbol *from(const Anchor *anchor, Symbol name = SYM_Unnamed, const Type *type = nullptr);
     static ASTSymbol *variadic_from(const Anchor *anchor, Symbol name = SYM_Unnamed, const Type *type = nullptr);
+    const Type *get_value_type() const;
 
     bool is_variadic() const;
 
@@ -156,37 +209,22 @@ struct ASTSymbol : ASTValue {
 
 //------------------------------------------------------------------------------
 
-struct ASTArgument {
-    Symbol key;
-    ASTNode *expr;
-};
-
-typedef std::vector<ASTArgument> ASTArguments;
-
-struct CallLike : ASTNode {
-    CallLike(ASTKind _kind, const Anchor *anchor, const ASTArguments &args);
-
-    void append(const ASTArgument &arg);
-    void append(Symbol key, ASTNode *node);
-    void append(ASTNode *node);
-
-    ASTArguments args;
-};
-
-//------------------------------------------------------------------------------
-
 enum CallFlags {
     CF_RawCall = (1 << 0),
     CF_TryCall = (1 << 1),
 };
 
-struct Call : CallLike {
+struct Call : ASTNode {
     static bool classof(const ASTNode *T);
 
-    Call(const Anchor *anchor, ASTNode *callee, const ASTArguments &args);
-    static Call *from(const Anchor *anchor, ASTNode *callee, const ASTArguments &args = {});
+    Call(const Anchor *anchor, ASTNode *callee, ASTArgumentList *args);
+    static Call *from(const Anchor *anchor, ASTNode *callee, ASTArgumentList *args = nullptr);
+    const Type *get_value_type() const;
+
+    ASTArgumentList *ensure_args();
 
     ASTNode *callee;
+    ASTArgumentList *args;
     uint32_t flags;
 };
 
@@ -228,6 +266,8 @@ struct Let : LetLike {
     static bool classof(const ASTNode *T);
 
     Let(const Anchor *anchor, const ASTBindings &bindings, Block *body);
+    const Type *get_value_type() const;
+
     static Let *from(const Anchor *anchor, const ASTBindings &bindings = {}, Block *body = nullptr);
 
     void move_constants_to_scope(Scope *scope);
@@ -240,6 +280,8 @@ struct Loop : LetLike {
     static bool classof(const ASTNode *T);
 
     Loop(const Anchor *anchor, const ASTBindings &bindings, Block *body);
+    const Type *get_value_type() const;
+
     static Loop *from(const Anchor *anchor, const ASTBindings &bindings = {}, Block *body = nullptr);
 };
 
@@ -249,6 +291,8 @@ struct Const : ASTValue {
     static bool classof(const ASTNode *T);
 
     Const(const Anchor *anchor, Any value);
+    const Type *get_value_type() const;
+
     static Const *from(const Anchor *anchor, Any value);
 
     Any value;
@@ -256,29 +300,47 @@ struct Const : ASTValue {
 
 //------------------------------------------------------------------------------
 
-struct Break : CallLike {
+struct Break : ASTNode {
     static bool classof(const ASTNode *T);
 
-    Break(const Anchor *anchor, const ASTArguments &args);
-    static Break *from(const Anchor *anchor, const ASTArguments &args = {});
+    Break(const Anchor *anchor, ASTArgumentList *args);
+    const Type *get_value_type() const;
+
+    static Break *from(const Anchor *anchor, ASTArgumentList *args = nullptr);
+
+    ASTArgumentList *ensure_args();
+
+    ASTArgumentList *args;
 };
 
 //------------------------------------------------------------------------------
 
-struct Repeat : CallLike {
+struct Repeat : ASTNode {
     static bool classof(const ASTNode *T);
 
-    Repeat(const Anchor *anchor, const ASTArguments &args);
-    static Repeat *from(const Anchor *anchor, const ASTArguments &args = {});
+    Repeat(const Anchor *anchor, ASTArgumentList *args);
+    const Type *get_value_type() const;
+
+    static Repeat *from(const Anchor *anchor, ASTArgumentList *args = nullptr);
+
+    ASTArgumentList *ensure_args();
+
+    ASTArgumentList *args;
 };
 
 //------------------------------------------------------------------------------
 
-struct Return : CallLike {
+struct Return : ASTNode {
     static bool classof(const ASTNode *T);
 
-    Return(const Anchor *anchor, const ASTArguments &args);
-    static Return *from(const Anchor *anchor, const ASTArguments &args = {});
+    Return(const Anchor *anchor, ASTArgumentList *args);
+    const Type *get_value_type() const;
+
+    static Return *from(const Anchor *anchor, ASTArgumentList *args = nullptr);
+
+    ASTArgumentList *ensure_args();
+
+    ASTArgumentList *args;
 };
 
 //------------------------------------------------------------------------------
@@ -287,6 +349,8 @@ struct SyntaxExtend : ASTNode {
     static bool classof(const ASTNode *T);
 
     SyntaxExtend(const Anchor *anchor, ASTFunction *func, const List *next, Scope *env);
+    const Type *get_value_type() const;
+
     static SyntaxExtend *from(const Anchor *anchor, ASTFunction *func, const List *next, Scope *env);
 
     ASTFunction *func;

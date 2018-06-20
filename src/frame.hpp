@@ -61,6 +61,8 @@ protected:
     Label *instance;
 };
 
+//------------------------------------------------------------------------------
+
 } // namespace scopes
 
 #endif // SCOPES_FRAME_HPP

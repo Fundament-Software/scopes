@@ -55,18 +55,22 @@ struct StreamAST : StreamAnchors {
         }
     }
 
-    void write_arguments(CallLike *val, int depth, int maxdepth) {
-        for (int i = 0; i < val->args.size(); ++i) {
+    void write_arguments(ASTArgumentList *args, int depth, int maxdepth) {
+        assert(args);
+        for (int i = 0; i < args->values.size(); ++i) {
             ss << std::endl;
-            auto &&arg = val->args[i];
-            if (arg.key == SYM_Unnamed) {
-                walk(val->args[i].expr, depth+1, maxdepth);
+            auto &&arg = args->values[i];
+
+            //if (arg.key == SYM_Unnamed) {
+                walk(arg, depth+1, maxdepth);
+            #if 0
             } else {
                 stream_indent(depth+1);
                 ss << arg.key << " "
                     << Style_Operator << "=" << Style_None << std::endl;
-                walk(val->args[i].expr, depth+2, maxdepth);
+                walk(args[i].expr, depth+2, maxdepth);
             }
+            #endif
         }
     }
 
@@ -155,7 +159,7 @@ struct StreamAST : StreamAnchors {
             }
             ss << std::endl;
             walk(val->callee, depth+1, maxdepth);
-            write_arguments(val, depth, maxdepth);
+            write_arguments(val->args, depth, maxdepth);
         } break;
         case ASTK_Let: {
             auto val = cast<Let>(node);
@@ -199,17 +203,17 @@ struct StreamAST : StreamAnchors {
         case ASTK_Break: {
             auto val = cast<Break>(node);
             ss << Style_Keyword << "Break" << Style_None;
-            write_arguments(val, depth, maxdepth);
+            write_arguments(val->args, depth, maxdepth);
         } break;
         case ASTK_Repeat: {
             auto val = cast<Repeat>(node);
             ss << Style_Keyword << "Repeat" << Style_None;
-            write_arguments(val, depth, maxdepth);
+            write_arguments(val->args, depth, maxdepth);
         } break;
         case ASTK_Return: {
             auto val = cast<Return>(node);
             ss << Style_Keyword << "Return" << Style_None;
-            write_arguments(val, depth, maxdepth);
+            write_arguments(val->args, depth, maxdepth);
         } break;
         case ASTK_SyntaxExtend: {
             auto val = cast<SyntaxExtend>(node);

@@ -15,7 +15,6 @@ namespace scopes {
 
 struct Anchor;
 struct ASTNode;
-struct CallLike;
 
 //------------------------------------------------------------------------------
 // AST PRINTER

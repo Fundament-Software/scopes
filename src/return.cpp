@@ -197,6 +197,14 @@ const Type *ReturnLabel(const Args &values, uint64_t flags) {
     return result;
 }
 
+const Type *ReturnType(const ArgTypes &values, uint64_t flags) {
+    Args args;
+    for (auto &&val : values) {
+        args.push_back(unknown_of(val));
+    }
+    return ReturnLabel(args, flags);
+}
+
 const Type *NoReturnLabel(uint64_t flags) {
     return ReturnLabel({}, flags | RLF_NoReturn);
 }

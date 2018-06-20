@@ -55,6 +55,7 @@ protected:
     bool has_vars;
 };
 
+const Type *ReturnType(const ArgTypes &values, uint64_t flags = 0);
 const Type *ReturnLabel(const Args &values, uint64_t flags = 0);
 const Type *NoReturnLabel(uint64_t flags = 0);
 

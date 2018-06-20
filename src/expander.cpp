@@ -54,13 +54,15 @@ static SCOPES_RESULT(void) verify_list_parameter_count(const char *context, cons
 
 struct Expander {
     Scope *env;
+    ASTFunction *astscope;
     const List *next;
     static bool verbose;
 
     static const Type *list_expander_func_type;
 
-    Expander(Scope *_env, const List *_next = EOL) :
+    Expander(Scope *_env, ASTFunction *_astscope, const List *_next = EOL) :
         env(_env),
+        astscope(_astscope),
         next(_next) {
         if (!list_expander_func_type) {
             list_expander_func_type = Pointer(Function(
@@ -99,11 +101,12 @@ struct Expander {
 
         auto scopeparam = ASTSymbol::from(_anchor, SYM_Unnamed, TYPE_Scope);
         ASTFunction *func = ASTFunction::from(_anchor, Symbol(KW_SyntaxExtend), {scopeparam});
+        func->scope = astscope;
 
         Scope *subenv = Scope::from(env);
         subenv->bind(Symbol(SYM_SyntaxScope), scopeparam);
 
-        Expander subexpr(subenv);
+        Expander subexpr(subenv, func);
 
         SCOPES_CHECK_RESULT(subexpr.expand_block(func->ensure_body(), it));
 
@@ -195,6 +198,7 @@ struct Expander {
         }
 
         // not a forward declaration
+        func->scope = astscope;
 
         const Syntax *sxplist = it->at;
         const List *params = sxplist->datum;
@@ -208,7 +212,7 @@ struct Expander {
         // ensure the local scope does not contain special symbols
         subenv = Scope::from(subenv);
 
-        Expander subexpr(subenv);
+        Expander subexpr(subenv, func);
 
         while (params != EOL) {
             func->append_param(SCOPES_GET_RESULT(subexpr.expand_parameter(params->at)));
@@ -266,7 +270,7 @@ struct Expander {
 
         Block *block = Block::from(_anchor);
         Scope *subenv = Scope::from(env);
-        Expander subexpr(subenv);
+        Expander subexpr(subenv, astscope);
         SCOPES_CHECK_RESULT(subexpr.expand_block(block, it));
         return block;
     }
@@ -320,7 +324,7 @@ struct Expander {
 
         it = values;
         // read init values
-        Expander subexp(env);
+        Expander subexp(env, astscope);
         while (it) {
             subexp.next = it->next;
             exprs.push_back(SCOPES_GET_RESULT(subexp.expand(it->at)));
@@ -397,7 +401,7 @@ struct Expander {
         it = values;
         it = it->next;
         // read init values
-        Expander subexp(env);
+        Expander subexp(env, astscope);
         while (it) {
             subexp.next = it->next;
             exprs.push_back(SCOPES_GET_RESULT(subexp.expand(it->at)));
@@ -514,7 +518,7 @@ struct Expander {
 
             Block *thenblock = Block::from(anchor);
 
-            Expander subexp(env);
+            Expander subexp(env, astscope);
             subexp.next = it->next;
             ASTNode *cond = SCOPES_GET_RESULT(subexp.expand(it->at));
             it = subexp.next;
@@ -529,7 +533,7 @@ struct Expander {
         if (it != EOL) {
             const Anchor *anchor = ((const Syntax *)it->at)->anchor;
             it = it->next;
-            Expander subexp(Scope::from(env));
+            Expander subexp(Scope::from(env), astscope);
 
             Block *elseblock = Block::from(anchor);
             SCOPES_CHECK_RESULT(subexp.expand_block(elseblock, it));
@@ -558,7 +562,7 @@ struct Expander {
         return true;
     }
 
-    SCOPES_RESULT(void) expand_arguments(CallLike *calllike, const List *it) {
+    SCOPES_RESULT(void) expand_arguments(ASTArgumentList *args, const List *it) {
         SCOPES_RESULT_TYPE(void);
         while (it) {
             next = it->next;
@@ -566,10 +570,10 @@ struct Expander {
             Any value;
             set_active_anchor(((const Syntax *)it->at)->anchor);
             if (SCOPES_GET_RESULT(get_kwargs(it->at, key, value))) {
-                calllike->append(key,
+                args->append(key,
                     SCOPES_GET_RESULT(expand(value)));
             } else {
-                calllike->append(SCOPES_GET_RESULT(expand(it->at)));
+                args->append(SCOPES_GET_RESULT(expand(it->at)));
             }
             it = next;
         }
@@ -583,8 +587,8 @@ struct Expander {
         it = it->next;
         auto ret = Return::from(_anchor);
         if (it) {
-            Expander subexp(env, it->next);
-            SCOPES_CHECK_RESULT(subexp.expand_arguments(ret, it));
+            Expander subexp(env, astscope, it->next);
+            SCOPES_CHECK_RESULT(subexp.expand_arguments(ret->ensure_args(), it));
         }
         return ret;
     }
@@ -596,8 +600,8 @@ struct Expander {
         it = it->next;
         auto br = Break::from(_anchor);
         if (it) {
-            Expander subexp(env, it->next);
-            SCOPES_CHECK_RESULT(subexp.expand_arguments(br, it));
+            Expander subexp(env, astscope, it->next);
+            SCOPES_CHECK_RESULT(subexp.expand_arguments(br->ensure_args(), it));
         }
         return br;
     }
@@ -609,8 +613,8 @@ struct Expander {
         it = it->next;
         auto rep = Repeat::from(_anchor);
         if (it) {
-            Expander subexp(env, it->next);
-            SCOPES_CHECK_RESULT(subexp.expand_arguments(rep, it));
+            Expander subexp(env, astscope, it->next);
+            SCOPES_CHECK_RESULT(subexp.expand_arguments(rep->ensure_args(), it));
         }
         return rep;
     }
@@ -620,14 +624,14 @@ struct Expander {
 
         auto _anchor = get_active_anchor();
         SCOPES_CHECK_RESULT(verify_list_parameter_count("call", it, 0, -1));
-        Expander subexp(env, it->next);
+        Expander subexp(env, astscope, it->next);
         ASTNode *enter = SCOPES_GET_RESULT(subexp.expand(it->at));
 
         auto call = Call::from(_anchor, enter);
         call->flags = flags;
 
         it = subexp.next;
-        SCOPES_CHECK_RESULT(subexp.expand_arguments(call, it));
+        SCOPES_CHECK_RESULT(subexp.expand_arguments(call->ensure_args(), it));
         return call;
     }
 
@@ -817,7 +821,7 @@ SCOPES_RESULT(ASTFunction *) expand_inline(Any expr, Scope *scope) {
     mainfunc->set_inline();
 
     Scope *subenv = scope?scope:globals;
-    Expander subexpr(subenv);
+    Expander subexpr(subenv, mainfunc);
     SCOPES_CHECK_RESULT(subexpr.expand_block(mainfunc->ensure_body(), expr));
 
     return mainfunc;
@@ -836,7 +840,7 @@ SCOPES_RESULT(ASTFunction *) expand_module(Any expr, Scope *scope) {
     ASTFunction *mainfunc = ASTFunction::from(anchor, anchor->path());
 
     Scope *subenv = scope?scope:globals;
-    Expander subexpr(subenv);
+    Expander subexpr(subenv, mainfunc);
     SCOPES_CHECK_RESULT(subexpr.expand_block(mainfunc->ensure_body(), expr));
 
     return mainfunc;

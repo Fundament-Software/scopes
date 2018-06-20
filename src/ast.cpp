@@ -6,9 +6,9 @@
 */
 
 #include "ast.hpp"
-#include "type.hpp"
 #include "error.hpp"
 #include "scope.hpp"
+#include "types.hpp"
 #include "dyn_cast.inc"
 
 #include <assert.h>
@@ -17,30 +17,81 @@ namespace scopes {
 
 //------------------------------------------------------------------------------
 
-ASTKind ASTNode::kind() const { return _kind; }
-
-ASTNode::ASTNode(ASTKind kind, const Anchor *anchor)
-    : _kind(kind),_anchor(anchor) {
-    assert(_anchor);
+ASTArgumentList::ASTArgumentList(const Anchor *anchor, const ASTNodes &_values)
+    : ASTValue(ASTK_ArgumentList, anchor), values(_values) {
 }
 
-const Anchor *ASTNode::anchor() const {
-    return _anchor;
+const Type *ASTArgumentList::get_value_type() const {
+    return TYPE_Unknown;
 }
 
-#define T(NAME, BNAME, CLASS) \
-    bool CLASS::classof(const ASTNode *T) { \
-        return T->kind() == NAME; \
+void ASTArgumentList::append(ASTNode *node) {
+    values.push_back(node);
+}
+
+void ASTArgumentList::append(Symbol key, ASTNode *node) {
+    assert(false); // todo: store key
+    values.push_back(node);
+}
+
+void ASTArgumentList::flatten() {
+    if (values.empty())
+        return;
+    int i = (int)values.size() - 1;
+    while (i > 0) {
+        i--;
+        auto nl = dyn_cast<ASTArgumentList>(values[i]);
+        if (nl) {
+            // nodelist not in last place
+            if (nl->values.empty()) {
+                // node list empty: replace with none
+                values[i] = Const::from(nl->anchor(), none);
+            } else {
+                // take only the first value
+                values[i] = nl->values[0];
+            }
+        }
     }
-SCOPES_AST_KIND()
-#undef T
+    // nodelist in last place: expand to full argument list
+    auto nl = dyn_cast<ASTArgumentList>(values.back());
+    if (nl) {
+        values.pop_back();
+        for (auto &&arg : nl->values) {
+            values.push_back(arg);
+        }
+    }
+}
+
+ASTArgumentList *ASTArgumentList::from(const Anchor *anchor, const ASTNodes &values) {
+    return new ASTArgumentList(anchor, values);
+}
 
 //------------------------------------------------------------------------------
 
 ASTFunction::ASTFunction(const Anchor *anchor, Symbol _name, const ASTSymbols &_params, Block *_body)
     : ASTValue(ASTK_Function, anchor),
         name(_name), params(_params), body(_body),
-        _inline(false), docstring(nullptr) {
+        _inline(false), docstring(nullptr), return_type(nullptr), scope(nullptr) {
+    return_type = TYPE_Unknown;
+}
+
+const Type *ASTFunction::get_value_type() const {
+    return return_type;
+}
+
+SCOPES_RESULT(ASTNode *) ASTFunction::resolve_symbol(ASTSymbol *sym) const {
+    SCOPES_RESULT_TYPE(ASTNode *);
+    const ASTFunction *func = this;
+    while (func) {
+        auto it = map.find(sym);
+        if (it != map.end())
+            return it->second;
+        func = func->scope;
+    }
+    set_active_anchor(sym->anchor());
+    StyledString ss;
+    ss.out << "symbol is unbound in any parent scope";
+    SCOPES_LOCATION_ERROR(ss.str());
 }
 
 bool ASTFunction::is_forward_decl() const {
@@ -82,6 +133,10 @@ Block *Block::from(const Anchor *anchor, const ASTNodes &nodes) {
     return new Block(anchor, nodes);
 }
 
+const Type *Block::get_value_type() const {
+    return TYPE_Unknown;
+}
+
 void Block::strip_constants() {
     int i = (int)body.size() - 1;
     while (i > 0) {
@@ -107,6 +162,8 @@ void Block::flatten() {
 }
 
 void Block::append(ASTNode *node) {
+    if (node->is_empty())
+        return;
     body.push_back(node);
 }
 
@@ -118,6 +175,10 @@ If::If(const Anchor *anchor, const Clauses &_clauses)
 
 If *If::from(const Anchor *anchor, const Clauses &_clauses) {
     return new If(anchor, _clauses);
+}
+
+const Type *If::get_value_type() const {
+    return TYPE_Unknown;
 }
 
 ASTNode *If::get_else_clause() const {
@@ -163,6 +224,10 @@ ASTSymbol::ASTSymbol(const Anchor *anchor, Symbol _name, const Type *_type, bool
         type = TYPE_Unknown;
 }
 
+const Type *ASTSymbol::get_value_type() const {
+    return type;
+}
+
 ASTSymbol *ASTSymbol::from(const Anchor *anchor, Symbol name, const Type *type) {
     return new ASTSymbol(anchor, name, type, false);
 }
@@ -177,31 +242,23 @@ bool ASTSymbol::is_variadic() const {
 
 //------------------------------------------------------------------------------
 
-CallLike::CallLike(ASTKind _kind, const Anchor *anchor, const ASTArguments &_args)
-    : ASTNode(_kind, anchor), args(_args) {
+Call::Call(const Anchor *anchor, ASTNode *_callee, ASTArgumentList *_args)
+    : ASTNode(ASTK_Call, anchor), callee(_callee), args(_args), flags(0) {
 }
 
-void CallLike::append(const ASTArgument &arg) {
-    assert(arg.expr);
-    args.push_back(arg);
+const Type *Call::get_value_type() const {
+    return TYPE_Unknown;
 }
 
-void CallLike::append(Symbol key, ASTNode *node) {
-    append({key, node});
+ASTArgumentList *Call::ensure_args() {
+    if (!args) {
+        args = ASTArgumentList::from(anchor());
+    }
+    return args;
 }
 
-void CallLike::append(ASTNode *node) {
-    append({SYM_Unnamed, node});
-}
-
-//------------------------------------------------------------------------------
-
-Call::Call(const Anchor *anchor, ASTNode *_callee, const ASTArguments &_args)
-    : CallLike(ASTK_Call, anchor, _args), callee(_callee), flags(0) {
-}
-
-Call *Call::from(const Anchor *anchor, ASTNode *callee, const ASTArguments &args) {
-    return new Call(anchor, callee, args);
+Call *Call::from(const Anchor *anchor, ASTNode *callee, ASTArgumentList *_args) {
+    return new Call(anchor, callee, _args);
 }
 
 //------------------------------------------------------------------------------
@@ -270,6 +327,7 @@ SCOPES_RESULT(void) LetLike::map(const ASTSymbols &syms, const ASTNodes &nodes) 
                 // only one symbol left, but it's not variadic
                 bindings.push_back({sym, expr});
             } else {
+                // unpacking section
                 assert(!has_variadic_section());
                 // the remainder goes to the variadic section
                 for (int j = i; j < symcount; ++j) {
@@ -277,6 +335,18 @@ SCOPES_RESULT(void) LetLike::map(const ASTSymbols &syms, const ASTNodes &nodes) 
                 }
                 variadic.expr = expr;
             }
+        } else if (sym->is_variadic()) {
+            // grouping multiple arguments under one variadic symbol
+            // reaching last symbol
+            assert(!has_variadic_section());
+            auto vals = ASTArgumentList::from(expr->anchor());
+            // store remaining arguments in single node
+            for (int j = i; j < argcount; ++j) {
+                vals->values.push_back(nodes[i]);
+            }
+            variadic.expr = vals;
+            variadic.syms.push_back(sym);
+            break;
         } else {
             bindings.push_back({sym, expr});
         }
@@ -298,6 +368,11 @@ Let::Let(const Anchor *anchor, const ASTBindings &bindings, Block *body)
 }
 Let *Let::from(const Anchor *anchor, const ASTBindings &bindings, Block *body) {
     return new Let(anchor, bindings, body);
+}
+
+const Type *Let::get_value_type() const {
+    assert(body);
+    return body->get_type();
 }
 
 void Let::move_constants_to_scope(Scope *scope) {
@@ -344,6 +419,11 @@ void Let::flatten() {
 Loop::Loop(const Anchor *anchor, const ASTBindings &bindings, Block *body)
     : LetLike(ASTK_Loop, anchor, bindings, body) {
 }
+
+const Type *Loop::get_value_type() const {
+    return TYPE_Unknown;
+}
+
 Loop *Loop::from(const Anchor *anchor, const ASTBindings &bindings, Block *body) {
     return new Loop(anchor, bindings, body);
 }
@@ -354,34 +434,71 @@ Const::Const(const Anchor *anchor, Any _value) :
     ASTValue(ASTK_Const, anchor), value(_value) {
 }
 
+const Type *Const::get_value_type() const {
+    return value.type;
+}
+
 Const *Const::from(const Anchor *anchor, Any value) {
     return new Const(anchor, value);
 }
 
 //------------------------------------------------------------------------------
 
-Break::Break(const Anchor *anchor, const ASTArguments &args)
-    : CallLike(ASTK_Break, anchor, args) {}
+Break::Break(const Anchor *anchor, ASTArgumentList *_args)
+    : ASTNode(ASTK_Break, anchor), args(_args) {}
 
-Break *Break::from(const Anchor *anchor, const ASTArguments &args) {
+const Type *Break::get_value_type() const {
+    return NoReturnLabel();
+}
+
+ASTArgumentList *Break::ensure_args() {
+    if (!args) {
+        args = ASTArgumentList::from(anchor());
+    }
+    return args;
+}
+
+Break *Break::from(const Anchor *anchor, ASTArgumentList *args) {
     return new Break(anchor, args);
 }
 
 //------------------------------------------------------------------------------
 
-Repeat::Repeat(const Anchor *anchor, const ASTArguments &args)
-    : CallLike(ASTK_Repeat, anchor, args) {}
+Repeat::Repeat(const Anchor *anchor, ASTArgumentList *_args)
+    : ASTNode(ASTK_Repeat, anchor), args(_args) {}
 
-Repeat *Repeat::from(const Anchor *anchor, const ASTArguments &args) {
+const Type *Repeat::get_value_type() const {
+    return NoReturnLabel();
+}
+
+ASTArgumentList *Repeat::ensure_args() {
+    if (!args) {
+        args = ASTArgumentList::from(anchor());
+    }
+    return args;
+}
+
+Repeat *Repeat::from(const Anchor *anchor, ASTArgumentList *args) {
     return new Repeat(anchor, args);
 }
 
 //------------------------------------------------------------------------------
 
-Return::Return(const Anchor *anchor, const ASTArguments &args)
-    : CallLike(ASTK_Return, anchor, args) {}
+Return::Return(const Anchor *anchor, ASTArgumentList *_args)
+    : ASTNode(ASTK_Return, anchor), args(_args) {}
 
-Return *Return::from(const Anchor *anchor, const ASTArguments &args) {
+const Type *Return::get_value_type() const {
+    return NoReturnLabel();
+}
+
+ASTArgumentList *Return::ensure_args() {
+    if (!args) {
+        args = ASTArgumentList::from(anchor());
+    }
+    return args;
+}
+
+Return *Return::from(const Anchor *anchor, ASTArgumentList *args) {
     return new Return(anchor, args);
 }
 
@@ -391,9 +508,49 @@ SyntaxExtend::SyntaxExtend(const Anchor *anchor, ASTFunction *_func, const List 
     : ASTNode(ASTK_SyntaxExtend, anchor), func(_func), next(_next), env(_env) {
 }
 
+const Type *SyntaxExtend::get_value_type() const {
+    return TYPE_Unknown;
+}
+
 SyntaxExtend *SyntaxExtend::from(const Anchor *anchor, ASTFunction *func, const List *next, Scope *env) {
     return new SyntaxExtend(anchor, func, next, env);
 }
+
+//------------------------------------------------------------------------------
+
+ASTKind ASTNode::kind() const { return _kind; }
+
+ASTNode::ASTNode(ASTKind kind, const Anchor *anchor)
+    : _kind(kind),_anchor(anchor) {
+    assert(_anchor);
+}
+
+bool ASTNode::is_empty() const {
+    const Block *block = dyn_cast<Block>(this);
+    if (!block) return false;
+    return block->body.empty();
+}
+
+const Anchor *ASTNode::anchor() const {
+    return _anchor;
+}
+
+const Type *ASTNode::get_type() const {
+    switch(kind()) {
+#define T(NAME, BNAME, CLASS) \
+    case NAME: return cast<CLASS>(this)->get_value_type();
+SCOPES_AST_KIND()
+#undef T
+    default: assert(false); return nullptr;
+    }
+}
+
+#define T(NAME, BNAME, CLASS) \
+    bool CLASS::classof(const ASTNode *T) { \
+        return T->kind() == NAME; \
+    }
+SCOPES_AST_KIND()
+#undef T
 
 //------------------------------------------------------------------------------
 

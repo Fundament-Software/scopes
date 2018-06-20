@@ -143,6 +143,7 @@ project "scopesrt"
         "src/c_import.cpp",
         "src/execution.cpp",
         "src/specializer.cpp",
+        "src/ast_specializer.cpp",
         "src/platform_abi.cpp",
         "src/scc.cpp",
         "src/gen_spirv.cpp",
