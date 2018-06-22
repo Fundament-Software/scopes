@@ -21,7 +21,7 @@ struct TupleType : StorageType {
     static bool classof(const Type *T);
 
     void stream_name(StyledStream &ss) const;
-    TupleType(const Args &_values, bool _packed, size_t _alignment);
+    TupleType(const KeyedTypes &_values, bool _packed, size_t _alignment);
 
     SCOPES_RESULT(void *) getelementptr(void *src, size_t i) const;
 
@@ -33,8 +33,7 @@ struct TupleType : StorageType {
 
     SCOPES_RESULT(Symbol) field_name(size_t i) const;
 
-    Args values;
-    ArgTypes types;
+    KeyedTypes values;
     bool packed;
     bool explicit_alignment;
     std::vector<size_t> offsets;
@@ -42,7 +41,7 @@ struct TupleType : StorageType {
 
 //------------------------------------------------------------------------------
 
-SCOPES_RESULT(const Type *) MixedTuple(const Args &values,
+SCOPES_RESULT(const Type *) KeyedTuple(const KeyedTypes &values,
     bool packed = false, size_t alignment = 0);
 
 SCOPES_RESULT(const Type *) Tuple(const ArgTypes &types,

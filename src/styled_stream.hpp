@@ -70,7 +70,7 @@ struct StyledStream {
 
 #if SCOPES_USE_WCHAR
     StyledStream& operator<<(const char * const s);
-    
+
 #endif
 
     StyledStream& stream_number(int8_t x);
@@ -114,10 +114,8 @@ struct Anchor;
 struct Closure;
 struct Argument;
 struct Builtin;
-struct Label;
 struct List;
 struct Nothing;
-struct Parameter;
 struct Scope;
 struct String;
 struct Symbol;
@@ -134,11 +132,8 @@ StyledStream& operator<<(StyledStream& ost, Builtin &builtin);
 StyledStream& operator<<(StyledStream& ost, const Builtin &builtin);
 StyledStream& operator<<(StyledStream& ost, const Anchor *anchor);
 StyledStream& operator<<(StyledStream& ss, const Closure *closure);
-StyledStream& operator<<(StyledStream& ss, Label *label);
-StyledStream& operator<<(StyledStream& ss, const Label *label);
 StyledStream& operator<<(StyledStream& ost, const List *list);
 StyledStream& operator<<(StyledStream& ost, const Nothing &value);
-StyledStream& operator<<(StyledStream& ss, Parameter *param);
 StyledStream& operator<<(StyledStream& ost, Scope *scope);
 StyledStream& operator<<(StyledStream& ost, const String *s);
 StyledStream& operator<<(StyledStream& ost, const Syntax *value);

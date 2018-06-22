@@ -10,22 +10,16 @@
 #include "list.hpp"
 #include "types.hpp"
 #include "c_import.hpp"
-#include "stream_label.hpp"
-#include "stream_frame.hpp"
 #include "stream_expr.hpp"
 #include "scope.hpp"
 #include "error.hpp"
 #include "globals.hpp"
 #include "platform_abi.hpp"
 #include "syntax.hpp"
-#include "parameter.hpp"
 #include "source_file.hpp"
 #include "lexerparser.hpp"
-#include "frame.hpp"
 #include "expander.hpp"
-#include "specializer.hpp"
 #include "closure.hpp"
-#include "label.hpp"
 #include "gen_llvm.hpp"
 #include "gen_spirv.hpp"
 #include "anchor.hpp"
@@ -34,6 +28,7 @@
 #include "compiler_flags.hpp"
 #include "hash.hpp"
 #include "ast.hpp"
+#include "ast_specializer.hpp"
 
 #include "scopes/scopes.h"
 
@@ -115,9 +110,9 @@ sc_bool_label_tuple_t sc_eval_inline(const sc_list_t *expr, sc_scope_t *scope) {
 #endif
 }
 
-sc_bool_label_tuple_t sc_typify(sc_closure_t *srcl, int numtypes, const sc_type_t **typeargs) {
+sc_bool_ast_tuple_t sc_typify(sc_closure_t *srcl, int numtypes, const sc_type_t **typeargs) {
     using namespace scopes;
-    if (srcl->label->is_inline()) {
+    if (srcl->func->is_inline()) {
         set_last_location_error(String::from("cannot typify inline function"));
         return { false, nullptr };
     }
@@ -125,22 +120,24 @@ sc_bool_label_tuple_t sc_typify(sc_closure_t *srcl, int numtypes, const sc_type_
     for (int i = 0; i < numtypes; ++i) {
         types.push_back(typeargs[i]);
     }
-    RETURN_RESULT(specialize(srcl->frame, srcl->label, types));
+    RETURN_RESULT(specialize(srcl->frame, srcl->func, types));
 }
 
-sc_bool_any_tuple_t sc_compile(sc_label_t *srcl, uint64_t flags) {
+sc_bool_any_tuple_t sc_compile(sc_ast_t *srcl, uint64_t flags) {
     using namespace scopes;
-    RETURN_RESULT(compile(srcl, flags));
+    RETURN_RESULT(compile(cast<ASTFunction>(srcl), flags));
 }
 
 sc_bool_string_tuple_t sc_compile_spirv(sc_symbol_t target, sc_label_t *srcl, uint64_t flags) {
     using namespace scopes;
-    RETURN_RESULT(compile_spirv(target, srcl, flags));
+    //RETURN_RESULT(compile_spirv(target, srcl, flags));
+    return {false,String::from("")};
 }
 
 sc_bool_string_tuple_t sc_compile_glsl(sc_symbol_t target, sc_label_t *srcl, uint64_t flags) {
     using namespace scopes;
-    RETURN_RESULT(compile_glsl(target, srcl, flags));
+    //RETURN_RESULT(compile_glsl(target, srcl, flags));
+    return {false,String::from("")};
 }
 
 bool sc_compile_object(const sc_string_t *path, sc_scope_t *table, uint64_t flags) {
@@ -150,7 +147,7 @@ bool sc_compile_object(const sc_string_t *path, sc_scope_t *table, uint64_t flag
 
 void sc_enter_solver_cli () {
     using namespace scopes;
-    enable_specializer_step_debugger();
+    //enable_specializer_step_debugger();
 }
 
 sc_bool_size_tuple_t sc_verify_stack () {
@@ -778,8 +775,8 @@ sc_bool_int_tuple_t sc_type_countof(const sc_type_t *T) {
         return { true, 1 };
     case TK_Array: return { true, (int)cast<ArrayType>(T)->count };
     case TK_Vector: return { true, (int)cast<VectorType>(T)->count };
-    case TK_Tuple: return { true, (int)cast<TupleType>(T)->types.size() };
-    case TK_Union: return { true, (int)cast<UnionType>(T)->types.size() };
+    case TK_Tuple: return { true, (int)cast<TupleType>(T)->values.size() };
+    case TK_Union: return { true, (int)cast<UnionType>(T)->values.size() };
     case TK_Function:  return { true, (int)(cast<FunctionType>(T)->argument_types.size() + 1) };
     default:  break;
     }
@@ -1104,8 +1101,8 @@ const sc_type_t *sc_function_type_raising(const sc_type_t *T) {
     using namespace scopes;
     if (is_kind<TK_Function>(T)) {
         auto ft = cast<FunctionType>(T);
-        auto rlt = cast<ReturnLabelType>(ft->return_type);
-        return Function(rlt->to_raising(), ft->argument_types, ft->flags);
+        auto rt = cast<ReturnType>(ft->return_type);
+        return Function(rt->to_raising(), ft->argument_types, ft->flags);
     }
     return T;
 }
@@ -1134,261 +1131,6 @@ const sc_type_t *sc_sampled_image_type(const sc_type_t *_type) {
     return SampledImage(cast<ImageType>(_type));
 }
 
-// Parameter
-////////////////////////////////////////////////////////////////////////////////
-
-sc_parameter_t *sc_parameter_new(const sc_anchor_t *anchor, sc_symbol_t symbol, const sc_type_t *type) {
-    using namespace scopes;
-    if (ends_with_parenthesis(symbol)) {
-        return Parameter::variadic_from(anchor, symbol, type);
-    } else {
-        return Parameter::from(anchor, symbol, type);
-    }
-}
-
-int sc_parameter_index(const sc_parameter_t *param) {
-    using namespace scopes;
-    return param->index;
-}
-
-sc_symbol_t sc_parameter_name(const sc_parameter_t *param) {
-    using namespace scopes;
-    return param->name;
-}
-
-const sc_type_t *sc_parameter_type(const sc_parameter_t *param) {
-    using namespace scopes;
-    return param->type;
-}
-
-// Label
-////////////////////////////////////////////////////////////////////////////////
-
-void sc_label_dump(sc_label_t *label) {
-    using namespace scopes;
-    StyledStream ss(SCOPES_CERR);
-    stream_label(ss, label, StreamLabelFormat::debug_all());
-}
-
-void sc_label_set_inline (sc_label_t *label) {
-    using namespace scopes;
-    label->set_inline();
-}
-
-const sc_anchor_t *sc_label_anchor(sc_label_t *label) {
-    using namespace scopes;
-    return label->anchor;
-}
-
-const sc_anchor_t *sc_label_body_anchor(sc_label_t *label) {
-    using namespace scopes;
-    return label->body.anchor;
-}
-
-sc_symbol_t sc_label_name(sc_label_t *label) {
-    using namespace scopes;
-    return label->name;
-}
-
-size_t sc_label_countof_reachable(sc_label_t *label) {
-    using namespace scopes;
-    std::unordered_set<Label *> labels;
-    label->build_reachable(labels);
-    return labels.size();
-}
-
-const sc_string_t *sc_label_docstring(sc_label_t *label) {
-    using namespace scopes;
-    if (label->docstring) {
-        return label->docstring;
-    } else {
-        return Symbol(SYM_Unnamed).name();
-    }
-}
-
-sc_any_t sc_label_get_enter(sc_label_t *label) {
-    using namespace scopes;
-    return label->body.enter;
-}
-
-void sc_label_set_enter(sc_label_t *label, sc_any_t value) {
-    using namespace scopes;
-    label->body.enter = value;
-}
-
-const sc_list_t *sc_label_get_arguments(sc_label_t *label) {
-    using namespace scopes;
-    const List *result = EOL;
-    size_t i = label->body.args.size();
-    while (i) {
-        i--;
-        auto &&arg = label->body.args[i];
-        result = List::from(arg.value, result);
-    }
-    return result;
-}
-
-void sc_label_set_arguments(sc_label_t *label, const sc_list_t *list) {
-    using namespace scopes;
-    label->body.args.clear();
-    if (!list)
-        return;
-    label->body.args.reserve(list->count);
-    while (list) {
-        label->body.args.push_back({SYM_Unnamed, list->at});
-        list = list->next;
-    }
-}
-
-const sc_list_t *sc_label_get_keyed(sc_label_t *label) {
-    using namespace scopes;
-    const List *result = EOL;
-    size_t i = label->body.args.size();
-    while (i) {
-        i--;
-        auto &&arg = label->body.args[i];
-        result = List::from(List::from({Any(arg.key), arg.value}), result);
-    }
-    return result;
-}
-
-bool sc_label_set_keyed(sc_label_t *label, const sc_list_t *list) {
-    using namespace scopes;
-    label->body.args.clear();
-    if (!list)
-        return true;
-    label->body.args.reserve(list->count);
-    while (list) {
-        const List *pair = list->at;
-        Symbol key = SYM_Unnamed;
-        Any value = none;
-        if (pair->count != 2) {
-            set_last_location_error(String::from("each argument must be a key/value pair"));
-            return false;
-        }
-        if (!pair->at.verify(TYPE_Symbol).ok())
-            return false;
-        key = pair->at.symbol;
-        value = pair->next->at;
-        label->body.args.push_back({key, value});
-        list = list->next;
-    }
-    return true;
-}
-
-const sc_list_t *sc_label_get_parameters(sc_label_t *label) {
-    using namespace scopes;
-    const List *result = EOL;
-    size_t i = label->params.size();
-    while (i) {
-        i--;
-        auto &&arg = label->params[i];
-        result = List::from(arg, result);
-    }
-    return result;
-}
-
-sc_label_t *sc_label_new_cont() {
-    using namespace scopes;
-    Label *label = Label::continuation_from(get_active_anchor(), SYM_Unnamed);
-    label->unset_template();
-    label->set_inline();
-    label->body.anchor = label->anchor;
-    return label;
-}
-
-sc_label_t *sc_label_new_cont_template() {
-    using namespace scopes;
-    Label *label = Label::continuation_from(get_active_anchor(), SYM_Unnamed);
-    label->set_inline();
-    label->body.anchor = label->anchor;
-    return label;
-}
-
-sc_label_t *sc_label_new_function_template() {
-    using namespace scopes;
-    Label *label = Label::function_from(get_active_anchor(), SYM_Unnamed);
-    label->body.anchor = label->anchor;
-    return label;
-}
-
-sc_label_t *sc_label_new_inline_template() {
-    using namespace scopes;
-    Label *label = Label::function_from(get_active_anchor(), SYM_Unnamed);
-    label->set_inline();
-    label->body.anchor = label->anchor;
-    return label;
-}
-
-void sc_label_set_complete(sc_label_t *label) {
-    label->body.set_complete();
-}
-
-bool sc_label_append_parameter(sc_label_t *label, sc_parameter_t *param) {
-    using namespace scopes;
-    if (param->label) {
-        set_last_location_error(
-            String::from("attempting to append parameter that's already owned by another label"));
-        return false;
-    }
-    label->append(param);
-    return true;
-}
-
-const sc_type_t *sc_label_function_type(sc_label_t *label) {
-    using namespace scopes;
-    return label->get_function_type();
-}
-
-void sc_label_set_rawcall(sc_label_t *label) {
-    using namespace scopes;
-    label->body.set_rawcall();
-}
-
-void sc_label_set_rawcont(sc_label_t *label) {
-    using namespace scopes;
-    label->body.set_rawcont();
-}
-
-sc_frame_t *sc_label_frame(sc_label_t *label) {
-    using namespace scopes;
-    auto frame = label->frame;
-    return frame?frame:Frame::root;
-}
-
-// Label
-////////////////////////////////////////////////////////////////////////////////
-
-void sc_frame_dump(sc_frame_t *frame) {
-    using namespace scopes;
-    StyledStream ss(SCOPES_CERR);
-    stream_frame(ss, frame, StreamFrameFormat::single());
-}
-
-sc_frame_t *sc_frame_root() {
-    using namespace scopes;
-    return Frame::root;
-}
-
-// Closure
-////////////////////////////////////////////////////////////////////////////////
-
-const sc_closure_t *sc_closure_new(sc_label_t *label, sc_frame_t *frame) {
-    using namespace scopes;
-    return Closure::from(label, frame);
-}
-
-sc_label_t *sc_closure_label(const sc_closure_t *closure) {
-    using namespace scopes;
-    return closure->label;
-}
-
-sc_frame_t *sc_closure_frame(const sc_closure_t *closure) {
-    using namespace scopes;
-    return closure->frame;
-}
-
-
 
 } // extern "C"
 
@@ -1413,11 +1155,11 @@ static const Type *result_tuple(const Type *rtype) {
 }
 
 static const Type *raising() {
-    return ReturnLabel({}, RLF_Raising);
+    return Return({}, RTF_Raising);
 }
 
 static const Type *raising(const Type *rtype) {
-    return ReturnLabel({unknown_of(rtype)}, RLF_Raising);
+    return Return({rtype}, RTF_Raising);
 }
 
 void init_globals(int argc, char *argv[]) {
@@ -1439,8 +1181,8 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_compiler_version, Tuple({TYPE_I32, TYPE_I32, TYPE_I32}).assert_ok());
     DEFINE_EXTERN_C_FUNCTION(sc_eval, raising(TYPE_Label), TYPE_Syntax, TYPE_Scope);
     DEFINE_EXTERN_C_FUNCTION(sc_eval_inline, raising(TYPE_Label), TYPE_List, TYPE_Scope);
-    DEFINE_EXTERN_C_FUNCTION(sc_typify, raising(TYPE_Label), TYPE_Closure, TYPE_I32, NativeROPointer(TYPE_Type));
-    DEFINE_EXTERN_C_FUNCTION(sc_compile, raising(TYPE_Any), TYPE_Label, TYPE_U64);
+    DEFINE_EXTERN_C_FUNCTION(sc_typify, raising(TYPE_ASTNode), TYPE_Closure, TYPE_I32, NativeROPointer(TYPE_Type));
+    DEFINE_EXTERN_C_FUNCTION(sc_compile, raising(TYPE_Any), TYPE_ASTNode, TYPE_U64);
     DEFINE_EXTERN_C_FUNCTION(sc_compile_spirv, raising(TYPE_String), TYPE_Symbol, TYPE_Label, TYPE_U64);
     DEFINE_EXTERN_C_FUNCTION(sc_compile_glsl, raising(TYPE_String), TYPE_Symbol, TYPE_Label, TYPE_U64);
     DEFINE_EXTERN_C_FUNCTION(sc_compile_object, raising(), TYPE_String, TYPE_Scope, TYPE_U64);
@@ -1584,43 +1326,6 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_syntax_wrap, TYPE_Any, TYPE_Anchor, TYPE_Any, TYPE_Bool);
     DEFINE_EXTERN_C_FUNCTION(sc_syntax_strip, TYPE_Any, TYPE_Any);
 
-    DEFINE_EXTERN_C_FUNCTION(sc_parameter_new, TYPE_Parameter, TYPE_Anchor, TYPE_Symbol, TYPE_Type);
-    DEFINE_EXTERN_C_FUNCTION(sc_parameter_index, TYPE_I32, TYPE_Parameter);
-    DEFINE_EXTERN_C_FUNCTION(sc_parameter_name, TYPE_Symbol, TYPE_Parameter);
-    DEFINE_EXTERN_C_FUNCTION(sc_parameter_type, TYPE_Type, TYPE_Parameter);
-
-    DEFINE_EXTERN_C_FUNCTION(sc_label_dump, TYPE_Void, TYPE_Label);
-    DEFINE_EXTERN_C_FUNCTION(sc_label_anchor, TYPE_Anchor, TYPE_Label);
-    DEFINE_EXTERN_C_FUNCTION(sc_label_body_anchor, TYPE_Anchor, TYPE_Label);
-    DEFINE_EXTERN_C_FUNCTION(sc_label_name, TYPE_Symbol, TYPE_Label);
-    DEFINE_EXTERN_C_FUNCTION(sc_label_docstring, TYPE_String, TYPE_Label);
-    DEFINE_EXTERN_C_FUNCTION(sc_label_set_inline, TYPE_Void, TYPE_Label);
-    DEFINE_EXTERN_C_FUNCTION(sc_label_countof_reachable, TYPE_USize, TYPE_Label);
-    DEFINE_EXTERN_C_FUNCTION(sc_label_get_enter, TYPE_Any, TYPE_Label);
-    DEFINE_EXTERN_C_FUNCTION(sc_label_set_enter, TYPE_Void, TYPE_Label, TYPE_Any);
-    DEFINE_EXTERN_C_FUNCTION(sc_label_get_arguments, TYPE_List, TYPE_Label);
-    DEFINE_EXTERN_C_FUNCTION(sc_label_set_arguments, TYPE_Void, TYPE_Label, TYPE_List);
-    DEFINE_EXTERN_C_FUNCTION(sc_label_get_keyed, TYPE_List, TYPE_Label);
-    DEFINE_EXTERN_C_FUNCTION(sc_label_set_keyed, raising(), TYPE_Label, TYPE_List);
-    DEFINE_EXTERN_C_FUNCTION(sc_label_get_parameters, TYPE_List, TYPE_Label);
-    DEFINE_EXTERN_C_FUNCTION(sc_label_new_cont, TYPE_Label);
-    DEFINE_EXTERN_C_FUNCTION(sc_label_new_cont_template, TYPE_Label);
-    DEFINE_EXTERN_C_FUNCTION(sc_label_new_function_template, TYPE_Label);
-    DEFINE_EXTERN_C_FUNCTION(sc_label_new_inline_template, TYPE_Label);
-    DEFINE_EXTERN_C_FUNCTION(sc_label_set_complete, TYPE_Void, TYPE_Label);
-    DEFINE_EXTERN_C_FUNCTION(sc_label_append_parameter, raising(), TYPE_Label, TYPE_Parameter);
-    DEFINE_EXTERN_C_FUNCTION(sc_label_function_type, TYPE_Type, TYPE_Label);
-    DEFINE_EXTERN_C_FUNCTION(sc_label_set_rawcall, TYPE_Void, TYPE_Label);
-    DEFINE_EXTERN_C_FUNCTION(sc_label_set_rawcont, TYPE_Void, TYPE_Label);
-    DEFINE_EXTERN_C_FUNCTION(sc_label_frame, TYPE_Frame, TYPE_Label);
-
-    DEFINE_EXTERN_C_FUNCTION(sc_frame_dump, TYPE_Void, TYPE_Frame);
-    DEFINE_EXTERN_C_FUNCTION(sc_frame_root, TYPE_Frame);
-
-    DEFINE_EXTERN_C_FUNCTION(sc_closure_new, TYPE_Closure, TYPE_Label, TYPE_Frame);
-    DEFINE_EXTERN_C_FUNCTION(sc_closure_label, TYPE_Label, TYPE_Closure);
-    DEFINE_EXTERN_C_FUNCTION(sc_closure_frame, TYPE_Frame, TYPE_Closure);
-
 #undef DEFINE_EXTERN_C_FUNCTION
 
 #ifdef SCOPES_WIN32
@@ -1642,7 +1347,8 @@ void init_globals(int argc, char *argv[]) {
     globals->bind_internal(Symbol("unroll-limit"), SCOPES_MAX_RECURSIONS);
     globals->bind_internal(KW_True, true);
     globals->bind_internal(KW_False, false);
-    globals->bind_internal(Symbol("noreturn"), NoReturnLabel());
+    globals->bind_internal(Symbol("noreturn"), (const Type *)NoReturn());
+    globals->bind_internal(Symbol("noreturn!"), (const Type *)NoReturn(RTF_Raising));
     globals->bind_internal(KW_ListEmpty, EOL);
     globals->bind_internal(KW_None, none);
     globals->bind_internal(Symbol("unnamed"), Symbol(SYM_Unnamed));

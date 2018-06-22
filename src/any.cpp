@@ -9,7 +9,6 @@
 #include "type.hpp"
 #include "types.hpp"
 #include "error.hpp"
-#include "parameter.hpp"
 #include "hash.hpp"
 #include "dyn_cast.inc"
 
@@ -23,8 +22,6 @@ namespace scopes {
 
 struct Syntax;
 struct List;
-struct Label;
-struct Parameter;
 struct Scope;
 struct Error;
 struct Frame;
@@ -57,8 +54,6 @@ Any::Any(const Syntax *x) : type(TYPE_Syntax), syntax(x) {}
 Any::Any(const Anchor *x) : type(TYPE_Anchor), anchor(x) {}
 Any::Any(const List *x) : type(TYPE_List), list(x) {}
 Any::Any(const Error *x) : type(TYPE_Error), error(x) {}
-Any::Any(Label *x) : type(TYPE_Label), label(x) {}
-Any::Any(Parameter *x) : type(TYPE_Parameter), parameter(x) {}
 Any::Any(Builtin x) : type(TYPE_Builtin), builtin(x) {}
 Any::Any(Scope *x) : type(TYPE_Scope), scope(x) {}
 Any::Any(Frame *x) : type(TYPE_Frame), frame(x) {}
@@ -101,9 +96,7 @@ SCOPES_RESULT_CAST_OPERATOR_IMPL(const Syntax *, TYPE_Syntax, syntax)
 SCOPES_RESULT_CAST_OPERATOR_IMPL(const Anchor *, TYPE_Anchor, anchor)
 SCOPES_RESULT_CAST_OPERATOR_IMPL(const String *, TYPE_String, string)
 SCOPES_RESULT_CAST_OPERATOR_IMPL(const Error *, TYPE_Error, error)
-SCOPES_RESULT_CAST_OPERATOR_IMPL(Label *, TYPE_Label, label)
 SCOPES_RESULT_CAST_OPERATOR_IMPL(Scope *, TYPE_Scope, scope)
-SCOPES_RESULT_CAST_OPERATOR_IMPL(Parameter *, TYPE_Parameter, parameter)
 SCOPES_RESULT_CAST_OPERATOR_IMPL(const Closure *, TYPE_Closure, closure)
 SCOPES_RESULT_CAST_OPERATOR_IMPL(Frame *, TYPE_Frame, frame)
 SCOPES_RESULT_CAST_OPERATOR_IMPL(ASTNode *, TYPE_ASTNode, astnode)
@@ -138,8 +131,6 @@ StyledStream& Any::stream(StyledStream& ost, bool annotate_type) const {
     else if (type == TYPE_Anchor) { as.typed(anchor); }
     else if (type == TYPE_List) { as.naked(list); }
     else if (type == TYPE_Builtin) { as.typed(builtin); }
-    else if (type == TYPE_Label) { as.typed(label); }
-    else if (type == TYPE_Parameter) { as.typed(parameter); }
     else if (type == TYPE_Scope) { as.typed(scope); }
     else if (type == TYPE_Frame) { as.typed(frame); }
     else if (type == TYPE_Closure) { as.typed(closure); }
@@ -216,7 +207,7 @@ size_t Any::hash() const {
     case TK_Tuple: {
         auto ti = cast<TupleType>(T);
         size_t h = 0;
-        for (size_t i = 0; i < ti->types.size(); ++i) {
+        for (size_t i = 0; i < ti->values.size(); ++i) {
             h = hash2(h, ti->unpack(pointer, i).assert_ok().hash());
         }
         return h;
@@ -275,7 +266,7 @@ bool Any::operator ==(const Any &other) const {
     } break;
     case TK_Tuple: {
         auto ti = cast<TupleType>(T);
-        for (size_t i = 0; i < ti->types.size(); ++i) {
+        for (size_t i = 0; i < ti->values.size(); ++i) {
             if (ti->unpack(pointer, i).assert_ok() != ti->unpack(other.pointer, i).assert_ok())
                 return false;
         }
@@ -290,22 +281,6 @@ bool Any::operator ==(const Any &other) const {
     ss << "incomparable value: " << T << std::endl;
     assert(false && "incomparable value");
     return false;
-}
-
-SCOPES_RESULT(void) Any::verify_indirect(const Type *T) const {
-    return scopes::verify(T, indirect_type());
-}
-
-bool Any::is_const() const {
-    return !((type == TYPE_Parameter) && parameter->label);
-}
-
-const Type *Any::indirect_type() const {
-    if (!is_const()) {
-        return parameter->type;
-    } else {
-        return type;
-    }
 }
 
 //------------------------------------------------------------------------------

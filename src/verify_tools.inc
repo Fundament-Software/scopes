@@ -32,7 +32,7 @@ inline SCOPES_RESULT(void) verify_kind(const Type *T) {
         case TK_Tuple: ss.out << "tuple"; break;
         case TK_Union: ss.out << "union"; break;
         case TK_Typename: ss.out << "typename"; break;
-        case TK_ReturnLabel: ss.out << "return label"; break;
+        case TK_Return: ss.out << "return"; break;
         case TK_Function: ss.out << "function"; break;
         case TK_Extern: ss.out << "extern"; break;
         case TK_Image: ss.out << "image"; break;
@@ -79,11 +79,7 @@ static SCOPES_RESULT(T) cast_number(const Any &value) {
     }
     StyledString ss;
     ss.out << "can not extract constant from ";
-    if (value.is_const()) {
-        ss.out << "value of type " << value.type;
-    } else {
-        ss.out << "variable of type " << value.indirect_type();
-    }
+    ss.out << "value of type " << value.type;
     SCOPES_LOCATION_ERROR(ss.str());
 }
 

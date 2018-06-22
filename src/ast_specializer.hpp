@@ -7,7 +7,15 @@
 #ifndef SCOPES_AST_SPECIALIZER_HPP
 #define SCOPES_AST_SPECIALIZER_HPP
 
+#include "result.hpp"
+#include "type.hpp"
+
 namespace scopes {
+
+struct ASTFunction;
+struct Template;
+
+SCOPES_RESULT(ASTFunction *) specialize(ASTFunction *frame, Template *func, const ArgTypes &types);
 
 } // namespace scopes
 

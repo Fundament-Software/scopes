@@ -10,11 +10,33 @@
 #include "anchor.hpp"
 #include "list.hpp"
 #include "syntax.hpp"
+#include "hash.hpp"
 #include "dyn_cast.inc"
 
 #include <memory.h>
 
 namespace scopes {
+
+//------------------------------------------------------------------------------
+
+KeyedType::KeyedType()
+    : key(SYM_Unnamed), type(TYPE_Unknown) {}
+KeyedType::KeyedType(const Type *_type)
+    : key(SYM_Unnamed), type(_type) {}
+KeyedType::KeyedType(Symbol _key, const Type *_type)
+    : key(_key), type(_type) {}
+
+size_t KeyedType::hash() const {
+    return hash2(key.hash(), std::hash<const Type *>{}(type));
+}
+
+bool KeyedType::operator ==(const KeyedType &other) const {
+    return (key == other.key) && (type == other.type);
+}
+
+bool KeyedType::operator !=(const KeyedType &other) const {
+    return !(*this == other);
+}
 
 //------------------------------------------------------------------------------
 
@@ -126,9 +148,9 @@ bool is_invalid_argument_type(const Type *T) {
             return is_invalid_argument_type(tt->storage_type);
         }
     } break;
-    case TK_ReturnLabel: {
-        const ReturnLabelType *rlt = cast<ReturnLabelType>(T);
-        return is_invalid_argument_type(rlt->return_type);
+    case TK_Return: {
+        const ReturnType *rt = cast<ReturnType>(T);
+        return is_invalid_argument_type(rt->return_type);
     } break;
     case TK_Function: return true;
     default: break;
@@ -146,9 +168,9 @@ bool is_opaque(const Type *T) {
             return is_opaque(tt->storage_type);
         }
     } break;
-    case TK_ReturnLabel: {
-        const ReturnLabelType *rlt = cast<ReturnLabelType>(T);
-        return is_opaque(rlt->return_type);
+    case TK_Return: {
+        const ReturnType *rt = cast<ReturnType>(T);
+        return is_opaque(rt->return_type);
     } break;
     case TK_Image:
     case TK_SampledImage:
@@ -175,8 +197,8 @@ SCOPES_RESULT(size_t) size_of(const Type *T) {
     case TK_Vector: return cast<VectorType>(T)->size;
     case TK_Tuple: return cast<TupleType>(T)->size;
     case TK_Union: return cast<UnionType>(T)->size;
-    case TK_ReturnLabel: {
-        return size_of(cast<ReturnLabelType>(T)->return_type);
+    case TK_Return: {
+        return size_of(cast<ReturnType>(T)->return_type);
     } break;
     case TK_Typename: return size_of(SCOPES_GET_RESULT(storage_type(cast<TypenameType>(T))));
     default: break;
@@ -210,8 +232,8 @@ SCOPES_RESULT(size_t) align_of(const Type *T) {
     case TK_Vector: return cast<VectorType>(T)->align;
     case TK_Tuple: return cast<TupleType>(T)->align;
     case TK_Union: return cast<UnionType>(T)->align;
-    case TK_ReturnLabel: {
-        return size_of(cast<ReturnLabelType>(T)->return_type);
+    case TK_Return: {
+        return size_of(cast<ReturnType>(T)->return_type);
     } break;
     case TK_Typename: return align_of(SCOPES_GET_RESULT(storage_type(cast<TypenameType>(T))));
     default: break;
@@ -232,7 +254,7 @@ const Type *superof(const Type *T) {
     case TK_Tuple: return TYPE_Tuple;
     case TK_Union: return TYPE_Union;
     case TK_Typename: return cast<TypenameType>(T)->super();
-    case TK_ReturnLabel: return TYPE_ReturnLabel;
+    case TK_Return: return TYPE_Return;
     case TK_Function: return TYPE_Function;
     case TK_Extern: return TYPE_Extern;
     case TK_Image: return TYPE_Image;
@@ -408,7 +430,7 @@ void init_types() {
     DEFINE_TYPENAME("vector", TYPE_Vector);
     DEFINE_TYPENAME("tuple", TYPE_Tuple);
     DEFINE_TYPENAME("union", TYPE_Union);
-    DEFINE_TYPENAME("ReturnLabel", TYPE_ReturnLabel);
+    DEFINE_TYPENAME("Return", TYPE_Return);
     DEFINE_TYPENAME("constant", TYPE_Constant);
     DEFINE_TYPENAME("function", TYPE_Function);
     DEFINE_TYPENAME("extern", TYPE_Extern);
@@ -485,7 +507,7 @@ void init_types() {
         cast<TypenameType>(const_cast<Type *>(TYPE_LabelMacro))
             ->finalize(
                 Pointer(
-                    Function(ReturnLabel({}, RLF_Raising), { TYPE_Label }),
+                    Function(Return({}, RTF_Raising), { TYPE_Label }),
                     PTF_NonWritable, SYM_Unnamed)).assert_ok();
     }
 

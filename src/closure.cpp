@@ -5,8 +5,8 @@
 */
 
 #include "closure.hpp"
-#include "label.hpp"
 #include "hash.hpp"
+#include "styled_stream.hpp"
 
 #include <assert.h>
 
@@ -14,28 +14,27 @@ namespace scopes {
 
 //------------------------------------------------------------------------------
 
-Closure::Closure(Label *_label, Frame *_frame) :
-    label(_label), frame(_frame) {}
+Closure::Closure(Template *_func, ASTFunction *_frame) :
+    func(_func), frame(_frame) {}
 
 std::size_t Closure::Hash::operator()(const Closure &k) const {
     return hash2(
-        std::hash<Label *>{}(k.label),
-        std::hash<Frame *>{}(k.frame));
+        std::hash<Template *>{}(k.func),
+        std::hash<ASTFunction *>{}(k.frame));
 }
 
 bool Closure::operator ==(const Closure &k) const {
-    return (label == k.label)
+    return (func == k.func)
         && (frame == k.frame);
 }
 
-const Closure *Closure::from(Label *label, Frame *frame) {
-    assert (label->is_template());
-    Closure cl(label, frame);
+const Closure *Closure::from(Template *func, ASTFunction *frame) {
+    Closure cl(func, frame);
     auto it = map.find(cl);
     if (it != map.end()) {
         return it->second;
     }
-    const Closure *result = new Closure(label, frame);
+    const Closure *result = new Closure(func, frame);
     map.insert({cl, result});
     return result;
 }
@@ -43,9 +42,9 @@ const Closure *Closure::from(Label *label, Frame *frame) {
 StyledStream &Closure::stream(StyledStream &ost) const {
     ost << Style_Comment << "<" << Style_None
         << frame
-        << Style_Comment << "::" << Style_None;
-    label->stream_short(ost);
-    ost << Style_Comment << ">" << Style_None;
+        << Style_Comment << "::" << Style_None
+        << func
+        << Style_Comment << ">" << Style_None;
     return ost;
 }
 

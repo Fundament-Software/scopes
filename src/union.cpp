@@ -10,7 +10,36 @@
 #include "tuple.hpp"
 #include "hash.hpp"
 
+#include <unordered_set>
+
 namespace scopes {
+
+namespace UnionSet {
+    struct Hash {
+        std::size_t operator()(const UnionType *s) const {
+            std::size_t h = 0;
+            for (auto &&arg : s->values) {
+                h = hash2(h, arg.hash());
+            }
+            return h;
+        }
+    };
+
+    struct KeyEqual {
+        bool operator()( const UnionType *lhs, const UnionType *rhs ) const {
+            if (lhs->values.size() != rhs->values.size()) return false;
+            for (size_t i = 0; i < lhs->values.size(); ++i) {
+                auto &&a = lhs->values[i];
+                auto &&b = rhs->values[i];
+                if (a != b)
+                    return false;
+            }
+            return true;
+        }
+    };
+} // namespace UnionSet
+
+static std::unordered_set<const UnionType *, UnionSet::Hash, UnionSet::KeyEqual> unions;
 
 //------------------------------------------------------------------------------
 // UNION TYPE
@@ -30,35 +59,19 @@ void UnionType::stream_name(StyledStream &ss) const {
         if (values[i].key != SYM_Unnamed) {
             ss << values[i].key.name()->data << "=";
         }
-        if (is_unknown(values[i].value)) {
-            stream_type_name(ss, values[i].value.typeref);
-        } else {
-            ss << "!";
-            stream_type_name(ss, values[i].value.type);
-        }
+        stream_type_name(ss, values[i].type);
     }
     ss << "}";
 }
 
-UnionType::UnionType(const Args &_values)
+UnionType::UnionType(const KeyedTypes &_values)
     : StorageType(TK_Union), values(_values) {
-    size_t tcount = values.size();
-    types.reserve(tcount);
-    for (size_t i = 0; i < values.size(); ++i) {
-        const Type *T = nullptr;
-        if (is_unknown(values[i].value)) {
-            T = values[i].value.typeref;
-        } else {
-            T = values[i].value.type;
-        }
-        types.push_back(T);
-    }
 
     size_t sz = 0;
     size_t al = 1;
     largest_field = 0;
-    for (size_t i = 0; i < types.size(); ++i) {
-        const Type *ET = types[i];
+    for (size_t i = 0; i < values.size(); ++i) {
+        const Type *ET = values[i].type;
         auto newsz = size_of(ET).assert_ok();
         if (newsz > sz) {
             largest_field = i;
@@ -68,7 +81,7 @@ UnionType::UnionType(const Args &_values)
     }
     size = scopes::align(sz, al);
     align = al;
-    tuple_type = Tuple({types[largest_field]}).assert_ok();
+    tuple_type = Tuple({values[largest_field].type}).assert_ok();
 }
 
 SCOPES_RESULT(Any) UnionType::unpack(void *src, size_t i) const {
@@ -78,8 +91,8 @@ SCOPES_RESULT(Any) UnionType::unpack(void *src, size_t i) const {
 
 SCOPES_RESULT(const Type *) UnionType::type_at_index(size_t i) const {
     SCOPES_RESULT_TYPE(const Type *);
-    SCOPES_CHECK_RESULT(verify_range(i, types.size()));
-    return types[i];
+    SCOPES_CHECK_RESULT(verify_range(i, values.size()));
+    return values[i].type;
 }
 
 size_t UnionType::field_index(Symbol name) const {
@@ -98,75 +111,32 @@ SCOPES_RESULT(Symbol) UnionType::field_name(size_t i) const {
 
 //------------------------------------------------------------------------------
 
-SCOPES_RESULT(const Type *) MixedUnion(const Args &values) {
+SCOPES_RESULT(const Type *) KeyedUnion(const KeyedTypes &values) {
     SCOPES_RESULT_TYPE(const Type *);
-
-    struct TypeArgs {
-        Args args;
-
-        TypeArgs() {}
-        TypeArgs(const Args &_args)
-            : args(_args) {}
-
-        bool operator==(const TypeArgs &other) const {
-            if (args.size() != other.args.size()) return false;
-            for (size_t i = 0; i < args.size(); ++i) {
-                auto &&a = args[i];
-                auto &&b = other.args[i];
-                if (a != b)
-                    return false;
-            }
-            return true;
-        }
-
-        struct Hash {
-            std::size_t operator()(const TypeArgs& s) const {
-                std::size_t h = 0;
-                for (auto &&arg : s.args) {
-                    h = hash2(h, arg.hash());
-                }
-                return h;
-            }
-        };
-    };
-
-    typedef std::unordered_map<TypeArgs, UnionType *, typename TypeArgs::Hash> ArgMap;
-
-    static ArgMap map;
-
+    UnionType key(values);
+    auto it = unions.find(&key);
+    if (it != unions.end())
+        return *it;
     for (size_t i = 0; i < values.size(); ++i) {
-        const Type *T = nullptr;
-        if (is_unknown(values[i].value)) {
-            T = values[i].value.typeref;
-        } else {
-            T = values[i].value.type;
-        }
+        const Type *T = values[i].type;
         if (is_opaque(T)) {
             StyledString ss;
-            ss.out << "can not construct union type with field of opaque type "
-                << T;
+            ss.out << "can not construct union type with field of opaque type " << T;
             SCOPES_LOCATION_ERROR(ss.str());
         }
     }
-
-    TypeArgs ta(values);
-    typename ArgMap::iterator it = map.find(ta);
-    if (it == map.end()) {
-        UnionType *t = new UnionType(values);
-        map.insert({ta, t});
-        return t;
-    } else {
-        return it->second;
-    }
+    auto result = new UnionType(values);
+    unions.insert(result);
+    return result;
 }
 
 SCOPES_RESULT(const Type *) Union(const ArgTypes &types) {
-    Args args;
+    KeyedTypes args;
     args.reserve(types.size());
     for (size_t i = 0; i < types.size(); ++i) {
-        args.push_back(unknown_of(types[i]));
+        args.push_back(types[i]);
     }
-    return MixedUnion(args);
+    return KeyedUnion(args);
 }
 
 } // namespace scopes

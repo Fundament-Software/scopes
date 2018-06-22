@@ -14,15 +14,12 @@
 #include "type.hpp"
 #include "syntax.hpp"
 #include "list.hpp"
-#include "frame.hpp"
 #include "execution.hpp"
 #include "globals.hpp"
 #include "error.hpp"
 #include "scope.hpp"
 #include "expander.hpp"
-#include "specializer.hpp"
 #include "gen_llvm.hpp"
-#include "profiler.hpp"
 #include "stream_ast.hpp"
 #include "ast.hpp"
 
@@ -234,8 +231,6 @@ SCOPES_RESULT(int) try_main(int argc, char *argv[]) {
 
     on_startup();
 
-    Frame::root = new Frame();
-
     Symbol::_init_symbols();
     init_llvm();
 
@@ -292,7 +287,7 @@ SCOPES_RESULT(int) try_main(int argc, char *argv[]) {
     }
 
 skip_regular_load:
-    ASTFunction *fn = SCOPES_GET_RESULT(expand_module(expr, Scope::from(globals)));
+    Template *fn = SCOPES_GET_RESULT(expand_module(expr, Scope::from(globals)));
 
     StyledStream ss;
     stream_ast(ss, fn, StreamASTFormat());

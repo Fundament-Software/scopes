@@ -13,14 +13,14 @@
 #include <vector>
 
 namespace scopes {
-
+#if 0
 struct Label;
 struct String;
 
 SCOPES_RESULT(void) optimize_spirv(std::vector<unsigned int> &result, int opt_level);
 SCOPES_RESULT(const String *) compile_spirv(Symbol target, Label *fn, uint64_t flags);
 SCOPES_RESULT(const String *) compile_glsl(Symbol target, Label *fn, uint64_t flags);
-
+#endif
 } // namespace scopes
 
 #endif // SCOPES_GEN_SPIRV_HPP

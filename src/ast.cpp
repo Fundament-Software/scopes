@@ -17,12 +17,18 @@ namespace scopes {
 
 //------------------------------------------------------------------------------
 
-ASTArgumentList::ASTArgumentList(const Anchor *anchor, const ASTNodes &_values)
-    : ASTValue(ASTK_ArgumentList, anchor), values(_values) {
+Keyed::Keyed(const Anchor *anchor, Symbol _key, ASTNode *node)
+    : ASTNode(ASTK_Keyed, anchor), key(_key), value(node)
+{}
+
+Keyed *Keyed::from(const Anchor *anchor, Symbol key, ASTNode *node) {
+    return new Keyed(anchor, key, node);
 }
 
-const Type *ASTArgumentList::get_value_type() const {
-    return TYPE_Unknown;
+//------------------------------------------------------------------------------
+
+ASTArgumentList::ASTArgumentList(const Anchor *anchor, const ASTNodes &_values)
+    : ASTValue(ASTK_ArgumentList, anchor), values(_values) {
 }
 
 void ASTArgumentList::append(ASTNode *node) {
@@ -68,59 +74,54 @@ ASTArgumentList *ASTArgumentList::from(const Anchor *anchor, const ASTNodes &val
 
 //------------------------------------------------------------------------------
 
-ASTFunction::ASTFunction(const Anchor *anchor, Symbol _name, const ASTSymbols &_params, Block *_body)
-    : ASTValue(ASTK_Function, anchor),
+Template::Template(const Anchor *anchor, Symbol _name, const ASTSymbols &_params, Block *_body)
+    : ASTValue(ASTK_Template, anchor),
         name(_name), params(_params), body(_body),
-        _inline(false), docstring(nullptr), return_type(nullptr), scope(nullptr) {
-    return_type = TYPE_Unknown;
+        _inline(false), docstring(nullptr), scope(nullptr) {
 }
 
-const Type *ASTFunction::get_value_type() const {
-    return return_type;
-}
-
-SCOPES_RESULT(ASTNode *) ASTFunction::resolve_symbol(ASTSymbol *sym) const {
-    SCOPES_RESULT_TYPE(ASTNode *);
-    const ASTFunction *func = this;
-    while (func) {
-        auto it = map.find(sym);
-        if (it != map.end())
-            return it->second;
-        func = func->scope;
-    }
-    set_active_anchor(sym->anchor());
-    StyledString ss;
-    ss.out << "symbol is unbound in any parent scope";
-    SCOPES_LOCATION_ERROR(ss.str());
-}
-
-bool ASTFunction::is_forward_decl() const {
+bool Template::is_forward_decl() const {
     return !body;
 }
 
-void ASTFunction::set_inline() {
+void Template::set_inline() {
     _inline = true;
 }
 
-bool ASTFunction::is_inline() const {
+bool Template::is_inline() const {
     return _inline;
 }
 
-void ASTFunction::append_param(ASTSymbol *sym) {
+void Template::append_param(ASTSymbol *sym) {
     params.push_back(sym);
 }
 
-Block *ASTFunction::ensure_body() {
+Block *Template::ensure_body() {
     if (!body) {
         body = Block::from(anchor());
     }
     return body;
 }
 
-ASTFunction *ASTFunction::from(
+Template *Template::from(
     const Anchor *anchor, Symbol name,
     const ASTSymbols &params, Block *block) {
-    return new ASTFunction(anchor, name, params, block);
+    return new Template(anchor, name, params, block);
+}
+
+//------------------------------------------------------------------------------
+
+ASTFunction::ASTFunction(const Anchor *anchor, Symbol _name, const ASTSymbols &_params, Block *_body)
+    : ASTValue(ASTK_Function, anchor),
+        name(_name), params(_params), body(_body),
+        docstring(nullptr) {
+    assert(body);
+}
+
+Template *ASTFunction::from(
+    const Anchor *anchor, Symbol name,
+    const ASTSymbols &params, Block *block) {
+    return new Template(anchor, name, params, block);
 }
 
 //------------------------------------------------------------------------------
@@ -131,10 +132,6 @@ Block::Block(const Anchor *anchor, const ASTNodes &_body)
 
 Block *Block::from(const Anchor *anchor, const ASTNodes &nodes) {
     return new Block(anchor, nodes);
-}
-
-const Type *Block::get_value_type() const {
-    return TYPE_Unknown;
 }
 
 void Block::strip_constants() {
@@ -177,10 +174,6 @@ If *If::from(const Anchor *anchor, const Clauses &_clauses) {
     return new If(anchor, _clauses);
 }
 
-const Type *If::get_value_type() const {
-    return TYPE_Unknown;
-}
-
 ASTNode *If::get_else_clause() const {
     if (!clauses.empty()) {
         const Clause &last = clauses.back();
@@ -208,7 +201,7 @@ ASTValue::ASTValue(ASTKind _kind, const Anchor *anchor)
 
 bool ASTValue::classof(const ASTNode *T) {
     switch(T->kind()) {
-    case ASTK_Function:
+    case ASTK_Template:
     case ASTK_Const:
     case ASTK_Symbol:
         return true;
@@ -222,10 +215,6 @@ ASTSymbol::ASTSymbol(const Anchor *anchor, Symbol _name, const Type *_type, bool
     : ASTValue(ASTK_Symbol, anchor), name(_name), type(_type), variadic(_variadic) {
     if (!type)
         type = TYPE_Unknown;
-}
-
-const Type *ASTSymbol::get_value_type() const {
-    return type;
 }
 
 ASTSymbol *ASTSymbol::from(const Anchor *anchor, Symbol name, const Type *type) {
@@ -246,8 +235,20 @@ Call::Call(const Anchor *anchor, ASTNode *_callee, ASTArgumentList *_args)
     : ASTNode(ASTK_Call, anchor), callee(_callee), args(_args), flags(0) {
 }
 
-const Type *Call::get_value_type() const {
-    return TYPE_Unknown;
+bool Call::is_rawcall() const {
+    return flags & CF_RawCall;
+}
+
+void Call::set_rawcall() {
+    flags |= CF_RawCall;
+}
+
+bool Call::is_trycall() const {
+    return flags & CF_TryCall;
+}
+
+void Call::set_trycall() {
+    flags |= CF_TryCall;
 }
 
 ASTArgumentList *Call::ensure_args() {
@@ -370,11 +371,6 @@ Let *Let::from(const Anchor *anchor, const ASTBindings &bindings, Block *body) {
     return new Let(anchor, bindings, body);
 }
 
-const Type *Let::get_value_type() const {
-    assert(body);
-    return body->get_type();
-}
-
 void Let::move_constants_to_scope(Scope *scope) {
     // turn all non-computing assignments into scope bindings
     int i = (int)bindings.size();
@@ -420,10 +416,6 @@ Loop::Loop(const Anchor *anchor, const ASTBindings &bindings, Block *body)
     : LetLike(ASTK_Loop, anchor, bindings, body) {
 }
 
-const Type *Loop::get_value_type() const {
-    return TYPE_Unknown;
-}
-
 Loop *Loop::from(const Anchor *anchor, const ASTBindings &bindings, Block *body) {
     return new Loop(anchor, bindings, body);
 }
@@ -434,42 +426,24 @@ Const::Const(const Anchor *anchor, Any _value) :
     ASTValue(ASTK_Const, anchor), value(_value) {
 }
 
-const Type *Const::get_value_type() const {
-    return value.type;
-}
-
 Const *Const::from(const Anchor *anchor, Any value) {
     return new Const(anchor, value);
 }
 
 //------------------------------------------------------------------------------
 
-Break::Break(const Anchor *anchor, ASTArgumentList *_args)
-    : ASTNode(ASTK_Break, anchor), args(_args) {}
-
-const Type *Break::get_value_type() const {
-    return NoReturnLabel();
+Break::Break(const Anchor *anchor, ASTNode *_value)
+    : ASTNode(ASTK_Break, anchor), value(_value) {
 }
 
-ASTArgumentList *Break::ensure_args() {
-    if (!args) {
-        args = ASTArgumentList::from(anchor());
-    }
-    return args;
-}
-
-Break *Break::from(const Anchor *anchor, ASTArgumentList *args) {
-    return new Break(anchor, args);
+Break *Break::from(const Anchor *anchor, ASTNode *value) {
+    return new Break(anchor, value);
 }
 
 //------------------------------------------------------------------------------
 
 Repeat::Repeat(const Anchor *anchor, ASTArgumentList *_args)
     : ASTNode(ASTK_Repeat, anchor), args(_args) {}
-
-const Type *Repeat::get_value_type() const {
-    return NoReturnLabel();
-}
 
 ASTArgumentList *Repeat::ensure_args() {
     if (!args) {
@@ -484,35 +458,20 @@ Repeat *Repeat::from(const Anchor *anchor, ASTArgumentList *args) {
 
 //------------------------------------------------------------------------------
 
-Return::Return(const Anchor *anchor, ASTArgumentList *_args)
-    : ASTNode(ASTK_Return, anchor), args(_args) {}
+ASTReturn::ASTReturn(const Anchor *anchor, ASTNode *_value)
+    : ASTNode(ASTK_Return, anchor), value(_value) {}
 
-const Type *Return::get_value_type() const {
-    return NoReturnLabel();
-}
-
-ASTArgumentList *Return::ensure_args() {
-    if (!args) {
-        args = ASTArgumentList::from(anchor());
-    }
-    return args;
-}
-
-Return *Return::from(const Anchor *anchor, ASTArgumentList *args) {
-    return new Return(anchor, args);
+ASTReturn *ASTReturn::from(const Anchor *anchor, ASTNode *value) {
+    return new ASTReturn(anchor, value);
 }
 
 //------------------------------------------------------------------------------
 
-SyntaxExtend::SyntaxExtend(const Anchor *anchor, ASTFunction *_func, const List *_next, Scope *_env)
+SyntaxExtend::SyntaxExtend(const Anchor *anchor, Template *_func, const List *_next, Scope *_env)
     : ASTNode(ASTK_SyntaxExtend, anchor), func(_func), next(_next), env(_env) {
 }
 
-const Type *SyntaxExtend::get_value_type() const {
-    return TYPE_Unknown;
-}
-
-SyntaxExtend *SyntaxExtend::from(const Anchor *anchor, ASTFunction *func, const List *next, Scope *env) {
+SyntaxExtend *SyntaxExtend::from(const Anchor *anchor, Template *func, const List *next, Scope *env) {
     return new SyntaxExtend(anchor, func, next, env);
 }
 
@@ -525,6 +484,18 @@ ASTNode::ASTNode(ASTKind kind, const Anchor *anchor)
     assert(_anchor);
 }
 
+bool ASTNode::is_typed() const {
+    return _type != nullptr;
+}
+void ASTNode::set_type(const ReturnType *type) {
+    assert(!is_typed());
+    _type = type;
+}
+const ReturnType *ASTNode::get_type() const {
+    assert(_type);
+    return _type;
+}
+
 bool ASTNode::is_empty() const {
     const Block *block = dyn_cast<Block>(this);
     if (!block) return false;
@@ -533,16 +504,6 @@ bool ASTNode::is_empty() const {
 
 const Anchor *ASTNode::anchor() const {
     return _anchor;
-}
-
-const Type *ASTNode::get_type() const {
-    switch(kind()) {
-#define T(NAME, BNAME, CLASS) \
-    case NAME: return cast<CLASS>(this)->get_value_type();
-SCOPES_AST_KIND()
-#undef T
-    default: assert(false); return nullptr;
-    }
 }
 
 #define T(NAME, BNAME, CLASS) \

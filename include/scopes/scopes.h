@@ -131,8 +131,8 @@ typedef struct sc_rawstring_size_t_tuple_ { const char *_0; size_t _1; } sc_raws
 
 sc_i32_i32_i32_tuple_t sc_compiler_version();
 sc_bool_label_tuple_t sc_eval(const sc_syntax_t *expr, sc_scope_t *scope);
-sc_bool_label_tuple_t sc_typify(sc_closure_t *srcl, int numtypes, const sc_type_t **typeargs);
-sc_bool_any_tuple_t sc_compile(sc_label_t *srcl, uint64_t flags);
+sc_bool_ast_tuple_t sc_typify(sc_closure_t *srcl, int numtypes, const sc_type_t **typeargs);
+sc_bool_any_tuple_t sc_compile(sc_ast_t *srcl, uint64_t flags);
 sc_bool_string_tuple_t sc_compile_spirv(sc_symbol_t target, sc_label_t *srcl, uint64_t flags);
 sc_bool_string_tuple_t sc_compile_glsl(sc_symbol_t target, sc_label_t *srcl, uint64_t flags);
 bool sc_compile_object(const sc_string_t *path, sc_scope_t *table, uint64_t flags);
@@ -328,51 +328,6 @@ const sc_type_t *sc_image_type(const sc_type_t *_type, sc_symbol_t _dim,
 // sampled image types
 
 const sc_type_t *sc_sampled_image_type(const sc_type_t *_type);
-
-// parameters
-
-sc_parameter_t *sc_parameter_new(const sc_anchor_t *anchor, sc_symbol_t symbol, const sc_type_t *type);
-int sc_parameter_index(const sc_parameter_t *param);
-sc_symbol_t sc_parameter_name(const sc_parameter_t *param);
-const sc_type_t *sc_parameter_type(const sc_parameter_t *param);
-
-// labels
-
-void sc_label_dump(sc_label_t *label);
-void sc_label_set_inline (sc_label_t *label);
-const sc_anchor_t *sc_label_anchor(sc_label_t *label);
-const sc_anchor_t *sc_label_body_anchor(sc_label_t *label);
-sc_symbol_t sc_label_name(sc_label_t *label);
-size_t sc_label_countof_reachable(sc_label_t *label);
-const sc_string_t *sc_label_docstring(sc_label_t *label);
-sc_any_t sc_label_get_enter(sc_label_t *label);
-void sc_label_set_enter(sc_label_t *label, sc_any_t value);
-const sc_list_t *sc_label_get_arguments(sc_label_t *label);
-void sc_label_set_arguments(sc_label_t *label, const sc_list_t *list);
-const sc_list_t *sc_label_get_keyed(sc_label_t *label);
-bool sc_label_set_keyed(sc_label_t *label, const sc_list_t *list);
-const sc_list_t *sc_label_get_parameters(sc_label_t *label);
-sc_label_t *sc_label_new_cont();
-sc_label_t *sc_label_new_cont_template();
-sc_label_t *sc_label_new_function_template();
-sc_label_t *sc_label_new_inline_template();
-void sc_label_set_complete(sc_label_t *label);
-bool sc_label_append_parameter(sc_label_t *label, sc_parameter_t *param);
-const sc_type_t *sc_label_function_type(sc_label_t *label);
-void sc_label_set_rawcall(sc_label_t *label);
-void sc_label_set_rawcont(sc_label_t *label);
-sc_frame_t *sc_label_frame(sc_label_t *label);
-
-// frames
-
-void sc_frame_dump(sc_frame_t *frame);
-sc_frame_t *sc_frame_root();
-
-// closures
-
-const sc_closure_t *sc_closure_new(sc_label_t *label, sc_frame_t *frame);
-sc_label_t *sc_closure_label(const sc_closure_t *closure);
-sc_frame_t *sc_closure_frame(const sc_closure_t *closure);
 
 #if defined __cplusplus
 }

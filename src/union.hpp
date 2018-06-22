@@ -21,7 +21,7 @@ struct UnionType : StorageType {
     static bool classof(const Type *T);
 
     void stream_name(StyledStream &ss) const;
-    UnionType(const Args &_values);
+    UnionType(const KeyedTypes &_values);
 
     SCOPES_RESULT(Any) unpack(void *src, size_t i) const;
 
@@ -31,13 +31,12 @@ struct UnionType : StorageType {
 
     SCOPES_RESULT(Symbol) field_name(size_t i) const;
 
-    Args values;
-    ArgTypes types;
+    KeyedTypes values;
     size_t largest_field;
     const Type *tuple_type;
 };
 
-SCOPES_RESULT(const Type *) MixedUnion(const Args &values);
+SCOPES_RESULT(const Type *) KeyedUnion(const KeyedTypes &values);
 
 SCOPES_RESULT(const Type *) Union(const ArgTypes &types);
 

@@ -54,19 +54,19 @@ static SCOPES_RESULT(void) verify_list_parameter_count(const char *context, cons
 
 struct Expander {
     Scope *env;
-    ASTFunction *astscope;
+    Template *astscope;
     const List *next;
     static bool verbose;
 
     static const Type *list_expander_func_type;
 
-    Expander(Scope *_env, ASTFunction *_astscope, const List *_next = EOL) :
+    Expander(Scope *_env, Template *_astscope, const List *_next = EOL) :
         env(_env),
         astscope(_astscope),
         next(_next) {
         if (!list_expander_func_type) {
             list_expander_func_type = Pointer(Function(
-                ReturnLabel({unknown_of(TYPE_List), unknown_of(TYPE_Scope)}, RLF_Raising),
+                Return({TYPE_List, TYPE_Scope}, RTF_Raising),
                 {TYPE_List, TYPE_Scope}), PTF_NonWritable, SYM_Unnamed);
         }
     }
@@ -100,7 +100,7 @@ struct Expander {
         it = it->next;
 
         auto scopeparam = ASTSymbol::from(_anchor, SYM_Unnamed, TYPE_Scope);
-        ASTFunction *func = ASTFunction::from(_anchor, Symbol(KW_SyntaxExtend), {scopeparam});
+        Template *func = Template::from(_anchor, Symbol(KW_SyntaxExtend), {scopeparam});
         func->scope = astscope;
 
         Scope *subenv = Scope::from(env);
@@ -158,7 +158,7 @@ struct Expander {
         assert(it != EOL);
 
         bool continuing = false;
-        ASTFunction *func = nullptr;
+        Template *func = nullptr;
         ASTNode *result = nullptr;
         Any tryfunc_name = SCOPES_GET_RESULT(unsyntax(it->at));
         if (tryfunc_name.type == TYPE_Symbol) {
@@ -166,23 +166,23 @@ struct Expander {
             // see if we can find a forward declaration in the local scope
             ASTValue *result = nullptr;
             if (env->lookup_local(tryfunc_name.symbol, result)
-                && isa<ASTFunction>(result)
-                && cast<ASTFunction>(result)->is_forward_decl()) {
-                func = cast<ASTFunction>(result);
+                && isa<Template>(result)
+                && cast<Template>(result)->is_forward_decl()) {
+                func = cast<Template>(result);
                 continuing = true;
             } else {
-                func = ASTFunction::from(_anchor, tryfunc_name.symbol);
+                func = Template::from(_anchor, tryfunc_name.symbol);
                 env->bind(tryfunc_name.symbol, func);
             }
             it = it->next;
         } else if (tryfunc_name.type == TYPE_String) {
             // named lambda
-            func = ASTFunction::from(_anchor, Symbol(tryfunc_name.string));
+            func = Template::from(_anchor, Symbol(tryfunc_name.string));
             result = func;
             it = it->next;
         } else {
             // unnamed lambda
-            func = ASTFunction::from(_anchor, Symbol(SYM_Unnamed));
+            func = Template::from(_anchor, Symbol(SYM_Unnamed));
             result = func;
         }
         if (setup.inlined)
@@ -585,12 +585,13 @@ struct Expander {
         auto _anchor = get_active_anchor();
         SCOPES_CHECK_RESULT(verify_list_parameter_count("return", it, 0, -1));
         it = it->next;
-        auto ret = Return::from(_anchor);
+        ASTNode *value = nullptr;
         if (it) {
-            Expander subexp(env, astscope, it->next);
-            SCOPES_CHECK_RESULT(subexp.expand_arguments(ret->ensure_args(), it));
+            value = SCOPES_GET_RESULT(expand(it->at));
+        } else {
+            value = ASTArgumentList::from(_anchor);
         }
-        return ret;
+        return ASTReturn::from(_anchor, value);
     }
 
     SCOPES_RESULT(ASTNode *) expand_break(const List *it) {
@@ -598,12 +599,13 @@ struct Expander {
         auto _anchor = get_active_anchor();
         SCOPES_CHECK_RESULT(verify_list_parameter_count("break", it, 0, -1));
         it = it->next;
-        auto br = Break::from(_anchor);
+        ASTNode *value = nullptr;
         if (it) {
-            Expander subexp(env, astscope, it->next);
-            SCOPES_CHECK_RESULT(subexp.expand_arguments(br->ensure_args(), it));
+            value = SCOPES_GET_RESULT(expand(it->at));
+        } else {
+            value = ASTArgumentList::from(_anchor);
         }
-        return br;
+        return Break::from(_anchor, value);
     }
 
     SCOPES_RESULT(ASTNode *) expand_repeat(const List *it) {
@@ -807,8 +809,8 @@ struct Expander {
 bool Expander::verbose = false;
 const Type *Expander::list_expander_func_type = nullptr;
 
-SCOPES_RESULT(ASTFunction *) expand_inline(Any expr, Scope *scope) {
-    SCOPES_RESULT_TYPE(ASTFunction *);
+SCOPES_RESULT(Template *) expand_inline(Any expr, Scope *scope) {
+    SCOPES_RESULT_TYPE(Template *);
     const Anchor *anchor = get_active_anchor();
     if (expr.type == TYPE_Syntax) {
         anchor = expr.syntax->anchor;
@@ -817,7 +819,7 @@ SCOPES_RESULT(ASTFunction *) expand_inline(Any expr, Scope *scope) {
     }
     SCOPES_CHECK_RESULT(expr.verify(TYPE_List));
     assert(anchor);
-    ASTFunction *mainfunc = ASTFunction::from(anchor, SYM_Unnamed);
+    Template *mainfunc = Template::from(anchor, SYM_Unnamed);
     mainfunc->set_inline();
 
     Scope *subenv = scope?scope:globals;
@@ -827,8 +829,8 @@ SCOPES_RESULT(ASTFunction *) expand_inline(Any expr, Scope *scope) {
     return mainfunc;
 }
 
-SCOPES_RESULT(ASTFunction *) expand_module(Any expr, Scope *scope) {
-    SCOPES_RESULT_TYPE(ASTFunction *);
+SCOPES_RESULT(Template *) expand_module(Any expr, Scope *scope) {
+    SCOPES_RESULT_TYPE(Template *);
     const Anchor *anchor = get_active_anchor();
     if (expr.type == TYPE_Syntax) {
         anchor = expr.syntax->anchor;
@@ -837,7 +839,7 @@ SCOPES_RESULT(ASTFunction *) expand_module(Any expr, Scope *scope) {
     }
     SCOPES_CHECK_RESULT(expr.verify(TYPE_List));
     assert(anchor);
-    ASTFunction *mainfunc = ASTFunction::from(anchor, anchor->path());
+    Template *mainfunc = Template::from(anchor, anchor->path());
 
     Scope *subenv = scope?scope:globals;
     Expander subexpr(subenv, mainfunc);

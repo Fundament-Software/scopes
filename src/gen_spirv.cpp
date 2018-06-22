@@ -4,6 +4,7 @@
     See LICENSE.md for details.
 */
 
+#if 0
 #include "gen_spirv.hpp"
 #include "styled_stream.hpp"
 #include "string.hpp"
@@ -29,7 +30,6 @@
 #include "dyn_cast.inc"
 
 namespace scopes {
-
 //------------------------------------------------------------------------------
 // IL->SPIR-V GENERATOR
 //------------------------------------------------------------------------------
@@ -2054,5 +2054,5 @@ SCOPES_RESULT(const String *) compile_glsl(Symbol target, Label *fn, uint64_t fl
 
     return String::from_stdstring(source);
 }
-
 } // namespace scopes
+#endif

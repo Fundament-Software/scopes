@@ -165,7 +165,7 @@ static size_t classify(const Type *T, ABIClass *classes, size_t offset) {
             assert(false && "illegal type");
         }
     } break;
-    case TK_ReturnLabel:
+    case TK_Return:
     case TK_Typename: {
         if (is_opaque(T)) {
             classes[0] = ABI_CLASS_NO_CLASS;
@@ -186,7 +186,7 @@ static size_t classify(const Type *T, ABIClass *classes, size_t offset) {
     } break;
     case TK_Union: {
         auto ut = cast<UnionType>(T);
-        return classify(ut->types[ut->largest_field], classes, offset);
+        return classify(ut->values[ut->largest_field].type, classes, offset);
     } break;
     case TK_Tuple: {
         const size_t UNITS_PER_WORD = 8;
@@ -202,8 +202,8 @@ static size_t classify(const Type *T, ABIClass *classes, size_t offset) {
         }
         auto tt = cast<TupleType>(T);
         ABIClass subclasses[MAX_ABI_CLASSES];
-        for (size_t i = 0; i < tt->types.size(); ++i) {
-            auto ET = tt->types[i];
+        for (size_t i = 0; i < tt->values.size(); ++i) {
+            auto ET = tt->values[i].type;
             if (!tt->packed)
                 offset = align(offset, align_of(ET).assert_ok());
             size_t num = classify (ET, subclasses, offset % 8);

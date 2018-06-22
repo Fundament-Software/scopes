@@ -87,15 +87,34 @@ struct StreamAST : StreamAnchors {
             visited.insert(node);
 
         switch(node->kind()) {
-        case ASTK_Function: {
-            auto val = cast<ASTFunction>(node);
-            ss << Style_Keyword << "Function" << Style_None;
+        case ASTK_Template: {
+            auto val = cast<Template>(node);
+            ss << Style_Keyword << "Template" << Style_None;
             if (val->is_inline()) {
                 ss << " " << Style_Keyword << "inline" << Style_None;
             }
             if (!val->body) {
                 ss << " " << Style_Keyword << "forward-decl" << Style_None;
             }
+            ss << " ";
+            ss << Style_Symbol << val->name.name()->data
+                << "λ" << (void *)val << Style_None;
+            if (is_new) {
+                for (int i = 0; i < val->params.size(); ++i) {
+                    ss << std::endl;
+                    walk(val->params[i], depth+1, maxdepth);
+                }
+                if (val->body) {
+                    ss << std::endl;
+                    walk(val->body, depth+1, maxdepth);
+                }
+            } else {
+                ss << " <...>";
+            }
+        } break;
+        case ASTK_Function: {
+            auto val = cast<ASTFunction>(node);
+            ss << Style_Keyword << "Function" << Style_None;
             ss << " ";
             ss << Style_Symbol << val->name.name()->data
                 << "λ" << (void *)val << Style_None;
@@ -203,7 +222,8 @@ struct StreamAST : StreamAnchors {
         case ASTK_Break: {
             auto val = cast<Break>(node);
             ss << Style_Keyword << "Break" << Style_None;
-            write_arguments(val->args, depth, maxdepth);
+            ss << std::endl;
+            walk(val->value, depth, maxdepth);
         } break;
         case ASTK_Repeat: {
             auto val = cast<Repeat>(node);
@@ -211,9 +231,10 @@ struct StreamAST : StreamAnchors {
             write_arguments(val->args, depth, maxdepth);
         } break;
         case ASTK_Return: {
-            auto val = cast<Return>(node);
-            ss << Style_Keyword << "Return" << Style_None;
-            write_arguments(val->args, depth, maxdepth);
+            auto val = cast<ASTReturn>(node);
+            ss << Style_Keyword << "ASTReturn" << Style_None;
+            ss << std::endl;
+            walk(val->value, depth, maxdepth);
         } break;
         case ASTK_SyntaxExtend: {
             auto val = cast<SyntaxExtend>(node);

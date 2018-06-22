@@ -25,8 +25,6 @@ namespace scopes {
 struct Type;
 struct Syntax;
 struct List;
-struct Label;
-struct Parameter;
 struct Scope;
 struct Error;
 struct Frame;
@@ -65,8 +63,6 @@ struct Any {
         const Syntax *syntax;
         const Anchor *anchor;
         const List *list;
-        Label *label;
-        Parameter *parameter;
         Builtin builtin;
         Scope *scope;
         Any *ref;
@@ -100,8 +96,6 @@ struct Any {
     Any(const Anchor *x);
     Any(const List *x);
     Any(const Error *x);
-    Any(Label *x);
-    Any(Parameter *x);
     Any(Builtin x);
     Any(Scope *x);
     Any(Frame *x);
@@ -123,9 +117,6 @@ struct Any {
     static Any from_pointer(const Type *type, void *ptr);
 
     SCOPES_RESULT(void) verify(const Type *T) const;
-    SCOPES_RESULT(void) verify_indirect(const Type *T) const;
-    const Type *indirect_type() const;
-    bool is_const() const;
 
     SCOPES_RESULT_CAST_OPERATOR(const Type *);
     SCOPES_RESULT_CAST_OPERATOR(const List *);
@@ -133,9 +124,7 @@ struct Any {
     SCOPES_RESULT_CAST_OPERATOR(const Anchor *);
     SCOPES_RESULT_CAST_OPERATOR(const String *);
     SCOPES_RESULT_CAST_OPERATOR(const Error *);
-    SCOPES_RESULT_CAST_OPERATOR(Label *);
     SCOPES_RESULT_CAST_OPERATOR(Scope *);
-    SCOPES_RESULT_CAST_OPERATOR(Parameter *);
     SCOPES_RESULT_CAST_OPERATOR(const Closure *);
     SCOPES_RESULT_CAST_OPERATOR(Frame *);
     SCOPES_RESULT_CAST_OPERATOR(ASTNode *);

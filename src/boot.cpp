@@ -5,7 +5,6 @@
 */
 
 #include "boot.hpp"
-#include "profiler.hpp"
 #include "timer.hpp"
 #include "gc.hpp"
 #include "scopes/config.h"

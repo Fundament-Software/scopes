@@ -111,7 +111,7 @@ public:
             tni->super_type = TYPE_CStruct;
         }
 
-        std::vector<Argument> args;
+        KeyedTypes args;
         //auto anchors = new std::vector<Anchor>();
         //StyledStream ss;
         const Type *ST = tni;
@@ -155,7 +155,7 @@ public:
                     //ss << "offset mismatch " << newsz << " != " << offset << std::endl;
                     if (newsz < offset) {
                         size_t pad = offset - newsz;
-                        args.push_back(Argument(SYM_Unnamed,
+                        args.push_back(KeyedType(SYM_Unnamed,
                             Array(TYPE_U8, pad).assert_ok()));
                     } else {
                         // our computed offset is later than the real one
@@ -169,7 +169,7 @@ public:
                 al = std::max(al, SCOPES_GET_RESULT(align_of(fieldtype)));
             }
 
-            args.push_back(Argument(name, unknown_of(fieldtype)));
+            args.push_back(KeyedType(name, fieldtype));
         }
         if (packed) {
             al = 1;
@@ -207,8 +207,8 @@ public:
             }
         }
 
-        SCOPES_CHECK_RESULT(tni->finalize(is_union?SCOPES_GET_RESULT(MixedUnion(args)):
-            SCOPES_GET_RESULT(MixedTuple(args, packed, explicit_alignment?al:0))));
+        SCOPES_CHECK_RESULT(tni->finalize(is_union?SCOPES_GET_RESULT(KeyedUnion(args)):
+            SCOPES_GET_RESULT(KeyedTuple(args, packed, explicit_alignment?al:0))));
         return true;
     }
 

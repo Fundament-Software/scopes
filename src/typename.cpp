@@ -85,9 +85,9 @@ SCOPES_RESULT(const Type *) storage_type(const Type *T) {
         }
         return tt->storage_type;
     } break;
-    case TK_ReturnLabel: {
-        const ReturnLabelType *rlt = cast<ReturnLabelType>(T);
-        return storage_type(rlt->ll_return_type);
+    case TK_Return: {
+        const ReturnType *rt = cast<ReturnType>(T);
+        return storage_type(rt->return_type);
     } break;
     default: return T;
     }

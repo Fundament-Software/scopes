@@ -12,12 +12,12 @@
 namespace scopes {
 
 struct ASTContext {
-    ASTFunction *func;
+    ASTFunction *frame;
     Loop *loop;
 
-    ASTContext(ASTFunction *_func, Loop *_loop = nullptr) :
-        func(_func), loop(_loop) {
-        assert(func);
+    ASTContext(ASTFunction *_frame, Loop *_loop = nullptr) :
+        frame(_frame), loop(_loop) {
+        assert(frame);
     }
 };
 
@@ -64,8 +64,8 @@ static SCOPES_RESULT(Const *) specialize_Const(const ASTContext &ctx, Const *vco
 
 static SCOPES_RESULT(Break *) specialize_Break(const ASTContext &ctx, Break *_break) {
     SCOPES_RESULT_TYPE(Break *);
-    ASTArgumentList *args = SCOPES_GET_RESULT(specialize_ASTArgumentList(ctx, _break->args));
-    return Break::from(_break->anchor(), args);
+    ASTNode *value = SCOPES_GET_RESULT(specialize(ctx, _break->value));
+    return Break::from(_break->anchor(), value);
 }
 
 static SCOPES_RESULT(Repeat *) specialize_Repeat(const ASTContext &ctx, Repeat *_repeat) {
@@ -74,16 +74,22 @@ static SCOPES_RESULT(Repeat *) specialize_Repeat(const ASTContext &ctx, Repeat *
     return Repeat::from(_repeat->anchor(), args);
 }
 
-static SCOPES_RESULT(Return *) specialize_Return(const ASTContext &ctx, Return *_return) {
-    SCOPES_RESULT_TYPE(Return *);
-    ASTArgumentList *args = SCOPES_GET_RESULT(specialize_ASTArgumentList(ctx, _return->args));
-    return Return::from(_return->anchor(), args);
+static SCOPES_RESULT(ASTReturn *) specialize_ASTReturn(const ASTContext &ctx, ASTReturn *_return) {
+    SCOPES_RESULT_TYPE(ASTReturn *);
+    ASTNode *value = SCOPES_GET_RESULT(specialize(ctx, _return->value));
+    return ASTReturn::from(_return->anchor(), value);
 }
 
 static SCOPES_RESULT(ASTNode *) specialize_SyntaxExtend(const ASTContext &ctx, SyntaxExtend *sx) {
     SCOPES_RESULT_TYPE(ASTNode *);
     assert(false);
     return nullptr;
+}
+
+static SCOPES_RESULT(Keyed *) specialize_Keyed(const ASTContext &ctx, Keyed *keyed) {
+    SCOPES_RESULT_TYPE(Keyed *);
+    return Keyed::from(keyed->anchor(), keyed->key,
+        SCOPES_GET_RESULT(specialize(ctx, keyed->value)));
 }
 
 static SCOPES_RESULT(ASTNode *) specialize_Call(const ASTContext &ctx, Call *call) {
@@ -95,7 +101,9 @@ static SCOPES_RESULT(ASTNode *) specialize_Call(const ASTContext &ctx, Call *cal
 
 static SCOPES_RESULT(ASTNode *) specialize_ASTSymbol(const ASTContext &ctx, ASTSymbol *sym) {
     SCOPES_RESULT_TYPE(ASTNode *);
-    return SCOPES_GET_RESULT(ctx.func->resolve_symbol(sym));
+    assert(false); // todo
+    return nullptr;
+    //return SCOPES_GET_RESULT(ctx.func->resolve_symbol(sym));
 }
 
 static SCOPES_RESULT(If *) specialize_If(const ASTContext &ctx, If *_if) {
@@ -113,10 +121,15 @@ static SCOPES_RESULT(If *) specialize_If(const ASTContext &ctx, If *_if) {
     return newif;
 }
 
-// the function is already instantiated
+// this must never happen
+static SCOPES_RESULT(ASTNode *) specialize_Template(const ASTContext &ctx, Template *_template) {
+    SCOPES_RESULT_TYPE(ASTNode *);
+    assert(false); // todo
+    return nullptr;
+}
+
 static SCOPES_RESULT(ASTFunction *) specialize_ASTFunction(const ASTContext &ctx, ASTFunction *fn) {
     SCOPES_RESULT_TYPE(ASTFunction *);
-    fn->body = SCOPES_GET_RESULT(specialize_Block(ASTContext(fn), fn->body));
     return fn;
 }
 
@@ -131,5 +144,43 @@ SCOPES_RESULT(ASTNode *) specialize(const ASTContext &ctx, ASTNode *node) {
     }
     return node;
 }
+
+SCOPES_RESULT(ASTFunction *) specialize(ASTFunction *frame, Template *func, const ArgTypes &types) {
+    SCOPES_RESULT_TYPE(ASTFunction *);
+#if 0
+    ASTSymbols params;
+    params.reserve(types.size());
+    int count = (int)func->params.size();
+    for (int i = 0; i < count; ++i) {
+        auto oldparam = func->params[i];
+        if (oldparam->is_variadic()) {
+            assert((i + 1) == count);
+
+        } else {
+            const Type *T = nullptr;
+            if (oldparam->type == TYPE_Unknown) {
+                oldparam->is_variadic()
+            }
+            ASTSymbol::from(oldparam->anchor(), oldparam->name, T);
+        }
+    }
+    ASTFunction *fn = ASTFunction::from(func->anchor(), func->name, params, func->body);
+
+    specialize_ASTFunction(ASTContext(frame), fn);
+    return sfunc;
+#endif
+    return nullptr;
+}
+
+#if 0
+static SCOPES_RESULT(ASTFunction *) type_function(const ASTContext &ctx, Template *fn, ASTArgumentList *args) {
+    ASTSymbols params;
+    assert(fn->body);
+    ASTFunction *newfn = ASTFunction::from(fn->anchor(), fn->name, params, fn->body);
+
+
+    return specialize_ASTFunction(ctx, newfn);
+}
+#endif
 
 } // namespace scopes
