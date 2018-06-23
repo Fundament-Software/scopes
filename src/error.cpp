@@ -8,6 +8,8 @@
 #include "anchor.hpp"
 #include "type.hpp"
 #include "boot.hpp"
+#include "ast.hpp"
+#include "return.hpp"
 
 #include "scopes/config.h"
 
@@ -106,5 +108,100 @@ Any make_runtime_error(const String *msg) {
 void set_last_location_error(const String *msg) {
     set_last_error(make_location_error(msg));
 }
+
+//------------------------------------------------------------------------------
+
+static void print_definition_anchor(ASTNode *node) {
+    location_message(node->anchor(), String::from("defined here"));
+}
+
+SCOPES_RESULT(void) error_invalid_call_type(ASTNode *callee) {
+    SCOPES_RESULT_TYPE(void);
+    print_definition_anchor(callee);
+    StyledString ss;
+    ss.out << "unable to call value of type " << callee->get_type();
+    SCOPES_LOCATION_ERROR(ss.str());
+}
+
+SCOPES_RESULT(void) error_invalid_condition_type(ASTNode *cond) {
+    SCOPES_RESULT_TYPE(void);
+    print_definition_anchor(cond);
+    StyledString ss;
+    ss.out << "condition of if-clause must be value of type "
+        << TYPE_Bool << ", not value of type " << cond->get_type();
+    SCOPES_LOCATION_ERROR(ss.str());
+}
+
+
+SCOPES_RESULT(void) error_constant_expected(ASTNode *value) {
+    SCOPES_RESULT_TYPE(void);
+    print_definition_anchor(value);
+    StyledString ss;
+    ss.out << "constant expected, got expression of type " << value->get_type();
+    SCOPES_LOCATION_ERROR(ss.str());
+}
+
+SCOPES_RESULT(void) error_unbound_symbol(ASTSymbol *value) {
+    SCOPES_RESULT_TYPE(void);
+    print_definition_anchor(value);
+    StyledString ss;
+    ss.out << "symbol " << value->name << " is unbound";
+    SCOPES_LOCATION_ERROR(ss.str());
+}
+
+SCOPES_RESULT(void) error_cannot_merge_expression_types(const Type *T1, const Type *T2) {
+    SCOPES_RESULT_TYPE(void);
+    StyledString ss;
+    ss.out << "cannot merge expression types " << T1 << " and " << T2;
+    SCOPES_LOCATION_ERROR(ss.str());
+}
+
+SCOPES_RESULT(void) error_noreturn_not_last_expression() {
+    SCOPES_RESULT_TYPE(void);
+    StyledString ss;
+    ss.out << "non-returning expression isn't last expression in block";
+    SCOPES_LOCATION_ERROR(ss.str());
+}
+
+SCOPES_RESULT(void) error_cannot_type_builtin(const Builtin &builtin) {
+    SCOPES_RESULT_TYPE(void);
+    StyledString ss;
+    ss.out << "can not type builtin " << builtin;
+    SCOPES_LOCATION_ERROR(ss.str());
+}
+
+SCOPES_RESULT(void) error_illegal_repeat_outside_loop() {
+    SCOPES_RESULT_TYPE(void);
+    StyledString ss;
+    ss.out << "illegal repeat outside loop";
+    SCOPES_LOCATION_ERROR(ss.str());
+}
+
+SCOPES_RESULT(void) error_illegal_break_outside_loop() {
+    SCOPES_RESULT_TYPE(void);
+    StyledString ss;
+    ss.out << "illegal break outside loop";
+    SCOPES_LOCATION_ERROR(ss.str());
+}
+
+//------------------------------------------------------------------------------
+
+SCOPES_RESULT(void) error_gen_invalid_call_type(const char *target, ASTNode *callee) {
+    SCOPES_RESULT_TYPE(void);
+    print_definition_anchor(callee);
+    StyledString ss;
+    ss.out << target << ": cannot translate call to value of type " << callee->get_type();
+    SCOPES_LOCATION_ERROR(ss.str());
+}
+
+SCOPES_RESULT(void) error_gen_unbound_symbol(const char *target, ASTSymbol *value) {
+    SCOPES_RESULT_TYPE(void);
+    print_definition_anchor(value);
+    StyledString ss;
+    ss.out << target << ": symbol " << value->name << " is unbound";
+    SCOPES_LOCATION_ERROR(ss.str());
+}
+
+//------------------------------------------------------------------------------
 
 } // namespace scopes

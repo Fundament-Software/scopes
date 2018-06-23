@@ -10,6 +10,7 @@
 #include "symbol.hpp"
 #include "any.hpp"
 #include "result.hpp"
+#include "type.hpp"
 
 #include <vector>
 #include <unordered_map>
@@ -85,14 +86,13 @@ struct ASTNode {
     ASTNode(const ASTNode &other) = delete;
 
     const Anchor *anchor() const;
-    bool is_empty() const;
 
     bool is_typed() const;
-    void set_type(const ReturnType *type);
-    const ReturnType *get_type() const;
+    void set_type(const Type *type);
+    const Type *get_type() const;
 private:
     const ASTKind _kind;
-    const ReturnType *_type;
+    const Type *_type;
 
 protected:
     const Anchor *_anchor;
@@ -128,7 +128,6 @@ struct ASTArgumentList : ASTValue {
 
     void append(Symbol key, ASTNode *node);
     void append(ASTNode *node);
-    void flatten();
 
     static ASTArgumentList *from(const Anchor *anchor, const ASTNodes &values = {});
 
@@ -140,21 +139,20 @@ struct ASTArgumentList : ASTValue {
 struct Template : ASTValue {
     static bool classof(const ASTNode *T);
 
-    Template(const Anchor *anchor, Symbol name, const ASTSymbols &params, Block *block);
+    Template(const Anchor *anchor, Symbol name, const ASTSymbols &params, ASTNode *value);
 
     bool is_forward_decl() const;
     void set_inline();
     bool is_inline() const;
     void append_param(ASTSymbol *sym);
-    Block *ensure_body();
 
     static Template *from(
         const Anchor *anchor, Symbol name,
-        const ASTSymbols &params = {}, Block *block = nullptr);
+        const ASTSymbols &params = {}, ASTNode *value = nullptr);
 
     Symbol name;
     ASTSymbols params;
-    Block *body;
+    ASTNode *value;
     bool _inline;
     const String *docstring;
     Template *scope;
@@ -165,18 +163,27 @@ struct Template : ASTValue {
 struct ASTFunction : ASTValue {
     static bool classof(const ASTNode *T);
 
-    ASTFunction(const Anchor *anchor, Symbol name, const ASTSymbols &params, Block *block);
+    ASTFunction(const Anchor *anchor, Symbol name, const ASTSymbols &params, ASTNode *value);
 
-    static Template *from(
+    static ASTFunction *from(
         const Anchor *anchor, Symbol name,
-        const ASTSymbols &params, Block *block);
+        const ASTSymbols &params, ASTNode *value);
+
+    void append_param(ASTSymbol *sym);
 
     Symbol name;
     ASTSymbols params;
-    Block *body;
+    ASTNode *value;
     const String *docstring;
+    const Type *return_type;
+    ASTFunction *frame;
+    Template *original;
 
-
+    ArgTypes instance_args;
+    ASTFunction *find_frame(Template *scope);
+    void bind(ASTNode *oldnode, ASTNode *newnode);
+    ASTNode *resolve(ASTNode *node);
+    std::unordered_map<ASTNode *, ASTNode *> map;
 };
 
 //------------------------------------------------------------------------------
@@ -184,22 +191,30 @@ struct ASTFunction : ASTValue {
 struct Block : ASTNode {
     static bool classof(const ASTNode *T);
 
-    Block(const Anchor *anchor, const ASTNodes &nodes);
+    Block(const Anchor *anchor, const ASTNodes &nodes, ASTNode *value);
     void append(ASTNode *node);
 
-    static Block *from(const Anchor *anchor, const ASTNodes &nodes = {});
+    static Block *from(const Anchor *anchor, const ASTNodes &nodes = {}, ASTNode *value = nullptr);
 
     void strip_constants();
-    void flatten();
+    ASTNode *canonicalize();
 
     ASTNodes body;
+    ASTNode *value;
 };
 
 //------------------------------------------------------------------------------
 
 struct Clause {
+    const Anchor *anchor;
     ASTNode *cond;
-    Block *body;
+    ASTNode *value;
+
+    Clause() : anchor(nullptr), cond(nullptr), value(nullptr) {}
+    Clause(const Anchor *_anchor, ASTNode *_cond, ASTNode *_value)
+        : anchor(_anchor), cond(_cond), value(_value) {}
+    Clause(const Anchor *_anchor, ASTNode *_value)
+        : anchor(_anchor), cond(nullptr), value(_value) {}
 };
 
 typedef std::vector<Clause> Clauses;
@@ -212,10 +227,12 @@ struct If : ASTNode {
     static If *from(const Anchor *anchor, const Clauses &clauses = {});
 
     ASTNode *get_else_clause() const;
-    void append(ASTNode *cond, Block *expr);
-    void append(Block *expr);
+    void append(const Anchor *anchor, ASTNode *cond, ASTNode *value);
+    void append(const Anchor *anchor, ASTNode *value);
+    ASTNode *canonicalize();
 
     Clauses clauses;
+    Clause else_clause;
 };
 
 //------------------------------------------------------------------------------
@@ -230,7 +247,6 @@ struct ASTSymbol : ASTValue {
     bool is_variadic() const;
 
     Symbol name;
-    const Type *type;
     bool variadic;
 };
 
@@ -275,7 +291,7 @@ struct ASTVariadicBinding {
 typedef std::vector<ASTBinding> ASTBindings;
 
 struct LetLike : ASTNode {
-    LetLike(ASTKind _kind, const Anchor *anchor, const ASTBindings &bindings, Block *body);
+    LetLike(ASTKind _kind, const Anchor *anchor, const ASTBindings &bindings, ASTNode *value);
 
     void append(const ASTBinding &bind);
     void append(ASTSymbol *sym, ASTNode *expr);
@@ -283,11 +299,9 @@ struct LetLike : ASTNode {
     bool has_variadic_section() const;
     bool has_assignments() const;
 
-    Block *ensure_body();
-
     ASTBindings bindings;
     ASTVariadicBinding variadic;
-    Block *body;
+    ASTNode *value;
 };
 
 //------------------------------------------------------------------------------
@@ -295,12 +309,13 @@ struct LetLike : ASTNode {
 struct Let : LetLike {
     static bool classof(const ASTNode *T);
 
-    Let(const Anchor *anchor, const ASTBindings &bindings, Block *body);
+    Let(const Anchor *anchor, const ASTBindings &bindings, ASTNode *value);
 
-    static Let *from(const Anchor *anchor, const ASTBindings &bindings = {}, Block *body = nullptr);
+    static Let *from(const Anchor *anchor, const ASTBindings &bindings = {}, ASTNode *value = nullptr);
 
     void move_constants_to_scope(Scope *scope);
     void flatten();
+    ASTNode *canonicalize();
 };
 
 //------------------------------------------------------------------------------
@@ -308,9 +323,11 @@ struct Let : LetLike {
 struct Loop : LetLike {
     static bool classof(const ASTNode *T);
 
-    Loop(const Anchor *anchor, const ASTBindings &bindings, Block *body);
+    Loop(const Anchor *anchor, const ASTBindings &bindings, ASTNode *value);
 
-    static Loop *from(const Anchor *anchor, const ASTBindings &bindings = {}, Block *body = nullptr);
+    static Loop *from(const Anchor *anchor, const ASTBindings &bindings = {}, ASTNode *value = nullptr);
+
+    const Type *return_type;
 };
 
 //------------------------------------------------------------------------------

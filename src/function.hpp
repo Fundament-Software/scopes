@@ -27,7 +27,7 @@ struct FunctionType : Type {
     static bool classof(const Type *T);
 
     FunctionType(
-        const ReturnType *_return_type, const ArgTypes &_argument_types, uint32_t _flags);
+        const Type *_return_type, const ArgTypes &_argument_types, uint32_t _flags);
 
     void stream_name(StyledStream &ss) const;
 
@@ -35,7 +35,7 @@ struct FunctionType : Type {
 
     SCOPES_RESULT(const Type *) type_at_index(size_t i) const;
 
-    const ReturnType *return_type;
+    const Type *return_type;
     ArgTypes argument_types;
     uint32_t flags;
 };

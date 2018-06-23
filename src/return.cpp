@@ -52,19 +52,27 @@ bool ReturnType::is_returning() const {
     return !(flags & RTF_NoReturn);
 }
 
-const ReturnType *ReturnType::to_trycall() const {
+const Type *ReturnType::to_trycall() const {
     if (!is_raising())
         return this;
     return KeyedReturn(values, flags & ~(RTF_Raising | RTF_NoReturn));
 }
 
-const ReturnType *ReturnType::to_raising() const {
+const Type *ReturnType::to_raising() const {
     if (is_raising())
         return this;
     return KeyedReturn(values, flags | RTF_Raising);
 }
 
-const ReturnType *ReturnType::to_single(Symbol key) const {
+const Type *ReturnType::get_single() const {
+    assert(is_returning());
+    int starti = (is_raising()?1:0);
+    if (values.size() > starti)
+        return values[starti].type;
+    return TYPE_Nothing;
+}
+
+const Type *ReturnType::to_single(Symbol key) const {
     if (!is_returning())
         return this;
     int starti = (is_raising()?1:0);
@@ -114,6 +122,7 @@ ReturnType::ReturnType(const KeyedTypes &_values, uint64_t _flags)
         } else if (values.size() == 1) {
             return_type = values[0].type;
         } else {
+            assert(values.size() != 1);
             return_type = KeyedTuple(values).assert_ok();
         }
     } else {
@@ -123,17 +132,27 @@ ReturnType::ReturnType(const KeyedTypes &_values, uint64_t _flags)
 
 //------------------------------------------------------------------------------
 
-const ReturnType *KeyedReturn(const KeyedTypes &values, uint64_t flags) {
+const Type *KeyedReturn(const KeyedTypes &values, uint64_t flags) {
+    if (!flags) {
+        if (values.size() == 0)
+            return TYPE_Void;
+        else if ((values.size() == 1)
+                && (values[0].key == SYM_Unnamed))
+            return values[0].type;
+    }
     ReturnType key(values, flags);
     auto it = returns.find(&key);
     if (it != returns.end())
         return *it;
+    if (flags & RTF_NoReturn) {
+        assert(values.size() == 0);
+    }
     auto result = new ReturnType(values, flags);
     returns.insert(result);
     return result;
 }
 
-const ReturnType *Return(const ArgTypes &values, uint64_t flags) {
+const Type *Return(const ArgTypes &values, uint64_t flags) {
     KeyedTypes types;
     for (auto &&val : values) {
         types.push_back(val);
@@ -141,8 +160,22 @@ const ReturnType *Return(const ArgTypes &values, uint64_t flags) {
     return KeyedReturn(types, flags);
 }
 
-const ReturnType *NoReturn(uint64_t flags) {
+const Type *NoReturn(uint64_t flags) {
     return KeyedReturn({}, flags | RTF_NoReturn);
+}
+
+bool is_raising(const Type *T) {
+    auto rt = dyn_cast<ReturnType>(T);
+    if (rt)
+        return rt->is_raising();
+    return true;
+}
+
+bool is_returning(const Type *T) {
+    auto rt = dyn_cast<ReturnType>(T);
+    if (rt)
+        return rt->is_returning();
+    return true;
 }
 
 } // namespace scopes

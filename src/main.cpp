@@ -19,9 +19,11 @@
 #include "error.hpp"
 #include "scope.hpp"
 #include "expander.hpp"
+#include "ast_specializer.hpp"
 #include "gen_llvm.hpp"
 #include "stream_ast.hpp"
 #include "ast.hpp"
+#include "compiler_flags.hpp"
 
 #include "scopes/scopes.h"
 
@@ -287,32 +289,26 @@ SCOPES_RESULT(int) try_main(int argc, char *argv[]) {
     }
 
 skip_regular_load:
-    Template *fn = SCOPES_GET_RESULT(expand_module(expr, Scope::from(globals)));
+    Template *tmpfn = SCOPES_GET_RESULT(expand_module(expr, Scope::from(globals)));
 
-    StyledStream ss;
-    stream_ast(ss, fn, StreamASTFormat());
-
-#if 0
-    // TODO
-
-#if SCOPES_DEBUG_CODEGEN
+#if 1 //SCOPES_DEBUG_CODEGEN
     StyledStream ss(std::cout);
     std::cout << "non-normalized:" << std::endl;
-    stream_label(ss, fn, StreamLabelFormat::debug_all());
+    stream_ast(ss, tmpfn, StreamASTFormat());
     std::cout << std::endl;
 #endif
 
-    fn = SCOPES_GET_RESULT(specialize(Frame::root, fn, {}));
-#if SCOPES_DEBUG_CODEGEN
+    ASTFunction *fn = SCOPES_GET_RESULT(specialize(nullptr, tmpfn, {}));
+
+#if 1 //SCOPES_DEBUG_CODEGEN
     std::cout << "normalized:" << std::endl;
-    stream_label(ss, fn, StreamLabelFormat::debug_all());
+    stream_ast(ss, fn, StreamASTFormat());
     std::cout << std::endl;
 #endif
 
     typedef void (*MainFuncType)();
-    MainFuncType fptr = (MainFuncType)SCOPES_GET_RESULT(compile(fn, 0)).pointer;
+    MainFuncType fptr = (MainFuncType)SCOPES_GET_RESULT(compile(fn, CF_DumpModule)).pointer;
     fptr();
-#endif
 
     return 0;
 }

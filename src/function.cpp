@@ -42,7 +42,7 @@ void FunctionType::stream_name(StyledStream &ss) const {
 }
 
 FunctionType::FunctionType(
-    const ReturnType *_return_type, const ArgTypes &_argument_types, uint32_t _flags) :
+    const Type *_return_type, const ArgTypes &_argument_types, uint32_t _flags) :
     Type(TK_Function),
     return_type(_return_type),
     argument_types(_argument_types),
@@ -68,12 +68,12 @@ const Type *Function(const Type *return_type,
     const ArgTypes &argument_types, uint32_t flags) {
 
     struct TypeArgs {
-        const ReturnType *return_type;
+        const Type *return_type;
         ArgTypes argtypes;
         uint32_t flags;
 
         TypeArgs() {}
-        TypeArgs(const ReturnType *_return_type,
+        TypeArgs(const Type *_return_type,
             const ArgTypes &_argument_types,
             uint32_t _flags = 0) :
             return_type(_return_type),
@@ -108,23 +108,10 @@ const Type *Function(const Type *return_type,
 
     static ArgMap map;
 
-    if (return_type->kind() != TK_Return) {
-        if (return_type == TYPE_Void) {
-            return_type = Return({});
-        } else if (return_type->kind() == TK_Tuple) {
-            auto &&types = cast<TupleType>(return_type)->values;
-            return_type = KeyedReturn(types);
-        } else {
-            return_type = Return({return_type});
-        }
-    }
-
-    auto rtype = cast<ReturnType>(return_type);
-
-    TypeArgs ta(rtype, argument_types, flags);
+    TypeArgs ta(return_type, argument_types, flags);
     typename ArgMap::iterator it = map.find(ta);
     if (it == map.end()) {
-        FunctionType *t = new FunctionType(rtype, argument_types, flags);
+        FunctionType *t = new FunctionType(return_type, argument_types, flags);
         map.insert({ta, t});
         return t;
     } else {

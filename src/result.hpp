@@ -28,6 +28,12 @@ namespace scopes {
 #define SCOPES_CHECK_OK(OK) if (!OK) { SCOPES_RETURN_ERROR(); }
 // if an expression returning a result fails, return
 #define SCOPES_CHECK_RESULT(EXPR) SCOPES_CHECK_OK((EXPR).ok())
+// execute expression and return an error
+#define SCOPES_EXPECT_ERROR(EXPR) {\
+    auto _tmp = (EXPR); \
+    assert(!_tmp.ok()); \
+    SCOPES_RETURN_ERROR(); \
+}
 // try to extract a value from a result or return
 #define SCOPES_GET_RESULT(EXPR) ({ \
         auto _result = (EXPR); \

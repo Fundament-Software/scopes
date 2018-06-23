@@ -106,6 +106,9 @@ STREAM_STYLED_NUMBER(double)
 
 #undef STREAM_STYLED_NUMBER
 
+#define SCOPES_DUMP(EXPR) \
+    { StyledStream ss; ss << __FILE__ << ":" << __LINE__ << ": " <<  (EXPR) << std::endl; }
+
 // we need to ensure all stream operators are visible, so they're grouped here
 // but implemented elsewhere.
 

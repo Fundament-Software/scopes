@@ -86,7 +86,7 @@ static SCOPES_RESULT(T) cast_number(const Any &value) {
 template<int mincount, int maxcount>
 inline SCOPES_RESULT(int) checkargs(size_t argsize, bool allow_overshoot = false) {
     SCOPES_RESULT_TYPE(int);
-    int count = (int)argsize - 1;
+    int count = (int)argsize;
     if ((mincount <= 0) && (maxcount == -1)) {
         return count;
     }

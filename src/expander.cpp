@@ -73,8 +73,9 @@ struct Expander {
 
     ~Expander() {}
 
-    SCOPES_RESULT(void) expand_block(Block *block, const List *it) {
-        SCOPES_RESULT_TYPE(void);
+    SCOPES_RESULT(ASTNode *) expand_block(const Anchor *anchor, const List *it) {
+        SCOPES_RESULT_TYPE(ASTNode *);
+        Block *block = Block::from(anchor);
         while (it) {
             next = it->next;
             const Syntax *sx = it->at;
@@ -85,9 +86,7 @@ struct Expander {
             block->append(SCOPES_GET_RESULT(expand(it->at)));
             it = next;
         }
-        block->strip_constants();
-        block->flatten();
-        return true;
+        return block->canonicalize();
     }
 
     SCOPES_RESULT(ASTNode *) expand_syntax_extend(const List *it) {
@@ -108,7 +107,7 @@ struct Expander {
 
         Expander subexpr(subenv, func);
 
-        SCOPES_CHECK_RESULT(subexpr.expand_block(func->ensure_body(), it));
+        func->value = SCOPES_GET_RESULT(subexpr.expand_block(_anchor, it));
 
         set_active_anchor(_anchor);
 
@@ -227,7 +226,7 @@ struct Expander {
             }
         }
 
-        SCOPES_CHECK_RESULT(subexpr.expand_block(func->ensure_body(), it));
+        func->value = SCOPES_GET_RESULT(subexpr.expand_block(_anchor, it));
 
         set_active_anchor(_anchor);
         return func;
@@ -268,11 +267,9 @@ struct Expander {
 
         it = it->next;
 
-        Block *block = Block::from(_anchor);
         Scope *subenv = Scope::from(env);
         Expander subexpr(subenv, astscope);
-        SCOPES_CHECK_RESULT(subexpr.expand_block(block, it));
-        return block;
+        return subexpr.expand_block(_anchor, it);
     }
 
     bool is_equal_token(const Any &name) {
@@ -340,7 +337,7 @@ struct Expander {
 
         SCOPES_CHECK_RESULT(loop->map(syms, exprs));
 
-        SCOPES_CHECK_RESULT(expand_block(loop->ensure_body(), next));
+        loop->value = SCOPES_GET_RESULT(expand_block(_anchor, next));
         return loop;
     }
 
@@ -418,15 +415,9 @@ struct Expander {
         SCOPES_CHECK_RESULT(let->map(syms, exprs));
         let->move_constants_to_scope(env);
 
-        SCOPES_CHECK_RESULT(expand_block(let->ensure_body(), next));
+        let->value = SCOPES_GET_RESULT(expand_block(_anchor, next));
 
-        let->flatten();
-
-        if (let->has_assignments()) {
-            return let;
-        } else {
-            return let->body;
-        }
+        return let->canonicalize();
     }
 
     // quote <value> ...
@@ -516,17 +507,14 @@ struct Expander {
             const Anchor *anchor = ((const Syntax *)it->at)->anchor;
             it = it->next;
 
-            Block *thenblock = Block::from(anchor);
-
             Expander subexp(env, astscope);
             subexp.next = it->next;
             ASTNode *cond = SCOPES_GET_RESULT(subexp.expand(it->at));
             it = subexp.next;
 
             subexp.env = Scope::from(env);
-            SCOPES_CHECK_RESULT(subexp.expand_block(thenblock, it));
-
-            ifexpr->append(cond, thenblock);
+            ifexpr->append(anchor, cond,
+                SCOPES_GET_RESULT(subexp.expand_block(anchor, it)));
         }
 
         it = branches[lastidx];
@@ -535,12 +523,11 @@ struct Expander {
             it = it->next;
             Expander subexp(Scope::from(env), astscope);
 
-            Block *elseblock = Block::from(anchor);
-            SCOPES_CHECK_RESULT(subexp.expand_block(elseblock, it));
-            ifexpr->append(elseblock);
+            ifexpr->append(anchor,
+                SCOPES_GET_RESULT(subexp.expand_block(anchor, it)));
         }
 
-        return ifexpr;
+        return ifexpr->canonicalize();
     }
 
     static SCOPES_RESULT(bool) get_kwargs(Any it, Symbol &key, Any &value) {
@@ -621,6 +608,19 @@ struct Expander {
         return rep;
     }
 
+    SCOPES_RESULT(ASTNode *) expand_forward(const List *it) {
+        SCOPES_RESULT_TYPE(ASTNode *);
+        auto _anchor = get_active_anchor();
+        SCOPES_CHECK_RESULT(verify_list_parameter_count("_", it, 0, -1));
+        it = it->next;
+        auto args = ASTArgumentList::from(_anchor);
+        if (it) {
+            Expander subexp(env, astscope, it->next);
+            SCOPES_CHECK_RESULT(subexp.expand_arguments(args, it));
+        }
+        return args;
+    }
+
     SCOPES_RESULT(ASTNode *) expand_call(const List *it, uint32_t flags = 0) {
         SCOPES_RESULT_TYPE(ASTNode *);
 
@@ -699,6 +699,7 @@ struct Expander {
                 case KW_Return: return expand_return(list);
                 case KW_Break: return expand_break(list);
                 case KW_Repeat: return expand_repeat(list);
+                case KW_Forward: return expand_forward(list);
                 //case KW_Defer: return expand_defer(list);
                 case KW_Do: return expand_do(list);
                 case KW_TryCall:
@@ -824,7 +825,7 @@ SCOPES_RESULT(Template *) expand_inline(Any expr, Scope *scope) {
 
     Scope *subenv = scope?scope:globals;
     Expander subexpr(subenv, mainfunc);
-    SCOPES_CHECK_RESULT(subexpr.expand_block(mainfunc->ensure_body(), expr));
+    mainfunc->value = SCOPES_GET_RESULT(subexpr.expand_block(anchor, expr));
 
     return mainfunc;
 }
@@ -843,7 +844,7 @@ SCOPES_RESULT(Template *) expand_module(Any expr, Scope *scope) {
 
     Scope *subenv = scope?scope:globals;
     Expander subexpr(subenv, mainfunc);
-    SCOPES_CHECK_RESULT(subexpr.expand_block(mainfunc->ensure_body(), expr));
+    mainfunc->value = SCOPES_GET_RESULT(subexpr.expand_block(anchor, expr));
 
     return mainfunc;
 }

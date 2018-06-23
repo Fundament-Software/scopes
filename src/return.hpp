@@ -33,9 +33,10 @@ struct ReturnType : Type {
     bool is_returning() const;
     bool is_raising() const;
 
-    const ReturnType *to_raising() const;
-    const ReturnType *to_trycall() const;
-    const ReturnType *to_single(Symbol key = SYM_Unnamed) const;
+    const Type *to_raising() const;
+    const Type *to_trycall() const;
+    const Type *to_single(Symbol key = SYM_Unnamed) const;
+    const Type *get_single() const;
 
     void stream_name(StyledStream &ss) const;
     ReturnType(const KeyedTypes &_values, uint64_t flags);
@@ -45,9 +46,12 @@ struct ReturnType : Type {
     uint64_t flags;
 };
 
-const ReturnType *Return(const ArgTypes &values, uint64_t flags = 0);
-const ReturnType *KeyedReturn(const KeyedTypes &values, uint64_t flags = 0);
-const ReturnType *NoReturn(uint64_t flags = 0);
+const Type *Return(const ArgTypes &values, uint64_t flags = 0);
+const Type *KeyedReturn(const KeyedTypes &values, uint64_t flags = 0);
+const Type *NoReturn(uint64_t flags = 0);
+
+bool is_raising(const Type *T);
+bool is_returning(const Type *T);
 
 } // namespace scopes
 

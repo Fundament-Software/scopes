@@ -86,6 +86,9 @@ struct StreamAST : StreamAnchors {
         if (is_new)
             visited.insert(node);
 
+        if (node->is_typed()) {
+            ss << (const Type *)node->get_type() << " ◀ ";
+        }
         switch(node->kind()) {
         case ASTK_Template: {
             auto val = cast<Template>(node);
@@ -93,7 +96,7 @@ struct StreamAST : StreamAnchors {
             if (val->is_inline()) {
                 ss << " " << Style_Keyword << "inline" << Style_None;
             }
-            if (!val->body) {
+            if (!val->value) {
                 ss << " " << Style_Keyword << "forward-decl" << Style_None;
             }
             ss << " ";
@@ -104,9 +107,16 @@ struct StreamAST : StreamAnchors {
                     ss << std::endl;
                     walk(val->params[i], depth+1, maxdepth);
                 }
-                if (val->body) {
+                if (val->scope) {
                     ss << std::endl;
-                    walk(val->body, depth+1, maxdepth);
+                    stream_indent(depth+1);
+                    ss << "scope = ";
+                    ss << Style_Symbol << val->scope->name.name()->data
+                        << "λ" << (void *)val->scope << Style_None;
+                }
+                if (val->value) {
+                    ss << std::endl;
+                    walk(val->value, depth+1, maxdepth);
                 }
             } else {
                 ss << " <...>";
@@ -123,9 +133,9 @@ struct StreamAST : StreamAnchors {
                     ss << std::endl;
                     walk(val->params[i], depth+1, maxdepth);
                 }
-                if (val->body) {
+                if (val->value) {
                     ss << std::endl;
-                    walk(val->body, depth+1, maxdepth);
+                    walk(val->value, depth+1, maxdepth);
                 }
             } else {
                 ss << " <...>";
@@ -138,22 +148,28 @@ struct StreamAST : StreamAnchors {
                 ss << std::endl;
                 walk(val->body[i], depth+1, maxdepth);
             }
+            ss << std::endl;
+            walk(val->value, depth+1, maxdepth);
         } break;
         case ASTK_If: {
             auto val = cast<If>(node);
             ss << Style_Keyword << "If" << Style_None;
             for (int i = 0; i < val->clauses.size(); ++i) {
                 ss << std::endl;
+                stream_indent(depth+1);
+                ss << "clause" << Style_None;
+                ss << std::endl;
                 auto &&expr = val->clauses[i];
                 if (expr.cond)
-                    walk(expr.cond, depth+1, maxdepth);
-                else {
-                    stream_indent(depth+1);
-                    ss << Style_Keyword << "Else" << Style_None;
-                }
+                    walk(expr.cond, depth+2, maxdepth);
                 ss << std::endl;
-                walk(expr.body, depth+1, maxdepth);
+                walk(expr.value, depth+2, maxdepth);
             }
+            ss << std::endl;
+            stream_indent(depth+1);
+            ss << "else";
+            ss << std::endl;
+            walk(val->else_clause.value, depth+2, maxdepth);
         } break;
         case ASTK_Symbol: {
             auto val = cast<ASTSymbol>(node);
@@ -161,10 +177,6 @@ struct StreamAST : StreamAnchors {
                 << "$" << (void *)val << Style_None;
             if (val->is_variadic()) {
                 ss << "…";
-            }
-            if (val->type != TYPE_Unknown) {
-                ss << Style_Operator << ":" << Style_None;
-                ss << val->type;
             }
         } break;
         case ASTK_Call: {
@@ -199,7 +211,15 @@ struct StreamAST : StreamAnchors {
                 walk(val->variadic.expr, depth+2, maxdepth);
             }
             ss << std::endl;
-            walk(val->body, depth+1, maxdepth);
+            walk(val->value, depth+1, maxdepth);
+        } break;
+        case ASTK_ArgumentList: {
+            auto val = cast<ASTArgumentList>(node);
+            ss << Style_Keyword << "ArgumentList" << Style_None;
+            for (int i = 0; i < val->values.size(); ++i) {
+                ss << std::endl;
+                walk(val->values[i], depth+1, maxdepth);
+            }
         } break;
         case ASTK_Loop: {
             auto val = cast<Loop>(node);
@@ -212,18 +232,18 @@ struct StreamAST : StreamAnchors {
                 walk(arg.expr, depth+2, maxdepth);
             }
             ss << std::endl;
-            walk(val->body, depth+1, maxdepth);
+            walk(val->value, depth+1, maxdepth);
         } break;
         case ASTK_Const: {
             auto val = cast<Const>(node);
             ss << Style_Keyword << "Const" << Style_None << " ";
-            ss << val->value;
+            val->value.stream(ss, false);
         } break;
         case ASTK_Break: {
             auto val = cast<Break>(node);
             ss << Style_Keyword << "Break" << Style_None;
             ss << std::endl;
-            walk(val->value, depth, maxdepth);
+            walk(val->value, depth+1, maxdepth);
         } break;
         case ASTK_Repeat: {
             auto val = cast<Repeat>(node);
@@ -234,7 +254,7 @@ struct StreamAST : StreamAnchors {
             auto val = cast<ASTReturn>(node);
             ss << Style_Keyword << "ASTReturn" << Style_None;
             ss << std::endl;
-            walk(val->value, depth, maxdepth);
+            walk(val->value, depth+1, maxdepth);
         } break;
         case ASTK_SyntaxExtend: {
             auto val = cast<SyntaxExtend>(node);
