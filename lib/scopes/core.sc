@@ -135,9 +135,9 @@ let
     Image-type = sc_image_type
     SampledImage-type = sc_sampled_image_type
 
-inline tuples (u)
+fn tuples (u...)
     sc_write "tuples!\n"
-    _ 1 u 3
+    _ 1 2 u...
 
 if false
     sc_write "one!\n"

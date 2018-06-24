@@ -285,12 +285,16 @@ static SCOPES_RESULT(void) specialize_bind_arguments(const ASTContext &ctx,
                 set_active_anchor(oldsym->anchor());
                 SCOPES_EXPECT_ERROR(error_variadic_symbol_not_in_last_place());
             }
-            auto arglist = ASTArgumentList::from(oldsym->anchor());
-            for (int j = i; j < tmpargs.size(); ++j) {
-                arglist->append(tmpargs[j]);
+            if ((i + 1) == (int)tmpargs.size()) {
+                newval = tmpargs[i];
+            } else {
+                auto arglist = ASTArgumentList::from(oldsym->anchor());
+                for (int j = i; j < tmpargs.size(); ++j) {
+                    arglist->append(tmpargs[j]);
+                }
+                arglist->set_type(return_type_from_arguments(arglist->values));
+                newval = arglist;
             }
-            arglist->set_type(return_type_from_arguments(arglist->values));
-            newval = arglist;
         } else if (i < tmpargs.size()) {
             newval = tmpargs[i];
         } else {
@@ -698,15 +702,12 @@ SCOPES_RESULT(ASTNode *) specialize_inline(ASTFunction *frame, Template *func, c
     Timer sum_specialize_time(TIMER_Specialize);
     assert(func);
     int count = (int)func->params.size();
-    assert(count == nodes.size());
     ASTFunction *fn = ASTFunction::from(func->anchor(), func->name, {}, func->value);
     fn->original = func;
     fn->frame = frame;
     auto let = Let::from(fn->anchor());
-    for (int i = 0; i < count; ++i) {
-        let->params.push_back(func->params[i]);
-        let->args.push_back(nodes[i]);
-    }
+    let->params = func->params;
+    let->args = nodes;
     fn->value = Block::from(func->anchor(), {let}, fn->value);
     SCOPES_CHECK_RESULT(specialize_ASTFunction(ASTContext(fn), fn));
     return fn->value;
@@ -724,20 +725,46 @@ SCOPES_RESULT(ASTFunction *) specialize(ASTFunction *frame, Template *func, cons
     if (it != astfunctions.end())
         return *it;
     int count = (int)func->params.size();
-    assert(count == types.size());
     ASTFunction *fn = ASTFunction::from(func->anchor(), func->name, {}, func->value);
     fn->original = func;
     fn->frame = frame;
     fn->instance_args = types;
     for (int i = 0; i < count; ++i) {
         auto oldparam = func->params[i];
-        const Type *T = types[i];
-        if (oldparam->is_typed()) {
-            assert(oldparam->get_type() == T);
+        if (oldparam->is_variadic()) {
+            if ((i + 1) < count) {
+                set_active_anchor(oldparam->anchor());
+                SCOPES_EXPECT_ERROR(error_variadic_symbol_not_in_last_place());
+            }
+            if ((i + 1) == (int)types.size()) {
+                auto newparam = ASTSymbol::from(oldparam->anchor(), oldparam->name, types[i]);
+                fn->append_param(newparam);
+                fn->bind(oldparam, newparam);
+            } else {
+                ArgTypes vtypes;
+                auto args = ASTArgumentList::from(oldparam->anchor());
+                for (int j = i; j < types.size(); ++j) {
+                    vtypes.push_back(types[j]);
+                    auto newparam = ASTSymbol::from(oldparam->anchor(), oldparam->name, types[j]);
+                    fn->append_param(newparam);
+                    args->values.push_back(newparam);
+                }
+                args->set_type(Return(vtypes));
+                fn->bind(oldparam, args);
+            }
+        } else {
+            const Type *T = TYPE_Nothing;
+            if (i < types.size()) {
+                T = types[i];
+            }
+            if (oldparam->is_typed()) {
+                set_active_anchor(oldparam->anchor());
+                SCOPES_CHECK_RESULT(verify(oldparam->get_type(), T));
+            }
+            auto newparam = ASTSymbol::from(oldparam->anchor(), oldparam->name, T);
+            fn->append_param(newparam);
+            fn->bind(oldparam, newparam);
         }
-        auto newparam = ASTSymbol::from(oldparam->anchor(), oldparam->name, T);
-        fn->bind(oldparam, newparam);
-        fn->append_param(newparam);
     }
     astfunctions.insert(fn);
     return specialize_ASTFunction(ASTContext(fn), fn);
