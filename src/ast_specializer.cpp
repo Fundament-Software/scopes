@@ -120,6 +120,7 @@ struct ASTContext {
 
 // returns
 static SCOPES_RESULT(ASTNode *) specialize(const ASTContext &ctx, ASTNode *node);
+static SCOPES_RESULT(ASTNode *) specialize_inline(ASTFunction *frame, Template *func, const ASTNodes &nodes);
 
 static SCOPES_RESULT(const Type *) merge_value_type(const ASTContext &ctx, const Type *T1, const Type *T2) {
     SCOPES_RESULT_TYPE(const Type *);
@@ -250,12 +251,15 @@ static const Type *return_type_from_arguments(const ASTNodes &values) {
     return Return(types);
 }
 
-static SCOPES_RESULT(ASTArgumentList *) specialize_ASTArgumentList(
-    const ASTContext &ctx, ASTArgumentList *nlist) {
-    SCOPES_RESULT_TYPE(ASTArgumentList *);
-    ASTArgumentList *newnlist = ASTArgumentList::from(nlist->anchor());
-    SCOPES_CHECK_RESULT(specialize_arguments(ctx, newnlist->values, nlist->values));
-    newnlist->set_type(return_type_from_arguments(newnlist->values));
+static SCOPES_RESULT(ASTNode *) specialize_ASTArgumentList(const ASTContext &ctx, ASTArgumentList *nlist) {
+    SCOPES_RESULT_TYPE(ASTNode *);
+    ASTNodes values;
+    SCOPES_CHECK_RESULT(specialize_arguments(ctx, values, nlist->values));
+    if (values.size() == 1) {
+        return values[0];
+    }
+    ASTArgumentList *newnlist = ASTArgumentList::from(nlist->anchor(), values);
+    newnlist->set_type(return_type_from_arguments(values));
     return newnlist;
 }
 
@@ -356,6 +360,11 @@ static SCOPES_RESULT(ASTReturn *) specialize_ASTReturn(const ASTContext &ctx, AS
     SCOPES_RESULT_TYPE(ASTReturn *);
     ASTNode *value = SCOPES_GET_RESULT(specialize(ctx.to_used(), _return->value));
     assert(ctx.frame);
+    if (ctx.frame->original
+        && ctx.frame->original->is_inline()) {
+        set_active_anchor(_return->anchor());
+        SCOPES_EXPECT_ERROR(error_illegal_return_in_inline());
+    }
     ctx.frame->return_type = SCOPES_GET_RESULT(merge_return_type(ctx.frame->return_type, value->get_type()));
     auto newreturn = ASTReturn::from(_return->anchor(), value);
     newreturn->set_type(NoReturn());
@@ -446,12 +455,16 @@ static SCOPES_RESULT(ASTNode *) specialize_Call(const ASTContext &ctx, Call *cal
         auto anycl = SCOPES_GET_RESULT(extract_constant(callee));
         //SCOPES_CHECK_RESULT(anycl.verify(TYPE_Closure));
         const Closure *cl = anycl.closure;
-        ArgTypes types;
-        for (auto &&arg : values) {
-            types.push_back(arg->get_type());
+        if (cl->func->is_inline()) {
+            return SCOPES_GET_RESULT(specialize_inline(cl->frame, cl->func, values));
+        } else {
+            ArgTypes types;
+            for (auto &&arg : values) {
+                types.push_back(arg->get_type());
+            }
+            callee = SCOPES_GET_RESULT(specialize(cl->frame, cl->func, types));
+            T = callee->get_type();
         }
-        callee = SCOPES_GET_RESULT(specialize(cl->frame, cl->func, types));
-        T = callee->get_type();
     } else if (T == TYPE_Builtin) {
         auto anycl = SCOPES_GET_RESULT(extract_constant(callee));
         //SCOPES_CHECK_RESULT(anycl.verify(TYPE_Builtin));
@@ -680,6 +693,25 @@ SCOPES_RESULT(ASTNode *) specialize(const ASTContext &ctx, ASTNode *node) {
     return node;
 }
 
+SCOPES_RESULT(ASTNode *) specialize_inline(ASTFunction *frame, Template *func, const ASTNodes &nodes) {
+    SCOPES_RESULT_TYPE(ASTNode *);
+    Timer sum_specialize_time(TIMER_Specialize);
+    assert(func);
+    int count = (int)func->params.size();
+    assert(count == nodes.size());
+    ASTFunction *fn = ASTFunction::from(func->anchor(), func->name, {}, func->value);
+    fn->original = func;
+    fn->frame = frame;
+    auto let = Let::from(fn->anchor());
+    for (int i = 0; i < count; ++i) {
+        let->params.push_back(func->params[i]);
+        let->args.push_back(nodes[i]);
+    }
+    fn->value = Block::from(func->anchor(), {let}, fn->value);
+    SCOPES_CHECK_RESULT(specialize_ASTFunction(ASTContext(fn), fn));
+    return fn->value;
+}
+
 SCOPES_RESULT(ASTFunction *) specialize(ASTFunction *frame, Template *func, const ArgTypes &types) {
     SCOPES_RESULT_TYPE(ASTFunction *);
     Timer sum_specialize_time(TIMER_Specialize);
@@ -699,7 +731,6 @@ SCOPES_RESULT(ASTFunction *) specialize(ASTFunction *frame, Template *func, cons
     fn->instance_args = types;
     for (int i = 0; i < count; ++i) {
         auto oldparam = func->params[i];
-        assert(!oldparam->is_variadic());
         const Type *T = types[i];
         if (oldparam->is_typed()) {
             assert(oldparam->get_type() == T);

@@ -75,6 +75,7 @@ SCOPES_RESULT(void) error_cannot_type_builtin(const Builtin &builtin);
 SCOPES_RESULT(void) error_illegal_repeat_outside_loop();
 SCOPES_RESULT(void) error_illegal_break_outside_loop();
 SCOPES_RESULT(void) error_variadic_symbol_not_in_last_place();
+SCOPES_RESULT(void) error_illegal_return_in_inline();
 
 // code generator errors
 SCOPES_RESULT(void) error_gen_invalid_call_type(const char *target, ASTNode *callee);
