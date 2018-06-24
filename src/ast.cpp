@@ -28,7 +28,7 @@ Keyed *Keyed::from(const Anchor *anchor, Symbol key, ASTNode *node) {
 //------------------------------------------------------------------------------
 
 ASTArgumentList::ASTArgumentList(const Anchor *anchor, const ASTNodes &_values)
-    : ASTValue(ASTK_ArgumentList, anchor), values(_values) {
+    : ASTNode(ASTK_ArgumentList, anchor), values(_values) {
 }
 
 void ASTArgumentList::append(ASTNode *node) {
@@ -42,6 +42,16 @@ void ASTArgumentList::append(Symbol key, ASTNode *node) {
 
 ASTArgumentList *ASTArgumentList::from(const Anchor *anchor, const ASTNodes &values) {
     return new ASTArgumentList(anchor, values);
+}
+
+//------------------------------------------------------------------------------
+
+ASTExtractArgument::ASTExtractArgument(const Anchor *anchor, ASTNode *_value, int _index)
+    : ASTNode(ASTK_ExtractArgument, anchor), value(_value), index(_index) {
+}
+
+ASTExtractArgument *ASTExtractArgument::from(const Anchor *anchor, ASTNode *value, int index) {
+    return new ASTExtractArgument(anchor, value, index);
 }
 
 //------------------------------------------------------------------------------
@@ -221,7 +231,7 @@ bool ASTSymbol::is_variadic() const {
 
 //------------------------------------------------------------------------------
 
-Call::Call(const Anchor *anchor, ASTNode *_callee, ASTArgumentList *_args)
+Call::Call(const Anchor *anchor, ASTNode *_callee, const ASTNodes &_args)
     : ASTNode(ASTK_Call, anchor), callee(_callee), args(_args), flags(0) {
 }
 
@@ -241,173 +251,27 @@ void Call::set_trycall() {
     flags |= CF_TryCall;
 }
 
-ASTArgumentList *Call::ensure_args() {
-    if (!args) {
-        args = ASTArgumentList::from(anchor());
-    }
-    return args;
-}
-
-Call *Call::from(const Anchor *anchor, ASTNode *callee, ASTArgumentList *_args) {
-    return new Call(anchor, callee, _args);
+Call *Call::from(const Anchor *anchor, ASTNode *callee, const ASTNodes &args) {
+    return new Call(anchor, callee, args);
 }
 
 //------------------------------------------------------------------------------
 
-#if 0
-        if (loop->is_variadic()) {
-            // accepts maximum number of arguments
-            numparams = (size_t)-1;
-        }
-
-        if (numvalues > numparams) {
-            set_active_anchor(loop->exprs[numparams]->get_anchor());
-            StyledString ss;
-            ss.out << "number of arguments exceeds number of defined names ("
-                << numvalues << " > " << numparams << ")";
-            SCOPES_LOCATION_ERROR(ss.str());
-        }
-#endif
-
-LetLike::LetLike(ASTKind _kind, const Anchor *anchor, const ASTBindings &_bindings, ASTNode *_value)
-    : ASTNode(_kind, anchor), bindings(_bindings), value(_value) {
+Let::Let(const Anchor *anchor, const ASTSymbols &_params, const ASTNodes &_args, ASTNode *_value)
+    : ASTNode(ASTK_Let, anchor), params(_params), args(_args), value(_value) {
 }
-
-void LetLike::append(const ASTBinding &bind) {
-    assert(bind.sym);
-    assert(bind.expr);
-    bindings.push_back(bind);
-}
-
-void LetLike::append(ASTSymbol *sym, ASTNode *expr) {
-    assert(sym);
-    assert(expr);
-    bindings.push_back({sym, expr});
-}
-
-bool LetLike::has_variadic_section() const {
-    return variadic.expr;
-}
-
-bool LetLike::has_assignments() const {
-    return has_variadic_section() || !bindings.empty();
-}
-
-SCOPES_RESULT(void) LetLike::map(const ASTSymbols &syms, const ASTNodes &nodes) {
-    SCOPES_RESULT_TYPE(void);
-    int argcount = (int)nodes.size();
-    int symcount = (int)syms.size();
-    // verify that all but the last syms aren't variadic
-    for (int i = 0; (i + 1) < symcount; ++i) {
-        ASTSymbol *sym = syms[i];
-        if (sym->is_variadic()) {
-            set_active_anchor(sym->anchor());
-            SCOPES_LOCATION_ERROR(String::from("a variadic symbol can only be in last place"));
-        }
-    }
-    for (int i = 0; i < argcount; ++i) {
-        ASTNode *expr = nodes[i];
-        if (i >= symcount) {
-            set_active_anchor(expr->anchor());
-            SCOPES_LOCATION_ERROR(String::from("overhanging expression is not going to be bound to a name"));
-        }
-        ASTSymbol *sym = syms[i];
-        if ((i + 1) == argcount) {
-            // last expression
-            if (((i + 1) == symcount) && (!sym->is_variadic())) {
-                // only one symbol left, but it's not variadic
-                bindings.push_back({sym, expr});
-            } else {
-                // unpacking section
-                assert(!has_variadic_section());
-                // the remainder goes to the variadic section
-                for (int j = i; j < symcount; ++j) {
-                    variadic.syms.push_back(syms[j]);
-                }
-                variadic.expr = expr;
-            }
-        } else if (sym->is_variadic()) {
-            // grouping multiple arguments under one variadic symbol
-            // reaching last symbol
-            assert(!has_variadic_section());
-            auto vals = ASTArgumentList::from(expr->anchor());
-            // store remaining arguments in single node
-            for (int j = i; j < argcount; ++j) {
-                vals->values.push_back(nodes[i]);
-            }
-            variadic.expr = vals;
-            variadic.syms.push_back(sym);
-            break;
-        } else {
-            bindings.push_back({sym, expr});
-        }
-    }
-    return true;
+Let *Let::from(const Anchor *anchor, const ASTSymbols &params, const ASTNodes &args, ASTNode *value) {
+    return new Let(anchor, params, args, value);
 }
 
 //------------------------------------------------------------------------------
 
-Let::Let(const Anchor *anchor, const ASTBindings &bindings, ASTNode *value)
-    : LetLike(ASTK_Let, anchor, bindings, value) {
-}
-Let *Let::from(const Anchor *anchor, const ASTBindings &bindings, ASTNode *value) {
-    return new Let(anchor, bindings, value);
+Loop::Loop(const Anchor *anchor, const ASTSymbols &_params, const ASTNodes &_args, ASTNode *_value)
+    : ASTNode(ASTK_Loop, anchor), params(_params), args(_args), value(_value) {
 }
 
-void Let::move_constants_to_scope(Scope *scope) {
-    // turn all non-computing assignments into scope bindings
-    int i = (int)bindings.size();
-    while (i > 0) {
-        i--;
-        auto &&bind = bindings[i];
-        if (isa<ASTValue>(bind.expr)
-            && (bind.sym->name != SYM_Unnamed)) {
-            assert(!bind.sym->is_variadic());
-            scope->bind(bind.sym->name, cast<ASTValue>(bind.expr));
-            bindings.erase(bindings.begin() + i);
-        }
-    }
-}
-
-ASTNode *Let::canonicalize() {
-    flatten();
-    if (has_assignments()) {
-        return this;
-    } else {
-        return value;
-    }
-}
-
-void Let::flatten() {
-    /*
-    if:
-        1. the body has only a single entry, and that entry is a Let
-        2. all assigned expressions are constants
-    then:
-        merge all arguments into this let, and use this lets body
-    */
-    assert(value);
-    auto let = dyn_cast<Let>(value);
-    if (!let) return;
-    if (let->has_variadic_section()) return;
-    for (auto &&bind : let->bindings) {
-        if (!isa<Const>(bind.expr))
-            return;
-    }
-    for (auto &&bind : let->bindings) {
-        bindings.push_back(bind);
-    }
-    value = let->value;
-}
-
-//------------------------------------------------------------------------------
-
-Loop::Loop(const Anchor *anchor, const ASTBindings &bindings, ASTNode *value)
-    : LetLike(ASTK_Loop, anchor, bindings, value), return_type(nullptr) {
-}
-
-Loop *Loop::from(const Anchor *anchor, const ASTBindings &bindings, ASTNode *value) {
-    return new Loop(anchor, bindings, value);
+Loop *Loop::from(const Anchor *anchor, const ASTSymbols &params, const ASTNodes &args, ASTNode *value) {
+    return new Loop(anchor, params, args, value);
 }
 
 //------------------------------------------------------------------------------
@@ -433,17 +297,10 @@ Break *Break::from(const Anchor *anchor, ASTNode *value) {
 
 //------------------------------------------------------------------------------
 
-Repeat::Repeat(const Anchor *anchor, ASTArgumentList *_args)
+Repeat::Repeat(const Anchor *anchor, const ASTNodes &_args)
     : ASTNode(ASTK_Repeat, anchor), args(_args) {}
 
-ASTArgumentList *Repeat::ensure_args() {
-    if (!args) {
-        args = ASTArgumentList::from(anchor());
-    }
-    return args;
-}
-
-Repeat *Repeat::from(const Anchor *anchor, ASTArgumentList *args) {
+Repeat *Repeat::from(const Anchor *anchor, const ASTNodes &args) {
     return new Repeat(anchor, args);
 }
 

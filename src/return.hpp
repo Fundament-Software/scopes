@@ -35,8 +35,7 @@ struct ReturnType : Type {
 
     const Type *to_raising() const;
     const Type *to_trycall() const;
-    const Type *to_single(Symbol key = SYM_Unnamed) const;
-    const Type *get_single() const;
+    const Type *type_at_index(size_t i) const;
 
     void stream_name(StyledStream &ss) const;
     ReturnType(const KeyedTypes &_values, uint64_t flags);

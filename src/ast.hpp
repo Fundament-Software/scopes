@@ -30,6 +30,7 @@ struct ReturnType;
     T(ASTK_Symbol, "ast-kind-symbol", ASTSymbol) \
     T(ASTK_Keyed, "ast-kind-keyed", Keyed) \
     T(ASTK_ArgumentList, "ast-kind-argumentlist", ASTArgumentList) \
+    T(ASTK_ExtractArgument, "ast-kind-extractargument", ASTExtractArgument) \
     T(ASTK_Call, "ast-kind-call", Call) \
     T(ASTK_Let, "ast-kind-let", Let) \
     T(ASTK_Loop, "ast-kind-loop", Loop) \
@@ -121,7 +122,7 @@ struct Keyed : ASTNode {
 
 //------------------------------------------------------------------------------
 
-struct ASTArgumentList : ASTValue {
+struct ASTArgumentList : ASTNode {
     static bool classof(const ASTNode *T);
 
     ASTArgumentList(const Anchor *anchor, const ASTNodes &values);
@@ -132,6 +133,19 @@ struct ASTArgumentList : ASTValue {
     static ASTArgumentList *from(const Anchor *anchor, const ASTNodes &values = {});
 
     ASTNodes values;
+};
+
+//------------------------------------------------------------------------------
+
+struct ASTExtractArgument : ASTNode {
+    static bool classof(const ASTNode *T);
+
+    ASTExtractArgument(const Anchor *anchor, ASTNode *value, int index);
+
+    static ASTExtractArgument *from(const Anchor *anchor, ASTNode *value, int index);
+
+    ASTNode *value;
+    int index;
 };
 
 //------------------------------------------------------------------------------
@@ -260,73 +274,44 @@ enum CallFlags {
 struct Call : ASTNode {
     static bool classof(const ASTNode *T);
 
-    Call(const Anchor *anchor, ASTNode *callee, ASTArgumentList *args);
-    static Call *from(const Anchor *anchor, ASTNode *callee, ASTArgumentList *args = nullptr);
+    Call(const Anchor *anchor, ASTNode *callee, const ASTNodes &args);
+    static Call *from(const Anchor *anchor, ASTNode *callee, const ASTNodes &args = {});
     bool is_rawcall() const;
     void set_rawcall();
     bool is_trycall() const;
     void set_trycall();
 
-    ASTArgumentList *ensure_args();
-
     ASTNode *callee;
-    ASTArgumentList *args;
+    ASTNodes args;
     uint32_t flags;
 };
 
 //------------------------------------------------------------------------------
 
-struct ASTBinding {
-    ASTSymbol *sym;
-    ASTNode *expr;
-};
+struct Let : ASTNode {
+    static bool classof(const ASTNode *T);
 
-struct ASTVariadicBinding {
-    ASTSymbols syms;
-    ASTNode *expr;
+    Let(const Anchor *anchor, const ASTSymbols &params, const ASTNodes &args, ASTNode *value);
 
-    ASTVariadicBinding() : expr(nullptr) {}
-};
+    static Let *from(const Anchor *anchor, const ASTSymbols &params = {}, const ASTNodes &args = {}, ASTNode *value = nullptr);
 
-typedef std::vector<ASTBinding> ASTBindings;
-
-struct LetLike : ASTNode {
-    LetLike(ASTKind _kind, const Anchor *anchor, const ASTBindings &bindings, ASTNode *value);
-
-    void append(const ASTBinding &bind);
-    void append(ASTSymbol *sym, ASTNode *expr);
-    SCOPES_RESULT(void) map(const ASTSymbols &syms, const ASTNodes &nodes);
-    bool has_variadic_section() const;
-    bool has_assignments() const;
-
-    ASTBindings bindings;
-    ASTVariadicBinding variadic;
+    ASTSymbols params;
+    ASTNodes args;
     ASTNode *value;
 };
 
 //------------------------------------------------------------------------------
 
-struct Let : LetLike {
+struct Loop : ASTNode {
     static bool classof(const ASTNode *T);
 
-    Let(const Anchor *anchor, const ASTBindings &bindings, ASTNode *value);
+    Loop(const Anchor *anchor, const ASTSymbols &params, const ASTNodes &args, ASTNode *value);
 
-    static Let *from(const Anchor *anchor, const ASTBindings &bindings = {}, ASTNode *value = nullptr);
+    static Loop *from(const Anchor *anchor, const ASTSymbols &params = {}, const ASTNodes &args = {}, ASTNode *value = nullptr);
 
-    void move_constants_to_scope(Scope *scope);
-    void flatten();
-    ASTNode *canonicalize();
-};
-
-//------------------------------------------------------------------------------
-
-struct Loop : LetLike {
-    static bool classof(const ASTNode *T);
-
-    Loop(const Anchor *anchor, const ASTBindings &bindings, ASTNode *value);
-
-    static Loop *from(const Anchor *anchor, const ASTBindings &bindings = {}, ASTNode *value = nullptr);
-
+    ASTSymbols params;
+    ASTNodes args;
+    ASTNode *value;
     const Type *return_type;
 };
 
@@ -359,13 +344,11 @@ struct Break : ASTNode {
 struct Repeat : ASTNode {
     static bool classof(const ASTNode *T);
 
-    Repeat(const Anchor *anchor, ASTArgumentList *args);
+    Repeat(const Anchor *anchor, const ASTNodes &args);
 
-    static Repeat *from(const Anchor *anchor, ASTArgumentList *args = nullptr);
+    static Repeat *from(const Anchor *anchor, const ASTNodes &args = {});
 
-    ASTArgumentList *ensure_args();
-
-    ASTArgumentList *args;
+    ASTNodes args;
 };
 
 //------------------------------------------------------------------------------

@@ -335,7 +335,8 @@ struct Expander {
             it = it->next;
         }
 
-        SCOPES_CHECK_RESULT(loop->map(syms, exprs));
+        loop->params = syms;
+        loop->args = exprs;
 
         loop->value = SCOPES_GET_RESULT(expand_block(_anchor, next));
         return loop;
@@ -412,12 +413,12 @@ struct Expander {
             it = it->next;
         }
 
-        SCOPES_CHECK_RESULT(let->map(syms, exprs));
-        let->move_constants_to_scope(env);
+        let->params = syms;
+        let->args = exprs;
 
         let->value = SCOPES_GET_RESULT(expand_block(_anchor, next));
 
-        return let->canonicalize();
+        return let;
     }
 
     // quote <value> ...
@@ -549,7 +550,7 @@ struct Expander {
         return true;
     }
 
-    SCOPES_RESULT(void) expand_arguments(ASTArgumentList *args, const List *it) {
+    SCOPES_RESULT(void) expand_arguments(ASTNodes &args, const List *it) {
         SCOPES_RESULT_TYPE(void);
         while (it) {
             next = it->next;
@@ -557,10 +558,11 @@ struct Expander {
             Any value;
             set_active_anchor(((const Syntax *)it->at)->anchor);
             if (SCOPES_GET_RESULT(get_kwargs(it->at, key, value))) {
-                args->append(key,
-                    SCOPES_GET_RESULT(expand(value)));
+                args.push_back(
+                    Keyed::from(get_active_anchor(), key,
+                        SCOPES_GET_RESULT(expand(value))));
             } else {
-                args->append(SCOPES_GET_RESULT(expand(it->at)));
+                args.push_back(SCOPES_GET_RESULT(expand(it->at)));
             }
             it = next;
         }
@@ -572,13 +574,12 @@ struct Expander {
         auto _anchor = get_active_anchor();
         SCOPES_CHECK_RESULT(verify_list_parameter_count("return", it, 0, -1));
         it = it->next;
-        ASTNode *value = nullptr;
+        ASTArgumentList *args = ASTArgumentList::from(_anchor);
         if (it) {
-            value = SCOPES_GET_RESULT(expand(it->at));
-        } else {
-            value = ASTArgumentList::from(_anchor);
+            Expander subexp(env, astscope, it->next);
+            SCOPES_CHECK_RESULT(subexp.expand_arguments(args->values, it));
         }
-        return ASTReturn::from(_anchor, value);
+        return ASTReturn::from(_anchor, args);
     }
 
     SCOPES_RESULT(ASTNode *) expand_break(const List *it) {
@@ -603,7 +604,7 @@ struct Expander {
         auto rep = Repeat::from(_anchor);
         if (it) {
             Expander subexp(env, astscope, it->next);
-            SCOPES_CHECK_RESULT(subexp.expand_arguments(rep->ensure_args(), it));
+            SCOPES_CHECK_RESULT(subexp.expand_arguments(rep->args, it));
         }
         return rep;
     }
@@ -616,7 +617,7 @@ struct Expander {
         auto args = ASTArgumentList::from(_anchor);
         if (it) {
             Expander subexp(env, astscope, it->next);
-            SCOPES_CHECK_RESULT(subexp.expand_arguments(args, it));
+            SCOPES_CHECK_RESULT(subexp.expand_arguments(args->values, it));
         }
         return args;
     }
@@ -633,7 +634,7 @@ struct Expander {
         call->flags = flags;
 
         it = subexp.next;
-        SCOPES_CHECK_RESULT(subexp.expand_arguments(call->ensure_args(), it));
+        SCOPES_CHECK_RESULT(subexp.expand_arguments(call->args, it));
         return call;
     }
 

@@ -64,22 +64,12 @@ const Type *ReturnType::to_raising() const {
     return KeyedReturn(values, flags | RTF_Raising);
 }
 
-const Type *ReturnType::get_single() const {
-    assert(is_returning());
-    int starti = (is_raising()?1:0);
-    if (values.size() > starti)
-        return values[starti].type;
-    return TYPE_Nothing;
-}
-
-const Type *ReturnType::to_single(Symbol key) const {
+const Type *ReturnType::type_at_index(size_t i) const {
     if (!is_returning())
         return this;
-    int starti = (is_raising()?1:0);
-    if (values.size() == starti)
-        return KeyedReturn({KeyedType(key, TYPE_Nothing)}, flags);
-    else
-        return KeyedReturn({KeyedType(key, values[starti].type)}, flags);
+    if (i < values.size())
+        return values[i].type;
+    return TYPE_Nothing;
 }
 
 void ReturnType::stream_name(StyledStream &ss) const {

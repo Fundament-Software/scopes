@@ -55,11 +55,10 @@ struct StreamAST : StreamAnchors {
         }
     }
 
-    void write_arguments(ASTArgumentList *args, int depth, int maxdepth) {
-        assert(args);
-        for (int i = 0; i < args->values.size(); ++i) {
+    void write_arguments(const ASTNodes &args, int depth, int maxdepth) {
+        for (int i = 0; i < args.size(); ++i) {
             ss << std::endl;
-            auto &&arg = args->values[i];
+            auto &&arg = args[i];
 
             //if (arg.key == SYM_Unnamed) {
                 walk(arg, depth+1, maxdepth);
@@ -195,20 +194,13 @@ struct StreamAST : StreamAnchors {
         case ASTK_Let: {
             auto val = cast<Let>(node);
             ss << Style_Keyword << "Let" << Style_None;
-            for (int i = 0; i < val->bindings.size(); ++i) {
+            for (int i = 0; i < val->params.size(); ++i) {
                 ss << std::endl;
-                auto &&arg = val->bindings[i];
-                walk(arg.sym, depth+1, maxdepth);
-                ss << std::endl;
-                walk(arg.expr, depth+2, maxdepth);
+                walk(val->params[i], depth+1, maxdepth);
             }
-            if (val->has_variadic_section()) {
-                for (int i = 0; i < val->variadic.syms.size(); ++i) {
-                    ss << std::endl;
-                    walk(val->variadic.syms[i], depth + 1, maxdepth);
-                }
+            for (int i = 0; i < val->args.size(); ++i) {
                 ss << std::endl;
-                walk(val->variadic.expr, depth+2, maxdepth);
+                walk(val->args[i], depth+2, maxdepth);
             }
             ss << std::endl;
             walk(val->value, depth+1, maxdepth);
@@ -221,15 +213,23 @@ struct StreamAST : StreamAnchors {
                 walk(val->values[i], depth+1, maxdepth);
             }
         } break;
+        case ASTK_ExtractArgument: {
+            auto val = cast<ASTExtractArgument>(node);
+            ss << Style_Keyword << "ExtractArgument" << Style_None;
+            ss << " " << val->index;
+            ss << std::endl;
+            walk(val->value, depth+1, maxdepth);
+        } break;
         case ASTK_Loop: {
             auto val = cast<Loop>(node);
             ss << Style_Keyword << "Loop" << Style_None;
-            for (int i = 0; i < val->bindings.size(); ++i) {
+            for (int i = 0; i < val->params.size(); ++i) {
                 ss << std::endl;
-                auto &&arg = val->bindings[i];
-                walk(arg.sym, depth+1, maxdepth);
+                walk(val->params[i], depth+1, maxdepth);
+            }
+            for (int i = 0; i < val->args.size(); ++i) {
                 ss << std::endl;
-                walk(arg.expr, depth+2, maxdepth);
+                walk(val->args[i], depth+2, maxdepth);
             }
             ss << std::endl;
             walk(val->value, depth+1, maxdepth);

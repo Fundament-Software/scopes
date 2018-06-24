@@ -159,7 +159,7 @@ SCOPES_RESULT(void) error_cannot_merge_expression_types(const Type *T1, const Ty
 SCOPES_RESULT(void) error_noreturn_not_last_expression() {
     SCOPES_RESULT_TYPE(void);
     StyledString ss;
-    ss.out << "non-returning expression isn't last expression in block";
+    ss.out << "non-returning expression isn't last expression in sequence";
     SCOPES_LOCATION_ERROR(ss.str());
 }
 
@@ -181,6 +181,13 @@ SCOPES_RESULT(void) error_illegal_break_outside_loop() {
     SCOPES_RESULT_TYPE(void);
     StyledString ss;
     ss.out << "illegal break outside loop";
+    SCOPES_LOCATION_ERROR(ss.str());
+}
+
+SCOPES_RESULT(void) error_variadic_symbol_not_in_last_place() {
+    SCOPES_RESULT_TYPE(void);
+    StyledString ss;
+    ss.out << "variadic symbol is not in last place";
     SCOPES_LOCATION_ERROR(ss.str());
 }
 

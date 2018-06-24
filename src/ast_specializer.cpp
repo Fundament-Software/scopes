@@ -170,31 +170,121 @@ static SCOPES_RESULT(ASTNode *) specialize_Block(const ASTContext &ctx, Block *b
     return newblock->canonicalize();
 }
 
+static ASTNode *extract_argument(ASTNode *value, int index) {
+    const Anchor *anchor = value->anchor();
+    const Type *T = value->get_type();
+    if (!is_returning(T))
+        return value;
+    auto rt = dyn_cast<ReturnType>(value->get_type());
+    if (rt) {
+        const Type *T = rt->type_at_index(index);
+        if (T == TYPE_Nothing) {
+            return Const::from(anchor, none);
+        } else {
+            auto result = ASTExtractArgument::from(anchor, value, index);
+            result->set_type(T);
+            return result;
+        }
+    } else if (index == 0) {
+        return value;
+    } else {
+        return Const::from(anchor, none);
+    }
+}
+
+static SCOPES_RESULT(void) specialize_arguments(
+    const ASTContext &ctx, ASTNodes &outargs, const ASTNodes &values) {
+    SCOPES_RESULT_TYPE(void);
+    auto subctx = ctx.to_used();
+    int count = (int)values.size();
+    for (int i = 0; i < count; ++i) {
+        auto value = SCOPES_GET_RESULT(specialize(subctx, values[i]));
+        const Type *T = value->get_type();
+        auto rt = dyn_cast<ReturnType>(T);
+        if (rt) {
+            if (!rt->is_returning()) {
+                SCOPES_EXPECT_ERROR(error_noreturn_not_last_expression());
+            }
+            if ((i + 1) == count) {
+                // last argument is appended in full
+                int starti = (rt->is_raising()?1:0);
+                int valcount = (int)rt->values.size();
+                for (int j = starti; j < valcount; ++j) {
+                    outargs.push_back(extract_argument(value, j));
+                }
+                break;
+            } else {
+                value = extract_argument(value, 0);
+            }
+        }
+        outargs.push_back(value);
+    }
+    return true;
+}
+
+static const Type *return_type_from_arguments(const ASTNodes &values) {
+    ArgTypes types;
+    for (auto arg : values) {
+        types.push_back(arg->get_type());
+    }
+    return Return(types);
+}
+
 static SCOPES_RESULT(ASTArgumentList *) specialize_ASTArgumentList(
     const ASTContext &ctx, ASTArgumentList *nlist) {
     SCOPES_RESULT_TYPE(ASTArgumentList *);
-    ArgTypes types;
     ASTArgumentList *newnlist = ASTArgumentList::from(nlist->anchor());
-    for (auto &&value : nlist->values) {
-        auto newvalue = SCOPES_GET_RESULT(specialize(ctx, value));
-        types.push_back(newvalue->get_type());
-        newnlist->append(newvalue);
-    }
-    newnlist->set_type(Return(types));
+    SCOPES_CHECK_RESULT(specialize_arguments(ctx, newnlist->values, nlist->values));
+    newnlist->set_type(return_type_from_arguments(newnlist->values));
     return newnlist;
+}
+
+static SCOPES_RESULT(ASTNode *) specialize_ASTExtractArgument(
+    const ASTContext &ctx, ASTExtractArgument *node) {
+    SCOPES_RESULT_TYPE(ASTNode *);
+    auto value = SCOPES_GET_RESULT(specialize(ctx, node->value));
+    return extract_argument(value, node->index);
+}
+
+static SCOPES_RESULT(void) specialize_bind_arguments(const ASTContext &ctx,
+    ASTSymbols &outparams, ASTNodes &outargs,
+    const ASTSymbols &params, const ASTNodes &values) {
+    SCOPES_RESULT_TYPE(void);
+    ASTNodes tmpargs;
+    SCOPES_CHECK_RESULT(specialize_arguments(ctx, tmpargs, values));
+    int count = (int)params.size();
+    for (int i = 0; i < count; ++i) {
+        auto oldsym = params[i];
+        ASTNode *newval = nullptr;
+        if (oldsym->is_variadic()) {
+            if ((i + 1) < count) {
+                set_active_anchor(oldsym->anchor());
+                SCOPES_EXPECT_ERROR(error_variadic_symbol_not_in_last_place());
+            }
+            auto arglist = ASTArgumentList::from(oldsym->anchor());
+            for (int j = i; j < tmpargs.size(); ++j) {
+                arglist->append(tmpargs[j]);
+            }
+            arglist->set_type(return_type_from_arguments(arglist->values));
+            newval = arglist;
+        } else if (i < tmpargs.size()) {
+            newval = tmpargs[i];
+        } else {
+            newval = Const::from(oldsym->anchor(), none);
+        }
+        auto newsym = ASTSymbol::from(oldsym->anchor(), oldsym->name, newval->get_type());
+        ctx.frame->bind(oldsym, newsym);
+        outparams.push_back(newsym);
+        outargs.push_back(newval);
+    }
+    return true;
 }
 
 static SCOPES_RESULT(ASTNode *) specialize_Let(const ASTContext &ctx, Let *let) {
     SCOPES_RESULT_TYPE(ASTNode *);
     Let *newlet = Let::from(let->anchor());
-    auto subctx = ctx.to_used();
-    for (auto &&binding : let->bindings) {
-        auto oldsym = binding.sym;
-        auto expr = SCOPES_GET_RESULT(specialize(subctx, binding.expr));
-        auto newsym = ASTSymbol::from(oldsym->anchor(), oldsym->name, expr->get_type());
-        ctx.frame->bind(oldsym, newsym);
-        newlet->append(newsym, expr);
-    }
+    SCOPES_CHECK_RESULT(specialize_bind_arguments(ctx,
+        newlet->params, newlet->args, let->params, let->args));
     newlet->value = SCOPES_GET_RESULT(specialize(ctx, let->value));
     auto rtype = newlet->value->get_type();
     if (is_returning(rtype) && ctx.ignored)
@@ -206,14 +296,8 @@ static SCOPES_RESULT(ASTNode *) specialize_Let(const ASTContext &ctx, Let *let) 
 static SCOPES_RESULT(Loop *) specialize_Loop(const ASTContext &ctx, Loop *loop) {
     SCOPES_RESULT_TYPE(Loop *);
     Loop *newloop = Loop::from(loop->anchor());
-    auto subctx = ctx.to_used();
-    for (auto &&binding : loop->bindings) {
-        auto oldsym = binding.sym;
-        auto expr = SCOPES_GET_RESULT(specialize(subctx, binding.expr));
-        auto newsym = ASTSymbol::from(oldsym->anchor(), oldsym->name, expr->get_type());
-        ctx.frame->bind(oldsym, newsym);
-        newloop->append(newsym, expr);
-    }
+    SCOPES_CHECK_RESULT(specialize_bind_arguments(ctx,
+        newloop->params, newloop->args, loop->params, loop->args));
     newloop->value = SCOPES_GET_RESULT(specialize(ctx.for_loop(newloop), loop->value));
     auto rtype = newloop->value->get_type();
     newloop->return_type = SCOPES_GET_RESULT(merge_value_type(ctx, newloop->return_type, rtype));
@@ -246,8 +330,8 @@ static SCOPES_RESULT(Repeat *) specialize_Repeat(const ASTContext &ctx, Repeat *
         set_active_anchor(_repeat->anchor());
         SCOPES_EXPECT_ERROR(error_illegal_repeat_outside_loop());
     }
-    ASTArgumentList *args = SCOPES_GET_RESULT(specialize_ASTArgumentList(ctx.to_used(), _repeat->args));
-    auto newrepeat = Repeat::from(_repeat->anchor(), args);
+    auto newrepeat = Repeat::from(_repeat->anchor());
+    SCOPES_CHECK_RESULT(specialize_arguments(ctx, newrepeat->args, _repeat->args));
     newrepeat->set_type(NoReturn());
     return newrepeat;
 }
@@ -327,7 +411,7 @@ static SCOPES_RESULT(void) verify_real_ops(const Type *a, const Type *b, const T
     SCOPES_CHECK_RESULT((checkargs<MINARGS, MAXARGS>(argcount)))
 #define RETARGTYPES(...) \
     { \
-        Call *newcall = Call::from(call->anchor(), callee, args); \
+        Call *newcall = Call::from(call->anchor(), callee, values); \
         newcall->set_type(Return({ __VA_ARGS__ })); \
         return newcall; \
     }
@@ -339,14 +423,15 @@ static SCOPES_RESULT(ASTNode *) specialize_Call(const ASTContext &ctx, Call *cal
     SCOPES_RESULT_TYPE(ASTNode *);
     auto subctx = ctx.to_used();
     ASTNode *callee = SCOPES_GET_RESULT(specialize(subctx, call->callee));
-    ASTArgumentList *args = SCOPES_GET_RESULT(specialize_ASTArgumentList(subctx, call->args));
+    ASTNodes values;
+    SCOPES_CHECK_RESULT(specialize_arguments(ctx, values, call->args));
     const Type *T = callee->get_type();
     if (T == TYPE_Closure) {
         auto anycl = SCOPES_GET_RESULT(extract_constant(callee));
         //SCOPES_CHECK_RESULT(anycl.verify(TYPE_Closure));
         const Closure *cl = anycl.closure;
         ArgTypes types;
-        for (auto &&arg : args->values) {
+        for (auto &&arg : values) {
             types.push_back(arg->get_type());
         }
         callee = SCOPES_GET_RESULT(specialize(cl->frame, cl->func, types));
@@ -355,18 +440,17 @@ static SCOPES_RESULT(ASTNode *) specialize_Call(const ASTContext &ctx, Call *cal
         auto anycl = SCOPES_GET_RESULT(extract_constant(callee));
         //SCOPES_CHECK_RESULT(anycl.verify(TYPE_Builtin));
         Builtin b = anycl.builtin;
-        auto &&values = args->values;
         size_t argcount = values.size();
         size_t argn = 0;
         set_active_anchor(call->anchor());
         switch(b.value()) {
         case FN_Dump: {
             StyledStream ss(SCOPES_CERR);
-            ss << call->anchor() << " dump: ";
-            if (args->values.size() == 1)
-                stream_ast(ss, args->values[0], StreamASTFormat());
-            else
-                stream_ast(ss, args, StreamASTFormat());
+            ss << call->anchor() << " dump:";
+            for (auto arg : values) {
+                ss << " ";
+                stream_ast(ss, arg, StreamASTFormat());
+            }
         } break;
         case OP_ICmpEQ:
         case OP_ICmpNE:
@@ -461,7 +545,7 @@ static SCOPES_RESULT(ASTNode *) specialize_Call(const ASTContext &ctx, Call *cal
 
         return specialize(ctx, ASTArgumentList::from(call->anchor()));
     }
-    Call *newcall = Call::from(call->anchor(), callee, args);
+    Call *newcall = Call::from(call->anchor(), callee, values);
     const FunctionType *ft = nullptr;
     if (is_function_pointer(T)) {
         ft = extract_function_type(T);

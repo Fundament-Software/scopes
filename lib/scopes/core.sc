@@ -13,33 +13,8 @@
     The core module implements the remaining standard functions and macros,
     parses the command-line and optionally enters the REPL.
 
-let newline = "\n"
+fn tuples ()
+    _ 1 2 3
 
-fn print-string (s)
-    if true
-        sc_write s
-        sc_write newline
-    elseif false
-        sc_write s
-        sc_write newline
-    else
-        _ 1 2 3
-    return true
-
-let result =
-    do
-        loop (i) = 0
-        if (icmp== i 5)
-            sc_write "break!\n"
-            break i
-        sc_write "loop!\n"
-        repeat (add i 1)
-    #
-        if (icmp<s i 5)
-            sc_write "loop!\n"
-            repeat (add i 1)
-        sc_write "break!\n"
-        i
-
-print-string "hello world"
-print-string "hello world, again"
+let x y... = (tuples)
+dump x

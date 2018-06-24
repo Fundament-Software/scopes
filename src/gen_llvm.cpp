@@ -923,7 +923,6 @@ struct LLVMIRGenerator {
         auto functype = SCOPES_GET_RESULT(type_to_llvm_type(ilfunctype));
 
         auto func = LLVMAddFunction(module, name, functype);
-        bind(node, func);
         if (use_debug_info) {
             LLVMSetFunctionSubprogram(func, function_to_subprogram(node));
         }
@@ -948,9 +947,11 @@ struct LLVMIRGenerator {
 
     SCOPES_RESULT(LLVMValueRef) Let_to_value(Let *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
-        for (auto &&binding : node->bindings) {
-            auto expr = SCOPES_GET_RESULT(node_to_value(binding.expr));
-            bind(binding.sym, expr);
+        assert(node->params.size() == node->args.size());
+        int count = (int)node->params.size();
+        for (int i = 0; i < count; ++i) {
+            auto expr = SCOPES_GET_RESULT(node_to_value(node->args[i]));
+            bind(node->params[i], expr);
         }
         return node_to_value(node->value);
     }
@@ -976,17 +977,17 @@ struct LLVMIRGenerator {
     SCOPES_RESULT(LLVMValueRef) Repeat_to_value(Repeat *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         assert(loop_info.loop);
-        int count = (int)loop_info.loop->bindings.size();
-        assert(node->args->values.size() == count);
+        int count = (int)loop_info.loop->params.size();
+        assert(node->args.size() == count);
         LLVMValueRef vals[count];
         for (int i = 0; i < count; ++i) {
-            vals[i] = SCOPES_GET_RESULT(node_to_value(node->args->values[i]));
+            vals[i] = SCOPES_GET_RESULT(node_to_value(node->args[i]));
         }
         LLVMBasicBlockRef bb = LLVMGetInsertBlock(builder);
         for (int i = 0; i < count; ++i) {
             LLVMBasicBlockRef incobbs[] = { bb };
             LLVMValueRef incovals[] = { vals[i] };
-            auto val = SCOPES_GET_RESULT(node_to_value(loop_info.loop->bindings[i].sym));
+            auto val = SCOPES_GET_RESULT(node_to_value(loop_info.loop->params[i]));
             LLVMAddIncoming(val, incovals, incobbs, 1);
         }
         return LLVMBuildBr(builder, loop_info.bb_loop);
@@ -999,10 +1000,11 @@ struct LLVMIRGenerator {
     SCOPES_RESULT(LLVMValueRef) Loop_to_value(Loop *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         //auto rtype = node->get_type();
-        int count = (int)node->bindings.size();
+        int count = (int)node->params.size();
+        assert(node->params.size() == node->args.size());
         LLVMValueRef initvals[count];
         for (int i = 0; i < count; ++i) {
-            initvals[i] = SCOPES_GET_RESULT(node_to_value(node->bindings[i].expr));
+            initvals[i] = SCOPES_GET_RESULT(node_to_value(node->args[i]));
         }
         auto old_loop_info = loop_info;
         loop_info.loop = node;
@@ -1014,7 +1016,7 @@ struct LLVMIRGenerator {
         LLVMPositionBuilderAtEnd(builder, loop_info.bb_loop);
         for (int i = 0; i < count; ++i) {
             auto val = LLVMBuildPhi(builder, LLVMTypeOf(initvals[i]), "");
-            bind(node->bindings[i].sym, val);
+            bind(node->params[i], val);
             LLVMBasicBlockRef incobbs[] = { bb };
             LLVMValueRef incovals[] = { initvals[i] };
             LLVMAddIncoming(val, incovals, incobbs, 1);
@@ -1051,8 +1053,19 @@ struct LLVMIRGenerator {
         auto rtype = node->get_type();
         auto T = SCOPES_GET_RESULT(type_to_llvm_type(rtype));
         LLVMValueRef value = LLVMGetUndef(T);
-        // todo
+        auto &&values = node->values;
+        int count = (int)values.size();
+        for (int i = 0; i < count; ++i) {
+            auto val = SCOPES_GET_RESULT(node_to_value(values[i]));
+            value = LLVMBuildInsertValue(builder, value, val, i, "");
+        }
         return value;
+    }
+
+    SCOPES_RESULT(LLVMValueRef) ASTExtractArgument_to_value(ASTExtractArgument *node) {
+        SCOPES_RESULT_TYPE(LLVMValueRef);
+        auto value = SCOPES_GET_RESULT(node_to_value(node->value));
+        return LLVMBuildExtractValue(builder, value, node->index, "");
     }
 
     SCOPES_RESULT(LLVMTypeRef) node_to_llvm_type(ASTNode *node) {
@@ -1064,7 +1077,7 @@ struct LLVMIRGenerator {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         set_active_anchor(call->anchor());
         auto callee = call->callee;
-        auto &&args = call->args->values;
+        auto &&args = call->args;
 
         set_active_anchor(call->anchor());
 
@@ -1589,11 +1602,8 @@ struct LLVMIRGenerator {
         return merge_value;
     }
 
-    SCOPES_RESULT(LLVMValueRef) node_to_value(ASTNode *node) {
+    SCOPES_RESULT(LLVMValueRef) _node_to_value(ASTNode *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
-        auto it = node2value.find(node);
-        if (it != node2value.end())
-            return it->second;
         switch(node->kind()) {
         #define T(NAME, BNAME, CLASS) \
             case NAME: return CLASS ## _to_value(cast<CLASS>(node));
@@ -1602,6 +1612,16 @@ struct LLVMIRGenerator {
             default: assert(false); break;
         }
         return nullptr;
+    }
+
+    SCOPES_RESULT(LLVMValueRef) node_to_value(ASTNode *node) {
+        SCOPES_RESULT_TYPE(LLVMValueRef);
+        auto it = node2value.find(node);
+        if (it != node2value.end())
+            return it->second;
+        auto value = SCOPES_GET_RESULT(_node_to_value(node));
+        node2value.insert({node,value});
+        return value;
     }
 
     SCOPES_RESULT(LLVMValueRef) Const_to_value(Const *node) {
@@ -2040,7 +2060,7 @@ struct LLVMIRGenerator {
         const char *name = entry->name.name()->data;
         setup_generate(name);
 
-        auto func = SCOPES_GET_RESULT(ASTFunction_to_value(entry));
+        auto func = SCOPES_GET_RESULT(node_to_value(entry));
         LLVMSetLinkage(func, LLVMExternalLinkage);
 
         SCOPES_CHECK_RESULT(teardown_generate(entry));
