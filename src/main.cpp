@@ -320,5 +320,6 @@ int main(int argc, char *argv[]) {
         print_error(get_last_error());
         f_exit(1);
     }
-    return result.assert_ok();
+    f_exit(result.assert_ok());
+    return 0;
 }

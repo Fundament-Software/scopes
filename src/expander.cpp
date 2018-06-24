@@ -17,6 +17,7 @@
 #include "stream_expr.hpp"
 #include "anchor.hpp"
 #include "ast.hpp"
+#include "timer.hpp"
 #include "dyn_cast.inc"
 #include "scopes/scopes.h"
 
@@ -29,7 +30,7 @@ namespace scopes {
 //------------------------------------------------------------------------------
 // expands macros and generates the AST
 
-static SCOPES_RESULT(void) verify_list_parameter_count(const char *context, const List *expr, int mincount, int maxcount) {
+static SCOPES_RESULT(void) verify_list_parameter_count(const char *context, const List *expr, int mincount, int maxcount, int starti = 1) {
     SCOPES_RESULT_TYPE(void);
     if (!expr) {
         SCOPES_LOCATION_ERROR(format("%s: expression is empty", context));
@@ -37,7 +38,7 @@ static SCOPES_RESULT(void) verify_list_parameter_count(const char *context, cons
     if ((mincount <= 0) && (maxcount == -1)) {
         return true;
     }
-    int argcount = (int)expr->count - 1;
+    int argcount = (int)expr->count - starti;
 
     if ((maxcount >= 0) && (argcount > maxcount)) {
         SCOPES_LOCATION_ERROR(
@@ -343,6 +344,7 @@ struct Expander {
     }
 
     // (let x ... [= args ...])
+    // (let (x ... = args ...) ...
     // ...
     SCOPES_RESULT(ASTNode *) expand_let(const List *it) {
         SCOPES_RESULT_TYPE(ASTNode *);
@@ -352,70 +354,98 @@ struct Expander {
 
         auto _anchor = get_active_anchor();
 
-        const List *values = nullptr;
-
-        auto endit = it;
-        // read parameter names
-        while (endit) {
-            auto name = SCOPES_GET_RESULT(unsyntax(endit->at));
-            if (is_equal_token(name))
-                break;
-            endit = endit->next;
-        }
-        if (endit != EOL)
-            values = endit;
-
-        if (!values) {
-            // no assignments, reimport parameter names into local scope
-            ASTNode *last_entry = nullptr;
-            while (it != endit) {
-                auto name = SCOPES_GET_RESULT(unsyntax(it->at));
-                SCOPES_CHECK_RESULT(name.verify(TYPE_Symbol));
-                ScopeEntry entry;
-                if (!env->lookup(name.symbol, entry)) {
-                    StyledString ss;
-                    ss.out << "no such name bound in parent scope: '"
-                        << name.symbol.name()->data << "'. ";
-                    print_name_suggestions(name.symbol, ss.out);
-                    SCOPES_LOCATION_ERROR(ss.str());
-                }
-                env->bind_with_doc(name.symbol, entry);
-                last_entry = entry.expr;
-                it = it->next;
-            }
-            if (!last_entry) {
-                last_entry = Const::from(_anchor, none);
-            }
-            return last_entry;
-        }
-
-        auto let = Let::from(_anchor);
-
-        const List *params = it;
-
         ASTSymbols syms;
         ASTNodes exprs;
 
-        it = values;
-        it = it->next;
-        // read init values
-        Expander subexp(env, astscope);
-        while (it) {
-            subexp.next = it->next;
-            exprs.push_back(SCOPES_GET_RESULT(subexp.expand(it->at)));
-            it = subexp.next;
-        }
+        if (SCOPES_GET_RESULT(unsyntax(it->at)).type == TYPE_List) {
+            // alternative format
+            const List *equit = it;
+            while (equit) {
+                const Syntax *sx = equit->at;
+                set_active_anchor(sx->anchor);
+                it = SCOPES_CHECK_CAST(const List *, SCOPES_GET_RESULT(unsyntax(sx)));
+                SCOPES_CHECK_RESULT(verify_list_parameter_count("=", it, 3, -1, 0));
+                auto paramval = it->at;
+                it = it->next;
+                auto name = SCOPES_GET_RESULT(unsyntax(it->at));
+                if (!is_equal_token(name)) {
+                    const Syntax *sx = it->at;
+                    set_active_anchor(sx->anchor);
+                    SCOPES_LOCATION_ERROR(String::from("= token expected"));
+                }
+                it = it->next;
+                // read init values
+                Expander subexp(env, astscope);
+                subexp.next = it->next;
+                exprs.push_back(SCOPES_GET_RESULT(subexp.expand(it->at)));
+                it = subexp.next;
+                if (it) {
+                    const Syntax *sx = it->at;
+                    set_active_anchor(sx->anchor);
+                    SCOPES_LOCATION_ERROR(String::from("extraneous argument"));
+                }
+                syms.push_back(SCOPES_GET_RESULT(expand_parameter(paramval)));
 
-        it = params;
-        // read parameter names
-        while (it != endit) {
-            syms.push_back(SCOPES_GET_RESULT(expand_parameter(it->at)));
+                equit = equit->next;
+            }
+        } else {
+            const List *values = nullptr;
+            auto endit = it;
+            // read parameter names
+            while (endit) {
+                auto name = SCOPES_GET_RESULT(unsyntax(endit->at));
+                if (is_equal_token(name))
+                    break;
+                endit = endit->next;
+            }
+            if (endit != EOL)
+                values = endit;
+
+            if (!values) {
+                // no assignments, reimport parameter names into local scope
+                ASTNode *last_entry = nullptr;
+                while (it != endit) {
+                    auto name = SCOPES_GET_RESULT(unsyntax(it->at));
+                    SCOPES_CHECK_RESULT(name.verify(TYPE_Symbol));
+                    ScopeEntry entry;
+                    if (!env->lookup(name.symbol, entry)) {
+                        StyledString ss;
+                        ss.out << "no such name bound in parent scope: '"
+                            << name.symbol.name()->data << "'. ";
+                        print_name_suggestions(name.symbol, ss.out);
+                        SCOPES_LOCATION_ERROR(ss.str());
+                    }
+                    env->bind_with_doc(name.symbol, entry);
+                    last_entry = entry.expr;
+                    it = it->next;
+                }
+                if (!last_entry) {
+                    last_entry = Const::from(_anchor, none);
+                }
+                return last_entry;
+            }
+
+            const List *params = it;
+
+            it = values;
             it = it->next;
+            // read init values
+            Expander subexp(env, astscope);
+            while (it) {
+                subexp.next = it->next;
+                exprs.push_back(SCOPES_GET_RESULT(subexp.expand(it->at)));
+                it = subexp.next;
+            }
+
+            it = params;
+            // read parameter names
+            while (it != endit) {
+                syms.push_back(SCOPES_GET_RESULT(expand_parameter(it->at)));
+                it = it->next;
+            }
         }
 
-        let->params = syms;
-        let->args = exprs;
-
+        auto let = Let::from(_anchor, syms, exprs);
         let->value = SCOPES_GET_RESULT(expand_block(_anchor, next));
 
         return let;
@@ -813,6 +843,7 @@ const Type *Expander::list_expander_func_type = nullptr;
 
 SCOPES_RESULT(Template *) expand_inline(Any expr, Scope *scope) {
     SCOPES_RESULT_TYPE(Template *);
+    Timer sum_expand_time(TIMER_Expand);
     const Anchor *anchor = get_active_anchor();
     if (expr.type == TYPE_Syntax) {
         anchor = expr.syntax->anchor;
@@ -833,6 +864,7 @@ SCOPES_RESULT(Template *) expand_inline(Any expr, Scope *scope) {
 
 SCOPES_RESULT(Template *) expand_module(Any expr, Scope *scope) {
     SCOPES_RESULT_TYPE(Template *);
+    Timer sum_expand_time(TIMER_Expand);
     const Anchor *anchor = get_active_anchor();
     if (expr.type == TYPE_Syntax) {
         anchor = expr.syntax->anchor;

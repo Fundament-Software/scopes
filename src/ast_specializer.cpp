@@ -11,6 +11,7 @@
 #include "closure.hpp"
 #include "stream_ast.hpp"
 #include "hash.hpp"
+#include "timer.hpp"
 #include "verify_tools.inc"
 #include "dyn_cast.inc"
 
@@ -636,6 +637,7 @@ SCOPES_RESULT(ASTNode *) specialize(const ASTContext &ctx, ASTNode *node) {
 
 SCOPES_RESULT(ASTFunction *) specialize(ASTFunction *frame, Template *func, const ArgTypes &types) {
     SCOPES_RESULT_TYPE(ASTFunction *);
+    Timer sum_specialize_time(TIMER_Specialize);
     assert(func);
     ASTFunction key(func->anchor(), func->name, {}, nullptr);
     key.original = func;

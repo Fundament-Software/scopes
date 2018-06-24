@@ -609,6 +609,7 @@ namespace scopes {
     T(TIMER_ValidateScope, "validate_scope()") \
     T(TIMER_Main, "main()") \
     T(TIMER_Specialize, "specialize()") \
+    T(TIMER_Expand, "expand()") \
     \
     /* ad-hoc builtin names */ \
     T(SYM_ExecuteReturn, "execute-return") \
