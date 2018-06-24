@@ -202,9 +202,14 @@ static ASTNode *extract_argument(ASTNode *value, int index) {
         if (T == TYPE_Nothing) {
             return Const::from(anchor, none);
         } else {
-            auto result = ASTExtractArgument::from(anchor, value, index);
-            result->set_type(T);
-            return result;
+            auto arglist = dyn_cast<ASTArgumentList>(value);
+            if (arglist) {
+                return arglist->values[index];
+            } else {
+                auto result = ASTExtractArgument::from(anchor, value, index);
+                result->set_type(T);
+                return result;
+            }
         }
     } else if (index == 0) {
         return value;

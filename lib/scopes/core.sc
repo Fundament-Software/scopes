@@ -146,5 +146,5 @@ elseif false
 else
     sc_write "yup!\n"
 
-let x = (tuples 5)
+let x = (tuples 5 6 7 8)
 dump x

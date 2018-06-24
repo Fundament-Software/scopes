@@ -884,8 +884,8 @@ struct LLVMIRGenerator {
         size_t offset = 0;
         if (use_sret) {
             offset++;
-            ASTSymbol *param = params[0];
-            bind(param, LLVMGetParam(func, 0));
+            //ASTSymbol *param = params[0];
+            //bind(param, LLVMGetParam(func, 0));
         }
 
         size_t paramcount = params.size();
