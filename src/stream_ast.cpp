@@ -202,8 +202,6 @@ struct StreamAST : StreamAnchors {
                 ss << std::endl;
                 walk(val->args[i], depth+2, maxdepth);
             }
-            ss << std::endl;
-            walk(val->value, depth+1, maxdepth);
         } break;
         case ASTK_ArgumentList: {
             auto val = cast<ASTArgumentList>(node);

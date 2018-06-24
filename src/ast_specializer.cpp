@@ -151,6 +151,23 @@ static SCOPES_RESULT(const Type *) merge_return_type(const Type *T1, const Type 
     SCOPES_EXPECT_ERROR(error_cannot_merge_expression_types(T1, T2));
 }
 
+static bool is_useless(ASTNode *node) {
+    switch(node->kind()) {
+    case ASTK_Template:
+    case ASTK_Function:
+    case ASTK_Symbol:
+    case ASTK_Const:
+        return true;
+    case ASTK_Let: {
+        auto let = cast<Let>(node);
+        if (!let->params.size())
+            return true;
+    } break;
+    default: break;
+    }
+    return false;
+}
+
 static SCOPES_RESULT(ASTNode *) specialize_Block(const ASTContext &ctx, Block *block) {
     SCOPES_RESULT_TYPE(ASTNode *);
     Block *newblock = Block::from(block->anchor());
@@ -161,7 +178,9 @@ static SCOPES_RESULT(ASTNode *) specialize_Block(const ASTContext &ctx, Block *b
             set_active_anchor(newsrc->anchor());
             SCOPES_CHECK_RESULT(error_noreturn_not_last_expression());
         }
-        newblock->append(newsrc);
+        if (!is_useless(newsrc)) {
+            newblock->append(newsrc);
+        }
     }
     newblock->value = SCOPES_GET_RESULT(specialize(ctx, block->value));
     auto rtype = newblock->value->get_type();
@@ -286,11 +305,7 @@ static SCOPES_RESULT(ASTNode *) specialize_Let(const ASTContext &ctx, Let *let) 
     Let *newlet = Let::from(let->anchor());
     SCOPES_CHECK_RESULT(specialize_bind_arguments(ctx,
         newlet->params, newlet->args, let->params, let->args));
-    newlet->value = SCOPES_GET_RESULT(specialize(ctx, let->value));
-    auto rtype = newlet->value->get_type();
-    if (is_returning(rtype) && ctx.ignored)
-        rtype = TYPE_Void;
-    newlet->set_type(rtype);
+    newlet->set_type(TYPE_Void);
     return newlet;
 }
 
@@ -568,29 +583,59 @@ static SCOPES_RESULT(ASTNode *) specialize_ASTSymbol(const ASTContext &ctx, ASTS
     return value;
 }
 
-static SCOPES_RESULT(If *) specialize_If(const ASTContext &ctx, If *_if) {
-    SCOPES_RESULT_TYPE(If *);
-    If *newif = If::from(_if->anchor());
+static SCOPES_RESULT(ASTNode *) specialize_If(const ASTContext &ctx, If *_if) {
+    SCOPES_RESULT_TYPE(ASTNode *);
     assert(!_if->clauses.empty());
     auto subctx = ctx.to_used();
     const Type *rtype = nullptr;
+    Clauses clauses;
+    Clause else_clause;
     for (auto &&clause : _if->clauses) {
         auto newcond = SCOPES_GET_RESULT(specialize(subctx, clause.cond));
         if (newcond->get_type() != TYPE_Bool) {
             set_active_anchor(clause.anchor);
             SCOPES_EXPECT_ERROR(error_invalid_condition_type(newcond));
         }
+        auto maybe_const = dyn_cast<Const>(newcond);
+        if (maybe_const) {
+            bool istrue = maybe_const->value.i1;
+            if (istrue) {
+                // always true - the remainder will not be evaluated
+                auto value = SCOPES_GET_RESULT(specialize(ctx, clause.value));
+                if (clauses.empty()) {
+                    // this is the first condition
+                    return value;
+                } else {
+                    // we have previous conditions
+                    set_active_anchor(value->anchor());
+                    rtype = SCOPES_GET_RESULT(merge_value_type(ctx, rtype, value->get_type()));
+                    else_clause = Clause(clause.anchor, value);
+                    goto finalize;
+                }
+            } else {
+                // always false - this block will never be evaluated
+                continue;
+            }
+        }
         auto value = SCOPES_GET_RESULT(specialize(ctx, clause.value));
         set_active_anchor(value->anchor());
         rtype = SCOPES_GET_RESULT(merge_value_type(ctx, rtype, value->get_type()));
-        newif->append(clause.anchor, newcond, value);
+        clauses.push_back(Clause(clause.anchor, newcond, value));
     }
     {
         auto value = SCOPES_GET_RESULT(specialize(ctx, _if->else_clause.value));
-        set_active_anchor(value->anchor());
-        rtype = SCOPES_GET_RESULT(merge_value_type(ctx, rtype, value->get_type()));
-        newif->append(_if->else_clause.anchor, value);
+        if (clauses.empty()) {
+            // else will always be executed
+            return value;
+        } else {
+            set_active_anchor(value->anchor());
+            rtype = SCOPES_GET_RESULT(merge_value_type(ctx, rtype, value->get_type()));
+            else_clause = Clause(_if->else_clause.anchor, value);
+        }
     }
+finalize:
+    If *newif = If::from(_if->anchor(), clauses);
+    newif->else_clause = else_clause;
     if (is_returning(rtype) && ctx.ignored) {
         rtype = TYPE_Void;
     }

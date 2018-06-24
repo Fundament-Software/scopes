@@ -953,7 +953,7 @@ struct LLVMIRGenerator {
             auto expr = SCOPES_GET_RESULT(node_to_value(node->args[i]));
             bind(node->params[i], expr);
         }
-        return node_to_value(node->value);
+        return nullptr;
     }
 
     SCOPES_RESULT(LLVMValueRef) SyntaxExtend_to_value(SyntaxExtend *node) {

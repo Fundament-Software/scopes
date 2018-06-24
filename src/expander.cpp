@@ -117,7 +117,7 @@ struct Expander {
         return node;
     }
 
-    SCOPES_RESULT(ASTSymbol *) expand_parameter(Any value) {
+    SCOPES_RESULT(ASTSymbol *) expand_parameter(Any value, ASTNode *node = nullptr) {
         SCOPES_RESULT_TYPE(ASTSymbol *);
         const Syntax *sxvalue = value;
         const Anchor *anchor = sxvalue->anchor;
@@ -127,14 +127,19 @@ struct Expander {
             return cast<ASTSymbol>(_value.astnode);
         } else {
             SCOPES_CHECK_RESULT(_value.verify(TYPE_Symbol));
-            ASTSymbol *param = nullptr;
-            if (ends_with_parenthesis(_value.symbol)) {
-                param = ASTSymbol::variadic_from(anchor, _value.symbol);
+            if (node && isa<ASTValue>(node)) {
+                env->bind(_value.symbol, cast<ASTValue>(node));
+                return nullptr;
             } else {
-                param = ASTSymbol::from(anchor, _value.symbol);
+                ASTSymbol *param = nullptr;
+                if (ends_with_parenthesis(_value.symbol)) {
+                    param = ASTSymbol::variadic_from(anchor, _value.symbol);
+                } else {
+                    param = ASTSymbol::from(anchor, _value.symbol);
+                }
+                env->bind(_value.symbol, param);
+                return param;
             }
-            env->bind(_value.symbol, param);
-            return param;
         }
     }
 
@@ -377,15 +382,18 @@ struct Expander {
                 // read init values
                 Expander subexp(env, astscope);
                 subexp.next = it->next;
-                exprs.push_back(SCOPES_GET_RESULT(subexp.expand(it->at)));
+                ASTNode *node = SCOPES_GET_RESULT(subexp.expand(it->at));
                 it = subexp.next;
                 if (it) {
                     const Syntax *sx = it->at;
                     set_active_anchor(sx->anchor);
                     SCOPES_LOCATION_ERROR(String::from("extraneous argument"));
                 }
-                syms.push_back(SCOPES_GET_RESULT(expand_parameter(paramval)));
-
+                auto sym = SCOPES_GET_RESULT(expand_parameter(paramval, node));
+                if (sym) {
+                    syms.push_back(sym);
+                    exprs.push_back(node);
+                }
                 equit = equit->next;
             }
         } else {
@@ -446,7 +454,6 @@ struct Expander {
         }
 
         auto let = Let::from(_anchor, syms, exprs);
-        let->value = SCOPES_GET_RESULT(expand_block(_anchor, next));
 
         return let;
     }

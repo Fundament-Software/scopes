@@ -291,13 +291,12 @@ struct Call : ASTNode {
 struct Let : ASTNode {
     static bool classof(const ASTNode *T);
 
-    Let(const Anchor *anchor, const ASTSymbols &params, const ASTNodes &args, ASTNode *value);
+    Let(const Anchor *anchor, const ASTSymbols &params, const ASTNodes &args);
 
-    static Let *from(const Anchor *anchor, const ASTSymbols &params = {}, const ASTNodes &args = {}, ASTNode *value = nullptr);
+    static Let *from(const Anchor *anchor, const ASTSymbols &params = {}, const ASTNodes &args = {});
 
     ASTSymbols params;
     ASTNodes args;
-    ASTNode *value;
 };
 
 //------------------------------------------------------------------------------

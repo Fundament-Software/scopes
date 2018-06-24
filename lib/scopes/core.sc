@@ -138,5 +138,12 @@ let
 fn tuples ()
     _ 1 2 3
 
+if false
+    sc_write "one!\n"
+elseif false
+    sc_write "two!\n"
+else
+    sc_write "yup!\n"
+
 let x = (tuples)
 dump x

@@ -257,11 +257,11 @@ Call *Call::from(const Anchor *anchor, ASTNode *callee, const ASTNodes &args) {
 
 //------------------------------------------------------------------------------
 
-Let::Let(const Anchor *anchor, const ASTSymbols &_params, const ASTNodes &_args, ASTNode *_value)
-    : ASTNode(ASTK_Let, anchor), params(_params), args(_args), value(_value) {
+Let::Let(const Anchor *anchor, const ASTSymbols &_params, const ASTNodes &_args)
+    : ASTNode(ASTK_Let, anchor), params(_params), args(_args) {
 }
-Let *Let::from(const Anchor *anchor, const ASTSymbols &params, const ASTNodes &args, ASTNode *value) {
-    return new Let(anchor, params, args, value);
+Let *Let::from(const Anchor *anchor, const ASTSymbols &params, const ASTNodes &args) {
+    return new Let(anchor, params, args);
 }
 
 //------------------------------------------------------------------------------
