@@ -150,6 +150,7 @@ project "scopesrt"
         "external/glslang/InReadableOrder.cpp",
         "external/glslang/disassemble.cpp",
         "external/glslang/doc.cpp",
+        "external/coro/coro.c",
         "SPIRV-Cross/spirv_glsl.cpp",
         "SPIRV-Cross/spirv_cross.cpp",
         "SPIRV-Cross/spirv_cfg.cpp",

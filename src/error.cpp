@@ -198,6 +198,13 @@ SCOPES_RESULT(void) error_illegal_return_in_inline() {
     SCOPES_LOCATION_ERROR(ss.str());
 }
 
+SCOPES_RESULT(void) error_untyped_recursive_call() {
+    SCOPES_RESULT_TYPE(void);
+    StyledString ss;
+    ss.out << "recursive call to function can not be typed because the function has no return type yet";
+    SCOPES_LOCATION_ERROR(ss.str());
+}
+
 //------------------------------------------------------------------------------
 
 SCOPES_RESULT(void) error_gen_invalid_call_type(const char *target, ASTNode *callee) {

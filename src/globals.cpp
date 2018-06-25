@@ -152,12 +152,7 @@ void sc_enter_solver_cli () {
 
 sc_bool_size_tuple_t sc_verify_stack () {
     using namespace scopes;
-    size_t ssz = memory_stack_size();
-    if (ssz >= SCOPES_MAX_STACK_SIZE) {
-        set_last_location_error(String::from("verify-stack!: stack overflow"));
-        return { false, ssz };
-    }
-    return { true, ssz };
+    RETURN_RESULT(verify_stack());
 }
 
 // stdin/out

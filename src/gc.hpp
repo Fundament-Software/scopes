@@ -7,6 +7,8 @@
 #ifndef SCOPES_GC_HPP
 #define SCOPES_GC_HPP
 
+#include "result.hpp"
+
 #include <stddef.h>
 
 namespace scopes {
@@ -15,6 +17,7 @@ extern char *g_stack_start;
 extern size_t g_largest_stack_size;
 
 size_t memory_stack_size();
+SCOPES_RESULT(size_t) verify_stack();
 
 // for allocated pointers, register the size of the range
 void track(void *ptr, size_t size);

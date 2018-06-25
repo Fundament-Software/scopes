@@ -5,6 +5,8 @@
 */
 
 #include "gc.hpp"
+#include "error.hpp"
+#include "scopes/config.h"
 
 #include <algorithm>
 #include <map>
@@ -19,6 +21,15 @@ size_t memory_stack_size() {
     size_t ss = (size_t)(g_stack_start - _stack_addr);
     g_largest_stack_size = std::max(ss, g_largest_stack_size);
     return ss;
+}
+
+SCOPES_RESULT(size_t) verify_stack() {
+    SCOPES_RESULT_TYPE(size_t);
+    size_t ssz = memory_stack_size();
+    if (ssz >= SCOPES_MAX_STACK_SIZE) {
+        SCOPES_LOCATION_ERROR(String::from("stack overflow encountered"));
+    }
+    return ssz;
 }
 
 // for allocated pointers, register the size of the range

@@ -61,24 +61,6 @@ typedef std::vector<ASTValue *> ASTValues;
 typedef std::vector<Block *> Blocks;
 
 //------------------------------------------------------------------------------
-/*
-    each ast node can have several ways to continue flow, which are not
-    mutually exclusive, and each flow method can have its own type:
-
-    1. continue: the continue type is forwarded to whatever
-        node needs to process it; if there's no continue type, the expression
-        always returns
-
-        for loops, the break statement defines the continue type.
-
-    2. return: the return type leaves the function and types the function's
-        continue type; if there's no return type, the expression always
-        continues
-
-
-*/
-
-//------------------------------------------------------------------------------
 
 struct ASTNode {
     ASTKind kind() const;
@@ -192,6 +174,7 @@ struct ASTFunction : ASTValue {
     const Type *return_type;
     ASTFunction *frame;
     Template *original;
+    bool complete;
 
     ArgTypes instance_args;
     ASTFunction *find_frame(Template *scope);

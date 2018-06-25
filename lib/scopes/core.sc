@@ -135,6 +135,22 @@ let
     Image-type = sc_image_type
     SampledImage-type = sc_sampled_image_type
 
+fn odd?
+
+fn even? (n)
+    if (icmp!= n 0)
+        odd? (sub n 1)
+    else true
+fn odd? (n)
+    if (icmp!= n 0)
+        even? (sub n 1)
+    else false
+
+if (even? 23)
+    sc_write "even\n"
+else
+    sc_write "odd\n"
+
 fn tuples (u...)
     sc_write "tuples!\n"
     _ 1 2 u...

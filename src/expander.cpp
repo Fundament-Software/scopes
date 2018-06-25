@@ -18,8 +18,8 @@
 #include "anchor.hpp"
 #include "ast.hpp"
 #include "timer.hpp"
+#include "gc.hpp"
 #include "dyn_cast.inc"
-#include "scopes/scopes.h"
 
 #include <assert.h>
 
@@ -682,7 +682,7 @@ struct Expander {
     SCOPES_RESULT(ASTNode *) expand(const Syntax *sx) {
         SCOPES_RESULT_TYPE(ASTNode *);
     expand_again:
-        sc_verify_stack();
+        SCOPES_CHECK_RESULT(verify_stack());
         set_active_anchor(sx->anchor);
         if (sx->quoted) {
             if (verbose) {

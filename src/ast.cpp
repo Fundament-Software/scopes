@@ -89,7 +89,7 @@ Template *Template::from(
 ASTFunction::ASTFunction(const Anchor *anchor, Symbol _name, const ASTSymbols &_params, ASTNode *_value)
     : ASTValue(ASTK_Function, anchor),
         name(_name), params(_params), value(_value),
-        docstring(nullptr), return_type(nullptr), frame(nullptr), original(nullptr) {
+        docstring(nullptr), return_type(nullptr), frame(nullptr), original(nullptr), complete(false) {
 }
 
 void ASTFunction::append_param(ASTSymbol *sym) {
@@ -109,7 +109,7 @@ ASTFunction *ASTFunction::find_frame(Template *scope) {
     ASTFunction *frame = this;
     while (frame) {
         if (scope == frame->original)
-            return this;
+            return frame;
         frame = frame->frame;
     }
     return nullptr;

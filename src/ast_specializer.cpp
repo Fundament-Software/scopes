@@ -12,6 +12,7 @@
 #include "stream_ast.hpp"
 #include "hash.hpp"
 #include "timer.hpp"
+#include "gc.hpp"
 #include "verify_tools.inc"
 #include "dyn_cast.inc"
 
@@ -90,43 +91,48 @@ static std::unordered_set<ASTFunction *, ASTFunctionSet::Hash, ASTFunctionSet::K
 
 //------------------------------------------------------------------------------
 
+enum EvalTarget {
+    EvalTarget_Void,
+    EvalTarget_Symbol,
+    EvalTarget_Return,
+};
+
 struct ASTContext {
     ASTFunction *frame;
+    EvalTarget target;
     Loop *loop;
-    bool ignored;
 
-    ASTContext to_used() const {
-        ASTContext ctx(*this);
-        ctx.ignored = false;
-        return ctx;
+    const Type *transform_return_type(const Type *T) const {
+        if (is_returning(T) && is_target_void())
+            return TYPE_Void;
+        return T;
     }
 
-    ASTContext to_ignored() const {
-        ASTContext ctx(*this);
-        ctx.ignored = true;
-        return ctx;
+    bool is_target_void() const {
+        return target == EvalTarget_Void;
+    }
+
+    ASTContext with_target(EvalTarget target) const {
+        return ASTContext(frame, target, loop);
     }
 
     ASTContext for_loop(Loop *loop) const {
-        ASTContext ctx(*this);
-        ctx.loop = loop;
-        return ctx;
+        return ASTContext(frame, EvalTarget_Symbol, loop);
     }
 
-    ASTContext(ASTFunction *_frame, Loop *_loop = nullptr) :
-        frame(_frame), loop(_loop), ignored(false) {
+    ASTContext(ASTFunction *_frame, EvalTarget _target, Loop *_loop = nullptr) :
+        frame(_frame), target(_target), loop(_loop) {
     }
 };
 
 // returns
 static SCOPES_RESULT(ASTNode *) specialize(const ASTContext &ctx, ASTNode *node);
-static SCOPES_RESULT(ASTNode *) specialize_inline(ASTFunction *frame, Template *func, const ASTNodes &nodes);
+static SCOPES_RESULT(ASTNode *) specialize_inline(const ASTContext &ctx, ASTFunction *frame, Template *func, const ASTNodes &nodes);
 
 static SCOPES_RESULT(const Type *) merge_value_type(const ASTContext &ctx, const Type *T1, const Type *T2) {
     SCOPES_RESULT_TYPE(const Type *);
     assert(T2);
-    if (ctx.ignored && is_returning(T2))
-        T2 = TYPE_Void;
+    T2 = ctx.transform_return_type(T2);
     if (!T1)
         return T2;
     if (T1 == T2)
@@ -172,7 +178,7 @@ static bool is_useless(ASTNode *node) {
 static SCOPES_RESULT(ASTNode *) specialize_Block(const ASTContext &ctx, Block *block) {
     SCOPES_RESULT_TYPE(ASTNode *);
     Block *newblock = Block::from(block->anchor());
-    auto subctx = ctx.to_ignored();
+    auto subctx = ctx.with_target(EvalTarget_Void);
     for (auto &&src : block->body) {
         auto newsrc = SCOPES_GET_RESULT(specialize(subctx, src));
         if (!is_returning(newsrc->get_type())) {
@@ -184,9 +190,7 @@ static SCOPES_RESULT(ASTNode *) specialize_Block(const ASTContext &ctx, Block *b
         }
     }
     newblock->value = SCOPES_GET_RESULT(specialize(ctx, block->value));
-    auto rtype = newblock->value->get_type();
-    if (is_returning(rtype) && ctx.ignored)
-        rtype = TYPE_Void;
+    auto rtype = ctx.transform_return_type(newblock->value->get_type());
     newblock->set_type(rtype);
     return newblock->canonicalize();
 }
@@ -221,7 +225,7 @@ static ASTNode *extract_argument(ASTNode *value, int index) {
 static SCOPES_RESULT(void) specialize_arguments(
     const ASTContext &ctx, ASTNodes &outargs, const ASTNodes &values) {
     SCOPES_RESULT_TYPE(void);
-    auto subctx = ctx.to_used();
+    auto subctx = ctx.with_target(EvalTarget_Symbol);
     int count = (int)values.size();
     for (int i = 0; i < count; ++i) {
         auto value = SCOPES_GET_RESULT(specialize(subctx, values[i]));
@@ -345,7 +349,7 @@ static SCOPES_RESULT(Break *) specialize_Break(const ASTContext &ctx, Break *_br
         set_active_anchor(_break->anchor());
         SCOPES_EXPECT_ERROR(error_illegal_break_outside_loop());
     }
-    auto subctx = ctx.to_used();
+    auto subctx = ctx.with_target(EvalTarget_Symbol);
     ASTNode *value = SCOPES_GET_RESULT(specialize(subctx, _break->value));
     ctx.loop->return_type = SCOPES_GET_RESULT(merge_value_type(subctx, ctx.loop->return_type, value->get_type()));
     auto newbreak = Break::from(_break->anchor(), value);
@@ -365,19 +369,27 @@ static SCOPES_RESULT(Repeat *) specialize_Repeat(const ASTContext &ctx, Repeat *
     return newrepeat;
 }
 
-static SCOPES_RESULT(ASTReturn *) specialize_ASTReturn(const ASTContext &ctx, ASTReturn *_return) {
+static SCOPES_RESULT(ASTReturn *) make_return(const ASTContext &ctx, const Anchor *anchor, ASTNode *value) {
     SCOPES_RESULT_TYPE(ASTReturn *);
-    ASTNode *value = SCOPES_GET_RESULT(specialize(ctx.to_used(), _return->value));
     assert(ctx.frame);
     if (ctx.frame->original
         && ctx.frame->original->is_inline()) {
-        set_active_anchor(_return->anchor());
+        set_active_anchor(anchor);
         SCOPES_EXPECT_ERROR(error_illegal_return_in_inline());
     }
     ctx.frame->return_type = SCOPES_GET_RESULT(merge_return_type(ctx.frame->return_type, value->get_type()));
-    auto newreturn = ASTReturn::from(_return->anchor(), value);
+    auto newreturn = ASTReturn::from(anchor, value);
     newreturn->set_type(NoReturn());
     return newreturn;
+}
+
+static SCOPES_RESULT(ASTNode *) specialize_ASTReturn(const ASTContext &ctx, ASTReturn *_return) {
+    SCOPES_RESULT_TYPE(ASTNode *);
+    ASTNode *value = SCOPES_GET_RESULT(specialize(ctx.with_target(EvalTarget_Symbol), _return->value));
+    if (ctx.target == EvalTarget_Return) {
+        return value;
+    }
+    return SCOPES_GET_RESULT(make_return(ctx, _return->anchor(), value));
 }
 
 static SCOPES_RESULT(ASTNode *) specialize_SyntaxExtend(const ASTContext &ctx, SyntaxExtend *sx) {
@@ -453,9 +465,17 @@ static SCOPES_RESULT(void) verify_real_ops(const Type *a, const Type *b, const T
         assert(argn <= argcount); \
         const Type *NAME = values[argn++]->get_type();
 
+static const Type *get_function_type(ASTFunction *fn) {
+    ArgTypes params;
+    for (int i = 0; i < fn->params.size(); ++i) {
+        params.push_back(fn->params[i]->get_type());
+    }
+    return NativeROPointer(Function(fn->return_type, params));
+}
+
 static SCOPES_RESULT(ASTNode *) specialize_Call(const ASTContext &ctx, Call *call) {
     SCOPES_RESULT_TYPE(ASTNode *);
-    auto subctx = ctx.to_used();
+    auto subctx = ctx.with_target(EvalTarget_Symbol);
     ASTNode *callee = SCOPES_GET_RESULT(specialize(subctx, call->callee));
     ASTNodes values;
     SCOPES_CHECK_RESULT(specialize_arguments(ctx, values, call->args));
@@ -465,14 +485,22 @@ static SCOPES_RESULT(ASTNode *) specialize_Call(const ASTContext &ctx, Call *cal
         //SCOPES_CHECK_RESULT(anycl.verify(TYPE_Closure));
         const Closure *cl = anycl.closure;
         if (cl->func->is_inline()) {
-            return SCOPES_GET_RESULT(specialize_inline(cl->frame, cl->func, values));
+            return SCOPES_GET_RESULT(specialize_inline(ctx, cl->frame, cl->func, values));
         } else {
             ArgTypes types;
             for (auto &&arg : values) {
                 types.push_back(arg->get_type());
             }
             callee = SCOPES_GET_RESULT(specialize(cl->frame, cl->func, types));
-            T = callee->get_type();
+            ASTFunction *f = cast<ASTFunction>(callee);
+            if (f->complete) {
+                T = callee->get_type();
+            } else if (f->return_type) {
+                T = get_function_type(f);
+            } else {
+                set_active_anchor(call->anchor());
+                SCOPES_EXPECT_ERROR(error_untyped_recursive_call());
+            }
         }
     } else if (T == TYPE_Builtin) {
         auto anycl = SCOPES_GET_RESULT(extract_constant(callee));
@@ -608,7 +636,7 @@ static SCOPES_RESULT(ASTNode *) specialize_ASTSymbol(const ASTContext &ctx, ASTS
 static SCOPES_RESULT(ASTNode *) specialize_If(const ASTContext &ctx, If *_if) {
     SCOPES_RESULT_TYPE(ASTNode *);
     assert(!_if->clauses.empty());
-    auto subctx = ctx.to_used();
+    auto subctx = ctx.with_target(EvalTarget_Symbol);
     const Type *rtype = nullptr;
     Clauses clauses;
     Clause else_clause;
@@ -658,9 +686,7 @@ static SCOPES_RESULT(ASTNode *) specialize_If(const ASTContext &ctx, If *_if) {
 finalize:
     If *newif = If::from(_if->anchor(), clauses);
     newif->else_clause = else_clause;
-    if (is_returning(rtype) && ctx.ignored) {
-        rtype = TYPE_Void;
-    }
+    rtype = ctx.transform_return_type(rtype);
     newif->set_type(rtype);
     return newif;
 }
@@ -668,6 +694,7 @@ finalize:
 // this must never happen
 static SCOPES_RESULT(ASTNode *) specialize_Template(const ASTContext &ctx, Template *_template) {
     SCOPES_RESULT_TYPE(ASTNode *);
+    assert(_template->scope);
     ASTFunction *frame = ctx.frame->find_frame(_template->scope);
     if (!frame) {
         SCOPES_LOCATION_ERROR(String::from("couldn't find frame"));
@@ -675,16 +702,9 @@ static SCOPES_RESULT(ASTNode *) specialize_Template(const ASTContext &ctx, Templ
     return Const::from(_template->anchor(), Closure::from(_template, frame));
 }
 
+
 static SCOPES_RESULT(ASTFunction *) specialize_ASTFunction(const ASTContext &ctx, ASTFunction *fn) {
     SCOPES_RESULT_TYPE(ASTFunction *);
-    assert(!ctx.ignored);
-    fn->value = SCOPES_GET_RESULT(specialize(ctx, fn->value));
-    fn->return_type = SCOPES_GET_RESULT(merge_return_type(fn->return_type, fn->value->get_type()));
-    ArgTypes params;
-    for (int i = 0; i < fn->params.size(); ++i) {
-        params.push_back(fn->params[i]->get_type());
-    }
-    fn->set_type(NativeROPointer(Function(fn->return_type, params)));
     return fn;
 }
 
@@ -692,17 +712,25 @@ SCOPES_RESULT(ASTNode *) specialize(const ASTContext &ctx, ASTNode *node) {
     SCOPES_RESULT_TYPE(ASTNode *);
     assert(node);
     set_active_anchor(node->anchor());
+    SCOPES_CHECK_RESULT(verify_stack());
+    ASTNode *result = nullptr;
     switch(node->kind()) {
 #define T(NAME, BNAME, CLASS) \
-    case NAME: return SCOPES_GET_RESULT(specialize_ ## CLASS(ctx, cast<CLASS>(node))); break;
+    case NAME: result = SCOPES_GET_RESULT(specialize_ ## CLASS(ctx, cast<CLASS>(node))); break;
     SCOPES_AST_KIND()
 #undef T
     default: assert(false);
     }
-    return node;
+    if (ctx.target == EvalTarget_Return) {
+        if (is_returning(result->get_type())) {
+            return SCOPES_GET_RESULT(make_return(ctx, result->anchor(), result));
+        }
+    }
+    return result;
 }
 
-SCOPES_RESULT(ASTNode *) specialize_inline(ASTFunction *frame, Template *func, const ASTNodes &nodes) {
+SCOPES_RESULT(ASTNode *) specialize_inline(const ASTContext &ctx,
+    ASTFunction *frame, Template *func, const ASTNodes &nodes) {
     SCOPES_RESULT_TYPE(ASTNode *);
     Timer sum_specialize_time(TIMER_Specialize);
     assert(func);
@@ -713,9 +741,10 @@ SCOPES_RESULT(ASTNode *) specialize_inline(ASTFunction *frame, Template *func, c
     auto let = Let::from(fn->anchor());
     let->params = func->params;
     let->args = nodes;
-    fn->value = Block::from(func->anchor(), {let}, fn->value);
-    SCOPES_CHECK_RESULT(specialize_ASTFunction(ASTContext(fn), fn));
-    return fn->value;
+    auto block = Block::from(func->anchor(), {let}, fn->value);
+
+    ASTContext subctx(fn, ctx.target);
+    return SCOPES_GET_RESULT(specialize(subctx, block));
 }
 
 SCOPES_RESULT(ASTFunction *) specialize(ASTFunction *frame, Template *func, const ArgTypes &types) {
@@ -772,18 +801,13 @@ SCOPES_RESULT(ASTFunction *) specialize(ASTFunction *frame, Template *func, cons
         }
     }
     astfunctions.insert(fn);
-    return specialize_ASTFunction(ASTContext(fn), fn);
+
+    ASTContext subctx(fn, EvalTarget_Return);
+    fn->value = SCOPES_GET_RESULT(specialize(subctx, fn->value));
+    assert(!is_returning(fn->value->get_type()));
+    fn->complete = true;
+    fn->set_type(get_function_type(fn));
+    return fn;
 }
-
-#if 0
-static SCOPES_RESULT(ASTFunction *) type_function(const ASTContext &ctx, Template *fn, ASTArgumentList *args) {
-    ASTSymbols params;
-    assert(fn->body);
-    ASTFunction *newfn = ASTFunction::from(fn->anchor(), fn->name, params, fn->body);
-
-
-    return specialize_ASTFunction(ctx, newfn);
-}
-#endif
 
 } // namespace scopes
