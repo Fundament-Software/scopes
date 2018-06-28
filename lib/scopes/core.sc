@@ -135,32 +135,94 @@ let
     Image-type = sc_image_type
     SampledImage-type = sc_sampled_image_type
 
-fn odd?
+# first we alias u64 to the integer type that can hold a pointer
+let intptr = u64
 
-fn even? (n)
-    if (icmp!= n 0)
-        odd? (sub n 1)
-    else true
-fn odd? (n)
-    if (icmp!= n 0)
-        even? (sub n 1)
-    else false
+# pointer comparison as a template function, because we'll compare pointers of many types
+fn ptrcmp!= (t1 t2)
+    icmp!= (ptrtoint t1 intptr) (ptrtoint t2 intptr)
 
-if (even? 23)
-    sc_write "even\n"
-else
-    sc_write "odd\n"
+fn ptrcmp== (t1 t2)
+    icmp== (ptrtoint t1 intptr) (ptrtoint t2 intptr)
 
-fn tuples (u...)
-    sc_write "tuples!\n"
-    _ 1 2 u...
+fn box-integer (value)
+    let val = (undef Any)
+    let val = (insertvalue val (typeof value) 0)
+    let val = (insertvalue val (zext value u64) 1)
+    val
 
-if false
-    sc_write "one!\n"
-elseif false
-    sc_write "two!\n"
-else
-    sc_write "yup!\n"
+# turn a symbol-like value (storage type u64) to an Any
+fn box-symbol (value)
+    let val = (undef Any)
+    let val = (insertvalue val (typeof value) 0)
+    let val = (insertvalue val value 1)
+    val
 
-let x = (tuples 5 6 7 8)
-dump x
+# turn a pointer value into an Any
+fn box-pointer (value)
+    let val = (undef Any)
+    let val = (insertvalue val (typeof value) 0)
+    let val = (insertvalue val (ptrtoint value u64) 1)
+    val
+
+fn raise-compile-error! (value)
+    set-error! (CompileError value)
+    __raise!;
+
+# print an unboxing error given two types
+fn unbox-verify (haveT wantT)
+    if (ptrcmp!= haveT wantT)
+        raise-compile-error!
+            sc_string_join "can't unbox value of type "
+                sc_string_join
+                    sc_any_repr (box-pointer haveT)
+                    sc_string_join " as value of type "
+                        sc_any_repr (box-pointer wantT)
+
+inline unbox-integer (value T)
+    unbox-verify (extractvalue value 0) T
+    itrunc (extractvalue value 1) T
+
+inline unbox-symbol (value T)
+    unbox-verify (extractvalue value 0) T
+    bitcast (extractvalue value 1) T
+
+# turn an Any back into a pointer
+inline unbox-pointer (value T)
+    unbox-verify (extractvalue value 0) T
+    inttoptr (extractvalue value 1) T
+
+fn verify-count (count mincount maxcount)
+    if (icmp>=s mincount 0)
+        if (icmp<s count mincount)
+            raise-compile-error!
+                sc_string_join "at least "
+                    sc_string_join (sc_any_repr (box-integer mincount))
+                        sc_string_join " argument(s) expected, got "
+                            sc_any_repr (box-integer count)
+    if (icmp>=s maxcount 0)
+        if (icmp>s count maxcount)
+            raise-compile-error!
+                sc_string_join "at most "
+                    sc_string_join (sc_any_repr (box-integer maxcount))
+                        sc_string_join " argument(s) expected, got "
+                            sc_any_repr (box-integer count)
+
+fn Any-typeof (value)
+    extractvalue value 0
+
+fn Any-constant? (value)
+    let T = (extractvalue value 0)
+    ptrcmp!= T Parameter
+
+fn Any-none? (value)
+    let T = (extractvalue value 0)
+    ptrcmp== T Nothing
+
+syntax-extend
+    let val = (box-pointer (sc_pointer_type type pointer-flag-non-writable unnamed))
+    sc_scope_set_symbol syntax-scope 'type-array val
+    let T = (sc_type_storage ASTMacro)
+    sc_scope_set_symbol syntax-scope 'ASTMacroFunctionType (box-pointer T)
+    sc_scope_set_symbol syntax-scope 'ellipsis-symbol (box-symbol (sc_symbol_new "..."))
+    syntax-scope

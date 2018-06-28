@@ -15,8 +15,12 @@
 #include "gc.hpp"
 #include "verify_tools.inc"
 #include "dyn_cast.inc"
+#include "coro/coro.h"
 
 #include <unordered_set>
+#include <deque>
+
+#pragma GCC diagnostic ignored "-Wvla-extension"
 
 namespace scopes {
 
@@ -120,6 +124,8 @@ struct ASTContext {
         return ASTContext(frame, EvalTarget_Symbol, loop);
     }
 
+    ASTContext() {}
+
     ASTContext(ASTFunction *_frame, EvalTarget _target, Loop *_loop = nullptr) :
         frame(_frame), target(_target), loop(_loop) {
     }
@@ -127,6 +133,76 @@ struct ASTContext {
 
 // returns
 static SCOPES_RESULT(ASTNode *) specialize(const ASTContext &ctx, ASTNode *node);
+
+struct SpecializeJob {
+    ASTContext ctx;
+    ASTNode *node;
+    Result<ASTNode *> result;
+    coro_stack stack;
+    coro_context from;
+    coro_context job;
+    bool done;
+};
+
+static std::deque<SpecializeJob *> jobs;
+
+static int process_jobs() {
+    int processed = 0;
+    while (!jobs.empty()) {
+        auto job = jobs.front();
+        jobs.pop_front();
+        coro_create(&job->from, nullptr, nullptr, nullptr, 0);
+        coro_transfer(&job->from, &job->job);
+        processed++;
+    }
+    return processed;
+}
+
+static void specialize_coroutine(void *ptr) {
+    SpecializeJob *job = (SpecializeJob *)ptr;
+    StyledStream ss;
+    ss << "processing: ";
+    stream_ast(ss, job->node, StreamASTFormat());
+    job->result = specialize(job->ctx, job->node);
+    job->done = true;
+    coro_transfer(&job->job, &job->from);
+}
+
+static bool wait_for_return_type(ASTFunction *f) {
+    // do more branches and try again
+    int processed = process_jobs();
+    return (f->return_type != nullptr);
+}
+
+static SCOPES_RESULT(void) specialize_jobs(const ASTContext &ctx, int count, ASTNode **nodes) {
+    SCOPES_RESULT_TYPE(void);
+    SpecializeJob local_jobs[count];
+    for (int i = 0; i < count; ++i) {
+        auto &&job = local_jobs[i];
+        job.ctx = ctx;
+        job.node = nodes[i];
+        job.done = false;
+        coro_stack_alloc(&job.stack, 0);
+        coro_create(&job.job, specialize_coroutine, &job, job.stack.sptr, job.stack.ssze);
+        jobs.push_back(&job);
+    }
+    process_jobs();
+    for (int i = 0; i < count; ++i) {
+        assert(local_jobs[i].done);
+    }
+    for (int i = 0; i < count; ++i) {
+        auto &&job = local_jobs[i];
+        coro_destroy(&job.job);
+        coro_stack_free(&job.stack);
+    }
+    for (int i = 0; i < count; ++i) {
+        auto &&job = local_jobs[i];
+        auto result = job.result;
+        nodes[i] = SCOPES_GET_RESULT(job.result);
+    }
+    return true;
+}
+
 static SCOPES_RESULT(ASTNode *) specialize_inline(const ASTContext &ctx, ASTFunction *frame, Template *func, const ASTNodes &nodes);
 
 static SCOPES_RESULT(const Type *) merge_value_type(const ASTContext &ctx, const Type *T1, const Type *T2) {
@@ -394,6 +470,12 @@ static SCOPES_RESULT(ASTNode *) specialize_ASTReturn(const ASTContext &ctx, ASTR
 
 static SCOPES_RESULT(ASTNode *) specialize_SyntaxExtend(const ASTContext &ctx, SyntaxExtend *sx) {
     SCOPES_RESULT_TYPE(ASTNode *);
+    assert(sx->func->scope);
+    ASTFunction *frame = ctx.frame->find_frame(sx->func->scope);
+    if (!frame) {
+        SCOPES_LOCATION_ERROR(String::from("couldn't find frame"));
+    }
+    ASTFunction *fn = SCOPES_GET_RESULT(specialize(frame, sx->func, {TYPE_Scope}));
     assert(false);
     return nullptr;
 }
@@ -411,6 +493,14 @@ SCOPES_RESULT(Any) extract_constant(ASTNode *value) {
         SCOPES_CHECK_RESULT(error_constant_expected(value));
     }
     return constval->value;
+}
+
+SCOPES_RESULT(const Type *) extract_type_constant(ASTNode *value) {
+    SCOPES_RESULT_TYPE(const Type *);
+    Any x = SCOPES_GET_RESULT(extract_constant(value));
+    set_active_anchor(value->anchor());
+    SCOPES_CHECK_RESULT(x.verify(TYPE_Type));
+    return x.typeref;
 }
 
 static SCOPES_RESULT(const Type *) bool_op_return_type(const Type *T) {
@@ -461,9 +551,18 @@ static SCOPES_RESULT(void) verify_real_ops(const Type *a, const Type *b, const T
         newcall->set_type(Return({ __VA_ARGS__ })); \
         return newcall; \
     }
-#define READ_TYPE(NAME) \
+#define READ_TYPEOF(NAME) \
         assert(argn <= argcount); \
         const Type *NAME = values[argn++]->get_type();
+#define READ_STORAGETYPEOF(NAME) \
+        assert(argn <= argcount); \
+        const Type *NAME = SCOPES_GET_RESULT(storage_type(values[argn++]->get_type()));
+#define READ_CONST(NAME) \
+        assert(argn <= argcount); \
+        Any NAME = SCOPES_GET_RESULT(extract_constant(values[argn++]));
+#define READ_TYPE_CONST(NAME) \
+        assert(argn <= argcount); \
+        const Type *NAME = SCOPES_GET_RESULT(extract_type_constant(values[argn++]));
 
 static const Type *get_function_type(ASTFunction *fn) {
     ArgTypes params;
@@ -498,8 +597,12 @@ static SCOPES_RESULT(ASTNode *) specialize_Call(const ASTContext &ctx, Call *cal
             } else if (f->return_type) {
                 T = get_function_type(f);
             } else {
-                set_active_anchor(call->anchor());
-                SCOPES_EXPECT_ERROR(error_untyped_recursive_call());
+                if (wait_for_return_type(f)) {
+                    T = get_function_type(f);
+                } else {
+                    set_active_anchor(call->anchor());
+                    SCOPES_EXPECT_ERROR(error_untyped_recursive_call());
+                }
             }
         }
     } else if (T == TYPE_Builtin) {
@@ -518,6 +621,85 @@ static SCOPES_RESULT(ASTNode *) specialize_Call(const ASTContext &ctx, Call *cal
                 stream_ast(ss, arg, StreamASTFormat());
             }
         } break;
+        case FN_Undef: {
+            CHECKARGS(1, 1);
+            READ_TYPE_CONST(T);
+            RETARGTYPES(T);
+        } break;
+        case FN_TypeOf: {
+            CHECKARGS(1, 1);
+            READ_TYPEOF(A);
+            return Const::from(call->anchor(), A);
+        } break;
+        case FN_IntToPtr: {
+            CHECKARGS(2, 2);
+            READ_STORAGETYPEOF(T);
+            READ_TYPE_CONST(DestT);
+            SCOPES_CHECK_RESULT(verify_integer(T));
+            SCOPES_CHECK_RESULT((verify_kind<TK_Pointer>(SCOPES_GET_RESULT(storage_type(DestT)))));
+            RETARGTYPES(DestT);
+        } break;
+        case FN_PtrToInt: {
+            CHECKARGS(2, 2);
+            READ_STORAGETYPEOF(T);
+            READ_TYPE_CONST(DestT);
+            SCOPES_CHECK_RESULT(verify_kind<TK_Pointer>(T));
+            SCOPES_CHECK_RESULT(verify_integer(SCOPES_GET_RESULT(storage_type(DestT))));
+            RETARGTYPES(DestT);
+        } break;
+        case FN_ExtractValue: {
+            CHECKARGS(2, 2);
+            READ_STORAGETYPEOF(T);
+            READ_CONST(index);
+            size_t idx = SCOPES_GET_RESULT(cast_number<size_t>(index));
+            switch(T->kind()) {
+            case TK_Array: {
+                auto ai = cast<ArrayType>(T);
+                RETARGTYPES(SCOPES_GET_RESULT(ai->type_at_index(idx)));
+            } break;
+            case TK_Tuple: {
+                auto ti = cast<TupleType>(T);
+                RETARGTYPES(SCOPES_GET_RESULT(ti->type_at_index(idx)));
+            } break;
+            case TK_Union: {
+                auto ui = cast<UnionType>(T);
+                RETARGTYPES(SCOPES_GET_RESULT(ui->type_at_index(idx)));
+            } break;
+            default: {
+                StyledString ss;
+                ss.out << "can not extract value from type " << T;
+                SCOPES_LOCATION_ERROR(ss.str());
+            } break;
+            }
+        } break;
+        case FN_InsertValue: {
+            CHECKARGS(3, 3);
+            READ_TYPEOF(AT);
+            READ_STORAGETYPEOF(ET);
+            READ_CONST(index);
+            size_t idx = SCOPES_GET_RESULT(cast_number<size_t>(index));
+            auto T = SCOPES_GET_RESULT(storage_type(AT));
+            switch(T->kind()) {
+            case TK_Array: {
+                auto ai = cast<ArrayType>(T);
+                SCOPES_CHECK_RESULT(verify(SCOPES_GET_RESULT(storage_type(SCOPES_GET_RESULT(ai->type_at_index(idx)))), ET));
+            } break;
+            case TK_Tuple: {
+                auto ti = cast<TupleType>(T);
+                SCOPES_CHECK_RESULT(verify(SCOPES_GET_RESULT(storage_type(SCOPES_GET_RESULT(ti->type_at_index(idx)))), ET));
+            } break;
+            case TK_Union: {
+                auto ui = cast<UnionType>(T);
+                SCOPES_CHECK_RESULT(verify(SCOPES_GET_RESULT(storage_type(SCOPES_GET_RESULT(ui->type_at_index(idx)))), ET));
+            } break;
+            default: {
+                StyledString ss;
+                ss.out << "can not insert value into type " << T;
+                SCOPES_LOCATION_ERROR(ss.str());
+            } break;
+            }
+            RETARGTYPES(AT);
+        } break;
         case OP_ICmpEQ:
         case OP_ICmpNE:
         case OP_ICmpUGT:
@@ -529,7 +711,7 @@ static SCOPES_RESULT(ASTNode *) specialize_Call(const ASTContext &ctx, Call *cal
         case OP_ICmpSLT:
         case OP_ICmpSLE: {
             CHECKARGS(2, 2);
-            READ_TYPE(A); READ_TYPE(B);
+            READ_TYPEOF(A); READ_TYPEOF(B);
             SCOPES_CHECK_RESULT(verify_integer_ops(A, B));
             RETARGTYPES(SCOPES_GET_RESULT(bool_op_return_type(A)));
         } break;
@@ -548,7 +730,7 @@ static SCOPES_RESULT(ASTNode *) specialize_Call(const ASTContext &ctx, Call *cal
         case OP_FCmpULT:
         case OP_FCmpULE: {
             CHECKARGS(2, 2);
-            READ_TYPE(A); READ_TYPE(B);
+            READ_TYPEOF(A); READ_TYPEOF(B);
             SCOPES_CHECK_RESULT(verify_real_ops(A, B));
             RETARGTYPES(SCOPES_GET_RESULT(bool_op_return_type(A)));
         } break;
@@ -557,42 +739,42 @@ static SCOPES_RESULT(ASTNode *) specialize_Call(const ASTContext &ctx, Call *cal
         case OP_ ## NAME ## NUW: \
         case OP_ ## NAME ## NSW: { \
             CHECKARGS(2, 2); \
-            READ_TYPE(A); READ_TYPE(B); \
+            READ_TYPEOF(A); READ_TYPEOF(B); \
             SCOPES_CHECK_RESULT(verify_integer_ops(A, B)); \
             RETARGTYPES(A); \
         } break;
 #define IARITH_OP(NAME, PFX) \
         case OP_ ## NAME: { \
             CHECKARGS(2, 2); \
-            READ_TYPE(A); READ_TYPE(B); \
+            READ_TYPEOF(A); READ_TYPEOF(B); \
             SCOPES_CHECK_RESULT(verify_integer_ops(A, B)); \
             RETARGTYPES(A); \
         } break;
 #define FARITH_OP(NAME) \
         case OP_ ## NAME: { \
             CHECKARGS(2, 2); \
-            READ_TYPE(A); READ_TYPE(B); \
+            READ_TYPEOF(A); READ_TYPEOF(B); \
             SCOPES_CHECK_RESULT(verify_real_ops(A, B)); \
             RETARGTYPES(A); \
         } break;
 #define FTRI_OP(NAME) \
         case OP_ ## NAME: { \
             CHECKARGS(3, 3); \
-            READ_TYPE(A); READ_TYPE(B); READ_TYPE(C); \
+            READ_TYPEOF(A); READ_TYPEOF(B); READ_TYPEOF(C); \
             SCOPES_CHECK_RESULT(verify_real_ops(A, B, C)); \
             RETARGTYPES(A); \
         } break;
 #define IUN_OP(NAME, PFX) \
         case OP_ ## NAME: { \
             CHECKARGS(1, 1); \
-            READ_TYPE(A); \
+            READ_TYPEOF(A); \
             SCOPES_CHECK_RESULT(verify_integer_ops(A)); \
             RETARGTYPES(A); \
         } break;
 #define FUN_OP(NAME) \
         case OP_ ## NAME: { \
             CHECKARGS(1, 1); \
-            READ_TYPE(A); \
+            READ_TYPEOF(A); \
             SCOPES_CHECK_RESULT(verify_real_ops(A)); \
             RETARGTYPES(A); \
         } break;
@@ -651,39 +833,41 @@ static SCOPES_RESULT(ASTNode *) specialize_If(const ASTContext &ctx, If *_if) {
             bool istrue = maybe_const->value.i1;
             if (istrue) {
                 // always true - the remainder will not be evaluated
-                auto value = SCOPES_GET_RESULT(specialize(ctx, clause.value));
-                if (clauses.empty()) {
-                    // this is the first condition
-                    return value;
-                } else {
-                    // we have previous conditions
-                    set_active_anchor(value->anchor());
-                    rtype = SCOPES_GET_RESULT(merge_value_type(ctx, rtype, value->get_type()));
-                    else_clause = Clause(clause.anchor, value);
-                    goto finalize;
-                }
+                else_clause = Clause(clause.anchor, clause.value);
+                goto finalize;
             } else {
                 // always false - this block will never be evaluated
                 continue;
             }
         }
-        auto value = SCOPES_GET_RESULT(specialize(ctx, clause.value));
-        set_active_anchor(value->anchor());
-        rtype = SCOPES_GET_RESULT(merge_value_type(ctx, rtype, value->get_type()));
-        clauses.push_back(Clause(clause.anchor, newcond, value));
+        clauses.push_back(Clause(clause.anchor, newcond, clause.value));
     }
-    {
-        auto value = SCOPES_GET_RESULT(specialize(ctx, _if->else_clause.value));
-        if (clauses.empty()) {
-            // else will always be executed
-            return value;
+    else_clause = Clause(_if->else_clause.anchor, _if->else_clause.value);
+finalize:
+    // run a suspendable job for each branch
+    int numclauses = clauses.size() + 1;
+    ASTNode *values[numclauses];
+    for (int i = 0; i < numclauses; ++i) {
+        if ((i + 1) == numclauses) {
+            values[i] = else_clause.value;
         } else {
-            set_active_anchor(value->anchor());
-            rtype = SCOPES_GET_RESULT(merge_value_type(ctx, rtype, value->get_type()));
-            else_clause = Clause(_if->else_clause.anchor, value);
+            values[i] = clauses[i].value;
         }
     }
-finalize:
+    SCOPES_CHECK_RESULT(specialize_jobs(ctx, numclauses, values));
+    for (int i = 0; i < numclauses; ++i) {
+        set_active_anchor(values[i]->anchor());
+        rtype = SCOPES_GET_RESULT(merge_value_type(ctx, rtype, values[i]->get_type()));
+        if ((i + 1) == numclauses) {
+            else_clause.value = values[i];
+        } else {
+            clauses[i].value = values[i];
+        }
+    }
+    if (clauses.empty()) {
+        // else is always selected
+        return else_clause.value;
+    }
     If *newif = If::from(_if->anchor(), clauses);
     newif->else_clause = else_clause;
     rtype = ctx.transform_return_type(rtype);
@@ -712,7 +896,7 @@ SCOPES_RESULT(ASTNode *) specialize(const ASTContext &ctx, ASTNode *node) {
     SCOPES_RESULT_TYPE(ASTNode *);
     assert(node);
     set_active_anchor(node->anchor());
-    SCOPES_CHECK_RESULT(verify_stack());
+    //SCOPES_CHECK_RESULT(verify_stack());
     ASTNode *result = nullptr;
     switch(node->kind()) {
 #define T(NAME, BNAME, CLASS) \

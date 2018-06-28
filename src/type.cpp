@@ -502,13 +502,16 @@ void init_types() {
         TYPE_Anchor,
         TYPE_String);
 
-    DEFINE_TYPENAME("LabelMacro", TYPE_LabelMacro);
+    DEFINE_TYPENAME("ASTMacro", TYPE_ASTMacro);
     {
-        cast<TypenameType>(const_cast<Type *>(TYPE_LabelMacro))
+        cast<TypenameType>(const_cast<Type *>(TYPE_ASTMacro))
             ->finalize(
-                Pointer(
-                    Function(Return({}, RTF_Raising), { TYPE_Label }),
-                    PTF_NonWritable, SYM_Unnamed)).assert_ok();
+                NativeROPointer(
+                    Function(Return({TYPE_ASTNode}, RTF_Raising), {
+                        NativeROPointer(TYPE_ASTNode),
+                        TYPE_I32
+                        })
+                    )).assert_ok();
     }
 
 #define T(TYPE, TYPENAME) \
