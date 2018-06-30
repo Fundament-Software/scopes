@@ -62,14 +62,14 @@ void location_message(const Anchor *anchor, const String* str);
 
 //------------------------------------------------------------------------------
 
-struct ASTNode;
-struct ASTSymbol;
+struct Value;
+struct SymbolValue;
 
 // specializer errors
-SCOPES_RESULT(void) error_invalid_call_type(ASTNode *callee);
-SCOPES_RESULT(void) error_invalid_condition_type(ASTNode *cond);
-SCOPES_RESULT(void) error_constant_expected(ASTNode *value);
-SCOPES_RESULT(void) error_unbound_symbol(ASTSymbol *value);
+SCOPES_RESULT(void) error_invalid_call_type(Value *callee);
+SCOPES_RESULT(void) error_invalid_condition_type(Value *cond);
+SCOPES_RESULT(void) error_constant_expected(Value *value);
+SCOPES_RESULT(void) error_unbound_symbol(SymbolValue *value);
 SCOPES_RESULT(void) error_cannot_merge_expression_types(const Type *T1, const Type *T2);
 SCOPES_RESULT(void) error_noreturn_not_last_expression();
 SCOPES_RESULT(void) error_cannot_type_builtin(const Builtin &builtin);
@@ -80,8 +80,8 @@ SCOPES_RESULT(void) error_illegal_return_in_inline();
 SCOPES_RESULT(void) error_untyped_recursive_call();
 
 // code generator errors
-SCOPES_RESULT(void) error_gen_invalid_call_type(const char *target, ASTNode *callee);
-SCOPES_RESULT(void) error_gen_unbound_symbol(const char *target, ASTSymbol *value);
+SCOPES_RESULT(void) error_gen_invalid_call_type(const char *target, Value *callee);
+SCOPES_RESULT(void) error_gen_unbound_symbol(const char *target, SymbolValue *value);
 
 //------------------------------------------------------------------------------
 

@@ -6,7 +6,7 @@
 
 #include "list.hpp"
 #include "hash.hpp"
-#include "ast.hpp"
+#include "value.hpp"
 #include "error.hpp"
 
 #include <unordered_set>
@@ -25,18 +25,18 @@ bool List::KeyEqual::operator()( const List *lhs, const List *rhs ) const {
 
 std::size_t List::Hash::operator()(const List *l) const {
     return hash2(
-        std::hash<ASTNode *>{}(l->at),
+        std::hash<Value *>{}(l->at),
         std::hash<const List *>{}(l->next));
 }
 
 static std::unordered_set<const List *, List::Hash, List::KeyEqual> list_map;
 
-List::List(ASTNode *_at, const List *_next, size_t _count) :
+List::List(Value *_at, const List *_next, size_t _count) :
     at(_at),
     next(_next),
     count(_count) {}
 
-ASTNode *List::first() const {
+Value *List::first() const {
     if (this == EOL) {
         return ConstTuple::none_from(get_active_anchor());
     } else {
@@ -44,7 +44,7 @@ ASTNode *List::first() const {
     }
 }
 
-const List *List::from(ASTNode *_at, const List *_next) {
+const List *List::from(Value *_at, const List *_next) {
     List list(_at, _next, 0);
     auto it = list_map.find(&list);
     if (it != list_map.end()) {
@@ -55,7 +55,7 @@ const List *List::from(ASTNode *_at, const List *_next) {
     return l;
 }
 
-const List *List::from(ASTNode * const *values, int N) {
+const List *List::from(Value * const *values, int N) {
     const List *list = EOL;
     for (int i = N - 1; i >= 0; --i) {
         list = from(values[i], list);

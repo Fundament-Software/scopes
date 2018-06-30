@@ -11,12 +11,12 @@
 
 namespace scopes {
 
-struct ASTNode;
+struct Value;
 struct Scope;
 struct Template;
 
-SCOPES_RESULT(Template *) expand_module(ASTNode *expr, Scope *scope = nullptr);
-SCOPES_RESULT(Template *) expand_inline(ASTNode *expr, Scope *scope = nullptr);
+SCOPES_RESULT(Template *) expand_module(Value *expr, Scope *scope = nullptr);
+SCOPES_RESULT(Template *) expand_inline(Value *expr, Scope *scope = nullptr);
 
 } // namespace scopes
 

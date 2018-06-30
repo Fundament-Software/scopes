@@ -4,8 +4,8 @@
     See LICENSE.md for details.
 */
 
-#ifndef SCOPES_AST_HPP
-#define SCOPES_AST_HPP
+#ifndef SCOPES_VALUE_HPP
+#define SCOPES_VALUE_HPP
 
 #include "symbol.hpp"
 #include "result.hpp"
@@ -21,58 +21,57 @@ struct List;
 struct Scope;
 struct ReturnType;
 
-#define SCOPES_AST_KIND() \
-    T(ASTK_Template, "ast-kind-template", Template) \
-    T(ASTK_Function, "ast-kind-function", ASTFunction) \
-    T(ASTK_Extern, "ast-kind-extern", ASTExtern) \
-    T(ASTK_Block, "ast-kind-block", Block) \
-    T(ASTK_If, "ast-kind-if", If) \
-    T(ASTK_Symbol, "ast-kind-symbol", ASTSymbol) \
-    T(ASTK_Keyed, "ast-kind-keyed", Keyed) \
-    T(ASTK_ConstInt, "ast-kind-const-int", ConstInt) \
-    T(ASTK_ConstReal, "ast-kind-const-real", ConstReal) \
-    T(ASTK_ConstTuple, "ast-kind-const-tuple", ConstTuple) \
-    T(ASTK_ConstArray, "ast-kind-const-array", ConstArray) \
-    T(ASTK_ConstVector, "ast-kind-const-vector", ConstVector) \
-    T(ASTK_ConstPointer, "ast-kind-const-pointer", ConstPointer) \
-    T(ASTK_ArgumentList, "ast-kind-argumentlist", ASTArgumentList) \
-    T(ASTK_ExtractArgument, "ast-kind-extractargument", ASTExtractArgument) \
-    T(ASTK_Call, "ast-kind-call", Call) \
-    T(ASTK_Let, "ast-kind-let", Let) \
-    T(ASTK_Loop, "ast-kind-loop", Loop) \
-    T(ASTK_Break, "ast-kind-break", Break) \
-    T(ASTK_Repeat, "ast-kind-repeat", Repeat) \
-    T(ASTK_Return, "ast-kind-return", ASTReturn) \
-    T(ASTK_SyntaxExtend, "ast-kind-syntax-extend", SyntaxExtend)
+#define SCOPES_VALUE_KIND() \
+    T(VK_Template, "value-kind-template", Template) \
+    T(VK_Function, "value-kind-function", Function) \
+    T(VK_Extern, "value-kind-extern", Extern) \
+    T(VK_Block, "value-kind-block", Block) \
+    T(VK_If, "value-kind-if", If) \
+    T(VK_Symbol, "value-kind-symbol", SymbolValue) \
+    T(VK_Keyed, "value-kind-keyed", Keyed) \
+    T(VK_ConstInt, "value-kind-const-int", ConstInt) \
+    T(VK_ConstReal, "value-kind-const-real", ConstReal) \
+    T(VK_ConstTuple, "value-kind-const-tuple", ConstTuple) \
+    T(VK_ConstArray, "value-kind-const-array", ConstArray) \
+    T(VK_ConstVector, "value-kind-const-vector", ConstVector) \
+    T(VK_ConstPointer, "value-kind-const-pointer", ConstPointer) \
+    T(VK_ArgumentList, "value-kind-argumentlist", ArgumentList) \
+    T(VK_ExtractArgument, "value-kind-extractargument", ExtractArgument) \
+    T(VK_Call, "value-kind-call", Call) \
+    T(VK_Let, "value-kind-let", Let) \
+    T(VK_Loop, "value-kind-loop", Loop) \
+    T(VK_Break, "value-kind-break", Break) \
+    T(VK_Repeat, "value-kind-repeat", Repeat) \
+    T(VK_Return, "value-kind-return", Return) \
+    T(VK_SyntaxExtend, "value-kind-syntax-extend", SyntaxExtend)
 
-enum ASTKind {
+enum ValueKind {
 #define T(NAME, BNAME, CLASS) \
     NAME,
-    SCOPES_AST_KIND()
+    SCOPES_VALUE_KIND()
 #undef T
 };
 
 // forward declarations
 #define T(NAME, BNAME, CLASS) struct CLASS;
-    SCOPES_AST_KIND()
+    SCOPES_VALUE_KIND()
 #undef T
 
-struct ASTNode;
-struct ASTValue;
+struct Value;
+struct Symbolic;
 
-typedef std::vector<ASTSymbol *> ASTSymbols;
-typedef std::vector<ASTNode *> ASTNodes;
+typedef std::vector<SymbolValue *> SymbolValues;
+typedef std::vector<Value *> Values;
 typedef std::vector<Const *> Constants;
-typedef std::vector<ASTValue *> ASTValues;
 typedef std::vector<Block *> Blocks;
 
 //------------------------------------------------------------------------------
 
-struct ASTNode {
-    ASTKind kind() const;
+struct Value {
+    ValueKind kind() const;
 
-    ASTNode(ASTKind _kind, const Anchor *_anchor);
-    ASTNode(const ASTNode &other) = delete;
+    Value(ValueKind _kind, const Anchor *_anchor);
+    Value(const Value &other) = delete;
 
     const Anchor *anchor() const;
 
@@ -81,7 +80,7 @@ struct ASTNode {
     const Type *get_type() const;
     void change_type(const Type *type);
 private:
-    const ASTKind _kind;
+    const ValueKind _kind;
     const Type *_type;
 
 protected:
@@ -90,72 +89,72 @@ protected:
 
 //------------------------------------------------------------------------------
 
-struct ASTValue : ASTNode {
-    static bool classof(const ASTNode *T);
+struct Symbolic : Value {
+    static bool classof(const Value *T);
 
-    ASTValue(ASTKind _kind, const Anchor *anchor);
+    Symbolic(ValueKind _kind, const Anchor *anchor);
 };
 
 //------------------------------------------------------------------------------
 
-struct Keyed : ASTNode {
-    static bool classof(const ASTNode *T);
+struct Keyed : Value {
+    static bool classof(const Value *T);
 
-    Keyed(const Anchor *anchor, Symbol key, ASTNode *node);
+    Keyed(const Anchor *anchor, Symbol key, Value *node);
 
-    static Keyed *from(const Anchor *anchor, Symbol key, ASTNode *node);
+    static Keyed *from(const Anchor *anchor, Symbol key, Value *node);
 
     Symbol key;
-    ASTNode *value;
+    Value *value;
 };
 
 //------------------------------------------------------------------------------
 
-struct ASTArgumentList : ASTNode {
-    static bool classof(const ASTNode *T);
+struct ArgumentList : Value {
+    static bool classof(const Value *T);
 
-    ASTArgumentList(const Anchor *anchor, const ASTNodes &values);
+    ArgumentList(const Anchor *anchor, const Values &values);
 
-    void append(Symbol key, ASTNode *node);
-    void append(ASTNode *node);
+    void append(Symbol key, Value *node);
+    void append(Value *node);
 
-    static ASTArgumentList *from(const Anchor *anchor, const ASTNodes &values = {});
+    static ArgumentList *from(const Anchor *anchor, const Values &values = {});
 
-    ASTNodes values;
+    Values values;
 };
 
 //------------------------------------------------------------------------------
 
-struct ASTExtractArgument : ASTNode {
-    static bool classof(const ASTNode *T);
+struct ExtractArgument : Value {
+    static bool classof(const Value *T);
 
-    ASTExtractArgument(const Anchor *anchor, ASTNode *value, int index);
+    ExtractArgument(const Anchor *anchor, Value *value, int index);
 
-    static ASTExtractArgument *from(const Anchor *anchor, ASTNode *value, int index);
+    static ExtractArgument *from(const Anchor *anchor, Value *value, int index);
 
-    ASTNode *value;
+    Value *value;
     int index;
 };
 
 //------------------------------------------------------------------------------
 
-struct Template : ASTValue {
-    static bool classof(const ASTNode *T);
+struct Template : Symbolic {
+    static bool classof(const Value *T);
 
-    Template(const Anchor *anchor, Symbol name, const ASTSymbols &params, ASTNode *value);
+    Template(const Anchor *anchor, Symbol name, const SymbolValues &params, Value *value);
 
     bool is_forward_decl() const;
     void set_inline();
     bool is_inline() const;
-    void append_param(ASTSymbol *sym);
+    void append_param(SymbolValue *sym);
 
     static Template *from(
         const Anchor *anchor, Symbol name,
-        const ASTSymbols &params = {}, ASTNode *value = nullptr);
+        const SymbolValues &params = {}, Value *value = nullptr);
 
     Symbol name;
-    ASTSymbols params;
-    ASTNode *value;
+    SymbolValues params;
+    Value *value;
     bool _inline;
     const String *docstring;
     Template *scope;
@@ -163,31 +162,31 @@ struct Template : ASTValue {
 
 //------------------------------------------------------------------------------
 
-struct ASTFunction : ASTValue {
-    static bool classof(const ASTNode *T);
+struct Function : Symbolic {
+    static bool classof(const Value *T);
 
-    ASTFunction(const Anchor *anchor, Symbol name, const ASTSymbols &params, ASTNode *value);
+    Function(const Anchor *anchor, Symbol name, const SymbolValues &params, Value *value);
 
-    static ASTFunction *from(
+    static Function *from(
         const Anchor *anchor, Symbol name,
-        const ASTSymbols &params, ASTNode *value);
+        const SymbolValues &params, Value *value);
 
-    void append_param(ASTSymbol *sym);
+    void append_param(SymbolValue *sym);
 
     Symbol name;
-    ASTSymbols params;
-    ASTNode *value;
+    SymbolValues params;
+    Value *value;
     const String *docstring;
     const Type *return_type;
-    ASTFunction *frame;
+    Function *frame;
     Template *original;
     bool complete;
 
     ArgTypes instance_args;
-    ASTFunction *find_frame(Template *scope);
-    void bind(ASTNode *oldnode, ASTNode *newnode);
-    ASTNode *resolve(ASTNode *node);
-    std::unordered_map<ASTNode *, ASTNode *> map;
+    Function *find_frame(Template *scope);
+    void bind(Value *oldnode, Value *newnode);
+    Value *resolve(Value *node);
+    std::unordered_map<Value *, Value *> map;
 };
 
 //------------------------------------------------------------------------------
@@ -204,13 +203,13 @@ enum ExternFlags {
     EF_Block = (1 << 6),
 };
 
-struct ASTExtern : ASTValue {
-    static bool classof(const ASTNode *T);
+struct Extern : Symbolic {
+    static bool classof(const Value *T);
 
-    ASTExtern(const Anchor *anchor, const Type *type, Symbol name,
+    Extern(const Anchor *anchor, const Type *type, Symbol name,
         size_t flags, Symbol storage_class, int location, int binding);
 
-    static ASTExtern *from(const Anchor *anchor, const Type *type, Symbol name,
+    static Extern *from(const Anchor *anchor, const Type *type, Symbol name,
         size_t flags = 0,
         Symbol storage_class = SYM_Unnamed,
         int location = -1, int binding = -1);
@@ -224,48 +223,48 @@ struct ASTExtern : ASTValue {
 
 //------------------------------------------------------------------------------
 
-struct Block : ASTNode {
-    static bool classof(const ASTNode *T);
+struct Block : Value {
+    static bool classof(const Value *T);
 
-    Block(const Anchor *anchor, const ASTNodes &nodes, ASTNode *value);
-    void append(ASTNode *node);
+    Block(const Anchor *anchor, const Values &nodes, Value *value);
+    void append(Value *node);
 
-    static Block *from(const Anchor *anchor, const ASTNodes &nodes = {}, ASTNode *value = nullptr);
+    static Block *from(const Anchor *anchor, const Values &nodes = {}, Value *value = nullptr);
 
     void strip_constants();
-    ASTNode *canonicalize();
+    Value *canonicalize();
 
-    ASTNodes body;
-    ASTNode *value;
+    Values body;
+    Value *value;
 };
 
 //------------------------------------------------------------------------------
 
 struct Clause {
     const Anchor *anchor;
-    ASTNode *cond;
-    ASTNode *value;
+    Value *cond;
+    Value *value;
 
     Clause() : anchor(nullptr), cond(nullptr), value(nullptr) {}
-    Clause(const Anchor *_anchor, ASTNode *_cond, ASTNode *_value)
+    Clause(const Anchor *_anchor, Value *_cond, Value *_value)
         : anchor(_anchor), cond(_cond), value(_value) {}
-    Clause(const Anchor *_anchor, ASTNode *_value)
+    Clause(const Anchor *_anchor, Value *_value)
         : anchor(_anchor), cond(nullptr), value(_value) {}
 };
 
 typedef std::vector<Clause> Clauses;
 
-struct If : ASTNode {
-    static bool classof(const ASTNode *T);
+struct If : Value {
+    static bool classof(const Value *T);
 
     If(const Anchor *anchor, const Clauses &clauses);
 
     static If *from(const Anchor *anchor, const Clauses &clauses = {});
 
-    ASTNode *get_else_clause() const;
-    void append(const Anchor *anchor, ASTNode *cond, ASTNode *value);
-    void append(const Anchor *anchor, ASTNode *value);
-    ASTNode *canonicalize();
+    Value *get_else_clause() const;
+    void append(const Anchor *anchor, Value *cond, Value *value);
+    void append(const Anchor *anchor, Value *value);
+    Value *canonicalize();
 
     Clauses clauses;
     Clause else_clause;
@@ -273,12 +272,12 @@ struct If : ASTNode {
 
 //------------------------------------------------------------------------------
 
-struct ASTSymbol : ASTValue {
-    static bool classof(const ASTNode *T);
+struct SymbolValue : Symbolic {
+    static bool classof(const Value *T);
 
-    ASTSymbol(const Anchor *anchor, Symbol name, const Type *type, bool variadic);
-    static ASTSymbol *from(const Anchor *anchor, Symbol name = SYM_Unnamed, const Type *type = nullptr);
-    static ASTSymbol *variadic_from(const Anchor *anchor, Symbol name = SYM_Unnamed, const Type *type = nullptr);
+    SymbolValue(const Anchor *anchor, Symbol name, const Type *type, bool variadic);
+    static SymbolValue *from(const Anchor *anchor, Symbol name = SYM_Unnamed, const Type *type = nullptr);
+    static SymbolValue *variadic_from(const Anchor *anchor, Symbol name = SYM_Unnamed, const Type *type = nullptr);
 
     bool is_variadic() const;
 
@@ -293,61 +292,61 @@ enum CallFlags {
     CF_TryCall = (1 << 1),
 };
 
-struct Call : ASTNode {
-    static bool classof(const ASTNode *T);
+struct Call : Value {
+    static bool classof(const Value *T);
 
-    Call(const Anchor *anchor, ASTNode *callee, const ASTNodes &args);
-    static Call *from(const Anchor *anchor, ASTNode *callee, const ASTNodes &args = {});
+    Call(const Anchor *anchor, Value *callee, const Values &args);
+    static Call *from(const Anchor *anchor, Value *callee, const Values &args = {});
     bool is_rawcall() const;
     void set_rawcall();
     bool is_trycall() const;
     void set_trycall();
 
-    ASTNode *callee;
-    ASTNodes args;
+    Value *callee;
+    Values args;
     uint32_t flags;
 };
 
 //------------------------------------------------------------------------------
 
-struct Let : ASTNode {
-    static bool classof(const ASTNode *T);
+struct Let : Value {
+    static bool classof(const Value *T);
 
-    Let(const Anchor *anchor, const ASTSymbols &params, const ASTNodes &args);
+    Let(const Anchor *anchor, const SymbolValues &params, const Values &args);
 
-    static Let *from(const Anchor *anchor, const ASTSymbols &params = {}, const ASTNodes &args = {});
+    static Let *from(const Anchor *anchor, const SymbolValues &params = {}, const Values &args = {});
 
-    ASTSymbols params;
-    ASTNodes args;
+    SymbolValues params;
+    Values args;
 };
 
 //------------------------------------------------------------------------------
 
-struct Loop : ASTNode {
-    static bool classof(const ASTNode *T);
+struct Loop : Value {
+    static bool classof(const Value *T);
 
-    Loop(const Anchor *anchor, const ASTSymbols &params, const ASTNodes &args, ASTNode *value);
+    Loop(const Anchor *anchor, const SymbolValues &params, const Values &args, Value *value);
 
-    static Loop *from(const Anchor *anchor, const ASTSymbols &params = {}, const ASTNodes &args = {}, ASTNode *value = nullptr);
+    static Loop *from(const Anchor *anchor, const SymbolValues &params = {}, const Values &args = {}, Value *value = nullptr);
 
-    ASTSymbols params;
-    ASTNodes args;
-    ASTNode *value;
+    SymbolValues params;
+    Values args;
+    Value *value;
     const Type *return_type;
 };
 
 //------------------------------------------------------------------------------
 
-struct Const : ASTValue {
-    static bool classof(const ASTNode *T);
+struct Const : Symbolic {
+    static bool classof(const Value *T);
 
-    Const(ASTKind _kind, const Anchor *anchor, const Type *type);
+    Const(ValueKind _kind, const Anchor *anchor, const Type *type);
 };
 
 //------------------------------------------------------------------------------
 
 struct ConstInt : Const {
-    static bool classof(const ASTNode *T);
+    static bool classof(const Value *T);
 
     ConstInt(const Anchor *anchor, const Type *type, uint64_t value);
 
@@ -361,7 +360,7 @@ struct ConstInt : Const {
 //------------------------------------------------------------------------------
 
 struct ConstReal : Const {
-    static bool classof(const ASTNode *T);
+    static bool classof(const Value *T);
 
     ConstReal(const Anchor *anchor, const Type *type, double value);
 
@@ -373,7 +372,7 @@ struct ConstReal : Const {
 //------------------------------------------------------------------------------
 
 struct ConstTuple : Const {
-    static bool classof(const ASTNode *T);
+    static bool classof(const Value *T);
 
     ConstTuple(const Anchor *anchor, const Type *type, const Constants &fields);
 
@@ -386,7 +385,7 @@ struct ConstTuple : Const {
 //------------------------------------------------------------------------------
 
 struct ConstArray : Const {
-    static bool classof(const ASTNode *T);
+    static bool classof(const Value *T);
 
     ConstArray(const Anchor *anchor, const Type *type, const Constants &fields);
 
@@ -398,7 +397,7 @@ struct ConstArray : Const {
 //------------------------------------------------------------------------------
 
 struct ConstVector : Const {
-    static bool classof(const ASTNode *T);
+    static bool classof(const Value *T);
 
     ConstVector(const Anchor *anchor, const Type *type, const Constants &fields);
 
@@ -410,7 +409,7 @@ struct ConstVector : Const {
 //------------------------------------------------------------------------------
 
 struct ConstPointer : Const {
-    static bool classof(const ASTNode *T);
+    static bool classof(const Value *T);
 
     ConstPointer(const Anchor *anchor, const Type *type, const void *pointer);
 
@@ -418,7 +417,7 @@ struct ConstPointer : Const {
     static ConstPointer *type_from(const Anchor *anchor, const Type *type);
     static ConstPointer *closure_from(const Anchor *anchor, const Closure *closure);
     static ConstPointer *string_from(const Anchor *anchor, const String *str);
-    static ConstPointer *ast_from(const Anchor *anchor, ASTNode *node);
+    static ConstPointer *ast_from(const Anchor *anchor, Value *node);
     static ConstPointer *list_from(const Anchor *anchor, const List *list);
 
     const void *value;
@@ -426,44 +425,44 @@ struct ConstPointer : Const {
 
 //------------------------------------------------------------------------------
 
-struct Break : ASTNode {
-    static bool classof(const ASTNode *T);
+struct Break : Value {
+    static bool classof(const Value *T);
 
-    Break(const Anchor *anchor, ASTNode *value);
+    Break(const Anchor *anchor, Value *value);
 
-    static Break *from(const Anchor *anchor, ASTNode *value);
+    static Break *from(const Anchor *anchor, Value *value);
 
-    ASTNode *value;
+    Value *value;
 };
 
 //------------------------------------------------------------------------------
 
-struct Repeat : ASTNode {
-    static bool classof(const ASTNode *T);
+struct Repeat : Value {
+    static bool classof(const Value *T);
 
-    Repeat(const Anchor *anchor, const ASTNodes &args);
+    Repeat(const Anchor *anchor, const Values &args);
 
-    static Repeat *from(const Anchor *anchor, const ASTNodes &args = {});
+    static Repeat *from(const Anchor *anchor, const Values &args = {});
 
-    ASTNodes args;
+    Values args;
 };
 
 //------------------------------------------------------------------------------
 
-struct ASTReturn : ASTNode {
-    static bool classof(const ASTNode *T);
+struct Return : Value {
+    static bool classof(const Value *T);
 
-    ASTReturn(const Anchor *anchor, ASTNode *value);
+    Return(const Anchor *anchor, Value *value);
 
-    static ASTReturn *from(const Anchor *anchor, ASTNode *value);
+    static Return *from(const Anchor *anchor, Value *value);
 
-    ASTNode *value;
+    Value *value;
 };
 
 //------------------------------------------------------------------------------
 
-struct SyntaxExtend : ASTNode {
-    static bool classof(const ASTNode *T);
+struct SyntaxExtend : Value {
+    static bool classof(const Value *T);
 
     SyntaxExtend(const Anchor *anchor, Template *func, const List *next, Scope *env);
 
@@ -478,4 +477,4 @@ struct SyntaxExtend : ASTNode {
 
 } // namespace scopes
 
-#endif // SCOPES_AST_HPP
+#endif // SCOPES_VALUE_HPP

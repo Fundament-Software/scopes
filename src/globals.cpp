@@ -25,8 +25,8 @@
 #include "gc.hpp"
 #include "compiler_flags.hpp"
 #include "hash.hpp"
-#include "ast.hpp"
-#include "ast_specializer.hpp"
+#include "value.hpp"
+#include "prover.hpp"
 
 #include "scopes/scopes.h"
 
@@ -72,19 +72,19 @@ sc_rawstring_array_i32_tuple_t sc_launch_args() {
 #define RETURN_RESULT(X) { auto _result = (X); \
     return {_result.ok(), _result.unsafe_extract()}; }
 
-sc_bool_ast_tuple_t sc_eval(sc_ast_t *expr, sc_scope_t *scope) {
+sc_bool_value_tuple_t sc_eval(sc_value_t *expr, sc_scope_t *scope) {
     using namespace scopes;
     auto module_result = expand_module(expr, scope);
     if (!module_result.ok()) return { false, nullptr };
     RETURN_RESULT(specialize(nullptr, module_result.assert_ok(), {}));
 }
 
-sc_bool_ast_tuple_t sc_eval_inline(sc_ast_t *expr, sc_scope_t *scope) {
+sc_bool_value_tuple_t sc_eval_inline(sc_value_t *expr, sc_scope_t *scope) {
     using namespace scopes;
     RETURN_RESULT(expand_inline(expr, scope));
 }
 
-sc_bool_ast_tuple_t sc_typify(sc_closure_t *srcl, int numtypes, const sc_type_t **typeargs) {
+sc_bool_value_tuple_t sc_typify(sc_closure_t *srcl, int numtypes, const sc_type_t **typeargs) {
     using namespace scopes;
     if (srcl->func->is_inline()) {
         set_last_location_error(String::from("cannot typify inline function"));
@@ -97,18 +97,18 @@ sc_bool_ast_tuple_t sc_typify(sc_closure_t *srcl, int numtypes, const sc_type_t 
     RETURN_RESULT(specialize(srcl->frame, srcl->func, types));
 }
 
-sc_bool_ast_tuple_t sc_compile(sc_ast_t *srcl, uint64_t flags) {
+sc_bool_value_tuple_t sc_compile(sc_value_t *srcl, uint64_t flags) {
     using namespace scopes;
-    RETURN_RESULT(compile(cast<ASTFunction>(srcl), flags));
+    RETURN_RESULT(compile(cast<Function>(srcl), flags));
 }
 
-sc_bool_string_tuple_t sc_compile_spirv(sc_symbol_t target, sc_ast_t *srcl, uint64_t flags) {
+sc_bool_string_tuple_t sc_compile_spirv(sc_symbol_t target, sc_value_t *srcl, uint64_t flags) {
     using namespace scopes;
     //RETURN_RESULT(compile_spirv(target, srcl, flags));
     return {false,String::from("")};
 }
 
-sc_bool_string_tuple_t sc_compile_glsl(sc_symbol_t target, sc_ast_t *srcl, uint64_t flags) {
+sc_bool_string_tuple_t sc_compile_glsl(sc_symbol_t target, sc_value_t *srcl, uint64_t flags) {
     using namespace scopes;
     //RETURN_RESULT(compile_glsl(target, srcl, flags));
     return {false,String::from("")};
@@ -325,12 +325,12 @@ void sc_exit(int c) {
 
 namespace scopes {
 
-typedef std::unordered_map<const List *, ASTNode *> MemoMap;
+typedef std::unordered_map<const List *, Value *> MemoMap;
 static MemoMap memo_map;
 
 }
 
-sc_bool_ast_tuple_t sc_map_load(const sc_list_t *key) {
+sc_bool_value_tuple_t sc_map_load(const sc_list_t *key) {
     using namespace scopes;
     auto it = memo_map.find(key);
     if (it != memo_map.end()) {
@@ -340,7 +340,7 @@ sc_bool_ast_tuple_t sc_map_load(const sc_list_t *key) {
     }
 }
 
-void sc_map_store(sc_ast_t *value, const sc_list_t *key) {
+void sc_map_store(sc_value_t *value, const sc_list_t *key) {
     using namespace scopes;
     auto ret = memo_map.insert({key, value});
     if (!ret.second) {
@@ -425,21 +425,21 @@ const sc_anchor_t *sc_get_active_anchor() {
 // Scope
 ////////////////////////////////////////////////////////////////////////////////
 
-void sc_scope_set_symbol(sc_scope_t *scope, sc_symbol_t sym, sc_ast_t *value) {
+void sc_scope_set_symbol(sc_scope_t *scope, sc_symbol_t sym, sc_value_t *value) {
     using namespace scopes;
-    scope->bind(sym, cast<ASTValue>(value));
+    scope->bind(sym, cast<Symbolic>(value));
 }
 
-sc_bool_ast_tuple_t sc_scope_at(sc_scope_t *scope, sc_symbol_t key) {
+sc_bool_value_tuple_t sc_scope_at(sc_scope_t *scope, sc_symbol_t key) {
     using namespace scopes;
-    ASTValue *result = nullptr;
+    Symbolic *result = nullptr;
     bool ok = scope->lookup(key, result);
     return { ok, result };
 }
 
-sc_bool_ast_tuple_t sc_scope_local_at(sc_scope_t *scope, sc_symbol_t key) {
+sc_bool_value_tuple_t sc_scope_local_at(sc_scope_t *scope, sc_symbol_t key) {
     using namespace scopes;
-    ASTValue *result = nullptr;
+    Symbolic *result = nullptr;
     bool ok = scope->lookup_local(key, result);
     return { ok, result };
 }
@@ -505,7 +505,7 @@ void sc_scope_del_symbol(sc_scope_t *scope, sc_symbol_t sym) {
     scope->del(sym);
 }
 
-sc_symbol_ast_tuple_t sc_scope_next(sc_scope_t *scope, sc_symbol_t key) {
+sc_symbol_value_tuple_t sc_scope_next(sc_scope_t *scope, sc_symbol_t key) {
     using namespace scopes;
     auto &&map = *scope->map;
     Scope::Map::const_iterator it;
@@ -606,7 +606,7 @@ const sc_string_t *sc_string_rslice(sc_string_t *str, size_t offset) {
 // List
 ////////////////////////////////////////////////////////////////////////////////
 
-const sc_list_t *sc_list_cons(sc_ast_t *at, const sc_list_t *next) {
+const sc_list_t *sc_list_cons(sc_value_t *at, const sc_list_t *next) {
     using namespace scopes;
     return List::from(at, next);
 }
@@ -623,7 +623,7 @@ const sc_list_t *sc_list_dump(const sc_list_t *l) {
     return l;
 }
 
-sc_ast_list_tuple_t sc_list_decons(const sc_list_t *l) {
+sc_value_list_tuple_t sc_list_decons(const sc_list_t *l) {
     using namespace scopes;
     if (l)
         return { l->at, l->next };
@@ -636,7 +636,7 @@ size_t sc_list_count(const sc_list_t *l) {
     return l?l->count:0;
 }
 
-sc_ast_t *sc_list_at(const sc_list_t *l) {
+sc_value_t *sc_list_at(const sc_list_t *l) {
     using namespace scopes;
     return l?l->at:ConstTuple::none_from(get_active_anchor());
 }
@@ -653,7 +653,7 @@ const sc_list_t *sc_list_reverse(const sc_list_t *l) {
 // Parser
 ////////////////////////////////////////////////////////////////////////////////
 
-sc_bool_ast_tuple_t sc_parse_from_path(const sc_string_t *path) {
+sc_bool_value_tuple_t sc_parse_from_path(const sc_string_t *path) {
     using namespace scopes;
     auto sf = SourceFile::from_file(path);
     if (!sf) {
@@ -666,7 +666,7 @@ sc_bool_ast_tuple_t sc_parse_from_path(const sc_string_t *path) {
     RETURN_RESULT(parser.parse());
 }
 
-sc_bool_ast_tuple_t sc_parse_from_string(const sc_string_t *str) {
+sc_bool_value_tuple_t sc_parse_from_string(const sc_string_t *str) {
     using namespace scopes;
     auto sf = SourceFile::from_string(Symbol("<string>"), str);
     assert(sf);
@@ -677,7 +677,7 @@ sc_bool_ast_tuple_t sc_parse_from_string(const sc_string_t *str) {
 // Types
 ////////////////////////////////////////////////////////////////////////////////
 
-sc_bool_ast_tuple_t sc_type_at(const sc_type_t *T, sc_symbol_t key) {
+sc_bool_value_tuple_t sc_type_at(const sc_type_t *T, sc_symbol_t key) {
     using namespace scopes;
     Const *result = nullptr;
     bool ok = T->lookup(key, result);
@@ -797,7 +797,7 @@ const sc_string_t *sc_type_string(const sc_type_t *T) {
     return ss.str();
 }
 
-sc_symbol_ast_tuple_t sc_type_next(const sc_type_t *type, sc_symbol_t key) {
+sc_symbol_value_tuple_t sc_type_next(const sc_type_t *type, sc_symbol_t key) {
     using namespace scopes;
     auto &&map = type->get_symbols();
     Type::Map::const_iterator it;
@@ -813,7 +813,7 @@ sc_symbol_ast_tuple_t sc_type_next(const sc_type_t *type, sc_symbol_t key) {
     return { SYM_Unnamed, nullptr };
 }
 
-void sc_type_set_symbol(sc_type_t *T, sc_symbol_t sym, sc_ast_t *value) {
+void sc_type_set_symbol(sc_type_t *T, sc_symbol_t sym, sc_value_t *value) {
     using namespace scopes;
     const_cast<Type *>(T)->bind(sym, cast<Const>(value));
 }
@@ -872,16 +872,16 @@ const sc_type_t *sc_pointer_type_set_element_type(const sc_type_t *T, const sc_t
 // Extern Type
 ////////////////////////////////////////////////////////////////////////////////
 
-int32_t sc_extern_location(sc_ast_t *node) {
+int32_t sc_extern_location(sc_value_t *node) {
     using namespace scopes;
-    auto ext = dyn_cast<ASTExtern>(node);
+    auto ext = dyn_cast<Extern>(node);
     if (!ext) return -1;
     return ext->location;
 }
 
-int32_t sc_extern_binding(sc_ast_t *node) {
+int32_t sc_extern_binding(sc_value_t *node) {
     using namespace scopes;
-    auto ext = dyn_cast<ASTExtern>(node);
+    auto ext = dyn_cast<Extern>(node);
     if (!ext) return -1;
     return ext->binding;
 }
@@ -1063,7 +1063,7 @@ namespace scopes {
 //------------------------------------------------------------------------------
 
 static void bind_extern(const Anchor *anchor, Symbol globalsym, Symbol externsym, const Type *T) {
-    globals->bind(globalsym, ASTExtern::from(anchor, T, externsym, EF_NonWritable));
+    globals->bind(globalsym, Extern::from(anchor, T, externsym, EF_NonWritable));
 }
 
 static void bind_symbol(const Anchor *anchor, Symbol sym, Symbol value) {
@@ -1104,12 +1104,12 @@ void init_globals(int argc, char *argv[]) {
     const Type *rawstring = native_ro_pointer_type(TYPE_I8);
 
     DEFINE_EXTERN_C_FUNCTION(sc_compiler_version, tuple_type({TYPE_I32, TYPE_I32, TYPE_I32}).assert_ok());
-    DEFINE_EXTERN_C_FUNCTION(sc_eval, raising(TYPE_ASTNode), TYPE_ASTNode, TYPE_Scope);
-    DEFINE_EXTERN_C_FUNCTION(sc_eval_inline, raising(TYPE_ASTNode), TYPE_ASTNode, TYPE_Scope);
-    DEFINE_EXTERN_C_FUNCTION(sc_typify, raising(TYPE_ASTNode), TYPE_Closure, TYPE_I32, native_ro_pointer_type(TYPE_Type));
-    DEFINE_EXTERN_C_FUNCTION(sc_compile, raising(TYPE_ASTNode), TYPE_ASTNode, TYPE_U64);
-    DEFINE_EXTERN_C_FUNCTION(sc_compile_spirv, raising(TYPE_String), TYPE_Symbol, TYPE_ASTNode, TYPE_U64);
-    DEFINE_EXTERN_C_FUNCTION(sc_compile_glsl, raising(TYPE_String), TYPE_Symbol, TYPE_ASTNode, TYPE_U64);
+    DEFINE_EXTERN_C_FUNCTION(sc_eval, raising(TYPE_Value), TYPE_Value, TYPE_Scope);
+    DEFINE_EXTERN_C_FUNCTION(sc_eval_inline, raising(TYPE_Value), TYPE_Value, TYPE_Scope);
+    DEFINE_EXTERN_C_FUNCTION(sc_typify, raising(TYPE_Value), TYPE_Closure, TYPE_I32, native_ro_pointer_type(TYPE_Type));
+    DEFINE_EXTERN_C_FUNCTION(sc_compile, raising(TYPE_Value), TYPE_Value, TYPE_U64);
+    DEFINE_EXTERN_C_FUNCTION(sc_compile_spirv, raising(TYPE_String), TYPE_Symbol, TYPE_Value, TYPE_U64);
+    DEFINE_EXTERN_C_FUNCTION(sc_compile_glsl, raising(TYPE_String), TYPE_Symbol, TYPE_Value, TYPE_U64);
     DEFINE_EXTERN_C_FUNCTION(sc_compile_object, raising(), TYPE_String, TYPE_Scope, TYPE_U64);
     DEFINE_EXTERN_C_FUNCTION(sc_enter_solver_cli, TYPE_Void);
     DEFINE_EXTERN_C_FUNCTION(sc_verify_stack, raising(TYPE_USize));
@@ -1144,8 +1144,8 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_set_signal_abort,
         TYPE_Void, TYPE_Bool);
 
-    DEFINE_EXTERN_C_FUNCTION(sc_map_load, tuple_type({TYPE_Bool, TYPE_ASTNode}).assert_ok(), TYPE_List);
-    DEFINE_EXTERN_C_FUNCTION(sc_map_store, TYPE_Void, TYPE_ASTNode, TYPE_List);
+    DEFINE_EXTERN_C_FUNCTION(sc_map_load, tuple_type({TYPE_Bool, TYPE_Value}).assert_ok(), TYPE_List);
+    DEFINE_EXTERN_C_FUNCTION(sc_map_store, TYPE_Void, TYPE_Value, TYPE_List);
 
     DEFINE_EXTERN_C_FUNCTION(sc_hash, TYPE_U64, TYPE_U64, TYPE_USize);
     DEFINE_EXTERN_C_FUNCTION(sc_hash2x64, TYPE_U64, TYPE_U64, TYPE_U64);
@@ -1157,18 +1157,18 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_get_active_anchor, TYPE_Anchor);
     DEFINE_EXTERN_C_FUNCTION(sc_set_active_anchor, TYPE_Void, TYPE_Anchor);
 
-    DEFINE_EXTERN_C_FUNCTION(sc_scope_at, tuple_type({TYPE_Bool, TYPE_ASTNode}).assert_ok(), TYPE_Scope, TYPE_Symbol);
-    DEFINE_EXTERN_C_FUNCTION(sc_scope_local_at, tuple_type({TYPE_Bool, TYPE_ASTNode}).assert_ok(), TYPE_Scope, TYPE_Symbol);
+    DEFINE_EXTERN_C_FUNCTION(sc_scope_at, tuple_type({TYPE_Bool, TYPE_Value}).assert_ok(), TYPE_Scope, TYPE_Symbol);
+    DEFINE_EXTERN_C_FUNCTION(sc_scope_local_at, tuple_type({TYPE_Bool, TYPE_Value}).assert_ok(), TYPE_Scope, TYPE_Symbol);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_get_docstring, TYPE_String, TYPE_Scope, TYPE_Symbol);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_set_docstring, TYPE_Void, TYPE_Scope, TYPE_Symbol, TYPE_String);
-    DEFINE_EXTERN_C_FUNCTION(sc_scope_set_symbol, TYPE_Void, TYPE_Scope, TYPE_Symbol, TYPE_ASTNode);
+    DEFINE_EXTERN_C_FUNCTION(sc_scope_set_symbol, TYPE_Void, TYPE_Scope, TYPE_Symbol, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_new, TYPE_Scope);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_clone, TYPE_Scope, TYPE_Scope);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_new_subscope, TYPE_Scope, TYPE_Scope);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_clone_subscope, TYPE_Scope, TYPE_Scope, TYPE_Scope);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_get_parent, TYPE_Scope, TYPE_Scope);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_del_symbol, TYPE_Void, TYPE_Scope, TYPE_Symbol);
-    DEFINE_EXTERN_C_FUNCTION(sc_scope_next, tuple_type({TYPE_Symbol, TYPE_ASTNode}).assert_ok(), TYPE_Scope, TYPE_Symbol);
+    DEFINE_EXTERN_C_FUNCTION(sc_scope_next, tuple_type({TYPE_Symbol, TYPE_Value}).assert_ok(), TYPE_Scope, TYPE_Symbol);
 
     DEFINE_EXTERN_C_FUNCTION(sc_symbol_new, TYPE_Symbol, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_symbol_to_string, TYPE_String, TYPE_Symbol);
@@ -1182,7 +1182,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_string_lslice, TYPE_String, TYPE_String, TYPE_USize);
     DEFINE_EXTERN_C_FUNCTION(sc_string_rslice, TYPE_String, TYPE_String, TYPE_USize);
 
-    DEFINE_EXTERN_C_FUNCTION(sc_type_at, tuple_type({TYPE_Bool, TYPE_ASTNode}).assert_ok(), TYPE_Type, TYPE_Symbol);
+    DEFINE_EXTERN_C_FUNCTION(sc_type_at, tuple_type({TYPE_Bool, TYPE_Value}).assert_ok(), TYPE_Type, TYPE_Symbol);
     DEFINE_EXTERN_C_FUNCTION(sc_type_element_at, raising(TYPE_Type), TYPE_Type, TYPE_I32);
     DEFINE_EXTERN_C_FUNCTION(sc_type_field_index, raising(TYPE_I32), TYPE_Type, TYPE_Symbol);
     DEFINE_EXTERN_C_FUNCTION(sc_type_field_name, raising(TYPE_Symbol), TYPE_Type, TYPE_I32);
@@ -1194,8 +1194,8 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_type_storage, raising(TYPE_Type), TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_type_is_opaque, TYPE_Bool, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_type_string, TYPE_String, TYPE_Type);
-    DEFINE_EXTERN_C_FUNCTION(sc_type_next, tuple_type({TYPE_Symbol, TYPE_ASTNode}).assert_ok(), TYPE_Type, TYPE_Symbol);
-    DEFINE_EXTERN_C_FUNCTION(sc_type_set_symbol, TYPE_Void, TYPE_Type, TYPE_Symbol, TYPE_ASTNode);
+    DEFINE_EXTERN_C_FUNCTION(sc_type_next, tuple_type({TYPE_Symbol, TYPE_Value}).assert_ok(), TYPE_Type, TYPE_Symbol);
+    DEFINE_EXTERN_C_FUNCTION(sc_type_set_symbol, TYPE_Void, TYPE_Type, TYPE_Symbol, TYPE_Value);
 
     DEFINE_EXTERN_C_FUNCTION(sc_pointer_type, TYPE_Type, TYPE_Type, TYPE_U64, TYPE_Symbol);
     DEFINE_EXTERN_C_FUNCTION(sc_pointer_type_get_flags, TYPE_U64, TYPE_Type);
@@ -1204,8 +1204,8 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_pointer_type_set_storage_class, TYPE_Type, TYPE_Type, TYPE_Symbol);
     DEFINE_EXTERN_C_FUNCTION(sc_pointer_type_set_element_type, TYPE_Type, TYPE_Type, TYPE_Type);
 
-    DEFINE_EXTERN_C_FUNCTION(sc_extern_location, TYPE_I32, TYPE_ASTNode);
-    DEFINE_EXTERN_C_FUNCTION(sc_extern_binding, TYPE_I32, TYPE_ASTNode);
+    DEFINE_EXTERN_C_FUNCTION(sc_extern_location, TYPE_I32, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_extern_binding, TYPE_I32, TYPE_Value);
 
     DEFINE_EXTERN_C_FUNCTION(sc_type_bitcountof, TYPE_I32, TYPE_Type);
 
@@ -1232,17 +1232,17 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_function_type, TYPE_Type, TYPE_Type, TYPE_I32, native_ro_pointer_type(TYPE_Type));
     DEFINE_EXTERN_C_FUNCTION(sc_function_type_raising, TYPE_Type, TYPE_Type);
 
-    DEFINE_EXTERN_C_FUNCTION(sc_list_cons, TYPE_List, TYPE_ASTNode, TYPE_List);
+    DEFINE_EXTERN_C_FUNCTION(sc_list_cons, TYPE_List, TYPE_Value, TYPE_List);
     DEFINE_EXTERN_C_FUNCTION(sc_list_dump, TYPE_List, TYPE_List);
     DEFINE_EXTERN_C_FUNCTION(sc_list_join, TYPE_List, TYPE_List, TYPE_List);
-    DEFINE_EXTERN_C_FUNCTION(sc_list_decons, tuple_type({TYPE_ASTNode, TYPE_List}).assert_ok(), TYPE_List);
+    DEFINE_EXTERN_C_FUNCTION(sc_list_decons, tuple_type({TYPE_Value, TYPE_List}).assert_ok(), TYPE_List);
     DEFINE_EXTERN_C_FUNCTION(sc_list_count, TYPE_USize, TYPE_List);
-    DEFINE_EXTERN_C_FUNCTION(sc_list_at, TYPE_ASTNode, TYPE_List);
+    DEFINE_EXTERN_C_FUNCTION(sc_list_at, TYPE_Value, TYPE_List);
     DEFINE_EXTERN_C_FUNCTION(sc_list_next, TYPE_List, TYPE_List);
     DEFINE_EXTERN_C_FUNCTION(sc_list_reverse, TYPE_List, TYPE_List);
 
-    DEFINE_EXTERN_C_FUNCTION(sc_parse_from_path, raising(TYPE_ASTNode), TYPE_String);
-    DEFINE_EXTERN_C_FUNCTION(sc_parse_from_string, raising(TYPE_ASTNode), TYPE_String);
+    DEFINE_EXTERN_C_FUNCTION(sc_parse_from_path, raising(TYPE_Value), TYPE_String);
+    DEFINE_EXTERN_C_FUNCTION(sc_parse_from_string, raising(TYPE_Value), TYPE_String);
 
 #undef DEFINE_EXTERN_C_FUNCTION
 

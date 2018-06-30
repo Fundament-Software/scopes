@@ -14,8 +14,8 @@
 #include "scope.hpp"
 #include "stream_expr.hpp"
 #include "anchor.hpp"
-#include "ast.hpp"
-#include "ast_specializer.hpp"
+#include "value.hpp"
+#include "prover.hpp"
 #include "timer.hpp"
 #include "gc.hpp"
 #include "dyn_cast.inc"
@@ -52,7 +52,7 @@ static SCOPES_RESULT(void) verify_list_parameter_count(const char *context, cons
 
 //------------------------------------------------------------------------------
 
-static Symbol try_extract_symbol(ASTNode *node) {
+static Symbol try_extract_symbol(Value *node) {
     auto ptr = dyn_cast<ConstInt>(node);
     if (ptr && (ptr->get_type() == TYPE_Symbol))
         return Symbol::wrap(ptr->value);
@@ -82,8 +82,8 @@ struct Expander {
 
     ~Expander() {}
 
-    SCOPES_RESULT(ASTNode *) expand_block(const Anchor *anchor, const List *it) {
-        SCOPES_RESULT_TYPE(ASTNode *);
+    SCOPES_RESULT(Value *) expand_block(const Anchor *anchor, const List *it) {
+        SCOPES_RESULT_TYPE(Value *);
         Block *block = Block::from(anchor);
         while (it) {
             next = it->next;
@@ -99,8 +99,8 @@ struct Expander {
         return block->canonicalize();
     }
 
-    SCOPES_RESULT(ASTNode *) expand_syntax_extend(const List *it) {
-        SCOPES_RESULT_TYPE(ASTNode *);
+    SCOPES_RESULT(Value *) expand_syntax_extend(const List *it) {
+        SCOPES_RESULT_TYPE(Value *);
         auto _anchor = get_active_anchor();
 
         SCOPES_CHECK_RESULT(verify_list_parameter_count("syntax-extend", it, 1, -1));
@@ -108,7 +108,7 @@ struct Expander {
         // skip head
         it = it->next;
 
-        auto scopeparam = ASTSymbol::from(_anchor, SYM_Unnamed, TYPE_Scope);
+        auto scopeparam = SymbolValue::from(_anchor, SYM_Unnamed, TYPE_Scope);
         Template *func = Template::from(_anchor, Symbol(KW_SyntaxExtend), {scopeparam});
         func->scope = astscope;
 
@@ -126,22 +126,22 @@ struct Expander {
         return node;
     }
 
-    SCOPES_RESULT(ASTSymbol *) expand_parameter(ASTNode *value, ASTNode *node = nullptr) {
-        SCOPES_RESULT_TYPE(ASTSymbol *);
+    SCOPES_RESULT(SymbolValue *) expand_parameter(Value *value, Value *node = nullptr) {
+        SCOPES_RESULT_TYPE(SymbolValue *);
         const Anchor *anchor = value->anchor();
-        if (isa<ASTSymbol>(value)) {
-            return cast<ASTSymbol>(value);
+        if (isa<SymbolValue>(value)) {
+            return cast<SymbolValue>(value);
         } else {
             Symbol sym = SCOPES_GET_RESULT(extract_symbol_constant(value));
-            if (node && isa<ASTValue>(node)) {
-                env->bind(sym, cast<ASTValue>(node));
+            if (node && isa<Symbolic>(node)) {
+                env->bind(sym, cast<Symbolic>(node));
                 return nullptr;
             } else {
-                ASTSymbol *param = nullptr;
+                SymbolValue *param = nullptr;
                 if (ends_with_parenthesis(sym)) {
-                    param = ASTSymbol::variadic_from(anchor, sym);
+                    param = SymbolValue::variadic_from(anchor, sym);
                 } else {
-                    param = ASTSymbol::from(anchor, sym);
+                    param = SymbolValue::from(anchor, sym);
                 }
                 env->bind(sym, param);
                 return param;
@@ -157,8 +157,8 @@ struct Expander {
         };
     };
 
-    SCOPES_RESULT(ASTNode *) expand_fn(const List *it, const ExpandFnSetup &setup) {
-        SCOPES_RESULT_TYPE(ASTNode *);
+    SCOPES_RESULT(Value *) expand_fn(const List *it, const ExpandFnSetup &setup) {
+        SCOPES_RESULT_TYPE(Value *);
         auto _anchor = get_active_anchor();
 
         SCOPES_CHECK_RESULT(verify_list_parameter_count("fn", it, 1, -1));
@@ -170,14 +170,14 @@ struct Expander {
 
         bool continuing = false;
         Template *func = nullptr;
-        ASTNode *result = nullptr;
+        Value *result = nullptr;
         //Any tryfunc_name = SCOPES_GET_RESULT(unsyntax(it->at));
         const Type *T = try_get_const_type(it->at);
         if (T == TYPE_Symbol) {
             auto sym = SCOPES_GET_RESULT(extract_symbol_constant(it->at));
             // named self-binding
             // see if we can find a forward declaration in the local scope
-            ASTValue *result = nullptr;
+            Symbolic *result = nullptr;
             if (env->lookup_local(sym, result)
                 && isa<Template>(result)
                 && cast<Template>(result)->is_forward_decl()) {
@@ -274,8 +274,8 @@ struct Expander {
     }
 #endif
 
-    SCOPES_RESULT(ASTNode *) expand_do(const List *it) {
-        SCOPES_RESULT_TYPE(ASTNode *);
+    SCOPES_RESULT(Value *) expand_do(const List *it) {
+        SCOPES_RESULT_TYPE(Value *);
         auto _anchor = get_active_anchor();
 
         it = it->next;
@@ -285,7 +285,7 @@ struct Expander {
         return subexpr.expand_block(_anchor, it);
     }
 
-    bool is_equal_token(ASTNode *name) {
+    bool is_equal_token(Value *name) {
         auto tok = try_extract_symbol(name);
         return tok == OP_Set;
     }
@@ -307,8 +307,8 @@ struct Expander {
     }
 
     // (loop ([x ...]) [= args ...] body ...)
-    SCOPES_RESULT(ASTNode *) expand_loop(const List *it) {
-        SCOPES_RESULT_TYPE(ASTNode *);
+    SCOPES_RESULT(Value *) expand_loop(const List *it) {
+        SCOPES_RESULT_TYPE(Value *);
 
         SCOPES_CHECK_RESULT(verify_list_parameter_count("loop", it, 1, -1));
         it = it->next;
@@ -329,8 +329,8 @@ struct Expander {
 
         auto loop = Loop::from(_anchor);
 
-        ASTSymbols syms;
-        ASTNodes exprs;
+        SymbolValues syms;
+        Values exprs;
 
         it = values;
         // read init values
@@ -358,16 +358,16 @@ struct Expander {
     // (let x ... [= args ...])
     // (let (x ... = args ...) ...
     // ...
-    SCOPES_RESULT(ASTNode *) expand_let(const List *it) {
-        SCOPES_RESULT_TYPE(ASTNode *);
+    SCOPES_RESULT(Value *) expand_let(const List *it) {
+        SCOPES_RESULT_TYPE(Value *);
 
         SCOPES_CHECK_RESULT(verify_list_parameter_count("let", it, 1, -1));
         it = it->next;
 
         auto _anchor = get_active_anchor();
 
-        ASTSymbols syms;
-        ASTNodes exprs;
+        SymbolValues syms;
+        Values exprs;
 
         const Type *T = try_get_const_type(it->at);
         if (T == TYPE_List) {
@@ -387,7 +387,7 @@ struct Expander {
                 // read init values
                 Expander subexp(env, astscope);
                 subexp.next = it->next;
-                ASTNode *node = SCOPES_GET_RESULT(subexp.expand(it->at));
+                Value *node = SCOPES_GET_RESULT(subexp.expand(it->at));
                 it = subexp.next;
                 if (it) {
                     set_active_anchor(it->at->anchor());
@@ -414,7 +414,7 @@ struct Expander {
 
             if (!values) {
                 // no assignments, reimport parameter names into local scope
-                ASTNode *last_entry = nullptr;
+                Value *last_entry = nullptr;
                 while (it != endit) {
                     auto name = SCOPES_GET_RESULT(extract_symbol_constant(it->at));
                     ScopeEntry entry;
@@ -462,8 +462,8 @@ struct Expander {
     }
 
     // quote <value> ...
-    SCOPES_RESULT(ASTNode *) expand_quote(const List *it) {
-        SCOPES_RESULT_TYPE(ASTNode *);
+    SCOPES_RESULT(Value *) expand_quote(const List *it) {
+        SCOPES_RESULT_TYPE(Value *);
         auto _anchor = get_active_anchor();
 
         SCOPES_CHECK_RESULT(verify_list_parameter_count("quote", it, 1, -1));
@@ -476,8 +476,8 @@ struct Expander {
         }
     }
 
-    SCOPES_RESULT(ASTNode *) expand_syntax_log(const List *it) {
-        SCOPES_RESULT_TYPE(ASTNode *);
+    SCOPES_RESULT(Value *) expand_syntax_log(const List *it) {
+        SCOPES_RESULT_TYPE(Value *);
         auto _anchor = get_active_anchor();
 
         SCOPES_CHECK_RESULT(verify_list_parameter_count("syntax-log", it, 1, 1));
@@ -498,8 +498,8 @@ struct Expander {
     // (if cond body ...)
     // [(elseif cond body ...)]
     // [(else body ...)]
-    SCOPES_RESULT(ASTNode *) expand_if(const List *it) {
-        SCOPES_RESULT_TYPE(ASTNode *);
+    SCOPES_RESULT(Value *) expand_if(const List *it) {
+        SCOPES_RESULT_TYPE(Value *);
         auto _anchor = get_active_anchor();
 
         std::vector<const List *> branches;
@@ -547,7 +547,7 @@ struct Expander {
             Expander subexp(env, astscope);
             assert(it);
             subexp.next = it->next;
-            ASTNode *cond = SCOPES_GET_RESULT(subexp.expand(it->at));
+            Value *cond = SCOPES_GET_RESULT(subexp.expand(it->at));
             it = subexp.next;
 
             subexp.env = Scope::from(env);
@@ -568,7 +568,7 @@ struct Expander {
         return ifexpr->canonicalize();
     }
 
-    static SCOPES_RESULT(bool) get_kwargs(ASTNode *it, Symbol &key, ASTNode *&value) {
+    static SCOPES_RESULT(bool) get_kwargs(Value *it, Symbol &key, Value *&value) {
         SCOPES_RESULT_TYPE(bool);
         auto T = try_get_const_type(it);
         if (T != TYPE_List) return false;
@@ -590,12 +590,12 @@ struct Expander {
         return true;
     }
 
-    SCOPES_RESULT(void) expand_arguments(ASTNodes &args, const List *it) {
+    SCOPES_RESULT(void) expand_arguments(Values &args, const List *it) {
         SCOPES_RESULT_TYPE(void);
         while (it) {
             next = it->next;
             Symbol key = SYM_Unnamed;
-            ASTNode *value;
+            Value *value;
             set_active_anchor(it->at->anchor());
             if (SCOPES_GET_RESULT(get_kwargs(it->at, key, value))) {
                 args.push_back(
@@ -609,35 +609,35 @@ struct Expander {
         return true;
     }
 
-    SCOPES_RESULT(ASTNode *) expand_return(const List *it) {
-        SCOPES_RESULT_TYPE(ASTNode *);
+    SCOPES_RESULT(Value *) expand_return(const List *it) {
+        SCOPES_RESULT_TYPE(Value *);
         auto _anchor = get_active_anchor();
         SCOPES_CHECK_RESULT(verify_list_parameter_count("return", it, 0, -1));
         it = it->next;
-        ASTArgumentList *args = ASTArgumentList::from(_anchor);
+        ArgumentList *args = ArgumentList::from(_anchor);
         if (it) {
             Expander subexp(env, astscope, it->next);
             SCOPES_CHECK_RESULT(subexp.expand_arguments(args->values, it));
         }
-        return ASTReturn::from(_anchor, args);
+        return Return::from(_anchor, args);
     }
 
-    SCOPES_RESULT(ASTNode *) expand_break(const List *it) {
-        SCOPES_RESULT_TYPE(ASTNode *);
+    SCOPES_RESULT(Value *) expand_break(const List *it) {
+        SCOPES_RESULT_TYPE(Value *);
         auto _anchor = get_active_anchor();
         SCOPES_CHECK_RESULT(verify_list_parameter_count("break", it, 0, -1));
         it = it->next;
-        ASTNode *value = nullptr;
+        Value *value = nullptr;
         if (it) {
             value = SCOPES_GET_RESULT(expand(it->at));
         } else {
-            value = ASTArgumentList::from(_anchor);
+            value = ArgumentList::from(_anchor);
         }
         return Break::from(_anchor, value);
     }
 
-    SCOPES_RESULT(ASTNode *) expand_repeat(const List *it) {
-        SCOPES_RESULT_TYPE(ASTNode *);
+    SCOPES_RESULT(Value *) expand_repeat(const List *it) {
+        SCOPES_RESULT_TYPE(Value *);
         auto _anchor = get_active_anchor();
         SCOPES_CHECK_RESULT(verify_list_parameter_count("repeat", it, 0, -1));
         it = it->next;
@@ -649,12 +649,12 @@ struct Expander {
         return rep;
     }
 
-    SCOPES_RESULT(ASTNode *) expand_forward(const List *it) {
-        SCOPES_RESULT_TYPE(ASTNode *);
+    SCOPES_RESULT(Value *) expand_forward(const List *it) {
+        SCOPES_RESULT_TYPE(Value *);
         auto _anchor = get_active_anchor();
         SCOPES_CHECK_RESULT(verify_list_parameter_count("_", it, 0, -1));
         it = it->next;
-        auto args = ASTArgumentList::from(_anchor);
+        auto args = ArgumentList::from(_anchor);
         if (it) {
             Expander subexp(env, astscope, it->next);
             SCOPES_CHECK_RESULT(subexp.expand_arguments(args->values, it));
@@ -662,13 +662,13 @@ struct Expander {
         return args;
     }
 
-    SCOPES_RESULT(ASTNode *) expand_call(const List *it, uint32_t flags = 0) {
-        SCOPES_RESULT_TYPE(ASTNode *);
+    SCOPES_RESULT(Value *) expand_call(const List *it, uint32_t flags = 0) {
+        SCOPES_RESULT_TYPE(Value *);
 
         auto _anchor = get_active_anchor();
         SCOPES_CHECK_RESULT(verify_list_parameter_count("call", it, 0, -1));
         Expander subexp(env, astscope, it->next);
-        ASTNode *enter = SCOPES_GET_RESULT(subexp.expand(it->at));
+        Value *enter = SCOPES_GET_RESULT(subexp.expand(it->at));
 
         auto call = Call::from(_anchor, enter);
         call->flags = flags;
@@ -682,8 +682,8 @@ struct Expander {
     struct OKListScopePair { bool ok; ListScopePair pair; };
     typedef OKListScopePair (*HandlerFuncType)(const List *, Scope *);
 
-    SCOPES_RESULT(ASTNode *) expand(ASTNode *node) {
-        SCOPES_RESULT_TYPE(ASTNode *);
+    SCOPES_RESULT(Value *) expand(Value *node) {
+        SCOPES_RESULT_TYPE(Value *);
     expand_again:
         SCOPES_CHECK_RESULT(verify_stack());
         set_active_anchor(node->anchor());
@@ -707,14 +707,14 @@ struct Expander {
                 SCOPES_LOCATION_ERROR(String::from("expression is empty"));
             }
 
-            ASTNode *head = list->at;
+            Value *head = list->at;
             if (isa<Const>(head)) {
             }
 
             auto headT = try_get_const_type(head);
             // resolve symbol
             if (headT == TYPE_Symbol) {
-                ASTValue *headnode = nullptr;
+                Symbolic *headnode = nullptr;
                 if (env->lookup(SCOPES_GET_RESULT(extract_symbol_constant(head)), headnode)) {
                     head = headnode;
                     headT = try_get_const_type(head);
@@ -762,7 +762,7 @@ struct Expander {
                 }
             }
 
-            ASTValue *list_handler_node;
+            Symbolic *list_handler_node;
             if (env->lookup(Symbol(SYM_ListWildcard), list_handler_node)) {
                 auto T = try_get_const_type(list_handler_node);
                 if (T != list_expander_func_type) {
@@ -777,7 +777,7 @@ struct Expander {
                     SCOPES_RETURN_ERROR();
                 }
                 auto result = ok_result.pair;
-                ASTNode *newnode = result.topit->at;
+                Value *newnode = result.topit->at;
                 if (newnode != node) {
                     node = newnode;
                     next = result.topit->next;
@@ -798,9 +798,9 @@ struct Expander {
 
             Symbol name = SCOPES_GET_RESULT(extract_symbol_constant(node));
 
-            ASTValue *result = nullptr;
+            Symbolic *result = nullptr;
             if (!env->lookup(name, result)) {
-                ASTValue *symbol_handler_node;
+                Symbolic *symbol_handler_node;
                 if (env->lookup(Symbol(SYM_SymbolWildcard), symbol_handler_node)) {
                     auto T = try_get_const_type(symbol_handler_node);
                     if (T != list_expander_func_type) {
@@ -815,7 +815,7 @@ struct Expander {
                         SCOPES_RETURN_ERROR();
                     }
                     auto result = ok_result.pair;
-                    ASTNode *newnode = result.topit->at;
+                    Value *newnode = result.topit->at;
                     if (newnode != node) {
                         node = newnode;
                         next = result.topit->next;
@@ -844,7 +844,7 @@ struct Expander {
 bool Expander::verbose = false;
 const Type *Expander::list_expander_func_type = nullptr;
 
-SCOPES_RESULT(Template *) expand_inline(ASTNode *expr, Scope *scope) {
+SCOPES_RESULT(Template *) expand_inline(Value *expr, Scope *scope) {
     SCOPES_RESULT_TYPE(Template *);
     Timer sum_expand_time(TIMER_Expand);
     const Anchor *anchor = expr->anchor();
@@ -860,7 +860,7 @@ SCOPES_RESULT(Template *) expand_inline(ASTNode *expr, Scope *scope) {
     return mainfunc;
 }
 
-SCOPES_RESULT(Template *) expand_module(ASTNode *expr, Scope *scope) {
+SCOPES_RESULT(Template *) expand_module(Value *expr, Scope *scope) {
     SCOPES_RESULT_TYPE(Template *);
     Timer sum_expand_time(TIMER_Expand);
     const Anchor *anchor = expr->anchor();

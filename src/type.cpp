@@ -392,7 +392,7 @@ void init_types() {
     DEFINE_BASIC_TYPE("Symbol", Symbol, TYPE_Symbol, TYPE_U64);
     DEFINE_BASIC_TYPE("Builtin", Builtin, TYPE_Builtin, TYPE_U64);
 
-    DEFINE_OPAQUE_HANDLE_TYPE("ASTNode", ASTNode, TYPE_ASTNode);
+    DEFINE_OPAQUE_HANDLE_TYPE("Value", Value, TYPE_Value);
 
     DEFINE_OPAQUE_HANDLE_TYPE("SourceFile", SourceFile, TYPE_SourceFile);
     DEFINE_OPAQUE_HANDLE_TYPE("Scope", Scope, TYPE_Scope);
@@ -416,8 +416,8 @@ void init_types() {
         cast<TypenameType>(const_cast<Type *>(TYPE_ASTMacro))
             ->finalize(
                 native_ro_pointer_type(
-                    function_type(return_type({TYPE_ASTNode}, RTF_Raising), {
-                        native_ro_pointer_type(TYPE_ASTNode),
+                    function_type(return_type({TYPE_Value}, RTF_Raising), {
+                        native_ro_pointer_type(TYPE_Value),
                         TYPE_I32
                         })
                     )).assert_ok();

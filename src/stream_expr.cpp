@@ -7,8 +7,8 @@
 #include "stream_expr.hpp"
 #include "list.hpp"
 #include "anchor.hpp"
-#include "ast.hpp"
-#include "ast_specializer.hpp"
+#include "value.hpp"
+#include "prover.hpp"
 #include "type.hpp"
 
 namespace scopes {
@@ -107,7 +107,7 @@ void StreamExpr::stream_indent(int depth) {
     }
 }
 
-bool StreamExpr::is_nested(ASTNode *_e) {
+bool StreamExpr::is_nested(Value *_e) {
     auto T = try_get_const_type(_e);
     if (T == TYPE_List) {
         auto it = extract_list_constant(_e).assert_ok();
@@ -123,7 +123,7 @@ bool StreamExpr::is_nested(ASTNode *_e) {
     return false;
 }
 
-bool StreamExpr::is_list (ASTNode *_value) {
+bool StreamExpr::is_list (Value *_value) {
     return try_get_const_type(_value) == TYPE_List;
 }
 
@@ -217,7 +217,7 @@ void StreamExpr::walk(const Anchor *anchor, const List *l, int depth, int maxdep
     if (naked) { ss << std::endl; }
 }
 
-void StreamExpr::walk(ASTNode *e, int depth, int maxdepth, bool naked) {
+void StreamExpr::walk(Value *e, int depth, int maxdepth, bool naked) {
     auto T = try_get_const_type(e);
     if (T == TYPE_List) {
         walk(e->anchor(), extract_list_constant(e).assert_ok(), depth, maxdepth, naked);

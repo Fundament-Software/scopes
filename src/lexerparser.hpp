@@ -19,7 +19,7 @@ struct List;
 struct Anchor;
 struct SourceFile;
 struct Const;
-struct ASTNode;
+struct Value;
 struct ConstInt;
 struct ConstPointer;
 struct Type;
@@ -63,7 +63,7 @@ struct LexerParser {
 
         ListBuilder(LexerParser &_lexer);
 
-        void append(ASTNode *value);
+        void append(Value *value);
 
         bool is_empty() const;
 
@@ -136,7 +136,7 @@ struct LexerParser {
     Symbol get_symbol();
     const String *get_string();
     const String *get_block_string();
-    ASTNode *get_number();
+    Value *get_number();
     //Const *get();
 
     // parses a list to its terminator and returns a handle to the first cell
@@ -144,11 +144,11 @@ struct LexerParser {
 
     // parses the next sequence and returns it wrapped in a cell that points
     // to prev
-    SCOPES_RESULT(ASTNode *) parse_any();
+    SCOPES_RESULT(Value *) parse_any();
 
-    SCOPES_RESULT(ASTNode *) parse_naked(int column, Token end_token);
+    SCOPES_RESULT(Value *) parse_naked(int column, Token end_token);
 
-    SCOPES_RESULT(ASTNode *) parse();
+    SCOPES_RESULT(Value *) parse();
 
     Token token;
     int base_offset;
@@ -165,7 +165,7 @@ struct LexerParser {
     const char *string;
     int string_len;
 
-    ASTNode *value;
+    Value *value;
 };
 
 

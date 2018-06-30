@@ -18,11 +18,11 @@ namespace scopes {
 // SCOPE
 //------------------------------------------------------------------------------
 
-struct ASTValue;
+struct Symbolic;
 struct String;
 
 struct ScopeEntry {
-    ASTValue *expr;
+    Symbolic *expr;
     const String *doc;
 };
 
@@ -51,7 +51,7 @@ public:
 
     void bind_with_doc(Symbol name, const ScopeEntry &entry);
 
-    void bind(Symbol name, ASTValue *value);
+    void bind(Symbol name, Symbolic *value);
 
     void del(Symbol name);
 
@@ -61,11 +61,11 @@ public:
 
     bool lookup(Symbol name, ScopeEntry &dest, size_t depth = -1) const;
 
-    bool lookup(Symbol name, ASTValue *&dest, size_t depth = -1) const;
+    bool lookup(Symbol name, Symbolic *&dest, size_t depth = -1) const;
 
     bool lookup_local(Symbol name, ScopeEntry &dest) const;
 
-    bool lookup_local(Symbol name, ASTValue *&dest) const;
+    bool lookup_local(Symbol name, Symbolic *&dest) const;
 
     StyledStream &stream(StyledStream &ss);
 

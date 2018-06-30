@@ -14,7 +14,7 @@
 #include "utils.hpp"
 #include "scope.hpp"
 #include "execution.hpp"
-#include "ast.hpp"
+#include "value.hpp"
 #include "dyn_cast.inc"
 
 #include "scopes/scopes.h"
@@ -576,7 +576,7 @@ public:
     }
 
     void exportExtern(Symbol name, const Type *type, const Anchor *anchor) {
-        dest->bind(name, ASTExtern::from(anchor, type, name));
+        dest->bind(name, Extern::from(anchor, type, name));
     }
 
     bool TraverseRecordDecl(clang::RecordDecl *rd) {
@@ -872,7 +872,7 @@ SCOPES_RESULT(Scope *) import_c_module (
         while (!todo.empty()) {
             auto sz = todo.size();
             for (auto it = todo.begin(); it != todo.end();) {
-                ASTValue *value;
+                Symbolic *value;
                 if (result->lookup(it->second, value)) {
                     result->bind(it->first, value);
                     auto oldit = it++;

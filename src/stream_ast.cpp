@@ -5,7 +5,7 @@
 */
 
 #include "stream_ast.hpp"
-#include "ast.hpp"
+#include "value.hpp"
 #include "type.hpp"
 #include "dyn_cast.inc"
 
@@ -31,7 +31,7 @@ struct StreamAST : StreamAnchors {
     bool line_anchors;
     bool atom_anchors;
 
-    std::unordered_set<const ASTNode *> visited;
+    std::unordered_set<const Value *> visited;
 
     StreamAST(StyledStream &_ss, const StreamASTFormat &_fmt)
         : StreamAnchors(_ss), fmt(_fmt) {
@@ -55,7 +55,7 @@ struct StreamAST : StreamAnchors {
         }
     }
 
-    void write_arguments(const ASTNodes &args, int depth, int maxdepth) {
+    void write_arguments(const Values &args, int depth, int maxdepth) {
         for (int i = 0; i < args.size(); ++i) {
             ss << std::endl;
             auto &&arg = args[i];
@@ -73,7 +73,7 @@ struct StreamAST : StreamAnchors {
         }
     }
 
-    void walk(const ASTNode *node, int depth, int maxdepth) {
+    void walk(const Value *node, int depth, int maxdepth) {
         const Anchor *anchor = node->anchor();
 
         stream_indent(depth);
@@ -89,7 +89,7 @@ struct StreamAST : StreamAnchors {
             ss << (const Type *)node->get_type() << " ◀ ";
         }
         switch(node->kind()) {
-        case ASTK_Template: {
+        case VK_Template: {
             auto val = cast<Template>(node);
             ss << Style_Keyword << "Template" << Style_None;
             if (val->is_inline()) {
@@ -121,8 +121,8 @@ struct StreamAST : StreamAnchors {
                 ss << " <...>";
             }
         } break;
-        case ASTK_Function: {
-            auto val = cast<ASTFunction>(node);
+        case VK_Function: {
+            auto val = cast<Function>(node);
             ss << Style_Keyword << "Function" << Style_None;
             ss << " ";
             ss << Style_Symbol << val->name.name()->data
@@ -140,7 +140,7 @@ struct StreamAST : StreamAnchors {
                 ss << " <...>";
             }
         } break;
-        case ASTK_Block: {
+        case VK_Block: {
             auto val = cast<Block>(node);
             ss << Style_Keyword << "Block" << Style_None;
             for (int i = 0; i < val->body.size(); ++i) {
@@ -150,7 +150,7 @@ struct StreamAST : StreamAnchors {
             ss << std::endl;
             walk(val->value, depth+1, maxdepth);
         } break;
-        case ASTK_If: {
+        case VK_If: {
             auto val = cast<If>(node);
             ss << Style_Keyword << "If" << Style_None;
             for (int i = 0; i < val->clauses.size(); ++i) {
@@ -170,15 +170,15 @@ struct StreamAST : StreamAnchors {
             ss << std::endl;
             walk(val->else_clause.value, depth+2, maxdepth);
         } break;
-        case ASTK_Symbol: {
-            auto val = cast<ASTSymbol>(node);
+        case VK_Symbol: {
+            auto val = cast<SymbolValue>(node);
             ss << Style_Symbol << val->name.name()->data
                 << "$" << (void *)val << Style_None;
             if (val->is_variadic()) {
                 ss << "…";
             }
         } break;
-        case ASTK_Call: {
+        case VK_Call: {
             auto val = cast<Call>(node);
             ss << Style_Keyword << "Call" << Style_None;
             if (val->flags & CF_RawCall) {
@@ -191,7 +191,7 @@ struct StreamAST : StreamAnchors {
             walk(val->callee, depth+1, maxdepth);
             write_arguments(val->args, depth, maxdepth);
         } break;
-        case ASTK_Let: {
+        case VK_Let: {
             auto val = cast<Let>(node);
             ss << Style_Keyword << "Let" << Style_None;
             for (int i = 0; i < val->params.size(); ++i) {
@@ -203,22 +203,22 @@ struct StreamAST : StreamAnchors {
                 walk(val->args[i], depth+2, maxdepth);
             }
         } break;
-        case ASTK_ArgumentList: {
-            auto val = cast<ASTArgumentList>(node);
+        case VK_ArgumentList: {
+            auto val = cast<ArgumentList>(node);
             ss << Style_Keyword << "ArgumentList" << Style_None;
             for (int i = 0; i < val->values.size(); ++i) {
                 ss << std::endl;
                 walk(val->values[i], depth+1, maxdepth);
             }
         } break;
-        case ASTK_ExtractArgument: {
-            auto val = cast<ASTExtractArgument>(node);
+        case VK_ExtractArgument: {
+            auto val = cast<ExtractArgument>(node);
             ss << Style_Keyword << "ExtractArgument" << Style_None;
             ss << " " << val->index;
             ss << std::endl;
             walk(val->value, depth+1, maxdepth);
         } break;
-        case ASTK_Loop: {
+        case VK_Loop: {
             auto val = cast<Loop>(node);
             ss << Style_Keyword << "Loop" << Style_None;
             for (int i = 0; i < val->params.size(); ++i) {
@@ -232,32 +232,32 @@ struct StreamAST : StreamAnchors {
             ss << std::endl;
             walk(val->value, depth+1, maxdepth);
         } break;
-        case ASTK_ConstInt: {
+        case VK_ConstInt: {
             auto val = cast<ConstInt>(node);
             ss << Style_Keyword << "ConstInt" << Style_None << " " << val->value;
         } break;
-        case ASTK_ConstReal: {
+        case VK_ConstReal: {
             auto val = cast<ConstReal>(node);
             ss << Style_Keyword << "ConstReal" << Style_None << " " << val->value;
         } break;
-        case ASTK_Break: {
+        case VK_Break: {
             auto val = cast<Break>(node);
             ss << Style_Keyword << "Break" << Style_None;
             ss << std::endl;
             walk(val->value, depth+1, maxdepth);
         } break;
-        case ASTK_Repeat: {
+        case VK_Repeat: {
             auto val = cast<Repeat>(node);
             ss << Style_Keyword << "Repeat" << Style_None;
             write_arguments(val->args, depth, maxdepth);
         } break;
-        case ASTK_Return: {
-            auto val = cast<ASTReturn>(node);
-            ss << Style_Keyword << "ASTReturn" << Style_None;
+        case VK_Return: {
+            auto val = cast<Return>(node);
+            ss << Style_Keyword << "Return" << Style_None;
             ss << std::endl;
             walk(val->value, depth+1, maxdepth);
         } break;
-        case ASTK_SyntaxExtend: {
+        case VK_SyntaxExtend: {
             auto val = cast<SyntaxExtend>(node);
             ss << Style_Keyword << "SyntaxExtend" << Style_None;
             ss << std::endl;
@@ -268,7 +268,7 @@ struct StreamAST : StreamAnchors {
         }
     }
 
-    void stream(const ASTNode *node) {
+    void stream(const Value *node) {
         visited.clear();
         walk(node, fmt.depth, -1);
         ss << std::endl;
@@ -278,7 +278,7 @@ struct StreamAST : StreamAnchors {
 //------------------------------------------------------------------------------
 
 void stream_ast(
-    StyledStream &_ss, const ASTNode *node, const StreamASTFormat &_fmt) {
+    StyledStream &_ss, const Value *node, const StreamASTFormat &_fmt) {
     StreamAST streamer(_ss, _fmt);
     streamer.stream(node);
 }

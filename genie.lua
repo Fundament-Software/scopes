@@ -94,7 +94,7 @@ project "scopesrt"
     language "C++"
     files {
         "src/globalsyms.c",
-        "src/ast.cpp",
+        "src/value.cpp",
         "src/gc.cpp",
         "src/symbol_enum.cpp",
         "src/none.cpp",
@@ -131,7 +131,7 @@ project "scopesrt"
         "src/stream_ast.cpp",
         "src/c_import.cpp",
         "src/execution.cpp",
-        "src/ast_specializer.cpp",
+        "src/prover.cpp",
         "src/platform_abi.cpp",
         "src/gen_spirv.cpp",
         "src/gen_llvm.cpp",

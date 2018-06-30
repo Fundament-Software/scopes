@@ -15,6 +15,7 @@ namespace scopes {
 
 struct Anchor;
 struct List;
+struct Value;
 
 //------------------------------------------------------------------------------
 // EXPRESSION PRINTER
@@ -61,12 +62,12 @@ struct StreamExpr : StreamAnchors {
 
     void stream_indent(int depth = 0);
 
-    static bool is_nested(ASTNode *_e);
+    static bool is_nested(Value *_e);
 
-    static bool is_list (ASTNode *_value);
+    static bool is_list (Value *_value);
 
     void walk(const Anchor *anchor, const List *l, int depth, int maxdepth, bool naked);
-    void walk(ASTNode *e, int depth, int maxdepth, bool naked);
+    void walk(Value *e, int depth, int maxdepth, bool naked);
 
     void stream(const List *l);
 };

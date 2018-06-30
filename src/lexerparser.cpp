@@ -10,7 +10,7 @@
 #include "anchor.hpp"
 #include "type.hpp"
 #include "list.hpp"
-#include "ast.hpp"
+#include "value.hpp"
 #include "dyn_cast.inc"
 
 #include "scopes/scopes.h"
@@ -438,7 +438,7 @@ const String *LexerParser::get_block_string() {
     }
     return String::from(dest, p - dest);
 }
-ASTNode *LexerParser::get_number() {
+Value *LexerParser::get_number() {
     return value;
 }
 #if 0
@@ -465,7 +465,7 @@ LexerParser::ListBuilder::ListBuilder(LexerParser &_lexer) :
     prev(EOL),
     eol(EOL) {}
 
-void LexerParser::ListBuilder::append(ASTNode *value) {
+void LexerParser::ListBuilder::append(Value *value) {
     prev = List::from(value, prev);
 }
 
@@ -523,8 +523,8 @@ SCOPES_RESULT(const List *) LexerParser::parse_list(Token end_token) {
 
 // parses the next sequence and returns it wrapped in a cell that points
 // to prev
-SCOPES_RESULT(ASTNode *) LexerParser::parse_any() {
-    SCOPES_RESULT_TYPE(ASTNode *);
+SCOPES_RESULT(Value *) LexerParser::parse_any() {
+    SCOPES_RESULT_TYPE(Value *);
     assert(this->token != tok_eof);
     const Anchor *anchor = this->anchor();
     if (this->token == tok_open) {
@@ -571,8 +571,8 @@ SCOPES_RESULT(ASTNode *) LexerParser::parse_any() {
     return ConstTuple::none_from(anchor);
 }
 
-SCOPES_RESULT(ASTNode *) LexerParser::parse_naked(int column, Token end_token) {
-    SCOPES_RESULT_TYPE(ASTNode *);
+SCOPES_RESULT(Value *) LexerParser::parse_naked(int column, Token end_token) {
+    SCOPES_RESULT_TYPE(Value *);
     int lineno = this->lineno;
 
     bool escape = false;
@@ -639,8 +639,8 @@ SCOPES_RESULT(ASTNode *) LexerParser::parse_naked(int column, Token end_token) {
     }
 }
 
-SCOPES_RESULT(ASTNode *) LexerParser::parse() {
-    SCOPES_RESULT_TYPE(ASTNode *);
+SCOPES_RESULT(Value *) LexerParser::parse() {
+    SCOPES_RESULT_TYPE(Value *);
     SCOPES_CHECK_RESULT(this->read_token());
     int lineno = 0;
     //bool escape = false;

@@ -51,7 +51,7 @@ namespace scopes {
     struct Closure;
     struct ExceptionPad;
     struct Argument;
-    struct ASTNode;
+    struct Value;
     struct Error;
 }
 
@@ -69,7 +69,7 @@ typedef scopes::Label sc_label_t;
 typedef scopes::Frame sc_frame_t;
 typedef scopes::Closure sc_closure_t;
 typedef scopes::ExceptionPad sc_exception_pad_t;
-typedef scopes::ASTNode sc_ast_t;
+typedef scopes::Value sc_value_t;
 
 // some of the return types are technically illegal in C, but we take care
 // that the alignment is correct
@@ -88,7 +88,7 @@ typedef struct sc_label_ sc_label_t;
 typedef struct sc_frame_ sc_frame_t;
 typedef struct sc_closure_ sc_closure_t;
 typedef struct sc_exception_pad_ sc_exception_pad_t;
-typedef struct sc_ast_ sc_ast_t;
+typedef struct sc_value_ sc_value_t;
 
 typedef uint64_t sc_symbol_t;
 
@@ -103,12 +103,12 @@ typedef struct sc_bool_bool_tuple_ { bool _0; bool _1; } sc_bool_bool_tuple_t;
 typedef struct sc_bool_type_tuple_ { bool _0; const sc_type_t *_1; } sc_bool_type_tuple_t;
 typedef struct sc_bool_symbol_tuple_ { bool _0; sc_symbol_t _1; } sc_bool_symbol_tuple_t;
 typedef struct sc_bool_int_tuple_ { bool _0; int32_t _1; } sc_bool_int_tuple_t;
-typedef struct sc_bool_ast_tuple_ { bool _0; sc_ast_t *_1; } sc_bool_ast_tuple_t;
+typedef struct sc_bool_value_tuple_ { bool _0; sc_value_t *_1; } sc_bool_value_tuple_t;
 
-typedef struct sc_ast_list_tuple_ { sc_ast_t *_0; const sc_list_t *_1; } sc_ast_list_tuple_t;
+typedef struct sc_value_list_tuple_ { sc_value_t *_0; const sc_list_t *_1; } sc_value_list_tuple_t;
 
 //typedef struct sc_symbol_any_tuple_ { sc_symbol_t _0; sc_any_t _1; } sc_symbol_any_tuple_t;
-typedef struct sc_symbol_ast_tuple_ { sc_symbol_t _0; sc_ast_t *_1; } sc_symbol_ast_tuple_t;
+typedef struct sc_symbol_value_tuple_ { sc_symbol_t _0; sc_value_t *_1; } sc_symbol_value_tuple_t;
 
 typedef struct sc_i32_i32_i32_tuple_ { int32_t _0, _1, _2; } sc_i32_i32_i32_tuple_t;
 
@@ -119,21 +119,21 @@ typedef struct sc_rawstring_array_i32_tuple_ { char **_0; int _1; } sc_rawstring
 // compiler
 
 sc_i32_i32_i32_tuple_t sc_compiler_version();
-sc_bool_ast_tuple_t sc_eval(sc_ast_t *expr, sc_scope_t *scope);
-sc_bool_ast_tuple_t sc_typify(sc_closure_t *srcl, int numtypes, const sc_type_t **typeargs);
-sc_bool_ast_tuple_t sc_compile(sc_ast_t *srcl, uint64_t flags);
-sc_bool_string_tuple_t sc_compile_spirv(sc_symbol_t target, sc_ast_t *srcl, uint64_t flags);
-sc_bool_string_tuple_t sc_compile_glsl(sc_symbol_t target, sc_ast_t *srcl, uint64_t flags);
+sc_bool_value_tuple_t sc_eval(sc_value_t *expr, sc_scope_t *scope);
+sc_bool_value_tuple_t sc_typify(sc_closure_t *srcl, int numtypes, const sc_type_t **typeargs);
+sc_bool_value_tuple_t sc_compile(sc_value_t *srcl, uint64_t flags);
+sc_bool_string_tuple_t sc_compile_spirv(sc_symbol_t target, sc_value_t *srcl, uint64_t flags);
+sc_bool_string_tuple_t sc_compile_glsl(sc_symbol_t target, sc_value_t *srcl, uint64_t flags);
 bool sc_compile_object(const sc_string_t *path, sc_scope_t *table, uint64_t flags);
 void sc_enter_solver_cli ();
 sc_bool_size_tuple_t sc_verify_stack ();
-sc_bool_ast_tuple_t sc_eval_inline(sc_ast_t *expr, sc_scope_t *scope);
+sc_bool_value_tuple_t sc_eval_inline(sc_value_t *expr, sc_scope_t *scope);
 sc_rawstring_array_i32_tuple_t sc_launch_args();
 
 // parsing
 
-sc_bool_ast_tuple_t sc_parse_from_path(const sc_string_t *path);
-sc_bool_ast_tuple_t sc_parse_from_string(const sc_string_t *str);
+sc_bool_value_tuple_t sc_parse_from_path(const sc_string_t *path);
+sc_bool_value_tuple_t sc_parse_from_string(const sc_string_t *str);
 
 // stdin/out
 
@@ -171,8 +171,8 @@ void sc_exit(int c);
 
 // memoization
 
-sc_bool_ast_tuple_t sc_map_load(const sc_list_t *key);
-void sc_map_store(sc_ast_t *value, const sc_list_t *key);
+sc_bool_value_tuple_t sc_map_load(const sc_list_t *key);
+void sc_map_store(sc_value_t *value, const sc_list_t *key);
 
 // hashing
 
@@ -193,9 +193,9 @@ const sc_anchor_t *sc_get_active_anchor();
 
 // lexical scopes
 
-void sc_scope_set_symbol(sc_scope_t *scope, sc_symbol_t sym, sc_ast_t *value);
-sc_bool_ast_tuple_t sc_scope_at(sc_scope_t *scope, sc_symbol_t key);
-sc_bool_ast_tuple_t sc_scope_local_at(sc_scope_t *scope, sc_symbol_t key);
+void sc_scope_set_symbol(sc_scope_t *scope, sc_symbol_t sym, sc_value_t *value);
+sc_bool_value_tuple_t sc_scope_at(sc_scope_t *scope, sc_symbol_t key);
+sc_bool_value_tuple_t sc_scope_local_at(sc_scope_t *scope, sc_symbol_t key);
 const sc_string_t *sc_scope_get_docstring(sc_scope_t *scope, sc_symbol_t key);
 void sc_scope_set_docstring(sc_scope_t *scope, sc_symbol_t key, const sc_string_t *str);
 sc_scope_t *sc_scope_new();
@@ -204,7 +204,7 @@ sc_scope_t *sc_scope_new_subscope(sc_scope_t *scope);
 sc_scope_t *sc_scope_clone_subscope(sc_scope_t *scope, sc_scope_t *clone);
 sc_scope_t *sc_scope_get_parent(sc_scope_t *scope);
 void sc_scope_del_symbol(sc_scope_t *scope, sc_symbol_t sym);
-sc_symbol_ast_tuple_t sc_scope_next(sc_scope_t *scope, sc_symbol_t key);
+sc_symbol_value_tuple_t sc_scope_next(sc_scope_t *scope, sc_symbol_t key);
 
 // symbols
 
@@ -224,18 +224,18 @@ const sc_string_t *sc_string_rslice(sc_string_t *str, size_t offset);
 
 // lists
 
-const sc_list_t *sc_list_cons(sc_ast_t *at, const sc_list_t *next);
+const sc_list_t *sc_list_cons(sc_value_t *at, const sc_list_t *next);
 const sc_list_t *sc_list_join(const sc_list_t *a, const sc_list_t *b);
 const sc_list_t *sc_list_dump(const sc_list_t *l);
-sc_ast_list_tuple_t sc_list_decons(const sc_list_t *l);
+sc_value_list_tuple_t sc_list_decons(const sc_list_t *l);
 size_t sc_list_count(const sc_list_t *l);
-sc_ast_t *sc_list_at(const sc_list_t *l);
+sc_value_t *sc_list_at(const sc_list_t *l);
 const sc_list_t *sc_list_next(const sc_list_t *l);
 const sc_list_t *sc_list_reverse(const sc_list_t *l);
 
 // types
 
-sc_bool_ast_tuple_t sc_type_at(const sc_type_t *T, sc_symbol_t key);
+sc_bool_value_tuple_t sc_type_at(const sc_type_t *T, sc_symbol_t key);
 sc_bool_size_tuple_t sc_type_sizeof(const sc_type_t *T);
 sc_bool_size_tuple_t sc_type_alignof(const sc_type_t *T);
 sc_bool_int_tuple_t sc_type_countof(const sc_type_t *T);
@@ -247,8 +247,8 @@ void sc_type_debug_abi(const sc_type_t *T);
 sc_bool_type_tuple_t sc_type_storage(const sc_type_t *T);
 bool sc_type_is_opaque(const sc_type_t *T);
 const sc_string_t *sc_type_string(const sc_type_t *T);
-sc_symbol_ast_tuple_t sc_type_next(const sc_type_t *type, sc_symbol_t key);
-void sc_type_set_symbol(sc_type_t *T, sc_symbol_t sym, sc_ast_t *value);
+sc_symbol_value_tuple_t sc_type_next(const sc_type_t *type, sc_symbol_t key);
+void sc_type_set_symbol(sc_type_t *T, sc_symbol_t sym, sc_value_t *value);
 
 // pointer types
 
@@ -261,8 +261,8 @@ const sc_type_t *sc_pointer_type_set_element_type(const sc_type_t *T, const sc_t
 
 // extern types
 
-int32_t sc_extern_location(sc_ast_t *T);
-int32_t sc_extern_binding(sc_ast_t *T);
+int32_t sc_extern_location(sc_value_t *T);
+int32_t sc_extern_binding(sc_value_t *T);
 
 // numerical types
 

@@ -13,13 +13,13 @@
 
 namespace scopes {
 
-struct ASTFunction;
+struct Function;
 struct String;
 struct ConstPointer;
 struct Scope;
 
 SCOPES_RESULT(void) compile_object(const String *path, Scope *scope, uint64_t flags);
-SCOPES_RESULT(ConstPointer *) compile(ASTFunction *fn, uint64_t flags);
+SCOPES_RESULT(ConstPointer *) compile(Function *fn, uint64_t flags);
 
 } // namespace scopes
 

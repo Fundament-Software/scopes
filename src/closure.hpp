@@ -14,13 +14,13 @@
 namespace scopes {
 
 struct Template;
-struct ASTFunction;
+struct Function;
 struct StyledStream;
 
 struct Closure {
 protected:
 
-    Closure(Template *_func, ASTFunction *_frame);
+    Closure(Template *_func, Function *_frame);
 
 public:
 
@@ -33,9 +33,9 @@ public:
     static std::unordered_map<Closure, const Closure *, Closure::Hash> map;
 
     Template *func;
-    ASTFunction *frame;
+    Function *frame;
 
-    static const Closure *from(Template *func, ASTFunction *frame);
+    static const Closure *from(Template *func, Function *frame);
 
     StyledStream &stream(StyledStream &ost) const;
 };

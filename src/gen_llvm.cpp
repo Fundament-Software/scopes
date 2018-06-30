@@ -14,10 +14,10 @@
 #include "gc.hpp"
 #include "scope.hpp"
 #include "timer.hpp"
-#include "ast.hpp"
+#include "value.hpp"
 #include "stream_ast.hpp"
 #include "compiler_flags.hpp"
-#include "ast_specializer.hpp"
+#include "prover.hpp"
 #include "hash.hpp"
 
 #include "verify_tools.inc"
@@ -249,11 +249,11 @@ struct LLVMIRGenerator {
 
     std::unordered_map<SourceFile *, LLVMValueRef> file2value;
     std::unordered_map<void *, LLVMValueRef> ptr2global;
-    std::unordered_map<ASTNode *, LLVMValueRef> node2value;
-    std::unordered_map<ASTFunction *, LLVMValueRef> func2md;
-    std::unordered_map<ASTExtern *, LLVMValueRef> extern2global;
+    std::unordered_map<Value *, LLVMValueRef> node2value;
+    std::unordered_map<Function *, LLVMValueRef> func2md;
+    std::unordered_map<Extern *, LLVMValueRef> extern2global;
     std::unordered_map<LLVMValueRef, LLVMBasicBlockRef> func_fail_label;
-    std::deque<ASTFunction *> function_todo;
+    std::deque<Function *> function_todo;
     static ArgTypes type_todo;
     static std::unordered_map<const Type *, LLVMTypeRef> type_cache;
 
@@ -282,7 +282,7 @@ struct LLVMIRGenerator {
 
     bool use_debug_info;
     bool inline_pointers;
-    ASTFunction *active_function;
+    Function *active_function;
 
     struct LoopInfo {
         Loop *loop;
@@ -339,7 +339,7 @@ struct LLVMIRGenerator {
         return result;
     }
 
-    LLVMValueRef function_to_subprogram(ASTFunction *l) {
+    LLVMValueRef function_to_subprogram(Function *l) {
         assert(use_debug_info);
 
         auto it = func2md.find(l);
@@ -817,7 +817,7 @@ struct LLVMIRGenerator {
         ok = false;
     }
 
-    void bind(ASTNode *node, LLVMValueRef value) {
+    void bind(Value *node, LLVMValueRef value) {
         assert(node);
         assert(value);
         node2value.insert({node, value});
@@ -832,7 +832,7 @@ struct LLVMIRGenerator {
         return nullptr;
     }
 
-    SCOPES_RESULT(LLVMValueRef) write_return(ASTNode *node) {
+    SCOPES_RESULT(LLVMValueRef) write_return(Value *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         const Type *T = node->get_type();
         LLVMValueRef value = SCOPES_GET_RESULT(node_to_value(node));
@@ -858,12 +858,12 @@ struct LLVMIRGenerator {
         }
     }
 
-    SCOPES_RESULT(LLVMValueRef) ASTReturn_to_value(ASTReturn *node) {
+    SCOPES_RESULT(LLVMValueRef) Return_to_value(Return *node) {
         //SCOPES_RESULT_TYPE(LLVMValueRef);
         return write_return(node->value);
     }
 
-    SCOPES_RESULT(void) ASTFunction_finalize(ASTFunction *node) {
+    SCOPES_RESULT(void) Function_finalize(Function *node) {
         SCOPES_RESULT_TYPE(void);
         active_function = node;
         auto it = node2value.find(node);
@@ -881,7 +881,7 @@ struct LLVMIRGenerator {
         size_t offset = 0;
         if (use_sret) {
             offset++;
-            //ASTSymbol *param = params[0];
+            //SymbolValue *param = params[0];
             //bind(param, LLVMGetParam(func, 0));
         }
 
@@ -891,7 +891,7 @@ struct LLVMIRGenerator {
             set_debug_location(node->anchor());
         size_t k = offset;
         for (size_t i = 0; i < paramcount; ++i) {
-            ASTSymbol *param = params[i];
+            SymbolValue *param = params[i];
             LLVMValueRef val = SCOPES_GET_RESULT(abi_import_argument(param->get_type(), func, k));
             assert(val);
             bind(param, val);
@@ -900,7 +900,7 @@ struct LLVMIRGenerator {
         return true;
     }
 
-    SCOPES_RESULT(LLVMValueRef) ASTFunction_to_value(ASTFunction *node) {
+    SCOPES_RESULT(LLVMValueRef) Function_to_value(Function *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         set_active_anchor(node->anchor());
 
@@ -928,7 +928,7 @@ struct LLVMIRGenerator {
         return func;
     }
 
-    SCOPES_RESULT(LLVMValueRef) ASTSymbol_to_value(ASTSymbol *node) {
+    SCOPES_RESULT(LLVMValueRef) SymbolValue_to_value(SymbolValue *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         SCOPES_EXPECT_ERROR(error_gen_unbound_symbol(SCOPES_GEN_TARGET, node));
     }
@@ -1045,7 +1045,7 @@ struct LLVMIRGenerator {
         return result;
     }
 
-    SCOPES_RESULT(LLVMValueRef) ASTArgumentList_to_value(ASTArgumentList *node) {
+    SCOPES_RESULT(LLVMValueRef) ArgumentList_to_value(ArgumentList *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         auto rtype = node->get_type();
         auto T = SCOPES_GET_RESULT(type_to_llvm_type(rtype));
@@ -1059,13 +1059,13 @@ struct LLVMIRGenerator {
         return value;
     }
 
-    SCOPES_RESULT(LLVMValueRef) ASTExtractArgument_to_value(ASTExtractArgument *node) {
+    SCOPES_RESULT(LLVMValueRef) ExtractArgument_to_value(ExtractArgument *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         auto value = SCOPES_GET_RESULT(node_to_value(node->value));
         return LLVMBuildExtractValue(builder, value, node->index, "");
     }
 
-    SCOPES_RESULT(LLVMTypeRef) node_to_llvm_type(ASTNode *node) {
+    SCOPES_RESULT(LLVMTypeRef) node_to_llvm_type(Value *node) {
         SCOPES_RESULT_TYPE(LLVMTypeRef);
         return type_to_llvm_type(SCOPES_GET_RESULT(extract_type_constant(node)));
     }
@@ -1087,7 +1087,7 @@ struct LLVMIRGenerator {
         size_t argn = 0;
 #define READ_VALUE(NAME) \
         assert(argn <= argcount); \
-        ASTNode * _ ## NAME = args[argn++]; \
+        Value * _ ## NAME = args[argn++]; \
         set_active_anchor(call->anchor()); \
         LLVMValueRef NAME = SCOPES_GET_RESULT(node_to_value(_ ## NAME));
 #define READ_TYPE(NAME) \
@@ -1598,19 +1598,19 @@ struct LLVMIRGenerator {
         return merge_value;
     }
 
-    SCOPES_RESULT(LLVMValueRef) _node_to_value(ASTNode *node) {
+    SCOPES_RESULT(LLVMValueRef) _node_to_value(Value *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         switch(node->kind()) {
         #define T(NAME, BNAME, CLASS) \
             case NAME: return CLASS ## _to_value(cast<CLASS>(node));
-        SCOPES_AST_KIND()
+        SCOPES_VALUE_KIND()
         #undef T
             default: assert(false); break;
         }
         return nullptr;
     }
 
-    SCOPES_RESULT(LLVMValueRef) node_to_value(ASTNode *node) {
+    SCOPES_RESULT(LLVMValueRef) node_to_value(Value *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         auto it = node2value.find(node);
         if (it != node2value.end())
@@ -1619,7 +1619,7 @@ struct LLVMIRGenerator {
         node2value.insert({node,value});
         return value;
     }
-    SCOPES_RESULT(LLVMValueRef) ASTExtern_to_value(ASTExtern *node) {
+    SCOPES_RESULT(LLVMValueRef) Extern_to_value(Extern *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         set_active_anchor(node->anchor());
         auto it = extern2global.find(node);
@@ -1757,7 +1757,7 @@ struct LLVMIRGenerator {
         return LLVMConstVector(values, count);
     }
 
-    SCOPES_RESULT(LLVMValueRef) build_call(bool trycall, const Type *functype, LLVMValueRef func, ASTNodes &args) {
+    SCOPES_RESULT(LLVMValueRef) build_call(bool trycall, const Type *functype, LLVMValueRef func, Values &args) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         size_t argcount = args.size();
 
@@ -1927,14 +1927,14 @@ struct LLVMIRGenerator {
     SCOPES_RESULT(void) process_functions() {
         SCOPES_RESULT_TYPE(void);
         while (!function_todo.empty()) {
-            ASTFunction *func = function_todo.front();
+            Function *func = function_todo.front();
             function_todo.pop_front();
-            SCOPES_CHECK_RESULT(ASTFunction_finalize(func));
+            SCOPES_CHECK_RESULT(Function_finalize(func));
         }
         return true;
     }
 
-    SCOPES_RESULT(void) teardown_generate(ASTFunction *entry = nullptr) {
+    SCOPES_RESULT(void) teardown_generate(Function *entry = nullptr) {
         SCOPES_RESULT_TYPE(void);
         SCOPES_CHECK_RESULT(process_functions());
 
@@ -2009,7 +2009,7 @@ struct LLVMIRGenerator {
 
     typedef std::pair<LLVMModuleRef, LLVMValueRef> ModuleValuePair;
 
-    SCOPES_RESULT(ModuleValuePair) generate(ASTFunction *entry) {
+    SCOPES_RESULT(ModuleValuePair) generate(Function *entry) {
         SCOPES_RESULT_TYPE(ModuleValuePair);
 
         const char *name = entry->name.name()->data;
@@ -2195,7 +2195,7 @@ SCOPES_RESULT(void) compile_object(const String *path, Scope *scope, uint64_t fl
 static DisassemblyListener *disassembly_listener = nullptr;
 #endif
 
-SCOPES_RESULT(ConstPointer *) compile(ASTFunction *fn, uint64_t flags) {
+SCOPES_RESULT(ConstPointer *) compile(Function *fn, uint64_t flags) {
     SCOPES_RESULT_TYPE(ConstPointer *);
     Timer sum_compile_time(TIMER_Compile);
 #if SCOPES_COMPILE_WITH_DEBUG_INFO

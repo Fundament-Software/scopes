@@ -12,7 +12,7 @@
 
 namespace scopes {
 
-struct ASTNode;
+struct Value;
 
 //------------------------------------------------------------------------------
 // LIST
@@ -20,21 +20,21 @@ struct ASTNode;
 
 struct List {
 protected:
-    List(ASTNode *_at, const List *_next, size_t _count);
+    List(Value *_at, const List *_next, size_t _count);
 
 public:
-    ASTNode *at;
+    Value *at;
     const List *next;
     size_t count;
 
-    ASTNode *first() const;
+    Value *first() const;
 
-    static const List *from(ASTNode *_at, const List *_next);
+    static const List *from(Value *_at, const List *_next);
 
-    static const List *from(ASTNode * const *values, int N);
+    static const List *from(Value * const *values, int N);
 
     template<unsigned N>
-    static const List *from(ASTNode * const (&values)[N]) {
+    static const List *from(Value * const (&values)[N]) {
         return from(values, N);
     }
 

@@ -17,10 +17,10 @@
 #include "error.hpp"
 #include "scope.hpp"
 #include "expander.hpp"
-#include "ast_specializer.hpp"
+#include "prover.hpp"
 #include "gen_llvm.hpp"
 #include "stream_ast.hpp"
-#include "ast.hpp"
+#include "value.hpp"
 #include "compiler_flags.hpp"
 
 #include "scopes/scopes.h"
@@ -75,8 +75,8 @@ namespace scopes {
 
    */
 
-static SCOPES_RESULT(ASTNode *) load_custom_core(const char *executable_path) {
-    SCOPES_RESULT_TYPE(ASTNode *);
+static SCOPES_RESULT(Value *) load_custom_core(const char *executable_path) {
+    SCOPES_RESULT_TYPE(Value *);
     // attempt to read bootstrap expression from end of binary
     auto file = SourceFile::from_file(
         Symbol(String::from_cstr(executable_path)));
@@ -244,7 +244,7 @@ SCOPES_RESULT(int) try_main(int argc, char *argv[]) {
     init_types();
     init_globals(argc, argv);
 
-    ASTNode *expr = SCOPES_GET_RESULT(load_custom_core(scopes_compiler_path));
+    Value *expr = SCOPES_GET_RESULT(load_custom_core(scopes_compiler_path));
     if (expr) {
         goto skip_regular_load;
     }
@@ -279,7 +279,7 @@ skip_regular_load:
     std::cout << std::endl;
 #endif
 
-    ASTFunction *fn = SCOPES_GET_RESULT(specialize(nullptr, tmpfn, {}));
+    Function *fn = SCOPES_GET_RESULT(specialize(nullptr, tmpfn, {}));
 
 #if 1 //SCOPES_DEBUG_CODEGEN
     std::cout << "normalized:" << std::endl;

@@ -8,7 +8,7 @@
 #include "anchor.hpp"
 #include "type.hpp"
 #include "boot.hpp"
-#include "ast.hpp"
+#include "value.hpp"
 #include "return_type.hpp"
 
 #include "scopes/config.h"
@@ -99,11 +99,11 @@ void set_last_location_error(const String *msg) {
 
 //------------------------------------------------------------------------------
 
-static void print_definition_anchor(ASTNode *node) {
+static void print_definition_anchor(Value *node) {
     location_message(node->anchor(), String::from("defined here"));
 }
 
-SCOPES_RESULT(void) error_invalid_call_type(ASTNode *callee) {
+SCOPES_RESULT(void) error_invalid_call_type(Value *callee) {
     SCOPES_RESULT_TYPE(void);
     print_definition_anchor(callee);
     StyledString ss;
@@ -111,7 +111,7 @@ SCOPES_RESULT(void) error_invalid_call_type(ASTNode *callee) {
     SCOPES_LOCATION_ERROR(ss.str());
 }
 
-SCOPES_RESULT(void) error_invalid_condition_type(ASTNode *cond) {
+SCOPES_RESULT(void) error_invalid_condition_type(Value *cond) {
     SCOPES_RESULT_TYPE(void);
     print_definition_anchor(cond);
     StyledString ss;
@@ -121,7 +121,7 @@ SCOPES_RESULT(void) error_invalid_condition_type(ASTNode *cond) {
 }
 
 
-SCOPES_RESULT(void) error_constant_expected(ASTNode *value) {
+SCOPES_RESULT(void) error_constant_expected(Value *value) {
     SCOPES_RESULT_TYPE(void);
     print_definition_anchor(value);
     StyledString ss;
@@ -129,7 +129,7 @@ SCOPES_RESULT(void) error_constant_expected(ASTNode *value) {
     SCOPES_LOCATION_ERROR(ss.str());
 }
 
-SCOPES_RESULT(void) error_unbound_symbol(ASTSymbol *value) {
+SCOPES_RESULT(void) error_unbound_symbol(SymbolValue *value) {
     SCOPES_RESULT_TYPE(void);
     print_definition_anchor(value);
     StyledString ss;
@@ -195,7 +195,7 @@ SCOPES_RESULT(void) error_untyped_recursive_call() {
 
 //------------------------------------------------------------------------------
 
-SCOPES_RESULT(void) error_gen_invalid_call_type(const char *target, ASTNode *callee) {
+SCOPES_RESULT(void) error_gen_invalid_call_type(const char *target, Value *callee) {
     SCOPES_RESULT_TYPE(void);
     print_definition_anchor(callee);
     StyledString ss;
@@ -203,7 +203,7 @@ SCOPES_RESULT(void) error_gen_invalid_call_type(const char *target, ASTNode *cal
     SCOPES_LOCATION_ERROR(ss.str());
 }
 
-SCOPES_RESULT(void) error_gen_unbound_symbol(const char *target, ASTSymbol *value) {
+SCOPES_RESULT(void) error_gen_unbound_symbol(const char *target, SymbolValue *value) {
     SCOPES_RESULT_TYPE(void);
     print_definition_anchor(value);
     StyledString ss;

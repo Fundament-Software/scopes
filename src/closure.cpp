@@ -14,13 +14,13 @@ namespace scopes {
 
 //------------------------------------------------------------------------------
 
-Closure::Closure(Template *_func, ASTFunction *_frame) :
+Closure::Closure(Template *_func, Function *_frame) :
     func(_func), frame(_frame) {}
 
 std::size_t Closure::Hash::operator()(const Closure &k) const {
     return hash2(
         std::hash<Template *>{}(k.func),
-        std::hash<ASTFunction *>{}(k.frame));
+        std::hash<Function *>{}(k.frame));
 }
 
 bool Closure::operator ==(const Closure &k) const {
@@ -28,7 +28,7 @@ bool Closure::operator ==(const Closure &k) const {
         && (frame == k.frame);
 }
 
-const Closure *Closure::from(Template *func, ASTFunction *frame) {
+const Closure *Closure::from(Template *func, Function *frame) {
     Closure cl(func, frame);
     auto it = map.find(cl);
     if (it != map.end()) {
