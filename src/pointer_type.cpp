@@ -85,7 +85,7 @@ bool PointerType::is_writable() const {
 
 //------------------------------------------------------------------------------
 
-const Type *Pointer(const Type *element_type, uint64_t flags,
+const Type *pointer_type(const Type *element_type, uint64_t flags,
     Symbol storage_class) {
     SCOPES_TYPE_KEY(PointerType, key);
     key->element_type = element_type;
@@ -99,24 +99,24 @@ const Type *Pointer(const Type *element_type, uint64_t flags,
     return result;
 }
 
-const Type *NativeROPointer(const Type *element_type) {
-    return Pointer(element_type, PTF_NonWritable, SYM_Unnamed);
+const Type *native_ro_pointer_type(const Type *element_type) {
+    return pointer_type(element_type, PTF_NonWritable, SYM_Unnamed);
 }
 
-const Type *NativePointer(const Type *element_type) {
-    return Pointer(element_type, 0, SYM_Unnamed);
+const Type *native_pointer_type(const Type *element_type) {
+    return pointer_type(element_type, 0, SYM_Unnamed);
 }
 
-const Type *LocalROPointer(const Type *element_type) {
-    return Pointer(element_type, PTF_NonWritable, SYM_SPIRV_StorageClassFunction);
+const Type *local_ro_pointer_type(const Type *element_type) {
+    return pointer_type(element_type, PTF_NonWritable, SYM_SPIRV_StorageClassFunction);
 }
 
-const Type *LocalPointer(const Type *element_type) {
-    return Pointer(element_type, 0, SYM_SPIRV_StorageClassFunction);
+const Type *local_pointer_type(const Type *element_type) {
+    return pointer_type(element_type, 0, SYM_SPIRV_StorageClassFunction);
 }
 
-const Type *StaticPointer(const Type *element_type) {
-    return Pointer(element_type, 0, SYM_SPIRV_StorageClassPrivate);
+const Type *static_pointer_type(const Type *element_type) {
+    return pointer_type(element_type, 0, SYM_SPIRV_StorageClassPrivate);
 }
 
 //------------------------------------------------------------------------------

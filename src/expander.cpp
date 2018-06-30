@@ -74,8 +74,8 @@ struct Expander {
         astscope(_astscope),
         next(_next) {
         if (!list_expander_func_type) {
-            list_expander_func_type = Pointer(Function(
-                Return({TYPE_List, TYPE_Scope}, RTF_Raising),
+            list_expander_func_type = pointer_type(function_type(
+                return_type({TYPE_List, TYPE_Scope}, RTF_Raising),
                 {TYPE_List, TYPE_Scope}), PTF_NonWritable, SYM_Unnamed);
         }
     }

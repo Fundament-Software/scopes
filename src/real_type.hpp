@@ -24,7 +24,7 @@ struct RealType : Type {
     size_t width;
 };
 
-const Type *Real(size_t _width);
+const Type *real_type(size_t _width);
 
 } // namespace scopes
 

@@ -51,7 +51,7 @@ VectorType::VectorType(const Type *_element_type, size_t _count)
     : SizedStorageType(TK_Vector, _element_type, _count) {
 }
 
-SCOPES_RESULT(const Type *) Vector(const Type *element_type, size_t count) {
+SCOPES_RESULT(const Type *) vector_type(const Type *element_type, size_t count) {
     SCOPES_RESULT_TYPE(const Type *);
     SCOPES_TYPE_KEY(VectorType, key);
     key->element_type = element_type;

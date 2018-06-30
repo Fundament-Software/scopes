@@ -47,7 +47,7 @@ SampledImageType::SampledImageType(const ImageType *_type) :
     Type(TK_SampledImage), type(_type) {
 }
 
-const Type *SampledImage(const ImageType *_type) {
+const Type *sampled_image_type(const ImageType *_type) {
     SCOPES_TYPE_KEY(SampledImageType, key);
     key->type = _type;
     auto it = sampled_images.find(key);

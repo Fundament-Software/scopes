@@ -39,7 +39,7 @@ struct TypenameType : Type {
 };
 
 // always generates a new type
-const Type *Typename(const String *name);
+const Type *typename_type(const String *name);
 
 SCOPES_RESULT(const Type *) storage_type(const Type *T);
 

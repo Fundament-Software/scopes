@@ -88,7 +88,7 @@ ImageType::ImageType(
     format(_format), access(_access) {
 }
 
-const Type *Image(
+const Type *image_type(
     const Type *_type,
     Symbol _dim,
     int _depth,

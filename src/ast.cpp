@@ -139,7 +139,7 @@ ASTExtern::ASTExtern(const Anchor *anchor, const Type *type, Symbol _name, size_
         ptrflags |= PTF_NonWritable;
     else if (flags & EF_NonReadable)
         ptrflags |= PTF_NonReadable;
-    set_type(Pointer(type, ptrflags, storage_class));
+    set_type(pointer_type(type, ptrflags, storage_class));
 }
 
 ASTExtern *ASTExtern::from(const Anchor *anchor, const Type *type, Symbol name, size_t flags, Symbol storage_class, int location, int binding) {

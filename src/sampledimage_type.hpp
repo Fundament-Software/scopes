@@ -26,7 +26,7 @@ struct SampledImageType : Type {
     const ImageType *type; // image type
 };
 
-const Type *SampledImage(const ImageType *_type);
+const Type *sampled_image_type(const ImageType *_type);
 
 } // namespace scopes
 

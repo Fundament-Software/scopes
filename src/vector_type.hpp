@@ -22,7 +22,7 @@ struct VectorType : SizedStorageType {
     VectorType(const Type *_element_type, size_t _count);
 };
 
-SCOPES_RESULT(const Type *) Vector(const Type *element_type, size_t count);
+SCOPES_RESULT(const Type *) vector_type(const Type *element_type, size_t count);
 
 SCOPES_RESULT(void) verify_integer_vector(const Type *type);
 SCOPES_RESULT(void) verify_real_vector(const Type *type);

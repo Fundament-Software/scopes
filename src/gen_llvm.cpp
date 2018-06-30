@@ -2206,7 +2206,7 @@ SCOPES_RESULT(ConstPointer *) compile(ASTFunction *fn, uint64_t flags) {
     flags |= CF_O3;
 #endif
 
-    const Type *functype = Pointer(
+    const Type *functype = pointer_type(
         fn->get_type(), PTF_NonWritable, SYM_Unnamed);
 
     LLVMIRGenerator ctx;

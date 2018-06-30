@@ -73,9 +73,9 @@ public:
     NamespaceMap typedefs;
 
     CVisitor() : dest(nullptr), Context(NULL), ok(true) {
-        const Type *T = Typename(String::from("__builtin_va_list"));
+        const Type *T = typename_type(String::from("__builtin_va_list"));
         auto tnt = cast<TypenameType>(const_cast<Type*>(T));
-        tnt->finalize(Array(TYPE_I8, sizeof(va_list)).assert_ok()).assert_ok();
+        tnt->finalize(array_type(TYPE_I8, sizeof(va_list)).assert_ok()).assert_ok();
         typedefs.insert({Symbol("__builtin_va_list"), T });
     }
 
@@ -146,7 +146,7 @@ public:
                     if (newsz < offset) {
                         size_t pad = offset - newsz;
                         args.push_back(KeyedType(SYM_Unnamed,
-                            Array(TYPE_U8, pad).assert_ok()));
+                            array_type(TYPE_U8, pad).assert_ok()));
                     } else {
                         // our computed offset is later than the real one
                         // structure is likely packed
@@ -197,8 +197,8 @@ public:
             }
         }
 
-        SCOPES_CHECK_RESULT(tni->finalize(is_union?SCOPES_GET_RESULT(KeyedUnion(args)):
-            SCOPES_GET_RESULT(KeyedTuple(args, packed, explicit_alignment?al:0))));
+        SCOPES_CHECK_RESULT(tni->finalize(is_union?SCOPES_GET_RESULT(keyed_union_type(args)):
+            SCOPES_GET_RESULT(keyed_tuple_type(args, packed, explicit_alignment?al:0))));
         return true;
     }
 
@@ -208,12 +208,12 @@ public:
             if (it != map.end()) {
                 return it->second;
             }
-            const Type *T = Typename(name.name());
+            const Type *T = typename_type(name.name());
             auto ok = map.insert({name, T});
             assert(ok.second);
             return T;
         }
-        return Typename(name.name());
+        return typename_type(name.name());
     }
 
     SCOPES_RESULT(const Type *) TranslateRecord(clang::RecordDecl *rd) {
@@ -397,12 +397,12 @@ public:
         al = (al + 7) / 8;
         assert (sz > al);
         ArgTypes fields;
-        const Type *TB = Integer(al * 8, false);
+        const Type *TB = integer_type(al * 8, false);
         fields.push_back(TB);
         size_t pad = sz - al;
         if (pad)
-            fields.push_back(Array(TYPE_U8, pad).assert_ok());
-        return Tuple(fields);
+            fields.push_back(array_type(TYPE_U8, pad).assert_ok());
+        return tuple_type(fields);
     }
 
     SCOPES_RESULT(const Type *) TranslateType(clang::QualType T) {
@@ -476,7 +476,7 @@ public:
             case clang::BuiltinType::Char16:
             case clang::BuiltinType::Char32: {
                 int sz = Context->getTypeSize(T);
-                return Integer(sz, !Ty->isUnsignedIntegerType());
+                return integer_type(sz, !Ty->isUnsignedIntegerType());
             } break;
             case clang::BuiltinType::Half: return TYPE_F16;
             case clang::BuiltinType::Float:
@@ -494,7 +494,7 @@ public:
             const clang::LValueReferenceType *PTy =
                 cast<clang::LValueReferenceType>(Ty);
             QualType ETy = PTy->getPointeeType();
-            return Pointer(SCOPES_GET_RESULT(TranslateType(ETy)), PointerFlags(ETy), SYM_Unnamed);
+            return pointer_type(SCOPES_GET_RESULT(TranslateType(ETy)), PointerFlags(ETy), SYM_Unnamed);
         } break;
         case clang::Type::RValueReference:
             break;
@@ -505,27 +505,27 @@ public:
         case clang::Type::Pointer: {
             const clang::PointerType *PTy = cast<clang::PointerType>(Ty);
             QualType ETy = PTy->getPointeeType();
-            return Pointer(SCOPES_GET_RESULT(TranslateType(ETy)), PointerFlags(ETy), SYM_Unnamed);
+            return pointer_type(SCOPES_GET_RESULT(TranslateType(ETy)), PointerFlags(ETy), SYM_Unnamed);
         } break;
         case clang::Type::VariableArray:
             break;
         case clang::Type::IncompleteArray: {
             const IncompleteArrayType *ATy = cast<IncompleteArrayType>(Ty);
             QualType ETy = ATy->getElementType();
-            return Pointer(SCOPES_GET_RESULT(TranslateType(ETy)), PointerFlags(ETy), SYM_Unnamed);
+            return pointer_type(SCOPES_GET_RESULT(TranslateType(ETy)), PointerFlags(ETy), SYM_Unnamed);
         } break;
         case clang::Type::ConstantArray: {
             const ConstantArrayType *ATy = cast<ConstantArrayType>(Ty);
             const Type *at = SCOPES_GET_RESULT(TranslateType(ATy->getElementType()));
             uint64_t sz = ATy->getSize().getZExtValue();
-            return Array(at, sz);
+            return array_type(at, sz);
         } break;
         case clang::Type::ExtVector:
         case clang::Type::Vector: {
             const clang::VectorType *VT = cast<clang::VectorType>(T);
             const Type *at = SCOPES_GET_RESULT(TranslateType(VT->getElementType()));
             uint64_t n = VT->getNumElements();
-            return Vector(at, n);
+            return vector_type(at, n);
         } break;
         case clang::Type::FunctionNoProto:
         case clang::Type::FunctionProto: {
@@ -568,7 +568,7 @@ public:
             }
         }
 
-        return Function(returntype, argtypes, flags);
+        return function_type(returntype, argtypes, flags);
     }
 
     void exportType(Symbol name, const Type *type, const Anchor *anchor) {

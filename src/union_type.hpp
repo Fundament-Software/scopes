@@ -33,9 +33,9 @@ struct UnionType : StorageType {
     const Type *tuple_type;
 };
 
-SCOPES_RESULT(const Type *) KeyedUnion(const KeyedTypes &values);
+SCOPES_RESULT(const Type *) keyed_union_type(const KeyedTypes &values);
 
-SCOPES_RESULT(const Type *) Union(const ArgTypes &types);
+SCOPES_RESULT(const Type *) union_type(const ArgTypes &types);
 
 } // namespace scopes
 

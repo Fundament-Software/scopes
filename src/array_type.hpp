@@ -26,7 +26,7 @@ struct ArrayType : SizedStorageType {
 
 //------------------------------------------------------------------------------
 
-SCOPES_RESULT(const Type *) Array(const Type *element_type, size_t count);
+SCOPES_RESULT(const Type *) array_type(const Type *element_type, size_t count);
 
 } // namespace scopes
 

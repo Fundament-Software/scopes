@@ -40,7 +40,7 @@ struct ImageType : Type {
     Symbol access; // resolved to spv::AccessQualifier
 };
 
-const Type *Image(
+const Type *image_type(
     const Type *_type,
     Symbol _dim,
     int _depth,

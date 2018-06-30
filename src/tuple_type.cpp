@@ -138,7 +138,7 @@ SCOPES_RESULT(Symbol) TupleType::field_name(size_t i) const {
 
 //------------------------------------------------------------------------------
 
-SCOPES_RESULT(const Type *) KeyedTuple(const KeyedTypes &values,
+SCOPES_RESULT(const Type *) keyed_tuple_type(const KeyedTypes &values,
     bool packed, size_t alignment) {
     SCOPES_RESULT_TYPE(const Type *);
     TupleType key(values, packed, alignment);
@@ -159,7 +159,7 @@ SCOPES_RESULT(const Type *) KeyedTuple(const KeyedTypes &values,
     return result;
 }
 
-SCOPES_RESULT(const Type *) Tuple(const ArgTypes &types,
+SCOPES_RESULT(const Type *) tuple_type(const ArgTypes &types,
     bool packed, size_t alignment) {
     //SCOPES_RESULT_TYPE(const Type *);
     KeyedTypes args;
@@ -167,7 +167,7 @@ SCOPES_RESULT(const Type *) Tuple(const ArgTypes &types,
     for (size_t i = 0; i < types.size(); ++i) {
         args.push_back(types[i]);
     }
-    return KeyedTuple(args, packed, alignment);
+    return keyed_tuple_type(args, packed, alignment);
 }
 
 } // namespace scopes

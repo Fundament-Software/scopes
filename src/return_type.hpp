@@ -44,9 +44,9 @@ struct ReturnType : Type {
     uint64_t flags;
 };
 
-const Type *Return(const ArgTypes &values, uint64_t flags = 0);
-const Type *KeyedReturn(const KeyedTypes &values, uint64_t flags = 0);
-const Type *NoReturn(uint64_t flags = 0);
+const Type *return_type(const ArgTypes &values, uint64_t flags = 0);
+const Type *keyed_return_type(const KeyedTypes &values, uint64_t flags = 0);
+const Type *no_return_type(uint64_t flags = 0);
 
 bool is_raising(const Type *T);
 bool is_returning(const Type *T);

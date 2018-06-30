@@ -81,7 +81,7 @@ UnionType::UnionType(const KeyedTypes &_values)
     }
     size = scopes::align(sz, al);
     align = al;
-    tuple_type = Tuple({values[largest_field].type}).assert_ok();
+    this->tuple_type = scopes::tuple_type({values[largest_field].type}).assert_ok();
 }
 
 SCOPES_RESULT(const Type *) UnionType::type_at_index(size_t i) const {
@@ -106,7 +106,7 @@ SCOPES_RESULT(Symbol) UnionType::field_name(size_t i) const {
 
 //------------------------------------------------------------------------------
 
-SCOPES_RESULT(const Type *) KeyedUnion(const KeyedTypes &values) {
+SCOPES_RESULT(const Type *) keyed_union_type(const KeyedTypes &values) {
     SCOPES_RESULT_TYPE(const Type *);
     UnionType key(values);
     auto it = unions.find(&key);
@@ -125,13 +125,13 @@ SCOPES_RESULT(const Type *) KeyedUnion(const KeyedTypes &values) {
     return result;
 }
 
-SCOPES_RESULT(const Type *) Union(const ArgTypes &types) {
+SCOPES_RESULT(const Type *) union_type(const ArgTypes &types) {
     KeyedTypes args;
     args.reserve(types.size());
     for (size_t i = 0; i < types.size(); ++i) {
         args.push_back(types[i]);
     }
-    return KeyedUnion(args);
+    return keyed_union_type(args);
 }
 
 } // namespace scopes

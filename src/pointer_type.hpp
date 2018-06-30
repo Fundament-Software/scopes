@@ -41,18 +41,18 @@ struct PointerType : Type {
     Symbol storage_class;
 };
 
-const Type *Pointer(const Type *element_type, uint64_t flags,
+const Type *pointer_type(const Type *element_type, uint64_t flags,
     Symbol storage_class);
 
-const Type *NativeROPointer(const Type *element_type);
+const Type *native_ro_pointer_type(const Type *element_type);
 
-const Type *NativePointer(const Type *element_type);
+const Type *native_pointer_type(const Type *element_type);
 
-const Type *LocalROPointer(const Type *element_type);
+const Type *local_ro_pointer_type(const Type *element_type);
 
-const Type *LocalPointer(const Type *element_type);
+const Type *local_pointer_type(const Type *element_type);
 
-const Type *StaticPointer(const Type *element_type);
+const Type *static_pointer_type(const Type *element_type);
 
 uint64_t required_flags_for_storage_class(Symbol storage_class);
 

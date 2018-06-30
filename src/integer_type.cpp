@@ -40,7 +40,7 @@ static const Type *_Integer(size_t _width, bool _issigned) {
 }
 static auto m_Integer = memoize(_Integer);
 
-const Type *Integer(size_t _width, bool _issigned) {
+const Type *integer_type(size_t _width, bool _issigned) {
     return m_Integer(_width, _issigned);
 }
 

@@ -69,7 +69,7 @@ std::unordered_set<Symbol, Symbol::Hash> TypenameType::used_names;
 //------------------------------------------------------------------------------
 
 // always generates a new type
-const Type *Typename(const String *name) {
+const Type *typename_type(const String *name) {
     return new TypenameType(name);
 }
 

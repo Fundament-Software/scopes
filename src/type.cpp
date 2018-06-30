@@ -308,34 +308,34 @@ SCOPES_RESULT(void) verify_range(size_t idx, size_t count) {
 //------------------------------------------------------------------------------
 
 #define DEFINE_TYPENAME(NAME, T) \
-    T = Typename(String::from(NAME));
+    T = typename_type(String::from(NAME));
 
 #define DEFINE_BASIC_TYPE(NAME, CT, T, BODY) { \
-        T = Typename(String::from(NAME)); \
+        T = typename_type(String::from(NAME)); \
         auto tn = cast<TypenameType>(const_cast<Type *>(T)); \
         tn->finalize(BODY).assert_ok(); \
         assert(sizeof(CT) == size_of(T).assert_ok()); \
     }
 
 #define DEFINE_STRUCT_TYPE(NAME, CT, T, ...) { \
-        T = Typename(String::from(NAME)); \
+        T = typename_type(String::from(NAME)); \
         auto tn = cast<TypenameType>(const_cast<Type *>(T)); \
-        tn->finalize(Tuple({ __VA_ARGS__ }).assert_ok()).assert_ok(); \
+        tn->finalize(tuple_type({ __VA_ARGS__ }).assert_ok()).assert_ok(); \
         assert(sizeof(CT) == size_of(T).assert_ok()); \
     }
 
 #define DEFINE_STRUCT_HANDLE_TYPE(NAME, CT, T, ...) { \
-        T = Typename(String::from(NAME)); \
+        T = typename_type(String::from(NAME)); \
         auto tn = cast<TypenameType>(const_cast<Type *>(T)); \
-        auto ET = Tuple({ __VA_ARGS__ }).assert_ok(); \
+        auto ET = tuple_type({ __VA_ARGS__ }).assert_ok(); \
         assert(sizeof(CT) == size_of(ET).assert_ok()); \
-        tn->finalize(NativeROPointer(ET)).assert_ok(); \
+        tn->finalize(native_ro_pointer_type(ET)).assert_ok(); \
     }
 
 #define DEFINE_OPAQUE_HANDLE_TYPE(NAME, CT, T) { \
-        T = Typename(String::from(NAME)); \
+        T = typename_type(String::from(NAME)); \
         auto tn = cast<TypenameType>(const_cast<Type *>(T)); \
-        tn->finalize(NativeROPointer(Typename(String::from("_" NAME)))).assert_ok(); \
+        tn->finalize(native_ro_pointer_type(typename_type(String::from("_" NAME)))).assert_ok(); \
     }
 
 void init_types() {
@@ -362,32 +362,32 @@ void init_types() {
     DEFINE_TYPENAME("CUnion", TYPE_CUnion);
     DEFINE_TYPENAME("CEnum", TYPE_CEnum);
 
-    TYPE_Bool = Integer(1, false);
+    TYPE_Bool = integer_type(1, false);
 
-    TYPE_I8 = Integer(8, true);
-    TYPE_I16 = Integer(16, true);
-    TYPE_I32 = Integer(32, true);
-    TYPE_I64 = Integer(64, true);
+    TYPE_I8 = integer_type(8, true);
+    TYPE_I16 = integer_type(16, true);
+    TYPE_I32 = integer_type(32, true);
+    TYPE_I64 = integer_type(64, true);
 
-    TYPE_U8 = Integer(8, false);
-    TYPE_U16 = Integer(16, false);
-    TYPE_U32 = Integer(32, false);
-    TYPE_U64 = Integer(64, false);
+    TYPE_U8 = integer_type(8, false);
+    TYPE_U16 = integer_type(16, false);
+    TYPE_U32 = integer_type(32, false);
+    TYPE_U64 = integer_type(64, false);
 
-    TYPE_F16 = Real(16);
-    TYPE_F32 = Real(32);
-    TYPE_F64 = Real(64);
-    TYPE_F80 = Real(80);
+    TYPE_F16 = real_type(16);
+    TYPE_F32 = real_type(32);
+    TYPE_F64 = real_type(64);
+    TYPE_F80 = real_type(80);
 
     DEFINE_BASIC_TYPE("usize", size_t, TYPE_USize, TYPE_U64);
 
-    TYPE_Type = Typename(String::from("type"));
-    TYPE_Unknown = Typename(String::from("Unknown"));
-    const Type *_TypePtr = NativeROPointer(Typename(String::from("_type")));
+    TYPE_Type = typename_type(String::from("type"));
+    TYPE_Unknown = typename_type(String::from("Unknown"));
+    const Type *_TypePtr = native_ro_pointer_type(typename_type(String::from("_type")));
     cast<TypenameType>(const_cast<Type *>(TYPE_Type))->finalize(_TypePtr).assert_ok();
     cast<TypenameType>(const_cast<Type *>(TYPE_Unknown))->finalize(_TypePtr).assert_ok();
 
-    cast<TypenameType>(const_cast<Type *>(TYPE_Nothing))->finalize(Tuple({}).assert_ok()).assert_ok();
+    cast<TypenameType>(const_cast<Type *>(TYPE_Nothing))->finalize(tuple_type({}).assert_ok()).assert_ok();
 
     DEFINE_BASIC_TYPE("Symbol", Symbol, TYPE_Symbol, TYPE_U64);
     DEFINE_BASIC_TYPE("Builtin", Builtin, TYPE_Builtin, TYPE_U64);
@@ -401,7 +401,7 @@ void init_types() {
     DEFINE_OPAQUE_HANDLE_TYPE("List", List, TYPE_List);
 
     DEFINE_STRUCT_HANDLE_TYPE("Anchor", Anchor, TYPE_Anchor,
-        NativeROPointer(TYPE_SourceFile),
+        native_ro_pointer_type(TYPE_SourceFile),
         TYPE_I32,
         TYPE_I32,
         TYPE_I32
@@ -415,9 +415,9 @@ void init_types() {
     {
         cast<TypenameType>(const_cast<Type *>(TYPE_ASTMacro))
             ->finalize(
-                NativeROPointer(
-                    Function(Return({TYPE_ASTNode}, RTF_Raising), {
-                        NativeROPointer(TYPE_ASTNode),
+                native_ro_pointer_type(
+                    function_type(return_type({TYPE_ASTNode}, RTF_Raising), {
+                        native_ro_pointer_type(TYPE_ASTNode),
                         TYPE_I32
                         })
                     )).assert_ok();

@@ -63,7 +63,7 @@ SCOPES_RESULT(const Type *) FunctionType::type_at_index(size_t i) const {
 
 //------------------------------------------------------------------------------
 
-const Type *Function(const Type *return_type,
+const Type *function_type(const Type *return_type,
     const ArgTypes &argument_types, uint32_t flags) {
 
     struct TypeArgs {

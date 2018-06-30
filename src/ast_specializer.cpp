@@ -334,7 +334,7 @@ static const Type *return_type_from_arguments(const ASTNodes &values) {
     for (auto arg : values) {
         types.push_back(arg->get_type());
     }
-    return Return(types);
+    return return_type(types);
 }
 
 static SCOPES_RESULT(ASTNode *) specialize_ASTArgumentList(const ASTContext &ctx, ASTArgumentList *nlist) {
@@ -449,7 +449,7 @@ static SCOPES_RESULT(Break *) specialize_Break(const ASTContext &ctx, Break *_br
     ASTNode *value = SCOPES_GET_RESULT(specialize(subctx, _break->value));
     ctx.loop->return_type = SCOPES_GET_RESULT(merge_value_type(subctx, ctx.loop->return_type, value->get_type()));
     auto newbreak = Break::from(_break->anchor(), value);
-    newbreak->set_type(NoReturn());
+    newbreak->set_type(no_return_type());
     return newbreak;
 }
 
@@ -461,7 +461,7 @@ static SCOPES_RESULT(Repeat *) specialize_Repeat(const ASTContext &ctx, Repeat *
     }
     auto newrepeat = Repeat::from(_repeat->anchor());
     SCOPES_CHECK_RESULT(specialize_arguments(ctx, newrepeat->args, _repeat->args));
-    newrepeat->set_type(NoReturn());
+    newrepeat->set_type(no_return_type());
     return newrepeat;
 }
 
@@ -475,7 +475,7 @@ static SCOPES_RESULT(ASTReturn *) make_return(const ASTContext &ctx, const Ancho
     }
     ctx.frame->return_type = SCOPES_GET_RESULT(merge_return_type(ctx.frame->return_type, value->get_type()));
     auto newreturn = ASTReturn::from(anchor, value);
-    newreturn->set_type(NoReturn());
+    newreturn->set_type(no_return_type());
     return newreturn;
 }
 
@@ -576,7 +576,7 @@ static SCOPES_RESULT(const Type *) bool_op_return_type(const Type *T) {
     T = SCOPES_GET_RESULT(storage_type(T));
     if (T->kind() == TK_Vector) {
         auto vi = cast<VectorType>(T);
-        return Vector(TYPE_Bool, vi->count);
+        return vector_type(TYPE_Bool, vi->count);
     } else {
         return TYPE_Bool;
     }
@@ -616,7 +616,7 @@ static SCOPES_RESULT(void) verify_real_ops(const Type *a, const Type *b, const T
 #define RETARGTYPES(...) \
     { \
         Call *newcall = Call::from(call->anchor(), callee, values); \
-        newcall->set_type(Return({ __VA_ARGS__ })); \
+        newcall->set_type(return_type({ __VA_ARGS__ })); \
         return newcall; \
     }
 #define READ_TYPEOF(NAME) \
@@ -637,7 +637,7 @@ static const Type *get_function_type(ASTFunction *fn) {
     for (int i = 0; i < fn->params.size(); ++i) {
         params.push_back(fn->params[i]->get_type());
     }
-    return NativeROPointer(Function(fn->return_type, params));
+    return native_ro_pointer_type(function_type(fn->return_type, params));
 }
 
 static SCOPES_RESULT(ASTNode *) specialize_Call(const ASTContext &ctx, Call *call) {
@@ -1030,7 +1030,7 @@ SCOPES_RESULT(ASTFunction *) specialize(ASTFunction *frame, Template *func, cons
                     fn->append_param(newparam);
                     args->values.push_back(newparam);
                 }
-                args->set_type(Return(vtypes));
+                args->set_type(return_type(vtypes));
                 fn->bind(oldparam, args);
             }
         } else {

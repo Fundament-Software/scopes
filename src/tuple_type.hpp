@@ -38,10 +38,10 @@ struct TupleType : StorageType {
 
 //------------------------------------------------------------------------------
 
-SCOPES_RESULT(const Type *) KeyedTuple(const KeyedTypes &values,
+SCOPES_RESULT(const Type *) keyed_tuple_type(const KeyedTypes &values,
     bool packed = false, size_t alignment = 0);
 
-SCOPES_RESULT(const Type *) Tuple(const ArgTypes &types,
+SCOPES_RESULT(const Type *) tuple_type(const ArgTypes &types,
     bool packed = false, size_t alignment = 0);
 
 } // namespace scopes

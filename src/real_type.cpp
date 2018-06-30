@@ -30,7 +30,7 @@ static const Type *_Real(size_t _width) {
 }
 static auto m_Real = memoize(_Real);
 
-const Type *Real(size_t _width) {
+const Type *real_type(size_t _width) {
     return m_Real(_width);
 }
 

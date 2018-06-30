@@ -25,7 +25,7 @@ struct IntegerType : Type {
     bool issigned;
 };
 
-const Type *Integer(size_t _width, bool _issigned);
+const Type *integer_type(size_t _width, bool _issigned);
 
 int integer_type_bit_size(const Type *T);
 

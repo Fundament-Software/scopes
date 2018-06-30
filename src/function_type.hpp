@@ -40,7 +40,7 @@ struct FunctionType : Type {
     uint32_t flags;
 };
 
-const Type *Function(const Type *return_type,
+const Type *function_type(const Type *return_type,
     const ArgTypes &argument_types, uint32_t flags = 0);
 
 bool is_function_pointer(const Type *type);

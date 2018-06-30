@@ -55,13 +55,13 @@ bool ReturnType::is_returning() const {
 const Type *ReturnType::to_trycall() const {
     if (!is_raising())
         return this;
-    return KeyedReturn(values, flags & ~(RTF_Raising | RTF_NoReturn));
+    return keyed_return_type(values, flags & ~(RTF_Raising | RTF_NoReturn));
 }
 
 const Type *ReturnType::to_raising() const {
     if (is_raising())
         return this;
-    return KeyedReturn(values, flags | RTF_Raising);
+    return keyed_return_type(values, flags | RTF_Raising);
 }
 
 const Type *ReturnType::type_at_index(size_t i) const {
@@ -113,7 +113,7 @@ ReturnType::ReturnType(const KeyedTypes &_values, uint64_t _flags)
             return_type = values[0].type;
         } else {
             assert(values.size() != 1);
-            return_type = KeyedTuple(values).assert_ok();
+            return_type = keyed_tuple_type(values).assert_ok();
         }
     } else {
         return_type = TYPE_Void;
@@ -122,7 +122,7 @@ ReturnType::ReturnType(const KeyedTypes &_values, uint64_t _flags)
 
 //------------------------------------------------------------------------------
 
-const Type *KeyedReturn(const KeyedTypes &values, uint64_t flags) {
+const Type *keyed_return_type(const KeyedTypes &values, uint64_t flags) {
     if (!flags) {
         if (values.size() == 0)
             return TYPE_Void;
@@ -142,16 +142,16 @@ const Type *KeyedReturn(const KeyedTypes &values, uint64_t flags) {
     return result;
 }
 
-const Type *Return(const ArgTypes &values, uint64_t flags) {
+const Type *return_type(const ArgTypes &values, uint64_t flags) {
     KeyedTypes types;
     for (auto &&val : values) {
         types.push_back(val);
     }
-    return KeyedReturn(types, flags);
+    return keyed_return_type(types, flags);
 }
 
-const Type *NoReturn(uint64_t flags) {
-    return KeyedReturn({}, flags | RTF_NoReturn);
+const Type *no_return_type(uint64_t flags) {
+    return keyed_return_type({}, flags | RTF_NoReturn);
 }
 
 bool is_raising(const Type *T) {
