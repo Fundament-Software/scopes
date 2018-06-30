@@ -427,19 +427,19 @@ const sc_anchor_t *sc_get_active_anchor() {
 
 void sc_scope_set_symbol(sc_scope_t *scope, sc_symbol_t sym, sc_value_t *value) {
     using namespace scopes;
-    scope->bind(sym, cast<Symbolic>(value));
+    scope->bind(sym, value);
 }
 
 sc_bool_value_tuple_t sc_scope_at(sc_scope_t *scope, sc_symbol_t key) {
     using namespace scopes;
-    Symbolic *result = nullptr;
+    Value *result = nullptr;
     bool ok = scope->lookup(key, result);
     return { ok, result };
 }
 
 sc_bool_value_tuple_t sc_scope_local_at(sc_scope_t *scope, sc_symbol_t key) {
     using namespace scopes;
-    Symbolic *result = nullptr;
+    Value *result = nullptr;
     bool ok = scope->lookup_local(key, result);
     return { ok, result };
 }

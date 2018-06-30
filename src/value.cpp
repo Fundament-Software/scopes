@@ -58,7 +58,7 @@ ExtractArgument *ExtractArgument::from(const Anchor *anchor, Value *value, int i
 //------------------------------------------------------------------------------
 
 Template::Template(const Anchor *anchor, Symbol _name, const SymbolValues &_params, Value *_value)
-    : Symbolic(VK_Template, anchor),
+    : Value(VK_Template, anchor),
         name(_name), params(_params), value(_value),
         _inline(false), docstring(nullptr), scope(nullptr) {
 }
@@ -88,7 +88,7 @@ Template *Template::from(
 //------------------------------------------------------------------------------
 
 Function::Function(const Anchor *anchor, Symbol _name, const SymbolValues &_params, Value *_value)
-    : Symbolic(VK_Function, anchor),
+    : Value(VK_Function, anchor),
         name(_name), params(_params), value(_value),
         docstring(nullptr), return_type(nullptr), frame(nullptr), original(nullptr), complete(false) {
 }
@@ -129,7 +129,7 @@ Function *Function::from(
 //------------------------------------------------------------------------------
 
 Extern::Extern(const Anchor *anchor, const Type *type, Symbol _name, size_t _flags, Symbol _storage_class, int _location, int _binding)
-    : Symbolic(VK_Extern, anchor), name(_name), flags(_flags), storage_class(_storage_class), location(_location), binding(_binding) {
+    : Value(VK_Extern, anchor), name(_name), flags(_flags), storage_class(_storage_class), location(_location), binding(_binding) {
     if ((storage_class == SYM_SPIRV_StorageClassUniform)
         && !(flags & EF_BufferBlock)) {
         flags |= EF_Block;
@@ -178,7 +178,7 @@ void Block::strip_constants() {
     while (i > 0) {
         i--;
         auto arg = body[i];
-        if (isa<Symbolic>(arg)) {
+        if (arg->is_symbolic()) {
             body.erase(body.begin() + i);
         }
     }
@@ -217,26 +217,8 @@ Value *If::canonicalize() {
 
 //------------------------------------------------------------------------------
 
-Symbolic::Symbolic(ValueKind _kind, const Anchor *anchor)
-    : Value(_kind, anchor) {
-}
-
-bool Symbolic::classof(const Value *T) {
-    if (Const::classof(T)) return true;
-    switch(T->kind()) {
-    case VK_Template:
-    case VK_Function:
-    case VK_Symbol:
-    case VK_Extern:
-        return true;
-    default: return false;
-    }
-}
-
-//------------------------------------------------------------------------------
-
 SymbolValue::SymbolValue(const Anchor *anchor, Symbol _name, const Type *_type, bool _variadic)
-    : Symbolic(VK_Symbol, anchor), name(_name), variadic(_variadic) {
+    : Value(VK_Symbol, anchor), name(_name), variadic(_variadic) {
     if (_type) set_type(_type);
 }
 
@@ -313,7 +295,7 @@ bool Const::classof(const Value *T) {
 }
 
 Const::Const(ValueKind _kind, const Anchor *anchor, const Type *type)
-    : Symbolic(_kind, anchor) {
+    : Value(_kind, anchor) {
     set_type(type);
 }
 
@@ -452,6 +434,18 @@ ValueKind Value::kind() const { return _kind; }
 Value::Value(ValueKind kind, const Anchor *anchor)
     : _kind(kind),_type(nullptr),_anchor(anchor) {
     assert(_anchor);
+}
+
+bool Value::is_symbolic() const {
+    switch(kind()) {
+    case VK_Template:
+    case VK_Function:
+    case VK_Symbol:
+    case VK_Extern:
+        return true;
+    default: break;
+    }
+    return isa<Const>(this);
 }
 
 bool Value::is_typed() const {

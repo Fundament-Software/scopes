@@ -133,8 +133,8 @@ struct Expander {
             return cast<SymbolValue>(value);
         } else {
             Symbol sym = SCOPES_GET_RESULT(extract_symbol_constant(value));
-            if (node && isa<Symbolic>(node)) {
-                env->bind(sym, cast<Symbolic>(node));
+            if (node && node->is_symbolic()) {
+                env->bind(sym, node);
                 return nullptr;
             } else {
                 SymbolValue *param = nullptr;
@@ -177,7 +177,7 @@ struct Expander {
             auto sym = SCOPES_GET_RESULT(extract_symbol_constant(it->at));
             // named self-binding
             // see if we can find a forward declaration in the local scope
-            Symbolic *result = nullptr;
+            Value *result = nullptr;
             if (env->lookup_local(sym, result)
                 && isa<Template>(result)
                 && cast<Template>(result)->is_forward_decl()) {
@@ -714,7 +714,7 @@ struct Expander {
             auto headT = try_get_const_type(head);
             // resolve symbol
             if (headT == TYPE_Symbol) {
-                Symbolic *headnode = nullptr;
+                Value *headnode = nullptr;
                 if (env->lookup(SCOPES_GET_RESULT(extract_symbol_constant(head)), headnode)) {
                     head = headnode;
                     headT = try_get_const_type(head);
@@ -762,7 +762,7 @@ struct Expander {
                 }
             }
 
-            Symbolic *list_handler_node;
+            Value *list_handler_node;
             if (env->lookup(Symbol(SYM_ListWildcard), list_handler_node)) {
                 auto T = try_get_const_type(list_handler_node);
                 if (T != list_expander_func_type) {
@@ -798,9 +798,9 @@ struct Expander {
 
             Symbol name = SCOPES_GET_RESULT(extract_symbol_constant(node));
 
-            Symbolic *result = nullptr;
+            Value *result = nullptr;
             if (!env->lookup(name, result)) {
-                Symbolic *symbol_handler_node;
+                Value *symbol_handler_node;
                 if (env->lookup(Symbol(SYM_SymbolWildcard), symbol_handler_node)) {
                     auto T = try_get_const_type(symbol_handler_node);
                     if (T != list_expander_func_type) {

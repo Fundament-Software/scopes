@@ -58,7 +58,6 @@ enum ValueKind {
 #undef T
 
 struct Value;
-struct Symbolic;
 
 typedef std::vector<SymbolValue *> SymbolValues;
 typedef std::vector<Value *> Values;
@@ -79,20 +78,13 @@ struct Value {
     void set_type(const Type *type);
     const Type *get_type() const;
     void change_type(const Type *type);
+    bool is_symbolic() const;
 private:
     const ValueKind _kind;
     const Type *_type;
 
 protected:
     const Anchor *_anchor;
-};
-
-//------------------------------------------------------------------------------
-
-struct Symbolic : Value {
-    static bool classof(const Value *T);
-
-    Symbolic(ValueKind _kind, const Anchor *anchor);
 };
 
 //------------------------------------------------------------------------------
@@ -138,7 +130,7 @@ struct ExtractArgument : Value {
 
 //------------------------------------------------------------------------------
 
-struct Template : Symbolic {
+struct Template : Value {
     static bool classof(const Value *T);
 
     Template(const Anchor *anchor, Symbol name, const SymbolValues &params, Value *value);
@@ -162,7 +154,7 @@ struct Template : Symbolic {
 
 //------------------------------------------------------------------------------
 
-struct Function : Symbolic {
+struct Function : Value {
     static bool classof(const Value *T);
 
     Function(const Anchor *anchor, Symbol name, const SymbolValues &params, Value *value);
@@ -203,7 +195,7 @@ enum ExternFlags {
     EF_Block = (1 << 6),
 };
 
-struct Extern : Symbolic {
+struct Extern : Value {
     static bool classof(const Value *T);
 
     Extern(const Anchor *anchor, const Type *type, Symbol name,
@@ -272,7 +264,7 @@ struct If : Value {
 
 //------------------------------------------------------------------------------
 
-struct SymbolValue : Symbolic {
+struct SymbolValue : Value {
     static bool classof(const Value *T);
 
     SymbolValue(const Anchor *anchor, Symbol name, const Type *type, bool variadic);
@@ -337,7 +329,7 @@ struct Loop : Value {
 
 //------------------------------------------------------------------------------
 
-struct Const : Symbolic {
+struct Const : Value {
     static bool classof(const Value *T);
 
     Const(ValueKind _kind, const Anchor *anchor, const Type *type);
