@@ -34,7 +34,6 @@ inline SCOPES_RESULT(void) verify_kind(const Type *T) {
         case TK_Typename: ss.out << "typename"; break;
         case TK_Return: ss.out << "return"; break;
         case TK_Function: ss.out << "function"; break;
-        case TK_Extern: ss.out << "extern"; break;
         case TK_Image: ss.out << "image"; break;
         case TK_SampledImage: ss.out << "sampled image"; break;
         }
@@ -42,45 +41,6 @@ inline SCOPES_RESULT(void) verify_kind(const Type *T) {
         SCOPES_LOCATION_ERROR(ss.str());
     }
     return true;
-}
-
-template<typename T>
-static SCOPES_RESULT(T) cast_number(const Any &value) {
-    SCOPES_RESULT_TYPE(T);
-    auto ST = SCOPES_GET_RESULT(storage_type(value.type));
-    auto it = dyn_cast<IntegerType>(ST);
-    if (it) {
-        if (it->issigned) {
-            switch(it->width) {
-            case 8: return (T)value.i8;
-            case 16: return (T)value.i16;
-            case 32: return (T)value.i32;
-            case 64: return (T)value.i64;
-            default: break;
-            }
-        } else {
-            switch(it->width) {
-            case 1: return (T)value.i1;
-            case 8: return (T)value.u8;
-            case 16: return (T)value.u16;
-            case 32: return (T)value.u32;
-            case 64: return (T)value.u64;
-            default: break;
-            }
-        }
-    }
-    auto ft = dyn_cast<RealType>(ST);
-    if (ft) {
-        switch(ft->width) {
-        case 32: return (T)value.f32;
-        case 64: return (T)value.f64;
-        default: break;
-        }
-    }
-    StyledString ss;
-    ss.out << "can not extract constant from ";
-    ss.out << "value of type " << value.type;
-    SCOPES_LOCATION_ERROR(ss.str());
 }
 
 template<int mincount, int maxcount>

@@ -23,6 +23,7 @@ protected:
     Symbol _name;
 
 public:
+    Builtin();
     Builtin(EnumT name);
 
     EnumT value() const;

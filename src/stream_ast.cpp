@@ -31,7 +31,7 @@ struct StreamAST : StreamAnchors {
     bool line_anchors;
     bool atom_anchors;
 
-    std::unordered_set<ASTNode *> visited;
+    std::unordered_set<const ASTNode *> visited;
 
     StreamAST(StyledStream &_ss, const StreamASTFormat &_fmt)
         : StreamAnchors(_ss), fmt(_fmt) {
@@ -73,7 +73,7 @@ struct StreamAST : StreamAnchors {
         }
     }
 
-    void walk(ASTNode *node, int depth, int maxdepth) {
+    void walk(const ASTNode *node, int depth, int maxdepth) {
         const Anchor *anchor = node->anchor();
 
         stream_indent(depth);
@@ -232,10 +232,13 @@ struct StreamAST : StreamAnchors {
             ss << std::endl;
             walk(val->value, depth+1, maxdepth);
         } break;
-        case ASTK_Const: {
-            auto val = cast<Const>(node);
-            ss << Style_Keyword << "Const" << Style_None << " ";
-            val->value.stream(ss, false);
+        case ASTK_ConstInt: {
+            auto val = cast<ConstInt>(node);
+            ss << Style_Keyword << "ConstInt" << Style_None << " " << val->value;
+        } break;
+        case ASTK_ConstReal: {
+            auto val = cast<ConstReal>(node);
+            ss << Style_Keyword << "ConstReal" << Style_None << " " << val->value;
         } break;
         case ASTK_Break: {
             auto val = cast<Break>(node);
@@ -265,7 +268,7 @@ struct StreamAST : StreamAnchors {
         }
     }
 
-    void stream(ASTNode *node) {
+    void stream(const ASTNode *node) {
         visited.clear();
         walk(node, fmt.depth, -1);
         ss << std::endl;
@@ -275,7 +278,7 @@ struct StreamAST : StreamAnchors {
 //------------------------------------------------------------------------------
 
 void stream_ast(
-    StyledStream &_ss, ASTNode *node, const StreamASTFormat &_fmt) {
+    StyledStream &_ss, const ASTNode *node, const StreamASTFormat &_fmt) {
     StreamAST streamer(_ss, _fmt);
     streamer.stream(node);
 }

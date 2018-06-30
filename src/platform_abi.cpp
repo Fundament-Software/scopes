@@ -129,7 +129,6 @@ static size_t classify_array_like(size_t size,
 static size_t classify(const Type *T, ABIClass *classes, size_t offset) {
     switch(T->kind()) {
     case TK_Integer:
-    case TK_Extern:
     case TK_Pointer: {
         size_t size = size_of(T).assert_ok() + offset;
         if (size <= 4) {

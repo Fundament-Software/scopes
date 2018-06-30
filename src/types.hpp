@@ -9,7 +9,6 @@
 #include "integer.hpp"
 #include "real.hpp"
 #include "pointer.hpp"
-#include "extern.hpp"
 #include "array.hpp"
 #include "vector.hpp"
 #include "tuple.hpp"

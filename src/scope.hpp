@@ -53,8 +53,6 @@ public:
 
     void bind(Symbol name, ASTValue *value);
 
-    void bind_internal(Symbol name, Any value);
-
     void del(Symbol name);
 
     std::vector<Symbol> find_closest_match(Symbol name) const;

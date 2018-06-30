@@ -8,7 +8,6 @@
 #define SCOPES_TYPE_HPP
 
 #include "symbol.hpp"
-#include "any.hpp"
 #include "result.hpp"
 
 #include <stddef.h>
@@ -19,6 +18,7 @@
 namespace scopes {
 
 struct StyledStream;
+struct Const;
 
 #define SCOPES_TYPE_KEY(T, NAME) \
     char NAME ## _buf[sizeof(T)]; \
@@ -39,7 +39,6 @@ struct StyledStream;
     T(TK_Typename, "type-kind-typename", TypenameType) \
     T(TK_Return, "type-kind-return", ReturnType) \
     T(TK_Function, "type-kind-function", FunctionType) \
-    T(TK_Extern, "type-kind-extern", ExternType) \
     T(TK_Image, "type-kind-image", ImageType) \
     T(TK_SampledImage, "type-kind-sampled-image", SampledImageType)
 
@@ -69,7 +68,7 @@ typedef std::vector<KeyedType> KeyedTypes;
 //------------------------------------------------------------------------------
 
 struct Type {
-    typedef std::unordered_map<Symbol, Any, Symbol::Hash> Map;
+    typedef std::unordered_map<Symbol, Const *, Symbol::Hash> Map;
 
     TypeKind kind() const;
 
@@ -78,17 +77,17 @@ struct Type {
 
     StyledStream& stream(StyledStream& ost) const;
 
-    void bind(Symbol name, const Any &value);
+    void bind(Symbol name, Const *value);
 
     void del(Symbol name);
 
-    bool lookup(Symbol name, Any &dest) const;
+    bool lookup(Symbol name, Const *&dest) const;
 
-    bool lookup_local(Symbol name, Any &dest) const;
+    bool lookup_local(Symbol name, Const *&dest) const;
 
-    bool lookup_call_handler(Any &dest) const;
+    bool lookup_call_handler(Const *&dest) const;
 
-    bool lookup_return_handler(Any &dest) const;
+    bool lookup_return_handler(Const *&dest) const;
 
     const Map &get_symbols() const;
 
@@ -107,7 +106,6 @@ typedef std::vector<const Type *> ArgTypes;
     /* types */ \
     T(TYPE_Void, "void") \
     T(TYPE_Nothing, "Nothing") \
-    T(TYPE_Any, "Any") \
     \
     T(TYPE_Type, "type") \
     T(TYPE_Unknown, "Unknown") \
@@ -133,7 +131,6 @@ typedef std::vector<const Type *> ArgTypes;
     T(TYPE_F80, "f80") \
     \
     T(TYPE_List, "list") \
-    T(TYPE_Syntax, "Syntax") \
     T(TYPE_Anchor, "Anchor") \
     T(TYPE_String, "string") \
     \
@@ -141,9 +138,6 @@ typedef std::vector<const Type *> ArgTypes;
     T(TYPE_SourceFile, "SourceFile") \
     T(TYPE_Error, "Error") \
     \
-    T(TYPE_Parameter, "Parameter") \
-    T(TYPE_Label, "Label") \
-    T(TYPE_Frame, "Frame") \
     T(TYPE_Closure, "Closure") \
     T(TYPE_ASTMacro, "ASTMacro") \
     \
@@ -163,7 +157,6 @@ typedef std::vector<const Type *> ArgTypes;
     T(TYPE_Return, "Return") \
     T(TYPE_Function, "function") \
     T(TYPE_Constant, "constant") \
-    T(TYPE_Extern, "extern") \
     T(TYPE_Image, "Image") \
     T(TYPE_SampledImage, "SampledImage") \
     T(TYPE_CStruct, "CStruct") \
@@ -183,9 +176,6 @@ SCOPES_RESULT(size_t) align_of(const Type *T);
 const Type *superof(const Type *T);
 bool is_invalid_argument_type(const Type *T);
 void stream_type_name(StyledStream &ss, const Type *T);
-
-SCOPES_RESULT(Any) wrap_pointer(const Type *type, void *ptr);
-SCOPES_RESULT(void *) get_pointer(const Type *type, Any &value, bool create = false);
 
 //------------------------------------------------------------------------------
 // TYPE CHECK PREDICATES

@@ -25,11 +25,6 @@ SCOPES_RESULT(void *) SizedStorageType::getelementptr(void *src, size_t i) const
     return (void *)((char *)src + stride * i);
 }
 
-SCOPES_RESULT(Any) SizedStorageType::unpack(void *src, size_t i) const {
-    SCOPES_RESULT_TYPE(Any);
-    return wrap_pointer(SCOPES_GET_RESULT(type_at_index(i)), SCOPES_GET_RESULT(getelementptr(src, i)));
-}
-
 SCOPES_RESULT(const Type *) SizedStorageType::type_at_index(size_t i) const {
     SCOPES_RESULT_TYPE(const Type *);
     SCOPES_CHECK_RESULT(verify_range(i, count));

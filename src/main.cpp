@@ -7,12 +7,10 @@
 #include "boot.hpp"
 #include "timer.hpp"
 #include "gc.hpp"
-#include "any.hpp"
 #include "source_file.hpp"
 #include "utils.hpp"
 #include "lexerparser.hpp"
 #include "type.hpp"
-#include "syntax.hpp"
 #include "list.hpp"
 #include "execution.hpp"
 #include "globals.hpp"
@@ -77,8 +75,8 @@ namespace scopes {
 
    */
 
-static SCOPES_RESULT(Any) load_custom_core(const char *executable_path) {
-    SCOPES_RESULT_TYPE(Any);
+static SCOPES_RESULT(ASTNode *) load_custom_core(const char *executable_path) {
+    SCOPES_RESULT_TYPE(ASTNode *);
     // attempt to read bootstrap expression from end of binary
     auto file = SourceFile::from_file(
         Symbol(String::from_cstr(executable_path)));
@@ -94,49 +92,32 @@ static SCOPES_RESULT(Any) load_custom_core(const char *executable_path) {
         // skip the trailing text formatting garbage
         // that win32 echo produces
         cursor--;
-        if (cursor < ptr) return Any(none);
+        if (cursor < ptr) return nullptr;
     }
-    if (*cursor != ')') return Any(none);
+    if (*cursor != ')') return nullptr;
     cursor--;
     // seek backwards to find beginning of expression
     while ((cursor >= ptr) && (*cursor != '('))
         cursor--;
-
     LexerParser footerParser(file, cursor - ptr);
-    auto expr = SCOPES_GET_RESULT(footerParser.parse());
-    if (expr.type == TYPE_Nothing) {
-        SCOPES_LOCATION_ERROR(String::from("could not parse footer expression"));
-    }
-    expr = strip_syntax(expr);
-    if ((expr.type != TYPE_List) || (expr.list == EOL)) {
+    auto expr = SCOPES_GET_RESULT(extract_list_constant(SCOPES_GET_RESULT(footerParser.parse())));
+    if (expr == EOL) {
         SCOPES_LOCATION_ERROR(String::from("footer parser returned illegal structure"));
     }
-    expr = ((const List *)expr)->at;
-    if (expr.type != TYPE_List)  {
-        SCOPES_LOCATION_ERROR(String::from("footer expression is not a symbolic list"));
-    }
-    auto symlist = expr.list;
-    auto it = symlist;
+    auto it = SCOPES_GET_RESULT(extract_list_constant(expr->at));
     if (it == EOL) {
         SCOPES_LOCATION_ERROR(String::from("footer expression is empty"));
     }
     auto head = it->at;
-    it = it->next;
-    if (head.type != TYPE_Symbol)  {
-        SCOPES_LOCATION_ERROR(String::from("footer expression does not begin with symbol"));
-    }
-    if (head != Any(Symbol("core-size")))  {
+    auto sym = SCOPES_GET_RESULT(extract_symbol_constant(head));
+    if (sym != Symbol("core-size"))  {
         SCOPES_LOCATION_ERROR(String::from("footer expression does not begin with 'core-size'"));
     }
+    it = it->next;
     if (it == EOL) {
         SCOPES_LOCATION_ERROR(String::from("footer expression needs two arguments"));
     }
-    auto arg = it->at;
-    it = it->next;
-    if (arg.type != TYPE_I32)  {
-        SCOPES_LOCATION_ERROR(String::from("script-size argument is not of type i32"));
-    }
-    auto script_size = arg.i32;
+    auto script_size = SCOPES_GET_RESULT(extract_integer_constant(it->at));
     if (script_size <= 0) {
         SCOPES_LOCATION_ERROR(String::from("script-size must be larger than zero"));
     }
@@ -263,8 +244,8 @@ SCOPES_RESULT(int) try_main(int argc, char *argv[]) {
     init_types();
     init_globals(argc, argv);
 
-    Any expr = SCOPES_GET_RESULT(load_custom_core(scopes_compiler_path));
-    if (expr != none) {
+    ASTNode *expr = SCOPES_GET_RESULT(load_custom_core(scopes_compiler_path));
+    if (expr) {
         goto skip_regular_load;
     }
 
@@ -307,7 +288,7 @@ skip_regular_load:
 #endif
 
     typedef void (*MainFuncType)();
-    MainFuncType fptr = (MainFuncType)SCOPES_GET_RESULT(compile(fn, CF_DumpModule)).pointer;
+    MainFuncType fptr = (MainFuncType)SCOPES_GET_RESULT(compile(fn, CF_DumpModule))->value;
     fptr();
 
     return 0;

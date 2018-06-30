@@ -7,14 +7,15 @@
 #ifndef SCOPES_ERROR_HPP
 #define SCOPES_ERROR_HPP
 
-#include "any.hpp"
 #include "result.hpp"
+#include "builtin.hpp"
 #include "scopes/config.h"
 
 namespace scopes {
 
 //------------------------------------------------------------------------------
 
+struct Type;
 struct String;
 struct Anchor;
 struct StyledStream;
@@ -35,16 +36,16 @@ struct Error {
 
 //------------------------------------------------------------------------------
 
-void set_last_error(const Any &err);
-Any get_last_error();
+void set_last_error(const Error *err);
+const Error *get_last_error();
 
-void print_error(const Any &value);
-void stream_error(StyledStream &ss, const Any &value);
-void stream_error_string(StyledStream &ss, const Any &value);
+void print_error(const Error *value);
+void stream_error(StyledStream &ss, const Error *value);
+void stream_error_string(StyledStream &ss, const Error *value);
 
 void set_last_location_error(const String *msg);
-Any make_location_error(const String *msg);
-Any make_runtime_error(const String *msg);
+const Error *make_location_error(const String *msg);
+const Error *make_runtime_error(const String *msg);
 
 #if SCOPES_EARLY_ABORT
 #define SCOPES_LOCATION_ERROR(MSG) \

@@ -44,15 +44,15 @@ Error::Error(const Anchor *_anchor, const String *_msg) :
 
 //------------------------------------------------------------------------------
 
-static Any _last_error = none;
+static const Error *_last_error = nullptr;
 
-void set_last_error(const Any &err) {
+void set_last_error(const Error *err) {
     _last_error = err;
 }
 
-Any get_last_error() {
-    Any result = _last_error;
-    _last_error = none;
+const Error *get_last_error() {
+    auto result = _last_error;
+    _last_error = nullptr;
     return result;
 }
 
@@ -65,44 +65,32 @@ void location_message(const Anchor *anchor, const String* str) {
     anchor->stream_source_line(cerr);
 }
 
-void stream_error_string(StyledStream &ss, const Any &value) {
-    if (value.type == TYPE_Error) {
-        const Error *exc = value;
-        ss << exc->msg->data;
-    } else {
-        ss << "exception raised: " << value;
+void stream_error_string(StyledStream &ss, const Error *exc) {
+    ss << exc->msg->data;
+}
+
+void stream_error(StyledStream &ss, const Error *exc) {
+    if (exc->anchor) {
+        ss << exc->anchor << " ";
+    }
+    ss << Style_Error << "error:" << Style_None << " "
+        << exc->msg->data << std::endl;
+    if (exc->anchor) {
+        exc->anchor->stream_source_line(ss);
     }
 }
 
-void stream_error(StyledStream &ss, const Any &value) {
-    if (value.type == TYPE_Error) {
-        const Error *exc = value;
-        if (exc->anchor) {
-            ss << exc->anchor << " ";
-        }
-        ss << Style_Error << "error:" << Style_None << " "
-            << exc->msg->data << std::endl;
-        if (exc->anchor) {
-            exc->anchor->stream_source_line(ss);
-        }
-    } else {
-        ss << "exception raised: " << value << std::endl;
-    }
-}
-
-void print_error(const Any &value) {
+void print_error(const Error *value) {
     auto cerr = StyledStream(SCOPES_CERR);
     stream_error(cerr, value);
 }
 
-Any make_location_error(const String *msg) {
-    const Error *exc = new Error(_active_anchor, msg);
-    return exc;
+const Error *make_location_error(const String *msg) {
+    return new Error(_active_anchor, msg);
 }
 
-Any make_runtime_error(const String *msg) {
-    const Error *exc = new Error(nullptr, msg);
-    return exc;
+const Error *make_runtime_error(const String *msg) {
+    return new Error(nullptr, msg);
 }
 
 void set_last_location_error(const String *msg) {

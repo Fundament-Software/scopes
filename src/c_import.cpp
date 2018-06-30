@@ -12,7 +12,6 @@
 #include "source_file.hpp"
 #include "anchor.hpp"
 #include "error.hpp"
-#include "argument.hpp"
 #include "utils.hpp"
 #include "union.hpp"
 #include "tuple.hpp"
@@ -22,7 +21,6 @@
 #include "pointer.hpp"
 #include "vector.hpp"
 #include "function.hpp"
-#include "extern.hpp"
 #include "execution.hpp"
 #include "ast.hpp"
 #include "dyn_cast.inc"
@@ -271,33 +269,12 @@ public:
                 ScopeEntry target;
                 // don't overwrite names already bound
                 if (!dest->lookup(name, target)) {
-                    dest->bind(name, Const::from(anchor, struct_type));
+                    dest->bind(name, ConstPointer::type_from(anchor, struct_type));
                 }
             }
         }
 
         return struct_type;
-    }
-
-    Any make_integer(const Type *T, int64_t v) {
-        auto it = cast<IntegerType>(T);
-        if (it->issigned) {
-            switch(it->width) {
-            case 8: return Any((int8_t)v);
-            case 16: return Any((int16_t)v);
-            case 32: return Any((int32_t)v);
-            case 64: return Any((int64_t)v);
-            default: assert(false); return none;
-            }
-        } else {
-            switch(it->width) {
-            case 8: return Any((uint8_t)v);
-            case 16: return Any((uint16_t)v);
-            case 32: return Any((uint32_t)v);
-            case 64: return Any((uint64_t)v);
-            default: assert(false); return none;
-            }
-        }
     }
 
     SCOPES_RESULT(const Type *) TranslateEnum(clang::EnumDecl *ed) {
@@ -318,17 +295,14 @@ public:
             SCOPES_CHECK_RESULT(tni->finalize(tag_type));
 
             for (auto it : ed->enumerators()) {
-                //const Anchor *anchor = anchorFromLocation(it->getSourceRange().getBegin());
+                const Anchor *anchor = anchorFromLocation(it->getSourceRange().getBegin());
                 auto &val = it->getInitVal();
 
                 auto name = Symbol(String::from_stdstring(it->getName().data()));
-                auto value = make_integer(tag_type, val.getExtValue());
-                value.type = enum_type;
-
-                const Anchor *anchor = anchorFromLocation(it->getSourceRange().getBegin());
+                auto value = ConstInt::from(anchor, enum_type, val.getExtValue());
 
                 tni->bind(name, value);
-                dest->bind(name, Const::from(anchor, value));
+                dest->bind(name, value);
             }
         }
 
@@ -606,13 +580,11 @@ public:
     }
 
     void exportType(Symbol name, const Type *type, const Anchor *anchor) {
-        dest->bind(name, Const::from(anchor, type));
+        dest->bind(name, ConstPointer::type_from(anchor, type));
     }
 
     void exportExtern(Symbol name, const Type *type, const Anchor *anchor) {
-        Any value(name);
-        value.type = Extern(type);
-        dest->bind(name, Const::from(anchor, value));
+        dest->bind(name, ASTExtern::from(anchor, type, name));
     }
 
     bool TraverseRecordDecl(clang::RecordDecl *rd) {
@@ -807,7 +779,7 @@ static void add_c_macro(clang::Preprocessor & PP,
         const String *value = String::from(svalue.c_str(), svalue.size());
         const Anchor *anchor = anchor_from_location(PP.getSourceManager(),
             MI->getDefinitionLoc());
-        scope->bind(Symbol(name), Const::from(anchor, value));
+        scope->bind(Symbol(name), ConstPointer::string_from(anchor, value));
         return;
     }
 
@@ -834,14 +806,14 @@ static void add_c_macro(clang::Preprocessor & PP,
         double V = Result.convertToDouble();
         if (negate)
             V = -V;
-        scope->bind(Symbol(name), Const::from(anchor, V));
+        scope->bind(Symbol(name), ConstReal::from(anchor, TYPE_F64, V));
     } else {
         llvm::APInt Result(64,0);
         Literal.GetIntegerValue(Result);
         int64_t i = Result.getSExtValue();
         if (negate)
             i = -i;
-        scope->bind(Symbol(name), Const::from(anchor, i));
+        scope->bind(Symbol(name), ConstInt::from(anchor, TYPE_I64, i));
     }
 }
 

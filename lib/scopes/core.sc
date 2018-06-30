@@ -79,19 +79,12 @@ let
     string-new = sc_string_new
     string-match? = sc_string_match
 
-    Any-repr = sc_any_repr
-    Any-string = sc_any_string
-    Any== = sc_any_eq
-
     list-cons = sc_list_cons
     list-join = sc_list_join
     list-dump = sc_list_dump
 
-    Syntax-new = sc_syntax_new
-    Syntax-wrap = sc_syntax_wrap
-    Syntax-strip = sc_syntax_strip
-    list-load = sc_syntax_from_path
-    list-parse = sc_syntax_from_string
+    list-load = sc_parse_from_path
+    list-parse = sc_parse_from_string
 
     element-type = sc_type_element_at
     type-countof = sc_type_countof
@@ -114,8 +107,8 @@ let
     pointer-type-set-storage-class = sc_pointer_type_set_storage_class
     pointer-type-storage-class = sc_pointer_type_get_storage_class
 
-    extern-type-location = sc_extern_type_location
-    extern-type-binding = sc_extern_type_binding
+    extern-location = sc_extern_location
+    extern-binding = sc_extern_binding
 
     bitcountof = sc_type_bitcountof
 

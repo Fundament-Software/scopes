@@ -10,7 +10,8 @@
 #include "anchor.hpp"
 #include "type.hpp"
 #include "list.hpp"
-#include "syntax.hpp"
+#include "ast.hpp"
+#include "dyn_cast.inc"
 
 #include "scopes/scopes.h"
 
@@ -56,7 +57,7 @@ SCOPES_RESULT(void) LexerParser::verify_good_taste(char c) {
 }
 
 LexerParser::LexerParser(SourceFile *_file, size_t offset, size_t length) :
-        value(none) {
+        value(nullptr) {
     file = _file;
     input_stream = file->strptr() + offset;
     token = tok_eof;
@@ -203,7 +204,7 @@ SCOPES_RESULT(void) LexerParser::read_comment() {
 }
 
 template<typename T>
-SCOPES_RESULT(int) LexerParser::read_integer(void (*strton)(T *, const char*, char**)) {
+SCOPES_RESULT(int) LexerParser::read_integer(const Type *TT, void (*strton)(T *, const char*, char**)) {
     SCOPES_RESULT_TYPE(int);
     char *cend;
     errno = 0;
@@ -214,7 +215,7 @@ SCOPES_RESULT(int) LexerParser::read_integer(void (*strton)(T *, const char*, ch
         || (cend > eof)) {
         return RN_Invalid;
     }
-    value = Any(srcval);
+    value = ConstInt::from(anchor(), TT, srcval);
     next_cursor = cend;
     if ((cend != eof)
         && (!isspace(*cend))
@@ -232,7 +233,7 @@ SCOPES_RESULT(int) LexerParser::read_integer(void (*strton)(T *, const char*, ch
 }
 
 template<typename T>
-SCOPES_RESULT(int) LexerParser::read_real(void (*strton)(T *, const char*, char**, int)) {
+SCOPES_RESULT(int) LexerParser::read_real(const Type *TT, void (*strton)(T *, const char*, char**, int)) {
     SCOPES_RESULT_TYPE(int);
     char *cend;
     errno = 0;
@@ -243,7 +244,7 @@ SCOPES_RESULT(int) LexerParser::read_real(void (*strton)(T *, const char*, char*
         || (cend > eof)) {
         return RN_Invalid;
     }
-    value = Any(srcval);
+    value = ConstInt::from(anchor(), TT, srcval);
     next_cursor = cend;
     if ((cend != eof)
         && (!isspace(*cend))
@@ -267,16 +268,17 @@ SCOPES_RESULT(bool) LexerParser::select_integer_suffix() {
     SCOPES_RESULT_TYPE(bool);
     if (!has_suffix())
         return false;
-    if (is_suffix(":i8")) { value = Any(value.i8); return true; }
-    else if (is_suffix(":i16")) { value = Any(value.i16); return true; }
-    else if (is_suffix(":i32")) { value = Any(value.i32); return true; }
-    else if (is_suffix(":i64")) { value = Any(value.i64); return true; }
-    else if (is_suffix(":u8")) { value = Any(value.u8); return true; }
-    else if (is_suffix(":u16")) { value = Any(value.u16); return true; }
-    else if (is_suffix(":u32")) { value = Any(value.u32); return true; }
-    else if (is_suffix(":u64")) { value = Any(value.u64); return true; }
+    assert(isa<ConstInt>(value));
+    if (is_suffix(":i8")) { value->change_type(TYPE_I8); return true; }
+    else if (is_suffix(":i16")) { value->change_type(TYPE_I16); return true; }
+    else if (is_suffix(":i32")) { value->change_type(TYPE_I32); return true; }
+    else if (is_suffix(":i64")) { value->change_type(TYPE_I64); return true; }
+    else if (is_suffix(":u8")) { value->change_type(TYPE_U8); return true; }
+    else if (is_suffix(":u16")) { value->change_type(TYPE_U16); return true; }
+    else if (is_suffix(":u32")) { value->change_type(TYPE_U32); return true; }
+    else if (is_suffix(":u64")) { value->change_type(TYPE_U64); return true; }
     //else if (is_suffix(":isize")) { value = Any(value.i64); return true; }
-    else if (is_suffix(":usize")) { value = Any(value.u64); value.type = TYPE_USize; return true; }
+    else if (is_suffix(":usize")) { value->change_type(TYPE_USize); return true; }
     else {
         StyledString ss;
         ss.out << "invalid suffix for integer literal: "
@@ -289,8 +291,9 @@ SCOPES_RESULT(bool) LexerParser::select_real_suffix() {
     SCOPES_RESULT_TYPE(bool);
     if (!has_suffix())
         return false;
-    if (is_suffix(":f32")) { value = Any((float)value.f64); return true; }
-    else if (is_suffix(":f64")) { value = Any(value.f64); return true; }
+    assert(isa<ConstReal>(value));
+    if (is_suffix(":f32")) { value->change_type(TYPE_F32); return true; }
+    else if (is_suffix(":f64")) { value->change_type(TYPE_F64); return true; }
     else {
         StyledString ss;
         ss.out << "invalid suffix for floating point literal: "
@@ -301,15 +304,17 @@ SCOPES_RESULT(bool) LexerParser::select_real_suffix() {
 
 SCOPES_RESULT(bool) LexerParser::read_int64() {
     SCOPES_RESULT_TYPE(bool);
-    switch(SCOPES_GET_RESULT(read_integer(scopes_strtoll))) {
+    switch(SCOPES_GET_RESULT(read_integer(TYPE_I64, scopes_strtoll))) {
     case RN_Invalid: return false;
-    case RN_Untyped:
-        if ((value.i64 >= -0x80000000ll) && (value.i64 <= 0x7fffffffll)) {
-            value = Any(int32_t(value.i64));
-        } else if ((value.i64 >= 0x80000000ll) && (value.i64 <= 0xffffffffll)) {
-            value = Any(uint32_t(value.i64));
+    case RN_Untyped: {
+        int64_t val = cast<ConstInt>(value)->value;
+        if ((val >= -0x80000000ll) && (val <= 0x7fffffffll)) {
+            value->change_type(TYPE_I32);
+        } else if ((val >= 0x80000000ll) && (val <= 0xffffffffll)) {
+            value->change_type(TYPE_U32);
         }
         return true;
+    } break;
     case RN_Typed:
         return select_integer_suffix();
     default: assert(false); return false;
@@ -317,7 +322,7 @@ SCOPES_RESULT(bool) LexerParser::read_int64() {
 }
 SCOPES_RESULT(bool) LexerParser::read_uint64() {
     SCOPES_RESULT_TYPE(bool);
-    switch(SCOPES_GET_RESULT(read_integer(scopes_strtoull))) {
+    switch(SCOPES_GET_RESULT(read_integer(TYPE_U64, scopes_strtoull))) {
     case RN_Invalid: return false;
     case RN_Untyped:
         return true;
@@ -328,10 +333,10 @@ SCOPES_RESULT(bool) LexerParser::read_uint64() {
 }
 SCOPES_RESULT(bool) LexerParser::read_real64() {
     SCOPES_RESULT_TYPE(bool);
-    switch(SCOPES_GET_RESULT(read_real(scopes_strtod))) {
+    switch(SCOPES_GET_RESULT(read_real(TYPE_F64, scopes_strtod))) {
     case RN_Invalid: return false;
     case RN_Untyped:
-        value = Any(float(value.f64));
+        value->change_type(TYPE_F32);
         return true;
     case RN_Typed:
         return select_real_suffix();
@@ -386,14 +391,14 @@ done:
     return token;
 }
 
-Any LexerParser::get_symbol() {
+Symbol LexerParser::get_symbol() {
     char dest[string_len + 1];
     memcpy(dest, string, string_len);
     dest[string_len] = 0;
     auto size = unescape_string(dest);
     return Symbol(String::from(dest, size));
 }
-Any LexerParser::get_string() {
+const String *LexerParser::get_string() {
     auto len = string_len - 2;
     char dest[len + 1];
     memcpy(dest, string + 1, len);
@@ -401,7 +406,7 @@ Any LexerParser::get_string() {
     auto size = unescape_string(dest);
     return String::from(dest, size);
 }
-Any LexerParser::get_block_string() {
+const String *LexerParser::get_block_string() {
     int strip_col = column() + 4;
     auto len = string_len - 4;
     assert(len >= 0);
@@ -433,9 +438,10 @@ Any LexerParser::get_block_string() {
     }
     return String::from(dest, p - dest);
 }
-Any LexerParser::get_number() {
+ASTNode *LexerParser::get_number() {
     return value;
 }
+#if 0
 Any LexerParser::get() {
     if (token == tok_number) {
         return get_number();
@@ -449,6 +455,7 @@ Any LexerParser::get() {
         return none;
     }
 }
+#endif
 
 // PARSER
 //////////////////////////////
@@ -458,8 +465,7 @@ LexerParser::ListBuilder::ListBuilder(LexerParser &_lexer) :
     prev(EOL),
     eol(EOL) {}
 
-void LexerParser::ListBuilder::append(const Any &value) {
-    assert(value.type == TYPE_Syntax);
+void LexerParser::ListBuilder::append(ASTNode *value) {
     prev = List::from(value, prev);
 }
 
@@ -478,8 +484,7 @@ void LexerParser::ListBuilder::reset_start() {
 void LexerParser::ListBuilder::split(const Anchor *anchor) {
     // reverse what we have, up to last split point and wrap result
     // in cell
-    prev = List::from(
-        Syntax::from(anchor,reverse_list(prev, eol)), eol);
+    prev = List::from(ConstPointer::list_from(anchor, reverse_list(prev, eol)), eol);
     reset_start();
 }
 
@@ -518,32 +523,35 @@ SCOPES_RESULT(const List *) LexerParser::parse_list(Token end_token) {
 
 // parses the next sequence and returns it wrapped in a cell that points
 // to prev
-SCOPES_RESULT(Any) LexerParser::parse_any() {
-    SCOPES_RESULT_TYPE(Any);
+SCOPES_RESULT(ASTNode *) LexerParser::parse_any() {
+    SCOPES_RESULT_TYPE(ASTNode *);
     assert(this->token != tok_eof);
     const Anchor *anchor = this->anchor();
     if (this->token == tok_open) {
-        return Any(Syntax::from(anchor, SCOPES_GET_RESULT(parse_list(tok_close))));
+        return ConstPointer::list_from(anchor,
+            SCOPES_GET_RESULT(parse_list(tok_close)));
     } else if (this->token == tok_square_open) {
-        return Any(Syntax::from(anchor,
-            List::from(Syntax::from(anchor,Symbol(SYM_SquareList)),
-                SCOPES_GET_RESULT(parse_list(tok_square_close)))));
+        return ConstPointer::list_from(anchor,
+            List::from(
+                ConstInt::symbol_from(anchor, Symbol(SYM_SquareList)),
+                SCOPES_GET_RESULT(parse_list(tok_square_close))));
     } else if (this->token == tok_curly_open) {
-        return Any(Syntax::from(anchor,
-            List::from(Syntax::from(anchor,Symbol(SYM_CurlyList)),
-                SCOPES_GET_RESULT(parse_list(tok_curly_close)))));
+        return ConstPointer::list_from(anchor,
+            List::from(
+                ConstInt::symbol_from(anchor,Symbol(SYM_CurlyList)),
+                SCOPES_GET_RESULT(parse_list(tok_curly_close))));
     } else if ((this->token == tok_close)
         || (this->token == tok_square_close)
         || (this->token == tok_curly_close)) {
         SCOPES_LOCATION_ERROR(String::from("stray closing bracket"));
     } else if (this->token == tok_string) {
-        return Any(Syntax::from(anchor, get_string()));
+        return ConstPointer::string_from(anchor, get_string());
     } else if (this->token == tok_block_string) {
-        return Any(Syntax::from(anchor, get_block_string()));
+        return ConstPointer::string_from(anchor, get_block_string());
     } else if (this->token == tok_symbol) {
-        return Any(Syntax::from(anchor, get_symbol()));
+        return ConstInt::symbol_from(anchor, get_symbol());
     } else if (this->token == tok_number) {
-        return Any(Syntax::from(anchor, get_number()));
+        return get_number();
     } else if (this->token == tok_quote) {
         SCOPES_CHECK_RESULT(this->read_token());
         if (this->token == tok_eof) {
@@ -551,19 +559,20 @@ SCOPES_RESULT(Any) LexerParser::parse_any() {
             SCOPES_LOCATION_ERROR(
                 String::from("unexpected end of file after quote token"));
         }
-        return Any(Syntax::from(anchor,
+        return ConstPointer::list_from(anchor,
             List::from({
-                Any(Syntax::from(anchor, Symbol(KW_Quote))),
-                SCOPES_GET_RESULT(parse_any()) })));
+                ConstInt::symbol_from(anchor, Symbol(KW_Quote)),
+                SCOPES_GET_RESULT(parse_any())
+                }));
     } else {
         SCOPES_LOCATION_ERROR(format("unexpected token: %c (%i)",
             this->cursor[0], (int)this->cursor[0]));
     }
-    return Any(none);
+    return ConstTuple::none_from(anchor);
 }
 
-SCOPES_RESULT(Any) LexerParser::parse_naked(int column, Token end_token) {
-    SCOPES_RESULT_TYPE(Any);
+SCOPES_RESULT(ASTNode *) LexerParser::parse_naked(int column, Token end_token) {
+    SCOPES_RESULT_TYPE(ASTNode *);
     int lineno = this->lineno;
 
     bool escape = false;
@@ -626,12 +635,12 @@ SCOPES_RESULT(Any) LexerParser::parse_naked(int column, Token end_token) {
     if (unwrap_single && result && result->count == 1) {
         return result->at;
     } else {
-        return Any(Syntax::from(anchor, result));
+        return ConstPointer::list_from(anchor, result);
     }
 }
 
-SCOPES_RESULT(Any) LexerParser::parse() {
-    SCOPES_RESULT_TYPE(Any);
+SCOPES_RESULT(ASTNode *) LexerParser::parse() {
+    SCOPES_RESULT_TYPE(ASTNode *);
     SCOPES_CHECK_RESULT(this->read_token());
     int lineno = 0;
     //bool escape = false;
@@ -673,7 +682,7 @@ SCOPES_RESULT(Any) LexerParser::parse() {
             SCOPES_CHECK_RESULT(this->read_token());
         }
     }
-    return Any(Syntax::from(anchor, builder.get_result()));
+    return ConstPointer::list_from(anchor, builder.get_result());
 }
 
 

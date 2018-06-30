@@ -7,9 +7,12 @@
 #ifndef SCOPES_LIST_HPP
 #define SCOPES_LIST_HPP
 
-#include "any.hpp"
+#include <stddef.h>
+#include <cstddef>
 
 namespace scopes {
+
+struct ASTNode;
 
 //------------------------------------------------------------------------------
 // LIST
@@ -17,21 +20,21 @@ namespace scopes {
 
 struct List {
 protected:
-    List(const Any &_at, const List *_next, size_t _count);
+    List(ASTNode *_at, const List *_next, size_t _count);
 
 public:
-    Any at;
+    ASTNode *at;
     const List *next;
     size_t count;
 
-    Any first() const;
+    ASTNode *first() const;
 
-    static const List *from(const Any &_at, const List *_next);
+    static const List *from(ASTNode *_at, const List *_next);
 
-    static const List *from(const Any *values, int N);
+    static const List *from(ASTNode * const *values, int N);
 
     template<unsigned N>
-    static const List *from(const Any (&values)[N]) {
+    static const List *from(ASTNode * const (&values)[N]) {
         return from(values, N);
     }
 

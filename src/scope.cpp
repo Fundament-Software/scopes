@@ -93,12 +93,6 @@ void Scope::bind(Symbol name, ASTValue *value) {
     next_doc = nullptr;
 }
 
-void Scope::bind_internal(Symbol name, Any value) {
-    assert(get_active_anchor());
-    ScopeEntry entry = { Const::from(get_active_anchor(), value), nullptr };
-    bind_with_doc(name, entry);
-}
-
 void Scope::del(Symbol name) {
     ensure_not_borrowed();
     auto it = map->find(name);

@@ -84,11 +84,6 @@ UnionType::UnionType(const KeyedTypes &_values)
     tuple_type = Tuple({values[largest_field].type}).assert_ok();
 }
 
-SCOPES_RESULT(Any) UnionType::unpack(void *src, size_t i) const {
-    SCOPES_RESULT_TYPE(Any);
-    return wrap_pointer(SCOPES_GET_RESULT(type_at_index(i)), src);
-}
-
 SCOPES_RESULT(const Type *) UnionType::type_at_index(size_t i) const {
     SCOPES_RESULT_TYPE(const Type *);
     SCOPES_CHECK_RESULT(verify_range(i, values.size()));

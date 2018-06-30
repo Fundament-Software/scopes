@@ -11,10 +11,6 @@
 #include <stddef.h>
 #include <stdbool.h>
 
-#if defined(SCOPESRT_IMPL) && defined(__cplusplus)
-#include "../src/any.hpp"
-#endif
-
 #include "config.h"
 
 #if defined __cplusplus
@@ -45,11 +41,9 @@ const char *scopes_compile_time_date();
 namespace scopes {
     struct Type;
     struct Scope;
-    struct Any;
     struct Symbol;
     struct String;
     struct List;
-    struct Syntax;
     struct Anchor;
     struct Parameter;
     struct Label;
@@ -58,6 +52,7 @@ namespace scopes {
     struct ExceptionPad;
     struct Argument;
     struct ASTNode;
+    struct Error;
 }
 
 extern "C" {
@@ -65,10 +60,9 @@ extern "C" {
 typedef scopes::Type sc_type_t;
 typedef scopes::Scope sc_scope_t;
 typedef scopes::Symbol sc_symbol_t;
-typedef scopes::Any sc_any_t;
 typedef scopes::String sc_string_t;
 typedef scopes::List sc_list_t;
-typedef scopes::Syntax sc_syntax_t;
+typedef scopes::Error sc_error_t;
 typedef scopes::Anchor sc_anchor_t;
 typedef scopes::Parameter sc_parameter_t;
 typedef scopes::Label sc_label_t;
@@ -87,7 +81,7 @@ typedef struct sc_type_ sc_type_t;
 typedef struct sc_scope_ sc_scope_t;
 typedef struct sc_string_ sc_string_t;
 typedef struct sc_list_ sc_list_t;
-typedef struct sc_syntax_ sc_syntax_t;
+typedef struct sc_error_ sc_error_t;
 typedef struct sc_anchor_ sc_anchor_t;
 typedef struct sc_parameter_ sc_parameter_t;
 typedef struct sc_label_ sc_label_t;
@@ -98,48 +92,48 @@ typedef struct sc_ast_ sc_ast_t;
 
 typedef uint64_t sc_symbol_t;
 
-typedef struct sc_any_ {
-    const sc_type_t *type;
-    uint64_t payload;
-} sc_any_t;
-
 #endif
 
-typedef struct sc_bool_any_tuple_ { bool _0; sc_any_t _1; } sc_bool_any_tuple_t;
 typedef struct sc_bool_list_tuple_ { bool _0; const sc_list_t *_1; } sc_bool_list_tuple_t;
 typedef struct sc_bool_label_tuple_ { bool _0; sc_label_t *_1; } sc_bool_label_tuple_t;
 typedef struct sc_bool_string_tuple_ { bool _0; const sc_string_t *_1; } sc_bool_string_tuple_t;
 typedef struct sc_bool_scope_tuple_ { bool _0; sc_scope_t *_1; } sc_bool_scope_tuple_t;
 typedef struct sc_bool_size_tuple_ { bool _0; size_t _1; } sc_bool_size_tuple_t;
 typedef struct sc_bool_bool_tuple_ { bool _0; bool _1; } sc_bool_bool_tuple_t;
-typedef struct sc_bool_syntax_tuple_ { bool _0; const sc_syntax_t *_1; } sc_bool_syntax_tuple_t;
 typedef struct sc_bool_type_tuple_ { bool _0; const sc_type_t *_1; } sc_bool_type_tuple_t;
 typedef struct sc_bool_symbol_tuple_ { bool _0; sc_symbol_t _1; } sc_bool_symbol_tuple_t;
 typedef struct sc_bool_int_tuple_ { bool _0; int32_t _1; } sc_bool_int_tuple_t;
 typedef struct sc_bool_ast_tuple_ { bool _0; sc_ast_t *_1; } sc_bool_ast_tuple_t;
 
-typedef struct sc_any_list_tuple_ { sc_any_t _0; const sc_list_t *_1; } sc_any_list_tuple_t;
+typedef struct sc_ast_list_tuple_ { sc_ast_t *_0; const sc_list_t *_1; } sc_ast_list_tuple_t;
 
-typedef struct sc_symbol_any_tuple_ { sc_symbol_t _0; sc_any_t _1; } sc_symbol_any_tuple_t;
+//typedef struct sc_symbol_any_tuple_ { sc_symbol_t _0; sc_any_t _1; } sc_symbol_any_tuple_t;
 typedef struct sc_symbol_ast_tuple_ { sc_symbol_t _0; sc_ast_t *_1; } sc_symbol_ast_tuple_t;
 
 typedef struct sc_i32_i32_i32_tuple_ { int32_t _0, _1, _2; } sc_i32_i32_i32_tuple_t;
 
 typedef struct sc_rawstring_size_t_tuple_ { const char *_0; size_t _1; } sc_rawstring_size_t_tuple_t;
 
+typedef struct sc_rawstring_array_i32_tuple_ { char **_0; int _1; } sc_rawstring_array_i32_tuple_t;
+
 // compiler
 
 sc_i32_i32_i32_tuple_t sc_compiler_version();
-sc_bool_label_tuple_t sc_eval(const sc_syntax_t *expr, sc_scope_t *scope);
+sc_bool_ast_tuple_t sc_eval(sc_ast_t *expr, sc_scope_t *scope);
 sc_bool_ast_tuple_t sc_typify(sc_closure_t *srcl, int numtypes, const sc_type_t **typeargs);
-sc_bool_any_tuple_t sc_compile(sc_ast_t *srcl, uint64_t flags);
-sc_bool_string_tuple_t sc_compile_spirv(sc_symbol_t target, sc_label_t *srcl, uint64_t flags);
-sc_bool_string_tuple_t sc_compile_glsl(sc_symbol_t target, sc_label_t *srcl, uint64_t flags);
+sc_bool_ast_tuple_t sc_compile(sc_ast_t *srcl, uint64_t flags);
+sc_bool_string_tuple_t sc_compile_spirv(sc_symbol_t target, sc_ast_t *srcl, uint64_t flags);
+sc_bool_string_tuple_t sc_compile_glsl(sc_symbol_t target, sc_ast_t *srcl, uint64_t flags);
 bool sc_compile_object(const sc_string_t *path, sc_scope_t *table, uint64_t flags);
 void sc_enter_solver_cli ();
 sc_bool_size_tuple_t sc_verify_stack ();
-sc_bool_label_tuple_t sc_eval_inline(const sc_list_t *expr, sc_scope_t *scope);
-const sc_list_t *sc_launch_args();
+sc_bool_ast_tuple_t sc_eval_inline(sc_ast_t *expr, sc_scope_t *scope);
+sc_rawstring_array_i32_tuple_t sc_launch_args();
+
+// parsing
+
+sc_bool_ast_tuple_t sc_parse_from_path(const sc_string_t *path);
+sc_bool_ast_tuple_t sc_parse_from_string(const sc_string_t *str);
 
 // stdin/out
 
@@ -164,21 +158,21 @@ void sc_set_globals(sc_scope_t *s);
 
 // error handling
 
-void sc_set_last_error(sc_any_t err);
-const sc_string_t *sc_format_error(sc_any_t err);
+void sc_set_last_error(const sc_error_t *err);
+const sc_string_t *sc_format_error(const sc_error_t *err);
 void sc_set_last_runtime_error(const sc_string_t *msg);
 void sc_set_last_location_error(const sc_string_t *msg);
-sc_any_t sc_get_last_error();
-sc_any_t sc_location_error_new(const sc_string_t *msg);
-sc_any_t sc_runtime_error_new(const sc_string_t *msg);
+const sc_error_t *sc_get_last_error();
+const sc_error_t *sc_location_error_new(const sc_string_t *msg);
+const sc_error_t *sc_runtime_error_new(const sc_string_t *msg);
 void sc_set_signal_abort(bool value);
 void sc_abort();
 void sc_exit(int c);
 
 // memoization
 
-sc_bool_any_tuple_t sc_map_load(sc_any_t key);
-void sc_map_store(sc_any_t value, sc_any_t key);
+sc_bool_ast_tuple_t sc_map_load(const sc_list_t *key);
+void sc_map_store(sc_ast_t *value, const sc_list_t *key);
 
 // hashing
 
@@ -228,34 +222,20 @@ sc_rawstring_size_t_tuple_t sc_string_buffer(sc_string_t *str);
 const sc_string_t *sc_string_lslice(sc_string_t *str, size_t offset);
 const sc_string_t *sc_string_rslice(sc_string_t *str, size_t offset);
 
-// any
-
-const sc_string_t *sc_any_repr(sc_any_t value);
-const sc_string_t *sc_any_string(sc_any_t value);
-bool sc_any_eq(sc_any_t a, sc_any_t b);
-
 // lists
 
-const sc_list_t *sc_list_cons(sc_any_t at, const sc_list_t *next);
+const sc_list_t *sc_list_cons(sc_ast_t *at, const sc_list_t *next);
 const sc_list_t *sc_list_join(const sc_list_t *a, const sc_list_t *b);
 const sc_list_t *sc_list_dump(const sc_list_t *l);
-sc_any_list_tuple_t sc_list_decons(const sc_list_t *l);
+sc_ast_list_tuple_t sc_list_decons(const sc_list_t *l);
 size_t sc_list_count(const sc_list_t *l);
-sc_any_t sc_list_at(const sc_list_t *l);
+sc_ast_t *sc_list_at(const sc_list_t *l);
 const sc_list_t *sc_list_next(const sc_list_t *l);
 const sc_list_t *sc_list_reverse(const sc_list_t *l);
 
-// syntax objects
-
-sc_bool_syntax_tuple_t sc_syntax_from_path(const sc_string_t *path);
-sc_bool_syntax_tuple_t sc_syntax_from_string(const sc_string_t *str);
-const sc_syntax_t *sc_syntax_new(const sc_anchor_t *anchor, sc_any_t value, bool quoted);
-sc_any_t sc_syntax_wrap(const sc_anchor_t *anchor, sc_any_t e, bool quoted);
-sc_any_t sc_syntax_strip(sc_any_t e);
-
 // types
 
-sc_bool_any_tuple_t sc_type_at(const sc_type_t *T, sc_symbol_t key);
+sc_bool_ast_tuple_t sc_type_at(const sc_type_t *T, sc_symbol_t key);
 sc_bool_size_tuple_t sc_type_sizeof(const sc_type_t *T);
 sc_bool_size_tuple_t sc_type_alignof(const sc_type_t *T);
 sc_bool_int_tuple_t sc_type_countof(const sc_type_t *T);
@@ -267,8 +247,8 @@ void sc_type_debug_abi(const sc_type_t *T);
 sc_bool_type_tuple_t sc_type_storage(const sc_type_t *T);
 bool sc_type_is_opaque(const sc_type_t *T);
 const sc_string_t *sc_type_string(const sc_type_t *T);
-sc_symbol_any_tuple_t sc_type_next(const sc_type_t *type, sc_symbol_t key);
-void sc_type_set_symbol(sc_type_t *T, sc_symbol_t sym, sc_any_t value);
+sc_symbol_ast_tuple_t sc_type_next(const sc_type_t *type, sc_symbol_t key);
+void sc_type_set_symbol(sc_type_t *T, sc_symbol_t sym, sc_ast_t *value);
 
 // pointer types
 
@@ -281,8 +261,8 @@ const sc_type_t *sc_pointer_type_set_element_type(const sc_type_t *T, const sc_t
 
 // extern types
 
-int32_t sc_extern_type_location(const sc_type_t *T);
-int32_t sc_extern_type_binding(const sc_type_t *T);
+int32_t sc_extern_location(sc_ast_t *T);
+int32_t sc_extern_binding(sc_ast_t *T);
 
 // numerical types
 

@@ -9,7 +9,6 @@
 #include "gc.hpp"
 #include "anchor.hpp"
 #include "list.hpp"
-#include "syntax.hpp"
 #include "hash.hpp"
 #include "dyn_cast.inc"
 
@@ -53,7 +52,7 @@ StyledStream& Type::stream(StyledStream& ost) const {
     return ost;
 }
 
-void Type::bind(Symbol name, const Any &value) {
+void Type::bind(Symbol name, Const *value) {
     auto ret = symbols.insert({ name, value });
     if (!ret.second) {
         ret.first->second = value;
@@ -67,7 +66,7 @@ void Type::del(Symbol name) {
     }
 }
 
-bool Type::lookup(Symbol name, Any &dest) const {
+bool Type::lookup(Symbol name, Const *&dest) const {
     const Type *self = this;
     do {
         auto it = self->symbols.find(name);
@@ -82,7 +81,7 @@ bool Type::lookup(Symbol name, Any &dest) const {
     return false;
 }
 
-bool Type::lookup_local(Symbol name, Any &dest) const {
+bool Type::lookup_local(Symbol name, Const *&dest) const {
     auto it = symbols.find(name);
     if (it != symbols.end()) {
         dest = it->second;
@@ -91,11 +90,11 @@ bool Type::lookup_local(Symbol name, Any &dest) const {
     return false;
 }
 
-bool Type::lookup_call_handler(Any &dest) const {
+bool Type::lookup_call_handler(Const *&dest) const {
     return lookup(SYM_CallHandler, dest);
 }
 
-bool Type::lookup_return_handler(Any &dest) const {
+bool Type::lookup_return_handler(Const *&dest) const {
     return lookup(SYM_ReturnHandler, dest);
 }
 
@@ -191,7 +190,6 @@ SCOPES_RESULT(size_t) size_of(const Type *T) {
         const RealType *rt = cast<RealType>(T);
         return (rt->width + 7) / 8;
     }
-    case TK_Extern:
     case TK_Pointer: return PointerType::size();
     case TK_Array: return cast<ArrayType>(T)->size;
     case TK_Vector: return cast<VectorType>(T)->size;
@@ -226,7 +224,6 @@ SCOPES_RESULT(size_t) align_of(const Type *T) {
         default: break;
         }
     }
-    case TK_Extern:
     case TK_Pointer: return PointerType::size();
     case TK_Array: return cast<ArrayType>(T)->align;
     case TK_Vector: return cast<VectorType>(T)->align;
@@ -256,85 +253,11 @@ const Type *superof(const Type *T) {
     case TK_Typename: return cast<TypenameType>(T)->super();
     case TK_Return: return TYPE_Return;
     case TK_Function: return TYPE_Function;
-    case TK_Extern: return TYPE_Extern;
     case TK_Image: return TYPE_Image;
     case TK_SampledImage: return TYPE_SampledImage;
     }
     assert(false && "unhandled type kind; corrupt pointer?");
     return nullptr;
-}
-
-//------------------------------------------------------------------------------
-
-SCOPES_RESULT(Any) wrap_pointer(const Type *type, void *ptr) {
-    SCOPES_RESULT_TYPE(Any);
-    Any result = none;
-    result.type = type;
-
-    type = SCOPES_GET_RESULT(storage_type(type));
-    switch(type->kind()) {
-    case TK_Integer:
-    case TK_Real:
-    case TK_Pointer:
-        memcpy(result.content, ptr, SCOPES_GET_RESULT(size_of(type)));
-        return result;
-    case TK_Array:
-    case TK_Vector:
-    case TK_Tuple:
-    case TK_Union:
-        result.pointer = ptr;
-        return result;
-    default: break;
-    }
-
-    StyledString ss;
-    ss.out << "cannot wrap data of type " << type;
-    SCOPES_LOCATION_ERROR(ss.str());
-}
-
-SCOPES_RESULT(void *) get_pointer(const Type *type, Any &value, bool create) {
-    SCOPES_RESULT_TYPE(void *);
-    if (type == TYPE_Void) {
-        return value.content;
-    }
-    switch(type->kind()) {
-    case TK_Integer: {
-        auto it = cast<IntegerType>(type);
-        switch(it->width) {
-        case 1: return (void *)&value.i1;
-        case 8: return (void *)&value.u8;
-        case 16: return (void *)&value.u16;
-        case 32: return (void *)&value.u32;
-        case 64: return (void *)&value.u64;
-        default: break;
-        }
-    } break;
-    case TK_Real: {
-        auto rt = cast<RealType>(type);
-        switch(rt->width) {
-        case 32: return (void *)&value.f32;
-        case 64: return (void *)&value.f64;
-        default: break;
-        }
-    } break;
-    case TK_Pointer: return (void *)&value.pointer;
-    case TK_Typename: {
-        return get_pointer(SCOPES_GET_RESULT(storage_type(type)), value, create);
-    } break;
-    case TK_Array:
-    case TK_Vector:
-    case TK_Tuple:
-    case TK_Union:
-        if (create) {
-            value.pointer = tracked_malloc(SCOPES_GET_RESULT(size_of(type)));
-        }
-        return value.pointer;
-    default: break;
-    };
-
-    StyledString ss;
-    ss.out << "cannot extract pointer from type " << type;
-    SCOPES_LOCATION_ERROR(ss.str());
 }
 
 //------------------------------------------------------------------------------
@@ -433,7 +356,6 @@ void init_types() {
     DEFINE_TYPENAME("Return", TYPE_Return);
     DEFINE_TYPENAME("constant", TYPE_Constant);
     DEFINE_TYPENAME("function", TYPE_Function);
-    DEFINE_TYPENAME("extern", TYPE_Extern);
     DEFINE_TYPENAME("Image", TYPE_Image);
     DEFINE_TYPENAME("SampledImage", TYPE_SampledImage);
     DEFINE_TYPENAME("CStruct", TYPE_CStruct);
@@ -470,18 +392,10 @@ void init_types() {
     DEFINE_BASIC_TYPE("Symbol", Symbol, TYPE_Symbol, TYPE_U64);
     DEFINE_BASIC_TYPE("Builtin", Builtin, TYPE_Builtin, TYPE_U64);
 
-    DEFINE_STRUCT_TYPE("Any", Any, TYPE_Any,
-        TYPE_Type,
-        TYPE_U64
-    );
-
     DEFINE_OPAQUE_HANDLE_TYPE("ASTNode", ASTNode, TYPE_ASTNode);
 
     DEFINE_OPAQUE_HANDLE_TYPE("SourceFile", SourceFile, TYPE_SourceFile);
-    DEFINE_OPAQUE_HANDLE_TYPE("Label", Label, TYPE_Label);
-    DEFINE_OPAQUE_HANDLE_TYPE("Parameter", Parameter, TYPE_Parameter);
     DEFINE_OPAQUE_HANDLE_TYPE("Scope", Scope, TYPE_Scope);
-    DEFINE_OPAQUE_HANDLE_TYPE("Frame", Frame, TYPE_Frame);
     DEFINE_OPAQUE_HANDLE_TYPE("Closure", Closure, TYPE_Closure);
     DEFINE_OPAQUE_HANDLE_TYPE("String", String, TYPE_String);
     DEFINE_OPAQUE_HANDLE_TYPE("List", List, TYPE_List);
@@ -492,11 +406,6 @@ void init_types() {
         TYPE_I32,
         TYPE_I32
     );
-
-    DEFINE_STRUCT_HANDLE_TYPE("Syntax", Syntax, TYPE_Syntax,
-        TYPE_Anchor,
-        TYPE_Any,
-        TYPE_Bool);
 
     DEFINE_STRUCT_HANDLE_TYPE("Error", Error, TYPE_Error,
         TYPE_Anchor,

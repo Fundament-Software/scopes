@@ -71,10 +71,6 @@ SCOPES_RESULT(void *) PointerType::getelementptr(void *src, size_t i) const {
     return (void *)((char *)src + stride * i);
 }
 
-SCOPES_RESULT(Any) PointerType::unpack(void *src) const {
-    //SCOPES_RESULT_TYPE(Any);
-    return wrap_pointer(element_type, src);
-}
 size_t PointerType::size() {
     return sizeof(uint64_t);
 }

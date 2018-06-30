@@ -8,7 +8,6 @@
 #define SCOPES_AST_HPP
 
 #include "symbol.hpp"
-#include "any.hpp"
 #include "result.hpp"
 #include "type.hpp"
 
@@ -25,16 +24,22 @@ struct ReturnType;
 #define SCOPES_AST_KIND() \
     T(ASTK_Template, "ast-kind-template", Template) \
     T(ASTK_Function, "ast-kind-function", ASTFunction) \
+    T(ASTK_Extern, "ast-kind-extern", ASTExtern) \
     T(ASTK_Block, "ast-kind-block", Block) \
     T(ASTK_If, "ast-kind-if", If) \
     T(ASTK_Symbol, "ast-kind-symbol", ASTSymbol) \
     T(ASTK_Keyed, "ast-kind-keyed", Keyed) \
+    T(ASTK_ConstInt, "ast-kind-const-int", ConstInt) \
+    T(ASTK_ConstReal, "ast-kind-const-real", ConstReal) \
+    T(ASTK_ConstTuple, "ast-kind-const-tuple", ConstTuple) \
+    T(ASTK_ConstArray, "ast-kind-const-array", ConstArray) \
+    T(ASTK_ConstVector, "ast-kind-const-vector", ConstVector) \
+    T(ASTK_ConstPointer, "ast-kind-const-pointer", ConstPointer) \
     T(ASTK_ArgumentList, "ast-kind-argumentlist", ASTArgumentList) \
     T(ASTK_ExtractArgument, "ast-kind-extractargument", ASTExtractArgument) \
     T(ASTK_Call, "ast-kind-call", Call) \
     T(ASTK_Let, "ast-kind-let", Let) \
     T(ASTK_Loop, "ast-kind-loop", Loop) \
-    T(ASTK_Const, "ast-kind-const", Const) \
     T(ASTK_Break, "ast-kind-break", Break) \
     T(ASTK_Repeat, "ast-kind-repeat", Repeat) \
     T(ASTK_Return, "ast-kind-return", ASTReturn) \
@@ -57,6 +62,7 @@ struct ASTValue;
 
 typedef std::vector<ASTSymbol *> ASTSymbols;
 typedef std::vector<ASTNode *> ASTNodes;
+typedef std::vector<Const *> Constants;
 typedef std::vector<ASTValue *> ASTValues;
 typedef std::vector<Block *> Blocks;
 
@@ -73,6 +79,7 @@ struct ASTNode {
     bool is_typed() const;
     void set_type(const Type *type);
     const Type *get_type() const;
+    void change_type(const Type *type);
 private:
     const ASTKind _kind;
     const Type *_type;
@@ -181,6 +188,38 @@ struct ASTFunction : ASTValue {
     void bind(ASTNode *oldnode, ASTNode *newnode);
     ASTNode *resolve(ASTNode *node);
     std::unordered_map<ASTNode *, ASTNode *> map;
+};
+
+//------------------------------------------------------------------------------
+
+enum ExternFlags {
+    // if storage class is 'Uniform, the value is a SSBO
+    EF_BufferBlock = (1 << 0),
+    EF_NonWritable = (1 << 1),
+    EF_NonReadable = (1 << 2),
+    EF_Volatile = (1 << 3),
+    EF_Coherent = (1 << 4),
+    EF_Restrict = (1 << 5),
+    // if storage class is 'Uniform, the value is a UBO
+    EF_Block = (1 << 6),
+};
+
+struct ASTExtern : ASTValue {
+    static bool classof(const ASTNode *T);
+
+    ASTExtern(const Anchor *anchor, const Type *type, Symbol name,
+        size_t flags, Symbol storage_class, int location, int binding);
+
+    static ASTExtern *from(const Anchor *anchor, const Type *type, Symbol name,
+        size_t flags = 0,
+        Symbol storage_class = SYM_Unnamed,
+        int location = -1, int binding = -1);
+
+    Symbol name;
+    size_t flags;
+    Symbol storage_class;
+    int location;
+    int binding;
 };
 
 //------------------------------------------------------------------------------
@@ -302,11 +341,87 @@ struct Loop : ASTNode {
 struct Const : ASTValue {
     static bool classof(const ASTNode *T);
 
-    Const(const Anchor *anchor, Any value);
+    Const(ASTKind _kind, const Anchor *anchor, const Type *type);
+};
 
-    static Const *from(const Anchor *anchor, Any value);
+//------------------------------------------------------------------------------
 
-    Any value;
+struct ConstInt : Const {
+    static bool classof(const ASTNode *T);
+
+    ConstInt(const Anchor *anchor, const Type *type, uint64_t value);
+
+    static ConstInt *from(const Anchor *anchor, const Type *type, uint64_t value);
+    static ConstInt *symbol_from(const Anchor *anchor, Symbol value);
+    static ConstInt *builtin_from(const Anchor *anchor, Builtin value);
+
+    uint64_t value;
+};
+
+//------------------------------------------------------------------------------
+
+struct ConstReal : Const {
+    static bool classof(const ASTNode *T);
+
+    ConstReal(const Anchor *anchor, const Type *type, double value);
+
+    static ConstReal *from(const Anchor *anchor, const Type *type, double value);
+
+    double value;
+};
+
+//------------------------------------------------------------------------------
+
+struct ConstTuple : Const {
+    static bool classof(const ASTNode *T);
+
+    ConstTuple(const Anchor *anchor, const Type *type, const Constants &fields);
+
+    static ConstTuple *from(const Anchor *anchor, const Type *type, const Constants &fields);
+    static ConstTuple *none_from(const Anchor *anchor);
+
+    Constants values;
+};
+
+//------------------------------------------------------------------------------
+
+struct ConstArray : Const {
+    static bool classof(const ASTNode *T);
+
+    ConstArray(const Anchor *anchor, const Type *type, const Constants &fields);
+
+    static ConstArray *from(const Anchor *anchor, const Type *type, const Constants &fields);
+
+    Constants values;
+};
+
+//------------------------------------------------------------------------------
+
+struct ConstVector : Const {
+    static bool classof(const ASTNode *T);
+
+    ConstVector(const Anchor *anchor, const Type *type, const Constants &fields);
+
+    static ConstVector *from(const Anchor *anchor, const Type *type, const Constants &fields);
+
+    Constants values;
+};
+
+//------------------------------------------------------------------------------
+
+struct ConstPointer : Const {
+    static bool classof(const ASTNode *T);
+
+    ConstPointer(const Anchor *anchor, const Type *type, const void *pointer);
+
+    static ConstPointer *from(const Anchor *anchor, const Type *type, const void *pointer);
+    static ConstPointer *type_from(const Anchor *anchor, const Type *type);
+    static ConstPointer *closure_from(const Anchor *anchor, const Closure *closure);
+    static ConstPointer *string_from(const Anchor *anchor, const String *str);
+    static ConstPointer *ast_from(const Anchor *anchor, ASTNode *node);
+    static ConstPointer *list_from(const Anchor *anchor, const List *list);
+
+    const void *value;
 };
 
 //------------------------------------------------------------------------------

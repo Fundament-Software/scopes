@@ -13,6 +13,7 @@
 #include "hash.hpp"
 #include "timer.hpp"
 #include "gc.hpp"
+#include "builtin.hpp"
 #include "verify_tools.inc"
 #include "dyn_cast.inc"
 #include "coro/coro.h"
@@ -235,11 +236,11 @@ static SCOPES_RESULT(const Type *) merge_return_type(const Type *T1, const Type 
 }
 
 static bool is_useless(ASTNode *node) {
+    if (Const::classof(node)) return true;
     switch(node->kind()) {
     case ASTK_Template:
     case ASTK_Function:
     case ASTK_Symbol:
-    case ASTK_Const:
         return true;
     case ASTK_Let: {
         auto let = cast<Let>(node);
@@ -280,7 +281,7 @@ static ASTNode *extract_argument(ASTNode *value, int index) {
     if (rt) {
         const Type *T = rt->type_at_index(index);
         if (T == TYPE_Nothing) {
-            return Const::from(anchor, none);
+            return ConstTuple::none_from(anchor);
         } else {
             auto arglist = dyn_cast<ASTArgumentList>(value);
             if (arglist) {
@@ -294,7 +295,7 @@ static ASTNode *extract_argument(ASTNode *value, int index) {
     } else if (index == 0) {
         return value;
     } else {
-        return Const::from(anchor, none);
+        return ConstTuple::none_from(anchor);
     }
 }
 
@@ -383,7 +384,7 @@ static SCOPES_RESULT(void) specialize_bind_arguments(const ASTContext &ctx,
         } else if (i < tmpargs.size()) {
             newval = tmpargs[i];
         } else {
-            newval = Const::from(oldsym->anchor(), none);
+            newval = ConstTuple::none_from(oldsym->anchor());
         }
         auto newsym = ASTSymbol::from(oldsym->anchor(), oldsym->name, newval->get_type());
         ctx.frame->bind(oldsym, newsym);
@@ -414,9 +415,28 @@ static SCOPES_RESULT(Loop *) specialize_Loop(const ASTContext &ctx, Loop *loop) 
     return newloop;
 }
 
-static SCOPES_RESULT(Const *) specialize_Const(const ASTContext &ctx, Const *vconst) {
-    SCOPES_RESULT_TYPE(Const *);
-    return vconst;
+#define CONST_SPECIALIZER(NAME) \
+    static SCOPES_RESULT(ASTNode *) specialize_ ## NAME(const ASTContext &ctx, NAME *node) { return node; }
+
+CONST_SPECIALIZER(ConstInt)
+CONST_SPECIALIZER(ConstReal)
+CONST_SPECIALIZER(ConstPointer)
+CONST_SPECIALIZER(ConstTuple)
+CONST_SPECIALIZER(ConstArray)
+CONST_SPECIALIZER(ConstVector)
+CONST_SPECIALIZER(ASTExtern)
+
+const Type *try_get_const_type(ASTNode *node) {
+    if (isa<Const>(node))
+        return node->get_type();
+    return TYPE_Unknown;
+}
+
+const String *try_extract_string(ASTNode *node) {
+    auto ptr = dyn_cast<ConstPointer>(node);
+    if (ptr && (ptr->get_type() == TYPE_String))
+        return (const String *)ptr->value;
+    return nullptr;
 }
 
 static SCOPES_RESULT(Break *) specialize_Break(const ASTContext &ctx, Break *_break) {
@@ -486,21 +506,69 @@ static SCOPES_RESULT(Keyed *) specialize_Keyed(const ASTContext &ctx, Keyed *key
         SCOPES_GET_RESULT(specialize(ctx, keyed->value)));
 }
 
-SCOPES_RESULT(Any) extract_constant(ASTNode *value) {
-    SCOPES_RESULT_TYPE(Any);
-    auto constval = dyn_cast<Const>(value);
+template<typename T>
+SCOPES_RESULT(T *) extract_constant(ASTNode *value) {
+    SCOPES_RESULT_TYPE(T *);
+    auto constval = dyn_cast<T>(value);
     if (!constval) {
+        set_active_anchor(value->anchor());
         SCOPES_CHECK_RESULT(error_constant_expected(value));
     }
-    return constval->value;
+    return constval;
 }
 
 SCOPES_RESULT(const Type *) extract_type_constant(ASTNode *value) {
     SCOPES_RESULT_TYPE(const Type *);
-    Any x = SCOPES_GET_RESULT(extract_constant(value));
+    ConstPointer* x = SCOPES_GET_RESULT(extract_constant<ConstPointer>(value));
     set_active_anchor(value->anchor());
-    SCOPES_CHECK_RESULT(x.verify(TYPE_Type));
-    return x.typeref;
+    SCOPES_CHECK_RESULT(verify(x->get_type(), TYPE_Type));
+    return (const Type *)x->value;
+}
+
+SCOPES_RESULT(const Closure *) extract_closure_constant(ASTNode *value) {
+    SCOPES_RESULT_TYPE(const Closure *);
+    ConstPointer* x = SCOPES_GET_RESULT(extract_constant<ConstPointer>(value));
+    set_active_anchor(value->anchor());
+    SCOPES_CHECK_RESULT(verify(x->get_type(), TYPE_Closure));
+    return (const Closure *)x->value;
+}
+
+SCOPES_RESULT(const List *) extract_list_constant(ASTNode *value) {
+    SCOPES_RESULT_TYPE(const List *);
+    ConstPointer* x = SCOPES_GET_RESULT(extract_constant<ConstPointer>(value));
+    set_active_anchor(value->anchor());
+    SCOPES_CHECK_RESULT(verify(x->get_type(), TYPE_List));
+    return (const List *)x->value;
+}
+
+SCOPES_RESULT(const String *) extract_string_constant(ASTNode *value) {
+    SCOPES_RESULT_TYPE(const String *);
+    ConstPointer* x = SCOPES_GET_RESULT(extract_constant<ConstPointer>(value));
+    set_active_anchor(value->anchor());
+    SCOPES_CHECK_RESULT(verify(x->get_type(), TYPE_String));
+    return (const String *)x->value;
+}
+
+SCOPES_RESULT(Builtin) extract_builtin_constant(ASTNode *value) {
+    SCOPES_RESULT_TYPE(Builtin);
+    ConstInt* x = SCOPES_GET_RESULT(extract_constant<ConstInt>(value));
+    set_active_anchor(value->anchor());
+    SCOPES_CHECK_RESULT(verify(x->get_type(), TYPE_Builtin));
+    return Builtin((KnownSymbol)x->value);
+}
+
+SCOPES_RESULT(Symbol) extract_symbol_constant(ASTNode *value) {
+    SCOPES_RESULT_TYPE(Symbol);
+    ConstInt* x = SCOPES_GET_RESULT(extract_constant<ConstInt>(value));
+    set_active_anchor(value->anchor());
+    SCOPES_CHECK_RESULT(verify(x->get_type(), TYPE_Symbol));
+    return Symbol::wrap(x->value);
+}
+
+SCOPES_RESULT(uint64_t) extract_integer_constant(ASTNode *value) {
+    SCOPES_RESULT_TYPE(uint64_t);
+    ConstInt* x = SCOPES_GET_RESULT(extract_constant<ConstInt>(value));
+    return x->value;
 }
 
 static SCOPES_RESULT(const Type *) bool_op_return_type(const Type *T) {
@@ -557,12 +625,12 @@ static SCOPES_RESULT(void) verify_real_ops(const Type *a, const Type *b, const T
 #define READ_STORAGETYPEOF(NAME) \
         assert(argn <= argcount); \
         const Type *NAME = SCOPES_GET_RESULT(storage_type(values[argn++]->get_type()));
-#define READ_CONST(NAME) \
+#define READ_INT_CONST(NAME) \
         assert(argn <= argcount); \
-        Any NAME = SCOPES_GET_RESULT(extract_constant(values[argn++]));
+        auto NAME = SCOPES_GET_RESULT(extract_integer_constant(values[argn++]));
 #define READ_TYPE_CONST(NAME) \
         assert(argn <= argcount); \
-        const Type *NAME = SCOPES_GET_RESULT(extract_type_constant(values[argn++]));
+        auto NAME = SCOPES_GET_RESULT(extract_type_constant(values[argn++]));
 
 static const Type *get_function_type(ASTFunction *fn) {
     ArgTypes params;
@@ -580,9 +648,7 @@ static SCOPES_RESULT(ASTNode *) specialize_Call(const ASTContext &ctx, Call *cal
     SCOPES_CHECK_RESULT(specialize_arguments(ctx, values, call->args));
     const Type *T = callee->get_type();
     if (T == TYPE_Closure) {
-        auto anycl = SCOPES_GET_RESULT(extract_constant(callee));
-        //SCOPES_CHECK_RESULT(anycl.verify(TYPE_Closure));
-        const Closure *cl = anycl.closure;
+        const Closure *cl = SCOPES_GET_RESULT((extract_closure_constant(callee)));
         if (cl->func->is_inline()) {
             return SCOPES_GET_RESULT(specialize_inline(ctx, cl->frame, cl->func, values));
         } else {
@@ -606,9 +672,8 @@ static SCOPES_RESULT(ASTNode *) specialize_Call(const ASTContext &ctx, Call *cal
             }
         }
     } else if (T == TYPE_Builtin) {
-        auto anycl = SCOPES_GET_RESULT(extract_constant(callee));
         //SCOPES_CHECK_RESULT(anycl.verify(TYPE_Builtin));
-        Builtin b = anycl.builtin;
+        Builtin b = SCOPES_GET_RESULT(extract_builtin_constant(callee));
         size_t argcount = values.size();
         size_t argn = 0;
         set_active_anchor(call->anchor());
@@ -629,7 +694,7 @@ static SCOPES_RESULT(ASTNode *) specialize_Call(const ASTContext &ctx, Call *cal
         case FN_TypeOf: {
             CHECKARGS(1, 1);
             READ_TYPEOF(A);
-            return Const::from(call->anchor(), A);
+            return ConstPointer::type_from(call->anchor(), A);
         } break;
         case FN_IntToPtr: {
             CHECKARGS(2, 2);
@@ -650,8 +715,7 @@ static SCOPES_RESULT(ASTNode *) specialize_Call(const ASTContext &ctx, Call *cal
         case FN_ExtractValue: {
             CHECKARGS(2, 2);
             READ_STORAGETYPEOF(T);
-            READ_CONST(index);
-            size_t idx = SCOPES_GET_RESULT(cast_number<size_t>(index));
+            READ_INT_CONST(idx);
             switch(T->kind()) {
             case TK_Array: {
                 auto ai = cast<ArrayType>(T);
@@ -676,8 +740,7 @@ static SCOPES_RESULT(ASTNode *) specialize_Call(const ASTContext &ctx, Call *cal
             CHECKARGS(3, 3);
             READ_TYPEOF(AT);
             READ_STORAGETYPEOF(ET);
-            READ_CONST(index);
-            size_t idx = SCOPES_GET_RESULT(cast_number<size_t>(index));
+            READ_INT_CONST(idx);
             auto T = SCOPES_GET_RESULT(storage_type(AT));
             switch(T->kind()) {
             case TK_Array: {
@@ -828,9 +891,9 @@ static SCOPES_RESULT(ASTNode *) specialize_If(const ASTContext &ctx, If *_if) {
             set_active_anchor(clause.anchor);
             SCOPES_EXPECT_ERROR(error_invalid_condition_type(newcond));
         }
-        auto maybe_const = dyn_cast<Const>(newcond);
+        auto maybe_const = dyn_cast<ConstInt>(newcond);
         if (maybe_const) {
-            bool istrue = maybe_const->value.i1;
+            bool istrue = maybe_const->value;
             if (istrue) {
                 // always true - the remainder will not be evaluated
                 else_clause = Clause(clause.anchor, clause.value);
@@ -883,7 +946,7 @@ static SCOPES_RESULT(ASTNode *) specialize_Template(const ASTContext &ctx, Templ
     if (!frame) {
         SCOPES_LOCATION_ERROR(String::from("couldn't find frame"));
     }
-    return Const::from(_template->anchor(), Closure::from(_template, frame));
+    return ConstPointer::closure_from(_template->anchor(), Closure::from(_template, frame));
 }
 
 

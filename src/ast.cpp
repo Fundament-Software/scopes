@@ -9,6 +9,7 @@
 #include "error.hpp"
 #include "scope.hpp"
 #include "types.hpp"
+#include "stream_ast.hpp"
 #include "dyn_cast.inc"
 
 #include <assert.h>
@@ -127,6 +128,26 @@ ASTFunction *ASTFunction::from(
 
 //------------------------------------------------------------------------------
 
+ASTExtern::ASTExtern(const Anchor *anchor, const Type *type, Symbol _name, size_t _flags, Symbol _storage_class, int _location, int _binding)
+    : ASTValue(ASTK_Extern, anchor), name(_name), flags(_flags), storage_class(_storage_class), location(_location), binding(_binding) {
+    if ((storage_class == SYM_SPIRV_StorageClassUniform)
+        && !(flags & EF_BufferBlock)) {
+        flags |= EF_Block;
+    }
+    size_t ptrflags = required_flags_for_storage_class(storage_class);
+    if (flags & EF_NonWritable)
+        ptrflags |= PTF_NonWritable;
+    else if (flags & EF_NonReadable)
+        ptrflags |= PTF_NonReadable;
+    set_type(Pointer(type, ptrflags, storage_class));
+}
+
+ASTExtern *ASTExtern::from(const Anchor *anchor, const Type *type, Symbol name, size_t flags, Symbol storage_class, int location, int binding) {
+    return new ASTExtern(anchor, type, name, flags, storage_class, location, binding);
+}
+
+//------------------------------------------------------------------------------
+
 Block::Block(const Anchor *anchor, const ASTNodes &_body, ASTNode *_value)
     : ASTNode(ASTK_Block, anchor), body(_body), value(_value) {
 }
@@ -201,10 +222,12 @@ ASTValue::ASTValue(ASTKind _kind, const Anchor *anchor)
 }
 
 bool ASTValue::classof(const ASTNode *T) {
+    if (Const::classof(T)) return true;
     switch(T->kind()) {
     case ASTK_Template:
-    case ASTK_Const:
+    case ASTK_Function:
     case ASTK_Symbol:
+    case ASTK_Extern:
         return true;
     default: return false;
     }
@@ -276,13 +299,112 @@ Loop *Loop::from(const Anchor *anchor, const ASTSymbols &params, const ASTNodes 
 
 //------------------------------------------------------------------------------
 
-Const::Const(const Anchor *anchor, Any _value) :
-    ASTValue(ASTK_Const, anchor), value(_value) {
-    set_type(value.type);
+bool Const::classof(const ASTNode *T) {
+    switch(T->kind()) {
+    case ASTK_ConstInt:
+    case ASTK_ConstReal:
+    case ASTK_ConstTuple:
+    case ASTK_ConstArray:
+    case ASTK_ConstVector:
+    case ASTK_ConstPointer:
+        return true;
+    default: return false;
+    }
 }
 
-Const *Const::from(const Anchor *anchor, Any value) {
-    return new Const(anchor, value);
+Const::Const(ASTKind _kind, const Anchor *anchor, const Type *type)
+    : ASTValue(_kind, anchor) {
+    set_type(type);
+}
+
+//------------------------------------------------------------------------------
+
+ConstInt::ConstInt(const Anchor *anchor, const Type *type, uint64_t _value)
+    : Const(ASTK_ConstInt, anchor, type), value(_value) {
+}
+
+ConstInt *ConstInt::from(const Anchor *anchor, const Type *type, uint64_t value) {
+    return new ConstInt(anchor, type, value);
+}
+
+ConstInt *ConstInt::symbol_from(const Anchor *anchor, Symbol value) {
+    return new ConstInt(anchor, TYPE_Symbol, value.value());
+}
+
+ConstInt *ConstInt::builtin_from(const Anchor *anchor, Builtin value) {
+    return new ConstInt(anchor, TYPE_Builtin, value.value());
+}
+
+//------------------------------------------------------------------------------
+
+ConstReal::ConstReal(const Anchor *anchor, const Type *type, double _value)
+    : Const(ASTK_ConstReal, anchor, type), value(_value) {}
+
+ConstReal *ConstReal::from(const Anchor *anchor, const Type *type, double value) {
+    return new ConstReal(anchor, type, value);
+}
+
+//------------------------------------------------------------------------------
+
+ConstTuple::ConstTuple(const Anchor *anchor, const Type *type, const Constants &_fields)
+    : Const(ASTK_ConstTuple, anchor, type), values(_fields) {
+}
+
+ConstTuple *ConstTuple::from(const Anchor *anchor, const Type *type, const Constants &fields) {
+    return new ConstTuple(anchor, type, fields);
+}
+
+ConstTuple *ConstTuple::none_from(const Anchor *anchor) {
+    return from(anchor, TYPE_Nothing, {});
+}
+
+//------------------------------------------------------------------------------
+
+ConstArray::ConstArray(const Anchor *anchor, const Type *type, const Constants &_fields)
+    : Const(ASTK_ConstTuple, anchor, type), values(_fields) {
+}
+
+ConstArray *ConstArray::from(const Anchor *anchor, const Type *type, const Constants &fields) {
+    return new ConstArray(anchor, type, fields);
+}
+
+//------------------------------------------------------------------------------
+
+ConstVector::ConstVector(const Anchor *anchor, const Type *type, const Constants &_fields)
+    : Const(ASTK_ConstTuple, anchor, type), values(_fields) {
+}
+
+ConstVector *ConstVector::from(const Anchor *anchor, const Type *type, const Constants &fields) {
+    return new ConstVector(anchor, type, fields);
+}
+
+//------------------------------------------------------------------------------
+
+ConstPointer::ConstPointer(const Anchor *anchor, const Type *type, const void *_pointer)
+    : Const(ASTK_ConstPointer, anchor, type), value(_pointer) {}
+
+ConstPointer *ConstPointer::from(const Anchor *anchor, const Type *type, const void *pointer) {
+    return new ConstPointer(anchor, type, pointer);
+}
+
+ConstPointer *ConstPointer::type_from(const Anchor *anchor, const Type *type) {
+    return from(anchor, TYPE_Type, type);
+}
+
+ConstPointer *ConstPointer::closure_from(const Anchor *anchor, const Closure *closure) {
+    return from(anchor, TYPE_Closure, closure);
+}
+
+ConstPointer *ConstPointer::string_from(const Anchor *anchor, const String *str) {
+    return from(anchor, TYPE_String, str);
+}
+
+ConstPointer *ConstPointer::ast_from(const Anchor *anchor, ASTNode *node) {
+    return from(anchor, TYPE_ASTNode, node);
+}
+
+ConstPointer *ConstPointer::list_from(const Anchor *anchor, const List *list) {
+    return from(anchor, TYPE_List, list);
 }
 
 //------------------------------------------------------------------------------
@@ -340,6 +462,11 @@ void ASTNode::set_type(const Type *type) {
     _type = type;
 }
 
+void ASTNode::change_type(const Type *type) {
+    assert(is_typed());
+    _type = type;
+}
+
 const Type *ASTNode::get_type() const {
     assert(_type);
     return _type;
@@ -358,5 +485,14 @@ SCOPES_AST_KIND()
 
 //------------------------------------------------------------------------------
 
+StyledStream& operator<<(StyledStream& ost, ASTNode *node) {
+    stream_ast(ost, node, StreamASTFormat());
+    return ost;
+}
+
+StyledStream& operator<<(StyledStream& ost, const ASTNode *node) {
+    stream_ast(ost, node, StreamASTFormat());
+    return ost;
+}
 
 } // namespace scopes

@@ -8,7 +8,6 @@
 #define SCOPES_RETURN_HPP
 
 #include "type.hpp"
-#include "argument.hpp"
 #include "symbol.hpp"
 
 namespace scopes {

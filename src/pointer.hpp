@@ -30,7 +30,6 @@ struct PointerType : Type {
     void stream_name(StyledStream &ss) const;
     SCOPES_RESULT(void *) getelementptr(void *src, size_t i) const;
 
-    SCOPES_RESULT(Any) unpack(void *src) const;
     static size_t size();
 
     bool is_readable() const;

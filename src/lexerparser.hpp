@@ -7,12 +7,22 @@
 #ifndef SCOPES_LEXERPARSER_HPP
 #define SCOPES_LEXERPARSER_HPP
 
-#include "any.hpp"
 #include "result.hpp"
+
+#include <stddef.h>
 
 namespace scopes {
 
+struct String;
+struct Symbol;
+struct List;
+struct Anchor;
 struct SourceFile;
+struct Const;
+struct ASTNode;
+struct ConstInt;
+struct ConstPointer;
+struct Type;
 
 //------------------------------------------------------------------------------
 // S-EXPR LEXER & PARSER
@@ -53,7 +63,7 @@ struct LexerParser {
 
         ListBuilder(LexerParser &_lexer);
 
-        void append(const Any &value);
+        void append(ASTNode *value);
 
         bool is_empty() const;
 
@@ -104,10 +114,10 @@ struct LexerParser {
     SCOPES_RESULT(void) read_comment();
 
     template<typename T>
-    SCOPES_RESULT(int) read_integer(void (*strton)(T *, const char*, char**));
+    SCOPES_RESULT(int) read_integer(const Type *TT, void (*strton)(T *, const char*, char**));
 
     template<typename T>
-    SCOPES_RESULT(int) read_real(void (*strton)(T *, const char*, char**, int));
+    SCOPES_RESULT(int) read_real(const Type *TT, void (*strton)(T *, const char*, char**, int));
 
     bool has_suffix() const;
 
@@ -123,22 +133,22 @@ struct LexerParser {
 
     SCOPES_RESULT(Token) read_token();
 
-    Any get_symbol();
-    Any get_string();
-    Any get_block_string();
-    Any get_number();
-    Any get();
+    Symbol get_symbol();
+    const String *get_string();
+    const String *get_block_string();
+    ASTNode *get_number();
+    //Const *get();
 
     // parses a list to its terminator and returns a handle to the first cell
     SCOPES_RESULT(const List *) parse_list(Token end_token);
 
     // parses the next sequence and returns it wrapped in a cell that points
     // to prev
-    SCOPES_RESULT(Any) parse_any();
+    SCOPES_RESULT(ASTNode *) parse_any();
 
-    SCOPES_RESULT(Any) parse_naked(int column, Token end_token);
+    SCOPES_RESULT(ASTNode *) parse_naked(int column, Token end_token);
 
-    SCOPES_RESULT(Any) parse();
+    SCOPES_RESULT(ASTNode *) parse();
 
     Token token;
     int base_offset;
@@ -155,7 +165,7 @@ struct LexerParser {
     const char *string;
     int string_len;
 
-    Any value;
+    ASTNode *value;
 };
 
 

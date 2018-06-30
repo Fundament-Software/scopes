@@ -8,7 +8,6 @@
 #include "return.hpp"
 #include "tuple.hpp"
 #include "pointer.hpp"
-#include "extern.hpp"
 #include "error.hpp"
 #include "dyn_cast.inc"
 #include "hash.hpp"
@@ -127,20 +126,12 @@ bool is_function_pointer(const Type *type) {
         const PointerType *ptype = cast<PointerType>(type);
         return isa<FunctionType>(ptype->element_type);
     } break;
-    case TK_Extern: {
-        const ExternType *etype = cast<ExternType>(type);
-        return isa<FunctionType>(etype->type);
-    } break;
     default: return false;
     }
 }
 
 const FunctionType *extract_function_type(const Type *T) {
     switch(T->kind()) {
-    case TK_Extern: {
-        auto et = cast<ExternType>(T);
-        return cast<FunctionType>(et->type);
-    } break;
     case TK_Pointer: {
         auto pi = cast<PointerType>(T);
         return cast<FunctionType>(pi->element_type);

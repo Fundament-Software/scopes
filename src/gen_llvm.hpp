@@ -7,15 +7,19 @@
 #ifndef SCOPES_GEN_LLVM_HPP
 #define SCOPES_GEN_LLVM_HPP
 
-#include "any.hpp"
 #include "result.hpp"
+
+#include <stdint.h>
 
 namespace scopes {
 
 struct ASTFunction;
+struct String;
+struct ConstPointer;
+struct Scope;
 
 SCOPES_RESULT(void) compile_object(const String *path, Scope *scope, uint64_t flags);
-SCOPES_RESULT(Any) compile(ASTFunction *fn, uint64_t flags);
+SCOPES_RESULT(ConstPointer *) compile(ASTFunction *fn, uint64_t flags);
 
 } // namespace scopes
 

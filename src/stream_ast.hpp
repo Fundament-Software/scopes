@@ -34,7 +34,7 @@ struct StreamASTFormat {
 };
 
 void stream_ast(
-    StyledStream &_ss, ASTNode *node, const StreamASTFormat &_fmt);
+    StyledStream &_ss, const ASTNode *node, const StreamASTFormat &_fmt);
 
 } // namespace scopes
 
