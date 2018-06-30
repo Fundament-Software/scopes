@@ -4,7 +4,7 @@
     See LICENSE.md for details.
 */
 
-#include "real.hpp"
+#include "real_type.hpp"
 #include "utils.hpp"
 
 namespace scopes {

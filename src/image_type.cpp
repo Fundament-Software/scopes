@@ -4,7 +4,7 @@
     See LICENSE.md for details.
 */
 
-#include "image.hpp"
+#include "image_type.hpp"
 #include "hash.hpp"
 
 #include <unordered_set>

@@ -9,7 +9,7 @@
 #include "type.hpp"
 #include "boot.hpp"
 #include "ast.hpp"
-#include "return.hpp"
+#include "return_type.hpp"
 
 #include "scopes/config.h"
 

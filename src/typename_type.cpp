@@ -4,9 +4,9 @@
     See LICENSE.md for details.
 */
 
-#include "typename.hpp"
+#include "typename_type.hpp"
 #include "error.hpp"
-#include "return.hpp"
+#include "return_type.hpp"
 #include "dyn_cast.inc"
 
 namespace scopes {

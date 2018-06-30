@@ -4,7 +4,7 @@
     See LICENSE.md for details.
 */
 
-#include "pointer.hpp"
+#include "pointer_type.hpp"
 #include "hash.hpp"
 
 #include <assert.h>

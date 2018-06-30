@@ -4,7 +4,7 @@
     See LICENSE.md for details.
 */
 
-#include "vector.hpp"
+#include "vector_type.hpp"
 #include "error.hpp"
 #include "dyn_cast.inc"
 #include "hash.hpp"

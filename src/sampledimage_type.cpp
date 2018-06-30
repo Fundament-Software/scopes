@@ -4,8 +4,8 @@
     See LICENSE.md for details.
 */
 
-#include "sampledimage.hpp"
-#include "image.hpp"
+#include "sampledimage_type.hpp"
+#include "image_type.hpp"
 #include "dyn_cast.inc"
 #include "hash.hpp"
 

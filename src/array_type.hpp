@@ -7,7 +7,7 @@
 #ifndef SCOPES_ARRAY_HPP
 #define SCOPES_ARRAY_HPP
 
-#include "sized_storage.hpp"
+#include "sized_storage_type.hpp"
 #include "result.hpp"
 
 namespace scopes {

@@ -4,10 +4,10 @@
     See LICENSE.md for details.
 */
 
-#include "function.hpp"
-#include "return.hpp"
-#include "tuple.hpp"
-#include "pointer.hpp"
+#include "function_type.hpp"
+#include "return_type.hpp"
+#include "tuple_type.hpp"
+#include "pointer_type.hpp"
 #include "error.hpp"
 #include "dyn_cast.inc"
 #include "hash.hpp"

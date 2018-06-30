@@ -4,7 +4,7 @@
     See LICENSE.md for details.
 */
 
-#include "sized_storage.hpp"
+#include "sized_storage_type.hpp"
 
 namespace scopes {
 

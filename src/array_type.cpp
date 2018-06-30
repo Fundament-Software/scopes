@@ -4,7 +4,7 @@
     See LICENSE.md for details.
 */
 
-#include "array.hpp"
+#include "array_type.hpp"
 #include "error.hpp"
 #include "hash.hpp"
 

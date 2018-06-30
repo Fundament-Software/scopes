@@ -7,7 +7,7 @@
 #ifndef SCOPES_VECTOR_HPP
 #define SCOPES_VECTOR_HPP
 
-#include "sized_storage.hpp"
+#include "sized_storage_type.hpp"
 
 namespace scopes {
 

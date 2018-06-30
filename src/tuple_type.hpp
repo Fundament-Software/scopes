@@ -7,7 +7,7 @@
 #ifndef SCOPES_TUPLE_HPP
 #define SCOPES_TUPLE_HPP
 
-#include "sized_storage.hpp"
+#include "sized_storage_type.hpp"
 #include "result.hpp"
 
 namespace scopes {

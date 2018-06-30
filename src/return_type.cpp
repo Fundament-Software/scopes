@@ -4,8 +4,8 @@
     See LICENSE.md for details.
 */
 
-#include "return.hpp"
-#include "tuple.hpp"
+#include "return_type.hpp"
+#include "tuple_type.hpp"
 #include "hash.hpp"
 #include "dyn_cast.inc"
 

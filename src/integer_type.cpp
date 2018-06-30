@@ -4,7 +4,7 @@
     See LICENSE.md for details.
 */
 
-#include "integer.hpp"
+#include "integer_type.hpp"
 #include "utils.hpp"
 #include "dyn_cast.inc"
 

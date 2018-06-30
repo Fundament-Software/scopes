@@ -4,7 +4,7 @@
     See LICENSE.md for details.
 */
 
-#include "tuple.hpp"
+#include "tuple_type.hpp"
 #include "error.hpp"
 #include "utils.hpp"
 #include "hash.hpp"

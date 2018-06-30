@@ -4,10 +4,10 @@
     See LICENSE.md for details.
 */
 
-#include "union.hpp"
+#include "union_type.hpp"
 #include "error.hpp"
 #include "utils.hpp"
-#include "tuple.hpp"
+#include "tuple_type.hpp"
 #include "hash.hpp"
 
 #include <unordered_set>
