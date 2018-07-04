@@ -107,9 +107,6 @@ let
     pointer-type-set-storage-class = sc_pointer_type_set_storage_class
     pointer-type-storage-class = sc_pointer_type_get_storage_class
 
-    extern-location = sc_extern_location
-    extern-binding = sc_extern_binding
-
     bitcountof = sc_type_bitcountof
 
     integer-type = sc_integer_type

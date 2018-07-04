@@ -51,6 +51,25 @@
 
 #pragma GCC diagnostic ignored "-Wgnu-zero-variadic-macro-arguments"
 
+namespace scopes {
+
+static void init_values_array(scopes::Values &dest, int numvalues, sc_value_t **values) {
+    dest.reserve(numvalues);
+    for (int i = 0; i < numvalues; ++i) {
+        dest.push_back(values[i]);
+    }
+}
+
+template<typename T>
+static void init_values_array(std::vector<T *> &dest, int numvalues, sc_value_t **values) {
+    dest.reserve(numvalues);
+    for (int i = 0; i < numvalues; ++i) {
+        dest.push_back(cast<T>(values[i]));
+    }
+}
+
+} // namespace scopes
+
 extern "C" {
 
 // Compiler
@@ -650,6 +669,175 @@ const sc_list_t *sc_list_reverse(const sc_list_t *l) {
     return reverse_list(l);
 }
 
+// Value
+////////////////////////////////////////////////////////////////////////////////
+
+sc_value_t *sc_keyed_new(sc_symbol_t key, sc_value_t *value) {
+    using namespace scopes;
+    return Keyed::from(get_active_anchor(), key, value);
+}
+sc_value_t *sc_argument_list_new(int numvalues, sc_value_t **values) {
+    using namespace scopes;
+    Values vals;
+    init_values_array(vals, numvalues, values);
+    return ArgumentList::from(get_active_anchor(), vals);
+}
+
+sc_value_t *sc_template_new(sc_symbol_t name) {
+    using namespace scopes;
+    // todo: set scope
+    return Template::from(get_active_anchor(), name);
+}
+void sc_template_append_parameter(sc_value_t *fn, sc_value_t *symbol) {
+    using namespace scopes;
+    cast<Template>(fn)->append_param(cast<SymbolValue>(symbol));
+}
+void sc_template_set_body(sc_value_t *fn, sc_value_t *value) {
+    using namespace scopes;
+    cast<Template>(fn)->value = value;
+}
+
+void sc_template_set_inline(sc_value_t *fn) {
+    using namespace scopes;
+    cast<Template>(fn)->set_inline();
+}
+
+sc_value_t *sc_block_new(int numvalues, sc_value_t **values) {
+    using namespace scopes;
+    auto block = Block::from(get_active_anchor());
+    for (int i = 0; i < numvalues; ++i) {
+        block->append(values[i]);
+    }
+    return block->canonicalize();
+}
+
+sc_value_t *sc_extern_new(sc_symbol_t name, const sc_type_t *type) {
+    using namespace scopes;
+    return Extern::from(get_active_anchor(), type, name);
+}
+void sc_extern_set_flags(sc_value_t *value, uint32_t flags) {
+    using namespace scopes;
+    cast<Extern>(value)->flags = flags;
+}
+uint32_t sc_extern_get_flags(sc_value_t *value) {
+    using namespace scopes;
+    return cast<Extern>(value)->flags;
+}
+void sc_extern_set_storage_class(sc_value_t *value, sc_symbol_t storage_class) {
+    using namespace scopes;
+    cast<Extern>(value)->storage_class = storage_class;
+}
+sc_symbol_t sc_extern_get_storage_class(sc_value_t *value) {
+    using namespace scopes;
+    return cast<Extern>(value)->storage_class;
+}
+void sc_extern_set_location(sc_value_t *value, int32_t location) {
+    using namespace scopes;
+    cast<Extern>(value)->location = location;
+}
+int32_t sc_extern_get_location(sc_value_t *value) {
+    using namespace scopes;
+    return cast<Extern>(value)->location;
+}
+
+void sc_extern_set_binding(sc_value_t *value, int32_t binding) {
+    using namespace scopes;
+    cast<Extern>(value)->binding = binding;
+}
+int32_t sc_extern_get_binding(sc_value_t *value) {
+    using namespace scopes;
+    return cast<Extern>(value)->binding;
+}
+
+sc_value_t *sc_if_new() {
+    using namespace scopes;
+    return If::from(get_active_anchor());
+}
+void sc_if_append_then_clause(sc_value_t *value, sc_value_t *cond, sc_value_t *body) {
+    using namespace scopes;
+    cast<If>(value)->append(get_active_anchor(), cond, body);
+}
+void sc_if_append_else_clause(sc_value_t *value, sc_value_t *body) {
+    using namespace scopes;
+    cast<If>(value)->append(get_active_anchor(), body);
+}
+
+sc_value_t *sc_symbol_value_new(sc_symbol_t name, const sc_type_t *type) {
+    using namespace scopes;
+    return SymbolValue::from(get_active_anchor(), name, type);
+}
+
+sc_value_t *sc_call_new(sc_value_t *callee, int numargs, sc_value_t **args) {
+    using namespace scopes;
+    Values vals;
+    init_values_array(vals, numargs, args);
+    return Call::from(get_active_anchor(), callee, vals);
+}
+
+sc_value_t *sc_let_new(int numparams, sc_value_t **params, int numvalues, sc_value_t **values) {
+    using namespace scopes;
+    SymbolValues paramvals;
+    init_values_array(paramvals, numparams, params);
+    Values vals;
+    init_values_array(vals, numvalues, values);
+    return Let::from(get_active_anchor(), paramvals, vals);
+}
+
+sc_value_t *sc_loop_new(int numparams, sc_value_t **params, int numargs, sc_value_t **args, sc_value_t *body) {
+    using namespace scopes;
+    SymbolValues paramvals;
+    init_values_array(paramvals, numparams, params);
+    Values vals;
+    init_values_array(vals, numargs, args);
+    return Loop::from(get_active_anchor(), paramvals, vals, body);
+}
+
+sc_value_t *sc_const_int_new(const sc_type_t *type, uint64_t value) {
+    using namespace scopes;
+    return ConstInt::from(get_active_anchor(), type, value);
+}
+sc_value_t *sc_const_real_new(const sc_type_t *type, double value) {
+    using namespace scopes;
+    return ConstReal::from(get_active_anchor(), type, value);
+}
+sc_value_t *sc_const_tuple_new(const sc_type_t *type, int numconsts, sc_value_t **consts) {
+    using namespace scopes;
+    Constants vals;
+    init_values_array(vals, numconsts, consts);
+    return ConstTuple::from(get_active_anchor(), type, vals);
+}
+sc_value_t *sc_const_array_new(const sc_type_t *type, int numconsts, sc_value_t **consts) {
+    using namespace scopes;
+    Constants vals;
+    init_values_array(vals, numconsts, consts);
+    return ConstArray::from(get_active_anchor(), type, vals);
+}
+sc_value_t *sc_const_vector_new(const sc_type_t *type, int numconsts, sc_value_t **consts) {
+    using namespace scopes;
+    Constants vals;
+    init_values_array(vals, numconsts, consts);
+    return ConstVector::from(get_active_anchor(), type, vals);
+}
+sc_value_t *sc_const_pointer_new(const sc_type_t *type, const void *pointer) {
+    using namespace scopes;
+    return ConstPointer::from(get_active_anchor(), type, pointer);
+}
+
+sc_value_t *sc_break_new(sc_value_t *value) {
+    using namespace scopes;
+    return Break::from(get_active_anchor(), value);
+}
+sc_value_t *sc_repeat_new(int numargs, sc_value_t **args) {
+    using namespace scopes;
+    Values vals;
+    init_values_array(vals, numargs, args);
+    return Repeat::from(get_active_anchor(), vals);
+}
+sc_value_t *sc_return_new(sc_value_t *value) {
+    using namespace scopes;
+    return Return::from(get_active_anchor(), value);
+}
+
 // Parser
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -869,23 +1057,6 @@ const sc_type_t *sc_pointer_type_set_element_type(const sc_type_t *T, const sc_t
     return T;
 }
 
-// Extern Type
-////////////////////////////////////////////////////////////////////////////////
-
-int32_t sc_extern_location(sc_value_t *node) {
-    using namespace scopes;
-    auto ext = dyn_cast<Extern>(node);
-    if (!ext) return -1;
-    return ext->location;
-}
-
-int32_t sc_extern_binding(sc_value_t *node) {
-    using namespace scopes;
-    auto ext = dyn_cast<Extern>(node);
-    if (!ext) return -1;
-    return ext->binding;
-}
-
 // numerical types
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -1102,6 +1273,7 @@ void init_globals(int argc, char *argv[]) {
 
 
     const Type *rawstring = native_ro_pointer_type(TYPE_I8);
+    const Type *TYPE_ValuePP = native_ro_pointer_type(TYPE_Value);
 
     DEFINE_EXTERN_C_FUNCTION(sc_compiler_version, tuple_type({TYPE_I32, TYPE_I32, TYPE_I32}).assert_ok());
     DEFINE_EXTERN_C_FUNCTION(sc_eval, raising(TYPE_Value), TYPE_Value, TYPE_Scope);
@@ -1120,6 +1292,39 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_default_styler, TYPE_String, TYPE_Symbol, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_format_message, TYPE_String, TYPE_Anchor, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_write, TYPE_Void, TYPE_String);
+
+    DEFINE_EXTERN_C_FUNCTION(sc_keyed_new, TYPE_Value, TYPE_Symbol, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_argument_list_new, TYPE_Value, TYPE_I32, TYPE_ValuePP);
+    DEFINE_EXTERN_C_FUNCTION(sc_template_new, TYPE_Value, TYPE_Symbol);
+    DEFINE_EXTERN_C_FUNCTION(sc_template_append_parameter, TYPE_Void, TYPE_Value, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_template_set_body, TYPE_Void, TYPE_Value, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_template_set_inline, TYPE_Void, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_block_new, TYPE_Value, TYPE_I32, TYPE_ValuePP);
+    DEFINE_EXTERN_C_FUNCTION(sc_extern_new, TYPE_Value, TYPE_Symbol, TYPE_Type);
+    DEFINE_EXTERN_C_FUNCTION(sc_extern_set_flags, TYPE_Void, TYPE_Value, TYPE_U32);
+    DEFINE_EXTERN_C_FUNCTION(sc_extern_get_flags, TYPE_U32, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_extern_set_storage_class, TYPE_Void, TYPE_Value, TYPE_Symbol);
+    DEFINE_EXTERN_C_FUNCTION(sc_extern_get_storage_class, TYPE_Symbol, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_extern_set_location, TYPE_Void, TYPE_Value, TYPE_I32);
+    DEFINE_EXTERN_C_FUNCTION(sc_extern_get_location, TYPE_I32, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_extern_set_binding, TYPE_Void, TYPE_Value, TYPE_I32);
+    DEFINE_EXTERN_C_FUNCTION(sc_extern_get_binding, TYPE_I32, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_if_new, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_if_append_then_clause, TYPE_Void, TYPE_Value, TYPE_Value, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_if_append_else_clause, TYPE_Void, TYPE_Value, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_symbol_value_new, TYPE_Value, TYPE_Symbol, TYPE_Type);
+    DEFINE_EXTERN_C_FUNCTION(sc_call_new, TYPE_Value, TYPE_Value, TYPE_I32, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_let_new, TYPE_Value, TYPE_I32, TYPE_ValuePP, TYPE_I32, TYPE_ValuePP);
+    DEFINE_EXTERN_C_FUNCTION(sc_loop_new, TYPE_Value, TYPE_I32, TYPE_ValuePP, TYPE_I32, TYPE_ValuePP, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_const_int_new, TYPE_Value, TYPE_Type, TYPE_U64);
+    DEFINE_EXTERN_C_FUNCTION(sc_const_real_new, TYPE_Value, TYPE_Type, TYPE_F64);
+    DEFINE_EXTERN_C_FUNCTION(sc_const_tuple_new, TYPE_Value, TYPE_Type, TYPE_I32, TYPE_ValuePP);
+    DEFINE_EXTERN_C_FUNCTION(sc_const_array_new, TYPE_Value, TYPE_Type, TYPE_I32, TYPE_ValuePP);
+    DEFINE_EXTERN_C_FUNCTION(sc_const_vector_new, TYPE_Value, TYPE_Type, TYPE_I32, TYPE_ValuePP);
+    DEFINE_EXTERN_C_FUNCTION(sc_const_pointer_new, TYPE_Value, TYPE_Type, native_ro_pointer_type(TYPE_Void));
+    DEFINE_EXTERN_C_FUNCTION(sc_break_new, TYPE_Value, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_repeat_new, TYPE_Value, TYPE_I32, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_return_new, TYPE_Value, TYPE_Value);
 
     DEFINE_EXTERN_C_FUNCTION(sc_is_file, TYPE_Bool, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_is_directory, TYPE_Bool, TYPE_String);
@@ -1203,9 +1408,6 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_pointer_type_get_storage_class, TYPE_Symbol, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_pointer_type_set_storage_class, TYPE_Type, TYPE_Type, TYPE_Symbol);
     DEFINE_EXTERN_C_FUNCTION(sc_pointer_type_set_element_type, TYPE_Type, TYPE_Type, TYPE_Type);
-
-    DEFINE_EXTERN_C_FUNCTION(sc_extern_location, TYPE_I32, TYPE_Value);
-    DEFINE_EXTERN_C_FUNCTION(sc_extern_binding, TYPE_I32, TYPE_Value);
 
     DEFINE_EXTERN_C_FUNCTION(sc_type_bitcountof, TYPE_I32, TYPE_Type);
 

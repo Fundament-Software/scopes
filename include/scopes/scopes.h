@@ -130,6 +130,51 @@ sc_bool_size_tuple_t sc_verify_stack ();
 sc_bool_value_tuple_t sc_eval_inline(sc_value_t *expr, sc_scope_t *scope);
 sc_rawstring_array_i32_tuple_t sc_launch_args();
 
+// value
+
+sc_value_t *sc_keyed_new(sc_symbol_t key, sc_value_t *value);
+sc_value_t *sc_argument_list_new(int numvalues, sc_value_t **values);
+
+sc_value_t *sc_template_new(sc_symbol_t name);
+void sc_template_append_parameter(sc_value_t *fn, sc_value_t *symbol);
+void sc_template_set_body(sc_value_t *fn, sc_value_t *value);
+void sc_template_set_inline(sc_value_t *fn);
+
+sc_value_t *sc_block_new(int numvalues, sc_value_t **values);
+
+sc_value_t *sc_extern_new(sc_symbol_t name, const sc_type_t *type);
+void sc_extern_set_flags(sc_value_t *value, uint32_t flags);
+uint32_t sc_extern_get_flags(sc_value_t *value);
+void sc_extern_set_storage_class(sc_value_t *value, sc_symbol_t storage_class);
+sc_symbol_t sc_extern_get_storage_class(sc_value_t *value);
+void sc_extern_set_location(sc_value_t *value, int32_t location);
+int32_t sc_extern_get_location(sc_value_t *value);
+void sc_extern_set_binding(sc_value_t *value, int32_t binding);
+int32_t sc_extern_get_binding(sc_value_t *value);
+
+sc_value_t *sc_if_new();
+void sc_if_append_then_clause(sc_value_t *value, sc_value_t *cond, sc_value_t *body);
+void sc_if_append_else_clause(sc_value_t *value, sc_value_t *body);
+
+sc_value_t *sc_symbol_value_new(sc_symbol_t name, const sc_type_t *type);
+
+sc_value_t *sc_call_new(sc_value_t *callee, int numargs, sc_value_t **args);
+
+sc_value_t *sc_let_new(int numparams, sc_value_t **params, int numvalues, sc_value_t **values);
+
+sc_value_t *sc_loop_new(int numparams, sc_value_t **params, int numargs, sc_value_t **args, sc_value_t *body);
+
+sc_value_t *sc_const_int_new(const sc_type_t *type, uint64_t value);
+sc_value_t *sc_const_real_new(const sc_type_t *type, double value);
+sc_value_t *sc_const_tuple_new(const sc_type_t *type, int numconsts, sc_value_t **consts);
+sc_value_t *sc_const_array_new(const sc_type_t *type, int numconsts, sc_value_t **consts);
+sc_value_t *sc_const_vector_new(const sc_type_t *type, int numconsts, sc_value_t **consts);
+sc_value_t *sc_const_pointer_new(const sc_type_t *type, const void *pointer);
+
+sc_value_t *sc_break_new(sc_value_t *value);
+sc_value_t *sc_repeat_new(int numargs, sc_value_t **args);
+sc_value_t *sc_return_new(sc_value_t *value);
+
 // parsing
 
 sc_bool_value_tuple_t sc_parse_from_path(const sc_string_t *path);
@@ -258,11 +303,6 @@ const sc_type_t *sc_pointer_type_set_flags(const sc_type_t *T, uint64_t flags);
 sc_symbol_t sc_pointer_type_get_storage_class(const sc_type_t *T);
 const sc_type_t *sc_pointer_type_set_storage_class(const sc_type_t *T, sc_symbol_t storage_class);
 const sc_type_t *sc_pointer_type_set_element_type(const sc_type_t *T, const sc_type_t *ET);
-
-// extern types
-
-int32_t sc_extern_location(sc_value_t *T);
-int32_t sc_extern_binding(sc_value_t *T);
 
 // numerical types
 

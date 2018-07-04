@@ -299,6 +299,7 @@ static Value *extract_argument(Value *value, int index) {
     }
 }
 
+// used by Let, Loop, ArgumentList, Repeat, Call
 static SCOPES_RESULT(void) specialize_arguments(
     const ASTContext &ctx, Values &outargs, const Values &values) {
     SCOPES_RESULT_TYPE(void);
@@ -356,6 +357,7 @@ static SCOPES_RESULT(Value *) specialize_ExtractArgument(
     return extract_argument(value, node->index);
 }
 
+// used by Let and Loop
 static SCOPES_RESULT(void) specialize_bind_arguments(const ASTContext &ctx,
     SymbolValues &outparams, Values &outargs,
     const SymbolValues &params, const Values &values) {
@@ -949,7 +951,6 @@ static SCOPES_RESULT(Value *) specialize_Template(const ASTContext &ctx, Templat
     return ConstPointer::closure_from(_template->anchor(), Closure::from(_template, frame));
 }
 
-
 static SCOPES_RESULT(Function *) specialize_Function(const ASTContext &ctx, Function *fn) {
     SCOPES_RESULT_TYPE(Function *);
     return fn;
@@ -958,21 +959,28 @@ static SCOPES_RESULT(Function *) specialize_Function(const ASTContext &ctx, Func
 SCOPES_RESULT(Value *) specialize(const ASTContext &ctx, Value *node) {
     SCOPES_RESULT_TYPE(Value *);
     assert(node);
-    set_active_anchor(node->anchor());
-    //SCOPES_CHECK_RESULT(verify_stack());
-    Value *result = nullptr;
-    switch(node->kind()) {
+    Value *result = nullptr; //ctx.frame->resolve(node);
+    if (!result) {
+        set_active_anchor(node->anchor());
+        //SCOPES_CHECK_RESULT(verify_stack());
+        switch(node->kind()) {
 #define T(NAME, BNAME, CLASS) \
-    case NAME: result = SCOPES_GET_RESULT(specialize_ ## CLASS(ctx, cast<CLASS>(node))); break;
-    SCOPES_VALUE_KIND()
+        case NAME: result = SCOPES_GET_RESULT(specialize_ ## CLASS(ctx, cast<CLASS>(node))); break;
+        SCOPES_VALUE_KIND()
 #undef T
-    default: assert(false);
-    }
-    if (ctx.target == EvalTarget_Return) {
-        if (is_returning(result->get_type())) {
-            return SCOPES_GET_RESULT(make_return(ctx, result->anchor(), result));
+        default: assert(false);
+        }
+        if (ctx.target == EvalTarget_Return) {
+            if (is_returning(result->get_type())) {
+                result = SCOPES_GET_RESULT(make_return(ctx, result->anchor(), result));
+            }
         }
     }
+    assert(result);
+    #if 0
+    if (node != result)
+        ctx.frame->bind(node, result);
+    #endif
     return result;
 }
 
