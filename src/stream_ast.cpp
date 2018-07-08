@@ -240,6 +240,10 @@ struct StreamAST : StreamAnchors {
             auto val = cast<ConstReal>(node);
             ss << Style_Keyword << "ConstReal" << Style_None << " " << val->value;
         } break;
+        case VK_ConstPointer: {
+            auto val = cast<ConstPointer>(node);
+            ss << Style_Keyword << "ConstPointer" << Style_None << " " << val->value;
+        } break;
         case VK_Break: {
             auto val = cast<Break>(node);
             ss << Style_Keyword << "Break" << Style_None;
@@ -264,7 +268,9 @@ struct StreamAST : StreamAnchors {
             walk(val->func, depth+1, maxdepth);
         } break;
         default:
-            ss << Style_Error << "<unknown AST node type>" << Style_None;
+            ss << Style_Error << "<unhandled AST node type: "
+                << get_value_kind_name(node->kind())
+                << ">" << Style_None;
         }
     }
 

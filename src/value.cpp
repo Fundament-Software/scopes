@@ -16,6 +16,16 @@
 
 namespace scopes {
 
+const char *get_value_kind_name(ValueKind kind) {
+    switch(kind) {
+#define T(NAME, BNAME, CLASS) \
+    case NAME: return #BNAME;
+SCOPES_VALUE_KIND()
+#undef T
+    default: return "???";
+    }
+}
+
 //------------------------------------------------------------------------------
 
 Keyed::Keyed(const Anchor *anchor, Symbol _key, Value *node)

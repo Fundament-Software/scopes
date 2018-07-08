@@ -64,6 +64,8 @@ typedef std::vector<Value *> Values;
 typedef std::vector<Const *> Constants;
 typedef std::vector<Block *> Blocks;
 
+const char *get_value_kind_name(ValueKind kind);
+
 //------------------------------------------------------------------------------
 
 struct Value {

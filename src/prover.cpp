@@ -17,6 +17,9 @@
 #include "verify_tools.inc"
 #include "dyn_cast.inc"
 #include "coro/coro.h"
+#include "compiler_flags.hpp"
+#include "gen_llvm.hpp"
+#include "expander.hpp"
 
 #include <unordered_set>
 #include <deque>
@@ -93,6 +96,15 @@ namespace FunctionSet {
 } // namespace FunctionSet
 
 static std::unordered_set<Function *, FunctionSet::Hash, FunctionSet::KeyEqual> functions;
+
+//------------------------------------------------------------------------------
+
+// reduce typekind to compatible
+static TypeKind canonical_typekind(TypeKind k) {
+    if (k == TK_Real)
+        return TK_Integer;
+    return k;
+}
 
 //------------------------------------------------------------------------------
 
@@ -498,8 +510,29 @@ static SCOPES_RESULT(Value *) specialize_SyntaxExtend(const ASTContext &ctx, Syn
         SCOPES_LOCATION_ERROR(String::from("couldn't find frame"));
     }
     Function *fn = SCOPES_GET_RESULT(specialize(frame, sx->func, {TYPE_Scope}));
-    assert(false);
-    return nullptr;
+    //StyledStream ss;
+    //stream_ast(ss, fn, StreamASTFormat());
+    auto ftype = native_ro_pointer_type(function_type(TYPE_Scope, {TYPE_Scope}));
+    const void *ptr = SCOPES_GET_RESULT(compile(fn, CF_DumpModule))->value;
+    Scope *env = nullptr;
+    if (fn->get_type() == ftype) {
+        typedef Scope *(*SyntaxExtendFuncType)(Scope *);
+        SyntaxExtendFuncType fptr = (SyntaxExtendFuncType)ptr;
+        env = fptr(sx->env);
+        assert(env);
+    } else {
+        set_active_anchor(sx->anchor());
+        StyledString ss;
+        ss.out << "syntax-extend has wrong return type (expected function of type "
+            << ftype
+            //<< " or "
+            //<< ReturnLabel({unknown_of(TYPE_Scope)}, RLF_Raising)
+            << ", got " << fn->get_type() << ")";
+        SCOPES_LOCATION_ERROR(ss.str());
+    }
+    auto nextfn = SCOPES_GET_RESULT(expand_module(
+        ConstPointer::list_from(fn->anchor(), sx->next), env));
+    return specialize(ctx, nextfn->value);
 }
 
 static SCOPES_RESULT(Keyed *) specialize_Keyed(const ASTContext &ctx, Keyed *keyed) {
@@ -623,7 +656,8 @@ static SCOPES_RESULT(void) verify_real_ops(const Type *a, const Type *b, const T
     }
 #define READ_TYPEOF(NAME) \
         assert(argn <= argcount); \
-        const Type *NAME = values[argn++]->get_type();
+        auto _ ## NAME = values[argn++]; \
+        const Type *NAME = _ ## NAME->get_type();
 #define READ_STORAGETYPEOF(NAME) \
         assert(argn <= argcount); \
         const Type *NAME = SCOPES_GET_RESULT(storage_type(values[argn++]->get_type()));
@@ -697,6 +731,41 @@ static SCOPES_RESULT(Value *) specialize_Call(const ASTContext &ctx, Call *call)
             CHECKARGS(1, 1);
             READ_TYPEOF(A);
             return ConstPointer::type_from(call->anchor(), A);
+        } break;
+        case FN_Bitcast: {
+            CHECKARGS(2, 2);
+            READ_TYPEOF(SrcT);
+            READ_TYPE_CONST(DestT);
+            if (SrcT == DestT) {
+                return _SrcT;
+            } else {
+                const Type *SSrcT = SCOPES_GET_RESULT(storage_type(SrcT));
+                const Type *SDestT = SCOPES_GET_RESULT(storage_type(DestT));
+                if (canonical_typekind(SSrcT->kind())
+                        != canonical_typekind(SDestT->kind())) {
+                    StyledString ss;
+                    ss.out << "can not bitcast value of type " << SrcT
+                        << " to type " << DestT
+                        << " because storage types are not of compatible category";
+                    SCOPES_LOCATION_ERROR(ss.str());
+                }
+                if (SSrcT != SDestT) {
+                    switch (SDestT->kind()) {
+                    case TK_Array:
+                    //case TK_Vector:
+                    case TK_Tuple:
+                    case TK_Union: {
+                        StyledString ss;
+                        ss.out << "can not bitcast value of type " << SrcT
+                            << " to type " << DestT
+                            << " with aggregate storage type " << SDestT;
+                        SCOPES_LOCATION_ERROR(ss.str());
+                    } break;
+                    default: break;
+                    }
+                }
+                RETARGTYPES(DestT);
+            }
         } break;
         case FN_IntToPtr: {
             CHECKARGS(2, 2);

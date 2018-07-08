@@ -10,6 +10,7 @@
 #include "types.hpp"
 #include "c_import.hpp"
 #include "stream_expr.hpp"
+#include "stream_ast.hpp"
 #include "scope.hpp"
 #include "error.hpp"
 #include "globals.hpp"
@@ -672,6 +673,36 @@ const sc_list_t *sc_list_reverse(const sc_list_t *l) {
 // Value
 ////////////////////////////////////////////////////////////////////////////////
 
+const sc_string_t *sc_value_repr (sc_value_t *value) {
+    using namespace scopes;
+    StyledString ss;
+    stream_ast(ss.out, value, StreamASTFormat());
+    return ss.str();
+}
+
+const sc_string_t *sc_value_tostring (sc_value_t *value) {
+    using namespace scopes;
+    StyledString ss = StyledString::plain();
+    stream_ast(ss.out, value, StreamASTFormat());
+    return ss.str();
+}
+
+const sc_type_t *sc_value_type (sc_value_t *value) {
+    using namespace scopes;
+    assert(value->is_typed());
+    return value->get_type();
+}
+
+bool sc_value_is_constant(sc_value_t *value) {
+    using namespace scopes;
+    return isa<Const>(value);
+}
+
+int sc_value_kind (sc_value_t *value) {
+    using namespace scopes;
+    return value->kind();
+}
+
 sc_value_t *sc_keyed_new(sc_symbol_t key, sc_value_t *value) {
     using namespace scopes;
     return Keyed::from(get_active_anchor(), key, value);
@@ -821,6 +852,40 @@ sc_value_t *sc_const_vector_new(const sc_type_t *type, int numconsts, sc_value_t
 sc_value_t *sc_const_pointer_new(const sc_type_t *type, const void *pointer) {
     using namespace scopes;
     return ConstPointer::from(get_active_anchor(), type, pointer);
+}
+uint64_t sc_const_int_extract(const sc_value_t *value) {
+    using namespace scopes;
+    return cast<ConstInt>(value)->value;
+}
+double sc_const_real_extract(const sc_value_t *value) {
+    using namespace scopes;
+    return cast<ConstReal>(value)->value;
+}
+sc_value_t *sc_const_extract_at(const sc_value_t *value, int index) {
+    using namespace scopes;
+    switch(value->kind()) {
+    case VK_ConstTuple: {
+        auto val = cast<ConstTuple>(value);
+        assert(index < val->values.size());
+        return val->values[index];
+    } break;
+    case VK_ConstArray: {
+        auto val = cast<ConstArray>(value);
+        assert(index < val->values.size());
+        return val->values[index];
+    } break;
+    case VK_ConstVector: {
+        auto val = cast<ConstVector>(value);
+        assert(index < val->values.size());
+        return val->values[index];
+    } break;
+    default: assert(false);
+    }
+    return nullptr;
+}
+const void *sc_const_pointer_extract(const sc_value_t *value) {
+    using namespace scopes;
+    return cast<ConstPointer>(value)->value;
 }
 
 sc_value_t *sc_break_new(sc_value_t *value) {
@@ -1274,6 +1339,7 @@ void init_globals(int argc, char *argv[]) {
 
     const Type *rawstring = native_ro_pointer_type(TYPE_I8);
     const Type *TYPE_ValuePP = native_ro_pointer_type(TYPE_Value);
+    const Type *voidstar = native_ro_pointer_type(TYPE_Void);
 
     DEFINE_EXTERN_C_FUNCTION(sc_compiler_version, tuple_type({TYPE_I32, TYPE_I32, TYPE_I32}).assert_ok());
     DEFINE_EXTERN_C_FUNCTION(sc_eval, raising(TYPE_Value), TYPE_Value, TYPE_Scope);
@@ -1293,6 +1359,11 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_format_message, TYPE_String, TYPE_Anchor, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_write, TYPE_Void, TYPE_String);
 
+    DEFINE_EXTERN_C_FUNCTION(sc_value_repr, TYPE_String, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_value_tostring, TYPE_String, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_value_type, TYPE_Type, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_value_is_constant, TYPE_Bool, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_value_kind, TYPE_I32, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_keyed_new, TYPE_Value, TYPE_Symbol, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_argument_list_new, TYPE_Value, TYPE_I32, TYPE_ValuePP);
     DEFINE_EXTERN_C_FUNCTION(sc_template_new, TYPE_Value, TYPE_Symbol);
@@ -1321,7 +1392,12 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_const_tuple_new, TYPE_Value, TYPE_Type, TYPE_I32, TYPE_ValuePP);
     DEFINE_EXTERN_C_FUNCTION(sc_const_array_new, TYPE_Value, TYPE_Type, TYPE_I32, TYPE_ValuePP);
     DEFINE_EXTERN_C_FUNCTION(sc_const_vector_new, TYPE_Value, TYPE_Type, TYPE_I32, TYPE_ValuePP);
-    DEFINE_EXTERN_C_FUNCTION(sc_const_pointer_new, TYPE_Value, TYPE_Type, native_ro_pointer_type(TYPE_Void));
+    DEFINE_EXTERN_C_FUNCTION(sc_const_pointer_new, TYPE_Value, TYPE_Type, voidstar);
+    DEFINE_EXTERN_C_FUNCTION(sc_const_int_extract, TYPE_U64, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_const_real_extract, TYPE_F64, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_const_extract_at, TYPE_Value, TYPE_Value, TYPE_I32);
+    DEFINE_EXTERN_C_FUNCTION(sc_const_pointer_extract, voidstar, TYPE_Value);
+
     DEFINE_EXTERN_C_FUNCTION(sc_break_new, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_repeat_new, TYPE_Value, TYPE_I32, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_return_new, TYPE_Value, TYPE_Value);
@@ -1491,6 +1567,8 @@ void init_globals(int argc, char *argv[]) {
         bind_symbol(LINE_ANCHOR, sym, sym);
     }
 
+    globals->bind(Symbol("voidstar"),
+        ConstPointer::type_from(LINE_ANCHOR, voidstar));
 #define T(TYPE, NAME) \
     globals->bind(Symbol(NAME), ConstPointer::type_from(LINE_ANCHOR, TYPE));
 B_TYPES()
@@ -1499,6 +1577,11 @@ B_TYPES()
 #define T(NAME, BNAME, CLASS) \
     globals->bind(Symbol(BNAME), ConstInt::from(LINE_ANCHOR, TYPE_I32, (int32_t)NAME));
     B_TYPE_KIND()
+#undef T
+
+#define T(NAME, BNAME, CLASS) \
+    globals->bind(Symbol(BNAME), ConstInt::from(LINE_ANCHOR, TYPE_I32, (int32_t)NAME));
+    SCOPES_VALUE_KIND()
 #undef T
 
     globals->bind(Symbol("pointer-flag-non-readable"),

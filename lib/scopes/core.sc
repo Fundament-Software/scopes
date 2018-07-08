@@ -136,24 +136,22 @@ fn ptrcmp== (t1 t2)
     icmp== (ptrtoint t1 intptr) (ptrtoint t2 intptr)
 
 fn box-integer (value)
-    let val = (undef Any)
-    let val = (insertvalue val (typeof value) 0)
-    let val = (insertvalue val (zext value u64) 1)
-    val
+    let T = (typeof value)
+    sc_const_int_new T
+        if (sc_integer_type_is_signed T)
+            sext value u64
+        else
+            zext value u64
 
 # turn a symbol-like value (storage type u64) to an Any
 fn box-symbol (value)
-    let val = (undef Any)
-    let val = (insertvalue val (typeof value) 0)
-    let val = (insertvalue val value 1)
-    val
+    sc_const_int_new (typeof value)
+        bitcast value u64
 
 # turn a pointer value into an Any
 fn box-pointer (value)
-    let val = (undef Any)
-    let val = (insertvalue val (typeof value) 0)
-    let val = (insertvalue val (ptrtoint value u64) 1)
-    val
+    sc_const_pointer_new (typeof value)
+        bitcast value voidstar
 
 fn raise-compile-error! (value)
     set-error! (CompileError value)
@@ -165,45 +163,38 @@ fn unbox-verify (haveT wantT)
         raise-compile-error!
             sc_string_join "can't unbox value of type "
                 sc_string_join
-                    sc_any_repr (box-pointer haveT)
+                    sc_value_repr (box-pointer haveT)
                     sc_string_join " as value of type "
-                        sc_any_repr (box-pointer wantT)
+                        sc_value_repr (box-pointer wantT)
 
 inline unbox-integer (value T)
-    unbox-verify (extractvalue value 0) T
-    itrunc (extractvalue value 1) T
+    unbox-verify (sc_value_type value) T
+    itrunc (sc_const_int_extract value) T
 
 inline unbox-symbol (value T)
-    unbox-verify (extractvalue value 0) T
-    bitcast (extractvalue value 1) T
+    unbox-verify (sc_value_type value) T
+    bitcast (sc_const_int_extract value) T
 
 # turn an Any back into a pointer
 inline unbox-pointer (value T)
-    unbox-verify (extractvalue value 0) T
-    inttoptr (extractvalue value 1) T
+    unbox-verify (sc_value_type value) T
+    bitcast (sc_const_pointer_extract value) T
 
 fn verify-count (count mincount maxcount)
     if (icmp>=s mincount 0)
         if (icmp<s count mincount)
             raise-compile-error!
                 sc_string_join "at least "
-                    sc_string_join (sc_any_repr (box-integer mincount))
+                    sc_string_join (sc_value_repr (box-integer mincount))
                         sc_string_join " argument(s) expected, got "
-                            sc_any_repr (box-integer count)
+                            sc_value_repr (box-integer count)
     if (icmp>=s maxcount 0)
         if (icmp>s count maxcount)
             raise-compile-error!
                 sc_string_join "at most "
-                    sc_string_join (sc_any_repr (box-integer maxcount))
+                    sc_string_join (sc_value_repr (box-integer maxcount))
                         sc_string_join " argument(s) expected, got "
-                            sc_any_repr (box-integer count)
-
-fn Any-typeof (value)
-    extractvalue value 0
-
-fn Any-constant? (value)
-    let T = (extractvalue value 0)
-    ptrcmp!= T Parameter
+                            sc_value_repr (box-integer count)
 
 fn Any-none? (value)
     let T = (extractvalue value 0)
