@@ -99,10 +99,12 @@ sc_bool_value_tuple_t sc_eval(sc_value_t *expr, sc_scope_t *scope) {
     RETURN_RESULT(specialize(nullptr, module_result.assert_ok(), {}));
 }
 
+#if 0
 sc_bool_value_tuple_t sc_eval_inline(sc_value_t *expr, sc_scope_t *scope) {
     using namespace scopes;
     RETURN_RESULT(expand_inline(expr, scope));
 }
+#endif
 
 sc_bool_value_tuple_t sc_typify(sc_closure_t *srcl, int numtypes, const sc_type_t **typeargs) {
     using namespace scopes;
@@ -1343,7 +1345,7 @@ void init_globals(int argc, char *argv[]) {
 
     DEFINE_EXTERN_C_FUNCTION(sc_compiler_version, tuple_type({TYPE_I32, TYPE_I32, TYPE_I32}).assert_ok());
     DEFINE_EXTERN_C_FUNCTION(sc_eval, raising(TYPE_Value), TYPE_Value, TYPE_Scope);
-    DEFINE_EXTERN_C_FUNCTION(sc_eval_inline, raising(TYPE_Value), TYPE_Value, TYPE_Scope);
+    //DEFINE_EXTERN_C_FUNCTION(sc_eval_inline, raising(TYPE_Value), TYPE_Value, TYPE_Scope);
     DEFINE_EXTERN_C_FUNCTION(sc_typify, raising(TYPE_Value), TYPE_Closure, TYPE_I32, native_ro_pointer_type(TYPE_Type));
     DEFINE_EXTERN_C_FUNCTION(sc_compile, raising(TYPE_Value), TYPE_Value, TYPE_U64);
     DEFINE_EXTERN_C_FUNCTION(sc_compile_spirv, raising(TYPE_String), TYPE_Symbol, TYPE_Value, TYPE_U64);

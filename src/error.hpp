@@ -64,6 +64,7 @@ void location_message(const Anchor *anchor, const String* str);
 
 struct Value;
 struct SymbolValue;
+struct Template;
 
 // specializer errors
 SCOPES_RESULT(void) error_invalid_call_type(Value *callee);
@@ -78,6 +79,7 @@ SCOPES_RESULT(void) error_illegal_break_outside_loop();
 SCOPES_RESULT(void) error_variadic_symbol_not_in_last_place();
 SCOPES_RESULT(void) error_illegal_return_in_inline();
 SCOPES_RESULT(void) error_untyped_recursive_call();
+SCOPES_RESULT(void) error_cannot_find_frame(Template *func);
 
 // code generator errors
 SCOPES_RESULT(void) error_gen_invalid_call_type(const char *target, Value *callee);

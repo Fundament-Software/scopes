@@ -19,6 +19,7 @@
 #include "coro/coro.h"
 #include "compiler_flags.hpp"
 #include "gen_llvm.hpp"
+#include "list.hpp"
 #include "expander.hpp"
 
 #include <unordered_set>
@@ -507,13 +508,14 @@ static SCOPES_RESULT(Value *) specialize_SyntaxExtend(const ASTContext &ctx, Syn
     assert(sx->func->scope);
     Function *frame = ctx.frame->find_frame(sx->func->scope);
     if (!frame) {
-        SCOPES_LOCATION_ERROR(String::from("couldn't find frame"));
+        set_active_anchor(sx->func->anchor());
+        SCOPES_EXPECT_ERROR(error_cannot_find_frame(sx->func));
     }
     Function *fn = SCOPES_GET_RESULT(specialize(frame, sx->func, {TYPE_Scope}));
     //StyledStream ss;
     //stream_ast(ss, fn, StreamASTFormat());
     auto ftype = native_ro_pointer_type(function_type(TYPE_Scope, {TYPE_Scope}));
-    const void *ptr = SCOPES_GET_RESULT(compile(fn, CF_DumpModule))->value;
+    const void *ptr = SCOPES_GET_RESULT(compile(fn, 0/*CF_DumpModule*/))->value;
     Scope *env = nullptr;
     if (fn->get_type() == ftype) {
         typedef Scope *(*SyntaxExtendFuncType)(Scope *);
@@ -530,8 +532,10 @@ static SCOPES_RESULT(Value *) specialize_SyntaxExtend(const ASTContext &ctx, Syn
             << ", got " << fn->get_type() << ")";
         SCOPES_LOCATION_ERROR(ss.str());
     }
-    auto nextfn = SCOPES_GET_RESULT(expand_module(
-        ConstPointer::list_from(fn->anchor(), sx->next), env));
+    auto anchor = sx->next?sx->next->at->anchor():fn->anchor();
+    auto nextfn = SCOPES_GET_RESULT(expand_inline(
+        ctx.frame->original,
+        ConstPointer::list_from(anchor, sx->next), env));
     return specialize(ctx, nextfn->value);
 }
 
@@ -1015,7 +1019,8 @@ static SCOPES_RESULT(Value *) specialize_Template(const ASTContext &ctx, Templat
     assert(_template->scope);
     Function *frame = ctx.frame->find_frame(_template->scope);
     if (!frame) {
-        SCOPES_LOCATION_ERROR(String::from("couldn't find frame"));
+        set_active_anchor(_template->anchor());
+        SCOPES_EXPECT_ERROR(error_cannot_find_frame(_template));
     }
     return ConstPointer::closure_from(_template->anchor(), Closure::from(_template, frame));
 }

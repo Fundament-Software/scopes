@@ -31,6 +31,8 @@ struct StreamASTFormat {
     int depth;
 
     StreamASTFormat();
+
+    static StreamASTFormat debug();
 };
 
 void stream_ast(

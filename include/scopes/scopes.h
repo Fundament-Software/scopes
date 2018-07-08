@@ -127,7 +127,7 @@ sc_bool_string_tuple_t sc_compile_glsl(sc_symbol_t target, sc_value_t *srcl, uin
 bool sc_compile_object(const sc_string_t *path, sc_scope_t *table, uint64_t flags);
 void sc_enter_solver_cli ();
 sc_bool_size_tuple_t sc_verify_stack ();
-sc_bool_value_tuple_t sc_eval_inline(sc_value_t *expr, sc_scope_t *scope);
+//sc_bool_value_tuple_t sc_eval_inline(sc_value_t *expr, sc_scope_t *scope);
 sc_rawstring_array_i32_tuple_t sc_launch_args();
 
 // value

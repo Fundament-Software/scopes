@@ -723,6 +723,7 @@ struct Expander {
 
             if (headT == TYPE_Builtin) {
                 Builtin func = SCOPES_GET_RESULT(extract_builtin_constant(head));
+                set_active_anchor(node->anchor());
                 switch(func.value()) {
                 case KW_SyntaxLog: return expand_syntax_log(list);
                 case KW_Fn: {
@@ -844,7 +845,7 @@ struct Expander {
 bool Expander::verbose = false;
 const Type *Expander::list_expander_func_type = nullptr;
 
-SCOPES_RESULT(Template *) expand_inline(Value *expr, Scope *scope) {
+SCOPES_RESULT(Template *) expand_inline(Template *astscope, Value *expr, Scope *scope) {
     SCOPES_RESULT_TYPE(Template *);
     Timer sum_expand_time(TIMER_Expand);
     const Anchor *anchor = expr->anchor();
@@ -852,9 +853,10 @@ SCOPES_RESULT(Template *) expand_inline(Value *expr, Scope *scope) {
     assert(anchor);
     Template *mainfunc = Template::from(anchor, SYM_Unnamed);
     mainfunc->set_inline();
+    mainfunc->scope = astscope;
 
     Scope *subenv = scope?scope:globals;
-    Expander subexpr(subenv, mainfunc);
+    Expander subexpr(subenv, astscope);
     mainfunc->value = SCOPES_GET_RESULT(subexpr.expand_block(anchor, list));
 
     return mainfunc;

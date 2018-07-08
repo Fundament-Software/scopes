@@ -201,9 +201,49 @@ fn Any-none? (value)
     ptrcmp== T Nothing
 
 syntax-extend
-    let val = (box-pointer (sc_pointer_type type pointer-flag-non-writable unnamed))
-    sc_scope_set_symbol syntax-scope 'type-array val
+    let TypeArrayPointer =
+        box-pointer (sc_pointer_type type pointer-flag-non-writable unnamed)
+    let ValueArrayPointer =
+        box-pointer (sc_pointer_type Value pointer-flag-non-writable unnamed)
+    sc_scope_set_symbol syntax-scope 'TypeArrayPointer TypeArrayPointer
+    sc_scope_set_symbol syntax-scope 'ValueArrayPointer ValueArrayPointer
     let T = (sc_type_storage ASTMacro)
-    sc_scope_set_symbol syntax-scope 'ASTMacroFunctionType (box-pointer T)
+    sc_scope_set_symbol syntax-scope 'ASTMacroFunction (box-pointer T)
     sc_scope_set_symbol syntax-scope 'ellipsis-symbol (box-symbol (sc_symbol_new "..."))
+    syntax-scope
+
+dump "hello"
+
+syntax-extend
+    fn typify (args argcount)
+        let args = (verify-count argcount 1 -1)
+        dump args
+        let src_fn = (load (getelementptr args 0))
+        let src_fn = (unbox-pointer src_fn Closure)
+        let typecount = (sub argcount 1)
+        let types = (alloca-array type typecount)
+        loop (i j) = 1 0
+        if (icmp<s i argcount)
+            let ty = (load (getelementptr args i))
+            store (unbox-pointer ty type) (getelementptr types j)
+            repeat (add i 1) (add j 1)
+        sc_typify src_fn typecount (bitcast types TypeArrayPointer)
+
+    do
+        let types = (alloca-array type 2:usize)
+        store ValueArrayPointer (getelementptr types 0)
+        store i32 (getelementptr types 1)
+        let types = (bitcast types TypeArrayPointer)
+        dump types
+        let result = (sc_compile (sc_typify typify 2 types) 0:u64)
+        let result-type = (sc_value_type result)
+        if (ptrcmp!= result-type ASTMacroFunction)
+            raise-compile-error!
+                sc_string_join "AST macro must have type "
+                    sc_value_repr (box-pointer ASTMacroFunction)
+        let ptr = (sc_const_pointer_extract result)
+        let result =
+            sc_const_pointer_new ASTMacroFunction ptr
+        sc_scope_set_symbol syntax-scope 'typify result
+
     syntax-scope

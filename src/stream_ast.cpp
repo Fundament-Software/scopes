@@ -24,6 +24,12 @@ StreamASTFormat::StreamASTFormat() :
     depth(0)
 {}
 
+StreamASTFormat StreamASTFormat::debug() {
+    auto fmt = StreamASTFormat();
+    fmt.anchors = Line;
+    return fmt;
+}
+
 //------------------------------------------------------------------------------
 
 struct StreamAST : StreamAnchors {
@@ -77,7 +83,7 @@ struct StreamAST : StreamAnchors {
         const Anchor *anchor = node->anchor();
 
         stream_indent(depth);
-        if (atom_anchors) {
+        if (line_anchors) {
             stream_anchor(anchor);
         }
 
@@ -231,6 +237,10 @@ struct StreamAST : StreamAnchors {
             }
             ss << std::endl;
             walk(val->value, depth+1, maxdepth);
+        } break;
+        case VK_Extern: {
+            auto val = cast<Extern>(node);
+            ss << Style_Keyword << "Extern" << Style_None << " " << val->name;
         } break;
         case VK_ConstInt: {
             auto val = cast<ConstInt>(node);

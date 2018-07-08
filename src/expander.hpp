@@ -16,7 +16,7 @@ struct Scope;
 struct Template;
 
 SCOPES_RESULT(Template *) expand_module(Value *expr, Scope *scope = nullptr);
-SCOPES_RESULT(Template *) expand_inline(Value *expr, Scope *scope = nullptr);
+SCOPES_RESULT(Template *) expand_inline(Template *astscope, Value *expr, Scope *scope = nullptr);
 
 } // namespace scopes
 

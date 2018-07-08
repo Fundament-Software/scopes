@@ -193,6 +193,14 @@ SCOPES_RESULT(void) error_untyped_recursive_call() {
     SCOPES_LOCATION_ERROR(ss.str());
 }
 
+SCOPES_RESULT(void) error_cannot_find_frame(Template *func) {
+    SCOPES_RESULT_TYPE(void);
+    print_definition_anchor(func->scope);
+    StyledString ss;
+    ss.out << "couldn't find frame for scope of function";
+    SCOPES_LOCATION_ERROR(ss.str());
+}
+
 //------------------------------------------------------------------------------
 
 SCOPES_RESULT(void) error_gen_invalid_call_type(const char *target, Value *callee) {
