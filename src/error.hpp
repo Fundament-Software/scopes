@@ -23,6 +23,14 @@ struct StyledStream;
 void set_active_anchor(const Anchor *anchor);
 const Anchor *get_active_anchor();
 
+struct ScopedAnchor {
+    ScopedAnchor(const Anchor *anchor);
+    ~ScopedAnchor();
+    const Anchor *parent_anchor;
+};
+
+#define SCOPES_ANCHOR(ANCHOR) ScopedAnchor _scoped_anchor ## __LINE__(ANCHOR)
+
 //------------------------------------------------------------------------------
 
 struct Error {

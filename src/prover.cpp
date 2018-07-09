@@ -107,6 +107,30 @@ static TypeKind canonical_typekind(TypeKind k) {
     return k;
 }
 
+static SCOPES_RESULT(void) verify_readable(const Type *T) {
+    SCOPES_RESULT_TYPE(void);
+    auto pi = cast<PointerType>(T);
+    if (!pi->is_readable()) {
+        StyledString ss;
+        ss.out << "can not load value from address of type " << T
+            << " because the target is non-readable";
+        SCOPES_LOCATION_ERROR(ss.str());
+    }
+    return true;
+}
+
+static SCOPES_RESULT(void) verify_writable(const Type *T) {
+    SCOPES_RESULT_TYPE(void);
+    auto pi = cast<PointerType>(T);
+    if (!pi->is_writable()) {
+        StyledString ss;
+        ss.out << "can not store value at address of type " << T
+            << " because the target is non-writable";
+        SCOPES_LOCATION_ERROR(ss.str());
+    }
+    return true;
+}
+
 //------------------------------------------------------------------------------
 
 enum EvalTarget {
@@ -659,17 +683,19 @@ static SCOPES_RESULT(void) verify_real_ops(const Type *a, const Type *b, const T
         return newcall; \
     }
 #define READ_TYPEOF(NAME) \
-        assert(argn <= argcount); \
-        auto _ ## NAME = values[argn++]; \
+        assert(argn < argcount); \
+        auto &&_ ## NAME = values[argn++]; \
         const Type *NAME = _ ## NAME->get_type();
 #define READ_STORAGETYPEOF(NAME) \
-        assert(argn <= argcount); \
-        const Type *NAME = SCOPES_GET_RESULT(storage_type(values[argn++]->get_type()));
+        assert(argn < argcount); \
+        auto &&_ ## NAME = values[argn++]; \
+        const Type *NAME = SCOPES_GET_RESULT(storage_type(_ ## NAME->get_type()));
 #define READ_INT_CONST(NAME) \
-        assert(argn <= argcount); \
-        auto NAME = SCOPES_GET_RESULT(extract_integer_constant(values[argn++]));
+        assert(argn < argcount); \
+        auto &&_ ## NAME = values[argn++]; \
+        auto NAME = SCOPES_GET_RESULT(extract_integer_constant(_ ## NAME));
 #define READ_TYPE_CONST(NAME) \
-        assert(argn <= argcount); \
+        assert(argn < argcount); \
         auto NAME = SCOPES_GET_RESULT(extract_type_constant(values[argn++]));
 
 static const Type *get_function_type(Function *fn) {
@@ -837,6 +863,104 @@ static SCOPES_RESULT(Value *) specialize_Call(const ASTContext &ctx, Call *call)
             } break;
             }
             RETARGTYPES(AT);
+        } break;
+        case FN_GetElementPtr: {
+            CHECKARGS(2, -1);
+            READ_STORAGETYPEOF(T);
+            SCOPES_CHECK_RESULT(verify_kind<TK_Pointer>(T));
+            auto pi = cast<PointerType>(T);
+            T = pi->element_type;
+            READ_STORAGETYPEOF(arg);
+            SCOPES_CHECK_RESULT(verify_integer(arg));
+            while (argn < argcount) {
+                const Type *ST = SCOPES_GET_RESULT(storage_type(T));
+                switch(ST->kind()) {
+                case TK_Array: {
+                    auto ai = cast<ArrayType>(ST);
+                    T = ai->element_type;
+                    READ_STORAGETYPEOF(arg);
+                    SCOPES_CHECK_RESULT(verify_integer(arg));
+                } break;
+                case TK_Tuple: {
+                    auto ti = cast<TupleType>(ST);
+                    READ_INT_CONST(arg);
+                    if (_arg->get_type() == TYPE_Symbol) {
+                        auto sym = Symbol::wrap(arg);
+                        size_t idx = ti->field_index(sym);
+                        if (idx == (size_t)-1) {
+                            StyledString ss;
+                            ss.out << "no such field " << sym << " in storage type " << ST;
+                            SCOPES_LOCATION_ERROR(ss.str());
+                        }
+                        // rewrite field
+                        arg = idx;
+                        _arg = ConstInt::from(_arg->anchor(), TYPE_I32, idx);
+                    }
+                    T = SCOPES_GET_RESULT(ti->type_at_index(arg));
+                } break;
+                default: {
+                    StyledString ss;
+                    ss.out << "can not get element pointer from type " << T;
+                    SCOPES_LOCATION_ERROR(ss.str());
+                } break;
+                }
+            }
+            T = pointer_type(T, pi->flags, pi->storage_class);
+            RETARGTYPES(T);
+        } break;
+        case FN_VolatileLoad:
+        case FN_Load: {
+            CHECKARGS(1, 1);
+            READ_STORAGETYPEOF(T);
+            SCOPES_GET_RESULT(verify_kind<TK_Pointer>(T));
+            SCOPES_GET_RESULT(verify_readable(T));
+            RETARGTYPES(cast<PointerType>(T)->element_type);
+        } break;
+        case FN_VolatileStore:
+        case FN_Store: {
+            CHECKARGS(2, 2);
+            READ_STORAGETYPEOF(ElemT);
+            READ_STORAGETYPEOF(DestT);
+            SCOPES_GET_RESULT(verify_kind<TK_Pointer>(DestT));
+            SCOPES_GET_RESULT(verify_writable(DestT));
+            auto pi = cast<PointerType>(DestT);
+            SCOPES_CHECK_RESULT(
+                verify(SCOPES_GET_RESULT(storage_type(pi->element_type)), ElemT));
+            RETARGTYPES();
+        } break;
+        case FN_Alloca: {
+            CHECKARGS(1, 1);
+            READ_TYPE_CONST(T);
+            RETARGTYPES(local_pointer_type(T));
+        } break;
+        case FN_AllocaArray: {
+            CHECKARGS(2, 2);
+            READ_TYPE_CONST(T);
+            READ_STORAGETYPEOF(size);
+            SCOPES_CHECK_RESULT(verify_integer(size));
+            RETARGTYPES(local_pointer_type(T));
+        } break;
+        case FN_Malloc: {
+            CHECKARGS(1, 1);
+            READ_TYPE_CONST(T);
+            RETARGTYPES(native_pointer_type(T));
+        } break;
+        case FN_MallocArray: {
+            CHECKARGS(2, 2);
+            READ_TYPE_CONST(T);
+            READ_STORAGETYPEOF(size);
+            SCOPES_CHECK_RESULT(verify_integer(size));
+            RETARGTYPES(native_pointer_type(T));
+        } break;
+        case FN_Free: {
+            CHECKARGS(1, 1);
+            READ_STORAGETYPEOF(T);
+            SCOPES_CHECK_RESULT(verify_writable(T));
+            if (cast<PointerType>(T)->storage_class != SYM_Unnamed) {
+                SCOPES_LOCATION_ERROR(String::from(
+                    "pointer is not a heap pointer"));
+            }
+            RETARGTYPES();
         } break;
         case OP_ICmpEQ:
         case OP_ICmpNE:

@@ -34,6 +34,15 @@ const Anchor *get_active_anchor() {
 
 //------------------------------------------------------------------------------
 
+ScopedAnchor::ScopedAnchor(const Anchor *anchor) : parent_anchor(get_active_anchor()) {
+    set_active_anchor(anchor);
+}
+ScopedAnchor::~ScopedAnchor() {
+    set_active_anchor(parent_anchor);
+}
+
+//------------------------------------------------------------------------------
+
 Error::Error() :
     anchor(nullptr),
     msg(nullptr) {}
