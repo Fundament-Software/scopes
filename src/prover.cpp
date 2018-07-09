@@ -435,6 +435,7 @@ static SCOPES_RESULT(void) specialize_bind_arguments(const ASTContext &ctx,
 
 static SCOPES_RESULT(Value *) specialize_Let(const ASTContext &ctx, Let *let) {
     SCOPES_RESULT_TYPE(Value *);
+    SCOPES_ANCHOR(let->anchor());
     Let *newlet = Let::from(let->anchor());
     SCOPES_CHECK_RESULT(specialize_bind_arguments(ctx,
         newlet->params, newlet->args, let->params, let->args));
@@ -444,6 +445,7 @@ static SCOPES_RESULT(Value *) specialize_Let(const ASTContext &ctx, Let *let) {
 
 static SCOPES_RESULT(Loop *) specialize_Loop(const ASTContext &ctx, Loop *loop) {
     SCOPES_RESULT_TYPE(Loop *);
+    SCOPES_ANCHOR(loop->anchor());
     Loop *newloop = Loop::from(loop->anchor());
     SCOPES_CHECK_RESULT(specialize_bind_arguments(ctx,
         newloop->params, newloop->args, loop->params, loop->args));
@@ -480,8 +482,8 @@ const String *try_extract_string(Value *node) {
 
 static SCOPES_RESULT(Break *) specialize_Break(const ASTContext &ctx, Break *_break) {
     SCOPES_RESULT_TYPE(Break *);
+    SCOPES_ANCHOR(_break->anchor());
     if (!ctx.loop) {
-        SCOPES_ANCHOR(_break->anchor());
         SCOPES_EXPECT_ERROR(error_illegal_break_outside_loop());
     }
     auto subctx = ctx.with_target(EvalTarget_Symbol);
@@ -494,8 +496,8 @@ static SCOPES_RESULT(Break *) specialize_Break(const ASTContext &ctx, Break *_br
 
 static SCOPES_RESULT(Repeat *) specialize_Repeat(const ASTContext &ctx, Repeat *_repeat) {
     SCOPES_RESULT_TYPE(Repeat *);
+    SCOPES_ANCHOR(_repeat->anchor());
     if (!ctx.loop) {
-        SCOPES_ANCHOR(_repeat->anchor());
         SCOPES_EXPECT_ERROR(error_illegal_repeat_outside_loop());
     }
     auto newrepeat = Repeat::from(_repeat->anchor());
@@ -506,10 +508,10 @@ static SCOPES_RESULT(Repeat *) specialize_Repeat(const ASTContext &ctx, Repeat *
 
 static SCOPES_RESULT(Return *) make_return(const ASTContext &ctx, const Anchor *anchor, Value *value) {
     SCOPES_RESULT_TYPE(Return *);
+    SCOPES_ANCHOR(anchor);
     assert(ctx.frame);
     if (ctx.frame->original
         && ctx.frame->original->is_inline()) {
-        SCOPES_ANCHOR(anchor);
         SCOPES_EXPECT_ERROR(error_illegal_return_in_inline());
     }
     ctx.frame->return_type = SCOPES_GET_RESULT(merge_return_type(ctx.frame->return_type, value->get_type()));
@@ -708,6 +710,7 @@ static const Type *get_function_type(Function *fn) {
 
 static SCOPES_RESULT(Value *) specialize_Call(const ASTContext &ctx, Call *call) {
     SCOPES_RESULT_TYPE(Value *);
+    SCOPES_ANCHOR(call->anchor());
     auto subctx = ctx.with_target(EvalTarget_Symbol);
     Value *callee = SCOPES_GET_RESULT(specialize(subctx, call->callee));
     Values values;
@@ -1159,7 +1162,8 @@ SCOPES_RESULT(Value *) specialize(const ASTContext &ctx, Value *node) {
     assert(node);
     Value *result = nullptr; //ctx.frame->resolve(node);
     if (!result) {
-        SCOPES_ANCHOR(node->anchor());
+        // we shouldn't set an anchor here because sometimes the parent context
+        // is more indicative than the node position
         //SCOPES_CHECK_RESULT(verify_stack());
         switch(node->kind()) {
 #define T(NAME, BNAME, CLASS) \
@@ -1197,6 +1201,7 @@ SCOPES_RESULT(Value *) specialize_inline(const ASTContext &ctx,
     auto block = Block::from(func->anchor(), {let}, fn->value);
 
     ASTContext subctx(fn, ctx.target);
+    SCOPES_ANCHOR(fn->anchor());
     return SCOPES_GET_RESULT(specialize(subctx, block));
 }
 
@@ -1256,6 +1261,7 @@ SCOPES_RESULT(Function *) specialize(Function *frame, Template *func, const ArgT
     functions.insert(fn);
 
     ASTContext subctx(fn, EvalTarget_Return);
+    SCOPES_ANCHOR(fn->anchor());
     fn->value = SCOPES_GET_RESULT(specialize(subctx, fn->value));
     assert(!is_returning(fn->value->get_type()));
     fn->complete = true;
