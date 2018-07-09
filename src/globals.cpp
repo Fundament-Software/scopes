@@ -436,7 +436,7 @@ bool sc_load_library(const sc_string_t *name) {
 
 void sc_set_active_anchor(const sc_anchor_t *anchor) {
     using namespace scopes;
-    set_active_anchor(anchor);
+    _set_active_anchor(anchor);
 }
 
 const sc_anchor_t *sc_get_active_anchor() {
@@ -1336,8 +1336,7 @@ void init_globals(int argc, char *argv[]) {
 
     auto stub_file = SourceFile::from_string(Symbol(__FILE__), String::from_cstr(""));
     auto stub_anchor = Anchor::from(stub_file, 1, 1);
-    set_active_anchor(stub_anchor);
-
+    _set_active_anchor(stub_anchor);
 
     const Type *rawstring = native_ro_pointer_type(TYPE_I8);
     const Type *TYPE_ValuePP = native_ro_pointer_type(TYPE_Value);

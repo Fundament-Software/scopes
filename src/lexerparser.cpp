@@ -224,6 +224,7 @@ SCOPES_RESULT(int) LexerParser::read_integer(const Type *TT, void (*strton)(T *,
         // suffix
         auto _lineno = lineno; auto _line = line; auto _cursor = cursor;
         next_token();
+        SCOPES_ANCHOR(anchor());
         SCOPES_CHECK_RESULT(read_symbol());
         lineno = _lineno; line = _line; cursor = _cursor;
         return RN_Typed;
@@ -252,6 +253,7 @@ SCOPES_RESULT(int) LexerParser::read_real(const Type *TT, void (*strton)(T *, co
         // suffix
         auto _lineno = lineno; auto _line = line; auto _cursor = cursor;
         next_token();
+        SCOPES_ANCHOR(anchor());
         SCOPES_CHECK_RESULT(read_symbol());
         lineno = _lineno; line = _line; cursor = _cursor;
         return RN_Typed;
@@ -348,7 +350,6 @@ void LexerParser::next_token() {
     lineno = next_lineno;
     line = next_line;
     cursor = next_cursor;
-    set_active_anchor(anchor());
 }
 
 SCOPES_RESULT(Token) LexerParser::read_token() {
@@ -356,6 +357,7 @@ SCOPES_RESULT(Token) LexerParser::read_token() {
     char c;
 skip:
     next_token();
+    SCOPES_ANCHOR(anchor());
     if (is_eof()) { token = tok_eof; goto done; }
     c = SCOPES_GET_RESULT(next());
     if (c == '\n') { newline(); }
@@ -508,7 +510,7 @@ SCOPES_RESULT(const List *) LexerParser::parse_list(Token end_token) {
             SCOPES_CHECK_RESULT(this->read_token());
             builder.append(SCOPES_GET_RESULT(parse_naked(column, end_token)));
         } else if (this->token == tok_eof) {
-            set_active_anchor(start_anchor);
+            SCOPES_ANCHOR(start_anchor);
             SCOPES_LOCATION_ERROR(String::from("unclosed open bracket"));
         } else if (this->token == tok_statement) {
             builder.split(this->anchor());
@@ -543,6 +545,7 @@ SCOPES_RESULT(Value *) LexerParser::parse_any() {
     } else if ((this->token == tok_close)
         || (this->token == tok_square_close)
         || (this->token == tok_curly_close)) {
+        SCOPES_ANCHOR(anchor);
         SCOPES_LOCATION_ERROR(String::from("stray closing bracket"));
     } else if (this->token == tok_string) {
         return ConstPointer::string_from(anchor, get_string());
@@ -555,7 +558,7 @@ SCOPES_RESULT(Value *) LexerParser::parse_any() {
     } else if (this->token == tok_quote) {
         SCOPES_CHECK_RESULT(this->read_token());
         if (this->token == tok_eof) {
-            set_active_anchor(anchor);
+            SCOPES_ANCHOR(anchor);
             SCOPES_LOCATION_ERROR(
                 String::from("unexpected end of file after quote token"));
         }
@@ -565,6 +568,7 @@ SCOPES_RESULT(Value *) LexerParser::parse_any() {
                 SCOPES_GET_RESULT(parse_any())
                 }));
     } else {
+        SCOPES_ANCHOR(anchor);
         SCOPES_LOCATION_ERROR(format("unexpected token: %c (%i)",
             this->cursor[0], (int)this->cursor[0]));
     }
@@ -589,6 +593,7 @@ SCOPES_RESULT(Value *) LexerParser::parse_naked(int column, Token end_token) {
             escape = true;
             SCOPES_CHECK_RESULT(this->read_token());
             if (this->lineno <= lineno) {
+                SCOPES_ANCHOR(this->anchor());
                 SCOPES_LOCATION_ERROR(String::from(
                     "escape character is not at end of line"));
             }
@@ -597,10 +602,12 @@ SCOPES_RESULT(Value *) LexerParser::parse_naked(int column, Token end_token) {
             if (subcolumn == 0) {
                 subcolumn = this->column();
             } else if (this->column() != subcolumn) {
+                SCOPES_ANCHOR(this->anchor());
                 SCOPES_LOCATION_ERROR(String::from("indentation mismatch"));
             }
             if (column != subcolumn) {
                 if ((column + 4) != subcolumn) {
+                    SCOPES_ANCHOR(this->anchor());
                     SCOPES_LOCATION_ERROR(String::from(
                         "indentations must nest by 4 spaces."));
                 }
@@ -655,12 +662,14 @@ SCOPES_RESULT(Value *) LexerParser::parse() {
             //escape = true;
             SCOPES_CHECK_RESULT(this->read_token());
             if (this->lineno <= lineno) {
+                SCOPES_ANCHOR(this->anchor());
                 SCOPES_LOCATION_ERROR(String::from(
                     "escape character is not at end of line"));
             }
             lineno = this->lineno;
         } else if (this->lineno > lineno) {
             if (this->column() != 1) {
+                SCOPES_ANCHOR(this->anchor());
                 SCOPES_LOCATION_ERROR(String::from(
                     "indentation mismatch"));
             }
@@ -674,6 +683,7 @@ SCOPES_RESULT(Value *) LexerParser::parse() {
                 builder.append(SCOPES_GET_RESULT(parse_naked(1, tok_none)));
             }
         } else if (this->token == tok_statement) {
+            SCOPES_ANCHOR(this->anchor());
             SCOPES_LOCATION_ERROR(String::from(
                 "unexpected statement token"));
         } else {

@@ -825,7 +825,6 @@ struct LLVMIRGenerator {
 
     SCOPES_RESULT(LLVMValueRef) Template_to_value(Template *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
-        set_active_anchor(node->anchor());
         assert(false);
 
         SCOPES_LOCATION_ERROR(String::from("IL->IR: cannot translate template"));
@@ -902,7 +901,6 @@ struct LLVMIRGenerator {
 
     SCOPES_RESULT(LLVMValueRef) Function_to_value(Function *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
-        set_active_anchor(node->anchor());
 
         const char *name;
         auto funcname = node->name;
@@ -1072,11 +1070,8 @@ struct LLVMIRGenerator {
 
     SCOPES_RESULT(LLVMValueRef) Call_to_value(Call *call) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
-        set_active_anchor(call->anchor());
         auto callee = call->callee;
         auto &&args = call->args;
-
-        set_active_anchor(call->anchor());
 
         LLVMValueRef diloc = nullptr;
         if (use_debug_info) {
@@ -1088,11 +1083,9 @@ struct LLVMIRGenerator {
 #define READ_VALUE(NAME) \
         assert(argn <= argcount); \
         Value * _ ## NAME = args[argn++]; \
-        set_active_anchor(call->anchor()); \
         LLVMValueRef NAME = SCOPES_GET_RESULT(node_to_value(_ ## NAME));
 #define READ_TYPE(NAME) \
         assert(argn <= argcount); \
-        set_active_anchor(call->anchor()); \
         LLVMTypeRef NAME = SCOPES_GET_RESULT(node_to_llvm_type(args[argn++]));
 
         auto T = try_get_const_type(callee);
@@ -1522,7 +1515,7 @@ struct LLVMIRGenerator {
             contarg = enter;
         } else {
 #endif
-        set_active_anchor(call->anchor());
+        SCOPES_ANCHOR(call->anchor());
         SCOPES_EXPECT_ERROR(error_gen_invalid_call_type(SCOPES_GEN_TARGET, callee));
     }
 
@@ -1600,6 +1593,7 @@ struct LLVMIRGenerator {
 
     SCOPES_RESULT(LLVMValueRef) _node_to_value(Value *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
+        SCOPES_ANCHOR(node->anchor());
         switch(node->kind()) {
         #define T(NAME, BNAME, CLASS) \
             case NAME: return CLASS ## _to_value(cast<CLASS>(node));
@@ -1621,7 +1615,6 @@ struct LLVMIRGenerator {
     }
     SCOPES_RESULT(LLVMValueRef) Extern_to_value(Extern *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
-        set_active_anchor(node->anchor());
         auto it = extern2global.find(node);
         if (it == extern2global.end()) {
             const String *namestr = node->name.name();
@@ -1658,21 +1651,18 @@ struct LLVMIRGenerator {
 
     SCOPES_RESULT(LLVMValueRef) ConstInt_to_value(ConstInt *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
-        set_active_anchor(node->anchor());
         auto T = SCOPES_GET_RESULT(type_to_llvm_type(node->get_type()));
         return LLVMConstInt(T, node->value, false);
     }
 
     SCOPES_RESULT(LLVMValueRef) ConstReal_to_value(ConstReal *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
-        set_active_anchor(node->anchor());
         auto T = SCOPES_GET_RESULT(type_to_llvm_type(node->get_type()));
         return LLVMConstReal(T, node->value);
     }
 
     SCOPES_RESULT(LLVMValueRef) ConstPointer_to_value(ConstPointer *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
-        set_active_anchor(node->anchor());
         auto LLT = SCOPES_GET_RESULT(type_to_llvm_type(node->get_type()));
         if (!node->value) {
             return LLVMConstPointerNull(LLT);
@@ -1719,7 +1709,6 @@ struct LLVMIRGenerator {
 
     SCOPES_RESULT(LLVMValueRef) ConstTuple_to_value(ConstTuple *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
-        set_active_anchor(node->anchor());
         LLVMTypeRef LLT = SCOPES_GET_RESULT(type_to_llvm_type(node->get_type()));
         size_t count = node->values.size();
         LLVMValueRef values[count];
@@ -1735,7 +1724,6 @@ struct LLVMIRGenerator {
 
     SCOPES_RESULT(LLVMValueRef) ConstArray_to_value(ConstArray *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
-        set_active_anchor(node->anchor());
         size_t count = node->values.size();
         LLVMValueRef values[count];
         for (size_t i = 0; i < count; ++i) {
@@ -1748,7 +1736,6 @@ struct LLVMIRGenerator {
 
     SCOPES_RESULT(LLVMValueRef) ConstVector_to_value(ConstVector *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
-        set_active_anchor(node->anchor());
         size_t count = node->values.size();
         LLVMValueRef values[count];
         for (size_t i = 0; i < count; ++i) {

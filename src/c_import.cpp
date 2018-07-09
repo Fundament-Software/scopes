@@ -236,7 +236,7 @@ public:
         } else if (rd->isClass()) {
             struct_type = get_typename(name, named_classes);
         } else {
-            set_active_anchor(anchorFromLocation(rd->getSourceRange().getBegin()));
+            SCOPES_ANCHOR(anchorFromLocation(rd->getSourceRange().getBegin()));
             StyledString ss;
             ss.out << "clang-bridge: can't translate record of unuspported type " << name;
             SCOPES_LOCATION_ERROR(ss.str());
@@ -248,7 +248,7 @@ public:
 
             auto tni = cast<TypenameType>(const_cast<Type *>(struct_type));
             if (tni->finalized()) {
-                set_active_anchor(anchorFromLocation(rd->getSourceRange().getBegin()));
+                SCOPES_ANCHOR(anchorFromLocation(rd->getSourceRange().getBegin()));
                 StyledString ss;
                 ss.out << "clang-bridge: duplicate body defined for type " << struct_type;
                 SCOPES_LOCATION_ERROR(ss.str());

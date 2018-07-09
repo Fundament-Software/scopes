@@ -119,8 +119,6 @@ struct Expander {
 
         func->value = SCOPES_GET_RESULT(subexpr.expand_block(_anchor, it));
 
-        set_active_anchor(_anchor);
-
         auto node = SyntaxExtend::from(_anchor, func, next, env);
         next = EOL;
         return node;
@@ -241,7 +239,6 @@ struct Expander {
 
         func->value = SCOPES_GET_RESULT(subexpr.expand_block(_anchor, it));
 
-        set_active_anchor(_anchor);
         return func;
     }
 
@@ -374,13 +371,13 @@ struct Expander {
             // alternative format
             const List *equit = it;
             while (equit) {
-                set_active_anchor(equit->at->anchor());
+                SCOPES_ANCHOR(equit->at->anchor());
                 it = SCOPES_GET_RESULT(extract_list_constant(equit->at));
                 SCOPES_CHECK_RESULT(verify_list_parameter_count("=", it, 3, -1, 0));
                 auto paramval = it->at;
                 it = it->next;
                 if (!is_equal_token(it->at)) {
-                    set_active_anchor(it->at->anchor());
+                    SCOPES_ANCHOR(it->at->anchor());
                     SCOPES_LOCATION_ERROR(String::from("= token expected"));
                 }
                 it = it->next;
@@ -390,7 +387,7 @@ struct Expander {
                 Value *node = SCOPES_GET_RESULT(subexp.expand(it->at));
                 it = subexp.next;
                 if (it) {
-                    set_active_anchor(it->at->anchor());
+                    SCOPES_ANCHOR(it->at->anchor());
                     SCOPES_LOCATION_ERROR(String::from("extraneous argument"));
                 }
                 auto sym = SCOPES_GET_RESULT(expand_parameter(paramval, node));
@@ -419,7 +416,7 @@ struct Expander {
                     auto name = SCOPES_GET_RESULT(extract_symbol_constant(it->at));
                     ScopeEntry entry;
                     if (!env->lookup(name, entry)) {
-                        set_active_anchor(it->at->anchor());
+                        SCOPES_ANCHOR(it->at->anchor());
                         StyledString ss;
                         ss.out << "no such name bound in parent scope: '"
                             << name.name()->data << "'. ";
@@ -596,7 +593,7 @@ struct Expander {
             next = it->next;
             Symbol key = SYM_Unnamed;
             Value *value;
-            set_active_anchor(it->at->anchor());
+            SCOPES_ANCHOR(it->at->anchor());
             if (SCOPES_GET_RESULT(get_kwargs(it->at, key, value))) {
                 args.push_back(
                     Keyed::from(get_active_anchor(), key,
@@ -686,7 +683,7 @@ struct Expander {
         SCOPES_RESULT_TYPE(Value *);
     expand_again:
         SCOPES_CHECK_RESULT(verify_stack());
-        set_active_anchor(node->anchor());
+        SCOPES_ANCHOR(node->anchor());
         if (!isa<Const>(node)) {
             if (verbose) {
                 StyledStream ss(SCOPES_CERR);
@@ -723,7 +720,6 @@ struct Expander {
 
             if (headT == TYPE_Builtin) {
                 Builtin func = SCOPES_GET_RESULT(extract_builtin_constant(head));
-                set_active_anchor(node->anchor());
                 switch(func.value()) {
                 case KW_SyntaxLog: return expand_syntax_log(list);
                 case KW_Fn: {
@@ -789,7 +785,7 @@ struct Expander {
                     ss << "ignored by list handler" << std::endl;
                 }
             }
-            set_active_anchor(node->anchor());
+            SCOPES_ANCHOR(node->anchor());
             return expand_call(list);
         } else if (T == TYPE_Symbol) {
             if (verbose) {

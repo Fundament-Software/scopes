@@ -23,7 +23,7 @@ namespace scopes {
 
 static const Anchor *_active_anchor = nullptr;
 
-void set_active_anchor(const Anchor *anchor) {
+void _set_active_anchor(const Anchor *anchor) {
     assert(anchor);
     _active_anchor = anchor;
 }
@@ -35,10 +35,10 @@ const Anchor *get_active_anchor() {
 //------------------------------------------------------------------------------
 
 ScopedAnchor::ScopedAnchor(const Anchor *anchor) : parent_anchor(get_active_anchor()) {
-    set_active_anchor(anchor);
+    _set_active_anchor(anchor);
 }
 ScopedAnchor::~ScopedAnchor() {
-    set_active_anchor(parent_anchor);
+    _set_active_anchor(parent_anchor);
 }
 
 //------------------------------------------------------------------------------
@@ -142,7 +142,7 @@ SCOPES_RESULT(void) error_unbound_symbol(SymbolValue *value) {
     SCOPES_RESULT_TYPE(void);
     print_definition_anchor(value);
     StyledString ss;
-    ss.out << "symbol " << value->name << " is unbound";
+    ss.out << "symbol " << value->name << " is unbound in scope";
     SCOPES_LOCATION_ERROR(ss.str());
 }
 

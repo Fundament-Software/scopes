@@ -296,7 +296,7 @@ static SCOPES_RESULT(Value *) specialize_Block(const ASTContext &ctx, Block *blo
     for (auto &&src : block->body) {
         auto newsrc = SCOPES_GET_RESULT(specialize(subctx, src));
         if (!is_returning(newsrc->get_type())) {
-            set_active_anchor(newsrc->anchor());
+            SCOPES_ANCHOR(newsrc->anchor());
             SCOPES_CHECK_RESULT(error_noreturn_not_last_expression());
         }
         if (!is_useless(newsrc)) {
@@ -407,7 +407,7 @@ static SCOPES_RESULT(void) specialize_bind_arguments(const ASTContext &ctx,
         Value *newval = nullptr;
         if (oldsym->is_variadic()) {
             if ((i + 1) < count) {
-                set_active_anchor(oldsym->anchor());
+                SCOPES_ANCHOR(oldsym->anchor());
                 SCOPES_EXPECT_ERROR(error_variadic_symbol_not_in_last_place());
             }
             if ((i + 1) == (int)tmpargs.size()) {
@@ -481,7 +481,7 @@ const String *try_extract_string(Value *node) {
 static SCOPES_RESULT(Break *) specialize_Break(const ASTContext &ctx, Break *_break) {
     SCOPES_RESULT_TYPE(Break *);
     if (!ctx.loop) {
-        set_active_anchor(_break->anchor());
+        SCOPES_ANCHOR(_break->anchor());
         SCOPES_EXPECT_ERROR(error_illegal_break_outside_loop());
     }
     auto subctx = ctx.with_target(EvalTarget_Symbol);
@@ -495,7 +495,7 @@ static SCOPES_RESULT(Break *) specialize_Break(const ASTContext &ctx, Break *_br
 static SCOPES_RESULT(Repeat *) specialize_Repeat(const ASTContext &ctx, Repeat *_repeat) {
     SCOPES_RESULT_TYPE(Repeat *);
     if (!ctx.loop) {
-        set_active_anchor(_repeat->anchor());
+        SCOPES_ANCHOR(_repeat->anchor());
         SCOPES_EXPECT_ERROR(error_illegal_repeat_outside_loop());
     }
     auto newrepeat = Repeat::from(_repeat->anchor());
@@ -509,7 +509,7 @@ static SCOPES_RESULT(Return *) make_return(const ASTContext &ctx, const Anchor *
     assert(ctx.frame);
     if (ctx.frame->original
         && ctx.frame->original->is_inline()) {
-        set_active_anchor(anchor);
+        SCOPES_ANCHOR(anchor);
         SCOPES_EXPECT_ERROR(error_illegal_return_in_inline());
     }
     ctx.frame->return_type = SCOPES_GET_RESULT(merge_return_type(ctx.frame->return_type, value->get_type()));
@@ -532,7 +532,7 @@ static SCOPES_RESULT(Value *) specialize_SyntaxExtend(const ASTContext &ctx, Syn
     assert(sx->func->scope);
     Function *frame = ctx.frame->find_frame(sx->func->scope);
     if (!frame) {
-        set_active_anchor(sx->func->anchor());
+        SCOPES_ANCHOR(sx->func->anchor());
         SCOPES_EXPECT_ERROR(error_cannot_find_frame(sx->func));
     }
     Function *fn = SCOPES_GET_RESULT(specialize(frame, sx->func, {TYPE_Scope}));
@@ -547,7 +547,7 @@ static SCOPES_RESULT(Value *) specialize_SyntaxExtend(const ASTContext &ctx, Syn
         env = fptr(sx->env);
         assert(env);
     } else {
-        set_active_anchor(sx->anchor());
+        SCOPES_ANCHOR(sx->anchor());
         StyledString ss;
         ss.out << "syntax-extend has wrong return type (expected function of type "
             << ftype
@@ -574,7 +574,7 @@ SCOPES_RESULT(T *) extract_constant(Value *value) {
     SCOPES_RESULT_TYPE(T *);
     auto constval = dyn_cast<T>(value);
     if (!constval) {
-        set_active_anchor(value->anchor());
+        SCOPES_ANCHOR(value->anchor());
         SCOPES_CHECK_RESULT(error_constant_expected(value));
     }
     return constval;
@@ -583,7 +583,7 @@ SCOPES_RESULT(T *) extract_constant(Value *value) {
 SCOPES_RESULT(const Type *) extract_type_constant(Value *value) {
     SCOPES_RESULT_TYPE(const Type *);
     ConstPointer* x = SCOPES_GET_RESULT(extract_constant<ConstPointer>(value));
-    set_active_anchor(value->anchor());
+    SCOPES_ANCHOR(value->anchor());
     SCOPES_CHECK_RESULT(verify(x->get_type(), TYPE_Type));
     return (const Type *)x->value;
 }
@@ -591,7 +591,7 @@ SCOPES_RESULT(const Type *) extract_type_constant(Value *value) {
 SCOPES_RESULT(const Closure *) extract_closure_constant(Value *value) {
     SCOPES_RESULT_TYPE(const Closure *);
     ConstPointer* x = SCOPES_GET_RESULT(extract_constant<ConstPointer>(value));
-    set_active_anchor(value->anchor());
+    SCOPES_ANCHOR(value->anchor());
     SCOPES_CHECK_RESULT(verify(x->get_type(), TYPE_Closure));
     return (const Closure *)x->value;
 }
@@ -599,7 +599,7 @@ SCOPES_RESULT(const Closure *) extract_closure_constant(Value *value) {
 SCOPES_RESULT(const List *) extract_list_constant(Value *value) {
     SCOPES_RESULT_TYPE(const List *);
     ConstPointer* x = SCOPES_GET_RESULT(extract_constant<ConstPointer>(value));
-    set_active_anchor(value->anchor());
+    SCOPES_ANCHOR(value->anchor());
     SCOPES_CHECK_RESULT(verify(x->get_type(), TYPE_List));
     return (const List *)x->value;
 }
@@ -607,7 +607,7 @@ SCOPES_RESULT(const List *) extract_list_constant(Value *value) {
 SCOPES_RESULT(const String *) extract_string_constant(Value *value) {
     SCOPES_RESULT_TYPE(const String *);
     ConstPointer* x = SCOPES_GET_RESULT(extract_constant<ConstPointer>(value));
-    set_active_anchor(value->anchor());
+    SCOPES_ANCHOR(value->anchor());
     SCOPES_CHECK_RESULT(verify(x->get_type(), TYPE_String));
     return (const String *)x->value;
 }
@@ -615,7 +615,7 @@ SCOPES_RESULT(const String *) extract_string_constant(Value *value) {
 SCOPES_RESULT(Builtin) extract_builtin_constant(Value *value) {
     SCOPES_RESULT_TYPE(Builtin);
     ConstInt* x = SCOPES_GET_RESULT(extract_constant<ConstInt>(value));
-    set_active_anchor(value->anchor());
+    SCOPES_ANCHOR(value->anchor());
     SCOPES_CHECK_RESULT(verify(x->get_type(), TYPE_Builtin));
     return Builtin((KnownSymbol)x->value);
 }
@@ -623,7 +623,7 @@ SCOPES_RESULT(Builtin) extract_builtin_constant(Value *value) {
 SCOPES_RESULT(Symbol) extract_symbol_constant(Value *value) {
     SCOPES_RESULT_TYPE(Symbol);
     ConstInt* x = SCOPES_GET_RESULT(extract_constant<ConstInt>(value));
-    set_active_anchor(value->anchor());
+    SCOPES_ANCHOR(value->anchor());
     SCOPES_CHECK_RESULT(verify(x->get_type(), TYPE_Symbol));
     return Symbol::wrap(x->value);
 }
@@ -732,7 +732,7 @@ static SCOPES_RESULT(Value *) specialize_Call(const ASTContext &ctx, Call *call)
                 if (wait_for_return_type(f)) {
                     T = get_function_type(f);
                 } else {
-                    set_active_anchor(call->anchor());
+                    SCOPES_ANCHOR(call->anchor());
                     SCOPES_EXPECT_ERROR(error_untyped_recursive_call());
                 }
             }
@@ -742,7 +742,7 @@ static SCOPES_RESULT(Value *) specialize_Call(const ASTContext &ctx, Call *call)
         Builtin b = SCOPES_GET_RESULT(extract_builtin_constant(callee));
         size_t argcount = values.size();
         size_t argn = 0;
-        set_active_anchor(call->anchor());
+        SCOPES_ANCHOR(call->anchor());
         switch(b.value()) {
         case FN_Dump: {
             StyledStream ss(SCOPES_CERR);
@@ -1060,7 +1060,7 @@ static SCOPES_RESULT(Value *) specialize_Call(const ASTContext &ctx, Call *call)
     if (is_function_pointer(T)) {
         ft = extract_function_type(T);
     } else {
-        set_active_anchor(call->anchor());
+        SCOPES_ANCHOR(call->anchor());
         SCOPES_CHECK_RESULT(error_invalid_call_type(callee));
     }
     newcall->set_type(ft->return_type);
@@ -1087,7 +1087,7 @@ static SCOPES_RESULT(Value *) specialize_If(const ASTContext &ctx, If *_if) {
     for (auto &&clause : _if->clauses) {
         auto newcond = SCOPES_GET_RESULT(specialize(subctx, clause.cond));
         if (newcond->get_type() != TYPE_Bool) {
-            set_active_anchor(clause.anchor);
+            SCOPES_ANCHOR(clause.anchor);
             SCOPES_EXPECT_ERROR(error_invalid_condition_type(newcond));
         }
         auto maybe_const = dyn_cast<ConstInt>(newcond);
@@ -1118,7 +1118,7 @@ finalize:
     }
     SCOPES_CHECK_RESULT(specialize_jobs(ctx, numclauses, values));
     for (int i = 0; i < numclauses; ++i) {
-        set_active_anchor(values[i]->anchor());
+        SCOPES_ANCHOR(values[i]->anchor());
         rtype = SCOPES_GET_RESULT(merge_value_type(ctx, rtype, values[i]->get_type()));
         if ((i + 1) == numclauses) {
             else_clause.value = values[i];
@@ -1143,7 +1143,7 @@ static SCOPES_RESULT(Value *) specialize_Template(const ASTContext &ctx, Templat
     assert(_template->scope);
     Function *frame = ctx.frame->find_frame(_template->scope);
     if (!frame) {
-        set_active_anchor(_template->anchor());
+        SCOPES_ANCHOR(_template->anchor());
         SCOPES_EXPECT_ERROR(error_cannot_find_frame(_template));
     }
     return ConstPointer::closure_from(_template->anchor(), Closure::from(_template, frame));
@@ -1159,7 +1159,7 @@ SCOPES_RESULT(Value *) specialize(const ASTContext &ctx, Value *node) {
     assert(node);
     Value *result = nullptr; //ctx.frame->resolve(node);
     if (!result) {
-        set_active_anchor(node->anchor());
+        SCOPES_ANCHOR(node->anchor());
         //SCOPES_CHECK_RESULT(verify_stack());
         switch(node->kind()) {
 #define T(NAME, BNAME, CLASS) \
@@ -1220,7 +1220,7 @@ SCOPES_RESULT(Function *) specialize(Function *frame, Template *func, const ArgT
         auto oldparam = func->params[i];
         if (oldparam->is_variadic()) {
             if ((i + 1) < count) {
-                set_active_anchor(oldparam->anchor());
+                SCOPES_ANCHOR(oldparam->anchor());
                 SCOPES_EXPECT_ERROR(error_variadic_symbol_not_in_last_place());
             }
             if ((i + 1) == (int)types.size()) {
@@ -1245,7 +1245,7 @@ SCOPES_RESULT(Function *) specialize(Function *frame, Template *func, const ArgT
                 T = types[i];
             }
             if (oldparam->is_typed()) {
-                set_active_anchor(oldparam->anchor());
+                SCOPES_ANCHOR(oldparam->anchor());
                 SCOPES_CHECK_RESULT(verify(oldparam->get_type(), T));
             }
             auto newparam = SymbolValue::from(oldparam->anchor(), oldparam->name, T);

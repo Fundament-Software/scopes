@@ -20,7 +20,7 @@ struct String;
 struct Anchor;
 struct StyledStream;
 
-void set_active_anchor(const Anchor *anchor);
+void _set_active_anchor(const Anchor *anchor);
 const Anchor *get_active_anchor();
 
 struct ScopedAnchor {
@@ -29,7 +29,9 @@ struct ScopedAnchor {
     const Anchor *parent_anchor;
 };
 
-#define SCOPES_ANCHOR(ANCHOR) ScopedAnchor _scoped_anchor ## __LINE__(ANCHOR)
+#define SCOPES_CAT(a, ...) SCOPES_PRIMITIVE_CAT(a, __VA_ARGS__)
+#define SCOPES_PRIMITIVE_CAT(a, ...) a ## __VA_ARGS__
+#define SCOPES_ANCHOR(ANCHOR) ScopedAnchor SCOPES_CAT(_scoped_anchor, __LINE__)(ANCHOR)
 
 //------------------------------------------------------------------------------
 
