@@ -708,7 +708,7 @@ static const Type *get_function_type(Function *fn) {
     return native_ro_pointer_type(function_type(fn->return_type, params));
 }
 
-static SCOPES_RESULT(Value *) specialize_Call(const ASTContext &ctx, Call *call) {
+static SCOPES_RESULT(Value *) specialize_call_interior(const ASTContext &ctx, Call *call) {
     SCOPES_RESULT_TYPE(Value *);
     SCOPES_ANCHOR(call->anchor());
     auto subctx = ctx.with_target(EvalTarget_Symbol);
@@ -1070,6 +1070,17 @@ static SCOPES_RESULT(Value *) specialize_Call(const ASTContext &ctx, Call *call)
     return newcall;
 }
 
+static SCOPES_RESULT(Value *) specialize_Call(const ASTContext &ctx, Call *call) {
+    SCOPES_RESULT_TYPE(Value *);
+    auto result = specialize_call_interior(ctx, call);
+    if (result.ok()) {
+        return result;
+    } else {
+        add_error_trace(call);
+        SCOPES_RETURN_ERROR();
+    }
+}
+
 static SCOPES_RESULT(Value *) specialize_SymbolValue(const ASTContext &ctx, SymbolValue *sym) {
     SCOPES_RESULT_TYPE(Value *);
     assert(ctx.frame);
@@ -1262,7 +1273,13 @@ SCOPES_RESULT(Function *) specialize(Function *frame, Template *func, const ArgT
 
     ASTContext subctx(fn, EvalTarget_Return);
     SCOPES_ANCHOR(fn->anchor());
-    fn->value = SCOPES_GET_RESULT(specialize(subctx, fn->value));
+    auto result = specialize(subctx, fn->value);
+    if (result.ok()) {
+        fn->value = result.assert_ok();
+    } else {
+        add_error_trace(fn);
+        SCOPES_RETURN_ERROR();
+    }
     assert(!is_returning(fn->value->get_type()));
     fn->complete = true;
     fn->set_type(get_function_type(fn));

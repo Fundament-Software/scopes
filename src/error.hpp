@@ -11,6 +11,8 @@
 #include "builtin.hpp"
 #include "scopes/config.h"
 
+#include <vector>
+
 namespace scopes {
 
 //------------------------------------------------------------------------------
@@ -19,6 +21,7 @@ struct Type;
 struct String;
 struct Anchor;
 struct StyledStream;
+struct Value;
 
 void _set_active_anchor(const Anchor *anchor);
 const Anchor *get_active_anchor();
@@ -36,26 +39,28 @@ struct ScopedAnchor {
 //------------------------------------------------------------------------------
 
 struct Error {
-    const Anchor *anchor;
-    const String *msg;
-
     Error();
 
     Error(const Anchor *_anchor, const String *_msg);
+
+    std::vector<Value *> trace;
+    const Anchor *anchor;
+    const String *msg;
 };
 
 //------------------------------------------------------------------------------
 
-void set_last_error(const Error *err);
+void set_last_error(Error *err);
 const Error *get_last_error();
+void add_error_trace(Value *value);
 
 void print_error(const Error *value);
 void stream_error(StyledStream &ss, const Error *value);
 void stream_error_string(StyledStream &ss, const Error *value);
 
 void set_last_location_error(const String *msg);
-const Error *make_location_error(const String *msg);
-const Error *make_runtime_error(const String *msg);
+Error *make_location_error(const String *msg);
+Error *make_runtime_error(const String *msg);
 
 #if SCOPES_EARLY_ABORT
 #define SCOPES_LOCATION_ERROR(MSG) \

@@ -213,13 +213,13 @@ void sc_set_globals(sc_scope_t *s);
 
 // error handling
 
-void sc_set_last_error(const sc_error_t *err);
+void sc_set_last_error(sc_error_t *err);
 const sc_string_t *sc_format_error(const sc_error_t *err);
 void sc_set_last_runtime_error(const sc_string_t *msg);
 void sc_set_last_location_error(const sc_string_t *msg);
 const sc_error_t *sc_get_last_error();
-const sc_error_t *sc_location_error_new(const sc_string_t *msg);
-const sc_error_t *sc_runtime_error_new(const sc_string_t *msg);
+sc_error_t *sc_location_error_new(const sc_string_t *msg);
+sc_error_t *sc_runtime_error_new(const sc_string_t *msg);
 void sc_set_signal_abort(bool value);
 void sc_abort();
 void sc_exit(int c);

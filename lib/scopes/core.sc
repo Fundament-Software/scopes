@@ -212,8 +212,6 @@ syntax-extend
     sc_scope_set_symbol syntax-scope 'ellipsis-symbol (box-symbol (sc_symbol_new "..."))
     syntax-scope
 
-dump "hello"
-
 syntax-extend
     fn typify (args argcount)
         let args = (verify-count argcount 1 -1)
@@ -234,7 +232,6 @@ syntax-extend
         store ValueArrayPointer (getelementptr types 0)
         store i32 (getelementptr types 1)
         let types = (bitcast types TypeArrayPointer)
-        dump types
         let result = (sc_compile (sc_typify typify 2 types) 0:u64)
         let result-type = (sc_value_type result)
         if (ptrcmp!= result-type ASTMacroFunction)

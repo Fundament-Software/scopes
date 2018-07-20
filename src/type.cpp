@@ -399,6 +399,7 @@ void init_types() {
     DEFINE_OPAQUE_HANDLE_TYPE("Closure", Closure, TYPE_Closure);
     DEFINE_OPAQUE_HANDLE_TYPE("String", String, TYPE_String);
     DEFINE_OPAQUE_HANDLE_TYPE("List", List, TYPE_List);
+    DEFINE_OPAQUE_HANDLE_TYPE("Error", Error, TYPE_Error);
 
     DEFINE_STRUCT_HANDLE_TYPE("Anchor", Anchor, TYPE_Anchor,
         native_ro_pointer_type(TYPE_SourceFile),
@@ -406,10 +407,6 @@ void init_types() {
         TYPE_I32,
         TYPE_I32
     );
-
-    DEFINE_STRUCT_HANDLE_TYPE("Error", Error, TYPE_Error,
-        TYPE_Anchor,
-        TYPE_String);
 
     DEFINE_TYPENAME("ASTMacro", TYPE_ASTMacro);
     {

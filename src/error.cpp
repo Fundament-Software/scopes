@@ -10,6 +10,7 @@
 #include "boot.hpp"
 #include "value.hpp"
 #include "return_type.hpp"
+#include "dyn_cast.inc"
 
 #include "scopes/config.h"
 
@@ -53,9 +54,9 @@ Error::Error(const Anchor *_anchor, const String *_msg) :
 
 //------------------------------------------------------------------------------
 
-static const Error *_last_error = nullptr;
+static Error *_last_error = nullptr;
 
-void set_last_error(const Error *err) {
+void set_last_error(Error *err) {
     _last_error = err;
 }
 
@@ -63,6 +64,18 @@ const Error *get_last_error() {
     auto result = _last_error;
     _last_error = nullptr;
     return result;
+}
+
+void add_error_trace(Value *value) {
+    if (_last_error) {
+        // only report deepest call
+        if (!_last_error->trace.empty()) {
+            Value *last = _last_error->trace.back();
+            if (isa<Call>(last) && isa<Call>(value))
+                return;
+        }
+        _last_error->trace.push_back(value);
+    }
 }
 
 //------------------------------------------------------------------------------
@@ -79,6 +92,23 @@ void stream_error_string(StyledStream &ss, const Error *exc) {
 }
 
 void stream_error(StyledStream &ss, const Error *exc) {
+    size_t i = exc->trace.size();
+    while (i--) {
+        auto value = exc->trace[i];
+        ss << value->anchor() << " in ";
+        if (isa<Function>(value)) {
+            auto fn = cast<Function>(value);
+            if (fn->name == SYM_Unnamed) {
+                ss << Style_Function << "unnamed" << Style_None;
+            } else {
+                ss << Style_Function << fn->name.name()->data << Style_None;
+            }
+        } else {
+            ss << "expression";
+        }
+        ss << std::endl;
+        value->anchor()->stream_source_line(ss);
+    }
     if (exc->anchor) {
         ss << exc->anchor << " ";
     }
@@ -94,11 +124,11 @@ void print_error(const Error *value) {
     stream_error(cerr, value);
 }
 
-const Error *make_location_error(const String *msg) {
+Error *make_location_error(const String *msg) {
     return new Error(_active_anchor, msg);
 }
 
-const Error *make_runtime_error(const String *msg) {
+Error *make_runtime_error(const String *msg) {
     return new Error(nullptr, msg);
 }
 
