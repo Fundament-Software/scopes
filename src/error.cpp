@@ -164,7 +164,9 @@ SCOPES_RESULT(void) error_constant_expected(Value *value) {
     SCOPES_RESULT_TYPE(void);
     print_definition_anchor(value);
     StyledString ss;
-    ss.out << "constant expected, got expression of type " << value->get_type();
+    ss.out << "constant expected, got "
+        << get_value_class_name(value->kind())
+        << " of type " << value->get_type();
     SCOPES_LOCATION_ERROR(ss.str());
 }
 

@@ -19,7 +19,17 @@ namespace scopes {
 const char *get_value_kind_name(ValueKind kind) {
     switch(kind) {
 #define T(NAME, BNAME, CLASS) \
-    case NAME: return #BNAME;
+    case NAME: return BNAME;
+SCOPES_VALUE_KIND()
+#undef T
+    default: return "???";
+    }
+}
+
+const char *get_value_class_name(ValueKind kind) {
+    switch(kind) {
+#define T(NAME, BNAME, CLASS) \
+    case NAME: return #CLASS;
 SCOPES_VALUE_KIND()
 #undef T
     default: return "???";
@@ -109,11 +119,21 @@ void Function::append_param(SymbolValue *sym) {
     params.push_back(sym);
 }
 
-Value *Function::resolve(Value *node) {
+Value *Function::resolve_local(Value *node) const {
     auto it = map.find(node);
     if (it == map.end())
         return nullptr;
     return it->second;
+}
+
+Value *Function::resolve(Value *node) const {
+    auto fn = this;
+    while (fn) {
+        auto val = fn->resolve_local(node);
+        if (val) return val;
+        fn = fn->frame;
+    }
+    return nullptr;
 }
 
 Function *Function::find_frame(Template *scope) {

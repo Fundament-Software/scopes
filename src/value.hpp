@@ -65,6 +65,7 @@ typedef std::vector<Const *> Constants;
 typedef std::vector<Block *> Blocks;
 
 const char *get_value_kind_name(ValueKind kind);
+const char *get_value_class_name(ValueKind kind);
 
 //------------------------------------------------------------------------------
 
@@ -179,7 +180,8 @@ struct Function : Value {
     ArgTypes instance_args;
     Function *find_frame(Template *scope);
     void bind(Value *oldnode, Value *newnode);
-    Value *resolve(Value *node);
+    Value *resolve(Value *node) const;
+    Value *resolve_local(Value *node) const;
     std::unordered_map<Value *, Value *> map;
 };
 

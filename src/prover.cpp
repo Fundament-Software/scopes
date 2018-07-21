@@ -397,7 +397,7 @@ static SCOPES_RESULT(Value *) specialize_ExtractArgument(
 // used by Let and Loop
 static SCOPES_RESULT(void) specialize_bind_arguments(const ASTContext &ctx,
     SymbolValues &outparams, Values &outargs,
-    const SymbolValues &params, const Values &values) {
+    const SymbolValues &params, const Values &values, bool inline_constants) {
     SCOPES_RESULT_TYPE(void);
     Values tmpargs;
     SCOPES_CHECK_RESULT(specialize_arguments(ctx, tmpargs, values));
@@ -425,10 +425,14 @@ static SCOPES_RESULT(void) specialize_bind_arguments(const ASTContext &ctx,
         } else {
             newval = ConstTuple::none_from(oldsym->anchor());
         }
-        auto newsym = SymbolValue::from(oldsym->anchor(), oldsym->name, newval->get_type());
-        ctx.frame->bind(oldsym, newsym);
-        outparams.push_back(newsym);
-        outargs.push_back(newval);
+        if (inline_constants && newval->is_symbolic()) {
+            ctx.frame->bind(oldsym, newval);
+        } else {
+            auto newsym = SymbolValue::from(oldsym->anchor(), oldsym->name, newval->get_type());
+            ctx.frame->bind(oldsym, newsym);
+            outparams.push_back(newsym);
+            outargs.push_back(newval);
+        }
     }
     return true;
 }
@@ -438,7 +442,7 @@ static SCOPES_RESULT(Value *) specialize_Let(const ASTContext &ctx, Let *let) {
     SCOPES_ANCHOR(let->anchor());
     Let *newlet = Let::from(let->anchor());
     SCOPES_CHECK_RESULT(specialize_bind_arguments(ctx,
-        newlet->params, newlet->args, let->params, let->args));
+        newlet->params, newlet->args, let->params, let->args, true));
     newlet->set_type(TYPE_Void);
     return newlet;
 }
@@ -448,7 +452,7 @@ static SCOPES_RESULT(Loop *) specialize_Loop(const ASTContext &ctx, Loop *loop) 
     SCOPES_ANCHOR(loop->anchor());
     Loop *newloop = Loop::from(loop->anchor());
     SCOPES_CHECK_RESULT(specialize_bind_arguments(ctx,
-        newloop->params, newloop->args, loop->params, loop->args));
+        newloop->params, newloop->args, loop->params, loop->args, false));
     newloop->value = SCOPES_GET_RESULT(specialize(ctx.for_loop(newloop), loop->value));
     auto rtype = newloop->value->get_type();
     newloop->return_type = SCOPES_GET_RESULT(merge_value_type(ctx, newloop->return_type, rtype));
