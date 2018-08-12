@@ -37,10 +37,6 @@ static std::unordered_set<const VectorType *, VectorSet::Hash, VectorSet::KeyEqu
 // VECTOR TYPE
 //------------------------------------------------------------------------------
 
-bool VectorType::classof(const Type *T) {
-    return T->kind() == TK_Vector;
-}
-
 void VectorType::stream_name(StyledStream &ss) const {
     ss << "<";
     stream_type_name(ss, element_type);

@@ -247,6 +247,17 @@ Value *If::canonicalize() {
 
 //------------------------------------------------------------------------------
 
+Try::Try(const Anchor *anchor, Value *_try_body, SymbolValue *_except_param, Value *_except_body)
+    : Value(VK_Try, anchor), try_body(_try_body), except_param(_except_param), except_body(_except_body)
+{}
+
+Try *Try::from(const Anchor *anchor, Value *try_body, SymbolValue *except_param,
+    Value *except_body) {
+    return new Try(anchor, try_body, except_param, except_body);
+}
+
+//------------------------------------------------------------------------------
+
 SymbolValue::SymbolValue(const Anchor *anchor, Symbol _name, const Type *_type, bool _variadic)
     : Value(VK_Symbol, anchor), name(_name), variadic(_variadic) {
     if (_type) set_type(_type);
@@ -445,6 +456,15 @@ Return::Return(const Anchor *anchor, Value *_value)
 
 Return *Return::from(const Anchor *anchor, Value *value) {
     return new Return(anchor, value);
+}
+
+//------------------------------------------------------------------------------
+
+Raise::Raise(const Anchor *anchor, Value *_value)
+    : Value(VK_Raise, anchor), value(_value) {}
+
+Raise *Raise::from(const Anchor *anchor, Value *value) {
+    return new Raise(anchor, value);
 }
 
 //------------------------------------------------------------------------------

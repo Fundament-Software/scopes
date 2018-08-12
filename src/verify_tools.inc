@@ -32,7 +32,8 @@ inline SCOPES_RESULT(void) verify_kind(const Type *T) {
         case TK_Tuple: ss.out << "tuple"; break;
         case TK_Union: ss.out << "union"; break;
         case TK_Typename: ss.out << "typename"; break;
-        case TK_Return: ss.out << "return"; break;
+        case TK_Arguments: ss.out << "arguments"; break;
+        case TK_Raises: ss.out << "raises"; break;
         case TK_Function: ss.out << "function"; break;
         case TK_Image: ss.out << "image"; break;
         case TK_SampledImage: ss.out << "sampled image"; break;

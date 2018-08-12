@@ -347,7 +347,6 @@ sc_bool_type_tuple_t sc_tuple_type(int numtypes, const sc_type_t **types);
 bool sc_function_type_is_variadic(const sc_type_t *T);
 const sc_type_t *sc_function_type(const sc_type_t *return_type,
     int numtypes, const sc_type_t **typeargs);
-const sc_type_t *sc_function_type_raising(const sc_type_t *T);
 
 // image types
 

@@ -1257,16 +1257,6 @@ const sc_type_t *sc_function_type(const sc_type_t *return_type,
     return function_type(return_type, types);
 }
 
-const sc_type_t *sc_function_type_raising(const sc_type_t *T) {
-    using namespace scopes;
-    if (is_kind<TK_Function>(T)) {
-        auto ft = cast<FunctionType>(T);
-        auto rt = cast<ReturnType>(ft->return_type);
-        return function_type(rt->to_raising(), ft->argument_types, ft->flags);
-    }
-    return T;
-}
-
 // Image Type
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -1317,11 +1307,11 @@ static const Type *result_tuple(const Type *rtype) {
 }
 
 static const Type *raising() {
-    return return_type({}, RTF_Raising);
+    return raises_type(TYPE_Void);
 }
 
 static const Type *raising(const Type *rtype) {
-    return return_type({rtype}, RTF_Raising);
+    return raises_type(rtype);
 }
 
 void init_globals(int argc, char *argv[]) {
@@ -1509,7 +1499,6 @@ void init_globals(int argc, char *argv[]) {
 
     DEFINE_EXTERN_C_FUNCTION(sc_function_type_is_variadic, TYPE_Bool, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_function_type, TYPE_Type, TYPE_Type, TYPE_I32, native_ro_pointer_type(TYPE_Type));
-    DEFINE_EXTERN_C_FUNCTION(sc_function_type_raising, TYPE_Type, TYPE_Type);
 
     DEFINE_EXTERN_C_FUNCTION(sc_list_cons, TYPE_List, TYPE_Value, TYPE_List);
     DEFINE_EXTERN_C_FUNCTION(sc_list_dump, TYPE_List, TYPE_List);
@@ -1546,9 +1535,7 @@ void init_globals(int argc, char *argv[]) {
     globals->bind(KW_True, ConstInt::from(LINE_ANCHOR, TYPE_Bool, true));
     globals->bind(KW_False, ConstInt::from(LINE_ANCHOR, TYPE_Bool, false));
     globals->bind(Symbol("noreturn"),
-        ConstPointer::type_from(LINE_ANCHOR, (const Type *)no_return_type()));
-    globals->bind(Symbol("noreturn!"),
-        ConstPointer::type_from(LINE_ANCHOR, (const Type *)no_return_type(RTF_Raising)));
+        ConstPointer::type_from(LINE_ANCHOR, TYPE_NoReturn));
     globals->bind(KW_None, ConstTuple::none_from(LINE_ANCHOR));
     bind_symbol(LINE_ANCHOR, Symbol("unnamed"), Symbol(SYM_Unnamed));
     globals->bind(SYM_CompilerDir,

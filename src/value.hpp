@@ -19,7 +19,7 @@ namespace scopes {
 struct Anchor;
 struct List;
 struct Scope;
-struct ReturnType;
+struct ArgumentsType;
 
 #define SCOPES_VALUE_KIND() \
     T(VK_Template, "value-kind-template", Template) \
@@ -27,6 +27,7 @@ struct ReturnType;
     T(VK_Extern, "value-kind-extern", Extern) \
     T(VK_Block, "value-kind-block", Block) \
     T(VK_If, "value-kind-if", If) \
+    T(VK_Try, "value-kind-try", Try) \
     T(VK_Symbol, "value-kind-symbol", SymbolValue) \
     T(VK_Keyed, "value-kind-keyed", Keyed) \
     T(VK_ConstInt, "value-kind-const-int", ConstInt) \
@@ -43,6 +44,7 @@ struct ReturnType;
     T(VK_Break, "value-kind-break", Break) \
     T(VK_Repeat, "value-kind-repeat", Repeat) \
     T(VK_Return, "value-kind-return", Return) \
+    T(VK_Raise, "value-kind-raise", Raise) \
     T(VK_SyntaxExtend, "value-kind-syntax-extend", SyntaxExtend)
 
 enum ValueKind {
@@ -268,6 +270,24 @@ struct If : Value {
 
 //------------------------------------------------------------------------------
 
+struct Try : Value {
+    static bool classof(const Value *T);
+
+    Try(const Anchor *anchor, Value *try_body, SymbolValue *except_param, Value *except_body);
+
+    static Try *from(const Anchor *anchor,
+        Value *try_body = nullptr,
+        SymbolValue *except_param = nullptr,
+        Value *except_body = nullptr);
+
+    Value *try_body;
+    SymbolValue *except_param;
+    Value *except_body;
+    const Type *raise_type;
+};
+
+//------------------------------------------------------------------------------
+
 struct SymbolValue : Value {
     static bool classof(const Value *T);
 
@@ -451,6 +471,18 @@ struct Return : Value {
     Return(const Anchor *anchor, Value *value);
 
     static Return *from(const Anchor *anchor, Value *value);
+
+    Value *value;
+};
+
+//------------------------------------------------------------------------------
+
+struct Raise : Value {
+    static bool classof(const Value *T);
+
+    Raise(const Anchor *anchor, Value *value);
+
+    static Raise *from(const Anchor *anchor, Value *value);
 
     Value *value;
 };

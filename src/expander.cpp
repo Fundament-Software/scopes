@@ -8,9 +8,10 @@
 #include "list.hpp"
 #include "error.hpp"
 #include "type.hpp"
-#include "return_type.hpp"
+#include "arguments_type.hpp"
 #include "pointer_type.hpp"
 #include "function_type.hpp"
+#include "raises_type.hpp"
 #include "scope.hpp"
 #include "stream_expr.hpp"
 #include "anchor.hpp"
@@ -75,7 +76,7 @@ struct Expander {
         next(_next) {
         if (!list_expander_func_type) {
             list_expander_func_type = pointer_type(function_type(
-                return_type({TYPE_List, TYPE_Scope}, RTF_Raising),
+                raises_type(arguments_type({TYPE_List, TYPE_Scope})),
                 {TYPE_List, TYPE_Scope}), PTF_NonWritable, SYM_Unnamed);
         }
     }

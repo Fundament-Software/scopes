@@ -284,6 +284,20 @@ struct LLVMIRGenerator {
     bool inline_pointers;
     Function *active_function;
 
+    struct TryInfo {
+        Try *_try;
+        LLVMBasicBlockRef bb_except;
+        LLVMValueRef except_value;
+
+        TryInfo() :
+            _try(nullptr),
+            bb_except(nullptr),
+            except_value(nullptr)
+        {}
+    };
+
+    TryInfo try_info;
+
     struct LoopInfo {
         Loop *loop;
         LLVMBasicBlockRef bb_loop;
@@ -649,6 +663,15 @@ struct LLVMIRGenerator {
             }
             return LLVMStructType(elements, count, ti->packed);
         } break;
+        case TK_Arguments: {
+            auto at = cast<ArgumentsType>(type);
+            size_t count = at->values.size();
+            LLVMTypeRef elements[count];
+            for (size_t i = 0; i < count; ++i) {
+                elements[i] = SCOPES_GET_RESULT(_type_to_llvm_type(at->values[i].type));
+            }
+            return LLVMStructType(elements, count, false);
+        } break;
         case TK_Union: {
             auto ui = cast<UnionType>(type);
             return _type_to_llvm_type(ui->tuple_type);
@@ -675,9 +698,13 @@ struct LLVMIRGenerator {
             return LLVMStructCreateNamed(
                 LLVMGetGlobalContext(), tn->name()->data);
         } break;
-        case TK_Return: {
-            auto rt = cast<ReturnType>(type);
-            return _type_to_llvm_type(rt->return_type);
+        case TK_Raises: {
+            auto rt = cast<RaisesType>(type);
+            LLVMTypeRef elements[] = {
+                SCOPES_GET_RESULT(_type_to_llvm_type(rt->except_type)),
+                SCOPES_GET_RESULT(_type_to_llvm_type(rt->result_type))
+            };
+            return LLVMStructType(elements, 2, false);
         } break;
         case TK_Function: {
             auto fi = cast<FunctionType>(type);
@@ -695,7 +722,7 @@ struct LLVMIRGenerator {
                 const Type *rtype = fi->return_type;
                 ABIClass classes[MAX_ABI_CLASSES];
                 size_t sz = abi_classify(rtype, classes);
-                LLVMTypeRef T = SCOPES_GET_RESULT(type_to_llvm_type(fi->return_type));
+                LLVMTypeRef T = SCOPES_GET_RESULT(_type_to_llvm_type(fi->return_type));
                 rettype = T;
                 if (sz) {
                     auto tk = LLVMGetTypeKind(T);
@@ -860,6 +887,18 @@ struct LLVMIRGenerator {
     SCOPES_RESULT(LLVMValueRef) Return_to_value(Return *node) {
         //SCOPES_RESULT_TYPE(LLVMValueRef);
         return write_return(node->value);
+    }
+
+    SCOPES_RESULT(LLVMValueRef) Raise_to_value(Raise *node) {
+        SCOPES_RESULT_TYPE(LLVMValueRef);
+        auto result = SCOPES_GET_RESULT(node_to_value(node->value));
+        if (try_info.except_value) {
+            LLVMBasicBlockRef bb = LLVMGetInsertBlock(builder);
+            LLVMBasicBlockRef incobbs[] = { bb };
+            LLVMValueRef incovals[] = { result };
+            LLVMAddIncoming(try_info.except_value, incovals, incobbs, 1);
+        }
+        return LLVMBuildBr(builder, try_info.bb_except);
     }
 
     SCOPES_RESULT(void) Function_finalize(Function *node) {
@@ -1041,6 +1080,70 @@ struct LLVMIRGenerator {
         auto result = loop_info.break_value;
         loop_info = old_loop_info;
         return result;
+    }
+
+    SCOPES_RESULT(LLVMValueRef) Try_to_value(Try *node) {
+        SCOPES_RESULT_TYPE(LLVMValueRef);
+        auto rtype = node->get_type();
+
+        auto old_try_info = try_info;
+        try_info._try = node;
+
+        auto except_value_type = SCOPES_GET_RESULT(
+            type_to_llvm_type(node->except_param->get_type()));
+
+        /*
+        LLVMBasicBlockRef bb_except;
+        LLVMBasicBlockRef bb_merge;
+        LLVMValueRef except_value;
+        */
+
+        LLVMBasicBlockRef bb = LLVMGetInsertBlock(builder);
+        LLVMValueRef func = LLVMGetBasicBlockParent(bb);
+        try_info.bb_except = LLVMAppendBasicBlock(func, "except");
+        LLVMBasicBlockRef bb_merge = nullptr;
+        LLVMValueRef merge_value = nullptr;
+        if (is_returning(rtype)) {
+            bb_merge = LLVMAppendBasicBlock(func, "merge");
+            LLVMPositionBuilderAtEnd(builder, bb_merge);
+            if (returns_mergable_value(rtype)) {
+                auto llvm_rtype = SCOPES_GET_RESULT(type_to_llvm_type(rtype));
+                merge_value = LLVMBuildPhi(builder, llvm_rtype, "");
+            }
+        }
+
+        LLVMPositionBuilderAtEnd(builder, try_info.bb_except);
+        try_info.except_value = LLVMBuildPhi(builder, except_value_type, "");
+        bind(node->except_param, try_info.except_value);
+
+        LLVMPositionBuilderAtEnd(builder, bb);
+        auto try_result = SCOPES_GET_RESULT(node_to_value(node->try_body));
+        if (is_returning(node->try_body->get_type())) {
+            LLVMBuildBr(builder, bb_merge);
+            if (merge_value) {
+                LLVMBasicBlockRef incobbs[] = { LLVMGetInsertBlock(builder) };
+                LLVMValueRef incovals[] = { try_result };
+                LLVMAddIncoming(merge_value, incovals, incobbs, 1);
+            }
+        }
+
+        LLVMPositionBuilderAtEnd(builder, try_info.bb_except);
+        auto except_result = SCOPES_GET_RESULT(node_to_value(node->except_body));
+        if (is_returning(node->except_body->get_type())) {
+            LLVMBuildBr(builder, bb_merge);
+            if (merge_value) {
+                LLVMBasicBlockRef incobbs[] = { LLVMGetInsertBlock(builder) };
+                LLVMValueRef incovals[] = { except_result };
+                LLVMAddIncoming(merge_value, incovals, incobbs, 1);
+            }
+        }
+
+        if (bb_merge) {
+            LLVMPositionBuilderAtEnd(builder, bb_merge);
+        }
+
+        try_info = old_try_info;
+        return merge_value;
     }
 
     SCOPES_RESULT(LLVMValueRef) ArgumentList_to_value(ArgumentList *node) {
@@ -1788,15 +1891,13 @@ struct LLVMIRGenerator {
             LLVMAddCallSiteAttribute(ret, 1, attr_sret);
             return LLVMBuildLoad(builder, values[0], "");
         }
-        if (fi->return_type == TYPE_Void) {
+        auto RT = fi->return_type;
+        if (RT == TYPE_Void)
             return ret;
-        }
-        auto rt = dyn_cast<ReturnType>(fi->return_type);
-        if (rt && !rt->is_returning() && !rt->is_raising()) {
+        if (RT == TYPE_NoReturn)
             return LLVMBuildUnreachable(builder);
-        }
         // check if ABI needs something else and do a bitcast
-        LLVMTypeRef retT = SCOPES_GET_RESULT(type_to_llvm_type(fi->return_type));
+        LLVMTypeRef retT = SCOPES_GET_RESULT(type_to_llvm_type(RT));
         auto srcT = LLVMTypeOf(ret);
         if (retT != srcT) {
             LLVMValueRef dest = safe_alloca(srcT);

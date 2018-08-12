@@ -47,10 +47,6 @@ static std::unordered_set<const ImageType *, ImageSet::Hash, ImageSet::KeyEqual>
 // IMAGE TYPE
 //------------------------------------------------------------------------------
 
-bool ImageType::classof(const Type *T) {
-    return T->kind() == TK_Image;
-}
-
 void ImageType::stream_name(StyledStream &ss) const {
     ss << "<Image ";
     stream_type_name(ss, type);

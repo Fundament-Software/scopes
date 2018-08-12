@@ -36,10 +36,6 @@ static std::unordered_set<const ArrayType *, ArraySet::Hash, ArraySet::KeyEqual>
 // ARRAY TYPE
 //------------------------------------------------------------------------------
 
-bool ArrayType::classof(const Type *T) {
-    return T->kind() == TK_Array;
-}
-
 void ArrayType::stream_name(StyledStream &ss) const {
     ss << "[";
     stream_type_name(ss, element_type);

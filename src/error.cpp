@@ -9,7 +9,7 @@
 #include "type.hpp"
 #include "boot.hpp"
 #include "value.hpp"
-#include "return_type.hpp"
+#include "arguments_type.hpp"
 #include "dyn_cast.inc"
 
 #include "scopes/config.h"

@@ -16,6 +16,13 @@
 
 namespace scopes {
 
+#define T(NAME, BNAME, CLASS) \
+    bool CLASS::classof(const Type *T) { \
+        return T->kind() == NAME; \
+    }
+B_TYPE_KIND()
+#undef T
+
 //------------------------------------------------------------------------------
 
 KeyedType::KeyedType()
@@ -137,26 +144,6 @@ B_TYPE_KIND()
     }
 }
 
-bool is_invalid_argument_type(const Type *T) {
-    switch(T->kind()) {
-    case TK_Typename: {
-        const TypenameType *tt = cast<TypenameType>(T);
-        if (!tt->finalized()) {
-            return true;
-        } else {
-            return is_invalid_argument_type(tt->storage_type);
-        }
-    } break;
-    case TK_Return: {
-        const ReturnType *rt = cast<ReturnType>(T);
-        return is_invalid_argument_type(rt->return_type);
-    } break;
-    case TK_Function: return true;
-    default: break;
-    }
-    return false;
-}
-
 bool is_opaque(const Type *T) {
     switch(T->kind()) {
     case TK_Typename: {
@@ -166,10 +153,6 @@ bool is_opaque(const Type *T) {
         } else {
             return is_opaque(tt->storage_type);
         }
-    } break;
-    case TK_Return: {
-        const ReturnType *rt = cast<ReturnType>(T);
-        return is_opaque(rt->return_type);
     } break;
     case TK_Image:
     case TK_SampledImage:
@@ -195,9 +178,6 @@ SCOPES_RESULT(size_t) size_of(const Type *T) {
     case TK_Vector: return cast<VectorType>(T)->size;
     case TK_Tuple: return cast<TupleType>(T)->size;
     case TK_Union: return cast<UnionType>(T)->size;
-    case TK_Return: {
-        return size_of(cast<ReturnType>(T)->return_type);
-    } break;
     case TK_Typename: return size_of(SCOPES_GET_RESULT(storage_type(cast<TypenameType>(T))));
     default: break;
     }
@@ -229,9 +209,6 @@ SCOPES_RESULT(size_t) align_of(const Type *T) {
     case TK_Vector: return cast<VectorType>(T)->align;
     case TK_Tuple: return cast<TupleType>(T)->align;
     case TK_Union: return cast<UnionType>(T)->align;
-    case TK_Return: {
-        return size_of(cast<ReturnType>(T)->return_type);
-    } break;
     case TK_Typename: return align_of(SCOPES_GET_RESULT(storage_type(cast<TypenameType>(T))));
     default: break;
     }
@@ -251,13 +228,22 @@ const Type *superof(const Type *T) {
     case TK_Tuple: return TYPE_Tuple;
     case TK_Union: return TYPE_Union;
     case TK_Typename: return cast<TypenameType>(T)->super();
-    case TK_Return: return TYPE_Return;
+    case TK_Arguments: return TYPE_Arguments;
+    case TK_Raises: return TYPE_Raises;
     case TK_Function: return TYPE_Function;
     case TK_Image: return TYPE_Image;
     case TK_SampledImage: return TYPE_SampledImage;
     }
     assert(false && "unhandled type kind; corrupt pointer?");
     return nullptr;
+}
+
+bool is_returning(const Type *T) {
+    auto rt = dyn_cast<RaisesType>(T);
+    if (rt) {
+        T = rt->result_type;
+    }
+    return (T != TYPE_NoReturn);
 }
 
 //------------------------------------------------------------------------------
@@ -343,6 +329,7 @@ void init_types() {
 
     DEFINE_TYPENAME("void", TYPE_Void);
     DEFINE_TYPENAME("Nothing", TYPE_Nothing);
+    DEFINE_TYPENAME("noreturn", TYPE_NoReturn);
 
     DEFINE_TYPENAME("Sampler", TYPE_Sampler);
 
@@ -353,7 +340,8 @@ void init_types() {
     DEFINE_TYPENAME("vector", TYPE_Vector);
     DEFINE_TYPENAME("tuple", TYPE_Tuple);
     DEFINE_TYPENAME("union", TYPE_Union);
-    DEFINE_TYPENAME("Return", TYPE_Return);
+    DEFINE_TYPENAME("Arguments", TYPE_Arguments);
+    DEFINE_TYPENAME("Raises", TYPE_Raises);
     DEFINE_TYPENAME("constant", TYPE_Constant);
     DEFINE_TYPENAME("function", TYPE_Function);
     DEFINE_TYPENAME("Image", TYPE_Image);
@@ -413,7 +401,8 @@ void init_types() {
         cast<TypenameType>(const_cast<Type *>(TYPE_ASTMacro))
             ->finalize(
                 native_ro_pointer_type(
-                    function_type(return_type({TYPE_Value}, RTF_Raising), {
+                    function_type(
+                        raises_type(TYPE_Value), {
                         native_ro_pointer_type(TYPE_Value),
                         TYPE_I32
                         })

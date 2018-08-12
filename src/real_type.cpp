@@ -13,10 +13,6 @@ namespace scopes {
 // REAL TYPE
 //------------------------------------------------------------------------------
 
-bool RealType::classof(const Type *T) {
-    return T->kind() == TK_Real;
-}
-
 void RealType::stream_name(StyledStream &ss) const {
     ss << "f" << width;
 }

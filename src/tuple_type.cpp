@@ -49,10 +49,6 @@ static std::unordered_set<const TupleType *, TupleSet::Hash, TupleSet::KeyEqual>
 // TUPLE TYPE
 //------------------------------------------------------------------------------
 
-bool TupleType::classof(const Type *T) {
-    return T->kind() == TK_Tuple;
-}
-
 void TupleType::stream_name(StyledStream &ss) const {
     if (explicit_alignment) {
         ss << "[align:" << align << "]";
@@ -141,10 +137,6 @@ SCOPES_RESULT(Symbol) TupleType::field_name(size_t i) const {
 SCOPES_RESULT(const Type *) keyed_tuple_type(const KeyedTypes &values,
     bool packed, size_t alignment) {
     SCOPES_RESULT_TYPE(const Type *);
-    TupleType key(values, packed, alignment);
-    auto it = tuples.find(&key);
-    if (it != tuples.end())
-        return *it;
     for (size_t i = 0; i < values.size(); ++i) {
         const Type *T = values[i].type;
         if (is_opaque(T)) {
@@ -154,6 +146,10 @@ SCOPES_RESULT(const Type *) keyed_tuple_type(const KeyedTypes &values,
             SCOPES_LOCATION_ERROR(ss.str());
         }
     }
+    TupleType key(values, packed, alignment);
+    auto it = tuples.find(&key);
+    if (it != tuples.end())
+        return *it;
     auto result = new TupleType(values, packed, alignment);
     tuples.insert(result);
     return result;

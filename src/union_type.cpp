@@ -45,11 +45,6 @@ static std::unordered_set<const UnionType *, UnionSet::Hash, UnionSet::KeyEqual>
 // UNION TYPE
 //------------------------------------------------------------------------------
 
-bool UnionType::classof(const Type *T) {
-    return T->kind() == TK_Union;
-}
-
-
 void UnionType::stream_name(StyledStream &ss) const {
     ss << "{";
     for (size_t i = 0; i < values.size(); ++i) {

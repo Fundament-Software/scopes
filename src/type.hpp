@@ -37,7 +37,8 @@ struct Const;
     T(TK_Tuple, "type-kind-tuple", TupleType) \
     T(TK_Union, "type-kind-union", UnionType) \
     T(TK_Typename, "type-kind-typename", TypenameType) \
-    T(TK_Return, "type-kind-return", ReturnType) \
+    T(TK_Arguments, "type-kind-arguments", ArgumentsType) \
+    T(TK_Raises, "type-kind-raises", RaisesType) \
     T(TK_Function, "type-kind-function", FunctionType) \
     T(TK_Image, "type-kind-image", ImageType) \
     T(TK_SampledImage, "type-kind-sampled-image", SampledImageType)
@@ -106,6 +107,7 @@ typedef std::vector<const Type *> ArgTypes;
     /* types */ \
     T(TYPE_Void, "void") \
     T(TYPE_Nothing, "Nothing") \
+    T(TYPE_NoReturn, "noreturn") \
     \
     T(TYPE_Type, "type") \
     T(TYPE_Unknown, "Unknown") \
@@ -154,7 +156,8 @@ typedef std::vector<const Type *> ArgTypes;
     T(TYPE_Tuple, "tuple") \
     T(TYPE_Union, "union") \
     T(TYPE_Typename, "typename") \
-    T(TYPE_Return, "Return") \
+    T(TYPE_Arguments, "Arguments") \
+    T(TYPE_Raises, "Raises") \
     T(TYPE_Function, "function") \
     T(TYPE_Constant, "constant") \
     T(TYPE_Image, "Image") \
@@ -174,8 +177,8 @@ bool is_opaque(const Type *T);
 SCOPES_RESULT(size_t) size_of(const Type *T);
 SCOPES_RESULT(size_t) align_of(const Type *T);
 const Type *superof(const Type *T);
-bool is_invalid_argument_type(const Type *T);
 void stream_type_name(StyledStream &ss, const Type *T);
+bool is_returning(const Type *T);
 
 //------------------------------------------------------------------------------
 // TYPE CHECK PREDICATES

@@ -14,10 +14,6 @@ namespace scopes {
 // INTEGER TYPE
 //------------------------------------------------------------------------------
 
-bool IntegerType::classof(const Type *T) {
-    return T->kind() == TK_Integer;
-}
-
 void IntegerType::stream_name(StyledStream &ss) const {
     if ((width == 1) && !issigned) {
         ss << "bool";

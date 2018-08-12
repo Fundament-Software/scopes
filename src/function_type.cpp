@@ -5,7 +5,7 @@
 */
 
 #include "function_type.hpp"
-#include "return_type.hpp"
+#include "arguments_type.hpp"
 #include "tuple_type.hpp"
 #include "pointer_type.hpp"
 #include "error.hpp"
@@ -19,10 +19,6 @@ namespace scopes {
 //------------------------------------------------------------------------------
 // FUNCTION TYPE
 //------------------------------------------------------------------------------
-
-bool FunctionType::classof(const Type *T) {
-    return T->kind() == TK_Function;
-}
 
 void FunctionType::stream_name(StyledStream &ss) const {
     stream_type_name(ss, return_type);

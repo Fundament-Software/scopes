@@ -6,7 +6,7 @@
 
 #include "typename_type.hpp"
 #include "error.hpp"
-#include "return_type.hpp"
+#include "arguments_type.hpp"
 #include "dyn_cast.inc"
 
 namespace scopes {
@@ -14,10 +14,6 @@ namespace scopes {
 //------------------------------------------------------------------------------
 // TYPENAME
 //------------------------------------------------------------------------------
-
-bool TypenameType::classof(const Type *T) {
-    return T->kind() == TK_Typename;
-}
 
 const String *TypenameType::name() const {
     return _name;
@@ -84,10 +80,6 @@ SCOPES_RESULT(const Type *) storage_type(const Type *T) {
             SCOPES_LOCATION_ERROR(ss.str());
         }
         return tt->storage_type;
-    } break;
-    case TK_Return: {
-        const ReturnType *rt = cast<ReturnType>(T);
-        return storage_type(rt->return_type);
     } break;
     default: return T;
     }

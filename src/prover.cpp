@@ -143,6 +143,7 @@ struct ASTContext {
     Function *frame;
     EvalTarget target;
     Loop *loop;
+    Try *_try;
 
     const Type *transform_return_type(const Type *T) const {
         if (is_returning(T) && is_target_void())
@@ -154,18 +155,26 @@ struct ASTContext {
         return target == EvalTarget_Void;
     }
 
+    ASTContext with_return_target() const { return with_target(EvalTarget_Return); }
+    ASTContext with_void_target() const { return with_target(EvalTarget_Void); }
+    ASTContext with_symbol_target() const { return with_target(EvalTarget_Symbol); }
+
     ASTContext with_target(EvalTarget target) const {
-        return ASTContext(frame, target, loop);
+        return ASTContext(frame, target, loop, _try);
     }
 
     ASTContext for_loop(Loop *loop) const {
-        return ASTContext(frame, EvalTarget_Symbol, loop);
+        return ASTContext(frame, EvalTarget_Symbol, loop, _try);
+    }
+
+    ASTContext for_try(Try *_try) const {
+        return ASTContext(frame, target, loop, _try);
     }
 
     ASTContext() {}
 
-    ASTContext(Function *_frame, EvalTarget _target, Loop *_loop = nullptr) :
-        frame(_frame), target(_target), loop(_loop) {
+    ASTContext(Function *_frame, EvalTarget _target, Loop *_loop, Try *xtry) :
+        frame(_frame), target(_target), loop(_loop), _try(xtry) {
     }
 };
 
@@ -292,7 +301,7 @@ static bool is_useless(Value *node) {
 static SCOPES_RESULT(Value *) specialize_Block(const ASTContext &ctx, Block *block) {
     SCOPES_RESULT_TYPE(Value *);
     Block *newblock = Block::from(block->anchor());
-    auto subctx = ctx.with_target(EvalTarget_Void);
+    auto subctx = ctx.with_void_target();
     for (auto &&src : block->body) {
         auto newsrc = SCOPES_GET_RESULT(specialize(subctx, src));
         if (!is_returning(newsrc->get_type())) {
@@ -314,7 +323,7 @@ static Value *extract_argument(Value *value, int index) {
     const Type *T = value->get_type();
     if (!is_returning(T))
         return value;
-    auto rt = dyn_cast<ReturnType>(value->get_type());
+    auto rt = dyn_cast<ArgumentsType>(value->get_type());
     if (rt) {
         const Type *T = rt->type_at_index(index);
         if (T == TYPE_Nothing) {
@@ -340,21 +349,20 @@ static Value *extract_argument(Value *value, int index) {
 static SCOPES_RESULT(void) specialize_arguments(
     const ASTContext &ctx, Values &outargs, const Values &values) {
     SCOPES_RESULT_TYPE(void);
-    auto subctx = ctx.with_target(EvalTarget_Symbol);
+    auto subctx = ctx.with_symbol_target();
     int count = (int)values.size();
     for (int i = 0; i < count; ++i) {
         auto value = SCOPES_GET_RESULT(specialize(subctx, values[i]));
         const Type *T = value->get_type();
-        auto rt = dyn_cast<ReturnType>(T);
+        if (!is_returning(T)) {
+            SCOPES_EXPECT_ERROR(error_noreturn_not_last_expression());
+        }
+        auto rt = dyn_cast<ArgumentsType>(T);
         if (rt) {
-            if (!rt->is_returning()) {
-                SCOPES_EXPECT_ERROR(error_noreturn_not_last_expression());
-            }
             if ((i + 1) == count) {
                 // last argument is appended in full
-                int starti = (rt->is_raising()?1:0);
                 int valcount = (int)rt->values.size();
-                for (int j = starti; j < valcount; ++j) {
+                for (int j = 0; j < valcount; ++j) {
                     outargs.push_back(extract_argument(value, j));
                 }
                 break;
@@ -367,12 +375,12 @@ static SCOPES_RESULT(void) specialize_arguments(
     return true;
 }
 
-static const Type *return_type_from_arguments(const Values &values) {
+static const Type *arguments_type_from_arguments(const Values &values) {
     ArgTypes types;
     for (auto arg : values) {
         types.push_back(arg->get_type());
     }
-    return return_type(types);
+    return arguments_type(types);
 }
 
 static SCOPES_RESULT(Value *) specialize_ArgumentList(const ASTContext &ctx, ArgumentList *nlist) {
@@ -383,7 +391,7 @@ static SCOPES_RESULT(Value *) specialize_ArgumentList(const ASTContext &ctx, Arg
         return values[0];
     }
     ArgumentList *newnlist = ArgumentList::from(nlist->anchor(), values);
-    newnlist->set_type(return_type_from_arguments(values));
+    newnlist->set_type(arguments_type_from_arguments(values));
     return newnlist;
 }
 
@@ -417,7 +425,7 @@ static SCOPES_RESULT(void) specialize_bind_arguments(const ASTContext &ctx,
                 for (int j = i; j < tmpargs.size(); ++j) {
                     arglist->append(tmpargs[j]);
                 }
-                arglist->set_type(return_type_from_arguments(arglist->values));
+                arglist->set_type(arguments_type_from_arguments(arglist->values));
                 newval = arglist;
             }
         } else if (i < tmpargs.size()) {
@@ -435,6 +443,14 @@ static SCOPES_RESULT(void) specialize_bind_arguments(const ASTContext &ctx,
         }
     }
     return true;
+}
+
+static SCOPES_RESULT(Value *) specialize_Try(const ASTContext &ctx, Try *_try) {
+    SCOPES_RESULT_TYPE(Value *);
+    auto try_body = SCOPES_GET_RESULT(specialize(ctx, _try->try_body));
+
+    auto except_body = SCOPES_GET_RESULT(specialize(ctx, _try->except_body));
+    assert(false);
 }
 
 static SCOPES_RESULT(Value *) specialize_Let(const ASTContext &ctx, Let *let) {
@@ -490,11 +506,11 @@ static SCOPES_RESULT(Break *) specialize_Break(const ASTContext &ctx, Break *_br
     if (!ctx.loop) {
         SCOPES_EXPECT_ERROR(error_illegal_break_outside_loop());
     }
-    auto subctx = ctx.with_target(EvalTarget_Symbol);
+    auto subctx = ctx.with_symbol_target();
     Value *value = SCOPES_GET_RESULT(specialize(subctx, _break->value));
     ctx.loop->return_type = SCOPES_GET_RESULT(merge_value_type(subctx, ctx.loop->return_type, value->get_type()));
     auto newbreak = Break::from(_break->anchor(), value);
-    newbreak->set_type(no_return_type());
+    newbreak->set_type(TYPE_NoReturn);
     return newbreak;
 }
 
@@ -506,7 +522,7 @@ static SCOPES_RESULT(Repeat *) specialize_Repeat(const ASTContext &ctx, Repeat *
     }
     auto newrepeat = Repeat::from(_repeat->anchor());
     SCOPES_CHECK_RESULT(specialize_arguments(ctx, newrepeat->args, _repeat->args));
-    newrepeat->set_type(no_return_type());
+    newrepeat->set_type(TYPE_NoReturn);
     return newrepeat;
 }
 
@@ -520,17 +536,23 @@ static SCOPES_RESULT(Return *) make_return(const ASTContext &ctx, const Anchor *
     }
     ctx.frame->return_type = SCOPES_GET_RESULT(merge_return_type(ctx.frame->return_type, value->get_type()));
     auto newreturn = Return::from(anchor, value);
-    newreturn->set_type(no_return_type());
+    newreturn->set_type(TYPE_NoReturn);
     return newreturn;
 }
 
 static SCOPES_RESULT(Value *) specialize_Return(const ASTContext &ctx, Return *_return) {
     SCOPES_RESULT_TYPE(Value *);
-    Value *value = SCOPES_GET_RESULT(specialize(ctx.with_target(EvalTarget_Symbol), _return->value));
+    Value *value = SCOPES_GET_RESULT(specialize(ctx.with_symbol_target(), _return->value));
     if (ctx.target == EvalTarget_Return) {
         return value;
     }
     return SCOPES_GET_RESULT(make_return(ctx, _return->anchor(), value));
+}
+
+static SCOPES_RESULT(Value *) specialize_Raise(const ASTContext &ctx, Raise *_raise) {
+    SCOPES_RESULT_TYPE(Value *);
+    Value *value = SCOPES_GET_RESULT(specialize(ctx.with_symbol_target(), _raise->value));
+    return SCOPES_GET_RESULT(make_return(ctx, _raise->anchor(), value));
 }
 
 static SCOPES_RESULT(Value *) specialize_SyntaxExtend(const ASTContext &ctx, SyntaxExtend *sx) {
@@ -685,7 +707,7 @@ static SCOPES_RESULT(void) verify_real_ops(const Type *a, const Type *b, const T
 #define RETARGTYPES(...) \
     { \
         Call *newcall = Call::from(call->anchor(), callee, values); \
-        newcall->set_type(return_type({ __VA_ARGS__ })); \
+        newcall->set_type(arguments_type({ __VA_ARGS__ })); \
         return newcall; \
     }
 #define READ_TYPEOF(NAME) \
@@ -715,7 +737,7 @@ static const Type *get_function_type(Function *fn) {
 static SCOPES_RESULT(Value *) specialize_call_interior(const ASTContext &ctx, Call *call) {
     SCOPES_RESULT_TYPE(Value *);
     SCOPES_ANCHOR(call->anchor());
-    auto subctx = ctx.with_target(EvalTarget_Symbol);
+    auto subctx = ctx.with_symbol_target();
     Value *callee = SCOPES_GET_RESULT(specialize(subctx, call->callee));
     Values values;
     SCOPES_CHECK_RESULT(specialize_arguments(ctx, values, call->args));
@@ -1098,7 +1120,7 @@ static SCOPES_RESULT(Value *) specialize_SymbolValue(const ASTContext &ctx, Symb
 static SCOPES_RESULT(Value *) specialize_If(const ASTContext &ctx, If *_if) {
     SCOPES_RESULT_TYPE(Value *);
     assert(!_if->clauses.empty());
-    auto subctx = ctx.with_target(EvalTarget_Symbol);
+    auto subctx = ctx.with_symbol_target();
     const Type *rtype = nullptr;
     Clauses clauses;
     Clause else_clause;
@@ -1215,7 +1237,7 @@ SCOPES_RESULT(Value *) specialize_inline(const ASTContext &ctx,
     let->args = nodes;
     auto block = Block::from(func->anchor(), {let}, fn->value);
 
-    ASTContext subctx(fn, ctx.target);
+    ASTContext subctx(fn, ctx.target, nullptr, nullptr);
     SCOPES_ANCHOR(fn->anchor());
     return SCOPES_GET_RESULT(specialize(subctx, block));
 }
@@ -1256,7 +1278,7 @@ SCOPES_RESULT(Function *) specialize(Function *frame, Template *func, const ArgT
                     fn->append_param(newparam);
                     args->values.push_back(newparam);
                 }
-                args->set_type(return_type(vtypes));
+                args->set_type(arguments_type(vtypes));
                 fn->bind(oldparam, args);
             }
         } else {
@@ -1275,7 +1297,7 @@ SCOPES_RESULT(Function *) specialize(Function *frame, Template *func, const ArgT
     }
     functions.insert(fn);
 
-    ASTContext subctx(fn, EvalTarget_Return);
+    ASTContext subctx(fn, EvalTarget_Return, nullptr, nullptr);
     SCOPES_ANCHOR(fn->anchor());
     auto result = specialize(subctx, fn->value);
     if (result.ok()) {

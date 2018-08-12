@@ -33,10 +33,6 @@ static std::unordered_set<const SampledImageType *, SampledImageSet::Hash, Sampl
 // SAMPLED IMAGE TYPE
 //------------------------------------------------------------------------------
 
-bool SampledImageType::classof(const Type *T) {
-    return T->kind() == TK_SampledImage;
-}
-
 void SampledImageType::stream_name(StyledStream &ss) const {
     ss << "<SampledImage ";
     stream_type_name(ss, type);

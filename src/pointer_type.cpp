@@ -39,10 +39,6 @@ static std::unordered_set<const PointerType *, PointerSet::Hash, PointerSet::Key
 // POINTER TYPE
 //------------------------------------------------------------------------------
 
-bool PointerType::classof(const Type *T) {
-    return T->kind() == TK_Pointer;
-}
-
 void PointerType::stream_name(StyledStream &ss) const {
     stream_type_name(ss, element_type);
     if (is_writable() && is_readable()) {
