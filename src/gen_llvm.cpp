@@ -701,10 +701,11 @@ struct LLVMIRGenerator {
         case TK_Raises: {
             auto rt = cast<RaisesType>(type);
             LLVMTypeRef elements[] = {
+                i1T,
                 SCOPES_GET_RESULT(_type_to_llvm_type(rt->except_type)),
                 SCOPES_GET_RESULT(_type_to_llvm_type(rt->result_type))
             };
-            return LLVMStructType(elements, 2, false);
+            return LLVMStructType(elements, 3, false);
         } break;
         case TK_Function: {
             auto fi = cast<FunctionType>(type);

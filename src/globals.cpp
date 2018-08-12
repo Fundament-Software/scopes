@@ -90,12 +90,14 @@ sc_rawstring_array_i32_tuple_t sc_launch_args() {
 }
 
 #define RETURN_RESULT(X) { auto _result = (X); \
-    return {_result.ok(), _result.unsafe_extract()}; }
+    return {_result.ok(), (_result.ok()?nullptr:get_last_error()), _result.unsafe_extract()}; }
+#define RETURN_VOID(X) { auto _result = (X); \
+    return {_result.ok(), (_result.ok()?nullptr:get_last_error())}; }
 
-sc_bool_value_tuple_t sc_eval(sc_value_t *expr, sc_scope_t *scope) {
+sc_value_raises_t sc_eval(sc_value_t *expr, sc_scope_t *scope) {
     using namespace scopes;
     auto module_result = expand_module(expr, scope);
-    if (!module_result.ok()) return { false, nullptr };
+    if (!module_result.ok()) return { false, get_last_error(), nullptr };
     RETURN_RESULT(specialize(nullptr, module_result.assert_ok(), {}));
 }
 
@@ -106,11 +108,11 @@ sc_bool_value_tuple_t sc_eval_inline(sc_value_t *expr, sc_scope_t *scope) {
 }
 #endif
 
-sc_bool_value_tuple_t sc_typify(sc_closure_t *srcl, int numtypes, const sc_type_t **typeargs) {
+sc_value_raises_t sc_typify(sc_closure_t *srcl, int numtypes, const sc_type_t **typeargs) {
     using namespace scopes;
     if (srcl->func->is_inline()) {
         set_last_location_error(String::from("cannot typify inline function"));
-        return { false, nullptr };
+        return { false, get_last_error(), nullptr };
     }
     ArgTypes types;
     for (int i = 0; i < numtypes; ++i) {
@@ -119,26 +121,26 @@ sc_bool_value_tuple_t sc_typify(sc_closure_t *srcl, int numtypes, const sc_type_
     RETURN_RESULT(specialize(srcl->frame, srcl->func, types));
 }
 
-sc_bool_value_tuple_t sc_compile(sc_value_t *srcl, uint64_t flags) {
+sc_value_raises_t sc_compile(sc_value_t *srcl, uint64_t flags) {
     using namespace scopes;
     RETURN_RESULT(compile(cast<Function>(srcl), flags));
 }
 
-sc_bool_string_tuple_t sc_compile_spirv(sc_symbol_t target, sc_value_t *srcl, uint64_t flags) {
+sc_string_raises_t sc_compile_spirv(sc_symbol_t target, sc_value_t *srcl, uint64_t flags) {
     using namespace scopes;
     //RETURN_RESULT(compile_spirv(target, srcl, flags));
-    return {false,String::from("")};
+    return {true,nullptr,String::from("")};
 }
 
-sc_bool_string_tuple_t sc_compile_glsl(sc_symbol_t target, sc_value_t *srcl, uint64_t flags) {
+sc_string_raises_t sc_compile_glsl(sc_symbol_t target, sc_value_t *srcl, uint64_t flags) {
     using namespace scopes;
     //RETURN_RESULT(compile_glsl(target, srcl, flags));
-    return {false,String::from("")};
+    return {true,nullptr,String::from("")};
 }
 
-bool sc_compile_object(const sc_string_t *path, sc_scope_t *table, uint64_t flags) {
+sc_void_raises_t sc_compile_object(const sc_string_t *path, sc_scope_t *table, uint64_t flags) {
     using namespace scopes;
-    return compile_object(path, table, flags).ok();
+    RETURN_VOID(compile_object(path, table, flags));
 }
 
 void sc_enter_solver_cli () {
@@ -146,7 +148,7 @@ void sc_enter_solver_cli () {
     //enable_specializer_step_debugger();
 }
 
-sc_bool_size_tuple_t sc_verify_stack () {
+sc_size_raises_t sc_verify_stack () {
     using namespace scopes;
     RETURN_RESULT(verify_stack());
 }
@@ -391,7 +393,7 @@ uint64_t sc_hashbytes (const char *data, size_t size) {
 // C Bridge
 ////////////////////////////////////////////////////////////////////////////////
 
-sc_bool_scope_tuple_t sc_import_c(const sc_string_t *path,
+sc_scope_raises_t sc_import_c(const sc_string_t *path,
     const sc_string_t *content, const sc_list_t *arglist) {
     using namespace scopes;
     std::vector<std::string> args;
@@ -405,7 +407,7 @@ sc_bool_scope_tuple_t sc_import_c(const sc_string_t *path,
     RETURN_RESULT(import_c_module(path->data, args, content->data));
 }
 
-bool sc_load_library(const sc_string_t *name) {
+sc_void_raises_t sc_load_library(const sc_string_t *name) {
     using namespace scopes;
 #ifdef SCOPES_WIN32
     // try to load library through regular interface first
@@ -419,16 +421,16 @@ bool sc_load_library(const sc_string_t *name) {
             ss.out << ": " << err;
         }
         set_last_location_error(ss.str());
-        return false;
+        return {false, get_last_error()};
     }
 #endif
     if (LLVMLoadLibraryPermanently(name->data)) {
         StyledString ss;
         ss.out << "error loading library " << name;
         set_last_location_error(ss.str());
-        return false;
+        return {false, get_last_error()};
     }
-    return true;
+    return {true,nullptr};
 }
 
 // Anchor
@@ -580,7 +582,7 @@ const sc_string_t *sc_string_join(const sc_string_t *a, const sc_string_t *b) {
 namespace scopes {
     static std::unordered_map<const String *, regexp::Reprog *> pattern_cache;
 }
-sc_bool_bool_tuple_t sc_string_match(const sc_string_t *pattern, const sc_string_t *text) {
+sc_bool_raises_t sc_string_match(const sc_string_t *pattern, const sc_string_t *text) {
     using namespace scopes;
     auto it = pattern_cache.find(pattern);
     regexp::Reprog *m = nullptr;
@@ -591,13 +593,13 @@ sc_bool_bool_tuple_t sc_string_match(const sc_string_t *pattern, const sc_string
             const String *err = String::from_cstr(error);
             regexp::regfree(m);
             set_last_location_error(err);
-            return { false, false };
+            return { false, get_last_error(), false };
         }
         pattern_cache.insert({ pattern, m });
     } else {
         m = it->second;
     }
-    return { true, (regexp::regexec(m, text->data, nullptr, 0) == 0) };
+    return { true, nullptr, (regexp::regexec(m, text->data, nullptr, 0) == 0) };
 }
 
 size_t sc_string_count(sc_string_t *str) {
@@ -908,20 +910,20 @@ sc_value_t *sc_return_new(sc_value_t *value) {
 // Parser
 ////////////////////////////////////////////////////////////////////////////////
 
-sc_bool_value_tuple_t sc_parse_from_path(const sc_string_t *path) {
+sc_value_raises_t sc_parse_from_path(const sc_string_t *path) {
     using namespace scopes;
     auto sf = SourceFile::from_file(path);
     if (!sf) {
         StyledString ss;
         ss.out << "no such file: " << path;
         set_last_location_error(ss.str());
-        return { false, nullptr };
+        return { false, get_last_error(), nullptr };
     }
     LexerParser parser(sf);
     RETURN_RESULT(parser.parse());
 }
 
-sc_bool_value_tuple_t sc_parse_from_string(const sc_string_t *str) {
+sc_value_raises_t sc_parse_from_string(const sc_string_t *str) {
     using namespace scopes;
     auto sf = SourceFile::from_string(Symbol("<string>"), str);
     assert(sf);
@@ -939,83 +941,95 @@ sc_bool_value_tuple_t sc_type_at(const sc_type_t *T, sc_symbol_t key) {
     return { ok, result };
 }
 
-sc_bool_size_tuple_t sc_type_sizeof(const sc_type_t *T) {
+sc_size_raises_t sc_type_sizeof(const sc_type_t *T) {
     using namespace scopes;
     RETURN_RESULT(size_of(T));
 }
 
-sc_bool_size_tuple_t sc_type_alignof(const sc_type_t *T) {
+sc_size_raises_t sc_type_alignof(const sc_type_t *T) {
     using namespace scopes;
     RETURN_RESULT(align_of(T));
 }
 
-sc_bool_int_tuple_t sc_type_countof(const sc_type_t *T) {
+sc_int_raises_t sc_type_countof(const sc_type_t *T) {
     using namespace scopes;
     auto rT = storage_type(T);
-    if (!rT.ok()) return { false, 0 };
+    if (!rT.ok()) return { false, get_last_error(), 0 };
     T = rT.assert_ok();
     switch(T->kind()) {
     case TK_Pointer:
     case TK_Image:
     case TK_SampledImage:
-        return { true, 1 };
-    case TK_Array: return { true, (int)cast<ArrayType>(T)->count };
-    case TK_Vector: return { true, (int)cast<VectorType>(T)->count };
-    case TK_Tuple: return { true, (int)cast<TupleType>(T)->values.size() };
-    case TK_Union: return { true, (int)cast<UnionType>(T)->values.size() };
-    case TK_Function:  return { true, (int)(cast<FunctionType>(T)->argument_types.size() + 1) };
-    default:  break;
+        return { true, nullptr, 1 };
+    case TK_Array: return { true, nullptr, (int)cast<ArrayType>(T)->count };
+    case TK_Vector: return { true, nullptr, (int)cast<VectorType>(T)->count };
+    case TK_Tuple: return { true, nullptr, (int)cast<TupleType>(T)->values.size() };
+    case TK_Union: return { true, nullptr, (int)cast<UnionType>(T)->values.size() };
+    case TK_Function:  return { true, nullptr, (int)(cast<FunctionType>(T)->argument_types.size() + 1) };
+    default: {
+        StyledString ss;
+        ss.out << "storage type " << T << " has no count";
+        set_last_location_error(ss.str());
+    } break;
     }
-    return { false, 0 };
+    return { false, get_last_error(), 0 };
 }
 
-sc_bool_type_tuple_t sc_type_element_at(const sc_type_t *T, int i) {
+sc_type_raises_t sc_type_element_at(const sc_type_t *T, int i) {
     using namespace scopes;
     auto rT = storage_type(T);
-    if (!rT.ok()) return { false, nullptr };
+    if (!rT.ok()) return { false, get_last_error(), nullptr };
     T = rT.assert_ok();
     switch(T->kind()) {
-    case TK_Pointer: return { true, cast<PointerType>(T)->element_type };
-    case TK_Array: return { true, cast<ArrayType>(T)->element_type };
-    case TK_Vector: return { true, cast<VectorType>(T)->element_type };
+    case TK_Pointer: return { true, nullptr, cast<PointerType>(T)->element_type };
+    case TK_Array: return { true, nullptr, cast<ArrayType>(T)->element_type };
+    case TK_Vector: return { true, nullptr, cast<VectorType>(T)->element_type };
     case TK_Tuple: RETURN_RESULT( cast<TupleType>(T)->type_at_index(i) );
     case TK_Union: RETURN_RESULT( cast<UnionType>(T)->type_at_index(i) );
     case TK_Function: RETURN_RESULT(cast<FunctionType>(T)->type_at_index(i));
-    case TK_Image: return { true, cast<ImageType>(T)->type };
-    case TK_SampledImage: return { true, cast<SampledImageType>(T)->type };
+    case TK_Image: return { true, nullptr, cast<ImageType>(T)->type };
+    case TK_SampledImage: return { true, nullptr, cast<SampledImageType>(T)->type };
     default: {
         StyledString ss;
         ss.out << "storage type " << T << " has no elements" << std::endl;
         set_last_location_error(ss.str());
     } break;
     }
-    return { false, nullptr };
+    return { false, get_last_error(), nullptr };
 }
 
-sc_bool_int_tuple_t sc_type_field_index(const sc_type_t *T, sc_symbol_t name) {
+sc_int_raises_t sc_type_field_index(const sc_type_t *T, sc_symbol_t name) {
     using namespace scopes;
     auto rT = storage_type(T);
-    if (!rT.ok()) return { false, -1 };
+    if (!rT.ok()) return { false, get_last_error(), -1 };
     T = rT.assert_ok();
     switch(T->kind()) {
-    case TK_Tuple: return { true, (int)cast<TupleType>(T)->field_index(name) };
-    case TK_Union: return { true, (int)cast<UnionType>(T)->field_index(name) };
-    default: break;
+    case TK_Tuple: return { true, nullptr, (int)cast<TupleType>(T)->field_index(name) };
+    case TK_Union: return { true, nullptr, (int)cast<UnionType>(T)->field_index(name) };
+    default: {
+        StyledString ss;
+        ss.out << "storage type " << T << " has no elements" << std::endl;
+        set_last_location_error(ss.str());
+    } break;
     }
-    return { false, -1 };
+    return { false, get_last_error(), -1 };
 }
 
-sc_bool_symbol_tuple_t sc_type_field_name(const sc_type_t *T, int index) {
+sc_symbol_raises_t sc_type_field_name(const sc_type_t *T, int index) {
     using namespace scopes;
     auto rT = storage_type(T);
-    if (!rT.ok()) return { false, SYM_Unnamed };
+    if (!rT.ok()) return { false, get_last_error(), SYM_Unnamed };
     T = rT.assert_ok();
     switch(T->kind()) {
     case TK_Tuple: RETURN_RESULT(cast<TupleType>(T)->field_name(index));
     case TK_Union: RETURN_RESULT(cast<UnionType>(T)->field_name(index));
-    default: break;
+    default: {
+        StyledString ss;
+        ss.out << "storage type " << T << " has no elements" << std::endl;
+        set_last_location_error(ss.str());
+    } break;
     }
-    return { false, SYM_Unnamed };
+    return { false, get_last_error(), SYM_Unnamed };
 }
 
 int32_t sc_type_kind(const sc_type_t *T) {
@@ -1035,7 +1049,7 @@ void sc_type_debug_abi(const sc_type_t *T) {
     ss << std::endl;
 }
 
-sc_bool_type_tuple_t sc_type_storage(const sc_type_t *T) {
+sc_type_raises_t sc_type_storage(const sc_type_t *T) {
     using namespace scopes;
     RETURN_RESULT(storage_type(T));
 }
@@ -1169,10 +1183,10 @@ const sc_type_t *sc_typename_type(const sc_string_t *str) {
     return typename_type(str);
 }
 
-bool sc_typename_type_set_super(const sc_type_t *T, const sc_type_t *ST) {
+sc_void_raises_t sc_typename_type_set_super(const sc_type_t *T, const sc_type_t *ST) {
     using namespace scopes;
-    if (!verify_kind<TK_Typename>(T).ok()) return false;
-    if (!verify_kind<TK_Typename>(ST).ok()) return false;
+    if (!verify_kind<TK_Typename>(T).ok()) return { false, get_last_error() };
+    if (!verify_kind<TK_Typename>(ST).ok()) return { false, get_last_error() };
     // if T <=: ST, the operation is illegal
     const Type *S = ST;
     while (S) {
@@ -1180,7 +1194,7 @@ bool sc_typename_type_set_super(const sc_type_t *T, const sc_type_t *ST) {
             StyledString ss;
             ss.out << "typename " << ST << " can not be a supertype of " << T;
             set_last_location_error(ss.str());
-            return false;
+            return { false, get_last_error() };
         }
         if (S == TYPE_Typename)
             break;
@@ -1188,7 +1202,7 @@ bool sc_typename_type_set_super(const sc_type_t *T, const sc_type_t *ST) {
     }
     auto tn = cast<TypenameType>(T);
     const_cast<TypenameType *>(tn)->super_type = ST;
-    return true;
+    return { true, nullptr };
 }
 
 const sc_type_t *sc_typename_type_get_super(const sc_type_t *T) {
@@ -1196,18 +1210,16 @@ const sc_type_t *sc_typename_type_get_super(const sc_type_t *T) {
     return superof(T);
 }
 
-bool sc_typename_type_set_storage(const sc_type_t *T, const sc_type_t *T2) {
+sc_void_raises_t sc_typename_type_set_storage(const sc_type_t *T, const sc_type_t *T2) {
     using namespace scopes;
-    if (is_kind<TK_Typename>(T)) {
-        return cast<TypenameType>(const_cast<Type *>(T))->finalize(T2).ok();
-    }
-    return false;
+    if (!verify_kind<TK_Typename>(T).ok()) return { false, get_last_error() };
+    RETURN_VOID(cast<TypenameType>(const_cast<Type *>(T))->finalize(T2));
 }
 
 // Array Type
 ////////////////////////////////////////////////////////////////////////////////
 
-sc_bool_type_tuple_t sc_array_type(const sc_type_t *element_type, size_t count) {
+sc_type_raises_t sc_array_type(const sc_type_t *element_type, size_t count) {
     using namespace scopes;
     RETURN_RESULT(array_type(element_type, count));
 }
@@ -1215,7 +1227,7 @@ sc_bool_type_tuple_t sc_array_type(const sc_type_t *element_type, size_t count) 
 // Vector Type
 ////////////////////////////////////////////////////////////////////////////////
 
-sc_bool_type_tuple_t sc_vector_type(const sc_type_t *element_type, size_t count) {
+sc_type_raises_t sc_vector_type(const sc_type_t *element_type, size_t count) {
     using namespace scopes;
     RETURN_RESULT(vector_type(element_type, count));
 }
@@ -1224,7 +1236,7 @@ sc_bool_type_tuple_t sc_vector_type(const sc_type_t *element_type, size_t count)
 ////////////////////////////////////////////////////////////////////////////////
 
 
-sc_bool_type_tuple_t sc_tuple_type(int numtypes, const sc_type_t **typeargs) {
+sc_type_raises_t sc_tuple_type(int numtypes, const sc_type_t **typeargs) {
     using namespace scopes;
     ArgTypes types;
     types.reserve(numtypes);
@@ -1334,7 +1346,6 @@ void init_globals(int argc, char *argv[]) {
 
     DEFINE_EXTERN_C_FUNCTION(sc_compiler_version, tuple_type({TYPE_I32, TYPE_I32, TYPE_I32}).assert_ok());
     DEFINE_EXTERN_C_FUNCTION(sc_eval, raising(TYPE_Value), TYPE_Value, TYPE_Scope);
-    //DEFINE_EXTERN_C_FUNCTION(sc_eval_inline, raising(TYPE_Value), TYPE_Value, TYPE_Scope);
     DEFINE_EXTERN_C_FUNCTION(sc_typify, raising(TYPE_Value), TYPE_Closure, TYPE_I32, native_ro_pointer_type(TYPE_Type));
     DEFINE_EXTERN_C_FUNCTION(sc_compile, raising(TYPE_Value), TYPE_Value, TYPE_U64);
     DEFINE_EXTERN_C_FUNCTION(sc_compile_spirv, raising(TYPE_String), TYPE_Symbol, TYPE_Value, TYPE_U64);
