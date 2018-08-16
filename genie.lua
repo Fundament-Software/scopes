@@ -117,7 +117,6 @@ project "scopesrt"
         "src/tuple_type.cpp",
         "src/union_type.cpp",
         "src/arguments_type.cpp",
-        "src/raises_type.cpp",
         "src/function_type.cpp",
         "src/typename_type.cpp",
         "src/image_type.cpp",

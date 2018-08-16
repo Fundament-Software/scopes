@@ -118,6 +118,12 @@ SCOPES_RESULT(const Type *) TupleType::type_at_index(size_t i) const {
     return values[i].type;
 }
 
+const Type *TupleType::type_at_index_or_nothing(size_t i) const {
+    if (i < values.size())
+        return values[i].type;
+    return TYPE_Nothing;
+}
+
 size_t TupleType::field_index(Symbol name) const {
     for (size_t i = 0; i < values.size(); ++i) {
         if (name == values[i].key)

@@ -37,8 +37,6 @@ struct Const;
     T(TK_Tuple, "type-kind-tuple", TupleType) \
     T(TK_Union, "type-kind-union", UnionType) \
     T(TK_Typename, "type-kind-typename", TypenameType) \
-    T(TK_Arguments, "type-kind-arguments", ArgumentsType) \
-    T(TK_Raises, "type-kind-raises", RaisesType) \
     T(TK_Function, "type-kind-function", FunctionType) \
     T(TK_Image, "type-kind-image", ImageType) \
     T(TK_SampledImage, "type-kind-sampled-image", SampledImageType)
@@ -179,6 +177,7 @@ SCOPES_RESULT(size_t) align_of(const Type *T);
 const Type *superof(const Type *T);
 void stream_type_name(StyledStream &ss, const Type *T);
 bool is_returning(const Type *T);
+bool is_returning_value(const Type *T);
 
 //------------------------------------------------------------------------------
 // TYPE CHECK PREDICATES

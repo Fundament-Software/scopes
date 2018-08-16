@@ -284,6 +284,20 @@ struct LLVMIRGenerator {
     bool inline_pointers;
     Function *active_function;
 
+    static const Type *abi_return_type(const FunctionType *ft) {
+        if (ft->has_exception()) {
+            ArgTypes types = { TYPE_Bool, ft->except_type };
+            if (is_returning_value(ft->return_type)) {
+                types.push_back(ft->return_type);
+            }
+            return tuple_type(types).assert_ok();
+        } else if (is_returning(ft->return_type)) {
+            return ft->return_type;
+        } else {
+            return TYPE_Void;
+        }
+    }
+
     struct TryInfo {
         Try *_try;
         LLVMBasicBlockRef bb_except;
@@ -663,15 +677,6 @@ struct LLVMIRGenerator {
             }
             return LLVMStructType(elements, count, ti->packed);
         } break;
-        case TK_Arguments: {
-            auto at = cast<ArgumentsType>(type);
-            size_t count = at->values.size();
-            LLVMTypeRef elements[count];
-            for (size_t i = 0; i < count; ++i) {
-                elements[i] = SCOPES_GET_RESULT(_type_to_llvm_type(at->values[i].type));
-            }
-            return LLVMStructType(elements, count, false);
-        } break;
         case TK_Union: {
             auto ui = cast<UnionType>(type);
             return _type_to_llvm_type(ui->tuple_type);
@@ -698,32 +703,23 @@ struct LLVMIRGenerator {
             return LLVMStructCreateNamed(
                 LLVMGetGlobalContext(), tn->name()->data);
         } break;
-        case TK_Raises: {
-            auto rt = cast<RaisesType>(type);
-            LLVMTypeRef elements[] = {
-                i1T,
-                SCOPES_GET_RESULT(_type_to_llvm_type(rt->except_type)),
-                SCOPES_GET_RESULT(_type_to_llvm_type(rt->result_type))
-            };
-            return LLVMStructType(elements, 3, false);
-        } break;
         case TK_Function: {
             auto fi = cast<FunctionType>(type);
             size_t count = fi->argument_types.size();
-            bool use_sret = is_memory_class(fi->return_type);
+            auto rtype = abi_return_type(fi);
+            bool use_sret = is_memory_class(rtype);
 
             std::vector<LLVMTypeRef> elements;
             elements.reserve(count);
             LLVMTypeRef rettype;
             if (use_sret) {
                 elements.push_back(
-                    LLVMPointerType(SCOPES_GET_RESULT(_type_to_llvm_type(fi->return_type)), 0));
+                    LLVMPointerType(SCOPES_GET_RESULT(_type_to_llvm_type(rtype)), 0));
                 rettype = voidT;
             } else {
-                const Type *rtype = fi->return_type;
                 ABIClass classes[MAX_ABI_CLASSES];
                 size_t sz = abi_classify(rtype, classes);
-                LLVMTypeRef T = SCOPES_GET_RESULT(_type_to_llvm_type(fi->return_type));
+                LLVMTypeRef T = SCOPES_GET_RESULT(_type_to_llvm_type(rtype));
                 rettype = T;
                 if (sz) {
                     auto tk = LLVMGetTypeKind(T);
@@ -859,22 +855,36 @@ struct LLVMIRGenerator {
         return nullptr;
     }
 
-    SCOPES_RESULT(LLVMValueRef) write_return(Value *node) {
+    SCOPES_RESULT(LLVMValueRef) write_return(LLVMValueRef value, bool is_except = false) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
-        const Type *T = node->get_type();
-        LLVMValueRef value = SCOPES_GET_RESULT(node_to_value(node));
-        if (!is_returning(T)) return value;
+        assert(active_function);
+        auto fi = extract_function_type(active_function->get_type());
+        auto rtype = abi_return_type(fi);
+        auto abiretT = SCOPES_GET_RESULT(type_to_llvm_type(rtype));
+        if (fi->has_exception()) {
+            auto abivalue = LLVMGetUndef(abiretT);
+            if (is_except) {
+                abivalue = LLVMBuildInsertValue(builder, abivalue, falseV, 0, "");
+                abivalue = LLVMBuildInsertValue(builder, abivalue, value, 1, "");
+            } else {
+                abivalue = LLVMBuildInsertValue(builder, abivalue, trueV, 0, "");
+                if (is_returning_value(fi->return_type)) {
+                    abivalue = LLVMBuildInsertValue(builder, abivalue, value, 2, "");
+                }
+            }
+            value = abivalue;
+        }
         LLVMValueRef parentfunc = LLVMGetBasicBlockParent(LLVMGetInsertBlock(builder));
-        bool use_sret = is_memory_class(T);
+        bool use_sret = is_memory_class(rtype);
         if (use_sret) {
             LLVMBuildStore(builder, value, LLVMGetParam(parentfunc, 0));
             return LLVMBuildRetVoid(builder);
-        } else if (T == TYPE_Void) {
+        } else if (rtype == TYPE_Void) {
             return LLVMBuildRetVoid(builder);
         } else {
             // check if ABI needs something else and do a bitcast
             auto retT = LLVMGetReturnType(LLVMGetElementType(LLVMTypeOf(parentfunc)));
-            auto srcT = LLVMTypeOf(value);
+            auto srcT = abiretT;
             if (retT != srcT) {
                 LLVMValueRef dest = safe_alloca(srcT);
                 LLVMBuildStore(builder, value, dest);
@@ -883,6 +893,14 @@ struct LLVMIRGenerator {
             }
             return LLVMBuildRet(builder, value);
         }
+    }
+
+    SCOPES_RESULT(LLVMValueRef) write_return(Value *node) {
+        SCOPES_RESULT_TYPE(LLVMValueRef);
+        const Type *T = node->get_type();
+        LLVMValueRef value = SCOPES_GET_RESULT(node_to_value(node));
+        if (!is_returning(T)) return value;
+        return write_return(value);
     }
 
     SCOPES_RESULT(LLVMValueRef) Return_to_value(Return *node) {
@@ -911,9 +929,24 @@ struct LLVMIRGenerator {
         assert(func);
         auto ilfunctype = node->get_type();
         auto fi = extract_function_type(ilfunctype);
-        bool use_sret = is_memory_class(fi->return_type);
-        //auto rt = cast<ReturnType>(fi->return_type);
+        auto rtype = abi_return_type(fi);
+        bool use_sret = is_memory_class(rtype);
         auto bb = LLVMAppendBasicBlock(func, "");
+
+        try_info._try = nullptr;
+        try_info.bb_except = nullptr;
+        try_info.except_value = nullptr;
+
+        if (fi->has_exception()) {
+            try_info.bb_except = LLVMAppendBasicBlock(func, "except");
+            LLVMPositionBuilderAtEnd(builder, try_info.bb_except);
+            auto except_value_type = SCOPES_GET_RESULT(type_to_llvm_type(node->except_type));
+            if (use_debug_info)
+                set_debug_location(node->anchor());
+            try_info.except_value = LLVMBuildPhi(builder, except_value_type, "");
+            SCOPES_CHECK_RESULT(write_return(try_info.except_value, true));
+        }
+
         LLVMPositionBuilderAtEnd(builder, bb);
 
         auto &&params = node->params;
@@ -1854,13 +1887,15 @@ struct LLVMIRGenerator {
 
         auto fi = cast<FunctionType>(functype);
 
-        bool use_sret = is_memory_class(fi->return_type);
+        auto rtype = abi_return_type(fi);
+        bool use_sret = is_memory_class(rtype);
 
         std::vector<LLVMValueRef> values;
         values.reserve(argcount + 1);
 
+        auto retT = SCOPES_GET_RESULT(type_to_llvm_type(rtype));
         if (use_sret) {
-            values.push_back(safe_alloca(SCOPES_GET_RESULT(_type_to_llvm_type(fi->return_type))));
+            values.push_back(safe_alloca(retT));
         }
         std::vector<size_t> memptrs;
         for (size_t i = 0; i < argcount; ++i) {
@@ -1890,21 +1925,42 @@ struct LLVMIRGenerator {
         }
         if (use_sret) {
             LLVMAddCallSiteAttribute(ret, 1, attr_sret);
-            return LLVMBuildLoad(builder, values[0], "");
+            ret = LLVMBuildLoad(builder, values[0], "");
+        } else if (rtype != TYPE_Void) {
+            // check if ABI needs something else and do a bitcast
+            auto srcT = LLVMTypeOf(ret);
+            if (retT != srcT) {
+                LLVMValueRef dest = safe_alloca(srcT);
+                LLVMBuildStore(builder, ret, dest);
+                ret = LLVMBuildBitCast(builder, dest, LLVMPointerType(retT, 0), "");
+                ret = LLVMBuildLoad(builder, ret, "");
+            }
         }
-        auto RT = fi->return_type;
-        if (RT == TYPE_Void)
-            return ret;
-        if (RT == TYPE_NoReturn)
+
+        if (fi->has_exception()) {
+            auto old_bb = LLVMGetInsertBlock(builder);
+            assert(try_info.bb_except);
+            if (try_info.except_value) {
+                auto except = LLVMBuildExtractValue(builder, ret, 1, "");
+                LLVMBasicBlockRef incobbs[] = { old_bb };
+                LLVMValueRef incovals[] = { except };
+                LLVMAddIncoming(try_info.except_value, incovals, incobbs, 1);
+            }
+            auto ok = LLVMBuildExtractValue(builder, ret, 0, "");
+            if (fi->return_type == TYPE_NoReturn) {
+                // always raises
+                return LLVMBuildBr(builder, try_info.bb_except);
+            } else {
+                auto bb = LLVMAppendBasicBlock(LLVMGetBasicBlockParent(old_bb), "ok");
+                LLVMBuildCondBr(builder, ok, bb, try_info.bb_except);
+                LLVMPositionBuilderAtEnd(builder, bb);
+                if (fi->return_type != TYPE_Void) {
+                    ret = LLVMBuildExtractValue(builder, ret, 2, "");
+                }
+            }
+        }
+        if (fi->return_type == TYPE_NoReturn) {
             return LLVMBuildUnreachable(builder);
-        // check if ABI needs something else and do a bitcast
-        LLVMTypeRef retT = SCOPES_GET_RESULT(type_to_llvm_type(RT));
-        auto srcT = LLVMTypeOf(ret);
-        if (retT != srcT) {
-            LLVMValueRef dest = safe_alloca(srcT);
-            LLVMBuildStore(builder, ret, dest);
-            ret = LLVMBuildBitCast(builder, dest, LLVMPointerType(retT, 0), "");
-            ret = LLVMBuildLoad(builder, ret, "");
         }
         return ret;
     }

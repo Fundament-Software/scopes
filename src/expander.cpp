@@ -11,7 +11,6 @@
 #include "arguments_type.hpp"
 #include "pointer_type.hpp"
 #include "function_type.hpp"
-#include "raises_type.hpp"
 #include "scope.hpp"
 #include "stream_expr.hpp"
 #include "anchor.hpp"
@@ -75,8 +74,8 @@ struct Expander {
         astscope(_astscope),
         next(_next) {
         if (!list_expander_func_type) {
-            list_expander_func_type = pointer_type(function_type(
-                raises_type(arguments_type({TYPE_List, TYPE_Scope})),
+            list_expander_func_type = pointer_type(raising_function_type(
+                arguments_type({TYPE_List, TYPE_Scope}),
                 {TYPE_List, TYPE_Scope}), PTF_NonWritable, SYM_Unnamed);
         }
     }
@@ -620,6 +619,19 @@ struct Expander {
         return Return::from(_anchor, args);
     }
 
+    SCOPES_RESULT(Value *) expand_raise(const List *it) {
+        SCOPES_RESULT_TYPE(Value *);
+        auto _anchor = get_active_anchor();
+        SCOPES_CHECK_RESULT(verify_list_parameter_count("raise", it, 0, -1));
+        it = it->next;
+        ArgumentList *args = ArgumentList::from(_anchor);
+        if (it) {
+            Expander subexp(env, astscope, it->next);
+            SCOPES_CHECK_RESULT(subexp.expand_arguments(args->values, it));
+        }
+        return Raise::from(_anchor, args);
+    }
+
     SCOPES_RESULT(Value *) expand_break(const List *it) {
         SCOPES_RESULT_TYPE(Value *);
         auto _anchor = get_active_anchor();
@@ -737,6 +749,7 @@ struct Expander {
                 case KW_If: return expand_if(list);
                 case KW_Quote: return expand_quote(list);
                 case KW_Return: return expand_return(list);
+                case KW_Raise: return expand_raise(list);
                 case KW_Break: return expand_break(list);
                 case KW_Repeat: return expand_repeat(list);
                 case KW_Forward: return expand_forward(list);

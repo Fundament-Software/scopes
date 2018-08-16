@@ -19,7 +19,6 @@ namespace scopes {
 struct Anchor;
 struct List;
 struct Scope;
-struct ArgumentsType;
 
 #define SCOPES_VALUE_KIND() \
     T(VK_Template, "value-kind-template", Template) \
@@ -175,6 +174,7 @@ struct Function : Value {
     Value *value;
     const String *docstring;
     const Type *return_type;
+    const Type *except_type;
     Function *frame;
     Template *original;
     bool complete;

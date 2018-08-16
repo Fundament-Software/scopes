@@ -15,7 +15,7 @@ namespace scopes {
 
 // list of symbols to be exposed as builtins to the default global namespace
 #define B_GLOBALS() \
-    T(FN_Branch) T(KW_Fn) T(KW_Label) T(KW_Quote) T(KW_Inline) T(KW_Forward) \
+    T(FN_Branch) T(KW_Fn) T(KW_Label) T(KW_Quote) T(KW_Inline) T(KW_Forward) T(KW_Raise) \
     T(KW_Call) T(KW_RawCall) T(KW_CCCall) T(SYM_QuoteForm) T(FN_Dump) T(KW_Do) \
     T(FN_FunctionType) T(FN_TupleType) T(FN_UnionType) T(FN_Alloca) T(FN_AllocaOf) T(FN_Malloc) \
     T(FN_AllocaArray) T(FN_MallocArray) T(FN_ReturnLabelType) T(KW_DoIn) T(FN_AllocaExceptionPad) \
@@ -37,7 +37,7 @@ namespace scopes {
     T(FN_GetElementPtr) T(FN_OffsetOf) T(SFXFN_CompilerError) T(FN_VaCountOf) T(FN_VaAt) \
     T(FN_VaKeys) T(FN_VaKey) T(FN_VaValues) T(FN_CompilerMessage) T(FN_Undef) T(FN_NullOf) T(KW_Let) \
     T(KW_If) T(SFXFN_DelTypeSymbol) T(FN_ExternSymbol) \
-    T(FN_ExternNew) T(SFXFN_Raise) \
+    T(FN_ExternNew) \
     T(SFXFN_Discard) \
     T(FN_TypeAt) T(FN_TypeLocalAt) T(KW_SyntaxExtend) T(FN_Location) T(SFXFN_Unreachable) \
     T(FN_FPTrunc) T(FN_FPExt) T(FN_ScopeOf) \
@@ -254,7 +254,7 @@ namespace scopes {
     T(KW_SyntaxLog, "syntax-log") T(KW_DoIn, "do-in") T(KW_Defer, "__defer") \
     T(KW_Assert, "assert") T(KW_Break, "break") T(KW_Label, "label") \
     T(KW_Call, "call") T(KW_RawCall, "rawcall") T(KW_CCCall, "cc/call") T(KW_Continue, "continue") \
-    T(KW_TryCall, "trycall") T(KW_Repeat, "repeat") \
+    T(KW_TryCall, "trycall") T(KW_Repeat, "repeat") T(KW_Raise, "raise") \
     T(KW_Define, "define") T(KW_Do, "do") T(KW_DumpSyntax, "dump-syntax") \
     T(KW_Else, "else") T(KW_ElseIf, "elseif") T(KW_EmptyList, "empty-list") \
     T(KW_EmptyTuple, "empty-tuple") T(KW_Escape, "escape") \
@@ -474,7 +474,6 @@ namespace scopes {
     T(SFXFN_Discard, "discard!") \
     T(SFXFN_Error, "__error!") \
     T(SFXFN_AnchorError, "__anchor-error!") \
-    T(SFXFN_Raise, "__raise!") \
     T(SFXFN_Abort, "abort!") \
     T(SFXFN_CompilerError, "compiler-error!") \
     T(SFXFN_SetAnchor, "set-anchor!") \

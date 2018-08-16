@@ -11,6 +11,8 @@
 
 #include <assert.h>
 
+#pragma GCC diagnostic ignored "-Wvla-extension"
+
 namespace scopes {
 
 //------------------------------------------------------------------------------
@@ -67,6 +69,64 @@ static ABIClass merge_abi_classes(ABIClass class1, ABIClass class2) {
 }
 
 static size_t classify(const Type *T, ABIClass *classes, size_t offset);
+
+static size_t classify_tuple_like(size_t size,
+    const Type **fields, size_t count, bool packed,
+    ABIClass *classes, size_t offset) {
+    const size_t UNITS_PER_WORD = 8;
+    size_t words = (size + UNITS_PER_WORD - 1) / UNITS_PER_WORD;
+    if (size > 32)
+        return 0;
+    for (size_t i = 0; i < MAX_ABI_CLASSES; i++)
+        classes[i] = ABI_CLASS_NO_CLASS;
+    if (!words) {
+        classes[0] = ABI_CLASS_NO_CLASS;
+        return 1;
+    }
+    ABIClass subclasses[MAX_ABI_CLASSES];
+    for (size_t i = 0; i < count; ++i) {
+        auto ET = fields[i];
+        if (!packed)
+            offset = align(offset, align_of(ET).assert_ok());
+        size_t num = classify (ET, subclasses, offset % 8);
+        if (!num) return 0;
+        for (size_t k = 0; k < num; ++k) {
+            size_t pos = offset / 8;
+            classes[k + pos] =
+                merge_abi_classes (subclasses[k], classes[k + pos]);
+        }
+        offset += size_of(ET).assert_ok();
+    }
+    if (words > 2) {
+        if (classes[0] != ABI_CLASS_SSE)
+            return 0;
+        for (size_t i = 1; i < words; ++i) {
+            if (classes[i] != ABI_CLASS_SSEUP)
+                return 0;
+        }
+    }
+    for (size_t i = 0; i < words; i++) {
+        if (classes[i] == ABI_CLASS_MEMORY)
+            return 0;
+
+        if (classes[i] == ABI_CLASS_SSEUP) {
+            assert(i > 0);
+            if (classes[i - 1] != ABI_CLASS_SSE
+                && classes[i - 1] != ABI_CLASS_SSEUP) {
+                classes[i] = ABI_CLASS_SSE;
+            }
+        }
+
+        if (classes[i] == ABI_CLASS_X87UP) {
+            assert(i > 0);
+            if(classes[i - 1] != ABI_CLASS_X87) {
+                return 0;
+            }
+        }
+    }
+    return words;
+
+}
 
 static size_t classify_array_like(size_t size,
     const Type *element_type, size_t count,
@@ -164,8 +224,6 @@ static size_t classify(const Type *T, ABIClass *classes, size_t offset) {
             assert(false && "illegal type");
         }
     } break;
-    case TK_Raises:
-    case TK_Arguments:
     case TK_Typename: {
         if (is_opaque(T)) {
             classes[0] = ABI_CLASS_NO_CLASS;
@@ -189,60 +247,14 @@ static size_t classify(const Type *T, ABIClass *classes, size_t offset) {
         return classify(ut->values[ut->largest_field].type, classes, offset);
     } break;
     case TK_Tuple: {
-        const size_t UNITS_PER_WORD = 8;
-        size_t size = size_of(T).assert_ok();
-	    size_t words = (size + UNITS_PER_WORD - 1) / UNITS_PER_WORD;
-        if (size > 32)
-            return 0;
-        for (size_t i = 0; i < MAX_ABI_CLASSES; i++)
-	        classes[i] = ABI_CLASS_NO_CLASS;
-        if (!words) {
-            classes[0] = ABI_CLASS_NO_CLASS;
-            return 1;
-        }
         auto tt = cast<TupleType>(T);
-        ABIClass subclasses[MAX_ABI_CLASSES];
+        size_t count = tt->values.size();
+        const Type *fields[count];
         for (size_t i = 0; i < tt->values.size(); ++i) {
-            auto ET = tt->values[i].type;
-            if (!tt->packed)
-                offset = align(offset, align_of(ET).assert_ok());
-            size_t num = classify (ET, subclasses, offset % 8);
-            if (!num) return 0;
-            for (size_t k = 0; k < num; ++k) {
-                size_t pos = offset / 8;
-		        classes[k + pos] =
-		            merge_abi_classes (subclasses[k], classes[k + pos]);
-            }
-            offset += size_of(ET).assert_ok();
+            fields[i] = tt->values[i].type;
         }
-        if (words > 2) {
-            if (classes[0] != ABI_CLASS_SSE)
-                return 0;
-            for (size_t i = 1; i < words; ++i) {
-                if (classes[i] != ABI_CLASS_SSEUP)
-                    return 0;
-            }
-        }
-        for (size_t i = 0; i < words; i++) {
-            if (classes[i] == ABI_CLASS_MEMORY)
-                return 0;
-
-            if (classes[i] == ABI_CLASS_SSEUP) {
-                assert(i > 0);
-                if (classes[i - 1] != ABI_CLASS_SSE
-                    && classes[i - 1] != ABI_CLASS_SSEUP) {
-                    classes[i] = ABI_CLASS_SSE;
-                }
-            }
-
-            if (classes[i] == ABI_CLASS_X87UP) {
-                assert(i > 0);
-                if(classes[i - 1] != ABI_CLASS_X87) {
-                    return 0;
-                }
-            }
-        }
-        return words;
+        return classify_tuple_like(size_of(T).assert_ok(),
+            fields, count, tt->packed, classes, offset);
     } break;
     default: {
         assert(false && "not supported in ABI");

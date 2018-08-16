@@ -228,8 +228,6 @@ const Type *superof(const Type *T) {
     case TK_Tuple: return TYPE_Tuple;
     case TK_Union: return TYPE_Union;
     case TK_Typename: return cast<TypenameType>(T)->super();
-    case TK_Arguments: return TYPE_Arguments;
-    case TK_Raises: return TYPE_Raises;
     case TK_Function: return TYPE_Function;
     case TK_Image: return TYPE_Image;
     case TK_SampledImage: return TYPE_SampledImage;
@@ -239,11 +237,11 @@ const Type *superof(const Type *T) {
 }
 
 bool is_returning(const Type *T) {
-    auto rt = dyn_cast<RaisesType>(T);
-    if (rt) {
-        T = rt->result_type;
-    }
     return (T != TYPE_NoReturn);
+}
+
+bool is_returning_value(const Type *T) {
+    return is_returning(T) && (T != TYPE_Void);
 }
 
 //------------------------------------------------------------------------------
@@ -401,8 +399,8 @@ void init_types() {
         cast<TypenameType>(const_cast<Type *>(TYPE_ASTMacro))
             ->finalize(
                 native_ro_pointer_type(
-                    function_type(
-                        raises_type(TYPE_Value), {
+                    raising_function_type(
+                        TYPE_Value, {
                         native_ro_pointer_type(TYPE_Value),
                         TYPE_I32
                         })

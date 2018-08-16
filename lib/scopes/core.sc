@@ -40,10 +40,6 @@ let
     globals = sc_get_globals
     set-globals! = sc_set_globals
 
-    set-error! = sc_set_last_error
-    set-location-error! = sc_set_last_location_error
-    set-runtime-error! = sc_set_last_runtime_error
-    get-error = sc_get_last_error
     format-error = sc_format_error
     CompileError = sc_location_error_new
     RuntimeError = sc_runtime_error_new
@@ -154,8 +150,7 @@ fn box-pointer (value)
         bitcast value voidstar
 
 fn raise-compile-error! (value)
-    set-error! (CompileError value)
-    __raise!;
+    raise (CompileError value)
 
 # print an unboxing error given two types
 fn unbox-verify (haveT wantT)

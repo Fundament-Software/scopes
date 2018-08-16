@@ -14,7 +14,6 @@
 #include "tuple_type.hpp"
 #include "union_type.hpp"
 #include "arguments_type.hpp"
-#include "raises_type.hpp"
 #include "function_type.hpp"
 #include "image_type.hpp"
 #include "sampledimage_type.hpp"

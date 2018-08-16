@@ -271,6 +271,12 @@ struct StreamAST : StreamAnchors {
             ss << std::endl;
             walk(val->value, depth+1, maxdepth);
         } break;
+        case VK_Raise: {
+            auto val = cast<Raise>(node);
+            ss << Style_Keyword << "Raise" << Style_None;
+            ss << std::endl;
+            walk(val->value, depth+1, maxdepth);
+        } break;
         case VK_SyntaxExtend: {
             auto val = cast<SyntaxExtend>(node);
             ss << Style_Keyword << "SyntaxExtend" << Style_None;

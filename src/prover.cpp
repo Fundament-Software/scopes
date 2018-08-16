@@ -323,9 +323,9 @@ static Value *extract_argument(Value *value, int index) {
     const Type *T = value->get_type();
     if (!is_returning(T))
         return value;
-    auto rt = dyn_cast<ArgumentsType>(value->get_type());
-    if (rt) {
-        const Type *T = rt->type_at_index(index);
+    if (is_arguments_type(T)) {
+        auto rt = cast<TupleType>(storage_type(T).assert_ok());
+        const Type *T = rt->type_at_index_or_nothing(index);
         if (T == TYPE_Nothing) {
             return ConstTuple::none_from(anchor);
         } else {
@@ -357,8 +357,8 @@ static SCOPES_RESULT(void) specialize_arguments(
         if (!is_returning(T)) {
             SCOPES_EXPECT_ERROR(error_noreturn_not_last_expression());
         }
-        auto rt = dyn_cast<ArgumentsType>(T);
-        if (rt) {
+        if (is_arguments_type(T)) {
+            auto rt = cast<TupleType>(storage_type(T).assert_ok());
             if ((i + 1) == count) {
                 // last argument is appended in full
                 int valcount = (int)rt->values.size();
@@ -551,8 +551,12 @@ static SCOPES_RESULT(Value *) specialize_Return(const ASTContext &ctx, Return *_
 
 static SCOPES_RESULT(Value *) specialize_Raise(const ASTContext &ctx, Raise *_raise) {
     SCOPES_RESULT_TYPE(Value *);
+    assert(ctx.frame);
     Value *value = SCOPES_GET_RESULT(specialize(ctx.with_symbol_target(), _raise->value));
-    return SCOPES_GET_RESULT(make_return(ctx, _raise->anchor(), value));
+    ctx.frame->except_type = SCOPES_GET_RESULT(merge_return_type(ctx.frame->except_type, value->get_type()));
+    auto newraise = Raise::from(_raise->anchor(), value);
+    newraise->set_type(TYPE_NoReturn);
+    return newraise;
 }
 
 static SCOPES_RESULT(Value *) specialize_SyntaxExtend(const ASTContext &ctx, SyntaxExtend *sx) {
@@ -563,7 +567,18 @@ static SCOPES_RESULT(Value *) specialize_SyntaxExtend(const ASTContext &ctx, Syn
         SCOPES_ANCHOR(sx->func->anchor());
         SCOPES_EXPECT_ERROR(error_cannot_find_frame(sx->func));
     }
+#if 1 //SCOPES_DEBUG_CODEGEN
+    StyledStream ss(std::cout);
+    std::cout << "syntax-extend non-normalized:" << std::endl;
+    stream_ast(ss, sx->func, StreamASTFormat::debug());
+    std::cout << std::endl;
+#endif
     Function *fn = SCOPES_GET_RESULT(specialize(frame, sx->func, {TYPE_Scope}));
+#if 1 //SCOPES_DEBUG_CODEGEN
+    std::cout << "syntax-extend normalized:" << std::endl;
+    stream_ast(ss, fn, StreamASTFormat());
+    std::cout << std::endl;
+#endif
     //StyledStream ss;
     //stream_ast(ss, fn, StreamASTFormat());
     auto ftype = native_ro_pointer_type(function_type(TYPE_Scope, {TYPE_Scope}));
@@ -575,14 +590,29 @@ static SCOPES_RESULT(Value *) specialize_SyntaxExtend(const ASTContext &ctx, Syn
         env = fptr(sx->env);
         assert(env);
     } else {
-        SCOPES_ANCHOR(sx->anchor());
-        StyledString ss;
-        ss.out << "syntax-extend has wrong return type (expected function of type "
-            << ftype
-            //<< " or "
-            //<< ReturnLabel({unknown_of(TYPE_Scope)}, RLF_Raising)
-            << ", got " << fn->get_type() << ")";
-        SCOPES_LOCATION_ERROR(ss.str());
+        auto ftype2 = native_ro_pointer_type(raising_function_type(TYPE_Scope, {TYPE_Scope}));
+        if (fn->get_type() == ftype2) {
+            typedef struct { bool ok; Error *err; Scope *scope; } ScopeRet;
+            typedef ScopeRet (*SyntaxExtendFuncType)(Scope *);
+            SyntaxExtendFuncType fptr = (SyntaxExtendFuncType)ptr;
+            auto ret = fptr(sx->env);
+            if (ret.ok) {
+                env = ret.scope;
+                assert(env);
+            } else {
+                set_last_error(ret.err);
+                SCOPES_RETURN_ERROR();
+            }
+        } else {
+            SCOPES_ANCHOR(sx->anchor());
+            StyledString ss;
+            ss.out << "syntax-extend has wrong return type (expected function of type "
+                << ftype
+                << " or "
+                << ftype2
+                << ", got " << fn->get_type() << ")";
+            SCOPES_LOCATION_ERROR(ss.str());
+        }
     }
     auto anchor = sx->next?sx->next->at->anchor():fn->anchor();
     auto nextfn = SCOPES_GET_RESULT(expand_inline(
@@ -731,7 +761,7 @@ static const Type *get_function_type(Function *fn) {
     for (int i = 0; i < fn->params.size(); ++i) {
         params.push_back(fn->params[i]->get_type());
     }
-    return native_ro_pointer_type(function_type(fn->return_type, params));
+    return native_ro_pointer_type(raising_function_type(fn->except_type, fn->return_type, params));
 }
 
 static SCOPES_RESULT(Value *) specialize_call_interior(const ASTContext &ctx, Call *call) {
@@ -1092,7 +1122,12 @@ static SCOPES_RESULT(Value *) specialize_call_interior(const ASTContext &ctx, Ca
         SCOPES_ANCHOR(call->anchor());
         SCOPES_CHECK_RESULT(error_invalid_call_type(callee));
     }
-    newcall->set_type(ft->return_type);
+    const Type *rt = ft->return_type;
+    newcall->set_type(rt);
+    if (ft->has_exception()) {
+        assert(ctx.frame);
+        ctx.frame->except_type = SCOPES_GET_RESULT(merge_return_type(ctx.frame->except_type, ft->except_type));
+    }
     return newcall;
 }
 
@@ -1159,6 +1194,13 @@ finalize:
     SCOPES_CHECK_RESULT(specialize_jobs(ctx, numclauses, values));
     for (int i = 0; i < numclauses; ++i) {
         SCOPES_ANCHOR(values[i]->anchor());
+        #if 1
+        if (!values[i]->is_typed()) {
+            StyledStream ss;
+            ss << "clause untyped: ";
+            stream_ast(ss, values[i], StreamASTFormat());
+        }
+        #endif
         rtype = SCOPES_GET_RESULT(merge_value_type(ctx, rtype, values[i]->get_type()));
         if ((i + 1) == numclauses) {
             else_clause.value = values[i];
@@ -1177,7 +1219,6 @@ finalize:
     return newif;
 }
 
-// this must never happen
 static SCOPES_RESULT(Value *) specialize_Template(const ASTContext &ctx, Template *_template) {
     SCOPES_RESULT_TYPE(Value *);
     assert(_template->scope);
@@ -1255,6 +1296,8 @@ SCOPES_RESULT(Function *) specialize(Function *frame, Template *func, const ArgT
         return *it;
     int count = (int)func->params.size();
     Function *fn = Function::from(func->anchor(), func->name, {}, func->value);
+    fn->return_type = TYPE_NoReturn;
+    fn->except_type = TYPE_NoReturn;
     fn->original = func;
     fn->frame = frame;
     fn->instance_args = types;

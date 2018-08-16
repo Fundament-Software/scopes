@@ -110,7 +110,8 @@ Template *Template::from(
 Function::Function(const Anchor *anchor, Symbol _name, const SymbolValues &_params, Value *_value)
     : Value(VK_Function, anchor),
         name(_name), params(_params), value(_value),
-        docstring(nullptr), return_type(nullptr), frame(nullptr), original(nullptr), complete(false) {
+        docstring(nullptr), return_type(nullptr), except_type(nullptr),
+        frame(nullptr), original(nullptr), complete(false) {
 }
 
 void Function::append_param(SymbolValue *sym) {
