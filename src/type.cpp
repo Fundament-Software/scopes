@@ -241,7 +241,7 @@ bool is_returning(const Type *T) {
 }
 
 bool is_returning_value(const Type *T) {
-    return is_returning(T) && (T != TYPE_Void);
+    return is_returning(T) && (T != empty_arguments_type());
 }
 
 //------------------------------------------------------------------------------
@@ -325,7 +325,6 @@ SCOPES_RESULT(void) verify_range(size_t idx, size_t count) {
 void init_types() {
     DEFINE_TYPENAME("typename", TYPE_Typename);
 
-    DEFINE_TYPENAME("void", TYPE_Void);
     DEFINE_TYPENAME("Nothing", TYPE_Nothing);
     DEFINE_TYPENAME("noreturn", TYPE_NoReturn);
 

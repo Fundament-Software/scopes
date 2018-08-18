@@ -294,7 +294,7 @@ struct LLVMIRGenerator {
         } else if (is_returning(ft->return_type)) {
             return ft->return_type;
         } else {
-            return TYPE_Void;
+            return empty_arguments_type();
         }
     }
 
@@ -682,7 +682,7 @@ struct LLVMIRGenerator {
             return _type_to_llvm_type(ui->tuple_type);
         } break;
         case TK_Typename: {
-            if (type == TYPE_Void)
+            if (type == empty_arguments_type())
                 return LLVMVoidType();
             else if (type == TYPE_Sampler) {
                 SCOPES_LOCATION_ERROR(String::from(
@@ -879,7 +879,7 @@ struct LLVMIRGenerator {
         if (use_sret) {
             LLVMBuildStore(builder, value, LLVMGetParam(parentfunc, 0));
             return LLVMBuildRetVoid(builder);
-        } else if (rtype == TYPE_Void) {
+        } else if (rtype == empty_arguments_type()) {
             return LLVMBuildRetVoid(builder);
         } else {
             // check if ABI needs something else and do a bitcast
@@ -1061,10 +1061,6 @@ struct LLVMIRGenerator {
         return LLVMBuildBr(builder, loop_info.bb_loop);
     }
 
-    bool returns_mergable_value(const Type *T) {
-        return is_returning(T) && (T != TYPE_Void);
-    }
-
     SCOPES_RESULT(LLVMValueRef) Loop_to_value(Loop *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         //auto rtype = node->get_type();
@@ -1091,7 +1087,7 @@ struct LLVMIRGenerator {
         }
         LLVMPositionBuilderAtEnd(builder, loop_info.bb_break);
         auto rtype = node->get_type();
-        if (returns_mergable_value(rtype)) {
+        if (is_returning_value(rtype)) {
             loop_info.break_value = LLVMBuildPhi(builder,
                 SCOPES_GET_RESULT(type_to_llvm_type(rtype)), "");
         } else {
@@ -1140,7 +1136,7 @@ struct LLVMIRGenerator {
         if (is_returning(rtype)) {
             bb_merge = LLVMAppendBasicBlock(func, "merge");
             LLVMPositionBuilderAtEnd(builder, bb_merge);
-            if (returns_mergable_value(rtype)) {
+            if (is_returning_value(rtype)) {
                 auto llvm_rtype = SCOPES_GET_RESULT(type_to_llvm_type(rtype));
                 merge_value = LLVMBuildPhi(builder, llvm_rtype, "");
             }
@@ -1678,7 +1674,7 @@ struct LLVMIRGenerator {
         if (is_returning(rtype)) {
             bb_merge = LLVMAppendBasicBlock(func, "merge");
             LLVMPositionBuilderAtEnd(builder, bb_merge);
-            if (returns_mergable_value(rtype)) {
+            if (is_returning_value(rtype)) {
                 merge_value = LLVMBuildPhi(builder, SCOPES_GET_RESULT(type_to_llvm_type(rtype)), "");
             }
         }
@@ -1926,7 +1922,7 @@ struct LLVMIRGenerator {
         if (use_sret) {
             LLVMAddCallSiteAttribute(ret, 1, attr_sret);
             ret = LLVMBuildLoad(builder, values[0], "");
-        } else if (rtype != TYPE_Void) {
+        } else if (is_returning_value(rtype)) {
             // check if ABI needs something else and do a bitcast
             auto srcT = LLVMTypeOf(ret);
             if (retT != srcT) {
@@ -1954,7 +1950,7 @@ struct LLVMIRGenerator {
                 auto bb = LLVMAppendBasicBlock(LLVMGetBasicBlockParent(old_bb), "ok");
                 LLVMBuildCondBr(builder, ok, bb, try_info.bb_except);
                 LLVMPositionBuilderAtEnd(builder, bb);
-                if (fi->return_type != TYPE_Void) {
+                if (fi->return_type != empty_arguments_type()) {
                     ret = LLVMBuildExtractValue(builder, ret, 2, "");
                 }
             }

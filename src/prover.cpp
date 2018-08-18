@@ -147,7 +147,7 @@ struct ASTContext {
 
     const Type *transform_return_type(const Type *T) const {
         if (is_returning(T) && is_target_void())
-            return TYPE_Void;
+            return empty_arguments_type();
         return T;
     }
 
@@ -207,9 +207,11 @@ static int process_jobs() {
 
 static void specialize_coroutine(void *ptr) {
     SpecializeJob *job = (SpecializeJob *)ptr;
+    #if 0
     StyledStream ss;
     ss << "processing: ";
     stream_ast(ss, job->node, StreamASTFormat());
+    #endif
     job->result = specialize(job->ctx, job->node);
     job->done = true;
     coro_transfer(&job->job, &job->from);
@@ -459,7 +461,7 @@ static SCOPES_RESULT(Value *) specialize_Let(const ASTContext &ctx, Let *let) {
     Let *newlet = Let::from(let->anchor());
     SCOPES_CHECK_RESULT(specialize_bind_arguments(ctx,
         newlet->params, newlet->args, let->params, let->args, true));
-    newlet->set_type(TYPE_Void);
+    newlet->set_type(empty_arguments_type());
     return newlet;
 }
 
@@ -869,6 +871,69 @@ static SCOPES_RESULT(Value *) specialize_call_interior(const ASTContext &ctx, Ca
             READ_STORAGETYPEOF(T);
             READ_TYPE_CONST(DestT);
             SCOPES_CHECK_RESULT(verify_kind<TK_Pointer>(T));
+            SCOPES_CHECK_RESULT(verify_integer(SCOPES_GET_RESULT(storage_type(DestT))));
+            RETARGTYPES(DestT);
+        } break;
+        case FN_ITrunc: {
+            CHECKARGS(2, 2);
+            READ_STORAGETYPEOF(T);
+            READ_TYPE_CONST(DestT);
+            SCOPES_CHECK_RESULT(verify_integer(T));
+            SCOPES_CHECK_RESULT(verify_integer(SCOPES_GET_RESULT(storage_type(DestT))));
+            RETARGTYPES(DestT);
+        } break;
+        case FN_FPTrunc: {
+            CHECKARGS(2, 2);
+            READ_STORAGETYPEOF(T);
+            READ_TYPE_CONST(DestT);
+            SCOPES_CHECK_RESULT(verify_real(T));
+            SCOPES_CHECK_RESULT(verify_real(SCOPES_GET_RESULT(storage_type(DestT))));
+            if (cast<RealType>(T)->width < cast<RealType>(DestT)->width) {
+                SCOPES_EXPECT_ERROR(error_invalid_operands(T, DestT));
+            }
+            RETARGTYPES(DestT);
+        } break;
+        case FN_FPExt: {
+            CHECKARGS(2, 2);
+            READ_STORAGETYPEOF(T);
+            READ_TYPE_CONST(DestT);
+            SCOPES_CHECK_RESULT(verify_real(T));
+            SCOPES_CHECK_RESULT(verify_real(SCOPES_GET_RESULT(storage_type(DestT))));
+            if (cast<RealType>(T)->width > cast<RealType>(DestT)->width) {
+                SCOPES_EXPECT_ERROR(error_invalid_operands(T, DestT));
+            }
+            RETARGTYPES(DestT);
+        } break;
+        case FN_FPToUI:
+        case FN_FPToSI: {
+            CHECKARGS(2, 2);
+            READ_STORAGETYPEOF(T);
+            READ_TYPE_CONST(DestT);
+            SCOPES_CHECK_RESULT(verify_real(T));
+            SCOPES_CHECK_RESULT(verify_integer(SCOPES_GET_RESULT(storage_type(DestT))));
+            if ((T != TYPE_F32) && (T != TYPE_F64)) {
+                SCOPES_EXPECT_ERROR(error_invalid_operands(T, DestT));
+            }
+            RETARGTYPES(DestT);
+        } break;
+        case FN_UIToFP:
+        case FN_SIToFP: {
+            CHECKARGS(2, 2);
+            READ_STORAGETYPEOF(T);
+            READ_TYPE_CONST(DestT);
+            SCOPES_CHECK_RESULT(verify_integer(T));
+            SCOPES_CHECK_RESULT(verify_real(SCOPES_GET_RESULT(storage_type(DestT))));
+            if ((DestT != TYPE_F32) && (DestT != TYPE_F64)) {
+                SCOPES_CHECK_RESULT(error_invalid_operands(T, DestT));
+            }
+            RETARGTYPES(DestT);
+        } break;
+        case FN_ZExt:
+        case FN_SExt: {
+            CHECKARGS(2, 2);
+            READ_STORAGETYPEOF(T);
+            READ_TYPE_CONST(DestT);
+            SCOPES_CHECK_RESULT(verify_integer(T));
             SCOPES_CHECK_RESULT(verify_integer(SCOPES_GET_RESULT(storage_type(DestT))));
             RETARGTYPES(DestT);
         } break;

@@ -205,6 +205,7 @@ syntax-extend
     let T = (sc_type_storage ASTMacro)
     sc_scope_set_symbol syntax-scope 'ASTMacroFunction (box-pointer T)
     sc_scope_set_symbol syntax-scope 'ellipsis-symbol (box-symbol (sc_symbol_new "..."))
+    let x... = 1 2 3
     syntax-scope
 
 syntax-extend

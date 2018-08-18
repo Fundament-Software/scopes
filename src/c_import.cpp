@@ -433,7 +433,7 @@ public:
             auto it = typedefs.find(
                 Symbol(String::from_stdstring(td->getName().data())));
             if (it == typedefs.end()) {
-                return TYPE_Void;
+                return empty_arguments_type();
             }
             return it->second;
         } break;
@@ -456,7 +456,7 @@ public:
         case clang::Type::Builtin:
             switch (cast<BuiltinType>(Ty)->getKind()) {
             case clang::BuiltinType::Void:
-                return TYPE_Void;
+                return empty_arguments_type();
             case clang::BuiltinType::Bool:
                 return TYPE_Bool;
             case clang::BuiltinType::Char_S:

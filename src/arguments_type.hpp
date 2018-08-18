@@ -18,6 +18,7 @@ namespace scopes {
 
 const Type *arguments_type(const ArgTypes &values);
 const Type *keyed_arguments_type(const KeyedTypes &values);
+const Type *empty_arguments_type();
 
 bool is_arguments_type(const Type *T);
 

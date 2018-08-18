@@ -150,6 +150,13 @@ SCOPES_RESULT(void) error_invalid_call_type(Value *callee) {
     SCOPES_LOCATION_ERROR(ss.str());
 }
 
+SCOPES_RESULT(void) error_invalid_operands(const Type *A, const Type *B) {
+    SCOPES_RESULT_TYPE(void);
+    StyledString ss;
+    ss.out << "invalid operand types " << A << " and " << B;
+    SCOPES_LOCATION_ERROR(ss.str());
+}
+
 SCOPES_RESULT(void) error_invalid_condition_type(Value *cond) {
     SCOPES_RESULT_TYPE(void);
     print_definition_anchor(cond);

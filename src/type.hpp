@@ -103,7 +103,6 @@ typedef std::vector<const Type *> ArgTypes;
 
 #define B_TYPES() \
     /* types */ \
-    T(TYPE_Void, "void") \
     T(TYPE_Nothing, "Nothing") \
     T(TYPE_NoReturn, "noreturn") \
     \
