@@ -244,7 +244,13 @@ struct StreamAST : StreamAnchors {
         } break;
         case VK_ConstInt: {
             auto val = cast<ConstInt>(node);
-            ss << Style_Keyword << "ConstInt" << Style_None << " " << val->value;
+            ss << Style_Keyword << "ConstInt" << Style_None << " ";
+            auto T = val->get_type();
+            if ((T == TYPE_Builtin) || (T == TYPE_Symbol)) {
+                ss << Symbol::wrap(val->value);
+            } else {
+                ss << val->value;
+            }
         } break;
         case VK_ConstReal: {
             auto val = cast<ConstReal>(node);
@@ -252,7 +258,25 @@ struct StreamAST : StreamAnchors {
         } break;
         case VK_ConstPointer: {
             auto val = cast<ConstPointer>(node);
-            ss << Style_Keyword << "ConstPointer" << Style_None << " " << val->value;
+            ss << Style_Keyword << "ConstPointer" << Style_None << " ";
+            auto T = val->get_type();
+            if (T == TYPE_Type) {
+                ss << (const Type *)val->value;
+            } else if (T == TYPE_String) {
+                ss << (const String *)val->value;
+            } else if (T == TYPE_Closure) {
+                ss << (const Closure *)val->value;
+            } else {
+                ss << val->value;
+            }
+        } break;
+        case VK_ConstTuple: {
+            auto val = cast<ConstTuple>(node);
+            ss << Style_Keyword << "ConstTuple" << Style_None;
+            for (int i = 0; i < val->values.size(); ++i) {
+                ss << std::endl;
+                walk(val->values[i], depth+1, maxdepth);
+            }
         } break;
         case VK_Break: {
             auto val = cast<Break>(node);

@@ -205,13 +205,11 @@ syntax-extend
     let T = (sc_type_storage ASTMacro)
     sc_scope_set_symbol syntax-scope 'ASTMacroFunction (box-pointer T)
     sc_scope_set_symbol syntax-scope 'ellipsis-symbol (box-symbol (sc_symbol_new "..."))
-    let x... = 1 2 3
     syntax-scope
 
 syntax-extend
     fn typify (args argcount)
-        let args = (verify-count argcount 1 -1)
-        dump args
+        verify-count argcount 1 -1
         let src_fn = (load (getelementptr args 0))
         let src_fn = (unbox-pointer src_fn Closure)
         let typecount = (sub argcount 1)
@@ -233,7 +231,10 @@ syntax-extend
         if (ptrcmp!= result-type ASTMacroFunction)
             raise-compile-error!
                 sc_string_join "AST macro must have type "
-                    sc_value_repr (box-pointer ASTMacroFunction)
+                    sc_string_join
+                        sc_value_repr (box-pointer ASTMacroFunction)
+                        sc_string_join " but has type "
+                            sc_value_repr (box-pointer result-type)
         let ptr = (sc_const_pointer_extract result)
         let result =
             sc_const_pointer_new ASTMacroFunction ptr

@@ -404,13 +404,11 @@ static SCOPES_RESULT(Value *) specialize_ExtractArgument(
     return extract_argument(value, node->index);
 }
 
-// used by Let and Loop
-static SCOPES_RESULT(void) specialize_bind_arguments(const ASTContext &ctx,
+// used by Let, Loop and inlined functions
+static SCOPES_RESULT(void) specialize_bind_specialized_arguments(const ASTContext &ctx,
     SymbolValues &outparams, Values &outargs,
-    const SymbolValues &params, const Values &values, bool inline_constants) {
+    const SymbolValues &params, const Values &tmpargs, bool inline_constants) {
     SCOPES_RESULT_TYPE(void);
-    Values tmpargs;
-    SCOPES_CHECK_RESULT(specialize_arguments(ctx, tmpargs, values));
     int count = (int)params.size();
     for (int i = 0; i < count; ++i) {
         auto oldsym = params[i];
@@ -445,6 +443,16 @@ static SCOPES_RESULT(void) specialize_bind_arguments(const ASTContext &ctx,
         }
     }
     return true;
+}
+
+static SCOPES_RESULT(void) specialize_bind_arguments(const ASTContext &ctx,
+    SymbolValues &outparams, Values &outargs,
+    const SymbolValues &params, const Values &values, bool inline_constants) {
+    SCOPES_RESULT_TYPE(void);
+    Values tmpargs;
+    SCOPES_CHECK_RESULT(specialize_arguments(ctx, tmpargs, values));
+    return specialize_bind_specialized_arguments(ctx, outparams, outargs,
+        params, tmpargs, inline_constants);
 }
 
 static SCOPES_RESULT(Value *) specialize_Try(const ASTContext &ctx, Try *_try) {
@@ -1212,7 +1220,7 @@ static SCOPES_RESULT(Value *) specialize_SymbolValue(const ASTContext &ctx, Symb
     assert(ctx.frame);
     auto value = ctx.frame->resolve(sym);
     if (!value) {
-        SCOPES_CHECK_RESULT(error_unbound_symbol(sym));
+        SCOPES_EXPECT_ERROR(error_unbound_symbol(sym));
     }
     return value;
 }
@@ -1259,7 +1267,7 @@ finalize:
     SCOPES_CHECK_RESULT(specialize_jobs(ctx, numclauses, values));
     for (int i = 0; i < numclauses; ++i) {
         SCOPES_ANCHOR(values[i]->anchor());
-        #if 1
+        #if 0
         if (!values[i]->is_typed()) {
             StyledStream ss;
             ss << "clause untyped: ";
@@ -1338,14 +1346,26 @@ SCOPES_RESULT(Value *) specialize_inline(const ASTContext &ctx,
     Function *fn = Function::from(func->anchor(), func->name, {}, func->value);
     fn->original = func;
     fn->frame = frame;
-    auto let = Let::from(fn->anchor());
-    let->params = func->params;
-    let->args = nodes;
-    auto block = Block::from(func->anchor(), {let}, fn->value);
 
     ASTContext subctx(fn, ctx.target, nullptr, nullptr);
+    auto let = Let::from(fn->anchor());
+    SCOPES_CHECK_RESULT(specialize_bind_specialized_arguments(subctx,
+        let->params, let->args, func->params, nodes, true));
+    let->set_type(empty_arguments_type());
+
+    auto block = Block::from(func->anchor(), {let});
     SCOPES_ANCHOR(fn->anchor());
-    return SCOPES_GET_RESULT(specialize(subctx, block));
+    auto result = specialize(subctx, fn->value);
+    if (result.ok()) {
+        block->value = result.assert_ok();
+    } else {
+        add_error_trace(fn);
+        SCOPES_RETURN_ERROR();
+    }
+    auto rtype = subctx.transform_return_type(block->value->get_type());
+    block->set_type(rtype);
+    fn->value = block->canonicalize();
+    return fn->value;
 }
 
 SCOPES_RESULT(Function *) specialize(Function *frame, Template *func, const ArgTypes &types) {

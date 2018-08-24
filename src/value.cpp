@@ -314,7 +314,7 @@ Let *Let::from(const Anchor *anchor, const SymbolValues &params, const Values &a
 //------------------------------------------------------------------------------
 
 Loop::Loop(const Anchor *anchor, const SymbolValues &_params, const Values &_args, Value *_value)
-    : Value(VK_Loop, anchor), params(_params), args(_args), value(_value) {
+    : Value(VK_Loop, anchor), params(_params), args(_args), value(_value), return_type(nullptr) {
 }
 
 Loop *Loop::from(const Anchor *anchor, const SymbolValues &params, const Values &args, Value *value) {
