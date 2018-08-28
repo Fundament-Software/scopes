@@ -21,6 +21,7 @@
 #include "gen_llvm.hpp"
 #include "list.hpp"
 #include "expander.hpp"
+#include "scopes/scopes.h"
 
 #include <unordered_set>
 #include <deque>
@@ -385,16 +386,20 @@ static const Type *arguments_type_from_arguments(const Values &values) {
     return arguments_type(types);
 }
 
+static Value *build_argument_list(const Anchor *anchor, const Values &values) {
+    if (values.size() == 1) {
+        return values[0];
+    }
+    ArgumentList *newnlist = ArgumentList::from(anchor, values);
+    newnlist->set_type(arguments_type_from_arguments(values));
+    return newnlist;
+}
+
 static SCOPES_RESULT(Value *) specialize_ArgumentList(const ASTContext &ctx, ArgumentList *nlist) {
     SCOPES_RESULT_TYPE(Value *);
     Values values;
     SCOPES_CHECK_RESULT(specialize_arguments(ctx, values, nlist->values));
-    if (values.size() == 1) {
-        return values[0];
-    }
-    ArgumentList *newnlist = ArgumentList::from(nlist->anchor(), values);
-    newnlist->set_type(arguments_type_from_arguments(values));
-    return newnlist;
+    return build_argument_list(nlist->anchor(), values);
 }
 
 static SCOPES_RESULT(Value *) specialize_ExtractArgument(
@@ -577,14 +582,14 @@ static SCOPES_RESULT(Value *) specialize_SyntaxExtend(const ASTContext &ctx, Syn
         SCOPES_ANCHOR(sx->func->anchor());
         SCOPES_EXPECT_ERROR(error_cannot_find_frame(sx->func));
     }
-#if 1 //SCOPES_DEBUG_CODEGEN
+#if 0 //SCOPES_DEBUG_CODEGEN
     StyledStream ss(std::cout);
     std::cout << "syntax-extend non-normalized:" << std::endl;
     stream_ast(ss, sx->func, StreamASTFormat::debug());
     std::cout << std::endl;
 #endif
     Function *fn = SCOPES_GET_RESULT(specialize(frame, sx->func, {TYPE_Scope}));
-#if 1 //SCOPES_DEBUG_CODEGEN
+#if 0 //SCOPES_DEBUG_CODEGEN
     std::cout << "syntax-extend normalized:" << std::endl;
     stream_ast(ss, fn, StreamASTFormat());
     std::cout << std::endl;
@@ -662,6 +667,14 @@ SCOPES_RESULT(const Closure *) extract_closure_constant(Value *value) {
     SCOPES_ANCHOR(value->anchor());
     SCOPES_CHECK_RESULT(verify(x->get_type(), TYPE_Closure));
     return (const Closure *)x->value;
+}
+
+SCOPES_RESULT(sc_ast_macro_func_t) extract_astmacro_constant(Value *value) {
+    SCOPES_RESULT_TYPE(sc_ast_macro_func_t);
+    ConstPointer* x = SCOPES_GET_RESULT(extract_constant<ConstPointer>(value));
+    SCOPES_ANCHOR(value->anchor());
+    SCOPES_CHECK_RESULT(verify(x->get_type(), TYPE_ASTMacro));
+    return (sc_ast_macro_func_t)x->value;
 }
 
 SCOPES_RESULT(const List *) extract_list_constant(Value *value) {
@@ -806,6 +819,18 @@ static SCOPES_RESULT(Value *) specialize_call_interior(const ASTContext &ctx, Ca
                 }
             }
         }
+    } else if (T == TYPE_ASTMacro) {
+        auto fptr = SCOPES_GET_RESULT(extract_astmacro_constant(callee));
+        assert(fptr);
+        auto result = fptr(&values[0], values.size());
+        if (result.ok) {
+            Value *value = result._0;
+            assert(value);
+            return specialize(ctx, value);
+        } else {
+            set_last_error(result.except);
+            SCOPES_RETURN_ERROR();
+        }
     } else if (T == TYPE_Builtin) {
         //SCOPES_CHECK_RESULT(anycl.verify(TYPE_Builtin));
         Builtin b = SCOPES_GET_RESULT(extract_builtin_constant(callee));
@@ -820,6 +845,7 @@ static SCOPES_RESULT(Value *) specialize_call_interior(const ASTContext &ctx, Ca
                 ss << " ";
                 stream_ast(ss, arg, StreamASTFormat());
             }
+            return build_argument_list(call->anchor(), values);
         } break;
         case FN_Undef: {
             CHECKARGS(1, 1);
@@ -1311,7 +1337,9 @@ static SCOPES_RESULT(Function *) specialize_Function(const ASTContext &ctx, Func
 SCOPES_RESULT(Value *) specialize(const ASTContext &ctx, Value *node) {
     SCOPES_RESULT_TYPE(Value *);
     assert(node);
-    Value *result = nullptr; //ctx.frame->resolve(node);
+    Value *result = ctx.frame->resolve(node);
+    if (!result && node->is_typed())
+        return node;
     if (!result) {
         // we shouldn't set an anchor here because sometimes the parent context
         // is more indicative than the node position

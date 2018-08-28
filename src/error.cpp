@@ -60,7 +60,7 @@ void set_last_error(Error *err) {
     _last_error = err;
 }
 
-const Error *get_last_error() {
+Error *get_last_error() {
     auto result = _last_error;
     _last_error = nullptr;
     return result;

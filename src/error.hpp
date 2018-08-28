@@ -51,7 +51,7 @@ struct Error {
 //------------------------------------------------------------------------------
 
 void set_last_error(Error *err);
-const Error *get_last_error();
+Error *get_last_error();
 void add_error_trace(Value *value);
 
 void print_error(const Error *value);

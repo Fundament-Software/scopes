@@ -94,9 +94,9 @@ typedef uint64_t sc_symbol_t;
 
 #endif
 
-typedef struct sc_void_raises_ { bool ok; const sc_error_t *except; } sc_void_raises_t;
+typedef struct sc_void_raises_ { bool ok; sc_error_t *except; } sc_void_raises_t;
 #define SCOPES_TYPEDEF_RESULT_RAISES(NAME, RESULT_TYPE) \
-    typedef struct NAME ## _ { bool ok; const sc_error_t *except; RESULT_TYPE _0; } NAME ## _t
+    typedef struct NAME ## _ { bool ok; sc_error_t *except; RESULT_TYPE _0; } NAME ## _t
 
 SCOPES_TYPEDEF_RESULT_RAISES(sc_value_raises, sc_value_t *);
 SCOPES_TYPEDEF_RESULT_RAISES(sc_string_raises, const sc_string_t *);
@@ -128,6 +128,10 @@ typedef struct sc_i32_i32_i32_tuple_ { int32_t _0, _1, _2; } sc_i32_i32_i32_tupl
 typedef struct sc_rawstring_size_t_tuple_ { const char *_0; size_t _1; } sc_rawstring_size_t_tuple_t;
 
 typedef struct sc_rawstring_array_i32_tuple_ { char **_0; int _1; } sc_rawstring_array_i32_tuple_t;
+
+// prototypes
+
+typedef sc_value_raises_t (*sc_ast_macro_func_t)(sc_value_t **, int);
 
 // compiler
 

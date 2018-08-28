@@ -118,7 +118,7 @@ sc_value_raises_t sc_typify(sc_closure_t *srcl, int numtypes, const sc_type_t **
     for (int i = 0; i < numtypes; ++i) {
         types.push_back(typeargs[i]);
     }
-#if 1 //SCOPES_DEBUG_CODEGEN
+#if 0 //SCOPES_DEBUG_CODEGEN
     StyledStream ss(std::cout);
     std::cout << "sc_typify non-normalized:" << std::endl;
     stream_ast(ss, srcl->func, StreamASTFormat());

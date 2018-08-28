@@ -237,7 +237,18 @@ syntax-extend
                             sc_value_repr (box-pointer result-type)
         let ptr = (sc_const_pointer_extract result)
         let result =
-            sc_const_pointer_new ASTMacroFunction ptr
+            sc_const_pointer_new ASTMacro ptr
         sc_scope_set_symbol syntax-scope 'typify result
+
+    syntax-scope
+
+let function->LabelMacro =
+    typify
+        fn "function->LabelMacro" (f)
+            bitcast f ASTMacro
+        ASTMacroFunction
+
+syntax-extend
+
 
     syntax-scope
