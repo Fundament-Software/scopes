@@ -1341,20 +1341,24 @@ SCOPES_RESULT(Value *) specialize(const ASTContext &ctx, Value *node) {
     if (!result && node->is_typed())
         return node;
     if (!result) {
-        // we shouldn't set an anchor here because sometimes the parent context
-        // is more indicative than the node position
-        //SCOPES_CHECK_RESULT(verify_stack());
-        switch(node->kind()) {
+        if (node->is_typed()) {
+            result = node;
+        } else {
+            // we shouldn't set an anchor here because sometimes the parent context
+            // is more indicative than the node position
+            //SCOPES_CHECK_RESULT(verify_stack());
+            switch(node->kind()) {
 #define T(NAME, BNAME, CLASS) \
-        case NAME: result = SCOPES_GET_RESULT(specialize_ ## CLASS(ctx, cast<CLASS>(node))); break;
-        SCOPES_VALUE_KIND()
+            case NAME: result = SCOPES_GET_RESULT(specialize_ ## CLASS(ctx, cast<CLASS>(node))); break;
+            SCOPES_VALUE_KIND()
 #undef T
-        default: assert(false);
-        }
-        if (ctx.target == EvalTarget_Return) {
-            if (is_returning(result->get_type())) {
-                result = SCOPES_GET_RESULT(make_return(ctx, result->anchor(), result));
+            default: assert(false);
             }
+        }
+    }
+    if (ctx.target == EvalTarget_Return) {
+        if (is_returning(result->get_type())) {
+            result = SCOPES_GET_RESULT(make_return(ctx, result->anchor(), result));
         }
     }
     assert(result);
