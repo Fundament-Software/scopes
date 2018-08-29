@@ -1213,15 +1213,26 @@ static SCOPES_RESULT(Value *) specialize_call_interior(const ASTContext &ctx, Ca
 
         return specialize(ctx, ArgumentList::from(call->anchor()));
     }
-    Call *newcall = Call::from(call->anchor(), callee, values);
-    const FunctionType *ft = nullptr;
-    if (is_function_pointer(T)) {
-        ft = extract_function_type(T);
-    } else {
+    if (!is_function_pointer(T)) {
         SCOPES_ANCHOR(call->anchor());
-        SCOPES_CHECK_RESULT(error_invalid_call_type(callee));
+        SCOPES_EXPECT_ERROR(error_invalid_call_type(callee));
+    }
+    const FunctionType *ft = extract_function_type(T);
+    int numargs = (int)ft->argument_types.size();
+    if (values.size() != numargs) {
+        SCOPES_ANCHOR(call->anchor());
+        SCOPES_EXPECT_ERROR(error_argument_count_mismatch(numargs, values.size()));
+    }
+    for (int i = 0; i < numargs; ++i) {
+        auto Ta = values[i]->get_type();
+        auto Tb = ft->argument_types[i];
+        if (Ta != Tb) {
+            SCOPES_ANCHOR(values[i]->anchor());
+            SCOPES_EXPECT_ERROR(error_argument_type_mismatch(Tb, Ta));
+        }
     }
     const Type *rt = ft->return_type;
+    Call *newcall = Call::from(call->anchor(), callee, values);
     newcall->set_type(rt);
     if (ft->has_exception()) {
         assert(ctx.frame);

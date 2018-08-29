@@ -150,6 +150,24 @@ SCOPES_RESULT(void) error_invalid_call_type(Value *callee) {
     SCOPES_LOCATION_ERROR(ss.str());
 }
 
+SCOPES_RESULT(void) error_argument_count_mismatch(int needed, int got) {
+    SCOPES_RESULT_TYPE(void);
+    StyledString ss;
+    if (got > needed)
+        ss.out << "too many";
+    else
+        ss.out << "not enough";
+    ss.out << " arguments in call (" << needed << " argument(s) expected, got " << got << ")";
+    SCOPES_LOCATION_ERROR(ss.str());
+}
+
+SCOPES_RESULT(void) error_argument_type_mismatch(const Type *expected, const Type *got) {
+    SCOPES_RESULT_TYPE(void);
+    StyledString ss;
+    ss.out << "parameter of type " << expected << " expected, but argument is of type " << got;
+    SCOPES_LOCATION_ERROR(ss.str());
+}
+
 SCOPES_RESULT(void) error_invalid_operands(const Type *A, const Type *B) {
     SCOPES_RESULT_TYPE(void);
     StyledString ss;

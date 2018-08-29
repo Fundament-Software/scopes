@@ -242,13 +242,71 @@ syntax-extend
 
     syntax-scope
 
-let function->LabelMacro =
+let function->ASTMacro =
     typify
-        fn "function->LabelMacro" (f)
+        fn "function->ASTMacro" (f)
             bitcast f ASTMacro
         ASTMacroFunction
 
-syntax-extend
+# take closure l, typify and compile it and return an Any of LabelMacro type
+inline ast-macro (l)
+    function->ASTMacro (typify l ValueArrayPointer i32)
 
+inline box-ast-macro (l)
+    box-pointer (ast-macro l)
+
+syntax-extend
+    fn va-fold (args argcount use-indices)
+        verify-count argcount 1 -1
+        let f = (load (getelementptr args 0))
+        loop (i) = 1
+        if (icmp<s i argcount)
+            sc_write
+                sc_value_repr (box-integer i)
+            sc_write " "
+            sc_write
+                sc_value_repr (load (getelementptr args i))
+            sc_write "\n"
+            repeat (add i 1)
+    #
+        if (icmp== numentries 0)
+            Label-return0 l
+            return;
+        let loop (i arg active-l last-param) = 0 args l (Any-wrap none)
+        if (icmp!= (sc_list_count arg) 0:usize)
+            let at arg = (sc_list_decons arg)
+            let k v = (unpack-symbol-value at)
+            loop (add i 1) arg
+                do
+                    let nextl = (sc_label_new_cont_template)
+                    let param = (sc_parameter_new anchor ellipsis-symbol Unknown)
+                    sc_label_append_parameter nextl param
+                    let boxed-param = (box-pointer param)
+                    sc_label_set_enter nextl (Any-wrap _)
+                    sc_label_set_keyed nextl
+                        sc_list_cons cont
+                            sc_list_cons (pack-symbol-value unnamed boxed-param) '()
+                    sc_label_set_enter active-l f
+                    let args =
+                        sc_list_cons (pack-symbol-value unnamed (box-symbol k))
+                            sc_list_cons (pack-symbol-value unnamed v)
+                                if (icmp>s i 0)
+                                    sc_list_cons (pack-symbol-value unnamed last-param) '()
+                                else '()
+                    sc_label_set_keyed active-l
+                        sc_list_cons
+                            pack-symbol-value unnamed (box-pointer (sc_closure_new nextl frame))
+                            if use-indices
+                                let i =
+                                    if reverse (sub (sub numentries i) 1)
+                                    else i
+                                sc_list_cons (pack-symbol-value unnamed (box-integer i)) args
+                            else args
+                    _ nextl boxed-param
+
+    sc_scope_set_symbol syntax-scope 'va-lfold (box-ast-macro (fn "va-lfold" (args argcount) (va-fold args argcount false)))
+    sc_scope_set_symbol syntax-scope 'va-lifold (box-ast-macro (fn "va-ilfold" (args argcount) (va-fold args argcount true)))
+    #sc_scope_set_symbol syntax-scope 'va-rfold (box-ast-macro (fn "va-rfold" (args argcount) (va-rfold args argcount false)))
+    #sc_scope_set_symbol syntax-scope 'va-rifold (box-ast-macro (fn "va-rifold" (args argcount) (va-rfold args argcount true)))
 
     syntax-scope

@@ -686,6 +686,11 @@ const sc_type_t *sc_value_type (sc_value_t *value) {
     return value->get_type();
 }
 
+const sc_anchor_t *sc_value_anchor (sc_value_t *value) {
+    using namespace scopes;
+    return value->anchor();
+}
+
 bool sc_value_is_constant(sc_value_t *value) {
     using namespace scopes;
     return isa<Const>(value);
@@ -1349,6 +1354,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_value_repr, TYPE_String, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_value_tostring, TYPE_String, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_value_type, TYPE_Type, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_value_anchor, TYPE_Anchor, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_value_is_constant, TYPE_Bool, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_value_kind, TYPE_I32, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_keyed_new, TYPE_Value, TYPE_Symbol, TYPE_Value);
