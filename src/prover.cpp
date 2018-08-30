@@ -544,12 +544,13 @@ static SCOPES_RESULT(Repeat *) specialize_Repeat(const ASTContext &ctx, Repeat *
 static SCOPES_RESULT(Return *) make_return(const ASTContext &ctx, const Anchor *anchor, Value *value) {
     SCOPES_RESULT_TYPE(Return *);
     SCOPES_ANCHOR(anchor);
-    assert(ctx.frame);
-    if (ctx.frame->original
-        && ctx.frame->original->is_inline()) {
-        SCOPES_EXPECT_ERROR(error_illegal_return_in_inline());
+    auto frame = ctx.frame;
+    assert(frame);
+    while (frame->original && frame->original->is_inline()) {
+        frame = frame->frame;
+        assert(frame);
     }
-    ctx.frame->return_type = SCOPES_GET_RESULT(merge_return_type(ctx.frame->return_type, value->get_type()));
+    frame->return_type = SCOPES_GET_RESULT(merge_return_type(frame->return_type, value->get_type()));
     auto newreturn = Return::from(anchor, value);
     newreturn->set_type(TYPE_NoReturn);
     return newreturn;
@@ -557,6 +558,10 @@ static SCOPES_RESULT(Return *) make_return(const ASTContext &ctx, const Anchor *
 
 static SCOPES_RESULT(Value *) specialize_Return(const ASTContext &ctx, Return *_return) {
     SCOPES_RESULT_TYPE(Value *);
+    if (ctx.frame->original
+        && ctx.frame->original->is_inline()) {
+        SCOPES_EXPECT_ERROR(error_illegal_return_in_inline());
+    }
     Value *value = SCOPES_GET_RESULT(specialize(ctx.with_symbol_target(), _return->value));
     if (ctx.target == EvalTarget_Return) {
         return value;
@@ -856,6 +861,18 @@ static SCOPES_RESULT(Value *) specialize_call_interior(const ASTContext &ctx, Ca
             CHECKARGS(1, 1);
             READ_TYPEOF(A);
             return ConstPointer::type_from(call->anchor(), A);
+        } break;
+        case OP_Tertiary: {
+            CHECKARGS(3, 3);
+            READ_STORAGETYPEOF(T1);
+            READ_TYPEOF(T2);
+            READ_TYPEOF(T3);
+            SCOPES_CHECK_RESULT(verify_bool_vector(T1));
+            if (T1->kind() == TK_Vector) {
+                SCOPES_CHECK_RESULT(verify_vector_sizes(T1, T2));
+            }
+            SCOPES_CHECK_RESULT(verify(T2, T3));
+            RETARGTYPES(T2);
         } break;
         case FN_Bitcast: {
             CHECKARGS(2, 2);
@@ -1223,13 +1240,30 @@ static SCOPES_RESULT(Value *) specialize_call_interior(const ASTContext &ctx, Ca
         SCOPES_ANCHOR(call->anchor());
         SCOPES_EXPECT_ERROR(error_argument_count_mismatch(numargs, values.size()));
     }
+    // verify_function_argument_signature
     for (int i = 0; i < numargs; ++i) {
-        auto Ta = values[i]->get_type();
-        auto Tb = ft->argument_types[i];
-        if (Ta != Tb) {
-            SCOPES_ANCHOR(values[i]->anchor());
-            SCOPES_EXPECT_ERROR(error_argument_type_mismatch(Tb, Ta));
+        const Type *Ta = values[i]->get_type();
+        const Type *Tb = ft->argument_types[i];
+        if (Ta == Tb)
+            continue;
+        Ta = SCOPES_GET_RESULT(storage_type(Ta));
+        Tb = SCOPES_GET_RESULT(storage_type(Tb));
+        if (isa<PointerType>(Ta) && isa<PointerType>(Tb)) {
+            auto pa = cast<PointerType>(Ta);
+            auto pb = cast<PointerType>(Tb);
+            auto flags = pb->flags;
+            auto scls = pb->storage_class;
+
+            if (scls == SYM_Unnamed) {
+                scls = pa->storage_class;
+            }
+            if ((pa->element_type == pb->element_type)
+                && pointer_flags_compatible(pb->flags, pa->flags)
+                && pointer_storage_classes_compatible(pb->storage_class, pa->storage_class))
+                continue;
         }
+        SCOPES_ANCHOR(values[i]->anchor());
+        SCOPES_EXPECT_ERROR(error_argument_type_mismatch(Tb, Ta));
     }
     const Type *rt = ft->return_type;
     Call *newcall = Call::from(call->anchor(), callee, values);
@@ -1391,23 +1425,31 @@ SCOPES_RESULT(Value *) specialize_inline(const ASTContext &ctx,
     fn->frame = frame;
 
     ASTContext subctx(fn, ctx.target, nullptr, nullptr);
-    auto let = Let::from(fn->anchor());
+    SymbolValues params;
+    Values args;
     SCOPES_CHECK_RESULT(specialize_bind_specialized_arguments(subctx,
-        let->params, let->args, func->params, nodes, true));
-    let->set_type(empty_arguments_type());
-
-    auto block = Block::from(func->anchor(), {let});
+        params, args, func->params, nodes, true));
     SCOPES_ANCHOR(fn->anchor());
-    auto result = specialize(subctx, fn->value);
+    Value *result_value = fn->value;
+    auto result = specialize(subctx, result_value);
     if (result.ok()) {
-        block->value = result.assert_ok();
+        result_value = result.assert_ok();
     } else {
         add_error_trace(fn);
         SCOPES_RETURN_ERROR();
     }
-    auto rtype = subctx.transform_return_type(block->value->get_type());
-    block->set_type(rtype);
-    fn->value = block->canonicalize();
+    if (!params.empty()) {
+        auto rtype = subctx.transform_return_type(result_value->get_type());
+        auto let = Let::from(fn->anchor());
+        let->params = params;
+        let->args = args;
+        let->set_type(empty_arguments_type());
+        auto block = Block::from(func->anchor(), {let}, result_value);
+        block->set_type(rtype);
+        fn->value = block->canonicalize();
+    } else {
+        fn->value = result_value;
+    }
     return fn->value;
 }
 

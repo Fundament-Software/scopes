@@ -170,7 +170,6 @@ inline unbox-symbol (value T)
     unbox-verify (sc_value_type value) T
     bitcast (sc_const_int_extract value) T
 
-# turn an Any back into a pointer
 inline unbox-pointer (value T)
     unbox-verify (sc_value_type value) T
     bitcast (sc_const_pointer_extract value) T
@@ -248,6 +247,9 @@ let function->ASTMacro =
             bitcast f ASTMacro
         ASTMacroFunction
 
+fn box-empty ()
+    sc_argument_list_new 0 (undef ValueArrayPointer)
+
 # take closure l, typify and compile it and return an Any of LabelMacro type
 inline ast-macro (l)
     function->ASTMacro (typify l ValueArrayPointer i32)
@@ -256,57 +258,110 @@ inline box-ast-macro (l)
     box-pointer (ast-macro l)
 
 syntax-extend
-    fn va-fold (args argcount use-indices)
+    fn va-lfold (args argcount use-indices)
         verify-count argcount 1 -1
         let f = (load (getelementptr args 0))
-        loop (i) = 1
+        if (icmp== argcount 1)
+            return (box-empty)
+        let ofs = (? use-indices 1 0)
+        let callargs = (alloca-array Value (add 3 ofs))
+        loop (i ret) = 1 (undef Value)
         if (icmp<s i argcount)
-            sc_write
-                sc_value_repr (box-integer i)
-            sc_write " "
-            sc_write
-                sc_value_repr (load (getelementptr args i))
-            sc_write "\n"
+            let arg =
+                load (getelementptr args i)
+            # optional index
+            if use-indices
+                store (box-integer (sub i 1)) (getelementptr callargs 0)
+            # key
+            store (box-symbol unnamed) (getelementptr callargs (add ofs 0))
+            # value
+            store arg (getelementptr callargs (add ofs 1))
+            let callargcount =
+                add ofs
+                    if (icmp>s i 1)
+                        # append previous result
+                        store ret (getelementptr callargs (add ofs 2))
+                        3
+                    else 2
             repeat (add i 1)
-    #
-        if (icmp== numentries 0)
-            Label-return0 l
-            return;
-        let loop (i arg active-l last-param) = 0 args l (Any-wrap none)
-        if (icmp!= (sc_list_count arg) 0:usize)
-            let at arg = (sc_list_decons arg)
-            let k v = (unpack-symbol-value at)
-            loop (add i 1) arg
-                do
-                    let nextl = (sc_label_new_cont_template)
-                    let param = (sc_parameter_new anchor ellipsis-symbol Unknown)
-                    sc_label_append_parameter nextl param
-                    let boxed-param = (box-pointer param)
-                    sc_label_set_enter nextl (Any-wrap _)
-                    sc_label_set_keyed nextl
-                        sc_list_cons cont
-                            sc_list_cons (pack-symbol-value unnamed boxed-param) '()
-                    sc_label_set_enter active-l f
-                    let args =
-                        sc_list_cons (pack-symbol-value unnamed (box-symbol k))
-                            sc_list_cons (pack-symbol-value unnamed v)
-                                if (icmp>s i 0)
-                                    sc_list_cons (pack-symbol-value unnamed last-param) '()
-                                else '()
-                    sc_label_set_keyed active-l
-                        sc_list_cons
-                            pack-symbol-value unnamed (box-pointer (sc_closure_new nextl frame))
-                            if use-indices
-                                let i =
-                                    if reverse (sub (sub numentries i) 1)
-                                    else i
-                                sc_list_cons (pack-symbol-value unnamed (box-integer i)) args
-                            else args
-                    _ nextl boxed-param
+                sc_call_new f callargcount callargs
+        ret
 
-    sc_scope_set_symbol syntax-scope 'va-lfold (box-ast-macro (fn "va-lfold" (args argcount) (va-fold args argcount false)))
-    sc_scope_set_symbol syntax-scope 'va-lifold (box-ast-macro (fn "va-ilfold" (args argcount) (va-fold args argcount true)))
-    #sc_scope_set_symbol syntax-scope 'va-rfold (box-ast-macro (fn "va-rfold" (args argcount) (va-rfold args argcount false)))
-    #sc_scope_set_symbol syntax-scope 'va-rifold (box-ast-macro (fn "va-rifold" (args argcount) (va-rfold args argcount true)))
+    fn va-rfold (args argcount use-indices)
+        verify-count argcount 1 -1
+        let f = (load (getelementptr args 0))
+        if (icmp== argcount 1)
+            return (box-empty)
+        let ofs = (? use-indices 1 0)
+        let callargs = (alloca-array Value (add 3 ofs))
+        loop (i ret) = argcount (undef Value)
+        if (icmp>s i 1)
+            let oi = i
+            let i = (sub i 1)
+            let arg =
+                load (getelementptr args i)
+            sc_write (sc_value_repr arg)
+
+            # optional index
+            if use-indices
+                store (box-integer (sub i 1)) (getelementptr callargs 0)
+            # key
+            store (box-symbol unnamed) (getelementptr callargs (add ofs 0))
+            # value
+            store arg (getelementptr callargs (add ofs 1))
+            let callargcount =
+                add ofs
+                    if (icmp!= oi argcount)
+                        # append previous result
+                        store ret (getelementptr callargs (add ofs 2))
+                        3
+                    else 2
+            repeat i
+                sc_call_new f callargcount callargs
+        ret
+
+    sc_scope_set_symbol syntax-scope 'va-lfold (box-ast-macro (fn "va-lfold" (args argcount) (va-lfold args argcount false)))
+    sc_scope_set_symbol syntax-scope 'va-lifold (box-ast-macro (fn "va-ilfold" (args argcount) (va-lfold args argcount true)))
+    sc_scope_set_symbol syntax-scope 'va-rfold (box-ast-macro (fn "va-rfold" (args argcount) (va-rfold args argcount false)))
+    sc_scope_set_symbol syntax-scope 'va-rifold (box-ast-macro (fn "va-rifold" (args argcount) (va-rfold args argcount true)))
+
+    fn type< (T superT)
+        loop (T) = T
+        let value = (sc_typename_type_get_super T)
+        if (ptrcmp== value superT) true
+        elseif (ptrcmp== value typename) false
+        else (repeat value)
+
+    fn type<= (T superT)
+        if (ptrcmp== T superT) true
+        else (type< T superT)
+
+    fn type> (superT T)
+        bxor (type<= T superT) true
+
+    fn type>= (superT T)
+        bxor (type< T superT) true
+
+    fn compare-type (args argcount f)
+        verify-count argcount 2 2
+        let a = (load (getelementptr args 0))
+        let b = (load (getelementptr args 1))
+        if (sc_value_is_constant a)
+            if (sc_value_is_constant b)
+                return
+                    box-integer
+                        f (unbox-pointer a type) (unbox-pointer b type)
+        sc_call_new (box-pointer f) 2 args
+
+    inline type-comparison-func (f)
+        fn (args argcount) (compare-type args argcount (typify f type type))
+
+    sc_scope_set_symbol syntax-scope 'type== (box-ast-macro (type-comparison-func ptrcmp==))
+    sc_scope_set_symbol syntax-scope 'type!= (box-ast-macro (type-comparison-func ptrcmp!=))
+    sc_scope_set_symbol syntax-scope 'type< (box-ast-macro (type-comparison-func type<))
+    sc_scope_set_symbol syntax-scope 'type<= (box-ast-macro (type-comparison-func type<=))
+    sc_scope_set_symbol syntax-scope 'type> (box-ast-macro (type-comparison-func type>))
+    sc_scope_set_symbol syntax-scope 'type>= (box-ast-macro (type-comparison-func type>=))
 
     syntax-scope
+

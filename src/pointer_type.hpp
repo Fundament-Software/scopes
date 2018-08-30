@@ -56,6 +56,9 @@ const Type *static_pointer_type(const Type *element_type);
 
 uint64_t required_flags_for_storage_class(Symbol storage_class);
 
+bool pointer_storage_classes_compatible(Symbol need, Symbol got);
+bool pointer_flags_compatible(uint64_t need, uint64_t got);
+
 } // namespace scopes
 
 #endif // SCOPES_POINTER_HPP

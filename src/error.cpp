@@ -164,7 +164,7 @@ SCOPES_RESULT(void) error_argument_count_mismatch(int needed, int got) {
 SCOPES_RESULT(void) error_argument_type_mismatch(const Type *expected, const Type *got) {
     SCOPES_RESULT_TYPE(void);
     StyledString ss;
-    ss.out << "parameter of type " << expected << " expected, but argument is of type " << got;
+    ss.out << "parameter is of type " << expected << ", but argument is of type " << got;
     SCOPES_LOCATION_ERROR(ss.str());
 }
 
