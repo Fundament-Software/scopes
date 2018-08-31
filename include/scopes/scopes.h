@@ -157,6 +157,8 @@ bool sc_value_is_constant (sc_value_t *value);
 int sc_value_kind (sc_value_t *value);
 
 sc_value_t *sc_keyed_new(sc_symbol_t key, sc_value_t *value);
+sc_symbol_value_tuple_t sc_key_value(sc_value_t *value);
+
 sc_value_t *sc_argument_list_new(int numvalues, sc_value_t **values);
 
 sc_value_t *sc_template_new(sc_symbol_t name);
@@ -361,6 +363,8 @@ sc_type_raises_t sc_tuple_type(int numtypes, const sc_type_t **types);
 bool sc_function_type_is_variadic(const sc_type_t *T);
 const sc_type_t *sc_function_type(const sc_type_t *return_type,
     int numtypes, const sc_type_t **typeargs);
+const sc_type_t *sc_function_type_raising(const sc_type_t *T,
+    const sc_type_t *except_type);
 
 // image types
 

@@ -250,6 +250,9 @@ let function->ASTMacro =
 fn box-empty ()
     sc_argument_list_new 0 (undef ValueArrayPointer)
 
+fn box-none ()
+    sc_const_tuple_new Nothing 0 (undef ValueArrayPointer)
+
 # take closure l, typify and compile it and return an Any of LabelMacro type
 inline ast-macro (l)
     function->ASTMacro (typify l ValueArrayPointer i32)
@@ -362,6 +365,221 @@ syntax-extend
     sc_scope_set_symbol syntax-scope 'type<= (box-ast-macro (type-comparison-func type<=))
     sc_scope_set_symbol syntax-scope 'type> (box-ast-macro (type-comparison-func type>))
     sc_scope_set_symbol syntax-scope 'type>= (box-ast-macro (type-comparison-func type>=))
+
+    # typecall
+    sc_type_set_symbol type '__call
+        box-ast-macro
+            fn "type-call" (args argcount)
+                verify-count argcount 1 -1
+                let self = (load (getelementptr args 0))
+                let T = (unbox-pointer self type)
+                let ok f = (sc_type_at T '__typecall)
+                if ok
+                    return
+                        sc_call_new f argcount args
+                raise-compile-error!
+                    sc_string_join "no type constructor available for type "
+                        sc_value_repr self
+
+    # method call syntax
+    sc_type_set_symbol Symbol '__call
+        box-ast-macro
+            fn "symbol-call" (args argcount)
+                verify-count argcount 2 -1
+                let symval = (load (getelementptr args 0))
+                let sym = (unbox-symbol symval Symbol)
+                let self = (load (getelementptr args 1))
+                let T = (sc_value_type self)
+                let ok f = (sc_type_at T sym)
+                if ok
+                    sc_call_new f (sub argcount 1) (getelementptr args 1)
+                else
+                    raise-compile-error!
+                        sc_string_join "no method named "
+                            sc_string_join (sc_value_repr symval)
+                                sc_string_join " in value of type "
+                                    sc_value_repr (box-pointer T)
+
+    inline gen-key-any-set (selftype fset)
+        box-ast-macro
+            fn "set-symbol" (args argcount)
+                verify-count argcount 2 3
+                let self = (load (getelementptr args 0))
+                let key value =
+                    if (icmp== argcount 3)
+                        let key = (load (getelementptr args 1))
+                        let value = (load (getelementptr args 2))
+                        _ key value
+                    else
+                        let key value = (sc_key_value (load (getelementptr args 1)))
+                        _ (box-symbol key) value
+                if (sc_value_is_constant self)
+                    if (sc_value_is_constant key)
+                        if (sc_value_is_constant value)
+                            let self = (unbox-pointer self selftype)
+                            let key = (unbox-symbol key Symbol)
+                            fset self key value
+                            return (box-empty)
+                let callargs = (alloca-array Value 3)
+                store self (getelementptr callargs 0)
+                store key (getelementptr callargs 1)
+                store value (getelementptr callargs 2)
+                sc_call_new (box-pointer fset) 3 callargs
+
+    # quick assignment of type attributes
+    sc_type_set_symbol type 'set-symbol (gen-key-any-set type sc_type_set_symbol)
+    sc_type_set_symbol Scope 'set-symbol (gen-key-any-set Scope sc_scope_set_symbol)
+
+    sc_type_set_symbol type 'pointer
+        box-ast-macro
+            fn "type-pointer" (args argcount)
+                verify-count argcount 1 1
+                let self = (load (getelementptr args 0))
+                let T = (unbox-pointer self type)
+                box-pointer
+                    sc_pointer_type T pointer-flag-non-writable unnamed
+
+    # tuple type constructor
+    sc_type_set_symbol tuple '__typecall
+        box-ast-macro
+            fn "tuple" (args argcount)
+                verify-count argcount 1 -1
+                let pcount = (sub argcount 1)
+                let types = (alloca-array type pcount)
+                loop (i) = 1
+                if (icmp<s i argcount)
+                    let arg = (load (getelementptr args i))
+                    let T = (unbox-pointer arg type)
+                    store T (getelementptr types (sub i 1))
+                    repeat (add i 1)
+                box-pointer (sc_tuple_type pcount types)
+
+    # function pointer type constructor
+    sc_type_set_symbol function '__typecall
+        box-ast-macro
+            fn "function" (args argcount)
+                verify-count argcount 2 -1
+                let rtype = (load (getelementptr args 1))
+                let rtype = (unbox-pointer rtype type)
+                let pcount = (sub argcount 2)
+                let types = (alloca-array type pcount)
+                loop (i) = 2
+                if (icmp<s i argcount)
+                    let arg = (load (getelementptr args i))
+                    let T = (unbox-pointer arg type)
+                    store T (getelementptr types (sub i 2))
+                    repeat (add i 1)
+                box-pointer (sc_function_type rtype pcount types)
+
+    sc_type_set_symbol type 'raising
+        box-ast-macro
+            fn "function-raising" (args argcount)
+                verify-count argcount 2 2
+                let self = (load (getelementptr args 0))
+                let except_type = (load (getelementptr args 1))
+                let T = (unbox-pointer self type)
+                let exceptT = (unbox-pointer except_type type)
+                box-pointer
+                    sc_function_type_raising T exceptT
+
+    # closure constructor
+    #sc_type_set_symbol Closure '__typecall
+        box-pointer
+            inline (cls func frame)
+                sc_closure_new func frame
+
+    # symbol constructor
+    sc_type_set_symbol Symbol '__typecall
+        box-pointer
+            inline (cls str)
+                sc_symbol_new str
+
+    sc_scope_set_symbol syntax-scope 'none?
+        box-ast-macro
+            fn (args argcount)
+                verify-count argcount 1 1
+                let value = (load (getelementptr args 0))
+                box-integer
+                    ptrcmp== (sc_value_type value) Nothing
+
+    fn unpack2 (args argcount)
+        verify-count argcount 2 2
+        let a = (load (getelementptr args 0))
+        let b = (load (getelementptr args 1))
+        return a b
+
+    sc_scope_set_symbol syntax-scope 'const.icmp<=.i32.i32
+        box-ast-macro
+            fn (args argcount)
+                let a b = (unpack2 args argcount)
+                if (sc_value_is_constant a)
+                    if (sc_value_is_constant b)
+                        let a = (unbox-integer a i32)
+                        let b = (unbox-integer b i32)
+                        return
+                            box-integer (icmp<=s a b)
+                raise-compile-error! "arguments must be constant"
+
+    sc_scope_set_symbol syntax-scope 'const.add.i32.i32
+        box-ast-macro
+            fn (args argcount)
+                let a b = (unpack2 args argcount)
+                if (sc_value_is_constant a)
+                    if (sc_value_is_constant b)
+                        let a = (unbox-integer a i32)
+                        let b = (unbox-integer b i32)
+                        return
+                            box-integer (add a b)
+                raise-compile-error! "arguments must be constant"
+
+    sc_scope_set_symbol syntax-scope 'constbranch
+        box-ast-macro
+            fn (args argcount)
+                verify-count argcount 3 3
+                let cond = (load (getelementptr args 0))
+                let thenf = (load (getelementptr args 1))
+                let elsef = (load (getelementptr args 2))
+                if (sc_value_is_constant cond)
+                else
+                    raise-compile-error! "condition must be constant"
+                let value = (unbox-integer cond bool)
+                sc_call_new
+                    ? value thenf elsef
+                    0
+                    undef ValueArrayPointer
+
+    sc_type_set_symbol Value '__typecall
+        box-ast-macro
+            fn (args argcount)
+                verify-count argcount 2 2
+                let value = (load (getelementptr args 1))
+                let T = (sc_value_type value)
+                inline make-none ()
+                    Any-wrap none
+                if (ptrcmp== T Value)
+                    value
+                elseif (sc_value_is_constant value)
+                    box-pointer value
+                elseif (ptrcmp== T Nothing)
+                    let blockargs = (alloca-array Value 2)
+                    store value (getelementptr blockargs 0)
+                    store (box-none) (getelementptr blockargs 1)
+                    sc_block_new 2 blockargs
+                else
+                    let storageT = (sc_type_storage T)
+                    let kind = (sc_type_kind storageT)
+                    let argptr = (getelementptr args 1)
+                    if (icmp== kind type-kind-pointer)
+                        sc_call_new (box-pointer box-pointer) 1 argptr
+                    elseif (icmp== kind type-kind-integer)
+                        sc_call_new (box-pointer box-integer) 1 argptr
+                    #elseif (bor (icmp== kind type-kind-tuple) (icmp== kind type-kind-array))
+                    #elseif (icmp== kind type-kind-vector)
+                    #elseif (icmp== kind type-kind-real)
+                    else
+                        raise-compile-error!
+                            sc_string_join "can't box value of type "
+                                sc_value_repr (box-pointer T)
 
     syntax-scope
 

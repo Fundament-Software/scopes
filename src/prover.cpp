@@ -641,10 +641,14 @@ static SCOPES_RESULT(Value *) specialize_SyntaxExtend(const ASTContext &ctx, Syn
     return specialize(ctx, nextfn->value);
 }
 
-static SCOPES_RESULT(Keyed *) specialize_Keyed(const ASTContext &ctx, Keyed *keyed) {
-    SCOPES_RESULT_TYPE(Keyed *);
-    return Keyed::from(keyed->anchor(), keyed->key,
-        SCOPES_GET_RESULT(specialize(ctx, keyed->value)));
+static SCOPES_RESULT(Value *) specialize_Keyed(const ASTContext &ctx, Keyed *keyed) {
+    SCOPES_RESULT_TYPE(Value *);
+    auto value = SCOPES_GET_RESULT(specialize(ctx, keyed->value));
+    if (keyed->key == SYM_Unnamed)
+        return value;
+    auto newkeyed = Keyed::from(keyed->anchor(), keyed->key, value);
+    newkeyed->set_type(value->get_type());
+    return newkeyed;
 }
 
 template<typename T>
@@ -799,7 +803,20 @@ static SCOPES_RESULT(Value *) specialize_call_interior(const ASTContext &ctx, Ca
     Value *callee = SCOPES_GET_RESULT(specialize(subctx, call->callee));
     Values values;
     SCOPES_CHECK_RESULT(specialize_arguments(ctx, values, call->args));
+    bool rawcall = call->is_rawcall();
+    int redirections = 0;
+repeat:
     const Type *T = callee->get_type();
+    if (!rawcall) {
+        assert(redirections < 16);
+        Const *dest;
+        if (T->lookup_call_handler(dest)) {
+            values.insert(values.begin(), callee);
+            callee = dest;
+            redirections++;
+            goto repeat;
+        }
+    }
     if (T == TYPE_Closure) {
         const Closure *cl = SCOPES_GET_RESULT((extract_closure_constant(callee)));
         if (cl->func->is_inline()) {
@@ -1244,24 +1261,8 @@ static SCOPES_RESULT(Value *) specialize_call_interior(const ASTContext &ctx, Ca
     for (int i = 0; i < numargs; ++i) {
         const Type *Ta = values[i]->get_type();
         const Type *Tb = ft->argument_types[i];
-        if (Ta == Tb)
+        if (SCOPES_GET_RESULT(types_compatible(Tb, Ta)))
             continue;
-        Ta = SCOPES_GET_RESULT(storage_type(Ta));
-        Tb = SCOPES_GET_RESULT(storage_type(Tb));
-        if (isa<PointerType>(Ta) && isa<PointerType>(Tb)) {
-            auto pa = cast<PointerType>(Ta);
-            auto pb = cast<PointerType>(Tb);
-            auto flags = pb->flags;
-            auto scls = pb->storage_class;
-
-            if (scls == SYM_Unnamed) {
-                scls = pa->storage_class;
-            }
-            if ((pa->element_type == pb->element_type)
-                && pointer_flags_compatible(pb->flags, pa->flags)
-                && pointer_storage_classes_compatible(pb->storage_class, pa->storage_class))
-                continue;
-        }
         SCOPES_ANCHOR(values[i]->anchor());
         SCOPES_EXPECT_ERROR(error_argument_type_mismatch(Tb, Ta));
     }

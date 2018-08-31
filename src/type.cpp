@@ -244,6 +244,36 @@ bool is_returning_value(const Type *T) {
     return is_returning(T) && (T != empty_arguments_type());
 }
 
+SCOPES_RESULT(bool) types_compatible(const Type *paramT, const Type *argT) {
+    SCOPES_RESULT_TYPE(bool);
+    if (paramT == argT)
+        return true;
+    if (!is_opaque(argT)) {
+        argT = SCOPES_GET_RESULT(storage_type(argT));
+        /*
+        if (argT == paramT)
+            return true;
+        */
+    }
+    if (!is_opaque(paramT)) {
+        paramT = SCOPES_GET_RESULT(storage_type(paramT));
+    }
+    if (isa<PointerType>(paramT) && isa<PointerType>(argT)) {
+        auto pa = cast<PointerType>(argT);
+        auto pb = cast<PointerType>(paramT);
+        auto flags = pb->flags;
+        auto scls = pb->storage_class;
+        if (scls == SYM_Unnamed) {
+            scls = pa->storage_class;
+        }
+        if (SCOPES_GET_RESULT(types_compatible(pb->element_type, pa->element_type))
+            && pointer_flags_compatible(pb->flags, pa->flags)
+            && pointer_storage_classes_compatible(pb->storage_class, pa->storage_class))
+            return true;
+    }
+    return false;
+}
+
 //------------------------------------------------------------------------------
 // TYPE CHECK PREDICATES
 //------------------------------------------------------------------------------
