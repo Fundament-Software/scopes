@@ -29,10 +29,12 @@ struct StreamASTFormat {
 
     Tagging anchors;
     int depth;
+    bool newlines;
 
     StreamASTFormat();
 
     static StreamASTFormat debug();
+    static StreamASTFormat singleline();
 };
 
 void stream_ast(

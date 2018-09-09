@@ -10,6 +10,7 @@
 #include "value.hpp"
 #include "prover.hpp"
 #include "type.hpp"
+#include "stream_ast.hpp"
 
 namespace scopes {
 
@@ -238,7 +239,7 @@ void StreamExpr::walk(Value *e, int depth, int maxdepth, bool naked) {
         sym.name()->stream(ss, SYMBOL_ESCAPE_CHARS);
         ss << Style_None;
     } else {
-        ss << e;
+        stream_ast(ss, e, StreamASTFormat::singleline());
     }
     if (naked) { ss << std::endl; }
 }

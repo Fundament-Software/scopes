@@ -101,7 +101,7 @@ public:
             tni->super_type = TYPE_CStruct;
         }
 
-        KeyedTypes args;
+        ArgTypes args;
         //auto anchors = new std::vector<Anchor>();
         //StyledStream ss;
         const Type *ST = tni;
@@ -128,7 +128,7 @@ public:
             //unsigned width = it->getBitWidthValue(*Context);
 
             Symbol name = it->isAnonymousStructOrUnion() ?
-                Symbol("") : Symbol(String::from_stdstring(declname.getAsString()));
+                SYM_Unnamed : Symbol(String::from_stdstring(declname.getAsString()));
 
             if (!is_union) {
                 //ss << "type " << ST << " field " << name << " : " << fieldtype << std::endl;
@@ -145,8 +145,7 @@ public:
                     //ss << "offset mismatch " << newsz << " != " << offset << std::endl;
                     if (newsz < offset) {
                         size_t pad = offset - newsz;
-                        args.push_back(KeyedType(SYM_Unnamed,
-                            array_type(TYPE_U8, pad).assert_ok()));
+                        args.push_back(array_type(TYPE_U8, pad).assert_ok());
                     } else {
                         // our computed offset is later than the real one
                         // structure is likely packed
@@ -159,7 +158,7 @@ public:
                 al = std::max(al, SCOPES_GET_RESULT(align_of(fieldtype)));
             }
 
-            args.push_back(KeyedType(name, fieldtype));
+            args.push_back(keyed_type(name, fieldtype));
         }
         if (packed) {
             al = 1;
@@ -197,8 +196,8 @@ public:
             }
         }
 
-        SCOPES_CHECK_RESULT(tni->finalize(is_union?SCOPES_GET_RESULT(keyed_union_type(args)):
-            SCOPES_GET_RESULT(keyed_tuple_type(args, packed, explicit_alignment?al:0))));
+        SCOPES_CHECK_RESULT(tni->finalize(is_union?SCOPES_GET_RESULT(union_type(args)):
+            SCOPES_GET_RESULT(tuple_type(args, packed, explicit_alignment?al:0))));
         return true;
     }
 

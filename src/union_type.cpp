@@ -9,6 +9,7 @@
 #include "utils.hpp"
 #include "tuple_type.hpp"
 #include "hash.hpp"
+#include "keyed_type.hpp"
 
 #include <unordered_set>
 
@@ -19,7 +20,7 @@ namespace UnionSet {
         std::size_t operator()(const UnionType *s) const {
             std::size_t h = 0;
             for (auto &&arg : s->values) {
-                h = hash2(h, arg.hash());
+                h = hash2(h, std::hash<const Type*>{}(arg));
             }
             return h;
         }
@@ -51,22 +52,19 @@ void UnionType::stream_name(StyledStream &ss) const {
         if (i > 0) {
             ss << " | ";
         }
-        if (values[i].key != SYM_Unnamed) {
-            ss << values[i].key.name()->data << "=";
-        }
-        stream_type_name(ss, values[i].type);
+        stream_type_name(ss, values[i]);
     }
     ss << "}";
 }
 
-UnionType::UnionType(const KeyedTypes &_values)
+UnionType::UnionType(const ArgTypes &_values)
     : StorageType(TK_Union), values(_values) {
 
     size_t sz = 0;
     size_t al = 1;
     largest_field = 0;
     for (size_t i = 0; i < values.size(); ++i) {
-        const Type *ET = values[i].type;
+        const Type *ET = values[i];
         auto newsz = size_of(ET).assert_ok();
         if (newsz > sz) {
             largest_field = i;
@@ -76,18 +74,18 @@ UnionType::UnionType(const KeyedTypes &_values)
     }
     size = scopes::align(sz, al);
     align = al;
-    this->tuple_type = scopes::tuple_type({values[largest_field].type}).assert_ok();
+    this->tuple_type = scopes::tuple_type({key_type(values[largest_field])._1}).assert_ok();
 }
 
 SCOPES_RESULT(const Type *) UnionType::type_at_index(size_t i) const {
     SCOPES_RESULT_TYPE(const Type *);
     SCOPES_CHECK_RESULT(verify_range(i, values.size()));
-    return values[i].type;
+    return values[i];
 }
 
 size_t UnionType::field_index(Symbol name) const {
     for (size_t i = 0; i < values.size(); ++i) {
-        if (name == values[i].key)
+        if (name == key_type(values[i])._0)
             return i;
     }
     return (size_t)-1;
@@ -96,19 +94,19 @@ size_t UnionType::field_index(Symbol name) const {
 SCOPES_RESULT(Symbol) UnionType::field_name(size_t i) const {
     SCOPES_RESULT_TYPE(Symbol);
     SCOPES_CHECK_RESULT(verify_range(i, values.size()));
-    return values[i].key;
+    return key_type(values[i])._0;
 }
 
 //------------------------------------------------------------------------------
 
-SCOPES_RESULT(const Type *) keyed_union_type(const KeyedTypes &values) {
+SCOPES_RESULT(const Type *) union_type(const ArgTypes &values) {
     SCOPES_RESULT_TYPE(const Type *);
     UnionType key(values);
     auto it = unions.find(&key);
     if (it != unions.end())
         return *it;
     for (size_t i = 0; i < values.size(); ++i) {
-        const Type *T = values[i].type;
+        const Type *T = values[i];
         if (is_opaque(T)) {
             StyledString ss;
             ss.out << "can not construct union type with field of opaque type " << T;
@@ -120,13 +118,5 @@ SCOPES_RESULT(const Type *) keyed_union_type(const KeyedTypes &values) {
     return result;
 }
 
-SCOPES_RESULT(const Type *) union_type(const ArgTypes &types) {
-    KeyedTypes args;
-    args.reserve(types.size());
-    for (size_t i = 0; i < types.size(); ++i) {
-        args.push_back(types[i]);
-    }
-    return keyed_union_type(args);
-}
 
 } // namespace scopes

@@ -40,9 +40,14 @@ SCOPES_VALUE_KIND()
 
 Keyed::Keyed(const Anchor *anchor, Symbol _key, Value *node)
     : Value(VK_Keyed, anchor), key(_key), value(node)
-{}
+{
+}
 
 Keyed *Keyed::from(const Anchor *anchor, Symbol key, Value *node) {
+    assert(node);
+    if (isa<Keyed>(node)) {
+        node = cast<Keyed>(node)->value;
+    }
     return new Keyed(anchor, key, node);
 }
 
@@ -160,7 +165,7 @@ Function *Function::from(
 //------------------------------------------------------------------------------
 
 Extern::Extern(const Anchor *anchor, const Type *type, Symbol _name, size_t _flags, Symbol _storage_class, int _location, int _binding)
-    : Value(VK_Extern, anchor), name(_name), flags(_flags), storage_class(_storage_class), location(_location), binding(_binding) {
+    : Const(VK_Extern, anchor, type), name(_name), flags(_flags), storage_class(_storage_class), location(_location), binding(_binding) {
     if ((storage_class == SYM_SPIRV_StorageClassUniform)
         && !(flags & EF_BufferBlock)) {
         flags |= EF_Block;
@@ -170,7 +175,7 @@ Extern::Extern(const Anchor *anchor, const Type *type, Symbol _name, size_t _fla
         ptrflags |= PTF_NonWritable;
     else if (flags & EF_NonReadable)
         ptrflags |= PTF_NonReadable;
-    set_type(pointer_type(type, ptrflags, storage_class));
+    change_type(pointer_type(type, ptrflags, storage_class));
 }
 
 Extern *Extern::from(const Anchor *anchor, const Type *type, Symbol name, size_t flags, Symbol storage_class, int location, int binding) {
@@ -223,7 +228,7 @@ void Block::append(Value *node) {
 //------------------------------------------------------------------------------
 
 If::If(const Anchor *anchor, const Clauses &_clauses)
-    : Value(VK_If, anchor), clauses(_clauses) {
+    : Instruction(VK_If, anchor), clauses(_clauses) {
 }
 
 If *If::from(const Anchor *anchor, const Clauses &_clauses) {
@@ -249,7 +254,7 @@ Value *If::canonicalize() {
 //------------------------------------------------------------------------------
 
 Try::Try(const Anchor *anchor, Value *_try_body, SymbolValue *_except_param, Value *_except_body)
-    : Value(VK_Try, anchor), try_body(_try_body), except_param(_except_param), except_body(_except_body)
+    : Instruction(VK_Try, anchor), try_body(_try_body), except_param(_except_param), except_body(_except_body)
 {}
 
 Try *Try::from(const Anchor *anchor, Value *try_body, SymbolValue *except_param,
@@ -279,7 +284,7 @@ bool SymbolValue::is_variadic() const {
 //------------------------------------------------------------------------------
 
 Call::Call(const Anchor *anchor, Value *_callee, const Values &_args)
-    : Value(VK_Call, anchor), callee(_callee), args(_args), flags(0) {
+    : Instruction(VK_Call, anchor), callee(_callee), args(_args), flags(0) {
 }
 
 bool Call::is_rawcall() const {
@@ -314,7 +319,7 @@ Let *Let::from(const Anchor *anchor, const SymbolValues &params, const Values &a
 //------------------------------------------------------------------------------
 
 Loop::Loop(const Anchor *anchor, const SymbolValues &_params, const Values &_args, Value *_value)
-    : Value(VK_Loop, anchor), params(_params), args(_args), value(_value), return_type(nullptr) {
+    : Instruction(VK_Loop, anchor), params(_params), args(_args), value(_value), return_type(nullptr) {
 }
 
 Loop *Loop::from(const Anchor *anchor, const SymbolValues &params, const Values &args, Value *value) {
@@ -324,16 +329,8 @@ Loop *Loop::from(const Anchor *anchor, const SymbolValues &params, const Values 
 //------------------------------------------------------------------------------
 
 bool Const::classof(const Value *T) {
-    switch(T->kind()) {
-    case VK_ConstInt:
-    case VK_ConstReal:
-    case VK_ConstTuple:
-    case VK_ConstArray:
-    case VK_ConstVector:
-    case VK_ConstPointer:
-        return true;
-    default: return false;
-    }
+    auto k = T->kind();
+    return (k >= VK_Extern) && (k <= VK_ConstPointer);
 }
 
 Const::Const(ValueKind _kind, const Anchor *anchor, const Type *type)
@@ -434,7 +431,7 @@ ConstPointer *ConstPointer::list_from(const Anchor *anchor, const List *list) {
 //------------------------------------------------------------------------------
 
 Break::Break(const Anchor *anchor, Value *_value)
-    : Value(VK_Break, anchor), value(_value) {
+    : Instruction(VK_Break, anchor), value(_value) {
 }
 
 Break *Break::from(const Anchor *anchor, Value *value) {
@@ -444,7 +441,7 @@ Break *Break::from(const Anchor *anchor, Value *value) {
 //------------------------------------------------------------------------------
 
 Repeat::Repeat(const Anchor *anchor, const Values &_args)
-    : Value(VK_Repeat, anchor), args(_args) {}
+    : Instruction(VK_Repeat, anchor), args(_args) {}
 
 Repeat *Repeat::from(const Anchor *anchor, const Values &args) {
     return new Repeat(anchor, args);
@@ -453,7 +450,7 @@ Repeat *Repeat::from(const Anchor *anchor, const Values &args) {
 //------------------------------------------------------------------------------
 
 Return::Return(const Anchor *anchor, Value *_value)
-    : Value(VK_Return, anchor), value(_value) {}
+    : Instruction(VK_Return, anchor), value(_value) {}
 
 Return *Return::from(const Anchor *anchor, Value *value) {
     return new Return(anchor, value);
@@ -462,7 +459,7 @@ Return *Return::from(const Anchor *anchor, Value *value) {
 //------------------------------------------------------------------------------
 
 Raise::Raise(const Anchor *anchor, Value *_value)
-    : Value(VK_Raise, anchor), value(_value) {}
+    : Instruction(VK_Raise, anchor), value(_value) {}
 
 Raise *Raise::from(const Anchor *anchor, Value *value) {
     return new Raise(anchor, value);
@@ -527,6 +524,17 @@ const Anchor *Value::anchor() const {
     }
 SCOPES_VALUE_KIND()
 #undef T
+
+//------------------------------------------------------------------------------
+
+Instruction::Instruction(ValueKind _kind, const Anchor *_anchor)
+    : Value(_kind, _anchor), name(SYM_Unnamed), block(nullptr) {
+}
+
+bool Instruction::classof(const Value *T) {
+    auto k = T->kind();
+    return (k >= VK_If) && (k <= VK_Raise);
+}
 
 //------------------------------------------------------------------------------
 

@@ -21,30 +21,34 @@ struct List;
 struct Scope;
 
 #define SCOPES_VALUE_KIND() \
-    T(VK_Template, "value-kind-template", Template) \
     T(VK_Function, "value-kind-function", Function) \
-    T(VK_Extern, "value-kind-extern", Extern) \
+    T(VK_Symbol, "value-kind-symbol", SymbolValue) \
+    T(VK_ArgumentList, "value-kind-argumentlist", ArgumentList) \
+    T(VK_ExtractArgument, "value-kind-extractargument", ExtractArgument) \
+    /* template-only */ \
+    T(VK_Template, "value-kind-template", Template) \
     T(VK_Block, "value-kind-block", Block) \
+    T(VK_Keyed, "value-kind-keyed", Keyed) \
+    T(VK_Let, "value-kind-let", Let) \
+    T(VK_SyntaxExtend, "value-kind-syntax-extend", SyntaxExtend) \
+    /* instructions (Instruction::classof) */ \
     T(VK_If, "value-kind-if", If) \
     T(VK_Try, "value-kind-try", Try) \
-    T(VK_Symbol, "value-kind-symbol", SymbolValue) \
-    T(VK_Keyed, "value-kind-keyed", Keyed) \
+    T(VK_Call, "value-kind-call", Call) \
+    T(VK_Loop, "value-kind-loop", Loop) \
+    T(VK_Break, "value-kind-break", Break) \
+    T(VK_Repeat, "value-kind-repeat", Repeat) \
+    T(VK_Return, "value-kind-return", Return) \
+    T(VK_Raise, "value-kind-raise", Raise) \
+    /* constants (Const::classof) */ \
+    T(VK_Extern, "value-kind-extern", Extern) \
     T(VK_ConstInt, "value-kind-const-int", ConstInt) \
     T(VK_ConstReal, "value-kind-const-real", ConstReal) \
     T(VK_ConstTuple, "value-kind-const-tuple", ConstTuple) \
     T(VK_ConstArray, "value-kind-const-array", ConstArray) \
     T(VK_ConstVector, "value-kind-const-vector", ConstVector) \
     T(VK_ConstPointer, "value-kind-const-pointer", ConstPointer) \
-    T(VK_ArgumentList, "value-kind-argumentlist", ArgumentList) \
-    T(VK_ExtractArgument, "value-kind-extractargument", ExtractArgument) \
-    T(VK_Call, "value-kind-call", Call) \
-    T(VK_Let, "value-kind-let", Let) \
-    T(VK_Loop, "value-kind-loop", Loop) \
-    T(VK_Break, "value-kind-break", Break) \
-    T(VK_Repeat, "value-kind-repeat", Repeat) \
-    T(VK_Return, "value-kind-return", Return) \
-    T(VK_Raise, "value-kind-raise", Raise) \
-    T(VK_SyntaxExtend, "value-kind-syntax-extend", SyntaxExtend)
+
 
 enum ValueKind {
 #define T(NAME, BNAME, CLASS) \
@@ -59,9 +63,12 @@ enum ValueKind {
 #undef T
 
 struct Value;
+struct Block;
+struct Instruction;
 
 typedef std::vector<SymbolValue *> SymbolValues;
 typedef std::vector<Value *> Values;
+typedef std::vector<Instruction *> Instructions;
 typedef std::vector<Const *> Constants;
 typedef std::vector<Block *> Blocks;
 
@@ -89,6 +96,17 @@ private:
 
 protected:
     const Anchor *_anchor;
+};
+
+//------------------------------------------------------------------------------
+
+struct Instruction : Value {
+    static bool classof(const Value *T);
+
+    Instruction(ValueKind _kind, const Anchor *_anchor);
+
+    Symbol name;
+    Block *block;
 };
 
 //------------------------------------------------------------------------------
@@ -189,38 +207,6 @@ struct Function : Value {
 
 //------------------------------------------------------------------------------
 
-enum ExternFlags {
-    // if storage class is 'Uniform, the value is a SSBO
-    EF_BufferBlock = (1 << 0),
-    EF_NonWritable = (1 << 1),
-    EF_NonReadable = (1 << 2),
-    EF_Volatile = (1 << 3),
-    EF_Coherent = (1 << 4),
-    EF_Restrict = (1 << 5),
-    // if storage class is 'Uniform, the value is a UBO
-    EF_Block = (1 << 6),
-};
-
-struct Extern : Value {
-    static bool classof(const Value *T);
-
-    Extern(const Anchor *anchor, const Type *type, Symbol name,
-        size_t flags, Symbol storage_class, int location, int binding);
-
-    static Extern *from(const Anchor *anchor, const Type *type, Symbol name,
-        size_t flags = 0,
-        Symbol storage_class = SYM_Unnamed,
-        int location = -1, int binding = -1);
-
-    Symbol name;
-    size_t flags;
-    Symbol storage_class;
-    int location;
-    int binding;
-};
-
-//------------------------------------------------------------------------------
-
 struct Block : Value {
     static bool classof(const Value *T);
 
@@ -252,7 +238,7 @@ struct Clause {
 
 typedef std::vector<Clause> Clauses;
 
-struct If : Value {
+struct If : Instruction {
     static bool classof(const Value *T);
 
     If(const Anchor *anchor, const Clauses &clauses);
@@ -270,7 +256,7 @@ struct If : Value {
 
 //------------------------------------------------------------------------------
 
-struct Try : Value {
+struct Try : Instruction {
     static bool classof(const Value *T);
 
     Try(const Anchor *anchor, Value *try_body, SymbolValue *except_param, Value *except_body);
@@ -308,7 +294,7 @@ enum CallFlags {
     CF_TryCall = (1 << 1),
 };
 
-struct Call : Value {
+struct Call : Instruction {
     static bool classof(const Value *T);
 
     Call(const Anchor *anchor, Value *callee, const Values &args);
@@ -338,7 +324,7 @@ struct Let : Value {
 
 //------------------------------------------------------------------------------
 
-struct Loop : Value {
+struct Loop : Instruction {
     static bool classof(const Value *T);
 
     Loop(const Anchor *anchor, const SymbolValues &params, const Values &args, Value *value);
@@ -441,7 +427,39 @@ struct ConstPointer : Const {
 
 //------------------------------------------------------------------------------
 
-struct Break : Value {
+enum ExternFlags {
+    // if storage class is 'Uniform, the value is a SSBO
+    EF_BufferBlock = (1 << 0),
+    EF_NonWritable = (1 << 1),
+    EF_NonReadable = (1 << 2),
+    EF_Volatile = (1 << 3),
+    EF_Coherent = (1 << 4),
+    EF_Restrict = (1 << 5),
+    // if storage class is 'Uniform, the value is a UBO
+    EF_Block = (1 << 6),
+};
+
+struct Extern : Const {
+    static bool classof(const Value *T);
+
+    Extern(const Anchor *anchor, const Type *type, Symbol name,
+        size_t flags, Symbol storage_class, int location, int binding);
+
+    static Extern *from(const Anchor *anchor, const Type *type, Symbol name,
+        size_t flags = 0,
+        Symbol storage_class = SYM_Unnamed,
+        int location = -1, int binding = -1);
+
+    Symbol name;
+    size_t flags;
+    Symbol storage_class;
+    int location;
+    int binding;
+};
+
+//------------------------------------------------------------------------------
+
+struct Break : Instruction {
     static bool classof(const Value *T);
 
     Break(const Anchor *anchor, Value *value);
@@ -453,7 +471,7 @@ struct Break : Value {
 
 //------------------------------------------------------------------------------
 
-struct Repeat : Value {
+struct Repeat : Instruction {
     static bool classof(const Value *T);
 
     Repeat(const Anchor *anchor, const Values &args);
@@ -465,7 +483,7 @@ struct Repeat : Value {
 
 //------------------------------------------------------------------------------
 
-struct Return : Value {
+struct Return : Instruction {
     static bool classof(const Value *T);
 
     Return(const Anchor *anchor, Value *value);
@@ -477,7 +495,7 @@ struct Return : Value {
 
 //------------------------------------------------------------------------------
 
-struct Raise : Value {
+struct Raise : Instruction {
     static bool classof(const Value *T);
 
     Raise(const Anchor *anchor, Value *value);

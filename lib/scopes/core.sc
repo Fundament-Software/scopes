@@ -190,9 +190,8 @@ fn verify-count (count mincount maxcount)
                         sc_string_join " argument(s) expected, got "
                             sc_value_repr (box-integer count)
 
-fn Any-none? (value)
-    let T = (extractvalue value 0)
-    ptrcmp== T Nothing
+fn Value-none? (value)
+    ptrcmp== (sc_value_type value) Nothing
 
 syntax-extend
     let TypeArrayPointer =
@@ -272,13 +271,16 @@ syntax-extend
         if (icmp<s i argcount)
             let arg =
                 load (getelementptr args i)
+            sc_write (sc_value_repr arg)
             # optional index
             if use-indices
                 store (box-integer (sub i 1)) (getelementptr callargs 0)
+            let k = (sc_type_key (sc_value_type arg))
+            let v = (sc_keyed_new unnamed arg)
             # key
-            store (box-symbol unnamed) (getelementptr callargs (add ofs 0))
+            store (box-symbol k) (getelementptr callargs (add ofs 0))
             # value
-            store arg (getelementptr callargs (add ofs 1))
+            store v (getelementptr callargs (add ofs 1))
             let callargcount =
                 add ofs
                     if (icmp>s i 1)
@@ -303,15 +305,15 @@ syntax-extend
             let i = (sub i 1)
             let arg =
                 load (getelementptr args i)
-            sc_write (sc_value_repr arg)
-
             # optional index
             if use-indices
                 store (box-integer (sub i 1)) (getelementptr callargs 0)
+            let k = (sc_type_key (sc_value_type arg))
+            let v = (sc_keyed_new unnamed arg)
             # key
-            store (box-symbol unnamed) (getelementptr callargs (add ofs 0))
+            store (box-symbol k) (getelementptr callargs (add ofs 0))
             # value
-            store arg (getelementptr callargs (add ofs 1))
+            store v (getelementptr callargs (add ofs 1))
             let callargcount =
                 add ofs
                     if (icmp!= oi argcount)
@@ -405,14 +407,20 @@ syntax-extend
             fn "set-symbol" (args argcount)
                 verify-count argcount 2 3
                 let self = (load (getelementptr args 0))
+                sc_write (sc_value_repr self)
                 let key value =
                     if (icmp== argcount 3)
                         let key = (load (getelementptr args 1))
                         let value = (load (getelementptr args 2))
+                        sc_write (sc_value_repr key)
+                        sc_write (sc_value_repr value)
                         _ key value
                     else
-                        let key value = (sc_key_value (load (getelementptr args 1)))
-                        _ (box-symbol key) value
+                        let arg = (load (getelementptr args 1))
+                        let key = (sc_type_key (sc_value_type arg))
+                        sc_write (sc_value_repr (box-symbol key))
+                        sc_write (sc_value_repr arg)
+                        _ (box-symbol key) arg
                 if (sc_value_is_constant self)
                     if (sc_value_is_constant key)
                         if (sc_value_is_constant value)
@@ -583,3 +591,50 @@ syntax-extend
 
     syntax-scope
 
+fn cons (values...)
+    va-rifold
+        inline (i key value next)
+            constbranch (none? next)
+                inline ()
+                    value
+                inline ()
+                    sc_list_cons (Value value) next
+        values...
+
+fn make-list (values...)
+    constbranch (const.icmp<=.i32.i32 (va-countof values...) 0)
+        inline () '()
+        inline ()
+            va-rifold
+                inline (i key value next)
+                    sc_list_cons (Value value)
+                        constbranch (none? next)
+                            inline () '()
+                            inline () next
+                values...
+
+inline decons (self count)
+    let count =
+        constbranch (none? count)
+            inline () 1
+            inline () count
+    let at next = (sc_list_decons self)
+    _ at
+        constbranch (const.icmp<=.i32.i32 count 1)
+            inline () next
+            inline () (decons next (const.add.i32.i32 count -1))
+
+inline set-symbols (self values...)
+    va-lfold
+        inline (key value)
+            'set-symbol self key value
+        values...
+
+'set-symbol type 'set-symbols set-symbols
+'set-symbol Scope 'set-symbols set-symbols
+
+'set-symbols Value
+    constant? = sc_value_is_constant
+    none? = (typify Value-none? Value)
+    __repr = sc_value_repr
+    typeof = sc_value_type

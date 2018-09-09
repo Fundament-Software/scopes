@@ -244,14 +244,14 @@ static size_t classify(const Type *T, ABIClass *classes, size_t offset) {
     } break;
     case TK_Union: {
         auto ut = cast<UnionType>(T);
-        return classify(ut->values[ut->largest_field].type, classes, offset);
+        return classify(ut->values[ut->largest_field], classes, offset);
     } break;
     case TK_Tuple: {
         auto tt = cast<TupleType>(T);
         size_t count = tt->values.size();
         const Type *fields[count];
         for (size_t i = 0; i < tt->values.size(); ++i) {
-            fields[i] = tt->values[i].type;
+            fields[i] = tt->values[i];
         }
         return classify_tuple_like(size_of(T).assert_ok(),
             fields, count, tt->packed, classes, offset);

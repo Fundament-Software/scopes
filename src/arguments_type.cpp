@@ -23,11 +23,10 @@ static std::unordered_map<const Type *, const Type *> arguments;
 // ARGUMENTS TYPE
 //------------------------------------------------------------------------------
 
-const Type *keyed_arguments_type(const KeyedTypes &values) {
-    if ((values.size() == 1)
-            && (values[0].key == SYM_Unnamed))
-        return values[0].type;
-    auto ST = keyed_tuple_type(values).assert_ok();
+const Type *arguments_type(const ArgTypes &values) {
+    if (values.size() == 1)
+        return values[0];
+    auto ST = tuple_type(values).assert_ok();
     auto it = arguments.find(ST);
     if (it != arguments.end())
         return it->second;
@@ -40,10 +39,7 @@ const Type *keyed_arguments_type(const KeyedTypes &values) {
             if (i > 0) {
                 ss.out << " ";
             }
-            if (values[i].key != SYM_Unnamed) {
-                ss.out << values[i].key.name()->data << "=";
-            }
-            stream_type_name(ss.out, values[i].type);
+            stream_type_name(ss.out, values[i]);
         }
         ss.out << ")";
     }
@@ -53,14 +49,6 @@ const Type *keyed_arguments_type(const KeyedTypes &values) {
     tn->finalize(ST).assert_ok();
     arguments.insert({ST, T});
     return T;
-}
-
-const Type *arguments_type(const ArgTypes &values) {
-    KeyedTypes types;
-    for (auto &&val : values) {
-        types.push_back(val);
-    }
-    return keyed_arguments_type(types);
 }
 
 static const Type *empty_type = nullptr;

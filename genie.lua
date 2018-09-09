@@ -116,6 +116,7 @@ project "scopesrt"
         "src/vector_type.cpp",
         "src/tuple_type.cpp",
         "src/union_type.cpp",
+        "src/keyed_type.cpp",
         "src/arguments_type.cpp",
         "src/function_type.cpp",
         "src/typename_type.cpp",
@@ -186,6 +187,7 @@ project "scopesrt"
             "-Wall",
             "-Wno-keyword-macro",
             "-Wno-gnu-redeclared-enum",
+            "-Werror=switch",
             "-fdiagnostics-absolute-paths"
         }
 

@@ -8,6 +8,7 @@
 #include "error.hpp"
 #include "utils.hpp"
 #include "hash.hpp"
+#include "keyed_type.hpp"
 
 #include <assert.h>
 
@@ -21,7 +22,7 @@ namespace TupleSet {
             std::size_t h = std::hash<bool>{}(s->packed);
             h = hash2(h, std::hash<size_t>{}(s->align));
             for (auto &&arg : s->values) {
-                h = hash2(h, arg.hash());
+                h = hash2(h, std::hash<const Type *>{}(arg));
             }
             return h;
         }
@@ -61,10 +62,7 @@ void TupleType::stream_name(StyledStream &ss) const {
         if (i > 0) {
             ss << " ";
         }
-        if (values[i].key != SYM_Unnamed) {
-            ss << values[i].key.name()->data << "=";
-        }
-        stream_type_name(ss, values[i].type);
+        stream_type_name(ss, values[i]);
     }
     ss << "}";
     if (packed) {
@@ -72,13 +70,13 @@ void TupleType::stream_name(StyledStream &ss) const {
     }
 }
 
-TupleType::TupleType(const KeyedTypes &_values, bool _packed, size_t _alignment)
+TupleType::TupleType(const ArgTypes &_values, bool _packed, size_t _alignment)
     : StorageType(TK_Tuple), values(_values), packed(_packed) {
     offsets.resize(values.size());
     size_t sz = 0;
     if (packed) {
         for (size_t i = 0; i < values.size(); ++i) {
-            const Type *ET = values[i].type;
+            const Type *ET = values[i];
             offsets[i] = sz;
             sz += size_of(ET).assert_ok();
         }
@@ -87,7 +85,7 @@ TupleType::TupleType(const KeyedTypes &_values, bool _packed, size_t _alignment)
     } else {
         size_t al = 1;
         for (size_t i = 0; i < values.size(); ++i) {
-            const Type *ET = values[i].type;
+            const Type *ET = values[i];
             size_t etal = align_of(ET).assert_ok();
             sz = scopes::align(sz, etal);
             offsets[i] = sz;
@@ -115,18 +113,18 @@ SCOPES_RESULT(void *) TupleType::getelementptr(void *src, size_t i) const {
 SCOPES_RESULT(const Type *) TupleType::type_at_index(size_t i) const {
     SCOPES_RESULT_TYPE(const Type *);
     SCOPES_CHECK_RESULT(verify_range(i, values.size()));
-    return values[i].type;
+    return values[i];
 }
 
 const Type *TupleType::type_at_index_or_nothing(size_t i) const {
     if (i < values.size())
-        return values[i].type;
+        return values[i];
     return TYPE_Nothing;
 }
 
 size_t TupleType::field_index(Symbol name) const {
     for (size_t i = 0; i < values.size(); ++i) {
-        if (name == values[i].key)
+        if (name == key_type(values[i])._0)
             return i;
     }
     return (size_t)-1;
@@ -135,16 +133,16 @@ size_t TupleType::field_index(Symbol name) const {
 SCOPES_RESULT(Symbol) TupleType::field_name(size_t i) const {
     SCOPES_RESULT_TYPE(Symbol);
     SCOPES_CHECK_RESULT(verify_range(i, values.size()));
-    return values[i].key;
+    return key_type(values[i])._0;
 }
 
 //------------------------------------------------------------------------------
 
-SCOPES_RESULT(const Type *) keyed_tuple_type(const KeyedTypes &values,
+SCOPES_RESULT(const Type *) tuple_type(const ArgTypes &values,
     bool packed, size_t alignment) {
     SCOPES_RESULT_TYPE(const Type *);
     for (size_t i = 0; i < values.size(); ++i) {
-        const Type *T = values[i].type;
+        const Type *T = values[i];
         if (is_opaque(T)) {
             StyledString ss;
             ss.out << "can not construct tuple type with field of opaque type "
@@ -159,17 +157,6 @@ SCOPES_RESULT(const Type *) keyed_tuple_type(const KeyedTypes &values,
     auto result = new TupleType(values, packed, alignment);
     tuples.insert(result);
     return result;
-}
-
-SCOPES_RESULT(const Type *) tuple_type(const ArgTypes &types,
-    bool packed, size_t alignment) {
-    //SCOPES_RESULT_TYPE(const Type *);
-    KeyedTypes args;
-    args.reserve(types.size());
-    for (size_t i = 0; i < types.size(); ++i) {
-        args.push_back(types[i]);
-    }
-    return keyed_tuple_type(args, packed, alignment);
 }
 
 } // namespace scopes

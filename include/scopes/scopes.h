@@ -122,6 +122,7 @@ typedef struct sc_value_list_tuple_ { sc_value_t *_0; const sc_list_t *_1; } sc_
 
 //typedef struct sc_symbol_any_tuple_ { sc_symbol_t _0; sc_any_t _1; } sc_symbol_any_tuple_t;
 typedef struct sc_symbol_value_tuple_ { sc_symbol_t _0; sc_value_t *_1; } sc_symbol_value_tuple_t;
+typedef struct sc_symbol_type_tuple_ { sc_symbol_t _0; const sc_type_t *_1; } sc_symbol_type_tuple_t;
 
 typedef struct sc_i32_i32_i32_tuple_ { int32_t _0, _1, _2; } sc_i32_i32_i32_tuple_t;
 
@@ -157,7 +158,6 @@ bool sc_value_is_constant (sc_value_t *value);
 int sc_value_kind (sc_value_t *value);
 
 sc_value_t *sc_keyed_new(sc_symbol_t key, sc_value_t *value);
-sc_symbol_value_tuple_t sc_key_value(sc_value_t *value);
 
 sc_value_t *sc_argument_list_new(int numvalues, sc_value_t **values);
 
@@ -320,6 +320,11 @@ bool sc_type_is_opaque(const sc_type_t *T);
 const sc_string_t *sc_type_string(const sc_type_t *T);
 sc_symbol_value_tuple_t sc_type_next(const sc_type_t *type, sc_symbol_t key);
 void sc_type_set_symbol(sc_type_t *T, sc_symbol_t sym, sc_value_t *value);
+
+// keyed types
+
+sc_symbol_type_tuple_t sc_type_key(const sc_type_t *T);
+const sc_type_t *sc_keyed_type(sc_symbol_t name, const sc_type_t *T);
 
 // pointer types
 

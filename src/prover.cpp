@@ -28,6 +28,9 @@
 
 #pragma GCC diagnostic ignored "-Wvla-extension"
 
+// the old specializer is at
+// https://bitbucket.org/duangle/scopes/raw/dfb69b02546e859b702176c58e92a63de3461d77/src/specializer.cpp
+
 namespace scopes {
 
 #define SCOPES_ARITH_OPS() \
@@ -644,10 +647,12 @@ static SCOPES_RESULT(Value *) specialize_SyntaxExtend(const ASTContext &ctx, Syn
 static SCOPES_RESULT(Value *) specialize_Keyed(const ASTContext &ctx, Keyed *keyed) {
     SCOPES_RESULT_TYPE(Value *);
     auto value = SCOPES_GET_RESULT(specialize(ctx, keyed->value));
-    if (keyed->key == SYM_Unnamed)
+    auto T = value->get_type();
+    auto NT = keyed_type(keyed->key, value->get_type());
+    if (T == NT)
         return value;
     auto newkeyed = Keyed::from(keyed->anchor(), keyed->key, value);
-    newkeyed->set_type(value->get_type());
+    newkeyed->set_type(NT);
     return newkeyed;
 }
 
@@ -1408,7 +1413,7 @@ SCOPES_RESULT(Value *) specialize(const ASTContext &ctx, Value *node) {
         }
     }
     assert(result);
-    #if 0
+    #if 1
     if (node != result)
         ctx.frame->bind(node, result);
     #endif

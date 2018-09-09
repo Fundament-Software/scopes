@@ -673,13 +673,17 @@ struct LLVMIRGenerator {
             size_t count = ti->values.size();
             LLVMTypeRef elements[count];
             for (size_t i = 0; i < count; ++i) {
-                elements[i] = SCOPES_GET_RESULT(_type_to_llvm_type(ti->values[i].type));
+                elements[i] = SCOPES_GET_RESULT(_type_to_llvm_type(ti->values[i]));
             }
             return LLVMStructType(elements, count, ti->packed);
         } break;
         case TK_Union: {
             auto ui = cast<UnionType>(type);
             return _type_to_llvm_type(ui->tuple_type);
+        } break;
+        case TK_Keyed: {
+            auto kt = cast<KeyedType>(type);
+            return _type_to_llvm_type(kt->type);
         } break;
         case TK_Typename: {
             if (type == empty_arguments_type())
@@ -768,7 +772,7 @@ struct LLVMIRGenerator {
                 size_t count = ti->values.size();
                 LLVMTypeRef elements[count];
                 for (size_t i = 0; i < count; ++i) {
-                    elements[i] = SCOPES_GET_RESULT(_type_to_llvm_type(ti->values[i].type));
+                    elements[i] = SCOPES_GET_RESULT(_type_to_llvm_type(ti->values[i]));
                 }
                 LLVMStructSetBody(LLT, elements, count, false);
             } break;
@@ -779,7 +783,7 @@ struct LLVMIRGenerator {
                 size_t al = ui->align;
                 // find member with the same alignment
                 for (size_t i = 0; i < count; ++i) {
-                    const Type *ET = ui->values[i].type;
+                    const Type *ET = ui->values[i];
                     size_t etal = SCOPES_GET_RESULT(align_of(ET));
                     if (etal == al) {
                         size_t remsz = sz - SCOPES_GET_RESULT(size_of(ET));

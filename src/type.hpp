@@ -36,6 +36,7 @@ struct Const;
     T(TK_Vector, "type-kind-vector", VectorType) \
     T(TK_Tuple, "type-kind-tuple", TupleType) \
     T(TK_Union, "type-kind-union", UnionType) \
+    T(TK_Keyed, "type-kind-keyed", KeyedType) \
     T(TK_Typename, "type-kind-typename", TypenameType) \
     T(TK_Function, "type-kind-function", FunctionType) \
     T(TK_Image, "type-kind-image", ImageType) \
@@ -47,22 +48,6 @@ enum TypeKind {
     B_TYPE_KIND()
 #undef T
 };
-
-//------------------------------------------------------------------------------
-
-struct KeyedType {
-    Symbol key;
-    const Type *type;
-
-    KeyedType();
-    KeyedType(const Type *type);
-    KeyedType(Symbol key, const Type *type);
-    size_t hash() const;
-    bool operator ==(const KeyedType &other) const;
-    bool operator !=(const KeyedType &other) const;
-};
-
-typedef std::vector<KeyedType> KeyedTypes;
 
 //------------------------------------------------------------------------------
 
@@ -152,6 +137,7 @@ typedef std::vector<const Type *> ArgTypes;
     T(TYPE_Vector, "vector") \
     T(TYPE_Tuple, "tuple") \
     T(TYPE_Union, "union") \
+    T(TYPE_Keyed, "Keyed") \
     T(TYPE_Typename, "typename") \
     T(TYPE_Arguments, "Arguments") \
     T(TYPE_Raises, "Raises") \
