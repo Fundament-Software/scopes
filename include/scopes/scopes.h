@@ -182,11 +182,9 @@ sc_value_t *sc_if_new();
 void sc_if_append_then_clause(sc_value_t *value, sc_value_t *cond, sc_value_t *body);
 void sc_if_append_else_clause(sc_value_t *value, sc_value_t *body);
 
-sc_value_t *sc_symbol_value_new(sc_symbol_t name, const sc_type_t *type);
+sc_value_t *sc_parameter_new(sc_symbol_t name, const sc_type_t *type);
 
 sc_value_t *sc_call_new(sc_value_t *callee, int numargs, sc_value_t **args);
-
-sc_value_t *sc_let_new(int numparams, sc_value_t **params, int numvalues, sc_value_t **values);
 
 sc_value_t *sc_loop_new(int numparams, sc_value_t **params, int numargs, sc_value_t **args, sc_value_t *body);
 

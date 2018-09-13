@@ -82,9 +82,9 @@ struct Expander {
 
     ~Expander() {}
 
-    SCOPES_RESULT(Value *) expand_block(const Anchor *anchor, const List *it) {
+    SCOPES_RESULT(Value *) expand_expression(const Anchor *anchor, const List *it) {
         SCOPES_RESULT_TYPE(Value *);
-        Block *block = Block::from(anchor);
+        Expression *expr = nullptr;
         while (it) {
             next = it->next;
             if (!last_expression()) {
@@ -93,10 +93,15 @@ struct Expander {
                     env->set_doc(doc);
                 }
             }
-            block->append(SCOPES_GET_RESULT(expand(it->at)));
+            if (!expr) {
+                expr = Expression::from(anchor);
+            }
+            expr->append(SCOPES_GET_RESULT(expand(it->at)));
             it = next;
         }
-        return block->canonicalize();
+        if (expr)
+            return expr;
+        return ArgumentList::from(anchor);
     }
 
     SCOPES_RESULT(Value *) expand_syntax_extend(const List *it) {
@@ -108,7 +113,7 @@ struct Expander {
         // skip head
         it = it->next;
 
-        auto scopeparam = SymbolValue::from(_anchor, SYM_Unnamed, TYPE_Scope);
+        auto scopeparam = Parameter::from(_anchor, SYM_Unnamed, TYPE_Scope);
         Template *func = Template::from(_anchor, Symbol(KW_SyntaxExtend), {scopeparam});
         func->scope = astscope;
 
@@ -117,29 +122,29 @@ struct Expander {
 
         Expander subexpr(subenv, func);
 
-        func->value = SCOPES_GET_RESULT(subexpr.expand_block(_anchor, it));
+        func->value = SCOPES_GET_RESULT(subexpr.expand_expression(_anchor, it));
 
         auto node = SyntaxExtend::from(_anchor, func, next, env);
         next = EOL;
         return node;
     }
 
-    SCOPES_RESULT(SymbolValue *) expand_parameter(Value *value, Value *node = nullptr) {
-        SCOPES_RESULT_TYPE(SymbolValue *);
+    SCOPES_RESULT(Parameter *) expand_parameter(Value *value, Value *node = nullptr) {
+        SCOPES_RESULT_TYPE(Parameter *);
         const Anchor *anchor = value->anchor();
-        if (isa<SymbolValue>(value)) {
-            return cast<SymbolValue>(value);
+        if (isa<Parameter>(value)) {
+            return cast<Parameter>(value);
         } else {
             Symbol sym = SCOPES_GET_RESULT(extract_symbol_constant(value));
-            if (node && node->is_symbolic()) {
+            if (node && node->is_pure()) {
                 env->bind(sym, node);
                 return nullptr;
             } else {
-                SymbolValue *param = nullptr;
+                Parameter *param = nullptr;
                 if (ends_with_parenthesis(sym)) {
-                    param = SymbolValue::variadic_from(anchor, sym);
+                    param = Parameter::variadic_from(anchor, sym);
                 } else {
-                    param = SymbolValue::from(anchor, sym);
+                    param = Parameter::from(anchor, sym);
                 }
                 env->bind(sym, param);
                 return param;
@@ -237,7 +242,7 @@ struct Expander {
             }
         }
 
-        func->value = SCOPES_GET_RESULT(subexpr.expand_block(_anchor, it));
+        func->value = SCOPES_GET_RESULT(subexpr.expand_expression(_anchor, it));
 
         return func;
     }
@@ -258,7 +263,7 @@ struct Expander {
 
         Label *nextstate = Label::continuation_from(_anchor, Symbol(SYM_Unnamed));
 
-        SCOPES_CHECK_RESULT(expand_block(block, nextstate));
+        SCOPES_CHECK_RESULT(expand_expression(block, nextstate));
 
         state = nextstate;
         // read parameter names
@@ -279,7 +284,7 @@ struct Expander {
 
         Scope *subenv = Scope::from(env);
         Expander subexpr(subenv, astscope);
-        return subexpr.expand_block(_anchor, it);
+        return subexpr.expand_expression(_anchor, it);
     }
 
     bool is_equal_token(Value *name) {
@@ -326,7 +331,7 @@ struct Expander {
 
         auto loop = Loop::from(_anchor);
 
-        SymbolValues syms;
+        Parameters syms;
         Values exprs;
 
         it = values;
@@ -348,7 +353,7 @@ struct Expander {
         loop->params = syms;
         loop->args = exprs;
 
-        loop->value = SCOPES_GET_RESULT(expand_block(_anchor, next));
+        loop->value = SCOPES_GET_RESULT(expand_expression(_anchor, next));
         return loop;
     }
 
@@ -363,7 +368,6 @@ struct Expander {
 
         auto _anchor = get_active_anchor();
 
-        SymbolValues syms;
         Values exprs;
 
         const Type *T = try_get_const_type(it->at);
@@ -385,16 +389,20 @@ struct Expander {
                 Expander subexp(env, astscope);
                 subexp.next = it->next;
                 Value *node = SCOPES_GET_RESULT(subexp.expand(it->at));
+                if (!node->is_pure())
+                    exprs.push_back(node);
                 it = subexp.next;
                 if (it) {
                     SCOPES_ANCHOR(it->at->anchor());
                     SCOPES_LOCATION_ERROR(String::from("extraneous argument"));
                 }
-                auto sym = SCOPES_GET_RESULT(expand_parameter(paramval, node));
-                if (sym) {
-                    syms.push_back(sym);
+
+                Symbol sym = SCOPES_GET_RESULT(extract_symbol_constant(paramval));
+                if (!ends_with_parenthesis(sym)) {
+                    node = ExtractArgument::from(paramval->anchor(), node, 0);
                     exprs.push_back(node);
                 }
+                env->bind(sym, node);
                 equit = equit->next;
             }
         } else {
@@ -433,6 +441,8 @@ struct Expander {
                 return last_entry;
             }
 
+            Values args;
+
             const List *params = it;
 
             it = values;
@@ -441,21 +451,51 @@ struct Expander {
             Expander subexp(env, astscope);
             while (it) {
                 subexp.next = it->next;
-                exprs.push_back(SCOPES_GET_RESULT(subexp.expand(it->at)));
+                auto node = SCOPES_GET_RESULT(subexp.expand(it->at));
+                if (!node->is_pure())
+                    exprs.push_back(node);
+                args.push_back(node);
                 it = subexp.next;
             }
 
+            int index = 0;
+            int lastarg = (int)args.size() - 1;
             it = params;
             // read parameter names
             while (it != endit) {
-                syms.push_back(SCOPES_GET_RESULT(expand_parameter(it->at)));
+                auto paramval = it->at;
+                Symbol sym = SCOPES_GET_RESULT(extract_symbol_constant(paramval));
+                if (!ends_with_parenthesis(sym)) {
+                    auto arg = args[std::min(lastarg, index)];
+                    auto indexed = ExtractArgument::from(paramval->anchor(), arg, std::max(0, index - lastarg));
+                    exprs.push_back(indexed);
+                    env->bind(sym, indexed);
+                } else {
+                    if (it->next != endit) {
+                        SCOPES_ANCHOR(paramval->anchor());
+                        SCOPES_EXPECT_ERROR(error_variadic_symbol_not_in_last_place());
+                    }
+                    if (index == lastarg) {
+                        env->bind(sym, args[index]);
+                    } else {
+                        auto arglist = ArgumentList::from(paramval->anchor());
+                        for (int j = index; j <= lastarg; ++j) {
+                            arglist->append(args[j]);
+                        }
+                        env->bind(sym, arglist);
+                    }
+                }
+
                 it = it->next;
+                index++;
             }
         }
 
-        auto let = Let::from(_anchor, syms, exprs);
-
-        return let;
+        if (exprs.empty())
+            return ArgumentList::from(_anchor);
+        auto result = Expression::from(_anchor, exprs, ArgumentList::from(_anchor));
+        result->scoped = false;
+        return result;
     }
 
     // quote <value> ...
@@ -549,7 +589,7 @@ struct Expander {
 
             subexp.env = Scope::from(env);
             ifexpr->append(anchor, cond,
-                SCOPES_GET_RESULT(subexp.expand_block(anchor, it)));
+                SCOPES_GET_RESULT(subexp.expand_expression(anchor, it)));
         }
 
         it = branches[lastidx];
@@ -559,7 +599,7 @@ struct Expander {
             Expander subexp(Scope::from(env), astscope);
 
             ifexpr->append(anchor,
-                SCOPES_GET_RESULT(subexp.expand_block(anchor, it)));
+                SCOPES_GET_RESULT(subexp.expand_expression(anchor, it)));
         }
 
         return ifexpr->canonicalize();
@@ -867,7 +907,7 @@ SCOPES_RESULT(Template *) expand_inline(Template *astscope, Value *expr, Scope *
 
     Scope *subenv = scope?scope:globals;
     Expander subexpr(subenv, astscope);
-    mainfunc->value = SCOPES_GET_RESULT(subexpr.expand_block(anchor, list));
+    mainfunc->value = SCOPES_GET_RESULT(subexpr.expand_expression(anchor, list));
 
     return mainfunc;
 }
@@ -882,7 +922,7 @@ SCOPES_RESULT(Template *) expand_module(Value *expr, Scope *scope) {
 
     Scope *subenv = scope?scope:globals;
     Expander subexpr(subenv, mainfunc);
-    mainfunc->value = SCOPES_GET_RESULT(subexpr.expand_block(anchor, list));
+    mainfunc->value = SCOPES_GET_RESULT(subexpr.expand_expression(anchor, list));
 
     return mainfunc;
 }

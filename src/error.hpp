@@ -78,7 +78,7 @@ void location_message(const Anchor *anchor, const String* str);
 //------------------------------------------------------------------------------
 
 struct Value;
-struct SymbolValue;
+struct Parameter;
 struct Template;
 
 // specializer errors
@@ -88,7 +88,7 @@ SCOPES_RESULT(void) error_argument_count_mismatch(int needed, int got);
 SCOPES_RESULT(void) error_invalid_operands(const Type *A, const Type *B);
 SCOPES_RESULT(void) error_argument_type_mismatch(const Type *expected, const Type *got);
 SCOPES_RESULT(void) error_constant_expected(Value *value);
-SCOPES_RESULT(void) error_unbound_symbol(SymbolValue *value);
+SCOPES_RESULT(void) error_unbound_symbol(Parameter *value);
 SCOPES_RESULT(void) error_cannot_merge_expression_types(const Type *T1, const Type *T2);
 SCOPES_RESULT(void) error_noreturn_not_last_expression();
 SCOPES_RESULT(void) error_cannot_type_builtin(const Builtin &builtin);
@@ -101,7 +101,7 @@ SCOPES_RESULT(void) error_cannot_find_frame(Template *func);
 
 // code generator errors
 SCOPES_RESULT(void) error_gen_invalid_call_type(const char *target, Value *callee);
-SCOPES_RESULT(void) error_gen_unbound_symbol(const char *target, SymbolValue *value);
+SCOPES_RESULT(void) error_gen_unbound_symbol(const char *target, Parameter *value);
 
 //------------------------------------------------------------------------------
 

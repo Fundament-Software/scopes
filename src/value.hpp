@@ -22,14 +22,11 @@ struct Scope;
 
 #define SCOPES_VALUE_KIND() \
     T(VK_Function, "value-kind-function", Function) \
-    T(VK_Symbol, "value-kind-symbol", SymbolValue) \
-    T(VK_ArgumentList, "value-kind-argumentlist", ArgumentList) \
-    T(VK_ExtractArgument, "value-kind-extractargument", ExtractArgument) \
+    T(VK_Parameter, "value-kind-parameter", Parameter) \
     /* template-only */ \
     T(VK_Template, "value-kind-template", Template) \
-    T(VK_Block, "value-kind-block", Block) \
     T(VK_Keyed, "value-kind-keyed", Keyed) \
-    T(VK_Let, "value-kind-let", Let) \
+    T(VK_Expression, "value-kind-expression", Expression) \
     T(VK_SyntaxExtend, "value-kind-syntax-extend", SyntaxExtend) \
     /* instructions (Instruction::classof) */ \
     T(VK_If, "value-kind-if", If) \
@@ -40,6 +37,8 @@ struct Scope;
     T(VK_Repeat, "value-kind-repeat", Repeat) \
     T(VK_Return, "value-kind-return", Return) \
     T(VK_Raise, "value-kind-raise", Raise) \
+    T(VK_ArgumentList, "value-kind-argumentlist", ArgumentList) \
+    T(VK_ExtractArgument, "value-kind-extractargument", ExtractArgument) \
     /* constants (Const::classof) */ \
     T(VK_Extern, "value-kind-extern", Extern) \
     T(VK_ConstInt, "value-kind-const-int", ConstInt) \
@@ -66,7 +65,7 @@ struct Value;
 struct Block;
 struct Instruction;
 
-typedef std::vector<SymbolValue *> SymbolValues;
+typedef std::vector<Parameter *> Parameters;
 typedef std::vector<Value *> Values;
 typedef std::vector<Instruction *> Instructions;
 typedef std::vector<Const *> Constants;
@@ -89,13 +88,22 @@ struct Value {
     void set_type(const Type *type);
     const Type *get_type() const;
     void change_type(const Type *type);
-    bool is_symbolic() const;
+    bool is_pure() const;
 private:
     const ValueKind _kind;
     const Type *_type;
 
 protected:
     const Anchor *_anchor;
+};
+
+//------------------------------------------------------------------------------
+
+struct Block {
+    void append(Value *node);
+    bool empty() const;
+
+    Values body;
 };
 
 //------------------------------------------------------------------------------
@@ -139,15 +147,15 @@ struct ArgumentList : Value {
 
 //------------------------------------------------------------------------------
 
-struct ExtractArgument : Value {
+struct ExtractArgument : Instruction {
     static bool classof(const Value *T);
 
     ExtractArgument(const Anchor *anchor, Value *value, int index);
 
     static ExtractArgument *from(const Anchor *anchor, Value *value, int index);
 
-    Value *value;
     int index;
+    Value *value;
 };
 
 //------------------------------------------------------------------------------
@@ -155,19 +163,19 @@ struct ExtractArgument : Value {
 struct Template : Value {
     static bool classof(const Value *T);
 
-    Template(const Anchor *anchor, Symbol name, const SymbolValues &params, Value *value);
+    Template(const Anchor *anchor, Symbol name, const Parameters &params, Value *value);
 
     bool is_forward_decl() const;
     void set_inline();
     bool is_inline() const;
-    void append_param(SymbolValue *sym);
+    void append_param(Parameter *sym);
 
     static Template *from(
         const Anchor *anchor, Symbol name,
-        const SymbolValues &params = {}, Value *value = nullptr);
+        const Parameters &params = {}, Value *value = nullptr);
 
     Symbol name;
-    SymbolValues params;
+    Parameters params;
     Value *value;
     bool _inline;
     const String *docstring;
@@ -179,17 +187,17 @@ struct Template : Value {
 struct Function : Value {
     static bool classof(const Value *T);
 
-    Function(const Anchor *anchor, Symbol name, const SymbolValues &params, Value *value);
+    Function(const Anchor *anchor, Symbol name, const Parameters &params);
 
     static Function *from(
         const Anchor *anchor, Symbol name,
-        const SymbolValues &params, Value *value);
+        const Parameters &params);
 
-    void append_param(SymbolValue *sym);
+    void append_param(Parameter *sym);
 
     Symbol name;
-    SymbolValues params;
-    Value *value;
+    Parameters params;
+    Block body;
     const String *docstring;
     const Type *return_type;
     const Type *except_type;
@@ -207,19 +215,17 @@ struct Function : Value {
 
 //------------------------------------------------------------------------------
 
-struct Block : Value {
+struct Expression : Value {
     static bool classof(const Value *T);
 
-    Block(const Anchor *anchor, const Values &nodes, Value *value);
+    Expression(const Anchor *anchor, const Values &nodes, Value *value);
     void append(Value *node);
 
-    static Block *from(const Anchor *anchor, const Values &nodes = {}, Value *value = nullptr);
-
-    void strip_constants();
-    Value *canonicalize();
+    static Expression *from(const Anchor *anchor, const Values &nodes = {}, Value *value = nullptr);
 
     Values body;
     Value *value;
+    bool scoped;
 };
 
 //------------------------------------------------------------------------------
@@ -227,6 +233,7 @@ struct Block : Value {
 struct Clause {
     const Anchor *anchor;
     Value *cond;
+    Block body;
     Value *value;
 
     Clause() : anchor(nullptr), cond(nullptr), value(nullptr) {}
@@ -259,27 +266,29 @@ struct If : Instruction {
 struct Try : Instruction {
     static bool classof(const Value *T);
 
-    Try(const Anchor *anchor, Value *try_body, SymbolValue *except_param, Value *except_body);
+    Try(const Anchor *anchor, Value *try_body, Parameter *except_param, Value *except_body);
 
     static Try *from(const Anchor *anchor,
         Value *try_body = nullptr,
-        SymbolValue *except_param = nullptr,
+        Parameter *except_param = nullptr,
         Value *except_body = nullptr);
 
-    Value *try_body;
-    SymbolValue *except_param;
-    Value *except_body;
+    Block try_body;
+    Value *try_value;
+    Parameter *except_param;
+    Block except_body;
+    Value *except_value;
     const Type *raise_type;
 };
 
 //------------------------------------------------------------------------------
 
-struct SymbolValue : Value {
+struct Parameter : Value {
     static bool classof(const Value *T);
 
-    SymbolValue(const Anchor *anchor, Symbol name, const Type *type, bool variadic);
-    static SymbolValue *from(const Anchor *anchor, Symbol name = SYM_Unnamed, const Type *type = nullptr);
-    static SymbolValue *variadic_from(const Anchor *anchor, Symbol name = SYM_Unnamed, const Type *type = nullptr);
+    Parameter(const Anchor *anchor, Symbol name, const Type *type, bool variadic);
+    static Parameter *from(const Anchor *anchor, Symbol name = SYM_Unnamed, const Type *type = nullptr);
+    static Parameter *variadic_from(const Anchor *anchor, Symbol name = SYM_Unnamed, const Type *type = nullptr);
 
     bool is_variadic() const;
 
@@ -311,28 +320,16 @@ struct Call : Instruction {
 
 //------------------------------------------------------------------------------
 
-struct Let : Value {
-    static bool classof(const Value *T);
-
-    Let(const Anchor *anchor, const SymbolValues &params, const Values &args);
-
-    static Let *from(const Anchor *anchor, const SymbolValues &params = {}, const Values &args = {});
-
-    SymbolValues params;
-    Values args;
-};
-
-//------------------------------------------------------------------------------
-
 struct Loop : Instruction {
     static bool classof(const Value *T);
 
-    Loop(const Anchor *anchor, const SymbolValues &params, const Values &args, Value *value);
+    Loop(const Anchor *anchor, const Parameters &params, const Values &args, Value *value);
 
-    static Loop *from(const Anchor *anchor, const SymbolValues &params = {}, const Values &args = {}, Value *value = nullptr);
+    static Loop *from(const Anchor *anchor, const Parameters &params = {}, const Values &args = {}, Value *value = nullptr);
 
-    SymbolValues params;
+    Parameters params;
     Values args;
+    Block body;
     Value *value;
     const Type *return_type;
 };

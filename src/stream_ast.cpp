@@ -8,8 +8,9 @@
 #include "value.hpp"
 #include "type.hpp"
 #include "dyn_cast.inc"
+#include "types.hpp"
 
-#include <unordered_set>
+#include <unordered_map>
 
 namespace scopes {
 
@@ -45,11 +46,12 @@ struct StreamAST : StreamAnchors {
     bool line_anchors;
     bool atom_anchors;
     bool newlines;
+    int nextid;
 
-    std::unordered_set<const Value *> visited;
+    std::unordered_map<const Value *, int> visited;
 
     StreamAST(StyledStream &_ss, const StreamASTFormat &_fmt)
-        : StreamAnchors(_ss), fmt(_fmt) {
+        : StreamAnchors(_ss), fmt(_fmt), nextid(0) {
         line_anchors = (fmt.anchors == StreamASTFormat::Line);
         atom_anchors = (fmt.anchors == StreamASTFormat::All);
         newlines = fmt.newlines;
@@ -109,20 +111,57 @@ struct StreamAST : StreamAnchors {
         }
     }
 
+    void stream_block(const Block &block, int depth, int maxdepth) {
+        if (block.empty())
+            return;
+        stream_newline();
+        stream_indent(depth);
+        ss << Style_Keyword << "body" << Style_None;
+        for (int i = 0; i < block.body.size(); ++i) {
+            stream_newline();
+            walk(block.body[i], depth+1, maxdepth);
+        }
+    }
+
     // old Any printing reference:
     // https://bitbucket.org/duangle/scopes/src/dfb69b02546e859b702176c58e92a63de3461d77/src/any.cpp
 
     void walk(const Value *node, int depth, int maxdepth) {
-        const Anchor *anchor = node->anchor();
-
         stream_indent(depth);
+        if (!node) {
+            ss << Style_Error << "<null>" << Style_None;
+            return;
+        }
+
+        const Anchor *anchor = node->anchor();
         if (line_anchors) {
             stream_anchor(anchor);
         }
 
-        bool is_new = !visited.count(node);
-        if (is_new)
-            visited.insert(node);
+        auto it = visited.find(node);
+        int id = -1;
+        bool is_new = true;
+        if (it == visited.end()) {
+            if (!node->is_pure()) {
+                id = nextid++;
+            }
+            visited.insert({node, id});
+        } else {
+            is_new = false;
+            id = it->second;
+        }
+
+        if (!node->is_pure()) {
+            ss << Style_Operator << "%" << id << Style_None;
+            if (is_new) {
+                ss << " " << Style_Operator << "=" << " " << Style_None;
+            } else {
+                if (node->is_typed()) {
+                    stream_type_suffix(node->get_type());
+                }
+                return;
+            }
+        }
 
         switch(node->kind()) {
         case VK_Template: {
@@ -170,18 +209,18 @@ struct StreamAST : StreamAnchors {
                     stream_newline();
                     walk(val->params[i], depth+1, maxdepth);
                 }
-                if (val->value) {
-                    stream_newline();
-                    walk(val->value, depth+1, maxdepth);
-                }
+                stream_block(val->body, depth+1, maxdepth);
             } else {
                 ss << " <...>";
             }
         } break;
-        case VK_Block: {
+        case VK_Expression: {
             stream_type_prefix(node);
-            auto val = cast<Block>(node);
-            ss << Style_Keyword << "Block" << Style_None;
+            auto val = cast<Expression>(node);
+            ss << Style_Keyword << "Expression" << Style_None;
+            if (!val->scoped) {
+                ss << " " << Style_Keyword << "inline" << Style_None;
+            }
             for (int i = 0; i < val->body.size(); ++i) {
                 stream_newline();
                 walk(val->body[i], depth+1, maxdepth);
@@ -201,17 +240,19 @@ struct StreamAST : StreamAnchors {
                 auto &&expr = val->clauses[i];
                 if (expr.cond)
                     walk(expr.cond, depth+2, maxdepth);
+                stream_block(expr.body, depth+2, maxdepth);
                 stream_newline();
                 walk(expr.value, depth+2, maxdepth);
             }
             stream_newline();
             stream_indent(depth+1);
             ss << Style_Keyword << "else" << Style_None;
+            stream_block(val->else_clause.body, depth+2, maxdepth);
             stream_newline();
             walk(val->else_clause.value, depth+2, maxdepth);
         } break;
-        case VK_Symbol: {
-            auto val = cast<SymbolValue>(node);
+        case VK_Parameter: {
+            auto val = cast<Parameter>(node);
             ss << Style_Symbol << val->name.name()->data
                 << "$" << (void *)val << Style_None;
             if (val->is_variadic()) {
@@ -234,19 +275,6 @@ struct StreamAST : StreamAnchors {
             walk(val->callee, depth+1, maxdepth);
             write_arguments(val->args, depth, maxdepth);
         } break;
-        case VK_Let: {
-            stream_type_prefix(node);
-            auto val = cast<Let>(node);
-            ss << Style_Keyword << "Let" << Style_None;
-            for (int i = 0; i < val->params.size(); ++i) {
-                stream_newline();
-                walk(val->params[i], depth+1, maxdepth);
-            }
-            for (int i = 0; i < val->args.size(); ++i) {
-                stream_newline();
-                walk(val->args[i], depth+2, maxdepth);
-            }
-        } break;
         case VK_ArgumentList: {
             stream_type_prefix(node);
             auto val = cast<ArgumentList>(node);
@@ -264,6 +292,14 @@ struct StreamAST : StreamAnchors {
             stream_newline();
             walk(val->value, depth+1, maxdepth);
         } break;
+        case VK_Keyed: {
+            stream_type_prefix(node);
+            auto val = cast<Keyed>(node);
+            ss << Style_Keyword << "Keyed" << Style_None;
+            ss << " " << val->key;
+            stream_newline();
+            walk(val->value, depth+1, maxdepth);
+        } break;
         case VK_Loop: {
             stream_type_prefix(node);
             auto val = cast<Loop>(node);
@@ -276,6 +312,7 @@ struct StreamAST : StreamAnchors {
                 stream_newline();
                 walk(val->args[i], depth+2, maxdepth);
             }
+            stream_block(val->body, depth+2, maxdepth);
             stream_newline();
             walk(val->value, depth+1, maxdepth);
         } break;
@@ -293,9 +330,18 @@ struct StreamAST : StreamAnchors {
                 if (T != TYPE_Symbol)
                     stream_type_suffix(T);
             } else {
-                ss << val->value;
-                if (T != TYPE_I32)
-                    stream_type_suffix(T);
+                auto TT = cast<IntegerType>(storage_type(T).assert_ok());
+                if (TT == TYPE_Bool) {
+                    ss << (bool)val->value;
+                } else {
+                    if (TT->issigned) {
+                        ss << (int64_t)val->value;
+                    } else {
+                        ss << val->value;
+                    }
+                    if (T != TYPE_I32)
+                        stream_type_suffix(T);
+                }
             }
         } break;
         case VK_ConstReal: {

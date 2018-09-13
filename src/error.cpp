@@ -195,7 +195,7 @@ SCOPES_RESULT(void) error_constant_expected(Value *value) {
     SCOPES_LOCATION_ERROR(ss.str());
 }
 
-SCOPES_RESULT(void) error_unbound_symbol(SymbolValue *value) {
+SCOPES_RESULT(void) error_unbound_symbol(Parameter *value) {
     SCOPES_RESULT_TYPE(void);
     print_definition_anchor(value);
     StyledString ss;
@@ -277,7 +277,7 @@ SCOPES_RESULT(void) error_gen_invalid_call_type(const char *target, Value *calle
     SCOPES_LOCATION_ERROR(ss.str());
 }
 
-SCOPES_RESULT(void) error_gen_unbound_symbol(const char *target, SymbolValue *value) {
+SCOPES_RESULT(void) error_gen_unbound_symbol(const char *target, Parameter *value) {
     SCOPES_RESULT_TYPE(void);
     print_definition_anchor(value);
     StyledString ss;

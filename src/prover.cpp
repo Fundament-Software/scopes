@@ -148,6 +148,7 @@ struct ASTContext {
     EvalTarget target;
     Loop *loop;
     Try *_try;
+    Block *block;
 
     const Type *transform_return_type(const Type *T) const {
         if (is_returning(T) && is_target_void())
@@ -164,21 +165,25 @@ struct ASTContext {
     ASTContext with_symbol_target() const { return with_target(EvalTarget_Symbol); }
 
     ASTContext with_target(EvalTarget target) const {
-        return ASTContext(frame, target, loop, _try);
+        return ASTContext(frame, target, loop, _try, block);
     }
 
     ASTContext for_loop(Loop *loop) const {
-        return ASTContext(frame, EvalTarget_Symbol, loop, _try);
+        return ASTContext(frame, EvalTarget_Symbol, loop, _try, block);
     }
 
     ASTContext for_try(Try *_try) const {
-        return ASTContext(frame, target, loop, _try);
+        return ASTContext(frame, target, loop, _try, block);
+    }
+
+    ASTContext with_block(Block &_block) const {
+        return ASTContext(frame, target, loop, _try, &_block);
     }
 
     ASTContext() {}
 
-    ASTContext(Function *_frame, EvalTarget _target, Loop *_loop, Try *xtry) :
-        frame(_frame), target(_target), loop(_loop), _try(xtry) {
+    ASTContext(Function *_frame, EvalTarget _target, Loop *_loop, Try *xtry, Block *_block) :
+        frame(_frame), target(_target), loop(_loop), _try(xtry), block(_block) {
     }
 };
 
@@ -227,12 +232,12 @@ static bool wait_for_return_type(Function *f) {
     return (f->return_type != nullptr);
 }
 
-static SCOPES_RESULT(void) specialize_jobs(const ASTContext &ctx, int count, Value **nodes) {
+static SCOPES_RESULT(void) specialize_jobs(const ASTContext &ctx, int count, Value **nodes, Block **blocks) {
     SCOPES_RESULT_TYPE(void);
     SpecializeJob local_jobs[count];
     for (int i = 0; i < count; ++i) {
         auto &&job = local_jobs[i];
-        job.ctx = ctx;
+        job.ctx = ctx.with_block(*blocks[i]);
         job.node = nodes[i];
         job.done = false;
         coro_stack_alloc(&job.stack, 0);
@@ -287,60 +292,84 @@ static SCOPES_RESULT(const Type *) merge_return_type(const Type *T1, const Type 
     SCOPES_EXPECT_ERROR(error_cannot_merge_expression_types(T1, T2));
 }
 
-static bool is_useless(Value *node) {
-    if (Const::classof(node)) return true;
-    switch(node->kind()) {
-    case VK_Template:
-    case VK_Function:
-    case VK_Symbol:
-        return true;
-    case VK_Let: {
-        auto let = cast<Let>(node);
-        if (!let->params.size())
-            return true;
-    } break;
-    default: break;
+static const Type *arguments_type_from_arguments(const Values &values) {
+    ArgTypes types;
+    for (auto arg : values) {
+        types.push_back(arg->get_type());
     }
-    return false;
+    return arguments_type(types);
 }
 
-static SCOPES_RESULT(Value *) specialize_Block(const ASTContext &ctx, Block *block) {
+static Value *build_argument_list(const Anchor *anchor, const Values &values) {
+    if (values.size() == 1) {
+        return values[0];
+    }
+    ArgumentList *newnlist = ArgumentList::from(anchor, values);
+    newnlist->set_type(arguments_type_from_arguments(values));
+    return newnlist;
+}
+
+static SCOPES_RESULT(Value *) specialize_Expression(const ASTContext &ctx, Expression *expr) {
     SCOPES_RESULT_TYPE(Value *);
-    Block *newblock = Block::from(block->anchor());
-    auto subctx = ctx.with_void_target();
-    for (auto &&src : block->body) {
-        auto newsrc = SCOPES_GET_RESULT(specialize(subctx, src));
+    ASTContext subctx;
+    if (expr->scoped)
+        subctx = ctx.with_void_target();
+    else
+        subctx = ctx.with_symbol_target();
+    int count = (int)expr->body.size();
+    for (int i = 0; i < count; ++i) {
+        auto newsrc = SCOPES_GET_RESULT(specialize(subctx, expr->body[i]));
         if (!is_returning(newsrc->get_type())) {
             SCOPES_ANCHOR(newsrc->anchor());
             SCOPES_CHECK_RESULT(error_noreturn_not_last_expression());
         }
-        if (!is_useless(newsrc)) {
-            newblock->append(newsrc);
-        }
     }
-    newblock->value = SCOPES_GET_RESULT(specialize(ctx, block->value));
-    auto rtype = ctx.transform_return_type(newblock->value->get_type());
-    newblock->set_type(rtype);
-    return newblock->canonicalize();
+    return SCOPES_GET_RESULT(specialize(ctx, expr->value));
 }
 
-static Value *extract_argument(Value *value, int index) {
+#if 0
+static void specialize_block(const ASTContext &ctx, Block *block) {
+    SCOPES_RESULT_TYPE(Value *);
+    auto subctx = ctx.with_void_target();
+    assert(!block->body.empty());
+    int count = (int)block->body.size();
+    for (int i = 0; i < count; ++i) {
+        auto newsrc = SCOPES_GET_RESULT(specialize(subctx, block->body[i]));
+        if (!is_returning(newsrc->get_type()) && ((i+1) < count)) {
+            SCOPES_ANCHOR(newsrc->anchor());
+            SCOPES_CHECK_RESULT(error_noreturn_not_last_expression());
+        }
+    }
+#if 0
+    auto rtype = ctx.transform_return_type(lastsrc->get_type());
+    newblock->set_type(rtype);
+    return newblock->canonicalize();
+#endif
+}
+#endif
+
+static Value *extract_argument(const ASTContext &ctx, Value *value, int index) {
+    assert ((index >= 0) && (index < 10));
     const Anchor *anchor = value->anchor();
     const Type *T = value->get_type();
     if (!is_returning(T))
         return value;
     if (is_arguments_type(T)) {
         auto rt = cast<TupleType>(storage_type(T).assert_ok());
-        const Type *T = rt->type_at_index_or_nothing(index);
-        if (T == TYPE_Nothing) {
+        const Type *AT = rt->type_at_index_or_nothing(index);
+        if (AT == TYPE_Nothing) {
             return ConstTuple::none_from(anchor);
         } else {
             auto arglist = dyn_cast<ArgumentList>(value);
             if (arglist) {
+                assert ((index >= 0) && (index < arglist->values.size()));
                 return arglist->values[index];
             } else {
                 auto result = ExtractArgument::from(anchor, value, index);
-                result->set_type(T);
+                result->set_type(AT);
+                assert(!result->is_pure());
+                assert(!result->block);
+                ctx.block->append(result);
                 return result;
             }
         }
@@ -369,33 +398,16 @@ static SCOPES_RESULT(void) specialize_arguments(
                 // last argument is appended in full
                 int valcount = (int)rt->values.size();
                 for (int j = 0; j < valcount; ++j) {
-                    outargs.push_back(extract_argument(value, j));
+                    outargs.push_back(extract_argument(ctx, value, j));
                 }
                 break;
             } else {
-                value = extract_argument(value, 0);
+                value = extract_argument(ctx, value, 0);
             }
         }
         outargs.push_back(value);
     }
     return true;
-}
-
-static const Type *arguments_type_from_arguments(const Values &values) {
-    ArgTypes types;
-    for (auto arg : values) {
-        types.push_back(arg->get_type());
-    }
-    return arguments_type(types);
-}
-
-static Value *build_argument_list(const Anchor *anchor, const Values &values) {
-    if (values.size() == 1) {
-        return values[0];
-    }
-    ArgumentList *newnlist = ArgumentList::from(anchor, values);
-    newnlist->set_type(arguments_type_from_arguments(values));
-    return newnlist;
 }
 
 static SCOPES_RESULT(Value *) specialize_ArgumentList(const ASTContext &ctx, ArgumentList *nlist) {
@@ -409,13 +421,14 @@ static SCOPES_RESULT(Value *) specialize_ExtractArgument(
     const ASTContext &ctx, ExtractArgument *node) {
     SCOPES_RESULT_TYPE(Value *);
     auto value = SCOPES_GET_RESULT(specialize(ctx, node->value));
-    return extract_argument(value, node->index);
+    assert((node->index >= 0) && (node->index < 10));
+    return extract_argument(ctx, value, node->index);
 }
 
-// used by Let, Loop and inlined functions
+// used by Loop and inlined functions
 static SCOPES_RESULT(void) specialize_bind_specialized_arguments(const ASTContext &ctx,
-    SymbolValues &outparams, Values &outargs,
-    const SymbolValues &params, const Values &tmpargs, bool inline_constants) {
+    Parameters &outparams, Values &outargs,
+    const Parameters &params, const Values &tmpargs, bool inline_constants) {
     SCOPES_RESULT_TYPE(void);
     int count = (int)params.size();
     for (int i = 0; i < count; ++i) {
@@ -441,10 +454,10 @@ static SCOPES_RESULT(void) specialize_bind_specialized_arguments(const ASTContex
         } else {
             newval = ConstTuple::none_from(oldsym->anchor());
         }
-        if (inline_constants && newval->is_symbolic()) {
+        if (inline_constants && newval->is_pure()) {
             ctx.frame->bind(oldsym, newval);
         } else {
-            auto newsym = SymbolValue::from(oldsym->anchor(), oldsym->name, newval->get_type());
+            auto newsym = Parameter::from(oldsym->anchor(), oldsym->name, newval->get_type());
             ctx.frame->bind(oldsym, newsym);
             outparams.push_back(newsym);
             outargs.push_back(newval);
@@ -454,8 +467,8 @@ static SCOPES_RESULT(void) specialize_bind_specialized_arguments(const ASTContex
 }
 
 static SCOPES_RESULT(void) specialize_bind_arguments(const ASTContext &ctx,
-    SymbolValues &outparams, Values &outargs,
-    const SymbolValues &params, const Values &values, bool inline_constants) {
+    Parameters &outparams, Values &outargs,
+    const Parameters &params, const Values &values, bool inline_constants) {
     SCOPES_RESULT_TYPE(void);
     Values tmpargs;
     SCOPES_CHECK_RESULT(specialize_arguments(ctx, tmpargs, values));
@@ -465,20 +478,12 @@ static SCOPES_RESULT(void) specialize_bind_arguments(const ASTContext &ctx,
 
 static SCOPES_RESULT(Value *) specialize_Try(const ASTContext &ctx, Try *_try) {
     SCOPES_RESULT_TYPE(Value *);
-    auto try_body = SCOPES_GET_RESULT(specialize(ctx, _try->try_body));
+    auto newtry = Try::from(_try->anchor());
+    auto try_value = SCOPES_GET_RESULT(specialize(ctx.with_block(newtry->try_body), _try->try_value));
 
-    auto except_body = SCOPES_GET_RESULT(specialize(ctx, _try->except_body));
+    auto except_value = SCOPES_GET_RESULT(specialize(ctx.with_block(newtry->except_body), _try->except_value));
     assert(false);
-}
-
-static SCOPES_RESULT(Value *) specialize_Let(const ASTContext &ctx, Let *let) {
-    SCOPES_RESULT_TYPE(Value *);
-    SCOPES_ANCHOR(let->anchor());
-    Let *newlet = Let::from(let->anchor());
-    SCOPES_CHECK_RESULT(specialize_bind_arguments(ctx,
-        newlet->params, newlet->args, let->params, let->args, true));
-    newlet->set_type(empty_arguments_type());
-    return newlet;
+    return newtry;
 }
 
 static SCOPES_RESULT(Loop *) specialize_Loop(const ASTContext &ctx, Loop *loop) {
@@ -487,8 +492,10 @@ static SCOPES_RESULT(Loop *) specialize_Loop(const ASTContext &ctx, Loop *loop) 
     Loop *newloop = Loop::from(loop->anchor());
     SCOPES_CHECK_RESULT(specialize_bind_arguments(ctx,
         newloop->params, newloop->args, loop->params, loop->args, false));
-    newloop->value = SCOPES_GET_RESULT(specialize(ctx.for_loop(newloop), loop->value));
-    auto rtype = newloop->value->get_type();
+    auto subctx = ctx.for_loop(newloop).with_block(newloop->body);
+    auto result = SCOPES_GET_RESULT(specialize(subctx, loop->value));
+    auto rtype = result->get_type();
+    newloop->value = result;
     newloop->return_type = SCOPES_GET_RESULT(merge_value_type(ctx, newloop->return_type, rtype));
     newloop->set_type(newloop->return_type);
     return newloop;
@@ -593,7 +600,7 @@ static SCOPES_RESULT(Value *) specialize_SyntaxExtend(const ASTContext &ctx, Syn
 #if 0 //SCOPES_DEBUG_CODEGEN
     StyledStream ss(std::cout);
     std::cout << "syntax-extend non-normalized:" << std::endl;
-    stream_ast(ss, sx->func, StreamASTFormat::debug());
+    stream_ast(ss, sx->func, StreamASTFormat());
     std::cout << std::endl;
 #endif
     Function *fn = SCOPES_GET_RESULT(specialize(frame, sx->func, {TYPE_Scope}));
@@ -869,6 +876,15 @@ repeat:
             StyledStream ss(SCOPES_CERR);
             ss << call->anchor() << " dump:";
             for (auto arg : values) {
+                ss << " ";
+                stream_ast(ss, arg, StreamASTFormat());
+            }
+            return build_argument_list(call->anchor(), values);
+        } break;
+        case FN_DumpTemplate: {
+            StyledStream ss(SCOPES_CERR);
+            ss << call->anchor() << " dump-template:";
+            for (auto arg : call->args) {
                 ss << " ";
                 stream_ast(ss, arg, StreamASTFormat());
             }
@@ -1292,7 +1308,7 @@ static SCOPES_RESULT(Value *) specialize_Call(const ASTContext &ctx, Call *call)
     }
 }
 
-static SCOPES_RESULT(Value *) specialize_SymbolValue(const ASTContext &ctx, SymbolValue *sym) {
+static SCOPES_RESULT(Value *) specialize_Parameter(const ASTContext &ctx, Parameter *sym) {
     SCOPES_RESULT_TYPE(Value *);
     assert(ctx.frame);
     auto value = ctx.frame->resolve(sym);
@@ -1315,6 +1331,7 @@ static SCOPES_RESULT(Value *) specialize_If(const ASTContext &ctx, If *_if) {
             SCOPES_ANCHOR(clause.anchor);
             SCOPES_EXPECT_ERROR(error_invalid_condition_type(newcond));
         }
+        #if 0
         auto maybe_const = dyn_cast<ConstInt>(newcond);
         if (maybe_const) {
             bool istrue = maybe_const->value;
@@ -1327,6 +1344,7 @@ static SCOPES_RESULT(Value *) specialize_If(const ASTContext &ctx, If *_if) {
                 continue;
             }
         }
+        #endif
         clauses.push_back(Clause(clause.anchor, newcond, clause.value));
     }
     else_clause = Clause(_if->else_clause.anchor, _if->else_clause.value);
@@ -1334,14 +1352,17 @@ finalize:
     // run a suspendable job for each branch
     int numclauses = clauses.size() + 1;
     Value *values[numclauses];
+    Block *blocks[numclauses];
     for (int i = 0; i < numclauses; ++i) {
         if ((i + 1) == numclauses) {
             values[i] = else_clause.value;
+            blocks[i] = &else_clause.body;
         } else {
             values[i] = clauses[i].value;
+            blocks[i] = &clauses[i].body;
         }
     }
-    SCOPES_CHECK_RESULT(specialize_jobs(ctx, numclauses, values));
+    SCOPES_CHECK_RESULT(specialize_jobs(ctx, numclauses, values, blocks));
     for (int i = 0; i < numclauses; ++i) {
         SCOPES_ANCHOR(values[i]->anchor());
         #if 0
@@ -1357,10 +1378,6 @@ finalize:
         } else {
             clauses[i].value = values[i];
         }
-    }
-    if (clauses.empty()) {
-        // else is always selected
-        return else_clause.value;
     }
     If *newif = If::from(_if->anchor(), clauses);
     newif->else_clause = else_clause;
@@ -1389,8 +1406,6 @@ SCOPES_RESULT(Value *) specialize(const ASTContext &ctx, Value *node) {
     SCOPES_RESULT_TYPE(Value *);
     assert(node);
     Value *result = ctx.frame->resolve(node);
-    if (!result && node->is_typed())
-        return node;
     if (!result) {
         if (node->is_typed()) {
             result = node;
@@ -1405,6 +1420,10 @@ SCOPES_RESULT(Value *) specialize(const ASTContext &ctx, Value *node) {
 #undef T
             default: assert(false);
             }
+            assert(result);
+            ctx.frame->bind(node, result);
+            assert (ctx.block);
+            ctx.block->append(result);
         }
     }
     if (ctx.target == EvalTarget_Return) {
@@ -1412,12 +1431,40 @@ SCOPES_RESULT(Value *) specialize(const ASTContext &ctx, Value *node) {
             result = SCOPES_GET_RESULT(make_return(ctx, result->anchor(), result));
         }
     }
-    assert(result);
-    #if 1
-    if (node != result)
-        ctx.frame->bind(node, result);
-    #endif
     return result;
+}
+
+// used by Loop and inlined functions
+static SCOPES_RESULT(void) specialize_inline_arguments(const ASTContext &ctx,
+    const Parameters &params, const Values &tmpargs) {
+    SCOPES_RESULT_TYPE(void);
+    int count = (int)params.size();
+    for (int i = 0; i < count; ++i) {
+        auto oldsym = params[i];
+        Value *newval = nullptr;
+        if (oldsym->is_variadic()) {
+            if ((i + 1) < count) {
+                SCOPES_ANCHOR(oldsym->anchor());
+                SCOPES_EXPECT_ERROR(error_variadic_symbol_not_in_last_place());
+            }
+            if ((i + 1) == (int)tmpargs.size()) {
+                newval = tmpargs[i];
+            } else {
+                auto arglist = ArgumentList::from(oldsym->anchor());
+                for (int j = i; j < tmpargs.size(); ++j) {
+                    arglist->append(tmpargs[j]);
+                }
+                arglist->set_type(arguments_type_from_arguments(arglist->values));
+                newval = arglist;
+            }
+        } else if (i < tmpargs.size()) {
+            newval = tmpargs[i];
+        } else {
+            newval = ConstTuple::none_from(oldsym->anchor());
+        }
+        ctx.frame->bind(oldsym, newval);
+    }
+    return true;
 }
 
 SCOPES_RESULT(Value *) specialize_inline(const ASTContext &ctx,
@@ -1426,44 +1473,29 @@ SCOPES_RESULT(Value *) specialize_inline(const ASTContext &ctx,
     Timer sum_specialize_time(TIMER_Specialize);
     assert(func);
     int count = (int)func->params.size();
-    Function *fn = Function::from(func->anchor(), func->name, {}, func->value);
+    Function *fn = Function::from(func->anchor(), func->name, {});
     fn->original = func;
     fn->frame = frame;
 
-    ASTContext subctx(fn, ctx.target, nullptr, nullptr);
-    SymbolValues params;
-    Values args;
-    SCOPES_CHECK_RESULT(specialize_bind_specialized_arguments(subctx,
-        params, args, func->params, nodes, true));
+    ASTContext subctx(fn, ctx.target, nullptr, nullptr, ctx.block);
+    SCOPES_CHECK_RESULT(specialize_inline_arguments(subctx, func->params, nodes));
     SCOPES_ANCHOR(fn->anchor());
-    Value *result_value = fn->value;
-    auto result = specialize(subctx, result_value);
+    Value *result_value = nullptr;
+    auto result = specialize(subctx, func->value);
     if (result.ok()) {
         result_value = result.assert_ok();
     } else {
         add_error_trace(fn);
         SCOPES_RETURN_ERROR();
     }
-    if (!params.empty()) {
-        auto rtype = subctx.transform_return_type(result_value->get_type());
-        auto let = Let::from(fn->anchor());
-        let->params = params;
-        let->args = args;
-        let->set_type(empty_arguments_type());
-        auto block = Block::from(func->anchor(), {let}, result_value);
-        block->set_type(rtype);
-        fn->value = block->canonicalize();
-    } else {
-        fn->value = result_value;
-    }
-    return fn->value;
+    return result_value;
 }
 
 SCOPES_RESULT(Function *) specialize(Function *frame, Template *func, const ArgTypes &types) {
     SCOPES_RESULT_TYPE(Function *);
     Timer sum_specialize_time(TIMER_Specialize);
     assert(func);
-    Function key(func->anchor(), func->name, {}, nullptr);
+    Function key(func->anchor(), func->name, {});
     key.original = func;
     key.frame = frame;
     key.instance_args = types;
@@ -1471,7 +1503,7 @@ SCOPES_RESULT(Function *) specialize(Function *frame, Template *func, const ArgT
     if (it != functions.end())
         return *it;
     int count = (int)func->params.size();
-    Function *fn = Function::from(func->anchor(), func->name, {}, func->value);
+    Function *fn = Function::from(func->anchor(), func->name, {});
     fn->return_type = TYPE_NoReturn;
     fn->except_type = TYPE_NoReturn;
     fn->original = func;
@@ -1485,7 +1517,7 @@ SCOPES_RESULT(Function *) specialize(Function *frame, Template *func, const ArgT
                 SCOPES_EXPECT_ERROR(error_variadic_symbol_not_in_last_place());
             }
             if ((i + 1) == (int)types.size()) {
-                auto newparam = SymbolValue::from(oldparam->anchor(), oldparam->name, types[i]);
+                auto newparam = Parameter::from(oldparam->anchor(), oldparam->name, types[i]);
                 fn->append_param(newparam);
                 fn->bind(oldparam, newparam);
             } else {
@@ -1493,7 +1525,7 @@ SCOPES_RESULT(Function *) specialize(Function *frame, Template *func, const ArgT
                 auto args = ArgumentList::from(oldparam->anchor());
                 for (int j = i; j < types.size(); ++j) {
                     vtypes.push_back(types[j]);
-                    auto newparam = SymbolValue::from(oldparam->anchor(), oldparam->name, types[j]);
+                    auto newparam = Parameter::from(oldparam->anchor(), oldparam->name, types[j]);
                     fn->append_param(newparam);
                     args->values.push_back(newparam);
                 }
@@ -1509,23 +1541,23 @@ SCOPES_RESULT(Function *) specialize(Function *frame, Template *func, const ArgT
                 SCOPES_ANCHOR(oldparam->anchor());
                 SCOPES_CHECK_RESULT(verify(oldparam->get_type(), T));
             }
-            auto newparam = SymbolValue::from(oldparam->anchor(), oldparam->name, T);
+            auto newparam = Parameter::from(oldparam->anchor(), oldparam->name, T);
             fn->append_param(newparam);
             fn->bind(oldparam, newparam);
         }
     }
     functions.insert(fn);
 
-    ASTContext subctx(fn, EvalTarget_Return, nullptr, nullptr);
+    ASTContext subctx(fn, EvalTarget_Return, nullptr, nullptr, &fn->body);
     SCOPES_ANCHOR(fn->anchor());
-    auto result = specialize(subctx, fn->value);
+    auto result = specialize(subctx, func->value);
     if (result.ok()) {
-        fn->value = result.assert_ok();
+        auto expr = result.assert_ok();
+        assert(!is_returning(expr->get_type()));
     } else {
         add_error_trace(fn);
         SCOPES_RETURN_ERROR();
     }
-    assert(!is_returning(fn->value->get_type()));
     fn->complete = true;
     fn->set_type(get_function_type(fn));
     return fn;

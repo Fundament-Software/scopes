@@ -73,7 +73,8 @@ ArgumentList *ArgumentList::from(const Anchor *anchor, const Values &values) {
 //------------------------------------------------------------------------------
 
 ExtractArgument::ExtractArgument(const Anchor *anchor, Value *_value, int _index)
-    : Value(VK_ExtractArgument, anchor), value(_value), index(_index) {
+    : Instruction(VK_ExtractArgument, anchor), index(_index), value(_value) {
+    assert((index < 10) && (index >= 0));
 }
 
 ExtractArgument *ExtractArgument::from(const Anchor *anchor, Value *value, int index) {
@@ -82,7 +83,7 @@ ExtractArgument *ExtractArgument::from(const Anchor *anchor, Value *value, int i
 
 //------------------------------------------------------------------------------
 
-Template::Template(const Anchor *anchor, Symbol _name, const SymbolValues &_params, Value *_value)
+Template::Template(const Anchor *anchor, Symbol _name, const Parameters &_params, Value *_value)
     : Value(VK_Template, anchor),
         name(_name), params(_params), value(_value),
         _inline(false), docstring(nullptr), scope(nullptr) {
@@ -100,26 +101,26 @@ bool Template::is_inline() const {
     return _inline;
 }
 
-void Template::append_param(SymbolValue *sym) {
+void Template::append_param(Parameter *sym) {
     params.push_back(sym);
 }
 
 Template *Template::from(
     const Anchor *anchor, Symbol name,
-    const SymbolValues &params, Value *value) {
+    const Parameters &params, Value *value) {
     return new Template(anchor, name, params, value);
 }
 
 //------------------------------------------------------------------------------
 
-Function::Function(const Anchor *anchor, Symbol _name, const SymbolValues &_params, Value *_value)
+Function::Function(const Anchor *anchor, Symbol _name, const Parameters &_params)
     : Value(VK_Function, anchor),
-        name(_name), params(_params), value(_value),
+        name(_name), params(_params),
         docstring(nullptr), return_type(nullptr), except_type(nullptr),
         frame(nullptr), original(nullptr), complete(false) {
 }
 
-void Function::append_param(SymbolValue *sym) {
+void Function::append_param(Parameter *sym) {
     // verify that the symbol is typed
     assert(sym->is_typed());
     params.push_back(sym);
@@ -158,8 +159,8 @@ void Function::bind(Value *oldnode, Value *newnode) {
 
 Function *Function::from(
     const Anchor *anchor, Symbol name,
-    const SymbolValues &params, Value *value) {
-    return new Function(anchor, name, params, value);
+    const Parameters &params) {
+    return new Function(anchor, name, params);
 }
 
 //------------------------------------------------------------------------------
@@ -184,27 +185,14 @@ Extern *Extern::from(const Anchor *anchor, const Type *type, Symbol name, size_t
 
 //------------------------------------------------------------------------------
 
-Block::Block(const Anchor *anchor, const Values &_body, Value *_value)
-    : Value(VK_Block, anchor), body(_body), value(_value) {
-}
-
-Block *Block::from(const Anchor *anchor, const Values &nodes, Value *value) {
-    return new Block(anchor, nodes, value);
-}
-
+/*
 Value *Block::canonicalize() {
-    if (!value) {
-        if (!body.empty()) {
-            value = body.back();
-            body.pop_back();
-        } else {
-            value = ArgumentList::from(anchor());
-        }
-    }
     strip_constants();
     // can strip block if no side effects
     if (body.empty())
-        return value;
+        return ArgumentList::from(anchor());
+    else if (body.size() == 1)
+        return body[0];
     else
         return this;
 }
@@ -214,15 +202,45 @@ void Block::strip_constants() {
     while (i > 0) {
         i--;
         auto arg = body[i];
-        if (arg->is_symbolic()) {
+        if (arg->is_pure()) {
             body.erase(body.begin() + i);
         }
     }
 }
+*/
+
+bool Block::empty() const {
+    return body.empty();
+}
 
 void Block::append(Value *node) {
-    assert(!value);
-    body.push_back(node);
+    if (node->is_pure())
+        return;
+    if (isa<Instruction>(node)) {
+        auto instr = cast<Instruction>(node);
+        if (instr->block)
+            return;
+        instr->block = this;
+        body.push_back(node);
+    }
+}
+
+//------------------------------------------------------------------------------
+
+Expression::Expression(const Anchor *anchor, const Values &_body, Value *_value)
+    : Value(VK_Expression, anchor), body(_body), value(_value), scoped(true) {
+}
+
+void Expression::append(Value *node) {
+    assert(node);
+    if (value && !value->is_pure()) {
+        body.push_back(value);
+    }
+    value = node;
+}
+
+Expression *Expression::from(const Anchor *anchor, const Values &nodes, Value *value) {
+    return new Expression(anchor, nodes, value);
 }
 
 //------------------------------------------------------------------------------
@@ -253,31 +271,33 @@ Value *If::canonicalize() {
 
 //------------------------------------------------------------------------------
 
-Try::Try(const Anchor *anchor, Value *_try_body, SymbolValue *_except_param, Value *_except_body)
-    : Instruction(VK_Try, anchor), try_body(_try_body), except_param(_except_param), except_body(_except_body)
+Try::Try(const Anchor *anchor, Value *_try_value, Parameter *_except_param, Value *_except_value)
+    : Instruction(VK_Try, anchor), try_value(_try_value),
+        except_param(_except_param), except_value(_except_value),
+        raise_type(nullptr)
 {}
 
-Try *Try::from(const Anchor *anchor, Value *try_body, SymbolValue *except_param,
-    Value *except_body) {
-    return new Try(anchor, try_body, except_param, except_body);
+Try *Try::from(const Anchor *anchor, Value *try_value, Parameter *except_param,
+    Value *except_value) {
+    return new Try(anchor, try_value, except_param, except_value);
 }
 
 //------------------------------------------------------------------------------
 
-SymbolValue::SymbolValue(const Anchor *anchor, Symbol _name, const Type *_type, bool _variadic)
-    : Value(VK_Symbol, anchor), name(_name), variadic(_variadic) {
+Parameter::Parameter(const Anchor *anchor, Symbol _name, const Type *_type, bool _variadic)
+    : Value(VK_Parameter, anchor), name(_name), variadic(_variadic) {
     if (_type) set_type(_type);
 }
 
-SymbolValue *SymbolValue::from(const Anchor *anchor, Symbol name, const Type *type) {
-    return new SymbolValue(anchor, name, type, false);
+Parameter *Parameter::from(const Anchor *anchor, Symbol name, const Type *type) {
+    return new Parameter(anchor, name, type, false);
 }
 
-SymbolValue *SymbolValue::variadic_from(const Anchor *anchor, Symbol name, const Type *type) {
-    return new SymbolValue(anchor, name, type, true);
+Parameter *Parameter::variadic_from(const Anchor *anchor, Symbol name, const Type *type) {
+    return new Parameter(anchor, name, type, true);
 }
 
-bool SymbolValue::is_variadic() const {
+bool Parameter::is_variadic() const {
     return variadic;
 }
 
@@ -309,20 +329,11 @@ Call *Call::from(const Anchor *anchor, Value *callee, const Values &args) {
 
 //------------------------------------------------------------------------------
 
-Let::Let(const Anchor *anchor, const SymbolValues &_params, const Values &_args)
-    : Value(VK_Let, anchor), params(_params), args(_args) {
-}
-Let *Let::from(const Anchor *anchor, const SymbolValues &params, const Values &args) {
-    return new Let(anchor, params, args);
-}
-
-//------------------------------------------------------------------------------
-
-Loop::Loop(const Anchor *anchor, const SymbolValues &_params, const Values &_args, Value *_value)
+Loop::Loop(const Anchor *anchor, const Parameters &_params, const Values &_args, Value *_value)
     : Instruction(VK_Loop, anchor), params(_params), args(_args), value(_value), return_type(nullptr) {
 }
 
-Loop *Loop::from(const Anchor *anchor, const SymbolValues &params, const Values &args, Value *value) {
+Loop *Loop::from(const Anchor *anchor, const Parameters &params, const Values &args, Value *value) {
     return new Loop(anchor, params, args, value);
 }
 
@@ -484,13 +495,21 @@ Value::Value(ValueKind kind, const Anchor *anchor)
     assert(_anchor);
 }
 
-bool Value::is_symbolic() const {
+bool Value::is_pure() const {
     switch(kind()) {
     case VK_Template:
     case VK_Function:
-    case VK_Symbol:
-    case VK_Extern:
+    case VK_Parameter:
         return true;
+    case VK_ArgumentList: {
+        auto al = cast<ArgumentList>(this);
+        for (auto val : al->values) {
+            assert(val);
+            if (!val->is_pure())
+                return false;
+        }
+        return true;
+    } break;
     default: break;
     }
     return isa<Const>(this);
@@ -533,7 +552,7 @@ Instruction::Instruction(ValueKind _kind, const Anchor *_anchor)
 
 bool Instruction::classof(const Value *T) {
     auto k = T->kind();
-    return (k >= VK_If) && (k <= VK_Raise);
+    return (k >= VK_If) && (k <= VK_ExtractArgument);
 }
 
 //------------------------------------------------------------------------------

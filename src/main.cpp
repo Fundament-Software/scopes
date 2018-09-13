@@ -275,7 +275,7 @@ skip_regular_load:
 #if 1 //SCOPES_DEBUG_CODEGEN
     StyledStream ss(std::cout);
     std::cout << "non-normalized:" << std::endl;
-    stream_ast(ss, tmpfn, StreamASTFormat::debug());
+    stream_ast(ss, tmpfn, StreamASTFormat());
     std::cout << std::endl;
 #endif
 

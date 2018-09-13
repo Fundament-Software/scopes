@@ -722,7 +722,7 @@ sc_value_t *sc_template_new(sc_symbol_t name) {
 }
 void sc_template_append_parameter(sc_value_t *fn, sc_value_t *symbol) {
     using namespace scopes;
-    cast<Template>(fn)->append_param(cast<SymbolValue>(symbol));
+    cast<Template>(fn)->append_param(cast<Parameter>(symbol));
 }
 void sc_template_set_body(sc_value_t *fn, sc_value_t *value) {
     using namespace scopes;
@@ -736,11 +736,11 @@ void sc_template_set_inline(sc_value_t *fn) {
 
 sc_value_t *sc_block_new(int numvalues, sc_value_t **values) {
     using namespace scopes;
-    auto block = Block::from(get_active_anchor());
+    auto block = Expression::from(get_active_anchor());
     for (int i = 0; i < numvalues; ++i) {
         block->append(values[i]);
     }
-    return block->canonicalize();
+    return block;
 }
 
 sc_value_t *sc_extern_new(sc_symbol_t name, const sc_type_t *type) {
@@ -794,9 +794,9 @@ void sc_if_append_else_clause(sc_value_t *value, sc_value_t *body) {
     cast<If>(value)->append(get_active_anchor(), body);
 }
 
-sc_value_t *sc_symbol_value_new(sc_symbol_t name, const sc_type_t *type) {
+sc_value_t *sc_parameter_new(sc_symbol_t name, const sc_type_t *type) {
     using namespace scopes;
-    return SymbolValue::from(get_active_anchor(), name, type);
+    return Parameter::from(get_active_anchor(), name, type);
 }
 
 sc_value_t *sc_call_new(sc_value_t *callee, int numargs, sc_value_t **args) {
@@ -806,18 +806,9 @@ sc_value_t *sc_call_new(sc_value_t *callee, int numargs, sc_value_t **args) {
     return Call::from(get_active_anchor(), callee, vals);
 }
 
-sc_value_t *sc_let_new(int numparams, sc_value_t **params, int numvalues, sc_value_t **values) {
-    using namespace scopes;
-    SymbolValues paramvals;
-    init_values_array(paramvals, numparams, params);
-    Values vals;
-    init_values_array(vals, numvalues, values);
-    return Let::from(get_active_anchor(), paramvals, vals);
-}
-
 sc_value_t *sc_loop_new(int numparams, sc_value_t **params, int numargs, sc_value_t **args, sc_value_t *body) {
     using namespace scopes;
-    SymbolValues paramvals;
+    Parameters paramvals;
     init_values_array(paramvals, numparams, params);
     Values vals;
     init_values_array(vals, numargs, args);
@@ -1398,9 +1389,8 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_if_new, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_if_append_then_clause, _void, TYPE_Value, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_if_append_else_clause, _void, TYPE_Value, TYPE_Value);
-    DEFINE_EXTERN_C_FUNCTION(sc_symbol_value_new, TYPE_Value, TYPE_Symbol, TYPE_Type);
+    DEFINE_EXTERN_C_FUNCTION(sc_parameter_new, TYPE_Value, TYPE_Symbol, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_call_new, TYPE_Value, TYPE_Value, TYPE_I32, TYPE_ValuePP);
-    DEFINE_EXTERN_C_FUNCTION(sc_let_new, TYPE_Value, TYPE_I32, TYPE_ValuePP, TYPE_I32, TYPE_ValuePP);
     DEFINE_EXTERN_C_FUNCTION(sc_loop_new, TYPE_Value, TYPE_I32, TYPE_ValuePP, TYPE_I32, TYPE_ValuePP, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_const_int_new, TYPE_Value, TYPE_Type, TYPE_U64);
     DEFINE_EXTERN_C_FUNCTION(sc_const_real_new, TYPE_Value, TYPE_Type, TYPE_F64);

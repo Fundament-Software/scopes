@@ -16,7 +16,7 @@ namespace scopes {
 // list of symbols to be exposed as builtins to the default global namespace
 #define B_GLOBALS() \
     T(FN_Branch) T(KW_Fn) T(KW_Label) T(KW_Quote) T(KW_Inline) T(KW_Forward) T(KW_Raise) \
-    T(KW_Call) T(KW_RawCall) T(KW_CCCall) T(SYM_QuoteForm) T(FN_Dump) T(KW_Do) \
+    T(KW_Call) T(KW_RawCall) T(KW_CCCall) T(SYM_QuoteForm) T(FN_Dump) T(FN_DumpTemplate) T(KW_Do) \
     T(FN_FunctionType) T(FN_TupleType) T(FN_UnionType) T(FN_Alloca) T(FN_AllocaOf) T(FN_Malloc) \
     T(FN_AllocaArray) T(FN_MallocArray) T(FN_ReturnLabelType) T(KW_DoIn) T(FN_AllocaExceptionPad) \
     T(FN_StaticAlloc) T(KW_TryCall) T(KW_Return) T(KW_Loop) T(KW_Repeat) T(KW_Break) \
@@ -307,7 +307,7 @@ namespace scopes {
     T(FN_LabelDocString, "Label-docstring") \
     T(FN_LabelSetInline, "Label-set-inline!") \
     T(FN_DefaultStyler, "default-styler") T(FN_StyleToString, "style->string") \
-    T(FN_Disqualify, "disqualify") T(FN_Dump, "dump") \
+    T(FN_Disqualify, "disqualify") T(FN_Dump, "dump") T(FN_DumpTemplate, "dump-template") \
     T(FN_DumpLabel, "dump-label") \
     T(FN_DumpList, "dump-list") \
     T(FN_DumpFrame, "dump-frame") \
