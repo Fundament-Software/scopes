@@ -1559,7 +1559,7 @@ SCOPES_RESULT(Function *) specialize(Function *frame, Template *func, const ArgT
         SCOPES_RETURN_ERROR();
     }
     fn->complete = true;
-    fn->set_type(get_function_type(fn));
+    fn->change_type(get_function_type(fn));
     return fn;
 }
 

@@ -271,7 +271,6 @@ syntax-extend
         if (icmp<s i argcount)
             let arg =
                 load (getelementptr args i)
-            sc_write (sc_value_repr arg)
             # optional index
             if use-indices
                 store (box-integer (sub i 1)) (getelementptr callargs 0)
@@ -407,19 +406,14 @@ syntax-extend
             fn "set-symbol" (args argcount)
                 verify-count argcount 2 3
                 let self = (load (getelementptr args 0))
-                sc_write (sc_value_repr self)
                 let key value =
                     if (icmp== argcount 3)
                         let key = (load (getelementptr args 1))
                         let value = (load (getelementptr args 2))
-                        sc_write (sc_value_repr key)
-                        sc_write (sc_value_repr value)
                         _ key value
                     else
                         let arg = (load (getelementptr args 1))
                         let key = (sc_type_key (sc_value_type arg))
-                        sc_write (sc_value_repr (box-symbol key))
-                        sc_write (sc_value_repr arg)
                         _ (box-symbol key) arg
                 if (sc_value_is_constant self)
                     if (sc_value_is_constant key)

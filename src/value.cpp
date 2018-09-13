@@ -114,7 +114,7 @@ Template *Template::from(
 //------------------------------------------------------------------------------
 
 Function::Function(const Anchor *anchor, Symbol _name, const Parameters &_params)
-    : Value(VK_Function, anchor),
+    : Const(VK_Function, anchor, TYPE_Unknown),
         name(_name), params(_params),
         docstring(nullptr), return_type(nullptr), except_type(nullptr),
         frame(nullptr), original(nullptr), complete(false) {
@@ -341,7 +341,7 @@ Loop *Loop::from(const Anchor *anchor, const Parameters &params, const Values &a
 
 bool Const::classof(const Value *T) {
     auto k = T->kind();
-    return (k >= VK_Extern) && (k <= VK_ConstPointer);
+    return (k >= VK_Function) && (k <= VK_ConstPointer);
 }
 
 Const::Const(ValueKind _kind, const Anchor *anchor, const Type *type)

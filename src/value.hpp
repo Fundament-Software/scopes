@@ -21,7 +21,6 @@ struct List;
 struct Scope;
 
 #define SCOPES_VALUE_KIND() \
-    T(VK_Function, "value-kind-function", Function) \
     T(VK_Parameter, "value-kind-parameter", Parameter) \
     /* template-only */ \
     T(VK_Template, "value-kind-template", Template) \
@@ -40,6 +39,7 @@ struct Scope;
     T(VK_ArgumentList, "value-kind-argumentlist", ArgumentList) \
     T(VK_ExtractArgument, "value-kind-extractargument", ExtractArgument) \
     /* constants (Const::classof) */ \
+    T(VK_Function, "value-kind-function", Function) \
     T(VK_Extern, "value-kind-extern", Extern) \
     T(VK_ConstInt, "value-kind-const-int", ConstInt) \
     T(VK_ConstReal, "value-kind-const-real", ConstReal) \
@@ -184,37 +184,6 @@ struct Template : Value {
 
 //------------------------------------------------------------------------------
 
-struct Function : Value {
-    static bool classof(const Value *T);
-
-    Function(const Anchor *anchor, Symbol name, const Parameters &params);
-
-    static Function *from(
-        const Anchor *anchor, Symbol name,
-        const Parameters &params);
-
-    void append_param(Parameter *sym);
-
-    Symbol name;
-    Parameters params;
-    Block body;
-    const String *docstring;
-    const Type *return_type;
-    const Type *except_type;
-    Function *frame;
-    Template *original;
-    bool complete;
-
-    ArgTypes instance_args;
-    Function *find_frame(Template *scope);
-    void bind(Value *oldnode, Value *newnode);
-    Value *resolve(Value *node) const;
-    Value *resolve_local(Value *node) const;
-    std::unordered_map<Value *, Value *> map;
-};
-
-//------------------------------------------------------------------------------
-
 struct Expression : Value {
     static bool classof(const Value *T);
 
@@ -340,6 +309,37 @@ struct Const : Value {
     static bool classof(const Value *T);
 
     Const(ValueKind _kind, const Anchor *anchor, const Type *type);
+};
+
+//------------------------------------------------------------------------------
+
+struct Function : Const {
+    static bool classof(const Value *T);
+
+    Function(const Anchor *anchor, Symbol name, const Parameters &params);
+
+    static Function *from(
+        const Anchor *anchor, Symbol name,
+        const Parameters &params);
+
+    void append_param(Parameter *sym);
+
+    Symbol name;
+    Parameters params;
+    Block body;
+    const String *docstring;
+    const Type *return_type;
+    const Type *except_type;
+    Function *frame;
+    Template *original;
+    bool complete;
+
+    ArgTypes instance_args;
+    Function *find_frame(Template *scope);
+    void bind(Value *oldnode, Value *newnode);
+    Value *resolve(Value *node) const;
+    Value *resolve_local(Value *node) const;
+    std::unordered_map<Value *, Value *> map;
 };
 
 //------------------------------------------------------------------------------
