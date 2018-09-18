@@ -891,9 +891,8 @@ syntax-extend
         ast-macro
             fn "cast-error" (argc argv)
                 verify-count argc 2 2
-
-                let cont value T = ('decons argv 3)
-                let vT = ('indirect-typeof value)
+                let value T = (loadarrayptrs argv 0 1)
+                let vT = ('typeof value)
                 let T = (unbox-pointer T type)
                 # create branch so we can trick the function into assuming
                     there's another exit path
@@ -904,6 +903,7 @@ syntax-extend
                                 '__repr (box-pointer vT)
                                 sc_string_join " to type "
                                     '__repr (box-pointer T)
+                undef Value
 
     let DispatchCastFunctionType =
         'pointer ('raising (function Value type type) Error)
@@ -927,9 +927,7 @@ syntax-extend
                 try
                     unbox-dispatch-cast-function-type anyf
                 except (err)
-                    dump err
                     attribute-format-error! vT symbol err
-            dump f
             try
                 return true (f vT T) false
             except (err)
@@ -947,6 +945,17 @@ syntax-extend
                 # ignore
         return false (undef Value) false
 
+    #syntax-extend
+        let types = (alloca-array type 4:usize)
+        store Symbol (getelementptr types 0)
+        store Symbol (getelementptr types 1)
+        store type (getelementptr types 2)
+        store type (getelementptr types 3)
+        let result = (sc_compile (sc_typify get-cast-dispatcher 4 types)
+            compile-flag-dump-module)
+        exit 0
+        syntax-scope
+
     fn implyfn (vT T)
         get-cast-dispatcher '__imply '__rimply vT T
     fn asfn (vT T)
@@ -962,20 +971,25 @@ syntax-extend
                 if (ptrcmp!= vT T)
                     let ok f reverse = (implyfn vT T)
                     if ok
-                        sc_call_new f (Value-array anyT value)
+                        sc_call_new f
+                            Value-array
+                                if reverse
+                                    _ anyT value
+                                else
+                                    _ value anyT
                     else
                         sc_call_new
-                            #box-pointer
-                            gen-cast-error "can't implicitly cast value of type "
-                            \ 0 (undef Value)
+                            box-pointer
+                                gen-cast-error "can't implicitly cast value of type "
+                            \ 0 (undef ValueArrayPointer)
                 else value
 
     let as =
         box-ast-macro
-            fn "as-dispatch" (l)
-                let args = ('verify-argument-count l 2 2)
-                let cont value anyT = ('decons args 3)
-                let vT = ('indirect-typeof value)
+            fn "as-dispatch" (argc argv)
+                verify-count argc 2 2
+                let value anyT = (loadarrayptrs argv 0 1)
+                let vT = ('typeof value)
                 let T = (unbox-pointer anyT type)
                 if (ptrcmp!= vT T)
                     let ok f reverse =
@@ -987,20 +1001,24 @@ syntax-extend
                                 # then try explicit cast
                                 asfn vT T
                     if ok
-                        'set-enter l f
-                        if reverse ('set-arguments l (make-list cont anyT value))
-                        return;
-                    'set-enter l
-                        box-pointer
-                            gen-cast-error "can't cast value of type "
-                else
-                    'return l value
+                        sc_call_new f
+                            Value-array
+                                if reverse
+                                    _ anyT value
+                                else
+                                    _ value anyT
+                    else
+                        sc_call_new
+                            box-pointer
+                                gen-cast-error "can't cast value of type "
+                            \ 0 (undef ValueArrayPointer)
+                else value
 
     let UnaryOpFunctionType =
-        'pointer ('raising (function Value type))
+        'pointer ('raising (function Value type) Error)
 
     let BinaryOpFunctionType =
-        'pointer ('raising (function Value type type))
+        'pointer ('raising (function Value type type) Error)
 
     fn unbox-binary-op-function-type (anyf)
         unbox-pointer anyf BinaryOpFunctionType
@@ -1013,7 +1031,7 @@ syntax-extend
                 except (err)
                     attribute-format-error! lhsT symbol err
             try
-                return (f lhsT rhsT)
+                return true (f lhsT rhsT)
             except (err)
         return false (undef Value)
 
@@ -1024,24 +1042,23 @@ syntax-extend
         sc_call_new castf 2 args
 
     # both types are typically the same
-    fn sym-binary-op-label-macro (l symbol rsymbol friendly-op-name)
-        let args = ('verify-argument-count l 2 2)
-        let cont lhs rhs = ('decons args 3)
-        let lhsT = ('indirect-typeof lhs)
-        let rhsT = ('indirect-typeof rhs)
+    fn sym-binary-op-label-macro (argc argv symbol rsymbol friendly-op-name)
+        verify-count argc 2 2
+        let lhs rhs = (loadarrayptrs argv 0 1)
+        let lhsT = ('typeof lhs)
+        let rhsT = ('typeof rhs)
         # try direct version first
         let ok f = (get-binary-op-dispatcher symbol lhsT rhsT)
         if ok
-            'set-enter l f
-            return;
+            return
+                sc_call_new f argc argv
         # if types are unequal, we can try other options
         if (ptrcmp!= lhsT rhsT)
             # try reverse version next
             let ok f = (get-binary-op-dispatcher rsymbol rhsT lhsT)
             if ok
-                'return l rhs lhs
-                'set-enter l f
-                return;
+                return
+                    sc_call_new f (Value-array rhs lhs)
             # can the operation be performed on the lhs type?
             let ok f = (get-binary-op-dispatcher symbol lhsT lhsT)
             if ok
@@ -1049,11 +1066,10 @@ syntax-extend
                 let ok castf reverse = (implyfn rhsT lhsT)
                 if ok
                     if (not reverse)
-                        let lcont param =
-                            binary-op-cast-macro l f castf lhsT rhs
-                        'set-arguments lcont
-                            list cont lhs (box-pointer param)
-                        return;
+                        return
+                            sc_call_new f
+                                Value-array lhs
+                                    binary-op-cast-macro castf lhsT rhs
             # can the operation be performed on the rhs type?
             let ok f = (get-binary-op-dispatcher symbol rhsT rhsT)
             if ok
@@ -1061,11 +1077,11 @@ syntax-extend
                 let ok castf reverse = (implyfn lhsT rhsT)
                 if ok
                     if (not reverse)
-                        let lcont param =
-                            binary-op-cast-macro l f castf rhsT lhs
-                        'set-arguments lcont
-                            list cont (box-pointer param) rhs
-                        return;
+                        return
+                            sc_call_new f
+                                Value-array
+                                    binary-op-cast-macro castf rhsT lhs
+                                    rhs
         # we give up
         raise-compile-error!
             'join "can't "
@@ -1077,25 +1093,24 @@ syntax-extend
                                 '__repr (box-pointer rhsT)
 
     # right hand has fixed type
-    fn asym-binary-op-label-macro (l symbol rtype friendly-op-name)
-        let args = ('verify-argument-count l 2 2)
-        let cont lhs rhs = ('decons args 3)
-        let lhsT = ('indirect-typeof lhs)
-        let rhsT = ('indirect-typeof rhs)
+    fn asym-binary-op-label-macro (argc argv symbol rtype friendly-op-name)
+        verify-count argc 2 2
+        let lhs rhs = (loadarrayptrs argv 0 1)
+        let lhsT = ('typeof lhs)
+        let rhsT = ('typeof rhs)
         let ok f = ('@ lhsT symbol)
         if ok
             if (ptrcmp== rhsT rtype)
-                'set-enter l f
-                return;
+                return
+                    sc_call_new f argc argv
             # can we cast rhsT to rtype?
             let ok castf reverse = (implyfn rhsT rtype)
             if ok
                 if (not reverse)
-                    let lcont param =
-                        binary-op-cast-macro l f castf rtype rhs
-                    'set-arguments lcont
-                        list cont lhs (box-pointer param)
-                    return;
+                    return
+                        sc_call_new f
+                            Value-array lhs
+                                binary-op-cast-macro castf rtype rhs
         # we give up
         raise-compile-error!
             'join "can't "
@@ -1106,14 +1121,14 @@ syntax-extend
                             'join " and "
                                 '__repr (box-pointer rhsT)
 
-    fn unary-op-label-macro (l symbol friendly-op-name)
-        let args = ('verify-argument-count l 1 1)
-        let cont lhs = ('decons args 2)
-        let lhsT = ('indirect-typeof lhs)
+    fn unary-op-label-macro (argc argv symbol friendly-op-name)
+        verify-count argc 1 1
+        let lhs = (loadarrayptrs argv 0)
+        let lhsT = ('typeof lhs)
         let ok f = ('@ lhsT symbol)
         if ok
-            'set-enter l f
-            return;
+            return
+                sc_call_new f argc argv
         raise-compile-error!
             'join "can't "
                 'join friendly-op-name
@@ -1121,13 +1136,13 @@ syntax-extend
                         '__repr (box-pointer lhsT)
 
     inline make-unary-op-dispatch (symbol friendly-op-name)
-        box-ast-macro (fn (l) (unary-op-label-macro l symbol friendly-op-name))
+        box-ast-macro (fn (argc argv) (unary-op-label-macro argc argv symbol friendly-op-name))
 
     inline make-sym-binary-op-dispatch (symbol rsymbol friendly-op-name)
-        box-ast-macro (fn (l) (sym-binary-op-label-macro l symbol rsymbol friendly-op-name))
+        box-ast-macro (fn (argc argv) (sym-binary-op-label-macro argc argv symbol rsymbol friendly-op-name))
 
     inline make-asym-binary-op-dispatch (symbol rtype friendly-op-name)
-        box-ast-macro (fn (l) (asym-binary-op-label-macro l symbol rtype friendly-op-name))
+        box-ast-macro (fn (argc argv) (asym-binary-op-label-macro argc argv symbol rtype friendly-op-name))
 
     # support for calling macro functions directly
     'set-symbols SyntaxMacro
@@ -1146,7 +1161,7 @@ syntax-extend
             box-cast-dispatch
                 fn "syntax-imply" (vT T)
                     if (ptrcmp== T string)
-                        return (Any-wrap symbol-imply)
+                        return (Value symbol-imply)
                     raise-compile-error! "unsupported type"
 
     fn string@ (self i)
@@ -1175,15 +1190,15 @@ syntax-extend
         fn (lhsT rhsT)
             if (ptrcmp== lhsT rhsT)
                 if ('signed? lhsT)
-                    return (Any-wrap sf)
+                    return (Value sf)
                 else
-                    return (Any-wrap uf)
+                    return (Value uf)
             raise-compile-error! "unsupported type"
 
     fn dispatch-and-or (argc argv flip)
         verify-count argc 2 2
-        let cond elsef = (loadarrayptrs argv 2)
-        let call-elsef = (sc_call_new elsef 0 (undef Value))
+        let cond elsef = (loadarrayptrs argv 0 1)
+        let call-elsef = (sc_call_new elsef 0 (undef ValueArrayPointer))
         if ('constant? cond)
             let value = (unbox-integer cond bool)
             return
@@ -1222,7 +1237,7 @@ syntax-extend
             box-ast-macro
                 fn "type-getattr" (argc argv)
                     verify-count argc 2 2
-                    let self key = (loadarrayptrs 0 1)
+                    let self key = (loadarrayptrs argv 0 1)
                     if ('constant? self)
                         if ('constant? key)
                             let self = (unbox-pointer self type)
@@ -1249,7 +1264,7 @@ syntax-extend
                             duplicate ``clone``, but descending from ``parent`` instead
                     verify-count argc 1 3
                     if (icmp== argc 1)
-                        sc_call_new (Value Scope-new) 0 (undef Value)
+                        sc_call_new (Value Scope-new) 0 (undef ValueArrayPointer)
                     elseif (icmp== argc 2)
                         sc_call_new (Value Scope-new-expand) 1 (getelementptr argv 1)
                     else
@@ -1270,8 +1285,8 @@ syntax-extend
         SyntaxMacroFunctionType = (box-pointer SyntaxMacroFunctionType)
         DispatchCastFunctionType = (box-pointer DispatchCastFunctionType)
         BinaryOpFunctionType = (box-pointer BinaryOpFunctionType)
-        implyfn = (typify implyfn type type)
-        asfn = (typify asfn type type)
+        implyfn = (box-pointer (typify implyfn type type))
+        asfn = (box-pointer (typify asfn type type))
         imply = imply
         as = as
         countof = (make-unary-op-dispatch '__countof "count")
@@ -1295,5 +1310,5 @@ syntax-extend
         getattr = (make-asym-binary-op-dispatch '__getattr Symbol "get attribute from")
         lslice = (make-asym-binary-op-dispatch '__lslice usize "apply left-slice operator with")
         rslice = (make-asym-binary-op-dispatch '__rslice usize "apply right-slice operator with")
-        constbranch = constbranch
+        #constbranch = constbranch
     syntax-scope

@@ -1172,6 +1172,7 @@ struct LLVMIRGenerator {
         }
 
         LLVMPositionBuilderAtEnd(builder, try_info.bb_except);
+        try_info = old_try_info;
         for (auto value : node->except_body.body) {
             SCOPES_CHECK_RESULT(node_to_value(value));
         }
@@ -1189,7 +1190,6 @@ struct LLVMIRGenerator {
             LLVMPositionBuilderAtEnd(builder, bb_merge);
         }
 
-        try_info = old_try_info;
         return merge_value;
     }
 

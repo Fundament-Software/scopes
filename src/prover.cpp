@@ -493,7 +493,6 @@ static SCOPES_RESULT(Value *) prove_Try(const ASTContext &ctx, Try *_try) {
 
     if (newtry->raise_type == TYPE_NoReturn) {
         // move all block instructions to parent block
-        assert(false);
         assert(ctx.block);
         ctx.block->migrate_from(newtry->try_body);
         return try_value;
