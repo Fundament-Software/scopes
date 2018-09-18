@@ -4,8 +4,8 @@
     See LICENSE.md for details.
 */
 
-#ifndef SCOPES_AST_SPECIALIZER_HPP
-#define SCOPES_AST_SPECIALIZER_HPP
+#ifndef SCOPES_AST_PROVER_HPP
+#define SCOPES_AST_PROVER_HPP
 
 #include "result.hpp"
 #include "type.hpp"
@@ -33,8 +33,8 @@ SCOPES_RESULT(uint64_t) extract_integer_constant(Value *value);
 const Type *try_get_const_type(Value *node);
 const String *try_extract_string(Value *node);
 
-SCOPES_RESULT(Function *) specialize(Function *frame, Template *func, const ArgTypes &types);
+SCOPES_RESULT(Function *) prove(Function *frame, Template *func, const ArgTypes &types);
 
 } // namespace scopes
 
-#endif // SCOPES_AST_SPECIALIZER_HPP
+#endif // SCOPES_AST_PROVER_HPP

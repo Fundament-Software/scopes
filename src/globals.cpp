@@ -98,7 +98,7 @@ sc_value_raises_t sc_eval(sc_value_t *expr, sc_scope_t *scope) {
     using namespace scopes;
     auto module_result = expand_module(expr, scope);
     if (!module_result.ok()) return { false, get_last_error(), nullptr };
-    RETURN_RESULT(specialize(nullptr, module_result.assert_ok(), {}));
+    RETURN_RESULT(prove(nullptr, module_result.assert_ok(), {}));
 }
 
 #if 0
@@ -124,7 +124,7 @@ sc_value_raises_t sc_typify(sc_closure_t *srcl, int numtypes, const sc_type_t **
     stream_ast(ss, srcl->func, StreamASTFormat());
     std::cout << std::endl;
 #endif
-    RETURN_RESULT(specialize(srcl->frame, srcl->func, types));
+    RETURN_RESULT(prove(srcl->frame, srcl->func, types));
 }
 
 sc_value_raises_t sc_compile(sc_value_t *srcl, uint64_t flags) {
@@ -740,6 +740,17 @@ sc_value_t *sc_block_new(int numvalues, sc_value_t **values) {
     for (int i = 0; i < numvalues; ++i) {
         block->append(values[i]);
     }
+    block->scoped = false;
+    return block;
+}
+
+sc_value_t *sc_scoped_block_new(int numvalues, sc_value_t **values) {
+    using namespace scopes;
+    auto block = Expression::from(get_active_anchor());
+    for (int i = 0; i < numvalues; ++i) {
+        block->append(values[i]);
+    }
+    block->scoped = true;
     return block;
 }
 
@@ -1245,6 +1256,19 @@ sc_type_raises_t sc_tuple_type(int numtypes, const sc_type_t **typeargs) {
     RETURN_RESULT(tuple_type(types));
 }
 
+// Arguments Type
+////////////////////////////////////////////////////////////////////////////////
+
+const sc_type_t *sc_arguments_type(int numtypes, const sc_type_t **typeargs) {
+    using namespace scopes;
+    ArgTypes types;
+    types.reserve(numtypes);
+    for (int i = 0; i < numtypes; ++i) {
+        types.push_back(typeargs[i]);
+    }
+    return arguments_type(types);
+}
+
 // Function Type
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -1377,6 +1401,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_template_set_body, _void, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_template_set_inline, _void, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_block_new, TYPE_Value, TYPE_I32, TYPE_ValuePP);
+    DEFINE_EXTERN_C_FUNCTION(sc_scoped_block_new, TYPE_Value, TYPE_I32, TYPE_ValuePP);
     DEFINE_EXTERN_C_FUNCTION(sc_extern_new, TYPE_Value, TYPE_Symbol, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_extern_set_flags, _void, TYPE_Value, TYPE_U32);
     DEFINE_EXTERN_C_FUNCTION(sc_extern_get_flags, TYPE_U32, TYPE_Value);
@@ -1504,6 +1529,8 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_vector_type, TYPE_Type, TYPE_Type, TYPE_USize);
 
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_tuple_type, TYPE_Type, TYPE_I32, native_ro_pointer_type(TYPE_Type));
+
+    DEFINE_EXTERN_C_FUNCTION(sc_arguments_type, TYPE_Type, TYPE_I32, native_ro_pointer_type(TYPE_Type));
 
     DEFINE_EXTERN_C_FUNCTION(sc_image_type, TYPE_Type,
         TYPE_Type, TYPE_Symbol, TYPE_I32, TYPE_I32, TYPE_I32, TYPE_I32, TYPE_Symbol, TYPE_Symbol);

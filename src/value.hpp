@@ -102,8 +102,10 @@ protected:
 struct Block {
     void append(Value *node);
     bool empty() const;
+    void migrate_from(Block &source);
+    void clear();
 
-    Values body;
+    Instructions body;
 };
 
 //------------------------------------------------------------------------------

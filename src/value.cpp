@@ -74,7 +74,7 @@ ArgumentList *ArgumentList::from(const Anchor *anchor, const Values &values) {
 
 ExtractArgument::ExtractArgument(const Anchor *anchor, Value *_value, int _index)
     : Instruction(VK_ExtractArgument, anchor), index(_index), value(_value) {
-    assert((index < 10) && (index >= 0));
+    assert(index >= 0);
 }
 
 ExtractArgument *ExtractArgument::from(const Anchor *anchor, Value *value, int index) {
@@ -209,6 +209,18 @@ void Block::strip_constants() {
 }
 */
 
+void Block::clear() {
+    body.clear();
+}
+
+void Block::migrate_from(Block &source) {
+    for (auto arg : source.body) {
+        arg->block = nullptr;
+        append(arg);
+    }
+    source.clear();
+}
+
 bool Block::empty() const {
     return body.empty();
 }
@@ -221,7 +233,7 @@ void Block::append(Value *node) {
         if (instr->block)
             return;
         instr->block = this;
-        body.push_back(node);
+        body.push_back(instr);
     }
 }
 

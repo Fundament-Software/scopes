@@ -413,8 +413,8 @@ void init_types() {
                 native_ro_pointer_type(
                     raising_function_type(
                         TYPE_Value, {
-                        native_ro_pointer_type(TYPE_Value),
-                        TYPE_I32
+                        TYPE_I32,
+                        native_ro_pointer_type(TYPE_Value)
                         })
                     )).assert_ok();
     }

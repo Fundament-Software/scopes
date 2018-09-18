@@ -228,6 +228,18 @@ struct StreamAST : StreamAnchors {
             stream_newline();
             walk(val->value, depth+1, maxdepth);
         } break;
+        case VK_Try: {
+            stream_type_prefix(node);
+            auto val = cast<Try>(node);
+            ss << Style_Keyword << "Try" << Style_None;
+            stream_block(val->try_body, depth+2, maxdepth);
+            stream_newline();
+            stream_indent(depth+1);
+            ss << Style_Keyword << "except" << Style_None;
+            stream_newline();
+            walk(val->except_param, depth+2, maxdepth);
+            stream_block(val->except_body, depth+2, maxdepth);
+        } break;
         case VK_If: {
             stream_type_prefix(node);
             auto val = cast<If>(node);

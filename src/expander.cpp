@@ -292,6 +292,11 @@ struct Expander {
         return tok == OP_Set;
     }
 
+    bool is_except_token(Value *name) {
+        auto tok = try_extract_symbol(name);
+        return tok == KW_Except;
+    }
+
     void print_name_suggestions(Symbol name, StyledStream &ss) {
         auto syms = env->find_closest_match(name);
         if (!syms.empty()) {
@@ -530,6 +535,69 @@ struct Expander {
         }
 
         return ConstTuple::none_from(_anchor);
+    }
+
+    // (try [x ...]) (except (param ...) [expr ...])
+    SCOPES_RESULT(Value *) expand_try(const List *it) {
+        SCOPES_RESULT_TYPE(Value *);
+
+        SCOPES_CHECK_RESULT(verify_list_parameter_count("try", it, 0, -1));
+        it = it->next;
+
+        auto _anchor = get_active_anchor();
+
+        Expander subexp(Scope::from(env), astscope);
+
+        Value *try_value = SCOPES_GET_RESULT(subexp.expand_expression(_anchor, it));
+
+        if (next != EOL) {
+            auto _next_anchor = next->at->anchor();
+            SCOPES_ANCHOR(_next_anchor);
+            it = SCOPES_GET_RESULT(extract_list_constant(next->at));
+            if (it != EOL) {
+                if (is_except_token(it->at)) {
+                    SCOPES_CHECK_RESULT(verify_list_parameter_count("except", it, 1, -1));
+                    it = it->next;
+                    next = next->next;
+
+                    const List *params = SCOPES_GET_RESULT(extract_list_constant(it->at));
+                    const List *body = it->next;
+
+                    Parameter* except_param = Parameter::from(it->at->anchor(), SYM_Unnamed);
+                    Expander subexp(Scope::from(env), astscope);
+
+                    Block exprs;
+
+                    it = params;
+                    int index = 0;
+                    // read parameter names
+                    while (it != EOL) {
+                        auto paramval = it->at;
+                        Symbol sym = SCOPES_GET_RESULT(extract_symbol_constant(paramval));
+                        if (!ends_with_parenthesis(sym)) {
+                            auto indexed = ExtractArgument::from(paramval->anchor(), except_param, index);
+                            exprs.append(indexed);
+                            subexp.env->bind(sym, indexed);
+                        } else {
+                            // not supported yet
+                            SCOPES_ANCHOR(paramval->anchor());
+                            SCOPES_EXPECT_ERROR(error_variadic_symbol_not_in_last_place());
+                        }
+                        it = it->next;
+                        index++;
+                    }
+
+                    it = body;
+                    Value *except_value = SCOPES_GET_RESULT(subexp.expand_expression(_anchor, it));
+
+                    auto _try = Try::from(_anchor, try_value, except_param, except_value);
+                    _try->except_body = exprs;
+                    return _try;
+                }
+            }
+            SCOPES_LOCATION_ERROR(String::from("except block expected"));
+        }
+        SCOPES_LOCATION_ERROR(String::from("except block expected"));
     }
 
     // (if cond body ...)
@@ -786,6 +854,7 @@ struct Expander {
                 case KW_SyntaxExtend: return expand_syntax_extend(list);
                 case KW_Let: return expand_let(list);
                 case KW_Loop: return expand_loop(list);
+                case KW_Try: return expand_try(list);
                 case KW_If: return expand_if(list);
                 case KW_Quote: return expand_quote(list);
                 case KW_Return: return expand_return(list);
@@ -795,7 +864,6 @@ struct Expander {
                 case KW_Forward: return expand_forward(list);
                 //case KW_Defer: return expand_defer(list);
                 case KW_Do: return expand_do(list);
-                case KW_TryCall:
                 case KW_RawCall:
                 case KW_Call: {
                     SCOPES_CHECK_RESULT(verify_list_parameter_count("special call", list, 1, -1));
@@ -804,7 +872,6 @@ struct Expander {
                     uint32_t flags = 0;
                     switch(func.value()) {
                     case KW_RawCall: flags |= CF_RawCall; break;
-                    case KW_TryCall: flags |= CF_TryCall; break;
                     default: break;
                     }
                     return expand_call(list, flags);

@@ -87,7 +87,7 @@ SCOPES_RESULT(void) error_invalid_condition_type(Value *cond);
 SCOPES_RESULT(void) error_argument_count_mismatch(int needed, int got);
 SCOPES_RESULT(void) error_invalid_operands(const Type *A, const Type *B);
 SCOPES_RESULT(void) error_argument_type_mismatch(const Type *expected, const Type *got);
-SCOPES_RESULT(void) error_constant_expected(Value *value);
+SCOPES_RESULT(void) error_constant_expected(const Type *want, Value *value);
 SCOPES_RESULT(void) error_unbound_symbol(Parameter *value);
 SCOPES_RESULT(void) error_cannot_merge_expression_types(const Type *T1, const Type *T2);
 SCOPES_RESULT(void) error_noreturn_not_last_expression();

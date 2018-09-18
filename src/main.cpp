@@ -279,7 +279,7 @@ skip_regular_load:
     std::cout << std::endl;
 #endif
 
-    Function *fn = SCOPES_GET_RESULT(specialize(nullptr, tmpfn, {}));
+    Function *fn = SCOPES_GET_RESULT(prove(nullptr, tmpfn, {}));
 
 #if 1 //SCOPES_DEBUG_CODEGEN
     std::cout << "normalized:" << std::endl;

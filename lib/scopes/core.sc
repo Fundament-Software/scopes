@@ -206,7 +206,7 @@ syntax-extend
     syntax-scope
 
 syntax-extend
-    fn typify (args argcount)
+    fn typify (argcount args)
         verify-count argcount 1 -1
         let src_fn = (load (getelementptr args 0))
         let src_fn = (unbox-pointer src_fn Closure)
@@ -221,8 +221,8 @@ syntax-extend
 
     do
         let types = (alloca-array type 2:usize)
-        store ValueArrayPointer (getelementptr types 0)
-        store i32 (getelementptr types 1)
+        store i32 (getelementptr types 0)
+        store ValueArrayPointer (getelementptr types 1)
         let types = (bitcast types TypeArrayPointer)
         let result = (sc_compile (sc_typify typify 2 types) 0:u64)
         let result-type = (sc_value_type result)
@@ -252,15 +252,15 @@ fn box-empty ()
 fn box-none ()
     sc_const_tuple_new Nothing 0 (undef ValueArrayPointer)
 
-# take closure l, typify and compile it and return an Any of LabelMacro type
+# take closure l, typify and compile it and return a function of ASTMacro type
 inline ast-macro (l)
-    function->ASTMacro (typify l ValueArrayPointer i32)
+    function->ASTMacro (typify l i32 ValueArrayPointer)
 
 inline box-ast-macro (l)
     box-pointer (ast-macro l)
 
 syntax-extend
-    fn va-lfold (args argcount use-indices)
+    fn va-lfold (argcount args use-indices)
         verify-count argcount 1 -1
         let f = (load (getelementptr args 0))
         if (icmp== argcount 1)
@@ -291,7 +291,7 @@ syntax-extend
                 sc_call_new f callargcount callargs
         ret
 
-    fn va-rfold (args argcount use-indices)
+    fn va-rfold (argcount args use-indices)
         verify-count argcount 1 -1
         let f = (load (getelementptr args 0))
         if (icmp== argcount 1)
@@ -324,10 +324,67 @@ syntax-extend
                 sc_call_new f callargcount callargs
         ret
 
-    sc_scope_set_symbol syntax-scope 'va-lfold (box-ast-macro (fn "va-lfold" (args argcount) (va-lfold args argcount false)))
-    sc_scope_set_symbol syntax-scope 'va-lifold (box-ast-macro (fn "va-ilfold" (args argcount) (va-lfold args argcount true)))
-    sc_scope_set_symbol syntax-scope 'va-rfold (box-ast-macro (fn "va-rfold" (args argcount) (va-rfold args argcount false)))
-    sc_scope_set_symbol syntax-scope 'va-rifold (box-ast-macro (fn "va-rifold" (args argcount) (va-rfold args argcount true)))
+    sc_scope_set_symbol syntax-scope 'va-lfold (box-ast-macro (fn "va-lfold" (argcount args) (va-lfold argcount args false)))
+    sc_scope_set_symbol syntax-scope 'va-lifold (box-ast-macro (fn "va-ilfold" (argcount args) (va-lfold argcount args true)))
+    sc_scope_set_symbol syntax-scope 'va-rfold (box-ast-macro (fn "va-rfold" (argcount args) (va-rfold argcount args false)))
+    sc_scope_set_symbol syntax-scope 'va-rifold (box-ast-macro (fn "va-rifold" (argcount args) (va-rfold argcount args true)))
+
+    # generate alloca instruction for multiple Values
+    sc_scope_set_symbol syntax-scope 'Value-array
+        box-ast-macro
+            fn "Value-array" (argc argv)
+                verify-count argc 1 -1
+                # ensure that the return signature is correct
+                let instr = (alloca-array Value (add argc 2))
+                let callargs = (alloca-array Value 2)
+                let boxed-argc = (box-integer argc)
+                store (box-pointer Value) (getelementptr callargs 0)
+                store boxed-argc (getelementptr callargs 1)
+                let arr = (sc_call_new (box-symbol alloca-array) 2 callargs)
+                store arr (getelementptr instr 0)
+                loop (i) = 0
+                if (icmp<s i argc)
+                    let gepargs = (alloca-array Value 2)
+                    store arr (getelementptr gepargs 0)
+                    store (box-integer i) (getelementptr gepargs 1)
+                    let storeargs = (alloca-array Value 2)
+                    store (load (getelementptr argv i)) (getelementptr storeargs 0)
+                    store
+                        sc_call_new (box-symbol getelementptr) 2 gepargs
+                        getelementptr storeargs 1
+                    store
+                        sc_call_new (box-symbol store) 2 storeargs
+                        getelementptr instr (add i 1)
+                    repeat (add i 1)
+                let retargs = (alloca-array Value 2)
+                store boxed-argc (getelementptr retargs 0)
+                store arr (getelementptr retargs 1)
+                store
+                    sc_argument_list_new 2 retargs
+                    getelementptr instr (add argc 1)
+                sc_block_new (add argc 2) instr
+
+    # unpack
+    sc_scope_set_symbol syntax-scope 'loadarrayptrs
+        box-ast-macro
+            fn "unpack-array" (argc argv)
+                verify-count argc 2 -1
+                let src = (load (getelementptr argv 0))
+                let instr = (alloca-array Value (sub argc 1))
+                loop (i) = 1
+                if (icmp<s i argc)
+                    let gepargs = (alloca-array Value 2)
+                    store src (getelementptr gepargs 0)
+                    store (load (getelementptr argv i)) (getelementptr gepargs 1)
+                    let loadargs = (alloca-array Value 1)
+                    store
+                        sc_call_new (box-symbol getelementptr) 2 gepargs
+                        getelementptr loadargs 0
+                    store
+                        sc_call_new (box-symbol load) 1 loadargs
+                        getelementptr instr (sub i 1)
+                    repeat (add i 1)
+                sc_argument_list_new (sub argc 1) instr
 
     fn type< (T superT)
         loop (T) = T
@@ -346,7 +403,7 @@ syntax-extend
     fn type>= (superT T)
         bxor (type< T superT) true
 
-    fn compare-type (args argcount f)
+    fn compare-type (argcount args f)
         verify-count argcount 2 2
         let a = (load (getelementptr args 0))
         let b = (load (getelementptr args 1))
@@ -358,7 +415,7 @@ syntax-extend
         sc_call_new (box-pointer f) 2 args
 
     inline type-comparison-func (f)
-        fn (args argcount) (compare-type args argcount (typify f type type))
+        fn (argcount args) (compare-type argcount args (typify f type type))
 
     sc_scope_set_symbol syntax-scope 'type== (box-ast-macro (type-comparison-func ptrcmp==))
     sc_scope_set_symbol syntax-scope 'type!= (box-ast-macro (type-comparison-func ptrcmp!=))
@@ -370,7 +427,7 @@ syntax-extend
     # typecall
     sc_type_set_symbol type '__call
         box-ast-macro
-            fn "type-call" (args argcount)
+            fn "type-call" (argcount args)
                 verify-count argcount 1 -1
                 let self = (load (getelementptr args 0))
                 let T = (unbox-pointer self type)
@@ -385,7 +442,7 @@ syntax-extend
     # method call syntax
     sc_type_set_symbol Symbol '__call
         box-ast-macro
-            fn "symbol-call" (args argcount)
+            fn "symbol-call" (argcount args)
                 verify-count argcount 2 -1
                 let symval = (load (getelementptr args 0))
                 let sym = (unbox-symbol symval Symbol)
@@ -403,7 +460,7 @@ syntax-extend
 
     inline gen-key-any-set (selftype fset)
         box-ast-macro
-            fn "set-symbol" (args argcount)
+            fn "set-symbol" (argcount args)
                 verify-count argcount 2 3
                 let self = (load (getelementptr args 0))
                 let key value =
@@ -434,7 +491,7 @@ syntax-extend
 
     sc_type_set_symbol type 'pointer
         box-ast-macro
-            fn "type-pointer" (args argcount)
+            fn "type-pointer" (argcount args)
                 verify-count argcount 1 1
                 let self = (load (getelementptr args 0))
                 let T = (unbox-pointer self type)
@@ -444,7 +501,7 @@ syntax-extend
     # tuple type constructor
     sc_type_set_symbol tuple '__typecall
         box-ast-macro
-            fn "tuple" (args argcount)
+            fn "tuple" (argcount args)
                 verify-count argcount 1 -1
                 let pcount = (sub argcount 1)
                 let types = (alloca-array type pcount)
@@ -456,10 +513,25 @@ syntax-extend
                     repeat (add i 1)
                 box-pointer (sc_tuple_type pcount types)
 
+    # arguments type constructor
+    sc_type_set_symbol Arguments '__typecall
+        box-ast-macro
+            fn "Arguments" (argcount args)
+                verify-count argcount 1 -1
+                let pcount = (sub argcount 1)
+                let types = (alloca-array type pcount)
+                loop (i) = 1
+                if (icmp<s i argcount)
+                    let arg = (load (getelementptr args i))
+                    let T = (unbox-pointer arg type)
+                    store T (getelementptr types (sub i 1))
+                    repeat (add i 1)
+                box-pointer (sc_arguments_type pcount types)
+
     # function pointer type constructor
     sc_type_set_symbol function '__typecall
         box-ast-macro
-            fn "function" (args argcount)
+            fn "function" (argcount args)
                 verify-count argcount 2 -1
                 let rtype = (load (getelementptr args 1))
                 let rtype = (unbox-pointer rtype type)
@@ -475,7 +547,7 @@ syntax-extend
 
     sc_type_set_symbol type 'raising
         box-ast-macro
-            fn "function-raising" (args argcount)
+            fn "function-raising" (argcount args)
                 verify-count argcount 2 2
                 let self = (load (getelementptr args 0))
                 let except_type = (load (getelementptr args 1))
@@ -498,13 +570,13 @@ syntax-extend
 
     sc_scope_set_symbol syntax-scope 'none?
         box-ast-macro
-            fn (args argcount)
+            fn (argcount args)
                 verify-count argcount 1 1
                 let value = (load (getelementptr args 0))
                 box-integer
                     ptrcmp== (sc_value_type value) Nothing
 
-    fn unpack2 (args argcount)
+    fn unpack2 (argcount args)
         verify-count argcount 2 2
         let a = (load (getelementptr args 0))
         let b = (load (getelementptr args 1))
@@ -512,8 +584,8 @@ syntax-extend
 
     sc_scope_set_symbol syntax-scope 'const.icmp<=.i32.i32
         box-ast-macro
-            fn (args argcount)
-                let a b = (unpack2 args argcount)
+            fn (argcount args)
+                let a b = (unpack2 argcount args)
                 if (sc_value_is_constant a)
                     if (sc_value_is_constant b)
                         let a = (unbox-integer a i32)
@@ -524,8 +596,8 @@ syntax-extend
 
     sc_scope_set_symbol syntax-scope 'const.add.i32.i32
         box-ast-macro
-            fn (args argcount)
-                let a b = (unpack2 args argcount)
+            fn (argcount args)
+                let a b = (unpack2 argcount args)
                 if (sc_value_is_constant a)
                     if (sc_value_is_constant b)
                         let a = (unbox-integer a i32)
@@ -536,7 +608,7 @@ syntax-extend
 
     sc_scope_set_symbol syntax-scope 'constbranch
         box-ast-macro
-            fn (args argcount)
+            fn (argcount args)
                 verify-count argcount 3 3
                 let cond = (load (getelementptr args 0))
                 let thenf = (load (getelementptr args 1))
@@ -552,12 +624,10 @@ syntax-extend
 
     sc_type_set_symbol Value '__typecall
         box-ast-macro
-            fn (args argcount)
+            fn (argcount args)
                 verify-count argcount 2 2
                 let value = (load (getelementptr args 1))
                 let T = (sc_value_type value)
-                inline make-none ()
-                    Any-wrap none
                 if (ptrcmp== T Value)
                     value
                 elseif (sc_value_is_constant value)
@@ -632,3 +702,598 @@ inline set-symbols (self values...)
     none? = (typify Value-none? Value)
     __repr = sc_value_repr
     typeof = sc_value_type
+
+'set-symbols Scope
+    @ = sc_scope_at
+
+'set-symbols string
+    join = sc_string_join
+
+'set-symbols list
+    __countof = sc_list_count
+    join = sc_list_join
+    @ = sc_list_at
+    next = sc_list_next
+    decons = decons
+    reverse = sc_list_reverse
+
+# label accessors
+#'set-symbols Label
+    verify-argument-count = verify-argument-count
+    verify-keyed-count = verify-keyed-count
+    keyed = sc_label_get_keyed
+    set-keyed = sc_label_set_keyed
+    arguments = sc_label_get_arguments
+    set-arguments = sc_label_set_arguments
+    parameters = sc_label_get_parameters
+    enter = sc_label_get_enter
+    set-enter = sc_label_set_enter
+    dump = sc_label_dump
+    function-type = sc_label_function_type
+    set-rawcall = sc_label_set_rawcall
+    set-rawcont = sc_label_set_rawcont
+    frame = sc_label_frame
+    anchor = sc_label_anchor
+    body-anchor = sc_label_body_anchor
+    append-parameter = sc_label_append_parameter
+    return-keyed = Label-return-keyed
+    return = Label-return
+
+'set-symbols type
+    bitcount = sc_type_bitcountof
+    signed? = sc_integer_type_is_signed
+    element@ = sc_type_element_at
+    element-count = sc_type_countof
+    storage = sc_type_storage
+    kind = sc_type_kind
+    @ = sc_type_at
+    opaque? = sc_type_is_opaque
+    string = sc_type_string
+    super = sc_typename_type_get_super
+    set-super = sc_typename_type_set_super
+    set-storage = sc_typename_type_set_storage
+
+#'set-symbols Closure
+    frame = sc_closure_frame
+    label = sc_closure_label
+
+let rawstring = ('pointer i8)
+
+inline box-cast-dispatch (f)
+    box-pointer (typify f type type)
+
+inline not (value)
+    bxor value true
+
+syntax-extend
+    # a supertype to be used for conversions
+    let immutable = (sc_typename_type "immutable")
+    sc_typename_type_set_super integer immutable
+    sc_typename_type_set_super real immutable
+    sc_typename_type_set_super vector immutable
+    sc_typename_type_set_super Symbol immutable
+    sc_typename_type_set_super CEnum immutable
+
+    let aggregate = (sc_typename_type "aggregate")
+    sc_typename_type_set_super array aggregate
+    sc_typename_type_set_super tuple aggregate
+
+    let opaquepointer = (sc_typename_type "opaquepointer")
+    sc_typename_type_set_super string opaquepointer
+    sc_typename_type_set_super type opaquepointer
+
+    sc_typename_type_set_super usize integer
+
+    # syntax macro type
+    let SyntaxMacro = (sc_typename_type "SyntaxMacro")
+    let SyntaxMacroFunctionType =
+        'pointer
+            'raising
+                function (Arguments list Scope) list list Scope
+                Error
+    sc_typename_type_set_storage SyntaxMacro SyntaxMacroFunctionType
+
+    # any extraction
+
+    inline unbox-u32 (value T)
+        unbox-verify (extractvalue value 0) T
+        bitcast (itrunc (extractvalue value 1) u32) T
+
+    inline unbox-bitcast (value T)
+        unbox-verify (extractvalue value 0) T
+        bitcast (extractvalue value 1) T
+
+    inline unbox-hidden-pointer (value T)
+        unbox-verify (extractvalue value 0) T
+        load (inttoptr (extractvalue value 1) ('pointer T))
+
+    fn value-imply (vT T)
+        let storageT = ('storage T)
+        let kind = ('kind storageT)
+        if (icmp== kind type-kind-pointer)
+            return (box-pointer unbox-pointer)
+        elseif (icmp== kind type-kind-integer)
+            return (box-pointer unbox-integer)
+        elseif (icmp== kind type-kind-real)
+            if (ptrcmp== storageT f32)
+                return (box-pointer unbox-u32)
+            elseif (ptrcmp== storageT f64)
+                return (box-pointer unbox-bitcast)
+        elseif (bor (icmp== kind type-kind-tuple) (icmp== kind type-kind-array))
+            return (box-pointer unbox-hidden-pointer)
+        raise-compile-error! "unsupported type"
+
+    inline value-rimply (cls value)
+        Value value
+
+    'set-symbols Value
+        __imply =
+            box-cast-dispatch value-imply
+        __rimply =
+            box-cast-dispatch
+                fn "syntax-imply" (T vT)
+                    if true
+                        return (Value value-rimply)
+                    raise-compile-error! "unsupported type"
+
+    # integer casting
+
+    fn integer-imply (vT T)
+        let T =
+            if (ptrcmp== T usize) ('storage T)
+            else T
+        if (icmp== ('kind T) type-kind-integer)
+            let valw = ('bitcount vT)
+            let destw = ('bitcount T)
+            # must have same signed bit
+            if (icmp== ('signed? vT) ('signed? T))
+                if (icmp== destw valw)
+                    return (box-symbol bitcast)
+                elseif (icmp>s destw valw)
+                    if ('signed? vT)
+                        return (box-symbol sext)
+                    else
+                        return (box-symbol zext)
+        raise-compile-error! "unsupported type"
+
+    fn integer-as (vT T)
+        let T =
+            if (ptrcmp== T usize) ('storage T)
+            else T
+        if (icmp== ('kind T) type-kind-integer)
+            let valw = ('bitcount vT)
+            let destw = ('bitcount T)
+            if (icmp== destw valw)
+                return (box-symbol bitcast)
+            elseif (icmp>s destw valw)
+                if ('signed? vT)
+                    return (box-symbol sext)
+                else
+                    return (box-symbol zext)
+            else
+                return (box-symbol itrunc)
+        elseif (icmp== ('kind T) type-kind-real)
+            if ('signed? vT)
+                return (box-symbol sitofp)
+            else
+                return (box-symbol uitofp)
+        raise-compile-error! "unsupported type"
+
+    inline box-binary-op-dispatch (f)
+        box-pointer (typify f type type)
+    inline single-binary-op-dispatch (destf)
+        fn (lhsT rhsT)
+            if (ptrcmp== lhsT rhsT)
+                return (Value destf)
+            raise-compile-error! "unsupported type"
+
+    inline gen-cast-error (intro-string)
+        ast-macro
+            fn "cast-error" (argc argv)
+                verify-count argc 2 2
+
+                let cont value T = ('decons argv 3)
+                let vT = ('indirect-typeof value)
+                let T = (unbox-pointer T type)
+                # create branch so we can trick the function into assuming
+                    there's another exit path
+                if true
+                    raise-compile-error!
+                        sc_string_join intro-string
+                            sc_string_join
+                                '__repr (box-pointer vT)
+                                sc_string_join " to type "
+                                    '__repr (box-pointer T)
+
+    let DispatchCastFunctionType =
+        'pointer ('raising (function Value type type) Error)
+
+    fn unbox-dispatch-cast-function-type (anyf)
+        unbox-pointer anyf DispatchCastFunctionType
+
+    fn attribute-format-error! (T symbol err)
+        raise-compile-error!
+            'join "wrong format for attribute "
+                'join ('__repr (box-symbol symbol))
+                    'join " of type "
+                        'join ('__repr (box-pointer T))
+                            'join ": "
+                                format-error err
+
+    fn get-cast-dispatcher (symbol rsymbol vT T)
+        let ok anyf = ('@ vT symbol)
+        if ok
+            let f =
+                try
+                    unbox-dispatch-cast-function-type anyf
+                except (err)
+                    dump err
+                    attribute-format-error! vT symbol err
+            dump f
+            try
+                return true (f vT T) false
+            except (err)
+                # ignore
+        let ok anyf = ('@ T rsymbol)
+        if ok
+            let f =
+                try
+                    unbox-dispatch-cast-function-type anyf
+                except (err)
+                    attribute-format-error! T rsymbol err
+            try
+                return true (f T vT) true
+            except (err)
+                # ignore
+        return false (undef Value) false
+
+    fn implyfn (vT T)
+        get-cast-dispatcher '__imply '__rimply vT T
+    fn asfn (vT T)
+        get-cast-dispatcher '__as '__ras vT T
+
+    let imply =
+        box-ast-macro
+            fn "imply-dispatch" (argc argv)
+                verify-count argc 2 2
+                let value anyT = (loadarrayptrs argv 0 1)
+                let vT = ('typeof value)
+                let T = (unbox-pointer anyT type)
+                if (ptrcmp!= vT T)
+                    let ok f reverse = (implyfn vT T)
+                    if ok
+                        sc_call_new f (Value-array anyT value)
+                    else
+                        sc_call_new
+                            #box-pointer
+                            gen-cast-error "can't implicitly cast value of type "
+                            \ 0 (undef Value)
+                else value
+
+    let as =
+        box-ast-macro
+            fn "as-dispatch" (l)
+                let args = ('verify-argument-count l 2 2)
+                let cont value anyT = ('decons args 3)
+                let vT = ('indirect-typeof value)
+                let T = (unbox-pointer anyT type)
+                if (ptrcmp!= vT T)
+                    let ok f reverse =
+                        do
+                            # try implicit cast first
+                            let ok f reverse = (implyfn vT T)
+                            if ok (_ ok f reverse)
+                            else
+                                # then try explicit cast
+                                asfn vT T
+                    if ok
+                        'set-enter l f
+                        if reverse ('set-arguments l (make-list cont anyT value))
+                        return;
+                    'set-enter l
+                        box-pointer
+                            gen-cast-error "can't cast value of type "
+                else
+                    'return l value
+
+    let UnaryOpFunctionType =
+        'pointer ('raising (function Value type))
+
+    let BinaryOpFunctionType =
+        'pointer ('raising (function Value type type))
+
+    fn unbox-binary-op-function-type (anyf)
+        unbox-pointer anyf BinaryOpFunctionType
+
+    fn get-binary-op-dispatcher (symbol lhsT rhsT)
+        let ok anyf = ('@ lhsT symbol)
+        if ok
+            let f =
+                try (unbox-binary-op-function-type anyf)
+                except (err)
+                    attribute-format-error! lhsT symbol err
+            try
+                return (f lhsT rhsT)
+            except (err)
+        return false (undef Value)
+
+    fn binary-op-cast-macro (castf lhsT rhs)
+        let args = (alloca-array Value 2)
+        store rhs (getelementptr args 0)
+        store (box-pointer lhsT) (getelementptr args 1)
+        sc_call_new castf 2 args
+
+    # both types are typically the same
+    fn sym-binary-op-label-macro (l symbol rsymbol friendly-op-name)
+        let args = ('verify-argument-count l 2 2)
+        let cont lhs rhs = ('decons args 3)
+        let lhsT = ('indirect-typeof lhs)
+        let rhsT = ('indirect-typeof rhs)
+        # try direct version first
+        let ok f = (get-binary-op-dispatcher symbol lhsT rhsT)
+        if ok
+            'set-enter l f
+            return;
+        # if types are unequal, we can try other options
+        if (ptrcmp!= lhsT rhsT)
+            # try reverse version next
+            let ok f = (get-binary-op-dispatcher rsymbol rhsT lhsT)
+            if ok
+                'return l rhs lhs
+                'set-enter l f
+                return;
+            # can the operation be performed on the lhs type?
+            let ok f = (get-binary-op-dispatcher symbol lhsT lhsT)
+            if ok
+                # can we cast rhsT to lhsT?
+                let ok castf reverse = (implyfn rhsT lhsT)
+                if ok
+                    if (not reverse)
+                        let lcont param =
+                            binary-op-cast-macro l f castf lhsT rhs
+                        'set-arguments lcont
+                            list cont lhs (box-pointer param)
+                        return;
+            # can the operation be performed on the rhs type?
+            let ok f = (get-binary-op-dispatcher symbol rhsT rhsT)
+            if ok
+                # can we cast lhsT to rhsT?
+                let ok castf reverse = (implyfn lhsT rhsT)
+                if ok
+                    if (not reverse)
+                        let lcont param =
+                            binary-op-cast-macro l f castf rhsT lhs
+                        'set-arguments lcont
+                            list cont (box-pointer param) rhs
+                        return;
+        # we give up
+        raise-compile-error!
+            'join "can't "
+                'join friendly-op-name
+                    'join " values of types "
+                        'join
+                            '__repr (box-pointer lhsT)
+                            'join " and "
+                                '__repr (box-pointer rhsT)
+
+    # right hand has fixed type
+    fn asym-binary-op-label-macro (l symbol rtype friendly-op-name)
+        let args = ('verify-argument-count l 2 2)
+        let cont lhs rhs = ('decons args 3)
+        let lhsT = ('indirect-typeof lhs)
+        let rhsT = ('indirect-typeof rhs)
+        let ok f = ('@ lhsT symbol)
+        if ok
+            if (ptrcmp== rhsT rtype)
+                'set-enter l f
+                return;
+            # can we cast rhsT to rtype?
+            let ok castf reverse = (implyfn rhsT rtype)
+            if ok
+                if (not reverse)
+                    let lcont param =
+                        binary-op-cast-macro l f castf rtype rhs
+                    'set-arguments lcont
+                        list cont lhs (box-pointer param)
+                    return;
+        # we give up
+        raise-compile-error!
+            'join "can't "
+                'join friendly-op-name
+                    'join " values of types "
+                        'join
+                            '__repr (box-pointer lhsT)
+                            'join " and "
+                                '__repr (box-pointer rhsT)
+
+    fn unary-op-label-macro (l symbol friendly-op-name)
+        let args = ('verify-argument-count l 1 1)
+        let cont lhs = ('decons args 2)
+        let lhsT = ('indirect-typeof lhs)
+        let ok f = ('@ lhsT symbol)
+        if ok
+            'set-enter l f
+            return;
+        raise-compile-error!
+            'join "can't "
+                'join friendly-op-name
+                    'join " value of type "
+                        '__repr (box-pointer lhsT)
+
+    inline make-unary-op-dispatch (symbol friendly-op-name)
+        box-ast-macro (fn (l) (unary-op-label-macro l symbol friendly-op-name))
+
+    inline make-sym-binary-op-dispatch (symbol rsymbol friendly-op-name)
+        box-ast-macro (fn (l) (sym-binary-op-label-macro l symbol rsymbol friendly-op-name))
+
+    inline make-asym-binary-op-dispatch (symbol rtype friendly-op-name)
+        box-ast-macro (fn (l) (asym-binary-op-label-macro l symbol rtype friendly-op-name))
+
+    # support for calling macro functions directly
+    'set-symbols SyntaxMacro
+        __call =
+            box-pointer
+                inline (self at next scope)
+                    (bitcast self SyntaxMacroFunctionType) at next scope
+
+    inline symbol-imply (self destT)
+        sc_symbol_to_string self
+
+    'set-symbols Symbol
+        __== = (box-binary-op-dispatch (single-binary-op-dispatch icmp==))
+        __!= = (box-binary-op-dispatch (single-binary-op-dispatch icmp!=))
+        __imply =
+            box-cast-dispatch
+                fn "syntax-imply" (vT T)
+                    if (ptrcmp== T string)
+                        return (Any-wrap symbol-imply)
+                    raise-compile-error! "unsupported type"
+
+    fn string@ (self i)
+        let s = (sc_string_buffer self)
+        load (getelementptr s i)
+
+    'set-symbols string
+        __== = (box-binary-op-dispatch (single-binary-op-dispatch ptrcmp==))
+        __!= = (box-binary-op-dispatch (single-binary-op-dispatch ptrcmp!=))
+        __.. = (box-binary-op-dispatch (single-binary-op-dispatch sc_string_join))
+        __countof = sc_string_count
+        __@ = string@
+        __lslice = sc_string_lslice
+        __rslice = sc_string_rslice
+
+    'set-symbols list
+        __typecall =
+            inline (self args...)
+                make-list args...
+        __.. = (box-binary-op-dispatch (single-binary-op-dispatch sc_list_join))
+        __repr =
+            inline "list-repr" (self)
+                '__repr (Value self)
+
+    inline single-signed-binary-op-dispatch (sf uf)
+        fn (lhsT rhsT)
+            if (ptrcmp== lhsT rhsT)
+                if ('signed? lhsT)
+                    return (Any-wrap sf)
+                else
+                    return (Any-wrap uf)
+            raise-compile-error! "unsupported type"
+
+    fn dispatch-and-or (argc argv flip)
+        verify-count argc 2 2
+        let cond elsef = (loadarrayptrs argv 2)
+        let call-elsef = (sc_call_new elsef 0 (undef Value))
+        if ('constant? cond)
+            let value = (unbox-integer cond bool)
+            return
+                if (bxor value flip) cond
+                else call-elsef
+        let ifval = (sc_if_new)
+        if flip
+            sc_if_append_then_clause ifval cond call-elsef
+            sc_if_append_else_clause ifval cond
+        else
+            sc_if_append_then_clause ifval cond cond
+            sc_if_append_else_clause ifval call-elsef
+        ifval
+
+    'set-symbols integer
+        __imply = (box-cast-dispatch integer-imply)
+        __as = (box-cast-dispatch integer-as)
+        __+ = (box-binary-op-dispatch (single-binary-op-dispatch add))
+        __- = (box-binary-op-dispatch (single-binary-op-dispatch sub))
+        __== = (box-binary-op-dispatch (single-binary-op-dispatch icmp==))
+        __!= = (box-binary-op-dispatch (single-binary-op-dispatch icmp!=))
+        __< = (box-binary-op-dispatch (single-signed-binary-op-dispatch icmp<s icmp<u))
+        __<= = (box-binary-op-dispatch (single-signed-binary-op-dispatch icmp<=s icmp<=u))
+        __> = (box-binary-op-dispatch (single-signed-binary-op-dispatch icmp>s icmp>u))
+        __>= = (box-binary-op-dispatch (single-signed-binary-op-dispatch icmp>=s icmp>=u))
+
+    'set-symbols type
+        __== = (box-binary-op-dispatch (single-binary-op-dispatch type==))
+        __!= = (box-binary-op-dispatch (single-binary-op-dispatch type!=))
+        __< = (box-binary-op-dispatch (single-binary-op-dispatch type<))
+        __<= = (box-binary-op-dispatch (single-binary-op-dispatch type<=))
+        __> = (box-binary-op-dispatch (single-binary-op-dispatch type>))
+        __>= = (box-binary-op-dispatch (single-binary-op-dispatch type>=))
+        __@ = sc_type_element_at
+        __getattr =
+            box-ast-macro
+                fn "type-getattr" (argc argv)
+                    verify-count argc 2 2
+                    let self key = (loadarrayptrs 0 1)
+                    if ('constant? self)
+                        if ('constant? key)
+                            let self = (unbox-pointer self type)
+                            let key = (unbox-symbol key Symbol)
+                            let ok result = (sc_type_at self key)
+                            return
+                                sc_argument_list_new
+                                    Value-array (box-integer ok) result
+                    sc_call_new (Value sc_type_at) argc argv
+
+    'set-symbols Scope
+        __getattr = sc_scope_at
+        __typecall =
+            box-ast-macro
+                fn "scope-typecall" (argc argv)
+                    """"There are four ways to create a new Scope:
+                        ``Scope``
+                            creates an empty scope without parent
+                        ``Scope parent``
+                            creates an empty scope descending from ``parent``
+                        ``Scope none clone``
+                            duplicate ``clone`` without a parent
+                        ``Scope parent clone``
+                            duplicate ``clone``, but descending from ``parent`` instead
+                    verify-count argc 1 3
+                    if (icmp== argc 1)
+                        sc_call_new (Value Scope-new) 0 (undef Value)
+                    elseif (icmp== argc 2)
+                        sc_call_new (Value Scope-new-expand) 1 (getelementptr argv 1)
+                    else
+                        # argc == 3
+                        let parent = (loadarrayptrs argv 1)
+                        if (type== ('typeof parent) Nothing)
+                            sc_call_new (Value Scope-new-expand) 1 (getelementptr argv 2)
+                        else
+                            sc_call_new (Value Scope-clone-expand) 2 (getelementptr argv 1)
+
+    'set-symbols syntax-scope
+        and-branch = (box-ast-macro (fn (argc argv) (dispatch-and-or argc argv true)))
+        or-branch = (box-ast-macro (fn (argc argv) (dispatch-and-or argc argv false)))
+        immutable = (box-pointer immutable)
+        aggregate = (box-pointer aggregate)
+        opaquepointer = (box-pointer opaquepointer)
+        SyntaxMacro = (box-pointer SyntaxMacro)
+        SyntaxMacroFunctionType = (box-pointer SyntaxMacroFunctionType)
+        DispatchCastFunctionType = (box-pointer DispatchCastFunctionType)
+        BinaryOpFunctionType = (box-pointer BinaryOpFunctionType)
+        implyfn = (typify implyfn type type)
+        asfn = (typify asfn type type)
+        imply = imply
+        as = as
+        countof = (make-unary-op-dispatch '__countof "count")
+        ~ = (make-unary-op-dispatch '__~ "bitwise-negate")
+        == = (make-sym-binary-op-dispatch '__== '__r== "compare")
+        != = (make-sym-binary-op-dispatch '__!= '__r!= "compare")
+        < = (make-sym-binary-op-dispatch '__< '__r< "compare")
+        <= = (make-sym-binary-op-dispatch '__<= '__r<= "compare")
+        > = (make-sym-binary-op-dispatch '__> '__r> "compare")
+        >= = (make-sym-binary-op-dispatch '__>= '__r>= "compare")
+        + = (make-sym-binary-op-dispatch '__+ '__r+ "add")
+        - = (make-sym-binary-op-dispatch '__- '__r- "subtract")
+        * = (make-sym-binary-op-dispatch '__* '__r* "multiply")
+        / = (make-sym-binary-op-dispatch '__/ '__r/ "divide")
+        % = (make-sym-binary-op-dispatch '__% '__r% "modulate")
+        & = (make-sym-binary-op-dispatch '__& '__r& "apply bitwise-and to")
+        | = (make-sym-binary-op-dispatch '__| '__r| "apply bitwise-or to")
+        ^ = (make-sym-binary-op-dispatch '__^ '__r^ "apply bitwise-xor to")
+        .. = (make-sym-binary-op-dispatch '__.. '__r.. "join")
+        @ = (make-asym-binary-op-dispatch '__@ usize "apply subscript operator with")
+        getattr = (make-asym-binary-op-dispatch '__getattr Symbol "get attribute from")
+        lslice = (make-asym-binary-op-dispatch '__lslice usize "apply left-slice operator with")
+        rslice = (make-asym-binary-op-dispatch '__rslice usize "apply right-slice operator with")
+        constbranch = constbranch
+    syntax-scope

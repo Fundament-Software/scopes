@@ -132,7 +132,7 @@ typedef struct sc_rawstring_array_i32_tuple_ { char **_0; int _1; } sc_rawstring
 
 // prototypes
 
-typedef sc_value_raises_t (*sc_ast_macro_func_t)(sc_value_t **, int);
+typedef sc_value_raises_t (*sc_ast_macro_func_t)(int, sc_value_t **);
 
 // compiler
 
@@ -167,6 +167,7 @@ void sc_template_set_body(sc_value_t *fn, sc_value_t *value);
 void sc_template_set_inline(sc_value_t *fn);
 
 sc_value_t *sc_block_new(int numvalues, sc_value_t **values);
+sc_value_t *sc_scoped_block_new(int numvalues, sc_value_t **values);
 
 sc_value_t *sc_extern_new(sc_symbol_t name, const sc_type_t *type);
 void sc_extern_set_flags(sc_value_t *value, uint32_t flags);
@@ -360,6 +361,10 @@ sc_type_raises_t sc_vector_type(const sc_type_t *element_type, size_t count);
 // tuple types
 
 sc_type_raises_t sc_tuple_type(int numtypes, const sc_type_t **types);
+
+// argument types
+
+const sc_type_t *sc_arguments_type(int numtypes, const sc_type_t **types);
 
 // function types
 

@@ -185,11 +185,14 @@ SCOPES_RESULT(void) error_invalid_condition_type(Value *cond) {
 }
 
 
-SCOPES_RESULT(void) error_constant_expected(Value *value) {
+SCOPES_RESULT(void) error_constant_expected(const Type *want, Value *value) {
     SCOPES_RESULT_TYPE(void);
     print_definition_anchor(value);
     StyledString ss;
-    ss.out << "constant expected, got "
+    ss.out << "constant";
+    if (want)
+        ss.out << " of type " << want;
+    ss.out << " expected, got "
         << get_value_class_name(value->kind())
         << " of type " << value->get_type();
     SCOPES_LOCATION_ERROR(ss.str());
