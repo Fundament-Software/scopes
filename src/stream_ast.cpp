@@ -248,10 +248,15 @@ struct StreamAST : StreamAnchors {
                 stream_newline();
                 stream_indent(depth+1);
                 ss << Style_Keyword << "clause" << Style_None;
-                stream_newline();
                 auto &&expr = val->clauses[i];
-                if (expr.cond)
-                    walk(expr.cond, depth+2, maxdepth);
+                if (expr.cond) {
+                    stream_newline();
+                    stream_indent(depth+2);
+                    ss << Style_Keyword << "condition" << Style_None;
+                    stream_block(expr.cond_body, depth+3, maxdepth);
+                    stream_newline();
+                    walk(expr.cond, depth+3, maxdepth);
+                }
                 stream_block(expr.body, depth+2, maxdepth);
                 stream_newline();
                 walk(expr.value, depth+2, maxdepth);

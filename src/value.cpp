@@ -266,17 +266,28 @@ If *If::from(const Anchor *anchor, const Clauses &_clauses) {
 }
 
 void If::append(const Anchor *anchor, Value *cond, Value *value) {
-    clauses.push_back({anchor, cond, value});
+    assert(anchor);
+    assert(cond);
+    assert(value);
+    Clause clause;
+    clause.anchor = anchor;
+    clause.cond = cond;
+    clause.value = value;
+    clauses.push_back(clause);
 }
 
 void If::append(const Anchor *anchor, Value *value) {
+    assert(anchor);
+    assert(value);
     assert(!else_clause.value);
-    else_clause = Clause(anchor, nullptr, value);
+    else_clause.anchor = anchor;
+    else_clause.value = value;
 }
 
 Value *If::canonicalize() {
     if (!else_clause.value) {
-        else_clause = Clause(anchor(), ArgumentList::from(anchor()));
+        else_clause.anchor = anchor();
+        else_clause.value = ArgumentList::from(anchor());
     }
     return this;
 }

@@ -1245,7 +1245,11 @@ syntax-extend
                             let ok result = (sc_type_at self key)
                             return
                                 sc_argument_list_new
-                                    Value-array (box-integer ok) result
+                                    Value-array (box-integer ok)
+                                        if ok
+                                            result
+                                        else
+                                            box-none;
                     sc_call_new (Value sc_type_at) argc argv
 
     'set-symbols Scope
@@ -1312,3 +1316,95 @@ syntax-extend
         rslice = (make-asym-binary-op-dispatch '__rslice usize "apply right-slice operator with")
         #constbranch = constbranch
     syntax-scope
+
+#inline Syntax-unbox (self destT)
+    imply ('datum self) destT
+
+inline not (value)
+    bxor (imply value bool) true
+
+let function->SyntaxMacro =
+    typify
+        fn "function->SyntaxMacro" (f)
+            bitcast f SyntaxMacro
+        SyntaxMacroFunctionType
+
+inline syntax-block-scope-macro (f)
+    function->SyntaxMacro (typify f list list Scope)
+
+inline syntax-scope-macro (f)
+    syntax-block-scope-macro
+        fn (at next scope)
+            let at scope = (f ('next at) scope)
+            return (cons (Value at) next) scope
+
+inline syntax-macro (f)
+    syntax-block-scope-macro
+        fn (at next scope)
+            return (cons (Value (f ('next at))) next) scope
+
+fn empty? (value)
+    == (countof value) 0:usize
+
+fn cons (at next)
+    sc_list_cons (Value at) next
+
+fn type-repr-needs-suffix? (CT)
+    if (== CT i32) false
+    elseif (== CT bool) false
+    elseif (== CT Nothing) false
+    elseif (== CT f32) false
+    elseif (== CT string) false
+    elseif (== CT list) false
+    elseif (== CT Symbol) false
+    elseif (== CT type) false
+    elseif (== ('kind CT) type-kind-vector)
+        let ET = ('element@ CT 0)
+        if (== ET i32) false
+        elseif (== ET bool) false
+        elseif (== ET f32) false
+        else true
+    else true
+
+fn tostring (value)
+    let T = (typeof value)
+    let ok f = (getattr T '__tostring)
+    constbranch ok
+        inline ()
+            f value
+        inline ()
+            sc_value_tostring (Value value)
+
+fn repr (value)
+    let T = (typeof value)
+    let ok f = (getattr T '__repr)
+    let s =
+        constbranch ok
+            inline ()
+                f value
+            inline ()
+                sc_value_repr (Value value)
+    if (type-repr-needs-suffix? T)
+        .. s
+            ..
+                default-styler style-operator ":"
+                default-styler style-type ('string T)
+
+    else s
+
+let print =
+    do
+        fn print-element (i key value)
+            if (!= i 0)
+                io-write! " "
+            constbranch (== (typeof value) string)
+                inline ()
+                    io-write! value
+                inline ()
+                    io-write! (repr value)
+
+        fn print (values...)
+            va-lifold print-element values...
+            io-write! "\n"
+            values...
+

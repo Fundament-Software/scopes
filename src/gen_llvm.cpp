@@ -1019,16 +1019,12 @@ struct LLVMIRGenerator {
         SCOPES_EXPECT_ERROR(error_gen_unbound_symbol(SCOPES_GEN_TARGET, node));
     }
 
-    SCOPES_RESULT(LLVMValueRef) Block_to_value(Block *node) {
-        SCOPES_RESULT_TYPE(LLVMValueRef);
-
-        assert(!node->body.empty());
-        int lasti = (int)node->body.size() - 1;
-        assert(lasti >= 0);
-        for (int i = 0; i <= lasti; ++i) {
-            SCOPES_CHECK_RESULT(node_to_value(node->body[i]));
+    SCOPES_RESULT(void) block_to_value(const Block &node) {
+        SCOPES_RESULT_TYPE(void);
+        for (auto entry : node.body) {
+            SCOPES_CHECK_RESULT(node_to_value(entry));
         }
-        return SCOPES_GET_RESULT(node_to_value(node->body[lasti]));
+        return true;
     }
 
 
@@ -1701,13 +1697,12 @@ struct LLVMIRGenerator {
             auto &&clause = node->clauses[i];
             LLVMBasicBlockRef bb_then = bbthen[i];
             LLVMBasicBlockRef bb_else = bbelse[i];
+            SCOPES_CHECK_RESULT(block_to_value(clause.cond_body));
             auto cond = SCOPES_GET_RESULT(node_to_value(clause.cond));
             assert(cond);
             LLVMBuildCondBr(builder, cond, bb_then, bb_else);
             LLVMPositionBuilderAtEnd(builder, bb_then);
-            for (auto value : clause.body.body) {
-                SCOPES_CHECK_RESULT(node_to_value(value));
-            }
+            SCOPES_CHECK_RESULT(block_to_value(clause.body));
             auto result = SCOPES_GET_RESULT(node_to_value(clause.value));
             auto rtype = clause.value->get_type();
             if (is_returning(rtype)) {
@@ -1724,9 +1719,7 @@ struct LLVMIRGenerator {
             LLVMPositionBuilderAtEnd(builder, bb_else);
         }
         {
-            for (auto value : node->else_clause.body.body) {
-                SCOPES_CHECK_RESULT(node_to_value(value));
-            }
+            SCOPES_CHECK_RESULT(block_to_value(node->else_clause.body));
             auto result = SCOPES_GET_RESULT(node_to_value(node->else_clause.value));
             auto rtype = node->else_clause.value->get_type();
             if (is_returning(rtype)) {

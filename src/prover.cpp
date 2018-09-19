@@ -1357,28 +1357,19 @@ static SCOPES_RESULT(Value *) prove_If(const ASTContext &ctx, If *_if) {
     Clauses clauses;
     Clause else_clause;
     for (auto &&clause : _if->clauses) {
-        auto newcond = SCOPES_GET_RESULT(prove(subctx, clause.cond));
+        Clause newclause;
+        newclause.anchor = clause.anchor;
+        auto newcond = SCOPES_GET_RESULT(prove(subctx.with_block(newclause.cond_body), clause.cond));
         if (newcond->get_type() != TYPE_Bool) {
             SCOPES_ANCHOR(clause.anchor);
             SCOPES_EXPECT_ERROR(error_invalid_condition_type(newcond));
         }
-        #if 0
-        auto maybe_const = dyn_cast<ConstInt>(newcond);
-        if (maybe_const) {
-            bool istrue = maybe_const->value;
-            if (istrue) {
-                // always true - the remainder will not be evaluated
-                else_clause = Clause(clause.anchor, clause.value);
-                goto finalize;
-            } else {
-                // always false - this block will never be evaluated
-                continue;
-            }
-        }
-        #endif
-        clauses.push_back(Clause(clause.anchor, newcond, clause.value));
+        newclause.cond = newcond;
+        newclause.value = clause.value;
+        clauses.push_back(newclause);
     }
-    else_clause = Clause(_if->else_clause.anchor, _if->else_clause.value);
+    else_clause.anchor = _if->else_clause.anchor;
+    else_clause.value = _if->else_clause.value;
 finalize:
     // run a suspendable job for each branch
     int numclauses = clauses.size() + 1;

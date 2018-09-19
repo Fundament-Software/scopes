@@ -203,15 +203,12 @@ struct Expression : Value {
 
 struct Clause {
     const Anchor *anchor;
+    Block cond_body;
     Value *cond;
     Block body;
     Value *value;
 
     Clause() : anchor(nullptr), cond(nullptr), value(nullptr) {}
-    Clause(const Anchor *_anchor, Value *_cond, Value *_value)
-        : anchor(_anchor), cond(_cond), value(_value) {}
-    Clause(const Anchor *_anchor, Value *_value)
-        : anchor(_anchor), cond(nullptr), value(_value) {}
 };
 
 typedef std::vector<Clause> Clauses;

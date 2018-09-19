@@ -57,6 +57,7 @@ namespace scopes {
 static void init_values_array(scopes::Values &dest, int numvalues, sc_value_t **values) {
     dest.reserve(numvalues);
     for (int i = 0; i < numvalues; ++i) {
+        assert(values[i]);
         dest.push_back(values[i]);
     }
 }
@@ -65,6 +66,7 @@ template<typename T>
 static void init_values_array(std::vector<T *> &dest, int numvalues, sc_value_t **values) {
     dest.reserve(numvalues);
     for (int i = 0; i < numvalues; ++i) {
+        assert(values[i]);
         dest.push_back(cast<T>(values[i]));
     }
 }
@@ -669,14 +671,14 @@ const sc_list_t *sc_list_reverse(const sc_list_t *l) {
 const sc_string_t *sc_value_repr (sc_value_t *value) {
     using namespace scopes;
     StyledString ss;
-    stream_ast(ss.out, value, StreamASTFormat());
+    stream_ast(ss.out, value, StreamASTFormat::singleline());
     return ss.str();
 }
 
 const sc_string_t *sc_value_tostring (sc_value_t *value) {
     using namespace scopes;
     StyledString ss = StyledString::plain();
-    stream_ast(ss.out, value, StreamASTFormat());
+    stream_ast(ss.out, value, StreamASTFormat::singleline());
     return ss.str();
 }
 
