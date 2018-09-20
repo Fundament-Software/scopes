@@ -17,8 +17,10 @@
 #include "value.hpp"
 #include "prover.hpp"
 #include "timer.hpp"
+#include "stream_ast.hpp"
 #include "gc.hpp"
 #include "dyn_cast.inc"
+#include "scopes/scopes.h"
 
 #include <assert.h>
 
@@ -441,7 +443,7 @@ struct Expander {
                     it = it->next;
                 }
                 if (!last_entry) {
-                    last_entry = ConstTuple::none_from(_anchor);
+                    last_entry = ConstAggregate::none_from(_anchor);
                 }
                 return last_entry;
             }
@@ -534,7 +536,7 @@ struct Expander {
             // ignore
         }
 
-        return ConstTuple::none_from(_anchor);
+        return ConstAggregate::none_from(_anchor);
     }
 
     // (try [x ...]) (except (param ...) [expr ...])
@@ -745,13 +747,12 @@ struct Expander {
         auto _anchor = get_active_anchor();
         SCOPES_CHECK_RESULT(verify_list_parameter_count("break", it, 0, -1));
         it = it->next;
-        Value *value = nullptr;
+        ArgumentList *args = ArgumentList::from(_anchor);
         if (it) {
-            value = SCOPES_GET_RESULT(expand(it->at));
-        } else {
-            value = ArgumentList::from(_anchor);
+            Expander subexp(env, astscope, it->next);
+            SCOPES_CHECK_RESULT(subexp.expand_arguments(args->values, it));
         }
-        return Break::from(_anchor, value);
+        return Break::from(_anchor, args);
     }
 
     SCOPES_RESULT(Value *) expand_repeat(const List *it) {
@@ -797,8 +798,9 @@ struct Expander {
     }
 
     struct ListScopePair { const List *topit; Scope *env; };
-    struct OKListScopePair { bool ok; ListScopePair pair; };
-    typedef OKListScopePair (*HandlerFuncType)(const List *, Scope *);
+
+    SCOPES_TYPEDEF_RESULT_RAISES(sc_list_scope_raises, ListScopePair);
+    typedef sc_list_scope_raises_t (*HandlerFuncType)(const List *, Scope *);
 
     SCOPES_RESULT(Value *) expand(Value *node) {
         SCOPES_RESULT_TYPE(Value *);
@@ -892,18 +894,21 @@ struct Expander {
                 HandlerFuncType f = (HandlerFuncType)cast<ConstPointer>(list_handler_node)->value;
                 auto ok_result = f(List::from(node, next), env);
                 if (!ok_result.ok) {
+                    set_last_error(ok_result.except);
                     SCOPES_RETURN_ERROR();
                 }
-                auto result = ok_result.pair;
-                Value *newnode = result.topit->at;
-                if (newnode != node) {
-                    node = newnode;
-                    next = result.topit->next;
-                    env = result.env;
-                    goto expand_again;
-                } else if (verbose) {
-                    StyledStream ss(SCOPES_CERR);
-                    ss << "ignored by list handler" << std::endl;
+                auto result = ok_result._0;
+                if (result.topit) {
+                    Value *newnode = result.topit->at;
+                    if (newnode != node) {
+                        node = newnode;
+                        next = result.topit->next;
+                        env = result.env;
+                        goto expand_again;
+                    } else if (verbose) {
+                        StyledStream ss(SCOPES_CERR);
+                        ss << "ignored by list handler" << std::endl;
+                    }
                 }
             }
             SCOPES_ANCHOR(node->anchor());
@@ -930,15 +935,18 @@ struct Expander {
                     HandlerFuncType f = (HandlerFuncType)cast<ConstPointer>(symbol_handler_node)->value;
                     auto ok_result = f(List::from(node, next), env);
                     if (!ok_result.ok) {
+                        set_last_error(ok_result.except);
                         SCOPES_RETURN_ERROR();
                     }
-                    auto result = ok_result.pair;
-                    Value *newnode = result.topit->at;
-                    if (newnode != node) {
-                        node = newnode;
-                        next = result.topit->next;
-                        env = result.env;
-                        goto expand_again;
+                    auto result = ok_result._0;
+                    if (result.topit) {
+                        Value *newnode = result.topit->at;
+                        if (newnode != node) {
+                            node = newnode;
+                            next = result.topit->next;
+                            env = result.env;
+                            goto expand_again;
+                        }
                     }
                 }
 

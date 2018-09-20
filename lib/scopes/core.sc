@@ -250,7 +250,7 @@ fn box-empty ()
     sc_argument_list_new 0 (undef ValueArrayPointer)
 
 fn box-none ()
-    sc_const_tuple_new Nothing 0 (undef ValueArrayPointer)
+    sc_const_aggregate_new Nothing 0 (undef ValueArrayPointer)
 
 # take closure l, typify and compile it and return a function of ASTMacro type
 inline ast-macro (l)
@@ -474,7 +474,7 @@ syntax-extend
                         _ (box-symbol key) arg
                 if (sc_value_is_constant self)
                     if (sc_value_is_constant key)
-                        if (sc_value_is_constant value)
+                        if (sc_value_is_pure value)
                             let self = (unbox-pointer self selftype)
                             let key = (unbox-symbol key Symbol)
                             fset self key value
@@ -665,7 +665,7 @@ fn cons (values...)
                     sc_list_cons (Value value) next
         values...
 
-fn make-list (values...)
+inline make-list (values...)
     constbranch (const.icmp<=.i32.i32 (va-countof values...) 0)
         inline () '()
         inline ()
@@ -699,9 +699,11 @@ inline set-symbols (self values...)
 
 'set-symbols Value
     constant? = sc_value_is_constant
+    pure? = sc_value_is_pure
     none? = (typify Value-none? Value)
     __repr = sc_value_repr
     typeof = sc_value_type
+    anchor = sc_value_anchor
 
 'set-symbols Scope
     @ = sc_scope_at
@@ -944,17 +946,6 @@ syntax-extend
             except (err)
                 # ignore
         return false (undef Value) false
-
-    #syntax-extend
-        let types = (alloca-array type 4:usize)
-        store Symbol (getelementptr types 0)
-        store Symbol (getelementptr types 1)
-        store type (getelementptr types 2)
-        store type (getelementptr types 3)
-        let result = (sc_compile (sc_typify get-cast-dispatcher 4 types)
-            compile-flag-dump-module)
-        exit 0
-        syntax-scope
 
     fn implyfn (vT T)
         get-cast-dispatcher '__imply '__rimply vT T
@@ -1280,6 +1271,7 @@ syntax-extend
                             sc_call_new (Value Scope-clone-expand) 2 (getelementptr argv 1)
 
     'set-symbols syntax-scope
+        eol = (Value (nullof list))
         and-branch = (box-ast-macro (fn (argc argv) (dispatch-and-or argc argv true)))
         or-branch = (box-ast-macro (fn (argc argv) (dispatch-and-or argc argv false)))
         immutable = (box-pointer immutable)
@@ -1407,4 +1399,733 @@ let print =
             va-lifold print-element values...
             io-write! "\n"
             values...
+
+syntax-extend
+    # implicit argument type coercion for functions, externs and typed labels
+    # --------------------------------------------------------------------------
+
+    let coerce-call-arguments =
+        box-ast-macro
+            fn "coerce-call-arguments" (argc argv)
+                verify-count argc 1 -1
+                let self = (load (getelementptr argv 0))
+                let argc = (sub argc 1)
+                let argv = (getelementptr argv 1)
+                let fptrT = ('typeof self)
+                let fT = ('element@ fptrT 0)
+                let pcount = ('element-count fT)
+                let callv =
+                    if (== pcount argc)
+                        let outargs = (alloca-array Value argc)
+                        loop (i) = 0
+                        if (< i argc)
+                            let arg = (load (getelementptr argv i))
+                            let argT = ('typeof arg)
+                            let paramT = ('element@ fT i)
+                            let outarg =
+                                if (== argT paramT) arg
+                                else
+                                    sc_call_new (Value imply)
+                                        Value-array arg (Value paramT)
+                            store outarg (getelementptr outargs i)
+                            repeat (+ i 1)
+                        sc_call_new self argc outargs
+                    else
+                        sc_call_new self argc argv
+                sc_call_set_rawcall callv true
+                callv
+
+    'set-symbols pointer
+        __call = coerce-call-arguments
+
+    # dotted symbol expander
+    # --------------------------------------------------------------------------
+
+    let dot-char = 46:i8 # "."
+    let dot-sym = '.
+
+    fn dotted-symbol? (env head)
+        if (== head dot-sym)
+            return false
+        let s = (as head string)
+        let sz = (countof s)
+        loop (i) = 0:usize
+        if (== i sz)
+            return false
+        elseif (== (@ s i) dot-char)
+            return true
+        repeat (+ i 1:usize)
+
+    fn split-dotted-symbol (head start end tail)
+        let s = (as head string)
+        loop (i) = start
+        if (== i end)
+            # did not find a dot
+            if (== start 0:usize)
+                return (cons head tail)
+            else
+                return (cons (Symbol (lslice s start)) tail)
+        if (== (@ s i) dot-char)
+            let tail =
+                # no remainder after dot
+                if (== i (- end 1:usize)) tail
+                else # remainder after dot, split the rest first
+                    split-dotted-symbol head (+ i 1:usize) end tail
+            let result = (cons dot-sym tail)
+            if (== i 0:usize)
+                # no prefix before dot
+                return result
+            else
+                # prefix before dot
+                let size = (- i start)
+                return
+                    cons (Symbol (rslice (lslice s start) size)) result
+        repeat (+ i 1:usize)
+
+    # infix notation support
+    # --------------------------------------------------------------------------
+
+    fn get-ifx-symbol (name)
+        Symbol (.. "#ifx:" name)
+
+    fn expand-define-infix (args scope order)
+        let prec rest = ('decons args)
+        let token rest = ('decons rest)
+        let func rest = ('decons rest)
+        let prec =
+            as prec i32
+        let token =
+            as token Symbol
+        let func =
+            if (== ('typeof func) Nothing) token
+            else
+                as func Symbol
+        'set-symbol scope (get-ifx-symbol token)
+            Value (cons prec (cons order (cons func '())))
+        return none scope
+
+    inline make-expand-define-infix (order)
+        fn (args scope)
+            expand-define-infix args scope order
+
+    fn get-ifx-op (env op)
+        let sym = op
+        if (== ('typeof sym) Symbol)
+            getattr env (get-ifx-symbol (as sym Symbol))
+        else
+            return false (Value none)
+
+    fn has-infix-ops? (infix-table expr)
+        # any expression of which one odd argument matches an infix operator
+            has infix operations.
+        loop (expr) = expr
+        if (< (countof expr) 3:usize)
+            return false
+        let __ expr = ('decons expr)
+        let at next = ('decons expr)
+        let ok result = (get-ifx-op infix-table at)
+        if ok
+            return true
+        repeat expr
+
+    fn unpack-infix-op (op)
+        let op = (as op list)
+        let op-prec rest = ('decons op)
+        let op-order rest = ('decons rest)
+        let op-func rest = ('decons rest)
+        return
+            as op-prec i32
+            as op-order Symbol
+            as op-func Symbol
+
+    inline infix-op (pred)
+        fn infix-op (infix-table token prec)
+            let ok op =
+                get-ifx-op infix-table token
+            if ok
+                let op-prec = (unpack-infix-op op)
+                ? (pred op-prec prec) op (Value none)
+            else
+                set-anchor! ('anchor token)
+                raise-compile-error!
+                    "unexpected token in infix expression"
+    let infix-op-gt = (infix-op >)
+    let infix-op-ge = (infix-op >=)
+
+    fn rtl-infix-op-eq (infix-table token prec)
+        let ok op =
+            get-ifx-op infix-table token
+        if ok
+            let op-prec op-order = (unpack-infix-op op)
+            if (== op-order '<)
+                ? (== op-prec prec) op (Value none)
+            else
+                Value none
+        else
+            set-anchor! ('anchor token)
+            raise-compile-error!
+                "unexpected token in infix expression"
+
+    fn parse-infix-expr (infix-table lhs state mprec)
+        loop (lhs state) = lhs state
+        if (empty? state)
+            return lhs state
+        let la next-state = ('decons state)
+        let op = (infix-op-ge infix-table la mprec)
+        if (== ('typeof op) Nothing)
+            return lhs state
+        let op-prec op-order op-name = (unpack-infix-op op)
+        let next-lhs next-state =
+            do
+                loop (rhs state) = ('decons next-state)
+                if (empty? state)
+                    break (Value (list op-name lhs rhs)) state
+                let ra __ = ('decons state)
+                let lop = (infix-op-gt infix-table ra op-prec)
+                let nextop =
+                    if (== ('typeof lop) Nothing)
+                        rtl-infix-op-eq infix-table ra op-prec
+                    else lop
+                if (== ('typeof nextop) Nothing)
+                    break (Value (list op-name lhs rhs)) state
+                let nextop-prec = (unpack-infix-op nextop)
+                let next-rhs next-state =
+                    parse-infix-expr infix-table rhs state nextop-prec
+                repeat next-rhs next-state
+        repeat next-lhs next-state
+
+    #syntax-extend
+        let types = (alloca-array type 4)
+        store Scope (getelementptr types 0)
+        store Value (getelementptr types 1)
+        store list (getelementptr types 2)
+        store i32 (getelementptr types 3)
+        let result = (sc_compile (sc_typify parse-infix-expr 4 types)
+            compile-flag-dump-module)
+        exit 0
+        syntax-scope
+
+    let parse-infix-expr =
+        typify parse-infix-expr Scope Value list i32
+
+    #---------------------------------------------------------------------------
+
+    # install general list hook for this scope
+    # is called for every list the expander would otherwise consider a call
+    fn list-handler (topexpr env)
+        let topexpr-at topexpr-next = ('decons topexpr)
+        let sxexpr = topexpr-at
+        let expr expr-anchor = sxexpr ('anchor sxexpr)
+        if (!= ('typeof expr) list)
+            return topexpr env
+        let expr = (as expr list)
+        let expr-at expr-next = ('decons expr)
+        let head-key = expr-at
+        let head =
+            if (== ('typeof head-key) Symbol)
+                let ok head = (getattr env (as head-key Symbol))
+                if ok head
+                else head-key
+            else head-key
+        let head =
+            if (== ('typeof head) type)
+                let ok attr = (getattr (as head type) '__macro)
+                if ok attr
+                else head
+            else head
+        if (== ('typeof head) SyntaxMacro)
+            let head = (as head SyntaxMacro)
+            let expr env = (head expr topexpr-next env)
+            # todo: attach expr-anchor
+            #let expr = (Syntax-wrap expr-anchor (Value expr) false)
+            return (as expr list) env
+        elseif (has-infix-ops? env expr)
+            let at next = ('decons expr)
+            let expr =
+                parse-infix-expr env at next 0
+            #let expr = (Syntax-wrap expr-anchor expr false)
+            return (cons expr topexpr-next) env
+        else
+            return topexpr env
+
+    # install general symbol hook for this scope
+    # is called for every symbol the expander could not resolve
+    fn symbol-handler (topexpr env)
+        let at next = ('decons topexpr)
+        let sxname = at
+        let name name-anchor = (as sxname Symbol) ('anchor sxname)
+        if (dotted-symbol? env name)
+            let s = (as name string)
+            let sz = (countof s)
+            let expr =
+                Value (split-dotted-symbol name 0:usize sz eol)
+            #let expr = (Syntax-wrap name-anchor expr false)
+            return (cons expr next) env
+        return topexpr env
+
+    'set-symbol syntax-scope (Symbol "#list")
+        Value (typify list-handler list Scope)
+
+    'set-symbol syntax-scope (Symbol "#symbol")
+        Value (typify symbol-handler list Scope)
+
+    fn backquote-list (x)
+        inline backquote-any (ox)
+            let x = ox
+            let T = ('typeof x)
+            if (== T list)
+                backquote-list (as x list)
+            else
+                cons quote (cons ox '())
+        if (empty? x)
+            return (cons quote (cons x '()))
+        let aat next = ('decons x)
+        let at = aat
+        let T = ('typeof at)
+        if (== T list)
+            let at = (as at list)
+            if (not (empty? at))
+                let at-at at-next = ('decons at)
+                if (== ('typeof at-at) Symbol)
+                    let at-at = (as at-at Symbol)
+                    if (== at-at 'unquote-splice)
+                        return
+                            cons (Value sc_list_join)
+                                cons (cons do at-next)
+                                    cons (backquote-list next) '()
+        elseif (== T Symbol)
+            let at = (as at Symbol)
+            if (== at 'unquote)
+                return (cons do next)
+            elseif (== at 'backquote)
+                return (backquote-list (backquote-list next))
+        return
+            cons cons
+                cons (backquote-any aat)
+                    cons (backquote-list next) '()
+
+    fn quote-label (expr scope)
+        #let arg = (Value expr)
+        let arg = (as expr list)
+        sc_eval_inline arg scope
+
+    fn expand-and-or (expr f)
+        if (empty? expr)
+            raise-compile-error! "at least one argument expected"
+        elseif (== (countof expr) 1:usize)
+            return ('@ expr)
+        let expr = ('reverse expr)
+        loop (result head) = ('decons expr)
+        if (empty? head)
+            return result
+        let at next = ('decons head)
+        repeat (Value (list f at (list inline '() result))) next
+
+    #syntax-extend
+        let vals = (alloca-array type 2)
+        store list (getelementptr vals 0)
+        store Value (getelementptr vals 1)
+        sc_compile
+            sc_typify expand-and-or 2 vals
+            0:u64
+        exit 0
+        syntax-scope
+
+    inline make-expand-and-or (f)
+        fn (expr)
+            expand-and-or expr f
+
+    fn ltr-multiop (argc argv target)
+        verify-count argc 2 -1
+        if (== argc 2)
+            sc_call_new target argc argv
+        else
+            # call for multiple args
+            let lhs = (loadarrayptrs argv 0)
+            loop (i lhs) = 1 lhs
+            let rhs = (loadarrayptrs argv i)
+            let op = (sc_call_new target (Value-array lhs rhs))
+            let i = (+ i 1)
+            if (< i argc)
+                repeat i op
+            op
+
+    fn rtl-multiop (argc argv target)
+        verify-count argc 2 -1
+        if (== argc 2)
+            sc_call_new target argc argv
+        else
+            # call for multiple args
+            let lasti = (- argc 1)
+            let rhs = (loadarrayptrs argv lasti)
+            loop (i rhs) = lasti rhs
+            let i = (- i 1)
+            let lhs = (loadarrayptrs argv i)
+            let op = (sc_call_new target (Value-array lhs rhs))
+            if (> i 0)
+                repeat i op
+            op
+
+    # dot macro
+    # (. value symbol ...)
+    'set-symbols syntax-scope
+        backquote-list = (Value backquote-list)
+        backquote =
+            Value
+                syntax-macro
+                    fn (args)
+                        backquote-list args
+        #quote-label = quote-label
+        quote-inline =
+            Value
+                syntax-scope-macro
+                    fn (args scope)
+                        return
+                            cons quote-label
+                                cons (backquote-list args)
+                                    cons scope '()
+                            scope
+        . =
+            Value
+                syntax-macro
+                    fn (args)
+                        fn op (a b)
+                            let sym = (as b Symbol)
+                            list getattr a (list quote sym)
+                        let a rest = ('decons args)
+                        let b rest = ('decons rest)
+                        loop (rest result) = rest (op a b)
+                        if (empty? rest)
+                            result
+                        else
+                            let c rest = ('decons rest)
+                            repeat rest (op result c)
+        and = (Value (syntax-macro (make-expand-and-or and-branch)))
+        or = (Value (syntax-macro (make-expand-and-or or-branch)))
+        define-infix> = (Value (syntax-scope-macro (make-expand-define-infix '>)))
+        define-infix< = (Value (syntax-scope-macro (make-expand-define-infix '<)))
+        .. = (box-ast-macro (fn (argc argv) (rtl-multiop argc argv (Value ..))))
+        + = (box-ast-macro (fn (argc argv) (ltr-multiop argc argv (Value +))))
+        * = (box-ast-macro (fn (argc argv) (ltr-multiop argc argv (Value *))))
+
+    syntax-scope
+
+define-infix< 50 +=
+define-infix< 50 -=
+define-infix< 50 *=
+define-infix< 50 /=
+define-infix< 50 //=
+define-infix< 50 %=
+define-infix< 50 >>=
+define-infix< 50 <<=
+define-infix< 50 &=
+define-infix< 50 |=
+define-infix< 50 ^=
+define-infix< 50 =
+
+define-infix> 100 or
+define-infix> 200 and
+
+define-infix> 300 <
+define-infix> 300 >
+define-infix> 300 <=
+define-infix> 300 >=
+define-infix> 300 !=
+define-infix> 300 ==
+
+define-infix> 340 |
+define-infix> 350 ^
+define-infix> 360 &
+
+define-infix< 400 ..
+define-infix> 450 <<
+define-infix> 450 >>
+define-infix> 500 -
+define-infix> 500 +
+define-infix> 600 %
+define-infix> 600 /
+define-infix> 600 //
+define-infix> 600 *
+define-infix< 700 ** pow
+define-infix> 750 as
+define-infix> 800 .
+define-infix> 800 @
+
+inline char (s)
+    let s sz = (sc_string_buffer s)
+    load s
+
+#syntax-extend
+    'set-symbols syntax-scope
+        block-macro =
+            Any
+                syntax-macro
+                    fn (args)
+                        let arg =
+                            backquote
+                                label-macro
+                                    fn (source-label)
+                                        let enter =
+                                            Closure
+                                                unquote
+                                                    cons do args
+                                                'frame source-label
+                                        'return source-label
+                                        'set-enter source-label (Any enter)
+                        let arg = ('decons arg)
+                        arg as list
+    syntax-scope
+
+#syntax-extend
+    'set-symbols syntax-scope
+        hello =
+            Any
+                block-macro
+                    let k arg = ('argument source-label 1)
+                    quote-inline
+                        io-write! "hello "
+                        io-write! (unquote arg)
+                        io-write! "\n"
+    syntax-scope
+
+#-------------------------------------------------------------------------------
+# REPL
+#-------------------------------------------------------------------------------
+
+fn compiler-version-string ()
+    let vmin vmaj vpatch = (compiler-version)
+    .. "Scopes " (tostring vmin) "." (tostring vmaj)
+        if (vpatch == 0) ""
+        else
+            .. "." (tostring vpatch)
+        " ("
+        if debug-build? "debug build, "
+        else ""
+        \ compiler-timestamp ")"
+
+fn print-logo ()
+    io-write! "  "; io-write! (default-styler style-string "\\\\\\"); io-write! "\n"
+    io-write! "   "; io-write! (default-styler style-number "\\\\\\"); io-write! "\n"
+    io-write! " "; io-write! (default-styler style-comment "///")
+    io-write! (default-styler style-sfxfunction "\\\\\\"); io-write! "\n"
+    io-write! (default-styler style-comment "///"); io-write! "  "
+    io-write! (default-styler style-function "\\\\\\")
+
+#fn read-eval-print-loop ()
+    fn repeat-string (n c)
+        let loop (i s) =
+            tie-const n (usize 0)
+            tie-const n ""
+        if (i == n)
+            return s
+        loop (i + (usize 1))
+            .. s c
+
+    fn leading-spaces (s)
+        let len = (i32 (countof s))
+        let loop (i) = (tie-const len 0)
+        if (i == len)
+            return s
+        let c = (@ s i)
+        if (c != (char " "))
+            return (string-new (string->rawstring s) (usize i))
+        loop (i + 1)
+
+    fn blank? (s)
+        let len = (i32 (countof s))
+        let loop (i) =
+            tie-const len 0
+        if (i == len)
+            return (unconst true)
+        if ((@ s i) != (char " "))
+            return (unconst false)
+        loop (i + 1)
+
+    let cwd =
+        realpath "."
+
+    print-logo;
+    print " "
+        compiler-version-string;
+
+    let global-scope = (globals)
+    let eval-scope = (Scope global-scope)
+    set-autocomplete-scope! eval-scope
+
+    set-scope-symbol! eval-scope 'module-dir cwd
+    loop (preload cmdlist counter eval-scope) = "" "" 0 eval-scope
+    #dump "loop"
+    fn make-idstr (counter)
+        .. "$" (string-repr counter)
+
+    let idstr = (make-idstr counter)
+    let promptstr =
+        .. idstr " "
+            default-styler style-comment "►"
+    let promptlen = ((countof idstr) + 2:usize)
+    let cmd success =
+        prompt
+            ..
+                if (empty? cmdlist) promptstr
+                else
+                    repeat-string promptlen "."
+                " "
+            preload
+    if (not success)
+        return;
+    fn endswith-blank (s)
+        let slen = (countof s)
+        if (slen == 0:usize) (unconst false)
+        else
+            (@ s (slen - 1:usize)) == (char " ")
+    let enter-multiline = (endswith-blank cmd)
+    #dump "loop 1"
+    let terminated? =
+        (blank? cmd) or
+            (empty? cmdlist) and (not enter-multiline)
+    let cmdlist =
+        .. cmdlist
+            if enter-multiline
+                slice cmd 0 -1
+            else cmd
+            "\n"
+    let preload =
+        if terminated? (unconst "")
+        else (leading-spaces cmd)
+    if (not terminated?)
+        repeat preload cmdlist counter eval-scope
+
+    define-scope-macro set-scope!
+        let scope rest = (decons args)
+        return
+            none
+            scope as Syntax as Scope
+
+    define-scope-macro get-scope
+        return
+            syntax-scope
+            syntax-scope
+
+    fn handle-retargs (counter eval-scope local-scope vals...)
+        # copy over values from local-scope
+        for k v in local-scope
+            set-scope-symbol! eval-scope k v
+        let count = (va-countof vals...)
+        let loop (i) = 0
+        if (i < count)
+            let x = (va@ i vals...)
+            let k = (counter + i)
+            let idstr = (make-idstr k)
+            set-scope-symbol! eval-scope (Symbol idstr) x
+            print idstr "="
+                repr x
+            loop (add i 1)
+        return
+            unconst eval-scope
+            unconst count
+
+    let eval-scope count =
+        xpcall
+            inline ()
+                let expr = (list-parse cmdlist)
+                let expr-anchor = (Syntax-anchor expr)
+                let tmp = (Parameter 'vals...)
+                let expr =
+                    Syntax-wrap expr-anchor
+                        Any
+                            list
+                                list handle-retargs counter
+                                    cons do
+                                        list set-scope! eval-scope
+                                        list __defer (list tmp)
+                                            list _ (list get-scope) (list locals) tmp
+                                        expr as list
+                        false
+                let f = (compile (eval (expr as Syntax) eval-scope))
+                let fptr =
+                    f as
+                        pointer (function (ReturnLabel Scope i32))
+                set-anchor! expr-anchor
+                return (fptr)
+            inline (exc)
+                io-write!
+                    format-exception exc
+                return eval-scope (unconst 0)
+    repeat "" "" (counter + count) eval-scope
+
+#-------------------------------------------------------------------------------
+# main
+#-------------------------------------------------------------------------------
+
+fn print-help (exename)
+    print "usage:" exename
+        """"[option [...]] [filename]
+
+            Options:
+            -h, --help                  print this text and exit.
+            -v, --version               print program version and exit.
+            -s, --signal-abort          raise SIGABRT when calling `abort!`.
+            --                          terminate option list.
+    exit 0
+    #unreachable!;
+
+fn print-version ()
+    print
+        compiler-version-string;
+    print "Executable path:" compiler-path
+    exit 0
+    #unreachable!;
+
+fn run-main ()
+    let argc argv = (launch-args)
+    let exename = (load (getelementptr argv 0))
+    let exename = (sc_string_new_from_cstr exename)
+    let sourcepath = (alloca string)
+    let parse-options = (alloca bool)
+    store "" sourcepath
+    store true parse-options
+    do
+        loop (i) = 1
+        if (i < argc)
+            let k = (i + 1)
+            let arg = (load (getelementptr argv i))
+            let arg = (sc_string_new_from_cstr arg)
+            if ((load parse-options) and ((@ arg 0:usize) == (char "-")))
+                if ((arg == "--help") or (arg == "-h"))
+                    print-help exename
+                elseif ((== arg "--version") or (== arg "-v"))
+                    print-version;
+                elseif ((== arg "--signal-abort") or (== arg "-s"))
+                    set-signal-abort! true
+                elseif (== arg "--")
+                    store false parse-options
+                else
+                    print
+                        .. "unrecognized option: " arg
+                            \ ". Try --help for help."
+                    exit 1
+                    #unreachable!;
+            elseif ((load sourcepath) == "")
+                store arg sourcepath
+                repeat k #arg parse-options
+            # remainder is passed on to script
+    let sourcepath = (load sourcepath)
+    if (sourcepath == "")
+        #read-eval-print-loop;
+    else
+        let scope =
+            Scope (globals)
+        'set-symbol scope
+            script-launch-args =
+                Value
+                    fn ()
+                        return sourcepath argc argv
+        #load-module "" sourcepath
+            scope = scope
+            main-module? = true
+        exit 0
+        #unreachable!;
+
+run-main;
+true
 

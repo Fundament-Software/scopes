@@ -38,14 +38,13 @@ struct Scope;
     T(VK_Raise, "value-kind-raise", Raise) \
     T(VK_ArgumentList, "value-kind-argumentlist", ArgumentList) \
     T(VK_ExtractArgument, "value-kind-extractargument", ExtractArgument) \
-    /* constants (Const::classof) */ \
+    /* pure (Pure::classof), which includes constants */ \
     T(VK_Function, "value-kind-function", Function) \
     T(VK_Extern, "value-kind-extern", Extern) \
+    /* constants (Const::classof) */ \
     T(VK_ConstInt, "value-kind-const-int", ConstInt) \
     T(VK_ConstReal, "value-kind-const-real", ConstReal) \
-    T(VK_ConstTuple, "value-kind-const-tuple", ConstTuple) \
-    T(VK_ConstArray, "value-kind-const-array", ConstArray) \
-    T(VK_ConstVector, "value-kind-const-vector", ConstVector) \
+    T(VK_ConstAggregate, "value-kind-const-aggregate", ConstAggregate) \
     T(VK_ConstPointer, "value-kind-const-pointer", ConstPointer) \
 
 
@@ -64,6 +63,7 @@ enum ValueKind {
 struct Value;
 struct Block;
 struct Instruction;
+struct Const;
 
 typedef std::vector<Parameter *> Parameters;
 typedef std::vector<Value *> Values;
@@ -162,7 +162,15 @@ struct ExtractArgument : Instruction {
 
 //------------------------------------------------------------------------------
 
-struct Template : Value {
+struct Pure : Value {
+    static bool classof(const Value *T);
+
+    Pure(ValueKind _kind, const Anchor *anchor);
+};
+
+//------------------------------------------------------------------------------
+
+struct Template : Pure {
     static bool classof(const Value *T);
 
     Template(const Anchor *anchor, Symbol name, const Parameters &params, Value *value);
@@ -304,7 +312,7 @@ struct Loop : Instruction {
 
 //------------------------------------------------------------------------------
 
-struct Const : Value {
+struct Const : Pure {
     static bool classof(const Value *T);
 
     Const(ValueKind _kind, const Anchor *anchor, const Type *type);
@@ -312,7 +320,7 @@ struct Const : Value {
 
 //------------------------------------------------------------------------------
 
-struct Function : Const {
+struct Function : Pure {
     static bool classof(const Value *T);
 
     Function(const Anchor *anchor, Symbol name, const Parameters &params);
@@ -369,37 +377,13 @@ struct ConstReal : Const {
 
 //------------------------------------------------------------------------------
 
-struct ConstTuple : Const {
+struct ConstAggregate : Const {
     static bool classof(const Value *T);
 
-    ConstTuple(const Anchor *anchor, const Type *type, const Constants &fields);
+    ConstAggregate(const Anchor *anchor, const Type *type, const Constants &fields);
 
-    static ConstTuple *from(const Anchor *anchor, const Type *type, const Constants &fields);
-    static ConstTuple *none_from(const Anchor *anchor);
-
-    Constants values;
-};
-
-//------------------------------------------------------------------------------
-
-struct ConstArray : Const {
-    static bool classof(const Value *T);
-
-    ConstArray(const Anchor *anchor, const Type *type, const Constants &fields);
-
-    static ConstArray *from(const Anchor *anchor, const Type *type, const Constants &fields);
-
-    Constants values;
-};
-
-//------------------------------------------------------------------------------
-
-struct ConstVector : Const {
-    static bool classof(const Value *T);
-
-    ConstVector(const Anchor *anchor, const Type *type, const Constants &fields);
-
-    static ConstVector *from(const Anchor *anchor, const Type *type, const Constants &fields);
+    static ConstAggregate *from(const Anchor *anchor, const Type *type, const Constants &fields);
+    static ConstAggregate *none_from(const Anchor *anchor);
 
     Constants values;
 };
@@ -435,7 +419,7 @@ enum ExternFlags {
     EF_Block = (1 << 6),
 };
 
-struct Extern : Const {
+struct Extern : Pure {
     static bool classof(const Value *T);
 
     Extern(const Anchor *anchor, const Type *type, Symbol name,

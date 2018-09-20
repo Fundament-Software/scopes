@@ -84,7 +84,7 @@ ExtractArgument *ExtractArgument::from(const Anchor *anchor, Value *value, int i
 //------------------------------------------------------------------------------
 
 Template::Template(const Anchor *anchor, Symbol _name, const Parameters &_params, Value *_value)
-    : Value(VK_Template, anchor),
+    : Pure(VK_Template, anchor),
         name(_name), params(_params), value(_value),
         _inline(false), docstring(nullptr), scope(nullptr) {
 }
@@ -114,10 +114,11 @@ Template *Template::from(
 //------------------------------------------------------------------------------
 
 Function::Function(const Anchor *anchor, Symbol _name, const Parameters &_params)
-    : Const(VK_Function, anchor, TYPE_Unknown),
+    : Pure(VK_Function, anchor),
         name(_name), params(_params),
         docstring(nullptr), return_type(nullptr), except_type(nullptr),
         frame(nullptr), original(nullptr), complete(false) {
+    set_type(TYPE_Unknown);
 }
 
 void Function::append_param(Parameter *sym) {
@@ -166,7 +167,7 @@ Function *Function::from(
 //------------------------------------------------------------------------------
 
 Extern::Extern(const Anchor *anchor, const Type *type, Symbol _name, size_t _flags, Symbol _storage_class, int _location, int _binding)
-    : Const(VK_Extern, anchor, type), name(_name), flags(_flags), storage_class(_storage_class), location(_location), binding(_binding) {
+    : Pure(VK_Extern, anchor), name(_name), flags(_flags), storage_class(_storage_class), location(_location), binding(_binding) {
     if ((storage_class == SYM_SPIRV_StorageClassUniform)
         && !(flags & EF_BufferBlock)) {
         flags |= EF_Block;
@@ -176,7 +177,7 @@ Extern::Extern(const Anchor *anchor, const Type *type, Symbol _name, size_t _fla
         ptrflags |= PTF_NonWritable;
     else if (flags & EF_NonReadable)
         ptrflags |= PTF_NonReadable;
-    change_type(pointer_type(type, ptrflags, storage_class));
+    set_type(pointer_type(type, ptrflags, storage_class));
 }
 
 Extern *Extern::from(const Anchor *anchor, const Type *type, Symbol name, size_t flags, Symbol storage_class, int location, int binding) {
@@ -362,13 +363,24 @@ Loop *Loop::from(const Anchor *anchor, const Parameters &params, const Values &a
 
 //------------------------------------------------------------------------------
 
+bool Pure::classof(const Value *T) {
+    auto k = T->kind();
+    return (k == VK_Function) || (k == VK_Extern) || (k == VK_Template) || Const::classof(T);
+}
+
+Pure::Pure(ValueKind _kind, const Anchor *anchor)
+    : Value(_kind, anchor) {
+}
+
+//------------------------------------------------------------------------------
+
 bool Const::classof(const Value *T) {
     auto k = T->kind();
-    return (k >= VK_Function) && (k <= VK_ConstPointer);
+    return (k >= VK_ConstInt) && (k <= VK_ConstPointer);
 }
 
 Const::Const(ValueKind _kind, const Anchor *anchor, const Type *type)
-    : Value(_kind, anchor) {
+    : Pure(_kind, anchor) {
     set_type(type);
 }
 
@@ -401,36 +413,16 @@ ConstReal *ConstReal::from(const Anchor *anchor, const Type *type, double value)
 
 //------------------------------------------------------------------------------
 
-ConstTuple::ConstTuple(const Anchor *anchor, const Type *type, const Constants &_fields)
-    : Const(VK_ConstTuple, anchor, type), values(_fields) {
+ConstAggregate::ConstAggregate(const Anchor *anchor, const Type *type, const Constants &_fields)
+    : Const(VK_ConstAggregate, anchor, type), values(_fields) {
 }
 
-ConstTuple *ConstTuple::from(const Anchor *anchor, const Type *type, const Constants &fields) {
-    return new ConstTuple(anchor, type, fields);
+ConstAggregate *ConstAggregate::from(const Anchor *anchor, const Type *type, const Constants &fields) {
+    return new ConstAggregate(anchor, type, fields);
 }
 
-ConstTuple *ConstTuple::none_from(const Anchor *anchor) {
+ConstAggregate *ConstAggregate::none_from(const Anchor *anchor) {
     return from(anchor, TYPE_Nothing, {});
-}
-
-//------------------------------------------------------------------------------
-
-ConstArray::ConstArray(const Anchor *anchor, const Type *type, const Constants &_fields)
-    : Const(VK_ConstTuple, anchor, type), values(_fields) {
-}
-
-ConstArray *ConstArray::from(const Anchor *anchor, const Type *type, const Constants &fields) {
-    return new ConstArray(anchor, type, fields);
-}
-
-//------------------------------------------------------------------------------
-
-ConstVector::ConstVector(const Anchor *anchor, const Type *type, const Constants &_fields)
-    : Const(VK_ConstTuple, anchor, type), values(_fields) {
-}
-
-ConstVector *ConstVector::from(const Anchor *anchor, const Type *type, const Constants &fields) {
-    return new ConstVector(anchor, type, fields);
 }
 
 //------------------------------------------------------------------------------
@@ -520,8 +512,6 @@ Value::Value(ValueKind kind, const Anchor *anchor)
 
 bool Value::is_pure() const {
     switch(kind()) {
-    case VK_Template:
-    case VK_Function:
     case VK_Parameter:
         return true;
     case VK_ArgumentList: {
@@ -535,7 +525,7 @@ bool Value::is_pure() const {
     } break;
     default: break;
     }
-    return isa<Const>(this);
+    return isa<Pure>(this);
 }
 
 bool Value::is_typed() const {

@@ -38,7 +38,7 @@ List::List(Value *_at, const List *_next, size_t _count) :
 
 Value *List::first() const {
     if (this == EOL) {
-        return ConstTuple::none_from(get_active_anchor());
+        return ConstAggregate::none_from(get_active_anchor());
     } else {
         return at;
     }

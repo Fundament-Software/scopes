@@ -18,7 +18,7 @@
 namespace scopes {
 
 struct StyledStream;
-struct Const;
+struct Pure;
 
 #define SCOPES_TYPE_KEY(T, NAME) \
     char NAME ## _buf[sizeof(T)]; \
@@ -52,7 +52,7 @@ enum TypeKind {
 //------------------------------------------------------------------------------
 
 struct Type {
-    typedef std::unordered_map<Symbol, Const *, Symbol::Hash> Map;
+    typedef std::unordered_map<Symbol, Pure *, Symbol::Hash> Map;
 
     TypeKind kind() const;
 
@@ -61,17 +61,17 @@ struct Type {
 
     StyledStream& stream(StyledStream& ost) const;
 
-    void bind(Symbol name, Const *value);
+    void bind(Symbol name, Pure *value);
 
     void del(Symbol name);
 
-    bool lookup(Symbol name, Const *&dest) const;
+    bool lookup(Symbol name, Pure *&dest) const;
 
-    bool lookup_local(Symbol name, Const *&dest) const;
+    bool lookup_local(Symbol name, Pure *&dest) const;
 
-    bool lookup_call_handler(Const *&dest) const;
+    bool lookup_call_handler(Pure *&dest) const;
 
-    bool lookup_return_handler(Const *&dest) const;
+    bool lookup_return_handler(Pure *&dest) const;
 
     const Map &get_symbols() const;
 

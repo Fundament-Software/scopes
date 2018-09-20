@@ -572,7 +572,7 @@ SCOPES_RESULT(Value *) LexerParser::parse_any() {
         SCOPES_LOCATION_ERROR(format("unexpected token: %c (%i)",
             this->cursor[0], (int)this->cursor[0]));
     }
-    return ConstTuple::none_from(anchor);
+    return ConstAggregate::none_from(anchor);
 }
 
 SCOPES_RESULT(Value *) LexerParser::parse_naked(int column, Token end_token) {

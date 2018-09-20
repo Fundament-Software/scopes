@@ -385,10 +385,10 @@ struct StreamAST : StreamAnchors {
                 stream_type_suffix(T);
             }
         } break;
-        case VK_ConstTuple: {
+        case VK_ConstAggregate: {
             stream_type_prefix(node);
-            auto val = cast<ConstTuple>(node);
-            ss << Style_Keyword << "ConstTuple" << Style_None;
+            auto val = cast<ConstAggregate>(node);
+            ss << Style_Keyword << "ConstAggregate" << Style_None;
             for (int i = 0; i < val->values.size(); ++i) {
                 stream_newline();
                 walk(val->values[i], depth+1, maxdepth);

@@ -1079,7 +1079,6 @@ struct LLVMIRGenerator {
         LLVMBasicBlockRef bb = LLVMGetInsertBlock(builder);
         LLVMValueRef func = LLVMGetBasicBlockParent(bb);
         loop_info.bb_loop = LLVMAppendBasicBlock(func, "loop");
-        loop_info.bb_break = LLVMAppendBasicBlock(func, "break");
         LLVMBuildBr(builder, loop_info.bb_loop);
         LLVMPositionBuilderAtEnd(builder, loop_info.bb_loop);
         for (int i = 0; i < count; ++i) {
@@ -1089,12 +1088,14 @@ struct LLVMIRGenerator {
             LLVMValueRef incovals[] = { initvals[i] };
             LLVMAddIncoming(val, incovals, incobbs, 1);
         }
-        LLVMPositionBuilderAtEnd(builder, loop_info.bb_break);
         auto rtype = node->get_type();
         if (is_returning_value(rtype)) {
+            loop_info.bb_break = LLVMAppendBasicBlock(func, "break");
+            LLVMPositionBuilderAtEnd(builder, loop_info.bb_break);
             loop_info.break_value = LLVMBuildPhi(builder,
                 SCOPES_GET_RESULT(type_to_llvm_type(rtype)), "");
         } else {
+            loop_info.bb_break = nullptr;
             loop_info.break_value = nullptr;
         }
         {
@@ -1856,7 +1857,7 @@ struct LLVMIRGenerator {
         }
     }
 
-    SCOPES_RESULT(LLVMValueRef) ConstTuple_to_value(ConstTuple *node) {
+    SCOPES_RESULT(LLVMValueRef) ConstAggregate_to_value(ConstAggregate *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         LLVMTypeRef LLT = SCOPES_GET_RESULT(type_to_llvm_type(node->get_type()));
         size_t count = node->values.size();
@@ -1864,33 +1865,26 @@ struct LLVMIRGenerator {
         for (size_t i = 0; i < count; ++i) {
             values[i] = SCOPES_GET_RESULT(node_to_value(node->values[i]));
         }
-        if (node->get_type()->kind() == TK_Typename) {
-            return LLVMConstNamedStruct(LLT, values, count);
-        } else {
-            return LLVMConstStruct(values, count, false);
+        switch(LLVMGetTypeKind(LLT)) {
+        case LLVMStructTypeKind: {
+            if (node->get_type()->kind() == TK_Typename) {
+                return LLVMConstNamedStruct(LLT, values, count);
+            } else {
+                return LLVMConstStruct(values, count, false);
+            }
+        } break;
+        case LLVMArrayTypeKind: {
+            auto ai = cast<ArrayType>(SCOPES_GET_RESULT(storage_type(node->get_type())));
+            return LLVMConstArray(SCOPES_GET_RESULT(type_to_llvm_type(ai->element_type)),
+                values, count);
+        } break;
+        case LLVMVectorTypeKind: {
+            return LLVMConstVector(values, count);
+        } break;
+        default:
+            assert(false);
+            return nullptr;
         }
-    }
-
-    SCOPES_RESULT(LLVMValueRef) ConstArray_to_value(ConstArray *node) {
-        SCOPES_RESULT_TYPE(LLVMValueRef);
-        size_t count = node->values.size();
-        LLVMValueRef values[count];
-        for (size_t i = 0; i < count; ++i) {
-            values[i] = SCOPES_GET_RESULT(node_to_value(node->values[i]));
-        }
-        auto ai = cast<ArrayType>(SCOPES_GET_RESULT(storage_type(node->get_type())));
-        return LLVMConstArray(SCOPES_GET_RESULT(type_to_llvm_type(ai->element_type)),
-            values, count);
-    }
-
-    SCOPES_RESULT(LLVMValueRef) ConstVector_to_value(ConstVector *node) {
-        SCOPES_RESULT_TYPE(LLVMValueRef);
-        size_t count = node->values.size();
-        LLVMValueRef values[count];
-        for (size_t i = 0; i < count; ++i) {
-            values[i] = SCOPES_GET_RESULT(node_to_value(node->values[i]));
-        }
-        return LLVMConstVector(values, count);
     }
 
     SCOPES_RESULT(LLVMValueRef) build_call(bool trycall, const Type *functype, LLVMValueRef func, Values &args) {

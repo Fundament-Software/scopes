@@ -137,6 +137,54 @@ static SCOPES_RESULT(void) verify_writable(const Type *T) {
     return true;
 }
 
+static SCOPES_RESULT(Const *) nullof(const Anchor *anchor, const Type *T) {
+    SCOPES_RESULT_TYPE(Const *);
+    SCOPES_ANCHOR(anchor);
+    const Type *ST = SCOPES_GET_RESULT(storage_type(T));
+    switch(ST->kind()) {
+    case TK_Integer: return ConstInt::from(anchor, T, 0);
+    case TK_Real: return ConstReal::from(anchor, T, 0.0);
+    case TK_Pointer: return ConstPointer::from(anchor, T, nullptr);
+    case TK_Array: {
+        auto at = cast<ArrayType>(ST);
+        Constants fields;
+        if (at->count) {
+            auto elem = SCOPES_GET_RESULT(nullof(anchor, at->element_type));
+            for (size_t i = 0; i < at->count; ++i) {
+                fields.push_back(elem);
+            }
+        }
+        return ConstAggregate::from(anchor, T, fields);
+    } break;
+    case TK_Vector: {
+        auto at = cast<VectorType>(ST);
+        Constants fields;
+        if (at->count) {
+            auto elem = SCOPES_GET_RESULT(nullof(anchor, at->element_type));
+            for (size_t i = 0; i < at->count; ++i) {
+                fields.push_back(elem);
+            }
+        }
+        return ConstAggregate::from(anchor, T, fields);
+    } break;
+    case TK_Tuple: {
+        auto at = cast<TupleType>(ST);
+        Constants fields;
+        for (auto valT : at->values) {
+            fields.push_back(SCOPES_GET_RESULT(nullof(anchor, valT)));
+        }
+        return ConstAggregate::from(anchor, T, fields);
+    } break;
+    default: {
+        SCOPES_LOCATION_ERROR(String::from(
+            "can't create constant of type"));
+    } break;
+    }
+    return nullptr;
+}
+
+
+
 //------------------------------------------------------------------------------
 
 enum EvalTarget {
@@ -364,7 +412,7 @@ static Value *extract_argument(const ASTContext &ctx, Value *value, int index) {
         auto rt = cast<TupleType>(storage_type(T).assert_ok());
         const Type *AT = rt->type_at_index_or_nothing(index);
         if (AT == TYPE_Nothing) {
-            return ConstTuple::none_from(anchor);
+            return ConstAggregate::none_from(anchor);
         } else {
             auto arglist = dyn_cast<ArgumentList>(value);
             if (arglist) {
@@ -382,7 +430,7 @@ static Value *extract_argument(const ASTContext &ctx, Value *value, int index) {
     } else if (index == 0) {
         return value;
     } else {
-        return ConstTuple::none_from(anchor);
+        return ConstAggregate::none_from(anchor);
     }
 }
 
@@ -458,7 +506,7 @@ static SCOPES_RESULT(void) prove_bind_proved_arguments(const ASTContext &ctx,
         } else if (i < tmpargs.size()) {
             newval = tmpargs[i];
         } else {
-            newval = ConstTuple::none_from(oldsym->anchor());
+            newval = ConstAggregate::none_from(oldsym->anchor());
         }
         if (inline_constants && newval->is_pure()) {
             ctx.frame->bind(oldsym, newval);
@@ -536,9 +584,7 @@ static SCOPES_RESULT(Loop *) prove_Loop(const ASTContext &ctx, Loop *loop) {
 CONST_PROVER(ConstInt)
 CONST_PROVER(ConstReal)
 CONST_PROVER(ConstPointer)
-CONST_PROVER(ConstTuple)
-CONST_PROVER(ConstArray)
-CONST_PROVER(ConstVector)
+CONST_PROVER(ConstAggregate)
 CONST_PROVER(Extern)
 
 const Type *try_get_const_type(Value *node) {
@@ -853,7 +899,7 @@ repeat:
     const Type *T = callee->get_type();
     if (!rawcall) {
         assert(redirections < 16);
-        Const *dest;
+        Pure *dest;
         if (T->lookup_call_handler(dest)) {
             values.insert(values.begin(), callee);
             callee = dest;
@@ -921,6 +967,14 @@ repeat:
                 stream_ast(ss, arg, StreamASTFormat());
             }
             return build_argument_list(call->anchor(), values);
+        } break;
+        case FN_VaCountOf: {
+            return ConstInt::from(call->anchor(), TYPE_I32, argcount);
+        } break;
+        case FN_NullOf: {
+            CHECKARGS(1, 1);
+            READ_TYPE_CONST(T);
+            return SCOPES_GET_RESULT(nullof(call->anchor(), T));
         } break;
         case FN_Undef: {
             CHECKARGS(1, 1);
@@ -1482,7 +1536,7 @@ static SCOPES_RESULT(void) prove_inline_arguments(const ASTContext &ctx,
         } else if (i < tmpargs.size()) {
             newval = tmpargs[i];
         } else {
-            newval = ConstTuple::none_from(oldsym->anchor());
+            newval = ConstAggregate::none_from(oldsym->anchor());
         }
         ctx.frame->bind(oldsym, newval);
     }

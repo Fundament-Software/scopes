@@ -128,7 +128,7 @@ typedef struct sc_i32_i32_i32_tuple_ { int32_t _0, _1, _2; } sc_i32_i32_i32_tupl
 
 typedef struct sc_rawstring_size_t_tuple_ { const char *_0; size_t _1; } sc_rawstring_size_t_tuple_t;
 
-typedef struct sc_rawstring_array_i32_tuple_ { char **_0; int _1; } sc_rawstring_array_i32_tuple_t;
+typedef struct sc_rawstring_i32_array_tuple_ { int _0; char **_1; } sc_rawstring_i32_array_tuple_t;
 
 // prototypes
 
@@ -145,8 +145,8 @@ sc_string_raises_t sc_compile_glsl(sc_symbol_t target, sc_value_t *srcl, uint64_
 sc_void_raises_t sc_compile_object(const sc_string_t *path, sc_scope_t *table, uint64_t flags);
 void sc_enter_solver_cli ();
 sc_size_raises_t sc_verify_stack ();
-//sc_bool_value_tuple_t sc_eval_inline(sc_value_t *expr, sc_scope_t *scope);
-sc_rawstring_array_i32_tuple_t sc_launch_args();
+sc_value_raises_t sc_eval_inline(sc_value_t *expr, sc_scope_t *scope);
+sc_rawstring_i32_array_tuple_t sc_launch_args();
 
 // value
 
@@ -155,6 +155,7 @@ const sc_string_t *sc_value_tostring (sc_value_t *value);
 const sc_type_t *sc_value_type (sc_value_t *value);
 const sc_anchor_t *sc_value_anchor (sc_value_t *value);
 bool sc_value_is_constant (sc_value_t *value);
+bool sc_value_is_pure (sc_value_t *value);
 int sc_value_kind (sc_value_t *value);
 
 sc_value_t *sc_keyed_new(sc_symbol_t key, sc_value_t *value);
@@ -186,14 +187,14 @@ void sc_if_append_else_clause(sc_value_t *value, sc_value_t *body);
 sc_value_t *sc_parameter_new(sc_symbol_t name, const sc_type_t *type);
 
 sc_value_t *sc_call_new(sc_value_t *callee, int numargs, sc_value_t **args);
+bool sc_call_is_rawcall(sc_value_t *value);
+void sc_call_set_rawcall(sc_value_t *value, bool enable);
 
 sc_value_t *sc_loop_new(int numparams, sc_value_t **params, int numargs, sc_value_t **args, sc_value_t *body);
 
 sc_value_t *sc_const_int_new(const sc_type_t *type, uint64_t value);
 sc_value_t *sc_const_real_new(const sc_type_t *type, double value);
-sc_value_t *sc_const_tuple_new(const sc_type_t *type, int numconsts, sc_value_t **consts);
-sc_value_t *sc_const_array_new(const sc_type_t *type, int numconsts, sc_value_t **consts);
-sc_value_t *sc_const_vector_new(const sc_type_t *type, int numconsts, sc_value_t **consts);
+sc_value_t *sc_const_aggregate_new(const sc_type_t *type, int numconsts, sc_value_t **consts);
 sc_value_t *sc_const_pointer_new(const sc_type_t *type, const void *pointer);
 uint64_t sc_const_int_extract(const sc_value_t *value);
 double sc_const_real_extract(const sc_value_t *value);
