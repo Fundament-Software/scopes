@@ -438,7 +438,20 @@ static SCOPES_RESULT(void) map_keyed_arguments(const Anchor *anchor,
         auto kt = key_type(arg->get_type());
         Symbol key = kt._0;
         int index = -1;
-        if (key != SYM_Unnamed) {
+        if (key == SYM_Unnamed) {
+            // argument without key
+
+            // find next argument that is unmapped
+            while ((next_index < mapped.size()) && mapped[next_index])
+                next_index++;
+            // fill up argument slots until index
+            while (mapped.size() <= next_index) {
+                mapped.push_back(false);
+                outargs.push_back(nullptr);
+            }
+            index = next_index;
+            next_index++;
+        } else {
             // find desired parameter index of key
             auto ki = find_key(symbols, key);
             if (ki >= 0) {
@@ -466,25 +479,10 @@ static SCOPES_RESULT(void) map_keyed_arguments(const Anchor *anchor,
                 mapped.push_back(false);
                 outargs.push_back(nullptr);
             } else {
-                // no such parameter, map like regular parameter
-                key = SYM_Unnamed;
-                // strip key from value
-                arg = rekey(anchor, SYM_Unnamed, arg);
+                StyledString ss;
+                ss.out << "no parameter with name " << key;
+                SCOPES_LOCATION_ERROR(ss.str());
             }
-        }
-        if (key == SYM_Unnamed) {
-            // argument without key
-
-            // find next argument that is unmapped
-            while ((next_index < mapped.size()) && mapped[next_index])
-                next_index++;
-            // fill up argument slots until index
-            while (mapped.size() <= next_index) {
-                mapped.push_back(false);
-                outargs.push_back(nullptr);
-            }
-            index = next_index;
-            next_index++;
         }
         mapped[index] = true;
         outargs[index] = arg;
