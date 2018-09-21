@@ -1386,9 +1386,11 @@ fn repr (value)
 
 let print =
     do
-        fn print-element (i key value)
-            if (!= i 0)
-                io-write! " "
+        inline print-element (i key value)
+            constbranch (const.icmp<=.i32.i32 i 0)
+                inline ()
+                inline ()
+                    io-write! " "
             constbranch (== (typeof value) string)
                 inline ()
                     io-write! value
@@ -2076,9 +2078,6 @@ fn print-version ()
     exit 0
     #unreachable!;
 
-#print-help "test"
-#print-version;
-
 fn run-main ()
     let argc argv = (launch-args)
     let exename = (load (getelementptr argv 0))
@@ -2095,9 +2094,9 @@ fn run-main ()
             let arg = (sc_string_new_from_cstr arg)
             if ((load parse-options) and ((@ arg 0:usize) == (char "-")))
                 if ((arg == "--help") or (arg == "-h"))
-                    #print-help exename
+                    print-help exename
                 elseif ((== arg "--version") or (== arg "-v"))
-                    #print-version;
+                    print-version;
                 elseif ((== arg "--signal-abort") or (== arg "-s"))
                     set-signal-abort! true
                 elseif (== arg "--")
@@ -2108,12 +2107,11 @@ fn run-main ()
                             \ ". Try --help for help."
                     exit 1
                     #unreachable!;
-                repeat k #arg parse-options
+                repeat k
             elseif ((load sourcepath) == "")
                 store arg sourcepath
-                repeat k #arg parse-options
+                repeat k
             # remainder is passed on to script
-#do
     let sourcepath = (load sourcepath)
     if (sourcepath == "")
         #read-eval-print-loop;
@@ -2122,15 +2120,14 @@ fn run-main ()
             Scope (globals)
         'set-symbol scope
             script-launch-args =
-                Value
-                    fn ()
-                        return sourcepath argc argv
+                fn ()
+                    return sourcepath argc argv
         #load-module "" sourcepath
             scope = scope
             main-module? = true
         #exit 0
         #unreachable!;
 
-run-main;
+#run-main;
 true
 

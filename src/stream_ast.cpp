@@ -263,7 +263,9 @@ struct StreamAST : StreamAnchors {
                         walk_same_or_newline(val->params[i], depth+1, maxdepth);
                     }
                     ss << Style_Operator << " )" << Style_None;
-                    stream_block(val->body, depth+1, maxdepth);
+                    for (int i = 0; i < val->body.body.size(); ++i) {
+                        walk_newline(val->body.body[i], depth+1, maxdepth);
+                    }
                 } else {
                     todo.push_back(node);
                 }

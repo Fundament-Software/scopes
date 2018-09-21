@@ -11,6 +11,7 @@
 #include "string.hpp"
 
 #include <cstddef>
+#include <vector>
 
 namespace scopes {
 
@@ -85,6 +86,8 @@ public:
 };
 
 bool ends_with_parenthesis(Symbol sym);
+
+typedef std::vector<Symbol> Symbols;
 
 } // namespace scopes
 

@@ -91,6 +91,7 @@ SCOPES_RESULT(void) error_constant_expected(const Type *want, Value *value);
 SCOPES_RESULT(void) error_unbound_symbol(Parameter *value);
 SCOPES_RESULT(void) error_cannot_merge_expression_types(const Type *T1, const Type *T2);
 SCOPES_RESULT(void) error_noreturn_not_last_expression();
+SCOPES_RESULT(void) error_noreturn_in_argument_list();
 SCOPES_RESULT(void) error_cannot_type_builtin(const Builtin &builtin);
 SCOPES_RESULT(void) error_illegal_repeat_outside_loop();
 SCOPES_RESULT(void) error_illegal_break_outside_loop();

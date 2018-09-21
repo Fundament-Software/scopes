@@ -32,6 +32,7 @@ SCOPES_RESULT(Symbol) extract_symbol_constant(Value *value);
 SCOPES_RESULT(uint64_t) extract_integer_constant(Value *value);
 const Type *try_get_const_type(Value *node);
 const String *try_extract_string(Value *node);
+Value *rekey(const Anchor *anchor, Symbol key, Value *value);
 
 SCOPES_RESULT(Function *) prove(Function *frame, Template *func, const ArgTypes &types);
 

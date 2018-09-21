@@ -366,42 +366,26 @@ static Value *build_argument_list(const Anchor *anchor, const Values &values) {
 
 static SCOPES_RESULT(Value *) prove_Expression(const ASTContext &ctx, Expression *expr) {
     SCOPES_RESULT_TYPE(Value *);
-    ASTContext subctx;
-    if (expr->scoped)
-        subctx = ctx.with_void_target();
-    else
-        subctx = ctx.with_symbol_target();
     int count = (int)expr->body.size();
-    for (int i = 0; i < count; ++i) {
-        auto newsrc = SCOPES_GET_RESULT(prove(subctx, expr->body[i]));
-        if (!is_returning(newsrc->get_type())) {
-            SCOPES_ANCHOR(newsrc->anchor());
-            SCOPES_CHECK_RESULT(error_noreturn_not_last_expression());
+    if (expr->scoped) {
+        auto subctx = ctx.with_void_target();
+        for (int i = 0; i < count; ++i) {
+            auto newsrc = SCOPES_GET_RESULT(prove(subctx, expr->body[i]));
+            if (!is_returning(newsrc->get_type())) {
+                StyledStream ss;
+                stream_ast(ss, expr->body[i], StreamASTFormat());
+                SCOPES_ANCHOR(expr->body[i]->anchor());
+                SCOPES_CHECK_RESULT(error_noreturn_not_last_expression());
+            }
+        }
+    } else {
+        auto subctx = ctx.with_symbol_target();
+        for (int i = 0; i < count; ++i) {
+            SCOPES_CHECK_RESULT(prove(subctx, expr->body[i]));
         }
     }
     return SCOPES_GET_RESULT(prove(ctx, expr->value));
 }
-
-#if 0
-static void prove_block(const ASTContext &ctx, Block *block) {
-    SCOPES_RESULT_TYPE(Value *);
-    auto subctx = ctx.with_void_target();
-    assert(!block->body.empty());
-    int count = (int)block->body.size();
-    for (int i = 0; i < count; ++i) {
-        auto newsrc = SCOPES_GET_RESULT(prove(subctx, block->body[i]));
-        if (!is_returning(newsrc->get_type()) && ((i+1) < count)) {
-            SCOPES_ANCHOR(newsrc->anchor());
-            SCOPES_CHECK_RESULT(error_noreturn_not_last_expression());
-        }
-    }
-#if 0
-    auto rtype = ctx.transform_return_type(lastsrc->get_type());
-    newblock->set_type(rtype);
-    return newblock->canonicalize();
-#endif
-}
-#endif
 
 static Value *extract_argument(const ASTContext &ctx, Value *value, int index) {
     const Anchor *anchor = value->anchor();
@@ -434,6 +418,89 @@ static Value *extract_argument(const ASTContext &ctx, Value *value, int index) {
     }
 }
 
+static int find_key(const Symbols &symbols, Symbol key) {
+    for (int i = 0; i < symbols.size(); ++i) {
+        if (symbols[i] == key)
+            return i;
+    }
+    return -1;
+}
+
+static SCOPES_RESULT(void) map_keyed_arguments(const Anchor *anchor,
+    Values &outargs, const Values &values, const Symbols &symbols, bool varargs) {
+    SCOPES_RESULT_TYPE(void);
+    outargs.reserve(values.size());
+    std::vector<bool> mapped;
+    mapped.reserve(values.size());
+    size_t next_index = 0;
+    for (size_t i = 0; i < values.size(); ++i) {
+        Value *arg = values[i];
+        auto kt = key_type(arg->get_type());
+        Symbol key = kt._0;
+        int index = -1;
+        if (key != SYM_Unnamed) {
+            // find desired parameter index of key
+            auto ki = find_key(symbols, key);
+            if (ki >= 0) {
+                // parameter with key exists
+                // fill up argument slots until index
+                while (mapped.size() <= (size_t)ki) {
+                    mapped.push_back(false);
+                    outargs.push_back(nullptr);
+                }
+                if (mapped[ki]) {
+                    StyledString ss;
+                    ss.out << "duplicate binding to parameter " << key;
+                    SCOPES_LOCATION_ERROR(ss.str());
+                }
+                index = ki;
+                // strip key from value
+                arg = rekey(anchor, SYM_Unnamed, arg);
+            } else if (varargs) {
+                // no parameter with that name, but we accept varargs
+                while (mapped.size() < symbols.size()) {
+                    mapped.push_back(false);
+                    outargs.push_back(nullptr);
+                }
+                index = (int)outargs.size();
+                mapped.push_back(false);
+                outargs.push_back(nullptr);
+            } else {
+                // no such parameter, map like regular parameter
+                key = SYM_Unnamed;
+                // strip key from value
+                arg = rekey(anchor, SYM_Unnamed, arg);
+            }
+        }
+        if (key == SYM_Unnamed) {
+            // argument without key
+
+            // find next argument that is unmapped
+            while ((next_index < mapped.size()) && mapped[next_index])
+                next_index++;
+            // fill up argument slots until index
+            while (mapped.size() <= next_index) {
+                mapped.push_back(false);
+                outargs.push_back(nullptr);
+            }
+            index = next_index;
+            next_index++;
+        }
+        mapped[index] = true;
+        outargs[index] = arg;
+    }
+    Value *noneval = nullptr;
+    for (size_t i = 0; i < outargs.size(); ++i) {
+        if (!outargs[i]) {
+            if (!noneval) {
+                noneval = ConstAggregate::none_from(anchor);
+            }
+            outargs[i] = noneval;
+        }
+    }
+    return true;
+}
+
 // used by Let, Loop, ArgumentList, Repeat, Call
 static SCOPES_RESULT(void) prove_arguments(
     const ASTContext &ctx, Values &outargs, const Values &values) {
@@ -444,7 +511,7 @@ static SCOPES_RESULT(void) prove_arguments(
         auto value = SCOPES_GET_RESULT(prove(subctx, values[i]));
         const Type *T = value->get_type();
         if (!is_returning(T)) {
-            SCOPES_EXPECT_ERROR(error_noreturn_not_last_expression());
+            SCOPES_EXPECT_ERROR(error_noreturn_in_argument_list());
         }
         if (is_arguments_type(T)) {
             auto rt = cast<TupleType>(storage_type(T).assert_ok());
@@ -600,6 +667,19 @@ const String *try_extract_string(Value *node) {
     return nullptr;
 }
 
+Value *rekey(const Anchor *anchor, Symbol key, Value *value) {
+    if (isa<Keyed>(value)) {
+        value = cast<Keyed>(value)->value;
+    }
+    auto T = value->get_type();
+    auto NT = keyed_type(key, value->get_type());
+    if (T == NT)
+        return value;
+    auto newkeyed = Keyed::from(anchor, key, value);
+    newkeyed->set_type(NT);
+    return newkeyed;
+}
+
 static SCOPES_RESULT(Break *) prove_Break(const ASTContext &ctx, Break *_break) {
     SCOPES_RESULT_TYPE(Break *);
     SCOPES_ANCHOR(_break->anchor());
@@ -639,7 +719,8 @@ static SCOPES_RESULT(void) annotate_except_type(const ASTContext &ctx, const Typ
 static SCOPES_RESULT(Return *) make_return(const ASTContext &ctx, const Anchor *anchor, Value *value) {
     SCOPES_RESULT_TYPE(Return *);
     SCOPES_ANCHOR(anchor);
-    ctx.function->return_type = SCOPES_GET_RESULT(merge_return_type(ctx.function->return_type, value->get_type()));
+    auto T = value->get_type();
+    ctx.function->return_type = SCOPES_GET_RESULT(merge_return_type(ctx.function->return_type, T));
     auto newreturn = Return::from(anchor, value);
     newreturn->set_type(TYPE_NoReturn);
     return newreturn;
@@ -733,13 +814,7 @@ static SCOPES_RESULT(Value *) prove_SyntaxExtend(const ASTContext &ctx, SyntaxEx
 static SCOPES_RESULT(Value *) prove_Keyed(const ASTContext &ctx, Keyed *keyed) {
     SCOPES_RESULT_TYPE(Value *);
     auto value = SCOPES_GET_RESULT(prove(ctx, keyed->value));
-    auto T = value->get_type();
-    auto NT = keyed_type(keyed->key, value->get_type());
-    if (T == NT)
-        return value;
-    auto newkeyed = Keyed::from(keyed->anchor(), keyed->key, value);
-    newkeyed->set_type(NT);
-    return newkeyed;
+    return rekey(keyed->anchor(), keyed->key, value);
 }
 
 template<typename T>
@@ -909,6 +984,20 @@ repeat:
     }
     if (T == TYPE_Closure) {
         const Closure *cl = SCOPES_GET_RESULT((extract_closure_constant(callee)));
+        {
+            Values args;
+            Symbols keys;
+            bool vararg = false;
+            for (auto param : cl->func->params) {
+                if (param->variadic) {
+                    vararg = true;
+                } else {
+                    keys.push_back(param->name);
+                }
+            }
+            SCOPES_CHECK_RESULT(map_keyed_arguments(call->anchor(), args, values, keys, vararg));
+            values = args;
+        }
         if (cl->func->is_inline()) {
             return SCOPES_GET_RESULT(prove_inline(ctx, cl->frame, cl->func, values));
         } else {

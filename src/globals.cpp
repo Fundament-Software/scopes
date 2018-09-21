@@ -709,9 +709,11 @@ int sc_value_kind (sc_value_t *value) {
 
 sc_value_t *sc_keyed_new(sc_symbol_t key, sc_value_t *value) {
     using namespace scopes;
-    if (value->is_typed() && (key == key_type(value->get_type())._0))
-        return value;
-    return Keyed::from(get_active_anchor(), key, value);
+    if (value->is_typed()) {
+        return rekey(get_active_anchor(), key, value);
+    } else {
+        return Keyed::from(get_active_anchor(), key, value);
+    }
 }
 
 sc_value_t *sc_argument_list_new(int numvalues, sc_value_t **values) {

@@ -220,6 +220,13 @@ SCOPES_RESULT(void) error_noreturn_not_last_expression() {
     SCOPES_LOCATION_ERROR(ss.str());
 }
 
+SCOPES_RESULT(void) error_noreturn_in_argument_list() {
+    SCOPES_RESULT_TYPE(void);
+    StyledString ss;
+    ss.out << "non-returning expression in argument list";
+    SCOPES_LOCATION_ERROR(ss.str());
+}
+
 SCOPES_RESULT(void) error_cannot_type_builtin(const Builtin &builtin) {
     SCOPES_RESULT_TYPE(void);
     StyledString ss;

@@ -1088,15 +1088,16 @@ struct LLVMIRGenerator {
             LLVMValueRef incovals[] = { initvals[i] };
             LLVMAddIncoming(val, incovals, incobbs, 1);
         }
+        loop_info.break_value = nullptr;
+        loop_info.bb_break = nullptr;
         auto rtype = node->get_type();
-        if (is_returning_value(rtype)) {
+        if (is_returning(rtype)) {
             loop_info.bb_break = LLVMAppendBasicBlock(func, "break");
-            LLVMPositionBuilderAtEnd(builder, loop_info.bb_break);
-            loop_info.break_value = LLVMBuildPhi(builder,
-                SCOPES_GET_RESULT(type_to_llvm_type(rtype)), "");
-        } else {
-            loop_info.bb_break = nullptr;
-            loop_info.break_value = nullptr;
+            if (is_returning_value(rtype)) {
+                LLVMPositionBuilderAtEnd(builder, loop_info.bb_break);
+                loop_info.break_value = LLVMBuildPhi(builder,
+                    SCOPES_GET_RESULT(type_to_llvm_type(rtype)), "");
+            }
         }
         {
             LLVMPositionBuilderAtEnd(builder, loop_info.bb_loop);
