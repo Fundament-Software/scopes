@@ -2076,6 +2076,9 @@ fn print-version ()
     exit 0
     #unreachable!;
 
+#print-help "test"
+#print-version;
+
 fn run-main ()
     let argc argv = (launch-args)
     let exename = (load (getelementptr argv 0))
@@ -2092,9 +2095,9 @@ fn run-main ()
             let arg = (sc_string_new_from_cstr arg)
             if ((load parse-options) and ((@ arg 0:usize) == (char "-")))
                 if ((arg == "--help") or (arg == "-h"))
-                    print-help exename
+                    #print-help exename
                 elseif ((== arg "--version") or (== arg "-v"))
-                    print-version;
+                    #print-version;
                 elseif ((== arg "--signal-abort") or (== arg "-s"))
                     set-signal-abort! true
                 elseif (== arg "--")
@@ -2105,10 +2108,12 @@ fn run-main ()
                             \ ". Try --help for help."
                     exit 1
                     #unreachable!;
+                repeat k #arg parse-options
             elseif ((load sourcepath) == "")
                 store arg sourcepath
                 repeat k #arg parse-options
             # remainder is passed on to script
+#do
     let sourcepath = (load sourcepath)
     if (sourcepath == "")
         #read-eval-print-loop;
@@ -2123,7 +2128,7 @@ fn run-main ()
         #load-module "" sourcepath
             scope = scope
             main-module? = true
-        exit 0
+        #exit 0
         #unreachable!;
 
 run-main;

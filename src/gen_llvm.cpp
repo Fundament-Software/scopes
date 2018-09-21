@@ -1106,6 +1106,7 @@ struct LLVMIRGenerator {
             auto result = SCOPES_GET_RESULT(node_to_value(node->value));
             LLVMBasicBlockRef bb = LLVMGetInsertBlock(builder);
             if (is_returning(node->value->get_type())) {
+                assert(loop_info.bb_break);
                 LLVMBuildBr(builder, loop_info.bb_break);
                 if (loop_info.break_value) {
                     LLVMBasicBlockRef incobbs[] = { bb };
