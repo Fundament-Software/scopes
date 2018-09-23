@@ -459,10 +459,10 @@ struct StreamAST : StreamAnchors {
             ss << Style_Keyword << "Raise" << Style_None;
             walk_same_or_newline(val->value, depth+1, maxdepth);
         } break;
-        case VK_SyntaxExtend: {
+        case VK_CompileStage: {
             stream_type_prefix(node);
-            auto val = cast<SyntaxExtend>(node);
-            ss << Style_Keyword << "SyntaxExtend" << Style_None;
+            auto val = cast<CompileStage>(node);
+            ss << Style_Keyword << "CompileStage" << Style_None;
             walk_newline(val->func, depth+1, maxdepth);
         } break;
         default:

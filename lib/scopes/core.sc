@@ -183,7 +183,6 @@ compile-stage
     let T = (sc_type_storage ASTMacro)
     sc_scope_set_symbol syntax-scope 'ASTMacroFunction (box-pointer T)
     sc_scope_set_symbol syntax-scope 'ellipsis-symbol (box-symbol (sc_symbol_new "..."))
-    syntax-scope
 
 compile-stage
     fn typify (argcount args)
@@ -217,8 +216,6 @@ compile-stage
         let result =
             sc_const_pointer_new ASTMacro ptr
         sc_scope_set_symbol syntax-scope 'typify result
-
-    syntax-scope
 
 let function->ASTMacro =
     typify
@@ -625,8 +622,6 @@ compile-stage
                         raise-compile-error!
                             sc_string_join "can't box value of type "
                                 sc_value_repr (box-pointer T)
-
-    syntax-scope
 
 fn cons (values...)
     va-rifold none
@@ -1285,7 +1280,6 @@ compile-stage
         lslice = (make-asym-binary-op-dispatch '__lslice usize "apply left-slice operator with")
         rslice = (make-asym-binary-op-dispatch '__rslice usize "apply right-slice operator with")
         #constbranch = constbranch
-    syntax-scope
 
 #inline Syntax-unbox (self destT)
     imply ('datum self) destT
@@ -1590,7 +1584,6 @@ compile-stage
         let result = (sc_compile (sc_typify parse-infix-expr 4 types)
             compile-flag-dump-module)
         exit 0
-        syntax-scope
 
     let parse-infix-expr =
         typify parse-infix-expr Scope Value list i32
@@ -1716,7 +1709,6 @@ compile-stage
             sc_typify expand-and-or 2 vals
             0:u64
         exit 0
-        syntax-scope
 
     inline make-expand-and-or (f)
         fn (expr)
@@ -1795,8 +1787,6 @@ compile-stage
         + = (box-ast-macro (fn (argc argv) (ltr-multiop argc argv (Value +))))
         * = (box-ast-macro (fn (argc argv) (ltr-multiop argc argv (Value *))))
 
-    syntax-scope
-
 define-infix< 50 +=
 define-infix< 50 -=
 define-infix< 50 *=
@@ -1861,7 +1851,6 @@ inline char (s)
                                         'set-enter source-label (Any enter)
                         let arg = ('decons arg)
                         arg as list
-    syntax-scope
 
 #compile-stage
     'set-symbols syntax-scope
@@ -1873,7 +1862,6 @@ inline char (s)
                         io-write! "hello "
                         io-write! (unquote arg)
                         io-write! "\n"
-    syntax-scope
 
 let
     io-write! = sc_write
@@ -1896,8 +1884,6 @@ let
 
 compile-stage
     sc_set_globals syntax-scope
-
-    syntax-scope
 
 #-------------------------------------------------------------------------------
 # REPL
@@ -2023,7 +2009,6 @@ fn read-eval-print-loop ()
                         return
                             syntax-scope
                             syntax-scope
-        syntax-scope
 
     fn handle-retargs (counter eval-scope local-scope vals...)
         if false

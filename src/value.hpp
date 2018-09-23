@@ -26,7 +26,7 @@ struct Scope;
     T(VK_Template, "value-kind-template", Template) \
     T(VK_Keyed, "value-kind-keyed", Keyed) \
     T(VK_Expression, "value-kind-expression", Expression) \
-    T(VK_SyntaxExtend, "value-kind-syntax-extend", SyntaxExtend) \
+    T(VK_CompileStage, "value-kind-compile-stage", CompileStage) \
     /* instructions (Instruction::classof) */ \
     T(VK_If, "value-kind-if", If) \
     T(VK_Try, "value-kind-try", Try) \
@@ -487,12 +487,12 @@ struct Raise : Instruction {
 
 //------------------------------------------------------------------------------
 
-struct SyntaxExtend : Value {
+struct CompileStage : Value {
     static bool classof(const Value *T);
 
-    SyntaxExtend(const Anchor *anchor, Template *func, const List *next, Scope *env);
+    CompileStage(const Anchor *anchor, Template *func, const List *next, Scope *env);
 
-    static SyntaxExtend *from(const Anchor *anchor, Template *func, const List *next, Scope *env);
+    static CompileStage *from(const Anchor *anchor, Template *func, const List *next, Scope *env);
 
     Template *func;
     const List *next;

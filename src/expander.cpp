@@ -106,17 +106,17 @@ struct Expander {
         return ArgumentList::from(anchor);
     }
 
-    SCOPES_RESULT(Value *) expand_syntax_extend(const List *it) {
+    SCOPES_RESULT(Value *) expand_compile_stage(const List *it) {
         SCOPES_RESULT_TYPE(Value *);
         auto _anchor = get_active_anchor();
 
-        SCOPES_CHECK_RESULT(verify_list_parameter_count("syntax-extend", it, 1, -1));
+        SCOPES_CHECK_RESULT(verify_list_parameter_count("compile-stage", it, 1, -1));
 
         // skip head
         it = it->next;
 
         auto scopeparam = Parameter::from(_anchor, SYM_Unnamed, TYPE_Scope);
-        Template *func = Template::from(_anchor, Symbol(KW_SyntaxExtend), {scopeparam});
+        Template *func = Template::from(_anchor, Symbol(KW_CompileStage), {scopeparam});
         func->scope = astscope;
 
         Scope *subenv = Scope::from(env);
@@ -124,9 +124,11 @@ struct Expander {
 
         Expander subexpr(subenv, func);
 
-        func->value = SCOPES_GET_RESULT(subexpr.expand_expression(_anchor, it));
+        auto expr = SCOPES_GET_RESULT(subexpr.expand_expression(_anchor, it));
 
-        auto node = SyntaxExtend::from(_anchor, func, next, env);
+        func->value = Expression::from(_anchor, {expr}, ArgumentList::from(_anchor));
+
+        auto node = CompileStage::from(_anchor, func, next, env);
         next = EOL;
         return node;
     }
@@ -853,7 +855,7 @@ struct Expander {
                     setup.inlined = true;
                     return expand_fn(list, setup);
                 }
-                case KW_SyntaxExtend: return expand_syntax_extend(list);
+                case KW_CompileStage: return expand_compile_stage(list);
                 case KW_Let: return expand_let(list);
                 case KW_Loop: return expand_loop(list);
                 case KW_Try: return expand_try(list);

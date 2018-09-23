@@ -799,7 +799,7 @@ static SCOPES_RESULT(Value *) prove_Raise(const ASTContext &ctx, Raise *_raise) 
     return newraise;
 }
 
-static SCOPES_RESULT(Value *) prove_SyntaxExtend(const ASTContext &ctx, SyntaxExtend *sx) {
+static SCOPES_RESULT(Value *) prove_CompileStage(const ASTContext &ctx, CompileStage *sx) {
     SCOPES_RESULT_TYPE(Value *);
     assert(sx->func->scope);
     Function *frame = ctx.frame->find_frame(sx->func->scope);
@@ -809,35 +809,37 @@ static SCOPES_RESULT(Value *) prove_SyntaxExtend(const ASTContext &ctx, SyntaxEx
     }
 #if SCOPES_DEBUG_SYNTAX_EXTEND
     StyledStream ss(std::cout);
-    std::cout << "syntax-extend non-normalized:" << std::endl;
+    std::cout << "compile-stage non-normalized:" << std::endl;
     stream_ast(ss, sx->func, StreamASTFormat());
     std::cout << std::endl;
 #endif
     Function *fn = SCOPES_GET_RESULT(prove(frame, sx->func, {TYPE_Scope}));
 #if SCOPES_DEBUG_SYNTAX_EXTEND
-    std::cout << "syntax-extend normalized:" << std::endl;
+    std::cout << "compile-stage normalized:" << std::endl;
     stream_ast(ss, fn, StreamASTFormat());
     std::cout << std::endl;
 #endif
     //StyledStream ss;
     //stream_ast(ss, fn, StreamASTFormat());
-    auto ftype = native_ro_pointer_type(function_type(TYPE_Scope, {TYPE_Scope}));
+    auto voidT = arguments_type({});
+    auto ftype = native_ro_pointer_type(function_type(voidT, {TYPE_Scope}));
     const void *ptr = SCOPES_GET_RESULT(compile(fn, 0/*CF_DumpModule*/))->value;
     Scope *env = nullptr;
     if (fn->get_type() == ftype) {
-        typedef Scope *(*SyntaxExtendFuncType)(Scope *);
+        typedef void (*SyntaxExtendFuncType)(Scope *);
         SyntaxExtendFuncType fptr = (SyntaxExtendFuncType)ptr;
-        env = fptr(sx->env);
+        fptr(sx->env);
+        env = sx->env;
         assert(env);
     } else {
-        auto ftype2 = native_ro_pointer_type(raising_function_type(TYPE_Scope, {TYPE_Scope}));
+        auto ftype2 = native_ro_pointer_type(raising_function_type(voidT, {TYPE_Scope}));
         if (fn->get_type() == ftype2) {
-            typedef struct { bool ok; Error *err; Scope *scope; } ScopeRet;
+            typedef struct { bool ok; Error *err; } ScopeRet;
             typedef ScopeRet (*SyntaxExtendFuncType)(Scope *);
             SyntaxExtendFuncType fptr = (SyntaxExtendFuncType)ptr;
             auto ret = fptr(sx->env);
             if (ret.ok) {
-                env = ret.scope;
+                env = sx->env;
                 assert(env);
             } else {
                 set_last_error(ret.err);
@@ -846,7 +848,7 @@ static SCOPES_RESULT(Value *) prove_SyntaxExtend(const ASTContext &ctx, SyntaxEx
         } else {
             SCOPES_ANCHOR(sx->anchor());
             StyledString ss;
-            ss.out << "syntax-extend has wrong return type (expected function of type "
+            ss.out << "compile-stage has wrong return type (expected function of type "
                 << ftype
                 << " or "
                 << ftype2

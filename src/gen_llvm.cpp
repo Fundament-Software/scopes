@@ -1028,7 +1028,7 @@ struct LLVMIRGenerator {
     }
 
 
-    SCOPES_RESULT(LLVMValueRef) SyntaxExtend_to_value(SyntaxExtend *node) {
+    SCOPES_RESULT(LLVMValueRef) CompileStage_to_value(CompileStage *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         assert(false);
         return nullptr;

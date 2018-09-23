@@ -493,12 +493,12 @@ Raise *Raise::from(const Anchor *anchor, Value *value) {
 
 //------------------------------------------------------------------------------
 
-SyntaxExtend::SyntaxExtend(const Anchor *anchor, Template *_func, const List *_next, Scope *_env)
-    : Value(VK_SyntaxExtend, anchor), func(_func), next(_next), env(_env) {
+CompileStage::CompileStage(const Anchor *anchor, Template *_func, const List *_next, Scope *_env)
+    : Value(VK_CompileStage, anchor), func(_func), next(_next), env(_env) {
 }
 
-SyntaxExtend *SyntaxExtend::from(const Anchor *anchor, Template *func, const List *next, Scope *env) {
-    return new SyntaxExtend(anchor, func, next, env);
+CompileStage *CompileStage::from(const Anchor *anchor, Template *func, const List *next, Scope *env) {
+    return new CompileStage(anchor, func, next, env);
 }
 
 //------------------------------------------------------------------------------
