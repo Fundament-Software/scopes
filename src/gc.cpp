@@ -16,12 +16,18 @@ namespace scopes {
 char *g_stack_start;
 size_t g_largest_stack_size = 0;
 
+#if 0
 size_t memory_stack_size() {
     char c; char *_stack_addr = &c;
     size_t ss = (size_t)(g_stack_start - _stack_addr);
     g_largest_stack_size = std::max(ss, g_largest_stack_size);
     return ss;
 }
+#else
+size_t memory_stack_size() {
+    return 0;
+}
+#endif
 
 SCOPES_RESULT(size_t) verify_stack() {
     SCOPES_RESULT_TYPE(size_t);

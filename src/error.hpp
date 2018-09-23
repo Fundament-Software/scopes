@@ -81,6 +81,8 @@ struct Value;
 struct Parameter;
 struct Template;
 
+void print_definition_anchor(Value *node);
+
 // specializer errors
 SCOPES_RESULT(void) error_invalid_call_type(Value *callee);
 SCOPES_RESULT(void) error_invalid_condition_type(Value *cond);

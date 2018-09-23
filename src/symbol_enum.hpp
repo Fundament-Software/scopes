@@ -265,7 +265,7 @@ namespace scopes {
     T(KW_QQuoteSyntax, "qquote-syntax") T(KW_Quote, "quote") T(KW_Inline, "inline") \
     T(KW_QuoteSyntax, "quote-syntax") T(KW_Recur, "recur") \
     T(KW_Return, "return") T(KW_Splice, "splice") \
-    T(KW_SyntaxExtend, "syntax-extend") T(KW_True, "true") T(KW_Try, "try") \
+    T(KW_SyntaxExtend, "compile-stage") T(KW_True, "true") T(KW_Try, "try") \
     T(KW_Unquote, "unquote") T(KW_UnquoteSplice, "unquote-splice") T(KW_ListEmpty, "eol") \
     T(KW_With, "with") T(KW_XFn, "xfn") T(KW_XLet, "xlet") T(KW_Yield, "yield") \
     \

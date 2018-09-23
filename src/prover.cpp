@@ -23,6 +23,7 @@
 #include "expander.hpp"
 #include "scopes/scopes.h"
 
+#include <algorithm>
 #include <unordered_set>
 #include <deque>
 
@@ -426,7 +427,45 @@ static int find_key(const Symbols &symbols, Symbol key) {
     return -1;
 }
 
-static SCOPES_RESULT(void) map_keyed_arguments(const Anchor *anchor,
+static std::vector<Symbol> find_closest_match(Symbol name, const Symbols &symbols) {
+    const String *s = name.name();
+    std::unordered_set<Symbol, Symbol::Hash> done;
+    done.insert(SYM_Unnamed);
+    std::vector<Symbol> best_syms;
+    size_t best_dist = (size_t)-1;
+    for (auto sym : symbols) {
+        if (done.count(sym))
+            continue;
+        size_t dist = distance(s, sym.name());
+        if (dist == best_dist) {
+            best_syms.push_back(sym);
+        } else if (dist < best_dist) {
+            best_dist = dist;
+            best_syms = { sym };
+        }
+        done.insert(sym);
+    }
+    std::sort(best_syms.begin(), best_syms.end());
+    return best_syms;
+}
+
+static void print_name_suggestions(Symbol name, const Symbols &symbols, StyledStream &ss) {
+    auto syms = find_closest_match(name, symbols);
+    if (!syms.empty()) {
+        ss << "Did you mean '" << syms[0].name()->data << "'";
+        for (size_t i = 1; i < syms.size(); ++i) {
+            if ((i + 1) == syms.size()) {
+                ss << " or ";
+            } else {
+                ss << ", ";
+            }
+            ss << "'" << syms[i].name()->data << "'";
+        }
+        ss << "?";
+    }
+}
+
+SCOPES_RESULT(void) map_keyed_arguments(const Anchor *anchor, Value *callee,
     Values &outargs, const Values &values, const Symbols &symbols, bool varargs) {
     SCOPES_RESULT_TYPE(void);
     outargs.reserve(values.size());
@@ -480,7 +519,20 @@ static SCOPES_RESULT(void) map_keyed_arguments(const Anchor *anchor,
                 outargs.push_back(nullptr);
             } else {
                 StyledString ss;
-                ss.out << "no parameter with name " << key;
+                ss.out << "no parameter named '" << key.name()->data << "'";
+                const Type *T = callee->get_type();
+                if (is_function_pointer(T)) {
+                    ss.out << " in function of type " << T;
+                } else if (T == TYPE_Closure) {
+                    const Closure *cl = SCOPES_GET_RESULT((extract_closure_constant(callee)));
+                    print_definition_anchor(cl->func);
+                    ss.out << " in untyped function ";
+                    if (cl->func->name != SYM_Unnamed) {
+                        ss.out << cl->func->name.name()->data;
+                    }
+                }
+                ss.out << ". ";
+                print_name_suggestions(key, symbols, ss.out);
                 SCOPES_LOCATION_ERROR(ss.str());
             }
         }
@@ -959,6 +1011,24 @@ static const Type *get_function_type(Function *fn) {
     return native_ro_pointer_type(raising_function_type(fn->except_type, fn->return_type, params));
 }
 
+static void keys_from_function_type(Symbols &keys, const FunctionType *ft) {
+    for (auto T : ft->argument_types) {
+        keys.push_back(key_type(T)._0);
+    }
+}
+
+static bool keys_from_parameters(Symbols &keys, const Parameters &params) {
+    bool vararg = false;
+    for (auto param : params) {
+        if (param->variadic) {
+            vararg = true;
+        } else {
+            keys.push_back(param->name);
+        }
+    }
+    return vararg;
+}
+
 static SCOPES_RESULT(Value *) prove_call_interior(const ASTContext &ctx, Call *call) {
     SCOPES_RESULT_TYPE(Value *);
     SCOPES_ANCHOR(call->anchor());
@@ -980,20 +1050,19 @@ repeat:
             goto repeat;
         }
     }
-    if (T == TYPE_Closure) {
+    if (is_function_pointer(T)) {
+        Values args;
+        Symbols keys;
+        keys_from_function_type(keys, extract_function_type(T));
+        SCOPES_CHECK_RESULT(map_keyed_arguments(call->anchor(), callee, args, values, keys, false));
+        values = args;
+    } else if (T == TYPE_Closure) {
         const Closure *cl = SCOPES_GET_RESULT((extract_closure_constant(callee)));
         {
             Values args;
             Symbols keys;
-            bool vararg = false;
-            for (auto param : cl->func->params) {
-                if (param->variadic) {
-                    vararg = true;
-                } else {
-                    keys.push_back(param->name);
-                }
-            }
-            SCOPES_CHECK_RESULT(map_keyed_arguments(call->anchor(), args, values, keys, vararg));
+            bool vararg = keys_from_parameters(keys, cl->func->params);
+            SCOPES_CHECK_RESULT(map_keyed_arguments(call->anchor(), callee, args, values, keys, vararg));
             values = args;
         }
         if (cl->func->is_inline()) {

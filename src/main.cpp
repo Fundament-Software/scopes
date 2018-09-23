@@ -272,7 +272,7 @@ SCOPES_RESULT(int) try_main(int argc, char *argv[]) {
 skip_regular_load:
     Template *tmpfn = SCOPES_GET_RESULT(expand_module(expr, Scope::from(globals)));
 
-#if 1 //SCOPES_DEBUG_CODEGEN
+#if 0 //SCOPES_DEBUG_CODEGEN
     StyledStream ss(std::cout);
     std::cout << "non-normalized:" << std::endl;
     stream_ast(ss, tmpfn, StreamASTFormat());
@@ -281,14 +281,18 @@ skip_regular_load:
 
     Function *fn = SCOPES_GET_RESULT(prove(nullptr, tmpfn, {}));
 
-#if 1 //SCOPES_DEBUG_CODEGEN
+#if 0 //SCOPES_DEBUG_CODEGEN
     std::cout << "normalized:" << std::endl;
     stream_ast(ss, fn, StreamASTFormat());
     std::cout << std::endl;
+
+    auto flags = CF_DumpModule;
+#else
+    auto flags = 0;
 #endif
 
     typedef void (*MainFuncType)();
-    MainFuncType fptr = (MainFuncType)SCOPES_GET_RESULT(compile(fn, CF_DumpModule))->value;
+    MainFuncType fptr = (MainFuncType)SCOPES_GET_RESULT(compile(fn, flags))->value;
     fptr();
 
     return 0;

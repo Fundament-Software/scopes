@@ -138,7 +138,7 @@ void set_last_location_error(const String *msg) {
 
 //------------------------------------------------------------------------------
 
-static void print_definition_anchor(Value *node) {
+void print_definition_anchor(Value *node) {
     location_message(node->anchor(), String::from("defined here"));
 }
 

@@ -13,45 +13,28 @@
     The core module implements the remaining standard functions and macros,
     parses the command-line and optionally enters the REPL.
 
-let
+#let
     __typify = sc_typify
     __compile = sc_compile
     __compile-object = sc_compile_object
     __compile-spirv = sc_compile_spirv
     __compile-glsl = sc_compile_glsl
-    eval = sc_eval
-    compiler-version = sc_compiler_version
     verify-stack! = sc_verify_stack
     enter-solver-cli! = sc_enter_solver_cli
-    launch-args = sc_launch_args
 
-    default-styler = sc_default_styler
-    io-write! = sc_write
     format-message = sc_format_message
-    __prompt = sc_prompt
-    set-autocomplete-scope! = sc_set_autocomplete_scope
 
     file? = sc_is_file
     directory? = sc_is_directory
-    realpath = sc_realpath
     dirname = sc_dirname
     basename = sc_basename
 
-    globals = sc_get_globals
-    set-globals! = sc_set_globals
-
-    format-error = sc_format_error
     CompileError = sc_location_error_new
     RuntimeError = sc_runtime_error_new
-    exit = sc_exit
-    set-signal-abort! = sc_set_signal_abort
 
     __hash = sc_hash
     __hash2x64 = sc_hash2x64
     __hashbytes = sc_hashbytes
-
-    set-anchor! = sc_set_active_anchor
-    active-anchor = sc_get_active_anchor
 
     import-c = sc_import_c
     load-library = sc_load_library
@@ -78,9 +61,6 @@ let
     list-cons = sc_list_cons
     list-join = sc_list_join
     list-dump = sc_list_dump
-
-    list-load = sc_parse_from_path
-    list-parse = sc_parse_from_string
 
     element-type = sc_type_element_at
     type-countof = sc_type_countof
@@ -150,7 +130,7 @@ fn box-pointer (value)
         bitcast value voidstar
 
 fn raise-compile-error! (value)
-    raise (CompileError value)
+    raise (sc_location_error_new value)
 
 # print an unboxing error given two types
 fn unbox-verify (haveT wantT)
@@ -193,7 +173,7 @@ fn verify-count (count mincount maxcount)
 fn Value-none? (value)
     ptrcmp== (sc_value_type value) Nothing
 
-syntax-extend
+compile-stage
     let TypeArrayPointer =
         box-pointer (sc_pointer_type type pointer-flag-non-writable unnamed)
     let ValueArrayPointer =
@@ -205,7 +185,7 @@ syntax-extend
     sc_scope_set_symbol syntax-scope 'ellipsis-symbol (box-symbol (sc_symbol_new "..."))
     syntax-scope
 
-syntax-extend
+compile-stage
     fn typify (argcount args)
         verify-count argcount 1 -1
         let src_fn = (load (getelementptr args 0))
@@ -259,15 +239,16 @@ inline ast-macro (l)
 inline box-ast-macro (l)
     box-pointer (ast-macro l)
 
-syntax-extend
+compile-stage
     fn va-lfold (argcount args use-indices)
-        verify-count argcount 1 -1
-        let f = (load (getelementptr args 0))
-        if (icmp== argcount 1)
-            return (box-empty)
+        verify-count argcount 2 -1
+        let init = (load (getelementptr args 0))
+        let f = (load (getelementptr args 1))
+        if (icmp== argcount 2)
+            return init
         let ofs = (? use-indices 1 0)
         let callargs = (alloca-array Value (add 3 ofs))
-        loop (i ret) = 1 (undef Value)
+        loop (i ret) = 2 init
         if (icmp<s i argcount)
             let arg =
                 load (getelementptr args i)
@@ -280,26 +261,22 @@ syntax-extend
             store (box-symbol k) (getelementptr callargs (add ofs 0))
             # value
             store v (getelementptr callargs (add ofs 1))
-            let callargcount =
-                add ofs
-                    if (icmp>s i 1)
-                        # append previous result
-                        store ret (getelementptr callargs (add ofs 2))
-                        3
-                    else 2
+            # append previous result
+            store ret (getelementptr callargs (add ofs 2))
             repeat (add i 1)
-                sc_call_new f callargcount callargs
+                sc_call_new f (add ofs 3) callargs
         ret
 
     fn va-rfold (argcount args use-indices)
-        verify-count argcount 1 -1
-        let f = (load (getelementptr args 0))
-        if (icmp== argcount 1)
-            return (box-empty)
+        verify-count argcount 2 -1
+        let init = (load (getelementptr args 0))
+        let f = (load (getelementptr args 1))
+        if (icmp== argcount 2)
+            return init
         let ofs = (? use-indices 1 0)
         let callargs = (alloca-array Value (add 3 ofs))
-        loop (i ret) = argcount (undef Value)
-        if (icmp>s i 1)
+        loop (i ret) = argcount init
+        if (icmp>s i 2)
             let oi = i
             let i = (sub i 1)
             let arg =
@@ -313,15 +290,10 @@ syntax-extend
             store (box-symbol k) (getelementptr callargs (add ofs 0))
             # value
             store v (getelementptr callargs (add ofs 1))
-            let callargcount =
-                add ofs
-                    if (icmp!= oi argcount)
-                        # append previous result
-                        store ret (getelementptr callargs (add ofs 2))
-                        3
-                    else 2
+            # append previous result
+            store ret (getelementptr callargs (add ofs 2))
             repeat i
-                sc_call_new f callargcount callargs
+                sc_call_new f (add ofs 3) callargs
         ret
 
     sc_scope_set_symbol syntax-scope 'va-lfold (box-ast-macro (fn "va-lfold" (argcount args) (va-lfold argcount args false)))
@@ -471,6 +443,7 @@ syntax-extend
                     else
                         let arg = (load (getelementptr args 1))
                         let key = (sc_type_key (sc_value_type arg))
+                        let arg = (sc_keyed_new unnamed arg)
                         _ (box-symbol key) arg
                 if (sc_value_is_constant self)
                     if (sc_value_is_constant key)
@@ -656,7 +629,7 @@ syntax-extend
     syntax-scope
 
 fn cons (values...)
-    va-rifold
+    va-rifold none
         inline (i key value next)
             constbranch (none? next)
                 inline ()
@@ -666,16 +639,10 @@ fn cons (values...)
         values...
 
 inline make-list (values...)
-    constbranch (const.icmp<=.i32.i32 (va-countof values...) 0)
-        inline () '()
-        inline ()
-            va-rifold
-                inline (i key value next)
-                    sc_list_cons (Value value)
-                        constbranch (none? next)
-                            inline () '()
-                            inline () next
-                values...
+    va-rifold '()
+        inline (i key value result)
+            sc_list_cons (Value value) result
+        values...
 
 inline decons (self count)
     let count =
@@ -689,7 +656,7 @@ inline decons (self count)
             inline () (decons next (const.add.i32.i32 count -1))
 
 inline set-symbols (self values...)
-    va-lfold
+    va-lfold none
         inline (key value)
             'set-symbol self key value
         values...
@@ -767,7 +734,7 @@ inline box-cast-dispatch (f)
 inline not (value)
     bxor value true
 
-syntax-extend
+compile-stage
     # a supertype to be used for conversions
     let immutable = (sc_typename_type "immutable")
     sc_typename_type_set_super integer immutable
@@ -920,7 +887,7 @@ syntax-extend
                     'join " of type "
                         'join ('__repr (box-pointer T))
                             'join ": "
-                                format-error err
+                                sc_format_error err
 
     fn get-cast-dispatcher (symbol rsymbol vT T)
         let ok anyf = ('@ vT symbol)
@@ -972,7 +939,7 @@ syntax-extend
                         sc_call_new
                             box-pointer
                                 gen-cast-error "can't implicitly cast value of type "
-                            \ 0 (undef ValueArrayPointer)
+                            \ argc argv
                 else value
 
     let as =
@@ -1002,7 +969,7 @@ syntax-extend
                         sc_call_new
                             box-pointer
                                 gen-cast-error "can't cast value of type "
-                            \ 0 (undef ValueArrayPointer)
+                            \ argc argv
                 else value
 
     let UnaryOpFunctionType =
@@ -1209,6 +1176,15 @@ syntax-extend
         __as = (box-cast-dispatch integer-as)
         __+ = (box-binary-op-dispatch (single-binary-op-dispatch add))
         __- = (box-binary-op-dispatch (single-binary-op-dispatch sub))
+        __* = (box-binary-op-dispatch (single-binary-op-dispatch mul))
+        __// = (box-binary-op-dispatch (single-signed-binary-op-dispatch sdiv udiv))
+        __% = (box-binary-op-dispatch (single-signed-binary-op-dispatch srem urem))
+        __& = (box-binary-op-dispatch (single-binary-op-dispatch band))
+        __| = (box-binary-op-dispatch (single-binary-op-dispatch bor))
+        __^ = (box-binary-op-dispatch (single-binary-op-dispatch bxor))
+        #__~ =
+        __<< = (box-binary-op-dispatch (single-binary-op-dispatch shl))
+        __>> = (box-binary-op-dispatch (single-signed-binary-op-dispatch ashr lshr))
         __== = (box-binary-op-dispatch (single-binary-op-dispatch icmp==))
         __!= = (box-binary-op-dispatch (single-binary-op-dispatch icmp!=))
         __< = (box-binary-op-dispatch (single-signed-binary-op-dispatch icmp<s icmp<u))
@@ -1259,19 +1235,19 @@ syntax-extend
                             duplicate ``clone``, but descending from ``parent`` instead
                     verify-count argc 1 3
                     if (icmp== argc 1)
-                        sc_call_new (Value Scope-new) 0 (undef ValueArrayPointer)
+                        sc_call_new (Value sc_scope_new) 0 (undef ValueArrayPointer)
                     elseif (icmp== argc 2)
-                        sc_call_new (Value Scope-new-expand) 1 (getelementptr argv 1)
+                        sc_call_new (Value sc_scope_new_subscope) 1 (getelementptr argv 1)
                     else
                         # argc == 3
                         let parent = (loadarrayptrs argv 1)
                         if (type== ('typeof parent) Nothing)
-                            sc_call_new (Value Scope-new-expand) 1 (getelementptr argv 2)
+                            sc_call_new (Value sc_scope_clone) 1 (getelementptr argv 2)
                         else
-                            sc_call_new (Value Scope-clone-expand) 2 (getelementptr argv 1)
+                            sc_call_new (Value sc_scope_clone_subscope) 2 (getelementptr argv 1)
 
     'set-symbols syntax-scope
-        eol = (Value (nullof list))
+        #eol = (Value (nullof list))
         and-branch = (box-ast-macro (fn (argc argv) (dispatch-and-or argc argv true)))
         or-branch = (box-ast-macro (fn (argc argv) (dispatch-and-or argc argv false)))
         immutable = (box-pointer immutable)
@@ -1301,6 +1277,8 @@ syntax-extend
         & = (make-sym-binary-op-dispatch '__& '__r& "apply bitwise-and to")
         | = (make-sym-binary-op-dispatch '__| '__r| "apply bitwise-or to")
         ^ = (make-sym-binary-op-dispatch '__^ '__r^ "apply bitwise-xor to")
+        << = (make-sym-binary-op-dispatch '__<< '__r<< "apply left shift with")
+        >> = (make-sym-binary-op-dispatch '__>> '__r>> "apply right shift with")
         .. = (make-sym-binary-op-dispatch '__.. '__r.. "join")
         @ = (make-asym-binary-op-dispatch '__@ usize "apply subscript operator with")
         getattr = (make-asym-binary-op-dispatch '__getattr Symbol "get attribute from")
@@ -1338,7 +1316,7 @@ inline syntax-macro (f)
 fn empty? (value)
     == (countof value) 0:usize
 
-fn cons (at next)
+#fn cons (at next)
     sc_list_cons (Value at) next
 
 fn type-repr-needs-suffix? (CT)
@@ -1379,8 +1357,8 @@ fn repr (value)
     if (type-repr-needs-suffix? T)
         .. s
             ..
-                default-styler style-operator ":"
-                default-styler style-type ('string T)
+                sc_default_styler style-operator ":"
+                sc_default_styler style-type ('string T)
 
     else s
 
@@ -1390,19 +1368,23 @@ let print =
             constbranch (const.icmp<=.i32.i32 i 0)
                 inline ()
                 inline ()
-                    io-write! " "
+                    sc_write " "
             constbranch (== (typeof value) string)
                 inline ()
-                    io-write! value
+                    sc_write value
                 inline ()
-                    io-write! (repr value)
+                    sc_write (repr value)
 
         fn print (values...)
-            va-lifold print-element values...
-            io-write! "\n"
+            va-lifold none print-element values...
+            sc_write "\n"
             values...
 
-syntax-extend
+compile-stage
+    'set-symbol integer '__typecall
+        inline (cls value)
+            as value cls
+
     # implicit argument type coercion for functions, externs and typed labels
     # --------------------------------------------------------------------------
 
@@ -1422,13 +1404,16 @@ syntax-extend
                         loop (i) = 0
                         if (< i argc)
                             let arg = (load (getelementptr argv i))
-                            let argT = ('typeof arg)
+                            let key argT = (sc_type_key ('typeof arg))
                             let paramT = ('element@ fT i)
                             let outarg =
                                 if (== argT paramT) arg
                                 else
-                                    sc_call_new (Value imply)
-                                        Value-array arg (Value paramT)
+                                    # remove key from cast, then re-add
+                                    let arg = (sc_keyed_new unnamed arg)
+                                    sc_keyed_new key
+                                        sc_call_new (Value imply)
+                                            Value-array arg (Value paramT)
                             store outarg (getelementptr outargs i)
                             repeat (+ i 1)
                         sc_call_new self argc outargs
@@ -1548,7 +1533,7 @@ syntax-extend
                 let op-prec = (unpack-infix-op op)
                 ? (pred op-prec prec) op (Value none)
             else
-                set-anchor! ('anchor token)
+                sc_set_active_anchor ('anchor token)
                 raise-compile-error!
                     "unexpected token in infix expression"
     let infix-op-gt = (infix-op >)
@@ -1564,7 +1549,7 @@ syntax-extend
             else
                 Value none
         else
-            set-anchor! ('anchor token)
+            sc_set_active_anchor ('anchor token)
             raise-compile-error!
                 "unexpected token in infix expression"
 
@@ -1596,7 +1581,7 @@ syntax-extend
                 repeat next-rhs next-state
         repeat next-lhs next-state
 
-    #syntax-extend
+    #compile-stage
         let types = (alloca-array type 4)
         store Scope (getelementptr types 0)
         store Value (getelementptr types 1)
@@ -1660,7 +1645,7 @@ syntax-extend
             let s = (as name string)
             let sz = (countof s)
             let expr =
-                Value (split-dotted-symbol name 0:usize sz eol)
+                Value (split-dotted-symbol name 0:usize sz '())
             #let expr = (Syntax-wrap name-anchor expr false)
             return (cons expr next) env
         return topexpr env
@@ -1723,7 +1708,7 @@ syntax-extend
         let at next = ('decons head)
         repeat (Value (list f at (list inline '() result))) next
 
-    #syntax-extend
+    #compile-stage
         let vals = (alloca-array type 2)
         store list (getelementptr vals 0)
         store Value (getelementptr vals 1)
@@ -1857,7 +1842,7 @@ inline char (s)
     let s sz = (sc_string_buffer s)
     load s
 
-#syntax-extend
+#compile-stage
     'set-symbols syntax-scope
         block-macro =
             Any
@@ -1878,7 +1863,7 @@ inline char (s)
                         arg as list
     syntax-scope
 
-#syntax-extend
+#compile-stage
     'set-symbols syntax-scope
         hello =
             Any
@@ -1890,12 +1875,36 @@ inline char (s)
                         io-write! "\n"
     syntax-scope
 
+let
+    io-write! = sc_write
+    compiler-version = sc_compiler_version
+    default-styler = sc_default_styler
+    realpath = sc_realpath
+    globals = sc_get_globals
+    set-globals! = sc_set_globals
+    __prompt = sc_prompt
+    set-autocomplete-scope! = sc_set_autocomplete_scope
+    exit = sc_exit
+    launch-args = sc_launch_args
+    set-signal-abort! = sc_set_signal_abort
+    list-load = sc_parse_from_path
+    list-parse = sc_parse_from_string
+    set-anchor! = sc_set_active_anchor
+    active-anchor = sc_get_active_anchor
+    eval = sc_eval
+    format-error = sc_format_error
+
+compile-stage
+    sc_set_globals syntax-scope
+
+    syntax-scope
+
 #-------------------------------------------------------------------------------
 # REPL
 #-------------------------------------------------------------------------------
 
 fn compiler-version-string ()
-    let vmin vmaj vpatch = (compiler-version)
+    let vmin vmaj vpatch = (sc_compiler_version)
     .. "Scopes " (tostring vmin) "." (tostring vmaj)
         if (vpatch == 0) ""
         else
@@ -1913,35 +1922,33 @@ fn print-logo ()
     io-write! (default-styler style-comment "///"); io-write! "  "
     io-write! (default-styler style-function "\\\\\\")
 
-#fn read-eval-print-loop ()
+fn read-eval-print-loop ()
     fn repeat-string (n c)
-        let loop (i s) =
-            tie-const n (usize 0)
-            tie-const n ""
+        loop (i s) = 0:usize ""
         if (i == n)
             return s
-        loop (i + (usize 1))
+        repeat (i + 1:usize)
             .. s c
 
     fn leading-spaces (s)
-        let len = (i32 (countof s))
-        let loop (i) = (tie-const len 0)
+        let len = (countof s)
+        loop (i) = 0:usize
         if (i == len)
             return s
         let c = (@ s i)
         if (c != (char " "))
-            return (string-new (string->rawstring s) (usize i))
-        loop (i + 1)
+            let s = (sc_string_buffer s)
+            return (sc_string_new s i)
+        repeat (i + 1:usize)
 
     fn blank? (s)
-        let len = (i32 (countof s))
-        let loop (i) =
-            tie-const len 0
+        let len = (countof s)
+        loop (i) = 0:usize
         if (i == len)
-            return (unconst true)
+            return true
         if ((@ s i) != (char " "))
-            return (unconst false)
-        loop (i + 1)
+            return false
+        repeat (i + 1:usize)
 
     let cwd =
         realpath "."
@@ -1954,19 +1961,19 @@ fn print-logo ()
     let eval-scope = (Scope global-scope)
     set-autocomplete-scope! eval-scope
 
-    set-scope-symbol! eval-scope 'module-dir cwd
+    'set-symbol eval-scope 'module-dir cwd
     loop (preload cmdlist counter eval-scope) = "" "" 0 eval-scope
     #dump "loop"
     fn make-idstr (counter)
-        .. "$" (string-repr counter)
+        .. "$" (tostring counter)
 
     let idstr = (make-idstr counter)
     let promptstr =
         .. idstr " "
             default-styler style-comment "►"
     let promptlen = ((countof idstr) + 2:usize)
-    let cmd success =
-        prompt
+    let success cmd =
+        __prompt
             ..
                 if (empty? cmdlist) promptstr
                 else
@@ -1977,7 +1984,7 @@ fn print-logo ()
         return;
     fn endswith-blank (s)
         let slen = (countof s)
-        if (slen == 0:usize) (unconst false)
+        if (slen == 0:usize) false
         else
             (@ s (slen - 1:usize)) == (char " ")
     let enter-multiline = (endswith-blank cmd)
@@ -1988,71 +1995,87 @@ fn print-logo ()
     let cmdlist =
         .. cmdlist
             if enter-multiline
-                slice cmd 0 -1
+                rslice cmd ((countof cmd) - 1:usize)
             else cmd
             "\n"
     let preload =
-        if terminated? (unconst "")
+        if terminated? ""
         else (leading-spaces cmd)
     if (not terminated?)
         repeat preload cmdlist counter eval-scope
 
-    define-scope-macro set-scope!
-        let scope rest = (decons args)
-        return
-            none
-            scope as Syntax as Scope
-
-    define-scope-macro get-scope
-        return
-            syntax-scope
-            syntax-scope
+    compile-stage
+        'set-symbols syntax-scope
+            set-scope! =
+                syntax-scope-macro
+                    fn (args syntax-scope)
+                        if false
+                            raise-compile-error! "never used"
+                        let scope rest = (decons args)
+                        return
+                            none
+                            scope as Scope
+            get-scope =
+                syntax-scope-macro
+                    fn (args syntax-scope)
+                        if false
+                            raise-compile-error! "never used"
+                        return
+                            syntax-scope
+                            syntax-scope
+        syntax-scope
 
     fn handle-retargs (counter eval-scope local-scope vals...)
+        if false
+            raise-compile-error! "force exception"
         # copy over values from local-scope
-        for k v in local-scope
+        #for k v in local-scope
             set-scope-symbol! eval-scope k v
-        let count = (va-countof vals...)
-        let loop (i) = 0
-        if (i < count)
-            let x = (va@ i vals...)
-            let k = (counter + i)
-            let idstr = (make-idstr k)
-            set-scope-symbol! eval-scope (Symbol idstr) x
-            print idstr "="
-                repr x
-            loop (add i 1)
-        return
-            unconst eval-scope
-            unconst count
+        let count =
+            va-lfold 0
+                inline (key value k)
+                    let idstr = (make-idstr k)
+                    'set-symbol eval-scope (Symbol idstr) value
+                    print idstr "="
+                        repr value
+                    k + 1
+                vals...
+        return eval-scope count
+
+    typify handle-retargs i32 Scope Scope
 
     let eval-scope count =
-        xpcall
-            inline ()
-                let expr = (list-parse cmdlist)
-                let expr-anchor = (Syntax-anchor expr)
-                let tmp = (Parameter 'vals...)
-                let expr =
-                    Syntax-wrap expr-anchor
-                        Any
-                            list
-                                list handle-retargs counter
+        try
+            let expr = (list-parse cmdlist)
+            let expr-anchor = ('anchor expr)
+            #let tmp = (Parameter 'vals...)
+            set-anchor! expr-anchor
+            let expr =
+                Value
+                    list
+                        list handle-retargs counter
+                            list do
+                                list set-scope! eval-scope
+                                #list __defer (list tmp)
+                                    list _ (list get-scope) (list locals) tmp
+                                list _ (list get-scope) none
                                     cons do
-                                        list set-scope! eval-scope
-                                        list __defer (list tmp)
-                                            list _ (list get-scope) (list locals) tmp
-                                        expr as list
-                        false
-                let f = (compile (eval (expr as Syntax) eval-scope))
-                let fptr =
-                    f as
-                        pointer (function (ReturnLabel Scope i32))
-                set-anchor! expr-anchor
-                return (fptr)
-            inline (exc)
-                io-write!
-                    format-exception exc
-                return eval-scope (unconst 0)
+                                        (expr as list)
+                                #expr as list
+            let f = (sc_compile (eval expr eval-scope) 0:u64)
+            let fptr =
+                f as
+                    'pointer
+                        'raising
+                            function (Arguments Scope i32)
+                            Error
+            set-anchor! expr-anchor
+            fptr;
+        except (exc)
+            io-write!
+                format-error exc
+            io-write! "\n"
+            _ eval-scope 0
     repeat "" "" (counter + count) eval-scope
 
 #-------------------------------------------------------------------------------
@@ -2114,7 +2137,7 @@ fn run-main ()
             # remainder is passed on to script
     let sourcepath = (load sourcepath)
     if (sourcepath == "")
-        #read-eval-print-loop;
+        read-eval-print-loop;
     else
         let scope =
             Scope (globals)
@@ -2128,6 +2151,6 @@ fn run-main ()
         #exit 0
         #unreachable!;
 
-#run-main;
+run-main;
 true
 

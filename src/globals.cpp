@@ -1335,10 +1335,6 @@ static void bind_extern(const Anchor *anchor, Symbol sym, const Type *T) {
     bind_extern(anchor, sym, sym, T);
 }
 
-static const Type *result_tuple(const Type *rtype) {
-    return tuple_type({ TYPE_Bool, rtype}).assert_ok();
-}
-
 void init_globals(int argc, char *argv[]) {
     scopes_argc = argc;
     scopes_argv = argv;
@@ -1373,7 +1369,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_verify_stack, TYPE_USize);
     DEFINE_EXTERN_C_FUNCTION(sc_launch_args, arguments_type({TYPE_I32,native_ro_pointer_type(rawstring)}));
 
-    DEFINE_EXTERN_C_FUNCTION(sc_prompt, result_tuple(TYPE_String), TYPE_String, TYPE_String);
+    DEFINE_EXTERN_C_FUNCTION(sc_prompt, arguments_type({TYPE_Bool, TYPE_String}), TYPE_String, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_set_autocomplete_scope, _void, TYPE_Scope);
     DEFINE_EXTERN_C_FUNCTION(sc_default_styler, TYPE_String, TYPE_Symbol, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_format_message, TYPE_String, TYPE_Anchor, TYPE_String);

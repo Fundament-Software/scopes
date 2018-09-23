@@ -9,19 +9,17 @@
 
 #include "result.hpp"
 #include "type.hpp"
+#include "value.hpp"
 
 #include <stdint.h>
 
 namespace scopes {
 
-struct Function;
-struct Template;
 struct Type;
 struct Closure;
 struct List;
 struct Builtin;
 struct Symbol;
-struct Value;
 
 SCOPES_RESULT(const Type *) extract_type_constant(Value *value);
 SCOPES_RESULT(const Closure *) extract_closure_constant(Value *value);
@@ -33,6 +31,8 @@ SCOPES_RESULT(uint64_t) extract_integer_constant(Value *value);
 const Type *try_get_const_type(Value *node);
 const String *try_extract_string(Value *node);
 Value *rekey(const Anchor *anchor, Symbol key, Value *value);
+SCOPES_RESULT(void) map_keyed_arguments(const Anchor *anchor,
+    Values &outargs, const Values &values, const Symbols &symbols, bool varargs);
 
 SCOPES_RESULT(Function *) prove(Function *frame, Template *func, const ArgTypes &types);
 
