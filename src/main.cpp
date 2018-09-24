@@ -23,7 +23,10 @@
 #include "value.hpp"
 #include "compiler_flags.hpp"
 
+#define SCOPESRT_IMPL
 #include "scopes/scopes.h"
+
+#include "types.hpp"
 
 #ifdef SCOPES_WIN32
 #include "stdlib_ex.h"
@@ -281,6 +284,17 @@ skip_regular_load:
 
     Function *fn = SCOPES_GET_RESULT(prove(nullptr, tmpfn, {}));
 
+    auto main_func_type = pointer_type(raising_function_type(
+        arguments_type({}), {}), PTF_NonWritable, SYM_Unnamed);
+
+    if (fn->get_type() != main_func_type) {
+        SCOPES_ANCHOR(fn->anchor());
+        StyledString ss;
+        ss.out << "core module function has wrong type "
+            << fn->get_type() << ", must be " << main_func_type;
+        SCOPES_LOCATION_ERROR(ss.str());
+    }
+
 #if 0 //SCOPES_DEBUG_CODEGEN
     std::cout << "normalized:" << std::endl;
     stream_ast(ss, fn, StreamASTFormat());
@@ -291,9 +305,16 @@ skip_regular_load:
     auto flags = 0;
 #endif
 
-    typedef void (*MainFuncType)();
+    typedef sc_void_raises_t (*MainFuncType)();
     MainFuncType fptr = (MainFuncType)SCOPES_GET_RESULT(compile(fn, flags))->value;
-    fptr();
+    {
+        SCOPES_ANCHOR(fn->anchor());
+        auto result = fptr();
+        if (!result.ok) {
+            set_last_error(result.except);
+            SCOPES_RETURN_ERROR();
+        }
+    }
 
     return 0;
 }

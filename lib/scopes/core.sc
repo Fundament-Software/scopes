@@ -2543,5 +2543,3 @@ fn run-main ()
         exit 0
 
 run-main;
-true
-
