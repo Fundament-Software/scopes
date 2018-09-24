@@ -185,6 +185,10 @@ compile-stage
     sc_scope_set_symbol syntax-scope 'ellipsis-symbol (box-symbol (sc_symbol_new "..."))
 
 compile-stage
+    sc_scope_set_symbol syntax-scope 'void
+        box-pointer
+            sc_arguments_type 0 (nullof TypeArrayPointer)
+
     fn typify (argcount args)
         verify-count argcount 1 -1
         let src_fn = (load (getelementptr args 0))
@@ -251,7 +255,7 @@ compile-stage
                 load (getelementptr args i)
             # optional index
             if use-indices
-                store (box-integer (sub i 1)) (getelementptr callargs 0)
+                store (box-integer (sub i 2)) (getelementptr callargs 0)
             let k = (sc_type_key (sc_value_type arg))
             let v = (sc_keyed_new unnamed arg)
             # key
@@ -280,7 +284,7 @@ compile-stage
                 load (getelementptr args i)
             # optional index
             if use-indices
-                store (box-integer (sub i 1)) (getelementptr callargs 0)
+                store (box-integer (sub i 2)) (getelementptr callargs 0)
             let k = (sc_type_key (sc_value_type arg))
             let v = (sc_keyed_new unnamed arg)
             # key
@@ -302,36 +306,41 @@ compile-stage
     sc_scope_set_symbol syntax-scope 'Value-array
         box-ast-macro
             fn "Value-array" (argc argv)
-                verify-count argc 1 -1
-                # ensure that the return signature is correct
-                let instr = (alloca-array Value (add argc 2))
-                let callargs = (alloca-array Value 2)
-                let boxed-argc = (box-integer argc)
-                store (box-pointer Value) (getelementptr callargs 0)
-                store boxed-argc (getelementptr callargs 1)
-                let arr = (sc_call_new (box-symbol alloca-array) 2 callargs)
-                store arr (getelementptr instr 0)
-                loop (i) = 0
-                if (icmp<s i argc)
-                    let gepargs = (alloca-array Value 2)
-                    store arr (getelementptr gepargs 0)
-                    store (box-integer i) (getelementptr gepargs 1)
-                    let storeargs = (alloca-array Value 2)
-                    store (load (getelementptr argv i)) (getelementptr storeargs 0)
-                    store
-                        sc_call_new (box-symbol getelementptr) 2 gepargs
-                        getelementptr storeargs 1
-                    store
-                        sc_call_new (box-symbol store) 2 storeargs
-                        getelementptr instr (add i 1)
-                    repeat (add i 1)
+                verify-count argc 0 -1
                 let retargs = (alloca-array Value 2)
-                store boxed-argc (getelementptr retargs 0)
-                store arr (getelementptr retargs 1)
-                store
+                let boxed-argc = (box-integer argc)
+                if (icmp== argc 0)
+                    store boxed-argc (getelementptr retargs 0)
+                    store (box-pointer (nullof ValueArrayPointer)) (getelementptr retargs 1)
                     sc_argument_list_new 2 retargs
-                    getelementptr instr (add argc 1)
-                sc_block_new (add argc 2) instr
+                else
+                    # ensure that the return signature is correct
+                    let instr = (alloca-array Value (add argc 2))
+                    let callargs = (alloca-array Value 2)
+                    store (box-pointer Value) (getelementptr callargs 0)
+                    store boxed-argc (getelementptr callargs 1)
+                    let arr = (sc_call_new (box-symbol alloca-array) 2 callargs)
+                    store arr (getelementptr instr 0)
+                    loop (i) = 0
+                    if (icmp<s i argc)
+                        let gepargs = (alloca-array Value 2)
+                        store arr (getelementptr gepargs 0)
+                        store (box-integer i) (getelementptr gepargs 1)
+                        let storeargs = (alloca-array Value 2)
+                        store (load (getelementptr argv i)) (getelementptr storeargs 0)
+                        store
+                            sc_call_new (box-symbol getelementptr) 2 gepargs
+                            getelementptr storeargs 1
+                        store
+                            sc_call_new (box-symbol store) 2 storeargs
+                            getelementptr instr (add i 1)
+                        repeat (add i 1)
+                    store boxed-argc (getelementptr retargs 0)
+                    store arr (getelementptr retargs 1)
+                    store
+                        sc_argument_list_new 2 retargs
+                        getelementptr instr (add argc 1)
+                    sc_block_new (add argc 2) instr
 
     # unpack
     sc_scope_set_symbol syntax-scope 'loadarrayptrs
@@ -716,6 +725,8 @@ inline set-symbols (self values...)
     super = sc_typename_type_get_super
     set-super = sc_typename_type_set_super
     set-storage = sc_typename_type_set_storage
+    return-type = sc_function_type_return_type
+    key = sc_type_key
 
 #'set-symbols Closure
     frame = sc_closure_frame
@@ -755,7 +766,7 @@ compile-stage
             'raising
                 function (Arguments list Scope) list list Scope
                 Error
-    sc_typename_type_set_storage SyntaxMacro SyntaxMacroFunctionType
+    'set-storage SyntaxMacro SyntaxMacroFunctionType
 
     # any extraction
 
@@ -1187,6 +1198,12 @@ compile-stage
         __> = (box-binary-op-dispatch (single-signed-binary-op-dispatch icmp>s icmp>u))
         __>= = (box-binary-op-dispatch (single-signed-binary-op-dispatch icmp>=s icmp>=u))
 
+    fn type-getattr-dynamic (T value)
+        let ok val = (sc_type_at T value)
+        if ok
+            return val
+        raise-compile-error! "no such attribute"
+
     'set-symbols type
         __== = (box-binary-op-dispatch (single-binary-op-dispatch type==))
         __!= = (box-binary-op-dispatch (single-binary-op-dispatch type!=))
@@ -1195,6 +1212,19 @@ compile-stage
         __> = (box-binary-op-dispatch (single-binary-op-dispatch type>))
         __>= = (box-binary-op-dispatch (single-binary-op-dispatch type>=))
         __@ = sc_type_element_at
+        # (dispatch-attr T key thenf elsef)
+        dispatch-attr =
+            box-ast-macro
+                fn "type-dispatch-attr" (argc argv)
+                    verify-count argc 4 4
+                    let self key thenf elsef = (loadarrayptrs argv 0 1 2 3)
+                    let self = (unbox-pointer self type)
+                    let key = (unbox-symbol key Symbol)
+                    let ok result = (sc_type_at self key)
+                    if ok
+                        return (sc_call_new thenf (Value-array result))
+                    else
+                        return (sc_call_new elsef (Value-array))
         __getattr =
             box-ast-macro
                 fn "type-getattr" (argc argv)
@@ -1205,17 +1235,36 @@ compile-stage
                             let self = (unbox-pointer self type)
                             let key = (unbox-symbol key Symbol)
                             let ok result = (sc_type_at self key)
-                            return
-                                sc_argument_list_new
-                                    Value-array (box-integer ok)
-                                        if ok
-                                            result
-                                        else
-                                            box-none;
-                    sc_call_new (Value sc_type_at) argc argv
+                            if ok
+                                return result
+                            else
+                                return
+                                    sc_argument_list_new 0 (nullof ValueArrayPointer)
+                    sc_call_new (Value type-getattr-dynamic) argc argv
+
+    fn scope-getattr-dynamic (T value)
+        let ok val = (sc_scope_at T value)
+        if ok
+            return val
+        raise-compile-error! "no such attribute"
 
     'set-symbols Scope
-        __getattr = sc_scope_at
+        __getattr =
+            box-ast-macro
+                fn "scope-getattr" (argc argv)
+                    verify-count argc 2 2
+                    let self key = (loadarrayptrs argv 0 1)
+                    if ('constant? self)
+                        if ('constant? key)
+                            let self = (unbox-pointer self Scope)
+                            let key = (unbox-symbol key Symbol)
+                            let ok result = (sc_scope_at self key)
+                            if ok
+                                return result
+                            else
+                                return
+                                    sc_argument_list_new 0 (nullof ValueArrayPointer)
+                    sc_call_new (Value scope-getattr-dynamic) argc argv
         __typecall =
             box-ast-macro
                 fn "scope-typecall" (argc argv)
@@ -1241,8 +1290,39 @@ compile-stage
                         else
                             sc_call_new (Value sc_scope_clone_subscope) 2 (getelementptr argv 1)
 
+    #---------------------------------------------------------------------------
+    # null type
+    #---------------------------------------------------------------------------
+
+    """"The type of the `null` constant. This type is uninstantiable.
+    let NullType = (sc_typename_type "NullType")
+    sc_typename_type_set_storage NullType ('pointer void)
+    'set-symbols NullType
+        __repr =
+            box-pointer
+                inline (self)
+                    sc_default_styler style-number "null"
+
+        #__imply =
+            box-ast-macro
+                box-cast-dispatch
+            fn (self destT)
+                icmp== (type-kind T) type-kind-pointer
+
+                if (destT < pointer)
+                    nullof destT
+        #__==
+            fn (a b flipped)
+                if flipped
+                    if (pointer-type? (storageof (typeof a)))
+                        icmp== (ptrtoint a usize) 0:usize
+                else
+                    if (pointer-type? (storageof (typeof b)))
+                        icmp== (ptrtoint b usize) 0:usize
+
+    #---------------------------------------------------------------------------
+
     'set-symbols syntax-scope
-        #eol = (Value (nullof list))
         and-branch = (box-ast-macro (fn (argc argv) (dispatch-and-or argc argv true)))
         or-branch = (box-ast-macro (fn (argc argv) (dispatch-and-or argc argv false)))
         immutable = (box-pointer immutable)
@@ -1279,8 +1359,10 @@ compile-stage
         getattr = (make-asym-binary-op-dispatch '__getattr Symbol "get attribute from")
         lslice = (make-asym-binary-op-dispatch '__lslice usize "apply left-slice operator with")
         rslice = (make-asym-binary-op-dispatch '__rslice usize "apply right-slice operator with")
+        NullType = (box-pointer NullType)
         #constbranch = constbranch
 
+let null = (nullof NullType)
 #inline Syntax-unbox (self destT)
     imply ('datum self) destT
 
@@ -1317,6 +1399,7 @@ fn type-repr-needs-suffix? (CT)
     if (== CT i32) false
     elseif (== CT bool) false
     elseif (== CT Nothing) false
+    elseif (== CT NullType) false
     elseif (== CT f32) false
     elseif (== CT string) false
     elseif (== CT list) false
@@ -1331,20 +1414,17 @@ fn type-repr-needs-suffix? (CT)
     else true
 
 fn tostring (value)
-    let T = (typeof value)
-    let ok f = (getattr T '__tostring)
-    constbranch ok
-        inline ()
+    'dispatch-attr (typeof value) '__tostring
+        inline (f)
             f value
         inline ()
             sc_value_tostring (Value value)
 
 fn repr (value)
     let T = (typeof value)
-    let ok f = (getattr T '__repr)
     let s =
-        constbranch ok
-            inline ()
+        'dispatch-attr T '__repr
+            inline (f)
                 f value
             inline ()
                 sc_value_repr (Value value)
@@ -1492,7 +1572,7 @@ compile-stage
     fn get-ifx-op (env op)
         let sym = op
         if (== ('typeof sym) Symbol)
-            getattr env (get-ifx-symbol (as sym Symbol))
+            '@ env (get-ifx-symbol (as sym Symbol))
         else
             return false (Value none)
 
@@ -1603,13 +1683,13 @@ compile-stage
         let head-key = expr-at
         let head =
             if (== ('typeof head-key) Symbol)
-                let ok head = (getattr env (as head-key Symbol))
+                let ok head = ('@ env (as head-key Symbol))
                 if ok head
                 else head-key
             else head-key
         let head =
             if (== ('typeof head) type)
-                let ok attr = (getattr (as head type) '__macro)
+                let ok attr = ('@ (as head type) '__macro)
                 if ok attr
                 else head
             else head
@@ -1745,9 +1825,70 @@ compile-stage
                 repeat i op
             op
 
-    # dot macro
-    # (. value symbol ...)
+    # extracting options from varargs
+
+    # (va-option-branch key thenf elsef args...)
+    fn va-option-branch (argc argv)
+        verify-count argc 3 -1
+        let key thenf elsef = (loadarrayptrs argv 0 1 2)
+        let key = (unbox-symbol key Symbol)
+        loop (i) = 2
+        if (< i argc)
+            let arg = (loadarrayptrs argv i)
+            let argkey = ('key ('typeof arg))
+            if (== key argkey)
+                return
+                    sc_call_new thenf
+                        Value-array
+                            sc_keyed_new unnamed arg
+            repeat (+ i 1)
+        sc_call_new elsef 0 (undef ValueArrayPointer)
+
+    # modules
+    ####
+
+    let package = (Scope)
+    'set-symbols package
+        path =
+            Value
+                list
+                    .. compiler-dir "/lib/scopes/?.sc"
+                    .. compiler-dir "/lib/scopes/?/init.sc"
+        modules = (Value (Scope))
+
+    fn clone-scope-contents (a b)
+        # search first upwards for the root scope of a, then clone a
+            piecewise with the cloned scopes as parents
+        let parent = (sc_scope_get_parent a)
+        let b =
+            if (== parent null) b
+            else
+                clone-scope-contents parent b
+        Scope b a
+
+    'set-symbols typename
+        __typecall =
+            box-ast-macro
+                fn (argc argv)
+                    verify-count argc 2 2
+                    let name = (loadarrayptrs argv 1)
+                    if ('constant? name)
+                        Value
+                            sc_typename_type
+                                as (loadarrayptrs argv 1) string
+                    else
+                        sc_call_new (Value sc_typename_type) 1
+                            getelementptr argv 1
+
+    'set-symbols Scope
+        __.. =
+            inline "Scope-join" (a b)
+                """"Join two scopes ``a`` and ``b`` into a new scope so that the
+                    root of ``a`` descends from ``b``.
+                clone-scope-contents a b
+
     'set-symbols syntax-scope
+        package = (Value package)
         backquote-list = (Value backquote-list)
         backquote =
             Value
@@ -1764,6 +1905,8 @@ compile-stage
                                 cons (backquote-list args)
                                     cons scope '()
                             scope
+        # dot macro
+        # (. value symbol ...)
         . =
             Value
                 syntax-macro
@@ -1786,6 +1929,26 @@ compile-stage
         .. = (box-ast-macro (fn (argc argv) (rtl-multiop argc argv (Value ..))))
         + = (box-ast-macro (fn (argc argv) (ltr-multiop argc argv (Value +))))
         * = (box-ast-macro (fn (argc argv) (ltr-multiop argc argv (Value *))))
+        va-option-branch = (box-ast-macro va-option-branch)
+        syntax-set-scope! =
+            Value
+                syntax-scope-macro
+                    fn (args syntax-scope)
+                        if false
+                            raise-compile-error! "never used"
+                        let scope rest = (decons args)
+                        return
+                            none
+                            as scope Scope
+        syntax-get-scope =
+            Value
+                syntax-scope-macro
+                    fn (args syntax-scope)
+                        if false
+                            raise-compile-error! "never used"
+                        return
+                            syntax-scope
+                            syntax-scope
 
 define-infix< 50 +=
 define-infix< 50 -=
@@ -1831,6 +1994,148 @@ define-infix> 800 @
 inline char (s)
     let s sz = (sc_string_buffer s)
     load s
+
+#-------------------------------------------------------------------------------
+# module loading
+#-------------------------------------------------------------------------------
+
+compile-stage
+    fn make-module-path (pattern name)
+        let sz = (countof pattern)
+        loop (i start result) = 0:usize 0:usize ""
+        if (i == sz)
+            return (.. result (lslice pattern start))
+        if ((@ pattern i) != (char "?"))
+            repeat (i + 1:usize) start result
+        else
+            repeat (i + 1:usize) (i + 1:usize)
+                .. result (lslice (rslice pattern i) start) name
+
+    fn exec-module (expr eval-scope)
+        let expr-anchor = ('anchor expr)
+        let ModuleFunctionType = ('pointer ('raising (function Value) Error))
+        sc_set_active_anchor expr-anchor
+        # build a wrapper
+        let expr =
+            list
+                list if false
+                    list raise-compile-error! "force exception type"
+                list Value
+                    cons do
+                        list syntax-set-scope! eval-scope
+                        expr
+        let f = (sc_compile (sc_eval (Value expr) (syntax-get-scope)) 0:u64)
+        let fptr = (f as ModuleFunctionType)
+        fptr;
+
+    fn dots-to-slashes (pattern)
+        let sz = (countof pattern)
+        loop (i start result) = 0:usize 0:usize ""
+        if (i == sz)
+            return (.. result (lslice pattern start))
+        let c = (@ pattern i)
+        if (c == (char "/"))
+            raise-compile-error!
+                .. "no slashes permitted in module name: " pattern
+        elseif (c == (char "\\"))
+            raise-compile-error!
+                .. "no slashes permitted in module name: " pattern
+        elseif (c != (char "."))
+            repeat (i + 1:usize) start result
+        elseif (icmp== (i + 1:usize) sz)
+            raise-compile-error!
+                .. "invalid dot at ending of module '" pattern "'"
+        else
+            if (icmp== i start)
+                if (icmp>u start 0:usize)
+                    repeat (i + 1:usize) (i + 1:usize)
+                        .. result (lslice (rslice pattern i) start) "../"
+            repeat (i + 1:usize) (i + 1:usize)
+                .. result (lslice (rslice pattern i) start) "/"
+
+    fn load-module (module-name module-path opts...)
+        if (not (sc_is_file module-path))
+            raise-compile-error!
+                .. "no such module: " module-path
+        let module-path = (sc_realpath module-path)
+        let module-dir = (sc_dirname module-path)
+        let expr = (sc_parse_from_path module-path)
+        let eval-scope =
+            va-option-branch 'scope
+                inline (x) x
+                inline ()
+                    Scope (sc_get_globals)
+                opts...
+        'set-symbols eval-scope
+            main-module? =
+                va-option-branch 'main-module?
+                    inline (x) x
+                    inline () false
+            module-path = module-path
+            module-dir = module-dir
+            module-name = module-name
+        exec-module expr (Scope eval-scope)
+
+    fn patterns-from-namestr (base-dir namestr)
+        # if namestr starts with a slash (because it started with a dot),
+            we only search base-dir
+        if ((@ namestr 0:usize) == (char "/"))
+            list
+                .. base-dir "?.sc"
+                .. base-dir "?/init.sc"
+        else
+            package.path as list
+
+    let incomplete = (typename "incomplete")
+    fn require-from (base-dir name)
+        #assert-typeof name Symbol
+        let namestr = (dots-to-slashes (name as string))
+        inline load-module-from-symbol (name)
+            let package = ((fn () package))
+            let modules = (package.modules as Scope)
+            loop (patterns) = (patterns-from-namestr base-dir namestr)
+            if (empty? patterns)
+                break false (Value none)
+            let pattern patterns = (decons patterns)
+            let pattern = (pattern as string)
+            let module-path = (sc_realpath (make-module-path pattern namestr))
+            if (empty? module-path)
+                repeat patterns
+            let module-path-sym = (Symbol module-path)
+            let ok content = ('@ modules module-path-sym)
+            if ok
+                if (('typeof content) == type)
+                    if (content == incomplete)
+                        raise-compile-error!
+                            .. "trying to import module " (repr name)
+                                " while it is being imported"
+                break true content
+            if (not (sc_is_file module-path))
+                repeat patterns
+            'set-symbol modules module-path-sym incomplete
+            let content = (load-module (name as string) module-path)
+            'set-symbol modules module-path-sym content
+            break true content
+        let ok content = (load-module-from-symbol name)
+        if ok
+            return content
+        sc_write "no such module '"
+        sc_write (as name string)
+        sc_write "' in paths:\n"
+        loop (patterns) = (patterns-from-namestr base-dir namestr)
+        if (empty? patterns)
+            raise-compile-error! "failed to import module"
+        let pattern patterns = (decons patterns)
+        let pattern = (pattern as string)
+        let module-path = (make-module-path pattern namestr)
+        sc_write "    "
+        sc_write module-path
+        sc_write "\n"
+        repeat patterns
+
+    'set-symbols syntax-scope
+        require-from = require-from
+        load-module = load-module
 
 #compile-stage
     'set-symbols syntax-scope
@@ -1884,6 +2189,7 @@ let
 
 compile-stage
     sc_set_globals syntax-scope
+
 
 #-------------------------------------------------------------------------------
 # REPL
@@ -1990,26 +2296,6 @@ fn read-eval-print-loop ()
     if (not terminated?)
         repeat preload cmdlist counter eval-scope
 
-    compile-stage
-        'set-symbols syntax-scope
-            set-scope! =
-                syntax-scope-macro
-                    fn (args syntax-scope)
-                        if false
-                            raise-compile-error! "never used"
-                        let scope rest = (decons args)
-                        return
-                            none
-                            scope as Scope
-            get-scope =
-                syntax-scope-macro
-                    fn (args syntax-scope)
-                        if false
-                            raise-compile-error! "never used"
-                        return
-                            syntax-scope
-                            syntax-scope
-
     fn handle-retargs (counter eval-scope local-scope vals...)
         if false
             raise-compile-error! "force exception"
@@ -2040,10 +2326,10 @@ fn read-eval-print-loop ()
                     list
                         list handle-retargs counter
                             list do
-                                list set-scope! eval-scope
+                                list syntax-set-scope! eval-scope
                                 #list __defer (list tmp)
                                     list _ (list get-scope) (list locals) tmp
-                                list _ (list get-scope) none
+                                list _ (list syntax-get-scope) none
                                     cons do
                                         (expr as list)
                                 #expr as list
@@ -2130,10 +2416,10 @@ fn run-main ()
             script-launch-args =
                 fn ()
                     return sourcepath argc argv
-        #load-module "" sourcepath
+        load-module "" sourcepath
             scope = scope
             main-module? = true
-        #exit 0
+        exit 0
         #unreachable!;
 
 run-main;

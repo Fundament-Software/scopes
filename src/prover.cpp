@@ -1113,8 +1113,9 @@ repeat:
             ss << call->anchor() << " dump:";
             for (auto arg : values) {
                 ss << " ";
-                stream_ast(ss, arg, StreamASTFormat());
+                stream_ast(ss, arg, StreamASTFormat::singleline());
             }
+            ss << std::endl;
             return build_argument_list(call->anchor(), values);
         } break;
         case FN_DumpTemplate: {

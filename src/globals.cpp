@@ -1290,6 +1290,16 @@ const sc_type_t *sc_function_type_raising(const sc_type_t *T,
         ft->argument_types, ft->flags);
 }
 
+sc_type_type_tuple_t sc_function_type_return_type(const sc_type_t *T) {
+    using namespace scopes;
+    auto val = dyn_cast<FunctionType>(T);
+    if (val) {
+        return { val->return_type, val->except_type };
+    } else {
+        return { TYPE_Unknown, TYPE_Unknown };
+    }
+}
+
 // Image Type
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -1528,6 +1538,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_function_type_is_variadic, TYPE_Bool, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_function_type, TYPE_Type, TYPE_Type, TYPE_I32, native_ro_pointer_type(TYPE_Type));
     DEFINE_EXTERN_C_FUNCTION(sc_function_type_raising, TYPE_Type, TYPE_Type, TYPE_Type);
+    DEFINE_EXTERN_C_FUNCTION(sc_function_type_return_type, arguments_type({TYPE_Type, TYPE_Type}), TYPE_Type);
 
     DEFINE_EXTERN_C_FUNCTION(sc_list_cons, TYPE_List, TYPE_Value, TYPE_List);
     DEFINE_EXTERN_C_FUNCTION(sc_list_dump, TYPE_List, TYPE_List);

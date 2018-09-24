@@ -130,6 +130,8 @@ typedef struct sc_rawstring_size_t_tuple_ { const char *_0; size_t _1; } sc_raws
 
 typedef struct sc_rawstring_i32_array_tuple_ { int _0; char **_1; } sc_rawstring_i32_array_tuple_t;
 
+typedef struct sc_type_type_tuple_ { const sc_type_t *_0; const sc_type_t *_1; } sc_type_type_tuple_t;
+
 // prototypes
 
 typedef sc_value_raises_t (*sc_ast_macro_func_t)(int, sc_value_t **);
@@ -374,6 +376,7 @@ const sc_type_t *sc_function_type(const sc_type_t *return_type,
     int numtypes, const sc_type_t **typeargs);
 const sc_type_t *sc_function_type_raising(const sc_type_t *T,
     const sc_type_t *except_type);
+sc_type_type_tuple_t sc_function_type_return_type(const sc_type_t *T);
 
 // image types
 

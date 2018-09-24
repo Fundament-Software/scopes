@@ -125,8 +125,12 @@ struct Expander {
         Expander subexpr(subenv, func);
 
         auto expr = SCOPES_GET_RESULT(subexpr.expand_expression(_anchor, it));
+        if (isa<Expression>(expr)) {
+            auto ex = cast<Expression>(expr);
+            ex->append(ArgumentList::from(_anchor));
+        }
 
-        func->value = Expression::from(_anchor, {expr}, ArgumentList::from(_anchor));
+        func->value = expr;
 
         auto node = CompileStage::from(_anchor, func, next, env);
         next = EOL;
