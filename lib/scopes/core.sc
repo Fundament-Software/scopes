@@ -2363,14 +2363,12 @@ fn print-help (exename)
             -s, --signal-abort          raise SIGABRT when calling `abort!`.
             --                          terminate option list.
     exit 0
-    #unreachable!;
 
 fn print-version ()
     print
         compiler-version-string;
     print "Executable path:" compiler-path
     exit 0
-    #unreachable!;
 
 fn run-main ()
     let argc argv = (launch-args)
@@ -2400,7 +2398,6 @@ fn run-main ()
                         .. "unrecognized option: " arg
                             \ ". Try --help for help."
                     exit 1
-                    #unreachable!;
                 repeat k
             elseif ((load sourcepath) == "")
                 store arg sourcepath
@@ -2420,7 +2417,6 @@ fn run-main ()
             scope = scope
             main-module? = true
         exit 0
-        #unreachable!;
 
 run-main;
 true

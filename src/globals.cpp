@@ -1443,8 +1443,8 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_runtime_error_new, TYPE_Error, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_format_error, TYPE_String, TYPE_Error);
 
-    DEFINE_EXTERN_C_FUNCTION(sc_abort, _void);
-    DEFINE_EXTERN_C_FUNCTION(sc_exit, _void, TYPE_I32);
+    DEFINE_EXTERN_C_FUNCTION(sc_abort, TYPE_NoReturn);
+    DEFINE_EXTERN_C_FUNCTION(sc_exit, TYPE_NoReturn, TYPE_I32);
 
     DEFINE_EXTERN_C_FUNCTION(sc_set_signal_abort,
         _void, TYPE_Bool);
