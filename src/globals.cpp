@@ -723,6 +723,11 @@ sc_value_t *sc_argument_list_new(int numvalues, sc_value_t **values) {
     return ArgumentList::from(get_active_anchor(), vals);
 }
 
+sc_value_t *sc_extract_argument_new(sc_value_t *value, int index) {
+    using namespace scopes;
+    return ExtractArgument::from(get_active_anchor(), value, index);
+}
+
 sc_value_t *sc_template_new(sc_symbol_t name) {
     using namespace scopes;
     // todo: set scope
@@ -1394,6 +1399,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_value_kind, TYPE_I32, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_keyed_new, TYPE_Value, TYPE_Symbol, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_argument_list_new, TYPE_Value, TYPE_I32, TYPE_ValuePP);
+    DEFINE_EXTERN_C_FUNCTION(sc_extract_argument_new, TYPE_Value, TYPE_Value, TYPE_I32);
     DEFINE_EXTERN_C_FUNCTION(sc_template_new, TYPE_Value, TYPE_Symbol);
     DEFINE_EXTERN_C_FUNCTION(sc_template_append_parameter, _void, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_template_set_body, _void, TYPE_Value, TYPE_Value);

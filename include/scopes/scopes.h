@@ -163,6 +163,7 @@ int sc_value_kind (sc_value_t *value);
 sc_value_t *sc_keyed_new(sc_symbol_t key, sc_value_t *value);
 
 sc_value_t *sc_argument_list_new(int numvalues, sc_value_t **values);
+sc_value_t *sc_extract_argument_new(sc_value_t *value, int index);
 
 sc_value_t *sc_template_new(sc_symbol_t name);
 void sc_template_append_parameter(sc_value_t *fn, sc_value_t *symbol);

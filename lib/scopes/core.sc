@@ -302,6 +302,20 @@ compile-stage
     sc_scope_set_symbol syntax-scope 'va-rfold (box-ast-macro (fn "va-rfold" (argcount args) (va-rfold argcount args false)))
     sc_scope_set_symbol syntax-scope 'va-rifold (box-ast-macro (fn "va-rifold" (argcount args) (va-rfold argcount args true)))
 
+    sc_scope_set_symbol syntax-scope 'raises-compile-error
+        box-ast-macro
+            # add a non-executing branch to the function that causes it to be
+                annotated with an exception type
+            fn "raises-compile-error" (argc argv)
+                verify-count argc 0 0
+                let branch = (sc_if_new)
+                let callargs = (alloca-array Value 1)
+                store (box-pointer "hidden") (getelementptr callargs 0)
+                sc_if_append_then_clause branch (box-integer false)
+                    sc_call_new (box-pointer raise-compile-error!) 1 callargs
+                sc_if_append_else_clause branch (box-empty)
+                branch
+
     # generate alloca instruction for multiple Values
     sc_scope_set_symbol syntax-scope 'Value-array
         box-ast-macro
@@ -678,6 +692,10 @@ inline set-symbols (self values...)
 
 'set-symbols Scope
     @ = sc_scope_at
+    next = sc_scope_next
+    docstring = sc_scope_get_docstring
+    set-docstring! = sc_scope_set_docstring
+    parent = sc_scope_get_parent
 
 'set-symbols string
     join = sc_string_join
@@ -1249,6 +1267,7 @@ compile-stage
         raise-compile-error! "no such attribute"
 
     'set-symbols Scope
+        __== = (box-binary-op-dispatch (single-binary-op-dispatch ptrcmp==))
         __getattr =
             box-ast-macro
                 fn "scope-getattr" (argc argv)
@@ -1302,15 +1321,12 @@ compile-stage
             box-pointer
                 inline (self)
                     sc_default_styler style-number "null"
-
-        #__imply =
-            box-ast-macro
-                box-cast-dispatch
-            fn (self destT)
-                icmp== (type-kind T) type-kind-pointer
-
-                if (destT < pointer)
-                    nullof destT
+        __imply =
+            box-cast-dispatch
+                fn "null-imply" (clsT T)
+                    if (icmp== ('kind ('storage T)) type-kind-pointer)
+                        return (Value bitcast)
+                    raise-compile-error! "cannot convert to type"
         #__==
             fn (a b flipped)
                 if flipped
@@ -1478,16 +1494,13 @@ compile-stage
                         loop (i) = 0
                         if (< i argc)
                             let arg = (load (getelementptr argv i))
-                            let key argT = (sc_type_key ('typeof arg))
+                            let argT = ('typeof arg)
                             let paramT = ('element@ fT i)
                             let outarg =
                                 if (== argT paramT) arg
                                 else
-                                    # remove key from cast, then re-add
-                                    let arg = (sc_keyed_new unnamed arg)
-                                    sc_keyed_new key
-                                        sc_call_new (Value imply)
-                                            Value-array arg (Value paramT)
+                                    sc_call_new (Value imply)
+                                        Value-array arg (Value paramT)
                             store outarg (getelementptr outargs i)
                             repeat (+ i 1)
                         sc_call_new self argc outargs
@@ -1496,8 +1509,77 @@ compile-stage
                 sc_call_set_rawcall callv true
                 callv
 
+    #
+        set-type-symbol! pointer 'set-element-type
+            fn (cls ET)
+                pointer-type-set-element-type cls ET
+        set-type-symbol! pointer 'set-storage
+            fn (cls storage)
+                pointer-type-set-storage-class cls storage
+        set-type-symbol! pointer 'immutable
+            fn (cls ET)
+                pointer-type-set-flags cls
+                    bor (pointer-type-flags cls) pointer-flag-non-writable
+        set-type-symbol! pointer 'mutable
+            fn (cls ET)
+                pointer-type-set-flags cls
+                    band (pointer-type-flags cls)
+                        bxor pointer-flag-non-writable -1:u64
+        set-type-symbol! pointer 'strip-storage
+            fn (cls ET)
+                pointer-type-set-storage-class cls unnamed
+        set-type-symbol! pointer 'storage
+            fn (cls)
+                pointer-type-storage-class cls
+        set-type-symbol! pointer 'readable?
+            fn (cls)
+                == (& (pointer-type-flags cls) pointer-flag-non-readable) 0:u64
+
+    fn pointer-type-immutable (cls)
+        sc_pointer_type_set_flags cls
+            bor (sc_pointer_type_get_flags cls) pointer-flag-non-writable
+
+    fn pointer-type-strip-storage (cls)
+        sc_pointer_type_set_storage_class cls unnamed
+
+    fn mutable-pointer-type (cls)
+        sc_pointer_type_set_flags cls
+            band (sc_pointer_type_get_flags cls)
+                bxor pointer-flag-non-writable -1:u64
+
+    fn pointer-type-writable? (cls)
+        icmp== (band (sc_pointer_type_get_flags cls) pointer-flag-non-writable) 0:u64
+
+    fn pointer-type-imply? (src dest)
+        let ET = ('element@ src 0)
+        let ET =
+            if ('opaque? ET) ET
+            else ('storage ET)
+        if (not (icmp== ('kind ET) type-kind-pointer))
+            # casts to voidstar are only permitted if we are not holding
+            # a ref to another pointer
+            if (type== dest voidstar)
+                return true
+            elseif (type== dest (mutable-pointer-type voidstar))
+                if (pointer-type-writable? src)
+                    return true
+        if (type== dest (pointer-type-strip-storage src))
+            return true
+        elseif (type== dest (pointer-type-immutable src))
+            return true
+        elseif (type== dest (pointer-type-strip-storage (pointer-type-immutable src)))
+            return true
+        return false
+
+    fn pointer-imply (vT T)
+        if (icmp== ('kind T) type-kind-pointer)
+            if (pointer-type-imply? vT T)
+                return (Value bitcast)
+        raise-compile-error! "unsupported type"
+
     'set-symbols pointer
         __call = coerce-call-arguments
+        __imply = (box-cast-dispatch pointer-imply)
 
     # dotted symbol expander
     # --------------------------------------------------------------------------
@@ -1654,16 +1736,6 @@ compile-stage
                     parse-infix-expr infix-table rhs state nextop-prec
                 repeat next-rhs next-state
         repeat next-lhs next-state
-
-    #compile-stage
-        let types = (alloca-array type 4)
-        store Scope (getelementptr types 0)
-        store Value (getelementptr types 1)
-        store list (getelementptr types 2)
-        store i32 (getelementptr types 3)
-        let result = (sc_compile (sc_typify parse-infix-expr 4 types)
-            compile-flag-dump-module)
-        exit 0
 
     let parse-infix-expr =
         typify parse-infix-expr Scope Value list i32
@@ -1857,14 +1929,25 @@ compile-stage
         modules = (Value (Scope))
 
     fn clone-scope-contents (a b)
+        """"Join two scopes ``a`` and ``b`` into a new scope so that the
+            root of ``a`` descends from ``b``.
         # search first upwards for the root scope of a, then clone a
             piecewise with the cloned scopes as parents
-        let parent = (sc_scope_get_parent a)
-        let b =
-            if (== parent null) b
-            else
-                clone-scope-contents parent b
-        Scope b a
+        let parent = ('parent a)
+        if (== parent null)
+            return (Scope b a)
+        Scope
+            clone-scope-contents parent b
+            a
+
+    #compile-stage
+        let types = (alloca-array type 2)
+        store Scope (getelementptr types 0)
+        store Scope (getelementptr types 1)
+        let result = (sc_compile (sc_typify clone-scope-contents 2 types)
+            compile-flag-dump-module)
+        if true
+            sc_exit 0
 
     'set-symbols typename
         __typecall =
@@ -1882,10 +1965,13 @@ compile-stage
 
     'set-symbols Scope
         __.. =
-            inline "Scope-join" (a b)
-                """"Join two scopes ``a`` and ``b`` into a new scope so that the
-                    root of ``a`` descends from ``b``.
-                clone-scope-contents a b
+            Value
+                typify
+                    fn (lhsT rhsT)
+                        if (ptrcmp== lhsT rhsT)
+                            return (Value clone-scope-contents)
+                        raise-compile-error! "unsupported type"
+                    \ type type
 
     'set-symbols syntax-scope
         package = (Value package)
@@ -2133,9 +2219,46 @@ compile-stage
         sc_write "\n"
         repeat patterns
 
+    """"export locals as a chain of two new scopes: a scope that contains
+        all the constant values in the immediate scope, and a scope that contains
+        the runtime values.
+    fn locals (args scope)
+        raises-compile-error;
+        let docstr = ('docstring scope unnamed)
+        let constant-scope = (Scope)
+        if (not (empty? docstr))
+            'set-docstring! constant-scope unnamed docstr
+        let tmp =
+            sc_call_new Scope (Value-array (Value constant-scope))
+        loop (last-key result) = unnamed (list tmp)
+        let key value =
+            'next scope last-key
+        if (key == unnamed)
+            return
+                cons do tmp result
+                scope
+        else
+            let keydocstr = ('docstring scope key)
+            repeat key
+                if (key == unnamed)
+                    # skip
+                    result
+                else
+                    if ('constant? value)
+                        'set-symbol constant-scope key value
+                        'set-docstring! constant-scope key keydocstr
+                        result
+                    else
+                        let value = (sc_extract_argument_new value 0)
+                        cons
+                            list sc_scope_set_symbol tmp (list quote key) (list Value value)
+                            list sc_scope_set_docstring tmp (list quote key) keydocstr
+                            result
+
     'set-symbols syntax-scope
         require-from = require-from
         load-module = load-module
+        locals = (syntax-scope-macro locals)
 
 #compile-stage
     'set-symbols syntax-scope
@@ -2187,9 +2310,8 @@ let
     eval = sc_eval
     format-error = sc_format_error
 
-compile-stage
-    sc_set_globals syntax-scope
-
+set-globals!
+    .. (locals) (globals)
 
 #-------------------------------------------------------------------------------
 # REPL
@@ -2255,7 +2377,6 @@ fn read-eval-print-loop ()
 
     'set-symbol eval-scope 'module-dir cwd
     loop (preload cmdlist counter eval-scope) = "" "" 0 eval-scope
-    #dump "loop"
     fn make-idstr (counter)
         .. "$" (tostring counter)
 
@@ -2280,7 +2401,6 @@ fn read-eval-print-loop ()
         else
             (@ s (slen - 1:usize)) == (char " ")
     let enter-multiline = (endswith-blank cmd)
-    #dump "loop 1"
     let terminated? =
         (blank? cmd) or
             (empty? cmdlist) and (not enter-multiline)
@@ -2297,42 +2417,46 @@ fn read-eval-print-loop ()
         repeat preload cmdlist counter eval-scope
 
     fn handle-retargs (counter eval-scope local-scope vals...)
-        if false
-            raise-compile-error! "force exception"
+        raises-compile-error;
+        let tmp = (Symbol "#result...")
         # copy over values from local-scope
-        #for k v in local-scope
-            set-scope-symbol! eval-scope k v
+        do
+            loop (key) = unnamed
+            let key value = ('next local-scope key)
+            if (key != unnamed)
+                if (key != tmp)
+                    'set-symbol eval-scope key value
+                repeat key
         let count =
             va-lfold 0
                 inline (key value k)
-                    let idstr = (make-idstr k)
-                    'set-symbol eval-scope (Symbol idstr) value
+                    let idstr = (make-idstr (counter + k))
+                    'set-symbol eval-scope (Symbol idstr) (Value value)
                     print idstr "="
                         repr value
                     k + 1
                 vals...
         return eval-scope count
 
-    typify handle-retargs i32 Scope Scope
-
     let eval-scope count =
         try
             let expr = (list-parse cmdlist)
             let expr-anchor = ('anchor expr)
-            #let tmp = (Parameter 'vals...)
             set-anchor! expr-anchor
+            let tmp = (Symbol "#result...")
             let expr =
                 Value
                     list
+                        list syntax-set-scope! eval-scope
+                        list let tmp '=
+                            cons inline-do
+                                expr as list
+                        #list __defer (list tmp)
+                            list _ (list get-scope) (list locals) tmp
                         list handle-retargs counter
-                            list do
-                                list syntax-set-scope! eval-scope
-                                #list __defer (list tmp)
-                                    list _ (list get-scope) (list locals) tmp
-                                list _ (list syntax-get-scope) none
-                                    cons do
-                                        (expr as list)
-                                #expr as list
+                            list syntax-get-scope
+                            list locals
+                            tmp
             let f = (sc_compile (eval expr eval-scope) 0:u64)
             let fptr =
                 f as

@@ -295,6 +295,21 @@ struct Expander {
         return subexpr.expand_expression(_anchor, it);
     }
 
+    SCOPES_RESULT(Value *) expand_inline_do(const List *it) {
+        SCOPES_RESULT_TYPE(Value *);
+        auto _anchor = get_active_anchor();
+
+        it = it->next;
+
+        Expander subexpr(env, astscope);
+        auto expr = SCOPES_GET_RESULT(subexpr.expand_expression(_anchor, it));
+        if (isa<Expression>(expr)) {
+            auto ex = cast<Expression>(expr);
+            ex->scoped = false;
+        }
+        return expr;
+    }
+
     bool is_equal_token(Value *name) {
         auto tok = try_extract_symbol(name);
         return tok == OP_Set;
@@ -872,6 +887,7 @@ struct Expander {
                 case KW_Forward: return expand_forward(list);
                 //case KW_Defer: return expand_defer(list);
                 case KW_Do: return expand_do(list);
+                case KW_DoIn: return expand_inline_do(list);
                 case KW_RawCall:
                 case KW_Call: {
                     SCOPES_CHECK_RESULT(verify_list_parameter_count("special call", list, 1, -1));

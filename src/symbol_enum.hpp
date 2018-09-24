@@ -251,7 +251,7 @@ namespace scopes {
     \
     /* keywords and macros */ \
     T(KW_CatRest, "::*") T(KW_CatOne, "::@") T(KW_Forward, "_") \
-    T(KW_SyntaxLog, "syntax-log") T(KW_DoIn, "do-in") T(KW_Defer, "__defer") \
+    T(KW_SyntaxLog, "syntax-log") T(KW_DoIn, "inline-do") T(KW_Defer, "__defer") \
     T(KW_Assert, "assert") T(KW_Break, "break") T(KW_Label, "label") \
     T(KW_Call, "call") T(KW_RawCall, "rawcall") T(KW_CCCall, "cc/call") T(KW_Continue, "continue") \
     T(KW_Repeat, "repeat") T(KW_Raise, "raise") \

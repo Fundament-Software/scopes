@@ -1078,7 +1078,7 @@ repeat:
             Function *f = cast<Function>(callee);
             if (f->complete) {
                 T = callee->get_type();
-            } else if (f->return_type) {
+            } else if (f->return_type != TYPE_NoReturn) {
                 T = get_function_type(f);
             } else {
                 if (wait_for_return_type(f)) {
