@@ -777,6 +777,10 @@ compile-stage
 
     sc_typename_type_set_super usize integer
 
+    # generator type
+    let Generator = (sc_typename_type "Generator")
+    'set-storage Generator ('storage Closure)
+
     # syntax macro type
     let SyntaxMacro = (sc_typename_type "SyntaxMacro")
     let SyntaxMacroFunctionType =
@@ -1344,6 +1348,7 @@ compile-stage
         immutable = (box-pointer immutable)
         aggregate = (box-pointer aggregate)
         opaquepointer = (box-pointer opaquepointer)
+        Generator = (box-pointer Generator)
         SyntaxMacro = (box-pointer SyntaxMacro)
         SyntaxMacroFunctionType = (box-pointer SyntaxMacroFunctionType)
         DispatchCastFunctionType = (box-pointer DispatchCastFunctionType)
@@ -1973,7 +1978,24 @@ compile-stage
                         raise-compile-error! "unsupported type"
                     \ type type
 
+    fn constant? (argc argv)
+        verify-count argc 1 1
+        let value = (loadarrayptrs argv 0)
+        Value ('constant? value)
+
+    fn Closure->Generator (argc argv)
+        verify-count argc 1 1
+        let self = (load (getelementptr argv 0))
+        if (not ('constant? self))
+            raise-compile-error! "Closure must be constant"
+        let self = (as self Closure)
+        let self = (bitcast self Generator)
+        Value self
+
     'set-symbols syntax-scope
+        constant? = (box-ast-macro constant?)
+        Closure->Generator = (box-ast-macro Closure->Generator)
+
         package = (Value package)
         backquote-list = (Value backquote-list)
         backquote =
@@ -2081,11 +2103,72 @@ inline char (s)
     let s sz = (sc_string_buffer s)
     load s
 
-#-------------------------------------------------------------------------------
-# module loading
-#-------------------------------------------------------------------------------
-
 compile-stage
+    #---------------------------------------------------------------------------
+    # for iterator
+    #---------------------------------------------------------------------------
+
+    'set-symbols Generator
+        __typecall =
+            inline "Generator-new" (cls iter init)
+                Closure->Generator
+                    inline "get-iter-init" ()
+                        _ iter init
+        __call =
+            ast-macro
+                fn (argc argv)
+                    verify-count argc 1 1
+                    let self = (load (getelementptr argv 0))
+                    if (not ('constant? self))
+                        raise-compile-error! "Generator must be constant"
+                    let self = (self as Generator)
+                    let self = (bitcast self Closure)
+                    sc_call_new
+                        Value self
+                        Value-array;
+
+    # example for a generator:
+        inline counter (a b)
+            Generator
+                inline (fdone x)
+                    if (x < b)
+                        # return next iterator and result values
+                        _ (x + 1) x (x * 10)
+                    else
+                        fdone;
+                a
+
+    fn for (args)
+        loop (it params) = args '()
+        if (empty? it)
+            raise-compile-error! "'in' expected"
+        let sxat it = (decons it)
+        let at = (sxat as Symbol)
+        if (at != 'in)
+            repeat it (cons sxat params)
+        let generator-expr body = (decons it)
+        let params = (sc_list_reverse params)
+        let iter = (sc_symbol_new_unique "iter")
+        let next = (sc_symbol_new_unique "next")
+        let start = (sc_symbol_new_unique "start")
+        inline fdone ()
+            break;
+        list do
+            list let iter start '= (list (list (do as) generator-expr Generator))
+            list loop (list next) '= start
+            cons let next
+                'join params
+                    list '=
+                        list iter fdone next
+            list inline 'continue '()
+                list repeat next
+            cons do body
+            list 'continue
+
+    #---------------------------------------------------------------------------
+    # module loading
+    #---------------------------------------------------------------------------
+
     fn make-module-path (pattern name)
         let sz = (countof pattern)
         loop (i start result) = 0:usize 0:usize ""
@@ -2255,10 +2338,125 @@ compile-stage
                             list sc_scope_set_docstring tmp (list quote key) keydocstr
                             result
 
+    #---------------------------------------------------------------------------
+    # using
+    #---------------------------------------------------------------------------
+
+    fn merge-scope-symbols (source target filter)
+        fn process-keys (source target filter)
+            loop (last-key) = unnamed
+            let key value = ('next source last-key)
+            if (key != unnamed)
+                if
+                    or
+                        none? filter
+                        do
+                            let keystr = (key as string)
+                            sc_string_match filter keystr
+                    'set-symbol target key value
+                repeat key
+            else
+                target
+        fn filter-contents (source target filter)
+            let parent = ('parent source)
+            if (parent == null)
+                return
+                    process-keys source target filter
+            process-keys source
+                filter-contents parent target filter
+                filter
+        filter-contents source target filter
+
+    fn using (args syntax-scope)
+        let name rest = (decons args)
+        let nameval = name
+        if ((('typeof nameval) == Symbol) and ((nameval as Symbol) == 'import))
+            let ok module-dir = ('@ syntax-scope 'module-dir)
+            if (not ok)
+                raise-compile-error!
+                    "using import requires module-dir symbol in scope"
+            let module-dir = (module-dir as string)
+            let name rest = (decons rest)
+            let name = (name as Symbol)
+            let module = ((require-from module-dir name) as Scope)
+            return (list do)
+                .. module syntax-scope
+        let pattern =
+            if (empty? rest)
+                '()
+            else
+                let token pattern rest = (decons rest 2)
+                let token = (token as Symbol)
+                if (token != 'filter)
+                    raise-compile-error!
+                        "syntax: using <scope> [filter <filter-string>]"
+                let pattern = (pattern as string)
+                list pattern
+        # attempt to import directly if possible
+        inline process (src)
+            _ (list do)
+                if (empty? pattern)
+                    merge-scope-symbols src syntax-scope none
+                else
+                    merge-scope-symbols src syntax-scope (('@ pattern) as string)
+        if (('typeof nameval) == Symbol)
+            let sym = (nameval as Symbol)
+            let ok src = ('@ syntax-scope sym)
+            if (ok and (('typeof src) == Scope))
+                return (process (src as Scope))
+        elseif (('typeof nameval) == Scope)
+            return (process (nameval as Scope))
+        return
+            list compile-stage
+                cons merge-scope-symbols name 'syntax-scope pattern
+            syntax-scope
+
+    #fn from (args)
+        inline load-from (src keys...)
+            let loop (i result...) = (va-countof keys...)
+            if (i == 0)
+                result...
+            else
+                let i = (i - 1)
+                let key = (va@ i keys...)
+                loop i
+                    src @ key
+                    result...
+        let src kw params = (decons args 2)
+        if ((kw as Syntax as Symbol) != 'let)
+            syntax-error! kw "`let` keyword expected"
+        fn quotify (params)
+            if (empty? params)
+                unconst '()
+            else
+                let entry rest = (decons params)
+                entry as Syntax as Symbol
+                cons
+                    list quote entry
+                    quotify rest
+        cons let
+            .. params
+                list '=
+                    cons load-from src
+                        quotify params
+
     'set-symbols syntax-scope
         require-from = require-from
         load-module = load-module
         locals = (syntax-scope-macro locals)
+        #from = (syntax-macro from)
+        using = (syntax-scope-macro using)
+        for = (syntax-macro for)
+
+inline counter (a b)
+    Generator
+        inline (fdone x)
+            if (x < b)
+                # return next iterator and result values
+                _ (x + 1) x (x * 10)
+            else
+                fdone;
+        a
 
 #compile-stage
     'set-symbols syntax-scope

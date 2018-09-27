@@ -283,6 +283,7 @@ sc_symbol_value_tuple_t sc_scope_next(sc_scope_t *scope, sc_symbol_t key);
 // symbols
 
 sc_symbol_t sc_symbol_new(const sc_string_t *str);
+sc_symbol_t sc_symbol_new_unique(const sc_string_t *str);
 const sc_string_t *sc_symbol_to_string(sc_symbol_t sym);
 
 // strings

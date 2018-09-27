@@ -1623,11 +1623,14 @@ finalize:
 
 static SCOPES_RESULT(Value *) prove_Template(const ASTContext &ctx, Template *_template) {
     SCOPES_RESULT_TYPE(Value *);
-    assert(_template->scope);
-    Function *frame = ctx.frame->find_frame(_template->scope);
-    if (!frame) {
-        SCOPES_ANCHOR(_template->anchor());
-        SCOPES_EXPECT_ERROR(error_cannot_find_frame(_template));
+    Function *frame = nullptr;
+    if (_template->scope) {
+        //assert(_template->scope);
+        frame = ctx.frame->find_frame(_template->scope);
+        if (!frame) {
+            SCOPES_ANCHOR(_template->anchor());
+            SCOPES_EXPECT_ERROR(error_cannot_find_frame(_template));
+        }
     }
     return ConstPointer::closure_from(_template->anchor(), Closure::from(_template, frame));
 }
@@ -1712,8 +1715,8 @@ SCOPES_RESULT(Value *) prove_inline(const ASTContext &ctx,
     fn->original = func;
     fn->frame = frame;
 
-    // can't escape any loop we are already in
-    ASTContext subctx = ctx.with_frame(fn).for_loop(nullptr);
+    // inlines may escape caller loops
+    ASTContext subctx = ctx.with_frame(fn);
     SCOPES_CHECK_RESULT(prove_inline_arguments(subctx, func->params, nodes));
     SCOPES_ANCHOR(fn->anchor());
     Value *result_value = nullptr;

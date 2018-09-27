@@ -57,13 +57,13 @@ namespace scopes {
 static void init_values_array(scopes::Values &dest, int numvalues, sc_value_t **values) {
     dest.reserve(numvalues);
     for (int i = 0; i < numvalues; ++i) {
-        assert(values[i]);
+        //assert(values[i] > (Value *)0x1000);
         dest.push_back(values[i]);
     }
 }
 
 template<typename T>
-static void init_values_array(std::vector<T *> &dest, int numvalues, sc_value_t **values) {
+static void init_values_arrayT(std::vector<T *> &dest, int numvalues, sc_value_t **values) {
     dest.reserve(numvalues);
     for (int i = 0; i < numvalues; ++i) {
         assert(values[i]);
@@ -550,6 +550,14 @@ const sc_string_t *sc_symbol_to_string(sc_symbol_t sym) {
     return sym.name();
 }
 
+size_t counter = 1;
+sc_symbol_t sc_symbol_new_unique(const sc_string_t *str) {
+    using namespace scopes;
+    std::stringstream ss;
+    ss << "#" << counter++ << "#" << str->data;
+    return Symbol(String::from_stdstring(ss.str()));
+}
+
 // String
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -843,7 +851,7 @@ void sc_call_set_rawcall(sc_value_t *value, bool enable) {
 sc_value_t *sc_loop_new(int numparams, sc_value_t **params, int numargs, sc_value_t **args, sc_value_t *body) {
     using namespace scopes;
     Parameters paramvals;
-    init_values_array(paramvals, numparams, params);
+    init_values_arrayT(paramvals, numparams, params);
     Values vals;
     init_values_array(vals, numargs, args);
     return Loop::from(get_active_anchor(), paramvals, vals, body);
@@ -860,7 +868,7 @@ sc_value_t *sc_const_real_new(const sc_type_t *type, double value) {
 sc_value_t *sc_const_aggregate_new(const sc_type_t *type, int numconsts, sc_value_t **consts) {
     using namespace scopes;
     Constants vals;
-    init_values_array(vals, numconsts, consts);
+    init_values_arrayT(vals, numconsts, consts);
     return ConstAggregate::from(get_active_anchor(), type, vals);
 }
 sc_value_t *sc_const_pointer_new(const sc_type_t *type, const void *pointer) {
@@ -1433,7 +1441,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_const_pointer_extract, voidstar, TYPE_Value);
 
     DEFINE_EXTERN_C_FUNCTION(sc_break_new, TYPE_Value, TYPE_Value);
-    DEFINE_EXTERN_C_FUNCTION(sc_repeat_new, TYPE_Value, TYPE_I32, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_repeat_new, TYPE_Value, TYPE_I32, TYPE_ValuePP);
     DEFINE_EXTERN_C_FUNCTION(sc_return_new, TYPE_Value, TYPE_Value);
 
     DEFINE_EXTERN_C_FUNCTION(sc_is_file, TYPE_Bool, TYPE_String);
@@ -1482,6 +1490,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_scope_next, arguments_type({TYPE_Symbol, TYPE_Value}), TYPE_Scope, TYPE_Symbol);
 
     DEFINE_EXTERN_C_FUNCTION(sc_symbol_new, TYPE_Symbol, TYPE_String);
+    DEFINE_EXTERN_C_FUNCTION(sc_symbol_new_unique, TYPE_Symbol, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_symbol_to_string, TYPE_String, TYPE_Symbol);
 
     DEFINE_EXTERN_C_FUNCTION(sc_string_new, TYPE_String, native_ro_pointer_type(TYPE_I8), TYPE_USize);
