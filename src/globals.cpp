@@ -139,7 +139,11 @@ sc_value_raises_t sc_typify(sc_closure_t *srcl, int numtypes, const sc_type_t **
 
 sc_value_raises_t sc_compile(sc_value_t *srcl, uint64_t flags) {
     using namespace scopes;
-    RETURN_RESULT(compile(cast<Function>(srcl), flags));
+    auto result = extract_function_constant(srcl);
+    if (!result.ok()) {
+        return { false, get_last_error(), nullptr };
+    }
+    RETURN_RESULT(compile(result.assert_ok(), flags));
 }
 
 sc_string_raises_t sc_compile_spirv(sc_symbol_t target, sc_value_t *srcl, uint64_t flags) {
@@ -728,6 +732,23 @@ bool sc_value_is_pure (sc_value_t *value) {
 int sc_value_kind (sc_value_t *value) {
     using namespace scopes;
     return value->kind();
+}
+
+sc_value_t *sc_value_wrap(const sc_type_t *type, sc_value_t *value) {
+    using namespace scopes;
+    if (isa<Const>(value)) {
+        return value;
+    }
+    auto result = wrap_value(type, value);
+    assert(result);
+    return result;
+}
+
+sc_value_t *sc_value_unwrap(const sc_type_t *type, sc_value_t *value) {
+    using namespace scopes;
+    auto result = unwrap_value(type, value);
+    assert(result);
+    return result;
 }
 
 sc_value_t *sc_keyed_new(sc_symbol_t key, sc_value_t *value) {
@@ -1421,6 +1442,8 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_value_is_constant, TYPE_Bool, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_value_is_pure, TYPE_Bool, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_value_kind, TYPE_I32, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_value_wrap, TYPE_Value, TYPE_Type, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_value_unwrap, TYPE_Value, TYPE_Type, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_keyed_new, TYPE_Value, TYPE_Symbol, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_argument_list_new, TYPE_Value, TYPE_I32, TYPE_ValuePP);
     DEFINE_EXTERN_C_FUNCTION(sc_extract_argument_new, TYPE_Value, TYPE_Value, TYPE_I32);

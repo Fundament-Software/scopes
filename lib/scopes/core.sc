@@ -640,6 +640,8 @@ sc_type_set_symbol Value '__typecall
                     store (box-none) (getelementptr blockargs 1)
                     sc_block_new 2 blockargs
                 else
+                    sc_value_wrap T value
+#
                     let storageT = (sc_type_storage T)
                     let kind = (sc_type_kind storageT)
                     let argptr = (getelementptr args 1)
@@ -654,6 +656,15 @@ sc_type_set_symbol Value '__typecall
                         raise-compile-error!
                             sc_string_join "can't box value of type "
                                 sc_value_repr (box-pointer T)
+
+let __unbox =
+    ast-macro
+        fn (argc argv)
+            verify-count argc 2 2
+            let value = (load (getelementptr argv 0))
+            let T = (load (getelementptr argv 1))
+            let T = (unbox-pointer T type)
+            sc_value_unwrap T value
 
 compile-stage;
 
@@ -718,28 +729,6 @@ inline set-symbols (self values...)
     next = sc_list_next
     decons = decons
     reverse = sc_list_reverse
-
-# label accessors
-#'set-symbols Label
-    verify-argument-count = verify-argument-count
-    verify-keyed-count = verify-keyed-count
-    keyed = sc_label_get_keyed
-    set-keyed = sc_label_set_keyed
-    arguments = sc_label_get_arguments
-    set-arguments = sc_label_set_arguments
-    parameters = sc_label_get_parameters
-    enter = sc_label_get_enter
-    set-enter = sc_label_set_enter
-    dump = sc_label_dump
-    function-type = sc_label_function_type
-    set-rawcall = sc_label_set_rawcall
-    set-rawcont = sc_label_set_rawcont
-    frame = sc_label_frame
-    anchor = sc_label_anchor
-    body-anchor = sc_label_body_anchor
-    append-parameter = sc_label_append_parameter
-    return-keyed = Label-return-keyed
-    return = Label-return
 
 'set-symbols type
     bitcount = sc_type_bitcountof
@@ -814,20 +803,13 @@ inline unbox-hidden-pointer (value T)
     unbox-verify (extractvalue value 0) T
     load (inttoptr (extractvalue value 1) ('pointer T))
 
+inline unbox (value T)
+    unbox-verify (sc_value_type value) T
+    __unbox value T
+
 fn value-imply (vT T)
-    let storageT = ('storage T)
-    let kind = ('kind storageT)
-    if (icmp== kind type-kind-pointer)
-        return (box-pointer unbox-pointer)
-    elseif (icmp== kind type-kind-integer)
-        return (box-pointer unbox-integer)
-    elseif (icmp== kind type-kind-real)
-        if (ptrcmp== storageT f32)
-            return (box-pointer unbox-u32)
-        elseif (ptrcmp== storageT f64)
-            return (box-pointer unbox-bitcast)
-    elseif (bor (icmp== kind type-kind-tuple) (icmp== kind type-kind-array))
-        return (box-pointer unbox-hidden-pointer)
+    if true
+        return (box-pointer unbox)
     raise-compile-error! "unsupported type"
 
 inline value-rimply (cls value)
@@ -1164,6 +1146,11 @@ inline symbol-imply (self destT)
 fn string@ (self i)
     let s = (sc_string_buffer self)
     load (getelementptr s i)
+
+'set-symbols tuple
+    __@ =
+        inline (self index)
+            extractvalue self index
 
 'set-symbols string
     __== = (box-binary-op-dispatch (single-binary-op-dispatch ptrcmp==))
@@ -2479,6 +2466,28 @@ define define-ast-macro
                         list verify-count argc paramcount paramcount
                         body
 
+let __assert =
+    ast-macro
+        fn (argc argv)
+            fn check-assertion (result anchor msg)
+                if (not result)
+                    sc_set_active_anchor anchor
+                    raise-compile-error!
+                        .. "assertion failed: " msg
+                return;
+
+            verify-count argc 2 2
+            let expr msg = (loadarrayptrs argv 0 1)
+            let anchor = (sc_get_active_anchor)
+            if ('constant? expr)
+                let msg = (msg as string)
+                let val = (expr as bool)
+                check-assertion val anchor msg
+                box-empty;
+            else
+                sc_call_new check-assertion
+                    Value-array expr (Value anchor) msg
+
 compile-stage;
 
 fn syntax-error! (anchor msg)
@@ -2546,6 +2555,179 @@ inline range (a b c)
                 fdone;
         from
 
+fn parse-compile-flags (argc argv)
+    loop (i flags) = 0 0:u64
+    if (i < argc)
+        let arg = (load (getelementptr argv i))
+        let flag = (arg as Symbol)
+        repeat (i + 1)
+            | flags
+                if (== flag 'dump-disassembly) compile-flag-dump-disassembly
+                elseif (== flag 'dump-module) compile-flag-dump-module
+                elseif (== flag 'dump-function) compile-flag-dump-function
+                elseif (== flag 'dump-time) compile-flag-dump-time
+                elseif (== flag 'no-debug-info) compile-flag-no-debug-info
+                elseif (== flag 'O1) compile-flag-O1
+                elseif (== flag 'O2) compile-flag-O2
+                elseif (== flag 'O3) compile-flag-O3
+                else
+                    raise-compile-error!
+                        .. "illegal flag: " (repr flag)
+                            ". try one of"
+                            \ " " (repr 'dump-disassembly)
+                            \ " " (repr 'dump-module)
+                            \ " " (repr 'dump-function)
+                            \ " " (repr 'dump-time)
+                            \ " " (repr 'no-debug-info)
+                            \ " " (repr 'O1)
+                            \ " " (repr 'O2)
+                            \ " " (repr 'O3)
+    flags
+
+let compile =
+    ast-macro
+        fn (argc argv)
+            verify-count argc 1 -1
+            let func = (load (getelementptr argv 0))
+            let flags =
+                parse-compile-flags (argc - 1) (getelementptr argv 1)
+            if ('pure? func)
+                sc_compile func flags
+            else
+                sc_call_new sc_compile
+                    Value-array func
+                        Value flags
+
+define-syntax-macro assert
+    let cond msg body = (decons args 2)
+    let msg =
+        if ((countof args) == 2:usize) msg
+        else
+            Value
+                repr cond
+    list __assert cond msg
+
+#-------------------------------------------------------------------------------
+# tuples
+#-------------------------------------------------------------------------------
+
+let tupleof =
+    ast-macro
+        fn (argc argv)
+            #verify-count argc 0 -1
+            raises-compile-error;
+
+            # build tuple type
+            let field-types = (alloca-array type argc)
+            loop (i) = 0
+            if (i < argc)
+                let arg = (load (getelementptr argv i))
+                let T = ('typeof arg)
+                store T (getelementptr field-types i)
+                repeat (i + 1)
+
+            # generate insert instructions
+            let TT = (sc_tuple_type argc field-types)
+            loop (i result) = 0
+                sc_call_new nullof (Value-array (Value TT))
+            if (i < argc)
+                let arg = (load (getelementptr argv i))
+                repeat (i + 1)
+                    sc_call_new insertvalue
+                        Value-array result arg (Value i)
+            result
+
+#-------------------------------------------------------------------------------
+# arrays
+#-------------------------------------------------------------------------------
+
+let arrayof =
+    ast-macro
+        fn (argc argv)
+            verify-count argc 1 -1
+            raises-compile-error;
+
+            let ET = (loadarrayptrs argv 0)
+            let numvals = (sub argc 1)
+
+            # generate insert instructions
+            let TT = (sc_array_type ET (usize numvals))
+            loop (i result) = 0
+                sc_call_new nullof (Value-array (Value TT))
+            if (i < numvals)
+                let arg = (load (getelementptr argv (add i 1)))
+                repeat (i + 1)
+                    sc_call_new insertvalue
+                        Value-array result arg (Value i)
+            result
+
+compile-stage;
+
+print
+    arrayof i32 1 2 3
+
+#-------------------------------------------------------------------------------
+# vectors
+#-------------------------------------------------------------------------------
+
+let vectorof =
+    ast-macro
+        fn (argc argv)
+            verify-count argc 1 -1
+            raises-compile-error;
+
+            let ET = (loadarrayptrs argv 0)
+            let numvals = (sub argc 1)
+
+            # generate insert instructions
+            let TT = (sc_vector_type ET (usize numvals))
+            loop (i result) = 0
+                sc_call_new nullof (Value-array (Value TT))
+            if (i < numvals)
+                let arg = (load (getelementptr argv (add i 1)))
+                repeat (i + 1)
+                    sc_call_new insertelement
+                        Value-array result arg (Value i)
+            result
+
+#-------------------------------------------------------------------------------
+
+#fn compile-flags (opts...)
+    let vacount = (va-countof opts...)
+    let loop (i flags) = 0 0:u64
+    if (== i vacount)
+        return flags
+    let flag = (va@ i opts...)
+    if (not (constant? flag))
+        compiler-error! "symbolic flags must be constant"
+    assert-typeof flag Symbol
+    loop (+ i 1)
+        | flags
+            if (== flag 'dump-disassembly) compile-flag-dump-disassembly
+            elseif (== flag 'dump-module) compile-flag-dump-module
+            elseif (== flag 'dump-function) compile-flag-dump-function
+            elseif (== flag 'dump-time) compile-flag-dump-time
+            elseif (== flag 'no-debug-info) compile-flag-no-debug-info
+            elseif (== flag 'O1) compile-flag-O1
+            elseif (== flag 'O2) compile-flag-O2
+            elseif (== flag 'O3) compile-flag-O3
+            else
+                compiler-error!
+                    .. "illegal flag: " (repr flag)
+                        ". try one of"
+                        \ " " (repr 'dump-disassembly)
+                        \ " " (repr 'dump-module)
+                        \ " " (repr 'dump-function)
+                        \ " " (repr 'dump-time)
+                        \ " " (repr 'no-debug-info)
+                        \ " " (repr 'O1)
+                        \ " " (repr 'O2)
+                        \ " " (repr 'O3)
+
+#fn compile (f opts...)
+    __compile f
+        compile-flags opts...
+
 #inline zip (a b)
     let iter-a init-a = ((a as Generator))
     let iter-b init-b = ((b as Generator))
@@ -2607,6 +2789,7 @@ let
     active-anchor = sc_get_active_anchor
     eval = sc_eval
     format-error = sc_format_error
+    import-c = sc_import_c
 
 compile-stage;
 

@@ -799,24 +799,129 @@ static SCOPES_RESULT(Value *) prove_Raise(const ASTContext &ctx, Raise *_raise) 
     return newraise;
 }
 
-static Value *wrap_value(Value *value) {
-    auto globs = sc_get_original_globals();
-#define T(NAME) \
-    auto g_ ## NAME = sc_scope_at(globs, Symbol(#NAME))._1; \
-    assert(g_ ## NAME);
+#define SCOPES_REIMPORT_SYMBOLS() \
+    T(g_sc_const_pointer_new, "sc_const_pointer_new") \
+    T(g_sc_const_int_new, "sc_const_int_new") \
+    T(g_sc_const_aggregate_new, "sc_const_aggregate_new") \
+    T(g_bitcast, "bitcast") \
+    T(g_voidstar, "voidstar") \
+    T(g_insertvalue, "insertvalue") \
+    T(g_extractvalue, "extractvalue") \
+    T(g_insertelement, "insertelement") \
+    T(g_extractelement, "extractelement") \
+    T(g_store, "store") \
+    T(g_getelementptr, "getelementptr") \
+    T(g_zext, "zext") \
+    T(g_sext, "sext") \
+    T(g_u64, "u64") \
+    T(g_alloca_array, "alloca-array") \
+    T(g_sc_scope_new_subscope, "sc_scope_new_subscope") \
+    T(g_sc_scope_set_symbol, "sc_scope_set_symbol") \
+    T(g_sc_scope_set_docstring, "sc_scope_set_docstring") \
+    T(g_sc_eval, "sc_eval") \
+    T(g_itrunc, "itrunc") \
+    T(g_sc_const_pointer_extract, "sc_const_pointer_extract") \
+    T(g_sc_const_int_extract, "sc_const_int_extract") \
+    T(g_sc_const_extract_at, "sc_const_extract_at") \
+    T(g_undef, "undef") \
 
-    T(sc_const_pointer_new);
-    T(sc_const_int_new);
-    T(bitcast);
-    T(voidstar);
-    T(zext);
-    T(sext);
-    T(u64);
-
+static bool symbols_imported = false;
+#define T(NAME, STR) \
+    static Value *NAME = nullptr;
+SCOPES_REIMPORT_SYMBOLS()
 #undef T
 
+void import_symbols() {
+    if (symbols_imported)
+        return;
+    symbols_imported = true;
+    auto globs = sc_get_original_globals();
+#define T(NAME, STR) \
+    NAME = sc_scope_at(globs, Symbol(STR))._1; \
+    assert(NAME);
+SCOPES_REIMPORT_SYMBOLS()
+#undef T
+}
+
+Value *unwrap_value(const Type *T, Value *value) {
+    import_symbols();
     auto anchor = value->anchor();
-    auto T = value->get_type();
+    auto ST = storage_type(T).assert_ok();
+    auto kind = ST->kind();
+    switch(kind) {
+    case TK_Pointer: {
+        return Call::from(anchor, g_bitcast, {
+                Call::from(anchor, g_sc_const_pointer_extract, { value }),
+                ConstPointer::type_from(anchor, T)
+            });
+    } break;
+    case TK_Integer: {
+        return Call::from(anchor, g_itrunc, {
+                Call::from(anchor, g_sc_const_int_extract, { value }),
+                ConstPointer::type_from(anchor, T)
+            });
+    } break;
+    case TK_Vector: {
+        auto vt = cast<VectorType>(ST);
+        auto argT = vt->element_type;
+        auto numvals = (int)vt->count;
+        auto numelems = ConstInt::from(anchor, TYPE_I32, numvals);
+        auto result = Call::from(anchor, g_undef, {
+                ConstPointer::type_from(anchor, T)
+            });
+        for (int i = 0; i < numvals; ++i) {
+            auto idx = ConstInt::from(anchor, TYPE_I32, i);
+            auto arg =
+                Call::from(anchor, g_sc_const_extract_at, { value, idx });
+            auto unwrapped_arg = unwrap_value(argT, arg);
+            result = Call::from(anchor, g_insertelement, { result, unwrapped_arg, idx });
+        }
+        return result;
+    } break;
+    case TK_Array: {
+        auto at = cast<ArrayType>(ST);
+        auto argT = at->element_type;
+        auto numvals = (int)at->count;
+        auto numelems = ConstInt::from(anchor, TYPE_I32, numvals);
+        auto result = Call::from(anchor, g_undef, {
+                ConstPointer::type_from(anchor, T)
+            });
+        for (int i = 0; i < numvals; ++i) {
+            auto idx = ConstInt::from(anchor, TYPE_I32, i);
+            auto arg =
+                Call::from(anchor, g_sc_const_extract_at, { value, idx });
+            auto unwrapped_arg = unwrap_value(argT, arg);
+            result = Call::from(anchor, g_insertvalue, { result, unwrapped_arg, idx });
+        }
+        return result;
+    } break;
+    case TK_Tuple: {
+        auto tt = cast<TupleType>(ST);
+        auto numelems = ConstInt::from(anchor, TYPE_I32, tt->values.size());
+        auto result = Call::from(anchor, g_undef, {
+                ConstPointer::type_from(anchor, T)
+            });
+        for (int i = 0; i < tt->values.size(); ++i) {
+            auto idx = ConstInt::from(anchor, TYPE_I32, i);
+            auto arg =
+                Call::from(anchor, g_sc_const_extract_at, { value, idx });
+            auto argT = tt->values[i];
+            auto unwrapped_arg = unwrap_value(argT, arg);
+            result = Call::from(anchor, g_insertvalue, { result, unwrapped_arg, idx });
+        }
+        //StyledStream ss;
+        //stream_ast(ss, result, StreamASTFormat());
+        return result;
+    } break;
+    default:
+        break;
+    }
+    return nullptr;
+}
+
+Value *wrap_value(const Type *T, Value *value) {
+    import_symbols();
+    auto anchor = value->anchor();
     assert(!sc_value_is_constant(value));
     if (!is_opaque(T)) {
         auto ST = storage_type(T).assert_ok();
@@ -834,6 +939,85 @@ static Value *wrap_value(Value *value) {
                     Call::from(anchor, ti->issigned?g_sext:g_zext, { value,
                     g_u64 }) });
         } break;
+        case TK_Vector: {
+            auto at = cast<VectorType>(ST);
+            auto result = Expression::from(anchor);
+            auto ET = at->element_type;
+            auto numvals = (int)at->count;
+            auto numelems = ConstInt::from(anchor, TYPE_I32, numvals);
+            auto buf = Call::from(anchor, g_alloca_array, {
+                    ConstPointer::type_from(anchor, TYPE_Value),
+                    numelems
+                });
+            result->append(buf);
+            for (int i = 0; i < numvals; ++i) {
+                auto idx = ConstInt::from(anchor, TYPE_I32, i);
+                auto arg =
+                    Call::from(anchor, g_extractelement, { value, idx });
+                auto wrapped_arg = wrap_value(ET, arg);
+                result->append(
+                    Call::from(anchor, g_store, {
+                        wrapped_arg,
+                        Call::from(anchor, g_getelementptr, { buf, idx })
+                    }));
+            }
+            result->append(Call::from(anchor, g_sc_const_aggregate_new,
+                { ConstPointer::type_from(anchor, T), numelems, buf }));
+            return result;
+        } break;
+        case TK_Array: {
+            auto at = cast<ArrayType>(ST);
+            auto result = Expression::from(anchor);
+            auto ET = at->element_type;
+            auto numvals = (int)at->count;
+            auto numelems = ConstInt::from(anchor, TYPE_I32, numvals);
+            auto buf = Call::from(anchor, g_alloca_array, {
+                    ConstPointer::type_from(anchor, TYPE_Value),
+                    numelems
+                });
+            result->append(buf);
+            for (int i = 0; i < numvals; ++i) {
+                auto idx = ConstInt::from(anchor, TYPE_I32, i);
+                auto arg =
+                    Call::from(anchor, g_extractvalue, { value, idx });
+                auto wrapped_arg = wrap_value(ET, arg);
+                result->append(
+                    Call::from(anchor, g_store, {
+                        wrapped_arg,
+                        Call::from(anchor, g_getelementptr, { buf, idx })
+                    }));
+            }
+            result->append(Call::from(anchor, g_sc_const_aggregate_new,
+                { ConstPointer::type_from(anchor, T), numelems, buf }));
+            return result;
+        } break;
+        case TK_Tuple: {
+            auto tt = cast<TupleType>(ST);
+            auto result = Expression::from(anchor);
+            auto numelems = ConstInt::from(anchor, TYPE_I32, tt->values.size());
+            auto buf = Call::from(anchor, g_alloca_array, {
+                    ConstPointer::type_from(anchor, TYPE_Value),
+                    numelems
+                });
+            result->append(buf);
+            for (int i = 0; i < tt->values.size(); ++i) {
+                auto idx = ConstInt::from(anchor, TYPE_I32, i);
+                auto arg =
+                    Call::from(anchor, g_extractvalue, { value, idx });
+                auto argT = tt->values[i];
+                auto wrapped_arg = wrap_value(argT, arg);
+                result->append(
+                    Call::from(anchor, g_store, {
+                        wrapped_arg,
+                        Call::from(anchor, g_getelementptr, { buf, idx })
+                    }));
+            }
+            result->append(Call::from(anchor, g_sc_const_aggregate_new,
+                { ConstPointer::type_from(anchor, T), numelems, buf }));
+            //StyledStream ss;
+            //stream_ast(ss, result, StreamASTFormat());
+            return result;
+        } break;
         default:
             break;
         }
@@ -844,17 +1028,7 @@ static Value *wrap_value(Value *value) {
 static SCOPES_RESULT(Value *) prove_CompileStage(const ASTContext &ctx, CompileStage *sx) {
     SCOPES_RESULT_TYPE(Value *);
 
-    auto globs = sc_get_original_globals();
-#define T(NAME) \
-    auto g_ ## NAME = sc_scope_at(globs, Symbol(#NAME))._1; \
-    assert(g_ ## NAME);
-
-    T(sc_scope_new_subscope);
-    T(sc_scope_set_symbol);
-    T(sc_scope_set_docstring);
-    T(sc_eval);
-
-#undef T
+    import_symbols();
 
     auto anchor = sx->anchor();
     sc_set_active_anchor(anchor);
@@ -890,7 +1064,7 @@ static SCOPES_RESULT(Value *) prove_CompileStage(const ASTContext &ctx, CompileS
                 sc_scope_set_symbol(constant_scope, key, typedvalue1);
                 sc_scope_set_docstring(constant_scope, key, keydocstr);
             } else {
-                auto wrapvalue = wrap_value(typedvalue1);
+                auto wrapvalue = wrap_value(typedvalue1->get_type(), typedvalue1);
                 if (wrapvalue) {
                     auto vkey = ConstInt::symbol_from(anchor, key);
                     block->append(Call::from(anchor, g_sc_scope_set_symbol, { tmp, vkey, wrapvalue }));
@@ -951,6 +1125,11 @@ SCOPES_RESULT(const Closure *) extract_closure_constant(Value *value) {
     SCOPES_RESULT_TYPE(const Closure *);
     ConstPointer* x = SCOPES_GET_RESULT(extract_typed_constant<ConstPointer>(TYPE_Closure, value));
     return (const Closure *)x->value;
+}
+
+SCOPES_RESULT(Function *) extract_function_constant(Value *value) {
+    SCOPES_RESULT_TYPE(Function *);
+    return extract_constant<Function>(TYPE_Function, value);
 }
 
 SCOPES_RESULT(sc_ast_macro_func_t) extract_astmacro_constant(Value *value) {
@@ -1143,7 +1322,11 @@ repeat:
         auto result = fptr(values.size(), &values[0]);
         if (result.ok) {
             Value *value = result._0;
-            assert(value);
+            if (!value) {
+                StyledString ss;
+                ss.out << "AST macro returned illegal value";
+                SCOPES_LOCATION_ERROR(ss.str());
+            }
             return prove(ctx, value);
         } else {
             set_last_error(result.except);
@@ -1318,6 +1501,26 @@ repeat:
             SCOPES_CHECK_RESULT(verify_integer(T));
             SCOPES_CHECK_RESULT(verify_integer(SCOPES_GET_RESULT(storage_type(DestT))));
             RETARGTYPES(DestT);
+        } break;
+        case FN_ExtractElement: {
+            CHECKARGS(2, 2);
+            READ_STORAGETYPEOF(T);
+            READ_STORAGETYPEOF(idx);
+            SCOPES_CHECK_RESULT(verify_kind<TK_Vector>(T));
+            auto vi = cast<VectorType>(T);
+            SCOPES_CHECK_RESULT(verify_integer(idx));
+            RETARGTYPES(vi->element_type);
+        } break;
+        case FN_InsertElement: {
+            CHECKARGS(3, 3);
+            READ_STORAGETYPEOF(T);
+            READ_STORAGETYPEOF(ET);
+            READ_STORAGETYPEOF(idx);
+            SCOPES_CHECK_RESULT(verify_integer(idx));
+            SCOPES_CHECK_RESULT(verify_kind<TK_Vector>(T));
+            auto vi = cast<VectorType>(T);
+            SCOPES_CHECK_RESULT(verify(SCOPES_GET_RESULT(storage_type(vi->element_type)), ET));
+            RETARGTYPES(_T->get_type());
         } break;
         case FN_ExtractValue: {
             CHECKARGS(2, 2);

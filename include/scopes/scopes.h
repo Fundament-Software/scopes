@@ -159,6 +159,8 @@ const sc_anchor_t *sc_value_anchor (sc_value_t *value);
 bool sc_value_is_constant (sc_value_t *value);
 bool sc_value_is_pure (sc_value_t *value);
 int sc_value_kind (sc_value_t *value);
+sc_value_t *sc_value_wrap(const sc_type_t *type, sc_value_t *value);
+sc_value_t *sc_value_unwrap(const sc_type_t *type, sc_value_t *value);
 
 sc_value_t *sc_keyed_new(sc_symbol_t key, sc_value_t *value);
 

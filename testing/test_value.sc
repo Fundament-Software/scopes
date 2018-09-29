@@ -2,10 +2,10 @@
 
 do
     let val =
-        Any
+        Value
             tupleof
                 1
-                unconst 2
+                2
                 3
     let tupleT =
         tuple i32 i32 i32
@@ -17,14 +17,14 @@ do
 
 do
     let val =
-        Any
-            vectorof f32 1 (unconst 2.0) 3
+        Value
+            vectorof f32 1 2.0 3
     print val
 
 do
     let val =
-        Any
-            arrayof i32 1 (unconst 2) 3
+        Value
+            arrayof i32 1 2 3
     let arrayT = (array i32 3)
     assert (('typeof val) == arrayT)
     let val = (val as arrayT)
@@ -34,8 +34,7 @@ do
 
 do
     let val =
-        Any
-            unconst (tupleof)
+        Value (tupleof)
     let tupleT =
         tuple;
     assert (('typeof val) == tupleT)
