@@ -66,4 +66,3 @@ test-modules
     .test_vector
     .test_while
     .test_xpcall
-

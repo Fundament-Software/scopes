@@ -624,33 +624,36 @@ let constbranch =
 sc_type_set_symbol Value '__typecall
     box-ast-macro
         fn (argcount args)
-            verify-count argcount 2 2
-            let value = (load (getelementptr args 1))
-            let T = (sc_value_type value)
-            if (ptrcmp== T Value)
-                value
-            elseif (sc_value_is_constant value)
-                box-pointer value
-            elseif (ptrcmp== T Nothing)
-                let blockargs = (alloca-array Value 2)
-                store value (getelementptr blockargs 0)
-                store (box-none) (getelementptr blockargs 1)
-                sc_block_new 2 blockargs
+            verify-count argcount 1 -1
+            if (icmp== argcount 1)
+                box-pointer (box-empty)
             else
-                let storageT = (sc_type_storage T)
-                let kind = (sc_type_kind storageT)
-                let argptr = (getelementptr args 1)
-                if (icmp== kind type-kind-pointer)
-                    sc_call_new (box-pointer box-pointer) 1 argptr
-                elseif (icmp== kind type-kind-integer)
-                    sc_call_new (box-pointer box-integer) 1 argptr
-                #elseif (bor (icmp== kind type-kind-tuple) (icmp== kind type-kind-array))
-                #elseif (icmp== kind type-kind-vector)
-                #elseif (icmp== kind type-kind-real)
+                let value = (load (getelementptr args 1))
+                let T = (sc_value_type value)
+                if (ptrcmp== T Value)
+                    value
+                elseif (sc_value_is_constant value)
+                    box-pointer value
+                elseif (ptrcmp== T Nothing)
+                    let blockargs = (alloca-array Value 2)
+                    store value (getelementptr blockargs 0)
+                    store (box-none) (getelementptr blockargs 1)
+                    sc_block_new 2 blockargs
                 else
-                    raise-compile-error!
-                        sc_string_join "can't box value of type "
-                            sc_value_repr (box-pointer T)
+                    let storageT = (sc_type_storage T)
+                    let kind = (sc_type_kind storageT)
+                    let argptr = (getelementptr args 1)
+                    if (icmp== kind type-kind-pointer)
+                        sc_call_new (box-pointer box-pointer) 1 argptr
+                    elseif (icmp== kind type-kind-integer)
+                        sc_call_new (box-pointer box-integer) 1 argptr
+                    #elseif (bor (icmp== kind type-kind-tuple) (icmp== kind type-kind-array))
+                    #elseif (icmp== kind type-kind-vector)
+                    #elseif (icmp== kind type-kind-real)
+                    else
+                        raise-compile-error!
+                            sc_string_join "can't box value of type "
+                                sc_value_repr (box-pointer T)
 
 compile-stage;
 
@@ -2182,14 +2185,11 @@ fn exec-module (expr eval-scope)
     # build a wrapper
     let expr =
         list
-            list if false
-                list raise-compile-error! "force exception type"
             list Value
                 cons do
-                    list syntax-set-scope! eval-scope
+                    list raises-compile-error
                     expr
-    let scope = (__this-scope)
-    let f = (sc_compile (sc_eval expr-anchor expr scope) 0:u64)
+    let f = (sc_compile (sc_eval expr-anchor expr eval-scope) 0:u64)
     let fptr = (f as ModuleFunctionType)
     fptr;
 
@@ -2379,8 +2379,9 @@ let using =
                 let name rest = (decons rest)
                 let name = (name as Symbol)
                 let module = ((require-from module-dir name) as Scope)
-                return (list do)
+                return (list do none)
                     .. module syntax-scope
+
             let pattern =
                 if (empty? rest)
                     '()
@@ -2440,14 +2441,12 @@ let using =
                 cons load-from src
                     quotify params
 
-compile-stage;
-
 # (define-macro name expr ...)
 # implies builtin names:
     args : list
 define define-syntax-macro
     syntax-macro
-        fn "expand-define-macro" (expr)
+        fn "expand-define-syntax-macro" (expr)
             raises-compile-error;
             let name body = (decons expr)
             list define name
@@ -2455,6 +2454,75 @@ define define-syntax-macro
                     cons fn '(args)
                         list raises-compile-error;
                         body
+
+define define-ast-macro
+    syntax-macro
+        fn "expand-define-ast-macro" (expr)
+            raises-compile-error;
+            let name params body = (decons expr 2)
+            let params = (params as list)
+            let paramcount = ((countof params) as i32)
+            let argc = (Symbol "#argc")
+            let argv = (Symbol "#argv")
+            loop (i rest body) = 0 params body
+            if (not (empty? rest))
+                let param rest = (decons rest)
+                let param = (param as Symbol)
+                let body =
+                    cons
+                        list let param '= (list load (list getelementptr argv i))
+                        body
+                repeat (i + 1) rest body
+            list define name
+                list ast-macro
+                    cons fn (name as Symbol as string) (list argc argv)
+                        list verify-count argc paramcount paramcount
+                        body
+
+compile-stage;
+
+fn syntax-error! (anchor msg)
+    sc_set_active_anchor anchor
+    raise-compile-error! msg
+
+# (define-scope-macro name expr ...)
+# implies builtin names:
+    args : list
+    scope : Scope
+define-syntax-macro define-scope-macro
+    let name body = (decons args)
+    list define name
+        list syntax-scope-macro
+            cons fn '(args syntax-scope) body
+
+# (define-block-scope-macro name expr ...)
+# implies builtin names:
+    expr : list
+    next-expr : list
+    scope : Scope
+define-syntax-macro define-block-scope-macro
+    let name body = (decons args)
+    list define name
+        list syntax-block-scope-macro
+            cons fn '(expr next-expr syntax-scope) body
+
+inline list-generator (self)
+    Generator
+        inline (fdone cell)
+            if (empty? cell)
+                fdone;
+            else
+                let at next = (decons cell)
+                _ next at
+        self
+
+'set-symbols list
+    __as =
+        box-cast-dispatch
+            fn "list-as" (vT T)
+                if (T == Generator)
+                    return (Value list-generator)
+                raise-compile-error! "unsupported type"
 
 inline range (a b c)
     let num-type = (typeof a)

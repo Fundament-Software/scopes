@@ -38,31 +38,30 @@ fn __test-modules (module-dir modules)
         except (err)
             io-write!
                 format-error err
+            io-write! "\n"
             false
     repeat modules
         if ok
             failed-modules
         else
             cons module failed-modules
-    return;
 
 # (test-modules module ...)
-define-macro test-modules
+define-syntax-macro test-modules
     list __test-modules 'module-dir
         list quote
             args
 
-define-macro assert-error
+define-syntax-macro assert-error
     inline test-function (f)
-        xpcall
-            inline fn ()
-                f;
-                unconst false
-            inline fn (exc)
-                io-write! "ASSERT OK: "
-                io-write!
-                    format-exception exc
-                unconst true
+        try
+            f;
+            false
+        except (err)
+            io-write! "ASSERT OK: "
+            io-write!
+                format-error err
+            true
 
     inline assertion-error! (constant anchor msg)
         let assert-msg =
@@ -74,10 +73,10 @@ define-macro assert-error
         else
             syntax-error! anchor assert-msg
     let cond body = (decons args)
-    let sxcond = (as cond Syntax)
-    let anchor = (Syntax-anchor sxcond)
+    let sxcond = cond
+    let anchor = ('anchor sxcond)
     let tmp =
-        Parameter-new anchor 'tmp Unknown
+        sc_symbol_new_unique "tmp"
     list do
         list let tmp '=
             list test-function
@@ -88,21 +87,19 @@ define-macro assert-error
                 list constant? tmp
                 active-anchor;
                 if (empty? body)
-                    list (repr (Syntax->datum sxcond))
+                    list (repr sxcond)
                 else body
 
-define-macro assert-compiler-error
+define-syntax-macro assert-compiler-error
     inline test-function (f)
-        xpcall
-            inline fn ()
-                compile
-                    typify (unconst f)
-                unconst false
-            inline fn (exc)
-                io-write! "ASSERT OK: "
-                io-write!
-                    format-exception exc
-                unconst true
+        try
+            sc_compile (typify f) 0:u64
+            false
+        except (err)
+            io-write! "ASSERT OK: "
+            io-write!
+                format-error err
+            true
 
     inline assertion-error! (constant anchor msg)
         let assert-msg =
@@ -114,10 +111,10 @@ define-macro assert-compiler-error
         else
             syntax-error! anchor assert-msg
     let cond body = (decons args)
-    let sxcond = (as cond Syntax)
-    let anchor = (Syntax-anchor sxcond)
+    let sxcond = cond
+    let anchor = ('anchor sxcond)
     let tmp =
-        Parameter-new anchor 'tmp Unknown
+        sc_symbol_new_unique "tmp"
     list do
         list let tmp '=
             list test-function
@@ -128,7 +125,7 @@ define-macro assert-compiler-error
                 list constant? tmp
                 active-anchor;
                 if (empty? body)
-                    list (repr (Syntax->datum sxcond))
+                    list (repr sxcond)
                 else body
 
 locals;
