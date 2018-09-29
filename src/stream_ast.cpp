@@ -481,9 +481,6 @@ struct StreamAST : StreamAnchors {
             stream_type_prefix(node);
             auto val = cast<CompileStage>(node);
             ss << Style_Keyword << "CompileStage" << Style_None;
-            if (newlines) {
-                walk_newline(val->func, depth+1, maxdepth);
-            }
         } break;
         default:
             stream_type_prefix(node);

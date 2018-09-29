@@ -799,68 +799,116 @@ static SCOPES_RESULT(Value *) prove_Raise(const ASTContext &ctx, Raise *_raise) 
     return newraise;
 }
 
-static SCOPES_RESULT(Value *) prove_CompileStage(const ASTContext &ctx, CompileStage *sx) {
-    SCOPES_RESULT_TYPE(Value *);
-    assert(sx->func->scope);
-    Function *frame = ctx.frame->find_frame(sx->func->scope);
-    if (!frame) {
-        SCOPES_ANCHOR(sx->func->anchor());
-        SCOPES_EXPECT_ERROR(error_cannot_find_frame(sx->func));
-    }
-#if SCOPES_DEBUG_SYNTAX_EXTEND
-    StyledStream ss(std::cout);
-    std::cout << "compile-stage non-normalized:" << std::endl;
-    stream_ast(ss, sx->func, StreamASTFormat());
-    std::cout << std::endl;
-#endif
-    Function *fn = SCOPES_GET_RESULT(prove(frame, sx->func, {TYPE_Scope}));
-#if SCOPES_DEBUG_SYNTAX_EXTEND
-    std::cout << "compile-stage normalized:" << std::endl;
-    stream_ast(ss, fn, StreamASTFormat());
-    std::cout << std::endl;
-#endif
-    //StyledStream ss;
-    //stream_ast(ss, fn, StreamASTFormat());
-    auto voidT = arguments_type({});
-    auto ftype = native_ro_pointer_type(function_type(voidT, {TYPE_Scope}));
-    const void *ptr = SCOPES_GET_RESULT(compile(fn, 0/*CF_DumpModule*/))->value;
-    Scope *env = nullptr;
-    if (fn->get_type() == ftype) {
-        typedef void (*SyntaxExtendFuncType)(Scope *);
-        SyntaxExtendFuncType fptr = (SyntaxExtendFuncType)ptr;
-        fptr(sx->env);
-        env = sx->env;
-        assert(env);
-    } else {
-        auto ftype2 = native_ro_pointer_type(raising_function_type(voidT, {TYPE_Scope}));
-        if (fn->get_type() == ftype2) {
-            typedef struct { bool ok; Error *err; } ScopeRet;
-            typedef ScopeRet (*SyntaxExtendFuncType)(Scope *);
-            SyntaxExtendFuncType fptr = (SyntaxExtendFuncType)ptr;
-            auto ret = fptr(sx->env);
-            if (ret.ok) {
-                env = sx->env;
-                assert(env);
-            } else {
-                set_last_error(ret.err);
-                SCOPES_RETURN_ERROR();
-            }
-        } else {
-            SCOPES_ANCHOR(sx->anchor());
-            StyledString ss;
-            ss.out << "compile-stage has wrong return type (expected function of type "
-                << ftype
-                << " or "
-                << ftype2
-                << ", got " << fn->get_type() << ")";
-            SCOPES_LOCATION_ERROR(ss.str());
+static Value *wrap_value(Value *value) {
+    auto globs = sc_get_original_globals();
+#define T(NAME) \
+    auto g_ ## NAME = sc_scope_at(globs, Symbol(#NAME))._1; \
+    assert(g_ ## NAME);
+
+    T(sc_const_pointer_new);
+    T(sc_const_int_new);
+    T(bitcast);
+    T(voidstar);
+    T(zext);
+    T(sext);
+    T(u64);
+
+#undef T
+
+    auto anchor = value->anchor();
+    auto T = value->get_type();
+    assert(!sc_value_is_constant(value));
+    if (!is_opaque(T)) {
+        auto ST = storage_type(T).assert_ok();
+        auto kind = ST->kind();
+        switch(kind) {
+        case TK_Pointer: {
+            return Call::from(anchor, g_sc_const_pointer_new,
+                { ConstPointer::type_from(anchor, T),
+                    Call::from(anchor, g_bitcast, { value, g_voidstar }) });
+        } break;
+        case TK_Integer: {
+            auto ti = cast<IntegerType>(ST);
+            return Call::from(anchor, g_sc_const_int_new,
+                { ConstPointer::type_from(anchor, T),
+                    Call::from(anchor, ti->issigned?g_sext:g_zext, { value,
+                    g_u64 }) });
+        } break;
+        default:
+            break;
         }
     }
-    auto anchor = sx->next?sx->next->at->anchor():fn->anchor();
-    auto nextfn = SCOPES_GET_RESULT(expand_inline(
-        ctx.frame->original,
-        ConstPointer::list_from(anchor, sx->next), env));
-    return prove(ctx, nextfn->value);
+    return nullptr;
+}
+
+static SCOPES_RESULT(Value *) prove_CompileStage(const ASTContext &ctx, CompileStage *sx) {
+    SCOPES_RESULT_TYPE(Value *);
+
+    auto globs = sc_get_original_globals();
+#define T(NAME) \
+    auto g_ ## NAME = sc_scope_at(globs, Symbol(#NAME))._1; \
+    assert(g_ ## NAME);
+
+    T(sc_scope_new_subscope);
+    T(sc_scope_set_symbol);
+    T(sc_scope_set_docstring);
+    T(sc_eval);
+
+#undef T
+
+    auto anchor = sx->anchor();
+    sc_set_active_anchor(anchor);
+    auto scope = sx->env;
+
+    auto docstr = sc_scope_get_docstring(scope, SYM_Unnamed);
+    auto constant_scope = sc_scope_new_subscope(scope);
+    if (sc_string_count(docstr)) {
+        sc_scope_set_docstring(constant_scope, SYM_Unnamed, docstr);
+    }
+
+    Symbol last_key = SYM_Unnamed;
+    auto tmp =
+        Call::from(anchor, g_sc_scope_new_subscope,
+            { ConstPointer::scope_from(sx->anchor(), constant_scope) });
+
+    auto block = Expression::from(anchor);
+    block->append(tmp);
+    while (true) {
+        auto key_value = sc_scope_next(scope, last_key);
+        auto key = key_value._0;
+        //StyledStream ss;
+        //ss << key << std::endl;
+        auto value = key_value._1;
+        if (key == SYM_Unnamed)
+            break;
+        last_key = key;
+        if (!sc_value_is_constant(value)) {
+            auto keydocstr = sc_scope_get_docstring(scope, key);
+            auto value1 = sc_extract_argument_new(value, 0);
+            auto typedvalue1 = SCOPES_GET_RESULT(prove(ctx.with_symbol_target(), value1));
+            if (sc_value_is_constant(typedvalue1)) {
+                sc_scope_set_symbol(constant_scope, key, typedvalue1);
+                sc_scope_set_docstring(constant_scope, key, keydocstr);
+            } else {
+                auto wrapvalue = wrap_value(typedvalue1);
+                if (wrapvalue) {
+                    auto vkey = ConstInt::symbol_from(anchor, key);
+                    block->append(Call::from(anchor, g_sc_scope_set_symbol, { tmp, vkey, wrapvalue }));
+                    block->append(Call::from(anchor, g_sc_scope_set_docstring, { tmp, vkey, ConstPointer::string_from(anchor, keydocstr) }));
+                }
+            }
+        }
+    }
+
+    block->append(
+        Call::from(anchor, g_sc_eval, {
+            ConstPointer::anchor_from(anchor),
+            ConstPointer::list_from(anchor, sx->next),
+            tmp })
+        );
+    //StyledStream ss;
+    //stream_ast(ss, block, StreamASTFormat());
+    return prove(ctx, block);
 }
 
 static SCOPES_RESULT(Value *) prove_Keyed(const ASTContext &ctx, Keyed *keyed) {

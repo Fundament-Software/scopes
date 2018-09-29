@@ -37,7 +37,7 @@ namespace scopes {
     T(FN_GetElementPtr) T(FN_OffsetOf) T(SFXFN_CompilerError) T(FN_VaCountOf) T(FN_VaAt) \
     T(FN_VaKeys) T(FN_VaKey) T(FN_VaValues) T(FN_CompilerMessage) T(FN_Undef) T(FN_NullOf) T(KW_Let) \
     T(KW_If) T(SFXFN_DelTypeSymbol) T(FN_ExternSymbol) \
-    T(FN_ExternNew) \
+    T(FN_ExternNew) T(FN_GetSyntaxScope) \
     T(SFXFN_Discard) \
     T(FN_TypeAt) T(FN_TypeLocalAt) T(KW_CompileStage) T(FN_Location) T(SFXFN_Unreachable) \
     T(FN_FPTrunc) T(FN_FPExt) T(FN_ScopeOf) \
@@ -467,6 +467,7 @@ namespace scopes {
     T(FN_VectorOf, "vectorof") T(FN_XPCall, "xpcall") T(FN_Zip, "zip") \
     T(FN_VectorType, "vector-type") \
     T(FN_ZipFill, "zip-fill") \
+    T(FN_GetSyntaxScope, "__this-scope") \
     \
     /* builtin and global functions with side effects */ \
     T(SFXFN_CopyMemory, "copy-memory!") \

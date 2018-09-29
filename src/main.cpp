@@ -22,6 +22,7 @@
 #include "stream_ast.hpp"
 #include "value.hpp"
 #include "compiler_flags.hpp"
+#include "dyn_cast.inc"
 
 #define SCOPESRT_IMPL
 #include "scopes/scopes.h"
@@ -273,7 +274,9 @@ SCOPES_RESULT(int) try_main(int argc, char *argv[]) {
     }
 
 skip_regular_load:
-    Template *tmpfn = SCOPES_GET_RESULT(expand_module(expr, Scope::from(globals)));
+    const Anchor *anchor = expr->anchor();
+    auto list = SCOPES_GET_RESULT(extract_list_constant(expr));
+    Template *tmpfn = SCOPES_GET_RESULT(expand_module(anchor, list, Scope::from(sc_get_globals())));
 
 #if 0 //SCOPES_DEBUG_CODEGEN
     StyledStream ss(std::cout);
@@ -286,6 +289,28 @@ skip_regular_load:
 
     auto main_func_type = pointer_type(raising_function_type(
         arguments_type({}), {}), PTF_NonWritable, SYM_Unnamed);
+
+    auto stage_func_type = pointer_type(raising_function_type(
+        arguments_type({TYPE_Value}), {}), PTF_NonWritable, SYM_Unnamed);
+
+compile_stage:
+    if (fn->get_type() == stage_func_type) {
+        typedef sc_value_raises_t (*StageFuncType)();
+        StageFuncType fptr = (StageFuncType)SCOPES_GET_RESULT(compile(fn, 0))->value;
+        SCOPES_ANCHOR(fn->anchor());
+        auto result = fptr();
+        if (!result.ok) {
+            set_last_error(result.except);
+            SCOPES_RETURN_ERROR();
+        }
+        auto value = result._0;
+        if (isa<Function>(value)) {
+            fn = cast<Function>(value);
+            goto compile_stage;
+        } else {
+            return 0;
+        }
+    }
 
     if (fn->get_type() != main_func_type) {
         SCOPES_ANCHOR(fn->anchor());

@@ -71,6 +71,13 @@ static void init_values_arrayT(std::vector<T *> &dest, int numvalues, sc_value_t
     }
 }
 
+//------------------------------------------------------------------------------
+
+static Scope *globals = nullptr;
+static Scope *original_globals = Scope::from();
+
+//------------------------------------------------------------------------------
+
 } // namespace scopes
 
 extern "C" {
@@ -96,16 +103,19 @@ sc_rawstring_i32_array_tuple_t sc_launch_args() {
 #define RETURN_VOID(X) { auto _result = (X); \
     return {_result.ok(), (_result.ok()?nullptr:get_last_error())}; }
 
-sc_value_raises_t sc_eval(sc_value_t *expr, sc_scope_t *scope) {
+sc_value_raises_t sc_eval(const sc_anchor_t *anchor, const sc_list_t *expr, sc_scope_t *scope) {
     using namespace scopes;
-    auto module_result = expand_module(expr, scope);
+    auto module_result = expand_module(anchor, expr, scope);
     if (!module_result.ok()) return { false, get_last_error(), nullptr };
     RETURN_RESULT(prove(nullptr, module_result.assert_ok(), {}));
 }
 
-sc_value_raises_t sc_eval_inline(sc_value_t *expr, sc_scope_t *scope) {
+sc_value_raises_t sc_eval_inline(const sc_anchor_t *anchor, const sc_list_t *expr, sc_scope_t *scope) {
     using namespace scopes;
-    RETURN_RESULT(expand_inline(nullptr, expr, scope));
+    //const Anchor *anchor = expr->anchor();
+    //auto list = SCOPES_GET_RESULT(extract_list_constant(expr));
+
+    RETURN_RESULT(expand_inline(anchor, nullptr, expr, scope));
 }
 
 sc_value_raises_t sc_typify(sc_closure_t *srcl, int numtypes, const sc_type_t **typeargs) {
@@ -293,6 +303,11 @@ bool sc_is_directory(const sc_string_t *path) {
 sc_scope_t *sc_get_globals() {
     using namespace scopes;
     return globals;
+}
+
+sc_scope_t *sc_get_original_globals() {
+    using namespace scopes;
+    return original_globals;
 }
 
 void sc_set_globals(sc_scope_t *s) {
@@ -599,17 +614,17 @@ sc_bool_raises_t sc_string_match(const sc_string_t *pattern, const sc_string_t *
     return { true, nullptr, (regexp::regexec(m, text->data, nullptr, 0) == 0) };
 }
 
-size_t sc_string_count(sc_string_t *str) {
+size_t sc_string_count(const sc_string_t *str) {
     using namespace scopes;
     return str->count;
 }
 
-sc_rawstring_size_t_tuple_t sc_string_buffer(sc_string_t *str) {
+sc_rawstring_size_t_tuple_t sc_string_buffer(const sc_string_t *str) {
     using namespace scopes;
     return {str->data, str->count};
 }
 
-const sc_string_t *sc_string_lslice(sc_string_t *str, size_t offset) {
+const sc_string_t *sc_string_lslice(const sc_string_t *str, size_t offset) {
     using namespace scopes;
     if (!offset) return str;
     if (offset >= str->count)
@@ -617,7 +632,7 @@ const sc_string_t *sc_string_lslice(sc_string_t *str, size_t offset) {
     return String::from(str->data + offset, str->count - offset);
 }
 
-const sc_string_t *sc_string_rslice(sc_string_t *str, size_t offset) {
+const sc_string_t *sc_string_rslice(const sc_string_t *str, size_t offset) {
     using namespace scopes;
     if (!offset) return Symbol(SYM_Unnamed).name();
     if (offset >= str->count) return str;
@@ -1359,6 +1374,7 @@ static void bind_extern(const Anchor *anchor, Symbol sym, const Type *T) {
 }
 
 void init_globals(int argc, char *argv[]) {
+    globals = original_globals;
     scopes_argc = argc;
     scopes_argv = argv;
 
@@ -1381,8 +1397,8 @@ void init_globals(int argc, char *argv[]) {
     const Type *voidstar = native_ro_pointer_type(_void);
 
     DEFINE_EXTERN_C_FUNCTION(sc_compiler_version, arguments_type({TYPE_I32, TYPE_I32, TYPE_I32}));
-    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_eval, TYPE_Value, TYPE_Value, TYPE_Scope);
-    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_eval_inline, TYPE_Value, TYPE_Value, TYPE_Scope);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_eval, TYPE_Value, TYPE_Anchor, TYPE_List, TYPE_Scope);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_eval_inline, TYPE_Anchor, TYPE_Value, TYPE_List, TYPE_Scope);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_typify, TYPE_Value, TYPE_Closure, TYPE_I32, native_ro_pointer_type(TYPE_Type));
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_compile, TYPE_Value, TYPE_Value, TYPE_U64);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_compile_spirv, TYPE_String, TYPE_Symbol, TYPE_Value, TYPE_U64);
@@ -1451,6 +1467,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_basename, TYPE_String, TYPE_String);
 
     DEFINE_EXTERN_C_FUNCTION(sc_get_globals, TYPE_Scope);
+    DEFINE_EXTERN_C_FUNCTION(sc_get_original_globals, TYPE_Scope);
     DEFINE_EXTERN_C_FUNCTION(sc_set_globals, _void, TYPE_Scope);
 
     DEFINE_EXTERN_C_FUNCTION(sc_location_error_new, TYPE_Error, TYPE_String);

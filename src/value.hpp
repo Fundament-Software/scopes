@@ -401,6 +401,8 @@ struct ConstPointer : Const {
     static ConstPointer *string_from(const Anchor *anchor, const String *str);
     static ConstPointer *ast_from(const Anchor *anchor, Value *node);
     static ConstPointer *list_from(const Anchor *anchor, const List *list);
+    static ConstPointer *scope_from(const Anchor *anchor, Scope *scope);
+    static ConstPointer *anchor_from(const Anchor *anchor);
 
     const void *value;
 };
@@ -490,11 +492,10 @@ struct Raise : Instruction {
 struct CompileStage : Value {
     static bool classof(const Value *T);
 
-    CompileStage(const Anchor *anchor, Template *func, const List *next, Scope *env);
+    CompileStage(const Anchor *anchor, const List *next, Scope *env);
 
-    static CompileStage *from(const Anchor *anchor, Template *func, const List *next, Scope *env);
+    static CompileStage *from(const Anchor *anchor, const List *next, Scope *env);
 
-    Template *func;
     const List *next;
     Scope *env;
 };

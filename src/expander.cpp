@@ -110,29 +110,9 @@ struct Expander {
         SCOPES_RESULT_TYPE(Value *);
         auto _anchor = get_active_anchor();
 
-        SCOPES_CHECK_RESULT(verify_list_parameter_count("compile-stage", it, 1, -1));
+        SCOPES_CHECK_RESULT(verify_list_parameter_count("compile-stage", it, 0, 0));
 
-        // skip head
-        it = it->next;
-
-        auto scopeparam = Parameter::from(_anchor, SYM_Unnamed, TYPE_Scope);
-        Template *func = Template::from(_anchor, Symbol(KW_CompileStage), {scopeparam});
-        func->scope = astscope;
-
-        Scope *subenv = Scope::from(env);
-        subenv->bind(Symbol(SYM_SyntaxScope), scopeparam);
-
-        Expander subexpr(subenv, func);
-
-        auto expr = SCOPES_GET_RESULT(subexpr.expand_expression(_anchor, it));
-        if (isa<Expression>(expr)) {
-            auto ex = cast<Expression>(expr);
-            ex->append(ArgumentList::from(_anchor));
-        }
-
-        func->value = expr;
-
-        auto node = CompileStage::from(_anchor, func, next, env);
+        auto node = CompileStage::from(_anchor, next, env);
         next = EOL;
         return node;
     }
@@ -865,6 +845,9 @@ struct Expander {
             if (headT == TYPE_Builtin) {
                 Builtin func = SCOPES_GET_RESULT(extract_builtin_constant(head));
                 switch(func.value()) {
+                case FN_GetSyntaxScope:
+                    SCOPES_CHECK_RESULT(verify_list_parameter_count("this-scope", list, 0, 0));
+                    return ConstPointer::scope_from(node->anchor(), env);
                 case KW_SyntaxLog: return expand_syntax_log(list);
                 case KW_Fn: {
                     return expand_fn(list, ExpandFnSetup());
@@ -992,34 +975,34 @@ struct Expander {
 bool Expander::verbose = false;
 const Type *Expander::list_expander_func_type = nullptr;
 
-SCOPES_RESULT(Template *) expand_inline(Template *astscope, Value *expr, Scope *scope) {
+SCOPES_RESULT(Template *) expand_inline(const Anchor *anchor, Template *astscope, const List *expr, Scope *scope) {
     SCOPES_RESULT_TYPE(Template *);
     Timer sum_expand_time(TIMER_Expand);
-    const Anchor *anchor = expr->anchor();
-    auto list = SCOPES_GET_RESULT(extract_list_constant(expr));
+    //const Anchor *anchor = expr->anchor();
+    //auto list = SCOPES_GET_RESULT(extract_list_constant(expr));
     assert(anchor);
     Template *mainfunc = Template::from(anchor, SYM_Unnamed);
     mainfunc->set_inline();
     mainfunc->scope = astscope;
 
-    Scope *subenv = scope?scope:globals;
+    Scope *subenv = scope?scope:sc_get_globals();
     Expander subexpr(subenv, astscope);
-    mainfunc->value = SCOPES_GET_RESULT(subexpr.expand_expression(anchor, list));
+    mainfunc->value = SCOPES_GET_RESULT(subexpr.expand_expression(anchor, expr));
 
     return mainfunc;
 }
 
-SCOPES_RESULT(Template *) expand_module(Value *expr, Scope *scope) {
+SCOPES_RESULT(Template *) expand_module(const Anchor *anchor, const List *expr, Scope *scope) {
     SCOPES_RESULT_TYPE(Template *);
     Timer sum_expand_time(TIMER_Expand);
-    const Anchor *anchor = expr->anchor();
-    auto list = SCOPES_GET_RESULT(extract_list_constant(expr));
+    //const Anchor *anchor = expr->anchor();
+    //auto list = SCOPES_GET_RESULT(extract_list_constant(expr));
     assert(anchor);
     Template *mainfunc = Template::from(anchor, anchor->path());
 
-    Scope *subenv = scope?scope:globals;
+    Scope *subenv = scope?scope:sc_get_globals();
     Expander subexpr(subenv, mainfunc);
-    mainfunc->value = SCOPES_GET_RESULT(subexpr.expand_expression(anchor, list));
+    mainfunc->value = SCOPES_GET_RESULT(subexpr.expand_expression(anchor, expr));
 
     return mainfunc;
 }

@@ -139,7 +139,7 @@ typedef sc_value_raises_t (*sc_ast_macro_func_t)(int, sc_value_t **);
 // compiler
 
 sc_i32_i32_i32_tuple_t sc_compiler_version();
-sc_value_raises_t sc_eval(sc_value_t *expr, sc_scope_t *scope);
+sc_value_raises_t sc_eval(const sc_anchor_t *anchor, const sc_list_t *expr, sc_scope_t *scope);
 sc_value_raises_t sc_typify(sc_closure_t *srcl, int numtypes, const sc_type_t **typeargs);
 sc_value_raises_t sc_compile(sc_value_t *srcl, uint64_t flags);
 sc_string_raises_t sc_compile_spirv(sc_symbol_t target, sc_value_t *srcl, uint64_t flags);
@@ -147,7 +147,7 @@ sc_string_raises_t sc_compile_glsl(sc_symbol_t target, sc_value_t *srcl, uint64_
 sc_void_raises_t sc_compile_object(const sc_string_t *path, sc_scope_t *table, uint64_t flags);
 void sc_enter_solver_cli ();
 sc_size_raises_t sc_verify_stack ();
-sc_value_raises_t sc_eval_inline(sc_value_t *expr, sc_scope_t *scope);
+sc_value_raises_t sc_eval_inline(const sc_anchor_t *anchor, const sc_list_t *expr, sc_scope_t *scope);
 sc_rawstring_i32_array_tuple_t sc_launch_args();
 
 // value
@@ -232,6 +232,7 @@ bool sc_is_directory(const sc_string_t *path);
 // globals
 
 sc_scope_t *sc_get_globals();
+sc_scope_t *sc_get_original_globals();
 void sc_set_globals(sc_scope_t *s);
 
 // error handling
@@ -292,10 +293,10 @@ const sc_string_t *sc_string_new(const char *ptr, size_t count);
 const sc_string_t *sc_string_new_from_cstr(const char *ptr);
 const sc_string_t *sc_string_join(const sc_string_t *a, const sc_string_t *b);
 sc_bool_raises_t sc_string_match(const sc_string_t *pattern, const sc_string_t *text);
-size_t sc_string_count(sc_string_t *str);
-sc_rawstring_size_t_tuple_t sc_string_buffer(sc_string_t *str);
-const sc_string_t *sc_string_lslice(sc_string_t *str, size_t offset);
-const sc_string_t *sc_string_rslice(sc_string_t *str, size_t offset);
+size_t sc_string_count(const sc_string_t *str);
+sc_rawstring_size_t_tuple_t sc_string_buffer(const sc_string_t *str);
+const sc_string_t *sc_string_lslice(const sc_string_t *str, size_t offset);
+const sc_string_t *sc_string_rslice(const sc_string_t *str, size_t offset);
 
 // lists
 

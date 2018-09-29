@@ -218,10 +218,6 @@ Scope *Scope::from(Scope *_parent, Scope *_borrow) {
 
 //------------------------------------------------------------------------------
 
-Scope *globals = Scope::from();
-
-//------------------------------------------------------------------------------
-
 StyledStream& operator<<(StyledStream& ost, Scope *scope) {
     scope->stream(ost);
     return ost;

@@ -72,8 +72,6 @@ public:
     static Scope *from(Scope *_parent = nullptr, Scope *_borrow = nullptr);
 };
 
-extern Scope *globals;
-
 } // namespace scopes
 
 #endif // SCOPES_SCOPE_HPP

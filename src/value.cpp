@@ -454,6 +454,14 @@ ConstPointer *ConstPointer::list_from(const Anchor *anchor, const List *list) {
     return from(anchor, TYPE_List, list);
 }
 
+ConstPointer *ConstPointer::scope_from(const Anchor *anchor, Scope *scope) {
+    return from(anchor, TYPE_Scope, scope);
+}
+
+ConstPointer *ConstPointer::anchor_from(const Anchor *anchor) {
+    return from(anchor, TYPE_Anchor, anchor);
+}
+
 //------------------------------------------------------------------------------
 
 Break::Break(const Anchor *anchor, Value *_value)
@@ -493,12 +501,12 @@ Raise *Raise::from(const Anchor *anchor, Value *value) {
 
 //------------------------------------------------------------------------------
 
-CompileStage::CompileStage(const Anchor *anchor, Template *_func, const List *_next, Scope *_env)
-    : Value(VK_CompileStage, anchor), func(_func), next(_next), env(_env) {
+CompileStage::CompileStage(const Anchor *anchor, const List *_next, Scope *_env)
+    : Value(VK_CompileStage, anchor), next(_next), env(_env) {
 }
 
-CompileStage *CompileStage::from(const Anchor *anchor, Template *func, const List *next, Scope *env) {
-    return new CompileStage(anchor, func, next, env);
+CompileStage *CompileStage::from(const Anchor *anchor, const List *next, Scope *env) {
+    return new CompileStage(anchor, next, env);
 }
 
 //------------------------------------------------------------------------------

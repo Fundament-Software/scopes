@@ -32,14 +32,13 @@ fn __test-modules (module-dir modules)
     print "* running" (module as string)
     print "***********************************************"
     let ok =
-        xpcall
-            inline fn ()
-                require-from module-dir module
-                unconst true
-            inline fn (exc)
-                io-write!
-                    format-exception exc
-                unconst false
+        try
+            require-from module-dir module
+            true
+        except (err)
+            io-write!
+                format-error err
+            false
     repeat modules
         if ok
             failed-modules
