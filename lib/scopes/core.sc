@@ -346,7 +346,15 @@ let Value-array =
                     store arr (getelementptr gepargs 0)
                     store (box-integer i) (getelementptr gepargs 1)
                     let storeargs = (alloca-array Value 2)
-                    store (load (getelementptr argv i)) (getelementptr storeargs 0)
+                    let arg = (load (getelementptr argv i))
+
+                    store
+                        if (ptrcmp!= (sc_value_type arg) Value)
+                            let callargs = (alloca-array Value 1)
+                            store arg (getelementptr callargs 0)
+                            sc_call_new (box-pointer Value) 1 callargs
+                        else arg
+                        getelementptr storeargs 0
                     store
                         sc_call_new (box-symbol getelementptr) 2 gepargs
                         getelementptr storeargs 1
@@ -752,8 +760,8 @@ inline set-symbols (self values...)
 
 let rawstring = ('pointer i8)
 
-inline box-cast-dispatch (f)
-    box-pointer (typify f type type)
+inline box-cast (f)
+    box-pointer (typify f type type Value)
 
 inline not (value)
     bxor value true
@@ -807,45 +815,49 @@ inline unbox (value T)
     unbox-verify (sc_value_type value) T
     __unbox value T
 
-fn value-imply (vT T)
+fn value-imply (vT T expr)
     if true
-        return (box-pointer unbox)
+        return
+            sc_call_new (Value unbox)
+                Value-array expr (Value T)
     raise-compile-error! "unsupported type"
-
-inline value-rimply (cls value)
-    Value value
 
 'set-symbols Value
     __imply =
-        box-cast-dispatch value-imply
+        box-cast value-imply
     __rimply =
-        box-cast-dispatch
-            fn "syntax-imply" (T vT)
+        box-cast
+            fn "syntax-imply" (T vT expr)
                 if true
-                    return (Value value-rimply)
+                    return
+                        sc_call_new (Value Value)
+                            Value-array expr
                 raise-compile-error! "unsupported type"
 
 # integer casting
 
-fn integer-imply (vT T)
-    let T =
+fn integer-imply (vT T expr)
+    let ST =
         if (ptrcmp== T usize) ('storage T)
         else T
-    if (icmp== ('kind T) type-kind-integer)
+    if (icmp== ('kind ST) type-kind-integer)
+        let args... = (Value-array expr T)
         let valw = ('bitcount vT)
-        let destw = ('bitcount T)
+        let destw = ('bitcount ST)
         # must have same signed bit
-        if (icmp== ('signed? vT) ('signed? T))
+        if (icmp== ('signed? vT) ('signed? ST))
             if (icmp== destw valw)
-                return (box-symbol bitcast)
+                return
+                    sc_call_new (Value bitcast) args...
             elseif (icmp>s destw valw)
                 if ('signed? vT)
-                    return (box-symbol sext)
+                    sc_call_new (Value sext) args...
                 else
-                    return (box-symbol zext)
+                    sc_call_new (Value zext) args...
     raise-compile-error! "unsupported type"
 
-fn integer-as (vT T)
+fn integer-as (vT T expr)
+    let args... = (Value-array expr T)
     let T =
         if (ptrcmp== T usize) ('storage T)
         else T
@@ -856,16 +868,21 @@ fn integer-as (vT T)
             return (box-symbol bitcast)
         elseif (icmp>s destw valw)
             if ('signed? vT)
-                return (box-symbol sext)
+                return
+                    sc_call_new (Value sext) args...
             else
-                return (box-symbol zext)
+                return
+                    sc_call_new (Value zext) args...
         else
-            return (box-symbol itrunc)
+            return
+                sc_call_new (Value itrunc) args...
     elseif (icmp== ('kind T) type-kind-real)
         if ('signed? vT)
-            return (box-symbol sitofp)
+            return
+                sc_call_new (Value sitofp) args...
         else
-            return (box-symbol uitofp)
+            return
+                sc_call_new (Value uitofp) args...
     raise-compile-error! "unsupported type"
 
 inline box-binary-op-dispatch (f)
@@ -894,11 +911,13 @@ inline gen-cast-error (intro-string)
                                 '__repr (box-pointer T)
             undef Value
 
-let DispatchCastFunctionType =
-    'pointer ('raising (function Value type type) Error)
+# receive a source type, a destination type and an expression, and return an
+    untyped expression that transforms the value to said type, or raise an error
+let CastFunctionType =
+    'pointer ('raising (function Value type type Value) Error)
 
-fn unbox-dispatch-cast-function-type (anyf)
-    unbox-pointer anyf DispatchCastFunctionType
+fn unbox-cast-function-type (anyf)
+    unbox-pointer anyf CastFunctionType
 
 fn attribute-format-error! (T symbol err)
     raise-compile-error!
@@ -909,35 +928,35 @@ fn attribute-format-error! (T symbol err)
                         'join ": "
                             sc_format_error err
 
-fn get-cast-dispatcher (symbol rsymbol vT T)
+fn cast-expr (symbol rsymbol vT T expr)
     let ok anyf = ('@ vT symbol)
     if ok
         let f =
             try
-                unbox-dispatch-cast-function-type anyf
+                unbox-cast-function-type anyf
             except (err)
                 attribute-format-error! vT symbol err
         try
-            return true (f vT T) false
+            return true (f vT T expr)
         except (err)
             # ignore
     let ok anyf = ('@ T rsymbol)
     if ok
         let f =
             try
-                unbox-dispatch-cast-function-type anyf
+                unbox-cast-function-type anyf
             except (err)
                 attribute-format-error! T rsymbol err
         try
-            return true (f T vT) true
+            return true (f T vT expr)
         except (err)
             # ignore
-    return false (undef Value) false
+    return false (nullof Value)
 
-fn implyfn (vT T)
-    get-cast-dispatcher '__imply '__rimply vT T
-fn asfn (vT T)
-    get-cast-dispatcher '__as '__ras vT T
+fn imply-expr (vT T expr)
+    cast-expr '__imply '__rimply vT T expr
+fn as-expr (vT T expr)
+    cast-expr '__as '__ras vT T expr
 
 let
     imply =
@@ -948,14 +967,8 @@ let
                 let vT = ('typeof value)
                 let T = (unbox-pointer anyT type)
                 if (ptrcmp!= vT T)
-                    let ok f reverse = (implyfn vT T)
-                    if ok
-                        sc_call_new f
-                            Value-array
-                                if reverse
-                                    _ anyT value
-                                else
-                                    _ value anyT
+                    let ok expr = (imply-expr vT T value)
+                    if ok expr
                     else
                         sc_call_new
                             box-pointer
@@ -971,21 +984,15 @@ let
                 let vT = ('typeof value)
                 let T = (unbox-pointer anyT type)
                 if (ptrcmp!= vT T)
-                    let ok f reverse =
+                    let ok expr =
                         do
                             # try implicit cast first
-                            let ok f reverse = (implyfn vT T)
-                            if ok (_ ok f reverse)
+                            let ok expr = (imply-expr vT T value)
+                            if ok (_ ok expr)
                             else
                                 # then try explicit cast
-                                asfn vT T
-                    if ok
-                        sc_call_new f
-                            Value-array
-                                if reverse
-                                    _ anyT value
-                                else
-                                    _ value anyT
+                                as-expr vT T value
+                    if ok expr
                     else
                         sc_call_new
                             box-pointer
@@ -1042,25 +1049,20 @@ fn sym-binary-op-label-macro (argc argv symbol rsymbol friendly-op-name)
         let ok f = (get-binary-op-dispatcher symbol lhsT lhsT)
         if ok
             # can we cast rhsT to lhsT?
-            let ok castf reverse = (implyfn rhsT lhsT)
+            let ok rhs = (imply-expr rhsT lhsT rhs)
             if ok
-                if (not reverse)
-                    return
-                        sc_call_new f
-                            Value-array lhs
-                                binary-op-cast-macro castf lhsT rhs
+                return
+                    sc_call_new f
+                        Value-array lhs rhs
         # can the operation be performed on the rhs type?
         let ok f = (get-binary-op-dispatcher symbol rhsT rhsT)
         if ok
             # can we cast lhsT to rhsT?
-            let ok castf reverse = (implyfn lhsT rhsT)
+            let ok lhs = (imply-expr lhsT rhsT lhs)
             if ok
-                if (not reverse)
-                    return
-                        sc_call_new f
-                            Value-array
-                                binary-op-cast-macro castf rhsT lhs
-                                rhs
+                return
+                    sc_call_new f
+                        Value-array lhs rhs
     # we give up
     raise-compile-error!
         'join "can't "
@@ -1083,13 +1085,11 @@ fn asym-binary-op-label-macro (argc argv symbol rtype friendly-op-name)
             return
                 sc_call_new f argc argv
         # can we cast rhsT to rtype?
-        let ok castf reverse = (implyfn rhsT rtype)
+        let ok rhs = (imply-expr rhsT rtype rhs)
         if ok
-            if (not reverse)
-                return
-                    sc_call_new f
-                        Value-array lhs
-                            binary-op-cast-macro castf rtype rhs
+            return
+                sc_call_new f
+                    Value-array lhs rhs
     # we give up
     raise-compile-error!
         'join "can't "
@@ -1130,17 +1130,16 @@ inline make-asym-binary-op-dispatch (symbol rtype friendly-op-name)
             inline (self at next scope)
                 (bitcast self SyntaxMacroFunctionType) at next scope
 
-inline symbol-imply (self destT)
-    sc_symbol_to_string self
-
 'set-symbols Symbol
     __== = (box-binary-op-dispatch (single-binary-op-dispatch icmp==))
     __!= = (box-binary-op-dispatch (single-binary-op-dispatch icmp!=))
     __imply =
-        box-cast-dispatch
-            fn "syntax-imply" (vT T)
+        box-cast
+            fn "syntax-imply" (vT T expr)
                 if (ptrcmp== T string)
-                    return (Value symbol-imply)
+                    return
+                        sc_call_new (Value sc_symbol_to_string)
+                            Value-array expr
                 raise-compile-error! "unsupported type"
 
 fn string@ (self i)
@@ -1198,8 +1197,8 @@ fn dispatch-and-or (argc argv flip)
     ifval
 
 'set-symbols integer
-    __imply = (box-cast-dispatch integer-imply)
-    __as = (box-cast-dispatch integer-as)
+    __imply = (box-cast integer-imply)
+    __as = (box-cast integer-as)
     __+ = (box-binary-op-dispatch (single-binary-op-dispatch add))
     __- = (box-binary-op-dispatch (single-binary-op-dispatch sub))
     __* = (box-binary-op-dispatch (single-binary-op-dispatch mul))
@@ -1324,10 +1323,11 @@ sc_typename_type_set_storage NullType ('pointer void)
             inline (self)
                 sc_default_styler style-number "null"
     __imply =
-        box-cast-dispatch
-            fn "null-imply" (clsT T)
+        box-cast
+            fn "null-imply" (clsT T expr)
                 if (icmp== ('kind ('storage T)) type-kind-pointer)
-                    return (Value bitcast)
+                    return
+                        sc_call_new (Value bitcast) (Value-array expr T)
                 raise-compile-error! "cannot convert to type"
     #__==
         fn (a b flipped)
@@ -1343,8 +1343,8 @@ sc_typename_type_set_storage NullType ('pointer void)
 let
     and-branch = (ast-macro (fn (argc argv) (dispatch-and-or argc argv true)))
     or-branch = (ast-macro (fn (argc argv) (dispatch-and-or argc argv false)))
-    implyfn = (typify implyfn type type)
-    asfn = (typify asfn type type)
+    #implyfn = (typify implyfn type type)
+    #asfn = (typify asfn type type)
     countof = (make-unary-op-dispatch '__countof "count")
     ~ = (make-unary-op-dispatch '__~ "bitwise-negate")
     == = (make-sym-binary-op-dispatch '__== '__r== "compare")
@@ -1563,15 +1563,16 @@ fn pointer-type-imply? (src dest)
         return true
     return false
 
-fn pointer-imply (vT T)
+fn pointer-imply (vT T expr)
     if (icmp== ('kind T) type-kind-pointer)
         if (pointer-type-imply? vT T)
-            return (Value bitcast)
+            return
+                sc_call_new (Value bitcast) (Value-array expr T)
     raise-compile-error! "unsupported type"
 
 'set-symbols pointer
     __call = coerce-call-arguments
-    __imply = (box-cast-dispatch pointer-imply)
+    __imply = (box-cast pointer-imply)
 
 # dotted symbol expander
 # --------------------------------------------------------------------------
@@ -2527,10 +2528,11 @@ inline list-generator (self)
 
 'set-symbols list
     __as =
-        box-cast-dispatch
-            fn "list-as" (vT T)
+        box-cast
+            fn "list-as" (vT T expr)
                 if (T == Generator)
-                    return (Value list-generator)
+                    return
+                        sc_call_new (Value list-generator) (Value-array expr)
                 raise-compile-error! "unsupported type"
 
 inline range (a b c)
@@ -2658,7 +2660,7 @@ let arrayof =
                 let arg = (load (getelementptr argv (add i 1)))
                 repeat (i + 1)
                     sc_call_new insertvalue
-                        Value-array result arg (Value i)
+                        Value-array result arg i
             result
 
 compile-stage;
