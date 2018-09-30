@@ -827,7 +827,7 @@ fn value-imply (vT T expr)
         box-cast value-imply
     __rimply =
         box-cast
-            fn "syntax-imply" (T vT expr)
+            fn "syntax-imply" (vT T expr)
                 if true
                     return
                         sc_call_new (Value Value)
@@ -885,12 +885,13 @@ fn integer-as (vT T expr)
                 sc_call_new (Value uitofp) args...
     raise-compile-error! "unsupported type"
 
-inline box-binary-op-dispatch (f)
-    box-pointer (typify f type type)
+inline box-binary-op (f)
+    box-pointer (typify f type type Value Value)
 inline single-binary-op-dispatch (destf)
-    fn (lhsT rhsT)
+    fn (lhsT rhsT lhs rhs)
         if (ptrcmp== lhsT rhsT)
-            return (Value destf)
+            return
+                sc_call_new (Value destf) (Value-array lhs rhs)
         raise-compile-error! "unsupported type"
 
 inline gen-cast-error (intro-string)
@@ -948,7 +949,7 @@ fn cast-expr (symbol rsymbol vT T expr)
             except (err)
                 attribute-format-error! T rsymbol err
         try
-            return true (f T vT expr)
+            return true (f vT T expr)
         except (err)
             # ignore
     return false (nullof Value)
@@ -1000,16 +1001,13 @@ let
                             \ argc argv
                 else value
 
-let UnaryOpFunctionType =
-    'pointer ('raising (function Value type) Error)
-
 let BinaryOpFunctionType =
-    'pointer ('raising (function Value type type) Error)
+    'pointer ('raising (function Value type type Value Value) Error)
 
 fn unbox-binary-op-function-type (anyf)
     unbox-pointer anyf BinaryOpFunctionType
 
-fn get-binary-op-dispatcher (symbol lhsT rhsT)
+fn binary-op-expr (symbol lhsT rhsT lhs rhs)
     let ok anyf = ('@ lhsT symbol)
     if ok
         let f =
@@ -1017,15 +1015,31 @@ fn get-binary-op-dispatcher (symbol lhsT rhsT)
             except (err)
                 attribute-format-error! lhsT symbol err
         try
-            return true (f lhsT rhsT)
+            return true (f lhsT rhsT lhs rhs)
         except (err)
-    return false (undef Value)
+    return false (nullof Value)
 
-fn binary-op-cast-macro (castf lhsT rhs)
-    let args = (alloca-array Value 2)
-    store rhs (getelementptr args 0)
-    store (box-pointer lhsT) (getelementptr args 1)
-    sc_call_new castf 2 args
+fn sym-binary-op-expr (symbol rsymbol lhsT rhsT lhs rhs)
+    let ok anyf = ('@ lhsT symbol)
+    if ok
+        let f =
+            try (unbox-binary-op-function-type anyf)
+            except (err)
+                attribute-format-error! lhsT symbol err
+        try
+            return true (f lhsT rhsT lhs rhs)
+        except (err)
+    if (ptrcmp!= lhsT rhsT)
+        let ok anyf = ('@ rhsT rsymbol)
+        if ok
+            let f =
+                try (unbox-binary-op-function-type anyf)
+                except (err)
+                    attribute-format-error! rhsT rsymbol err
+            try
+                return true (f lhsT rhsT lhs rhs)
+            except (err)
+    return false (nullof Value)
 
 # both types are typically the same
 fn sym-binary-op-label-macro (argc argv symbol rsymbol friendly-op-name)
@@ -1034,35 +1048,27 @@ fn sym-binary-op-label-macro (argc argv symbol rsymbol friendly-op-name)
     let lhsT = ('typeof lhs)
     let rhsT = ('typeof rhs)
     # try direct version first
-    let ok f = (get-binary-op-dispatcher symbol lhsT rhsT)
+    let ok expr = (sym-binary-op-expr symbol rsymbol lhsT rhsT lhs rhs)
     if ok
-        return
-            sc_call_new f argc argv
+        return expr
     # if types are unequal, we can try other options
     if (ptrcmp!= lhsT rhsT)
-        # try reverse version next
-        let ok f = (get-binary-op-dispatcher rsymbol rhsT lhsT)
-        if ok
-            return
-                sc_call_new f (Value-array rhs lhs)
-        # can the operation be performed on the lhs type?
-        let ok f = (get-binary-op-dispatcher symbol lhsT lhsT)
-        if ok
+        do
             # can we cast rhsT to lhsT?
             let ok rhs = (imply-expr rhsT lhsT rhs)
             if ok
-                return
-                    sc_call_new f
-                        Value-array lhs rhs
-        # can the operation be performed on the rhs type?
-        let ok f = (get-binary-op-dispatcher symbol rhsT rhsT)
-        if ok
+                # try again
+                let ok expr = (binary-op-expr symbol lhsT lhsT lhs rhs)
+                if ok
+                    return expr
+        do
             # can we cast lhsT to rhsT?
             let ok lhs = (imply-expr lhsT rhsT lhs)
             if ok
-                return
-                    sc_call_new f
-                        Value-array lhs rhs
+                # try again
+                let ok expr = (binary-op-expr symbol rhsT rhsT lhs rhs)
+                if ok
+                    return expr
     # we give up
     raise-compile-error!
         'join "can't "
@@ -1131,8 +1137,8 @@ inline make-asym-binary-op-dispatch (symbol rtype friendly-op-name)
                 (bitcast self SyntaxMacroFunctionType) at next scope
 
 'set-symbols Symbol
-    __== = (box-binary-op-dispatch (single-binary-op-dispatch icmp==))
-    __!= = (box-binary-op-dispatch (single-binary-op-dispatch icmp!=))
+    __== = (box-binary-op (single-binary-op-dispatch icmp==))
+    __!= = (box-binary-op (single-binary-op-dispatch icmp!=))
     __imply =
         box-cast
             fn "syntax-imply" (vT T expr)
@@ -1152,9 +1158,9 @@ fn string@ (self i)
             extractvalue self index
 
 'set-symbols string
-    __== = (box-binary-op-dispatch (single-binary-op-dispatch ptrcmp==))
-    __!= = (box-binary-op-dispatch (single-binary-op-dispatch ptrcmp!=))
-    __.. = (box-binary-op-dispatch (single-binary-op-dispatch sc_string_join))
+    __== = (box-binary-op (single-binary-op-dispatch ptrcmp==))
+    __!= = (box-binary-op (single-binary-op-dispatch ptrcmp!=))
+    __.. = (box-binary-op (single-binary-op-dispatch sc_string_join))
     __countof = sc_string_count
     __@ = string@
     __lslice = sc_string_lslice
@@ -1164,18 +1170,21 @@ fn string@ (self i)
     __typecall =
         inline (self args...)
             make-list args...
-    __.. = (box-binary-op-dispatch (single-binary-op-dispatch sc_list_join))
+    __.. = (box-binary-op (single-binary-op-dispatch sc_list_join))
     __repr =
         inline "list-repr" (self)
             '__repr (Value self)
 
 inline single-signed-binary-op-dispatch (sf uf)
-    fn (lhsT rhsT)
+    fn (lhsT rhsT lhs rhs)
         if (ptrcmp== lhsT rhsT)
-            if ('signed? lhsT)
-                return (Value sf)
-            else
-                return (Value uf)
+            return
+                sc_call_new
+                    if ('signed? lhsT)
+                        Value sf
+                    else
+                        Value uf
+                    Value-array lhs rhs
         raise-compile-error! "unsupported type"
 
 fn dispatch-and-or (argc argv flip)
@@ -1199,23 +1208,23 @@ fn dispatch-and-or (argc argv flip)
 'set-symbols integer
     __imply = (box-cast integer-imply)
     __as = (box-cast integer-as)
-    __+ = (box-binary-op-dispatch (single-binary-op-dispatch add))
-    __- = (box-binary-op-dispatch (single-binary-op-dispatch sub))
-    __* = (box-binary-op-dispatch (single-binary-op-dispatch mul))
-    __// = (box-binary-op-dispatch (single-signed-binary-op-dispatch sdiv udiv))
-    __% = (box-binary-op-dispatch (single-signed-binary-op-dispatch srem urem))
-    __& = (box-binary-op-dispatch (single-binary-op-dispatch band))
-    __| = (box-binary-op-dispatch (single-binary-op-dispatch bor))
-    __^ = (box-binary-op-dispatch (single-binary-op-dispatch bxor))
+    __+ = (box-binary-op (single-binary-op-dispatch add))
+    __- = (box-binary-op (single-binary-op-dispatch sub))
+    __* = (box-binary-op (single-binary-op-dispatch mul))
+    __// = (box-binary-op (single-signed-binary-op-dispatch sdiv udiv))
+    __% = (box-binary-op (single-signed-binary-op-dispatch srem urem))
+    __& = (box-binary-op (single-binary-op-dispatch band))
+    __| = (box-binary-op (single-binary-op-dispatch bor))
+    __^ = (box-binary-op (single-binary-op-dispatch bxor))
     #__~ =
-    __<< = (box-binary-op-dispatch (single-binary-op-dispatch shl))
-    __>> = (box-binary-op-dispatch (single-signed-binary-op-dispatch ashr lshr))
-    __== = (box-binary-op-dispatch (single-binary-op-dispatch icmp==))
-    __!= = (box-binary-op-dispatch (single-binary-op-dispatch icmp!=))
-    __< = (box-binary-op-dispatch (single-signed-binary-op-dispatch icmp<s icmp<u))
-    __<= = (box-binary-op-dispatch (single-signed-binary-op-dispatch icmp<=s icmp<=u))
-    __> = (box-binary-op-dispatch (single-signed-binary-op-dispatch icmp>s icmp>u))
-    __>= = (box-binary-op-dispatch (single-signed-binary-op-dispatch icmp>=s icmp>=u))
+    __<< = (box-binary-op (single-binary-op-dispatch shl))
+    __>> = (box-binary-op (single-signed-binary-op-dispatch ashr lshr))
+    __== = (box-binary-op (single-binary-op-dispatch icmp==))
+    __!= = (box-binary-op (single-binary-op-dispatch icmp!=))
+    __< = (box-binary-op (single-signed-binary-op-dispatch icmp<s icmp<u))
+    __<= = (box-binary-op (single-signed-binary-op-dispatch icmp<=s icmp<=u))
+    __> = (box-binary-op (single-signed-binary-op-dispatch icmp>s icmp>u))
+    __>= = (box-binary-op (single-signed-binary-op-dispatch icmp>=s icmp>=u))
 
 fn type-getattr-dynamic (T value)
     let ok val = (sc_type_at T value)
@@ -1224,12 +1233,12 @@ fn type-getattr-dynamic (T value)
     raise-compile-error! "no such attribute"
 
 'set-symbols type
-    __== = (box-binary-op-dispatch (single-binary-op-dispatch type==))
-    __!= = (box-binary-op-dispatch (single-binary-op-dispatch type!=))
-    __< = (box-binary-op-dispatch (single-binary-op-dispatch type<))
-    __<= = (box-binary-op-dispatch (single-binary-op-dispatch type<=))
-    __> = (box-binary-op-dispatch (single-binary-op-dispatch type>))
-    __>= = (box-binary-op-dispatch (single-binary-op-dispatch type>=))
+    __== = (box-binary-op (single-binary-op-dispatch type==))
+    __!= = (box-binary-op (single-binary-op-dispatch type!=))
+    __< = (box-binary-op (single-binary-op-dispatch type<))
+    __<= = (box-binary-op (single-binary-op-dispatch type<=))
+    __> = (box-binary-op (single-binary-op-dispatch type>))
+    __>= = (box-binary-op (single-binary-op-dispatch type>=))
     __@ = sc_type_element_at
     # (dispatch-attr T key thenf elsef)
     dispatch-attr =
@@ -1268,7 +1277,7 @@ fn scope-getattr-dynamic (T value)
     raise-compile-error! "no such attribute"
 
 'set-symbols Scope
-    __== = (box-binary-op-dispatch (single-binary-op-dispatch ptrcmp==))
+    __== = (box-binary-op (single-binary-op-dispatch ptrcmp==))
     __getattr =
         box-ast-macro
             fn "scope-getattr" (argc argv)
@@ -1952,13 +1961,8 @@ fn clone-scope-contents (a b)
 
 'set-symbols Scope
     __.. =
-        Value
-            typify
-                fn (lhsT rhsT)
-                    if (ptrcmp== lhsT rhsT)
-                        return (Value clone-scope-contents)
-                    raise-compile-error! "unsupported type"
-                \ type type
+        box-binary-op
+            single-binary-op-dispatch clone-scope-contents
 
 let constant? =
     ast-macro
