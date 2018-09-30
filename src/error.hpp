@@ -60,6 +60,7 @@ void stream_error_string(StyledStream &ss, const Error *value);
 
 void set_last_location_error(const String *msg);
 Error *make_location_error(const String *msg);
+Error *make_location_error(const Anchor *anchor, const String *msg);
 Error *make_runtime_error(const String *msg);
 
 #if SCOPES_EARLY_ABORT

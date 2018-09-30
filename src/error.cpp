@@ -128,6 +128,10 @@ Error *make_location_error(const String *msg) {
     return new Error(_active_anchor, msg);
 }
 
+Error *make_location_error(const Anchor *anchor, const String *msg) {
+    return new Error(anchor, msg);
+}
+
 Error *make_runtime_error(const String *msg) {
     return new Error(nullptr, msg);
 }

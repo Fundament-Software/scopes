@@ -322,9 +322,9 @@ void sc_set_globals(sc_scope_t *s) {
 // Error Handling
 ////////////////////////////////////////////////////////////////////////////////
 
-sc_error_t *sc_location_error_new(const sc_string_t *msg) {
+sc_error_t *sc_location_error_new(const sc_anchor_t *anchor, const sc_string_t *msg) {
     using namespace scopes;
-    return make_location_error(msg);
+    return make_location_error(anchor, msg);
 }
 sc_error_t *sc_runtime_error_new(const sc_string_t *msg) {
     using namespace scopes;
@@ -1493,7 +1493,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_get_original_globals, TYPE_Scope);
     DEFINE_EXTERN_C_FUNCTION(sc_set_globals, _void, TYPE_Scope);
 
-    DEFINE_EXTERN_C_FUNCTION(sc_location_error_new, TYPE_Error, TYPE_String);
+    DEFINE_EXTERN_C_FUNCTION(sc_location_error_new, TYPE_Error, TYPE_Anchor, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_runtime_error_new, TYPE_Error, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_format_error, TYPE_String, TYPE_Error);
 

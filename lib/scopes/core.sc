@@ -129,13 +129,17 @@ fn box-pointer (value)
     sc_const_pointer_new (typeof value)
         bitcast value voidstar
 
-fn raise-compile-error! (value)
-    raise (sc_location_error_new value)
+fn syntax-error! (anchor msg)
+    raise (sc_location_error_new anchor msg)
+
+fn compiler-error! (value)
+    raise (sc_location_error_new (sc_get_active_anchor) value)
 
 # print an unboxing error given two types
-fn unbox-verify (haveT wantT)
+fn unbox-verify (value wantT)
+    let haveT = (sc_value_type value)
     if (ptrcmp!= haveT wantT)
-        raise-compile-error!
+        syntax-error! (sc_value_anchor value)
             sc_string_join "can't unbox value of type "
                 sc_string_join
                     sc_value_repr (box-pointer haveT)
@@ -143,28 +147,28 @@ fn unbox-verify (haveT wantT)
                         sc_value_repr (box-pointer wantT)
 
 inline unbox-integer (value T)
-    unbox-verify (sc_value_type value) T
+    unbox-verify value T
     itrunc (sc_const_int_extract value) T
 
 inline unbox-symbol (value T)
-    unbox-verify (sc_value_type value) T
+    unbox-verify value T
     bitcast (sc_const_int_extract value) T
 
 inline unbox-pointer (value T)
-    unbox-verify (sc_value_type value) T
+    unbox-verify value T
     bitcast (sc_const_pointer_extract value) T
 
 fn verify-count (count mincount maxcount)
     if (icmp>=s mincount 0)
         if (icmp<s count mincount)
-            raise-compile-error!
+            compiler-error!
                 sc_string_join "at least "
                     sc_string_join (sc_value_repr (box-integer mincount))
                         sc_string_join " argument(s) expected, got "
                             sc_value_repr (box-integer count)
     if (icmp>=s maxcount 0)
         if (icmp>s count maxcount)
-            raise-compile-error!
+            compiler-error!
                 sc_string_join "at most "
                     sc_string_join (sc_value_repr (box-integer maxcount))
                         sc_string_join " argument(s) expected, got "
@@ -211,7 +215,7 @@ let typify =
         let result = (sc_compile (sc_typify typify 2 types) 0:u64)
         let result-type = (sc_value_type result)
         if (ptrcmp!= result-type ASTMacroFunction)
-            raise-compile-error!
+            compiler-error!
                 sc_string_join "AST macro must have type "
                     sc_string_join
                         sc_value_repr (box-pointer ASTMacroFunction)
@@ -317,7 +321,7 @@ let raises-compile-error =
             let callargs = (alloca-array Value 1)
             store (box-pointer "hidden") (getelementptr callargs 0)
             sc_if_append_then_clause branch (box-integer false)
-                sc_call_new (box-pointer raise-compile-error!) 1 callargs
+                sc_call_new (box-pointer compiler-error!) 1 callargs
             sc_if_append_else_clause branch (box-empty)
             branch
 
@@ -441,7 +445,7 @@ sc_type_set_symbol type '__call
             if ok
                 return
                     sc_call_new f argcount args
-            raise-compile-error!
+            compiler-error!
                 sc_string_join "no type constructor available for type "
                     sc_value_repr self
 
@@ -449,20 +453,32 @@ sc_type_set_symbol type '__call
 sc_type_set_symbol Symbol '__call
     box-ast-macro
         fn "symbol-call" (argcount args)
-            verify-count argcount 2 -1
-            let symval = (load (getelementptr args 0))
-            let sym = (unbox-symbol symval Symbol)
-            let self = (load (getelementptr args 1))
-            let T = (sc_value_type self)
-            let ok f = (sc_type_at T sym)
-            if ok
-                sc_call_new f (sub argcount 1) (getelementptr args 1)
-            else
-                raise-compile-error!
+            fn resolve-method (self symval)
+                let sym = (unbox-symbol symval Symbol)
+                let T = (sc_value_type self)
+                let ok f = (sc_type_at T sym)
+                if ok
+                    return f
+                # if calling method of type, try typemethod
+                if (ptrcmp== T type)
+                    if (sc_value_is_constant self)
+                        let self = (unbox-pointer self type)
+                        let ok f = (sc_type_at self sym)
+                        if ok
+                            return f
+                compiler-error!
                     sc_string_join "no method named "
                         sc_string_join (sc_value_repr symval)
                             sc_string_join " in value of type "
                                 sc_value_repr (box-pointer T)
+
+            verify-count argcount 2 -1
+            let symval = (load (getelementptr args 0))
+            let self = (load (getelementptr args 1))
+            sc_call_new
+                resolve-method self symval
+                sub argcount 1
+                getelementptr args 1
 
 inline gen-key-any-set (selftype fset)
     box-ast-macro
@@ -599,7 +615,7 @@ let const.icmp<=.i32.i32 =
                     let b = (unbox-integer b i32)
                     return
                         box-integer (icmp<=s a b)
-            raise-compile-error! "arguments must be constant"
+            compiler-error! "arguments must be constant"
 
 let const.add.i32.i32 =
     ast-macro
@@ -611,7 +627,7 @@ let const.add.i32.i32 =
                     let b = (unbox-integer b i32)
                     return
                         box-integer (add a b)
-            raise-compile-error! "arguments must be constant"
+            compiler-error! "arguments must be constant"
 
 let constbranch =
     ast-macro
@@ -622,7 +638,7 @@ let constbranch =
             let elsef = (load (getelementptr args 2))
             if (sc_value_is_constant cond)
             else
-                raise-compile-error! "condition must be constant"
+                compiler-error! "condition must be constant"
             let value = (unbox-integer cond bool)
             sc_call_new
                 ? value thenf elsef
@@ -661,7 +677,7 @@ sc_type_set_symbol Value '__typecall
                     #elseif (icmp== kind type-kind-vector)
                     #elseif (icmp== kind type-kind-real)
                     else
-                        raise-compile-error!
+                        compiler-error!
                             sc_string_join "can't box value of type "
                                 sc_value_repr (box-pointer T)
 
@@ -799,20 +815,8 @@ let SyntaxMacroFunctionType =
 
 # any extraction
 
-inline unbox-u32 (value T)
-    unbox-verify (extractvalue value 0) T
-    bitcast (itrunc (extractvalue value 1) u32) T
-
-inline unbox-bitcast (value T)
-    unbox-verify (extractvalue value 0) T
-    bitcast (extractvalue value 1) T
-
-inline unbox-hidden-pointer (value T)
-    unbox-verify (extractvalue value 0) T
-    load (inttoptr (extractvalue value 1) ('pointer T))
-
 inline unbox (value T)
-    unbox-verify (sc_value_type value) T
+    unbox-verify value T
     __unbox value T
 
 fn value-imply (vT T expr)
@@ -820,7 +824,7 @@ fn value-imply (vT T expr)
         return
             sc_call_new (Value unbox)
                 Value-array expr (Value T)
-    raise-compile-error! "unsupported type"
+    compiler-error! "unsupported type"
 
 'set-symbols Value
     __imply =
@@ -832,7 +836,7 @@ fn value-imply (vT T expr)
                     return
                         sc_call_new (Value Value)
                             Value-array expr
-                raise-compile-error! "unsupported type"
+                compiler-error! "unsupported type"
 
 # integer casting
 
@@ -854,7 +858,7 @@ fn integer-imply (vT T expr)
                     sc_call_new (Value sext) args...
                 else
                     sc_call_new (Value zext) args...
-    raise-compile-error! "unsupported type"
+    compiler-error! "unsupported type"
 
 fn integer-as (vT T expr)
     let args... = (Value-array expr T)
@@ -883,7 +887,7 @@ fn integer-as (vT T expr)
         else
             return
                 sc_call_new (Value uitofp) args...
-    raise-compile-error! "unsupported type"
+    compiler-error! "unsupported type"
 
 inline box-binary-op (f)
     box-pointer (typify f type type Value Value)
@@ -892,7 +896,7 @@ inline single-binary-op-dispatch (destf)
         if (ptrcmp== lhsT rhsT)
             return
                 sc_call_new (Value destf) (Value-array lhs rhs)
-        raise-compile-error! "unsupported type"
+        compiler-error! "unsupported type"
 
 inline gen-cast-error (intro-string)
     ast-macro
@@ -904,7 +908,7 @@ inline gen-cast-error (intro-string)
             # create branch so we can trick the function into assuming
                 there's another exit path
             if true
-                raise-compile-error!
+                compiler-error!
                     sc_string_join intro-string
                         sc_string_join
                             '__repr (box-pointer vT)
@@ -921,7 +925,7 @@ fn unbox-cast-function-type (anyf)
     unbox-pointer anyf CastFunctionType
 
 fn attribute-format-error! (T symbol err)
-    raise-compile-error!
+    compiler-error!
         'join "wrong format for attribute "
             'join ('__repr (box-symbol symbol))
                 'join " of type "
@@ -1070,7 +1074,7 @@ fn sym-binary-op-label-macro (argc argv symbol rsymbol friendly-op-name)
                 if ok
                     return expr
     # we give up
-    raise-compile-error!
+    compiler-error!
         'join "can't "
             'join friendly-op-name
                 'join " values of types "
@@ -1097,7 +1101,7 @@ fn asym-binary-op-label-macro (argc argv symbol rtype friendly-op-name)
                 sc_call_new f
                     Value-array lhs rhs
     # we give up
-    raise-compile-error!
+    compiler-error!
         'join "can't "
             'join friendly-op-name
                 'join " values of types "
@@ -1114,7 +1118,7 @@ fn unary-op-label-macro (argc argv symbol friendly-op-name)
     if ok
         return
             sc_call_new f argc argv
-    raise-compile-error!
+    compiler-error!
         'join "can't "
             'join friendly-op-name
                 'join " value of type "
@@ -1146,7 +1150,7 @@ inline make-asym-binary-op-dispatch (symbol rtype friendly-op-name)
                     return
                         sc_call_new (Value sc_symbol_to_string)
                             Value-array expr
-                raise-compile-error! "unsupported type"
+                compiler-error! "unsupported type"
 
 fn string@ (self i)
     let s = (sc_string_buffer self)
@@ -1185,7 +1189,7 @@ inline single-signed-binary-op-dispatch (sf uf)
                     else
                         Value uf
                     Value-array lhs rhs
-        raise-compile-error! "unsupported type"
+        compiler-error! "unsupported type"
 
 fn dispatch-and-or (argc argv flip)
     verify-count argc 2 2
@@ -1230,7 +1234,7 @@ fn type-getattr-dynamic (T value)
     let ok val = (sc_type_at T value)
     if ok
         return val
-    raise-compile-error! "no such attribute"
+    compiler-error! "no such attribute"
 
 'set-symbols type
     __== = (box-binary-op (single-binary-op-dispatch type==))
@@ -1274,7 +1278,7 @@ fn scope-getattr-dynamic (T value)
     let ok val = (sc_scope_at T value)
     if ok
         return val
-    raise-compile-error! "no such attribute"
+    compiler-error! "no such attribute"
 
 'set-symbols Scope
     __== = (box-binary-op (single-binary-op-dispatch ptrcmp==))
@@ -1337,7 +1341,7 @@ sc_typename_type_set_storage NullType ('pointer void)
                 if (icmp== ('kind ('storage T)) type-kind-pointer)
                     return
                         sc_call_new (Value bitcast) (Value-array expr T)
-                raise-compile-error! "cannot convert to type"
+                compiler-error! "cannot convert to type"
     #__==
         fn (a b flipped)
             if flipped
@@ -1577,7 +1581,7 @@ fn pointer-imply (vT T expr)
         if (pointer-type-imply? vT T)
             return
                 sc_call_new (Value bitcast) (Value-array expr T)
-    raise-compile-error! "unsupported type"
+    compiler-error! "unsupported type"
 
 'set-symbols pointer
     __call = coerce-call-arguments
@@ -1692,7 +1696,7 @@ inline infix-op (pred)
             ? (pred op-prec prec) op (Value none)
         else
             sc_set_active_anchor ('anchor token)
-            raise-compile-error!
+            compiler-error!
                 "unexpected token in infix expression"
 let infix-op-gt = (infix-op >)
 let infix-op-ge = (infix-op >=)
@@ -1708,7 +1712,7 @@ fn rtl-infix-op-eq (infix-table token prec)
             Value none
     else
         sc_set_active_anchor ('anchor token)
-        raise-compile-error!
+        compiler-error!
             "unexpected token in infix expression"
 
 fn parse-infix-expr (infix-table lhs state mprec)
@@ -1839,7 +1843,7 @@ fn quote-label (expr scope)
 
 fn expand-and-or (expr f)
     if (empty? expr)
-        raise-compile-error! "at least one argument expected"
+        compiler-error! "at least one argument expected"
     elseif (== (countof expr) 1:usize)
         return ('@ expr)
     let expr = ('reverse expr)
@@ -1936,15 +1940,6 @@ fn clone-scope-contents (a b)
         clone-scope-contents parent b
         a
 
-#compile-stage
-    let types = (alloca-array type 2)
-    store Scope (getelementptr types 0)
-    store Scope (getelementptr types 1)
-    let result = (sc_compile (sc_typify clone-scope-contents 2 types)
-        compile-flag-dump-module)
-    if true
-        sc_exit 0
-
 'set-symbols typename
     __typecall =
         box-ast-macro
@@ -1977,7 +1972,7 @@ let Closure->Generator =
             verify-count argc 1 1
             let self = (load (getelementptr argv 0))
             if (not ('constant? self))
-                raise-compile-error! "Closure must be constant"
+                compiler-error! "Closure must be constant"
             let self = (as self Closure)
             let self = (bitcast self Generator)
             Value self
@@ -2105,7 +2100,7 @@ inline char (s)
                 verify-count argc 1 1
                 let self = (load (getelementptr argv 0))
                 if (not ('constant? self))
-                    raise-compile-error! "Generator must be constant"
+                    compiler-error! "Generator must be constant"
                 let self = (self as Generator)
                 let self = (bitcast self Closure)
                 sc_call_new
@@ -2129,7 +2124,7 @@ let for =
         fn "for" (args)
             loop (it params) = args '()
             if (empty? it)
-                raise-compile-error! "'in' expected"
+                compiler-error! "'in' expected"
             let sxat it = (decons it)
             let at = (sxat as Symbol)
             if (at != 'in)
@@ -2192,15 +2187,15 @@ fn dots-to-slashes (pattern)
         return (.. result (lslice pattern start))
     let c = (@ pattern i)
     if (c == (char "/"))
-        raise-compile-error!
+        compiler-error!
             .. "no slashes permitted in module name: " pattern
     elseif (c == (char "\\"))
-        raise-compile-error!
+        compiler-error!
             .. "no slashes permitted in module name: " pattern
     elseif (c != (char "."))
         repeat (i + 1:usize) start result
     elseif (icmp== (i + 1:usize) sz)
-        raise-compile-error!
+        compiler-error!
             .. "invalid dot at ending of module '" pattern "'"
     else
         if (icmp== i start)
@@ -2212,7 +2207,7 @@ fn dots-to-slashes (pattern)
 
 fn load-module (module-name module-path opts...)
     if (not (sc_is_file module-path))
-        raise-compile-error!
+        compiler-error!
             .. "no such module: " module-path
     let module-path = (sc_realpath module-path)
     let module-dir = (sc_dirname module-path)
@@ -2263,7 +2258,7 @@ fn require-from (base-dir name)
         if ok
             if (('typeof content) == type)
                 if (content == incomplete)
-                    raise-compile-error!
+                    compiler-error!
                         .. "trying to import module " (repr name)
                             " while it is being imported"
             break true content
@@ -2281,7 +2276,7 @@ fn require-from (base-dir name)
     sc_write "' in paths:\n"
     loop (patterns) = (patterns-from-namestr base-dir namestr)
     if (empty? patterns)
-        raise-compile-error! "failed to import module"
+        compiler-error! "failed to import module"
     let pattern patterns = (decons patterns)
     let pattern = (pattern as string)
     let module-path = (make-module-path pattern namestr)
@@ -2365,7 +2360,7 @@ let using =
             if ((('typeof nameval) == Symbol) and ((nameval as Symbol) == 'import))
                 let ok module-dir = ('@ syntax-scope 'module-dir)
                 if (not ok)
-                    raise-compile-error!
+                    compiler-error!
                         "using import requires module-dir symbol in scope"
                 let module-dir = (module-dir as string)
                 let name rest = (decons rest)
@@ -2381,7 +2376,7 @@ let using =
                     let token pattern rest = (decons rest 2)
                     let token = (token as Symbol)
                     if (token != 'filter)
-                        raise-compile-error!
+                        compiler-error!
                             "syntax: using <scope> [filter <filter-string>]"
                     let pattern = (pattern as string)
                     list pattern
@@ -2477,7 +2472,7 @@ let __assert =
             fn check-assertion (result anchor msg)
                 if (not result)
                     sc_set_active_anchor anchor
-                    raise-compile-error!
+                    compiler-error!
                         .. "assertion failed: " msg
                 return;
 
@@ -2494,10 +2489,6 @@ let __assert =
                     Value-array expr (Value anchor) msg
 
 compile-stage;
-
-fn syntax-error! (anchor msg)
-    sc_set_active_anchor anchor
-    raise-compile-error! msg
 
 # (define-scope-macro name expr ...)
 # implies builtin names:
@@ -2537,7 +2528,7 @@ inline list-generator (self)
                 if (T == Generator)
                     return
                         sc_call_new (Value list-generator) (Value-array expr)
-                raise-compile-error! "unsupported type"
+                compiler-error! "unsupported type"
 
 inline range (a b c)
     let num-type = (typeof a)
@@ -2577,7 +2568,7 @@ fn parse-compile-flags (argc argv)
                 elseif (== flag 'O2) compile-flag-O2
                 elseif (== flag 'O3) compile-flag-O3
                 else
-                    raise-compile-error!
+                    compiler-error!
                         .. "illegal flag: " (repr flag)
                             ". try one of"
                             \ " " (repr 'dump-disassembly)
@@ -2666,11 +2657,6 @@ let arrayof =
                     sc_call_new insertvalue
                         Value-array result arg i
             result
-
-compile-stage;
-
-print
-    arrayof i32 1 2 3
 
 #-------------------------------------------------------------------------------
 # vectors
@@ -3032,6 +3018,4 @@ fn run-main ()
 
 run-main;
 
-if false
-    raise (sc_location_error_new "test")
 return;
