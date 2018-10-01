@@ -1,5 +1,5 @@
 
-let mask = (eval (vectorof i32 7 5 3 1))
+let mask = (syntax-eval (vectorof i32 7 5 3 1))
 
 fn do-ops (v w)
     v + w * w

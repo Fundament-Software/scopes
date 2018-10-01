@@ -2219,9 +2219,18 @@ fn exec-module (expr eval-scope)
                 cons do
                     list raises-compile-error
                     expr
-    let f = (sc_compile (sc_eval expr-anchor expr eval-scope) 0:u64)
+    let f = (sc_eval expr-anchor expr eval-scope)
+    loop (f) = f
+    let f = (sc_compile f 0:u64)
     let fptr = (f as ModuleFunctionType)
-    fptr;
+    let result = (fptr)
+    let T = ('typeof result)
+    if (('kind T) == type-kind-pointer)
+        let ET = ('element@ T 0)
+        if (('kind ET) == type-kind-function)
+            # multi-stage, compile function and execute
+            repeat result
+    result
 
 fn dots-to-slashes (pattern)
     let sz = (countof pattern)
@@ -2967,26 +2976,12 @@ let vectorof =
 
 #-------------------------------------------------------------------------------
 
-let eval =
+let syntax-eval =
     syntax-scope-macro
         fn (args scope)
             let subscope = (Scope scope)
-            let anchor = (sc_get_active_anchor)
-            let expr =
-                list
-                    list Value
-                        cons do
-                            list raises-compile-error
-                            args
-            let f = (sc_compile (sc_eval anchor expr subscope) 0:u64)
-            let fptr =
-                f as
-                    'pointer
-                        'raising
-                            function Value
-                            Error
             return
-                fptr;
+                exec-module (Value args) subscope
                 scope
 
 #fn compile-flags (opts...)
