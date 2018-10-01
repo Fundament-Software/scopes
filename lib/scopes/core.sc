@@ -2219,33 +2219,26 @@ fn make-module-path (pattern name)
             .. result (rslice (lslice pattern i) start) name
 
 fn exec-module (expr eval-scope)
-    let expr-anchor = ('anchor expr)
     let ModuleFunctionType = ('pointer ('raising (function Value) Error))
     let StageFunctionType = ('pointer ('raising (function CompileStage) Error))
+    let expr-anchor = ('anchor expr)
     sc_set_active_anchor expr-anchor
-    # build a wrapper
-    let expr =
-        list
-            list wrap-if-not-compile-stage
-                cons do
-                    list raises-compile-error
-                    expr
     let f = (sc_eval expr-anchor expr eval-scope)
     loop (f) = f
-    let f = (sc_compile f 0:u64)
+    # build a wrapper
+    let wrapf = (sc_template_new 'exec-module-stage)
+    sc_template_set_body wrapf
+        sc_block_new
+            Value-array
+                sc_call_new raises-compile-error (Value-array)
+                sc_call_new wrap-if-not-compile-stage
+                    Value-array
+                        sc_call_new f (Value-array)
+    let wrapf = (sc_typify_template wrapf 0 (undef TypeArrayPointer))
+    let f = (sc_compile wrapf 0:u64)
     if (('typeof f) == StageFunctionType)
         let fptr = (f as StageFunctionType)
-        let result = (bitcast (fptr) Value)
-        let wrapf = (sc_template_new 'exec-module-stage)
-        sc_template_set_body wrapf
-            sc_block_new
-                Value-array
-                    sc_call_new raises-compile-error (Value-array)
-                    sc_call_new wrap-if-not-compile-stage
-                        Value-array
-                            sc_call_new result (Value-array)
-        let wrapf = (sc_typify_template wrapf 0 (undef TypeArrayPointer))
-        repeat wrapf
+        repeat (bitcast (fptr) Value)
     else
         let fptr = (f as ModuleFunctionType)
         fptr;

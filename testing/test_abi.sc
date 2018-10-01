@@ -63,35 +63,39 @@ let lib =
         '()
 
 compile-stage;
+print "yep"
+compile-stage;
 
-fn testf1 ()
-    lib.testfunc_ivec2_ivec2
-        lib.IVec2 1 2
-        lib.IVec2 3 4
+true
+#
+    fn testf1 ()
+        lib.testfunc_ivec2_ivec2
+            lib.IVec2 1 2
+            lib.IVec2 3 4
 
-fn testf2 ()
-    lib.testfunc_vec2_vec2_vec4_vec4
-        lib.Vec2 1.0 2.0
-        lib.Vec2 3.0 4.0
-        lib.Vec4 5.0 6.0 7.0 8.0
-        lib.Vec4 9.0 10.0 11.0 12.0
-
-fn testf3 ()
-    lib.testfunc_vec2x2
-        lib.Vec2x2
+    fn testf2 ()
+        lib.testfunc_vec2_vec2_vec4_vec4
             lib.Vec2 1.0 2.0
             lib.Vec2 3.0 4.0
+            lib.Vec4 5.0 6.0 7.0 8.0
+            lib.Vec4 9.0 10.0 11.0 12.0
 
-fn testf4 ()
-    lib.testfunc_vec3_vec3
-        lib.Vec3 1.0 2.0 3.0
-        lib.Vec3 4.0 5.0 6.0
+    fn testf3 ()
+        lib.testfunc_vec2x2
+            lib.Vec2x2
+                lib.Vec2 1.0 2.0
+                lib.Vec2 3.0 4.0
 
-compile
-    typify testf1
-    'dump-module
+    fn testf4 ()
+        lib.testfunc_vec3_vec3
+            lib.Vec3 1.0 2.0 3.0
+            lib.Vec3 4.0 5.0 6.0
 
-assert (1 == (testf4))
-assert (1 == (testf3))
-assert (1 == (testf2))
-assert (1 == (testf1))
+    compile
+        typify testf1
+        'dump-module
+
+    assert (1 == (testf4))
+    assert (1 == (testf3))
+    assert (1 == (testf2))
+    assert (1 == (testf1))
