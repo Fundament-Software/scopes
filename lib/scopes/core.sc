@@ -129,6 +129,9 @@ fn box-pointer (value)
     sc_const_pointer_new (typeof value)
         bitcast value voidstar
 
+fn error! (msg)
+    raise (sc_runtime_error_new msg)
+
 fn syntax-error! (anchor msg)
     raise (sc_location_error_new anchor msg)
 
@@ -1168,16 +1171,6 @@ fn string@ (self i)
     let s = (sc_string_buffer self)
     load (getelementptr s i)
 
-'set-symbols tuple
-    __@ =
-        inline (self index)
-            extractvalue self index
-
-'set-symbols array
-    __@ =
-        inline (self index)
-            extractvalue self index
-
 'set-symbols string
     __== = (box-binary-op (single-binary-op-dispatch ptrcmp==))
     __!= = (box-binary-op (single-binary-op-dispatch ptrcmp!=))
@@ -1376,6 +1369,7 @@ let
     #implyfn = (typify implyfn type type)
     #asfn = (typify asfn type type)
     countof = (make-unary-op-dispatch '__countof "count")
+    unpack = (make-unary-op-dispatch '__unpack "unpack")
     ~ = (make-unary-op-dispatch '__~ "bitwise-negate")
     == = (make-sym-binary-op-dispatch '__== '__r== "compare")
     != = (make-sym-binary-op-dispatch '__!= '__r!= "compare")
@@ -1630,7 +1624,7 @@ fn split-dotted-symbol (head start end tail)
         if (== start 0:usize)
             return (cons head tail)
         else
-            return (cons (Symbol (lslice s start)) tail)
+            return (cons (Symbol (rslice s start)) tail)
     if (== (@ s i) dot-char)
         let tail =
             # no remainder after dot
@@ -1645,7 +1639,7 @@ fn split-dotted-symbol (head start end tail)
             # prefix before dot
             let size = (- i start)
             return
-                cons (Symbol (rslice (lslice s start) size)) result
+                cons (Symbol (lslice (rslice s start) size)) result
     repeat (+ i 1:usize)
 
 # infix notation support
@@ -1961,15 +1955,25 @@ fn clone-scope-contents (a b)
     __typecall =
         box-ast-macro
             fn (argc argv)
-                verify-count argc 2 2
-                let name = (loadarrayptrs argv 1)
-                if ('constant? name)
-                    Value
-                        sc_typename_type
-                            as (loadarrayptrs argv 1) string
-                else
-                    sc_call_new (Value sc_typename_type) 1
-                        getelementptr argv 1
+                verify-count argc 1 -1
+                let cls = (loadarrayptrs argv 0)
+                if (ptrcmp== ('typeof cls) type)
+                    let cls = (as cls type)
+                    if (ptrcmp== cls typename)
+                        verify-count argc 2 2
+                        let name = (loadarrayptrs argv 1)
+                        return
+                            if ('constant? name)
+                                Value
+                                    sc_typename_type
+                                        as (loadarrayptrs argv 1) string
+                            else
+                                sc_call_new (Value sc_typename_type) 1
+                                    getelementptr argv 1
+                compiler-error!
+                    sc_string_join "typename "
+                        sc_string_join ('__repr cls)
+                            " has no constructor"
 
 'set-symbols Scope
     __.. =
@@ -2175,12 +2179,12 @@ fn make-module-path (pattern name)
     let sz = (countof pattern)
     loop (i start result) = 0:usize 0:usize ""
     if (i == sz)
-        return (.. result (lslice pattern start))
+        return (.. result (rslice pattern start))
     if ((@ pattern i) != (char "?"))
         repeat (i + 1:usize) start result
     else
         repeat (i + 1:usize) (i + 1:usize)
-            .. result (lslice (rslice pattern i) start) name
+            .. result (rslice (lslice pattern i) start) name
 
 fn exec-module (expr eval-scope)
     let expr-anchor = ('anchor expr)
@@ -2201,7 +2205,7 @@ fn dots-to-slashes (pattern)
     let sz = (countof pattern)
     loop (i start result) = 0:usize 0:usize ""
     if (i == sz)
-        return (.. result (lslice pattern start))
+        return (.. result (rslice pattern start))
     let c = (@ pattern i)
     if (c == (char "/"))
         compiler-error!
@@ -2218,9 +2222,9 @@ fn dots-to-slashes (pattern)
         if (icmp== i start)
             if (icmp>u start 0:usize)
                 repeat (i + 1:usize) (i + 1:usize)
-                    .. result (lslice (rslice pattern i) start) "../"
+                    .. result (rslice (lslice pattern i) start) "../"
         repeat (i + 1:usize) (i + 1:usize)
-            .. result (lslice (rslice pattern i) start) "/"
+            .. result (rslice (lslice pattern i) start) "/"
 
 fn load-module (module-name module-path opts...)
     if (not (sc_is_file module-path))
@@ -2621,9 +2625,44 @@ define-syntax-macro assert
                 repr cond
     list __assert cond msg
 
+define-syntax-macro while
+    let cond body = (decons args)
+    list do
+        list loop '()
+        list inline 'continue '()
+            list repeat
+        list if cond
+            cons do body
+            list repeat
+
 #-------------------------------------------------------------------------------
 # tuples
 #-------------------------------------------------------------------------------
+
+inline make-unpack-function (extractf)
+    ast-macro
+        fn (argc argv)
+            verify-count argc 1 1
+            let self = (load (getelementptr argv 0))
+            let T = ('typeof self)
+            let count = ('element-count T)
+            let args = (alloca-array Value count)
+            loop (i) = 0
+            if (icmp<s i count)
+                store
+                    sc_call_new (Value extractf)
+                        Value-array self i
+                    getelementptr args i
+                repeat (add i 1)
+            sc_argument_list_new count args
+
+let __unpack-aggregate = (make-unpack-function extractvalue)
+
+'set-symbols tuple
+    __unpack = (Value __unpack-aggregate)
+    __@ =
+        inline (self index)
+            extractvalue self index
 
 let tupleof =
     ast-macro
@@ -2655,6 +2694,12 @@ let tupleof =
 # arrays
 #-------------------------------------------------------------------------------
 
+'set-symbols array
+    __unpack = (Value __unpack-aggregate)
+    __@ =
+        inline (self index)
+            extractvalue self index
+
 let arrayof =
     ast-macro
         fn (argc argv)
@@ -2682,6 +2727,137 @@ let arrayof =
 #-------------------------------------------------------------------------------
 # vectors
 #-------------------------------------------------------------------------------
+
+let vector-reduce =
+    ast-macro
+        fn (argc argv)
+            verify-count argc 2 2
+            let f v = (loadarrayptrs argv 0 1)
+            let T = ('typeof v)
+            let sz = ('element-count T)
+            loop (v sz) = v sz
+            # special cases for low vector sizes
+            if (sz == 1)
+                sc_call_new extractelement (Value-array v 0)
+            elseif (sz == 2)
+                sc_call_new f
+                    Value-array
+                        sc_call_new extractelement (Value-array v 0)
+                        sc_call_new extractelement (Value-array v 1)
+            elseif (sz == 3)
+                sc_call_new f
+                    Value-array
+                        sc_call_new f
+                            Value-array
+                                sc_call_new extractelement (Value-array v 0)
+                                sc_call_new extractelement (Value-array v 1)
+                        sc_call_new extractelement (Value-array v 2)
+            elseif (sz == 4)
+                sc_call_new f
+                    Value-array
+                        sc_call_new f
+                            Value-array
+                                sc_call_new extractelement (Value-array v 0)
+                                sc_call_new extractelement (Value-array v 1)
+                        sc_call_new f
+                            Value-array
+                                sc_call_new extractelement (Value-array v 2)
+                                sc_call_new extractelement (Value-array v 3)
+            else
+                let hsz = (sz >> 1)
+                let fsz = (hsz << 1)
+                if (fsz != sz)
+                    compiler-error! "vector size must be a power of two"
+                let hsz-value = (Value (hsz as usize))
+                repeat
+                    sc_call_new f
+                        Value-array
+                            sc_call_new lslice (Value-array v hsz-value)
+                            sc_call_new rslice (Value-array v hsz-value)
+                    hsz
+
+fn any? (v)
+    vector-reduce bor v
+fn all? (v)
+    vector-reduce band v
+
+#typefn vector '__slice (self i0 i1)
+    if ((constant? i0) and (constant? i1))
+        let usz = (sub i1 i0)
+        let loop (i mask) = i0 (nullof (vector i32 usz))
+        if (icmp<u i i1)
+            loop (add i 1:usize) (insertelement mask (i32 i) (sub i i0))
+        else
+            shufflevector self self mask
+    else
+        compiler-error! "slice indices must be constant"
+
+'set-symbols vector
+    __lslice =
+        ast-macro
+            fn (argc argv)
+                verify-count argc 2 2
+                let self offset = (loadarrayptrs argv 0 1)
+                if (not ('constant? offset))
+                    compiler-error! "slice offset must be constant"
+                let T = ('typeof self)
+                let sz = (('element-count T) as usize)
+                let offset:usize = (offset as usize)
+                if (offset:usize >= sz)
+                    return self
+                let offset = (offset:usize as i32)
+                let maskvals = (alloca-array Value offset)
+                loop (i) = 0
+                if (i < offset)
+                    store (Value i) (getelementptr maskvals i)
+                    repeat (i + 1)
+                let maskT =
+                    sc_vector_type i32 offset:usize
+                sc_call_new shufflevector
+                    Value-array self self
+                        sc_const_aggregate_new maskT offset maskvals
+    __rslice =
+        ast-macro
+            fn (argc argv)
+                verify-count argc 2 2
+                let self offset = (loadarrayptrs argv 0 1)
+                if (not ('constant? offset))
+                    compiler-error! "slice offset must be constant"
+                let T = ('typeof self)
+                let sz = (('element-count T) as usize)
+                let offset:usize = (offset as usize)
+                if (offset:usize == 0)
+                    return self
+                let offset:usize =
+                    ? (offset:usize > sz) sz offset:usize
+                let total:usize = (sz - offset:usize)
+                let offset = (offset:usize as i32)
+                let total = (total:usize as i32)
+                let maskvals = (alloca-array Value total)
+                loop (i) = 0
+                if (i < total)
+                    store (Value (i + offset)) (getelementptr maskvals i)
+                    repeat (i + 1)
+                let maskT =
+                    sc_vector_type i32 total:usize
+                sc_call_new shufflevector
+                    Value-array self self
+                        sc_const_aggregate_new maskT total maskvals
+    __unpack = (Value (make-unpack-function extractelement))
+    # vector type constructor
+    __typecall =
+        ast-macro
+            fn "vector" (argcount args)
+                verify-count argcount 3 3
+                let ET = (unbox-pointer (load (getelementptr args 1)) type)
+                let size = (load (getelementptr args 2))
+                let sizeT = (sc_value_type size)
+                if (type< sizeT integer)
+                else
+                    unbox-verify size integer
+                let size =
+                    bitcast (sc_const_int_extract size) usize
+                box-pointer (sc_vector_type ET size)
 
 let vectorof =
     ast-macro
@@ -2906,7 +3082,7 @@ fn read-eval-print-loop ()
     let cmdlist =
         .. cmdlist
             if enter-multiline
-                rslice cmd ((countof cmd) - 1:usize)
+                lslice cmd ((countof cmd) - 1:usize)
             else cmd
             "\n"
     let preload =
@@ -3036,11 +3212,18 @@ fn run-main ()
             script-launch-args =
                 fn ()
                     return sourcepath argc argv
-        load-module "" sourcepath
-            scope = scope
-            main-module? = true
+        do  #try
+            load-module "" sourcepath
+                scope = scope
+                main-module? = true
+            _;
+        #except (err)
+            print
+                default-styler style-error "error:"
+                format-error err
         exit 0
 
+raises-compile-error;
 run-main;
 
 return;

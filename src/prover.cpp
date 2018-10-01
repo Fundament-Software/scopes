@@ -1186,6 +1186,11 @@ SCOPES_RESULT(uint64_t) extract_integer_constant(Value *value) {
     return x->value;
 }
 
+SCOPES_RESULT(ConstAggregate *) extract_vector_constant(Value *value) {
+    SCOPES_RESULT_TYPE(ConstAggregate *);
+    return extract_constant<ConstAggregate>(TYPE_Vector, value);
+}
+
 static SCOPES_RESULT(const Type *) bool_op_return_type(const Type *T) {
     SCOPES_RESULT_TYPE(const Type *);
     T = SCOPES_GET_RESULT(storage_type(T));
@@ -1249,6 +1254,9 @@ static SCOPES_RESULT(void) verify_real_ops(const Type *a, const Type *b, const T
 #define READ_TYPE_CONST(NAME) \
         assert(argn < argcount); \
         auto NAME = SCOPES_GET_RESULT(extract_type_constant(values[argn++]));
+#define READ_VECTOR_CONST(NAME) \
+        assert(argn < argcount); \
+        auto NAME = SCOPES_GET_RESULT(extract_vector_constant(values[argn++]));
 
 static const Type *get_function_type(Function *fn) {
     ArgTypes params;
@@ -1549,6 +1557,28 @@ repeat:
             auto vi = cast<VectorType>(T);
             SCOPES_CHECK_RESULT(verify(SCOPES_GET_RESULT(storage_type(vi->element_type)), ET));
             RETARGTYPES(_T->get_type());
+        } break;
+        case FN_ShuffleVector: {
+            CHECKARGS(3, 3);
+            READ_STORAGETYPEOF(TV1);
+            READ_STORAGETYPEOF(TV2);
+            READ_VECTOR_CONST(mask);
+            const Type *TMask = mask->get_type();
+            SCOPES_CHECK_RESULT(verify_kind<TK_Vector>(TV1));
+            SCOPES_CHECK_RESULT(verify_kind<TK_Vector>(TV2));
+            SCOPES_CHECK_RESULT(verify_kind<TK_Vector>(TMask));
+            SCOPES_CHECK_RESULT(verify(TV1, TV2));
+            auto vi = cast<VectorType>(TV1);
+            auto mask_vi = cast<VectorType>(TMask);
+            SCOPES_CHECK_RESULT(verify(TYPE_I32, mask_vi->element_type));
+            size_t incount = vi->count * 2;
+            size_t outcount = mask_vi->count;
+            for (size_t i = 0; i < outcount; ++i) {
+                SCOPES_CHECK_RESULT(verify_range(
+                    cast<ConstInt>(mask->values[i])->value,
+                    incount));
+            }
+            RETARGTYPES(SCOPES_GET_RESULT(vector_type(vi->element_type, outcount)));
         } break;
         case FN_ExtractValue: {
             CHECKARGS(2, 2);

@@ -629,7 +629,7 @@ sc_rawstring_size_t_tuple_t sc_string_buffer(const sc_string_t *str) {
     return {str->data, str->count};
 }
 
-const sc_string_t *sc_string_lslice(const sc_string_t *str, size_t offset) {
+const sc_string_t *sc_string_rslice(const sc_string_t *str, size_t offset) {
     using namespace scopes;
     if (!offset) return str;
     if (offset >= str->count)
@@ -637,7 +637,7 @@ const sc_string_t *sc_string_lslice(const sc_string_t *str, size_t offset) {
     return String::from(str->data + offset, str->count - offset);
 }
 
-const sc_string_t *sc_string_rslice(const sc_string_t *str, size_t offset) {
+const sc_string_t *sc_string_lslice(const sc_string_t *str, size_t offset) {
     using namespace scopes;
     if (!offset) return Symbol(SYM_Unnamed).name();
     if (offset >= str->count) return str;

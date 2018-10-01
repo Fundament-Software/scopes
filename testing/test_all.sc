@@ -4,7 +4,6 @@ using import testing
 test-modules
     .test_abi
     .test_ansi_colors
-    .test_value
     .test_array
     .test_branch
     .test_assorted
@@ -59,10 +58,11 @@ test-modules
     .test_struct
     .test_submod
     .test_testing
+    .test_try
     .test_tuple_array
     .test_union
     .test_using
+    .test_value
     .test_varargs
     .test_vector
     .test_while
-    .test_xpcall
