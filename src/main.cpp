@@ -291,7 +291,7 @@ skip_regular_load:
         arguments_type({}), {}), PTF_NonWritable, SYM_Unnamed);
 
     auto stage_func_type = pointer_type(raising_function_type(
-        arguments_type({TYPE_Value}), {}), PTF_NonWritable, SYM_Unnamed);
+        arguments_type({TYPE_CompileStage}), {}), PTF_NonWritable, SYM_Unnamed);
 
 compile_stage:
     if (fn->get_type() == stage_func_type) {

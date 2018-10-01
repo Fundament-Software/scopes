@@ -124,6 +124,7 @@ typedef std::vector<const Type *> ArgTypes;
     \
     T(TYPE_Closure, "Closure") \
     T(TYPE_ASTMacro, "ASTMacro") \
+    T(TYPE_CompileStage, "CompileStage") \
     \
     T(TYPE_USize, "usize") \
     \

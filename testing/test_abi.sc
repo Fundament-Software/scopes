@@ -62,6 +62,8 @@ let lib =
             }
         '()
 
+compile-stage;
+
 fn testf1 ()
     lib.testfunc_ivec2_ivec2
         lib.IVec2 1 2
@@ -93,4 +95,3 @@ assert (1 == (testf4))
 assert (1 == (testf3))
 assert (1 == (testf2))
 assert (1 == (testf1))
-

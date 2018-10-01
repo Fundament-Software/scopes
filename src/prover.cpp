@@ -1093,11 +1093,14 @@ static SCOPES_RESULT(Value *) prove_CompileStage(const ASTContext &ctx, CompileS
     }
 
     block->append(
-        Call::from(anchor, g_sc_eval, {
-            ConstPointer::anchor_from(anchor),
-            ConstPointer::list_from(anchor, sx->next),
-            tmp })
-        );
+        Call::from(anchor, g_bitcast, {
+            Call::from(anchor, g_sc_eval, {
+                ConstPointer::anchor_from(anchor),
+                ConstPointer::list_from(anchor, sx->next),
+                tmp }),
+            ConstPointer::type_from(anchor, TYPE_CompileStage)
+        })
+    );
     //StyledStream ss;
     //stream_ast(ss, block, StreamASTFormat());
     return prove(ctx, block);

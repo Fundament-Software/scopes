@@ -119,6 +119,20 @@ sc_value_raises_t sc_eval_inline(const sc_anchor_t *anchor, const sc_list_t *exp
     RETURN_RESULT(expand_inline(anchor, nullptr, expr, scope));
 }
 
+sc_value_raises_t sc_typify_template(sc_value_t *f, int numtypes, const sc_type_t **typeargs) {
+    using namespace scopes;
+    auto tf = cast<Template>(f);
+    if (tf->is_inline()) {
+        set_last_location_error(String::from("cannot typify inline function"));
+        return { false, get_last_error(), nullptr };
+    }
+    ArgTypes types;
+    for (int i = 0; i < numtypes; ++i) {
+        types.push_back(typeargs[i]);
+    }
+    RETURN_RESULT(prove(nullptr, tf, types));
+}
+
 sc_value_raises_t sc_typify(sc_closure_t *srcl, int numtypes, const sc_type_t **typeargs) {
     using namespace scopes;
     if (srcl->func->is_inline()) {
@@ -1421,6 +1435,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_compiler_version, arguments_type({TYPE_I32, TYPE_I32, TYPE_I32}));
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_eval, TYPE_Value, TYPE_Anchor, TYPE_List, TYPE_Scope);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_eval_inline, TYPE_Anchor, TYPE_Value, TYPE_List, TYPE_Scope);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_typify_template, TYPE_Value, TYPE_Value, TYPE_I32, native_ro_pointer_type(TYPE_Type));
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_typify, TYPE_Value, TYPE_Closure, TYPE_I32, native_ro_pointer_type(TYPE_Type));
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_compile, TYPE_Value, TYPE_Value, TYPE_U64);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_compile_spirv, TYPE_String, TYPE_Symbol, TYPE_Value, TYPE_U64);

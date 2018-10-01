@@ -399,6 +399,8 @@ void init_types() {
     DEFINE_OPAQUE_HANDLE_TYPE("List", List, TYPE_List);
     DEFINE_OPAQUE_HANDLE_TYPE("Error", Error, TYPE_Error);
 
+    DEFINE_OPAQUE_HANDLE_TYPE("CompileStage", Value, TYPE_CompileStage);
+
     DEFINE_STRUCT_HANDLE_TYPE("Anchor", Anchor, TYPE_Anchor,
         native_ro_pointer_type(TYPE_SourceFile),
         TYPE_I32,
