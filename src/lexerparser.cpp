@@ -245,7 +245,7 @@ SCOPES_RESULT(int) LexerParser::read_real(const Type *TT, void (*strton)(T *, co
         || (cend > eof)) {
         return RN_Invalid;
     }
-    value = ConstInt::from(anchor(), TT, srcval);
+    value = ConstReal::from(anchor(), TT, srcval);
     next_cursor = cend;
     if ((cend != eof)
         && (!isspace(*cend))

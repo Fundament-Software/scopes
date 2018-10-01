@@ -426,14 +426,6 @@ fn compare-type (argcount args f)
 inline type-comparison-func (f)
     fn (argcount args) (compare-type argcount args (typify f type type))
 
-let
-    type== = (ast-macro (type-comparison-func ptrcmp==))
-    type!= = (ast-macro (type-comparison-func ptrcmp!=))
-    type< = (ast-macro (type-comparison-func type<))
-    type<= = (ast-macro (type-comparison-func type<=))
-    type> = (ast-macro (type-comparison-func type>))
-    type>= = (ast-macro (type-comparison-func type>=))
-
 # typecall
 sc_type_set_symbol type '__call
     box-ast-macro
@@ -535,6 +527,21 @@ sc_type_set_symbol tuple '__typecall
                 store T (getelementptr types (sub i 1))
                 repeat (add i 1)
             box-pointer (sc_tuple_type pcount types)
+
+# array type constructor
+sc_type_set_symbol array '__typecall
+    box-ast-macro
+        fn "tuple" (argcount args)
+            verify-count argcount 3 3
+            let ET = (unbox-pointer (load (getelementptr args 1)) type)
+            let size = (load (getelementptr args 2))
+            let sizeT = (sc_value_type size)
+            if (type< sizeT integer)
+            else
+                unbox-verify size integer
+            let size =
+                bitcast (sc_const_int_extract size) usize
+            box-pointer (sc_array_type ET size)
 
 # arguments type constructor
 sc_type_set_symbol Arguments '__typecall
@@ -689,6 +696,13 @@ let __unbox =
             let T = (load (getelementptr argv 1))
             let T = (unbox-pointer T type)
             sc_value_unwrap T value
+let
+    type== = (ast-macro (type-comparison-func ptrcmp==))
+    type!= = (ast-macro (type-comparison-func ptrcmp!=))
+    type< = (ast-macro (type-comparison-func type<))
+    type<= = (ast-macro (type-comparison-func type<=))
+    type> = (ast-macro (type-comparison-func type>))
+    type>= = (ast-macro (type-comparison-func type>=))
 
 compile-stage;
 
@@ -845,6 +859,15 @@ fn integer-imply (vT T expr)
         if (ptrcmp== T usize) ('storage T)
         else T
     if (icmp== ('kind ST) type-kind-integer)
+        # constant i32 auto-expands to usize if not negative
+        if ('constant? expr)
+            if (ptrcmp== vT i32)
+                let val = (unbox expr i32)
+                if (ptrcmp== T usize)
+                    if (icmp<s val 0)
+                        compiler-error! "signed integer is negative"
+                    return
+                        box-integer (sext val usize)
         let args... = (Value-array expr T)
         let valw = ('bitcount vT)
         let destw = ('bitcount ST)
@@ -855,9 +878,11 @@ fn integer-imply (vT T expr)
                     sc_call_new (Value bitcast) args...
             elseif (icmp>s destw valw)
                 if ('signed? vT)
-                    sc_call_new (Value sext) args...
+                    return
+                        sc_call_new (Value sext) args...
                 else
-                    sc_call_new (Value zext) args...
+                    return
+                        sc_call_new (Value zext) args...
     compiler-error! "unsupported type"
 
 fn integer-as (vT T expr)
@@ -869,7 +894,8 @@ fn integer-as (vT T expr)
         let valw = ('bitcount vT)
         let destw = ('bitcount T)
         if (icmp== destw valw)
-            return (box-symbol bitcast)
+            return
+                sc_call_new (Value bitcast) args...
         elseif (icmp>s destw valw)
             if ('signed? vT)
                 return
@@ -898,23 +924,15 @@ inline single-binary-op-dispatch (destf)
                 sc_call_new (Value destf) (Value-array lhs rhs)
         compiler-error! "unsupported type"
 
-inline gen-cast-error (intro-string)
-    ast-macro
-        fn "cast-error" (argc argv)
-            verify-count argc 2 2
-            let value T = (loadarrayptrs argv 0 1)
-            let vT = ('typeof value)
-            let T = (unbox-pointer T type)
-            # create branch so we can trick the function into assuming
-                there's another exit path
-            if true
-                compiler-error!
-                    sc_string_join intro-string
-                        sc_string_join
-                            '__repr (box-pointer vT)
-                            sc_string_join " to type "
-                                '__repr (box-pointer T)
-            undef Value
+inline cast-error! (intro-string vT T)
+    # create branch so we can trick the function into assuming
+        there's another exit path
+    compiler-error!
+        sc_string_join intro-string
+            sc_string_join
+                '__repr (box-pointer vT)
+                sc_string_join " to type "
+                    '__repr (box-pointer T)
 
 # receive a source type, a destination type and an expression, and return an
     untyped expression that transforms the value to said type, or raise an error
@@ -975,10 +993,7 @@ let
                     let ok expr = (imply-expr vT T value)
                     if ok expr
                     else
-                        sc_call_new
-                            box-pointer
-                                gen-cast-error "can't implicitly cast value of type "
-                            \ argc argv
+                        cast-error! "can't implicitly cast value of type " vT T
                 else value
 
     as =
@@ -999,10 +1014,7 @@ let
                                 as-expr vT T value
                     if ok expr
                     else
-                        sc_call_new
-                            box-pointer
-                                gen-cast-error "can't cast value of type "
-                            \ argc argv
+                        cast-error! "can't cast value of type " vT T
                 else value
 
 let BinaryOpFunctionType =
@@ -1157,6 +1169,11 @@ fn string@ (self i)
     load (getelementptr s i)
 
 'set-symbols tuple
+    __@ =
+        inline (self index)
+            extractvalue self index
+
+'set-symbols array
     __@ =
         inline (self index)
             extractvalue self index
@@ -2644,7 +2661,7 @@ let arrayof =
             verify-count argc 1 -1
             raises-compile-error;
 
-            let ET = (loadarrayptrs argv 0)
+            let ET = ((loadarrayptrs argv 0) as type)
             let numvals = (sub argc 1)
 
             # generate insert instructions
@@ -2653,6 +2670,10 @@ let arrayof =
                 sc_call_new nullof (Value-array (Value TT))
             if (i < numvals)
                 let arg = (load (getelementptr argv (add i 1)))
+                let arg =
+                    if ((sc_value_type arg) == ET) arg
+                    else
+                        sc_call_new (Value as) (Value-array arg ET)
                 repeat (i + 1)
                     sc_call_new insertvalue
                         Value-array result arg i
@@ -2668,7 +2689,7 @@ let vectorof =
             verify-count argc 1 -1
             raises-compile-error;
 
-            let ET = (loadarrayptrs argv 0)
+            let ET = ((loadarrayptrs argv 0) as type)
             let numvals = (sub argc 1)
 
             # generate insert instructions
@@ -2677,6 +2698,10 @@ let vectorof =
                 sc_call_new nullof (Value-array (Value TT))
             if (i < numvals)
                 let arg = (load (getelementptr argv (add i 1)))
+                let arg =
+                    if ((sc_value_type arg) == ET) arg
+                    else
+                        sc_call_new (Value as) (Value-array arg ET)
                 repeat (i + 1)
                     sc_call_new insertelement
                         Value-array result arg (Value i)

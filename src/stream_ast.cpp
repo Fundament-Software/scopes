@@ -168,6 +168,11 @@ struct StreamAST : StreamAnchors {
         }
     }
 
+    void stream_illegal_value_type(const std::string &name, const Type *T) {
+        ss << Style_Error << "<illegal type for " << name << ">" << Style_None;
+        stream_type_suffix(T);
+    }
+
     // old Any printing reference:
     // https://bitbucket.org/duangle/scopes/src/dfb69b02546e859b702176c58e92a63de3461d77/src/any.cpp
 
@@ -401,8 +406,10 @@ struct StreamAST : StreamAnchors {
                 if (T != TYPE_Symbol)
                     stream_type_suffix(T);
             } else {
-                auto TT = cast<IntegerType>(storage_type(T).assert_ok());
-                if (TT == TYPE_Bool) {
+                auto TT = dyn_cast<IntegerType>(storage_type(T).assert_ok());
+                if (!TT) {
+                    stream_illegal_value_type("ConstInt", T);
+                } else if (TT == TYPE_Bool) {
                     ss << (bool)val->value;
                 } else {
                     if (TT->issigned) {
@@ -418,7 +425,7 @@ struct StreamAST : StreamAnchors {
         case VK_ConstReal: {
             auto val = cast<ConstReal>(node);
             auto T = val->get_type();
-            ss << val;
+            ss << val->value;
             if (T != TYPE_F32)
                 stream_type_suffix(T);
         } break;

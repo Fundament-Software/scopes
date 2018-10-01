@@ -57,6 +57,7 @@ namespace scopes {
 static void init_values_array(scopes::Values &dest, int numvalues, sc_value_t **values) {
     dest.reserve(numvalues);
     for (int i = 0; i < numvalues; ++i) {
+        assert(values[i]);
         //assert(values[i] > (Value *)0x1000);
         dest.push_back(values[i]);
     }

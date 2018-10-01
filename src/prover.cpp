@@ -802,6 +802,7 @@ static SCOPES_RESULT(Value *) prove_Raise(const ASTContext &ctx, Raise *_raise) 
 #define SCOPES_REIMPORT_SYMBOLS() \
     T(g_sc_const_pointer_new, "sc_const_pointer_new") \
     T(g_sc_const_int_new, "sc_const_int_new") \
+    T(g_sc_const_real_new, "sc_const_real_new") \
     T(g_sc_const_aggregate_new, "sc_const_aggregate_new") \
     T(g_bitcast, "bitcast") \
     T(g_voidstar, "voidstar") \
@@ -814,6 +815,7 @@ static SCOPES_RESULT(Value *) prove_Raise(const ASTContext &ctx, Raise *_raise) 
     T(g_zext, "zext") \
     T(g_sext, "sext") \
     T(g_u64, "u64") \
+    T(g_f64, "f64") \
     T(g_alloca_array, "alloca-array") \
     T(g_sc_scope_new_subscope, "sc_scope_new_subscope") \
     T(g_sc_scope_set_symbol, "sc_scope_set_symbol") \
@@ -822,8 +824,11 @@ static SCOPES_RESULT(Value *) prove_Raise(const ASTContext &ctx, Raise *_raise) 
     T(g_itrunc, "itrunc") \
     T(g_sc_const_pointer_extract, "sc_const_pointer_extract") \
     T(g_sc_const_int_extract, "sc_const_int_extract") \
+    T(g_sc_const_real_extract, "sc_const_real_extract") \
     T(g_sc_const_extract_at, "sc_const_extract_at") \
     T(g_undef, "undef") \
+    T(g_fptrunc, "fptrunc") \
+    T(g_fpext, "fpext")
 
 static bool symbols_imported = false;
 #define T(NAME, STR) \
@@ -858,6 +863,12 @@ Value *unwrap_value(const Type *T, Value *value) {
     case TK_Integer: {
         return Call::from(anchor, g_itrunc, {
                 Call::from(anchor, g_sc_const_int_extract, { value }),
+                ConstPointer::type_from(anchor, T)
+            });
+    } break;
+    case TK_Real: {
+        return Call::from(anchor, g_fptrunc, {
+                Call::from(anchor, g_sc_const_real_extract, { value }),
                 ConstPointer::type_from(anchor, T)
             });
     } break;
@@ -938,6 +949,13 @@ Value *wrap_value(const Type *T, Value *value) {
                 { ConstPointer::type_from(anchor, T),
                     Call::from(anchor, ti->issigned?g_sext:g_zext, { value,
                     g_u64 }) });
+        } break;
+        case TK_Real: {
+            auto ti = cast<RealType>(ST);
+            return Call::from(anchor, g_sc_const_real_new,
+                { ConstPointer::type_from(anchor, T),
+                    Call::from(anchor, g_fpext, { value,
+                    g_f64 }) });
         } break;
         case TK_Vector: {
             auto at = cast<VectorType>(ST);
@@ -1349,11 +1367,21 @@ repeat:
             ss << std::endl;
             return build_argument_list(call->anchor(), values);
         } break;
+        case FN_DumpAST: {
+            StyledStream ss(SCOPES_CERR);
+            ss << call->anchor() << " dump-ast:";
+            for (auto arg : values) {
+                ss << std::endl;
+                stream_ast(ss, arg, StreamASTFormat());
+            }
+            ss << std::endl;
+            return build_argument_list(call->anchor(), values);
+        } break;
         case FN_DumpTemplate: {
             StyledStream ss(SCOPES_CERR);
             ss << call->anchor() << " dump-template:";
             for (auto arg : call->args) {
-                ss << " ";
+                ss << std::endl;
                 stream_ast(ss, arg, StreamASTFormat());
             }
             return build_argument_list(call->anchor(), values);
