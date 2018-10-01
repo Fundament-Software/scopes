@@ -920,6 +920,7 @@ fn integer-as (vT T expr)
 
 inline box-binary-op (f)
     box-pointer (typify f type type Value Value)
+
 inline single-binary-op-dispatch (destf)
     fn (lhsT rhsT lhs rhs)
         if (ptrcmp== lhsT rhsT)
@@ -1239,6 +1240,27 @@ fn dispatch-and-or (argc argv flip)
     __<= = (box-binary-op (single-signed-binary-op-dispatch icmp<=s icmp<=u))
     __> = (box-binary-op (single-signed-binary-op-dispatch icmp>s icmp>u))
     __>= = (box-binary-op (single-signed-binary-op-dispatch icmp>=s icmp>=u))
+
+'set-symbols real
+    __== = (box-binary-op (single-binary-op-dispatch fcmp==o))
+    __!= = (box-binary-op (single-binary-op-dispatch fcmp!=u))
+    __> = (box-binary-op (single-binary-op-dispatch fcmp>o))
+    __>= = (box-binary-op (single-binary-op-dispatch fcmp>=o))
+    __< = (box-binary-op (single-binary-op-dispatch fcmp<o))
+    __<= = (box-binary-op (single-binary-op-dispatch fcmp<=o))
+    __+ = (box-binary-op (single-binary-op-dispatch fadd))
+    __- = (box-binary-op (single-binary-op-dispatch fsub))
+    #__neg
+        inline (self)
+            fsub (nullof (typeof self)) self
+    __* = (box-binary-op (single-binary-op-dispatch fmul))
+    __/ = (box-binary-op (single-binary-op-dispatch fdiv))
+    #__rcp
+        inline (self)
+            fdiv (imply 1 (typeof self)) self
+    #__// = (box-binary-op (single-binary-op-dispatch floordiv)
+    __% = (box-binary-op (single-binary-op-dispatch frem))
+
 
 fn type-getattr-dynamic (T value)
     let ok val = (sc_type_at T value)
@@ -2509,6 +2531,54 @@ let __assert =
                 sc_call_new check-assertion
                     Value-array expr (Value anchor) msg
 
+let vector-reduce =
+    ast-macro
+        fn (argc argv)
+            verify-count argc 2 2
+            let f v = (loadarrayptrs argv 0 1)
+            let T = ('typeof v)
+            let sz = ('element-count T)
+            loop (v sz) = v sz
+            # special cases for low vector sizes
+            if (sz == 1)
+                sc_call_new extractelement (Value-array v 0)
+            elseif (sz == 2)
+                sc_call_new f
+                    Value-array
+                        sc_call_new extractelement (Value-array v 0)
+                        sc_call_new extractelement (Value-array v 1)
+            elseif (sz == 3)
+                sc_call_new f
+                    Value-array
+                        sc_call_new f
+                            Value-array
+                                sc_call_new extractelement (Value-array v 0)
+                                sc_call_new extractelement (Value-array v 1)
+                        sc_call_new extractelement (Value-array v 2)
+            elseif (sz == 4)
+                sc_call_new f
+                    Value-array
+                        sc_call_new f
+                            Value-array
+                                sc_call_new extractelement (Value-array v 0)
+                                sc_call_new extractelement (Value-array v 1)
+                        sc_call_new f
+                            Value-array
+                                sc_call_new extractelement (Value-array v 2)
+                                sc_call_new extractelement (Value-array v 3)
+            else
+                let hsz = (sz >> 1)
+                let fsz = (hsz << 1)
+                if (fsz != sz)
+                    compiler-error! "vector size must be a power of two"
+                let hsz-value = (Value (hsz as usize))
+                repeat
+                    sc_call_new f
+                        Value-array
+                            sc_call_new lslice (Value-array v hsz-value)
+                            sc_call_new rslice (Value-array v hsz-value)
+                    hsz
+
 compile-stage;
 
 # (define-scope-macro name expr ...)
@@ -2728,71 +2798,83 @@ let arrayof =
 # vectors
 #-------------------------------------------------------------------------------
 
-let vector-reduce =
-    ast-macro
-        fn (argc argv)
-            verify-count argc 2 2
-            let f v = (loadarrayptrs argv 0 1)
-            let T = ('typeof v)
-            let sz = ('element-count T)
-            loop (v sz) = v sz
-            # special cases for low vector sizes
-            if (sz == 1)
-                sc_call_new extractelement (Value-array v 0)
-            elseif (sz == 2)
-                sc_call_new f
-                    Value-array
-                        sc_call_new extractelement (Value-array v 0)
-                        sc_call_new extractelement (Value-array v 1)
-            elseif (sz == 3)
-                sc_call_new f
-                    Value-array
-                        sc_call_new f
-                            Value-array
-                                sc_call_new extractelement (Value-array v 0)
-                                sc_call_new extractelement (Value-array v 1)
-                        sc_call_new extractelement (Value-array v 2)
-            elseif (sz == 4)
-                sc_call_new f
-                    Value-array
-                        sc_call_new f
-                            Value-array
-                                sc_call_new extractelement (Value-array v 0)
-                                sc_call_new extractelement (Value-array v 1)
-                        sc_call_new f
-                            Value-array
-                                sc_call_new extractelement (Value-array v 2)
-                                sc_call_new extractelement (Value-array v 3)
-            else
-                let hsz = (sz >> 1)
-                let fsz = (hsz << 1)
-                if (fsz != sz)
-                    compiler-error! "vector size must be a power of two"
-                let hsz-value = (Value (hsz as usize))
-                repeat
-                    sc_call_new f
-                        Value-array
-                            sc_call_new lslice (Value-array v hsz-value)
-                            sc_call_new rslice (Value-array v hsz-value)
-                    hsz
-
 fn any? (v)
     vector-reduce bor v
 fn all? (v)
     vector-reduce band v
 
-#typefn vector '__slice (self i0 i1)
-    if ((constant? i0) and (constant? i1))
-        let usz = (sub i1 i0)
-        let loop (i mask) = i0 (nullof (vector i32 usz))
-        if (icmp<u i i1)
-            loop (add i 1:usize) (insertelement mask (i32 i) (sub i i0))
-        else
-            shufflevector self self mask
-    else
-        compiler-error! "slice indices must be constant"
+inline single-signed-vector-binary-op-dispatch (sf uf)
+    fn (lhsT rhsT lhs rhs)
+        if (ptrcmp== lhsT rhsT)
+            let Ta = ('element@ lhsT 0)
+            return
+                sc_call_new
+                    if ('signed? Ta)
+                        Value sf
+                    else
+                        Value uf
+                    Value-array lhs rhs
+        compiler-error! "unsupported type"
+
+'set-symbols integer
+    __vector+ = (box-binary-op (single-binary-op-dispatch add))
+    __vector- = (box-binary-op (single-binary-op-dispatch sub))
+    __vector* = (box-binary-op (single-binary-op-dispatch mul))
+    __vector// = (box-binary-op (single-signed-binary-op-dispatch sdiv udiv))
+    __vector% = (box-binary-op (single-signed-binary-op-dispatch srem urem))
+    __vector& = (box-binary-op (single-binary-op-dispatch band))
+    __vector| = (box-binary-op (single-binary-op-dispatch bor))
+    __vector^ = (box-binary-op (single-binary-op-dispatch bxor))
+    __vector<< = (box-binary-op (single-binary-op-dispatch shl))
+    __vector>> = (box-binary-op (single-signed-binary-op-dispatch ashr lshr))
+    __vector== = (box-binary-op (single-binary-op-dispatch icmp==))
+    __vector!= = (box-binary-op (single-binary-op-dispatch icmp!=))
+    __vector> = (box-binary-op (single-signed-binary-op-dispatch icmp>s icmp>u))
+    __vector>= = (box-binary-op (single-signed-binary-op-dispatch icmp>s icmp>=u))
+    __vector< = (box-binary-op (single-signed-binary-op-dispatch icmp<s icmp<u))
+    __vector<= = (box-binary-op (single-signed-binary-op-dispatch icmp<=s icmp<=u))
+
+'set-symbols real
+    __vector+ = (box-binary-op (single-binary-op-dispatch fadd))
+    __vector- = (box-binary-op (single-binary-op-dispatch fsub))
+    __vector* = (box-binary-op (single-binary-op-dispatch fmul))
+    __vector/ = (box-binary-op (single-binary-op-dispatch fdiv))
+    __vector% = (box-binary-op (single-binary-op-dispatch frem))
+    __vector== = (box-binary-op (single-binary-op-dispatch fcmp==o))
+    __vector!= = (box-binary-op (single-binary-op-dispatch fcmp!=u))
+    __vector> = (box-binary-op (single-binary-op-dispatch fcmp>o))
+    __vector>= = (box-binary-op (single-binary-op-dispatch fcmp>=o))
+    __vector< = (box-binary-op (single-binary-op-dispatch fcmp<o))
+    __vector<= = (box-binary-op (single-binary-op-dispatch fcmp<=o))
+
+fn vector-binary-op-expr (symbol lhsT rhsT lhs rhs)
+    let Ta = ('element@ lhsT 0)
+    let ok f = ('@ Ta symbol)
+    if ok
+        let f = (unbox-binary-op-function-type f)
+        return (f lhsT rhsT lhs rhs)
+    compiler-error! "unsupported operation"
+
+inline vector-binary-op-dispatch (symbol)
+    box-binary-op
+        fn (lhsT rhsT lhs rhs) (vector-binary-op-expr symbol lhsT rhsT lhs rhs)
 
 'set-symbols vector
+    __+ = (vector-binary-op-dispatch '__vector+)
+    __- = (vector-binary-op-dispatch '__vector-)
+    __* = (vector-binary-op-dispatch '__vector*)
+    __/ = (vector-binary-op-dispatch '__vector/)
+    __// = (vector-binary-op-dispatch '__vector//)
+    __% = (vector-binary-op-dispatch '__vector%)
+    __& = (vector-binary-op-dispatch '__vector&)
+    __| = (vector-binary-op-dispatch '__vector|)
+    __^ = (vector-binary-op-dispatch '__vector^)
+    __== = (vector-binary-op-dispatch '__vector==)
+    __!= = (vector-binary-op-dispatch '__vector!=)
+    __> = (vector-binary-op-dispatch '__vector>)
+    __>= = (vector-binary-op-dispatch '__vector>=)
+    __< = (vector-binary-op-dispatch '__vector<)
+    __<= = (vector-binary-op-dispatch '__vector<=)
     __lslice =
         ast-macro
             fn (argc argv)
@@ -2884,6 +2966,28 @@ let vectorof =
             result
 
 #-------------------------------------------------------------------------------
+
+let eval =
+    syntax-scope-macro
+        fn (args scope)
+            let subscope = (Scope scope)
+            let anchor = (sc_get_active_anchor)
+            let expr =
+                list
+                    list Value
+                        cons do
+                            list raises-compile-error
+                            args
+            let f = (sc_compile (sc_eval anchor expr subscope) 0:u64)
+            let fptr =
+                f as
+                    'pointer
+                        'raising
+                            function Value
+                            Error
+            return
+                fptr;
+                scope
 
 #fn compile-flags (opts...)
     let vacount = (va-countof opts...)
@@ -2980,7 +3084,7 @@ let
     list-parse = sc_parse_from_string
     set-anchor! = sc_set_active_anchor
     active-anchor = sc_get_active_anchor
-    eval = sc_eval
+    #eval = sc_eval
     format-error = sc_format_error
     import-c = sc_import_c
 
@@ -3132,7 +3236,7 @@ fn read-eval-print-loop ()
                             list __this-scope
                             list locals
                             tmp
-            let f = (sc_compile (eval expr-anchor (unbox-pointer expr list) eval-scope) 0:u64)
+            let f = (sc_compile (sc_eval expr-anchor (unbox-pointer expr list) eval-scope) 0:u64)
             let fptr =
                 f as
                     'pointer

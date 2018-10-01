@@ -1580,6 +1580,16 @@ repeat:
             }
             RETARGTYPES(SCOPES_GET_RESULT(vector_type(vi->element_type, outcount)));
         } break;
+        case FN_Length: {
+            CHECKARGS(1, 1);
+            READ_STORAGETYPEOF(T);
+            SCOPES_CHECK_RESULT(verify_real_vector(T));
+            if (T->kind() == TK_Vector) {
+                RETARGTYPES(cast<VectorType>(T)->element_type);
+            } else {
+                RETARGTYPES(_T->get_type());
+            }
+        } break;
         case FN_ExtractValue: {
             CHECKARGS(2, 2);
             READ_STORAGETYPEOF(T);
