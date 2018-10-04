@@ -752,6 +752,10 @@ inline set-symbols (self values...)
     __repr = sc_value_repr
     typeof = sc_value_type
     anchor = sc_value_anchor
+    dekey =
+        fn "dekey" (self)
+            let k = (sc_type_key ('typeof self))
+            _ k (sc_keyed_new unnamed self)
 
 'set-symbols Scope
     @ = sc_scope_at
@@ -779,6 +783,7 @@ inline set-symbols (self values...)
     storage = sc_type_storage
     kind = sc_type_kind
     @ = sc_type_at
+    local@ = sc_type_local_at
     opaque? = sc_type_is_opaque
     string = sc_type_string
     super = sc_typename_type_get_super
@@ -786,6 +791,19 @@ inline set-symbols (self values...)
     set-storage = sc_typename_type_set_storage
     return-type = sc_function_type_return_type
     key = sc_type_key
+    variadic? = sc_function_type_is_variadic
+    pointer? =
+        fn (cls)
+            icmp== ('kind cls) type-kind-pointer
+    function? =
+        fn (cls)
+            icmp== ('kind cls) type-kind-function
+    function-pointer? =
+        fn (cls)
+            if ('pointer? cls)
+                if ('function? ('element@ cls 0))
+                    return true
+            return false
 
 #'set-symbols Closure
     frame = sc_closure_frame
@@ -917,6 +935,48 @@ fn integer-as (vT T expr)
             return
                 sc_call_new (Value uitofp) args...
     compiler-error! "unsupported type"
+
+# only perform safe casts: i.e. float to double
+fn real-imply (vT T expr)
+    if (icmp== ('kind T) type-kind-real)
+        let args... = (Value-array expr T)
+        let valw = ('bitcount vT)
+        let destw = ('bitcount T)
+        if (icmp== destw valw)
+            return
+                sc_call_new (Value bitcast) args...
+        elseif (icmp>s destw valw)
+            return
+                sc_call_new (Value fpext) args...
+    compiler-error! "unsupported type"
+
+# more aggressive cast that converts from all numerical types
+fn real-as (vT T expr)
+    let args... = (Value-array expr T)
+    let T =
+        if (ptrcmp== T usize) ('storage T)
+        else T
+    let kind = ('kind T)
+    if (icmp== kind type-kind-real)
+        let valw destw = ('bitcount vT) ('bitcount T)
+        if (icmp== destw valw)
+            return
+                sc_call_new (Value bitcast) args...
+        elseif (icmp>s destw valw)
+            return
+                sc_call_new (Value fpext) args...
+        else
+            return
+                sc_call_new (Value fptrunc) args...
+    elseif (icmp== kind type-kind-integer)
+        if ('signed? T)
+            return
+                sc_call_new (Value fptosi) args...
+        else
+            return
+                sc_call_new (Value fptoui) args...
+    compiler-error! "unsupported type"
+
 
 inline box-binary-op (f)
     box-pointer (typify f type type Value Value)
@@ -1159,6 +1219,8 @@ inline make-asym-binary-op-dispatch (symbol rtype friendly-op-name)
 'set-symbols Symbol
     __== = (box-binary-op (single-binary-op-dispatch icmp==))
     __!= = (box-binary-op (single-binary-op-dispatch icmp!=))
+    unique = sc_symbol_new_unique
+    vararg? = sc_symbol_is_vararg
     __imply =
         box-cast
             fn "syntax-imply" (vT T expr)
@@ -1241,7 +1303,12 @@ fn dispatch-and-or (argc argv flip)
     __> = (box-binary-op (single-signed-binary-op-dispatch icmp>s icmp>u))
     __>= = (box-binary-op (single-signed-binary-op-dispatch icmp>=s icmp>=u))
 
+inline floordiv (a b)
+    sdiv (fptosi a i32) (fptosi b i32)
+
 'set-symbols real
+    __imply = (box-cast real-imply)
+    __as = (box-cast real-as)
     __== = (box-binary-op (single-binary-op-dispatch fcmp==o))
     __!= = (box-binary-op (single-binary-op-dispatch fcmp!=u))
     __> = (box-binary-op (single-binary-op-dispatch fcmp>o))
@@ -1258,7 +1325,7 @@ fn dispatch-and-or (argc argv flip)
     #__rcp
         inline (self)
             fdiv (imply 1 (typeof self)) self
-    #__// = (box-binary-op (single-binary-op-dispatch floordiv)
+    __// = (box-binary-op (single-binary-op-dispatch floordiv))
     __% = (box-binary-op (single-binary-op-dispatch frem))
 
 
@@ -1267,6 +1334,10 @@ fn type-getattr-dynamic (T value)
     if ok
         return val
     compiler-error! "no such attribute"
+
+'set-symbols Value
+    __== = (box-binary-op (single-binary-op-dispatch ptrcmp==))
+    __!= = (box-binary-op (single-binary-op-dispatch ptrcmp!=))
 
 'set-symbols type
     __== = (box-binary-op (single-binary-op-dispatch type==))
@@ -1402,7 +1473,8 @@ let
     + = (make-sym-binary-op-dispatch '__+ '__r+ "add")
     - = (make-sym-binary-op-dispatch '__- '__r- "subtract")
     * = (make-sym-binary-op-dispatch '__* '__r* "multiply")
-    / = (make-sym-binary-op-dispatch '__/ '__r/ "divide")
+    / = (make-sym-binary-op-dispatch '__/ '__r/ "real-divide")
+    // = (make-sym-binary-op-dispatch '__// '__r// "integer-divide")
     % = (make-sym-binary-op-dispatch '__% '__r% "modulate")
     & = (make-sym-binary-op-dispatch '__& '__r& "apply bitwise-and to")
     | = (make-sym-binary-op-dispatch '__| '__r| "apply bitwise-or to")
@@ -1510,6 +1582,10 @@ let print =
             values...
 
 'set-symbol integer '__typecall
+    inline (cls value)
+        as value cls
+
+'set-symbol real '__typecall
     inline (cls value)
         as value cls
 
@@ -1932,10 +2008,10 @@ fn rtl-multiop (argc argv target)
 
 # extracting options from varargs
 
-# (va-option-branch key thenf elsef args...)
+# (va-option-branch key elsef args...)
 fn va-option-branch (argc argv)
-    verify-count argc 3 -1
-    let key thenf elsef = (loadarrayptrs argv 0 1 2)
+    verify-count argc 2 -1
+    let key elsef = (loadarrayptrs argv 0 1)
     let key = (unbox-symbol key Symbol)
     loop (i) = 2
     if (< i argc)
@@ -1943,11 +2019,9 @@ fn va-option-branch (argc argv)
         let argkey = ('key ('typeof arg))
         if (== key argkey)
             return
-                sc_call_new thenf
-                    Value-array
-                        sc_keyed_new unnamed arg
+                sc_keyed_new unnamed arg
         repeat (+ i 1)
-    sc_call_new elsef 0 (undef ValueArrayPointer)
+    sc_call_new elsef 0 (nullof ValueArrayPointer)
 
 # modules
 ####
@@ -1982,16 +2056,22 @@ fn clone-scope-contents (a b)
                 if (ptrcmp== ('typeof cls) type)
                     let cls = (as cls type)
                     if (ptrcmp== cls typename)
-                        verify-count argc 2 2
+                        verify-count argc 2 4
                         let name = (loadarrayptrs argv 1)
-                        return
-                            if ('constant? name)
-                                Value
-                                    sc_typename_type
-                                        as (loadarrayptrs argv 1) string
+                        let T =
+                            sc_typename_type
+                                as name string
+                        loop (i) = 2
+                        if (< i argc)
+                            let arg = (loadarrayptrs argv i)
+                            let k v = (sc_type_key (sc_value_type arg))
+                            if (== k 'super)
+                                sc_typename_type_set_super T (as v type)
+                            elseif (== k 'storage)
+                                sc_typename_type_set_storage T (as v type)
                             else
-                                sc_call_new (Value sc_typename_type) 1
-                                    getelementptr argv 1
+                                compiler-error! "super or storage key expected"
+                        return (Value T)
                 compiler-error!
                     sc_string_join "typename "
                         sc_string_join ('__repr cls)
@@ -2126,6 +2206,16 @@ define-infix> 800 @
 inline char (s)
     let s sz = (sc_string_buffer s)
     load s
+
+# (va-option key args... else-body)
+let va-option =
+    syntax-macro
+        fn (args)
+            let key va body = (decons args 2)
+            let sym = (as key Symbol)
+            list va-option-branch (list quote sym)
+                cons inline '() body
+                va
 
 #---------------------------------------------------------------------------
 # for iterator
@@ -2276,16 +2366,11 @@ fn load-module (module-name module-path opts...)
     let module-dir = (sc_dirname module-path)
     let expr = (sc_parse_from_path module-path)
     let eval-scope =
-        va-option-branch 'scope
-            inline (x) x
-            inline ()
-                Scope (sc_get_globals)
-            opts...
+        va-option scope opts...
+            Scope (sc_get_globals)
     'set-symbols eval-scope
         main-module? =
-            va-option-branch 'main-module?
-                inline (x) x
-                inline () false
+            va-option main-module? opts... false
         module-path = module-path
         module-dir = module-dir
         module-name = module-name
@@ -2506,27 +2591,47 @@ define define-syntax-macro
                         body
 
 define define-ast-macro
+
+    inline wrap-ast-macro (f)
+        ast-macro
+            fn (argc argv)
+                return (Value (f argc argv))
+
     syntax-macro
         fn "expand-define-ast-macro" (expr)
             raises-compile-error;
             let name params body = (decons expr 2)
             let params = (params as list)
             let paramcount = ((countof params) as i32)
+
             let argc = (Symbol "#argc")
             let argv = (Symbol "#argv")
-            loop (i rest body) = 0 params body
+            loop (i rest body varargs) = 0 params body false
             if (not (empty? rest))
-                let param rest = (decons rest)
-                let param = (param as Symbol)
+                let paramv rest = (decons rest)
+                let param = (paramv as Symbol)
+                let vararg? = ('vararg? param)
                 let body =
-                    cons
-                        list let param '= (list load (list getelementptr argv i))
-                        body
-                repeat (i + 1) rest body
+                    if vararg?
+                        if (not (empty? rest))
+                            syntax-error! ('anchor paramv)
+                                "vararg parameter is not in last place"
+                        cons
+                            list let paramv '=
+                                list sub argc i
+                                list getelementptr argv i
+                            body
+                    else
+                        cons
+                            list let paramv '= (list load (list getelementptr argv i))
+                            body
+                repeat (i + 1) rest body (| varargs vararg?)
             list define name
-                list ast-macro
-                    cons fn (name as Symbol as string) (list argc argv)
-                        list verify-count argc paramcount paramcount
+                list wrap-ast-macro
+                    cons inline (name as Symbol as string) (list argc argv)
+                        list verify-count argc
+                            ? varargs (sub paramcount 1) paramcount
+                            ? varargs -1 paramcount
                         body
 
 let __assert =
@@ -2599,13 +2704,22 @@ let vector-reduce =
                             sc_call_new rslice (Value-array v hsz-value)
                     hsz
 
+let __countof-aggregate =
+    ast-macro
+        fn (argc argv)
+            verify-count argc 1 1
+            let self = (loadarrayptrs argv 0)
+            let T = ('typeof self)
+            let sz = ('element-count T)
+            Value (sz as usize)
+
 compile-stage;
 
 # (define-scope-macro name expr ...)
 # implies builtin names:
     args : list
     scope : Scope
-define-syntax-macro define-scope-macro
+define-syntax-macro define-syntax-scope-macro
     let name body = (decons args)
     list define name
         list syntax-scope-macro
@@ -2616,7 +2730,7 @@ define-syntax-macro define-scope-macro
     expr : list
     next-expr : list
     scope : Scope
-define-syntax-macro define-block-scope-macro
+define-syntax-macro define-syntax-block-scope-macro
     let name body = (decons args)
     list define name
         list syntax-block-scope-macro
@@ -2641,15 +2755,24 @@ inline list-generator (self)
                         sc_call_new (Value list-generator) (Value-array expr)
                 compiler-error! "unsupported type"
 
+inline vararg-range (argc argv)
+    Generator
+        inline (fdone x)
+            if (x < argc)
+                _ (x + 1) (load (getelementptr argv x))
+            else
+                fdone;
+        0
+
 inline range (a b c)
     let num-type = (typeof a)
     let step =
         constbranch (none? c)
-            inline () (num-type 1)
+            inline () (1 as num-type)
             inline () c
     let from =
         constbranch (none? b)
-            inline () (num-type 0)
+            inline () (0 as num-type)
             inline () a
     let to =
         constbranch (none? b)
@@ -2749,7 +2872,8 @@ inline make-unpack-function (extractf)
 let __unpack-aggregate = (make-unpack-function extractvalue)
 
 'set-symbols tuple
-    __unpack = (Value __unpack-aggregate)
+    __unpack = __unpack-aggregate
+    __countof = __countof-aggregate
     __@ =
         inline (self index)
             extractvalue self index
@@ -2785,7 +2909,8 @@ let tupleof =
 #-------------------------------------------------------------------------------
 
 'set-symbols array
-    __unpack = (Value __unpack-aggregate)
+    __unpack = __unpack-aggregate
+    __countof = __countof-aggregate
     __@ =
         inline (self index)
             extractvalue self index
@@ -2946,6 +3071,7 @@ inline vector-binary-op-dispatch (symbol)
                     Value-array self self
                         sc_const_aggregate_new maskT total maskvals
     __unpack = (Value (make-unpack-function extractelement))
+    __countof = __countof-aggregate
     # vector type constructor
     __typecall =
         ast-macro
@@ -2987,13 +3113,482 @@ let vectorof =
 
 #-------------------------------------------------------------------------------
 
-let syntax-eval =
-    syntax-scope-macro
-        fn (args scope)
-            let subscope = (Scope scope)
-            return
-                exec-module (Value args) subscope
-                scope
+let
+    min =
+        ast-macro
+            fn (argc argv)
+                ltr-multiop argc argv
+                    Value
+                        inline "min" (a b)
+                            ? (<= a b) a b
+    max =
+        ast-macro
+            fn (argc argv)
+                ltr-multiop argc argv
+                    Value
+                        inline "max" (a b)
+                            ? (>= a b) a b
+
+inline clamp (x mn mx)
+    ? (> x mx) mx
+        ? (< x mn) mn x
+
+#-------------------------------------------------------------------------------
+# various C related sugar
+#-------------------------------------------------------------------------------
+
+# functions safecast to function pointers
+'set-symbols Closure
+    __imply =
+        box-cast
+            fn (srcT destT expr)
+                if ('function-pointer? destT)
+                    let funcT = ('element@ destT 0)
+                    let sz = ('element-count funcT)
+                    let func = (expr as Closure)
+                    if ('variadic? funcT)
+                        compiler-error! "cannot typify to variadic function"
+                    let args = (alloca-array type sz)
+                    for i in (range sz)
+                        store ('element@ funcT i) (getelementptr args i)
+                    let result =
+                        sc_typify func sz args
+                    let resultT = ('typeof result)
+                    if (resultT != destT)
+                        syntax-error! ('anchor result)
+                            .. "function does not compile to type " (repr destT)
+                                \ "but has type " (repr resultT)
+                    return result
+                compiler-error! "unsupported type"
+
+let
+    extern =
+        ast-macro
+            fn (argc argv)
+                verify-count argc 2 2
+                let sym T = (loadarrayptrs argv 0 1)
+                let sym = (sym as Symbol)
+                let T = (T as type)
+                Value
+                    sc_extern_new sym T
+
+#-------------------------------------------------------------------------------
+
+compile-stage;
+
+let infinite-range =
+    Generator
+        inline (fdone x)
+            _ (x + 1) x
+        0
+
+inline zip (a b)
+    let iter-a init-a = ((a as Generator))
+    let iter-b init-b = ((b as Generator))
+    Generator
+        inline (fdone t)
+            let a = (@ t 0)
+            let b = (@ t 1)
+            let next-a at-a... = (iter-a fdone a)
+            let next-b at-b... = (iter-b fdone b)
+            _ (tupleof next-a next-b) at-a... at-b...
+        tupleof init-a init-b
+
+inline enumerate (x)
+    zip infinite-range x
+
+#-------------------------------------------------------------------------------
+# references
+#-------------------------------------------------------------------------------
+
+inline construct
+inline copy-construct
+inline destruct
+inline move-construct
+
+let ref = (typename "ref")
+
+set-symbols Value
+    typeof& =
+        fn (self)
+            let T = ('typeof self)
+            assert (T < ref)
+                .. "argument must be of reference type, but is of type " (repr T)
+            'element@ T 0
+
+let ref-attribs-key = '__refattrs
+set-symbols type
+    @& =
+        fn "@&" (T name)
+            loop (T) = T
+            let ok attrs = ('local@ T ref-attribs-key)
+            if ok
+                let attrs = (attrs as type)
+                let ok val = ('@ attrs name)
+                if ok
+                    return ok val
+            if (T == typename)
+                return false (nullof Value)
+            repeat ('super T)
+    set-symbol& =
+        fn "set-symbol&" (T name value)
+            let ok attrs = ('local@ T ref-attribs-key)
+            let attrs =
+                if ok (attrs as type)
+                else
+                    let attrs = (sc_typename_type (ref-attribs-key as string))
+                    'set-symbol T ref-attribs-key (Value attrs)
+                    attrs
+            'set-symbol attrs name value
+
+#define-ast-macro deref (values...)
+    let count = values...
+    let result = (alloca-array Value count)
+    for i kvalue in (enumerate (vararg-range values...))
+        let key value = ('dekey kvalue)
+        let T = ('typeof value)
+        store
+            if (T < ref)
+                let ok op = ('@ T '__deref)
+                if ok
+                    let cmd = (sc_call_new op (Value-array value))
+                    if (key == unnamed) cmd
+                    else
+                        sc_keyed_new key cmd
+            else
+                kvalue
+            getelementptr result i
+    sc_argument_list_new count result
+
+#inline deref1 (value)
+    let T = (typeof value)
+    if (T < ref)
+        let op = (type@ T '__deref)
+        op value
+    else value
+
+#inline deref (values...)
+    let repeat (i result...) = (va-countof values...)
+    if (i > 0)
+        let i = (i - 1)
+        let value = (va@ i values...)
+        repeat i
+            deref1 value
+            result...
+    result...
+
+#compile-stage;
+#print
+    deref 5 6 7 8
+
+#
+    let voidstar = (pointer void)
+
+    set-type-symbol!& Any 'typeof
+        inline (self)
+            Any-typeof (deref self)
+
+    set-type-symbol!& Any '__imply
+        inline (src destT)
+            Any-extract (deref src) destT
+
+    do
+        inline passthru-overload (sym func)
+            set-type-symbol! ref sym (fn (a b flipped) (func (deref a) (deref b)))
+        passthru-overload '__== ==; passthru-overload '__!= !=
+        passthru-overload '__< <; passthru-overload '__<= <=
+        passthru-overload '__> >; passthru-overload '__>= >=
+        passthru-overload '__& &; passthru-overload '__| |; passthru-overload '__^ ^
+        passthru-overload '__+ +; passthru-overload '__- -
+        passthru-overload '__* *; passthru-overload '__/ /
+        passthru-overload '__** pow
+        passthru-overload '__// //
+        passthru-overload '__% %
+        passthru-overload '__<< <<; passthru-overload '__>> >>
+        passthru-overload '__.. ..
+
+        fn passthru-inplace-overload (methodname fallback)
+            set-type-symbol! ref methodname
+                inline (a b)
+                    let ET = (typeof& a)
+                    let op ok = (type@& ET methodname)
+                    if ok
+                        return (op a b)
+                    let op ok = (type@& ET '__deref)
+                    if (not ok)
+                        compiler-error!
+                            .. (op-prettyname methodname)
+                                \ " of reference not supported by value of type " (repr ET)
+                        return;
+                    = a (fallback a b)
+                    true
+
+        passthru-inplace-overload '__+= +
+        passthru-inplace-overload '__-= -
+        passthru-inplace-overload '__*= *
+        passthru-inplace-overload '__/= /
+        passthru-inplace-overload '__//= //
+        passthru-inplace-overload '__%= %
+        passthru-inplace-overload '__>>= >>
+        passthru-inplace-overload '__<<= <<
+        passthru-inplace-overload '__&= &
+        passthru-inplace-overload '__|= |
+        passthru-inplace-overload '__^= ^
+
+        fn define-ref-forward (failedf methodname)
+            set-type-symbol! ref methodname
+                inline (self args...)
+                    let ET = (typeof& self)
+                    let op success = (type@& ET methodname)
+                    if success
+                        return (op self args...)
+                    let op ok = (type@& ET '__deref)
+                    if (not ok)
+                        compiler-error!
+                            .. (op-prettyname methodname)
+                                \ " of reference not supported by value of type " (repr ET)
+                        return;
+                    failedf (deref self) args...
+
+        fn define-ref-forward-failable (failedf methodname)
+            set-type-symbol! ref methodname
+                inline (self args...)
+                    let ET = (typeof& self)
+                    let op success = (type@& ET methodname)
+                    if success
+                        let result... = (op self args...)
+                        if (not (va-empty? result...))
+                            return result...
+                    let op ok = (type@& ET '__deref)
+                    if (not ok)
+                        return;
+                    failedf (deref self) args...
+
+        define-ref-forward (do -) '__neg
+        define-ref-forward (do /) '__rcp
+        define-ref-forward countof '__countof
+        define-ref-forward unpack '__unpack
+        define-ref-forward forward-hash '__hash
+        define-ref-forward (do @) '__@
+        define-ref-forward-failable forward-as '__as
+        define-ref-forward-failable forward-getattr '__getattr
+
+        set-type-symbol! ref '__repr
+            fn (self)
+                let ET = (typeof& self)
+                let op ok = (type@& ET '__repr)
+                if ok
+                    return (op self)
+                let op ok = (type@& ET '__deref)
+                if ok
+                    forward-repr (deref self)
+                else
+                    string-repr
+                        bitcast self (storageof (typeof self))
+
+        set-type-symbol! ref '__deref
+            inline "ref-deref" (self)
+                let ET = (typeof& self)
+                let op ok = (type@& ET '__deref)
+                if ok
+                    op self
+                else
+                    compiler-error!
+                        .. "cannot dereference value of type " (repr ET)
+
+        set-type-symbol! ref '__typeattr
+            inline "ref-typeattr" (cls name)
+                let T = (storageof cls)
+                let ET = (element-type T 0)
+                let value success = (type@& ET name)
+                if success
+                    return value
+                let op success = (type@& ET '__typeattr)
+                if success
+                    let result... = (op ET name)
+                    if (va-empty? result...)
+                    else
+                        return result...
+
+        set-type-symbol! ref '__call
+            inline "ref-call" (self args...)
+                let ET = (typeof& self)
+                let op success = (type@& ET '__call)
+                if success
+                    return (op self args...)
+                else
+                    call (deref self) args...
+
+        set-type-symbol! ref '__imply
+            inline "ref-imply" (self destT)
+                let ptrtype = (storageof (typeof self))
+                if (type== destT ptrtype)
+                    return (bitcast self ptrtype)
+                if (pointer-type-imply? ptrtype destT)
+                    return (bitcast self destT)
+                let ET = (element-type ptrtype 0)
+                if (array-type? ET)
+                    let ET = (element-type ET 0)
+                    let aptrtype = (pointer ET)
+                    if (type== destT aptrtype)
+                        return (bitcast self aptrtype)
+                # try to ask target type for implicit refcast
+                let op ok = (type@& ET '__imply)
+                if ok
+                    let result... = (op self destT)
+                    if (not (va-empty? result...))
+                        return result...
+                # dereference if target type can implicitly cast
+                let op ok = (type@& ET '__deref)
+                if ok
+                    return
+                        forward-imply (deref self) destT
+
+        set-type-symbol! ref '__=
+            inline "ref=" (self value)
+                let ET = (typeof& self)
+                let op ok = (type@& ET '__=)
+                if ok
+                    let result... = (op self value)
+                    if (not (va-empty? result...))
+                        return result...
+                destruct self
+                copy-construct self value
+                true
+
+        fn make-ref-type (PT)
+            let ET = (element-type PT 0)
+            let class = ('storage PT)
+            let T =
+                typename
+                    ..
+                        if ('writable? PT) "&"
+                        else "(&)"
+                        if (class != unnamed)
+                            .. "[" (Symbol->string class) "]"
+                        else ""
+                        type-name ET
+                    ref
+                    PT
+            set-type-symbol! T 'ElementType ET
+            T
+
+        set-type-symbol! ref '__typecall
+            inline "ref-typecall" (cls T)
+                assert-typeof T type
+                if (T < ref)
+                    compiler-error!
+                        .. "cannot create reference type of reference type "
+                            repr T
+                make-ref-type T
+
+    #var has been removed; use `local`
+
+    #global has been removed; use `static`
+
+    # (typefn[!][&] type 'symbol (params) body ...)
+    define-macro typefn
+        let ty name params body = (decons args 3)
+        list set-type-symbol! ty name
+            cons fn params body
+    define-macro typefn&
+        let ty name params body = (decons args 3)
+        list set-type-symbol!& ty name
+            cons fn params body
+    define-macro typeinline
+        let ty name params body = (decons args 3)
+        list set-type-symbol! ty name
+            cons inline params body
+    define-macro typeinline&
+        let ty name params body = (decons args 3)
+        list set-type-symbol!& ty name
+            cons inline params body
+
+    inline bitcast& (self destT)
+        let T = (typeof self)
+        assert (T < ref) "argument must be of reference type"
+        let ST = (storageof T)
+        # todo: ensure types are compatible
+        (bitcast self ('set-element-type ST destT)) as ref
+
+#-------------------------------------------------------------------------------
+
+define-syntax-block-scope-macro static-if
+    fn process (body next-expr)
+        if false
+            return '() next-expr
+        let cond body = (decons body)
+        let elseexpr next-next-expr =
+            if (empty? next-expr)
+                _ '() next-expr
+            else
+                let else-expr next-next-expr = (decons next-expr)
+                if (('typeof else-expr) == list)
+                    let kw body = (decons (else-expr as list))
+                    let kw = (kw as Symbol)
+                    if (kw == 'elseif)
+                        process body next-next-expr
+                    elseif (kw == 'else)
+                        _ body next-next-expr
+                    else
+                        _ '() next-expr
+                else
+                    _ '() next-expr
+        return
+            list
+                list constbranch cond
+                    cons inline '() body
+                    cons inline '() elseexpr
+            next-next-expr
+    let kw body = (decons expr)
+    let body next-expr = (process body next-expr)
+    return
+        cons
+            cons do body
+            next-expr
+        syntax-scope
+
+define-syntax-block-scope-macro syntax-if
+    fn process (syntax-scope body next-expr)
+        if false
+            return '() next-expr
+        let cond body = (decons body)
+        let elseexpr next-next-expr =
+            if (empty? next-expr)
+                _ '() next-expr
+            else
+                let else-expr next-next-expr = (decons next-expr)
+                if (('typeof else-expr) == list)
+                    let kw body = (decons (else-expr as list))
+                    let kw = (kw as Symbol)
+                    if (kw == 'elseif)
+                        process syntax-scope body next-next-expr
+                    elseif (kw == 'else)
+                        _ body next-next-expr
+                    else
+                        _ '() next-expr
+                else
+                    _ '() next-expr
+        let cond = (sc_expand cond syntax-scope)
+        if ((('typeof cond) == bool) and ('constant? cond))
+            if (cond as bool)
+                return body next-next-expr
+            else
+                return elseexpr next-next-expr
+        syntax-error! ('anchor cond) "condition must be constant"
+    let kw body = (decons expr)
+    let body next-expr = (process syntax-scope body next-expr)
+    return
+        cons
+            cons do body
+            next-expr
+        syntax-scope
+
+define-syntax-scope-macro syntax-eval
+    let subscope = (Scope syntax-scope)
+    return
+        exec-module (Value args) subscope
+        syntax-scope
 
 #fn compile-flags (opts...)
     let vacount = (va-countof opts...)
@@ -3310,7 +3905,6 @@ fn run-main ()
                 repeat k
             elseif ((load sourcepath) == "")
                 store arg sourcepath
-                repeat k
             # remainder is passed on to script
     let sourcepath = (load sourcepath)
     if (sourcepath == "")

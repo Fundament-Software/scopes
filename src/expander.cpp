@@ -365,6 +365,18 @@ struct Expander {
         return loop;
     }
 
+    static Value *extract_argument(const Anchor *anchor, Value *node, int index, bool vararg = false) {
+        if (isa<Const>(node)) {
+            assert(!is_arguments_type(node->get_type()));
+            if (index == 0) {
+                return node;
+            } else {
+                return ConstAggregate::none_from(anchor);
+            }
+        }
+        return ExtractArgument::from(anchor, node, index, vararg);
+    }
+
     // (let x ... [= args ...])
     // (let (x ... = args ...) ...
     // ...
@@ -407,7 +419,7 @@ struct Expander {
 
                 Symbol sym = SCOPES_GET_RESULT(extract_symbol_constant(paramval));
                 if (!ends_with_parenthesis(sym)) {
-                    node = ExtractArgument::from(paramval->anchor(), node, 0);
+                    node = extract_argument(paramval->anchor(), node, 0);
                     exprs.push_back(node);
                 }
                 env->bind(sym, node);
@@ -474,23 +486,35 @@ struct Expander {
                 auto paramval = it->at;
                 Symbol sym = SCOPES_GET_RESULT(extract_symbol_constant(paramval));
                 if (!ends_with_parenthesis(sym)) {
-                    auto arg = args[std::min(lastarg, index)];
-                    auto indexed = ExtractArgument::from(paramval->anchor(), arg, std::max(0, index - lastarg));
-                    exprs.push_back(indexed);
-                    env->bind(sym, indexed);
+                    if (lastarg == -1) {
+                        env->bind(sym, ConstAggregate::none_from(paramval->anchor()));
+                    } else {
+                        auto arg = args[std::min(lastarg, index)];
+                        auto indexed = extract_argument(paramval->anchor(), arg, std::max(0, index - lastarg));
+                        exprs.push_back(indexed);
+                        env->bind(sym, indexed);
+                    }
                 } else {
                     if (it->next != endit) {
                         SCOPES_ANCHOR(paramval->anchor());
                         SCOPES_EXPECT_ERROR(error_variadic_symbol_not_in_last_place());
                     }
-                    if (index == lastarg) {
+                    if (lastarg == -1) {
+                        env->bind(sym, ArgumentList::from(_anchor));
+                    } else if (index == lastarg) {
                         env->bind(sym, args[index]);
-                    } else {
+                    } else if (index < lastarg) {
                         auto arglist = ArgumentList::from(paramval->anchor());
                         for (int j = index; j <= lastarg; ++j) {
                             arglist->append(args[j]);
                         }
                         env->bind(sym, arglist);
+                    } else {
+                        int offset = index - lastarg;
+                        env->bind(sym,
+                            extract_argument(
+                                paramval->anchor(), args[lastarg],
+                                index - lastarg, true));
                     }
                 }
 
@@ -578,7 +602,7 @@ struct Expander {
                         auto paramval = it->at;
                         Symbol sym = SCOPES_GET_RESULT(extract_symbol_constant(paramval));
                         if (!ends_with_parenthesis(sym)) {
-                            auto indexed = ExtractArgument::from(paramval->anchor(), except_param, index);
+                            auto indexed = extract_argument(paramval->anchor(), except_param, index);
                             exprs.append(indexed);
                             subexp.env->bind(sym, indexed);
                         } else {
@@ -974,6 +998,13 @@ struct Expander {
 
 bool Expander::verbose = false;
 const Type *Expander::list_expander_func_type = nullptr;
+
+SCOPES_RESULT(Value *) expand(Value *expr, Scope *scope) {
+    SCOPES_RESULT_TYPE(Value *);
+    Scope *subenv = scope?scope:sc_get_globals();
+    Expander subexpr(subenv, nullptr);
+    return subexpr.expand(expr);
+}
 
 SCOPES_RESULT(Template *) expand_inline(const Anchor *anchor, Template *astscope, const List *expr, Scope *scope) {
     SCOPES_RESULT_TYPE(Template *);

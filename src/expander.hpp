@@ -17,6 +17,7 @@ struct Anchor;
 struct Template;
 struct List;
 
+SCOPES_RESULT(Value *) expand(Value *expr, Scope *scope = nullptr);
 SCOPES_RESULT(Template *) expand_module(const Anchor *anchor, const List *expr, Scope *scope = nullptr);
 SCOPES_RESULT(Template *) expand_inline(const Anchor *anchor, Template *astscope, const List *expr, Scope *scope = nullptr);
 

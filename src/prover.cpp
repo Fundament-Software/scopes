@@ -419,6 +419,27 @@ static Value *extract_argument(const ASTContext &ctx, Value *value, int index) {
     }
 }
 
+static Value *extract_arguments(const ASTContext &ctx, Value *value, int index) {
+    const Anchor *anchor = value->anchor();
+    const Type *T = value->get_type();
+    if (!is_returning(T))
+        return value;
+    if (is_arguments_type(T)) {
+        auto rt = cast<TupleType>(storage_type(T).assert_ok());
+        Values values;
+        for (int i = index; i < rt->values.size(); ++i) {
+            values.push_back(extract_argument(ctx, value, i));
+        }
+        auto newlist = build_argument_list(anchor, values);
+        ctx.block->append(newlist);
+        return newlist;
+    } else if (index == 0) {
+        return value;
+    } else {
+        return build_argument_list(anchor, {});
+    }
+}
+
 static int find_key(const Symbols &symbols, Symbol key) {
     for (int i = 0; i < symbols.size(); ++i) {
         if (symbols[i] == key)
@@ -593,7 +614,10 @@ static SCOPES_RESULT(Value *) prove_ExtractArgument(
     SCOPES_RESULT_TYPE(Value *);
     auto value = SCOPES_GET_RESULT(prove(ctx, node->value));
     assert(node->index >= 0);
-    return extract_argument(ctx, value, node->index);
+    if (node->vararg)
+        return extract_arguments(ctx, value, node->index);
+    else
+        return extract_argument(ctx, value, node->index);
 }
 
 // used by Loop and inlined functions
@@ -1741,6 +1765,12 @@ repeat:
                     "pointer is not a heap pointer"));
             }
             RETARGTYPES();
+        } break;
+        case FN_StaticAlloc: {
+            CHECKARGS(1, 1);
+            READ_TYPE_CONST(T);
+            void *dst = tracked_malloc(SCOPES_GET_RESULT(size_of(T)));
+            return ConstPointer::from(call->anchor(), static_pointer_type(T), dst);
         } break;
         case OP_ICmpEQ:
         case OP_ICmpNE:

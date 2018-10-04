@@ -28,14 +28,14 @@ fn test2 ()
         static 'copy false
     let event = (local 'copy 1)
     inline handle_events ()
-        loop;
+        loop ()
         if (event != 0)
             if (event == 1)
                 quit = true
         else
             repeat;
     inline mainloop ()
-        loop;
+        loop ()
         if (not quit)
             handle_events;
             repeat;
@@ -43,7 +43,7 @@ fn test2 ()
 
 fn test3 ()
     fn handle_events ()
-        if (unconst true)
+        if true
             io-write! "\n"
         else
             handle_events;

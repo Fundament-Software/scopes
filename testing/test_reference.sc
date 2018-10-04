@@ -1,4 +1,57 @@
 
+#
+    local T args ...
+    local 'copy value
+
+    new T args ...
+    new 'copy value
+
+    static T args ...
+    static 'copy value
+
+    and then there's the question of array construction?
+
+    local (T args ...)
+
+    T args ... -> (inline (dest) ...)
+
+
+    copy local value
+    move local value
+    new local T args ...
+
+    copy [local] value
+    move [local] value
+    new [local] T args ...
+
+    local copy value
+    local move value
+    local Array args ...
+
+    new copy value
+    new move value
+    new Array args ...
+
+    static copy value
+    static move value
+    static Array args ...
+
+    local x = value
+    local x <- value
+    local x : Array args ...
+
+    new x = value
+    new x <- value
+    new x : Array args ...
+
+    static x = value
+    static x <- value
+    static x : Array args ...
+
+
+
+
+
 # `local` creates a stack variable of reference type
 let x = (local 'copy 5)
 assert (x == 5)

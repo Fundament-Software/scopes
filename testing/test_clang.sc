@@ -7,5 +7,8 @@ let lib =
                 return x * y;
             }
         '()
+
+compile-stage;
+
 let testfunc = lib.testfunc
 assert ((testfunc 2 3) == 6)

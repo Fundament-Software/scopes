@@ -139,6 +139,7 @@ typedef sc_value_raises_t (*sc_ast_macro_func_t)(int, sc_value_t **);
 // compiler
 
 sc_i32_i32_i32_tuple_t sc_compiler_version();
+sc_value_raises_t sc_expand(sc_value_t *expr, sc_scope_t *scope);
 sc_value_raises_t sc_eval(const sc_anchor_t *anchor, const sc_list_t *expr, sc_scope_t *scope);
 sc_value_raises_t sc_typify_template(sc_value_t *f, int numtypes, const sc_type_t **typeargs);
 sc_value_raises_t sc_typify(sc_closure_t *srcl, int numtypes, const sc_type_t **typeargs);
@@ -289,6 +290,7 @@ sc_symbol_value_tuple_t sc_scope_next(sc_scope_t *scope, sc_symbol_t key);
 sc_symbol_t sc_symbol_new(const sc_string_t *str);
 sc_symbol_t sc_symbol_new_unique(const sc_string_t *str);
 const sc_string_t *sc_symbol_to_string(sc_symbol_t sym);
+bool sc_symbol_is_vararg(sc_symbol_t sym);
 
 // strings
 
@@ -315,6 +317,7 @@ const sc_list_t *sc_list_reverse(const sc_list_t *l);
 // types
 
 sc_bool_value_tuple_t sc_type_at(const sc_type_t *T, sc_symbol_t key);
+sc_bool_value_tuple_t sc_type_local_at(const sc_type_t *T, sc_symbol_t key);
 sc_size_raises_t sc_type_sizeof(const sc_type_t *T);
 sc_size_raises_t sc_type_alignof(const sc_type_t *T);
 sc_int_raises_t sc_type_countof(const sc_type_t *T);

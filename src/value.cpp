@@ -72,13 +72,13 @@ ArgumentList *ArgumentList::from(const Anchor *anchor, const Values &values) {
 
 //------------------------------------------------------------------------------
 
-ExtractArgument::ExtractArgument(const Anchor *anchor, Value *_value, int _index)
-    : Instruction(VK_ExtractArgument, anchor), index(_index), value(_value) {
+ExtractArgument::ExtractArgument(const Anchor *anchor, Value *_value, int _index, bool _vararg)
+    : Instruction(VK_ExtractArgument, anchor), index(_index), value(_value), vararg(_vararg) {
     assert(index >= 0);
 }
 
-ExtractArgument *ExtractArgument::from(const Anchor *anchor, Value *value, int index) {
-    return new ExtractArgument(anchor, value, index);
+ExtractArgument *ExtractArgument::from(const Anchor *anchor, Value *value, int index, bool vararg) {
+    return new ExtractArgument(anchor, value, index, vararg);
 }
 
 //------------------------------------------------------------------------------

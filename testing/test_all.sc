@@ -7,13 +7,12 @@ test-modules
     .test_array
     .test_branch
     .test_assorted
-    .test_call_override
     .test_callback
     .test_capture
     .test_clang
     .test_closure
     .test_conversion
-    .test_defer
+    #.test_defer # fix in 0.15
     .test_dispatch
     .test_docstring
     .test_dots

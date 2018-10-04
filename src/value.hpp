@@ -152,12 +152,14 @@ struct ArgumentList : Value {
 struct ExtractArgument : Instruction {
     static bool classof(const Value *T);
 
-    ExtractArgument(const Anchor *anchor, Value *value, int index);
+    ExtractArgument(const Anchor *anchor, Value *value, int index, bool vararg);
 
-    static ExtractArgument *from(const Anchor *anchor, Value *value, int index);
+    static ExtractArgument *from(const Anchor *anchor, Value *value, int index,
+        bool vararg = false);
 
     int index;
     Value *value;
+    bool vararg;
 };
 
 //------------------------------------------------------------------------------

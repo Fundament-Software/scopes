@@ -93,11 +93,11 @@ define-syntax-macro assert-error
 define-syntax-macro assert-compiler-error
     inline test-function (f)
         try
-            sc_compile (typify f) 0:u64
+            sc_compile (sc_typify f 0 null) 0:u64
             false
         except (err)
             io-write! "ASSERT OK: "
-            io-write!
+            print
                 format-error err
             true
 

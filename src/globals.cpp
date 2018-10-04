@@ -104,6 +104,11 @@ sc_rawstring_i32_array_tuple_t sc_launch_args() {
 #define RETURN_VOID(X) { auto _result = (X); \
     return {_result.ok(), (_result.ok()?nullptr:get_last_error())}; }
 
+sc_value_raises_t sc_expand(sc_value_t *expr, sc_scope_t *scope) {
+    using namespace scopes;
+    RETURN_RESULT(expand(expr, scope));
+}
+
 sc_value_raises_t sc_eval(const sc_anchor_t *anchor, const sc_list_t *expr, sc_scope_t *scope) {
     using namespace scopes;
     auto module_result = expand_module(anchor, expr, scope);
@@ -579,6 +584,11 @@ sc_symbol_t sc_symbol_new(const sc_string_t *str) {
     return Symbol(str);
 }
 
+bool sc_symbol_is_vararg(sc_symbol_t sym) {
+    using namespace scopes;
+    return ends_with_parenthesis(sym);
+}
+
 const sc_string_t *sc_symbol_to_string(sc_symbol_t sym) {
     using namespace scopes;
     return sym.name();
@@ -991,6 +1001,13 @@ sc_bool_value_tuple_t sc_type_at(const sc_type_t *T, sc_symbol_t key) {
     using namespace scopes;
     Pure *result = nullptr;
     bool ok = T->lookup(key, result);
+    return { ok, result };
+}
+
+sc_bool_value_tuple_t sc_type_local_at(const sc_type_t *T, sc_symbol_t key) {
+    using namespace scopes;
+    Pure *result = nullptr;
+    bool ok = T->lookup_local(key, result);
     return { ok, result };
 }
 
@@ -1433,6 +1450,7 @@ void init_globals(int argc, char *argv[]) {
     const Type *voidstar = native_ro_pointer_type(_void);
 
     DEFINE_EXTERN_C_FUNCTION(sc_compiler_version, arguments_type({TYPE_I32, TYPE_I32, TYPE_I32}));
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_expand, TYPE_Value, TYPE_Value, TYPE_Scope);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_eval, TYPE_Value, TYPE_Anchor, TYPE_List, TYPE_Scope);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_eval_inline, TYPE_Anchor, TYPE_Value, TYPE_List, TYPE_Scope);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_typify_template, TYPE_Value, TYPE_Value, TYPE_I32, native_ro_pointer_type(TYPE_Type));
@@ -1548,6 +1566,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_symbol_new, TYPE_Symbol, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_symbol_new_unique, TYPE_Symbol, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_symbol_to_string, TYPE_String, TYPE_Symbol);
+    DEFINE_EXTERN_C_FUNCTION(sc_symbol_is_vararg, TYPE_Bool, TYPE_Symbol);
 
     DEFINE_EXTERN_C_FUNCTION(sc_string_new, TYPE_String, native_ro_pointer_type(TYPE_I8), TYPE_USize);
     DEFINE_EXTERN_C_FUNCTION(sc_string_new_from_cstr, TYPE_String, native_ro_pointer_type(TYPE_I8));
@@ -1559,6 +1578,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_string_rslice, TYPE_String, TYPE_String, TYPE_USize);
 
     DEFINE_EXTERN_C_FUNCTION(sc_type_at, arguments_type({TYPE_Bool, TYPE_Value}), TYPE_Type, TYPE_Symbol);
+    DEFINE_EXTERN_C_FUNCTION(sc_type_local_at, arguments_type({TYPE_Bool, TYPE_Value}), TYPE_Type, TYPE_Symbol);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_type_element_at, TYPE_Type, TYPE_Type, TYPE_I32);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_type_field_index, TYPE_I32, TYPE_Type, TYPE_Symbol);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_type_field_name, TYPE_Symbol, TYPE_Type, TYPE_I32);
