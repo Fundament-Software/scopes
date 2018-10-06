@@ -35,6 +35,8 @@ struct Scope;
     T(VK_Break, "value-kind-break", Break) \
     T(VK_Repeat, "value-kind-repeat", Repeat) \
     T(VK_Return, "value-kind-return", Return) \
+    T(VK_Label, "value-kind-label", Label) \
+    T(VK_Merge, "value-kind-merge", Merge) \
     T(VK_Raise, "value-kind-raise", Raise) \
     T(VK_ArgumentList, "value-kind-argumentlist", ArgumentList) \
     T(VK_ExtractArgument, "value-kind-extractargument", ExtractArgument) \
@@ -314,6 +316,21 @@ struct Loop : Instruction {
 
 //------------------------------------------------------------------------------
 
+struct Label : Instruction {
+    static bool classof(const Value *T);
+
+    Label(const Anchor *anchor, Value *value);
+
+    static Label *from(const Anchor *anchor,
+        Value *value = nullptr);
+
+    Block body;
+    Value *value;
+    const Type *return_type;
+};
+
+//------------------------------------------------------------------------------
+
 struct Const : Pure {
     static bool classof(const Value *T);
 
@@ -341,6 +358,7 @@ struct Function : Pure {
     const Type *except_type;
     Function *frame;
     Template *original;
+    Label *label;
     bool complete;
 
     ArgTypes instance_args;
@@ -474,6 +492,19 @@ struct Return : Instruction {
 
     static Return *from(const Anchor *anchor, Value *value);
 
+    Value *value;
+};
+
+//------------------------------------------------------------------------------
+
+struct Merge : Instruction {
+    static bool classof(const Value *T);
+
+    Merge(const Anchor *anchor, Label *label, Value *value);
+
+    static Merge *from(const Anchor *anchor, Label *label, Value *value);
+
+    Label *label;
     Value *value;
 };
 

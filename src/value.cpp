@@ -117,7 +117,7 @@ Function::Function(const Anchor *anchor, Symbol _name, const Parameters &_params
     : Pure(VK_Function, anchor),
         name(_name), params(_params),
         docstring(nullptr), return_type(nullptr), except_type(nullptr),
-        frame(nullptr), original(nullptr), complete(false) {
+        frame(nullptr), original(nullptr), label(nullptr), complete(false) {
     set_type(TYPE_Unknown);
 }
 
@@ -363,6 +363,15 @@ Loop *Loop::from(const Anchor *anchor, const Parameters &params, const Values &a
 
 //------------------------------------------------------------------------------
 
+Label::Label(const Anchor *anchor, Value *_value)
+    : Instruction(VK_Label, anchor), value(_value), return_type(nullptr) {}
+
+Label *Label::from(const Anchor *anchor, Value *value) {
+    return new Label(anchor, value);
+}
+
+//------------------------------------------------------------------------------
+
 bool Pure::classof(const Value *T) {
     auto k = T->kind();
     return (k == VK_Function) || (k == VK_Extern) || (k == VK_Template) || Const::classof(T);
@@ -488,6 +497,15 @@ Return::Return(const Anchor *anchor, Value *_value)
 
 Return *Return::from(const Anchor *anchor, Value *value) {
     return new Return(anchor, value);
+}
+
+//------------------------------------------------------------------------------
+
+Merge::Merge(const Anchor *anchor, Label *_label, Value *_value)
+    : Instruction(VK_Merge, anchor), label(_label), value(_value) {}
+
+Merge *Merge::from(const Anchor *anchor, Label *label, Value *value) {
+    return new Merge(anchor, label, value);
 }
 
 //------------------------------------------------------------------------------

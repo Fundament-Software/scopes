@@ -259,13 +259,6 @@ SCOPES_RESULT(void) error_variadic_symbol_not_in_last_place() {
     SCOPES_LOCATION_ERROR(ss.str());
 }
 
-SCOPES_RESULT(void) error_illegal_return_in_inline() {
-    SCOPES_RESULT_TYPE(void);
-    StyledString ss;
-    ss.out << "illegal return inside inline";
-    SCOPES_LOCATION_ERROR(ss.str());
-}
-
 SCOPES_RESULT(void) error_untyped_recursive_call() {
     SCOPES_RESULT_TYPE(void);
     StyledString ss;

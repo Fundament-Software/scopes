@@ -725,6 +725,13 @@ const sc_string_t *sc_value_repr (sc_value_t *value) {
     return ss.str();
 }
 
+const sc_string_t *sc_value_ast_repr (sc_value_t *value) {
+    using namespace scopes;
+    StyledString ss;
+    stream_ast(ss.out, value, StreamASTFormat());
+    return ss.str();
+}
+
 const sc_string_t *sc_value_tostring (sc_value_t *value) {
     using namespace scopes;
     StyledString ss = StyledString::plain();
@@ -1470,6 +1477,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_write, _void, TYPE_String);
 
     DEFINE_EXTERN_C_FUNCTION(sc_value_repr, TYPE_String, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_value_ast_repr, TYPE_String, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_value_tostring, TYPE_String, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_value_type, TYPE_Type, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_value_anchor, TYPE_Anchor, TYPE_Value);

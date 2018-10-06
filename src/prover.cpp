@@ -790,6 +790,17 @@ static SCOPES_RESULT(void) annotate_except_type(const ASTContext &ctx, const Typ
     return true;
 }
 
+static SCOPES_RESULT(Merge *) make_merge(const Anchor *anchor, Label *label, Value *value) {
+    SCOPES_RESULT_TYPE(Merge *);
+    SCOPES_ANCHOR(anchor);
+    assert(label);
+    auto T = value->get_type();
+    label->return_type = SCOPES_GET_RESULT(merge_return_type(label->return_type, T));
+    auto newmerge = Merge::from(anchor, label, value);
+    newmerge->set_type(TYPE_NoReturn);
+    return newmerge;
+}
+
 static SCOPES_RESULT(Return *) make_return(const ASTContext &ctx, const Anchor *anchor, Value *value) {
     SCOPES_RESULT_TYPE(Return *);
     SCOPES_ANCHOR(anchor);
@@ -802,15 +813,19 @@ static SCOPES_RESULT(Return *) make_return(const ASTContext &ctx, const Anchor *
 
 static SCOPES_RESULT(Value *) prove_Return(const ASTContext &ctx, Return *_return) {
     SCOPES_RESULT_TYPE(Value *);
-    if (ctx.frame->original
-        && ctx.frame->original->is_inline()) {
-        SCOPES_EXPECT_ERROR(error_illegal_return_in_inline());
-    }
     Value *value = SCOPES_GET_RESULT(prove(ctx.with_symbol_target(), _return->value));
-    if (ctx.target == EvalTarget_Return) {
-        return value;
+    if (ctx.frame->label) {
+        assert(ctx.frame->original && ctx.frame->original->is_inline());
+        // generate a merge
+        return SCOPES_GET_RESULT(make_merge(_return->anchor(), ctx.frame->label, value));
+    } else {
+        assert(!(ctx.frame->original && ctx.frame->original->is_inline()));
+        // generate a return
+        if (ctx.target == EvalTarget_Return) {
+            return value;
+        }
+        return SCOPES_GET_RESULT(make_return(ctx, _return->anchor(), value));
     }
-    return SCOPES_GET_RESULT(make_return(ctx, _return->anchor(), value));
 }
 
 static SCOPES_RESULT(Value *) prove_Raise(const ASTContext &ctx, Raise *_raise) {
@@ -1992,6 +2007,18 @@ static SCOPES_RESULT(Function *) prove_Function(const ASTContext &ctx, Function 
     return fn;
 }
 
+static SCOPES_RESULT(Merge *) prove_Merge(const ASTContext &ctx, Merge *value) {
+    SCOPES_RESULT_TYPE(Merge *);
+    assert(false);
+    return value;
+}
+
+static SCOPES_RESULT(Label *) prove_Label(const ASTContext &ctx, Label *value) {
+    SCOPES_RESULT_TYPE(Label *);
+    assert(false);
+    return value;
+}
+
 SCOPES_RESULT(Value *) prove(const ASTContext &ctx, Value *node) {
     SCOPES_RESULT_TYPE(Value *);
     assert(node);
@@ -2066,20 +2093,35 @@ SCOPES_RESULT(Value *) prove_inline(const ASTContext &ctx,
     Function *fn = Function::from(func->anchor(), func->name, {});
     fn->original = func;
     fn->frame = frame;
+    Label *label = Label::from(func->anchor());
+    fn->label = label;
 
     // inlines may escape caller loops
     ASTContext subctx = ctx.with_frame(fn);
     SCOPES_CHECK_RESULT(prove_inline_arguments(subctx, func->params, nodes));
     SCOPES_ANCHOR(fn->anchor());
     Value *result_value = nullptr;
-    auto result = prove(subctx, func->value);
+    auto result = prove(subctx.with_block(label->body), func->value);
     if (result.ok()) {
         result_value = result.assert_ok();
     } else {
         add_error_trace(fn);
         SCOPES_RETURN_ERROR();
     }
-    return result_value;
+    if (label->body.empty()) {
+        return result_value;
+    } else if (!label->return_type) {
+        // label does not need a merge label
+        assert(ctx.block);
+        ctx.block->migrate_from(label->body);
+        return result_value;
+    } else {
+        label->value = result_value;
+        label->return_type = SCOPES_GET_RESULT(merge_value_type(
+            ctx, label->return_type, result_value->get_type()));
+        label->set_type(label->return_type);
+        return label;
+    }
 }
 
 SCOPES_RESULT(Function *) prove(Function *frame, Template *func, const ArgTypes &types) {

@@ -99,7 +99,6 @@ SCOPES_RESULT(void) error_cannot_type_builtin(const Builtin &builtin);
 SCOPES_RESULT(void) error_illegal_repeat_outside_loop();
 SCOPES_RESULT(void) error_illegal_break_outside_loop();
 SCOPES_RESULT(void) error_variadic_symbol_not_in_last_place();
-SCOPES_RESULT(void) error_illegal_return_in_inline();
 SCOPES_RESULT(void) error_untyped_recursive_call();
 SCOPES_RESULT(void) error_cannot_find_frame(Template *func);
 

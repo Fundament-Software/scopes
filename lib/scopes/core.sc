@@ -750,6 +750,7 @@ inline set-symbols (self values...)
     pure? = sc_value_is_pure
     none? = (typify Value-none? Value)
     __repr = sc_value_repr
+    ast-repr = sc_value_ast_repr
     typeof = sc_value_type
     anchor = sc_value_anchor
     dekey =
@@ -804,6 +805,33 @@ inline set-symbols (self values...)
                 if ('function? ('element@ cls 0))
                     return true
             return false
+    set-pointer-element-type =
+        fn (cls ET)
+            sc_pointer_type_set_element_type cls ET
+    set-pointer-storage-class =
+        fn (cls storage-class)
+            sc_pointer_type_set_storage_class cls storage-class
+    set-pointer-immutable =
+        fn (cls)
+            sc_pointer_type_set_flags cls
+                bor (sc_pointer_type_get_flags cls) pointer-flag-non-writable
+    set-pointer-mutable =
+        fn (cls)
+            sc_pointer_type_set_flags cls
+                band (sc_pointer_type_get_flags cls)
+                    bxor pointer-flag-non-writable -1:u64
+    strip-pointer-storage-class =
+        fn (cls)
+            sc_pointer_type_set_storage_class cls unnamed
+    pointer-storage-class =
+        fn (cls)
+            sc_pointer_type_get_storage_class cls
+    pointer-readable? =
+        fn (cls)
+            icmp== (band (sc_pointer_type_get_flags cls) pointer-flag-non-readable) 0:u64
+    pointer-writable? =
+        fn (cls)
+            icmp== (band (sc_pointer_type_get_flags cls) pointer-flag-non-writable) 0:u64
 
 #'set-symbols Closure
     frame = sc_closure_frame
@@ -841,12 +869,12 @@ let Generator = (sc_typename_type "Generator")
 
 # syntax macro type
 let SyntaxMacro = (sc_typename_type "SyntaxMacro")
-let SyntaxMacroFunctionType =
+let SyntaxMacroFunction =
     'pointer
         'raising
             function (Arguments list Scope) list list Scope
             Error
-'set-storage SyntaxMacro SyntaxMacroFunctionType
+'set-storage SyntaxMacro SyntaxMacroFunction
 
 # any extraction
 
@@ -866,11 +894,22 @@ fn value-imply (vT T expr)
         box-cast value-imply
     __rimply =
         box-cast
-            fn "syntax-imply" (vT T expr)
+            fn "syntax-rimply" (vT T expr)
                 if true
                     return
                         sc_call_new (Value Value)
                             Value-array expr
+                compiler-error! "unsupported type"
+
+'set-symbols ASTMacro
+    __rimply =
+        box-cast
+            fn "ASTMacro-rimply" (vT T expr)
+                if (ptrcmp== vT ASTMacroFunction)
+                    return (sc_call_new (Value bitcast) (Value-array expr T))
+                elseif (ptrcmp== vT Closure)
+                    if ('constant? expr)
+                        return (sc_call_new (Value ast-macro) (Value-array expr))
                 compiler-error! "unsupported type"
 
 # integer casting
@@ -1214,7 +1253,7 @@ inline make-asym-binary-op-dispatch (symbol rtype friendly-op-name)
     __call =
         box-pointer
             inline (self at next scope)
-                (bitcast self SyntaxMacroFunctionType) at next scope
+                (bitcast self SyntaxMacroFunction) at next scope
 
 'set-symbols Symbol
     __== = (box-binary-op (single-binary-op-dispatch icmp==))
@@ -1500,7 +1539,7 @@ let function->SyntaxMacro =
     typify
         fn "function->SyntaxMacro" (f)
             bitcast f SyntaxMacro
-        SyntaxMacroFunctionType
+        SyntaxMacroFunction
 
 inline syntax-block-scope-macro (f)
     function->SyntaxMacro (typify f list list Scope)
@@ -1649,21 +1688,6 @@ let coerce-call-arguments =
         fn (cls)
             == (& (pointer-type-flags cls) pointer-flag-non-readable) 0:u64
 
-fn pointer-type-immutable (cls)
-    sc_pointer_type_set_flags cls
-        bor (sc_pointer_type_get_flags cls) pointer-flag-non-writable
-
-fn pointer-type-strip-storage (cls)
-    sc_pointer_type_set_storage_class cls unnamed
-
-fn mutable-pointer-type (cls)
-    sc_pointer_type_set_flags cls
-        band (sc_pointer_type_get_flags cls)
-            bxor pointer-flag-non-writable -1:u64
-
-fn pointer-type-writable? (cls)
-    icmp== (band (sc_pointer_type_get_flags cls) pointer-flag-non-writable) 0:u64
-
 fn pointer-type-imply? (src dest)
     let ET = ('element@ src 0)
     let ET =
@@ -1674,14 +1698,14 @@ fn pointer-type-imply? (src dest)
         # a ref to another pointer
         if (type== dest voidstar)
             return true
-        elseif (type== dest (mutable-pointer-type voidstar))
-            if (pointer-type-writable? src)
+        elseif (type== dest ('set-pointer-mutable voidstar))
+            if ('pointer-writable? src)
                 return true
-    if (type== dest (pointer-type-strip-storage src))
+    if (type== dest ('strip-pointer-storage-class src))
         return true
-    elseif (type== dest (pointer-type-immutable src))
+    elseif (type== dest ('set-pointer-immutable src))
         return true
-    elseif (type== dest (pointer-type-strip-storage (pointer-type-immutable src)))
+    elseif (type== dest ('strip-pointer-storage-class ('set-pointer-immutable src)))
         return true
     return false
 
@@ -1910,16 +1934,16 @@ fn symbol-handler (topexpr env)
         return (cons expr next) env
     return topexpr env
 
-fn backquote-list (x)
-    inline backquote-any (ox)
+fn quasiquote-list (x)
+    inline quasiquote-any (ox)
         let x = ox
         let T = ('typeof x)
         if (== T list)
-            backquote-list (as x list)
+            quasiquote-list (as x list)
         else
-            cons quote (cons ox '())
+            list quote ox
     if (empty? x)
-        return (cons quote (cons x '()))
+        return (list quote x)
     let aat next = ('decons x)
     let at = aat
     let T = ('typeof at)
@@ -1931,24 +1955,25 @@ fn backquote-list (x)
                 let at-at = (as at-at Symbol)
                 if (== at-at 'unquote-splice)
                     return
-                        cons (Value sc_list_join)
-                            cons (cons do at-next)
-                                cons (backquote-list next) '()
+                        list (Value sc_list_join)
+                            cons do at-next
+                            quasiquote-list next
+                elseif (== at-at 'square-list)
+                    if (> (countof at-next) 1:usize)
+                        return
+                            list (Value sc_list_join)
+                                list list (cons _ at-next)
+                                quasiquote-list next
     elseif (== T Symbol)
         let at = (as at Symbol)
         if (== at 'unquote)
             return (cons do next)
-        elseif (== at 'backquote)
-            return (backquote-list (backquote-list next))
+        elseif (== at 'square-list)
+            return (cons do next)
+        elseif (== at 'quasiquote)
+            return (quasiquote-list (quasiquote-list next))
     return
-        cons cons
-            cons (backquote-any aat)
-                cons (backquote-list next) '()
-
-fn quote-label (expr scope)
-    #let arg = (Value expr)
-    let arg = (as expr list)
-    sc_eval_inline arg scope
+        list cons (quasiquote-any aat) (quasiquote-list next)
 
 fn expand-and-or (expr f)
     if (empty? expr)
@@ -2109,17 +2134,25 @@ fn expand-define (expr)
         cons do content
 
 let
-    backquote =
+    quasiquote =
         syntax-macro
             fn (args)
-                backquote-list args
-    quote-inline =
+                quasiquote-list args
+    spice-quote =
         syntax-scope-macro
             fn (args scope)
+                fn expand (expr scope)
+                    let arg = (as expr list)
+                    print arg
+                    sc_expand
+                        if (== (countof arg) 1)
+                            let arg = (decons arg)
+                            as arg list
+                        else
+                            cons do arg
+                        scope
                 return
-                    cons quote-label
-                        cons (backquote-list args)
-                            cons scope '()
+                    list expand (quasiquote-list args) scope
                     scope
     # dot macro
     # (. value symbol ...)
@@ -2590,50 +2623,6 @@ define define-syntax-macro
                         list raises-compile-error;
                         body
 
-define define-ast-macro
-
-    inline wrap-ast-macro (f)
-        ast-macro
-            fn (argc argv)
-                return (Value (f argc argv))
-
-    syntax-macro
-        fn "expand-define-ast-macro" (expr)
-            raises-compile-error;
-            let name params body = (decons expr 2)
-            let params = (params as list)
-            let paramcount = ((countof params) as i32)
-
-            let argc = (Symbol "#argc")
-            let argv = (Symbol "#argv")
-            loop (i rest body varargs) = 0 params body false
-            if (not (empty? rest))
-                let paramv rest = (decons rest)
-                let param = (paramv as Symbol)
-                let vararg? = ('vararg? param)
-                let body =
-                    if vararg?
-                        if (not (empty? rest))
-                            syntax-error! ('anchor paramv)
-                                "vararg parameter is not in last place"
-                        cons
-                            list let paramv '=
-                                list sub argc i
-                                list getelementptr argv i
-                            body
-                    else
-                        cons
-                            list let paramv '= (list load (list getelementptr argv i))
-                            body
-                repeat (i + 1) rest body (| varargs vararg?)
-            list define name
-                list wrap-ast-macro
-                    cons inline (name as Symbol as string) (list argc argv)
-                        list verify-count argc
-                            ? varargs (sub paramcount 1) paramcount
-                            ? varargs -1 paramcount
-                        body
-
 let __assert =
     ast-macro
         fn (argc argv)
@@ -2746,6 +2735,8 @@ inline list-generator (self)
                 _ next at
         self
 
+let ValueRange = (typename "ValueRange")
+
 'set-symbols list
     __as =
         box-cast
@@ -2754,15 +2745,72 @@ inline list-generator (self)
                     return
                         sc_call_new (Value list-generator) (Value-array expr)
                 compiler-error! "unsupported type"
+    # better list constructor that splices ValueRange objects
+    __typecall =
+        box-ast-macro
+            fn (argc argv)
+                raises-compile-error;
+                fn cons-value-range (self other)
+                    let argc argv = (unpack self)
+                    loop (i result) = argc other
+                    if (i > 0)
+                        let i = (i - 1)
+                        repeat i (sc_list_cons (load (getelementptr argv i)) result)
+                    result
+                loop (i result) = argc (Value '())
+                if (i > 1)
+                    let i = (i - 1)
+                    let arg = (load (getelementptr argv i))
+                    repeat i
+                        sc_call_new
+                            if (('typeof arg) == ValueRange)
+                                Value cons-value-range
+                            else
+                                Value sc_list_cons
+                            Value-array arg result
+                result
 
-inline vararg-range (argc argv)
-    Generator
-        inline (fdone x)
-            if (x < argc)
-                _ (x + 1) (load (getelementptr argv x))
-            else
-                fdone;
-        0
+'set-storage ValueRange (tuple i32 ValueArrayPointer)
+
+'set-symbols ValueRange
+    __countof =
+        inline (self)
+            extractvalue self 0
+    __typecall =
+        inline (cls argc argv)
+            let self = (nullof (tuple i32 ValueArrayPointer))
+            let self = (insertvalue self argc 0)
+            let self = (insertvalue self argv 1)
+            bitcast self ValueRange
+    __@ =
+        inline (self index)
+            #assert (index < (as (extractvalue self 0) usize))
+            load (getelementptr (extractvalue self 1) index)
+    __unpack =
+        inline (self)
+            _
+                extractvalue self 0
+                extractvalue self 1
+    __repr =
+        inline (self)
+            let argc = (extractvalue self 0)
+            .. "<" (repr argc) " values>"
+    __as =
+        box-cast
+            fn "ValueRange-as" (vT T expr)
+                inline vararg-range (self)
+                    let argc argv = (unpack self)
+                    Generator
+                        inline (fdone x)
+                            if (x < argc)
+                                _ (x + 1) (load (getelementptr argv x))
+                            else
+                                fdone;
+                        0
+                if (T == Generator)
+                    return
+                        sc_call_new vararg-range (Value-array expr)
+                compiler-error! "unsupported type"
 
 inline range (a b c)
     let num-type = (typeof a)
@@ -3174,6 +3222,68 @@ let
 
 #-------------------------------------------------------------------------------
 
+define spice
+    inline half-wrap-ast-macro (f)
+        fn (argc argv)
+            return (Value (f argc argv))
+
+    inline wrap-ast-macro (f)
+        ast-macro
+            fn (argc argv)
+                return (Value (f argc argv))
+
+    syntax-macro
+        fn "expand-spice" (expr)
+            raises-compile-error;
+            let name params body =
+                do
+                    let arg body = (decons expr)
+                    if (('typeof arg) == list)
+                        _ (Value "") arg body
+                    else
+                        let params body = (decons body)
+                        _ arg params body
+
+            let params = (params as list)
+            let paramcount = ((countof params) as i32)
+
+            let argc = (Symbol "#argc")
+            let argv = (Symbol "#argv")
+            loop (i rest body varargs) = 0 params body false
+            if (not (empty? rest))
+                let paramv rest = (decons rest)
+                let param = (paramv as Symbol)
+                let vararg? = ('vararg? param)
+                let body =
+                    if vararg?
+                        if (not (empty? rest))
+                            syntax-error! ('anchor paramv)
+                                "vararg parameter is not in last place"
+                        cons
+                            list let paramv '=
+                                list ValueRange
+                                    list sub argc i
+                                    list getelementptr argv i
+                            body
+                    else
+                        cons
+                            list let paramv '= (list load (list getelementptr argv i))
+                            body
+                repeat (i + 1) rest body (| varargs vararg?)
+            let content =
+                cons (list argc argv)
+                    list verify-count argc
+                        ? varargs (sub paramcount 1) paramcount
+                        ? varargs -1 paramcount
+                    body
+            if (('typeof name) == Symbol)
+                list let name '=
+                    list wrap-ast-macro
+                        cons inline (name as Symbol as string) content
+            else
+                list half-wrap-ast-macro
+                    cons inline name content
+
 compile-stage;
 
 let infinite-range =
@@ -3208,7 +3318,7 @@ inline move-construct
 
 let ref = (typename "ref")
 
-set-symbols Value
+'set-symbols Value
     typeof& =
         fn (self)
             let T = ('typeof self)
@@ -3217,7 +3327,7 @@ set-symbols Value
             'element@ T 0
 
 let ref-attribs-key = '__refattrs
-set-symbols type
+'set-symbols type
     @& =
         fn "@&" (T name)
             loop (T) = T
@@ -3241,100 +3351,147 @@ set-symbols type
                     attrs
             'set-symbol attrs name value
 
-#define-ast-macro deref (values...)
-    let count = values...
-    let result = (alloca-array Value count)
-    for i kvalue in (enumerate (vararg-range values...))
-        let key value = ('dekey kvalue)
-        let T = ('typeof value)
-        store
-            if (T < ref)
-                let ok op = ('@ T '__deref)
-                if ok
-                    let cmd = (sc_call_new op (Value-array value))
-                    if (key == unnamed) cmd
+let deref =
+    spice "deref" (values...)
+        let count = (countof values...)
+        let result = (alloca-array Value count)
+        for i kvalue in (enumerate values...)
+            let key value = ('dekey kvalue)
+            let T = ('typeof value)
+            store
+                if (T < ref)
+                    let ok op = ('@ T '__deref)
+                    if ok
+                        let cmd = (sc_call_new op (Value-array value))
+                        if (key == unnamed) cmd
+                        else
+                            sc_keyed_new key cmd
                     else
-                        sc_keyed_new key cmd
-            else
-                kvalue
-            getelementptr result i
-    sc_argument_list_new count result
+                        syntax-error! ('anchor kvalue)
+                            .. "deref attribute missing in value of type " (repr T)
+                else
+                    kvalue
+                getelementptr result i
+        sc_argument_list_new count result
 
-#inline deref1 (value)
-    let T = (typeof value)
-    if (T < ref)
-        let op = (type@ T '__deref)
-        op value
-    else value
+#set-type-symbol!& Any 'typeof
+    inline (self)
+        Any-typeof (deref self)
 
-#inline deref (values...)
-    let repeat (i result...) = (va-countof values...)
-    if (i > 0)
-        let i = (i - 1)
-        let value = (va@ i values...)
-        repeat i
-            deref1 value
-            result...
-    result...
+#set-type-symbol!& Any '__imply
+    inline (src destT)
+        Any-extract (deref src) destT
 
-#compile-stage;
-#print
-    deref 5 6 7 8
+#inline box-binary-op (f)
+    box-pointer (typify f type type Value Value)
+
+#inline single-binary-op-dispatch (destf)
+    fn (lhsT rhsT lhs rhs)
+        if (ptrcmp== lhsT rhsT)
+            return
+                sc_call_new (Value destf) (Value-array lhs rhs)
+        compiler-error! "unsupported type"
+
+do
+    fn ref-binary-op-expr (symbol func lhs rhs)
+        sc_call_new func
+            Value-array
+                sc_call_new (deref as ASTMacro) (Value-array lhs rhs)
+
+    inline passthru-overload (sym func)
+        'set-symbol ref sym
+            box-binary-op
+                fn (lhsT rhsT lhs rhs)
+                    ref-binary-op-expr sym (Value func) lhs rhs
+
+    passthru-overload '__== ==; passthru-overload '__!= !=
+    passthru-overload '__< <; passthru-overload '__<= <=
+    passthru-overload '__> >; passthru-overload '__>= >=
+    passthru-overload '__& &; passthru-overload '__| |; passthru-overload '__^ ^
+    passthru-overload '__+ +; passthru-overload '__- -
+    passthru-overload '__* *; passthru-overload '__/ /
+    #passthru-overload '__** pow
+    passthru-overload '__// //
+    passthru-overload '__% %
+    passthru-overload '__<< <<; passthru-overload '__>> >>
+    passthru-overload '__.. ..
+
+#
+    inline passthru-inplace-overload (methodname fallback)
+        'set-symbol ref methodname
+
+            fn (a b)
+                let ET = (typeof& a)
+                let op ok = (type@& ET methodname)
+                if ok
+                    return (op a b)
+                let op ok = (type@& ET '__deref)
+                if (not ok)
+                    compiler-error!
+                        .. (op-prettyname methodname)
+                            \ " of reference not supported by value of type " (repr ET)
+                    return;
+                = a (fallback a b)
+                true
+
+    passthru-inplace-overload '__+= +
+    passthru-inplace-overload '__-= -
+    passthru-inplace-overload '__*= *
+    passthru-inplace-overload '__/= /
+    passthru-inplace-overload '__//= //
+    passthru-inplace-overload '__%= %
+    passthru-inplace-overload '__>>= >>
+    passthru-inplace-overload '__<<= <<
+    passthru-inplace-overload '__&= &
+    passthru-inplace-overload '__|= |
+    passthru-inplace-overload '__^= ^
+
+fn ref-type (PT)
+    assert (PT < pointer) "pointer type expected"
+    let ET = ('element@ PT 0)
+    let class = ('pointer-storage-class PT)
+    let T =
+        sc_typename_type
+            ..
+                if ('pointer-writable? PT) "&"
+                else "(&)"
+                if (class != unnamed)
+                    .. "[" (class as string) "]"
+                else ""
+                tostring ET
+    'set-super T ref
+    'set-storage T PT
+    'set-symbol T 'ElementType ET
+    T
+
+'set-symbols ref
+    __= =
+        ast-macro
+            spice "ref=" (self value)
+                let ET = ('typeof& self)
+                let ok op = ('@& ET '__=)
+                if ok
+                    sc_call_new op (Value-array self value)
+                else
+                    sc_block_new
+                        Value-array
+                            sc_call_new destruct (Value-array self)
+                            sc_call_new copy-construct (Value-array self value)
+                            box-empty;
+    __typecall =
+        ast-macro
+            spice "ref-typecall" (cls T)
+                let T = (T as type)
+                if ((T < ref) or (not (T < pointer)))
+                    compiler-error!
+                        .. "cannot create reference type of reference type "
+                            repr T
+                ref-type T
 
 #
     let voidstar = (pointer void)
 
-    set-type-symbol!& Any 'typeof
-        inline (self)
-            Any-typeof (deref self)
-
-    set-type-symbol!& Any '__imply
-        inline (src destT)
-            Any-extract (deref src) destT
-
     do
-        inline passthru-overload (sym func)
-            set-type-symbol! ref sym (fn (a b flipped) (func (deref a) (deref b)))
-        passthru-overload '__== ==; passthru-overload '__!= !=
-        passthru-overload '__< <; passthru-overload '__<= <=
-        passthru-overload '__> >; passthru-overload '__>= >=
-        passthru-overload '__& &; passthru-overload '__| |; passthru-overload '__^ ^
-        passthru-overload '__+ +; passthru-overload '__- -
-        passthru-overload '__* *; passthru-overload '__/ /
-        passthru-overload '__** pow
-        passthru-overload '__// //
-        passthru-overload '__% %
-        passthru-overload '__<< <<; passthru-overload '__>> >>
-        passthru-overload '__.. ..
-
-        fn passthru-inplace-overload (methodname fallback)
-            set-type-symbol! ref methodname
-                inline (a b)
-                    let ET = (typeof& a)
-                    let op ok = (type@& ET methodname)
-                    if ok
-                        return (op a b)
-                    let op ok = (type@& ET '__deref)
-                    if (not ok)
-                        compiler-error!
-                            .. (op-prettyname methodname)
-                                \ " of reference not supported by value of type " (repr ET)
-                        return;
-                    = a (fallback a b)
-                    true
-
-        passthru-inplace-overload '__+= +
-        passthru-inplace-overload '__-= -
-        passthru-inplace-overload '__*= *
-        passthru-inplace-overload '__/= /
-        passthru-inplace-overload '__//= //
-        passthru-inplace-overload '__%= %
-        passthru-inplace-overload '__>>= >>
-        passthru-inplace-overload '__<<= <<
-        passthru-inplace-overload '__&= &
-        passthru-inplace-overload '__|= |
-        passthru-inplace-overload '__^= ^
-
         fn define-ref-forward (failedf methodname)
             set-type-symbol! ref methodname
                 inline (self args...)
@@ -3444,44 +3601,6 @@ set-symbols type
                     return
                         forward-imply (deref self) destT
 
-        set-type-symbol! ref '__=
-            inline "ref=" (self value)
-                let ET = (typeof& self)
-                let op ok = (type@& ET '__=)
-                if ok
-                    let result... = (op self value)
-                    if (not (va-empty? result...))
-                        return result...
-                destruct self
-                copy-construct self value
-                true
-
-        fn make-ref-type (PT)
-            let ET = (element-type PT 0)
-            let class = ('storage PT)
-            let T =
-                typename
-                    ..
-                        if ('writable? PT) "&"
-                        else "(&)"
-                        if (class != unnamed)
-                            .. "[" (Symbol->string class) "]"
-                        else ""
-                        type-name ET
-                    ref
-                    PT
-            set-type-symbol! T 'ElementType ET
-            T
-
-        set-type-symbol! ref '__typecall
-            inline "ref-typecall" (cls T)
-                assert-typeof T type
-                if (T < ref)
-                    compiler-error!
-                        .. "cannot create reference type of reference type "
-                            repr T
-                make-ref-type T
-
     #var has been removed; use `local`
 
     #global has been removed; use `static`
@@ -3510,6 +3629,237 @@ set-symbols type
         let ST = (storageof T)
         # todo: ensure types are compatible
         (bitcast self ('set-element-type ST destT)) as ref
+
+let deref = (deref as ASTMacro)
+
+#-------------------------------------------------------------------------------
+# default memory allocators
+#-------------------------------------------------------------------------------
+
+spice pointer-each (n op value args...)
+    if ('constant? n)
+        let n = (n as usize)
+        if (n == 1:usize)
+            let argc argv = (unpack args...)
+            let argcount = (argc + 1)
+            let argarray = (alloca-array Value argcount)
+            for i in (range 1 argcount)
+                store (@ args... (usize (i - 1))) (getelementptr argarray i)
+            store
+                sc_call_new (do as) (Value-array value ref)
+                getelementptr argarray 0
+            return
+                sc_call_new op argcount argarray
+    let i = (sc_parameter_new 'i null)
+    spice-quote
+        loop ([i]) = 0
+        if ([i] < [n])
+            op
+                (getelementptr [value] [i]) as ref
+                [ args... ]
+            repeat ([i] + 1)
+
+#inline pointer-each (n op value args...)
+    let n = (imply n usize)
+    if (n == 1:usize)
+        op (value as ref) args...
+    else
+        # unroll only if <= 4 elements
+        let loop (i) =
+            if ((constant? n) and (n <= 4:usize)) 0:usize
+            else (unconst 0:usize)
+        if (i < n)
+            op
+                (getelementptr value i) as ref
+                args...
+            loop (i + 1:usize)
+    return;
+
+#
+    inline pointer-each2 (n op value other)
+        let n = (imply n usize)
+        if (n == 1:usize)
+            op (value as ref) (other as ref)
+        else
+            # unroll only if <= 4 elements
+            let loop (i) =
+                if ((constant? n) and (n <= 4:usize)) 0:usize
+                else (unconst 0:usize)
+            if (i < n)
+                op
+                    (getelementptr value i) as ref
+                    (getelementptr other i) as ref
+                loop (i + 1:usize)
+        return;
+
+    inline construct (value args...)
+        """"Invokes the constructor for `value` of reference-like type,
+            passing along optional argument set `args...`.
+        let ET = (typeof& value)
+        let op ok = (type@& ET '__new)
+        if (not ok)
+            compiler-error!
+                .. "type " (repr ET) " has no constructor"
+        pointer-each 1 op value args...
+
+    inline construct-array (n value args...)
+        """"Invokes the constructor for an array `value` of reference-like type,
+            assuming that value is a pointer to an array element, passing along
+            optional argument set `args...`.
+        let ET = (typeof& value)
+        let op ok = (type@& ET '__new)
+        if (not ok)
+            compiler-error!
+                .. "type " (repr ET) " has no constructor"
+        pointer-each n op value args...
+
+    inline destruct (value)
+        """"Invokes the destructor for `value` of reference-like type.
+        let ET = (typeof& value)
+        let op ok = (type@& ET '__delete)
+        if (not ok)
+            compiler-error!
+                .. "type " (repr ET) " has no destructor"
+        pointer-each 1 op value
+
+    inline destruct-array (n value)
+        """"Invokes the destructor for an array `value` of reference-like type,
+            assuming that value is a pointer to an array element.
+        let ET = (typeof& value)
+        let op ok = (type@& ET '__delete)
+        if (not ok)
+            compiler-error!
+                .. "type " (repr ET) " has no destructor"
+        pointer-each n op value
+
+    inline copy-construct (value source)
+        """"Invokes the copy constructor for `value` of reference-like type if
+            present, passing `source` as a value from which to copy.
+
+            `source` does not have to be of reference type, but can also be of
+            immutable element type.
+        let ET = (typeof& value)
+        let op ok = (type@& ET '__copy)
+        if (not ok)
+            compiler-error!
+                .. "type " (repr ET) " has no copy constructor"
+        pointer-each 1 op value source
+
+    inline copy-construct-array (n value source)
+        """"Invokes the copy constructor for an array `value` of reference-like type,
+            passing `source` as a value from which to copy.
+
+            `source` has to be the first (referenced) element of an array too.
+        let ET = (typeof& value)
+        let op ok = (type@& ET '__copy)
+        if (not ok)
+            compiler-error!
+                .. "type " (repr ET) " has no copy constructor"
+        assert ((typeof source) < ref)
+        pointer-each2 n op value source
+
+    inline move-construct (value source)
+        """"Invokes the move constructor for `value` of reference-like type,
+            passing `source` as the reference from which to move.
+        let ET = (typeof& value)
+        let op ok = (type@& ET '__move)
+        if ok
+            pointer-each2 1 op value source
+        else
+            # try copy, then destruct source
+            copy-construct value source
+            destruct source
+
+    inline move-construct-array (n value source)
+        """"Invokes the move constructor for an array of pointers `value`
+            passing `source` as an array of pointers from which to move.
+        let ET = (typeof& value)
+        let op ok = (type@& ET '__move)
+        if ok
+            pointer-each2 n op value source
+        else
+            copy-construct-array n value source
+            destruct-array n source
+
+#
+    let Memory = (typename "Memory")
+    typeinline Memory '__typecall (cls T args...)
+        if (((typeof T) == Symbol) and (T == 'copy))
+            if ((va-countof args...) > 1)
+                compiler-error! "copy constructor only takes one argument"
+            (type@ cls 'copy) cls args...
+        else cls
+            (type@ cls 'new) cls T args...
+
+    typeinline Memory 'delete (cls value)
+        destruct value
+        (type@ cls 'free) cls value
+
+    typeinline Memory 'copy (cls value)
+        let T = (typeof value)
+        let ET =
+            if (T < ref)
+                element-type (storageof T) 0
+            else T
+        let self =
+            ((type@ cls 'allocate) cls ET) as ref
+        copy-construct self value
+        self
+
+    typeinline Memory 'new (cls T args...)
+        let self =
+            ((type@ cls 'allocate) cls T) as ref
+        construct self args...
+        self
+
+    let HeapMemory = (typename "HeapMemory" (super = Memory))
+    typeinline HeapMemory 'allocate (cls T)
+        malloc T
+    typeinline HeapMemory 'free (cls value)
+        free value
+        return;
+    typeinline HeapMemory 'allocate-array (cls T count)
+        malloc-array T count
+    typeinline HeapMemory 'free-array (cls value count)
+        free value
+        return;
+
+    let FunctionMemory = (typename "FunctionMemory" (super = Memory))
+    typeinline FunctionMemory 'allocate (cls T)
+        alloca T
+    typeinline FunctionMemory 'free (cls value)
+        return;
+    typeinline FunctionMemory 'allocate-array (cls T count)
+        alloca-array T count
+    typeinline FunctionMemory 'free-array (cls value count)
+        return;
+
+    let GlobalMemory = (typename "GlobalMemory" (super = Memory))
+    typeinline GlobalMemory 'allocate (cls T)
+        static-alloc T
+    typeinline GlobalMemory 'free (cls value)
+        return;
+    typeinline GlobalMemory 'allocate-array (cls T count)
+        assert (constant? count) "count must be constant"
+        bitcast
+            static-alloc
+                array T count
+            'set-storage (pointer T 'mutable) 'Private
+    typeinline GlobalMemory 'free-array (cls value count)
+        return;
+
+    typefn ref '__delete (self)
+        let T = (typeof self)
+        let ptrT = (storageof T)
+        let class = ('storage ptrT)
+        if (class == unnamed)
+            'delete HeapMemory self
+        elseif (class == 'Function)
+            'delete FunctionMemory self
+        elseif (class == 'Private)
+            'delete GlobalMemory self
+        else
+            .. "cannot delete reference of type " (repr T)
 
 #-------------------------------------------------------------------------------
 
@@ -3589,85 +3939,6 @@ define-syntax-scope-macro syntax-eval
     return
         exec-module (Value args) subscope
         syntax-scope
-
-#fn compile-flags (opts...)
-    let vacount = (va-countof opts...)
-    let loop (i flags) = 0 0:u64
-    if (== i vacount)
-        return flags
-    let flag = (va@ i opts...)
-    if (not (constant? flag))
-        compiler-error! "symbolic flags must be constant"
-    assert-typeof flag Symbol
-    loop (+ i 1)
-        | flags
-            if (== flag 'dump-disassembly) compile-flag-dump-disassembly
-            elseif (== flag 'dump-module) compile-flag-dump-module
-            elseif (== flag 'dump-function) compile-flag-dump-function
-            elseif (== flag 'dump-time) compile-flag-dump-time
-            elseif (== flag 'no-debug-info) compile-flag-no-debug-info
-            elseif (== flag 'O1) compile-flag-O1
-            elseif (== flag 'O2) compile-flag-O2
-            elseif (== flag 'O3) compile-flag-O3
-            else
-                compiler-error!
-                    .. "illegal flag: " (repr flag)
-                        ". try one of"
-                        \ " " (repr 'dump-disassembly)
-                        \ " " (repr 'dump-module)
-                        \ " " (repr 'dump-function)
-                        \ " " (repr 'dump-time)
-                        \ " " (repr 'no-debug-info)
-                        \ " " (repr 'O1)
-                        \ " " (repr 'O2)
-                        \ " " (repr 'O3)
-
-#fn compile (f opts...)
-    __compile f
-        compile-flags opts...
-
-#inline zip (a b)
-    let iter-a init-a = ((a as Generator))
-    let iter-b init-b = ((b as Generator))
-    Generator
-        inline (fdone t)
-            let a = (@ t 0)
-            let b = (@ t 1)
-            let next-a at-a... = (iter-a fdone a)
-            let next-b at-b... = (iter-b fdone b)
-            _ (tupleof next-a next-b) at-a... at-b...
-        tupleof init-a init-b
-
-#compile-stage
-    'set-symbols syntax-scope
-        block-macro =
-            Any
-                syntax-macro
-                    fn (args)
-                        let arg =
-                            backquote
-                                label-macro
-                                    fn (source-label)
-                                        let enter =
-                                            Closure
-                                                unquote
-                                                    cons do args
-                                                'frame source-label
-                                        'return source-label
-                                        'set-enter source-label (Any enter)
-                        let arg = ('decons arg)
-                        arg as list
-
-#compile-stage
-    'set-symbols syntax-scope
-        hello =
-            Any
-                block-macro
-                    let k arg = ('argument source-label 1)
-                    quote-inline
-                        io-write! "hello "
-                        io-write! (unquote arg)
-                        io-write! "\n"
 
 let
     io-write! = sc_write

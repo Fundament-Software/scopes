@@ -328,6 +328,20 @@ struct LLVMIRGenerator {
 
     LoopInfo loop_info;
 
+    struct LabelInfo {
+        Label *label;
+        LLVMBasicBlockRef bb_merge;
+        LLVMValueRef merge_value;
+
+        LabelInfo() :
+            label(nullptr),
+            bb_merge(nullptr),
+            merge_value(nullptr)
+        {}
+    };
+
+    std::vector<LabelInfo> label_info_stack;
+
     template<unsigned N>
     static LLVMAttributeRef get_attribute(const char (&s)[N]) {
         unsigned kind = LLVMGetEnumAttributeKindForName(s, N - 1);
@@ -825,20 +839,6 @@ struct LLVMIRGenerator {
         return typeref;
     }
 
-#if 0
-    SCOPES_RESULT(LLVMValueRef) label_to_value(Label *label) {
-        SCOPES_RESULT_TYPE(LLVMValueRef);
-        if (label->is_basic_block_like()) {
-            auto bb = SCOPES_GET_RESULT(label_to_basic_block(label));
-            if (!bb) return nullptr;
-            else
-                return LLVMBasicBlockAsValue(bb);
-        } else {
-            return generate_function(label);
-        }
-    }
-#endif
-
     static bool ok;
     static void fatal_error_handler(const char *Reason) {
         set_last_location_error(String::from_cstr(Reason));
@@ -980,9 +980,7 @@ struct LLVMIRGenerator {
             assert(val);
             bind(param, val);
         }
-        for (auto value : node->body.body) {
-            SCOPES_CHECK_RESULT(node_to_value(value));
-        }
+        SCOPES_CHECK_RESULT(block_to_value(node->body));
         //SCOPES_CHECK_RESULT(write_return(node->value));
         return true;
     }
@@ -1034,6 +1032,30 @@ struct LLVMIRGenerator {
         return nullptr;
     }
 
+    LabelInfo &find_label_info(Label *label) {
+        int i = label_info_stack.size();
+        while (i-- > 0) {
+            auto &&info = label_info_stack[i];
+            if (info.label == label)
+                return info;
+        }
+        assert(false);
+        return label_info_stack.back();
+    }
+
+    SCOPES_RESULT(LLVMValueRef) Merge_to_value(Merge *node) {
+        SCOPES_RESULT_TYPE(LLVMValueRef);
+        auto result = SCOPES_GET_RESULT(node_to_value(node->value));
+        auto &&label_info = find_label_info(node->label);
+        if (label_info.merge_value) {
+            LLVMBasicBlockRef bb = LLVMGetInsertBlock(builder);
+            LLVMBasicBlockRef incobbs[] = { bb };
+            LLVMValueRef incovals[] = { result };
+            LLVMAddIncoming(label_info.merge_value, incovals, incobbs, 1);
+        }
+        return LLVMBuildBr(builder, label_info.bb_merge);
+    }
+
     SCOPES_RESULT(LLVMValueRef) Break_to_value(Break *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         auto result = SCOPES_GET_RESULT(node_to_value(node->value));
@@ -1063,6 +1085,46 @@ struct LLVMIRGenerator {
             LLVMAddIncoming(val, incovals, incobbs, 1);
         }
         return LLVMBuildBr(builder, loop_info.bb_loop);
+    }
+
+    SCOPES_RESULT(LLVMValueRef) Label_to_value(Label *node) {
+        SCOPES_RESULT_TYPE(LLVMValueRef);
+        LabelInfo label_info;
+        label_info.label = node;
+        LLVMBasicBlockRef bb = LLVMGetInsertBlock(builder);
+        LLVMValueRef func = LLVMGetBasicBlockParent(bb);
+        label_info.merge_value = nullptr;
+        label_info.bb_merge = nullptr;
+        auto rtype = node->get_type();
+        if (is_returning(rtype)) {
+            label_info.bb_merge = LLVMAppendBasicBlock(func, "merge");
+            if (is_returning_value(rtype)) {
+                LLVMPositionBuilderAtEnd(builder, label_info.bb_merge);
+                label_info.merge_value = LLVMBuildPhi(builder,
+                    SCOPES_GET_RESULT(type_to_llvm_type(rtype)), "");
+            }
+        }
+
+        label_info_stack.push_back(label_info);
+        {
+            LLVMPositionBuilderAtEnd(builder, bb);
+            SCOPES_CHECK_RESULT(block_to_value(node->body));
+            auto result = SCOPES_GET_RESULT(node_to_value(node->value));
+            LLVMBasicBlockRef bb = LLVMGetInsertBlock(builder);
+            if (is_returning(node->value->get_type())) {
+                assert(label_info.bb_merge);
+                LLVMBuildBr(builder, label_info.bb_merge);
+                if (label_info.merge_value) {
+                    LLVMBasicBlockRef incobbs[] = { bb };
+                    LLVMValueRef incovals[] = { result };
+                    LLVMAddIncoming(label_info.merge_value, incovals, incobbs, 1);
+                }
+            }
+        }
+        LLVMPositionBuilderAtEnd(builder, label_info.bb_merge);
+        auto result = label_info.merge_value;
+        label_info_stack.pop_back();
+        return result;
     }
 
     SCOPES_RESULT(LLVMValueRef) Loop_to_value(Loop *node) {
@@ -1101,9 +1163,7 @@ struct LLVMIRGenerator {
         }
         {
             LLVMPositionBuilderAtEnd(builder, loop_info.bb_loop);
-            for (auto value : node->body.body) {
-                SCOPES_CHECK_RESULT(node_to_value(value));
-            }
+            SCOPES_CHECK_RESULT(block_to_value(node->body));
             auto result = SCOPES_GET_RESULT(node_to_value(node->value));
             LLVMBasicBlockRef bb = LLVMGetInsertBlock(builder);
             if (is_returning(node->value->get_type())) {

@@ -392,6 +392,14 @@ struct StreamAST : StreamAnchors {
                 stream_block_result(val->body, val->value, depth+1, maxdepth);
             }
         } break;
+        case VK_Label: {
+            stream_type_prefix(node);
+            auto val = cast<Label>(node);
+            ss << Style_Keyword << "Label" << Style_None << " " << (void *)val;
+            if (newlines) {
+                stream_block_result(val->body, val->value, depth+1, maxdepth);
+            }
+        } break;
         case VK_Extern: {
             auto val = cast<Extern>(node);
             auto T = val->get_type();
@@ -474,6 +482,14 @@ struct StreamAST : StreamAnchors {
             stream_type_prefix(node);
             auto val = cast<Return>(node);
             ss << Style_Keyword << "Return" << Style_None;
+            if (newlines) {
+                walk_same_or_newline(val->value, depth+1, maxdepth);
+            }
+        } break;
+        case VK_Merge: {
+            stream_type_prefix(node);
+            auto val = cast<Merge>(node);
+            ss << Style_Keyword << "Merge" << Style_None << " " << (void *)val->label;
             if (newlines) {
                 walk_same_or_newline(val->value, depth+1, maxdepth);
             }
