@@ -36,7 +36,7 @@ namespace scopes {
     T(FN_ExtractValue) T(FN_InsertValue) T(FN_ITrunc) T(FN_ZExt) T(FN_SExt) \
     T(FN_GetElementPtr) T(FN_OffsetOf) T(SFXFN_CompilerError) T(FN_VaCountOf) T(FN_VaAt) \
     T(FN_VaKeys) T(FN_VaKey) T(FN_VaValues) T(FN_CompilerMessage) T(FN_Undef) T(FN_NullOf) T(KW_Let) \
-    T(KW_If) T(SFXFN_DelTypeSymbol) T(FN_ExternSymbol) \
+    T(KW_If) T(KW_Switch) T(SFXFN_DelTypeSymbol) T(FN_ExternSymbol) \
     T(FN_ExternNew) T(FN_GetSyntaxScope) \
     T(SFXFN_Discard) \
     T(FN_TypeAt) T(FN_TypeLocalAt) T(KW_CompileStage) T(FN_Location) T(SFXFN_Unreachable) \
@@ -260,7 +260,7 @@ namespace scopes {
     T(KW_EmptyTuple, "empty-tuple") T(KW_Escape, "escape") \
     T(KW_Except, "except") T(KW_False, "false") T(KW_Fn, "fn") \
     T(KW_FnTypes, "fn-types") T(KW_FnCC, "fn/cc") T(KW_Globals, "globals") \
-    T(KW_If, "if") T(KW_In, "in") T(KW_Let, "let") T(KW_Loop, "loop") \
+    T(KW_If, "if") T(KW_Switch, "switch") T(KW_In, "in") T(KW_Let, "let") T(KW_Loop, "loop") \
     T(KW_LoopFor, "loop-for") T(KW_None, "none") T(KW_Null, "null") \
     T(KW_QQuoteSyntax, "qquote-syntax") T(KW_Quote, "quote") T(KW_Inline, "inline") \
     T(KW_QuoteSyntax, "quote-syntax") T(KW_Recur, "recur") \
@@ -292,7 +292,7 @@ namespace scopes {
     T(FN_Bitcast, "bitcast") T(FN_IntToPtr, "inttoptr") T(FN_PtrToInt, "ptrtoint") \
     T(FN_BlockMacro, "block-macro") \
     T(FN_BlockScopeMacro, "block-scope-macro") T(FN_BoolEq, "bool==") \
-    T(FN_BuiltinEq, "Builtin==") \
+    T(FN_BuiltinEq, "Builtin==") T(KW_Case, "case") T(KW_Default, "default") \
     T(FN_Branch, "branch") T(FN_IsCallable, "callable?") T(FN_Cast, "cast") \
     T(FN_Concat, "concat") T(FN_Cons, "cons") T(FN_IsConstant, "constant?") \
     T(FN_Countof, "countof") \

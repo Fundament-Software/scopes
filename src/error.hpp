@@ -87,6 +87,9 @@ void print_definition_anchor(Value *node);
 // specializer errors
 SCOPES_RESULT(void) error_invalid_call_type(Value *callee);
 SCOPES_RESULT(void) error_invalid_condition_type(Value *cond);
+SCOPES_RESULT(void) error_invalid_case_literal_type(Value *lit);
+SCOPES_RESULT(void) error_duplicate_default_case();
+SCOPES_RESULT(void) error_missing_default_case();
 SCOPES_RESULT(void) error_argument_count_mismatch(int needed, int got);
 SCOPES_RESULT(void) error_invalid_operands(const Type *A, const Type *B);
 SCOPES_RESULT(void) error_argument_type_mismatch(const Type *expected, const Type *got);

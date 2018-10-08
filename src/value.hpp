@@ -29,6 +29,7 @@ struct Scope;
     T(VK_CompileStage, "value-kind-compile-stage", CompileStage) \
     /* instructions (Instruction::classof) */ \
     T(VK_If, "value-kind-if", If) \
+    T(VK_Switch, "value-kind-switch", Switch) \
     T(VK_Try, "value-kind-try", Try) \
     T(VK_Call, "value-kind-call", Call) \
     T(VK_Loop, "value-kind-loop", Loop) \
@@ -213,19 +214,19 @@ struct Expression : Value {
 
 //------------------------------------------------------------------------------
 
-struct Clause {
-    const Anchor *anchor;
-    Block cond_body;
-    Value *cond;
-    Block body;
-    Value *value;
-
-    Clause() : anchor(nullptr), cond(nullptr), value(nullptr) {}
-};
-
-typedef std::vector<Clause> Clauses;
-
 struct If : Instruction {
+    struct Clause {
+        const Anchor *anchor;
+        Block cond_body;
+        Value *cond;
+        Block body;
+        Value *value;
+
+        Clause() : anchor(nullptr), cond(nullptr), value(nullptr) {}
+    };
+
+    typedef std::vector<Clause> Clauses;
+
     static bool classof(const Value *T);
 
     If(const Anchor *anchor, const Clauses &clauses);
@@ -239,6 +240,34 @@ struct If : Instruction {
 
     Clauses clauses;
     Clause else_clause;
+};
+
+//------------------------------------------------------------------------------
+
+struct Switch : Instruction {
+    struct Case {
+        const Anchor *anchor;
+        Value *literal;
+        Block body;
+        Value *value;
+
+        Case() : anchor(nullptr), literal(nullptr), value(nullptr) {}
+
+        bool is_default() const { return literal == nullptr; }
+    };
+
+    typedef std::vector<Case> Cases;
+
+    static bool classof(const Value *T);
+
+    Switch(const Anchor *anchor, Value *expr, const Cases &cases);
+
+    static Switch *from(const Anchor *anchor, Value *expr = nullptr, const Cases &cases = {});
+
+    void append(const Anchor *anchor, Value *literal, Value *value);
+
+    Value *expr;
+    Cases cases;
 };
 
 //------------------------------------------------------------------------------

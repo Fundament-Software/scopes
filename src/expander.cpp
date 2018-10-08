@@ -627,6 +627,58 @@ struct Expander {
         SCOPES_LOCATION_ERROR(String::from("except block expected"));
     }
 
+    // (switch cond)
+    // [(case literal body ...)]
+    // (default body ...)
+    SCOPES_RESULT(Value *) expand_switch(const List *it) {
+        SCOPES_RESULT_TYPE(Value *);
+        auto _anchor = get_active_anchor();
+
+        SCOPES_CHECK_RESULT(verify_list_parameter_count("switch", it, 1, -1));
+        it = it->next;
+
+        Expander subexp(env, astscope);
+        assert(it);
+        subexp.next = it->next;
+        auto expr = SCOPES_GET_RESULT(subexp.expand(it->at));
+        it = subexp.next;
+
+        Switch::Cases cases;
+
+        it = next;
+    collect_case:
+        if ((it == EOL) || (try_get_const_type(it->at) != TYPE_List)) {
+            SCOPES_EXPECT_ERROR(error_missing_default_case());
+        }
+        next = it->next;
+        auto _case = Switch::Case();
+        _case.anchor = it->at->anchor();
+        it = SCOPES_GET_RESULT(extract_list_constant(it->at));
+        SCOPES_CHECK_RESULT(verify_list_parameter_count("case", it, 1, -1));
+        auto head = try_extract_symbol(it->at);
+        if (head == KW_Case) {
+            it = it->next;
+            subexp.next = it->next;
+            _case.literal = SCOPES_GET_RESULT(subexp.expand(it->at));
+            it = subexp.next;
+
+            Expander nativeexp(Scope::from(env), astscope);
+            _case.value = SCOPES_GET_RESULT(subexp.expand_expression(_case.anchor, it));
+            cases.push_back(_case);
+
+            it = next;
+            goto collect_case;
+        } else if (head == KW_Default) {
+            it = it->next;
+
+            Expander nativeexp(Scope::from(env), astscope);
+            _case.value = SCOPES_GET_RESULT(subexp.expand_expression(_case.anchor, it));
+            cases.push_back(_case);
+        }
+
+        return Switch::from(_anchor, expr, cases);
+    }
+
     // (if cond body ...)
     // [(elseif cond body ...)]
     // [(else body ...)]
@@ -886,6 +938,7 @@ struct Expander {
                 case KW_Loop: return expand_loop(list);
                 case KW_Try: return expand_try(list);
                 case KW_If: return expand_if(list);
+                case KW_Switch: return expand_switch(list);
                 case KW_Quote: return expand_quote(list);
                 case KW_Return: return expand_return(list);
                 case KW_Raise: return expand_raise(list);

@@ -299,6 +299,26 @@ struct StreamAST : StreamAnchors {
             walk_same_or_newline(val->except_param, depth+2, maxdepth);
             stream_block_result(val->except_body, val->except_value, depth+2, maxdepth);
         } break;
+        case VK_Switch: {
+            stream_type_prefix(node);
+            auto val = cast<Switch>(node);
+            ss << Style_Keyword << "Switch" << Style_None;
+            if (newlines) {
+                walk_same_or_newline(val->expr, depth+1, maxdepth);
+                for (int i = 0; i < val->cases.size(); ++i) {
+                    auto &&_case = val->cases[i];
+                    stream_newline();
+                    stream_indent(depth+1);
+                    if (_case.literal) {
+                        ss << Style_Keyword << "case" << Style_None;
+                        walk_same_or_newline(_case.literal, depth+2, maxdepth);
+                    } else {
+                        ss << Style_Keyword << "default" << Style_None;
+                    }
+                    stream_block_result(_case.body, _case.value, depth+2, maxdepth);
+                }
+            }
+        } break;
         case VK_If: {
             stream_type_prefix(node);
             auto val = cast<If>(node);

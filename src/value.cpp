@@ -295,6 +295,26 @@ Value *If::canonicalize() {
 
 //------------------------------------------------------------------------------
 
+Switch::Switch(const Anchor *anchor, Value *_expr, const Cases &_cases)
+    : Instruction(VK_Switch, anchor), expr(_expr), cases(_cases)
+{}
+
+Switch *Switch::from(const Anchor *anchor, Value *expr, const Cases &cases) {
+    return new Switch(anchor, expr, cases);
+}
+
+void Switch::append(const Anchor *anchor, Value *literal, Value *value) {
+    assert(anchor);
+    assert(value);
+    Case _case;
+    _case.anchor = anchor;
+    _case.literal = literal;
+    _case.value = value;
+    cases.push_back(_case);
+}
+
+//------------------------------------------------------------------------------
+
 Try::Try(const Anchor *anchor, Value *_try_value, Parameter *_except_param, Value *_except_value)
     : Instruction(VK_Try, anchor), try_value(_try_value),
         except_param(_except_param), except_value(_except_value),

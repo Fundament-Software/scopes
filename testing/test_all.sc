@@ -56,6 +56,7 @@ test-modules
     .test_string
     .test_struct
     .test_submod
+    .test_switch
     .test_testing
     .test_try
     .test_tuple_array

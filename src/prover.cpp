@@ -1929,15 +1929,65 @@ static SCOPES_RESULT(Value *) prove_Parameter(const ASTContext &ctx, Parameter *
     return value;
 }
 
+static SCOPES_RESULT(Value *) prove_Switch(const ASTContext &ctx, Switch *node) {
+    SCOPES_RESULT_TYPE(Value *);
+
+    auto subctx = ctx.with_symbol_target();
+    auto newexpr = SCOPES_GET_RESULT(prove(subctx, node->expr));
+
+    const Type *rtype = nullptr;
+    const Type *casetype = newexpr->get_type();
+
+    Switch::Cases cases;
+    bool has_default = false;
+    for (auto &&_case : node->cases) {
+        SCOPES_ANCHOR(_case.anchor);
+        Switch::Case newcase;
+        newcase.anchor = _case.anchor;
+        if (_case.literal) {
+            auto newlit = SCOPES_GET_RESULT(prove(subctx, _case.literal));
+            if (!isa<ConstInt>(newlit)) {
+                SCOPES_EXPECT_ERROR(error_invalid_case_literal_type(newlit));
+            }
+            casetype = SCOPES_GET_RESULT(merge_value_type(subctx, casetype, newlit->get_type()));
+            newcase.literal = newlit;
+        } else {
+            if (has_default) {
+                SCOPES_EXPECT_ERROR(error_duplicate_default_case());
+            }
+            newcase.literal = nullptr;
+            has_default = true;
+        }
+        auto bodyctx = ctx.with_block(newcase.body);
+        auto newvalue = SCOPES_GET_RESULT(prove(bodyctx, _case.value));
+        newcase.value = newvalue;
+        rtype = SCOPES_GET_RESULT(merge_value_type(bodyctx, rtype, newvalue->get_type()));
+        cases.push_back(newcase);
+    }
+
+    if (!has_default) {
+        SCOPES_EXPECT_ERROR(error_missing_default_case());
+    }
+
+    if (cases.size() == 1) {
+        ctx.block->migrate_from(cases[0].body);
+        return cases[0].value;
+    }
+
+    auto result = Switch::from(node->anchor(), newexpr, cases);
+    result->set_type(rtype);
+    return result;
+}
+
 static SCOPES_RESULT(Value *) prove_If(const ASTContext &ctx, If *_if) {
     SCOPES_RESULT_TYPE(Value *);
     assert(!_if->clauses.empty());
     auto subctx = ctx.with_symbol_target();
     const Type *rtype = nullptr;
-    Clauses clauses;
-    Clause else_clause;
+    If::Clauses clauses;
+    If::Clause else_clause;
     for (auto &&clause : _if->clauses) {
-        Clause newclause;
+        If::Clause newclause;
         newclause.anchor = clause.anchor;
         auto newcond = SCOPES_GET_RESULT(prove(subctx.with_block(newclause.cond_body), clause.cond));
         if (newcond->get_type() != TYPE_Bool) {

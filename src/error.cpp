@@ -188,6 +188,28 @@ SCOPES_RESULT(void) error_invalid_condition_type(Value *cond) {
     SCOPES_LOCATION_ERROR(ss.str());
 }
 
+SCOPES_RESULT(void) error_invalid_case_literal_type(Value *lit) {
+    SCOPES_RESULT_TYPE(void);
+    print_definition_anchor(lit);
+    StyledString ss;
+    ss.out << "condition of switch-case must be constant of type "
+        << TYPE_Integer << ", not value of type " << lit->get_type();
+    SCOPES_LOCATION_ERROR(ss.str());
+}
+
+SCOPES_RESULT(void) error_duplicate_default_case() {
+    SCOPES_RESULT_TYPE(void);
+    StyledString ss;
+    ss.out << "duplicate default case";
+    SCOPES_LOCATION_ERROR(ss.str());
+}
+
+SCOPES_RESULT(void) error_missing_default_case() {
+    SCOPES_RESULT_TYPE(void);
+    StyledString ss;
+    ss.out << "missing default case";
+    SCOPES_LOCATION_ERROR(ss.str());
+}
 
 SCOPES_RESULT(void) error_constant_expected(const Type *want, Value *value) {
     SCOPES_RESULT_TYPE(void);

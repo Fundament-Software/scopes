@@ -1733,6 +1733,58 @@ struct LLVMIRGenerator {
         return node_to_value(node->value);
     }
 
+    SCOPES_RESULT(LLVMValueRef) Switch_to_value(Switch *node) {
+        SCOPES_RESULT_TYPE(LLVMValueRef);
+        auto expr = SCOPES_GET_RESULT(node_to_value(node->expr));
+        LLVMBasicBlockRef bb = LLVMGetInsertBlock(builder);
+        LLVMValueRef func = LLVMGetBasicBlockParent(bb);
+        auto rtype = node->get_type();
+        LLVMBasicBlockRef bb_merge = nullptr;
+        LLVMValueRef merge_value = nullptr;
+        if (is_returning(rtype)) {
+            bb_merge = LLVMAppendBasicBlock(func, "switch-merge");
+            LLVMPositionBuilderAtEnd(builder, bb_merge);
+            if (is_returning_value(rtype)) {
+                merge_value = LLVMBuildPhi(builder,
+                    SCOPES_GET_RESULT(type_to_llvm_type(rtype)), "");
+            }
+        }
+        LLVMBasicBlockRef bbdefault = LLVMAppendBasicBlock(func, "default");
+        LLVMPositionBuilderAtEnd(builder, bb);
+        int count = (int)node->cases.size();
+        assert(count);
+        auto _sw = LLVMBuildSwitch(builder, expr, bbdefault, count - 1);
+        for (int i = 0; i < count; ++i) {
+            auto &&_case = node->cases[i];
+            if (_case.is_default()) {
+                LLVMPositionBuilderAtEnd(builder, bbdefault);
+            } else {
+                auto lit = SCOPES_GET_RESULT(node_to_value(_case.literal));
+                LLVMBasicBlockRef bbcase = LLVMAppendBasicBlock(func, "case");
+                LLVMPositionBuilderAtEnd(builder, bbcase);
+                LLVMAddCase(_sw, lit, bbcase);
+            }
+            SCOPES_CHECK_RESULT(block_to_value(_case.body));
+            auto result = SCOPES_GET_RESULT(node_to_value(_case.value));
+            auto rtype = _case.value->get_type();
+            if (is_returning(rtype)) {
+                assert(bb_merge);
+                LLVMBasicBlockRef bb_active = LLVMGetInsertBlock(builder);
+                LLVMBuildBr(builder, bb_merge);
+                if (merge_value) {
+                    assert(result);
+                    LLVMBasicBlockRef incobbs[] = { bb_active };
+                    LLVMValueRef incovals[] = { result };
+                    LLVMAddIncoming(merge_value, incovals, incobbs, 1);
+                }
+            }
+        }
+        if (bb_merge) {
+            LLVMPositionBuilderAtEnd(builder, bb_merge);
+        }
+        return merge_value;
+    }
+
     SCOPES_RESULT(LLVMValueRef) If_to_value(If *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         LLVMBasicBlockRef bb = LLVMGetInsertBlock(builder);

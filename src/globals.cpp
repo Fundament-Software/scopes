@@ -894,6 +894,20 @@ void sc_if_append_else_clause(sc_value_t *value, sc_value_t *body) {
     cast<If>(value)->append(get_active_anchor(), body);
 }
 
+sc_value_t *sc_switch_new(sc_value_t *expr) {
+    using namespace scopes;
+    return Switch::from(get_active_anchor(), expr);
+}
+void sc_switch_append_case(sc_value_t *value, sc_value_t *literal, sc_value_t *body) {
+    using namespace scopes;
+    cast<Switch>(value)->append(get_active_anchor(), literal, body);
+}
+void sc_switch_append_default(sc_value_t *value, sc_value_t *body) {
+    using namespace scopes;
+    cast<Switch>(value)->append(get_active_anchor(), nullptr, body);
+}
+
+
 sc_value_t *sc_parameter_new(sc_symbol_t name, const sc_type_t *type) {
     using namespace scopes;
     return Parameter::from(get_active_anchor(), name, type);
@@ -1507,6 +1521,9 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_if_new, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_if_append_then_clause, _void, TYPE_Value, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_if_append_else_clause, _void, TYPE_Value, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_switch_new, TYPE_Value, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_switch_append_case, _void, TYPE_Value, TYPE_Value, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_switch_append_default, _void, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_parameter_new, TYPE_Value, TYPE_Symbol, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_call_new, TYPE_Value, TYPE_Value, TYPE_I32, TYPE_ValuePP);
     DEFINE_EXTERN_C_FUNCTION(sc_call_is_rawcall, TYPE_Bool, TYPE_Value);
