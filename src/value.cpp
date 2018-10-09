@@ -303,12 +303,36 @@ Switch *Switch::from(const Anchor *anchor, Value *expr, const Cases &cases) {
     return new Switch(anchor, expr, cases);
 }
 
-void Switch::append(const Anchor *anchor, Value *literal, Value *value) {
+void Switch::append_case(const Anchor *anchor, Value *literal, Value *value) {
+    assert(anchor);
+    assert(literal);
+    assert(value);
+    Case _case;
+    _case.kind = CK_Case;
+    _case.anchor = anchor;
+    _case.literal = literal;
+    _case.value = value;
+    cases.push_back(_case);
+}
+
+void Switch::append_pass(const Anchor *anchor, Value *literal, Value *value) {
+    assert(anchor);
+    assert(literal);
+    assert(value);
+    Case _case;
+    _case.kind = CK_Pass;
+    _case.anchor = anchor;
+    _case.literal = literal;
+    _case.value = value;
+    cases.push_back(_case);
+}
+
+void Switch::append_default(const Anchor *anchor, Value *value) {
     assert(anchor);
     assert(value);
     Case _case;
+    _case.kind = CK_Default;
     _case.anchor = anchor;
-    _case.literal = literal;
     _case.value = value;
     cases.push_back(_case);
 }

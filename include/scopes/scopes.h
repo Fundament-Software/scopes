@@ -194,6 +194,7 @@ void sc_if_append_else_clause(sc_value_t *value, sc_value_t *body);
 
 sc_value_t *sc_switch_new(sc_value_t *expr);
 void sc_switch_append_case(sc_value_t *value, sc_value_t *literal, sc_value_t *body);
+void sc_switch_append_pass(sc_value_t *value, sc_value_t *literal, sc_value_t *body);
 void sc_switch_append_default(sc_value_t *value, sc_value_t *body);
 
 sc_value_t *sc_parameter_new(sc_symbol_t name, const sc_type_t *type);

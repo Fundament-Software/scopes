@@ -244,17 +244,21 @@ struct If : Instruction {
 
 //------------------------------------------------------------------------------
 
+enum CaseKind {
+    CK_Case = 0,
+    CK_Pass,
+    CK_Default
+};
+
 struct Switch : Instruction {
     struct Case {
+        CaseKind kind;
         const Anchor *anchor;
         Value *literal;
         Block body;
         Value *value;
 
-        Case() : anchor(nullptr), literal(nullptr), value(nullptr) {}
-
-        bool is_default() const { return literal == nullptr; }
-        bool is_pass() const { return value == nullptr; }
+        Case() : kind(CK_Case), anchor(nullptr), literal(nullptr), value(nullptr) {}
     };
 
     typedef std::vector<Case> Cases;
@@ -265,7 +269,9 @@ struct Switch : Instruction {
 
     static Switch *from(const Anchor *anchor, Value *expr = nullptr, const Cases &cases = {});
 
-    void append(const Anchor *anchor, Value *literal, Value *value);
+    void append_case(const Anchor *anchor, Value *literal, Value *value);
+    void append_pass(const Anchor *anchor, Value *literal, Value *value);
+    void append_default(const Anchor *anchor, Value *value);
 
     Value *expr;
     Cases cases;

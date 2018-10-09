@@ -675,21 +675,6 @@ sc_type_set_symbol Value '__typecall
                     sc_block_new 2 blockargs
                 else
                     sc_value_wrap T value
-#
-                    let storageT = (sc_type_storage T)
-                    let kind = (sc_type_kind storageT)
-                    let argptr = (getelementptr args 1)
-                    if (icmp== kind type-kind-pointer)
-                        sc_call_new (box-pointer box-pointer) 1 argptr
-                    elseif (icmp== kind type-kind-integer)
-                        sc_call_new (box-pointer box-integer) 1 argptr
-                    #elseif (bor (icmp== kind type-kind-tuple) (icmp== kind type-kind-array))
-                    #elseif (icmp== kind type-kind-vector)
-                    #elseif (icmp== kind type-kind-real)
-                    else
-                        compiler-error!
-                            sc_string_join "can't box value of type "
-                                sc_value_repr (box-pointer T)
 
 let __unbox =
     ast-macro
@@ -1453,11 +1438,12 @@ fn scope-getattr-dynamic (T value)
                     ``Scope parent clone``
                         duplicate ``clone``, but descending from ``parent`` instead
                 verify-count argc 1 3
-                if (icmp== argc 1)
+                switch argc
+                case 1
                     sc_call_new (Value sc_scope_new) 0 (undef ValueArrayPointer)
-                elseif (icmp== argc 2)
+                case 2
                     sc_call_new (Value sc_scope_new_subscope) 1 (getelementptr argv 1)
-                else
+                default
                     # argc == 3
                     let parent = (loadarrayptrs argv 1)
                     if (type== ('typeof parent) Nothing)
@@ -2654,14 +2640,15 @@ let vector-reduce =
             let sz = ('element-count T)
             loop (v sz) = v sz
             # special cases for low vector sizes
-            if (sz == 1)
+            switch sz
+            case 1
                 sc_call_new extractelement (Value-array v 0)
-            elseif (sz == 2)
+            case 2
                 sc_call_new f
                     Value-array
                         sc_call_new extractelement (Value-array v 0)
                         sc_call_new extractelement (Value-array v 1)
-            elseif (sz == 3)
+            case 3
                 sc_call_new f
                     Value-array
                         sc_call_new f
@@ -2669,7 +2656,7 @@ let vector-reduce =
                                 sc_call_new extractelement (Value-array v 0)
                                 sc_call_new extractelement (Value-array v 1)
                         sc_call_new extractelement (Value-array v 2)
-            elseif (sz == 4)
+            case 4
                 sc_call_new f
                     Value-array
                         sc_call_new f
@@ -2680,7 +2667,7 @@ let vector-reduce =
                             Value-array
                                 sc_call_new extractelement (Value-array v 2)
                                 sc_call_new extractelement (Value-array v 3)
-            else
+            default
                 let hsz = (sz >> 1)
                 let fsz = (hsz << 1)
                 if (fsz != sz)
@@ -2841,15 +2828,16 @@ fn parse-compile-flags (argc argv)
         let flag = (arg as Symbol)
         repeat (i + 1)
             | flags
-                if (== flag 'dump-disassembly) compile-flag-dump-disassembly
-                elseif (== flag 'dump-module) compile-flag-dump-module
-                elseif (== flag 'dump-function) compile-flag-dump-function
-                elseif (== flag 'dump-time) compile-flag-dump-time
-                elseif (== flag 'no-debug-info) compile-flag-no-debug-info
-                elseif (== flag 'O1) compile-flag-O1
-                elseif (== flag 'O2) compile-flag-O2
-                elseif (== flag 'O3) compile-flag-O3
-                else
+                switch flag
+                case 'dump-disassembly compile-flag-dump-disassembly
+                case 'dump-module compile-flag-dump-module
+                case 'dump-function compile-flag-dump-function
+                case 'dump-time compile-flag-dump-time
+                case 'no-debug-info compile-flag-no-debug-info
+                case 'O1 compile-flag-O1
+                case 'O2 compile-flag-O2
+                case 'O3 compile-flag-O3
+                default
                     compiler-error!
                         .. "illegal flag: " (repr flag)
                             ". try one of"
@@ -3883,11 +3871,12 @@ define-syntax-block-scope-macro static-if
                 if (('typeof else-expr) == list)
                     let kw body = (decons (else-expr as list))
                     let kw = (kw as Symbol)
-                    if (kw == 'elseif)
+                    switch kw
+                    case 'elseif
                         process body next-next-expr
-                    elseif (kw == 'else)
+                    case 'else
                         _ body next-next-expr
-                    else
+                    default
                         _ '() next-expr
                 else
                     _ '() next-expr
@@ -3918,11 +3907,12 @@ define-syntax-block-scope-macro syntax-if
                 if (('typeof else-expr) == list)
                     let kw body = (decons (else-expr as list))
                     let kw = (kw as Symbol)
-                    if (kw == 'elseif)
+                    switch kw
+                    case 'elseif
                         process syntax-scope body next-next-expr
-                    elseif (kw == 'else)
+                    case 'else
                         _ body next-next-expr
-                    else
+                    default
                         _ '() next-expr
                 else
                     _ '() next-expr

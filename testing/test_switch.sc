@@ -1,13 +1,15 @@
 
 print
-    switch 2
+    switch 3
     case 0
         print "!"
         print "zero"
     case 1
         print "one"
-    case 2 pass
-    case 3 pass
+    pass 2
+        print "two or larger"
+    pass 3
+        print "three or larger"
     case 4
         print "two to four"
     case 5

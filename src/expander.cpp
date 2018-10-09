@@ -656,22 +656,15 @@ struct Expander {
         it = SCOPES_GET_RESULT(extract_list_constant(it->at));
         SCOPES_CHECK_RESULT(verify_list_parameter_count("case", it, 1, -1));
         auto head = try_extract_symbol(it->at);
-        if (head == KW_Case) {
+        if ((head == KW_Case) || (head == KW_Pass)) {
+            if (head == KW_Pass) {
+                _case.kind = CK_Pass;
+            }
+
             it = it->next;
             subexp.next = it->next;
             _case.literal = SCOPES_GET_RESULT(subexp.expand(it->at));
             it = subexp.next;
-
-            if (it) {
-                auto token = try_extract_symbol(it->at);
-                if (token == KW_Pass) {
-                    SCOPES_ANCHOR(it->at->anchor());
-                    SCOPES_CHECK_RESULT(verify_list_parameter_count("pass", it, 0, 0));
-                    cases.push_back(_case);
-                    it = next;
-                    goto collect_case;
-                }
-            }
 
             Expander nativeexp(Scope::from(env), astscope);
             _case.value = SCOPES_GET_RESULT(subexp.expand_expression(_case.anchor, it));
@@ -681,6 +674,8 @@ struct Expander {
             goto collect_case;
         } else if (head == KW_Default) {
             it = it->next;
+
+            _case.kind = CK_Default;
 
             Expander nativeexp(Scope::from(env), astscope);
             _case.value = SCOPES_GET_RESULT(subexp.expand_expression(_case.anchor, it));

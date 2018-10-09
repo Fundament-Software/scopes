@@ -1920,12 +1920,12 @@ static SCOPES_RESULT(Value *) prove_Switch(const ASTContext &ctx, Switch *node) 
     for (auto &&_case : node->cases) {
         SCOPES_ANCHOR(_case.anchor);
         Switch::Case newcase;
+        newcase.kind = _case.kind;
         newcase.anchor = _case.anchor;
-        if (_case.is_default()) {
+        if (_case.kind == CK_Default) {
             if (has_default) {
                 SCOPES_EXPECT_ERROR(error_duplicate_default_case());
             }
-            newcase.literal = nullptr;
             has_default = true;
         } else {
             auto newlit = SCOPES_GET_RESULT(prove(subctx, _case.literal));
@@ -1935,11 +1935,11 @@ static SCOPES_RESULT(Value *) prove_Switch(const ASTContext &ctx, Switch *node) 
             casetype = SCOPES_GET_RESULT(merge_value_type(casetype, newlit->get_type()));
             newcase.literal = newlit;
         }
-        if (!_case.is_pass() || _case.is_default()) {
-            assert(_case.value);
-            auto bodyctx = ctx.with_block(newcase.body);
-            auto newvalue = SCOPES_GET_RESULT(prove(bodyctx, _case.value));
-            newcase.value = newvalue;
+        assert(_case.value);
+        auto bodyctx = ctx.with_block(newcase.body);
+        auto newvalue = SCOPES_GET_RESULT(prove(bodyctx, _case.value));
+        newcase.value = newvalue;
+        if (_case.kind != CK_Pass) {
             rtype = SCOPES_GET_RESULT(merge_value_type(rtype, newvalue->get_type()));
         }
         cases.push_back(newcase);
@@ -1951,7 +1951,7 @@ static SCOPES_RESULT(Value *) prove_Switch(const ASTContext &ctx, Switch *node) 
 
     if (cases.size() == 1) {
         ctx.block->migrate_from(cases[0].body);
-        assert(!cases[0].is_pass());
+        assert(cases[0].kind != CK_Pass);
         return cases[0].value;
     }
 
