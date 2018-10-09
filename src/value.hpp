@@ -254,6 +254,7 @@ struct Switch : Instruction {
         Case() : anchor(nullptr), literal(nullptr), value(nullptr) {}
 
         bool is_default() const { return literal == nullptr; }
+        bool is_pass() const { return value == nullptr; }
     };
 
     typedef std::vector<Case> Cases;

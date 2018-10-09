@@ -1754,15 +1754,25 @@ struct LLVMIRGenerator {
         int count = (int)node->cases.size();
         assert(count);
         auto _sw = LLVMBuildSwitch(builder, expr, bbdefault, count - 1);
-        for (int i = 0; i < count; ++i) {
+        int i = count;
+        LLVMBasicBlockRef lastbb = nullptr;
+        while (i-- > 0) {
             auto &&_case = node->cases[i];
+            if (_case.is_pass()) {
+                assert(!_case.is_default());
+                auto lit = SCOPES_GET_RESULT(node_to_value(_case.literal));
+                LLVMAddCase(_sw, lit, lastbb);
+                continue;
+            }
             if (_case.is_default()) {
                 LLVMPositionBuilderAtEnd(builder, bbdefault);
+                lastbb = bbdefault;
             } else {
                 auto lit = SCOPES_GET_RESULT(node_to_value(_case.literal));
                 LLVMBasicBlockRef bbcase = LLVMAppendBasicBlock(func, "case");
                 LLVMPositionBuilderAtEnd(builder, bbcase);
                 LLVMAddCase(_sw, lit, bbcase);
+                lastbb = bbcase;
             }
             SCOPES_CHECK_RESULT(block_to_value(_case.body));
             auto result = SCOPES_GET_RESULT(node_to_value(_case.value));
@@ -1870,6 +1880,7 @@ struct LLVMIRGenerator {
 
     SCOPES_RESULT(LLVMValueRef) node_to_value(Value *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
+        assert(node);
         auto it = node2value.find(node);
         if (it != node2value.end())
             return it->second;

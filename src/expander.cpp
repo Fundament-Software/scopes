@@ -662,6 +662,17 @@ struct Expander {
             _case.literal = SCOPES_GET_RESULT(subexp.expand(it->at));
             it = subexp.next;
 
+            if (it) {
+                auto token = try_extract_symbol(it->at);
+                if (token == KW_Pass) {
+                    SCOPES_ANCHOR(it->at->anchor());
+                    SCOPES_CHECK_RESULT(verify_list_parameter_count("pass", it, 0, 0));
+                    cases.push_back(_case);
+                    it = next;
+                    goto collect_case;
+                }
+            }
+
             Expander nativeexp(Scope::from(env), astscope);
             _case.value = SCOPES_GET_RESULT(subexp.expand_expression(_case.anchor, it));
             cases.push_back(_case);

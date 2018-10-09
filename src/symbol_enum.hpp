@@ -295,7 +295,7 @@ namespace scopes {
     T(FN_BuiltinEq, "Builtin==") T(KW_Case, "case") T(KW_Default, "default") \
     T(FN_Branch, "branch") T(FN_IsCallable, "callable?") T(FN_Cast, "cast") \
     T(FN_Concat, "concat") T(FN_Cons, "cons") T(FN_IsConstant, "constant?") \
-    T(FN_Countof, "countof") \
+    T(FN_Countof, "countof") T(KW_Pass, "pass") \
     T(FN_Compile, "__compile") T(FN_CompileSPIRV, "__compile-spirv") \
     T(FN_CompileGLSL, "__compile-glsl") \
     T(FN_CompileObject, "__compile-object") \
