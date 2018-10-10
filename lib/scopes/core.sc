@@ -733,6 +733,7 @@ inline set-symbols (self values...)
 'set-symbols Value
     constant? = sc_value_is_constant
     pure? = sc_value_is_pure
+    kind = sc_value_kind
     none? = (typify Value-none? Value)
     __repr = sc_value_repr
     ast-repr = sc_value_ast_repr
@@ -2129,7 +2130,6 @@ let
             fn (args scope)
                 fn expand (expr scope)
                     let arg = (as expr list)
-                    print arg
                     sc_expand
                         if (== (countof arg) 1)
                             let arg = (decons arg)

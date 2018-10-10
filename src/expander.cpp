@@ -741,7 +741,7 @@ struct Expander {
             it = subexp.next;
 
             subexp.env = Scope::from(env);
-            ifexpr->append(anchor, cond,
+            ifexpr->append_then(anchor, cond,
                 SCOPES_GET_RESULT(subexp.expand_expression(anchor, it)));
         }
 
@@ -751,7 +751,7 @@ struct Expander {
             it = it->next;
             Expander subexp(Scope::from(env), astscope);
 
-            ifexpr->append(anchor,
+            ifexpr->append_else(anchor,
                 SCOPES_GET_RESULT(subexp.expand_expression(anchor, it)));
         }
 

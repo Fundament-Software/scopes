@@ -887,11 +887,11 @@ sc_value_t *sc_if_new() {
 }
 void sc_if_append_then_clause(sc_value_t *value, sc_value_t *cond, sc_value_t *body) {
     using namespace scopes;
-    cast<If>(value)->append(get_active_anchor(), cond, body);
+    cast<If>(value)->append_then(get_active_anchor(), cond, body);
 }
 void sc_if_append_else_clause(sc_value_t *value, sc_value_t *body) {
     using namespace scopes;
-    cast<If>(value)->append(get_active_anchor(), body);
+    cast<If>(value)->append_else(get_active_anchor(), body);
 }
 
 sc_value_t *sc_switch_new(sc_value_t *expr) {

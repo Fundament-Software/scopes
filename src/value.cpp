@@ -266,7 +266,7 @@ If *If::from(const Anchor *anchor, const Clauses &_clauses) {
     return new If(anchor, _clauses);
 }
 
-void If::append(const Anchor *anchor, Value *cond, Value *value) {
+void If::append_then(const Anchor *anchor, Value *cond, Value *value) {
     assert(anchor);
     assert(cond);
     assert(value);
@@ -277,7 +277,7 @@ void If::append(const Anchor *anchor, Value *cond, Value *value) {
     clauses.push_back(clause);
 }
 
-void If::append(const Anchor *anchor, Value *value) {
+void If::append_else(const Anchor *anchor, Value *value) {
     assert(anchor);
     assert(value);
     assert(!else_clause.value);

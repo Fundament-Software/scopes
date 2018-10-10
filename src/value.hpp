@@ -234,8 +234,8 @@ struct If : Instruction {
     static If *from(const Anchor *anchor, const Clauses &clauses = {});
 
     Value *get_else_clause() const;
-    void append(const Anchor *anchor, Value *cond, Value *value);
-    void append(const Anchor *anchor, Value *value);
+    void append_then(const Anchor *anchor, Value *cond, Value *value);
+    void append_else(const Anchor *anchor, Value *value);
     Value *canonicalize();
 
     Clauses clauses;
