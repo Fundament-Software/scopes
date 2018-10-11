@@ -26,6 +26,8 @@ struct Scope;
     T(VK_Template, "value-kind-template", Template) \
     T(VK_Keyed, "value-kind-keyed", Keyed) \
     T(VK_Expression, "value-kind-expression", Expression) \
+    T(VK_Quote, "value-kind-quote", Quote) \
+    T(VK_Unquote, "value-kind-unquote", Unquote) \
     T(VK_CompileStage, "value-kind-compile-stage", CompileStage) \
     /* instructions (Instruction::classof) */ \
     T(VK_If, "value-kind-if", If) \
@@ -552,6 +554,30 @@ struct Raise : Instruction {
     Raise(const Anchor *anchor, Value *value);
 
     static Raise *from(const Anchor *anchor, Value *value);
+
+    Value *value;
+};
+
+//------------------------------------------------------------------------------
+
+struct Quote : Value {
+    static bool classof(const Value *T);
+
+    Quote(const Anchor *anchor, Value *value);
+
+    static Quote *from(const Anchor *anchor, Value *value);
+
+    Value *value;
+};
+
+//------------------------------------------------------------------------------
+
+struct Unquote : Value {
+    static bool classof(const Value *T);
+
+    Unquote(const Anchor *anchor, Value *value);
+
+    static Unquote *from(const Anchor *anchor, Value *value);
 
     Value *value;
 };

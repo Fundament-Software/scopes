@@ -45,6 +45,7 @@ test-modules
     .test_overload
     .test_parser
     .test_quality
+    .test_quote
     .test_recursion
     .test_reference
     .test_regexp

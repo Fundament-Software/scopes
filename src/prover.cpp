@@ -2032,6 +2032,16 @@ static SCOPES_RESULT(Value *) prove_Template(const ASTContext &ctx, Template *_t
     return ConstPointer::closure_from(_template->anchor(), Closure::from(_template, frame));
 }
 
+static SCOPES_RESULT(Value *) prove_Quote(const ASTContext &ctx, Quote *node) {
+    SCOPES_RESULT_TYPE(Value *);
+    SCOPES_LOCATION_ERROR(String::from("quote not supported yet"));
+}
+
+static SCOPES_RESULT(Value *) prove_Unquote(const ASTContext &ctx, Unquote *node) {
+    SCOPES_RESULT_TYPE(Value *);
+    SCOPES_LOCATION_ERROR(String::from("unexpected unquote"));
+}
+
 static SCOPES_RESULT(Function *) prove_Function(const ASTContext &ctx, Function *fn) {
     SCOPES_RESULT_TYPE(Function *);
     return fn;

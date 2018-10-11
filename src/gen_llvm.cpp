@@ -851,20 +851,24 @@ struct LLVMIRGenerator {
         node2value.insert({node, value});
     }
 
+    SCOPES_RESULT(LLVMValueRef) Quote_to_value(Quote *node) {
+        SCOPES_RESULT_TYPE(LLVMValueRef);
+        SCOPES_LOCATION_ERROR(String::from("IL->IR: cannot translate quote"));
+    }
+
+    SCOPES_RESULT(LLVMValueRef) Unquote_to_value(Unquote *node) {
+        SCOPES_RESULT_TYPE(LLVMValueRef);
+        SCOPES_LOCATION_ERROR(String::from("IL->IR: cannot translate unquote"));
+    }
+
     SCOPES_RESULT(LLVMValueRef) Template_to_value(Template *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
-        assert(false);
-
         SCOPES_LOCATION_ERROR(String::from("IL->IR: cannot translate template"));
-        return nullptr;
     }
 
     SCOPES_RESULT(LLVMValueRef) Expression_to_value(Expression *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
-        assert(false);
-
         SCOPES_LOCATION_ERROR(String::from("IL->IR: cannot translate expression"));
-        return nullptr;
     }
 
     SCOPES_RESULT(LLVMValueRef) write_return(LLVMValueRef value, bool is_except = false) {

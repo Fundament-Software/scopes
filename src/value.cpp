@@ -563,6 +563,26 @@ Raise *Raise::from(const Anchor *anchor, Value *value) {
 
 //------------------------------------------------------------------------------
 
+Quote::Quote(const Anchor *anchor, Value *_value)
+    : Value(VK_Quote, anchor), value(_value) {
+}
+
+Quote *Quote::from(const Anchor *anchor, Value *value) {
+    return new Quote(anchor, value);
+}
+
+//------------------------------------------------------------------------------
+
+Unquote::Unquote(const Anchor *anchor, Value *_value)
+    : Value(VK_Unquote, anchor), value(_value) {
+}
+
+Unquote *Unquote::from(const Anchor *anchor, Value *value) {
+    return new Unquote(anchor, value);
+}
+
+//------------------------------------------------------------------------------
+
 CompileStage::CompileStage(const Anchor *anchor, const List *_next, Scope *_env)
     : Value(VK_CompileStage, anchor), next(_next), env(_env) {
 }
