@@ -531,11 +531,11 @@ struct Expander {
     }
 
     // quote <value> ...
-    SCOPES_RESULT(Value *) expand_quote(const List *it) {
+    SCOPES_RESULT(Value *) expand_syntax_quote(const List *it) {
         SCOPES_RESULT_TYPE(Value *);
         auto _anchor = get_active_anchor();
 
-        SCOPES_CHECK_RESULT(verify_list_parameter_count("quote", it, 1, -1));
+        SCOPES_CHECK_RESULT(verify_list_parameter_count("syntax-quote", it, 1, -1));
         it = it->next;
 
         if (it->count == 1) {
@@ -799,6 +799,19 @@ struct Expander {
         return true;
     }
 
+    SCOPES_RESULT(Value *) expand_ast_unquote(const List *it) {
+        SCOPES_RESULT_TYPE(Value *);
+        auto _anchor = get_active_anchor();
+        SCOPES_CHECK_RESULT(verify_list_parameter_count("unquote", it, 0, -1));
+        it = it->next;
+        ArgumentList *args = ArgumentList::from(_anchor);
+        if (it) {
+            Expander subexp(env, astscope, it->next);
+            SCOPES_CHECK_RESULT(subexp.expand_arguments(args->values, it));
+        }
+        return Unquote::from(_anchor, args);
+    }
+
     SCOPES_RESULT(Value *) expand_return(const List *it) {
         SCOPES_RESULT_TYPE(Value *);
         auto _anchor = get_active_anchor();
@@ -945,7 +958,8 @@ struct Expander {
                 case KW_Try: return expand_try(list);
                 case KW_If: return expand_if(list);
                 case KW_Switch: return expand_switch(list);
-                case KW_Quote: return expand_quote(list);
+                case KW_SyntaxQuote: return expand_syntax_quote(list);
+                case SYM_SquareList: return expand_ast_unquote(list);
                 case KW_Return: return expand_return(list);
                 case KW_Raise: return expand_raise(list);
                 case KW_Break: return expand_break(list);

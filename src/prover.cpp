@@ -2039,6 +2039,7 @@ static SCOPES_RESULT(Value *) prove_Quote(const ASTContext &ctx, Quote *node) {
 
 static SCOPES_RESULT(Value *) prove_Unquote(const ASTContext &ctx, Unquote *node) {
     SCOPES_RESULT_TYPE(Value *);
+    SCOPES_ANCHOR(node->anchor());
     SCOPES_LOCATION_ERROR(String::from("unexpected unquote"));
 }
 

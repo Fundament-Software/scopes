@@ -564,7 +564,7 @@ SCOPES_RESULT(Value *) LexerParser::parse_any() {
         }
         return ConstPointer::list_from(anchor,
             List::from({
-                ConstInt::symbol_from(anchor, Symbol(KW_Quote)),
+                ConstInt::symbol_from(anchor, Symbol(KW_SyntaxQuote)),
                 SCOPES_GET_RESULT(parse_any())
                 }));
     } else {

@@ -15,12 +15,12 @@ namespace scopes {
 
 // list of symbols to be exposed as builtins to the default global namespace
 #define B_GLOBALS() \
-    T(FN_Branch) T(KW_Fn) T(KW_Label) T(KW_Quote) T(KW_Inline) T(KW_Forward) T(KW_Raise) \
+    T(FN_Branch) T(KW_Fn) T(KW_Label) T(KW_SyntaxQuote) T(KW_Inline) T(KW_Forward) T(KW_Raise) \
     T(KW_Call) T(KW_RawCall) T(KW_CCCall) T(SYM_QuoteForm) T(FN_Dump) T(FN_DumpTemplate) T(KW_Do) \
     T(FN_FunctionType) T(FN_TupleType) T(FN_UnionType) T(FN_Alloca) T(FN_AllocaOf) T(FN_Malloc) \
     T(FN_AllocaArray) T(FN_MallocArray) T(FN_ReturnLabelType) T(KW_DoIn) T(FN_AllocaExceptionPad) \
     T(FN_StaticAlloc) T(KW_Try) T(KW_Return) T(KW_Loop) T(KW_Repeat) T(KW_Break) \
-    T(FN_AnyExtract) T(FN_AnyWrap) T(FN_Free) T(KW_Defer) T(FN_DumpAST) \
+    T(FN_AnyExtract) T(FN_AnyWrap) T(FN_Free) T(KW_Defer) T(FN_DumpAST) T(SYM_SquareList) \
     T(OP_ICmpEQ) T(OP_ICmpNE) T(FN_Sample) T(FN_ImageRead) T(FN_ImageWrite) \
     T(FN_ImageQuerySize) T(FN_ImageQueryLod) T(FN_ImageQueryLevels) T(FN_ImageQuerySamples) \
     T(OP_ICmpUGT) T(OP_ICmpUGE) T(OP_ICmpULT) T(OP_ICmpULE) \
@@ -262,8 +262,7 @@ namespace scopes {
     T(KW_FnTypes, "fn-types") T(KW_FnCC, "fn/cc") T(KW_Globals, "globals") \
     T(KW_If, "if") T(KW_Switch, "switch") T(KW_In, "in") T(KW_Let, "let") T(KW_Loop, "loop") \
     T(KW_LoopFor, "loop-for") T(KW_None, "none") T(KW_Null, "null") \
-    T(KW_QQuoteSyntax, "qquote-syntax") T(KW_Quote, "quote") T(KW_Inline, "inline") \
-    T(KW_QuoteSyntax, "quote-syntax") T(KW_Recur, "recur") \
+    T(KW_SyntaxQuote, "syntax-quote") T(KW_Inline, "inline") T(KW_Recur, "recur") \
     T(KW_Return, "return") T(KW_Splice, "splice") \
     T(KW_CompileStage, "compile-stage") T(KW_True, "true") T(KW_Try, "try") \
     T(KW_Unquote, "unquote") T(KW_UnquoteSplice, "unquote-splice") T(KW_ListEmpty, "eol") \
@@ -434,7 +433,7 @@ namespace scopes {
     T(FN_SyntaxToAnchor, "syntax->anchor") T(FN_SyntaxToDatum, "syntax->datum") \
     T(FN_SyntaxCons, "syntax-cons") T(FN_SyntaxDo, "syntax-do") \
     T(FN_IsSyntaxHead, "syntax-head?") \
-    T(FN_SyntaxList, "syntax-list") T(FN_SyntaxQuote, "syntax-quote") \
+    T(FN_SyntaxList, "syntax-list") \
     T(FN_IsSyntaxQuoted, "syntax-quoted?") \
     T(FN_SyntaxUnquote, "syntax-unquote") \
     T(FN_SymbolToString, "Symbol->string") \

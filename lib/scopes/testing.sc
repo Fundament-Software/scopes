@@ -49,29 +49,27 @@ fn __test-modules (module-dir modules)
 # (test-modules module ...)
 define-syntax-macro test-modules
     list __test-modules 'module-dir
-        list quote
+        list syntax-quote
             args
 
 define-syntax-macro assert-error
     inline test-function (f)
         try
-            f;
+            if true
+                f;
             false
         except (err)
             io-write! "ASSERT OK: "
-            io-write!
+            print
                 format-error err
             true
 
-    inline assertion-error! (constant anchor msg)
+    inline assertion-error! (anchor msg)
         let assert-msg =
             .. "error assertion failed: "
                 if (== (typeof msg) string) msg
                 else (repr msg)
-        if constant
-            compiler-error! assert-msg
-        else
-            syntax-error! anchor assert-msg
+        syntax-error! anchor assert-msg
     let cond body = (decons args)
     let sxcond = cond
     let anchor = ('anchor sxcond)
@@ -84,7 +82,6 @@ define-syntax-macro assert-error
         list if tmp
         list 'else
             cons assertion-error!
-                list constant? tmp
                 active-anchor;
                 if (empty? body)
                     list (repr sxcond)
@@ -101,15 +98,12 @@ define-syntax-macro assert-compiler-error
                 format-error err
             true
 
-    inline assertion-error! (constant anchor msg)
+    inline assertion-error! (anchor msg)
         let assert-msg =
             .. "compiler error assertion failed: "
                 if (== (typeof msg) string) msg
                 else (repr msg)
-        if constant
-            compiler-error! assert-msg
-        else
-            syntax-error! anchor assert-msg
+        syntax-error! anchor assert-msg
     let cond body = (decons args)
     let sxcond = cond
     let anchor = ('anchor sxcond)
@@ -122,7 +116,6 @@ define-syntax-macro assert-compiler-error
         list if tmp
         list 'else
             cons assertion-error!
-                list constant? tmp
                 active-anchor;
                 if (empty? body)
                     list (repr sxcond)

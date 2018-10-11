@@ -1928,9 +1928,9 @@ fn quasiquote-list (x)
         if (== T list)
             quasiquote-list (as x list)
         else
-            list quote ox
+            list syntax-quote ox
     if (empty? x)
-        return (list quote x)
+        return (list syntax-quote x)
     let aat next = ('decons x)
     let at = aat
     let T = ('typeof at)
@@ -2147,7 +2147,7 @@ let
             fn (args)
                 fn op (a b)
                     let sym = (as b Symbol)
-                    list getattr a (list quote sym)
+                    list getattr a (list syntax-quote sym)
                 let a rest = ('decons args)
                 let b rest = ('decons rest)
                 loop (rest result) = rest (op a b)
@@ -2232,7 +2232,7 @@ let va-option =
         fn (args)
             let key va body = (decons args 2)
             let sym = (as key Symbol)
-            list va-option-branch (list quote sym)
+            list va-option-branch (list syntax-quote sym)
                 cons inline '() body
                 va
 
@@ -2486,8 +2486,8 @@ let locals =
                         else
                             let value = (sc_extract_argument_new value 0)
                             cons
-                                list sc_scope_set_symbol tmp (list quote key) (list Value value)
-                                list sc_scope_set_docstring tmp (list quote key) keydocstr
+                                list sc_scope_set_symbol tmp (list syntax-quote key) (list Value value)
+                                list sc_scope_set_docstring tmp (list syntax-quote key) keydocstr
                                 result
 
 #---------------------------------------------------------------------------
@@ -2587,7 +2587,7 @@ let using =
             let entry rest = (decons params)
             entry as Syntax as Symbol
             cons
-                list quote entry
+                list syntax-quote entry
                 quotify rest
     cons let
         .. params
