@@ -13,8 +13,20 @@
 namespace scopes {
 
 //------------------------------------------------------------------------------
-// ARGUMENTS LABEL TYPE
+// ARGUMENTS TYPE
 //------------------------------------------------------------------------------
+
+struct TupleType;
+
+struct ArgumentsType : Type {
+    static bool classof(const Type *T);
+
+    void stream_name(StyledStream &ss) const;
+    ArgumentsType(const ArgTypes &_values);
+    const TupleType *to_tuple_type() const;
+
+    ArgTypes values;
+};
 
 const Type *arguments_type(const ArgTypes &values);
 const Type *empty_arguments_type();

@@ -469,6 +469,9 @@ struct StreamAST : StreamAnchors {
                 stream_type_suffix(T);
             } else if (T == TYPE_List) {
                 ss << (const List *)val->value;
+            } else if (T == TYPE_Value) {
+                stream_ast(ss, (Value *)val->value, StreamASTFormat::singleline());
+                stream_type_suffix(T);
             } else {
                 ss << val->value;
                 stream_type_suffix(T);
@@ -518,6 +521,18 @@ struct StreamAST : StreamAnchors {
             stream_type_prefix(node);
             auto val = cast<Raise>(node);
             ss << Style_Keyword << "Raise" << Style_None;
+            walk_same_or_newline(val->value, depth+1, maxdepth);
+        } break;
+        case VK_Quote: {
+            stream_type_prefix(node);
+            auto val = cast<Quote>(node);
+            ss << Style_Keyword << "Quote" << Style_None;
+            walk_same_or_newline(val->value, depth+1, maxdepth);
+        } break;
+        case VK_Unquote: {
+            stream_type_prefix(node);
+            auto val = cast<Unquote>(node);
+            ss << Style_Keyword << "Unquote" << Style_None;
             walk_same_or_newline(val->value, depth+1, maxdepth);
         } break;
         case VK_CompileStage: {

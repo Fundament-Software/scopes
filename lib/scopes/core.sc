@@ -101,6 +101,9 @@
     Image-type = sc_image_type
     SampledImage-type = sc_sampled_image_type
 
+# square list expressions are ast unquotes by default
+let square-list = ast-unquote
+
 # first we alias u64 to the integer type that can hold a pointer
 let intptr = u64
 
@@ -198,24 +201,24 @@ let void =
 
 let typify =
     do
-        fn typify (argcount args)
+        fn typify (args)
+            let argcount = (sc_argcount args)
             verify-count argcount 1 -1
-            let src_fn = (load (getelementptr args 0))
+            let src_fn = (sc_getarg args 0)
             let src_fn = (unbox-pointer src_fn Closure)
             let typecount = (sub argcount 1)
             let types = (alloca-array type typecount)
             loop (i j) = 1 0
             if (icmp<s i argcount)
-                let ty = (load (getelementptr args i))
+                let ty = (sc_getarg args i)
                 store (unbox-pointer ty type) (getelementptr types j)
                 repeat (add i 1) (add j 1)
             sc_typify src_fn typecount (bitcast types TypeArrayPointer)
 
-        let types = (alloca-array type 2:usize)
-        store i32 (getelementptr types 0)
-        store ValueArrayPointer (getelementptr types 1)
+        let types = (alloca-array type 1:usize)
+        store Value (getelementptr types 0)
         let types = (bitcast types TypeArrayPointer)
-        let result = (sc_compile (sc_typify typify 2 types) 0:u64)
+        let result = (sc_compile (sc_typify typify 1 types) 0:u64)
         let result-type = (sc_value_type result)
         if (ptrcmp!= result-type ASTMacroFunction)
             compiler-error!
@@ -229,6 +232,31 @@ let typify =
 
 compile-stage;
 
+#fn write_something (text)
+    sc_write text
+    sc_write "\n"
+
+#fn test ()
+    let expr =
+        ast-quote
+            sc_string_join "hello world!" "\n"
+    ast-quote
+        fn write_something2 ()
+            sc_write [ expr ]
+            sc_write "\n"
+
+        write_something [ expr ]
+        write_something2;
+
+#dump-ast
+    typify test
+
+#sc_write
+    sc_value_ast_repr
+        test;
+
+#compile-stage;
+
 let function->ASTMacro =
     typify
         fn "function->ASTMacro" (f)
@@ -236,167 +264,155 @@ let function->ASTMacro =
         ASTMacroFunction
 
 fn box-empty ()
-    sc_argument_list_new 0 (undef ValueArrayPointer)
+    sc_argument_list_new;
 
 fn box-none ()
     sc_const_aggregate_new Nothing 0 (undef ValueArrayPointer)
 
 # take closure l, typify and compile it and return a function of ASTMacro type
 inline ast-macro (l)
-    function->ASTMacro (typify l i32 ValueArrayPointer)
+    function->ASTMacro (typify l Value)
 
 inline box-ast-macro (l)
     box-pointer (ast-macro l)
 
 let va-lfold va-lifold =
     do
-        fn va-lfold (argcount args use-indices)
+        fn va-lfold (args use-indices)
+            let argcount = (sc_argcount args)
             verify-count argcount 2 -1
-            let init = (load (getelementptr args 0))
-            let f = (load (getelementptr args 1))
+            let init = (sc_getarg args 0)
+            let f = (sc_getarg args 1)
             if (icmp== argcount 2)
                 return init
             let ofs = (? use-indices 1 0)
-            let callargs = (alloca-array Value (add 3 ofs))
             loop (i ret) = 2 init
             if (icmp<s i argcount)
                 let arg =
-                    load (getelementptr args i)
+                    sc_getarg args i
+                let callargs = (sc_call_new f)
                 # optional index
                 if use-indices
-                    store (box-integer (sub i 2)) (getelementptr callargs 0)
+                    sc_call_append_argument callargs (box-integer (sub i 2))
                 let k = (sc_type_key (sc_value_type arg))
                 let v = (sc_keyed_new unnamed arg)
                 # key
-                store (box-symbol k) (getelementptr callargs (add ofs 0))
+                sc_call_append_argument callargs (box-symbol k)
                 # value
-                store v (getelementptr callargs (add ofs 1))
+                sc_call_append_argument callargs v
                 # append previous result
-                store ret (getelementptr callargs (add ofs 2))
-                repeat (add i 1)
-                    sc_call_new f (add ofs 3) callargs
+                sc_call_append_argument callargs ret
+                repeat (add i 1) callargs
             ret
         _
-            ast-macro (fn "va-lfold" (argcount args) (va-lfold argcount args false))
-            ast-macro (fn "va-ilfold" (argcount args) (va-lfold argcount args true))
+            ast-macro (fn "va-lfold" (args) (va-lfold args false))
+            ast-macro (fn "va-ilfold" (args) (va-lfold args true))
 
 let va-rfold va-rifold =
     do
-        fn va-rfold (argcount args use-indices)
+        fn va-rfold (args use-indices)
+            let argcount = (sc_argcount args)
             verify-count argcount 2 -1
-            let init = (load (getelementptr args 0))
-            let f = (load (getelementptr args 1))
+            let init = (sc_getarg args 0)
+            let f = (sc_getarg args 1)
             if (icmp== argcount 2)
                 return init
             let ofs = (? use-indices 1 0)
-            let callargs = (alloca-array Value (add 3 ofs))
             loop (i ret) = argcount init
             if (icmp>s i 2)
                 let oi = i
                 let i = (sub i 1)
                 let arg =
-                    load (getelementptr args i)
+                    sc_getarg args i
+                let callargs = (sc_call_new f)
                 # optional index
                 if use-indices
-                    store (box-integer (sub i 2)) (getelementptr callargs 0)
+                    sc_call_append_argument callargs (box-integer (sub i 2))
                 let k = (sc_type_key (sc_value_type arg))
                 let v = (sc_keyed_new unnamed arg)
                 # key
-                store (box-symbol k) (getelementptr callargs (add ofs 0))
+                sc_call_append_argument callargs (box-symbol k)
                 # value
-                store v (getelementptr callargs (add ofs 1))
+                sc_call_append_argument callargs v
                 # append previous result
-                store ret (getelementptr callargs (add ofs 2))
-                repeat i
-                    sc_call_new f (add ofs 3) callargs
+                sc_call_append_argument callargs ret
+                repeat i callargs
             ret
         _
-            ast-macro (fn "va-rfold" (argcount args) (va-rfold argcount args false))
-            ast-macro (fn "va-rifold" (argcount args) (va-rfold argcount args true))
+            ast-macro (fn "va-rfold" (args) (va-rfold args false))
+            ast-macro (fn "va-rifold" (args) (va-rfold args true))
 
 let raises-compile-error =
     ast-macro
         # add a non-executing branch to the function that causes it to be
             annotated with an exception type
-        fn "raises-compile-error" (argc argv)
-            verify-count argc 0 0
+        fn "raises-compile-error" (args)
+            verify-count (sc_argcount args) 0 0
             let branch = (sc_if_new)
-            let callargs = (alloca-array Value 1)
-            store (box-pointer "hidden") (getelementptr callargs 0)
-            sc_if_append_then_clause branch (box-integer false)
-                sc_call_new (box-pointer compiler-error!) 1 callargs
+            let callargs = (sc_call_new (box-pointer compiler-error!))
+            sc_call_append_argument callargs (box-pointer "hidden")
+            sc_if_append_then_clause branch (box-integer false) callargs
             sc_if_append_else_clause branch (box-empty)
             branch
 
 # generate alloca instruction for multiple Values
-let Value-array =
+#let Value-array =
     ast-macro
-        fn "Value-array" (argc argv)
+        fn "Value-array" (args)
+            let argc = (sc_argcount args)
             verify-count argc 0 -1
-            let retargs = (alloca-array Value 2)
+            let retargs = (sc_argument_list_new)
             let boxed-argc = (box-integer argc)
             if (icmp== argc 0)
-                store boxed-argc (getelementptr retargs 0)
-                store (box-pointer (nullof ValueArrayPointer)) (getelementptr retargs 1)
-                sc_argument_list_new 2 retargs
+                sc_argument_list_append retargs boxed-argc
+                sc_argument_list_append retargs (box-pointer (nullof ValueArrayPointer))
+                retargs
             else
                 # ensure that the return signature is correct
-                let instr = (alloca-array Value (add argc 2))
-                let callargs = (alloca-array Value 2)
-                store (box-pointer Value) (getelementptr callargs 0)
-                store boxed-argc (getelementptr callargs 1)
-                let arr = (sc_call_new (box-symbol alloca-array) 2 callargs)
-                store arr (getelementptr instr 0)
+                let instr = (sc_expression_new)
+                let arr = (sc_call_new (box-symbol alloca-array))
+                sc_call_append_argument arr (box-pointer Value)
+                sc_call_append_argument arr boxed-argc
+                sc_expression_append instr arr
                 loop (i) = 0
                 if (icmp<s i argc)
-                    let gepargs = (alloca-array Value 2)
-                    store arr (getelementptr gepargs 0)
-                    store (box-integer i) (getelementptr gepargs 1)
-                    let storeargs = (alloca-array Value 2)
+                    let gepargs = (sc_call_new (box-symbol getelementptr))
+                    sc_call_append_argument gepargs arr
+                    sc_call_append_argument gepargs (box-integer i)
+                    let storeargs = (sc_call_new (box-symbol store))
                     let arg = (load (getelementptr argv i))
-
-                    store
+                    sc_call_append_argument storeargs
                         if (ptrcmp!= (sc_value_type arg) Value)
-                            let callargs = (alloca-array Value 1)
-                            store arg (getelementptr callargs 0)
-                            sc_call_new (box-pointer Value) 1 callargs
+                            let callargs = (sc_call_new (box-pointer Value))
+                            sc_call_append_argument callargs arg
+                            callargs
                         else arg
-                        getelementptr storeargs 0
-                    store
-                        sc_call_new (box-symbol getelementptr) 2 gepargs
-                        getelementptr storeargs 1
-                    store
-                        sc_call_new (box-symbol store) 2 storeargs
-                        getelementptr instr (add i 1)
+                    sc_call_append_argument storeargs gepargs
+                    sc_expression_append instr storeargs
                     repeat (add i 1)
-                store boxed-argc (getelementptr retargs 0)
-                store arr (getelementptr retargs 1)
-                store
-                    sc_argument_list_new 2 retargs
-                    getelementptr instr (add argc 1)
-                sc_block_new (add argc 2) instr
+                sc_argument_list_append retargs boxed-argc
+                sc_argument_list_append retargs arr
+                sc_expression_append instr retargs
+                instr
 
 # unpack
-let loadarrayptrs =
+#let loadarrayptrs =
     ast-macro
-        fn "unpack-array" (argc argv)
+        fn "unpack-array" (args)
+            let argc = (sc_argcount args)
             verify-count argc 2 -1
-            let src = (load (getelementptr argv 0))
-            let instr = (alloca-array Value (sub argc 1))
+            let src = (sc_getarg args 0)
+            let instr = (sc_argument_list_new)
             loop (i) = 1
             if (icmp<s i argc)
-                let gepargs = (alloca-array Value 2)
-                store src (getelementptr gepargs 0)
-                store (load (getelementptr argv i)) (getelementptr gepargs 1)
-                let loadargs = (alloca-array Value 1)
-                store
-                    sc_call_new (box-symbol getelementptr) 2 gepargs
-                    getelementptr loadargs 0
-                store
-                    sc_call_new (box-symbol load) 1 loadargs
-                    getelementptr instr (sub i 1)
+                let gepargs = (sc_call_new (box-symbol getelementptr))
+                sc_call_append_argument gepargs src
+                sc_call_append_argument gepargs (sc_getarg args i)
+                let loadargs = (sc_call_new (box-symbol load))
+                sc_call_append_argument loadargs gepargs
+                sc_argument_list_append instr loadargs
                 repeat (add i 1)
-            sc_argument_list_new (sub argc 1) instr
+            instr
 
 fn type< (T superT)
     loop (T) = T
@@ -415,31 +431,34 @@ fn type> (superT T)
 fn type>= (superT T)
     bxor (type< T superT) true
 
-fn compare-type (argcount args f)
+fn compare-type (args f)
+    let argcount = (sc_argcount args)
     verify-count argcount 2 2
-    let a = (load (getelementptr args 0))
-    let b = (load (getelementptr args 1))
+    let a = (sc_getarg args 0)
+    let b = (sc_getarg args 1)
     if (sc_value_is_constant a)
         if (sc_value_is_constant b)
             return
                 box-integer
                     f (unbox-pointer a type) (unbox-pointer b type)
-    sc_call_new (box-pointer f) 2 args
+    ast-quote (f args)
 
 inline type-comparison-func (f)
-    fn (argcount args) (compare-type argcount args (typify f type type))
+    fn (args) (compare-type args (typify f type type))
 
 # typecall
 sc_type_set_symbol type '__call
     box-ast-macro
-        fn "type-call" (argcount args)
+        fn "type-call" (args)
+            let argcount = (sc_argcount args)
             verify-count argcount 1 -1
-            let self = (load (getelementptr args 0))
+            let self = (sc_getarg args 0)
             let T = (unbox-pointer self type)
             let ok f = (sc_type_at T '__typecall)
             if ok
-                return
-                    sc_call_new f argcount args
+                let expr = (sc_call_new f)
+                sc_call_append_argument expr args
+                return expr
             compiler-error!
                 sc_string_join "no type constructor available for type "
                     sc_value_repr self
@@ -447,7 +466,7 @@ sc_type_set_symbol type '__call
 # method call syntax
 sc_type_set_symbol Symbol '__call
     box-ast-macro
-        fn "symbol-call" (argcount args)
+        fn "symbol-call" (args)
             fn resolve-method (self symval)
                 let sym = (unbox-symbol symval Symbol)
                 let T = (sc_value_type self)
@@ -467,26 +486,29 @@ sc_type_set_symbol Symbol '__call
                             sc_string_join " in value of type "
                                 sc_value_repr (box-pointer T)
 
+            let argcount = (sc_argcount args)
             verify-count argcount 2 -1
-            let symval = (load (getelementptr args 0))
-            let self = (load (getelementptr args 1))
-            sc_call_new
-                resolve-method self symval
-                sub argcount 1
-                getelementptr args 1
+            let symval = (sc_getarg args 0)
+            let self = (sc_getarg args 1)
+            let expr =
+                sc_call_new
+                    resolve-method self symval
+            sc_call_append_argument expr (sc_extract_argument_list_new args 1)
+            expr
 
 inline gen-key-any-set (selftype fset)
     box-ast-macro
-        fn "set-symbol" (argcount args)
+        fn "set-symbol" (args)
+            let argcount = (sc_argcount args)
             verify-count argcount 2 3
-            let self = (load (getelementptr args 0))
+            let self = (sc_getarg args 0)
             let key value =
                 if (icmp== argcount 3)
-                    let key = (load (getelementptr args 1))
-                    let value = (load (getelementptr args 2))
+                    let key = (sc_getarg args 1)
+                    let value = (sc_getarg args 2)
                     _ key value
                 else
-                    let arg = (load (getelementptr args 1))
+                    let arg = (sc_getarg args 1)
                     let key = (sc_type_key (sc_value_type arg))
                     let arg = (sc_keyed_new unnamed arg)
                     _ (box-symbol key) arg
@@ -497,11 +519,7 @@ inline gen-key-any-set (selftype fset)
                         let key = (unbox-symbol key Symbol)
                         fset self key value
                         return (box-empty)
-            let callargs = (alloca-array Value 3)
-            store self (getelementptr callargs 0)
-            store key (getelementptr callargs 1)
-            store value (getelementptr callargs 2)
-            sc_call_new (box-pointer fset) 3 callargs
+            ast-quote (fset self key value)
 
 # quick assignment of type attributes
 sc_type_set_symbol type 'set-symbol (gen-key-any-set type sc_type_set_symbol)
@@ -509,9 +527,10 @@ sc_type_set_symbol Scope 'set-symbol (gen-key-any-set Scope sc_scope_set_symbol)
 
 sc_type_set_symbol type 'pointer
     box-ast-macro
-        fn "type-pointer" (argcount args)
+        fn "type-pointer" (args)
+            let argcount = (sc_argcount args)
             verify-count argcount 1 1
-            let self = (load (getelementptr args 0))
+            let self = (sc_getarg args 0)
             let T = (unbox-pointer self type)
             box-pointer
                 sc_pointer_type T pointer-flag-non-writable unnamed
@@ -519,13 +538,14 @@ sc_type_set_symbol type 'pointer
 # tuple type constructor
 sc_type_set_symbol tuple '__typecall
     box-ast-macro
-        fn "tuple" (argcount args)
+        fn "tuple" (args)
+            let argcount = (sc_argcount args)
             verify-count argcount 1 -1
             let pcount = (sub argcount 1)
             let types = (alloca-array type pcount)
             loop (i) = 1
             if (icmp<s i argcount)
-                let arg = (load (getelementptr args i))
+                let arg = (sc_getarg args i)
                 let T = (unbox-pointer arg type)
                 store T (getelementptr types (sub i 1))
                 repeat (add i 1)
@@ -534,10 +554,11 @@ sc_type_set_symbol tuple '__typecall
 # array type constructor
 sc_type_set_symbol array '__typecall
     box-ast-macro
-        fn "tuple" (argcount args)
+        fn "tuple" (args)
+            let argcount = (sc_argcount args)
             verify-count argcount 3 3
-            let ET = (unbox-pointer (load (getelementptr args 1)) type)
-            let size = (load (getelementptr args 2))
+            let ET = (unbox-pointer (sc_getarg args 1) type)
+            let size = (sc_getarg args 2)
             let sizeT = (sc_value_type size)
             if (type< sizeT integer)
             else
@@ -549,13 +570,14 @@ sc_type_set_symbol array '__typecall
 # arguments type constructor
 sc_type_set_symbol Arguments '__typecall
     box-ast-macro
-        fn "Arguments" (argcount args)
+        fn "Arguments" (args)
+            let argcount = (sc_argcount args)
             verify-count argcount 1 -1
             let pcount = (sub argcount 1)
             let types = (alloca-array type pcount)
             loop (i) = 1
             if (icmp<s i argcount)
-                let arg = (load (getelementptr args i))
+                let arg = (sc_getarg args i)
                 let T = (unbox-pointer arg type)
                 store T (getelementptr types (sub i 1))
                 repeat (add i 1)
@@ -564,15 +586,16 @@ sc_type_set_symbol Arguments '__typecall
 # function pointer type constructor
 sc_type_set_symbol function '__typecall
     box-ast-macro
-        fn "function" (argcount args)
+        fn "function" (args)
+            let argcount = (sc_argcount args)
             verify-count argcount 2 -1
-            let rtype = (load (getelementptr args 1))
+            let rtype = (sc_getarg args 1)
             let rtype = (unbox-pointer rtype type)
             let pcount = (sub argcount 2)
             let types = (alloca-array type pcount)
             loop (i) = 2
             if (icmp<s i argcount)
-                let arg = (load (getelementptr args i))
+                let arg = (sc_getarg args i)
                 let T = (unbox-pointer arg type)
                 store T (getelementptr types (sub i 2))
                 repeat (add i 1)
@@ -580,10 +603,11 @@ sc_type_set_symbol function '__typecall
 
 sc_type_set_symbol type 'raising
     box-ast-macro
-        fn "function-raising" (argcount args)
+        fn "function-raising" (args)
+            let argcount = (sc_argcount args)
             verify-count argcount 2 2
-            let self = (load (getelementptr args 0))
-            let except_type = (load (getelementptr args 1))
+            let self = (sc_getarg args 0)
+            let except_type = (sc_getarg args 1)
             let T = (unbox-pointer self type)
             let exceptT = (unbox-pointer except_type type)
             box-pointer
@@ -603,22 +627,24 @@ sc_type_set_symbol Symbol '__typecall
 
 let none? =
     ast-macro
-        fn (argcount args)
+        fn (args)
+            let argcount = (sc_argcount args)
             verify-count argcount 1 1
-            let value = (load (getelementptr args 0))
+            let value = (sc_getarg args 0)
             box-integer
                 ptrcmp== (sc_value_type value) Nothing
 
-fn unpack2 (argcount args)
+fn unpack2 (args)
+    let argcount = (sc_argcount args)
     verify-count argcount 2 2
-    let a = (load (getelementptr args 0))
-    let b = (load (getelementptr args 1))
+    let a = (sc_getarg args 0)
+    let b = (sc_getarg args 1)
     return a b
 
 let const.icmp<=.i32.i32 =
     ast-macro
-        fn (argcount args)
-            let a b = (unpack2 argcount args)
+        fn (args)
+            let a b = (unpack2 args)
             if (sc_value_is_constant a)
                 if (sc_value_is_constant b)
                     let a = (unbox-integer a i32)
@@ -629,8 +655,8 @@ let const.icmp<=.i32.i32 =
 
 let const.add.i32.i32 =
     ast-macro
-        fn (argcount args)
-            let a b = (unpack2 argcount args)
+        fn (args)
+            let a b = (unpack2 args)
             if (sc_value_is_constant a)
                 if (sc_value_is_constant b)
                     let a = (unbox-integer a i32)
@@ -641,47 +667,44 @@ let const.add.i32.i32 =
 
 let constbranch =
     ast-macro
-        fn (argcount args)
+        fn (args)
+            let argcount = (sc_argcount args)
             verify-count argcount 3 3
-            let cond = (load (getelementptr args 0))
-            let thenf = (load (getelementptr args 1))
-            let elsef = (load (getelementptr args 2))
+            let cond = (sc_getarg args 0)
+            let thenf = (sc_getarg args 1)
+            let elsef = (sc_getarg args 2)
             if (sc_value_is_constant cond)
             else
                 compiler-error! "condition must be constant"
             let value = (unbox-integer cond bool)
-            sc_call_new
-                ? value thenf elsef
-                0
-                undef ValueArrayPointer
+            ast-quote ([(? value thenf elsef)])
 
 sc_type_set_symbol Value '__typecall
     box-ast-macro
-        fn (argcount args)
+        fn (args)
+            let argcount = (sc_argcount args)
             verify-count argcount 1 -1
             if (icmp== argcount 1)
                 box-pointer (box-empty)
             else
-                let value = (load (getelementptr args 1))
+                let value = (sc_getarg args 1)
                 let T = (sc_value_type value)
                 if (ptrcmp== T Value)
                     value
                 elseif (sc_value_is_constant value)
                     box-pointer value
                 elseif (ptrcmp== T Nothing)
-                    let blockargs = (alloca-array Value 2)
-                    store value (getelementptr blockargs 0)
-                    store (box-none) (getelementptr blockargs 1)
-                    sc_block_new 2 blockargs
+                    box-none;
                 else
                     sc_value_wrap T value
 
 let __unbox =
     ast-macro
-        fn (argc argv)
+        fn (args)
+            let argc = (sc_argcount args)
             verify-count argc 2 2
-            let value = (load (getelementptr argv 0))
-            let T = (load (getelementptr argv 1))
+            let value = (sc_getarg args 0)
+            let T = (sc_getarg args 1)
             let T = (unbox-pointer T type)
             sc_value_unwrap T value
 let
@@ -739,6 +762,9 @@ inline set-symbols (self values...)
     ast-repr = sc_value_ast_repr
     typeof = sc_value_type
     anchor = sc_value_anchor
+    argcount = sc_argcount
+    getarg = sc_getarg
+    getarglist = sc_getarglist
     dekey =
         fn "dekey" (self)
             let k = (sc_type_key ('typeof self))
@@ -870,9 +896,7 @@ inline unbox (value T)
 
 fn value-imply (vT T expr)
     if true
-        return
-            sc_call_new (Value unbox)
-                Value-array expr (Value T)
+        return (ast-quote (unbox expr T))
     compiler-error! "unsupported type"
 
 'set-symbols Value
@@ -882,9 +906,7 @@ fn value-imply (vT T expr)
         box-cast
             fn "syntax-rimply" (vT T expr)
                 if true
-                    return
-                        sc_call_new (Value Value)
-                            Value-array expr
+                    return (ast-quote (Value expr))
                 compiler-error! "unsupported type"
 
 'set-symbols ASTMacro
@@ -892,10 +914,10 @@ fn value-imply (vT T expr)
         box-cast
             fn "ASTMacro-rimply" (vT T expr)
                 if (ptrcmp== vT ASTMacroFunction)
-                    return (sc_call_new (Value bitcast) (Value-array expr T))
+                    return (ast-quote (bitcast expr T))
                 elseif (ptrcmp== vT Closure)
                     if ('constant? expr)
-                        return (sc_call_new (Value ast-macro) (Value-array expr))
+                        return (ast-quote (ast-macro expr))
                 compiler-error! "unsupported type"
 
 # integer casting
@@ -914,25 +936,22 @@ fn integer-imply (vT T expr)
                         compiler-error! "signed integer is negative"
                     return
                         box-integer (sext val usize)
-        let args... = (Value-array expr T)
+        let args... = expr T
         let valw = ('bitcount vT)
         let destw = ('bitcount ST)
         # must have same signed bit
         if (icmp== ('signed? vT) ('signed? ST))
             if (icmp== destw valw)
-                return
-                    sc_call_new (Value bitcast) args...
+                return (ast-quote (bitcast args...))
             elseif (icmp>s destw valw)
                 if ('signed? vT)
-                    return
-                        sc_call_new (Value sext) args...
+                    return (ast-quote (sext args...))
                 else
-                    return
-                        sc_call_new (Value zext) args...
+                    return (ast-quote (zext args...))
     compiler-error! "unsupported type"
 
 fn integer-as (vT T expr)
-    let args... = (Value-array expr T)
+    let args... = expr T
     let T =
         if (ptrcmp== T usize) ('storage T)
         else T
@@ -940,44 +959,36 @@ fn integer-as (vT T expr)
         let valw = ('bitcount vT)
         let destw = ('bitcount T)
         if (icmp== destw valw)
-            return
-                sc_call_new (Value bitcast) args...
+            return (ast-quote (bitcast args...))
         elseif (icmp>s destw valw)
             if ('signed? vT)
-                return
-                    sc_call_new (Value sext) args...
+                return (ast-quote (sext args...))
             else
-                return
-                    sc_call_new (Value zext) args...
+                return (ast-quote (zext args...))
         else
-            return
-                sc_call_new (Value itrunc) args...
+            return (ast-quote (itrunc args...))
     elseif (icmp== ('kind T) type-kind-real)
         if ('signed? vT)
-            return
-                sc_call_new (Value sitofp) args...
+            return (ast-quote (sitofp args...))
         else
-            return
-                sc_call_new (Value uitofp) args...
+            return (ast-quote (uitofp args...))
     compiler-error! "unsupported type"
 
 # only perform safe casts: i.e. float to double
 fn real-imply (vT T expr)
     if (icmp== ('kind T) type-kind-real)
-        let args... = (Value-array expr T)
+        let args... = expr T
         let valw = ('bitcount vT)
         let destw = ('bitcount T)
         if (icmp== destw valw)
-            return
-                sc_call_new (Value bitcast) args...
+            return (ast-quote (bitcast args...))
         elseif (icmp>s destw valw)
-            return
-                sc_call_new (Value fpext) args...
+            return (ast-quote (fpext args...))
     compiler-error! "unsupported type"
 
 # more aggressive cast that converts from all numerical types
 fn real-as (vT T expr)
-    let args... = (Value-array expr T)
+    let args... = expr T
     let T =
         if (ptrcmp== T usize) ('storage T)
         else T
@@ -985,21 +996,16 @@ fn real-as (vT T expr)
     if (icmp== kind type-kind-real)
         let valw destw = ('bitcount vT) ('bitcount T)
         if (icmp== destw valw)
-            return
-                sc_call_new (Value bitcast) args...
+            return (ast-quote (bitcast args...))
         elseif (icmp>s destw valw)
-            return
-                sc_call_new (Value fpext) args...
+            return (ast-quote (fpext args...))
         else
-            return
-                sc_call_new (Value fptrunc) args...
+            return (ast-quote (fptrunc args...))
     elseif (icmp== kind type-kind-integer)
         if ('signed? T)
-            return
-                sc_call_new (Value fptosi) args...
+            return (ast-quote (fptosi args...))
         else
-            return
-                sc_call_new (Value fptoui) args...
+            return (ast-quote (fptoui args...))
     compiler-error! "unsupported type"
 
 
@@ -1009,8 +1015,7 @@ inline box-binary-op (f)
 inline single-binary-op-dispatch (destf)
     fn (lhsT rhsT lhs rhs)
         if (ptrcmp== lhsT rhsT)
-            return
-                sc_call_new (Value destf) (Value-array lhs rhs)
+            return (ast-quote (destf lhs rhs))
         compiler-error! "unsupported type"
 
 inline cast-error! (intro-string vT T)
@@ -1073,9 +1078,11 @@ fn as-expr (vT T expr)
 let
     imply =
         ast-macro
-            fn "imply-dispatch" (argc argv)
+            fn "imply-dispatch" (args)
+                let argc = ('argcount args)
                 verify-count argc 2 2
-                let value anyT = (loadarrayptrs argv 0 1)
+                let value = ('getarg args 0)
+                let anyT = ('getarg args 1)
                 let vT = ('typeof value)
                 let T = (unbox-pointer anyT type)
                 if (ptrcmp!= vT T)
@@ -1087,9 +1094,11 @@ let
 
     as =
         ast-macro
-            fn "as-dispatch" (argc argv)
+            fn "as-dispatch" (args)
+                let argc = ('argcount args)
                 verify-count argc 2 2
-                let value anyT = (loadarrayptrs argv 0 1)
+                let value = ('getarg args 0)
+                let anyT = ('getarg args 1)
                 let vT = ('typeof value)
                 let T = (unbox-pointer anyT type)
                 if (ptrcmp!= vT T)
@@ -1147,9 +1156,12 @@ fn sym-binary-op-expr (symbol rsymbol lhsT rhsT lhs rhs)
     return false (nullof Value)
 
 # both types are typically the same
-fn sym-binary-op-label-macro (argc argv symbol rsymbol friendly-op-name)
+fn sym-binary-op-label-macro (args symbol rsymbol friendly-op-name)
+    let argc = ('argcount args)
     verify-count argc 2 2
-    let lhs rhs = (loadarrayptrs argv 0 1)
+    let lhs rhs =
+        'getarg args 0
+        'getarg args 1
     let lhsT = ('typeof lhs)
     let rhsT = ('typeof rhs)
     # try direct version first
@@ -1185,22 +1197,24 @@ fn sym-binary-op-label-macro (argc argv symbol rsymbol friendly-op-name)
                             '__repr (box-pointer rhsT)
 
 # right hand has fixed type
-fn asym-binary-op-label-macro (argc argv symbol rtype friendly-op-name)
+fn asym-binary-op-label-macro (args symbol rtype friendly-op-name)
+    let argc = ('argcount args)
     verify-count argc 2 2
-    let lhs rhs = (loadarrayptrs argv 0 1)
+    let lhs rhs =
+        'getarg args 0
+        'getarg args 1
     let lhsT = ('typeof lhs)
     let rhsT = ('typeof rhs)
     let ok f = ('@ lhsT symbol)
     if ok
         if (ptrcmp== rhsT rtype)
             return
-                sc_call_new f argc argv
+                ast-quote (f args)
         # can we cast rhsT to rtype?
         let ok rhs = (imply-expr rhsT rtype rhs)
         if ok
             return
-                sc_call_new f
-                    Value-array lhs rhs
+                ast-quote (f lhs rhs)
     # we give up
     compiler-error!
         'join "can't "
@@ -1211,14 +1225,15 @@ fn asym-binary-op-label-macro (argc argv symbol rtype friendly-op-name)
                         'join " and "
                             '__repr (box-pointer rhsT)
 
-fn unary-op-label-macro (argc argv symbol friendly-op-name)
+fn unary-op-label-macro (args symbol friendly-op-name)
+    let argc = ('argcount args)
     verify-count argc 1 1
-    let lhs = (loadarrayptrs argv 0)
+    let lhs = ('getarg args 0)
     let lhsT = ('typeof lhs)
     let ok f = ('@ lhsT symbol)
     if ok
         return
-            sc_call_new f argc argv
+            ast-quote (f args)
     compiler-error!
         'join "can't "
             'join friendly-op-name
@@ -1226,13 +1241,13 @@ fn unary-op-label-macro (argc argv symbol friendly-op-name)
                     '__repr (box-pointer lhsT)
 
 inline make-unary-op-dispatch (symbol friendly-op-name)
-    ast-macro (fn (argc argv) (unary-op-label-macro argc argv symbol friendly-op-name))
+    ast-macro (fn (args) (unary-op-label-macro args symbol friendly-op-name))
 
 inline make-sym-binary-op-dispatch (symbol rsymbol friendly-op-name)
-    ast-macro (fn (argc argv) (sym-binary-op-label-macro argc argv symbol rsymbol friendly-op-name))
+    ast-macro (fn (args) (sym-binary-op-label-macro args symbol rsymbol friendly-op-name))
 
 inline make-asym-binary-op-dispatch (symbol rtype friendly-op-name)
-    ast-macro (fn (argc argv) (asym-binary-op-label-macro argc argv symbol rtype friendly-op-name))
+    ast-macro (fn (args) (asym-binary-op-label-macro args symbol rtype friendly-op-name))
 
 # support for calling macro functions directly
 'set-symbols SyntaxMacro
@@ -1251,8 +1266,7 @@ inline make-asym-binary-op-dispatch (symbol rtype friendly-op-name)
             fn "syntax-imply" (vT T expr)
                 if (ptrcmp== T string)
                     return
-                        sc_call_new (Value sc_symbol_to_string)
-                            Value-array expr
+                        ast-quote (sc_symbol_to_string expr)
                 compiler-error! "unsupported type"
 
 fn string@ (self i)
@@ -1281,18 +1295,25 @@ inline single-signed-binary-op-dispatch (sf uf)
     fn (lhsT rhsT lhs rhs)
         if (ptrcmp== lhsT rhsT)
             return
-                sc_call_new
-                    if ('signed? lhsT)
-                        Value sf
-                    else
-                        Value uf
-                    Value-array lhs rhs
+                ast-quote
+                    call
+                        [   \
+                            do
+                                if ('signed? lhsT)
+                                    Value sf
+                                else
+                                    Value uf
+                        ]
+                        \ lhs rhs
         compiler-error! "unsupported type"
 
-fn dispatch-and-or (argc argv flip)
+fn dispatch-and-or (args flip)
+    let argc = ('argcount args)
     verify-count argc 2 2
-    let cond elsef = (loadarrayptrs argv 0 1)
-    let call-elsef = (sc_call_new elsef 0 (undef ValueArrayPointer))
+    let cond elsef =
+        'getarg args 0
+        'getarg args 1
+    let call-elsef = (ast-quote (elsef))
     if ('constant? cond)
         let value = (unbox-integer cond bool)
         return
@@ -1375,21 +1396,29 @@ fn type-getattr-dynamic (T value)
     # (dispatch-attr T key thenf elsef)
     dispatch-attr =
         box-ast-macro
-            fn "type-dispatch-attr" (argc argv)
+            fn "type-dispatch-attr" (args)
+                let argc = ('argcount args)
                 verify-count argc 4 4
-                let self key thenf elsef = (loadarrayptrs argv 0 1 2 3)
+                let self key thenf elsef =
+                    'getarg args 0
+                    'getarg args 1
+                    'getarg args 2
+                    'getarg args 3
                 let self = (unbox-pointer self type)
                 let key = (unbox-symbol key Symbol)
                 let ok result = (sc_type_at self key)
                 if ok
-                    return (sc_call_new thenf (Value-array result))
+                    return (ast-quote (thenf result))
                 else
-                    return (sc_call_new elsef (Value-array))
+                    return (ast-quote (elsef))
     __getattr =
         box-ast-macro
-            fn "type-getattr" (argc argv)
+            fn "type-getattr" (args)
+                let argc = ('argcount args)
                 verify-count argc 2 2
-                let self key = (loadarrayptrs argv 0 1)
+                let self key =
+                    'getarg args 0
+                    'getarg args 1
                 if ('constant? self)
                     if ('constant? key)
                         let self = (unbox-pointer self type)
@@ -1398,9 +1427,8 @@ fn type-getattr-dynamic (T value)
                         if ok
                             return result
                         else
-                            return
-                                sc_argument_list_new 0 (nullof ValueArrayPointer)
-                sc_call_new (Value type-getattr-dynamic) argc argv
+                            return (ast-quote (_))
+                ast-quote (type-getattr-dynamic args)
 
 fn scope-getattr-dynamic (T value)
     let ok val = (sc_scope_at T value)
@@ -1412,9 +1440,12 @@ fn scope-getattr-dynamic (T value)
     __== = (box-binary-op (single-binary-op-dispatch ptrcmp==))
     __getattr =
         box-ast-macro
-            fn "scope-getattr" (argc argv)
+            fn "scope-getattr" (args)
+                let argc = ('argcount args)
                 verify-count argc 2 2
-                let self key = (loadarrayptrs argv 0 1)
+                let self key =
+                    'getarg args 0
+                    'getarg args 1
                 if ('constant? self)
                     if ('constant? key)
                         let self = (unbox-pointer self Scope)
@@ -1423,12 +1454,11 @@ fn scope-getattr-dynamic (T value)
                         if ok
                             return result
                         else
-                            return
-                                sc_argument_list_new 0 (nullof ValueArrayPointer)
-                sc_call_new (Value scope-getattr-dynamic) argc argv
+                            return (ast-quote (_))
+                ast-quote (scope-getattr-dynamic args)
     __typecall =
         box-ast-macro
-            fn "scope-typecall" (argc argv)
+            fn "scope-typecall" (args)
                 """"There are four ways to create a new Scope:
                     ``Scope``
                         creates an empty scope without parent
@@ -1438,19 +1468,21 @@ fn scope-getattr-dynamic (T value)
                         duplicate ``clone`` without a parent
                     ``Scope parent clone``
                         duplicate ``clone``, but descending from ``parent`` instead
+                let argc = ('argcount args)
                 verify-count argc 1 3
                 switch argc
                 case 1
-                    sc_call_new (Value sc_scope_new) 0 (undef ValueArrayPointer)
+                    ast-quote (sc_scope_new)
                 case 2
-                    sc_call_new (Value sc_scope_new_subscope) 1 (getelementptr argv 1)
+                    ast-quote (sc_scope_new_subscope [ ('getarg args 1) ])
                 default
                     # argc == 3
-                    let parent = (loadarrayptrs argv 1)
+                    let parent = ('getarg args 1)
                     if (type== ('typeof parent) Nothing)
-                        sc_call_new (Value sc_scope_clone) 1 (getelementptr argv 2)
+                        ast-quote (sc_scope_clone [ ('getarg args 2) ])
                     else
-                        sc_call_new (Value sc_scope_clone_subscope) 2 (getelementptr argv 1)
+                        ast-quote (sc_scope_clone_subscope
+                            [(sc_extract_argument_list_new args 1)])
 
 #---------------------------------------------------------------------------
 # null type
@@ -1469,7 +1501,7 @@ sc_typename_type_set_storage NullType ('pointer void)
             fn "null-imply" (clsT T expr)
                 if (icmp== ('kind ('storage T)) type-kind-pointer)
                     return
-                        sc_call_new (Value bitcast) (Value-array expr T)
+                        ast-quote (bitcast expr T)
                 compiler-error! "cannot convert to type"
     #__==
         fn (a b flipped)
@@ -1483,8 +1515,8 @@ sc_typename_type_set_storage NullType ('pointer void)
 #---------------------------------------------------------------------------
 
 let
-    and-branch = (ast-macro (fn (argc argv) (dispatch-and-or argc argv true)))
-    or-branch = (ast-macro (fn (argc argv) (dispatch-and-or argc argv false)))
+    and-branch = (ast-macro (fn (args) (dispatch-and-or args true)))
+    or-branch = (ast-macro (fn (args) (dispatch-and-or args false)))
     #implyfn = (typify implyfn type type)
     #asfn = (typify asfn type type)
     countof = (make-unary-op-dispatch '__countof "count")
@@ -1620,34 +1652,32 @@ let print =
 
 let coerce-call-arguments =
     box-ast-macro
-        fn "coerce-call-arguments" (argc argv)
+        fn "coerce-call-arguments" (args)
+            let argc = ('argcount args)
             verify-count argc 1 -1
-            let self = (load (getelementptr argv 0))
+            let self = ('getarg args 0)
             let argc = (sub argc 1)
-            let argv = (getelementptr argv 1)
             let fptrT = ('typeof self)
             let fT = ('element@ fptrT 0)
             let pcount = ('element-count fT)
-            let callv =
-                if (== pcount argc)
-                    let outargs = (alloca-array Value argc)
-                    loop (i) = 0
-                    if (< i argc)
-                        let arg = (load (getelementptr argv i))
-                        let argT = ('typeof arg)
-                        let paramT = ('element@ fT i)
-                        let outarg =
-                            if (== argT paramT) arg
-                            else
-                                sc_call_new (Value imply)
-                                    Value-array arg (Value paramT)
-                        store outarg (getelementptr outargs i)
-                        repeat (+ i 1)
-                    sc_call_new self argc outargs
-                else
-                    sc_call_new self argc argv
-            sc_call_set_rawcall callv true
-            callv
+            if (== pcount argc)
+                let outargs = (sc_call_new self)
+                sc_call_set_rawcall outargs true
+                loop (i) = 0
+                if (< i argc)
+                    let arg = ('getarg args (add i 1))
+                    let argT = ('typeof arg)
+                    let paramT = ('element@ fT i)
+                    let outarg =
+                        if (== argT paramT) arg
+                        else
+                            ast-quote (imply arg paramT)
+                    sc_call_append_argument outargs outarg
+                    repeat (+ i 1)
+                outargs
+            else
+                ast-quote
+                    rawcall self [(sc_extract_argument_list_new args 1)]
 
 #
     set-type-symbol! pointer 'set-element-type
@@ -1699,8 +1729,7 @@ fn pointer-type-imply? (src dest)
 fn pointer-imply (vT T expr)
     if (icmp== ('kind T) type-kind-pointer)
         if (pointer-type-imply? vT T)
-            return
-                sc_call_new (Value bitcast) (Value-array expr T)
+            return (ast-quote (bitcast expr T))
     compiler-error! "unsupported type"
 
 'set-symbols pointer
@@ -1987,33 +2016,35 @@ inline make-expand-and-or (f)
     fn (expr)
         expand-and-or expr f
 
-fn ltr-multiop (argc argv target)
+fn ltr-multiop (args target)
+    let argc = ('argcount args)
     verify-count argc 2 -1
     if (== argc 2)
-        sc_call_new target argc argv
+        ast-quote (target args)
     else
         # call for multiple args
-        let lhs = (loadarrayptrs argv 0)
+        let lhs = ('getarg args 0)
         loop (i lhs) = 1 lhs
-        let rhs = (loadarrayptrs argv i)
-        let op = (sc_call_new target (Value-array lhs rhs))
+        let rhs = ('getarg args i)
+        let op = (ast-quote (target lhs rhs))
         let i = (+ i 1)
         if (< i argc)
             repeat i op
         op
 
-fn rtl-multiop (argc argv target)
+fn rtl-multiop (args target)
+    let argc = ('argcount args)
     verify-count argc 2 -1
     if (== argc 2)
-        sc_call_new target argc argv
+        ast-quote (target args)
     else
         # call for multiple args
         let lasti = (- argc 1)
-        let rhs = (loadarrayptrs argv lasti)
+        let rhs = ('getarg args lasti)
         loop (i rhs) = lasti rhs
         let i = (- i 1)
-        let lhs = (loadarrayptrs argv i)
-        let op = (sc_call_new target (Value-array lhs rhs))
+        let lhs = ('getarg args i)
+        let op = (ast-quote (target lhs rhs))
         if (> i 0)
             repeat i op
         op
@@ -2021,19 +2052,22 @@ fn rtl-multiop (argc argv target)
 # extracting options from varargs
 
 # (va-option-branch key elsef args...)
-fn va-option-branch (argc argv)
+fn va-option-branch (args)
+    let argc = ('argcount args)
     verify-count argc 2 -1
-    let key elsef = (loadarrayptrs argv 0 1)
+    let key elsef =
+        'getarg args 0
+        'getarg args 1
     let key = (unbox-symbol key Symbol)
     loop (i) = 2
     if (< i argc)
-        let arg = (loadarrayptrs argv i)
+        let arg = ('getarg args i)
         let argkey = ('key ('typeof arg))
         if (== key argkey)
             return
                 sc_keyed_new unnamed arg
         repeat (+ i 1)
-    sc_call_new elsef 0 (nullof ValueArrayPointer)
+    ast-quote (elsef)
 
 # modules
 ####
@@ -2062,20 +2096,21 @@ fn clone-scope-contents (a b)
 'set-symbols typename
     __typecall =
         box-ast-macro
-            fn (argc argv)
+            fn (args)
+                let argc = ('argcount args)
                 verify-count argc 1 -1
-                let cls = (loadarrayptrs argv 0)
+                let cls = ('getarg args 0)
                 if (ptrcmp== ('typeof cls) type)
                     let cls = (as cls type)
                     if (ptrcmp== cls typename)
                         verify-count argc 2 4
-                        let name = (loadarrayptrs argv 1)
+                        let name = ('getarg args 1)
                         let T =
                             sc_typename_type
                                 as name string
                         loop (i) = 2
                         if (< i argc)
-                            let arg = (loadarrayptrs argv i)
+                            let arg = ('getarg args i)
                             let k v = (sc_type_key (sc_value_type arg))
                             if (== k 'super)
                                 sc_typename_type_set_super T (as v type)
@@ -2096,16 +2131,18 @@ fn clone-scope-contents (a b)
 
 let constant? =
     ast-macro
-        fn "constant?" (argc argv)
+        fn "constant?" (args)
+            let argc = ('argcount args)
             verify-count argc 1 1
-            let value = (loadarrayptrs argv 0)
+            let value = ('getarg args 0)
             Value ('constant? value)
 
 let Closure->Generator =
     ast-macro
-        fn "Closure->Generator" (argc argv)
+        fn "Closure->Generator" (args)
+            let argc = ('argcount args)
             verify-count argc 1 1
-            let self = (load (getelementptr argv 0))
+            let self = ('getarg args 0)
             if (not ('constant? self))
                 compiler-error! "Closure must be constant"
             let self = (as self Closure)
@@ -2161,9 +2198,9 @@ let
     define = (syntax-macro expand-define)
     define-infix> = (syntax-scope-macro (make-expand-define-infix '>))
     define-infix< = (syntax-scope-macro (make-expand-define-infix '<))
-    .. = (ast-macro (fn (argc argv) (rtl-multiop argc argv (Value ..))))
-    + = (ast-macro (fn (argc argv) (ltr-multiop argc argv (Value +))))
-    * = (ast-macro (fn (argc argv) (ltr-multiop argc argv (Value *))))
+    .. = (ast-macro (fn (args) (rtl-multiop args (Value ..))))
+    + = (ast-macro (fn (args) (ltr-multiop args (Value +))))
+    * = (ast-macro (fn (args) (ltr-multiop args (Value *))))
     va-option-branch = (ast-macro va-option-branch)
     syntax-set-scope! =
         syntax-scope-macro
@@ -2248,16 +2285,15 @@ let va-option =
                     _ iter init
     __call =
         ast-macro
-            fn (argc argv)
+            fn (args)
+                let argc = ('argcount args)
                 verify-count argc 1 1
-                let self = (load (getelementptr argv 0))
+                let self = ('getarg args 0)
                 if (not ('constant? self))
                     compiler-error! "Generator must be constant"
                 let self = (self as Generator)
                 let self = (bitcast self Closure)
-                sc_call_new
-                    Value self
-                    Value-array;
+                ast-quote (self)
 
 # typical pattern for a generator:
     inline make-generator (init end?)
@@ -2306,13 +2342,14 @@ let for =
 
 let wrap-if-not-compile-stage =
     ast-macro
-        fn (argc argv)
+        fn (args)
             raises-compile-error;
+            let argc = ('argcount args)
             if (argc == 1)
-                let arg = (load (getelementptr argv 0))
+                let arg = ('getarg args 0)
                 if (('typeof arg) == CompileStage)
                     return arg
-            sc_call_new Value argc argv
+            ast-quote (Value args)
 
 compile-stage;
 
@@ -2335,14 +2372,11 @@ fn exec-module (expr eval-scope)
     let f = (sc_eval expr-anchor expr eval-scope)
     loop (f) = f
     # build a wrapper
-    let wrapf = (sc_template_new 'exec-module-stage)
-    sc_template_set_body wrapf
-        sc_block_new
-            Value-array
-                sc_call_new raises-compile-error (Value-array)
-                sc_call_new wrap-if-not-compile-stage
-                    Value-array
-                        sc_call_new f (Value-array)
+    let wrapf =
+        ast-quote
+            fn "exec-module-stage" ()
+                raises-compile-error;
+                wrap-if-not-compile-stage (f)
     let wrapf = (sc_typify_template wrapf 0 (undef TypeArrayPointer))
     let f = (sc_compile wrapf 0:u64)
     if (('typeof f) == StageFunctionType)
@@ -2464,7 +2498,7 @@ let locals =
             if (not (empty? docstr))
                 'set-docstring! constant-scope unnamed docstr
             let tmp =
-                sc_call_new Scope (Value-array (Value constant-scope))
+                ast-quote (Scope constant-scope)
             loop (last-key result) = unnamed (list tmp)
             let key value =
                 'next scope last-key
@@ -2611,7 +2645,7 @@ define define-syntax-macro
 
 let __assert =
     ast-macro
-        fn (argc argv)
+        fn (args)
             fn check-assertion (result anchor msg)
                 if (not result)
                     sc_set_active_anchor anchor
@@ -2619,8 +2653,11 @@ let __assert =
                         .. "assertion failed: " msg
                 return;
 
+            let argc = ('argcount args)
             verify-count argc 2 2
-            let expr msg = (loadarrayptrs argv 0 1)
+            let expr msg =
+                'getarg args 0
+                'getarg args 1
             let anchor = (sc_get_active_anchor)
             if ('constant? expr)
                 let msg = (msg as string)
@@ -2628,45 +2665,45 @@ let __assert =
                 check-assertion val anchor msg
                 box-empty;
             else
-                sc_call_new check-assertion
-                    Value-array expr (Value anchor) msg
+                ast-quote (check-assertion expr anchor msg)
 
 let vector-reduce =
     ast-macro
-        fn (argc argv)
+        fn (args)
+            let argc = ('argcount args)
             verify-count argc 2 2
-            let f v = (loadarrayptrs argv 0 1)
+            let f v =
+                'getarg args 0
+                'getarg args 1
             let T = ('typeof v)
             let sz = ('element-count T)
             loop (v sz) = v sz
             # special cases for low vector sizes
             switch sz
             case 1
-                sc_call_new extractelement (Value-array v 0)
+                ast-quote
+                    extractelement v 0
             case 2
-                sc_call_new f
-                    Value-array
-                        sc_call_new extractelement (Value-array v 0)
-                        sc_call_new extractelement (Value-array v 1)
+                ast-quote
+                    f
+                        extractelement v 0
+                        extractelement v 1
             case 3
-                sc_call_new f
-                    Value-array
-                        sc_call_new f
-                            Value-array
-                                sc_call_new extractelement (Value-array v 0)
-                                sc_call_new extractelement (Value-array v 1)
-                        sc_call_new extractelement (Value-array v 2)
+                ast-quote
+                    f
+                        f
+                            extractelement v 0
+                            extractelement v 1
+                        extractelement v 2
             case 4
-                sc_call_new f
-                    Value-array
-                        sc_call_new f
-                            Value-array
-                                sc_call_new extractelement (Value-array v 0)
-                                sc_call_new extractelement (Value-array v 1)
-                        sc_call_new f
-                            Value-array
-                                sc_call_new extractelement (Value-array v 2)
-                                sc_call_new extractelement (Value-array v 3)
+                ast-quote
+                    f
+                        f
+                            extractelement v 0
+                            extractelement v 1
+                        f
+                            extractelement v 2
+                            extractelement v 3
             default
                 let hsz = (sz >> 1)
                 let fsz = (hsz << 1)
@@ -2674,17 +2711,18 @@ let vector-reduce =
                     compiler-error! "vector size must be a power of two"
                 let hsz-value = (Value (hsz as usize))
                 repeat
-                    sc_call_new f
-                        Value-array
-                            sc_call_new lslice (Value-array v hsz-value)
-                            sc_call_new rslice (Value-array v hsz-value)
+                    ast-quote
+                        f
+                            lslice v hsz-value
+                            rslice v hsz-value
                     hsz
 
 let __countof-aggregate =
     ast-macro
-        fn (argc argv)
+        fn (args)
+            let argc = ('argcount args)
             verify-count argc 1 1
-            let self = (loadarrayptrs argv 0)
+            let self = ('getarg args 0)
             let T = ('typeof self)
             let sz = ('element-count T)
             Value (sz as usize)
@@ -2722,82 +2760,25 @@ inline list-generator (self)
                 _ next at
         self
 
-let ValueRange = (typename "ValueRange")
-
 'set-symbols list
     __as =
         box-cast
             fn "list-as" (vT T expr)
                 if (T == Generator)
-                    return
-                        sc_call_new (Value list-generator) (Value-array expr)
+                    return (ast-quote (list-generator expr))
                 compiler-error! "unsupported type"
-    # better list constructor that splices ValueRange objects
-    __typecall =
-        box-ast-macro
-            fn (argc argv)
-                raises-compile-error;
-                fn cons-value-range (self other)
-                    let argc argv = (unpack self)
-                    loop (i result) = argc other
-                    if (i > 0)
-                        let i = (i - 1)
-                        repeat i (sc_list_cons (load (getelementptr argv i)) result)
-                    result
-                loop (i result) = argc (Value '())
-                if (i > 1)
-                    let i = (i - 1)
-                    let arg = (load (getelementptr argv i))
-                    repeat i
-                        sc_call_new
-                            if (('typeof arg) == ValueRange)
-                                Value cons-value-range
-                            else
-                                Value sc_list_cons
-                            Value-array arg result
-                result
 
-'set-storage ValueRange (tuple i32 ValueArrayPointer)
-
-'set-symbols ValueRange
-    __countof =
-        inline (self)
-            extractvalue self 0
-    __typecall =
-        inline (cls argc argv)
-            let self = (nullof (tuple i32 ValueArrayPointer))
-            let self = (insertvalue self argc 0)
-            let self = (insertvalue self argv 1)
-            bitcast self ValueRange
-    __@ =
-        inline (self index)
-            #assert (index < (as (extractvalue self 0) usize))
-            load (getelementptr (extractvalue self 1) index)
-    __unpack =
-        inline (self)
-            _
-                extractvalue self 0
-                extractvalue self 1
-    __repr =
-        inline (self)
-            let argc = (extractvalue self 0)
-            .. "<" (repr argc) " values>"
-    __as =
-        box-cast
-            fn "ValueRange-as" (vT T expr)
-                inline vararg-range (self)
-                    let argc argv = (unpack self)
-                    Generator
-                        inline (fdone x)
-                            if (x < argc)
-                                _ (x + 1) (load (getelementptr argv x))
-                            else
-                                fdone;
-                        0
-                if (T == Generator)
-                    return
-                        sc_call_new vararg-range (Value-array expr)
-                compiler-error! "unsupported type"
+'set-symbols Value
+    args =
+        inline "Value-args" (self)
+            let argc = ('argcount self)
+            Generator
+                inline (fdone x)
+                    if (x < argc)
+                        _ (x + 1) ('getarg self x)
+                    else
+                        fdone;
+                0
 
 inline range (a b c)
     let num-type = (typeof a)
@@ -2821,10 +2802,11 @@ inline range (a b c)
                 fdone;
         from
 
-fn parse-compile-flags (argc argv)
+fn parse-compile-flags (args)
+    let argc = ('argcount args)
     loop (i flags) = 0 0:u64
     if (i < argc)
-        let arg = (load (getelementptr argv i))
+        let arg = ('getarg args i)
         let flag = (arg as Symbol)
         repeat (i + 1)
             | flags
@@ -2853,17 +2835,17 @@ fn parse-compile-flags (argc argv)
 
 let compile =
     ast-macro
-        fn (argc argv)
+        fn (args)
+            let argc = ('argcount args)
             verify-count argc 1 -1
-            let func = (load (getelementptr argv 0))
+            let func = ('getarg args 0)
             let flags =
-                parse-compile-flags (argc - 1) (getelementptr argv 1)
+                parse-compile-flags
+                    'getarglist args 1
             if ('pure? func)
                 sc_compile func flags
             else
-                sc_call_new sc_compile
-                    Value-array func
-                        Value flags
+                ast-quote (sc_compile func flags)
 
 define-syntax-macro assert
     let cond msg body = (decons args 2)
@@ -2890,20 +2872,20 @@ define-syntax-macro while
 
 inline make-unpack-function (extractf)
     ast-macro
-        fn (argc argv)
+        fn (args)
+            let argc = ('argcount args)
             verify-count argc 1 1
-            let self = (load (getelementptr argv 0))
+            let self = ('getarg args 0)
             let T = ('typeof self)
             let count = ('element-count T)
-            let args = (alloca-array Value count)
+            let outargs = (sc_argument_list_new)
             loop (i) = 0
             if (icmp<s i count)
-                store
-                    sc_call_new (Value extractf)
-                        Value-array self i
-                    getelementptr args i
+                sc_argument_list_append outargs
+                    ast-quote
+                        extractf self i
                 repeat (add i 1)
-            sc_argument_list_new count args
+            outargs
 
 let __unpack-aggregate = (make-unpack-function extractvalue)
 
@@ -2916,7 +2898,8 @@ let __unpack-aggregate = (make-unpack-function extractvalue)
 
 let tupleof =
     ast-macro
-        fn (argc argv)
+        fn (args)
+            let argc = ('argcount args)
             #verify-count argc 0 -1
             raises-compile-error;
 
@@ -2924,7 +2907,7 @@ let tupleof =
             let field-types = (alloca-array type argc)
             loop (i) = 0
             if (i < argc)
-                let arg = (load (getelementptr argv i))
+                let arg = ('getarg args i)
                 let T = ('typeof arg)
                 store T (getelementptr field-types i)
                 repeat (i + 1)
@@ -2932,12 +2915,13 @@ let tupleof =
             # generate insert instructions
             let TT = (sc_tuple_type argc field-types)
             loop (i result) = 0
-                sc_call_new nullof (Value-array (Value TT))
+                ast-quote
+                    nullof TT
             if (i < argc)
-                let arg = (load (getelementptr argv i))
+                let arg = ('getarg args i)
                 repeat (i + 1)
-                    sc_call_new insertvalue
-                        Value-array result arg (Value i)
+                    ast-quote
+                        insertvalue result arg i
             result
 
 #-------------------------------------------------------------------------------
@@ -2953,26 +2937,29 @@ let tupleof =
 
 let arrayof =
     ast-macro
-        fn (argc argv)
+        fn (args)
+            let argc = ('argcount args)
             verify-count argc 1 -1
             raises-compile-error;
 
-            let ET = ((loadarrayptrs argv 0) as type)
+            let ET = (('getarg args 0) as type)
             let numvals = (sub argc 1)
 
             # generate insert instructions
             let TT = (sc_array_type ET (usize numvals))
             loop (i result) = 0
-                sc_call_new nullof (Value-array (Value TT))
+                ast-quote
+                    nullof TT
             if (i < numvals)
-                let arg = (load (getelementptr argv (add i 1)))
+                let arg = ('getarg args (add i 1))
                 let arg =
                     if ((sc_value_type arg) == ET) arg
                     else
-                        sc_call_new (Value as) (Value-array arg ET)
+                        ast-quote
+                            arg as ET
                 repeat (i + 1)
-                    sc_call_new insertvalue
-                        Value-array result arg i
+                    ast-quote
+                        insertvalue result arg i
             result
 
 #-------------------------------------------------------------------------------
@@ -2989,12 +2976,14 @@ inline single-signed-vector-binary-op-dispatch (sf uf)
         if (ptrcmp== lhsT rhsT)
             let Ta = ('element@ lhsT 0)
             return
-                sc_call_new
-                    if ('signed? Ta)
-                        Value sf
-                    else
-                        Value uf
-                    Value-array lhs rhs
+                ast-quote
+                    call [  \
+                            do
+                                if ('signed? Ta)
+                                    Value sf
+                                else
+                                    Value uf ]
+                        \ lhs rhs
         compiler-error! "unsupported type"
 
 'set-symbols integer
@@ -3058,9 +3047,12 @@ inline vector-binary-op-dispatch (symbol)
     __<= = (vector-binary-op-dispatch '__vector<=)
     __lslice =
         ast-macro
-            fn (argc argv)
+            fn (args)
+                let argc = ('argcount args)
                 verify-count argc 2 2
-                let self offset = (loadarrayptrs argv 0 1)
+                let self offset =
+                    'getarg args 0
+                    'getarg args 1
                 if (not ('constant? offset))
                     compiler-error! "slice offset must be constant"
                 let T = ('typeof self)
@@ -3076,14 +3068,17 @@ inline vector-binary-op-dispatch (symbol)
                     repeat (i + 1)
                 let maskT =
                     sc_vector_type i32 offset:usize
-                sc_call_new shufflevector
-                    Value-array self self
-                        sc_const_aggregate_new maskT offset maskvals
+                ast-quote
+                    shufflevector self self
+                        [ sc_const_aggregate_new maskT offset maskvals ]
     __rslice =
         ast-macro
-            fn (argc argv)
+            fn (args)
+                let argc = ('argcount args)
                 verify-count argc 2 2
-                let self offset = (loadarrayptrs argv 0 1)
+                let self offset =
+                    'getarg args 0
+                    'getarg args 1
                 if (not ('constant? offset))
                     compiler-error! "slice offset must be constant"
                 let T = ('typeof self)
@@ -3103,18 +3098,19 @@ inline vector-binary-op-dispatch (symbol)
                     repeat (i + 1)
                 let maskT =
                     sc_vector_type i32 total:usize
-                sc_call_new shufflevector
-                    Value-array self self
-                        sc_const_aggregate_new maskT total maskvals
+                ast-quote
+                    shufflevector self self
+                        [ sc_const_aggregate_new maskT total maskvals ]
     __unpack = (Value (make-unpack-function extractelement))
     __countof = __countof-aggregate
     # vector type constructor
     __typecall =
         ast-macro
-            fn "vector" (argcount args)
-                verify-count argcount 3 3
-                let ET = (unbox-pointer (load (getelementptr args 1)) type)
-                let size = (load (getelementptr args 2))
+            fn "vector" (args)
+                let argc = ('argcount args)
+                verify-count argc 3 3
+                let ET = (unbox-pointer ('getarg args 1) type)
+                let size = ('getarg args 2)
                 let sizeT = (sc_value_type size)
                 if (type< sizeT integer)
                 else
@@ -3125,26 +3121,29 @@ inline vector-binary-op-dispatch (symbol)
 
 let vectorof =
     ast-macro
-        fn (argc argv)
+        fn (args)
+            let argc = ('argcount args)
             verify-count argc 1 -1
             raises-compile-error;
 
-            let ET = ((loadarrayptrs argv 0) as type)
+            let ET = (('getarg args 0) as type)
             let numvals = (sub argc 1)
 
             # generate insert instructions
             let TT = (sc_vector_type ET (usize numvals))
             loop (i result) = 0
-                sc_call_new nullof (Value-array (Value TT))
+                ast-quote
+                    nullof TT
             if (i < numvals)
-                let arg = (load (getelementptr argv (add i 1)))
+                let arg = ('getarg args (add i 1))
                 let arg =
                     if ((sc_value_type arg) == ET) arg
                     else
-                        sc_call_new (Value as) (Value-array arg ET)
+                        ast-quote
+                            arg as ET
                 repeat (i + 1)
-                    sc_call_new insertelement
-                        Value-array result arg (Value i)
+                    ast-quote
+                        insertelement result arg i
             result
 
 #-------------------------------------------------------------------------------
@@ -3152,15 +3151,15 @@ let vectorof =
 let
     min =
         ast-macro
-            fn (argc argv)
-                ltr-multiop argc argv
+            fn (args)
+                ltr-multiop args
                     Value
                         inline "min" (a b)
                             ? (<= a b) a b
     max =
         ast-macro
-            fn (argc argv)
-                ltr-multiop argc argv
+            fn (args)
+                ltr-multiop args
                     Value
                         inline "max" (a b)
                             ? (>= a b) a b
@@ -3200,9 +3199,12 @@ inline clamp (x mn mx)
 let
     extern =
         ast-macro
-            fn (argc argv)
+            fn (args)
+                let argc = ('argcount args)
                 verify-count argc 2 2
-                let sym T = (loadarrayptrs argv 0 1)
+                let sym T =
+                    'getarg args 0
+                    'getarg args 1
                 let sym = (sym as Symbol)
                 let T = (T as type)
                 Value
@@ -3212,13 +3214,13 @@ let
 
 define spice
     inline half-wrap-ast-macro (f)
-        fn (argc argv)
-            return (Value (f argc argv))
+        fn (args)
+            return (Value (f args))
 
     inline wrap-ast-macro (f)
         ast-macro
-            fn (argc argv)
-                return (Value (f argc argv))
+            fn (args)
+                return (Value (f args))
 
     syntax-macro
         fn "expand-spice" (expr)
@@ -3235,8 +3237,7 @@ define spice
             let params = (params as list)
             let paramcount = ((countof params) as i32)
 
-            let argc = (Symbol "#argc")
-            let argv = (Symbol "#argv")
+            let args = (Symbol "#args")
             loop (i rest body varargs) = 0 params body false
             if (not (empty? rest))
                 let paramv rest = (decons rest)
@@ -3249,18 +3250,16 @@ define spice
                                 "vararg parameter is not in last place"
                         cons
                             list let paramv '=
-                                list ValueRange
-                                    list sub argc i
-                                    list getelementptr argv i
+                                list sc_getarglist args i
                             body
                     else
                         cons
-                            list let paramv '= (list load (list getelementptr argv i))
+                            list let paramv '= (list sc_getarg args i)
                             body
                 repeat (i + 1) rest body (| varargs vararg?)
             let content =
-                cons (list argc argv)
-                    list verify-count argc
+                cons (list args)
+                    list verify-count (list sc_argcount args)
                         ? varargs (sub paramcount 1) paramcount
                         ? varargs -1 paramcount
                     body
@@ -3294,13 +3293,6 @@ inline zip (a b)
 
 inline enumerate (x)
     zip infinite-range x
-
-#-------------------------------------------------------------------------------
-# ast quasiquotation
-#-------------------------------------------------------------------------------
-
-# these functions receive an ast node and generate an ast that generates this
-# node instead.
 
 #-------------------------------------------------------------------------------
 # references
@@ -3348,16 +3340,16 @@ let ref-attribs-key = '__refattrs
 
 let deref =
     spice "deref" (values...)
-        let count = (countof values...)
-        let result = (alloca-array Value count)
-        for i kvalue in (enumerate values...)
+        let count = ('argcount values...)
+        let result = (sc_argument_list_new)
+        for i kvalue in (enumerate ('args values...))
             let key value = ('dekey kvalue)
             let T = ('typeof value)
-            store
+            sc_argument_list_append result
                 if (T < ref)
                     let ok op = ('@ T '__deref)
                     if ok
-                        let cmd = (sc_call_new op (Value-array value))
+                        let cmd =  (ast-quote (op value))
                         if (key == unnamed) cmd
                         else
                             sc_keyed_new key cmd
@@ -3366,8 +3358,7 @@ let deref =
                             .. "deref attribute missing in value of type " (repr T)
                 else
                     kvalue
-                getelementptr result i
-        sc_argument_list_new count result
+        result
 
 #set-type-symbol!& Any 'typeof
     inline (self)
@@ -3389,9 +3380,9 @@ let deref =
 
 do
     fn ref-binary-op-expr (symbol func lhs rhs)
-        sc_call_new func
-            Value-array
-                sc_call_new (deref as ASTMacro) (Value-array lhs rhs)
+        ast-quote
+            func
+                [ (deref as ASTMacro) ] lhs rhs
 
     inline passthru-overload (sym func)
         'set-symbol ref sym
@@ -3466,13 +3457,13 @@ fn ref-type (PT)
                 let ET = ('typeof& self)
                 let ok op = ('@& ET '__=)
                 if ok
-                    sc_call_new op (Value-array self value)
+                    ast-quote
+                        op self value
                 else
-                    sc_block_new
-                        Value-array
-                            sc_call_new destruct (Value-array self)
-                            sc_call_new copy-construct (Value-array self value)
-                            box-empty;
+                    ast-quote
+                        destruct self
+                        copy-construct self value
+                        _;
     __typecall =
         ast-macro
             spice "ref-typecall" (cls T)
@@ -3631,21 +3622,18 @@ let deref = (deref as ASTMacro)
 # default memory allocators
 #-------------------------------------------------------------------------------
 
-spice pointer-each (n op value args...)
+#spice pointer-each (n op value args...)
     if ('constant? n)
         let n = (n as usize)
         if (n == 1:usize)
-            let argc argv = (unpack args...)
-            let argcount = (argc + 1)
-            let argarray = (alloca-array Value argcount)
-            for i in (range 1 argcount)
-                store (@ args... (usize (i - 1))) (getelementptr argarray i)
-            store
-                sc_call_new (do as) (Value-array value ref)
-                getelementptr argarray 0
-            return
-                sc_call_new op argcount argarray
-    let i = (sc_parameter_new 'i null)
+            let argc = ('argcount args...)
+            let expr = (sc_call_new op)
+            sc_call_append_argument expr
+                ast-quote
+                    value as ref
+            sc_call_append_argument expr args...
+            return expr
+    let i = (sc_parameter_new 'i)
     spice-quote
         loop ([i]) = 0
         if ([i] < [n])
@@ -4194,6 +4182,19 @@ fn run-main ()
                 default-styler style-error "error:"
                 format-error err
         exit 0
+
+#let x = (1 + 2)
+#print
+    'ast-repr
+        ast-quote
+            fn test (a b)
+                [   \
+                    do
+                        print a b
+                        ast-quote
+                            print "hello"
+                ]
+
 
 raises-compile-error;
 run-main;

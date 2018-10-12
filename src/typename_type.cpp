@@ -6,6 +6,7 @@
 
 #include "typename_type.hpp"
 #include "error.hpp"
+#include "tuple_type.hpp"
 #include "arguments_type.hpp"
 #include "dyn_cast.inc"
 
@@ -72,6 +73,9 @@ const Type *typename_type(const String *name) {
 SCOPES_RESULT(const Type *) storage_type(const Type *T) {
     SCOPES_RESULT_TYPE(const Type *);
     switch(T->kind()) {
+    case TK_Arguments: {
+        return cast<ArgumentsType>(T)->to_tuple_type();
+    } break;
     case TK_Typename: {
         const TypenameType *tt = cast<TypenameType>(T);
         if (!tt->finalized()) {

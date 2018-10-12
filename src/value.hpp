@@ -147,6 +147,8 @@ struct ArgumentList : Value {
     void append(Symbol key, Value *node);
     void append(Value *node);
 
+    bool is_constant() const;
+
     static ArgumentList *from(const Anchor *anchor, const Values &values = {});
 
     Values values;
@@ -177,7 +179,7 @@ struct Pure : Value {
 
 //------------------------------------------------------------------------------
 
-struct Template : Pure {
+struct Template : Value {
     static bool classof(const Value *T);
 
     Template(const Anchor *anchor, Symbol name, const Parameters &params, Value *value);
@@ -208,6 +210,7 @@ struct Expression : Value {
     void append(Value *node);
 
     static Expression *from(const Anchor *anchor, const Values &nodes = {}, Value *value = nullptr);
+    static Expression *unscoped_from(const Anchor *anchor, const Values &nodes = {}, Value *value = nullptr);
 
     Values body;
     Value *value;

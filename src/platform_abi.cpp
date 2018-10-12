@@ -224,6 +224,7 @@ static size_t classify(const Type *T, ABIClass *classes, size_t offset) {
             assert(false && "illegal type");
         }
     } break;
+    case TK_Arguments:
     case TK_Typename: {
         if (is_opaque(T)) {
             classes[0] = ABI_CLASS_NO_CLASS;
@@ -284,6 +285,7 @@ size_t abi_classify(const Type *T, ABIClass *classes) {
     case TK_Array:
     case TK_Union:
     case TK_Tuple:
+    case TK_Arguments:
         if (sz <= 1)
             classes[0] = ABI_CLASS_INTEGERSI8;
         else if (sz <= 2)

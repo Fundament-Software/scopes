@@ -159,7 +159,8 @@ SCOPES_RESULT(size_t) size_of(const Type *T) {
     case TK_Vector: return cast<VectorType>(T)->size;
     case TK_Tuple: return cast<TupleType>(T)->size;
     case TK_Union: return cast<UnionType>(T)->size;
-    case TK_Typename: return size_of(SCOPES_GET_RESULT(storage_type(cast<TypenameType>(T))));
+    case TK_Arguments:
+    case TK_Typename: return size_of(SCOPES_GET_RESULT(storage_type(T)));
     default: break;
     }
 
@@ -191,7 +192,8 @@ SCOPES_RESULT(size_t) align_of(const Type *T) {
     case TK_Vector: return cast<VectorType>(T)->align;
     case TK_Tuple: return cast<TupleType>(T)->align;
     case TK_Union: return cast<UnionType>(T)->align;
-    case TK_Typename: return align_of(SCOPES_GET_RESULT(storage_type(cast<TypenameType>(T))));
+    case TK_Arguments:
+    case TK_Typename: return align_of(SCOPES_GET_RESULT(storage_type(T)));
     default: break;
     }
 
@@ -202,6 +204,7 @@ SCOPES_RESULT(size_t) align_of(const Type *T) {
 
 const Type *superof(const Type *T) {
     switch(T->kind()) {
+    case TK_Arguments: return TYPE_Arguments;
     case TK_Keyed: return TYPE_Keyed;
     case TK_Integer: return TYPE_Integer;
     case TK_Real: return TYPE_Real;
@@ -414,10 +417,7 @@ void init_types() {
             ->finalize(
                 native_ro_pointer_type(
                     raising_function_type(
-                        TYPE_Value, {
-                        TYPE_I32,
-                        native_ro_pointer_type(TYPE_Value)
-                        })
+                        TYPE_Value, { TYPE_Value })
                     )).assert_ok();
     }
 

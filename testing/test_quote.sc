@@ -1,3 +1,5 @@
 
 let x = 5
-print [x]
+print
+    ast-quote
+        print [x]

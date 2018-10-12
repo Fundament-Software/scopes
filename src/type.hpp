@@ -37,6 +37,7 @@ struct Pure;
     T(TK_Tuple, "type-kind-tuple", TupleType) \
     T(TK_Union, "type-kind-union", UnionType) \
     T(TK_Keyed, "type-kind-keyed", KeyedType) \
+    T(TK_Arguments, "type-kind-arguments", ArgumentsType) \
     T(TK_Typename, "type-kind-typename", TypenameType) \
     T(TK_Function, "type-kind-function", FunctionType) \
     T(TK_Image, "type-kind-image", ImageType) \

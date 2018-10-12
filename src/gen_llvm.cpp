@@ -682,6 +682,11 @@ struct LLVMIRGenerator {
             auto vi = cast<VectorType>(type);
             return LLVMVectorType(SCOPES_GET_RESULT(_type_to_llvm_type(vi->element_type)), vi->count);
         } break;
+        case TK_Arguments: {
+            if (type == empty_arguments_type())
+                return LLVMVoidType();
+            return create_llvm_type(cast<ArgumentsType>(type)->to_tuple_type());
+        } break;
         case TK_Tuple: {
             auto ti = cast<TupleType>(type);
             size_t count = ti->values.size();
@@ -700,9 +705,7 @@ struct LLVMIRGenerator {
             return _type_to_llvm_type(kt->type);
         } break;
         case TK_Typename: {
-            if (type == empty_arguments_type())
-                return LLVMVoidType();
-            else if (type == TYPE_Sampler) {
+            if (type == TYPE_Sampler) {
                 SCOPES_LOCATION_ERROR(String::from(
                     "sampler type can not be used for native target"));
             }

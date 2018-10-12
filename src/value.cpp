@@ -66,6 +66,15 @@ void ArgumentList::append(Symbol key, Value *node) {
     values.push_back(node);
 }
 
+bool ArgumentList::is_constant() const {
+    for (auto val : values) {
+        assert(val);
+        if (!isa<Const>(val))
+            return false;
+    }
+    return true;
+}
+
 ArgumentList *ArgumentList::from(const Anchor *anchor, const Values &values) {
     return new ArgumentList(anchor, values);
 }
@@ -84,7 +93,7 @@ ExtractArgument *ExtractArgument::from(const Anchor *anchor, Value *value, int i
 //------------------------------------------------------------------------------
 
 Template::Template(const Anchor *anchor, Symbol _name, const Parameters &_params, Value *_value)
-    : Pure(VK_Template, anchor),
+    : Value(VK_Template, anchor),
         name(_name), params(_params), value(_value),
         _inline(false), docstring(nullptr), scope(nullptr) {
 }
@@ -256,6 +265,13 @@ Expression *Expression::from(const Anchor *anchor, const Values &nodes, Value *v
     return new Expression(anchor, nodes, value);
 }
 
+Expression *Expression::unscoped_from(const Anchor *anchor, const Values &nodes, Value *value) {
+    auto expr = new Expression(anchor, nodes, value);
+    expr->scoped = false;
+    return expr;
+}
+
+
 //------------------------------------------------------------------------------
 
 If::If(const Anchor *anchor, const Clauses &_clauses)
@@ -418,7 +434,7 @@ Label *Label::from(const Anchor *anchor, Value *value) {
 
 bool Pure::classof(const Value *T) {
     auto k = T->kind();
-    return (k == VK_Function) || (k == VK_Extern) || (k == VK_Template) || Const::classof(T);
+    return (k == VK_Function) || (k == VK_Extern) || Const::classof(T);
 }
 
 Pure::Pure(ValueKind _kind, const Anchor *anchor)

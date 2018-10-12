@@ -28,6 +28,7 @@
 #include "hash.hpp"
 #include "value.hpp"
 #include "prover.hpp"
+#include "quote.hpp"
 
 #include "scopes/scopes.h"
 
@@ -54,6 +55,25 @@
 
 namespace scopes {
 
+//------------------------------------------------------------------------------
+
+#define T(NAME, STR) \
+    Value *NAME = nullptr;
+SCOPES_REIMPORT_SYMBOLS()
+#undef T
+
+static void import_symbols() {
+    auto globs = sc_get_original_globals();
+#define T(NAME, STR) \
+    NAME = sc_scope_at(globs, Symbol(STR))._1; \
+    assert(NAME);
+SCOPES_REIMPORT_SYMBOLS()
+#undef T
+}
+
+//------------------------------------------------------------------------------
+
+#if 0
 static void init_values_array(scopes::Values &dest, int numvalues, sc_value_t **values) {
     dest.reserve(numvalues);
     for (int i = 0; i < numvalues; ++i) {
@@ -62,6 +82,7 @@ static void init_values_array(scopes::Values &dest, int numvalues, sc_value_t **
         dest.push_back(values[i]);
     }
 }
+#endif
 
 template<typename T>
 static void init_values_arrayT(std::vector<T *> &dest, int numvalues, sc_value_t **values) {
@@ -792,16 +813,62 @@ sc_value_t *sc_keyed_new(sc_symbol_t key, sc_value_t *value) {
     }
 }
 
-sc_value_t *sc_argument_list_new(int numvalues, sc_value_t **values) {
+sc_value_t *sc_argument_list_new() {
     using namespace scopes;
-    Values vals;
-    init_values_array(vals, numvalues, values);
-    return ArgumentList::from(get_active_anchor(), vals);
+    return ArgumentList::from(get_active_anchor());
+}
+
+void sc_argument_list_append(sc_value_t *alist, sc_value_t *value) {
+    using namespace scopes;
+    return cast<ArgumentList>(alist)->append(value);
+}
+
+int sc_argcount(sc_value_t *value) {
+    using namespace scopes;
+    if (isa<ArgumentList>(value)) {
+        return (int)cast<ArgumentList>(value)->values.size();
+    } else {
+        return 1;
+    }
+}
+
+sc_value_t *sc_getarg(sc_value_t *value, int index) {
+    using namespace scopes;
+    if (isa<ArgumentList>(value)) {
+        auto al = cast<ArgumentList>(value);
+        assert((index >= 0) && (index < (int)al->values.size()));
+        return al->values[index];
+    } else if (index == 0) {
+        return value;
+    } else {
+        return ConstAggregate::none_from(get_active_anchor());
+    }
+}
+
+sc_value_t *sc_getarglist(sc_value_t *value, int index) {
+    using namespace scopes;
+    if (isa<ArgumentList>(value)) {
+        auto al = cast<ArgumentList>(value);
+        Values values;
+        for (int i = index; i < al->values.size(); ++i) {
+            values.push_back(al->values[i]);
+        }
+        return build_argument_list(get_active_anchor(), values);
+    } else if (index == 0) {
+        return value;
+    } else {
+        return build_argument_list(get_active_anchor(), {});
+    }
 }
 
 sc_value_t *sc_extract_argument_new(sc_value_t *value, int index) {
     using namespace scopes;
     return ExtractArgument::from(get_active_anchor(), value, index);
+}
+
+sc_value_t *sc_extract_argument_list_new(sc_value_t *value, int index) {
+    using namespace scopes;
+    return ExtractArgument::from(get_active_anchor(), value, index, true);
 }
 
 sc_value_t *sc_template_new(sc_symbol_t name) {
@@ -823,24 +890,21 @@ void sc_template_set_inline(sc_value_t *fn) {
     cast<Template>(fn)->set_inline();
 }
 
-sc_value_t *sc_block_new(int numvalues, sc_value_t **values) {
+sc_value_t *sc_expression_new() {
     using namespace scopes;
     auto block = Expression::from(get_active_anchor());
-    for (int i = 0; i < numvalues; ++i) {
-        block->append(values[i]);
-    }
     block->scoped = false;
     return block;
 }
 
-sc_value_t *sc_scoped_block_new(int numvalues, sc_value_t **values) {
+void sc_expression_set_scoped(sc_value_t *expr) {
     using namespace scopes;
-    auto block = Expression::from(get_active_anchor());
-    for (int i = 0; i < numvalues; ++i) {
-        block->append(values[i]);
-    }
-    block->scoped = true;
-    return block;
+    cast<Expression>(expr)->scoped = true;
+}
+
+void sc_expression_append(sc_value_t *expr, sc_value_t *value) {
+    using namespace scopes;
+    cast<Expression>(expr)->append(value);
 }
 
 sc_value_t *sc_extern_new(sc_symbol_t name, const sc_type_t *type) {
@@ -911,17 +975,24 @@ void sc_switch_append_default(sc_value_t *value, sc_value_t *body) {
     cast<Switch>(value)->append_default(get_active_anchor(), body);
 }
 
-
-sc_value_t *sc_parameter_new(sc_symbol_t name, const sc_type_t *type) {
+sc_value_t *sc_try_new(sc_value_t *try_value, sc_value_t *except_param, sc_value_t *except_value) {
     using namespace scopes;
-    return Parameter::from(get_active_anchor(), name, type);
+    return Try::from(get_active_anchor(), try_value, cast<Parameter>(except_param), except_value);
 }
 
-sc_value_t *sc_call_new(sc_value_t *callee, int numargs, sc_value_t **args) {
+sc_value_t *sc_parameter_new(sc_symbol_t name) {
     using namespace scopes;
-    Values vals;
-    init_values_array(vals, numargs, args);
-    return Call::from(get_active_anchor(), callee, vals);
+    return Parameter::from(get_active_anchor(), name, nullptr);
+}
+
+sc_value_t *sc_call_new(sc_value_t *callee) {
+    using namespace scopes;
+    return Call::from(get_active_anchor(), callee);
+}
+
+void sc_call_append_argument(sc_value_t *call, sc_value_t *value) {
+    using namespace scopes;
+    cast<Call>(call)->args.push_back(value);
 }
 
 bool sc_call_is_rawcall(sc_value_t *value) {
@@ -934,13 +1005,19 @@ void sc_call_set_rawcall(sc_value_t *value, bool enable) {
     cast<Call>(value)->set_rawcall();
 }
 
-sc_value_t *sc_loop_new(int numparams, sc_value_t **params, int numargs, sc_value_t **args, sc_value_t *body) {
+sc_value_t *sc_loop_new(sc_value_t *body) {
     using namespace scopes;
-    Parameters paramvals;
-    init_values_arrayT(paramvals, numparams, params);
-    Values vals;
-    init_values_array(vals, numargs, args);
-    return Loop::from(get_active_anchor(), paramvals, vals, body);
+    return Loop::from(get_active_anchor(), {}, {}, body);
+}
+
+void sc_loop_append_parameter(sc_value_t *loop, sc_value_t *symbol) {
+    using namespace scopes;
+    cast<Loop>(loop)->params.push_back(cast<Parameter>(symbol));
+}
+
+void sc_loop_append_argument(sc_value_t *loop, sc_value_t *value) {
+    using namespace scopes;
+    cast<Loop>(loop)->args.push_back(value);
 }
 
 sc_value_t *sc_const_int_new(const sc_type_t *type, uint64_t value) {
@@ -984,15 +1061,21 @@ sc_value_t *sc_break_new(sc_value_t *value) {
     using namespace scopes;
     return Break::from(get_active_anchor(), value);
 }
-sc_value_t *sc_repeat_new(int numargs, sc_value_t **args) {
+sc_value_t *sc_repeat_new() {
     using namespace scopes;
-    Values vals;
-    init_values_array(vals, numargs, args);
-    return Repeat::from(get_active_anchor(), vals);
+    return Repeat::from(get_active_anchor());
+}
+void sc_repeat_append_argument(sc_value_t *rep, sc_value_t *value) {
+    using namespace scopes;
+    cast<Repeat>(rep)->args.push_back(value);
 }
 sc_value_t *sc_return_new(sc_value_t *value) {
     using namespace scopes;
     return Return::from(get_active_anchor(), value);
+}
+sc_value_t *sc_raise_new(sc_value_t *value) {
+    using namespace scopes;
+    return Raise::from(get_active_anchor(), value);
 }
 
 // Parser
@@ -1505,14 +1588,20 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_value_wrap, TYPE_Value, TYPE_Type, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_value_unwrap, TYPE_Value, TYPE_Type, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_keyed_new, TYPE_Value, TYPE_Symbol, TYPE_Value);
-    DEFINE_EXTERN_C_FUNCTION(sc_argument_list_new, TYPE_Value, TYPE_I32, TYPE_ValuePP);
+    DEFINE_EXTERN_C_FUNCTION(sc_argument_list_new, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_argument_list_append, _void, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_extract_argument_new, TYPE_Value, TYPE_Value, TYPE_I32);
+    DEFINE_EXTERN_C_FUNCTION(sc_extract_argument_list_new, TYPE_Value, TYPE_Value, TYPE_I32);
+    DEFINE_EXTERN_C_FUNCTION(sc_argcount, TYPE_I32, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_getarg, TYPE_Value, TYPE_Value, TYPE_I32);
+    DEFINE_EXTERN_C_FUNCTION(sc_getarglist, TYPE_Value, TYPE_Value, TYPE_I32);
     DEFINE_EXTERN_C_FUNCTION(sc_template_new, TYPE_Value, TYPE_Symbol);
     DEFINE_EXTERN_C_FUNCTION(sc_template_append_parameter, _void, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_template_set_body, _void, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_template_set_inline, _void, TYPE_Value);
-    DEFINE_EXTERN_C_FUNCTION(sc_block_new, TYPE_Value, TYPE_I32, TYPE_ValuePP);
-    DEFINE_EXTERN_C_FUNCTION(sc_scoped_block_new, TYPE_Value, TYPE_I32, TYPE_ValuePP);
+    DEFINE_EXTERN_C_FUNCTION(sc_expression_new, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_expression_set_scoped, _void, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_expression_append, _void, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_extern_new, TYPE_Value, TYPE_Symbol, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_extern_set_flags, _void, TYPE_Value, TYPE_U32);
     DEFINE_EXTERN_C_FUNCTION(sc_extern_get_flags, TYPE_U32, TYPE_Value);
@@ -1529,11 +1618,15 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_switch_append_case, _void, TYPE_Value, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_switch_append_pass, _void, TYPE_Value, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_switch_append_default, _void, TYPE_Value, TYPE_Value);
-    DEFINE_EXTERN_C_FUNCTION(sc_parameter_new, TYPE_Value, TYPE_Symbol, TYPE_Type);
-    DEFINE_EXTERN_C_FUNCTION(sc_call_new, TYPE_Value, TYPE_Value, TYPE_I32, TYPE_ValuePP);
+    DEFINE_EXTERN_C_FUNCTION(sc_try_new, TYPE_Value, TYPE_Value, TYPE_Value, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_parameter_new, TYPE_Value, TYPE_Symbol);
+    DEFINE_EXTERN_C_FUNCTION(sc_call_new, TYPE_Value, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_call_append_argument, _void, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_call_is_rawcall, TYPE_Bool, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_call_set_rawcall, _void, TYPE_Value, TYPE_Bool);
-    DEFINE_EXTERN_C_FUNCTION(sc_loop_new, TYPE_Value, TYPE_I32, TYPE_ValuePP, TYPE_I32, TYPE_ValuePP, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_loop_new, TYPE_Value, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_loop_append_parameter, _void, TYPE_Value, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_loop_append_argument, _void, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_const_int_new, TYPE_Value, TYPE_Type, TYPE_U64);
     DEFINE_EXTERN_C_FUNCTION(sc_const_real_new, TYPE_Value, TYPE_Type, TYPE_F64);
     DEFINE_EXTERN_C_FUNCTION(sc_const_aggregate_new, TYPE_Value, TYPE_Type, TYPE_I32, TYPE_ValuePP);
@@ -1544,8 +1637,12 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_const_pointer_extract, voidstar, TYPE_Value);
 
     DEFINE_EXTERN_C_FUNCTION(sc_break_new, TYPE_Value, TYPE_Value);
-    DEFINE_EXTERN_C_FUNCTION(sc_repeat_new, TYPE_Value, TYPE_I32, TYPE_ValuePP);
+
+    DEFINE_EXTERN_C_FUNCTION(sc_repeat_new, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_repeat_append_argument, _void, TYPE_Value, TYPE_Value);
+
     DEFINE_EXTERN_C_FUNCTION(sc_return_new, TYPE_Value, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_raise_new, TYPE_Value, TYPE_Value);
 
     DEFINE_EXTERN_C_FUNCTION(sc_is_file, TYPE_Bool, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_is_directory, TYPE_Bool, TYPE_String);
@@ -1770,6 +1867,8 @@ B_TYPES()
 
     linenoiseSetCompletionCallback(prompt_completion_cb);
 
+    // reimport wrapped symbols
+    import_symbols();
 }
 
 } // namespace scopes

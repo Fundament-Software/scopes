@@ -17,38 +17,71 @@
 
 namespace scopes {
 
-static std::unordered_map<const Type *, const Type *> arguments;
+namespace ArgumentsSet {
+    struct Hash {
+        std::size_t operator()(const ArgumentsType *s) const {
+            std::size_t h = 0;
+            for (auto &&arg : s->values) {
+                h = hash2(h, std::hash<const Type *>{}(arg));
+            }
+            return h;
+        }
+    };
+
+    struct KeyEqual {
+        bool operator()( const ArgumentsType *lhs, const ArgumentsType *rhs ) const {
+            if (lhs->values.size() != rhs->values.size()) return false;
+            for (size_t i = 0; i < lhs->values.size(); ++i) {
+                auto &&a = lhs->values[i];
+                auto &&b = rhs->values[i];
+                if (a != b)
+                    return false;
+            }
+            return true;
+        }
+    };
+} // namespace TupleSet
+
+static std::unordered_set<const ArgumentsType *,
+    ArgumentsSet::Hash, ArgumentsSet::KeyEqual> arguments;
 
 //------------------------------------------------------------------------------
 // ARGUMENTS TYPE
 //------------------------------------------------------------------------------
 
+void ArgumentsType::stream_name(StyledStream &ss) const {
+    if (values.size() == 0) {
+        ss << "void";
+    } else {
+        ss << "λ(";
+        for (size_t i = 0; i < values.size(); ++i) {
+            if (i > 0) {
+                ss << " ";
+            }
+            stream_type_name(ss, values[i]);
+        }
+        ss << ")";
+    }
+}
+
+const TupleType *ArgumentsType::to_tuple_type() const {
+    return cast<TupleType>(tuple_type(values).assert_ok());
+}
+
+ArgumentsType::ArgumentsType(const ArgTypes &_values) :
+    Type(TK_Arguments), values(_values) {
+}
+
 const Type *arguments_type(const ArgTypes &values) {
     if (values.size() == 1)
         return values[0];
-    auto ST = tuple_type(values).assert_ok();
-    auto it = arguments.find(ST);
+    ArgumentsType key(values);
+    auto it = arguments.find(&key);
     if (it != arguments.end())
-        return it->second;
-    StyledString ss = StyledString::plain();
-    if (values.size() == 0) {
-        ss.out << "void";
-    } else {
-        ss.out << "λ(";
-        for (size_t i = 0; i < values.size(); ++i) {
-            if (i > 0) {
-                ss.out << " ";
-            }
-            stream_type_name(ss.out, values[i]);
-        }
-        ss.out << ")";
-    }
-    auto T = typename_type(ss.str());
-    auto tn = const_cast<TypenameType *>(cast<TypenameType>(T));
-    tn->super_type = TYPE_Arguments;
-    tn->finalize(ST).assert_ok();
-    arguments.insert({ST, T});
-    return T;
+        return *it;
+    auto result = new ArgumentsType(values);
+    arguments.insert(result);
+    return result;
 }
 
 static const Type *empty_type = nullptr;
@@ -60,7 +93,7 @@ const Type *empty_arguments_type() {
 }
 
 bool is_arguments_type(const Type *T) {
-    return superof(T) == TYPE_Arguments;
+    return T->kind() == TK_Arguments;
 }
 
 } // namespace scopes

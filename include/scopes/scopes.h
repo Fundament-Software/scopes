@@ -134,7 +134,7 @@ typedef struct sc_type_type_tuple_ { const sc_type_t *_0; const sc_type_t *_1; }
 
 // prototypes
 
-typedef sc_value_raises_t (*sc_ast_macro_func_t)(int, sc_value_t **);
+typedef sc_value_raises_t (*sc_ast_macro_func_t)(sc_value_t *);
 
 // compiler
 
@@ -167,16 +167,22 @@ sc_value_t *sc_value_unwrap(const sc_type_t *type, sc_value_t *value);
 
 sc_value_t *sc_keyed_new(sc_symbol_t key, sc_value_t *value);
 
-sc_value_t *sc_argument_list_new(int numvalues, sc_value_t **values);
+sc_value_t *sc_argument_list_new();
+void sc_argument_list_append(sc_value_t *alist, sc_value_t *value);
 sc_value_t *sc_extract_argument_new(sc_value_t *value, int index);
+sc_value_t *sc_extract_argument_list_new(sc_value_t *value, int index);
+int sc_argcount(sc_value_t *value);
+sc_value_t *sc_getarg(sc_value_t *value, int index);
+sc_value_t *sc_getarglist(sc_value_t *value, int index);
 
 sc_value_t *sc_template_new(sc_symbol_t name);
 void sc_template_append_parameter(sc_value_t *fn, sc_value_t *symbol);
 void sc_template_set_body(sc_value_t *fn, sc_value_t *value);
 void sc_template_set_inline(sc_value_t *fn);
 
-sc_value_t *sc_block_new(int numvalues, sc_value_t **values);
-sc_value_t *sc_scoped_block_new(int numvalues, sc_value_t **values);
+sc_value_t *sc_expression_new();
+void sc_expression_append(sc_value_t *expr, sc_value_t *value);
+void sc_expression_set_scoped(sc_value_t *expr);
 
 sc_value_t *sc_extern_new(sc_symbol_t name, const sc_type_t *type);
 void sc_extern_set_flags(sc_value_t *value, uint32_t flags);
@@ -197,13 +203,18 @@ void sc_switch_append_case(sc_value_t *value, sc_value_t *literal, sc_value_t *b
 void sc_switch_append_pass(sc_value_t *value, sc_value_t *literal, sc_value_t *body);
 void sc_switch_append_default(sc_value_t *value, sc_value_t *body);
 
-sc_value_t *sc_parameter_new(sc_symbol_t name, const sc_type_t *type);
+sc_value_t *sc_try_new(sc_value_t *try_value, sc_value_t *except_param, sc_value_t *except_value);
 
-sc_value_t *sc_call_new(sc_value_t *callee, int numargs, sc_value_t **args);
+sc_value_t *sc_parameter_new(sc_symbol_t name);
+
+sc_value_t *sc_call_new(sc_value_t *callee);
+void sc_call_append_argument(sc_value_t *call, sc_value_t *value);
 bool sc_call_is_rawcall(sc_value_t *value);
 void sc_call_set_rawcall(sc_value_t *value, bool enable);
 
-sc_value_t *sc_loop_new(int numparams, sc_value_t **params, int numargs, sc_value_t **args, sc_value_t *body);
+sc_value_t *sc_loop_new(sc_value_t *body);
+void sc_loop_append_parameter(sc_value_t *loop, sc_value_t *symbol);
+void sc_loop_append_argument(sc_value_t *loop, sc_value_t *value);
 
 sc_value_t *sc_const_int_new(const sc_type_t *type, uint64_t value);
 sc_value_t *sc_const_real_new(const sc_type_t *type, double value);
@@ -215,8 +226,10 @@ sc_value_t *sc_const_extract_at(const sc_value_t *value, int index);
 const void *sc_const_pointer_extract(const sc_value_t *value);
 
 sc_value_t *sc_break_new(sc_value_t *value);
-sc_value_t *sc_repeat_new(int numargs, sc_value_t **args);
+sc_value_t *sc_repeat_new();
+void sc_repeat_append_argument(sc_value_t *rep, sc_value_t *value);
 sc_value_t *sc_return_new(sc_value_t *value);
+sc_value_t *sc_raise_new(sc_value_t *value);
 
 // parsing
 
