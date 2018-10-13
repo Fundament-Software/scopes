@@ -39,7 +39,8 @@ struct Type;
     T(curly_close, '}') \
     T(string, '"') \
     T(block_string, 'B') \
-    T(quote, '\'') \
+    T(syntax_quote, '\'') \
+    T(ast_quote, '`') \
     T(symbol, 'S') \
     T(escape, '\\') \
     T(statement, ';') \

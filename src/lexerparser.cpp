@@ -383,7 +383,8 @@ skip:
         }
     }
     else if (c == ';') { token = tok_statement; }
-    else if (c == '\'') { token = tok_quote; }
+    else if (c == '\'') { token = tok_syntax_quote; }
+    else if (c == '`') { token = tok_ast_quote; }
     else if (c == ',') { token = tok_symbol; read_single_symbol(); }
     else if (SCOPES_GET_RESULT(read_int64())
         || SCOPES_GET_RESULT(read_uint64())
@@ -555,7 +556,7 @@ SCOPES_RESULT(Value *) LexerParser::parse_any() {
         return ConstInt::symbol_from(anchor, get_symbol());
     } else if (this->token == tok_number) {
         return get_number();
-    } else if (this->token == tok_quote) {
+    } else if (this->token == tok_syntax_quote) {
         SCOPES_CHECK_RESULT(this->read_token());
         if (this->token == tok_eof) {
             SCOPES_ANCHOR(anchor);
@@ -565,6 +566,18 @@ SCOPES_RESULT(Value *) LexerParser::parse_any() {
         return ConstPointer::list_from(anchor,
             List::from({
                 ConstInt::symbol_from(anchor, Symbol(KW_SyntaxQuote)),
+                SCOPES_GET_RESULT(parse_any())
+                }));
+    } else if (this->token == tok_ast_quote) {
+        SCOPES_CHECK_RESULT(this->read_token());
+        if (this->token == tok_eof) {
+            SCOPES_ANCHOR(anchor);
+            SCOPES_LOCATION_ERROR(
+                String::from("unexpected end of file after quote token"));
+        }
+        return ConstPointer::list_from(anchor,
+            List::from({
+                ConstInt::symbol_from(anchor, Symbol(KW_ASTQuote)),
                 SCOPES_GET_RESULT(parse_any())
                 }));
     } else {

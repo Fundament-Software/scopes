@@ -238,9 +238,7 @@ compile-stage;
         sc_write "\n"
 
     fn test ()
-        let expr =
-            ast-quote
-                sc_string_join "hello world!" "\n"
+        let expr = `(sc_string_join "hello world!" "\n")
         ast-quote
             fn write_something2 ()
                 sc_write [ expr ]
@@ -453,7 +451,7 @@ fn compare-type (args f)
             return
                 box-integer
                     f (unbox-pointer a type) (unbox-pointer b type)
-    ast-quote (f args)
+    `(f args)
 
 inline type-comparison-func (f)
     fn (args) (compare-type args (typify f type type))
@@ -531,7 +529,7 @@ inline gen-key-any-set (selftype fset)
                         let key = (unbox-symbol key Symbol)
                         fset self key value
                         return (box-empty)
-            ast-quote (fset self key value)
+            `(fset self key value)
 
 # quick assignment of type attributes
 sc_type_set_symbol type 'set-symbol (gen-key-any-set type sc_type_set_symbol)
@@ -689,7 +687,7 @@ let constbranch =
             else
                 compiler-error! "condition must be constant"
             let value = (unbox-integer cond bool)
-            ast-quote ([(? value thenf elsef)])
+            `([(? value thenf elsef)])
 
 sc_type_set_symbol Value '__typecall
     box-ast-macro
@@ -908,7 +906,7 @@ inline unbox (value T)
 
 fn value-imply (vT T expr)
     if true
-        return (ast-quote (unbox expr T))
+        return `(unbox expr T)
     compiler-error! "unsupported type"
 
 'set-symbols Value
@@ -918,7 +916,7 @@ fn value-imply (vT T expr)
         box-cast
             fn "syntax-rimply" (vT T expr)
                 if true
-                    return (ast-quote (Value expr))
+                    return `(Value expr)
                 compiler-error! "unsupported type"
 
 'set-symbols ASTMacro
@@ -926,10 +924,10 @@ fn value-imply (vT T expr)
         box-cast
             fn "ASTMacro-rimply" (vT T expr)
                 if (ptrcmp== vT ASTMacroFunction)
-                    return (ast-quote (bitcast expr T))
+                    return `(bitcast expr T)
                 elseif (ptrcmp== vT Closure)
                     if ('constant? expr)
-                        return (ast-quote (ast-macro expr))
+                        return `(ast-macro expr)
                 compiler-error! "unsupported type"
 
 # integer casting
@@ -954,12 +952,12 @@ fn integer-imply (vT T expr)
         # must have same signed bit
         if (icmp== ('signed? vT) ('signed? ST))
             if (icmp== destw valw)
-                return (ast-quote (bitcast args...))
+                return `(bitcast args...)
             elseif (icmp>s destw valw)
                 if ('signed? vT)
-                    return (ast-quote (sext args...))
+                    return `(sext args...)
                 else
-                    return (ast-quote (zext args...))
+                    return `(zext args...)
     compiler-error! "unsupported type"
 
 fn integer-as (vT T expr)
@@ -971,19 +969,19 @@ fn integer-as (vT T expr)
         let valw = ('bitcount vT)
         let destw = ('bitcount T)
         if (icmp== destw valw)
-            return (ast-quote (bitcast args...))
+            return `(bitcast args...)
         elseif (icmp>s destw valw)
             if ('signed? vT)
-                return (ast-quote (sext args...))
+                return `(sext args...)
             else
-                return (ast-quote (zext args...))
+                return `(zext args...)
         else
-            return (ast-quote (itrunc args...))
+            return `(itrunc args...)
     elseif (icmp== ('kind T) type-kind-real)
         if ('signed? vT)
-            return (ast-quote (sitofp args...))
+            return `(sitofp args...)
         else
-            return (ast-quote (uitofp args...))
+            return `(uitofp args...)
     compiler-error! "unsupported type"
 
 # only perform safe casts: i.e. float to double
@@ -993,9 +991,9 @@ fn real-imply (vT T expr)
         let valw = ('bitcount vT)
         let destw = ('bitcount T)
         if (icmp== destw valw)
-            return (ast-quote (bitcast args...))
+            return `(bitcast args...)
         elseif (icmp>s destw valw)
-            return (ast-quote (fpext args...))
+            return `(fpext args...)
     compiler-error! "unsupported type"
 
 # more aggressive cast that converts from all numerical types
@@ -1008,16 +1006,16 @@ fn real-as (vT T expr)
     if (icmp== kind type-kind-real)
         let valw destw = ('bitcount vT) ('bitcount T)
         if (icmp== destw valw)
-            return (ast-quote (bitcast args...))
+            return `(bitcast args...)
         elseif (icmp>s destw valw)
-            return (ast-quote (fpext args...))
+            return `(fpext args...)
         else
-            return (ast-quote (fptrunc args...))
+            return `(fptrunc args...)
     elseif (icmp== kind type-kind-integer)
         if ('signed? T)
-            return (ast-quote (fptosi args...))
+            return `(fptosi args...)
         else
-            return (ast-quote (fptoui args...))
+            return `(fptoui args...)
     compiler-error! "unsupported type"
 
 
@@ -1027,7 +1025,7 @@ inline box-binary-op (f)
 inline single-binary-op-dispatch (destf)
     fn (lhsT rhsT lhs rhs)
         if (ptrcmp== lhsT rhsT)
-            return (ast-quote (destf lhs rhs))
+            return `(destf lhs rhs)
         compiler-error! "unsupported type"
 
 inline cast-error! (intro-string vT T)
@@ -1220,13 +1218,11 @@ fn asym-binary-op-label-macro (args symbol rtype friendly-op-name)
     let ok f = ('@ lhsT symbol)
     if ok
         if (ptrcmp== rhsT rtype)
-            return
-                ast-quote (f args)
+            return `(f args)
         # can we cast rhsT to rtype?
         let ok rhs = (imply-expr rhsT rtype rhs)
         if ok
-            return
-                ast-quote (f lhs rhs)
+            return `(f lhs rhs)
     # we give up
     compiler-error!
         'join "can't "
@@ -1244,8 +1240,7 @@ fn unary-op-label-macro (args symbol friendly-op-name)
     let lhsT = ('typeof lhs)
     let ok f = ('@ lhsT symbol)
     if ok
-        return
-            ast-quote (f args)
+        return `(f args)
     compiler-error!
         'join "can't "
             'join friendly-op-name
@@ -1277,8 +1272,7 @@ inline make-asym-binary-op-dispatch (symbol rtype friendly-op-name)
         box-cast
             fn "syntax-imply" (vT T expr)
                 if (ptrcmp== T string)
-                    return
-                        ast-quote (sc_symbol_to_string expr)
+                    return `(sc_symbol_to_string expr)
                 compiler-error! "unsupported type"
 
 fn string@ (self i)
@@ -1323,7 +1317,7 @@ fn dispatch-and-or (args flip)
     let cond elsef =
         'getarg args 0
         'getarg args 1
-    let call-elsef = (ast-quote (elsef))
+    let call-elsef = `(elsef)
     if ('constant? cond)
         let value = (unbox-integer cond bool)
         return
@@ -1418,9 +1412,9 @@ fn type-getattr-dynamic (T value)
                 let key = (unbox-symbol key Symbol)
                 let ok result = (sc_type_at self key)
                 if ok
-                    return (ast-quote (thenf result))
+                    return `(thenf result)
                 else
-                    return (ast-quote (elsef))
+                    return `(elsef)
     __getattr =
         box-ast-macro
             fn "type-getattr" (args)
@@ -1437,8 +1431,8 @@ fn type-getattr-dynamic (T value)
                         if ok
                             return result
                         else
-                            return (ast-quote (_))
-                ast-quote (type-getattr-dynamic args)
+                            return `(_)
+                `(type-getattr-dynamic args)
 
 fn scope-getattr-dynamic (T value)
     let ok val = (sc_scope_at T value)
@@ -1464,8 +1458,8 @@ fn scope-getattr-dynamic (T value)
                         if ok
                             return result
                         else
-                            return (ast-quote (_))
-                ast-quote (scope-getattr-dynamic args)
+                            return `(_)
+                `(scope-getattr-dynamic args)
     __typecall =
         box-ast-macro
             fn "scope-typecall" (args)
@@ -1482,16 +1476,16 @@ fn scope-getattr-dynamic (T value)
                 verify-count argc 1 3
                 switch argc
                 case 1
-                    ast-quote (sc_scope_new)
+                    `(sc_scope_new)
                 case 2
-                    ast-quote (sc_scope_new_subscope [ ('getarg args 1) ])
+                    `(sc_scope_new_subscope [ ('getarg args 1) ])
                 default
                     # argc == 3
                     let parent = ('getarg args 1)
                     if (type== ('typeof parent) Nothing)
-                        ast-quote (sc_scope_clone [ ('getarg args 2) ])
+                        `(sc_scope_clone [ ('getarg args 2) ])
                     else
-                        ast-quote (sc_scope_clone_subscope
+                        `(sc_scope_clone_subscope
                             [(sc_extract_argument_list_new args 1)])
 
 #---------------------------------------------------------------------------
@@ -1510,8 +1504,7 @@ sc_typename_type_set_storage NullType ('pointer void)
         box-cast
             fn "null-imply" (clsT T expr)
                 if (icmp== ('kind ('storage T)) type-kind-pointer)
-                    return
-                        ast-quote (bitcast expr T)
+                    return `(bitcast expr T)
                 compiler-error! "cannot convert to type"
     #__==
         fn (a b flipped)
@@ -1680,14 +1673,11 @@ let coerce-call-arguments =
                     let paramT = ('element@ fT i)
                     let outarg =
                         if (== argT paramT) arg
-                        else
-                            ast-quote (imply arg paramT)
+                        else `(imply arg paramT)
                     sc_call_append_argument outargs outarg
                     repeat (+ i 1)
                 outargs
-            else
-                ast-quote
-                    rawcall self [(sc_extract_argument_list_new args 1)]
+            else `(rawcall self [(sc_extract_argument_list_new args 1)])
 
 #
     set-type-symbol! pointer 'set-element-type
@@ -1739,7 +1729,7 @@ fn pointer-type-imply? (src dest)
 fn pointer-imply (vT T expr)
     if (icmp== ('kind T) type-kind-pointer)
         if (pointer-type-imply? vT T)
-            return (ast-quote (bitcast expr T))
+            return `(bitcast expr T)
     compiler-error! "unsupported type"
 
 'set-symbols pointer
@@ -2030,13 +2020,13 @@ fn ltr-multiop (args target)
     let argc = ('argcount args)
     verify-count argc 2 -1
     if (== argc 2)
-        ast-quote (target args)
+        `(target args)
     else
         # call for multiple args
         let lhs = ('getarg args 0)
         loop (i lhs) = 1 lhs
         let rhs = ('getarg args i)
-        let op = (ast-quote (target lhs rhs))
+        let op = `(target lhs rhs)
         let i = (+ i 1)
         if (< i argc)
             repeat i op
@@ -2046,7 +2036,7 @@ fn rtl-multiop (args target)
     let argc = ('argcount args)
     verify-count argc 2 -1
     if (== argc 2)
-        ast-quote (target args)
+        `(target args)
     else
         # call for multiple args
         let lasti = (- argc 1)
@@ -2054,7 +2044,7 @@ fn rtl-multiop (args target)
         loop (i rhs) = lasti rhs
         let i = (- i 1)
         let lhs = ('getarg args i)
-        let op = (ast-quote (target lhs rhs))
+        let op = `(target lhs rhs)
         if (> i 0)
             repeat i op
         op
@@ -2077,7 +2067,7 @@ fn va-option-branch (args)
             return
                 sc_keyed_new unnamed arg
         repeat (+ i 1)
-    ast-quote (elsef)
+    `(elsef)
 
 # modules
 ####
@@ -2303,7 +2293,7 @@ let va-option =
                     compiler-error! "Generator must be constant"
                 let self = (self as Generator)
                 let self = (bitcast self Closure)
-                ast-quote (self)
+                `(self)
 
 # typical pattern for a generator:
     inline make-generator (init end?)
@@ -2359,7 +2349,7 @@ let wrap-if-not-compile-stage =
                 let arg = ('getarg args 0)
                 if (('typeof arg) == CompileStage)
                     return arg
-            ast-quote (Value args)
+            `(Value args)
 
 compile-stage;
 
@@ -2508,7 +2498,7 @@ let locals =
             if (not (empty? docstr))
                 'set-docstring! constant-scope unnamed docstr
             let tmp =
-                ast-quote (Scope constant-scope)
+                `(Scope constant-scope)
             loop (last-key result) = unnamed (list tmp)
             let key value =
                 'next scope last-key
@@ -2675,7 +2665,7 @@ let __assert =
                 check-assertion val anchor msg
                 box-empty;
             else
-                ast-quote (check-assertion expr anchor msg)
+                `(check-assertion expr anchor msg)
 
 let vector-reduce =
     ast-macro
@@ -2775,7 +2765,7 @@ inline list-generator (self)
         box-cast
             fn "list-as" (vT T expr)
                 if (T == Generator)
-                    return (ast-quote (list-generator expr))
+                    return `(list-generator expr)
                 compiler-error! "unsupported type"
 
 'set-symbols Value
@@ -2855,7 +2845,7 @@ let compile =
             if ('pure? func)
                 sc_compile func flags
             else
-                ast-quote (sc_compile func flags)
+                `(sc_compile func flags)
 
 define-syntax-macro assert
     let cond msg body = (decons args 2)
@@ -2891,9 +2881,7 @@ inline make-unpack-function (extractf)
             let outargs = (sc_argument_list_new)
             loop (i) = 0
             if (icmp<s i count)
-                sc_argument_list_append outargs
-                    ast-quote
-                        extractf self i
+                sc_argument_list_append outargs `(extractf self i)
                 repeat (add i 1)
             outargs
 
@@ -2924,14 +2912,11 @@ let tupleof =
 
             # generate insert instructions
             let TT = (sc_tuple_type argc field-types)
-            loop (i result) = 0
-                ast-quote
-                    nullof TT
+            loop (i result) = 0 `(nullof TT)
             if (i < argc)
                 let arg = ('getarg args i)
                 repeat (i + 1)
-                    ast-quote
-                        insertvalue result arg i
+                    `(insertvalue result arg i)
             result
 
 #-------------------------------------------------------------------------------
@@ -2957,19 +2942,14 @@ let arrayof =
 
             # generate insert instructions
             let TT = (sc_array_type ET (usize numvals))
-            loop (i result) = 0
-                ast-quote
-                    nullof TT
+            loop (i result) = 0 `(nullof TT)
             if (i < numvals)
                 let arg = ('getarg args (add i 1))
                 let arg =
                     if ((sc_value_type arg) == ET) arg
-                    else
-                        ast-quote
-                            arg as ET
+                    else `(arg as ET)
                 repeat (i + 1)
-                    ast-quote
-                        insertvalue result arg i
+                    `(insertvalue result arg i)
             result
 
 #-------------------------------------------------------------------------------
@@ -3141,19 +3121,13 @@ let vectorof =
 
             # generate insert instructions
             let TT = (sc_vector_type ET (usize numvals))
-            loop (i result) = 0
-                ast-quote
-                    nullof TT
+            loop (i result) = 0 `(nullof TT)
             if (i < numvals)
                 let arg = ('getarg args (add i 1))
                 let arg =
                     if ((sc_value_type arg) == ET) arg
-                    else
-                        ast-quote
-                            arg as ET
-                repeat (i + 1)
-                    ast-quote
-                        insertelement result arg i
+                    else `(arg as ET)
+                repeat (i + 1) `(insertelement result arg i)
             result
 
 #-------------------------------------------------------------------------------
@@ -3359,7 +3333,7 @@ let deref =
                 if (T < ref)
                     let ok op = ('@ T '__deref)
                     if ok
-                        let cmd =  (ast-quote (op value))
+                        let cmd =  `(op value)
                         if (key == unnamed) cmd
                         else
                             sc_keyed_new key cmd
@@ -3390,9 +3364,7 @@ let deref =
 
 do
     fn ref-binary-op-expr (symbol func lhs rhs)
-        ast-quote
-            func
-                [ (deref as ASTMacro) ] lhs rhs
+        `(func [ (deref as ASTMacro) ] lhs rhs)
 
     inline passthru-overload (sym func)
         'set-symbol ref sym
@@ -3466,9 +3438,7 @@ fn ref-type (PT)
             spice "ref=" (self value)
                 let ET = ('typeof& self)
                 let ok op = ('@& ET '__=)
-                if ok
-                    ast-quote
-                        op self value
+                if ok `(op self value)
                 else
                     ast-quote
                         destruct self
@@ -3638,9 +3608,7 @@ let deref = (deref as ASTMacro)
         if (n == 1:usize)
             let argc = ('argcount args...)
             let expr = (sc_call_new op)
-            sc_call_append_argument expr
-                ast-quote
-                    value as ref
+            sc_call_append_argument expr `(value as ref)
             sc_call_append_argument expr args...
             return expr
     let i = (sc_parameter_new 'i)
