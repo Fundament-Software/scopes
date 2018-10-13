@@ -10,7 +10,7 @@
 #include "error.hpp"
 #include "prover.hpp"
 //#include "closure.hpp"
-//#include "stream_ast.hpp"
+#include "stream_ast.hpp"
 //#include "hash.hpp"
 //#include "timer.hpp"
 //#include "gc.hpp"
@@ -34,6 +34,12 @@ struct Quoter {
     Quoter(const ASTContext  &_ctx) :
         ctx(_ctx) {}
 
+    Value *canonicalize(Expression *expr) {
+        if (expr->body.empty())
+            return expr->value;
+        return expr;
+    }
+
     SCOPES_RESULT(Value *) quote_Expression(Expression *node) {
         SCOPES_RESULT_TYPE(Value *);
         auto _anchor = node->anchor();
@@ -49,7 +55,7 @@ struct Quoter {
         expr->append(Call::from(_anchor, g_sc_expression_append,
             { value, SCOPES_GET_RESULT(quote(node->value)) }));
         expr->append(value);
-        return expr;
+        return canonicalize(expr);
     }
 
     SCOPES_RESULT(Value *) quote_ArgumentList(ArgumentList *node) {
@@ -63,7 +69,7 @@ struct Quoter {
                 { value, SCOPES_GET_RESULT(quote(node->values[i])) }));
         }
         expr->append(value);
-        return expr;
+        return canonicalize(expr);
     }
 
     SCOPES_RESULT(Value *) quote_ExtractArgument(ExtractArgument *node) {
@@ -80,11 +86,14 @@ struct Quoter {
         }
     }
 
-    Value *quote_param(Parameter *node) {
+    SCOPES_RESULT(Value *) quote_param(Parameter *node) {
+        SCOPES_RESULT_TYPE(Value *);
         auto newparam = Call::from(node->anchor(), g_sc_parameter_new, {
             ConstInt::symbol_from(node->anchor(), node->name) });
-        bind(node, newparam);
-        return newparam;
+        auto typednewparam = SCOPES_GET_RESULT(prove(ctx, newparam));
+        bind(node, typednewparam);
+        ctx.frame->bind(node, typednewparam);
+        return typednewparam;
     }
 
     SCOPES_RESULT(Value *) quote_Try(Try *node) {
@@ -92,7 +101,7 @@ struct Quoter {
         auto _anchor = node->anchor();
         return Call::from(_anchor, g_sc_try_new, {
             SCOPES_GET_RESULT(quote(node->try_value)),
-            quote_param(node->except_param),
+            SCOPES_GET_RESULT(quote_param(node->except_param)),
             SCOPES_GET_RESULT(quote(node->except_value))
         });
     }
@@ -106,14 +115,14 @@ struct Quoter {
         auto expr = Expression::unscoped_from(_anchor);
         for (auto &&param : node->params) {
             expr->append(Call::from(_anchor, g_sc_loop_append_parameter,
-                { value, quote_param(param) }));
+                { value, SCOPES_GET_RESULT(quote_param(param)) }));
         }
         for (auto &&arg : node->args) {
             expr->append(Call::from(_anchor, g_sc_loop_append_argument,
                 { value, SCOPES_GET_RESULT(quote(arg)) }));
         }
         expr->append(value);
-        return expr;
+        return canonicalize(expr);
     }
 
     #define CONST_QUOTER(NAME) \
@@ -147,7 +156,7 @@ struct Quoter {
                 { value, SCOPES_GET_RESULT(quote(node->args[i])) }));
         }
         expr->append(value);
-        return expr;
+        return canonicalize(expr);
     }
 
     SCOPES_RESULT(Value *) quote_Return(Return *node) {
@@ -195,7 +204,7 @@ struct Quoter {
                 { value, SCOPES_GET_RESULT(quote(arg)) }));
         }
         expr->append(value);
-        return expr;
+        return canonicalize(expr);
     }
 
     SCOPES_RESULT(Value *) quote_Parameter(Parameter *sym) {
@@ -234,7 +243,7 @@ struct Quoter {
             }
         }
         expr->append(value);
-        return expr;
+        return canonicalize(expr);
     }
 
     SCOPES_RESULT(Value *) quote_If(If *node) {
@@ -250,7 +259,7 @@ struct Quoter {
         expr->append(Call::from(_anchor, g_sc_if_append_else_clause, { value,
             SCOPES_GET_RESULT(quote(node->else_clause.value)) }));
         expr->append(value);
-        return expr;
+        return canonicalize(expr);
     }
 
     SCOPES_RESULT(Value *) quote_Template(Template *node) {
@@ -264,19 +273,18 @@ struct Quoter {
         }
         for (auto &&param : node->params) {
             expr->append(Call::from(_anchor, g_sc_template_append_parameter, {
-                value, quote_param(param)
+                value, SCOPES_GET_RESULT(quote_param(param))
             }));
         }
         expr->append(Call::from(_anchor, g_sc_template_set_body, { value,
             SCOPES_GET_RESULT(quote(node->value)) }));
         expr->append(value);
-        return expr;
+        return canonicalize(expr);
     }
 
     SCOPES_RESULT(Value *) quote_Quote(Quote *node) {
         SCOPES_RESULT_TYPE(Value *);
-        auto value = SCOPES_GET_RESULT(quote(node->value));
-        return quote(value);
+        SCOPES_LOCATION_ERROR(String::from("cannot quote inside a quote"));
     }
 
     Value *quote_typed(Value *node) {
@@ -309,7 +317,7 @@ struct Quoter {
                     extract_argument(subctx, value, i)) }));
             }
             expr->append(result);
-            return expr;
+            return canonicalize(expr);
         } else {
             return quote_typed(value);
         }
@@ -351,22 +359,50 @@ struct Quoter {
         SCOPES_RESULT_TYPE(Value *);
         assert(node);
         assert(ctx.frame);
-        Value *result = resolve(node);
-        if (result)
-            return result;
-        Value *frame_result = ctx.frame->resolve(node);
-        result = SCOPES_GET_RESULT(quote_new_node(frame_result?frame_result:node));
-        #if 0
-        if (!frame_result) {
-            ctx.frame->bind(node, result);
+        // check if node is already typed
+        Value *result = ctx.frame->resolve(node);
+        if (result) {
+            assert(result->is_typed());
+            // check if we have an existing wrap for the node
+            Value *wrapped = resolve(result);
+            if (!wrapped) {
+                // wrap it anew
+                wrapped = quote_typed(result);
+                bind(result, wrapped);
+            }
+            return wrapped;
         }
-        #endif
-        bind(node, result);
+        // check if we have an existing quote for the node
+        result = resolve(node);
+        if (!result) {
+            // node is untyped or unbound yet
+            result = SCOPES_GET_RESULT(quote_new_node(node));
+            if (!result->is_typed()) {
+                // type node
+                result = SCOPES_GET_RESULT(prove(ctx, result));
+            }
+            bind(node, result);
+            if (!node->is_typed() && !node->is_pure()) {
+                #if 0
+                StyledStream ss;
+                ss << "binding ";
+                stream_ast(ss, node, StreamASTFormat());
+                ss << " to ";
+                stream_ast(ss, result, StreamASTFormat());
+                ss << std::endl;
+                #endif
+                // ensure that the unquoted context can access the typed result
+                ctx.frame->bind(node, result);
+            }
+        }
         return result;
     }
 
     void bind(Value *oldnode, Value *newnode) {
-        map.insert({oldnode, newnode});
+        auto it = map.insert({oldnode, newnode});
+        if (!it.second) {
+            it.first->second = newnode;
+        }
     }
 
     Value *resolve(Value *node) const {

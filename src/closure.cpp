@@ -7,6 +7,7 @@
 #include "closure.hpp"
 #include "hash.hpp"
 #include "styled_stream.hpp"
+#include "value.hpp"
 
 #include <assert.h>
 
@@ -41,9 +42,9 @@ const Closure *Closure::from(Template *func, Function *frame) {
 
 StyledStream &Closure::stream(StyledStream &ost) const {
     ost << Style_Comment << "<" << Style_None
-        << frame
+        << Style_Symbol << frame->name.name()->data << "λ" << (void *)frame << Style_None
         << Style_Comment << "::" << Style_None
-        << func
+        << Style_Symbol << func->name.name()->data << "λ" << (void *)func << Style_None
         << Style_Comment << ">" << Style_None;
     return ost;
 }

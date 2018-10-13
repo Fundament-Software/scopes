@@ -394,6 +394,7 @@ struct Function : Pure {
     Symbol name;
     Parameters params;
     Block body;
+    Value *value;
     const String *docstring;
     const Type *return_type;
     const Type *except_type;

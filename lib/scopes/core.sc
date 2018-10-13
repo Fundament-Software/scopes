@@ -232,29 +232,41 @@ let typify =
 
 compile-stage;
 
-#fn write_something (text)
-    sc_write text
-    sc_write "\n"
+#do
+    fn write_something (text)
+        sc_write text
+        sc_write "\n"
 
-#fn test ()
-    let expr =
+    fn test ()
+        let expr =
+            ast-quote
+                sc_string_join "hello world!" "\n"
         ast-quote
-            sc_string_join "hello world!" "\n"
-    ast-quote
-        fn write_something2 ()
-            sc_write [ expr ]
+            fn write_something2 ()
+                sc_write [ expr ]
+                sc_write "\n"
+
+            sc_write
+                sc_string_join [ "hello world!" "\n" ]
             sc_write "\n"
+            let x = (add 1 2)
+            let y = [
+                \ do
+                    dump-ast x;
+                    x
+            ]
+            write_something [ expr ]
+            write_something2;
 
-        write_something [ expr ]
-        write_something2;
+    dump-ast
+        typify test
 
-#dump-ast
-    typify test
+    sc_write
+        sc_value_ast_repr
+            test;
 
-#sc_write
-    sc_value_ast_repr
-        test;
-
+    if true
+        sc_exit 0
 #compile-stage;
 
 let function->ASTMacro =
@@ -1296,14 +1308,12 @@ inline single-signed-binary-op-dispatch (sf uf)
         if (ptrcmp== lhsT rhsT)
             return
                 ast-quote
-                    call
-                        [   \
-                            do
-                                if ('signed? lhsT)
-                                    Value sf
-                                else
-                                    Value uf
-                        ]
+                    call [
+                        \ do
+                            if ('signed? lhsT)
+                                Value sf
+                            else
+                                Value uf ]
                         \ lhs rhs
         compiler-error! "unsupported type"
 
@@ -2977,12 +2987,12 @@ inline single-signed-vector-binary-op-dispatch (sf uf)
             let Ta = ('element@ lhsT 0)
             return
                 ast-quote
-                    call [  \
-                            do
-                                if ('signed? Ta)
-                                    Value sf
-                                else
-                                    Value uf ]
+                    call [
+                        \ do
+                            if ('signed? Ta)
+                                Value sf
+                            else
+                                Value uf ]
                         \ lhs rhs
         compiler-error! "unsupported type"
 
@@ -4182,19 +4192,6 @@ fn run-main ()
                 default-styler style-error "error:"
                 format-error err
         exit 0
-
-#let x = (1 + 2)
-#print
-    'ast-repr
-        ast-quote
-            fn test (a b)
-                [   \
-                    do
-                        print a b
-                        ast-quote
-                            print "hello"
-                ]
-
 
 raises-compile-error;
 run-main;

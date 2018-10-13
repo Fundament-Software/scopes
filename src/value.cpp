@@ -124,7 +124,7 @@ Template *Template::from(
 
 Function::Function(const Anchor *anchor, Symbol _name, const Parameters &_params)
     : Pure(VK_Function, anchor),
-        name(_name), params(_params),
+        name(_name), params(_params), value(nullptr),
         docstring(nullptr), return_type(nullptr), except_type(nullptr),
         frame(nullptr), original(nullptr), label(nullptr), complete(false) {
     set_type(TYPE_Unknown);
@@ -164,7 +164,10 @@ Function *Function::find_frame(Template *scope) {
 }
 
 void Function::bind(Value *oldnode, Value *newnode) {
-    map.insert({oldnode, newnode});
+    auto it = map.insert({oldnode, newnode});
+    if (!it.second) {
+        it.first->second = newnode;
+    }
 }
 
 Function *Function::from(

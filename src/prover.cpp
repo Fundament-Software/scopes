@@ -770,7 +770,7 @@ static SCOPES_RESULT(void) annotate_except_type(const ASTContext &ctx, const Typ
     return true;
 }
 
-static SCOPES_RESULT(Merge *) make_merge(const Anchor *anchor, Label *label, Value *value) {
+static SCOPES_RESULT(Merge *) make_merge(const ASTContext &ctx, const Anchor *anchor, Label *label, Value *value) {
     SCOPES_RESULT_TYPE(Merge *);
     SCOPES_ANCHOR(anchor);
     assert(label);
@@ -778,6 +778,8 @@ static SCOPES_RESULT(Merge *) make_merge(const Anchor *anchor, Label *label, Val
     label->return_type = SCOPES_GET_RESULT(merge_value_type(label->return_type, T));
     auto newmerge = Merge::from(anchor, label, value);
     newmerge->set_type(TYPE_NoReturn);
+    assert(ctx.block);
+    ctx.block->append(newmerge);
     return newmerge;
 }
 
@@ -788,6 +790,8 @@ static SCOPES_RESULT(Return *) make_return(const ASTContext &ctx, const Anchor *
     ctx.function->return_type = SCOPES_GET_RESULT(merge_value_type(ctx.function->return_type, T));
     auto newreturn = Return::from(anchor, value);
     newreturn->set_type(TYPE_NoReturn);
+    assert(ctx.block);
+    ctx.block->append(newreturn);
     return newreturn;
 }
 
@@ -797,7 +801,7 @@ static SCOPES_RESULT(Value *) prove_Return(const ASTContext &ctx, Return *_retur
     if (ctx.frame->label) {
         assert(ctx.frame->original && ctx.frame->original->is_inline());
         // generate a merge
-        return SCOPES_GET_RESULT(make_merge(_return->anchor(), ctx.frame->label, value));
+        return SCOPES_GET_RESULT(make_merge(ctx, _return->anchor(), ctx.frame->label, value));
     } else {
         assert(!(ctx.frame->original && ctx.frame->original->is_inline()));
         // generate a return
@@ -1797,10 +1801,9 @@ static SCOPES_RESULT(Value *) prove_Quote(const ASTContext &ctx, Quote *node) {
     //StyledStream ss;
     //ss << "before quote" << std::endl;
     //stream_ast(ss, node, StreamASTFormat());
-    auto value = SCOPES_GET_RESULT(quote(ctx, node->value));
+    return quote(ctx.with_symbol_target(), node->value);
     //ss << "after quote" << std::endl;
     //stream_ast(ss, value, StreamASTFormat());
-    return prove(ctx, value);
 }
 
 static SCOPES_RESULT(Value *) prove_Unquote(const ASTContext &ctx, Unquote *node) {
@@ -1987,6 +1990,7 @@ SCOPES_RESULT(Function *) prove(Function *frame, Template *func, const ArgTypes 
     if (result.ok()) {
         auto expr = result.assert_ok();
         assert(!is_returning(expr->get_type()));
+        fn->value = expr;
     } else {
         add_error_trace(fn);
         SCOPES_RETURN_ERROR();

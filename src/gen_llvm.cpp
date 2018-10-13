@@ -988,7 +988,10 @@ struct LLVMIRGenerator {
             bind(param, val);
         }
         SCOPES_CHECK_RESULT(block_to_value(node->body));
-        //SCOPES_CHECK_RESULT(write_return(node->value));
+        auto result = SCOPES_GET_RESULT(node_to_value(node->value));
+        if (is_returning(node->value->get_type())) {
+            SCOPES_CHECK_RESULT(write_return(result));
+        }
         return true;
     }
 

@@ -9,6 +9,7 @@
 #include "type.hpp"
 #include "dyn_cast.inc"
 #include "types.hpp"
+#include "closure.hpp"
 
 #include <unordered_map>
 #include <queue>
@@ -268,9 +269,7 @@ struct StreamAST : StreamAnchors {
                         walk_same_or_newline(val->params[i], depth+1, maxdepth);
                     }
                     ss << Style_Operator << " )" << Style_None;
-                    for (int i = 0; i < val->body.body.size(); ++i) {
-                        walk_newline(val->body.body[i], depth+1, maxdepth);
-                    }
+                    stream_block_result(val->body, val->value, depth+1, maxdepth);
                 } else {
                     todo.push_back(node);
                 }
@@ -465,8 +464,13 @@ struct StreamAST : StreamAnchors {
             } else if (T == TYPE_String) {
                 ss << (const String *)val->value;
             } else if (T == TYPE_Closure) {
-                ss << (const Closure *)val->value;
+                auto cl = (const Closure *)val->value;
+                ss << cl;
                 stream_type_suffix(T);
+                if (newlines && !visited.count(cl->func)) {
+                    visited.insert({cl->func, -1});
+                    todo.push_back(cl->func);
+                }
             } else if (T == TYPE_List) {
                 ss << (const List *)val->value;
             } else if (T == TYPE_Value) {

@@ -101,8 +101,13 @@ struct Expander {
             expr->append(SCOPES_GET_RESULT(expand(it->at)));
             it = next;
         }
-        if (expr)
+        if (expr) {
+            #if 1
+            if (expr->body.empty())
+                return expr->value;
+            #endif
             return expr;
+        }
         return ArgumentList::from(anchor);
     }
 
