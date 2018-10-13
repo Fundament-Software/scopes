@@ -2162,21 +2162,6 @@ let
         syntax-macro
             fn (args)
                 quasiquote-list args
-    spice-quote =
-        syntax-scope-macro
-            fn (args scope)
-                fn expand (expr scope)
-                    let arg = (as expr list)
-                    sc_expand
-                        if (== (countof arg) 1)
-                            let arg = (decons arg)
-                            as arg list
-                        else
-                            cons do arg
-                        scope
-                return
-                    list expand (quasiquote-list args) scope
-                    scope
     # dot macro
     # (. value symbol ...)
     . =
@@ -3602,23 +3587,18 @@ let deref = (deref as ASTMacro)
 # default memory allocators
 #-------------------------------------------------------------------------------
 
-#spice pointer-each (n op value args...)
+spice pointer-each (n op value args...)
     if ('constant? n)
         let n = (n as usize)
         if (n == 1:usize)
-            let argc = ('argcount args...)
-            let expr = (sc_call_new op)
-            sc_call_append_argument expr `(value as ref)
-            sc_call_append_argument expr args...
-            return expr
-    let i = (sc_parameter_new 'i)
-    spice-quote
-        loop ([i]) = 0
-        if ([i] < [n])
+            return `(op (value as ref) args...)
+    ast-quote
+        loop (i) = 0
+        if (i < n)
             op
-                (getelementptr [value] [i]) as ref
-                [ args... ]
-            repeat ([i] + 1)
+                (getelementptr value i) as ref
+                args...
+            repeat (i + 1)
 
 #inline pointer-each (n op value args...)
     let n = (imply n usize)

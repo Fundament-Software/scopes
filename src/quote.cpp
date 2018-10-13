@@ -109,9 +109,7 @@ struct Quoter {
     SCOPES_RESULT(Value *) quote_Loop(Loop *node) {
         SCOPES_RESULT_TYPE(Value *);
         auto _anchor = node->anchor();
-        auto value = Call::from(_anchor, g_sc_loop_new, {
-            SCOPES_GET_RESULT(quote(node->value))
-        });
+        auto value = Call::from(_anchor, g_sc_loop_new, {});
         auto expr = Expression::unscoped_from(_anchor);
         for (auto &&param : node->params) {
             expr->append(Call::from(_anchor, g_sc_loop_append_parameter,
@@ -121,6 +119,8 @@ struct Quoter {
             expr->append(Call::from(_anchor, g_sc_loop_append_argument,
                 { value, SCOPES_GET_RESULT(quote(arg)) }));
         }
+        expr->append(Call::from(_anchor, g_sc_loop_set_body, { value,
+            SCOPES_GET_RESULT(quote(node->value)) }));
         expr->append(value);
         return canonicalize(expr);
     }

@@ -212,9 +212,10 @@ void sc_call_append_argument(sc_value_t *call, sc_value_t *value);
 bool sc_call_is_rawcall(sc_value_t *value);
 void sc_call_set_rawcall(sc_value_t *value, bool enable);
 
-sc_value_t *sc_loop_new(sc_value_t *body);
+sc_value_t *sc_loop_new();
 void sc_loop_append_parameter(sc_value_t *loop, sc_value_t *symbol);
 void sc_loop_append_argument(sc_value_t *loop, sc_value_t *value);
+void sc_loop_set_body(sc_value_t *loop, sc_value_t *body);
 
 sc_value_t *sc_const_int_new(const sc_type_t *type, uint64_t value);
 sc_value_t *sc_const_real_new(const sc_type_t *type, double value);

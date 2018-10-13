@@ -810,7 +810,7 @@ struct Expander {
 
         it = it->next;
 
-        Expander subexpr(Scope::from(env), astscope);
+        Expander subexpr(env, astscope);
         auto expr = SCOPES_GET_RESULT(subexpr.expand_expression(_anchor, it));
         if (isa<Expression>(expr)) {
             auto ex = cast<Expression>(expr);
