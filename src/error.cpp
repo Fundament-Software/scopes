@@ -9,6 +9,7 @@
 #include "type.hpp"
 #include "boot.hpp"
 #include "value.hpp"
+#include "stream_ast.hpp"
 #include "arguments_type.hpp"
 #include "dyn_cast.inc"
 
@@ -293,6 +294,18 @@ SCOPES_RESULT(void) error_cannot_find_frame(Template *func) {
     print_definition_anchor(func->scope);
     StyledString ss;
     ss.out << "couldn't find frame for scope of function";
+    SCOPES_LOCATION_ERROR(ss.str());
+}
+
+SCOPES_RESULT(void) error_value_inaccessible_from_closure(Value *value,
+    const Function *frame) {
+    SCOPES_RESULT_TYPE(void);
+    print_definition_anchor(value);
+    if (frame)
+        print_definition_anchor(const_cast<Function *>(frame));
+    StyledString ss;
+    ss.out << "non-constant value of type " << value->get_type()
+        << " is inaccessible from function";
     SCOPES_LOCATION_ERROR(ss.str());
 }
 

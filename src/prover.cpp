@@ -1663,7 +1663,7 @@ static SCOPES_RESULT(Value *) prove_Call(const ASTContext &ctx, Call *call) {
 static SCOPES_RESULT(Value *) prove_Parameter(const ASTContext &ctx, Parameter *sym) {
     SCOPES_RESULT_TYPE(Value *);
     assert(ctx.frame);
-    auto value = ctx.frame->resolve(sym);
+    auto value = SCOPES_GET_RESULT(ctx.frame->resolve(sym));
     if (!value) {
         SCOPES_EXPECT_ERROR(error_unbound_symbol(sym));
     }
@@ -1827,7 +1827,7 @@ static SCOPES_RESULT(Label *) prove_Label(const ASTContext &ctx, Label *value) {
 SCOPES_RESULT(Value *) prove(const ASTContext &ctx, Value *node) {
     SCOPES_RESULT_TYPE(Value *);
     assert(node);
-    Value *result = ctx.frame->resolve(node);
+    Value *result = SCOPES_GET_RESULT(ctx.frame->resolve(node));
     if (!result) {
         if (node->is_typed()) {
             result = node;

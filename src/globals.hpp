@@ -72,6 +72,9 @@ namespace scopes {
     T(g_sc_argument_list_append, "sc_argument_list_append") \
     T(g_sc_extract_argument_new, "sc_extract_argument_new") \
     T(g_sc_extract_argument_list_new, "sc_extract_argument_list_new") \
+    T(g_sc_quote_new, "sc_quote_new") \
+    T(g_sc_unquote_new, "sc_unquote_new") \
+
 
 struct Value;
 #define T(NAME, STR) \

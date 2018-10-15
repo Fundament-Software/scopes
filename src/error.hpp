@@ -81,6 +81,7 @@ void location_message(const Anchor *anchor, const String* str);
 struct Value;
 struct Parameter;
 struct Template;
+struct Function;
 
 void print_definition_anchor(Value *node);
 
@@ -104,6 +105,7 @@ SCOPES_RESULT(void) error_illegal_break_outside_loop();
 SCOPES_RESULT(void) error_variadic_symbol_not_in_last_place();
 SCOPES_RESULT(void) error_untyped_recursive_call();
 SCOPES_RESULT(void) error_cannot_find_frame(Template *func);
+SCOPES_RESULT(void) error_value_inaccessible_from_closure(Value *value, const Function *frame);
 
 // code generator errors
 SCOPES_RESULT(void) error_gen_invalid_call_type(const char *target, Value *callee);

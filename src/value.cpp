@@ -143,7 +143,7 @@ Value *Function::resolve_local(Value *node) const {
     return it->second;
 }
 
-Value *Function::resolve(Value *node) const {
+Value *Function::unsafe_resolve(Value *node) const {
     auto fn = this;
     while (fn) {
         auto val = fn->resolve_local(node);
@@ -152,6 +152,28 @@ Value *Function::resolve(Value *node) const {
     }
     return nullptr;
 }
+
+SCOPES_RESULT(Value *) Function::resolve(Value *node) const {
+    SCOPES_RESULT_TYPE(Value *)
+    auto fn = this;
+    const Function *border = nullptr;
+    while (fn) {
+        auto val = fn->resolve_local(node);
+        if (val) {
+            if (border && !val->is_accessible()) {
+                SCOPES_EXPECT_ERROR(
+                    error_value_inaccessible_from_closure(val, border));
+            }
+            return val;
+        }
+        if (fn->original && !fn->original->is_inline()) {
+            border = fn;
+        }
+        fn = fn->frame;
+    }
+    return nullptr;
+}
+
 
 Function *Function::find_frame(Template *scope) {
     Function *frame = this;
@@ -628,6 +650,22 @@ bool Value::is_pure() const {
         for (auto val : al->values) {
             assert(val);
             if (!val->is_pure())
+                return false;
+        }
+        return true;
+    } break;
+    default: break;
+    }
+    return isa<Pure>(this);
+}
+
+bool Value::is_accessible() const {
+    switch(kind()) {
+    case VK_ArgumentList: {
+        auto al = cast<ArgumentList>(this);
+        for (auto val : al->values) {
+            assert(val);
+            if (!val->is_accessible())
                 return false;
         }
         return true;

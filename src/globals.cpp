@@ -1083,6 +1083,16 @@ sc_value_t *sc_raise_new(sc_value_t *value) {
     return Raise::from(get_active_anchor(), value);
 }
 
+sc_value_t *sc_quote_new(sc_value_t *value) {
+    using namespace scopes;
+    return Quote::from(get_active_anchor(), value);
+}
+
+sc_value_t *sc_unquote_new(sc_value_t *value) {
+    using namespace scopes;
+    return Unquote::from(get_active_anchor(), value);
+}
+
 // Parser
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -1649,6 +1659,9 @@ void init_globals(int argc, char *argv[]) {
 
     DEFINE_EXTERN_C_FUNCTION(sc_return_new, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_raise_new, TYPE_Value, TYPE_Value);
+
+    DEFINE_EXTERN_C_FUNCTION(sc_quote_new, TYPE_Value, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_unquote_new, TYPE_Value, TYPE_Value);
 
     DEFINE_EXTERN_C_FUNCTION(sc_is_file, TYPE_Bool, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_is_directory, TYPE_Bool, TYPE_String);

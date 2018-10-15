@@ -232,41 +232,6 @@ let typify =
 
 compile-stage;
 
-#do
-    fn write_something (text)
-        sc_write text
-        sc_write "\n"
-
-    fn test ()
-        let expr = `(sc_string_join "hello world!" "\n")
-        ast-quote
-            fn write_something2 ()
-                sc_write [ expr ]
-                sc_write "\n"
-
-            sc_write
-                sc_string_join [ "hello world!" "\n" ]
-            sc_write "\n"
-            let x = (add 1 2)
-            let y = [
-                \ do
-                    dump-ast x;
-                    x
-            ]
-            write_something [ expr ]
-            write_something2;
-
-    dump-ast
-        typify test
-
-    sc_write
-        sc_value_ast_repr
-            test;
-
-    if true
-        sc_exit 0
-#compile-stage;
-
 let function->ASTMacro =
     typify
         fn "function->ASTMacro" (f)
@@ -300,19 +265,13 @@ let va-lfold va-lifold =
             if (icmp<s i argcount)
                 let arg =
                     sc_getarg args i
-                let callargs = (sc_call_new f)
-                # optional index
-                if use-indices
-                    sc_call_append_argument callargs (box-integer (sub i 2))
                 let k = (sc_type_key (sc_value_type arg))
                 let v = (sc_keyed_new unnamed arg)
-                # key
-                sc_call_append_argument callargs (box-symbol k)
-                # value
-                sc_call_append_argument callargs v
-                # append previous result
-                sc_call_append_argument callargs ret
-                repeat (add i 1) callargs
+                repeat (add i 1)
+                    if use-indices
+                        `(f [(sub i 2)] k v ret)
+                    else
+                        `(f k v ret)
             ret
         _
             ast-macro (fn "va-lfold" (args) (va-lfold args false))
@@ -334,95 +293,21 @@ let va-rfold va-rifold =
                 let i = (sub i 1)
                 let arg =
                     sc_getarg args i
-                let callargs = (sc_call_new f)
-                # optional index
-                if use-indices
-                    sc_call_append_argument callargs (box-integer (sub i 2))
                 let k = (sc_type_key (sc_value_type arg))
                 let v = (sc_keyed_new unnamed arg)
-                # key
-                sc_call_append_argument callargs (box-symbol k)
-                # value
-                sc_call_append_argument callargs v
-                # append previous result
-                sc_call_append_argument callargs ret
-                repeat i callargs
+                repeat i
+                    if use-indices
+                        `(f [(sub i 2)] k v ret)
+                    else
+                        `(f k v ret)
             ret
         _
             ast-macro (fn "va-rfold" (args) (va-rfold args false))
             ast-macro (fn "va-rifold" (args) (va-rfold args true))
 
-let raises-compile-error =
-    ast-macro
-        # add a non-executing branch to the function that causes it to be
-            annotated with an exception type
-        fn "raises-compile-error" (args)
-            verify-count (sc_argcount args) 0 0
-            let branch = (sc_if_new)
-            let callargs = (sc_call_new (box-pointer compiler-error!))
-            sc_call_append_argument callargs (box-pointer "hidden")
-            sc_if_append_then_clause branch (box-integer false) callargs
-            sc_if_append_else_clause branch (box-empty)
-            branch
-
-# generate alloca instruction for multiple Values
-#let Value-array =
-    ast-macro
-        fn "Value-array" (args)
-            let argc = (sc_argcount args)
-            verify-count argc 0 -1
-            let retargs = (sc_argument_list_new)
-            let boxed-argc = (box-integer argc)
-            if (icmp== argc 0)
-                sc_argument_list_append retargs boxed-argc
-                sc_argument_list_append retargs (box-pointer (nullof ValueArrayPointer))
-                retargs
-            else
-                # ensure that the return signature is correct
-                let instr = (sc_expression_new)
-                let arr = (sc_call_new (box-symbol alloca-array))
-                sc_call_append_argument arr (box-pointer Value)
-                sc_call_append_argument arr boxed-argc
-                sc_expression_append instr arr
-                loop (i) = 0
-                if (icmp<s i argc)
-                    let gepargs = (sc_call_new (box-symbol getelementptr))
-                    sc_call_append_argument gepargs arr
-                    sc_call_append_argument gepargs (box-integer i)
-                    let storeargs = (sc_call_new (box-symbol store))
-                    let arg = (load (getelementptr argv i))
-                    sc_call_append_argument storeargs
-                        if (ptrcmp!= (sc_value_type arg) Value)
-                            let callargs = (sc_call_new (box-pointer Value))
-                            sc_call_append_argument callargs arg
-                            callargs
-                        else arg
-                    sc_call_append_argument storeargs gepargs
-                    sc_expression_append instr storeargs
-                    repeat (add i 1)
-                sc_argument_list_append retargs boxed-argc
-                sc_argument_list_append retargs arr
-                sc_expression_append instr retargs
-                instr
-
-# unpack
-#let loadarrayptrs =
-    ast-macro
-        fn "unpack-array" (args)
-            let argc = (sc_argcount args)
-            verify-count argc 2 -1
-            let src = (sc_getarg args 0)
-            let instr = (sc_argument_list_new)
-            loop (i) = 1
-            if (icmp<s i argc)
-                let gepargs = (sc_call_new (box-symbol getelementptr))
-                sc_call_append_argument gepargs src
-                sc_call_append_argument gepargs (sc_getarg args i)
-                let loadargs = (sc_call_new (box-symbol load))
-                sc_call_append_argument loadargs gepargs
-                sc_argument_list_append instr loadargs
-                repeat (add i 1)
-            instr
+inline raises-compile-error ()
+    if false
+        compiler-error! "hidden"
 
 fn type< (T superT)
     loop (T) = T
@@ -466,9 +351,7 @@ sc_type_set_symbol type '__call
             let T = (unbox-pointer self type)
             let ok f = (sc_type_at T '__typecall)
             if ok
-                let expr = (sc_call_new f)
-                sc_call_append_argument expr args
-                return expr
+                return `(f args)
             compiler-error!
                 sc_string_join "no type constructor available for type "
                     sc_value_repr self
@@ -500,10 +383,8 @@ sc_type_set_symbol Symbol '__call
             verify-count argcount 2 -1
             let symval = (sc_getarg args 0)
             let self = (sc_getarg args 1)
-            let expr =
-                sc_call_new
-                    resolve-method self symval
-            sc_call_append_argument expr (sc_extract_argument_list_new args 1)
+            let expr = `([(resolve-method self symval)]
+                [(sc_extract_argument_list_new args 1)])
             expr
 
 inline gen-key-any-set (selftype fset)
@@ -528,7 +409,7 @@ inline gen-key-any-set (selftype fset)
                         let self = (unbox-pointer self selftype)
                         let key = (unbox-symbol key Symbol)
                         fset self key value
-                        return (box-empty)
+                        return `[]
             `(fset self key value)
 
 # quick assignment of type attributes

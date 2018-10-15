@@ -94,6 +94,7 @@ struct Value {
     const Type *get_type() const;
     void change_type(const Type *type);
     bool is_pure() const;
+    bool is_accessible() const;
 private:
     const ValueKind _kind;
     const Type *_type;
@@ -406,8 +407,9 @@ struct Function : Pure {
     ArgTypes instance_args;
     Function *find_frame(Template *scope);
     void bind(Value *oldnode, Value *newnode);
-    Value *resolve(Value *node) const;
+    Value *unsafe_resolve(Value *node) const;
     Value *resolve_local(Value *node) const;
+    SCOPES_RESULT(Value *) resolve(Value *node) const;
     std::unordered_map<Value *, Value *> map;
 };
 

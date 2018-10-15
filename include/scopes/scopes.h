@@ -232,6 +232,9 @@ void sc_repeat_append_argument(sc_value_t *rep, sc_value_t *value);
 sc_value_t *sc_return_new(sc_value_t *value);
 sc_value_t *sc_raise_new(sc_value_t *value);
 
+sc_value_t *sc_quote_new(sc_value_t *value);
+sc_value_t *sc_unquote_new(sc_value_t *value);
+
 // parsing
 
 sc_value_raises_t sc_parse_from_path(const sc_string_t *path);

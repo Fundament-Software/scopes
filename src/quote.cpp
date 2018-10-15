@@ -40,7 +40,7 @@ struct Quoter {
         return expr;
     }
 
-    SCOPES_RESULT(Value *) quote_Expression(Expression *node) {
+    SCOPES_RESULT(Value *) quote_Expression(int level, Expression *node) {
         SCOPES_RESULT_TYPE(Value *);
         auto _anchor = node->anchor();
         auto value = Call::from(_anchor, g_sc_expression_new, {});
@@ -50,15 +50,15 @@ struct Quoter {
         }
         for (auto &&instr : node->body) {
             expr->append(Call::from(_anchor, g_sc_expression_append,
-                { value, SCOPES_GET_RESULT(quote(instr)) }));
+                { value, SCOPES_GET_RESULT(quote(level, instr)) }));
         }
         expr->append(Call::from(_anchor, g_sc_expression_append,
-            { value, SCOPES_GET_RESULT(quote(node->value)) }));
+            { value, SCOPES_GET_RESULT(quote(level, node->value)) }));
         expr->append(value);
         return canonicalize(expr);
     }
 
-    SCOPES_RESULT(Value *) quote_ArgumentList(ArgumentList *node) {
+    SCOPES_RESULT(Value *) quote_ArgumentList(int level, ArgumentList *node) {
         SCOPES_RESULT_TYPE(Value *);
         auto _anchor = node->anchor();
         auto value = Call::from(_anchor, g_sc_argument_list_new, {});
@@ -66,22 +66,22 @@ struct Quoter {
         int count = (int)node->values.size();
         for (int i = 0; i < count; ++i) {
             expr->append(Call::from(_anchor, g_sc_argument_list_append,
-                { value, SCOPES_GET_RESULT(quote(node->values[i])) }));
+                { value, SCOPES_GET_RESULT(quote(level, node->values[i])) }));
         }
         expr->append(value);
         return canonicalize(expr);
     }
 
-    SCOPES_RESULT(Value *) quote_ExtractArgument(ExtractArgument *node) {
+    SCOPES_RESULT(Value *) quote_ExtractArgument(int level, ExtractArgument *node) {
         SCOPES_RESULT_TYPE(Value *);
         auto _anchor = node->anchor();
         if (node->vararg) {
             return Call::from(_anchor, g_sc_extract_argument_list_new, {
-                    SCOPES_GET_RESULT(quote(node->value)),
+                    SCOPES_GET_RESULT(quote(level, node->value)),
                     ConstInt::from(_anchor, TYPE_I32, node->index) });
         } else {
             return Call::from(_anchor, g_sc_extract_argument_new, {
-                    SCOPES_GET_RESULT(quote(node->value)),
+                    SCOPES_GET_RESULT(quote(level, node->value)),
                     ConstInt::from(_anchor, TYPE_I32, node->index) });
         }
     }
@@ -96,17 +96,17 @@ struct Quoter {
         return typednewparam;
     }
 
-    SCOPES_RESULT(Value *) quote_Try(Try *node) {
+    SCOPES_RESULT(Value *) quote_Try(int level, Try *node) {
         SCOPES_RESULT_TYPE(Value *);
         auto _anchor = node->anchor();
         return Call::from(_anchor, g_sc_try_new, {
-            SCOPES_GET_RESULT(quote(node->try_value)),
+            SCOPES_GET_RESULT(quote(level, node->try_value)),
             SCOPES_GET_RESULT(quote_param(node->except_param)),
-            SCOPES_GET_RESULT(quote(node->except_value))
+            SCOPES_GET_RESULT(quote(level, node->except_value))
         });
     }
 
-    SCOPES_RESULT(Value *) quote_Loop(Loop *node) {
+    SCOPES_RESULT(Value *) quote_Loop(int level, Loop *node) {
         SCOPES_RESULT_TYPE(Value *);
         auto _anchor = node->anchor();
         auto value = Call::from(_anchor, g_sc_loop_new, {});
@@ -117,16 +117,16 @@ struct Quoter {
         }
         for (auto &&arg : node->args) {
             expr->append(Call::from(_anchor, g_sc_loop_append_argument,
-                { value, SCOPES_GET_RESULT(quote(arg)) }));
+                { value, SCOPES_GET_RESULT(quote(level, arg)) }));
         }
         expr->append(Call::from(_anchor, g_sc_loop_set_body, { value,
-            SCOPES_GET_RESULT(quote(node->value)) }));
+            SCOPES_GET_RESULT(quote(level, node->value)) }));
         expr->append(value);
         return canonicalize(expr);
     }
 
     #define CONST_QUOTER(NAME) \
-        SCOPES_RESULT(Value *) quote_ ## NAME(NAME *node) { \
+        SCOPES_RESULT(Value *) quote_ ## NAME(int level, NAME *node) { \
             return ConstPointer::ast_from(node->anchor(), node); \
         } \
 
@@ -137,15 +137,15 @@ struct Quoter {
     CONST_QUOTER(Extern)
     CONST_QUOTER(Function)
 
-    SCOPES_RESULT(Value *) quote_Break(Break *node) {
+    SCOPES_RESULT(Value *) quote_Break(int level, Break *node) {
         SCOPES_RESULT_TYPE(Value *);
         auto _anchor = node->anchor();
         return Call::from(_anchor, g_sc_break_new, {
-            SCOPES_GET_RESULT(quote(node->value))
+            SCOPES_GET_RESULT(quote(level, node->value))
         });
     }
 
-    SCOPES_RESULT(Value *) quote_Repeat(Repeat *node) {
+    SCOPES_RESULT(Value *) quote_Repeat(int level, Repeat *node) {
         SCOPES_RESULT_TYPE(Value *);
         auto _anchor = node->anchor();
         auto value = Call::from(_anchor, g_sc_repeat_new, {});
@@ -153,46 +153,46 @@ struct Quoter {
         int count = (int)node->args.size();
         for (int i = 0; i < count; ++i) {
             expr->append(Call::from(_anchor, g_sc_repeat_append_argument,
-                { value, SCOPES_GET_RESULT(quote(node->args[i])) }));
+                { value, SCOPES_GET_RESULT(quote(level, node->args[i])) }));
         }
         expr->append(value);
         return canonicalize(expr);
     }
 
-    SCOPES_RESULT(Value *) quote_Return(Return *node) {
+    SCOPES_RESULT(Value *) quote_Return(int level, Return *node) {
         SCOPES_RESULT_TYPE(Value *);
         auto _anchor = node->anchor();
         return Call::from(_anchor, g_sc_return_new, {
-            SCOPES_GET_RESULT(quote(node->value))
+            SCOPES_GET_RESULT(quote(level, node->value))
         });
     }
 
-    SCOPES_RESULT(Value *) quote_Raise(Raise *node) {
+    SCOPES_RESULT(Value *) quote_Raise(int level, Raise *node) {
         SCOPES_RESULT_TYPE(Value *);
         auto _anchor = node->anchor();
         return Call::from(_anchor, g_sc_raise_new, {
-            SCOPES_GET_RESULT(quote(node->value))
+            SCOPES_GET_RESULT(quote(level, node->value))
         });
     }
 
-    SCOPES_RESULT(Value *) quote_CompileStage(CompileStage *node) {
+    SCOPES_RESULT(Value *) quote_CompileStage(int level, CompileStage *node) {
         SCOPES_RESULT_TYPE(Value *);
         SCOPES_LOCATION_ERROR(String::from("cannot quote compile stage"));
     }
 
-    SCOPES_RESULT(Value *) quote_Keyed(Keyed *node) {
+    SCOPES_RESULT(Value *) quote_Keyed(int level, Keyed *node) {
         SCOPES_RESULT_TYPE(Value *);
-        auto value = SCOPES_GET_RESULT(quote(node->value));
+        auto value = SCOPES_GET_RESULT(quote(level, node->value));
         auto _anchor = node->anchor();
         return Call::from(_anchor, g_sc_keyed_new,
             { ConstInt::symbol_from(_anchor, node->key), value });
     }
 
-    SCOPES_RESULT(Value *) quote_Call(Call *node) {
+    SCOPES_RESULT(Value *) quote_Call(int level, Call *node) {
         SCOPES_RESULT_TYPE(Value *);
         auto _anchor = node->anchor();
         auto value = Call::from(_anchor, g_sc_call_new, {
-            SCOPES_GET_RESULT(quote(node->callee))
+            SCOPES_GET_RESULT(quote(level, node->callee))
         });
         auto expr = Expression::unscoped_from(_anchor);
         if (node->is_rawcall()) {
@@ -201,13 +201,13 @@ struct Quoter {
         }
         for (auto &&arg : node->args) {
             expr->append(Call::from(_anchor, g_sc_call_append_argument,
-                { value, SCOPES_GET_RESULT(quote(arg)) }));
+                { value, SCOPES_GET_RESULT(quote(level, arg)) }));
         }
         expr->append(value);
         return canonicalize(expr);
     }
 
-    SCOPES_RESULT(Value *) quote_Parameter(Parameter *sym) {
+    SCOPES_RESULT(Value *) quote_Parameter(int level, Parameter *sym) {
         SCOPES_RESULT_TYPE(Value *);
         auto value = resolve(sym);
         if (!value) {
@@ -216,28 +216,28 @@ struct Quoter {
         return value;
     }
 
-    SCOPES_RESULT(Value *) quote_Switch(Switch *node) {
+    SCOPES_RESULT(Value *) quote_Switch(int level, Switch *node) {
         SCOPES_RESULT_TYPE(Value *);
         auto _anchor = node->anchor();
         auto value = Call::from(_anchor, g_sc_switch_new, {
-            SCOPES_GET_RESULT(quote(node->expr))
+            SCOPES_GET_RESULT(quote(level, node->expr))
         });
         auto expr = Expression::unscoped_from(_anchor);
         for (auto &&_case : node->cases) {
             switch(_case.kind) {
             case CK_Case: {
                 expr->append(Call::from(_anchor, g_sc_switch_append_case, { value,
-                    SCOPES_GET_RESULT(quote(_case.literal)),
-                    SCOPES_GET_RESULT(quote(_case.value)) }));
+                    SCOPES_GET_RESULT(quote(level, _case.literal)),
+                    SCOPES_GET_RESULT(quote(level, _case.value)) }));
             } break;
             case CK_Pass: {
                 expr->append(Call::from(_anchor, g_sc_switch_append_pass, { value,
-                    SCOPES_GET_RESULT(quote(_case.literal)),
-                    SCOPES_GET_RESULT(quote(_case.value)) }));
+                    SCOPES_GET_RESULT(quote(level, _case.literal)),
+                    SCOPES_GET_RESULT(quote(level, _case.value)) }));
             } break;
             case CK_Default: {
                 expr->append(Call::from(_anchor, g_sc_switch_append_default, { value,
-                    SCOPES_GET_RESULT(quote(_case.value)) }));
+                    SCOPES_GET_RESULT(quote(level, _case.value)) }));
             } break;
             default: assert(false);
             }
@@ -246,23 +246,23 @@ struct Quoter {
         return canonicalize(expr);
     }
 
-    SCOPES_RESULT(Value *) quote_If(If *node) {
+    SCOPES_RESULT(Value *) quote_If(int level, If *node) {
         SCOPES_RESULT_TYPE(Value *);
         auto _anchor = node->anchor();
         auto value = Call::from(_anchor, g_sc_if_new, {});
         auto expr = Expression::unscoped_from(_anchor);
         for (auto &&clause : node->clauses) {
             expr->append(Call::from(_anchor, g_sc_if_append_then_clause, { value,
-                SCOPES_GET_RESULT(quote(clause.cond)),
-                SCOPES_GET_RESULT(quote(clause.value)) }));
+                SCOPES_GET_RESULT(quote(level, clause.cond)),
+                SCOPES_GET_RESULT(quote(level, clause.value)) }));
         }
         expr->append(Call::from(_anchor, g_sc_if_append_else_clause, { value,
-            SCOPES_GET_RESULT(quote(node->else_clause.value)) }));
+            SCOPES_GET_RESULT(quote(level, node->else_clause.value)) }));
         expr->append(value);
         return canonicalize(expr);
     }
 
-    SCOPES_RESULT(Value *) quote_Template(Template *node) {
+    SCOPES_RESULT(Value *) quote_Template(int level, Template *node) {
         SCOPES_RESULT_TYPE(Value *);
         auto _anchor = node->anchor();
         auto value = Call::from(_anchor, g_sc_template_new,
@@ -277,14 +277,16 @@ struct Quoter {
             }));
         }
         expr->append(Call::from(_anchor, g_sc_template_set_body, { value,
-            SCOPES_GET_RESULT(quote(node->value)) }));
+            SCOPES_GET_RESULT(quote(level, node->value)) }));
         expr->append(value);
         return canonicalize(expr);
     }
 
-    SCOPES_RESULT(Value *) quote_Quote(Quote *node) {
+    SCOPES_RESULT(Value *) quote_Quote(int level, Quote *node) {
         SCOPES_RESULT_TYPE(Value *);
-        SCOPES_LOCATION_ERROR(String::from("cannot quote inside a quote"));
+        auto _anchor = node->anchor();
+        return Call::from(_anchor, g_sc_quote_new,
+            { SCOPES_GET_RESULT(quote(level+1, node->value)) });
     }
 
     Value *quote_typed(Value *node) {
@@ -299,41 +301,48 @@ struct Quoter {
         }
     }
 
-    SCOPES_RESULT(Value *) quote_Unquote(Unquote *node) {
+    SCOPES_RESULT(Value *) quote_Unquote(int level, Unquote *node) {
         SCOPES_RESULT_TYPE(Value *);
         SCOPES_ANCHOR(node->anchor());
-        auto subctx = ctx.with_symbol_target();
-        auto value = SCOPES_GET_RESULT(prove(subctx, node->value));
-        auto T = value->get_type();
-        if (is_arguments_type(T)) {
-            auto at = cast<ArgumentsType>(T);
-            auto _anchor = node->anchor();
-            auto result = Call::from(_anchor, g_sc_argument_list_new, {});
-            auto expr = Expression::unscoped_from(_anchor);
-            int count = (int)at->values.size();
-            for (int i = 0; i < count; ++i) {
-                expr->append(Call::from(_anchor, g_sc_argument_list_append,
-                    { result, quote_typed(
-                    extract_argument(subctx, value, i)) }));
+        assert(level >= 0);
+        if (!level) {
+            auto subctx = ctx.with_symbol_target();
+            auto value = SCOPES_GET_RESULT(prove(subctx, node->value));
+            auto T = value->get_type();
+            if (is_arguments_type(T)) {
+                auto at = cast<ArgumentsType>(T);
+                auto _anchor = node->anchor();
+                auto result = Call::from(_anchor, g_sc_argument_list_new, {});
+                auto expr = Expression::unscoped_from(_anchor);
+                int count = (int)at->values.size();
+                for (int i = 0; i < count; ++i) {
+                    expr->append(Call::from(_anchor, g_sc_argument_list_append,
+                        { result, quote_typed(
+                        extract_argument(subctx, value, i)) }));
+                }
+                expr->append(result);
+                return canonicalize(expr);
+            } else {
+                return quote_typed(value);
             }
-            expr->append(result);
-            return canonicalize(expr);
         } else {
-            return quote_typed(value);
+            auto _anchor = node->anchor();
+            return Call::from(_anchor, g_sc_unquote_new,
+                { SCOPES_GET_RESULT(quote(level-1, node->value)) });
         }
     }
 
-    SCOPES_RESULT(Value *) quote_Merge(Merge *node) {
+    SCOPES_RESULT(Value *) quote_Merge(int level, Merge *node) {
         SCOPES_RESULT_TYPE(Value *);
         SCOPES_LOCATION_ERROR(String::from("cannot quote merge"));
     }
 
-    SCOPES_RESULT(Value *) quote_Label(Label *node) {
+    SCOPES_RESULT(Value *) quote_Label(int level, Label *node) {
         SCOPES_RESULT_TYPE(Value *);
         SCOPES_LOCATION_ERROR(String::from("cannot quote label"));
     }
 
-    SCOPES_RESULT(Value *) quote_new_node(Value *node) {
+    SCOPES_RESULT(Value *) quote_new_node(int level, Value *node) {
         SCOPES_RESULT_TYPE(Value *);
         assert(node);
         Value *result = nullptr;
@@ -345,7 +354,7 @@ struct Quoter {
             //SCOPES_CHECK_RESULT(verify_stack());
             switch(node->kind()) {
     #define T(NAME, BNAME, CLASS) \
-            case NAME: result = SCOPES_GET_RESULT(quote_ ## CLASS(cast<CLASS>(node))); break;
+            case NAME: result = SCOPES_GET_RESULT(quote_ ## CLASS(level, cast<CLASS>(node))); break;
             SCOPES_VALUE_KIND()
     #undef T
             default: assert(false);
@@ -355,12 +364,12 @@ struct Quoter {
         return result;
     }
 
-    SCOPES_RESULT(Value *) quote(Value *node) {
+    SCOPES_RESULT(Value *) quote(int level, Value *node) {
         SCOPES_RESULT_TYPE(Value *);
         assert(node);
         assert(ctx.frame);
         // check if node is already typed
-        Value *result = ctx.frame->resolve(node);
+        Value *result = SCOPES_GET_RESULT(ctx.frame->resolve(node));
         if (result) {
             assert(result->is_typed());
             // check if we have an existing wrap for the node
@@ -376,7 +385,7 @@ struct Quoter {
         result = resolve(node);
         if (!result) {
             // node is untyped or unbound yet
-            result = SCOPES_GET_RESULT(quote_new_node(node));
+            result = SCOPES_GET_RESULT(quote_new_node(level, node));
             if (!result->is_typed()) {
                 // type node
                 result = SCOPES_GET_RESULT(prove(ctx, result));
@@ -612,7 +621,7 @@ Value *wrap_value(const Type *T, Value *value) {
 }
 
 SCOPES_RESULT(Value *) quote(const ASTContext &ctx, Value *node) {
-    return Quoter(ctx).quote(node);
+    return Quoter(ctx).quote(0, node);
 }
 
 //------------------------------------------------------------------------------

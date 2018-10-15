@@ -1,5 +1,17 @@
 
-let x = 5
-print
+spice test ()
+    spice kwok ()
+        ast-quote
+            1 + 2
+
     ast-quote
-        print [x]
+        fn ()
+            print
+                kwok;
+
+compile-stage;
+
+print
+    ((test))
+
+return;
