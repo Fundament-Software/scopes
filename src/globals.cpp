@@ -876,6 +876,14 @@ sc_value_t *sc_template_new(sc_symbol_t name) {
     // todo: set scope
     return Template::from(get_active_anchor(), name);
 }
+void sc_template_set_name(sc_value_t *fn, sc_symbol_t name) {
+    using namespace scopes;
+    cast<Template>(fn)->name = name;
+}
+sc_symbol_t sc_template_get_name(sc_value_t *fn) {
+    using namespace scopes;
+    return cast<Template>(fn)->name;
+}
 void sc_template_append_parameter(sc_value_t *fn, sc_value_t *symbol) {
     using namespace scopes;
     cast<Template>(fn)->append_param(cast<Parameter>(symbol));
@@ -1611,6 +1619,8 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_getarg, TYPE_Value, TYPE_Value, TYPE_I32);
     DEFINE_EXTERN_C_FUNCTION(sc_getarglist, TYPE_Value, TYPE_Value, TYPE_I32);
     DEFINE_EXTERN_C_FUNCTION(sc_template_new, TYPE_Value, TYPE_Symbol);
+    DEFINE_EXTERN_C_FUNCTION(sc_template_set_name, _void, TYPE_Value, TYPE_Symbol);
+    DEFINE_EXTERN_C_FUNCTION(sc_template_get_name, TYPE_Symbol, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_template_append_parameter, _void, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_template_set_body, _void, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_template_set_inline, _void, TYPE_Value);

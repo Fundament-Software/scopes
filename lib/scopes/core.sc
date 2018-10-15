@@ -1831,14 +1831,15 @@ fn symbol-handler (topexpr env)
         return (cons expr next) env
     return topexpr env
 
+fn quasiquote-list
+inline quasiquote-any (ox)
+    let x = ox
+    let T = ('typeof x)
+    if (== T list)
+        quasiquote-list (as x list)
+    else
+        list syntax-quote ox
 fn quasiquote-list (x)
-    inline quasiquote-any (ox)
-        let x = ox
-        let T = ('typeof x)
-        if (== T list)
-            quasiquote-list (as x list)
-        else
-            list syntax-quote ox
     if (empty? x)
         return (list syntax-quote x)
     let aat next = ('decons x)
@@ -2039,10 +2040,13 @@ fn expand-define (expr)
         cons do content
 
 let
-    quasiquote =
+    qq =
         syntax-macro
             fn (args)
-                quasiquote-list args
+                if (== (countof args) 1)
+                    quasiquote-any ('@ args)
+                else
+                    quasiquote-list args
     # dot macro
     # (. value symbol ...)
     . =
@@ -3065,12 +3069,12 @@ let
 define spice
     inline half-wrap-ast-macro (f)
         fn (args)
-            return (Value (f args))
+            return `[(f args)]
 
     inline wrap-ast-macro (f)
         ast-macro
             fn (args)
-                return (Value (f args))
+                return `[(f args)]
 
     syntax-macro
         fn "expand-spice" (expr)
@@ -3099,27 +3103,33 @@ define spice
                             syntax-error! ('anchor paramv)
                                 "vararg parameter is not in last place"
                         cons
-                            list let paramv '=
-                                list sc_getarglist args i
+                            qq
+                                [let paramv] =
+                                    [sc_getarglist args i];
                             body
                     else
                         cons
-                            list let paramv '= (list sc_getarg args i)
+                            qq
+                                [let paramv] =
+                                    [sc_getarg args i];
                             body
                 repeat (i + 1) rest body (| varargs vararg?)
             let content =
                 cons (list args)
-                    list verify-count (list sc_argcount args)
-                        ? varargs (sub paramcount 1) paramcount
-                        ? varargs -1 paramcount
+                    qq
+                        [verify-count] ([sc_argcount args])
+                            [(? varargs (sub paramcount 1) paramcount)]
+                            [(? varargs -1 paramcount)]
                     body
             if (('typeof name) == Symbol)
-                list let name '=
-                    list wrap-ast-macro
-                        cons inline (name as Symbol as string) content
+                qq
+                    [let name] =
+                        [wrap-ast-macro]
+                            [(cons inline (name as Symbol as string) content)]
             else
-                list half-wrap-ast-macro
-                    cons inline name content
+                qq
+                    [half-wrap-ast-macro]
+                        [(cons inline name content)]
 
 compile-stage;
 

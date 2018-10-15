@@ -176,6 +176,8 @@ sc_value_t *sc_getarg(sc_value_t *value, int index);
 sc_value_t *sc_getarglist(sc_value_t *value, int index);
 
 sc_value_t *sc_template_new(sc_symbol_t name);
+void sc_template_set_name(sc_value_t *fn, sc_symbol_t name);
+sc_symbol_t sc_template_get_name(sc_value_t *fn);
 void sc_template_append_parameter(sc_value_t *fn, sc_value_t *symbol);
 void sc_template_set_body(sc_value_t *fn, sc_value_t *value);
 void sc_template_set_inline(sc_value_t *fn);

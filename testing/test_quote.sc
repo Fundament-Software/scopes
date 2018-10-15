@@ -4,16 +4,19 @@ spice kwok ()
         1 + 2
 
 spice test ()
+    dump kwok
     ast-quote
-        fn "demofunc" ()
-            print
-                kwok;
+        print
+            kwok;
 
 #let test = (typify test)
 
 compile-stage;
 
 print
-    ((test))
+    'ast-repr test
+
+#print
+    test;
 
 return;
