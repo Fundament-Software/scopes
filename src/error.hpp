@@ -104,7 +104,6 @@ SCOPES_RESULT(void) error_illegal_repeat_outside_loop();
 SCOPES_RESULT(void) error_illegal_break_outside_loop();
 SCOPES_RESULT(void) error_variadic_symbol_not_in_last_place();
 SCOPES_RESULT(void) error_untyped_recursive_call();
-SCOPES_RESULT(void) error_cannot_find_frame(Template *func);
 SCOPES_RESULT(void) error_value_inaccessible_from_closure(Value *value, const Function *frame);
 
 // code generator errors

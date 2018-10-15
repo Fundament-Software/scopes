@@ -208,9 +208,6 @@ struct Expander {
             return func;
         }
 
-        // not a forward declaration
-        func->scope = astscope;
-
         const List *params = SCOPES_GET_RESULT(extract_list_constant(it->at));
 
         it = it->next;
@@ -1108,7 +1105,6 @@ SCOPES_RESULT(Template *) expand_inline(const Anchor *anchor, Template *astscope
     assert(anchor);
     Template *mainfunc = Template::from(anchor, SYM_Unnamed);
     mainfunc->set_inline();
-    mainfunc->scope = astscope;
 
     Scope *subenv = scope?scope:sc_get_globals();
     Expander subexpr(subenv, astscope);

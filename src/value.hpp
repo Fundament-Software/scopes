@@ -199,7 +199,6 @@ struct Template : Value {
     Value *value;
     bool _inline;
     const String *docstring;
-    Template *scope;
 };
 
 //------------------------------------------------------------------------------
@@ -400,16 +399,16 @@ struct Function : Pure {
     const Type *return_type;
     const Type *except_type;
     Function *frame;
+    Function *boundary;
     Template *original;
     Label *label;
     bool complete;
 
     ArgTypes instance_args;
-    Function *find_frame(Template *scope);
     void bind(Value *oldnode, Value *newnode);
     Value *unsafe_resolve(Value *node) const;
     Value *resolve_local(Value *node) const;
-    SCOPES_RESULT(Value *) resolve(Value *node) const;
+    SCOPES_RESULT(Value *) resolve(Value *node, Function *boundary) const;
     std::unordered_map<Value *, Value *> map;
 };
 

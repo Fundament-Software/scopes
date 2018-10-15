@@ -236,13 +236,6 @@ struct StreamAST : StreamAnchors {
                         walk_same_or_newline(val->params[i], depth+1, maxdepth);
                     }
                     ss << Style_Operator << " )" << Style_None;
-                    if (val->scope) {
-                        stream_newline();
-                        stream_indent(depth+1);
-                        ss << "scope = ";
-                        ss << Style_Symbol << val->scope->name.name()->data
-                            << "λ" << (void *)val->scope << Style_None;
-                    }
                     if (val->value) {
                         walk_newline(val->value, depth+1, maxdepth);
                     }

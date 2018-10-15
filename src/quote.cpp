@@ -369,7 +369,7 @@ struct Quoter {
         assert(node);
         assert(ctx.frame);
         // check if node is already typed
-        Value *result = SCOPES_GET_RESULT(ctx.frame->resolve(node));
+        Value *result = SCOPES_GET_RESULT(ctx.frame->resolve(node, ctx.function));
         if (result) {
             assert(result->is_typed());
             // check if we have an existing wrap for the node

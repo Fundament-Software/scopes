@@ -1663,7 +1663,7 @@ static SCOPES_RESULT(Value *) prove_Call(const ASTContext &ctx, Call *call) {
 static SCOPES_RESULT(Value *) prove_Parameter(const ASTContext &ctx, Parameter *sym) {
     SCOPES_RESULT_TYPE(Value *);
     assert(ctx.frame);
-    auto value = SCOPES_GET_RESULT(ctx.frame->resolve(sym));
+    auto value = SCOPES_GET_RESULT(ctx.frame->resolve(sym, ctx.function));
     if (!value) {
         SCOPES_EXPECT_ERROR(error_unbound_symbol(sym));
     }
@@ -1784,15 +1784,8 @@ finalize:
 
 static SCOPES_RESULT(Value *) prove_Template(const ASTContext &ctx, Template *_template) {
     SCOPES_RESULT_TYPE(Value *);
-    Function *frame = nullptr;
-    if (_template->scope) {
-        //assert(_template->scope);
-        frame = ctx.frame->find_frame(_template->scope);
-        if (!frame) {
-            SCOPES_ANCHOR(_template->anchor());
-            SCOPES_EXPECT_ERROR(error_cannot_find_frame(_template));
-        }
-    }
+    Function *frame = ctx.frame;
+    assert(frame);
     return ConstPointer::closure_from(_template->anchor(), Closure::from(_template, frame));
 }
 
@@ -1827,7 +1820,7 @@ static SCOPES_RESULT(Label *) prove_Label(const ASTContext &ctx, Label *value) {
 SCOPES_RESULT(Value *) prove(const ASTContext &ctx, Value *node) {
     SCOPES_RESULT_TYPE(Value *);
     assert(node);
-    Value *result = SCOPES_GET_RESULT(ctx.frame->resolve(node));
+    Value *result = SCOPES_GET_RESULT(ctx.frame->resolve(node, ctx.function));
     if (!result) {
         if (node->is_typed()) {
             result = node;
@@ -1900,6 +1893,7 @@ SCOPES_RESULT(Value *) prove_inline(const ASTContext &ctx,
     fn->frame = frame;
     Label *label = Label::from(func->anchor());
     fn->label = label;
+    fn->boundary = ctx.function;
 
     // inlines may escape caller loops
     ASTContext subctx = ctx.with_frame(fn);
@@ -1945,6 +1939,7 @@ SCOPES_RESULT(Function *) prove(Function *frame, Template *func, const ArgTypes 
     fn->original = func;
     fn->frame = frame;
     fn->instance_args = types;
+    fn->boundary = fn;
     for (int i = 0; i < count; ++i) {
         auto oldparam = func->params[i];
         if (oldparam->is_variadic()) {

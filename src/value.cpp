@@ -95,7 +95,7 @@ ExtractArgument *ExtractArgument::from(const Anchor *anchor, Value *value, int i
 Template::Template(const Anchor *anchor, Symbol _name, const Parameters &_params, Value *_value)
     : Value(VK_Template, anchor),
         name(_name), params(_params), value(_value),
-        _inline(false), docstring(nullptr), scope(nullptr) {
+        _inline(false), docstring(nullptr) {
 }
 
 bool Template::is_forward_decl() const {
@@ -126,7 +126,8 @@ Function::Function(const Anchor *anchor, Symbol _name, const Parameters &_params
     : Pure(VK_Function, anchor),
         name(_name), params(_params), value(nullptr),
         docstring(nullptr), return_type(nullptr), except_type(nullptr),
-        frame(nullptr), original(nullptr), label(nullptr), complete(false) {
+        frame(nullptr), boundary(nullptr), original(nullptr), label(nullptr),
+        complete(false) {
     set_type(TYPE_Unknown);
 }
 
@@ -153,34 +154,19 @@ Value *Function::unsafe_resolve(Value *node) const {
     return nullptr;
 }
 
-SCOPES_RESULT(Value *) Function::resolve(Value *node) const {
+SCOPES_RESULT(Value *) Function::resolve(Value *node, Function *_boundary) const {
     SCOPES_RESULT_TYPE(Value *)
     auto fn = this;
-    const Function *border = nullptr;
     while (fn) {
         auto val = fn->resolve_local(node);
         if (val) {
-            if (border && !val->is_accessible()) {
+            if ((fn->boundary != _boundary) && !val->is_accessible()) {
                 SCOPES_EXPECT_ERROR(
-                    error_value_inaccessible_from_closure(val, border));
+                    error_value_inaccessible_from_closure(val, _boundary));
             }
             return val;
         }
-        if (fn->original && !fn->original->is_inline()) {
-            border = fn;
-        }
         fn = fn->frame;
-    }
-    return nullptr;
-}
-
-
-Function *Function::find_frame(Template *scope) {
-    Function *frame = this;
-    while (frame) {
-        if (scope == frame->original)
-            return frame;
-        frame = frame->frame;
     }
     return nullptr;
 }
