@@ -232,10 +232,10 @@ project "scopesrt"
         }
         linkoptions(LLVM_LDFLAGS)
         linkoptions {
+            "-lclangCodeGen",
             "-lclangFrontend",
             "-lclangDriver",
             "-lclangSerialization",
-            "-lclangCodeGen",
             "-lclangParse",
             "-lclangSema",
             "-lclangAnalysis",
