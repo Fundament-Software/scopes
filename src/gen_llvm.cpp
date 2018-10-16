@@ -34,10 +34,11 @@
 #include <llvm-c/Transforms/PassManagerBuilder.h>
 #include <llvm-c/Disassembler.h>
 #include <llvm-c/Support.h>
+#include <llvm-c/DebugInfo.h>
 
 #include "llvm/IR/Module.h"
 //#include "llvm/IR/DebugInfoMetadata.h"
-#include "llvm/IR/DIBuilder.h"
+//#include "llvm/IR/DIBuilder.h"
 //#include "llvm/ExecutionEngine/SectionMemoryManager.h"
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 #include "llvm/ExecutionEngine/JITEventListener.h"
@@ -90,103 +91,6 @@ static void build_and_run_opt_passes(LLVMModuleRef module, int opt_level) {
 
     LLVMDisposePassManager(functionPasses);
     LLVMDisposePassManager(modulePasses);
-}
-
-typedef llvm::DIBuilder *LLVMDIBuilderRef;
-
-static LLVMDIBuilderRef LLVMCreateDIBuilder(LLVMModuleRef M) {
-  return new llvm::DIBuilder(*llvm::unwrap(M));
-}
-
-static void LLVMDisposeDIBuilder(LLVMDIBuilderRef Builder) {
-  Builder->finalize();
-  delete Builder;
-}
-
-static llvm::MDNode *value_to_mdnode(LLVMValueRef value) {
-    return value ? cast<llvm::MDNode>(
-        llvm::unwrap<llvm::MetadataAsValue>(value)->getMetadata()) : nullptr;
-}
-
-template<typename T>
-static T *value_to_DI(LLVMValueRef value) {
-    return value ? cast<T>(
-        llvm::unwrap<llvm::MetadataAsValue>(value)->getMetadata()) : nullptr;
-}
-
-static LLVMValueRef mdnode_to_value(llvm::MDNode *node) {
-  return llvm::wrap(
-    llvm::MetadataAsValue::get(*llvm::unwrap(LLVMGetGlobalContext()), node));
-}
-
-typedef llvm::DINode::DIFlags LLVMDIFlags;
-
-static LLVMValueRef LLVMDIBuilderCreateSubroutineType(
-    LLVMDIBuilderRef Builder, LLVMValueRef ParameterTypes) {
-    return mdnode_to_value(
-        Builder->createSubroutineType(value_to_DI<llvm::MDTuple>(ParameterTypes)));
-}
-
-static LLVMValueRef LLVMDIBuilderCreateCompileUnit(LLVMDIBuilderRef Builder,
-    unsigned Lang,
-    const char *File, const char *Dir, const char *Producer, bool isOptimized,
-    const char *Flags, unsigned RV, const char *SplitName,
-    //DICompileUnit::DebugEmissionKind Kind,
-    uint64_t DWOId) {
-    auto ctx = (llvm::LLVMContext *)LLVMGetGlobalContext();
-    auto file = llvm::DIFile::get(*ctx, File, Dir);
-    return mdnode_to_value(
-        Builder->createCompileUnit(Lang, file,
-                      Producer, isOptimized, Flags,
-                      RV, SplitName,
-                      llvm::DICompileUnit::DebugEmissionKind::FullDebug,
-                      //llvm::DICompileUnit::DebugEmissionKind::LineTablesOnly,
-                      DWOId));
-}
-
-static LLVMValueRef LLVMDIBuilderCreateFunction(
-    LLVMDIBuilderRef Builder, LLVMValueRef Scope, const char *Name,
-    const char *LinkageName, LLVMValueRef File, unsigned LineNo,
-    LLVMValueRef Ty, bool IsLocalToUnit, bool IsDefinition,
-    unsigned ScopeLine) {
-  return mdnode_to_value(Builder->createFunction(
-        cast<llvm::DIScope>(value_to_mdnode(Scope)), Name, LinkageName,
-        cast<llvm::DIFile>(value_to_mdnode(File)),
-        LineNo, cast<llvm::DISubroutineType>(value_to_mdnode(Ty)),
-        IsLocalToUnit, IsDefinition, ScopeLine));
-}
-
-static LLVMValueRef LLVMGetFunctionSubprogram(LLVMValueRef func) {
-    return mdnode_to_value(
-        llvm::cast<llvm::Function>(llvm::unwrap(func))->getSubprogram());
-}
-
-static void LLVMSetFunctionSubprogram(LLVMValueRef func, LLVMValueRef subprogram) {
-    llvm::cast<llvm::Function>(llvm::unwrap(func))->setSubprogram(
-        value_to_DI<llvm::DISubprogram>(subprogram));
-}
-
-#if 0
-static LLVMValueRef LLVMDIBuilderCreateLexicalBlock(LLVMDIBuilderRef Builder,
-    LLVMValueRef Scope, LLVMValueRef File, unsigned Line, unsigned Col) {
-    return mdnode_to_value(Builder->createLexicalBlock(
-        value_to_DI<llvm::DIScope>(Scope),
-        value_to_DI<llvm::DIFile>(File), Line, Col));
-}
-#endif
-
-static LLVMValueRef LLVMCreateDebugLocation(unsigned Line,
-                                     unsigned Col, const LLVMValueRef Scope,
-                                     const LLVMValueRef InlinedAt) {
-  llvm::MDNode *SNode = value_to_mdnode(Scope);
-  llvm::MDNode *INode = value_to_mdnode(InlinedAt);
-  return mdnode_to_value(llvm::DebugLoc::get(Line, Col, SNode, INode).get());
-}
-
-static LLVMValueRef LLVMDIBuilderCreateFile(
-    LLVMDIBuilderRef Builder, const char *Filename,
-                            const char *Directory) {
-  return mdnode_to_value(Builder->createFile(Filename, Directory));
 }
 
 struct LLVMIRGenerator {
@@ -248,10 +152,10 @@ struct LLVMIRGenerator {
     Label::UserMap user_map;
 #endif
 
-    std::unordered_map<SourceFile *, LLVMValueRef> file2value;
+    std::unordered_map<SourceFile *, LLVMMetadataRef> file2value;
     std::unordered_map<void *, LLVMValueRef> ptr2global;
     std::unordered_map<Value *, LLVMValueRef> node2value;
-    std::unordered_map<Function *, LLVMValueRef> func2md;
+    std::unordered_map<Function *, LLVMMetadataRef> func2md;
     std::unordered_map<Extern *, LLVMValueRef> extern2global;
     std::unordered_map<LLVMValueRef, LLVMBasicBlockRef> func_fail_label;
     std::deque<Function *> function_todo;
@@ -365,7 +269,7 @@ struct LLVMIRGenerator {
         }
     }
 
-    LLVMValueRef source_file_to_scope(SourceFile *sf) {
+    LLVMMetadataRef source_file_to_scope(SourceFile *sf) {
         assert(use_debug_info);
 
         auto it = file2value.find(sf);
@@ -375,8 +279,12 @@ struct LLVMIRGenerator {
         char *dn = strdup(sf->path.name()->data);
         char *bn = strdup(dn);
 
-        LLVMValueRef result = LLVMDIBuilderCreateFile(di_builder,
-            basename(bn), dirname(dn));
+        char *fname = basename(bn);
+        char *dname = dirname(dn);
+
+        LLVMMetadataRef result = LLVMDIBuilderCreateFile(di_builder,
+            fname, strlen(fname), dname, strlen(dname));
+
         free(dn);
         free(bn);
 
@@ -385,7 +293,7 @@ struct LLVMIRGenerator {
         return result;
     }
 
-    LLVMValueRef function_to_subprogram(Function *l) {
+    LLVMMetadataRef function_to_subprogram(Function *l) {
         assert(use_debug_info);
 
         auto it = func2md.find(l);
@@ -394,18 +302,21 @@ struct LLVMIRGenerator {
 
         const Anchor *anchor = l->anchor();
 
-        LLVMValueRef difile = source_file_to_scope(anchor->file);
+        LLVMMetadataRef difile = source_file_to_scope(anchor->file);
 
-        LLVMValueRef subroutinevalues[] = {
+        LLVMMetadataRef subroutinevalues[] = {
             nullptr
         };
-        LLVMValueRef disrt = LLVMDIBuilderCreateSubroutineType(di_builder,
-            LLVMMDNode(subroutinevalues, 1));
+        LLVMMetadataRef disrt = LLVMDIBuilderCreateSubroutineType(di_builder,
+            difile, nullptr, 0, LLVMDIFlagZero);
 
-        LLVMValueRef difunc = LLVMDIBuilderCreateFunction(
-            di_builder, difile, l->name.name()->data, l->name.name()->data,
+        auto name = l->name.name();
+        LLVMMetadataRef difunc = LLVMDIBuilderCreateFunction(
+            di_builder, difile, name->data, name->count,
+            // todo: insert actual linkage name here
+            name->data, name->count,
             difile, anchor->lineno, disrt, false, true,
-            anchor->lineno);
+            anchor->lineno, LLVMDIFlagZero, false);
 
         func2md.insert({ l, difunc });
         return difunc;
@@ -1033,7 +944,7 @@ struct LLVMIRGenerator {
 #endif
 
         if (use_debug_info) {
-            LLVMSetFunctionSubprogram(func, function_to_subprogram(node));
+            LLVMSetSubprogram(func, function_to_subprogram(node));
         }
 #if !SCOPES_LLVM_CACHE_FUNCTIONS
         LLVMSetLinkage(func, LLVMPrivateLinkage);
@@ -1312,7 +1223,7 @@ struct LLVMIRGenerator {
         auto callee = call->callee;
         auto &&args = call->args;
 
-        LLVMValueRef diloc = nullptr;
+        LLVMMetadataRef diloc = nullptr;
         if (use_debug_info) {
             diloc = set_debug_location(call->anchor());
         }
@@ -2129,23 +2040,25 @@ struct LLVMIRGenerator {
         return ret;
     }
 
-    LLVMValueRef anchor_to_location(const Anchor *anchor) {
+    LLVMMetadataRef anchor_to_location(const Anchor *anchor) {
         assert(use_debug_info);
 
         auto old_bb = LLVMGetInsertBlock(builder);
         LLVMValueRef func = LLVMGetBasicBlockParent(old_bb);
-        LLVMValueRef disp = LLVMGetFunctionSubprogram(func);
+        LLVMMetadataRef disp = LLVMGetSubprogram(func);
 
-        LLVMValueRef result = LLVMCreateDebugLocation(
+        LLVMMetadataRef result = LLVMDIBuilderCreateDebugLocation(
+            LLVMGetGlobalContext(),
             anchor->lineno, anchor->column, disp, nullptr);
 
         return result;
     }
 
-    LLVMValueRef set_debug_location(const Anchor *anchor) {
+    LLVMMetadataRef set_debug_location(const Anchor *anchor) {
         assert(use_debug_info);
-        LLVMValueRef diloc = anchor_to_location(anchor);
-        LLVMSetCurrentDebugLocation(builder, diloc);
+        LLVMMetadataRef diloc = anchor_to_location(anchor);
+        LLVMSetCurrentDebugLocation(builder,
+            LLVMMetadataAsValue(LLVMGetGlobalContext(), diloc));
         return diloc;
     }
 
@@ -2226,9 +2139,27 @@ struct LLVMIRGenerator {
             LLVMAddNamedMetadataOperand(module, "llvm.module.flags",
                 LLVMMDNode(DbgVer, 3));
 
-            LLVMDIBuilderCreateCompileUnit(di_builder,
-                llvm::dwarf::DW_LANG_C99, "file", "directory", "scopes",
-                false, "", 0, "", 0);
+            const char *fname = "file"; // module_name
+            const char *dname = "directory";
+            LLVMMetadataRef fileref = LLVMDIBuilderCreateFile(di_builder,
+                fname, strlen(fname),
+                dname, strlen(dname));
+
+            const char *producer = "scopes";
+            LLVMDIBuilderCreateCompileUnit(
+                di_builder,
+                /*Lang*/ LLVMDWARFSourceLanguageC99,
+                /*FileRef*/ fileref,
+                /*Producer*/ producer, strlen(producer),
+                /*isOptimized*/ false,
+                /*Flags*/ "", 0,
+                /*RuntimeVer*/ 0,
+                /*SplitName*/ "", 0,
+                /*Kind*/ LLVMDWARFEmissionFull,
+                /*DWOId*/ 0,
+                /*SplitDebugInlining*/ true,
+                /*DebugInfoForProfiling*/ false);
+
             //LLVMAddNamedMetadataOperand(module, "llvm.dbg.cu", dicu);
         }
     }
@@ -2251,6 +2182,7 @@ struct LLVMIRGenerator {
         assert(!k);
 
         LLVMDisposeBuilder(builder);
+        LLVMDIBuilderFinalize(di_builder);
         LLVMDisposeDIBuilder(di_builder);
 
 #if SCOPES_DEBUG_CODEGEN
