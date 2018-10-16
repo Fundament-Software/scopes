@@ -1459,7 +1459,7 @@ inline syntax-macro (f)
             return (cons (Value (f ('next at))) next) scope
 
 fn empty? (value)
-    == (countof value) 0:usize
+    == (countof value) 0
 
 #fn cons (at next)
     sc_list_cons (Value at) next
@@ -1698,7 +1698,7 @@ fn has-infix-ops? (infix-table expr)
     # any expression of which one odd argument matches an infix operator
         has infix operations.
     loop (expr) = expr
-    if (< (countof expr) 3:usize)
+    if (< (countof expr) 3)
         return false
     let __ expr = ('decons expr)
     let at next = ('decons expr)
@@ -1857,7 +1857,7 @@ fn quasiquote-list (x)
                             cons do at-next
                             quasiquote-list next
                 elseif (== at-at 'square-list)
-                    if (> (countof at-next) 1:usize)
+                    if (> (countof at-next) 1)
                         return
                             list (Value sc_list_join)
                                 list list (cons _ at-next)
@@ -1876,7 +1876,7 @@ fn quasiquote-list (x)
 fn expand-and-or (expr f)
     if (empty? expr)
         compiler-error! "at least one argument expected"
-    elseif (== (countof expr) 1:usize)
+    elseif (== (countof expr) 1)
         return ('@ expr)
     let expr = ('reverse expr)
     loop (result head) = ('decons expr)
@@ -2720,7 +2720,7 @@ let compile =
 define-syntax-macro assert
     let cond msg body = (decons args 2)
     let msg =
-        if ((countof args) == 2:usize) msg
+        if ((countof args) == 2) msg
         else
             Value
                 repr cond
@@ -3066,6 +3066,83 @@ let
 
 #-------------------------------------------------------------------------------
 
+fn extract-name-params-body (expr)
+    let arg body = (decons expr)
+    if (('typeof arg) == list)
+        return (Value "") (arg as list) body
+    else
+        let params body = (decons body)
+        return arg (params as list) body
+
+define sugar
+    inline half-wrap-syntax-macro (f)
+        fn (expr next scope)
+            let new-expr new-next = (f expr next scope)
+            return
+                constbranch (none? new-next)
+                    inline ()
+                        cons new-expr next
+                    inline ()
+                        cons new-expr new-next
+                scope
+
+    inline wrap-syntax-macro (f)
+        syntax-block-scope-macro
+            half-wrap-syntax-macro f
+
+    syntax-macro
+        fn "expand-sugar" (expr)
+            raises-compile-error;
+            let name params body =
+                extract-name-params-body expr
+            let paramcount = ((countof params) as i32)
+            let expr = (Symbol "#expr")
+            let next = 'next-expr
+            let scope = 'syntax-scope
+            let head = 'expr-head
+            loop (i rest letbody varargs) = 0 params '() false
+            if (not (empty? rest))
+                let paramv rest = (decons rest)
+                let param = (paramv as Symbol)
+                let vararg? = ('vararg? param)
+                let letbody =
+                    if vararg?
+                        if (not (empty? rest))
+                            syntax-error! ('anchor paramv)
+                                "vararg parameter is not in last place"
+                        cons
+                            qq
+                                [let paramv] = [expr]
+                            letbody
+                    else
+                        cons
+                            qq
+                                [let paramv expr] =
+                                    [sc_list_decons expr];
+                            letbody
+                repeat (i + 1) rest letbody (| varargs vararg?)
+            let body =
+                .. ('reverse letbody) body
+            let content =
+                cons (list expr next scope)
+                    qq
+                        [let head expr] =
+                            [sc_list_decons expr];
+                    qq
+                        [verify-count] ([sc_list_count expr])
+                            [(? varargs (sub paramcount 1) paramcount)]
+                            [(? varargs -1 paramcount)]
+                    body
+            if (('typeof name) == Symbol)
+                qq
+                    [let name] =
+                        [wrap-syntax-macro]
+                            [(cons inline (name as Symbol as string) content)]
+            else
+                qq
+                    [half-wrap-syntax-macro]
+                        [(cons inline name content)]
+
 define spice
     inline half-wrap-ast-macro (f)
         fn (args)
@@ -3080,15 +3157,7 @@ define spice
         fn "expand-spice" (expr)
             raises-compile-error;
             let name params body =
-                do
-                    let arg body = (decons expr)
-                    if (('typeof arg) == list)
-                        _ (Value "") arg body
-                    else
-                        let params body = (decons body)
-                        _ arg params body
-
-            let params = (params as list)
+                extract-name-params-body expr
             let paramcount = ((countof params) as i32)
 
             let args = (Symbol "#args")

@@ -717,7 +717,7 @@ sc_value_list_tuple_t sc_list_decons(const sc_list_t *l) {
         return { ConstAggregate::none_from(get_active_anchor()), nullptr };
 }
 
-size_t sc_list_count(const sc_list_t *l) {
+int sc_list_count(const sc_list_t *l) {
     using namespace scopes;
     return l?l->count:0;
 }
@@ -1791,7 +1791,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_list_dump, TYPE_List, TYPE_List);
     DEFINE_EXTERN_C_FUNCTION(sc_list_join, TYPE_List, TYPE_List, TYPE_List);
     DEFINE_EXTERN_C_FUNCTION(sc_list_decons, arguments_type({TYPE_Value, TYPE_List}), TYPE_List);
-    DEFINE_EXTERN_C_FUNCTION(sc_list_count, TYPE_USize, TYPE_List);
+    DEFINE_EXTERN_C_FUNCTION(sc_list_count, TYPE_I32, TYPE_List);
     DEFINE_EXTERN_C_FUNCTION(sc_list_at, TYPE_Value, TYPE_List);
     DEFINE_EXTERN_C_FUNCTION(sc_list_next, TYPE_List, TYPE_List);
     DEFINE_EXTERN_C_FUNCTION(sc_list_reverse, TYPE_List, TYPE_List);
