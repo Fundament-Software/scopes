@@ -52,6 +52,7 @@
 namespace scopes {
 
 #define SCOPES_GEN_TARGET "IR"
+#define SCOPES_LLVM_CACHE_FUNCTIONS 1
 
 //------------------------------------------------------------------------------
 // IL->LLVM IR GENERATOR
@@ -256,6 +257,7 @@ struct LLVMIRGenerator {
     std::deque<Function *> function_todo;
     static ArgTypes type_todo;
     static std::unordered_map<const Type *, LLVMTypeRef> type_cache;
+    static std::unordered_map<Function *, LLVMModuleRef> func_cache;
 
     LLVMModuleRef module;
     LLVMBuilderRef builder;
@@ -283,6 +285,7 @@ struct LLVMIRGenerator {
     bool use_debug_info;
     bool inline_pointers;
     Function *active_function;
+    int functions_generated;
 
     static const Type *abi_return_type(const FunctionType *ft) {
         if (ft->has_exception()) {
@@ -354,7 +357,8 @@ struct LLVMIRGenerator {
         //active_function_value(nullptr),
         use_debug_info(true),
         inline_pointers(true),
-        active_function(nullptr) {
+        active_function(nullptr),
+        functions_generated(0) {
         static_init();
         for (int i = 0; i < NumIntrinsics; ++i) {
             intrinsics[i] = nullptr;
@@ -941,6 +945,9 @@ struct LLVMIRGenerator {
 
     SCOPES_RESULT(void) Function_finalize(Function *node) {
         SCOPES_RESULT_TYPE(void);
+
+        functions_generated++;
+
         active_function = node;
         auto it = node2value.find(node);
         assert(it != node2value.end());
@@ -1014,10 +1021,23 @@ struct LLVMIRGenerator {
         auto functype = SCOPES_GET_RESULT(type_to_llvm_type(ilfunctype));
 
         auto func = LLVMAddFunction(module, name, functype);
+
+#if SCOPES_LLVM_CACHE_FUNCTIONS
+        auto it = func_cache.find(node);
+        if (it != func_cache.end()) {
+            assert(it->second != module);
+            return func;
+        }
+
+        func_cache.insert({node, module});
+#endif
+
         if (use_debug_info) {
             LLVMSetFunctionSubprogram(func, function_to_subprogram(node));
         }
+#if !SCOPES_LLVM_CACHE_FUNCTIONS
         LLVMSetLinkage(func, LLVMPrivateLinkage);
+#endif
         function_todo.push_back(node);
         return func;
     }
@@ -2316,6 +2336,7 @@ struct LLVMIRGenerator {
 
 bool LLVMIRGenerator::ok = true;
 std::unordered_map<const Type *, LLVMTypeRef> LLVMIRGenerator::type_cache;
+std::unordered_map<Function *, LLVMModuleRef> LLVMIRGenerator::func_cache;
 ArgTypes LLVMIRGenerator::type_todo;
 LLVMTypeRef LLVMIRGenerator::voidT = nullptr;
 LLVMTypeRef LLVMIRGenerator::i1T = nullptr;
@@ -2516,6 +2537,13 @@ SCOPES_RESULT(ConstPointer *) compile(Function *fn, uint64_t flags) {
         Timer generate_timer(TIMER_Generate);
         result = SCOPES_GET_RESULT(ctx.generate(fn));
     }
+
+#if 0
+    {
+        StyledStream ss;
+        ss << ctx.functions_generated << " function(s) generated" << std::endl;
+    }
+#endif
 
     auto module = result.first;
     auto func = result.second;
