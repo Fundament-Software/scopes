@@ -307,6 +307,23 @@ static SCOPES_RESULT(const Type *) merge_value_type(const Type *T1, const Type *
     SCOPES_EXPECT_ERROR(error_cannot_merge_expression_types(T1, T2));
 }
 
+static SCOPES_RESULT(const Type *) merge_void_or_value_type(const Type *T1, const Type *T2) {
+    SCOPES_RESULT_TYPE(const Type *);
+    assert(T2);
+    if (!T1)
+        return T2;
+    if (T1 == T2)
+        return T1;
+    if (!is_returning(T1))
+        return T2;
+    if (!is_returning(T2))
+        return T1;
+    auto _void = empty_arguments_type();
+    if ((T1 == _void) || (T2 == _void))
+        return _void;
+    SCOPES_EXPECT_ERROR(error_cannot_merge_expression_types(T1, T2));
+}
+
 static const Type *arguments_type_from_arguments(const Values &values) {
     ArgTypes types;
     for (auto arg : values) {
@@ -677,7 +694,7 @@ static SCOPES_RESULT(Value *) prove_Try(const ASTContext &ctx, Try *_try) {
     auto except_value = SCOPES_GET_RESULT(prove(exceptctx, _try->except_value));
     newtry->except_value = except_value;
 
-    const Type *rtype = SCOPES_GET_RESULT(merge_value_type(
+    const Type *rtype = SCOPES_GET_RESULT(merge_void_or_value_type(
         try_value->get_type(), except_value->get_type()));
     newtry->set_type(rtype);
     return newtry;
@@ -1676,11 +1693,12 @@ static SCOPES_RESULT(Value *) prove_Switch(const ASTContext &ctx, Switch *node) 
     auto subctx = ctx.with_symbol_target();
     auto newexpr = SCOPES_GET_RESULT(prove(subctx, node->expr));
 
-    const Type *rtype = nullptr;
     const Type *casetype = newexpr->get_type();
 
     Switch::Cases cases;
     bool has_default = false;
+    const Type *rtype = nullptr;
+    auto _void = empty_arguments_type();
     for (auto &&_case : node->cases) {
         SCOPES_ANCHOR(_case.anchor);
         Switch::Case newcase;
@@ -1704,9 +1722,20 @@ static SCOPES_RESULT(Value *) prove_Switch(const ASTContext &ctx, Switch *node) 
         auto newvalue = SCOPES_GET_RESULT(prove(bodyctx, _case.value));
         newcase.value = newvalue;
         if (_case.kind != CK_Pass) {
-            rtype = SCOPES_GET_RESULT(merge_value_type(rtype, newvalue->get_type()));
+            if (newvalue->get_type() == _void) {
+                rtype = _void;
+            }
         }
         cases.push_back(newcase);
+    }
+
+    if (!rtype) {
+        for (auto &&_case : cases) {
+            if (_case.kind != CK_Pass) {
+                rtype = SCOPES_GET_RESULT(merge_value_type(rtype,
+                    _case.value->get_type()));
+            }
+        }
     }
 
     if (!has_default) {
@@ -1728,7 +1757,6 @@ static SCOPES_RESULT(Value *) prove_If(const ASTContext &ctx, If *_if) {
     SCOPES_RESULT_TYPE(Value *);
     assert(!_if->clauses.empty());
     auto subctx = ctx.with_symbol_target();
-    const Type *rtype = nullptr;
     If::Clauses clauses;
     If::Clause else_clause;
     for (auto &&clause : _if->clauses) {
@@ -1760,20 +1788,22 @@ finalize:
         }
     }
     SCOPES_CHECK_RESULT(prove_jobs(ctx, numclauses, values, blocks));
+    const Type *rtype = nullptr;
+    auto _void = empty_arguments_type();
     for (int i = 0; i < numclauses; ++i) {
         SCOPES_ANCHOR(values[i]->anchor());
-        #if 0
-        if (!values[i]->is_typed()) {
-            StyledStream ss;
-            ss << "clause untyped: ";
-            stream_ast(ss, values[i], StreamASTFormat());
-        }
-        #endif
-        rtype = SCOPES_GET_RESULT(merge_value_type(rtype, values[i]->get_type()));
+        if (values[i]->get_type() == _void)
+            rtype = _void;
         if ((i + 1) == numclauses) {
             else_clause.value = values[i];
         } else {
             clauses[i].value = values[i];
+        }
+    }
+    if (!rtype) {
+        for (int i = 0; i < numclauses; ++i) {
+            SCOPES_ANCHOR(values[i]->anchor());
+            rtype = SCOPES_GET_RESULT(merge_value_type(rtype, values[i]->get_type()));
         }
     }
     If *newif = If::from(_if->anchor(), clauses);

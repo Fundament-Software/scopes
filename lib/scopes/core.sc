@@ -3183,20 +3183,17 @@ define syntax-match
                 expr
 
 define sugar
-    inline half-wrap-syntax-macro (f)
-        fn (expr next scope)
-            let new-expr new-next = (f expr next scope)
-            return
-                constbranch (none? new-next)
-                    inline ()
-                        cons new-expr next
-                    inline ()
-                        cons new-expr new-next
-                scope
-
     inline wrap-syntax-macro (f)
         syntax-block-scope-macro
-            half-wrap-syntax-macro f
+            fn (expr next scope)
+                let new-expr new-next = (f expr next scope)
+                return
+                    constbranch (none? new-next)
+                        inline ()
+                            cons new-expr next
+                        inline ()
+                            cons new-expr new-next
+                    scope
 
     syntax-macro
         fn "expand-sugar" (expr)
@@ -3224,14 +3221,10 @@ define sugar
                             [(cons inline (name as Symbol as string) content)]
             else
                 qq
-                    [half-wrap-syntax-macro]
+                    [wrap-syntax-macro]
                         [(cons inline name content)]
 
 define spice
-    inline half-wrap-ast-macro (f)
-        fn (args)
-            return `[(f args)]
-
     inline wrap-ast-macro (f)
         ast-macro
             fn (args)
@@ -3281,7 +3274,7 @@ define spice
                             [(cons inline (name as Symbol as string) content)]
             else
                 qq
-                    [half-wrap-ast-macro]
+                    [wrap-ast-macro]
                         [(cons inline name content)]
 
 compile-stage;
@@ -3351,27 +3344,28 @@ let ref-attribs-key = '__refattrs
                     attrs
             'set-symbol attrs name value
 
-let deref =
-    spice "deref" (values...)
-        let count = ('argcount values...)
-        let result = (sc_argument_list_new)
-        for i kvalue in (enumerate ('args values...))
-            let key value = ('dekey kvalue)
-            let T = ('typeof value)
-            sc_argument_list_append result
-                if (T < ref)
-                    let ok op = ('@ T '__deref)
-                    if ok
-                        let cmd =  `(op value)
-                        if (key == unnamed) cmd
-                        else
-                            sc_keyed_new key cmd
+spice deref (values...)
+    let count = ('argcount values...)
+    let result = (sc_argument_list_new)
+    for i kvalue in (enumerate ('args values...))
+        let key value = ('dekey kvalue)
+        let T = ('typeof value)
+        sc_argument_list_append result
+            if (T < ref)
+                let ok op = ('@ T '__deref)
+                if ok
+                    let cmd =  `(op value)
+                    if (key == unnamed) cmd
                     else
-                        syntax-error! ('anchor kvalue)
-                            .. "deref attribute missing in value of type " (repr T)
+                        sc_keyed_new key cmd
                 else
-                    kvalue
-        result
+                    syntax-error! ('anchor kvalue)
+                        .. "deref attribute missing in value of type " (repr T)
+            else
+                kvalue
+    result
+
+compile-stage;
 
 #set-type-symbol!& Any 'typeof
     inline (self)
@@ -3393,7 +3387,7 @@ let deref =
 
 do
     fn ref-binary-op-expr (symbol func lhs rhs)
-        `(func [ (deref as ASTMacro) ] lhs rhs)
+        `(func deref lhs rhs)
 
     inline passthru-overload (sym func)
         'set-symbol ref sym
@@ -3463,25 +3457,23 @@ fn ref-type (PT)
 
 'set-symbols ref
     __= =
-        ast-macro
-            spice "ref=" (self value)
-                let ET = ('typeof& self)
-                let ok op = ('@& ET '__=)
-                if ok `(op self value)
-                else
-                    ast-quote
-                        destruct self
-                        copy-construct self value
-                        _;
+        spice "ref=" (self value)
+            let ET = ('typeof& self)
+            let ok op = ('@& ET '__=)
+            if ok `(op self value)
+            else
+                ast-quote
+                    destruct self
+                    copy-construct self value
+                    _;
     __typecall =
-        ast-macro
-            spice "ref-typecall" (cls T)
-                let T = (T as type)
-                if ((T < ref) or (not (T < pointer)))
-                    compiler-error!
-                        .. "cannot create reference type of reference type "
-                            repr T
-                ref-type T
+        spice "ref-typecall" (cls T)
+            let T = (T as type)
+            if ((T < ref) or (not (T < pointer)))
+                compiler-error!
+                    .. "cannot create reference type of reference type "
+                        repr T
+            ref-type T
 
 #
     let voidstar = (pointer void)
@@ -3624,8 +3616,6 @@ fn ref-type (PT)
         let ST = (storageof T)
         # todo: ensure types are compatible
         (bitcast self ('set-element-type ST destT)) as ref
-
-let deref = (deref as ASTMacro)
 
 #-------------------------------------------------------------------------------
 # default memory allocators
