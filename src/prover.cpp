@@ -362,6 +362,32 @@ Value *build_argument_list(const Anchor *anchor, const Values &values) {
 #endif
 }
 
+static SCOPES_RESULT(Value *) prove_Label(const ASTContext &ctx, Label *node) {
+    SCOPES_RESULT_TYPE(Value *);
+    Label *label = Label::from(node->anchor(), node->name);
+    assert(ctx.frame);
+    assert(ctx.block);
+    label->set_type(empty_arguments_type());
+    ctx.frame->bind(node, label);
+    SCOPES_ANCHOR(node->anchor());
+    auto result = SCOPES_GET_RESULT(
+        prove(ctx.with_block(label->body), node->value));
+    assert(result);
+    if (!label->return_type) {
+        // label does not need a merge label
+        assert(ctx.block);
+        ctx.block->migrate_from(label->body);
+        return result;
+    } else {
+        ctx.block->append(label);
+        label->value = result;
+        label->return_type = SCOPES_GET_RESULT(merge_value_type(
+            label->return_type, result->get_type()));
+        label->change_type(label->return_type);
+        return label;
+    }
+}
+
 static SCOPES_RESULT(Value *) prove_Expression(const ASTContext &ctx, Expression *expr) {
     SCOPES_RESULT_TYPE(Value *);
     int count = (int)expr->body.size();
@@ -370,8 +396,8 @@ static SCOPES_RESULT(Value *) prove_Expression(const ASTContext &ctx, Expression
         for (int i = 0; i < count; ++i) {
             auto newsrc = SCOPES_GET_RESULT(prove(subctx, expr->body[i]));
             if (!is_returning(newsrc->get_type())) {
-                StyledStream ss;
-                stream_ast(ss, expr->body[i], StreamASTFormat());
+                //StyledStream ss;
+                //stream_ast(ss, expr->body[i], StreamASTFormat());
                 SCOPES_ANCHOR(expr->body[i]->anchor());
                 SCOPES_CHECK_RESULT(error_noreturn_not_last_expression());
             }
@@ -570,16 +596,16 @@ SCOPES_RESULT(void) map_keyed_arguments(const Anchor *anchor, Value *callee,
 }
 
 // used by Let, Loop, ArgumentList, Repeat, Call
-static SCOPES_RESULT(void) prove_arguments(
+static SCOPES_RESULT(Value *) prove_arguments(
     const ASTContext &ctx, Values &outargs, const Values &values) {
-    SCOPES_RESULT_TYPE(void);
+    SCOPES_RESULT_TYPE(Value *);
     auto subctx = ctx.with_symbol_target();
     int count = (int)values.size();
     for (int i = 0; i < count; ++i) {
         auto value = SCOPES_GET_RESULT(prove(subctx, values[i]));
         const Type *T = value->get_type();
         if (!is_returning(T)) {
-            SCOPES_EXPECT_ERROR(error_noreturn_in_argument_list());
+            return value;
         }
         if (is_arguments_type(T)) {
             auto rt = cast<TupleType>(storage_type(T).assert_ok());
@@ -596,13 +622,16 @@ static SCOPES_RESULT(void) prove_arguments(
         }
         outargs.push_back(value);
     }
-    return true;
+    return nullptr;
 }
 
 static SCOPES_RESULT(Value *) prove_ArgumentList(const ASTContext &ctx, ArgumentList *nlist) {
     SCOPES_RESULT_TYPE(Value *);
     Values values;
-    SCOPES_CHECK_RESULT(prove_arguments(ctx, values, nlist->values));
+    Value *noret = SCOPES_GET_RESULT(prove_arguments(ctx, values, nlist->values));
+    if (noret) {
+        return noret;
+    }
     return build_argument_list(nlist->anchor(), values);
 }
 
@@ -658,14 +687,18 @@ static SCOPES_RESULT(void) prove_bind_proved_arguments(const ASTContext &ctx,
     return true;
 }
 
-static SCOPES_RESULT(void) prove_bind_arguments(const ASTContext &ctx,
+static SCOPES_RESULT(Value *) prove_bind_arguments(const ASTContext &ctx,
     Parameters &outparams, Values &outargs,
     const Parameters &params, const Values &values, bool inline_constants) {
-    SCOPES_RESULT_TYPE(void);
+    SCOPES_RESULT_TYPE(Value *);
     Values tmpargs;
-    SCOPES_CHECK_RESULT(prove_arguments(ctx, tmpargs, values));
-    return prove_bind_proved_arguments(ctx, outparams, outargs,
-        params, tmpargs, inline_constants);
+    Value *noret = SCOPES_GET_RESULT(prove_arguments(ctx, tmpargs, values));
+    if (noret) {
+        return noret;
+    }
+    SCOPES_CHECK_RESULT(prove_bind_proved_arguments(ctx, outparams, outargs,
+        params, tmpargs, inline_constants));
+    return nullptr;
 }
 
 static SCOPES_RESULT(Value *) prove_Try(const ASTContext &ctx, Try *_try) {
@@ -700,12 +733,14 @@ static SCOPES_RESULT(Value *) prove_Try(const ASTContext &ctx, Try *_try) {
     return newtry;
 }
 
-static SCOPES_RESULT(Loop *) prove_Loop(const ASTContext &ctx, Loop *loop) {
-    SCOPES_RESULT_TYPE(Loop *);
+static SCOPES_RESULT(Value *) prove_Loop(const ASTContext &ctx, Loop *loop) {
+    SCOPES_RESULT_TYPE(Value *);
     SCOPES_ANCHOR(loop->anchor());
     Loop *newloop = Loop::from(loop->anchor());
-    SCOPES_CHECK_RESULT(prove_bind_arguments(ctx,
-        newloop->params, newloop->args, loop->params, loop->args, false));
+    auto noret =
+        SCOPES_GET_RESULT(prove_bind_arguments(ctx,
+            newloop->params, newloop->args, loop->params, loop->args, false));
+    if (noret) return noret;
     auto subctx = ctx.for_loop(newloop).with_block(newloop->body);
     auto result = SCOPES_GET_RESULT(prove(subctx, loop->value));
     auto rtype = result->get_type();
@@ -765,14 +800,16 @@ static SCOPES_RESULT(Break *) prove_Break(const ASTContext &ctx, Break *_break) 
     return newbreak;
 }
 
-static SCOPES_RESULT(Repeat *) prove_Repeat(const ASTContext &ctx, Repeat *_repeat) {
-    SCOPES_RESULT_TYPE(Repeat *);
+static SCOPES_RESULT(Value *) prove_Repeat(const ASTContext &ctx, Repeat *_repeat) {
+    SCOPES_RESULT_TYPE(Value *);
     SCOPES_ANCHOR(_repeat->anchor());
     if (!ctx.loop) {
         SCOPES_EXPECT_ERROR(error_illegal_repeat_outside_loop());
     }
     auto newrepeat = Repeat::from(_repeat->anchor());
-    SCOPES_CHECK_RESULT(prove_arguments(ctx, newrepeat->args, _repeat->args));
+    auto noret = SCOPES_GET_RESULT(prove_arguments(ctx, newrepeat->args, _repeat->args));
+    if (noret)
+        return noret;
     newrepeat->set_type(TYPE_NoReturn);
     return newrepeat;
 }
@@ -827,6 +864,18 @@ static SCOPES_RESULT(Value *) prove_Return(const ASTContext &ctx, Return *_retur
         }
         return SCOPES_GET_RESULT(make_return(ctx, _return->anchor(), value));
     }
+}
+
+static SCOPES_RESULT(Value *) prove_Merge(const ASTContext &ctx, Merge *node) {
+    SCOPES_RESULT_TYPE(Value *);
+    Value *label = SCOPES_GET_RESULT(ctx.frame->resolve(node->label, ctx.function));
+    if (!isa<Label>(label)) {
+        SCOPES_EXPECT_ERROR(error_label_expected(label));
+    }
+    Value *value = SCOPES_GET_RESULT(prove(ctx.with_symbol_target(), node->value));
+    if (!is_returning(value->get_type()))
+        return value;
+    return SCOPES_GET_RESULT(make_merge(ctx, node->anchor(), cast<Label>(label), value));
 }
 
 static SCOPES_RESULT(Value *) prove_Raise(const ASTContext &ctx, Raise *_raise) {
@@ -1090,7 +1139,8 @@ static SCOPES_RESULT(Value *) prove_call_interior(const ASTContext &ctx, Call *c
     auto subctx = ctx.with_symbol_target();
     Value *callee = SCOPES_GET_RESULT(prove(subctx, call->callee));
     Values values;
-    SCOPES_CHECK_RESULT(prove_arguments(ctx, values, call->args));
+    auto noret = SCOPES_GET_RESULT(prove_arguments(ctx, values, call->args));
+    if (noret) return noret;
     bool rawcall = call->is_rawcall();
     int redirections = 0;
 repeat:
@@ -1835,18 +1885,6 @@ static SCOPES_RESULT(Value *) prove_Unquote(const ASTContext &ctx, Unquote *node
     SCOPES_LOCATION_ERROR(String::from("unexpected unquote"));
 }
 
-static SCOPES_RESULT(Merge *) prove_Merge(const ASTContext &ctx, Merge *value) {
-    SCOPES_RESULT_TYPE(Merge *);
-    assert(false);
-    return value;
-}
-
-static SCOPES_RESULT(Label *) prove_Label(const ASTContext &ctx, Label *value) {
-    SCOPES_RESULT_TYPE(Label *);
-    assert(false);
-    return value;
-}
-
 SCOPES_RESULT(Value *) prove(const ASTContext &ctx, Value *node) {
     SCOPES_RESULT_TYPE(Value *);
     assert(node);
@@ -1921,7 +1959,7 @@ SCOPES_RESULT(Value *) prove_inline(const ASTContext &ctx,
     Function *fn = Function::from(func->anchor(), func->name, {});
     fn->original = func;
     fn->frame = frame;
-    Label *label = Label::from(func->anchor());
+    Label *label = Label::from(func->anchor(), func->name);
     fn->label = label;
     fn->boundary = ctx.function;
 

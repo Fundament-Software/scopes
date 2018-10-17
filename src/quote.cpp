@@ -334,12 +334,27 @@ struct Quoter {
 
     SCOPES_RESULT(Value *) quote_Merge(int level, Merge *node) {
         SCOPES_RESULT_TYPE(Value *);
-        SCOPES_LOCATION_ERROR(String::from("cannot quote merge"));
+        auto _anchor = node->anchor();
+        return Call::from(_anchor, g_sc_merge_new, {
+            SCOPES_GET_RESULT(quote(level, node->label)),
+            SCOPES_GET_RESULT(quote(level, node->value))
+        });
     }
 
     SCOPES_RESULT(Value *) quote_Label(int level, Label *node) {
         SCOPES_RESULT_TYPE(Value *);
-        SCOPES_LOCATION_ERROR(String::from("cannot quote label"));
+        auto _anchor = node->anchor();
+        auto value = Call::from(_anchor, g_sc_label_new, {
+            ConstInt::symbol_from(_anchor, node->name)
+        });
+        bind(node, value);
+        auto typedvalue = SCOPES_GET_RESULT(prove(ctx, value));
+        ctx.frame->bind(node, typedvalue);
+        auto expr = Expression::unscoped_from(_anchor);
+        expr->append(Call::from(_anchor, g_sc_label_set_body, { typedvalue,
+            SCOPES_GET_RESULT(quote(level, node->value)) }));
+        expr->append(typedvalue);
+        return canonicalize(expr);
     }
 
     SCOPES_RESULT(Value *) quote_new_node(int level, Value *node) {

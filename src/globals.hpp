@@ -74,6 +74,9 @@ namespace scopes {
     T(g_sc_extract_argument_list_new, "sc_extract_argument_list_new") \
     T(g_sc_quote_new, "sc_quote_new") \
     T(g_sc_unquote_new, "sc_unquote_new") \
+    T(g_sc_label_new, "sc_label_new") \
+    T(g_sc_label_set_body, "sc_label_set_body") \
+    T(g_sc_merge_new, "sc_merge_new") \
 
 
 struct Value;

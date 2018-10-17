@@ -678,6 +678,7 @@ inline set-symbols (self values...)
     next = sc_list_next
     decons = decons
     reverse = sc_list_reverse
+    dump = sc_list_dump
 
 'set-symbols type
     bitcount = sc_type_bitcountof
@@ -3076,7 +3077,32 @@ fn extract-name-params-body (expr)
         let params body = (decons body)
         return arg (params as list) body
 
-fn gen-syntax-matcher (params)
+#label ok
+    label case1
+        if fit-pattern
+            merge ok
+                do
+                    body
+        else
+            merge case1
+    label case2
+        if fit-pattern
+            merge ok
+                do
+                    body
+        else
+            merge case1
+
+fn gen-syntax-matcher (fail-label params)
+    fn check-count (count mincount maxcount)
+        if (icmp>=s mincount 0)
+            if (icmp<s count mincount)
+                return false
+        if (icmp>=s maxcount 0)
+            if (icmp>s count maxcount)
+                return false
+        return true
+
     if false
         return unnamed '()
     let paramcount = (countof params)
@@ -3117,9 +3143,11 @@ fn gen-syntax-matcher (params)
                     if ((have as Symbol) != want)
                         syntax-error! ('anchor have)
                             .. (repr want) " token expected"
+                # todo: fix verify-token
                 let letbody =
                     cons
-                        list verify-token token (list syntax-quote sym)
+                        qq
+                            [verify-token token] (syntax-quote [sym])
                         qq
                             [let token expr] =
                                 [`sc_list_decons expr];
@@ -3131,8 +3159,9 @@ fn gen-syntax-matcher (params)
                 if ('vararg? param)
                     syntax-error! ('anchor head)
                         "vararg parameter cannot be typed"
-                inline verify-type (have want)
+                inline check-type (have want)
                     if (('typeof have) != want)
+                        return false
                         syntax-error! ('anchor have)
                             .. "value of type " (repr want) " expected"
                     have as want
@@ -3140,7 +3169,10 @@ fn gen-syntax-matcher (params)
                     cons
                         qq
                             [let head] =
-                                [verify-type head exprT];
+                                [if] ([ptrcmp!=] ('typeof [head]) [exprT])
+                                    [merge fail-label];
+                                else
+                                    [as head exprT];
                         qq
                             [let head expr] =
                                 [`sc_list_decons expr];
@@ -3148,13 +3180,16 @@ fn gen-syntax-matcher (params)
                 repeat (i + 1) rest letbody varargs
             else
                 let token body =
-                    gen-syntax-matcher param
+                    gen-syntax-matcher fail-label param
                 let letbody =
                     cons
                         cons inline-do body
                         qq
                             [let token] =
-                                [as token list];
+                                [if] ([ptrcmp!=] ('typeof [token]) [list])
+                                    [merge fail-label];
+                                else
+                                    [as token list];
                         qq
                             [let token expr] =
                                 [`sc_list_decons expr];
@@ -3166,21 +3201,61 @@ fn gen-syntax-matcher (params)
     return expr
         cons
             qq
-                [verify-count] ([`sc_list_count expr])
+                [if] ([not] ([check-count] ([`sc_list_count expr])
                     [(? varargs (sub paramcount 1) paramcount)]
-                    [(? varargs -1 paramcount)]
+                    [(? varargs -1 paramcount)]))
+                    [merge fail-label];
             'reverse letbody
 
 define syntax-match
-    syntax-macro
-        fn "syntax-match" (expr)
-            let arg params = (decons expr 2)
-            let params = (params as list)
-            let token expr =
-                gen-syntax-matcher params
-            cons inline-do
-                list let token '= arg
-                expr
+    fn next-head? (next)
+        if (not (empty? next))
+            let expr next = (decons next)
+            if (('typeof expr) == list)
+                let at = ('@ (expr as list))
+                if (('typeof at) == Symbol)
+                    return (at as Symbol)
+        unnamed
+    syntax-block-scope-macro
+        fn "syntax-match" (expr next scope)
+            let head arg = (decons expr 2)
+            let ok-label = ('unique Symbol "ok")
+            loop (next result) = next '()
+            let head = (next-head? next)
+            switch head
+            case 'case
+                let expr next = (decons next)
+                let expr = (expr as list)
+                let head cond body = (decons expr 2)
+                let cond = (cond as list)
+                let case-label = ('unique Symbol "case")
+                let token unpack-expr =
+                    gen-syntax-matcher case-label cond
+                let result =
+                    cons
+                        qq
+                            [label case-label]
+                                [(list let token '= arg)]
+                                unquote-splice unpack-expr
+                                [merge ok-label (cons do body)];
+                        result
+                repeat next result
+            case 'default
+                let expr next = (decons next)
+                let expr = (expr as list)
+                let head body = (decons expr)
+                let result =
+                    cons label ok-label
+                        'reverse
+                            cons
+                                qq
+                                    [merge ok-label (cons do body)];
+                                result
+                return
+                    cons result next
+                    scope
+            default
+                compiler-error! "default branch missing"
 
 define sugar
     inline wrap-syntax-macro (f)
@@ -3204,16 +3279,20 @@ define sugar
             let next = 'next-expr
             let scope = 'syntax-scope
             let head = 'expr-head
+            let ok-label = ('unique Symbol "ok")
+            let fail-label = ('unique Symbol "fail")
             let expr unpack-expr =
-                gen-syntax-matcher params
+                gen-syntax-matcher fail-label params
             let content =
                 cons (list expr next scope)
                     qq
                         [let head expr] =
                             [`sc_list_decons expr];
-                    cons inline-do
-                        unpack-expr
-                    body
+                        [label ok-label]
+                            [label fail-label]
+                                unquote-splice unpack-expr
+                                [merge ok-label (cons do body)];
+                            [compiler-error!] "syntax error"
             if (('typeof name) == Symbol)
                 qq
                     [let name] =

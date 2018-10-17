@@ -434,11 +434,11 @@ Loop *Loop::from(const Anchor *anchor, const Parameters &params, const Values &a
 
 //------------------------------------------------------------------------------
 
-Label::Label(const Anchor *anchor, Value *_value)
-    : Instruction(VK_Label, anchor), value(_value), return_type(nullptr) {}
+Label::Label(const Anchor *anchor, Symbol _name, Value *_value)
+    : Instruction(VK_Label, anchor), name(_name), value(_value), return_type(nullptr) {}
 
-Label *Label::from(const Anchor *anchor, Value *value) {
-    return new Label(anchor, value);
+Label *Label::from(const Anchor *anchor, Symbol name, Value *value) {
+    return new Label(anchor, name, value);
 }
 
 //------------------------------------------------------------------------------

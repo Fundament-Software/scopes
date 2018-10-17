@@ -30,6 +30,7 @@ test-modules
     .test_inplace_arithmetic
     .test_intrinsics
     .test_iter2
+    .test_label
     .test_label_macro
     .test_let
     .test_locals

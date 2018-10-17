@@ -360,11 +360,13 @@ struct Loop : Instruction {
 struct Label : Instruction {
     static bool classof(const Value *T);
 
-    Label(const Anchor *anchor, Value *value);
+    Label(const Anchor *anchor, Symbol name, Value *value);
 
     static Label *from(const Anchor *anchor,
+        Symbol name = SYM_Unnamed,
         Value *value = nullptr);
 
+    Symbol name;
     Block body;
     Value *value;
     const Type *return_type;

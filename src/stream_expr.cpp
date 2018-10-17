@@ -198,6 +198,7 @@ void StreamExpr::walk(const Anchor *anchor, const List *l, int depth, int maxdep
             offset = offset + 1;
             it = it->next;
         }
+        return;
     } else {
         depth = depth + 1;
         ss << Style_Operator << "(" << Style_None;

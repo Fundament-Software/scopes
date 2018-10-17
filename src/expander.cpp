@@ -266,6 +266,23 @@ struct Expander {
     }
 #endif
 
+    SCOPES_RESULT(Value *) expand_label(const List *it) {
+        SCOPES_RESULT_TYPE(Value *);
+        auto _anchor = get_active_anchor();
+
+        it = it->next;
+
+        auto name = SCOPES_GET_RESULT(extract_symbol_constant(it->at));
+        it = it->next;
+
+        Scope *subenv = Scope::from(env);
+        auto label = Label::from(_anchor, name);
+        subenv->bind(name, label);
+        Expander subexpr(subenv, astscope);
+        label->value = SCOPES_GET_RESULT(subexpr.expand_expression(_anchor, it));
+        return label;
+    }
+
     SCOPES_RESULT(Value *) expand_do(const List *it) {
         SCOPES_RESULT_TYPE(Value *);
         auto _anchor = get_active_anchor();
@@ -669,7 +686,7 @@ struct Expander {
             it = subexp.next;
 
             Expander nativeexp(Scope::from(env), astscope);
-            _case.value = SCOPES_GET_RESULT(subexp.expand_expression(_case.anchor, it));
+            _case.value = SCOPES_GET_RESULT(nativeexp.expand_expression(_case.anchor, it));
             cases.push_back(_case);
 
             it = next;
@@ -680,7 +697,7 @@ struct Expander {
             _case.kind = CK_Default;
 
             Expander nativeexp(Scope::from(env), astscope);
-            _case.value = SCOPES_GET_RESULT(subexp.expand_expression(_case.anchor, it));
+            _case.value = SCOPES_GET_RESULT(nativeexp.expand_expression(_case.anchor, it));
             cases.push_back(_case);
         }
 
@@ -881,6 +898,28 @@ struct Expander {
         return rep;
     }
 
+    SCOPES_RESULT(Value *) expand_merge(const List *it) {
+        SCOPES_RESULT_TYPE(Value *);
+        auto _anchor = get_active_anchor();
+        SCOPES_CHECK_RESULT(verify_list_parameter_count("merge", it, 1, -1));
+        it = it->next;
+
+        Expander subexp(Scope::from(env), astscope, it->next);
+        Value *label = SCOPES_GET_RESULT(subexp.expand(it->at));
+        it = subexp.next;
+
+        if (!isa<Label>(label)) {
+            SCOPES_EXPECT_ERROR(error_label_expected(label));
+        }
+
+        ArgumentList *args = ArgumentList::from(_anchor);
+        if (it) {
+            Expander subexp(env, astscope, it->next);
+            SCOPES_CHECK_RESULT(subexp.expand_arguments(args->values, it));
+        }
+        return Merge::from(_anchor, cast<Label>(label), args);
+    }
+
     SCOPES_RESULT(Value *) expand_forward(const List *it) {
         SCOPES_RESULT_TYPE(Value *);
         auto _anchor = get_active_anchor();
@@ -982,10 +1021,12 @@ struct Expander {
                 case KW_Raise: return expand_raise(list);
                 case KW_Break: return expand_break(list);
                 case KW_Repeat: return expand_repeat(list);
+                case KW_Merge: return expand_merge(list);
                 case KW_Forward: return expand_forward(list);
                 //case KW_Defer: return expand_defer(list);
                 case KW_Do: return expand_do(list);
                 case KW_DoIn: return expand_inline_do(list);
+                case KW_Label: return expand_label(list);
                 case KW_RawCall:
                 case KW_Call: {
                     SCOPES_CHECK_RESULT(verify_list_parameter_count("special call", list, 1, -1));

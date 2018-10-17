@@ -35,10 +35,20 @@ assert
 
 assert true
 
-syntax-match '((kwok 2 4 5 6) 3 4)
-    ('kwok (a : i32) b q...) c...
+fn test-match (expr)
+    syntax-match expr
+    case (('kwok (a : i32) b q...) c...)
+        print "case 1"
+        print a b c...
+        print q...
+        return;
+    case ('kwok 'kwok x)
+        print "case 2"
+        print x
+        return;
+    default
+        compiler-error! "wrong!"
 
-print a b c...
-print q...
-
+test-match '((kwok 2 4 5 6) 3 4)
+test-match '(kwok kwok 20)
 return;

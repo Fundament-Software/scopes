@@ -237,6 +237,10 @@ sc_value_t *sc_raise_new(sc_value_t *value);
 sc_value_t *sc_quote_new(sc_value_t *value);
 sc_value_t *sc_unquote_new(sc_value_t *value);
 
+sc_value_t *sc_label_new(sc_symbol_t name);
+void sc_label_set_body(sc_value_t *label, sc_value_t *body);
+sc_value_t *sc_merge_new(sc_value_t *label, sc_value_t *value);
+
 // parsing
 
 sc_value_raises_t sc_parse_from_path(const sc_string_t *path);

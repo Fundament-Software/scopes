@@ -96,7 +96,8 @@
         "__memory": "cpp",
         "forward_list": "cpp",
         "numeric": "cpp",
-        "codecvt": "cpp"
+        "codecvt": "cpp",
+        "__node_handle": "cpp"
     },
     "C_Cpp.intelliSenseEngine": "Tag Parser"
 }

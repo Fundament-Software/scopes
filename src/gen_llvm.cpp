@@ -987,13 +987,15 @@ struct LLVMIRGenerator {
     SCOPES_RESULT(LLVMValueRef) Merge_to_value(Merge *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         auto result = SCOPES_GET_RESULT(node_to_value(node->value));
-        auto &&label_info = find_label_info(node->label);
+        auto label = cast<Label>(node->label);
+        auto &&label_info = find_label_info(label);
         if (label_info.merge_value) {
             LLVMBasicBlockRef bb = LLVMGetInsertBlock(builder);
             LLVMBasicBlockRef incobbs[] = { bb };
             LLVMValueRef incovals[] = { result };
             LLVMAddIncoming(label_info.merge_value, incovals, incobbs, 1);
         }
+        assert(label_info.bb_merge);
         return LLVMBuildBr(builder, label_info.bb_merge);
     }
 

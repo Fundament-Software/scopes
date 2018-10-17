@@ -407,7 +407,9 @@ struct StreamAST : StreamAnchors {
         case VK_Label: {
             stream_type_prefix(node);
             auto val = cast<Label>(node);
-            ss << Style_Keyword << "Label" << Style_None << " " << (void *)val;
+            ss << Style_Keyword << "Label" << Style_None << " ";
+            ss << Style_Symbol << val->name.name()->data
+                << "@" << (void *)val << Style_None;
             if (newlines) {
                 stream_block_result(val->body, val->value, depth+1, maxdepth);
             }
@@ -509,7 +511,9 @@ struct StreamAST : StreamAnchors {
         case VK_Merge: {
             stream_type_prefix(node);
             auto val = cast<Merge>(node);
-            ss << Style_Keyword << "Merge" << Style_None << " " << (void *)val->label;
+            ss << Style_Keyword << "Merge" << Style_None << " ";
+            ss << Style_Symbol << val->label->name.name()->data
+                << "@" << (void *)val->label << Style_None;
             if (newlines) {
                 walk_same_or_newline(val->value, depth+1, maxdepth);
             }
