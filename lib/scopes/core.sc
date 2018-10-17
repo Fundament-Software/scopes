@@ -1147,7 +1147,9 @@ inline make-asym-binary-op-dispatch (symbol rtype friendly-op-name)
 'set-symbols Symbol
     __== = (box-binary-op (single-binary-op-dispatch icmp==))
     __!= = (box-binary-op (single-binary-op-dispatch icmp!=))
-    unique = sc_symbol_new_unique
+    unique =
+        inline (cls name)
+            sc_symbol_new_unique name
     vararg? = sc_symbol_is_vararg
     __imply =
         box-cast
@@ -3074,6 +3076,90 @@ fn extract-name-params-body (expr)
         let params body = (decons body)
         return arg (params as list) body
 
+fn gen-syntax-matcher (params)
+    if false
+        return unnamed '()
+    let paramcount = (countof params)
+    let expr =
+        'unique Symbol "expr"
+    loop (i rest letbody varargs) = 0 params '() false
+    if (not (empty? rest))
+        let paramv rest = (decons rest)
+        let T = ('typeof paramv)
+        if (T == Symbol)
+            let param = (paramv as Symbol)
+            let vararg? = ('vararg? param)
+            let letbody =
+                if vararg?
+                    if (not (empty? rest))
+                        syntax-error! ('anchor paramv)
+                            "vararg parameter is not in last place"
+                    cons
+                        qq
+                            [let paramv] = [expr]
+                        letbody
+                else
+                    cons
+                        qq
+                            [let paramv expr] =
+                                [`sc_list_decons expr];
+                        letbody
+            repeat (i + 1) rest letbody (| varargs vararg?)
+        elseif (T == list)
+            let param = (paramv as list)
+            let head head-rest = (decons param)
+            if ((('typeof head) == Symbol) and ((head as Symbol) == 'syntax-quote))
+                let head = (head as Symbol)
+                let sym = (decons head-rest)
+                let token = ('unique Symbol "token")
+                inline verify-token (have want)
+                    if ((have as Symbol) != want)
+                        syntax-error! ('anchor have)
+                            .. (repr want) " token expected"
+                let letbody =
+                    cons
+                        list verify-token token (list syntax-quote sym)
+                        qq
+                            [let token expr] =
+                                [`sc_list_decons expr];
+                        letbody
+                repeat (i + 1) rest letbody varargs
+            else
+                let token body =
+                    gen-syntax-matcher param
+                let letbody =
+                    cons
+                        cons inline-do body
+                        qq
+                            [let token] =
+                                [as token list];
+                        qq
+                            [let token expr] =
+                                [`sc_list_decons expr];
+                        letbody
+                repeat (i + 1) rest letbody varargs
+        else
+            syntax-error! ('anchor paramv)
+                "unsupported pattern"
+    return expr
+        cons
+            qq
+                [verify-count] ([`sc_list_count expr])
+                    [(? varargs (sub paramcount 1) paramcount)]
+                    [(? varargs -1 paramcount)]
+            'reverse letbody
+
+define syntax-match
+    syntax-macro
+        fn "syntax-match" (expr)
+            let arg params = (decons expr 2)
+            let params = (params as list)
+            let token expr =
+                gen-syntax-matcher params
+            cons inline-do
+                list let token '= arg
+                expr
+
 define sugar
     inline half-wrap-syntax-macro (f)
         fn (expr next scope)
@@ -3096,42 +3182,18 @@ define sugar
             let name params body =
                 extract-name-params-body expr
             let paramcount = ((countof params) as i32)
-            let expr = (Symbol "#expr")
             let next = 'next-expr
             let scope = 'syntax-scope
             let head = 'expr-head
-            loop (i rest letbody varargs) = 0 params '() false
-            if (not (empty? rest))
-                let paramv rest = (decons rest)
-                let param = (paramv as Symbol)
-                let vararg? = ('vararg? param)
-                let letbody =
-                    if vararg?
-                        if (not (empty? rest))
-                            syntax-error! ('anchor paramv)
-                                "vararg parameter is not in last place"
-                        cons
-                            qq
-                                [let paramv] = [expr]
-                            letbody
-                    else
-                        cons
-                            qq
-                                [let paramv expr] =
-                                    [sc_list_decons expr];
-                            letbody
-                repeat (i + 1) rest letbody (| varargs vararg?)
-            let body =
-                .. ('reverse letbody) body
+            let expr unpack-expr =
+                gen-syntax-matcher params
             let content =
                 cons (list expr next scope)
                     qq
                         [let head expr] =
-                            [sc_list_decons expr];
-                    qq
-                        [verify-count] ([sc_list_count expr])
-                            [(? varargs (sub paramcount 1) paramcount)]
-                            [(? varargs -1 paramcount)]
+                            [`sc_list_decons expr];
+                    cons inline-do
+                        unpack-expr
                     body
             if (('typeof name) == Symbol)
                 qq
@@ -3174,19 +3236,19 @@ define spice
                         cons
                             qq
                                 [let paramv] =
-                                    [sc_getarglist args i];
+                                    [`sc_getarglist args i];
                             body
                     else
                         cons
                             qq
                                 [let paramv] =
-                                    [sc_getarg args i];
+                                    [`sc_getarg args i];
                             body
                 repeat (i + 1) rest body (| varargs vararg?)
             let content =
                 cons (list args)
                     qq
-                        [verify-count] ([sc_argcount args])
+                        [verify-count] ([`sc_argcount args])
                             [(? varargs (sub paramcount 1) paramcount)]
                             [(? varargs -1 paramcount)]
                     body

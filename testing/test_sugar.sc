@@ -35,5 +35,10 @@ assert
 
 assert true
 
+syntax-match '((kwok 2 4 5 6) 3 4)
+    ('kwok a b q...) c...
+
+print a b c...
+print q...
 
 return;
