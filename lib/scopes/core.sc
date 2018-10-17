@@ -3108,6 +3108,7 @@ fn gen-syntax-matcher (params)
         elseif (T == list)
             let param = (paramv as list)
             let head head-rest = (decons param)
+            let mid mid-rest = (decons head-rest)
             if ((('typeof head) == Symbol) and ((head as Symbol) == 'syntax-quote))
                 let head = (head as Symbol)
                 let sym = (decons head-rest)
@@ -3121,6 +3122,27 @@ fn gen-syntax-matcher (params)
                         list verify-token token (list syntax-quote sym)
                         qq
                             [let token expr] =
+                                [`sc_list_decons expr];
+                        letbody
+                repeat (i + 1) rest letbody varargs
+            elseif ((('typeof mid) == Symbol) and ((mid as Symbol) == ':))
+                let exprT = (decons mid-rest)
+                let param = (head as Symbol)
+                if ('vararg? param)
+                    syntax-error! ('anchor head)
+                        "vararg parameter cannot be typed"
+                inline verify-type (have want)
+                    if (('typeof have) != want)
+                        syntax-error! ('anchor have)
+                            .. "value of type " (repr want) " expected"
+                    have as want
+                let letbody =
+                    cons
+                        qq
+                            [let head] =
+                                [verify-type head exprT];
+                        qq
+                            [let head expr] =
                                 [`sc_list_decons expr];
                         letbody
                 repeat (i + 1) rest letbody varargs
