@@ -949,11 +949,6 @@ struct Expander {
         return call;
     }
 
-    struct ListScopePair { const List *topit; Scope *env; };
-
-    SCOPES_TYPEDEF_RESULT_RAISES(sc_list_scope_raises, ListScopePair);
-    typedef sc_list_scope_raises_t (*HandlerFuncType)(const List *, Scope *);
-
     SCOPES_RESULT(Value *) expand(Value *node) {
         SCOPES_RESULT_TYPE(Value *);
     expand_again:
@@ -1052,19 +1047,20 @@ struct Expander {
                         << T << ", must be " << list_expander_func_type;
                     SCOPES_LOCATION_ERROR(ss.str());
                 }
-                HandlerFuncType f = (HandlerFuncType)cast<ConstPointer>(list_handler_node)->value;
+                sc_syntax_wildcard_func_t f =
+                    (sc_syntax_wildcard_func_t)cast<ConstPointer>(list_handler_node)->value;
                 auto ok_result = f(List::from(node, next), env);
                 if (!ok_result.ok) {
                     set_last_error(ok_result.except);
                     SCOPES_RETURN_ERROR();
                 }
                 auto result = ok_result._0;
-                if (result.topit) {
-                    Value *newnode = result.topit->at;
+                if (result._0) {
+                    Value *newnode = result._0->at;
                     if (newnode != node) {
                         node = newnode;
-                        next = result.topit->next;
-                        env = result.env;
+                        next = result._0->next;
+                        env = result._1;
                         goto expand_again;
                     } else if (verbose) {
                         StyledStream ss(SCOPES_CERR);
@@ -1093,19 +1089,19 @@ struct Expander {
                             << T << ", must be " << list_expander_func_type;
                         SCOPES_LOCATION_ERROR(ss.str());
                     }
-                    HandlerFuncType f = (HandlerFuncType)cast<ConstPointer>(symbol_handler_node)->value;
+                    sc_syntax_wildcard_func_t f = (sc_syntax_wildcard_func_t)cast<ConstPointer>(symbol_handler_node)->value;
                     auto ok_result = f(List::from(node, next), env);
                     if (!ok_result.ok) {
                         set_last_error(ok_result.except);
                         SCOPES_RETURN_ERROR();
                     }
                     auto result = ok_result._0;
-                    if (result.topit) {
-                        Value *newnode = result.topit->at;
+                    if (result._0) {
+                        Value *newnode = result._0->at;
                         if (newnode != node) {
                             node = newnode;
-                            next = result.topit->next;
-                            env = result.env;
+                            next = result._0->next;
+                            env = result._1;
                             goto expand_again;
                         }
                     }

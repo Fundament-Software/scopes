@@ -94,19 +94,6 @@ typedef uint64_t sc_symbol_t;
 
 #endif
 
-typedef struct sc_void_raises_ { bool ok; sc_error_t *except; } sc_void_raises_t;
-#define SCOPES_TYPEDEF_RESULT_RAISES(NAME, RESULT_TYPE) \
-    typedef struct NAME ## _ { bool ok; sc_error_t *except; RESULT_TYPE _0; } NAME ## _t
-
-SCOPES_TYPEDEF_RESULT_RAISES(sc_value_raises, sc_value_t *);
-SCOPES_TYPEDEF_RESULT_RAISES(sc_string_raises, const sc_string_t *);
-SCOPES_TYPEDEF_RESULT_RAISES(sc_size_raises, size_t);
-SCOPES_TYPEDEF_RESULT_RAISES(sc_scope_raises, sc_scope_t *);
-SCOPES_TYPEDEF_RESULT_RAISES(sc_int_raises, int32_t);
-SCOPES_TYPEDEF_RESULT_RAISES(sc_symbol_raises, sc_symbol_t);
-SCOPES_TYPEDEF_RESULT_RAISES(sc_type_raises, const sc_type_t *);
-SCOPES_TYPEDEF_RESULT_RAISES(sc_bool_raises, bool);
-
 typedef struct sc_bool_list_tuple_ { bool _0; const sc_list_t *_1; } sc_bool_list_tuple_t;
 typedef struct sc_bool_label_tuple_ { bool _0; sc_label_t *_1; } sc_bool_label_tuple_t;
 typedef struct sc_bool_string_tuple_ { bool _0; const sc_string_t *_1; } sc_bool_string_tuple_t;
@@ -119,7 +106,6 @@ typedef struct sc_bool_int_tuple_ { bool _0; int32_t _1; } sc_bool_int_tuple_t;
 typedef struct sc_bool_value_tuple_ { bool _0; sc_value_t *_1; } sc_bool_value_tuple_t;
 
 typedef struct sc_value_list_tuple_ { sc_value_t *_0; const sc_list_t *_1; } sc_value_list_tuple_t;
-SCOPES_TYPEDEF_RESULT_RAISES(sc_value_list_raises, sc_value_list_tuple_t);
 
 //typedef struct sc_symbol_any_tuple_ { sc_symbol_t _0; sc_any_t _1; } sc_symbol_any_tuple_t;
 typedef struct sc_symbol_value_tuple_ { sc_symbol_t _0; sc_value_t *_1; } sc_symbol_value_tuple_t;
@@ -133,9 +119,30 @@ typedef struct sc_rawstring_i32_array_tuple_ { int _0; char **_1; } sc_rawstring
 
 typedef struct sc_type_type_tuple_ { const sc_type_t *_0; const sc_type_t *_1; } sc_type_type_tuple_t;
 
+typedef struct sc_list_scope_tuple_ { const sc_list_t *_0; sc_scope_t *_1; } sc_list_scope_tuple_t;
+
+// raising types
+
+typedef struct sc_void_raises_ { bool ok; sc_error_t *except; } sc_void_raises_t;
+#define SCOPES_TYPEDEF_RESULT_RAISES(NAME, RESULT_TYPE) \
+    typedef struct NAME ## _ { bool ok; sc_error_t *except; RESULT_TYPE _0; } NAME ## _t
+
+SCOPES_TYPEDEF_RESULT_RAISES(sc_value_raises, sc_value_t *);
+SCOPES_TYPEDEF_RESULT_RAISES(sc_string_raises, const sc_string_t *);
+SCOPES_TYPEDEF_RESULT_RAISES(sc_size_raises, size_t);
+SCOPES_TYPEDEF_RESULT_RAISES(sc_scope_raises, sc_scope_t *);
+SCOPES_TYPEDEF_RESULT_RAISES(sc_int_raises, int32_t);
+SCOPES_TYPEDEF_RESULT_RAISES(sc_symbol_raises, sc_symbol_t);
+SCOPES_TYPEDEF_RESULT_RAISES(sc_type_raises, const sc_type_t *);
+SCOPES_TYPEDEF_RESULT_RAISES(sc_bool_raises, bool);
+
+SCOPES_TYPEDEF_RESULT_RAISES(sc_value_list_raises, sc_value_list_tuple_t);
+SCOPES_TYPEDEF_RESULT_RAISES(sc_list_scope_raises, sc_list_scope_tuple_t);
+
 // prototypes
 
 typedef sc_value_raises_t (*sc_ast_macro_func_t)(sc_value_t *);
+typedef sc_list_scope_raises_t (*sc_syntax_wildcard_func_t)(const sc_list_t *, sc_scope_t *);
 
 // compiler
 
