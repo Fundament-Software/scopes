@@ -651,6 +651,9 @@ inline set-symbols (self values...)
     none? = (typify Value-none? Value)
     __repr = sc_value_repr
     ast-repr = sc_value_ast_repr
+    dump =
+        inline (self)
+            sc_write (sc_value_ast_repr self)
     typeof = sc_value_type
     anchor = sc_value_anchor
     argcount = sc_argcount
@@ -3077,23 +3080,7 @@ fn extract-name-params-body (expr)
         let params body = (decons body)
         return arg (params as list) body
 
-#label ok
-    label case1
-        if fit-pattern
-            merge ok
-                do
-                    body
-        else
-            merge case1
-    label case2
-        if fit-pattern
-            merge ok
-                do
-                    body
-        else
-            merge case1
-
-fn gen-syntax-matcher (fail-label params)
+fn gen-syntax-matcher (failfunc expr scope params)
     fn check-count (count mincount maxcount)
         if (icmp>=s mincount 0)
             if (icmp<s count mincount)
@@ -3102,110 +3089,84 @@ fn gen-syntax-matcher (fail-label params)
             if (icmp>s count maxcount)
                 return false
         return true
-
     if false
-        return unnamed '()
+        return `[]
     let paramcount = (countof params)
-    let expr =
-        'unique Symbol "expr"
-    loop (i rest letbody varargs) = 0 params '() false
+    let outexpr = (sc_expression_new)
+    loop (i rest next varargs) = 0 params expr false
     if (not (empty? rest))
         let paramv rest = (decons rest)
         let T = ('typeof paramv)
         if (T == Symbol)
             let param = (paramv as Symbol)
             let vararg? = ('vararg? param)
-            let letbody =
+            let arg next =
                 if vararg?
                     if (not (empty? rest))
                         syntax-error! ('anchor paramv)
                             "vararg parameter is not in last place"
-                    cons
-                        qq
-                            [let paramv] = [expr]
-                        letbody
+                    _ next `[]
                 else
-                    cons
-                        qq
-                            [let paramv expr] =
-                                [`sc_list_decons expr];
-                        letbody
-            repeat (i + 1) rest letbody (| varargs vararg?)
+                    ast-quote
+                        let arg next =
+                            sc_list_decons next
+                    _ arg next
+            sc_expression_append outexpr arg
+            'set-symbol scope param arg
+            repeat (i + 1) rest next (| varargs vararg?)
         elseif (T == list)
             let param = (paramv as list)
             let head head-rest = (decons param)
             let mid mid-rest = (decons head-rest)
             if ((('typeof head) == Symbol) and ((head as Symbol) == 'syntax-quote))
                 let head = (head as Symbol)
-                let sym = (decons head-rest)
-                let token = ('unique Symbol "token")
-                inline verify-token (have want)
-                    if ((have as Symbol) != want)
-                        syntax-error! ('anchor have)
-                            .. (repr want) " token expected"
-                # todo: fix verify-token
-                let letbody =
-                    cons
-                        qq
-                            [verify-token token] (syntax-quote [sym])
-                        qq
-                            [let token expr] =
-                                [`sc_list_decons expr];
-                        letbody
-                repeat (i + 1) rest letbody varargs
+                let sym = ((decons head-rest) as Symbol)
+                sc_expression_append outexpr
+                    ast-quote
+                        let arg next = (sc_list_decons next)
+                        if (ptrcmp!= ('typeof arg) Symbol)
+                            failfunc;
+                        if ((arg as Symbol) != sym)
+                            failfunc;
+                repeat (i + 1) rest next varargs
             elseif ((('typeof mid) == Symbol) and ((mid as Symbol) == ':))
                 let exprT = (decons mid-rest)
+                let exprT = (sc_expand exprT '() scope)
                 let param = (head as Symbol)
                 if ('vararg? param)
                     syntax-error! ('anchor head)
                         "vararg parameter cannot be typed"
-                inline check-type (have want)
-                    if (('typeof have) != want)
-                        return false
-                        syntax-error! ('anchor have)
-                            .. "value of type " (repr want) " expected"
-                    have as want
-                let letbody =
-                    cons
-                        qq
-                            [let head] =
-                                [if] ([ptrcmp!=] ('typeof [head]) [exprT])
-                                    [merge fail-label];
-                                else
-                                    [as head exprT];
-                        qq
-                            [let head expr] =
-                                [`sc_list_decons expr];
-                        letbody
-                repeat (i + 1) rest letbody varargs
+                sc_expression_append outexpr
+                    ast-quote
+                        let arg next =
+                            sc_list_decons next
+                        let arg =
+                            if (not (('typeof arg) == exprT))
+                                failfunc;
+                            else (arg as exprT)
+                'set-symbol scope param arg
+                repeat (i + 1) rest next varargs
             else
-                let token body =
-                    gen-syntax-matcher fail-label param
-                let letbody =
-                    cons
-                        cons inline-do body
-                        qq
-                            [let token] =
-                                [if] ([ptrcmp!=] ('typeof [token]) [list])
-                                    [merge fail-label];
-                                else
-                                    [as token list];
-                        qq
-                            [let token expr] =
-                                [`sc_list_decons expr];
-                        letbody
-                repeat (i + 1) rest letbody varargs
+                ast-quote
+                    let arg next = (sc_list_decons next)
+                    let arg =
+                        if (ptrcmp!= ('typeof arg) list)
+                            failfunc;
+                        else
+                            arg as list
+                    ast-unquote
+                        gen-syntax-matcher failfunc arg scope param
+                repeat (i + 1) rest next varargs
         else
             syntax-error! ('anchor paramv)
                 "unsupported pattern"
-    return expr
-        cons
-            qq
-                [if] ([not] ([check-count] ([`sc_list_count expr])
+    return
+        ast-quote
+            if (not (check-count (sc_list_count expr)
                     [(? varargs (sub paramcount 1) paramcount)]
                     [(? varargs -1 paramcount)]))
-                    [merge fail-label];
-            'reverse letbody
+                failfunc;
+            outexpr
 
 define syntax-match
     fn next-head? (next)
@@ -3218,44 +3179,52 @@ define syntax-match
         unnamed
     syntax-block-scope-macro
         fn "syntax-match" (expr next scope)
-            let head arg = (decons expr 2)
-            let ok-label = ('unique Symbol "ok")
-            loop (next result) = next '()
-            let head = (next-head? next)
-            switch head
-            case 'case
-                let expr next = (decons next)
-                let expr = (expr as list)
-                let head cond body = (decons expr 2)
-                let cond = (cond as list)
-                let case-label = ('unique Symbol "case")
-                let token unpack-expr =
-                    gen-syntax-matcher case-label cond
-                let result =
-                    cons
-                        qq
-                            [label case-label]
-                                [(list let token '= arg)]
-                                unquote-splice unpack-expr
-                                [merge ok-label (cons do body)];
-                        result
-                repeat next result
-            case 'default
-                let expr next = (decons next)
-                let expr = (expr as list)
-                let head body = (decons expr)
-                let result =
-                    cons label ok-label
-                        'reverse
-                            cons
-                                qq
-                                    [merge ok-label (cons do body)];
-                                result
-                return
-                    cons result next
-                    scope
-            default
-                compiler-error! "default branch missing"
+            let head arg argrest = (decons expr 2)
+            let arg argrest = (sc_expand arg argrest scope)
+            let outnext = (alloca-array list 1)
+            let outexpr next =
+                ast-quote
+                    label ok-label
+                        inline return-ok (args...)
+                            merge ok-label args...
+                        ast-unquote
+                            let outexpr = (sc_expression_new)
+                            loop (next) = next
+                            let head = (next-head? next)
+                            switch head
+                            case 'case
+                                let expr next = (decons next)
+                                let expr = (expr as list)
+                                let head cond body = (decons expr 2)
+                                let cond = (cond as list)
+                                sc_expression_append outexpr
+                                    ast-quote
+                                        label case-label
+                                            inline fail-case ()
+                                                merge case-label
+                                            let token = arg
+                                            ast-unquote
+                                                let newscope = (Scope scope)
+                                                let unpack-expr =
+                                                    gen-syntax-matcher fail-case token newscope cond
+                                                let body =
+                                                    sc_expand (cons do body) '() newscope
+                                                ast-quote
+                                                    unpack-expr
+                                                    return-ok body
+                                repeat next
+                            case 'default
+                                let expr next = (decons next)
+                                let expr = (expr as list)
+                                let head body = (decons expr)
+                                let body =
+                                    sc_expand (cons do body) '() scope
+                                sc_expression_append outexpr `(return-ok body)
+                                store next outnext
+                                outexpr
+                            default
+                                compiler-error! "default branch missing"
+            return (cons outexpr (load outnext)) scope
 
 define sugar
     inline wrap-syntax-macro (f)
@@ -3270,38 +3239,45 @@ define sugar
                             cons new-expr new-next
                     scope
 
-    syntax-macro
-        fn "expand-sugar" (expr)
+    syntax-block-scope-macro
+        fn "expand-sugar" (expr next scope)
             raises-compile-error;
+            let head expr = (decons expr)
             let name params body =
                 extract-name-params-body expr
-            let paramcount = ((countof params) as i32)
-            let next = 'next-expr
-            let scope = 'syntax-scope
-            let head = 'expr-head
-            let ok-label = ('unique Symbol "ok")
-            let fail-label = ('unique Symbol "fail")
-            let expr unpack-expr =
-                gen-syntax-matcher fail-label params
-            let content =
-                cons (list expr next scope)
+            let func =
+                ast-quote
+                    inline (expr next-expr syntax-scope)
+                        let head expr = (sc_list_decons expr)
+                        label ok-label
+                            inline return-ok (args...)
+                                merge ok-label args...
+                            label fail-label
+                                inline fail-case ()
+                                    merge fail-label
+                                ast-unquote
+                                    let subscope = (Scope scope)
+                                    'set-symbols subscope
+                                        next-expr = next-expr
+                                        syntax-scope = syntax-scope
+                                        expr-head = head
+                                    let unpack-expr =
+                                        gen-syntax-matcher fail-case expr subscope params
+                                    let body =
+                                        sc_expand (cons do body) '() subscope
+                                    ast-quote
+                                        unpack-expr
+                                        return-ok body
+                            compiler-error! "syntax error"
+            let outexpr =
+                if (('typeof name) == Symbol)
                     qq
-                        [let head expr] =
-                            [`sc_list_decons expr];
-                        [label ok-label]
-                            [label fail-label]
-                                unquote-splice unpack-expr
-                                [merge ok-label (cons do body)];
-                            [compiler-error!] "syntax error"
-            if (('typeof name) == Symbol)
-                qq
-                    [let name] =
-                        [wrap-syntax-macro]
-                            [(cons inline (name as Symbol as string) content)]
-            else
-                qq
-                    [wrap-syntax-macro]
-                        [(cons inline name content)]
+                        [let name] =
+                            [wrap-syntax-macro func];
+                else
+                    qq
+                        [wrap-syntax-macro func];
+            return (cons outexpr next) scope
 
 define spice
     inline wrap-ast-macro (f)

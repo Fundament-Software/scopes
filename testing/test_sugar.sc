@@ -33,22 +33,26 @@ assert
 assert
     (test2 1 2 3 4 5 6) == 12
 
-assert true
-
 fn test-match (expr)
     syntax-match expr
     case (('kwok (a : i32) b q...) c...)
-        print "case 1"
-        print a b c...
-        print q...
+        print "case1" a b q...
+        print c...
         return;
     case ('kwok 'kwok x)
-        print "case 2"
-        print x
+        print "case2" x
+        return;
+    case (x (y z) w)
+        print "case3" x y z w
+        return;
+    case (x y...)
+        print "case4" x y...
         return;
     default
         compiler-error! "wrong!"
 
 test-match '((kwok 2 4 5 6) 3 4)
 test-match '(kwok kwok 20)
+test-match '(1 (2 3) 4)
+test-match '(1 2 3)
 return;

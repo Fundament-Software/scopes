@@ -202,7 +202,11 @@ SCOPES_RESULT(void) error_label_expected(Value *value) {
     SCOPES_RESULT_TYPE(void);
     print_definition_anchor(value);
     StyledString ss;
-    ss.out << "expected label, not value of type " << value->get_type();
+    if (value->is_typed()) {
+        ss.out << "expected label, not value of type " << value->get_type();
+    } else {
+        ss.out << "expected label, not untyped value";
+    }
     SCOPES_LOCATION_ERROR(ss.str());
 }
 
