@@ -119,6 +119,7 @@ typedef struct sc_bool_int_tuple_ { bool _0; int32_t _1; } sc_bool_int_tuple_t;
 typedef struct sc_bool_value_tuple_ { bool _0; sc_value_t *_1; } sc_bool_value_tuple_t;
 
 typedef struct sc_value_list_tuple_ { sc_value_t *_0; const sc_list_t *_1; } sc_value_list_tuple_t;
+SCOPES_TYPEDEF_RESULT_RAISES(sc_value_list_raises, sc_value_list_tuple_t);
 
 //typedef struct sc_symbol_any_tuple_ { sc_symbol_t _0; sc_any_t _1; } sc_symbol_any_tuple_t;
 typedef struct sc_symbol_value_tuple_ { sc_symbol_t _0; sc_value_t *_1; } sc_symbol_value_tuple_t;
@@ -139,7 +140,7 @@ typedef sc_value_raises_t (*sc_ast_macro_func_t)(sc_value_t *);
 // compiler
 
 sc_i32_i32_i32_tuple_t sc_compiler_version();
-sc_value_raises_t sc_expand(sc_value_t *expr, sc_scope_t *scope);
+sc_value_list_raises_t sc_expand(sc_value_t *expr, const sc_list_t *next, sc_scope_t *scope);
 sc_value_raises_t sc_eval(const sc_anchor_t *anchor, const sc_list_t *expr, sc_scope_t *scope);
 sc_value_raises_t sc_typify_template(sc_value_t *f, int numtypes, const sc_type_t **typeargs);
 sc_value_raises_t sc_typify(sc_closure_t *srcl, int numtypes, const sc_type_t **typeargs);

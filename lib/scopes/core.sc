@@ -3958,6 +3958,7 @@ define-syntax-block-scope-macro syntax-if
         if false
             return '() next-expr
         let cond body = (decons body)
+        let cond body = (sc_expand cond body syntax-scope)
         let elseexpr next-next-expr =
             if (empty? next-expr)
                 _ '() next-expr
@@ -3975,7 +3976,6 @@ define-syntax-block-scope-macro syntax-if
                         _ '() next-expr
                 else
                     _ '() next-expr
-        let cond = (sc_expand cond syntax-scope)
         if ((('typeof cond) == bool) and ('constant? cond))
             if (cond as bool)
                 return body next-next-expr

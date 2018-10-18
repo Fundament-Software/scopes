@@ -125,9 +125,9 @@ sc_rawstring_i32_array_tuple_t sc_launch_args() {
 #define RETURN_VOID(X) { auto _result = (X); \
     return {_result.ok(), (_result.ok()?nullptr:get_last_error())}; }
 
-sc_value_raises_t sc_expand(sc_value_t *expr, sc_scope_t *scope) {
+sc_value_list_raises_t sc_expand(sc_value_t *expr, const sc_list_t *next, sc_scope_t *scope) {
     using namespace scopes;
-    RETURN_RESULT(expand(expr, scope));
+    RETURN_RESULT(expand(expr, next, scope));
 }
 
 sc_value_raises_t sc_eval(const sc_anchor_t *anchor, const sc_list_t *expr, sc_scope_t *scope) {
@@ -1594,7 +1594,7 @@ void init_globals(int argc, char *argv[]) {
     const Type *voidstar = native_ro_pointer_type(_void);
 
     DEFINE_EXTERN_C_FUNCTION(sc_compiler_version, arguments_type({TYPE_I32, TYPE_I32, TYPE_I32}));
-    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_expand, TYPE_Value, TYPE_Value, TYPE_Scope);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_expand, arguments_type({TYPE_Value, TYPE_List}), TYPE_Value, TYPE_List, TYPE_Scope);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_eval, TYPE_Value, TYPE_Anchor, TYPE_List, TYPE_Scope);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_eval_inline, TYPE_Anchor, TYPE_Value, TYPE_List, TYPE_Scope);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_typify_template, TYPE_Value, TYPE_Value, TYPE_I32, native_ro_pointer_type(TYPE_Type));

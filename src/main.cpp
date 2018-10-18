@@ -4,6 +4,8 @@
     See LICENSE.md for details.
 */
 
+#define SCOPESRT_IMPL
+
 #include "boot.hpp"
 #include "timer.hpp"
 #include "gc.hpp"
@@ -23,8 +25,6 @@
 #include "value.hpp"
 #include "compiler_flags.hpp"
 #include "dyn_cast.inc"
-
-#define SCOPESRT_IMPL
 #include "scopes/scopes.h"
 
 #include "types.hpp"

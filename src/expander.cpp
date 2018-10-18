@@ -1131,11 +1131,13 @@ struct Expander {
 bool Expander::verbose = false;
 const Type *Expander::list_expander_func_type = nullptr;
 
-SCOPES_RESULT(Value *) expand(Value *expr, Scope *scope) {
-    SCOPES_RESULT_TYPE(Value *);
+SCOPES_RESULT(sc_value_list_tuple_t) expand(Value *expr, const List *next, Scope *scope) {
+    SCOPES_RESULT_TYPE(sc_value_list_tuple_t);
     Scope *subenv = scope?scope:sc_get_globals();
-    Expander subexpr(subenv, nullptr);
-    return subexpr.expand(expr);
+    Expander subexpr(subenv, nullptr, next);
+    Value *value = SCOPES_GET_RESULT(subexpr.expand(expr));
+    sc_value_list_tuple_t result = { value, subexpr.next };
+    return result;
 }
 
 SCOPES_RESULT(Template *) expand_inline(const Anchor *anchor, Template *astscope, const List *expr, Scope *scope) {
