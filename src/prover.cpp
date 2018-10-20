@@ -408,6 +408,8 @@ static SCOPES_RESULT(Value *) prove_Expression(const ASTContext &ctx, Expression
             SCOPES_CHECK_RESULT(prove(subctx, expr->body[i]));
         }
     }
+    if (!expr->value)
+        return build_argument_list(expr->anchor(), {});
     return SCOPES_GET_RESULT(prove(ctx, expr->value));
 }
 

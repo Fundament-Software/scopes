@@ -1393,14 +1393,18 @@ sc_typename_type_set_storage NullType ('pointer void)
                 if (icmp== ('kind ('storage T)) type-kind-pointer)
                     return `(bitcast expr T)
                 compiler-error! "cannot convert to type"
-    #__==
-        fn (a b flipped)
-            if flipped
-                if (pointer-type? (storageof (typeof a)))
-                    icmp== (ptrtoint a usize) 0:usize
-            else
-                if (pointer-type? (storageof (typeof b)))
-                    icmp== (ptrtoint b usize) 0:usize
+    __== =
+        box-binary-op
+            fn (lhsT rhsT lhs rhs)
+                if (icmp== ('kind ('storage rhsT)) type-kind-pointer)
+                    return `(icmp== (ptrtoint rhs usize) 0:usize)
+                compiler-error! "only pointers can be compared to null"
+    __r== =
+        box-binary-op
+            fn (lhsT rhsT lhs rhs)
+                if (icmp== ('kind ('storage lhsT)) type-kind-pointer)
+                    return `(icmp== (ptrtoint lhs usize) 0:usize)
+                compiler-error! "only pointers can be compared to null"
 
 #---------------------------------------------------------------------------
 
@@ -3080,15 +3084,16 @@ fn extract-name-params-body (expr)
         let params body = (decons body)
         return arg (params as list) body
 
+fn check-count (count mincount maxcount)
+    if (icmp>=s mincount 0)
+        if (icmp<s count mincount)
+            return false
+    if (icmp>=s maxcount 0)
+        if (icmp>s count maxcount)
+            return false
+    return true
+
 fn gen-syntax-matcher (failfunc expr scope params)
-    fn check-count (count mincount maxcount)
-        if (icmp>=s mincount 0)
-            if (icmp<s count mincount)
-                return false
-        if (icmp>=s maxcount 0)
-            if (icmp>s count maxcount)
-                return false
-        return true
     if false
         return `[]
     let paramcount = (countof params)
@@ -3129,7 +3134,7 @@ fn gen-syntax-matcher (failfunc expr scope params)
                         if ((arg as Symbol) != sym)
                             failfunc;
                 repeat (i + 1) rest next varargs
-            elseif ((('typeof mid) == Symbol) and ((mid as Symbol) == ':))
+            elseif ((('typeof mid) == Symbol) and ((mid as Symbol) == 'as))
                 let exprT = (decons mid-rest)
                 let exprT = (sc_expand exprT '() scope)
                 let param = (head as Symbol)
@@ -3141,21 +3146,23 @@ fn gen-syntax-matcher (failfunc expr scope params)
                         let arg next =
                             sc_list_decons next
                         let arg =
-                            if (not (('typeof arg) == exprT))
+                            if (('constant? arg) and (('typeof arg) == exprT))
+                                arg as exprT
+                            else
                                 failfunc;
-                            else (arg as exprT)
                 'set-symbol scope param arg
                 repeat (i + 1) rest next varargs
             else
-                ast-quote
-                    let arg next = (sc_list_decons next)
-                    let arg =
-                        if (ptrcmp!= ('typeof arg) list)
-                            failfunc;
-                        else
-                            arg as list
-                    ast-unquote
-                        gen-syntax-matcher failfunc arg scope param
+                sc_expression_append outexpr
+                    ast-quote
+                        let arg next = (sc_list_decons next)
+                        let arg =
+                            if (ptrcmp!= ('typeof arg) list)
+                                failfunc;
+                            else
+                                arg as list
+                        ast-unquote
+                            gen-syntax-matcher failfunc arg scope param
                 repeat (i + 1) rest next varargs
         else
             syntax-error! ('anchor paramv)
@@ -3226,6 +3233,8 @@ define syntax-match
                                 compiler-error! "default branch missing"
             return (cons outexpr (load outnext)) scope
 
+#-------------------------------------------------------------------------------
+
 define sugar
     inline wrap-syntax-macro (f)
         syntax-block-scope-macro
@@ -3278,6 +3287,172 @@ define sugar
                     qq
                         [wrap-syntax-macro func];
             return (cons outexpr next) scope
+
+#-------------------------------------------------------------------------------
+
+fn uncomma (l)
+    """"uncomma list l, wrapping all comma separated symbols as new lists
+        example:
+            (uncomma '(a , b c d , e f , g h)) -> '(a (b c d) (e f) (g h))
+    fn comma-separated? (l)
+        loop (next) = l
+        if (empty? next)
+            return false
+        let at next = (decons next)
+        if ((('typeof at) == Symbol) and ((at as Symbol) == ',))
+            return true
+        repeat next
+    fn merge-lists (anchor current total)
+        if ((countof current) == 0)
+            syntax-error! anchor "unexpected comma"
+        cons
+            if ((countof current) == 1) ('@ current)
+            else (Value current)
+            total
+    if (comma-separated? l)
+        fn process (l)
+            if (empty? l)
+                return (nullof Anchor) '() '()
+            let at next = (decons l)
+            let anchor current total = (process next)
+            let anchor = ('anchor at)
+            if ((('typeof at) == Symbol) and ((at as Symbol) == ',))
+                if (empty? next)
+                    return anchor '() total
+                return anchor '() (merge-lists anchor current total)
+            else
+                return anchor (cons at current) total
+        return (merge-lists (process l))
+    else l
+
+fn gen-argument-matcher (failfunc expr scope params)
+    if false
+        return `[]
+    let params = (uncomma params)
+    let paramcount = (countof params)
+    let outexpr = (sc_expression_new)
+    loop (i rest varargs) = 0 params false
+    if (not (empty? rest))
+        let paramv rest = (decons rest)
+        let T = ('typeof paramv)
+        if (T == Symbol)
+            let param = (paramv as Symbol)
+            let vararg? = ('vararg? param)
+            let arg =
+                if vararg?
+                    if (not (empty? rest))
+                        syntax-error! ('anchor paramv)
+                            "vararg parameter is not in last place"
+                    `(sc_getarglist expr i)
+                else
+                    `(sc_getarg expr i)
+            sc_expression_append outexpr arg
+            'set-symbol scope param arg
+            repeat (i + 1) rest (| varargs vararg?)
+        elseif (T == list)
+            let param = (paramv as list)
+            let head head-rest = (decons param)
+            let mid mid-rest = (decons head-rest)
+            if ((('typeof mid) == Symbol) and ((mid as Symbol) == ':))
+                let exprT = (decons mid-rest)
+                let exprT = (sc_expand exprT '() scope)
+                let param = (head as Symbol)
+                if ('vararg? param)
+                    syntax-error! ('anchor head)
+                        "vararg parameter cannot be typed"
+                sc_expression_append outexpr
+                    ast-quote
+                        let arg = (sc_getarg expr i)
+                        let ok wraparg = (imply-expr ('typeof arg) exprT arg)
+                        let arg =
+                            if ok wraparg
+                            else
+                                failfunc;
+                'set-symbol scope param arg
+                repeat (i + 1) rest varargs
+            elseif ((('typeof mid) == Symbol) and ((mid as Symbol) == 'as))
+                let exprT = (decons mid-rest)
+                let exprT = (sc_expand exprT '() scope)
+                let param = (head as Symbol)
+                if ('vararg? param)
+                    syntax-error! ('anchor head)
+                        "vararg parameter cannot be typed"
+                sc_expression_append outexpr
+                    ast-quote
+                        let arg = (sc_getarg expr i)
+                        let arg =
+                            if (('constant? arg) and (('typeof arg) == exprT))
+                                arg as exprT
+                            else
+                                failfunc;
+                'set-symbol scope param arg
+                repeat (i + 1) rest varargs
+        syntax-error! ('anchor paramv) "unsupported pattern"
+    return
+        ast-quote
+            if (not (check-count (sc_argcount expr)
+                    [(? varargs (sub paramcount 1) paramcount)]
+                    [(? varargs -1 paramcount)]))
+                failfunc;
+            outexpr
+
+define match-args
+    fn next-head? (next)
+        if (not (empty? next))
+            let expr next = (decons next)
+            if (('typeof expr) == list)
+                let at = ('@ (expr as list))
+                if (('typeof at) == Symbol)
+                    return (at as Symbol)
+        unnamed
+    syntax-block-scope-macro
+        fn "match-args" (expr next scope)
+            let head arg argrest = (decons expr 2)
+            let arg argrest = (sc_expand arg argrest scope)
+            let outnext = (alloca-array list 1)
+            let outexpr next =
+                ast-quote
+                    label ok-label
+                        inline return-ok (args...)
+                            merge ok-label args...
+                        ast-unquote
+                            let outexpr = (sc_expression_new)
+                            loop (next) = next
+                            let head = (next-head? next)
+                            switch head
+                            case 'case
+                                let expr next = (decons next)
+                                let expr = (expr as list)
+                                let head cond body = (decons expr 2)
+                                let cond = (cond as list)
+                                sc_expression_append outexpr
+                                    ast-quote
+                                        label case-label
+                                            inline fail-case ()
+                                                merge case-label
+                                            let token = arg
+                                            ast-unquote
+                                                let newscope = (Scope scope)
+                                                let unpack-expr =
+                                                    gen-argument-matcher fail-case token newscope cond
+                                                let body =
+                                                    sc_expand (cons do body) '() newscope
+                                                ast-quote
+                                                    unpack-expr
+                                                    return-ok body
+                                repeat next
+                            case 'default
+                                let expr next = (decons next)
+                                let expr = (expr as list)
+                                let head body = (decons expr)
+                                let body =
+                                    sc_expand (cons do body) '() scope
+                                sc_expression_append outexpr `(return-ok body)
+                                store next outnext
+                                outexpr
+                            default
+                                compiler-error! "default branch missing"
+            return (cons outexpr (load outnext)) scope
 
 define spice
     inline wrap-ast-macro (f)
