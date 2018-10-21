@@ -1149,7 +1149,7 @@ repeat:
     const Type *T = callee->get_type();
     if (!rawcall) {
         assert(redirections < 16);
-        Pure *dest;
+        Value *dest;
         if (T->lookup_call_handler(dest)) {
             values.insert(values.begin(), callee);
             callee = dest;

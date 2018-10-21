@@ -1,22 +1,26 @@
 
+using import testing
 
-# todo
+# define overloaded function
+fn... testf
+case (a : i32, b : i32)
+    a * b
+case (a : i32,)
+    testf a a
 
-#print
-    tuple
-        va-types 1 2 "hi" (tupleof 1 true)
+# prints type
+print testf
+# prints function templates of the overloaded function
+print testf.templates
+# prints signatures of the overloaded function
+print testf.parameter-types
 
-#    set-type-symbol! Parameter 'apply-type
-        fn (cls params...)
-            let param1 param2 param3 = params...
-            let TT = (tuple (typeof param1) (typeof param2) (typeof param3))
-            if (type== TT (tuple Anchor Symbol type))
-                Parameter-new param1 param2 param3
-            elseif (type== TT (tuple Anchor Symbol Nothing))
-                Parameter-new param1 param2 Unknown
-            elseif (type== TT (tuple Symbol type Nothing))
-                Parameter-new (active-anchor) param1 param2
-            elseif (type== TT (tuple Symbol Nothing Nothing))
-                Parameter-new (active-anchor) param1 Unknown
-            else
-                compiler-error! "usage: Parameter [anchor] symbol [type]"
+# matches case 2
+assert ((testf 3) == 9)
+# matches case 1
+assert ((testf 3 2) == 6)
+# error: could not match argument types (i32 i32 i32) to overloaded function
+  with types
+      λ(i32 i32)
+      λ(i32)
+assert-compiler-error (testf 4 5 6)

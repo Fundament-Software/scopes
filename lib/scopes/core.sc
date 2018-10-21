@@ -1568,7 +1568,7 @@ let coerce-call-arguments =
                     sc_call_append_argument outargs outarg
                     repeat (+ i 1)
                 outargs
-            else `(rawcall self [(sc_extract_argument_list_new args 1)])
+            else `(rawcall self [('getarglist args 1)])
 
 #
     set-type-symbol! pointer 'set-element-type
@@ -3529,6 +3529,113 @@ inline zip (a b)
 
 inline enumerate (x)
     zip infinite-range x
+
+#-------------------------------------------------------------------------------
+# function overloading
+#-------------------------------------------------------------------------------
+
+let OverloadedFunction = (typename "OverloadedFunction")
+'set-symbol OverloadedFunction
+    __typecall =
+        spice "dispatch-overloaded-function" (cls args...)
+            let T = (cls as type)
+            let ok fns = ('@ T 'templates)
+            if (not ok)
+                compiler-error! "overloaded function has no functions attribute"
+            let ok ftypes = ('@ T 'parameter-types)
+            if (not ok)
+                compiler-error! "overloaded function has no parameter-types attribute"
+
+            let count = ('argcount args...)
+            for f FT in (zip ('args fns) ('args ftypes))
+                let FT = (FT as type)
+                let argcount = ('element-count FT)
+                if (count != argcount)
+                    continue;
+                label break-next
+                    let outargs = (sc_call_new f)
+                    sc_call_set_rawcall outargs true
+                    for i arg in (enumerate ('args args...))
+                        let argT = ('typeof arg)
+                        let paramT = ('element@ FT i)
+                        let outarg =
+                            if (== argT paramT) arg
+                            else
+                                let ok newarg = (imply-expr argT paramT arg)
+                                if (not ok)
+                                    merge break-next
+                                newarg
+                        sc_call_append_argument outargs outarg
+                    return outargs
+            # if we got here, there was no match
+            compiler-error!
+                .. "could not match argument types ("
+                    do
+                        loop (i str) = 0 ""
+                        if (i < count)
+                            repeat (i + 1)
+                                .. str
+                                    ? (i == 0) "" " "
+                                    repr ('typeof ('getarg args... i))
+                        str
+                    ") to overloaded function with types"
+                    do
+                        let fcount = ('argcount ftypes)
+                        loop (i str) = 0 ""
+                        if (i < fcount)
+                            repeat (i + 1)
+                                .. str
+                                    "\n    "
+                                    repr (('getarg ftypes i) as type)
+                        str
+
+sugar fn... (name...)
+    let fn-name =
+        syntax-match name...
+        case (name as Symbol;) name
+        case (name as string;) (Symbol name)
+        case () unnamed
+        default
+            compiler-error!
+                """"syntax: (fn... name|"name") (case pattern body...) ...
+    let outexpr = (sc_expression_new)
+    let functions = (sc_argument_list_new)
+    let functypes = (sc_argument_list_new)
+    let outtype = (sc_typename_type (fn-name as string))
+    'set-super outtype OverloadedFunction
+    syntax-match name...
+    case (name as Symbol;)
+        'set-symbol syntax-scope fn-name outtype
+    default;
+    loop (next) = next-expr
+    syntax-match next
+    case (('case condv body...) rest...)
+        do
+            let tmpl = (sc_template_new fn-name)
+            sc_expression_append outexpr tmpl
+            sc_argument_list_append functions tmpl
+            let scope = (Scope syntax-scope)
+            loop (expr types) = (uncomma (condv as list)) void
+            syntax-match expr
+            case ()
+                let body = (sc_expand (cons do body...) '() scope)
+                sc_template_set_body tmpl body
+                sc_argument_list_append functypes types
+            case (((arg as Symbol) ': T) rest...)
+                let T = (sc_expand T '() syntax-scope); T as type
+                let param = (sc_parameter_new arg)
+                sc_template_append_parameter tmpl param
+                'set-symbol scope arg param
+                repeat rest...
+                    sc_arguments_type_pair types T
+            default
+                syntax-error! ('anchor condv) "syntax: (parameter-name : type, ...)"
+        repeat rest...
+    default
+        'set-symbol outtype 'templates functions
+        'set-symbol outtype 'parameter-types functypes
+        sc_expression_append outexpr outtype
+        return outexpr next
 
 #-------------------------------------------------------------------------------
 # references

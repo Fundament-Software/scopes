@@ -1143,14 +1143,14 @@ sc_value_raises_t sc_parse_from_string(const sc_string_t *str) {
 
 sc_bool_value_tuple_t sc_type_at(const sc_type_t *T, sc_symbol_t key) {
     using namespace scopes;
-    Pure *result = nullptr;
+    Value *result = nullptr;
     bool ok = T->lookup(key, result);
     return { ok, result };
 }
 
 sc_bool_value_tuple_t sc_type_local_at(const sc_type_t *T, sc_symbol_t key) {
     using namespace scopes;
-    Pure *result = nullptr;
+    Value *result = nullptr;
     bool ok = T->lookup_local(key, result);
     return { ok, result };
 }
@@ -1298,7 +1298,7 @@ sc_symbol_value_tuple_t sc_type_next(const sc_type_t *type, sc_symbol_t key) {
 
 void sc_type_set_symbol(sc_type_t *T, sc_symbol_t sym, sc_value_t *value) {
     using namespace scopes;
-    const_cast<Type *>(T)->bind(sym, cast<Pure>(value));
+    const_cast<Type *>(T)->bind(sym, value);
 }
 
 // Pointer Type
@@ -1482,6 +1482,11 @@ const sc_type_t *sc_arguments_type(int numtypes, const sc_type_t **typeargs) {
         types.push_back(typeargs[i]);
     }
     return arguments_type(types);
+}
+
+const sc_type_t *sc_arguments_type_pair(const sc_type_t *T1, const sc_type_t *T2) {
+    using namespace scopes;
+    return arguments_type({T1, T2});
 }
 
 // Function Type
@@ -1793,6 +1798,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_tuple_type, TYPE_Type, TYPE_I32, native_ro_pointer_type(TYPE_Type));
 
     DEFINE_EXTERN_C_FUNCTION(sc_arguments_type, TYPE_Type, TYPE_I32, native_ro_pointer_type(TYPE_Type));
+    DEFINE_EXTERN_C_FUNCTION(sc_arguments_type_pair, TYPE_Type, TYPE_Type, TYPE_Type);
 
     DEFINE_EXTERN_C_FUNCTION(sc_image_type, TYPE_Type,
         TYPE_Type, TYPE_Symbol, TYPE_I32, TYPE_I32, TYPE_I32, TYPE_I32, TYPE_Symbol, TYPE_Symbol);

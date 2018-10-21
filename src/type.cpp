@@ -38,7 +38,7 @@ StyledStream& Type::stream(StyledStream& ost) const {
     return ost;
 }
 
-void Type::bind(Symbol name, Pure *value) {
+void Type::bind(Symbol name, Value *value) {
     auto ret = symbols.insert({ name, value });
     if (!ret.second) {
         ret.first->second = value;
@@ -52,7 +52,7 @@ void Type::del(Symbol name) {
     }
 }
 
-bool Type::lookup(Symbol name, Pure *&dest) const {
+bool Type::lookup(Symbol name, Value *&dest) const {
     const Type *self = this;
     do {
         auto it = self->symbols.find(name);
@@ -67,7 +67,7 @@ bool Type::lookup(Symbol name, Pure *&dest) const {
     return false;
 }
 
-bool Type::lookup_local(Symbol name, Pure *&dest) const {
+bool Type::lookup_local(Symbol name, Value *&dest) const {
     auto it = symbols.find(name);
     if (it != symbols.end()) {
         dest = it->second;
@@ -76,11 +76,11 @@ bool Type::lookup_local(Symbol name, Pure *&dest) const {
     return false;
 }
 
-bool Type::lookup_call_handler(Pure *&dest) const {
+bool Type::lookup_call_handler(Value *&dest) const {
     return lookup(SYM_CallHandler, dest);
 }
 
-bool Type::lookup_return_handler(Pure *&dest) const {
+bool Type::lookup_return_handler(Value *&dest) const {
     return lookup(SYM_ReturnHandler, dest);
 }
 

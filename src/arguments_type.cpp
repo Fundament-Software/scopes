@@ -75,11 +75,26 @@ ArgumentsType::ArgumentsType(const ArgTypes &_values) :
 const Type *arguments_type(const ArgTypes &values) {
     if (values.size() == 1)
         return values[0];
-    ArgumentsType key(values);
+    ArgTypes newvalues;
+    int idx = 1;
+    for (auto &&value : values) {
+        if (is_arguments_type(value)) {
+            auto at = cast<ArgumentsType>(value);
+            for (auto &&value : at->values) {
+                newvalues.push_back(value);
+                if (idx != values.size())
+                    break;
+            }
+        } else {
+            newvalues.push_back(value);
+        }
+        idx++;
+    }
+    ArgumentsType key(newvalues);
     auto it = arguments.find(&key);
     if (it != arguments.end())
         return *it;
-    auto result = new ArgumentsType(values);
+    auto result = new ArgumentsType(newvalues);
     arguments.insert(result);
     return result;
 }

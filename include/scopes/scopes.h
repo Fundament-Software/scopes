@@ -414,6 +414,7 @@ sc_type_raises_t sc_tuple_type(int numtypes, const sc_type_t **types);
 // argument types
 
 const sc_type_t *sc_arguments_type(int numtypes, const sc_type_t **types);
+const sc_type_t *sc_arguments_type_pair(const sc_type_t *T1, const sc_type_t *T2);
 
 // function types
 
