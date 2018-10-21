@@ -3568,15 +3568,12 @@ fn get-overloaded-fn-append ()
                         syntax-error! ('anchor f) "cannot inherit from own type"
                     let fT = (f as type)
                     if (fT < OverloadedFunction)
-                        let ok fns = ('@ fT 'templates)
-                        if (not ok)
+                        if (not (let ok fns = ('@ fT 'templates)))
                             syntax-error! ('anchor f) "overloaded function has no functions attribute"
-                        let ok ftypes = ('@ fT 'parameter-types)
-                        if (not ok)
+                        if (not (let ok ftypes = ('@ fT 'parameter-types)))
                             syntax-error! ('anchor f) "overloaded function has no parameter-types attribute"
                         # copy over existing options
                         for func ftype in (zip ('args fns) ('args ftypes))
-                            print func ftype
                             sc_argument_list_append functions func
                             sc_argument_list_append functypes ftype
                 elseif (fT == Closure)
