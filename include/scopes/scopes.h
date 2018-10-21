@@ -216,6 +216,7 @@ void sc_switch_append_default(sc_value_t *value, sc_value_t *body);
 sc_value_t *sc_try_new(sc_value_t *try_value, sc_value_t *except_param, sc_value_t *except_value);
 
 sc_value_t *sc_parameter_new(sc_symbol_t name);
+bool sc_parameter_is_variadic(sc_value_t *param);
 
 sc_value_t *sc_call_new(sc_value_t *callee);
 void sc_call_append_argument(sc_value_t *call, sc_value_t *value);
@@ -327,7 +328,7 @@ sc_symbol_value_tuple_t sc_scope_next(sc_scope_t *scope, sc_symbol_t key);
 sc_symbol_t sc_symbol_new(const sc_string_t *str);
 sc_symbol_t sc_symbol_new_unique(const sc_string_t *str);
 const sc_string_t *sc_symbol_to_string(sc_symbol_t sym);
-bool sc_symbol_is_vararg(sc_symbol_t sym);
+bool sc_symbol_is_variadic(sc_symbol_t sym);
 
 // strings
 
@@ -414,7 +415,9 @@ sc_type_raises_t sc_tuple_type(int numtypes, const sc_type_t **types);
 // argument types
 
 const sc_type_t *sc_arguments_type(int numtypes, const sc_type_t **types);
-const sc_type_t *sc_arguments_type_pair(const sc_type_t *T1, const sc_type_t *T2);
+const sc_type_t *sc_arguments_type_join(const sc_type_t *T1, const sc_type_t *T2);
+int sc_arguments_type_argcount(sc_type_t *T);
+const sc_type_t *sc_arguments_type_getarg(sc_type_t *T, int index);
 
 // function types
 

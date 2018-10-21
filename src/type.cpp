@@ -384,6 +384,7 @@ void init_types() {
 
     TYPE_Type = typename_type(String::from("type"));
     TYPE_Unknown = typename_type(String::from("Unknown"));
+    TYPE_Variadic = typename_type(String::from("..."));
     const Type *_TypePtr = native_ro_pointer_type(typename_type(String::from("_type")));
     cast<TypenameType>(const_cast<Type *>(TYPE_Type))->finalize(_TypePtr).assert_ok();
     cast<TypenameType>(const_cast<Type *>(TYPE_Unknown))->finalize(_TypePtr).assert_ok();

@@ -1154,7 +1154,7 @@ inline make-asym-binary-op-dispatch (symbol rtype friendly-op-name)
     unique =
         inline (cls name)
             sc_symbol_new_unique name
-    vararg? = sc_symbol_is_vararg
+    variadic? = sc_symbol_is_variadic
     __imply =
         box-cast
             fn "syntax-imply" (vT T expr)
@@ -3104,9 +3104,9 @@ fn gen-syntax-matcher (failfunc expr scope params)
         let T = ('typeof paramv)
         if (T == Symbol)
             let param = (paramv as Symbol)
-            let vararg? = ('vararg? param)
+            let variadic? = ('variadic? param)
             let arg next =
-                if vararg?
+                if variadic?
                     if (not (empty? rest))
                         syntax-error! ('anchor paramv)
                             "vararg parameter is not in last place"
@@ -3118,7 +3118,7 @@ fn gen-syntax-matcher (failfunc expr scope params)
                     _ arg next
             sc_expression_append outexpr arg
             'set-symbol scope param arg
-            repeat (i + 1) rest next (| varargs vararg?)
+            repeat (i + 1) rest next (| varargs variadic?)
         elseif (T == list)
             let param = (paramv as list)
             let head head-rest = (decons param)
@@ -3138,7 +3138,7 @@ fn gen-syntax-matcher (failfunc expr scope params)
                 let exprT = (decons mid-rest)
                 let exprT = (sc_expand exprT '() scope)
                 let param = (head as Symbol)
-                if ('vararg? param)
+                if ('variadic? param)
                     syntax-error! ('anchor head)
                         "vararg parameter cannot be typed"
                 sc_expression_append outexpr
@@ -3337,9 +3337,9 @@ fn gen-argument-matcher (failfunc expr scope params)
         let T = ('typeof paramv)
         if (T == Symbol)
             let param = (paramv as Symbol)
-            let vararg? = ('vararg? param)
+            let variadic? = ('variadic? param)
             let arg =
-                if vararg?
+                if variadic?
                     if (not (empty? rest))
                         syntax-error! ('anchor paramv)
                             "vararg parameter is not in last place"
@@ -3348,7 +3348,7 @@ fn gen-argument-matcher (failfunc expr scope params)
                     `(sc_getarg expr i)
             sc_expression_append outexpr arg
             'set-symbol scope param arg
-            repeat (i + 1) rest (| varargs vararg?)
+            repeat (i + 1) rest (| varargs variadic?)
         elseif (T == list)
             let param = (paramv as list)
             let head head-rest = (decons param)
@@ -3357,7 +3357,7 @@ fn gen-argument-matcher (failfunc expr scope params)
                 let exprT = (decons mid-rest)
                 let exprT = (sc_expand exprT '() scope)
                 let param = (head as Symbol)
-                if ('vararg? param)
+                if ('variadic? param)
                     syntax-error! ('anchor head)
                         "vararg parameter cannot be typed"
                 sc_expression_append outexpr
@@ -3374,7 +3374,7 @@ fn gen-argument-matcher (failfunc expr scope params)
                 let exprT = (decons mid-rest)
                 let exprT = (sc_expand exprT '() scope)
                 let param = (head as Symbol)
-                if ('vararg? param)
+                if ('variadic? param)
                     syntax-error! ('anchor head)
                         "vararg parameter cannot be typed"
                 sc_expression_append outexpr
@@ -3472,9 +3472,9 @@ define spice
             if (not (empty? rest))
                 let paramv rest = (decons rest)
                 let param = (paramv as Symbol)
-                let vararg? = ('vararg? param)
+                let variadic? = ('variadic? param)
                 let body =
-                    if vararg?
+                    if variadic?
                         if (not (empty? rest))
                             syntax-error! ('anchor paramv)
                                 "vararg parameter is not in last place"
@@ -3489,7 +3489,7 @@ define spice
                                 [let paramv] =
                                     [`sc_getarg args i];
                             body
-                repeat (i + 1) rest body (| varargs vararg?)
+                repeat (i + 1) rest body (| varargs variadic?)
             let content =
                 cons (list args)
                     qq
@@ -3549,17 +3549,26 @@ let OverloadedFunction = (typename "OverloadedFunction")
             let count = ('argcount args...)
             for f FT in (zip ('args fns) ('args ftypes))
                 let FT = (FT as type)
-                let argcount = ('element-count FT)
-                if (count != argcount)
+                let argcount = (sc_arguments_type_argcount FT)
+                let variadic? =
+                    (argcount > 0) and
+                        ((sc_arguments_type_getarg FT (argcount - 1)) == Variadic)
+                if variadic?
+                    if ((count + 1) < argcount)
+                        continue;
+                elseif (count != argcount)
                     continue;
                 label break-next
                     let outargs = (sc_call_new f)
                     sc_call_set_rawcall outargs true
+                    let lasti = (argcount - 1)
                     for i arg in (enumerate ('args args...))
                         let argT = ('typeof arg)
-                        let paramT = ('element@ FT i)
+                        let paramT = (sc_arguments_type_getarg FT (min i lasti))
                         let outarg =
-                            if (== argT paramT) arg
+                            if (paramT == Unknown) arg
+                            elseif (paramT == Variadic) arg
+                            elseif (argT == paramT) arg
                             else
                                 let ok newarg = (imply-expr argT paramT arg)
                                 if (not ok)
@@ -3590,6 +3599,63 @@ let OverloadedFunction = (typename "OverloadedFunction")
                         str
 
 sugar fn... (name...)
+    spice finalize-overloaded-fn (T args...)
+        let outtype = (T as type)
+        let functions functypes =
+            sc_argument_list_new; sc_argument_list_new;
+        'set-symbol outtype 'templates functions
+        'set-symbol outtype 'parameter-types functypes
+        for i in (range 0 ('argcount args...) 2)
+            let f = ('getarg args... i)
+            let ftype = ('getarg args... (i + 1))
+            if (('typeof ftype) == Nothing)
+                let fT = ('typeof f)
+                if ('function-pointer? fT)
+                    if ((('kind f) != value-kind-function)
+                        and (not ('constant? f)))
+                        syntax-error! ('anchor f) "argument must be constant or function"
+                    let fT = ('element@ fT 0)
+                    let argcount = ('element-count fT)
+                    loop (k types) = 0 void
+                    if (k < argcount)
+                        let argT = ('element@ fT k)
+                        repeat (k + 1)
+                            sc_arguments_type_join types argT
+                    sc_argument_list_append functions f
+                    sc_argument_list_append functypes types
+                elseif (fT == type)
+                    if (fT == outtype)
+                        syntax-error! ('anchor f) "cannot inherit from own type"
+                    let fT = (f as type)
+                    if (fT < OverloadedFunction)
+                        let ok fns = ('@ fT 'templates)
+                        if (not ok)
+                            syntax-error! ('anchor f) "overloaded function has no functions attribute"
+                        let ok ftypes = ('@ fT 'parameter-types)
+                        if (not ok)
+                            syntax-error! ('anchor f) "overloaded function has no parameter-types attribute"
+                        # copy over existing options
+                        for func ftype in (zip ('args fns) ('args ftypes))
+                            print func ftype
+                            sc_argument_list_append functions func
+                            sc_argument_list_append functypes ftype
+                elseif (fT == Closure)
+                    # ensure argument is constant
+                    f as Closure
+                    # append as templated option
+                    sc_argument_list_append functions f
+                    sc_argument_list_append functypes Variadic
+                else
+                    syntax-error! ('anchor f)
+                        .. "cannot embed argument of type "
+                            repr ('typeof f)
+                            " in overloaded function"
+            else
+                let T = (ftype as type)
+                sc_argument_list_append functions f
+                sc_argument_list_append functypes ftype
+        T
+
     let fn-name =
         syntax-match name...
         case (name as Symbol;) name
@@ -3598,44 +3664,65 @@ sugar fn... (name...)
         default
             compiler-error!
                 """"syntax: (fn... name|"name") (case pattern body...) ...
-    let outexpr = (sc_expression_new)
-    let functions = (sc_argument_list_new)
-    let functypes = (sc_argument_list_new)
+    let oldname? oldname = ('@ syntax-scope fn-name)
+    let outargs = (sc_argument_list_new)
     let outtype = (sc_typename_type (fn-name as string))
     'set-super outtype OverloadedFunction
+    let bodyscope = (Scope syntax-scope)
     syntax-match name...
     case (name as Symbol;)
-        'set-symbol syntax-scope fn-name outtype
+        'set-symbol bodyscope fn-name outtype
     default;
     loop (next) = next-expr
     syntax-match next
+    case (('case 'using body...) rest...)
+        let obj = (sc_expand (cons do body...) '() syntax-scope)
+        sc_argument_list_append outargs obj
+        sc_argument_list_append outargs `none
+        repeat rest...
     case (('case condv body...) rest...)
         do
             let tmpl = (sc_template_new fn-name)
-            sc_expression_append outexpr tmpl
-            sc_argument_list_append functions tmpl
-            let scope = (Scope syntax-scope)
+            sc_argument_list_append outargs tmpl
+            let scope = (Scope bodyscope)
             loop (expr types) = (uncomma (condv as list)) void
             syntax-match expr
             case ()
                 let body = (sc_expand (cons do body...) '() scope)
                 sc_template_set_body tmpl body
-                sc_argument_list_append functypes types
-            case (((arg as Symbol) ': T) rest...)
-                let T = (sc_expand T '() syntax-scope); T as type
+                sc_argument_list_append outargs types
+            case ((arg as Symbol) ': T)
+                syntax-error! ('anchor condv) "single typed parameter definition is missing trailing comma or semicolon"
+            case ((arg as Symbol) rest...)
+                if ('variadic? arg)
+                    if (not (empty? rest...))
+                        syntax-error! ('anchor condv) "variadic parameter must be in last place"
                 let param = (sc_parameter_new arg)
                 sc_template_append_parameter tmpl param
                 'set-symbol scope arg param
                 repeat rest...
-                    sc_arguments_type_pair types T
+                    sc_arguments_type_join types
+                        ? ('variadic? arg) Variadic Unknown
+            case (((arg as Symbol) ': T) rest...)
+                if ('variadic? arg)
+                    syntax-error! ('anchor condv) "a typed parameter can't be variadic"
+                let T = ((sc_expand T '() syntax-scope) as type)
+                let param = (sc_parameter_new arg)
+                sc_template_append_parameter tmpl param
+                'set-symbol scope arg param
+                repeat rest...
+                    sc_arguments_type_join types T
             default
-                syntax-error! ('anchor condv) "syntax: (parameter-name : type, ...)"
+                syntax-error! ('anchor condv) "syntax: (parameter-name[: type], ...)"
         repeat rest...
     default
-        'set-symbol outtype 'templates functions
-        'set-symbol outtype 'parameter-types functypes
-        sc_expression_append outexpr outtype
-        return outexpr next
+        syntax-match name...
+        case (name as Symbol;)
+            'set-symbol syntax-scope fn-name outtype
+        default;
+        return
+            `(finalize-overloaded-fn outtype outargs)
+            next
 
 #-------------------------------------------------------------------------------
 # references

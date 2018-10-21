@@ -94,6 +94,7 @@ typedef std::vector<const Type *> ArgTypes;
     \
     T(TYPE_Type, "type") \
     T(TYPE_Unknown, "Unknown") \
+    T(TYPE_Variadic, "Variadic") \
     T(TYPE_Symbol, "Symbol") \
     T(TYPE_Builtin, "Builtin") \
     T(TYPE_Value, "Value") \

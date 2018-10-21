@@ -605,7 +605,7 @@ sc_symbol_t sc_symbol_new(const sc_string_t *str) {
     return Symbol(str);
 }
 
-bool sc_symbol_is_vararg(sc_symbol_t sym) {
+bool sc_symbol_is_variadic(sc_symbol_t sym) {
     using namespace scopes;
     return ends_with_parenthesis(sym);
 }
@@ -836,13 +836,13 @@ sc_value_t *sc_getarg(sc_value_t *value, int index) {
     using namespace scopes;
     if (isa<ArgumentList>(value)) {
         auto al = cast<ArgumentList>(value);
-        assert((index >= 0) && (index < (int)al->values.size()));
-        return al->values[index];
+        if (index < al->values.size()) {
+            return al->values[index];
+        }
     } else if (index == 0) {
         return value;
-    } else {
-        return ConstAggregate::none_from(get_active_anchor());
     }
+    return ConstAggregate::none_from(get_active_anchor());
 }
 
 sc_value_t *sc_getarglist(sc_value_t *value, int index) {
@@ -990,7 +990,15 @@ sc_value_t *sc_try_new(sc_value_t *try_value, sc_value_t *except_param, sc_value
 
 sc_value_t *sc_parameter_new(sc_symbol_t name) {
     using namespace scopes;
-    return Parameter::from(get_active_anchor(), name, nullptr);
+    auto param = Parameter::from(get_active_anchor(), name, nullptr);
+    if (ends_with_parenthesis(name))
+        param->variadic = true;
+    return param;
+}
+
+bool sc_parameter_is_variadic(sc_value_t *param) {
+    using namespace scopes;
+    return cast<Parameter>(param)->is_variadic();
 }
 
 sc_value_t *sc_call_new(sc_value_t *callee) {
@@ -1484,9 +1492,46 @@ const sc_type_t *sc_arguments_type(int numtypes, const sc_type_t **typeargs) {
     return arguments_type(types);
 }
 
-const sc_type_t *sc_arguments_type_pair(const sc_type_t *T1, const sc_type_t *T2) {
+const sc_type_t *sc_arguments_type_join(const sc_type_t *T1, const sc_type_t *T2) {
     using namespace scopes;
-    return arguments_type({T1, T2});
+    ArgTypes types;
+    if (isa<ArgumentsType>(T1)) {
+        for (auto &&value : cast<ArgumentsType>(T1)->values) {
+            types.push_back(value);
+        }
+    } else {
+        types.push_back(T1);
+    }
+    if (isa<ArgumentsType>(T2)) {
+        for (auto &&value : cast<ArgumentsType>(T2)->values) {
+            types.push_back(value);
+        }
+    } else {
+        types.push_back(T2);
+    }
+    return arguments_type(types);
+}
+
+int sc_arguments_type_argcount(sc_type_t *T) {
+    using namespace scopes;
+    if (isa<ArgumentsType>(T)) {
+        return cast<ArgumentsType>(T)->values.size();
+    } else {
+        return 1;
+    }
+}
+
+const sc_type_t *sc_arguments_type_getarg(sc_type_t *T, int index) {
+    using namespace scopes;
+    if (isa<ArgumentsType>(T)) {
+        auto at = cast<ArgumentsType>(T);
+        if (index < at->values.size()) {
+            return at->values[index];
+        }
+    } else if (index == 0) {
+        return T;
+    }
+    return TYPE_Nothing;
 }
 
 // Function Type
@@ -1663,6 +1708,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_switch_append_default, _void, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_try_new, TYPE_Value, TYPE_Value, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_parameter_new, TYPE_Value, TYPE_Symbol);
+    DEFINE_EXTERN_C_FUNCTION(sc_parameter_is_variadic, TYPE_Bool, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_call_new, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_call_append_argument, _void, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_call_is_rawcall, TYPE_Bool, TYPE_Value);
@@ -1744,7 +1790,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_symbol_new, TYPE_Symbol, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_symbol_new_unique, TYPE_Symbol, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_symbol_to_string, TYPE_String, TYPE_Symbol);
-    DEFINE_EXTERN_C_FUNCTION(sc_symbol_is_vararg, TYPE_Bool, TYPE_Symbol);
+    DEFINE_EXTERN_C_FUNCTION(sc_symbol_is_variadic, TYPE_Bool, TYPE_Symbol);
 
     DEFINE_EXTERN_C_FUNCTION(sc_string_new, TYPE_String, native_ro_pointer_type(TYPE_I8), TYPE_USize);
     DEFINE_EXTERN_C_FUNCTION(sc_string_new_from_cstr, TYPE_String, native_ro_pointer_type(TYPE_I8));
@@ -1798,7 +1844,9 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_tuple_type, TYPE_Type, TYPE_I32, native_ro_pointer_type(TYPE_Type));
 
     DEFINE_EXTERN_C_FUNCTION(sc_arguments_type, TYPE_Type, TYPE_I32, native_ro_pointer_type(TYPE_Type));
-    DEFINE_EXTERN_C_FUNCTION(sc_arguments_type_pair, TYPE_Type, TYPE_Type, TYPE_Type);
+    DEFINE_EXTERN_C_FUNCTION(sc_arguments_type_join, TYPE_Type, TYPE_Type, TYPE_Type);
+    DEFINE_EXTERN_C_FUNCTION(sc_arguments_type_argcount, TYPE_I32, TYPE_Type);
+    DEFINE_EXTERN_C_FUNCTION(sc_arguments_type_getarg, TYPE_Type, TYPE_Type, TYPE_I32);
 
     DEFINE_EXTERN_C_FUNCTION(sc_image_type, TYPE_Type,
         TYPE_Type, TYPE_Symbol, TYPE_I32, TYPE_I32, TYPE_I32, TYPE_I32, TYPE_Symbol, TYPE_Symbol);
