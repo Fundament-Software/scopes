@@ -3455,11 +3455,6 @@ define match-args
             return (cons outexpr (load outnext)) scope
 
 define spice
-    inline wrap-ast-macro (f)
-        ast-macro
-            fn (args)
-                return `[(f args)]
-
     syntax-macro
         fn "expand-spice" (expr)
             raises-compile-error;
@@ -3500,12 +3495,19 @@ define spice
             if (('typeof name) == Symbol)
                 qq
                     [let name] =
-                        [wrap-ast-macro]
-                            [(cons inline (name as Symbol as string) content)]
+                        [ast-macro]
+                            [fn] [(name as Symbol as string)] (args)
+                                [ast-quote]
+                                    [ast-unquote]
+                                        [(cons inline content)] args
             else
                 qq
-                    [wrap-ast-macro]
-                        [(cons inline name content)]
+                    [ast-macro]
+                        [fn name] (args)
+                            [ast-quote]
+                                [ast-unquote]
+                                    [(cons inline content)] args
+
 
 compile-stage;
 
@@ -3535,7 +3537,69 @@ inline enumerate (x)
 #-------------------------------------------------------------------------------
 
 let OverloadedFunction = (typename "OverloadedFunction")
-'set-symbol OverloadedFunction
+
+fn get-overloaded-fn-append ()
+    spice "overloaded-fn-append" (T args...)
+        let outtype = (T as type)
+        let ok functions = ('@ outtype 'templates)
+        if (not ok)
+            compiler-error! "overloaded function has no functions attribute"
+        let ok functypes = ('@ outtype 'parameter-types)
+        if (not ok)
+            compiler-error! "overloaded function has no parameter-types attribute"
+        for i in (range 0 ('argcount args...) 2)
+            let f = ('getarg args... i)
+            let ftype = ('getarg args... (i + 1))
+            if (('typeof ftype) == Nothing)
+                let fT = ('typeof f)
+                if ('function-pointer? fT)
+                    if ((('kind f) != value-kind-function)
+                        and (not ('constant? f)))
+                        syntax-error! ('anchor f) "argument must be constant or function"
+                    let fT = ('element@ fT 0)
+                    let argcount = ('element-count fT)
+                    loop (k types) = 0 void
+                    if (k < argcount)
+                        let argT = ('element@ fT k)
+                        repeat (k + 1)
+                            sc_arguments_type_join types argT
+                    sc_argument_list_append functions f
+                    sc_argument_list_append functypes types
+                elseif (fT == type)
+                    if (fT == outtype)
+                        syntax-error! ('anchor f) "cannot inherit from own type"
+                    let fT = (f as type)
+                    if (fT < OverloadedFunction)
+                        let ok fns = ('@ fT 'templates)
+                        if (not ok)
+                            syntax-error! ('anchor f) "overloaded function has no functions attribute"
+                        let ok ftypes = ('@ fT 'parameter-types)
+                        if (not ok)
+                            syntax-error! ('anchor f) "overloaded function has no parameter-types attribute"
+                        # copy over existing options
+                        for func ftype in (zip ('args fns) ('args ftypes))
+                            print func ftype
+                            sc_argument_list_append functions func
+                            sc_argument_list_append functypes ftype
+                elseif (fT == Closure)
+                    # ensure argument is constant
+                    f as Closure
+                    # append as templated option
+                    sc_argument_list_append functions f
+                    sc_argument_list_append functypes Variadic
+                else
+                    syntax-error! ('anchor f)
+                        .. "cannot embed argument of type "
+                            repr ('typeof f)
+                            " in overloaded function"
+            else
+                let T = (ftype as type)
+                sc_argument_list_append functions f
+                sc_argument_list_append functypes ftype
+        T
+
+'set-symbols OverloadedFunction
+    append = (get-overloaded-fn-append)
     __typecall =
         spice "dispatch-overloaded-function" (cls args...)
             let T = (cls as type)
@@ -3545,7 +3609,6 @@ let OverloadedFunction = (typename "OverloadedFunction")
             let ok ftypes = ('@ T 'parameter-types)
             if (not ok)
                 compiler-error! "overloaded function has no parameter-types attribute"
-
             let count = ('argcount args...)
             for f FT in (zip ('args fns) ('args ftypes))
                 let FT = (FT as type)
@@ -3599,63 +3662,7 @@ let OverloadedFunction = (typename "OverloadedFunction")
                         str
 
 sugar fn... (name...)
-    spice finalize-overloaded-fn (T args...)
-        let outtype = (T as type)
-        let functions functypes =
-            sc_argument_list_new; sc_argument_list_new;
-        'set-symbol outtype 'templates functions
-        'set-symbol outtype 'parameter-types functypes
-        for i in (range 0 ('argcount args...) 2)
-            let f = ('getarg args... i)
-            let ftype = ('getarg args... (i + 1))
-            if (('typeof ftype) == Nothing)
-                let fT = ('typeof f)
-                if ('function-pointer? fT)
-                    if ((('kind f) != value-kind-function)
-                        and (not ('constant? f)))
-                        syntax-error! ('anchor f) "argument must be constant or function"
-                    let fT = ('element@ fT 0)
-                    let argcount = ('element-count fT)
-                    loop (k types) = 0 void
-                    if (k < argcount)
-                        let argT = ('element@ fT k)
-                        repeat (k + 1)
-                            sc_arguments_type_join types argT
-                    sc_argument_list_append functions f
-                    sc_argument_list_append functypes types
-                elseif (fT == type)
-                    if (fT == outtype)
-                        syntax-error! ('anchor f) "cannot inherit from own type"
-                    let fT = (f as type)
-                    if (fT < OverloadedFunction)
-                        let ok fns = ('@ fT 'templates)
-                        if (not ok)
-                            syntax-error! ('anchor f) "overloaded function has no functions attribute"
-                        let ok ftypes = ('@ fT 'parameter-types)
-                        if (not ok)
-                            syntax-error! ('anchor f) "overloaded function has no parameter-types attribute"
-                        # copy over existing options
-                        for func ftype in (zip ('args fns) ('args ftypes))
-                            print func ftype
-                            sc_argument_list_append functions func
-                            sc_argument_list_append functypes ftype
-                elseif (fT == Closure)
-                    # ensure argument is constant
-                    f as Closure
-                    # append as templated option
-                    sc_argument_list_append functions f
-                    sc_argument_list_append functypes Variadic
-                else
-                    syntax-error! ('anchor f)
-                        .. "cannot embed argument of type "
-                            repr ('typeof f)
-                            " in overloaded function"
-            else
-                let T = (ftype as type)
-                sc_argument_list_append functions f
-                sc_argument_list_append functypes ftype
-        T
-
+    let finalize-overloaded-fn = (get-overloaded-fn-append)
     let fn-name =
         syntax-match name...
         case (name as Symbol;) name
@@ -3664,10 +3671,12 @@ sugar fn... (name...)
         default
             compiler-error!
                 """"syntax: (fn... name|"name") (case pattern body...) ...
-    let oldname? oldname = ('@ syntax-scope fn-name)
     let outargs = (sc_argument_list_new)
     let outtype = (sc_typename_type (fn-name as string))
     'set-super outtype OverloadedFunction
+    'set-symbols outtype
+        templates = (sc_argument_list_new)
+        parameter-types = (sc_argument_list_new)
     let bodyscope = (Scope syntax-scope)
     syntax-match name...
     case (name as Symbol;)

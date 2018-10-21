@@ -42,3 +42,16 @@ print testf.templates
 # prints signatures of the overloaded function
 print testf.parameter-types
 
+fn... test2
+case (a : i32,)
+    a + a
+
+'append test2
+    # template
+    fn (a)
+        .. a a
+    # signature pattern
+    Arguments string
+
+assert ((test2 5) == 10)
+assert ((test2 "hi") == "hihi")

@@ -542,11 +542,7 @@ struct Expander {
             }
         }
 
-        if (exprs.empty())
-            return ArgumentList::from(_anchor);
-        auto result = Expression::from(_anchor, exprs, ArgumentList::from(_anchor));
-        result->scoped = false;
-        return result;
+        return ArgumentList::from(_anchor, exprs);
     }
 
     // quote <value> ...
