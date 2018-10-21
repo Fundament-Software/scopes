@@ -1814,7 +1814,8 @@ static SCOPES_RESULT(Value *) prove_If(const ASTContext &ctx, If *_if) {
     for (auto &&clause : _if->clauses) {
         If::Clause newclause;
         newclause.anchor = clause.anchor;
-        auto newcond = SCOPES_GET_RESULT(prove(subctx.with_block(newclause.cond_body), clause.cond));
+        Value *newcond = SCOPES_GET_RESULT(prove(subctx.with_block(newclause.cond_body), clause.cond));
+        newcond = extract_argument(ctx, newcond, 0);
         if (newcond->get_type() != TYPE_Bool) {
             SCOPES_ANCHOR(clause.anchor);
             SCOPES_EXPECT_ERROR(error_invalid_condition_type(newcond));

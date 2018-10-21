@@ -428,8 +428,6 @@ struct Expander {
                 Expander subexp(env, astscope);
                 subexp.next = it->next;
                 Value *node = SCOPES_GET_RESULT(subexp.expand(it->at));
-                if (!node->is_pure())
-                    exprs.push_back(node);
                 it = subexp.next;
                 if (it) {
                     SCOPES_ANCHOR(it->at->anchor());
@@ -439,8 +437,8 @@ struct Expander {
                 Symbol sym = SCOPES_GET_RESULT(extract_symbol_constant(paramval));
                 if (!ends_with_parenthesis(sym)) {
                     node = extract_argument(paramval->anchor(), node, 0);
-                    exprs.push_back(node);
                 }
+                exprs.push_back(node);
                 env->bind(sym, node);
                 equit = equit->next;
             }
@@ -491,8 +489,6 @@ struct Expander {
             while (it) {
                 subexp.next = it->next;
                 auto node = SCOPES_GET_RESULT(subexp.expand(it->at));
-                if (!node->is_pure())
-                    exprs.push_back(node);
                 args.push_back(node);
                 it = subexp.next;
             }
@@ -504,14 +500,13 @@ struct Expander {
             while (it != endit) {
                 auto paramval = it->at;
                 Symbol sym = SCOPES_GET_RESULT(extract_symbol_constant(paramval));
+                Value *node = nullptr;
                 if (!ends_with_parenthesis(sym)) {
                     if (lastarg == -1) {
-                        env->bind(sym, ConstAggregate::none_from(paramval->anchor()));
+                        node = ConstAggregate::none_from(paramval->anchor());
                     } else {
                         auto arg = args[std::min(lastarg, index)];
-                        auto indexed = extract_argument(paramval->anchor(), arg, std::max(0, index - lastarg));
-                        exprs.push_back(indexed);
-                        env->bind(sym, indexed);
+                        node = extract_argument(paramval->anchor(), arg, std::max(0, index - lastarg));
                     }
                 } else {
                     if (it->next != endit) {
@@ -519,23 +514,24 @@ struct Expander {
                         SCOPES_EXPECT_ERROR(error_variadic_symbol_not_in_last_place());
                     }
                     if (lastarg == -1) {
-                        env->bind(sym, ArgumentList::from(_anchor));
+                        node = ArgumentList::from(_anchor);
                     } else if (index == lastarg) {
-                        env->bind(sym, args[index]);
+                        node = args[index];
                     } else if (index < lastarg) {
                         auto arglist = ArgumentList::from(paramval->anchor());
                         for (int j = index; j <= lastarg; ++j) {
                             arglist->append(args[j]);
                         }
-                        env->bind(sym, arglist);
+                        node = arglist;
                     } else {
                         int offset = index - lastarg;
-                        env->bind(sym,
-                            extract_argument(
-                                paramval->anchor(), args[lastarg],
-                                index - lastarg, true));
+                        node = extract_argument(
+                            paramval->anchor(), args[lastarg],
+                            index - lastarg, true);
                     }
                 }
+                exprs.push_back(node);
+                env->bind(sym, node);
 
                 it = it->next;
                 index++;

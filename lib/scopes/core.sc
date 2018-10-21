@@ -3541,11 +3541,9 @@ let OverloadedFunction = (typename "OverloadedFunction")
 fn get-overloaded-fn-append ()
     spice "overloaded-fn-append" (T args...)
         let outtype = (T as type)
-        let ok functions = ('@ outtype 'templates)
-        if (not ok)
+        if (not (let ok functions = ('@ outtype 'templates)))
             compiler-error! "overloaded function has no functions attribute"
-        let ok functypes = ('@ outtype 'parameter-types)
-        if (not ok)
+        if (not (let ok functypes = ('@ outtype 'parameter-types)))
             compiler-error! "overloaded function has no parameter-types attribute"
         for i in (range 0 ('argcount args...) 2)
             let f = ('getarg args... i)
@@ -3603,11 +3601,9 @@ fn get-overloaded-fn-append ()
     __typecall =
         spice "dispatch-overloaded-function" (cls args...)
             let T = (cls as type)
-            let ok fns = ('@ T 'templates)
-            if (not ok)
+            if (not (let ok fns = ('@ T 'templates)))
                 compiler-error! "overloaded function has no functions attribute"
-            let ok ftypes = ('@ T 'parameter-types)
-            if (not ok)
+            if (not (let ok ftypes = ('@ T 'parameter-types)))
                 compiler-error! "overloaded function has no parameter-types attribute"
             let count = ('argcount args...)
             for f FT in (zip ('args fns) ('args ftypes))

@@ -16,13 +16,26 @@ do
     assert (y == 2)
     assert (z == 3)
 
-# let as last statement in a body returns none
-assert
-    ==
-        call
-            fn ()
-                let x = 5
-        none
+do
+    # let returns all arguments it declared
+    let x y z =
+        let u v w =
+            _ 1 2 3
 
+    assert (x == 1)
+    assert (y == 2)
+    assert (z == 3)
+    assert (u == 1)
+    assert (v == 2)
+    assert (w == 3)
 
+do
+    # if condition block scope is accessible in subsequent blocks
+    fn get () (_ true 303)
+    if (let ok n = (get))
+        assert (n == 303)
+    else
+        error! "failed"
+
+    assert (n == 303)
 
