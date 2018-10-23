@@ -828,6 +828,17 @@ struct Expander {
         SCOPES_CHECK_RESULT(verify_list_parameter_count("ast-unquote", it, 0, -1));
         it = it->next;
         ArgumentList *args = ArgumentList::from(_anchor);
+        Expander subexp(env, astscope);
+        return Unquote::from(_anchor,
+            SCOPES_GET_RESULT(subexp.expand_expression(_anchor, it)));
+    }
+
+    SCOPES_RESULT(Value *) expand_ast_unquote_arguments(const List *it) {
+        SCOPES_RESULT_TYPE(Value *);
+        auto _anchor = get_active_anchor();
+        SCOPES_CHECK_RESULT(verify_list_parameter_count("ast-unquote-arguments", it, 0, -1));
+        it = it->next;
+        ArgumentList *args = ArgumentList::from(_anchor);
         if (it) {
             Expander subexp(env, astscope, it->next);
             SCOPES_CHECK_RESULT(subexp.expand_arguments(args->values, it));
@@ -1001,6 +1012,7 @@ struct Expander {
                 case KW_SyntaxQuote: return expand_syntax_quote(list);
                 case KW_ASTQuote: return expand_ast_quote(list);
                 case KW_ASTUnquote: return expand_ast_unquote(list);
+                case KW_ASTUnquoteArguments: return expand_ast_unquote_arguments(list);
                 case KW_Return: return expand_return(list);
                 case KW_Raise: return expand_raise(list);
                 case KW_Break: return expand_break(list);

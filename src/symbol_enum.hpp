@@ -20,7 +20,7 @@ namespace scopes {
     T(FN_FunctionType) T(FN_TupleType) T(FN_UnionType) T(FN_Alloca) T(FN_AllocaOf) T(FN_Malloc) \
     T(FN_AllocaArray) T(FN_MallocArray) T(FN_ReturnLabelType) T(KW_DoIn) T(FN_AllocaExceptionPad) \
     T(FN_StaticAlloc) T(KW_Try) T(KW_Return) T(KW_Loop) T(KW_Repeat) T(KW_Break) \
-    T(KW_ASTQuote) T(KW_ASTUnquote) T(KW_Merge) \
+    T(KW_ASTQuote) T(KW_ASTUnquote) T(KW_ASTUnquoteArguments) T(KW_Merge) \
     T(FN_AnyExtract) T(FN_AnyWrap) T(FN_Free) T(KW_Defer) T(FN_DumpAST) \
     T(OP_ICmpEQ) T(OP_ICmpNE) T(FN_Sample) T(FN_ImageRead) T(FN_ImageWrite) \
     T(FN_ImageQuerySize) T(FN_ImageQueryLod) T(FN_ImageQueryLevels) T(FN_ImageQuerySamples) \
@@ -264,6 +264,7 @@ namespace scopes {
     T(KW_If, "if") T(KW_Switch, "switch") T(KW_In, "in") T(KW_Let, "let") T(KW_Loop, "loop") \
     T(KW_LoopFor, "loop-for") T(KW_None, "none") T(KW_Null, "null") \
     T(KW_SyntaxQuote, "syntax-quote") T(KW_ASTQuote, "ast-quote") T(KW_ASTUnquote, "ast-unquote") \
+    T(KW_ASTUnquoteArguments, "ast-unquote-arguments") \
     T(KW_Inline, "inline") T(KW_Recur, "recur") T(KW_Merge, "merge") \
     T(KW_Return, "return") T(KW_Splice, "splice") \
     T(KW_CompileStage, "compile-stage") T(KW_True, "true") T(KW_Try, "try") \

@@ -102,7 +102,7 @@
     SampledImage-type = sc_sampled_image_type
 
 # square list expressions are ast unquotes by default
-let square-list = ast-unquote
+let square-list = ast-unquote-arguments
 
 # first we alias u64 to the integer type that can hold a pointer
 let intptr = u64
@@ -2147,9 +2147,22 @@ let va-option =
                     _ ('next x) ('@ x)
             init
 
-let for =
-    syntax-macro
-        fn "for" (args)
+define for
+    inline fdone ()
+        break;
+
+    #let ast-for
+        ast-macro
+            fn "ast-for" (args)
+
+    #sc_value_t *sc_loop_new();
+    #void sc_loop_append_parameter(sc_value_t *loop, sc_value_t *symbol);
+    #void sc_loop_append_argument(sc_value_t *loop, sc_value_t *value);
+    #void sc_loop_set_body(sc_value_t *loop, sc_value_t *body);
+
+    syntax-block-scope-macro
+        fn "expand-for" (expr next-expr scope)
+            let head args = (decons expr)
             let it params =
                 loop (it params = args '())
                     if (empty? it)
@@ -2160,23 +2173,30 @@ let for =
                         repeat it (cons sxat params)
                     _ it params
             let generator-expr body = (decons it)
-            let params = (sc_list_reverse params)
-            let iter = (sc_symbol_new_unique "iter")
-            let next = (sc_symbol_new_unique "next")
-            let start = (sc_symbol_new_unique "start")
-            inline fdone ()
-                break;
-            list do
-                list let iter start '= (list (list (do as) generator-expr Generator))
-                list loop (list next '= start)
-                    cons let next
-                        'join params
-                            list '=
-                                list iter fdone next
-                    list inline 'continue '()
-                        list repeat next
-                    cons do body
-                    list 'continue
+            let subscope = (Scope scope)
+            ast-quote
+                let iter start =
+                    (as [(sc_expand generator-expr '() subscope)] Generator);
+            return
+                cons
+                    ast-quote iter start # order expressions
+                        loop (next = start)
+                            let next args... = (iter fdone next)
+                            inline continue ()
+                                repeat next
+                            ast-unquote
+                                let expr =
+                                    loop (params expr = params (list '= args...))
+                                        if (empty? params)
+                                            break expr
+                                        let param next = (decons params)
+                                        repeat next (cons param expr)
+                                let expr = (cons let expr)
+                                'set-symbol subscope 'continue continue
+                                sc_expand (cons do expr body) '() subscope
+                            repeat next
+                    next-expr
+                scope
 
 #---------------------------------------------------------------------------
 # module loading
