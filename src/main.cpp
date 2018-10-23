@@ -300,8 +300,7 @@ compile_stage:
         SCOPES_ANCHOR(fn->anchor());
         auto result = fptr();
         if (!result.ok) {
-            set_last_error(result.except);
-            SCOPES_RETURN_ERROR();
+            SCOPES_RETURN_ERROR(result.except);
         }
         auto value = result._0;
         if (isa<Function>(value)) {
@@ -336,8 +335,7 @@ compile_stage:
         SCOPES_ANCHOR(fn->anchor());
         auto result = fptr();
         if (!result.ok) {
-            set_last_error(result.except);
-            SCOPES_RETURN_ERROR();
+            SCOPES_RETURN_ERROR(result.except);
         }
     }
 
@@ -348,7 +346,7 @@ int main(int argc, char *argv[]) {
     using namespace scopes;
     auto result = try_main(argc, argv);
     if (!result.ok()) {
-        print_error(get_last_error());
+        print_error(result.assert_error());
         f_exit(1);
     }
     f_exit(result.assert_ok());

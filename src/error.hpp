@@ -44,34 +44,32 @@ struct Error {
     Error(const Anchor *_anchor, const String *_msg);
 
     std::vector<Value *> trace;
+    std::vector<Value *> definitions;
+    std::vector<const String *> messages;
     const Anchor *anchor;
     const String *msg;
+
+    void append_error_trace(Value *value);
+    void append_definition(Value *value);
 };
 
 //------------------------------------------------------------------------------
-
-void set_last_error(Error *err);
-Error *get_last_error();
-void add_error_trace(Value *value);
 
 void print_error(const Error *value);
 void stream_error(StyledStream &ss, const Error *value);
 void stream_error_string(StyledStream &ss, const Error *value);
 
-void set_last_location_error(const String *msg);
 Error *make_location_error(const String *msg);
 Error *make_location_error(const Anchor *anchor, const String *msg);
 Error *make_runtime_error(const String *msg);
 
 #if SCOPES_EARLY_ABORT
 #define SCOPES_LOCATION_ERROR(MSG) \
-    set_last_location_error((MSG)); \
-    assert(false); \
-    return Result<_result_type>();
+    assert (false); \
+    return Result<_result_type>::raise(make_location_error((MSG)));
 #else
 #define SCOPES_LOCATION_ERROR(MSG) \
-    set_last_location_error((MSG)); \
-    return Result<_result_type>();
+    return Result<_result_type>::raise(make_location_error((MSG)));
 #endif
 
 void location_message(const Anchor *anchor, const String* str);
@@ -82,8 +80,6 @@ struct Value;
 struct Parameter;
 struct Template;
 struct Function;
-
-void print_definition_anchor(Value *node);
 
 // specializer errors
 SCOPES_RESULT(void) error_invalid_call_type(Value *callee);
@@ -97,14 +93,14 @@ SCOPES_RESULT(void) error_invalid_operands(const Type *A, const Type *B);
 SCOPES_RESULT(void) error_argument_type_mismatch(const Type *expected, const Type *got);
 SCOPES_RESULT(void) error_constant_expected(const Type *want, Value *value);
 SCOPES_RESULT(void) error_unbound_symbol(Parameter *value);
-SCOPES_RESULT(void) error_cannot_merge_expression_types(const Type *T1, const Type *T2);
+SCOPES_RESULT(void) error_cannot_merge_expression_types(const char *context, const Type *T1, const Type *T2);
 SCOPES_RESULT(void) error_noreturn_not_last_expression();
 SCOPES_RESULT(void) error_noreturn_in_argument_list();
 SCOPES_RESULT(void) error_cannot_type_builtin(const Builtin &builtin);
 SCOPES_RESULT(void) error_illegal_repeat_outside_loop();
 SCOPES_RESULT(void) error_illegal_break_outside_loop();
 SCOPES_RESULT(void) error_variadic_symbol_not_in_last_place();
-SCOPES_RESULT(void) error_untyped_recursive_call();
+SCOPES_RESULT(void) error_untyped_recursive_call(Function *func);
 SCOPES_RESULT(void) error_value_inaccessible_from_closure(Value *value, const Function *frame);
 
 // code generator errors

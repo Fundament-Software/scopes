@@ -39,7 +39,7 @@ inline SCOPES_RESULT(void) verify_kind(const Type *T) {
         ss.out << " kind expected, got " << T;
         SCOPES_LOCATION_ERROR(ss.str());
     }
-    return true;
+    return {};
 }
 
 template<int mincount, int maxcount>

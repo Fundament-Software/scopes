@@ -524,7 +524,7 @@ struct LLVMIRGenerator {
             val = ptrval;
             memptrs.push_back(values.size());
             values.push_back(val);
-            return true;
+            return {};
         }
         auto tk = LLVMGetTypeKind(LLVMTypeOf(val));
         if (tk == LLVMStructTypeKind) {
@@ -543,11 +543,11 @@ struct LLVMIRGenerator {
                     val = LLVMBuildLoad(builder, val, "");
                     values.push_back(val);
                 }
-                return true;
+                return {};
             }
         }
         values.push_back(val);
-        return true;
+        return {};
     }
 
     static SCOPES_RESULT(void) abi_transform_parameter(const Type *AT,
@@ -558,7 +558,7 @@ struct LLVMIRGenerator {
         auto T = SCOPES_GET_RESULT(type_to_llvm_type(AT));
         if (!sz) {
             params.push_back(LLVMPointerType(T, 0));
-            return true;
+            return {};
         }
         auto tk = LLVMGetTypeKind(T);
         if (tk == LLVMStructTypeKind) {
@@ -567,11 +567,11 @@ struct LLVMIRGenerator {
                 for (size_t i = 0; i < sz; ++i) {
                     params.push_back(LLVMStructGetTypeAtIndex(ST, i));
                 }
-                return true;
+                return {};
             }
         }
         params.push_back(T);
-        return true;
+        return {};
     }
 
     static SCOPES_RESULT(LLVMTypeRef) create_llvm_type(const Type *type) {
@@ -757,10 +757,9 @@ struct LLVMIRGenerator {
         return typeref;
     }
 
-    static bool ok;
+    static Error *last_llvm_error;
     static void fatal_error_handler(const char *Reason) {
-        set_last_location_error(String::from_cstr(Reason));
-        ok = false;
+        last_llvm_error = make_location_error(String::from_cstr(Reason));
     }
 
     void bind(Value *node, LLVMValueRef value) {
@@ -910,7 +909,7 @@ struct LLVMIRGenerator {
         if (is_returning(node->value->get_type())) {
             SCOPES_CHECK_RESULT(write_return(result));
         }
-        return true;
+        return {};
     }
 
     SCOPES_RESULT(LLVMValueRef) Function_to_value(Function *node) {
@@ -963,7 +962,7 @@ struct LLVMIRGenerator {
         for (auto entry : node.body) {
             SCOPES_CHECK_RESULT(node_to_value(entry));
         }
-        return true;
+        return {};
     }
 
 
@@ -1745,13 +1744,6 @@ struct LLVMIRGenerator {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         LLVMBasicBlockRef bb = LLVMGetInsertBlock(builder);
         LLVMValueRef func = LLVMGetBasicBlockParent(bb);
-        int count = (int)node->clauses.size();
-        LLVMBasicBlockRef bbthen[count];
-        LLVMBasicBlockRef bbelse[count];
-        for (int i = 0; i < count; ++i) {
-            bbthen[i] = LLVMAppendBasicBlock(func, "then");
-            bbelse[i] = LLVMAppendBasicBlock(func, "else");
-        }
         auto rtype = node->get_type();
         LLVMBasicBlockRef bb_merge = nullptr;
         LLVMValueRef merge_value = nullptr;
@@ -1762,17 +1754,36 @@ struct LLVMIRGenerator {
                 merge_value = LLVMBuildPhi(builder, SCOPES_GET_RESULT(type_to_llvm_type(rtype)), "");
             }
         }
+        int count = (int)node->clauses.size();
+        LLVMBasicBlockRef bbthen[count];
+        LLVMBasicBlockRef bbelse[count];
+        for (int i = 0; i < count; ++i) {
+            if (node->clauses[i].is_then()) {
+                bbthen[i] = LLVMAppendBasicBlock(func, "then");
+            } else {
+                bbthen[i] = nullptr;
+            }
+            if ((i + 1) < count) {
+                bbelse[i] = LLVMAppendBasicBlock(func, "else");
+            } else { // last clause
+                bbelse[i] = bb_merge;
+            }
+        }
         LLVMPositionBuilderAtEnd(builder, bb);
         assert(count);
         for (int i = 0; i < count; ++i) {
             auto &&clause = node->clauses[i];
-            LLVMBasicBlockRef bb_then = bbthen[i];
             LLVMBasicBlockRef bb_else = bbelse[i];
-            SCOPES_CHECK_RESULT(block_to_value(clause.cond_body));
-            auto cond = SCOPES_GET_RESULT(node_to_value(clause.cond));
-            assert(cond);
-            LLVMBuildCondBr(builder, cond, bb_then, bb_else);
-            LLVMPositionBuilderAtEnd(builder, bb_then);
+            if (clause.is_then()) {
+                LLVMBasicBlockRef bb_then = bbthen[i];
+                SCOPES_CHECK_RESULT(block_to_value(clause.cond_body));
+                auto cond = SCOPES_GET_RESULT(node_to_value(clause.cond));
+                assert(cond);
+                assert(bb_then);
+                assert(bb_else);
+                LLVMBuildCondBr(builder, cond, bb_then, bb_else);
+                LLVMPositionBuilderAtEnd(builder, bb_then);
+            }
             SCOPES_CHECK_RESULT(block_to_value(clause.body));
             auto result = SCOPES_GET_RESULT(node_to_value(clause.value));
             auto rtype = clause.value->get_type();
@@ -1787,26 +1798,8 @@ struct LLVMIRGenerator {
                     LLVMAddIncoming(merge_value, incovals, incobbs, 1);
                 }
             }
-            LLVMPositionBuilderAtEnd(builder, bb_else);
-        }
-        {
-            SCOPES_CHECK_RESULT(block_to_value(node->else_clause.body));
-            auto result = SCOPES_GET_RESULT(node_to_value(node->else_clause.value));
-            auto rtype = node->else_clause.value->get_type();
-            if (is_returning(rtype)) {
-                assert(bb_merge);
-                LLVMBasicBlockRef bb_active = LLVMGetInsertBlock(builder);
-                LLVMBuildBr(builder, bb_merge);
-                if (merge_value) {
-                    assert(result);
-                    LLVMBasicBlockRef incobbs[] = { bb_active };
-                    LLVMValueRef incovals[] = { result };
-                    LLVMAddIncoming(merge_value, incovals, incobbs, 1);
-                }
-            }
-        }
-        if (bb_merge) {
-            LLVMPositionBuilderAtEnd(builder, bb_merge);
+            if (bb_else)
+                LLVMPositionBuilderAtEnd(builder, bb_else);
         }
         return merge_value;
     }
@@ -1850,11 +1843,13 @@ struct LLVMIRGenerator {
                 void *pptr = local_aware_dlsym(node->name);
                 uint64_t ptr = *(uint64_t*)&pptr;
                 if (!ptr) {
-                    ok = true;
+                    last_llvm_error = nullptr;
                     LLVMInstallFatalErrorHandler(fatal_error_handler);
                     ptr = get_address(name);
                     LLVMResetFatalErrorHandler();
-                    SCOPES_CHECK_OK(ok);
+                    if (last_llvm_error) {
+                        SCOPES_RETURN_ERROR(last_llvm_error);
+                    }
                 }
                 if (!ptr) {
                     StyledString ss;
@@ -1979,7 +1974,7 @@ struct LLVMIRGenerator {
             auto arg = args[i];
             LLVMValueRef val = SCOPES_GET_RESULT(node_to_value(arg));
             auto AT = arg->get_type();
-            SCOPES_GET_RESULT(abi_export_argument(val, AT, values, memptrs));
+            SCOPES_CHECK_RESULT(abi_export_argument(val, AT, values, memptrs));
         }
 
         size_t fargcount = fi->argument_types.size();
@@ -2173,7 +2168,7 @@ struct LLVMIRGenerator {
             function_todo.pop_front();
             SCOPES_CHECK_RESULT(Function_finalize(func));
         }
-        return true;
+        return {};
     }
 
     SCOPES_RESULT(void) teardown_generate(Function *entry = nullptr) {
@@ -2203,7 +2198,7 @@ struct LLVMIRGenerator {
                     String::from_cstr(errmsg)));
         }
         LLVMDisposeMessage(errmsg);
-        return true;
+        return {};
     }
 
 #if 0
@@ -2268,7 +2263,7 @@ struct LLVMIRGenerator {
 
 };
 
-bool LLVMIRGenerator::ok = true;
+Error *LLVMIRGenerator::last_llvm_error = nullptr;
 std::unordered_map<const Type *, LLVMTypeRef> LLVMIRGenerator::type_cache;
 std::unordered_map<Function *, LLVMModuleRef> LLVMIRGenerator::func_cache;
 ArgTypes LLVMIRGenerator::type_todo;
@@ -2432,7 +2427,7 @@ SCOPES_RESULT(void) compile_object(const String *path, Scope *scope, uint64_t fl
     }
     free(path_cstr);
 #endif
-    return true;
+    return {};
 }
 
 #if 0

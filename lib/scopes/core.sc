@@ -349,12 +349,8 @@ sc_type_set_symbol type '__call
             verify-count argcount 1 -1
             let self = (sc_getarg args 0)
             let T = (unbox-pointer self type)
-            let ok f = (sc_type_at T '__typecall)
-            if ok
-                return `(f args)
-            compiler-error!
-                sc_string_join "no type constructor available for type "
-                    sc_value_repr self
+            let f = (sc_type_at T '__typecall)
+            return `(f args)
 
 # method call syntax
 sc_type_set_symbol Symbol '__call
@@ -363,16 +359,16 @@ sc_type_set_symbol Symbol '__call
             fn resolve-method (self symval)
                 let sym = (unbox-symbol symval Symbol)
                 let T = (sc_value_type self)
-                let ok f = (sc_type_at T sym)
-                if ok
-                    return f
+                try
+                    return (sc_type_at T sym)
+                except (err)
                 # if calling method of type, try typemethod
                 if (ptrcmp== T type)
                     if (sc_value_is_constant self)
                         let self = (unbox-pointer self type)
-                        let ok f = (sc_type_at self sym)
-                        if ok
-                            return f
+                        try
+                            return (sc_type_at self sym)
+                        except (err)
                 compiler-error!
                     sc_string_join "no method named "
                         sc_string_join (sc_value_repr symval)
@@ -913,15 +909,14 @@ inline single-binary-op-dispatch (destf)
             return `(destf lhs rhs)
         compiler-error! "unsupported type"
 
-inline cast-error! (intro-string vT T)
-    # create branch so we can trick the function into assuming
-        there's another exit path
+inline cast-error! (intro-string vT T err)
     compiler-error!
         sc_string_join intro-string
-            sc_string_join
-                '__repr (box-pointer vT)
+            sc_string_join ('__repr (box-pointer vT))
                 sc_string_join " to type "
-                    '__repr (box-pointer T)
+                    sc_string_join ('__repr (box-pointer T))
+                        sc_string_join ": "
+                            sc_format_error err
 
 # receive a source type, a destination type and an expression, and return an
     untyped expression that transforms the value to said type, or raise an error
@@ -941,29 +936,24 @@ fn attribute-format-error! (T symbol err)
                             sc_format_error err
 
 fn cast-expr (symbol rsymbol vT T expr)
-    let ok anyf = ('@ vT symbol)
-    if ok
+    try
+        let anyf = ('@ vT symbol)
         let f =
-            try
-                unbox-cast-function-type anyf
+            try (unbox-cast-function-type anyf)
             except (err)
                 attribute-format-error! vT symbol err
-        try
-            return true (f vT T expr)
-        except (err)
-            # ignore
-    let ok anyf = ('@ T rsymbol)
-    if ok
-        let f =
+        return (f vT T expr)
+    except (lhs-err)
+        let anyf =
             try
-                unbox-cast-function-type anyf
+                '@ T rsymbol
+            except (err)
+                raise lhs-err
+        let f =
+            try (unbox-cast-function-type anyf)
             except (err)
                 attribute-format-error! T rsymbol err
-        try
-            return true (f vT T expr)
-        except (err)
-            # ignore
-    return false (nullof Value)
+        return (f vT T expr)
 
 fn imply-expr (vT T expr)
     cast-expr '__imply '__rimply vT T expr
@@ -981,10 +971,11 @@ let
                 let vT = ('typeof value)
                 let T = (unbox-pointer anyT type)
                 if (ptrcmp!= vT T)
-                    let ok expr = (imply-expr vT T value)
-                    if ok expr
-                    else
-                        cast-error! "can't implicitly cast value of type " vT T
+                    try
+                        imply-expr vT T value
+                    except (err)
+                        cast-error!
+                            \ "can't coerce value of type " vT T err
                 else value
 
     as =
@@ -997,17 +988,15 @@ let
                 let vT = ('typeof value)
                 let T = (unbox-pointer anyT type)
                 if (ptrcmp!= vT T)
-                    let ok expr =
-                        do
-                            # try implicit cast first
-                            let ok expr = (imply-expr vT T value)
-                            if ok (_ ok expr)
-                            else
-                                # then try explicit cast
-                                as-expr vT T value
-                    if ok expr
-                    else
-                        cast-error! "can't cast value of type " vT T
+                    try
+                        # try implicit cast first
+                        imply-expr vT T value
+                    except (imply-err)
+                        try
+                            # then try explicit cast
+                            as-expr vT T value
+                        except (err)
+                            cast-error! "can't cast value of type " vT T err
                 else value
 
 let BinaryOpFunctionType =
@@ -1016,39 +1005,41 @@ let BinaryOpFunctionType =
 fn unbox-binary-op-function-type (anyf)
     unbox-pointer anyf BinaryOpFunctionType
 
+# assuming both types are the same
 fn binary-op-expr (symbol lhsT rhsT lhs rhs)
-    let ok anyf = ('@ lhsT symbol)
-    if ok
-        let f =
-            try (unbox-binary-op-function-type anyf)
-            except (err)
-                attribute-format-error! lhsT symbol err
-        try
-            return true (f lhsT rhsT lhs rhs)
+    let anyf = ('@ lhsT symbol)
+    let f =
+        try (unbox-binary-op-function-type anyf)
         except (err)
-    return false (nullof Value)
+            attribute-format-error! lhsT symbol err
+    f lhsT rhsT lhs rhs
 
+# assuming both types are different
 fn sym-binary-op-expr (symbol rsymbol lhsT rhsT lhs rhs)
-    let ok anyf = ('@ lhsT symbol)
-    if ok
+    try
+        return (binary-op-expr symbol lhsT rhsT lhs rhs)
+    except (lhs-err)
+        let anyf =
+            try
+                '@ rhsT rsymbol
+            except (geterr)
+                raise lhs-err
         let f =
             try (unbox-binary-op-function-type anyf)
             except (err)
-                attribute-format-error! lhsT symbol err
-        try
-            return true (f lhsT rhsT lhs rhs)
-        except (err)
-    if (ptrcmp!= lhsT rhsT)
-        let ok anyf = ('@ rhsT rsymbol)
-        if ok
-            let f =
-                try (unbox-binary-op-function-type anyf)
-                except (err)
-                    attribute-format-error! rhsT rsymbol err
-            try
-                return true (f lhsT rhsT lhs rhs)
-            except (err)
-    return false (nullof Value)
+                attribute-format-error! rhsT rsymbol err
+        f lhsT rhsT lhs rhs
+
+fn binary-op-error! (friendly-op-name lhsT rhsT err)
+    compiler-error!
+        'join "can't "
+            'join friendly-op-name
+                'join " values of types "
+                    'join ('__repr (box-pointer lhsT))
+                        'join " and "
+                            'join ('__repr (box-pointer rhsT))
+                                'join ": "
+                                    sc_format_error err
 
 # both types are typically the same
 fn sym-binary-op-label-macro (args symbol rsymbol friendly-op-name)
@@ -1059,37 +1050,33 @@ fn sym-binary-op-label-macro (args symbol rsymbol friendly-op-name)
         'getarg args 1
     let lhsT = ('typeof lhs)
     let rhsT = ('typeof rhs)
-    # try direct version first
-    let ok expr = (sym-binary-op-expr symbol rsymbol lhsT rhsT lhs rhs)
-    if ok
-        return expr
-    # if types are unequal, we can try other options
-    if (ptrcmp!= lhsT rhsT)
-        do
-            # can we cast rhsT to lhsT?
-            let ok rhs = (imply-expr rhsT lhsT rhs)
-            if ok
-                # try again
-                let ok expr = (binary-op-expr symbol lhsT lhsT lhs rhs)
-                if ok
-                    return expr
-        do
-            # can we cast lhsT to rhsT?
-            let ok lhs = (imply-expr lhsT rhsT lhs)
-            if ok
-                # try again
-                let ok expr = (binary-op-expr symbol rhsT rhsT lhs rhs)
-                if ok
-                    return expr
+    if (ptrcmp== lhsT rhsT)
+        try
+            # use simple version
+            return (binary-op-expr symbol lhsT lhsT lhs rhs)
+        except (err)
+            binary-op-error! friendly-op-name lhsT rhsT err
+    # asymmetrical types
+    # try direct operation first (from both sides)
+    let err =
+        try
+            return (sym-binary-op-expr symbol rsymbol lhsT rhsT lhs rhs)
+        except (err) err
+    # try other options
+    try
+        # can we cast rhsT to lhsT?
+        let rhs = (imply-expr rhsT lhsT rhs)
+        # try again
+        return (binary-op-expr symbol lhsT lhsT lhs rhs)
+    except (err)
+    try
+        # can we cast lhsT to rhsT?
+        let lhs = (imply-expr lhsT rhsT lhs)
+        # try again
+        return (binary-op-expr symbol rhsT rhsT lhs rhs)
+    except (err)
     # we give up
-    compiler-error!
-        'join "can't "
-            'join friendly-op-name
-                'join " values of types "
-                    'join
-                        '__repr (box-pointer lhsT)
-                        'join " and "
-                            '__repr (box-pointer rhsT)
+    binary-op-error! friendly-op-name lhsT rhsT err
 
 # right hand has fixed type
 fn asym-binary-op-label-macro (args symbol rtype friendly-op-name)
@@ -1100,37 +1087,41 @@ fn asym-binary-op-label-macro (args symbol rtype friendly-op-name)
         'getarg args 1
     let lhsT = ('typeof lhs)
     let rhsT = ('typeof rhs)
-    let ok f = ('@ lhsT symbol)
-    if ok
+    try
+        let f = ('@ lhsT symbol)
         if (ptrcmp== rhsT rtype)
             return `(f args)
         # can we cast rhsT to rtype?
-        let ok rhs = (imply-expr rhsT rtype rhs)
-        if ok
-            return `(f lhs rhs)
-    # we give up
-    compiler-error!
-        'join "can't "
-            'join friendly-op-name
-                'join " values of types "
-                    'join
-                        '__repr (box-pointer lhsT)
-                        'join " and "
-                            '__repr (box-pointer rhsT)
+        let rhs = (imply-expr rhsT rtype rhs)
+        return `(f lhs rhs)
+    except (err)
+        # we give up
+        compiler-error!
+            'join "can't "
+                'join friendly-op-name
+                    'join " values of types "
+                        'join ('__repr (box-pointer lhsT))
+                            'join " and "
+                                'join ('__repr (box-pointer rhsT))
+                                    'join ": "
+                                        sc_format_error err
 
 fn unary-op-label-macro (args symbol friendly-op-name)
     let argc = ('argcount args)
     verify-count argc 1 1
     let lhs = ('getarg args 0)
     let lhsT = ('typeof lhs)
-    let ok f = ('@ lhsT symbol)
-    if ok
+    try
+        let f = ('@ lhsT symbol)
         return `(f args)
-    compiler-error!
-        'join "can't "
-            'join friendly-op-name
-                'join " value of type "
-                    '__repr (box-pointer lhsT)
+    except (err)
+        compiler-error!
+            'join "can't "
+                'join friendly-op-name
+                    'join " value of type "
+                        'join ('__repr (box-pointer lhsT))
+                            'join ": "
+                                sc_format_error err
 
 inline make-unary-op-dispatch (symbol friendly-op-name)
     ast-macro (fn (args) (unary-op-label-macro args symbol friendly-op-name))
@@ -1266,12 +1257,6 @@ inline floordiv (a b)
     __% = (box-binary-op (single-binary-op-dispatch frem))
 
 
-fn type-getattr-dynamic (T value)
-    let ok val = (sc_type_at T value)
-    if ok
-        return val
-    compiler-error! "no such attribute"
-
 'set-symbols Value
     __== = (box-binary-op (single-binary-op-dispatch ptrcmp==))
     __!= = (box-binary-op (single-binary-op-dispatch ptrcmp!=))
@@ -1297,10 +1282,10 @@ fn type-getattr-dynamic (T value)
                     'getarg args 3
                 let self = (unbox-pointer self type)
                 let key = (unbox-symbol key Symbol)
-                let ok result = (sc_type_at self key)
-                if ok
+                try
+                    let result = (sc_type_at self key)
                     return `(thenf result)
-                else
+                except (err)
                     return `(elsef)
     __getattr =
         box-ast-macro
@@ -1314,18 +1299,8 @@ fn type-getattr-dynamic (T value)
                     if ('constant? key)
                         let self = (unbox-pointer self type)
                         let key = (unbox-symbol key Symbol)
-                        let ok result = (sc_type_at self key)
-                        if ok
-                            return result
-                        else
-                            return `(_)
-                `(type-getattr-dynamic args)
-
-fn scope-getattr-dynamic (T value)
-    let ok val = (sc_scope_at T value)
-    if ok
-        return val
-    compiler-error! "no such attribute"
+                        return (sc_type_at self key)
+                `(sc_type_at args)
 
 'set-symbols Scope
     __== = (box-binary-op (single-binary-op-dispatch ptrcmp==))
@@ -1341,12 +1316,8 @@ fn scope-getattr-dynamic (T value)
                     if ('constant? key)
                         let self = (unbox-pointer self Scope)
                         let key = (unbox-symbol key Symbol)
-                        let ok result = (sc_scope_at self key)
-                        if ok
-                            return result
-                        else
-                            return `(_)
-                `(scope-getattr-dynamic args)
+                        return (sc_scope_at self key)
+                `(sc_scope_at args)
     __typecall =
         box-ast-macro
             fn "scope-typecall" (args)
@@ -1698,11 +1669,7 @@ inline make-expand-define-infix (order)
         expand-define-infix args scope order
 
 fn get-ifx-op (env op)
-    let sym = op
-    if (== ('typeof sym) Symbol)
-        '@ env (get-ifx-symbol (as sym Symbol))
-    else
-        return false (Value none)
+    '@ env (get-ifx-symbol (as op Symbol))
 
 fn has-infix-ops? (infix-table expr)
     # any expression of which one odd argument matches an infix operator
@@ -1712,10 +1679,11 @@ fn has-infix-ops? (infix-table expr)
         return false
     let __ expr = ('decons expr)
     let at next = ('decons expr)
-    let ok result = (get-ifx-op infix-table at)
-    if ok
+    try
+        get-ifx-op infix-table at
         return true
-    repeat expr
+    except (err)
+        repeat expr
 
 fn unpack-infix-op (op)
     let op = (as op list)
@@ -1729,31 +1697,30 @@ fn unpack-infix-op (op)
 
 inline infix-op (pred)
     fn infix-op (infix-table token prec)
-        let ok op =
-            get-ifx-op infix-table token
-        if ok
-            let op-prec = (unpack-infix-op op)
-            ? (pred op-prec prec) op (Value none)
-        else
-            sc_set_active_anchor ('anchor token)
-            compiler-error!
-                "unexpected token in infix expression"
+        let op =
+            try (get-ifx-op infix-table token)
+            except (err)
+                sc_set_active_anchor ('anchor token)
+                compiler-error!
+                    "unexpected token in infix expression"
+        let op-prec = (unpack-infix-op op)
+        ? (pred op-prec prec) op (Value none)
+
 let infix-op-gt = (infix-op >)
 let infix-op-ge = (infix-op >=)
 
 fn rtl-infix-op-eq (infix-table token prec)
-    let ok op =
-        get-ifx-op infix-table token
-    if ok
-        let op-prec op-order = (unpack-infix-op op)
-        if (== op-order '<)
-            ? (== op-prec prec) op (Value none)
-        else
-            Value none
+    let op =
+        try (get-ifx-op infix-table token)
+        except (err)
+            sc_set_active_anchor ('anchor token)
+            compiler-error!
+                "unexpected token in infix expression"
+    let op-prec op-order = (unpack-infix-op op)
+    if (== op-order '<)
+        ? (== op-prec prec) op (Value none)
     else
-        sc_set_active_anchor ('anchor token)
-        compiler-error!
-            "unexpected token in infix expression"
+        Value none
 
 fn parse-infix-expr (infix-table lhs state mprec)
     loop (lhs state) = lhs state
@@ -1800,28 +1767,23 @@ fn list-handler (topexpr env)
     let expr-at expr-next = ('decons expr)
     let head-key = expr-at
     let head =
-        if (== ('typeof head-key) Symbol)
-            let ok head = ('@ env (as head-key Symbol))
-            if ok head
-            else head-key
-        else head-key
+        try
+            '@ env (as head-key Symbol)
+        except (err) head-key
     let head =
-        if (== ('typeof head) type)
-            let ok attr = ('@ (as head type) '__macro)
-            if ok attr
-            else head
-        else head
+        try
+            '@ (as head type) '__macro
+        except (err) head
     if (== ('typeof head) SyntaxMacro)
         let head = (as head SyntaxMacro)
+        sc_set_active_anchor expr-anchor
         let expr env = (head expr topexpr-next env)
-        # todo: attach expr-anchor
-        #let expr = (Syntax-wrap expr-anchor (Value expr) false)
         return (as expr list) env
     elseif (has-infix-ops? env expr)
         let at next = ('decons expr)
+        sc_set_active_anchor expr-anchor
         let expr =
             parse-infix-expr env at next 0
-        #let expr = (Syntax-wrap expr-anchor expr false)
         return (cons expr topexpr-next) env
     else
         return topexpr env
@@ -2323,48 +2285,45 @@ let incomplete = (typename "incomplete")
 fn require-from (base-dir name)
     #assert-typeof name Symbol
     let namestr = (dots-to-slashes (name as string))
-    inline load-module-from-symbol (name)
-        let package = ((fn () package))
-        let modules = (package.modules as Scope)
-        loop (patterns) = (patterns-from-namestr base-dir namestr)
+    let package = ((fn () package))
+    let modules = (package.modules as Scope)
+    let all-patterns = (patterns-from-namestr base-dir namestr)
+    loop (patterns) = all-patterns
+    if (empty? patterns)
+        sc_write "no such module '"
+        sc_write (as name string)
+        sc_write "' in paths:\n"
+        loop (patterns) = all-patterns
         if (empty? patterns)
-            break false (Value none)
+            compiler-error! "failed to import module"
         let pattern patterns = (decons patterns)
         let pattern = (pattern as string)
-        let module-path = (sc_realpath (make-module-path pattern namestr))
-        if (empty? module-path)
-            repeat patterns
-        let module-path-sym = (Symbol module-path)
-        let ok content = ('@ modules module-path-sym)
-        if ok
-            if (('typeof content) == type)
-                if (content == incomplete)
-                    compiler-error!
-                        .. "trying to import module " (repr name)
-                            " while it is being imported"
-            break true content
-        if (not (sc_is_file module-path))
-            repeat patterns
-        'set-symbol modules module-path-sym incomplete
-        let content = (load-module (name as string) module-path)
-        'set-symbol modules module-path-sym content
-        break true content
-    let ok content = (load-module-from-symbol name)
-    if ok
-        return content
-    sc_write "no such module '"
-    sc_write (as name string)
-    sc_write "' in paths:\n"
-    loop (patterns) = (patterns-from-namestr base-dir namestr)
-    if (empty? patterns)
-        compiler-error! "failed to import module"
+        let module-path = (make-module-path pattern namestr)
+        sc_write "    "
+        sc_write module-path
+        sc_write "\n"
+        repeat patterns
     let pattern patterns = (decons patterns)
     let pattern = (pattern as string)
-    let module-path = (make-module-path pattern namestr)
-    sc_write "    "
-    sc_write module-path
-    sc_write "\n"
-    repeat patterns
+    let module-path = (sc_realpath (make-module-path pattern namestr))
+    if (empty? module-path)
+        repeat patterns
+    let module-path-sym = (Symbol module-path)
+    let content =
+        try ('@ modules module-path-sym)
+        except (err)
+            if (not (sc_is_file module-path))
+                repeat patterns
+            'set-symbol modules module-path-sym incomplete
+            let content = (load-module (name as string) module-path)
+            'set-symbol modules module-path-sym content
+            return content
+    if (('typeof content) == type)
+        if (content == incomplete)
+            compiler-error!
+                .. "trying to import module " (repr name)
+                    " while it is being imported"
+    return content
 
 """"export locals as a chain of two new scopes: a scope that contains
     all the constant values in the immediate scope, and a scope that contains
@@ -2439,11 +2398,7 @@ let using =
             let name rest = (decons args)
             let nameval = name
             if ((('typeof nameval) == Symbol) and ((nameval as Symbol) == 'import))
-                let ok module-dir = ('@ syntax-scope 'module-dir)
-                if (not ok)
-                    compiler-error!
-                        "using import requires module-dir symbol in scope"
-                let module-dir = (module-dir as string)
+                let module-dir = (('@ syntax-scope 'module-dir) as string)
                 let name rest = (decons rest)
                 let name = (name as Symbol)
                 let module = ((require-from module-dir name) as Scope)
@@ -2470,9 +2425,13 @@ let using =
                         merge-scope-symbols src syntax-scope (('@ pattern) as string)
             if (('typeof nameval) == Symbol)
                 let sym = (nameval as Symbol)
-                let ok src = ('@ syntax-scope sym)
-                if (ok and (('typeof src) == Scope))
-                    return (process (src as Scope))
+                label skip
+                    let src =
+                        try
+                            ('@ syntax-scope sym) as Scope
+                        except (err)
+                            merge skip
+                    return (process src)
             elseif (('typeof nameval) == Scope)
                 return (process (nameval as Scope))
             return
@@ -2889,11 +2848,12 @@ inline single-signed-vector-binary-op-dispatch (sf uf)
 
 fn vector-binary-op-expr (symbol lhsT rhsT lhs rhs)
     let Ta = ('element@ lhsT 0)
-    let ok f = ('@ Ta symbol)
-    if ok
-        let f = (unbox-binary-op-function-type f)
-        return (f lhsT rhsT lhs rhs)
-    compiler-error! "unsupported operation"
+    let f =
+        try ('@ Ta symbol)
+        except (err)
+            compiler-error! "unsupported operation"
+    let f = (unbox-binary-op-function-type f)
+    return (f lhsT rhsT lhs rhs)
 
 inline vector-binary-op-dispatch (symbol)
     box-binary-op
@@ -3363,10 +3323,9 @@ fn gen-argument-matcher (failfunc expr scope params)
                 sc_expression_append outexpr
                     ast-quote
                         let arg = (sc_getarg expr i)
-                        let ok wraparg = (imply-expr ('typeof arg) exprT arg)
                         let arg =
-                            if ok wraparg
-                            else
+                            try (imply-expr ('typeof arg) exprT arg)
+                            except (err)
                                 failfunc;
                 'set-symbol scope param arg
                 repeat (i + 1) rest varargs
@@ -3541,10 +3500,8 @@ let OverloadedFunction = (typename "OverloadedFunction")
 fn get-overloaded-fn-append ()
     spice "overloaded-fn-append" (T args...)
         let outtype = (T as type)
-        if (not (let ok functions = ('@ outtype 'templates)))
-            compiler-error! "overloaded function has no functions attribute"
-        if (not (let ok functypes = ('@ outtype 'parameter-types)))
-            compiler-error! "overloaded function has no parameter-types attribute"
+        let functions = ('@ outtype 'templates)
+        let functypes = ('@ outtype 'parameter-types)
         for i in (range 0 ('argcount args...) 2)
             let f = ('getarg args... i)
             let ftype = ('getarg args... (i + 1))
@@ -3568,10 +3525,8 @@ fn get-overloaded-fn-append ()
                         syntax-error! ('anchor f) "cannot inherit from own type"
                     let fT = (f as type)
                     if (fT < OverloadedFunction)
-                        if (not (let ok fns = ('@ fT 'templates)))
-                            syntax-error! ('anchor f) "overloaded function has no functions attribute"
-                        if (not (let ok ftypes = ('@ fT 'parameter-types)))
-                            syntax-error! ('anchor f) "overloaded function has no parameter-types attribute"
+                        let fns = ('@ fT 'templates)
+                        let ftypes = ('@ fT 'parameter-types)
                         # copy over existing options
                         for func ftype in (zip ('args fns) ('args ftypes))
                             sc_argument_list_append functions func
@@ -3598,10 +3553,8 @@ fn get-overloaded-fn-append ()
     __typecall =
         spice "dispatch-overloaded-function" (cls args...)
             let T = (cls as type)
-            if (not (let ok fns = ('@ T 'templates)))
-                compiler-error! "overloaded function has no functions attribute"
-            if (not (let ok ftypes = ('@ T 'parameter-types)))
-                compiler-error! "overloaded function has no parameter-types attribute"
+            let fns = ('@ T 'templates)
+            let ftypes = ('@ T 'parameter-types)
             let count = ('argcount args...)
             for f FT in (zip ('args fns) ('args ftypes))
                 let FT = (FT as type)
@@ -3626,10 +3579,9 @@ fn get-overloaded-fn-append ()
                             elseif (paramT == Variadic) arg
                             elseif (argT == paramT) arg
                             else
-                                let ok newarg = (imply-expr argT paramT arg)
-                                if (not ok)
+                                try (imply-expr argT paramT arg)
+                                except (err)
                                     merge break-next
-                                newarg
                         sc_call_append_argument outargs outarg
                     return outargs
             # if we got here, there was no match
@@ -3750,21 +3702,18 @@ let ref-attribs-key = '__refattrs
     @& =
         fn "@&" (T name)
             loop (T) = T
-            let ok attrs = ('local@ T ref-attribs-key)
-            if ok
-                let attrs = (attrs as type)
-                let ok val = ('@ attrs name)
-                if ok
-                    return ok val
-            if (T == typename)
-                return false (nullof Value)
+            try
+                let attrs = (('local@ T ref-attribs-key) as type)
+                return ('@ attrs name)
+            except (err)
+                if (T == typename)
+                    raise err
             repeat ('super T)
     set-symbol& =
         fn "set-symbol&" (T name value)
-            let ok attrs = ('local@ T ref-attribs-key)
             let attrs =
-                if ok (attrs as type)
-                else
+                try (('local@ T ref-attribs-key) as type)
+                except (err)
                     let attrs = (sc_typename_type (ref-attribs-key as string))
                     'set-symbol T ref-attribs-key (Value attrs)
                     attrs
@@ -3778,15 +3727,11 @@ spice deref (values...)
         let T = ('typeof value)
         sc_argument_list_append result
             if (T < ref)
-                let ok op = ('@ T '__deref)
-                if ok
-                    let cmd =  `(op value)
-                    if (key == unnamed) cmd
-                    else
-                        sc_keyed_new key cmd
+                let op = ('@ T '__deref)
+                let cmd = `(op value)
+                if (key == unnamed) cmd
                 else
-                    syntax-error! ('anchor kvalue)
-                        .. "deref attribute missing in value of type " (repr T)
+                    sc_keyed_new key cmd
             else
                 kvalue
     result
@@ -3885,9 +3830,10 @@ fn ref-type (PT)
     __= =
         spice "ref=" (self value)
             let ET = ('typeof& self)
-            let ok op = ('@& ET '__=)
-            if ok `(op self value)
-            else
+            try
+                let op = ('@& ET '__=)
+                `(op self value)
+            except (err)
                 ast-quote
                     destruct self
                     copy-construct self value

@@ -327,13 +327,13 @@ struct StreamAST : StreamAnchors {
                         } else {
                             stream_block_result(expr.cond_body, expr.cond, depth+3, maxdepth);
                         }
+                    } else {
+                        stream_newline();
+                        stream_indent(depth+1);
+                        ss << Style_Keyword << "else" << Style_None;
                     }
                     stream_block_result(expr.body, expr.value, depth+2, maxdepth);
                 }
-                stream_newline();
-                stream_indent(depth+1);
-                ss << Style_Keyword << "else" << Style_None;
-                stream_block_result(val->else_clause.body, val->else_clause.value, depth+2, maxdepth);
             }
         } break;
         case VK_Parameter: {

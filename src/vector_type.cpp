@@ -76,7 +76,7 @@ SCOPES_RESULT(void) verify_integer_vector(const Type *type) {
         ss.out << "integer scalar or vector type expected, got " << type;
         SCOPES_LOCATION_ERROR(ss.str());
     }
-    return true;
+    return {};
 }
 
 SCOPES_RESULT(void) verify_real_vector(const Type *type) {
@@ -89,7 +89,7 @@ SCOPES_RESULT(void) verify_real_vector(const Type *type) {
         ss.out << "real scalar or vector type expected, got " << type;
         SCOPES_LOCATION_ERROR(ss.str());
     }
-    return true;
+    return {};
 }
 
 SCOPES_RESULT(void) verify_bool_vector(const Type *type) {
@@ -102,7 +102,7 @@ SCOPES_RESULT(void) verify_bool_vector(const Type *type) {
         ss.out << "bool value or vector type expected, got " << type;
         SCOPES_LOCATION_ERROR(ss.str());
     }
-    return true;
+    return {};
 }
 
 SCOPES_RESULT(void) verify_real_vector(const Type *type, size_t fixedsz) {
@@ -110,7 +110,7 @@ SCOPES_RESULT(void) verify_real_vector(const Type *type, size_t fixedsz) {
     if (type->kind() == TK_Vector) {
         auto T = cast<VectorType>(type);
         if (T->count == fixedsz)
-            return true;
+            return {};
     }
     StyledString ss;
     ss.out << "vector type of size " << fixedsz << " expected, got " << type;
@@ -125,10 +125,10 @@ SCOPES_RESULT(void) verify_vector_sizes(const Type *type1, const Type *type2) {
         if (type1v) {
             if (cast<VectorType>(type1)->count
                     == cast<VectorType>(type2)->count) {
-                return true;
+                return {};
             }
         } else {
-            return true;
+            return {};
         }
     }
     StyledString ss;

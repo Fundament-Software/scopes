@@ -285,6 +285,10 @@ Expression *Expression::unscoped_from(const Anchor *anchor, const Values &nodes,
 
 //------------------------------------------------------------------------------
 
+bool If::Clause::is_then() const {
+    return cond != nullptr;
+}
+
 If::If(const Anchor *anchor, const Clauses &_clauses)
     : Instruction(VK_If, anchor), clauses(_clauses) {
 }
@@ -307,17 +311,10 @@ void If::append_then(const Anchor *anchor, Value *cond, Value *value) {
 void If::append_else(const Anchor *anchor, Value *value) {
     assert(anchor);
     assert(value);
-    assert(!else_clause.value);
-    else_clause.anchor = anchor;
-    else_clause.value = value;
-}
-
-Value *If::canonicalize() {
-    if (!else_clause.value) {
-        else_clause.anchor = anchor();
-        else_clause.value = ArgumentList::from(anchor());
-    }
-    return this;
+    Clause clause;
+    clause.anchor = anchor;
+    clause.value = value;
+    clauses.push_back(clause);
 }
 
 //------------------------------------------------------------------------------

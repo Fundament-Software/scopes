@@ -53,30 +53,18 @@ Error::Error(const Anchor *_anchor, const String *_msg) :
     anchor(_anchor),
     msg(_msg) {}
 
-//------------------------------------------------------------------------------
-
-static Error *_last_error = nullptr;
-
-void set_last_error(Error *err) {
-    _last_error = err;
+void Error::append_definition(Value *value) {
+    definitions.push_back(value);
 }
 
-Error *get_last_error() {
-    auto result = _last_error;
-    _last_error = nullptr;
-    return result;
-}
-
-void add_error_trace(Value *value) {
-    if (_last_error) {
-        // only report deepest call
-        if (!_last_error->trace.empty()) {
-            Value *last = _last_error->trace.back();
-            if (isa<Call>(last) && isa<Call>(value))
-                return;
-        }
-        _last_error->trace.push_back(value);
+void Error::append_error_trace(Value *value) {
+    // only report deepest call
+    if (!trace.empty()) {
+        Value *last = trace.back();
+        if (isa<Call>(last) && isa<Call>(value))
+            return;
     }
+    trace.push_back(value);
 }
 
 //------------------------------------------------------------------------------
@@ -115,8 +103,14 @@ void stream_error(StyledStream &ss, const Error *exc) {
     }
     ss << Style_Error << "error:" << Style_None << " "
         << exc->msg->data << std::endl;
+    /*
     if (exc->anchor) {
         exc->anchor->stream_source_line(ss);
+    }
+    */
+    for (auto def : exc->definitions) {
+        ss << def->anchor() << " defined here" << std::endl;
+        def->anchor()->stream_source_line(ss);
     }
 }
 
@@ -137,22 +131,19 @@ Error *make_runtime_error(const String *msg) {
     return new Error(nullptr, msg);
 }
 
-void set_last_location_error(const String *msg) {
-    set_last_error(make_location_error(msg));
-}
-
 //------------------------------------------------------------------------------
 
-void print_definition_anchor(Value *node) {
-    location_message(node->anchor(), String::from("defined here"));
+#define SCOPES_LOCATION_DEF_ERROR(DEF, MSG) { \
+    auto err = make_location_error((MSG)); \
+    err->append_definition((DEF)); \
+    return Result<_result_type>::raise(err); \
 }
 
 SCOPES_RESULT(void) error_invalid_call_type(Value *callee) {
     SCOPES_RESULT_TYPE(void);
-    print_definition_anchor(callee);
     StyledString ss;
     ss.out << "unable to call value of type " << callee->get_type();
-    SCOPES_LOCATION_ERROR(ss.str());
+    SCOPES_LOCATION_DEF_ERROR(callee, ss.str());
 }
 
 SCOPES_RESULT(void) error_argument_count_mismatch(int needed, int got) {
@@ -182,32 +173,29 @@ SCOPES_RESULT(void) error_invalid_operands(const Type *A, const Type *B) {
 
 SCOPES_RESULT(void) error_invalid_condition_type(Value *cond) {
     SCOPES_RESULT_TYPE(void);
-    print_definition_anchor(cond);
     StyledString ss;
     ss.out << "condition of if-clause must be value of type "
         << TYPE_Bool << ", not value of type " << cond->get_type();
-    SCOPES_LOCATION_ERROR(ss.str());
+    SCOPES_LOCATION_DEF_ERROR(cond, ss.str());
 }
 
 SCOPES_RESULT(void) error_invalid_case_literal_type(Value *lit) {
     SCOPES_RESULT_TYPE(void);
-    print_definition_anchor(lit);
     StyledString ss;
     ss.out << "condition of switch-case must be constant of type "
         << TYPE_Integer << ", not value of type " << lit->get_type();
-    SCOPES_LOCATION_ERROR(ss.str());
+    SCOPES_LOCATION_DEF_ERROR(lit, ss.str());
 }
 
 SCOPES_RESULT(void) error_label_expected(Value *value) {
     SCOPES_RESULT_TYPE(void);
-    print_definition_anchor(value);
     StyledString ss;
     if (value->is_typed()) {
         ss.out << "expected label, not value of type " << value->get_type();
     } else {
         ss.out << "expected label, not untyped value";
     }
-    SCOPES_LOCATION_ERROR(ss.str());
+    SCOPES_LOCATION_DEF_ERROR(value, ss.str());
 }
 
 SCOPES_RESULT(void) error_duplicate_default_case() {
@@ -226,7 +214,6 @@ SCOPES_RESULT(void) error_missing_default_case() {
 
 SCOPES_RESULT(void) error_constant_expected(const Type *want, Value *value) {
     SCOPES_RESULT_TYPE(void);
-    print_definition_anchor(value);
     StyledString ss;
     ss.out << "constant";
     if (want)
@@ -234,21 +221,20 @@ SCOPES_RESULT(void) error_constant_expected(const Type *want, Value *value) {
     ss.out << " expected, got "
         << get_value_class_name(value->kind())
         << " of type " << value->get_type();
-    SCOPES_LOCATION_ERROR(ss.str());
+    SCOPES_LOCATION_DEF_ERROR(value, ss.str());
 }
 
 SCOPES_RESULT(void) error_unbound_symbol(Parameter *value) {
     SCOPES_RESULT_TYPE(void);
-    print_definition_anchor(value);
     StyledString ss;
     ss.out << "symbol " << value->name << " is unbound in scope";
-    SCOPES_LOCATION_ERROR(ss.str());
+    SCOPES_LOCATION_DEF_ERROR(value, ss.str());
 }
 
-SCOPES_RESULT(void) error_cannot_merge_expression_types(const Type *T1, const Type *T2) {
+SCOPES_RESULT(void) error_cannot_merge_expression_types(const char *context, const Type *T1, const Type *T2) {
     SCOPES_RESULT_TYPE(void);
     StyledString ss;
-    ss.out << "cannot merge expression types " << T1 << " and " << T2;
+    ss.out << "conflicting " << context << " types " << T1 << " and " << T2;
     SCOPES_LOCATION_ERROR(ss.str());
 }
 
@@ -294,41 +280,41 @@ SCOPES_RESULT(void) error_variadic_symbol_not_in_last_place() {
     SCOPES_LOCATION_ERROR(ss.str());
 }
 
-SCOPES_RESULT(void) error_untyped_recursive_call() {
+SCOPES_RESULT(void) error_untyped_recursive_call(Function *func) {
     SCOPES_RESULT_TYPE(void);
     StyledString ss;
-    ss.out << "recursive call to function can not be typed because the function has no return type yet";
-    SCOPES_LOCATION_ERROR(ss.str());
+    ss.out << "recursive call to function " << func->name
+         << " can not be typed because the function has no return type yet";
+    SCOPES_LOCATION_DEF_ERROR(func, ss.str());
 }
 
 SCOPES_RESULT(void) error_value_inaccessible_from_closure(Value *value,
     const Function *frame) {
     SCOPES_RESULT_TYPE(void);
-    print_definition_anchor(value);
-    if (frame)
-        print_definition_anchor(const_cast<Function *>(frame));
     StyledString ss;
     ss.out << "non-constant value of type " << value->get_type()
         << " is inaccessible from function";
-    SCOPES_LOCATION_ERROR(ss.str());
+    if (frame) {
+        SCOPES_LOCATION_DEF_ERROR(const_cast<Function *>(frame), ss.str());
+    } else {
+        SCOPES_LOCATION_ERROR(ss.str());
+    }
 }
 
 //------------------------------------------------------------------------------
 
 SCOPES_RESULT(void) error_gen_invalid_call_type(const char *target, Value *callee) {
     SCOPES_RESULT_TYPE(void);
-    print_definition_anchor(callee);
     StyledString ss;
     ss.out << target << ": cannot translate call to value of type " << callee->get_type();
-    SCOPES_LOCATION_ERROR(ss.str());
+    SCOPES_LOCATION_DEF_ERROR(callee, ss.str());
 }
 
 SCOPES_RESULT(void) error_gen_unbound_symbol(const char *target, Parameter *value) {
     SCOPES_RESULT_TYPE(void);
-    print_definition_anchor(value);
     StyledString ss;
     ss.out << target << ": symbol " << value->name << " is unbound";
-    SCOPES_LOCATION_ERROR(ss.str());
+    SCOPES_LOCATION_DEF_ERROR(value, ss.str());
 }
 
 //------------------------------------------------------------------------------

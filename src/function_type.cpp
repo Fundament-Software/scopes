@@ -168,7 +168,7 @@ SCOPES_RESULT(void) verify_function_pointer(const Type *type) {
         ss.out << "function pointer expected, got " << type;
         SCOPES_LOCATION_ERROR(ss.str());
     }
-    return true;
+    return {};
 }
 
 } // namespace scopes

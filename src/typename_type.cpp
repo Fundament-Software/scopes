@@ -51,7 +51,7 @@ SCOPES_RESULT(void) TypenameType::finalize(const Type *_type) {
         SCOPES_LOCATION_ERROR(ss.str());
     }
     storage_type = _type;
-    return true;
+    return {};
 }
 
 bool TypenameType::finalized() const { return storage_type != nullptr; }

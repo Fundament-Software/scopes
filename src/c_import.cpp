@@ -63,7 +63,7 @@ public:
 
     Scope *dest;
     clang::ASTContext *Context;
-    bool ok;
+    Result<void> ok;
     std::unordered_map<clang::RecordDecl *, bool> record_defined;
     std::unordered_map<clang::EnumDecl *, bool> enum_defined;
     NamespaceMap named_structs;
@@ -72,7 +72,7 @@ public:
     NamespaceMap named_enums;
     NamespaceMap typedefs;
 
-    CVisitor() : dest(nullptr), Context(NULL), ok(true) {
+    CVisitor() : dest(nullptr), Context(NULL) {
         const Type *T = typename_type(String::from("__builtin_va_list"));
         auto tnt = cast<TypenameType>(const_cast<Type*>(T));
         tnt->finalize(array_type(TYPE_I8, sizeof(va_list)).assert_ok()).assert_ok();
@@ -198,7 +198,7 @@ public:
 
         SCOPES_CHECK_RESULT(tni->finalize(is_union?SCOPES_GET_RESULT(union_type(args)):
             SCOPES_GET_RESULT(tuple_type(args, packed, explicit_alignment?al:0))));
-        return true;
+        return {};
     }
 
     const Type *get_typename(Symbol name, NamespaceMap &map) {
@@ -578,30 +578,36 @@ public:
         dest->bind(name, Extern::from(anchor, type, name));
     }
 
+#define SCOPES_COMBINE_RESULT(DEST, EXPR) { \
+        auto _result = (EXPR); \
+        if (!_result.ok()) \
+            DEST = Result<void>::raise(_result.unsafe_error()); \
+    }
+
     bool TraverseRecordDecl(clang::RecordDecl *rd) {
-        if (!ok) return false;
+        if (!ok.ok()) return false;
         if (rd->isFreeStanding()) {
-            ok = ok && TranslateRecord(rd).ok();
+            SCOPES_COMBINE_RESULT(ok, TranslateRecord(rd));
         }
         return true;
     }
 
     bool TraverseEnumDecl(clang::EnumDecl *ed) {
-        if (!ok) return false;
+        if (!ok.ok()) return false;
         if (ed->isFreeStanding()) {
-            ok = ok && TranslateEnum(ed).ok();
+            SCOPES_COMBINE_RESULT(ok, TranslateEnum(ed));
         }
         return true;
     }
 
     bool TraverseVarDecl(clang::VarDecl *vd) {
-        if (!ok) return false;
+        if (!ok.ok()) return false;
         if (vd->isExternC()) {
             const Anchor *anchor = anchorFromLocation(vd->getSourceRange().getBegin());
 
             auto type = TranslateType(vd->getType());
-            ok = ok && type.ok();
-            if (!ok) return false;
+            SCOPES_COMBINE_RESULT(ok, type);
+            if (!ok.ok()) return false;
             exportExtern(
                 String::from_stdstring(vd->getName().data()),
                 type.assert_ok(),
@@ -612,13 +618,13 @@ public:
     }
 
     bool TraverseTypedefDecl(clang::TypedefDecl *td) {
-        if (!ok) return false;
+        if (!ok.ok()) return false;
 
         //const Anchor *anchor = anchorFromLocation(td->getSourceRange().getBegin());
 
         auto type_result = TranslateType(td->getUnderlyingType());
-        ok = ok && type_result.ok();
-        if (!ok) return false;
+        SCOPES_COMBINE_RESULT(ok, type_result);
+        if (!ok.ok()) return false;
         const Type *type = type_result.assert_ok();
 
         Symbol name = Symbol(String::from_stdstring(td->getName().data()));
@@ -631,7 +637,7 @@ public:
     }
 
     bool TraverseLinkageSpecDecl(clang::LinkageSpecDecl *ct) {
-        if (!ok) return false;
+        if (!ok.ok()) return false;
         if (ct->getLanguage() == clang::LinkageSpecDecl::lang_c) {
             return clang::RecursiveASTVisitor<CVisitor>::TraverseLinkageSpecDecl(ct);
         }
@@ -639,12 +645,12 @@ public:
     }
 
     bool TraverseClassTemplateDecl(clang::ClassTemplateDecl *ct) {
-        if (!ok) return false;
+        if (!ok.ok()) return false;
         return false;
     }
 
     bool TraverseFunctionDecl(clang::FunctionDecl *f) {
-        if (!ok) return false;
+        if (!ok.ok()) return false;
 
         clang::DeclarationName DeclName = f->getNameInfo().getName();
         std::string FuncName = DeclName.getAsString();
@@ -658,8 +664,8 @@ public:
         }
 
         auto functype_result = TranslateFuncType(fntyp);
-        ok = ok && functype_result.ok();
-        if (!ok) return false;
+        SCOPES_COMBINE_RESULT(ok, functype_result);
+        if (!ok.ok()) return false;
 
         const Type *functype = functype_result.assert_ok();
 
@@ -679,58 +685,65 @@ public:
 
         return true;
     }
+#undef SCOPES_COMBINE_RESULT
 
 };
-
-class CodeGenProxy : public clang::ASTConsumer {
-public:
-    Scope *dest;
-
-    static bool ok;
-    CVisitor visitor;
-
-    CodeGenProxy(Scope *dest_) : dest(dest_) {
-        ok = true;
-    }
-    virtual ~CodeGenProxy() {}
-
-    virtual void Initialize(clang::ASTContext &Context) {
-        visitor.SetContext(&Context, dest);
-    }
-
-    virtual bool HandleTopLevelDecl(clang::DeclGroupRef D) {
-        if (!ok) return false;
-        for (clang::DeclGroupRef::iterator b = D.begin(), e = D.end(); b != e; ++b) {
-            ok = ok && visitor.TraverseDecl(*b);
-            ok = ok && visitor.ok;
-            if (!ok) return false;
-        }
-        return true;
-    }
-};
-
-bool CodeGenProxy::ok = true;
 
 // see ASTConsumers.h for more utilities
 class EmitLLVMOnlyAction : public clang::EmitLLVMOnlyAction {
 public:
     Scope *dest;
+    Result<void> result;
 
-    EmitLLVMOnlyAction(Scope *dest_) :
-        clang::EmitLLVMOnlyAction((llvm::LLVMContext *)LLVMGetGlobalContext()),
-        dest(dest_)
-    {
-    }
+    EmitLLVMOnlyAction(Scope *dest_);
 
     std::unique_ptr<clang::ASTConsumer> CreateASTConsumer(clang::CompilerInstance &CI,
-                                                 clang::StringRef InFile) override {
+        clang::StringRef InFile) override;
+};
 
-        std::vector< std::unique_ptr<clang::ASTConsumer> > consumers;
-        consumers.push_back(clang::EmitLLVMOnlyAction::CreateASTConsumer(CI, InFile));
-        consumers.push_back(llvm::make_unique<CodeGenProxy>(dest));
-        return llvm::make_unique<clang::MultiplexConsumer>(std::move(consumers));
+class CodeGenProxy : public clang::ASTConsumer {
+public:
+    EmitLLVMOnlyAction &act;
+    CVisitor visitor;
+
+    CodeGenProxy(EmitLLVMOnlyAction &_act) : act(_act) {
+    }
+    virtual ~CodeGenProxy() {}
+
+    virtual void Initialize(clang::ASTContext &Context) {
+        visitor.SetContext(&Context, act.dest);
+    }
+
+    virtual bool HandleTopLevelDecl(clang::DeclGroupRef D) {
+        if (!visitor.ok.ok()) {
+            act.result = visitor.ok;
+            return false;
+        }
+        for (clang::DeclGroupRef::iterator b = D.begin(), e = D.end(); b != e; ++b) {
+            visitor.TraverseDecl(*b);
+            if (!visitor.ok.ok()) {
+                act.result = visitor.ok;
+                return false;
+            }
+        }
+        return true;
     }
 };
+
+EmitLLVMOnlyAction::EmitLLVMOnlyAction(Scope *dest_) :
+    clang::EmitLLVMOnlyAction((llvm::LLVMContext *)LLVMGetGlobalContext()),
+    dest(dest_)
+{
+}
+
+std::unique_ptr<clang::ASTConsumer> EmitLLVMOnlyAction::CreateASTConsumer(clang::CompilerInstance &CI,
+                                                clang::StringRef InFile) {
+
+    std::vector< std::unique_ptr<clang::ASTConsumer> > consumers;
+    consumers.push_back(clang::EmitLLVMOnlyAction::CreateASTConsumer(CI, InFile));
+    consumers.push_back(llvm::make_unique<CodeGenProxy>(*this));
+    return llvm::make_unique<clang::MultiplexConsumer>(std::move(consumers));
+}
 
 static std::vector<LLVMModuleRef> llvm_c_modules;
 
@@ -852,9 +865,9 @@ SCOPES_RESULT(Scope *) import_c_module (
     Scope *result = Scope::from();
 
     // Create and execute the frontend to generate an LLVM bitcode module.
-    std::unique_ptr<CodeGenAction> Act(new EmitLLVMOnlyAction(result));
+    std::unique_ptr<EmitLLVMOnlyAction> Act(new EmitLLVMOnlyAction(result));
     if (compiler.ExecuteAction(*Act)) {
-        SCOPES_CHECK_OK(CodeGenProxy::ok);
+        SCOPES_CHECK_RESULT(Act->result);
 
         clang::Preprocessor & PP = compiler.getPreprocessor();
         PP.getDiagnostics().setClient(new IgnoringDiagConsumer(), true);

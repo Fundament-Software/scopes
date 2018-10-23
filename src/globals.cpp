@@ -65,7 +65,7 @@ SCOPES_REIMPORT_SYMBOLS()
 static void import_symbols() {
     auto globs = sc_get_original_globals();
 #define T(NAME, STR) \
-    NAME = sc_scope_at(globs, Symbol(STR))._1; \
+    NAME = sc_scope_at(globs, Symbol(STR))._0; \
     assert(NAME);
 SCOPES_REIMPORT_SYMBOLS()
 #undef T
@@ -121,9 +121,9 @@ sc_rawstring_i32_array_tuple_t sc_launch_args() {
 }
 
 #define RETURN_RESULT(X) { auto _result = (X); \
-    return {_result.ok(), (_result.ok()?nullptr:get_last_error()), _result.unsafe_extract()}; }
+    return {_result.ok(), (_result.ok()?nullptr:_result.unsafe_error()), _result.unsafe_extract()}; }
 #define RETURN_VOID(X) { auto _result = (X); \
-    return {_result.ok(), (_result.ok()?nullptr:get_last_error())}; }
+    return {_result.ok(), (_result.ok()?nullptr:_result.unsafe_error())}; }
 
 sc_value_list_raises_t sc_expand(sc_value_t *expr, const sc_list_t *next, sc_scope_t *scope) {
     using namespace scopes;
@@ -133,7 +133,7 @@ sc_value_list_raises_t sc_expand(sc_value_t *expr, const sc_list_t *next, sc_sco
 sc_value_raises_t sc_eval(const sc_anchor_t *anchor, const sc_list_t *expr, sc_scope_t *scope) {
     using namespace scopes;
     auto module_result = expand_module(anchor, expr, scope);
-    if (!module_result.ok()) return { false, get_last_error(), nullptr };
+    if (!module_result.ok()) return { false, module_result.assert_error(), nullptr };
     RETURN_RESULT(prove(nullptr, module_result.assert_ok(), {}));
 }
 
@@ -149,8 +149,9 @@ sc_value_raises_t sc_typify_template(sc_value_t *f, int numtypes, const sc_type_
     using namespace scopes;
     auto tf = cast<Template>(f);
     if (tf->is_inline()) {
-        set_last_location_error(String::from("cannot typify inline function"));
-        return { false, get_last_error(), nullptr };
+        return { false,
+            make_location_error(String::from("cannot typify inline function")),
+            nullptr };
     }
     ArgTypes types;
     for (int i = 0; i < numtypes; ++i) {
@@ -162,8 +163,9 @@ sc_value_raises_t sc_typify_template(sc_value_t *f, int numtypes, const sc_type_
 sc_value_raises_t sc_typify(sc_closure_t *srcl, int numtypes, const sc_type_t **typeargs) {
     using namespace scopes;
     if (srcl->func->is_inline()) {
-        set_last_location_error(String::from("cannot typify inline function"));
-        return { false, get_last_error(), nullptr };
+        return { false,
+            make_location_error(String::from("cannot typify function")),
+            nullptr };
     }
     ArgTypes types;
     for (int i = 0; i < numtypes; ++i) {
@@ -182,7 +184,7 @@ sc_value_raises_t sc_compile(sc_value_t *srcl, uint64_t flags) {
     using namespace scopes;
     auto result = extract_function_constant(srcl);
     if (!result.ok()) {
-        return { false, get_last_error(), nullptr };
+        return { false, result.assert_error(), nullptr };
     }
     RETURN_RESULT(compile(result.assert_ok(), flags));
 }
@@ -469,15 +471,13 @@ sc_void_raises_t sc_load_library(const sc_string_t *name) {
         if (err) {
             ss.out << ": " << err;
         }
-        set_last_location_error(ss.str());
-        return {false, get_last_error()};
+        return {false, make_location_error(ss.str()) };
     }
 #endif
     if (LLVMLoadLibraryPermanently(name->data)) {
         StyledString ss;
         ss.out << "error loading library " << name;
-        set_last_location_error(ss.str());
-        return {false, get_last_error()};
+        return {false, make_location_error(ss.str()) };
     }
     return {true,nullptr};
 }
@@ -503,18 +503,28 @@ void sc_scope_set_symbol(sc_scope_t *scope, sc_symbol_t sym, sc_value_t *value) 
     scope->bind(sym, value);
 }
 
-sc_bool_value_tuple_t sc_scope_at(sc_scope_t *scope, sc_symbol_t key) {
+sc_value_raises_t sc_scope_at(sc_scope_t *scope, sc_symbol_t key) {
     using namespace scopes;
     Value *result = nullptr;
     bool ok = scope->lookup(key, result);
-    return { ok, result };
+    if (!ok) {
+        StyledString ss;
+        ss.out << "no attribute " << key << " in scope";
+        return { false, make_location_error(ss.str()), nullptr };
+    }
+    return { true, nullptr, result };
 }
 
-sc_bool_value_tuple_t sc_scope_local_at(sc_scope_t *scope, sc_symbol_t key) {
+sc_value_raises_t sc_scope_local_at(sc_scope_t *scope, sc_symbol_t key) {
     using namespace scopes;
     Value *result = nullptr;
     bool ok = scope->lookup_local(key, result);
-    return { ok, result };
+    if (!ok) {
+        StyledString ss;
+        ss.out << "no local attribute " << key << " in scope";
+        return { false, make_location_error(ss.str()), nullptr };
+    }
+    return { true, nullptr, result };
 }
 
 const sc_string_t *sc_scope_get_docstring(sc_scope_t *scope, sc_symbol_t key) {
@@ -654,8 +664,7 @@ sc_bool_raises_t sc_string_match(const sc_string_t *pattern, const sc_string_t *
         if (error) {
             const String *err = String::from_cstr(error);
             regexp::regfree(m);
-            set_last_location_error(err);
-            return { false, get_last_error(), false };
+            return { false, make_location_error(err), false };
         }
         pattern_cache.insert({ pattern, m });
     } else {
@@ -1131,8 +1140,7 @@ sc_value_raises_t sc_parse_from_path(const sc_string_t *path) {
     if (!sf) {
         StyledString ss;
         ss.out << "no such file: " << path;
-        set_last_location_error(ss.str());
-        return { false, get_last_error(), nullptr };
+        return { false, make_location_error(ss.str()), nullptr };
     }
     LexerParser parser(sf);
     RETURN_RESULT(parser.parse());
@@ -1149,18 +1157,28 @@ sc_value_raises_t sc_parse_from_string(const sc_string_t *str) {
 // Types
 ////////////////////////////////////////////////////////////////////////////////
 
-sc_bool_value_tuple_t sc_type_at(const sc_type_t *T, sc_symbol_t key) {
+sc_value_raises_t sc_type_at(const sc_type_t *T, sc_symbol_t key) {
     using namespace scopes;
     Value *result = nullptr;
     bool ok = T->lookup(key, result);
-    return { ok, result };
+    if (!ok) {
+        StyledString ss;
+        ss.out << "no attribute " << key << " in type " << T;
+        return { false, make_location_error(ss.str()), nullptr };
+    }
+    return { true, nullptr, result };
 }
 
-sc_bool_value_tuple_t sc_type_local_at(const sc_type_t *T, sc_symbol_t key) {
+sc_value_raises_t sc_type_local_at(const sc_type_t *T, sc_symbol_t key) {
     using namespace scopes;
     Value *result = nullptr;
     bool ok = T->lookup_local(key, result);
-    return { ok, result };
+    if (!ok) {
+        StyledString ss;
+        ss.out << "no local attribute " << key << " in type " << T;
+        return { false, make_location_error(ss.str()), nullptr };
+    }
+    return { true, nullptr, result };
 }
 
 sc_size_raises_t sc_type_sizeof(const sc_type_t *T) {
@@ -1176,7 +1194,7 @@ sc_size_raises_t sc_type_alignof(const sc_type_t *T) {
 sc_int_raises_t sc_type_countof(const sc_type_t *T) {
     using namespace scopes;
     auto rT = storage_type(T);
-    if (!rT.ok()) return { false, get_last_error(), 0 };
+    if (!rT.ok()) return { false, rT.assert_error(), 0 };
     T = rT.assert_ok();
     switch(T->kind()) {
     case TK_Pointer:
@@ -1188,19 +1206,17 @@ sc_int_raises_t sc_type_countof(const sc_type_t *T) {
     case TK_Tuple: return { true, nullptr, (int)cast<TupleType>(T)->values.size() };
     case TK_Union: return { true, nullptr, (int)cast<UnionType>(T)->values.size() };
     case TK_Function:  return { true, nullptr, (int)(cast<FunctionType>(T)->argument_types.size()) };
-    default: {
-        StyledString ss;
-        ss.out << "storage type " << T << " has no count";
-        set_last_location_error(ss.str());
-    } break;
+    default: break;
     }
-    return { false, get_last_error(), 0 };
+    StyledString ss;
+    ss.out << "storage type " << T << " has no count";
+    return { false, make_location_error(ss.str()), 0 };
 }
 
 sc_type_raises_t sc_type_element_at(const sc_type_t *T, int i) {
     using namespace scopes;
     auto rT = storage_type(T);
-    if (!rT.ok()) return { false, get_last_error(), nullptr };
+    if (!rT.ok()) return { false, rT.assert_error(), nullptr };
     T = rT.assert_ok();
     switch(T->kind()) {
     case TK_Pointer: return { true, nullptr, cast<PointerType>(T)->element_type };
@@ -1211,47 +1227,41 @@ sc_type_raises_t sc_type_element_at(const sc_type_t *T, int i) {
     case TK_Function: RETURN_RESULT(cast<FunctionType>(T)->type_at_index(i));
     case TK_Image: return { true, nullptr, cast<ImageType>(T)->type };
     case TK_SampledImage: return { true, nullptr, cast<SampledImageType>(T)->type };
-    default: {
-        StyledString ss;
-        ss.out << "storage type " << T << " has no elements" << std::endl;
-        set_last_location_error(ss.str());
-    } break;
+    default: break;
     }
-    return { false, get_last_error(), nullptr };
+    StyledString ss;
+    ss.out << "storage type " << T << " has no elements" << std::endl;
+    return { false, make_location_error(ss.str()), nullptr };
 }
 
 sc_int_raises_t sc_type_field_index(const sc_type_t *T, sc_symbol_t name) {
     using namespace scopes;
     auto rT = storage_type(T);
-    if (!rT.ok()) return { false, get_last_error(), -1 };
+    if (!rT.ok()) return { false, rT.assert_error(), -1 };
     T = rT.assert_ok();
     switch(T->kind()) {
     case TK_Tuple: return { true, nullptr, (int)cast<TupleType>(T)->field_index(name) };
     case TK_Union: return { true, nullptr, (int)cast<UnionType>(T)->field_index(name) };
-    default: {
-        StyledString ss;
-        ss.out << "storage type " << T << " has no elements" << std::endl;
-        set_last_location_error(ss.str());
-    } break;
+    default: break;
     }
-    return { false, get_last_error(), -1 };
+    StyledString ss;
+    ss.out << "storage type " << T << " has no elements" << std::endl;
+    return { false, make_location_error(ss.str()), -1 };
 }
 
 sc_symbol_raises_t sc_type_field_name(const sc_type_t *T, int index) {
     using namespace scopes;
     auto rT = storage_type(T);
-    if (!rT.ok()) return { false, get_last_error(), SYM_Unnamed };
+    if (!rT.ok()) return { false, rT.assert_error(), SYM_Unnamed };
     T = rT.assert_ok();
     switch(T->kind()) {
     case TK_Tuple: RETURN_RESULT(cast<TupleType>(T)->field_name(index));
     case TK_Union: RETURN_RESULT(cast<UnionType>(T)->field_name(index));
-    default: {
-        StyledString ss;
-        ss.out << "storage type " << T << " has no elements" << std::endl;
-        set_last_location_error(ss.str());
-    } break;
+    default: break;
     }
-    return { false, get_last_error(), SYM_Unnamed };
+    StyledString ss;
+    ss.out << "storage type " << T << " has no elements" << std::endl;
+    return { false, make_location_error(ss.str()), SYM_Unnamed };
 }
 
 int32_t sc_type_kind(const sc_type_t *T) {
@@ -1418,16 +1428,17 @@ const sc_type_t *sc_typename_type(const sc_string_t *str) {
 
 sc_void_raises_t sc_typename_type_set_super(const sc_type_t *T, const sc_type_t *ST) {
     using namespace scopes;
-    if (!verify_kind<TK_Typename>(T).ok()) return { false, get_last_error() };
-    if (!verify_kind<TK_Typename>(ST).ok()) return { false, get_last_error() };
+    auto r1 = verify_kind<TK_Typename>(T);
+    if (!r1.ok()) return { false, r1.assert_error() };
+    auto r2 = verify_kind<TK_Typename>(ST);
+    if (!r2.ok()) return { false, r2.assert_error() };
     // if T <=: ST, the operation is illegal
     const Type *S = ST;
     while (S) {
         if (S == T) {
             StyledString ss;
             ss.out << "typename " << ST << " can not be a supertype of " << T;
-            set_last_location_error(ss.str());
-            return { false, get_last_error() };
+            return { false, make_location_error(ss.str()) };
         }
         if (S == TYPE_Typename)
             break;
@@ -1445,7 +1456,8 @@ const sc_type_t *sc_typename_type_get_super(const sc_type_t *T) {
 
 sc_void_raises_t sc_typename_type_set_storage(const sc_type_t *T, const sc_type_t *T2) {
     using namespace scopes;
-    if (!verify_kind<TK_Typename>(T).ok()) return { false, get_last_error() };
+    auto r1 = verify_kind<TK_Typename>(T);
+    if (!r1.ok()) return { false, r1.assert_error() };
     RETURN_VOID(cast<TypenameType>(const_cast<Type *>(T))->finalize(T2));
 }
 
@@ -1774,8 +1786,8 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_get_active_anchor, TYPE_Anchor);
     DEFINE_EXTERN_C_FUNCTION(sc_set_active_anchor, _void, TYPE_Anchor);
 
-    DEFINE_EXTERN_C_FUNCTION(sc_scope_at, arguments_type({TYPE_Bool, TYPE_Value}), TYPE_Scope, TYPE_Symbol);
-    DEFINE_EXTERN_C_FUNCTION(sc_scope_local_at, arguments_type({TYPE_Bool, TYPE_Value}), TYPE_Scope, TYPE_Symbol);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_scope_at, TYPE_Value, TYPE_Scope, TYPE_Symbol);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_scope_local_at, TYPE_Value, TYPE_Scope, TYPE_Symbol);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_get_docstring, TYPE_String, TYPE_Scope, TYPE_Symbol);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_set_docstring, _void, TYPE_Scope, TYPE_Symbol, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_set_symbol, _void, TYPE_Scope, TYPE_Symbol, TYPE_Value);
@@ -1801,8 +1813,8 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_string_lslice, TYPE_String, TYPE_String, TYPE_USize);
     DEFINE_EXTERN_C_FUNCTION(sc_string_rslice, TYPE_String, TYPE_String, TYPE_USize);
 
-    DEFINE_EXTERN_C_FUNCTION(sc_type_at, arguments_type({TYPE_Bool, TYPE_Value}), TYPE_Type, TYPE_Symbol);
-    DEFINE_EXTERN_C_FUNCTION(sc_type_local_at, arguments_type({TYPE_Bool, TYPE_Value}), TYPE_Type, TYPE_Symbol);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_type_at, TYPE_Value, TYPE_Type, TYPE_Symbol);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_type_local_at, TYPE_Value, TYPE_Type, TYPE_Symbol);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_type_element_at, TYPE_Type, TYPE_Type, TYPE_I32);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_type_field_index, TYPE_I32, TYPE_Type, TYPE_Symbol);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_type_field_name, TYPE_Symbol, TYPE_Type, TYPE_I32);

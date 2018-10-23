@@ -192,7 +192,7 @@ SCOPES_RESULT(void) add_module(LLVMModuleRef module) {
         }
     }
     LLVMAddModule(ee, module);
-    return true;
+    return {};
 }
 
 uint64_t get_address(const char *name) {

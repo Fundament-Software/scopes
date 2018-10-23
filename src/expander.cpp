@@ -37,7 +37,7 @@ static SCOPES_RESULT(void) verify_list_parameter_count(const char *context, cons
         SCOPES_LOCATION_ERROR(format("%s: expression is empty", context));
     }
     if ((mincount <= 0) && (maxcount == -1)) {
-        return true;
+        return {};
     }
     int argcount = (int)expr->count - starti;
 
@@ -49,7 +49,7 @@ static SCOPES_RESULT(void) verify_list_parameter_count(const char *context, cons
         SCOPES_LOCATION_ERROR(
             format("%s: at least %i arguments expected, got %i", context, mincount, argcount));
     }
-    return true;
+    return {};
 }
 
 //------------------------------------------------------------------------------
@@ -766,7 +766,7 @@ struct Expander {
                 SCOPES_GET_RESULT(subexp.expand_expression(anchor, it)));
         }
 
-        return ifexpr->canonicalize();
+        return ifexpr;
     }
 
     static SCOPES_RESULT(bool) get_kwargs(Value *it, Symbol &key, Value *&value) {
@@ -807,7 +807,7 @@ struct Expander {
             }
             it = next;
         }
-        return true;
+        return {};
     }
 
     SCOPES_RESULT(Value *) expand_ast_quote(const List *it) {
@@ -1043,8 +1043,7 @@ struct Expander {
                     (sc_syntax_wildcard_func_t)cast<ConstPointer>(list_handler_node)->value;
                 auto ok_result = f(List::from(node, next), env);
                 if (!ok_result.ok) {
-                    set_last_error(ok_result.except);
-                    SCOPES_RETURN_ERROR();
+                    SCOPES_RETURN_ERROR(ok_result.except);
                 }
                 auto result = ok_result._0;
                 if (result._0) {
@@ -1084,8 +1083,7 @@ struct Expander {
                     sc_syntax_wildcard_func_t f = (sc_syntax_wildcard_func_t)cast<ConstPointer>(symbol_handler_node)->value;
                     auto ok_result = f(List::from(node, next), env);
                     if (!ok_result.ok) {
-                        set_last_error(ok_result.except);
-                        SCOPES_RETURN_ERROR();
+                        SCOPES_RETURN_ERROR(ok_result.except);
                     }
                     auto result = ok_result._0;
                     if (result._0) {

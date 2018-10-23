@@ -252,12 +252,15 @@ struct Quoter {
         auto value = Call::from(_anchor, g_sc_if_new, {});
         auto expr = Expression::unscoped_from(_anchor);
         for (auto &&clause : node->clauses) {
-            expr->append(Call::from(_anchor, g_sc_if_append_then_clause, { value,
-                SCOPES_GET_RESULT(quote(level, clause.cond)),
-                SCOPES_GET_RESULT(quote(level, clause.value)) }));
+            if (clause.is_then()) {
+                expr->append(Call::from(_anchor, g_sc_if_append_then_clause, { value,
+                    SCOPES_GET_RESULT(quote(level, clause.cond)),
+                    SCOPES_GET_RESULT(quote(level, clause.value)) }));
+            } else {
+                expr->append(Call::from(_anchor, g_sc_if_append_else_clause, { value,
+                    SCOPES_GET_RESULT(quote(level, clause.value)) }));
+            }
         }
-        expr->append(Call::from(_anchor, g_sc_if_append_else_clause, { value,
-            SCOPES_GET_RESULT(quote(level, node->else_clause.value)) }));
         expr->append(value);
         return canonicalize(expr);
     }

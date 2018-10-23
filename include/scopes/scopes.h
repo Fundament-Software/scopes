@@ -44,15 +44,12 @@ namespace scopes {
     struct Symbol;
     struct String;
     struct List;
+    struct Error;
     struct Anchor;
     struct Parameter;
-    struct Label;
     struct Frame;
     struct Closure;
-    struct ExceptionPad;
-    struct Argument;
     struct Value;
-    struct Error;
 }
 
 extern "C" {
@@ -65,10 +62,8 @@ typedef scopes::List sc_list_t;
 typedef scopes::Error sc_error_t;
 typedef scopes::Anchor sc_anchor_t;
 typedef scopes::Parameter sc_parameter_t;
-typedef scopes::Label sc_label_t;
 typedef scopes::Frame sc_frame_t;
 typedef scopes::Closure sc_closure_t;
-typedef scopes::ExceptionPad sc_exception_pad_t;
 typedef scopes::Value sc_value_t;
 
 // some of the return types are technically illegal in C, but we take care
@@ -84,30 +79,19 @@ typedef struct sc_list_ sc_list_t;
 typedef struct sc_error_ sc_error_t;
 typedef struct sc_anchor_ sc_anchor_t;
 typedef struct sc_parameter_ sc_parameter_t;
-typedef struct sc_label_ sc_label_t;
 typedef struct sc_frame_ sc_frame_t;
 typedef struct sc_closure_ sc_closure_t;
-typedef struct sc_exception_pad_ sc_exception_pad_t;
 typedef struct sc_value_ sc_value_t;
 
 typedef uint64_t sc_symbol_t;
 
 #endif
 
-typedef struct sc_bool_list_tuple_ { bool _0; const sc_list_t *_1; } sc_bool_list_tuple_t;
-typedef struct sc_bool_label_tuple_ { bool _0; sc_label_t *_1; } sc_bool_label_tuple_t;
 typedef struct sc_bool_string_tuple_ { bool _0; const sc_string_t *_1; } sc_bool_string_tuple_t;
-typedef struct sc_bool_scope_tuple_ { bool _0; sc_scope_t *_1; } sc_bool_scope_tuple_t;
-typedef struct sc_bool_size_tuple_ { bool _0; size_t _1; } sc_bool_size_tuple_t;
-typedef struct sc_bool_bool_tuple_ { bool _0; bool _1; } sc_bool_bool_tuple_t;
-typedef struct sc_bool_type_tuple_ { bool _0; const sc_type_t *_1; } sc_bool_type_tuple_t;
-typedef struct sc_bool_symbol_tuple_ { bool _0; sc_symbol_t _1; } sc_bool_symbol_tuple_t;
-typedef struct sc_bool_int_tuple_ { bool _0; int32_t _1; } sc_bool_int_tuple_t;
 typedef struct sc_bool_value_tuple_ { bool _0; sc_value_t *_1; } sc_bool_value_tuple_t;
 
 typedef struct sc_value_list_tuple_ { sc_value_t *_0; const sc_list_t *_1; } sc_value_list_tuple_t;
 
-//typedef struct sc_symbol_any_tuple_ { sc_symbol_t _0; sc_any_t _1; } sc_symbol_any_tuple_t;
 typedef struct sc_symbol_value_tuple_ { sc_symbol_t _0; sc_value_t *_1; } sc_symbol_value_tuple_t;
 typedef struct sc_symbol_type_tuple_ { sc_symbol_t _0; const sc_type_t *_1; } sc_symbol_type_tuple_t;
 
@@ -311,8 +295,8 @@ const sc_anchor_t *sc_get_active_anchor();
 // lexical scopes
 
 void sc_scope_set_symbol(sc_scope_t *scope, sc_symbol_t sym, sc_value_t *value);
-sc_bool_value_tuple_t sc_scope_at(sc_scope_t *scope, sc_symbol_t key);
-sc_bool_value_tuple_t sc_scope_local_at(sc_scope_t *scope, sc_symbol_t key);
+sc_value_raises_t sc_scope_at(sc_scope_t *scope, sc_symbol_t key);
+sc_value_raises_t sc_scope_local_at(sc_scope_t *scope, sc_symbol_t key);
 const sc_string_t *sc_scope_get_docstring(sc_scope_t *scope, sc_symbol_t key);
 void sc_scope_set_docstring(sc_scope_t *scope, sc_symbol_t key, const sc_string_t *str);
 sc_scope_t *sc_scope_new();
@@ -354,8 +338,8 @@ const sc_list_t *sc_list_reverse(const sc_list_t *l);
 
 // types
 
-sc_bool_value_tuple_t sc_type_at(const sc_type_t *T, sc_symbol_t key);
-sc_bool_value_tuple_t sc_type_local_at(const sc_type_t *T, sc_symbol_t key);
+sc_value_raises_t sc_type_at(const sc_type_t *T, sc_symbol_t key);
+sc_value_raises_t sc_type_local_at(const sc_type_t *T, sc_symbol_t key);
 sc_size_raises_t sc_type_sizeof(const sc_type_t *T);
 sc_size_raises_t sc_type_alignof(const sc_type_t *T);
 sc_int_raises_t sc_type_countof(const sc_type_t *T);

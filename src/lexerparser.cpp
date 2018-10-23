@@ -53,7 +53,7 @@ SCOPES_RESULT(void) LexerParser::verify_good_taste(char c) {
     if (c == '\t') {
         SCOPES_LOCATION_ERROR(String::from("please use spaces instead of tabs."));
     }
-    return true;
+    return {};
 }
 
 LexerParser::LexerParser(SourceFile *_file, size_t offset, size_t length) :
@@ -139,7 +139,7 @@ SCOPES_RESULT(void) LexerParser::read_symbol() {
         }
     }
     select_string();
-    return true;
+    return {};
 }
 
 SCOPES_RESULT(void) LexerParser::read_string(char terminator) {
@@ -165,7 +165,7 @@ SCOPES_RESULT(void) LexerParser::read_string(char terminator) {
         }
     }
     select_string();
-    return true;
+    return {};
 }
 
 SCOPES_RESULT(void) LexerParser::read_block(int indent) {
@@ -184,7 +184,7 @@ SCOPES_RESULT(void) LexerParser::read_block(int indent) {
             break;
         }
     }
-    return true;
+    return {};
 }
 
 SCOPES_RESULT(void) LexerParser::read_block_string() {
@@ -194,13 +194,13 @@ SCOPES_RESULT(void) LexerParser::read_block_string() {
     SCOPES_CHECK_RESULT(next());
     SCOPES_CHECK_RESULT(read_block(3));
     select_string();
-    return true;
+    return {};
 }
 
 SCOPES_RESULT(void) LexerParser::read_comment() {
     SCOPES_RESULT_TYPE(void);
     SCOPES_CHECK_RESULT(read_block(0));
-    return true;
+    return {};
 }
 
 template<typename T>

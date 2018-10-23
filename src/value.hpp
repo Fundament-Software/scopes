@@ -228,6 +228,8 @@ struct If : Instruction {
         Value *value;
 
         Clause() : anchor(nullptr), cond(nullptr), value(nullptr) {}
+
+        bool is_then() const;
     };
 
     typedef std::vector<Clause> Clauses;
@@ -238,13 +240,10 @@ struct If : Instruction {
 
     static If *from(const Anchor *anchor, const Clauses &clauses = {});
 
-    Value *get_else_clause() const;
     void append_then(const Anchor *anchor, Value *cond, Value *value);
     void append_else(const Anchor *anchor, Value *value);
-    Value *canonicalize();
 
     Clauses clauses;
-    Clause else_clause;
 };
 
 //------------------------------------------------------------------------------

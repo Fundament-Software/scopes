@@ -270,7 +270,7 @@ SCOPES_RESULT(void) verify(const Type *typea, const Type *typeb) {
         ss.out << "type " << typea << " expected, got " << typeb;
         SCOPES_LOCATION_ERROR(ss.str());
     }
-    return true;
+    return {};
 }
 
 SCOPES_RESULT(void) verify_integer(const Type *type) {
@@ -280,7 +280,7 @@ SCOPES_RESULT(void) verify_integer(const Type *type) {
         ss.out << "integer type expected, got " << type;
         SCOPES_LOCATION_ERROR(ss.str());
     }
-    return true;
+    return {};
 }
 
 SCOPES_RESULT(void) verify_real(const Type *type) {
@@ -290,7 +290,7 @@ SCOPES_RESULT(void) verify_real(const Type *type) {
         ss.out << "real type expected, got " << type;
         SCOPES_LOCATION_ERROR(ss.str());
     }
-    return true;
+    return {};
 }
 
 SCOPES_RESULT(void) verify_range(size_t idx, size_t count) {
@@ -301,7 +301,7 @@ SCOPES_RESULT(void) verify_range(size_t idx, size_t count) {
             << " >= " << count << ")";
         SCOPES_LOCATION_ERROR(ss.str());
     }
-    return true;
+    return {};
 }
 
 //------------------------------------------------------------------------------
