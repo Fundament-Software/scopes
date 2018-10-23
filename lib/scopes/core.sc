@@ -208,11 +208,11 @@ let typify =
             let src_fn = (unbox-pointer src_fn Closure)
             let typecount = (sub argcount 1)
             let types = (alloca-array type typecount)
-            loop (i j) = 1 0
-            if (icmp<s i argcount)
-                let ty = (sc_getarg args i)
-                store (unbox-pointer ty type) (getelementptr types j)
-                repeat (add i 1) (add j 1)
+            loop (i j = 1 0)
+                if (icmp<s i argcount)
+                    let ty = (sc_getarg args i)
+                    store (unbox-pointer ty type) (getelementptr types j)
+                    repeat (add i 1) (add j 1)
             sc_typify src_fn typecount (bitcast types TypeArrayPointer)
 
         let types = (alloca-array type 1:usize)
@@ -261,18 +261,18 @@ let va-lfold va-lifold =
             if (icmp== argcount 2)
                 return init
             let ofs = (? use-indices 1 0)
-            loop (i ret) = 2 init
-            if (icmp<s i argcount)
-                let arg =
-                    sc_getarg args i
-                let k = (sc_type_key (sc_value_type arg))
-                let v = (sc_keyed_new unnamed arg)
-                repeat (add i 1)
-                    if use-indices
-                        `(f [(sub i 2)] k v ret)
-                    else
-                        `(f k v ret)
-            ret
+            loop (i ret = 2 init)
+                if (icmp<s i argcount)
+                    let arg =
+                        sc_getarg args i
+                    let k = (sc_type_key (sc_value_type arg))
+                    let v = (sc_keyed_new unnamed arg)
+                    repeat (add i 1)
+                        if use-indices
+                            `(f [(sub i 2)] k v ret)
+                        else
+                            `(f k v ret)
+                ret
         _
             ast-macro (fn "va-lfold" (args) (va-lfold args false))
             ast-macro (fn "va-ilfold" (args) (va-lfold args true))
@@ -287,20 +287,20 @@ let va-rfold va-rifold =
             if (icmp== argcount 2)
                 return init
             let ofs = (? use-indices 1 0)
-            loop (i ret) = argcount init
-            if (icmp>s i 2)
-                let oi = i
-                let i = (sub i 1)
-                let arg =
-                    sc_getarg args i
-                let k = (sc_type_key (sc_value_type arg))
-                let v = (sc_keyed_new unnamed arg)
-                repeat i
-                    if use-indices
-                        `(f [(sub i 2)] k v ret)
-                    else
-                        `(f k v ret)
-            ret
+            loop (i ret = argcount init)
+                if (icmp>s i 2)
+                    let oi = i
+                    let i = (sub i 1)
+                    let arg =
+                        sc_getarg args i
+                    let k = (sc_type_key (sc_value_type arg))
+                    let v = (sc_keyed_new unnamed arg)
+                    repeat i
+                        if use-indices
+                            `(f [(sub i 2)] k v ret)
+                        else
+                            `(f k v ret)
+                ret
         _
             ast-macro (fn "va-rfold" (args) (va-rfold args false))
             ast-macro (fn "va-rifold" (args) (va-rfold args true))
@@ -310,11 +310,11 @@ inline raises-compile-error ()
         compiler-error! "hidden"
 
 fn type< (T superT)
-    loop (T) = T
-    let value = (sc_typename_type_get_super T)
-    if (ptrcmp== value superT) true
-    elseif (ptrcmp== value typename) false
-    else (repeat value)
+    loop (T = T)
+        let value = (sc_typename_type_get_super T)
+        if (ptrcmp== value superT) true
+        elseif (ptrcmp== value typename) false
+        else (repeat value)
 
 fn type<= (T superT)
     if (ptrcmp== T superT) true
@@ -430,13 +430,13 @@ sc_type_set_symbol tuple '__typecall
             verify-count argcount 1 -1
             let pcount = (sub argcount 1)
             let types = (alloca-array type pcount)
-            loop (i) = 1
-            if (icmp<s i argcount)
-                let arg = (sc_getarg args i)
-                let T = (unbox-pointer arg type)
-                store T (getelementptr types (sub i 1))
-                repeat (add i 1)
-            box-pointer (sc_tuple_type pcount types)
+            loop (i = 1)
+                if (icmp<s i argcount)
+                    let arg = (sc_getarg args i)
+                    let T = (unbox-pointer arg type)
+                    store T (getelementptr types (sub i 1))
+                    repeat (add i 1)
+                box-pointer (sc_tuple_type pcount types)
 
 # array type constructor
 sc_type_set_symbol array '__typecall
@@ -462,13 +462,13 @@ sc_type_set_symbol Arguments '__typecall
             verify-count argcount 1 -1
             let pcount = (sub argcount 1)
             let types = (alloca-array type pcount)
-            loop (i) = 1
-            if (icmp<s i argcount)
-                let arg = (sc_getarg args i)
-                let T = (unbox-pointer arg type)
-                store T (getelementptr types (sub i 1))
-                repeat (add i 1)
-            box-pointer (sc_arguments_type pcount types)
+            loop (i = 1)
+                if (icmp<s i argcount)
+                    let arg = (sc_getarg args i)
+                    let T = (unbox-pointer arg type)
+                    store T (getelementptr types (sub i 1))
+                    repeat (add i 1)
+                box-pointer (sc_arguments_type pcount types)
 
 # function pointer type constructor
 sc_type_set_symbol function '__typecall
@@ -480,13 +480,13 @@ sc_type_set_symbol function '__typecall
             let rtype = (unbox-pointer rtype type)
             let pcount = (sub argcount 2)
             let types = (alloca-array type pcount)
-            loop (i) = 2
-            if (icmp<s i argcount)
-                let arg = (sc_getarg args i)
-                let T = (unbox-pointer arg type)
-                store T (getelementptr types (sub i 2))
-                repeat (add i 1)
-            box-pointer (sc_function_type rtype pcount types)
+            loop (i = 2)
+                if (icmp<s i argcount)
+                    let arg = (sc_getarg args i)
+                    let T = (unbox-pointer arg type)
+                    store T (getelementptr types (sub i 2))
+                    repeat (add i 1)
+                box-pointer (sc_function_type rtype pcount types)
 
 sc_type_set_symbol type 'raising
     box-ast-macro
@@ -1528,17 +1528,17 @@ let coerce-call-arguments =
             if (== pcount argc)
                 let outargs = (sc_call_new self)
                 sc_call_set_rawcall outargs true
-                loop (i) = 0
-                if (< i argc)
-                    let arg = ('getarg args (add i 1))
-                    let argT = ('typeof arg)
-                    let paramT = ('element@ fT i)
-                    let outarg =
-                        if (== argT paramT) arg
-                        else `(imply arg paramT)
-                    sc_call_append_argument outargs outarg
-                    repeat (+ i 1)
-                outargs
+                loop (i = 0)
+                    if (< i argc)
+                        let arg = ('getarg args (add i 1))
+                        let argT = ('typeof arg)
+                        let paramT = ('element@ fT i)
+                        let outarg =
+                            if (== argT paramT) arg
+                            else `(imply arg paramT)
+                        sc_call_append_argument outargs outarg
+                        repeat (+ i 1)
+                    outargs
             else `(rawcall self [('getarglist args 1)])
 
 #
@@ -1609,38 +1609,38 @@ fn dotted-symbol? (env head)
         return false
     let s = (as head string)
     let sz = (countof s)
-    loop (i) = 0:usize
-    if (== i sz)
-        return false
-    elseif (== (@ s i) dot-char)
-        return true
-    repeat (+ i 1:usize)
+    loop (i = 0:usize)
+        if (== i sz)
+            return false
+        elseif (== (@ s i) dot-char)
+            return true
+        repeat (+ i 1:usize)
 
 fn split-dotted-symbol (head start end tail)
     let s = (as head string)
-    loop (i) = start
-    if (== i end)
-        # did not find a dot
-        if (== start 0:usize)
-            return (cons head tail)
-        else
-            return (cons (Symbol (rslice s start)) tail)
-    if (== (@ s i) dot-char)
-        let tail =
-            # no remainder after dot
-            if (== i (- end 1:usize)) tail
-            else # remainder after dot, split the rest first
-                split-dotted-symbol head (+ i 1:usize) end tail
-        let result = (cons dot-sym tail)
-        if (== i 0:usize)
-            # no prefix before dot
-            return result
-        else
-            # prefix before dot
-            let size = (- i start)
-            return
-                cons (Symbol (lslice (rslice s start) size)) result
-    repeat (+ i 1:usize)
+    loop (i = start)
+        if (== i end)
+            # did not find a dot
+            if (== start 0:usize)
+                return (cons head tail)
+            else
+                return (cons (Symbol (rslice s start)) tail)
+        if (== (@ s i) dot-char)
+            let tail =
+                # no remainder after dot
+                if (== i (- end 1:usize)) tail
+                else # remainder after dot, split the rest first
+                    split-dotted-symbol head (+ i 1:usize) end tail
+            let result = (cons dot-sym tail)
+            if (== i 0:usize)
+                # no prefix before dot
+                return result
+            else
+                # prefix before dot
+                let size = (- i start)
+                return
+                    cons (Symbol (lslice (rslice s start) size)) result
+        repeat (+ i 1:usize)
 
 # infix notation support
 # --------------------------------------------------------------------------
@@ -1674,16 +1674,16 @@ fn get-ifx-op (env op)
 fn has-infix-ops? (infix-table expr)
     # any expression of which one odd argument matches an infix operator
         has infix operations.
-    loop (expr) = expr
-    if (< (countof expr) 3)
-        return false
-    let __ expr = ('decons expr)
-    let at next = ('decons expr)
-    try
-        get-ifx-op infix-table at
-        return true
-    except (err)
-        repeat expr
+    loop (expr = expr)
+        if (< (countof expr) 3)
+            return false
+        let __ expr = ('decons expr)
+        let at next = ('decons expr)
+        try
+            get-ifx-op infix-table at
+            return true
+        except (err)
+            repeat expr
 
 fn unpack-infix-op (op)
     let op = (as op list)
@@ -1723,32 +1723,30 @@ fn rtl-infix-op-eq (infix-table token prec)
         Value none
 
 fn parse-infix-expr (infix-table lhs state mprec)
-    loop (lhs state) = lhs state
-    if (empty? state)
-        return lhs state
-    let la next-state = ('decons state)
-    let op = (infix-op-ge infix-table la mprec)
-    if (== ('typeof op) Nothing)
-        return lhs state
-    let op-prec op-order op-name = (unpack-infix-op op)
-    let next-lhs next-state =
-        do
-            loop (rhs state) = ('decons next-state)
-            if (empty? state)
-                break (Value (list op-name lhs rhs)) state
-            let ra __ = ('decons state)
-            let lop = (infix-op-gt infix-table ra op-prec)
-            let nextop =
-                if (== ('typeof lop) Nothing)
-                    rtl-infix-op-eq infix-table ra op-prec
-                else lop
-            if (== ('typeof nextop) Nothing)
-                break (Value (list op-name lhs rhs)) state
-            let nextop-prec = (unpack-infix-op nextop)
-            let next-rhs next-state =
-                parse-infix-expr infix-table rhs state nextop-prec
-            repeat next-rhs next-state
-    repeat next-lhs next-state
+    loop (lhs state = lhs state)
+        if (empty? state)
+            return lhs state
+        let la next-state = ('decons state)
+        let op = (infix-op-ge infix-table la mprec)
+        if (== ('typeof op) Nothing)
+            return lhs state
+        let op-prec op-order op-name = (unpack-infix-op op)
+        repeat
+            loop (rhs state = ('decons next-state))
+                if (empty? state)
+                    break (Value (list op-name lhs rhs)) state
+                let ra __ = ('decons state)
+                let lop = (infix-op-gt infix-table ra op-prec)
+                let nextop =
+                    if (== ('typeof lop) Nothing)
+                        rtl-infix-op-eq infix-table ra op-prec
+                    else lop
+                if (== ('typeof nextop) Nothing)
+                    break (Value (list op-name lhs rhs)) state
+                let nextop-prec = (unpack-infix-op nextop)
+                let next-rhs next-state =
+                    parse-infix-expr infix-table rhs state nextop-prec
+                repeat next-rhs next-state
 
 let parse-infix-expr =
     typify parse-infix-expr Scope Value list i32
@@ -1851,11 +1849,11 @@ fn expand-and-or (expr f)
     elseif (== (countof expr) 1)
         return ('@ expr)
     let expr = ('reverse expr)
-    loop (result head) = ('decons expr)
-    if (empty? head)
-        return result
-    let at next = ('decons head)
-    repeat (Value (list f at (list inline '() result))) next
+    loop (result head = ('decons expr))
+        if (empty? head)
+            return result
+        let at next = ('decons head)
+        repeat (Value (list f at (list inline '() result))) next
 
 #compile-stage
     let vals = (alloca-array type 2)
@@ -1878,13 +1876,13 @@ fn ltr-multiop (args target)
     else
         # call for multiple args
         let lhs = ('getarg args 0)
-        loop (i lhs) = 1 lhs
-        let rhs = ('getarg args i)
-        let op = `(target lhs rhs)
-        let i = (+ i 1)
-        if (< i argc)
-            repeat i op
-        op
+        loop (i lhs = 1 lhs)
+            let rhs = ('getarg args i)
+            let op = `(target lhs rhs)
+            let i = (+ i 1)
+            if (< i argc)
+                repeat i op
+            op
 
 fn rtl-multiop (args target)
     let argc = ('argcount args)
@@ -1895,13 +1893,13 @@ fn rtl-multiop (args target)
         # call for multiple args
         let lasti = (- argc 1)
         let rhs = ('getarg args lasti)
-        loop (i rhs) = lasti rhs
-        let i = (- i 1)
-        let lhs = ('getarg args i)
-        let op = `(target lhs rhs)
-        if (> i 0)
-            repeat i op
-        op
+        loop (i rhs = lasti rhs)
+            let i = (- i 1)
+            let lhs = ('getarg args i)
+            let op = `(target lhs rhs)
+            if (> i 0)
+                repeat i op
+            op
 
 # extracting options from varargs
 
@@ -1913,15 +1911,15 @@ fn va-option-branch (args)
         'getarg args 0
         'getarg args 1
     let key = (unbox-symbol key Symbol)
-    loop (i) = 2
-    if (< i argc)
-        let arg = ('getarg args i)
-        let argkey = ('key ('typeof arg))
-        if (== key argkey)
-            return
-                sc_keyed_new unnamed arg
-        repeat (+ i 1)
-    `(elsef)
+    loop (i = 2)
+        if (< i argc)
+            let arg = ('getarg args i)
+            let argkey = ('key ('typeof arg))
+            if (== key argkey)
+                return
+                    sc_keyed_new unnamed arg
+            repeat (+ i 1)
+        `(elsef)
 
 # modules
 ####
@@ -1962,17 +1960,17 @@ fn clone-scope-contents (a b)
                         let T =
                             sc_typename_type
                                 as name string
-                        loop (i) = 2
-                        if (< i argc)
-                            let arg = ('getarg args i)
-                            let k v = (sc_type_key (sc_value_type arg))
-                            if (== k 'super)
-                                sc_typename_type_set_super T (as v type)
-                            elseif (== k 'storage)
-                                sc_typename_type_set_storage T (as v type)
-                            else
-                                compiler-error! "super or storage key expected"
-                        return (Value T)
+                        loop (i = 2)
+                            if (< i argc)
+                                let arg = ('getarg args i)
+                                let k v = (sc_type_key (sc_value_type arg))
+                                if (== k 'super)
+                                    sc_typename_type_set_super T (as v type)
+                                elseif (== k 'storage)
+                                    sc_typename_type_set_storage T (as v type)
+                                else
+                                    compiler-error! "super or storage key expected"
+                            return (Value T)
                 compiler-error!
                     sc_string_join "typename "
                         sc_string_join ('__repr cls)
@@ -2029,12 +2027,12 @@ let
                     list getattr a (list syntax-quote sym)
                 let a rest = ('decons args)
                 let b rest = ('decons rest)
-                loop (rest result) = rest (op a b)
-                if (empty? rest)
-                    result
-                else
-                    let c rest = ('decons rest)
-                    repeat rest (op result c)
+                loop (rest result = rest (op a b))
+                    if (empty? rest)
+                        result
+                    else
+                        let c rest = ('decons rest)
+                        repeat rest (op result c)
     and = (syntax-macro (make-expand-and-or and-branch))
     or = (syntax-macro (make-expand-and-or or-branch))
     define = (syntax-macro expand-define)
@@ -2152,13 +2150,15 @@ let va-option =
 let for =
     syntax-macro
         fn "for" (args)
-            loop (it params) = args '()
-            if (empty? it)
-                compiler-error! "'in' expected"
-            let sxat it = (decons it)
-            let at = (sxat as Symbol)
-            if (at != 'in)
-                repeat it (cons sxat params)
+            let it params =
+                loop (it params = args '())
+                    if (empty? it)
+                        compiler-error! "'in' expected"
+                    let sxat it = (decons it)
+                    let at = (sxat as Symbol)
+                    if (at != 'in)
+                        repeat it (cons sxat params)
+                    _ it params
             let generator-expr body = (decons it)
             let params = (sc_list_reverse params)
             let iter = (sc_symbol_new_unique "iter")
@@ -2168,15 +2168,15 @@ let for =
                 break;
             list do
                 list let iter start '= (list (list (do as) generator-expr Generator))
-                list loop (list next) '= start
-                cons let next
-                    'join params
-                        list '=
-                            list iter fdone next
-                list inline 'continue '()
-                    list repeat next
-                cons do body
-                list 'continue
+                list loop (list next '= start)
+                    cons let next
+                        'join params
+                            list '=
+                                list iter fdone next
+                    list inline 'continue '()
+                        list repeat next
+                    cons do body
+                    list 'continue
 
 #---------------------------------------------------------------------------
 # module loading
@@ -2197,14 +2197,14 @@ compile-stage;
 
 fn make-module-path (pattern name)
     let sz = (countof pattern)
-    loop (i start result) = 0:usize 0:usize ""
-    if (i == sz)
-        return (.. result (rslice pattern start))
-    if ((@ pattern i) != (char "?"))
-        repeat (i + 1:usize) start result
-    else
-        repeat (i + 1:usize) (i + 1:usize)
-            .. result (rslice (lslice pattern i) start) name
+    loop (i start result = 0:usize 0:usize "")
+        if (i == sz)
+            return (.. result (rslice pattern start))
+        if ((@ pattern i) != (char "?"))
+            repeat (i + 1:usize) start result
+        else
+            repeat (i + 1:usize) (i + 1:usize)
+                .. result (rslice (lslice pattern i) start) name
 
 fn exec-module (expr eval-scope)
     let ModuleFunctionType = ('pointer ('raising (function Value) Error))
@@ -2212,46 +2212,46 @@ fn exec-module (expr eval-scope)
     let expr-anchor = ('anchor expr)
     sc_set_active_anchor expr-anchor
     let f = (sc_eval expr-anchor expr eval-scope)
-    loop (f) = f
-    # build a wrapper
-    let wrapf =
-        ast-quote
-            fn "exec-module-stage" ()
-                raises-compile-error;
-                wrap-if-not-compile-stage (f)
-    let wrapf = (sc_typify_template wrapf 0 (undef TypeArrayPointer))
-    let f = (sc_compile wrapf 0:u64)
-    if (('typeof f) == StageFunctionType)
-        let fptr = (f as StageFunctionType)
-        repeat (bitcast (fptr) Value)
-    else
-        let fptr = (f as ModuleFunctionType)
-        fptr;
+    loop (f = f)
+        # build a wrapper
+        let wrapf =
+            ast-quote
+                fn "exec-module-stage" ()
+                    raises-compile-error;
+                    wrap-if-not-compile-stage (f)
+        let wrapf = (sc_typify_template wrapf 0 (undef TypeArrayPointer))
+        let f = (sc_compile wrapf 0:u64)
+        if (('typeof f) == StageFunctionType)
+            let fptr = (f as StageFunctionType)
+            repeat (bitcast (fptr) Value)
+        else
+            let fptr = (f as ModuleFunctionType)
+            fptr;
 
 fn dots-to-slashes (pattern)
     let sz = (countof pattern)
-    loop (i start result) = 0:usize 0:usize ""
-    if (i == sz)
-        return (.. result (rslice pattern start))
-    let c = (@ pattern i)
-    if (c == (char "/"))
-        compiler-error!
-            .. "no slashes permitted in module name: " pattern
-    elseif (c == (char "\\"))
-        compiler-error!
-            .. "no slashes permitted in module name: " pattern
-    elseif (c != (char "."))
-        repeat (i + 1:usize) start result
-    elseif (icmp== (i + 1:usize) sz)
-        compiler-error!
-            .. "invalid dot at ending of module '" pattern "'"
-    else
-        if (icmp== i start)
-            if (icmp>u start 0:usize)
-                repeat (i + 1:usize) (i + 1:usize)
-                    .. result (rslice (lslice pattern i) start) "../"
-        repeat (i + 1:usize) (i + 1:usize)
-            .. result (rslice (lslice pattern i) start) "/"
+    loop (i start result = 0:usize 0:usize "")
+        if (i == sz)
+            return (.. result (rslice pattern start))
+        let c = (@ pattern i)
+        if (c == (char "/"))
+            compiler-error!
+                .. "no slashes permitted in module name: " pattern
+        elseif (c == (char "\\"))
+            compiler-error!
+                .. "no slashes permitted in module name: " pattern
+        elseif (c != (char "."))
+            repeat (i + 1:usize) start result
+        elseif (icmp== (i + 1:usize) sz)
+            compiler-error!
+                .. "invalid dot at ending of module '" pattern "'"
+        else
+            if (icmp== i start)
+                if (icmp>u start 0:usize)
+                    repeat (i + 1:usize) (i + 1:usize)
+                        .. result (rslice (lslice pattern i) start) "../"
+            repeat (i + 1:usize) (i + 1:usize)
+                .. result (rslice (lslice pattern i) start) "/"
 
 fn load-module (module-name module-path opts...)
     if (not (sc_is_file module-path))
@@ -2288,42 +2288,42 @@ fn require-from (base-dir name)
     let package = ((fn () package))
     let modules = (package.modules as Scope)
     let all-patterns = (patterns-from-namestr base-dir namestr)
-    loop (patterns) = all-patterns
-    if (empty? patterns)
-        sc_write "no such module '"
-        sc_write (as name string)
-        sc_write "' in paths:\n"
-        loop (patterns) = all-patterns
+    loop (patterns = all-patterns)
         if (empty? patterns)
-            compiler-error! "failed to import module"
+            sc_write "no such module '"
+            sc_write (as name string)
+            sc_write "' in paths:\n"
+            loop (patterns = all-patterns)
+                if (empty? patterns)
+                    compiler-error! "failed to import module"
+                let pattern patterns = (decons patterns)
+                let pattern = (pattern as string)
+                let module-path = (make-module-path pattern namestr)
+                sc_write "    "
+                sc_write module-path
+                sc_write "\n"
+                repeat patterns
         let pattern patterns = (decons patterns)
         let pattern = (pattern as string)
-        let module-path = (make-module-path pattern namestr)
-        sc_write "    "
-        sc_write module-path
-        sc_write "\n"
-        repeat patterns
-    let pattern patterns = (decons patterns)
-    let pattern = (pattern as string)
-    let module-path = (sc_realpath (make-module-path pattern namestr))
-    if (empty? module-path)
-        repeat patterns
-    let module-path-sym = (Symbol module-path)
-    let content =
-        try ('@ modules module-path-sym)
-        except (err)
-            if (not (sc_is_file module-path))
-                repeat patterns
-            'set-symbol modules module-path-sym incomplete
-            let content = (load-module (name as string) module-path)
-            'set-symbol modules module-path-sym content
-            return content
-    if (('typeof content) == type)
-        if (content == incomplete)
-            compiler-error!
-                .. "trying to import module " (repr name)
-                    " while it is being imported"
-    return content
+        let module-path = (sc_realpath (make-module-path pattern namestr))
+        if (empty? module-path)
+            repeat patterns
+        let module-path-sym = (Symbol module-path)
+        let content =
+            try ('@ modules module-path-sym)
+            except (err)
+                if (not (sc_is_file module-path))
+                    repeat patterns
+                'set-symbol modules module-path-sym incomplete
+                let content = (load-module (name as string) module-path)
+                'set-symbol modules module-path-sym content
+                return content
+        if (('typeof content) == type)
+            if (content == incomplete)
+                compiler-error!
+                    .. "trying to import module " (repr name)
+                        " while it is being imported"
+        return content
 
 """"export locals as a chain of two new scopes: a scope that contains
     all the constant values in the immediate scope, and a scope that contains
@@ -2338,30 +2338,28 @@ let locals =
                 'set-docstring! constant-scope unnamed docstr
             let tmp =
                 `(Scope constant-scope)
-            loop (last-key result) = unnamed (list tmp)
-            let key value =
-                'next scope last-key
-            if (key == unnamed)
-                return
-                    cons do tmp result
-                    scope
-            else
-                let keydocstr = ('docstring scope key)
-                repeat key
-                    if (key == unnamed)
-                        # skip
-                        result
-                    else
-                        if ('constant? value)
-                            'set-symbol constant-scope key value
-                            'set-docstring! constant-scope key keydocstr
-                            result
+            loop (last-key result = unnamed (list tmp))
+                let key value =
+                    'next scope last-key
+                if (key == unnamed)
+                    return
+                        cons do tmp result
+                        scope
+                else
+                    let keydocstr = ('docstring scope key)
+                    repeat key
+                        if (key == unnamed) result # skip
                         else
-                            let value = (sc_extract_argument_new value 0)
-                            cons
-                                list sc_scope_set_symbol tmp (list syntax-quote key) (list Value value)
-                                list sc_scope_set_docstring tmp (list syntax-quote key) keydocstr
+                            if ('constant? value)
+                                'set-symbol constant-scope key value
+                                'set-docstring! constant-scope key keydocstr
                                 result
+                            else
+                                let value = (sc_extract_argument_new value 0)
+                                cons
+                                    list sc_scope_set_symbol tmp (list syntax-quote key) (list Value value)
+                                    list sc_scope_set_docstring tmp (list syntax-quote key) keydocstr
+                                    result
 
 #---------------------------------------------------------------------------
 # using
@@ -2369,19 +2367,19 @@ let locals =
 
 fn merge-scope-symbols (source target filter)
     fn process-keys (source target filter)
-        loop (last-key) = unnamed
-        let key value = ('next source last-key)
-        if (key != unnamed)
-            if
-                or
-                    none? filter
-                    do
-                        let keystr = (key as string)
-                        sc_string_match filter keystr
-                'set-symbol target key value
-            repeat key
-        else
-            target
+        loop (last-key = unnamed)
+            let key value = ('next source last-key)
+            if (key != unnamed)
+                if
+                    or
+                        none? filter
+                        do
+                            let keystr = (key as string)
+                            sc_string_match filter keystr
+                    'set-symbol target key value
+                repeat key
+            else
+                target
     fn filter-contents (source target filter)
         let parent = ('parent source)
         if (parent == null)
@@ -2516,45 +2514,45 @@ let vector-reduce =
                 'getarg args 1
             let T = ('typeof v)
             let sz = ('element-count T)
-            loop (v sz) = v sz
-            # special cases for low vector sizes
-            switch sz
-            case 1
-                ast-quote
-                    extractelement v 0
-            case 2
-                ast-quote
-                    f
+            loop (v sz = v sz)
+                # special cases for low vector sizes
+                switch sz
+                case 1
+                    ast-quote
                         extractelement v 0
-                        extractelement v 1
-            case 3
-                ast-quote
-                    f
-                        f
-                            extractelement v 0
-                            extractelement v 1
-                        extractelement v 2
-            case 4
-                ast-quote
-                    f
-                        f
-                            extractelement v 0
-                            extractelement v 1
-                        f
-                            extractelement v 2
-                            extractelement v 3
-            default
-                let hsz = (sz >> 1)
-                let fsz = (hsz << 1)
-                if (fsz != sz)
-                    compiler-error! "vector size must be a power of two"
-                let hsz-value = (Value (hsz as usize))
-                repeat
+                case 2
                     ast-quote
                         f
-                            lslice v hsz-value
-                            rslice v hsz-value
-                    hsz
+                            extractelement v 0
+                            extractelement v 1
+                case 3
+                    ast-quote
+                        f
+                            f
+                                extractelement v 0
+                                extractelement v 1
+                            extractelement v 2
+                case 4
+                    ast-quote
+                        f
+                            f
+                                extractelement v 0
+                                extractelement v 1
+                            f
+                                extractelement v 2
+                                extractelement v 3
+                default
+                    let hsz = (sz >> 1)
+                    let fsz = (hsz << 1)
+                    if (fsz != sz)
+                        compiler-error! "vector size must be a power of two"
+                    let hsz-value = (Value (hsz as usize))
+                    repeat
+                        ast-quote
+                            f
+                                lslice v hsz-value
+                                rslice v hsz-value
+                        hsz
 
 let __countof-aggregate =
     ast-macro
@@ -2643,34 +2641,34 @@ inline range (a b c)
 
 fn parse-compile-flags (args)
     let argc = ('argcount args)
-    loop (i flags) = 0 0:u64
-    if (i < argc)
-        let arg = ('getarg args i)
-        let flag = (arg as Symbol)
-        repeat (i + 1)
-            | flags
-                switch flag
-                case 'dump-disassembly compile-flag-dump-disassembly
-                case 'dump-module compile-flag-dump-module
-                case 'dump-function compile-flag-dump-function
-                case 'dump-time compile-flag-dump-time
-                case 'no-debug-info compile-flag-no-debug-info
-                case 'O1 compile-flag-O1
-                case 'O2 compile-flag-O2
-                case 'O3 compile-flag-O3
-                default
-                    compiler-error!
-                        .. "illegal flag: " (repr flag)
-                            ". try one of"
-                            \ " " (repr 'dump-disassembly)
-                            \ " " (repr 'dump-module)
-                            \ " " (repr 'dump-function)
-                            \ " " (repr 'dump-time)
-                            \ " " (repr 'no-debug-info)
-                            \ " " (repr 'O1)
-                            \ " " (repr 'O2)
-                            \ " " (repr 'O3)
-    flags
+    loop (i flags = 0 0:u64)
+        if (i < argc)
+            let arg = ('getarg args i)
+            let flag = (arg as Symbol)
+            repeat (i + 1)
+                | flags
+                    switch flag
+                    case 'dump-disassembly compile-flag-dump-disassembly
+                    case 'dump-module compile-flag-dump-module
+                    case 'dump-function compile-flag-dump-function
+                    case 'dump-time compile-flag-dump-time
+                    case 'no-debug-info compile-flag-no-debug-info
+                    case 'O1 compile-flag-O1
+                    case 'O2 compile-flag-O2
+                    case 'O3 compile-flag-O3
+                    default
+                        compiler-error!
+                            .. "illegal flag: " (repr flag)
+                                ". try one of"
+                                \ " " (repr 'dump-disassembly)
+                                \ " " (repr 'dump-module)
+                                \ " " (repr 'dump-function)
+                                \ " " (repr 'dump-time)
+                                \ " " (repr 'no-debug-info)
+                                \ " " (repr 'O1)
+                                \ " " (repr 'O2)
+                                \ " " (repr 'O3)
+        flags
 
 let compile =
     ast-macro
@@ -2718,11 +2716,11 @@ inline make-unpack-function (extractf)
             let T = ('typeof self)
             let count = ('element-count T)
             let outargs = (sc_argument_list_new)
-            loop (i) = 0
-            if (icmp<s i count)
-                sc_argument_list_append outargs `(extractf self i)
-                repeat (add i 1)
-            outargs
+            loop (i = 0)
+                if (icmp<s i count)
+                    sc_argument_list_append outargs `(extractf self i)
+                    repeat (add i 1)
+                outargs
 
 let __unpack-aggregate = (make-unpack-function extractvalue)
 
@@ -2742,21 +2740,21 @@ let tupleof =
 
             # build tuple type
             let field-types = (alloca-array type argc)
-            loop (i) = 0
-            if (i < argc)
-                let arg = ('getarg args i)
-                let T = ('typeof arg)
-                store T (getelementptr field-types i)
-                repeat (i + 1)
+            loop (i = 0)
+                if (i < argc)
+                    let arg = ('getarg args i)
+                    let T = ('typeof arg)
+                    store T (getelementptr field-types i)
+                    repeat (i + 1)
 
             # generate insert instructions
             let TT = (sc_tuple_type argc field-types)
-            loop (i result) = 0 `(nullof TT)
-            if (i < argc)
-                let arg = ('getarg args i)
-                repeat (i + 1)
-                    `(insertvalue result arg i)
-            result
+            loop (i result = 0 `(nullof TT))
+                if (i < argc)
+                    let arg = ('getarg args i)
+                    repeat (i + 1)
+                        `(insertvalue result arg i)
+                result
 
 #-------------------------------------------------------------------------------
 # arrays
@@ -2781,15 +2779,15 @@ let arrayof =
 
             # generate insert instructions
             let TT = (sc_array_type ET (usize numvals))
-            loop (i result) = 0 `(nullof TT)
-            if (i < numvals)
-                let arg = ('getarg args (add i 1))
-                let arg =
-                    if ((sc_value_type arg) == ET) arg
-                    else `(arg as ET)
-                repeat (i + 1)
-                    `(insertvalue result arg i)
-            result
+            loop (i result = 0 `(nullof TT))
+                if (i < numvals)
+                    let arg = ('getarg args (add i 1))
+                    let arg =
+                        if ((sc_value_type arg) == ET) arg
+                        else `(arg as ET)
+                    repeat (i + 1)
+                        `(insertvalue result arg i)
+                result
 
 #-------------------------------------------------------------------------------
 # vectors
@@ -2892,10 +2890,10 @@ inline vector-binary-op-dispatch (symbol)
                     return self
                 let offset = (offset:usize as i32)
                 let maskvals = (alloca-array Value offset)
-                loop (i) = 0
-                if (i < offset)
-                    store (Value i) (getelementptr maskvals i)
-                    repeat (i + 1)
+                loop (i = 0)
+                    if (i < offset)
+                        store (Value i) (getelementptr maskvals i)
+                        repeat (i + 1)
                 let maskT =
                     sc_vector_type i32 offset:usize
                 ast-quote
@@ -2922,10 +2920,10 @@ inline vector-binary-op-dispatch (symbol)
                 let offset = (offset:usize as i32)
                 let total = (total:usize as i32)
                 let maskvals = (alloca-array Value total)
-                loop (i) = 0
-                if (i < total)
-                    store (Value (i + offset)) (getelementptr maskvals i)
-                    repeat (i + 1)
+                loop (i = 0)
+                    if (i < total)
+                        store (Value (i + offset)) (getelementptr maskvals i)
+                        repeat (i + 1)
                 let maskT =
                     sc_vector_type i32 total:usize
                 ast-quote
@@ -2961,14 +2959,14 @@ let vectorof =
 
             # generate insert instructions
             let TT = (sc_vector_type ET (usize numvals))
-            loop (i result) = 0 `(nullof TT)
-            if (i < numvals)
-                let arg = ('getarg args (add i 1))
-                let arg =
-                    if ((sc_value_type arg) == ET) arg
-                    else `(arg as ET)
-                repeat (i + 1) `(insertelement result arg i)
-            result
+            loop (i result = 0 `(nullof TT))
+                if (i < numvals)
+                    let arg = ('getarg args (add i 1))
+                    let arg =
+                        if ((sc_value_type arg) == ET) arg
+                        else `(arg as ET)
+                    repeat (i + 1) `(insertelement result arg i)
+                result
 
 #-------------------------------------------------------------------------------
 
@@ -3058,82 +3056,82 @@ fn gen-syntax-matcher (failfunc expr scope params)
         return `[]
     let paramcount = (countof params)
     let outexpr = (sc_expression_new)
-    loop (i rest next varargs) = 0 params expr false
-    if (not (empty? rest))
-        let paramv rest = (decons rest)
-        let T = ('typeof paramv)
-        if (T == Symbol)
-            let param = (paramv as Symbol)
-            let variadic? = ('variadic? param)
-            let arg next =
-                if variadic?
-                    if (not (empty? rest))
-                        syntax-error! ('anchor paramv)
-                            "vararg parameter is not in last place"
-                    _ next `[]
-                else
-                    ast-quote
-                        let arg next =
-                            sc_list_decons next
-                    _ arg next
-            sc_expression_append outexpr arg
-            'set-symbol scope param arg
-            repeat (i + 1) rest next (| varargs variadic?)
-        elseif (T == list)
-            let param = (paramv as list)
-            let head head-rest = (decons param)
-            let mid mid-rest = (decons head-rest)
-            if ((('typeof head) == Symbol) and ((head as Symbol) == 'syntax-quote))
-                let head = (head as Symbol)
-                let sym = ((decons head-rest) as Symbol)
-                sc_expression_append outexpr
-                    ast-quote
-                        let arg next = (sc_list_decons next)
-                        if (ptrcmp!= ('typeof arg) Symbol)
-                            failfunc;
-                        if ((arg as Symbol) != sym)
-                            failfunc;
-                repeat (i + 1) rest next varargs
-            elseif ((('typeof mid) == Symbol) and ((mid as Symbol) == 'as))
-                let exprT = (decons mid-rest)
-                let exprT = (sc_expand exprT '() scope)
-                let param = (head as Symbol)
-                if ('variadic? param)
-                    syntax-error! ('anchor head)
-                        "vararg parameter cannot be typed"
-                sc_expression_append outexpr
-                    ast-quote
-                        let arg next =
-                            sc_list_decons next
-                        let arg =
-                            if (('constant? arg) and (('typeof arg) == exprT))
-                                arg as exprT
-                            else
-                                failfunc;
+    loop (i rest next varargs = 0 params expr false)
+        if (not (empty? rest))
+            let paramv rest = (decons rest)
+            let T = ('typeof paramv)
+            if (T == Symbol)
+                let param = (paramv as Symbol)
+                let variadic? = ('variadic? param)
+                let arg next =
+                    if variadic?
+                        if (not (empty? rest))
+                            syntax-error! ('anchor paramv)
+                                "vararg parameter is not in last place"
+                        _ next `[]
+                    else
+                        ast-quote
+                            let arg next =
+                                sc_list_decons next
+                        _ arg next
+                sc_expression_append outexpr arg
                 'set-symbol scope param arg
-                repeat (i + 1) rest next varargs
-            else
-                sc_expression_append outexpr
-                    ast-quote
-                        let arg next = (sc_list_decons next)
-                        let arg =
-                            if (ptrcmp!= ('typeof arg) list)
+                repeat (i + 1) rest next (| varargs variadic?)
+            elseif (T == list)
+                let param = (paramv as list)
+                let head head-rest = (decons param)
+                let mid mid-rest = (decons head-rest)
+                if ((('typeof head) == Symbol) and ((head as Symbol) == 'syntax-quote))
+                    let head = (head as Symbol)
+                    let sym = ((decons head-rest) as Symbol)
+                    sc_expression_append outexpr
+                        ast-quote
+                            let arg next = (sc_list_decons next)
+                            if (ptrcmp!= ('typeof arg) Symbol)
                                 failfunc;
-                            else
-                                arg as list
-                        ast-unquote
-                            gen-syntax-matcher failfunc arg scope param
-                repeat (i + 1) rest next varargs
-        else
-            syntax-error! ('anchor paramv)
-                "unsupported pattern"
-    return
-        ast-quote
-            if (not (check-count (sc_list_count expr)
-                    [(? varargs (sub paramcount 1) paramcount)]
-                    [(? varargs -1 paramcount)]))
-                failfunc;
-            outexpr
+                            if ((arg as Symbol) != sym)
+                                failfunc;
+                    repeat (i + 1) rest next varargs
+                elseif ((('typeof mid) == Symbol) and ((mid as Symbol) == 'as))
+                    let exprT = (decons mid-rest)
+                    let exprT = (sc_expand exprT '() scope)
+                    let param = (head as Symbol)
+                    if ('variadic? param)
+                        syntax-error! ('anchor head)
+                            "vararg parameter cannot be typed"
+                    sc_expression_append outexpr
+                        ast-quote
+                            let arg next =
+                                sc_list_decons next
+                            let arg =
+                                if (('constant? arg) and (('typeof arg) == exprT))
+                                    arg as exprT
+                                else
+                                    failfunc;
+                    'set-symbol scope param arg
+                    repeat (i + 1) rest next varargs
+                else
+                    sc_expression_append outexpr
+                        ast-quote
+                            let arg next = (sc_list_decons next)
+                            let arg =
+                                if (ptrcmp!= ('typeof arg) list)
+                                    failfunc;
+                                else
+                                    arg as list
+                            ast-unquote
+                                gen-syntax-matcher failfunc arg scope param
+                    repeat (i + 1) rest next varargs
+            else
+                syntax-error! ('anchor paramv)
+                    "unsupported pattern"
+        return
+            ast-quote
+                if (not (check-count (sc_list_count expr)
+                        [(? varargs (sub paramcount 1) paramcount)]
+                        [(? varargs -1 paramcount)]))
+                    failfunc;
+                outexpr
 
 define syntax-match
     fn next-head? (next)
@@ -3156,41 +3154,41 @@ define syntax-match
                             merge ok-label args...
                         ast-unquote
                             let outexpr = (sc_expression_new)
-                            loop (next) = next
-                            let head = (next-head? next)
-                            switch head
-                            case 'case
-                                let expr next = (decons next)
-                                let expr = (expr as list)
-                                let head cond body = (decons expr 2)
-                                let cond = (cond as list)
-                                sc_expression_append outexpr
-                                    ast-quote
-                                        label case-label
-                                            inline fail-case ()
-                                                merge case-label
-                                            let token = arg
-                                            ast-unquote
-                                                let newscope = (Scope scope)
-                                                let unpack-expr =
-                                                    gen-syntax-matcher fail-case token newscope cond
-                                                let body =
-                                                    sc_expand (cons do body) '() newscope
-                                                ast-quote
-                                                    unpack-expr
-                                                    return-ok body
-                                repeat next
-                            case 'default
-                                let expr next = (decons next)
-                                let expr = (expr as list)
-                                let head body = (decons expr)
-                                let body =
-                                    sc_expand (cons do body) '() scope
-                                sc_expression_append outexpr `(return-ok body)
-                                store next outnext
-                                outexpr
-                            default
-                                compiler-error! "default branch missing"
+                            loop (next = next)
+                                let head = (next-head? next)
+                                switch head
+                                case 'case
+                                    let expr next = (decons next)
+                                    let expr = (expr as list)
+                                    let head cond body = (decons expr 2)
+                                    let cond = (cond as list)
+                                    sc_expression_append outexpr
+                                        ast-quote
+                                            label case-label
+                                                inline fail-case ()
+                                                    merge case-label
+                                                let token = arg
+                                                ast-unquote
+                                                    let newscope = (Scope scope)
+                                                    let unpack-expr =
+                                                        gen-syntax-matcher fail-case token newscope cond
+                                                    let body =
+                                                        sc_expand (cons do body) '() newscope
+                                                    ast-quote
+                                                        unpack-expr
+                                                        return-ok body
+                                    repeat next
+                                case 'default
+                                    let expr next = (decons next)
+                                    let expr = (expr as list)
+                                    let head body = (decons expr)
+                                    let body =
+                                        sc_expand (cons do body) '() scope
+                                    sc_expression_append outexpr `(return-ok body)
+                                    store next outnext
+                                    outexpr
+                                default
+                                    compiler-error! "default branch missing"
             return (cons outexpr (load outnext)) scope
 
 #-------------------------------------------------------------------------------
@@ -3255,13 +3253,13 @@ fn uncomma (l)
         example:
             (uncomma '(a , b c d , e f , g h)) -> '(a (b c d) (e f) (g h))
     fn comma-separated? (l)
-        loop (next) = l
-        if (empty? next)
-            return false
-        let at next = (decons next)
-        if ((('typeof at) == Symbol) and ((at as Symbol) == ',))
-            return true
-        repeat next
+        loop (next = l)
+            if (empty? next)
+                return false
+            let at next = (decons next)
+            if ((('typeof at) == Symbol) and ((at as Symbol) == ',))
+                return true
+            repeat next
     fn merge-lists (anchor current total)
         if ((countof current) == 0)
             syntax-error! anchor "unexpected comma"
@@ -3291,69 +3289,69 @@ fn gen-argument-matcher (failfunc expr scope params)
     let params = (uncomma params)
     let paramcount = (countof params)
     let outexpr = (sc_expression_new)
-    loop (i rest varargs) = 0 params false
-    if (not (empty? rest))
-        let paramv rest = (decons rest)
-        let T = ('typeof paramv)
-        if (T == Symbol)
-            let param = (paramv as Symbol)
-            let variadic? = ('variadic? param)
-            let arg =
-                if variadic?
-                    if (not (empty? rest))
-                        syntax-error! ('anchor paramv)
-                            "vararg parameter is not in last place"
-                    `(sc_getarglist expr i)
-                else
-                    `(sc_getarg expr i)
-            sc_expression_append outexpr arg
-            'set-symbol scope param arg
-            repeat (i + 1) rest (| varargs variadic?)
-        elseif (T == list)
-            let param = (paramv as list)
-            let head head-rest = (decons param)
-            let mid mid-rest = (decons head-rest)
-            if ((('typeof mid) == Symbol) and ((mid as Symbol) == ':))
-                let exprT = (decons mid-rest)
-                let exprT = (sc_expand exprT '() scope)
-                let param = (head as Symbol)
-                if ('variadic? param)
-                    syntax-error! ('anchor head)
-                        "vararg parameter cannot be typed"
-                sc_expression_append outexpr
-                    ast-quote
-                        let arg = (sc_getarg expr i)
-                        let arg =
-                            try (imply-expr ('typeof arg) exprT arg)
-                            except (err)
-                                failfunc;
+    loop (i rest varargs = 0 params false)
+        if (not (empty? rest))
+            let paramv rest = (decons rest)
+            let T = ('typeof paramv)
+            if (T == Symbol)
+                let param = (paramv as Symbol)
+                let variadic? = ('variadic? param)
+                let arg =
+                    if variadic?
+                        if (not (empty? rest))
+                            syntax-error! ('anchor paramv)
+                                "vararg parameter is not in last place"
+                        `(sc_getarglist expr i)
+                    else
+                        `(sc_getarg expr i)
+                sc_expression_append outexpr arg
                 'set-symbol scope param arg
-                repeat (i + 1) rest varargs
-            elseif ((('typeof mid) == Symbol) and ((mid as Symbol) == 'as))
-                let exprT = (decons mid-rest)
-                let exprT = (sc_expand exprT '() scope)
-                let param = (head as Symbol)
-                if ('variadic? param)
-                    syntax-error! ('anchor head)
-                        "vararg parameter cannot be typed"
-                sc_expression_append outexpr
-                    ast-quote
-                        let arg = (sc_getarg expr i)
-                        let arg =
-                            if (('constant? arg) and (('typeof arg) == exprT))
-                                arg as exprT
-                            else
-                                failfunc;
-                'set-symbol scope param arg
-                repeat (i + 1) rest varargs
-        syntax-error! ('anchor paramv) "unsupported pattern"
-    return
-        ast-quote
-            if (not (check-count (sc_argcount expr)
-                    [(? varargs (sub paramcount 1) paramcount)]
-                    [(? varargs -1 paramcount)]))
-                failfunc;
-            outexpr
+                repeat (i + 1) rest (| varargs variadic?)
+            elseif (T == list)
+                let param = (paramv as list)
+                let head head-rest = (decons param)
+                let mid mid-rest = (decons head-rest)
+                if ((('typeof mid) == Symbol) and ((mid as Symbol) == ':))
+                    let exprT = (decons mid-rest)
+                    let exprT = (sc_expand exprT '() scope)
+                    let param = (head as Symbol)
+                    if ('variadic? param)
+                        syntax-error! ('anchor head)
+                            "vararg parameter cannot be typed"
+                    sc_expression_append outexpr
+                        ast-quote
+                            let arg = (sc_getarg expr i)
+                            let arg =
+                                try (imply-expr ('typeof arg) exprT arg)
+                                except (err)
+                                    failfunc;
+                    'set-symbol scope param arg
+                    repeat (i + 1) rest varargs
+                elseif ((('typeof mid) == Symbol) and ((mid as Symbol) == 'as))
+                    let exprT = (decons mid-rest)
+                    let exprT = (sc_expand exprT '() scope)
+                    let param = (head as Symbol)
+                    if ('variadic? param)
+                        syntax-error! ('anchor head)
+                            "vararg parameter cannot be typed"
+                    sc_expression_append outexpr
+                        ast-quote
+                            let arg = (sc_getarg expr i)
+                            let arg =
+                                if (('constant? arg) and (('typeof arg) == exprT))
+                                    arg as exprT
+                                else
+                                    failfunc;
+                    'set-symbol scope param arg
+                    repeat (i + 1) rest varargs
+            syntax-error! ('anchor paramv) "unsupported pattern"
+        return
+            ast-quote
+                if (not (check-count (sc_argcount expr)
+                        [(? varargs (sub paramcount 1) paramcount)]
+                        [(? varargs -1 paramcount)]))
+                    failfunc;
+                outexpr
 
 define match-args
     fn next-head? (next)
@@ -3376,41 +3374,41 @@ define match-args
                             merge ok-label args...
                         ast-unquote
                             let outexpr = (sc_expression_new)
-                            loop (next) = next
-                            let head = (next-head? next)
-                            switch head
-                            case 'case
-                                let expr next = (decons next)
-                                let expr = (expr as list)
-                                let head cond body = (decons expr 2)
-                                let cond = (cond as list)
-                                sc_expression_append outexpr
-                                    ast-quote
-                                        label case-label
-                                            inline fail-case ()
-                                                merge case-label
-                                            let token = arg
-                                            ast-unquote
-                                                let newscope = (Scope scope)
-                                                let unpack-expr =
-                                                    gen-argument-matcher fail-case token newscope cond
-                                                let body =
-                                                    sc_expand (cons do body) '() newscope
-                                                ast-quote
-                                                    unpack-expr
-                                                    return-ok body
-                                repeat next
-                            case 'default
-                                let expr next = (decons next)
-                                let expr = (expr as list)
-                                let head body = (decons expr)
-                                let body =
-                                    sc_expand (cons do body) '() scope
-                                sc_expression_append outexpr `(return-ok body)
-                                store next outnext
-                                outexpr
-                            default
-                                compiler-error! "default branch missing"
+                            loop (next = next)
+                                let head = (next-head? next)
+                                switch head
+                                case 'case
+                                    let expr next = (decons next)
+                                    let expr = (expr as list)
+                                    let head cond body = (decons expr 2)
+                                    let cond = (cond as list)
+                                    sc_expression_append outexpr
+                                        ast-quote
+                                            label case-label
+                                                inline fail-case ()
+                                                    merge case-label
+                                                let token = arg
+                                                ast-unquote
+                                                    let newscope = (Scope scope)
+                                                    let unpack-expr =
+                                                        gen-argument-matcher fail-case token newscope cond
+                                                    let body =
+                                                        sc_expand (cons do body) '() newscope
+                                                    ast-quote
+                                                        unpack-expr
+                                                        return-ok body
+                                    repeat next
+                                case 'default
+                                    let expr next = (decons next)
+                                    let expr = (expr as list)
+                                    let head body = (decons expr)
+                                    let body =
+                                        sc_expand (cons do body) '() scope
+                                    sc_expression_append outexpr `(return-ok body)
+                                    store next outnext
+                                    outexpr
+                                default
+                                    compiler-error! "default branch missing"
             return (cons outexpr (load outnext)) scope
 
 define spice
@@ -3422,50 +3420,50 @@ define spice
             let paramcount = ((countof params) as i32)
 
             let args = (Symbol "#args")
-            loop (i rest body varargs) = 0 params body false
-            if (not (empty? rest))
-                let paramv rest = (decons rest)
-                let param = (paramv as Symbol)
-                let variadic? = ('variadic? param)
-                let body =
-                    if variadic?
-                        if (not (empty? rest))
-                            syntax-error! ('anchor paramv)
-                                "vararg parameter is not in last place"
-                        cons
-                            qq
-                                [let paramv] =
-                                    [`sc_getarglist args i];
-                            body
-                    else
-                        cons
-                            qq
-                                [let paramv] =
-                                    [`sc_getarg args i];
-                            body
-                repeat (i + 1) rest body (| varargs variadic?)
-            let content =
-                cons (list args)
+            loop (i rest body varargs = 0 params body false)
+                if (not (empty? rest))
+                    let paramv rest = (decons rest)
+                    let param = (paramv as Symbol)
+                    let variadic? = ('variadic? param)
+                    let body =
+                        if variadic?
+                            if (not (empty? rest))
+                                syntax-error! ('anchor paramv)
+                                    "vararg parameter is not in last place"
+                            cons
+                                qq
+                                    [let paramv] =
+                                        [`sc_getarglist args i];
+                                body
+                        else
+                            cons
+                                qq
+                                    [let paramv] =
+                                        [`sc_getarg args i];
+                                body
+                    repeat (i + 1) rest body (| varargs variadic?)
+                let content =
+                    cons (list args)
+                        qq
+                            [verify-count] ([`sc_argcount args])
+                                [(? varargs (sub paramcount 1) paramcount)]
+                                [(? varargs -1 paramcount)]
+                        body
+                if (('typeof name) == Symbol)
                     qq
-                        [verify-count] ([`sc_argcount args])
-                            [(? varargs (sub paramcount 1) paramcount)]
-                            [(? varargs -1 paramcount)]
-                    body
-            if (('typeof name) == Symbol)
-                qq
-                    [let name] =
+                        [let name] =
+                            [ast-macro]
+                                [fn] [(name as Symbol as string)] (args)
+                                    [ast-quote]
+                                        [ast-unquote]
+                                            [(cons inline content)] args
+                else
+                    qq
                         [ast-macro]
-                            [fn] [(name as Symbol as string)] (args)
+                            [fn name] (args)
                                 [ast-quote]
                                     [ast-unquote]
                                         [(cons inline content)] args
-            else
-                qq
-                    [ast-macro]
-                        [fn name] (args)
-                            [ast-quote]
-                                [ast-unquote]
-                                    [(cons inline content)] args
 
 
 compile-stage;
@@ -3513,13 +3511,13 @@ fn get-overloaded-fn-append ()
                         syntax-error! ('anchor f) "argument must be constant or function"
                     let fT = ('element@ fT 0)
                     let argcount = ('element-count fT)
-                    loop (k types) = 0 void
-                    if (k < argcount)
-                        let argT = ('element@ fT k)
-                        repeat (k + 1)
-                            sc_arguments_type_join types argT
-                    sc_argument_list_append functions f
-                    sc_argument_list_append functypes types
+                    loop (k types = 0 void)
+                        if (k < argcount)
+                            let argT = ('element@ fT k)
+                            repeat (k + 1)
+                                sc_arguments_type_join types argT
+                        sc_argument_list_append functions f
+                        sc_argument_list_append functypes types
                 elseif (fT == type)
                     if (fT == outtype)
                         syntax-error! ('anchor f) "cannot inherit from own type"
@@ -3588,23 +3586,23 @@ fn get-overloaded-fn-append ()
             compiler-error!
                 .. "could not match argument types ("
                     do
-                        loop (i str) = 0 ""
-                        if (i < count)
-                            repeat (i + 1)
-                                .. str
-                                    ? (i == 0) "" " "
-                                    repr ('typeof ('getarg args... i))
-                        str
+                        loop (i str = 0 "")
+                            if (i < count)
+                                repeat (i + 1)
+                                    .. str
+                                        ? (i == 0) "" " "
+                                        repr ('typeof ('getarg args... i))
+                            str
                     ") to overloaded function with types"
                     do
                         let fcount = ('argcount ftypes)
-                        loop (i str) = 0 ""
-                        if (i < fcount)
-                            repeat (i + 1)
-                                .. str
-                                    "\n    "
-                                    repr (('getarg ftypes i) as type)
-                        str
+                        loop (i str = 0 "")
+                            if (i < fcount)
+                                repeat (i + 1)
+                                    .. str
+                                        "\n    "
+                                        repr (('getarg ftypes i) as type)
+                            str
 
 sugar fn... (name...)
     let finalize-overloaded-fn = (get-overloaded-fn-append)
@@ -3627,56 +3625,56 @@ sugar fn... (name...)
     case (name as Symbol;)
         'set-symbol bodyscope fn-name outtype
     default;
-    loop (next) = next-expr
-    syntax-match next
-    case (('case 'using body...) rest...)
-        let obj = (sc_expand (cons do body...) '() syntax-scope)
-        sc_argument_list_append outargs obj
-        sc_argument_list_append outargs `none
-        repeat rest...
-    case (('case condv body...) rest...)
-        do
-            let tmpl = (sc_template_new fn-name)
-            sc_argument_list_append outargs tmpl
-            let scope = (Scope bodyscope)
-            loop (expr types) = (uncomma (condv as list)) void
-            syntax-match expr
-            case ()
-                let body = (sc_expand (cons do body...) '() scope)
-                sc_template_set_body tmpl body
-                sc_argument_list_append outargs types
-            case ((arg as Symbol) ': T)
-                syntax-error! ('anchor condv) "single typed parameter definition is missing trailing comma or semicolon"
-            case ((arg as Symbol) rest...)
-                if ('variadic? arg)
-                    if (not (empty? rest...))
-                        syntax-error! ('anchor condv) "variadic parameter must be in last place"
-                let param = (sc_parameter_new arg)
-                sc_template_append_parameter tmpl param
-                'set-symbol scope arg param
-                repeat rest...
-                    sc_arguments_type_join types
-                        ? ('variadic? arg) Variadic Unknown
-            case (((arg as Symbol) ': T) rest...)
-                if ('variadic? arg)
-                    syntax-error! ('anchor condv) "a typed parameter can't be variadic"
-                let T = ((sc_expand T '() syntax-scope) as type)
-                let param = (sc_parameter_new arg)
-                sc_template_append_parameter tmpl param
-                'set-symbol scope arg param
-                repeat rest...
-                    sc_arguments_type_join types T
-            default
-                syntax-error! ('anchor condv) "syntax: (parameter-name[: type], ...)"
-        repeat rest...
-    default
-        syntax-match name...
-        case (name as Symbol;)
-            'set-symbol syntax-scope fn-name outtype
-        default;
-        return
-            `(finalize-overloaded-fn outtype outargs)
-            next
+    loop (next = next-expr)
+        syntax-match next
+        case (('case 'using body...) rest...)
+            let obj = (sc_expand (cons do body...) '() syntax-scope)
+            sc_argument_list_append outargs obj
+            sc_argument_list_append outargs `none
+            repeat rest...
+        case (('case condv body...) rest...)
+            do
+                let tmpl = (sc_template_new fn-name)
+                sc_argument_list_append outargs tmpl
+                let scope = (Scope bodyscope)
+                loop (expr types = (uncomma (condv as list)) void)
+                    syntax-match expr
+                    case ()
+                        let body = (sc_expand (cons do body...) '() scope)
+                        sc_template_set_body tmpl body
+                        sc_argument_list_append outargs types
+                    case ((arg as Symbol) ': T)
+                        syntax-error! ('anchor condv) "single typed parameter definition is missing trailing comma or semicolon"
+                    case ((arg as Symbol) rest...)
+                        if ('variadic? arg)
+                            if (not (empty? rest...))
+                                syntax-error! ('anchor condv) "variadic parameter must be in last place"
+                        let param = (sc_parameter_new arg)
+                        sc_template_append_parameter tmpl param
+                        'set-symbol scope arg param
+                        repeat rest...
+                            sc_arguments_type_join types
+                                ? ('variadic? arg) Variadic Unknown
+                    case (((arg as Symbol) ': T) rest...)
+                        if ('variadic? arg)
+                            syntax-error! ('anchor condv) "a typed parameter can't be variadic"
+                        let T = ((sc_expand T '() syntax-scope) as type)
+                        let param = (sc_parameter_new arg)
+                        sc_template_append_parameter tmpl param
+                        'set-symbol scope arg param
+                        repeat rest...
+                            sc_arguments_type_join types T
+                    default
+                        syntax-error! ('anchor condv) "syntax: (parameter-name[: type], ...)"
+            repeat rest...
+        default
+            syntax-match name...
+            case (name as Symbol;)
+                'set-symbol syntax-scope fn-name outtype
+            default;
+            return
+                `(finalize-overloaded-fn outtype outargs)
+                next
 
 #-------------------------------------------------------------------------------
 # references
@@ -3701,14 +3699,14 @@ let ref-attribs-key = '__refattrs
 'set-symbols type
     @& =
         fn "@&" (T name)
-            loop (T) = T
-            try
-                let attrs = (('local@ T ref-attribs-key) as type)
-                return ('@ attrs name)
-            except (err)
-                if (T == typename)
-                    raise err
-            repeat ('super T)
+            loop (T = T)
+                try
+                    let attrs = (('local@ T ref-attribs-key) as type)
+                    return ('@ attrs name)
+                except (err)
+                    if (T == typename)
+                        raise err
+                repeat ('super T)
     set-symbol& =
         fn "set-symbol&" (T name value)
             let attrs =
@@ -3999,12 +3997,12 @@ spice pointer-each (n op value args...)
         if (n == 1:usize)
             return `(op (value as ref) args...)
     ast-quote
-        loop (i) = 0
-        if (i < n)
-            op
-                (getelementptr value i) as ref
-                args...
-            repeat (i + 1)
+        loop (i = 0)
+            if (i < n)
+                op
+                    (getelementptr value i) as ref
+                    args...
+                repeat (i + 1)
 
 #inline pointer-each (n op value args...)
     let n = (imply n usize)
@@ -4338,31 +4336,31 @@ fn print-logo ()
 
 fn read-eval-print-loop ()
     fn repeat-string (n c)
-        loop (i s) = 0:usize ""
-        if (i == n)
-            return s
-        repeat (i + 1:usize)
-            .. s c
+        loop (i s = 0:usize "")
+            if (i == n)
+                return s
+            repeat (i + 1:usize)
+                .. s c
 
     fn leading-spaces (s)
         let len = (countof s)
-        loop (i) = 0:usize
-        if (i == len)
-            return s
-        let c = (@ s i)
-        if (c != (char " "))
-            let s = (sc_string_buffer s)
-            return (sc_string_new s i)
-        repeat (i + 1:usize)
+        loop (i = 0:usize)
+            if (i == len)
+                return s
+            let c = (@ s i)
+            if (c != (char " "))
+                let s = (sc_string_buffer s)
+                return (sc_string_new s i)
+            repeat (i + 1:usize)
 
     fn blank? (s)
         let len = (countof s)
-        loop (i) = 0:usize
-        if (i == len)
-            return true
-        if ((@ s i) != (char " "))
-            return false
-        repeat (i + 1:usize)
+        loop (i = 0:usize)
+            if (i == len)
+                return true
+            if ((@ s i) != (char " "))
+                return false
+            repeat (i + 1:usize)
 
     let cwd =
         realpath "."
@@ -4376,102 +4374,101 @@ fn read-eval-print-loop ()
     set-autocomplete-scope! eval-scope
 
     'set-symbol eval-scope 'module-dir cwd
-    loop (preload cmdlist counter eval-scope) = "" "" 0 eval-scope
-    fn make-idstr (counter)
-        .. "$" (tostring counter)
+    loop (preload cmdlist counter eval-scope = "" "" 0 eval-scope)
+        fn make-idstr (counter)
+            .. "$" (tostring counter)
 
-    let idstr = (make-idstr counter)
-    let promptstr =
-        .. idstr " "
-            default-styler style-comment "►"
-    let promptlen = ((countof idstr) + 2:usize)
-    let success cmd =
-        __prompt
-            ..
-                if (empty? cmdlist) promptstr
-                else
-                    repeat-string promptlen "."
-                " "
-            preload
-    if (not success)
-        return;
-    fn endswith-blank (s)
-        let slen = (countof s)
-        if (slen == 0:usize) false
-        else
-            (@ s (slen - 1:usize)) == (char " ")
-    let enter-multiline = (endswith-blank cmd)
-    let terminated? =
-        (blank? cmd) or
-            (empty? cmdlist) and (not enter-multiline)
-    let cmdlist =
-        .. cmdlist
-            if enter-multiline
-                lslice cmd ((countof cmd) - 1:usize)
-            else cmd
-            "\n"
-    let preload =
-        if terminated? ""
-        else (leading-spaces cmd)
-    if (not terminated?)
-        repeat preload cmdlist counter eval-scope
+        let idstr = (make-idstr counter)
+        let promptstr =
+            .. idstr " "
+                default-styler style-comment "►"
+        let promptlen = ((countof idstr) + 2:usize)
+        let success cmd =
+            __prompt
+                ..
+                    if (empty? cmdlist) promptstr
+                    else
+                        repeat-string promptlen "."
+                    " "
+                preload
+        if (not success)
+            return;
+        fn endswith-blank (s)
+            let slen = (countof s)
+            if (slen == 0:usize) false
+            else
+                (@ s (slen - 1:usize)) == (char " ")
+        let enter-multiline = (endswith-blank cmd)
+        let terminated? =
+            (blank? cmd) or
+                (empty? cmdlist) and (not enter-multiline)
+        let cmdlist =
+            .. cmdlist
+                if enter-multiline
+                    lslice cmd ((countof cmd) - 1:usize)
+                else cmd
+                "\n"
+        let preload =
+            if terminated? ""
+            else (leading-spaces cmd)
+        if (not terminated?)
+            repeat preload cmdlist counter eval-scope
 
-    fn handle-retargs (counter eval-scope local-scope vals...)
-        raises-compile-error;
-        let tmp = (Symbol "#result...")
-        # copy over values from local-scope
-        do
-            loop (key) = unnamed
-            let key value = ('next local-scope key)
-            if (key != unnamed)
-                if (key != tmp)
-                    'set-symbol eval-scope key value
-                repeat key
-        let count =
-            va-lfold 0
-                inline (key value k)
-                    let idstr = (make-idstr (counter + k))
-                    'set-symbol eval-scope (Symbol idstr) (Value value)
-                    print idstr "="
-                        repr value
-                    k + 1
-                vals...
-        return eval-scope count
-
-    let eval-scope count =
-        try
-            let expr = (list-parse cmdlist)
-            let expr-anchor = ('anchor expr)
-            set-anchor! expr-anchor
+        fn handle-retargs (counter eval-scope local-scope vals...)
+            raises-compile-error;
             let tmp = (Symbol "#result...")
-            let expr =
-                Value
-                    list
-                        list syntax-set-scope! eval-scope
-                        list let tmp '=
-                            cons inline-do
-                                expr as list
-                        #list __defer (list tmp)
-                            list _ (list get-scope) (list locals) tmp
-                        list handle-retargs counter
-                            list __this-scope
-                            list locals
-                            tmp
-            let f = (sc_compile (sc_eval expr-anchor (unbox-pointer expr list) eval-scope) 0:u64)
-            let fptr =
-                f as
-                    'pointer
-                        'raising
-                            function (Arguments Scope i32)
-                            Error
-            set-anchor! expr-anchor
-            fptr;
-        except (exc)
-            io-write!
-                format-error exc
-            io-write! "\n"
-            _ eval-scope 0
-    repeat "" "" (counter + count) eval-scope
+            # copy over values from local-scope
+            loop (key = unnamed)
+                let key value = ('next local-scope key)
+                if (key != unnamed)
+                    if (key != tmp)
+                        'set-symbol eval-scope key value
+                    repeat key
+            let count =
+                va-lfold 0
+                    inline (key value k)
+                        let idstr = (make-idstr (counter + k))
+                        'set-symbol eval-scope (Symbol idstr) (Value value)
+                        print idstr "="
+                            repr value
+                        k + 1
+                    vals...
+            return eval-scope count
+
+        let eval-scope count =
+            try
+                let expr = (list-parse cmdlist)
+                let expr-anchor = ('anchor expr)
+                set-anchor! expr-anchor
+                let tmp = (Symbol "#result...")
+                let expr =
+                    Value
+                        list
+                            list syntax-set-scope! eval-scope
+                            list let tmp '=
+                                cons inline-do
+                                    expr as list
+                            #list __defer (list tmp)
+                                list _ (list get-scope) (list locals) tmp
+                            list handle-retargs counter
+                                list __this-scope
+                                list locals
+                                tmp
+                let f = (sc_compile (sc_eval expr-anchor (unbox-pointer expr list) eval-scope) 0:u64)
+                let fptr =
+                    f as
+                        'pointer
+                            'raising
+                                function (Arguments Scope i32)
+                                Error
+                set-anchor! expr-anchor
+                fptr;
+            except (exc)
+                io-write!
+                    format-error exc
+                io-write! "\n"
+                _ eval-scope 0
+        repeat "" "" (counter + count) eval-scope
 
 #-------------------------------------------------------------------------------
 # main
@@ -4502,8 +4499,7 @@ fn run-main ()
     let parse-options = (alloca bool)
     store "" sourcepath
     store true parse-options
-    do
-        loop (i) = 1
+    loop (i = 1)
         if (i < argc)
             let k = (i + 1)
             let arg = (load (getelementptr argv i))

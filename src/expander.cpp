@@ -335,7 +335,7 @@ struct Expander {
         }
     }
 
-    // (loop ([x ...]) [= args ...] body ...)
+    // (loop ([x...] [= args...]) body...)
     SCOPES_RESULT(Value *) expand_loop(const List *it) {
         SCOPES_RESULT_TYPE(Value *);
 
@@ -346,17 +346,15 @@ struct Expander {
 
         const List *params = SCOPES_GET_RESULT(extract_list_constant(it->at));
         const List *values = nullptr;
-        {
-            auto nextit = it->next;
-            if (nextit != EOL) {
-                if (!is_equal_token(nextit->at)) {
-                    SCOPES_LOCATION_ERROR(String::from("equal sign (=) expected"));
-                }
-                values = nextit->next;
-            }
+        const List *body = it->next;
+        auto endit = params;
+        while (endit) {
+            if (is_equal_token(endit->at))
+                break;
+            endit = endit->next;
         }
-
-        auto loop = Loop::from(_anchor);
+        if (endit != EOL)
+            values = endit->next;
 
         Parameters syms;
         Values exprs;
@@ -370,18 +368,17 @@ struct Expander {
             it = subexp.next;
         }
 
+        Expander bodyexp(Scope::from(env), astscope);
+
         it = params;
         // read parameter names
-        while (it != EOL) {
-            syms.push_back(SCOPES_GET_RESULT(expand_parameter(it->at)));
+        while (it != endit) {
+            syms.push_back(SCOPES_GET_RESULT(bodyexp.expand_parameter(it->at)));
             it = it->next;
         }
 
-        loop->params = syms;
-        loop->args = exprs;
-
-        loop->value = SCOPES_GET_RESULT(expand_expression(_anchor, next));
-        return loop;
+        auto value = SCOPES_GET_RESULT(bodyexp.expand_expression(_anchor, body));
+        return Loop::from(_anchor, syms, exprs, value);
     }
 
     static Value *extract_argument(const Anchor *anchor, Value *node, int index, bool vararg = false) {
