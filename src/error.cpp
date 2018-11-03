@@ -164,6 +164,24 @@ SCOPES_RESULT(void) error_argument_type_mismatch(const Type *expected, const Typ
     SCOPES_LOCATION_ERROR(ss.str());
 }
 
+SCOPES_RESULT(void) error_value_moved(Value *value, Value *mover) {
+    SCOPES_RESULT_TYPE(void);
+    StyledString ss;
+    ss.out << "unique value has already been moved";
+    SCOPES_LOCATION_DEF_ERROR(mover, ss.str());
+}
+
+SCOPES_RESULT(void) error_value_already_in_use(Value *value, const ValueSet &viewers) {
+    SCOPES_RESULT_TYPE(void);
+    StyledString ss;
+    ss.out << "unique value can't be moved because it is still required";
+    auto err = make_location_error(ss.str());
+    for (auto user : viewers) {
+        err->append_definition(user);
+    }
+    return Result<_result_type>::raise(err);
+}
+
 SCOPES_RESULT(void) error_invalid_operands(const Type *A, const Type *B) {
     SCOPES_RESULT_TYPE(void);
     StyledString ss;

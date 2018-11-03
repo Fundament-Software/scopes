@@ -11,6 +11,7 @@
 #include "types.hpp"
 #include "stream_ast.hpp"
 #include "dyn_cast.inc"
+#include "qualifier.inc"
 
 #include <assert.h>
 
@@ -54,7 +55,7 @@ Keyed *Keyed::from(const Anchor *anchor, Symbol key, Value *node) {
 //------------------------------------------------------------------------------
 
 ArgumentList::ArgumentList(const Anchor *anchor, const Values &_values)
-    : Value(VK_ArgumentList, anchor), values(_values) {
+    : Instruction(VK_ArgumentList, anchor), values(_values) {
 }
 
 void ArgumentList::append(Value *node) {
@@ -96,6 +97,9 @@ Template::Template(const Anchor *anchor, Symbol _name, const Parameters &_params
     : Value(VK_Template, anchor),
         name(_name), params(_params), value(_value),
         _inline(false), docstring(nullptr) {
+    for (auto param : params) {
+        param->set_owner(this);
+    }
 }
 
 bool Template::is_forward_decl() const {
@@ -112,6 +116,7 @@ bool Template::is_inline() const {
 
 void Template::append_param(Parameter *sym) {
     params.push_back(sym);
+    sym->set_owner(this);
 }
 
 Template *Template::from(
@@ -127,14 +132,50 @@ Function::Function(const Anchor *anchor, Symbol _name, const Parameters &_params
         name(_name), params(_params), value(nullptr),
         docstring(nullptr), return_type(nullptr), except_type(nullptr),
         frame(nullptr), boundary(nullptr), original(nullptr), label(nullptr),
-        complete(false) {
+        complete(false), next_id(1) {
     set_type(TYPE_Unknown);
+    body.depth = 1;
+    for (auto param : params) {
+        param->set_owner(this);
+    }
+}
+
+uint32_t Function::new_id() {
+    return next_id++;
+}
+
+uint32_t Function::get_id(Value *value) {
+    auto result = value2id.find(value);
+    if (result == value2id.end()) {
+        auto id = new_id();
+        value2id.insert({value, id});
+        id2value.insert({id, value});
+        return id;
+    }
+    return result->second;
+}
+
+Value *Function::get_value(uint32_t id) {
+    auto result = id2value.find(id);
+    assert(result != id2value.end());
+    return result->second;
+}
+
+uint32_t Function::get_id(Symbol name) {
+    auto result = name2block.find(name);
+    if (result == name2block.end()) {
+        auto id = new_id();
+        name2block.insert({ name, id });
+        return id;
+    }
+    return result->second;
 }
 
 void Function::append_param(Parameter *sym) {
     // verify that the symbol is typed
     assert(sym->is_typed());
     params.push_back(sym);
+    sym->set_owner(this);
 }
 
 Value *Function::resolve_local(Value *node) const {
@@ -206,32 +247,28 @@ Extern *Extern::from(const Anchor *anchor, const Type *type, Symbol name, size_t
 
 //------------------------------------------------------------------------------
 
-/*
-Value *Block::canonicalize() {
-    strip_constants();
-    // can strip block if no side effects
-    if (body.empty())
-        return ArgumentList::from(anchor());
-    else if (body.size() == 1)
-        return body[0];
-    else
-        return this;
+Block::Block()
+    : depth(0), insert_index(0), terminator(nullptr), blockid(0), parent(nullptr)
+{}
+
+bool Block::is_scoped() const {
+    return blockid != 0;
 }
 
-void Block::strip_constants() {
-    int i = (int)body.size();
-    while (i > 0) {
-        i--;
-        auto arg = body[i];
-        if (arg->is_pure()) {
-            body.erase(body.begin() + i);
-        }
+void Block::set_scope(uint32_t _blockid, Block *_parent) {
+    assert(_blockid);
+    blockid = _blockid;
+    parent = _parent;
+    if (_parent) {
+        depth = _parent->depth + 1;
     }
 }
-*/
 
 void Block::clear() {
     body.clear();
+    terminator = nullptr;
+    blockid = 0;
+    parent = nullptr;
 }
 
 void Block::migrate_from(Block &source) {
@@ -239,23 +276,45 @@ void Block::migrate_from(Block &source) {
         arg->block = nullptr;
         append(arg);
     }
+    if (source.terminator) {
+        terminator = source.terminator;
+        terminator->block = this;
+    }
     source.clear();
 }
 
 bool Block::empty() const {
-    return body.empty();
+    return body.empty() && !terminator;
 }
 
-void Block::append(Value *node) {
+void Block::insert_at(int index) {
+    assert((index >= 0) && (index <= body.size()));
+    insert_index = index;
+}
+
+void Block::insert_at_end() {
+    insert_index = body.size();
+}
+
+bool Block::append(Value *node) {
     if (node->is_pure())
-        return;
+        return false;
     if (isa<Instruction>(node)) {
         auto instr = cast<Instruction>(node);
         if (instr->block)
-            return;
+            return false;
         instr->block = this;
-        body.push_back(instr);
+        if (!is_returning(instr->get_type())) {
+            assert(!terminator);
+            assert(insert_index == body.size());
+            terminator = instr;
+        } else {
+            body.insert(body.begin() + insert_index, instr);
+            insert_index++;
+        }
+        return true;
     }
+    return false;
 }
 
 //------------------------------------------------------------------------------
@@ -367,17 +426,25 @@ Try::Try(const Anchor *anchor, Value *_try_value, Parameter *_except_param, Valu
     : Instruction(VK_Try, anchor), try_value(_try_value),
         except_param(_except_param), except_value(_except_value),
         raise_type(nullptr)
-{}
+{
+    if (except_param)
+        except_param->set_owner(this);
+}
 
 Try *Try::from(const Anchor *anchor, Value *try_value, Parameter *except_param,
     Value *except_value) {
     return new Try(anchor, try_value, except_param, except_value);
 }
 
+void Try::set_except_param(Parameter *param) {
+    except_param = param;
+    except_param->set_owner(this);
+}
+
 //------------------------------------------------------------------------------
 
 Parameter::Parameter(const Anchor *anchor, Symbol _name, const Type *_type, bool _variadic)
-    : Value(VK_Parameter, anchor), name(_name), variadic(_variadic) {
+    : Value(VK_Parameter, anchor), name(_name), variadic(_variadic), owner(nullptr) {
     if (_type) set_type(_type);
 }
 
@@ -391,6 +458,11 @@ Parameter *Parameter::variadic_from(const Anchor *anchor, Symbol name, const Typ
 
 bool Parameter::is_variadic() const {
     return variadic;
+}
+
+void Parameter::set_owner(Value *_owner) {
+    assert(!owner);
+    owner = _owner;
 }
 
 //------------------------------------------------------------------------------
@@ -421,12 +493,21 @@ Call *Call::from(const Anchor *anchor, Value *callee, const Values &args) {
 
 //------------------------------------------------------------------------------
 
-Loop::Loop(const Anchor *anchor, const Parameters &_params, const Values &_args, Value *_value)
-    : Instruction(VK_Loop, anchor), params(_params), args(_args), value(_value), return_type(nullptr) {
+Loop::Loop(const Anchor *anchor, Parameter *_param, Value *_init, Value *_value)
+    : Instruction(VK_Loop, anchor), param(_param), init(_init), value(_value), return_type(nullptr) {
+    if (param) {
+        param->set_owner(this);
+    }
 }
 
-Loop *Loop::from(const Anchor *anchor, const Parameters &params, const Values &args, Value *value) {
-    return new Loop(anchor, params, args, value);
+Loop *Loop::from(const Anchor *anchor, Parameter *param, Value *init, Value *value) {
+    return new Loop(anchor, param, init, value);
+}
+
+void Loop::set_param(Parameter *_param) {
+    assert(!param);
+    param = _param;
+    param->set_owner(this);
 }
 
 //------------------------------------------------------------------------------
@@ -551,11 +632,11 @@ Break *Break::from(const Anchor *anchor, Value *value) {
 
 //------------------------------------------------------------------------------
 
-Repeat::Repeat(const Anchor *anchor, const Values &_args)
-    : Instruction(VK_Repeat, anchor), args(_args) {}
+Repeat::Repeat(const Anchor *anchor, Value *_value)
+    : Instruction(VK_Repeat, anchor), value(_value) {}
 
-Repeat *Repeat::from(const Anchor *anchor, const Values &args) {
-    return new Repeat(anchor, args);
+Repeat *Repeat::from(const Anchor *anchor, Value *value) {
+    return new Repeat(anchor, value);
 }
 
 //------------------------------------------------------------------------------

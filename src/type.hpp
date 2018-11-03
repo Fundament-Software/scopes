@@ -29,6 +29,14 @@ struct Value;
 //------------------------------------------------------------------------------
 
 #define B_TYPE_KIND() \
+    /* qualifiers */ \
+    T(TK_Keyed, "type-kind-keyed", KeyedType) \
+    T(TK_Move, "type-kind-move", MoveType) \
+    T(TK_View, "type-kind-view", ViewType) \
+    /* abstract types */ \
+    T(TK_Arguments, "type-kind-arguments", ArgumentsType) \
+    T(TK_Typename, "type-kind-typename", TypenameType) \
+    /* machine types */ \
     T(TK_Integer, "type-kind-integer", IntegerType) \
     T(TK_Real, "type-kind-real", RealType) \
     T(TK_Pointer, "type-kind-pointer", PointerType) \
@@ -36,10 +44,8 @@ struct Value;
     T(TK_Vector, "type-kind-vector", VectorType) \
     T(TK_Tuple, "type-kind-tuple", TupleType) \
     T(TK_Union, "type-kind-union", UnionType) \
-    T(TK_Keyed, "type-kind-keyed", KeyedType) \
-    T(TK_Arguments, "type-kind-arguments", ArgumentsType) \
-    T(TK_Typename, "type-kind-typename", TypenameType) \
     T(TK_Function, "type-kind-function", FunctionType) \
+    /* additional GPU machine types */ \
     T(TK_Image, "type-kind-image", ImageType) \
     T(TK_SampledImage, "type-kind-sampled-image", SampledImageType)
 
@@ -48,6 +54,8 @@ enum TypeKind {
     NAME,
     B_TYPE_KIND()
 #undef T
+    // abstract kinds
+    TK_Qualifier,
 };
 
 //------------------------------------------------------------------------------
@@ -84,6 +92,19 @@ protected:
 };
 
 typedef std::vector<const Type *> ArgTypes;
+
+//------------------------------------------------------------------------------
+
+struct Qualifier : Type {
+    static bool classof(const Type *T);
+
+    Qualifier(TypeKind kind, const Type *_type);
+
+    const Type *type;
+};
+
+bool is_qualifier(const Type *T);
+const Type *next_qualifier(const Type *T);
 
 //------------------------------------------------------------------------------
 
@@ -141,6 +162,8 @@ typedef std::vector<const Type *> ArgTypes;
     T(TYPE_Tuple, "tuple") \
     T(TYPE_Union, "union") \
     T(TYPE_Keyed, "Keyed") \
+    T(TYPE_Move, "Move") \
+    T(TYPE_View, "View") \
     T(TYPE_Typename, "typename") \
     T(TYPE_Arguments, "Arguments") \
     T(TYPE_Raises, "Raises") \
@@ -167,6 +190,8 @@ void stream_type_name(StyledStream &ss, const Type *T);
 bool is_returning(const Type *T);
 bool is_returning_value(const Type *T);
 SCOPES_RESULT(bool) types_compatible(const Type *paramT, const Type *argT);
+const Type *strip_qualifiers(const Type *T);
+bool is_tracked(const Type *T);
 
 //------------------------------------------------------------------------------
 // TYPE CHECK PREDICATES

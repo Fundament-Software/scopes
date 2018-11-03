@@ -19,6 +19,7 @@ namespace scopes {
 enum PointerTypeFlags {
     PTF_NonWritable = (1 << 1),
     PTF_NonReadable = (1 << 2),
+    PTF_Unique = (1 << 3),
 };
 
 struct PointerType : Type {
@@ -33,8 +34,8 @@ struct PointerType : Type {
     static size_t size();
 
     bool is_readable() const;
-
     bool is_writable() const;
+    bool is_unique() const;
 
     const Type *element_type;
     uint64_t flags;

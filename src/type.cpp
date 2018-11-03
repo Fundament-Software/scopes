@@ -109,6 +109,32 @@ B_TYPES()
 #undef T
 
 //------------------------------------------------------------------------------
+// QUALIFIER
+//------------------------------------------------------------------------------
+
+bool Qualifier::classof(const Type *T) {
+    switch (T->kind()) {
+    case TK_Keyed:
+    case TK_Move:
+    case TK_View:
+        return true;
+    default: return false;
+    }
+}
+
+Qualifier::Qualifier(TypeKind kind, const Type *_type)
+    : Type(kind), type(_type)
+{}
+
+bool is_qualifier(const Type *T) {
+    return isa<Qualifier>(T);
+}
+
+const Type *next_qualifier(const Type *T) {
+    return cast<Qualifier>(T)->type;
+}
+
+//------------------------------------------------------------------------------
 // TYPE INQUIRIES
 //------------------------------------------------------------------------------
 
@@ -124,8 +150,9 @@ B_TYPE_KIND()
 }
 
 bool is_opaque(const Type *T) {
+    if (isa<Qualifier>(T))
+        return is_opaque(cast<Qualifier>(T)->type);
     switch(T->kind()) {
-    case TK_Keyed: return is_opaque(cast<KeyedType>(T)->type);
     case TK_Typename: {
         const TypenameType *tt = cast<TypenameType>(T);
         if (!tt->finalized()) {
@@ -144,8 +171,9 @@ bool is_opaque(const Type *T) {
 
 SCOPES_RESULT(size_t) size_of(const Type *T) {
     SCOPES_RESULT_TYPE(size_t);
+    if (isa<Qualifier>(T))
+        return size_of(cast<Qualifier>(T)->type);
     switch(T->kind()) {
-    case TK_Keyed: return size_of(cast<KeyedType>(T)->type);
     case TK_Integer: {
         const IntegerType *it = cast<IntegerType>(T);
         return (it->width + 7) / 8;
@@ -171,8 +199,9 @@ SCOPES_RESULT(size_t) size_of(const Type *T) {
 
 SCOPES_RESULT(size_t) align_of(const Type *T) {
     SCOPES_RESULT_TYPE(size_t);
+    if (isa<Qualifier>(T))
+        return align_of(cast<Qualifier>(T)->type);
     switch(T->kind()) {
-    case TK_Keyed: return align_of(cast<KeyedType>(T)->type);
     case TK_Integer: {
         const IntegerType *it = cast<IntegerType>(T);
         return (it->width + 7) / 8;
@@ -204,6 +233,9 @@ SCOPES_RESULT(size_t) align_of(const Type *T) {
 
 const Type *superof(const Type *T) {
     switch(T->kind()) {
+    case TK_Qualifier: assert(false); break;
+    case TK_View: return TYPE_View;
+    case TK_Move: return TYPE_Move;
     case TK_Arguments: return TYPE_Arguments;
     case TK_Keyed: return TYPE_Keyed;
     case TK_Integer: return TYPE_Integer;
@@ -228,6 +260,16 @@ bool is_returning(const Type *T) {
 
 bool is_returning_value(const Type *T) {
     return is_returning(T) && (T != empty_arguments_type());
+}
+
+bool is_tracked(const Type *T) {
+    switch(T->kind()) {
+    case TK_Typename:
+        return cast<TypenameType>(T)->is_unique();
+    case TK_Pointer:
+        return cast<PointerType>(T)->is_unique();
+    default: return false;
+    }
 }
 
 SCOPES_RESULT(bool) types_compatible(const Type *paramT, const Type *argT) {
@@ -257,6 +299,13 @@ SCOPES_RESULT(bool) types_compatible(const Type *paramT, const Type *argT) {
             return true;
     }
     return false;
+}
+
+const Type *strip_qualifiers(const Type *T) {
+    while (isa<Qualifier>(T)) {
+        T = cast<Qualifier>(T)->type;
+    }
+    return T;
 }
 
 //------------------------------------------------------------------------------
@@ -353,6 +402,8 @@ void init_types() {
     DEFINE_TYPENAME("tuple", TYPE_Tuple);
     DEFINE_TYPENAME("union", TYPE_Union);
     DEFINE_TYPENAME("Keyed", TYPE_Keyed);
+    DEFINE_TYPENAME("Move", TYPE_Move);
+    DEFINE_TYPENAME("View", TYPE_View);
     DEFINE_TYPENAME("Arguments", TYPE_Arguments);
     DEFINE_TYPENAME("Raises", TYPE_Raises);
     DEFINE_TYPENAME("constant", TYPE_Constant);

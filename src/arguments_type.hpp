@@ -32,6 +32,9 @@ const Type *arguments_type(const ArgTypes &values);
 const Type *empty_arguments_type();
 
 bool is_arguments_type(const Type *T);
+int get_argument_count(const Type *T);
+const Type *get_argument(const Type *T, int index);
+
 
 } // namespace scopes
 

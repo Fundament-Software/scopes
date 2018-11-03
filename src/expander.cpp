@@ -356,29 +356,44 @@ struct Expander {
         if (endit != EOL)
             values = endit->next;
 
-        Parameters syms;
-        Values exprs;
-
         it = values;
-        // read init values
-        Expander subexp(env, astscope);
-        while (it) {
-            subexp.next = it->next;
-            exprs.push_back(SCOPES_GET_RESULT(subexp.expand(it->at)));
-            it = subexp.next;
+        ArgumentList *args = ArgumentList::from(_anchor);
+        if (it) {
+            Expander subexp(env, astscope, it->next);
+            SCOPES_CHECK_RESULT(subexp.expand_arguments(args->values, it));
         }
 
         Expander bodyexp(Scope::from(env), astscope);
+        Parameter *param = Parameter::from(_anchor, SYM_Unnamed, nullptr);
 
-        it = params;
-        // read parameter names
-        while (it != endit) {
-            syms.push_back(SCOPES_GET_RESULT(bodyexp.expand_parameter(it->at)));
-            it = it->next;
+        auto expr = Expression::from(_anchor);
+        {
+            int index = 0;
+            it = params;
+            // read parameter names
+            while (it != endit) {
+                auto paramval = it->at;
+                Symbol sym = SCOPES_GET_RESULT(extract_symbol_constant(paramval));
+                Value *node = nullptr;
+                if (!ends_with_parenthesis(sym)) {
+                    node = extract_argument(paramval->anchor(), param, index);
+                } else {
+                    if (it->next != endit) {
+                        SCOPES_ANCHOR(paramval->anchor());
+                        SCOPES_EXPECT_ERROR(error_variadic_symbol_not_in_last_place());
+                    }
+                    node = extract_argument(paramval->anchor(), param, index, true);
+                }
+                bodyexp.env->bind(sym, node);
+                expr->append(node);
+                it = it->next;
+                index++;
+            }
         }
 
         auto value = SCOPES_GET_RESULT(bodyexp.expand_expression(_anchor, body));
-        return Loop::from(_anchor, syms, exprs, value);
+        expr->append(value);
+        return Loop::from(_anchor, param, args, expr);
     }
 
     static Value *extract_argument(const Anchor *anchor, Value *node, int index, bool vararg = false) {
@@ -601,8 +616,6 @@ struct Expander {
                     Parameter* except_param = Parameter::from(it->at->anchor(), SYM_Unnamed);
                     Expander subexp(Scope::from(env), astscope);
 
-                    Block exprs;
-
                     it = params;
                     int index = 0;
                     // read parameter names
@@ -611,7 +624,6 @@ struct Expander {
                         Symbol sym = SCOPES_GET_RESULT(extract_symbol_constant(paramval));
                         if (!ends_with_parenthesis(sym)) {
                             auto indexed = extract_argument(paramval->anchor(), except_param, index);
-                            exprs.append(indexed);
                             subexp.env->bind(sym, indexed);
                         } else {
                             // not supported yet
@@ -626,7 +638,6 @@ struct Expander {
                     Value *except_value = SCOPES_GET_RESULT(subexp.expand_expression(_anchor, it));
 
                     auto _try = Try::from(_anchor, try_value, except_param, except_value);
-                    _try->except_body = exprs;
                     return _try;
                 }
             }
@@ -890,12 +901,12 @@ struct Expander {
         auto _anchor = get_active_anchor();
         SCOPES_CHECK_RESULT(verify_list_parameter_count("repeat", it, 0, -1));
         it = it->next;
-        auto rep = Repeat::from(_anchor);
+        ArgumentList *args = ArgumentList::from(_anchor);
         if (it) {
             Expander subexp(env, astscope, it->next);
-            SCOPES_CHECK_RESULT(subexp.expand_arguments(rep->args, it));
+            SCOPES_CHECK_RESULT(subexp.expand_arguments(args->values, it));
         }
-        return rep;
+        return Repeat::from(_anchor, args);
     }
 
     SCOPES_RESULT(Value *) expand_merge(const List *it) {

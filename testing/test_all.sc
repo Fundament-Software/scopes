@@ -65,6 +65,7 @@ test-modules
     .test_try
     .test_tuple_array
     .test_union
+    .test_unique
     .test_using
     .test_value
     .test_varargs

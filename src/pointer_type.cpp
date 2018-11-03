@@ -79,6 +79,10 @@ bool PointerType::is_writable() const {
     return !(flags & PTF_NonWritable);
 }
 
+bool PointerType::is_unique() const {
+    return flags & PTF_Unique;
+}
+
 //------------------------------------------------------------------------------
 
 const Type *pointer_type(const Type *element_type, uint64_t flags,

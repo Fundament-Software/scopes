@@ -224,12 +224,14 @@ struct LLVMIRGenerator {
         LLVMBasicBlockRef bb_loop;
         LLVMBasicBlockRef bb_break;
         LLVMValueRef break_value;
+        LLVMValueRef repeat_value;
 
         LoopInfo() :
             loop(nullptr),
             bb_loop(nullptr),
             bb_break(nullptr),
-            break_value(nullptr)
+            break_value(nullptr),
+            repeat_value(nullptr)
         {}
     };
 
@@ -576,7 +578,11 @@ struct LLVMIRGenerator {
 
     static SCOPES_RESULT(LLVMTypeRef) create_llvm_type(const Type *type) {
         SCOPES_RESULT_TYPE(LLVMTypeRef);
+        if (isa<Qualifier>(type)) {
+            return _type_to_llvm_type(cast<Qualifier>(type)->type);
+        }
         switch(type->kind()) {
+        case TK_Qualifier: assert(false); break;
         case TK_Integer:
             return LLVMIntType(cast<IntegerType>(type)->width);
         case TK_Real:
@@ -614,10 +620,6 @@ struct LLVMIRGenerator {
         case TK_Union: {
             auto ui = cast<UnionType>(type);
             return _type_to_llvm_type(ui->tuple_type);
-        } break;
-        case TK_Keyed: {
-            auto kt = cast<KeyedType>(type);
-            return _type_to_llvm_type(kt->type);
         } break;
         case TK_Typename: {
             if (type == TYPE_Sampler) {
@@ -680,6 +682,7 @@ struct LLVMIRGenerator {
             SCOPES_LOCATION_ERROR(String::from(
                 "image type can not be used for native target"));
         } break;
+        default: break;
         };
 
         StyledString ss;
@@ -962,6 +965,9 @@ struct LLVMIRGenerator {
         for (auto entry : node.body) {
             SCOPES_CHECK_RESULT(node_to_value(entry));
         }
+        if (node.terminator) {
+            SCOPES_CHECK_RESULT(node_to_value(node.terminator));
+        }
         return {};
     }
 
@@ -1012,20 +1018,12 @@ struct LLVMIRGenerator {
 
     SCOPES_RESULT(LLVMValueRef) Repeat_to_value(Repeat *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
-        assert(loop_info.loop);
-        int count = (int)loop_info.loop->params.size();
-        assert(node->args.size() == count);
-        LLVMValueRef vals[count];
-        for (int i = 0; i < count; ++i) {
-            vals[i] = SCOPES_GET_RESULT(node_to_value(node->args[i]));
-        }
+        auto result = SCOPES_GET_RESULT(node_to_value(node->value));
+        assert(loop_info.repeat_value);
         LLVMBasicBlockRef bb = LLVMGetInsertBlock(builder);
-        for (int i = 0; i < count; ++i) {
-            LLVMBasicBlockRef incobbs[] = { bb };
-            LLVMValueRef incovals[] = { vals[i] };
-            auto val = SCOPES_GET_RESULT(node_to_value(loop_info.loop->params[i]));
-            LLVMAddIncoming(val, incovals, incobbs, 1);
-        }
+        LLVMBasicBlockRef incobbs[] = { bb };
+        LLVMValueRef incovals[] = { result };
+        LLVMAddIncoming(loop_info.repeat_value, incovals, incobbs, 1);
         return LLVMBuildBr(builder, loop_info.bb_loop);
     }
 
@@ -1072,12 +1070,7 @@ struct LLVMIRGenerator {
     SCOPES_RESULT(LLVMValueRef) Loop_to_value(Loop *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         //auto rtype = node->get_type();
-        int count = (int)node->params.size();
-        assert(node->params.size() == node->args.size());
-        LLVMValueRef initvals[count];
-        for (int i = 0; i < count; ++i) {
-            initvals[i] = SCOPES_GET_RESULT(node_to_value(node->args[i]));
-        }
+        LLVMValueRef init = SCOPES_GET_RESULT(node_to_value(node->init));
         auto old_loop_info = loop_info;
         loop_info.loop = node;
         LLVMBasicBlockRef bb = LLVMGetInsertBlock(builder);
@@ -1085,13 +1078,11 @@ struct LLVMIRGenerator {
         loop_info.bb_loop = LLVMAppendBasicBlock(func, "loop");
         LLVMBuildBr(builder, loop_info.bb_loop);
         LLVMPositionBuilderAtEnd(builder, loop_info.bb_loop);
-        for (int i = 0; i < count; ++i) {
-            auto val = LLVMBuildPhi(builder, LLVMTypeOf(initvals[i]), "");
-            bind(node->params[i], val);
-            LLVMBasicBlockRef incobbs[] = { bb };
-            LLVMValueRef incovals[] = { initvals[i] };
-            LLVMAddIncoming(val, incovals, incobbs, 1);
-        }
+        loop_info.repeat_value = LLVMBuildPhi(builder, LLVMTypeOf(init), "");
+        bind(node->param, loop_info.repeat_value);
+        LLVMBasicBlockRef incobbs[] = { bb };
+        LLVMValueRef incovals[] = { init };
+        LLVMAddIncoming(loop_info.repeat_value, incovals, incobbs, 1);
         loop_info.break_value = nullptr;
         loop_info.bb_break = nullptr;
         auto rtype = node->get_type();
@@ -1288,6 +1279,10 @@ struct LLVMIRGenerator {
                 READ_VALUE(v2);
                 READ_VALUE(mask);
                 return LLVMBuildShuffleVector(builder, v1, v2, mask, "");
+            } break;
+            case FN_Move: {
+                READ_VALUE(val);
+                return val;
             } break;
             case FN_Undef: { READ_TYPE(ty);
                 return LLVMGetUndef(ty); } break;

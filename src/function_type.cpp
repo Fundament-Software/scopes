@@ -52,6 +52,18 @@ FunctionType::FunctionType(const Type *_except_type,
     assert(return_type);
 }
 
+const FunctionType *FunctionType::strip_qualifiers() const {
+    ArgTypes args;
+    for (auto arg : argument_types) {
+        args.push_back(scopes::strip_qualifiers(arg));
+    }
+    return cast<FunctionType>(raising_function_type(
+        scopes::strip_qualifiers(except_type),
+        scopes::strip_qualifiers(return_type),
+        args,
+        flags));
+}
+
 bool FunctionType::has_exception() const {
     return except_type != TYPE_NoReturn;
 }

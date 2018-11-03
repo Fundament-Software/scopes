@@ -18,3 +18,4 @@
 #include "image_type.hpp"
 #include "sampledimage_type.hpp"
 #include "keyed_type.hpp"
+#include "unique_type.hpp"

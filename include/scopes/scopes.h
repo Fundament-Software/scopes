@@ -150,6 +150,7 @@ const sc_string_t *sc_value_repr (sc_value_t *value);
 const sc_string_t *sc_value_ast_repr (sc_value_t *value);
 const sc_string_t *sc_value_tostring (sc_value_t *value);
 const sc_type_t *sc_value_type (sc_value_t *value);
+const sc_type_t *sc_value_qualified_type (sc_value_t *value);
 const sc_anchor_t *sc_value_anchor (sc_value_t *value);
 bool sc_value_is_constant (sc_value_t *value);
 bool sc_value_is_pure (sc_value_t *value);
@@ -207,9 +208,7 @@ void sc_call_append_argument(sc_value_t *call, sc_value_t *value);
 bool sc_call_is_rawcall(sc_value_t *value);
 void sc_call_set_rawcall(sc_value_t *value, bool enable);
 
-sc_value_t *sc_loop_new();
-void sc_loop_append_parameter(sc_value_t *loop, sc_value_t *symbol);
-void sc_loop_append_argument(sc_value_t *loop, sc_value_t *value);
+sc_value_t *sc_loop_new(sc_value_t *param, sc_value_t *init);
 void sc_loop_set_body(sc_value_t *loop, sc_value_t *body);
 
 sc_value_t *sc_const_int_new(const sc_type_t *type, uint64_t value);
@@ -222,8 +221,7 @@ sc_value_t *sc_const_extract_at(const sc_value_t *value, int index);
 const void *sc_const_pointer_extract(const sc_value_t *value);
 
 sc_value_t *sc_break_new(sc_value_t *value);
-sc_value_t *sc_repeat_new();
-void sc_repeat_append_argument(sc_value_t *rep, sc_value_t *value);
+sc_value_t *sc_repeat_new(sc_value_t *value);
 sc_value_t *sc_return_new(sc_value_t *value);
 sc_value_t *sc_raise_new(sc_value_t *value);
 
@@ -383,6 +381,8 @@ const sc_type_t *sc_typename_type(const sc_string_t *str);
 sc_void_raises_t sc_typename_type_set_super(const sc_type_t *T, const sc_type_t *ST);
 const sc_type_t *sc_typename_type_get_super(const sc_type_t *T);
 sc_void_raises_t sc_typename_type_set_storage(const sc_type_t *T, const sc_type_t *T2);
+void sc_typename_type_set_unique(const sc_type_t *T);
+bool sc_typename_type_is_unique(const sc_type_t *T);
 
 // array types
 
@@ -402,6 +402,11 @@ const sc_type_t *sc_arguments_type(int numtypes, const sc_type_t **types);
 const sc_type_t *sc_arguments_type_join(const sc_type_t *T1, const sc_type_t *T2);
 int sc_arguments_type_argcount(sc_type_t *T);
 const sc_type_t *sc_arguments_type_getarg(sc_type_t *T, int index);
+
+// unique types
+
+const sc_type_t *sc_move_type(const sc_type_t *type);
+const sc_type_t *sc_view_type(const sc_type_t *type, int id);
 
 // function types
 

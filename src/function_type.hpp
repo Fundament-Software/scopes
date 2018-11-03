@@ -35,6 +35,8 @@ struct FunctionType : Type {
     bool has_exception() const;
     bool returns_value() const;
 
+    const FunctionType *strip_qualifiers() const;
+
     SCOPES_RESULT(const Type *) type_at_index(size_t i) const;
 
     const Type *except_type;

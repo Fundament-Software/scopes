@@ -265,7 +265,7 @@ let va-lfold va-lifold =
                 if (icmp<s i argcount)
                     let arg =
                         sc_getarg args i
-                    let k = (sc_type_key (sc_value_type arg))
+                    let k = (sc_type_key (sc_value_qualified_type arg))
                     let v = (sc_keyed_new unnamed arg)
                     repeat (add i 1)
                         if use-indices
@@ -293,7 +293,7 @@ let va-rfold va-rifold =
                     let i = (sub i 1)
                     let arg =
                         sc_getarg args i
-                    let k = (sc_type_key (sc_value_type arg))
+                    let k = (sc_type_key (sc_value_qualified_type arg))
                     let v = (sc_keyed_new unnamed arg)
                     repeat i
                         if use-indices
@@ -396,7 +396,7 @@ inline gen-key-any-set (selftype fset)
                     _ key value
                 else
                     let arg = (sc_getarg args 1)
-                    let key = (sc_type_key (sc_value_type arg))
+                    let key = (sc_type_key (sc_value_qualified_type arg))
                     let arg = (sc_keyed_new unnamed arg)
                     _ (box-symbol key) arg
             if (sc_value_is_constant self)
@@ -418,9 +418,12 @@ sc_type_set_symbol type 'pointer
             let argcount = (sc_argcount args)
             verify-count argcount 1 1
             let self = (sc_getarg args 0)
-            let T = (unbox-pointer self type)
-            box-pointer
-                sc_pointer_type T pointer-flag-non-writable unnamed
+            if (sc_value_is_constant self)
+                let T = (unbox-pointer self type)
+                box-pointer
+                    sc_pointer_type T pointer-flag-non-writable unnamed
+            else
+                `(sc_pointer_type self pointer-flag-non-writable unnamed)
 
 # tuple type constructor
 sc_type_set_symbol tuple '__typecall
@@ -476,17 +479,40 @@ sc_type_set_symbol function '__typecall
         fn "function" (args)
             let argcount = (sc_argcount args)
             verify-count argcount 2 -1
-            let rtype = (sc_getarg args 1)
-            let rtype = (unbox-pointer rtype type)
             let pcount = (sub argcount 2)
-            let types = (alloca-array type pcount)
-            loop (i = 2)
-                if (icmp<s i argcount)
-                    let arg = (sc_getarg args i)
-                    let T = (unbox-pointer arg type)
-                    store T (getelementptr types (sub i 2))
-                    repeat (add i 1)
-                box-pointer (sc_function_type rtype pcount types)
+            let constant? =
+                loop (i = 1)
+                    if (icmp<s i argcount)
+                        let arg = (sc_getarg args i)
+                        if (sc_value_is_constant arg)
+                            repeat (add i 1)
+                        else
+                            break false
+                    break true
+            let rtype = (sc_getarg args 1)
+            if constant?
+                let rtype = (unbox-pointer rtype type)
+                let types = (alloca-array type pcount)
+                loop (i = 2)
+                    if (icmp<s i argcount)
+                        let arg = (sc_getarg args i)
+                        let T = (unbox-pointer arg type)
+                        store T (getelementptr types (sub i 2))
+                        repeat (add i 1)
+                    box-pointer (sc_function_type rtype pcount types)
+            else
+                ast-quote
+                    let types = (alloca-array type pcount)
+                    ast-unquote
+                        let expr = (sc_expression_new)
+                        loop (i = 2)
+                            if (icmp<s i argcount)
+                                let arg = (sc_getarg args i)
+                                sc_expression_append expr
+                                    `(store arg (getelementptr types [(sub i 2)]))
+                                repeat (add i 1)
+                        expr
+                    sc_function_type rtype pcount types
 
 sc_type_set_symbol type 'raising
     box-ast-macro
@@ -651,13 +677,14 @@ inline set-symbols (self values...)
         inline (self)
             sc_write (sc_value_ast_repr self)
     typeof = sc_value_type
+    qualified-typeof = sc_value_qualified_type
     anchor = sc_value_anchor
     argcount = sc_argcount
     getarg = sc_getarg
     getarglist = sc_getarglist
     dekey =
         fn "dekey" (self)
-            let k = (sc_type_key ('typeof self))
+            let k = (sc_type_key ('qualified-typeof self))
             _ k (sc_keyed_new unnamed self)
 
 'set-symbols Scope
@@ -693,6 +720,8 @@ inline set-symbols (self values...)
     super = sc_typename_type_get_super
     set-super = sc_typename_type_set_super
     set-storage = sc_typename_type_set_storage
+    set-unique = sc_typename_type_set_unique
+    unique? = sc_typename_type_is_unique
     return-type = sc_function_type_return_type
     key = sc_type_key
     variadic? = sc_function_type_is_variadic
@@ -1499,7 +1528,7 @@ let print =
                 inline ()
                     sc_write (repr value)
 
-        fn print (values...)
+        inline print (values...)
             va-lifold none print-element values...
             sc_write "\n"
             values...
@@ -1914,7 +1943,7 @@ fn va-option-branch (args)
     loop (i = 2)
         if (< i argc)
             let arg = ('getarg args i)
-            let argkey = ('key ('typeof arg))
+            let argkey = ('key ('qualified-typeof arg))
             if (== key argkey)
                 return
                     sc_keyed_new unnamed arg
@@ -1963,7 +1992,7 @@ fn clone-scope-contents (a b)
                         loop (i = 2)
                             if (< i argc)
                                 let arg = ('getarg args i)
-                                let k v = (sc_type_key (sc_value_type arg))
+                                let k v = (sc_type_key (sc_value_qualified_type arg))
                                 if (== k 'super)
                                     sc_typename_type_set_super T (as v type)
                                 elseif (== k 'storage)

@@ -9,6 +9,7 @@
 
 #include "result.hpp"
 #include "builtin.hpp"
+#include "value.hpp"
 #include "scopes/config.h"
 
 #include <vector>
@@ -21,7 +22,6 @@ struct Type;
 struct String;
 struct Anchor;
 struct StyledStream;
-struct Value;
 
 void _set_active_anchor(const Anchor *anchor);
 const Anchor *get_active_anchor();
@@ -102,6 +102,10 @@ SCOPES_RESULT(void) error_illegal_break_outside_loop();
 SCOPES_RESULT(void) error_variadic_symbol_not_in_last_place();
 SCOPES_RESULT(void) error_untyped_recursive_call(Function *func);
 SCOPES_RESULT(void) error_value_inaccessible_from_closure(Value *value, const Function *frame);
+
+// borrow checker errors
+SCOPES_RESULT(void) error_value_moved(Value *value, Value *mover);
+SCOPES_RESULT(void) error_value_already_in_use(Value *value, const ValueSet &viewers);
 
 // code generator errors
 SCOPES_RESULT(void) error_gen_invalid_call_type(const char *target, Value *callee);

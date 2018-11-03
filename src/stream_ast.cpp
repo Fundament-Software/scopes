@@ -103,21 +103,30 @@ struct StreamAST : StreamAnchors {
     }
 
     void stream_block(const Block &block, int depth, int maxdepth) {
-        if (block.empty())
+        if (!block.empty())
             return;
         stream_newline();
         stream_indent(depth);
         ss << Style_Keyword << "body" << Style_None;
+        ss << " " << block.depth;
         for (int i = 0; i < block.body.size(); ++i) {
             walk_newline(block.body[i], depth+1, maxdepth);
         }
+        if (block.terminator)
+            walk_newline(block.terminator, depth+1, maxdepth);
     }
 
     void stream_block_result(const Block &block, const Value *value, int depth, int maxdepth) {
         if (!block.empty()) {
+            stream_newline();
+            stream_indent(depth);
+            ss << Style_Keyword << "body" << Style_None;
+            ss << " " << block.depth;
             for (int i = 0; i < block.body.size(); ++i) {
                 walk_newline(block.body[i], depth, maxdepth);
             }
+            if (block.terminator)
+                walk_newline(block.terminator, depth, maxdepth);
         }
         stream_newline();
         stream_indent(depth);
@@ -394,13 +403,9 @@ struct StreamAST : StreamAnchors {
             auto val = cast<Loop>(node);
             ss << Style_Keyword << "Loop" << Style_None;
             if (newlines) {
-                for (int i = 0; i < val->params.size(); ++i) {
-                    walk_same_or_newline(val->params[i], depth+1, maxdepth);
-                }
+                walk_same_or_newline(val->param, depth+1, maxdepth);
                 ss << " " << Style_Operator << "=" << Style_None;
-                for (int i = 0; i < val->args.size(); ++i) {
-                    walk_same_or_newline(val->args[i], depth+1, maxdepth);
-                }
+                walk_same_or_newline(val->init, depth+1, maxdepth);
                 stream_block_result(val->body, val->value, depth+1, maxdepth);
             }
         } break;
@@ -497,7 +502,7 @@ struct StreamAST : StreamAnchors {
             auto val = cast<Repeat>(node);
             ss << Style_Keyword << "Repeat" << Style_None;
             if (newlines) {
-                write_arguments(val->args, depth, maxdepth);
+                walk_same_or_newline(val->value, depth+1, maxdepth);
             }
         } break;
         case VK_Return: {

@@ -109,16 +109,11 @@ struct Quoter {
     SCOPES_RESULT(Value *) quote_Loop(int level, Loop *node) {
         SCOPES_RESULT_TYPE(Value *);
         auto _anchor = node->anchor();
-        auto value = Call::from(_anchor, g_sc_loop_new, {});
+        auto value = Call::from(_anchor, g_sc_loop_new, {
+            SCOPES_GET_RESULT(quote_param(node->param)),
+            SCOPES_GET_RESULT(quote(level, node->init))
+        });
         auto expr = Expression::unscoped_from(_anchor);
-        for (auto &&param : node->params) {
-            expr->append(Call::from(_anchor, g_sc_loop_append_parameter,
-                { value, SCOPES_GET_RESULT(quote_param(param)) }));
-        }
-        for (auto &&arg : node->args) {
-            expr->append(Call::from(_anchor, g_sc_loop_append_argument,
-                { value, SCOPES_GET_RESULT(quote(level, arg)) }));
-        }
         expr->append(Call::from(_anchor, g_sc_loop_set_body, { value,
             SCOPES_GET_RESULT(quote(level, node->value)) }));
         expr->append(value);
@@ -148,15 +143,9 @@ struct Quoter {
     SCOPES_RESULT(Value *) quote_Repeat(int level, Repeat *node) {
         SCOPES_RESULT_TYPE(Value *);
         auto _anchor = node->anchor();
-        auto value = Call::from(_anchor, g_sc_repeat_new, {});
-        auto expr = Expression::unscoped_from(_anchor);
-        int count = (int)node->args.size();
-        for (int i = 0; i < count; ++i) {
-            expr->append(Call::from(_anchor, g_sc_repeat_append_argument,
-                { value, SCOPES_GET_RESULT(quote(level, node->args[i])) }));
-        }
-        expr->append(value);
-        return canonicalize(expr);
+        return Call::from(_anchor, g_sc_repeat_new, {
+            SCOPES_GET_RESULT(quote(level, node->value))
+        });
     }
 
     SCOPES_RESULT(Value *) quote_Return(int level, Return *node) {

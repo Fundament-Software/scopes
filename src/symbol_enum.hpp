@@ -21,6 +21,7 @@ namespace scopes {
     T(FN_AllocaArray) T(FN_MallocArray) T(FN_ReturnLabelType) T(KW_DoIn) T(FN_AllocaExceptionPad) \
     T(FN_StaticAlloc) T(KW_Try) T(KW_Return) T(KW_Loop) T(KW_Repeat) T(KW_Break) \
     T(KW_ASTQuote) T(KW_ASTUnquote) T(KW_ASTUnquoteArguments) T(KW_Merge) \
+    T(FN_Move) T(FN_Destroy) \
     T(FN_AnyExtract) T(FN_AnyWrap) T(FN_Free) T(KW_Defer) T(FN_DumpAST) \
     T(OP_ICmpEQ) T(OP_ICmpNE) T(FN_Sample) T(FN_ImageRead) T(FN_ImageWrite) \
     T(FN_ImageQuerySize) T(FN_ImageQueryLod) T(FN_ImageQueryLevels) T(FN_ImageQuerySamples) \
@@ -265,8 +266,8 @@ namespace scopes {
     T(KW_LoopFor, "loop-for") T(KW_None, "none") T(KW_Null, "null") \
     T(KW_SyntaxQuote, "syntax-quote") T(KW_ASTQuote, "ast-quote") T(KW_ASTUnquote, "ast-unquote") \
     T(KW_ASTUnquoteArguments, "ast-unquote-arguments") \
-    T(KW_Inline, "inline") T(KW_Recur, "recur") T(KW_Merge, "merge") \
-    T(KW_Return, "return") T(KW_Splice, "splice") \
+    T(KW_Inline, "inline") T(KW_Recur, "recur") T(KW_Merge, "merge") T(FN_Move, "move") \
+    T(KW_Return, "return") T(KW_Splice, "splice") T(FN_Destroy, "destroy") \
     T(KW_CompileStage, "compile-stage") T(KW_True, "true") T(KW_Try, "try") \
     T(KW_Unquote, "unquote") T(KW_UnquoteSplice, "unquote-splice") T(KW_ListEmpty, "eol") \
     T(KW_With, "with") T(KW_XFn, "xfn") T(KW_XLet, "xlet") T(KW_Yield, "yield") \
@@ -543,6 +544,7 @@ namespace scopes {
     T(SYM_SyntaxScope, "syntax-scope") \
     T(SYM_CallHandler, "__call") \
     T(SYM_ReturnHandler, "__return") \
+    T(SYM_DropHandler, "__drop") \
     \
     /* varargs */ \
     T(SYM_Parenthesis, "...") \

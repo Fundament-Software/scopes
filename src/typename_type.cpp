@@ -7,6 +7,7 @@
 #include "typename_type.hpp"
 #include "error.hpp"
 #include "tuple_type.hpp"
+#include "pointer_type.hpp"
 #include "arguments_type.hpp"
 #include "dyn_cast.inc"
 
@@ -25,7 +26,8 @@ void TypenameType::stream_name(StyledStream &ss) const {
 }
 
 TypenameType::TypenameType(const String *name)
-    : Type(TK_Typename), storage_type(nullptr), super_type(nullptr) {
+    : Type(TK_Typename), storage_type(nullptr), super_type(nullptr),
+        _name(nullptr), unique(false) {
     auto newname = Symbol(name);
     size_t idx = 2;
     while (used_names.count(newname)) {
@@ -36,6 +38,12 @@ TypenameType::TypenameType(const String *name)
     }
     used_names.insert(newname);
     _name = newname.name();
+}
+
+bool TypenameType::is_unique() const { return unique; }
+void TypenameType::set_unique() {
+    assert(!finalized());
+    unique = true;
 }
 
 SCOPES_RESULT(void) TypenameType::finalize(const Type *_type) {
@@ -49,6 +57,9 @@ SCOPES_RESULT(void) TypenameType::finalize(const Type *_type) {
         StyledString ss;
         ss.out << "cannot use typename " << _type << " as storage type";
         SCOPES_LOCATION_ERROR(ss.str());
+    }
+    if (isa<PointerType>(_type) && cast<PointerType>(_type)->is_unique()) {
+        set_unique();
     }
     storage_type = _type;
     return {};
@@ -72,6 +83,7 @@ const Type *typename_type(const String *name) {
 
 SCOPES_RESULT(const Type *) storage_type(const Type *T) {
     SCOPES_RESULT_TYPE(const Type *);
+    T = strip_qualifiers(T);
     switch(T->kind()) {
     case TK_Arguments: {
         return cast<ArgumentsType>(T)->to_tuple_type();

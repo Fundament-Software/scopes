@@ -17,14 +17,13 @@ namespace scopes {
 // KEYED TYPE
 //------------------------------------------------------------------------------
 
-struct KeyedType : Type {
+struct KeyedType : Qualifier {
     static bool classof(const Type *T);
 
     KeyedType(Symbol key, const Type *type);
     void stream_name(StyledStream &ss) const;
 
     Symbol key;
-    const Type *type;
 };
 
 //------------------------------------------------------------------------------

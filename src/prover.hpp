@@ -39,13 +39,17 @@ struct ASTContext {
     ASTContext for_try(Try *_try) const;
 
     ASTContext with_block(Block &_block) const;
-
     ASTContext with_frame(Function *frame) const;
 
     ASTContext();
 
     ASTContext(Function *_function, Function *_frame, EvalTarget _target,
         Loop *_loop, Try *xtry, Block *_block);
+
+    static ASTContext from_function(Function *fn);
+
+    void append(Value *value) const;
+    void merge_block(Block &_block) const;
 
     Function *function;
     Function *frame;

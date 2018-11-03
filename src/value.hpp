@@ -13,6 +13,7 @@
 
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace scopes {
 
@@ -72,6 +73,8 @@ struct Const;
 
 typedef std::vector<Parameter *> Parameters;
 typedef std::vector<Value *> Values;
+typedef std::unordered_set<Value *> ValueSet;
+typedef std::vector<ValueSet> ValueSetArray;
 typedef std::vector<Instruction *> Instructions;
 typedef std::vector<Const *> Constants;
 typedef std::vector<Block *> Blocks;
@@ -106,12 +109,23 @@ protected:
 //------------------------------------------------------------------------------
 
 struct Block {
-    void append(Value *node);
+    Block();
+    bool append(Value *node);
     bool empty() const;
     void migrate_from(Block &source);
     void clear();
+    bool is_scoped() const;
+    void set_scope(uint32_t blockid, Block *parent);
 
+    void insert_at(int index);
+    void insert_at_end();
+
+    int depth;
+    int insert_index;
     Instructions body;
+    Instruction *terminator;
+    uint32_t blockid;
+    Block *parent;
 };
 
 //------------------------------------------------------------------------------
@@ -140,7 +154,7 @@ struct Keyed : Value {
 
 //------------------------------------------------------------------------------
 
-struct ArgumentList : Value {
+struct ArgumentList : Instruction {
     static bool classof(const Value *T);
 
     ArgumentList(const Anchor *anchor, const Values &values);
@@ -293,6 +307,8 @@ struct Try : Instruction {
         Parameter *except_param = nullptr,
         Value *except_body = nullptr);
 
+    void set_except_param(Parameter *param);
+
     Block try_body;
     Value *try_value;
     Parameter *except_param;
@@ -311,9 +327,29 @@ struct Parameter : Value {
     static Parameter *variadic_from(const Anchor *anchor, Symbol name = SYM_Unnamed, const Type *type = nullptr);
 
     bool is_variadic() const;
+    void set_owner(Value *_owner);
 
     Symbol name;
     bool variadic;
+    Value *owner;
+};
+
+//------------------------------------------------------------------------------
+
+struct Label : Instruction {
+    static bool classof(const Value *T);
+
+    Label(const Anchor *anchor, Symbol name, Value *value);
+
+    static Label *from(const Anchor *anchor,
+        Symbol name = SYM_Unnamed,
+        Value *value = nullptr);
+
+    Symbol name;
+    Block body;
+    Value *value;
+    const Type *return_type;
+    std::vector<Merge *> merges;
 };
 
 //------------------------------------------------------------------------------
@@ -343,32 +379,19 @@ struct Call : Instruction {
 struct Loop : Instruction {
     static bool classof(const Value *T);
 
-    Loop(const Anchor *anchor, const Parameters &params, const Values &args, Value *value);
+    Loop(const Anchor *anchor, Parameter *param, Value *init, Value *value);
 
-    static Loop *from(const Anchor *anchor, const Parameters &params = {}, const Values &args = {}, Value *value = nullptr);
+    static Loop *from(const Anchor *anchor, Parameter *param = nullptr, Value *init = nullptr, Value *value = nullptr);
 
-    Parameters params;
-    Values args;
+    void set_param(Parameter *param);
+
+    Parameter *param;
+    Value *init;
     Block body;
     Value *value;
     const Type *return_type;
-};
-
-//------------------------------------------------------------------------------
-
-struct Label : Instruction {
-    static bool classof(const Value *T);
-
-    Label(const Anchor *anchor, Symbol name, Value *value);
-
-    static Label *from(const Anchor *anchor,
-        Symbol name = SYM_Unnamed,
-        Value *value = nullptr);
-
-    Symbol name;
-    Block body;
-    Value *value;
-    const Type *return_type;
+    std::vector<Repeat *> repeats;
+    std::vector<Break *> breaks;
 };
 
 //------------------------------------------------------------------------------
@@ -391,6 +414,10 @@ struct Function : Pure {
         const Parameters &params);
 
     void append_param(Parameter *sym);
+    uint32_t new_id();
+    uint32_t get_id(Symbol name);
+    uint32_t get_id(Value *value);
+    Value *get_value(uint32_t id);
 
     Symbol name;
     Parameters params;
@@ -404,6 +431,12 @@ struct Function : Pure {
     Template *original;
     Label *label;
     bool complete;
+    uint32_t next_id;
+    // map external block names to internal ones
+    std::unordered_map<Symbol, uint32_t, Symbol::Hash> name2block;
+    // resolve value to id and id to value
+    std::unordered_map<Value *, uint32_t> value2id;
+    std::unordered_map<uint32_t, Value *> id2value;
 
     ArgTypes instance_args;
     void bind(Value *oldnode, Value *newnode);
@@ -411,6 +444,7 @@ struct Function : Pure {
     Value *resolve_local(Value *node) const;
     SCOPES_RESULT(Value *) resolve(Value *node, Function *boundary) const;
     std::unordered_map<Value *, Value *> map;
+    std::vector<Return *> returns;
 };
 
 //------------------------------------------------------------------------------
@@ -520,11 +554,11 @@ struct Break : Instruction {
 struct Repeat : Instruction {
     static bool classof(const Value *T);
 
-    Repeat(const Anchor *anchor, const Values &args);
+    Repeat(const Anchor *anchor, Value *value);
 
-    static Repeat *from(const Anchor *anchor, const Values &args = {});
+    static Repeat *from(const Anchor *anchor, Value *value);
 
-    Values args;
+    Value *value;
 };
 
 //------------------------------------------------------------------------------

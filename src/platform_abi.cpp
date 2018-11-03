@@ -270,6 +270,7 @@ static size_t classify(const Type *T, ABIClass *classes, size_t offset) {
 #endif // SCOPES_WIN32
 
 size_t abi_classify(const Type *T, ABIClass *classes) {
+    T = strip_qualifiers(T);
 #ifdef SCOPES_WIN32
     if (T->kind() == TK_ReturnLabel) {
         T = cast<ReturnLabelType>(T)->ll_return_type;

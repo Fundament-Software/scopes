@@ -773,6 +773,13 @@ const sc_type_t *sc_value_type (sc_value_t *value) {
     using namespace scopes;
     if (!value->is_typed())
         return TYPE_Unknown;
+    return strip_qualifiers(value->get_type());
+}
+
+const sc_type_t *sc_value_qualified_type (sc_value_t *value) {
+    using namespace scopes;
+    if (!value->is_typed())
+        return TYPE_Unknown;
     return value->get_type();
 }
 
@@ -1030,19 +1037,9 @@ void sc_call_set_rawcall(sc_value_t *value, bool enable) {
     cast<Call>(value)->set_rawcall();
 }
 
-sc_value_t *sc_loop_new() {
+sc_value_t *sc_loop_new(sc_value_t *param, sc_value_t *init) {
     using namespace scopes;
-    return Loop::from(get_active_anchor());
-}
-
-void sc_loop_append_parameter(sc_value_t *loop, sc_value_t *symbol) {
-    using namespace scopes;
-    cast<Loop>(loop)->params.push_back(cast<Parameter>(symbol));
-}
-
-void sc_loop_append_argument(sc_value_t *loop, sc_value_t *value) {
-    using namespace scopes;
-    cast<Loop>(loop)->args.push_back(value);
+    return Loop::from(get_active_anchor(), cast<Parameter>(param), init);
 }
 
 void sc_loop_set_body(sc_value_t *loop, sc_value_t *body) {
@@ -1091,13 +1088,9 @@ sc_value_t *sc_break_new(sc_value_t *value) {
     using namespace scopes;
     return Break::from(get_active_anchor(), value);
 }
-sc_value_t *sc_repeat_new() {
+sc_value_t *sc_repeat_new(sc_value_t *value) {
     using namespace scopes;
-    return Repeat::from(get_active_anchor());
-}
-void sc_repeat_append_argument(sc_value_t *rep, sc_value_t *value) {
-    using namespace scopes;
-    cast<Repeat>(rep)->args.push_back(value);
+    return Repeat::from(get_active_anchor(), value);
 }
 sc_value_t *sc_return_new(sc_value_t *value) {
     using namespace scopes;
@@ -1461,6 +1454,16 @@ sc_void_raises_t sc_typename_type_set_storage(const sc_type_t *T, const sc_type_
     RETURN_VOID(cast<TypenameType>(const_cast<Type *>(T))->finalize(T2));
 }
 
+void sc_typename_type_set_unique(const sc_type_t *T) {
+    using namespace scopes;
+    cast<TypenameType>(const_cast<Type *>(T))->set_unique();
+}
+
+bool sc_typename_type_is_unique(const sc_type_t *T) {
+    using namespace scopes;
+    return cast<TypenameType>(T)->is_unique();
+}
+
 // Array Type
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -1526,24 +1529,23 @@ const sc_type_t *sc_arguments_type_join(const sc_type_t *T1, const sc_type_t *T2
 
 int sc_arguments_type_argcount(sc_type_t *T) {
     using namespace scopes;
-    if (isa<ArgumentsType>(T)) {
-        return cast<ArgumentsType>(T)->values.size();
-    } else {
-        return 1;
-    }
+    return get_argument_count(T);
 }
 
 const sc_type_t *sc_arguments_type_getarg(sc_type_t *T, int index) {
     using namespace scopes;
-    if (isa<ArgumentsType>(T)) {
-        auto at = cast<ArgumentsType>(T);
-        if (index < at->values.size()) {
-            return at->values[index];
-        }
-    } else if (index == 0) {
-        return T;
-    }
-    return TYPE_Nothing;
+    return get_argument(T, index);
+}
+
+// Unique Type
+////////////////////////////////////////////////////////////////////////////////
+
+const sc_type_t *sc_move_type(const sc_type_t *type) {
+    return move_type(type);
+}
+
+const sc_type_t *sc_view_type(const sc_type_t *type, int id) {
+    return view_type(type, { id });
 }
 
 // Function Type
@@ -1679,6 +1681,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_value_ast_repr, TYPE_String, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_value_tostring, TYPE_String, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_value_type, TYPE_Type, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_value_qualified_type, TYPE_Type, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_value_anchor, TYPE_Anchor, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_value_is_constant, TYPE_Bool, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_value_is_pure, TYPE_Bool, TYPE_Value);
@@ -1725,9 +1728,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_call_append_argument, _void, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_call_is_rawcall, TYPE_Bool, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_call_set_rawcall, _void, TYPE_Value, TYPE_Bool);
-    DEFINE_EXTERN_C_FUNCTION(sc_loop_new, TYPE_Value);
-    DEFINE_EXTERN_C_FUNCTION(sc_loop_append_parameter, _void, TYPE_Value, TYPE_Value);
-    DEFINE_EXTERN_C_FUNCTION(sc_loop_append_argument, _void, TYPE_Value, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_loop_new, TYPE_Value, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_loop_set_body, _void, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_const_int_new, TYPE_Value, TYPE_Type, TYPE_U64);
     DEFINE_EXTERN_C_FUNCTION(sc_const_real_new, TYPE_Value, TYPE_Type, TYPE_F64);
@@ -1739,10 +1740,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_const_pointer_extract, voidstar, TYPE_Value);
 
     DEFINE_EXTERN_C_FUNCTION(sc_break_new, TYPE_Value, TYPE_Value);
-
-    DEFINE_EXTERN_C_FUNCTION(sc_repeat_new, TYPE_Value);
-    DEFINE_EXTERN_C_FUNCTION(sc_repeat_append_argument, _void, TYPE_Value, TYPE_Value);
-
+    DEFINE_EXTERN_C_FUNCTION(sc_repeat_new, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_return_new, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_raise_new, TYPE_Value, TYPE_Value);
 
@@ -1848,6 +1846,8 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_typename_type_set_super, _void, TYPE_Type, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_typename_type_get_super, TYPE_Type, TYPE_Type);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_typename_type_set_storage, _void, TYPE_Type, TYPE_Type);
+    DEFINE_EXTERN_C_FUNCTION(sc_typename_type_set_unique, _void, TYPE_Type);
+    DEFINE_EXTERN_C_FUNCTION(sc_typename_type_is_unique, TYPE_Bool, TYPE_Type);
 
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_array_type, TYPE_Type, TYPE_Type, TYPE_USize);
 
@@ -1859,6 +1859,9 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_arguments_type_join, TYPE_Type, TYPE_Type, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_arguments_type_argcount, TYPE_I32, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_arguments_type_getarg, TYPE_Type, TYPE_Type, TYPE_I32);
+
+    DEFINE_EXTERN_C_FUNCTION(sc_move_type, TYPE_Type, TYPE_Type);
+    DEFINE_EXTERN_C_FUNCTION(sc_view_type, TYPE_Type, TYPE_Type, TYPE_I32);
 
     DEFINE_EXTERN_C_FUNCTION(sc_image_type, TYPE_Type,
         TYPE_Type, TYPE_Symbol, TYPE_I32, TYPE_I32, TYPE_I32, TYPE_I32, TYPE_Symbol, TYPE_Symbol);
@@ -1946,6 +1949,8 @@ B_TYPES()
         ConstInt::from(LINE_ANCHOR, TYPE_U64, (uint64_t)PTF_NonReadable));
     globals->bind(Symbol("pointer-flag-non-writable"),
         ConstInt::from(LINE_ANCHOR, TYPE_U64, (uint64_t)PTF_NonWritable));
+    globals->bind(Symbol("pointer-flag-unique"),
+        ConstInt::from(LINE_ANCHOR, TYPE_U64, (uint64_t)PTF_Unique));
 
     globals->bind(Symbol(SYM_DumpDisassembly),
         ConstInt::from(LINE_ANCHOR, TYPE_U64, (uint64_t)CF_DumpDisassembly));

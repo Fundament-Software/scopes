@@ -111,4 +111,29 @@ bool is_arguments_type(const Type *T) {
     return T->kind() == TK_Arguments;
 }
 
+//------------------------------------------------------------------------------
+
+int get_argument_count(const Type *T) {
+    if (isa<ArgumentsType>(T)) {
+        return cast<ArgumentsType>(T)->values.size();
+    } else {
+        return 1;
+    }
+}
+
+const Type *get_argument(const Type *T, int index) {
+    if (isa<ArgumentsType>(T)) {
+        auto at = cast<ArgumentsType>(T);
+        if (index < at->values.size()) {
+            return at->values[index];
+        }
+    } else if (index == 0) {
+        return T;
+    }
+    return TYPE_Nothing;
+}
+
+//------------------------------------------------------------------------------
+
+
 } // namespace scopes

@@ -39,7 +39,7 @@ static std::unordered_set<const KeyedType *, KeyedSet::Hash, KeyedSet::KeyEqual>
 //------------------------------------------------------------------------------
 
 KeyedType::KeyedType(Symbol _key, const Type *_type)
-    : Type(TK_Keyed), key(_key), type(_type) {}
+    : Qualifier(TK_Keyed, _type), key(_key) {}
 
 void KeyedType::stream_name(StyledStream &ss) const {
     ss << key.name()->data << "=";
