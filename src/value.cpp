@@ -12,6 +12,7 @@
 #include "stream_ast.hpp"
 #include "dyn_cast.inc"
 #include "qualifier.inc"
+#include "hash.hpp"
 
 #include <assert.h>
 
@@ -35,6 +36,94 @@ SCOPES_VALUE_KIND()
 #undef T
     default: return "???";
     }
+}
+
+//------------------------------------------------------------------------------
+
+std::size_t ValueIndex::Hash::operator()(const ValueIndex & s) const {
+    return hash2(std::hash<Value *>{}(s.value), s.index);
+}
+
+ValueIndex::ValueIndex(Value *_value, int _index)
+    : value(_value), index(_index) {
+    if (isa<ArgumentList>(value)) {
+        auto al = cast<ArgumentList>(value);
+        if (index < al->values.size()) {
+            value = al->values[index];
+            index = 0;
+        }
+    }
+}
+
+bool ValueIndex::operator ==(const ValueIndex &other) const {
+    return value == other.value && index == other.index;
+}
+
+const Type *ValueIndex::get_type() const {
+    return get_argument(value->get_type(), index);
+}
+
+const ValueIndexSet *ValueIndex::deps() const {
+    if (value->deps.empty(index))
+        return nullptr;
+    const ValueIndexSet &args = value->deps.args[index];
+    return &args;
+}
+
+bool ValueIndex::has_deps() const {
+    return !value->deps.empty(index);
+}
+
+//------------------------------------------------------------------------------
+
+bool Depends::empty(int index) const {
+    if (index >= args.size()) return true;
+    return args[index].empty();
+}
+
+bool Depends::empty() const {
+    for (auto &&arg : args) {
+        if (!arg.empty())
+            return false;
+    }
+    return true;
+}
+
+void Depends::ensure_arg(int index) {
+    while(args.size() <= index) {
+        args.push_back(ValueIndexSet());
+        kinds.push_back(DK_Undefined);
+    }
+}
+
+void Depends::unique(Value *value) {
+    auto T = value->get_type();
+    int count = get_argument_count(T);
+    for (int i = 0; i < count; ++i) {
+        unique(i);
+    }
+}
+
+void Depends::unique(int index) {
+    ensure_arg(index);
+    auto &&s = kinds[index];
+    s |= DK_Unique;
+}
+
+void Depends::borrow(Value *value) {
+    auto T = value->get_type();
+    int count = get_argument_count(T);
+    for (int i = 0; i < count; ++i) {
+        borrow(i, ValueIndex(value, i));
+    }
+}
+
+void Depends::borrow(int index, ValueIndex value) {
+    ensure_arg(index);
+    ValueIndexSet &arg = args[index];
+    auto &&s = kinds[index];
+    s |= DK_Borrowed;
+    arg.insert(value);
 }
 
 //------------------------------------------------------------------------------
@@ -250,6 +339,10 @@ Extern *Extern::from(const Anchor *anchor, const Type *type, Symbol name, size_t
 Block::Block()
     : depth(0), insert_index(0), terminator(nullptr), blockid(0), parent(nullptr)
 {}
+
+void Block::annotate(const String *msg) {
+    annotations.push_back(msg);
+}
 
 bool Block::is_scoped() const {
     return blockid != 0;
@@ -739,6 +832,10 @@ bool Value::is_accessible() const {
     return isa<Pure>(this);
 }
 
+void Value::annotate(const String *msg) {
+    annotations.push_back(msg);
+}
+
 bool Value::is_typed() const {
     return _type != nullptr;
 }
@@ -759,6 +856,36 @@ const Type *Value::get_type() const {
 
 const Anchor *Value::anchor() const {
     return _anchor;
+}
+
+int Value::get_depth() const {
+    const Value *value = this;
+    if (isa<Parameter>(value)) {
+        auto param = cast<Parameter>(value);
+        assert(param->owner);
+        if (isa<Function>(param->owner)) {
+            // outside of function
+            return 0;
+        } else if (isa<Instruction>(param->owner)) {
+            auto instr = cast<Instruction>(param->owner);
+            if (!instr->block) {
+                StyledStream ss;
+                stream_ast(ss, instr, StreamASTFormat());
+            }
+            assert(instr->block);
+            return instr->block->depth;
+        } else {
+            assert(false);
+            return 0;
+        }
+    } else if (isa<Instruction>(value)) {
+        if (value->is_pure())
+            return 0;
+        auto instr = cast<Instruction>(value);
+        assert(instr->block);
+        return instr->block->depth;
+    }
+    return 0;
 }
 
 #define T(NAME, BNAME, CLASS) \
@@ -782,12 +909,34 @@ bool Instruction::classof(const Value *T) {
 //------------------------------------------------------------------------------
 
 StyledStream& operator<<(StyledStream& ost, Value *node) {
-    stream_ast(ost, node, StreamASTFormat());
+    ost << const_cast<const Value *>(node);
     return ost;
 }
 
 StyledStream& operator<<(StyledStream& ost, const Value *node) {
-    stream_ast(ost, node, StreamASTFormat());
+    ost << Style_Keyword << get_value_class_name(node->kind()) << Style_None;
+    ost << "$" << (const void *)node;
+    if (node->is_typed()) {
+        ost << Style_Operator << ":" << Style_None << node->get_type();
+    }
+    return ost;
+}
+
+StyledStream& operator<<(StyledStream& ost, const ValueIndex &arg) {
+    ost << arg.value;
+    if (arg.value->is_typed()) {
+        if (get_argument_count(arg.value->get_type()) != 1) {
+            ost << Style_Operator << "@" << Style_None << arg.index;
+            ost << Style_Operator << ":" << Style_None << arg.get_type();
+        }
+    } else {
+        ost << Style_Operator << "@" << Style_None << arg.index;
+    }
+    return ost;
+}
+
+StyledStream& operator<<(StyledStream& ost, ValueIndex &arg) {
+    ost << const_cast<const ValueIndex &>(arg);
     return ost;
 }
 

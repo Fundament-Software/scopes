@@ -164,22 +164,32 @@ SCOPES_RESULT(void) error_argument_type_mismatch(const Type *expected, const Typ
     SCOPES_LOCATION_ERROR(ss.str());
 }
 
-SCOPES_RESULT(void) error_value_moved(Value *value, Value *mover) {
+SCOPES_RESULT(void) error_value_moved(Value *value, Value *mover, const char *by) {
     SCOPES_RESULT_TYPE(void);
     StyledString ss;
-    ss.out << "unique value has already been moved";
+    ss.out << by << " cannot move unique value because it will already be moved";
     SCOPES_LOCATION_DEF_ERROR(mover, ss.str());
 }
 
-SCOPES_RESULT(void) error_value_already_in_use(Value *value, const ValueSet &viewers) {
+SCOPES_RESULT(void) error_value_in_use(Value *value, Value *user, const char *by) {
     SCOPES_RESULT_TYPE(void);
     StyledString ss;
-    ss.out << "unique value can't be moved because it is still required";
-    auto err = make_location_error(ss.str());
-    for (auto user : viewers) {
-        err->append_definition(user);
-    }
-    return Result<_result_type>::raise(err);
+    ss.out << by << " cannot move unique value because it will be used";
+    SCOPES_LOCATION_DEF_ERROR(user, ss.str());
+}
+
+SCOPES_RESULT(void) error_value_is_borrowed(Value *value, Value *user, const char *by) {
+    SCOPES_RESULT_TYPE(void);
+    StyledString ss;
+    ss.out << by << " cannot move view of unique value(s)";
+    SCOPES_LOCATION_DEF_ERROR(user, ss.str());
+}
+
+SCOPES_RESULT(void) error_cannot_merge_moves(const char *by) {
+    SCOPES_RESULT_TYPE(void);
+    StyledString ss;
+    ss.out << "conflicting attempt in " << by << " to move or view unique value(s)";
+    SCOPES_LOCATION_ERROR(ss.str());
 }
 
 SCOPES_RESULT(void) error_invalid_operands(const Type *A, const Type *B) {

@@ -25,7 +25,8 @@ static const char INDENT_SEP[] = "⁞";
 StreamASTFormat::StreamASTFormat() :
     anchors(None),
     depth(0),
-    newlines(true)
+    newlines(true),
+    data_dependency(true)
 {}
 
 StreamASTFormat StreamASTFormat::debug() {
@@ -48,6 +49,7 @@ struct StreamAST : StreamAnchors {
     bool line_anchors;
     bool atom_anchors;
     bool newlines;
+    bool data_dependency;
     int nextid;
 
     std::unordered_map<const Value *, int> visited;
@@ -58,6 +60,7 @@ struct StreamAST : StreamAnchors {
         line_anchors = (fmt.anchors == StreamASTFormat::Line);
         atom_anchors = (fmt.anchors == StreamASTFormat::All);
         newlines = fmt.newlines;
+        data_dependency = fmt.data_dependency;
     }
 
     void stream_newline() {
@@ -112,6 +115,7 @@ struct StreamAST : StreamAnchors {
         for (int i = 0; i < block.body.size(); ++i) {
             walk_newline(block.body[i], depth+1, maxdepth);
         }
+        stream_annotations(depth, block.annotations);
         if (block.terminator)
             walk_newline(block.terminator, depth+1, maxdepth);
     }
@@ -128,6 +132,7 @@ struct StreamAST : StreamAnchors {
             if (block.terminator)
                 walk_newline(block.terminator, depth, maxdepth);
         }
+        stream_annotations(depth, block.annotations);
         stream_newline();
         stream_indent(depth);
         ss << Style_Keyword << "_ " << Style_None;
@@ -151,15 +156,26 @@ struct StreamAST : StreamAnchors {
         return false;
     }
 
+    void stream_annotations(int depth, const Strings &annotations) {
+        for (auto entry : annotations) {
+            stream_newline();
+            stream_indent(depth);
+            ss << "# " << entry->data;
+        }
+    }
+
     void walk_newline(const Value *node, int depth, int maxdepth) {
+        stream_annotations(depth, node->annotations);
         stream_newline();
         stream_indent(depth);
         walk(node, depth, maxdepth);
     }
 
-    void walk_same_or_newline(const Value *node, int depth, int maxdepth) {
+    void walk_same_or_newline(const Value *node, int depth, int maxdepth, bool skip_space = false) {
         if (sameline(node)) {
-            ss << " ";
+            if (!skip_space) {
+                ss << " ";
+            }
         } else {
             stream_newline();
             stream_indent(depth);
@@ -181,6 +197,46 @@ struct StreamAST : StreamAnchors {
     void stream_illegal_value_type(const std::string &name, const Type *T) {
         ss << Style_Error << "<illegal type for " << name << ">" << Style_None;
         stream_type_suffix(T);
+    }
+
+    void stream_depends(const Depends &deps) {
+        auto &&args = deps.args;
+        auto &&kinds = deps.kinds;
+        ss << Style_Operator << "[" << Style_None;
+        for (int i = 0; i < args.size(); ++i) {
+            if (i > 0)
+                ss << " ";
+            auto &&arg = args[i];
+            auto kind = kinds[i];
+            bool first = true;
+            switch(kind) {
+            case DK_Unique: ss << Style_Operator << "†" << Style_None; break;
+            case DK_Borrowed: ss << Style_Operator << "%" << Style_None; break;
+            case DK_Conflicted: ss << Style_Error << "!" << Style_None; break;
+            case DK_Undefined: ss << Style_Error << "?" << Style_None; break;
+            }
+            for (auto &&dep : arg) {
+                if (!first) {
+                    ss << Style_Operator << "|" << Style_None;
+                }
+                first = false;
+                ValueIndex val = dep;
+                if (isa<Parameter>(val.value)) {
+                    walk_same_or_newline(val.value, 0, 0, true);
+                } else {
+                    auto it = visited.find(val.value);
+                    if (it == visited.end()) {
+                        ss << Style_Error << "?" << Style_None;
+                    } else {
+                        int id = it->second;
+                        ss << Style_Operator << "%" << id << Style_None;
+                    }
+                }
+                if (val.index != 0)
+                    ss << Style_Operator << "@" << Style_None << val.index;
+            }
+        }
+        ss << Style_Operator << "]" << Style_None;
     }
 
     // old Any printing reference:
@@ -214,6 +270,10 @@ struct StreamAST : StreamAnchors {
             ss << Style_Operator << "%" << id << Style_None;
             if (is_new) {
                 ss << " " << Style_Operator << "=" << " " << Style_None;
+                if (data_dependency) {
+                    stream_depends(node->deps);
+                    ss << " ";
+                }
             } else {
                 if (node->is_typed()) {
                     stream_type_suffix(node->get_type());
@@ -258,6 +318,10 @@ struct StreamAST : StreamAnchors {
             if (newlines && is_new && (depth == 0)) {
                 ss << Style_Keyword << "Function" << Style_None;
                 ss << " ";
+                if (data_dependency) {
+                    stream_depends(val->deps);
+                    ss << " ";
+                }
             }
             ss << Style_Symbol << val->name.name()->data
                 << "λ" << (void *)val << Style_None;
@@ -271,6 +335,7 @@ struct StreamAST : StreamAnchors {
                         walk_same_or_newline(val->params[i], depth+1, maxdepth);
                     }
                     ss << Style_Operator << " )" << Style_None;
+                    stream_annotations(depth+1, val->annotations);
                     stream_block_result(val->body, val->value, depth+1, maxdepth);
                 } else {
                     todo.push_back(node);
@@ -329,13 +394,12 @@ struct StreamAST : StreamAnchors {
                     auto &&expr = val->clauses[i];
                     if (expr.cond) {
                         stream_newline();
-                        stream_indent(depth+2);
+                        stream_indent(depth+1);
                         ss << Style_Keyword << "condition" << Style_None;
-                        if (expr.cond_body.empty()) {
-                            walk_same_or_newline(expr.cond, depth+3, maxdepth);
-                        } else {
-                            stream_block_result(expr.cond_body, expr.cond, depth+3, maxdepth);
-                        }
+                        stream_block_result(expr.cond_body, expr.cond, depth+2, maxdepth);
+                        stream_newline();
+                        stream_indent(depth+1);
+                        ss << Style_Keyword << "then" << Style_None;
                     } else {
                         stream_newline();
                         stream_indent(depth+1);

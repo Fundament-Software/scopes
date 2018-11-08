@@ -84,6 +84,49 @@ const char *get_value_class_name(ValueKind kind);
 
 //------------------------------------------------------------------------------
 
+struct ValueIndex {
+    struct Hash {
+        std::size_t operator()(const ValueIndex & s) const;
+    };
+    typedef std::unordered_set<ValueIndex, ValueIndex::Hash> Set;
+
+    ValueIndex(Value *_value, int _index = 0);
+    bool operator ==(const ValueIndex &other) const;
+
+    const Type *get_type() const;
+    const Set *deps() const;
+    bool has_deps() const;
+
+    Value *value;
+    int index;
+};
+
+typedef ValueIndex::Set ValueIndexSet;
+
+//------------------------------------------------------------------------------
+
+enum DependsKind {
+    DK_Undefined = 0,
+    DK_Unique = 1 << 0,
+    DK_Borrowed = 1 << 1,
+    DK_Conflicted = DK_Unique | DK_Borrowed,
+};
+
+struct Depends {
+    std::vector<ValueIndexSet> args;
+    std::vector<char> kinds;
+
+    void ensure_arg(int index);
+    void borrow(Value *value);
+    void borrow(int index, ValueIndex value);
+    void unique(Value *value);
+    void unique(int index);
+    bool empty() const;
+    bool empty(int index) const;
+};
+
+//------------------------------------------------------------------------------
+
 struct Value {
     ValueKind kind() const;
 
@@ -98,6 +141,11 @@ struct Value {
     void change_type(const Type *type);
     bool is_pure() const;
     bool is_accessible() const;
+    int get_depth() const;
+    void annotate(const String *msg);
+
+    Depends deps;
+    Strings annotations;
 private:
     const ValueKind _kind;
     const Type *_type;
@@ -120,12 +168,15 @@ struct Block {
     void insert_at(int index);
     void insert_at_end();
 
+    void annotate(const String *msg);
+
     int depth;
     int insert_index;
     Instructions body;
     Instruction *terminator;
     uint32_t blockid;
     Block *parent;
+    Strings annotations;
 };
 
 //------------------------------------------------------------------------------

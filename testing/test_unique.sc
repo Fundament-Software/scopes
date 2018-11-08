@@ -19,13 +19,14 @@ compile-stage;
     if x a
     else b
 
-fn test (a b)
-    let a = (move a)
-    let b = (move b)
-    if true a
-    else b
+fn test (a b c)
+    #let a = (move a)
+    #let b = (move b)
+    if true (move a)
+    elseif true (move b)
+    else (move c)
 
-let test = (typify test T T)
+let test = (typify test T T T)
 dump-ast test
 
 dump (typeof test)

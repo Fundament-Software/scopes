@@ -114,7 +114,6 @@ STREAM_STYLED_NUMBER(double)
 
 struct Anchor;
 struct Closure;
-struct ASTNode;
 struct Builtin;
 struct List;
 struct Nothing;
@@ -123,6 +122,8 @@ struct String;
 struct Symbol;
 struct Syntax;
 struct Type;
+struct ValueIndex;
+struct Value;
 
 StyledStream& operator<<(StyledStream& ost, Symbol &sym);
 StyledStream& operator<<(StyledStream& ost, const Symbol &sym);
@@ -136,8 +137,10 @@ StyledStream& operator<<(StyledStream& ost, Scope *scope);
 StyledStream& operator<<(StyledStream& ost, const String *s);
 StyledStream& operator<<(StyledStream& ost, const Syntax *value);
 StyledStream& operator<<(StyledStream& ost, const Type *type);
-StyledStream& operator<<(StyledStream& ost, ASTNode *node);
-StyledStream& operator<<(StyledStream& ost, const ASTNode *node);
+StyledStream& operator<<(StyledStream& ost, const ValueIndex &arg);
+StyledStream& operator<<(StyledStream& ost, ValueIndex &arg);
+StyledStream& operator<<(StyledStream& ost, const Value *value);
+StyledStream& operator<<(StyledStream& ost, Value *value);
 
 } // namespace scopes
 

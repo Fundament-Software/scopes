@@ -236,6 +236,74 @@ ASTContext ASTContext::from_function(Function *fn) {
 
 //------------------------------------------------------------------------------
 
+static void merge_depends(const ASTContext &ctx, Depends &deps, const Values &values) {
+    int depth = ctx.block?ctx.block->depth:0;
+    for (int i = 0; i < values.size(); ++i) {
+        auto value = values[i];
+        const Type *T = value->get_type();
+        if (!is_returning_value(T))
+            continue;
+        if (isa<Pure>(value))
+            continue;
+        auto arg = ValueIndex(value);
+        if (value->deps.empty()) { // unique
+            if (value->get_depth() <= depth) {
+                deps.borrow(i, arg);
+            } else {
+                deps.unique(i);
+            }
+        } else {
+            const ValueIndexSet *args = arg.deps();
+            if (args) { // borrowed
+                for (auto &&val : *args) {
+                    if (val.value->get_depth() <= depth) {
+                        deps.borrow(i, val);
+                    } else {
+                        deps.unique(i);
+                    }
+                }
+            } else { // unique
+                if (value->get_depth() <= depth) {
+                    deps.borrow(i, arg);
+                } else {
+                    deps.unique(i);
+                }
+            }
+        }
+    }
+}
+
+static void merge_depends(const ASTContext &ctx, Depends &deps, Value *value) {
+    assert(value);
+    const Type *T = value->get_type();
+    if (!is_returning_value(T))
+        return;
+    if (isa<Pure>(value))
+        return;
+    int depth = ctx.block?ctx.block->depth:0;
+    if (value->deps.empty()) { // is unique
+        if (value->get_depth() <= depth) { // has required lifetime
+            deps.borrow(value);
+        } else {
+            deps.unique(value);
+        }
+    } else { // is borrowed
+        auto &&args = value->deps.args;
+        for (int i = 0; i < args.size(); ++i) {
+            auto &&arg = args[i];
+            for (auto &&val : arg) {
+                if (val.value->get_depth() <= depth) {
+                    deps.borrow(i, val);
+                } else {
+                    deps.unique(i);
+                }
+            }
+        }
+    }
+}
+
+//------------------------------------------------------------------------------
+
 static SCOPES_RESULT(Value *) prove_block(const ASTContext &ctx, Block &block, Value *node);
 static SCOPES_RESULT(Value *) prove_inline(const ASTContext &ctx, Function *frame, Template *func, const Values &nodes);
 
@@ -290,22 +358,9 @@ Value *build_argument_list(const Anchor *anchor, const Values &values) {
     if (values.size() == 1) {
         return values[0];
     }
-#if 0
-    if (is_argument_list_constant(values)) {
-        Constants consts;
-        for (auto &&val : values) {
-            consts.push_back(cast<Const>(val));
-        }
-        return ConstAggregate::from(anchor,
-            arguments_type_from_arguments(values), consts);
-    } else {
-#endif
-        ArgumentList *newnlist = ArgumentList::from(anchor, values);
-        newnlist->set_type(arguments_type_from_arguments(values));
-        return newnlist;
-#if 0
-    }
-#endif
+    ArgumentList *newnlist = ArgumentList::from(anchor, values);
+    newnlist->set_type(arguments_type_from_arguments(values));
+    return newnlist;
 }
 
 static SCOPES_RESULT(Value *) prove_Label(const ASTContext &ctx, Label *node) {
@@ -1778,6 +1833,9 @@ static SCOPES_RESULT(Value *) prove_If(const ASTContext &ctx, If *_if) {
         _else.body.set_scope(subctx.function->new_id(), subctx.block);
     }
     newif->set_type(rtype);
+    for (auto &&clause : newif->clauses) {
+        merge_depends(ctx, newif->deps, clause.value);
+    }
     return newif;
 }
 
@@ -1995,6 +2053,10 @@ SCOPES_RESULT(Function *) prove(Function *frame, Template *func, const ArgTypes 
         fn->except_type = TYPE_NoReturn;
     fn->complete = true;
     fn->change_type(get_function_type(fn));
+    merge_depends(fnctx, fn->deps, fn->value);
+    for (auto &&ret : fn->returns) {
+        merge_depends(fnctx, fn->deps, ret->value);
+    }
     SCOPES_CHECK_RESULT(track(fnctx));
     return fn;
 }

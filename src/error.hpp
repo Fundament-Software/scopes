@@ -104,8 +104,10 @@ SCOPES_RESULT(void) error_untyped_recursive_call(Function *func);
 SCOPES_RESULT(void) error_value_inaccessible_from_closure(Value *value, const Function *frame);
 
 // borrow checker errors
-SCOPES_RESULT(void) error_value_moved(Value *value, Value *mover);
-SCOPES_RESULT(void) error_value_already_in_use(Value *value, const ValueSet &viewers);
+SCOPES_RESULT(void) error_value_moved(Value *value, Value *mover, const char *by);
+SCOPES_RESULT(void) error_value_in_use(Value *value, Value *user, const char *by);
+SCOPES_RESULT(void) error_value_is_borrowed(Value *value, Value *user, const char *by);
+SCOPES_RESULT(void) error_cannot_merge_moves(const char *by);
 
 // code generator errors
 SCOPES_RESULT(void) error_gen_invalid_call_type(const char *target, Value *callee);

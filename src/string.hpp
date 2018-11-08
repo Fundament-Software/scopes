@@ -13,6 +13,7 @@
 #include "scopes/config.h"
 
 #include <sstream>
+#include <vector>
 
 namespace scopes {
 
@@ -69,6 +70,8 @@ struct StyledString {
     static StyledString plain();
     const String *str() const;
 };
+
+typedef std::vector<const String *> Strings;
 
 const String *vformat( const char *fmt, va_list va );
 

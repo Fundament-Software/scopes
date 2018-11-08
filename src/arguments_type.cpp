@@ -122,6 +122,8 @@ int get_argument_count(const Type *T) {
 }
 
 const Type *get_argument(const Type *T, int index) {
+    if (!is_returning(T))
+        return TYPE_NoReturn;
     if (isa<ArgumentsType>(T)) {
         auto at = cast<ArgumentsType>(T);
         if (index < at->values.size()) {
