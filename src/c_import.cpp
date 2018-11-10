@@ -8,6 +8,7 @@
 #include "symbol.hpp"
 #include "type.hpp"
 #include "types.hpp"
+#include "qualifiers.hpp"
 #include "source_file.hpp"
 #include "anchor.hpp"
 #include "error.hpp"
@@ -158,7 +159,7 @@ public:
                 al = std::max(al, SCOPES_GET_RESULT(align_of(fieldtype)));
             }
 
-            args.push_back(keyed_type(name, fieldtype));
+            args.push_back(key_type(name, fieldtype));
         }
         if (packed) {
             al = 1;

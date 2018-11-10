@@ -8,7 +8,7 @@
 #define SCOPES_UNIQUE_TYPE_HPP
 
 #include "type.hpp"
-#include "qualified_type.hpp"
+#include "qualify_type.hpp"
 
 #include <vector>
 #include <unordered_set>
@@ -17,24 +17,26 @@ namespace scopes {
 
 //------------------------------------------------------------------------------
 
-struct MoveType : Qualifier {
-    enum { Kind = TK_Move };
-    static bool classof(const Type *T);
+struct MoveQualifier : Qualifier {
+    enum { Kind = QK_Move };
+    static bool classof(const Qualifier *T);
 
-    void stream_name(StyledStream &ss) const;
+    void stream_prefix(StyledStream &ss) const;
+    void stream_postfix(StyledStream &ss) const;
 
-    MoveType();
+    MoveQualifier();
 };
 
 //------------------------------------------------------------------------------
 
-struct MutatedType : Qualifier {
-    enum { Kind = TK_Mutated };
-    static bool classof(const Type *T);
+struct MutateQualifier : Qualifier {
+    enum { Kind = QK_Mutate };
+    static bool classof(const Qualifier *T);
 
-    void stream_name(StyledStream &ss) const;
+    void stream_prefix(StyledStream &ss) const;
+    void stream_postfix(StyledStream &ss) const;
 
-    MutatedType();
+    MutateQualifier();
 };
 
 //------------------------------------------------------------------------------
@@ -42,13 +44,14 @@ struct MutatedType : Qualifier {
 typedef std::unordered_set<int> IDSet;
 typedef std::vector<int> IDs;
 
-struct ViewType : Qualifier {
-    enum { Kind = TK_View };
-    static bool classof(const Type *T);
+struct ViewQualifier : Qualifier {
+    enum { Kind = QK_View };
+    static bool classof(const Qualifier *T);
 
-    void stream_name(StyledStream &ss) const;
+    void stream_prefix(StyledStream &ss) const;
+    void stream_postfix(StyledStream &ss) const;
 
-    ViewType(const IDSet &ids);
+    ViewQualifier(const IDSet &ids);
 
     IDSet ids;
     IDs sorted_ids;
@@ -58,7 +61,7 @@ struct ViewType : Qualifier {
 //------------------------------------------------------------------------------
 
 const Type *move_type(const Type *type);
-const Type *mutated_type(const Type *type);
+const Type *mutate_type(const Type *type);
 const Type *view_type(const Type *type, IDSet ids);
 
 } // namespace scopes

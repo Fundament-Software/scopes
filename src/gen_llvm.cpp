@@ -578,11 +578,9 @@ struct LLVMIRGenerator {
 
     static SCOPES_RESULT(LLVMTypeRef) create_llvm_type(const Type *type) {
         SCOPES_RESULT_TYPE(LLVMTypeRef);
-        if (isa<QualifiedType>(type)) {
-            return _type_to_llvm_type(cast<QualifiedType>(type)->type);
-        }
         switch(type->kind()) {
-        case TK_Qualifier: assert(false); break;
+        case TK_Qualify:
+            return _type_to_llvm_type(cast<QualifyType>(type)->type);
         case TK_Integer:
             return LLVMIntType(cast<IntegerType>(type)->width);
         case TK_Real:

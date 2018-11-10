@@ -14,17 +14,30 @@
 
 namespace scopes {
 
-//------------------------------------------------------------------------------
+#define SCOPES_QUALIFIER_KIND() \
+    T(QK_Key, "qualifier-kind-key", KeyQualifier) \
+    T(QK_Move, "qualifier-kind-move", MoveQualifier) \
+    T(QK_Mutate, "qualifier-kind-mutate", MutateQualifier) \
+    T(QK_View, "qualifier-kind-view", ViewQualifier)
 
-struct Qualifier : Type {
-    static bool classof(const Type *T);
-
-    void stream_name(StyledStream &ss) const;
-
-    Qualifier(TypeKind kind);
+enum QualifierKind {
+#define T(NAME, BNAME, CLASS) \
+    NAME,
+    SCOPES_QUALIFIER_KIND()
+#undef T
 };
 
-bool is_qualifier(const Type *T);
+//------------------------------------------------------------------------------
+
+struct Qualifier {
+    QualifierKind kind() const;
+
+    Qualifier(QualifierKind kind);
+    Qualifier(const Qualifier &other) = delete;
+
+private:
+    const QualifierKind _kind;
+};
 
 //------------------------------------------------------------------------------
 
@@ -33,12 +46,12 @@ typedef std::unordered_map<int, const Qualifier *> QualifierMap;
 
 //------------------------------------------------------------------------------
 
-struct QualifiedType : Type {
+struct QualifyType : Type {
     static bool classof(const Type *T);
 
     void stream_name(StyledStream &ss) const;
 
-    QualifiedType(const Type *type, const QualifierMap &qualifiers);
+    QualifyType(const Type *type, const QualifierMap &qualifiers);
 
     const Type *type;
     QualifierMap qualifiers;
@@ -49,9 +62,9 @@ struct QualifiedType : Type {
 //------------------------------------------------------------------------------
 
 const Type *qualify(const Type *type, const Qualifiers &qualifiers);
-const Type *find_qualifier(const Type *type, TypeKind kind);
+const Qualifier *find_qualifier(const Type *type, QualifierKind kind);
 const Type *strip_qualifiers(const Type *T);
-const Type *strip_qualifier(const Type *T, TypeKind kind);
+const Type *strip_qualifier(const Type *T, QualifierKind kind);
 
 //------------------------------------------------------------------------------
 

@@ -7,9 +7,8 @@
 #ifndef SCOPES_KEYED_HPP
 #define SCOPES_KEYED_HPP
 
-#include "type.hpp"
 #include "symbol.hpp"
-#include "qualified_type.hpp"
+#include "qualify_type.hpp"
 #include "scopes/scopes.h"
 
 namespace scopes {
@@ -18,21 +17,22 @@ namespace scopes {
 // KEYED TYPE
 //------------------------------------------------------------------------------
 
-struct KeyedType : Qualifier {
-    enum { Kind = TK_Keyed };
-    static bool classof(const Type *T);
+struct KeyQualifier : Qualifier {
+    enum { Kind = QK_Key };
+    static bool classof(const Qualifier *T);
 
-    KeyedType(Symbol key);
-    void stream_name(StyledStream &ss) const;
+    KeyQualifier(Symbol key);
+    void stream_prefix(StyledStream &ss) const;
+    void stream_postfix(StyledStream &ss) const;
 
     Symbol key;
 };
 
 //------------------------------------------------------------------------------
 
-const Type *keyed_type(Symbol key, const Type *type);
+const Type *key_type(Symbol key, const Type *type);
 
-sc_symbol_type_tuple_t key_type(const Type *type);
+sc_symbol_type_tuple_t type_key(const Type *type);
 
 } // namespace scopes
 

@@ -29,13 +29,8 @@ struct Value;
 //------------------------------------------------------------------------------
 
 #define B_TYPE_KIND() \
-    /* qualifiers */ \
-    T(TK_Keyed, "type-kind-keyed", KeyedType) \
-    T(TK_Move, "type-kind-move", MoveType) \
-    T(TK_View, "type-kind-view", ViewType) \
-    T(TK_Mutated, "type-kind-mutated", MutatedType) \
     /* abstract types */ \
-    T(TK_Qualified, "type-kind-qualified", QualifiedType) \
+    T(TK_Qualify, "type-kind-qualify", QualifyType) \
     T(TK_Arguments, "type-kind-arguments", ArgumentsType) \
     T(TK_Typename, "type-kind-typename", TypenameType) \
     /* machine types */ \
@@ -56,8 +51,6 @@ enum TypeKind {
     NAME,
     B_TYPE_KIND()
 #undef T
-    // abstract kinds
-    TK_Qualifier,
 };
 
 //------------------------------------------------------------------------------
@@ -150,11 +143,7 @@ typedef std::vector<const Type *> ArgTypes;
     T(TYPE_Vector, "vector") \
     T(TYPE_Tuple, "tuple") \
     T(TYPE_Union, "union") \
-    T(TYPE_Keyed, "Keyed") \
-    T(TYPE_Move, "Move") \
-    T(TYPE_View, "View") \
-    T(TYPE_Mutated, "Mutated") \
-    T(TYPE_Qualified, "Qualified") \
+    T(TYPE_Qualify, "Qualify") \
     T(TYPE_Typename, "typename") \
     T(TYPE_Arguments, "Arguments") \
     T(TYPE_Raises, "Raises") \

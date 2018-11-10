@@ -124,9 +124,9 @@ B_TYPE_KIND()
 }
 
 bool is_opaque(const Type *T) {
-    if (isa<QualifiedType>(T))
-        return is_opaque(cast<QualifiedType>(T)->type);
     switch(T->kind()) {
+    case TK_Qualify:
+        return is_opaque(cast<QualifyType>(T)->type);
     case TK_Typename: {
         const TypenameType *tt = cast<TypenameType>(T);
         if (!tt->finalized()) {
@@ -145,9 +145,9 @@ bool is_opaque(const Type *T) {
 
 SCOPES_RESULT(size_t) size_of(const Type *T) {
     SCOPES_RESULT_TYPE(size_t);
-    if (isa<QualifiedType>(T))
-        return size_of(cast<QualifiedType>(T)->type);
     switch(T->kind()) {
+    case TK_Qualify:
+        return size_of(cast<QualifyType>(T)->type);
     case TK_Integer: {
         const IntegerType *it = cast<IntegerType>(T);
         return (it->width + 7) / 8;
@@ -173,9 +173,9 @@ SCOPES_RESULT(size_t) size_of(const Type *T) {
 
 SCOPES_RESULT(size_t) align_of(const Type *T) {
     SCOPES_RESULT_TYPE(size_t);
-    if (isa<QualifiedType>(T))
-        return align_of(cast<QualifiedType>(T)->type);
     switch(T->kind()) {
+    case TK_Qualify:
+        return align_of(cast<QualifyType>(T)->type);
     case TK_Integer: {
         const IntegerType *it = cast<IntegerType>(T);
         return (it->width + 7) / 8;
@@ -207,13 +207,8 @@ SCOPES_RESULT(size_t) align_of(const Type *T) {
 
 const Type *superof(const Type *T) {
     switch(T->kind()) {
-    case TK_Qualifier: assert(false); break;
-    case TK_Qualified: return TYPE_Qualified;
-    case TK_View: return TYPE_View;
-    case TK_Move: return TYPE_Move;
+    case TK_Qualify: return TYPE_Qualify;
     case TK_Arguments: return TYPE_Arguments;
-    case TK_Keyed: return TYPE_Keyed;
-    case TK_Mutated: return TYPE_Mutated;
     case TK_Integer: return TYPE_Integer;
     case TK_Real: return TYPE_Real;
     case TK_Pointer: return TYPE_Pointer;
@@ -370,11 +365,7 @@ void init_types() {
     DEFINE_TYPENAME("vector", TYPE_Vector);
     DEFINE_TYPENAME("tuple", TYPE_Tuple);
     DEFINE_TYPENAME("union", TYPE_Union);
-    DEFINE_TYPENAME("Keyed", TYPE_Keyed);
-    DEFINE_TYPENAME("Move", TYPE_Move);
-    DEFINE_TYPENAME("View", TYPE_View);
-    DEFINE_TYPENAME("Mutated", TYPE_Mutated);
-    DEFINE_TYPENAME("Qualified", TYPE_Qualified);
+    DEFINE_TYPENAME("Qualify", TYPE_Qualify);
     DEFINE_TYPENAME("Arguments", TYPE_Arguments);
     DEFINE_TYPENAME("Raises", TYPE_Raises);
     DEFINE_TYPENAME("constant", TYPE_Constant);

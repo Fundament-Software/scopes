@@ -9,7 +9,7 @@
 #include "tuple_type.hpp"
 #include "pointer_type.hpp"
 #include "arguments_type.hpp"
-#include "qualified_type.hpp"
+#include "qualify_type.hpp"
 #include "dyn_cast.inc"
 
 namespace scopes {

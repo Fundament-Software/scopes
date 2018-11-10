@@ -8,6 +8,7 @@
 #include "string.hpp"
 #include "list.hpp"
 #include "types.hpp"
+#include "qualifiers.hpp"
 #include "c_import.hpp"
 #include "stream_expr.hpp"
 #include "stream_ast.hpp"
@@ -1316,11 +1317,11 @@ void sc_type_set_symbol(sc_type_t *T, sc_symbol_t sym, sc_value_t *value) {
 ////////////////////////////////////////////////////////////////////////////////
 
 sc_symbol_type_tuple_t sc_type_key(const sc_type_t *T) {
-    return key_type(T);
+    return type_key(T);
 }
 
-const sc_type_t *sc_keyed_type(sc_symbol_t name, const sc_type_t *T) {
-    return keyed_type(name, T);
+const sc_type_t *sc_key_type(sc_symbol_t name, const sc_type_t *T) {
+    return key_type(name, T);
 }
 
 // Pointer Type
@@ -1550,9 +1551,9 @@ const sc_type_t *sc_view_type(const sc_type_t *type, int id) {
     return view_type(type, { id });
 }
 
-const sc_type_t *sc_mutated_type(const sc_type_t *type) {
+const sc_type_t *sc_mutate_type(const sc_type_t *type) {
     using namespace scopes;
-    return mutated_type(type);
+    return mutate_type(type);
 }
 
 // Function Type
@@ -1835,7 +1836,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_type_set_symbol, _void, TYPE_Type, TYPE_Symbol, TYPE_Value);
 
     DEFINE_EXTERN_C_FUNCTION(sc_type_key, arguments_type({TYPE_Symbol, TYPE_Type}), TYPE_Type);
-    DEFINE_EXTERN_C_FUNCTION(sc_keyed_type, TYPE_Type, TYPE_Symbol, TYPE_Type);
+    DEFINE_EXTERN_C_FUNCTION(sc_key_type, TYPE_Type, TYPE_Symbol, TYPE_Type);
 
     DEFINE_EXTERN_C_FUNCTION(sc_pointer_type, TYPE_Type, TYPE_Type, TYPE_U64, TYPE_Symbol);
     DEFINE_EXTERN_C_FUNCTION(sc_pointer_type_get_flags, TYPE_U64, TYPE_Type);
@@ -1869,7 +1870,7 @@ void init_globals(int argc, char *argv[]) {
 
     DEFINE_EXTERN_C_FUNCTION(sc_move_type, TYPE_Type, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_view_type, TYPE_Type, TYPE_Type, TYPE_I32);
-    DEFINE_EXTERN_C_FUNCTION(sc_mutated_type, TYPE_Type, TYPE_Type);
+    DEFINE_EXTERN_C_FUNCTION(sc_mutate_type, TYPE_Type, TYPE_Type);
 
     DEFINE_EXTERN_C_FUNCTION(sc_image_type, TYPE_Type,
         TYPE_Type, TYPE_Symbol, TYPE_I32, TYPE_I32, TYPE_I32, TYPE_I32, TYPE_Symbol, TYPE_Symbol);

@@ -13,6 +13,7 @@
 #include "dyn_cast.inc"
 #include "stream_ast.hpp"
 #include "prover.hpp"
+#include "qualifiers.hpp"
 
 #include <unordered_map>
 

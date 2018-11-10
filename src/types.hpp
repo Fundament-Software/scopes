@@ -17,6 +17,4 @@
 #include "function_type.hpp"
 #include "image_type.hpp"
 #include "sampledimage_type.hpp"
-#include "keyed_type.hpp"
-#include "unique_type.hpp"
-#include "qualified_type.hpp"
+#include "qualify_type.hpp"

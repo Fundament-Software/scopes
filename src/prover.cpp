@@ -7,6 +7,7 @@
 #include "prover.hpp"
 #include "value.hpp"
 #include "types.hpp"
+#include "qualifiers.hpp"
 #include "error.hpp"
 #include "closure.hpp"
 #include "stream_ast.hpp"
@@ -521,7 +522,7 @@ SCOPES_RESULT(void) map_keyed_arguments(const Anchor *anchor, Value *callee,
     size_t next_index = 0;
     for (size_t i = 0; i < values.size(); ++i) {
         Value *arg = values[i];
-        auto kt = key_type(arg->get_type());
+        auto kt = type_key(arg->get_type());
         Symbol key = kt._0;
         int index = -1;
         if (key == SYM_Unnamed) {
@@ -733,7 +734,7 @@ Value *rekey(const Anchor *anchor, Symbol key, Value *value) {
         value = cast<Keyed>(value)->value;
     }
     auto T = value->get_type();
-    auto NT = keyed_type(key, value->get_type());
+    auto NT = key_type(key, value->get_type());
     if (T == NT)
         return value;
     auto newkeyed = Keyed::from(anchor, key, value);
@@ -1083,7 +1084,7 @@ static const Type *get_function_type(Function *fn) {
 
 static void keys_from_function_type(Symbols &keys, const FunctionType *ft) {
     for (auto T : ft->argument_types) {
-        keys.push_back(key_type(T)._0);
+        keys.push_back(type_key(T)._0);
     }
 }
 

@@ -8,7 +8,7 @@
 #include "error.hpp"
 #include "utils.hpp"
 #include "hash.hpp"
-#include "keyed_type.hpp"
+#include "key_qualifier.hpp"
 
 #include <assert.h>
 
@@ -124,7 +124,7 @@ const Type *TupleType::type_at_index_or_nothing(size_t i) const {
 
 size_t TupleType::field_index(Symbol name) const {
     for (size_t i = 0; i < values.size(); ++i) {
-        if (name == key_type(values[i])._0)
+        if (name == type_key(values[i])._0)
             return i;
     }
     return (size_t)-1;
@@ -133,7 +133,7 @@ size_t TupleType::field_index(Symbol name) const {
 SCOPES_RESULT(Symbol) TupleType::field_name(size_t i) const {
     SCOPES_RESULT_TYPE(Symbol);
     SCOPES_CHECK_RESULT(verify_range(i, values.size()));
-    return key_type(values[i])._0;
+    return type_key(values[i])._0;
 }
 
 //------------------------------------------------------------------------------

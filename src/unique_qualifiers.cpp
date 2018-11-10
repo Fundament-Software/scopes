@@ -4,7 +4,7 @@
     See LICENSE.md for details.
 */
 
-#include "unique_type.hpp"
+#include "unique_qualifiers.hpp"
 #include "error.hpp"
 #include "dyn_cast.inc"
 #include "hash.hpp"
@@ -18,42 +18,49 @@ namespace scopes {
 
 namespace ViewSet {
 struct Hash {
-    std::size_t operator()(const ViewType *s) const {
+    std::size_t operator()(const ViewQualifier *s) const {
         return s->prehash;
     }
 };
 
 struct KeyEqual {
-    bool operator()( const ViewType *lhs, const ViewType *rhs ) const {
+    bool operator()( const ViewQualifier *lhs, const ViewQualifier *rhs ) const {
         return lhs->ids == rhs->ids;
     }
 };
 } // namespace ViewSet
 
-static std::unordered_set<const ViewType *, ViewSet::Hash, ViewSet::KeyEqual> views;
+static std::unordered_set<const ViewQualifier *, ViewSet::Hash, ViewSet::KeyEqual> views;
 
 //------------------------------------------------------------------------------
 
-MoveType::MoveType()
-    : Qualifier(TK_Move) {}
+MoveQualifier::MoveQualifier()
+    : Qualifier((QualifierKind)Kind) {}
 
-void MoveType::stream_name(StyledStream &ss) const {
+void MoveQualifier::stream_prefix(StyledStream &ss) const {
     ss << "†";
+}
+
+void MoveQualifier::stream_postfix(StyledStream &ss) const {
 }
 
 //------------------------------------------------------------------------------
 
-MutatedType::MutatedType()
-    : Qualifier(TK_Mutated) {}
+MutateQualifier::MutateQualifier()
+    : Qualifier((QualifierKind)Kind) {}
 
-void MutatedType::stream_name(StyledStream &ss) const {
+void MutateQualifier::stream_prefix(StyledStream &ss) const {
+    ss << "!";
+}
+
+void MutateQualifier::stream_postfix(StyledStream &ss) const {
     ss << "!";
 }
 
 //------------------------------------------------------------------------------
 
-ViewType::ViewType(const IDSet &_ids)
-    : Qualifier(TK_View), ids(_ids) {
+ViewQualifier::ViewQualifier(const IDSet &_ids)
+    : Qualifier((QualifierKind)Kind), ids(_ids) {
     for (auto entry : ids) {
         sorted_ids.push_back(entry);
     }
@@ -65,7 +72,7 @@ ViewType::ViewType(const IDSet &_ids)
     prehash = h;
 }
 
-void ViewType::stream_name(StyledStream &ss) const {
+void ViewQualifier::stream_prefix(StyledStream &ss) const {
     ss << "%";
     for (int i = 0; i < sorted_ids.size(); ++i) {
         if (i > 0) ss << "|";
@@ -74,42 +81,45 @@ void ViewType::stream_name(StyledStream &ss) const {
     ss << ":";
 }
 
-//------------------------------------------------------------------------------
-
-static const MoveType *_move_type = nullptr;
-const Type * move_type(const Type *type) {
-    if (has_qualifier<MoveType>(type))
-        return type;
-    if (!_move_type) {
-        _move_type = new MoveType();
-    }
-    return qualify(type, { _move_type });
+void ViewQualifier::stream_postfix(StyledStream &ss) const {
 }
 
-static const MutatedType *_mutated_type = nullptr;
-const Type *mutated_type(const Type *type) {
-    if (has_qualifier<MutatedType>(type))
+//------------------------------------------------------------------------------
+
+static const MoveQualifier *_move_qualifier = nullptr;
+const Type * move_type(const Type *type) {
+    if (has_qualifier<MoveQualifier>(type))
         return type;
-    if (!_mutated_type) {
-        _mutated_type = new MutatedType();
+    if (!_move_qualifier) {
+        _move_qualifier = new MoveQualifier();
     }
-    return qualify(type, { _mutated_type });
+    return qualify(type, { _move_qualifier });
+}
+
+static const MutateQualifier *_mutate_qualifier = nullptr;
+const Type *mutate_type(const Type *type) {
+    if (has_qualifier<MutateQualifier>(type))
+        return type;
+    if (!_mutate_qualifier) {
+        _mutate_qualifier = new MutateQualifier();
+    }
+    return qualify(type, { _mutate_qualifier });
 }
 
 const Type * view_type(const Type *type, IDSet ids) {
-    auto vt = try_qualifier<ViewType>(type);
+    auto vt = try_qualifier<ViewQualifier>(type);
     if (vt) {
         for (auto entry : vt->ids) {
             ids.insert(entry);
         }
     }
-    const ViewType *result = nullptr;
-    ViewType key(ids);
+    const ViewQualifier *result = nullptr;
+    ViewQualifier key(ids);
     auto it = views.find(&key);
     if (it != views.end()) {
         result = *it;
     } else {
-        result = new ViewType(ids);
+        result = new ViewQualifier(ids);
         views.insert(result);
     }
     return qualify(type, { result });

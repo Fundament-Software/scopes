@@ -4,7 +4,7 @@
     See LICENSE.md for details.
 */
 
-#include "keyed_type.hpp"
+#include "key_qualifier.hpp"
 #include "error.hpp"
 #include "utils.hpp"
 #include "hash.hpp"
@@ -19,54 +19,57 @@ namespace scopes {
 
 namespace KeyedSet {
     struct Hash {
-        std::size_t operator()(const KeyedType *s) const {
+        std::size_t operator()(const KeyQualifier *s) const {
             return s->key.hash();
         }
     };
 
     struct KeyEqual {
-        bool operator()( const KeyedType *lhs, const KeyedType *rhs ) const {
+        bool operator()( const KeyQualifier *lhs, const KeyQualifier *rhs ) const {
             if (lhs->key != rhs->key) return false;
             return true;
         }
     };
 } // namespace TupleSet
 
-static std::unordered_set<const KeyedType *, KeyedSet::Hash, KeyedSet::KeyEqual> keyeds;
+static std::unordered_set<const KeyQualifier *, KeyedSet::Hash, KeyedSet::KeyEqual> keyeds;
 
 //------------------------------------------------------------------------------
-// KEYED TYPE
+// KEY QUALIFIER
 //------------------------------------------------------------------------------
 
-KeyedType::KeyedType(Symbol _key)
-    : Qualifier(TK_Keyed), key(_key) {}
+KeyQualifier::KeyQualifier(Symbol _key)
+    : Qualifier((QualifierKind)Kind), key(_key) {}
 
-void KeyedType::stream_name(StyledStream &ss) const {
+void KeyQualifier::stream_prefix(StyledStream &ss) const {
     ss << key.name()->data << "=";
+}
+
+void KeyQualifier::stream_postfix(StyledStream &ss) const {
 }
 
 //------------------------------------------------------------------------------
 
-const Type *keyed_type(Symbol key, const Type *type) {
+const Type *key_type(Symbol key, const Type *type) {
     if (key == SYM_Unnamed) {
-        return strip_qualifier(type, TK_Keyed);
+        return strip_qualifier(type, QK_Key);
     }
-    const KeyedType *result = nullptr;
-    KeyedType kt(key);
+    const KeyQualifier *result = nullptr;
+    KeyQualifier kt(key);
     auto it = keyeds.find(&kt);
     if (it != keyeds.end()) {
         result = *it;
     } else {
-        result = new KeyedType(key);
+        result = new KeyQualifier(key);
         keyeds.insert(result);
     }
     return qualify(type, { result });
 }
 
-sc_symbol_type_tuple_t key_type(const Type *type) {
-    auto kt = try_qualifier<KeyedType>(type);
+sc_symbol_type_tuple_t type_key(const Type *type) {
+    auto kt = try_qualifier<KeyQualifier>(type);
     if (kt) {
-        return { kt->key, strip_qualifier<KeyedType>(type) };
+        return { kt->key, strip_qualifier<KeyQualifier>(type) };
     } else {
         return { SYM_Unnamed, type };
     }

@@ -9,7 +9,7 @@
 #include "utils.hpp"
 #include "tuple_type.hpp"
 #include "hash.hpp"
-#include "keyed_type.hpp"
+#include "key_qualifier.hpp"
 
 #include <unordered_set>
 
@@ -74,7 +74,7 @@ UnionType::UnionType(const ArgTypes &_values)
     }
     size = scopes::align(sz, al);
     align = al;
-    this->tuple_type = scopes::tuple_type({key_type(values[largest_field])._1}).assert_ok();
+    this->tuple_type = scopes::tuple_type({type_key(values[largest_field])._1}).assert_ok();
 }
 
 SCOPES_RESULT(const Type *) UnionType::type_at_index(size_t i) const {
@@ -85,7 +85,7 @@ SCOPES_RESULT(const Type *) UnionType::type_at_index(size_t i) const {
 
 size_t UnionType::field_index(Symbol name) const {
     for (size_t i = 0; i < values.size(); ++i) {
-        if (name == key_type(values[i])._0)
+        if (name == type_key(values[i])._0)
             return i;
     }
     return (size_t)-1;
@@ -94,7 +94,7 @@ size_t UnionType::field_index(Symbol name) const {
 SCOPES_RESULT(Symbol) UnionType::field_name(size_t i) const {
     SCOPES_RESULT_TYPE(Symbol);
     SCOPES_CHECK_RESULT(verify_range(i, values.size()));
-    return key_type(values[i])._0;
+    return type_key(values[i])._0;
 }
 
 //------------------------------------------------------------------------------
