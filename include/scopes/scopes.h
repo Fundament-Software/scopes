@@ -352,11 +352,6 @@ const sc_string_t *sc_type_string(const sc_type_t *T);
 sc_symbol_value_tuple_t sc_type_next(const sc_type_t *type, sc_symbol_t key);
 void sc_type_set_symbol(sc_type_t *T, sc_symbol_t sym, sc_value_t *value);
 
-// keyed types
-
-sc_symbol_type_tuple_t sc_type_key(const sc_type_t *T);
-const sc_type_t *sc_key_type(sc_symbol_t name, const sc_type_t *T);
-
 // pointer types
 
 const sc_type_t *sc_pointer_type(const sc_type_t *T, uint64_t flags, sc_symbol_t storage_class);
@@ -403,11 +398,14 @@ const sc_type_t *sc_arguments_type_join(const sc_type_t *T1, const sc_type_t *T2
 int sc_arguments_type_argcount(sc_type_t *T);
 const sc_type_t *sc_arguments_type_getarg(sc_type_t *T, int index);
 
-// unique types
+// qualifiers
 
+const sc_type_t *sc_key_type(sc_symbol_t name, const sc_type_t *T);
+sc_symbol_type_tuple_t sc_type_key(const sc_type_t *T);
 const sc_type_t *sc_move_type(const sc_type_t *type);
 const sc_type_t *sc_view_type(const sc_type_t *type, int id);
 const sc_type_t *sc_mutate_type(const sc_type_t *type);
+const sc_type_t *sc_refer_type(const sc_type_t *type, uint64_t flags, sc_symbol_t storage_class);
 
 // function types
 

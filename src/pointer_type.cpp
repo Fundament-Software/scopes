@@ -72,11 +72,11 @@ size_t PointerType::size() {
 }
 
 bool PointerType::is_readable() const {
-    return !(flags & PTF_NonReadable);
+    return pointer_flags_is_readable(flags);
 }
 
 bool PointerType::is_writable() const {
-    return !(flags & PTF_NonWritable);
+    return pointer_flags_is_writable(flags);
 }
 
 bool PointerType::is_unique() const {
@@ -120,6 +120,14 @@ const Type *static_pointer_type(const Type *element_type) {
 }
 
 //------------------------------------------------------------------------------
+
+bool pointer_flags_is_readable(uint64_t flags) {
+    return !(flags & PTF_NonReadable);
+}
+
+bool pointer_flags_is_writable(uint64_t flags) {
+    return !(flags & PTF_NonWritable);
+}
 
 uint64_t required_flags_for_storage_class(Symbol storage_class) {
     switch (storage_class.value()) {

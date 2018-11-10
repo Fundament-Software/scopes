@@ -50,7 +50,6 @@ MutateQualifier::MutateQualifier()
     : Qualifier((QualifierKind)Kind) {}
 
 void MutateQualifier::stream_prefix(StyledStream &ss) const {
-    ss << "!";
 }
 
 void MutateQualifier::stream_postfix(StyledStream &ss) const {

@@ -42,6 +42,9 @@ struct PointerType : Type {
     Symbol storage_class;
 };
 
+bool pointer_flags_is_readable(uint64_t flags);
+bool pointer_flags_is_writable(uint64_t flags);
+
 const Type *pointer_type(const Type *element_type, uint64_t flags,
     Symbol storage_class);
 

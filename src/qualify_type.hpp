@@ -17,8 +17,9 @@ namespace scopes {
 #define SCOPES_QUALIFIER_KIND() \
     T(QK_Key, "qualifier-kind-key", KeyQualifier) \
     T(QK_Move, "qualifier-kind-move", MoveQualifier) \
+    T(QK_View, "qualifier-kind-view", ViewQualifier) \
     T(QK_Mutate, "qualifier-kind-mutate", MutateQualifier) \
-    T(QK_View, "qualifier-kind-view", ViewQualifier)
+    T(QK_Refer, "qualifier-kind-refer", ReferQualifier)
 
 enum QualifierKind {
 #define T(NAME, BNAME, CLASS) \

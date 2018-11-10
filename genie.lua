@@ -118,6 +118,7 @@ project "scopesrt"
         "src/union_type.cpp",
         "src/unique_qualifiers.cpp",
         "src/key_qualifier.cpp",
+        "src/refer_qualifier.cpp",
         "src/qualify_type.cpp",
         "src/arguments_type.cpp",
         "src/function_type.cpp",
