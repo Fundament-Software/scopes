@@ -233,9 +233,6 @@ static size_t classify(const Type *T, ABIClass *classes, size_t offset) {
             return classify(storage_type(T).assert_ok(), classes, offset);
         }
     } break;
-    case TK_Keyed: {
-        return classify(cast<KeyedType>(T)->type, classes, offset);
-    } break;
     case TK_Vector: {
         auto tt = cast<VectorType>(T);
         return classify_array_like(size_of(T).assert_ok(),

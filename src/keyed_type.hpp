@@ -9,6 +9,7 @@
 
 #include "type.hpp"
 #include "symbol.hpp"
+#include "qualified_type.hpp"
 #include "scopes/scopes.h"
 
 namespace scopes {
@@ -18,9 +19,10 @@ namespace scopes {
 //------------------------------------------------------------------------------
 
 struct KeyedType : Qualifier {
+    enum { Kind = TK_Keyed };
     static bool classof(const Type *T);
 
-    KeyedType(Symbol key, const Type *type);
+    KeyedType(Symbol key);
     void stream_name(StyledStream &ss) const;
 
     Symbol key;

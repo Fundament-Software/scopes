@@ -186,8 +186,9 @@ Template::Template(const Anchor *anchor, Symbol _name, const Parameters &_params
     : Value(VK_Template, anchor),
         name(_name), params(_params), value(_value),
         _inline(false), docstring(nullptr) {
+    int index = 0;
     for (auto param : params) {
-        param->set_owner(this);
+        param->set_owner(this, index++);
     }
 }
 
@@ -204,8 +205,8 @@ bool Template::is_inline() const {
 }
 
 void Template::append_param(Parameter *sym) {
+    sym->set_owner(this, params.size());
     params.push_back(sym);
-    sym->set_owner(this);
 }
 
 Template *Template::from(
@@ -224,8 +225,9 @@ Function::Function(const Anchor *anchor, Symbol _name, const Parameters &_params
         complete(false), next_id(1) {
     set_type(TYPE_Unknown);
     body.depth = 1;
+    int index = 0;
     for (auto param : params) {
-        param->set_owner(this);
+        param->set_owner(this, index++);
     }
 }
 
@@ -263,8 +265,8 @@ uint32_t Function::get_id(Symbol name) {
 void Function::append_param(Parameter *sym) {
     // verify that the symbol is typed
     assert(sym->is_typed());
+    sym->set_owner(this, params.size());
     params.push_back(sym);
-    sym->set_owner(this);
 }
 
 Value *Function::resolve_local(Value *node) const {
@@ -521,7 +523,7 @@ Try::Try(const Anchor *anchor, Value *_try_value, Parameter *_except_param, Valu
         raise_type(nullptr)
 {
     if (except_param)
-        except_param->set_owner(this);
+        except_param->set_owner(this, 0);
 }
 
 Try *Try::from(const Anchor *anchor, Value *try_value, Parameter *except_param,
@@ -531,13 +533,13 @@ Try *Try::from(const Anchor *anchor, Value *try_value, Parameter *except_param,
 
 void Try::set_except_param(Parameter *param) {
     except_param = param;
-    except_param->set_owner(this);
+    except_param->set_owner(this, 0);
 }
 
 //------------------------------------------------------------------------------
 
 Parameter::Parameter(const Anchor *anchor, Symbol _name, const Type *_type, bool _variadic)
-    : Value(VK_Parameter, anchor), name(_name), variadic(_variadic), owner(nullptr) {
+    : Value(VK_Parameter, anchor), name(_name), variadic(_variadic), owner(nullptr), index(-1) {
     if (_type) set_type(_type);
 }
 
@@ -553,9 +555,10 @@ bool Parameter::is_variadic() const {
     return variadic;
 }
 
-void Parameter::set_owner(Value *_owner) {
+void Parameter::set_owner(Value *_owner, int _index) {
     assert(!owner);
     owner = _owner;
+    index = _index;
 }
 
 //------------------------------------------------------------------------------
@@ -589,7 +592,7 @@ Call *Call::from(const Anchor *anchor, Value *callee, const Values &args) {
 Loop::Loop(const Anchor *anchor, Parameter *_param, Value *_init, Value *_value)
     : Instruction(VK_Loop, anchor), param(_param), init(_init), value(_value), return_type(nullptr) {
     if (param) {
-        param->set_owner(this);
+        param->set_owner(this, 0);
     }
 }
 
@@ -600,7 +603,7 @@ Loop *Loop::from(const Anchor *anchor, Parameter *param, Value *init, Value *val
 void Loop::set_param(Parameter *_param) {
     assert(!param);
     param = _param;
-    param->set_owner(this);
+    param->set_owner(this, 0);
 }
 
 //------------------------------------------------------------------------------

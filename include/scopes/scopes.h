@@ -407,6 +407,7 @@ const sc_type_t *sc_arguments_type_getarg(sc_type_t *T, int index);
 
 const sc_type_t *sc_move_type(const sc_type_t *type);
 const sc_type_t *sc_view_type(const sc_type_t *type, int id);
+const sc_type_t *sc_mutated_type(const sc_type_t *type);
 
 // function types
 

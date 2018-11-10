@@ -33,7 +33,9 @@ struct Value;
     T(TK_Keyed, "type-kind-keyed", KeyedType) \
     T(TK_Move, "type-kind-move", MoveType) \
     T(TK_View, "type-kind-view", ViewType) \
+    T(TK_Mutated, "type-kind-mutated", MutatedType) \
     /* abstract types */ \
+    T(TK_Qualified, "type-kind-qualified", QualifiedType) \
     T(TK_Arguments, "type-kind-arguments", ArgumentsType) \
     T(TK_Typename, "type-kind-typename", TypenameType) \
     /* machine types */ \
@@ -95,19 +97,6 @@ typedef std::vector<const Type *> ArgTypes;
 
 //------------------------------------------------------------------------------
 
-struct Qualifier : Type {
-    static bool classof(const Type *T);
-
-    Qualifier(TypeKind kind, const Type *_type);
-
-    const Type *type;
-};
-
-bool is_qualifier(const Type *T);
-const Type *next_qualifier(const Type *T);
-
-//------------------------------------------------------------------------------
-
 #define B_TYPES() \
     /* types */ \
     T(TYPE_Nothing, "Nothing") \
@@ -164,6 +153,8 @@ const Type *next_qualifier(const Type *T);
     T(TYPE_Keyed, "Keyed") \
     T(TYPE_Move, "Move") \
     T(TYPE_View, "View") \
+    T(TYPE_Mutated, "Mutated") \
+    T(TYPE_Qualified, "Qualified") \
     T(TYPE_Typename, "typename") \
     T(TYPE_Arguments, "Arguments") \
     T(TYPE_Raises, "Raises") \
@@ -190,7 +181,6 @@ void stream_type_name(StyledStream &ss, const Type *T);
 bool is_returning(const Type *T);
 bool is_returning_value(const Type *T);
 SCOPES_RESULT(bool) types_compatible(const Type *paramT, const Type *argT);
-const Type *strip_qualifiers(const Type *T);
 bool is_tracked(const Type *T);
 
 //------------------------------------------------------------------------------

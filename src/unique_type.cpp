@@ -16,22 +16,6 @@ namespace scopes {
 
 //------------------------------------------------------------------------------
 
-namespace MoveSet {
-struct Hash {
-    std::size_t operator()(const MoveType *s) const {
-        return std::hash<const Type *>{}(s->type);
-    }
-};
-
-struct KeyEqual {
-    bool operator()( const MoveType *lhs, const MoveType *rhs ) const {
-        return lhs->type == rhs->type;
-    }
-};
-} // namespace MoveSet
-
-static std::unordered_set<const MoveType *, MoveSet::Hash, MoveSet::KeyEqual> moves;
-
 namespace ViewSet {
 struct Hash {
     std::size_t operator()(const ViewType *s) const {
@@ -41,8 +25,7 @@ struct Hash {
 
 struct KeyEqual {
     bool operator()( const ViewType *lhs, const ViewType *rhs ) const {
-        return lhs->type == rhs->type
-            && lhs->ids == rhs->ids;
+        return lhs->ids == rhs->ids;
     }
 };
 } // namespace ViewSet
@@ -51,23 +34,31 @@ static std::unordered_set<const ViewType *, ViewSet::Hash, ViewSet::KeyEqual> vi
 
 //------------------------------------------------------------------------------
 
-MoveType::MoveType(const Type *type)
-    : Qualifier(TK_Move, type) {}
+MoveType::MoveType()
+    : Qualifier(TK_Move) {}
 
 void MoveType::stream_name(StyledStream &ss) const {
     ss << "†";
-    stream_type_name(ss, type);
 }
 
 //------------------------------------------------------------------------------
 
-ViewType::ViewType(const Type *type, const IDSet &_ids)
-    : Qualifier(TK_View, type), ids(_ids) {
+MutatedType::MutatedType()
+    : Qualifier(TK_Mutated) {}
+
+void MutatedType::stream_name(StyledStream &ss) const {
+    ss << "!";
+}
+
+//------------------------------------------------------------------------------
+
+ViewType::ViewType(const IDSet &_ids)
+    : Qualifier(TK_View), ids(_ids) {
     for (auto entry : ids) {
         sorted_ids.push_back(entry);
     }
     std::sort(sorted_ids.begin(), sorted_ids.end());
-    std::size_t h = std::hash<const Type *>{}(type);
+    std::size_t h = 0;
     for (auto &&entry : sorted_ids) {
         h = hash2(h, std::hash<int>{}(entry));
     }
@@ -81,21 +72,28 @@ void ViewType::stream_name(StyledStream &ss) const {
         ss << sorted_ids[i];
     }
     ss << ":";
-    stream_type_name(ss, type);
 }
 
 //------------------------------------------------------------------------------
 
+static const MoveType *_move_type = nullptr;
 const Type * move_type(const Type *type) {
     if (has_qualifier<MoveType>(type))
         return type;
-    MoveType key(type);
-    auto it = moves.find(&key);
-    if (it != moves.end())
-        return *it;
-    auto result = new MoveType(type);
-    moves.insert(result);
-    return result;
+    if (!_move_type) {
+        _move_type = new MoveType();
+    }
+    return qualify(type, { _move_type });
+}
+
+static const MutatedType *_mutated_type = nullptr;
+const Type *mutated_type(const Type *type) {
+    if (has_qualifier<MutatedType>(type))
+        return type;
+    if (!_mutated_type) {
+        _mutated_type = new MutatedType();
+    }
+    return qualify(type, { _mutated_type });
 }
 
 const Type * view_type(const Type *type, IDSet ids) {
@@ -104,15 +102,17 @@ const Type * view_type(const Type *type, IDSet ids) {
         for (auto entry : vt->ids) {
             ids.insert(entry);
         }
-        type = vt->type;
     }
-    ViewType key(type, ids);
+    const ViewType *result = nullptr;
+    ViewType key(ids);
     auto it = views.find(&key);
-    if (it != views.end())
-        return *it;
-    auto result = new ViewType(type, ids);
-    views.insert(result);
-    return result;
+    if (it != views.end()) {
+        result = *it;
+    } else {
+        result = new ViewType(ids);
+        views.insert(result);
+    }
+    return qualify(type, { result });
 }
 
 } // namespace scopes

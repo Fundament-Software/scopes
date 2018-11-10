@@ -2051,13 +2051,13 @@ SCOPES_RESULT(Function *) prove(Function *frame, Template *func, const ArgTypes 
         fn->return_type = TYPE_NoReturn;
     if (!fn->except_type)
         fn->except_type = TYPE_NoReturn;
-    fn->complete = true;
     fn->change_type(get_function_type(fn));
     merge_depends(fnctx, fn->deps, fn->value);
     for (auto &&ret : fn->returns) {
         merge_depends(fnctx, fn->deps, ret->value);
     }
     SCOPES_CHECK_RESULT(track(fnctx));
+    fn->complete = true;
     return fn;
 }
 

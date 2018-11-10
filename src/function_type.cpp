@@ -8,6 +8,7 @@
 #include "arguments_type.hpp"
 #include "tuple_type.hpp"
 #include "pointer_type.hpp"
+#include "qualified_type.hpp"
 #include "error.hpp"
 #include "dyn_cast.inc"
 #include "hash.hpp"

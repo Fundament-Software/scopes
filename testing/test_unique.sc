@@ -22,9 +22,9 @@ compile-stage;
 fn test (a b c)
     #let a = (move a)
     #let b = (move b)
-    if true (move a)
-    elseif true (move b)
-    else (move c)
+    #print a
+    if true a
+    else b
 
 let test = (typify test T T T)
 dump-ast test

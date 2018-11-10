@@ -9,6 +9,7 @@
 #include "utils.hpp"
 #include "hash.hpp"
 #include "dyn_cast.inc"
+#include "qualifier.inc"
 
 #include <assert.h>
 
@@ -19,14 +20,13 @@ namespace scopes {
 namespace KeyedSet {
     struct Hash {
         std::size_t operator()(const KeyedType *s) const {
-            return hash2(s->key.hash(), std::hash<const Type *>{}(s->type));
+            return s->key.hash();
         }
     };
 
     struct KeyEqual {
         bool operator()( const KeyedType *lhs, const KeyedType *rhs ) const {
             if (lhs->key != rhs->key) return false;
-            if (lhs->type != rhs->type) return false;
             return true;
         }
     };
@@ -38,34 +38,35 @@ static std::unordered_set<const KeyedType *, KeyedSet::Hash, KeyedSet::KeyEqual>
 // KEYED TYPE
 //------------------------------------------------------------------------------
 
-KeyedType::KeyedType(Symbol _key, const Type *_type)
-    : Qualifier(TK_Keyed, _type), key(_key) {}
+KeyedType::KeyedType(Symbol _key)
+    : Qualifier(TK_Keyed), key(_key) {}
 
 void KeyedType::stream_name(StyledStream &ss) const {
     ss << key.name()->data << "=";
-    stream_type_name(ss, type);
 }
 
 //------------------------------------------------------------------------------
 
 const Type *keyed_type(Symbol key, const Type *type) {
-    if (isa<KeyedType>(type))
-        type = cast<KeyedType>(type)->type;
-    if (key == SYM_Unnamed)
-        return type;
-    KeyedType kt(key, type);
+    if (key == SYM_Unnamed) {
+        return strip_qualifier(type, TK_Keyed);
+    }
+    const KeyedType *result = nullptr;
+    KeyedType kt(key);
     auto it = keyeds.find(&kt);
-    if (it != keyeds.end())
-        return *it;
-    auto result = new KeyedType(key, type);
-    keyeds.insert(result);
-    return result;
+    if (it != keyeds.end()) {
+        result = *it;
+    } else {
+        result = new KeyedType(key);
+        keyeds.insert(result);
+    }
+    return qualify(type, { result });
 }
 
 sc_symbol_type_tuple_t key_type(const Type *type) {
-    auto kt = dyn_cast<KeyedType>(type);
+    auto kt = try_qualifier<KeyedType>(type);
     if (kt) {
-        return { kt->key, kt->type };
+        return { kt->key, strip_qualifier<KeyedType>(type) };
     } else {
         return { SYM_Unnamed, type };
     }

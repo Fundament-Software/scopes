@@ -1541,11 +1541,18 @@ const sc_type_t *sc_arguments_type_getarg(sc_type_t *T, int index) {
 ////////////////////////////////////////////////////////////////////////////////
 
 const sc_type_t *sc_move_type(const sc_type_t *type) {
+    using namespace scopes;
     return move_type(type);
 }
 
 const sc_type_t *sc_view_type(const sc_type_t *type, int id) {
+    using namespace scopes;
     return view_type(type, { id });
+}
+
+const sc_type_t *sc_mutated_type(const sc_type_t *type) {
+    using namespace scopes;
+    return mutated_type(type);
 }
 
 // Function Type
@@ -1862,6 +1869,7 @@ void init_globals(int argc, char *argv[]) {
 
     DEFINE_EXTERN_C_FUNCTION(sc_move_type, TYPE_Type, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_view_type, TYPE_Type, TYPE_Type, TYPE_I32);
+    DEFINE_EXTERN_C_FUNCTION(sc_mutated_type, TYPE_Type, TYPE_Type);
 
     DEFINE_EXTERN_C_FUNCTION(sc_image_type, TYPE_Type,
         TYPE_Type, TYPE_Symbol, TYPE_I32, TYPE_I32, TYPE_I32, TYPE_I32, TYPE_Symbol, TYPE_Symbol);

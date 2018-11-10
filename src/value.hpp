@@ -378,11 +378,12 @@ struct Parameter : Value {
     static Parameter *variadic_from(const Anchor *anchor, Symbol name = SYM_Unnamed, const Type *type = nullptr);
 
     bool is_variadic() const;
-    void set_owner(Value *_owner);
+    void set_owner(Value *_owner, int _index);
 
     Symbol name;
     bool variadic;
     Value *owner;
+    int index;
 };
 
 //------------------------------------------------------------------------------

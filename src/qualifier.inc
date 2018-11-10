@@ -14,21 +14,19 @@ namespace scopes {
 
 template<typename T>
 static bool has_qualifier(const Type *type) {
-    while (is_qualifier(type)) {
-        if (isa<T>(type)) return true;
-        type = next_qualifier(type);
-    }
-    return false;
+    return find_qualifier(type, (TypeKind)T::Kind) != nullptr;
 }
 
 template<typename T>
 static const T *try_qualifier(const Type *type) {
-    while (is_qualifier(type)) {
-        auto val = dyn_cast<T>(type);
-        if (val) return val;
-        type = next_qualifier(type);
-    }
-    return nullptr;
+    auto q = find_qualifier(type, (TypeKind)T::Kind);
+    if (!q) return nullptr;
+    return cast<T>(q);
+}
+
+template<typename T>
+static const Type *strip_qualifier(const Type *type) {
+    return strip_qualifier(type, (TypeKind)T::Kind);
 }
 
 }

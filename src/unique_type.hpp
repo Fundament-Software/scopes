@@ -8,6 +8,7 @@
 #define SCOPES_UNIQUE_TYPE_HPP
 
 #include "type.hpp"
+#include "qualified_type.hpp"
 
 #include <vector>
 #include <unordered_set>
@@ -17,11 +18,23 @@ namespace scopes {
 //------------------------------------------------------------------------------
 
 struct MoveType : Qualifier {
+    enum { Kind = TK_Move };
     static bool classof(const Type *T);
 
     void stream_name(StyledStream &ss) const;
 
-    MoveType(const Type *type);
+    MoveType();
+};
+
+//------------------------------------------------------------------------------
+
+struct MutatedType : Qualifier {
+    enum { Kind = TK_Mutated };
+    static bool classof(const Type *T);
+
+    void stream_name(StyledStream &ss) const;
+
+    MutatedType();
 };
 
 //------------------------------------------------------------------------------
@@ -30,11 +43,12 @@ typedef std::unordered_set<int> IDSet;
 typedef std::vector<int> IDs;
 
 struct ViewType : Qualifier {
+    enum { Kind = TK_View };
     static bool classof(const Type *T);
 
     void stream_name(StyledStream &ss) const;
 
-    ViewType(const Type *type, const IDSet &ids);
+    ViewType(const IDSet &ids);
 
     IDSet ids;
     IDs sorted_ids;
@@ -44,6 +58,7 @@ struct ViewType : Qualifier {
 //------------------------------------------------------------------------------
 
 const Type *move_type(const Type *type);
+const Type *mutated_type(const Type *type);
 const Type *view_type(const Type *type, IDSet ids);
 
 } // namespace scopes

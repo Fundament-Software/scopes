@@ -501,7 +501,7 @@ struct Tracker {
             block.insert_at_end();
             state.finalized = true;
             SCOPES_CHECK_RESULT(track_return_argument(
-                state, return_value, state.block.depth - 1, "block"));
+                state, return_value, state.block.depth - 1, "block result"));
             state.finalized = false;
         }
         auto loc = state.where;
@@ -524,9 +524,59 @@ struct Tracker {
         SCOPES_RESULT_TYPE(void);
         State root_state(function->body);
         root_state.set_location(function);
-        SCOPES_CHECK_RESULT(verify_deps(root_state, function->deps,
-            function->return_type, "return"));
+        auto fT = extract_function_type(function->get_type());
+        auto return_type = fT->return_type;
+        auto &&deps = function->deps;
+        SCOPES_CHECK_RESULT(verify_deps(root_state, deps,
+            return_type, "return"));
         SCOPES_CHECK_RESULT(track_block(root_state, function->value));
+        {
+            ArgTypes rettypes;
+            int acount = get_argument_count(return_type);
+            auto &&args = deps.args;
+            auto &&kinds = deps.kinds;
+            for (int i = 0; i < acount; ++i) {
+                auto T = get_argument(return_type, i);
+                if (is_tracked(T) && (i < args.size())) {
+                    auto kind = kinds[i];
+                    IDSet set;
+                    if (kind == DK_Borrowed) {
+                        auto &&arg = args[i];
+                        for (auto &&key : arg) {
+                            auto param = dyn_cast<Parameter>(key.value);
+                            if (!param)
+                                continue;
+                            if (param->owner != function)
+                                continue;
+                            set.insert(param->index);
+                        }
+                    }
+                    if (!set.empty())
+                        T = view_type(T, set);
+                }
+                rettypes.push_back(T);
+            }
+            return_type = arguments_type(rettypes);
+        }
+        ArgTypes argtypes;
+        for (int i = 0; i < function->params.size(); ++i) {
+            auto param = function->params[i];
+            const Type *T = param->get_type();
+            const Data *data = root_state.find_data(ValueIndex(param));
+            if (data) {
+                if (data->will_be_moved()) {
+                    T = move_type(T);
+                }
+            }
+            argtypes.push_back(T);
+        }
+        auto newT = native_ro_pointer_type(raising_function_type(
+            fT->except_type, return_type, argtypes, fT->flags));
+        if (function->get_type() != newT) {
+            StyledStream ss;
+            ss << function->get_type() << " -> " << newT << std::endl;
+            function->change_type(newT);
+        }
         return {};
     }
 

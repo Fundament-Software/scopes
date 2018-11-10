@@ -19,3 +19,4 @@
 #include "sampledimage_type.hpp"
 #include "keyed_type.hpp"
 #include "unique_type.hpp"
+#include "qualified_type.hpp"
