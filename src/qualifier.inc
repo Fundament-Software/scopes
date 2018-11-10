@@ -7,7 +7,7 @@
 #ifndef SCOPES_QUALIFIER_INC
 #define SCOPES_QUALIFIER_INC
 
-#include "qualify_type.hpp"
+#include "type/qualify_type.hpp"
 #include "dyn_cast.inc"
 
 namespace scopes {

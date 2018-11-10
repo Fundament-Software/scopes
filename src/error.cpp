@@ -10,7 +10,7 @@
 #include "boot.hpp"
 #include "value.hpp"
 #include "stream_ast.hpp"
-#include "arguments_type.hpp"
+#include "type/arguments_type.hpp"
 #include "dyn_cast.inc"
 
 #include "scopes/config.h"

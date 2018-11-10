@@ -4,6 +4,6 @@
     See LICENSE.md for details.
 */
 
-#include "unique_qualifiers.hpp"
-#include "key_qualifier.hpp"
-#include "refer_qualifier.hpp"
+#include "qualifier/unique_qualifiers.hpp"
+#include "qualifier/key_qualifier.hpp"
+#include "qualifier/refer_qualifier.hpp"
