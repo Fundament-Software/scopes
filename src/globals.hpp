@@ -14,12 +14,14 @@ namespace scopes {
     T(g_sc_const_int_new, "sc_const_int_new") \
     T(g_sc_const_real_new, "sc_const_real_new") \
     T(g_sc_const_aggregate_new, "sc_const_aggregate_new") \
+    T(g_deref, "deref") \
     T(g_bitcast, "bitcast") \
     T(g_voidstar, "voidstar") \
     T(g_insertvalue, "insertvalue") \
     T(g_extractvalue, "extractvalue") \
     T(g_insertelement, "insertelement") \
     T(g_extractelement, "extractelement") \
+    T(g_getelementref, "getelementref") \
     T(g_store, "store") \
     T(g_getelementptr, "getelementptr") \
     T(g_zext, "zext") \

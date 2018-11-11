@@ -19,7 +19,8 @@
 #include "compiler_flags.hpp"
 #include "prover.hpp"
 #include "hash.hpp"
-
+#include "qualifiers.hpp"
+#include "qualifier.inc"
 #include "verify_tools.inc"
 
 #ifdef SCOPES_WIN32
@@ -579,8 +580,15 @@ struct LLVMIRGenerator {
     static SCOPES_RESULT(LLVMTypeRef) create_llvm_type(const Type *type) {
         SCOPES_RESULT_TYPE(LLVMTypeRef);
         switch(type->kind()) {
-        case TK_Qualify:
-            return _type_to_llvm_type(cast<QualifyType>(type)->type);
+        case TK_Qualify: {
+            auto qt = cast<QualifyType>(type);
+            auto lltype = SCOPES_GET_RESULT(_type_to_llvm_type(qt->type));
+            auto rq = try_qualifier<ReferQualifier>(type);
+            if (rq) {
+                lltype = LLVMPointerType(lltype, 0);
+            }
+            return lltype;
+        } break;
         case TK_Integer:
             return LLVMIntType(cast<IntegerType>(type)->width);
         case TK_Real:
@@ -1295,13 +1303,31 @@ struct LLVMIRGenerator {
                 return LLVMBuildArrayMalloc(builder, ty, val, ""); } break;
             case FN_Free: { READ_VALUE(val);
                 return LLVMBuildFree(builder, val); } break;
+            case FN_GetElementRef: {
+                READ_VALUE(pointer);
+                assert(LLVMGetTypeKind(LLVMTypeOf(pointer)) == LLVMPointerTypeKind);
+                assert(argcount > 1);
+                size_t count = argcount;
+                LLVMValueRef indices[count];
+                LLVMTypeRef IT = nullptr;
+                for (size_t i = 1; i < count; ++i) {
+                    indices[i] = SCOPES_GET_RESULT(node_to_value(args[i]));
+                    assert(LLVMGetValueKind(indices[i]) == LLVMConstantIntValueKind);
+                    IT = LLVMTypeOf(indices[i]);
+                }
+                assert(IT);
+                indices[0] = LLVMConstInt(IT, 0, false);
+                return LLVMBuildGEP(builder, pointer, indices, count, "");
+            } break;
             case FN_GetElementPtr: {
                 READ_VALUE(pointer);
+                assert(LLVMGetTypeKind(LLVMTypeOf(pointer)) == LLVMPointerTypeKind);
                 assert(argcount > 1);
                 size_t count = argcount - 1;
                 LLVMValueRef indices[count];
                 for (size_t i = 0; i < count; ++i) {
                     indices[i] = SCOPES_GET_RESULT(node_to_value(args[argn + i]));
+                    assert(LLVMGetTypeKind(LLVMTypeOf(indices[i])) == LLVMIntegerTypeKind);
                 }
                 return LLVMBuildGEP(builder, pointer, indices, count, "");
             } break;
@@ -1341,6 +1367,25 @@ struct LLVMIRGenerator {
                 return LLVMBuildUIToFP(builder, val, ty, ""); } break;
             case FN_SIToFP: { READ_VALUE(val); READ_TYPE(ty);
                 return LLVMBuildSIToFP(builder, val, ty, ""); } break;
+            case FN_Deref: {
+                READ_VALUE(ptr);
+                LLVMValueRef retvalue = LLVMBuildLoad(builder, ptr, "");
+                return retvalue;
+            } break;
+            case FN_Assign: {
+                READ_VALUE(lhs);
+                READ_VALUE(rhs);
+                LLVMValueRef retvalue = LLVMBuildStore(builder, lhs, rhs);
+                return retvalue;
+            } break;
+            case FN_PtrToRef: {
+                READ_VALUE(ptr);
+                return ptr;
+            } break;
+            case FN_RefToPtr: {
+                READ_VALUE(ptr);
+                return ptr;
+            } break;
             case FN_VolatileLoad:
             case FN_Load: { READ_VALUE(ptr);
                 LLVMValueRef retvalue = LLVMBuildLoad(builder, ptr, "");

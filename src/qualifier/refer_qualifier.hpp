@@ -26,12 +26,16 @@ struct ReferQualifier : Qualifier {
     void stream_prefix(StyledStream &ss) const;
     void stream_postfix(StyledStream &ss) const;
 
+    const Type *get_pointer_type(const Type *ET) const;
+
     uint64_t flags;
     Symbol storage_class;
 };
 
 const Type *refer_type(const Type *element_type, uint64_t flags,
     Symbol storage_class);
+uint64_t refer_flags(const Type *T);
+Symbol refer_storage_class(const Type *T);
 
 } // namespace scopes
 

@@ -5,7 +5,9 @@
 */
 
 #include "refer_qualifier.hpp"
+#include "../type/pointer_type.hpp"
 #include "../hash.hpp"
+#include "../qualifier.inc"
 
 #include <assert.h>
 
@@ -53,6 +55,10 @@ void ReferQualifier::stream_prefix(StyledStream &ss) const {
 void ReferQualifier::stream_postfix(StyledStream &ss) const {
 }
 
+const Type *ReferQualifier::get_pointer_type(const Type *ET) const {
+    return pointer_type(ET, flags, storage_class);
+}
+
 ReferQualifier::ReferQualifier(uint64_t _flags, Symbol _storage_class)
     : Qualifier((QualifierKind)Kind),
         flags(_flags),
@@ -73,6 +79,18 @@ const Type *refer_type(const Type *type, uint64_t flags,
         refers.insert(result);
     }
     return qualify(type, { result });
+}
+
+uint64_t refer_flags(const Type *T) {
+    auto q = try_qualifier<ReferQualifier>(T);
+    if (q) { return q->flags; }
+    return 0;
+}
+
+Symbol refer_storage_class(const Type *T) {
+    auto q = try_qualifier<ReferQualifier>(T);
+    if (q) { return q->storage_class; }
+    return SYM_Unnamed;
 }
 
 //------------------------------------------------------------------------------

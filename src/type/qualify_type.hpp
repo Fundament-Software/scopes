@@ -66,6 +66,7 @@ const Type *qualify(const Type *type, const Qualifiers &qualifiers);
 const Qualifier *find_qualifier(const Type *type, QualifierKind kind);
 const Type *strip_qualifiers(const Type *T);
 const Type *strip_qualifier(const Type *T, QualifierKind kind);
+const Type *copy_qualifiers(const Type *type, const Type *from);
 
 //------------------------------------------------------------------------------
 

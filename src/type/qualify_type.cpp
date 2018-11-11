@@ -115,6 +115,14 @@ const Type *qualify(const Type *type, const Qualifiers &qualifiers) {
     return result;
 }
 
+const Type *copy_qualifiers(const Type *type, const Type *from) {
+    auto qt = dyn_cast<QualifyType>(from);
+    if (qt) {
+        return qualify(type, qt->sorted_qualifiers);
+    }
+    return type;
+}
+
 const Qualifier *find_qualifier(const Type *type, QualifierKind kind) {
     if (isa<QualifyType>(type)) {
         auto qt = cast<QualifyType>(type);

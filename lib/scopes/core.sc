@@ -2087,6 +2087,9 @@ let
 
 compile-stage;
 
+inline = (lhs rhs)
+    assign rhs lhs
+
 define-infix< 50 +=
 define-infix< 50 -=
 define-infix< 50 *=
@@ -3766,7 +3769,7 @@ let ref-attribs-key = '__refattrs
                     attrs
             'set-symbol attrs name value
 
-spice deref (values...)
+#spice deref (values...)
     let count = ('argcount values...)
     let result = (sc_argument_list_new)
     for i kvalue in (enumerate ('args values...))

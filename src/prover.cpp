@@ -118,6 +118,39 @@ static TypeKind canonical_typekind(TypeKind k) {
     return k;
 }
 
+static SCOPES_RESULT(const ReferQualifier *) verify_refer(const Type *T) {
+    SCOPES_RESULT_TYPE(const ReferQualifier *);
+    auto rq = try_qualifier<ReferQualifier>(T);
+    if (!rq) {
+        StyledString ss;
+        ss.out << "value of type " << T << " must be reference";
+        SCOPES_LOCATION_ERROR(ss.str());
+    }
+    return rq;
+}
+
+static SCOPES_RESULT(void) verify_readable(const ReferQualifier *Q, const Type *T) {
+    SCOPES_RESULT_TYPE(void);
+    if (!pointer_flags_is_readable(Q->flags)) {
+        StyledString ss;
+        ss.out << "can not dereference value of type " << T
+            << " because the reference is non-readable";
+        SCOPES_LOCATION_ERROR(ss.str());
+    }
+    return {};
+}
+
+static SCOPES_RESULT(void) verify_writable(const ReferQualifier *Q, const Type *T) {
+    SCOPES_RESULT_TYPE(void);
+    if (!pointer_flags_is_writable(Q->flags)) {
+        StyledString ss;
+        ss.out << "can not assign to value of type " << T
+            << " because the reference is non-writable";
+        SCOPES_LOCATION_ERROR(ss.str());
+    }
+    return {};
+}
+
 static SCOPES_RESULT(void) verify_readable(const Type *T) {
     SCOPES_RESULT_TYPE(void);
     auto pi = cast<PointerType>(T);
@@ -1044,6 +1077,22 @@ static SCOPES_RESULT(void) verify_real_ops(const Type *a, const Type *b, const T
     return verify(a, c);
 }
 
+static SCOPES_RESULT(void) build_deref(
+    const ASTContext &ctx, const Anchor *anchor, Value *&val) {
+    SCOPES_RESULT_TYPE(void);
+    auto T = val->get_type();
+    auto rq = try_qualifier<ReferQualifier>(T);
+    if (rq) {
+        SCOPES_CHECK_RESULT(verify_readable(rq, T));
+        auto retT = strip_qualifier<ReferQualifier>(T);
+        auto call = Call::from(anchor, g_deref, { val });
+        call->set_type(retT);
+        ctx.append(call);
+        val = call;
+    }
+    return {};
+}
+
 #define CHECKARGS(MINARGS, MAXARGS) \
     SCOPES_CHECK_RESULT((checkargs<MINARGS, MAXARGS>(argcount)))
 #define RETARGTYPES(...) \
@@ -1052,14 +1101,28 @@ static SCOPES_RESULT(void) verify_real_ops(const Type *a, const Type *b, const T
         newcall->set_type(arguments_type({ __VA_ARGS__ })); \
         return newcall; \
     }
-#define READ_TYPEOF(NAME) \
+#define DEREF(NAME) \
+        SCOPES_CHECK_RESULT(build_deref(ctx, call->anchor(), NAME));
+#define READ_NODEREF_TYPEOF(NAME) \
         assert(argn < argcount); \
         auto &&_ ## NAME = values[argn++]; \
         const Type *NAME = _ ## NAME->get_type();
+#define READ_TYPEOF(NAME) \
+        assert(argn < argcount); \
+        auto &&_ ## NAME = values[argn++]; \
+        DEREF(_ ## NAME); \
+        const Type *NAME = _ ## NAME->get_type();
+#define READ_NODEREF_STORAGETYPEOF(NAME) \
+        assert(argn < argcount); \
+        auto &&_ ## NAME = values[argn++]; \
+        const Type *typeof_ ## NAME = _ ## NAME->get_type(); \
+        const Type *NAME = SCOPES_GET_RESULT(storage_type(typeof_ ## NAME));
 #define READ_STORAGETYPEOF(NAME) \
         assert(argn < argcount); \
         auto &&_ ## NAME = values[argn++]; \
-        const Type *NAME = SCOPES_GET_RESULT(storage_type(_ ## NAME->get_type()));
+        DEREF(_ ## NAME); \
+        const Type *typeof_ ## NAME = _ ## NAME->get_type(); \
+        const Type *NAME = SCOPES_GET_RESULT(storage_type(typeof_ ## NAME));
 #define READ_INT_CONST(NAME) \
         assert(argn < argcount); \
         auto &&_ ## NAME = values[argn++]; \
@@ -1098,6 +1161,43 @@ static bool keys_from_parameters(Symbols &keys, const Parameters &params) {
         }
     }
     return vararg;
+}
+
+static SCOPES_RESULT(const Type *) ptr_to_ref(const Type *T) {
+    SCOPES_RESULT_TYPE(const Type *);
+    T = SCOPES_GET_RESULT(storage_type(T));
+    SCOPES_CHECK_RESULT(verify_kind<TK_Pointer>(T));
+    auto pt = cast<PointerType>(T);
+    return refer_type(
+        pt->element_type, pt->flags, pt->storage_class);
+}
+
+static SCOPES_RESULT(const Type *) ref_to_ptr(const Type *T) {
+    SCOPES_RESULT_TYPE(const Type *);
+    auto rq = SCOPES_GET_RESULT(verify_refer(T));
+    return copy_qualifiers(
+        rq->get_pointer_type(strip_qualifiers(T)),
+        strip_qualifier<ReferQualifier>(T));
+}
+
+template<typename T>
+SCOPES_RESULT(void) sanitize_tuple_index(const Anchor *anchor, const Type *ST, const T *type, uint64_t &arg, Value *&_arg) {
+    SCOPES_RESULT_TYPE(void);
+    if (_arg->get_type() != TYPE_I32) {
+        _arg = ConstInt::from(anchor, TYPE_I32, arg);
+    } else if (_arg->get_type() == TYPE_Symbol) {
+        auto sym = Symbol::wrap(arg);
+        size_t idx = type->field_index(sym);
+        if (idx == (size_t)-1) {
+            StyledString ss;
+            ss.out << "no such field " << sym << " in storage type " << ST;
+            SCOPES_LOCATION_ERROR(ss.str());
+        }
+        // rewrite field
+        arg = idx;
+        _arg = ConstInt::from(anchor, TYPE_I32, idx);
+    }
+    return {};
 }
 
 static SCOPES_RESULT(Value *) prove_call_interior(const ASTContext &ctx, Call *call) {
@@ -1208,12 +1308,12 @@ repeat:
         } break;
         case FN_Move: {
             CHECKARGS(1, 1);
-            READ_TYPEOF(X);
+            READ_NODEREF_TYPEOF(X);
             RETARGTYPES(X);
         } break;
         case FN_Destroy: {
             CHECKARGS(1, 1);
-            READ_TYPEOF(X);
+            READ_NODEREF_TYPEOF(X);
             RETARGTYPES();
         } break;
         case FN_VaCountOf: {
@@ -1231,7 +1331,7 @@ repeat:
         } break;
         case FN_TypeOf: {
             CHECKARGS(1, 1);
-            READ_TYPEOF(A);
+            READ_NODEREF_TYPEOF(A);
             return ConstPointer::type_from(call->anchor(), strip_qualifiers(A));
         } break;
         case OP_Tertiary: {
@@ -1248,11 +1348,12 @@ repeat:
         } break;
         case FN_Bitcast: {
             CHECKARGS(2, 2);
-            READ_TYPEOF(SrcT);
+            READ_NODEREF_TYPEOF(SrcT);
             READ_TYPE_CONST(DestT);
             if (SrcT == DestT) {
                 return _SrcT;
             } else {
+                DEREF(_SrcT);
                 const Type *SSrcT = SCOPES_GET_RESULT(storage_type(SrcT));
                 const Type *SDestT = SCOPES_GET_RESULT(storage_type(DestT));
                 if (canonical_typekind(SSrcT->kind())
@@ -1414,26 +1515,37 @@ repeat:
         } break;
         case FN_ExtractValue: {
             CHECKARGS(2, 2);
-            READ_STORAGETYPEOF(T);
+            READ_NODEREF_STORAGETYPEOF(T);
             READ_INT_CONST(idx);
+            const Type *RT = nullptr;
             switch(T->kind()) {
             case TK_Array: {
                 auto ai = cast<ArrayType>(T);
-                RETARGTYPES(SCOPES_GET_RESULT(ai->type_at_index(idx)));
+                RT = SCOPES_GET_RESULT(ai->type_at_index(idx));
             } break;
             case TK_Tuple: {
                 auto ti = cast<TupleType>(T);
-                RETARGTYPES(SCOPES_GET_RESULT(ti->type_at_index(idx)));
+                SCOPES_CHECK_RESULT(sanitize_tuple_index(call->anchor(), T, ti, idx, _idx));
+                RT = SCOPES_GET_RESULT(ti->type_at_index(idx));
             } break;
             case TK_Union: {
                 auto ui = cast<UnionType>(T);
-                RETARGTYPES(SCOPES_GET_RESULT(ui->type_at_index(idx)));
+                SCOPES_CHECK_RESULT(sanitize_tuple_index(call->anchor(), T, ui, idx, _idx));
+                RT = SCOPES_GET_RESULT(ui->type_at_index(idx));
             } break;
             default: {
                 StyledString ss;
                 ss.out << "can not extract value from type " << T;
                 SCOPES_LOCATION_ERROR(ss.str());
             } break;
+            }
+            auto rq = try_qualifier<ReferQualifier>(typeof_T);
+            if (rq) {
+                auto newcall = Call::from(call->anchor(), g_getelementref, { _T, _idx });
+                newcall->set_type(qualify(RT, { rq }));
+                return newcall;
+            } else {
+                RETARGTYPES(RT);
             }
         } break;
         case FN_InsertValue: {
@@ -1463,14 +1575,27 @@ repeat:
             }
             RETARGTYPES(AT);
         } break;
+        case FN_GetElementRef:
         case FN_GetElementPtr: {
             CHECKARGS(2, -1);
-            READ_STORAGETYPEOF(T);
+            const Type *T;
+            bool is_ref = (b.value() == FN_GetElementRef);
+            if (is_ref) {
+                READ_NODEREF_TYPEOF(argT);
+                T = SCOPES_GET_RESULT(ref_to_ptr(argT));
+            } else {
+                READ_STORAGETYPEOF(argT);
+                T = argT;
+            }
             SCOPES_CHECK_RESULT(verify_kind<TK_Pointer>(T));
             auto pi = cast<PointerType>(T);
             T = pi->element_type;
-            READ_STORAGETYPEOF(arg);
-            SCOPES_CHECK_RESULT(verify_integer(arg));
+            if (!is_ref) {
+                // first argument is pointer offset
+                // not applicable to references
+                READ_STORAGETYPEOF(arg);
+                SCOPES_CHECK_RESULT(verify_integer(arg));
+            }
             while (argn < argcount) {
                 const Type *ST = SCOPES_GET_RESULT(storage_type(T));
                 switch(ST->kind()) {
@@ -1483,18 +1608,7 @@ repeat:
                 case TK_Tuple: {
                     auto ti = cast<TupleType>(ST);
                     READ_INT_CONST(arg);
-                    if (_arg->get_type() == TYPE_Symbol) {
-                        auto sym = Symbol::wrap(arg);
-                        size_t idx = ti->field_index(sym);
-                        if (idx == (size_t)-1) {
-                            StyledString ss;
-                            ss.out << "no such field " << sym << " in storage type " << ST;
-                            SCOPES_LOCATION_ERROR(ss.str());
-                        }
-                        // rewrite field
-                        arg = idx;
-                        _arg = ConstInt::from(_arg->anchor(), TYPE_I32, idx);
-                    }
+                    SCOPES_CHECK_RESULT(sanitize_tuple_index(call->anchor(), ST, ti, arg, _arg));
                     T = SCOPES_GET_RESULT(ti->type_at_index(arg));
                 } break;
                 default: {
@@ -1505,7 +1619,39 @@ repeat:
                 }
             }
             T = pointer_type(T, pi->flags, pi->storage_class);
+            if (is_ref) {
+                T = SCOPES_GET_RESULT(ptr_to_ref(T));
+            }
             RETARGTYPES(T);
+        } break;
+        case FN_Deref: {
+            CHECKARGS(1, 1);
+            READ_TYPEOF(T);
+            return _T;
+        } break;
+        case FN_Assign: {
+            CHECKARGS(2, 2);
+            READ_TYPEOF(ElemT);
+            READ_NODEREF_TYPEOF(DestT);
+            auto rq = SCOPES_GET_RESULT(verify_refer(DestT));
+            if (rq) {
+                SCOPES_CHECK_RESULT(verify_writable(rq, DestT));
+            }
+            strip_qualifiers(ElemT);
+            strip_qualifiers(DestT);
+            SCOPES_CHECK_RESULT(
+                verify(strip_qualifiers(ElemT), strip_qualifiers(DestT)));
+            RETARGTYPES();
+        } break;
+        case FN_PtrToRef: {
+            CHECKARGS(1, 1);
+            READ_TYPEOF(T);
+            RETARGTYPES(SCOPES_GET_RESULT(ptr_to_ref(T)));
+        } break;
+        case FN_RefToPtr: {
+            CHECKARGS(1, 1);
+            READ_NODEREF_TYPEOF(T);
+            RETARGTYPES(SCOPES_GET_RESULT(ref_to_ptr(T)));
         } break;
         case FN_VolatileLoad:
         case FN_Load: {
