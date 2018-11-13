@@ -32,6 +32,7 @@
 #include <deque>
 
 #pragma GCC diagnostic ignored "-Wvla-extension"
+#pragma GCC diagnostic ignored "-Wgnu-statement-expression"
 
 #define SCOPES_DEBUG_SYNTAX_EXTEND 0
 
@@ -373,7 +374,7 @@ static SCOPES_RESULT(const Type *) merge_void_or_value_type(const char *context,
 }
 
 static const Type *arguments_type_from_arguments(const Values &values) {
-    ArgTypes types;
+    Types types;
     for (auto arg : values) {
         types.push_back(arg->get_type());
     }
@@ -727,6 +728,7 @@ static SCOPES_RESULT(Value *) prove_Loop(const ASTContext &ctx, Loop *loop) {
     assert(loop->param);
     auto oldparam = loop->param;
     auto param = Parameter::from(oldparam->anchor(), oldparam->name, init->get_type());
+    param->block = ctx.block;
     ctx.frame->bind(oldparam, param);
     Loop *newloop = Loop::from(loop->anchor(), param, init);
     auto subctx = ctx.for_loop(newloop);
@@ -1088,6 +1090,7 @@ static SCOPES_RESULT(void) build_deref(
         auto call = Call::from(anchor, g_deref, { val });
         call->set_type(retT);
         ctx.append(call);
+        merge_depends(ctx, call->deps, val);
         val = call;
     }
     return {};
@@ -1095,12 +1098,33 @@ static SCOPES_RESULT(void) build_deref(
 
 #define CHECKARGS(MINARGS, MAXARGS) \
     SCOPES_CHECK_RESULT((checkargs<MINARGS, MAXARGS>(argcount)))
-#define RETARGTYPES(...) \
-    { \
+#define ARGTYPE0() ({ \
+        Call *newcall = Call::from(call->anchor(), callee, values); \
+        newcall->set_type(empty_arguments_type()); \
+        newcall; \
+    })
+#define ARGTYPE1(ARGT) ({ \
+        Call *newcall = Call::from(call->anchor(), callee, values); \
+        newcall->set_type(ARGT); \
+        newcall; \
+    })
+#define DEPS1(CALL, ...) ({ \
+        Call *newcall = CALL; \
+        merge_depends(ctx, newcall->deps, Values({ __VA_ARGS__ })); \
+        newcall; \
+    })
+#define NODEPS1(CALL) ({ \
+        Call *newcall = CALL; \
+        newcall->deps.unique(0); \
+        newcall; \
+    })
+#if 0
+#define ARGTYPES(...) ({ \
         Call *newcall = Call::from(call->anchor(), callee, values); \
         newcall->set_type(arguments_type({ __VA_ARGS__ })); \
-        return newcall; \
-    }
+        newcall; \
+    })
+#endif
 #define DEREF(NAME) \
         SCOPES_CHECK_RESULT(build_deref(ctx, call->anchor(), NAME));
 #define READ_NODEREF_TYPEOF(NAME) \
@@ -1135,7 +1159,7 @@ static SCOPES_RESULT(void) build_deref(
         auto NAME = SCOPES_GET_RESULT(extract_vector_constant(values[argn++]));
 
 static const Type *get_function_type(Function *fn) {
-    ArgTypes params;
+    Types params;
     for (int i = 0; i < fn->params.size(); ++i) {
         params.push_back(fn->params[i]->get_type());
     }
@@ -1240,7 +1264,7 @@ repeat:
         if (cl->func->is_inline()) {
             return SCOPES_GET_RESULT(prove_inline(ctx, cl->frame, cl->func, values));
         } else {
-            ArgTypes types;
+            Types types;
             for (auto &&arg : values) {
                 types.push_back(arg->get_type());
             }
@@ -1309,12 +1333,12 @@ repeat:
         case FN_Move: {
             CHECKARGS(1, 1);
             READ_NODEREF_TYPEOF(X);
-            RETARGTYPES(X);
+            return NODEPS1(ARGTYPE1(X));
         } break;
         case FN_Destroy: {
             CHECKARGS(1, 1);
             READ_NODEREF_TYPEOF(X);
-            RETARGTYPES();
+            return ARGTYPE0();
         } break;
         case FN_VaCountOf: {
             return ConstInt::from(call->anchor(), TYPE_I32, argcount);
@@ -1327,7 +1351,7 @@ repeat:
         case FN_Undef: {
             CHECKARGS(1, 1);
             READ_TYPE_CONST(T);
-            RETARGTYPES(T);
+            return NODEPS1(ARGTYPE1(T));
         } break;
         case FN_TypeOf: {
             CHECKARGS(1, 1);
@@ -1344,7 +1368,7 @@ repeat:
                 SCOPES_CHECK_RESULT(verify_vector_sizes(T1, T2));
             }
             SCOPES_CHECK_RESULT(verify(T2, T3));
-            RETARGTYPES(T2);
+            return DEPS1(ARGTYPE1(T2), _T2, _T3);
         } break;
         case FN_Bitcast: {
             CHECKARGS(2, 2);
@@ -1379,7 +1403,7 @@ repeat:
                     default: break;
                     }
                 }
-                RETARGTYPES(DestT);
+                return DEPS1(ARGTYPE1(DestT), _SrcT);
             }
         } break;
         case FN_IntToPtr: {
@@ -1388,7 +1412,7 @@ repeat:
             READ_TYPE_CONST(DestT);
             SCOPES_CHECK_RESULT(verify_integer(T));
             SCOPES_CHECK_RESULT((verify_kind<TK_Pointer>(SCOPES_GET_RESULT(storage_type(DestT)))));
-            RETARGTYPES(DestT);
+            return DEPS1(ARGTYPE1(DestT), _T);
         } break;
         case FN_PtrToInt: {
             CHECKARGS(2, 2);
@@ -1396,7 +1420,7 @@ repeat:
             READ_TYPE_CONST(DestT);
             SCOPES_CHECK_RESULT(verify_kind<TK_Pointer>(T));
             SCOPES_CHECK_RESULT(verify_integer(SCOPES_GET_RESULT(storage_type(DestT))));
-            RETARGTYPES(DestT);
+            return DEPS1(ARGTYPE1(DestT), _T);
         } break;
         case FN_ITrunc: {
             CHECKARGS(2, 2);
@@ -1404,7 +1428,7 @@ repeat:
             READ_TYPE_CONST(DestT);
             SCOPES_CHECK_RESULT(verify_integer(T));
             SCOPES_CHECK_RESULT(verify_integer(SCOPES_GET_RESULT(storage_type(DestT))));
-            RETARGTYPES(DestT);
+            return DEPS1(ARGTYPE1(DestT), _T);
         } break;
         case FN_FPTrunc: {
             CHECKARGS(2, 2);
@@ -1415,7 +1439,7 @@ repeat:
             if (cast<RealType>(T)->width < cast<RealType>(DestT)->width) {
                 SCOPES_EXPECT_ERROR(error_invalid_operands(T, DestT));
             }
-            RETARGTYPES(DestT);
+            return DEPS1(ARGTYPE1(DestT), _T);
         } break;
         case FN_FPExt: {
             CHECKARGS(2, 2);
@@ -1426,7 +1450,7 @@ repeat:
             if (cast<RealType>(T)->width > cast<RealType>(DestT)->width) {
                 SCOPES_EXPECT_ERROR(error_invalid_operands(T, DestT));
             }
-            RETARGTYPES(DestT);
+            return DEPS1(ARGTYPE1(DestT), _T);
         } break;
         case FN_FPToUI:
         case FN_FPToSI: {
@@ -1438,7 +1462,7 @@ repeat:
             if ((T != TYPE_F32) && (T != TYPE_F64)) {
                 SCOPES_EXPECT_ERROR(error_invalid_operands(T, DestT));
             }
-            RETARGTYPES(DestT);
+            return DEPS1(ARGTYPE1(DestT), _T);
         } break;
         case FN_UIToFP:
         case FN_SIToFP: {
@@ -1450,7 +1474,7 @@ repeat:
             if ((DestT != TYPE_F32) && (DestT != TYPE_F64)) {
                 SCOPES_CHECK_RESULT(error_invalid_operands(T, DestT));
             }
-            RETARGTYPES(DestT);
+            return DEPS1(ARGTYPE1(DestT), _T);
         } break;
         case FN_ZExt:
         case FN_SExt: {
@@ -1459,7 +1483,7 @@ repeat:
             READ_TYPE_CONST(DestT);
             SCOPES_CHECK_RESULT(verify_integer(T));
             SCOPES_CHECK_RESULT(verify_integer(SCOPES_GET_RESULT(storage_type(DestT))));
-            RETARGTYPES(DestT);
+            return DEPS1(ARGTYPE1(DestT), _T);
         } break;
         case FN_ExtractElement: {
             CHECKARGS(2, 2);
@@ -1468,7 +1492,7 @@ repeat:
             SCOPES_CHECK_RESULT(verify_kind<TK_Vector>(T));
             auto vi = cast<VectorType>(T);
             SCOPES_CHECK_RESULT(verify_integer(idx));
-            RETARGTYPES(vi->element_type);
+            return DEPS1(ARGTYPE1(vi->element_type), _T);
         } break;
         case FN_InsertElement: {
             CHECKARGS(3, 3);
@@ -1479,7 +1503,7 @@ repeat:
             SCOPES_CHECK_RESULT(verify_kind<TK_Vector>(T));
             auto vi = cast<VectorType>(T);
             SCOPES_CHECK_RESULT(verify(SCOPES_GET_RESULT(storage_type(vi->element_type)), ET));
-            RETARGTYPES(_T->get_type());
+            return DEPS1(ARGTYPE1(_T->get_type()), _T, _ET);
         } break;
         case FN_ShuffleVector: {
             CHECKARGS(3, 3);
@@ -1501,16 +1525,16 @@ repeat:
                     cast<ConstInt>(mask->values[i])->value,
                     incount));
             }
-            RETARGTYPES(SCOPES_GET_RESULT(vector_type(vi->element_type, outcount)));
+            return DEPS1(ARGTYPE1(SCOPES_GET_RESULT(vector_type(vi->element_type, outcount))), _TV1, _TV2);
         } break;
         case FN_Length: {
             CHECKARGS(1, 1);
             READ_STORAGETYPEOF(T);
             SCOPES_CHECK_RESULT(verify_real_vector(T));
             if (T->kind() == TK_Vector) {
-                RETARGTYPES(cast<VectorType>(T)->element_type);
+                return DEPS1(ARGTYPE1(cast<VectorType>(T)->element_type), _T);
             } else {
-                RETARGTYPES(_T->get_type());
+                return DEPS1(ARGTYPE1(_T->get_type()), _T);
             }
         } break;
         case FN_ExtractValue: {
@@ -1541,11 +1565,11 @@ repeat:
             }
             auto rq = try_qualifier<ReferQualifier>(typeof_T);
             if (rq) {
-                auto newcall = Call::from(call->anchor(), g_getelementref, { _T, _idx });
-                newcall->set_type(qualify(RT, { rq }));
-                return newcall;
+                auto newcall2 = Call::from(call->anchor(), g_getelementref, { _T, _idx });
+                newcall2->set_type(qualify(RT, { rq }));
+                return DEPS1(newcall2, _T);
             } else {
-                RETARGTYPES(RT);
+                return DEPS1(ARGTYPE1(RT), _T);
             }
         } break;
         case FN_InsertValue: {
@@ -1573,19 +1597,22 @@ repeat:
                 SCOPES_LOCATION_ERROR(ss.str());
             } break;
             }
-            RETARGTYPES(AT);
+            return DEPS1(ARGTYPE1(AT), _AT, _ET);
         } break;
         case FN_GetElementRef:
         case FN_GetElementPtr: {
             CHECKARGS(2, -1);
             const Type *T;
             bool is_ref = (b.value() == FN_GetElementRef);
+            Value *dep = nullptr;
             if (is_ref) {
                 READ_NODEREF_TYPEOF(argT);
                 T = SCOPES_GET_RESULT(ref_to_ptr(argT));
+                dep = _argT;
             } else {
                 READ_STORAGETYPEOF(argT);
                 T = argT;
+                dep = _argT;
             }
             SCOPES_CHECK_RESULT(verify_kind<TK_Pointer>(T));
             auto pi = cast<PointerType>(T);
@@ -1622,7 +1649,7 @@ repeat:
             if (is_ref) {
                 T = SCOPES_GET_RESULT(ptr_to_ref(T));
             }
-            RETARGTYPES(T);
+            return DEPS1(ARGTYPE1(T), dep);
         } break;
         case FN_Deref: {
             CHECKARGS(1, 1);
@@ -1641,17 +1668,17 @@ repeat:
             strip_qualifiers(DestT);
             SCOPES_CHECK_RESULT(
                 verify(strip_qualifiers(ElemT), strip_qualifiers(DestT)));
-            RETARGTYPES();
+            return ARGTYPE0();
         } break;
         case FN_PtrToRef: {
             CHECKARGS(1, 1);
             READ_TYPEOF(T);
-            RETARGTYPES(SCOPES_GET_RESULT(ptr_to_ref(T)));
+            return DEPS1(ARGTYPE1(SCOPES_GET_RESULT(ptr_to_ref(T))), _T);
         } break;
         case FN_RefToPtr: {
             CHECKARGS(1, 1);
             READ_NODEREF_TYPEOF(T);
-            RETARGTYPES(SCOPES_GET_RESULT(ref_to_ptr(T)));
+            return DEPS1(ARGTYPE1(SCOPES_GET_RESULT(ref_to_ptr(T))), _T);
         } break;
         case FN_VolatileLoad:
         case FN_Load: {
@@ -1659,7 +1686,7 @@ repeat:
             READ_STORAGETYPEOF(T);
             SCOPES_CHECK_RESULT(verify_kind<TK_Pointer>(T));
             SCOPES_CHECK_RESULT(verify_readable(T));
-            RETARGTYPES(cast<PointerType>(T)->element_type);
+            return DEPS1(ARGTYPE1(cast<PointerType>(T)->element_type), _T);
         } break;
         case FN_VolatileStore:
         case FN_Store: {
@@ -1671,31 +1698,31 @@ repeat:
             auto pi = cast<PointerType>(DestT);
             SCOPES_CHECK_RESULT(
                 verify(SCOPES_GET_RESULT(storage_type(pi->element_type)), ElemT));
-            RETARGTYPES();
+            return ARGTYPE0();
         } break;
         case FN_Alloca: {
             CHECKARGS(1, 1);
             READ_TYPE_CONST(T);
-            RETARGTYPES(local_pointer_type(T));
+            return NODEPS1(ARGTYPE1(local_pointer_type(T)));
         } break;
         case FN_AllocaArray: {
             CHECKARGS(2, 2);
             READ_TYPE_CONST(T);
             READ_STORAGETYPEOF(size);
             SCOPES_CHECK_RESULT(verify_integer(size));
-            RETARGTYPES(local_pointer_type(T));
+            return NODEPS1(ARGTYPE1(local_pointer_type(T)));
         } break;
         case FN_Malloc: {
             CHECKARGS(1, 1);
             READ_TYPE_CONST(T);
-            RETARGTYPES(native_pointer_type(T));
+            return NODEPS1(ARGTYPE1(native_pointer_type(T)));
         } break;
         case FN_MallocArray: {
             CHECKARGS(2, 2);
             READ_TYPE_CONST(T);
             READ_STORAGETYPEOF(size);
             SCOPES_CHECK_RESULT(verify_integer(size));
-            RETARGTYPES(native_pointer_type(T));
+            return NODEPS1(ARGTYPE1(native_pointer_type(T)));
         } break;
         case FN_Free: {
             CHECKARGS(1, 1);
@@ -1705,7 +1732,7 @@ repeat:
                 SCOPES_LOCATION_ERROR(String::from(
                     "pointer is not a heap pointer"));
             }
-            RETARGTYPES();
+            return ARGTYPE0();
         } break;
         case FN_StaticAlloc: {
             CHECKARGS(1, 1);
@@ -1726,7 +1753,7 @@ repeat:
             CHECKARGS(2, 2);
             READ_TYPEOF(A); READ_TYPEOF(B);
             SCOPES_CHECK_RESULT(verify_integer_ops(A, B));
-            RETARGTYPES(SCOPES_GET_RESULT(bool_op_return_type(A)));
+            return DEPS1(ARGTYPE1(SCOPES_GET_RESULT(bool_op_return_type(A))), _A, _B);
         } break;
         case OP_FCmpOEQ:
         case OP_FCmpONE:
@@ -1745,7 +1772,7 @@ repeat:
             CHECKARGS(2, 2);
             READ_TYPEOF(A); READ_TYPEOF(B);
             SCOPES_CHECK_RESULT(verify_real_ops(A, B));
-            RETARGTYPES(SCOPES_GET_RESULT(bool_op_return_type(A)));
+            return DEPS1(ARGTYPE1(SCOPES_GET_RESULT(bool_op_return_type(A))), _A, _B);
         } break;
 #define IARITH_NUW_NSW_OPS(NAME) \
         case OP_ ## NAME: \
@@ -1754,42 +1781,42 @@ repeat:
             CHECKARGS(2, 2); \
             READ_TYPEOF(A); READ_TYPEOF(B); \
             SCOPES_CHECK_RESULT(verify_integer_ops(A, B)); \
-            RETARGTYPES(A); \
+            return DEPS1(ARGTYPE1(A), _A, _B); \
         } break;
 #define IARITH_OP(NAME, PFX) \
         case OP_ ## NAME: { \
             CHECKARGS(2, 2); \
             READ_TYPEOF(A); READ_TYPEOF(B); \
             SCOPES_CHECK_RESULT(verify_integer_ops(A, B)); \
-            RETARGTYPES(A); \
+            return DEPS1(ARGTYPE1(A), _A, _B); \
         } break;
 #define FARITH_OP(NAME) \
         case OP_ ## NAME: { \
             CHECKARGS(2, 2); \
             READ_TYPEOF(A); READ_TYPEOF(B); \
             SCOPES_CHECK_RESULT(verify_real_ops(A, B)); \
-            RETARGTYPES(A); \
+            return DEPS1(ARGTYPE1(A), _A, _B); \
         } break;
 #define FTRI_OP(NAME) \
         case OP_ ## NAME: { \
             CHECKARGS(3, 3); \
             READ_TYPEOF(A); READ_TYPEOF(B); READ_TYPEOF(C); \
             SCOPES_CHECK_RESULT(verify_real_ops(A, B, C)); \
-            RETARGTYPES(A); \
+            return DEPS1(ARGTYPE1(A), _A, _B, _C); \
         } break;
 #define IUN_OP(NAME, PFX) \
         case OP_ ## NAME: { \
             CHECKARGS(1, 1); \
             READ_TYPEOF(A); \
             SCOPES_CHECK_RESULT(verify_integer_ops(A)); \
-            RETARGTYPES(A); \
+            return DEPS1(ARGTYPE1(A), _A); \
         } break;
 #define FUN_OP(NAME) \
         case OP_ ## NAME: { \
             CHECKARGS(1, 1); \
             READ_TYPEOF(A); \
             SCOPES_CHECK_RESULT(verify_real_ops(A)); \
-            RETARGTYPES(A); \
+            return DEPS1(ARGTYPE1(A), _A); \
         } break;
         SCOPES_ARITH_OPS()
 
@@ -2125,7 +2152,7 @@ SCOPES_RESULT(Value *) prove_inline(const ASTContext &ctx,
     }
 }
 
-SCOPES_RESULT(Function *) prove(Function *frame, Template *func, const ArgTypes &types) {
+SCOPES_RESULT(Function *) prove(Function *frame, Template *func, const Types &types) {
     SCOPES_RESULT_TYPE(Function *);
     Timer sum_prove_time(TIMER_Specialize);
     assert(func);
@@ -2154,7 +2181,7 @@ SCOPES_RESULT(Function *) prove(Function *frame, Template *func, const ArgTypes 
                 fn->append_param(newparam);
                 fn->bind(oldparam, newparam);
             } else {
-                ArgTypes vtypes;
+                Types vtypes;
                 auto args = ArgumentList::from(oldparam->anchor());
                 for (int j = i; j < types.size(); ++j) {
                     vtypes.push_back(types[j]);

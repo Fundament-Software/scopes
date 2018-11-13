@@ -22,13 +22,13 @@ struct ArgumentsType : Type {
     static bool classof(const Type *T);
 
     void stream_name(StyledStream &ss) const;
-    ArgumentsType(const ArgTypes &_values);
+    ArgumentsType(const Types &_values);
     const TupleType *to_tuple_type() const;
 
-    ArgTypes values;
+    Types values;
 };
 
-const Type *arguments_type(const ArgTypes &values);
+const Type *arguments_type(const Types &values);
 const Type *empty_arguments_type();
 
 bool is_arguments_type(const Type *T);

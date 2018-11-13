@@ -399,6 +399,11 @@ bool Block::append(Value *node) {
         if (instr->block)
             return false;
         instr->block = this;
+        if (isa<Loop>(node)) {
+            auto loop = cast<Loop>(node);
+            assert(loop->param);
+            loop->param->block = this;
+        }
         if (!is_returning(instr->get_type())) {
             assert(!terminator);
             assert(insert_index == body.size());
@@ -539,7 +544,8 @@ void Try::set_except_param(Parameter *param) {
 //------------------------------------------------------------------------------
 
 Parameter::Parameter(const Anchor *anchor, Symbol _name, const Type *_type, bool _variadic)
-    : Value(VK_Parameter, anchor), name(_name), variadic(_variadic), owner(nullptr), index(-1) {
+    : Value(VK_Parameter, anchor), name(_name), variadic(_variadic),
+        owner(nullptr), block(nullptr), index(-1) {
     if (_type) set_type(_type);
 }
 
@@ -866,7 +872,9 @@ int Value::get_depth() const {
     if (isa<Parameter>(value)) {
         auto param = cast<Parameter>(value);
         assert(param->owner);
-        if (isa<Function>(param->owner)) {
+        if (param->block) {
+            return param->block->depth;
+        } if (isa<Function>(param->owner)) {
             // outside of function
             return 0;
         } else if (isa<Instruction>(param->owner)) {

@@ -383,6 +383,7 @@ struct Parameter : Value {
     Symbol name;
     bool variadic;
     Value *owner;
+    Block *block;
     int index;
 };
 
@@ -490,7 +491,7 @@ struct Function : Pure {
     std::unordered_map<Value *, uint32_t> value2id;
     std::unordered_map<uint32_t, Value *> id2value;
 
-    ArgTypes instance_args;
+    Types instance_args;
     void bind(Value *oldnode, Value *newnode);
     Value *unsafe_resolve(Value *node) const;
     Value *resolve_local(Value *node) const;

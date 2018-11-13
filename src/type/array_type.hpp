@@ -16,7 +16,7 @@ namespace scopes {
 // ARRAY TYPE
 //------------------------------------------------------------------------------
 
-struct ArrayType : SizedStorageType {
+struct ArrayType : ArrayLikeType {
     static bool classof(const Type *T);
 
     void stream_name(StyledStream &ss) const;

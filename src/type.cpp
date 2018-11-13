@@ -10,7 +10,9 @@
 #include "anchor.hpp"
 #include "list.hpp"
 #include "hash.hpp"
+#include "type/qualify_type.hpp"
 #include "dyn_cast.inc"
+#include "qualifier.inc"
 
 #include <memory.h>
 
@@ -123,6 +125,39 @@ B_TYPE_KIND()
     }
 }
 
+bool all_plain(const Types &types) {
+    for (auto type : types) {
+        if (!is_plain(type))
+            return false;
+    }
+    return true;
+}
+
+bool is_plain(const Type *T) {
+    switch(T->kind()) {
+    case TK_Qualify:
+        return is_plain(cast<QualifyType>(T)->type);
+    case TK_Integer:
+    case TK_Real:
+    case TK_Pointer:
+        return true;
+    case TK_Array:
+    case TK_Vector:
+        return is_plain(cast<ArrayLikeType>(T)->element_type);
+    case TK_Tuple:
+    case TK_Union:
+        return all_plain(cast<TupleLikeType>(T)->values);
+    case TK_Arguments:
+        return all_plain(cast<ArgumentsType>(T)->values);
+    case TK_Typename:
+    case TK_Function:
+    case TK_Image:
+    case TK_SampledImage:
+        return false;
+    }
+    return false;
+}
+
 bool is_opaque(const Type *T) {
     switch(T->kind()) {
     case TK_Qualify:
@@ -231,16 +266,6 @@ bool is_returning(const Type *T) {
 
 bool is_returning_value(const Type *T) {
     return is_returning(T) && (T != empty_arguments_type());
-}
-
-bool is_tracked(const Type *T) {
-    switch(T->kind()) {
-    case TK_Typename:
-        return cast<TypenameType>(T)->is_unique();
-    case TK_Pointer:
-        return cast<PointerType>(T)->is_unique();
-    default: return false;
-    }
 }
 
 SCOPES_RESULT(bool) types_compatible(const Type *paramT, const Type *argT) {

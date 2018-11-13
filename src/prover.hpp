@@ -75,7 +75,7 @@ Value *rekey(const Anchor *anchor, Symbol key, Value *value);
 SCOPES_RESULT(void) map_keyed_arguments(const Anchor *anchor,
     Values &outargs, const Values &values, const Symbols &symbols, bool varargs);
 
-SCOPES_RESULT(Function *) prove(Function *frame, Template *func, const ArgTypes &types);
+SCOPES_RESULT(Function *) prove(Function *frame, Template *func, const Types &types);
 SCOPES_RESULT(Value *) prove(const ASTContext &ctx, Value *node);
 
 } // namespace scopes

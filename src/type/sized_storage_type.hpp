@@ -11,9 +11,8 @@
 
 namespace scopes {
 
-struct StorageType : Type {
-
-    StorageType(TypeKind kind);
+struct CompositeType : Type {
+    CompositeType(TypeKind kind);
 
     size_t size;
     size_t align;
@@ -21,8 +20,10 @@ struct StorageType : Type {
 
 //------------------------------------------------------------------------------
 
-struct SizedStorageType : StorageType {
-    SizedStorageType(TypeKind kind, const Type *_element_type, size_t _count);
+struct ArrayLikeType : CompositeType {
+    static bool classof(const Type *T);
+
+    ArrayLikeType(TypeKind kind, const Type *_element_type, size_t _count);
 
     SCOPES_RESULT(void *) getelementptr(void *src, size_t i) const;
 
@@ -32,6 +33,22 @@ struct SizedStorageType : StorageType {
     size_t count;
     size_t stride;
 };
+
+//------------------------------------------------------------------------------
+
+struct TupleLikeType : CompositeType {
+    static bool classof(const Type *T);
+
+    TupleLikeType(TypeKind kind, const Types &values);
+
+    bool is_plain() const;
+
+    Types values;
+protected:
+    bool _is_plain;
+};
+
+//------------------------------------------------------------------------------
 
 } // namespace scopes
 

@@ -43,7 +43,7 @@ void ArrayType::stream_name(StyledStream &ss) const {
 }
 
 ArrayType::ArrayType(const Type *_element_type, size_t _count)
-    : SizedStorageType(TK_Array, _element_type, _count) {
+    : ArrayLikeType(TK_Array, _element_type, _count) {
 }
 
 //------------------------------------------------------------------------------

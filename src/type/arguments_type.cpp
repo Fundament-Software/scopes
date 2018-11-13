@@ -68,14 +68,14 @@ const TupleType *ArgumentsType::to_tuple_type() const {
     return cast<TupleType>(tuple_type(values).assert_ok());
 }
 
-ArgumentsType::ArgumentsType(const ArgTypes &_values) :
+ArgumentsType::ArgumentsType(const Types &_values) :
     Type(TK_Arguments), values(_values) {
 }
 
-const Type *arguments_type(const ArgTypes &values) {
+const Type *arguments_type(const Types &values) {
     if (values.size() == 1)
         return values[0];
-    ArgTypes newvalues;
+    Types newvalues;
     int idx = 1;
     for (auto &&value : values) {
         if (is_arguments_type(value)) {

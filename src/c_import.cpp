@@ -102,7 +102,7 @@ public:
             tni->super_type = TYPE_CStruct;
         }
 
-        ArgTypes args;
+        Types args;
         //auto anchors = new std::vector<Anchor>();
         //StyledStream ss;
         const Type *ST = tni;
@@ -396,7 +396,7 @@ public:
         sz = (sz + 7) / 8;
         al = (al + 7) / 8;
         assert (sz > al);
-        ArgTypes fields;
+        Types fields;
         const Type *TB = integer_type(al * 8, false);
         fields.push_back(TB);
         size_t pad = sz - al;
@@ -555,7 +555,7 @@ public:
 
         uint64_t flags = 0;
 
-        ArgTypes argtypes;
+        Types argtypes;
 
         const clang::FunctionProtoType * proto = f->getAs<clang::FunctionProtoType>();
         if(proto) {

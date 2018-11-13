@@ -376,8 +376,6 @@ const sc_type_t *sc_typename_type(const sc_string_t *str);
 sc_void_raises_t sc_typename_type_set_super(const sc_type_t *T, const sc_type_t *ST);
 const sc_type_t *sc_typename_type_get_super(const sc_type_t *T);
 sc_void_raises_t sc_typename_type_set_storage(const sc_type_t *T, const sc_type_t *T2);
-void sc_typename_type_set_unique(const sc_type_t *T);
-bool sc_typename_type_is_unique(const sc_type_t *T);
 
 // array types
 

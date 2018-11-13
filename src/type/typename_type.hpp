@@ -30,15 +30,12 @@ struct TypenameType : Type {
     SCOPES_RESULT(void) finalize(const Type *_type);
 
     bool finalized() const;
-    bool is_unique() const;
-    void set_unique();
 
     const Type *super() const;
 
     const Type *storage_type;
     const Type *super_type;
     const String *_name;
-    bool unique;
 };
 
 // always generates a new type

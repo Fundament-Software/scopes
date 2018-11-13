@@ -72,7 +72,6 @@ ViewQualifier::ViewQualifier(const IDSet &_ids)
 }
 
 void ViewQualifier::stream_prefix(StyledStream &ss) const {
-    ss << "%";
     for (int i = 0; i < sorted_ids.size(); ++i) {
         if (i > 0) ss << "|";
         ss << sorted_ids[i];

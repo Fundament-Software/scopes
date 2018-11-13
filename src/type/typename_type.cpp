@@ -28,7 +28,7 @@ void TypenameType::stream_name(StyledStream &ss) const {
 
 TypenameType::TypenameType(const String *name)
     : Type(TK_Typename), storage_type(nullptr), super_type(nullptr),
-        _name(nullptr), unique(false) {
+        _name(nullptr) {
     auto newname = Symbol(name);
     size_t idx = 2;
     while (used_names.count(newname)) {
@@ -39,12 +39,6 @@ TypenameType::TypenameType(const String *name)
     }
     used_names.insert(newname);
     _name = newname.name();
-}
-
-bool TypenameType::is_unique() const { return unique; }
-void TypenameType::set_unique() {
-    assert(!finalized());
-    unique = true;
 }
 
 SCOPES_RESULT(void) TypenameType::finalize(const Type *_type) {
@@ -58,9 +52,6 @@ SCOPES_RESULT(void) TypenameType::finalize(const Type *_type) {
         StyledString ss;
         ss.out << "cannot use typename " << _type << " as storage type";
         SCOPES_LOCATION_ERROR(ss.str());
-    }
-    if (isa<PointerType>(_type) && cast<PointerType>(_type)->is_unique()) {
-        set_unique();
     }
     storage_type = _type;
     return {};

@@ -57,8 +57,8 @@ void UnionType::stream_name(StyledStream &ss) const {
     ss << "}";
 }
 
-UnionType::UnionType(const ArgTypes &_values)
-    : StorageType(TK_Union), values(_values) {
+UnionType::UnionType(const Types &_values)
+    : TupleLikeType(TK_Union, _values) {
 
     size_t sz = 0;
     size_t al = 1;
@@ -99,7 +99,7 @@ SCOPES_RESULT(Symbol) UnionType::field_name(size_t i) const {
 
 //------------------------------------------------------------------------------
 
-SCOPES_RESULT(const Type *) union_type(const ArgTypes &values) {
+SCOPES_RESULT(const Type *) union_type(const Types &values) {
     SCOPES_RESULT_TYPE(const Type *);
     UnionType key(values);
     auto it = unions.find(&key);

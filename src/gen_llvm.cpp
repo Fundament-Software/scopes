@@ -160,7 +160,7 @@ struct LLVMIRGenerator {
     std::unordered_map<Extern *, LLVMValueRef> extern2global;
     std::unordered_map<LLVMValueRef, LLVMBasicBlockRef> func_fail_label;
     std::deque<Function *> function_todo;
-    static ArgTypes type_todo;
+    static Types type_todo;
     static std::unordered_map<const Type *, LLVMTypeRef> type_cache;
     static std::unordered_map<Function *, LLVMModuleRef> func_cache;
 
@@ -194,7 +194,7 @@ struct LLVMIRGenerator {
 
     static const Type *abi_return_type(const FunctionType *ft) {
         if (ft->has_exception()) {
-            ArgTypes types = { TYPE_Bool, ft->except_type };
+            Types types = { TYPE_Bool, ft->except_type };
             if (is_returning_value(ft->return_type)) {
                 types.push_back(ft->return_type);
             }
@@ -2304,7 +2304,7 @@ struct LLVMIRGenerator {
 Error *LLVMIRGenerator::last_llvm_error = nullptr;
 std::unordered_map<const Type *, LLVMTypeRef> LLVMIRGenerator::type_cache;
 std::unordered_map<Function *, LLVMModuleRef> LLVMIRGenerator::func_cache;
-ArgTypes LLVMIRGenerator::type_todo;
+Types LLVMIRGenerator::type_todo;
 LLVMTypeRef LLVMIRGenerator::voidT = nullptr;
 LLVMTypeRef LLVMIRGenerator::i1T = nullptr;
 LLVMTypeRef LLVMIRGenerator::i8T = nullptr;

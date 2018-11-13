@@ -154,7 +154,7 @@ sc_value_raises_t sc_typify_template(sc_value_t *f, int numtypes, const sc_type_
             make_location_error(String::from("cannot typify inline function")),
             nullptr };
     }
-    ArgTypes types;
+    Types types;
     for (int i = 0; i < numtypes; ++i) {
         types.push_back(typeargs[i]);
     }
@@ -168,7 +168,7 @@ sc_value_raises_t sc_typify(sc_closure_t *srcl, int numtypes, const sc_type_t **
             make_location_error(String::from("cannot typify function")),
             nullptr };
     }
-    ArgTypes types;
+    Types types;
     for (int i = 0; i < numtypes; ++i) {
         types.push_back(typeargs[i]);
     }
@@ -1455,16 +1455,6 @@ sc_void_raises_t sc_typename_type_set_storage(const sc_type_t *T, const sc_type_
     RETURN_VOID(cast<TypenameType>(const_cast<Type *>(T))->finalize(T2));
 }
 
-void sc_typename_type_set_unique(const sc_type_t *T) {
-    using namespace scopes;
-    cast<TypenameType>(const_cast<Type *>(T))->set_unique();
-}
-
-bool sc_typename_type_is_unique(const sc_type_t *T) {
-    using namespace scopes;
-    return cast<TypenameType>(T)->is_unique();
-}
-
 // Array Type
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -1487,7 +1477,7 @@ sc_type_raises_t sc_vector_type(const sc_type_t *element_type, size_t count) {
 
 sc_type_raises_t sc_tuple_type(int numtypes, const sc_type_t **typeargs) {
     using namespace scopes;
-    ArgTypes types;
+    Types types;
     types.reserve(numtypes);
     for (int i = 0; i < numtypes; ++i) {
         types.push_back(typeargs[i]);
@@ -1500,7 +1490,7 @@ sc_type_raises_t sc_tuple_type(int numtypes, const sc_type_t **typeargs) {
 
 const sc_type_t *sc_arguments_type(int numtypes, const sc_type_t **typeargs) {
     using namespace scopes;
-    ArgTypes types;
+    Types types;
     types.reserve(numtypes);
     for (int i = 0; i < numtypes; ++i) {
         types.push_back(typeargs[i]);
@@ -1510,7 +1500,7 @@ const sc_type_t *sc_arguments_type(int numtypes, const sc_type_t **typeargs) {
 
 const sc_type_t *sc_arguments_type_join(const sc_type_t *T1, const sc_type_t *T2) {
     using namespace scopes;
-    ArgTypes types;
+    Types types;
     if (isa<ArgumentsType>(T1)) {
         for (auto &&value : cast<ArgumentsType>(T1)->values) {
             types.push_back(value);
@@ -1576,7 +1566,7 @@ bool sc_function_type_is_variadic(const sc_type_t *T) {
 const sc_type_t *sc_function_type(const sc_type_t *return_type,
     int numtypes, const sc_type_t **typeargs) {
     using namespace scopes;
-    ArgTypes types;
+    Types types;
     types.reserve(numtypes);
     for (int i = 0; i < numtypes; ++i) {
         types.push_back(typeargs[i]);
@@ -1859,8 +1849,6 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_typename_type_set_super, _void, TYPE_Type, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_typename_type_get_super, TYPE_Type, TYPE_Type);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_typename_type_set_storage, _void, TYPE_Type, TYPE_Type);
-    DEFINE_EXTERN_C_FUNCTION(sc_typename_type_set_unique, _void, TYPE_Type);
-    DEFINE_EXTERN_C_FUNCTION(sc_typename_type_is_unique, TYPE_Bool, TYPE_Type);
 
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_array_type, TYPE_Type, TYPE_Type, TYPE_USize);
 
@@ -1964,8 +1952,6 @@ B_TYPES()
         ConstInt::from(LINE_ANCHOR, TYPE_U64, (uint64_t)PTF_NonReadable));
     globals->bind(Symbol("pointer-flag-non-writable"),
         ConstInt::from(LINE_ANCHOR, TYPE_U64, (uint64_t)PTF_NonWritable));
-    globals->bind(Symbol("pointer-flag-unique"),
-        ConstInt::from(LINE_ANCHOR, TYPE_U64, (uint64_t)PTF_Unique));
 
     globals->bind(Symbol(SYM_DumpDisassembly),
         ConstInt::from(LINE_ANCHOR, TYPE_U64, (uint64_t)CF_DumpDisassembly));

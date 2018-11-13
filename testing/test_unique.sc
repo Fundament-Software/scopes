@@ -20,8 +20,8 @@ compile-stage;
     else b
 
 fn test (a b c)
-    #let a = (move a)
-    #let b = (move b)
+    let a = (move a)
+    let b = (move b)
     #print a
     if true a
     else b

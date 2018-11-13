@@ -535,8 +535,8 @@ struct StreamAST : StreamAnchors {
                     visited.insert({cl->func, -1});
                     todo.push_back(cl->func);
                 }
-            } else if (T == TYPE_List) {
-                ss << (const List *)val->value;
+            /*} else if (T == TYPE_List) {
+                ss << (const List *)val->value;*/
             } else if (T == TYPE_Value) {
                 stream_ast(ss, (Value *)val->value, StreamASTFormat::singleline());
                 stream_type_suffix(T);

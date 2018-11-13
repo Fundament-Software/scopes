@@ -23,11 +23,14 @@ fn test ()
     let b = (new i32)
     b = 7
     let c = (local i32)
-    c = 3 + 7
+    c = a + b
     print c
     return;
 
-fn test2 ()
+dump-ast
+    typify test
+
+#fn test2 ()
     let c = (tupleof 1 (tupleof 2 3) true)
     let k = (local (typeof c))
     k = c
@@ -35,6 +38,6 @@ fn test2 ()
     return;
 
 test;
-test2;
+#test2;
 
 true

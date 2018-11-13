@@ -44,7 +44,7 @@ void VectorType::stream_name(StyledStream &ss) const {
 }
 
 VectorType::VectorType(const Type *_element_type, size_t _count)
-    : SizedStorageType(TK_Vector, _element_type, _count) {
+    : ArrayLikeType(TK_Vector, _element_type, _count) {
 }
 
 SCOPES_RESULT(const Type *) vector_type(const Type *element_type, size_t count) {

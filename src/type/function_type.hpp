@@ -27,7 +27,7 @@ struct FunctionType : Type {
     FunctionType(
         const Type *_except_type,
         const Type *_return_type,
-        const ArgTypes &_argument_types, uint32_t _flags);
+        const Types &_argument_types, uint32_t _flags);
 
     void stream_name(StyledStream &ss) const;
 
@@ -41,16 +41,16 @@ struct FunctionType : Type {
 
     const Type *except_type;
     const Type *return_type;
-    ArgTypes argument_types;
+    Types argument_types;
     uint32_t flags;
 };
 
 const Type *raising_function_type(const Type *except_type, const Type *return_type,
-    const ArgTypes &argument_types, uint32_t flags = 0);
+    const Types &argument_types, uint32_t flags = 0);
 const Type *raising_function_type(const Type *return_type,
-    const ArgTypes &argument_types, uint32_t flags = 0);
+    const Types &argument_types, uint32_t flags = 0);
 const Type *function_type(const Type *return_type,
-    const ArgTypes &argument_types, uint32_t flags = 0);
+    const Types &argument_types, uint32_t flags = 0);
 
 bool is_function_pointer(const Type *type);
 

@@ -15,7 +15,7 @@ namespace scopes {
 // VECTOR TYPE
 //------------------------------------------------------------------------------
 
-struct VectorType : SizedStorageType {
+struct VectorType : ArrayLikeType {
     static bool classof(const Type *T);
 
     void stream_name(StyledStream &ss) const;

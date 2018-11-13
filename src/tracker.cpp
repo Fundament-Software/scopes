@@ -30,6 +30,8 @@ https://gist.github.com/paniq/71251083aa52c1577f2d1b22be0ac6e1
 
 //------------------------------------------------------------------------------
 
+static int track_count = 0;
+
 struct Tracker {
     enum VisitMode {
         // inject destructor when last reference
@@ -321,8 +323,6 @@ struct Tracker {
         auto &&kinds = depends.kinds;
         for (int i = 0; i < count; ++i) {
             auto ET = get_argument(T, i);
-            if (!is_tracked(ET))
-                continue;
             assert(i < kinds.size());
             if (kinds[i] == DK_Conflicted) {
             #if SCOPES_SOFT_TRACKING
@@ -532,13 +532,13 @@ struct Tracker {
             return_type, "return"));
         SCOPES_CHECK_RESULT(track_block(root_state, function->value));
         {
-            ArgTypes rettypes;
+            Types rettypes;
             int acount = get_argument_count(return_type);
             auto &&args = deps.args;
             auto &&kinds = deps.kinds;
             for (int i = 0; i < acount; ++i) {
                 auto T = get_argument(return_type, i);
-                if (is_tracked(T) && (i < args.size())) {
+                if (i < args.size()) {
                     auto kind = kinds[i];
                     IDSet set;
                     if (kind == DK_Borrowed) {
@@ -559,7 +559,7 @@ struct Tracker {
             }
             return_type = arguments_type(rettypes);
         }
-        ArgTypes argtypes;
+        Types argtypes;
         for (int i = 0; i < function->params.size(); ++i) {
             auto param = function->params[i];
             const Type *T = param->get_type();
@@ -573,11 +573,16 @@ struct Tracker {
         }
         auto newT = native_ro_pointer_type(raising_function_type(
             fT->except_type, return_type, argtypes, fT->flags));
-        if (function->get_type() != newT) {
+        if (track_count++ == 0) {
+            if (function->get_type() != newT) {
+                StyledStream ss;
+                ss << function->get_type() << " -> " << newT << std::endl;
+                function->change_type(newT);
+            }
             StyledStream ss;
-            ss << function->get_type() << " -> " << newT << std::endl;
-            function->change_type(newT);
+            stream_ast(ss, function, StreamASTFormat());
         }
+
         return {};
     }
 
@@ -611,7 +616,6 @@ struct Tracker {
         const ValueIndex &arg, const char *context, int retdepth = -1) {
         SCOPES_RESULT_TYPE(void);
         auto T = arg.get_type();
-        assert(is_tracked(T));
         assert(!arg.has_deps());
         auto &data = state.ensure_data(arg);
         switch(mode) {
@@ -651,7 +655,6 @@ struct Tracker {
         const ValueIndex &arg, const char *context, int retdepth = -1) {
         SCOPES_RESULT_TYPE(void);
         auto T = arg.get_type();
-        if (!is_tracked(T)) return {};
         auto deps = arg.deps();
         if (retdepth < 0) {
             if (deps) {
@@ -767,8 +770,6 @@ struct Tracker {
         int argc = get_argument_count(T);
         for (int i = 0; i < argc; ++i) {
             auto argT = get_argument(T, i);
-            if (!is_tracked(argT))
-                continue;
             SCOPES_CHECK_RESULT(track_subargument(state,
                 ValueIndex(node, i), context));
         }

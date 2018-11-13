@@ -70,8 +70,8 @@ void TupleType::stream_name(StyledStream &ss) const {
     }
 }
 
-TupleType::TupleType(const ArgTypes &_values, bool _packed, size_t _alignment)
-    : StorageType(TK_Tuple), values(_values), packed(_packed) {
+TupleType::TupleType(const Types &_values, bool _packed, size_t _alignment)
+    : TupleLikeType(TK_Tuple, _values), packed(_packed) {
     offsets.resize(values.size());
     size_t sz = 0;
     if (packed) {
@@ -138,7 +138,7 @@ SCOPES_RESULT(Symbol) TupleType::field_name(size_t i) const {
 
 //------------------------------------------------------------------------------
 
-SCOPES_RESULT(const Type *) tuple_type(const ArgTypes &values,
+SCOPES_RESULT(const Type *) tuple_type(const Types &values,
     bool packed, size_t alignment) {
     SCOPES_RESULT_TYPE(const Type *);
     for (size_t i = 0; i < values.size(); ++i) {

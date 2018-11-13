@@ -43,7 +43,7 @@ void FunctionType::stream_name(StyledStream &ss) const {
 
 FunctionType::FunctionType(const Type *_except_type,
     const Type *_return_type,
-    const ArgTypes &_argument_types, uint32_t _flags) :
+    const Types &_argument_types, uint32_t _flags) :
     Type(TK_Function),
     except_type(_except_type),
     return_type(_return_type),
@@ -54,7 +54,7 @@ FunctionType::FunctionType(const Type *_except_type,
 }
 
 const FunctionType *FunctionType::strip_qualifiers() const {
-    ArgTypes args;
+    Types args;
     for (auto arg : argument_types) {
         args.push_back(scopes::strip_qualifiers(arg));
     }
@@ -82,18 +82,18 @@ SCOPES_RESULT(const Type *) FunctionType::type_at_index(size_t i) const {
 //------------------------------------------------------------------------------
 
 const Type *raising_function_type(const Type *except_type, const Type *return_type,
-    const ArgTypes &argument_types, uint32_t flags) {
+    const Types &argument_types, uint32_t flags) {
 
     struct TypeArgs {
         const Type *except_type;
         const Type *return_type;
-        ArgTypes argtypes;
+        Types argtypes;
         uint32_t flags;
 
         TypeArgs() {}
         TypeArgs(const Type *_except_type,
             const Type *_return_type,
-            const ArgTypes &_argument_types,
+            const Types &_argument_types,
             uint32_t _flags = 0) :
             except_type(_except_type),
             return_type(_return_type),
@@ -142,12 +142,12 @@ const Type *raising_function_type(const Type *except_type, const Type *return_ty
 }
 
 const Type *raising_function_type(const Type *return_type,
-    const ArgTypes &argument_types, uint32_t flags) {
+    const Types &argument_types, uint32_t flags) {
     return raising_function_type(TYPE_Error, return_type, argument_types, flags);
 }
 
 const Type *function_type(const Type *return_type,
-    const ArgTypes &argument_types, uint32_t flags) {
+    const Types &argument_types, uint32_t flags) {
     return raising_function_type(TYPE_NoReturn, return_type, argument_types, flags);
 }
 
