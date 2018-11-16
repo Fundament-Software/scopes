@@ -14,6 +14,11 @@
 
 namespace scopes {
 
+enum TypenameFlags {
+    //
+    TNF_Plain = (1 << 0),
+};
+
 //------------------------------------------------------------------------------
 // TYPENAME
 //------------------------------------------------------------------------------
@@ -27,15 +32,17 @@ struct TypenameType : Type {
 
     TypenameType(const String *name);
 
-    SCOPES_RESULT(void) finalize(const Type *_type);
+    SCOPES_RESULT(void) finalize(const Type *_type, uint32_t flags);
 
     bool finalized() const;
+    bool is_plain() const;
 
     const Type *super() const;
 
     const Type *storage_type;
     const Type *super_type;
     const String *_name;
+    uint32_t flags;
 };
 
 // always generates a new type

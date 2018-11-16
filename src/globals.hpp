@@ -23,6 +23,8 @@ namespace scopes {
     T(g_extractelement, "extractelement") \
     T(g_getelementref, "getelementref") \
     T(g_store, "store") \
+    T(g_move, "move") \
+    T(g_copy, "copy") \
     T(g_getelementptr, "getelementptr") \
     T(g_zext, "zext") \
     T(g_sext, "sext") \

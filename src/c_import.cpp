@@ -76,7 +76,7 @@ public:
     CVisitor() : dest(nullptr), Context(NULL) {
         const Type *T = typename_type(String::from("__builtin_va_list"));
         auto tnt = cast<TypenameType>(const_cast<Type*>(T));
-        tnt->finalize(array_type(TYPE_I8, sizeof(va_list)).assert_ok()).assert_ok();
+        tnt->finalize(array_type(TYPE_I8, sizeof(va_list)).assert_ok(), TNF_Plain).assert_ok();
         typedefs.insert({Symbol("__builtin_va_list"), T });
     }
 
@@ -198,7 +198,7 @@ public:
         }
 
         SCOPES_CHECK_RESULT(tni->finalize(is_union?SCOPES_GET_RESULT(union_type(args)):
-            SCOPES_GET_RESULT(tuple_type(args, packed, explicit_alignment?al:0))));
+            SCOPES_GET_RESULT(tuple_type(args, packed, explicit_alignment?al:0)), TNF_Plain));
         return {};
     }
 
@@ -284,7 +284,7 @@ public:
 
             auto tni = cast<TypenameType>(const_cast<Type *>(enum_type));
             tni->super_type = TYPE_CEnum;
-            SCOPES_CHECK_RESULT(tni->finalize(tag_type));
+            SCOPES_CHECK_RESULT(tni->finalize(tag_type, TNF_Plain));
 
             for (auto it : ed->enumerators()) {
                 const Anchor *anchor = anchorFromLocation(it->getSourceRange().getBegin());

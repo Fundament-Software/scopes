@@ -350,7 +350,7 @@ sc_type_raises_t sc_type_storage(const sc_type_t *T);
 bool sc_type_is_opaque(const sc_type_t *T);
 const sc_string_t *sc_type_string(const sc_type_t *T);
 sc_symbol_value_tuple_t sc_type_next(const sc_type_t *type, sc_symbol_t key);
-void sc_type_set_symbol(sc_type_t *T, sc_symbol_t sym, sc_value_t *value);
+void sc_type_set_symbol(const sc_type_t *T, sc_symbol_t sym, sc_value_t *value);
 
 // pointer types
 
@@ -375,7 +375,7 @@ bool sc_integer_type_is_signed(const sc_type_t *T);
 const sc_type_t *sc_typename_type(const sc_string_t *str);
 sc_void_raises_t sc_typename_type_set_super(const sc_type_t *T, const sc_type_t *ST);
 const sc_type_t *sc_typename_type_get_super(const sc_type_t *T);
-sc_void_raises_t sc_typename_type_set_storage(const sc_type_t *T, const sc_type_t *T2);
+sc_void_raises_t sc_typename_type_set_storage(const sc_type_t *T, const sc_type_t *T2, uint32_t flags);
 
 // array types
 

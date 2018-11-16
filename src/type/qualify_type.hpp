@@ -14,18 +14,29 @@
 
 namespace scopes {
 
+// key=mutate(move(view(refer(T))))
 #define SCOPES_QUALIFIER_KIND() \
-    T(QK_Key, "qualifier-kind-key", KeyQualifier) \
-    T(QK_Move, "qualifier-kind-move", MoveQualifier) \
+    T(QK_Refer, "qualifier-kind-refer", ReferQualifier) \
     T(QK_View, "qualifier-kind-view", ViewQualifier) \
+    T(QK_Move, "qualifier-kind-move", MoveQualifier) \
     T(QK_Mutate, "qualifier-kind-mutate", MutateQualifier) \
-    T(QK_Refer, "qualifier-kind-refer", ReferQualifier)
+    T(QK_Key, "qualifier-kind-key", KeyQualifier) \
 
 enum QualifierKind {
 #define T(NAME, BNAME, CLASS) \
     NAME,
     SCOPES_QUALIFIER_KIND()
 #undef T
+    QualifierCount
+};
+
+enum QualifierMask {
+    QM_UniquenessTags =
+          (1 << QK_View)
+        | (1 << QK_Move)
+        | (1 << QK_Mutate),
+    QM_Annotations = QM_UniquenessTags
+        | (1 << QK_Key),
 };
 
 //------------------------------------------------------------------------------
@@ -43,7 +54,6 @@ private:
 //------------------------------------------------------------------------------
 
 typedef std::vector<const Qualifier *> Qualifiers;
-typedef std::unordered_map<int, const Qualifier *> QualifierMap;
 
 //------------------------------------------------------------------------------
 
@@ -52,11 +62,12 @@ struct QualifyType : Type {
 
     void stream_name(StyledStream &ss) const;
 
-    QualifyType(const Type *type, const QualifierMap &qualifiers);
+    QualifyType(const Type *type, const Qualifier * const *qualifiers);
 
     const Type *type;
-    QualifierMap qualifiers;
-    Qualifiers sorted_qualifiers;
+    // bits of available qualifiers are set
+    uint32_t mask;
+    const Qualifier *qualifiers[QualifierCount];
     std::size_t prehash;
 };
 
@@ -64,7 +75,8 @@ struct QualifyType : Type {
 
 const Type *qualify(const Type *type, const Qualifiers &qualifiers);
 const Qualifier *find_qualifier(const Type *type, QualifierKind kind);
-const Type *strip_qualifiers(const Type *T);
+const Type *strip_qualifiers(const Type *T, uint32_t mask = 0xffffffff);
+bool has_qualifiers(const Type *T, uint32_t mask = ((1 << QualifierCount) - 1));
 const Type *strip_qualifier(const Type *T, QualifierKind kind);
 const Type *copy_qualifiers(const Type *type, const Type *from);
 

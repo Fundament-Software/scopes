@@ -35,7 +35,7 @@ struct FunctionType : Type {
     bool has_exception() const;
     bool returns_value() const;
 
-    const FunctionType *strip_qualifiers() const;
+    const FunctionType *strip_annotations() const;
 
     SCOPES_RESULT(const Type *) type_at_index(size_t i) const;
 
@@ -43,6 +43,7 @@ struct FunctionType : Type {
     const Type *return_type;
     Types argument_types;
     uint32_t flags;
+    mutable const FunctionType *stripped;
 };
 
 const Type *raising_function_type(const Type *except_type, const Type *return_type,

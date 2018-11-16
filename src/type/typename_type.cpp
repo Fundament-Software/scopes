@@ -28,7 +28,7 @@ void TypenameType::stream_name(StyledStream &ss) const {
 
 TypenameType::TypenameType(const String *name)
     : Type(TK_Typename), storage_type(nullptr), super_type(nullptr),
-        _name(nullptr) {
+        _name(nullptr), flags(0) {
     auto newname = Symbol(name);
     size_t idx = 2;
     while (used_names.count(newname)) {
@@ -41,7 +41,7 @@ TypenameType::TypenameType(const String *name)
     _name = newname.name();
 }
 
-SCOPES_RESULT(void) TypenameType::finalize(const Type *_type) {
+SCOPES_RESULT(void) TypenameType::finalize(const Type *_type, uint32_t _flags) {
     SCOPES_RESULT_TYPE(void);
     if (finalized()) {
         StyledString ss;
@@ -53,11 +53,20 @@ SCOPES_RESULT(void) TypenameType::finalize(const Type *_type) {
         ss.out << "cannot use typename " << _type << " as storage type";
         SCOPES_LOCATION_ERROR(ss.str());
     }
+    if ((_flags & TNF_Plain) && !::scopes::is_plain(_type)) {
+        StyledString ss;
+        ss.out << "cannot tag typename as plain because storage type " << _type << " is not plain";
+        SCOPES_LOCATION_ERROR(ss.str());
+    }
     storage_type = _type;
+    flags = _flags;
     return {};
 }
 
 bool TypenameType::finalized() const { return storage_type != nullptr; }
+bool TypenameType::is_plain() const {
+    return (flags & TNF_Plain) == TNF_Plain;
+}
 
 const Type *TypenameType::super() const {
     if (!super_type) return TYPE_Typename;

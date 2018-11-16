@@ -26,7 +26,8 @@ StreamASTFormat::StreamASTFormat() :
     anchors(None),
     depth(0),
     newlines(true),
-    data_dependency(true)
+    data_dependency(true),
+    dependent_functions(false)
 {}
 
 StreamASTFormat StreamASTFormat::debug() {
@@ -50,6 +51,7 @@ struct StreamAST : StreamAnchors {
     bool atom_anchors;
     bool newlines;
     bool data_dependency;
+    bool dependent_functions;
     int nextid;
 
     std::unordered_map<const Value *, int> visited;
@@ -61,6 +63,7 @@ struct StreamAST : StreamAnchors {
         atom_anchors = (fmt.anchors == StreamASTFormat::All);
         newlines = fmt.newlines;
         data_dependency = fmt.data_dependency;
+        dependent_functions = fmt.dependent_functions;
     }
 
     void stream_newline() {
@@ -223,6 +226,8 @@ struct StreamAST : StreamAnchors {
                 ValueIndex val = dep;
                 if (isa<Parameter>(val.value)) {
                     walk_same_or_newline(val.value, 0, 0, true);
+                } else if (isa<Pure>(val.value)) {
+                    ss << Style_Keyword << get_value_class_name(val.value->kind()) << Style_None;
                 } else {
                     auto it = visited.find(val.value);
                     if (it == visited.end()) {
@@ -308,7 +313,7 @@ struct StreamAST : StreamAnchors {
                     if (val->value) {
                         walk_newline(val->value, depth+1, maxdepth);
                     }
-                } else {
+                } else if (dependent_functions) {
                     todo.push_back(node);
                 }
             }
@@ -337,7 +342,7 @@ struct StreamAST : StreamAnchors {
                     ss << Style_Operator << " )" << Style_None;
                     stream_annotations(depth+1, val->annotations);
                     stream_block_result(val->body, val->value, depth+1, maxdepth);
-                } else {
+                } else if (dependent_functions) {
                     todo.push_back(node);
                 }
             }
@@ -467,6 +472,8 @@ struct StreamAST : StreamAnchors {
             auto val = cast<Loop>(node);
             ss << Style_Keyword << "Loop" << Style_None;
             if (newlines) {
+                ss << " ";
+                stream_depends(val->param->deps);
                 walk_same_or_newline(val->param, depth+1, maxdepth);
                 ss << " " << Style_Operator << "=" << Style_None;
                 walk_same_or_newline(val->init, depth+1, maxdepth);
@@ -533,7 +540,8 @@ struct StreamAST : StreamAnchors {
                 stream_type_suffix(T);
                 if (newlines && !visited.count(cl->func)) {
                     visited.insert({cl->func, -1});
-                    todo.push_back(cl->func);
+                    if (dependent_functions)
+                        todo.push_back(cl->func);
                 }
             /*} else if (T == TYPE_List) {
                 ss << (const List *)val->value;*/

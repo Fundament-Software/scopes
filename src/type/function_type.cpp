@@ -48,21 +48,26 @@ FunctionType::FunctionType(const Type *_except_type,
     except_type(_except_type),
     return_type(_return_type),
     argument_types(_argument_types),
-    flags(_flags) {
+    flags(_flags),
+    stripped(nullptr) {
     assert(except_type);
     assert(return_type);
 }
 
-const FunctionType *FunctionType::strip_qualifiers() const {
-    Types args;
-    for (auto arg : argument_types) {
-        args.push_back(scopes::strip_qualifiers(arg));
+const FunctionType *FunctionType::strip_annotations() const {
+    if (!stripped) {
+        Types args;
+        for (auto arg : argument_types) {
+            args.push_back(strip_qualifiers(arg, QM_Annotations));
+        }
+        stripped =
+        cast<FunctionType>(raising_function_type(
+            strip_qualifiers(except_type, QM_Annotations),
+            strip_qualifiers(return_type, QM_Annotations),
+            args,
+            flags));
     }
-    return cast<FunctionType>(raising_function_type(
-        scopes::strip_qualifiers(except_type),
-        scopes::strip_qualifiers(return_type),
-        args,
-        flags));
+    return stripped;
 }
 
 bool FunctionType::has_exception() const {

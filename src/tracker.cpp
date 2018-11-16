@@ -523,6 +523,13 @@ struct Tracker {
 
     SCOPES_RESULT(void) process() {
         SCOPES_RESULT_TYPE(void);
+        StyledStream ss;
+        ss << "processing #" << track_count << std::endl;
+        const int HALT_AT = 400;
+        if (track_count == HALT_AT) {
+            StyledStream ss;
+            stream_ast(ss, function, StreamASTFormat());
+        }
         State root_state(function->body);
         root_state.set_location(function);
         auto fT = extract_function_type(function->get_type());
@@ -573,14 +580,14 @@ struct Tracker {
         }
         auto newT = native_ro_pointer_type(raising_function_type(
             fT->except_type, return_type, argtypes, fT->flags));
-        if (track_count++ == 0) {
+        if (track_count++ == HALT_AT) {
             if (function->get_type() != newT) {
-                StyledStream ss;
                 ss << function->get_type() << " -> " << newT << std::endl;
                 function->change_type(newT);
             }
             StyledStream ss;
             stream_ast(ss, function, StreamASTFormat());
+            exit(0);
         }
 
         return {};
@@ -615,6 +622,8 @@ struct Tracker {
     SCOPES_RESULT(void) visit_unique_argument(State &state, VisitMode mode,
         const ValueIndex &arg, const char *context, int retdepth = -1) {
         SCOPES_RESULT_TYPE(void);
+        if (isa<Pure>(arg.value))
+            return {};
         auto T = arg.get_type();
         assert(!arg.has_deps());
         auto &data = state.ensure_data(arg);

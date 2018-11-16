@@ -146,10 +146,11 @@ bool is_plain(const Type *T) {
         return is_plain(cast<ArrayLikeType>(T)->element_type);
     case TK_Tuple:
     case TK_Union:
-        return all_plain(cast<TupleLikeType>(T)->values);
+        return cast<TupleLikeType>(T)->is_plain();
     case TK_Arguments:
         return all_plain(cast<ArgumentsType>(T)->values);
     case TK_Typename:
+        return cast<TypenameType>(T)->is_plain();
     case TK_Function:
     case TK_Image:
     case TK_SampledImage:
@@ -350,29 +351,14 @@ SCOPES_RESULT(void) verify_range(size_t idx, size_t count) {
 #define DEFINE_BASIC_TYPE(NAME, CT, T, BODY) { \
         T = typename_type(String::from(NAME)); \
         auto tn = cast<TypenameType>(const_cast<Type *>(T)); \
-        tn->finalize(BODY).assert_ok(); \
+        tn->finalize(BODY, TNF_Plain).assert_ok(); \
         assert(sizeof(CT) == size_of(T).assert_ok()); \
-    }
-
-#define DEFINE_STRUCT_TYPE(NAME, CT, T, ...) { \
-        T = typename_type(String::from(NAME)); \
-        auto tn = cast<TypenameType>(const_cast<Type *>(T)); \
-        tn->finalize(tuple_type({ __VA_ARGS__ }).assert_ok()).assert_ok(); \
-        assert(sizeof(CT) == size_of(T).assert_ok()); \
-    }
-
-#define DEFINE_STRUCT_HANDLE_TYPE(NAME, CT, T, ...) { \
-        T = typename_type(String::from(NAME)); \
-        auto tn = cast<TypenameType>(const_cast<Type *>(T)); \
-        auto ET = tuple_type({ __VA_ARGS__ }).assert_ok(); \
-        assert(sizeof(CT) == size_of(ET).assert_ok()); \
-        tn->finalize(native_ro_pointer_type(ET)).assert_ok(); \
     }
 
 #define DEFINE_OPAQUE_HANDLE_TYPE(NAME, CT, T) { \
         T = typename_type(String::from(NAME)); \
         auto tn = cast<TypenameType>(const_cast<Type *>(T)); \
-        tn->finalize(native_ro_pointer_type(typename_type(String::from("_" NAME)))).assert_ok(); \
+        tn->finalize(native_ro_pointer_type(typename_type(String::from("_" NAME))), TNF_Plain).assert_ok(); \
     }
 
 void init_types() {
@@ -424,10 +410,10 @@ void init_types() {
     TYPE_Unknown = typename_type(String::from("Unknown"));
     TYPE_Variadic = typename_type(String::from("..."));
     const Type *_TypePtr = native_ro_pointer_type(typename_type(String::from("_type")));
-    cast<TypenameType>(const_cast<Type *>(TYPE_Type))->finalize(_TypePtr).assert_ok();
-    cast<TypenameType>(const_cast<Type *>(TYPE_Unknown))->finalize(_TypePtr).assert_ok();
+    cast<TypenameType>(const_cast<Type *>(TYPE_Type))->finalize(_TypePtr, TNF_Plain).assert_ok();
+    cast<TypenameType>(const_cast<Type *>(TYPE_Unknown))->finalize(_TypePtr, TNF_Plain).assert_ok();
 
-    cast<TypenameType>(const_cast<Type *>(TYPE_Nothing))->finalize(tuple_type({}).assert_ok()).assert_ok();
+    cast<TypenameType>(const_cast<Type *>(TYPE_Nothing))->finalize(tuple_type({}).assert_ok(), TNF_Plain).assert_ok();
 
     DEFINE_BASIC_TYPE("Symbol", Symbol, TYPE_Symbol, TYPE_U64);
     DEFINE_BASIC_TYPE("Builtin", Builtin, TYPE_Builtin, TYPE_U64);
@@ -443,12 +429,7 @@ void init_types() {
 
     DEFINE_OPAQUE_HANDLE_TYPE("CompileStage", Value, TYPE_CompileStage);
 
-    DEFINE_STRUCT_HANDLE_TYPE("Anchor", Anchor, TYPE_Anchor,
-        native_ro_pointer_type(TYPE_SourceFile),
-        TYPE_I32,
-        TYPE_I32,
-        TYPE_I32
-    );
+    DEFINE_OPAQUE_HANDLE_TYPE("Anchor", Anchor, TYPE_Anchor);
 
     DEFINE_TYPENAME("ASTMacro", TYPE_ASTMacro);
     {
@@ -457,7 +438,8 @@ void init_types() {
                 native_ro_pointer_type(
                     raising_function_type(
                         TYPE_Value, { TYPE_Value })
-                    )).assert_ok();
+                ),
+                TNF_Plain).assert_ok();
     }
 
 #define T(TYPE, TYPENAME) \
@@ -468,10 +450,7 @@ void init_types() {
 
 #undef DEFINE_TYPENAME
 #undef DEFINE_BASIC_TYPE
-#undef DEFINE_STRUCT_TYPE
-#undef DEFINE_STRUCT_HANDLE_TYPE
 #undef DEFINE_OPAQUE_HANDLE_TYPE
-#undef DEFINE_STRUCT_TYPE
 
 } // namespace scopes
 

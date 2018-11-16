@@ -1153,6 +1153,7 @@ sc_value_raises_t sc_parse_from_string(const sc_string_t *str) {
 
 sc_value_raises_t sc_type_at(const sc_type_t *T, sc_symbol_t key) {
     using namespace scopes;
+    T = strip_qualifiers(T);
     Value *result = nullptr;
     bool ok = T->lookup(key, result);
     if (!ok) {
@@ -1165,6 +1166,7 @@ sc_value_raises_t sc_type_at(const sc_type_t *T, sc_symbol_t key) {
 
 sc_value_raises_t sc_type_local_at(const sc_type_t *T, sc_symbol_t key) {
     using namespace scopes;
+    T = strip_qualifiers(T);
     Value *result = nullptr;
     bool ok = T->lookup_local(key, result);
     if (!ok) {
@@ -1260,6 +1262,7 @@ sc_symbol_raises_t sc_type_field_name(const sc_type_t *T, int index) {
 
 int32_t sc_type_kind(const sc_type_t *T) {
     using namespace scopes;
+    T = strip_qualifiers(T);
     return T->kind();
 }
 
@@ -1294,6 +1297,7 @@ const sc_string_t *sc_type_string(const sc_type_t *T) {
 
 sc_symbol_value_tuple_t sc_type_next(const sc_type_t *type, sc_symbol_t key) {
     using namespace scopes;
+    type = strip_qualifiers(type);
     auto &&map = type->get_symbols();
     Type::Map::const_iterator it;
     if (key == SYM_Unnamed) {
@@ -1308,8 +1312,9 @@ sc_symbol_value_tuple_t sc_type_next(const sc_type_t *type, sc_symbol_t key) {
     return { SYM_Unnamed, nullptr };
 }
 
-void sc_type_set_symbol(sc_type_t *T, sc_symbol_t sym, sc_value_t *value) {
+void sc_type_set_symbol(const sc_type_t *T, sc_symbol_t sym, sc_value_t *value) {
     using namespace scopes;
+    T = strip_qualifiers(T);
     const_cast<Type *>(T)->bind(sym, value);
 }
 
@@ -1448,11 +1453,11 @@ const sc_type_t *sc_typename_type_get_super(const sc_type_t *T) {
     return superof(T);
 }
 
-sc_void_raises_t sc_typename_type_set_storage(const sc_type_t *T, const sc_type_t *T2) {
+sc_void_raises_t sc_typename_type_set_storage(const sc_type_t *T, const sc_type_t *T2, uint32_t flags) {
     using namespace scopes;
     auto r1 = verify_kind<TK_Typename>(T);
     if (!r1.ok()) return { false, r1.assert_error() };
-    RETURN_VOID(cast<TypenameType>(const_cast<Type *>(T))->finalize(T2));
+    RETURN_VOID(cast<TypenameType>(const_cast<Type *>(T))->finalize(T2, flags));
 }
 
 // Array Type
@@ -1848,7 +1853,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_typename_type, TYPE_Type, TYPE_String);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_typename_type_set_super, _void, TYPE_Type, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_typename_type_get_super, TYPE_Type, TYPE_Type);
-    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_typename_type_set_storage, _void, TYPE_Type, TYPE_Type);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_typename_type_set_storage, _void, TYPE_Type, TYPE_Type, TYPE_U32);
 
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_array_type, TYPE_Type, TYPE_Type, TYPE_USize);
 
@@ -1952,6 +1957,9 @@ B_TYPES()
         ConstInt::from(LINE_ANCHOR, TYPE_U64, (uint64_t)PTF_NonReadable));
     globals->bind(Symbol("pointer-flag-non-writable"),
         ConstInt::from(LINE_ANCHOR, TYPE_U64, (uint64_t)PTF_NonWritable));
+
+    globals->bind(Symbol("typename-flag-plain"),
+        ConstInt::from(LINE_ANCHOR, TYPE_U32, (uint32_t)TNF_Plain));
 
     globals->bind(Symbol(SYM_DumpDisassembly),
         ConstInt::from(LINE_ANCHOR, TYPE_U64, (uint64_t)CF_DumpDisassembly));

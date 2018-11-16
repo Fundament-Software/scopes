@@ -329,6 +329,13 @@ SCOPES_RESULT(void) error_value_inaccessible_from_closure(Value *value,
     }
 }
 
+SCOPES_RESULT(void) error_cannot_deref_non_plain(const Type *T) {
+    SCOPES_RESULT_TYPE(void)
+    StyledString ss;
+    ss.out << "can not implicitly dereference non-plain value of type " << T;
+    SCOPES_LOCATION_ERROR(ss.str());
+}
+
 //------------------------------------------------------------------------------
 
 SCOPES_RESULT(void) error_gen_invalid_call_type(const char *target, Value *callee) {

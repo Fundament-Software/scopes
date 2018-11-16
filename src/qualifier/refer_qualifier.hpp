@@ -37,6 +37,8 @@ const Type *refer_type(const Type *element_type, uint64_t flags,
 uint64_t refer_flags(const Type *T);
 Symbol refer_storage_class(const Type *T);
 
+bool is_reference(const Type *T);
+
 } // namespace scopes
 
 #endif // SCOPES_REFER_QUALIFIER_HPP

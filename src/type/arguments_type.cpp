@@ -116,6 +116,8 @@ bool is_arguments_type(const Type *T) {
 int get_argument_count(const Type *T) {
     if (isa<ArgumentsType>(T)) {
         return cast<ArgumentsType>(T)->values.size();
+    } else if (T == TYPE_NoReturn) {
+        return 0;
     } else {
         return 1;
     }

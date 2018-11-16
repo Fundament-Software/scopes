@@ -93,6 +93,10 @@ Symbol refer_storage_class(const Type *T) {
     return SYM_Unnamed;
 }
 
+bool is_reference(const Type *T) {
+    return has_qualifier<ReferQualifier>(T);
+}
+
 //------------------------------------------------------------------------------
 
 } // namespace scopes

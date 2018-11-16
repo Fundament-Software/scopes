@@ -271,40 +271,34 @@ ASTContext ASTContext::from_function(Function *fn) {
 
 //------------------------------------------------------------------------------
 
-static void merge_depends(const ASTContext &ctx, Depends &deps, const Values &values) {
+static void merge_depends(const ASTContext &ctx, Depends &deps, int i, Value *value, int index = 0) {
+    const Type *T = value->get_type();
+    if (!is_returning_value(T))
+        return;
+    auto arg = ValueIndex(value, index);
     int depth = ctx.block?ctx.block->depth:0;
-    for (int i = 0; i < values.size(); ++i) {
-        auto value = values[i];
-        const Type *T = value->get_type();
-        if (!is_returning_value(T))
-            continue;
-        if (isa<Pure>(value))
-            continue;
-        auto arg = ValueIndex(value);
-        if (value->deps.empty()) { // unique
-            if (value->get_depth() <= depth) {
-                deps.borrow(i, arg);
+    const ValueIndexSet *args = arg.deps();
+    if (args) { // borrowed
+        for (auto &&val : *args) {
+            if (val.value->get_depth() <= depth) {
+                deps.borrow(i, val);
             } else {
                 deps.unique(i);
             }
-        } else {
-            const ValueIndexSet *args = arg.deps();
-            if (args) { // borrowed
-                for (auto &&val : *args) {
-                    if (val.value->get_depth() <= depth) {
-                        deps.borrow(i, val);
-                    } else {
-                        deps.unique(i);
-                    }
-                }
-            } else { // unique
-                if (value->get_depth() <= depth) {
-                    deps.borrow(i, arg);
-                } else {
-                    deps.unique(i);
-                }
-            }
         }
+    } else { // unique
+        if (value->get_depth() <= depth) {
+            deps.borrow(i, arg);
+        } else {
+            deps.unique(i);
+        }
+    }
+}
+
+static void merge_depends(const ASTContext &ctx, Depends &deps, const Values &values) {
+    int depth = ctx.block?ctx.block->depth:0;
+    for (int i = 0; i < values.size(); ++i) {
+        merge_depends(ctx, deps, i, values[i]);
     }
 }
 
@@ -313,27 +307,10 @@ static void merge_depends(const ASTContext &ctx, Depends &deps, Value *value) {
     const Type *T = value->get_type();
     if (!is_returning_value(T))
         return;
-    if (isa<Pure>(value))
-        return;
     int depth = ctx.block?ctx.block->depth:0;
-    if (value->deps.empty()) { // is unique
-        if (value->get_depth() <= depth) { // has required lifetime
-            deps.borrow(value);
-        } else {
-            deps.unique(value);
-        }
-    } else { // is borrowed
-        auto &&args = value->deps.args;
-        for (int i = 0; i < args.size(); ++i) {
-            auto &&arg = args[i];
-            for (auto &&val : arg) {
-                if (val.value->get_depth() <= depth) {
-                    deps.borrow(i, val);
-                } else {
-                    deps.unique(i);
-                }
-            }
-        }
+    int count = get_argument_count(T);
+    for (int i = 0; i < count; ++i) {
+        merge_depends(ctx, deps, i, value, i);
     }
 }
 
@@ -395,6 +372,16 @@ Value *build_argument_list(const Anchor *anchor, const Values &values) {
     }
     ArgumentList *newnlist = ArgumentList::from(anchor, values);
     newnlist->set_type(arguments_type_from_arguments(values));
+    return newnlist;
+}
+
+Value *build_runtime_argument_list(const ASTContext &ctx, const Anchor *anchor, const Values &values) {
+    if (values.size() == 1) {
+        return values[0];
+    }
+    ArgumentList *newnlist = ArgumentList::from(anchor, values);
+    newnlist->set_type(arguments_type_from_arguments(values));
+    merge_depends(ctx, newnlist->deps, values);
     return newnlist;
 }
 
@@ -469,6 +456,7 @@ Value *extract_argument(const ASTContext &ctx, Value *value, int index) {
                 result->set_type(AT);
                 assert(!result->is_pure());
                 assert(!result->block);
+                result->deps.unique(0);
                 ctx.append(result);
                 return result;
             }
@@ -491,7 +479,7 @@ static Value *extract_arguments(const ASTContext &ctx, Value *value, int index) 
         for (int i = index; i < rt->values.size(); ++i) {
             values.push_back(extract_argument(ctx, value, i));
         }
-        auto newlist = build_argument_list(anchor, values);
+        auto newlist = build_runtime_argument_list(ctx, anchor, values);
         ctx.append(newlist);
         return newlist;
     } else if (index == 0) {
@@ -674,7 +662,7 @@ static SCOPES_RESULT(Value *) prove_ArgumentList(const ASTContext &ctx, Argument
     if (noret) {
         return noret;
     }
-    return build_argument_list(nlist->anchor(), values);
+    return build_runtime_argument_list(ctx, nlist->anchor(), values);
 }
 
 static SCOPES_RESULT(Value *) prove_ExtractArgument(
@@ -738,6 +726,19 @@ static SCOPES_RESULT(Value *) prove_Loop(const ASTContext &ctx, Loop *loop) {
     newloop->return_type = SCOPES_GET_RESULT(merge_value_type("loop break",
         newloop->return_type, rtype));
     newloop->set_type(newloop->return_type);
+
+    for (auto _break : newloop->breaks) {
+        merge_depends(ctx, newloop->deps, _break->value);
+    }
+    merge_depends(ctx, newloop->deps, newloop->value);
+
+    for (auto repeat : newloop->repeats) {
+        merge_depends(ctx, param->deps, repeat->value);
+    }
+
+    //std::vector<Repeat *> repeats;
+    //std::vector<Break *> breaks;
+
     return newloop;
 }
 
@@ -1086,12 +1087,25 @@ static SCOPES_RESULT(void) build_deref(
     auto rq = try_qualifier<ReferQualifier>(T);
     if (rq) {
         SCOPES_CHECK_RESULT(verify_readable(rq, T));
-        auto retT = strip_qualifier<ReferQualifier>(T);
-        auto call = Call::from(anchor, g_deref, { val });
-        call->set_type(retT);
-        ctx.append(call);
-        merge_depends(ctx, call->deps, val);
-        val = call;
+        if (is_plain(T)) {
+            auto retT = strip_qualifier<ReferQualifier>(T);
+            auto call = Call::from(anchor, g_deref, { val });
+            call->set_type(retT);
+            ctx.append(call);
+            call->deps.unique(0);
+            val = call;
+            return {};
+        }
+    #if 0
+        Value *handler = nullptr;
+        auto TT = strip_qualifiers(T);
+        if (TT->lookup(SYM_DerefHandler, handler)) {
+            auto call = Call::from(anchor, handler, { val });
+            val = SCOPES_GET_RESULT(prove(ctx.with_symbol_target(), call));
+            return {};
+        }
+    #endif
+        SCOPES_EXPECT_ERROR(error_cannot_deref_non_plain(T));
     }
     return {};
 }
@@ -1309,7 +1323,7 @@ repeat:
                 stream_ast(ss, arg, StreamASTFormat::singleline());
             }
             ss << std::endl;
-            return build_argument_list(call->anchor(), values);
+            return build_runtime_argument_list(ctx, call->anchor(), values);
         } break;
         case FN_DumpAST: {
             StyledStream ss(SCOPES_CERR);
@@ -1319,7 +1333,7 @@ repeat:
                 stream_ast(ss, arg, StreamASTFormat());
             }
             ss << std::endl;
-            return build_argument_list(call->anchor(), values);
+            return build_runtime_argument_list(ctx, call->anchor(), values);
         } break;
         case FN_DumpTemplate: {
             StyledStream ss(SCOPES_CERR);
@@ -1328,7 +1342,7 @@ repeat:
                 ss << std::endl;
                 stream_ast(ss, arg, StreamASTFormat());
             }
-            return build_argument_list(call->anchor(), values);
+            return build_runtime_argument_list(ctx, call->anchor(), values);
         } break;
         case FN_Move: {
             CHECKARGS(1, 1);
@@ -1403,7 +1417,7 @@ repeat:
                     default: break;
                     }
                 }
-                return DEPS1(ARGTYPE1(DestT), _SrcT);
+                return NODEPS1(ARGTYPE1(DestT));
             }
         } break;
         case FN_IntToPtr: {
@@ -1412,7 +1426,7 @@ repeat:
             READ_TYPE_CONST(DestT);
             SCOPES_CHECK_RESULT(verify_integer(T));
             SCOPES_CHECK_RESULT((verify_kind<TK_Pointer>(SCOPES_GET_RESULT(storage_type(DestT)))));
-            return DEPS1(ARGTYPE1(DestT), _T);
+            return NODEPS1(ARGTYPE1(DestT));
         } break;
         case FN_PtrToInt: {
             CHECKARGS(2, 2);
@@ -1420,7 +1434,7 @@ repeat:
             READ_TYPE_CONST(DestT);
             SCOPES_CHECK_RESULT(verify_kind<TK_Pointer>(T));
             SCOPES_CHECK_RESULT(verify_integer(SCOPES_GET_RESULT(storage_type(DestT))));
-            return DEPS1(ARGTYPE1(DestT), _T);
+            return NODEPS1(ARGTYPE1(DestT));
         } break;
         case FN_ITrunc: {
             CHECKARGS(2, 2);
@@ -1428,7 +1442,7 @@ repeat:
             READ_TYPE_CONST(DestT);
             SCOPES_CHECK_RESULT(verify_integer(T));
             SCOPES_CHECK_RESULT(verify_integer(SCOPES_GET_RESULT(storage_type(DestT))));
-            return DEPS1(ARGTYPE1(DestT), _T);
+            return NODEPS1(ARGTYPE1(DestT));
         } break;
         case FN_FPTrunc: {
             CHECKARGS(2, 2);
@@ -1439,7 +1453,7 @@ repeat:
             if (cast<RealType>(T)->width < cast<RealType>(DestT)->width) {
                 SCOPES_EXPECT_ERROR(error_invalid_operands(T, DestT));
             }
-            return DEPS1(ARGTYPE1(DestT), _T);
+            return NODEPS1(ARGTYPE1(DestT));
         } break;
         case FN_FPExt: {
             CHECKARGS(2, 2);
@@ -1450,7 +1464,7 @@ repeat:
             if (cast<RealType>(T)->width > cast<RealType>(DestT)->width) {
                 SCOPES_EXPECT_ERROR(error_invalid_operands(T, DestT));
             }
-            return DEPS1(ARGTYPE1(DestT), _T);
+            return NODEPS1(ARGTYPE1(DestT));
         } break;
         case FN_FPToUI:
         case FN_FPToSI: {
@@ -1462,7 +1476,7 @@ repeat:
             if ((T != TYPE_F32) && (T != TYPE_F64)) {
                 SCOPES_EXPECT_ERROR(error_invalid_operands(T, DestT));
             }
-            return DEPS1(ARGTYPE1(DestT), _T);
+            return NODEPS1(ARGTYPE1(DestT));
         } break;
         case FN_UIToFP:
         case FN_SIToFP: {
@@ -1474,7 +1488,7 @@ repeat:
             if ((DestT != TYPE_F32) && (DestT != TYPE_F64)) {
                 SCOPES_CHECK_RESULT(error_invalid_operands(T, DestT));
             }
-            return DEPS1(ARGTYPE1(DestT), _T);
+            return NODEPS1(ARGTYPE1(DestT));
         } break;
         case FN_ZExt:
         case FN_SExt: {
@@ -1483,7 +1497,7 @@ repeat:
             READ_TYPE_CONST(DestT);
             SCOPES_CHECK_RESULT(verify_integer(T));
             SCOPES_CHECK_RESULT(verify_integer(SCOPES_GET_RESULT(storage_type(DestT))));
-            return DEPS1(ARGTYPE1(DestT), _T);
+            return NODEPS1(ARGTYPE1(DestT));
         } break;
         case FN_ExtractElement: {
             CHECKARGS(2, 2);
@@ -1492,7 +1506,7 @@ repeat:
             SCOPES_CHECK_RESULT(verify_kind<TK_Vector>(T));
             auto vi = cast<VectorType>(T);
             SCOPES_CHECK_RESULT(verify_integer(idx));
-            return DEPS1(ARGTYPE1(vi->element_type), _T);
+            return NODEPS1(ARGTYPE1(vi->element_type));
         } break;
         case FN_InsertElement: {
             CHECKARGS(3, 3);
@@ -1503,7 +1517,7 @@ repeat:
             SCOPES_CHECK_RESULT(verify_kind<TK_Vector>(T));
             auto vi = cast<VectorType>(T);
             SCOPES_CHECK_RESULT(verify(SCOPES_GET_RESULT(storage_type(vi->element_type)), ET));
-            return DEPS1(ARGTYPE1(_T->get_type()), _T, _ET);
+            return NODEPS1(ARGTYPE1(_T->get_type()));
         } break;
         case FN_ShuffleVector: {
             CHECKARGS(3, 3);
@@ -1525,16 +1539,16 @@ repeat:
                     cast<ConstInt>(mask->values[i])->value,
                     incount));
             }
-            return DEPS1(ARGTYPE1(SCOPES_GET_RESULT(vector_type(vi->element_type, outcount))), _TV1, _TV2);
+            return NODEPS1(ARGTYPE1(SCOPES_GET_RESULT(vector_type(vi->element_type, outcount))));
         } break;
         case FN_Length: {
             CHECKARGS(1, 1);
             READ_STORAGETYPEOF(T);
             SCOPES_CHECK_RESULT(verify_real_vector(T));
             if (T->kind() == TK_Vector) {
-                return DEPS1(ARGTYPE1(cast<VectorType>(T)->element_type), _T);
+                return NODEPS1(ARGTYPE1(cast<VectorType>(T)->element_type));
             } else {
-                return DEPS1(ARGTYPE1(_T->get_type()), _T);
+                return NODEPS1(ARGTYPE1(_T->get_type()));
             }
         } break;
         case FN_ExtractValue: {
@@ -1569,7 +1583,7 @@ repeat:
                 newcall2->set_type(qualify(RT, { rq }));
                 return DEPS1(newcall2, _T);
             } else {
-                return DEPS1(ARGTYPE1(RT), _T);
+                return NODEPS1(ARGTYPE1(RT));
             }
         } break;
         case FN_InsertValue: {
@@ -1597,7 +1611,7 @@ repeat:
                 SCOPES_LOCATION_ERROR(ss.str());
             } break;
             }
-            return DEPS1(ARGTYPE1(AT), _AT, _ET);
+            return NODEPS1(ARGTYPE1(AT));
         } break;
         case FN_GetElementRef:
         case FN_GetElementPtr: {
@@ -1673,12 +1687,12 @@ repeat:
         case FN_PtrToRef: {
             CHECKARGS(1, 1);
             READ_TYPEOF(T);
-            return DEPS1(ARGTYPE1(SCOPES_GET_RESULT(ptr_to_ref(T))), _T);
+            return NODEPS1(ARGTYPE1(SCOPES_GET_RESULT(ptr_to_ref(T))));
         } break;
         case FN_RefToPtr: {
             CHECKARGS(1, 1);
             READ_NODEREF_TYPEOF(T);
-            return DEPS1(ARGTYPE1(SCOPES_GET_RESULT(ref_to_ptr(T))), _T);
+            return NODEPS1(ARGTYPE1(SCOPES_GET_RESULT(ref_to_ptr(T))));
         } break;
         case FN_VolatileLoad:
         case FN_Load: {
@@ -1686,7 +1700,7 @@ repeat:
             READ_STORAGETYPEOF(T);
             SCOPES_CHECK_RESULT(verify_kind<TK_Pointer>(T));
             SCOPES_CHECK_RESULT(verify_readable(T));
-            return DEPS1(ARGTYPE1(cast<PointerType>(T)->element_type), _T);
+            return NODEPS1(ARGTYPE1(cast<PointerType>(T)->element_type));
         } break;
         case FN_VolatileStore:
         case FN_Store: {
@@ -1753,7 +1767,7 @@ repeat:
             CHECKARGS(2, 2);
             READ_TYPEOF(A); READ_TYPEOF(B);
             SCOPES_CHECK_RESULT(verify_integer_ops(A, B));
-            return DEPS1(ARGTYPE1(SCOPES_GET_RESULT(bool_op_return_type(A))), _A, _B);
+            return NODEPS1(ARGTYPE1(SCOPES_GET_RESULT(bool_op_return_type(A))));
         } break;
         case OP_FCmpOEQ:
         case OP_FCmpONE:
@@ -1772,7 +1786,7 @@ repeat:
             CHECKARGS(2, 2);
             READ_TYPEOF(A); READ_TYPEOF(B);
             SCOPES_CHECK_RESULT(verify_real_ops(A, B));
-            return DEPS1(ARGTYPE1(SCOPES_GET_RESULT(bool_op_return_type(A))), _A, _B);
+            return NODEPS1(ARGTYPE1(SCOPES_GET_RESULT(bool_op_return_type(A))));
         } break;
 #define IARITH_NUW_NSW_OPS(NAME) \
         case OP_ ## NAME: \
@@ -1781,42 +1795,42 @@ repeat:
             CHECKARGS(2, 2); \
             READ_TYPEOF(A); READ_TYPEOF(B); \
             SCOPES_CHECK_RESULT(verify_integer_ops(A, B)); \
-            return DEPS1(ARGTYPE1(A), _A, _B); \
+            return NODEPS1(ARGTYPE1(A)); \
         } break;
 #define IARITH_OP(NAME, PFX) \
         case OP_ ## NAME: { \
             CHECKARGS(2, 2); \
             READ_TYPEOF(A); READ_TYPEOF(B); \
             SCOPES_CHECK_RESULT(verify_integer_ops(A, B)); \
-            return DEPS1(ARGTYPE1(A), _A, _B); \
+            return NODEPS1(ARGTYPE1(A)); \
         } break;
 #define FARITH_OP(NAME) \
         case OP_ ## NAME: { \
             CHECKARGS(2, 2); \
             READ_TYPEOF(A); READ_TYPEOF(B); \
             SCOPES_CHECK_RESULT(verify_real_ops(A, B)); \
-            return DEPS1(ARGTYPE1(A), _A, _B); \
+            return NODEPS1(ARGTYPE1(A)); \
         } break;
 #define FTRI_OP(NAME) \
         case OP_ ## NAME: { \
             CHECKARGS(3, 3); \
             READ_TYPEOF(A); READ_TYPEOF(B); READ_TYPEOF(C); \
             SCOPES_CHECK_RESULT(verify_real_ops(A, B, C)); \
-            return DEPS1(ARGTYPE1(A), _A, _B, _C); \
+            return NODEPS1(ARGTYPE1(A)); \
         } break;
 #define IUN_OP(NAME, PFX) \
         case OP_ ## NAME: { \
             CHECKARGS(1, 1); \
             READ_TYPEOF(A); \
             SCOPES_CHECK_RESULT(verify_integer_ops(A)); \
-            return DEPS1(ARGTYPE1(A), _A); \
+            return NODEPS1(ARGTYPE1(A)); \
         } break;
 #define FUN_OP(NAME) \
         case OP_ ## NAME: { \
             CHECKARGS(1, 1); \
             READ_TYPEOF(A); \
             SCOPES_CHECK_RESULT(verify_real_ops(A)); \
-            return DEPS1(ARGTYPE1(A), _A); \
+            return NODEPS1(ARGTYPE1(A)); \
         } break;
         SCOPES_ARITH_OPS()
 
@@ -1837,7 +1851,8 @@ repeat:
         SCOPES_ANCHOR(call->anchor());
         SCOPES_EXPECT_ERROR(error_invalid_call_type(callee));
     }
-    const FunctionType *ft = extract_function_type(T);
+    const FunctionType *aft = extract_function_type(T);
+    const FunctionType *ft = aft->strip_annotations();
     int numargs = (int)ft->argument_types.size();
     if (values.size() != numargs) {
         SCOPES_ANCHOR(call->anchor());
@@ -1847,14 +1862,35 @@ repeat:
     for (int i = 0; i < numargs; ++i) {
         const Type *Ta = values[i]->get_type();
         const Type *Tb = ft->argument_types[i];
-        if (SCOPES_GET_RESULT(types_compatible(Tb, Ta)))
+        if (is_reference(Ta) && !is_reference(Tb)) {
+            SCOPES_CHECK_RESULT(build_deref(ctx, call->anchor(), values[i]));
+            Ta = values[i]->get_type();
+        }
+        if (SCOPES_GET_RESULT(types_compatible(Tb, Ta))) {
             continue;
+        }
         SCOPES_ANCHOR(values[i]->anchor());
         SCOPES_EXPECT_ERROR(error_argument_type_mismatch(Tb, Ta));
     }
+    const Type *art = aft->return_type;
     const Type *rt = ft->return_type;
     Call *newcall = Call::from(call->anchor(), callee, values);
     newcall->set_type(rt);
+    {
+        int depth = ctx.block?ctx.block->depth:0;
+        int acount = get_argument_count(rt);
+        for (int i = 0; i < acount; ++i) {
+            const Type *argT = get_argument(art, i);
+            if (auto vq = try_qualifier<ViewQualifier>(argT)) {
+                for (auto idx : vq->sorted_ids) {
+                    assert((size_t)idx < values.size());
+                    merge_depends(ctx, newcall->deps, i, values[idx]);
+                }
+            } else {
+                newcall->deps.unique(i);
+            }
+        }
+    }
     if (ft->has_exception()) {
         SCOPES_CHECK_RESULT(annotate_except_type(ctx, ft->except_type));
     }
@@ -2078,7 +2114,7 @@ SCOPES_RESULT(Value *) prove_block(const ASTContext &ctx, Block &block, Value *n
     return result;
 }
 
-// used by Loop and inlined functions
+// used by inlined functions
 static SCOPES_RESULT(void) prove_inline_arguments(const ASTContext &ctx,
     const Parameters &params, const Values &tmpargs) {
     SCOPES_RESULT_TYPE(void);
@@ -2098,7 +2134,7 @@ static SCOPES_RESULT(void) prove_inline_arguments(const ASTContext &ctx,
                 for (int j = i; j < tmpargs.size(); ++j) {
                     args.push_back(tmpargs[j]);
                 }
-                newval = build_argument_list(oldsym->anchor(), args);
+                newval = build_runtime_argument_list(ctx, oldsym->anchor(), args);
             }
         } else if (i < tmpargs.size()) {
             newval = tmpargs[i];
@@ -2226,10 +2262,10 @@ SCOPES_RESULT(Function *) prove(Function *frame, Template *func, const Types &ty
     if (!fn->except_type)
         fn->except_type = TYPE_NoReturn;
     fn->change_type(get_function_type(fn));
-    merge_depends(fnctx, fn->deps, fn->value);
     for (auto &&ret : fn->returns) {
         merge_depends(fnctx, fn->deps, ret->value);
     }
+    merge_depends(fnctx, fn->deps, fn->value);
     SCOPES_CHECK_RESULT(track(fnctx));
     fn->complete = true;
     return fn;

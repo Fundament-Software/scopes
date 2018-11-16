@@ -31,6 +31,7 @@ struct StreamASTFormat {
     int depth;
     bool newlines;
     bool data_dependency;
+    bool dependent_functions;
 
     StreamASTFormat();
 

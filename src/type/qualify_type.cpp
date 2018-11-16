@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <unordered_set>
+#include <cstring>
 
 namespace scopes {
 
@@ -43,8 +44,13 @@ struct Hash {
 
 struct KeyEqual {
     bool operator()( const QualifyType *lhs, const QualifyType *rhs ) const {
-        return lhs->type == rhs->type
-            && lhs->sorted_qualifiers == rhs->sorted_qualifiers;
+        if (lhs->type != rhs->type) return false;
+        if (lhs->mask != rhs->mask) return false;
+        for (int i = 0; i < QualifierCount; ++i) {
+            if (lhs->qualifiers[i] != rhs->qualifiers[i])
+                return false;
+        }
+        return true;
     }
 };
 } // namespace QualifySet
@@ -54,71 +60,84 @@ static std::unordered_set<const QualifyType *, QualifySet::Hash, QualifySet::Key
 //------------------------------------------------------------------------------
 
 void QualifyType::stream_name(StyledStream &ss) const {
-    for (auto entry : sorted_qualifiers) {
+    for (int i = QualifierCount; i-- > 0;) {
+        auto entry = qualifiers[i];
+        if (!entry)
+            continue;
         switch(entry->kind()) {
 #define T(NAME, BNAME, CLASS) \
         case NAME: cast<CLASS>(entry)->stream_prefix(ss); break;
 SCOPES_QUALIFIER_KIND()
 #undef T
+        default: break;
         }
     }
     stream_type_name(ss, type);
-    for (auto entry : sorted_qualifiers) {
+    for (int i = 0; i < QualifierCount; ++i) {
+        auto entry = qualifiers[i];
+        if (!entry)
+            continue;
         switch(entry->kind()) {
 #define T(NAME, BNAME, CLASS) \
         case NAME: cast<CLASS>(entry)->stream_postfix(ss); break;
 SCOPES_QUALIFIER_KIND()
 #undef T
+        default: break;
         }
     }
 }
 
-bool comp_qualifier(const Qualifier *a, const Qualifier *b) {
-    return a->kind() < b->kind();
-}
-
-QualifyType::QualifyType(const Type *_type, const QualifierMap &_qualifiers)
-    : Type(TK_Qualify), type(_type), qualifiers(_qualifiers) {
-    for (auto entry : qualifiers) {
-        sorted_qualifiers.push_back(entry.second);
-    }
-    std::sort(sorted_qualifiers.begin(), sorted_qualifiers.end(), comp_qualifier);
+QualifyType::QualifyType(const Type *_type, const Qualifier * const *_qualifiers)
+    : Type(TK_Qualify), type(_type), mask(0) {
     std::size_t h = std::hash<const Type *>{}(type);
-    for (auto &&entry : sorted_qualifiers) {
-        h = hash2(h, std::hash<const Qualifier *>{}(entry));
+    for (int i = 0; i < QualifierCount; ++i) {
+        qualifiers[i] = _qualifiers[i];
+        if (_qualifiers[i]) {
+            mask |= 1 << i;
+            h = hash2(h, std::hash<const Qualifier *>{}(qualifiers[i]));
+        }
     }
+    assert(mask);
     prehash = h;
 }
 
 //------------------------------------------------------------------------------
 
-const Type *qualify(const Type *type, const Qualifiers &qualifiers) {
-    if (qualifiers.empty())
-        return type;
-    QualifierMap map;
-    for (auto q : qualifiers) {
-        map.insert({q->kind(), q});
-    }
-    if (isa<QualifyType>(type)) {
-        auto qt = cast<QualifyType>(type);
-        for (auto q : qt->sorted_qualifiers) {
-            map.insert({q->kind(), q});
-        }
-        type = qt->type;
-    }
-    QualifyType key(type, map);
+static const Type *_qualify(const Type *type, const Qualifier * const * quals) {
+    QualifyType key(type, quals);
     auto it = qualifys.find(&key);
     if (it != qualifys.end())
         return *it;
-    auto result = new QualifyType(type, map);
+    auto result = new QualifyType(type, quals);
     qualifys.insert(result);
     return result;
+}
+
+const Type *qualify(const Type *type, const Qualifiers &qualifiers) {
+    if (qualifiers.empty())
+        return type;
+    const Qualifier *quals[QualifierCount];
+    if (isa<QualifyType>(type)) {
+        auto qt = cast<QualifyType>(type);
+        for (int i = 0; i < QualifierCount; ++i) {
+            quals[i] = qt->qualifiers[i];
+        }
+        type = qt->type;
+    } else {
+        std::memset(quals, 0, sizeof(quals));
+    }
+    for (auto q : qualifiers) {
+        auto kind = q->kind();
+        assert(kind < QualifierCount);
+        quals[kind] = q;
+    }
+    return _qualify(type, quals);
 }
 
 const Type *copy_qualifiers(const Type *type, const Type *from) {
     auto qt = dyn_cast<QualifyType>(from);
     if (qt) {
-        return qualify(type, qt->sorted_qualifiers);
+        return _qualify(type, qt->qualifiers);
     }
     return type;
 }
@@ -126,31 +145,45 @@ const Type *copy_qualifiers(const Type *type, const Type *from) {
 const Qualifier *find_qualifier(const Type *type, QualifierKind kind) {
     if (isa<QualifyType>(type)) {
         auto qt = cast<QualifyType>(type);
-        auto it = qt->qualifiers.find(kind);
-        if (it != qt->qualifiers.end())
-            return it->second;
+        assert(kind < QualifierCount);
+        return qt->qualifiers[kind];
     }
     return nullptr;
 }
 
-const Type *strip_qualifiers(const Type *T) {
-    if (isa<QualifyType>(T))
-        return cast<QualifyType>(T)->type;
+bool has_qualifiers(const Type *T, uint32_t mask) {
+    if (isa<QualifyType>(T)) {
+        auto qt = cast<QualifyType>(T);
+        return ((qt->mask & mask) == mask);
+    }
+    return false;
+}
+
+const Type *strip_qualifiers(const Type *T, uint32_t mask) {
+    if (isa<QualifyType>(T)) {
+        auto qt = cast<QualifyType>(T);
+        if (!(qt->mask & mask))
+            return T;
+        uint32_t outmask = 0;
+        const Qualifier *quals[QualifierCount];
+        for (int i = 0; i < QualifierCount; ++i) {
+            if ((mask & (1 << i)) || !qt->qualifiers[i]) {
+                quals[i] = nullptr;
+            } else {
+                quals[i] = qt->qualifiers[i];
+                outmask |= (1 << i);
+            }
+        }
+        if (!outmask)
+            return qt->type;
+        else
+            return _qualify(qt->type, quals);
+    }
     return T;
 }
 
 const Type *strip_qualifier(const Type *T, QualifierKind kind) {
-    if (isa<QualifyType>(T)) {
-        auto qt = cast<QualifyType>(T);
-        Qualifiers qual;
-        for (auto key : qt->qualifiers) {
-            if (key.first != kind) {
-                qual.push_back(key.second);
-            }
-        }
-        return qualify(qt->type, qual);
-    }
-    return T;
+    return strip_qualifiers(T, 1 << kind);
 }
 
 } // namespace scopes

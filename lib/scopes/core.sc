@@ -719,9 +719,12 @@ inline set-symbols (self values...)
     string = sc_type_string
     super = sc_typename_type_get_super
     set-super = sc_typename_type_set_super
-    set-storage = sc_typename_type_set_storage
-    set-unique = sc_typename_type_set_unique
-    unique? = sc_typename_type_is_unique
+    set-storage =
+        inline (type storage-type)
+            sc_typename_type_set_storage type storage-type 0:u32
+    set-plain-storage =
+        inline (type storage-type)
+            sc_typename_type_set_storage type storage-type typename-flag-plain
     return-type = sc_function_type_return_type
     key = sc_type_key
     variadic? = sc_function_type_is_variadic
@@ -1381,7 +1384,7 @@ inline floordiv (a b)
 
 """"The type of the `null` constant. This type is uninstantiable.
 let NullType = (sc_typename_type "NullType")
-sc_typename_type_set_storage NullType ('pointer void)
+'set-plain-storage NullType ('pointer void)
 'set-symbols NullType
     __repr =
         box-pointer
@@ -1996,7 +1999,7 @@ fn clone-scope-contents (a b)
                                 if (== k 'super)
                                     sc_typename_type_set_super T (as v type)
                                 elseif (== k 'storage)
-                                    sc_typename_type_set_storage T (as v type)
+                                    'set-plain-storage T (as v type)
                                 else
                                     compiler-error! "super or storage key expected"
                             return (Value T)
@@ -4580,7 +4583,7 @@ fn run-main ()
     else
         let scope =
             Scope (globals)
-        'set-symbol scope
+        'set-symbols scope
             script-launch-args =
                 fn ()
                     return sourcepath argc argv

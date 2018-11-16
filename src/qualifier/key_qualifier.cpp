@@ -52,7 +52,7 @@ void KeyQualifier::stream_postfix(StyledStream &ss) const {
 
 const Type *key_type(Symbol key, const Type *type) {
     if (key == SYM_Unnamed) {
-        return strip_qualifier(type, QK_Key);
+        return strip_qualifier<KeyQualifier>(type);
     }
     const KeyQualifier *result = nullptr;
     KeyQualifier kt(key);
