@@ -1107,9 +1107,9 @@ sc_value_t *sc_unquote_new(sc_value_t *value) {
     return Unquote::from(get_active_anchor(), value);
 }
 
-sc_value_t *sc_label_new(sc_symbol_t name, uint32_t flags) {
+sc_value_t *sc_label_new(int kind, sc_symbol_t name) {
     using namespace scopes;
-    return Label::from(get_active_anchor(), name, nullptr, flags);
+    return Label::from(get_active_anchor(), (LabelKind)kind, name, nullptr);
 }
 void sc_label_set_body(sc_value_t *label, sc_value_t *body) {
     using namespace scopes;
@@ -1749,7 +1749,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_quote_new, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_unquote_new, TYPE_Value, TYPE_Value);
 
-    DEFINE_EXTERN_C_FUNCTION(sc_label_new, TYPE_Value, TYPE_Symbol, TYPE_U32);
+    DEFINE_EXTERN_C_FUNCTION(sc_label_new, TYPE_Value, TYPE_I32, TYPE_Symbol);
     DEFINE_EXTERN_C_FUNCTION(sc_label_set_body, _void, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_merge_new, TYPE_Value, TYPE_Value, TYPE_Value);
 

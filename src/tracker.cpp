@@ -342,7 +342,7 @@ struct Tracker {
             ss.out
                 << Style_Error << "error: " << Style_None
                 << "attempt to move " << arg << " which is tagged as ";
-            bool acount = 0;
+            int acount = 0;
             if (data.will_be_used()) {
                 ss.out << "to-be-used by " << data.get_user();
                 acount++;

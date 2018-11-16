@@ -327,8 +327,8 @@ struct Quoter {
         SCOPES_RESULT_TYPE(Value *);
         auto _anchor = node->anchor();
         auto value = Call::from(_anchor, g_sc_label_new, {
-            ConstInt::symbol_from(_anchor, node->name),
-            ConstInt::from(_anchor, TYPE_U32, node->flags)
+            ConstInt::from(_anchor, TYPE_I32, node->label_kind),
+            ConstInt::symbol_from(_anchor, node->name)
         });
         bind(node, value);
         auto typedvalue = SCOPES_GET_RESULT(prove(ctx, value));

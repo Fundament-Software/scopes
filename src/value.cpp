@@ -585,28 +585,29 @@ void Loop::set_param(Parameter *_param) {
 
 //------------------------------------------------------------------------------
 
-Label::Label(const Anchor *anchor, Symbol _name, Value *_value, uint32_t _flags)
-    : Instruction(VK_Label, anchor), name(_name), value(_value), return_type(nullptr), flags(_flags) {}
+Label::Label(const Anchor *anchor, LabelKind _kind, Symbol _name, Value *_value)
+    : Instruction(VK_Label, anchor), name(_name), value(_value),
+        return_type(nullptr), label_kind(_kind) {}
 
-Label *Label::from(const Anchor *anchor, Symbol name, Value *value, uint32_t flags) {
-    return new Label(anchor, name, value, flags);
+Label *Label::from(const Anchor *anchor, LabelKind kind, Symbol name, Value *value) {
+    return new Label(anchor, kind, name, value);
 }
 
 Label *Label::try_from(const Anchor *anchor,
     Value *value) {
-    return new Label(anchor, KW_Try, value, LF_Try);
+    return new Label(anchor, LK_Try, KW_Try, value);
 }
 Label *Label::except_from(const Anchor *anchor,
     Value *value) {
-    return new Label(anchor, KW_Except, value, LF_Except);
+    return new Label(anchor, LK_Except, KW_Except, value);
 }
 
 bool Label::is_try() const {
-    return (flags & LF_Try) == LF_Try;
+    return label_kind == LK_Try;
 }
 
 bool Label::is_except() const {
-    return (flags & LF_Except) == LF_Except;
+    return label_kind == LK_Except;
 }
 
 //------------------------------------------------------------------------------

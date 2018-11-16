@@ -276,7 +276,7 @@ struct Expander {
         it = it->next;
 
         Scope *subenv = Scope::from(env);
-        auto label = Label::from(_anchor, name);
+        auto label = Label::from(_anchor, LK_User, name);
         subenv->bind(name, label);
         Expander subexpr(subenv, astscope);
         label->value = SCOPES_GET_RESULT(subexpr.expand_expression(_anchor, it));

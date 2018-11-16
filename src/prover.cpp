@@ -387,7 +387,7 @@ Value *build_runtime_argument_list(const ASTContext &ctx, const Anchor *anchor, 
 
 static SCOPES_RESULT(Value *) prove_Label(const ASTContext &ctx, Label *node) {
     SCOPES_RESULT_TYPE(Value *);
-    Label *label = Label::from(node->anchor(), node->name, nullptr, node->flags);
+    Label *label = Label::from(node->anchor(), node->label_kind, node->name, nullptr);
     assert(ctx.frame);
     assert(ctx.block);
     label->set_type(empty_arguments_type());
@@ -2147,7 +2147,7 @@ SCOPES_RESULT(Value *) prove_inline(const ASTContext &ctx,
     Function *fn = Function::from(func->anchor(), func->name, {});
     fn->original = func;
     fn->frame = frame;
-    Label *label = Label::from(func->anchor(), func->name);
+    Label *label = Label::from(func->anchor(), LK_Inline, func->name);
     fn->label = label;
     fn->boundary = ctx.function;
 

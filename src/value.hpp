@@ -367,22 +367,34 @@ struct Parameter : Value {
 
 //------------------------------------------------------------------------------
 
-enum LabelFlags {
-    // this is the try block of a try/except construct
-    LF_Try = (1 << 0),
-    // this is the except block of a try/except construct
-    LF_Except = (1 << 1)
+#define SCOPES_LABEL_KIND() \
+    /* an user-created label */ \
+    T(LK_User, "user") \
+    /* the return label of an inline function */ \
+    T(LK_Inline, "inline") \
+    /* the try block of a try/except construct */ \
+    T(LK_Try, "try") \
+    /* the except block of a try/except construct */ \
+    T(LK_Except, "except") \
+    /* a break label of a loop */ \
+    T(LK_Break, "break")
+
+enum LabelKind {
+#define T(NAME, BNAME) \
+    NAME,
+SCOPES_LABEL_KIND()
+#undef T
 };
 
 struct Label : Instruction {
     static bool classof(const Value *T);
 
-    Label(const Anchor *anchor, Symbol name, Value *value, uint32_t flags = 0);
+    Label(const Anchor *anchor, LabelKind kind, Symbol name, Value *value);
 
     static Label *from(const Anchor *anchor,
+        LabelKind kind,
         Symbol name = SYM_Unnamed,
-        Value *value = nullptr,
-        uint32_t flags = 0);
+        Value *value = nullptr);
     static Label *try_from(const Anchor *anchor,
         Value *value = nullptr);
     static Label *except_from(const Anchor *anchor,
@@ -396,7 +408,7 @@ struct Label : Instruction {
     Value *value;
     const Type *return_type;
     std::vector<Merge *> merges;
-    uint32_t flags;
+    LabelKind label_kind;
 };
 
 //------------------------------------------------------------------------------
