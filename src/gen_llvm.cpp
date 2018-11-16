@@ -771,25 +771,13 @@ struct LLVMIRGenerator {
         node2value.insert({node, value});
     }
 
-    SCOPES_RESULT(LLVMValueRef) Quote_to_value(Quote *node) {
-        SCOPES_RESULT_TYPE(LLVMValueRef);
-        SCOPES_LOCATION_ERROR(String::from("IL->IR: cannot translate quote"));
+#define T(NAME, BNAME, CLASS) \
+    SCOPES_RESULT(LLVMValueRef) CLASS ## _to_value(Value *node) { \
+        SCOPES_RESULT_TYPE(LLVMValueRef); \
+        SCOPES_EXPECT_ERROR(error_cannot_translate(SCOPES_GEN_TARGET, node)); \
     }
-
-    SCOPES_RESULT(LLVMValueRef) Unquote_to_value(Unquote *node) {
-        SCOPES_RESULT_TYPE(LLVMValueRef);
-        SCOPES_LOCATION_ERROR(String::from("IL->IR: cannot translate unquote"));
-    }
-
-    SCOPES_RESULT(LLVMValueRef) Template_to_value(Template *node) {
-        SCOPES_RESULT_TYPE(LLVMValueRef);
-        SCOPES_LOCATION_ERROR(String::from("IL->IR: cannot translate template"));
-    }
-
-    SCOPES_RESULT(LLVMValueRef) Expression_to_value(Expression *node) {
-        SCOPES_RESULT_TYPE(LLVMValueRef);
-        SCOPES_LOCATION_ERROR(String::from("IL->IR: cannot translate expression"));
-    }
+    SCOPES_TEMPLATE_VALUE_KIND()
+#undef T
 
     SCOPES_RESULT(LLVMValueRef) write_return(LLVMValueRef value, bool is_except = false) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
@@ -985,6 +973,7 @@ struct LLVMIRGenerator {
 
     void build_merge_phi(LLVMValueRef phi, LLVMValueRef result) {
         if (phi) {
+            assert(result);
             LLVMBasicBlockRef bb = LLVMGetInsertBlock(builder);
             LLVMBasicBlockRef incobbs[] = { bb };
             LLVMValueRef incovals[] = { result };
@@ -1004,11 +993,6 @@ struct LLVMIRGenerator {
         auto result = SCOPES_GET_RESULT(node_to_value(node->value));
         auto label = cast<Label>(node->label);
         return build_merge(label, result);
-    }
-
-    SCOPES_RESULT(LLVMValueRef) Break_to_value(Break *node) {
-        SCOPES_RESULT_TYPE(LLVMValueRef);
-        SCOPES_LOCATION_ERROR(String::from("IL->IR: cannot translate break"));
     }
 
     SCOPES_RESULT(LLVMValueRef) Repeat_to_value(Repeat *node) {
@@ -1656,14 +1640,8 @@ struct LLVMIRGenerator {
                 auto rtype = _case.value->get_type();
                 if (is_returning(rtype)) {
                     assert(bb_merge);
-                    LLVMBasicBlockRef bb_active = LLVMGetInsertBlock(builder);
+                    build_merge_phi(merge_value, result);
                     LLVMBuildBr(builder, bb_merge);
-                    if (merge_value) {
-                        assert(result);
-                        LLVMBasicBlockRef incobbs[] = { bb_active };
-                        LLVMValueRef incovals[] = { result };
-                        LLVMAddIncoming(merge_value, incovals, incobbs, 1);
-                    }
                 }
             }
             lastbb = bbcase;
@@ -1723,14 +1701,8 @@ struct LLVMIRGenerator {
             auto rtype = clause.value->get_type();
             if (is_returning(rtype)) {
                 assert(bb_merge);
-                LLVMBasicBlockRef bb_active = LLVMGetInsertBlock(builder);
+                build_merge_phi(merge_value, result);
                 LLVMBuildBr(builder, bb_merge);
-                if (merge_value) {
-                    assert(result);
-                    LLVMBasicBlockRef incobbs[] = { bb_active };
-                    LLVMValueRef incovals[] = { result };
-                    LLVMAddIncoming(merge_value, incovals, incobbs, 1);
-                }
             }
             if (bb_else)
                 LLVMPositionBuilderAtEnd(builder, bb_else);

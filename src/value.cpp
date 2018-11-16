@@ -692,7 +692,7 @@ ConstPointer *ConstPointer::anchor_from(const Anchor *anchor) {
 //------------------------------------------------------------------------------
 
 Break::Break(const Anchor *anchor, Value *_value)
-    : Instruction(VK_Break, anchor), value(_value) {
+    : Value(VK_Break, anchor), value(_value) {
 }
 
 Break *Break::from(const Anchor *anchor, Value *value) {

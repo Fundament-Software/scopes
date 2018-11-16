@@ -113,6 +113,7 @@ SCOPES_RESULT(void) error_cannot_merge_moves(const char *by);
 // code generator errors
 SCOPES_RESULT(void) error_gen_invalid_call_type(const char *target, Value *callee);
 SCOPES_RESULT(void) error_gen_unbound_symbol(const char *target, Parameter *value);
+SCOPES_RESULT(void) error_cannot_translate(const char *target, Value *value);
 
 //------------------------------------------------------------------------------
 

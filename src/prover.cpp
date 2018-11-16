@@ -733,15 +733,10 @@ static SCOPES_RESULT(Value *) prove_Loop(const ASTContext &ctx, Loop *loop) {
     return newloop;
 }
 
-#define CONST_PROVER(NAME) \
-    static SCOPES_RESULT(Value *) prove_ ## NAME(const ASTContext &ctx, NAME *node) { return node; }
-
-CONST_PROVER(ConstInt)
-CONST_PROVER(ConstReal)
-CONST_PROVER(ConstPointer)
-CONST_PROVER(ConstAggregate)
-CONST_PROVER(Extern)
-CONST_PROVER(Function)
+#define T(NAME, BNAME, CLASS) \
+    static SCOPES_RESULT(Value *) prove_ ## CLASS(const ASTContext &ctx, Value *node) { return node; }
+    SCOPES_PURE_VALUE_KIND()
+#undef T
 
 const Type *try_get_const_type(Value *node) {
     if (isa<Const>(node))

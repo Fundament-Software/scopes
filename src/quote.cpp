@@ -111,17 +111,12 @@ struct Quoter {
         return canonicalize(expr);
     }
 
-    #define CONST_QUOTER(NAME) \
-        SCOPES_RESULT(Value *) quote_ ## NAME(int level, NAME *node) { \
+    #define T(NAME, BNAME, CLASS) \
+        SCOPES_RESULT(Value *) quote_ ## CLASS(int level, Value *node) { \
             return ConstPointer::ast_from(node->anchor(), node); \
-        } \
-
-    CONST_QUOTER(ConstInt)
-    CONST_QUOTER(ConstReal)
-    CONST_QUOTER(ConstPointer)
-    CONST_QUOTER(ConstAggregate)
-    CONST_QUOTER(Extern)
-    CONST_QUOTER(Function)
+        }
+    SCOPES_PURE_VALUE_KIND()
+    #undef T
 
     SCOPES_RESULT(Value *) quote_Break(int level, Break *node) {
         SCOPES_RESULT_TYPE(Value *);

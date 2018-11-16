@@ -21,21 +21,35 @@ struct Anchor;
 struct List;
 struct Scope;
 
-#define SCOPES_VALUE_KIND() \
-    T(VK_Parameter, "value-kind-parameter", Parameter) \
-    /* template-only */ \
+#define SCOPES_TEMPLATE_VALUE_KIND() \
     T(VK_Template, "value-kind-template", Template) \
     T(VK_Keyed, "value-kind-keyed", Keyed) \
     T(VK_Expression, "value-kind-expression", Expression) \
     T(VK_Quote, "value-kind-quote", Quote) \
     T(VK_Unquote, "value-kind-unquote", Unquote) \
     T(VK_CompileStage, "value-kind-compile-stage", CompileStage) \
+    T(VK_Break, "value-kind-break", Break)
+
+
+#define SCOPES_PURE_VALUE_KIND() \
+    T(VK_Function, "value-kind-function", Function) \
+    T(VK_Extern, "value-kind-extern", Extern) \
+    /* constants (Const::classof) */ \
+    T(VK_ConstInt, "value-kind-const-int", ConstInt) \
+    T(VK_ConstReal, "value-kind-const-real", ConstReal) \
+    T(VK_ConstAggregate, "value-kind-const-aggregate", ConstAggregate) \
+    T(VK_ConstPointer, "value-kind-const-pointer", ConstPointer) \
+
+
+#define SCOPES_VALUE_KIND() \
+    T(VK_Parameter, "value-kind-parameter", Parameter) \
+    /* template-only */ \
+    SCOPES_TEMPLATE_VALUE_KIND() \
     /* instructions (Instruction::classof) */ \
     T(VK_If, "value-kind-if", If) \
     T(VK_Switch, "value-kind-switch", Switch) \
     T(VK_Call, "value-kind-call", Call) \
     T(VK_Loop, "value-kind-loop", Loop) \
-    T(VK_Break, "value-kind-break", Break) \
     T(VK_Repeat, "value-kind-repeat", Repeat) \
     T(VK_Return, "value-kind-return", Return) \
     T(VK_Label, "value-kind-label", Label) \
@@ -44,13 +58,7 @@ struct Scope;
     T(VK_ArgumentList, "value-kind-argumentlist", ArgumentList) \
     T(VK_ExtractArgument, "value-kind-extractargument", ExtractArgument) \
     /* pure (Pure::classof), which includes constants */ \
-    T(VK_Function, "value-kind-function", Function) \
-    T(VK_Extern, "value-kind-extern", Extern) \
-    /* constants (Const::classof) */ \
-    T(VK_ConstInt, "value-kind-const-int", ConstInt) \
-    T(VK_ConstReal, "value-kind-const-real", ConstReal) \
-    T(VK_ConstAggregate, "value-kind-const-aggregate", ConstAggregate) \
-    T(VK_ConstPointer, "value-kind-const-pointer", ConstPointer) \
+    SCOPES_PURE_VALUE_KIND() \
 
 
 enum ValueKind {
@@ -590,7 +598,7 @@ struct Extern : Pure {
 
 //------------------------------------------------------------------------------
 
-struct Break : Instruction {
+struct Break : Value {
     static bool classof(const Value *T);
 
     Break(const Anchor *anchor, Value *value);

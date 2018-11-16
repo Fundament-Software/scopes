@@ -352,6 +352,14 @@ SCOPES_RESULT(void) error_gen_unbound_symbol(const char *target, Parameter *valu
     SCOPES_LOCATION_DEF_ERROR(value, ss.str());
 }
 
+SCOPES_RESULT(void) error_cannot_translate(const char *target, Value *value) {
+    SCOPES_RESULT_TYPE(void);
+    StyledString ss;
+    ss.out << target << ": cannot translate template value of kind "
+        << Style_Keyword << get_value_class_name(value->kind()) << Style_None;
+    SCOPES_LOCATION_ERROR(ss.str());
+}
+
 //------------------------------------------------------------------------------
 
 } // namespace scopes
