@@ -399,11 +399,6 @@ bool Block::append(Value *node) {
         if (instr->block)
             return false;
         instr->block = this;
-        if (isa<Loop>(node)) {
-            auto loop = cast<Loop>(node);
-            assert(loop->param);
-            loop->param->block = this;
-        }
         if (!is_returning(instr->get_type())) {
             assert(!terminator);
             assert(insert_index == body.size());
@@ -566,21 +561,12 @@ Call *Call::from(const Anchor *anchor, Value *callee, const Values &args) {
 
 //------------------------------------------------------------------------------
 
-Loop::Loop(const Anchor *anchor, Parameter *_param, Value *_init, Value *_value)
-    : Instruction(VK_Loop, anchor), param(_param), init(_init), value(_value), return_type(nullptr) {
-    if (param) {
-        param->set_owner(this, 0);
-    }
+Loop::Loop(const Anchor *anchor, Value *_init, Value *_value)
+    : Instruction(VK_Loop, anchor), init(_init), value(_value), return_type(nullptr) {
 }
 
-Loop *Loop::from(const Anchor *anchor, Parameter *param, Value *init, Value *value) {
-    return new Loop(anchor, param, init, value);
-}
-
-void Loop::set_param(Parameter *_param) {
-    assert(!param);
-    param = _param;
-    param->set_owner(this, 0);
+Loop *Loop::from(const Anchor *anchor, Value *init, Value *value) {
+    return new Loop(anchor, init, value);
 }
 
 //------------------------------------------------------------------------------
@@ -600,14 +586,6 @@ Label *Label::try_from(const Anchor *anchor,
 Label *Label::except_from(const Anchor *anchor,
     Value *value) {
     return new Label(anchor, LK_Except, KW_Except, value);
-}
-
-bool Label::is_try() const {
-    return label_kind == LK_Try;
-}
-
-bool Label::is_except() const {
-    return label_kind == LK_Except;
 }
 
 //------------------------------------------------------------------------------

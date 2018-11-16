@@ -400,9 +400,6 @@ struct Label : Instruction {
     static Label *except_from(const Anchor *anchor,
         Value *value = nullptr);
 
-    bool is_try() const;
-    bool is_except() const;
-
     Symbol name;
     Block body;
     Value *value;
@@ -436,19 +433,15 @@ struct Call : Instruction {
 struct Loop : Instruction {
     static bool classof(const Value *T);
 
-    Loop(const Anchor *anchor, Parameter *param, Value *init, Value *value);
+    Loop(const Anchor *anchor, Value *init, Value *value);
 
-    static Loop *from(const Anchor *anchor, Parameter *param = nullptr, Value *init = nullptr, Value *value = nullptr);
+    static Loop *from(const Anchor *anchor, Value *init = nullptr, Value *value = nullptr);
 
-    void set_param(Parameter *param);
-
-    Parameter *param;
     Value *init;
     Block body;
     Value *value;
     const Type *return_type;
     std::vector<Repeat *> repeats;
-    std::vector<Break *> breaks;
 };
 
 //------------------------------------------------------------------------------

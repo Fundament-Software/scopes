@@ -335,9 +335,19 @@ struct Expander {
         }
     }
 
-    // (loop ([x...] [= args...]) body...)
+    // (loop ([x...] [= init...]) body...)
     SCOPES_RESULT(Value *) expand_loop(const List *it) {
         SCOPES_RESULT_TYPE(Value *);
+
+        /*
+        we're building this structure
+
+        label break
+            loop x... (init...)
+                body...
+
+        break labels never type themselves from their body
+        */
 
         SCOPES_CHECK_RESULT(verify_list_parameter_count("loop", it, 1, -1));
         it = it->next;
@@ -363,8 +373,10 @@ struct Expander {
             SCOPES_CHECK_RESULT(subexp.expand_arguments(args->values, it));
         }
 
+        Loop *loop = Loop::from(_anchor, args);
+        Label *break_label = Label::from(_anchor, LK_Break, KW_Break, loop);
+
         Expander bodyexp(Scope::from(env), astscope);
-        Parameter *param = Parameter::from(_anchor, SYM_Unnamed, nullptr);
 
         auto expr = Expression::from(_anchor);
         {
@@ -376,13 +388,13 @@ struct Expander {
                 Symbol sym = SCOPES_GET_RESULT(extract_symbol_constant(paramval));
                 Value *node = nullptr;
                 if (!ends_with_parenthesis(sym)) {
-                    node = extract_argument(paramval->anchor(), param, index);
+                    node = extract_argument(paramval->anchor(), loop, index);
                 } else {
                     if (it->next != endit) {
                         SCOPES_ANCHOR(paramval->anchor());
                         SCOPES_EXPECT_ERROR(error_variadic_symbol_not_in_last_place());
                     }
-                    node = extract_argument(paramval->anchor(), param, index, true);
+                    node = extract_argument(paramval->anchor(), loop, index, true);
                 }
                 bodyexp.env->bind(sym, node);
                 expr->append(node);
@@ -393,7 +405,8 @@ struct Expander {
 
         auto value = SCOPES_GET_RESULT(bodyexp.expand_expression(_anchor, body));
         expr->append(value);
-        return Loop::from(_anchor, param, args, expr);
+        loop->value = expr;
+        return break_label;
     }
 
     static Value *extract_argument(const Anchor *anchor, Value *node, int index, bool vararg = false) {

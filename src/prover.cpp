@@ -229,31 +229,35 @@ ASTContext ASTContext::with_void_target() const { return with_target(EvalTarget_
 ASTContext ASTContext::with_symbol_target() const { return with_target(EvalTarget_Symbol); }
 
 ASTContext ASTContext::with_target(EvalTarget target) const {
-    return ASTContext(function, frame, target, loop, except, block);
+    return ASTContext(function, frame, target, loop, except, _break, block);
 }
 
 ASTContext ASTContext::for_loop(Loop *loop) const {
-    return ASTContext(function, frame, EvalTarget_Symbol, loop, except, block);
+    return ASTContext(function, frame, EvalTarget_Symbol, loop, except, _break, block);
+}
+
+ASTContext ASTContext::for_break(Label *xbreak) const {
+    return ASTContext(function, frame, EvalTarget_Symbol, loop, except, xbreak, block);
 }
 
 ASTContext ASTContext::for_try(Label *except) const {
-    return ASTContext(function, frame, target, loop, except, block);
+    return ASTContext(function, frame, target, loop, except, _break, block);
 }
 
 ASTContext ASTContext::with_block(Block &_block) const {
-    return ASTContext(function, frame, target, loop, except, &_block);
+    return ASTContext(function, frame, target, loop, except, _break, &_block);
 }
 
 ASTContext ASTContext::with_frame(Function *frame) const {
-    return ASTContext(function, frame, target, loop, except, block);
+    return ASTContext(function, frame, target, loop, except, _break, block);
 }
 
 ASTContext::ASTContext() {}
 
 ASTContext::ASTContext(Function *_function, Function *_frame,
-    EvalTarget _target, Loop *_loop, Label *_except, Block *_block) :
+    EvalTarget _target, Loop *_loop, Label *_except, Label *xbreak, Block *_block) :
     function(_function), frame(_frame), target(_target), loop(_loop),
-    except(_except), block(_block) {
+    except(_except), _break(xbreak), block(_block) {
 }
 
 void ASTContext::merge_block(Block &_block) const {
@@ -266,7 +270,7 @@ void ASTContext::append(Value *value) const {
 }
 
 ASTContext ASTContext::from_function(Function *fn) {
-    return ASTContext(fn, fn, EvalTarget_Return, nullptr, nullptr, nullptr);
+    return ASTContext(fn, fn, EvalTarget_Return, nullptr, nullptr, nullptr, nullptr);
 }
 
 //------------------------------------------------------------------------------
@@ -395,16 +399,23 @@ static SCOPES_RESULT(Value *) prove_Label(const ASTContext &ctx, Label *node) {
     SCOPES_ANCHOR(node->anchor());
     Value *result = nullptr;
     const char *by = "label merge";
-    if (label->is_except()) {
+    switch (label->label_kind) {
+    case LK_Except: {
         by = "exception";
         result = SCOPES_GET_RESULT(
             prove_block(ctx.for_try(label), label->body, node->value));
-    } else {
-        if (label->is_try()) {
-            by = "try block";
-        }
+    } break;
+    case LK_Break: {
+        by = "break";
+        result = SCOPES_GET_RESULT(
+            prove_block(ctx.for_break(label), label->body, node->value));
+    } break;
+    case LK_Try:
+        by = "try block";
+    default: {
         result = SCOPES_GET_RESULT(
             prove_block(ctx, label->body, node->value));
+    } break;
     }
     assert(result);
     if (!label->return_type) {
@@ -695,30 +706,26 @@ static SCOPES_RESULT(Value *) prove_Loop(const ASTContext &ctx, Loop *loop) {
     SCOPES_RESULT_TYPE(Value *);
     SCOPES_ANCHOR(loop->anchor());
     auto init = SCOPES_GET_RESULT(prove(ctx.with_symbol_target(), loop->init));
-    if (!is_returning(init->get_type()))
+    auto ltype = init->get_type();
+    if (!is_returning(ltype))
         return init;
-    assert(loop->param);
-    auto oldparam = loop->param;
-    auto param = Parameter::from(oldparam->anchor(), oldparam->name, init->get_type());
-    param->block = ctx.block;
-    ctx.frame->bind(oldparam, param);
-    Loop *newloop = Loop::from(loop->anchor(), param, init);
+    Loop *newloop = Loop::from(loop->anchor(), init);
+    newloop->set_type(ltype);
+    newloop->return_type = ltype;
+    ctx.frame->bind(loop, newloop);
     auto subctx = ctx.for_loop(newloop);
     auto result = SCOPES_GET_RESULT(prove_block(subctx, newloop->body, loop->value));
     auto rtype = result->get_type();
     newloop->value = result;
-    newloop->return_type = SCOPES_GET_RESULT(merge_value_type("loop break",
+    newloop->return_type = SCOPES_GET_RESULT(merge_value_type("loop repeat",
         newloop->return_type, rtype));
-    newloop->set_type(newloop->return_type);
+    newloop->change_type(TYPE_NoReturn);
 
-    for (auto _break : newloop->breaks) {
-        merge_depends(ctx, newloop->deps, _break->value);
+    merge_depends(ctx, newloop->deps, init);
+    for (auto repeat : newloop->repeats) {
+        merge_depends(ctx, newloop->deps, repeat->value);
     }
     merge_depends(ctx, newloop->deps, newloop->value);
-
-    for (auto repeat : newloop->repeats) {
-        merge_depends(ctx, param->deps, repeat->value);
-    }
 
     //std::vector<Repeat *> repeats;
     //std::vector<Break *> breaks;
@@ -762,52 +769,6 @@ Value *rekey(const Anchor *anchor, Symbol key, Value *value) {
     return newkeyed;
 }
 
-static SCOPES_RESULT(Break *) prove_Break(const ASTContext &ctx, Break *_break) {
-    SCOPES_RESULT_TYPE(Break *);
-    SCOPES_ANCHOR(_break->anchor());
-    if (!ctx.loop) {
-        SCOPES_EXPECT_ERROR(error_illegal_break_outside_loop());
-    }
-    auto subctx = ctx.with_symbol_target();
-    Value *value = SCOPES_GET_RESULT(prove(subctx, _break->value));
-    ctx.loop->return_type = SCOPES_GET_RESULT(merge_value_type(
-        "loop break", ctx.loop->return_type, value->get_type()));
-    auto newbreak = Break::from(_break->anchor(), value);
-    newbreak->set_type(TYPE_NoReturn);
-    ctx.append(newbreak);
-    ctx.loop->breaks.push_back(newbreak);
-    return newbreak;
-}
-
-static SCOPES_RESULT(Value *) prove_Repeat(const ASTContext &ctx, Repeat *_repeat) {
-    SCOPES_RESULT_TYPE(Value *);
-    SCOPES_ANCHOR(_repeat->anchor());
-    if (!ctx.loop) {
-        SCOPES_EXPECT_ERROR(error_illegal_repeat_outside_loop());
-    }
-    auto subctx = ctx.with_symbol_target();
-    Value *value = SCOPES_GET_RESULT(prove(subctx, _repeat->value));
-    ctx.loop->param->change_type(SCOPES_GET_RESULT(merge_value_type(
-        "loop repeat", ctx.loop->param->get_type(), value->get_type())));
-    auto newrepeat = Repeat::from(_repeat->anchor(), value);
-    newrepeat->set_type(TYPE_NoReturn);
-    ctx.append(newrepeat);
-    ctx.loop->repeats.push_back(newrepeat);
-    return newrepeat;
-}
-
-static SCOPES_RESULT(void) annotate_except_type(const ASTContext &ctx, const Type *T) {
-    SCOPES_RESULT_TYPE(void);
-    if (ctx.except) {
-        ctx.except->return_type = SCOPES_GET_RESULT(
-            merge_value_type("exception", ctx.except->return_type, T));
-    } else {
-        ctx.function->except_type = SCOPES_GET_RESULT(
-            merge_value_type("exception", ctx.function->except_type, T));
-    }
-    return {};
-}
-
 static SCOPES_RESULT(Merge *) make_merge(const ASTContext &ctx, const char *merge_context, const Anchor *anchor, Label *label, Value *value) {
     SCOPES_RESULT_TYPE(Merge *);
     SCOPES_ANCHOR(anchor);
@@ -833,6 +794,46 @@ static SCOPES_RESULT(Return *) make_return(const ASTContext &ctx, const Anchor *
     ctx.append(newreturn);
     ctx.function->returns.push_back(newreturn);
     return newreturn;
+}
+
+static SCOPES_RESULT(Value *) prove_Break(const ASTContext &ctx, Break *_break) {
+    SCOPES_RESULT_TYPE(Value *);
+    SCOPES_ANCHOR(_break->anchor());
+    if (!ctx._break) {
+        SCOPES_EXPECT_ERROR(error_illegal_break_outside_loop());
+    }
+    auto subctx = ctx.with_symbol_target();
+    Value *value = SCOPES_GET_RESULT(prove(subctx, _break->value));
+    return SCOPES_GET_RESULT(make_merge(ctx, "break", _break->anchor(), ctx._break, value));
+}
+
+static SCOPES_RESULT(Value *) prove_Repeat(const ASTContext &ctx, Repeat *_repeat) {
+    SCOPES_RESULT_TYPE(Value *);
+    SCOPES_ANCHOR(_repeat->anchor());
+    if (!ctx.loop) {
+        SCOPES_EXPECT_ERROR(error_illegal_repeat_outside_loop());
+    }
+    auto subctx = ctx.with_symbol_target();
+    Value *value = SCOPES_GET_RESULT(prove(subctx, _repeat->value));
+    ctx.loop->return_type = SCOPES_GET_RESULT(merge_value_type(
+        "loop repeat", ctx.loop->return_type, value->get_type()));
+    auto newrepeat = Repeat::from(_repeat->anchor(), value);
+    newrepeat->set_type(TYPE_NoReturn);
+    ctx.append(newrepeat);
+    ctx.loop->repeats.push_back(newrepeat);
+    return newrepeat;
+}
+
+static SCOPES_RESULT(void) annotate_except_type(const ASTContext &ctx, const Type *T) {
+    SCOPES_RESULT_TYPE(void);
+    if (ctx.except) {
+        ctx.except->return_type = SCOPES_GET_RESULT(
+            merge_value_type("exception", ctx.except->return_type, T));
+    } else {
+        ctx.function->except_type = SCOPES_GET_RESULT(
+            merge_value_type("exception", ctx.function->except_type, T));
+    }
+    return {};
 }
 
 static SCOPES_RESULT(Value *) prove_Return(const ASTContext &ctx, Return *_return) {

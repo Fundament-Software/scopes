@@ -221,15 +221,11 @@ struct LLVMIRGenerator {
     struct LoopInfo {
         Loop *loop;
         LLVMBasicBlockRef bb_loop;
-        LLVMBasicBlockRef bb_break;
-        LLVMValueRef break_value;
         LLVMValueRef repeat_value;
 
         LoopInfo() :
             loop(nullptr),
             bb_loop(nullptr),
-            bb_break(nullptr),
-            break_value(nullptr),
             repeat_value(nullptr)
         {}
     };
@@ -851,12 +847,7 @@ struct LLVMIRGenerator {
     SCOPES_RESULT(LLVMValueRef) Raise_to_value(Raise *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         auto result = SCOPES_GET_RESULT(node_to_value(node->value));
-        if (try_info.except_value) {
-            LLVMBasicBlockRef bb = LLVMGetInsertBlock(builder);
-            LLVMBasicBlockRef incobbs[] = { bb };
-            LLVMValueRef incovals[] = { result };
-            LLVMAddIncoming(try_info.except_value, incovals, incobbs, 1);
-        }
+        build_merge_phi(try_info.except_value, result);
         return LLVMBuildBr(builder, try_info.bb_except);
     }
 
@@ -1017,24 +1008,13 @@ struct LLVMIRGenerator {
 
     SCOPES_RESULT(LLVMValueRef) Break_to_value(Break *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
-        auto result = SCOPES_GET_RESULT(node_to_value(node->value));
-        if (loop_info.break_value) {
-            LLVMBasicBlockRef bb = LLVMGetInsertBlock(builder);
-            LLVMBasicBlockRef incobbs[] = { bb };
-            LLVMValueRef incovals[] = { result };
-            LLVMAddIncoming(loop_info.break_value, incovals, incobbs, 1);
-        }
-        return LLVMBuildBr(builder, loop_info.bb_break);
+        SCOPES_LOCATION_ERROR(String::from("IL->IR: cannot translate break"));
     }
 
     SCOPES_RESULT(LLVMValueRef) Repeat_to_value(Repeat *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         auto result = SCOPES_GET_RESULT(node_to_value(node->value));
-        assert(loop_info.repeat_value);
-        LLVMBasicBlockRef bb = LLVMGetInsertBlock(builder);
-        LLVMBasicBlockRef incobbs[] = { bb };
-        LLVMValueRef incovals[] = { result };
-        LLVMAddIncoming(loop_info.repeat_value, incovals, incobbs, 1);
+        build_merge_phi(loop_info.repeat_value, result);
         return LLVMBuildBr(builder, loop_info.bb_loop);
     }
 
@@ -1048,7 +1028,7 @@ struct LLVMIRGenerator {
         label_info.bb_merge = nullptr;
         auto rtype = node->get_type();
         if (is_returning(rtype)) {
-            label_info.bb_merge = LLVMAppendBasicBlock(func, "merge");
+            label_info.bb_merge = LLVMAppendBasicBlock(func, node->name.name()->data);
             if (is_returning_value(rtype)) {
                 LLVMPositionBuilderAtEnd(builder, label_info.bb_merge);
                 label_info.merge_value = LLVMBuildPhi(builder,
@@ -1061,15 +1041,10 @@ struct LLVMIRGenerator {
             LLVMPositionBuilderAtEnd(builder, bb);
             SCOPES_CHECK_RESULT(block_to_value(node->body));
             auto result = SCOPES_GET_RESULT(node_to_value(node->value));
-            LLVMBasicBlockRef bb = LLVMGetInsertBlock(builder);
             if (is_returning(node->value->get_type())) {
                 assert(label_info.bb_merge);
+                build_merge_phi(label_info.merge_value, result);
                 LLVMBuildBr(builder, label_info.bb_merge);
-                if (label_info.merge_value) {
-                    LLVMBasicBlockRef incobbs[] = { bb };
-                    LLVMValueRef incovals[] = { result };
-                    LLVMAddIncoming(label_info.merge_value, incovals, incobbs, 1);
-                }
             }
         }
         LLVMPositionBuilderAtEnd(builder, label_info.bb_merge);
@@ -1087,43 +1062,28 @@ struct LLVMIRGenerator {
         LLVMBasicBlockRef bb = LLVMGetInsertBlock(builder);
         LLVMValueRef func = LLVMGetBasicBlockParent(bb);
         loop_info.bb_loop = LLVMAppendBasicBlock(func, "loop");
+        loop_info.repeat_value = nullptr;
+        auto ltype = node->init->get_type();
+        if (is_returning_value(ltype)) {
+            LLVMPositionBuilderAtEnd(builder, loop_info.bb_loop);
+            loop_info.repeat_value = LLVMBuildPhi(builder, LLVMTypeOf(init), "");
+            bind(node, loop_info.repeat_value);
+            LLVMPositionBuilderAtEnd(builder, bb);
+        }
+        build_merge_phi(loop_info.repeat_value, init);
         LLVMBuildBr(builder, loop_info.bb_loop);
         LLVMPositionBuilderAtEnd(builder, loop_info.bb_loop);
-        loop_info.repeat_value = LLVMBuildPhi(builder, LLVMTypeOf(init), "");
-        bind(node->param, loop_info.repeat_value);
-        LLVMBasicBlockRef incobbs[] = { bb };
-        LLVMValueRef incovals[] = { init };
-        LLVMAddIncoming(loop_info.repeat_value, incovals, incobbs, 1);
-        loop_info.break_value = nullptr;
-        loop_info.bb_break = nullptr;
-        auto rtype = node->get_type();
+        SCOPES_CHECK_RESULT(block_to_value(node->body));
+        auto result = SCOPES_GET_RESULT(node_to_value(node->value));
+        auto rtype = node->value->get_type();
         if (is_returning(rtype)) {
-            loop_info.bb_break = LLVMAppendBasicBlock(func, "break");
             if (is_returning_value(rtype)) {
-                LLVMPositionBuilderAtEnd(builder, loop_info.bb_break);
-                loop_info.break_value = LLVMBuildPhi(builder,
-                    SCOPES_GET_RESULT(type_to_llvm_type(rtype)), "");
+                build_merge_phi(loop_info.repeat_value, result);
             }
+            LLVMBuildBr(builder, loop_info.bb_loop);
         }
-        {
-            LLVMPositionBuilderAtEnd(builder, loop_info.bb_loop);
-            SCOPES_CHECK_RESULT(block_to_value(node->body));
-            auto result = SCOPES_GET_RESULT(node_to_value(node->value));
-            LLVMBasicBlockRef bb = LLVMGetInsertBlock(builder);
-            if (is_returning(node->value->get_type())) {
-                assert(loop_info.bb_break);
-                LLVMBuildBr(builder, loop_info.bb_break);
-                if (loop_info.break_value) {
-                    LLVMBasicBlockRef incobbs[] = { bb };
-                    LLVMValueRef incovals[] = { result };
-                    LLVMAddIncoming(loop_info.break_value, incovals, incobbs, 1);
-                }
-            }
-        }
-        LLVMPositionBuilderAtEnd(builder, loop_info.bb_break);
-        auto result = loop_info.break_value;
         loop_info = old_loop_info;
-        return result;
+        return nullptr;
     }
 
     SCOPES_RESULT(LLVMValueRef) ArgumentList_to_value(ArgumentList *node) {
@@ -1722,7 +1682,7 @@ struct LLVMIRGenerator {
         LLVMBasicBlockRef bb_merge = nullptr;
         LLVMValueRef merge_value = nullptr;
         if (is_returning(rtype)) {
-            bb_merge = LLVMAppendBasicBlock(func, "merge");
+            bb_merge = LLVMAppendBasicBlock(func, "if-merge");
             LLVMPositionBuilderAtEnd(builder, bb_merge);
             if (is_returning_value(rtype)) {
                 merge_value = LLVMBuildPhi(builder, SCOPES_GET_RESULT(type_to_llvm_type(rtype)), "");

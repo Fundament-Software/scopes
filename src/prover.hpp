@@ -37,6 +37,7 @@ struct ASTContext {
     ASTContext for_loop(Loop *loop) const;
 
     ASTContext for_try(Label *except) const;
+    ASTContext for_break(Label *_break) const;
 
     ASTContext with_block(Block &_block) const;
     ASTContext with_frame(Function *frame) const;
@@ -44,7 +45,7 @@ struct ASTContext {
     ASTContext();
 
     ASTContext(Function *_function, Function *_frame, EvalTarget _target,
-        Loop *_loop, Label *_except, Block *_block);
+        Loop *_loop, Label *_except, Label *_break, Block *_block);
 
     static ASTContext from_function(Function *fn);
 
@@ -56,6 +57,7 @@ struct ASTContext {
     EvalTarget target;
     Loop *loop;
     Label *except;
+    Label *_break;
     Block *block;
 };
 

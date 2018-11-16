@@ -100,10 +100,11 @@ struct Quoter {
         SCOPES_RESULT_TYPE(Value *);
         auto _anchor = node->anchor();
         auto value = Call::from(_anchor, g_sc_loop_new, {
-            SCOPES_GET_RESULT(quote_param(node->param)),
             SCOPES_GET_RESULT(quote(level, node->init))
         });
+        bind(node, value);
         auto expr = Expression::unscoped_from(_anchor);
+        expr->append(value);
         expr->append(Call::from(_anchor, g_sc_loop_set_body, { value,
             SCOPES_GET_RESULT(quote(level, node->value)) }));
         expr->append(value);

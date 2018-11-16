@@ -209,10 +209,11 @@ let typify =
             let typecount = (sub argcount 1)
             let types = (alloca-array type typecount)
             loop (i j = 1 0)
-                if (icmp<s i argcount)
-                    let ty = (sc_getarg args i)
-                    store (unbox-pointer ty type) (getelementptr types j)
-                    repeat (add i 1) (add j 1)
+                if (icmp== i argcount)
+                    break;
+                let ty = (sc_getarg args i)
+                store (unbox-pointer ty type) (getelementptr types j)
+                _ (add i 1) (add j 1)
             sc_typify src_fn typecount (bitcast types TypeArrayPointer)
 
         let types = (alloca-array type 1:usize)
@@ -262,17 +263,17 @@ let va-lfold va-lifold =
                 return init
             let ofs = (? use-indices 1 0)
             loop (i ret = 2 init)
-                if (icmp<s i argcount)
-                    let arg =
-                        sc_getarg args i
-                    let k = (sc_type_key (sc_value_qualified_type arg))
-                    let v = (sc_keyed_new unnamed arg)
-                    repeat (add i 1)
-                        if use-indices
-                            `(f [(sub i 2)] k v ret)
-                        else
-                            `(f k v ret)
-                ret
+                if (icmp== i argcount)
+                    break ret
+                let arg =
+                    sc_getarg args i
+                let k = (sc_type_key (sc_value_qualified_type arg))
+                let v = (sc_keyed_new unnamed arg)
+                _ (add i 1)
+                    if use-indices
+                        `(f [(sub i 2)] k v ret)
+                    else
+                        `(f k v ret)
         _
             ast-macro (fn "va-lfold" (args) (va-lfold args false))
             ast-macro (fn "va-ilfold" (args) (va-lfold args true))
@@ -288,19 +289,19 @@ let va-rfold va-rifold =
                 return init
             let ofs = (? use-indices 1 0)
             loop (i ret = argcount init)
-                if (icmp>s i 2)
-                    let oi = i
-                    let i = (sub i 1)
-                    let arg =
-                        sc_getarg args i
-                    let k = (sc_type_key (sc_value_qualified_type arg))
-                    let v = (sc_keyed_new unnamed arg)
-                    repeat i
-                        if use-indices
-                            `(f [(sub i 2)] k v ret)
-                        else
-                            `(f k v ret)
-                ret
+                if (icmp<=s i 2)
+                    break ret
+                let oi = i
+                let i = (sub i 1)
+                let arg =
+                    sc_getarg args i
+                let k = (sc_type_key (sc_value_qualified_type arg))
+                let v = (sc_keyed_new unnamed arg)
+                _ i
+                    if use-indices
+                        `(f [(sub i 2)] k v ret)
+                    else
+                        `(f k v ret)
         _
             ast-macro (fn "va-rfold" (args) (va-rfold args false))
             ast-macro (fn "va-rifold" (args) (va-rfold args true))
@@ -312,9 +313,11 @@ inline raises-compile-error ()
 fn type< (T superT)
     loop (T = T)
         let value = (sc_typename_type_get_super T)
-        if (ptrcmp== value superT) true
-        elseif (ptrcmp== value typename) false
-        else (repeat value)
+        if (ptrcmp== value superT)
+            break true
+        elseif (ptrcmp== value typename)
+            break false
+        value
 
 fn type<= (T superT)
     if (ptrcmp== T superT) true
@@ -434,12 +437,13 @@ sc_type_set_symbol tuple '__typecall
             let pcount = (sub argcount 1)
             let types = (alloca-array type pcount)
             loop (i = 1)
-                if (icmp<s i argcount)
-                    let arg = (sc_getarg args i)
-                    let T = (unbox-pointer arg type)
-                    store T (getelementptr types (sub i 1))
-                    repeat (add i 1)
-                box-pointer (sc_tuple_type pcount types)
+                if (icmp== i argcount)
+                    break;
+                let arg = (sc_getarg args i)
+                let T = (unbox-pointer arg type)
+                store T (getelementptr types (sub i 1))
+                add i 1
+            box-pointer (sc_tuple_type pcount types)
 
 # array type constructor
 sc_type_set_symbol array '__typecall
@@ -466,12 +470,13 @@ sc_type_set_symbol Arguments '__typecall
             let pcount = (sub argcount 1)
             let types = (alloca-array type pcount)
             loop (i = 1)
-                if (icmp<s i argcount)
-                    let arg = (sc_getarg args i)
-                    let T = (unbox-pointer arg type)
-                    store T (getelementptr types (sub i 1))
-                    repeat (add i 1)
-                box-pointer (sc_arguments_type pcount types)
+                if (icmp== i argcount)
+                    break;
+                let arg = (sc_getarg args i)
+                let T = (unbox-pointer arg type)
+                store T (getelementptr types (sub i 1))
+                add i 1
+            box-pointer (sc_arguments_type pcount types)
 
 # function pointer type constructor
 sc_type_set_symbol function '__typecall
@@ -482,35 +487,36 @@ sc_type_set_symbol function '__typecall
             let pcount = (sub argcount 2)
             let constant? =
                 loop (i = 1)
-                    if (icmp<s i argcount)
-                        let arg = (sc_getarg args i)
-                        if (sc_value_is_constant arg)
-                            repeat (add i 1)
-                        else
-                            break false
-                    break true
+                    if (icmp== i argcount)
+                        break true
+                    let arg = (sc_getarg args i)
+                    if (sc_value_is_constant arg)
+                        repeat (add i 1)
+                    break false
             let rtype = (sc_getarg args 1)
             if constant?
                 let rtype = (unbox-pointer rtype type)
                 let types = (alloca-array type pcount)
                 loop (i = 2)
-                    if (icmp<s i argcount)
-                        let arg = (sc_getarg args i)
-                        let T = (unbox-pointer arg type)
-                        store T (getelementptr types (sub i 2))
-                        repeat (add i 1)
-                    box-pointer (sc_function_type rtype pcount types)
+                    if (icmp== i argcount)
+                        break;
+                    let arg = (sc_getarg args i)
+                    let T = (unbox-pointer arg type)
+                    store T (getelementptr types (sub i 2))
+                    add i 1
+                box-pointer (sc_function_type rtype pcount types)
             else
                 ast-quote
                     let types = (alloca-array type pcount)
                     ast-unquote
                         let expr = (sc_expression_new)
                         loop (i = 2)
-                            if (icmp<s i argcount)
-                                let arg = (sc_getarg args i)
-                                sc_expression_append expr
-                                    `(store arg (getelementptr types [(sub i 2)]))
-                                repeat (add i 1)
+                            if (icmp== i argcount)
+                                break;
+                            let arg = (sc_getarg args i)
+                            sc_expression_append expr
+                                `(store arg (getelementptr types [(sub i 2)]))
+                            add i 1
                         expr
                     sc_function_type rtype pcount types
 
@@ -1561,16 +1567,16 @@ let coerce-call-arguments =
                 let outargs = (sc_call_new self)
                 sc_call_set_rawcall outargs true
                 loop (i = 0)
-                    if (< i argc)
-                        let arg = ('getarg args (add i 1))
-                        let argT = ('typeof arg)
-                        let paramT = ('element@ fT i)
-                        let outarg =
-                            if (== argT paramT) arg
-                            else `(imply arg paramT)
-                        sc_call_append_argument outargs outarg
-                        repeat (+ i 1)
-                    outargs
+                    if (== i argc)
+                        break outargs
+                    let arg = ('getarg args (add i 1))
+                    let argT = ('typeof arg)
+                    let paramT = ('element@ fT i)
+                    let outarg =
+                        if (== argT paramT) arg
+                        else `(imply arg paramT)
+                    sc_call_append_argument outargs outarg
+                    + i 1
             else `(rawcall self [('getarglist args 1)])
 
 #
@@ -1646,7 +1652,7 @@ fn dotted-symbol? (env head)
             return false
         elseif (== (@ s i) dot-char)
             return true
-        repeat (+ i 1:usize)
+        + i 1:usize
 
 fn split-dotted-symbol (head start end tail)
     let s = (as head string)
@@ -1672,7 +1678,7 @@ fn split-dotted-symbol (head start end tail)
                 let size = (- i start)
                 return
                     cons (Symbol (lslice (rslice s start) size)) result
-        repeat (+ i 1:usize)
+        + i 1:usize
 
 # infix notation support
 # --------------------------------------------------------------------------
@@ -1763,22 +1769,21 @@ fn parse-infix-expr (infix-table lhs state mprec)
         if (== ('typeof op) Nothing)
             return lhs state
         let op-prec op-order op-name = (unpack-infix-op op)
-        repeat
-            loop (rhs state = ('decons next-state))
-                if (empty? state)
-                    break (Value (list op-name lhs rhs)) state
-                let ra __ = ('decons state)
-                let lop = (infix-op-gt infix-table ra op-prec)
-                let nextop =
-                    if (== ('typeof lop) Nothing)
-                        rtl-infix-op-eq infix-table ra op-prec
-                    else lop
-                if (== ('typeof nextop) Nothing)
-                    break (Value (list op-name lhs rhs)) state
-                let nextop-prec = (unpack-infix-op nextop)
-                let next-rhs next-state =
-                    parse-infix-expr infix-table rhs state nextop-prec
-                repeat next-rhs next-state
+        loop (rhs state = ('decons next-state))
+            if (empty? state)
+                break (Value (list op-name lhs rhs)) state
+            let ra __ = ('decons state)
+            let lop = (infix-op-gt infix-table ra op-prec)
+            let nextop =
+                if (== ('typeof lop) Nothing)
+                    rtl-infix-op-eq infix-table ra op-prec
+                else lop
+            if (== ('typeof nextop) Nothing)
+                break (Value (list op-name lhs rhs)) state
+            let nextop-prec = (unpack-infix-op nextop)
+            let next-rhs next-state =
+                parse-infix-expr infix-table rhs state nextop-prec
+            _ next-rhs next-state
 
 let parse-infix-expr =
     typify parse-infix-expr Scope Value list i32
@@ -1885,7 +1890,7 @@ fn expand-and-or (expr f)
         if (empty? head)
             return result
         let at next = ('decons head)
-        repeat (Value (list f at (list inline '() result))) next
+        _ (Value (list f at (list inline '() result))) next
 
 #compile-stage
     let vals = (alloca-array type 2)
@@ -1912,9 +1917,9 @@ fn ltr-multiop (args target)
             let rhs = ('getarg args i)
             let op = `(target lhs rhs)
             let i = (+ i 1)
-            if (< i argc)
-                repeat i op
-            op
+            if (== i argc)
+                break op
+            _ i op
 
 fn rtl-multiop (args target)
     let argc = ('argcount args)
@@ -1929,9 +1934,9 @@ fn rtl-multiop (args target)
             let i = (- i 1)
             let lhs = ('getarg args i)
             let op = `(target lhs rhs)
-            if (> i 0)
-                repeat i op
-            op
+            if (== i 0)
+                break op
+            _ i op
 
 # extracting options from varargs
 
@@ -1944,14 +1949,15 @@ fn va-option-branch (args)
         'getarg args 1
     let key = (unbox-symbol key Symbol)
     loop (i = 2)
-        if (< i argc)
-            let arg = ('getarg args i)
-            let argkey = ('key ('qualified-typeof arg))
-            if (== key argkey)
-                return
-                    sc_keyed_new unnamed arg
-            repeat (+ i 1)
-        `(elsef)
+        if (== i argc)
+            break;
+        let arg = ('getarg args i)
+        let argkey = ('key ('qualified-typeof arg))
+        if (== key argkey)
+            return
+                sc_keyed_new unnamed arg
+        + i 1
+    `(elsef)
 
 # modules
 ####
@@ -1993,16 +1999,17 @@ fn clone-scope-contents (a b)
                             sc_typename_type
                                 as name string
                         loop (i = 2)
-                            if (< i argc)
-                                let arg = ('getarg args i)
-                                let k v = (sc_type_key (sc_value_qualified_type arg))
-                                if (== k 'super)
-                                    sc_typename_type_set_super T (as v type)
-                                elseif (== k 'storage)
-                                    'set-plain-storage T (as v type)
-                                else
-                                    compiler-error! "super or storage key expected"
-                            return (Value T)
+                            if (== i argc)
+                                return (Value T)
+                            let arg = ('getarg args i)
+                            let k v = (sc_type_key (sc_value_qualified_type arg))
+                            if (== k 'super)
+                                sc_typename_type_set_super T (as v type)
+                            elseif (== k 'storage)
+                                'set-plain-storage T (as v type)
+                            else
+                                compiler-error! "super or storage key expected"
+                            + i 1
                 compiler-error!
                     sc_string_join "typename "
                         sc_string_join ('__repr cls)
@@ -2061,10 +2068,9 @@ let
                 let b rest = ('decons rest)
                 loop (rest result = rest (op a b))
                     if (empty? rest)
-                        result
-                    else
-                        let c rest = ('decons rest)
-                        repeat rest (op result c)
+                        break result
+                    let c rest = ('decons rest)
+                    _ rest (op result c)
     and = (syntax-macro (make-expand-and-or and-branch))
     or = (syntax-macro (make-expand-and-or or-branch))
     define = (syntax-macro expand-define)
@@ -2186,15 +2192,6 @@ define for
     inline fdone ()
         break;
 
-    #let ast-for
-        ast-macro
-            fn "ast-for" (args)
-
-    #sc_value_t *sc_loop_new();
-    #void sc_loop_append_parameter(sc_value_t *loop, sc_value_t *symbol);
-    #void sc_loop_append_argument(sc_value_t *loop, sc_value_t *value);
-    #void sc_loop_set_body(sc_value_t *loop, sc_value_t *body);
-
     syntax-block-scope-macro
         fn "expand-for" (expr next-expr scope)
             let head args = (decons expr)
@@ -2204,9 +2201,9 @@ define for
                         compiler-error! "'in' expected"
                     let sxat it = (decons it)
                     let at = (sxat as Symbol)
-                    if (at != 'in)
-                        repeat it (cons sxat params)
-                    _ it params
+                    if (at == 'in)
+                        break it params
+                    _ it (cons sxat params)
             let generator-expr body = (decons it)
             let subscope = (Scope scope)
             ast-quote
@@ -2225,11 +2222,11 @@ define for
                                         if (empty? params)
                                             break expr
                                         let param next = (decons params)
-                                        repeat next (cons param expr)
+                                        _ next (cons param expr)
                                 let expr = (cons let expr)
                                 'set-symbol subscope 'continue continue
                                 sc_expand (cons do expr body) '() subscope
-                            repeat next
+                            next
                     next-expr
                 scope
 
@@ -2281,7 +2278,7 @@ fn exec-module (expr eval-scope)
             repeat (bitcast (fptr) Value)
         else
             let fptr = (f as ModuleFunctionType)
-            fptr;
+            break (fptr)
 
 fn dots-to-slashes (pattern)
     let sz = (countof pattern)
@@ -2357,7 +2354,7 @@ fn require-from (base-dir name)
                 sc_write "    "
                 sc_write module-path
                 sc_write "\n"
-                repeat patterns
+                patterns
         let pattern patterns = (decons patterns)
         let pattern = (pattern as string)
         let module-path = (sc_realpath (make-module-path pattern namestr))
@@ -2434,7 +2431,7 @@ fn merge-scope-symbols (source target filter)
                     'set-symbol target key value
                 repeat key
             else
-                target
+                break target
     fn filter-contents (source target filter)
         let parent = ('parent source)
         if (parent == null)
@@ -2573,29 +2570,33 @@ let vector-reduce =
                 # special cases for low vector sizes
                 switch sz
                 case 1
-                    ast-quote
-                        extractelement v 0
-                case 2
-                    ast-quote
-                        f
+                    break
+                        ast-quote
                             extractelement v 0
-                            extractelement v 1
+                case 2
+                    break
+                        ast-quote
+                            f
+                                extractelement v 0
+                                extractelement v 1
                 case 3
-                    ast-quote
-                        f
+                    break
+                        ast-quote
                             f
-                                extractelement v 0
-                                extractelement v 1
-                            extractelement v 2
-                case 4
-                    ast-quote
-                        f
-                            f
-                                extractelement v 0
-                                extractelement v 1
-                            f
+                                f
+                                    extractelement v 0
+                                    extractelement v 1
                                 extractelement v 2
-                                extractelement v 3
+                case 4
+                    break
+                        ast-quote
+                            f
+                                f
+                                    extractelement v 0
+                                    extractelement v 1
+                                f
+                                    extractelement v 2
+                                    extractelement v 3
                 default
                     let hsz = (sz >> 1)
                     let fsz = (hsz << 1)
@@ -2697,33 +2698,33 @@ inline range (a b c)
 fn parse-compile-flags (args)
     let argc = ('argcount args)
     loop (i flags = 0 0:u64)
-        if (i < argc)
-            let arg = ('getarg args i)
-            let flag = (arg as Symbol)
-            repeat (i + 1)
-                | flags
-                    switch flag
-                    case 'dump-disassembly compile-flag-dump-disassembly
-                    case 'dump-module compile-flag-dump-module
-                    case 'dump-function compile-flag-dump-function
-                    case 'dump-time compile-flag-dump-time
-                    case 'no-debug-info compile-flag-no-debug-info
-                    case 'O1 compile-flag-O1
-                    case 'O2 compile-flag-O2
-                    case 'O3 compile-flag-O3
-                    default
-                        compiler-error!
-                            .. "illegal flag: " (repr flag)
-                                ". try one of"
-                                \ " " (repr 'dump-disassembly)
-                                \ " " (repr 'dump-module)
-                                \ " " (repr 'dump-function)
-                                \ " " (repr 'dump-time)
-                                \ " " (repr 'no-debug-info)
-                                \ " " (repr 'O1)
-                                \ " " (repr 'O2)
-                                \ " " (repr 'O3)
-        flags
+        if (i == argc)
+            break flags
+        let arg = ('getarg args i)
+        let flag = (arg as Symbol)
+        _ (i + 1)
+            | flags
+                switch flag
+                case 'dump-disassembly compile-flag-dump-disassembly
+                case 'dump-module compile-flag-dump-module
+                case 'dump-function compile-flag-dump-function
+                case 'dump-time compile-flag-dump-time
+                case 'no-debug-info compile-flag-no-debug-info
+                case 'O1 compile-flag-O1
+                case 'O2 compile-flag-O2
+                case 'O3 compile-flag-O3
+                default
+                    compiler-error!
+                        .. "illegal flag: " (repr flag)
+                            ". try one of"
+                            \ " " (repr 'dump-disassembly)
+                            \ " " (repr 'dump-module)
+                            \ " " (repr 'dump-function)
+                            \ " " (repr 'dump-time)
+                            \ " " (repr 'no-debug-info)
+                            \ " " (repr 'O1)
+                            \ " " (repr 'O2)
+                            \ " " (repr 'O3)
 
 let compile =
     ast-macro
@@ -2750,13 +2751,14 @@ define-syntax-macro assert
 
 define-syntax-macro while
     let cond body = (decons args)
-    list do
-        list loop '()
+    list loop '()
         list inline 'continue '()
             list repeat
         list if cond
             cons do body
             list repeat
+        list 'else
+            list break
 
 #-------------------------------------------------------------------------------
 # tuples
@@ -2772,10 +2774,10 @@ inline make-unpack-function (extractf)
             let count = ('element-count T)
             let outargs = (sc_argument_list_new)
             loop (i = 0)
-                if (icmp<s i count)
-                    sc_argument_list_append outargs `(extractf self i)
-                    repeat (add i 1)
-                outargs
+                if (icmp== i count)
+                    break outargs
+                sc_argument_list_append outargs `(extractf self i)
+                add i 1
 
 let __unpack-aggregate = (make-unpack-function extractvalue)
 
@@ -2796,20 +2798,21 @@ let tupleof =
             # build tuple type
             let field-types = (alloca-array type argc)
             loop (i = 0)
-                if (i < argc)
-                    let arg = ('getarg args i)
-                    let T = ('typeof arg)
-                    store T (getelementptr field-types i)
-                    repeat (i + 1)
+                if (i == argc)
+                    break;
+                let arg = ('getarg args i)
+                let T = ('typeof arg)
+                store T (getelementptr field-types i)
+                i + 1
 
             # generate insert instructions
             let TT = (sc_tuple_type argc field-types)
             loop (i result = 0 `(nullof TT))
-                if (i < argc)
-                    let arg = ('getarg args i)
-                    repeat (i + 1)
-                        `(insertvalue result arg i)
-                result
+                if (i == argc)
+                    break result
+                let arg = ('getarg args i)
+                _ (i + 1)
+                    `(insertvalue result arg i)
 
 #-------------------------------------------------------------------------------
 # arrays
@@ -2835,14 +2838,14 @@ let arrayof =
             # generate insert instructions
             let TT = (sc_array_type ET (usize numvals))
             loop (i result = 0 `(nullof TT))
-                if (i < numvals)
-                    let arg = ('getarg args (add i 1))
-                    let arg =
-                        if ((sc_value_type arg) == ET) arg
-                        else `(arg as ET)
-                    repeat (i + 1)
-                        `(insertvalue result arg i)
-                result
+                if (i == numvals)
+                    break result
+                let arg = ('getarg args (add i 1))
+                let arg =
+                    if ((sc_value_type arg) == ET) arg
+                    else `(arg as ET)
+                _ (i + 1)
+                    `(insertvalue result arg i)
 
 #-------------------------------------------------------------------------------
 # vectors
@@ -2946,9 +2949,10 @@ inline vector-binary-op-dispatch (symbol)
                 let offset = (offset:usize as i32)
                 let maskvals = (alloca-array Value offset)
                 loop (i = 0)
-                    if (i < offset)
-                        store (Value i) (getelementptr maskvals i)
-                        repeat (i + 1)
+                    if (i == offset)
+                        break;
+                    store (Value i) (getelementptr maskvals i)
+                    i + 1
                 let maskT =
                     sc_vector_type i32 offset:usize
                 ast-quote
@@ -2976,9 +2980,10 @@ inline vector-binary-op-dispatch (symbol)
                 let total = (total:usize as i32)
                 let maskvals = (alloca-array Value total)
                 loop (i = 0)
-                    if (i < total)
-                        store (Value (i + offset)) (getelementptr maskvals i)
-                        repeat (i + 1)
+                    if (i == total)
+                        break;
+                    store (Value (i + offset)) (getelementptr maskvals i)
+                    i + 1
                 let maskT =
                     sc_vector_type i32 total:usize
                 ast-quote
@@ -3015,13 +3020,13 @@ let vectorof =
             # generate insert instructions
             let TT = (sc_vector_type ET (usize numvals))
             loop (i result = 0 `(nullof TT))
-                if (i < numvals)
-                    let arg = ('getarg args (add i 1))
-                    let arg =
-                        if ((sc_value_type arg) == ET) arg
-                        else `(arg as ET)
-                    repeat (i + 1) `(insertelement result arg i)
-                result
+                if (i == numvals)
+                    break result
+                let arg = ('getarg args (add i 1))
+                let arg =
+                    if ((sc_value_type arg) == ET) arg
+                    else `(arg as ET)
+                _ (i + 1) `(insertelement result arg i)
 
 #-------------------------------------------------------------------------------
 
@@ -3241,7 +3246,7 @@ define syntax-match
                                         sc_expand (cons do body) '() scope
                                     sc_expression_append outexpr `(return-ok body)
                                     store next outnext
-                                    outexpr
+                                    break outexpr
                                 default
                                     compiler-error! "default branch missing"
             return (cons outexpr (load outnext)) scope
@@ -3461,7 +3466,7 @@ define match-args
                                         sc_expand (cons do body) '() scope
                                     sc_expression_append outexpr `(return-ok body)
                                     store next outnext
-                                    outexpr
+                                    break outexpr
                                 default
                                     compiler-error! "default branch missing"
             return (cons outexpr (load outnext)) scope
@@ -3504,21 +3509,22 @@ define spice
                                 [(? varargs (sub paramcount 1) paramcount)]
                                 [(? varargs -1 paramcount)]
                         body
-                if (('typeof name) == Symbol)
-                    qq
-                        [let name] =
+                break
+                    if (('typeof name) == Symbol)
+                        qq
+                            [let name] =
+                                [ast-macro]
+                                    [fn] [(name as Symbol as string)] (args)
+                                        [ast-quote]
+                                            [ast-unquote]
+                                                [(cons inline content)] args
+                    else
+                        qq
                             [ast-macro]
-                                [fn] [(name as Symbol as string)] (args)
+                                [fn name] (args)
                                     [ast-quote]
                                         [ast-unquote]
                                             [(cons inline content)] args
-                else
-                    qq
-                        [ast-macro]
-                            [fn name] (args)
-                                [ast-quote]
-                                    [ast-unquote]
-                                        [(cons inline content)] args
 
 
 compile-stage;
@@ -3573,6 +3579,7 @@ fn get-overloaded-fn-append ()
                                 sc_arguments_type_join types argT
                         sc_argument_list_append functions f
                         sc_argument_list_append functypes types
+                        break;
                 elseif (fT == type)
                     if (fT == outtype)
                         syntax-error! ('anchor f) "cannot inherit from own type"
@@ -3647,7 +3654,7 @@ fn get-overloaded-fn-append ()
                                     .. str
                                         ? (i == 0) "" " "
                                         repr ('typeof ('getarg args... i))
-                            str
+                            break str
                     ") to overloaded function with types"
                     do
                         let fcount = ('argcount ftypes)
@@ -3657,7 +3664,7 @@ fn get-overloaded-fn-append ()
                                     .. str
                                         "\n    "
                                         repr (('getarg ftypes i) as type)
-                            str
+                            break str
 
 sugar fn... (name...)
     let finalize-overloaded-fn = (get-overloaded-fn-append)
@@ -3698,6 +3705,7 @@ sugar fn... (name...)
                         let body = (sc_expand (cons do body...) '() scope)
                         sc_template_set_body tmpl body
                         sc_argument_list_append outargs types
+                        break;
                     case ((arg as Symbol) ': T)
                         syntax-error! ('anchor condv) "single typed parameter definition is missing trailing comma or semicolon"
                     case ((arg as Symbol) rest...)
@@ -4058,6 +4066,7 @@ spice pointer-each (n op value args...)
                     (getelementptr value i) as ref
                     args...
                 repeat (i + 1)
+            break;
 
 #inline pointer-each (n op value args...)
     let n = (imply n usize)
@@ -4479,6 +4488,7 @@ fn read-eval-print-loop ()
                     if (key != tmp)
                         'set-symbol eval-scope key value
                     repeat key
+                break;
             let count =
                 va-lfold 0
                     inline (key value k)
@@ -4555,28 +4565,30 @@ fn run-main ()
     store "" sourcepath
     store true parse-options
     loop (i = 1)
-        if (i < argc)
-            let k = (i + 1)
-            let arg = (load (getelementptr argv i))
-            let arg = (sc_string_new_from_cstr arg)
-            if ((load parse-options) and ((@ arg 0:usize) == (char "-")))
-                if ((arg == "--help") or (arg == "-h"))
-                    print-help exename
-                elseif ((== arg "--version") or (== arg "-v"))
-                    print-version;
-                elseif ((== arg "--signal-abort") or (== arg "-s"))
-                    set-signal-abort! true
-                elseif (== arg "--")
-                    store false parse-options
-                else
-                    print
-                        .. "unrecognized option: " arg
-                            \ ". Try --help for help."
-                    exit 1
-                repeat k
-            elseif ((load sourcepath) == "")
-                store arg sourcepath
+        if (i >= argc)
+            break;
+        let k = (i + 1)
+        let arg = (load (getelementptr argv i))
+        let arg = (sc_string_new_from_cstr arg)
+        if ((load parse-options) and ((@ arg 0:usize) == (char "-")))
+            if ((arg == "--help") or (arg == "-h"))
+                print-help exename
+            elseif ((== arg "--version") or (== arg "-v"))
+                print-version;
+            elseif ((== arg "--signal-abort") or (== arg "-s"))
+                set-signal-abort! true
+            elseif (== arg "--")
+                store false parse-options
+            else
+                print
+                    .. "unrecognized option: " arg
+                        \ ". Try --help for help."
+                exit 1
+        elseif ((load sourcepath) == "")
+            store arg sourcepath
             # remainder is passed on to script
+            break;
+        k
     let sourcepath = (load sourcepath)
     if (sourcepath == "")
         read-eval-print-loop;

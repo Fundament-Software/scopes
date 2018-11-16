@@ -1033,9 +1033,9 @@ void sc_call_set_rawcall(sc_value_t *value, bool enable) {
     cast<Call>(value)->set_rawcall();
 }
 
-sc_value_t *sc_loop_new(sc_value_t *param, sc_value_t *init) {
+sc_value_t *sc_loop_new(sc_value_t *init) {
     using namespace scopes;
-    return Loop::from(get_active_anchor(), cast<Parameter>(param), init);
+    return Loop::from(get_active_anchor(), init);
 }
 
 void sc_loop_set_body(sc_value_t *loop, sc_value_t *body) {
@@ -1730,7 +1730,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_call_append_argument, _void, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_call_is_rawcall, TYPE_Bool, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_call_set_rawcall, _void, TYPE_Value, TYPE_Bool);
-    DEFINE_EXTERN_C_FUNCTION(sc_loop_new, TYPE_Value, TYPE_Value, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_loop_new, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_loop_set_body, _void, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_const_int_new, TYPE_Value, TYPE_Type, TYPE_U64);
     DEFINE_EXTERN_C_FUNCTION(sc_const_real_new, TYPE_Value, TYPE_Type, TYPE_F64);

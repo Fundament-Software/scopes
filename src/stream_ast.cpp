@@ -463,9 +463,6 @@ struct StreamAST : StreamAnchors {
             auto val = cast<Loop>(node);
             ss << Style_Keyword << "Loop" << Style_None;
             if (newlines) {
-                ss << " ";
-                stream_depends(val->param->deps);
-                walk_same_or_newline(val->param, depth+1, maxdepth);
                 ss << " " << Style_Operator << "=" << Style_None;
                 walk_same_or_newline(val->init, depth+1, maxdepth);
                 stream_block_result(val->body, val->value, depth+1, maxdepth);
@@ -475,6 +472,15 @@ struct StreamAST : StreamAnchors {
             stream_type_prefix(node);
             auto val = cast<Label>(node);
             ss << Style_Keyword << "Label" << Style_None << " ";
+            switch(val->label_kind) {
+            #define T(NAME, BNAME) \
+                case NAME: ss << BNAME; break;
+            SCOPES_LABEL_KIND()
+            #undef T
+            default:
+                ss << Style_Error << "?kind";
+            }
+            ss << Style_None << " ";
             ss << Style_Symbol << val->name.name()->data
                 << "@" << (void *)val << Style_None;
             if (newlines) {
