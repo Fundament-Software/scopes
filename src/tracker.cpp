@@ -22,6 +22,8 @@
 
 namespace scopes {
 
+#define SCOPES_GEN_TARGET "borrow checker"
+
 /*
 for more info on borrow inference, see
 https://gist.github.com/paniq/71251083aa52c1577f2d1b22be0ac6e1
@@ -164,31 +166,23 @@ struct Tracker {
         : ctx(_ctx), function(_ctx.function)
     {}
 
+#define T(NAME, BNAME, CLASS) \
+    SCOPES_RESULT(void) track_ ## CLASS(State &state, Value *node) { \
+        SCOPES_RESULT_TYPE(void); \
+        SCOPES_EXPECT_ERROR(error_cannot_translate(SCOPES_GEN_TARGET, node)); \
+    }
+    SCOPES_TEMPLATE_VALUE_KIND()
+#undef T
+
+#define T(NAME, BNAME, CLASS) \
+    SCOPES_RESULT(void) track_ ## CLASS(State &state, Value *node) { \
+        assert(false); \
+        return {}; \
+    }
+    SCOPES_PURE_VALUE_KIND()
+#undef T
+
     SCOPES_RESULT(void) track_Parameter(State &state, Value *node) {
-        assert(false);
-        return {};
-    }
-    SCOPES_RESULT(void) track_Template(State &state, Value *node) {
-        assert(false);
-        return {};
-    }
-    SCOPES_RESULT(void) track_Keyed(State &state, Value *node) {
-        assert(false);
-        return {};
-    }
-    SCOPES_RESULT(void) track_Expression(State &state, Value *node) {
-        assert(false);
-        return {};
-    }
-    SCOPES_RESULT(void) track_Quote(State &state, Value *node) {
-        assert(false);
-        return {};
-    }
-    SCOPES_RESULT(void) track_Unquote(State &state, Value *node) {
-        assert(false);
-        return {};
-    }
-    SCOPES_RESULT(void) track_CompileStage(State &state, Value *node) {
         assert(false);
         return {};
     }
@@ -462,30 +456,6 @@ struct Tracker {
     }
     SCOPES_RESULT(void) track_ExtractArgument(State &state, ExtractArgument *node) {
         return track_argument(state, node->value, "extract argument");
-    }
-    SCOPES_RESULT(void) track_Function(State &state, Value *node) {
-        assert(false);
-        return {};
-    }
-    SCOPES_RESULT(void) track_Extern(State &state, Value *node) {
-        assert(false);
-        return {};
-    }
-    SCOPES_RESULT(void) track_ConstInt(State &state, Value *node) {
-        assert(false);
-        return {};
-    }
-    SCOPES_RESULT(void) track_ConstReal(State &state, Value *node) {
-        assert(false);
-        return {};
-    }
-    SCOPES_RESULT(void) track_ConstAggregate(State &state, Value *node) {
-        assert(false);
-        return {};
-    }
-    SCOPES_RESULT(void) track_ConstPointer(State &state, Value *node) {
-        assert(false);
-        return {};
     }
 
     SCOPES_RESULT(void) track_block(State &state, Value *return_value) {
