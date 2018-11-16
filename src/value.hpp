@@ -33,7 +33,6 @@ struct Scope;
     /* instructions (Instruction::classof) */ \
     T(VK_If, "value-kind-if", If) \
     T(VK_Switch, "value-kind-switch", Switch) \
-    T(VK_Try, "value-kind-try", Try) \
     T(VK_Call, "value-kind-call", Call) \
     T(VK_Loop, "value-kind-loop", Loop) \
     T(VK_Break, "value-kind-break", Break) \
@@ -70,6 +69,7 @@ struct Value;
 struct Block;
 struct Instruction;
 struct Const;
+struct Raise;
 
 typedef std::vector<Parameter *> Parameters;
 typedef std::vector<Value *> Values;
@@ -348,28 +348,6 @@ struct Switch : Instruction {
 
 //------------------------------------------------------------------------------
 
-struct Try : Instruction {
-    static bool classof(const Value *T);
-
-    Try(const Anchor *anchor, Value *try_body, Parameter *except_param, Value *except_body);
-
-    static Try *from(const Anchor *anchor,
-        Value *try_body = nullptr,
-        Parameter *except_param = nullptr,
-        Value *except_body = nullptr);
-
-    void set_except_param(Parameter *param);
-
-    Block try_body;
-    Value *try_value;
-    Parameter *except_param;
-    Block except_body;
-    Value *except_value;
-    const Type *raise_type;
-};
-
-//------------------------------------------------------------------------------
-
 struct Parameter : Value {
     static bool classof(const Value *T);
 
@@ -389,27 +367,42 @@ struct Parameter : Value {
 
 //------------------------------------------------------------------------------
 
+enum LabelFlags {
+    // this is the try block of a try/except construct
+    LF_Try = (1 << 0),
+    // this is the except block of a try/except construct
+    LF_Except = (1 << 1)
+};
+
 struct Label : Instruction {
     static bool classof(const Value *T);
 
-    Label(const Anchor *anchor, Symbol name, Value *value);
+    Label(const Anchor *anchor, Symbol name, Value *value, uint32_t flags = 0);
 
     static Label *from(const Anchor *anchor,
         Symbol name = SYM_Unnamed,
+        Value *value = nullptr,
+        uint32_t flags = 0);
+    static Label *try_from(const Anchor *anchor,
         Value *value = nullptr);
+    static Label *except_from(const Anchor *anchor,
+        Value *value = nullptr);
+
+    bool is_try() const;
+    bool is_except() const;
 
     Symbol name;
     Block body;
     Value *value;
     const Type *return_type;
     std::vector<Merge *> merges;
+    uint32_t flags;
 };
 
 //------------------------------------------------------------------------------
 
 enum CallFlags {
     CF_RawCall = (1 << 0),
-    CF_TryCall = (1 << 1),
 };
 
 struct Call : Instruction {
@@ -419,12 +412,11 @@ struct Call : Instruction {
     static Call *from(const Anchor *anchor, Value *callee, const Values &args = {});
     bool is_rawcall() const;
     void set_rawcall();
-    bool is_trycall() const;
-    void set_trycall();
 
     Value *callee;
     Values args;
     uint32_t flags;
+    Label *except_label;
 };
 
 //------------------------------------------------------------------------------
@@ -498,6 +490,7 @@ struct Function : Pure {
     SCOPES_RESULT(Value *) resolve(Value *node, Function *boundary) const;
     std::unordered_map<Value *, Value *> map;
     std::vector<Return *> returns;
+    std::vector<Raise *> raises;
 };
 
 //------------------------------------------------------------------------------

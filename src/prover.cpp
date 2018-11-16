@@ -229,31 +229,31 @@ ASTContext ASTContext::with_void_target() const { return with_target(EvalTarget_
 ASTContext ASTContext::with_symbol_target() const { return with_target(EvalTarget_Symbol); }
 
 ASTContext ASTContext::with_target(EvalTarget target) const {
-    return ASTContext(function, frame, target, loop, _try, block);
+    return ASTContext(function, frame, target, loop, except, block);
 }
 
 ASTContext ASTContext::for_loop(Loop *loop) const {
-    return ASTContext(function, frame, EvalTarget_Symbol, loop, _try, block);
+    return ASTContext(function, frame, EvalTarget_Symbol, loop, except, block);
 }
 
-ASTContext ASTContext::for_try(Try *_try) const {
-    return ASTContext(function, frame, target, loop, _try, block);
+ASTContext ASTContext::for_try(Label *except) const {
+    return ASTContext(function, frame, target, loop, except, block);
 }
 
 ASTContext ASTContext::with_block(Block &_block) const {
-    return ASTContext(function, frame, target, loop, _try, &_block);
+    return ASTContext(function, frame, target, loop, except, &_block);
 }
 
 ASTContext ASTContext::with_frame(Function *frame) const {
-    return ASTContext(function, frame, target, loop, _try, block);
+    return ASTContext(function, frame, target, loop, except, block);
 }
 
 ASTContext::ASTContext() {}
 
 ASTContext::ASTContext(Function *_function, Function *_frame,
-    EvalTarget _target, Loop *_loop, Try *xtry, Block *_block) :
+    EvalTarget _target, Loop *_loop, Label *_except, Block *_block) :
     function(_function), frame(_frame), target(_target), loop(_loop),
-    _try(xtry), block(_block) {
+    except(_except), block(_block) {
 }
 
 void ASTContext::merge_block(Block &_block) const {
@@ -387,14 +387,25 @@ Value *build_runtime_argument_list(const ASTContext &ctx, const Anchor *anchor, 
 
 static SCOPES_RESULT(Value *) prove_Label(const ASTContext &ctx, Label *node) {
     SCOPES_RESULT_TYPE(Value *);
-    Label *label = Label::from(node->anchor(), node->name);
+    Label *label = Label::from(node->anchor(), node->name, nullptr, node->flags);
     assert(ctx.frame);
     assert(ctx.block);
     label->set_type(empty_arguments_type());
     ctx.frame->bind(node, label);
     SCOPES_ANCHOR(node->anchor());
-    auto result = SCOPES_GET_RESULT(
-        prove_block(ctx, label->body, node->value));
+    Value *result = nullptr;
+    const char *by = "label merge";
+    if (label->is_except()) {
+        by = "exception";
+        result = SCOPES_GET_RESULT(
+            prove_block(ctx.for_try(label), label->body, node->value));
+    } else {
+        if (label->is_try()) {
+            by = "try block";
+        }
+        result = SCOPES_GET_RESULT(
+            prove_block(ctx, label->body, node->value));
+    }
     assert(result);
     if (!label->return_type) {
         // label does not need a merge label
@@ -404,7 +415,7 @@ static SCOPES_RESULT(Value *) prove_Label(const ASTContext &ctx, Label *node) {
     } else {
         ctx.append(label);
         label->value = result;
-        label->return_type = SCOPES_GET_RESULT(merge_value_type("label merge",
+        label->return_type = SCOPES_GET_RESULT(merge_value_type(by,
             label->return_type, result->get_type()));
         label->change_type(label->return_type);
         for (auto merge : label->merges) {
@@ -680,37 +691,6 @@ static SCOPES_RESULT(Value *) prove_ExtractArgument(
         return extract_argument(ctx, value, node->index);
 }
 
-static SCOPES_RESULT(Value *) prove_Try(const ASTContext &ctx, Try *_try) {
-    SCOPES_RESULT_TYPE(Value *);
-    SCOPES_ANCHOR(_try->anchor());
-
-    auto newtry = Try::from(_try->anchor());
-    newtry->raise_type = TYPE_NoReturn;
-    auto tryctx = ctx.for_try(newtry);
-    auto try_value = SCOPES_GET_RESULT(prove_block(tryctx, newtry->try_body,
-        _try->try_value));
-    if (newtry->raise_type == TYPE_NoReturn) {
-        // move all block instructions to parent block
-        assert(ctx.block);
-        ctx.merge_block(newtry->try_body);
-        return try_value;
-    }
-    auto oldparam = _try->except_param;
-    auto T = newtry->raise_type;
-    auto newparam = Parameter::from(oldparam->anchor(), oldparam->name, T);
-    newtry->set_except_param(newparam);
-    newtry->try_value = try_value;
-
-    ctx.frame->bind(oldparam, newparam);
-    auto except_value = SCOPES_GET_RESULT(prove_block(ctx, newtry->except_body, _try->except_value));
-    newtry->except_value = except_value;
-
-    const Type *rtype = SCOPES_GET_RESULT(merge_void_or_value_type("try/except",
-        try_value->get_type(), except_value->get_type()));
-    newtry->set_type(rtype);
-    return newtry;
-}
-
 static SCOPES_RESULT(Value *) prove_Loop(const ASTContext &ctx, Loop *loop) {
     SCOPES_RESULT_TYPE(Value *);
     SCOPES_ANCHOR(loop->anchor());
@@ -818,9 +798,9 @@ static SCOPES_RESULT(Value *) prove_Repeat(const ASTContext &ctx, Repeat *_repea
 
 static SCOPES_RESULT(void) annotate_except_type(const ASTContext &ctx, const Type *T) {
     SCOPES_RESULT_TYPE(void);
-    if (ctx._try) {
-        ctx._try->raise_type = SCOPES_GET_RESULT(
-            merge_value_type("exception", ctx._try->raise_type, T));
+    if (ctx.except) {
+        ctx.except->return_type = SCOPES_GET_RESULT(
+            merge_value_type("exception", ctx.except->return_type, T));
     } else {
         ctx.function->except_type = SCOPES_GET_RESULT(
             merge_value_type("exception", ctx.function->except_type, T));
@@ -888,11 +868,17 @@ static SCOPES_RESULT(Value *) prove_Raise(const ASTContext &ctx, Raise *_raise) 
     SCOPES_RESULT_TYPE(Value *);
     assert(ctx.frame);
     Value *value = SCOPES_GET_RESULT(prove(ctx.with_symbol_target(), _raise->value));
-    SCOPES_CHECK_RESULT(annotate_except_type(ctx, value->get_type()));
-    auto newraise = Raise::from(_raise->anchor(), value);
-    newraise->set_type(TYPE_NoReturn);
-    ctx.append(newraise);
-    return newraise;
+    if (ctx.except) {
+        return SCOPES_GET_RESULT(make_merge(ctx, "exception",
+            _raise->anchor(), ctx.except, value));
+    } else {
+        SCOPES_CHECK_RESULT(annotate_except_type(ctx, value->get_type()));
+        auto newraise = Raise::from(_raise->anchor(), value);
+        newraise->set_type(TYPE_NoReturn);
+        ctx.append(newraise);
+        ctx.function->raises.push_back(newraise);
+        return newraise;
+    }
 }
 
 static SCOPES_RESULT(Value *) prove_CompileStage(const ASTContext &ctx, CompileStage *sx) {
@@ -1898,6 +1884,7 @@ repeat:
     }
     if (ft->has_exception()) {
         SCOPES_CHECK_RESULT(annotate_except_type(ctx, ft->except_type));
+        newcall->except_label = ctx.except;
     }
     return newcall;
 }

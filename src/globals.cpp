@@ -1000,11 +1000,6 @@ void sc_switch_append_default(sc_value_t *value, sc_value_t *body) {
     cast<Switch>(value)->append_default(get_active_anchor(), body);
 }
 
-sc_value_t *sc_try_new(sc_value_t *try_value, sc_value_t *except_param, sc_value_t *except_value) {
-    using namespace scopes;
-    return Try::from(get_active_anchor(), try_value, cast<Parameter>(except_param), except_value);
-}
-
 sc_value_t *sc_parameter_new(sc_symbol_t name) {
     using namespace scopes;
     auto param = Parameter::from(get_active_anchor(), name, nullptr);
@@ -1112,9 +1107,9 @@ sc_value_t *sc_unquote_new(sc_value_t *value) {
     return Unquote::from(get_active_anchor(), value);
 }
 
-sc_value_t *sc_label_new(sc_symbol_t name) {
+sc_value_t *sc_label_new(sc_symbol_t name, uint32_t flags) {
     using namespace scopes;
-    return Label::from(get_active_anchor(), name);
+    return Label::from(get_active_anchor(), name, nullptr, flags);
 }
 void sc_label_set_body(sc_value_t *label, sc_value_t *body) {
     using namespace scopes;
@@ -1729,7 +1724,6 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_switch_append_case, _void, TYPE_Value, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_switch_append_pass, _void, TYPE_Value, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_switch_append_default, _void, TYPE_Value, TYPE_Value);
-    DEFINE_EXTERN_C_FUNCTION(sc_try_new, TYPE_Value, TYPE_Value, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_parameter_new, TYPE_Value, TYPE_Symbol);
     DEFINE_EXTERN_C_FUNCTION(sc_parameter_is_variadic, TYPE_Bool, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_call_new, TYPE_Value, TYPE_Value);
@@ -1755,7 +1749,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_quote_new, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_unquote_new, TYPE_Value, TYPE_Value);
 
-    DEFINE_EXTERN_C_FUNCTION(sc_label_new, TYPE_Value, TYPE_Symbol);
+    DEFINE_EXTERN_C_FUNCTION(sc_label_new, TYPE_Value, TYPE_Symbol, TYPE_U32);
     DEFINE_EXTERN_C_FUNCTION(sc_label_set_body, _void, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_merge_new, TYPE_Value, TYPE_Value, TYPE_Value);
 

@@ -308,13 +308,6 @@ struct Tracker {
         }
         return {};
     }
-    SCOPES_RESULT(void) track_Try(State &state, Try *node) {
-        SCOPES_RESULT_TYPE(void);
-        State except_state(node->except_body, state);
-        SCOPES_CHECK_RESULT(track_block(except_state, node->except_value));
-        State try_state(node->try_body, state);
-        return track_block(try_state, node->try_value);
-    }
 
     SCOPES_RESULT(void) verify_deps(
         State &state, const Depends &depends, const Type *T, const char *context) {

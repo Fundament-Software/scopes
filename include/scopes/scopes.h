@@ -198,8 +198,6 @@ void sc_switch_append_case(sc_value_t *value, sc_value_t *literal, sc_value_t *b
 void sc_switch_append_pass(sc_value_t *value, sc_value_t *literal, sc_value_t *body);
 void sc_switch_append_default(sc_value_t *value, sc_value_t *body);
 
-sc_value_t *sc_try_new(sc_value_t *try_value, sc_value_t *except_param, sc_value_t *except_value);
-
 sc_value_t *sc_parameter_new(sc_symbol_t name);
 bool sc_parameter_is_variadic(sc_value_t *param);
 
@@ -228,7 +226,7 @@ sc_value_t *sc_raise_new(sc_value_t *value);
 sc_value_t *sc_quote_new(sc_value_t *value);
 sc_value_t *sc_unquote_new(sc_value_t *value);
 
-sc_value_t *sc_label_new(sc_symbol_t name);
+sc_value_t *sc_label_new(sc_symbol_t name, uint32_t flags);
 void sc_label_set_body(sc_value_t *label, sc_value_t *body);
 sc_value_t *sc_merge_new(sc_value_t *label, sc_value_t *value);
 

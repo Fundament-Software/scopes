@@ -59,7 +59,6 @@ namespace scopes {
     T(g_sc_switch_append_case, "sc_switch_append_case") \
     T(g_sc_switch_append_pass, "sc_switch_append_pass") \
     T(g_sc_switch_append_default, "sc_switch_append_default") \
-    T(g_sc_try_new, "sc_try_new") \
     T(g_sc_call_new, "sc_call_new") \
     T(g_sc_call_append_argument, "sc_call_append_argument") \
     T(g_sc_call_set_rawcall, "sc_call_set_rawcall") \

@@ -522,27 +522,6 @@ void Switch::append_default(const Anchor *anchor, Value *value) {
 
 //------------------------------------------------------------------------------
 
-Try::Try(const Anchor *anchor, Value *_try_value, Parameter *_except_param, Value *_except_value)
-    : Instruction(VK_Try, anchor), try_value(_try_value),
-        except_param(_except_param), except_value(_except_value),
-        raise_type(nullptr)
-{
-    if (except_param)
-        except_param->set_owner(this, 0);
-}
-
-Try *Try::from(const Anchor *anchor, Value *try_value, Parameter *except_param,
-    Value *except_value) {
-    return new Try(anchor, try_value, except_param, except_value);
-}
-
-void Try::set_except_param(Parameter *param) {
-    except_param = param;
-    except_param->set_owner(this, 0);
-}
-
-//------------------------------------------------------------------------------
-
 Parameter::Parameter(const Anchor *anchor, Symbol _name, const Type *_type, bool _variadic)
     : Value(VK_Parameter, anchor), name(_name), variadic(_variadic),
         owner(nullptr), block(nullptr), index(-1) {
@@ -570,7 +549,7 @@ void Parameter::set_owner(Value *_owner, int _index) {
 //------------------------------------------------------------------------------
 
 Call::Call(const Anchor *anchor, Value *_callee, const Values &_args)
-    : Instruction(VK_Call, anchor), callee(_callee), args(_args), flags(0) {
+    : Instruction(VK_Call, anchor), callee(_callee), args(_args), flags(0), except_label(nullptr) {
 }
 
 bool Call::is_rawcall() const {
@@ -579,14 +558,6 @@ bool Call::is_rawcall() const {
 
 void Call::set_rawcall() {
     flags |= CF_RawCall;
-}
-
-bool Call::is_trycall() const {
-    return flags & CF_TryCall;
-}
-
-void Call::set_trycall() {
-    flags |= CF_TryCall;
 }
 
 Call *Call::from(const Anchor *anchor, Value *callee, const Values &args) {
@@ -614,11 +585,28 @@ void Loop::set_param(Parameter *_param) {
 
 //------------------------------------------------------------------------------
 
-Label::Label(const Anchor *anchor, Symbol _name, Value *_value)
-    : Instruction(VK_Label, anchor), name(_name), value(_value), return_type(nullptr) {}
+Label::Label(const Anchor *anchor, Symbol _name, Value *_value, uint32_t _flags)
+    : Instruction(VK_Label, anchor), name(_name), value(_value), return_type(nullptr), flags(_flags) {}
 
-Label *Label::from(const Anchor *anchor, Symbol name, Value *value) {
-    return new Label(anchor, name, value);
+Label *Label::from(const Anchor *anchor, Symbol name, Value *value, uint32_t flags) {
+    return new Label(anchor, name, value, flags);
+}
+
+Label *Label::try_from(const Anchor *anchor,
+    Value *value) {
+    return new Label(anchor, KW_Try, value, LF_Try);
+}
+Label *Label::except_from(const Anchor *anchor,
+    Value *value) {
+    return new Label(anchor, KW_Except, value, LF_Except);
+}
+
+bool Label::is_try() const {
+    return (flags & LF_Try) == LF_Try;
+}
+
+bool Label::is_except() const {
+    return (flags & LF_Except) == LF_Except;
 }
 
 //------------------------------------------------------------------------------

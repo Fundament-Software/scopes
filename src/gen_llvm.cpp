@@ -207,12 +207,10 @@ struct LLVMIRGenerator {
     }
 
     struct TryInfo {
-        Try *_try;
         LLVMBasicBlockRef bb_except;
         LLVMValueRef except_value;
 
         TryInfo() :
-            _try(nullptr),
             bb_except(nullptr),
             except_value(nullptr)
         {}
@@ -878,7 +876,6 @@ struct LLVMIRGenerator {
         bool use_sret = is_memory_class(rtype);
         auto bb = LLVMAppendBasicBlock(func, "");
 
-        try_info._try = nullptr;
         try_info.bb_except = nullptr;
         try_info.except_value = nullptr;
 
@@ -995,19 +992,27 @@ struct LLVMIRGenerator {
         return label_info_stack.back();
     }
 
+    void build_merge_phi(LLVMValueRef phi, LLVMValueRef result) {
+        if (phi) {
+            LLVMBasicBlockRef bb = LLVMGetInsertBlock(builder);
+            LLVMBasicBlockRef incobbs[] = { bb };
+            LLVMValueRef incovals[] = { result };
+            LLVMAddIncoming(phi, incovals, incobbs, 1);
+        }
+    }
+
+    LLVMValueRef build_merge(Label *label, LLVMValueRef result) {
+        auto &&label_info = find_label_info(label);
+        build_merge_phi(label_info.merge_value, result);
+        assert(label_info.bb_merge);
+        return LLVMBuildBr(builder, label_info.bb_merge);
+    }
+
     SCOPES_RESULT(LLVMValueRef) Merge_to_value(Merge *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         auto result = SCOPES_GET_RESULT(node_to_value(node->value));
         auto label = cast<Label>(node->label);
-        auto &&label_info = find_label_info(label);
-        if (label_info.merge_value) {
-            LLVMBasicBlockRef bb = LLVMGetInsertBlock(builder);
-            LLVMBasicBlockRef incobbs[] = { bb };
-            LLVMValueRef incovals[] = { result };
-            LLVMAddIncoming(label_info.merge_value, incovals, incobbs, 1);
-        }
-        assert(label_info.bb_merge);
-        return LLVMBuildBr(builder, label_info.bb_merge);
+        return build_merge(label, result);
     }
 
     SCOPES_RESULT(LLVMValueRef) Break_to_value(Break *node) {
@@ -1121,76 +1126,6 @@ struct LLVMIRGenerator {
         return result;
     }
 
-    SCOPES_RESULT(LLVMValueRef) Try_to_value(Try *node) {
-        SCOPES_RESULT_TYPE(LLVMValueRef);
-        auto rtype = node->get_type();
-
-        auto old_try_info = try_info;
-        try_info._try = node;
-
-        auto except_value_type = SCOPES_GET_RESULT(
-            type_to_llvm_type(node->except_param->get_type()));
-
-        /*
-        LLVMBasicBlockRef bb_except;
-        LLVMBasicBlockRef bb_merge;
-        LLVMValueRef except_value;
-        */
-
-        LLVMBasicBlockRef bb = LLVMGetInsertBlock(builder);
-        LLVMValueRef func = LLVMGetBasicBlockParent(bb);
-        try_info.bb_except = LLVMAppendBasicBlock(func, "except");
-        LLVMBasicBlockRef bb_merge = nullptr;
-        LLVMValueRef merge_value = nullptr;
-        if (is_returning(rtype)) {
-            bb_merge = LLVMAppendBasicBlock(func, "merge");
-            LLVMPositionBuilderAtEnd(builder, bb_merge);
-            if (is_returning_value(rtype)) {
-                auto llvm_rtype = SCOPES_GET_RESULT(type_to_llvm_type(rtype));
-                merge_value = LLVMBuildPhi(builder, llvm_rtype, "");
-            }
-        }
-
-        LLVMPositionBuilderAtEnd(builder, try_info.bb_except);
-        try_info.except_value = LLVMBuildPhi(builder, except_value_type, "");
-        bind(node->except_param, try_info.except_value);
-
-        LLVMPositionBuilderAtEnd(builder, bb);
-        for (auto value : node->try_body.body) {
-            SCOPES_CHECK_RESULT(node_to_value(value));
-        }
-        auto try_result = SCOPES_GET_RESULT(node_to_value(node->try_value));
-        if (is_returning(node->try_value->get_type())) {
-            LLVMBuildBr(builder, bb_merge);
-            if (merge_value) {
-                LLVMBasicBlockRef incobbs[] = { LLVMGetInsertBlock(builder) };
-                LLVMValueRef incovals[] = { try_result };
-                LLVMAddIncoming(merge_value, incovals, incobbs, 1);
-            }
-        }
-
-        LLVMPositionBuilderAtEnd(builder, try_info.bb_except);
-        try_info = old_try_info;
-        for (auto value : node->except_body.body) {
-            SCOPES_CHECK_RESULT(node_to_value(value));
-        }
-        auto except_result = SCOPES_GET_RESULT(node_to_value(node->except_value));
-        if (is_returning(node->except_value->get_type())) {
-            LLVMBuildBr(builder, bb_merge);
-            if (merge_value) {
-                LLVMBasicBlockRef incobbs[] = { LLVMGetInsertBlock(builder) };
-                LLVMValueRef incovals[] = { except_result };
-                LLVMAddIncoming(merge_value, incovals, incobbs, 1);
-            }
-        }
-
-        if (bb_merge) {
-            LLVMPositionBuilderAtEnd(builder, bb_merge);
-        }
-
-        return merge_value;
-    }
-
     SCOPES_RESULT(LLVMValueRef) ArgumentList_to_value(ArgumentList *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         auto rtype = node->get_type();
@@ -1239,9 +1174,10 @@ struct LLVMIRGenerator {
         auto T = try_get_const_type(callee);
         const Type *rtype = callee->get_type();
         if (is_function_pointer(rtype)) {
-            return SCOPES_GET_RESULT(build_call(call->is_trycall(),
+            return SCOPES_GET_RESULT(build_call(
                 extract_function_type(rtype),
-                SCOPES_GET_RESULT(node_to_value(callee)), args));
+                SCOPES_GET_RESULT(node_to_value(callee)), args,
+                call->except_label));
         } else if (T == TYPE_Builtin) {
             auto builtin = SCOPES_GET_RESULT(extract_builtin_constant(callee));
             switch(builtin.value()) {
@@ -1991,7 +1927,9 @@ struct LLVMIRGenerator {
         }
     }
 
-    SCOPES_RESULT(LLVMValueRef) build_call(bool trycall, const Type *functype, LLVMValueRef func, Values &args) {
+    SCOPES_RESULT(LLVMValueRef) build_call(
+        const Type *functype, LLVMValueRef func, Values &args,
+        Label *except_label) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         size_t argcount = args.size();
 
@@ -2048,21 +1986,29 @@ struct LLVMIRGenerator {
         }
 
         if (fi->has_exception()) {
+            LLVMBasicBlockRef bb_except = nullptr;
+            LLVMValueRef except_phi = nullptr;
+            if (except_label) {
+                auto &&label_info = find_label_info(except_label);
+                bb_except = label_info.bb_merge;
+                except_phi = label_info.merge_value;
+            } else {
+                bb_except = try_info.bb_except;
+                except_phi = try_info.except_value;
+            }
             auto old_bb = LLVMGetInsertBlock(builder);
-            assert(try_info.bb_except);
-            if (try_info.except_value) {
+            assert(bb_except);
+            if (except_phi) {
                 auto except = LLVMBuildExtractValue(builder, ret, 1, "");
-                LLVMBasicBlockRef incobbs[] = { old_bb };
-                LLVMValueRef incovals[] = { except };
-                LLVMAddIncoming(try_info.except_value, incovals, incobbs, 1);
+                build_merge_phi(except_phi, except);
             }
             auto ok = LLVMBuildExtractValue(builder, ret, 0, "");
             if (fi->return_type == TYPE_NoReturn) {
                 // always raises
-                return LLVMBuildBr(builder, try_info.bb_except);
+                return LLVMBuildBr(builder, bb_except);
             } else {
                 auto bb = LLVMAppendBasicBlock(LLVMGetBasicBlockParent(old_bb), "ok");
-                LLVMBuildCondBr(builder, ok, bb, try_info.bb_except);
+                LLVMBuildCondBr(builder, ok, bb, bb_except);
                 LLVMPositionBuilderAtEnd(builder, bb);
                 if (fi->return_type != empty_arguments_type()) {
                     ret = LLVMBuildExtractValue(builder, ret, 2, "");

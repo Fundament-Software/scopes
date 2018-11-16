@@ -591,6 +591,18 @@ struct Expander {
     SCOPES_RESULT(Value *) expand_try(const List *it) {
         SCOPES_RESULT_TYPE(Value *);
 
+        /*
+        # we're building this structure
+        label try
+            let except-param ... =
+                label except
+                    merge try
+                        do
+                            try-body ...
+                            (any raise merges to except)
+            except-body ...
+        */
+
         SCOPES_CHECK_RESULT(verify_list_parameter_count("try", it, 0, -1));
         it = it->next;
 
@@ -599,6 +611,9 @@ struct Expander {
         Expander subexp(Scope::from(env), astscope);
 
         Value *try_value = SCOPES_GET_RESULT(subexp.expand_expression(_anchor, it));
+        Label *try_label = Label::try_from(_anchor);
+        Label *except_label = Label::except_from(_anchor,
+            Merge::from(_anchor, try_label, try_value));
 
         if (next != EOL) {
             auto _next_anchor = next->at->anchor();
@@ -613,32 +628,38 @@ struct Expander {
                     const List *params = SCOPES_GET_RESULT(extract_list_constant(it->at));
                     const List *body = it->next;
 
-                    Parameter* except_param = Parameter::from(it->at->anchor(), SYM_Unnamed);
                     Expander subexp(Scope::from(env), astscope);
-
-                    it = params;
-                    int index = 0;
-                    // read parameter names
-                    while (it != EOL) {
-                        auto paramval = it->at;
-                        Symbol sym = SCOPES_GET_RESULT(extract_symbol_constant(paramval));
-                        if (!ends_with_parenthesis(sym)) {
-                            auto indexed = extract_argument(paramval->anchor(), except_param, index);
-                            subexp.env->bind(sym, indexed);
-                        } else {
-                            // not supported yet
-                            SCOPES_ANCHOR(paramval->anchor());
-                            SCOPES_EXPECT_ERROR(error_variadic_symbol_not_in_last_place());
+                    auto expr = Expression::from(_next_anchor);
+                    expr->append(except_label);
+                    {
+                        int index = 0;
+                        it = params;
+                        // read parameter names
+                        while (it != EOL) {
+                            auto paramval = it->at;
+                            Symbol sym = SCOPES_GET_RESULT(extract_symbol_constant(paramval));
+                            Value *node = nullptr;
+                            if (!ends_with_parenthesis(sym)) {
+                                node = extract_argument(paramval->anchor(), except_label, index);
+                            } else {
+                                if (it->next != EOL) {
+                                    SCOPES_ANCHOR(paramval->anchor());
+                                    SCOPES_EXPECT_ERROR(error_variadic_symbol_not_in_last_place());
+                                }
+                                node = extract_argument(paramval->anchor(), except_label, index, true);
+                            }
+                            subexp.env->bind(sym, node);
+                            expr->append(node);
+                            it = it->next;
+                            index++;
                         }
-                        it = it->next;
-                        index++;
                     }
 
                     it = body;
                     Value *except_value = SCOPES_GET_RESULT(subexp.expand_expression(_anchor, it));
-
-                    auto _try = Try::from(_anchor, try_value, except_param, except_value);
-                    return _try;
+                    expr->append(except_value);
+                    try_label->value = expr;
+                    return try_label;
                 }
             }
             SCOPES_LOCATION_ERROR(String::from("except block expected"));

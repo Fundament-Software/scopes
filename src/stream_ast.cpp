@@ -359,17 +359,6 @@ struct StreamAST : StreamAnchors {
             }
             walk_newline(val->value, depth+1, maxdepth);
         } break;
-        case VK_Try: {
-            stream_type_prefix(node);
-            auto val = cast<Try>(node);
-            ss << Style_Keyword << "Try" << Style_None;
-            stream_block_result(val->try_body, val->try_value, depth+2, maxdepth);
-            stream_newline();
-            stream_indent(depth+1);
-            ss << Style_Keyword << "except" << Style_None;
-            walk_same_or_newline(val->except_param, depth+2, maxdepth);
-            stream_block_result(val->except_body, val->except_value, depth+2, maxdepth);
-        } break;
         case VK_Switch: {
             stream_type_prefix(node);
             auto val = cast<Switch>(node);
@@ -432,8 +421,10 @@ struct StreamAST : StreamAnchors {
                 if (val->flags & CF_RawCall) {
                     ss << Style_Keyword << " rawcall" << Style_None;
                 }
-                if (val->flags & CF_TryCall) {
-                    ss << Style_Keyword << " trycall" << Style_None;
+                if (val->except_label) {
+                    ss << Style_Keyword << " except=" << Style_None;
+                    ss << Style_Symbol << val->except_label->name.name()->data
+                        << "@" << (void *)val->except_label << Style_None;
                 }
                 walk_same_or_newline(val->callee, depth+1, maxdepth);
                 write_arguments(val->args, depth, maxdepth);
