@@ -407,6 +407,10 @@ static SCOPES_RESULT(Value *) prove_Label(const ASTContext &ctx, Label *node) {
         label->return_type = SCOPES_GET_RESULT(merge_value_type("label merge",
             label->return_type, result->get_type()));
         label->change_type(label->return_type);
+        for (auto merge : label->merges) {
+            merge_depends(ctx, label->deps, merge);
+        }
+        merge_depends(ctx, label->deps, label->value);
         return label;
     }
 }
@@ -1860,7 +1864,8 @@ repeat:
     }
     // verify_function_argument_signature
     for (int i = 0; i < numargs; ++i) {
-        const Type *Ta = values[i]->get_type();
+        const Type *Ta = strip_qualifiers(values[i]->get_type(),
+            (1 << QK_Key));
         const Type *Tb = ft->argument_types[i];
         if (is_reference(Ta) && !is_reference(Tb)) {
             SCOPES_CHECK_RESULT(build_deref(ctx, call->anchor(), values[i]));
@@ -2266,7 +2271,7 @@ SCOPES_RESULT(Function *) prove(Function *frame, Template *func, const Types &ty
         merge_depends(fnctx, fn->deps, ret->value);
     }
     merge_depends(fnctx, fn->deps, fn->value);
-    SCOPES_CHECK_RESULT(track(fnctx));
+    //SCOPES_CHECK_RESULT(track(fnctx));
     fn->complete = true;
     return fn;
 }
