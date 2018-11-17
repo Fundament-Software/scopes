@@ -247,7 +247,7 @@ struct Tracker {
 
     SCOPES_RESULT(void) track_If(State &state, If *node) {
         SCOPES_RESULT_TYPE(void);
-        SCOPES_CHECK_RESULT(verify_deps(state, node->deps, node->get_type(), "branch"));
+        SCOPES_CHECK_RESULT(verify_deps(state, node, node->deps, node->get_type(), "branch"));
         auto &&clauses = node->clauses;
         auto clause_count = clauses.size();
         std::vector<State> states;
@@ -293,6 +293,7 @@ struct Tracker {
     }
     SCOPES_RESULT(void) track_Switch(State &state, Switch *node) {
         SCOPES_RESULT_TYPE(void);
+        SCOPES_CHECK_RESULT(verify_deps(state, node, node->deps, node->get_type(), "case"));
         std::vector<State> states;
         states.reserve(node->cases.size());
         for (auto &&_case : node->cases) {
@@ -300,16 +301,42 @@ struct Tracker {
             State &case_state = states.back();
             SCOPES_CHECK_RESULT(track_block(case_state, _case.value));
         }
+        int count = node->cases.size();
+        State *next_state = nullptr;
+        for (int i = count; i-- > 0;) {
+            auto &&_case = node->cases[i];
+            auto &&case_state = states[i];
+            switch(_case.kind) {
+            case CK_Pass: {
+                assert(next_state);
+                SCOPES_CHECK_RESULT(merge_state(case_state, *next_state, "pass-merge"));
+            } break;
+            case CK_Case:
+            case CK_Default: {
+                SCOPES_CHECK_RESULT(merge_state(state, case_state, "case-merge"));
+            } break;
+            }
+            next_state = &case_state;
+        }
+        SCOPES_CHECK_RESULT(visit_argument(state, VM_AUTO, ValueIndex(node->expr), "switch selector"));
         return {};
     }
 
     SCOPES_RESULT(void) verify_deps(
-        State &state, const Depends &depends, const Type *T, const char *context) {
+        State &state, Value *from,
+        const Depends &depends, const Type *T, const char *context) {
         SCOPES_RESULT_TYPE(void);
         int count = get_argument_count(T);
         auto &&kinds = depends.kinds;
         for (int i = 0; i < count; ++i) {
             auto ET = get_argument(T, i);
+            #if SCOPES_SOFT_TRACKING
+            if (i >= kinds.size()) {
+                StyledStream ss;
+                ss << "possibly incomplete instruction:" << std::endl;
+                stream_ast(ss, from, StreamASTFormat());
+            }
+            #endif
             assert(i < kinds.size());
             if (kinds[i] == DK_Conflicted) {
             #if SCOPES_SOFT_TRACKING
@@ -498,7 +525,7 @@ struct Tracker {
         auto fT = extract_function_type(function->get_type());
         auto return_type = fT->return_type;
         auto &&deps = function->deps;
-        SCOPES_CHECK_RESULT(verify_deps(root_state, deps,
+        SCOPES_CHECK_RESULT(verify_deps(root_state, function, deps,
             return_type, "return"));
         SCOPES_CHECK_RESULT(track_block(root_state, function->value));
         {

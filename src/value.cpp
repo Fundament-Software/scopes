@@ -46,11 +46,17 @@ std::size_t ValueIndex::Hash::operator()(const ValueIndex & s) const {
 
 ValueIndex::ValueIndex(Value *_value, int _index)
     : value(_value), index(_index) {
+    if (isa<Keyed>(value)) {
+        value = cast<Keyed>(value)->value;
+    }
     if (isa<ArgumentList>(value)) {
         auto al = cast<ArgumentList>(value);
         if (index < al->values.size()) {
             value = al->values[index];
             index = 0;
+            if (isa<Keyed>(value)) {
+                value = cast<Keyed>(value)->value;
+            }
         }
     }
 }

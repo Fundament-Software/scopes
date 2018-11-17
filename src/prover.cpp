@@ -374,8 +374,9 @@ Value *build_argument_list(const Anchor *anchor, const Values &values) {
     if (values.size() == 1) {
         return values[0];
     }
+    auto T = arguments_type_from_arguments(values);
     ArgumentList *newnlist = ArgumentList::from(anchor, values);
-    newnlist->set_type(arguments_type_from_arguments(values));
+    newnlist->set_type(T);
     return newnlist;
 }
 
@@ -383,8 +384,9 @@ Value *build_runtime_argument_list(const ASTContext &ctx, const Anchor *anchor, 
     if (values.size() == 1) {
         return values[0];
     }
+    auto T = arguments_type_from_arguments(values);
     ArgumentList *newnlist = ArgumentList::from(anchor, values);
-    newnlist->set_type(arguments_type_from_arguments(values));
+    newnlist->set_type(T);
     merge_depends(ctx, newnlist->deps, values);
     return newnlist;
 }
@@ -651,7 +653,7 @@ SCOPES_RESULT(void) map_keyed_arguments(const Anchor *anchor, Value *callee,
     return {};
 }
 
-// used by Let, Loop, ArgumentList, Repeat, Call
+// used by ArgumentList & Call
 static SCOPES_RESULT(Value *) prove_arguments(
     const ASTContext &ctx, Values &outargs, const Values &values) {
     SCOPES_RESULT_TYPE(Value *);
@@ -1944,8 +1946,10 @@ static SCOPES_RESULT(Value *) prove_Switch(const ASTContext &ctx, Switch *node) 
         }
         assert(_case.value);
         auto newvalue = SCOPES_GET_RESULT(prove_block(ctx, newcase.body, _case.value));
-        newcase.value = newvalue;
-        if (_case.kind != CK_Pass) {
+        if (_case.kind == CK_Pass) {
+            newcase.value = build_argument_list(_case.anchor, {});
+        } else {
+            newcase.value = newvalue;
             if (newvalue->get_type() == _void) {
                 rtype = _void;
             }
@@ -1974,6 +1978,11 @@ static SCOPES_RESULT(Value *) prove_Switch(const ASTContext &ctx, Switch *node) 
 
     auto result = Switch::from(node->anchor(), newexpr, cases);
     result->set_type(rtype);
+    for (auto &&_case : result->cases) {
+        if (_case.kind != CK_Pass) {
+            merge_depends(ctx, result->deps, _case.value);
+        }
+    }
     return result;
 }
 
