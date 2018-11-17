@@ -708,7 +708,7 @@ Break *Break::from(const Anchor *anchor, Value *value) {
 //------------------------------------------------------------------------------
 
 Repeat::Repeat(const Anchor *anchor, Value *_value)
-    : Instruction(VK_Repeat, anchor), value(_value) {}
+    : Instruction(VK_Repeat, anchor), value(_value), loop(nullptr) {}
 
 Repeat *Repeat::from(const Anchor *anchor, Value *value) {
     return new Repeat(anchor, value);
@@ -887,7 +887,7 @@ Instruction::Instruction(ValueKind _kind, const Anchor *_anchor)
 
 bool Instruction::classof(const Value *T) {
     auto k = T->kind();
-    return (k >= VK_If) && (k <= VK_ExtractArgument);
+    return (k >= VK_Label) && (k <= VK_Raise);
 }
 
 //------------------------------------------------------------------------------

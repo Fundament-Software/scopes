@@ -337,23 +337,6 @@ static SCOPES_RESULT(const Type *) merge_value_type(const char *context, const T
     SCOPES_EXPECT_ERROR(error_cannot_merge_expression_types(context, T1, T2));
 }
 
-static SCOPES_RESULT(const Type *) merge_void_or_value_type(const char *context, const Type *T1, const Type *T2) {
-    SCOPES_RESULT_TYPE(const Type *);
-    assert(T2);
-    if (!T1)
-        return T2;
-    if (T1 == T2)
-        return T1;
-    if (!is_returning(T1))
-        return T2;
-    if (!is_returning(T2))
-        return T1;
-    auto _void = empty_arguments_type();
-    if ((T1 == _void) || (T2 == _void))
-        return _void;
-    SCOPES_EXPECT_ERROR(error_cannot_merge_expression_types(context, T1, T2));
-}
-
 static const Type *arguments_type_from_arguments(const Values &values) {
     Types types;
     for (auto arg : values) {
@@ -815,6 +798,7 @@ static SCOPES_RESULT(Value *) prove_Repeat(const ASTContext &ctx, Repeat *_repea
     ctx.loop->return_type = SCOPES_GET_RESULT(merge_value_type(
         "loop repeat", ctx.loop->return_type, value->get_type()));
     auto newrepeat = Repeat::from(_repeat->anchor(), value);
+    newrepeat->loop = ctx.loop;
     newrepeat->set_type(TYPE_NoReturn);
     ctx.append(newrepeat);
     ctx.loop->repeats.push_back(newrepeat);
@@ -1964,6 +1948,14 @@ static SCOPES_RESULT(Value *) prove_Switch(const ASTContext &ctx, Switch *node) 
                     merge_value_type("switch case", rtype, _case.value->get_type()));
             }
         }
+    } else {
+        // return value is void, ensure no argument is being returned
+        for (auto &&_case : cases) {
+            auto T = _case.value->get_type();
+            if (is_returning_value(_case.value->get_type())) {
+                _case.value = build_argument_list(_case.anchor, {});
+            }
+        }
     }
 
     if (!has_default) {
@@ -2040,6 +2032,15 @@ static SCOPES_RESULT(Value *) prove_If(const ASTContext &ctx, If *_if) {
         _else.body.set_scope(subctx.function->new_id(), subctx.block);
     }
     newif->set_type(rtype);
+    if (rtype == _void) {
+        // return value is void, ensure no argument is being returned
+        for (auto &&clause : newif->clauses) {
+            auto T = clause.value->get_type();
+            if (is_returning_value(clause.value->get_type())) {
+                clause.value = build_argument_list(clause.anchor, {});
+            }
+        }
+    }
     for (auto &&clause : newif->clauses) {
         merge_depends(ctx, newif->deps, clause.value);
     }

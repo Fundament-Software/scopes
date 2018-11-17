@@ -126,7 +126,7 @@ struct Tracker {
         void delete_data(const ValueIndex &value) {
         #if SCOPES_SOFT_TRACKING
             StyledString ss;
-            ss.out << "no longer tracking " << value;
+            ss.out << "beginning lifetime of " << value;
             annotate(ss.str());
         #endif
             auto it = _data.find(value);
@@ -163,7 +163,7 @@ struct Tracker {
     };
 
     Tracker(ASTContext &_ctx)
-        : ctx(_ctx), function(_ctx.function)
+        : ctx(_ctx), function(_ctx.function), active_loop(nullptr)
     {}
 
 #define T(NAME, BNAME, CLASS) \
@@ -452,15 +452,21 @@ struct Tracker {
     }
     SCOPES_RESULT(void) track_Loop(State &state, Loop *node) {
         SCOPES_RESULT_TYPE(void);
+        auto old_active_loop = active_loop;
+        active_loop = node;
         State loop_state(node->body, state);
         SCOPES_CHECK_RESULT(track_block(loop_state, node->value));
-        return track_argument(state, node->init, "loop");
-    }
-    SCOPES_RESULT(void) track_Break(State &state, Break *node) {
-        return track_argument(state, node->value, "break");
+        SCOPES_CHECK_RESULT(merge_state(state, loop_state, "loop-merge"));
+        active_loop = old_active_loop;
+        SCOPES_CHECK_RESULT(visit_value(state, VM_AUTO, node->init, "loop"));
+        return {};
     }
     SCOPES_RESULT(void) track_Repeat(State &state, Repeat *node) {
-        return track_argument(state, node->value, "repeat");
+        assert(node->loop);
+        assert(node->loop == active_loop);
+        int retdepth = node->loop->body.depth;
+        // TODO: we're not breaking, so this is not entirely true. but maybe it's enough?
+        return track_return_argument(state, node->value, retdepth - 1, "repeat");
     }
     SCOPES_RESULT(void) track_Return(State &state, Return *node) {
         return track_return_argument(state, node->value, 0, "return");
@@ -468,21 +474,25 @@ struct Tracker {
     SCOPES_RESULT(void) track_Label(State &state, Label *node) {
         SCOPES_RESULT_TYPE(void);
         State label_state(node->body, state);
-        return track_block(label_state, node->value);
+        SCOPES_CHECK_RESULT(track_block(label_state, node->value));
+        SCOPES_CHECK_RESULT(merge_state(state, label_state, "label-merge"));
+        return {};
     }
     SCOPES_RESULT(void) track_Merge(State &state, Merge *node) {
         SCOPES_RESULT_TYPE(void);
-        return track_argument(state, node->value, "merge");
+        int retdepth = node->label->body.depth;
+        return track_return_argument(state, node->value, retdepth - 1, "merge");
     }
     SCOPES_RESULT(void) track_Raise(State &state, Raise *node) {
-        return track_argument(state, node->value, "raise");
+        return track_return_argument(state, node->value, 0, "raise");
     }
     SCOPES_RESULT(void) track_ArgumentList(State &state, ArgumentList *node) {
         SCOPES_RESULT_TYPE(void);
         return {};
     }
     SCOPES_RESULT(void) track_ExtractArgument(State &state, ExtractArgument *node) {
-        return track_argument(state, node->value, "extract argument");
+        assert(!node->vararg);
+        return visit_argument(state, VM_AUTO, ValueIndex(node->value, node->index), "extract argument");
     }
 
     SCOPES_RESULT(void) track_block(State &state, Value *return_value) {
@@ -748,6 +758,7 @@ struct Tracker {
         return {};
     }
 
+#if 0
     SCOPES_RESULT(void) track_subargument(State &state,
         const ValueIndex &arg, const char *context) {
         SCOPES_RESULT_TYPE(void);
@@ -775,6 +786,17 @@ struct Tracker {
         return {};
     }
 
+    SCOPES_RESULT(void) track_arguments(State &state,
+        const Values &args, const char *context) {
+        SCOPES_RESULT_TYPE(void);
+        int i = args.size();
+        while (i-- > 0) {
+            SCOPES_CHECK_RESULT(track_argument(state, args[i], context));
+        }
+        return {};
+    }
+#endif
+
     SCOPES_RESULT(void) track_declaration(State &state, Value *node) {
         SCOPES_RESULT_TYPE(void);
         assert(node);
@@ -788,16 +810,6 @@ struct Tracker {
                 auto arg = ValueIndex(node, i);
                 state.delete_data(arg);
             }
-        }
-        return {};
-    }
-
-    SCOPES_RESULT(void) track_arguments(State &state,
-        const Values &args, const char *context) {
-        SCOPES_RESULT_TYPE(void);
-        int i = args.size();
-        while (i-- > 0) {
-            SCOPES_CHECK_RESULT(track_argument(state, args[i], context));
         }
         return {};
     }
@@ -821,6 +833,7 @@ struct Tracker {
 
     ASTContext &ctx;
     Function *function;
+    Loop *active_loop;
 };
 
 SCOPES_RESULT(void) track(ASTContext &ctx) {

@@ -28,7 +28,7 @@ struct Scope;
     T(VK_Quote, "value-kind-quote", Quote) \
     T(VK_Unquote, "value-kind-unquote", Unquote) \
     T(VK_CompileStage, "value-kind-compile-stage", CompileStage) \
-    T(VK_Break, "value-kind-break", Break)
+    T(VK_Break, "value-kind-break", Break) \
 
 
 #define SCOPES_PURE_VALUE_KIND() \
@@ -41,22 +41,30 @@ struct Scope;
     T(VK_ConstPointer, "value-kind-const-pointer", ConstPointer) \
 
 
+#define SCOPES_TERMINATOR_VALUE_KIND() \
+    T(VK_Merge, "value-kind-merge", Merge) \
+    T(VK_Repeat, "value-kind-repeat", Repeat) \
+    T(VK_Return, "value-kind-return", Return) \
+    T(VK_Raise, "value-kind-raise", Raise) \
+
+
+#define SCOPES_INSTRUCTION_VALUE_KIND() \
+    T(VK_Label, "value-kind-label", Label) \
+    T(VK_Loop, "value-kind-loop", Loop) \
+    T(VK_If, "value-kind-if", If) \
+    T(VK_Switch, "value-kind-switch", Switch) \
+    T(VK_Call, "value-kind-call", Call) \
+    T(VK_ArgumentList, "value-kind-argumentlist", ArgumentList) \
+    T(VK_ExtractArgument, "value-kind-extractargument", ExtractArgument) \
+
+
 #define SCOPES_VALUE_KIND() \
     T(VK_Parameter, "value-kind-parameter", Parameter) \
     /* template-only */ \
     SCOPES_TEMPLATE_VALUE_KIND() \
     /* instructions (Instruction::classof) */ \
-    T(VK_If, "value-kind-if", If) \
-    T(VK_Switch, "value-kind-switch", Switch) \
-    T(VK_Call, "value-kind-call", Call) \
-    T(VK_Loop, "value-kind-loop", Loop) \
-    T(VK_Repeat, "value-kind-repeat", Repeat) \
-    T(VK_Return, "value-kind-return", Return) \
-    T(VK_Label, "value-kind-label", Label) \
-    T(VK_Merge, "value-kind-merge", Merge) \
-    T(VK_Raise, "value-kind-raise", Raise) \
-    T(VK_ArgumentList, "value-kind-argumentlist", ArgumentList) \
-    T(VK_ExtractArgument, "value-kind-extractargument", ExtractArgument) \
+    SCOPES_INSTRUCTION_VALUE_KIND() \
+    SCOPES_TERMINATOR_VALUE_KIND() \
     /* pure (Pure::classof), which includes constants */ \
     SCOPES_PURE_VALUE_KIND() \
 
@@ -618,6 +626,7 @@ struct Repeat : Instruction {
     static Repeat *from(const Anchor *anchor, Value *value);
 
     Value *value;
+    Loop *loop;
 };
 
 //------------------------------------------------------------------------------
