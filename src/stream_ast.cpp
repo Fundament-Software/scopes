@@ -119,8 +119,12 @@ struct StreamAST : StreamAnchors {
             walk_newline(block.body[i], depth+1, maxdepth);
         }
         stream_annotations(depth, block.annotations);
-        if (block.terminator)
+        if (block.terminator) {
+            stream_newline();
+            stream_indent(depth);
+            ss << Style_Keyword << "---" << Style_None;
             walk_newline(block.terminator, depth+1, maxdepth);
+        }
     }
 
     void stream_block_result(const Block &block, const Value *value, int depth, int maxdepth) {
@@ -132,10 +136,15 @@ struct StreamAST : StreamAnchors {
             for (int i = 0; i < block.body.size(); ++i) {
                 walk_newline(block.body[i], depth, maxdepth);
             }
-            if (block.terminator)
+            stream_annotations(depth, block.annotations);
+            if (block.terminator) {
+                stream_newline();
+                stream_indent(depth);
+                ss << Style_Keyword << "---" << Style_None;
                 walk_newline(block.terminator, depth, maxdepth);
+                return;
+            }
         }
-        stream_annotations(depth, block.annotations);
         stream_newline();
         stream_indent(depth);
         ss << Style_Keyword << "_ " << Style_None;

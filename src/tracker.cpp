@@ -17,8 +17,10 @@
 
 #include <unordered_map>
 
-// do not produce errors, just annotate
+// do not produce errors, do not generate destructors
 #define SCOPES_SOFT_TRACKING 1
+// annotate blocks and instructions with actions
+#define SCOPES_ANNOTATE_TRACKING 1
 
 namespace scopes {
 
@@ -124,7 +126,7 @@ struct Tracker {
         }
 
         void delete_data(const ValueIndex &value) {
-        #if SCOPES_SOFT_TRACKING
+        #if SCOPES_ANNOTATE_TRACKING
             StyledString ss;
             ss.out << "beginning lifetime of " << value;
             annotate(ss.str());
@@ -137,14 +139,15 @@ struct Tracker {
         }
 
         Data &ensure_data(const ValueIndex &value) {
-        #if SCOPES_SOFT_TRACKING
+        #if SCOPES_ANNOTATE_TRACKING
             if (_deleted.count(value)) {
                 StyledString ss;
                 ss.out << Style_Error << "error: " << Style_None
                     << "referencing " << value << " before it is created";
                 annotate(ss.str());
             }
-        #else
+        #endif
+        #if !SCOPES_SOFT_TRACKING
             assert(!_deleted.count(value));
         #endif
             auto data = find_data(value);
@@ -231,14 +234,12 @@ struct Tracker {
         for (auto key : then_moved) {
             if (else_moved.count(key))
                 continue;
-            SCOPES_CHECK_RESULT(move_argument(_else, key, "then-branch"));
-            SCOPES_CHECK_RESULT(write_destructor(_else, key, "then-branch"));
+            SCOPES_CHECK_RESULT(drop_argument(_else, key, "then-branch"));
         }
         for (auto key : else_moved) {
             if (then_moved.count(key))
                 continue;
-            SCOPES_CHECK_RESULT(move_argument(_then, key, "else-branch"));
-            SCOPES_CHECK_RESULT(write_destructor(_then, key, "else-branch"));
+            SCOPES_CHECK_RESULT(drop_argument(_then, key, "else-branch"));
         }
         state.finalize();
         SCOPES_CHECK_RESULT(merge_state(state, _then, "branch-merge"));
@@ -330,7 +331,7 @@ struct Tracker {
         auto &&kinds = depends.kinds;
         for (int i = 0; i < count; ++i) {
             auto ET = get_argument(T, i);
-            #if SCOPES_SOFT_TRACKING
+            #if SCOPES_ANNOTATE_TRACKING
             if (i >= kinds.size()) {
                 StyledStream ss;
                 ss << "possibly incomplete instruction:" << std::endl;
@@ -339,13 +340,14 @@ struct Tracker {
             #endif
             assert(i < kinds.size());
             if (kinds[i] == DK_Conflicted) {
-            #if SCOPES_SOFT_TRACKING
+            #if SCOPES_ANNOTATE_TRACKING
                 {
                     StyledString ss;
                     ss.out << Style_Error << "error: " << Style_None << context << " conflict, not all merges perform the same move/borrow operation";
                     state.annotate(ss.str());
                 }
-            #else
+            #endif
+            #if !SCOPES_SOFT_TRACKING
                 SCOPES_EXPECT_ERROR(error_cannot_merge_moves(context));
             #endif
             }
@@ -357,7 +359,7 @@ struct Tracker {
         const ValueIndex &arg, const char *context) {
         SCOPES_RESULT_TYPE(void);
         auto &data = state.ensure_data(arg);
-        #if SCOPES_SOFT_TRACKING
+        #if SCOPES_ANNOTATE_TRACKING
         if (data.will_be_used() || data.will_be_moved()) {
             StyledString ss;
             ss.out
@@ -376,14 +378,15 @@ struct Tracker {
             state.annotate(ss.str());
             return {};
         }
-        #else
+        #endif
+        #if !SCOPES_SOFT_TRACKING
         if (data.will_be_used()) {
             SCOPES_EXPECT_ERROR(error_value_in_use(arg.value, data.get_user(), context));
         } else if (data.will_be_moved()) {
             SCOPES_EXPECT_ERROR(error_value_moved(arg.value, data.get_mover(), context));
         }
         #endif
-        #if SCOPES_SOFT_TRACKING
+        #if SCOPES_ANNOTATE_TRACKING
         {
             StyledString ss;
             ss.out << context << " tagging " << arg << " as to-be-moved";
@@ -525,7 +528,7 @@ struct Tracker {
         SCOPES_RESULT_TYPE(void);
         StyledStream ss;
         ss << "processing #" << track_count << std::endl;
-        const int HALT_AT = 400;
+        const int HALT_AT = 0;
         if (track_count == HALT_AT) {
             StyledStream ss;
             stream_ast(ss, function, StreamASTFormat());
@@ -593,13 +596,20 @@ struct Tracker {
         return {};
     }
 
+    SCOPES_RESULT(void) drop_argument(State &state, const ValueIndex &arg, const char *context) {
+        SCOPES_RESULT_TYPE(void);
+        SCOPES_CHECK_RESULT(move_argument(state, arg, context));
+        return write_destructor(state, arg, context);
+    }
+
     SCOPES_RESULT(void) write_destructor(State &state, const ValueIndex &arg, const char *context) {
         SCOPES_RESULT_TYPE(void);
-        #if SCOPES_SOFT_TRACKING
+        #if SCOPES_ANNOTATE_TRACKING
         StyledString ss;
         ss.out << context << " destructor injection for " << arg;
         state.annotate(ss.str());
-        #else
+        #endif
+        #if !SCOPES_SOFT_TRACKING
         auto argT = arg.get_type();
         // generate destructor
         Value *handler;
@@ -634,9 +644,7 @@ struct Tracker {
                 && (arg.value->get_depth() > 0) // do not destroy constants and
                                                 // function parameters
                 ) {
-                SCOPES_CHECK_RESULT(
-                    move_argument(state, arg, context));
-                SCOPES_CHECK_RESULT(write_destructor(state, arg, context));
+                SCOPES_CHECK_RESULT(drop_argument(state, arg, context));
             }
         } break;
         case VM_FORCE_BORROW: {
@@ -646,7 +654,7 @@ struct Tracker {
                 move_argument(state, arg, context));
         } break;
         }
-        #if SCOPES_SOFT_TRACKING
+        #if SCOPES_ANNOTATE_TRACKING
         {
             StyledString ss;
             ss.out << context << " tagging " << arg << " as to-be-used";
@@ -703,14 +711,15 @@ struct Tracker {
             // value is borrowing
             switch(mode) {
             case VM_FORCE_MOVE: {
-            #if SCOPES_SOFT_TRACKING
+            #if SCOPES_ANNOTATE_TRACKING
             {
                 StyledString ss;
                 ss.out << Style_Error << "error: " << Style_None
                     << "cannot force " << arg << " to move";
                 state.annotate(ss.str());
             }
-            #else
+            #endif
+            #if !SCOPES_SOFT_TRACKING
                 // we can't force a borrowed value to move
                 SCOPES_EXPECT_ERROR(
                     error_value_is_borrowed(arg.value, state.where, context));
@@ -757,45 +766,6 @@ struct Tracker {
         }
         return {};
     }
-
-#if 0
-    SCOPES_RESULT(void) track_subargument(State &state,
-        const ValueIndex &arg, const char *context) {
-        SCOPES_RESULT_TYPE(void);
-        auto &data = state.ensure_data(arg);
-        if (data.will_be_used())
-            return {};
-        SCOPES_CHECK_RESULT(
-            move_argument(state, arg, context));
-        return write_destructor(state, arg, context);
-    }
-
-    SCOPES_RESULT(void) track_argument(State &state, Value *node,
-        const char *context) {
-        SCOPES_RESULT_TYPE(void);
-        assert(node);
-        auto T = node->get_type();
-        if (!is_returning(T))
-            return {};
-        int argc = get_argument_count(T);
-        for (int i = 0; i < argc; ++i) {
-            auto argT = get_argument(T, i);
-            SCOPES_CHECK_RESULT(track_subargument(state,
-                ValueIndex(node, i), context));
-        }
-        return {};
-    }
-
-    SCOPES_RESULT(void) track_arguments(State &state,
-        const Values &args, const char *context) {
-        SCOPES_RESULT_TYPE(void);
-        int i = args.size();
-        while (i-- > 0) {
-            SCOPES_CHECK_RESULT(track_argument(state, args[i], context));
-        }
-        return {};
-    }
-#endif
 
     SCOPES_RESULT(void) track_declaration(State &state, Value *node) {
         SCOPES_RESULT_TYPE(void);

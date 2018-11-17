@@ -1952,7 +1952,7 @@ static SCOPES_RESULT(Value *) prove_Switch(const ASTContext &ctx, Switch *node) 
         // return value is void, ensure no argument is being returned
         for (auto &&_case : cases) {
             auto T = _case.value->get_type();
-            if (is_returning_value(_case.value->get_type())) {
+            if (is_returning_value(T)) {
                 _case.value = build_argument_list(_case.anchor, {});
             }
         }
@@ -2036,7 +2036,7 @@ static SCOPES_RESULT(Value *) prove_If(const ASTContext &ctx, If *_if) {
         // return value is void, ensure no argument is being returned
         for (auto &&clause : newif->clauses) {
             auto T = clause.value->get_type();
-            if (is_returning_value(clause.value->get_type())) {
+            if (is_returning_value(T)) {
                 clause.value = build_argument_list(clause.anchor, {});
             }
         }
@@ -2264,7 +2264,7 @@ SCOPES_RESULT(Function *) prove(Function *frame, Template *func, const Types &ty
         merge_depends(fnctx, fn->deps, ret->value);
     }
     merge_depends(fnctx, fn->deps, fn->value);
-    //SCOPES_CHECK_RESULT(track(fnctx));
+    SCOPES_CHECK_RESULT(track(fnctx));
     fn->complete = true;
     return fn;
 }
