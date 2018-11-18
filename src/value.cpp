@@ -116,19 +116,19 @@ void Depends::unique(int index) {
     s |= DK_Unique;
 }
 
-void Depends::borrow(Value *value) {
+void Depends::view(Value *value) {
     auto T = value->get_type();
     int count = get_argument_count(T);
     for (int i = 0; i < count; ++i) {
-        borrow(i, ValueIndex(value, i));
+        view(i, ValueIndex(value, i));
     }
 }
 
-void Depends::borrow(int index, ValueIndex value) {
+void Depends::view(int index, ValueIndex value) {
     ensure_arg(index);
     ValueIndexSet &arg = args[index];
     auto &&s = kinds[index];
-    s |= DK_Borrowed;
+    s |= DK_Viewed;
     arg.insert(value);
 }
 
@@ -899,7 +899,8 @@ StyledStream& operator<<(StyledStream& ost, Value *node) {
 
 StyledStream& operator<<(StyledStream& ost, const Value *node) {
     ost << Style_Keyword << get_value_class_name(node->kind()) << Style_None;
-    ost << "$" << (const void *)node;
+    ost << "$";
+    stream_address(ost, node);
     if (node->is_typed()) {
         ost << Style_Operator << ":" << Style_None << node->get_type();
     }

@@ -178,7 +178,7 @@ SCOPES_RESULT(void) error_value_in_use(Value *value, Value *user, const char *by
     SCOPES_LOCATION_DEF_ERROR(user, ss.str());
 }
 
-SCOPES_RESULT(void) error_value_is_borrowed(Value *value, Value *user, const char *by) {
+SCOPES_RESULT(void) error_value_is_viewed(Value *value, Value *user, const char *by) {
     SCOPES_RESULT_TYPE(void);
     StyledString ss;
     ss.out << by << " cannot move view of unique value(s)";

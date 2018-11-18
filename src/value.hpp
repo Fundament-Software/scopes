@@ -118,14 +118,15 @@ struct ValueIndex {
 };
 
 typedef ValueIndex::Set ValueIndexSet;
+typedef std::vector<ValueIndex> ValueIndices;
 
 //------------------------------------------------------------------------------
 
 enum DependsKind {
     DK_Undefined = 0,
     DK_Unique = 1 << 0,
-    DK_Borrowed = 1 << 1,
-    DK_Conflicted = DK_Unique | DK_Borrowed,
+    DK_Viewed = 1 << 1,
+    DK_Conflicted = DK_Unique | DK_Viewed,
 };
 
 struct Depends {
@@ -133,8 +134,8 @@ struct Depends {
     std::vector<char> kinds;
 
     void ensure_arg(int index);
-    void borrow(Value *value);
-    void borrow(int index, ValueIndex value);
+    void view(Value *value);
+    void view(int index, ValueIndex value);
     void unique(Value *value);
     void unique(int index);
     bool empty() const;

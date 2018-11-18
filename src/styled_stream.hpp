@@ -142,6 +142,9 @@ StyledStream& operator<<(StyledStream& ost, ValueIndex &arg);
 StyledStream& operator<<(StyledStream& ost, const Value *value);
 StyledStream& operator<<(StyledStream& ost, Value *value);
 
+void stream_uid(StyledStream &ss, uint64_t uid);
+void stream_address(StyledStream &ss, const void *ptr);
+
 } // namespace scopes
 
 #endif // SCOPES_STYLED_STREAM_HPP

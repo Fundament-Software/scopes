@@ -34,18 +34,6 @@ static std::unordered_set<const ViewQualifier *, ViewSet::Hash, ViewSet::KeyEqua
 
 //------------------------------------------------------------------------------
 
-MoveQualifier::MoveQualifier()
-    : Qualifier((QualifierKind)Kind) {}
-
-void MoveQualifier::stream_prefix(StyledStream &ss) const {
-    ss << "†";
-}
-
-void MoveQualifier::stream_postfix(StyledStream &ss) const {
-}
-
-//------------------------------------------------------------------------------
-
 MutateQualifier::MutateQualifier()
     : Qualifier((QualifierKind)Kind) {}
 
@@ -72,27 +60,22 @@ ViewQualifier::ViewQualifier(const IDSet &_ids)
 }
 
 void ViewQualifier::stream_prefix(StyledStream &ss) const {
-    for (int i = 0; i < sorted_ids.size(); ++i) {
-        if (i > 0) ss << "|";
-        ss << sorted_ids[i];
+    ss << "<view";
+    if (sorted_ids.empty()) {
+    } else {
+        ss << " ";
+        for (int i = 0; i < sorted_ids.size(); ++i) {
+            if (i > 0) ss << "|";
+            ss << "#" << sorted_ids[i];
+        }
     }
-    ss << ":";
+    ss << ">";
 }
 
 void ViewQualifier::stream_postfix(StyledStream &ss) const {
 }
 
 //------------------------------------------------------------------------------
-
-static const MoveQualifier *_move_qualifier = nullptr;
-const Type * move_type(const Type *type) {
-    if (has_qualifier<MoveQualifier>(type))
-        return type;
-    if (!_move_qualifier) {
-        _move_qualifier = new MoveQualifier();
-    }
-    return qualify(type, { _move_qualifier });
-}
 
 static const MutateQualifier *_mutate_qualifier = nullptr;
 const Type *mutate_type(const Type *type) {

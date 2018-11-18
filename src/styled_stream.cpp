@@ -17,6 +17,8 @@
 #include <windows.h>
 #endif
 
+#include <assert.h>
+
 namespace scopes {
 
 //------------------------------------------------------------------------------
@@ -188,7 +190,87 @@ StyledStream& StyledStream::operator<<(const char * const s) {
     }
     return *this;
 }
-    
+
 #endif
+
+//------------------------------------------------------------------------------
+
+static const char even_letters[] = "bdfghklmnprstwx";
+static const char odd_letters[] = "aeiou";
+//static const char even_letters[] = "0123456789ABCDEF";
+//static const char odd_letters[] = "0123456789ABCDEF";
+
+// based on https://preshing.com/20121224/how-to-generate-a-sequence-of-unique-random-integers/
+static uint32_t permute(uint32_t x, uint32_t prime) {
+    if (x >= prime)
+        return x;
+    uint32_t residue = ((uint64_t) x * x) % prime;
+    return (x <= prime / 2) ? residue : prime - residue;
+}
+
+static uint64_t scramble(uint64_t x) {
+    // find msb
+    int bits = -1;
+    for (int i = 64; i-- > 0;) {
+        if (x & (1ull << i)) {
+            bits = i;
+            break;
+        }
+    }
+    if (bits < 1) return x;
+    // scramble up to first 32 bits
+    bits = std::min(32,bits);
+    uint64_t mask = (1ull << bits) - 1ull;
+    uint64_t top = x & ~mask;
+    x = x & mask;
+    if (bits >= 8) {
+        uint32_t delta = 0;
+        // from https://primes.utm.edu/lists/2small/0bit.html
+        switch(bits) {
+        case  8: delta = 5; break; case  9: delta = 3; break; case 10: delta = 3; break; case 11: delta = 9; break;
+        case 12: delta = 3; break; case 13: delta = 1; break; case 14: delta = 3; break; case 15: delta = 19; break;
+        case 16: delta = 15; break; case 17: delta = 1; break; case 18: delta = 5; break; case 19: delta = 1; break;
+        case 20: delta = 3; break; case 21: delta = 9; break; case 22: delta = 3; break; case 23: delta = 15; break;
+        case 24: delta = 3; break; case 25: delta = 39; break; case 26: delta = 5; break; case 27: delta = 39; break;
+        case 28: delta = 57; break; case 29: delta = 3; break; case 30: delta = 35; break; case 31: delta = 1; break;
+        case 32: delta = 5; break; default: assert(false); break;
+        }
+        uint32_t prime = (1u << bits) - delta;
+        uint32_t m = 0x5bf03635 & mask;
+        x = permute(x, prime);
+        x = permute(x ^ m, prime);
+    }
+    return x | top;
+}
+
+static void print_uid_digit(StyledStream &ss, uint64_t n, bool odd) {
+	if (n != 0) {
+        uint64_t base;
+        const char *letters;
+        if (odd) {
+            // odd
+            base = sizeof(odd_letters) / sizeof(char) - 1;
+            letters = odd_letters;
+        } else {
+            // even
+            base = sizeof(even_letters) / sizeof(char) - 1;
+            letters = even_letters;
+        }
+        print_uid_digit(ss, n / base, !odd);
+        char k = letters[(n % base)];
+        char buf[2] = { k, '\0' };
+        ss << buf;
+	}
+}
+
+void stream_uid(StyledStream &ss, uint64_t uid) {
+    print_uid_digit(ss, scramble(uid), false);
+}
+
+void stream_address(StyledStream &ss, const void *ptr) {
+    uint64_t addr = (uint64_t)ptr;
+    stream_uid(ss, addr);
+}
+
 
 } // namespace scopes

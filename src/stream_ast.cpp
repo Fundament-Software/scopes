@@ -172,7 +172,7 @@ struct StreamAST : StreamAnchors {
         for (auto entry : annotations) {
             stream_newline();
             stream_indent(depth);
-            ss << "# " << entry->data;
+            ss << Style_Comment << "# " << Style_None << entry->data;
         }
     }
 
@@ -214,7 +214,9 @@ struct StreamAST : StreamAnchors {
     void stream_depends(const Depends &deps) {
         auto &&args = deps.args;
         auto &&kinds = deps.kinds;
-        ss << Style_Operator << "[" << Style_None;
+        if (args.empty())
+            return;
+        ss << Style_Operator << "<" << Style_None;
         for (int i = 0; i < args.size(); ++i) {
             if (i > 0)
                 ss << " ";
@@ -223,7 +225,7 @@ struct StreamAST : StreamAnchors {
             bool first = true;
             switch(kind) {
             case DK_Unique: ss << Style_Operator << "†" << Style_None; break;
-            case DK_Borrowed: ss << Style_Operator << "%" << Style_None; break;
+            case DK_Viewed: ss << Style_Operator << "%" << Style_None; break;
             case DK_Conflicted: ss << Style_Error << "!" << Style_None; break;
             case DK_Undefined: ss << Style_Error << "?" << Style_None; break;
             }
@@ -250,7 +252,7 @@ struct StreamAST : StreamAnchors {
                     ss << Style_Operator << "@" << Style_None << val.index;
             }
         }
-        ss << Style_Operator << "]" << Style_None;
+        ss << Style_Operator << ">" << Style_None << " ";
     }
 
     // old Any printing reference:
@@ -281,14 +283,22 @@ struct StreamAST : StreamAnchors {
         }
 
         if (newlines && !node->is_pure()) {
-            ss << Style_Operator << "%" << id << Style_None;
             if (is_new) {
-                ss << " " << Style_Operator << "=" << " " << Style_None;
-                if (data_dependency) {
-                    stream_depends(node->deps);
-                    ss << " ";
+                if (is_returning_value(node->get_type())) {
+                    ss << Style_Operator << "%" << Style_None;
+                    ss << Style_Number;
+                    stream_address(ss, node);
+                    ss << Style_None;
+                    ss << " " << Style_Operator << "=" << Style_None << " ";
+                    if (data_dependency) {
+                        stream_depends(node->deps);
+                    }
                 }
             } else {
+                ss << Style_Operator << "%" << Style_None;
+                ss << Style_Number;
+                stream_address(ss, node);
+                ss << Style_None;
                 stream_type_suffix(node);
                 return;
             }
@@ -307,8 +317,9 @@ struct StreamAST : StreamAnchors {
                 }
                 ss << " ";
             }
-            ss << Style_Symbol << val->name.name()->data
-                << "λ" << (void *)val << Style_None;
+            ss << Style_Symbol << val->name.name()->data << "λ";
+            stream_address(ss, val);
+            ss << Style_None;
             stream_type_suffix(node);
             if (newlines && is_new) {
                 if (depth == 0) {
@@ -332,11 +343,11 @@ struct StreamAST : StreamAnchors {
                 ss << " ";
                 if (data_dependency) {
                     stream_depends(val->deps);
-                    ss << " ";
                 }
             }
-            ss << Style_Symbol << val->name.name()->data
-                << "λ" << (void *)val << Style_None;
+            ss << Style_Symbol << val->name.name()->data << "λ";
+            stream_address(ss, val);
+            ss << Style_None;
             stream_type_suffix(node);
             if (newlines && is_new) {
                 if (depth == 0) {
@@ -354,8 +365,7 @@ struct StreamAST : StreamAnchors {
         } break;
         case VK_Expression: {
             auto val = cast<Expression>(node);
-            ss << Style_Keyword << "Expression" << Style_None;
-            stream_type_suffix(node);
+            ss << node;
             if (!val->scoped) {
                 ss << " " << Style_Keyword << "inline" << Style_None;
             }
@@ -366,8 +376,7 @@ struct StreamAST : StreamAnchors {
         } break;
         case VK_Switch: {
             auto val = cast<Switch>(node);
-            ss << Style_Keyword << "Switch" << Style_None;
-            stream_type_suffix(node);
+            ss << node;
             if (newlines) {
                 walk_same_or_newline(val->expr, depth+1, maxdepth);
                 for (int i = 0; i < val->cases.size(); ++i) {
@@ -386,8 +395,7 @@ struct StreamAST : StreamAnchors {
         } break;
         case VK_If: {
             auto val = cast<If>(node);
-            ss << Style_Keyword << "If" << Style_None;
-            stream_type_suffix(node);
+            ss << node;
             if (newlines) {
                 for (int i = 0; i < val->clauses.size(); ++i) {
                     auto &&expr = val->clauses[i];
@@ -410,8 +418,9 @@ struct StreamAST : StreamAnchors {
         } break;
         case VK_Parameter: {
             auto val = cast<Parameter>(node);
-            ss << Style_Symbol << val->name.name()->data
-                << "$" << (void *)val << Style_None;
+            ss << Style_Symbol << val->name.name()->data << "$";
+            stream_address(ss, val);
+            ss << Style_None;
             if (val->is_variadic()) {
                 ss << Style_Keyword << "…" << Style_None;
             }
@@ -419,8 +428,7 @@ struct StreamAST : StreamAnchors {
         } break;
         case VK_Call: {
             auto val = cast<Call>(node);
-            ss << Style_Keyword << "Call" << Style_None;
-            stream_type_suffix(node);
+            ss << node;
             if (newlines) {
                 if (val->flags & CF_RawCall) {
                     ss << Style_Keyword << " rawcall" << Style_None;
@@ -428,7 +436,9 @@ struct StreamAST : StreamAnchors {
                 if (val->except_label) {
                     ss << Style_Keyword << " except=" << Style_None;
                     ss << Style_Symbol << val->except_label->name.name()->data
-                        << "@" << (void *)val->except_label << Style_None;
+                        << "@";
+                    stream_address(ss, val->except_label);
+                    ss << Style_None;
                 }
                 walk_same_or_newline(val->callee, depth+1, maxdepth);
                 write_arguments(val->args, depth, maxdepth);
@@ -436,8 +446,7 @@ struct StreamAST : StreamAnchors {
         } break;
         case VK_ArgumentList: {
             auto val = cast<ArgumentList>(node);
-            ss << Style_Keyword << "ArgumentList" << Style_None;
-            stream_type_suffix(node);
+            ss << node;
             if (newlines) {
                 for (int i = 0; i < val->values.size(); ++i) {
                     walk_same_or_newline(val->values[i], depth+1, maxdepth);
@@ -446,8 +455,7 @@ struct StreamAST : StreamAnchors {
         } break;
         case VK_ExtractArgument: {
             auto val = cast<ExtractArgument>(node);
-            ss << Style_Keyword << "ExtractArgument" << Style_None;
-            stream_type_suffix(node);
+            ss << node;
             if (newlines) {
                 ss << " " << val->index;
                 walk_same_or_newline(val->value, depth+1, maxdepth);
@@ -455,8 +463,7 @@ struct StreamAST : StreamAnchors {
         } break;
         case VK_Keyed: {
             auto val = cast<Keyed>(node);
-            ss << Style_Keyword << "Keyed" << Style_None;
-            stream_type_suffix(node);
+            ss << node;
             if (newlines) {
                 ss << " " << val->key;
                 walk_same_or_newline(val->value, depth+1, maxdepth);
@@ -464,8 +471,7 @@ struct StreamAST : StreamAnchors {
         } break;
         case VK_Loop: {
             auto val = cast<Loop>(node);
-            ss << Style_Keyword << "Loop" << Style_None;
-            stream_type_suffix(node);
+            ss << node;
             if (newlines) {
                 ss << " " << Style_Operator << "=" << Style_None;
                 walk_same_or_newline(val->init, depth+1, maxdepth);
@@ -474,8 +480,7 @@ struct StreamAST : StreamAnchors {
         } break;
         case VK_Label: {
             auto val = cast<Label>(node);
-            ss << Style_Keyword << "Label" << Style_None;
-            stream_type_suffix(node);
+            ss << node;
             ss << " ";
             switch(val->label_kind) {
             #define T(NAME, BNAME) \
@@ -486,8 +491,9 @@ struct StreamAST : StreamAnchors {
                 ss << Style_Error << "?kind";
             }
             ss << Style_None << " ";
-            ss << Style_Symbol << val->name.name()->data
-                << "@" << (void *)val << Style_None;
+            ss << Style_Symbol << val->name.name()->data << "@";
+            stream_address(ss, val);
+            ss << Style_None;
             if (newlines) {
                 stream_block_result(val->body, val->value, depth+1, maxdepth);
             }
@@ -551,75 +557,68 @@ struct StreamAST : StreamAnchors {
                 stream_ast(ss, (Value *)val->value, StreamASTFormat::singleline());
                 stream_type_suffix(T);
             } else {
-                ss << val->value;
+                ss << "$";
+                stream_address(ss, val->value);
                 stream_type_suffix(T);
             }
         } break;
         case VK_ConstAggregate: {
             auto val = cast<ConstAggregate>(node);
-            ss << Style_Keyword << "ConstAggregate" << Style_None;
-            stream_type_suffix(node);
+            ss << node;
             for (int i = 0; i < val->values.size(); ++i) {
                 walk_same_or_newline(val->values[i], depth+1, maxdepth);
             }
         } break;
         case VK_Break: {
             auto val = cast<Break>(node);
-            ss << Style_Keyword << "Break" << Style_None;
-            stream_type_suffix(node);
+            ss << node;
             if (newlines) {
                 walk_same_or_newline(val->value, depth+1, maxdepth);
             }
         } break;
         case VK_Repeat: {
             auto val = cast<Repeat>(node);
-            ss << Style_Keyword << "Repeat" << Style_None;
-            stream_type_suffix(node);
+            ss << node;
             if (newlines) {
                 walk_same_or_newline(val->value, depth+1, maxdepth);
             }
         } break;
         case VK_Return: {
             auto val = cast<Return>(node);
-            ss << Style_Keyword << "Return" << Style_None;
-            stream_type_suffix(node);
+            ss << node;
             if (newlines) {
                 walk_same_or_newline(val->value, depth+1, maxdepth);
             }
         } break;
         case VK_Merge: {
             auto val = cast<Merge>(node);
-            ss << Style_Keyword << "Merge" << Style_None;
-            stream_type_suffix(node);
+            ss << node;
             ss << " ";
-            ss << Style_Symbol << val->label->name.name()->data
-                << "@" << (void *)val->label << Style_None;
+            ss << Style_Symbol << val->label->name.name()->data << "@";
+            stream_address(ss, val->label);
+            ss << Style_None;
             if (newlines) {
                 walk_same_or_newline(val->value, depth+1, maxdepth);
             }
         } break;
         case VK_Raise: {
             auto val = cast<Raise>(node);
-            ss << Style_Keyword << "Raise" << Style_None;
-            stream_type_suffix(node);
+            ss << node;
             walk_same_or_newline(val->value, depth+1, maxdepth);
         } break;
         case VK_Quote: {
             auto val = cast<Quote>(node);
-            ss << Style_Keyword << "Quote" << Style_None;
-            stream_type_suffix(node);
+            ss << node;
             walk_same_or_newline(val->value, depth+1, maxdepth);
         } break;
         case VK_Unquote: {
             auto val = cast<Unquote>(node);
-            ss << Style_Keyword << "Unquote" << Style_None;
-            stream_type_suffix(node);
+            ss << node;
             walk_same_or_newline(val->value, depth+1, maxdepth);
         } break;
         case VK_CompileStage: {
             auto val = cast<CompileStage>(node);
-            ss << Style_Keyword << "CompileStage" << Style_None;
-            stream_type_suffix(node);
+            ss << node;
         } break;
         default:
             ss << Style_Error << "<unhandled AST node type: "

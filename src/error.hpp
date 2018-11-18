@@ -104,10 +104,10 @@ SCOPES_RESULT(void) error_untyped_recursive_call(Function *func);
 SCOPES_RESULT(void) error_value_inaccessible_from_closure(Value *value, const Function *frame);
 SCOPES_RESULT(void) error_cannot_deref_non_plain(const Type *T);
 
-// borrow checker errors
+// lifetime checker errors
 SCOPES_RESULT(void) error_value_moved(Value *value, Value *mover, const char *by);
 SCOPES_RESULT(void) error_value_in_use(Value *value, Value *user, const char *by);
-SCOPES_RESULT(void) error_value_is_borrowed(Value *value, Value *user, const char *by);
+SCOPES_RESULT(void) error_value_is_viewed(Value *value, Value *user, const char *by);
 SCOPES_RESULT(void) error_cannot_merge_moves(const char *by);
 
 // code generator errors

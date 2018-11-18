@@ -285,14 +285,14 @@ static void merge_depends(const ASTContext &ctx, Depends &deps, int i, Value *va
     if (args) { // borrowed
         for (auto &&val : *args) {
             if (val.value->get_depth() <= depth) {
-                deps.borrow(i, val);
+                deps.view(i, val);
             } else {
                 deps.unique(i);
             }
         }
     } else { // unique
         if (value->get_depth() <= depth) {
-            deps.borrow(i, arg);
+            deps.view(i, arg);
         } else {
             deps.unique(i);
         }
@@ -1321,7 +1321,7 @@ repeat:
             READ_NODEREF_TYPEOF(X);
             return NODEPS1(ARGTYPE1(X));
         } break;
-        case FN_Destroy: {
+        case FN_Forget: {
             CHECKARGS(1, 1);
             READ_NODEREF_TYPEOF(X);
             return ARGTYPE0();

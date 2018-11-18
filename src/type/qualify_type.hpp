@@ -18,7 +18,6 @@ namespace scopes {
 #define SCOPES_QUALIFIER_KIND() \
     T(QK_Refer, "qualifier-kind-refer", ReferQualifier) \
     T(QK_View, "qualifier-kind-view", ViewQualifier) \
-    T(QK_Move, "qualifier-kind-move", MoveQualifier) \
     T(QK_Mutate, "qualifier-kind-mutate", MutateQualifier) \
     T(QK_Key, "qualifier-kind-key", KeyQualifier) \
 
@@ -33,7 +32,6 @@ enum QualifierKind {
 enum QualifierMask {
     QM_UniquenessTags =
           (1 << QK_View)
-        | (1 << QK_Move)
         | (1 << QK_Mutate),
     QM_Annotations = QM_UniquenessTags
         | (1 << QK_Key),

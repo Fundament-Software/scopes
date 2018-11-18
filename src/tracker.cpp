@@ -14,6 +14,7 @@
 #include "stream_ast.hpp"
 #include "prover.hpp"
 #include "qualifiers.hpp"
+#include "qualifier.inc"
 
 #include <unordered_map>
 
@@ -24,12 +25,11 @@
 
 namespace scopes {
 
-#define SCOPES_GEN_TARGET "borrow checker"
+#define SCOPES_GEN_TARGET "Lifetime"
 
 /*
 for more info on borrow inference, see
 https://gist.github.com/paniq/71251083aa52c1577f2d1b22be0ac6e1
-
 */
 
 //------------------------------------------------------------------------------
@@ -40,10 +40,17 @@ struct Tracker {
     enum VisitMode {
         // inject destructor when last reference
         VM_AUTO,
-        // always borrow
-        VM_FORCE_BORROW,
-        // force move, no destructor injection
+        // always view
+        VM_FORCE_VIEW,
+        // force move (into parent context)
         VM_FORCE_MOVE,
+        // force move (into another context)
+        // plain types will be copied, and so no move takes place
+        VM_FORCE_COPY_OR_MOVE,
+        // force move with destructor injection, simulating the value
+        // being destroyed by a called function
+        // plain types will be copied, and so no drop takes place
+        VM_FORCE_COPY_OR_DROP,
     };
 
     struct Data {
@@ -128,7 +135,7 @@ struct Tracker {
         void delete_data(const ValueIndex &value) {
         #if SCOPES_ANNOTATE_TRACKING
             StyledString ss;
-            ss.out << "beginning lifetime of " << value;
+            ss.out << "beginning lifetime of " << value << ", not tracked before this point";
             annotate(ss.str());
         #endif
             auto it = _data.find(value);
@@ -147,14 +154,30 @@ struct Tracker {
                 annotate(ss.str());
             }
         #endif
-        #if !SCOPES_SOFT_TRACKING
-            assert(!_deleted.count(value));
-        #endif
+            if (!SCOPES_SOFT_TRACKING) {
+                assert(!_deleted.count(value));
+            }
             auto data = find_data(value);
             if (data)
                 return *data;
             auto result = _data.insert({value, Data()});
             return result.first->second;
+        }
+
+        bool garbage_empty() {
+            return garbage.empty();
+        }
+
+        void clear_garbage() {
+            garbage.clear();
+            collect_order.clear();
+        }
+
+        void drop(const ValueIndex &value) {
+            if (garbage.count(value))
+                return;
+            garbage.insert(value);
+            collect_order.push_back(value);
         }
 
         Block &block;
@@ -163,6 +186,8 @@ struct Tracker {
         bool finalized;
         std::unordered_map<ValueIndex, Data, ValueIndex::Hash> _data;
         std::unordered_set<ValueIndex, ValueIndex::Hash> _deleted;
+        ValueIndexSet garbage;
+        ValueIndices collect_order;
     };
 
     Tracker(ASTContext &_ctx)
@@ -343,90 +368,15 @@ struct Tracker {
             #if SCOPES_ANNOTATE_TRACKING
                 {
                     StyledString ss;
-                    ss.out << Style_Error << "error: " << Style_None << context << " conflict, not all merges perform the same move/borrow operation";
+                    ss.out << Style_Error << "error: " << Style_None << context << " conflict, not all merges perform the same move/view operation";
                     state.annotate(ss.str());
                 }
             #endif
-            #if !SCOPES_SOFT_TRACKING
-                SCOPES_EXPECT_ERROR(error_cannot_merge_moves(context));
-            #endif
-            }
-        }
-        return {};
-    }
-
-    SCOPES_RESULT(void) move_argument(State &state,
-        const ValueIndex &arg, const char *context) {
-        SCOPES_RESULT_TYPE(void);
-        auto &data = state.ensure_data(arg);
-        #if SCOPES_ANNOTATE_TRACKING
-        if (data.will_be_used() || data.will_be_moved()) {
-            StyledString ss;
-            ss.out
-                << Style_Error << "error: " << Style_None
-                << "attempt to move " << arg << " which is tagged as ";
-            int acount = 0;
-            if (data.will_be_used()) {
-                ss.out << "to-be-used by " << data.get_user();
-                acount++;
-            }
-            if (data.will_be_moved()) {
-                if (acount)
-                    ss.out << " and ";
-                ss.out << "to-be-moved by " << data.get_mover();
-            }
-            state.annotate(ss.str());
-            return {};
-        }
-        #endif
-        #if !SCOPES_SOFT_TRACKING
-        if (data.will_be_used()) {
-            SCOPES_EXPECT_ERROR(error_value_in_use(arg.value, data.get_user(), context));
-        } else if (data.will_be_moved()) {
-            SCOPES_EXPECT_ERROR(error_value_moved(arg.value, data.get_mover(), context));
-        }
-        #endif
-        #if SCOPES_ANNOTATE_TRACKING
-        {
-            StyledString ss;
-            ss.out << context << " tagging " << arg << " as to-be-moved";
-            state.annotate(ss.str());
-        }
-        #endif
-        data.move(state.where, state.block.depth);
-        return {};
-    }
-
-    SCOPES_RESULT(void) track_return_argument(State &state, Value *node,
-        int retdepth, const char *context) {
-        SCOPES_RESULT_TYPE(void);
-        assert(retdepth >= 0);
-        assert(node);
-        auto T = node->get_type();
-        if (!is_returning_value(T))
-            return {};
-        // collect values to be moved later which are in the scopes we are
-        // jumping out of
-        State *s = state.parent;
-        ValueIndexSet moved;
-        while (s && s->block.depth > retdepth) {
-            for (auto &entries : s->_data) {
-                const ValueIndex &key = entries.first;
-                Data &data = entries.second;
-                if (data.will_be_moved()
-                    && (data.get_move_depth() > retdepth)) {
-                    moved.insert(key);
+                if (!SCOPES_SOFT_TRACKING) {
+                    SCOPES_EXPECT_ERROR(error_cannot_merge_moves(context));
                 }
             }
-            s = s->parent;
         }
-        // finally generate destructors for those values
-        state.block.insert_at_end();
-        for (auto &&entry : moved) {
-            // data will be moved, so we need to write a destructor
-            SCOPES_CHECK_RESULT(write_destructor(state, entry, context));
-        }
-        SCOPES_CHECK_RESULT(visit_value(state, VM_AUTO, node, context, retdepth));
         return {};
     }
 
@@ -434,22 +384,41 @@ struct Tracker {
         SCOPES_RESULT_TYPE(void);
         auto callee = node->callee;
         const Type *T = callee->get_type();
-        if (T == TYPE_Builtin) {
+        if (is_function_pointer(T)) {
+            const FunctionType *ft = extract_function_type(T);
+            int numargs = (int)ft->argument_types.size();
+            assert(numargs <= node->args.size());
+            for (int i = 0; i < numargs; ++i) {
+                Value *arg = node->args[i];
+                const Type *argT = ft->argument_types[i];
+                auto vq = try_qualifier<ViewQualifier>(argT);
+                if (vq) {
+                    // we're viewing
+                    SCOPES_CHECK_RESULT(visit_value(state, VM_FORCE_VIEW, arg, "argument"));
+                } else {
+                    // we're moving
+                    SCOPES_CHECK_RESULT(visit_value(state, VM_FORCE_COPY_OR_MOVE, arg, "argument"));
+                }
+            }
+        } else if (T == TYPE_Builtin) {
             Builtin b = SCOPES_GET_RESULT(extract_builtin_constant(callee));
             SCOPES_ANCHOR(node->anchor());
             switch(b.value()) {
             case FN_Move:
-            case FN_Destroy: {
+            case FN_Forget: {
                 assert(node->args.size() == 1);
                 SCOPES_CHECK_RESULT(
-                    visit_argument(state, VM_FORCE_MOVE,
+                    visit_argument(state, VM_FORCE_COPY_OR_MOVE,
                         ValueIndex(node->args[0]), "call"));
                 return {};
             } break;
-            default: break;
+            default: {
+                SCOPES_CHECK_RESULT(visit_values(state, VM_FORCE_COPY_OR_DROP, node->args, "call"));
+            } break;
             }
+        } else {
+            SCOPES_CHECK_RESULT(visit_values(state, VM_AUTO, node->args, "call"));
         }
-        SCOPES_CHECK_RESULT(visit_values(state, VM_AUTO, node->args, "call"));
         SCOPES_CHECK_RESULT(visit_argument(state, VM_AUTO, ValueIndex(node->callee), "call"));
         return {};
     }
@@ -551,7 +520,7 @@ struct Tracker {
                 if (i < args.size()) {
                     auto kind = kinds[i];
                     IDSet set;
-                    if (kind == DK_Borrowed) {
+                    if (kind == DK_Viewed) {
                         auto &&arg = args[i];
                         for (auto &&key : arg) {
                             auto param = dyn_cast<Parameter>(key.value);
@@ -574,10 +543,8 @@ struct Tracker {
             auto param = function->params[i];
             const Type *T = param->get_type();
             const Data *data = root_state.find_data(ValueIndex(param));
-            if (data) {
-                if (data->will_be_moved()) {
-                    T = move_type(T);
-                }
+            if (!(data && data->will_be_moved())) {
+                T = view_type(T, {});
             }
             argtypes.push_back(T);
         }
@@ -596,6 +563,94 @@ struct Tracker {
         return {};
     }
 
+    void view_argument(State &state,
+        const ValueIndex &arg, const char *context) {
+        #if SCOPES_ANNOTATE_TRACKING
+        {
+            StyledString ss;
+            ss.out << context << " tagging " << arg << " as to-be-used";
+            state.annotate(ss.str());
+        }
+        #endif
+        auto &data = state.ensure_data(arg);
+        data.use(state.where);
+    }
+
+    SCOPES_RESULT(void) move_argument(State &state,
+        const ValueIndex &arg, const char *context) {
+        SCOPES_RESULT_TYPE(void);
+        auto &data = state.ensure_data(arg);
+        #if SCOPES_ANNOTATE_TRACKING
+        if (data.will_be_used() || data.will_be_moved()) {
+            StyledString ss;
+            ss.out
+                << Style_Error << "error: " << Style_None
+                << "attempt to move " << arg << " which is tagged as ";
+            int acount = 0;
+            if (data.will_be_used()) {
+                ss.out << "to-be-used by " << data.get_user();
+                acount++;
+            }
+            if (data.will_be_moved()) {
+                if (acount)
+                    ss.out << " and ";
+                ss.out << "to-be-moved by " << data.get_mover();
+            }
+            state.annotate(ss.str());
+            return {};
+        }
+        #endif
+        if (!SCOPES_SOFT_TRACKING) {
+            if (data.will_be_used()) {
+                SCOPES_EXPECT_ERROR(error_value_in_use(arg.value, data.get_user(), context));
+            } else if (data.will_be_moved()) {
+                SCOPES_EXPECT_ERROR(error_value_moved(arg.value, data.get_mover(), context));
+            }
+        }
+        #if SCOPES_ANNOTATE_TRACKING
+        {
+            StyledString ss;
+            ss.out << context << " tagging " << arg << " as to-be-moved";
+            state.annotate(ss.str());
+        }
+        #endif
+        data.move(state.where, state.block.depth);
+        return {};
+    }
+
+    SCOPES_RESULT(void) track_return_argument(State &state, Value *node,
+        int retdepth, const char *context) {
+        SCOPES_RESULT_TYPE(void);
+        assert(retdepth >= 0);
+        assert(node);
+        auto T = node->get_type();
+        if (!is_returning_value(T))
+            return {};
+        // collect values to be moved later which are in the scopes we are
+        // jumping out of
+        State *s = state.parent;
+        ValueIndexSet moved;
+        while (s && s->block.depth > retdepth) {
+            for (auto &entries : s->_data) {
+                const ValueIndex &key = entries.first;
+                Data &data = entries.second;
+                if (data.will_be_moved()
+                    && (data.get_move_depth() > retdepth)) {
+                    moved.insert(key);
+                }
+            }
+            s = s->parent;
+        }
+        // finally generate destructors for those values
+        state.block.insert_at_end();
+        for (auto &&entry : moved) {
+            // data will be moved, so we need to write a destructor
+            SCOPES_CHECK_RESULT(write_destructor(state, entry, context));
+        }
+        SCOPES_CHECK_RESULT(visit_value(state, VM_AUTO, node, context, retdepth));
+        return {};
+    }
+
     SCOPES_RESULT(void) drop_argument(State &state, const ValueIndex &arg, const char *context) {
         SCOPES_RESULT_TYPE(void);
         SCOPES_CHECK_RESULT(move_argument(state, arg, context));
@@ -604,26 +659,32 @@ struct Tracker {
 
     SCOPES_RESULT(void) write_destructor(State &state, const ValueIndex &arg, const char *context) {
         SCOPES_RESULT_TYPE(void);
+        // generate destructor
+        auto argT = arg.get_type();
+        Value *handler;
+        if (!argT->lookup(SYM_DropHandler, handler)) {
+            #if SCOPES_ANNOTATE_TRACKING
+            StyledString ss;
+            ss.out << context << " invokes empty destructor of " << arg;
+            state.annotate(ss.str());
+            #endif
+            return {};
+        }
         #if SCOPES_ANNOTATE_TRACKING
         StyledString ss;
-        ss.out << context << " destructor injection for " << arg;
+        ss.out << context << " invokes destructor of " << arg;
         state.annotate(ss.str());
         #endif
-        #if !SCOPES_SOFT_TRACKING
-        auto argT = arg.get_type();
-        // generate destructor
-        Value *handler;
-        if (!argT->lookup(SYM_DropHandler, handler))
-            return {};
-        auto where = state.where;
-        assert(where);
-        auto anchor = where->anchor();
-        auto expr =
-            Call::from(anchor, handler, {
-                ExtractArgument::from(anchor, arg.value, arg.index) });
-        SCOPES_CHECK_RESULT(
-            prove(ctx.with_block(state.block).with_symbol_target(), expr));
-        #endif
+        if (!SCOPES_SOFT_TRACKING) {
+            auto where = state.where;
+            assert(where);
+            auto anchor = where->anchor();
+            auto expr =
+                Call::from(anchor, handler, {
+                    ExtractArgument::from(anchor, arg.value, arg.index) });
+            SCOPES_CHECK_RESULT(
+                prove(ctx.with_block(state.block).with_symbol_target(), expr));
+        }
         return {};
     }
 
@@ -637,33 +698,74 @@ struct Tracker {
         auto T = arg.get_type();
         assert(!arg.has_deps());
         auto &data = state.ensure_data(arg);
+        bool last_appearance = !(data.will_be_moved() || data.will_be_used());
+        bool is_local = (arg.value->get_depth() > 0);
+        // only move/destroy when inside function - don't touch function
+        // parameters and global constants
+        bool must_drop = last_appearance && is_local;
         switch(mode) {
         case VM_AUTO: {
-            if (!data.will_be_moved()
-                && !data.will_be_used()
-                && (arg.value->get_depth() > 0) // do not destroy constants and
-                                                // function parameters
-                ) {
-                SCOPES_CHECK_RESULT(drop_argument(state, arg, context));
+            if (must_drop) {
+                state.drop(arg);
+            } else {
+                view_argument(state, arg, context);
             }
         } break;
-        case VM_FORCE_BORROW: {
+        case VM_FORCE_VIEW: {
+            if (must_drop) {
+                state.drop(arg);
+            } else {
+                view_argument(state, arg, context);
+            }
         } break;
         case VM_FORCE_MOVE: {
+            if (is_plain(arg.get_type())) {
+                #if SCOPES_ANNOTATE_TRACKING
+                StyledString ss;
+                ss.out << context << " moves plain " << arg;
+                state.annotate(ss.str());
+                #endif
+            }
             SCOPES_CHECK_RESULT(
                 move_argument(state, arg, context));
         } break;
-        }
-        #if SCOPES_ANNOTATE_TRACKING
-        {
-            StyledString ss;
-            ss.out << context << " tagging " << arg << " as to-be-used";
-            state.annotate(ss.str());
-        }
-        #endif
-        {
-            auto &data = state.ensure_data(arg);
-            data.use(state.where);
+        case VM_FORCE_COPY_OR_MOVE: {
+            if (is_plain(arg.get_type())) {
+                #if SCOPES_ANNOTATE_TRACKING
+                StyledString ss;
+                ss.out << context << " moves copy of plain " << arg;
+                state.annotate(ss.str());
+                #endif
+                // last use of original, which we have copied?
+                if (must_drop) {
+                    state.drop(arg);
+                } else {
+                    view_argument(state, arg, context);
+                }
+            } else {
+                SCOPES_CHECK_RESULT(
+                    move_argument(state, arg, context));
+            }
+        } break;
+        case VM_FORCE_COPY_OR_DROP: {
+            if (is_plain(arg.get_type())) {
+                #if SCOPES_ANNOTATE_TRACKING
+                StyledString ss;
+                ss.out << context << " drops copy of plain " << arg;
+                state.annotate(ss.str());
+                #endif
+                // last use of original, which we have copied?
+                if (must_drop) {
+                    state.drop(arg);
+                } else {
+                    view_argument(state, arg, context);
+                }
+            } else {
+                // drop immediately
+                SCOPES_CHECK_RESULT(
+                    drop_argument(state, arg, context));
+            }
+        } break;
         }
         return {};
     }
@@ -700,30 +802,48 @@ struct Tracker {
         }
         if (mode == VM_AUTO) {
             if (depth <= retdepth) {
-                // values exist outside of block, we only borrow
-                mode = VM_FORCE_BORROW;
+                // values exist outside of block, we only view
+                mode = VM_FORCE_VIEW;
             } else {
                 // values are inside block, we must move
                 mode = VM_FORCE_MOVE;
             }
         }
         if (deps) {
-            // value is borrowing
+            // value is viewing
             switch(mode) {
+            case VM_FORCE_COPY_OR_DROP:
+            case VM_FORCE_COPY_OR_MOVE:
             case VM_FORCE_MOVE: {
-            #if SCOPES_ANNOTATE_TRACKING
-            {
-                StyledString ss;
-                ss.out << Style_Error << "error: " << Style_None
-                    << "cannot force " << arg << " to move";
-                state.annotate(ss.str());
-            }
-            #endif
-            #if !SCOPES_SOFT_TRACKING
-                // we can't force a borrowed value to move
-                SCOPES_EXPECT_ERROR(
-                    error_value_is_borrowed(arg.value, state.where, context));
-            #endif
+                if (is_plain(arg.get_type())) {
+                    #if SCOPES_ANNOTATE_TRACKING
+                    {
+                        StyledString ss;
+                        ss.out << context << " copies view of plain " << arg;
+                        state.annotate(ss.str());
+                    }
+                    #endif
+                    // tag all connected unique values as viewed
+                    const ValueIndexSet &args = *deps;
+                    for (auto arg : args) {
+                        SCOPES_CHECK_RESULT(
+                            visit_unique_argument(state, VM_FORCE_VIEW, arg, context, retdepth));
+                    }
+                } else {
+                    #if SCOPES_ANNOTATE_TRACKING
+                    {
+                        StyledString ss;
+                        ss.out << Style_Error << "error: " << Style_None
+                            << context << " cannot force view " << arg << " to move";
+                        state.annotate(ss.str());
+                    }
+                    #endif
+                    if (!SCOPES_SOFT_TRACKING) {
+                        // we can't force a viewed value to move
+                        SCOPES_EXPECT_ERROR(
+                            error_value_is_viewed(arg.value, state.where, context));
+                    }
+                }
             } break;
             default: {
                 // tag all connected unique values
@@ -787,6 +907,7 @@ struct Tracker {
     SCOPES_RESULT(void) track_instruction(State &state, Value *node) {
         SCOPES_RESULT_TYPE(void);
         SCOPES_ANCHOR(node->anchor());
+        assert(state.garbage_empty());
         state.set_location(node);
         SCOPES_CHECK_RESULT(track_declaration(state, node));
         Result<_result_type> result;
@@ -798,6 +919,17 @@ struct Tracker {
         default: assert(false);
         }
         SCOPES_CHECK_RESULT(result);
+        SCOPES_CHECK_RESULT(collect(state));
+        return {};
+    }
+
+    SCOPES_RESULT(void) collect(State &state) {
+        SCOPES_RESULT_TYPE(void);
+        // drop all collected values
+        for (auto arg : state.collect_order) {
+            SCOPES_CHECK_RESULT(drop_argument(state, arg, "collector"));
+        }
+        state.clear_garbage();
         return {};
     }
 

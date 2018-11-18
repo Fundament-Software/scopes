@@ -17,18 +17,6 @@ namespace scopes {
 
 //------------------------------------------------------------------------------
 
-struct MoveQualifier : Qualifier {
-    enum { Kind = QK_Move };
-    static bool classof(const Qualifier *T);
-
-    void stream_prefix(StyledStream &ss) const;
-    void stream_postfix(StyledStream &ss) const;
-
-    MoveQualifier();
-};
-
-//------------------------------------------------------------------------------
-
 struct MutateQualifier : Qualifier {
     enum { Kind = QK_Mutate };
     static bool classof(const Qualifier *T);
@@ -60,7 +48,6 @@ struct ViewQualifier : Qualifier {
 
 //------------------------------------------------------------------------------
 
-const Type *move_type(const Type *type);
 const Type *mutate_type(const Type *type);
 const Type *view_type(const Type *type, IDSet ids);
 
