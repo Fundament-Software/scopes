@@ -23,11 +23,15 @@ struct Scope;
 
 #define SCOPES_TEMPLATE_VALUE_KIND() \
     T(VK_Template, "value-kind-template", Template) \
+    T(VK_LabelTemplate, "value-kind-label-template", LabelTemplate) \
+    T(VK_Loop, "value-kind-loop", Loop) \
     T(VK_Keyed, "value-kind-keyed", Keyed) \
     T(VK_Expression, "value-kind-expression", Expression) \
     T(VK_Quote, "value-kind-quote", Quote) \
     T(VK_Unquote, "value-kind-unquote", Unquote) \
     T(VK_CompileStage, "value-kind-compile-stage", CompileStage) \
+    T(VK_If, "value-kind-if", If) \
+    T(VK_MergeTemplate, "value-kind-merge-template", MergeTemplate) \
     T(VK_Break, "value-kind-break", Break) \
 
 
@@ -50,8 +54,8 @@ struct Scope;
 
 #define SCOPES_INSTRUCTION_VALUE_KIND() \
     T(VK_Label, "value-kind-label", Label) \
-    T(VK_Loop, "value-kind-loop", Loop) \
-    T(VK_If, "value-kind-if", If) \
+    T(VK_LoopLabel, "value-kind-looplabel", LoopLabel) \
+    T(VK_CondBr, "value-kind-condbr", CondBr) \
     T(VK_Switch, "value-kind-switch", Switch) \
     T(VK_Call, "value-kind-call", Call) \
     T(VK_ArgumentList, "value-kind-argumentlist", ArgumentList) \
@@ -60,6 +64,7 @@ struct Scope;
 
 #define SCOPES_VALUE_KIND() \
     T(VK_Parameter, "value-kind-parameter", Parameter) \
+    T(VK_Exception, "value-kind-exception", Exception) \
     /* template-only */ \
     SCOPES_TEMPLATE_VALUE_KIND() \
     /* instructions (Instruction::classof) */ \
@@ -179,8 +184,7 @@ struct Block {
     bool empty() const;
     void migrate_from(Block &source);
     void clear();
-    bool is_scoped() const;
-    void set_scope(uint32_t blockid, Block *parent);
+    void set_parent(Block *parent);
 
     void insert_at(int index);
     void insert_at_end();
@@ -191,7 +195,6 @@ struct Block {
     int insert_index;
     Instructions body;
     Instruction *terminator;
-    uint32_t blockid;
     Block *parent;
     Strings annotations;
 };
@@ -301,12 +304,24 @@ struct Expression : Value {
 
 //------------------------------------------------------------------------------
 
-struct If : Instruction {
+struct CondBr : Instruction {
+    static bool classof(const Value *T);
+
+    CondBr(const Anchor *anchor, Value *cond);
+
+    static CondBr *from(const Anchor *anchor, Value *cond = nullptr);
+
+    Value *cond;
+    Block then_body;
+    Block else_body;
+};
+
+//------------------------------------------------------------------------------
+
+struct If : Value {
     struct Clause {
         const Anchor *anchor;
-        Block cond_body;
         Value *cond;
-        Block body;
         Value *value;
 
         Clause() : anchor(nullptr), cond(nullptr), value(nullptr) {}
@@ -384,6 +399,15 @@ struct Parameter : Value {
 
 //------------------------------------------------------------------------------
 
+struct Exception : Value {
+    static bool classof(const Value *T);
+
+    Exception(const Anchor *anchor);
+    static Exception *from(const Anchor *anchor);
+};
+
+//------------------------------------------------------------------------------
+
 #define SCOPES_LABEL_KIND() \
     /* an user-created label */ \
     T(LK_User, "user") \
@@ -394,7 +418,9 @@ struct Parameter : Value {
     /* the except block of a try/except construct */ \
     T(LK_Except, "except") \
     /* a break label of a loop */ \
-    T(LK_Break, "break")
+    T(LK_Break, "break") \
+    /* a merge label of a branch */ \
+    T(LK_BranchMerge, "branch-merge") \
 
 enum LabelKind {
 #define T(NAME, BNAME) \
@@ -406,22 +432,36 @@ SCOPES_LABEL_KIND()
 struct Label : Instruction {
     static bool classof(const Value *T);
 
-    Label(const Anchor *anchor, LabelKind kind, Symbol name, Value *value);
+    Label(const Anchor *anchor, LabelKind kind, Symbol name);
 
     static Label *from(const Anchor *anchor,
         LabelKind kind,
-        Symbol name = SYM_Unnamed,
-        Value *value = nullptr);
-    static Label *try_from(const Anchor *anchor,
-        Value *value = nullptr);
-    static Label *except_from(const Anchor *anchor,
-        Value *value = nullptr);
+        Symbol name = SYM_Unnamed);
 
     Symbol name;
     Block body;
-    Value *value;
-    const Type *return_type;
     std::vector<Merge *> merges;
+    LabelKind label_kind;
+};
+
+//------------------------------------------------------------------------------
+
+struct LabelTemplate : Value {
+    static bool classof(const Value *T);
+
+    LabelTemplate(const Anchor *anchor, LabelKind kind, Symbol name, Value *value);
+
+    static LabelTemplate *from(const Anchor *anchor,
+        LabelKind kind,
+        Symbol name = SYM_Unnamed,
+        Value *value = nullptr);
+    static LabelTemplate *try_from(const Anchor *anchor,
+        Value *value = nullptr);
+    static LabelTemplate *except_from(const Anchor *anchor,
+        Value *value = nullptr);
+
+    Symbol name;
+    Value *value;
     LabelKind label_kind;
 };
 
@@ -442,12 +482,27 @@ struct Call : Instruction {
     Value *callee;
     Values args;
     uint32_t flags;
-    Label *except_label;
+    Block except_body;
+    Exception *except;
 };
 
 //------------------------------------------------------------------------------
 
-struct Loop : Instruction {
+struct LoopLabel : Instruction {
+    static bool classof(const Value *T);
+
+    LoopLabel(const Anchor *anchor, Value *init);
+
+    static LoopLabel *from(const Anchor *anchor, Value *init = nullptr);
+
+    Value *init;
+    Block body;
+    std::vector<Repeat *> repeats;
+};
+
+//------------------------------------------------------------------------------
+
+struct Loop : Value {
     static bool classof(const Value *T);
 
     Loop(const Anchor *anchor, Value *init, Value *value);
@@ -455,10 +510,7 @@ struct Loop : Instruction {
     static Loop *from(const Anchor *anchor, Value *init = nullptr, Value *value = nullptr);
 
     Value *init;
-    Block body;
     Value *value;
-    const Type *return_type;
-    std::vector<Repeat *> repeats;
 };
 
 //------------------------------------------------------------------------------
@@ -481,29 +533,16 @@ struct Function : Pure {
         const Parameters &params);
 
     void append_param(Parameter *sym);
-    uint32_t new_id();
-    uint32_t get_id(Symbol name);
-    uint32_t get_id(Value *value);
-    Value *get_value(uint32_t id);
 
     Symbol name;
     Parameters params;
     Block body;
-    Value *value;
     const String *docstring;
-    const Type *return_type;
-    const Type *except_type;
     Function *frame;
     Function *boundary;
     Template *original;
     Label *label;
     bool complete;
-    uint32_t next_id;
-    // map external block names to internal ones
-    std::unordered_map<Symbol, uint32_t, Symbol::Hash> name2block;
-    // resolve value to id and id to value
-    std::unordered_map<Value *, uint32_t> value2id;
-    std::unordered_map<uint32_t, Value *> id2value;
 
     Types instance_args;
     void bind(Value *oldnode, Value *newnode);
@@ -627,7 +666,7 @@ struct Repeat : Instruction {
     static Repeat *from(const Anchor *anchor, Value *value);
 
     Value *value;
-    Loop *loop;
+    LoopLabel *loop;
 };
 
 //------------------------------------------------------------------------------
@@ -652,6 +691,19 @@ struct Merge : Instruction {
     static Merge *from(const Anchor *anchor, Label *label, Value *value);
 
     Label *label;
+    Value *value;
+};
+
+//------------------------------------------------------------------------------
+
+struct MergeTemplate : Value {
+    static bool classof(const Value *T);
+
+    MergeTemplate(const Anchor *anchor, LabelTemplate *label, Value *value);
+
+    static MergeTemplate *from(const Anchor *anchor, LabelTemplate *label, Value *value);
+
+    LabelTemplate *label;
     Value *value;
 };
 

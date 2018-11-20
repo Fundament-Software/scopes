@@ -1109,15 +1109,15 @@ sc_value_t *sc_unquote_new(sc_value_t *value) {
 
 sc_value_t *sc_label_new(int kind, sc_symbol_t name) {
     using namespace scopes;
-    return Label::from(get_active_anchor(), (LabelKind)kind, name, nullptr);
+    return LabelTemplate::from(get_active_anchor(), (LabelKind)kind, name);
 }
 void sc_label_set_body(sc_value_t *label, sc_value_t *body) {
     using namespace scopes;
-    cast<Label>(label)->value = body;
+    cast<LabelTemplate>(label)->value = body;
 }
 sc_value_t *sc_merge_new(sc_value_t *label, sc_value_t *value) {
     using namespace scopes;
-    return Merge::from(get_active_anchor(), cast<Label>(label), value);
+    return MergeTemplate::from(get_active_anchor(), cast<LabelTemplate>(label), value);
 }
 
 // Parser

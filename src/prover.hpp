@@ -21,20 +21,8 @@ struct List;
 struct Builtin;
 struct Symbol;
 
-enum EvalTarget {
-    EvalTarget_Void,
-    EvalTarget_Symbol,
-    EvalTarget_Return,
-};
-
 struct ASTContext {
-    ASTContext with_return_target() const;
-    ASTContext with_void_target() const;
-    ASTContext with_symbol_target() const;
-
-    ASTContext with_target(EvalTarget target) const;
-
-    ASTContext for_loop(Loop *loop) const;
+    ASTContext for_loop(LoopLabel *loop) const;
 
     ASTContext for_try(Label *except) const;
     ASTContext for_break(Label *_break) const;
@@ -44,8 +32,8 @@ struct ASTContext {
 
     ASTContext();
 
-    ASTContext(Function *_function, Function *_frame, EvalTarget _target,
-        Loop *_loop, Label *_except, Label *_break, Block *_block);
+    ASTContext(Function *_function, Function *_frame,
+        LoopLabel *_loop, Label *_except, Label *_break, Block *_block);
 
     static ASTContext from_function(Function *fn);
 
@@ -54,8 +42,7 @@ struct ASTContext {
 
     Function *function;
     Function *frame;
-    EvalTarget target;
-    Loop *loop;
+    LoopLabel *loop;
     Label *except;
     Label *_break;
     Block *block;

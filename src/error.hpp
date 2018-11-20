@@ -101,6 +101,7 @@ SCOPES_RESULT(void) error_illegal_repeat_outside_loop();
 SCOPES_RESULT(void) error_illegal_break_outside_loop();
 SCOPES_RESULT(void) error_variadic_symbol_not_in_last_place();
 SCOPES_RESULT(void) error_untyped_recursive_call(Function *func);
+SCOPES_RESULT(void) error_recursive_function_changed_type(Function *func, const Type *T1, const Type *T2);
 SCOPES_RESULT(void) error_value_inaccessible_from_closure(Value *value, const Function *frame);
 SCOPES_RESULT(void) error_cannot_deref_non_plain(const Type *T);
 

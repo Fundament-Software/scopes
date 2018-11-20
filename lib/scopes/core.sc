@@ -3329,6 +3329,7 @@ fn uncomma (l)
             total
     if (comma-separated? l)
         fn process (l)
+            raises-compile-error;
             if (empty? l)
                 return (nullof Anchor) '() '()
             let at next = (decons l)

@@ -219,7 +219,7 @@ struct LLVMIRGenerator {
     TryInfo try_info;
 
     struct LoopInfo {
-        Loop *loop;
+        LoopLabel *loop;
         LLVMBasicBlockRef bb_loop;
         LLVMValueRef repeat_value;
 
@@ -861,7 +861,7 @@ struct LLVMIRGenerator {
         if (fi->has_exception()) {
             try_info.bb_except = LLVMAppendBasicBlock(func, "except");
             LLVMPositionBuilderAtEnd(builder, try_info.bb_except);
-            auto except_value_type = SCOPES_GET_RESULT(type_to_llvm_type(node->except_type));
+            auto except_value_type = SCOPES_GET_RESULT(type_to_llvm_type(fi->except_type));
             if (use_debug_info)
                 set_debug_location(node->anchor());
             try_info.except_value = LLVMBuildPhi(builder, except_value_type, "");
@@ -890,10 +890,6 @@ struct LLVMIRGenerator {
             bind(param, val);
         }
         SCOPES_CHECK_RESULT(block_to_value(node->body));
-        auto result = SCOPES_GET_RESULT(node_to_value(node->value));
-        if (is_returning(node->value->get_type())) {
-            SCOPES_CHECK_RESULT(write_return(result));
-        }
         return {};
     }
 
@@ -940,6 +936,11 @@ struct LLVMIRGenerator {
     SCOPES_RESULT(LLVMValueRef) Parameter_to_value(Parameter *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         SCOPES_EXPECT_ERROR(error_gen_unbound_symbol(SCOPES_GEN_TARGET, node));
+    }
+
+    SCOPES_RESULT(LLVMValueRef) Exception_to_value(Exception *node) {
+        SCOPES_RESULT_TYPE(LLVMValueRef);
+        SCOPES_EXPECT_ERROR(error_cannot_translate(SCOPES_GEN_TARGET, node));
     }
 
     SCOPES_RESULT(void) block_to_value(const Block &node) {
@@ -1024,12 +1025,6 @@ struct LLVMIRGenerator {
         {
             LLVMPositionBuilderAtEnd(builder, bb);
             SCOPES_CHECK_RESULT(block_to_value(node->body));
-            auto result = SCOPES_GET_RESULT(node_to_value(node->value));
-            if (is_returning(node->value->get_type())) {
-                assert(label_info.bb_merge);
-                build_merge_phi(label_info.merge_value, result);
-                LLVMBuildBr(builder, label_info.bb_merge);
-            }
         }
         LLVMPositionBuilderAtEnd(builder, label_info.bb_merge);
         auto result = label_info.merge_value;
@@ -1037,7 +1032,7 @@ struct LLVMIRGenerator {
         return result;
     }
 
-    SCOPES_RESULT(LLVMValueRef) Loop_to_value(Loop *node) {
+    SCOPES_RESULT(LLVMValueRef) LoopLabel_to_value(LoopLabel *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         //auto rtype = node->get_type();
         LLVMValueRef init = SCOPES_GET_RESULT(node_to_value(node->init));
@@ -1058,14 +1053,6 @@ struct LLVMIRGenerator {
         LLVMBuildBr(builder, loop_info.bb_loop);
         LLVMPositionBuilderAtEnd(builder, loop_info.bb_loop);
         SCOPES_CHECK_RESULT(block_to_value(node->body));
-        auto result = SCOPES_GET_RESULT(node_to_value(node->value));
-        auto rtype = node->value->get_type();
-        if (is_returning(rtype)) {
-            if (is_returning_value(rtype)) {
-                build_merge_phi(loop_info.repeat_value, result);
-            }
-            LLVMBuildBr(builder, loop_info.bb_loop);
-        }
         loop_info = old_loop_info;
         return nullptr;
     }
@@ -1118,10 +1105,9 @@ struct LLVMIRGenerator {
         auto T = try_get_const_type(callee);
         const Type *rtype = callee->get_type();
         if (is_function_pointer(rtype)) {
-            return SCOPES_GET_RESULT(build_call(
+            return SCOPES_GET_RESULT(build_call(call,
                 extract_function_type(rtype),
-                SCOPES_GET_RESULT(node_to_value(callee)), args,
-                call->except_label));
+                SCOPES_GET_RESULT(node_to_value(callee)), args));
         } else if (T == TYPE_Builtin) {
             auto builtin = SCOPES_GET_RESULT(extract_builtin_constant(callee));
             switch(builtin.value()) {
@@ -1652,62 +1638,29 @@ struct LLVMIRGenerator {
         return merge_value;
     }
 
-    SCOPES_RESULT(LLVMValueRef) If_to_value(If *node) {
+    SCOPES_RESULT(LLVMValueRef) CondBr_to_value(CondBr *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         LLVMBasicBlockRef bb = LLVMGetInsertBlock(builder);
         LLVMValueRef func = LLVMGetBasicBlockParent(bb);
+        auto cond = SCOPES_GET_RESULT(node_to_value(node->cond));
+        assert(cond);
         auto rtype = node->get_type();
-        LLVMBasicBlockRef bb_merge = nullptr;
-        LLVMValueRef merge_value = nullptr;
-        if (is_returning(rtype)) {
-            bb_merge = LLVMAppendBasicBlock(func, "if-merge");
-            LLVMPositionBuilderAtEnd(builder, bb_merge);
-            if (is_returning_value(rtype)) {
-                merge_value = LLVMBuildPhi(builder, SCOPES_GET_RESULT(type_to_llvm_type(rtype)), "");
-            }
+        LLVMBasicBlockRef bbthen = LLVMAppendBasicBlock(func, "then");
+        LLVMBasicBlockRef bbelse = LLVMAppendBasicBlock(func, "else");
+        LLVMBuildCondBr(builder, cond, bbthen, bbelse);
+
+        // write then-block
+        {
+            LLVMPositionBuilderAtEnd(builder, bbthen);
+            SCOPES_CHECK_RESULT(block_to_value(node->then_body));
         }
-        int count = (int)node->clauses.size();
-        LLVMBasicBlockRef bbthen[count];
-        LLVMBasicBlockRef bbelse[count];
-        for (int i = 0; i < count; ++i) {
-            if (node->clauses[i].is_then()) {
-                bbthen[i] = LLVMAppendBasicBlock(func, "then");
-            } else {
-                bbthen[i] = nullptr;
-            }
-            if ((i + 1) < count) {
-                bbelse[i] = LLVMAppendBasicBlock(func, "else");
-            } else { // last clause
-                bbelse[i] = bb_merge;
-            }
+        // write else-block
+        {
+            LLVMPositionBuilderAtEnd(builder, bbelse);
+            SCOPES_CHECK_RESULT(block_to_value(node->else_body));
         }
-        LLVMPositionBuilderAtEnd(builder, bb);
-        assert(count);
-        for (int i = 0; i < count; ++i) {
-            auto &&clause = node->clauses[i];
-            LLVMBasicBlockRef bb_else = bbelse[i];
-            if (clause.is_then()) {
-                LLVMBasicBlockRef bb_then = bbthen[i];
-                SCOPES_CHECK_RESULT(block_to_value(clause.cond_body));
-                auto cond = SCOPES_GET_RESULT(node_to_value(clause.cond));
-                assert(cond);
-                assert(bb_then);
-                assert(bb_else);
-                LLVMBuildCondBr(builder, cond, bb_then, bb_else);
-                LLVMPositionBuilderAtEnd(builder, bb_then);
-            }
-            SCOPES_CHECK_RESULT(block_to_value(clause.body));
-            auto result = SCOPES_GET_RESULT(node_to_value(clause.value));
-            auto rtype = clause.value->get_type();
-            if (is_returning(rtype)) {
-                assert(bb_merge);
-                build_merge_phi(merge_value, result);
-                LLVMBuildBr(builder, bb_merge);
-            }
-            if (bb_else)
-                LLVMPositionBuilderAtEnd(builder, bb_else);
-        }
-        return merge_value;
+
+        return nullptr;
     }
 
     SCOPES_RESULT(LLVMValueRef) _node_to_value(Value *node) {
@@ -1859,9 +1812,8 @@ struct LLVMIRGenerator {
         }
     }
 
-    SCOPES_RESULT(LLVMValueRef) build_call(
-        const Type *functype, LLVMValueRef func, Values &args,
-        Label *except_label) {
+    SCOPES_RESULT(LLVMValueRef) build_call(Call *call,
+        const Type *functype, LLVMValueRef func, Values &args) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         size_t argcount = args.size();
 
@@ -1918,31 +1870,25 @@ struct LLVMIRGenerator {
         }
 
         if (fi->has_exception()) {
-            LLVMBasicBlockRef bb_except = nullptr;
-            LLVMValueRef except_phi = nullptr;
-            if (except_label) {
-                auto &&label_info = find_label_info(except_label);
-                bb_except = label_info.bb_merge;
-                except_phi = label_info.merge_value;
-            } else {
-                bb_except = try_info.bb_except;
-                except_phi = try_info.except_value;
-            }
-            auto old_bb = LLVMGetInsertBlock(builder);
-            assert(bb_except);
-            if (except_phi) {
+            if (is_returning_value(fi->except_type)) {
+                assert(call->except);
                 auto except = LLVMBuildExtractValue(builder, ret, 1, "");
-                build_merge_phi(except_phi, except);
+                node2value.insert({call->except,except});
             }
             auto ok = LLVMBuildExtractValue(builder, ret, 0, "");
+            auto old_bb = LLVMGetInsertBlock(builder);
+            auto bb_except = LLVMAppendBasicBlock(LLVMGetBasicBlockParent(old_bb), "call_failed");
+            LLVMPositionBuilderAtEnd(builder, bb_except);
+            SCOPES_CHECK_RESULT(block_to_value(call->except_body));
+            LLVMPositionBuilderAtEnd(builder, old_bb);
             if (fi->return_type == TYPE_NoReturn) {
                 // always raises
                 return LLVMBuildBr(builder, bb_except);
             } else {
-                auto bb = LLVMAppendBasicBlock(LLVMGetBasicBlockParent(old_bb), "ok");
+                auto bb = LLVMAppendBasicBlock(LLVMGetBasicBlockParent(old_bb), "call_ok");
                 LLVMBuildCondBr(builder, ok, bb, bb_except);
                 LLVMPositionBuilderAtEnd(builder, bb);
-                if (fi->return_type != empty_arguments_type()) {
+                if (is_returning_value(fi->return_type)) {
                     ret = LLVMBuildExtractValue(builder, ret, 2, "");
                 }
             }
@@ -2105,7 +2051,9 @@ struct LLVMIRGenerator {
         if (LLVMVerifyModule(module, LLVMReturnStatusAction, &errmsg)) {
             StyledStream ss(SCOPES_CERR);
             if (entry) {
-                stream_ast(ss, entry, StreamASTFormat());
+                StreamASTFormat fmt;
+                fmt.dependent_functions = true;
+                stream_ast(ss, entry, fmt);
             }
             LLVMDumpModule(module);
             SCOPES_LOCATION_ERROR(

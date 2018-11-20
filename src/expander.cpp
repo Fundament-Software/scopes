@@ -276,7 +276,7 @@ struct Expander {
         it = it->next;
 
         Scope *subenv = Scope::from(env);
-        auto label = Label::from(_anchor, LK_User, name);
+        auto label = LabelTemplate::from(_anchor, LK_User, name);
         subenv->bind(name, label);
         Expander subexpr(subenv, astscope);
         label->value = SCOPES_GET_RESULT(subexpr.expand_expression(_anchor, it));
@@ -374,7 +374,7 @@ struct Expander {
         }
 
         Loop *loop = Loop::from(_anchor, args);
-        Label *break_label = Label::from(_anchor, LK_Break, KW_Break, loop);
+        LabelTemplate *break_label = LabelTemplate::from(_anchor, LK_Break, KW_Break, loop);
 
         Expander bodyexp(Scope::from(env), astscope);
 
@@ -624,9 +624,9 @@ struct Expander {
         Expander subexp(Scope::from(env), astscope);
 
         Value *try_value = SCOPES_GET_RESULT(subexp.expand_expression(_anchor, it));
-        Label *try_label = Label::try_from(_anchor);
-        Label *except_label = Label::except_from(_anchor,
-            Merge::from(_anchor, try_label, try_value));
+        LabelTemplate *try_label = LabelTemplate::try_from(_anchor);
+        LabelTemplate *except_label = LabelTemplate::except_from(_anchor,
+            MergeTemplate::from(_anchor, try_label, try_value));
 
         if (next != EOL) {
             auto _next_anchor = next->at->anchor();
@@ -953,7 +953,7 @@ struct Expander {
         Value *label = SCOPES_GET_RESULT(subexp.expand(it->at));
         it = subexp.next;
 
-        if (!isa<Label>(label)) {
+        if (!isa<LabelTemplate>(label)) {
             SCOPES_EXPECT_ERROR(error_label_expected(label));
         }
 
@@ -962,7 +962,7 @@ struct Expander {
             Expander subexp(env, astscope, it->next);
             SCOPES_CHECK_RESULT(subexp.expand_arguments(args->values, it));
         }
-        return Merge::from(_anchor, cast<Label>(label), args);
+        return MergeTemplate::from(_anchor, cast<LabelTemplate>(label), args);
     }
 
     SCOPES_RESULT(Value *) expand_forward(const List *it) {

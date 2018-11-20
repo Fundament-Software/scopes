@@ -221,6 +221,36 @@ struct Quoter {
         return canonicalize(expr);
     }
 
+    SCOPES_RESULT(Value *) quote_CondBr(int level, CondBr *node) {
+        SCOPES_RESULT_TYPE(Value *);
+        assert(false);
+        return nullptr;
+    }
+
+    SCOPES_RESULT(Value *) quote_LoopLabel(int level, LoopLabel *node) {
+        SCOPES_RESULT_TYPE(Value *);
+        assert(false);
+        return nullptr;
+    }
+
+    SCOPES_RESULT(Value *) quote_Exception(int level, Exception *node) {
+        SCOPES_RESULT_TYPE(Value *);
+        assert(false);
+        return nullptr;
+    }
+
+    SCOPES_RESULT(Value *) quote_Label(int level, Label *node) {
+        SCOPES_RESULT_TYPE(Value *);
+        assert(false);
+        return nullptr;
+    }
+
+    SCOPES_RESULT(Value *) quote_Merge(int level, Merge *node) {
+        SCOPES_RESULT_TYPE(Value *);
+        assert(false);
+        return nullptr;
+    }
+
     SCOPES_RESULT(Value *) quote_If(int level, If *node) {
         SCOPES_RESULT_TYPE(Value *);
         auto _anchor = node->anchor();
@@ -284,8 +314,7 @@ struct Quoter {
         SCOPES_ANCHOR(node->anchor());
         assert(level >= 0);
         if (!level) {
-            auto subctx = ctx.with_symbol_target();
-            auto value = SCOPES_GET_RESULT(prove(subctx, node->value));
+            auto value = SCOPES_GET_RESULT(prove(ctx, node->value));
             auto T = value->get_type();
             if (is_arguments_type(T)) {
                 auto at = cast<ArgumentsType>(T);
@@ -296,7 +325,7 @@ struct Quoter {
                 for (int i = 0; i < count; ++i) {
                     expr->append(Call::from(_anchor, g_sc_argument_list_append,
                         { result, quote_typed(
-                        extract_argument(subctx, value, i)) }));
+                        extract_argument(ctx, value, i)) }));
                 }
                 expr->append(result);
                 return canonicalize(expr);
@@ -310,7 +339,7 @@ struct Quoter {
         }
     }
 
-    SCOPES_RESULT(Value *) quote_Merge(int level, Merge *node) {
+    SCOPES_RESULT(Value *) quote_MergeTemplate(int level, MergeTemplate *node) {
         SCOPES_RESULT_TYPE(Value *);
         auto _anchor = node->anchor();
         return Call::from(_anchor, g_sc_merge_new, {
@@ -319,7 +348,7 @@ struct Quoter {
         });
     }
 
-    SCOPES_RESULT(Value *) quote_Label(int level, Label *node) {
+    SCOPES_RESULT(Value *) quote_LabelTemplate(int level, LabelTemplate *node) {
         SCOPES_RESULT_TYPE(Value *);
         auto _anchor = node->anchor();
         auto value = Call::from(_anchor, g_sc_label_new, {

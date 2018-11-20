@@ -195,11 +195,6 @@ StyledStream& StyledStream::operator<<(const char * const s) {
 
 //------------------------------------------------------------------------------
 
-static const char even_letters[] = "bdfghklmnprstwx";
-static const char odd_letters[] = "aeiou";
-//static const char even_letters[] = "0123456789ABCDEF";
-//static const char odd_letters[] = "0123456789ABCDEF";
-
 // based on https://preshing.com/20121224/how-to-generate-a-sequence-of-unique-random-integers/
 static uint32_t permute(uint32_t x, uint32_t prime) {
     if (x >= prime)
@@ -227,13 +222,13 @@ static uint64_t scramble(uint64_t x) {
         uint32_t delta = 0;
         // from https://primes.utm.edu/lists/2small/0bit.html
         switch(bits) {
-        case  8: delta = 5; break; case  9: delta = 3; break; case 10: delta = 3; break; case 11: delta = 9; break;
-        case 12: delta = 3; break; case 13: delta = 1; break; case 14: delta = 3; break; case 15: delta = 19; break;
-        case 16: delta = 15; break; case 17: delta = 1; break; case 18: delta = 5; break; case 19: delta = 1; break;
-        case 20: delta = 3; break; case 21: delta = 9; break; case 22: delta = 3; break; case 23: delta = 15; break;
-        case 24: delta = 3; break; case 25: delta = 39; break; case 26: delta = 5; break; case 27: delta = 39; break;
-        case 28: delta = 57; break; case 29: delta = 3; break; case 30: delta = 35; break; case 31: delta = 1; break;
-        case 32: delta = 5; break; default: assert(false); break;
+        case  8: delta =  5; break; case  9: delta =  3; break; case 10: delta =  3; break; case 11: delta =  9; break;
+        case 12: delta =  3; break; case 13: delta =  1; break; case 14: delta =  3; break; case 15: delta = 19; break;
+        case 16: delta = 15; break; case 17: delta =  1; break; case 18: delta =  5; break; case 19: delta =  1; break;
+        case 20: delta =  3; break; case 21: delta =  9; break; case 22: delta =  3; break; case 23: delta = 15; break;
+        case 24: delta =  3; break; case 25: delta = 39; break; case 26: delta =  5; break; case 27: delta = 39; break;
+        case 28: delta = 57; break; case 29: delta =  3; break; case 30: delta = 35; break; case 31: delta =  1; break;
+        case 32: delta =  5; break; default: assert(false); break;
         }
         uint32_t prime = (1u << bits) - delta;
         uint32_t m = 0x5bf03635 & mask;
@@ -242,6 +237,13 @@ static uint64_t scramble(uint64_t x) {
     }
     return x | top;
 }
+
+#if 1
+// alternating base 15 / base 5
+static const char even_letters[] = "bdfghklmnprstwx";
+static const char odd_letters[] = "aeiou";
+//static const char even_letters[] = "0123456789ABCDEF";
+//static const char odd_letters[] = "0123456789ABCDEF";
 
 static void print_uid_digit(StyledStream &ss, uint64_t n, bool odd) {
 	if (n != 0) {
@@ -266,6 +268,40 @@ static void print_uid_digit(StyledStream &ss, uint64_t n, bool odd) {
 void stream_uid(StyledStream &ss, uint64_t uid) {
     print_uid_digit(ss, scramble(uid), false);
 }
+
+#else
+// partial katakana romaji, base 65
+
+static const char *syllables[] = {
+    "ka", "ki","ku","ke","ko",//"kya","kyu","kyo",
+    "sa",/*"shi",*/"su","se","so",//"sha","shu","sho",
+    "ta",/*"chi","tsu",*/"te","to",//"cha","chu","cho",
+    "na","ni","nu","ne","no",//"nya","nyu","nyo",
+    "ha","hi","fu","he","ho",//"hya","hyu","hyo",
+    "ma","mi","mu","me","mo",//"mya","myu","myo",
+    "ya","yu","yo",
+    "ra","ri","ru","re","ro",//"rya","ryu","ryo",
+    "wa","wi","we","wo",
+    "ga","gi","gu","ge","go",//"gya","gyu","gyo",
+    "za","ji","zu","ze","zo","ja","ju","jo",
+    "da","de","do",
+    "ba","bi","bu","be","bo",//"bya","byu","byo",
+    "pa","pi","pu","pe","po",//"pya","pyu","pyo",
+};
+
+static void print_uid_digit(StyledStream &ss, uint64_t n) {
+	if (n != 0) {
+        uint64_t base = sizeof(syllables) / sizeof(const char *);
+        print_uid_digit(ss, n / base);
+        ss << syllables[(n % base)];
+	}
+}
+
+void stream_uid(StyledStream &ss, uint64_t uid) {
+    print_uid_digit(ss, scramble(uid));
+}
+
+#endif
 
 void stream_address(StyledStream &ss, const void *ptr) {
     uint64_t addr = (uint64_t)ptr;

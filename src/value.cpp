@@ -225,47 +225,16 @@ Template *Template::from(
 
 Function::Function(const Anchor *anchor, Symbol _name, const Parameters &_params)
     : Pure(VK_Function, anchor),
-        name(_name), params(_params), value(nullptr),
-        docstring(nullptr), return_type(nullptr), except_type(nullptr),
+        name(_name), params(_params),
+        docstring(nullptr),
         frame(nullptr), boundary(nullptr), original(nullptr), label(nullptr),
-        complete(false), next_id(1) {
-    set_type(TYPE_Unknown);
+        complete(false) {
+    //set_type(TYPE_Unknown);
     body.depth = 1;
     int index = 0;
     for (auto param : params) {
         param->set_owner(this, index++);
     }
-}
-
-uint32_t Function::new_id() {
-    return next_id++;
-}
-
-uint32_t Function::get_id(Value *value) {
-    auto result = value2id.find(value);
-    if (result == value2id.end()) {
-        auto id = new_id();
-        value2id.insert({value, id});
-        id2value.insert({id, value});
-        return id;
-    }
-    return result->second;
-}
-
-Value *Function::get_value(uint32_t id) {
-    auto result = id2value.find(id);
-    assert(result != id2value.end());
-    return result->second;
-}
-
-uint32_t Function::get_id(Symbol name) {
-    auto result = name2block.find(name);
-    if (result == name2block.end()) {
-        auto id = new_id();
-        name2block.insert({ name, id });
-        return id;
-    }
-    return result->second;
 }
 
 void Function::append_param(Parameter *sym) {
@@ -345,20 +314,15 @@ Extern *Extern::from(const Anchor *anchor, const Type *type, Symbol name, size_t
 //------------------------------------------------------------------------------
 
 Block::Block()
-    : depth(0), insert_index(0), terminator(nullptr), blockid(0), parent(nullptr)
+    : depth(-1), insert_index(0), terminator(nullptr), parent(nullptr)
 {}
 
 void Block::annotate(const String *msg) {
     annotations.push_back(msg);
 }
 
-bool Block::is_scoped() const {
-    return blockid != 0;
-}
-
-void Block::set_scope(uint32_t _blockid, Block *_parent) {
-    assert(_blockid);
-    blockid = _blockid;
+void Block::set_parent(Block *_parent) {
+    assert(!parent && _parent);
     parent = _parent;
     if (_parent) {
         depth = _parent->depth + 1;
@@ -368,7 +332,6 @@ void Block::set_scope(uint32_t _blockid, Block *_parent) {
 void Block::clear() {
     body.clear();
     terminator = nullptr;
-    blockid = 0;
     parent = nullptr;
 }
 
@@ -442,6 +405,15 @@ Expression *Expression::unscoped_from(const Anchor *anchor, const Values &nodes,
     return expr;
 }
 
+//------------------------------------------------------------------------------
+
+CondBr::CondBr(const Anchor *anchor, Value *_cond)
+    : Instruction(VK_CondBr, anchor), cond(_cond)
+{}
+
+CondBr *CondBr::from(const Anchor *anchor, Value *cond) {
+    return new CondBr(anchor, cond);
+}
 
 //------------------------------------------------------------------------------
 
@@ -450,7 +422,7 @@ bool If::Clause::is_then() const {
 }
 
 If::If(const Anchor *anchor, const Clauses &_clauses)
-    : Instruction(VK_If, anchor), clauses(_clauses) {
+    : Value(VK_If, anchor), clauses(_clauses) {
 }
 
 If *If::from(const Anchor *anchor, const Clauses &_clauses) {
@@ -549,8 +521,19 @@ void Parameter::set_owner(Value *_owner, int _index) {
 
 //------------------------------------------------------------------------------
 
+Exception::Exception(const Anchor *anchor)
+    : Value(VK_Exception, anchor) {
+}
+
+Exception *Exception::from(const Anchor *anchor) {
+    return new Exception(anchor);
+}
+
+//------------------------------------------------------------------------------
+
 Call::Call(const Anchor *anchor, Value *_callee, const Values &_args)
-    : Instruction(VK_Call, anchor), callee(_callee), args(_args), flags(0), except_label(nullptr) {
+    : Instruction(VK_Call, anchor), callee(_callee), args(_args), flags(0),
+        except(nullptr) {
 }
 
 bool Call::is_rawcall() const {
@@ -567,8 +550,18 @@ Call *Call::from(const Anchor *anchor, Value *callee, const Values &args) {
 
 //------------------------------------------------------------------------------
 
+LoopLabel::LoopLabel(const Anchor *anchor, Value *_init)
+    : Instruction(VK_LoopLabel, anchor), init(_init) {
+}
+
+LoopLabel *LoopLabel::from(const Anchor *anchor, Value *init) {
+    return new LoopLabel(anchor, init);
+}
+
+//------------------------------------------------------------------------------
+
 Loop::Loop(const Anchor *anchor, Value *_init, Value *_value)
-    : Instruction(VK_Loop, anchor), init(_init), value(_value), return_type(nullptr) {
+    : Value(VK_Loop, anchor), init(_init), value(_value) {
 }
 
 Loop *Loop::from(const Anchor *anchor, Value *init, Value *value) {
@@ -577,21 +570,29 @@ Loop *Loop::from(const Anchor *anchor, Value *init, Value *value) {
 
 //------------------------------------------------------------------------------
 
-Label::Label(const Anchor *anchor, LabelKind _kind, Symbol _name, Value *_value)
-    : Instruction(VK_Label, anchor), name(_name), value(_value),
-        return_type(nullptr), label_kind(_kind) {}
+Label::Label(const Anchor *anchor, LabelKind _kind, Symbol _name)
+    : Instruction(VK_Label, anchor), name(_name), label_kind(_kind) {}
 
-Label *Label::from(const Anchor *anchor, LabelKind kind, Symbol name, Value *value) {
-    return new Label(anchor, kind, name, value);
+Label *Label::from(const Anchor *anchor, LabelKind kind, Symbol name) {
+    return new Label(anchor, kind, name);
 }
 
-Label *Label::try_from(const Anchor *anchor,
-    Value *value) {
-    return new Label(anchor, LK_Try, KW_Try, value);
+//------------------------------------------------------------------------------
+
+LabelTemplate::LabelTemplate(const Anchor *anchor, LabelKind _kind, Symbol _name, Value *_value)
+    : Value(VK_LabelTemplate, anchor), name(_name), value(_value), label_kind(_kind) {}
+
+LabelTemplate *LabelTemplate::from(const Anchor *anchor, LabelKind kind, Symbol name, Value *value) {
+    return new LabelTemplate(anchor, kind, name, value);
 }
-Label *Label::except_from(const Anchor *anchor,
+
+LabelTemplate *LabelTemplate::try_from(const Anchor *anchor,
     Value *value) {
-    return new Label(anchor, LK_Except, KW_Except, value);
+    return new LabelTemplate(anchor, LK_Try, KW_Try, value);
+}
+LabelTemplate *LabelTemplate::except_from(const Anchor *anchor,
+    Value *value) {
+    return new LabelTemplate(anchor, LK_Except, KW_Except, value);
 }
 
 //------------------------------------------------------------------------------
@@ -734,6 +735,15 @@ Merge *Merge::from(const Anchor *anchor, Label *label, Value *value) {
 
 //------------------------------------------------------------------------------
 
+MergeTemplate::MergeTemplate(const Anchor *anchor, LabelTemplate *_label, Value *_value)
+    : Value(VK_MergeTemplate, anchor), label(_label), value(_value) {}
+
+MergeTemplate *MergeTemplate::from(const Anchor *anchor, LabelTemplate *label, Value *value) {
+    return new MergeTemplate(anchor, label, value);
+}
+
+//------------------------------------------------------------------------------
+
 Raise::Raise(const Anchor *anchor, Value *_value)
     : Instruction(VK_Raise, anchor), value(_value) {}
 
@@ -782,6 +792,7 @@ Value::Value(ValueKind kind, const Anchor *anchor)
 
 bool Value::is_pure() const {
     switch(kind()) {
+    case VK_Exception:
     case VK_Parameter:
         return true;
     case VK_ArgumentList: {

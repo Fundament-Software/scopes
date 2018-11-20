@@ -316,6 +316,14 @@ SCOPES_RESULT(void) error_untyped_recursive_call(Function *func) {
     SCOPES_LOCATION_DEF_ERROR(func, ss.str());
 }
 
+SCOPES_RESULT(void) error_recursive_function_changed_type(Function *func, const Type *T1, const Type *T2) {
+    SCOPES_RESULT_TYPE(void);
+    StyledString ss;
+    ss.out << "recursive function " << func->name
+         << " changed signature from " << T1 << " to " << T2 << " after first use";
+    SCOPES_LOCATION_DEF_ERROR(func, ss.str());
+}
+
 SCOPES_RESULT(void) error_value_inaccessible_from_closure(Value *value,
     const Function *frame) {
     SCOPES_RESULT_TYPE(void);

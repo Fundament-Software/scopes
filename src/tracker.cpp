@@ -215,6 +215,11 @@ struct Tracker {
         return {};
     }
 
+    SCOPES_RESULT(void) track_Exception(State &state, Value *node) {
+        assert(false);
+        return {};
+    }
+
     void collect_local_keys(ValueIndexSet &set, State &from, int retdepth) {
         for (auto &entries : from._data) {
             const ValueIndex &key = entries.first;
@@ -271,50 +276,16 @@ struct Tracker {
         return {};
     }
 
-    SCOPES_RESULT(void) track_If(State &state, If *node) {
+    SCOPES_RESULT(void) track_CondBr(State &state, CondBr *node) {
         SCOPES_RESULT_TYPE(void);
         SCOPES_CHECK_RESULT(verify_deps(state, node, node->deps, node->get_type(), "branch"));
-        auto &&clauses = node->clauses;
-        auto clause_count = clauses.size();
-        std::vector<State> states;
-        std::vector<State> cond_states;
-        states.reserve(clause_count);
-        cond_states.reserve(clause_count);
-        State *cond_state = &state;
-        for (auto &&clause : clauses) {
-            if (clause.is_then()) {
-                cond_states.push_back(State(clause.cond_body, *cond_state));
-                State &clause_cond_state = cond_states.back();
-                states.push_back(State(clause.body, clause_cond_state));
-                State &clause_state = states.back();
-                SCOPES_CHECK_RESULT(track_block(clause_state, clause.value));
-                SCOPES_CHECK_RESULT(track_block(clause_cond_state, clause.cond));
-                cond_state = &clause_cond_state;
-            } else {
-                states.push_back(State(clause.body, *cond_state));
-                State &clause_state = states.back();
-                SCOPES_CHECK_RESULT(track_block(clause_state, clause.value));
-                cond_state = nullptr;
-            }
-        }
-        assert(!cond_state);
-        int i = clause_count;
-        State *else_state = nullptr;
-        while (i-- > 0) {
-            auto &&clause = clauses[i];
-            State &clause_state = states[i];
-            if (clause.is_then()) {
-                State &clause_cond_state = cond_states[i];
-                assert(else_state);
-                SCOPES_CHECK_RESULT(merge_states(
-                    clause_cond_state, clause_state, *else_state));
-                else_state = &clause_cond_state;
-            } else {
-                else_state = &clause_state;
-            }
-        }
-        assert(else_state);
-        SCOPES_CHECK_RESULT(merge_state(state, *else_state, "if-merge"));
+        State then_state(node->then_body, state);
+        State else_state(node->else_body, state);
+        SCOPES_CHECK_RESULT(track_block(then_state));
+        SCOPES_CHECK_RESULT(track_block(else_state));
+        SCOPES_CHECK_RESULT(merge_states(
+            state, then_state, else_state));
+        SCOPES_CHECK_RESULT(visit_value(state, VM_FORCE_COPY_OR_MOVE, node->cond, "conditional"));
         return {};
     }
     SCOPES_RESULT(void) track_Switch(State &state, Switch *node) {
@@ -384,8 +355,9 @@ struct Tracker {
         SCOPES_RESULT_TYPE(void);
         auto callee = node->callee;
         const Type *T = callee->get_type();
+        const FunctionType *ft = nullptr;
         if (is_function_pointer(T)) {
-            const FunctionType *ft = extract_function_type(T);
+            ft = extract_function_type(T);
             int numargs = (int)ft->argument_types.size();
             assert(numargs <= node->args.size());
             for (int i = 0; i < numargs; ++i) {
@@ -420,14 +392,29 @@ struct Tracker {
             SCOPES_CHECK_RESULT(visit_values(state, VM_AUTO, node->args, "call"));
         }
         SCOPES_CHECK_RESULT(visit_argument(state, VM_AUTO, ValueIndex(node->callee), "call"));
+        #if 0
+        if (ft && ft->has_exception()) {
+            int retdepth = 0;
+            if (node->except_label) {
+                retdepth = node->except_label->body.depth - 1;
+            }
+            // generate unwind destructors for an untimely exit
+            State unwind_state(node->unwind_body, state);
+            unwind_state.finalize();
+            // write destructors for registered arguments
+            SCOPES_CHECK_RESULT(write_collected_destructors(unwind_state, state.collect_order, "unwind collector"));
+            // write return destructors
+            SCOPES_CHECK_RESULT(write_return_destructors(unwind_state, retdepth, "unwind return"));
+        }
+        #endif
         return {};
     }
-    SCOPES_RESULT(void) track_Loop(State &state, Loop *node) {
+    SCOPES_RESULT(void) track_LoopLabel(State &state, LoopLabel *node) {
         SCOPES_RESULT_TYPE(void);
         auto old_active_loop = active_loop;
         active_loop = node;
         State loop_state(node->body, state);
-        SCOPES_CHECK_RESULT(track_block(loop_state, node->value));
+        SCOPES_CHECK_RESULT(track_block(loop_state));
         SCOPES_CHECK_RESULT(merge_state(state, loop_state, "loop-merge"));
         active_loop = old_active_loop;
         SCOPES_CHECK_RESULT(visit_value(state, VM_AUTO, node->init, "loop"));
@@ -446,7 +433,7 @@ struct Tracker {
     SCOPES_RESULT(void) track_Label(State &state, Label *node) {
         SCOPES_RESULT_TYPE(void);
         State label_state(node->body, state);
-        SCOPES_CHECK_RESULT(track_block(label_state, node->value));
+        SCOPES_CHECK_RESULT(track_block(label_state));
         SCOPES_CHECK_RESULT(merge_state(state, label_state, "label-merge"));
         return {};
     }
@@ -465,6 +452,25 @@ struct Tracker {
     SCOPES_RESULT(void) track_ExtractArgument(State &state, ExtractArgument *node) {
         assert(!node->vararg);
         return visit_argument(state, VM_AUTO, ValueIndex(node->value, node->index), "extract argument");
+    }
+
+    SCOPES_RESULT(void) track_block(State &state) {
+        SCOPES_RESULT_TYPE(void);
+        auto &&block = state.block;
+        auto loc = state.where;
+        if (block.terminator) {
+            auto val = block.terminator;
+            block.insert_at_end();
+            SCOPES_CHECK_RESULT(track_instruction(state, val));
+        }
+        auto &&body = block.body;
+        int i = body.size();
+        while (i-- > 0) {
+            block.insert_at(i + 1);
+            SCOPES_CHECK_RESULT(track_instruction(state, body[i]));
+        }
+        state.set_location(loc);
+        return {};
     }
 
     SCOPES_RESULT(void) track_block(State &state, Value *return_value) {
@@ -497,7 +503,7 @@ struct Tracker {
         SCOPES_RESULT_TYPE(void);
         StyledStream ss;
         ss << "processing #" << track_count << std::endl;
-        const int HALT_AT = 0;
+        const int HALT_AT = 4;
         if (track_count == HALT_AT) {
             StyledStream ss;
             stream_ast(ss, function, StreamASTFormat());
@@ -509,7 +515,7 @@ struct Tracker {
         auto &&deps = function->deps;
         SCOPES_CHECK_RESULT(verify_deps(root_state, function, deps,
             return_type, "return"));
-        SCOPES_CHECK_RESULT(track_block(root_state, function->value));
+        SCOPES_CHECK_RESULT(track_block(root_state));
         {
             Types rettypes;
             int acount = get_argument_count(return_type);
@@ -585,7 +591,7 @@ struct Tracker {
             StyledString ss;
             ss.out
                 << Style_Error << "error: " << Style_None
-                << "attempt to move " << arg << " which is tagged as ";
+                << context << " attempts to move " << arg << " which is tagged as ";
             int acount = 0;
             if (data.will_be_used()) {
                 ss.out << "to-be-used by " << data.get_user();
@@ -618,14 +624,10 @@ struct Tracker {
         return {};
     }
 
-    SCOPES_RESULT(void) track_return_argument(State &state, Value *node,
+    SCOPES_RESULT(void) write_return_destructors(State &state,
         int retdepth, const char *context) {
         SCOPES_RESULT_TYPE(void);
         assert(retdepth >= 0);
-        assert(node);
-        auto T = node->get_type();
-        if (!is_returning_value(T))
-            return {};
         // collect values to be moved later which are in the scopes we are
         // jumping out of
         State *s = state.parent;
@@ -647,6 +649,18 @@ struct Tracker {
             // data will be moved, so we need to write a destructor
             SCOPES_CHECK_RESULT(write_destructor(state, entry, context));
         }
+        return {};
+    }
+
+    SCOPES_RESULT(void) track_return_argument(State &state, Value *node,
+        int retdepth, const char *context) {
+        SCOPES_RESULT_TYPE(void);
+        assert(retdepth >= 0);
+        assert(node);
+        auto T = node->get_type();
+        if (!is_returning_value(T))
+            return {};
+        SCOPES_CHECK_RESULT(write_return_destructors(state, retdepth, context));
         SCOPES_CHECK_RESULT(visit_value(state, VM_AUTO, node, context, retdepth));
         return {};
     }
@@ -683,7 +697,7 @@ struct Tracker {
                 Call::from(anchor, handler, {
                     ExtractArgument::from(anchor, arg.value, arg.index) });
             SCOPES_CHECK_RESULT(
-                prove(ctx.with_block(state.block).with_symbol_target(), expr));
+                prove(ctx.with_block(state.block), expr));
         }
         return {};
     }
@@ -923,19 +937,26 @@ struct Tracker {
         return {};
     }
 
-    SCOPES_RESULT(void) collect(State &state) {
+    SCOPES_RESULT(void) write_collected_destructors(State &state,
+        const ValueIndices &collect_order, const char *context) {
         SCOPES_RESULT_TYPE(void);
         // drop all collected values
-        for (auto arg : state.collect_order) {
-            SCOPES_CHECK_RESULT(drop_argument(state, arg, "collector"));
+        for (auto arg : collect_order) {
+            SCOPES_CHECK_RESULT(drop_argument(state, arg, context));
         }
+        return {};
+    }
+
+    SCOPES_RESULT(void) collect(State &state) {
+        SCOPES_RESULT_TYPE(void);
+        SCOPES_CHECK_RESULT(write_collected_destructors(state, state.collect_order, "collector"));
         state.clear_garbage();
         return {};
     }
 
     ASTContext &ctx;
     Function *function;
-    Loop *active_loop;
+    LoopLabel *active_loop;
 };
 
 SCOPES_RESULT(void) track(ASTContext &ctx) {

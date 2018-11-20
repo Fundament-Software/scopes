@@ -109,21 +109,24 @@ struct StreamAST : StreamAnchors {
     }
 
     void stream_block(const Block &block, int depth, int maxdepth) {
-        if (!block.empty())
-            return;
         stream_newline();
         stream_indent(depth);
+        if (block.empty()) {
+            ss << Style_Error << "<empty>" << Style_None;
+            return;
+        }
         ss << Style_Keyword << "body" << Style_None;
         ss << " " << block.depth;
         for (int i = 0; i < block.body.size(); ++i) {
-            walk_newline(block.body[i], depth+1, maxdepth);
+            walk_newline(block.body[i], depth, maxdepth);
         }
         stream_annotations(depth, block.annotations);
         if (block.terminator) {
+            walk_newline(block.terminator, depth, maxdepth);
+        } else {
             stream_newline();
             stream_indent(depth);
-            ss << Style_Keyword << "---" << Style_None;
-            walk_newline(block.terminator, depth+1, maxdepth);
+            ss << Style_Error << "<terminator missing>" << Style_None;
         }
     }
 
@@ -140,9 +143,12 @@ struct StreamAST : StreamAnchors {
             if (block.terminator) {
                 stream_newline();
                 stream_indent(depth);
-                ss << Style_Keyword << "---" << Style_None;
                 walk_newline(block.terminator, depth, maxdepth);
                 return;
+            } else {
+                stream_newline();
+                stream_indent(depth);
+                ss << Style_Error << "<terminator missing>" << Style_None;
             }
         }
         stream_newline();
@@ -284,7 +290,7 @@ struct StreamAST : StreamAnchors {
 
         if (newlines && !node->is_pure()) {
             if (is_new) {
-                if (is_returning_value(node->get_type())) {
+                if (!node->is_typed() || is_returning_value(node->get_type())) {
                     ss << Style_Operator << "%" << Style_None;
                     ss << Style_Number;
                     stream_address(ss, node);
@@ -357,7 +363,7 @@ struct StreamAST : StreamAnchors {
                     }
                     ss << Style_Operator << " )" << Style_None;
                     stream_annotations(depth+1, val->annotations);
-                    stream_block_result(val->body, val->value, depth+1, maxdepth);
+                    stream_block(val->body, depth+1, maxdepth);
                 } else if (dependent_functions) {
                     todo.push_back(node);
                 }
@@ -393,6 +399,21 @@ struct StreamAST : StreamAnchors {
                 }
             }
         } break;
+        case VK_CondBr: {
+            auto val = cast<CondBr>(node);
+            ss << node;
+            if (newlines) {
+                walk_same_or_newline(val->cond, depth+1, maxdepth);
+                stream_newline();
+                stream_indent(depth);
+                ss << Style_Keyword << "then" << Style_None;
+                stream_block(val->then_body, depth+1, maxdepth);
+                stream_newline();
+                stream_indent(depth);
+                ss << Style_Keyword << "else" << Style_None;
+                stream_block(val->else_body, depth+1, maxdepth);
+            }
+        } break;
         case VK_If: {
             auto val = cast<If>(node);
             ss << node;
@@ -403,7 +424,7 @@ struct StreamAST : StreamAnchors {
                         stream_newline();
                         stream_indent(depth+1);
                         ss << Style_Keyword << "condition" << Style_None;
-                        stream_block_result(expr.cond_body, expr.cond, depth+2, maxdepth);
+                        walk_same_or_newline(expr.cond, depth+2, maxdepth);
                         stream_newline();
                         stream_indent(depth+1);
                         ss << Style_Keyword << "then" << Style_None;
@@ -412,7 +433,7 @@ struct StreamAST : StreamAnchors {
                         stream_indent(depth+1);
                         ss << Style_Keyword << "else" << Style_None;
                     }
-                    stream_block_result(expr.body, expr.value, depth+2, maxdepth);
+                    walk_same_or_newline(expr.value, depth+2, maxdepth);
                 }
             }
         } break;
@@ -426,6 +447,9 @@ struct StreamAST : StreamAnchors {
             }
             stream_type_suffix(node);
         } break;
+        case VK_Exception: {
+            ss << node;
+        } break;
         case VK_Call: {
             auto val = cast<Call>(node);
             ss << node;
@@ -433,15 +457,11 @@ struct StreamAST : StreamAnchors {
                 if (val->flags & CF_RawCall) {
                     ss << Style_Keyword << " rawcall" << Style_None;
                 }
-                if (val->except_label) {
-                    ss << Style_Keyword << " except=" << Style_None;
-                    ss << Style_Symbol << val->except_label->name.name()->data
-                        << "@";
-                    stream_address(ss, val->except_label);
-                    ss << Style_None;
-                }
                 walk_same_or_newline(val->callee, depth+1, maxdepth);
                 write_arguments(val->args, depth, maxdepth);
+                if (!val->except_body.empty()) {
+                    stream_block(val->except_body, depth+1, maxdepth);
+                }
             }
         } break;
         case VK_ArgumentList: {
@@ -475,7 +495,35 @@ struct StreamAST : StreamAnchors {
             if (newlines) {
                 ss << " " << Style_Operator << "=" << Style_None;
                 walk_same_or_newline(val->init, depth+1, maxdepth);
-                stream_block_result(val->body, val->value, depth+1, maxdepth);
+                walk_same_or_newline(val->value, depth+1, maxdepth);
+            }
+        } break;
+        case VK_LoopLabel: {
+            auto val = cast<LoopLabel>(node);
+            ss << node;
+            if (newlines) {
+                ss << " " << Style_Operator << "=" << Style_None;
+                walk_same_or_newline(val->init, depth+1, maxdepth);
+                stream_block(val->body, depth+1, maxdepth);
+            }
+        } break;
+        case VK_LabelTemplate: {
+            auto val = cast<LabelTemplate>(node);
+            ss << node;
+            ss << " ";
+            switch(val->label_kind) {
+            #define T(NAME, BNAME) \
+                case NAME: ss << Style_Keyword << BNAME; break;
+            SCOPES_LABEL_KIND()
+            #undef T
+            default:
+                ss << Style_Error << "?kind";
+            }
+            ss << Style_None << " ";
+            ss << Style_Symbol << val->name.name()->data;
+            ss << Style_None;
+            if (newlines) {
+                walk_same_or_newline(val->value, depth+1, maxdepth);
             }
         } break;
         case VK_Label: {
@@ -491,11 +539,10 @@ struct StreamAST : StreamAnchors {
                 ss << Style_Error << "?kind";
             }
             ss << Style_None << " ";
-            ss << Style_Symbol << val->name.name()->data << "@";
-            stream_address(ss, val);
+            ss << Style_Symbol << val->name.name()->data;
             ss << Style_None;
             if (newlines) {
-                stream_block_result(val->body, val->value, depth+1, maxdepth);
+                stream_block(val->body, depth+1, maxdepth);
             }
         } break;
         case VK_Extern: {
@@ -592,6 +639,17 @@ struct StreamAST : StreamAnchors {
         } break;
         case VK_Merge: {
             auto val = cast<Merge>(node);
+            ss << node;
+            ss << " ";
+            ss << Style_Symbol << val->label->name.name()->data << "@";
+            stream_address(ss, val->label);
+            ss << Style_None;
+            if (newlines) {
+                walk_same_or_newline(val->value, depth+1, maxdepth);
+            }
+        } break;
+        case VK_MergeTemplate: {
+            auto val = cast<MergeTemplate>(node);
             ss << node;
             ss << " ";
             ss << Style_Symbol << val->label->name.name()->data << "@";
