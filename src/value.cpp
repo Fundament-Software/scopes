@@ -317,10 +317,6 @@ Block::Block()
     : depth(-1), insert_index(0), terminator(nullptr), parent(nullptr)
 {}
 
-void Block::annotate(const String *msg) {
-    annotations.push_back(msg);
-}
-
 void Block::set_parent(Block *_parent) {
     assert(!parent && _parent);
     parent = _parent;
@@ -823,10 +819,6 @@ bool Value::is_accessible() const {
     default: break;
     }
     return isa<Pure>(this);
-}
-
-void Value::annotate(const String *msg) {
-    annotations.push_back(msg);
 }
 
 bool Value::is_typed() const {

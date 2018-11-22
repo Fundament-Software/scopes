@@ -164,10 +164,8 @@ struct Value {
     bool is_pure() const;
     bool is_accessible() const;
     int get_depth() const;
-    void annotate(const String *msg);
 
     Depends deps;
-    Strings annotations;
 private:
     const ValueKind _kind;
     const Type *_type;
@@ -189,14 +187,11 @@ struct Block {
     void insert_at(int index);
     void insert_at_end();
 
-    void annotate(const String *msg);
-
     int depth;
     int insert_index;
     Instructions body;
     Instruction *terminator;
     Block *parent;
-    Strings annotations;
 };
 
 //------------------------------------------------------------------------------

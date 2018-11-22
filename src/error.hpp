@@ -110,6 +110,7 @@ SCOPES_RESULT(void) error_value_moved(Value *value, Value *mover, const char *by
 SCOPES_RESULT(void) error_value_in_use(Value *value, Value *user, const char *by);
 SCOPES_RESULT(void) error_value_is_viewed(Value *value, Value *user, const char *by);
 SCOPES_RESULT(void) error_cannot_merge_moves(const char *by);
+SCOPES_RESULT(void) error_nonreturning_function_must_move();
 
 // code generator errors
 SCOPES_RESULT(void) error_gen_invalid_call_type(const char *target, Value *callee);

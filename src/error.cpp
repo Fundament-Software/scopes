@@ -167,7 +167,7 @@ SCOPES_RESULT(void) error_argument_type_mismatch(const Type *expected, const Typ
 SCOPES_RESULT(void) error_value_moved(Value *value, Value *mover, const char *by) {
     SCOPES_RESULT_TYPE(void);
     StyledString ss;
-    ss.out << by << " cannot move unique value because it will already be moved";
+    ss.out << by << " cannot move value of type " << value->get_type() << " out of function because it is still in use";
     SCOPES_LOCATION_DEF_ERROR(mover, ss.str());
 }
 
@@ -189,6 +189,13 @@ SCOPES_RESULT(void) error_cannot_merge_moves(const char *by) {
     SCOPES_RESULT_TYPE(void);
     StyledString ss;
     ss.out << "conflicting attempt in " << by << " to move or view unique value(s)";
+    SCOPES_LOCATION_ERROR(ss.str());
+}
+
+SCOPES_RESULT(void) error_nonreturning_function_must_move() {
+    SCOPES_RESULT_TYPE(void);
+    StyledString ss;
+    ss.out << "non-returning function must acquire all arguments";
     SCOPES_LOCATION_ERROR(ss.str());
 }
 

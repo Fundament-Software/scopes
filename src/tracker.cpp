@@ -18,8 +18,6 @@
 
 #include <unordered_map>
 
-// do not produce errors, do not generate destructors
-#define SCOPES_SOFT_TRACKING 1
 // annotate blocks and instructions with actions
 #define SCOPES_ANNOTATE_TRACKING 1
 
@@ -30,6 +28,13 @@ namespace scopes {
 /*
 for more info on borrow inference, see
 https://gist.github.com/paniq/71251083aa52c1577f2d1b22be0ac6e1
+
+lessons learned:
+* nearly all built-ins consume arguments as handles
+* "plain" typed arguments can be copied, and so views can also be copied to new handles
+* any instruction with noreturn type requires post-actions to be executed first,
+  and all arguments must be consumed by the instruction
+
 */
 
 //------------------------------------------------------------------------------
@@ -104,18 +109,7 @@ struct Tracker {
         }
 
         void finalize() {
-            block.insert_at_end();
             finalized = true;
-        }
-
-        void annotate(const String *str) {
-            assert(str);
-            if (finalized) {
-                block.annotate(str);
-            } else {
-                assert(where);
-                where->annotate(str);
-            }
         }
 
         void set_location(Value *_where) {
@@ -133,11 +127,6 @@ struct Tracker {
         }
 
         void delete_data(const ValueIndex &value) {
-        #if SCOPES_ANNOTATE_TRACKING
-            StyledString ss;
-            ss.out << "beginning lifetime of " << value << ", not tracked before this point";
-            annotate(ss.str());
-        #endif
             auto it = _data.find(value);
             if (it != _data.end()) {
                 _data.erase(it);
@@ -146,17 +135,7 @@ struct Tracker {
         }
 
         Data &ensure_data(const ValueIndex &value) {
-        #if SCOPES_ANNOTATE_TRACKING
-            if (_deleted.count(value)) {
-                StyledString ss;
-                ss.out << Style_Error << "error: " << Style_None
-                    << "referencing " << value << " before it is created";
-                annotate(ss.str());
-            }
-        #endif
-            if (!SCOPES_SOFT_TRACKING) {
-                assert(!_deleted.count(value));
-            }
+            assert(!_deleted.count(value));
             auto data = find_data(value);
             if (data)
                 return *data;
@@ -264,12 +243,12 @@ struct Tracker {
         for (auto key : then_moved) {
             if (else_moved.count(key))
                 continue;
-            SCOPES_CHECK_RESULT(drop_argument(_else, key, "then-branch"));
+            SCOPES_CHECK_RESULT(drop_argument(_else, key, "then->else-branch"));
         }
         for (auto key : else_moved) {
             if (then_moved.count(key))
                 continue;
-            SCOPES_CHECK_RESULT(drop_argument(_then, key, "else-branch"));
+            SCOPES_CHECK_RESULT(drop_argument(_then, key, "else->then-branch"));
         }
         state.finalize();
         SCOPES_CHECK_RESULT(merge_state(state, _then, "branch-merge"));
@@ -283,9 +262,16 @@ struct Tracker {
         State else_state(node->else_body, state);
         SCOPES_CHECK_RESULT(track_block(then_state));
         SCOPES_CHECK_RESULT(track_block(else_state));
+        // problem here: the conditional is consumed by the branch check, but needs to be
+        // destroyed afterwards; since we have no guarantee that our branches return, we need to
+        // inject the destructors in both branches
+        SCOPES_CHECK_RESULT(visit_value(then_state, VM_FORCE_COPY_OR_DROP, node->cond, "conditional"));
+        SCOPES_CHECK_RESULT(collect(then_state));
+        SCOPES_CHECK_RESULT(visit_value(else_state, VM_FORCE_COPY_OR_DROP, node->cond, "conditional"));
+        SCOPES_CHECK_RESULT(collect(else_state));
         SCOPES_CHECK_RESULT(merge_states(
             state, then_state, else_state));
-        SCOPES_CHECK_RESULT(visit_value(state, VM_FORCE_COPY_OR_MOVE, node->cond, "conditional"));
+
         return {};
     }
     SCOPES_RESULT(void) track_Switch(State &state, Switch *node) {
@@ -315,7 +301,7 @@ struct Tracker {
             }
             next_state = &case_state;
         }
-        SCOPES_CHECK_RESULT(visit_argument(state, VM_AUTO, ValueIndex(node->expr), "switch selector"));
+        SCOPES_CHECK_RESULT(visit_argument(state, VM_FORCE_COPY_OR_DROP, ValueIndex(node->expr), "switch selector"));
         return {};
     }
 
@@ -336,16 +322,7 @@ struct Tracker {
             #endif
             assert(i < kinds.size());
             if (kinds[i] == DK_Conflicted) {
-            #if SCOPES_ANNOTATE_TRACKING
-                {
-                    StyledString ss;
-                    ss.out << Style_Error << "error: " << Style_None << context << " conflict, not all merges perform the same move/view operation";
-                    state.annotate(ss.str());
-                }
-            #endif
-                if (!SCOPES_SOFT_TRACKING) {
-                    SCOPES_EXPECT_ERROR(error_cannot_merge_moves(context));
-                }
+                SCOPES_EXPECT_ERROR(error_cannot_merge_moves(context));
             }
         }
         return {};
@@ -353,29 +330,38 @@ struct Tracker {
 
     SCOPES_RESULT(void) track_Call(State &state, Call *node) {
         SCOPES_RESULT_TYPE(void);
+        SCOPES_ANCHOR(node->anchor());
+        // special care needs to be taken with nonreturning functions, which
+        // must move all their arguments.
         auto callee = node->callee;
         const Type *T = callee->get_type();
         const FunctionType *ft = nullptr;
         if (is_function_pointer(T)) {
             ft = extract_function_type(T);
             int numargs = (int)ft->argument_types.size();
+            bool returning = is_returning(ft->return_type);
             assert(numargs <= node->args.size());
             for (int i = 0; i < numargs; ++i) {
                 Value *arg = node->args[i];
                 const Type *argT = ft->argument_types[i];
                 auto vq = try_qualifier<ViewQualifier>(argT);
                 if (vq) {
+                    if (!returning) {
+                        SCOPES_EXPECT_ERROR(error_nonreturning_function_must_move());
+                    }
                     // we're viewing
                     SCOPES_CHECK_RESULT(visit_value(state, VM_FORCE_VIEW, arg, "argument"));
                 } else {
                     // we're moving
-                    SCOPES_CHECK_RESULT(visit_value(state, VM_FORCE_COPY_OR_MOVE, arg, "argument"));
+                    SCOPES_CHECK_RESULT(visit_value(state, returning?VM_FORCE_COPY_OR_MOVE:VM_FORCE_MOVE, arg, "argument"));
                 }
             }
         } else if (T == TYPE_Builtin) {
             Builtin b = SCOPES_GET_RESULT(extract_builtin_constant(callee));
-            SCOPES_ANCHOR(node->anchor());
             switch(b.value()) {
+            case FN_Annotate: {
+                return {};
+            } break;
             case FN_Move:
             case FN_Forget: {
                 assert(node->args.size() == 1);
@@ -392,21 +378,11 @@ struct Tracker {
             SCOPES_CHECK_RESULT(visit_values(state, VM_AUTO, node->args, "call"));
         }
         SCOPES_CHECK_RESULT(visit_argument(state, VM_AUTO, ValueIndex(node->callee), "call"));
-        #if 0
         if (ft && ft->has_exception()) {
-            int retdepth = 0;
-            if (node->except_label) {
-                retdepth = node->except_label->body.depth - 1;
-            }
             // generate unwind destructors for an untimely exit
-            State unwind_state(node->unwind_body, state);
-            unwind_state.finalize();
-            // write destructors for registered arguments
-            SCOPES_CHECK_RESULT(write_collected_destructors(unwind_state, state.collect_order, "unwind collector"));
-            // write return destructors
-            SCOPES_CHECK_RESULT(write_return_destructors(unwind_state, retdepth, "unwind return"));
+            State except_state(node->except_body, state);
+            SCOPES_CHECK_RESULT(track_block(except_state));
         }
-        #endif
         return {};
     }
     SCOPES_RESULT(void) track_LoopLabel(State &state, LoopLabel *node) {
@@ -469,6 +445,7 @@ struct Tracker {
             block.insert_at(i + 1);
             SCOPES_CHECK_RESULT(track_instruction(state, body[i]));
         }
+        block.insert_at(0);
         state.set_location(loc);
         return {};
     }
@@ -503,7 +480,7 @@ struct Tracker {
         SCOPES_RESULT_TYPE(void);
         StyledStream ss;
         ss << "processing #" << track_count << std::endl;
-        const int HALT_AT = 4;
+        const int HALT_AT = 7;
         if (track_count == HALT_AT) {
             StyledStream ss;
             stream_ast(ss, function, StreamASTFormat());
@@ -537,7 +514,7 @@ struct Tracker {
                             set.insert(param->index);
                         }
                     }
-                    if (!set.empty())
+                    if (!set.empty() && !is_plain(T))
                         T = view_type(T, set);
                 }
                 rettypes.push_back(T);
@@ -549,7 +526,7 @@ struct Tracker {
             auto param = function->params[i];
             const Type *T = param->get_type();
             const Data *data = root_state.find_data(ValueIndex(param));
-            if (!(data && data->will_be_moved())) {
+            if (!(data && data->will_be_moved()) && !is_plain(T)) {
                 T = view_type(T, {});
             }
             argtypes.push_back(T);
@@ -571,13 +548,6 @@ struct Tracker {
 
     void view_argument(State &state,
         const ValueIndex &arg, const char *context) {
-        #if SCOPES_ANNOTATE_TRACKING
-        {
-            StyledString ss;
-            ss.out << context << " tagging " << arg << " as to-be-used";
-            state.annotate(ss.str());
-        }
-        #endif
         auto &data = state.ensure_data(arg);
         data.use(state.where);
     }
@@ -586,40 +556,11 @@ struct Tracker {
         const ValueIndex &arg, const char *context) {
         SCOPES_RESULT_TYPE(void);
         auto &data = state.ensure_data(arg);
-        #if SCOPES_ANNOTATE_TRACKING
-        if (data.will_be_used() || data.will_be_moved()) {
-            StyledString ss;
-            ss.out
-                << Style_Error << "error: " << Style_None
-                << context << " attempts to move " << arg << " which is tagged as ";
-            int acount = 0;
-            if (data.will_be_used()) {
-                ss.out << "to-be-used by " << data.get_user();
-                acount++;
-            }
-            if (data.will_be_moved()) {
-                if (acount)
-                    ss.out << " and ";
-                ss.out << "to-be-moved by " << data.get_mover();
-            }
-            state.annotate(ss.str());
-            return {};
+        if (data.will_be_used()) {
+            SCOPES_EXPECT_ERROR(error_value_in_use(arg.value, data.get_user(), context));
+        } else if (data.will_be_moved()) {
+            SCOPES_EXPECT_ERROR(error_value_moved(arg.value, data.get_mover(), context));
         }
-        #endif
-        if (!SCOPES_SOFT_TRACKING) {
-            if (data.will_be_used()) {
-                SCOPES_EXPECT_ERROR(error_value_in_use(arg.value, data.get_user(), context));
-            } else if (data.will_be_moved()) {
-                SCOPES_EXPECT_ERROR(error_value_moved(arg.value, data.get_mover(), context));
-            }
-        }
-        #if SCOPES_ANNOTATE_TRACKING
-        {
-            StyledString ss;
-            ss.out << context << " tagging " << arg << " as to-be-moved";
-            state.annotate(ss.str());
-        }
-        #endif
         data.move(state.where, state.block.depth);
         return {};
     }
@@ -641,6 +582,9 @@ struct Tracker {
                     moved.insert(key);
                 }
             }
+            for (auto vi : s->collect_order) {
+                moved.insert(vi);
+            }
             s = s->parent;
         }
         // finally generate destructors for those values
@@ -649,6 +593,7 @@ struct Tracker {
             // data will be moved, so we need to write a destructor
             SCOPES_CHECK_RESULT(write_destructor(state, entry, context));
         }
+
         return {};
     }
 
@@ -671,6 +616,18 @@ struct Tracker {
         return write_destructor(state, arg, context);
     }
 
+    void write_annotation(State &state, const String *msg, Values values) {
+        auto where = state.where;
+        assert(where);
+        auto anchor = where->anchor();
+        values.insert(values.begin(), ConstPointer::string_from(anchor, msg));
+        auto expr =
+            Call::from(anchor,
+                ConstInt::builtin_from(anchor, Builtin(FN_Annotate)),
+                    values);
+        prove(ctx.with_block(state.block), expr).assert_ok();
+    }
+
     SCOPES_RESULT(void) write_destructor(State &state, const ValueIndex &arg, const char *context) {
         SCOPES_RESULT_TYPE(void);
         // generate destructor
@@ -679,26 +636,24 @@ struct Tracker {
         if (!argT->lookup(SYM_DropHandler, handler)) {
             #if SCOPES_ANNOTATE_TRACKING
             StyledString ss;
-            ss.out << context << " invokes empty destructor of " << arg;
-            state.annotate(ss.str());
+            ss.out << context << ": forget";
+            write_annotation(state, ss.str(), { arg.value });
             #endif
             return {};
         }
         #if SCOPES_ANNOTATE_TRACKING
         StyledString ss;
-        ss.out << context << " invokes destructor of " << arg;
-        state.annotate(ss.str());
+        ss.out << context << " destruct";
+        write_annotation(state, ss.str(), { arg.value });
         #endif
-        if (!SCOPES_SOFT_TRACKING) {
-            auto where = state.where;
-            assert(where);
-            auto anchor = where->anchor();
-            auto expr =
-                Call::from(anchor, handler, {
-                    ExtractArgument::from(anchor, arg.value, arg.index) });
-            SCOPES_CHECK_RESULT(
-                prove(ctx.with_block(state.block), expr));
-        }
+        auto where = state.where;
+        assert(where);
+        auto anchor = where->anchor();
+        auto expr =
+            Call::from(anchor, handler, {
+                ExtractArgument::from(anchor, arg.value, arg.index) });
+        SCOPES_CHECK_RESULT(
+            prove(ctx.with_block(state.block), expr));
         return {};
     }
 
@@ -734,22 +689,12 @@ struct Tracker {
         } break;
         case VM_FORCE_MOVE: {
             if (is_plain(arg.get_type())) {
-                #if SCOPES_ANNOTATE_TRACKING
-                StyledString ss;
-                ss.out << context << " moves plain " << arg;
-                state.annotate(ss.str());
-                #endif
             }
             SCOPES_CHECK_RESULT(
                 move_argument(state, arg, context));
         } break;
         case VM_FORCE_COPY_OR_MOVE: {
             if (is_plain(arg.get_type())) {
-                #if SCOPES_ANNOTATE_TRACKING
-                StyledString ss;
-                ss.out << context << " moves copy of plain " << arg;
-                state.annotate(ss.str());
-                #endif
                 // last use of original, which we have copied?
                 if (must_drop) {
                     state.drop(arg);
@@ -763,11 +708,6 @@ struct Tracker {
         } break;
         case VM_FORCE_COPY_OR_DROP: {
             if (is_plain(arg.get_type())) {
-                #if SCOPES_ANNOTATE_TRACKING
-                StyledString ss;
-                ss.out << context << " drops copy of plain " << arg;
-                state.annotate(ss.str());
-                #endif
                 // last use of original, which we have copied?
                 if (must_drop) {
                     state.drop(arg);
@@ -830,13 +770,6 @@ struct Tracker {
             case VM_FORCE_COPY_OR_MOVE:
             case VM_FORCE_MOVE: {
                 if (is_plain(arg.get_type())) {
-                    #if SCOPES_ANNOTATE_TRACKING
-                    {
-                        StyledString ss;
-                        ss.out << context << " copies view of plain " << arg;
-                        state.annotate(ss.str());
-                    }
-                    #endif
                     // tag all connected unique values as viewed
                     const ValueIndexSet &args = *deps;
                     for (auto arg : args) {
@@ -844,19 +777,9 @@ struct Tracker {
                             visit_unique_argument(state, VM_FORCE_VIEW, arg, context, retdepth));
                     }
                 } else {
-                    #if SCOPES_ANNOTATE_TRACKING
-                    {
-                        StyledString ss;
-                        ss.out << Style_Error << "error: " << Style_None
-                            << context << " cannot force view " << arg << " to move";
-                        state.annotate(ss.str());
-                    }
-                    #endif
-                    if (!SCOPES_SOFT_TRACKING) {
-                        // we can't force a viewed value to move
-                        SCOPES_EXPECT_ERROR(
-                            error_value_is_viewed(arg.value, state.where, context));
-                    }
+                    // we can't force a viewed value to move
+                    SCOPES_EXPECT_ERROR(
+                        error_value_is_viewed(arg.value, state.where, context));
                 }
             } break;
             default: {

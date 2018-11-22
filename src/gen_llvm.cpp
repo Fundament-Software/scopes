@@ -1111,6 +1111,9 @@ struct LLVMIRGenerator {
         } else if (T == TYPE_Builtin) {
             auto builtin = SCOPES_GET_RESULT(extract_builtin_constant(callee));
             switch(builtin.value()) {
+            case FN_Annotate: {
+                return nullptr;
+            } break;
             case OP_Tertiary: {
                 READ_VALUE(cond);
                 READ_VALUE(then_value);

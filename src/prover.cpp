@@ -380,6 +380,13 @@ SCOPES_RESULT(Value *) prove_block(const ASTContext &ctx, Block &block, Value *n
     return prove_block(ctx, block, node, newctx);
 }
 
+static Value *empty_if_void(Value *value) {
+    assert(is_returning(value->get_type()));
+    if ((value->get_type() == empty_arguments_type()) && !isa<ArgumentList>(value))
+        return build_argument_list(value->anchor(), {});
+    return value;
+}
+
 static SCOPES_RESULT(Value *) make_merge(const ASTContext &ctx, const Anchor *anchor, Label *label, Value *value) {
     SCOPES_RESULT_TYPE(Value *);
     SCOPES_ANCHOR(anchor);
@@ -387,7 +394,7 @@ static SCOPES_RESULT(Value *) make_merge(const ASTContext &ctx, const Anchor *an
     auto T = value->get_type();
     if (!is_returning(T))
         return value;
-    auto newmerge = Merge::from(anchor, label, value);
+    auto newmerge = Merge::from(anchor, label, empty_if_void(value));
     newmerge->set_type(TYPE_NoReturn);
     ctx.append(newmerge);
     label->merges.push_back(newmerge);
@@ -401,7 +408,7 @@ static SCOPES_RESULT(Value *) make_repeat(const ASTContext &ctx, const Anchor *a
     auto T = value->get_type();
     if (!is_returning(T))
         return value;
-    auto newrepeat = Repeat::from(anchor, value);
+    auto newrepeat = Repeat::from(anchor, empty_if_void(value));
     newrepeat->loop = label;
     newrepeat->set_type(TYPE_NoReturn);
     ctx.append(newrepeat);
@@ -415,7 +422,7 @@ static SCOPES_RESULT(Value *) make_return(const ASTContext &ctx, const Anchor *a
     auto T = value->get_type();
     if (!is_returning(T))
         return value;
-    auto newreturn = Return::from(anchor, value);
+    auto newreturn = Return::from(anchor, empty_if_void(value));
     newreturn->set_type(TYPE_NoReturn);
     ctx.append(newreturn);
     ctx.function->returns.push_back(newreturn);
@@ -1360,6 +1367,9 @@ repeat:
                 stream_ast(ss, arg, StreamASTFormat());
             }
             return build_runtime_argument_list(ctx, call->anchor(), values);
+        } break;
+        case FN_Annotate: {
+            return ARGTYPE0();
         } break;
         case FN_Move: {
             CHECKARGS(1, 1);
@@ -2346,7 +2356,7 @@ SCOPES_RESULT(Function *) prove(Function *frame, Template *func, const Types &ty
     for (auto &&ret : fn->returns) {
         merge_depends(fnctx, fn->deps, ret->value);
     }
-    //SCOPES_CHECK_RESULT(track(fnctx));
+    SCOPES_CHECK_RESULT(track(fnctx));
     fn->complete = true;
     return fn;
 }

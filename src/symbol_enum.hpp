@@ -303,7 +303,7 @@ namespace scopes {
     T(FN_CompileGLSL, "__compile-glsl") \
     T(FN_CompileObject, "__compile-object") \
     T(FN_ElementIndex, "element-index") \
-    T(FN_ElementName, "element-name") \
+    T(FN_ElementName, "element-name") T(FN_Annotate, "annotate") \
     T(FN_CompilerMessage, "compiler-message") \
     T(FN_CStr, "cstr") T(FN_DatumToSyntax, "datum->syntax") \
     T(FN_DatumToQuotedSyntax, "datum->quoted-syntax") \
