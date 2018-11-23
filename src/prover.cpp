@@ -774,9 +774,11 @@ static SCOPES_RESULT(Value *) prove_Loop(const ASTContext &ctx, Loop *loop) {
     if (!is_returning(ltype))
         return init;
     LoopLabel *newloop = LoopLabel::from(loop->anchor(), init);
-    newloop->set_type(ltype);
+    // set to noreturn type so loop is recognized to be a terminator
+    newloop->set_type(TYPE_NoReturn);
     // anchor loop to the local block to avoid it landing in the wrong place
     ctx.append(newloop);
+    newloop->change_type(ltype);
     ctx.frame->bind(loop, newloop);
     auto subctx = ctx.for_loop(newloop);
     ASTContext newctx;

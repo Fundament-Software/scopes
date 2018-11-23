@@ -96,16 +96,42 @@ struct Tracker {
     // per block
     struct State {
         State(Block &_block)
-            : block(_block), parent(nullptr), where(nullptr), finalized(false)
+            : block(_block), parent(nullptr), where(nullptr),
+                depth_offset(0), finalized(false), test(false)
         {
         }
 
         State(Block &_block, State &_parent)
-            : block(_block), parent(&_parent), where(_parent.where)
+            : block(_block), parent(&_parent), where(_parent.where),
+                depth_offset(0), finalized(false), test(_parent.test)
         {
             for (auto &&key : _parent._data) {
                 _data.insert({key.first, key.second});
             }
+        }
+
+        int get_depth() {
+            return block.depth + depth_offset;
+        }
+
+        int get_value_depth(Value *value) {
+            int retdepth = block.depth;
+            int depth = value->get_depth();
+            if (depth >= retdepth)
+                return depth + depth_offset;
+            return depth;
+        }
+
+        void set_depth_offset(int offset) {
+            depth_offset = offset;
+        }
+
+        void set_test() {
+            test = true;
+        }
+
+        bool is_test() {
+            return test;
         }
 
         void finalize() {
@@ -127,6 +153,12 @@ struct Tracker {
         }
 
         void delete_data(const ValueIndex &value) {
+            #if SCOPES_ANNOTATE_TRACKING
+            StyledStream ss;
+            ss << "deleting " << block.depth << " " << block.insert_index << " " << depth_offset << " " << test << " " << value.value << std::endl;
+            #endif
+            assert(!garbage.count(value));
+            assert(!_deleted.count(value));
             auto it = _data.find(value);
             if (it != _data.end()) {
                 _data.erase(it);
@@ -135,6 +167,16 @@ struct Tracker {
         }
 
         Data &ensure_data(const ValueIndex &value) {
+            #if SCOPES_ANNOTATE_TRACKING
+            StyledStream ss;
+            ss << "ensuring " << block.depth << " " << block.insert_index << " " << depth_offset << " " << test << " " << value.value << std::endl;
+            if (_deleted.count(value)) {
+                StyledStream ss;
+                ss << "error resurrecting future value: " << std::endl;
+                stream_ast(ss, value.value, StreamASTFormat::singleline());
+                ss << std::endl;
+            }
+            #endif
             assert(!_deleted.count(value));
             auto data = find_data(value);
             if (data)
@@ -155,6 +197,7 @@ struct Tracker {
         void drop(const ValueIndex &value) {
             if (garbage.count(value))
                 return;
+            assert(!_deleted.count(value));
             garbage.insert(value);
             collect_order.push_back(value);
         }
@@ -162,7 +205,9 @@ struct Tracker {
         Block &block;
         State *parent;
         Value *where;
+        int depth_offset;
         bool finalized;
+        bool test;
         std::unordered_map<ValueIndex, Data, ValueIndex::Hash> _data;
         std::unordered_set<ValueIndex, ValueIndex::Hash> _deleted;
         ValueIndexSet garbage;
@@ -203,7 +248,7 @@ struct Tracker {
         for (auto &entries : from._data) {
             const ValueIndex &key = entries.first;
             Data &data = entries.second;
-            int depth = key.value->get_depth();
+            int depth = from.get_value_depth(key.value);
             if (data.will_be_moved()
                 && (data.get_move_depth() > retdepth)) {
                 set.insert(key);
@@ -211,18 +256,23 @@ struct Tracker {
         }
     }
 
-    SCOPES_RESULT(void) merge_state(State &state, State &sub, const char *context) {
+    SCOPES_RESULT(void) merge_state(State &state, State &sub, const char *context, bool drop_arguments = false) {
         SCOPES_RESULT_TYPE(void);
         assert(&state != &sub);
-        int retdepth = state.block.depth;
+        int retdepth = state.get_depth();
         assert(retdepth >= 0);
         for (auto &entries : sub._data) {
             const ValueIndex &key = entries.first;
             Data &data = entries.second;
-            int depth = key.value->get_depth();
+            int depth = sub.get_value_depth(key.value);
             if (data.will_be_moved()
+                && (depth <= retdepth)
                 && (data.get_move_depth() > retdepth)) {
-                SCOPES_CHECK_RESULT(move_argument(state, key, context));
+                if (drop_arguments) {
+                    SCOPES_CHECK_RESULT(drop_argument(state, key, context));
+                } else {
+                    SCOPES_CHECK_RESULT(move_argument(state, key, context));
+                }
             }
         }
         return {};
@@ -232,7 +282,7 @@ struct Tracker {
         SCOPES_RESULT_TYPE(void);
         assert(&state != &_then);
         assert(&_then != &_else);
-        int retdepth = state.block.depth;
+        int retdepth = state.get_depth();
         assert(retdepth >= 0);
         ValueIndexSet then_moved;
         ValueIndexSet else_moved;
@@ -335,9 +385,13 @@ struct Tracker {
         // must move all their arguments.
         auto callee = node->callee;
         const Type *T = callee->get_type();
-        const FunctionType *ft = nullptr;
         if (is_function_pointer(T)) {
-            ft = extract_function_type(T);
+            const FunctionType *ft = extract_function_type(T);
+            if (ft->has_exception()) {
+                // generate unwind destructors for an untimely exit
+                State except_state(node->except_body, state);
+                SCOPES_CHECK_RESULT(track_block(except_state));
+            }
             int numargs = (int)ft->argument_types.size();
             bool returning = is_returning(ft->return_type);
             assert(numargs <= node->args.size());
@@ -378,11 +432,6 @@ struct Tracker {
             SCOPES_CHECK_RESULT(visit_values(state, VM_AUTO, node->args, "call"));
         }
         SCOPES_CHECK_RESULT(visit_argument(state, VM_AUTO, ValueIndex(node->callee), "call"));
-        if (ft && ft->has_exception()) {
-            // generate unwind destructors for an untimely exit
-            State except_state(node->except_body, state);
-            SCOPES_CHECK_RESULT(track_block(except_state));
-        }
         return {};
     }
     SCOPES_RESULT(void) track_LoopLabel(State &state, LoopLabel *node) {
@@ -390,10 +439,33 @@ struct Tracker {
         auto old_active_loop = active_loop;
         active_loop = node;
         State loop_state(node->body, state);
+        State test_loop_state(node->body, loop_state);
+        test_loop_state.set_test();
+        test_loop_state.set_depth_offset(1);
+        /*
+            1. we need to look at how the loop moves values to the next loop and pull init values
+                in the same way; we also need to ensure that all repeats perform the same
+                operation.
+            2. moving values from outside the loop scope is illegal, because if the loop
+                runs a second time, the value has already been moved by the previous iteration.
+
+                we can either carry a flag that enforces borrows everywhere we would otherwise
+                move, or just try to prove [iteration n [iteration n-1]]; that means we run the
+                loop twice; once, to generate the initial state, and then starting from that state,
+                we run it again; but we need to suppress the generation of destructors on the first
+                run.
+
+                for the second run, we need to ensure that the loop itself is not tracked yet
+
+            3. after the loop, we need to inject destructors for all outer values that have been moved inside
+                this must be done from the break label
+        */
+        SCOPES_CHECK_RESULT(track_block(test_loop_state));
+        SCOPES_CHECK_RESULT(merge_state(loop_state, test_loop_state, "loop-merge-test"));
         SCOPES_CHECK_RESULT(track_block(loop_state));
+        SCOPES_CHECK_RESULT(visit_value(loop_state, VM_FORCE_COPY_OR_MOVE, node->init, "loop-init"));
         SCOPES_CHECK_RESULT(merge_state(state, loop_state, "loop-merge"));
         active_loop = old_active_loop;
-        SCOPES_CHECK_RESULT(visit_value(state, VM_AUTO, node->init, "loop"));
         return {};
     }
     SCOPES_RESULT(void) track_Repeat(State &state, Repeat *node) {
@@ -408,9 +480,15 @@ struct Tracker {
     }
     SCOPES_RESULT(void) track_Label(State &state, Label *node) {
         SCOPES_RESULT_TYPE(void);
+        bool do_drop = false;
+        if (is_returning(node->get_type())) {
+            if (node->label_kind == LK_Break) {
+                do_drop = true;
+            }
+        }
         State label_state(node->body, state);
         SCOPES_CHECK_RESULT(track_block(label_state));
-        SCOPES_CHECK_RESULT(merge_state(state, label_state, "label-merge"));
+        SCOPES_CHECK_RESULT(merge_state(state, label_state, "label-merge", do_drop));
         return {};
     }
     SCOPES_RESULT(void) track_Merge(State &state, Merge *node) {
@@ -457,7 +535,7 @@ struct Tracker {
             block.insert_at_end();
             state.finalized = true;
             SCOPES_CHECK_RESULT(track_return_argument(
-                state, return_value, state.block.depth - 1, "block result"));
+                state, return_value, state.get_depth() - 1, "block result"));
             state.finalized = false;
         }
         auto loc = state.where;
@@ -480,7 +558,7 @@ struct Tracker {
         SCOPES_RESULT_TYPE(void);
         StyledStream ss;
         ss << "processing #" << track_count << std::endl;
-        const int HALT_AT = 7;
+        const int HALT_AT = 9;
         if (track_count == HALT_AT) {
             StyledStream ss;
             stream_ast(ss, function, StreamASTFormat());
@@ -561,7 +639,7 @@ struct Tracker {
         } else if (data.will_be_moved()) {
             SCOPES_EXPECT_ERROR(error_value_moved(arg.value, data.get_mover(), context));
         }
-        data.move(state.where, state.block.depth);
+        data.move(state.where, state.get_depth());
         return {};
     }
 
@@ -573,7 +651,7 @@ struct Tracker {
         // jumping out of
         State *s = state.parent;
         ValueIndexSet moved;
-        while (s && s->block.depth > retdepth) {
+        while (s && s->get_depth() > retdepth) {
             for (auto &entries : s->_data) {
                 const ValueIndex &key = entries.first;
                 Data &data = entries.second;
@@ -630,6 +708,8 @@ struct Tracker {
 
     SCOPES_RESULT(void) write_destructor(State &state, const ValueIndex &arg, const char *context) {
         SCOPES_RESULT_TYPE(void);
+        if (state.test)
+            return {};
         // generate destructor
         auto argT = arg.get_type();
         Value *handler;
@@ -668,7 +748,7 @@ struct Tracker {
         assert(!arg.has_deps());
         auto &data = state.ensure_data(arg);
         bool last_appearance = !(data.will_be_moved() || data.will_be_used());
-        bool is_local = (arg.value->get_depth() > 0);
+        bool is_local = (state.get_value_depth(arg.value) > 0);
         // only move/destroy when inside function - don't touch function
         // parameters and global constants
         bool must_drop = last_appearance && is_local;
@@ -749,10 +829,10 @@ struct Tracker {
             const ValueIndexSet &args = *deps;
             for (auto arg : args) {
                 // deepest depth tells us the shortest lifetime
-                depth = std::max(depth, arg.value->get_depth());
+                depth = std::max(depth, state.get_value_depth(arg.value));
             }
         } else {
-            depth = arg.value->get_depth();
+            depth = state.get_value_depth(arg.value);
         }
         if (mode == VM_AUTO) {
             if (depth <= retdepth) {
@@ -824,13 +904,12 @@ struct Tracker {
         return {};
     }
 
-    SCOPES_RESULT(void) track_declaration(State &state, Value *node) {
+    SCOPES_RESULT(void) delete_declaration(State &state, Value *node) {
         SCOPES_RESULT_TYPE(void);
         assert(node);
         auto T = strip_qualifiers(node->get_type());
         if (!is_returning(T))
             return {};
-        SCOPES_CHECK_RESULT(visit_value(state, VM_AUTO, node, "declaration"));
         if (!isa<ArgumentList>(node)) {
             int argc = get_argument_count(T);
             for (int i = 0; i < argc; ++i) {
@@ -846,7 +925,7 @@ struct Tracker {
         SCOPES_ANCHOR(node->anchor());
         assert(state.garbage_empty());
         state.set_location(node);
-        SCOPES_CHECK_RESULT(track_declaration(state, node));
+        SCOPES_CHECK_RESULT(visit_value(state, VM_AUTO, node, "declaration"));
         Result<_result_type> result;
         switch(node->kind()) {
     #define T(NAME, BNAME, CLASS) \
@@ -857,6 +936,7 @@ struct Tracker {
         }
         SCOPES_CHECK_RESULT(result);
         SCOPES_CHECK_RESULT(collect(state));
+        SCOPES_CHECK_RESULT(delete_declaration(state, node));
         return {};
     }
 
