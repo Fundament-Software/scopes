@@ -1611,7 +1611,7 @@ struct LLVMIRGenerator {
             if (_case.kind == CK_Default) {
                 LLVMPositionBuilderAtEnd(builder, bbdefault);
                 bbcase = bbdefault;
-            } else if (_case.kind == CK_Pass && _case.body.empty()) {
+            } else if (_case.body.empty()) {
                 auto lit = SCOPES_GET_RESULT(node_to_value(_case.literal));
                 LLVMAddCase(_sw, lit, lastbb);
                 continue;
@@ -1622,16 +1622,8 @@ struct LLVMIRGenerator {
                 LLVMAddCase(_sw, lit, bbcase);
             }
             SCOPES_CHECK_RESULT(block_to_value(_case.body));
-            if (_case.kind == CK_Pass) {
+            if (!_case.body.terminator) {
                 LLVMBuildBr(builder, lastbb);
-            } else {
-                auto result = SCOPES_GET_RESULT(node_to_value(_case.value));
-                auto rtype = _case.value->get_type();
-                if (is_returning(rtype)) {
-                    assert(bb_merge);
-                    build_merge_phi(merge_value, result);
-                    LLVMBuildBr(builder, bb_merge);
-                }
             }
             lastbb = bbcase;
         }

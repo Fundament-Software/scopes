@@ -696,7 +696,7 @@ struct Expander {
         auto expr = SCOPES_GET_RESULT(subexp.expand(it->at));
         it = subexp.next;
 
-        Switch::Cases cases;
+        SwitchTemplate::Cases cases;
 
         it = next;
     collect_case:
@@ -704,7 +704,7 @@ struct Expander {
             SCOPES_EXPECT_ERROR(error_missing_default_case());
         }
         next = it->next;
-        auto _case = Switch::Case();
+        auto _case = SwitchTemplate::Case();
         _case.anchor = it->at->anchor();
         it = SCOPES_GET_RESULT(extract_list_constant(it->at));
         SCOPES_CHECK_RESULT(verify_list_parameter_count("case", it, 1, -1));
@@ -735,7 +735,7 @@ struct Expander {
             cases.push_back(_case);
         }
 
-        return Switch::from(_anchor, expr, cases);
+        return SwitchTemplate::from(_anchor, expr, cases);
     }
 
     // (if cond body ...)

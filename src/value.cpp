@@ -447,15 +447,15 @@ void If::append_else(const Anchor *anchor, Value *value) {
 
 //------------------------------------------------------------------------------
 
-Switch::Switch(const Anchor *anchor, Value *_expr, const Cases &_cases)
-    : Instruction(VK_Switch, anchor), expr(_expr), cases(_cases)
+SwitchTemplate::SwitchTemplate(const Anchor *anchor, Value *_expr, const Cases &_cases)
+    : Value(VK_SwitchTemplate, anchor), expr(_expr), cases(_cases)
 {}
 
-Switch *Switch::from(const Anchor *anchor, Value *expr, const Cases &cases) {
-    return new Switch(anchor, expr, cases);
+SwitchTemplate *SwitchTemplate::from(const Anchor *anchor, Value *expr, const Cases &cases) {
+    return new SwitchTemplate(anchor, expr, cases);
 }
 
-void Switch::append_case(const Anchor *anchor, Value *literal, Value *value) {
+void SwitchTemplate::append_case(const Anchor *anchor, Value *literal, Value *value) {
     assert(anchor);
     assert(literal);
     assert(value);
@@ -467,7 +467,7 @@ void Switch::append_case(const Anchor *anchor, Value *literal, Value *value) {
     cases.push_back(_case);
 }
 
-void Switch::append_pass(const Anchor *anchor, Value *literal, Value *value) {
+void SwitchTemplate::append_pass(const Anchor *anchor, Value *literal, Value *value) {
     assert(anchor);
     assert(literal);
     assert(value);
@@ -479,7 +479,7 @@ void Switch::append_pass(const Anchor *anchor, Value *literal, Value *value) {
     cases.push_back(_case);
 }
 
-void Switch::append_default(const Anchor *anchor, Value *value) {
+void SwitchTemplate::append_default(const Anchor *anchor, Value *value) {
     assert(anchor);
     assert(value);
     Case _case;
@@ -487,6 +487,36 @@ void Switch::append_default(const Anchor *anchor, Value *value) {
     _case.anchor = anchor;
     _case.value = value;
     cases.push_back(_case);
+}
+
+//------------------------------------------------------------------------------
+
+Switch::Switch(const Anchor *anchor, Value *_expr, const Cases &_cases)
+    : Instruction(VK_Switch, anchor), expr(_expr), cases(_cases)
+{}
+
+Switch *Switch::from(const Anchor *anchor, Value *expr, const Cases &cases) {
+    return new Switch(anchor, expr, cases);
+}
+
+Switch::Case &Switch::append_pass(const Anchor *anchor, ConstInt *literal) {
+    assert(anchor);
+    assert(literal);
+    Case _case;
+    _case.kind = CK_Pass;
+    _case.anchor = anchor;
+    _case.literal = literal;
+    cases.push_back(_case);
+    return cases.back();
+}
+
+Switch::Case &Switch::append_default(const Anchor *anchor) {
+    assert(anchor);
+    Case _case;
+    _case.kind = CK_Default;
+    _case.anchor = anchor;
+    cases.push_back(_case);
+    return cases.back();
 }
 
 //------------------------------------------------------------------------------
@@ -571,6 +601,16 @@ Label::Label(const Anchor *anchor, LabelKind _kind, Symbol _name)
 
 Label *Label::from(const Anchor *anchor, LabelKind kind, Symbol name) {
     return new Label(anchor, kind, name);
+}
+
+const char *get_label_kind_name(LabelKind kind) {
+    switch(kind) {
+    #define T(NAME, BNAME) \
+        case NAME: return BNAME;
+    SCOPES_LABEL_KIND()
+    #undef T
+    default: return "???";
+    }
 }
 
 //------------------------------------------------------------------------------

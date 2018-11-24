@@ -985,19 +985,19 @@ void sc_if_append_else_clause(sc_value_t *value, sc_value_t *body) {
 
 sc_value_t *sc_switch_new(sc_value_t *expr) {
     using namespace scopes;
-    return Switch::from(get_active_anchor(), expr);
+    return SwitchTemplate::from(get_active_anchor(), expr);
 }
 void sc_switch_append_case(sc_value_t *value, sc_value_t *literal, sc_value_t *body) {
     using namespace scopes;
-    cast<Switch>(value)->append_case(get_active_anchor(), literal, body);
+    cast<SwitchTemplate>(value)->append_case(get_active_anchor(), literal, body);
 }
 void sc_switch_append_pass(sc_value_t *value, sc_value_t *literal, sc_value_t *body) {
     using namespace scopes;
-    cast<Switch>(value)->append_pass(get_active_anchor(), literal, body);
+    cast<SwitchTemplate>(value)->append_pass(get_active_anchor(), literal, body);
 }
 void sc_switch_append_default(sc_value_t *value, sc_value_t *body) {
     using namespace scopes;
-    cast<Switch>(value)->append_default(get_active_anchor(), body);
+    cast<SwitchTemplate>(value)->append_default(get_active_anchor(), body);
 }
 
 sc_value_t *sc_parameter_new(sc_symbol_t name) {

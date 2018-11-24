@@ -154,8 +154,8 @@ struct Tracker {
 
         void delete_data(const ValueIndex &value) {
             #if SCOPES_ANNOTATE_TRACKING
-            StyledStream ss;
-            ss << "deleting " << block.depth << " " << block.insert_index << " " << depth_offset << " " << test << " " << value.value << std::endl;
+            //StyledStream ss;
+            //ss << "deleting " << block.depth << " " << block.insert_index << " " << depth_offset << " " << test << " " << value.value << std::endl;
             #endif
             assert(!garbage.count(value));
             assert(!_deleted.count(value));
@@ -168,8 +168,8 @@ struct Tracker {
 
         Data &ensure_data(const ValueIndex &value) {
             #if SCOPES_ANNOTATE_TRACKING
-            StyledStream ss;
-            ss << "ensuring " << block.depth << " " << block.insert_index << " " << depth_offset << " " << test << " " << value.value << std::endl;
+            //StyledStream ss;
+            //ss << "ensuring " << block.depth << " " << block.insert_index << " " << depth_offset << " " << test << " " << value.value << std::endl;
             if (_deleted.count(value)) {
                 StyledStream ss;
                 ss << "error resurrecting future value: " << std::endl;
@@ -332,7 +332,7 @@ struct Tracker {
         for (auto &&_case : node->cases) {
             states.push_back(State(_case.body, state));
             State &case_state = states.back();
-            SCOPES_CHECK_RESULT(track_block(case_state, _case.value));
+            SCOPES_CHECK_RESULT(track_block(case_state));
         }
         int count = node->cases.size();
         State *next_state = nullptr;
@@ -340,13 +340,18 @@ struct Tracker {
             auto &&_case = node->cases[i];
             auto &&case_state = states[i];
             switch(_case.kind) {
-            case CK_Pass: {
-                assert(next_state);
-                SCOPES_CHECK_RESULT(merge_state(case_state, *next_state, "pass-merge"));
-            } break;
             case CK_Case:
+                 assert(false); // continue
+            case CK_Pass: {
+                if (_case.body.terminator) {
+                    SCOPES_CHECK_RESULT(merge_state(state, case_state, "case-merge"));
+                } else {
+                    assert(next_state);
+                    SCOPES_CHECK_RESULT(merge_state(case_state, *next_state, "pass-merge"));
+                }
+            } break;
             case CK_Default: {
-                SCOPES_CHECK_RESULT(merge_state(state, case_state, "case-merge"));
+                SCOPES_CHECK_RESULT(merge_state(state, case_state, "default-merge"));
             } break;
             }
             next_state = &case_state;
@@ -480,6 +485,7 @@ struct Tracker {
     }
     SCOPES_RESULT(void) track_Label(State &state, Label *node) {
         SCOPES_RESULT_TYPE(void);
+
         bool do_drop = false;
         if (is_returning(node->get_type())) {
             if (node->label_kind == LK_Break) {
@@ -494,7 +500,8 @@ struct Tracker {
     SCOPES_RESULT(void) track_Merge(State &state, Merge *node) {
         SCOPES_RESULT_TYPE(void);
         int retdepth = node->label->body.depth;
-        return track_return_argument(state, node->value, retdepth - 1, "merge");
+        return track_return_argument(state, node->value, retdepth - 1,
+            get_label_kind_name(node->label->label_kind));
     }
     SCOPES_RESULT(void) track_Raise(State &state, Raise *node) {
         return track_return_argument(state, node->value, 0, "raise");
@@ -528,6 +535,7 @@ struct Tracker {
         return {};
     }
 
+    /*
     SCOPES_RESULT(void) track_block(State &state, Value *return_value) {
         SCOPES_RESULT_TYPE(void);
         auto &&block = state.block;
@@ -553,12 +561,14 @@ struct Tracker {
         state.set_location(loc);
         return {};
     }
+    */
 
     SCOPES_RESULT(void) process() {
         SCOPES_RESULT_TYPE(void);
         StyledStream ss;
         ss << "processing #" << track_count << std::endl;
-        const int HALT_AT = 9;
+        //const int HALT_AT = 9;
+        const int HALT_AT = 11;
         if (track_count == HALT_AT) {
             StyledStream ss;
             stream_ast(ss, function, StreamASTFormat());
@@ -631,9 +641,22 @@ struct Tracker {
     }
 
     SCOPES_RESULT(void) move_argument(State &state,
-        const ValueIndex &arg, const char *context) {
+        const ValueIndex &arg, const char *context, int retdepth = -1) {
         SCOPES_RESULT_TYPE(void);
         auto &data = state.ensure_data(arg);
+        // if this is a return move
+        if (retdepth >= 0) {
+            // if the data we are moving becomes inaccessible anyway
+            if (state.get_value_depth(arg.value) > retdepth) {
+                // if it has not been moved
+                if (!data.will_be_moved()) {
+                    // move it
+                    data.move(state.where, state.get_depth());
+                }
+                // otherwise do nothing
+                return {};
+            }
+        }
         if (data.will_be_used()) {
             SCOPES_EXPECT_ERROR(error_value_in_use(arg.value, data.get_user(), context));
         } else if (data.will_be_moved()) {
@@ -688,9 +711,9 @@ struct Tracker {
         return {};
     }
 
-    SCOPES_RESULT(void) drop_argument(State &state, const ValueIndex &arg, const char *context) {
+    SCOPES_RESULT(void) drop_argument(State &state, const ValueIndex &arg, const char *context, int retdepth = -1) {
         SCOPES_RESULT_TYPE(void);
-        SCOPES_CHECK_RESULT(move_argument(state, arg, context));
+        SCOPES_CHECK_RESULT(move_argument(state, arg, context, retdepth));
         return write_destructor(state, arg, context);
     }
 
@@ -771,7 +794,7 @@ struct Tracker {
             if (is_plain(arg.get_type())) {
             }
             SCOPES_CHECK_RESULT(
-                move_argument(state, arg, context));
+                move_argument(state, arg, context, retdepth));
         } break;
         case VM_FORCE_COPY_OR_MOVE: {
             if (is_plain(arg.get_type())) {
@@ -783,7 +806,7 @@ struct Tracker {
                 }
             } else {
                 SCOPES_CHECK_RESULT(
-                    move_argument(state, arg, context));
+                    move_argument(state, arg, context, retdepth));
             }
         } break;
         case VM_FORCE_COPY_OR_DROP: {
@@ -797,7 +820,7 @@ struct Tracker {
             } else {
                 // drop immediately
                 SCOPES_CHECK_RESULT(
-                    drop_argument(state, arg, context));
+                    drop_argument(state, arg, context, retdepth));
             }
         } break;
         }

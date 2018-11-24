@@ -368,6 +368,35 @@ struct StreamAST : StreamAnchors {
             }
             walk_newline(val->value, depth+1, maxdepth);
         } break;
+        case VK_SwitchTemplate: {
+            auto val = cast<SwitchTemplate>(node);
+            ss << node;
+            if (newlines) {
+                walk_same_or_newline(val->expr, depth+1, maxdepth);
+                for (int i = 0; i < val->cases.size(); ++i) {
+                    auto &&_case = val->cases[i];
+                    stream_newline();
+                    stream_indent(depth);
+                    switch(_case.kind) {
+                    case CK_Case: {
+                        ss << Style_Keyword << "case" << Style_None;
+                        walk_same_or_newline(_case.literal, depth+1, maxdepth);
+                    } break;
+                    case CK_Pass: {
+                        ss << Style_Keyword << "pass" << Style_None;
+                        walk_same_or_newline(_case.literal, depth+1, maxdepth);
+                    } break;
+                    case CK_Default: {
+                        ss << Style_Keyword << "default" << Style_None;
+                    } break;
+                    default: {
+                        ss << Style_Error << "???" << Style_None;
+                    } break;
+                    }
+                    walk_same_or_newline(_case.value, depth+1, maxdepth);
+                }
+            }
+        } break;
         case VK_Switch: {
             auto val = cast<Switch>(node);
             ss << node;
@@ -376,14 +405,20 @@ struct StreamAST : StreamAnchors {
                 for (int i = 0; i < val->cases.size(); ++i) {
                     auto &&_case = val->cases[i];
                     stream_newline();
-                    stream_indent(depth+1);
-                    if (_case.literal) {
-                        ss << Style_Keyword << "case" << Style_None;
-                        walk_same_or_newline(_case.literal, depth+2, maxdepth);
-                    } else {
+                    stream_indent(depth);
+                    switch(_case.kind) {
+                    case CK_Pass: {
+                        ss << Style_Keyword << "pass" << Style_None;
+                        walk_same_or_newline(_case.literal, depth+1, maxdepth);
+                    } break;
+                    case CK_Default: {
                         ss << Style_Keyword << "default" << Style_None;
+                    } break;
+                    default: {
+                        ss << Style_Error << "???" << Style_None;
+                    } break;
                     }
-                    stream_block_result(_case.body, _case.value, depth+2, maxdepth);
+                    stream_block(_case.body, depth+1, maxdepth);
                 }
             }
         } break;
@@ -521,14 +556,7 @@ struct StreamAST : StreamAnchors {
             auto val = cast<LabelTemplate>(node);
             ss << node;
             ss << " ";
-            switch(val->label_kind) {
-            #define T(NAME, BNAME) \
-                case NAME: ss << Style_Keyword << BNAME; break;
-            SCOPES_LABEL_KIND()
-            #undef T
-            default:
-                ss << Style_Error << "?kind";
-            }
+            ss << Style_Keyword << get_label_kind_name(val->label_kind);
             ss << Style_None << " ";
             ss << Style_Symbol << val->name.name()->data;
             ss << Style_None;

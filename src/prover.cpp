@@ -387,9 +387,7 @@ static Value *empty_if_void(Value *value) {
     return value;
 }
 
-static SCOPES_RESULT(Value *) make_merge(const ASTContext &ctx, const Anchor *anchor, Label *label, Value *value) {
-    SCOPES_RESULT_TYPE(Value *);
-    SCOPES_ANCHOR(anchor);
+static Value *make_merge(const ASTContext &ctx, const Anchor *anchor, Label *label, Value *value) {
     assert(label);
     auto T = value->get_type();
     if (!is_returning(T))
@@ -401,9 +399,7 @@ static SCOPES_RESULT(Value *) make_merge(const ASTContext &ctx, const Anchor *an
     return newmerge;
 }
 
-static SCOPES_RESULT(Value *) make_repeat(const ASTContext &ctx, const Anchor *anchor, LoopLabel *label, Value *value) {
-    SCOPES_RESULT_TYPE(Value *);
-    SCOPES_ANCHOR(anchor);
+static Value * make_repeat(const ASTContext &ctx, const Anchor *anchor, LoopLabel *label, Value *value) {
     assert(label);
     auto T = value->get_type();
     if (!is_returning(T))
@@ -416,9 +412,7 @@ static SCOPES_RESULT(Value *) make_repeat(const ASTContext &ctx, const Anchor *a
     return newrepeat;
 }
 
-static SCOPES_RESULT(Value *) make_return(const ASTContext &ctx, const Anchor *anchor, Value *value) {
-    SCOPES_RESULT_TYPE(Value *);
-    SCOPES_ANCHOR(anchor);
+static Value * make_return(const ASTContext &ctx, const Anchor *anchor, Value *value) {
     auto T = value->get_type();
     if (!is_returning(T))
         return value;
@@ -480,7 +474,7 @@ static SCOPES_RESULT(Value *) prove_LabelTemplate(const ASTContext &ctx, LabelTe
         ctx.merge_block(label->body);
         return result;
     } else {
-        SCOPES_CHECK_RESULT(make_merge(labelctx, result->anchor(), label, result));
+        make_merge(labelctx, result->anchor(), label, result);
         #if 0
         if (label->body.empty()) {
             StyledStream ss;
@@ -784,8 +778,8 @@ static SCOPES_RESULT(Value *) prove_Loop(const ASTContext &ctx, Loop *loop) {
     ASTContext newctx;
     auto result = SCOPES_GET_RESULT(prove_block(subctx, newloop->body, loop->value, newctx));
     auto rtype = result->get_type();
-    SCOPES_CHECK_RESULT(make_repeat(newctx,
-        result->anchor(), newloop, result));
+    make_repeat(newctx,
+        result->anchor(), newloop, result);
     newloop->change_type(TYPE_NoReturn);
 
     for (auto repeat : newloop->repeats) {
@@ -838,7 +832,7 @@ static SCOPES_RESULT(Value *) prove_Break(const ASTContext &ctx, Break *_break) 
         SCOPES_EXPECT_ERROR(error_illegal_break_outside_loop());
     }
     Value *value = SCOPES_GET_RESULT(prove(ctx, _break->value));
-    return SCOPES_GET_RESULT(make_merge(ctx, _break->anchor(), ctx._break, value));
+    return make_merge(ctx, _break->anchor(), ctx._break, value);
 }
 
 static SCOPES_RESULT(Value *) prove_Repeat(const ASTContext &ctx, Repeat *_repeat) {
@@ -848,7 +842,7 @@ static SCOPES_RESULT(Value *) prove_Repeat(const ASTContext &ctx, Repeat *_repea
         SCOPES_EXPECT_ERROR(error_illegal_repeat_outside_loop());
     }
     Value *value = SCOPES_GET_RESULT(prove(ctx, _repeat->value));
-    return SCOPES_GET_RESULT(make_repeat(ctx, _repeat->anchor(), ctx.loop, value));
+    return make_repeat(ctx, _repeat->anchor(), ctx.loop, value);
 }
 
 static SCOPES_RESULT(Value *) prove_Return(const ASTContext &ctx, Return *_return) {
@@ -857,11 +851,11 @@ static SCOPES_RESULT(Value *) prove_Return(const ASTContext &ctx, Return *_retur
     if (ctx.frame->label) {
         assert(ctx.frame->original && ctx.frame->original->is_inline());
         // generate a merge
-        return SCOPES_GET_RESULT(make_merge(ctx, _return->anchor(), ctx.frame->label, value));
+        return make_merge(ctx, _return->anchor(), ctx.frame->label, value);
     } else {
         assert(!(ctx.frame->original && ctx.frame->original->is_inline()));
         // generate a return
-        return SCOPES_GET_RESULT(make_return(ctx, _return->anchor(), value));
+        return make_return(ctx, _return->anchor(), value);
     }
 }
 
@@ -874,7 +868,7 @@ static SCOPES_RESULT(Value *) prove_MergeTemplate(const ASTContext &ctx, MergeTe
     Value *value = SCOPES_GET_RESULT(prove(ctx, node->value));
     if (!is_returning(value->get_type()))
         return value;
-    return SCOPES_GET_RESULT(make_merge(ctx, node->anchor(), cast<Label>(label), value));
+    return make_merge(ctx, node->anchor(), cast<Label>(label), value);
 }
 
 static SCOPES_RESULT(Value *) make_raise(const ASTContext &ctx, const Anchor *anchor, Value *value) {
@@ -883,8 +877,8 @@ static SCOPES_RESULT(Value *) make_raise(const ASTContext &ctx, const Anchor *an
     auto T = value->get_type();
     assert(is_returning(T));
     if (ctx.except) {
-        return SCOPES_GET_RESULT(make_merge(ctx,
-            anchor, ctx.except, value));
+        return make_merge(ctx,
+            anchor, ctx.except, value);
     } else {
         auto newraise = Raise::from(anchor, value);
         newraise->set_type(TYPE_NoReturn);
@@ -1005,7 +999,6 @@ SCOPES_RESULT(const Closure *) extract_closure_constant(Value *value) {
 }
 
 SCOPES_RESULT(Function *) extract_function_constant(Value *value) {
-    SCOPES_RESULT_TYPE(Function *);
     return extract_constant<Function>(TYPE_Function, value);
 }
 
@@ -1046,7 +1039,6 @@ SCOPES_RESULT(uint64_t) extract_integer_constant(Value *value) {
 }
 
 SCOPES_RESULT(ConstAggregate *) extract_vector_constant(Value *value) {
-    SCOPES_RESULT_TYPE(ConstAggregate *);
     return extract_constant<ConstAggregate>(TYPE_Vector, value);
 }
 
@@ -1945,7 +1937,6 @@ static SCOPES_RESULT(Value *) prove_Call(const ASTContext &ctx, Call *call) {
 }
 
 static SCOPES_RESULT(Value *) prove_Parameter(const ASTContext &ctx, Parameter *sym) {
-    SCOPES_RESULT_TYPE(Value *);
     assert(false);
     /*
     assert(ctx.frame);
@@ -1959,32 +1950,78 @@ static SCOPES_RESULT(Value *) prove_Parameter(const ASTContext &ctx, Parameter *
 }
 
 static SCOPES_RESULT(Value *) prove_Exception(const ASTContext &ctx, Exception *sym) {
-    SCOPES_RESULT_TYPE(Value *);
     assert(false);
     return nullptr;
 }
 
 static SCOPES_RESULT(Value *) prove_Switch(const ASTContext &ctx, Switch *node) {
+    assert(false);
+    return nullptr;
+}
+
+static Label *make_merge_label(const ASTContext &ctx, const Anchor *anchor) {
+    Label *merge_label = Label::from(anchor, LK_BranchMerge);
+    merge_label->body.set_parent(ctx.block);
+    return merge_label;
+}
+
+static SCOPES_RESULT(Value *) finalize_merge_label(const ASTContext &ctx, Label *merge_label, const char *by) {
+    SCOPES_RESULT_TYPE(Value *);
+    auto _void = empty_arguments_type();
+    const Type *rtype = nullptr;
+    for (auto merge : merge_label->merges) {
+        auto T = merge->value->get_type();
+        if (T == _void) {
+            rtype = _void;
+            break;
+        }
+    }
+    if (rtype == _void) {
+        // ensure all merges return nothing
+        for (auto merge : merge_label->merges) {
+            if (is_returning_value(merge->value->get_type())) {
+                merge->value = build_argument_list(merge->anchor(), {});
+            }
+        }
+    } else if (!rtype) {
+        for (auto merge : merge_label->merges) {
+            rtype = SCOPES_GET_RESULT(merge_value_type(by, rtype, merge->value->get_type()));
+        }
+    }
+    merge_label->set_type(rtype);
+    for (auto merge : merge_label->merges) {
+        merge_depends(ctx, merge_label->deps, merge->value);
+    }
+    return merge_label;
+}
+
+static SCOPES_RESULT(Value *) prove_SwitchTemplate(const ASTContext &ctx, SwitchTemplate *node) {
     SCOPES_RESULT_TYPE(Value *);
 
     auto newexpr = SCOPES_GET_RESULT(prove(ctx, node->expr));
 
     const Type *casetype = newexpr->get_type();
 
-    Switch::Cases cases;
+    auto _switch = Switch::from(node->anchor(), newexpr);
+    _switch->set_type(TYPE_NoReturn);
+
+    Label *merge_label = make_merge_label(ctx, node->anchor());
+
+    ASTContext subctx = ctx.with_block(merge_label->body);
+    subctx.append(_switch);
+
     bool has_default = false;
     const Type *rtype = nullptr;
     auto _void = empty_arguments_type();
     for (auto &&_case : node->cases) {
         SCOPES_ANCHOR(_case.anchor);
-        Switch::Case newcase;
-        newcase.kind = _case.kind;
-        newcase.anchor = _case.anchor;
+        Switch::Case *newcase = nullptr;
         if (_case.kind == CK_Default) {
             if (has_default) {
                 SCOPES_EXPECT_ERROR(error_duplicate_default_case());
             }
             has_default = true;
+            newcase = &_switch->append_default(_case.anchor);
         } else {
             auto newlit = SCOPES_GET_RESULT(prove(ctx, _case.literal));
             if (!isa<ConstInt>(newlit)) {
@@ -1992,34 +2029,15 @@ static SCOPES_RESULT(Value *) prove_Switch(const ASTContext &ctx, Switch *node) 
             }
             casetype = SCOPES_GET_RESULT(
                 merge_value_type("switch case literal", casetype, newlit->get_type()));
-            newcase.literal = newlit;
+            newcase = &_switch->append_pass(_case.anchor, cast<ConstInt>(newlit));
         }
         assert(_case.value);
-        auto newvalue = SCOPES_GET_RESULT(prove_block(ctx, newcase.body, _case.value));
-        if (_case.kind == CK_Pass) {
-            newcase.value = build_argument_list(_case.anchor, {});
-        } else {
-            newcase.value = newvalue;
-            if (newvalue->get_type() == _void) {
-                rtype = _void;
-            }
-        }
-        cases.push_back(newcase);
-    }
-
-    if (!rtype) {
-        for (auto &&_case : cases) {
-            if (_case.kind != CK_Pass) {
-                rtype = SCOPES_GET_RESULT(
-                    merge_value_type("switch case", rtype, _case.value->get_type()));
-            }
-        }
-    } else {
-        // return value is void, ensure no argument is being returned
-        for (auto &&_case : cases) {
-            auto T = _case.value->get_type();
-            if (is_returning_value(T)) {
-                _case.value = build_argument_list(_case.anchor, {});
+        ASTContext newctx;
+        auto newvalue = SCOPES_GET_RESULT(prove_block(subctx, newcase->body, _case.value, newctx));
+        if (_case.kind != CK_Pass) {
+            if (is_returning(newvalue->get_type())) {
+                make_merge(newctx,
+                    newvalue->anchor(), merge_label, newvalue);
             }
         }
     }
@@ -2028,20 +2046,15 @@ static SCOPES_RESULT(Value *) prove_Switch(const ASTContext &ctx, Switch *node) 
         SCOPES_EXPECT_ERROR(error_missing_default_case());
     }
 
-    if (cases.size() == 1) {
-        ctx.merge_block(cases[0].body);
-        assert(cases[0].kind != CK_Pass);
-        return cases[0].value;
+    if (merge_label->merges.empty()) {
+        // none of the paths are returning
+        // cases do not need a merge label
+        assert(ctx.block);
+        ctx.merge_block(merge_label->body);
+        return _switch;
     }
 
-    auto result = Switch::from(node->anchor(), newexpr, cases);
-    result->set_type(rtype);
-    for (auto &&_case : result->cases) {
-        if (_case.kind != CK_Pass) {
-            merge_depends(ctx, result->deps, _case.value);
-        }
-    }
-    return result;
+    return finalize_merge_label(ctx, merge_label, "switch case");
 }
 
 static SCOPES_RESULT(Value *) prove_If(const ASTContext &ctx, If *_if) {
@@ -2053,8 +2066,7 @@ static SCOPES_RESULT(Value *) prove_If(const ASTContext &ctx, If *_if) {
     CondBr *first_condbr = nullptr;
     CondBr *last_condbr = nullptr;
     ASTContext subctx(ctx);
-    Label *merge_label = Label::from(_if->anchor(), LK_BranchMerge);
-    merge_label->body.set_parent(ctx.block);
+    Label *merge_label = make_merge_label(ctx, _if->anchor());
     for (int i = 0; i < numclauses; ++i) {
         auto &&clause = _if->clauses[i];
         assert(clause.anchor);
@@ -2075,8 +2087,8 @@ static SCOPES_RESULT(Value *) prove_If(const ASTContext &ctx, If *_if) {
             auto thenctx = subctx.with_block(condbr->then_body);
             auto thenresult = SCOPES_GET_RESULT(prove(thenctx, clause.value));
             if (is_returning(thenresult->get_type())) {
-                SCOPES_CHECK_RESULT(make_merge(thenctx,
-                    thenresult->anchor(), merge_label, thenresult));
+                make_merge(thenctx,
+                    thenresult->anchor(), merge_label, thenresult);
             }
             condbr->set_type(TYPE_NoReturn);
             if (last_condbr) {
@@ -2091,8 +2103,8 @@ static SCOPES_RESULT(Value *) prove_If(const ASTContext &ctx, If *_if) {
             auto elseresult = SCOPES_GET_RESULT(prove(subctx, clause.value));
             if (is_returning(elseresult->get_type())) {
                 ASTContext elsectx = ctx.with_block(last_condbr->else_body);
-                SCOPES_CHECK_RESULT(make_merge(elsectx,
-                    clause.anchor, merge_label, elseresult));
+                make_merge(elsectx,
+                    clause.anchor, merge_label, elseresult);
             }
             last_condbr = nullptr;
         }
@@ -2100,9 +2112,9 @@ static SCOPES_RESULT(Value *) prove_If(const ASTContext &ctx, If *_if) {
     if (last_condbr) {
         // last else value missing
         ASTContext elsectx = ctx.with_block(last_condbr->else_body);
-        SCOPES_CHECK_RESULT(make_merge(elsectx,
+        make_merge(elsectx,
             _if->anchor(), merge_label,
-            build_argument_list(_if->anchor(), {})));
+            build_argument_list(_if->anchor(), {}));
     }
 
     if (merge_label->merges.empty()) {
@@ -2113,42 +2125,16 @@ static SCOPES_RESULT(Value *) prove_If(const ASTContext &ctx, If *_if) {
         return first_condbr;
     }
 
-    const Type *rtype = nullptr;
-    for (auto merge : merge_label->merges) {
-        auto T = merge->value->get_type();
-        if (T == _void) {
-            rtype = _void;
-            break;
-        }
-    }
-    if (rtype == _void) {
-        // ensure all merges return nothing
-        for (auto merge : merge_label->merges) {
-            if (is_returning_value(merge->value->get_type())) {
-                merge->value = build_argument_list(merge->anchor(), {});
-            }
-        }
-    } else if (!rtype) {
-        for (auto merge : merge_label->merges) {
-            rtype = SCOPES_GET_RESULT(merge_value_type("branch", rtype, merge->value->get_type()));
-        }
-    }
-    merge_label->set_type(rtype);
-    for (auto merge : merge_label->merges) {
-        merge_depends(ctx, merge_label->deps, merge->value);
-    }
-    return merge_label;
+    return finalize_merge_label(ctx, merge_label, "branch");
 }
 
 static SCOPES_RESULT(Value *) prove_Template(const ASTContext &ctx, Template *_template) {
-    SCOPES_RESULT_TYPE(Value *);
     Function *frame = ctx.frame;
     assert(frame);
     return ConstPointer::closure_from(_template->anchor(), Closure::from(_template, frame));
 }
 
 static SCOPES_RESULT(Value *) prove_Quote(const ASTContext &ctx, Quote *node) {
-    SCOPES_RESULT_TYPE(Value *);
     //StyledStream ss;
     //ss << "before quote" << std::endl;
     //stream_ast(ss, node, StreamASTFormat());
@@ -2158,7 +2144,6 @@ static SCOPES_RESULT(Value *) prove_Quote(const ASTContext &ctx, Quote *node) {
 }
 
 static SCOPES_RESULT(Value *) prove_CondBr(const ASTContext &ctx, CondBr *node) {
-    SCOPES_RESULT_TYPE(Value *);
     assert(false);
     return nullptr;
 }
@@ -2269,8 +2254,8 @@ SCOPES_RESULT(Value *) prove_inline(const ASTContext &ctx,
         return result_value;
     } else {
         if (is_returning(result_value->get_type())) {
-            SCOPES_CHECK_RESULT(make_merge(bodyctx,
-                result_value->anchor(), label, result_value));
+            make_merge(bodyctx,
+                result_value->anchor(), label, result_value);
         }
         const Type *rtype = nullptr;
         for (auto merge : label->merges) {
@@ -2347,7 +2332,7 @@ SCOPES_RESULT(Function *) prove(Function *frame, Template *func, const Types &ty
     auto result = prove(bodyctx, func->value);
     if (result.ok()) {
         auto expr = result.assert_ok();
-        SCOPES_CHECK_RESULT(make_return(bodyctx, expr->anchor(), expr));
+        make_return(bodyctx, expr->anchor(), expr);
     } else {
         auto err = result.assert_error();
         err->append_error_trace(fn);
@@ -2358,7 +2343,7 @@ SCOPES_RESULT(Function *) prove(Function *frame, Template *func, const Types &ty
     for (auto &&ret : fn->returns) {
         merge_depends(fnctx, fn->deps, ret->value);
     }
-    SCOPES_CHECK_RESULT(track(fnctx));
+    //SCOPES_CHECK_RESULT(track(fnctx));
     fn->complete = true;
     return fn;
 }

@@ -191,7 +191,7 @@ struct Quoter {
         return value;
     }
 
-    SCOPES_RESULT(Value *) quote_Switch(int level, Switch *node) {
+    SCOPES_RESULT(Value *) quote_SwitchTemplate(int level, SwitchTemplate *node) {
         SCOPES_RESULT_TYPE(Value *);
         auto _anchor = node->anchor();
         auto value = Call::from(_anchor, g_sc_switch_new, {
@@ -221,20 +221,22 @@ struct Quoter {
         return canonicalize(expr);
     }
 
+    SCOPES_RESULT(Value *) quote_Switch(int level, Switch *node) {
+        assert(false);
+        return nullptr;
+    }
+
     SCOPES_RESULT(Value *) quote_CondBr(int level, CondBr *node) {
-        SCOPES_RESULT_TYPE(Value *);
         assert(false);
         return nullptr;
     }
 
     SCOPES_RESULT(Value *) quote_LoopLabel(int level, LoopLabel *node) {
-        SCOPES_RESULT_TYPE(Value *);
         assert(false);
         return nullptr;
     }
 
     SCOPES_RESULT(Value *) quote_Exception(int level, Exception *node) {
-        SCOPES_RESULT_TYPE(Value *);
         assert(false);
         return nullptr;
     }

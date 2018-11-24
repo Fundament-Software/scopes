@@ -31,6 +31,7 @@ struct Scope;
     T(VK_Unquote, "value-kind-unquote", Unquote) \
     T(VK_CompileStage, "value-kind-compile-stage", CompileStage) \
     T(VK_If, "value-kind-if", If) \
+    T(VK_SwitchTemplate, "value-kind-switch-template", SwitchTemplate) \
     T(VK_MergeTemplate, "value-kind-merge-template", MergeTemplate) \
     T(VK_Break, "value-kind-break", Break) \
 
@@ -346,15 +347,42 @@ enum CaseKind {
     CK_Default
 };
 
-struct Switch : Instruction {
+struct SwitchTemplate : Value {
     struct Case {
         CaseKind kind;
         const Anchor *anchor;
         Value *literal;
-        Block body;
         Value *value;
 
         Case() : kind(CK_Case), anchor(nullptr), literal(nullptr), value(nullptr) {}
+    };
+
+    typedef std::vector<Case> Cases;
+
+    static bool classof(const Value *T);
+
+    SwitchTemplate(const Anchor *anchor, Value *expr, const Cases &cases);
+
+    static SwitchTemplate *from(const Anchor *anchor, Value *expr = nullptr, const Cases &cases = {});
+
+    void append_case(const Anchor *anchor, Value *literal, Value *value);
+    void append_pass(const Anchor *anchor, Value *literal, Value *value);
+    void append_default(const Anchor *anchor, Value *value);
+
+    Value *expr;
+    Cases cases;
+};
+
+//------------------------------------------------------------------------------
+
+struct Switch : Instruction {
+    struct Case {
+        CaseKind kind;
+        const Anchor *anchor;
+        ConstInt *literal;
+        Block body;
+
+        Case() : kind(CK_Case), anchor(nullptr), literal(nullptr) {}
     };
 
     typedef std::vector<Case> Cases;
@@ -365,9 +393,8 @@ struct Switch : Instruction {
 
     static Switch *from(const Anchor *anchor, Value *expr = nullptr, const Cases &cases = {});
 
-    void append_case(const Anchor *anchor, Value *literal, Value *value);
-    void append_pass(const Anchor *anchor, Value *literal, Value *value);
-    void append_default(const Anchor *anchor, Value *value);
+    Case &append_pass(const Anchor *anchor, ConstInt *literal);
+    Case &append_default(const Anchor *anchor);
 
     Value *expr;
     Cases cases;
@@ -405,7 +432,7 @@ struct Exception : Value {
 
 #define SCOPES_LABEL_KIND() \
     /* an user-created label */ \
-    T(LK_User, "user") \
+    T(LK_User, "merge") \
     /* the return label of an inline function */ \
     T(LK_Inline, "inline") \
     /* the try block of a try/except construct */ \
@@ -438,6 +465,8 @@ struct Label : Instruction {
     std::vector<Merge *> merges;
     LabelKind label_kind;
 };
+
+const char *get_label_kind_name(LabelKind kind);
 
 //------------------------------------------------------------------------------
 
