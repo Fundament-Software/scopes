@@ -110,16 +110,22 @@ struct Tracker {
             }
         }
 
+        int translate_depth(int depth) {
+            if (depth >= block.depth)
+                return depth + depth_offset;
+            return depth;
+        }
+
+        int get_block_depth(Block &block) {
+            return translate_depth(block.depth);
+        }
+
         int get_depth() {
-            return block.depth + depth_offset;
+            return get_block_depth(block);
         }
 
         int get_value_depth(Value *value) {
-            int retdepth = block.depth;
-            int depth = value->get_depth();
-            if (depth >= retdepth)
-                return depth + depth_offset;
-            return depth;
+            return translate_depth(value->get_depth());
         }
 
         void set_depth_offset(int offset) {
@@ -214,6 +220,8 @@ struct Tracker {
         ValueIndices collect_order;
     };
 
+    typedef std::vector<State> States;
+
     Tracker(ASTContext &_ctx)
         : ctx(_ctx), function(_ctx.function), active_loop(nullptr)
     {}
@@ -244,18 +252,6 @@ struct Tracker {
         return {};
     }
 
-    void collect_local_keys(ValueIndexSet &set, State &from, int retdepth) {
-        for (auto &entries : from._data) {
-            const ValueIndex &key = entries.first;
-            Data &data = entries.second;
-            int depth = from.get_value_depth(key.value);
-            if (data.will_be_moved()
-                && (data.get_move_depth() > retdepth)) {
-                set.insert(key);
-            }
-        }
-    }
-
     SCOPES_RESULT(void) merge_state(State &state, State &sub, const char *context, bool drop_arguments = false) {
         SCOPES_RESULT_TYPE(void);
         assert(&state != &sub);
@@ -278,64 +274,101 @@ struct Tracker {
         return {};
     }
 
-    SCOPES_RESULT(void) merge_states(State &state, State &_then, State &_else) {
+    void collect_moved_keys(State &substate, ValueIndexSet &moved, int retdepth) {
+        for (auto &entries : substate._data) {
+            const ValueIndex &key = entries.first;
+            Data &data = entries.second;
+            int depth = substate.get_value_depth(key.value);
+            if (data.will_be_moved()
+                && (data.get_move_depth() > retdepth)) {
+                moved.insert(key);
+            }
+        }
+    }
+
+    SCOPES_RESULT(void) drop_moved_keys(State &state, const ValueIndexSet &moved, const char *context) {
         SCOPES_RESULT_TYPE(void);
-        assert(&state != &_then);
-        assert(&_then != &_else);
+        for (auto key : moved) {
+            Data &data = state.ensure_data(key);
+            if (data.will_be_moved())
+                continue;
+            SCOPES_CHECK_RESULT(drop_argument(state, key, context));
+        }
+        return {};
+    }
+
+    SCOPES_RESULT(void) merge_states(State &state, States &states) {// State &_then, State &_else) {
+        SCOPES_RESULT_TYPE(void);
         int retdepth = state.get_depth();
         assert(retdepth >= 0);
-        ValueIndexSet then_moved;
-        ValueIndexSet else_moved;
-        collect_local_keys(then_moved, _then, retdepth);
-        collect_local_keys(else_moved, _else, retdepth);
-        _else.finalize();
-        _then.finalize();
-        for (auto key : then_moved) {
-            if (else_moved.count(key))
-                continue;
-            SCOPES_CHECK_RESULT(drop_argument(_else, key, "then->else-branch"));
+        ValueIndexSet moved;
+        for (auto &&substate : states) {
+            collect_moved_keys(substate, moved, retdepth);
+            substate.finalize();
         }
-        for (auto key : else_moved) {
-            if (then_moved.count(key))
-                continue;
-            SCOPES_CHECK_RESULT(drop_argument(_then, key, "else->then-branch"));
+        for (auto &&substate : states) {
+            SCOPES_CHECK_RESULT(drop_moved_keys(substate, moved, "merge-branches"));
         }
-        state.finalize();
-        SCOPES_CHECK_RESULT(merge_state(state, _then, "branch-merge"));
         return {};
     }
 
     SCOPES_RESULT(void) track_CondBr(State &state, CondBr *node) {
         SCOPES_RESULT_TYPE(void);
         SCOPES_CHECK_RESULT(verify_deps(state, node, node->deps, node->get_type(), "branch"));
-        State then_state(node->then_body, state);
-        State else_state(node->else_body, state);
-        SCOPES_CHECK_RESULT(track_block(then_state));
-        SCOPES_CHECK_RESULT(track_block(else_state));
+        States states = {
+            State(node->then_body, state),
+            State(node->else_body, state)
+        };
+        SCOPES_CHECK_RESULT(track_block(states[0]));
+        SCOPES_CHECK_RESULT(track_block(states[1]));
         // problem here: the conditional is consumed by the branch check, but needs to be
         // destroyed afterwards; since we have no guarantee that our branches return, we need to
         // inject the destructors in both branches
-        SCOPES_CHECK_RESULT(visit_value(then_state, VM_FORCE_COPY_OR_DROP, node->cond, "conditional"));
-        SCOPES_CHECK_RESULT(collect(then_state));
-        SCOPES_CHECK_RESULT(visit_value(else_state, VM_FORCE_COPY_OR_DROP, node->cond, "conditional"));
-        SCOPES_CHECK_RESULT(collect(else_state));
+        SCOPES_CHECK_RESULT(visit_value(states[0], VM_FORCE_COPY_OR_DROP, node->cond, "conditional"));
+        SCOPES_CHECK_RESULT(collect(states[0]));
+        SCOPES_CHECK_RESULT(visit_value(states[1], VM_FORCE_COPY_OR_DROP, node->cond, "conditional"));
+        SCOPES_CHECK_RESULT(collect(states[1]));
         SCOPES_CHECK_RESULT(merge_states(
-            state, then_state, else_state));
-
+            state, states));
+        SCOPES_CHECK_RESULT(merge_state(state, states[0], "branch-merge"));
         return {};
     }
     SCOPES_RESULT(void) track_Switch(State &state, Switch *node) {
         SCOPES_RESULT_TYPE(void);
         SCOPES_CHECK_RESULT(verify_deps(state, node, node->deps, node->get_type(), "case"));
-        std::vector<State> states;
-        states.reserve(node->cases.size());
+        int retdepth = state.get_depth();
+        assert(retdepth >= 0);
+        States states;
+        const int count = node->cases.size();
+        states.reserve(count);
         for (auto &&_case : node->cases) {
             states.push_back(State(_case.body, state));
-            State &case_state = states.back();
-            SCOPES_CHECK_RESULT(track_block(case_state));
         }
-        int count = node->cases.size();
         State *next_state = nullptr;
+        ValueIndexSet moved;
+        for (int i = count; i-- > 0;) {
+            State &case_state = states[i];
+            auto &&_case = node->cases[i];
+            switch(_case.kind) {
+            case CK_Case:
+                 assert(false); // continue
+            case CK_Pass: {
+                if (!_case.body.terminator) {
+                    assert(next_state);
+                    SCOPES_CHECK_RESULT(merge_state(case_state, *next_state, "pass-merge"));
+                }
+            } break;
+            case CK_Default: break;
+            }
+            SCOPES_CHECK_RESULT(track_block(case_state));
+            collect_moved_keys(case_state, moved, retdepth);
+            case_state.finalize();
+            next_state = &case_state;
+        }
+
+        //SCOPES_CHECK_RESULT(visit_value(case_state, VM_FORCE_COPY_OR_DROP, node->expr, "selector"));
+        //SCOPES_CHECK_RESULT(collect(case_state));
+        next_state = nullptr;
         for (int i = count; i-- > 0;) {
             auto &&_case = node->cases[i];
             auto &&case_state = states[i];
@@ -344,19 +377,17 @@ struct Tracker {
                  assert(false); // continue
             case CK_Pass: {
                 if (_case.body.terminator) {
-                    SCOPES_CHECK_RESULT(merge_state(state, case_state, "case-merge"));
+                    SCOPES_CHECK_RESULT(drop_moved_keys(case_state, moved, "merge-case"));
                 } else {
                     assert(next_state);
-                    SCOPES_CHECK_RESULT(merge_state(case_state, *next_state, "pass-merge"));
                 }
             } break;
             case CK_Default: {
-                SCOPES_CHECK_RESULT(merge_state(state, case_state, "default-merge"));
+                SCOPES_CHECK_RESULT(drop_moved_keys(case_state, moved, "merge-default"));
             } break;
             }
             next_state = &case_state;
         }
-        SCOPES_CHECK_RESULT(visit_argument(state, VM_FORCE_COPY_OR_DROP, ValueIndex(node->expr), "switch selector"));
         return {};
     }
 
@@ -368,6 +399,8 @@ struct Tracker {
         auto &&kinds = depends.kinds;
         for (int i = 0; i < count; ++i) {
             auto ET = get_argument(T, i);
+            if (is_plain(ET))
+                continue;
             #if SCOPES_ANNOTATE_TRACKING
             if (i >= kinds.size()) {
                 StyledStream ss;
@@ -392,13 +425,30 @@ struct Tracker {
         const Type *T = callee->get_type();
         if (is_function_pointer(T)) {
             const FunctionType *ft = extract_function_type(T);
+            bool returning = is_returning(ft->return_type);
+            int raise_retdepth = -1;
+            State except_state(node->except_body, state);
             if (ft->has_exception()) {
+                #if 0
+                if (!returning) {
+                    auto term = node->except_body.terminator;
+                    assert(term);
+                    switch(term->kind()) {
+                    case VK_Raise:
+                        raise_retdepth = 0;
+                        break;
+                    case VK_Merge:
+                        raise_retdepth = state.get_value_depth(cast<Merge>(term)->label);
+                        break;
+                    default:
+                        assert(false); break;
+                    }
+                }
+                #endif
                 // generate unwind destructors for an untimely exit
-                State except_state(node->except_body, state);
                 SCOPES_CHECK_RESULT(track_block(except_state));
             }
             int numargs = (int)ft->argument_types.size();
-            bool returning = is_returning(ft->return_type);
             assert(numargs <= node->args.size());
             for (int i = 0; i < numargs; ++i) {
                 Value *arg = node->args[i];
@@ -409,11 +459,16 @@ struct Tracker {
                         SCOPES_EXPECT_ERROR(error_nonreturning_function_must_move());
                     }
                     // we're viewing
-                    SCOPES_CHECK_RESULT(visit_value(state, VM_FORCE_VIEW, arg, "argument"));
+                    SCOPES_CHECK_RESULT(visit_value(state, VM_FORCE_VIEW, arg, "argument", raise_retdepth));
                 } else {
                     // we're moving
-                    SCOPES_CHECK_RESULT(visit_value(state, returning?VM_FORCE_COPY_OR_MOVE:VM_FORCE_MOVE, arg, "argument"));
+                    SCOPES_CHECK_RESULT(visit_value(state,
+                        VM_FORCE_COPY_OR_MOVE, arg,
+                        "argument", raise_retdepth));
                 }
+            }
+            if (ft->has_exception()) {
+                SCOPES_CHECK_RESULT(write_collected_destructors(except_state, state.collect_order, "argument"));
             }
         } else if (T == TYPE_Builtin) {
             Builtin b = SCOPES_GET_RESULT(extract_builtin_constant(callee));
@@ -476,9 +531,9 @@ struct Tracker {
     SCOPES_RESULT(void) track_Repeat(State &state, Repeat *node) {
         assert(node->loop);
         assert(node->loop == active_loop);
-        int retdepth = node->loop->body.depth;
+        int retdepth = state.get_value_depth(node->loop);
         // TODO: we're not breaking, so this is not entirely true. but maybe it's enough?
-        return track_return_argument(state, node->value, retdepth - 1, "repeat");
+        return track_return_argument(state, node->value, retdepth, "repeat");
     }
     SCOPES_RESULT(void) track_Return(State &state, Return *node) {
         return track_return_argument(state, node->value, 0, "return");
@@ -487,11 +542,13 @@ struct Tracker {
         SCOPES_RESULT_TYPE(void);
 
         bool do_drop = false;
+        #if 0
         if (is_returning(node->get_type())) {
             if (node->label_kind == LK_Break) {
                 do_drop = true;
             }
         }
+        #endif
         State label_state(node->body, state);
         SCOPES_CHECK_RESULT(track_block(label_state));
         SCOPES_CHECK_RESULT(merge_state(state, label_state, "label-merge", do_drop));
@@ -499,8 +556,8 @@ struct Tracker {
     }
     SCOPES_RESULT(void) track_Merge(State &state, Merge *node) {
         SCOPES_RESULT_TYPE(void);
-        int retdepth = node->label->body.depth;
-        return track_return_argument(state, node->value, retdepth - 1,
+        int retdepth = state.get_value_depth(node->label);
+        return track_return_argument(state, node->value, retdepth,
             get_label_kind_name(node->label->label_kind));
     }
     SCOPES_RESULT(void) track_Raise(State &state, Raise *node) {
@@ -566,9 +623,13 @@ struct Tracker {
     SCOPES_RESULT(void) process() {
         SCOPES_RESULT_TYPE(void);
         StyledStream ss;
-        ss << "processing #" << track_count << std::endl;
-        //const int HALT_AT = 9;
-        const int HALT_AT = 11;
+        //ss << "processing #" << track_count << std::endl;
+        //const int HALT_AT = 9; // loop
+        //const int HALT_AT = 11; // another loop
+        //const int HALT_AT = 62; // nested try/except blocks
+        //const int HALT_AT = 120; // switch case
+        //const int HALT_AT = 174; // function with mixed return type
+        const int HALT_AT = -1;
         if (track_count == HALT_AT) {
             StyledStream ss;
             stream_ast(ss, function, StreamASTFormat());
@@ -667,7 +728,7 @@ struct Tracker {
     }
 
     SCOPES_RESULT(void) write_return_destructors(State &state,
-        int retdepth, const char *context) {
+        int retdepth, Value *ignore_node, const char *context) {
         SCOPES_RESULT_TYPE(void);
         assert(retdepth >= 0);
         // collect values to be moved later which are in the scopes we are
@@ -677,6 +738,8 @@ struct Tracker {
         while (s && s->get_depth() > retdepth) {
             for (auto &entries : s->_data) {
                 const ValueIndex &key = entries.first;
+                if (key.value == ignore_node)
+                    continue;
                 Data &data = entries.second;
                 if (data.will_be_moved()
                     && (data.get_move_depth() > retdepth)) {
@@ -703,11 +766,11 @@ struct Tracker {
         SCOPES_RESULT_TYPE(void);
         assert(retdepth >= 0);
         assert(node);
+        SCOPES_CHECK_RESULT(write_return_destructors(state, retdepth, node, context));
         auto T = node->get_type();
-        if (!is_returning_value(T))
-            return {};
-        SCOPES_CHECK_RESULT(write_return_destructors(state, retdepth, context));
-        SCOPES_CHECK_RESULT(visit_value(state, VM_AUTO, node, context, retdepth));
+        if (is_returning_value(T)) {
+            SCOPES_CHECK_RESULT(visit_value(state, VM_AUTO, node, context, retdepth));
+        }
         return {};
     }
 
@@ -791,8 +854,6 @@ struct Tracker {
             }
         } break;
         case VM_FORCE_MOVE: {
-            if (is_plain(arg.get_type())) {
-            }
             SCOPES_CHECK_RESULT(
                 move_argument(state, arg, context, retdepth));
         } break;
@@ -949,6 +1010,9 @@ struct Tracker {
         assert(state.garbage_empty());
         state.set_location(node);
         SCOPES_CHECK_RESULT(visit_value(state, VM_AUTO, node, "declaration"));
+        SCOPES_CHECK_RESULT(collect(state));
+        // lifetime must end before body is evaluated
+        SCOPES_CHECK_RESULT(delete_declaration(state, node));
         Result<_result_type> result;
         switch(node->kind()) {
     #define T(NAME, BNAME, CLASS) \
@@ -959,7 +1023,6 @@ struct Tracker {
         }
         SCOPES_CHECK_RESULT(result);
         SCOPES_CHECK_RESULT(collect(state));
-        SCOPES_CHECK_RESULT(delete_declaration(state, node));
         return {};
     }
 

@@ -174,7 +174,7 @@ SCOPES_RESULT(void) error_value_moved(Value *value, Value *mover, const char *by
 SCOPES_RESULT(void) error_value_in_use(Value *value, Value *user, const char *by) {
     SCOPES_RESULT_TYPE(void);
     StyledString ss;
-    ss.out << by << " cannot move unique value because it will be used";
+    ss.out << by << " cannot move value of type " << value->get_type() << " out of function because it is still in use";
     SCOPES_LOCATION_DEF_ERROR(user, ss.str());
 }
 
