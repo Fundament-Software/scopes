@@ -268,7 +268,7 @@ struct StreamAST : StreamAnchors {
         int id = -1;
         bool is_new = true;
         if (it == visited.end()) {
-            if (!node->is_pure()) {
+            if (isa<Instruction>(node)) {
                 id = nextid++;
             }
             visited.insert({node, id});
@@ -277,7 +277,7 @@ struct StreamAST : StreamAnchors {
             id = it->second;
         }
 
-        if (newlines && !node->is_pure()) {
+        if (newlines && isa<Instruction>(node)) {
             if (is_new) {
                 if (!node->is_typed() || is_returning_value(node->get_type())) {
                     ss << Style_Operator << "%" << Style_None;
@@ -696,6 +696,22 @@ struct StreamAST : StreamAnchors {
             if (newlines) {
                 walk_same_or_newline(val->value, depth+1, maxdepth);
             }
+        } break;
+        case VK_LoopLabelArguments: {
+            auto val = cast<LoopLabelArguments>(node);
+            ss << node;
+            ss << " ";
+            ss << Style_Symbol << "@";
+            stream_address(ss, val->loop);
+            ss << Style_None;
+        } break;
+        case VK_LoopArguments: {
+            auto val = cast<LoopArguments>(node);
+            ss << node;
+            ss << " ";
+            ss << Style_Symbol << "@";
+            stream_address(ss, val->loop);
+            ss << Style_None;
         } break;
         case VK_Raise: {
             auto val = cast<Raise>(node);

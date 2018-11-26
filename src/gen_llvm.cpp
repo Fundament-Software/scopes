@@ -192,15 +192,22 @@ struct LLVMIRGenerator {
     Function *active_function;
     int functions_generated;
 
+    static const Type *arguments_to_tuple(const Type *T) {
+        if (isa<ArgumentsType>(T)) {
+            return cast<ArgumentsType>(T)->to_tuple_type();
+        }
+        return T;
+    }
+
     static const Type *abi_return_type(const FunctionType *ft) {
         if (ft->has_exception()) {
             Types types = { TYPE_Bool, ft->except_type };
             if (is_returning_value(ft->return_type)) {
-                types.push_back(ft->return_type);
+                types.push_back(arguments_to_tuple(ft->return_type));
             }
             return tuple_type(types).assert_ok();
-        } else if (is_returning(ft->return_type)) {
-            return ft->return_type;
+        } else if (is_returning_value(ft->return_type)) {
+            return arguments_to_tuple(ft->return_type);
         } else {
             return empty_arguments_type();
         }
@@ -938,6 +945,11 @@ struct LLVMIRGenerator {
         SCOPES_EXPECT_ERROR(error_gen_unbound_symbol(SCOPES_GEN_TARGET, node));
     }
 
+    SCOPES_RESULT(LLVMValueRef) LoopLabelArguments_to_value(LoopLabelArguments *node) {
+        SCOPES_RESULT_TYPE(LLVMValueRef);
+        SCOPES_EXPECT_ERROR(error_gen_unbound_symbol(SCOPES_GEN_TARGET, node));
+    }
+
     SCOPES_RESULT(LLVMValueRef) Exception_to_value(Exception *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         SCOPES_EXPECT_ERROR(error_cannot_translate(SCOPES_GEN_TARGET, node));
@@ -1046,7 +1058,7 @@ struct LLVMIRGenerator {
         if (is_returning_value(ltype)) {
             LLVMPositionBuilderAtEnd(builder, loop_info.bb_loop);
             loop_info.repeat_value = LLVMBuildPhi(builder, LLVMTypeOf(init), "");
-            bind(node, loop_info.repeat_value);
+            bind(node->args, loop_info.repeat_value);
             LLVMPositionBuilderAtEnd(builder, bb);
         }
         build_merge_phi(loop_info.repeat_value, init);
@@ -1674,12 +1686,20 @@ struct LLVMIRGenerator {
     SCOPES_RESULT(LLVMValueRef) node_to_value(Value *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         assert(node);
-        auto it = node2value.find(node);
-        if (it != node2value.end())
-            return it->second;
-        auto value = SCOPES_GET_RESULT(_node_to_value(node));
-        node2value.insert({node,value});
-        return value;
+        switch(node->kind()) {
+        case VK_ArgumentList:
+        case VK_ExtractArgument: {
+            return SCOPES_GET_RESULT(_node_to_value(node));
+        } break;
+        default: {
+            auto it = node2value.find(node);
+            if (it != node2value.end())
+                return it->second;
+            auto value = SCOPES_GET_RESULT(_node_to_value(node));
+            node2value.insert({node,value});
+            return value;
+        } break;
+        }
     }
     SCOPES_RESULT(LLVMValueRef) Extern_to_value(Extern *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);

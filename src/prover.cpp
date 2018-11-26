@@ -475,7 +475,7 @@ static SCOPES_RESULT(Value *) prove_LabelTemplate(const ASTContext &ctx, LabelTe
         return result;
     } else {
         make_merge(labelctx, result->anchor(), label, result);
-        #if 0
+        #if 1
         if (label->body.empty()) {
             StyledStream ss;
             stream_ast(ss, label, StreamASTFormat());
@@ -527,8 +527,7 @@ Value *extract_argument(const ASTContext &ctx, Value *value, int index) {
     if (!is_returning(T))
         return value;
     if (is_arguments_type(T)) {
-        auto rt = cast<TupleType>(storage_type(T).assert_ok());
-        const Type *AT = rt->type_at_index_or_nothing(index);
+        const Type *AT = get_argument(T, index);
         if (AT == TYPE_Nothing) {
             return ConstAggregate::none_from(anchor);
         } else {
@@ -539,8 +538,6 @@ Value *extract_argument(const ASTContext &ctx, Value *value, int index) {
             } else {
                 auto result = ExtractArgument::from(anchor, value, index);
                 result->set_type(AT);
-                assert(!result->is_pure());
-                assert(!result->block);
                 result->deps.unique(0);
                 ctx.append(result);
                 return result;
@@ -559,9 +556,9 @@ static Value *extract_arguments(const ASTContext &ctx, Value *value, int index) 
     if (!is_returning(T))
         return value;
     if (is_arguments_type(T)) {
-        auto rt = cast<TupleType>(storage_type(T).assert_ok());
+        int count = get_argument_count(T);
         Values values;
-        for (int i = index; i < rt->values.size(); ++i) {
+        for (int i = index; i < count; ++i) {
             values.push_back(extract_argument(ctx, value, i));
         }
         auto newlist = build_runtime_argument_list(ctx, anchor, values);
@@ -722,10 +719,9 @@ static SCOPES_RESULT(Value *) prove_arguments(
             return value;
         }
         if (is_arguments_type(T)) {
-            auto rt = cast<TupleType>(storage_type(T).assert_ok());
             if ((i + 1) == count) {
                 // last argument is appended in full
-                int valcount = (int)rt->values.size();
+                int valcount = get_argument_count(T);
                 for (int j = 0; j < valcount; ++j) {
                     outargs.push_back(extract_argument(ctx, value, j));
                 }
@@ -770,25 +766,24 @@ static SCOPES_RESULT(Value *) prove_Loop(const ASTContext &ctx, Loop *loop) {
     LoopLabel *newloop = LoopLabel::from(loop->anchor(), init);
     // set to noreturn type so loop is recognized to be a terminator
     newloop->set_type(TYPE_NoReturn);
+    newloop->args->set_type(ltype);
     // anchor loop to the local block to avoid it landing in the wrong place
-    ctx.append(newloop);
-    newloop->change_type(ltype);
-    ctx.frame->bind(loop, newloop);
+    // ctx.append(newloop);
+    ctx.frame->bind(loop->args, newloop->args);
     auto subctx = ctx.for_loop(newloop);
     ASTContext newctx;
     auto result = SCOPES_GET_RESULT(prove_block(subctx, newloop->body, loop->value, newctx));
     auto rtype = result->get_type();
     make_repeat(newctx,
         result->anchor(), newloop, result);
-    newloop->change_type(TYPE_NoReturn);
 
     for (auto repeat : newloop->repeats) {
         SCOPES_CHECK_RESULT(merge_value_type("loop repeat", ltype, repeat->value->get_type()));
     }
 
-    merge_depends(ctx, newloop->deps, init);
+    merge_depends(ctx, newloop->args->deps, init);
     for (auto repeat : newloop->repeats) {
-        merge_depends(ctx, newloop->deps, repeat->value);
+        merge_depends(ctx, newloop->args->deps, repeat->value);
     }
 
     return newloop;
@@ -959,6 +954,7 @@ static SCOPES_RESULT(Value *) prove_CompileStage(const ASTContext &ctx, CompileS
 static SCOPES_RESULT(Value *) prove_Keyed(const ASTContext &ctx, Keyed *keyed) {
     SCOPES_RESULT_TYPE(Value *);
     auto value = SCOPES_GET_RESULT(prove(ctx, keyed->value));
+    assert(!isa<ArgumentList>(value));
     return rekey(keyed->anchor(), keyed->key, value);
 }
 
@@ -1938,14 +1934,17 @@ static SCOPES_RESULT(Value *) prove_Call(const ASTContext &ctx, Call *call) {
 
 static SCOPES_RESULT(Value *) prove_Parameter(const ASTContext &ctx, Parameter *sym) {
     assert(false);
-    /*
-    assert(ctx.frame);
-    auto value = SCOPES_GET_RESULT(ctx.frame->resolve(sym, ctx.function));
-    if (!value) {
-        SCOPES_EXPECT_ERROR(error_unbound_symbol(sym));
-    }
-    return value;
-    */
+   return nullptr;
+}
+
+static SCOPES_RESULT(Value *) prove_LoopArguments(const ASTContext &ctx, LoopArguments *node) {
+    SCOPES_RESULT_TYPE(Value *);
+    assert(false);
+    return nullptr;
+}
+
+static SCOPES_RESULT(Value *) prove_LoopLabelArguments(const ASTContext &ctx, LoopLabelArguments *node) {
+   assert(false);
    return nullptr;
 }
 
@@ -2343,7 +2342,7 @@ SCOPES_RESULT(Function *) prove(Function *frame, Template *func, const Types &ty
     for (auto &&ret : fn->returns) {
         merge_depends(fnctx, fn->deps, ret->value);
     }
-    SCOPES_CHECK_RESULT(track(fnctx));
+    //SCOPES_CHECK_RESULT(track(fnctx));
     fn->complete = true;
     return fn;
 }

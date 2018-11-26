@@ -796,7 +796,7 @@ bool sc_value_is_constant(sc_value_t *value) {
 
 bool sc_value_is_pure (sc_value_t *value) {
     using namespace scopes;
-    return value->is_pure();
+    return isa<Pure>(value);
 }
 
 int sc_value_kind (sc_value_t *value) {
@@ -1036,6 +1036,11 @@ void sc_call_set_rawcall(sc_value_t *value, bool enable) {
 sc_value_t *sc_loop_new(sc_value_t *init) {
     using namespace scopes;
     return Loop::from(get_active_anchor(), init);
+}
+
+sc_value_t *sc_loop_arguments(sc_value_t *loop) {
+    using namespace scopes;
+    return cast<Loop>(loop)->args;
 }
 
 void sc_loop_set_body(sc_value_t *loop, sc_value_t *body) {
@@ -1726,6 +1731,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_call_is_rawcall, TYPE_Bool, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_call_set_rawcall, _void, TYPE_Value, TYPE_Bool);
     DEFINE_EXTERN_C_FUNCTION(sc_loop_new, TYPE_Value, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_loop_arguments, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_loop_set_body, _void, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_const_int_new, TYPE_Value, TYPE_Type, TYPE_U64);
     DEFINE_EXTERN_C_FUNCTION(sc_const_real_new, TYPE_Value, TYPE_Type, TYPE_F64);

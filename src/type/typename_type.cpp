@@ -86,9 +86,6 @@ SCOPES_RESULT(const Type *) storage_type(const Type *T) {
     SCOPES_RESULT_TYPE(const Type *);
     T = strip_qualifiers(T);
     switch(T->kind()) {
-    case TK_Arguments: {
-        return cast<ArgumentsType>(T)->to_tuple_type();
-    } break;
     case TK_Typename: {
         const TypenameType *tt = cast<TypenameType>(T);
         if (!tt->finalized()) {

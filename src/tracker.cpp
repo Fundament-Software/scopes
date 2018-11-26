@@ -247,6 +247,16 @@ struct Tracker {
         return {};
     }
 
+    SCOPES_RESULT(void) track_LoopLabelArguments(State &state, Value *node) {
+        assert(false);
+        return {};
+    }
+
+    SCOPES_RESULT(void) track_LabelArguments(State &state, Value *node) {
+        assert(false);
+        return {};
+    }
+
     SCOPES_RESULT(void) track_Exception(State &state, Value *node) {
         assert(false);
         return {};
@@ -623,13 +633,14 @@ struct Tracker {
     SCOPES_RESULT(void) process() {
         SCOPES_RESULT_TYPE(void);
         StyledStream ss;
-        //ss << "processing #" << track_count << std::endl;
+        ss << "processing #" << track_count << std::endl;
         //const int HALT_AT = 9; // loop
         //const int HALT_AT = 11; // another loop
         //const int HALT_AT = 62; // nested try/except blocks
         //const int HALT_AT = 120; // switch case
         //const int HALT_AT = 174; // function with mixed return type
-        const int HALT_AT = -1;
+        const int HALT_AT = 327; // use of argument list
+        //const int HALT_AT = -1;
         if (track_count == HALT_AT) {
             StyledStream ss;
             stream_ast(ss, function, StreamASTFormat());

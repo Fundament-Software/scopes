@@ -207,6 +207,7 @@ bool sc_call_is_rawcall(sc_value_t *value);
 void sc_call_set_rawcall(sc_value_t *value, bool enable);
 
 sc_value_t *sc_loop_new(sc_value_t *init);
+sc_value_t *sc_loop_arguments(sc_value_t *loop);
 void sc_loop_set_body(sc_value_t *loop, sc_value_t *body);
 
 sc_value_t *sc_const_int_new(const sc_type_t *type, uint64_t value);

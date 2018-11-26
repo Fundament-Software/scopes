@@ -25,6 +25,7 @@ struct Scope;
     T(VK_Template, "value-kind-template", Template) \
     T(VK_LabelTemplate, "value-kind-label-template", LabelTemplate) \
     T(VK_Loop, "value-kind-loop", Loop) \
+    T(VK_LoopArguments, "value-kind-loop-arguments", LoopArguments) \
     T(VK_Keyed, "value-kind-keyed", Keyed) \
     T(VK_Expression, "value-kind-expression", Expression) \
     T(VK_Quote, "value-kind-quote", Quote) \
@@ -46,6 +47,14 @@ struct Scope;
     T(VK_ConstPointer, "value-kind-const-pointer", ConstPointer) \
 
 
+#define SCOPES_INSTRUCTION_VALUE_KIND() \
+    T(VK_Label, "value-kind-label", Label) \
+    T(VK_LoopLabel, "value-kind-loop-label", LoopLabel) \
+    T(VK_CondBr, "value-kind-condbr", CondBr) \
+    T(VK_Switch, "value-kind-switch", Switch) \
+    T(VK_Call, "value-kind-call", Call) \
+
+
 #define SCOPES_TERMINATOR_VALUE_KIND() \
     T(VK_Merge, "value-kind-merge", Merge) \
     T(VK_Repeat, "value-kind-repeat", Repeat) \
@@ -53,19 +62,12 @@ struct Scope;
     T(VK_Raise, "value-kind-raise", Raise) \
 
 
-#define SCOPES_INSTRUCTION_VALUE_KIND() \
-    T(VK_Label, "value-kind-label", Label) \
-    T(VK_LoopLabel, "value-kind-looplabel", LoopLabel) \
-    T(VK_CondBr, "value-kind-condbr", CondBr) \
-    T(VK_Switch, "value-kind-switch", Switch) \
-    T(VK_Call, "value-kind-call", Call) \
-    T(VK_ArgumentList, "value-kind-argumentlist", ArgumentList) \
-    T(VK_ExtractArgument, "value-kind-extractargument", ExtractArgument) \
-
-
 #define SCOPES_VALUE_KIND() \
     T(VK_Parameter, "value-kind-parameter", Parameter) \
     T(VK_Exception, "value-kind-exception", Exception) \
+    T(VK_ArgumentList, "value-kind-argument-list", ArgumentList) \
+    T(VK_ExtractArgument, "value-kind-extract-argument", ExtractArgument) \
+    T(VK_LoopLabelArguments, "value-kind-loop-label-arguments", LoopLabelArguments) \
     /* template-only */ \
     SCOPES_TEMPLATE_VALUE_KIND() \
     /* instructions (Instruction::classof) */ \
@@ -162,7 +164,6 @@ struct Value {
     void set_type(const Type *type);
     const Type *get_type() const;
     void change_type(const Type *type);
-    bool is_pure() const;
     bool is_accessible() const;
     int get_depth() const;
 
@@ -221,7 +222,7 @@ struct Keyed : Value {
 
 //------------------------------------------------------------------------------
 
-struct ArgumentList : Instruction {
+struct ArgumentList : Value {
     static bool classof(const Value *T);
 
     ArgumentList(const Anchor *anchor, const Values &values);
@@ -238,7 +239,7 @@ struct ArgumentList : Instruction {
 
 //------------------------------------------------------------------------------
 
-struct ExtractArgument : Instruction {
+struct ExtractArgument : Value {
     static bool classof(const Value *T);
 
     ExtractArgument(const Anchor *anchor, Value *value, int index, bool vararg);
@@ -421,6 +422,28 @@ struct Parameter : Value {
 
 //------------------------------------------------------------------------------
 
+struct LoopArguments : Value {
+    static bool classof(const Value *T);
+
+    LoopArguments(const Anchor *anchor, Loop *loop);
+    static LoopArguments *from(const Anchor *anchor, Loop *loop);
+
+    Loop *loop;
+};
+
+//------------------------------------------------------------------------------
+
+struct LoopLabelArguments : Value {
+    static bool classof(const Value *T);
+
+    LoopLabelArguments(const Anchor *anchor, LoopLabel *loop);
+    static LoopLabelArguments *from(const Anchor *anchor, LoopLabel *loop);
+
+    LoopLabel *loop;
+};
+
+//------------------------------------------------------------------------------
+
 struct Exception : Value {
     static bool classof(const Value *T);
 
@@ -522,6 +545,7 @@ struct LoopLabel : Instruction {
     Value *init;
     Block body;
     std::vector<Repeat *> repeats;
+    LoopLabelArguments *args;
 };
 
 //------------------------------------------------------------------------------
@@ -535,6 +559,7 @@ struct Loop : Value {
 
     Value *init;
     Value *value;
+    LoopArguments *args;
 };
 
 //------------------------------------------------------------------------------

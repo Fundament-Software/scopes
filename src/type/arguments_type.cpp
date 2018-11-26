@@ -65,6 +65,7 @@ void ArgumentsType::stream_name(StyledStream &ss) const {
 }
 
 const TupleType *ArgumentsType::to_tuple_type() const {
+    assert(!values.empty());
     return cast<TupleType>(tuple_type(values).assert_ok());
 }
 

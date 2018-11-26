@@ -224,7 +224,6 @@ static size_t classify(const Type *T, ABIClass *classes, size_t offset) {
             assert(false && "illegal type");
         }
     } break;
-    case TK_Arguments:
     case TK_Typename: {
         if (is_opaque(T)) {
             classes[0] = ABI_CLASS_NO_CLASS;
@@ -268,10 +267,14 @@ static size_t classify(const Type *T, ABIClass *classes, size_t offset) {
 
 size_t abi_classify(const Type *T, ABIClass *classes) {
     T = strip_qualifiers(T);
-#ifdef SCOPES_WIN32
-    if (T->kind() == TK_ReturnLabel) {
-        T = cast<ReturnLabelType>(T)->ll_return_type;
+    if (T->kind() == TK_Arguments) {
+        if (T == empty_arguments_type()) {
+            classes[0] = ABI_CLASS_NO_CLASS;
+            return 1;
+        }
+        T = cast<ArgumentsType>(T)->to_tuple_type();
     }
+#ifdef SCOPES_WIN32
     classes[0] = ABI_CLASS_NO_CLASS;
     if (is_opaque(T))
         return 1;
@@ -283,7 +286,6 @@ size_t abi_classify(const Type *T, ABIClass *classes) {
     case TK_Array:
     case TK_Union:
     case TK_Tuple:
-    case TK_Arguments:
         if (sz <= 1)
             classes[0] = ABI_CLASS_INTEGERSI8;
         else if (sz <= 2)

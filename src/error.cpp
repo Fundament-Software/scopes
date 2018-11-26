@@ -266,6 +266,13 @@ SCOPES_RESULT(void) error_unbound_symbol(Parameter *value) {
     SCOPES_LOCATION_DEF_ERROR(value, ss.str());
 }
 
+SCOPES_RESULT(void) error_unbound_symbol(Value *value) {
+    SCOPES_RESULT_TYPE(void);
+    StyledString ss;
+    ss.out << "token " << value << " is unbound in scope";
+    SCOPES_LOCATION_DEF_ERROR(value, ss.str());
+}
+
 SCOPES_RESULT(void) error_cannot_merge_expression_types(const char *context, const Type *T1, const Type *T2) {
     SCOPES_RESULT_TYPE(void);
     StyledString ss;
@@ -364,6 +371,13 @@ SCOPES_RESULT(void) error_gen_unbound_symbol(const char *target, Parameter *valu
     SCOPES_RESULT_TYPE(void);
     StyledString ss;
     ss.out << target << ": symbol " << value->name << " is unbound";
+    SCOPES_LOCATION_DEF_ERROR(value, ss.str());
+}
+
+SCOPES_RESULT(void) error_gen_unbound_symbol(const char *target, Value *value) {
+    SCOPES_RESULT_TYPE(void);
+    StyledString ss;
+    ss.out << target << ": IL token " << value << " is unbound";
     SCOPES_LOCATION_DEF_ERROR(value, ss.str());
 }
 

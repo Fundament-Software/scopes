@@ -93,6 +93,7 @@ SCOPES_RESULT(void) error_invalid_operands(const Type *A, const Type *B);
 SCOPES_RESULT(void) error_argument_type_mismatch(const Type *expected, const Type *got);
 SCOPES_RESULT(void) error_constant_expected(const Type *want, Value *value);
 SCOPES_RESULT(void) error_unbound_symbol(Parameter *value);
+SCOPES_RESULT(void) error_unbound_symbol(Value *value);
 SCOPES_RESULT(void) error_cannot_merge_expression_types(const char *context, const Type *T1, const Type *T2);
 SCOPES_RESULT(void) error_noreturn_not_last_expression();
 SCOPES_RESULT(void) error_noreturn_in_argument_list();
@@ -115,6 +116,7 @@ SCOPES_RESULT(void) error_nonreturning_function_must_move();
 // code generator errors
 SCOPES_RESULT(void) error_gen_invalid_call_type(const char *target, Value *callee);
 SCOPES_RESULT(void) error_gen_unbound_symbol(const char *target, Parameter *value);
+SCOPES_RESULT(void) error_gen_unbound_symbol(const char *target, Value *value);
 SCOPES_RESULT(void) error_cannot_translate(const char *target, Value *value);
 
 //------------------------------------------------------------------------------

@@ -60,16 +60,20 @@ struct Quoter {
 
     SCOPES_RESULT(Value *) quote_ArgumentList(int level, ArgumentList *node) {
         SCOPES_RESULT_TYPE(Value *);
-        auto _anchor = node->anchor();
-        auto value = Call::from(_anchor, g_sc_argument_list_new, {});
-        auto expr = Expression::unscoped_from(_anchor);
-        int count = (int)node->values.size();
-        for (int i = 0; i < count; ++i) {
-            expr->append(Call::from(_anchor, g_sc_argument_list_append,
-                { value, SCOPES_GET_RESULT(quote(level, node->values[i])) }));
+        /*if (node->values.size() == 1) {
+            return quote(level, node->values[0]);
+        } else*/ {
+            auto _anchor = node->anchor();
+            auto value = Call::from(_anchor, g_sc_argument_list_new, {});
+            auto expr = Expression::unscoped_from(_anchor);
+            int count = (int)node->values.size();
+            for (int i = 0; i < count; ++i) {
+                expr->append(Call::from(_anchor, g_sc_argument_list_append,
+                    { value, SCOPES_GET_RESULT(quote(level, node->values[i])) }));
+            }
+            expr->append(value);
+            return canonicalize(expr);
         }
-        expr->append(value);
-        return canonicalize(expr);
     }
 
     SCOPES_RESULT(Value *) quote_ExtractArgument(int level, ExtractArgument *node) {
@@ -102,9 +106,11 @@ struct Quoter {
         auto value = Call::from(_anchor, g_sc_loop_new, {
             SCOPES_GET_RESULT(quote(level, node->init))
         });
-        bind(node, value);
+        auto args = Call::from(_anchor, g_sc_loop_arguments, { value });
+        bind(node->args, args);
         auto expr = Expression::unscoped_from(_anchor);
         expr->append(value);
+        expr->append(args);
         expr->append(Call::from(_anchor, g_sc_loop_set_body, { value,
             SCOPES_GET_RESULT(quote(level, node->value)) }));
         expr->append(value);
@@ -191,6 +197,15 @@ struct Quoter {
         return value;
     }
 
+    SCOPES_RESULT(Value *) quote_LoopArguments(int level, LoopArguments *sym) {
+        SCOPES_RESULT_TYPE(Value *);
+        auto value = resolve(sym);
+        if (!value) {
+            SCOPES_EXPECT_ERROR(error_unbound_symbol(sym));
+        }
+        return value;
+    }
+
     SCOPES_RESULT(Value *) quote_SwitchTemplate(int level, SwitchTemplate *node) {
         SCOPES_RESULT_TYPE(Value *);
         auto _anchor = node->anchor();
@@ -236,6 +251,11 @@ struct Quoter {
         return nullptr;
     }
 
+    SCOPES_RESULT(Value *) quote_LoopLabelArguments(int level, LoopLabelArguments *node) {
+        assert(false);
+        return nullptr;
+    }
+
     SCOPES_RESULT(Value *) quote_Exception(int level, Exception *node) {
         assert(false);
         return nullptr;
@@ -248,7 +268,6 @@ struct Quoter {
     }
 
     SCOPES_RESULT(Value *) quote_Merge(int level, Merge *node) {
-        SCOPES_RESULT_TYPE(Value *);
         assert(false);
         return nullptr;
     }
@@ -299,11 +318,30 @@ struct Quoter {
             { SCOPES_GET_RESULT(quote(level+1, node->value)) });
     }
 
+    Value *quote_typed_argument_list(ArgumentList *node) {
+        /*if (node->values.size() == 1) {
+            return quote_typed(node->values[0]);
+        } else*/ {
+            auto _anchor = node->anchor();
+            auto value = Call::from(_anchor, g_sc_argument_list_new, {});
+            auto expr = Expression::unscoped_from(_anchor);
+            int count = (int)node->values.size();
+            for (int i = 0; i < count; ++i) {
+                expr->append(Call::from(_anchor, g_sc_argument_list_append,
+                    { value, quote_typed(node->values[i]) }));
+            }
+            expr->append(value);
+            return canonicalize(expr);
+        }
+    }
+
     Value *quote_typed(Value *node) {
         if (node->get_type() == TYPE_Value)
             return node;
         if (isa<Pure>(node)) {
             return ConstPointer::ast_from(node->anchor(), node);
+        } else if (isa<ArgumentList>(node)) {
+            return quote_typed_argument_list(cast<ArgumentList>(node));
         } else {
             auto result = wrap_value(node->get_type(), node);
             assert(result);
@@ -321,16 +359,20 @@ struct Quoter {
             if (is_arguments_type(T)) {
                 auto at = cast<ArgumentsType>(T);
                 auto _anchor = node->anchor();
-                auto result = Call::from(_anchor, g_sc_argument_list_new, {});
-                auto expr = Expression::unscoped_from(_anchor);
-                int count = (int)at->values.size();
-                for (int i = 0; i < count; ++i) {
-                    expr->append(Call::from(_anchor, g_sc_argument_list_append,
-                        { result, quote_typed(
-                        extract_argument(ctx, value, i)) }));
+                /*if (at->values.size() == 1) {
+                    return quote_typed(extract_argument(ctx, value, 0));
+                } else*/ {
+                    auto result = Call::from(_anchor, g_sc_argument_list_new, {});
+                    auto expr = Expression::unscoped_from(_anchor);
+                    int count = (int)at->values.size();
+                    for (int i = 0; i < count; ++i) {
+                        expr->append(Call::from(_anchor, g_sc_argument_list_append,
+                            { result, quote_typed(
+                            extract_argument(ctx, value, i)) }));
+                    }
+                    expr->append(result);
+                    return canonicalize(expr);
                 }
-                expr->append(result);
-                return canonicalize(expr);
             } else {
                 return quote_typed(value);
             }
@@ -416,7 +458,7 @@ struct Quoter {
                 result = SCOPES_GET_RESULT(prove(ctx, result));
             }
             bind(node, result);
-            if (!node->is_typed() && !node->is_pure()) {
+            if (!node->is_typed() && !isa<Pure>(node)) {
                 #if 0
                 StyledStream ss;
                 ss << "binding ";

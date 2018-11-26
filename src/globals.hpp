@@ -63,6 +63,7 @@ namespace scopes {
     T(g_sc_call_append_argument, "sc_call_append_argument") \
     T(g_sc_call_set_rawcall, "sc_call_set_rawcall") \
     T(g_sc_loop_new, "sc_loop_new") \
+    T(g_sc_loop_arguments, "sc_loop_arguments") \
     T(g_sc_loop_set_body, "sc_loop_set_body") \
     T(g_sc_break_new, "sc_break_new") \
     T(g_sc_repeat_new, "sc_repeat_new") \

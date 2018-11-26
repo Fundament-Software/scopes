@@ -150,7 +150,7 @@ Keyed *Keyed::from(const Anchor *anchor, Symbol key, Value *node) {
 //------------------------------------------------------------------------------
 
 ArgumentList::ArgumentList(const Anchor *anchor, const Values &_values)
-    : Instruction(VK_ArgumentList, anchor), values(_values) {
+    : Value(VK_ArgumentList, anchor), values(_values) {
 }
 
 void ArgumentList::append(Value *node) {
@@ -178,7 +178,7 @@ ArgumentList *ArgumentList::from(const Anchor *anchor, const Values &values) {
 //------------------------------------------------------------------------------
 
 ExtractArgument::ExtractArgument(const Anchor *anchor, Value *_value, int _index, bool _vararg)
-    : Instruction(VK_ExtractArgument, anchor), index(_index), value(_value), vararg(_vararg) {
+    : Value(VK_ExtractArgument, anchor), index(_index), value(_value), vararg(_vararg) {
     assert(index >= 0);
 }
 
@@ -357,8 +357,6 @@ void Block::insert_at_end() {
 }
 
 bool Block::append(Value *node) {
-    if (node->is_pure())
-        return false;
     if (isa<Instruction>(node)) {
         auto instr = cast<Instruction>(node);
         if (instr->block)
@@ -385,7 +383,7 @@ Expression::Expression(const Anchor *anchor, const Values &_body, Value *_value)
 
 void Expression::append(Value *node) {
     assert(node);
-    if (value && !value->is_pure()) {
+    if (value && !isa<Pure>(value)) {
         body.push_back(value);
     }
     value = node;
@@ -547,6 +545,24 @@ void Parameter::set_owner(Value *_owner, int _index) {
 
 //------------------------------------------------------------------------------
 
+LoopArguments::LoopArguments(const Anchor *anchor, Loop *_loop)
+    : Value(VK_LoopArguments, anchor), loop(_loop) {}
+
+LoopArguments *LoopArguments::from(const Anchor *anchor, Loop *loop) {
+    return new LoopArguments(anchor, loop);
+}
+
+//------------------------------------------------------------------------------
+
+LoopLabelArguments::LoopLabelArguments(const Anchor *anchor, LoopLabel *_loop)
+    : Value(VK_LoopLabelArguments, anchor), loop(_loop) {}
+
+LoopLabelArguments *LoopLabelArguments::from(const Anchor *anchor, LoopLabel *loop) {
+    return new LoopLabelArguments(anchor, loop);
+}
+
+//------------------------------------------------------------------------------
+
 Exception::Exception(const Anchor *anchor)
     : Value(VK_Exception, anchor) {
 }
@@ -578,6 +594,7 @@ Call *Call::from(const Anchor *anchor, Value *callee, const Values &args) {
 
 LoopLabel::LoopLabel(const Anchor *anchor, Value *_init)
     : Instruction(VK_LoopLabel, anchor), init(_init) {
+    args = LoopLabelArguments::from(anchor, this);
 }
 
 LoopLabel *LoopLabel::from(const Anchor *anchor, Value *init) {
@@ -588,6 +605,7 @@ LoopLabel *LoopLabel::from(const Anchor *anchor, Value *init) {
 
 Loop::Loop(const Anchor *anchor, Value *_init, Value *_value)
     : Value(VK_Loop, anchor), init(_init), value(_value) {
+    args = LoopArguments::from(anchor, this);
 }
 
 Loop *Loop::from(const Anchor *anchor, Value *init, Value *value) {
@@ -826,25 +844,6 @@ Value::Value(ValueKind kind, const Anchor *anchor)
     assert(_anchor);
 }
 
-bool Value::is_pure() const {
-    switch(kind()) {
-    case VK_Exception:
-    case VK_Parameter:
-        return true;
-    case VK_ArgumentList: {
-        auto al = cast<ArgumentList>(this);
-        for (auto val : al->values) {
-            assert(val);
-            if (!val->is_pure())
-                return false;
-        }
-        return true;
-    } break;
-    default: break;
-    }
-    return isa<Pure>(this);
-}
-
 bool Value::is_accessible() const {
     switch(kind()) {
     case VK_ArgumentList: {
@@ -906,8 +905,8 @@ int Value::get_depth() const {
             return 0;
         }
     } else if (isa<Instruction>(value)) {
-        if (value->is_pure())
-            return 0;
+        //if (value->is_pure_in_function())
+        //    return 0;
         auto instr = cast<Instruction>(value);
         assert(instr->block);
         return instr->block->depth;
