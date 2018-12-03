@@ -797,7 +797,7 @@ struct Tracker {
         auto anchor = where->anchor();
         values.insert(values.begin(), ConstPointer::string_from(anchor, msg));
         auto expr =
-            Call::from(anchor,
+            CallTemplate::from(anchor,
                 ConstInt::builtin_from(anchor, Builtin(FN_Annotate)),
                     values);
         prove(ctx.with_block(state.block), expr).assert_ok();
@@ -827,7 +827,7 @@ struct Tracker {
         assert(where);
         auto anchor = where->anchor();
         auto expr =
-            Call::from(anchor, handler, {
+            CallTemplate::from(anchor, handler, {
                 ExtractArgument::from(anchor, arg.value, arg.index) });
         SCOPES_CHECK_RESULT(
             prove(ctx.with_block(state.block), expr));

@@ -573,21 +573,32 @@ Exception *Exception::from(const Anchor *anchor) {
 
 //------------------------------------------------------------------------------
 
-Call::Call(const Anchor *anchor, Value *_callee, const Values &_args)
-    : Instruction(VK_Call, anchor), callee(_callee), args(_args), flags(0),
-        except(nullptr) {
+CallTemplate::CallTemplate(const Anchor *anchor, Value *_callee, const Values &_args)
+    : Value(VK_CallTemplate, anchor), callee(_callee), args(_args), flags(0) {
 }
 
-bool Call::is_rawcall() const {
+bool CallTemplate::is_rawcall() const {
     return flags & CF_RawCall;
 }
 
-void Call::set_rawcall() {
+void CallTemplate::set_rawcall() {
     flags |= CF_RawCall;
 }
 
-Call *Call::from(const Anchor *anchor, Value *callee, const Values &args) {
-    return new Call(anchor, callee, args);
+CallTemplate *CallTemplate::from(const Anchor *anchor, Value *callee, const Values &args) {
+    return new CallTemplate(anchor, callee, args);
+}
+
+//------------------------------------------------------------------------------
+
+Call::Call(const Anchor *anchor, const Type *type, Value *_callee, const Values &_args)
+    : Instruction(VK_Call, anchor), callee(_callee), args(_args),
+        except(nullptr) {
+    set_type(type);
+}
+
+Call *Call::from(const Anchor *anchor, const Type *type, Value *callee, const Values &args) {
+    return new Call(anchor, type, callee, args);
 }
 
 //------------------------------------------------------------------------------

@@ -34,6 +34,7 @@ struct Scope;
     T(VK_If, "value-kind-if", If) \
     T(VK_SwitchTemplate, "value-kind-switch-template", SwitchTemplate) \
     T(VK_MergeTemplate, "value-kind-merge-template", MergeTemplate) \
+    T(VK_CallTemplate, "value-kind-call-template", CallTemplate) \
     T(VK_Break, "value-kind-break", Break) \
 
 
@@ -518,17 +519,29 @@ enum CallFlags {
     CF_RawCall = (1 << 0),
 };
 
-struct Call : Instruction {
+struct CallTemplate : Value {
     static bool classof(const Value *T);
 
-    Call(const Anchor *anchor, Value *callee, const Values &args);
-    static Call *from(const Anchor *anchor, Value *callee, const Values &args = {});
+    CallTemplate(const Anchor *anchor, Value *callee, const Values &args);
+    static CallTemplate *from(const Anchor *anchor, Value *callee, const Values &args = {});
     bool is_rawcall() const;
     void set_rawcall();
 
     Value *callee;
     Values args;
     uint32_t flags;
+};
+
+//------------------------------------------------------------------------------
+
+struct Call : Instruction {
+    static bool classof(const Value *T);
+
+    Call(const Anchor *anchor, const Type *type, Value *callee, const Values &args);
+    static Call *from(const Anchor *anchor, const Type *type, Value *callee, const Values &args = {});
+
+    Value *callee;
+    Values args;
     Block except_body;
     Exception *except;
 };

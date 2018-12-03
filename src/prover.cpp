@@ -905,7 +905,7 @@ static SCOPES_RESULT(Value *) prove_CompileStage(const ASTContext &ctx, CompileS
 
     Symbol last_key = SYM_Unnamed;
     auto tmp =
-        Call::from(anchor, g_sc_scope_new_subscope,
+        CallTemplate::from(anchor, g_sc_scope_new_subscope,
             { ConstPointer::scope_from(sx->anchor(), constant_scope) });
 
     auto block = Expression::unscoped_from(anchor);
@@ -930,16 +930,16 @@ static SCOPES_RESULT(Value *) prove_CompileStage(const ASTContext &ctx, CompileS
                 auto wrapvalue = wrap_value(typedvalue1->get_type(), typedvalue1);
                 if (wrapvalue) {
                     auto vkey = ConstInt::symbol_from(anchor, key);
-                    block->append(Call::from(anchor, g_sc_scope_set_symbol, { tmp, vkey, wrapvalue }));
-                    block->append(Call::from(anchor, g_sc_scope_set_docstring, { tmp, vkey, ConstPointer::string_from(anchor, keydocstr) }));
+                    block->append(CallTemplate::from(anchor, g_sc_scope_set_symbol, { tmp, vkey, wrapvalue }));
+                    block->append(CallTemplate::from(anchor, g_sc_scope_set_docstring, { tmp, vkey, ConstPointer::string_from(anchor, keydocstr) }));
                 }
             }
         }
     }
 
     block->append(
-        Call::from(anchor, g_bitcast, {
-            Call::from(anchor, g_sc_eval, {
+        CallTemplate::from(anchor, g_bitcast, {
+            CallTemplate::from(anchor, g_sc_eval, {
                 ConstPointer::anchor_from(anchor),
                 ConstPointer::list_from(anchor, sx->next),
                 tmp }),
@@ -1087,7 +1087,7 @@ static SCOPES_RESULT(void) build_deref(
         SCOPES_CHECK_RESULT(verify_readable(rq, T));
         if (is_plain(T)) {
             auto retT = strip_qualifier<ReferQualifier>(T);
-            auto call = Call::from(anchor, g_deref, { val });
+            auto call = CallTemplate::from(anchor, g_deref, { val });
             call->set_type(retT);
             ctx.append(call);
             call->deps.unique(0);
@@ -1111,13 +1111,11 @@ static SCOPES_RESULT(void) build_deref(
 #define CHECKARGS(MINARGS, MAXARGS) \
     SCOPES_CHECK_RESULT((checkargs<MINARGS, MAXARGS>(argcount)))
 #define ARGTYPE0() ({ \
-        Call *newcall = Call::from(call->anchor(), callee, values); \
-        newcall->set_type(empty_arguments_type()); \
+        Call *newcall = Call::from(call->anchor(), empty_arguments_type(), callee, values); \
         newcall; \
     })
 #define ARGTYPE1(ARGT) ({ \
-        Call *newcall = Call::from(call->anchor(), callee, values); \
-        newcall->set_type(ARGT); \
+        Call *newcall = Call::from(call->anchor(), ARGT, callee, values); \
         newcall; \
     })
 #define DEPS1(CALL, ...) ({ \
@@ -1256,7 +1254,7 @@ SCOPES_RESULT(void) sanitize_tuple_index(const Anchor *anchor, const Type *ST, c
     return {};
 }
 
-static SCOPES_RESULT(Value *) prove_call_interior(const ASTContext &ctx, Call *call) {
+static SCOPES_RESULT(Value *) prove_call_interior(const ASTContext &ctx, CallTemplate *call) {
     SCOPES_RESULT_TYPE(Value *);
     SCOPES_ANCHOR(call->anchor());
     Value *callee = SCOPES_GET_RESULT(prove(ctx, call->callee));
@@ -1596,8 +1594,7 @@ repeat:
             }
             auto rq = try_qualifier<ReferQualifier>(typeof_T);
             if (rq) {
-                auto newcall2 = Call::from(call->anchor(), g_getelementref, { _T, _idx });
-                newcall2->set_type(qualify(RT, { rq }));
+                auto newcall2 = Call::from(call->anchor(), qualify(RT, { rq }), g_getelementref, { _T, _idx });
                 return DEPS1(newcall2, _T);
             } else {
                 return NODEPS1(ARGTYPE1(RT));
@@ -1892,8 +1889,7 @@ repeat:
     }
     const Type *art = aft->return_type;
     const Type *rt = ft->return_type;
-    Call *newcall = Call::from(call->anchor(), callee, values);
-    newcall->set_type(rt);
+    Call *newcall = Call::from(call->anchor(), rt, callee, values);
     {
         int depth = ctx.block?ctx.block->depth:0;
         int acount = get_argument_count(rt);
@@ -1920,7 +1916,7 @@ repeat:
     return newcall;
 }
 
-static SCOPES_RESULT(Value *) prove_Call(const ASTContext &ctx, Call *call) {
+static SCOPES_RESULT(Value *) prove_CallTemplate(const ASTContext &ctx, CallTemplate *call) {
     SCOPES_RESULT_TYPE(Value *);
     auto result = prove_call_interior(ctx, call);
     if (result.ok()) {
@@ -1930,6 +1926,11 @@ static SCOPES_RESULT(Value *) prove_Call(const ASTContext &ctx, Call *call) {
         err->append_error_trace(call);
         SCOPES_RETURN_ERROR(err);
     }
+}
+
+static SCOPES_RESULT(Value *) prove_Call(const ASTContext &ctx, Call *sym) {
+    assert(false);
+   return nullptr;
 }
 
 static SCOPES_RESULT(Value *) prove_Parameter(const ASTContext &ctx, Parameter *sym) {

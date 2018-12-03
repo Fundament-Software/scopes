@@ -1015,22 +1015,22 @@ bool sc_parameter_is_variadic(sc_value_t *param) {
 
 sc_value_t *sc_call_new(sc_value_t *callee) {
     using namespace scopes;
-    return Call::from(get_active_anchor(), callee);
+    return CallTemplate::from(get_active_anchor(), callee);
 }
 
 void sc_call_append_argument(sc_value_t *call, sc_value_t *value) {
     using namespace scopes;
-    cast<Call>(call)->args.push_back(value);
+    cast<CallTemplate>(call)->args.push_back(value);
 }
 
 bool sc_call_is_rawcall(sc_value_t *value) {
     using namespace scopes;
-    return cast<Call>(value)->is_rawcall();
+    return cast<CallTemplate>(value)->is_rawcall();
 }
 
 void sc_call_set_rawcall(sc_value_t *value, bool enable) {
     using namespace scopes;
-    cast<Call>(value)->set_rawcall();
+    cast<CallTemplate>(value)->set_rawcall();
 }
 
 sc_value_t *sc_loop_new(sc_value_t *init) {

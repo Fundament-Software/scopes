@@ -473,8 +473,8 @@ struct StreamAST : StreamAnchors {
         case VK_Exception: {
             ss << node;
         } break;
-        case VK_Call: {
-            auto val = cast<Call>(node);
+        case VK_CallTemplate: {
+            auto val = cast<CallTemplate>(node);
             bool is_annotation = val->callee->is_typed()
                     && val->callee->get_type() == TYPE_Builtin
                     && isa<ConstInt>(val->callee)
@@ -499,6 +499,36 @@ struct StreamAST : StreamAnchors {
                     if (val->flags & CF_RawCall) {
                         ss << Style_Keyword << " rawcall" << Style_None;
                     }
+                    walk_same_or_newline(val->callee, depth+1, maxdepth);
+                    write_arguments(val->args, depth, maxdepth);
+                }
+            } else {
+                ss << node;
+            }
+        } break;
+        case VK_Call: {
+            auto val = cast<Call>(node);
+            bool is_annotation = val->callee->is_typed()
+                    && val->callee->get_type() == TYPE_Builtin
+                    && isa<ConstInt>(val->callee)
+                    && cast<ConstInt>(val->callee)->value == FN_Annotate;
+            if (newlines) {
+                if (is_annotation) {
+                    ss << Style_Comment << "#" << Style_None;
+                    for (int i = 0; i < val->args.size(); ++i) {
+                        auto &&arg = val->args[i];
+                        if ((i == 0)
+                            && isa<ConstPointer>(arg)
+                            && arg->get_type() == TYPE_String) {
+                            ss << Style_Comment << " "
+                                << ((String *)cast<ConstPointer>(arg)->value)->data
+                                << Style_None;
+                        } else {
+                            walk_same_or_newline(arg, depth+1, maxdepth);
+                        }
+                    }
+                } else {
+                    ss << node;
                     walk_same_or_newline(val->callee, depth+1, maxdepth);
                     write_arguments(val->args, depth, maxdepth);
                     if (!val->except_body.empty()) {

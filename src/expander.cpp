@@ -1004,7 +1004,7 @@ struct Expander {
         Expander subexp(env, astscope, it->next);
         Value *enter = SCOPES_GET_RESULT(subexp.expand(it->at));
 
-        auto call = Call::from(_anchor, enter);
+        auto call = CallTemplate::from(_anchor, enter);
         call->flags = flags;
 
         it = subexp.next;
