@@ -11,6 +11,7 @@
 #include "prover.hpp"
 #include "type.hpp"
 #include "stream_ast.hpp"
+#include "dyn_cast.inc"
 
 namespace scopes {
 
@@ -111,7 +112,7 @@ void StreamExpr::stream_indent(int depth) {
 bool StreamExpr::is_nested(Value *_e) {
     auto T = try_get_const_type(_e);
     if (T == TYPE_List) {
-        auto it = extract_list_constant(_e).assert_ok();
+        auto it = extract_list_constant(cast<TypedValue>(_e)).assert_ok();
         while (it != EOL) {
             auto q = it->at;
             auto qT = try_get_const_type(q);
@@ -222,7 +223,7 @@ void StreamExpr::walk(const Anchor *anchor, const List *l, int depth, int maxdep
 void StreamExpr::walk(Value *e, int depth, int maxdepth, bool naked) {
     auto T = try_get_const_type(e);
     if (T == TYPE_List) {
-        walk(e->anchor(), extract_list_constant(e).assert_ok(), depth, maxdepth, naked);
+        walk(e->anchor(), extract_list_constant(cast<TypedValue>(e)).assert_ok(), depth, maxdepth, naked);
         return;
     }
 

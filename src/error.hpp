@@ -82,9 +82,9 @@ struct Template;
 struct Function;
 
 // specializer errors
-SCOPES_RESULT(void) error_invalid_call_type(Value *callee);
-SCOPES_RESULT(void) error_invalid_condition_type(Value *cond);
-SCOPES_RESULT(void) error_invalid_case_literal_type(Value *lit);
+SCOPES_RESULT(void) error_invalid_call_type(TypedValue *callee);
+SCOPES_RESULT(void) error_invalid_condition_type(TypedValue *cond);
+SCOPES_RESULT(void) error_invalid_case_literal_type(TypedValue *lit);
 SCOPES_RESULT(void) error_label_expected(Value *value);
 SCOPES_RESULT(void) error_duplicate_default_case();
 SCOPES_RESULT(void) error_missing_default_case();
@@ -103,18 +103,18 @@ SCOPES_RESULT(void) error_illegal_break_outside_loop();
 SCOPES_RESULT(void) error_variadic_symbol_not_in_last_place();
 SCOPES_RESULT(void) error_untyped_recursive_call(Function *func);
 SCOPES_RESULT(void) error_recursive_function_changed_type(Function *func, const Type *T1, const Type *T2);
-SCOPES_RESULT(void) error_value_inaccessible_from_closure(Value *value, const Function *frame);
+SCOPES_RESULT(void) error_value_inaccessible_from_closure(TypedValue *value, const Function *frame);
 SCOPES_RESULT(void) error_cannot_deref_non_plain(const Type *T);
 
 // lifetime checker errors
-SCOPES_RESULT(void) error_value_moved(Value *value, Value *mover, const char *by);
-SCOPES_RESULT(void) error_value_in_use(Value *value, Value *user, const char *by);
+SCOPES_RESULT(void) error_value_moved(TypedValue *value, Value *mover, const char *by);
+SCOPES_RESULT(void) error_value_in_use(TypedValue *value, Value *user, const char *by);
 SCOPES_RESULT(void) error_value_is_viewed(Value *value, Value *user, const char *by);
 SCOPES_RESULT(void) error_cannot_merge_moves(const char *by);
 SCOPES_RESULT(void) error_nonreturning_function_must_move();
 
 // code generator errors
-SCOPES_RESULT(void) error_gen_invalid_call_type(const char *target, Value *callee);
+SCOPES_RESULT(void) error_gen_invalid_call_type(const char *target, TypedValue *callee);
 SCOPES_RESULT(void) error_gen_unbound_symbol(const char *target, Parameter *value);
 SCOPES_RESULT(void) error_gen_unbound_symbol(const char *target, Value *value);
 SCOPES_RESULT(void) error_cannot_translate(const char *target, Value *value);

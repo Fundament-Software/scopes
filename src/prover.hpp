@@ -37,7 +37,7 @@ struct ASTContext {
 
     static ASTContext from_function(Function *fn);
 
-    void append(Value *value) const;
+    void append(TypedValue *value) const;
     void merge_block(Block &_block) const;
 
     Function *function;
@@ -56,16 +56,13 @@ SCOPES_RESULT(Builtin) extract_builtin_constant(Value *value);
 SCOPES_RESULT(Symbol) extract_symbol_constant(Value *value);
 SCOPES_RESULT(uint64_t) extract_integer_constant(Value *value);
 SCOPES_RESULT(Function *) extract_function_constant(Value *value);
-Value *extract_argument(const ASTContext &ctx, Value *value, int index);
-Value *build_argument_list(const Anchor *anchor, const Values &values);
 const Type *try_get_const_type(Value *node);
 const String *try_extract_string(Value *node);
-Value *rekey(const Anchor *anchor, Symbol key, Value *value);
 SCOPES_RESULT(void) map_keyed_arguments(const Anchor *anchor,
     Values &outargs, const Values &values, const Symbols &symbols, bool varargs);
 
 SCOPES_RESULT(Function *) prove(Function *frame, Template *func, const Types &types);
-SCOPES_RESULT(Value *) prove(const ASTContext &ctx, Value *node);
+SCOPES_RESULT(TypedValue *) prove(const ASTContext &ctx, Value *node);
 
 } // namespace scopes
 

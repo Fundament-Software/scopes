@@ -231,7 +231,7 @@ struct Tracker {
         SCOPES_RESULT_TYPE(void); \
         SCOPES_EXPECT_ERROR(error_cannot_translate(SCOPES_GEN_TARGET, node)); \
     }
-    SCOPES_TEMPLATE_VALUE_KIND()
+    SCOPES_UNTYPED_VALUE_KIND()
 #undef T
 
 #define T(NAME, BNAME, CLASS) \
@@ -461,7 +461,7 @@ struct Tracker {
             int numargs = (int)ft->argument_types.size();
             assert(numargs <= node->args.size());
             for (int i = 0; i < numargs; ++i) {
-                Value *arg = node->args[i];
+                TypedValue *arg = node->args[i];
                 const Type *argT = ft->argument_types[i];
                 auto vq = try_qualifier<ViewQualifier>(argT);
                 if (vq) {
@@ -565,7 +565,6 @@ struct Tracker {
         return {};
     }
     SCOPES_RESULT(void) track_Merge(State &state, Merge *node) {
-        SCOPES_RESULT_TYPE(void);
         int retdepth = state.get_value_depth(node->label);
         return track_return_argument(state, node->value, retdepth,
             get_label_kind_name(node->label->label_kind));
@@ -574,11 +573,12 @@ struct Tracker {
         return track_return_argument(state, node->value, 0, "raise");
     }
     SCOPES_RESULT(void) track_ArgumentList(State &state, ArgumentList *node) {
-        SCOPES_RESULT_TYPE(void);
+        return {};
+    }
+    SCOPES_RESULT(void) track_Keyed(State &state, Keyed *node) {
         return {};
     }
     SCOPES_RESULT(void) track_ExtractArgument(State &state, ExtractArgument *node) {
-        assert(!node->vararg);
         return visit_argument(state, VM_AUTO, ValueIndex(node->value, node->index), "extract argument");
     }
 
@@ -772,7 +772,7 @@ struct Tracker {
         return {};
     }
 
-    SCOPES_RESULT(void) track_return_argument(State &state, Value *node,
+    SCOPES_RESULT(void) track_return_argument(State &state, TypedValue *node,
         int retdepth, const char *context) {
         SCOPES_RESULT_TYPE(void);
         assert(retdepth >= 0);
@@ -809,7 +809,7 @@ struct Tracker {
             return {};
         // generate destructor
         auto argT = arg.get_type();
-        Value *handler;
+        TypedValue *handler;
         if (!argT->lookup(SYM_DropHandler, handler)) {
             #if SCOPES_ANNOTATE_TRACKING
             StyledString ss;
@@ -975,7 +975,7 @@ struct Tracker {
     }
 
     SCOPES_RESULT(void) visit_value(State &state, VisitMode mode,
-        Value *node, const char *context, int retdepth = -1) {
+        TypedValue *node, const char *context, int retdepth = -1) {
         SCOPES_RESULT_TYPE(void);
         auto T = node->get_type();
         if (!is_returning(T))
@@ -989,7 +989,7 @@ struct Tracker {
     }
 
     SCOPES_RESULT(void) visit_values(State &state, VisitMode mode,
-        const Values &args, const char *context, int retdepth = -1) {
+        const TypedValues &args, const char *context, int retdepth = -1) {
         SCOPES_RESULT_TYPE(void);
         int i = args.size();
         while (i-- > 0) {
@@ -999,8 +999,7 @@ struct Tracker {
         return {};
     }
 
-    SCOPES_RESULT(void) delete_declaration(State &state, Value *node) {
-        SCOPES_RESULT_TYPE(void);
+    SCOPES_RESULT(void) delete_declaration(State &state, TypedValue *node) {
         assert(node);
         auto T = strip_qualifiers(node->get_type());
         if (!is_returning(T))
@@ -1015,7 +1014,7 @@ struct Tracker {
         return {};
     }
 
-    SCOPES_RESULT(void) track_instruction(State &state, Value *node) {
+    SCOPES_RESULT(void) track_instruction(State &state, TypedValue *node) {
         SCOPES_RESULT_TYPE(void);
         SCOPES_ANCHOR(node->anchor());
         assert(state.garbage_empty());
@@ -1028,7 +1027,7 @@ struct Tracker {
         switch(node->kind()) {
     #define T(NAME, BNAME, CLASS) \
         case NAME: result = track_ ## CLASS(state, cast<CLASS>(node)); break;
-        SCOPES_VALUE_KIND()
+        SCOPES_TYPED_VALUE_KIND()
     #undef T
         default: assert(false);
         }

@@ -271,22 +271,26 @@ SCOPES_RESULT(bool) LexerParser::select_integer_suffix() {
     if (!has_suffix())
         return false;
     assert(isa<ConstInt>(value));
-    if (is_suffix(":i8")) { value->change_type(TYPE_I8); return true; }
-    else if (is_suffix(":i16")) { value->change_type(TYPE_I16); return true; }
-    else if (is_suffix(":i32")) { value->change_type(TYPE_I32); return true; }
-    else if (is_suffix(":i64")) { value->change_type(TYPE_I64); return true; }
-    else if (is_suffix(":u8")) { value->change_type(TYPE_U8); return true; }
-    else if (is_suffix(":u16")) { value->change_type(TYPE_U16); return true; }
-    else if (is_suffix(":u32")) { value->change_type(TYPE_U32); return true; }
-    else if (is_suffix(":u64")) { value->change_type(TYPE_U64); return true; }
-    //else if (is_suffix(":isize")) { value = Any(value.i64); return true; }
-    else if (is_suffix(":usize")) { value->change_type(TYPE_USize); return true; }
+    const Type *newtype = nullptr;
+    if (is_suffix(":i8")) { newtype = TYPE_I8; }
+    else if (is_suffix(":i16")) { newtype = TYPE_I16; }
+    else if (is_suffix(":i32")) { newtype = TYPE_I32; }
+    else if (is_suffix(":i64")) { newtype = TYPE_I64; }
+    else if (is_suffix(":u8")) { newtype = TYPE_U8; }
+    else if (is_suffix(":u16")) { newtype = TYPE_U16; }
+    else if (is_suffix(":u32")) { newtype = TYPE_U32; }
+    else if (is_suffix(":u64")) { newtype = TYPE_U64; }
+    //else if (is_suffix(":isize")) { newtype = TYPE_ISize; }
+    else if (is_suffix(":usize")) { newtype = TYPE_USize; }
     else {
         StyledString ss;
         ss.out << "invalid suffix for integer literal: "
             << String::from(string, string_len);
         SCOPES_LOCATION_ERROR(ss.str());
     }
+    value = ConstInt::from(value->anchor(), newtype, cast<ConstInt>(value)->value);
+
+    return true;
 }
 
 SCOPES_RESULT(bool) LexerParser::select_real_suffix() {
@@ -294,14 +298,17 @@ SCOPES_RESULT(bool) LexerParser::select_real_suffix() {
     if (!has_suffix())
         return false;
     assert(isa<ConstReal>(value));
-    if (is_suffix(":f32")) { value->change_type(TYPE_F32); return true; }
-    else if (is_suffix(":f64")) { value->change_type(TYPE_F64); return true; }
+    const Type *newtype = nullptr;
+    if (is_suffix(":f32")) { newtype = TYPE_F32; }
+    else if (is_suffix(":f64")) { newtype = TYPE_F64; }
     else {
         StyledString ss;
         ss.out << "invalid suffix for floating point literal: "
             << String::from(string, string_len);
         SCOPES_LOCATION_ERROR(ss.str());
     }
+    value = ConstInt::from(value->anchor(), newtype, cast<ConstReal>(value)->value);
+    return true;
 }
 
 SCOPES_RESULT(bool) LexerParser::read_int64() {
@@ -311,9 +318,9 @@ SCOPES_RESULT(bool) LexerParser::read_int64() {
     case RN_Untyped: {
         int64_t val = cast<ConstInt>(value)->value;
         if ((val >= -0x80000000ll) && (val <= 0x7fffffffll)) {
-            value->change_type(TYPE_I32);
+            value = ConstInt::from(value->anchor(), TYPE_I32, val);
         } else if ((val >= 0x80000000ll) && (val <= 0xffffffffll)) {
-            value->change_type(TYPE_U32);
+            value = ConstInt::from(value->anchor(), TYPE_U32, val);
         }
         return true;
     } break;
@@ -338,7 +345,8 @@ SCOPES_RESULT(bool) LexerParser::read_real64() {
     switch(SCOPES_GET_RESULT(read_real(TYPE_F64, scopes_strtod))) {
     case RN_Invalid: return false;
     case RN_Untyped:
-        value->change_type(TYPE_F32);
+        value = ConstReal::from(
+            value->anchor(), TYPE_F32, cast<ConstReal>(value)->value);
         return true;
     case RN_Typed:
         return select_real_suffix();

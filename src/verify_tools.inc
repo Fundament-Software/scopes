@@ -42,6 +42,20 @@ inline SCOPES_RESULT(void) verify_kind(const Type *T) {
     return {};
 }
 
+template<ValueKind tk>
+inline SCOPES_RESULT(void) verify_kind(const Value *V) {
+    SCOPES_RESULT_TYPE(void);
+    if (V->kind() != tk) {
+        StyledString ss;
+        ss.out << "value of "
+            << Style_Keyword << get_value_class_name(tk) << Style_None
+             << " kind expected, got "
+            << Style_Keyword << get_value_class_name(V->kind()) << Style_None;
+        SCOPES_LOCATION_ERROR(ss.str());
+    }
+    return {};
+}
+
 template<int mincount, int maxcount>
 inline SCOPES_RESULT(int) checkargs(size_t argsize, bool allow_overshoot = false) {
     SCOPES_RESULT_TYPE(int);

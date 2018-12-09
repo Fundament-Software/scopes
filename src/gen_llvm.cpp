@@ -308,9 +308,11 @@ struct LLVMIRGenerator {
 
         LLVMMetadataRef difile = source_file_to_scope(anchor->file);
 
+        #if 0
         LLVMMetadataRef subroutinevalues[] = {
             nullptr
         };
+        #endif
         LLVMMetadataRef disrt = LLVMDIBuilderCreateSubroutineType(di_builder,
             difile, nullptr, 0, LLVMDIFlagZero);
 
@@ -783,7 +785,7 @@ struct LLVMIRGenerator {
         SCOPES_RESULT_TYPE(LLVMValueRef); \
         SCOPES_EXPECT_ERROR(error_cannot_translate(SCOPES_GEN_TARGET, node)); \
     }
-    SCOPES_TEMPLATE_VALUE_KIND()
+    SCOPES_UNTYPED_VALUE_KIND()
 #undef T
 
     SCOPES_RESULT(LLVMValueRef) write_return(LLVMValueRef value, bool is_except = false) {
@@ -826,7 +828,7 @@ struct LLVMIRGenerator {
         }
     }
 
-    SCOPES_RESULT(LLVMValueRef) write_return(Value *node) {
+    SCOPES_RESULT(LLVMValueRef) write_return(TypedValue *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         const Type *T = node->get_type();
         LLVMValueRef value = SCOPES_GET_RESULT(node_to_value(node));
@@ -966,13 +968,6 @@ struct LLVMIRGenerator {
         return {};
     }
 
-
-    SCOPES_RESULT(LLVMValueRef) CompileStage_to_value(CompileStage *node) {
-        SCOPES_RESULT_TYPE(LLVMValueRef);
-        assert(false);
-        return nullptr;
-    }
-
     LabelInfo &find_label_info(Label *label) {
         int i = label_info_stack.size();
         while (i-- > 0) {
@@ -1089,7 +1084,7 @@ struct LLVMIRGenerator {
         return LLVMBuildExtractValue(builder, value, node->index, "");
     }
 
-    SCOPES_RESULT(LLVMTypeRef) node_to_llvm_type(Value *node) {
+    SCOPES_RESULT(LLVMTypeRef) node_to_llvm_type(TypedValue *node) {
         SCOPES_RESULT_TYPE(LLVMTypeRef);
         return type_to_llvm_type(SCOPES_GET_RESULT(extract_type_constant(node)));
     }
@@ -1108,7 +1103,7 @@ struct LLVMIRGenerator {
         size_t argn = 0;
 #define READ_VALUE(NAME) \
         assert(argn <= argcount); \
-        Value * _ ## NAME = args[argn++]; \
+        TypedValue * _ ## NAME = args[argn++]; \
         LLVMValueRef NAME = SCOPES_GET_RESULT(node_to_value(_ ## NAME));
 #define READ_TYPE(NAME) \
         assert(argn <= argcount); \
@@ -1590,7 +1585,6 @@ struct LLVMIRGenerator {
     }
 
     SCOPES_RESULT(LLVMValueRef) Keyed_to_value(Keyed *node) {
-        SCOPES_RESULT_TYPE(LLVMValueRef);
         return node_to_value(node->value);
     }
 
@@ -1651,7 +1645,6 @@ struct LLVMIRGenerator {
         LLVMValueRef func = LLVMGetBasicBlockParent(bb);
         auto cond = SCOPES_GET_RESULT(node_to_value(node->cond));
         assert(cond);
-        auto rtype = node->get_type();
         LLVMBasicBlockRef bbthen = LLVMAppendBasicBlock(func, "then");
         LLVMBasicBlockRef bbelse = LLVMAppendBasicBlock(func, "else");
         LLVMBuildCondBr(builder, cond, bbthen, bbelse);
@@ -1670,20 +1663,19 @@ struct LLVMIRGenerator {
         return nullptr;
     }
 
-    SCOPES_RESULT(LLVMValueRef) _node_to_value(Value *node) {
-        SCOPES_RESULT_TYPE(LLVMValueRef);
+    SCOPES_RESULT(LLVMValueRef) _node_to_value(TypedValue *node) {
         SCOPES_ANCHOR(node->anchor());
         switch(node->kind()) {
         #define T(NAME, BNAME, CLASS) \
             case NAME: return CLASS ## _to_value(cast<CLASS>(node));
-        SCOPES_VALUE_KIND()
+        SCOPES_TYPED_VALUE_KIND()
         #undef T
             default: assert(false); break;
         }
         return nullptr;
     }
 
-    SCOPES_RESULT(LLVMValueRef) node_to_value(Value *node) {
+    SCOPES_RESULT(LLVMValueRef) node_to_value(TypedValue *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         assert(node);
         switch(node->kind()) {
@@ -1828,7 +1820,7 @@ struct LLVMIRGenerator {
     }
 
     SCOPES_RESULT(LLVMValueRef) build_call(Call *call,
-        const Type *functype, LLVMValueRef func, Values &args) {
+        const Type *functype, LLVMValueRef func, TypedValues &args) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         size_t argcount = args.size();
 
@@ -2257,8 +2249,8 @@ public:
 #endif
 
 SCOPES_RESULT(void) compile_object(const String *path, Scope *scope, uint64_t flags) {
-    SCOPES_RESULT_TYPE(void);
 #if 0 // TODO
+    SCOPES_RESULT_TYPE(void);
     Timer sum_compile_time(TIMER_Compile);
 #if SCOPES_COMPILE_WITH_DEBUG_INFO
 #else

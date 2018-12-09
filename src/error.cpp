@@ -139,7 +139,7 @@ Error *make_runtime_error(const String *msg) {
     return Result<_result_type>::raise(err); \
 }
 
-SCOPES_RESULT(void) error_invalid_call_type(Value *callee) {
+SCOPES_RESULT(void) error_invalid_call_type(TypedValue *callee) {
     SCOPES_RESULT_TYPE(void);
     StyledString ss;
     ss.out << "unable to call value of type " << callee->get_type();
@@ -164,14 +164,14 @@ SCOPES_RESULT(void) error_argument_type_mismatch(const Type *expected, const Typ
     SCOPES_LOCATION_ERROR(ss.str());
 }
 
-SCOPES_RESULT(void) error_value_moved(Value *value, Value *mover, const char *by) {
+SCOPES_RESULT(void) error_value_moved(TypedValue *value, Value *mover, const char *by) {
     SCOPES_RESULT_TYPE(void);
     StyledString ss;
     ss.out << by << " cannot move value of type " << value->get_type() << " out of function because it is still in use";
     SCOPES_LOCATION_DEF_ERROR(mover, ss.str());
 }
 
-SCOPES_RESULT(void) error_value_in_use(Value *value, Value *user, const char *by) {
+SCOPES_RESULT(void) error_value_in_use(TypedValue *value, Value *user, const char *by) {
     SCOPES_RESULT_TYPE(void);
     StyledString ss;
     ss.out << by << " cannot move value of type " << value->get_type() << " out of function because it is still in use";
@@ -206,7 +206,7 @@ SCOPES_RESULT(void) error_invalid_operands(const Type *A, const Type *B) {
     SCOPES_LOCATION_ERROR(ss.str());
 }
 
-SCOPES_RESULT(void) error_invalid_condition_type(Value *cond) {
+SCOPES_RESULT(void) error_invalid_condition_type(TypedValue *cond) {
     SCOPES_RESULT_TYPE(void);
     StyledString ss;
     ss.out << "condition of if-clause must be value of type "
@@ -214,7 +214,7 @@ SCOPES_RESULT(void) error_invalid_condition_type(Value *cond) {
     SCOPES_LOCATION_DEF_ERROR(cond, ss.str());
 }
 
-SCOPES_RESULT(void) error_invalid_case_literal_type(Value *lit) {
+SCOPES_RESULT(void) error_invalid_case_literal_type(TypedValue *lit) {
     SCOPES_RESULT_TYPE(void);
     StyledString ss;
     ss.out << "condition of switch-case must be constant of type "
@@ -225,8 +225,8 @@ SCOPES_RESULT(void) error_invalid_case_literal_type(Value *lit) {
 SCOPES_RESULT(void) error_label_expected(Value *value) {
     SCOPES_RESULT_TYPE(void);
     StyledString ss;
-    if (value->is_typed()) {
-        ss.out << "expected label, not value of type " << value->get_type();
+    if (isa<TypedValue>(value)) {
+        ss.out << "expected label, not value of type " << cast<TypedValue>(value)->get_type();
     } else {
         ss.out << "expected label, not untyped value";
     }
@@ -254,8 +254,10 @@ SCOPES_RESULT(void) error_constant_expected(const Type *want, Value *value) {
     if (want)
         ss.out << " of type " << want;
     ss.out << " expected, got "
-        << get_value_class_name(value->kind())
-        << " of type " << value->get_type();
+        << get_value_class_name(value->kind());
+    if (isa<TypedValue>(value)) {
+        ss.out << " of type " << cast<TypedValue>(value)->get_type();
+    }
     SCOPES_LOCATION_DEF_ERROR(value, ss.str());
 }
 
@@ -338,7 +340,7 @@ SCOPES_RESULT(void) error_recursive_function_changed_type(Function *func, const 
     SCOPES_LOCATION_DEF_ERROR(func, ss.str());
 }
 
-SCOPES_RESULT(void) error_value_inaccessible_from_closure(Value *value,
+SCOPES_RESULT(void) error_value_inaccessible_from_closure(TypedValue *value,
     const Function *frame) {
     SCOPES_RESULT_TYPE(void);
     StyledString ss;
@@ -360,7 +362,7 @@ SCOPES_RESULT(void) error_cannot_deref_non_plain(const Type *T) {
 
 //------------------------------------------------------------------------------
 
-SCOPES_RESULT(void) error_gen_invalid_call_type(const char *target, Value *callee) {
+SCOPES_RESULT(void) error_gen_invalid_call_type(const char *target, TypedValue *callee) {
     SCOPES_RESULT_TYPE(void);
     StyledString ss;
     ss.out << target << ": cannot translate call to value of type " << callee->get_type();

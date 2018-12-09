@@ -91,7 +91,8 @@ struct StreamAST : StreamAnchors {
         }
     }
 
-    void write_arguments(const Values &args, int depth, int maxdepth) {
+    template<typename T>
+    void write_arguments(const std::vector<T *> &args, int depth, int maxdepth) {
         for (int i = 0; i < args.size(); ++i) {
             auto &&arg = args[i];
             walk_same_or_newline(arg, depth+1, maxdepth);
@@ -103,8 +104,8 @@ struct StreamAST : StreamAnchors {
     }
 
     void stream_type_suffix(const Value *node) {
-        if (node->is_typed()) {
-            stream_type_suffix(node->get_type());
+        if (isa<TypedValue>(node)) {
+            stream_type_suffix(cast<TypedValue>(node)->get_type());
         }
     }
 
@@ -250,6 +251,12 @@ struct StreamAST : StreamAnchors {
         ss << Style_Operator << ">" << Style_None << " ";
     }
 
+    static bool is_annotation(Value *value) {
+        return isa<ConstInt>(value)
+            && cast<ConstInt>(value)->get_type() == TYPE_Builtin
+            && cast<ConstInt>(value)->value == FN_Annotate;
+    }
+
     // old Any printing reference:
     // https://bitbucket.org/duangle/scopes/src/dfb69b02546e859b702176c58e92a63de3461d77/src/any.cpp
 
@@ -279,14 +286,14 @@ struct StreamAST : StreamAnchors {
 
         if (newlines && isa<Instruction>(node)) {
             if (is_new) {
-                if (!node->is_typed() || is_returning_value(node->get_type())) {
+                if (!isa<TypedValue>(node) || is_returning_value(cast<TypedValue>(node)->get_type())) {
                     ss << Style_Operator << "%" << Style_None;
                     ss << Style_Number;
                     stream_address(ss, node);
                     ss << Style_None;
                     ss << " " << Style_Operator << "=" << Style_None << " ";
-                    if (data_dependency) {
-                        stream_depends(node->deps);
+                    if (data_dependency && isa<TypedValue>(node)) {
+                        stream_depends(cast<TypedValue>(node)->deps);
                     }
                 }
             } else {
@@ -465,33 +472,35 @@ struct StreamAST : StreamAnchors {
             ss << Style_Symbol << val->name.name()->data << "$";
             stream_address(ss, val);
             ss << Style_None;
+            stream_type_suffix(node);
+        } break;
+        case VK_ParameterTemplate: {
+            auto val = cast<ParameterTemplate>(node);
+            ss << Style_Symbol << val->name.name()->data << "$";
+            stream_address(ss, val);
+            ss << Style_None;
             if (val->is_variadic()) {
                 ss << Style_Keyword << "…" << Style_None;
             }
-            stream_type_suffix(node);
         } break;
         case VK_Exception: {
             ss << node;
         } break;
         case VK_CallTemplate: {
             auto val = cast<CallTemplate>(node);
-            bool is_annotation = val->callee->is_typed()
-                    && val->callee->get_type() == TYPE_Builtin
-                    && isa<ConstInt>(val->callee)
-                    && cast<ConstInt>(val->callee)->value == FN_Annotate;
             if (newlines) {
-                if (is_annotation) {
+                if (is_annotation(val->callee)) {
                     ss << Style_Comment << "#" << Style_None;
                     for (int i = 0; i < val->args.size(); ++i) {
                         auto &&arg = val->args[i];
                         if ((i == 0)
                             && isa<ConstPointer>(arg)
-                            && arg->get_type() == TYPE_String) {
+                            && cast<ConstPointer>(arg)->get_type() == TYPE_String) {
                             ss << Style_Comment << " "
                                 << ((String *)cast<ConstPointer>(arg)->value)->data
                                 << Style_None;
                         } else {
-                            walk_same_or_newline(arg, depth+1, maxdepth);
+                            walk_newline(arg, depth+1, maxdepth);
                         }
                     }
                 } else {
@@ -499,7 +508,7 @@ struct StreamAST : StreamAnchors {
                     if (val->flags & CF_RawCall) {
                         ss << Style_Keyword << " rawcall" << Style_None;
                     }
-                    walk_same_or_newline(val->callee, depth+1, maxdepth);
+                    walk_newline(val->callee, depth+1, maxdepth);
                     write_arguments(val->args, depth, maxdepth);
                 }
             } else {
@@ -508,12 +517,8 @@ struct StreamAST : StreamAnchors {
         } break;
         case VK_Call: {
             auto val = cast<Call>(node);
-            bool is_annotation = val->callee->is_typed()
-                    && val->callee->get_type() == TYPE_Builtin
-                    && isa<ConstInt>(val->callee)
-                    && cast<ConstInt>(val->callee)->value == FN_Annotate;
             if (newlines) {
-                if (is_annotation) {
+                if (is_annotation(val->callee)) {
                     ss << Style_Comment << "#" << Style_None;
                     for (int i = 0; i < val->args.size(); ++i) {
                         auto &&arg = val->args[i];
@@ -554,6 +559,17 @@ struct StreamAST : StreamAnchors {
             if (newlines) {
                 ss << " " << val->index;
                 walk_same_or_newline(val->value, depth+1, maxdepth);
+            }
+        } break;
+        case VK_ExtractArgumentTemplate: {
+            auto val = cast<ExtractArgumentTemplate>(node);
+            ss << node;
+            if (newlines) {
+                ss << " " << val->index;
+                if (val->vararg) {
+                    ss << Style_Keyword << "…" << Style_None;
+                }
+                walk_newline(val->value, depth+1, maxdepth);
             }
         } break;
         case VK_Keyed: {

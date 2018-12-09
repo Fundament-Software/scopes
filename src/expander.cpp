@@ -108,7 +108,7 @@ struct Expander {
             #endif
             return expr;
         }
-        return ArgumentList::from(anchor);
+        return ArgumentListTemplate::from(anchor);
     }
 
     SCOPES_RESULT(Value *) expand_compile_stage(const List *it) {
@@ -122,22 +122,22 @@ struct Expander {
         return node;
     }
 
-    SCOPES_RESULT(Parameter *) expand_parameter(Value *value, Value *node = nullptr) {
-        SCOPES_RESULT_TYPE(Parameter *);
+    SCOPES_RESULT(ParameterTemplate *) expand_parameter(Value *value, Value *node = nullptr) {
+        SCOPES_RESULT_TYPE(ParameterTemplate *);
         const Anchor *anchor = value->anchor();
-        if (isa<Parameter>(value)) {
-            return cast<Parameter>(value);
+        if (isa<ParameterTemplate>(value)) {
+            return cast<ParameterTemplate>(value);
         } else {
             Symbol sym = SCOPES_GET_RESULT(extract_symbol_constant(value));
             if (node && isa<Pure>(node)) {
                 env->bind(sym, node);
                 return nullptr;
             } else {
-                Parameter *param = nullptr;
+                ParameterTemplate *param = nullptr;
                 if (ends_with_parenthesis(sym)) {
-                    param = Parameter::variadic_from(anchor, sym);
+                    param = ParameterTemplate::variadic_from(anchor, sym);
                 } else {
-                    param = Parameter::from(anchor, sym);
+                    param = ParameterTemplate::from(anchor, sym);
                 }
                 env->bind(sym, param);
                 return param;
@@ -374,7 +374,7 @@ struct Expander {
             SCOPES_CHECK_RESULT(subexp.expand_arguments(initargs, it));
         }
 
-        Loop *loop = Loop::from(_anchor, build_untyped_argument_list(_anchor, initargs));
+        Loop *loop = Loop::from(_anchor, ArgumentListTemplate::from(_anchor, initargs));
         LabelTemplate *break_label = LabelTemplate::from(_anchor, LK_Break, KW_Break, loop);
 
         Expander bodyexp(Scope::from(env), astscope);
@@ -411,7 +411,7 @@ struct Expander {
     }
 
     static Value *strip_unused_extract_argument(Value *value) {
-        if (value->is_typed())
+        if (isa<TypedValue>(value))
             return value;
         if (!isa<ExtractArgument>(value))
             return value;
@@ -421,40 +421,16 @@ struct Expander {
         return node->value;
     }
 
-    static Value *build_untyped_argument_list(const Anchor *anchor, const Values &values) {
-        #if 1
-        if (values.size() == 1) {
-            return values[0];
-        }
-        #endif
-        auto alist = ArgumentList::from(anchor, values);
-        #if 0
-        for (int i = 0; (i + 1) < alist->values.size(); ++i) {
-            alist->values[i] = strip_unused_extract_argument(alist->values[i]);
-        }
-        #endif
-        return alist;
-    }
-
     static Value *extract_argument(const Anchor *anchor, Value *node, int index, bool vararg = false) {
-        #if 0
-        if (!vararg) {
-            if (node->is_typed() && (get_argument_count(node->get_type()) == 1))
-                return node;
-        } else {
-            if (index == 0)
-                return node;
-        }
-        #endif
         if (isa<Const>(node)) {
-            assert(!is_arguments_type(node->get_type()));
+            assert(!is_arguments_type(cast<Const>(node)->get_type()));
             if (index == 0) {
                 return node;
             } else {
                 return ConstAggregate::none_from(anchor);
             }
         }
-        return ExtractArgument::from(anchor, node, index, vararg);
+        return ExtractArgumentTemplate::from(anchor, node, index, vararg);
     }
 
     // (let x ... [= args ...])
@@ -554,10 +530,10 @@ struct Expander {
                 it = subexp.next;
             }
 
-            Value *srcval = build_untyped_argument_list(_anchor, exprs);
+            Value *srcval = ArgumentListTemplate::from(_anchor, exprs);
 
             int index = 0;
-            int lastarg = (int)args.size() - 1;
+            //int lastarg = (int)args.size() - 1;
             it = params;
             // read parameter names
             while (it != endit) {
@@ -581,7 +557,7 @@ struct Expander {
         }
 
         return Expression::from(_anchor, exprs,
-            build_untyped_argument_list(_anchor, args));
+            ArgumentListTemplate::from(_anchor, args));
     }
 
     // quote <value> ...
@@ -860,7 +836,7 @@ struct Expander {
             SCOPES_ANCHOR(it->at->anchor());
             if (SCOPES_GET_RESULT(get_kwargs(it->at, key, value))) {
                 args.push_back(
-                    Keyed::from(get_active_anchor(), key,
+                    KeyedTemplate::from(get_active_anchor(), key,
                         SCOPES_GET_RESULT(expand(value))));
             } else {
                 args.push_back(SCOPES_GET_RESULT(expand(it->at)));
@@ -905,7 +881,7 @@ struct Expander {
             Expander subexp(env, astscope, it->next);
             SCOPES_CHECK_RESULT(subexp.expand_arguments(args, it));
         }
-        return Unquote::from(_anchor, build_untyped_argument_list(_anchor, args));
+        return Unquote::from(_anchor, ArgumentListTemplate::from(_anchor, args));
     }
 
     SCOPES_RESULT(Value *) expand_return(const List *it) {
@@ -918,7 +894,7 @@ struct Expander {
             Expander subexp(env, astscope, it->next);
             SCOPES_CHECK_RESULT(subexp.expand_arguments(args, it));
         }
-        return Return::from(_anchor, build_untyped_argument_list(_anchor, args));
+        return ReturnTemplate::from(_anchor, ArgumentListTemplate::from(_anchor, args));
     }
 
     SCOPES_RESULT(Value *) expand_raise(const List *it) {
@@ -931,7 +907,7 @@ struct Expander {
             Expander subexp(env, astscope, it->next);
             SCOPES_CHECK_RESULT(subexp.expand_arguments(args, it));
         }
-        return Raise::from(_anchor, build_untyped_argument_list(_anchor, args));
+        return RaiseTemplate::from(_anchor, ArgumentListTemplate::from(_anchor, args));
     }
 
     SCOPES_RESULT(Value *) expand_break(const List *it) {
@@ -944,7 +920,7 @@ struct Expander {
             Expander subexp(env, astscope, it->next);
             SCOPES_CHECK_RESULT(subexp.expand_arguments(args, it));
         }
-        return Break::from(_anchor, build_untyped_argument_list(_anchor, args));
+        return Break::from(_anchor, ArgumentListTemplate::from(_anchor, args));
     }
 
     SCOPES_RESULT(Value *) expand_repeat(const List *it) {
@@ -957,7 +933,7 @@ struct Expander {
             Expander subexp(env, astscope, it->next);
             SCOPES_CHECK_RESULT(subexp.expand_arguments(args, it));
         }
-        return Repeat::from(_anchor, build_untyped_argument_list(_anchor, args));
+        return RepeatTemplate::from(_anchor, ArgumentListTemplate::from(_anchor, args));
     }
 
     SCOPES_RESULT(Value *) expand_merge(const List *it) {
@@ -980,7 +956,7 @@ struct Expander {
             SCOPES_CHECK_RESULT(subexp.expand_arguments(args, it));
         }
         return MergeTemplate::from(_anchor, cast<LabelTemplate>(label),
-            build_untyped_argument_list(_anchor, args));
+            ArgumentListTemplate::from(_anchor, args));
     }
 
     SCOPES_RESULT(Value *) expand_forward(const List *it) {
@@ -993,7 +969,7 @@ struct Expander {
             Expander subexp(env, astscope, it->next);
             SCOPES_CHECK_RESULT(subexp.expand_arguments(args, it));
         }
-        return build_untyped_argument_list(_anchor, args);
+        return ArgumentListTemplate::from(_anchor, args);
     }
 
     SCOPES_RESULT(Value *) expand_call(const List *it, uint32_t flags = 0) {
@@ -1012,19 +988,20 @@ struct Expander {
         return call;
     }
 
-    SCOPES_RESULT(Value *) expand(Value *node) {
+    SCOPES_RESULT(Value *) expand(Value *anynode) {
         SCOPES_RESULT_TYPE(Value *);
     expand_again:
         SCOPES_CHECK_RESULT(verify_stack());
-        SCOPES_ANCHOR(node->anchor());
-        if (!isa<Const>(node)) {
+        SCOPES_ANCHOR(anynode->anchor());
+        if (!isa<Const>(anynode)) {
             if (verbose) {
                 StyledStream ss(SCOPES_CERR);
-                ss << "ignoring " << node << std::endl;
+                ss << "ignoring " << anynode << std::endl;
             }
             // return as-is
-            return node;
+            return anynode;
         }
+        Const *node = cast<Const>(anynode);
         auto T = node->get_type();
         if (T == TYPE_List) {
             if (verbose) {
@@ -1121,7 +1098,7 @@ struct Expander {
                 if (result._0) {
                     Value *newnode = result._0->at;
                     if (newnode != node) {
-                        node = newnode;
+                        anynode = newnode;
                         next = result._0->next;
                         env = result._1;
                         goto expand_again;
@@ -1161,7 +1138,7 @@ struct Expander {
                     if (result._0) {
                         Value *newnode = result._0->at;
                         if (newnode != node) {
-                            node = newnode;
+                            anynode = newnode;
                             next = result._0->next;
                             env = result._1;
                             goto expand_again;

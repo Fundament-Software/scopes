@@ -10,6 +10,8 @@
 namespace scopes {
 
 #define SCOPES_REIMPORT_SYMBOLS() \
+    T(g_none, "none") \
+    T(g_set_active_anchor, "sc_set_active_anchor") \
     T(g_sc_const_pointer_new, "sc_const_pointer_new") \
     T(g_sc_const_int_new, "sc_const_int_new") \
     T(g_sc_const_real_new, "sc_const_real_new") \
@@ -80,9 +82,9 @@ namespace scopes {
     T(g_sc_merge_new, "sc_merge_new") \
 
 
-struct Value;
+struct TypedValue;
 #define T(NAME, STR) \
-    extern Value *NAME;
+    extern TypedValue *NAME;
 SCOPES_REIMPORT_SYMBOLS()
 #undef T
 

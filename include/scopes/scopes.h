@@ -158,28 +158,28 @@ int sc_value_kind (sc_value_t *value);
 sc_value_t *sc_value_wrap(const sc_type_t *type, sc_value_t *value);
 sc_value_t *sc_value_unwrap(const sc_type_t *type, sc_value_t *value);
 
-sc_value_t *sc_keyed_new(sc_symbol_t key, sc_value_t *value);
+sc_value_t *sc_keyed_new(const sc_anchor_t *anchor, sc_symbol_t key, sc_value_t *value);
 
-sc_value_t *sc_argument_list_new();
+sc_value_t *sc_argument_list_new(const sc_anchor_t *anchor);
 void sc_argument_list_append(sc_value_t *alist, sc_value_t *value);
-sc_value_t *sc_extract_argument_new(sc_value_t *value, int index);
-sc_value_t *sc_extract_argument_list_new(sc_value_t *value, int index);
+sc_value_t *sc_extract_argument_new(const sc_anchor_t *anchor, sc_value_t *value, int index);
+sc_value_t *sc_extract_argument_list_new(const sc_anchor_t *anchor, sc_value_t *value, int index);
 int sc_argcount(sc_value_t *value);
 sc_value_t *sc_getarg(sc_value_t *value, int index);
 sc_value_t *sc_getarglist(sc_value_t *value, int index);
 
-sc_value_t *sc_template_new(sc_symbol_t name);
+sc_value_t *sc_template_new(const sc_anchor_t *anchor, sc_symbol_t name);
 void sc_template_set_name(sc_value_t *fn, sc_symbol_t name);
 sc_symbol_t sc_template_get_name(sc_value_t *fn);
 void sc_template_append_parameter(sc_value_t *fn, sc_value_t *symbol);
 void sc_template_set_body(sc_value_t *fn, sc_value_t *value);
 void sc_template_set_inline(sc_value_t *fn);
 
-sc_value_t *sc_expression_new();
+sc_value_t *sc_expression_new(const sc_anchor_t *anchor);
 void sc_expression_append(sc_value_t *expr, sc_value_t *value);
 void sc_expression_set_scoped(sc_value_t *expr);
 
-sc_value_t *sc_extern_new(sc_symbol_t name, const sc_type_t *type);
+sc_value_t *sc_extern_new(const sc_anchor_t *anchor, sc_symbol_t name, const sc_type_t *type);
 void sc_extern_set_flags(sc_value_t *value, uint32_t flags);
 uint32_t sc_extern_get_flags(sc_value_t *value);
 void sc_extern_set_storage_class(sc_value_t *value, sc_symbol_t storage_class);
@@ -189,47 +189,47 @@ int32_t sc_extern_get_location(sc_value_t *value);
 void sc_extern_set_binding(sc_value_t *value, int32_t binding);
 int32_t sc_extern_get_binding(sc_value_t *value);
 
-sc_value_t *sc_if_new();
-void sc_if_append_then_clause(sc_value_t *value, sc_value_t *cond, sc_value_t *body);
-void sc_if_append_else_clause(sc_value_t *value, sc_value_t *body);
+sc_value_t *sc_if_new(const sc_anchor_t *anchor);
+void sc_if_append_then_clause(sc_value_t *value, const sc_anchor_t *anchor, sc_value_t *cond, sc_value_t *body);
+void sc_if_append_else_clause(sc_value_t *value, const sc_anchor_t *anchor, sc_value_t *body);
 
-sc_value_t *sc_switch_new(sc_value_t *expr);
-void sc_switch_append_case(sc_value_t *value, sc_value_t *literal, sc_value_t *body);
-void sc_switch_append_pass(sc_value_t *value, sc_value_t *literal, sc_value_t *body);
-void sc_switch_append_default(sc_value_t *value, sc_value_t *body);
+sc_value_t *sc_switch_new(const sc_anchor_t *anchor, sc_value_t *expr);
+void sc_switch_append_case(sc_value_t *value, const sc_anchor_t *anchor, sc_value_t *literal, sc_value_t *body);
+void sc_switch_append_pass(sc_value_t *value, const sc_anchor_t *anchor, sc_value_t *literal, sc_value_t *body);
+void sc_switch_append_default(sc_value_t *value, const sc_anchor_t *anchor, sc_value_t *body);
 
-sc_value_t *sc_parameter_new(sc_symbol_t name);
+sc_value_t *sc_parameter_new(const sc_anchor_t *anchor, sc_symbol_t name);
 bool sc_parameter_is_variadic(sc_value_t *param);
 
-sc_value_t *sc_call_new(sc_value_t *callee);
+sc_value_t *sc_call_new(const sc_anchor_t *anchor, sc_value_t *callee);
 void sc_call_append_argument(sc_value_t *call, sc_value_t *value);
 bool sc_call_is_rawcall(sc_value_t *value);
 void sc_call_set_rawcall(sc_value_t *value, bool enable);
 
-sc_value_t *sc_loop_new(sc_value_t *init);
+sc_value_t *sc_loop_new(const sc_anchor_t *anchor, sc_value_t *init);
 sc_value_t *sc_loop_arguments(sc_value_t *loop);
 void sc_loop_set_body(sc_value_t *loop, sc_value_t *body);
 
-sc_value_t *sc_const_int_new(const sc_type_t *type, uint64_t value);
-sc_value_t *sc_const_real_new(const sc_type_t *type, double value);
-sc_value_t *sc_const_aggregate_new(const sc_type_t *type, int numconsts, sc_value_t **consts);
-sc_value_t *sc_const_pointer_new(const sc_type_t *type, const void *pointer);
+sc_value_t *sc_const_int_new(const sc_anchor_t *anchor, const sc_type_t *type, uint64_t value);
+sc_value_t *sc_const_real_new(const sc_anchor_t *anchor, const sc_type_t *type, double value);
+sc_value_t *sc_const_aggregate_new(const sc_anchor_t *anchor, const sc_type_t *type, int numconsts, sc_value_t **consts);
+sc_value_t *sc_const_pointer_new(const sc_anchor_t *anchor, const sc_type_t *type, const void *pointer);
 uint64_t sc_const_int_extract(const sc_value_t *value);
 double sc_const_real_extract(const sc_value_t *value);
 sc_value_t *sc_const_extract_at(const sc_value_t *value, int index);
 const void *sc_const_pointer_extract(const sc_value_t *value);
 
-sc_value_t *sc_break_new(sc_value_t *value);
-sc_value_t *sc_repeat_new(sc_value_t *value);
-sc_value_t *sc_return_new(sc_value_t *value);
-sc_value_t *sc_raise_new(sc_value_t *value);
+sc_value_t *sc_break_new(const sc_anchor_t *anchor, sc_value_t *value);
+sc_value_t *sc_repeat_new(const sc_anchor_t *anchor, sc_value_t *value);
+sc_value_t *sc_return_new(const sc_anchor_t *anchor, sc_value_t *value);
+sc_value_t *sc_raise_new(const sc_anchor_t *anchor, sc_value_t *value);
 
-sc_value_t *sc_quote_new(sc_value_t *value);
-sc_value_t *sc_unquote_new(sc_value_t *value);
+sc_value_t *sc_quote_new(const sc_anchor_t *anchor, sc_value_t *value);
+sc_value_t *sc_unquote_new(const sc_anchor_t *anchor, sc_value_t *value);
 
-sc_value_t *sc_label_new(int kind, sc_symbol_t name);
+sc_value_t *sc_label_new(const sc_anchor_t *anchor, int kind, sc_symbol_t name);
 void sc_label_set_body(sc_value_t *label, sc_value_t *body);
-sc_value_t *sc_merge_new(sc_value_t *label, sc_value_t *value);
+sc_value_t *sc_merge_new(const sc_anchor_t *anchor, sc_value_t *label, sc_value_t *value);
 
 // parsing
 

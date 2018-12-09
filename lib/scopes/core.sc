@@ -116,7 +116,7 @@ fn ptrcmp== (t1 t2)
 
 fn box-integer (value)
     let T = (typeof value)
-    sc_const_int_new T
+    sc_const_int_new (sc_get_active_anchor) T
         if (sc_integer_type_is_signed T)
             sext value u64
         else
@@ -124,12 +124,12 @@ fn box-integer (value)
 
 # turn a symbol-like value (storage type u64) to an Any
 fn box-symbol (value)
-    sc_const_int_new (typeof value)
+    sc_const_int_new (sc_get_active_anchor) (typeof value)
         bitcast value u64
 
 # turn a pointer value into an Any
 fn box-pointer (value)
-    sc_const_pointer_new (typeof value)
+    sc_const_pointer_new (sc_get_active_anchor) (typeof value)
         bitcast value voidstar
 
 fn error! (msg)
@@ -240,10 +240,10 @@ let function->ASTMacro =
         ASTMacroFunction
 
 fn box-empty ()
-    sc_argument_list_new;
+    sc_argument_list_new (sc_get_active_anchor)
 
 fn box-none ()
-    sc_const_aggregate_new Nothing 0 (undef ValueArrayPointer)
+    sc_const_aggregate_new (sc_get_active_anchor) Nothing 0 (undef ValueArrayPointer)
 
 # take closure l, typify and compile it and return a function of ASTMacro type
 inline ast-macro (l)
@@ -268,7 +268,7 @@ let va-lfold va-lifold =
                 let arg =
                     sc_getarg args i
                 let k = (sc_type_key (sc_value_qualified_type arg))
-                let v = (sc_keyed_new unnamed arg)
+                let v = (sc_keyed_new (sc_value_anchor arg) unnamed arg)
                 _ (add i 1)
                     if use-indices
                         `(f [(sub i 2)] k v ret)
@@ -296,7 +296,7 @@ let va-rfold va-rifold =
                 let arg =
                     sc_getarg args i
                 let k = (sc_type_key (sc_value_qualified_type arg))
-                let v = (sc_keyed_new unnamed arg)
+                let v = (sc_keyed_new (sc_value_anchor arg) unnamed arg)
                 _ i
                     if use-indices
                         `(f [(sub i 2)] k v ret)
@@ -383,7 +383,7 @@ sc_type_set_symbol Symbol '__call
             let symval = (sc_getarg args 0)
             let self = (sc_getarg args 1)
             let expr = `([(resolve-method self symval)]
-                [(sc_extract_argument_list_new args 1)])
+                [(sc_extract_argument_list_new (sc_value_anchor args) args 1)])
             expr
 
 inline gen-key-any-set (selftype fset)
@@ -400,7 +400,7 @@ inline gen-key-any-set (selftype fset)
                 else
                     let arg = (sc_getarg args 1)
                     let key = (sc_type_key (sc_value_qualified_type arg))
-                    let arg = (sc_keyed_new unnamed arg)
+                    let arg = (sc_keyed_new (sc_value_anchor arg) unnamed arg)
                     _ (box-symbol key) arg
             if (sc_value_is_constant self)
                 if (sc_value_is_constant key)
@@ -509,7 +509,7 @@ sc_type_set_symbol function '__typecall
                 ast-quote
                     let types = (alloca-array type pcount)
                     ast-unquote
-                        let expr = (sc_expression_new)
+                        let expr = (sc_expression_new (sc_get_active_anchor))
                         loop (i = 2)
                             if (icmp== i argcount)
                                 break;
@@ -613,7 +613,8 @@ sc_type_set_symbol Value '__typecall
                 elseif (sc_value_is_constant value)
                     box-pointer value
                 elseif (ptrcmp== T Nothing)
-                    box-none;
+                    box-pointer
+                        box-none;
                 else
                     sc_value_wrap T value
 
@@ -691,7 +692,7 @@ inline set-symbols (self values...)
     dekey =
         fn "dekey" (self)
             let k = (sc_type_key ('qualified-typeof self))
-            _ k (sc_keyed_new unnamed self)
+            _ k (sc_keyed_new (sc_value_anchor self) unnamed self)
 
 'set-symbols Scope
     @ = sc_scope_at
@@ -1239,13 +1240,14 @@ fn dispatch-and-or (args flip)
         return
             if (bxor value flip) cond
             else call-elsef
-    let ifval = (sc_if_new)
+    let anchor = (sc_get_active_anchor)
+    let ifval = (sc_if_new anchor)
     if flip
-        sc_if_append_then_clause ifval cond call-elsef
-        sc_if_append_else_clause ifval cond
+        sc_if_append_then_clause ifval anchor cond call-elsef
+        sc_if_append_else_clause ifval anchor cond
     else
-        sc_if_append_then_clause ifval cond cond
-        sc_if_append_else_clause ifval call-elsef
+        sc_if_append_then_clause ifval anchor cond cond
+        sc_if_append_else_clause ifval anchor call-elsef
     ifval
 
 'set-symbols integer
@@ -1382,7 +1384,7 @@ inline floordiv (a b)
                         `(sc_scope_clone [ ('getarg args 2) ])
                     else
                         `(sc_scope_clone_subscope
-                            [(sc_extract_argument_list_new args 1)])
+                            [(sc_extract_argument_list_new (sc_value_anchor args) args 1)])
 
 #---------------------------------------------------------------------------
 # null type
@@ -1564,7 +1566,7 @@ let coerce-call-arguments =
             let fT = ('element@ fptrT 0)
             let pcount = ('element-count fT)
             if (== pcount argc)
-                let outargs = (sc_call_new self)
+                let outargs = (sc_call_new (sc_get_active_anchor) self)
                 sc_call_set_rawcall outargs true
                 loop (i = 0)
                     if (== i argc)
@@ -1955,7 +1957,7 @@ fn va-option-branch (args)
         let argkey = ('key ('qualified-typeof arg))
         if (== key argkey)
             return
-                sc_keyed_new unnamed arg
+                sc_keyed_new (sc_value_anchor arg) unnamed arg
         + i 1
     `(elsef)
 
@@ -2407,7 +2409,7 @@ let locals =
                                 'set-docstring! constant-scope key keydocstr
                                 result
                             else
-                                let value = (sc_extract_argument_new value 0)
+                                let value = (sc_extract_argument_new (sc_value_anchor value) value 0)
                                 cons
                                     list sc_scope_set_symbol tmp (list syntax-quote key) (list Value value)
                                     list sc_scope_set_docstring tmp (list syntax-quote key) keydocstr
@@ -2772,7 +2774,7 @@ inline make-unpack-function (extractf)
             let self = ('getarg args 0)
             let T = ('typeof self)
             let count = ('element-count T)
-            let outargs = (sc_argument_list_new)
+            let outargs = (sc_argument_list_new (sc_get_active_anchor))
             loop (i = 0)
                 if (icmp== i count)
                     break outargs
@@ -3090,7 +3092,7 @@ let
                 let sym = (sym as Symbol)
                 let T = (T as type)
                 Value
-                    sc_extern_new sym T
+                    sc_extern_new (sc_get_active_anchor) sym T
 
 #-------------------------------------------------------------------------------
 
@@ -3115,7 +3117,7 @@ fn gen-syntax-matcher (failfunc expr scope params)
     if false
         return `[]
     let paramcount = (countof params)
-    let outexpr = (sc_expression_new)
+    let outexpr = (sc_expression_new (sc_get_active_anchor))
     loop (i rest next varargs = 0 params expr false)
         if (not (empty? rest))
             let paramv rest = (decons rest)
@@ -3213,7 +3215,7 @@ define syntax-match
                         inline return-ok (args...)
                             merge ok-label args...
                         ast-unquote
-                            let outexpr = (sc_expression_new)
+                            let outexpr = (sc_expression_new (sc_get_active_anchor))
                             loop (next = next)
                                 let head = (next-head? next)
                                 switch head
@@ -3349,7 +3351,7 @@ fn gen-argument-matcher (failfunc expr scope params)
         return `[]
     let params = (uncomma params)
     let paramcount = (countof params)
-    let outexpr = (sc_expression_new)
+    let outexpr = (sc_expression_new (sc_get_active_anchor))
     loop (i rest varargs = 0 params false)
         if (not (empty? rest))
             let paramv rest = (decons rest)
@@ -3434,7 +3436,7 @@ define match-args
                         inline return-ok (args...)
                             merge ok-label args...
                         ast-unquote
-                            let outexpr = (sc_expression_new)
+                            let outexpr = (sc_expression_new (sc_get_active_anchor))
                             loop (next = next)
                                 let head = (next-head? next)
                                 switch head
@@ -3629,7 +3631,7 @@ fn get-overloaded-fn-append ()
                 elseif (count != argcount)
                     continue;
                 label break-next
-                    let outargs = (sc_call_new f)
+                    let outargs = (sc_call_new (sc_get_active_anchor) f)
                     sc_call_set_rawcall outargs true
                     let lasti = (argcount - 1)
                     for i arg in (enumerate ('args args...))
@@ -3677,12 +3679,13 @@ sugar fn... (name...)
         default
             compiler-error!
                 """"syntax: (fn... name|"name") (case pattern body...) ...
-    let outargs = (sc_argument_list_new)
+    let anchor = (sc_get_active_anchor)
+    let outargs = (sc_argument_list_new anchor)
     let outtype = (sc_typename_type (fn-name as string))
     'set-super outtype OverloadedFunction
     'set-symbols outtype
-        templates = (sc_argument_list_new)
-        parameter-types = (sc_argument_list_new)
+        templates = (sc_argument_list_new anchor)
+        parameter-types = (sc_argument_list_new anchor)
     let bodyscope = (Scope syntax-scope)
     syntax-match name...
     case (name as Symbol;)
@@ -3697,7 +3700,7 @@ sugar fn... (name...)
             repeat rest...
         case (('case condv body...) rest...)
             do
-                let tmpl = (sc_template_new fn-name)
+                let tmpl = (sc_template_new ('anchor condv) fn-name)
                 sc_argument_list_append outargs tmpl
                 let scope = (Scope bodyscope)
                 loop (expr types = (uncomma (condv as list)) void)
@@ -3713,7 +3716,7 @@ sugar fn... (name...)
                         if ('variadic? arg)
                             if (not (empty? rest...))
                                 syntax-error! ('anchor condv) "variadic parameter must be in last place"
-                        let param = (sc_parameter_new arg)
+                        let param = (sc_parameter_new ('anchor condv) arg)
                         sc_template_append_parameter tmpl param
                         'set-symbol scope arg param
                         repeat rest...
@@ -3723,7 +3726,7 @@ sugar fn... (name...)
                         if ('variadic? arg)
                             syntax-error! ('anchor condv) "a typed parameter can't be variadic"
                         let T = ((sc_expand T '() syntax-scope) as type)
-                        let param = (sc_parameter_new arg)
+                        let param = (sc_parameter_new ('anchor condv) arg)
                         sc_template_append_parameter tmpl param
                         'set-symbol scope arg param
                         repeat rest...
@@ -3783,7 +3786,7 @@ let ref-attribs-key = '__refattrs
 
 #spice deref (values...)
     let count = ('argcount values...)
-    let result = (sc_argument_list_new)
+    let result = (sc_argument_list_new (sc_get_active_anchor))
     for i kvalue in (enumerate ('args values...))
         let key value = ('dekey kvalue)
         let T = ('typeof value)
@@ -3793,7 +3796,7 @@ let ref-attribs-key = '__refattrs
                 let cmd = `(op value)
                 if (key == unnamed) cmd
                 else
-                    sc_keyed_new key cmd
+                    sc_keyed_new (sc_value_anchor cmd) key cmd
             else
                 kvalue
     result
@@ -3815,7 +3818,7 @@ compile-stage;
     fn (lhsT rhsT lhs rhs)
         if (ptrcmp== lhsT rhsT)
             return
-                sc_call_new (Value destf) (Value-array lhs rhs)
+                sc_call_new (sc_get_active_anchor) (Value destf) (Value-array lhs rhs)
         compiler-error! "unsupported type"
 
 do
