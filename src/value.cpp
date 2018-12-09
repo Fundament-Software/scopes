@@ -1228,6 +1228,16 @@ StyledStream& operator<<(StyledStream& ost, const Value *node) {
     return ost;
 }
 
+StyledStream& operator<<(StyledStream& ost, TypedValue *node) {
+    ost << (Value *)node;
+    return ost;
+}
+
+StyledStream& operator<<(StyledStream& ost, const TypedValue *node) {
+    ost << (const Value *)node;
+    return ost;
+}
+
 StyledStream& operator<<(StyledStream& ost, const ValueIndex &arg) {
     ost << arg.value;
     if (get_argument_count(arg.value->get_type()) != 1) {

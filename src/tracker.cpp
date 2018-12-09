@@ -639,7 +639,7 @@ struct Tracker {
         //const int HALT_AT = 62; // nested try/except blocks
         //const int HALT_AT = 120; // switch case
         //const int HALT_AT = 174; // function with mixed return type
-        const int HALT_AT = 327; // use of argument list
+        const int HALT_AT = 338; // use of argument list
         //const int HALT_AT = -1;
         if (track_count == HALT_AT) {
             StyledStream ss;
@@ -842,6 +842,14 @@ struct Tracker {
         if (isa<Pure>(arg.value))
             return {};
         auto T = arg.get_type();
+        #if SCOPES_ANNOTATE_TRACKING
+        if (arg.has_deps()) {
+            StyledStream ss;
+            ss << "not supposed to have deps: " << std::endl;
+            stream_ast(ss, arg.value, StreamASTFormat());
+            ss << std::endl;
+        }
+        #endif
         assert(!arg.has_deps());
         auto &data = state.ensure_data(arg);
         bool last_appearance = !(data.will_be_moved() || data.will_be_used());

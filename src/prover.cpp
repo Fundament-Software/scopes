@@ -664,9 +664,9 @@ static SCOPES_RESULT(TypedValue *) prove_Loop(const ASTContext &ctx, Loop *loop)
         SCOPES_CHECK_RESULT(merge_value_type("loop repeat", ltype, repeat->value->get_type()));
     }
 
-    merge_depends(ctx, newloop->args->deps, init);
+    merge_depends(ctx, newloop->deps, init);
     for (auto repeat : newloop->repeats) {
-        merge_depends(ctx, newloop->args->deps, repeat->value);
+        merge_depends(ctx, newloop->deps, repeat->value);
     }
 
     return newloop;

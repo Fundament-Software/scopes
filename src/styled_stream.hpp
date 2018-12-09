@@ -124,6 +124,7 @@ struct Syntax;
 struct Type;
 struct ValueIndex;
 struct Value;
+struct TypedValue;
 
 StyledStream& operator<<(StyledStream& ost, Symbol &sym);
 StyledStream& operator<<(StyledStream& ost, const Symbol &sym);
@@ -141,6 +142,8 @@ StyledStream& operator<<(StyledStream& ost, const ValueIndex &arg);
 StyledStream& operator<<(StyledStream& ost, ValueIndex &arg);
 StyledStream& operator<<(StyledStream& ost, const Value *value);
 StyledStream& operator<<(StyledStream& ost, Value *value);
+StyledStream& operator<<(StyledStream& ost, const TypedValue *value);
+StyledStream& operator<<(StyledStream& ost, TypedValue *value);
 
 void stream_uid(StyledStream &ss, uint64_t uid);
 void stream_address(StyledStream &ss, const void *ptr);

@@ -240,8 +240,10 @@ struct StreamAST : StreamAnchors {
                     if (it == visited.end()) {
                         ss << Style_Error << "?" << Style_None;
                     } else {
-                        int id = it->second;
-                        ss << Style_Operator << "%" << id << Style_None;
+                        ss << Style_Operator << "%" << Style_None;
+                        ss << Style_Number;
+                        stream_address(ss, val.value);
+                        ss << Style_None;
                     }
                 }
                 if (val.index != 0)
@@ -256,6 +258,13 @@ struct StreamAST : StreamAnchors {
             && cast<ConstInt>(value)->get_type() == TYPE_Builtin
             && cast<ConstInt>(value)->value == FN_Annotate;
     }
+
+    static bool can_assign_id(const Value *node) {
+
+        return isa<Instruction>(node)
+            || isa<LoopLabelArguments>(node)
+            || isa<LoopArguments>(node);
+     }
 
     // old Any printing reference:
     // https://bitbucket.org/duangle/scopes/src/dfb69b02546e859b702176c58e92a63de3461d77/src/any.cpp
@@ -275,7 +284,7 @@ struct StreamAST : StreamAnchors {
         int id = -1;
         bool is_new = true;
         if (it == visited.end()) {
-            if (isa<Instruction>(node)) {
+            if (can_assign_id(node)) {
                 id = nextid++;
             }
             visited.insert({node, id});
@@ -284,7 +293,7 @@ struct StreamAST : StreamAnchors {
             id = it->second;
         }
 
-        if (newlines && isa<Instruction>(node)) {
+        if (newlines && can_assign_id(node)) {
             if (is_new) {
                 if (!isa<TypedValue>(node) || is_returning_value(cast<TypedValue>(node)->get_type())) {
                     ss << Style_Operator << "%" << Style_None;
@@ -584,6 +593,7 @@ struct StreamAST : StreamAnchors {
             auto val = cast<Loop>(node);
             ss << node;
             if (newlines) {
+                walk_same_or_newline(val->args, depth+1, maxdepth);
                 ss << " " << Style_Operator << "=" << Style_None;
                 walk_same_or_newline(val->init, depth+1, maxdepth);
                 walk_same_or_newline(val->value, depth+1, maxdepth);
@@ -593,6 +603,7 @@ struct StreamAST : StreamAnchors {
             auto val = cast<LoopLabel>(node);
             ss << node;
             if (newlines) {
+                walk_same_or_newline(val->args, depth+1, maxdepth);
                 ss << " " << Style_Operator << "=" << Style_None;
                 walk_same_or_newline(val->init, depth+1, maxdepth);
                 stream_block(val->body, depth+1, maxdepth);
