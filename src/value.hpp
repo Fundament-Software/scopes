@@ -209,9 +209,6 @@ struct TypedValue : Value {
 
     //bool is_typed() const;
     const Type *get_type() const;
-
-    Depends deps;
-
 protected:
     const Type *_type;
 };
@@ -245,6 +242,8 @@ struct Instruction : TypedValue {
 
     Symbol name;
     Block *block;
+
+    Depends deps;
 };
 
 //------------------------------------------------------------------------------
@@ -722,6 +721,8 @@ struct Function : Pure {
     std::unordered_map<Value *, TypedValue *> map;
     std::vector<Return *> returns;
     std::vector<Raise *> raises;
+
+    Depends deps;
 };
 
 //------------------------------------------------------------------------------

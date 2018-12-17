@@ -618,6 +618,7 @@ namespace scopes {
     T(TIMER_Main, "main()") \
     T(TIMER_Specialize, "specialize()") \
     T(TIMER_Expand, "expand()") \
+    T(TIMER_Tracker, "track()") \
     \
     /* ad-hoc builtin names */ \
     T(SYM_ExecuteReturn, "execute-return") \

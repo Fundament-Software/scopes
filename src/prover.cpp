@@ -2168,7 +2168,7 @@ SCOPES_RESULT(Function *) prove(Function *frame, Template *func, const Types &ty
     for (auto &&ret : fn->returns) {
         merge_depends(fnctx, fn->deps, ret->value);
     }
-    //SCOPES_CHECK_RESULT(track(fnctx));
+    SCOPES_CHECK_RESULT(track(fnctx));
     fn->complete = true;
     return fn;
 }

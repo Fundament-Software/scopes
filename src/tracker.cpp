@@ -15,6 +15,7 @@
 #include "prover.hpp"
 #include "qualifiers.hpp"
 #include "qualifier.inc"
+#include "timer.hpp"
 
 #include <unordered_map>
 
@@ -178,7 +179,7 @@ struct Tracker {
             //ss << "ensuring " << block.depth << " " << block.insert_index << " " << depth_offset << " " << test << " " << value.value << std::endl;
             if (_deleted.count(value)) {
                 StyledStream ss;
-                ss << "error resurrecting future value: " << std::endl;
+                ss << get_active_anchor() << "error resurrecting future value: " << std::endl;
                 stream_ast(ss, value.value, StreamASTFormat::singleline());
                 ss << std::endl;
             }
@@ -501,7 +502,15 @@ struct Tracker {
         } else {
             SCOPES_CHECK_RESULT(visit_values(state, VM_AUTO, node->args, "call"));
         }
+        //StyledStream ss;
+        //ss << "in ";
+        //stream_ast(ss, node, StreamASTFormat());
+        //stream_ast(ss, node->callee, StreamASTFormat::singleline());
+        //ss << std::endl;
         SCOPES_CHECK_RESULT(visit_argument(state, VM_AUTO, ValueIndex(node->callee), "call"));
+        //ss << "out ";
+        //stream_ast(ss, node, StreamASTFormat::singleline());
+        //ss << std::endl;
         return {};
     }
     SCOPES_RESULT(void) track_LoopLabel(State &state, LoopLabel *node) {
@@ -633,14 +642,14 @@ struct Tracker {
     SCOPES_RESULT(void) process() {
         SCOPES_RESULT_TYPE(void);
         StyledStream ss;
-        ss << "processing #" << track_count << std::endl;
+        //ss << "processing #" << track_count << std::endl;
         //const int HALT_AT = 9; // loop
         //const int HALT_AT = 11; // another loop
         //const int HALT_AT = 62; // nested try/except blocks
         //const int HALT_AT = 120; // switch case
         //const int HALT_AT = 174; // function with mixed return type
-        const int HALT_AT = 338; // use of argument list
-        //const int HALT_AT = -1;
+        //const int HALT_AT = 338; // use of argument list
+        const int HALT_AT = -1;
         if (track_count == HALT_AT) {
             StyledStream ss;
             stream_ast(ss, function, StreamASTFormat());
@@ -1068,6 +1077,7 @@ struct Tracker {
 
 SCOPES_RESULT(void) track(ASTContext &ctx) {
     SCOPES_RESULT_TYPE(void);
+    Timer sum_track_time(TIMER_Tracker);
     Tracker tracker(ctx);
     SCOPES_CHECK_RESULT(tracker.process());
     return {};

@@ -284,7 +284,7 @@ struct Expander {
     }
 
     SCOPES_RESULT(Value *) expand_do(const List *it) {
-        SCOPES_RESULT_TYPE(Value *);
+        //SCOPES_RESULT_TYPE(Value *);
         auto _anchor = get_active_anchor();
 
         it = it->next;

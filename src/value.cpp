@@ -47,18 +47,33 @@ std::size_t ValueIndex::Hash::operator()(const ValueIndex & s) const {
 
 ValueIndex::ValueIndex(TypedValue *_value, int _index)
     : value(_value), index(_index) {
-    if (isa<Keyed>(value)) {
+repeat:
+    switch(value->kind()) {
+    case VK_Keyed: {
         value = cast<Keyed>(value)->value;
-    }
-    if (isa<ArgumentList>(value)) {
+        goto repeat;
+    } break;
+    case VK_ArgumentList: {
         auto al = cast<ArgumentList>(value);
         if (index < al->values.size()) {
             value = al->values[index];
             index = 0;
-            if (isa<Keyed>(value)) {
-                value = cast<Keyed>(value)->value;
-            }
+            goto repeat;
+        } else {
+            assert(false);
         }
+    } break;
+    case VK_ExtractArgument: {
+        auto ea = cast<ExtractArgument>(value);
+        if (index == 0) {
+            value = ea->value;
+            index = ea->index;
+            goto repeat;
+        } else {
+            assert(false);
+        }
+    } break;
+    default: break;
     }
 }
 
@@ -71,14 +86,18 @@ const Type *ValueIndex::get_type() const {
 }
 
 const ValueIndexSet *ValueIndex::deps() const {
-    if (value->deps.empty(index))
-        return nullptr;
-    const ValueIndexSet &args = value->deps.args[index];
-    return &args;
+    if (isa<Instruction>(value)) {
+        auto instr = cast<Instruction>(value);
+        if (!instr->deps.empty(index)) {
+            const ValueIndexSet &args = instr->deps.args[index];
+            return &args;
+        }
+    }
+    return nullptr;
 }
 
 bool ValueIndex::has_deps() const {
-    return !value->deps.empty(index);
+    return deps() != nullptr;
 }
 
 //------------------------------------------------------------------------------

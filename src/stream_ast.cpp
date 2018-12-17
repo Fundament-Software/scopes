@@ -301,8 +301,8 @@ struct StreamAST : StreamAnchors {
                     stream_address(ss, node);
                     ss << Style_None;
                     ss << " " << Style_Operator << "=" << Style_None << " ";
-                    if (data_dependency && isa<TypedValue>(node)) {
-                        stream_depends(cast<TypedValue>(node)->deps);
+                    if (data_dependency && isa<Instruction>(node)) {
+                        stream_depends(cast<Instruction>(node)->deps);
                     }
                 }
             } else {
