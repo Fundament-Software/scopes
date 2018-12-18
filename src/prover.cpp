@@ -1131,10 +1131,10 @@ repeat:
     const Type *T = callee->get_type();
     if (!rawcall) {
         assert(redirections < 16);
-        TypedValue *dest;
+        Value *dest;
         if (T->lookup_call_handler(dest)) {
             values.insert(values.begin(), callee);
-            callee = dest;
+            callee = SCOPES_GET_RESULT(prove(ctx, dest));
             redirections++;
             goto repeat;
         }

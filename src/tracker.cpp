@@ -818,7 +818,7 @@ struct Tracker {
             return {};
         // generate destructor
         auto argT = arg.get_type();
-        TypedValue *handler;
+        Value *handler;
         if (!argT->lookup(SYM_DropHandler, handler)) {
             #if SCOPES_ANNOTATE_TRACKING
             StyledString ss;

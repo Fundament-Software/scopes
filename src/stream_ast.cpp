@@ -562,6 +562,15 @@ struct StreamAST : StreamAnchors {
                 }
             }
         } break;
+        case VK_ArgumentListTemplate: {
+            auto val = cast<ArgumentListTemplate>(node);
+            ss << node;
+            if (newlines) {
+                for (int i = 0; i < val->values.size(); ++i) {
+                    walk_same_or_newline(val->values[i], depth+1, maxdepth);
+                }
+            }
+        } break;
         case VK_ExtractArgument: {
             auto val = cast<ExtractArgument>(node);
             ss << node;

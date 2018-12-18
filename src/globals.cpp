@@ -1217,7 +1217,7 @@ sc_value_raises_t sc_parse_from_string(const sc_string_t *str) {
 sc_value_raises_t sc_type_at(const sc_type_t *T, sc_symbol_t key) {
     using namespace scopes;
     T = strip_qualifiers(T);
-    TypedValue *result = nullptr;
+    Value *result = nullptr;
     bool ok = T->lookup(key, result);
     if (!ok) {
         StyledString ss;
@@ -1230,7 +1230,7 @@ sc_value_raises_t sc_type_at(const sc_type_t *T, sc_symbol_t key) {
 sc_value_raises_t sc_type_local_at(const sc_type_t *T, sc_symbol_t key) {
     using namespace scopes;
     T = strip_qualifiers(T);
-    TypedValue *result = nullptr;
+    Value *result = nullptr;
     bool ok = T->lookup_local(key, result);
     if (!ok) {
         StyledString ss;
@@ -1380,7 +1380,7 @@ sc_symbol_value_tuple_t sc_type_next(const sc_type_t *type, sc_symbol_t key) {
 void sc_type_set_symbol(const sc_type_t *T, sc_symbol_t sym, sc_value_t *value) {
     using namespace scopes;
     T = strip_qualifiers(T);
-    const_cast<Type *>(T)->bind(sym, cast<TypedValue>(value));
+    const_cast<Type *>(T)->bind(sym, value);
 }
 
 // Pointer Type
