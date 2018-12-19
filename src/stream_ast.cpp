@@ -614,7 +614,9 @@ struct StreamAST : StreamAnchors {
             if (newlines) {
                 walk_same_or_newline(val->args, depth+1, maxdepth);
                 ss << " " << Style_Operator << "=" << Style_None;
-                walk_same_or_newline(val->init, depth+1, maxdepth);
+                for (int i = 0; i < val->init.size(); ++i) {
+                    walk_same_or_newline(val->init[i], depth+1, maxdepth);
+                }
                 stream_block(val->body, depth+1, maxdepth);
             }
         } break;
@@ -731,14 +733,18 @@ struct StreamAST : StreamAnchors {
             auto val = cast<Repeat>(node);
             ss << node;
             if (newlines) {
-                walk_same_or_newline(val->value, depth+1, maxdepth);
+                for (int i = 0; i < val->values.size(); ++i) {
+                    walk_same_or_newline(val->values[i], depth+1, maxdepth);
+                }
             }
         } break;
         case VK_Return: {
             auto val = cast<Return>(node);
             ss << node;
             if (newlines) {
-                walk_same_or_newline(val->value, depth+1, maxdepth);
+                for (int i = 0; i < val->values.size(); ++i) {
+                    walk_same_or_newline(val->values[i], depth+1, maxdepth);
+                }
             }
         } break;
         case VK_Merge: {
@@ -749,7 +755,9 @@ struct StreamAST : StreamAnchors {
             stream_address(ss, val->label);
             ss << Style_None;
             if (newlines) {
-                walk_same_or_newline(val->value, depth+1, maxdepth);
+                for (int i = 0; i < val->values.size(); ++i) {
+                    walk_same_or_newline(val->values[i], depth+1, maxdepth);
+                }
             }
         } break;
         case VK_MergeTemplate: {
@@ -782,7 +790,9 @@ struct StreamAST : StreamAnchors {
         case VK_Raise: {
             auto val = cast<Raise>(node);
             ss << node;
-            walk_same_or_newline(val->value, depth+1, maxdepth);
+            for (int i = 0; i < val->values.size(); ++i) {
+                walk_same_or_newline(val->values[i], depth+1, maxdepth);
+            }
         } break;
         case VK_Quote: {
             auto val = cast<Quote>(node);

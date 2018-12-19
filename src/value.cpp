@@ -238,7 +238,7 @@ Value *ArgumentListTemplate::from(const Anchor *anchor, const Values &values) {
 
 //------------------------------------------------------------------------------
 
-static const Type *arguments_type_from_typed_values(const TypedValues &_values) {
+const Type *arguments_type_from_typed_values(const TypedValues &_values) {
     Types types;
     for (auto value : _values) {
         types.push_back(value->get_type());
@@ -795,12 +795,12 @@ Call *Call::from(const Anchor *anchor, const Type *type, TypedValue *callee, con
 
 //------------------------------------------------------------------------------
 
-LoopLabel::LoopLabel(const Anchor *anchor, TypedValue *_init)
+LoopLabel::LoopLabel(const Anchor *anchor, const TypedValues &_init)
     : Instruction(VK_LoopLabel, anchor, TYPE_NoReturn), init(_init) {
-    args = LoopLabelArguments::from(anchor, _init->get_type(), this);
+    args = LoopLabelArguments::from(anchor, arguments_type_from_typed_values(_init), this);
 }
 
-LoopLabel *LoopLabel::from(const Anchor *anchor, TypedValue *init) {
+LoopLabel *LoopLabel::from(const Anchor *anchor, const TypedValues &init) {
     return new LoopLabel(anchor, init);
 }
 
@@ -990,12 +990,12 @@ RepeatTemplate *RepeatTemplate::from(const Anchor *anchor, Value *value) {
 
 //------------------------------------------------------------------------------
 
-Repeat::Repeat(const Anchor *anchor, TypedValue *_value, LoopLabel *_loop)
-    : Terminator(VK_Repeat, anchor, _value), loop(_loop) {
+Repeat::Repeat(const Anchor *anchor, LoopLabel *_loop, const TypedValues &values)
+    : Terminator(VK_Repeat, anchor, values), loop(_loop) {
 }
 
-Repeat *Repeat::from(const Anchor *anchor, TypedValue *value, LoopLabel *loop) {
-    return new Repeat(anchor, value, loop);
+Repeat *Repeat::from(const Anchor *anchor, LoopLabel *loop, const TypedValues &values) {
+    return new Repeat(anchor, loop, values);
 }
 
 //------------------------------------------------------------------------------
@@ -1009,22 +1009,22 @@ ReturnTemplate *ReturnTemplate::from(const Anchor *anchor, Value *value) {
 
 //------------------------------------------------------------------------------
 
-Return::Return(const Anchor *anchor, TypedValue *_value)
-    : Terminator(VK_Return, anchor, _value) {
+Return::Return(const Anchor *anchor, const TypedValues &values)
+    : Terminator(VK_Return, anchor, values) {
 }
 
-Return *Return::from(const Anchor *anchor, TypedValue *value) {
-    return new Return(anchor, value);
+Return *Return::from(const Anchor *anchor, const TypedValues &values) {
+    return new Return(anchor, values);
 }
 
 //------------------------------------------------------------------------------
 
-Merge::Merge(const Anchor *anchor, Label *_label, TypedValue *_value)
-    : Terminator(VK_Merge, anchor, _value), label(_label) {
+Merge::Merge(const Anchor *anchor, Label *_label, const TypedValues &values)
+    : Terminator(VK_Merge, anchor, values), label(_label) {
 }
 
-Merge *Merge::from(const Anchor *anchor, Label *label, TypedValue *value) {
-    return new Merge(anchor, label, value);
+Merge *Merge::from(const Anchor *anchor, Label *label, const TypedValues &values) {
+    return new Merge(anchor, label, values);
 }
 
 //------------------------------------------------------------------------------
@@ -1047,12 +1047,12 @@ RaiseTemplate *RaiseTemplate::from(const Anchor *anchor, Value *value) {
 
 //------------------------------------------------------------------------------
 
-Raise::Raise(const Anchor *anchor, TypedValue *_value)
-    : Terminator(VK_Raise, anchor, _value) {
+Raise::Raise(const Anchor *anchor, const TypedValues &values)
+    : Terminator(VK_Raise, anchor, values) {
 }
 
-Raise *Raise::from(const Anchor *anchor, TypedValue *value) {
-    return new Raise(anchor, value);
+Raise *Raise::from(const Anchor *anchor, const TypedValues &values) {
+    return new Raise(anchor, values);
 }
 
 //------------------------------------------------------------------------------
@@ -1226,8 +1226,8 @@ SCOPES_TERMINATOR_VALUE_KIND()
     }
 }
 
-Terminator::Terminator(ValueKind _kind, const Anchor *_anchor, TypedValue *_value)
-    : Instruction(_kind, _anchor, TYPE_NoReturn), value(_value)
+Terminator::Terminator(ValueKind _kind, const Anchor *_anchor, const TypedValues &_values)
+    : Instruction(_kind, _anchor, TYPE_NoReturn), values(_values)
 {}
 
 //------------------------------------------------------------------------------

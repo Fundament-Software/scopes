@@ -251,9 +251,9 @@ struct Instruction : TypedValue {
 struct Terminator : Instruction {
     static bool classof(const Value *T);
 
-    Terminator(ValueKind _kind, const Anchor *_anchor, TypedValue *_value);
+    Terminator(ValueKind _kind, const Anchor *_anchor, const TypedValues &_values);
 
-    TypedValue *value;
+    TypedValues values;
 };
 
 //------------------------------------------------------------------------------
@@ -301,6 +301,8 @@ struct ArgumentListTemplate : UntypedValue {
 };
 
 //------------------------------------------------------------------------------
+
+const Type *arguments_type_from_typed_values(const TypedValues &_values);
 
 struct ArgumentList : TypedValue {
     static bool classof(const Value *T);
@@ -657,11 +659,11 @@ struct Call : Instruction {
 struct LoopLabel : Instruction {
     static bool classof(const Value *T);
 
-    LoopLabel(const Anchor *anchor, TypedValue *init);
+    LoopLabel(const Anchor *anchor, const TypedValues &init);
 
-    static LoopLabel *from(const Anchor *anchor, TypedValue *init);
+    static LoopLabel *from(const Anchor *anchor, const TypedValues &init);
 
-    TypedValue *init;
+    TypedValues init;
     Block body;
     std::vector<Repeat *> repeats;
     LoopLabelArguments *args;
@@ -834,9 +836,9 @@ struct Break : UntypedValue {
 struct Merge : Terminator {
     static bool classof(const Value *T);
 
-    Merge(const Anchor *anchor, Label *label, TypedValue *value);
+    Merge(const Anchor *anchor, Label *label, const TypedValues &values);
 
-    static Merge *from(const Anchor *anchor, Label *label, TypedValue *value);
+    static Merge *from(const Anchor *anchor, Label *label, const TypedValues &values);
 
     Label *label;
 };
@@ -871,9 +873,9 @@ struct RepeatTemplate : UntypedValue {
 struct Repeat : Terminator {
     static bool classof(const Value *T);
 
-    Repeat(const Anchor *anchor, TypedValue *value, LoopLabel *loop);
+    Repeat(const Anchor *anchor, LoopLabel *loop, const TypedValues &values);
 
-    static Repeat *from(const Anchor *anchor, TypedValue *value, LoopLabel *loop);
+    static Repeat *from(const Anchor *anchor, LoopLabel *loop, const TypedValues &values);
 
     LoopLabel *loop;
 };
@@ -895,9 +897,9 @@ struct ReturnTemplate : UntypedValue {
 struct Return : Terminator {
     static bool classof(const Value *T);
 
-    Return(const Anchor *anchor, TypedValue *value);
+    Return(const Anchor *anchor, const TypedValues &values);
 
-    static Return *from(const Anchor *anchor, TypedValue *value);
+    static Return *from(const Anchor *anchor, const TypedValues &values);
 };
 
 //------------------------------------------------------------------------------
@@ -917,9 +919,9 @@ struct RaiseTemplate : UntypedValue {
 struct Raise : Terminator {
     static bool classof(const Value *T);
 
-    Raise(const Anchor *anchor, TypedValue *value);
+    Raise(const Anchor *anchor, const TypedValues &values);
 
-    static Raise *from(const Anchor *anchor, TypedValue *value);
+    static Raise *from(const Anchor *anchor, const TypedValues &values);
 };
 
 //------------------------------------------------------------------------------

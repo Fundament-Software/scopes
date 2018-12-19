@@ -542,7 +542,7 @@ struct Tracker {
         SCOPES_CHECK_RESULT(track_block(test_loop_state));
         SCOPES_CHECK_RESULT(merge_state(loop_state, test_loop_state, "loop-merge-test"));
         SCOPES_CHECK_RESULT(track_block(loop_state));
-        SCOPES_CHECK_RESULT(visit_value(loop_state, VM_FORCE_COPY_OR_MOVE, node->init, "loop-init"));
+        SCOPES_CHECK_RESULT(visit_values(loop_state, VM_FORCE_COPY_OR_MOVE, node->init, "loop-init"));
         SCOPES_CHECK_RESULT(merge_state(state, loop_state, "loop-merge"));
         active_loop = old_active_loop;
         return {};
@@ -552,10 +552,10 @@ struct Tracker {
         assert(node->loop == active_loop);
         int retdepth = state.get_value_depth(node->loop);
         // TODO: we're not breaking, so this is not entirely true. but maybe it's enough?
-        return track_return_argument(state, node->value, retdepth, "repeat");
+        return track_return_arguments(state, node->values, retdepth, "repeat");
     }
     SCOPES_RESULT(void) track_Return(State &state, Return *node) {
-        return track_return_argument(state, node->value, 0, "return");
+        return track_return_arguments(state, node->values, 0, "return");
     }
     SCOPES_RESULT(void) track_Label(State &state, Label *node) {
         SCOPES_RESULT_TYPE(void);
@@ -575,11 +575,11 @@ struct Tracker {
     }
     SCOPES_RESULT(void) track_Merge(State &state, Merge *node) {
         int retdepth = state.get_value_depth(node->label);
-        return track_return_argument(state, node->value, retdepth,
+        return track_return_arguments(state, node->values, retdepth,
             get_label_kind_name(node->label->label_kind));
     }
     SCOPES_RESULT(void) track_Raise(State &state, Raise *node) {
-        return track_return_argument(state, node->value, 0, "raise");
+        return track_return_arguments(state, node->values, 0, "raise");
     }
     SCOPES_RESULT(void) track_ArgumentList(State &state, ArgumentList *node) {
         return {};
@@ -778,6 +778,15 @@ struct Tracker {
             SCOPES_CHECK_RESULT(write_destructor(state, entry, context));
         }
 
+        return {};
+    }
+
+    SCOPES_RESULT(void) track_return_arguments(State &state, const TypedValues &nodes,
+        int retdepth, const char *context) {
+        SCOPES_RESULT_TYPE(void);
+        for (auto &&node : nodes) {
+            SCOPES_CHECK_RESULT(track_return_argument(state, node, retdepth, context));
+        }
         return {};
     }
 

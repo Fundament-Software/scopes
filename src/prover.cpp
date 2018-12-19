@@ -336,43 +336,85 @@ SCOPES_RESULT(TypedValue *) prove_block(const ASTContext &ctx, Block &block, Val
     return result;
 }
 
-static TypedValue *empty_if_void(TypedValue *value) {
-    assert(is_returning(value->get_type()));
-    if ((value->get_type() == empty_arguments_type()) && !isa<ArgumentList>(value))
-        return ArgumentList::from(value->anchor(), {});
-    return value;
+static bool split_return_values(TypedValues &values, TypedValue *value) {
+    auto T = value->get_type();
+    if (!is_returning(T)) return false;
+    auto count = get_argument_count(T);
+    for (int i = 0; i < count; ++i) {
+        values.push_back(ExtractArgument::from(value->anchor(), value, i));
+    }
+    return true;
 }
 
-static TypedValue *make_merge(const ASTContext &ctx, const Anchor *anchor, Label *label, TypedValue *value) {
+static TypedValue *make_merge1(const ASTContext &ctx, const Anchor *anchor, Label *label, const TypedValues &values) {
     assert(label);
-    auto T = value->get_type();
-    if (!is_returning(T))
-        return value;
-    auto newmerge = Merge::from(anchor, label, empty_if_void(value));
+    auto newmerge = Merge::from(anchor, label, values);
     ctx.append(newmerge);
     label->merges.push_back(newmerge);
     return newmerge;
 }
 
-static TypedValue * make_repeat(const ASTContext &ctx, const Anchor *anchor, LoopLabel *label, TypedValue *value) {
-    assert(label);
-    auto T = value->get_type();
-    if (!is_returning(T))
+static TypedValue *make_merge(const ASTContext &ctx, const Anchor *anchor, Label *label, TypedValue *value) {
+    TypedValues results;
+    if (split_return_values(results, value)) {
+        return make_merge1(ctx, anchor, label, results);
+    } else {
         return value;
-    auto newrepeat = Repeat::from(anchor, empty_if_void(value), label);
+    }
+}
+
+static TypedValue * make_repeat1(const ASTContext &ctx, const Anchor *anchor, LoopLabel *label, const TypedValues &values) {
+    assert(label);
+    auto newrepeat = Repeat::from(anchor, label, values);
     ctx.append(newrepeat);
     label->repeats.push_back(newrepeat);
     return newrepeat;
 }
 
-static TypedValue * make_return(const ASTContext &ctx, const Anchor *anchor, TypedValue *value) {
-    auto T = value->get_type();
-    if (!is_returning(T))
+static TypedValue *make_repeat(const ASTContext &ctx, const Anchor *anchor, LoopLabel *label, TypedValue *value) {
+    TypedValues results;
+    if (split_return_values(results, value)) {
+        return make_repeat1(ctx, anchor, label, results);
+    } else {
         return value;
-    auto newreturn = Return::from(anchor, empty_if_void(value));
+    }
+}
+
+static TypedValue * make_return1(const ASTContext &ctx, const Anchor *anchor, const TypedValues &values) {
+    auto newreturn = Return::from(anchor, values);
     ctx.append(newreturn);
     ctx.function->returns.push_back(newreturn);
     return newreturn;
+}
+
+static TypedValue *make_return(const ASTContext &ctx, const Anchor *anchor, TypedValue *value) {
+    TypedValues results;
+    if (split_return_values(results, value)) {
+        return make_return1(ctx, anchor, results);
+    } else {
+        return value;
+    }
+}
+
+static TypedValue *make_raise1(const ASTContext &ctx, const Anchor *anchor, const TypedValues &values) {
+    if (ctx.except) {
+        return make_merge1(ctx,
+            anchor, ctx.except, values);
+    } else {
+        auto newraise = Raise::from(anchor, values);
+        ctx.append(newraise);
+        ctx.function->raises.push_back(newraise);
+        return newraise;
+    }
+}
+
+static TypedValue *make_raise(const ASTContext &ctx, const Anchor *anchor, TypedValue *value) {
+    TypedValues results;
+    if (split_return_values(results, value)) {
+        return make_raise1(ctx, anchor, results);
+    } else {
+        return value;
+    }
 }
 
 static SCOPES_RESULT(TypedValue *) prove_LabelTemplate(const ASTContext &ctx, LabelTemplate *node) {
@@ -423,12 +465,12 @@ static SCOPES_RESULT(TypedValue *) prove_LabelTemplate(const ASTContext &ctx, La
         const Type *rtype = nullptr;
         for (auto merge : label->merges) {
             rtype = SCOPES_GET_RESULT(merge_value_type("label merge",
-                rtype, merge->value->get_type()));
+                rtype, arguments_type_from_typed_values(merge->values)));
         }
         label->change_type(rtype);
         ctx.append(label);
         for (auto merge : label->merges) {
-            merge_depends(ctx, label->deps, merge->value);
+            merge_depends(ctx, label->deps, merge->values);
         }
         return label;
     }
@@ -649,7 +691,14 @@ static SCOPES_RESULT(TypedValue *) prove_Loop(const ASTContext &ctx, Loop *loop)
     auto ltype = init->get_type();
     if (!is_returning(ltype))
         return init;
-    LoopLabel *newloop = LoopLabel::from(loop->anchor(), init);
+    LoopLabel *newloop = nullptr;
+    if (isa<ArgumentList>(init)) {
+        newloop = LoopLabel::from(loop->anchor(), cast<ArgumentList>(init)->values);
+    } else if (!is_returning_value(ltype)) {
+        newloop = LoopLabel::from(loop->anchor(), {});
+    } else {
+        newloop = LoopLabel::from(loop->anchor(), { init });
+    }
     // anchor loop to the local block to avoid it landing in the wrong place
     // ctx.append(newloop);
     ctx.frame->bind(loop->args, newloop->args);
@@ -661,12 +710,13 @@ static SCOPES_RESULT(TypedValue *) prove_Loop(const ASTContext &ctx, Loop *loop)
         result->anchor(), newloop, result);
 
     for (auto repeat : newloop->repeats) {
-        SCOPES_CHECK_RESULT(merge_value_type("loop repeat", ltype, repeat->value->get_type()));
+        SCOPES_CHECK_RESULT(merge_value_type("loop repeat", ltype,
+            arguments_type_from_typed_values(repeat->values)));
     }
 
     merge_depends(ctx, newloop->deps, init);
     for (auto repeat : newloop->repeats) {
-        merge_depends(ctx, newloop->deps, repeat->value);
+        merge_depends(ctx, newloop->deps, repeat->values);
     }
 
     return newloop;
@@ -732,20 +782,6 @@ static SCOPES_RESULT(TypedValue *) prove_MergeTemplate(const ASTContext &ctx, Me
     if (!is_returning(value->get_type()))
         return value;
     return make_merge(ctx, node->anchor(), cast<Label>(label), value);
-}
-
-static TypedValue *make_raise(const ASTContext &ctx, const Anchor *anchor, TypedValue *value) {
-    auto T = value->get_type();
-    assert(is_returning(T));
-    if (ctx.except) {
-        return make_merge(ctx,
-            anchor, ctx.except, value);
-    } else {
-        auto newraise = Raise::from(anchor, value);
-        ctx.append(newraise);
-        ctx.function->raises.push_back(newraise);
-        return newraise;
-    }
 }
 
 static SCOPES_RESULT(TypedValue *) prove_RaiseTemplate(const ASTContext &ctx, RaiseTemplate *node) {
@@ -1040,11 +1076,13 @@ static SCOPES_RESULT(const Type *) get_function_type(Function *fn) {
     }
     const Type *rettype = TYPE_NoReturn;
     for (auto _return : fn->returns) {
-        rettype = SCOPES_GET_RESULT(merge_value_type("return", rettype, _return->value->get_type()));
+        rettype = SCOPES_GET_RESULT(merge_value_type("return", rettype,
+            arguments_type_from_typed_values(_return->values)));
     }
     const Type *raisetype = TYPE_NoReturn;
     for (auto _raise : fn->raises) {
-        raisetype = SCOPES_GET_RESULT(merge_value_type("raise", raisetype, _raise->value->get_type()));
+        raisetype = SCOPES_GET_RESULT(merge_value_type("raise", raisetype,
+            arguments_type_from_typed_values(_raise->values)));
     }
     return native_ro_pointer_type(raising_function_type(raisetype, rettype, params));
 }
@@ -1804,8 +1842,7 @@ static SCOPES_RESULT(TypedValue *) finalize_merge_label(const ASTContext &ctx, L
     auto _void = empty_arguments_type();
     const Type *rtype = nullptr;
     for (auto merge : merge_label->merges) {
-        auto T = merge->value->get_type();
-        if (T == _void) {
+        if (merge->values.empty()) {
             rtype = _void;
             break;
         }
@@ -1813,18 +1850,17 @@ static SCOPES_RESULT(TypedValue *) finalize_merge_label(const ASTContext &ctx, L
     if (rtype == _void) {
         // ensure all merges return nothing
         for (auto merge : merge_label->merges) {
-            if (is_returning_value(merge->value->get_type())) {
-                merge->value = ArgumentList::from(merge->anchor(), {});
-            }
+            merge->values.clear();
         }
     } else if (!rtype) {
         for (auto merge : merge_label->merges) {
-            rtype = SCOPES_GET_RESULT(merge_value_type(by, rtype, merge->value->get_type()));
+            rtype = SCOPES_GET_RESULT(merge_value_type(by, rtype,
+                arguments_type_from_typed_values(merge->values)));
         }
     }
     merge_label->change_type(rtype);
     for (auto merge : merge_label->merges) {
-        merge_depends(ctx, merge_label->deps, merge->value);
+        merge_depends(ctx, merge_label->deps, merge->values);
     }
     return merge_label;
 }
@@ -2084,11 +2120,12 @@ SCOPES_RESULT(TypedValue *) prove_inline(const ASTContext &ctx,
         const Type *rtype = nullptr;
         for (auto merge : label->merges) {
             rtype = SCOPES_GET_RESULT(merge_value_type("label merge",
-                rtype, merge->value->get_type()));
+                rtype,
+                arguments_type_from_typed_values(merge->values)));
         }
         label->change_type(rtype);
         for (auto merge : label->merges) {
-            merge_depends(ctx, label->deps, merge->value);
+            merge_depends(ctx, label->deps, merge->values);
         }
         return label;
     }
@@ -2166,7 +2203,7 @@ SCOPES_RESULT(Function *) prove(Function *frame, Template *func, const Types &ty
 
     SCOPES_CHECK_RESULT(ensure_function_type(fn));
     for (auto &&ret : fn->returns) {
-        merge_depends(fnctx, fn->deps, ret->value);
+        merge_depends(fnctx, fn->deps, ret->values);
     }
     SCOPES_CHECK_RESULT(track(fnctx));
     fn->complete = true;

@@ -386,8 +386,19 @@ SCOPES_RESULT(void) error_gen_unbound_symbol(const char *target, Value *value) {
 SCOPES_RESULT(void) error_cannot_translate(const char *target, Value *value) {
     SCOPES_RESULT_TYPE(void);
     StyledString ss;
-    ss.out << target << ": cannot translate template value of kind "
-        << Style_Keyword << get_value_class_name(value->kind()) << Style_None;
+    if (isa<Instruction>(value)) {
+        ss.out << target << ": instruction of kind "
+            << Style_Keyword << get_value_class_name(value->kind()) << Style_None
+            << " is referenced by argument but ";
+        if (cast<Instruction>(value)->block) {
+            ss.out << "its block has not been processed";
+        } else {
+            ss.out << "not associated with a block";
+        }
+    } else {
+        ss.out << target << ": cannot translate value of kind "
+            << Style_Keyword << get_value_class_name(value->kind()) << Style_None;
+    }
     SCOPES_LOCATION_ERROR(ss.str());
 }
 

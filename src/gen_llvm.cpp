@@ -153,9 +153,12 @@ struct LLVMIRGenerator {
     Label::UserMap user_map;
 #endif
 
+    typedef std::vector<LLVMValueRef> LLVMValueRefs;
+    typedef std::vector<LLVMTypeRef> LLVMTypeRefs;
+
     std::unordered_map<SourceFile *, LLVMMetadataRef> file2value;
     std::unordered_map<void *, LLVMValueRef> ptr2global;
-    std::unordered_map<Value *, LLVMValueRef> node2value;
+    std::unordered_map<ValueIndex, LLVMValueRef, ValueIndex::Hash> ref2value;
     std::unordered_map<Function *, LLVMMetadataRef> func2md;
     std::unordered_map<Extern *, LLVMValueRef> extern2global;
     std::unordered_map<LLVMValueRef, LLVMBasicBlockRef> func_fail_label;
@@ -215,12 +218,16 @@ struct LLVMIRGenerator {
 
     struct TryInfo {
         LLVMBasicBlockRef bb_except;
-        LLVMValueRef except_value;
+        LLVMValueRefs except_values;
 
         TryInfo() :
-            bb_except(nullptr),
-            except_value(nullptr)
+            bb_except(nullptr)
         {}
+
+        void clear() {
+            bb_except = nullptr;
+            except_values.clear();
+        }
     };
 
     TryInfo try_info;
@@ -228,12 +235,11 @@ struct LLVMIRGenerator {
     struct LoopInfo {
         LoopLabel *loop;
         LLVMBasicBlockRef bb_loop;
-        LLVMValueRef repeat_value;
+        LLVMValueRefs repeat_values;
 
         LoopInfo() :
             loop(nullptr),
-            bb_loop(nullptr),
-            repeat_value(nullptr)
+            bb_loop(nullptr)
         {}
     };
 
@@ -242,12 +248,11 @@ struct LLVMIRGenerator {
     struct LabelInfo {
         Label *label;
         LLVMBasicBlockRef bb_merge;
-        LLVMValueRef merge_value;
+        LLVMValueRefs merge_values;
 
         LabelInfo() :
             label(nullptr),
-            bb_merge(nullptr),
-            merge_value(nullptr)
+            bb_merge(nullptr)
         {}
     };
 
@@ -308,11 +313,11 @@ struct LLVMIRGenerator {
 
         LLVMMetadataRef difile = source_file_to_scope(anchor->file);
 
-        #if 0
+        /*
         LLVMMetadataRef subroutinevalues[] = {
             nullptr
         };
-        #endif
+        */
         LLVMMetadataRef disrt = LLVMDIBuilderCreateSubroutineType(di_builder,
             difile, nullptr, 0, LLVMDIFlagZero);
 
@@ -353,6 +358,7 @@ struct LLVMIRGenerator {
         LLVMTypeRef argtypes[] = {__VA_ARGS__}; \
         result = LLVMAddFunction(module, STRNAME, LLVMFunctionType(RETTYPE, argtypes, sizeof(argtypes) / sizeof(LLVMTypeRef), false)); \
     } break;
+
 #define LLVM_INTRINSIC_IMPL_BEGIN(ENUMVAL, RETTYPE, STRNAME, ...) \
     case ENUMVAL: { \
         LLVMTypeRef argtypes[] = { __VA_ARGS__ }; \
@@ -361,10 +367,12 @@ struct LLVMIRGenerator {
         LLVMSetLinkage(result, LLVMPrivateLinkage); \
         auto bb = LLVMAppendBasicBlock(result, ""); \
         auto oldbb = LLVMGetInsertBlock(builder); \
-        LLVMPositionBuilderAtEnd(builder, bb);
+        position_builder_at_end(bb);
+
 #define LLVM_INTRINSIC_IMPL_END() \
-        LLVMPositionBuilderAtEnd(builder, oldbb); \
+        position_builder_at_end(oldbb); \
     } break;
+
             LLVM_INTRINSIC_IMPL(llvm_sin_f32, f32T, "llvm.sin.f32", f32T)
             LLVM_INTRINSIC_IMPL(llvm_sin_f64, f64T, "llvm.sin.f64", f64T)
             LLVM_INTRINSIC_IMPL(llvm_cos_f32, f32T, "llvm.cos.f32", f32T)
@@ -520,7 +528,7 @@ struct LLVMIRGenerator {
     }
 
     SCOPES_RESULT(void) abi_export_argument(LLVMValueRef val, const Type *AT,
-        std::vector<LLVMValueRef> &values, std::vector<size_t> &memptrs) {
+        LLVMValueRefs &values, std::vector<size_t> &memptrs) {
         SCOPES_RESULT_TYPE(void);
         ABIClass classes[MAX_ABI_CLASSES];
         size_t sz = abi_classify(AT, classes);
@@ -557,7 +565,7 @@ struct LLVMIRGenerator {
     }
 
     static SCOPES_RESULT(void) abi_transform_parameter(const Type *AT,
-        std::vector<LLVMTypeRef> &params) {
+        LLVMTypeRefs &params) {
         SCOPES_RESULT_TYPE(void);
         ABIClass classes[MAX_ABI_CLASSES];
         size_t sz = abi_classify(AT, classes);
@@ -656,7 +664,7 @@ struct LLVMIRGenerator {
             auto rtype = abi_return_type(fi);
             bool use_sret = is_memory_class(rtype);
 
-            std::vector<LLVMTypeRef> elements;
+            LLVMTypeRefs elements;
             elements.reserve(count);
             LLVMTypeRef rettype;
             if (use_sret) {
@@ -774,38 +782,41 @@ struct LLVMIRGenerator {
         last_llvm_error = make_location_error(String::from_cstr(Reason));
     }
 
-    void bind(Value *node, LLVMValueRef value) {
-        assert(node);
+    void bind(const ValueIndex &node, LLVMValueRef value) {
         assert(value);
-        node2value.insert({node, value});
+        ref2value.insert({node, value});
     }
 
-#define T(NAME, BNAME, CLASS) \
-    SCOPES_RESULT(LLVMValueRef) CLASS ## _to_value(Value *node) { \
-        SCOPES_RESULT_TYPE(LLVMValueRef); \
-        SCOPES_EXPECT_ERROR(error_cannot_translate(SCOPES_GEN_TARGET, node)); \
-    }
-    SCOPES_UNTYPED_VALUE_KIND()
-#undef T
-
-    SCOPES_RESULT(LLVMValueRef) write_return(LLVMValueRef value, bool is_except = false) {
+    SCOPES_RESULT(LLVMValueRef) write_return(const LLVMValueRefs &values, bool is_except = false) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         assert(active_function);
         auto fi = extract_function_type(active_function->get_type());
         auto rtype = abi_return_type(fi);
         auto abiretT = SCOPES_GET_RESULT(type_to_llvm_type(rtype));
+        LLVMValueRef value = nullptr;
         if (fi->has_exception()) {
             auto abivalue = LLVMGetUndef(abiretT);
             if (is_except) {
                 abivalue = LLVMBuildInsertValue(builder, abivalue, falseV, 0, "");
-                abivalue = LLVMBuildInsertValue(builder, abivalue, value, 1, "");
+                if (is_returning_value(fi->except_type)) {
+                    auto exceptT = SCOPES_GET_RESULT(type_to_llvm_type(fi->except_type));
+                    abivalue = LLVMBuildInsertValue(builder, abivalue,
+                        values_to_struct(exceptT, values), 1, "");
+                }
             } else {
                 abivalue = LLVMBuildInsertValue(builder, abivalue, trueV, 0, "");
                 if (is_returning_value(fi->return_type)) {
-                    abivalue = LLVMBuildInsertValue(builder, abivalue, value, 2, "");
+                    auto returnT = SCOPES_GET_RESULT(type_to_llvm_type(fi->return_type));
+                    abivalue = LLVMBuildInsertValue(builder, abivalue,
+                        values_to_struct(returnT, values), 2, "");
                 }
             }
             value = abivalue;
+        } else {
+            if (is_returning_value(fi->return_type)) {
+                auto returnT = SCOPES_GET_RESULT(type_to_llvm_type(fi->return_type));
+                value = values_to_struct(returnT, values);
+            }
         }
         LLVMValueRef parentfunc = LLVMGetBasicBlockParent(LLVMGetInsertBlock(builder));
         bool use_sret = is_memory_class(rtype);
@@ -815,6 +826,7 @@ struct LLVMIRGenerator {
         } else if (rtype == empty_arguments_type()) {
             return LLVMBuildRetVoid(builder);
         } else {
+            assert(value);
             // check if ABI needs something else and do a bitcast
             auto retT = LLVMGetReturnType(LLVMGetElementType(LLVMTypeOf(parentfunc)));
             auto srcT = abiretT;
@@ -828,24 +840,26 @@ struct LLVMIRGenerator {
         }
     }
 
-    SCOPES_RESULT(LLVMValueRef) write_return(TypedValue *node) {
+    SCOPES_RESULT(LLVMValueRef) write_return(const TypedValues &values, bool is_except = false) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
-        const Type *T = node->get_type();
-        LLVMValueRef value = SCOPES_GET_RESULT(node_to_value(node));
-        if (!is_returning(T)) return value;
-        return write_return(value);
+        LLVMValueRefs refs;
+        for (auto val : values) {
+            refs.push_back(SCOPES_GET_RESULT(ref_to_value(val)));
+        }
+        return write_return(refs, is_except);
     }
 
-    SCOPES_RESULT(LLVMValueRef) Return_to_value(Return *node) {
-        //SCOPES_RESULT_TYPE(LLVMValueRef);
-        return write_return(node->value);
+    SCOPES_RESULT(void) translate_Return(Return *node) {
+        SCOPES_RESULT_TYPE(void);
+        SCOPES_CHECK_RESULT(write_return(node->values));
+        return {};
     }
 
-    SCOPES_RESULT(LLVMValueRef) Raise_to_value(Raise *node) {
-        SCOPES_RESULT_TYPE(LLVMValueRef);
-        auto result = SCOPES_GET_RESULT(node_to_value(node->value));
-        build_merge_phi(try_info.except_value, result);
-        return LLVMBuildBr(builder, try_info.bb_except);
+    SCOPES_RESULT(void) translate_Raise(Raise *node) {
+        SCOPES_RESULT_TYPE(void);
+        SCOPES_CHECK_RESULT(build_merge_phi(try_info.except_values, node->values));
+        LLVMBuildBr(builder, try_info.bb_except);
+        return {};
     }
 
     SCOPES_RESULT(void) Function_finalize(Function *node) {
@@ -854,8 +868,8 @@ struct LLVMIRGenerator {
         functions_generated++;
 
         active_function = node;
-        auto it = node2value.find(node);
-        assert(it != node2value.end());
+        auto it = ref2value.find(node);
+        assert(it != ref2value.end());
         LLVMValueRef func = it->second;
         assert(func);
         auto ilfunctype = node->get_type();
@@ -864,20 +878,18 @@ struct LLVMIRGenerator {
         bool use_sret = is_memory_class(rtype);
         auto bb = LLVMAppendBasicBlock(func, "");
 
-        try_info.bb_except = nullptr;
-        try_info.except_value = nullptr;
+        try_info.clear();
 
         if (fi->has_exception()) {
             try_info.bb_except = LLVMAppendBasicBlock(func, "except");
-            LLVMPositionBuilderAtEnd(builder, try_info.bb_except);
-            auto except_value_type = SCOPES_GET_RESULT(type_to_llvm_type(fi->except_type));
+            position_builder_at_end(try_info.bb_except);
             if (use_debug_info)
                 set_debug_location(node->anchor());
-            try_info.except_value = LLVMBuildPhi(builder, except_value_type, "");
-            SCOPES_CHECK_RESULT(write_return(try_info.except_value, true));
+            SCOPES_CHECK_RESULT(build_phi(try_info.except_values, fi->except_type));
+            SCOPES_CHECK_RESULT(write_return(try_info.except_values, true));
         }
 
-        LLVMPositionBuilderAtEnd(builder, bb);
+        position_builder_at_end(bb);
 
         auto &&params = node->params;
         size_t offset = 0;
@@ -898,7 +910,7 @@ struct LLVMIRGenerator {
             assert(val);
             bind(param, val);
         }
-        SCOPES_CHECK_RESULT(block_to_value(node->body));
+        SCOPES_CHECK_RESULT(translate_block(node->body));
         return {};
     }
 
@@ -957,16 +969,17 @@ struct LLVMIRGenerator {
         SCOPES_EXPECT_ERROR(error_cannot_translate(SCOPES_GEN_TARGET, node));
     }
 
-    SCOPES_RESULT(void) block_to_value(const Block &node) {
+    SCOPES_RESULT(void) translate_block(const Block &node) {
         SCOPES_RESULT_TYPE(void);
         for (auto entry : node.body) {
-            SCOPES_CHECK_RESULT(node_to_value(entry));
+            SCOPES_CHECK_RESULT(translate_instruction(entry));
         }
         if (node.terminator) {
-            SCOPES_CHECK_RESULT(node_to_value(node.terminator));
+            SCOPES_CHECK_RESULT(translate_instruction(node.terminator));
         }
         return {};
     }
+
 
     LabelInfo &find_label_info(Label *label) {
         int i = label_info_stack.size();
@@ -979,118 +992,607 @@ struct LLVMIRGenerator {
         return label_info_stack.back();
     }
 
-    void build_merge_phi(LLVMValueRef phi, LLVMValueRef result) {
-        if (phi) {
-            assert(result);
-            LLVMBasicBlockRef bb = LLVMGetInsertBlock(builder);
-            LLVMBasicBlockRef incobbs[] = { bb };
-            LLVMValueRef incovals[] = { result };
+    SCOPES_RESULT(void) build_merge_phi(const LLVMValueRefs &phis, const TypedValues &values) {
+        SCOPES_RESULT_TYPE(void);
+        if (phis.size() != values.size()) {
+            StyledStream ss;
+            for (auto phi : phis) {
+                LLVMDumpValue(phi);
+                ss << std::endl;
+            }
+            for (auto value : values) {
+                stream_ast(ss, value, StreamASTFormat::singleline());
+            }
+        }
+        assert(phis.size() == values.size());
+        LLVMBasicBlockRef bb = LLVMGetInsertBlock(builder);
+        assert(bb);
+        LLVMBasicBlockRef incobbs[] = { bb };
+        int count = phis.size();
+        for (int i = 0; i < count; ++i) {
+            auto phi = phis[i];
+            auto llvmval = SCOPES_GET_RESULT(ref_to_value(values[i]));
+            LLVMValueRef incovals[] = { llvmval };
             LLVMAddIncoming(phi, incovals, incobbs, 1);
         }
+        return {};
     }
 
-    LLVMValueRef build_merge(Label *label, LLVMValueRef result) {
+    SCOPES_RESULT(LLVMValueRef) build_merge(Label *label, const TypedValues &values) {
+        SCOPES_RESULT_TYPE(LLVMValueRef);
         auto &&label_info = find_label_info(label);
-        build_merge_phi(label_info.merge_value, result);
+        SCOPES_CHECK_RESULT(build_merge_phi(label_info.merge_values, values));
         assert(label_info.bb_merge);
         return LLVMBuildBr(builder, label_info.bb_merge);
     }
 
-    SCOPES_RESULT(LLVMValueRef) Merge_to_value(Merge *node) {
-        SCOPES_RESULT_TYPE(LLVMValueRef);
-        auto result = SCOPES_GET_RESULT(node_to_value(node->value));
+    SCOPES_RESULT(void) translate_Merge(Merge *node) {
+        SCOPES_RESULT_TYPE(void);
         auto label = cast<Label>(node->label);
-        return build_merge(label, result);
+        SCOPES_CHECK_RESULT(build_merge(label, node->values));
+        return {};
     }
 
-    SCOPES_RESULT(LLVMValueRef) Repeat_to_value(Repeat *node) {
-        SCOPES_RESULT_TYPE(LLVMValueRef);
-        auto result = SCOPES_GET_RESULT(node_to_value(node->value));
-        build_merge_phi(loop_info.repeat_value, result);
-        return LLVMBuildBr(builder, loop_info.bb_loop);
+    SCOPES_RESULT(void) translate_Repeat(Repeat *node) {
+        SCOPES_RESULT_TYPE(void);
+        SCOPES_CHECK_RESULT(build_merge_phi(loop_info.repeat_values, node->values));
+        LLVMBuildBr(builder, loop_info.bb_loop);
+        return {};
     }
 
-    SCOPES_RESULT(LLVMValueRef) Label_to_value(Label *node) {
-        SCOPES_RESULT_TYPE(LLVMValueRef);
+    SCOPES_RESULT(void) translate_Label(Label *node) {
+        SCOPES_RESULT_TYPE(void);
         LabelInfo label_info;
         label_info.label = node;
         LLVMBasicBlockRef bb = LLVMGetInsertBlock(builder);
         LLVMValueRef func = LLVMGetBasicBlockParent(bb);
-        label_info.merge_value = nullptr;
         label_info.bb_merge = nullptr;
         auto rtype = node->get_type();
         if (is_returning(rtype)) {
             label_info.bb_merge = LLVMAppendBasicBlock(func, node->name.name()->data);
-            if (is_returning_value(rtype)) {
-                LLVMPositionBuilderAtEnd(builder, label_info.bb_merge);
-                label_info.merge_value = LLVMBuildPhi(builder,
-                    SCOPES_GET_RESULT(type_to_llvm_type(rtype)), "");
-            }
+            position_builder_at_end(label_info.bb_merge);
+            SCOPES_CHECK_RESULT(build_phi(label_info.merge_values, node));
         }
-
         label_info_stack.push_back(label_info);
         {
-            LLVMPositionBuilderAtEnd(builder, bb);
-            SCOPES_CHECK_RESULT(block_to_value(node->body));
+            position_builder_at_end(bb);
+            SCOPES_CHECK_RESULT(translate_block(node->body));
         }
-        LLVMPositionBuilderAtEnd(builder, label_info.bb_merge);
-        auto result = label_info.merge_value;
+        if (label_info.bb_merge)
+            position_builder_at_end(label_info.bb_merge);
         label_info_stack.pop_back();
-        return result;
+        return {};
     }
 
-    SCOPES_RESULT(LLVMValueRef) LoopLabel_to_value(LoopLabel *node) {
-        SCOPES_RESULT_TYPE(LLVMValueRef);
+    SCOPES_RESULT(void) build_phi(LLVMValueRefs &refs, const Type *T) {
+        SCOPES_RESULT_TYPE(void);
+        assert(refs.empty());
+        int count = get_argument_count(T);
+        for (int i = 0; i < count; ++i) {
+            auto argT = SCOPES_GET_RESULT(type_to_llvm_type(get_argument(T, i)));
+            auto val = LLVMBuildPhi(builder, argT, "");
+            refs.push_back(val);
+        }
+        return {};
+    }
+
+    void map_phi(const LLVMValueRefs &refs, TypedValue *node) {
+        for (int i = 0; i < refs.size(); ++i) {
+            bind(ValueIndex(node, i), refs[i]);
+        }
+    }
+
+    SCOPES_RESULT(void) build_phi(LLVMValueRefs &refs, TypedValue *node) {
+        SCOPES_RESULT_TYPE(void);
+        SCOPES_CHECK_RESULT(build_phi(refs, node->get_type()));
+        map_phi(refs, node);
+        return {};
+    }
+
+    SCOPES_RESULT(void) translate_LoopLabel(LoopLabel *node) {
+        SCOPES_RESULT_TYPE(void);
         //auto rtype = node->get_type();
-        LLVMValueRef init = SCOPES_GET_RESULT(node_to_value(node->init));
         auto old_loop_info = loop_info;
         loop_info.loop = node;
         LLVMBasicBlockRef bb = LLVMGetInsertBlock(builder);
         LLVMValueRef func = LLVMGetBasicBlockParent(bb);
         loop_info.bb_loop = LLVMAppendBasicBlock(func, "loop");
-        loop_info.repeat_value = nullptr;
-        auto ltype = node->init->get_type();
-        if (is_returning_value(ltype)) {
-            LLVMPositionBuilderAtEnd(builder, loop_info.bb_loop);
-            loop_info.repeat_value = LLVMBuildPhi(builder, LLVMTypeOf(init), "");
-            bind(node->args, loop_info.repeat_value);
-            LLVMPositionBuilderAtEnd(builder, bb);
-        }
-        build_merge_phi(loop_info.repeat_value, init);
+        loop_info.repeat_values.clear();
+        position_builder_at_end(loop_info.bb_loop);
+        SCOPES_CHECK_RESULT(build_phi(loop_info.repeat_values, node->args));
+        position_builder_at_end(bb);
+        SCOPES_CHECK_RESULT(build_merge_phi(loop_info.repeat_values, node->init));
         LLVMBuildBr(builder, loop_info.bb_loop);
-        LLVMPositionBuilderAtEnd(builder, loop_info.bb_loop);
-        SCOPES_CHECK_RESULT(block_to_value(node->body));
+        position_builder_at_end(loop_info.bb_loop);
+        SCOPES_CHECK_RESULT(translate_block(node->body));
         loop_info = old_loop_info;
-        return nullptr;
+        return {};
     }
 
-    SCOPES_RESULT(LLVMValueRef) ArgumentList_to_value(ArgumentList *node) {
-        SCOPES_RESULT_TYPE(LLVMValueRef);
-        auto rtype = node->get_type();
-        auto T = SCOPES_GET_RESULT(type_to_llvm_type(rtype));
-        LLVMValueRef value = LLVMGetUndef(T);
-        auto &&values = node->values;
+    LLVMValueRef values_to_struct(LLVMTypeRef T, const LLVMValueRefs &values) {
         int count = (int)values.size();
-        for (int i = 0; i < count; ++i) {
-            auto val = SCOPES_GET_RESULT(node_to_value(values[i]));
-            value = LLVMBuildInsertValue(builder, value, val, i, "");
+        if (count == 1) {
+            return values[0];
+        } else {
+            LLVMValueRef value = LLVMGetUndef(T);
+            for (int i = 0; i < count; ++i) {
+                value = LLVMBuildInsertValue(builder, value, values[i], i, "");
+            }
+            return value;
         }
-        return value;
     }
 
-    SCOPES_RESULT(LLVMValueRef) ExtractArgument_to_value(ExtractArgument *node) {
-        SCOPES_RESULT_TYPE(LLVMValueRef);
-        auto value = SCOPES_GET_RESULT(node_to_value(node->value));
-        return LLVMBuildExtractValue(builder, value, node->index, "");
+    void struct_to_values(LLVMValueRefs &values, const Type *T, LLVMValueRef value) {
+        assert(value);
+        int count = get_argument_count(T);
+        if (count == 1) {
+            values.push_back(value);
+        } else {
+            for (int i = 0; i < count; ++i) {
+                values.push_back(LLVMBuildExtractValue(builder, value, i, ""));
+            }
+        }
     }
 
-    SCOPES_RESULT(LLVMTypeRef) node_to_llvm_type(TypedValue *node) {
+    SCOPES_RESULT(LLVMTypeRef) node_to_llvm_type(Value *node) {
         SCOPES_RESULT_TYPE(LLVMTypeRef);
         return type_to_llvm_type(SCOPES_GET_RESULT(extract_type_constant(node)));
     }
 
-    SCOPES_RESULT(LLVMValueRef) Call_to_value(Call *call) {
+    SCOPES_RESULT(LLVMValueRef) translate_builtin(Call *call, Builtin builtin, const TypedValues &args) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
+        size_t argcount = args.size();
+        size_t argn = 0;
+
+#define READ_VALUE(NAME) \
+        assert(argn <= argcount); \
+        TypedValue * _ ## NAME = args[argn++]; \
+        LLVMValueRef NAME = SCOPES_GET_RESULT(ref_to_value(_ ## NAME));
+
+#define READ_TYPE(NAME) \
+        assert(argn <= argcount); \
+        LLVMTypeRef NAME = SCOPES_GET_RESULT(node_to_llvm_type(args[argn++]));
+
+        switch(builtin.value()) {
+        case FN_Annotate: {
+            return nullptr;
+        } break;
+        case OP_Tertiary: {
+            READ_VALUE(cond);
+            READ_VALUE(then_value);
+            READ_VALUE(else_value);
+            return LLVMBuildSelect(
+                builder, cond, then_value, else_value, "");
+        } break;
+        case FN_ExtractValue: {
+            READ_VALUE(val);
+            READ_VALUE(index);
+            assert(LLVMIsConstant(index));
+            assert(LLVMGetTypeKind(LLVMTypeOf(index)) == LLVMIntegerTypeKind);
+            auto index_value = LLVMConstIntGetZExtValue(index);
+            return LLVMBuildExtractValue(builder, val, index_value, "");
+        } break;
+        case FN_InsertValue: {
+            READ_VALUE(val);
+            READ_VALUE(eltval);
+            READ_VALUE(index);
+            assert(LLVMIsConstant(index));
+            assert(LLVMGetTypeKind(LLVMTypeOf(index)) == LLVMIntegerTypeKind);
+            auto index_value = LLVMConstIntGetZExtValue(index);
+            return LLVMBuildInsertValue(builder, val, eltval, index_value, "");
+        } break;
+        case FN_ExtractElement: {
+            READ_VALUE(val);
+            READ_VALUE(index);
+            return LLVMBuildExtractElement(builder, val, index, "");
+        } break;
+        case FN_InsertElement: {
+            READ_VALUE(val);
+            READ_VALUE(eltval);
+            READ_VALUE(index);
+            return LLVMBuildInsertElement(builder, val, eltval, index, "");
+        } break;
+        case FN_ShuffleVector: {
+            READ_VALUE(v1);
+            READ_VALUE(v2);
+            READ_VALUE(mask);
+            return LLVMBuildShuffleVector(builder, v1, v2, mask, "");
+        } break;
+        case FN_Move: {
+            READ_VALUE(val);
+            return val;
+        } break;
+        case FN_Undef: { READ_TYPE(ty);
+            return LLVMGetUndef(ty); } break;
+        case FN_Alloca: { READ_TYPE(ty);
+            return safe_alloca(ty);
+        } break;
+        case FN_AllocaArray: { READ_TYPE(ty); READ_VALUE(val);
+            return safe_alloca(ty, val); } break;
+        case FN_Malloc: { READ_TYPE(ty);
+            return LLVMBuildMalloc(builder, ty, ""); } break;
+        case FN_MallocArray: { READ_TYPE(ty); READ_VALUE(val);
+            return LLVMBuildArrayMalloc(builder, ty, val, ""); } break;
+        case FN_Free: { READ_VALUE(val);
+            return LLVMBuildFree(builder, val); } break;
+        case FN_GetElementRef: {
+            READ_VALUE(pointer);
+            assert(LLVMGetTypeKind(LLVMTypeOf(pointer)) == LLVMPointerTypeKind);
+            assert(argcount > 1);
+            size_t count = argcount;
+            LLVMValueRef indices[count];
+            LLVMTypeRef IT = nullptr;
+            for (size_t i = 1; i < count; ++i) {
+                indices[i] = SCOPES_GET_RESULT(ref_to_value(args[i]));
+                assert(LLVMGetValueKind(indices[i]) == LLVMConstantIntValueKind);
+                IT = LLVMTypeOf(indices[i]);
+            }
+            assert(IT);
+            indices[0] = LLVMConstInt(IT, 0, false);
+            return LLVMBuildGEP(builder, pointer, indices, count, "");
+        } break;
+        case FN_GetElementPtr: {
+            READ_VALUE(pointer);
+            assert(LLVMGetTypeKind(LLVMTypeOf(pointer)) == LLVMPointerTypeKind);
+            assert(argcount > 1);
+            size_t count = argcount - 1;
+            LLVMValueRef indices[count];
+            for (size_t i = 0; i < count; ++i) {
+                indices[i] = SCOPES_GET_RESULT(ref_to_value(args[argn + i]));
+                assert(LLVMGetTypeKind(LLVMTypeOf(indices[i])) == LLVMIntegerTypeKind);
+            }
+            return LLVMBuildGEP(builder, pointer, indices, count, "");
+        } break;
+        case FN_Bitcast: { READ_VALUE(val); READ_TYPE(ty);
+            auto T = LLVMTypeOf(val);
+            if (T == ty) {
+                return val;
+            } else if (LLVMGetTypeKind(ty) == LLVMStructTypeKind) {
+                // completely braindead, but what can you do
+                LLVMValueRef ptr = safe_alloca(T);
+                LLVMBuildStore(builder, val, ptr);
+                ptr = LLVMBuildBitCast(builder, ptr, LLVMPointerType(ty,0), "");
+                return LLVMBuildLoad(builder, ptr, "");
+            } else {
+                return LLVMBuildBitCast(builder, val, ty, "");
+            }
+        } break;
+        case FN_IntToPtr: { READ_VALUE(val); READ_TYPE(ty);
+            return LLVMBuildIntToPtr(builder, val, ty, ""); } break;
+        case FN_PtrToInt: { READ_VALUE(val); READ_TYPE(ty);
+            return LLVMBuildPtrToInt(builder, val, ty, ""); } break;
+        case FN_ITrunc: { READ_VALUE(val); READ_TYPE(ty);
+            return LLVMBuildTrunc(builder, val, ty, ""); } break;
+        case FN_SExt: { READ_VALUE(val); READ_TYPE(ty);
+            return LLVMBuildSExt(builder, val, ty, ""); } break;
+        case FN_ZExt: { READ_VALUE(val); READ_TYPE(ty);
+            return LLVMBuildZExt(builder, val, ty, ""); } break;
+        case FN_FPTrunc: { READ_VALUE(val); READ_TYPE(ty);
+            return LLVMBuildFPTrunc(builder, val, ty, ""); } break;
+        case FN_FPExt: { READ_VALUE(val); READ_TYPE(ty);
+            return LLVMBuildFPExt(builder, val, ty, ""); } break;
+        case FN_FPToUI: { READ_VALUE(val); READ_TYPE(ty);
+            return LLVMBuildFPToUI(builder, val, ty, ""); } break;
+        case FN_FPToSI: { READ_VALUE(val); READ_TYPE(ty);
+            return LLVMBuildFPToSI(builder, val, ty, ""); } break;
+        case FN_UIToFP: { READ_VALUE(val); READ_TYPE(ty);
+            return LLVMBuildUIToFP(builder, val, ty, ""); } break;
+        case FN_SIToFP: { READ_VALUE(val); READ_TYPE(ty);
+            return LLVMBuildSIToFP(builder, val, ty, ""); } break;
+        case FN_Deref: {
+            READ_VALUE(ptr);
+            LLVMValueRef retvalue = LLVMBuildLoad(builder, ptr, "");
+            return retvalue;
+        } break;
+        case FN_Assign: {
+            READ_VALUE(lhs);
+            READ_VALUE(rhs);
+            LLVMValueRef retvalue = LLVMBuildStore(builder, lhs, rhs);
+            return retvalue;
+        } break;
+        case FN_PtrToRef: {
+            READ_VALUE(ptr);
+            return ptr;
+        } break;
+        case FN_RefToPtr: {
+            READ_VALUE(ptr);
+            return ptr;
+        } break;
+        case FN_VolatileLoad:
+        case FN_Load: { READ_VALUE(ptr);
+            LLVMValueRef retvalue = LLVMBuildLoad(builder, ptr, "");
+            if (builtin.value() == FN_VolatileLoad) { LLVMSetVolatile(retvalue, true); }
+            return retvalue;
+        } break;
+        case FN_VolatileStore:
+        case FN_Store: { READ_VALUE(val); READ_VALUE(ptr);
+            LLVMValueRef retvalue = LLVMBuildStore(builder, val, ptr);
+            if (builtin.value() == FN_VolatileStore) { LLVMSetVolatile(retvalue, true); }
+            return retvalue;
+        } break;
+        case OP_ICmpEQ:
+        case OP_ICmpNE:
+        case OP_ICmpUGT:
+        case OP_ICmpUGE:
+        case OP_ICmpULT:
+        case OP_ICmpULE:
+        case OP_ICmpSGT:
+        case OP_ICmpSGE:
+        case OP_ICmpSLT:
+        case OP_ICmpSLE: {
+            READ_VALUE(a); READ_VALUE(b);
+            LLVMIntPredicate pred = LLVMIntEQ;
+            switch(builtin.value()) {
+                case OP_ICmpEQ: pred = LLVMIntEQ; break;
+                case OP_ICmpNE: pred = LLVMIntNE; break;
+                case OP_ICmpUGT: pred = LLVMIntUGT; break;
+                case OP_ICmpUGE: pred = LLVMIntUGE; break;
+                case OP_ICmpULT: pred = LLVMIntULT; break;
+                case OP_ICmpULE: pred = LLVMIntULE; break;
+                case OP_ICmpSGT: pred = LLVMIntSGT; break;
+                case OP_ICmpSGE: pred = LLVMIntSGE; break;
+                case OP_ICmpSLT: pred = LLVMIntSLT; break;
+                case OP_ICmpSLE: pred = LLVMIntSLE; break;
+                default: assert(false); break;
+            }
+            return LLVMBuildICmp(builder, pred, a, b, "");
+        } break;
+        case OP_FCmpOEQ:
+        case OP_FCmpONE:
+        case OP_FCmpORD:
+        case OP_FCmpOGT:
+        case OP_FCmpOGE:
+        case OP_FCmpOLT:
+        case OP_FCmpOLE:
+        case OP_FCmpUEQ:
+        case OP_FCmpUNE:
+        case OP_FCmpUNO:
+        case OP_FCmpUGT:
+        case OP_FCmpUGE:
+        case OP_FCmpULT:
+        case OP_FCmpULE: {
+            READ_VALUE(a); READ_VALUE(b);
+            LLVMRealPredicate pred = LLVMRealOEQ;
+            switch(builtin.value()) {
+                case OP_FCmpOEQ: pred = LLVMRealOEQ; break;
+                case OP_FCmpONE: pred = LLVMRealONE; break;
+                case OP_FCmpORD: pred = LLVMRealORD; break;
+                case OP_FCmpOGT: pred = LLVMRealOGT; break;
+                case OP_FCmpOGE: pred = LLVMRealOGE; break;
+                case OP_FCmpOLT: pred = LLVMRealOLT; break;
+                case OP_FCmpOLE: pred = LLVMRealOLE; break;
+                case OP_FCmpUEQ: pred = LLVMRealUEQ; break;
+                case OP_FCmpUNE: pred = LLVMRealUNE; break;
+                case OP_FCmpUNO: pred = LLVMRealUNO; break;
+                case OP_FCmpUGT: pred = LLVMRealUGT; break;
+                case OP_FCmpUGE: pred = LLVMRealUGE; break;
+                case OP_FCmpULT: pred = LLVMRealULT; break;
+                case OP_FCmpULE: pred = LLVMRealULE; break;
+                default: assert(false); break;
+            }
+            return LLVMBuildFCmp(builder, pred, a, b, "");
+        } break;
+        case OP_Add: { READ_VALUE(a); READ_VALUE(b);
+            return LLVMBuildAdd(builder, a, b, ""); } break;
+        case OP_AddNUW: { READ_VALUE(a); READ_VALUE(b);
+            return LLVMBuildNUWAdd(builder, a, b, ""); } break;
+        case OP_AddNSW: { READ_VALUE(a); READ_VALUE(b);
+            return LLVMBuildNSWAdd(builder, a, b, ""); } break;
+        case OP_Sub: { READ_VALUE(a); READ_VALUE(b);
+            return LLVMBuildSub(builder, a, b, ""); } break;
+        case OP_SubNUW: { READ_VALUE(a); READ_VALUE(b);
+            return LLVMBuildNUWSub(builder, a, b, ""); } break;
+        case OP_SubNSW: { READ_VALUE(a); READ_VALUE(b);
+            return LLVMBuildNSWSub(builder, a, b, ""); } break;
+        case OP_Mul: { READ_VALUE(a); READ_VALUE(b);
+            return LLVMBuildMul(builder, a, b, ""); } break;
+        case OP_MulNUW: { READ_VALUE(a); READ_VALUE(b);
+            return LLVMBuildNUWMul(builder, a, b, ""); } break;
+        case OP_MulNSW: { READ_VALUE(a); READ_VALUE(b);
+            return LLVMBuildNSWMul(builder, a, b, ""); } break;
+        case OP_SDiv: { READ_VALUE(a); READ_VALUE(b);
+            return LLVMBuildSDiv(builder, a, b, ""); } break;
+        case OP_UDiv: { READ_VALUE(a); READ_VALUE(b);
+            return LLVMBuildUDiv(builder, a, b, ""); } break;
+        case OP_SRem: { READ_VALUE(a); READ_VALUE(b);
+            return LLVMBuildSRem(builder, a, b, ""); } break;
+        case OP_URem: { READ_VALUE(a); READ_VALUE(b);
+            return LLVMBuildURem(builder, a, b, ""); } break;
+        case OP_Shl: { READ_VALUE(a); READ_VALUE(b);
+            return LLVMBuildShl(builder, a, b, ""); } break;
+        case OP_LShr: { READ_VALUE(a); READ_VALUE(b);
+            return LLVMBuildLShr(builder, a, b, ""); } break;
+        case OP_AShr: { READ_VALUE(a); READ_VALUE(b);
+            return LLVMBuildAShr(builder, a, b, ""); } break;
+        case OP_BAnd: { READ_VALUE(a); READ_VALUE(b);
+            return LLVMBuildAnd(builder, a, b, ""); } break;
+        case OP_BOr: { READ_VALUE(a); READ_VALUE(b);
+            return LLVMBuildOr(builder, a, b, ""); } break;
+        case OP_BXor: { READ_VALUE(a); READ_VALUE(b);
+            return LLVMBuildXor(builder, a, b, ""); } break;
+        case OP_FAdd: { READ_VALUE(a); READ_VALUE(b);
+            return LLVMBuildFAdd(builder, a, b, ""); } break;
+        case OP_FSub: { READ_VALUE(a); READ_VALUE(b);
+            return LLVMBuildFSub(builder, a, b, ""); } break;
+        case OP_FMul: { READ_VALUE(a); READ_VALUE(b);
+            return LLVMBuildFMul(builder, a, b, ""); } break;
+        case OP_FDiv: { READ_VALUE(a); READ_VALUE(b);
+            return LLVMBuildFDiv(builder, a, b, ""); } break;
+        case OP_FRem: { READ_VALUE(a); READ_VALUE(b);
+            return LLVMBuildFRem(builder, a, b, ""); } break;
+        case OP_FMix: {
+            READ_VALUE(a);
+            READ_VALUE(b);
+            READ_VALUE(x);
+            LLVMValueRef one = build_matching_constant_real_vector(a, 1.0);
+            auto invx = LLVMBuildFSub(builder, one, x, "");
+            return LLVMBuildFAdd(builder,
+                LLVMBuildFMul(builder, a, invx, ""),
+                LLVMBuildFMul(builder, b, x, ""),
+                "");
+        } break;
+        case FN_Length: {
+            READ_VALUE(x);
+            auto T = LLVMTypeOf(x);
+            if (LLVMGetTypeKind(T) == LLVMVectorTypeKind) {
+                return build_length_op(x);
+            } else {
+                LLVMValueRef func_fabs = get_intrinsic((T == f64T)?llvm_fabs_f64:llvm_fabs_f32);
+                assert(func_fabs);
+                LLVMValueRef values[] = { x };
+                return LLVMBuildCall(builder, func_fabs, values, 1, "");
+            }
+        } break;
+        case FN_Normalize: {
+            READ_VALUE(x);
+            auto T = LLVMTypeOf(x);
+            if (LLVMGetTypeKind(T) == LLVMVectorTypeKind) {
+                auto count = LLVMGetVectorSize(T);
+                auto ET = LLVMGetElementType(T);
+                LLVMValueRef l = build_length_op(x);
+                l = LLVMBuildInsertElement(builder,
+                    LLVMGetUndef(LLVMVectorType(ET, 1)), l,
+                    LLVMConstInt(i32T, 0, false),
+                    "");
+                LLVMValueRef mask[count];
+                for (int i = 0; i < count; ++i) {
+                    mask[i] = 0;
+                }
+                l = LLVMBuildShuffleVector(builder, l, l,
+                    LLVMConstNull(LLVMVectorType(i32T, count)), "");
+                return LLVMBuildFDiv(builder, x, l, "");
+            } else {
+                return LLVMConstReal(T, 1.0);
+            }
+        } break;
+        case FN_Cross: {
+            READ_VALUE(a);
+            READ_VALUE(b);
+            auto T = LLVMTypeOf(a);
+            assert (LLVMGetTypeKind(T) == LLVMVectorTypeKind);
+            LLVMValueRef i0 = LLVMConstInt(i32T, 0, false);
+            LLVMValueRef i1 = LLVMConstInt(i32T, 1, false);
+            LLVMValueRef i2 = LLVMConstInt(i32T, 2, false);
+            LLVMValueRef i120[] = { i1, i2, i0 };
+            LLVMValueRef v120 = LLVMConstVector(i120, 3);
+            LLVMValueRef a120 = LLVMBuildShuffleVector(builder, a, a, v120, "");
+            LLVMValueRef b120 = LLVMBuildShuffleVector(builder, b, b, v120, "");
+            LLVMValueRef retvalue = LLVMBuildFSub(builder,
+                LLVMBuildFMul(builder, a, b120, ""),
+                LLVMBuildFMul(builder, b, a120, ""), "");
+            return LLVMBuildShuffleVector(builder, retvalue, retvalue, v120, "");
+        } break;
+        case OP_Step: {
+            // select (lhs > rhs) (T 0) (T 1)
+            READ_VALUE(a);
+            READ_VALUE(b);
+            LLVMValueRef one = build_matching_constant_real_vector(a, 1.0);
+            LLVMValueRef zero = build_matching_constant_real_vector(b, 0.0);
+            return LLVMBuildSelect(
+                builder,
+                LLVMBuildFCmp(builder, LLVMRealOGT, a, b, ""),
+                zero, one, "");
+        } break;
+        // binops
+        case OP_Pow: {
+            READ_VALUE(a);
+            READ_VALUE(b);
+            auto T = LLVMTypeOf(a);
+            auto ET = T;
+            if (LLVMGetTypeKind(T) == LLVMVectorTypeKind) {
+                ET = LLVMGetElementType(T);
+            }
+            LLVMValueRef func = nullptr;
+            Intrinsic op = NumIntrinsics;
+            switch(builtin.value()) {
+            case OP_Pow: { op = (ET == f64T)?llvm_pow_f64:llvm_pow_f32; } break;
+            default: break;
+            }
+            func = get_intrinsic(op);
+            assert(func);
+            if (LLVMGetTypeKind(T) == LLVMVectorTypeKind) {
+                auto count = LLVMGetVectorSize(T);
+                LLVMValueRef retvalue = LLVMGetUndef(T);
+                for (unsigned i = 0; i < count; ++i) {
+                    LLVMValueRef idx = LLVMConstInt(i32T, i, false);
+                    LLVMValueRef values[] = {
+                        LLVMBuildExtractElement(builder, a, idx, ""),
+                        LLVMBuildExtractElement(builder, b, idx, "")
+                    };
+                    LLVMValueRef eltval = LLVMBuildCall(builder, func, values, 2, "");
+                    retvalue = LLVMBuildInsertElement(builder, retvalue, eltval, idx, "");
+                }
+                return retvalue;
+            } else {
+                LLVMValueRef values[] = { a, b };
+                return LLVMBuildCall(builder, func, values, 2, "");
+            }
+        } break;
+        // unops
+        case OP_Sin:
+        case OP_Cos:
+        case OP_Sqrt:
+        case OP_FAbs:
+        case OP_FSign:
+        case OP_Trunc:
+        case OP_Exp:
+        case OP_Log:
+        case OP_Exp2:
+        case OP_Log2:
+        case OP_Floor: { READ_VALUE(x);
+            auto T = LLVMTypeOf(x);
+            auto ET = T;
+            if (LLVMGetTypeKind(T) == LLVMVectorTypeKind) {
+                ET = LLVMGetElementType(T);
+            }
+            LLVMValueRef func = nullptr;
+            Intrinsic op = NumIntrinsics;
+            switch(builtin.value()) {
+            case OP_Sin: { op = (ET == f64T)?llvm_sin_f64:llvm_sin_f32; } break;
+            case OP_Cos: { op = (ET == f64T)?llvm_cos_f64:llvm_cos_f32; } break;
+            case OP_Sqrt: { op = (ET == f64T)?llvm_sqrt_f64:llvm_sqrt_f32; } break;
+            case OP_FAbs: { op = (ET == f64T)?llvm_fabs_f64:llvm_fabs_f32; } break;
+            case OP_Trunc: { op = (ET == f64T)?llvm_trunc_f64:llvm_trunc_f32; } break;
+            case OP_Floor: { op = (ET == f64T)?llvm_floor_f64:llvm_floor_f32; } break;
+            case OP_Exp: { op = (ET == f64T)?llvm_exp_f64:llvm_exp_f32; } break;
+            case OP_Log: { op = (ET == f64T)?llvm_log_f64:llvm_log_f32; } break;
+            case OP_Exp2: { op = (ET == f64T)?llvm_exp2_f64:llvm_exp2_f32; } break;
+            case OP_Log2: { op = (ET == f64T)?llvm_log2_f64:llvm_log2_f32; } break;
+            case OP_FSign: { op = (ET == f64T)?custom_fsign_f64:custom_fsign_f32; } break;
+            default: break;
+            }
+            func = get_intrinsic(op);
+            assert(func);
+            if (LLVMGetTypeKind(T) == LLVMVectorTypeKind) {
+                auto count = LLVMGetVectorSize(T);
+                LLVMValueRef retvalue = LLVMGetUndef(T);
+                for (unsigned i = 0; i < count; ++i) {
+                    LLVMValueRef idx = LLVMConstInt(i32T, i, false);
+                    LLVMValueRef values[] = { LLVMBuildExtractElement(builder, x, idx, "") };
+                    LLVMValueRef eltval = LLVMBuildCall(builder, func, values, 1, "");
+                    retvalue = LLVMBuildInsertElement(builder, retvalue, eltval, idx, "");
+                }
+                return retvalue;
+            } else {
+                LLVMValueRef values[] = { x };
+                return LLVMBuildCall(builder, func, values, 1, "");
+            }
+        } break;
+        case SFXFN_Unreachable:
+            return LLVMBuildUnreachable(builder);
+        default: {
+            StyledString ss;
+            ss.out << "IL->IR: unsupported builtin " << builtin << " encountered";
+            SCOPES_LOCATION_ERROR(ss.str());
+        } break;
+        }
+#undef READ_TYPE
+#undef READ_VALUE
+        return nullptr;
+    }
+
+    SCOPES_RESULT(void) translate_Call(Call *call) {
+        SCOPES_RESULT_TYPE(void);
         auto callee = call->callee;
         auto &&args = call->args;
 
@@ -1099,457 +1601,20 @@ struct LLVMIRGenerator {
             diloc = set_debug_location(call->anchor());
         }
 
-        size_t argcount = args.size();
-        size_t argn = 0;
-#define READ_VALUE(NAME) \
-        assert(argn <= argcount); \
-        TypedValue * _ ## NAME = args[argn++]; \
-        LLVMValueRef NAME = SCOPES_GET_RESULT(node_to_value(_ ## NAME));
-#define READ_TYPE(NAME) \
-        assert(argn <= argcount); \
-        LLVMTypeRef NAME = SCOPES_GET_RESULT(node_to_llvm_type(args[argn++]));
-
         auto T = try_get_const_type(callee);
         const Type *rtype = callee->get_type();
         if (is_function_pointer(rtype)) {
-            return SCOPES_GET_RESULT(build_call(call,
+            SCOPES_CHECK_RESULT(build_call(call,
                 extract_function_type(rtype),
-                SCOPES_GET_RESULT(node_to_value(callee)), args));
+                SCOPES_GET_RESULT(ref_to_value(callee)), args));
+            return {};
         } else if (T == TYPE_Builtin) {
             auto builtin = SCOPES_GET_RESULT(extract_builtin_constant(callee));
-            switch(builtin.value()) {
-            case FN_Annotate: {
-                return nullptr;
-            } break;
-            case OP_Tertiary: {
-                READ_VALUE(cond);
-                READ_VALUE(then_value);
-                READ_VALUE(else_value);
-                return LLVMBuildSelect(
-                    builder, cond, then_value, else_value, "");
-            } break;
-            case FN_ExtractValue: {
-                READ_VALUE(val);
-                READ_VALUE(index);
-                assert(LLVMIsConstant(index));
-                assert(LLVMGetTypeKind(LLVMTypeOf(index)) == LLVMIntegerTypeKind);
-                auto index_value = LLVMConstIntGetZExtValue(index);
-                return LLVMBuildExtractValue(builder, val, index_value, "");
-            } break;
-            case FN_InsertValue: {
-                READ_VALUE(val);
-                READ_VALUE(eltval);
-                READ_VALUE(index);
-                assert(LLVMIsConstant(index));
-                assert(LLVMGetTypeKind(LLVMTypeOf(index)) == LLVMIntegerTypeKind);
-                auto index_value = LLVMConstIntGetZExtValue(index);
-                return LLVMBuildInsertValue(builder, val, eltval, index_value, "");
-            } break;
-            case FN_ExtractElement: {
-                READ_VALUE(val);
-                READ_VALUE(index);
-                return LLVMBuildExtractElement(builder, val, index, "");
-            } break;
-            case FN_InsertElement: {
-                READ_VALUE(val);
-                READ_VALUE(eltval);
-                READ_VALUE(index);
-                return LLVMBuildInsertElement(builder, val, eltval, index, "");
-            } break;
-            case FN_ShuffleVector: {
-                READ_VALUE(v1);
-                READ_VALUE(v2);
-                READ_VALUE(mask);
-                return LLVMBuildShuffleVector(builder, v1, v2, mask, "");
-            } break;
-            case FN_Move: {
-                READ_VALUE(val);
-                return val;
-            } break;
-            case FN_Undef: { READ_TYPE(ty);
-                return LLVMGetUndef(ty); } break;
-            case FN_Alloca: { READ_TYPE(ty);
-                return safe_alloca(ty);
-            } break;
-            case FN_AllocaArray: { READ_TYPE(ty); READ_VALUE(val);
-                return safe_alloca(ty, val); } break;
-            case FN_Malloc: { READ_TYPE(ty);
-                return LLVMBuildMalloc(builder, ty, ""); } break;
-            case FN_MallocArray: { READ_TYPE(ty); READ_VALUE(val);
-                return LLVMBuildArrayMalloc(builder, ty, val, ""); } break;
-            case FN_Free: { READ_VALUE(val);
-                return LLVMBuildFree(builder, val); } break;
-            case FN_GetElementRef: {
-                READ_VALUE(pointer);
-                assert(LLVMGetTypeKind(LLVMTypeOf(pointer)) == LLVMPointerTypeKind);
-                assert(argcount > 1);
-                size_t count = argcount;
-                LLVMValueRef indices[count];
-                LLVMTypeRef IT = nullptr;
-                for (size_t i = 1; i < count; ++i) {
-                    indices[i] = SCOPES_GET_RESULT(node_to_value(args[i]));
-                    assert(LLVMGetValueKind(indices[i]) == LLVMConstantIntValueKind);
-                    IT = LLVMTypeOf(indices[i]);
-                }
-                assert(IT);
-                indices[0] = LLVMConstInt(IT, 0, false);
-                return LLVMBuildGEP(builder, pointer, indices, count, "");
-            } break;
-            case FN_GetElementPtr: {
-                READ_VALUE(pointer);
-                assert(LLVMGetTypeKind(LLVMTypeOf(pointer)) == LLVMPointerTypeKind);
-                assert(argcount > 1);
-                size_t count = argcount - 1;
-                LLVMValueRef indices[count];
-                for (size_t i = 0; i < count; ++i) {
-                    indices[i] = SCOPES_GET_RESULT(node_to_value(args[argn + i]));
-                    assert(LLVMGetTypeKind(LLVMTypeOf(indices[i])) == LLVMIntegerTypeKind);
-                }
-                return LLVMBuildGEP(builder, pointer, indices, count, "");
-            } break;
-            case FN_Bitcast: { READ_VALUE(val); READ_TYPE(ty);
-                auto T = LLVMTypeOf(val);
-                if (T == ty) {
-                    return val;
-                } else if (LLVMGetTypeKind(ty) == LLVMStructTypeKind) {
-                    // completely braindead, but what can you do
-                    LLVMValueRef ptr = safe_alloca(T);
-                    LLVMBuildStore(builder, val, ptr);
-                    ptr = LLVMBuildBitCast(builder, ptr, LLVMPointerType(ty,0), "");
-                    return LLVMBuildLoad(builder, ptr, "");
-                } else {
-                    return LLVMBuildBitCast(builder, val, ty, "");
-                }
-            } break;
-            case FN_IntToPtr: { READ_VALUE(val); READ_TYPE(ty);
-                return LLVMBuildIntToPtr(builder, val, ty, ""); } break;
-            case FN_PtrToInt: { READ_VALUE(val); READ_TYPE(ty);
-                return LLVMBuildPtrToInt(builder, val, ty, ""); } break;
-            case FN_ITrunc: { READ_VALUE(val); READ_TYPE(ty);
-                return LLVMBuildTrunc(builder, val, ty, ""); } break;
-            case FN_SExt: { READ_VALUE(val); READ_TYPE(ty);
-                return LLVMBuildSExt(builder, val, ty, ""); } break;
-            case FN_ZExt: { READ_VALUE(val); READ_TYPE(ty);
-                return LLVMBuildZExt(builder, val, ty, ""); } break;
-            case FN_FPTrunc: { READ_VALUE(val); READ_TYPE(ty);
-                return LLVMBuildFPTrunc(builder, val, ty, ""); } break;
-            case FN_FPExt: { READ_VALUE(val); READ_TYPE(ty);
-                return LLVMBuildFPExt(builder, val, ty, ""); } break;
-            case FN_FPToUI: { READ_VALUE(val); READ_TYPE(ty);
-                return LLVMBuildFPToUI(builder, val, ty, ""); } break;
-            case FN_FPToSI: { READ_VALUE(val); READ_TYPE(ty);
-                return LLVMBuildFPToSI(builder, val, ty, ""); } break;
-            case FN_UIToFP: { READ_VALUE(val); READ_TYPE(ty);
-                return LLVMBuildUIToFP(builder, val, ty, ""); } break;
-            case FN_SIToFP: { READ_VALUE(val); READ_TYPE(ty);
-                return LLVMBuildSIToFP(builder, val, ty, ""); } break;
-            case FN_Deref: {
-                READ_VALUE(ptr);
-                LLVMValueRef retvalue = LLVMBuildLoad(builder, ptr, "");
-                return retvalue;
-            } break;
-            case FN_Assign: {
-                READ_VALUE(lhs);
-                READ_VALUE(rhs);
-                LLVMValueRef retvalue = LLVMBuildStore(builder, lhs, rhs);
-                return retvalue;
-            } break;
-            case FN_PtrToRef: {
-                READ_VALUE(ptr);
-                return ptr;
-            } break;
-            case FN_RefToPtr: {
-                READ_VALUE(ptr);
-                return ptr;
-            } break;
-            case FN_VolatileLoad:
-            case FN_Load: { READ_VALUE(ptr);
-                LLVMValueRef retvalue = LLVMBuildLoad(builder, ptr, "");
-                if (builtin.value() == FN_VolatileLoad) { LLVMSetVolatile(retvalue, true); }
-                return retvalue;
-            } break;
-            case FN_VolatileStore:
-            case FN_Store: { READ_VALUE(val); READ_VALUE(ptr);
-                LLVMValueRef retvalue = LLVMBuildStore(builder, val, ptr);
-                if (builtin.value() == FN_VolatileStore) { LLVMSetVolatile(retvalue, true); }
-                return retvalue;
-            } break;
-            case OP_ICmpEQ:
-            case OP_ICmpNE:
-            case OP_ICmpUGT:
-            case OP_ICmpUGE:
-            case OP_ICmpULT:
-            case OP_ICmpULE:
-            case OP_ICmpSGT:
-            case OP_ICmpSGE:
-            case OP_ICmpSLT:
-            case OP_ICmpSLE: {
-                READ_VALUE(a); READ_VALUE(b);
-                LLVMIntPredicate pred = LLVMIntEQ;
-                switch(builtin.value()) {
-                    case OP_ICmpEQ: pred = LLVMIntEQ; break;
-                    case OP_ICmpNE: pred = LLVMIntNE; break;
-                    case OP_ICmpUGT: pred = LLVMIntUGT; break;
-                    case OP_ICmpUGE: pred = LLVMIntUGE; break;
-                    case OP_ICmpULT: pred = LLVMIntULT; break;
-                    case OP_ICmpULE: pred = LLVMIntULE; break;
-                    case OP_ICmpSGT: pred = LLVMIntSGT; break;
-                    case OP_ICmpSGE: pred = LLVMIntSGE; break;
-                    case OP_ICmpSLT: pred = LLVMIntSLT; break;
-                    case OP_ICmpSLE: pred = LLVMIntSLE; break;
-                    default: assert(false); break;
-                }
-                return LLVMBuildICmp(builder, pred, a, b, "");
-            } break;
-            case OP_FCmpOEQ:
-            case OP_FCmpONE:
-            case OP_FCmpORD:
-            case OP_FCmpOGT:
-            case OP_FCmpOGE:
-            case OP_FCmpOLT:
-            case OP_FCmpOLE:
-            case OP_FCmpUEQ:
-            case OP_FCmpUNE:
-            case OP_FCmpUNO:
-            case OP_FCmpUGT:
-            case OP_FCmpUGE:
-            case OP_FCmpULT:
-            case OP_FCmpULE: {
-                READ_VALUE(a); READ_VALUE(b);
-                LLVMRealPredicate pred = LLVMRealOEQ;
-                switch(builtin.value()) {
-                    case OP_FCmpOEQ: pred = LLVMRealOEQ; break;
-                    case OP_FCmpONE: pred = LLVMRealONE; break;
-                    case OP_FCmpORD: pred = LLVMRealORD; break;
-                    case OP_FCmpOGT: pred = LLVMRealOGT; break;
-                    case OP_FCmpOGE: pred = LLVMRealOGE; break;
-                    case OP_FCmpOLT: pred = LLVMRealOLT; break;
-                    case OP_FCmpOLE: pred = LLVMRealOLE; break;
-                    case OP_FCmpUEQ: pred = LLVMRealUEQ; break;
-                    case OP_FCmpUNE: pred = LLVMRealUNE; break;
-                    case OP_FCmpUNO: pred = LLVMRealUNO; break;
-                    case OP_FCmpUGT: pred = LLVMRealUGT; break;
-                    case OP_FCmpUGE: pred = LLVMRealUGE; break;
-                    case OP_FCmpULT: pred = LLVMRealULT; break;
-                    case OP_FCmpULE: pred = LLVMRealULE; break;
-                    default: assert(false); break;
-                }
-                return LLVMBuildFCmp(builder, pred, a, b, "");
-            } break;
-            case OP_Add: { READ_VALUE(a); READ_VALUE(b);
-                return LLVMBuildAdd(builder, a, b, ""); } break;
-            case OP_AddNUW: { READ_VALUE(a); READ_VALUE(b);
-                return LLVMBuildNUWAdd(builder, a, b, ""); } break;
-            case OP_AddNSW: { READ_VALUE(a); READ_VALUE(b);
-                return LLVMBuildNSWAdd(builder, a, b, ""); } break;
-            case OP_Sub: { READ_VALUE(a); READ_VALUE(b);
-                return LLVMBuildSub(builder, a, b, ""); } break;
-            case OP_SubNUW: { READ_VALUE(a); READ_VALUE(b);
-                return LLVMBuildNUWSub(builder, a, b, ""); } break;
-            case OP_SubNSW: { READ_VALUE(a); READ_VALUE(b);
-                return LLVMBuildNSWSub(builder, a, b, ""); } break;
-            case OP_Mul: { READ_VALUE(a); READ_VALUE(b);
-                return LLVMBuildMul(builder, a, b, ""); } break;
-            case OP_MulNUW: { READ_VALUE(a); READ_VALUE(b);
-                return LLVMBuildNUWMul(builder, a, b, ""); } break;
-            case OP_MulNSW: { READ_VALUE(a); READ_VALUE(b);
-                return LLVMBuildNSWMul(builder, a, b, ""); } break;
-            case OP_SDiv: { READ_VALUE(a); READ_VALUE(b);
-                return LLVMBuildSDiv(builder, a, b, ""); } break;
-            case OP_UDiv: { READ_VALUE(a); READ_VALUE(b);
-                return LLVMBuildUDiv(builder, a, b, ""); } break;
-            case OP_SRem: { READ_VALUE(a); READ_VALUE(b);
-                return LLVMBuildSRem(builder, a, b, ""); } break;
-            case OP_URem: { READ_VALUE(a); READ_VALUE(b);
-                return LLVMBuildURem(builder, a, b, ""); } break;
-            case OP_Shl: { READ_VALUE(a); READ_VALUE(b);
-                return LLVMBuildShl(builder, a, b, ""); } break;
-            case OP_LShr: { READ_VALUE(a); READ_VALUE(b);
-                return LLVMBuildLShr(builder, a, b, ""); } break;
-            case OP_AShr: { READ_VALUE(a); READ_VALUE(b);
-                return LLVMBuildAShr(builder, a, b, ""); } break;
-            case OP_BAnd: { READ_VALUE(a); READ_VALUE(b);
-                return LLVMBuildAnd(builder, a, b, ""); } break;
-            case OP_BOr: { READ_VALUE(a); READ_VALUE(b);
-                return LLVMBuildOr(builder, a, b, ""); } break;
-            case OP_BXor: { READ_VALUE(a); READ_VALUE(b);
-                return LLVMBuildXor(builder, a, b, ""); } break;
-            case OP_FAdd: { READ_VALUE(a); READ_VALUE(b);
-                return LLVMBuildFAdd(builder, a, b, ""); } break;
-            case OP_FSub: { READ_VALUE(a); READ_VALUE(b);
-                return LLVMBuildFSub(builder, a, b, ""); } break;
-            case OP_FMul: { READ_VALUE(a); READ_VALUE(b);
-                return LLVMBuildFMul(builder, a, b, ""); } break;
-            case OP_FDiv: { READ_VALUE(a); READ_VALUE(b);
-                return LLVMBuildFDiv(builder, a, b, ""); } break;
-            case OP_FRem: { READ_VALUE(a); READ_VALUE(b);
-                return LLVMBuildFRem(builder, a, b, ""); } break;
-            case OP_FMix: {
-                READ_VALUE(a);
-                READ_VALUE(b);
-                READ_VALUE(x);
-                LLVMValueRef one = build_matching_constant_real_vector(a, 1.0);
-                auto invx = LLVMBuildFSub(builder, one, x, "");
-                return LLVMBuildFAdd(builder,
-                    LLVMBuildFMul(builder, a, invx, ""),
-                    LLVMBuildFMul(builder, b, x, ""),
-                    "");
-            } break;
-            case FN_Length: {
-                READ_VALUE(x);
-                auto T = LLVMTypeOf(x);
-                if (LLVMGetTypeKind(T) == LLVMVectorTypeKind) {
-                    return build_length_op(x);
-                } else {
-                    LLVMValueRef func_fabs = get_intrinsic((T == f64T)?llvm_fabs_f64:llvm_fabs_f32);
-                    assert(func_fabs);
-                    LLVMValueRef values[] = { x };
-                    return LLVMBuildCall(builder, func_fabs, values, 1, "");
-                }
-            } break;
-            case FN_Normalize: {
-                READ_VALUE(x);
-                auto T = LLVMTypeOf(x);
-                if (LLVMGetTypeKind(T) == LLVMVectorTypeKind) {
-                    auto count = LLVMGetVectorSize(T);
-                    auto ET = LLVMGetElementType(T);
-                    LLVMValueRef l = build_length_op(x);
-                    l = LLVMBuildInsertElement(builder,
-                        LLVMGetUndef(LLVMVectorType(ET, 1)), l,
-                        LLVMConstInt(i32T, 0, false),
-                        "");
-                    LLVMValueRef mask[count];
-                    for (int i = 0; i < count; ++i) {
-                        mask[i] = 0;
-                    }
-                    l = LLVMBuildShuffleVector(builder, l, l,
-                        LLVMConstNull(LLVMVectorType(i32T, count)), "");
-                    return LLVMBuildFDiv(builder, x, l, "");
-                } else {
-                    return LLVMConstReal(T, 1.0);
-                }
-            } break;
-            case FN_Cross: {
-                READ_VALUE(a);
-                READ_VALUE(b);
-                auto T = LLVMTypeOf(a);
-                assert (LLVMGetTypeKind(T) == LLVMVectorTypeKind);
-                LLVMValueRef i0 = LLVMConstInt(i32T, 0, false);
-                LLVMValueRef i1 = LLVMConstInt(i32T, 1, false);
-                LLVMValueRef i2 = LLVMConstInt(i32T, 2, false);
-                LLVMValueRef i120[] = { i1, i2, i0 };
-                LLVMValueRef v120 = LLVMConstVector(i120, 3);
-                LLVMValueRef a120 = LLVMBuildShuffleVector(builder, a, a, v120, "");
-                LLVMValueRef b120 = LLVMBuildShuffleVector(builder, b, b, v120, "");
-                LLVMValueRef retvalue = LLVMBuildFSub(builder,
-                    LLVMBuildFMul(builder, a, b120, ""),
-                    LLVMBuildFMul(builder, b, a120, ""), "");
-                return LLVMBuildShuffleVector(builder, retvalue, retvalue, v120, "");
-            } break;
-            case OP_Step: {
-                // select (lhs > rhs) (T 0) (T 1)
-                READ_VALUE(a);
-                READ_VALUE(b);
-                LLVMValueRef one = build_matching_constant_real_vector(a, 1.0);
-                LLVMValueRef zero = build_matching_constant_real_vector(b, 0.0);
-                return LLVMBuildSelect(
-                    builder,
-                    LLVMBuildFCmp(builder, LLVMRealOGT, a, b, ""),
-                    zero, one, "");
-            } break;
-            // binops
-            case OP_Pow: {
-                READ_VALUE(a);
-                READ_VALUE(b);
-                auto T = LLVMTypeOf(a);
-                auto ET = T;
-                if (LLVMGetTypeKind(T) == LLVMVectorTypeKind) {
-                    ET = LLVMGetElementType(T);
-                }
-                LLVMValueRef func = nullptr;
-                Intrinsic op = NumIntrinsics;
-                switch(builtin.value()) {
-                case OP_Pow: { op = (ET == f64T)?llvm_pow_f64:llvm_pow_f32; } break;
-                default: break;
-                }
-                func = get_intrinsic(op);
-                assert(func);
-                if (LLVMGetTypeKind(T) == LLVMVectorTypeKind) {
-                    auto count = LLVMGetVectorSize(T);
-                    LLVMValueRef retvalue = LLVMGetUndef(T);
-                    for (unsigned i = 0; i < count; ++i) {
-                        LLVMValueRef idx = LLVMConstInt(i32T, i, false);
-                        LLVMValueRef values[] = {
-                            LLVMBuildExtractElement(builder, a, idx, ""),
-                            LLVMBuildExtractElement(builder, b, idx, "")
-                        };
-                        LLVMValueRef eltval = LLVMBuildCall(builder, func, values, 2, "");
-                        retvalue = LLVMBuildInsertElement(builder, retvalue, eltval, idx, "");
-                    }
-                    return retvalue;
-                } else {
-                    LLVMValueRef values[] = { a, b };
-                    return LLVMBuildCall(builder, func, values, 2, "");
-                }
-            } break;
-            // unops
-            case OP_Sin:
-            case OP_Cos:
-            case OP_Sqrt:
-            case OP_FAbs:
-            case OP_FSign:
-            case OP_Trunc:
-            case OP_Exp:
-            case OP_Log:
-            case OP_Exp2:
-            case OP_Log2:
-            case OP_Floor: { READ_VALUE(x);
-                auto T = LLVMTypeOf(x);
-                auto ET = T;
-                if (LLVMGetTypeKind(T) == LLVMVectorTypeKind) {
-                    ET = LLVMGetElementType(T);
-                }
-                LLVMValueRef func = nullptr;
-                Intrinsic op = NumIntrinsics;
-                switch(builtin.value()) {
-                case OP_Sin: { op = (ET == f64T)?llvm_sin_f64:llvm_sin_f32; } break;
-                case OP_Cos: { op = (ET == f64T)?llvm_cos_f64:llvm_cos_f32; } break;
-                case OP_Sqrt: { op = (ET == f64T)?llvm_sqrt_f64:llvm_sqrt_f32; } break;
-                case OP_FAbs: { op = (ET == f64T)?llvm_fabs_f64:llvm_fabs_f32; } break;
-                case OP_Trunc: { op = (ET == f64T)?llvm_trunc_f64:llvm_trunc_f32; } break;
-                case OP_Floor: { op = (ET == f64T)?llvm_floor_f64:llvm_floor_f32; } break;
-                case OP_Exp: { op = (ET == f64T)?llvm_exp_f64:llvm_exp_f32; } break;
-                case OP_Log: { op = (ET == f64T)?llvm_log_f64:llvm_log_f32; } break;
-                case OP_Exp2: { op = (ET == f64T)?llvm_exp2_f64:llvm_exp2_f32; } break;
-                case OP_Log2: { op = (ET == f64T)?llvm_log2_f64:llvm_log2_f32; } break;
-                case OP_FSign: { op = (ET == f64T)?custom_fsign_f64:custom_fsign_f32; } break;
-                default: break;
-                }
-                func = get_intrinsic(op);
-                assert(func);
-                if (LLVMGetTypeKind(T) == LLVMVectorTypeKind) {
-                    auto count = LLVMGetVectorSize(T);
-                    LLVMValueRef retvalue = LLVMGetUndef(T);
-                    for (unsigned i = 0; i < count; ++i) {
-                        LLVMValueRef idx = LLVMConstInt(i32T, i, false);
-                        LLVMValueRef values[] = { LLVMBuildExtractElement(builder, x, idx, "") };
-                        LLVMValueRef eltval = LLVMBuildCall(builder, func, values, 1, "");
-                        retvalue = LLVMBuildInsertElement(builder, retvalue, eltval, idx, "");
-                    }
-                    return retvalue;
-                } else {
-                    LLVMValueRef values[] = { x };
-                    return LLVMBuildCall(builder, func, values, 1, "");
-                }
-            } break;
-            case SFXFN_Unreachable:
-                return LLVMBuildUnreachable(builder);
-            default: {
-                StyledString ss;
-                ss.out << "IL->IR: unsupported builtin " << builtin << " encountered";
-                SCOPES_LOCATION_ERROR(ss.str());
-            } break;
+            auto result = SCOPES_GET_RESULT(translate_builtin(call, builtin, args));
+            if (result) {
+                map_phi({ result }, call);
             }
+            return {};
         }
 #if 0
         } else if (enter.type == TYPE_Parameter) {
@@ -1584,28 +1649,13 @@ struct LLVMIRGenerator {
         SCOPES_EXPECT_ERROR(error_gen_invalid_call_type(SCOPES_GEN_TARGET, callee));
     }
 
-    SCOPES_RESULT(LLVMValueRef) Keyed_to_value(Keyed *node) {
-        return node_to_value(node->value);
-    }
-
-    SCOPES_RESULT(LLVMValueRef) Switch_to_value(Switch *node) {
-        SCOPES_RESULT_TYPE(LLVMValueRef);
-        auto expr = SCOPES_GET_RESULT(node_to_value(node->expr));
+    SCOPES_RESULT(void) translate_Switch(Switch *node) {
+        SCOPES_RESULT_TYPE(void);
+        auto expr = SCOPES_GET_RESULT(ref_to_value(node->expr));
         LLVMBasicBlockRef bb = LLVMGetInsertBlock(builder);
         LLVMValueRef func = LLVMGetBasicBlockParent(bb);
-        auto rtype = node->get_type();
-        LLVMBasicBlockRef bb_merge = nullptr;
-        LLVMValueRef merge_value = nullptr;
-        if (is_returning(rtype)) {
-            bb_merge = LLVMAppendBasicBlock(func, "switch-merge");
-            LLVMPositionBuilderAtEnd(builder, bb_merge);
-            if (is_returning_value(rtype)) {
-                merge_value = LLVMBuildPhi(builder,
-                    SCOPES_GET_RESULT(type_to_llvm_type(rtype)), "");
-            }
-        }
         LLVMBasicBlockRef bbdefault = LLVMAppendBasicBlock(func, "default");
-        LLVMPositionBuilderAtEnd(builder, bb);
+        position_builder_at_end(bb);
         int count = (int)node->cases.size();
         assert(count);
         auto _sw = LLVMBuildSwitch(builder, expr, bbdefault, count - 1);
@@ -1615,35 +1665,37 @@ struct LLVMIRGenerator {
             auto &&_case = node->cases[i];
             LLVMBasicBlockRef bbcase = nullptr;
             if (_case.kind == CK_Default) {
-                LLVMPositionBuilderAtEnd(builder, bbdefault);
+                position_builder_at_end(bbdefault);
                 bbcase = bbdefault;
             } else if (_case.body.empty()) {
-                auto lit = SCOPES_GET_RESULT(node_to_value(_case.literal));
+                auto lit = SCOPES_GET_RESULT(ref_to_value(_case.literal));
                 LLVMAddCase(_sw, lit, lastbb);
                 continue;
             } else {
-                auto lit = SCOPES_GET_RESULT(node_to_value(_case.literal));
+                auto lit = SCOPES_GET_RESULT(ref_to_value(_case.literal));
                 bbcase = LLVMAppendBasicBlock(func, "case");
-                LLVMPositionBuilderAtEnd(builder, bbcase);
+                position_builder_at_end(bbcase);
                 LLVMAddCase(_sw, lit, bbcase);
             }
-            SCOPES_CHECK_RESULT(block_to_value(_case.body));
+            SCOPES_CHECK_RESULT(translate_block(_case.body));
             if (!_case.body.terminator) {
                 LLVMBuildBr(builder, lastbb);
             }
             lastbb = bbcase;
         }
-        if (bb_merge) {
-            LLVMPositionBuilderAtEnd(builder, bb_merge);
-        }
-        return merge_value;
+        return {};
     }
 
-    SCOPES_RESULT(LLVMValueRef) CondBr_to_value(CondBr *node) {
-        SCOPES_RESULT_TYPE(LLVMValueRef);
+    void position_builder_at_end(LLVMBasicBlockRef bb) {
+        //LLVMDumpValue(LLVMBasicBlockAsValue(bb));
+        LLVMPositionBuilderAtEnd(builder, bb);
+    }
+
+    SCOPES_RESULT(void) translate_CondBr(CondBr *node) {
+        SCOPES_RESULT_TYPE(void);
         LLVMBasicBlockRef bb = LLVMGetInsertBlock(builder);
         LLVMValueRef func = LLVMGetBasicBlockParent(bb);
-        auto cond = SCOPES_GET_RESULT(node_to_value(node->cond));
+        auto cond = SCOPES_GET_RESULT(ref_to_value(node->cond));
         assert(cond);
         LLVMBasicBlockRef bbthen = LLVMAppendBasicBlock(func, "then");
         LLVMBasicBlockRef bbelse = LLVMAppendBasicBlock(func, "else");
@@ -1651,48 +1703,51 @@ struct LLVMIRGenerator {
 
         // write then-block
         {
-            LLVMPositionBuilderAtEnd(builder, bbthen);
-            SCOPES_CHECK_RESULT(block_to_value(node->then_body));
+            position_builder_at_end(bbthen);
+            SCOPES_CHECK_RESULT(translate_block(node->then_body));
         }
         // write else-block
         {
-            LLVMPositionBuilderAtEnd(builder, bbelse);
-            SCOPES_CHECK_RESULT(block_to_value(node->else_body));
+            position_builder_at_end(bbelse);
+            SCOPES_CHECK_RESULT(translate_block(node->else_body));
         }
 
-        return nullptr;
+        return {};
     }
 
-    SCOPES_RESULT(LLVMValueRef) _node_to_value(TypedValue *node) {
+    SCOPES_RESULT(void) translate_instruction(Instruction *node) {
         SCOPES_ANCHOR(node->anchor());
         switch(node->kind()) {
         #define T(NAME, BNAME, CLASS) \
-            case NAME: return CLASS ## _to_value(cast<CLASS>(node));
-        SCOPES_TYPED_VALUE_KIND()
+            case NAME: return translate_ ## CLASS(cast<CLASS>(node));
+        SCOPES_INSTRUCTION_VALUE_KIND()
         #undef T
             default: assert(false); break;
         }
-        return nullptr;
+        return {};
     }
 
-    SCOPES_RESULT(LLVMValueRef) node_to_value(TypedValue *node) {
+    SCOPES_RESULT(LLVMValueRef) ref_to_value(const ValueIndex &ref) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
-        assert(node);
-        switch(node->kind()) {
-        case VK_ArgumentList:
-        case VK_ExtractArgument: {
-            return SCOPES_GET_RESULT(_node_to_value(node));
-        } break;
-        default: {
-            auto it = node2value.find(node);
-            if (it != node2value.end())
-                return it->second;
-            auto value = SCOPES_GET_RESULT(_node_to_value(node));
-            node2value.insert({node,value});
-            return value;
-        } break;
+        SCOPES_ANCHOR(ref.value->anchor());
+        auto it = ref2value.find(ref);
+        if (it != ref2value.end())
+            return it->second;
+        LLVMValueRef value = nullptr;
+        switch(ref.value->kind()) {
+        #define T(NAME, BNAME, CLASS) \
+            case NAME: value = SCOPES_GET_RESULT(CLASS ## _to_value(cast<CLASS>(ref.value))); break;
+        SCOPES_PURE_VALUE_KIND()
+        #undef T
+            default: {
+                SCOPES_EXPECT_ERROR(error_cannot_translate(SCOPES_GEN_TARGET, ref.value));
+            } break;
         }
+        ref2value.insert({ref,value});
+        return value;
     }
+
+
     SCOPES_RESULT(LLVMValueRef) Extern_to_value(Extern *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         auto it = extern2global.find(node);
@@ -1795,7 +1850,7 @@ struct LLVMIRGenerator {
         size_t count = node->values.size();
         LLVMValueRef values[count];
         for (size_t i = 0; i < count; ++i) {
-            values[i] = SCOPES_GET_RESULT(node_to_value(node->values[i]));
+            values[i] = SCOPES_GET_RESULT(ref_to_value(node->values[i]));
         }
         switch(LLVMGetTypeKind(LLT)) {
         case LLVMStructTypeKind: {
@@ -1819,9 +1874,9 @@ struct LLVMIRGenerator {
         }
     }
 
-    SCOPES_RESULT(LLVMValueRef) build_call(Call *call,
-        const Type *functype, LLVMValueRef func, TypedValues &args) {
-        SCOPES_RESULT_TYPE(LLVMValueRef);
+    SCOPES_RESULT(void) build_call(Call *call,
+        const Type *functype, LLVMValueRef func, const TypedValues &args) {
+        SCOPES_RESULT_TYPE(void);
         size_t argcount = args.size();
 
         auto fi = cast<FunctionType>(functype);
@@ -1829,7 +1884,7 @@ struct LLVMIRGenerator {
         auto rtype = abi_return_type(fi);
         bool use_sret = is_memory_class(rtype);
 
-        std::vector<LLVMValueRef> values;
+        LLVMValueRefs values;
         values.reserve(argcount + 1);
 
         auto retT = SCOPES_GET_RESULT(type_to_llvm_type(rtype));
@@ -1839,7 +1894,7 @@ struct LLVMIRGenerator {
         std::vector<size_t> memptrs;
         for (size_t i = 0; i < argcount; ++i) {
             auto arg = args[i];
-            LLVMValueRef val = SCOPES_GET_RESULT(node_to_value(arg));
+            LLVMValueRef val = SCOPES_GET_RESULT(ref_to_value(arg));
             auto AT = arg->get_type();
             SCOPES_CHECK_RESULT(abi_export_argument(val, AT, values, memptrs));
         }
@@ -1880,36 +1935,46 @@ struct LLVMIRGenerator {
             if (is_returning_value(fi->except_type)) {
                 assert(call->except);
                 auto except = LLVMBuildExtractValue(builder, ret, 1, "");
-                node2value.insert({call->except,except});
+                LLVMValueRefs values;
+                struct_to_values(values, fi->except_type, except);
+                map_phi(values, call->except);
             }
             auto ok = LLVMBuildExtractValue(builder, ret, 0, "");
             auto old_bb = LLVMGetInsertBlock(builder);
             auto bb_except = LLVMAppendBasicBlock(LLVMGetBasicBlockParent(old_bb), "call_failed");
-            LLVMPositionBuilderAtEnd(builder, bb_except);
-            SCOPES_CHECK_RESULT(block_to_value(call->except_body));
-            LLVMPositionBuilderAtEnd(builder, old_bb);
+            position_builder_at_end(bb_except);
+            SCOPES_CHECK_RESULT(translate_block(call->except_body));
+            position_builder_at_end(old_bb);
             if (fi->return_type == TYPE_NoReturn) {
                 // always raises
-                return LLVMBuildBr(builder, bb_except);
+                LLVMBuildBr(builder, bb_except);
+                return {};
             } else {
                 auto bb = LLVMAppendBasicBlock(LLVMGetBasicBlockParent(old_bb), "call_ok");
                 LLVMBuildCondBr(builder, ok, bb, bb_except);
-                LLVMPositionBuilderAtEnd(builder, bb);
+                position_builder_at_end(bb);
                 if (is_returning_value(fi->return_type)) {
                     ret = LLVMBuildExtractValue(builder, ret, 2, "");
+                    LLVMValueRefs values;
+                    struct_to_values(values, fi->return_type, ret);
+                    map_phi(values, call);
                 }
             }
+        } else if (!is_returning(fi->return_type)) {
+            LLVMBuildUnreachable(builder);
+        } else {
+            LLVMValueRefs values;
+            struct_to_values(values, fi->return_type, ret);
+            map_phi(values, call);
         }
-        if (fi->return_type == TYPE_NoReturn) {
-            return LLVMBuildUnreachable(builder);
-        }
-        return ret;
+        return {};
     }
 
     LLVMMetadataRef anchor_to_location(const Anchor *anchor) {
         assert(use_debug_info);
 
         auto old_bb = LLVMGetInsertBlock(builder);
+        assert(old_bb);
         LLVMValueRef func = LLVMGetBasicBlockParent(old_bb);
         LLVMMetadataRef disp = LLVMGetSubprogram(func);
 
@@ -1961,7 +2026,7 @@ struct LLVMIRGenerator {
             if (instr) {
                 LLVMPositionBuilderBefore(builder, instr);
             } else {
-                LLVMPositionBuilderAtEnd(builder, entry);
+                position_builder_at_end(entry);
             }
             LLVMValueRef result;
             if (val) {
@@ -1970,7 +2035,7 @@ struct LLVMIRGenerator {
                 result = LLVMBuildAlloca(builder, ty, "");
                 //LLVMSetAlignment(result, 16);
             }
-            LLVMPositionBuilderAtEnd(builder, oldbb);
+            position_builder_at_end(oldbb);
             return result;
         }
     }
@@ -2124,7 +2189,7 @@ struct LLVMIRGenerator {
         const char *name = entry->name.name()->data;
         setup_generate(name);
 
-        auto func = SCOPES_GET_RESULT(node_to_value(entry));
+        auto func = SCOPES_GET_RESULT(ref_to_value(entry));
         LLVMSetLinkage(func, LLVMExternalLinkage);
 
         SCOPES_CHECK_RESULT(teardown_generate(entry));
@@ -2250,7 +2315,6 @@ public:
 
 SCOPES_RESULT(void) compile_object(const String *path, Scope *scope, uint64_t flags) {
 #if 0 // TODO
-    SCOPES_RESULT_TYPE(void);
     Timer sum_compile_time(TIMER_Compile);
 #if SCOPES_COMPILE_WITH_DEBUG_INFO
 #else
