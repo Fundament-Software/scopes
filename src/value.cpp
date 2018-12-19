@@ -991,7 +991,7 @@ RepeatTemplate *RepeatTemplate::from(const Anchor *anchor, Value *value) {
 //------------------------------------------------------------------------------
 
 Repeat::Repeat(const Anchor *anchor, TypedValue *_value, LoopLabel *_loop)
-    : Terminator(VK_Repeat, anchor), value(_value), loop(_loop) {
+    : Terminator(VK_Repeat, anchor, _value), loop(_loop) {
 }
 
 Repeat *Repeat::from(const Anchor *anchor, TypedValue *value, LoopLabel *loop) {
@@ -1010,7 +1010,7 @@ ReturnTemplate *ReturnTemplate::from(const Anchor *anchor, Value *value) {
 //------------------------------------------------------------------------------
 
 Return::Return(const Anchor *anchor, TypedValue *_value)
-    : Terminator(VK_Return, anchor), value(_value) {
+    : Terminator(VK_Return, anchor, _value) {
 }
 
 Return *Return::from(const Anchor *anchor, TypedValue *value) {
@@ -1020,7 +1020,7 @@ Return *Return::from(const Anchor *anchor, TypedValue *value) {
 //------------------------------------------------------------------------------
 
 Merge::Merge(const Anchor *anchor, Label *_label, TypedValue *_value)
-    : Terminator(VK_Merge, anchor), label(_label), value(_value) {
+    : Terminator(VK_Merge, anchor, _value), label(_label) {
 }
 
 Merge *Merge::from(const Anchor *anchor, Label *label, TypedValue *value) {
@@ -1048,7 +1048,7 @@ RaiseTemplate *RaiseTemplate::from(const Anchor *anchor, Value *value) {
 //------------------------------------------------------------------------------
 
 Raise::Raise(const Anchor *anchor, TypedValue *_value)
-    : Terminator(VK_Raise, anchor), value(_value) {
+    : Terminator(VK_Raise, anchor, _value) {
 }
 
 Raise *Raise::from(const Anchor *anchor, TypedValue *value) {
@@ -1226,8 +1226,8 @@ SCOPES_TERMINATOR_VALUE_KIND()
     }
 }
 
-Terminator::Terminator(ValueKind _kind, const Anchor *_anchor)
-    : Instruction(_kind, _anchor, TYPE_NoReturn)
+Terminator::Terminator(ValueKind _kind, const Anchor *_anchor, TypedValue *_value)
+    : Instruction(_kind, _anchor, TYPE_NoReturn), value(_value)
 {}
 
 //------------------------------------------------------------------------------

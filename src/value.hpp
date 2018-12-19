@@ -251,7 +251,9 @@ struct Instruction : TypedValue {
 struct Terminator : Instruction {
     static bool classof(const Value *T);
 
-    Terminator(ValueKind _kind, const Anchor *_anchor);
+    Terminator(ValueKind _kind, const Anchor *_anchor, TypedValue *_value);
+
+    TypedValue *value;
 };
 
 //------------------------------------------------------------------------------
@@ -837,7 +839,6 @@ struct Merge : Terminator {
     static Merge *from(const Anchor *anchor, Label *label, TypedValue *value);
 
     Label *label;
-    TypedValue *value;
 };
 
 //------------------------------------------------------------------------------
@@ -874,7 +875,6 @@ struct Repeat : Terminator {
 
     static Repeat *from(const Anchor *anchor, TypedValue *value, LoopLabel *loop);
 
-    TypedValue *value;
     LoopLabel *loop;
 };
 
@@ -898,8 +898,6 @@ struct Return : Terminator {
     Return(const Anchor *anchor, TypedValue *value);
 
     static Return *from(const Anchor *anchor, TypedValue *value);
-
-    TypedValue *value;
 };
 
 //------------------------------------------------------------------------------
@@ -922,8 +920,6 @@ struct Raise : Terminator {
     Raise(const Anchor *anchor, TypedValue *value);
 
     static Raise *from(const Anchor *anchor, TypedValue *value);
-
-    TypedValue *value;
 };
 
 //------------------------------------------------------------------------------

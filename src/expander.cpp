@@ -884,61 +884,60 @@ struct Expander {
         return Unquote::from(_anchor, ArgumentListTemplate::from(_anchor, args));
     }
 
-    SCOPES_RESULT(Value *) expand_return(const List *it) {
+    template<typename T>
+    SCOPES_RESULT(Value *) build_terminator(const List *it) {
         SCOPES_RESULT_TYPE(Value *);
         auto _anchor = get_active_anchor();
-        SCOPES_CHECK_RESULT(verify_list_parameter_count("return", it, 0, -1));
-        it = it->next;
         Values args;
         if (it) {
             Expander subexp(env, astscope, it->next);
             SCOPES_CHECK_RESULT(subexp.expand_arguments(args, it));
         }
-        return ReturnTemplate::from(_anchor, ArgumentListTemplate::from(_anchor, args));
+        return T::from(_anchor, ArgumentListTemplate::from(_anchor, args));
+    }
+
+    template<typename T>
+    SCOPES_RESULT(Value *) build_terminator(const List *it, LabelTemplate *label) {
+        SCOPES_RESULT_TYPE(Value *);
+        auto _anchor = get_active_anchor();
+        Values args;
+        if (it) {
+            Expander subexp(env, astscope, it->next);
+            SCOPES_CHECK_RESULT(subexp.expand_arguments(args, it));
+        }
+        return T::from(_anchor, label, ArgumentListTemplate::from(_anchor, args));
+    }
+
+    SCOPES_RESULT(Value *) expand_return(const List *it) {
+        SCOPES_RESULT_TYPE(Value *);
+        SCOPES_CHECK_RESULT(verify_list_parameter_count("return", it, 0, -1));
+        it = it->next;
+        return build_terminator<ReturnTemplate>(it);
     }
 
     SCOPES_RESULT(Value *) expand_raise(const List *it) {
         SCOPES_RESULT_TYPE(Value *);
-        auto _anchor = get_active_anchor();
         SCOPES_CHECK_RESULT(verify_list_parameter_count("raise", it, 0, -1));
         it = it->next;
-        Values args;
-        if (it) {
-            Expander subexp(env, astscope, it->next);
-            SCOPES_CHECK_RESULT(subexp.expand_arguments(args, it));
-        }
-        return RaiseTemplate::from(_anchor, ArgumentListTemplate::from(_anchor, args));
+        return build_terminator<RaiseTemplate>(it);
     }
 
     SCOPES_RESULT(Value *) expand_break(const List *it) {
         SCOPES_RESULT_TYPE(Value *);
-        auto _anchor = get_active_anchor();
         SCOPES_CHECK_RESULT(verify_list_parameter_count("break", it, 0, -1));
         it = it->next;
-        Values args;
-        if (it) {
-            Expander subexp(env, astscope, it->next);
-            SCOPES_CHECK_RESULT(subexp.expand_arguments(args, it));
-        }
-        return Break::from(_anchor, ArgumentListTemplate::from(_anchor, args));
+        return build_terminator<Break>(it);
     }
 
     SCOPES_RESULT(Value *) expand_repeat(const List *it) {
         SCOPES_RESULT_TYPE(Value *);
-        auto _anchor = get_active_anchor();
         SCOPES_CHECK_RESULT(verify_list_parameter_count("repeat", it, 0, -1));
         it = it->next;
-        Values args;
-        if (it) {
-            Expander subexp(env, astscope, it->next);
-            SCOPES_CHECK_RESULT(subexp.expand_arguments(args, it));
-        }
-        return RepeatTemplate::from(_anchor, ArgumentListTemplate::from(_anchor, args));
+        return build_terminator<RepeatTemplate>(it);
     }
 
     SCOPES_RESULT(Value *) expand_merge(const List *it) {
         SCOPES_RESULT_TYPE(Value *);
-        auto _anchor = get_active_anchor();
         SCOPES_CHECK_RESULT(verify_list_parameter_count("merge", it, 1, -1));
         it = it->next;
 
@@ -949,14 +948,7 @@ struct Expander {
         if (!isa<LabelTemplate>(label)) {
             SCOPES_EXPECT_ERROR(error_label_expected(label));
         }
-
-        Values args;
-        if (it) {
-            Expander subexp(env, astscope, it->next);
-            SCOPES_CHECK_RESULT(subexp.expand_arguments(args, it));
-        }
-        return MergeTemplate::from(_anchor, cast<LabelTemplate>(label),
-            ArgumentListTemplate::from(_anchor, args));
+        return build_terminator<MergeTemplate>(it, cast<LabelTemplate>(label));
     }
 
     SCOPES_RESULT(Value *) expand_forward(const List *it) {
