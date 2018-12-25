@@ -572,10 +572,10 @@ SCOPES_RESULT(Value *) LexerParser::parse_any() {
                 String::from("unexpected end of file after quote token"));
         }
         return ConstPointer::list_from(anchor,
-            List::from({
+            List::from(
                 ConstInt::symbol_from(anchor, Symbol(KW_SyntaxQuote)),
                 SCOPES_GET_RESULT(parse_any())
-                }));
+                ));
     } else if (this->token == tok_ast_quote) {
         SCOPES_CHECK_RESULT(this->read_token());
         if (this->token == tok_eof) {
@@ -584,10 +584,10 @@ SCOPES_RESULT(Value *) LexerParser::parse_any() {
                 String::from("unexpected end of file after quote token"));
         }
         return ConstPointer::list_from(anchor,
-            List::from({
+            List::from(
                 ConstInt::symbol_from(anchor, Symbol(KW_ASTQuote)),
                 SCOPES_GET_RESULT(parse_any())
-                }));
+                ));
     } else {
         SCOPES_ANCHOR(anchor);
         SCOPES_LOCATION_ERROR(format("unexpected token: %c (%i)",

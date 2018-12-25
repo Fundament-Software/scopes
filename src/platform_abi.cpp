@@ -278,8 +278,8 @@ size_t abi_classify(const Type *T, ABIClass *classes) {
     classes[0] = ABI_CLASS_NO_CLASS;
     if (is_opaque(T))
         return 1;
-    T = storage_type(T);
-    size_t sz = size_of(T);
+    T = storage_type(T).assert_ok();
+    size_t sz = size_of(T).assert_ok();
     if (sz > 8)
         return 0;
     switch(T->kind()) {
@@ -296,13 +296,10 @@ size_t abi_classify(const Type *T, ABIClass *classes) {
             classes[0] = ABI_CLASS_INTEGER;
         return 1;
     case TK_Integer:
-    case TK_Extern:
     case TK_Pointer:
     case TK_Real:
-    case TK_ReturnLabel:
     case TK_Typename:
     case TK_Vector:
-    case TK_Keyed:
     default:
         return 1;
     }

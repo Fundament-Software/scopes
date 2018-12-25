@@ -55,6 +55,12 @@ struct StyledStream {
     static StyledStream plain(OStream &ost);
     static StyledStream plain(StyledStream &ost);
 
+#if SCOPES_USE_WCHAR
+    StyledStream& operator<<(const char * const s);
+    StyledStream& operator<<(const std::string &s);
+
+#endif
+
     template<typename T>
     StyledStream& operator<<(const T &o) { _ost << o; return *this; }
     template<typename T>
@@ -68,10 +74,6 @@ struct StyledStream {
 
     StyledStream& operator<<(bool s);
 
-#if SCOPES_USE_WCHAR
-    StyledStream& operator<<(const char * const s);
-
-#endif
 
     StyledStream& stream_number(int8_t x);
     StyledStream& stream_number(uint8_t x);

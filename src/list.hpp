@@ -33,6 +33,9 @@ public:
 
     static const List *from(Value * const *values, int N);
 
+
+    static inline const List *from(Value *v0, Value *v1) { Value *values[] = { v0, v1 }; return from(values, 2); }
+
     template<unsigned N>
     static const List *from(Value * const (&values)[N]) {
         return from(values, N);

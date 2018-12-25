@@ -372,7 +372,7 @@ struct Template : UntypedValue {
     Symbol name;
     ParameterTemplates params;
     Value *value;
-    bool _inline;
+    bool _is_inline;
     const String *docstring;
 };
 

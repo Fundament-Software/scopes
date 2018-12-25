@@ -191,6 +191,10 @@ StyledStream& StyledStream::operator<<(const char * const s) {
     return *this;
 }
 
+StyledStream& StyledStream::operator<<(const std::string &s) {
+    return *this << s.c_str();
+}
+
 #endif
 
 //------------------------------------------------------------------------------

@@ -336,7 +336,7 @@ TypedValue *ExtractArgument::from(const Anchor *anchor, TypedValue *value, int i
 Template::Template(const Anchor *anchor, Symbol _name, const ParameterTemplates &_params, Value *_value)
     : UntypedValue(VK_Template, anchor),
         name(_name), params(_params), value(_value),
-        _inline(false), docstring(nullptr) {
+        _is_inline(false), docstring(nullptr) {
     int index = 0;
     for (auto param : params) {
         param->set_owner(this, index++);
@@ -348,11 +348,11 @@ bool Template::is_forward_decl() const {
 }
 
 void Template::set_inline() {
-    _inline = true;
+    _is_inline = true;
 }
 
 bool Template::is_inline() const {
-    return _inline;
+    return _is_inline;
 }
 
 void Template::append_param(ParameterTemplate *sym) {
