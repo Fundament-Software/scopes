@@ -311,7 +311,7 @@ project "scopesrt"
         }
 
         links {
-            "uuid", "ole32", "psapi", "version", "stdc++",
+            "uuid", "ole32", "psapi", "version", "stdc++", "z",
         }
 
         linkoptions {
@@ -323,17 +323,17 @@ project "scopesrt"
         }
         linkoptions(LLVM_LDFLAGS)
         linkoptions {
+            "-lclangCodeGen",
             "-lclangFrontend",
             "-lclangDriver",
             "-lclangSerialization",
-            "-lclangCodeGen",
             "-lclangParse",
             "-lclangSema",
             "-lclangAnalysis",
             "-lclangEdit",
             "-lclangAST",
             "-lclangLex",
-            "-lclangBasic"
+            "-lclangBasic"            
         }
         linkoptions(LLVM_LIBS)
 
