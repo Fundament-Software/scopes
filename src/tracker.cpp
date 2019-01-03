@@ -289,7 +289,7 @@ struct Tracker {
         for (auto &entries : substate._data) {
             const ValueIndex &key = entries.first;
             Data &data = entries.second;
-            int depth = substate.get_value_depth(key.value);
+            //int depth = substate.get_value_depth(key.value);
             if (data.will_be_moved()
                 && (data.get_move_depth() > retdepth)) {
                 moved.insert(key);
@@ -859,7 +859,7 @@ struct Tracker {
         SCOPES_RESULT_TYPE(void);
         if (isa<Pure>(arg.value))
             return {};
-        auto T = arg.get_type();
+        //auto T = arg.get_type();
         #if SCOPES_ANNOTATE_TRACKING
         if (arg.has_deps()) {
             StyledStream ss;
@@ -928,7 +928,7 @@ struct Tracker {
     SCOPES_RESULT(void) visit_argument(State &state, VisitMode mode,
         const ValueIndex &arg, const char *context, int retdepth = -1) {
         SCOPES_RESULT_TYPE(void);
-        auto T = arg.get_type();
+        //auto T = arg.get_type();
         auto deps = arg.deps();
         if (retdepth < 0) {
             if (deps) {

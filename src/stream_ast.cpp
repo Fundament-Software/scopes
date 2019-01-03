@@ -805,7 +805,7 @@ struct StreamAST : StreamAnchors {
             walk_same_or_newline(val->value, depth+1, maxdepth);
         } break;
         case VK_CompileStage: {
-            auto val = cast<CompileStage>(node);
+            //auto val = cast<CompileStage>(node);
             ss << node;
         } break;
         default:
