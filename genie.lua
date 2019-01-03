@@ -152,6 +152,8 @@ project "scopesrt"
         "external/glslang/disassemble.cpp",
         "external/glslang/doc.cpp",
         --"external/coro/coro.c",
+        "SPIRV-Cross/spirv_cross_parsed_ir.cpp",
+        "SPIRV-Cross/spirv_parser.cpp",
         "SPIRV-Cross/spirv_glsl.cpp",
         "SPIRV-Cross/spirv_cross.cpp",
         "SPIRV-Cross/spirv_cfg.cpp",
@@ -333,7 +335,7 @@ project "scopesrt"
             "-lclangEdit",
             "-lclangAST",
             "-lclangLex",
-            "-lclangBasic"            
+            "-lclangBasic"
         }
         linkoptions(LLVM_LIBS)
 
