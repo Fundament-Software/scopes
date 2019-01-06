@@ -9,7 +9,7 @@ if os.is("linux") then
 elseif os.is("windows") then
     CLANG_PATH = MINGW_BASE_PATH .. "/bin"
 elseif os.is("macosx") then
-    CLANG_PATH = THISDIR .. "/clang/bin:/usr/local/opt/llvm/bin:/usr/local/bin:/usr/bin"
+    CLANG_PATH = os.outputof("brew --prefix llvm|tr -d '\n'") .. "/bin"
 else
     error("unsupported os")
 end
@@ -77,6 +77,7 @@ local LLVM_CONFIG = toolpath("llvm-config", CLANG_PATH)
 local LLVM_LDFLAGS = pkg_config(LLVM_CONFIG .. " --ldflags")
 local LLVM_CXXFLAGS = pkg_config(LLVM_CONFIG .. " --cxxflags")
 local LLVM_LIBS = pkg_config(LLVM_CONFIG .. " --link-static --libs orcjit engine passes option objcarcopts coverage support lto coroutines")
+local LLVM_INCLUDEDIR = pkg_config(LLVM_CONFIG .. " --includedir")
 
 if not os.is("windows") then
     premake.gcc.cxx = CLANG_CXX
@@ -357,8 +358,7 @@ project "scopesrt"
         defines { "SCOPES_MACOS" }
 
         includedirs {
-            "clang/include",
-            "/usr/local/opt/llvm/include"
+			LLVM_INCLUDEDIR
         }
 
         buildoptions_cpp {
@@ -545,7 +545,7 @@ project "scopes"
         defines { "SCOPES_MACOS" }
 
         includedirs {
-			"/usr/local/opt/llvm/include"
+            LLVM_INCLUDEDIR
         }
 
         buildoptions_cpp {
