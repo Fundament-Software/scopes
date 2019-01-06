@@ -9,7 +9,7 @@ if os.is("linux") then
 elseif os.is("windows") then
     CLANG_PATH = MINGW_BASE_PATH .. "/bin"
 elseif os.is("macosx") then
-    CLANG_PATH = os.outputof("brew --prefix llvm|tr -d '\n'") .. "/bin"
+    CLANG_PATH = "/clang/bin:" .. os.outputof("brew --prefix llvm|tr -d '\n'") .. "/bin"
 else
     error("unsupported os")
 end
