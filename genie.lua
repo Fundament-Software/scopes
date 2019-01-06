@@ -545,6 +545,7 @@ project "scopes"
         defines { "SCOPES_MACOS" }
 
         includedirs {
+			"/usr/local/opt/llvm/include"
         }
 
         buildoptions_cpp {
