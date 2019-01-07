@@ -18,15 +18,14 @@ Scopes only supports the mingw64 toolchain for the foreseeable future.
 
 * Beware: Make sure your MSYS2 installation resides in ``C:\msys64``.
 * Install `MSYS2 <http://msys2.github.io>`_ and
-  `install <https://github.com/valtron/llvm-stuff/wiki/Build-LLVM-3.8-with-MSYS2>`_
-  clang, LLVM 4.0.x, cmake and make for ``x86_64``. The packages are named
-  ``mingw64/mingw-w64-x86_64-llvm``, ``mingw64/mingw-w64-x86_64-clang``,
-  ``mingw64/mingw-w64-x86_64-libffi``, ``mingw64/mingw-w64-x86_64-cmake``
+  `install <https://github.com/valtron/llvm-stuff/wiki/Build-LLVM-with-MSYS2>`_
+  clang, LLVM 7.0.x, cmake and make for ``x86_64``. The packages are named
+  ``mingw64/mingw-w64-x86_64-llvm``, ``mingw64/mingw-w64-x86_64-clang``, ``mingw64/mingw-w64-x86_64-cmake``
   and ``make``.
 * Nice to have: ``mingw-w64-x86_64-gdb``
 * You also need the latest source distributions of
   `SPIRV-Tools <https://github.com/KhronosGroup/SPIRV-Tools>`_ and
-  `SPIRV-Cross <https://github.com/KhronosGroup/SPIRV-Cross>`_ symlinked into the workspace folder.
+  `SPIRV-Cross <https://github.com/KhronosGroup/SPIRV-Cross>`_ checked out into the workspace folder.
 * Lastly, you need a build of `GENie <https://github.com/bkaradzic/GENie>`_ (binaries
   available on the page).
 * Check ``SPIRV-Tools``' build instructions to verify that its dependency on ``SPIRV-Headers``
@@ -51,7 +50,7 @@ Building Scopes on Linux
 * Alternatively, provide your own clang distribution and symlink it to ``scopes-repo/clang``.
 * You also need the latest source distributions of
   `SPIRV-Tools <https://github.com/KhronosGroup/SPIRV-Tools>`_ and
-  `SPIRV-Cross <https://github.com/KhronosGroup/SPIRV-Cross>`_ symlinked into the workspace folder.
+  `SPIRV-Cross <https://github.com/KhronosGroup/SPIRV-Cross>`_ checked out or symlinked into the workspace folder.
 * Lastly, you need a build of `GENie <https://github.com/bkaradzic/GENie>`_ (binaries
   available on the page).
 * Check ``SPIRV-Tools``' build instructions to verify that its dependency on ``SPIRV-Headers``
@@ -79,7 +78,7 @@ Building Scopes on macOS
   ``xcode-select --install``.
 * You also need the latest source distributions of
   `SPIRV-Tools <https://github.com/KhronosGroup/SPIRV-Tools>`_ and
-  `SPIRV-Cross <https://github.com/KhronosGroup/SPIRV-Cross>`_ symlinked into the workspace folder.
+  `SPIRV-Cross <https://github.com/KhronosGroup/SPIRV-Cross>`_ checked out or symlinked into the workspace folder.
 * Lastly, you need a build of `GENie <https://github.com/bkaradzic/GENie>`_ (binaries
   available on the page).
 * Check ``SPIRV-Tools``' build instructions to verify that its dependency on ``SPIRV-Headers``
