@@ -10,6 +10,9 @@ You can either download a binary distribution of Scopes from the
 The main repository for scopes is on
 `bitbucket <https://bitbucket.org/duangle/scopes>`_.
 
+Note: any reference to `scopes-repo` in the instructions refers to wherever
+you have checked out the Scopes source tree.
+
 Building Scopes on Windows
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
