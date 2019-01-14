@@ -85,7 +85,7 @@ static size_t classify_tuple_like(size_t size,
     }
     ABIClass subclasses[MAX_ABI_CLASSES];
     for (size_t i = 0; i < count; ++i) {
-        auto ET = fields[i];
+        auto ET = strip_qualifiers(fields[i]);
         if (!packed)
             offset = align(offset, align_of(ET).assert_ok());
         size_t num = classify (ET, subclasses, offset % 8);

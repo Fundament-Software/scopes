@@ -1614,6 +1614,11 @@ const sc_type_t *sc_refer_type(const sc_type_t *type, uint64_t flags, sc_symbol_
     return refer_type(type, flags, storage_class);
 }
 
+const sc_type_t *sc_strip_qualifiers(const sc_type_t *type) {
+    using namespace scopes;
+    return strip_qualifiers(type);
+}
+
 // Function Type
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -1927,6 +1932,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_view_type, TYPE_Type, TYPE_Type, TYPE_I32);
     DEFINE_EXTERN_C_FUNCTION(sc_mutate_type, TYPE_Type, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_refer_type, TYPE_Type, TYPE_Type, TYPE_U64, TYPE_Symbol);
+    DEFINE_EXTERN_C_FUNCTION(sc_strip_qualifiers, TYPE_Type, TYPE_Type);
 
     DEFINE_EXTERN_C_FUNCTION(sc_image_type, TYPE_Type,
         TYPE_Type, TYPE_Symbol, TYPE_I32, TYPE_I32, TYPE_I32, TYPE_I32, TYPE_Symbol, TYPE_Symbol);

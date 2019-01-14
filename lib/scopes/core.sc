@@ -4377,11 +4377,47 @@ let
 
 compile-stage;
 
+#-------------------------------------------------------------------------------
+# C type support
+#-------------------------------------------------------------------------------
+
+'set-symbols CStruct
+    __getattr =
+        spice "CStruct-getattr" (self key)
+            let cls = ('typeof self)
+            let key = (key as Symbol)
+            let key = (sc_type_field_index cls key)
+            `(extractvalue self key)
+    __typecall =
+        spice "CStruct-typecall" (cls args...)
+            if ((cls as type) == CStruct)
+                compiler-error! "CStruct type constructor is deprecated"
+            let cls = (cls as type)
+            let argc = ('argcount args...)
+            loop (i result = 0 `(nullof cls))
+                if (i == argc)
+                    break result
+                let k v = ('dekey ('getarg args... i))
+                let k =
+                    if (k == unnamed) i
+                    else
+                        sc_type_field_index cls k
+                let ET = (sc_strip_qualifiers (sc_type_element_at cls k))
+                _ (i + 1)
+                    `(insertvalue result (imply v ET) k)
+
+compile-stage;
+
+#-------------------------------------------------------------------------------
+
 set-globals! (__this-scope)
 
 #-------------------------------------------------------------------------------
 # REPL
 #-------------------------------------------------------------------------------
+
+# REPL and main loop must stay in core.sc to make sure that they remain
+    accessible even when there's no module loading support (for whatever reason)
 
 fn compiler-version-string ()
     let vmin vmaj vpatch = (sc_compiler_version)
