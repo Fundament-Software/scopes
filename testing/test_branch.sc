@@ -20,8 +20,13 @@ fn test ()
         dump "branch B2"
         'set-symbol T 'x 3
 syntax-eval
-    let ok x = ('@ T 'x)
-    assert (not ok)
+    assert
+        do
+            try
+                let x = ('@ T 'x)
+                false
+            except (x)
+                true
 test;
 assert (T.x == 3)
 
