@@ -1,9 +1,15 @@
 print
     .. "test module 2 loaded from " module-path
 
-syntax-eval
-    let ok val = ('@ package 'test_module2)
-    assert (not ok) "module loaded twice"
+assert
+    do
+        try
+            '@ package 'test_module2
+            false
+        except (err)
+            true
+    "module loaded twice"
+
 'set-symbol package 'test_module2 true
 
 let env = (Scope)

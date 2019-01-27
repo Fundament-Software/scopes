@@ -386,34 +386,45 @@ sc_type_set_symbol Symbol '__call
                 [(sc_extract_argument_list_new (sc_value_anchor args) args 1)])
             expr
 
-inline gen-key-any-set (selftype fset)
-    box-ast-macro
-        fn "set-symbol" (args)
-            let argcount = (sc_argcount args)
-            verify-count argcount 2 3
-            let self = (sc_getarg args 0)
-            let key value =
-                if (icmp== argcount 3)
-                    let key = (sc_getarg args 1)
-                    let value = (sc_getarg args 2)
-                    _ key value
-                else
-                    let arg = (sc_getarg args 1)
-                    let key = (sc_type_key (sc_value_qualified_type arg))
-                    let arg = (sc_keyed_new (sc_value_anchor arg) unnamed arg)
-                    _ (box-symbol key) arg
-            if (sc_value_is_constant self)
-                if (sc_value_is_constant key)
-                    if (sc_value_is_pure value)
-                        let self = (unbox-pointer self selftype)
-                        let key = (unbox-symbol key Symbol)
-                        fset self key value
-                        return `[]
-            `(fset self key value)
+do
+    fn get-key-value-args (args)
+        let argcount = (sc_argcount args)
+        verify-count argcount 2 3
+        let self = (sc_getarg args 0)
+        if (icmp== argcount 3)
+            let key = (sc_getarg args 1)
+            let value = (sc_getarg args 2)
+            return self key value
+        else
+            let arg = (sc_getarg args 1)
+            let key = (sc_type_key (sc_value_qualified_type arg))
+            let arg = (sc_keyed_new (sc_value_anchor arg) unnamed arg)
+            return self (box-symbol key) arg
 
-# quick assignment of type attributes
-sc_type_set_symbol type 'set-symbol (gen-key-any-set type sc_type_set_symbol)
-sc_type_set_symbol Scope 'set-symbol (gen-key-any-set Scope sc_scope_set_symbol)
+    inline gen-key-any-set (selftype fset)
+        box-ast-macro
+            fn "set-symbol" (args)
+                let self key value = (get-key-value-args args)
+                `(fset self key value)
+
+    inline gen-key-any-define (selftype fset)
+        box-ast-macro
+            fn "define-symbol" (args)
+                let self key value = (get-key-value-args args)
+                if (sc_value_is_constant self)
+                    if (sc_value_is_constant key)
+                        if (sc_value_is_pure value)
+                            let self = (unbox-pointer self selftype)
+                            let key = (unbox-symbol key Symbol)
+                            fset self key value
+                            return `[]
+                compiler-error! "all arguments must be constant"
+
+    # quick assignment of type attributes
+    sc_type_set_symbol type 'set-symbol (gen-key-any-set type sc_type_set_symbol)
+    sc_type_set_symbol Scope 'set-symbol (gen-key-any-set Scope sc_scope_set_symbol)
+    sc_type_set_symbol type 'define-symbol (gen-key-any-define type sc_type_set_symbol)
+    sc_type_set_symbol Scope 'define-symbol (gen-key-any-define Scope sc_scope_set_symbol)
 
 sc_type_set_symbol type 'pointer
     box-ast-macro
@@ -670,10 +681,18 @@ inline set-symbols (self values...)
             'set-symbol self key value
         values...
 
-'set-symbol type 'set-symbols set-symbols
-'set-symbol Scope 'set-symbols set-symbols
+inline define-symbols (self values...)
+    va-lfold none
+        inline (key value)
+            'define-symbol self key value
+        values...
 
-'set-symbols Value
+'define-symbol type 'set-symbols set-symbols
+'define-symbol Scope 'set-symbols set-symbols
+'define-symbol type 'define-symbols define-symbols
+'define-symbol Scope 'define-symbols define-symbols
+
+'define-symbols Value
     constant? = sc_value_is_constant
     pure? = sc_value_is_pure
     kind = sc_value_kind
@@ -694,17 +713,17 @@ inline set-symbols (self values...)
             let k = (sc_type_key ('qualified-typeof self))
             _ k (sc_keyed_new (sc_value_anchor self) unnamed self)
 
-'set-symbols Scope
+'define-symbols Scope
     @ = sc_scope_at
     next = sc_scope_next
     docstring = sc_scope_get_docstring
     set-docstring! = sc_scope_set_docstring
     parent = sc_scope_get_parent
 
-'set-symbols string
+'define-symbols string
     join = sc_string_join
 
-'set-symbols list
+'define-symbols list
     __countof = sc_list_count
     join = sc_list_join
     @ = sc_list_at
@@ -713,7 +732,7 @@ inline set-symbols (self values...)
     reverse = sc_list_reverse
     dump = sc_list_dump
 
-'set-symbols type
+'define-symbols type
     bitcount = sc_type_bitcountof
     signed? = sc_integer_type_is_signed
     element@ = sc_type_element_at
@@ -775,7 +794,7 @@ inline set-symbols (self values...)
         fn (cls)
             icmp== (band (sc_pointer_type_get_flags cls) pointer-flag-non-writable) 0:u64
 
-#'set-symbols Closure
+#'define-symbols Closure
     frame = sc_closure_frame
     label = sc_closure_label
 
@@ -1178,13 +1197,15 @@ inline make-asym-binary-op-dispatch (symbol rtype friendly-op-name)
             inline (self at next scope)
                 (bitcast self SyntaxMacroFunction) at next scope
 
-'set-symbols Symbol
-    __== = (box-binary-op (single-binary-op-dispatch icmp==))
-    __!= = (box-binary-op (single-binary-op-dispatch icmp!=))
+'define-symbols Symbol
     unique =
         inline (cls name)
             sc_symbol_new_unique name
     variadic? = sc_symbol_is_variadic
+
+'set-symbols Symbol
+    __== = (box-binary-op (single-binary-op-dispatch icmp==))
+    __!= = (box-binary-op (single-binary-op-dispatch icmp!=))
     __imply =
         box-cast
             fn "syntax-imply" (vT T expr)
@@ -1196,23 +1217,27 @@ fn string@ (self i)
     let s = (sc_string_buffer self)
     load (getelementptr s i)
 
-'set-symbols string
-    __== = (box-binary-op (single-binary-op-dispatch ptrcmp==))
-    __!= = (box-binary-op (single-binary-op-dispatch ptrcmp!=))
-    __.. = (box-binary-op (single-binary-op-dispatch sc_string_join))
+'define-symbols string
     __countof = sc_string_count
     __@ = string@
     __lslice = sc_string_lslice
     __rslice = sc_string_rslice
 
-'set-symbols list
+'set-symbols string
+    __== = (box-binary-op (single-binary-op-dispatch ptrcmp==))
+    __!= = (box-binary-op (single-binary-op-dispatch ptrcmp!=))
+    __.. = (box-binary-op (single-binary-op-dispatch sc_string_join))
+
+'define-symbols list
     __typecall =
         inline (self args...)
             make-list args...
-    __.. = (box-binary-op (single-binary-op-dispatch sc_list_join))
     __repr =
         inline "list-repr" (self)
             '__repr (Value self)
+
+'set-symbols list
+    __.. = (box-binary-op (single-binary-op-dispatch sc_list_join))
 
 inline single-signed-binary-op-dispatch (sf uf)
     fn (lhsT rhsT lhs rhs)
@@ -1301,6 +1326,9 @@ inline floordiv (a b)
     __== = (box-binary-op (single-binary-op-dispatch ptrcmp==))
     __!= = (box-binary-op (single-binary-op-dispatch ptrcmp!=))
 
+'define-symbols type
+    __@ = sc_type_element_at
+
 'set-symbols type
     __== = (box-binary-op (single-binary-op-dispatch type==))
     __!= = (box-binary-op (single-binary-op-dispatch type!=))
@@ -1308,7 +1336,6 @@ inline floordiv (a b)
     __<= = (box-binary-op (single-binary-op-dispatch type<=))
     __> = (box-binary-op (single-binary-op-dispatch type>))
     __>= = (box-binary-op (single-binary-op-dispatch type>=))
-    __@ = sc_type_element_at
     # (dispatch-attr T key thenf elsef)
     dispatch-attr =
         box-ast-macro
@@ -1544,11 +1571,11 @@ let print =
             sc_write "\n"
             values...
 
-'set-symbol integer '__typecall
+'define-symbol integer '__typecall
     inline (cls value)
         as value cls
 
-'set-symbol real '__typecall
+'define-symbol real '__typecall
     inline (cls value)
         as value cls
 

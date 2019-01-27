@@ -9,16 +9,16 @@ fn test ()
     # force branching
     if true
         dump "branch A1"
-        'set-symbol T 'x 0
+        'define-symbol T 'x 0
     else
         dump "branch A2"
-        'set-symbol T 'x 1
+        'define-symbol T 'x 1
     if true
         dump "branch B1"
-        'set-symbol T 'x 2
+        'define-symbol T 'x 2
     else
         dump "branch B2"
-        'set-symbol T 'x 3
+        'define-symbol T 'x 3
 syntax-eval
     assert
         do
