@@ -13,9 +13,7 @@ do
 
 do
     inline f (x)
-        let x = (unconst x)
         inline ff (y)
-            let y = (unconst y)
             add x y
 
     fn q ()
@@ -24,32 +22,36 @@ do
     assert ((q) == 5)
 
 fn test2 ()
-    let quit =
-        static 'copy false
-    let event = (local 'copy 1)
+    let quit = (ptrtoref (private bool))
+    let event = (ptrtoref (alloca i32))
+    event = 1
     inline handle_events ()
         loop ()
-        if (event != 0)
-            if (event == 1)
-                quit = true
-        else
-            repeat;
+            if (event != 0)
+                if (event == 1)
+                    quit = true
+                break;
     inline mainloop ()
         loop ()
-        if (not quit)
+            if quit
+                break;
             handle_events;
-            repeat;
     mainloop;
 
 fn test3 ()
     fn handle_events ()
+        # force void return signature
+        if false
+            return;
         if true
             io-write! "\n"
         else
             handle_events;
     handle_events;
 
-'dump
+dump-ast
     typify test3
 
 test2;
+
+true

@@ -452,25 +452,39 @@ Function *Function::from(
 
 //------------------------------------------------------------------------------
 
-static const Type *pointer_for_extern_type(const Type *type, size_t flags, Symbol storage_class) {
+static const Type *pointer_for_global_type(const Type *type, size_t flags, Symbol storage_class) {
     size_t ptrflags = required_flags_for_storage_class(storage_class);
-    if (flags & EF_NonWritable)
+    if (flags & GF_NonWritable)
         ptrflags |= PTF_NonWritable;
-    else if (flags & EF_NonReadable)
+    else if (flags & GF_NonReadable)
         ptrflags |= PTF_NonReadable;
     return pointer_type(type, ptrflags, storage_class);
 }
 
-Extern::Extern(const Anchor *anchor, const Type *type, Symbol _name, size_t _flags, Symbol _storage_class, int _location, int _binding)
-    : Pure(VK_Extern, anchor, pointer_for_extern_type(type, _flags, _storage_class)), name(_name), flags(_flags), storage_class(_storage_class), location(_location), binding(_binding) {
+Global::Global(const Anchor *anchor, const Type *type, Symbol _name, size_t _flags, Symbol _storage_class, int _location, int _binding)
+    : Pure(VK_Global, anchor, pointer_for_global_type(type, _flags, _storage_class)), name(_name), flags(_flags), storage_class(_storage_class), location(_location), binding(_binding) {
 }
 
-Extern *Extern::from(const Anchor *anchor, const Type *type, Symbol name, size_t flags, Symbol storage_class, int location, int binding) {
+Global *Global::from(const Anchor *anchor, const Type *type, Symbol name, size_t flags, Symbol storage_class, int location, int binding) {
     if ((storage_class == SYM_SPIRV_StorageClassUniform)
-        && !(flags & EF_BufferBlock)) {
-        flags |= EF_Block;
+        && !(flags & GF_BufferBlock)) {
+        flags |= GF_Block;
     }
-    return new Extern(anchor, type, name, flags, storage_class, location, binding);
+    return new Global(anchor, type, name, flags, storage_class, location, binding);
+}
+
+//------------------------------------------------------------------------------
+
+PureCast::PureCast(const Anchor *anchor, const Type *type, Pure *_value)
+    : Pure(VK_PureCast, anchor, type), value(_value) {}
+
+Pure *PureCast::from(const Anchor *anchor, const Type *type, Pure *value) {
+    if (isa<PureCast>(value)) {
+        value = cast<PureCast>(value)->value;
+    }
+    if (value->get_type() == type)
+        return value;
+    return new PureCast(anchor, type, value);
 }
 
 //------------------------------------------------------------------------------

@@ -793,6 +793,12 @@ inline define-symbols (self values...)
     pointer-writable? =
         fn (cls)
             icmp== (band (sc_pointer_type_get_flags cls) pointer-flag-non-writable) 0:u64
+    pointer->refer-type =
+        fn "pointer->refer-type" (cls)
+            sc_refer_type
+                sc_type_element_at cls 0
+                sc_pointer_type_get_flags cls
+                sc_pointer_type_get_storage_class cls
 
 #'define-symbols Closure
     frame = sc_closure_frame
@@ -3119,7 +3125,17 @@ let
                 let sym = (sym as Symbol)
                 let T = (T as type)
                 Value
-                    sc_extern_new (sc_get_active_anchor) sym T
+                    sc_global_new (sc_get_active_anchor) sym T
+    private =
+        ast-macro
+            fn (args)
+                let argc = ('argcount args)
+                verify-count argc 1 1
+                let T = ('getarg args 0)
+                let T = (T as type)
+                let g = (sc_global_new (sc_get_active_anchor) unnamed T)
+                sc_global_set_storage_class g 'Private
+                Value g
 
 #-------------------------------------------------------------------------------
 

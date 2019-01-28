@@ -1605,12 +1605,22 @@ repeat:
         case FN_PtrToRef: {
             CHECKARGS(1, 1);
             READ_TYPEOF(T);
-            return NODEPS1(ARGTYPE1(SCOPES_GET_RESULT(ptr_to_ref(T))));
+            auto NT = SCOPES_GET_RESULT(ptr_to_ref(T));
+            if (isa<Pure>(_T)) {
+                return PureCast::from(call->anchor(), NT, cast<Pure>(_T));
+            } else {
+                return NODEPS1(ARGTYPE1(NT));
+            }
         } break;
         case FN_RefToPtr: {
             CHECKARGS(1, 1);
             READ_NODEREF_TYPEOF(T);
-            return NODEPS1(ARGTYPE1(SCOPES_GET_RESULT(ref_to_ptr(T))));
+            auto NT = SCOPES_GET_RESULT(ref_to_ptr(T));
+            if (isa<Pure>(_T)) {
+                return PureCast::from(call->anchor(), NT, cast<Pure>(_T));
+            } else {
+                return NODEPS1(ARGTYPE1(NT));
+            }
         } break;
         case FN_VolatileLoad:
         case FN_Load: {
@@ -1869,6 +1879,8 @@ static SCOPES_RESULT(TypedValue *) prove_SwitchTemplate(const ASTContext &ctx, S
     SCOPES_RESULT_TYPE(TypedValue *);
 
     auto newexpr = SCOPES_GET_RESULT(prove(ctx, node->expr));
+    newexpr = ExtractArgument::from(newexpr->anchor(), newexpr, 0);
+    SCOPES_CHECK_RESULT(build_deref(ctx, newexpr->anchor(), newexpr));
 
     const Type *casetype = newexpr->get_type();
 
@@ -1940,6 +1952,7 @@ static SCOPES_RESULT(TypedValue *) prove_If(const ASTContext &ctx, If *_if) {
         if (clause.is_then()) {
             TypedValue *newcond = SCOPES_GET_RESULT(prove(subctx, clause.cond));
             newcond = ExtractArgument::from(newcond->anchor(), newcond, 0);
+            SCOPES_CHECK_RESULT(build_deref(ctx, newcond->anchor(), newcond));
             if (newcond->get_type() != TYPE_Bool) {
                 SCOPES_ANCHOR(clause.anchor);
                 SCOPES_EXPECT_ERROR(error_invalid_condition_type(newcond));

@@ -576,7 +576,7 @@ public:
     }
 
     void exportExtern(Symbol name, const Type *type, const Anchor *anchor) {
-        dest->bind(name, Extern::from(anchor, type, name));
+        dest->bind(name, Global::from(anchor, type, name));
     }
 
 #define SCOPES_COMBINE_RESULT(DEST, EXPR) { \

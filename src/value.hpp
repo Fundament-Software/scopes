@@ -9,6 +9,7 @@
 
 #include "symbol.hpp"
 #include "result.hpp"
+#include "builtin.hpp"
 #include "type.hpp"
 
 #include <vector>
@@ -53,7 +54,8 @@ struct Scope;
 
 #define SCOPES_PURE_VALUE_KIND() \
     T(VK_Function, "value-kind-function", Function) \
-    T(VK_Extern, "value-kind-extern", Extern) \
+    T(VK_Global, "value-kind-global", Global) \
+    T(VK_PureCast, "value-kind-pure-cast", PureCast) \
     /* constants (Const::classof) */ \
     SCOPES_CONST_VALUE_KIND() \
 
@@ -789,25 +791,25 @@ struct ConstPointer : Const {
 
 //------------------------------------------------------------------------------
 
-enum ExternFlags {
+enum GlobalFlags {
     // if storage class is 'Uniform, the value is a SSBO
-    EF_BufferBlock = (1 << 0),
-    EF_NonWritable = (1 << 1),
-    EF_NonReadable = (1 << 2),
-    EF_Volatile = (1 << 3),
-    EF_Coherent = (1 << 4),
-    EF_Restrict = (1 << 5),
+    GF_BufferBlock = (1 << 0),
+    GF_NonWritable = (1 << 1),
+    GF_NonReadable = (1 << 2),
+    GF_Volatile = (1 << 3),
+    GF_Coherent = (1 << 4),
+    GF_Restrict = (1 << 5),
     // if storage class is 'Uniform, the value is a UBO
-    EF_Block = (1 << 6),
+    GF_Block = (1 << 6),
 };
 
-struct Extern : Pure {
+struct Global : Pure {
     static bool classof(const Value *T);
 
-    Extern(const Anchor *anchor, const Type *type, Symbol name,
+    Global(const Anchor *anchor, const Type *type, Symbol name,
         size_t flags, Symbol storage_class, int location, int binding);
 
-    static Extern *from(const Anchor *anchor, const Type *type, Symbol name,
+    static Global *from(const Anchor *anchor, const Type *type, Symbol name,
         size_t flags = 0,
         Symbol storage_class = SYM_Unnamed,
         int location = -1, int binding = -1);
@@ -817,6 +819,17 @@ struct Extern : Pure {
     Symbol storage_class;
     int location;
     int binding;
+};
+
+//------------------------------------------------------------------------------
+
+struct PureCast : Pure {
+    static bool classof(const Value *T);
+
+    PureCast(const Anchor *anchor, const Type *type, Pure *value);
+    static Pure *from(const Anchor *anchor, const Type *type, Pure *value);
+
+    Pure *value;
 };
 
 //------------------------------------------------------------------------------

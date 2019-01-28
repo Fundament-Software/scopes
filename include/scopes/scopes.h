@@ -179,15 +179,15 @@ sc_value_t *sc_expression_new(const sc_anchor_t *anchor);
 void sc_expression_append(sc_value_t *expr, sc_value_t *value);
 void sc_expression_set_scoped(sc_value_t *expr);
 
-sc_value_t *sc_extern_new(const sc_anchor_t *anchor, sc_symbol_t name, const sc_type_t *type);
-void sc_extern_set_flags(sc_value_t *value, uint32_t flags);
-uint32_t sc_extern_get_flags(sc_value_t *value);
-void sc_extern_set_storage_class(sc_value_t *value, sc_symbol_t storage_class);
-sc_symbol_t sc_extern_get_storage_class(sc_value_t *value);
-void sc_extern_set_location(sc_value_t *value, int32_t location);
-int32_t sc_extern_get_location(sc_value_t *value);
-void sc_extern_set_binding(sc_value_t *value, int32_t binding);
-int32_t sc_extern_get_binding(sc_value_t *value);
+sc_value_t *sc_global_new(const sc_anchor_t *anchor, sc_symbol_t name, const sc_type_t *type);
+void sc_global_set_flags(sc_value_t *value, uint32_t flags);
+uint32_t sc_global_get_flags(sc_value_t *value);
+void sc_global_set_storage_class(sc_value_t *value, sc_symbol_t storage_class);
+sc_symbol_t sc_global_get_storage_class(sc_value_t *value);
+void sc_global_set_location(sc_value_t *value, int32_t location);
+int32_t sc_global_get_location(sc_value_t *value);
+void sc_global_set_binding(sc_value_t *value, int32_t binding);
+int32_t sc_global_get_binding(sc_value_t *value);
 
 sc_value_t *sc_if_new(const sc_anchor_t *anchor);
 void sc_if_append_then_clause(sc_value_t *value, const sc_anchor_t *anchor, sc_value_t *cond, sc_value_t *body);

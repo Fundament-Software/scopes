@@ -160,7 +160,7 @@ struct LLVMIRGenerator {
     std::unordered_map<void *, LLVMValueRef> ptr2global;
     std::unordered_map<ValueIndex, LLVMValueRef, ValueIndex::Hash> ref2value;
     std::unordered_map<Function *, LLVMMetadataRef> func2md;
-    std::unordered_map<Extern *, LLVMValueRef> extern2global;
+    std::unordered_map<Global *, LLVMValueRef> global2global;
     std::unordered_map<LLVMValueRef, LLVMBasicBlockRef> func_fail_label;
     std::deque<Function *> function_todo;
     static Types type_todo;
@@ -1139,7 +1139,7 @@ struct LLVMIRGenerator {
         return type_to_llvm_type(SCOPES_GET_RESULT(extract_type_constant(node)));
     }
 
-    SCOPES_RESULT(LLVMValueRef) translate_builtin(Call *call, Builtin builtin, const TypedValues &args) {
+    SCOPES_RESULT(LLVMValueRef) translate_builtin(Builtin builtin, const TypedValues &args) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         size_t argcount = args.size();
         size_t argn = 0;
@@ -1610,7 +1610,7 @@ struct LLVMIRGenerator {
             return {};
         } else if (T == TYPE_Builtin) {
             auto builtin = SCOPES_GET_RESULT(extract_builtin_constant(callee));
-            auto result = SCOPES_GET_RESULT(translate_builtin(call, builtin, args));
+            auto result = SCOPES_GET_RESULT(translate_builtin(builtin, args));
             if (result) {
                 map_phi({ result }, call);
             }
@@ -1747,39 +1747,47 @@ struct LLVMIRGenerator {
         return value;
     }
 
+    SCOPES_RESULT(LLVMValueRef) PureCast_to_value(PureCast *node) {
+        return ref_to_value(node->value);
+    }
 
-    SCOPES_RESULT(LLVMValueRef) Extern_to_value(Extern *node) {
+    SCOPES_RESULT(LLVMValueRef) Global_to_value(Global *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
-        auto it = extern2global.find(node);
-        if (it == extern2global.end()) {
-            const String *namestr = node->name.name();
-            const char *name = namestr->data;
-            assert(name);
+        auto it = global2global.find(node);
+        if (it == global2global.end()) {
             auto pi = cast<PointerType>(node->get_type());
             LLVMTypeRef LLT = SCOPES_GET_RESULT(type_to_llvm_type(pi->element_type));
             LLVMValueRef result = nullptr;
-            if ((namestr->count > 5) && !strncmp(name, "llvm.", 5)) {
-                result = LLVMAddFunction(module, name, LLT);
-            } else {
-                void *pptr = local_aware_dlsym(node->name);
-                uint64_t ptr = *(uint64_t*)&pptr;
-                if (!ptr) {
-                    last_llvm_error = nullptr;
-                    LLVMInstallFatalErrorHandler(fatal_error_handler);
-                    ptr = get_address(name);
-                    LLVMResetFatalErrorHandler();
-                    if (last_llvm_error) {
-                        SCOPES_RETURN_ERROR(last_llvm_error);
-                    }
-                }
-                if (!ptr) {
-                    StyledString ss;
-                    ss.out << "could not resolve " << node;
-                    SCOPES_LOCATION_ERROR(ss.str());
-                }
+            const String *namestr = node->name.name();
+            const char *name = namestr->data;
+            assert(name);
+            if (node->storage_class == SYM_SPIRV_StorageClassPrivate) {
                 result = LLVMAddGlobal(module, LLT, name);
+                LLVMSetInitializer(result, LLVMConstNull(LLT));
+            } else {
+                if ((namestr->count > 5) && !strncmp(name, "llvm.", 5)) {
+                    result = LLVMAddFunction(module, name, LLT);
+                } else {
+                    void *pptr = local_aware_dlsym(node->name);
+                    uint64_t ptr = *(uint64_t*)&pptr;
+                    if (!ptr) {
+                        last_llvm_error = nullptr;
+                        LLVMInstallFatalErrorHandler(fatal_error_handler);
+                        ptr = get_address(name);
+                        LLVMResetFatalErrorHandler();
+                        if (last_llvm_error) {
+                            SCOPES_RETURN_ERROR(last_llvm_error);
+                        }
+                    }
+                    if (!ptr) {
+                        StyledString ss;
+                        ss.out << "could not resolve " << node;
+                        SCOPES_LOCATION_ERROR(ss.str());
+                    }
+                    result = LLVMAddGlobal(module, LLT, name);
+                }
             }
-            extern2global.insert({ node, result });
+            global2global.insert({ node, result });
             return result;
         } else {
             return it->second;

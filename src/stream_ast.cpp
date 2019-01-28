@@ -162,7 +162,7 @@ struct StreamAST : StreamAnchors {
         case VK_ConstReal:
         case VK_ConstPointer:
         case VK_Parameter:
-        case VK_Extern:
+        case VK_Global:
         case VK_Template:
         case VK_Function:
             return true;
@@ -579,6 +579,13 @@ struct StreamAST : StreamAnchors {
                 walk_same_or_newline(val->value, depth+1, maxdepth);
             }
         } break;
+        case VK_PureCast: {
+            auto val = cast<PureCast>(node);
+            ss << node;
+            if (newlines) {
+                walk_same_or_newline(val->value, depth+1, maxdepth);
+            }
+        } break;
         case VK_ExtractArgumentTemplate: {
             auto val = cast<ExtractArgumentTemplate>(node);
             ss << node;
@@ -651,8 +658,8 @@ struct StreamAST : StreamAnchors {
                 stream_block(val->body, depth+1, maxdepth);
             }
         } break;
-        case VK_Extern: {
-            auto val = cast<Extern>(node);
+        case VK_Global: {
+            auto val = cast<Global>(node);
             auto T = val->get_type();
             ss << val->name;
             stream_type_suffix(T);

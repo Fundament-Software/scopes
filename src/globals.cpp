@@ -993,42 +993,42 @@ void sc_expression_append(sc_value_t *expr, sc_value_t *value) {
     cast<Expression>(expr)->append(value);
 }
 
-sc_value_t *sc_extern_new(const sc_anchor_t *anchor, sc_symbol_t name, const sc_type_t *type) {
+sc_value_t *sc_global_new(const sc_anchor_t *anchor, sc_symbol_t name, const sc_type_t *type) {
     using namespace scopes;
-    return Extern::from(anchor, type, name);
+    return Global::from(anchor, type, name);
 }
-void sc_extern_set_flags(sc_value_t *value, uint32_t flags) {
+void sc_global_set_flags(sc_value_t *value, uint32_t flags) {
     using namespace scopes;
-    cast<Extern>(value)->flags = flags;
+    cast<Global>(value)->flags = flags;
 }
-uint32_t sc_extern_get_flags(sc_value_t *value) {
+uint32_t sc_global_get_flags(sc_value_t *value) {
     using namespace scopes;
-    return cast<Extern>(value)->flags;
+    return cast<Global>(value)->flags;
 }
-void sc_extern_set_storage_class(sc_value_t *value, sc_symbol_t storage_class) {
+void sc_global_set_storage_class(sc_value_t *value, sc_symbol_t storage_class) {
     using namespace scopes;
-    cast<Extern>(value)->storage_class = storage_class;
+    cast<Global>(value)->storage_class = storage_class;
 }
-sc_symbol_t sc_extern_get_storage_class(sc_value_t *value) {
+sc_symbol_t sc_global_get_storage_class(sc_value_t *value) {
     using namespace scopes;
-    return cast<Extern>(value)->storage_class;
+    return cast<Global>(value)->storage_class;
 }
-void sc_extern_set_location(sc_value_t *value, int32_t location) {
+void sc_global_set_location(sc_value_t *value, int32_t location) {
     using namespace scopes;
-    cast<Extern>(value)->location = location;
+    cast<Global>(value)->location = location;
 }
-int32_t sc_extern_get_location(sc_value_t *value) {
+int32_t sc_global_get_location(sc_value_t *value) {
     using namespace scopes;
-    return cast<Extern>(value)->location;
+    return cast<Global>(value)->location;
 }
 
-void sc_extern_set_binding(sc_value_t *value, int32_t binding) {
+void sc_global_set_binding(sc_value_t *value, int32_t binding) {
     using namespace scopes;
-    cast<Extern>(value)->binding = binding;
+    cast<Global>(value)->binding = binding;
 }
-int32_t sc_extern_get_binding(sc_value_t *value) {
+int32_t sc_global_get_binding(sc_value_t *value) {
     using namespace scopes;
-    return cast<Extern>(value)->binding;
+    return cast<Global>(value)->binding;
 }
 
 sc_value_t *sc_if_new(const sc_anchor_t *anchor) {
@@ -1694,7 +1694,7 @@ namespace scopes {
 //------------------------------------------------------------------------------
 
 static void bind_extern(const Anchor *anchor, Symbol globalsym, Symbol externsym, const Type *T) {
-    globals->bind(globalsym, Extern::from(anchor, T, externsym, EF_NonWritable));
+    globals->bind(globalsym, Global::from(anchor, T, externsym, GF_NonWritable));
 }
 
 static void bind_symbol(const Anchor *anchor, Symbol sym, Symbol value) {
@@ -1776,15 +1776,15 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_expression_new, TYPE_Value, TYPE_Anchor);
     DEFINE_EXTERN_C_FUNCTION(sc_expression_set_scoped, _void, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_expression_append, _void, TYPE_Value, TYPE_Value);
-    DEFINE_EXTERN_C_FUNCTION(sc_extern_new, TYPE_Value, TYPE_Anchor, TYPE_Symbol, TYPE_Type);
-    DEFINE_EXTERN_C_FUNCTION(sc_extern_set_flags, _void, TYPE_Value, TYPE_U32);
-    DEFINE_EXTERN_C_FUNCTION(sc_extern_get_flags, TYPE_U32, TYPE_Value);
-    DEFINE_EXTERN_C_FUNCTION(sc_extern_set_storage_class, _void, TYPE_Value, TYPE_Symbol);
-    DEFINE_EXTERN_C_FUNCTION(sc_extern_get_storage_class, TYPE_Symbol, TYPE_Value);
-    DEFINE_EXTERN_C_FUNCTION(sc_extern_set_location, _void, TYPE_Value, TYPE_I32);
-    DEFINE_EXTERN_C_FUNCTION(sc_extern_get_location, TYPE_I32, TYPE_Value);
-    DEFINE_EXTERN_C_FUNCTION(sc_extern_set_binding, _void, TYPE_Value, TYPE_I32);
-    DEFINE_EXTERN_C_FUNCTION(sc_extern_get_binding, TYPE_I32, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_global_new, TYPE_Value, TYPE_Anchor, TYPE_Symbol, TYPE_Type);
+    DEFINE_EXTERN_C_FUNCTION(sc_global_set_flags, _void, TYPE_Value, TYPE_U32);
+    DEFINE_EXTERN_C_FUNCTION(sc_global_get_flags, TYPE_U32, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_global_set_storage_class, _void, TYPE_Value, TYPE_Symbol);
+    DEFINE_EXTERN_C_FUNCTION(sc_global_get_storage_class, TYPE_Symbol, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_global_set_location, _void, TYPE_Value, TYPE_I32);
+    DEFINE_EXTERN_C_FUNCTION(sc_global_get_location, TYPE_I32, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_global_set_binding, _void, TYPE_Value, TYPE_I32);
+    DEFINE_EXTERN_C_FUNCTION(sc_global_get_binding, TYPE_I32, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_if_new, TYPE_Value, TYPE_Anchor);
     DEFINE_EXTERN_C_FUNCTION(sc_if_append_then_clause, _void, TYPE_Value, TYPE_Anchor, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_if_append_else_clause, _void, TYPE_Value, TYPE_Anchor, TYPE_Value);
