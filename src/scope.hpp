@@ -40,6 +40,7 @@ public:
     const String *next_doc;
 
     void set_doc(const String *str);
+    void clear_doc();
 
     size_t count() const;
 

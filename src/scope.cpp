@@ -36,6 +36,10 @@ void Scope::set_doc(const String *str) {
     }
 }
 
+void Scope::clear_doc() {
+    doc = nullptr;
+}
+
 size_t Scope::count() const {
 #if 0
     return map->size();

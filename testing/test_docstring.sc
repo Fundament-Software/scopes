@@ -1,10 +1,7 @@
-
-define scope syntax-scope
-
-#let g = (globals)
-#print (Scope-docstring g 'e)
-
 """"a module docstring
+
+let scope =
+    syntax-eval syntax-scope
 
 """"a docstring for x
 let x = 5
@@ -13,35 +10,38 @@ let x = 5
 let y = 6
 
 assert
-    (Scope-docstring scope unnamed) == "a module docstring\n"
+    ('docstring scope 'x) == "a docstring for x\n"
 assert
-    (Scope-docstring scope 'x) == "a docstring for x\n"
+    ('docstring scope 'y) == "a docstring for y\n"
+print ('docstring scope unnamed)
+#FIXME
 assert
-    (Scope-docstring scope 'y) == "a docstring for y\n"
+    ('docstring scope unnamed) == "a module docstring\n"
 
 let scope =
     do
         # reimports should also import docstrings
         let x y
 
-        define scope syntax-scope
+        let scope =
+            syntax-eval syntax-scope
 
         assert
-            (Scope-docstring scope 'x) == "a docstring for x\n"
+            ('docstring scope 'x) == "a docstring for x\n"
         assert
-            (Scope-docstring scope 'y) == "a docstring for y\n"
+            ('docstring scope 'y) == "a docstring for y\n"
         # locals should also export docstrings
         locals;
 
 assert
-    (Scope-docstring scope 'x) == "a docstring for x\n"
+    ('docstring scope 'x) == "a docstring for x\n"
 assert
-    (Scope-docstring scope 'y) == "a docstring for y\n"
+    ('docstring scope 'y) == "a docstring for y\n"
 
 fn testfun (x y)
     """"a function docstring
     true
 
-assert ((docstring testfun) == "a function docstring\n")
+assert (('docstring testfun) == "a function docstring\n")
 
 true

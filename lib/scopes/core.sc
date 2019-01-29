@@ -2349,7 +2349,10 @@ fn load-module (module-name module-path opts...)
     let expr = (sc_parse_from_path module-path)
     let eval-scope =
         va-option scope opts...
-            Scope (sc_get_globals)
+            do
+                let newscope = (Scope (sc_get_globals))
+                'set-docstring! newscope unnamed ""
+                newscope
     'set-symbols eval-scope
         main-module? =
             va-option main-module? opts... false
@@ -3091,6 +3094,7 @@ inline clamp (x mn mx)
 
 # functions safecast to function pointers
 'set-symbols Closure
+    docstring = sc_closure_get_docstring
     __imply =
         box-cast
             fn (srcT destT expr)
@@ -4394,6 +4398,7 @@ define-syntax-block-scope-macro syntax-if
 
 define-syntax-scope-macro syntax-eval
     let subscope = (Scope syntax-scope)
+    'set-symbol subscope 'syntax-scope syntax-scope
     return
         exec-module (Value args) subscope
         syntax-scope
@@ -4678,6 +4683,7 @@ fn run-main ()
     else
         let scope =
             Scope (globals)
+        'set-docstring! scope unnamed ""
         'set-symbols scope
             script-launch-args =
                 fn ()

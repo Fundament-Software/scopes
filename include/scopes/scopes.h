@@ -333,6 +333,10 @@ sc_value_t *sc_list_at(const sc_list_t *l);
 const sc_list_t *sc_list_next(const sc_list_t *l);
 const sc_list_t *sc_list_reverse(const sc_list_t *l);
 
+// closures
+
+const sc_string_t *sc_closure_get_docstring(sc_closure_t *func);
+
 // types
 
 sc_value_raises_t sc_type_at(const sc_type_t *T, sc_symbol_t key);

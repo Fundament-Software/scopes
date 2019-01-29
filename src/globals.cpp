@@ -580,6 +580,8 @@ const sc_string_t *sc_scope_get_docstring(sc_scope_t *scope, sc_symbol_t key) {
 void sc_scope_set_docstring(sc_scope_t *scope, sc_symbol_t key, const sc_string_t *str) {
     using namespace scopes;
     if (key == SYM_Unnamed) {
+        if (str && !str->count)
+            str = nullptr;
         scope->doc = str;
     } else {
         ScopeEntry entry;
@@ -780,6 +782,13 @@ const sc_list_t *sc_list_next(const sc_list_t *l) {
 
 const sc_list_t *sc_list_reverse(const sc_list_t *l) {
     return reverse_list(l);
+}
+
+// Closure
+////////////////////////////////////////////////////////////////////////////////
+
+const sc_string_t *sc_closure_get_docstring(sc_closure_t *func) {
+    return func->func->docstring;
 }
 
 // Value
@@ -1952,6 +1961,8 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_list_at, TYPE_Value, TYPE_List);
     DEFINE_EXTERN_C_FUNCTION(sc_list_next, TYPE_List, TYPE_List);
     DEFINE_EXTERN_C_FUNCTION(sc_list_reverse, TYPE_List, TYPE_List);
+
+    DEFINE_EXTERN_C_FUNCTION(sc_closure_get_docstring, TYPE_String, TYPE_Closure);
 
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_parse_from_path, TYPE_Value, TYPE_String);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_parse_from_string, TYPE_Value, TYPE_String);

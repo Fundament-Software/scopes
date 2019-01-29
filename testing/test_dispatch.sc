@@ -1,4 +1,4 @@
-do
+#do
     let m =
         fn-dispatcher
             call
@@ -22,14 +22,16 @@ do
 
 do
     fn... add3
-        (a : i32, b : i32, c : i32)
-            add a (add b c)
-        (a : f32, b : f32, c : f32)
-            fadd a (fadd b c)
-        (a : string, b : string, c : string)
-            string-join a (string-join b c)
+    case (a : i32, b : i32, c : i32)
+        add a (add b c)
+    case (a : f32, b : f32, c : f32)
+        fadd a (fadd b c)
+    case (a : string, b : string, c : string)
+        sc_string_join a (sc_string_join b c)
 
-    let x = (local 'copy 1) # reference type will be implicitly converted to value type
+    # reference type will be implicitly converted to value type
+    let x = (ptrtoref (alloca i32))
+    x = 1
     assert ((add3 x 2 3) == 6)
     assert ((add3 1.0 2.0 3.0) == 6.0)
     assert ((add3 "a" "b" "c") == "abc")
@@ -40,14 +42,14 @@ do
 do
     # recursive dispatch
     fn... div2
-        (a : f32, b : f32)
-            fdiv a b
-        (a : i32, b : i32)
-            div2 (f32 a) (f32 b)
-        (a : i32, b : f32)
-            div2 (f32 a) b
-        (a : f32, b : i32)
-            div2 a (f32 b)
+    case (a : f32, b : f32)
+        fdiv a b
+    case (a : i32, b : i32)
+        div2 (f32 a) (f32 b)
+    case (a : i32, b : f32)
+        div2 (f32 a) b
+    case (a : f32, b : i32)
+        div2 a (f32 b)
 
     assert ((div2 4.0 2.0) == 2.0)
     assert ((div2 4   2  ) == 2.0)
