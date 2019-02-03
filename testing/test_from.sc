@@ -2,11 +2,15 @@
 
 let T =
     do
-        let k = (typename-type "T")
-        set-type-symbol! k 'A i32
-        set-type-symbol! k 'B u32
-        typefn k 'test () 303
+        let k = (typename "T")
+        'set-symbols k
+            A = i32
+            B = u32
+            test =
+                fn "test" () 303
         k
+
+compile-stage;
 
 from T let A B test
 assert (A == i32)
