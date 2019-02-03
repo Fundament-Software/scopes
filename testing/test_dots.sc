@@ -1,10 +1,9 @@
 
 # test if dots expand correctly in expression list
-syntax-extend
-    let k = (Scope)
-    set-scope-symbol! k 'x true
-    set-scope-symbol! syntax-scope 'k k
-    syntax-scope
+let k = (Scope)
+'set-symbol k 'x true
+
+compile-stage;
 
 fn X ()
     if k.x true

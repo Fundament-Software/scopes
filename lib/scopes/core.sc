@@ -4429,6 +4429,9 @@ compile-stage;
 # C type support
 #-------------------------------------------------------------------------------
 
+# structs
+#-------------------------------------------------------------------------------
+
 'set-symbols CStruct
     __getattr =
         spice "CStruct-getattr" (self key)
@@ -4453,6 +4456,70 @@ compile-stage;
                 let ET = (sc_strip_qualifiers (sc_type_element_at cls k))
                 _ (i + 1)
                     `(insertvalue result (imply v ET) k)
+
+# enums
+#-------------------------------------------------------------------------------
+
+'set-symbols CEnum
+    __== = (box-binary-op (single-binary-op-dispatch icmp==))
+    __!= = (box-binary-op (single-binary-op-dispatch icmp!=))
+    __imply =
+        box-cast
+            fn "CEnum-imply" (vT T expr)
+                if (T == i32)
+                    return `(bitcast expr T)
+                compiler-error! "unsupported type"
+
+sugar enum (name values...)
+    spice make-enum (T vals...)
+        let T = (T as type)
+        inline make-enumval (anchor val)
+            sc_const_int_new anchor T
+                sext (imply val i32) u64
+
+        'set-super T CEnum
+        'set-storage T i32
+        let count = ('argcount vals...)
+        loop (i nextval = 0 0)
+            if (i >= count)
+                break;
+            let arg = ('getarg vals... i)
+            let anchor = ('anchor arg)
+            let key val = ('dekey arg)
+            if (not ('constant? val))
+                compiler-error! "all enum values must be constant"
+            _ (i + 1)
+                if (key == unnamed)
+                    # auto-numerical
+                    'set-symbol T val (make-enumval anchor nextval)
+                    nextval + 1
+                else
+                    'set-symbol T key (make-enumval anchor val)
+                    val + 1
+        T
+
+    fn convert-body (body)
+        if false
+            # hint return type
+            return '() 
+        let expr body = (decons body)
+        cons
+            if (('typeof expr) == Symbol)
+                Value (list syntax-quote expr)
+            else expr
+            if (empty? body)
+                '()
+            else
+                convert-body body
+
+    let newbody = (convert-body values...)
+    return
+        if (('typeof name) == Symbol)
+            let namestr = (name as Symbol as string)
+            list let name '=
+                cons make-enum (list typename namestr) newbody
+        else
+            cons make-enum (list typename (list (do as) name string)) newbody
 
 compile-stage;
 

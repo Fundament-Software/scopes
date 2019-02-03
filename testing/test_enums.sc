@@ -8,8 +8,8 @@ do
         Q
         R
 
-    assert ((superof test-enum) == CEnum)
-    assert ((storageof test-enum) == i32)
+    assert (('super test-enum) == CEnum)
+    assert (('storage test-enum) == i32)
 
     assert ((typeof test-enum.X) == test-enum)
     assert (test-enum.X == 0)
@@ -24,13 +24,6 @@ do
     assert (not (test-enum.X == test-enum.Y))
     assert (test-enum.X != test-enum.Y)
 
-    assert (((unconst test-enum.R) == (unconst test-enum.R)) == true)
-    assert (not ((unconst test-enum.X) == (unconst test-enum.Y)))
-    assert ((unconst test-enum.X) != (unconst test-enum.Y))
-    assert (((unconst test-enum.R) != (unconst test-enum.R)) == false)
-
-
-
 do
     let T =
         enum (do "test-enum") X
@@ -41,9 +34,9 @@ do
             R
 
     assert
-        (superof T) == CEnum
+        ('super T) == CEnum
     assert
-        (storageof T) == i32
+        ('storage T) == i32
 
     assert ((typeof T.X) == T)
     assert
