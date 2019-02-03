@@ -1332,6 +1332,10 @@ inline floordiv (a b)
     __== = (box-binary-op (single-binary-op-dispatch ptrcmp==))
     __!= = (box-binary-op (single-binary-op-dispatch ptrcmp!=))
 
+'set-symbols Closure
+    __== = (box-binary-op (single-binary-op-dispatch ptrcmp==))
+    __!= = (box-binary-op (single-binary-op-dispatch ptrcmp!=))
+
 'define-symbols type
     __@ = sc_type_element_at
 
@@ -4501,7 +4505,7 @@ sugar enum (name values...)
     fn convert-body (body)
         if false
             # hint return type
-            return '() 
+            return '()
         let expr body = (decons body)
         cons
             if (('typeof expr) == Symbol)
