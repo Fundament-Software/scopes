@@ -791,6 +791,14 @@ const sc_string_t *sc_closure_get_docstring(sc_closure_t *func) {
     return func->func->docstring;
 }
 
+sc_value_t *sc_closure_get_template(sc_closure_t *func) {
+    return func->func;
+}
+
+sc_value_t *sc_closure_get_context(sc_closure_t *func) {
+    return func->frame;
+}
+
 // Value
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -1963,6 +1971,8 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_list_reverse, TYPE_List, TYPE_List);
 
     DEFINE_EXTERN_C_FUNCTION(sc_closure_get_docstring, TYPE_String, TYPE_Closure);
+    DEFINE_EXTERN_C_FUNCTION(sc_closure_get_template, TYPE_Value, TYPE_Closure);
+    DEFINE_EXTERN_C_FUNCTION(sc_closure_get_context, TYPE_Value, TYPE_Closure);
 
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_parse_from_path, TYPE_Value, TYPE_String);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_parse_from_string, TYPE_Value, TYPE_String);

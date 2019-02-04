@@ -336,6 +336,8 @@ const sc_list_t *sc_list_reverse(const sc_list_t *l);
 // closures
 
 const sc_string_t *sc_closure_get_docstring(sc_closure_t *func);
+sc_value_t *sc_closure_get_template(sc_closure_t *func);
+sc_value_t *sc_closure_get_context(sc_closure_t *func);
 
 // types
 

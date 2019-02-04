@@ -1469,6 +1469,32 @@ repeat:
                 return NODEPS1(ARGTYPE1(_T->get_type()));
             }
         } break;
+        case FN_Normalize: {
+            CHECKARGS(1, 1);
+            READ_TYPEOF(A);
+            SCOPES_CHECK_RESULT(verify_real_ops(A));
+            return NODEPS1(ARGTYPE1(A));
+        } break;
+        case FN_Cross: {
+            CHECKARGS(2, 2);
+            READ_TYPEOF(A);
+            READ_TYPEOF(B);
+            SCOPES_CHECK_RESULT(verify_real_vector(A, 3));
+            SCOPES_CHECK_RESULT(verify(A, B));
+            return NODEPS1(ARGTYPE1(A));
+        } break;
+        case FN_Distance: {
+            CHECKARGS(2, 2);
+            READ_TYPEOF(A);
+            READ_TYPEOF(B);
+            SCOPES_CHECK_RESULT(verify_real_ops(A, B));
+            const Type *T = SCOPES_GET_RESULT(storage_type(A));
+            if (T->kind() == TK_Vector) {
+                return NODEPS1(ARGTYPE1(cast<VectorType>(T)->element_type));
+            } else {
+                return NODEPS1(ARGTYPE1(A));
+            }
+        } break;
         case FN_ExtractValue: {
             CHECKARGS(2, 2);
             READ_NODEREF_STORAGETYPEOF(T);

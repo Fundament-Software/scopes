@@ -16,3 +16,4 @@ from T let A B test
 assert (A == i32)
 assert (B == u32)
 assert ((test) == 303)
+

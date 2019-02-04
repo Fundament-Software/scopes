@@ -2133,10 +2133,75 @@ let
 'set-symbol (__this-scope) (Symbol "#symbol")
     Value (typify symbol-handler list Scope)
 
+inline select-op-macro (sop fop numargs)
+    inline scalar-type (T)
+        let ST = ('storage T)
+        if (type== ('super ST) vector)
+            'element@ ST 0
+        else ST
+    ast-macro
+        fn (args)
+            let argc = ('argcount args)
+            verify-count argc numargs numargs
+            let a b =
+                'getarg args 0; 'getarglist args 1
+            let T = (scalar-type ('typeof a))
+            let fun =
+                if (type== ('super T) integer) `sop
+                elseif (type== ('super T) real) `fop
+                else
+                    compiler-error!
+                        sc_string_join "invalid argument type: "
+                            sc_string_join (sc_value_repr (box-pointer T))
+                                ". integer or real vector or scalar expected"
+            `(fun a b)
+
+fn powi (base exponent)
+    # special case for constant base 2
+    if (icmp== base 2)
+        return
+            shl 1 exponent
+    loop (result cur exponent = 1 base exponent)
+        if (icmp== exponent 0)
+            return result
+        else
+            repeat
+                do
+                    if (icmp== (band exponent 1) 0) result
+                    else
+                        mul result cur
+                mul cur cur
+                lshr exponent 1
+
+inline sabs (x)
+    let zero = (nullof (typeof x))
+    ? (icmp<s x zero) (sub zero x) x
+
+let pow = (select-op-macro powi powf 2)
+let abs = (select-op-macro sabs fabs 1)
+let sign = (select-op-macro ssign fsign 1)
+
 compile-stage;
 
 inline = (lhs rhs)
     assign rhs lhs
+
+inline make-inplace-op (op)
+    inline (lhs rhs)
+        assign (op lhs rhs) lhs
+
+let
+    -= = (make-inplace-op -)
+    += = (make-inplace-op +)
+    *= = (make-inplace-op *)
+    /= = (make-inplace-op /)
+    //= = (make-inplace-op //)
+    %= = (make-inplace-op %)
+    >>= = (make-inplace-op >>)
+    <<= = (make-inplace-op <<)
+    &= = (make-inplace-op &)
+    |= = (make-inplace-op |)
+    ^= = (make-inplace-op ^)
 
 define-infix< 50 +=
 define-infix< 50 -=

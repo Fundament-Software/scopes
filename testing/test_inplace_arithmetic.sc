@@ -1,6 +1,7 @@
 
 
-let x = (local i32 5)
+let x = (ptrtoref (alloca i32))
+x = 5
 
 x += 7
 assert (x == 12)
