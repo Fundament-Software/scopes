@@ -1240,7 +1240,7 @@ fn string@ (self i)
             make-list args...
     __repr =
         inline "list-repr" (self)
-            '__repr (Value self)
+            sc_list_repr self
 
 'set-symbols list
     __.. = (box-binary-op (single-binary-op-dispatch sc_list_join))
@@ -2184,11 +2184,11 @@ let sign = (select-op-macro ssign fsign 1)
 compile-stage;
 
 inline = (lhs rhs)
-    assign rhs lhs
+    assign (imply rhs (typeof lhs)) lhs
 
 inline make-inplace-op (op)
     inline (lhs rhs)
-        assign (op lhs rhs) lhs
+        = lhs (op lhs rhs)
 
 let
     -= = (make-inplace-op -)
@@ -2824,7 +2824,7 @@ define-syntax-macro assert
         if ((countof args) == 2) msg
         else
             Value
-                repr cond
+                sc_list_repr cond
     list __assert cond msg
 
 define-syntax-macro while
@@ -3961,6 +3961,42 @@ let
     import-c = sc_import_c
 
 compile-stage;
+
+#-------------------------------------------------------------------------------
+# standard allocators
+#-------------------------------------------------------------------------------
+
+sugar local (values...)
+    spice local-copy-typed (T value)
+        ast-quote
+            let val =
+                ptrtoref (alloca T)
+            val = value
+            val
+    spice local-copy (value)
+        ast-quote
+            let val =
+                ptrtoref (alloca (typeof value))
+            val = value
+            val
+    spice local-new (T)
+        ast-quote
+            let val =
+                ptrtoref (alloca T)
+            val = (nullof T)
+            val
+    syntax-match values...
+    case (name '= value)
+        qq
+            [let name] = ([local-copy value])
+    case (name ': T '= value)
+        qq
+            [let name] = ([local-copy-typed T value])
+    case (name ': T)
+        qq
+            [let name] = ([local-new T])
+    default
+        compiler-error! "syntax: local <name> [: <type>] [= <value>]"
 
 #-------------------------------------------------------------------------------
 # C type support

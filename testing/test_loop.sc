@@ -1,23 +1,18 @@
 
-# explicit, unrollable form
+# default form
 let x =
     do
-        let aloop (i k) = (unconst 0) (unconst 10)
-        if (i < k)
-            aloop (i + 1) k
-        else i
-assert (x == 10)
-
-# non-unrolled form
-let x =
-    do
-        loop (i k) = 0 64
-        if (i < k)
-            repeat (i + 1) k
-        else i
+        loop (i k = 0 64)
+            # last line in loop is fed back into loop
+            # breaks must be explicit
+            if (i < k)
+                _ (i + 1) k
+            else
+                break i
 assert (x == 64)
 
-let i = (local 'copy 10)
+# while loop
+local i = 10
 while (i != 0)
     i = i - 1
     if (i == 3)
@@ -26,21 +21,13 @@ while (i != 0)
 
 # infinite loop
 do
-    let x =
-        local i32 0
-    loop () =
-    if (x < 100)
-        x += 1
-        repeat;
-
-# infinite loop, even shorter form
-do
-    let x =
-        local i32 0
-    loop;
-    if (x < 100)
-        x += 1
-        repeat;
+    local x = 0
+    loop ()
+        if (x < 100)
+            x += 1
+            repeat;
+        else
+            break;
 
 fn test_2d_loops ()
     let w h = 4 4
@@ -53,14 +40,18 @@ fn test_2d_loops ()
     print;
 
     # method 2: two basic nested loops (permitting immutable state changes)
-    loop (y) = 0
-    if (y < h)
-        do
-            loop (x) = 0
-            if (x < w)
-                print x y
-                repeat (x + 1)
-        repeat (y + 1)
+    loop (y = 0)
+        if (y < h)
+            do
+                loop (x = 0)
+                    if (x < w)
+                        print x y
+                        repeat (x + 1)
+                    else
+                        break;
+            repeat (y + 1)
+        else
+            break;
 
     print;
 
@@ -68,22 +59,26 @@ fn test_2d_loops ()
     if (h <= 0)
         return;
     let y1 = (h - 1)
-    loop (x y) = 0 0
-    if (x < w)
-        print x y
-        repeat (x + 1) y
-    elseif (y < y1)
-        repeat 0 (y + 1)
+    loop (x y = 0 0)
+        if (x < w)
+            print x y
+            repeat (x + 1) y
+        elseif (y < y1)
+            repeat 0 (y + 1)
+        else
+            break;
 
     print;
 
     # method 4: single loop, one counter
     let size = (w * h)
-    loop (i) = 0
-    if (i < size)
-        let x y = (i % w) (i // h)
-        print x y
-        repeat (i + 1)
+    loop (i = 0)
+        if (i < size)
+            let x y = (i % w) (i // h)
+            print x y
+            repeat (i + 1)
+        else
+            break;
 
 test_2d_loops;
 
@@ -91,7 +86,7 @@ test_2d_loops;
 fn looper ()
     for i in (range 32)
         if (i == 5)
-            return (unconst false)
-    unconst true
+            return false
+    true
 
 assert (not (looper))

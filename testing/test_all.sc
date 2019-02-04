@@ -31,8 +31,8 @@ test-modules
     .test_intrinsics
     .test_iter2
     .test_label
-    .test_label_macro
     .test_let
+    .test_local
     .test_locals
     .test_loop
     .test_macro

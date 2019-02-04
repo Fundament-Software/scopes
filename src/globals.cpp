@@ -757,6 +757,13 @@ const sc_list_t *sc_list_dump(const sc_list_t *l) {
     return l;
 }
 
+const sc_string_t *sc_list_repr(const sc_list_t *l) {
+    using namespace scopes;
+    StyledString ss;
+    stream_expr(ss.out, l, StreamExprFormat::singleline());
+    return ss.str();
+}
+
 sc_value_list_tuple_t sc_list_decons(const sc_list_t *l) {
     using namespace scopes;
     if (l)
@@ -1963,6 +1970,7 @@ void init_globals(int argc, char *argv[]) {
 
     DEFINE_EXTERN_C_FUNCTION(sc_list_cons, TYPE_List, TYPE_Value, TYPE_List);
     DEFINE_EXTERN_C_FUNCTION(sc_list_dump, TYPE_List, TYPE_List);
+    DEFINE_EXTERN_C_FUNCTION(sc_list_repr, TYPE_String, TYPE_List);
     DEFINE_EXTERN_C_FUNCTION(sc_list_join, TYPE_List, TYPE_List, TYPE_List);
     DEFINE_EXTERN_C_FUNCTION(sc_list_decons, arguments_type({TYPE_Value, TYPE_List}), TYPE_List);
     DEFINE_EXTERN_C_FUNCTION(sc_list_count, TYPE_I32, TYPE_List);

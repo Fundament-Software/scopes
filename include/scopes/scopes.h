@@ -327,6 +327,7 @@ const sc_string_t *sc_string_rslice(const sc_string_t *str, size_t offset);
 const sc_list_t *sc_list_cons(sc_value_t *at, const sc_list_t *next);
 const sc_list_t *sc_list_join(const sc_list_t *a, const sc_list_t *b);
 const sc_list_t *sc_list_dump(const sc_list_t *l);
+const sc_string_t *sc_list_repr(const sc_list_t *l);
 sc_value_list_tuple_t sc_list_decons(const sc_list_t *l);
 int sc_list_count(const sc_list_t *l);
 sc_value_t *sc_list_at(const sc_list_t *l);
