@@ -2041,7 +2041,8 @@ fn clone-scope-contents (a b)
                             if (== i argc)
                                 return (Value T)
                             let arg = ('getarg args i)
-                            let k v = (sc_type_key (sc_value_qualified_type arg))
+                            let k = (sc_type_key (sc_value_qualified_type arg))
+                            let v = (sc_keyed_new (sc_value_anchor arg) unnamed arg)
                             if (== k 'super)
                                 sc_typename_type_set_super T (as v type)
                             elseif (== k 'storage)
@@ -2059,13 +2060,31 @@ fn clone-scope-contents (a b)
         box-binary-op
             single-binary-op-dispatch clone-scope-contents
 
-let constant? =
+fn extract-single-arg (args)
+    let argc = ('argcount args)
+    verify-count argc 1 1
+    'getarg args 0
+
+inline make-const-type-property-function (func)
     ast-macro
-        fn "constant?" (args)
-            let argc = ('argcount args)
-            verify-count argc 1 1
-            let value = ('getarg args 0)
-            Value ('constant? value)
+        fn (args)
+            let value = (extract-single-arg args)
+            let val = (func (as value type))
+            `val
+
+let
+    constant? =
+        ast-macro
+            fn "constant?" (args)
+                let value = (extract-single-arg args)
+                Value ('constant? value)
+    storageof = (make-const-type-property-function sc_type_storage)
+    superof = (make-const-type-property-function sc_typename_type_get_super)
+    sizeof = (make-const-type-property-function sc_type_sizeof)
+    alignof = (make-const-type-property-function sc_type_alignof)
+
+#del extract-single-arg
+#del make-const-type-property-function
 
 let Closure->Generator =
     ast-macro
@@ -2241,6 +2260,7 @@ define-infix> 600 //
 define-infix> 600 *
 define-infix< 700 ** pow
 define-infix> 750 as
+define-infix> 780 :
 define-infix> 800 .
 define-infix> 800 @
 
@@ -3200,9 +3220,68 @@ fn check-count (count mincount maxcount)
             return false
     return true
 
+fn next-head? (next)
+    if (not (empty? next))
+        let expr next = (decons next)
+        if (('typeof expr) == list)
+            let at = ('@ (expr as list))
+            if (('typeof at) == Symbol)
+                return (at as Symbol)
+    unnamed
+
+inline gen-match-block-parser (handle-case)
+    syntax-block-scope-macro
+        fn (expr next scope)
+            let head arg argrest = (decons expr 2)
+            let arg argrest = (sc_expand arg argrest scope)
+            let outnext = (alloca-array list 1)
+            let outexpr next =
+                ast-quote
+                    label ok-label
+                        inline return-ok (args...)
+                            merge ok-label args...
+                        ast-unquote
+                            let outexpr = (sc_expression_new (sc_get_active_anchor))
+                            loop (next = next)
+                                let head = (next-head? next)
+                                switch head
+                                case 'case
+                                    let expr next = (decons next)
+                                    let expr = (expr as list)
+                                    let head cond body = (decons expr 2)
+                                    sc_expression_append outexpr
+                                        ast-quote
+                                            label case-label
+                                                inline fail-case ()
+                                                    merge case-label
+                                                let token = arg
+                                                ast-unquote
+                                                    let newscope = (Scope scope)
+                                                    let unpack-expr =
+                                                        handle-case fail-case token newscope cond
+                                                    let body =
+                                                        sc_expand (cons do body) '() newscope
+                                                    ast-quote
+                                                        unpack-expr
+                                                        return-ok body
+                                    repeat next
+                                case 'default
+                                    let expr next = (decons next)
+                                    let expr = (expr as list)
+                                    let head body = (decons expr)
+                                    let body =
+                                        sc_expand (cons do body) '() scope
+                                    sc_expression_append outexpr `(return-ok body)
+                                    store next outnext
+                                    break outexpr
+                                default
+                                    compiler-error! "default branch missing"
+            return (cons outexpr (load outnext)) scope
+
 fn gen-syntax-matcher (failfunc expr scope params)
     if false
         return `[]
+    let params = (params as list)
     let paramcount = (countof params)
     let outexpr = (sc_expression_new (sc_get_active_anchor))
     loop (i rest next varargs = 0 params expr false)
@@ -3283,62 +3362,7 @@ fn gen-syntax-matcher (failfunc expr scope params)
                 outexpr
 
 define syntax-match
-    fn next-head? (next)
-        if (not (empty? next))
-            let expr next = (decons next)
-            if (('typeof expr) == list)
-                let at = ('@ (expr as list))
-                if (('typeof at) == Symbol)
-                    return (at as Symbol)
-        unnamed
-    syntax-block-scope-macro
-        fn "syntax-match" (expr next scope)
-            let head arg argrest = (decons expr 2)
-            let arg argrest = (sc_expand arg argrest scope)
-            let outnext = (alloca-array list 1)
-            let outexpr next =
-                ast-quote
-                    label ok-label
-                        inline return-ok (args...)
-                            merge ok-label args...
-                        ast-unquote
-                            let outexpr = (sc_expression_new (sc_get_active_anchor))
-                            loop (next = next)
-                                let head = (next-head? next)
-                                switch head
-                                case 'case
-                                    let expr next = (decons next)
-                                    let expr = (expr as list)
-                                    let head cond body = (decons expr 2)
-                                    let cond = (cond as list)
-                                    sc_expression_append outexpr
-                                        ast-quote
-                                            label case-label
-                                                inline fail-case ()
-                                                    merge case-label
-                                                let token = arg
-                                                ast-unquote
-                                                    let newscope = (Scope scope)
-                                                    let unpack-expr =
-                                                        gen-syntax-matcher fail-case token newscope cond
-                                                    let body =
-                                                        sc_expand (cons do body) '() newscope
-                                                    ast-quote
-                                                        unpack-expr
-                                                        return-ok body
-                                    repeat next
-                                case 'default
-                                    let expr next = (decons next)
-                                    let expr = (expr as list)
-                                    let head body = (decons expr)
-                                    let body =
-                                        sc_expand (cons do body) '() scope
-                                    sc_expression_append outexpr `(return-ok body)
-                                    store next outnext
-                                    break outexpr
-                                default
-                                    compiler-error! "default branch missing"
-            return (cons outexpr (load outnext)) scope
+    gen-match-block-parser gen-syntax-matcher
 
 #-------------------------------------------------------------------------------
 
@@ -3436,6 +3460,7 @@ fn uncomma (l)
 fn gen-argument-matcher (failfunc expr scope params)
     if false
         return `[]
+    let params = (params as list)
     let params = (uncomma params)
     let paramcount = (countof params)
     let outexpr = (sc_expression_new (sc_get_active_anchor))
@@ -3504,62 +3529,7 @@ fn gen-argument-matcher (failfunc expr scope params)
                 outexpr
 
 define match-args
-    fn next-head? (next)
-        if (not (empty? next))
-            let expr next = (decons next)
-            if (('typeof expr) == list)
-                let at = ('@ (expr as list))
-                if (('typeof at) == Symbol)
-                    return (at as Symbol)
-        unnamed
-    syntax-block-scope-macro
-        fn "match-args" (expr next scope)
-            let head arg argrest = (decons expr 2)
-            let arg argrest = (sc_expand arg argrest scope)
-            let outnext = (alloca-array list 1)
-            let outexpr next =
-                ast-quote
-                    label ok-label
-                        inline return-ok (args...)
-                            merge ok-label args...
-                        ast-unquote
-                            let outexpr = (sc_expression_new (sc_get_active_anchor))
-                            loop (next = next)
-                                let head = (next-head? next)
-                                switch head
-                                case 'case
-                                    let expr next = (decons next)
-                                    let expr = (expr as list)
-                                    let head cond body = (decons expr 2)
-                                    let cond = (cond as list)
-                                    sc_expression_append outexpr
-                                        ast-quote
-                                            label case-label
-                                                inline fail-case ()
-                                                    merge case-label
-                                                let token = arg
-                                                ast-unquote
-                                                    let newscope = (Scope scope)
-                                                    let unpack-expr =
-                                                        gen-argument-matcher fail-case token newscope cond
-                                                    let body =
-                                                        sc_expand (cons do body) '() newscope
-                                                    ast-quote
-                                                        unpack-expr
-                                                        return-ok body
-                                    repeat next
-                                case 'default
-                                    let expr next = (decons next)
-                                    let expr = (expr as list)
-                                    let head body = (decons expr)
-                                    let body =
-                                        sc_expand (cons do body) '() scope
-                                    sc_expression_append outexpr `(return-ok body)
-                                    store next outnext
-                                    break outexpr
-                                default
-                                    compiler-error! "default branch missing"
-            return (cons outexpr (load outnext)) scope
+    gen-match-block-parser gen-argument-matcher
 
 define spice
     syntax-macro
@@ -3616,6 +3586,78 @@ define spice
                                         [ast-unquote]
                                             [(cons inline content)] args
 
+#-------------------------------------------------------------------------------
+
+fn gen-match-matcher
+
+fn gen-or-matcher (failfunc expr scope params)
+    ast-quote
+        label or-ok
+            ast-unquote
+                loop (prefix params = `[] params)
+                    let at params = (decons params)
+                    if (empty? params)
+                        break
+                            ast-quote
+                                prefix
+                                ast-unquote
+                                    let unpack-expr =
+                                        gen-match-matcher failfunc expr
+                                            \ (Scope scope) at
+                                    ast-quote unpack-expr (merge or-ok)
+                    repeat
+                        ast-quote
+                            label or-fail
+                                inline fail-case ()
+                                    merge or-fail
+                                prefix
+                                ast-unquote
+                                    let unpack-expr =
+                                        gen-match-matcher fail-case expr
+                                            \ (Scope scope) at
+                                    ast-quote unpack-expr (merge or-ok)
+                        params
+
+fn gen-match-matcher (failfunc expr scope cond)
+    """"features:
+        <constant> -> (input == <constant>)
+        (or <expr_a> <expr_b>) -> (or <expr_a> <expr_b>)
+
+        TODO:
+        (: x T) -> ((typeof input) == T), let x = input
+        <unknown symbol> -> unpack as symbol
+    if false
+        return `[]
+    let condT = ('typeof cond)
+    if (condT == list)
+        let cond-anchor = ('anchor cond)
+        let cond = (uncomma (cond as list))
+        let cond =
+            if (has-infix-ops? scope cond)
+                let at next = ('decons cond)
+                sc_set_active_anchor ('anchor at)
+                let expr =
+                    parse-infix-expr scope at next 0
+                expr as list
+            else cond
+        let head rest = (decons cond)
+        let T = ('typeof head)
+        if (T == Symbol)
+            let token = (head as Symbol)
+            if (token == 'or)
+                return (gen-or-matcher failfunc expr scope rest)
+        syntax-error! cond-anchor
+            .. "unsupported pattern: " (repr cond)
+    let cond =
+        sc_expand cond '() scope
+    ast-quote
+        if (expr != cond)
+            failfunc;
+
+#-------------------------------------------------------------------------------
+
+define match
+    gen-match-block-parser gen-match-matcher
 
 compile-stage;
 
