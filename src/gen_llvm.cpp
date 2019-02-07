@@ -94,6 +94,9 @@ static void build_and_run_opt_passes(LLVMModuleRef module, int opt_level) {
     LLVMDisposePassManager(modulePasses);
 }
 
+const double deg2rad = 0.017453292519943295;
+const double rad2deg = 57.29577951308232;
+
 struct LLVMIRGenerator {
     enum Intrinsic {
         llvm_sin_f32,
@@ -120,6 +123,10 @@ struct LLVMIRGenerator {
         llvm_log2_f64,
         custom_fsign_f32,
         custom_fsign_f64,
+        custom_radians_f32,
+        custom_radians_f64,
+        custom_degrees_f32,
+        custom_degrees_f64,
         NumIntrinsics,
     };
 
@@ -415,6 +422,22 @@ struct LLVMIRGenerator {
                 val = LLVMBuildSub(builder, a, b, "");
                 val = LLVMBuildSIToFP(builder, val, f64T, "");
                 LLVMBuildRet(builder, val);
+            LLVM_INTRINSIC_IMPL_END()
+            LLVM_INTRINSIC_IMPL_BEGIN(custom_radians_f32, f32T, "custom.radians.f32", f32T)
+                LLVMBuildRet(builder, LLVMBuildFMul(builder,
+                    LLVMGetParam(result, 0), LLVMConstReal(f32T, deg2rad), ""));
+            LLVM_INTRINSIC_IMPL_END()
+            LLVM_INTRINSIC_IMPL_BEGIN(custom_radians_f64, f64T, "custom.radians.f64", f64T)
+                LLVMBuildRet(builder, LLVMBuildFMul(builder,
+                    LLVMGetParam(result, 0), LLVMConstReal(f64T, deg2rad), ""));
+            LLVM_INTRINSIC_IMPL_END()
+            LLVM_INTRINSIC_IMPL_BEGIN(custom_degrees_f32, f32T, "custom.degrees.f32", f32T)
+                LLVMBuildRet(builder, LLVMBuildFMul(builder,
+                    LLVMGetParam(result, 0), LLVMConstReal(f32T, rad2deg), ""));
+            LLVM_INTRINSIC_IMPL_END()
+            LLVM_INTRINSIC_IMPL_BEGIN(custom_degrees_f64, f64T, "custom.degrees.f64", f64T)
+                LLVMBuildRet(builder, LLVMBuildFMul(builder,
+                    LLVMGetParam(result, 0), LLVMConstReal(f64T, rad2deg), ""));
             LLVM_INTRINSIC_IMPL_END()
 #undef LLVM_INTRINSIC_IMPL
 #undef LLVM_INTRINSIC_IMPL_BEGIN
@@ -1539,7 +1562,10 @@ struct LLVMIRGenerator {
         case OP_Log:
         case OP_Exp2:
         case OP_Log2:
-        case OP_Floor: { READ_VALUE(x);
+        case OP_Floor:
+        case OP_Radians:
+        case OP_Degrees:
+        { READ_VALUE(x);
             auto T = LLVMTypeOf(x);
             auto ET = T;
             if (LLVMGetTypeKind(T) == LLVMVectorTypeKind) {
@@ -1559,6 +1585,8 @@ struct LLVMIRGenerator {
             case OP_Exp2: { op = (ET == f64T)?llvm_exp2_f64:llvm_exp2_f32; } break;
             case OP_Log2: { op = (ET == f64T)?llvm_log2_f64:llvm_log2_f32; } break;
             case OP_FSign: { op = (ET == f64T)?custom_fsign_f64:custom_fsign_f32; } break;
+            case OP_Radians: { op = (ET == f64T)?custom_radians_f64:custom_radians_f32; } break;
+            case OP_Degrees: { op = (ET == f64T)?custom_degrees_f64:custom_degrees_f32; } break;
             default: break;
             }
             func = get_intrinsic(op);
