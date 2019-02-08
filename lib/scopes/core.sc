@@ -747,6 +747,8 @@ inline define-symbols (self values...)
     element-count = sc_type_countof
     storage = sc_type_storage
     kind = sc_type_kind
+    size = sc_type_sizeof
+    align = sc_type_alignof
     @ = sc_type_at
     local@ = sc_type_local_at
     opaque? = sc_type_is_opaque
@@ -1469,6 +1471,7 @@ let
     #asfn = (typify asfn type type)
     countof = (make-unary-op-dispatch '__countof "count")
     unpack = (make-unary-op-dispatch '__unpack "unpack")
+    hash1 = (make-unary-op-dispatch '__hash "hash")
     ~ = (make-unary-op-dispatch '__~ "bitwise-negate")
     == = (make-sym-binary-op-dispatch '__== '__r== "compare")
     != = (make-sym-binary-op-dispatch '__!= '__r!= "compare")
@@ -2365,80 +2368,53 @@ define for
 #---------------------------------------------------------------------------
 
 let hash = (typename "hash")
-'set-storage hash u64
+'set-plain-storage hash u64
+
+let hash-storage =
+    ast-macro
+        fn "hash-storage" (args)
+            let argc = ('argcount args)
+            verify-count argc 1 1
+            let value = ('getarg args 0)
+            let OT = ('typeof value)
+            let T =
+                if ('opaque? OT) OT
+                else ('storage OT)
+            let conv_u64 =
+                switch ('kind T)
+                case type-kind-integer
+                    `(zext (bitcast value T) u64)
+                case type-kind-pointer
+                    `(ptrtoint value u64)
+                default
+                    if (type== T f32)
+                        `(zext (bitcast value u32) u64)
+                    elseif (type== T f64)
+                        `(bitcast value u64)
+                    else
+                        compiler-error!
+                            .. "can't hash storage of type " (repr OT)
+            `(bitcast (sc_hash conv_u64 [('size T)]) hash)
 
 'set-symbols hash
+    __hash = (inline (self) self)
     __typecall =
-        box-ast-macro
-            fn "hash-typecall" (args)
-                let argc = ('argcount args)
-                verify-count argc 1 1
-                let value = ('getarg args 0)
-                let T = ('typeof value)
-                if (type== T hash)
-                    return value
-                `[]
-
-
-#inline forward-hash (value)
-    let T = (typeof value)
-    if (type== T hash)
-        return value
-    let f ok = (type@ T '__hash)
-    if ok
-        let result = (f value)
-        if (type== (typeof result) hash)
-            return result
-        else
-            compiler-error!
-                string-join "value of type "
-                    string-join (Any-repr (Any-wrap T))
-                        string-join "did not hash to type"
-                            Any-repr (Any-wrap hash)
-    let T =
-        if (opaque? T) T
-        else (storageof T)
-    if (integer-type? T)
-        bitcast
-            __hash
-                zext (bitcast value T) u64
-                sizeof T
-            hash
-    elseif (pointer-type? T)
-        bitcast
-            __hash
-                ptrtoint value u64
-                sizeof T
-            hash
-    elseif (type== T f32)
-        bitcast
-            __hash
-                zext (bitcast value u32) u64
-                sizeof T
-            hash
-    elseif (type== T f64)
-        bitcast
-            __hash
-                bitcast value u64
-                sizeof T
-            hash
-
-#inline hash1 (value)
-    let result... = (forward-hash value)
-    if (va-empty? result...)
-        compiler-error!
-            string-join "cannot hash value of type "
-                Any-repr (Any-wrap (typeof value))
-    result...
-
-#let hash2 =
-    op2-ltr-multiop
-        inline "hash2" (a b)
-            bitcast
-                __hash2x64
-                    bitcast (hash1 a) u64
-                    bitcast (hash1 b) u64
-                hash
+        do
+            inline hash2 (a b)
+                bitcast
+                    sc_hash2x64
+                        bitcast (hash1 a) u64
+                        bitcast (hash1 b) u64
+                    hash
+            ast-macro
+                fn "hash-typecall" (args)
+                    let argc = ('argcount args)
+                    verify-count argc 2 -1
+                    let value = ('getarg args 1)
+                    if (argc == 2)
+                        `(hash1 value)
+                    else
+                        ltr-multiop ('getarglist args 1) hash2
 
 #---------------------------------------------------------------------------
 # module loading
