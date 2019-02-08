@@ -20,18 +20,21 @@ struct SourceFile;
 
 struct Anchor {
 protected:
-    Anchor(SourceFile *_file, int _lineno, int _column, int _offset);
+    Anchor(SourceFile *_file, int _lineno, int _column, int _offset, const Anchor *_next);
 
 public:
     SourceFile *file;
     int lineno;
     int column;
     int offset;
+    const Anchor *next;
 
     Symbol path() const;
 
+    bool is_same(const Anchor *other) const;
+
     static const Anchor *from(
-        SourceFile *_file, int _lineno, int _column, int _offset = 0);
+        SourceFile *_file, int _lineno, int _column, int _offset = 0, const Anchor *_next = nullptr);
 
     StyledStream& stream(StyledStream& ost) const;
 

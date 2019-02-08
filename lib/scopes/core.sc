@@ -151,6 +151,14 @@ fn unbox-verify (value wantT)
                     sc_value_repr (box-pointer haveT)
                     sc_string_join " as value of type "
                         sc_value_repr (box-pointer wantT)
+    if (sc_value_is_constant value)
+    else
+        syntax-error! (sc_value_anchor value)
+            sc_string_join "constant of type "
+                sc_string_join
+                    sc_value_repr (box-pointer haveT)
+                    sc_string_join " expected, got expression of type "
+                        sc_value_repr (box-pointer wantT)
 
 inline unbox-integer (value T)
     unbox-verify value T
@@ -849,17 +857,17 @@ inline unbox (value T)
     unbox-verify value T
     __unbox value T
 
-fn value-imply (vT T expr)
+fn value-as (vT T expr)
     if true
         return `(unbox expr T)
     compiler-error! "unsupported type"
 
 'set-symbols Value
-    __imply =
-        box-cast value-imply
+    __as =
+        box-cast value-as
     __rimply =
         box-cast
-            fn "syntax-rimply" (vT T expr)
+            fn "Value-rimply" (vT T expr)
                 if true
                     return `(Value expr)
                 compiler-error! "unsupported type"
@@ -1453,8 +1461,6 @@ let NullType = (sc_typename_type "NullType")
                 if (icmp== ('kind ('storage lhsT)) type-kind-pointer)
                     return `(icmp== (ptrtoint lhs usize) 0:usize)
                 compiler-error! "only pointers can be compared to null"
-
-#---------------------------------------------------------------------------
 
 let
     and-branch = (ast-macro (fn (args) (dispatch-and-or args true)))
@@ -2355,6 +2361,86 @@ define for
                 scope
 
 #---------------------------------------------------------------------------
+# hashing
+#---------------------------------------------------------------------------
+
+let hash = (typename "hash")
+'set-storage hash u64
+
+'set-symbols hash
+    __typecall =
+        box-ast-macro
+            fn "hash-typecall" (args)
+                let argc = ('argcount args)
+                verify-count argc 1 1
+                let value = ('getarg args 0)
+                let T = ('typeof value)
+                if (type== T hash)
+                    return value
+                `[]
+
+
+#inline forward-hash (value)
+    let T = (typeof value)
+    if (type== T hash)
+        return value
+    let f ok = (type@ T '__hash)
+    if ok
+        let result = (f value)
+        if (type== (typeof result) hash)
+            return result
+        else
+            compiler-error!
+                string-join "value of type "
+                    string-join (Any-repr (Any-wrap T))
+                        string-join "did not hash to type"
+                            Any-repr (Any-wrap hash)
+    let T =
+        if (opaque? T) T
+        else (storageof T)
+    if (integer-type? T)
+        bitcast
+            __hash
+                zext (bitcast value T) u64
+                sizeof T
+            hash
+    elseif (pointer-type? T)
+        bitcast
+            __hash
+                ptrtoint value u64
+                sizeof T
+            hash
+    elseif (type== T f32)
+        bitcast
+            __hash
+                zext (bitcast value u32) u64
+                sizeof T
+            hash
+    elseif (type== T f64)
+        bitcast
+            __hash
+                bitcast value u64
+                sizeof T
+            hash
+
+#inline hash1 (value)
+    let result... = (forward-hash value)
+    if (va-empty? result...)
+        compiler-error!
+            string-join "cannot hash value of type "
+                Any-repr (Any-wrap (typeof value))
+    result...
+
+#let hash2 =
+    op2-ltr-multiop
+        inline "hash2" (a b)
+            bitcast
+                __hash2x64
+                    bitcast (hash1 a) u64
+                    bitcast (hash1 b) u64
+                hash
+
+#---------------------------------------------------------------------------
 # module loading
 #---------------------------------------------------------------------------
 
@@ -2387,7 +2473,7 @@ fn exec-module (expr eval-scope)
     let StageFunctionType = ('pointer ('raising (function CompileStage) Error))
     let expr-anchor = ('anchor expr)
     sc_set_active_anchor expr-anchor
-    let f = (sc_eval expr-anchor expr eval-scope)
+    let f = (sc_eval expr-anchor (expr as list) eval-scope)
     loop (f = f)
         # build a wrapper
         let wrapf =
@@ -2844,7 +2930,7 @@ define-syntax-macro assert
         if ((countof args) == 2) msg
         else
             Value
-                sc_list_repr cond
+                sc_list_repr (cond as list)
     list __assert cond msg
 
 define-syntax-macro while
@@ -4090,7 +4176,7 @@ sugar enum (name values...)
         let T = (T as type)
         inline make-enumval (anchor val)
             sc_const_int_new anchor T
-                sext (imply val i32) u64
+                sext (as val i32) u64
 
         'set-super T CEnum
         'set-storage T i32
@@ -4106,11 +4192,11 @@ sugar enum (name values...)
             _ (i + 1)
                 if (key == unnamed)
                     # auto-numerical
-                    'set-symbol T val (make-enumval anchor nextval)
+                    'set-symbol T (as val Symbol) (make-enumval anchor nextval)
                     nextval + 1
                 else
                     'set-symbol T key (make-enumval anchor val)
-                    val + 1
+                    (as val i32) + 1
         T
 
     fn convert-body (body)

@@ -33,3 +33,8 @@ assert (g_x == 82)
 
 f;
 assert (g_x == 82)
+
+
+let chain1 = (FunctionChain "test")
+let chain2 = (FunctionChain "test")
+assert (chain1 != chain2)

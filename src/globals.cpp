@@ -148,6 +148,12 @@ sc_symbol_raises_t convert_result(const Result<Symbol> &_result) CRESULT;
 
 } // namespace scopes
 
+#if 1
+#define REWRITE_ANCHOR(X) X = get_active_anchor();
+#else
+#define REWRITE_ANCHOR(X)
+#endif
+
 extern "C" {
 
 // Compiler
@@ -174,12 +180,14 @@ sc_value_list_raises_t sc_expand(sc_value_t *expr, const sc_list_t *next, sc_sco
 sc_value_raises_t sc_eval(const sc_anchor_t *anchor, const sc_list_t *expr, sc_scope_t *scope) {
     using namespace scopes;
     SCOPES_RESULT_TYPE(TypedValue *);
+    REWRITE_ANCHOR(anchor)
     auto module_result = SCOPES_C_GET_RESULT(expand_module(anchor, expr, scope));
     return convert_result(prove(nullptr, module_result, {}));
 }
 
 sc_value_raises_t sc_eval_inline(const sc_anchor_t *anchor, const sc_list_t *expr, sc_scope_t *scope) {
     using namespace scopes;
+    REWRITE_ANCHOR(anchor)
     //const Anchor *anchor = expr->anchor();
     //auto list = SCOPES_GET_RESULT(extract_list_constant(expr));
     return convert_result(expand_inline(anchor, nullptr, expr, scope));
@@ -307,6 +315,7 @@ void sc_set_autocomplete_scope(const sc_scope_t* scope) {
 
 const sc_string_t *sc_format_message(const sc_anchor_t *anchor, const sc_string_t *message) {
     using namespace scopes;
+    REWRITE_ANCHOR(anchor)
     StyledString ss;
     if (anchor) {
         ss.out << anchor << " ";
@@ -404,6 +413,7 @@ void sc_set_globals(sc_scope_t *s) {
 
 sc_error_t *sc_location_error_new(const sc_anchor_t *anchor, const sc_string_t *msg) {
     using namespace scopes;
+    REWRITE_ANCHOR(anchor)
     return make_location_error(anchor, msg);
 }
 sc_error_t *sc_runtime_error_new(const sc_string_t *msg) {
@@ -883,11 +893,13 @@ sc_value_t *sc_value_unwrap(const sc_type_t *type, sc_value_t *value) {
 
 sc_value_t *sc_keyed_new(const sc_anchor_t *anchor, sc_symbol_t key, sc_value_t *value) {
     using namespace scopes;
+    REWRITE_ANCHOR(anchor)
     return KeyedTemplate::from(anchor, key, value);
 }
 
 sc_value_t *sc_argument_list_new(const sc_anchor_t *anchor) {
     using namespace scopes;
+    REWRITE_ANCHOR(anchor)
     return ArgumentListTemplate::empty_from(anchor);
 }
 
@@ -965,17 +977,19 @@ sc_value_t *sc_getarglist(sc_value_t *value, int index) {
 
 sc_value_t *sc_extract_argument_new(const sc_anchor_t *anchor, sc_value_t *value, int index) {
     using namespace scopes;
+    REWRITE_ANCHOR(anchor)
     return ExtractArgumentTemplate::from(anchor, value, index);
 }
 
 sc_value_t *sc_extract_argument_list_new(const sc_anchor_t *anchor, sc_value_t *value, int index) {
     using namespace scopes;
+    REWRITE_ANCHOR(anchor)
     return ExtractArgumentTemplate::from(anchor, value, index, true);
 }
 
 sc_value_t *sc_template_new(const sc_anchor_t *anchor, sc_symbol_t name) {
     using namespace scopes;
-    // todo: set scope
+    REWRITE_ANCHOR(anchor)
     return Template::from(anchor, name);
 }
 void sc_template_set_name(sc_value_t *fn, sc_symbol_t name) {
@@ -1002,6 +1016,7 @@ void sc_template_set_inline(sc_value_t *fn) {
 
 sc_value_t *sc_expression_new(const sc_anchor_t *anchor) {
     using namespace scopes;
+    REWRITE_ANCHOR(anchor)
     auto block = Expression::from(anchor);
     block->scoped = false;
     return block;
@@ -1019,6 +1034,7 @@ void sc_expression_append(sc_value_t *expr, sc_value_t *value) {
 
 sc_value_t *sc_global_new(const sc_anchor_t *anchor, sc_symbol_t name, const sc_type_t *type) {
     using namespace scopes;
+    REWRITE_ANCHOR(anchor)
     return Global::from(anchor, type, name);
 }
 void sc_global_set_flags(sc_value_t *value, uint32_t flags) {
@@ -1057,36 +1073,44 @@ int32_t sc_global_get_binding(sc_value_t *value) {
 
 sc_value_t *sc_if_new(const sc_anchor_t *anchor) {
     using namespace scopes;
+    REWRITE_ANCHOR(anchor)
     return If::from(anchor);
 }
 void sc_if_append_then_clause(sc_value_t *value, const sc_anchor_t *anchor, sc_value_t *cond, sc_value_t *body) {
     using namespace scopes;
+    REWRITE_ANCHOR(anchor)
     cast<If>(value)->append_then(anchor, cond, body);
 }
 void sc_if_append_else_clause(sc_value_t *value, const sc_anchor_t *anchor, sc_value_t *body) {
     using namespace scopes;
+    REWRITE_ANCHOR(anchor)
     cast<If>(value)->append_else(anchor, body);
 }
 
 sc_value_t *sc_switch_new(const sc_anchor_t *anchor, sc_value_t *expr) {
     using namespace scopes;
+    REWRITE_ANCHOR(anchor)
     return SwitchTemplate::from(anchor, expr);
 }
 void sc_switch_append_case(sc_value_t *value, const sc_anchor_t *anchor, sc_value_t *literal, sc_value_t *body) {
     using namespace scopes;
+    REWRITE_ANCHOR(anchor)
     cast<SwitchTemplate>(value)->append_case(anchor, literal, body);
 }
 void sc_switch_append_pass(sc_value_t *value, const sc_anchor_t *anchor, sc_value_t *literal, sc_value_t *body) {
     using namespace scopes;
+    REWRITE_ANCHOR(anchor)
     cast<SwitchTemplate>(value)->append_pass(anchor, literal, body);
 }
 void sc_switch_append_default(sc_value_t *value, const sc_anchor_t *anchor, sc_value_t *body) {
     using namespace scopes;
+    REWRITE_ANCHOR(anchor)
     cast<SwitchTemplate>(value)->append_default(anchor, body);
 }
 
 sc_value_t *sc_parameter_new(const sc_anchor_t *anchor, sc_symbol_t name) {
     using namespace scopes;
+    REWRITE_ANCHOR(anchor)
     if (ends_with_parenthesis(name)) {
         return ParameterTemplate::variadic_from(anchor, name);
     } else {
@@ -1101,6 +1125,7 @@ bool sc_parameter_is_variadic(sc_value_t *param) {
 
 sc_value_t *sc_call_new(const sc_anchor_t *anchor, sc_value_t *callee) {
     using namespace scopes;
+    REWRITE_ANCHOR(anchor)
     return CallTemplate::from(anchor, callee);
 }
 
@@ -1121,6 +1146,7 @@ void sc_call_set_rawcall(sc_value_t *value, bool enable) {
 
 sc_value_t *sc_loop_new(const sc_anchor_t *anchor, sc_value_t *init) {
     using namespace scopes;
+    REWRITE_ANCHOR(anchor)
     return Loop::from(anchor, init);
 }
 
@@ -1136,20 +1162,24 @@ void sc_loop_set_body(sc_value_t *loop, sc_value_t *body) {
 
 sc_value_t *sc_const_int_new(const sc_anchor_t *anchor, const sc_type_t *type, uint64_t value) {
     using namespace scopes;
+    REWRITE_ANCHOR(anchor)
     return ConstInt::from(anchor, type, value);
 }
 sc_value_t *sc_const_real_new(const sc_anchor_t *anchor, const sc_type_t *type, double value) {
     using namespace scopes;
+    REWRITE_ANCHOR(anchor)
     return ConstReal::from(anchor, type, value);
 }
 sc_value_t *sc_const_aggregate_new(const sc_anchor_t *anchor, const sc_type_t *type, int numconsts, sc_value_t **consts) {
     using namespace scopes;
+    REWRITE_ANCHOR(anchor)
     Constants vals;
     init_values_arrayT(vals, numconsts, consts);
     return ConstAggregate::from(anchor, type, vals);
 }
 sc_value_t *sc_const_pointer_new(const sc_anchor_t *anchor, const sc_type_t *type, const void *pointer) {
     using namespace scopes;
+    REWRITE_ANCHOR(anchor)
     return ConstPointer::from(anchor, type, pointer);
 }
 uint64_t sc_const_int_extract(const sc_value_t *value) {
@@ -1173,33 +1203,40 @@ const void *sc_const_pointer_extract(const sc_value_t *value) {
 
 sc_value_t *sc_break_new(const sc_anchor_t *anchor, sc_value_t *value) {
     using namespace scopes;
+    REWRITE_ANCHOR(anchor)
     return Break::from(anchor, value);
 }
 sc_value_t *sc_repeat_new(const sc_anchor_t *anchor, sc_value_t *value) {
     using namespace scopes;
+    REWRITE_ANCHOR(anchor)
     return RepeatTemplate::from(anchor, value);
 }
 sc_value_t *sc_return_new(const sc_anchor_t *anchor, sc_value_t *value) {
     using namespace scopes;
+    REWRITE_ANCHOR(anchor)
     return ReturnTemplate::from(anchor, value);
 }
 sc_value_t *sc_raise_new(const sc_anchor_t *anchor, sc_value_t *value) {
     using namespace scopes;
+    REWRITE_ANCHOR(anchor)
     return RaiseTemplate::from(anchor, value);
 }
 
 sc_value_t *sc_quote_new(const sc_anchor_t *anchor, sc_value_t *value) {
     using namespace scopes;
+    REWRITE_ANCHOR(anchor)
     return Quote::from(anchor, value);
 }
 
 sc_value_t *sc_unquote_new(const sc_anchor_t *anchor, sc_value_t *value) {
     using namespace scopes;
+    REWRITE_ANCHOR(anchor)
     return Unquote::from(anchor, value);
 }
 
 sc_value_t *sc_label_new(const sc_anchor_t *anchor, int kind, sc_symbol_t name) {
     using namespace scopes;
+    REWRITE_ANCHOR(anchor)
     return LabelTemplate::from(anchor, (LabelKind)kind, name);
 }
 void sc_label_set_body(sc_value_t *label, sc_value_t *body) {
@@ -1208,6 +1245,7 @@ void sc_label_set_body(sc_value_t *label, sc_value_t *body) {
 }
 sc_value_t *sc_merge_new(const sc_anchor_t *anchor, sc_value_t *label, sc_value_t *value) {
     using namespace scopes;
+    REWRITE_ANCHOR(anchor)
     return MergeTemplate::from(anchor, cast<LabelTemplate>(label), value);
 }
 

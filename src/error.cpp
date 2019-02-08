@@ -82,8 +82,12 @@ void stream_error_string(StyledStream &ss, const Error *exc) {
 
 void stream_error(StyledStream &ss, const Error *exc) {
     size_t i = exc->trace.size();
+    const Anchor *last_anchor = nullptr;
     while (i--) {
         auto value = exc->trace[i];
+        if (last_anchor && value->anchor()->is_same(last_anchor))
+            continue;
+        last_anchor = value->anchor();
         ss << value->anchor() << " in ";
         if (isa<Function>(value)) {
             auto fn = cast<Function>(value);
