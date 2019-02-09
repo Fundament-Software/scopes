@@ -1940,15 +1940,6 @@ fn expand-and-or (expr f)
         let at next = ('decons head)
         _ (Value (list f at (list inline '() result))) next
 
-#compile-stage
-    let vals = (alloca-array type 2)
-    store list (getelementptr vals 0)
-    store Value (getelementptr vals 1)
-    sc_compile
-        sc_typify expand-and-or 2 vals
-        0:u64
-    exit 0
-
 inline make-expand-and-or (f)
     fn (expr)
         expand-and-or expr f
@@ -2398,6 +2389,23 @@ let hash-storage =
 
 'set-symbols hash
     __hash = (inline (self) self)
+    __== = integer.__==
+    __!= = integer.__!=
+    __as =
+        box-cast
+            fn "hash-as" (vT T expr)
+                let ST = ('storage vT)
+                if (T == ST)
+                    return `(bitcast expr T)
+                elseif (T == integer)
+                    return `(bitcast expr ST)
+                compiler-error! "unsupported type"
+    __ras =
+        box-cast
+            fn "hash-as" (vT T expr)
+                if (vT == ('storage vT))
+                    return `(bitcast expr T)
+                compiler-error! "unsupported type"
     __typecall =
         do
             inline hash2 (a b)
@@ -2415,6 +2423,11 @@ let hash-storage =
                         `(hash1 value)
                     else
                         ltr-multiop ('getarglist args 1) hash2
+
+va-lfold none
+    inline (key T)
+        'set-symbol T '__hash hash-storage
+    \ integer pointer real type Closure Builtin Symbol string Scope
 
 #---------------------------------------------------------------------------
 # module loading
