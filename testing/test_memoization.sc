@@ -1,15 +1,21 @@
 
-fn memoized ()
-    typename "bang"
+fn unpack-type (x) (x as type)
 
-fn memoized-clone ()
-    typename "bang"
 
-fn memoized2 (x)
-    typename x
+let memoized =
+    memoize 
+        fn ()
+            sc_typename_type "bang"
+        unpack-type
 
-inline not-memoized ()
-    typename "T"
+let memoized-clone =
+    memoize 
+        fn ()
+            sc_typename_type "bang"
+        unpack-type
+
+fn not-memoized ()
+    sc_typename_type "T"
 
 assert
     (not-memoized) != (not-memoized)
@@ -20,7 +26,15 @@ assert
 assert
     (memoized) != (memoized-clone)
 
+let memoized2 =
+    memoize 
+        fn (x)
+            sc_typename_type x
+        unpack-type
+
 assert
     (memoized2 "test") == (memoized2 "test")
+assert
+    (memoized2 "test") != (memoized2 "test2")
 
 true

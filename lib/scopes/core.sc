@@ -3758,6 +3758,27 @@ inline enumerate (x)
     zip infinite-range x
 
 #-------------------------------------------------------------------------------
+# function memoization
+#-------------------------------------------------------------------------------
+
+inline memoize (f castfunc)
+    let castfunc =
+        constbranch (none? castfunc)
+            inline () _
+            inline () castfunc
+    fn (args...)
+        let key = `[f args...]
+        let value = (sc_map_get key)
+        let result =
+            if (value == null)
+                let value =
+                    `[(f args...)] 
+                sc_map_set key value
+                value
+            else value
+        castfunc result
+
+#-------------------------------------------------------------------------------
 # function overloading
 #-------------------------------------------------------------------------------
 

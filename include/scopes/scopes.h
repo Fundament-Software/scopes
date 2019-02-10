@@ -269,8 +269,8 @@ void sc_exit(int c);
 
 // memoization
 
-sc_bool_value_tuple_t sc_map_load(const sc_list_t *key);
-void sc_map_store(sc_value_t *value, const sc_list_t *key);
+sc_value_t *sc_map_get(sc_value_t *key);
+void sc_map_set(sc_value_t *key, sc_value_t *value);
 
 // hashing
 

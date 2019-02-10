@@ -447,26 +447,115 @@ void sc_exit(int c) {
 
 namespace scopes {
 
-typedef std::unordered_map<const List *, Value *> MemoMap;
+struct MemoKeyEqual {
+    bool operator()( Value *lhs, Value *rhs ) const {
+        if (lhs->kind() != rhs->kind())
+            return false;
+        if (isa<ArgumentList>(lhs)) {
+            auto a = cast<ArgumentList>(lhs);
+            auto b = cast<ArgumentList>(rhs);
+            if (a->get_type() != b->get_type())
+                return false;
+            for (int i = 0; i < a->values.size(); ++i) {
+                auto u = a->values[i];
+                auto v = b->values[i];
+                if (u->kind() != v->kind())
+                    return false;
+                if (isa<Pure>(u)) {
+                    if (!cast<Pure>(u)->key_equal(cast<Pure>(v)))
+                        return false;
+                } else {
+                    if (u != v)
+                        return false;
+                }
+            }
+            return true;
+        } else if (isa<ArgumentListTemplate>(lhs)) {
+            auto a = cast<ArgumentListTemplate>(lhs);
+            auto b = cast<ArgumentListTemplate>(rhs);
+            for (int i = 0; i < a->values.size(); ++i) {
+                auto u = a->values[i];
+                auto v = b->values[i];
+                if (u->kind() != v->kind())
+                    return false;
+                if (isa<Pure>(u)) {
+                    if (!cast<Pure>(u)->key_equal(cast<Pure>(v)))
+                        return false;
+                } else {
+                    if (u != v)
+                        return false;
+                }
+            }
+            return true;
+        } else if (isa<Pure>(lhs)) {
+            return cast<Pure>(lhs)->key_equal(cast<Pure>(rhs));
+        } else {
+            lhs == rhs;
+        }
+    }
+};
+
+struct MemoHash {
+    std::size_t operator()(Value *l) const {
+        if (isa<ArgumentList>(l)) {
+            auto alist = cast<ArgumentList>(l);
+            uint64_t h = std::hash<const Type *>{}(alist->get_type());
+            for (int i = 0; i < alist->values.size(); ++i) {
+                auto x = alist->values[i];
+                if (isa<Pure>(x)) {
+                    h = hash2(h, cast<Pure>(x)->hash());
+                } else {
+                    h = hash2(h, std::hash<const TypedValue *>{}(x));
+                }
+            }
+            return h;
+        } else if (isa<ArgumentListTemplate>(l)) {
+            auto alist = cast<ArgumentListTemplate>(l);
+            uint64_t h = 0;
+            for (int i = 0; i < alist->values.size(); ++i) {
+                auto x = alist->values[i];
+                if (isa<Pure>(x)) {
+                    h = hash2(h, cast<Pure>(x)->hash());
+                } else {
+                    h = hash2(h, std::hash<const Value *>{}(x));
+                }
+            }
+            return h;
+        } else if (isa<Pure>(l)) {
+            return cast<Pure>(l)->hash();
+        } else {
+            return std::hash<const Value *>{}(l);
+        }
+    }
+};
+
+typedef std::unordered_map<Value *, Value *, MemoHash, MemoKeyEqual> MemoMap;
 static MemoMap memo_map;
 
 }
 
-sc_bool_value_tuple_t sc_map_load(const sc_list_t *key) {
+sc_value_t *sc_map_get(sc_value_t *key) {
     using namespace scopes;
     auto it = memo_map.find(key);
     if (it != memo_map.end()) {
-        return { true, it->second };
+        return it->second;
     } else {
-        return { false, nullptr };
+        return nullptr;
     }
 }
 
-void sc_map_store(sc_value_t *value, const sc_list_t *key) {
+void sc_map_set(sc_value_t *key, sc_value_t *value) {
     using namespace scopes;
-    auto ret = memo_map.insert({key, value});
-    if (!ret.second) {
-        ret.first->second = value;
+    if (!value) {
+        auto it = memo_map.find(key);
+        if (it != memo_map.end()) {
+            memo_map.erase(it);
+        }
+    } else {
+        auto ret = memo_map.insert({key, value});
+        if (!ret.second) {
+            ret.first->second = value;
+        }
     }
 }
 
@@ -1904,8 +1993,8 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_set_signal_abort,
         _void, TYPE_Bool);
 
-    DEFINE_EXTERN_C_FUNCTION(sc_map_load, arguments_type({TYPE_Bool, TYPE_Value}), TYPE_List);
-    DEFINE_EXTERN_C_FUNCTION(sc_map_store, _void, TYPE_Value, TYPE_List);
+    DEFINE_EXTERN_C_FUNCTION(sc_map_get, TYPE_Value, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_map_set, _void, TYPE_Value, TYPE_Value);
 
     DEFINE_EXTERN_C_FUNCTION(sc_hash, TYPE_U64, TYPE_U64, TYPE_USize);
     DEFINE_EXTERN_C_FUNCTION(sc_hash2x64, TYPE_U64, TYPE_U64, TYPE_U64);

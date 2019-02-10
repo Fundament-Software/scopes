@@ -16,6 +16,7 @@
 #include "hash.hpp"
 
 #include <assert.h>
+#include <unordered_set>
 
 namespace scopes {
 
@@ -381,6 +382,14 @@ Function::Function(const Anchor *anchor, Symbol _name, const Parameters &_params
     }
 }
 
+bool Function::key_equal(const Function *other) const {
+    return this == other;
+}
+
+std::size_t Function::hash() const {
+    return std::hash<const Function *>{}(this);
+}
+
 bool Function::is_typed() const {
     assert(_type);
     return _type != TYPE_Unknown;
@@ -465,6 +474,14 @@ Global::Global(const Anchor *anchor, const Type *type, Symbol _name, size_t _fla
     : Pure(VK_Global, anchor, pointer_for_global_type(type, _flags, _storage_class)), name(_name), flags(_flags), storage_class(_storage_class), location(_location), binding(_binding) {
 }
 
+bool Global::key_equal(const Global *other) const {
+    return this == other;
+}
+
+std::size_t Global::hash() const {
+    return std::hash<const Global *>{}(this);
+}
+
 Global *Global::from(const Anchor *anchor, const Type *type, Symbol name, size_t flags, Symbol storage_class, int location, int binding) {
     if ((storage_class == SYM_SPIRV_StorageClassUniform)
         && !(flags & GF_BufferBlock)) {
@@ -477,6 +494,15 @@ Global *Global::from(const Anchor *anchor, const Type *type, Symbol name, size_t
 
 PureCast::PureCast(const Anchor *anchor, const Type *type, Pure *_value)
     : Pure(VK_PureCast, anchor, type), value(_value) {}
+
+bool PureCast::key_equal(const PureCast *other) const {
+    return get_type() == other->get_type()
+        && value == other->value;
+}
+
+std::size_t PureCast::hash() const {
+    return value->hash();
+}
 
 Pure *PureCast::from(const Anchor *anchor, const Type *type, Pure *value) {
     if (isa<PureCast>(value)) {
@@ -888,6 +914,30 @@ Pure::Pure(ValueKind _kind, const Anchor *anchor, const Type *type)
     : TypedValue(_kind, anchor, type) {
 }
 
+bool Pure::key_equal(const Pure *other) const {
+    if (kind() != other->kind())
+        return false;
+    switch(kind()) {
+    #define T(KIND, NAME, CLASS) \
+        case KIND: \
+            return cast<CLASS>(this)->key_equal(cast<CLASS>(other));
+    SCOPES_PURE_VALUE_KIND()
+    #undef T
+    default: assert(false); return false;
+    }
+}
+
+std::size_t Pure::hash() const {
+    switch(kind()) {
+    #define T(KIND, NAME, CLASS) \
+        case KIND: \
+            return cast<CLASS>(this)->hash();
+    SCOPES_PURE_VALUE_KIND()
+    #undef T
+    default: assert(false); return 0;   
+    }     
+}
+
 //------------------------------------------------------------------------------
 
 bool Const::classof(const Value *T) {
@@ -911,6 +961,15 @@ ConstInt::ConstInt(const Anchor *anchor, const Type *type, uint64_t _value)
     : Const(VK_ConstInt, anchor, type), value(_value) {
 }
 
+bool ConstInt::key_equal(const ConstInt *other) const {
+    return get_type() == other->get_type()
+        && value == other->value;
+}
+
+std::size_t ConstInt::hash() const {
+    return std::hash<uint64_t>{}(value);
+}
+
 ConstInt *ConstInt::from(const Anchor *anchor, const Type *type, uint64_t value) {
     return new ConstInt(anchor, type, value);
 }
@@ -928,6 +987,15 @@ ConstInt *ConstInt::builtin_from(const Anchor *anchor, Builtin value) {
 ConstReal::ConstReal(const Anchor *anchor, const Type *type, double _value)
     : Const(VK_ConstReal, anchor, type), value(_value) {}
 
+bool ConstReal::key_equal(const ConstReal *other) const {
+    return get_type() == other->get_type()
+        && value == other->value;
+}
+
+std::size_t ConstReal::hash() const {
+    return std::hash<double>{}(value);
+}
+
 ConstReal *ConstReal::from(const Anchor *anchor, const Type *type, double value) {
     return new ConstReal(anchor, type, value);
 }
@@ -936,6 +1004,26 @@ ConstReal *ConstReal::from(const Anchor *anchor, const Type *type, double value)
 
 ConstAggregate::ConstAggregate(const Anchor *anchor, const Type *type, const Constants &_fields)
     : Const(VK_ConstAggregate, anchor, type), values(_fields) {
+}
+
+bool ConstAggregate::key_equal(const ConstAggregate *other) const {
+    if (get_type() != other->get_type())
+        return false;
+    for (int i = 0; i < values.size(); ++i) {
+        auto a = values[i];
+        auto b = other->values[i];
+        if (!a->key_equal(b))
+            return false;
+    }
+    return true;
+}
+
+std::size_t ConstAggregate::hash() const {
+    uint64_t h = std::hash<const Type *>{}(get_type());
+    for (int i = 0; i < values.size(); ++i) {
+        h = hash2(h, values[i]->hash());
+    }
+    return h;
 }
 
 ConstAggregate *ConstAggregate::from(const Anchor *anchor, const Type *type, const Constants &fields) {
@@ -950,6 +1038,15 @@ ConstAggregate *ConstAggregate::none_from(const Anchor *anchor) {
 
 ConstPointer::ConstPointer(const Anchor *anchor, const Type *type, const void *_pointer)
     : Const(VK_ConstPointer, anchor, type), value(_pointer) {}
+
+bool ConstPointer::key_equal(const ConstPointer *other) const {
+    return (get_type() == other->get_type())
+        && value == other->value;
+}
+
+std::size_t ConstPointer::hash() const {
+    return std::hash<const void *>{}(value);
+}
 
 ConstPointer *ConstPointer::from(const Anchor *anchor, const Type *type, const void *pointer) {
     return new ConstPointer(anchor, type, pointer);

@@ -352,6 +352,9 @@ struct ExtractArgument : TypedValue {
 struct Pure : TypedValue {
     static bool classof(const Value *T);
 
+    bool key_equal(const Pure *other) const;
+    std::size_t hash() const;
+
     Pure(ValueKind _kind, const Anchor *anchor, const Type *type);
 };
 
@@ -709,6 +712,9 @@ struct Function : Pure {
     void set_type(const Type *type);
     bool is_typed() const;
 
+    bool key_equal(const Function *other) const;
+    std::size_t hash() const;
+
     Symbol name;
     Parameters params;
     Block body;
@@ -738,6 +744,9 @@ struct ConstInt : Const {
 
     ConstInt(const Anchor *anchor, const Type *type, uint64_t value);
 
+    bool key_equal(const ConstInt *other) const;
+    std::size_t hash() const;
+
     static ConstInt *from(const Anchor *anchor, const Type *type, uint64_t value);
     static ConstInt *symbol_from(const Anchor *anchor, Symbol value);
     static ConstInt *builtin_from(const Anchor *anchor, Builtin value);
@@ -752,6 +761,9 @@ struct ConstReal : Const {
 
     ConstReal(const Anchor *anchor, const Type *type, double value);
 
+    bool key_equal(const ConstReal *other) const;
+    std::size_t hash() const;
+
     static ConstReal *from(const Anchor *anchor, const Type *type, double value);
 
     double value;
@@ -763,6 +775,9 @@ struct ConstAggregate : Const {
     static bool classof(const Value *T);
 
     ConstAggregate(const Anchor *anchor, const Type *type, const Constants &fields);
+
+    bool key_equal(const ConstAggregate *other) const;
+    std::size_t hash() const;
 
     static ConstAggregate *from(const Anchor *anchor, const Type *type, const Constants &fields);
     static ConstAggregate *none_from(const Anchor *anchor);
@@ -776,6 +791,9 @@ struct ConstPointer : Const {
     static bool classof(const Value *T);
 
     ConstPointer(const Anchor *anchor, const Type *type, const void *pointer);
+
+    bool key_equal(const ConstPointer *other) const;
+    std::size_t hash() const;
 
     static ConstPointer *from(const Anchor *anchor, const Type *type, const void *pointer);
     static ConstPointer *type_from(const Anchor *anchor, const Type *type);
@@ -809,6 +827,9 @@ struct Global : Pure {
     Global(const Anchor *anchor, const Type *type, Symbol name,
         size_t flags, Symbol storage_class, int location, int binding);
 
+    bool key_equal(const Global *other) const;
+    std::size_t hash() const;
+
     static Global *from(const Anchor *anchor, const Type *type, Symbol name,
         size_t flags = 0,
         Symbol storage_class = SYM_Unnamed,
@@ -825,6 +846,9 @@ struct Global : Pure {
 
 struct PureCast : Pure {
     static bool classof(const Value *T);
+
+    bool key_equal(const PureCast *other) const;
+    std::size_t hash() const;
 
     PureCast(const Anchor *anchor, const Type *type, Pure *value);
     static Pure *from(const Anchor *anchor, const Type *type, Pure *value);
