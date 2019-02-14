@@ -18,3 +18,12 @@ assert (scope.x as i32 == 2)
 assert (scope.y as i32 == 3)
 assert (scope.z as i32 == 5)
 
+
+let locs = 
+    do
+        let x = 1
+        let y = 2
+        let z = 3
+        locals;
+
+dump locs

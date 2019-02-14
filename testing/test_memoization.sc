@@ -1,21 +1,20 @@
 
 fn unpack-type (x) (x as type)
 
-
 let memoized =
     memoize 
         fn ()
-            sc_typename_type "bang"
+            typename "bang"
         unpack-type
 
 let memoized-clone =
     memoize 
         fn ()
-            sc_typename_type "bang"
+            typename "bang"
         unpack-type
 
 fn not-memoized ()
-    sc_typename_type "T"
+    typename "T"
 
 assert
     (not-memoized) != (not-memoized)
@@ -36,5 +35,10 @@ assert
     (memoized2 "test") == (memoized2 "test")
 assert
     (memoized2 "test") != (memoized2 "test2")
+
+fn memoized-by-typedef ()
+    define-typename "test"
+
+assert ((memoized-by-typedef) == (memoized-by-typedef))
 
 true

@@ -1496,6 +1496,19 @@ let
     lslice = (make-asym-binary-op-dispatch '__lslice usize "apply left-slice operator with")
     rslice = (make-asym-binary-op-dispatch '__rslice usize "apply right-slice operator with")
 
+let missing-constructor = 
+    ast-macro
+        fn "missing-constructor" (args)
+            if false
+                return `[]
+            let argc = ('argcount args)
+            verify-count argc 1 -1
+            let cls = ('getarg args 0)
+            compiler-error!
+                sc_string_join "typename "
+                    sc_string_join ('__repr cls)
+                        " has no constructor"
+
 compile-stage;
 
 let null = (nullof NullType)
@@ -2022,38 +2035,37 @@ fn clone-scope-contents (a b)
         clone-scope-contents parent b
         a
 
-'set-symbols typename
-    __typecall =
-        box-ast-macro
-            fn (args)
-                let argc = ('argcount args)
-                verify-count argc 1 -1
-                let cls = ('getarg args 0)
-                if (ptrcmp== ('typeof cls) type)
-                    let cls = (as cls type)
-                    if (ptrcmp== cls typename)
-                        verify-count argc 2 4
-                        let name = ('getarg args 1)
-                        let T =
-                            sc_typename_type
-                                as name string
-                        loop (i = 2)
-                            if (== i argc)
-                                return (Value T)
-                            let arg = ('getarg args i)
-                            let k = (sc_type_key (sc_value_qualified_type arg))
-                            let v = (sc_keyed_new (sc_value_anchor arg) unnamed arg)
-                            if (== k 'super)
-                                sc_typename_type_set_super T (as v type)
-                            elseif (== k 'storage)
-                                'set-plain-storage T (as v type)
-                            else
-                                compiler-error! "super or storage key expected"
-                            + i 1
-                compiler-error!
-                    sc_string_join "typename "
-                        sc_string_join ('__repr cls)
-                            " has no constructor"
+'define-symbols typename
+    __typecall = 
+        fn (cls name)
+            let T = (sc_typename_type name)
+            'set-symbol T '__typecall missing-constructor
+            T
+
+let define-typename =
+    ast-macro
+        fn (args)
+            let argc = ('argcount args)
+            verify-count argc 1 3
+            let name = ('getarg args 0)
+            let T =
+                sc_typename_type
+                    as name string
+            loop (i = 1)
+                if (== i argc)
+                    return (Value T)
+                let arg = ('getarg args i)
+                let k = (sc_type_key (sc_value_qualified_type arg))
+                let v = (sc_keyed_new (sc_value_anchor arg) unnamed arg)
+                if (== k 'super)
+                    sc_typename_type_set_super T (as v type)
+                elseif (== k 'storage)
+                    'set-storage T (as v type)
+                elseif (== k 'plain-storage)
+                    'set-plain-storage T (as v type)
+                else
+                    compiler-error! "super or storage key expected"
+                + i 1
 
 'set-symbols Scope
     __.. =
@@ -2358,8 +2370,9 @@ define for
 # hashing
 #---------------------------------------------------------------------------
 
-let hash = (typename "hash")
-'set-plain-storage hash u64
+let hash =
+    define-typename "hash"
+        plain-storage = u64
 
 let hash-storage =
     ast-macro
@@ -2535,7 +2548,7 @@ fn patterns-from-namestr (base-dir namestr)
     else
         package.path as list
 
-let incomplete = (typename "incomplete")
+let incomplete = (define-typename "incomplete")
 fn require-from (base-dir name)
     #assert-typeof name Symbol
     let namestr = (dots-to-slashes (name as string))
@@ -3782,7 +3795,7 @@ inline memoize (f castfunc)
 # function overloading
 #-------------------------------------------------------------------------------
 
-let OverloadedFunction = (typename "OverloadedFunction")
+let OverloadedFunction = (define-typename "OverloadedFunction")
 
 fn get-overloaded-fn-append ()
     spice "overloaded-fn-append" (T args...)
@@ -4182,7 +4195,8 @@ sugar local (values...)
                 compiler-error! "unsupported type"
 
 sugar enum (name values...)
-    spice make-enum (T vals...)
+    spice make-enum (name vals...)
+        if ('constant? name)
         let T = (T as type)
         inline make-enumval (anchor val)
             sc_const_int_new anchor T
@@ -4228,9 +4242,9 @@ sugar enum (name values...)
         if (('typeof name) == Symbol)
             let namestr = (name as Symbol as string)
             list let name '=
-                cons make-enum (list typename namestr) newbody
+                cons make-enum namestr newbody
         else
-            cons make-enum (list typename (list (do as) name string)) newbody
+            cons make-enum (list (do as) name string) newbody
 
 compile-stage;
 
