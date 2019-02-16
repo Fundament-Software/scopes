@@ -490,7 +490,7 @@ struct MemoKeyEqual {
         } else if (isa<Pure>(lhs)) {
             return cast<Pure>(lhs)->key_equal(cast<Pure>(rhs));
         } else {
-            lhs == rhs;
+            return lhs == rhs;
         }
     }
 };

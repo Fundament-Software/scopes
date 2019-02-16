@@ -1,3 +1,14 @@
+spice make-enum (val)
+    ast-quote
+        enum [(.. (val as string) "-enum")]
+            X
+            Y = 5
+            Z
+            W = -1
+            'Q
+            R
+
+compile-stage;
 
 do
     enum test-enum
@@ -8,8 +19,8 @@ do
         Q
         R
 
-    assert (('super test-enum) == CEnum)
-    assert (('storage test-enum) == i32)
+    assert ((superof test-enum) == CEnum)
+    assert ((storageof test-enum) == i32)
 
     assert ((typeof test-enum.X) == test-enum)
     assert (test-enum.X == 0)
@@ -26,17 +37,12 @@ do
 
 do
     let T =
-        enum (do "test-enum") X
-            Y = 5
-            Z
-            W = -1
-            'Q
-            R
+        make-enum "test2"
 
     assert
-        ('super T) == CEnum
+        (superof T) == CEnum
     assert
-        ('storage T) == i32
+        (storageof T) == i32
 
     assert ((typeof T.X) == T)
     assert

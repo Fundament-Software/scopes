@@ -1496,7 +1496,7 @@ let
     lslice = (make-asym-binary-op-dispatch '__lslice usize "apply left-slice operator with")
     rslice = (make-asym-binary-op-dispatch '__rslice usize "apply right-slice operator with")
 
-let missing-constructor = 
+let missing-constructor =
     ast-macro
         fn "missing-constructor" (args)
             if false
@@ -2036,7 +2036,7 @@ fn clone-scope-contents (a b)
         a
 
 'define-symbols typename
-    __typecall = 
+    __typecall =
         fn (cls name)
             let T = (sc_typename_type name)
             'set-symbol T '__typecall missing-constructor
@@ -3785,7 +3785,7 @@ inline memoize (f castfunc)
         let result =
             if (value == null)
                 let value =
-                    `[(f args...)] 
+                    `[(f args...)]
                 sc_map_set key value
                 value
             else value
@@ -4196,12 +4196,10 @@ sugar local (values...)
 
 sugar enum (name values...)
     spice make-enum (name vals...)
-        if ('constant? name)
-        let T = (T as type)
+        let T = (typename (name as string))
         inline make-enumval (anchor val)
             sc_const_int_new anchor T
                 sext (as val i32) u64
-
         'set-super T CEnum
         'set-storage T i32
         let count = ('argcount vals...)
@@ -4211,8 +4209,9 @@ sugar enum (name values...)
             let arg = ('getarg vals... i)
             let anchor = ('anchor arg)
             let key val = ('dekey arg)
+            #print arg key val
             if (not ('constant? val))
-                compiler-error! "all enum values must be constant"
+                syntax-error! anchor "all enum values must be constant"
             _ (i + 1)
                 if (key == unnamed)
                     # auto-numerical
@@ -4238,13 +4237,12 @@ sugar enum (name values...)
                 convert-body body
 
     let newbody = (convert-body values...)
-    return
-        if (('typeof name) == Symbol)
-            let namestr = (name as Symbol as string)
-            list let name '=
-                cons make-enum namestr newbody
-        else
-            cons make-enum (list (do as) name string) newbody
+    if (('typeof name) == Symbol)
+        let namestr = (name as Symbol as string)
+        list let name '=
+            cons make-enum namestr newbody
+    else
+        cons make-enum name newbody
 
 compile-stage;
 

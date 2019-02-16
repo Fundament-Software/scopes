@@ -188,7 +188,11 @@ TypedValue *Keyed::from(const Anchor *anchor, Symbol key, TypedValue *node) {
     auto NT = key_type(key, T);
     if (T == NT)
         return node;
-    return new Keyed(anchor, NT, key, node);
+    if (isa<Pure>(node)) {
+        return PureCast::from(anchor, NT, cast<Pure>(node));
+    } else {
+        return new Keyed(anchor, NT, key, node);
+    }
 }
 
 //------------------------------------------------------------------------------
@@ -934,8 +938,8 @@ std::size_t Pure::hash() const {
             return cast<CLASS>(this)->hash();
     SCOPES_PURE_VALUE_KIND()
     #undef T
-    default: assert(false); return 0;   
-    }     
+    default: assert(false); return 0;
+    }
 }
 
 //------------------------------------------------------------------------------
