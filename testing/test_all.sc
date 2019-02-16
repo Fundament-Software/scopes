@@ -39,7 +39,6 @@ test-modules
     .test_macro
     .test_match
     .test_memoization
-    .test_merge
     .test_mutarray
     .test_namedargs
     .test_object

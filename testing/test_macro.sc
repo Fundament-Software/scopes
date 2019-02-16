@@ -1,6 +1,7 @@
 
 define Name
-    let T = (typename "Name" (storage = (storageof string)))
+    let T =
+        define-typename "Name" (storage = (storageof string))
     fn apply-type (str)
         bitcast str T
     sugar constructor (name)
