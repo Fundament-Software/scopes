@@ -80,6 +80,7 @@ struct Value;
 struct Parameter;
 struct Template;
 struct Function;
+struct FunctionType;
 
 // specializer errors
 SCOPES_RESULT(void) error_invalid_call_type(TypedValue *callee);
@@ -88,7 +89,7 @@ SCOPES_RESULT(void) error_invalid_case_literal_type(TypedValue *lit);
 SCOPES_RESULT(void) error_label_expected(Value *value);
 SCOPES_RESULT(void) error_duplicate_default_case();
 SCOPES_RESULT(void) error_missing_default_case();
-SCOPES_RESULT(void) error_argument_count_mismatch(int needed, int got);
+SCOPES_RESULT(void) error_argument_count_mismatch(int needed, int got, const FunctionType *ft = nullptr);
 SCOPES_RESULT(void) error_invalid_operands(const Type *A, const Type *B);
 SCOPES_RESULT(void) error_argument_type_mismatch(const Type *expected, const Type *got);
 SCOPES_RESULT(void) error_constant_expected(const Type *want, Value *value);

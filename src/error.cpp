@@ -11,6 +11,7 @@
 #include "value.hpp"
 #include "stream_ast.hpp"
 #include "type/arguments_type.hpp"
+#include "type/function_type.hpp"
 #include "dyn_cast.inc"
 
 #include "scopes/config.h"
@@ -150,14 +151,22 @@ SCOPES_RESULT(void) error_invalid_call_type(TypedValue *callee) {
     SCOPES_LOCATION_DEF_ERROR(callee, ss.str());
 }
 
-SCOPES_RESULT(void) error_argument_count_mismatch(int needed, int got) {
+SCOPES_RESULT(void) error_argument_count_mismatch(int needed, int got, const FunctionType *ft) {
     SCOPES_RESULT_TYPE(void);
     StyledString ss;
     if (got > needed)
         ss.out << "too many";
     else
         ss.out << "not enough";
-    ss.out << " arguments in call (" << needed << " argument(s) expected, got " << got << ")";
+    ss.out << " arguments in call";
+    if (ft) {
+        ss.out << " to function of type " << (const Type *)ft;
+    }
+    ss.out << " (";
+    if (ft && ft->vararg()) {
+        ss.out << "at least ";
+    }
+    ss.out << needed << " argument(s) expected, got " << got << ")";
     SCOPES_LOCATION_ERROR(ss.str());
 }
 

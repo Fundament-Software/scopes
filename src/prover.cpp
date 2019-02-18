@@ -1808,9 +1808,10 @@ repeat:
     const FunctionType *aft = extract_function_type(T);
     const FunctionType *ft = aft->strip_annotations();
     int numargs = (int)ft->argument_types.size();
-    if (values.size() != numargs) {
+    if ((!ft->vararg() && (values.size() != numargs))
+        || (ft->vararg() && (values.size() < numargs))) {
         SCOPES_ANCHOR(call->anchor());
-        SCOPES_EXPECT_ERROR(error_argument_count_mismatch(numargs, values.size()));
+        SCOPES_EXPECT_ERROR(error_argument_count_mismatch(numargs, values.size(), ft));
     }
     // verify_function_argument_signature
     for (int i = 0; i < numargs; ++i) {

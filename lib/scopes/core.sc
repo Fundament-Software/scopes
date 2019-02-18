@@ -1611,6 +1611,28 @@ let print =
     inline (cls value)
         as value cls
 
+'set-symbols string
+    __imply =
+        box-cast
+            fn "string-imply" (vT T expr)
+                let string->rawstring =
+                    ast-macro
+                        fn (args)
+                            let argc = ('argcount args)
+                            verify-count argc 1 1
+                            let str = ('getarg args 0)
+                            if ('constant? str)
+                                let s c = (sc_string_buffer (as str string))
+                                `s
+                            else
+                                ast-quote
+                                    do
+                                        let s c = (sc_string_buffer str)
+                                        s
+                if (ptrcmp== T rawstring)
+                    return `(string->rawstring expr)
+                compiler-error! "unsupported type"
+
 # implicit argument type coercion for functions, externs and typed labels
 # --------------------------------------------------------------------------
 
@@ -2926,6 +2948,18 @@ let compile =
             else
                 `(sc_compile func flags)
 
+let compile-object =
+    ast-macro
+        fn (args)
+            let argc = ('argcount args)
+            verify-count argc 1 -1
+            let path = ('getarg args 0)
+            let table = ('getarg args 1)
+            let flags =
+                parse-compile-flags
+                    'getarglist args 2
+            `(sc_compile_object path table flags)
+
 define-syntax-macro assert
     let cond msg body = (decons args 2)
     let msg =
@@ -4117,41 +4151,54 @@ compile-stage;
 # standard allocators
 #-------------------------------------------------------------------------------
 
-sugar local (values...)
-    spice local-copy-typed (T value)
-        ast-quote
-            let val =
-                ptrtoref (alloca T)
-            val = value
-            val
-    spice local-copy (value)
-        ast-quote
-            let val =
-                ptrtoref (alloca (typeof value))
-            val = value
-            val
-    spice local-new (T)
-        ast-quote
-            let val =
-                ptrtoref (alloca T)
-            val = (nullof T)
-            val
-    syntax-match values...
-    case (name '= value)
-        qq
-            [let name] = ([local-copy value])
-    case (name ': T '= value)
-        qq
-            [let name] = ([local-copy-typed T value])
-    case (name ': T)
-        qq
-            [let name] = ([local-new T])
-    default
-        compiler-error! "syntax: local <name> [: <type>] [= <value>]"
+inline gen-allocator-syntax (name f)
+    sugar "" (values...)
+        spice local-copy-typed (T value)
+            ast-quote
+                let val =
+                    ptrtoref (f T)
+                val = value
+                val
+        spice local-copy (value)
+            ast-quote
+                let val =
+                    ptrtoref (f (typeof value))
+                val = value
+                val
+        spice local-new (T)
+            ast-quote
+                let val =
+                    ptrtoref (f T)
+                val = (nullof T)
+                val
+        syntax-match values...
+        case (name '= value)
+            qq
+                [let name] = ([local-copy value])
+        case (name ': T '= value)
+            qq
+                [let name] = ([local-copy-typed T value])
+        case (name ': T)
+            qq
+                [let name] = ([local-new T])
+        default
+            compiler-error!
+                .. "syntax: " name " <name> [: <type>] [= <value>]"
+
+let local = (gen-allocator-syntax "local" alloca)
+let global = (gen-allocator-syntax "global" private)
 
 #-------------------------------------------------------------------------------
 # C type support
 #-------------------------------------------------------------------------------
+
+# pointers
+#-------------------------------------------------------------------------------
+
+'set-symbols pointer
+    __@ =
+        inline (self index)
+            getelementptr self index
 
 # structs
 #-------------------------------------------------------------------------------

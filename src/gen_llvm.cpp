@@ -167,6 +167,7 @@ struct LLVMIRGenerator {
     std::unordered_map<void *, LLVMValueRef> ptr2global;
     std::unordered_map<ValueIndex, LLVMValueRef, ValueIndex::Hash> ref2value;
     std::unordered_map<Function *, LLVMMetadataRef> func2md;
+    std::unordered_map<Function *, Symbol> func_export_table;
     std::unordered_map<Global *, LLVMValueRef> global2global;
     std::unordered_map<LLVMValueRef, LLVMBasicBlockRef> func_fail_label;
     std::deque<Function *> function_todo;
@@ -940,17 +941,27 @@ struct LLVMIRGenerator {
     SCOPES_RESULT(LLVMValueRef) Function_to_value(Function *node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
 
-        const char *name;
-        auto funcname = node->name;
-        if (funcname == SYM_Unnamed) {
-            name = "unnamed";
-        } else {
-            name = funcname.name()->data;
+        bool is_export = false;
+        const char *name = nullptr;
+        {
+            auto it = func_export_table.find(node);
+            if (it != func_export_table.end()) {
+                name = it->second.name()->data;
+                is_export = true;
+            }
         }
-        size_t mangled_name_size = strlen(name) + 32;
-        char *mangled_name = new char[mangled_name_size];
-        snprintf(mangled_name, mangled_name_size, "_scopes_jit_%s_%p", name, (void *)node);
-        name = mangled_name;
+        if (!name) {
+            auto funcname = node->name;
+            if (funcname == SYM_Unnamed) {
+                name = "unnamed";
+            } else {
+                name = funcname.name()->data;
+            }
+            size_t mangled_name_size = strlen(name) + 32;
+            char *mangled_name = new char[mangled_name_size];
+            snprintf(mangled_name, mangled_name_size, "_scopes_jit_%s_%p", name, (void *)node);
+            name = mangled_name;
+        }
 
         auto ilfunctype = extract_function_type(node->get_type());
         auto functype = SCOPES_GET_RESULT(type_to_llvm_type(ilfunctype));
@@ -970,9 +981,13 @@ struct LLVMIRGenerator {
         if (use_debug_info) {
             LLVMSetSubprogram(func, function_to_subprogram(node));
         }
+        if (is_export) {
+            LLVMSetLinkage(func, LLVMExternalLinkage);
+        } else {
 #if !SCOPES_LLVM_CACHE_FUNCTIONS
         LLVMSetLinkage(func, LLVMPrivateLinkage);
 #endif
+        }
         function_todo.push_back(node);
         return func;
     }
@@ -2173,41 +2188,24 @@ struct LLVMIRGenerator {
         return {};
     }
 
-#if 0
-    // TODO
+    typedef std::pair<LLVMModuleRef, LLVMValueRef> ModuleValuePair;
+
     // for generating object files
     SCOPES_RESULT(LLVMModuleRef) generate(const String *name, Scope *table) {
         SCOPES_RESULT_TYPE(LLVMModuleRef);
-        {
-            std::unordered_set<Label *> visited;
-            Labels labels;
-            Scope *t = table;
-            while (t) {
-                for (auto it = t->map->begin(); it != t->map->end(); ++it) {
-                    Label *fn = it->second.value;
-
-                    SCOPES_CHECK_RESULT(fn->verify_compilable());
-                    fn->build_reachable(visited, &labels);
-                }
-                t = t->parent;
-            }
-            for (auto it = labels.begin(); it != labels.end(); ++it) {
-                (*it)->insert_into_usermap(user_map);
-            }
-        }
 
         setup_generate(name->data);
 
         Scope *t = table;
         while (t) {
             for (auto it = t->map->begin(); it != t->map->end(); ++it) {
-
+                Value *val = it->second.expr;
+                if (!val) continue;
                 Symbol name = it->first;
-                Label *fn = it->second.value;
+                Function *fn = SCOPES_GET_RESULT(extract_function_constant(val));
+                func_export_table.insert({fn, name});
 
-                auto func = SCOPES_GET_RESULT(generate_function(fn, true, name));
-                LLVMSetLinkage(func, LLVMExternalLinkage);
-
+                SCOPES_CHECK_RESULT(ref_to_value(fn));
             }
             t = t->parent;
         }
@@ -2215,9 +2213,6 @@ struct LLVMIRGenerator {
         SCOPES_CHECK_RESULT(teardown_generate());
         return module;
     }
-#endif
-
-    typedef std::pair<LLVMModuleRef, LLVMValueRef> ModuleValuePair;
 
     SCOPES_RESULT(ModuleValuePair) generate(Function *entry) {
         SCOPES_RESULT_TYPE(ModuleValuePair);
@@ -2350,7 +2345,7 @@ public:
 #endif
 
 SCOPES_RESULT(void) compile_object(const String *path, Scope *scope, uint64_t flags) {
-#if 0 // TODO
+    SCOPES_RESULT_TYPE(void);
     Timer sum_compile_time(TIMER_Compile);
 #if SCOPES_COMPILE_WITH_DEBUG_INFO
 #else
@@ -2397,7 +2392,6 @@ SCOPES_RESULT(void) compile_object(const String *path, Scope *scope, uint64_t fl
         SCOPES_LOCATION_ERROR(String::from_cstr(errormsg));
     }
     free(path_cstr);
-#endif
     return {};
 }
 
