@@ -10,9 +10,8 @@ fn constructor (cls x)
 # this pseudoquotes(!) a function - we're actually not declaring constructor2
     right away, but instead generate the API calls that build a new function
     object at runtime. T is constant at runtime and can be properly inlined.
-ast-quote
-    fn constructor2 (cls x)
-        bitcast x T
+fn! constructor2 (cls x)
+    bitcast x T
 
 # we assign constructor2 to T at runtime, and now our type is complete
 'set-symbol T '__typecall constructor2

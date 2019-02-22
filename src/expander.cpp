@@ -147,9 +147,11 @@ struct Expander {
 
     struct ExpandFnSetup {
         bool inlined;
+        bool quoted;
 
         ExpandFnSetup() {
             inlined = false;
+            quoted = false;
         };
     };
 
@@ -173,7 +175,6 @@ struct Expander {
             auto sym = SCOPES_GET_RESULT(extract_symbol_constant(it->at));
             // named self-binding
             // see if we can find a forward declaration in the local scope
-            Value *result = nullptr;
             if (env->lookup_local(sym, result)
                 && isa<Template>(result)
                 && cast<Template>(result)->is_forward_decl()) {
@@ -181,6 +182,7 @@ struct Expander {
                 continuing = true;
             } else {
                 func = Template::from(_anchor, sym);
+                result = func;
                 env->bind(sym, func);
             }
             it = it->next;
@@ -198,6 +200,8 @@ struct Expander {
         }
         if (setup.inlined)
             func->set_inline();
+        if (setup.quoted)
+            result = ast_quote(func);
 
         if (it == EOL) {
             // forward declaration
@@ -205,7 +209,7 @@ struct Expander {
                 SCOPES_LOCATION_ERROR(
                     String::from("forward declared function must be named"));
             }
-            return func;
+            return result;
         }
 
         const List *params = SCOPES_GET_RESULT(extract_list_constant(it->at));
@@ -234,7 +238,7 @@ struct Expander {
 
         func->value = SCOPES_GET_RESULT(subexpr.expand_expression(_anchor, it));
 
-        return func;
+        return result;
     }
 
     bool last_expression() {
@@ -846,6 +850,14 @@ struct Expander {
         return {};
     }
 
+    Value *ast_quote(Value *expr, const Anchor *anchor = nullptr) {
+        if (isa<Expression>(expr)) {
+            auto ex = cast<Expression>(expr);
+            ex->scoped = false;
+        }
+        return Quote::from(anchor?anchor:(expr->anchor()), expr);
+    }
+
     SCOPES_RESULT(Value *) expand_ast_quote(const List *it) {
         SCOPES_RESULT_TYPE(Value *);
         auto _anchor = get_active_anchor();
@@ -854,11 +866,7 @@ struct Expander {
 
         Expander subexpr(env, astscope);
         auto expr = SCOPES_GET_RESULT(subexpr.expand_expression(_anchor, it));
-        if (isa<Expression>(expr)) {
-            auto ex = cast<Expression>(expr);
-            ex->scoped = false;
-        }
-        return Quote::from(_anchor, expr);
+        return ast_quote(expr, _anchor);
     }
 
     SCOPES_RESULT(Value *) expand_ast_unquote(const List *it) {
@@ -980,6 +988,28 @@ struct Expander {
         return call;
     }
 
+    SCOPES_RESULT(sc_list_scope_tuple_t) expand_symbol(Const *node) {
+        SCOPES_RESULT_TYPE(sc_list_scope_tuple_t);
+        Value *symbol_handler_node;
+        if (env->lookup(Symbol(SYM_SymbolWildcard), symbol_handler_node)) {
+            auto T = try_get_const_type(symbol_handler_node);
+            if (T != list_expander_func_type) {
+                StyledString ss;
+                ss.out << "custom symbol expander has wrong type "
+                    << T << ", must be " << list_expander_func_type;
+                SCOPES_LOCATION_ERROR(ss.str());
+            }
+            sc_syntax_wildcard_func_t f = (sc_syntax_wildcard_func_t)cast<ConstPointer>(symbol_handler_node)->value;
+            auto ok_result = f(List::from(node, next), env);
+            if (!ok_result.ok) {
+                SCOPES_RETURN_ERROR(ok_result.except);
+            }
+            return ok_result._0;
+        }
+        sc_list_scope_tuple_t result = { nullptr, nullptr };
+        return result;
+    }
+
     SCOPES_RESULT(Value *) expand(Value *anynode) {
         SCOPES_RESULT_TYPE(Value *);
     expand_again:
@@ -1027,12 +1057,21 @@ struct Expander {
                     SCOPES_CHECK_RESULT(verify_list_parameter_count("this-scope", list, 0, 0));
                     return ConstPointer::scope_from(node->anchor(), env);
                 case KW_SyntaxLog: return expand_syntax_log(list);
-                case KW_Fn: {
-                    return expand_fn(list, ExpandFnSetup());
+                case KW_Fn: return expand_fn(list, ExpandFnSetup());
+                case KW_QuotedFn: {
+                    ExpandFnSetup setup;
+                    setup.quoted = true;
+                    return expand_fn(list, setup);
                 }
                 case KW_Inline: {
                     ExpandFnSetup setup;
                     setup.inlined = true;
+                    return expand_fn(list, setup);
+                }
+                case KW_QuotedInline: {
+                    ExpandFnSetup setup;
+                    setup.inlined = true;
+                    setup.quoted = true;
                     return expand_fn(list, setup);
                 }
                 case KW_RunStage: return expand_run_stage(list);
@@ -1112,29 +1151,14 @@ struct Expander {
 
             Value *result = nullptr;
             if (!env->lookup(name, result)) {
-                Value *symbol_handler_node;
-                if (env->lookup(Symbol(SYM_SymbolWildcard), symbol_handler_node)) {
-                    auto T = try_get_const_type(symbol_handler_node);
-                    if (T != list_expander_func_type) {
-                        StyledString ss;
-                        ss.out << "custom symbol expander has wrong type "
-                            << T << ", must be " << list_expander_func_type;
-                        SCOPES_LOCATION_ERROR(ss.str());
-                    }
-                    sc_syntax_wildcard_func_t f = (sc_syntax_wildcard_func_t)cast<ConstPointer>(symbol_handler_node)->value;
-                    auto ok_result = f(List::from(node, next), env);
-                    if (!ok_result.ok) {
-                        SCOPES_RETURN_ERROR(ok_result.except);
-                    }
-                    auto result = ok_result._0;
-                    if (result._0) {
-                        Value *newnode = result._0->at;
-                        if (newnode != node) {
-                            anynode = newnode;
-                            next = result._0->next;
-                            env = result._1;
-                            goto expand_again;
-                        }
+                sc_list_scope_tuple_t result = SCOPES_GET_RESULT(expand_symbol(node));
+                if (result._0) {
+                    Value *newnode = result._0->at;
+                    if (newnode != node) {
+                        anynode = newnode;
+                        next = result._0->next;
+                        env = result._1;
+                        goto expand_again;
                     }
                 }
 
