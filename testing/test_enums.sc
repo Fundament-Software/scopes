@@ -8,7 +8,7 @@ spice make-enum (val)
             'Q
             R
 
-compile-stage;
+run-stage;
 
 do
     enum test-enum

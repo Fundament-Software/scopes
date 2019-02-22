@@ -18,7 +18,7 @@ spice gen-label-merge-test ()
                                     default
                                         return "?"
 
-compile-stage;
+run-stage;
 
 let select1 = (gen-label-merge-test)
 fn select2 (k str)

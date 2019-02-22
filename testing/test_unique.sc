@@ -11,7 +11,7 @@ let T = (typename "T")
             sc_write "dropped\n"
             destroy self
 
-compile-stage;
+run-stage;
 
 #fn test_select (x a b)
     let a = (move a)

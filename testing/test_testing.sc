@@ -8,7 +8,7 @@ spice cause-compiler-error (msg)
     else
         compiler-error! "this is a compiler error!"
 
-compile-stage;
+run-stage;
 
 assert-compiler-error
     cause-compiler-error "this is a compiler error!"

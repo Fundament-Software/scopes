@@ -1791,7 +1791,10 @@ struct LLVMIRGenerator {
     }
 
     SCOPES_RESULT(LLVMValueRef) PureCast_to_value(PureCast *node) {
-        return ref_to_value(node->value);
+        SCOPES_RESULT_TYPE(LLVMValueRef);
+        LLVMTypeRef LLT = SCOPES_GET_RESULT(type_to_llvm_type(node->get_type()));
+        auto val = SCOPES_GET_RESULT(ref_to_value(node->value));
+        return LLVMConstBitCast(val, LLT);
     }
 
     SCOPES_RESULT(LLVMValueRef) Global_to_value(Global *node) {

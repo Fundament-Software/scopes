@@ -62,7 +62,7 @@ let lib =
             }
         '()
 
-compile-stage;
+run-stage;
 
 fn testf1 ()
     lib.testfunc_ivec2_ivec2

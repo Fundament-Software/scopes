@@ -31,7 +31,7 @@ spice test-match (args...)
     default
         compiler-error! "wrong!"
 
-compile-stage;
+run-stage;
 
 do
     test-match 1 2 3 4          # case 1

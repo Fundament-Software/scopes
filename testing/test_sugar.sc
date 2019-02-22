@@ -25,7 +25,7 @@ sugar test2 (x y z args...)
         list (do +) 6 6
         next-expr
 
-compile-stage;
+run-stage;
 
 assert
     (test 1 2 3 4 5 6) == 6

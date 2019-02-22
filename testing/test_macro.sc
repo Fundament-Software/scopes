@@ -16,7 +16,7 @@ define Name
                     compiler-error! "unsupported type"
     T
 
-compile-stage;
+run-stage;
 
 # Name is a type
 assert ((typeof Name) == type)

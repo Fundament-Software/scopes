@@ -10,7 +10,7 @@ let C =
 
 let scope = (Scope)
 
-compile-stage;
+run-stage;
 
 fn static-array-init ()
     private (array i32 10:usize)

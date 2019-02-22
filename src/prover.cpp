@@ -1335,7 +1335,11 @@ repeat:
                     default: break;
                     }
                 }
-                return NODEPS1(ARGTYPE1(DestT));
+                if (isa<Pure>(_SrcT)) {
+                    return PureCast::from(call->anchor(), DestT, cast<Pure>(_SrcT));
+                } else {
+                    return NODEPS1(ARGTYPE1(DestT));
+                }
             }
         } break;
         case FN_IntToPtr: {

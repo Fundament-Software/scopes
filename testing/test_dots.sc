@@ -3,7 +3,7 @@
 let k = (Scope)
 'set-symbol k 'x true
 
-compile-stage;
+run-stage;
 
 fn X ()
     if k.x true

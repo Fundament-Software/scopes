@@ -5,6 +5,7 @@ test-modules
     .test_abi
     .test_ansi_colors
     .test_array
+    .test_ast_quote
     .test_branch
     .test_assorted
     .test_callback
@@ -46,7 +47,6 @@ test-modules
     .test_overload
     .test_parser
     .test_qualifiers
-    .test_quality
     .test_quote
     .test_recursion
     .test_reference

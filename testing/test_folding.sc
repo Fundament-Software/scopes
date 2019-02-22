@@ -25,7 +25,7 @@ do
         print_stuff2 "hello"
     main2;
 
-    compile-stage;
+    run-stage;
 
     # this case is illegal
     # error: non-constant value of type String is inaccessible from function

@@ -201,7 +201,7 @@ let ASTMacroFunction = (sc_type_storage ASTMacro)
 let ellipsis-symbol = (sc_symbol_new "...")
 
 # execute until here and treat the remainder as a new translation unit
-compile-stage;
+run-stage;
 
 # we can now access TypeArrayPointer as a compile time value
 let void =
@@ -239,13 +239,17 @@ let typify =
         let ptr = (sc_const_pointer_extract result)
         bitcast ptr ASTMacro
 
-compile-stage;
+run-stage;
 
-let function->ASTMacro =
-    typify
-        fn "function->ASTMacro" (f)
-            bitcast f ASTMacro
-        ASTMacroFunction
+fn function->ASTMacro (f)
+    if (ptrcmp!= (typeof f) ASTMacroFunction)
+        compiler-error!
+            sc_string_join "AST macro must have type "
+                sc_string_join
+                    sc_value_repr (box-pointer ASTMacroFunction)
+                    sc_string_join " but has type "
+                        sc_value_repr (box-pointer (typeof f))
+    bitcast f ASTMacro
 
 fn box-empty ()
     sc_argument_list_new (sc_get_active_anchor)
@@ -654,7 +658,7 @@ let
     type> = (ast-macro (type-comparison-func type>))
     type>= = (ast-macro (type-comparison-func type>=))
 
-compile-stage;
+run-stage;
 
 fn cons (values...)
     va-rifold none
@@ -1509,7 +1513,7 @@ let missing-constructor =
                     sc_string_join ('__repr cls)
                         " has no constructor"
 
-compile-stage;
+run-stage;
 
 let null = (nullof NullType)
 #inline Syntax-unbox (self destT)
@@ -2234,7 +2238,7 @@ let pow = (select-op-macro powi powf 2)
 let abs = (select-op-macro sabs fabs 1)
 let sign = (select-op-macro ssign fsign 1)
 
-compile-stage;
+run-stage;
 
 inline = (lhs rhs)
     assign (imply rhs (typeof lhs)) lhs
@@ -2468,7 +2472,7 @@ va-lfold none
 # module loading
 #---------------------------------------------------------------------------
 
-let wrap-if-not-compile-stage =
+let wrap-if-not-run-stage =
     ast-macro
         fn (args)
             raises-compile-error;
@@ -2479,7 +2483,7 @@ let wrap-if-not-compile-stage =
                     return arg
             `(Value args)
 
-compile-stage;
+run-stage;
 
 fn make-module-path (pattern name)
     let sz = (countof pattern)
@@ -2504,7 +2508,7 @@ fn exec-module (expr eval-scope)
             ast-quote
                 fn "exec-module-stage" ()
                     raises-compile-error;
-                    wrap-if-not-compile-stage (f)
+                    wrap-if-not-run-stage (f)
         let wrapf = (sc_typify_template wrapf 0 (undef TypeArrayPointer))
         let f = (sc_compile wrapf 0:u64)
         if (('typeof f) == StageFunctionType)
@@ -2722,7 +2726,7 @@ let using =
             elseif (('typeof nameval) == Scope)
                 return (process (nameval as Scope))
             return
-                list compile-stage
+                list run-stage
                     cons merge-scope-symbols name 'syntax-scope pattern
                 syntax-scope
 
@@ -2828,7 +2832,7 @@ let __countof-aggregate =
             let sz = ('element-count T)
             Value (sz as usize)
 
-compile-stage;
+run-stage;
 
 # (define-scope-macro name expr ...)
 # implies builtin names:
@@ -3781,7 +3785,7 @@ fn gen-match-matcher (failfunc expr scope cond)
 define match
     gen-match-block-parser gen-match-matcher
 
-compile-stage;
+run-stage;
 
 let infinite-range =
     Generator
@@ -4043,7 +4047,7 @@ sugar from (src 'let params...)
                 cons load-from src
                     quotify params...
 
-compile-stage;
+run-stage;
 
 define-syntax-block-scope-macro static-if
     fn process (body next-expr)
@@ -4145,7 +4149,7 @@ let
     format-error = sc_format_error
     import-c = sc_import_c
 
-compile-stage;
+run-stage;
 
 #-------------------------------------------------------------------------------
 # standard allocators
@@ -4291,7 +4295,7 @@ sugar enum (name values...)
     else
         cons make-enum name newbody
 
-compile-stage;
+run-stage;
 
 #-------------------------------------------------------------------------------
 

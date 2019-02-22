@@ -22,7 +22,7 @@ let lib =
             }
         '()
 
-compile-stage;
+run-stage;
 
 fn testf (x y)
     + x y

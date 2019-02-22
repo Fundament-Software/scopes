@@ -10,7 +10,7 @@ let T =
                 fn "test" () 303
         k
 
-compile-stage;
+run-stage;
 
 from T let A B test
 assert (A == i32)

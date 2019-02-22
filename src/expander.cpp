@@ -111,11 +111,11 @@ struct Expander {
         return ArgumentListTemplate::from(anchor);
     }
 
-    SCOPES_RESULT(Value *) expand_compile_stage(const List *it) {
+    SCOPES_RESULT(Value *) expand_run_stage(const List *it) {
         SCOPES_RESULT_TYPE(Value *);
         auto _anchor = get_active_anchor();
 
-        SCOPES_CHECK_RESULT(verify_list_parameter_count("compile-stage", it, 0, 0));
+        SCOPES_CHECK_RESULT(verify_list_parameter_count("run-stage", it, 0, 0));
 
         auto node = CompileStage::from(_anchor, next, env);
         next = EOL;
@@ -1035,7 +1035,7 @@ struct Expander {
                     setup.inlined = true;
                     return expand_fn(list, setup);
                 }
-                case KW_CompileStage: return expand_compile_stage(list);
+                case KW_RunStage: return expand_run_stage(list);
                 case KW_Let: return expand_let(list);
                 case KW_Loop: return expand_loop(list);
                 case KW_Try: return expand_try(list);

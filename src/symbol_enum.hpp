@@ -41,7 +41,7 @@ namespace scopes {
     T(KW_If) T(KW_Switch) T(SFXFN_DelTypeSymbol) T(FN_ExternSymbol) \
     T(FN_ExternNew) T(FN_GetSyntaxScope) \
     T(SFXFN_Discard) \
-    T(FN_TypeAt) T(FN_TypeLocalAt) T(KW_CompileStage) T(FN_Location) T(SFXFN_Unreachable) \
+    T(FN_TypeAt) T(FN_TypeLocalAt) T(KW_RunStage) T(FN_Location) T(SFXFN_Unreachable) \
     T(FN_FPTrunc) T(FN_FPExt) T(FN_ScopeOf) \
     T(FN_FPToUI) T(FN_FPToSI) \
     T(FN_UIToFP) T(FN_SIToFP) \
@@ -268,7 +268,7 @@ namespace scopes {
     T(KW_ASTUnquoteArguments, "ast-unquote-arguments") T(FN_Copy, "copy") \
     T(KW_Inline, "inline") T(KW_Recur, "recur") T(KW_Merge, "merge") T(FN_Move, "move") \
     T(KW_Return, "return") T(KW_Splice, "splice") T(FN_Forget, "forget") \
-    T(KW_CompileStage, "compile-stage") T(KW_True, "true") T(KW_Try, "try") \
+    T(KW_RunStage, "run-stage") T(KW_True, "true") T(KW_Try, "try") \
     T(KW_Unquote, "unquote") T(KW_UnquoteSplice, "unquote-splice") T(KW_ListEmpty, "eol") \
     T(KW_With, "with") T(KW_XFn, "xfn") T(KW_XLet, "xlet") T(KW_Yield, "yield") \
     \

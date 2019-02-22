@@ -9,7 +9,7 @@ do
     dump C
     C "hello from C!\n"
 
-compile-stage;
+run-stage;
 
 assert
     ==
