@@ -4152,6 +4152,37 @@ let
 run-stage;
 
 #-------------------------------------------------------------------------------
+# method syntax
+#-------------------------------------------------------------------------------
+
+sugar method (expr...)
+    fn typeref-or-default (typeref rest)
+        if (('typeof typeref) == list)
+            let head rest... = (decons (typeref as list))
+            if (('typeof head) == Symbol)
+                if ((head as Symbol) == 'do)
+                    return typeref rest
+            return `'this-type (cons typeref rest)
+        return typeref rest
+
+    syntax-match expr...
+    case (('syntax-quote (name as Symbol)) typeref rest...)
+        let typeref rest = (typeref-or-default typeref rest...)
+        qq
+            'set-symbol [typeref] '[name]
+                [fn!] [(name as string)]
+                    unquote-splice rest
+    case ('inline ('syntax-quote (name as Symbol)) typeref rest...)
+        let typeref rest = (typeref-or-default typeref rest...)
+        qq
+            'set-symbol [typeref] '[name]
+                [inline!] [(name as string)]
+                    unquote-splice rest
+    default
+        compiler-error!
+            "syntax: method [inline] 'name [type] (parameter...) body..."
+
+#-------------------------------------------------------------------------------
 # standard allocators
 #-------------------------------------------------------------------------------
 
