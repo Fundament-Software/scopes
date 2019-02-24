@@ -241,7 +241,10 @@ let typify =
 
 run-stage;
 
-fn function->ASTMacro (f)
+let ast-macro-verify-signature =
+    typify (fn "ast-macro-verify-signature" (f)) ASTMacroFunction
+
+#fn ast-macro-verify-signature (f)
     if (ptrcmp!= (typeof f) ASTMacroFunction)
         compiler-error!
             sc_string_join "AST macro must have type "
@@ -249,7 +252,12 @@ fn function->ASTMacro (f)
                     sc_value_repr (box-pointer ASTMacroFunction)
                     sc_string_join " but has type "
                         sc_value_repr (box-pointer (typeof f))
-    bitcast f ASTMacro
+
+let function->ASTMacro =
+    typify
+        fn "function->ASTMacro" (f)
+            bitcast f ASTMacro
+        ASTMacroFunction
 
 fn box-empty ()
     sc_argument_list_new (sc_get_active_anchor)
@@ -4122,7 +4130,7 @@ define-syntax-block-scope-macro syntax-if
             next-expr
         syntax-scope
 
-define-syntax-block-scope-macro !
+define-syntax-block-scope-macro @@
     raises-compile-error;
     let kw body = (decons expr)
     let head = (kw as Symbol)
@@ -4138,24 +4146,39 @@ define-syntax-block-scope-macro !
                         `body
                     result
             let follow-expr next-next-expr = (decons next-expr)
-            if (('typeof follow-expr) == list)
-                let kw body = (decons (follow-expr as list))
-                if (('typeof kw) == Symbol)
-                    let kw = (kw as Symbol)
-                    if (kw == head)
-                        # more decorators
-                        repeat body next-next-expr result
+            if (('typeof follow-expr) != list)
+                compiler-error! "decorator must be applied to expression"
+            let kw body = (decons (follow-expr as list))
+            let kw = (kw as Symbol)
+            if (kw == head)
+                # more decorators
+                repeat body next-next-expr result
+            else
+                # terminating actual expression
+                let newkw = (Symbol (.. "decorate-" (kw as string)))
+                break
+                    cons newkw follow-expr result
+                    next-next-expr
+    return
+        cons result next-expr
+        syntax-scope
+
+define-syntax-block-scope-macro vvv
+    raises-compile-error;
+    let kw body = (decons expr)
+    let head = (kw as Symbol)
+    let result next-expr =
+        loop (body next-expr result = body next-expr '())
+            if (empty? next-expr)
+                compiler-error! "expression decorator is not applied to anything"
+            let result =
+                cons
+                    if ((countof body) == 1)
+                        '@ body
                     else
-                        # terminating actual expression
-                        let newkw = (Symbol (.. "decorate-" (kw as string)))
-                        let decoratefn =
-                            try
-                                getattr syntax-scope newkw
-                            except (x)
-                                `'decorate-*
-                        break
-                            cons decoratefn follow-expr result
-                            next-next-expr
+                        `body
+                    result
+            let follow-expr next-next-expr = (decons next-expr)
             break
                 cons 'decorate-* follow-expr result
                 next-next-expr

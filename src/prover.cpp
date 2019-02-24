@@ -867,6 +867,11 @@ static SCOPES_RESULT(TypedValue *) prove_KeyedTemplate(const ASTContext &ctx, Ke
 template<typename T>
 static SCOPES_RESULT(T *) extract_constant(const Type *want, Value *value) {
     SCOPES_RESULT_TYPE(T *);
+    /*
+    if (isa<PureCast>(value)) {
+        value = cast<PureCast>(value)->value;
+    }
+    */
     auto constval = dyn_cast<T>(value);
     if (!constval) {
         SCOPES_ANCHOR(value->anchor());
@@ -878,13 +883,21 @@ static SCOPES_RESULT(T *) extract_constant(const Type *want, Value *value) {
 template<typename T>
 static SCOPES_RESULT(T *) extract_typed_constant(const Type *want, Value *value) {
     SCOPES_RESULT_TYPE(T *);
+    const Type *TT = nullptr;
+    if (isa<PureCast>(value)) {
+        TT = cast<PureCast>(value)->get_type();
+        value = cast<PureCast>(value)->value;
+    }
     auto constval = dyn_cast<T>(value);
     if (!constval) {
         SCOPES_ANCHOR(value->anchor());
         SCOPES_CHECK_RESULT(error_constant_expected(want, value));
     }
+    if (!TT) {
+        TT = constval->get_type();
+    }
     SCOPES_ANCHOR(value->anchor());
-    SCOPES_CHECK_RESULT(verify(constval->get_type(), want));
+    SCOPES_CHECK_RESULT(verify(TT, want));
     return constval;
 }
 

@@ -31,16 +31,19 @@ spice test-match (args...)
     default
         compiler-error! "wrong!"
 
-run-stage;
-
-do
+@@ ast-quote
+fn test-main ()
     test-match 1 2 3 4          # case 1
     test-match (4 - 3) 2 3 4    # case 2
     test-match 1:i8 2 3 4       # case 2
     test-match "a" "b" "c"      # case 3
     test-match "a" "b"          # case 4
 
-assert
-    (test 1 2 3 4 5 6) == 21
+    assert
+        (test 1 2 3 4 5 6) == 21
+
+run-stage;
+
+test-main;
 
 return;

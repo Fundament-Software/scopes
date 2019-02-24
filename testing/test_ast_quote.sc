@@ -3,9 +3,9 @@
 let T = (typename "T")
 'set-plain-storage T i32
 
-! ast-quote
-fn test ()
-    print T
+@@ ast-quote; inline test ()
+    fn ()
+        print T
 
 # declare a function and assign it as attribute to T
 method '__typecall T (cls x)
@@ -26,12 +26,12 @@ do
 
     # declare an inline and assign it as attribute to this-type
     # also test method decorators
-    ! ast-quote
+    @@ ast-quote
     method inline '__typecall (cls x)
         bitcast x T
 
 run-stage;
 
-test;
+((test))
 
 print (T 5)

@@ -8,8 +8,8 @@ inline multiply (z)
         inline (x y)
             (f x y) * z
 
-! debugprint
-! multiply 2
+@@ debugprint
+@@ multiply 2
 fn test (x y)
     x + y
 
@@ -19,22 +19,23 @@ assert ((test 1 2) == 6)
 let T = (typename "T")
 
 inline replace-result (f)
-    ! ast-quote
+    @@ ast-quote
     inline (cls x)
         print f
         x + 300
 
 # test method decorators
-! replace-result
+@@ replace-result
 method inline '__typecall T (cls x)
     compiler-error! "should not see me"
 
-! print
+vvv print
 2 + 3
 
-! print
+vvv print
 let x y z = 3 4 5
 
 run-stage;
 
 assert ((T 3) == 303)
+
