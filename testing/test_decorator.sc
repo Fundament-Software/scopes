@@ -32,8 +32,33 @@ method inline '__typecall T (cls x)
 vvv print
 2 + 3
 
-vvv print
-let x y z = 3 4 5
+do
+    inline incby1x3 (x y z)
+        _
+            x + 1; y + 1; z + 1
+
+    @@ print
+    @@ incby1x3
+    let x y z = 3 4 5
+
+    assert (x == 4)
+    assert (y == 5)
+    assert (z == 6)
+
+do
+    inline incby1 (x)
+        x + 1
+
+    @@ print
+    @@ incby1
+    let
+        x = 3
+        y = 4
+        z = 5
+
+    assert (x == 4)
+    assert (y == 5)
+    assert (z == 6)
 
 run-stage;
 

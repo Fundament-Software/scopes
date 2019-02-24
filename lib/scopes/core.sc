@@ -4214,6 +4214,55 @@ define-syntax-macro decorate-fn
 
 let decorate-inline = decorate-fn
 
+define-syntax-macro decorate-let
+    raises-compile-error;
+    let letexpr decorators = (decons args)
+    let letexpr = (letexpr as list)
+    let kw entry = (decons letexpr 2)
+    if (('typeof entry) == list)
+        # map form: wrap each arg
+        let result =
+            loop (in out = ('next letexpr) '())
+                if (empty? in)
+                    break out
+                let entry in = (decons in)
+                let k eq val = (decons (entry as list) 2)
+                let result =
+                    loop (in out = decorators val)
+                        if (empty? in)
+                            break out
+                        let decorator in = (decons in)
+                        repeat in
+                            list (cons decorator out)
+                repeat in
+                    cons
+                        cons k eq result
+                        out
+        cons let ('reverse result)
+    else
+        # unpack form: wrap all args
+        let params values =
+            loop (expr params = letexpr '())
+                if (empty? expr)
+                    compiler-error! "reimport form not supported for decorate-let"
+                let val rest = (decons expr)
+                if ((('typeof val) == Symbol) and ((val as Symbol) == '=))
+                    break params rest
+                _ rest (cons val params)
+        let result =
+            loop (in out = decorators (cons _ values))
+                if (empty? in)
+                    break out
+                let decorator in = (decons in)
+                repeat in
+                    cons decorator (list out)
+        loop (in out = params (list '= result))
+            if (empty? in)
+                break out
+            let param params = (decons in)
+            repeat params
+                cons param out
+
 define-syntax-scope-macro syntax-eval
     let subscope = (Scope syntax-scope)
     'set-symbol subscope 'syntax-scope syntax-scope
