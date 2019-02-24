@@ -106,7 +106,7 @@ static Scope *original_globals = Scope::from();
 
 sc_void_raises_t convert_result(const Result<void> &_result) VOID_CRESULT;
 
-sc_value_list_raises_t convert_result(const Result<sc_value_list_tuple_t> &_result) CRESULT;
+sc_value_list_scope_raises_t convert_result(const Result<sc_value_list_scope_tuple_t> &_result) CRESULT;
 
 sc_value_raises_t convert_result(const Result<Value *> &_result) CRESULT;
 sc_value_raises_t convert_result(const Result<TypedValue *> &_result) CRESULT;
@@ -172,7 +172,7 @@ sc_rawstring_i32_array_tuple_t sc_launch_args() {
     return {(int)scopes_argc, scopes_argv};
 }
 
-sc_value_list_raises_t sc_expand(sc_value_t *expr, const sc_list_t *next, sc_scope_t *scope) {
+sc_value_list_scope_raises_t sc_expand(sc_value_t *expr, const sc_list_t *next, sc_scope_t *scope) {
     using namespace scopes;
     return convert_result(expand(expr, next, scope));
 }
@@ -1880,7 +1880,7 @@ void init_globals(int argc, char *argv[]) {
     const Type *voidstar = native_ro_pointer_type(_void);
 
     DEFINE_EXTERN_C_FUNCTION(sc_compiler_version, arguments_type({TYPE_I32, TYPE_I32, TYPE_I32}));
-    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_expand, arguments_type({TYPE_Value, TYPE_List}), TYPE_Value, TYPE_List, TYPE_Scope);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_expand, arguments_type({TYPE_Value, TYPE_List, TYPE_Scope}), TYPE_Value, TYPE_List, TYPE_Scope);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_eval, TYPE_Value, TYPE_Anchor, TYPE_List, TYPE_Scope);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_eval_inline, TYPE_Anchor, TYPE_Value, TYPE_List, TYPE_Scope);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_typify_template, TYPE_Value, TYPE_Value, TYPE_I32, native_ro_pointer_type(TYPE_Type));

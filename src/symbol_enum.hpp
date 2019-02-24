@@ -20,7 +20,6 @@ namespace scopes {
     T(FN_FunctionType) T(FN_TupleType) T(FN_UnionType) T(FN_Alloca) T(FN_AllocaOf) T(FN_Malloc) \
     T(FN_AllocaArray) T(FN_MallocArray) T(FN_ReturnLabelType) T(KW_DoIn) T(FN_AllocaExceptionPad) \
     T(FN_StaticAlloc) T(KW_Try) T(KW_Return) T(KW_Loop) T(KW_Repeat) T(KW_Break) \
-    T(KW_QuotedFn) T(KW_QuotedInline) \
     T(KW_ASTQuote) T(KW_ASTUnquote) T(KW_ASTUnquoteArguments) T(KW_Merge) T(FN_Copy) \
     T(FN_Move) T(FN_Forget) T(FN_Assign) T(FN_Deref) T(FN_PtrToRef) T(FN_RefToPtr) \
     T(FN_AnyExtract) T(FN_AnyWrap) T(FN_Free) T(KW_Defer) T(FN_DumpAST) \
@@ -261,13 +260,13 @@ namespace scopes {
     T(KW_Define, "define") T(KW_Do, "do") T(KW_DumpSyntax, "dump-syntax") \
     T(KW_Else, "else") T(KW_ElseIf, "elseif") T(KW_EmptyList, "empty-list") \
     T(KW_EmptyTuple, "empty-tuple") T(KW_Escape, "escape") \
-    T(KW_Except, "except") T(KW_False, "false") T(KW_Fn, "fn") T(KW_QuotedFn, "fn!") \
+    T(KW_Except, "except") T(KW_False, "false") T(KW_Fn, "fn") \
     T(KW_FnTypes, "fn-types") T(KW_FnCC, "fn/cc") T(KW_Globals, "globals") \
     T(KW_If, "if") T(KW_Switch, "switch") T(KW_In, "in") T(KW_Let, "let") T(KW_Loop, "loop") \
     T(KW_LoopFor, "loop-for") T(KW_None, "none") T(KW_Null, "null") \
     T(KW_SyntaxQuote, "syntax-quote") T(KW_ASTQuote, "ast-quote") T(KW_ASTUnquote, "ast-unquote") \
     T(KW_ASTUnquoteArguments, "ast-unquote-arguments") T(FN_Copy, "copy") \
-    T(KW_Inline, "inline") T(KW_QuotedInline, "inline!") T(KW_Recur, "recur") \
+    T(KW_Inline, "inline") T(KW_Recur, "recur") \
     T(KW_Merge, "merge") T(FN_Move, "move") \
     T(KW_Return, "return") T(KW_Splice, "splice") T(FN_Forget, "forget") \
     T(KW_RunStage, "run-stage") T(KW_True, "true") T(KW_Try, "try") \

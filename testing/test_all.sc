@@ -13,6 +13,7 @@ test-modules
     .test_clang
     .test_closure
     .test_conversion
+    .test_decorator
     #.test_defer # fix in 0.15
     .test_dispatch
     .test_docstring

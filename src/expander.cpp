@@ -147,11 +147,9 @@ struct Expander {
 
     struct ExpandFnSetup {
         bool inlined;
-        bool quoted;
 
         ExpandFnSetup() {
             inlined = false;
-            quoted = false;
         };
     };
 
@@ -200,8 +198,10 @@ struct Expander {
         }
         if (setup.inlined)
             func->set_inline();
+        /*
         if (setup.quoted)
             result = ast_quote(func);
+        */
 
         if (it == EOL) {
             // forward declaration
@@ -1058,20 +1058,9 @@ struct Expander {
                     return ConstPointer::scope_from(node->anchor(), env);
                 case KW_SyntaxLog: return expand_syntax_log(list);
                 case KW_Fn: return expand_fn(list, ExpandFnSetup());
-                case KW_QuotedFn: {
-                    ExpandFnSetup setup;
-                    setup.quoted = true;
-                    return expand_fn(list, setup);
-                }
                 case KW_Inline: {
                     ExpandFnSetup setup;
                     setup.inlined = true;
-                    return expand_fn(list, setup);
-                }
-                case KW_QuotedInline: {
-                    ExpandFnSetup setup;
-                    setup.inlined = true;
-                    setup.quoted = true;
                     return expand_fn(list, setup);
                 }
                 case KW_RunStage: return expand_run_stage(list);
@@ -1182,12 +1171,12 @@ struct Expander {
 bool Expander::verbose = false;
 const Type *Expander::list_expander_func_type = nullptr;
 
-SCOPES_RESULT(sc_value_list_tuple_t) expand(Value *expr, const List *next, Scope *scope) {
-    SCOPES_RESULT_TYPE(sc_value_list_tuple_t);
+SCOPES_RESULT(sc_value_list_scope_tuple_t) expand(Value *expr, const List *next, Scope *scope) {
+    SCOPES_RESULT_TYPE(sc_value_list_scope_tuple_t);
     Scope *subenv = scope?scope:sc_get_globals();
     Expander subexpr(subenv, nullptr, next);
     Value *value = SCOPES_GET_RESULT(subexpr.expand(expr));
-    sc_value_list_tuple_t result = { value, subexpr.next };
+    sc_value_list_scope_tuple_t result = { value, subexpr.next, subexpr.env };
     return result;
 }
 

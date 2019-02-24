@@ -855,7 +855,7 @@ let SyntaxMacroFunction =
         'raising
             function (Arguments list Scope) list list Scope
             Error
-'set-storage SyntaxMacro SyntaxMacroFunction
+'set-plain-storage SyntaxMacro SyntaxMacroFunction
 
 # any extraction
 
@@ -4122,6 +4122,75 @@ define-syntax-block-scope-macro syntax-if
             next-expr
         syntax-scope
 
+define-syntax-block-scope-macro !
+    raises-compile-error;
+    let kw body = (decons expr)
+    let head = (kw as Symbol)
+    let result next-expr =
+        loop (body next-expr result = body next-expr '())
+            if (empty? next-expr)
+                compiler-error! "decorator is not applied to anything"
+            let result =
+                cons
+                    if ((countof body) == 1)
+                        '@ body
+                    else
+                        `body
+                    result
+            let follow-expr next-next-expr = (decons next-expr)
+            if (('typeof follow-expr) == list)
+                let kw body = (decons (follow-expr as list))
+                if (('typeof kw) == Symbol)
+                    let kw = (kw as Symbol)
+                    if (kw == head)
+                        # more decorators
+                        repeat body next-next-expr result
+                    else
+                        # terminating actual expression
+                        let newkw = (Symbol (.. "decorate-" (kw as string)))
+                        let decoratefn =
+                            try
+                                getattr syntax-scope newkw
+                            except (x)
+                                `'decorate-*
+                        break
+                            cons decoratefn follow-expr result
+                            next-next-expr
+            break
+                cons 'decorate-* follow-expr result
+                next-next-expr
+    return
+        cons result next-expr
+        syntax-scope
+
+define-syntax-macro decorate-*
+    raises-compile-error;
+    let expr decorators = (decons args)
+    loop (in out = decorators expr)
+        if (empty? in)
+            break out
+        let decorator in = (decons in)
+        repeat in
+            Value (cons decorator (list out))
+
+define-syntax-macro decorate-fn
+    raises-compile-error;
+    let fnexpr decorators = (decons args)
+    let kw name = (decons (fnexpr as list) 2)
+    let result =
+        loop (in out = decorators fnexpr)
+            if (empty? in)
+                break out
+            let decorator in = (decons in)
+            repeat in
+                Value (cons decorator (list out))
+    if (('typeof name) == Symbol)
+        Value (list let name '= result)
+    else
+        result
+
+let decorate-inline = decorate-fn
+
 define-syntax-scope-macro syntax-eval
     let subscope = (Scope syntax-scope)
     'set-symbol subscope 'syntax-scope syntax-scope
@@ -4155,8 +4224,9 @@ run-stage;
 # method syntax
 #-------------------------------------------------------------------------------
 
-sugar method (expr...)
-    fn typeref-or-default (typeref rest)
+fn parse-method-definition (expr)
+
+    fn parse-typeref-or-default (typeref rest)
         if (('typeof typeref) == list)
             let head rest... = (decons (typeref as list))
             if (('typeof head) == Symbol)
@@ -4165,22 +4235,40 @@ sugar method (expr...)
             return `'this-type (cons typeref rest)
         return typeref rest
 
-    syntax-match expr...
+    syntax-match expr
     case (('syntax-quote (name as Symbol)) typeref rest...)
-        let typeref rest = (typeref-or-default typeref rest...)
-        qq
-            'set-symbol [typeref] '[name]
-                [fn!] [(name as string)]
+        let typeref rest = (parse-typeref-or-default typeref rest...)
+        _ typeref name
+            qq
+                [fn] [(name as string)]
                     unquote-splice rest
     case ('inline ('syntax-quote (name as Symbol)) typeref rest...)
-        let typeref rest = (typeref-or-default typeref rest...)
-        qq
-            'set-symbol [typeref] '[name]
-                [inline!] [(name as string)]
+        let typeref rest = (parse-typeref-or-default typeref rest...)
+        _ typeref name
+            qq
+                [inline] [(name as string)]
                     unquote-splice rest
     default
         compiler-error!
             "syntax: method [inline] 'name [type] (parameter...) body..."
+
+sugar method (expr...)
+    let typeref name fndef = (parse-method-definition expr...)
+    qq
+        'set-symbol [typeref] '[name] [fndef]
+
+sugar decorate-method (expr decorators...)
+    let kw rest = (decons (expr as list))
+    let typeref name fnexpr = (parse-method-definition rest)
+    let result =
+        loop (in out = decorators... fnexpr)
+            if (empty? in)
+                break out
+            let decorator in = (decons in)
+            repeat in
+                cons decorator (list out)
+    qq
+        'set-symbol [typeref] '[name] [result]
 
 #-------------------------------------------------------------------------------
 # standard allocators

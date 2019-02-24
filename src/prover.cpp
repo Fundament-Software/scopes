@@ -820,15 +820,20 @@ static SCOPES_RESULT(TypedValue *) prove_CompileStage(const ASTContext &ctx, Com
         if (key == SYM_Unnamed)
             break;
         last_key = key;
-        if (!sc_value_is_constant(value)) {
+        if (!sc_value_is_pure(value)) {
             auto keydocstr = sc_scope_get_docstring(scope, key);
             auto value1 = sc_extract_argument_new(value->anchor(), value, 0);
             auto typedvalue1 = SCOPES_GET_RESULT(prove(ctx, value1));
-            if (sc_value_is_constant(typedvalue1)) {
+            if (sc_value_is_pure(typedvalue1)) {
                 sc_scope_set_symbol(constant_scope, key, typedvalue1);
                 sc_scope_set_docstring(constant_scope, key, keydocstr);
             } else {
-                auto wrapvalue = wrap_value(typedvalue1->get_type(), typedvalue1);
+                Value *wrapvalue = nullptr;
+                if (typedvalue1->get_type() == TYPE_Value) {
+                    wrapvalue = typedvalue1;
+                } else {
+                    wrapvalue = wrap_value(typedvalue1->get_type(), typedvalue1);
+                }
                 if (wrapvalue) {
                     auto vkey = ConstInt::symbol_from(anchor, key);
                     block->append(CallTemplate::from(anchor, g_sc_scope_set_symbol, { tmp, vkey, wrapvalue }));
