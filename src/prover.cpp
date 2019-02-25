@@ -791,8 +791,8 @@ static SCOPES_RESULT(TypedValue *) prove_RaiseTemplate(const ASTContext &ctx, Ra
     return make_raise(ctx, node->anchor(), value);
 }
 
-bool value_stage_ready(Value *value) {
-    return isa<Pure>(value) && !isa<PureCast>(value);
+bool is_value_stage_constant(Value *value) {
+    return isa<Pure>(value) && (cast<Pure>(value)->get_type() != TYPE_ASTMacro);
 }
 
 static SCOPES_RESULT(TypedValue *) prove_CompileStage(const ASTContext &ctx, CompileStage *sx) {
@@ -824,11 +824,11 @@ static SCOPES_RESULT(TypedValue *) prove_CompileStage(const ASTContext &ctx, Com
         if (key == SYM_Unnamed)
             break;
         last_key = key;
-        if (!value_stage_ready(value)) {
+        if (!is_value_stage_constant(value)) {
             auto keydocstr = sc_scope_get_docstring(scope, key);
             auto value1 = sc_extract_argument_new(value->anchor(), value, 0);
             auto typedvalue1 = SCOPES_GET_RESULT(prove(ctx, value1));
-            if (value_stage_ready(typedvalue1)) {
+            if (is_value_stage_constant(typedvalue1)) {
                 sc_scope_set_symbol(constant_scope, key, typedvalue1);
                 sc_scope_set_docstring(constant_scope, key, keydocstr);
             } else {

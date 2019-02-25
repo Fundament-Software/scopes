@@ -58,6 +58,7 @@ SCOPES_RESULT(uint64_t) extract_integer_constant(Value *value);
 SCOPES_RESULT(Function *) extract_function_constant(Value *value);
 const Type *try_get_const_type(Value *node);
 const String *try_extract_string(Value *node);
+bool is_value_stage_constant(Value *value);
 SCOPES_RESULT(void) map_keyed_arguments(const Anchor *anchor,
     Values &outargs, const Values &values, const Symbols &symbols, bool varargs);
 
