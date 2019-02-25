@@ -3,37 +3,48 @@ using import FunctionChain
 
 fnchain f
 
-let g_x = (static i32)
+global g_x : i32
+g_x = 0
+fn get_g_x () g_x
+
+run-stage;
 
 f;
-assert (g_x == 0)
+assert ((get_g_x) == 0)
 
 'append f
     fn ()
-        g_x = g_x + 1
+        (get_g_x) += 1
+
+run-stage;
 
 f;
-assert (g_x == 1)
+assert ((get_g_x) == 1)
 
 'append f
     fn ()
-        g_x = g_x * 2
+        (get_g_x) *= 2
+
+run-stage;
 
 f;
-assert (g_x == 4)
+assert ((get_g_x) == 4)
 
 'prepend f
     fn ()
-        g_x = g_x * 10
+        (get_g_x) *= 10
+
+run-stage;
 
 f;
-assert (g_x == 82)
+assert ((get_g_x) == 82)
 
 'clear f
 
-f;
-assert (g_x == 82)
+run-stage;
 
+f;
+assert ((get_g_x) == 82)
 
 let chain1 = (FunctionChain "test")
 let chain2 = (FunctionChain "test")

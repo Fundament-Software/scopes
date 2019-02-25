@@ -4333,12 +4333,12 @@ sugar decorate-method (expr decorators...)
     let kw rest = (decons (expr as list))
     let typeref name fnexpr = (parse-method-definition rest)
     let result =
-        loop (in out = decorators... fnexpr)
-            if (empty? in)
-                break out
-            let decorator in = (decons in)
-            repeat in
-                cons decorator (list out)
+        loop (inp outp = decorators... fnexpr)
+            if (empty? inp)
+                break outp
+            let decorator inp = (decons inp)
+            repeat inp
+                cons decorator (list outp)
     qq
         'set-symbol [typeref] '[name] [result]
 

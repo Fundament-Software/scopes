@@ -50,56 +50,62 @@
 
 let FunctionChain = (typename "FunctionChain")
 
-typefn FunctionChain 'clear (self)
+fn clear (cls)
     """"Clear the function chain. When the function chain is applied next,
         no functions will be called.
-    assert (not (type== self FunctionChain))
-    assert (constant? self)
-    typefn self '__typecall (self args...)
-    self
-typefn FunctionChain 'append (self f)
+    method '__typecall cls (cls args...)
+    cls
+
+fn append (cls f)
     """"Append function `f` to function chain. When the function chain is called,
         `f` will be called last. The return value of `f` will be ignored.
-    assert (not (type== self FunctionChain))
-    assert (constant? f)
-    assert (constant? self)
-    let oldfn = self.__typecall
-    typefn self '__typecall (self args...)
-        oldfn self args...
+    let oldfn = cls.__typecall
+
+    @@ ast-quote
+    method '__typecall cls (cls args...)
+        oldfn cls args...
         f args...
-    self
-typefn FunctionChain 'prepend (self f)
+
+    cls
+
+fn prepend (cls f)
     """"Prepend function `f` to function chain. When the function chain is called,
         `f` will be called first. The return value of `f` will be ignored.
-    assert (not (type== self FunctionChain))
-    assert (constant? f)
-    assert (constant? self)
-    let oldfn = self.__typecall
-    typefn self '__typecall (self args...)
-        f args...
-        oldfn self args...
-    self
+    let oldfn = cls.__typecall
 
-typeinline FunctionChain '__typecall (cls name)
+    @@ ast-quote
+    method '__typecall cls (cls args...)
+        f args...
+        oldfn cls args...
+
+    cls
+
+method inline '__typecall FunctionChain (cls name)
     let T = (typename (.. "<FunctionChain " name ">"))
-    set-typename-super! T cls
-    typefn T '__typecall (cls args...)
-    T
+    'set-super T cls
+    'set-symbols T
+        clear = clear
+        append = append
+        prepend = prepend
+    clear T
+
+run-stage;
 
 """".. macro:: (fnchain name)
 
        Binds a new unique and empty function chain to identifier `name`. The
        function chain's typename is going to incorporate the name of the module
        in which it was declared.
-define-macro fnchain
-    let name = (decons args)
+sugar fnchain ((name as Symbol))
     list let name '=
         list FunctionChain
             list (do ..)
                 'module-name
                 "."
-                name as Syntax as Symbol as string
+                name as string
+
+let decorate-fnchain = decorate-fn
 
 do
-    let FunctionChain fnchain
+    let FunctionChain fnchain decorate-fnchain
     locals;
