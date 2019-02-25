@@ -335,7 +335,7 @@ struct Quoter {
     Value *quote_typed(TypedValue *node) {
         if (node->get_type() == TYPE_Value)
             return node;
-        if (isa<Pure>(node)) {
+        if (isa<Pure>(node) && !isa<PureCast>(node)) {
             return ConstPointer::ast_from(node->anchor(), node);
         } else if (isa<ArgumentList>(node)) {
             return quote_typed_argument_list(cast<ArgumentList>(node));

@@ -244,20 +244,9 @@ run-stage;
 let ast-macro-verify-signature =
     typify (fn "ast-macro-verify-signature" (f)) ASTMacroFunction
 
-#fn ast-macro-verify-signature (f)
-    if (ptrcmp!= (typeof f) ASTMacroFunction)
-        compiler-error!
-            sc_string_join "AST macro must have type "
-                sc_string_join
-                    sc_value_repr (box-pointer ASTMacroFunction)
-                    sc_string_join " but has type "
-                        sc_value_repr (box-pointer (typeof f))
-
-let function->ASTMacro =
-    typify
-        fn "function->ASTMacro" (f)
-            bitcast f ASTMacro
-        ASTMacroFunction
+inline function->ASTMacro (f)
+    ast-macro-verify-signature f
+    bitcast f ASTMacro
 
 fn box-empty ()
     sc_argument_list_new (sc_get_active_anchor)
@@ -3664,6 +3653,10 @@ fn gen-argument-matcher (failfunc expr scope params)
 
 define match-args
     gen-match-block-parser gen-argument-matcher
+
+#inline spice-macro (f)
+    ast-macro-verify-signature f
+    bitcast (typify f Value) ASTMacro
 
 define spice
     syntax-macro

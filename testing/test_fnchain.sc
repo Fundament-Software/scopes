@@ -1,22 +1,20 @@
 
 using import FunctionChain
 
-fnchain f
-
 global g_x : i32
 g_x = 0
 fn get_g_x () g_x
 
-run-stage;
+@@ print
+fnchain f
 
 f;
 assert ((get_g_x) == 0)
 
-'append f
-    fn ()
-        (get_g_x) += 1
-
-run-stage;
+# decorator syntax
+@@ 'on f
+fn ()
+    (get_g_x) += 1
 
 f;
 assert ((get_g_x) == 1)
@@ -25,8 +23,6 @@ assert ((get_g_x) == 1)
     fn ()
         (get_g_x) *= 2
 
-run-stage;
-
 f;
 assert ((get_g_x) == 4)
 
@@ -34,14 +30,10 @@ assert ((get_g_x) == 4)
     fn ()
         (get_g_x) *= 10
 
-run-stage;
-
 f;
 assert ((get_g_x) == 82)
 
 'clear f
-
-run-stage;
 
 f;
 assert ((get_g_x) == 82)

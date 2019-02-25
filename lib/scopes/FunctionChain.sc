@@ -48,17 +48,17 @@
         handler activated with argument 3
 
 
-let FunctionChain = (typename "FunctionChain")
-
-fn clear (cls)
+spice clear (cls)
     """"Clear the function chain. When the function chain is applied next,
         no functions will be called.
+    let cls = (cls as type)
     method '__typecall cls (cls args...)
     cls
 
-fn append (cls f)
+spice append (cls f)
     """"Append function `f` to function chain. When the function chain is called,
         `f` will be called last. The return value of `f` will be ignored.
+    let cls = (cls as type)
     let oldfn = cls.__typecall
 
     @@ ast-quote
@@ -68,9 +68,10 @@ fn append (cls f)
 
     cls
 
-fn prepend (cls f)
+spice prepend (cls f)
     """"Prepend function `f` to function chain. When the function chain is called,
         `f` will be called first. The return value of `f` will be ignored.
+    let cls = (cls as type)
     let oldfn = cls.__typecall
 
     @@ ast-quote
@@ -80,16 +81,25 @@ fn prepend (cls f)
 
     cls
 
-method inline '__typecall FunctionChain (cls name)
-    let T = (typename (.. "<FunctionChain " name ">"))
-    'set-super T cls
-    'set-symbols T
-        clear = clear
-        append = append
-        prepend = prepend
-    clear T
+inline on (cls)
+    """"Returns a decorator that appends the provided function to the
+        function chain.
+    inline (f)
+        'append cls f
+        f
 
-run-stage;
+let FunctionChain = (define-typename "FunctionChain")
+'define-symbol FunctionChain '__typecall
+    fn (cls name)
+        let T = (typename (.. "<FunctionChain " name ">"))
+        'set-super T cls
+        'set-symbols T
+            clear = clear
+            append = append
+            prepend = prepend
+            on = on
+        method '__typecall T (cls args...)
+        T
 
 """".. macro:: (fnchain name)
 
@@ -98,11 +108,10 @@ run-stage;
        in which it was declared.
 sugar fnchain ((name as Symbol))
     list let name '=
-        list FunctionChain
-            list (do ..)
-                'module-name
-                "."
-                name as string
+        FunctionChain
+            ..
+                syntax-scope.module-name as string
+                \ "." (name as string)
 
 let decorate-fnchain = decorate-fn
 
