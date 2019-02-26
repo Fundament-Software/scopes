@@ -66,6 +66,7 @@ test-modules
     .test_testing
     .test_try
     .test_tuple_array
+    .test_typedef
     .test_union
     .test_unique
     .test_using

@@ -1,10 +1,13 @@
 
 using import testing
 
+let T = (typename "test")
+
+run-stage;
+
 # impure compile time operations are only clearly determinable after the
     all-true blocks of a function have gone through, and their
     processing order isn't always clear
-let T = (define-typename "test")
 fn test ()
     # force branching
     if true

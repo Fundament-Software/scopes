@@ -746,15 +746,15 @@ inline define-symbols (self values...)
     signed? = sc_integer_type_is_signed
     element@ = sc_type_element_at
     element-count = sc_type_countof
-    storage = sc_type_storage
+    storageof = sc_type_storage
     kind = sc_type_kind
-    size = sc_type_sizeof
-    align = sc_type_alignof
+    sizeof = sc_type_sizeof
+    alignof = sc_type_alignof
     @ = sc_type_at
     local@ = sc_type_local_at
     opaque? = sc_type_is_opaque
     string = sc_type_string
-    super = sc_typename_type_get_super
+    superof = sc_typename_type_get_super
     set-super = sc_typename_type_set_super
     set-storage =
         inline (type storage-type)
@@ -843,7 +843,7 @@ sc_typename_type_set_super usize integer
 
 # generator type
 let Generator = (sc_typename_type "Generator")
-'set-storage Generator ('storage Closure)
+'set-storage Generator ('storageof Closure)
 
 # syntax macro type
 let SyntaxMacro = (sc_typename_type "SyntaxMacro")
@@ -890,7 +890,7 @@ fn value-as (vT T expr)
 
 fn integer-imply (vT T expr)
     let ST =
-        if (ptrcmp== T usize) ('storage T)
+        if (ptrcmp== T usize) ('storageof T)
         else T
     if (icmp== ('kind ST) type-kind-integer)
         # constant i32 auto-expands to usize if not negative
@@ -919,7 +919,7 @@ fn integer-imply (vT T expr)
 fn integer-as (vT T expr)
     let args... = expr T
     let T =
-        if (ptrcmp== T usize) ('storage T)
+        if (ptrcmp== T usize) ('storageof T)
         else T
     if (icmp== ('kind T) type-kind-integer)
         let valw = ('bitcount vT)
@@ -956,7 +956,7 @@ fn real-imply (vT T expr)
 fn real-as (vT T expr)
     let args... = expr T
     let T =
-        if (ptrcmp== T usize) ('storage T)
+        if (ptrcmp== T usize) ('storageof T)
         else T
     let kind = ('kind T)
     if (icmp== kind type-kind-real)
@@ -1449,19 +1449,19 @@ let NullType = (sc_typename_type "NullType")
     __imply =
         box-cast
             fn "null-imply" (clsT T expr)
-                if (icmp== ('kind ('storage T)) type-kind-pointer)
+                if (icmp== ('kind ('storageof T)) type-kind-pointer)
                     return `(bitcast expr T)
                 compiler-error! "cannot convert to type"
     __== =
         box-binary-op
             fn (lhsT rhsT lhs rhs)
-                if (icmp== ('kind ('storage rhsT)) type-kind-pointer)
+                if (icmp== ('kind ('storageof rhsT)) type-kind-pointer)
                     return `(icmp== (ptrtoint rhs usize) 0:usize)
                 compiler-error! "only pointers can be compared to null"
     __r== =
         box-binary-op
             fn (lhsT rhsT lhs rhs)
-                if (icmp== ('kind ('storage lhsT)) type-kind-pointer)
+                if (icmp== ('kind ('storageof lhsT)) type-kind-pointer)
                     return `(icmp== (ptrtoint lhs usize) 0:usize)
                 compiler-error! "only pointers can be compared to null"
 
@@ -1682,7 +1682,7 @@ let coerce-call-arguments =
     set-type-symbol! pointer 'strip-storage
         fn (cls ET)
             pointer-type-set-storage-class cls unnamed
-    set-type-symbol! pointer 'storage
+    set-type-symbol! pointer 'storageof
         fn (cls)
             pointer-type-storage-class cls
     set-type-symbol! pointer 'readable?
@@ -1693,7 +1693,7 @@ fn pointer-type-imply? (src dest)
     let ET = ('element@ src 0)
     let ET =
         if ('opaque? ET) ET
-        else ('storage ET)
+        else ('storageof ET)
     if (not (icmp== ('kind ET) type-kind-pointer))
         # casts to voidstar are only permitted if we are not holding
         # a ref to another pointer
@@ -2065,31 +2065,6 @@ fn clone-scope-contents (a b)
             'set-symbol T '__typecall missing-constructor
             T
 
-let define-typename =
-    ast-macro
-        fn (args)
-            let argc = ('argcount args)
-            verify-count argc 1 3
-            let name = ('getarg args 0)
-            let T =
-                sc_typename_type
-                    as name string
-            loop (i = 1)
-                if (== i argc)
-                    return (Value T)
-                let arg = ('getarg args i)
-                let k = (sc_type_key (sc_value_qualified_type arg))
-                let v = (sc_keyed_new (sc_value_anchor arg) unnamed arg)
-                if (== k 'super)
-                    sc_typename_type_set_super T (as v type)
-                elseif (== k 'storage)
-                    'set-storage T (as v type)
-                elseif (== k 'plain-storage)
-                    'set-plain-storage T (as v type)
-                else
-                    compiler-error! "super or storage key expected"
-                + i 1
-
 'set-symbols Scope
     __.. =
         box-binary-op
@@ -2189,8 +2164,8 @@ let
 
 inline select-op-macro (sop fop numargs)
     inline scalar-type (T)
-        let ST = ('storage T)
-        if (type== ('super ST) vector)
+        let ST = ('storageof T)
+        if (type== ('superof ST) vector)
             'element@ ST 0
         else ST
     ast-macro
@@ -2201,8 +2176,8 @@ inline select-op-macro (sop fop numargs)
                 'getarg args 0; 'getarglist args 1
             let T = (scalar-type ('typeof a))
             let fun =
-                if (type== ('super T) integer) `sop
-                elseif (type== ('super T) real) `fop
+                if (type== ('superof T) integer) `sop
+                elseif (type== ('superof T) real) `fop
                 else
                     compiler-error!
                         sc_string_join "invalid argument type: "
@@ -2234,6 +2209,9 @@ inline sabs (x)
 let pow = (select-op-macro powi powf 2)
 let abs = (select-op-macro sabs fabs 1)
 let sign = (select-op-macro ssign fsign 1)
+
+let hash = (sc_typename_type "hash")
+'set-plain-storage hash u64
 
 run-stage;
 
@@ -2393,10 +2371,6 @@ define for
 # hashing
 #---------------------------------------------------------------------------
 
-let hash =
-    define-typename "hash"
-        plain-storage = u64
-
 let hash-storage =
     ast-macro
         fn "hash-storage" (args)
@@ -2406,7 +2380,7 @@ let hash-storage =
             let OT = ('typeof value)
             let T =
                 if ('opaque? OT) OT
-                else ('storage OT)
+                else ('storageof OT)
             let conv_u64 =
                 switch ('kind T)
                 case type-kind-integer
@@ -2421,7 +2395,7 @@ let hash-storage =
                     else
                         compiler-error!
                             .. "can't hash storage of type " (repr OT)
-            `(bitcast (sc_hash conv_u64 [('size T)]) hash)
+            `(bitcast (sc_hash conv_u64 [('sizeof T)]) hash)
 
 'set-symbols hash
     __hash = (inline (self) self)
@@ -2430,7 +2404,7 @@ let hash-storage =
     __as =
         box-cast
             fn "hash-as" (vT T expr)
-                let ST = ('storage vT)
+                let ST = ('storageof vT)
                 if (T == ST)
                     return `(bitcast expr T)
                 elseif (T == integer)
@@ -2439,7 +2413,7 @@ let hash-storage =
     __ras =
         box-cast
             fn "hash-as" (vT T expr)
-                if (vT == ('storage vT))
+                if (vT == ('storageof vT))
                     return `(bitcast expr T)
                 compiler-error! "unsupported type"
     __typecall =
@@ -2479,6 +2453,8 @@ let wrap-if-not-run-stage =
                 if (('typeof arg) == CompileStage)
                     return arg
             `(Value args)
+
+let incomplete = (typename "incomplete")
 
 run-stage;
 
@@ -2571,7 +2547,6 @@ fn patterns-from-namestr (base-dir namestr)
     else
         package.path as list
 
-let incomplete = (define-typename "incomplete")
 fn require-from (base-dir name)
     #assert-typeof name Symbol
     let namestr = (dots-to-slashes (name as string))
@@ -3786,6 +3761,8 @@ fn gen-match-matcher (failfunc expr scope cond)
 define match
     gen-match-block-parser gen-match-matcher
 
+let OverloadedFunction = (typename "OverloadedFunction")
+
 run-stage;
 
 let infinite-range =
@@ -3833,8 +3810,6 @@ inline memoize (f castfunc)
 #-------------------------------------------------------------------------------
 # function overloading
 #-------------------------------------------------------------------------------
-
-let OverloadedFunction = (define-typename "OverloadedFunction")
 
 fn get-overloaded-fn-append ()
     spice "overloaded-fn-append" (T args...)
@@ -4284,6 +4259,32 @@ let
     import-c = sc_import_c
 
 run-stage;
+
+#-------------------------------------------------------------------------------
+# typedef
+#-------------------------------------------------------------------------------
+
+sugar typedef ((name as Symbol) body...)
+    loop (inp outp = body... '())
+        syntax-match inp
+        case ('< supertype rest...)
+            repeat rest...
+                cons (list sc_typename_type_set_super 'this-type supertype) outp
+        case (': storagetype rest...)
+            repeat rest...
+                cons (list sc_typename_type_set_storage 'this-type storagetype typename-flag-plain) outp
+        case (':: storagetype rest...)
+            repeat rest...
+                cons (list sc_typename_type_set_storage 'this-type storagetype 0:u32) outp
+        default
+            break
+                qq
+                    [let] [name] =
+                        [do]
+                            [let] this-type = ([typename] [(name as string)])
+                            unquote-splice outp
+                            [(cons do inp)]
+                            this-type
 
 #-------------------------------------------------------------------------------
 # method syntax
