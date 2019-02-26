@@ -8,8 +8,7 @@ inline unpack-type (f)
 fn memoized ()
     typename "bang"
 
-@@ unpack-type
-@@ memoize
+@@ type-factory
 fn memoized-clone ()
     typename "bang"
 

@@ -13,6 +13,11 @@
 typedef vec-type < immutable
 typedef mat-type < immutable
 
+inline memoize-type-generator (f)
+    let f = (memoize f)
+    fn (...)
+        ((f ...) as type)
+
 fn element-prefix (element-type)
     match element-type
     case bool "b"
@@ -23,6 +28,7 @@ fn element-prefix (element-type)
     default
         compiler-error! "illegal element type"
 
+@@ memoize-type-factory
 fn construct-vec-type (element-type size)
     assert ((typeof size) == i32)
     assert (size > 1)
@@ -36,6 +42,7 @@ fn construct-vec-type (element-type size)
     set-type-symbol! T 'Count size
     T
 
+@@ memoize-type-generator
 fn construct-mat-type (element-type cols rows)
     assert ((typeof cols) == i32)
     assert ((typeof rows) == i32)
