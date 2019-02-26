@@ -3790,22 +3790,16 @@ inline enumerate (x)
 # function memoization
 #-------------------------------------------------------------------------------
 
-inline memoize (f castfunc)
-    let castfunc =
-        constbranch (none? castfunc)
-            inline () _
-            inline () castfunc
+inline memoize (f)
     fn (args...)
         let key = `[f args...]
         let value = (sc_map_get key)
-        let result =
-            if (value == null)
-                let value =
-                    `[(f args...)]
-                sc_map_set key value
-                value
-            else value
-        castfunc result
+        if (value == null)
+            let value =
+                `[(f args...)]
+            sc_map_set key value
+            value
+        else value
 
 #-------------------------------------------------------------------------------
 # function overloading
@@ -4264,7 +4258,7 @@ run-stage;
 # typedef
 #-------------------------------------------------------------------------------
 
-sugar typedef ((name as Symbol) body...)
+sugar typedef (name body...)
     loop (inp outp = body... '())
         syntax-match inp
         case ('< supertype rest...)
@@ -4277,14 +4271,20 @@ sugar typedef ((name as Symbol) body...)
             repeat rest...
                 cons (list sc_typename_type_set_storage 'this-type storagetype 0:u32) outp
         default
+            let declaration? = (('typeof name) == Symbol)
+            let namestr =
+                if declaration? `[(name as Symbol as string)]
+                else name
+            let expr =
+                qq [do]
+                    [let] this-type = ([typename] [namestr])
+                    unquote-splice outp
+                    [(cons do inp)]
+                    this-type
             break
-                qq
-                    [let] [name] =
-                        [do]
-                            [let] this-type = ([typename] [(name as string)])
-                            unquote-splice outp
-                            [(cons do inp)]
-                            this-type
+                if declaration?
+                    qq [let] [name] = [expr]
+                else expr
 
 #-------------------------------------------------------------------------------
 # method syntax

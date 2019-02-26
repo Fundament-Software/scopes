@@ -10,18 +10,18 @@
     related arithmetic operations which mimic the features available to shaders
     written in the GL shader language.
 
-let vec-type = (typename "vec-type" immutable)
-let mat-type = (typename "mat-type" immutable)
+typedef vec-type < immutable
+typedef mat-type < immutable
 
 fn element-prefix (element-type)
     match element-type
-        bool "b"
-        i32 "i"
-        u32 "u"
-        f32 ""
-        f64 "d"
-        else
-            compiler-error! "illegal element type"
+    case bool "b"
+    case i32 "i"
+    case u32 "u"
+    case f32 ""
+    case f64 "d"
+    default
+        compiler-error! "illegal element type"
 
 fn construct-vec-type (element-type size)
     assert ((typeof size) == i32)

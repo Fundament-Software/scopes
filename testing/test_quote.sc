@@ -11,14 +11,12 @@ spice test ()
         print
             kwok;
 
-#let test = (typify test)
-
 run-stage;
 
-print
+#print
     'ast-repr test
 
-#print
+print
     test;
 
 return;
