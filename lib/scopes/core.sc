@@ -2563,6 +2563,9 @@ fn patterns-from-namestr (base-dir namestr)
     else
         package.path as list
 
+inline slice (value start end)
+    rslice (lslice value end) start
+
 fn require-from (base-dir name)
     #assert-typeof name Symbol
     let namestr = (dots-to-slashes (name as string))
@@ -2605,6 +2608,27 @@ fn require-from (base-dir name)
                     .. "trying to import module " (repr name)
                         " while it is being imported"
         return content
+
+let import =
+    syntax-scope-macro
+        fn "import" (args scope)
+            fn resolve-scope (scope namestr start)
+                let sz = (countof namestr)
+                loop (i start = start start)
+                    if (i == sz)
+                        return (Symbol (slice namestr start i))
+                    if ((@ namestr i) == (char "."))
+                        if (i == start)
+                            repeat (add i 1:usize) (add i 1:usize)
+                    repeat (add i 1:usize) start
+            let sxname rest = (decons args)
+            let name = (sxname as Symbol)
+            let namestr = (name as string)
+            let module-dir = (scope.module-dir as string)
+            let key = (resolve-scope scope namestr 0:usize)
+            let module = (require-from module-dir name)
+            'set-symbol scope key module
+            _ module scope
 
 """"export locals as a chain of two new scopes: a scope that contains
     all the constant values in the immediate scope, and a scope that contains

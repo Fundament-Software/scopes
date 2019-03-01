@@ -29,6 +29,7 @@ test-modules
     .test_glm
     .test_glsl
     .test_hash
+    .test_import
     .test_inline
     .test_inplace_arithmetic
     .test_intrinsics
@@ -60,7 +61,6 @@ test-modules
     .test_static
     .test_string
     .test_struct
-    .test_submod
     .test_sugar
     .test_switch
     .test_testing
