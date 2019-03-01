@@ -1319,6 +1319,7 @@ struct LLVMIRGenerator {
             return LLVMBuildSIToFP(builder, val, ty, ""); } break;
         case FN_Deref: {
             READ_VALUE(ptr);
+            assert(LLVMGetTypeKind(LLVMTypeOf(ptr)) == LLVMPointerTypeKind);
             LLVMValueRef retvalue = LLVMBuildLoad(builder, ptr, "");
             return retvalue;
         } break;

@@ -1085,7 +1085,8 @@ static SCOPES_RESULT(void) build_deref(
         auto NAME = SCOPES_GET_RESULT(extract_integer_constant(_ ## NAME));
 #define READ_TYPE_CONST(NAME) \
         assert(argn < argcount); \
-        auto NAME = SCOPES_GET_RESULT(extract_type_constant(values[argn++]));
+        auto &&_ ## NAME = values[argn++]; \
+        auto NAME = SCOPES_GET_RESULT(extract_type_constant(_ ## NAME));
 #define READ_VECTOR_CONST(NAME) \
         assert(argn < argcount); \
         auto NAME = SCOPES_GET_RESULT(extract_vector_constant(values[argn++]));
@@ -1331,7 +1332,7 @@ repeat:
             if (SrcT == DestT) {
                 return _SrcT;
             } else {
-                DEREF(_SrcT);
+                //DEREF(_SrcT);
                 const Type *SSrcT = SCOPES_GET_RESULT(storage_type(SrcT));
                 const Type *SDestT = SCOPES_GET_RESULT(storage_type(DestT));
                 if (canonical_typekind(SSrcT->kind())
@@ -1356,6 +1357,11 @@ repeat:
                     } break;
                     default: break;
                     }
+                }
+                auto rq = try_qualifier<ReferQualifier>(SrcT);
+                if (rq) {
+                    DestT = qualify(DestT, { rq });
+                    _DestT = ConstPointer::type_from(_DestT->anchor(), DestT);
                 }
                 if (isa<Pure>(_SrcT)) {
                     return PureCast::from(call->anchor(), DestT, cast<Pure>(_SrcT));
@@ -1445,13 +1451,56 @@ repeat:
         } break;
         case FN_ExtractElement: {
             CHECKARGS(2, 2);
-            READ_STORAGETYPEOF(T);
+            READ_NODEREF_STORAGETYPEOF(T);
             READ_STORAGETYPEOF(idx);
             SCOPES_CHECK_RESULT(verify_kind<TK_Vector>(T));
             auto vi = cast<VectorType>(T);
             SCOPES_CHECK_RESULT(verify_integer(idx));
-            return NODEPS1(ARGTYPE1(vi->element_type));
+            auto rq = try_qualifier<ReferQualifier>(typeof_T);
+            auto RT = vi->element_type;
+            if (rq) {
+                auto newcall2 = Call::from(call->anchor(), qualify(RT, { rq }), g_getelementref, { _T, _idx });
+                return DEPS1(newcall2, _T);
+            } else {
+                return NODEPS1(ARGTYPE1(RT));
+            }
         } break;
+        /*
+        case FN_ExtractValue: {
+            CHECKARGS(2, 2);
+            READ_NODEREF_STORAGETYPEOF(T);
+            READ_INT_CONST(idx);
+            const Type *RT = nullptr;
+            switch(T->kind()) {
+            case TK_Array: {
+                auto ai = cast<ArrayType>(T);
+                RT = SCOPES_GET_RESULT(ai->type_at_index(idx));
+            } break;
+            case TK_Tuple: {
+                auto ti = cast<TupleType>(T);
+                SCOPES_CHECK_RESULT(sanitize_tuple_index(call->anchor(), T, ti, idx, _idx));
+                RT = SCOPES_GET_RESULT(ti->type_at_index(idx));
+            } break;
+            case TK_Union: {
+                auto ui = cast<UnionType>(T);
+                SCOPES_CHECK_RESULT(sanitize_tuple_index(call->anchor(), T, ui, idx, _idx));
+                RT = SCOPES_GET_RESULT(ui->type_at_index(idx));
+            } break;
+            default: {
+                StyledString ss;
+                ss.out << "can not extract value from type " << T;
+                SCOPES_LOCATION_ERROR(ss.str());
+            } break;
+            }
+            auto rq = try_qualifier<ReferQualifier>(typeof_T);
+            if (rq) {
+                auto newcall2 = Call::from(call->anchor(), qualify(RT, { rq }), g_getelementref, { _T, _idx });
+                return DEPS1(newcall2, _T);
+            } else {
+                return NODEPS1(ARGTYPE1(RT));
+            }
+        } break;
+        */
         case FN_InsertElement: {
             CHECKARGS(3, 3);
             READ_STORAGETYPEOF(T);
@@ -1642,16 +1691,16 @@ repeat:
         } break;
         case FN_Assign: {
             CHECKARGS(2, 2);
-            READ_TYPEOF(ElemT);
-            READ_NODEREF_TYPEOF(DestT);
-            auto rq = SCOPES_GET_RESULT(verify_refer(DestT));
+            READ_STORAGETYPEOF(ElemT);
+            READ_NODEREF_STORAGETYPEOF(DestT);
+            auto rq = SCOPES_GET_RESULT(verify_refer(typeof_DestT));
             if (rq) {
-                SCOPES_CHECK_RESULT(verify_writable(rq, DestT));
+                SCOPES_CHECK_RESULT(verify_writable(rq, typeof_DestT));
             }
-            strip_qualifiers(ElemT);
-            strip_qualifiers(DestT);
+            //strip_qualifiers(ElemT);
+            //strip_qualifiers(DestT);
             SCOPES_CHECK_RESULT(
-                verify(strip_qualifiers(ElemT), strip_qualifiers(DestT)));
+                verify(ElemT, DestT));
             return ARGTYPE0();
         } break;
         case FN_PtrToRef: {

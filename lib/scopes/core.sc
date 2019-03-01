@@ -465,22 +465,6 @@ sc_type_set_symbol tuple '__typecall
                 add i 1
             box-pointer (sc_tuple_type pcount types)
 
-# array type constructor
-sc_type_set_symbol array '__typecall
-    box-ast-macro
-        fn "tuple" (args)
-            let argcount = (sc_argcount args)
-            verify-count argcount 3 3
-            let ET = (unbox-pointer (sc_getarg args 1) type)
-            let size = (sc_getarg args 2)
-            let sizeT = (sc_value_type size)
-            if (type< sizeT integer)
-            else
-                unbox-verify size integer
-            let size =
-                bitcast (sc_const_int_extract size) usize
-            box-pointer (sc_array_type ET size)
-
 # arguments type constructor
 sc_type_set_symbol Arguments '__typecall
     box-ast-macro
@@ -764,6 +748,7 @@ inline define-symbols (self values...)
             sc_typename_type_set_storage type storage-type typename-flag-plain
     return-type = sc_function_type_return_type
     key = sc_type_key
+    refer? = sc_type_is_refer
     variadic? = sc_function_type_is_variadic
     pointer? =
         fn (cls)
@@ -1235,6 +1220,7 @@ fn string@ (self i)
     load (getelementptr s i)
 
 'define-symbols string
+    buffer = sc_string_buffer
     __countof = sc_string_count
     __@ = string@
     __lslice = sc_string_lslice
@@ -1492,12 +1478,22 @@ let
     << = (make-sym-binary-op-dispatch '__<< '__r<< "apply left shift with")
     >> = (make-sym-binary-op-dispatch '__>> '__r>> "apply right shift with")
     .. = (make-sym-binary-op-dispatch '__.. '__r.. "join")
+    = = (make-sym-binary-op-dispatch '__= '__r= "apply assignment with")
     @ = (make-asym-binary-op-dispatch '__@ usize "apply subscript operator with")
     getattr = (make-asym-binary-op-dispatch '__getattr Symbol "get attribute from")
     lslice = (make-asym-binary-op-dispatch '__lslice usize "apply left-slice operator with")
     rslice = (make-asym-binary-op-dispatch '__rslice usize "apply right-slice operator with")
 
-let missing-constructor =
+# default assignment operator
+'set-symbols typename
+    __= =
+        box-binary-op
+            fn (lhsT rhsT lhs rhs)
+                if (ptrcmp== lhsT rhsT)
+                    return `(assign rhs lhs)
+                compiler-error! "unequal types"
+
+#let missing-constructor =
     ast-macro
         fn "missing-constructor" (args)
             if false
@@ -2062,7 +2058,7 @@ fn clone-scope-contents (a b)
     __typecall =
         fn (cls name)
             let T = (sc_typename_type name)
-            'set-symbol T '__typecall missing-constructor
+            #'set-symbol T '__typecall missing-constructor
             T
 
 'set-symbols Scope
@@ -2214,9 +2210,6 @@ let hash = (sc_typename_type "hash")
 'set-plain-storage hash u64
 
 run-stage;
-
-inline = (lhs rhs)
-    assign (imply rhs (typeof lhs)) lhs
 
 inline make-inplace-op (op)
     inline (lhs rhs)
@@ -3020,6 +3013,9 @@ let tupleof =
     __@ =
         inline (self index)
             extractvalue self index
+    __typecall =
+        inline "array.__typecall" (cls element-type size)
+            sc_array_type element-type (size as usize)
 
 let arrayof =
     ast-macro
@@ -3189,6 +3185,9 @@ inline vector-binary-op-dispatch (symbol)
     __countof = __countof-aggregate
     # vector type constructor
     __typecall =
+        inline "vector.__typecall" (cls element-type size)
+            sc_vector_type element-type (size as usize)
+    #__typecall =
         ast-macro
             fn "vector" (args)
                 let argc = ('argcount args)
@@ -4392,7 +4391,7 @@ let global = (gen-allocator-syntax "global" private)
 'set-symbols pointer
     __@ =
         inline (self index)
-            getelementptr self index
+            ptrtoref (getelementptr self index)
 
 # structs
 #-------------------------------------------------------------------------------

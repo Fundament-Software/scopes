@@ -9,6 +9,7 @@
 #include "list.hpp"
 #include "types.hpp"
 #include "qualifiers.hpp"
+#include "qualifier.inc"
 #include "c_import.hpp"
 #include "stream_expr.hpp"
 #include "stream_ast.hpp"
@@ -1534,15 +1535,22 @@ void sc_type_set_symbol(const sc_type_t *T, sc_symbol_t sym, sc_value_t *value) 
     const_cast<Type *>(T)->bind(sym, value);
 }
 
-// Pointer Type
+// Qualifier
 ////////////////////////////////////////////////////////////////////////////////
 
 sc_symbol_type_tuple_t sc_type_key(const sc_type_t *T) {
+    using namespace scopes;
     return type_key(T);
 }
 
 const sc_type_t *sc_key_type(sc_symbol_t name, const sc_type_t *T) {
+    using namespace scopes;
     return key_type(name, T);
+}
+
+bool sc_type_is_refer(const sc_type_t *T) {
+    using namespace scopes;
+    return has_qualifier<ReferQualifier>(T);
 }
 
 // Pointer Type
@@ -2048,6 +2056,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_type_string, TYPE_String, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_type_next, arguments_type({TYPE_Symbol, TYPE_Value}), TYPE_Type, TYPE_Symbol);
     DEFINE_EXTERN_C_FUNCTION(sc_type_set_symbol, _void, TYPE_Type, TYPE_Symbol, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_type_is_refer, TYPE_Bool, TYPE_Type);
 
     DEFINE_EXTERN_C_FUNCTION(sc_type_key, arguments_type({TYPE_Symbol, TYPE_Type}), TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_key_type, TYPE_Type, TYPE_Symbol, TYPE_Type);

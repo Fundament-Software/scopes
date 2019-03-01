@@ -3,8 +3,13 @@
 let T = (typename "T")
 'set-plain-storage T i32
 
+spice hello (x)
+    print x
+    true
+
 @@ ast-quote; inline test ()
     fn ()
+        hello 5
         print T
 
 # declare a function and assign it as attribute to T
