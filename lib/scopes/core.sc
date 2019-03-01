@@ -828,7 +828,7 @@ sc_typename_type_set_super usize integer
 
 # generator type
 let Generator = (sc_typename_type "Generator")
-'set-storage Generator ('storageof Closure)
+'set-plain-storage Generator ('storageof Closure)
 
 # syntax macro type
 let SyntaxMacro = (sc_typename_type "SyntaxMacro")
@@ -1016,9 +1016,18 @@ fn cast-expr (symbol rsymbol vT T expr)
         return (f vT T expr)
 
 fn imply-expr (vT T expr)
-    cast-expr '__imply '__rimply vT T expr
+    if (ptrcmp!= vT T)
+        cast-expr '__imply '__rimply vT T expr
+    else expr
+
 fn as-expr (vT T expr)
-    cast-expr '__as '__ras vT T expr
+    if (ptrcmp!= vT T)
+        try
+            # try implicit cast first
+            imply-expr vT T expr
+        except (imply-err)
+            cast-expr '__as '__ras vT T expr
+    else expr
 
 let
     imply =
@@ -1030,13 +1039,11 @@ let
                 let anyT = ('getarg args 1)
                 let vT = ('typeof value)
                 let T = (unbox-pointer anyT type)
-                if (ptrcmp!= vT T)
-                    try
-                        imply-expr vT T value
-                    except (err)
-                        cast-error!
-                            \ "can't coerce value of type " vT T err
-                else value
+                try
+                    imply-expr vT T value
+                except (err)
+                    cast-error!
+                        \ "can't coerce value of type " vT T err
 
     as =
         ast-macro
@@ -1047,17 +1054,11 @@ let
                 let anyT = ('getarg args 1)
                 let vT = ('typeof value)
                 let T = (unbox-pointer anyT type)
-                if (ptrcmp!= vT T)
-                    try
-                        # try implicit cast first
-                        imply-expr vT T value
-                    except (imply-err)
-                        try
-                            # then try explicit cast
-                            as-expr vT T value
-                        except (err)
-                            cast-error! "can't cast value of type " vT T err
-                else value
+                try
+                    # then try explicit cast
+                    as-expr vT T value
+                except (err)
+                    cast-error! "can't cast value of type " vT T err
 
 let BinaryOpFunctionType =
     'pointer ('raising (function Value type type Value Value) Error)
@@ -1183,8 +1184,19 @@ fn unary-op-label-macro (args symbol friendly-op-name)
                             'join ": "
                                 sc_format_error err
 
+fn unary-sym-binary-op-label-macro (args usymbol ufriendly-op-name symbol rsymbol friendly-op-name)
+    let argc = ('argcount args)
+    if (icmp== argc 1)
+        unary-op-label-macro args usymbol ufriendly-op-name
+    else
+        sym-binary-op-label-macro args symbol rsymbol friendly-op-name
+
 inline make-unary-op-dispatch (symbol friendly-op-name)
     ast-macro (fn (args) (unary-op-label-macro args symbol friendly-op-name))
+
+inline make-unary-sym-binary-op-dispatch (usymbol ufriendly-op-name symbol rsymbol friendly-op-name)
+    ast-macro (fn (args) (unary-sym-binary-op-label-macro
+        args usymbol ufriendly-op-name symbol rsymbol friendly-op-name))
 
 inline make-sym-binary-op-dispatch (symbol rsymbol friendly-op-name)
     ast-macro (fn (args) (sym-binary-op-label-macro args symbol rsymbol friendly-op-name))
@@ -1283,8 +1295,15 @@ fn dispatch-and-or (args flip)
     __as = (box-cast integer-as)
     __+ = (box-binary-op (single-binary-op-dispatch add))
     __- = (box-binary-op (single-binary-op-dispatch sub))
+    __neg = (box-pointer (inline (self) (sub (nullof (typeof self)) self)))
     __* = (box-binary-op (single-binary-op-dispatch mul))
     __// = (box-binary-op (single-signed-binary-op-dispatch sdiv udiv))
+    __/ =
+        box-binary-op
+            single-signed-binary-op-dispatch
+                inline (a b) (fdiv (sitofp a f32) (sitofp b f32))
+                inline (a b) (fdiv (uitofp a f32) (uitofp b f32))
+    __rcp = (ast-quote (inline (self) (fdiv 1.0 (as self f32))))
     __% = (box-binary-op (single-signed-binary-op-dispatch srem urem))
     __& = (box-binary-op (single-binary-op-dispatch band))
     __| = (box-binary-op (single-binary-op-dispatch bor))
@@ -1313,14 +1332,10 @@ inline floordiv (a b)
     __<= = (box-binary-op (single-binary-op-dispatch fcmp<=o))
     __+ = (box-binary-op (single-binary-op-dispatch fadd))
     __- = (box-binary-op (single-binary-op-dispatch fsub))
-    #__neg
-        inline (self)
-            fsub (nullof (typeof self)) self
+    __neg = (box-pointer (inline (self) (fsub (nullof (typeof self)) self)))
     __* = (box-binary-op (single-binary-op-dispatch fmul))
     __/ = (box-binary-op (single-binary-op-dispatch fdiv))
-    #__rcp
-        inline (self)
-            fdiv (imply 1 (typeof self)) self
+    __rcp = (box-pointer (inline (self) (fdiv (uitofp 1 (typeof self)) self)))
     __// = (box-binary-op (single-binary-op-dispatch floordiv))
     __% = (box-binary-op (single-binary-op-dispatch frem))
 
@@ -1467,9 +1482,9 @@ let
     > = (make-sym-binary-op-dispatch '__> '__r> "compare")
     >= = (make-sym-binary-op-dispatch '__>= '__r>= "compare")
     + = (make-sym-binary-op-dispatch '__+ '__r+ "add")
-    - = (make-sym-binary-op-dispatch '__- '__r- "subtract")
+    - = (make-unary-sym-binary-op-dispatch '__neg "negate" '__- '__r- "subtract")
     * = (make-sym-binary-op-dispatch '__* '__r* "multiply")
-    / = (make-sym-binary-op-dispatch '__/ '__r/ "real-divide")
+    / = (make-unary-sym-binary-op-dispatch '__rcp "invert" '__/ '__r/ "real-divide")
     // = (make-sym-binary-op-dispatch '__// '__r// "integer-divide")
     % = (make-sym-binary-op-dispatch '__% '__r% "modulate")
     & = (make-sym-binary-op-dispatch '__& '__r& "apply bitwise-and to")
@@ -1484,8 +1499,15 @@ let
     lslice = (make-asym-binary-op-dispatch '__lslice usize "apply left-slice operator with")
     rslice = (make-asym-binary-op-dispatch '__rslice usize "apply right-slice operator with")
 
-# default assignment operator
 'set-symbols typename
+    # inverted compare attempts regular compare
+    __!= =
+        box-binary-op
+            fn (lhsT rhsT lhs rhs)
+                if (ptrcmp== lhsT rhsT)
+                    return `(not (== lhs rhs))
+                compiler-error! "unequal types"
+    # default assignment operator
     __= =
         box-binary-op
             fn (lhsT rhsT lhs rhs)
@@ -2318,6 +2340,7 @@ let va-option =
                     _ ('next x) ('@ x)
             init
 
+# for <name> ... in <generator> body ...
 define for
     inline fdone ()
         break;
@@ -3392,7 +3415,7 @@ fn gen-syntax-matcher (failfunc expr scope params)
                     if variadic?
                         if (not (empty? rest))
                             syntax-error! ('anchor paramv)
-                                "vararg parameter is not in last place"
+                                "variadic match pattern is not in last place"
                         _ next `[]
                     else
                         ast-quote
@@ -4257,6 +4280,55 @@ let
     import-c = sc_import_c
 
 run-stage;
+
+#-------------------------------------------------------------------------------
+# fold iteration
+#-------------------------------------------------------------------------------
+
+# fold (<name> ... = <init> ...) for <name> ... in <expr>
+sugar fold ((binding...) 'for expr...)
+    fn split-until (expr token errmsg)
+        loop (it params = expr '())
+            if (empty? it)
+                compiler-error! errmsg
+            let sxat it = (decons it)
+            let at = (sxat as Symbol)
+            if (at == token)
+                break it params
+            _ it (cons sxat params)
+    let it params = (split-until expr... 'in "'in' expected")
+    let init foldparams = (split-until binding... '= "'=' expected")
+    let generator-expr body = (decons it)
+    let subscope = (Scope syntax-scope)
+    ast-quote
+        let iter start =
+            (as [(sc_expand generator-expr '() subscope)] Generator);
+    let next = ('unique Symbol "next")
+    let bindings breakargs =
+        loop (inp bindings breakargs = foldparams (cons '= start init) '())
+            if (empty? inp)
+                break (cons next bindings) breakargs
+            let at next = (decons inp)
+            _ next (cons at bindings) (cons at breakargs)
+    let itercall =
+        qq [iter]
+            [inline] ()
+                [(cons break breakargs)]
+            [next]
+    let letexpr =
+        loop (inp letexpr = params (list '= itercall))
+            if (empty? inp)
+                break (cons let next letexpr)
+            let at next = (decons inp)
+            _ next (cons at letexpr)
+    let repeatexpr = (cons repeat next breakargs)
+    qq [loop] [bindings]
+        [letexpr]
+        [inline] repeat (...)
+            [repeat] [next] ...
+        [inline] continue () [repeatexpr]
+        [repeat] [next]
+            [(cons do body)]
 
 #-------------------------------------------------------------------------------
 # typedef

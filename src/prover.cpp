@@ -1319,10 +1319,11 @@ repeat:
             READ_TYPEOF(T2);
             READ_TYPEOF(T3);
             SCOPES_CHECK_RESULT(verify_bool_vector(T1));
-            if (T1->kind() == TK_Vector) {
-                SCOPES_CHECK_RESULT(verify_vector_sizes(T1, T2));
-            }
             SCOPES_CHECK_RESULT(verify(T2, T3));
+            if (T1->kind() == TK_Vector) {
+                auto ST2 = SCOPES_GET_RESULT(storage_type(T2));
+                SCOPES_CHECK_RESULT(verify_vector_sizes(T1, ST2));
+            }
             return DEPS1(ARGTYPE1(T2), _T2, _T3);
         } break;
         case FN_Bitcast: {

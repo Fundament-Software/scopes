@@ -2,16 +2,16 @@
 using import glm
 
 do
-    let v = (local vec4 1 2 3 4)
+    local v = (vec4 1 2 3 4)
     assert (v.yw == (vec2 2 4))
     v.xz = (vec2 10 20)
     assert (v == (vec4 10 2 20 4))
     assert ((v.xz + v.yw) == (vec2 12 24))
 
-    let v = (local vec2 4 3)
+    local v = (vec2 4 3)
     assert (v.yyxx == (vec4 3 3 4 4))
-    assert (v.y == 3)
-    v.y = 2
+    assert (v.y == 3.0)
+    v.y = 2.0
     assert (v == (vec2 4 2))
 
 assert ((vec4 1 2 3 4) == (vec4 1 2 3 4))
@@ -46,7 +46,7 @@ assert ((max (vec2 1.0 2.0) (vec2 4.0 0.0)) == (vec2 4.0 2.0))
 for x in (vec3 1)
     assert (x == 1.0)
 
-assert ((mat4 1) != (mat4 (unconst 0)))
+assert ((mat4 1) != (mat4 0))
 
 assert ((mat4 1) == (mat4))
 
