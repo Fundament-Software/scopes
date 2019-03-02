@@ -877,6 +877,7 @@ fn integer-imply (vT T expr)
     let ST =
         if (ptrcmp== T usize) ('storageof T)
         else T
+    let args... = expr T
     if (icmp== ('kind ST) type-kind-integer)
         # constant i32 auto-expands to usize if not negative
         if ('constant? expr)
@@ -887,7 +888,6 @@ fn integer-imply (vT T expr)
                         compiler-error! "signed integer is negative"
                     return
                         box-integer (sext val usize)
-        let args... = expr T
         let valw = ('bitcount vT)
         let destw = ('bitcount ST)
         # must have same signed bit
@@ -899,6 +899,14 @@ fn integer-imply (vT T expr)
                     return `(sext args...)
                 else
                     return `(zext args...)
+    elseif (icmp== ('kind ST) type-kind-real)
+        # constant i32 auto-converts to real
+        if ('constant? expr)
+            if (ptrcmp== vT i32)
+                if ('signed? vT)
+                    return `(sitofp args...)
+                else
+                    return `(uitofp args...)
     compiler-error! "unsupported type"
 
 fn integer-as (vT T expr)

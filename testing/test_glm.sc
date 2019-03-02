@@ -10,8 +10,8 @@ do
 
     local v = (vec2 4 3)
     assert (v.yyxx == (vec4 3 3 4 4))
-    assert (v.y == 3.0)
-    v.y = 2.0
+    assert (v.y == 3)
+    v.y = 2
     assert (v == (vec2 4 2))
 
 assert ((vec4 1 2 3 4) == (vec4 1 2 3 4))
