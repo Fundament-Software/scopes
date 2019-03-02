@@ -310,6 +310,7 @@ struct Expander {
             auto ex = cast<Expression>(expr);
             ex->scoped = false;
         }
+        env = subexpr.env;
         return expr;
     }
 
@@ -471,11 +472,11 @@ struct Expander {
                 subexp.next = it->next;
                 Value *node = SCOPES_GET_RESULT(subexp.expand(it->at));
                 it = subexp.next;
+                env = subexp.env;
                 if (it) {
                     SCOPES_ANCHOR(it->at->anchor());
                     SCOPES_LOCATION_ERROR(String::from("extraneous argument"));
                 }
-
                 exprs.push_back(node);
                 Symbol sym = SCOPES_GET_RESULT(extract_symbol_constant(paramval));
                 if (!ends_with_parenthesis(sym)) {
@@ -533,6 +534,7 @@ struct Expander {
                 exprs.push_back(node);
                 it = subexp.next;
             }
+            env = subexp.env;
 
             Value *srcval = ArgumentListTemplate::from(_anchor, exprs);
 

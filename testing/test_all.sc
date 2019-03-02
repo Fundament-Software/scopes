@@ -31,6 +31,7 @@ test-modules
     .test_hash
     .test_import
     .test_inline
+    .test_inline_do
     .test_inplace_arithmetic
     .test_intrinsics
     .test_iter2

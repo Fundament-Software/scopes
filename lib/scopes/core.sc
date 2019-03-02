@@ -2745,7 +2745,8 @@ let using =
                     return (process src)
             elseif (('typeof nameval) == Scope)
                 return (process (nameval as Scope))
-            return
+            compiler-error! "using: scope expeced"
+            #return
                 list run-stage
                     cons merge-scope-symbols name 'syntax-scope pattern
                 syntax-scope
@@ -4715,10 +4716,12 @@ fn read-eval-print-loop ()
                 va-lfold 0
                     inline (key value k)
                         let idstr = (make-idstr (counter + k))
-                        'set-symbol eval-scope (Symbol idstr) (Value value)
-                        print idstr "="
-                            repr value
-                        k + 1
+                        if (not (none? value))
+                            'set-symbol eval-scope (Symbol idstr) (Value value)
+                            print idstr "="
+                                repr value
+                            k + 1
+                        else k
                     vals...
             return eval-scope count
 
