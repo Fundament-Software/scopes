@@ -1553,11 +1553,11 @@ repeat:
         } break;
         case FN_Cross: {
             CHECKARGS(2, 2);
-            READ_TYPEOF(A);
+            READ_STORAGETYPEOF(A);
             READ_TYPEOF(B);
             SCOPES_CHECK_RESULT(verify_real_vector(A, 3));
-            SCOPES_CHECK_RESULT(verify(A, B));
-            return NODEPS1(ARGTYPE1(A));
+            SCOPES_CHECK_RESULT(verify(typeof_A, B));
+            return NODEPS1(ARGTYPE1(typeof_A));
         } break;
         case FN_Distance: {
             CHECKARGS(2, 2);
