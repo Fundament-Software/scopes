@@ -353,6 +353,15 @@ fn compare-type (args f)
 inline type-comparison-func (f)
     fn (args) (compare-type args (typify f type type))
 
+let storagecast =
+    box-ast-macro
+        fn "storagecast" (args)
+            let argcount = (sc_argcount args)
+            verify-count argcount 1 1
+            let self = (sc_getarg args 0)
+            let T = (sc_type_storage (sc_value_type self))
+            return `(bitcast self T)
+
 # typecall
 sc_type_set_symbol type '__call
     box-ast-macro
@@ -4489,25 +4498,41 @@ sugar decorate-method (expr decorators...)
 # standard allocators
 #-------------------------------------------------------------------------------
 
+spice __init (target)
+    let T = ('typeof target)
+    let constructor =
+        try
+            getattr T '__init
+        except (err)
+            return `(target = (nullof T))
+    `(constructor target)
+
+spice __init-copy (target source)
+    let T = ('typeof target)
+    let constructor =
+        try
+            getattr T '__init-copy
+        except (err)
+            return
+                ast-quote
+                    __init target
+                    target = source
+    `(constructor target source)
+
 inline gen-allocator-syntax (name f)
     sugar "" (values...)
         spice local-copy-typed (T value)
             ast-quote
-                let val =
-                    ptrtoref (f T)
-                val = value
+                let val = (ptrtoref (f T))
+                __init-copy val value
                 val
         spice local-copy (value)
-            ast-quote
-                let val =
-                    ptrtoref (f (typeof value))
-                val = value
-                val
+            let T = ('typeof value)
+            `(local-copy-typed T value)
         spice local-new (T)
             ast-quote
-                let val =
-                    ptrtoref (f T)
-                val = (nullof T)
+                let val = (ptrtoref (f T))
+                __init val
                 val
         syntax-match values...
         case (name '= value)
