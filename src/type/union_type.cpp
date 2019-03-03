@@ -59,7 +59,6 @@ void UnionType::stream_name(StyledStream &ss) const {
 
 UnionType::UnionType(const Types &_values)
     : TupleLikeType(TK_Union, _values) {
-
     size_t sz = 0;
     size_t al = 1;
     largest_field = 0;

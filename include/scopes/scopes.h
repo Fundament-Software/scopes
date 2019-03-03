@@ -396,6 +396,10 @@ sc_type_raises_t sc_vector_type(const sc_type_t *element_type, size_t count);
 
 sc_type_raises_t sc_tuple_type(int numtypes, const sc_type_t **types);
 
+// union types
+
+sc_type_raises_t sc_union_type(int numtypes, const sc_type_t **types);
+
 // argument types
 
 const sc_type_t *sc_arguments_type(int numtypes, const sc_type_t **types);

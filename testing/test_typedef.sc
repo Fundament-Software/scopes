@@ -35,6 +35,18 @@ typedef MyTupleType < MyTupleSuperType : (tuple i32 i32)
             extractvalue self 0
             extractvalue self 1
 
+# forward declare self-ref type
+typedef SelfRefType
+assert (constant? SelfRefType)
+
+let SRT = SelfRefType
+
+typedef SelfRefType < tuple : (tuple i32 (pointer SelfRefType))
+
+assert (SelfRefType == SRT)
+assert (('superof SelfRefType) == tuple)
+assert (('storageof SelfRefType) == (tuple i32 (pointer SelfRefType)))
+
 run-stage;
 
 let val = (MyTupleType 1 2)

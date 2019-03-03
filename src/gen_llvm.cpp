@@ -1240,6 +1240,8 @@ struct LLVMIRGenerator {
             READ_VALUE(val);
             return val;
         } break;
+        case FN_NullOf: { READ_TYPE(ty);
+            return LLVMConstNull(ty); } break;
         case FN_Undef: { READ_TYPE(ty);
             return LLVMGetUndef(ty); } break;
         case FN_Alloca: { READ_TYPE(ty);

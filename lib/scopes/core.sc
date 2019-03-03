@@ -455,15 +455,25 @@ sc_type_set_symbol tuple '__typecall
             let argcount = (sc_argcount args)
             verify-count argcount 1 -1
             let pcount = (sub argcount 1)
-            let types = (alloca-array type pcount)
-            loop (i = 1)
-                if (icmp== i argcount)
-                    break;
-                let arg = (sc_getarg args i)
-                let T = (unbox-pointer arg type)
-                store T (getelementptr types (sub i 1))
-                add i 1
-            box-pointer (sc_tuple_type pcount types)
+            ast-quote
+                let types = (alloca-array type pcount)
+                ast-unquote
+                    let body = (sc_expression_new (sc_get_active_anchor))
+                    loop (i = 1)
+                        if (icmp== i argcount)
+                            break;
+                        let arg = (sc_getarg args i)
+                        let k = (sc_type_key (sc_value_qualified_type arg))
+                        let arg = (sc_keyed_new (sc_value_anchor arg) unnamed arg)
+                        if (ptrcmp!= (sc_value_type arg) type)
+                            compiler-error! "type expected"
+                        sc_expression_append body
+                            `(store
+                                (sc_key_type k arg)
+                                (getelementptr types [(sub i 1)]))
+                        add i 1
+                    body
+                sc_tuple_type pcount types
 
 # arguments type constructor
 sc_type_set_symbol Arguments '__typecall
@@ -748,6 +758,9 @@ inline define-symbols (self values...)
             sc_typename_type_set_storage type storage-type typename-flag-plain
     return-type = sc_function_type_return_type
     key = sc_type_key
+    key-type =
+        inline (self key)
+            sc_key_type key self
     refer? = sc_type_is_refer
     variadic? = sc_function_type_is_variadic
     pointer? =
@@ -1523,7 +1536,7 @@ let
                     return `(assign rhs lhs)
                 compiler-error! "unequal types"
 
-#let missing-constructor =
+let missing-constructor =
     ast-macro
         fn "missing-constructor" (args)
             if false
@@ -1539,6 +1552,7 @@ let
 run-stage;
 
 let null = (nullof NullType)
+
 #inline Syntax-unbox (self destT)
     imply ('datum self) destT
 
@@ -1745,6 +1759,11 @@ fn pointer-imply (vT T expr)
 'set-symbols pointer
     __call = coerce-call-arguments
     __imply = (box-cast pointer-imply)
+
+'define-symbols pointer
+    __typecall =
+        inline (cls T)
+            sc_pointer_type T pointer-flag-non-writable unnamed
 
 # dotted symbol expander
 # --------------------------------------------------------------------------
@@ -2078,7 +2097,7 @@ fn clone-scope-contents (a b)
     # search first upwards for the root scope of a, then clone a
         piecewise with the cloned scopes as parents
     let parent = ('parent a)
-    if (== parent null)
+    if (== parent (nullof Scope))
         return (Scope b a)
     Scope
         clone-scope-contents parent b
@@ -2086,10 +2105,12 @@ fn clone-scope-contents (a b)
 
 'define-symbols typename
     __typecall =
-        fn (cls name)
-            let T = (sc_typename_type name)
-            #'set-symbol T '__typecall missing-constructor
-            T
+        inline (cls name)
+            constbranch (== cls typename)
+                inline ()
+                    sc_typename_type name
+                inline ()
+                    missing-constructor cls
 
 'set-symbols Scope
     __.. =
@@ -3029,9 +3050,8 @@ let __unpack-aggregate = (make-unpack-function extractvalue)
 'set-symbols tuple
     __unpack = __unpack-aggregate
     __countof = __countof-aggregate
-    __@ =
-        inline (self index)
-            extractvalue self index
+    __getattr = extractvalue
+    __@ = extractvalue
 
 let tupleof =
     ast-macro
@@ -3045,8 +3065,8 @@ let tupleof =
             loop (i = 0)
                 if (i == argc)
                     break;
-                let arg = ('getarg args i)
-                let T = ('typeof arg)
+                let k arg = ('dekey ('getarg args i))
+                let T = ('key-type ('typeof arg) k)
                 store T (getelementptr field-types i)
                 i + 1
 
@@ -4368,6 +4388,30 @@ sugar fold ((binding...) 'for expr...)
 #-------------------------------------------------------------------------------
 
 sugar typedef (name body...)
+    let declaration? = (('typeof name) == Symbol)
+    let typedecl =
+        label got-typedecl
+            if declaration?
+                if (empty? body...)
+                    # forward declaration - we build the type at syntax time
+                    return
+                        qq [let] [name] = [(typename (name as Symbol as string))]
+
+                let symname = (name as Symbol)
+                # see if we can find a forward declaration in the local scope
+                try
+                    let T = (getattr syntax-scope symname)
+                    let T = (T as type)
+                    assert (('opaque? T) and (('superof T) == typename))
+                    # reuse type
+                    merge got-typedecl `T
+                except (err)
+
+            let namestr =
+                if declaration? `[(name as Symbol as string)]
+                else name
+            `[(qq [typename] [namestr])]
+
     loop (inp outp = body... '())
         syntax-match inp
         case ('< supertype rest...)
@@ -4380,13 +4424,9 @@ sugar typedef (name body...)
             repeat rest...
                 cons (list sc_typename_type_set_storage 'this-type storagetype 0:u32) outp
         default
-            let declaration? = (('typeof name) == Symbol)
-            let namestr =
-                if declaration? `[(name as Symbol as string)]
-                else name
             let expr =
                 qq [do]
-                    [let] this-type = ([typename] [namestr])
+                    [let] this-type = [typedecl]
                     unquote-splice outp
                     [(cons do inp)]
                     this-type
@@ -4484,7 +4524,23 @@ inline gen-allocator-syntax (name f)
                 .. "syntax: " name " <name> [: <type>] [= <value>]"
 
 let local = (gen-allocator-syntax "local" alloca)
+let new = (gen-allocator-syntax "new" malloc)
 let global = (gen-allocator-syntax "global" private)
+
+fn delete (value)
+    free (reftoptr value)
+
+#-------------------------------------------------------------------------------
+
+define struct-dsl
+    sugar : (name T)
+        qq [=] field-types
+            [cons] (list '[name] [T]) field-types
+
+    define-infix> 70 :
+    locals;
+
+run-stage;
 
 #-------------------------------------------------------------------------------
 # C type support
@@ -4497,17 +4553,24 @@ let global = (gen-allocator-syntax "global" private)
     __@ =
         inline (self index)
             ptrtoref (getelementptr self index)
+    __getattr =
+        inline (self key)
+            getattr (ptrtoref self) key
+
+# unions
+#-------------------------------------------------------------------------------
+
+'set-symbols CUnion
+    __getattr = extractvalue
+    __typecall =
+        inline (cls)
+            nullof cls
 
 # structs
 #-------------------------------------------------------------------------------
 
 'set-symbols CStruct
-    __getattr =
-        spice "CStruct-getattr" (self key)
-            let cls = ('typeof self)
-            let key = (key as Symbol)
-            let key = (sc_type_field_index cls key)
-            `(extractvalue self key)
+    __getattr = extractvalue
     __typecall =
         spice "CStruct-typecall" (cls args...)
             if ((cls as type) == CStruct)
@@ -4522,9 +4585,128 @@ let global = (gen-allocator-syntax "global" private)
                     if (k == unnamed) i
                     else
                         sc_type_field_index cls k
-                let ET = (sc_strip_qualifiers (sc_type_element_at cls k))
-                _ (i + 1)
-                    `(insertvalue result (imply v ET) k)
+                let ET = (sc_type_element_at cls k)
+                let ET = (sc_strip_qualifiers ET)
+                let v =
+                    if (('pointer? ET) and ('refer? ('qualified-typeof v)))
+                        `(imply (reftoptr v) ET)
+                    else `(imply v ET)
+                _ (i + 1) `(insertvalue result v k)
+
+sugar struct (name body...)
+    fn finalize-struct (T field-types)
+        let numfields = (countof field-types)
+        let fields = (alloca-array type numfields)
+        for i field in (enumerate ('reverse field-types))
+            let k T = (decons (field as list) 2)
+            fields @ (usize i) = (sc_key_type (k as Symbol) (T as type))
+        if (T < CUnion)
+            'set-plain-storage T
+                sc_union_type numfields fields
+        elseif (T < CStruct)
+            'set-plain-storage T
+                sc_tuple_type numfields fields
+        else
+            compiler-error!
+                .. "type " (repr T) " must have CStruct or CUnion supertype"
+        T
+
+    fn make-body (body...)
+        qq
+            [local] field-types = [`(ptrtoref (alloca list))]
+            field-types = [null]
+            do
+                [using] [struct-dsl]
+                unquote-splice body...
+            [finalize-struct] this-type field-types
+
+    if (('typeof name) == Symbol)
+        if (empty? body...)
+            # forward declaration
+            return
+                qq [typedef] [name]
+
+    let supertype body... =
+        syntax-match body...
+        case ('union rest...)
+            _ `CUnion rest...
+        case ('< supertype rest...)
+            _ supertype rest...
+        default
+            _ `CStruct body...
+
+    qq [typedef] [name] < [supertype]
+        [local] field-types = [`(ptrtoref (alloca list))]
+        field-types = [null]
+        do
+            [using] [struct-dsl]
+            unquote-splice body...
+        [finalize-struct] this-type field-types
+
+#
+    fn complete-declaration ()
+    inline generate-expression (superT name body)
+        if (('typeof (name as Any)) == Symbol)
+            # constant
+            let symname = (name as Any as Symbol)
+            # see if we can find a forward declaration in the local scope
+            let T ok = (Scope-local@ syntax-scope symname)
+            fn completable-type? (T)
+                and
+                    (typeof T) == type
+                    typename-type? T
+                    opaque? T
+                    (superof T) == typename
+
+            return
+                if (empty? body)
+                    # forward declaration
+                    list let name '=
+                        list do
+                            list using struct-dsl
+                            list let 'this-struct '=
+                                list typename-type
+                                    symname as string
+                            'this-struct
+                else
+                    # body declaration
+                    list let name '=
+                        cons do
+                            list using struct-dsl
+                            list let 'this-struct '=
+                                list if (list completable-type? T) T
+                                list 'else
+                                    list typename-type
+                                        symname as string
+                            list let name '= 'this-struct
+                            list set-typename-super! 'this-struct superT
+                            list let 'field-types '= end-args
+                            ..
+                                cons do body
+                                list
+                                    list finalize-struct 'this-struct 'field-types
+                syntax-scope
+        else
+            # expression
+            return
+                cons do
+                    list using struct-dsl
+                    list let 'this-struct '=
+                        list typename-type
+                            list (do as) name string
+                    list set-typename-super! 'this-struct superT
+                    list let 'field-types '= end-args
+                    ..
+                        cons do body
+                        list
+                            list finalize-struct 'this-struct 'field-types
+                syntax-scope
+
+    if (('typeof any-head) == Symbol and any-head as Symbol == 'union)
+        let head body = (decons body)
+        generate-expression CUnion (head as Syntax) body
+    else
+        generate-expression CStruct head body
 
 # enums
 #-------------------------------------------------------------------------------

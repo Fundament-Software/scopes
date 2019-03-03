@@ -280,7 +280,7 @@ do
         let rhs =
             if (lhsT == rhsT) rhs
             else
-                `(lhsT [(as-expr rhsT Ta rhs)])
+                `(lhsT [(imply-expr rhsT Ta rhs)])
         return (f lhsT lhsT lhs rhs)
 
     fn vec-type-binary-op-expr-r (symbol lhsT rhsT lhs rhs)
@@ -293,7 +293,7 @@ do
         let lhs =
             if (lhsT == rhsT) lhs
             else
-                `(rhsT [(as-expr lhsT Tb lhs)])
+                `(rhsT [(imply-expr lhsT Tb lhs)])
         return (f rhsT rhsT lhs rhs)
 
     inline vec-type-binary-op-dispatch (lop rop symbol)

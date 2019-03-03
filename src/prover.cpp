@@ -176,6 +176,7 @@ static SCOPES_RESULT(void) verify_writable(const Type *T) {
     return {};
 }
 
+#if 0
 static SCOPES_RESULT(Const *) nullof(const Anchor *anchor, const Type *T) {
     SCOPES_RESULT_TYPE(Const *);
     SCOPES_ANCHOR(anchor);
@@ -214,6 +215,14 @@ static SCOPES_RESULT(Const *) nullof(const Anchor *anchor, const Type *T) {
         }
         return ConstAggregate::from(anchor, T, fields);
     } break;
+    case TK_Tuple: {
+        auto at = cast<TupleType>(ST);
+        Constants fields;
+        for (auto valT : at->values) {
+            fields.push_back(SCOPES_GET_RESULT(nullof(anchor, valT)));
+        }
+        return ConstAggregate::from(anchor, T, fields);
+    } break;
     default: {
         SCOPES_LOCATION_ERROR(String::from(
             "can't create constant of type"));
@@ -221,6 +230,7 @@ static SCOPES_RESULT(Const *) nullof(const Anchor *anchor, const Type *T) {
     }
     return nullptr;
 }
+#endif
 
 //------------------------------------------------------------------------------
 
@@ -1162,9 +1172,7 @@ static SCOPES_RESULT(const Type *) ref_to_ptr(const Type *T) {
 template<typename T>
 SCOPES_RESULT(void) sanitize_tuple_index(const Anchor *anchor, const Type *ST, const T *type, uint64_t &arg, TypedValue *&_arg) {
     SCOPES_RESULT_TYPE(void);
-    if (_arg->get_type() != TYPE_I32) {
-        _arg = ConstInt::from(anchor, TYPE_I32, arg);
-    } else if (_arg->get_type() == TYPE_Symbol) {
+    if (_arg->get_type() == TYPE_Symbol) {
         auto sym = Symbol::wrap(arg);
         size_t idx = type->field_index(sym);
         if (idx == (size_t)-1) {
@@ -1175,6 +1183,8 @@ SCOPES_RESULT(void) sanitize_tuple_index(const Anchor *anchor, const Type *ST, c
         // rewrite field
         arg = idx;
         _arg = ConstInt::from(anchor, TYPE_I32, idx);
+    } else if (_arg->get_type() != TYPE_I32) {
+        _arg = ConstInt::from(anchor, TYPE_I32, arg);
     }
     return {};
 }
@@ -1301,7 +1311,8 @@ repeat:
         case FN_NullOf: {
             CHECKARGS(1, 1);
             READ_TYPE_CONST(T);
-            return SCOPES_GET_RESULT(nullof(call->anchor(), T));
+            return NODEPS1(ARGTYPE1(T));
+            //return SCOPES_GET_RESULT(nullof(call->anchor(), T));
         } break;
         case FN_Undef: {
             CHECKARGS(1, 1);
@@ -1466,42 +1477,6 @@ repeat:
                 return NODEPS1(ARGTYPE1(RT));
             }
         } break;
-        /*
-        case FN_ExtractValue: {
-            CHECKARGS(2, 2);
-            READ_NODEREF_STORAGETYPEOF(T);
-            READ_INT_CONST(idx);
-            const Type *RT = nullptr;
-            switch(T->kind()) {
-            case TK_Array: {
-                auto ai = cast<ArrayType>(T);
-                RT = SCOPES_GET_RESULT(ai->type_at_index(idx));
-            } break;
-            case TK_Tuple: {
-                auto ti = cast<TupleType>(T);
-                SCOPES_CHECK_RESULT(sanitize_tuple_index(call->anchor(), T, ti, idx, _idx));
-                RT = SCOPES_GET_RESULT(ti->type_at_index(idx));
-            } break;
-            case TK_Union: {
-                auto ui = cast<UnionType>(T);
-                SCOPES_CHECK_RESULT(sanitize_tuple_index(call->anchor(), T, ui, idx, _idx));
-                RT = SCOPES_GET_RESULT(ui->type_at_index(idx));
-            } break;
-            default: {
-                StyledString ss;
-                ss.out << "can not extract value from type " << T;
-                SCOPES_LOCATION_ERROR(ss.str());
-            } break;
-            }
-            auto rq = try_qualifier<ReferQualifier>(typeof_T);
-            if (rq) {
-                auto newcall2 = Call::from(call->anchor(), qualify(RT, { rq }), g_getelementref, { _T, _idx });
-                return DEPS1(newcall2, _T);
-            } else {
-                return NODEPS1(ARGTYPE1(RT));
-            }
-        } break;
-        */
         case FN_InsertElement: {
             CHECKARGS(3, 3);
             READ_STORAGETYPEOF(T);
@@ -1590,6 +1565,28 @@ repeat:
                 auto ui = cast<UnionType>(T);
                 SCOPES_CHECK_RESULT(sanitize_tuple_index(call->anchor(), T, ui, idx, _idx));
                 RT = SCOPES_GET_RESULT(ui->type_at_index(idx));
+                _idx = ConstInt::from(_idx->anchor(), TYPE_I32, 0);
+                auto TT = tuple_type({RT}).assert_ok();
+                RT = type_key(RT)._1;
+                auto rq = try_qualifier<ReferQualifier>(typeof_T);
+                if (rq) {
+                    TT = qualify(TT, {rq});
+                    auto newcall2 = Call::from(call->anchor(), TT, g_bitcast,
+                        { _T, ConstPointer::type_from(call->anchor(), TT) });
+                    ctx.append(newcall2);
+                    DEPS1(newcall2, _T);
+                    auto newcall3 = Call::from(call->anchor(), qualify(RT, { rq }),
+                        g_getelementref, { newcall2, _idx });
+                    ctx.append(newcall3);
+                    return DEPS1(newcall3, newcall2);
+                } else {
+                    auto newcall2 = Call::from(call->anchor(), TT, g_bitcast,
+                        { _T, ConstPointer::type_from(call->anchor(), TT) });
+                    DEPS1(newcall2, _T);
+                    ctx.append(newcall2);
+                    _T = newcall2;
+                    return NODEPS1(ARGTYPE1(RT));
+                }
             } break;
             default: {
                 StyledString ss;
@@ -1597,9 +1594,11 @@ repeat:
                 SCOPES_LOCATION_ERROR(ss.str());
             } break;
             }
+            RT = type_key(RT)._1;
             auto rq = try_qualifier<ReferQualifier>(typeof_T);
             if (rq) {
                 auto newcall2 = Call::from(call->anchor(), qualify(RT, { rq }), g_getelementref, { _T, _idx });
+                ctx.append(newcall2);
                 return DEPS1(newcall2, _T);
             } else {
                 return NODEPS1(ARGTYPE1(RT));
