@@ -4448,17 +4448,16 @@ sugar typedef (name body...)
 # method syntax
 #-------------------------------------------------------------------------------
 
+fn parse-typeref-or-default (typeref rest)
+    if (('typeof typeref) == list)
+        let head rest... = (decons (typeref as list))
+        if (('typeof head) == Symbol)
+            if ((head as Symbol) == 'do)
+                return typeref rest
+        return `'this-type (cons typeref rest)
+    return typeref rest
+
 fn parse-method-definition (expr)
-
-    fn parse-typeref-or-default (typeref rest)
-        if (('typeof typeref) == list)
-            let head rest... = (decons (typeref as list))
-            if (('typeof head) == Symbol)
-                if ((head as Symbol) == 'do)
-                    return typeref rest
-            return `'this-type (cons typeref rest)
-        return typeref rest
-
     syntax-match expr
     case (('syntax-quote (name as Symbol)) typeref rest...)
         let typeref rest = (parse-typeref-or-default typeref rest...)
@@ -4481,6 +4480,19 @@ sugar method (expr...)
     qq
         'set-symbol [typeref] '[name] [fndef]
 
+sugar method... (expr...)
+    syntax-match expr...
+    case (('syntax-quote (name as Symbol)) typeref...)
+        let typeref =
+            if (empty? typeref...) (Value 'this-type)
+            else ('@ typeref...)
+        let head = (qq [fn...] [(name as string)])
+        let fndef next scope = (sc_expand head next-expr syntax-scope)
+        return (qq 'set-symbol [typeref] '[name] [fndef]) next scope
+    default
+        compiler-error!
+            "syntax: method... 'name [type]"
+
 sugar decorate-method (expr decorators...)
     let kw rest = (decons (expr as list))
     let typeref name fnexpr = (parse-method-definition rest)
@@ -4498,14 +4510,16 @@ sugar decorate-method (expr decorators...)
 # standard allocators
 #-------------------------------------------------------------------------------
 
-spice __init (target)
+spice __init (target args...)
     let T = ('typeof target)
     let constructor =
         try
             getattr T '__init
         except (err)
+            if (('argcount args...) > 0)
+                compiler-error! "default constructor takes no arguments"
             return `(target = (nullof T))
-    `(constructor target)
+    `(constructor target args...)
 
 spice __init-copy (target source)
     let T = ('typeof target)
@@ -4529,21 +4543,20 @@ inline gen-allocator-syntax (name f)
         spice local-copy (value)
             let T = ('typeof value)
             `(local-copy-typed T value)
-        spice local-new (T)
+        spice local-new (T args...)
             ast-quote
                 let val = (ptrtoref (f T))
-                __init val
+                __init val args...
                 val
         syntax-match values...
         case (name '= value)
-            qq
-                [let name] = ([local-copy value])
+            qq [let name] = ([local-copy value])
         case (name ': T '= value)
-            qq
-                [let name] = ([local-copy-typed T value])
-        case (name ': T)
-            qq
-                [let name] = ([local-new T])
+            qq [let name] = ([local-copy-typed T value])
+        case (name ': T args...)
+            qq [let name] = ([local-new T] (unquote-splice args...))
+        case (T args...)
+            qq [local-new] [T] (unquote-splice args...)
         default
             compiler-error!
                 .. "syntax: " name " <name> [: <type>] [= <value>]"

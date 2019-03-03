@@ -96,8 +96,11 @@ typedef refable < integer : i32
     method inline '__typecall (cls)
         nullof cls
 
-    method '__init (self)
-        (storagecast self) = -1
+    method... '__init
+    case (self)
+        (storagecast self) = 0
+    case (self, initval : i32)
+        (storagecast self) = initval
 
     method '__init-copy (self other)
         (storagecast self) = other
@@ -120,7 +123,7 @@ let q = (refable)
 assert (('value q) == 0)
 assert (('value ('inced q)) == 1)
 assert (('value q) == 0)
-local q : refable
+local q : refable -1
 assert (('value q) == -1)
 assert (('value ('inc q)) == 0)
 assert (('value q) == 0)
