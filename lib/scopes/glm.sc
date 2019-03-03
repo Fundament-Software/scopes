@@ -327,9 +327,9 @@ typedef vec-type < immutable
         if (sz > 4)
             compiler-error! "too many characters in accessor (try 1 <= x <= 4)"
         let set =
-            if (sc_string_match element-set-xyzw s) "xyzw"
-            elseif (sc_string_match element-set-rgba s) "rgba"
-            elseif (sc_string_match element-set-stpq s) "stpq"
+            if ('match? element-set-xyzw s) "xyzw"
+            elseif ('match? element-set-rgba s) "rgba"
+            elseif ('match? element-set-stpq s) "stpq"
             else
                 compiler-error! "try one of xyzw | rgba | stpq"
         fn find-index (set c)

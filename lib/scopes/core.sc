@@ -734,6 +734,7 @@ inline define-symbols (self values...)
 
 'define-symbols string
     join = sc_string_join
+    match? = sc_string_match
 
 'define-symbols list
     __countof = sc_list_count
@@ -2750,7 +2751,7 @@ fn merge-scope-symbols (source target filter)
                         none? filter
                         do
                             let keystr = (key as string)
-                            sc_string_match filter keystr
+                            'match? filter keystr
                     'set-symbol target key value
                 repeat key
             else
