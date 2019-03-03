@@ -34,13 +34,13 @@ struct AnotherStruct
     y : i32
     z : i32
 
-    method inline '__typecall (cls x z y)
+    inline __typecall (cls x z y)
         CStruct.__typecall cls
             x = x
             y = y
             z = z
 
-    method 'sum (self)
+    fn sum (self)
         + self.x self.y self.z
 
 run-stage;

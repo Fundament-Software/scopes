@@ -84,7 +84,11 @@ define-syntax-macro assert-error
             cons assertion-error!
                 active-anchor;
                 if (empty? body)
-                    list (repr sxcond)
+                    list
+                        if (('typeof sxcond) == list)
+                            repr (sxcond as list)
+                        else
+                            repr sxcond
                 else body
 
 define-syntax-macro assert-compiler-error
@@ -118,7 +122,11 @@ define-syntax-macro assert-compiler-error
             cons assertion-error!
                 active-anchor;
                 if (empty? body)
-                    list (repr sxcond)
+                    list
+                        if (('typeof sxcond) == list)
+                            repr (sxcond as list)
+                        else
+                            repr sxcond
                 else body
 
 locals;

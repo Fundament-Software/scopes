@@ -1,11 +1,10 @@
 
 typedef Name : (storageof string)
-    'set-symbol this-type '__as
-        box-cast
-            fn apply-as (vT T expr)
-                if (T == string)
-                    return `(bitcast expr T)
-                compiler-error! "unsupported type"
+    @@ box-cast
+    fn __as (vT T expr)
+        if (T == string)
+            return `(bitcast expr T)
+        compiler-error! "unsupported type"
 
 run-stage;
 

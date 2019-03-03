@@ -2675,34 +2675,66 @@ let locals =
     syntax-scope-macro
         fn "locals" (args scope)
             raises-compile-error;
-            let docstr = ('docstring scope unnamed)
-            let constant-scope = (Scope)
-            if (not (empty? docstr))
-                'set-docstring! constant-scope unnamed docstr
-            let tmp =
-                `(Scope constant-scope)
-            loop (last-key result = unnamed (list tmp))
-                let key value =
-                    'next scope last-key
-                if (key == unnamed)
-                    return
-                        cons do tmp result
-                        scope
-                else
-                    let keydocstr = ('docstring scope key)
-                    repeat key
-                        if (key == unnamed) result # skip
+
+            fn stage-constant? (value)
+                ('pure? value) and (('typeof value) != ASTMacro)
+
+            let build-local =
+                ast-macro
+                    fn (args)
+                        let constant-scope = (('getarg args 0) as Scope)
+                        let tmp = ('getarg args 1)
+                        let key = ('getarg args 2)
+                        let value = ('getarg args 3)
+                        let keydocstr = (('getarg args 4) as string)
+                        if (stage-constant? value)
+                            let key = (key as Symbol)
+                            'set-symbol constant-scope key value
+                            'set-docstring! constant-scope key keydocstr
+                            `none
                         else
-                            if ('constant? value)
-                                'set-symbol constant-scope key value
-                                'set-docstring! constant-scope key keydocstr
-                                result
-                            else
-                                let value = (sc_extract_argument_new (sc_value_anchor value) value 0)
-                                cons
-                                    list sc_scope_set_symbol tmp (list syntax-quote key) (list Value value)
-                                    list sc_scope_set_docstring tmp (list syntax-quote key) keydocstr
-                                    result
+                            let wrapvalue =
+                                if (('typeof value) == Value) value
+                                else (Value value)
+                            ast-quote
+                                sc_scope_set_symbol tmp key wrapvalue
+                                sc_scope_set_docstring tmp key keydocstr
+
+            let build-locals =
+                ast-macro
+                    fn (args)
+                        let scope = (('getarg args 0) as Scope)
+                        let docstr = ('docstring scope unnamed)
+                        let constant-scope = (Scope)
+                        if (not (empty? docstr))
+                            'set-docstring! constant-scope unnamed docstr
+                        let tmp = `(Scope constant-scope)
+                        let block = (sc_expression_new (sc_get_active_anchor))
+                        sc_expression_append block tmp
+                        loop (last-key = unnamed)
+                            let key value = ('next scope last-key)
+                            if (key == unnamed)
+                                sc_expression_append block tmp
+                                return block
+                            #if (not (stage-constant? value))
+                            let keydocstr = ('docstring scope key)
+                            let value = (sc_extract_argument_new (sc_value_anchor value) value 0)
+                            sc_expression_append block
+                                `(build-local constant-scope tmp key value keydocstr)
+                            repeat key
+
+            return `(build-locals scope) scope
+
+fn set-symbols-from-scope (T scope)
+    loop (last-key = unnamed)
+        let key value =
+            'next scope last-key
+        if (key == unnamed)
+            return;
+        #let keydocstr = ('docstring scope key)
+        'set-symbol T key value
+        #'set-docstring! T key keydocstr
+        repeat key
 
 #---------------------------------------------------------------------------
 # using
@@ -4344,6 +4376,16 @@ let
 run-stage;
 
 #-------------------------------------------------------------------------------
+# unlet
+#-------------------------------------------------------------------------------
+
+sugar unlet ((name as Symbol) names...)
+    sc_scope_del_symbol syntax-scope name
+    for name in names...
+        sc_scope_del_symbol syntax-scope (name as Symbol)
+    `[]
+
+#-------------------------------------------------------------------------------
 # fold iteration
 #-------------------------------------------------------------------------------
 
@@ -4421,28 +4463,41 @@ sugar typedef (name body...)
                 else name
             `[(qq [typename] [namestr])]
 
-    loop (inp outp = body... '())
-        syntax-match inp
-        case ('< supertype rest...)
-            repeat rest...
-                cons (list sc_typename_type_set_super 'this-type supertype) outp
-        case (': storagetype rest...)
-            repeat rest...
-                cons (list sc_typename_type_set_storage 'this-type storagetype typename-flag-plain) outp
-        case (':: storagetype rest...)
-            repeat rest...
-                cons (list sc_typename_type_set_storage 'this-type storagetype 0:u32) outp
-        default
-            let expr =
-                qq [do]
-                    [let] this-type = [typedecl]
-                    unquote-splice outp
-                    [(cons do inp)]
-                    this-type
-            break
-                if declaration?
-                    qq [let] [name] = [expr]
-                else expr
+    let expr =
+        loop (inp outp = body... '())
+            syntax-match inp
+            case ('< supertype rest...)
+                repeat rest...
+                    cons (list sc_typename_type_set_super 'this-type supertype) outp
+            case (': storagetype rest...)
+                repeat rest...
+                    cons (list sc_typename_type_set_storage 'this-type storagetype typename-flag-plain) outp
+            case (':: storagetype rest...)
+                repeat rest...
+                    cons (list sc_typename_type_set_storage 'this-type storagetype 0:u32) outp
+            case ('do rest...)
+                break
+                    qq [do]
+                        [let] this-type = [typedecl]
+                        unquote-splice outp
+                        [do]
+                            unquote-splice rest...
+                        this-type
+            default
+                break
+                    qq [do]
+                        [let] this-type = [typedecl]
+                        unquote-splice outp
+                        [let] scope =
+                            [do]
+                                unquote-splice inp
+                                [locals];
+                        [set-symbols-from-scope] this-type ('parent scope)
+                        [set-symbols-from-scope] this-type scope
+                        this-type
+    if declaration?
+        qq [let] [name] = [expr]
+    else expr
 
 #-------------------------------------------------------------------------------
 # method syntax
@@ -4649,15 +4704,6 @@ sugar struct (name body...)
                 .. "type " (repr T) " must have CStruct or CUnion supertype"
         T
 
-    fn make-body (body...)
-        qq
-            [local] field-types = [`(ptrtoref (alloca list))]
-            field-types = [null]
-            do
-                [using] [struct-dsl]
-                unquote-splice body...
-            [finalize-struct] this-type field-types
-
     if (('typeof name) == Symbol)
         if (empty? body...)
             # forward declaration
@@ -4673,78 +4719,17 @@ sugar struct (name body...)
         default
             _ `CStruct body...
 
-    qq [typedef] [name] < [supertype]
+    qq [typedef] [name] < [supertype] do
         [local] field-types = [`(ptrtoref (alloca list))]
         field-types = [null]
-        do
-            [using] [struct-dsl]
-            unquote-splice body...
+        [using] [struct-dsl]
+        [let] scope =
+            [do]
+                unquote-splice body...
+                [locals];
+        [set-symbols-from-scope] this-type ('parent scope)
+        [set-symbols-from-scope] this-type scope
         [finalize-struct] this-type field-types
-
-#
-    fn complete-declaration ()
-    inline generate-expression (superT name body)
-        if (('typeof (name as Any)) == Symbol)
-            # constant
-            let symname = (name as Any as Symbol)
-            # see if we can find a forward declaration in the local scope
-            let T ok = (Scope-local@ syntax-scope symname)
-            fn completable-type? (T)
-                and
-                    (typeof T) == type
-                    typename-type? T
-                    opaque? T
-                    (superof T) == typename
-
-            return
-                if (empty? body)
-                    # forward declaration
-                    list let name '=
-                        list do
-                            list using struct-dsl
-                            list let 'this-struct '=
-                                list typename-type
-                                    symname as string
-                            'this-struct
-                else
-                    # body declaration
-                    list let name '=
-                        cons do
-                            list using struct-dsl
-                            list let 'this-struct '=
-                                list if (list completable-type? T) T
-                                list 'else
-                                    list typename-type
-                                        symname as string
-                            list let name '= 'this-struct
-                            list set-typename-super! 'this-struct superT
-                            list let 'field-types '= end-args
-                            ..
-                                cons do body
-                                list
-                                    list finalize-struct 'this-struct 'field-types
-                syntax-scope
-        else
-            # expression
-            return
-                cons do
-                    list using struct-dsl
-                    list let 'this-struct '=
-                        list typename-type
-                            list (do as) name string
-                    list set-typename-super! 'this-struct superT
-                    list let 'field-types '= end-args
-                    ..
-                        cons do body
-                        list
-                            list finalize-struct 'this-struct 'field-types
-                syntax-scope
-
-    if (('typeof any-head) == Symbol and any-head as Symbol == 'union)
-        let head body = (decons body)
-        generate-expression CUnion (head as Syntax) body
-    else
-        generate-expression CStruct head body
 
 # enums
 #-------------------------------------------------------------------------------

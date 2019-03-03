@@ -93,27 +93,28 @@ x @ 4 = x @ 3 + 1
 assert ((x @ 4) == 5)
 
 typedef refable < integer : i32
-    method inline '__typecall (cls)
+    inline __typecall (cls)
         nullof cls
 
-    method... '__init
+    fn... __init
     case (self)
         (storagecast self) = 0
     case (self, initval : i32)
         (storagecast self) = initval
 
-    method '__init-copy (self other)
+    fn __init-copy (self other)
         (storagecast self) = other
 
-    method 'value (self)
+    fn value (self)
         storagecast self
 
-    method 'inced (self)
+    @@ ast-quote
+    fn inced (self)
         bitcast
             (storagecast self) + 1
-            typeof self
+            [this-type]
 
-    method 'inc (self)
+    fn inc (self)
         self = ('inced self)
         self
 

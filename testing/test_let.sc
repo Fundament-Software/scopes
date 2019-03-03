@@ -1,4 +1,5 @@
 
+using import testing
 
 do
     let x = (_ 1 2 3)
@@ -38,4 +39,14 @@ do
         error! "failed"
 
     assert (n == 303)
+
+# ASSERT OK: no attribute 'x in scope
+assert-error
+    do
+        let scope =
+            do
+                let x y z = 5 6 7
+                unlet x y z
+                locals;
+        scope.z
 
