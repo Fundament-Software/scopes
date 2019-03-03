@@ -4382,7 +4382,9 @@ run-stage;
 sugar unlet ((name as Symbol) names...)
     sc_scope_del_symbol syntax-scope name
     for name in names...
-        sc_scope_del_symbol syntax-scope (name as Symbol)
+        let name = (name as Symbol)
+        getattr syntax-scope name
+        sc_scope_del_symbol syntax-scope name
     `[]
 
 #-------------------------------------------------------------------------------
@@ -4498,68 +4500,6 @@ sugar typedef (name body...)
     if declaration?
         qq [let] [name] = [expr]
     else expr
-
-#-------------------------------------------------------------------------------
-# method syntax
-#-------------------------------------------------------------------------------
-
-fn parse-typeref-or-default (typeref rest)
-    if (('typeof typeref) == list)
-        let head rest... = (decons (typeref as list))
-        if (('typeof head) == Symbol)
-            if ((head as Symbol) == 'do)
-                return typeref rest
-        return `'this-type (cons typeref rest)
-    return typeref rest
-
-fn parse-method-definition (expr)
-    syntax-match expr
-    case (('syntax-quote (name as Symbol)) typeref rest...)
-        let typeref rest = (parse-typeref-or-default typeref rest...)
-        _ typeref name
-            qq
-                [fn] [(name as string)]
-                    unquote-splice rest
-    case ('inline ('syntax-quote (name as Symbol)) typeref rest...)
-        let typeref rest = (parse-typeref-or-default typeref rest...)
-        _ typeref name
-            qq
-                [inline] [(name as string)]
-                    unquote-splice rest
-    default
-        compiler-error!
-            "syntax: method [inline] 'name [type] (parameter...) body..."
-
-sugar method (expr...)
-    let typeref name fndef = (parse-method-definition expr...)
-    qq
-        'set-symbol [typeref] '[name] [fndef]
-
-sugar method... (expr...)
-    syntax-match expr...
-    case (('syntax-quote (name as Symbol)) typeref...)
-        let typeref =
-            if (empty? typeref...) (Value 'this-type)
-            else ('@ typeref...)
-        let head = (qq [fn...] [(name as string)])
-        let fndef next scope = (sc_expand head next-expr syntax-scope)
-        return (qq 'set-symbol [typeref] '[name] [fndef]) next scope
-    default
-        compiler-error!
-            "syntax: method... 'name [type]"
-
-sugar decorate-method (expr decorators...)
-    let kw rest = (decons (expr as list))
-    let typeref name fnexpr = (parse-method-definition rest)
-    let result =
-        loop (inp outp = decorators... fnexpr)
-            if (empty? inp)
-                break outp
-            let decorator inp = (decons inp)
-            repeat inp
-                cons decorator (list outp)
-    qq
-        'set-symbol [typeref] '[name] [result]
 
 #-------------------------------------------------------------------------------
 # standard allocators

@@ -16,18 +16,18 @@ fn test (x y)
 assert ((test 1 2) == 6)
 
 
-let T = (typename "T")
+typedef T
+    inline replace-result (f)
+        @@ ast-quote
+        inline (cls x)
+            print f
+            x + 300
 
-inline replace-result (f)
-    @@ ast-quote
-    inline (cls x)
-        print f
-        x + 300
+    @@ replace-result
+    inline __typecall (cls x)
+        compiler-error! "should not see me"
 
-# test method decorators
-@@ replace-result
-method inline '__typecall T (cls x)
-    compiler-error! "should not see me"
+    unlet replace-result
 
 vvv print
 2 + 3

@@ -24,13 +24,13 @@ typedef MyTupleType < MyTupleSuperType : (tuple i32 i32)
 
     # constructor
     @@ ast-quote
-    method inline '__typecall (cls x y)
+    inline __typecall (cls x y)
         bitcast
             tupleof (imply x i32) (imply y i32)
             this-type
 
     # accessor
-    method inline 'get (self)
+    inline get (self)
         return
             extractvalue self 0
             extractvalue self 1

@@ -10,11 +10,11 @@
     related arithmetic operations which mimic the features available to shaders
     written in the GL shader language.
 
-typedef vec-type < immutable
-typedef mat-type < immutable
+typedef vec-type
+typedef mat-type
 typedef vec-type-accessor
 
-run-stage;
+#run-stage;
 
 fn element-prefix (element-type)
     match element-type
@@ -105,76 +105,71 @@ let mat4 dmat4 imat4 umat4 bmat4 = mat4x4 dmat4x4 imat4x4 umat4x4 bmat4x4
 # VECTORS
 #-------------------------------------------------------------------------------
 
-do
-    let this-type = vec-type-accessor
+typedef vec-type-accessor
+    do
+        fn binary-op-expr (op lhsT rhsT lhs rhs)
+            raises-compile-error;
+            `(op (imply lhs vec-type) rhs)
 
-    fn binary-op-expr (op lhsT rhsT lhs rhs)
+        fn binary-op-expr-r (op lhsT rhsT lhs rhs)
+            raises-compile-error;
+            `(op lhs (imply rhs vec-type))
+
+        inline binary-op-dispatch (lop rop op)
+            'set-symbol this-type lop
+                box-binary-op
+                    fn (lhsT rhsT lhs rhs)
+                        binary-op-expr op lhsT rhsT lhs rhs
+            'set-symbol this-type rop
+                box-binary-op
+                    fn (lhsT rhsT lhs rhs)
+                        binary-op-expr-r op lhsT rhsT lhs rhs
+
+        binary-op-dispatch '__+ '__r+ +
+        binary-op-dispatch '__- '__r- -
+        binary-op-dispatch '__* '__r* *
+        binary-op-dispatch '__/ '__r/ /
+        binary-op-dispatch '__// '__r// //
+        binary-op-dispatch '__& '__r& &
+        binary-op-dispatch '__| '__r| |
+        binary-op-dispatch '__^ '__r^ ^
+        binary-op-dispatch '__% '__r% %
+        binary-op-dispatch '__> '__r> >
+        binary-op-dispatch '__< '__r< <
+        binary-op-dispatch '__>= '__r>= >=
+        binary-op-dispatch '__<= '__r<= <=
+
+    @@ box-cast
+    fn __imply (vT T self)
+        let rhvecT = (vT.RHVectorType as type)
+        if ((T == rhvecT) or (T == vec-type))
+            let mask = vT.Mask
+            return `(bitcast (shufflevector self self mask) rhvecT)
+        compiler-error! "unsupported type"
+
+    @@ box-binary-op
+    fn __= (lhsT rhsT lhs rhs)
         raises-compile-error;
-        `(op (imply lhs vec-type) rhs)
-
-    fn binary-op-expr-r (op lhsT rhsT lhs rhs)
-        raises-compile-error;
-        `(op lhs (imply rhs vec-type))
-
-    inline binary-op-dispatch (lop rop op)
-        'set-symbol this-type lop
-            box-binary-op
-                fn (lhsT rhsT lhs rhs)
-                    binary-op-expr op lhsT rhsT lhs rhs
-        'set-symbol this-type rop
-            box-binary-op
-                fn (lhsT rhsT lhs rhs)
-                    binary-op-expr-r op lhsT rhsT lhs rhs
-
-    binary-op-dispatch '__+ '__r+ +
-    binary-op-dispatch '__- '__r- -
-    binary-op-dispatch '__* '__r* *
-    binary-op-dispatch '__/ '__r/ /
-    binary-op-dispatch '__// '__r// //
-    binary-op-dispatch '__& '__r& &
-    binary-op-dispatch '__| '__r| |
-    binary-op-dispatch '__^ '__r^ ^
-    binary-op-dispatch '__% '__r% %
-    binary-op-dispatch '__> '__r> >
-    binary-op-dispatch '__< '__r< <
-    binary-op-dispatch '__>= '__r>= >=
-    binary-op-dispatch '__<= '__r<= <=
-
-    'set-symbols this-type
-        __imply =
-            box-cast
-                fn "vec-type-accessor-imply" (vT T self)
-                    let rhvecT = (vT.RHVectorType as type)
-                    if ((T == rhvecT) or (T == vec-type))
-                        let mask = vT.Mask
-                        return `(bitcast (shufflevector self self mask) rhvecT)
-                    compiler-error! "unsupported type"
-        __= =
-            box-binary-op
-                fn "vec-type-accessor-assign" (lhsT rhsT lhs rhs)
-                    raises-compile-error;
-                    let rhvecT = (lhsT.RHVectorType as type)
-                    let assignmask = lhsT.AssignMask
-                    let lhsz = ('element-count lhsT)
-                    let sz = ('element-count rhvecT)
-                    let vecT = ('superof rhvecT)
-                    if (lhsz == sz)
-                        `(assign
-                            (shufflevector lhs (imply rhs rhvecT) assignmask)
-                            lhs)
-                    else
-                        let expandmask = lhsT.ExpandMask
-                        ast-quote
-                            do
-                                let rhs = (imply rhs rhvecT)
-                                # expand or contract
-                                let rhs = (shufflevector rhs rhs expandmask)
-                                assign (shufflevector lhs rhs assignmask) lhs
+        let rhvecT = (lhsT.RHVectorType as type)
+        let assignmask = lhsT.AssignMask
+        let lhsz = ('element-count lhsT)
+        let sz = ('element-count rhvecT)
+        let vecT = ('superof rhvecT)
+        if (lhsz == sz)
+            `(assign
+                (shufflevector lhs (imply rhs rhvecT) assignmask)
+                lhs)
+        else
+            let expandmask = lhsT.ExpandMask
+            ast-quote
+                do
+                    let rhs = (imply rhs rhvecT)
+                    # expand or contract
+                    let rhs = (shufflevector rhs rhs expandmask)
+                    assign (shufflevector lhs rhs assignmask) lhs
 
 
-do
-    let this-type = vec-type
-
+typedef vec-type < immutable
     inline vec-type-constructor (element-type size)
         construct-vec-type (imply element-type type) (imply size i32)
 
@@ -224,7 +219,7 @@ do
                 .. "number of arguments (" (repr flatargsz)
                     \ ") doesn't match number of elements (" (repr vecsz) ")"
 
-    spice vec-constructor (self ...)
+    spice __typecall (self ...)
         let self = (self as type)
         if (self == vec-type)
             `(vec-type-constructor ...)
@@ -239,8 +234,7 @@ do
                     else arg
             `(vec-constructor2 self args)
 
-    method inline '__repr (self)
-        tostring (self as vector)
+    unlet vec-type-constructor vec-constructor2
 
     spice _vec-repr (self)
         let T = ('typeof self)
@@ -255,84 +249,79 @@ do
         `(.. s ">")
 
     @@ ast-quote
-    fn vec-repr (self) (_vec-repr self)
+    fn __repr (self) (_vec-repr self)
 
-    method inline '__@ (self i)
+    unlet _vec-repr
+
+    inline __@ (self i)
         extractelement self i
 
-    method inline '__unpack (self)
+    inline __unpack (self)
         unpack (self as vector)
 
-    method inline '__neg (self)
+    inline __neg (self)
         - ((typeof self) 0) self
 
-    method inline '__rcp (self)
+    inline __rcp (self)
         / ((typeof self) 1) self
 
-    fn vec-type-binary-op-expr (symbol lhsT rhsT lhs rhs)
-        let Ta = ('element@ lhsT 0)
-        let f =
-            try ('@ Ta symbol)
-            except (err)
-                compiler-error! "unsupported operation"
-        let f = (unbox-binary-op-function-type f)
+    do
+        fn vec-type-binary-op-expr (symbol lhsT rhsT lhs rhs)
+            let Ta = ('element@ lhsT 0)
+            let f =
+                try ('@ Ta symbol)
+                except (err)
+                    compiler-error! "unsupported operation"
+            let f = (unbox-binary-op-function-type f)
 
-        let rhs =
-            if (lhsT == rhsT) rhs
-            else
-                `(lhsT [(imply-expr rhsT Ta rhs)])
-        return (f lhsT lhsT lhs rhs)
+            let rhs =
+                if (lhsT == rhsT) rhs
+                else
+                    `(lhsT [(imply-expr rhsT Ta rhs)])
+            return (f lhsT lhsT lhs rhs)
 
-    fn vec-type-binary-op-expr-r (symbol lhsT rhsT lhs rhs)
-        let Tb = ('element@ rhsT 0)
-        let f =
-            try ('@ Tb symbol)
-            except (err)
-                compiler-error! "unsupported operation"
-        let f = (unbox-binary-op-function-type f)
-        let lhs =
-            if (lhsT == rhsT) lhs
-            else
-                `(rhsT [(imply-expr lhsT Tb lhs)])
-        return (f rhsT rhsT lhs rhs)
+        fn vec-type-binary-op-expr-r (symbol lhsT rhsT lhs rhs)
+            let Tb = ('element@ rhsT 0)
+            let f =
+                try ('@ Tb symbol)
+                except (err)
+                    compiler-error! "unsupported operation"
+            let f = (unbox-binary-op-function-type f)
+            let lhs =
+                if (lhsT == rhsT) lhs
+                else
+                    `(rhsT [(imply-expr lhsT Tb lhs)])
+            return (f rhsT rhsT lhs rhs)
 
-    inline vec-type-binary-op-dispatch (lop rop symbol)
-        'set-symbol this-type lop
-            box-binary-op
-                fn (lhsT rhsT lhs rhs) (vec-type-binary-op-expr symbol lhsT rhsT lhs rhs)
-        'set-symbol this-type rop
-            box-binary-op
-                fn (lhsT rhsT lhs rhs) (vec-type-binary-op-expr-r symbol lhsT rhsT lhs rhs)
+        inline vec-type-binary-op-dispatch (lop rop symbol)
+            'set-symbol this-type lop
+                box-binary-op
+                    fn (lhsT rhsT lhs rhs) (vec-type-binary-op-expr symbol lhsT rhsT lhs rhs)
+            'set-symbol this-type rop
+                box-binary-op
+                    fn (lhsT rhsT lhs rhs) (vec-type-binary-op-expr-r symbol lhsT rhsT lhs rhs)
 
-    vec-type-binary-op-dispatch '__+ '__r+ '__vector+
-    vec-type-binary-op-dispatch '__- '__r- '__vector-
-    vec-type-binary-op-dispatch '__* '__r* '__vector*
-    vec-type-binary-op-dispatch '__/ '__r/ '__vector/
-    vec-type-binary-op-dispatch '__// '__r// '__vector//
-    vec-type-binary-op-dispatch '__& '__r& '__vector&
-    vec-type-binary-op-dispatch '__| '__r| '__vector|
-    vec-type-binary-op-dispatch '__^ '__r^ '__vector^
-    vec-type-binary-op-dispatch '__% '__r% '__vector%
+        vec-type-binary-op-dispatch '__+ '__r+ '__vector+
+        vec-type-binary-op-dispatch '__- '__r- '__vector-
+        vec-type-binary-op-dispatch '__* '__r* '__vector*
+        vec-type-binary-op-dispatch '__/ '__r/ '__vector/
+        vec-type-binary-op-dispatch '__// '__r// '__vector//
+        vec-type-binary-op-dispatch '__& '__r& '__vector&
+        vec-type-binary-op-dispatch '__| '__r| '__vector|
+        vec-type-binary-op-dispatch '__^ '__r^ '__vector^
+        vec-type-binary-op-dispatch '__% '__r% '__vector%
 
-    vec-type-binary-op-dispatch '__> '__r> '__vector>
-    vec-type-binary-op-dispatch '__< '__r< '__vector<
-    vec-type-binary-op-dispatch '__>= '__r>= '__vector>=
-    vec-type-binary-op-dispatch '__<= '__r<= '__vector<=
-
-    #set-type-symbol! vec-type '__neg
-        inline (self)
-            - ((typeof self) 0) self
-
-    #set-type-symbol! vec-type '__rcp
-        inline (self)
-            / ((typeof self) 1) self
-
-    let element-set-xyzw = "^[xyzw]{1,4}$"
-    let element-set-rgba = "^[rgba]{1,4}$"
-    let element-set-stpq = "^[stpq]{1,4}$"
-    let element-set-any = "^([xyzw]|[stpq]|[rgba]){1,4}$"
+        vec-type-binary-op-dispatch '__> '__r> '__vector>
+        vec-type-binary-op-dispatch '__< '__r< '__vector<
+        vec-type-binary-op-dispatch '__>= '__r>= '__vector>=
+        vec-type-binary-op-dispatch '__<= '__r<= '__vector<=
 
     fn build-access-mask (name)
+        let element-set-xyzw = "^[xyzw]{1,4}$"
+        let element-set-rgba = "^[rgba]{1,4}$"
+        let element-set-stpq = "^[stpq]{1,4}$"
+        let element-set-any = "^([xyzw]|[stpq]|[rgba]){1,4}$"
+
         let s = (name as string)
         let sz = ((countof s) as i32)
         if (sz > 4)
@@ -406,7 +395,7 @@ do
                 AssignMask = (assign-mask lhsz mask)
                 ExpandMask = (expand-mask lhsz sz)
 
-    spice vec-getattr (self name)
+    spice __getattr (self name)
         let name = (name as Symbol as string)
         let sz mask = (build-access-mask name)
         let QT = ('qualified-typeof self)
@@ -422,32 +411,30 @@ do
                     shufflevector self self mask
                     [(construct-vec-type ('element@ ('typeof self) 0) sz)]
 
-    'set-symbols this-type
-        __typecall = vec-constructor
-        __getattr = vec-getattr
-        __repr = vec-repr
-        __as =
-            box-cast
-                fn "vec-type-as" (vT T self)
-                    let ST = ('storageof vT)
-                    if ((T == vector) or (T == ST))
-                        `(bitcast self ST)
-                    elseif (T == Generator)
-                        let count = ('element-count ST)
-                        ast-quote
-                            Generator
-                                inline (fdone index)
-                                    if (index == count)
-                                        fdone;
-                                    else
-                                        _ (index + 1) (extractelement self index)
-                                0
-                    else
-                        compiler-error! "unsupported type"
-        __== =
-            box-binary-op
-                fn "vec-type==" (lhsT rhsT lhs rhs)
-                    `(all? [(vector.__== lhsT rhsT lhs rhs)])
+    unlet construct-getter-type assign-mask range-mask expand-mask
+        \ build-access-mask
+
+    @@ box-cast
+    fn __as (vT T self)
+        let ST = ('storageof vT)
+        if ((T == vector) or (T == ST))
+            `(bitcast self ST)
+        elseif (T == Generator)
+            let count = ('element-count ST)
+            ast-quote
+                Generator
+                    inline (fdone index)
+                        if (index == count)
+                            fdone;
+                        else
+                            _ (index + 1) (extractelement self index)
+                    0
+        else
+            compiler-error! "unsupported type"
+
+    @@ box-binary-op
+    fn __== (lhsT rhsT lhs rhs)
+        `(all? [(vector.__== lhsT rhsT lhs rhs)])
 
 fn dot (u v)
     let w = (u * v)
@@ -457,13 +444,12 @@ fn dot (u v)
 # MATRICES
 #-------------------------------------------------------------------------------
 
-do
-    let this-type = mat-type
+typedef mat-type < immutable
 
-    method inline '__unpack (self)
+    inline __unpack (self)
         unpack (self as array)
 
-    method inline '__@ (self index)
+    inline __@ (self index)
         extractvalue self index
 
     spice _mat-repr (self)
@@ -479,12 +465,14 @@ do
         `(.. s "]")
 
     @@ ast-quote
-    fn mat-repr (self) (_mat-repr self)
+    fn __repr (self) (_mat-repr self)
+
+    unlet _mat-repr
 
     #inline empty-value (T)
         nullof T
 
-    spice mat-row (self i)
+    spice row (self i)
         let T = ('typeof self)
         let rowT = (T.RowType as type)
         let cols = ('element-count T)
@@ -502,7 +490,7 @@ do
         construct-mat-type
             imply element-type type; imply cols i32; imply rows i32
 
-    spice mat-constructor (cls ...)
+    spice __typecall (cls ...)
         let cls = (cls as type)
         if (cls == mat-type)
             return `(mat-type-constructor ...)
@@ -596,7 +584,11 @@ do
                         \ ") doesn't match number of columns required (" (repr (i32 cols)) ")"
             self
 
-    fn mat-mul (lhsT rhsT lhs rhs)
+    unlet make-diagonal-vector mat-type-constructor
+
+    @@ box-binary-op
+    fn __* (lhsT rhsT lhs rhs)
+        let mat-row = row
         if ((lhsT < mat-type)
                 and (rhsT < mat-type)
                 and (lhsT == (rhsT.TransposedType as type)))
@@ -620,7 +612,8 @@ do
         else
             compiler-error! "unsupported type"
 
-    fn mat-rmul (lhsT rhsT lhs rhs)
+    @@ box-binary-op
+    fn __r* (lhsT rhsT lhs rhs)
         if (lhsT == ('element@ rhsT 0))
             # vec(j) * mat(i,j) -> vec(i)
             let sz = ('element-count rhsT)
@@ -629,43 +622,36 @@ do
         else
             compiler-error! "unsupported type"
 
-    'set-symbols this-type
-        __typecall = mat-constructor
-        __repr = mat-repr
-        row = mat-row
-        __* = (box-binary-op mat-mul)
-        __r* = (box-binary-op mat-rmul)
-        __as =
-            box-cast
-                fn "mat-type-as" (vT T self)
-                    let ST = ('storageof vT)
-                    if ((T == array) or (T == ST))
-                        `(bitcast self ST)
-                    elseif (T == Generator)
-                        let count = ('element-count ST)
-                        ast-quote
-                            Generator
-                                inline (fdone index)
-                                    if (index == count)
-                                        fdone;
-                                    else
-                                        _ (index + 1) (extractvalue self index)
-                                0
-                    else
-                        compiler-error! "unsupported type"
-        __== =
-            box-binary-op
-                fn "mat-type==" (lhsT rhsT lhs rhs)
-                    if (lhsT == rhsT)
-                        let cols = ('element-count lhsT)
-                        let VT = (vector bool cols)
-                        let vec =
-                            fold (vec = `(nullof VT)) for i in (range cols)
-                                let cmp =
-                                    `((extractvalue lhs i) == (extractvalue rhs i))
-                                `(insertelement vec cmp i)
-                        return `(all? vec)
-                    compiler-error! "unsupported type"
+    @@ box-cast
+    fn __as (vT T self)
+        let ST = ('storageof vT)
+        if ((T == array) or (T == ST))
+            `(bitcast self ST)
+        elseif (T == Generator)
+            let count = ('element-count ST)
+            ast-quote
+                Generator
+                    inline (fdone index)
+                        if (index == count)
+                            fdone;
+                        else
+                            _ (index + 1) (extractvalue self index)
+                    0
+        else
+            compiler-error! "unsupported type"
+
+    @@ box-binary-op
+    fn __== (lhsT rhsT lhs rhs)
+        if (lhsT == rhsT)
+            let cols = ('element-count lhsT)
+            let VT = (vector bool cols)
+            let vec =
+                fold (vec = `(nullof VT)) for i in (range cols)
+                    let cmp =
+                        `((extractvalue lhs i) == (extractvalue rhs i))
+                    `(insertelement vec cmp i)
+            return `(all? vec)
+        compiler-error! "unsupported type"
 
 spice _transpose (m)
     let T = ('typeof m)

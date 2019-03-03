@@ -48,39 +48,42 @@
         handler activated with argument 3
 
 typedef FunctionChain : ('storageof type)
-    method '__repr (self)
+    fn __repr (self)
         repr (bitcast self type)
 
-    method 'clear (self)
+    fn clear (self)
         """"Clear the function chain. When the function chain is applied next,
             no functions will be called.
         let cls = (bitcast self type)
-        method inline 'chain cls (cls args...)
+        'set-symbol cls 'chain
+            inline (cls args...)
         self
 
-    method 'append (self f)
+    fn append (self f)
         """"Append function `f` to function chain. When the function chain is called,
             `f` will be called last. The return value of `f` will be ignored.
         let cls = (bitcast self type)
         let oldfn = cls.chain
-        @@ ast-quote
-        method inline 'chain cls (cls args...)
-            oldfn cls args...
-            f args...
+        'set-symbol cls 'chain
+            @@ ast-quote
+            inline (cls args...)
+                oldfn cls args...
+                f args...
         self
 
-    method 'prepend (self f)
+    fn prepend (self f)
         """"Prepend function `f` to function chain. When the function chain is called,
             `f` will be called first. The return value of `f` will be ignored.
         let cls = (bitcast self type)
         let oldfn = cls.chain
-        @@ ast-quote
-        method inline 'chain cls (cls args...)
-            f args...
-            oldfn cls args...
+        'set-symbol cls 'chain
+            @@ ast-quote
+            inline (cls args...)
+                f args...
+                oldfn cls args...
         self
 
-    method inline 'on (self)
+    inline on (self)
         """"Returns a decorator that appends the provided function to the
             function chain.
         inline (f)
@@ -88,9 +91,10 @@ typedef FunctionChain : ('storageof type)
             f
 
     @@ ast-quote
-    method '__typecall (cls name)
+    fn __typecall (cls name)
         let T = (typename (.. "<FunctionChain " name ">"))
-        method inline 'chain T (cls args...)
+        'set-symbol T 'chain
+            inline (cls args...)
         bitcast T this-type
 
 run-stage;
