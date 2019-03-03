@@ -4918,7 +4918,7 @@ fn read-eval-print-loop ()
                         list
                             list syntax-set-scope! eval-scope
                             list let tmp '=
-                                cons inline-do
+                                cons embed
                                     expr as list
                             #list __defer (list tmp)
                                 list _ (list get-scope) (list locals) tmp

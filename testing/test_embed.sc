@@ -1,7 +1,7 @@
 
 
 let x =
-    inline-do
+    embed
         using import testing
         assert (not (none? assert-error))
 

@@ -18,6 +18,7 @@ test-modules
     .test_dispatch
     .test_docstring
     .test_dots
+    .test_embed
     .test_enums
     .test_extraparams
     .test_fnchain
@@ -31,7 +32,6 @@ test-modules
     .test_hash
     .test_import
     .test_inline
-    .test_inline_do
     .test_inplace_arithmetic
     .test_intrinsics
     .test_iter2
