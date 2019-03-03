@@ -341,7 +341,8 @@ TypedValue *ExtractArgument::from(const Anchor *anchor, TypedValue *value, int i
 Template::Template(const Anchor *anchor, Symbol _name, const ParameterTemplates &_params, Value *_value)
     : UntypedValue(VK_Template, anchor),
         name(_name), params(_params), value(_value),
-        _is_inline(false), docstring(nullptr) {
+        _is_inline(false), docstring(nullptr),
+        recursion(0) {
     int index = 0;
     for (auto param : params) {
         param->set_owner(this, index++);

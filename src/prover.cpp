@@ -322,7 +322,7 @@ static void merge_depends(const ASTContext &ctx, Depends &deps, TypedValue *valu
 
 //------------------------------------------------------------------------------
 
-static SCOPES_RESULT(TypedValue *) prove_inline(const ASTContext &ctx, Function *frame, Template *func, const TypedValues &nodes);
+static SCOPES_RESULT(TypedValue *) prove_inline(const ASTContext &ctx, const Closure *cl, const TypedValues &nodes);
 
 static SCOPES_RESULT(const Type *) merge_value_type(const char *context, const Type *T1, const Type *T2) {
     SCOPES_RESULT_TYPE(const Type *);
@@ -1226,7 +1226,7 @@ repeat:
             values = args;
         }
         if (cl->func->is_inline()) {
-            return SCOPES_GET_RESULT(prove_inline(ctx, cl->frame, cl->func, values));
+            return SCOPES_GET_RESULT(prove_inline(ctx, cl, values));
         } else {
             Types types;
             for (auto &&arg : values) {
@@ -2195,9 +2195,11 @@ static SCOPES_RESULT(void) prove_inline_arguments(const ASTContext &ctx,
     return {};
 }
 
-SCOPES_RESULT(TypedValue *) prove_inline(const ASTContext &ctx,
-    Function *frame, Template *func, const TypedValues &nodes) {
+static SCOPES_RESULT(TypedValue *) prove_inline_body(const ASTContext &ctx,
+    const Closure *cl, const TypedValues &nodes) {
     SCOPES_RESULT_TYPE(TypedValue *);
+    auto frame = cl->frame;
+    auto func = cl->func;
     Timer sum_prove_time(TIMER_Specialize);
     assert(func);
     //int count = (int)func->params.size();
@@ -2246,7 +2248,20 @@ SCOPES_RESULT(TypedValue *) prove_inline(const ASTContext &ctx,
     }
 }
 
-SCOPES_RESULT(Function *) prove(Function *frame, Template *func, const Types &types) {
+SCOPES_RESULT(TypedValue *) prove_inline(const ASTContext &ctx,
+    const Closure *cl, const TypedValues &nodes) {
+    SCOPES_RESULT_TYPE(TypedValue *);
+    auto func = cl->func;
+    if (func->recursion >= SCOPES_MAX_RECURSIONS) {
+        SCOPES_EXPECT_ERROR(error_recursion_overflow());
+    }
+    func->recursion++;
+    auto result = prove_inline_body(ctx, cl, nodes);
+    func->recursion--;
+    return result;
+}
+
+static SCOPES_RESULT(Function *) prove_body(Function *frame, Template *func, const Types &types) {
     SCOPES_RESULT_TYPE(Function *);
     Timer sum_prove_time(TIMER_Specialize);
     assert(func);
@@ -2323,6 +2338,17 @@ SCOPES_RESULT(Function *) prove(Function *frame, Template *func, const Types &ty
     SCOPES_CHECK_RESULT(track(fnctx));
     fn->complete = true;
     return fn;
+}
+
+SCOPES_RESULT(Function *) prove(Function *frame, Template *func, const Types &types) {
+    SCOPES_RESULT_TYPE(Function *);
+    if (func->recursion >= SCOPES_MAX_RECURSIONS) {
+        SCOPES_EXPECT_ERROR(error_recursion_overflow());
+    }
+    func->recursion++;
+    auto result = prove_body(frame, func, types);
+    func->recursion--;
+    return result;
 }
 
 //------------------------------------------------------------------------------

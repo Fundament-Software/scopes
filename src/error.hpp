@@ -97,6 +97,7 @@ SCOPES_RESULT(void) error_unbound_symbol(Parameter *value);
 SCOPES_RESULT(void) error_unbound_symbol(Value *value);
 SCOPES_RESULT(void) error_cannot_merge_expression_types(const char *context, const Type *T1, const Type *T2);
 SCOPES_RESULT(void) error_noreturn_not_last_expression();
+SCOPES_RESULT(void) error_recursion_overflow();
 SCOPES_RESULT(void) error_noreturn_in_argument_list();
 SCOPES_RESULT(void) error_cannot_type_builtin(const Builtin &builtin);
 SCOPES_RESULT(void) error_illegal_repeat_outside_loop();

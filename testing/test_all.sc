@@ -49,7 +49,6 @@ test-modules
     .test_operators
     .test_overload
     .test_parser
-    .test_qualifiers
     .test_quote
     .test_recursion
     .test_reference

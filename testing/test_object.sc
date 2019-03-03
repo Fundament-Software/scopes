@@ -10,17 +10,19 @@ let C =
 
 let scope = (Scope)
 
+let i32x10 = (array i32 10:usize)
+
 run-stage;
 
 fn static-array-init ()
-    private (array i32 10:usize)
+    private i32x10
 
 compile
     typify static-array-init
     'dump-module
     'no-debug-info
 
-global x : (array i32 10:usize)
+global x : i32x10
 global y : i32
 
 fn main (argc argv)

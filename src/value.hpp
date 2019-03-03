@@ -379,6 +379,7 @@ struct Template : UntypedValue {
     Value *value;
     bool _is_inline;
     const String *docstring;
+    int recursion;
 };
 
 //------------------------------------------------------------------------------

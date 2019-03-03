@@ -302,6 +302,16 @@ SCOPES_RESULT(void) error_noreturn_not_last_expression() {
     SCOPES_LOCATION_ERROR(ss.str());
 }
 
+SCOPES_RESULT(void) error_recursion_overflow() {
+    SCOPES_RESULT_TYPE(void);
+    StyledString ss;
+
+    ss.out << "maximum number of compile time recursions exceeded (> ";
+    ss.out << SCOPES_MAX_RECURSIONS;
+    ss.out << ")";
+    SCOPES_LOCATION_ERROR(ss.str());
+}
+
 SCOPES_RESULT(void) error_noreturn_in_argument_list() {
     SCOPES_RESULT_TYPE(void);
     StyledString ss;
