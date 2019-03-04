@@ -3039,62 +3039,49 @@ inline range (a b c)
                 fdone;
         from
 
-fn parse-compile-flags (args)
-    let argc = ('argcount args)
-    loop (i flags = 0 0:u64)
-        if (i == argc)
-            break flags
-        let arg = ('getarg args i)
-        let flag = (arg as Symbol)
-        _ (i + 1)
-            | flags
-                switch flag
-                case 'dump-disassembly compile-flag-dump-disassembly
-                case 'dump-module compile-flag-dump-module
-                case 'dump-function compile-flag-dump-function
-                case 'dump-time compile-flag-dump-time
-                case 'no-debug-info compile-flag-no-debug-info
-                case 'O1 compile-flag-O1
-                case 'O2 compile-flag-O2
-                case 'O3 compile-flag-O3
-                default
-                    compiler-error!
-                        .. "illegal flag: " (repr flag)
-                            ". try one of"
-                            \ " " (repr 'dump-disassembly)
-                            \ " " (repr 'dump-module)
-                            \ " " (repr 'dump-function)
-                            \ " " (repr 'dump-time)
-                            \ " " (repr 'no-debug-info)
-                            \ " " (repr 'O1)
-                            \ " " (repr 'O2)
-                            \ " " (repr 'O3)
-
-let compile =
+let parse-compile-flags =
     ast-macro
         fn (args)
+            inline flag-error (flag)
+                compiler-error!
+                    .. "illegal flag: " (repr flag)
+                        ". try one of"
+                        \ " " (repr 'dump-disassembly)
+                        \ " " (repr 'dump-module)
+                        \ " " (repr 'dump-function)
+                        \ " " (repr 'dump-time)
+                        \ " " (repr 'no-debug-info)
+                        \ " " (repr 'O1)
+                        \ " " (repr 'O2)
+                        \ " " (repr 'O3)
             let argc = ('argcount args)
-            verify-count argc 1 -1
-            let func = ('getarg args 0)
-            let flags =
-                parse-compile-flags
-                    'getarglist args 1
-            if ('pure? func)
-                sc_compile func flags
-            else
-                `(sc_compile func flags)
+            loop (i flags = 0 0:u64)
+                if (i == argc)
+                    break `flags
+                let arg = ('getarg args i)
+                let flag = (arg as Symbol)
+                let flag =
+                    switch flag
+                    case 'dump-disassembly compile-flag-dump-disassembly
+                    case 'dump-module compile-flag-dump-module
+                    case 'dump-function compile-flag-dump-function
+                    case 'dump-time compile-flag-dump-time
+                    case 'no-debug-info compile-flag-no-debug-info
+                    case 'O1 compile-flag-O1
+                    case 'O2 compile-flag-O2
+                    case 'O3 compile-flag-O3
+                    default (flag-error flag)
+                _ (i + 1) (flags | flag)
 
-let compile-object =
-    ast-macro
-        fn (args)
-            let argc = ('argcount args)
-            verify-count argc 1 -1
-            let path = ('getarg args 0)
-            let table = ('getarg args 1)
-            let flags =
-                parse-compile-flags
-                    'getarglist args 2
-            `(sc_compile_object path table flags)
+ast-quote
+    inline compile (func flags...)
+        sc_compile func (parse-compile-flags flags...)
+
+    inline compile-glsl (target func flags...)
+        sc_compile_glsl target func (parse-compile-flags flags...)
+
+    inline compile-object (func table flags...)
+        sc_compile_object func table (parse-compile-flags flags...)
 
 define-syntax-macro assert
     let cond msg body = (decons args 2)
