@@ -13,94 +13,6 @@
     The core module implements the remaining standard functions and macros,
     parses the command-line and optionally enters the REPL.
 
-#let
-    __typify = sc_typify
-    __compile = sc_compile
-    __compile-object = sc_compile_object
-    __compile-spirv = sc_compile_spirv
-    __compile-glsl = sc_compile_glsl
-    verify-stack! = sc_verify_stack
-    enter-solver-cli! = sc_enter_solver_cli
-
-    format-message = sc_format_message
-
-    file? = sc_is_file
-    directory? = sc_is_directory
-    dirname = sc_dirname
-    basename = sc_basename
-
-    CompileError = sc_location_error_new
-    RuntimeError = sc_runtime_error_new
-
-    __hash = sc_hash
-    __hash2x64 = sc_hash2x64
-    __hashbytes = sc_hashbytes
-
-    import-c = sc_import_c
-    load-library = sc_load_library
-
-    Scope@ = sc_scope_at
-    Scope-local@ = sc_scope_local_at
-    Scope-docstring = sc_scope_get_docstring
-    set-scope-docstring! = sc_scope_set_docstring
-    Scope-new = sc_scope_new
-    Scope-clone = sc_scope_clone
-    Scope-new-expand = sc_scope_new_subscope
-    Scope-clone-expand = sc_scope_clone_subscope
-    Scope-parent = sc_scope_get_parent
-    delete-scope-symbol! = sc_scope_del_symbol
-    Scope-next = sc_scope_next
-
-    string->Symbol = sc_symbol_new
-    Symbol->string = sc_symbol_to_string
-
-    string-join = sc_string_join
-    string-new = sc_string_new
-    string-match? = sc_string_match
-
-    list-cons = sc_list_cons
-    list-join = sc_list_join
-    list-dump = sc_list_dump
-
-    element-type = sc_type_element_at
-    type-countof = sc_type_countof
-    sizeof = sc_type_sizeof
-    runtime-type@ = sc_type_at
-    element-index = sc_type_field_index
-    element-name = sc_type_field_name
-    type-kind = sc_type_kind
-    storageof = sc_type_storage
-    opaque? = sc_type_is_opaque
-    type-name = sc_type_string
-    type-next = sc_type_next
-    set-type-symbol! = sc_type_set_symbol
-
-    pointer-type = sc_pointer_type
-    pointer-type-set-element-type = sc_pointer_type_set_element_type
-    pointer-type-set-storage-class = sc_pointer_type_set_storage_class
-    pointer-type-set-flags = sc_pointer_type_set_flags
-    pointer-type-flags = sc_pointer_type_get_flags
-    pointer-type-set-storage-class = sc_pointer_type_set_storage_class
-    pointer-type-storage-class = sc_pointer_type_get_storage_class
-
-    bitcountof = sc_type_bitcountof
-
-    integer-type = sc_integer_type
-    signed? = sc_integer_type_is_signed
-
-    typename-type = sc_typename_type
-    set-typename-super! = sc_typename_type_set_super
-    superof = sc_typename_type_get_super
-    set-typename-storage! = sc_typename_type_set_storage
-
-    array-type = sc_array_type
-    vector-type = sc_vector_type
-
-    function-type-variadic? = sc_function_type_is_variadic
-
-    Image-type = sc_image_type
-    SampledImage-type = sc_sampled_image_type
-
 # square list expressions are ast unquotes by default
 let square-list = ast-unquote-arguments
 
@@ -207,9 +119,50 @@ run-stage;
 let void =
     sc_arguments_type 0 (nullof TypeArrayPointer)
 
+fn build-typify-function (f)
+    let types = (alloca-array type 1:usize)
+    store Value (getelementptr types 0)
+    let types = (bitcast types TypeArrayPointer)
+    let result = (sc_compile (sc_typify f 1 types) 0:u64)
+    let result-type = (sc_value_type result)
+    if (ptrcmp!= result-type ASTMacroFunction)
+        compiler-error!
+            sc_string_join "AST macro must have type "
+                sc_string_join
+                    sc_value_repr (box-pointer ASTMacroFunction)
+                    sc_string_join " but has type "
+                        sc_value_repr (box-pointer result-type)
+    let ptr = (sc_const_pointer_extract result)
+    bitcast ptr ASTMacro
+
 let typify =
     do
         fn typify (args)
+            let argcount = (sc_argcount args)
+            verify-count argcount 1 -1
+            let src_fn = (sc_getarg args 0)
+            let typecount = (sub argcount 1)
+            ast-quote
+                let types = (alloca-array type typecount)
+                ast-unquote
+                    let body = (sc_expression_new (sc_get_active_anchor))
+                    loop (i j = 1 0)
+                        if (icmp== i argcount)
+                            break;
+                        let ty = (sc_getarg args i)
+                        if (ptrcmp!= (sc_value_type ty) type)
+                            compiler-error! "type expected"
+                        sc_expression_append body
+                            `(store ty (getelementptr types j))
+                        _ (add i 1) (add j 1)
+                    body
+                sc_typify src_fn typecount (bitcast types TypeArrayPointer)
+
+        build-typify-function typify
+
+let const-typify =
+    do
+        fn const-typify (args)
             let argcount = (sc_argcount args)
             verify-count argcount 1 -1
             let src_fn = (sc_getarg args 0)
@@ -224,25 +177,12 @@ let typify =
                 _ (add i 1) (add j 1)
             sc_typify src_fn typecount (bitcast types TypeArrayPointer)
 
-        let types = (alloca-array type 1:usize)
-        store Value (getelementptr types 0)
-        let types = (bitcast types TypeArrayPointer)
-        let result = (sc_compile (sc_typify typify 1 types) 0:u64)
-        let result-type = (sc_value_type result)
-        if (ptrcmp!= result-type ASTMacroFunction)
-            compiler-error!
-                sc_string_join "AST macro must have type "
-                    sc_string_join
-                        sc_value_repr (box-pointer ASTMacroFunction)
-                        sc_string_join " but has type "
-                            sc_value_repr (box-pointer result-type)
-        let ptr = (sc_const_pointer_extract result)
-        bitcast ptr ASTMacro
+        build-typify-function const-typify
 
 run-stage;
 
 let ast-macro-verify-signature =
-    typify (fn "ast-macro-verify-signature" (f)) ASTMacroFunction
+    const-typify (fn "ast-macro-verify-signature" (f)) ASTMacroFunction
 
 inline function->ASTMacro (f)
     ast-macro-verify-signature f
@@ -256,7 +196,7 @@ fn box-none ()
 
 # take closure l, typify and compile it and return a function of ASTMacro type
 inline ast-macro (l)
-    function->ASTMacro (typify l Value)
+    function->ASTMacro (const-typify l Value)
 
 inline box-ast-macro (l)
     box-pointer (ast-macro l)
@@ -351,7 +291,7 @@ fn compare-type (args f)
     `(f args)
 
 inline type-comparison-func (f)
-    fn (args) (compare-type args (typify f type type))
+    fn (args) (compare-type args (const-typify f type type))
 
 let storagecast =
     box-ast-macro
@@ -708,7 +648,7 @@ inline define-symbols (self values...)
     constant? = sc_value_is_constant
     pure? = sc_value_is_pure
     kind = sc_value_kind
-    none? = (typify Value-none? Value)
+    none? = (const-typify Value-none? Value)
     __repr = sc_value_repr
     ast-repr = sc_value_ast_repr
     dump =
@@ -829,7 +769,7 @@ inline define-symbols (self values...)
 let rawstring = ('pointer i8)
 
 inline box-cast (f)
-    box-pointer (typify f type type Value)
+    box-pointer (const-typify f type type Value)
 
 inline not (value)
     bxor value true
@@ -995,7 +935,7 @@ fn real-as (vT T expr)
 
 
 inline box-binary-op (f)
-    box-pointer (typify f type type Value Value)
+    box-pointer (const-typify f type type Value Value)
 
 inline single-binary-op-dispatch (destf)
     fn (lhsT rhsT lhs rhs)
@@ -1503,8 +1443,8 @@ let NullType = (sc_typename_type "NullType")
 let
     and-branch = (ast-macro (fn (args) (dispatch-and-or args true)))
     or-branch = (ast-macro (fn (args) (dispatch-and-or args false)))
-    #implyfn = (typify implyfn type type)
-    #asfn = (typify asfn type type)
+    #implyfn = (const-typify implyfn type type)
+    #asfn = (const-typify asfn type type)
     countof = (make-unary-op-dispatch '__countof "count")
     unpack = (make-unary-op-dispatch '__unpack "unpack")
     hash1 = (make-unary-op-dispatch '__hash "hash")
@@ -1573,13 +1513,13 @@ inline not (value)
     bxor (imply value bool) true
 
 let function->SyntaxMacro =
-    typify
+    const-typify
         fn "function->SyntaxMacro" (f)
             bitcast f SyntaxMacro
         SyntaxMacroFunction
 
 inline syntax-block-scope-macro (f)
-    function->SyntaxMacro (typify f list list Scope)
+    function->SyntaxMacro (const-typify f list list Scope)
 
 inline syntax-scope-macro (f)
     syntax-block-scope-macro
@@ -1928,7 +1868,7 @@ fn parse-infix-expr (infix-table lhs state mprec)
             _ next-rhs next-state
 
 let parse-infix-expr =
-    typify parse-infix-expr Scope Value list i32
+    const-typify parse-infix-expr Scope Value list i32
 
 #---------------------------------------------------------------------------
 
@@ -2219,9 +2159,9 @@ let
                     as scope Scope
 
 'set-symbol (__this-scope) (Symbol "#list")
-    Value (typify list-handler list Scope)
+    Value (const-typify list-handler list Scope)
 'set-symbol (__this-scope) (Symbol "#symbol")
-    Value (typify symbol-handler list Scope)
+    Value (const-typify symbol-handler list Scope)
 
 inline select-op-macro (sop fop numargs)
     inline scalar-type (T)
@@ -3785,7 +3725,7 @@ define match-args
 
 #inline spice-macro (f)
     ast-macro-verify-signature f
-    bitcast (typify f Value) ASTMacro
+    bitcast (const-typify f Value) ASTMacro
 
 define spice
     syntax-macro

@@ -199,7 +199,7 @@ struct LLVMIRGenerator {
     LLVMValueRef intrinsics[NumIntrinsics];
 
     bool use_debug_info;
-    bool inline_pointers;
+    bool generate_object;
     Function *active_function;
     int functions_generated;
 
@@ -277,7 +277,7 @@ struct LLVMIRGenerator {
         //active_function(nullptr),
         //active_function_value(nullptr),
         use_debug_info(true),
-        inline_pointers(true),
+        generate_object(true),
         active_function(nullptr),
         functions_generated(0) {
         static_init();
@@ -969,13 +969,15 @@ struct LLVMIRGenerator {
         auto func = LLVMAddFunction(module, name, functype);
 
 #if SCOPES_LLVM_CACHE_FUNCTIONS
-        auto it = func_cache.find(node);
-        if (it != func_cache.end()) {
-            assert(it->second != module);
-            return func;
-        }
+        if (!generate_object) {
+            auto it = func_cache.find(node);
+            if (it != func_cache.end()) {
+                assert(it->second != module);
+                return func;
+            }
 
-        func_cache.insert({node, module});
+            func_cache.insert({node, module});
+        }
 #endif
 
         if (use_debug_info) {
@@ -983,9 +985,11 @@ struct LLVMIRGenerator {
         }
         if (is_export) {
             LLVMSetLinkage(func, LLVMExternalLinkage);
+        } else if (generate_object) {
+            LLVMSetLinkage(func, LLVMPrivateLinkage);
         } else {
 #if !SCOPES_LLVM_CACHE_FUNCTIONS
-        LLVMSetLinkage(func, LLVMPrivateLinkage);
+            LLVMSetLinkage(func, LLVMPrivateLinkage);
 #endif
         }
         function_todo.push_back(node);
@@ -1860,7 +1864,7 @@ struct LLVMIRGenerator {
         auto LLT = SCOPES_GET_RESULT(type_to_llvm_type(node->get_type()));
         if (!node->value) {
             return LLVMConstPointerNull(LLT);
-        } else if (inline_pointers) {
+        } else if (generate_object) {
             return LLVMConstIntToPtr(
                 LLVMConstInt(i64T, *(uint64_t*)&(node->value), false),
                 LLT);
@@ -2362,7 +2366,7 @@ SCOPES_RESULT(void) compile_object(const String *path, Scope *scope, uint64_t fl
 #endif
 
     LLVMIRGenerator ctx;
-    ctx.inline_pointers = false;
+    ctx.generate_object = false;
     if (flags & CF_NoDebugInfo) {
         ctx.use_debug_info = false;
     }

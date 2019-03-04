@@ -8,8 +8,6 @@ let C =
             #include <stdio.h>
         list;
 
-let scope = (Scope)
-
 let i32x10 = (array i32 10:usize)
 
 run-stage;
@@ -18,7 +16,7 @@ fn static-array-init ()
     private i32x10
 
 compile
-    `[(typify static-array-init)]
+    typify static-array-init
     'dump-module
     'no-debug-info
 
@@ -34,13 +32,16 @@ fn main (argc argv)
     return 0
 
 let main = (typify main i32 ('pointer rawstring))
-compile `main
+compile main
     'dump-module
     'no-debug-info
 
-'define-symbol scope 'main main
+print "-----------------"
 
-#compile-object
+let scope = (Scope)
+'set-symbol scope 'main main
+
+compile-object
     module-dir .. "/test.o"
     scope
     'no-debug-info

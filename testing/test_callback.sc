@@ -4,12 +4,12 @@ fn main ()
         + a b
 
     # force a translation to a C function pointer
-    let f = (typify testf i32 i32)
+    let f = (const-typify testf i32 i32)
     assert ((f 2 3) == 5)
     true
 
 dump-ast
-    typify main
+    const-typify main
 
 #fn testfunc (x y)
     x * y

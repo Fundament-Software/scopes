@@ -4,7 +4,7 @@ using import testing
 # start out with general template
 fn testf (a b)
     a * b
-let testf = (typify testf i32 i32)
+let testf = (const-typify testf i32 i32)
 
 # define overloaded function and expand existing testf
 fn... testf

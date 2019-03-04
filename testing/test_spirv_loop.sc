@@ -7,7 +7,7 @@ fn main ()
     return;
 
 compile-glsl 'fragment
-    `[(typify main)]
+    typify main
     'dump-module
     'dump-disassembly
     'no-debug-info
