@@ -21,6 +21,7 @@ test-modules
     .test_embed
     .test_enums
     .test_extraparams
+    .test_feature_matrix
     .test_fnchain
     .test_folding
     .test_forward

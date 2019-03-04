@@ -1,21 +1,25 @@
 
 # various ways to create arrays
 
+let u8x4 = (array u8 4)
+
+run-stage;
+
 # an array initialization template
-#fn init-array (vals)
+fn init-array (vals)
     """"initializes the mutable array-like `vals` with four integer elements
         0 1 2 and 3
-    for k in (range 4)
-        vals @ k = k
+    for k in (range 4:usize)
+        vals @ k = (k as i32)
 
 # an array checking template
 fn check-array (vals)
     """"checks whether the array-like `vals` is carrying four integer elements
         defined as 0 1 2 and 3
-    va-lifold none
-        inline (i key value)
-            assert (i == value)
-        unpack vals
+    assert (vals @ 0 == 0)
+    assert (vals @ 1 == 1)
+    assert (vals @ 2 == 2)
+    assert (vals @ 3 == 3)
 
 fn check-vals (a b c d)
     assert
@@ -50,26 +54,25 @@ do
     do
         let a b c d = (unpack vals)
         check-vals a b c d
-#
+
     do
         # array using memory interface
-        let vals = (local (array u8 4:usize))
-        assert ((vals @ 0) == 0)
-        assert ((vals @ 1) == 0)
-        assert ((vals @ 2) == 0)
-        assert ((vals @ 3) == 0)
+        local vals : u8x4
+        assert ((vals @ 0) == 0:u8)
+        assert ((vals @ 1) == 0:u8)
+        assert ((vals @ 2) == 0:u8)
+        assert ((vals @ 3) == 0:u8)
         vals = (arrayof u8 0xa0 0xb0 0xc0 0xd0)
-        assert ((vals @ 0) == 0xa0)
-        assert ((vals @ 1) == 0xb0)
-        assert ((vals @ 2) == 0xc0)
-        assert ((vals @ 3) == 0xd0)
+        assert ((vals @ 0) == 0xa0:u8)
+        assert ((vals @ 1) == 0xb0:u8)
+        assert ((vals @ 2) == 0xc0:u8)
+        assert ((vals @ 3) == 0xd0:u8)
 
-        let vals2 = (local (array u8 4:usize))
-        vals2 = vals
-        assert ((vals2 @ 0) == 0xa0)
-        assert ((vals2 @ 1) == 0xb0)
-        assert ((vals2 @ 2) == 0xc0)
-        assert ((vals2 @ 3) == 0xd0)
+        local vals2 = vals
+        assert ((vals2 @ 0) == 0xa0:u8)
+        assert ((vals2 @ 1) == 0xb0:u8)
+        assert ((vals2 @ 2) == 0xc0:u8)
+        assert ((vals2 @ 3) == 0xd0:u8)
 
     do
         # uninitialized mutable array on stack with constant length
@@ -81,14 +84,16 @@ do
 
     do
         # uninitialized mutable array on stack with dynamic length
-        let count = (unconst 4) # simulate a runtime value
+        # simulate a runtime value
+        let count = ((fn (x) x) 4)
         let vals = (alloca-array i32 count)
         init-array vals
         check-array vals
 
     do
         # uninitialized mutable array on heap with dynamic length
-        let count = (unconst 4) # simulate a runtime value
+        # simulate a runtime value
+        let count = ((fn (x) x) 4)
         let vals = (malloc-array i32 count)
         init-array vals
         check-array vals

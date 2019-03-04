@@ -129,4 +129,42 @@ define-syntax-macro assert-compiler-error
                             repr sxcond
                 else body
 
+sugar features (args...)
+    """"A feature matrix that tests 2-d permutations
+
+        usage:
+        features    B1  B2  B3 ...
+            ---
+            A1      Y   N   Y
+            A2      N   Y   N
+            A3      Y   N   Q
+
+        will expand to:
+        do
+            Y A1 B1; N A1 B2; Y A1 B3
+            N A2 B1; Y A2 B2; N A2 B3
+            Y A3 B1; N A3 B2; Q A3 B3
+
+    let header rest =
+        loop (header rest = '() args...)
+            if (empty? rest)
+                compiler-error! "-* expected"
+            let arg rest = (decons rest)
+            if (('typeof arg) == Symbol)
+                let s = (arg as Symbol as string)
+                if ((lslice s 1) == "-")
+                    break header rest
+            repeat
+                cons arg header
+                rest
+    let numcolumns = (countof header)
+    let reversed_header = ('reverse header)
+    cons do
+        'reverse
+            fold (result = '()) for row in rest
+                let func outcomes = (decons (row as list))
+                fold (result = result) for outcome title in
+                    zip outcomes reversed_header
+                    cons (list outcome func title) result
+
 locals;
