@@ -8,7 +8,7 @@ sugar test (x y z args...)
     assert ((u as i32) == 4)
     assert ((v as i32) == 5)
     assert ((w as i32) == 6)
-    print syntax-scope expr-head
+    print sugar-scope expr-head
     list (do +) 3 3
 
 sugar test2 (x y z args...)
@@ -20,7 +20,7 @@ sugar test2 (x y z args...)
     assert ((u as i32) == 4)
     assert ((v as i32) == 5)
     assert ((w as i32) == 6)
-    print syntax-scope expr-head
+    print sugar-scope expr-head
     return
         list (do +) 6 6
         next-expr
@@ -34,7 +34,7 @@ assert
     (test2 1 2 3 4 5 6) == 12
 
 fn test-match (expr)
-    syntax-match expr
+    sugar-match expr
     case (('kwok (a : i32) b q...) c...)
         print "case1" a b q...
         print c...

@@ -18,7 +18,7 @@ assert ((test 1 2) == 6)
 
 typedef T
     inline replace-result (f)
-        @@ ast-quote
+        @@ spice-quote
         inline (cls x)
             print f
             x + 300

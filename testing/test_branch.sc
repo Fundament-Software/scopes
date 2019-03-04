@@ -22,7 +22,7 @@ fn test ()
     else
         dump "branch B2"
         'define-symbol T 'x 3
-syntax-eval
+sugar-eval
     assert
         do
             try

@@ -1,5 +1,5 @@
 spice make-enum (val)
-    ast-quote
+    spice-quote
         enum [(.. (val as string) "-enum")]
             X
             Y = 5

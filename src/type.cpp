@@ -430,7 +430,7 @@ void init_types() {
 
     DEFINE_OPAQUE_HANDLE_TYPE("Anchor", Anchor, TYPE_Anchor);
 
-    DEFINE_TYPENAME("ASTMacro", TYPE_ASTMacro);
+    DEFINE_TYPENAME("SugarMacro", TYPE_ASTMacro);
     {
         cast<TypenameType>(const_cast<Type *>(TYPE_ASTMacro))
             ->finalize(

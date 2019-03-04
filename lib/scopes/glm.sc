@@ -161,7 +161,7 @@ typedef vec-type-accessor
                 lhs)
         else
             let expandmask = lhsT.ExpandMask
-            ast-quote
+            spice-quote
                 do
                     let rhs = (imply rhs rhvecT)
                     # expand or contract
@@ -240,7 +240,7 @@ typedef vec-type < immutable
         let T = ('typeof self)
         let sz = ('element-count T)
         let s =
-            fold (s = (ast-quote "<")) for i in (range sz)
+            fold (s = (spice-quote "<")) for i in (range sz)
                 let txt = `(repr (extractelement self i))
                 if (i == 0)
                     `(.. s txt)
@@ -248,7 +248,7 @@ typedef vec-type < immutable
                     `(.. s " " txt)
         `(.. s ">")
 
-    @@ ast-quote
+    @@ spice-quote
     fn __repr (self) (_vec-repr self)
 
     unlet _vec-repr
@@ -402,11 +402,11 @@ typedef vec-type < immutable
         if (sz == 1)
             `(extractelement self mask)
         elseif ('refer? QT)
-            ast-quote
+            spice-quote
                 bitcast self
                     [(construct-getter-type ('typeof self) mask)]
         else
-            ast-quote
+            spice-quote
                 bitcast
                     shufflevector self self mask
                     [(construct-vec-type ('element@ ('typeof self) 0) sz)]
@@ -421,7 +421,7 @@ typedef vec-type < immutable
             `(bitcast self ST)
         elseif (T == Generator)
             let count = ('element-count ST)
-            ast-quote
+            spice-quote
                 Generator
                     inline (fdone index)
                         if (index == count)
@@ -456,7 +456,7 @@ typedef mat-type < immutable
         let T = ('typeof self)
         let sz = (T.Columns as i32)
         let s =
-            fold (s = (ast-quote "[")) for i in (range sz)
+            fold (s = (spice-quote "[")) for i in (range sz)
                 let txt = `('__repr (extractvalue self i))
                 if (i == 0)
                     `(.. s txt)
@@ -464,7 +464,7 @@ typedef mat-type < immutable
                     `(.. s " " txt)
         `(.. s "]")
 
-    @@ ast-quote
+    @@ spice-quote
     fn __repr (self) (_mat-repr self)
 
     unlet _mat-repr
@@ -629,7 +629,7 @@ typedef mat-type < immutable
             `(bitcast self ST)
         elseif (T == Generator)
             let count = ('element-count ST)
-            ast-quote
+            spice-quote
                 Generator
                     inline (fdone index)
                         if (index == count)
@@ -660,7 +660,7 @@ spice _transpose (m)
     fold (self = `(nullof TT)) for i in (range (T.Rows as i32))
         `(insertvalue self ('row m i) i)
 
-@@ ast-quote
+@@ spice-quote
 fn transpose (m)
     _transpose m
 

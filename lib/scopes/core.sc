@@ -14,7 +14,7 @@
     parses the command-line and optionally enters the REPL.
 
 # square list expressions are ast unquotes by default
-let square-list = ast-unquote-arguments
+let square-list = spice-unquote-arguments
 
 # first we alias u64 to the integer type that can hold a pointer
 let intptr = u64
@@ -47,7 +47,7 @@ fn box-pointer (value)
 fn error! (msg)
     raise (sc_runtime_error_new msg)
 
-fn syntax-error! (anchor msg)
+fn sugar-error! (anchor msg)
     raise (sc_location_error_new anchor msg)
 
 fn compiler-error! (value)
@@ -57,7 +57,7 @@ fn compiler-error! (value)
 fn unbox-verify (value wantT)
     let haveT = (sc_value_type value)
     if (ptrcmp!= haveT wantT)
-        syntax-error! (sc_value_anchor value)
+        sugar-error! (sc_value_anchor value)
             sc_string_join "can't unbox value of type "
                 sc_string_join
                     sc_value_repr (box-pointer haveT)
@@ -65,7 +65,7 @@ fn unbox-verify (value wantT)
                         sc_value_repr (box-pointer wantT)
     if (sc_value_is_constant value)
     else
-        syntax-error! (sc_value_anchor value)
+        sugar-error! (sc_value_anchor value)
             sc_string_join "constant of type "
                 sc_string_join
                     sc_value_repr (box-pointer haveT)
@@ -108,7 +108,7 @@ let TypeArrayPointer =
     sc_pointer_type type pointer-flag-non-writable unnamed
 let ValueArrayPointer =
     sc_pointer_type Value pointer-flag-non-writable unnamed
-let ASTMacroFunction = (sc_type_storage ASTMacro)
+let SpiceMacroFunction = (sc_type_storage SpiceMacro)
 # dynamically construct a new symbol
 let ellipsis-symbol = (sc_symbol_new "...")
 
@@ -125,15 +125,15 @@ fn build-typify-function (f)
     let types = (bitcast types TypeArrayPointer)
     let result = (sc_compile (sc_typify f 1 types) 0:u64)
     let result-type = (sc_value_type result)
-    if (ptrcmp!= result-type ASTMacroFunction)
+    if (ptrcmp!= result-type SpiceMacroFunction)
         compiler-error!
             sc_string_join "AST macro must have type "
                 sc_string_join
-                    sc_value_repr (box-pointer ASTMacroFunction)
+                    sc_value_repr (box-pointer SpiceMacroFunction)
                     sc_string_join " but has type "
                         sc_value_repr (box-pointer result-type)
     let ptr = (sc_const_pointer_extract result)
-    bitcast ptr ASTMacro
+    bitcast ptr SpiceMacro
 
 let typify =
     do
@@ -142,9 +142,9 @@ let typify =
             verify-count argcount 1 -1
             let src_fn = (sc_getarg args 0)
             let typecount = (sub argcount 1)
-            ast-quote
+            spice-quote
                 let types = (alloca-array type typecount)
-                ast-unquote
+                spice-unquote
                     let body = (sc_expression_new (sc_get_active_anchor))
                     loop (i j = 1 0)
                         if (icmp== i argcount)
@@ -181,12 +181,12 @@ let const-typify =
 
 run-stage;
 
-let ast-macro-verify-signature =
-    const-typify (fn "ast-macro-verify-signature" (f)) ASTMacroFunction
+let spice-macro-verify-signature =
+    const-typify (fn "spice-macro-verify-signature" (f)) SpiceMacroFunction
 
-inline function->ASTMacro (f)
-    ast-macro-verify-signature f
-    bitcast f ASTMacro
+inline function->SpiceMacro (f)
+    spice-macro-verify-signature f
+    bitcast f SpiceMacro
 
 fn box-empty ()
     sc_argument_list_new (sc_get_active_anchor)
@@ -194,12 +194,12 @@ fn box-empty ()
 fn box-none ()
     sc_const_aggregate_new (sc_get_active_anchor) Nothing 0 (undef ValueArrayPointer)
 
-# take closure l, typify and compile it and return a function of ASTMacro type
-inline ast-macro (l)
-    function->ASTMacro (const-typify l Value)
+# take closure l, typify and compile it and return a function of SpiceMacro type
+inline spice-macro (l)
+    function->SpiceMacro (const-typify l Value)
 
-inline box-ast-macro (l)
-    box-pointer (ast-macro l)
+inline box-spice-macro (l)
+    box-pointer (spice-macro l)
 
 let va-lfold va-lifold =
     do
@@ -224,8 +224,8 @@ let va-lfold va-lifold =
                     else
                         `(f k v ret)
         _
-            ast-macro (fn "va-lfold" (args) (va-lfold args false))
-            ast-macro (fn "va-ilfold" (args) (va-lfold args true))
+            spice-macro (fn "va-lfold" (args) (va-lfold args false))
+            spice-macro (fn "va-ilfold" (args) (va-lfold args true))
 
 let va-rfold va-rifold =
     do
@@ -252,8 +252,8 @@ let va-rfold va-rifold =
                     else
                         `(f k v ret)
         _
-            ast-macro (fn "va-rfold" (args) (va-rfold args false))
-            ast-macro (fn "va-rifold" (args) (va-rfold args true))
+            spice-macro (fn "va-rfold" (args) (va-rfold args false))
+            spice-macro (fn "va-rifold" (args) (va-rfold args true))
 
 inline raises-compile-error ()
     if false
@@ -294,7 +294,7 @@ inline type-comparison-func (f)
     fn (args) (compare-type args (const-typify f type type))
 
 let storagecast =
-    box-ast-macro
+    box-spice-macro
         fn "storagecast" (args)
             let argcount = (sc_argcount args)
             verify-count argcount 1 1
@@ -304,7 +304,7 @@ let storagecast =
 
 # typecall
 sc_type_set_symbol type '__call
-    box-ast-macro
+    box-spice-macro
         fn "type-call" (args)
             let argcount = (sc_argcount args)
             verify-count argcount 1 -1
@@ -315,7 +315,7 @@ sc_type_set_symbol type '__call
 
 # method call syntax
 sc_type_set_symbol Symbol '__call
-    box-ast-macro
+    box-spice-macro
         fn "symbol-call" (args)
             fn resolve-method (self symval)
                 let sym = (unbox-symbol symval Symbol)
@@ -360,13 +360,13 @@ do
             return self (box-symbol key) arg
 
     inline gen-key-any-set (selftype fset)
-        box-ast-macro
+        box-spice-macro
             fn "set-symbol" (args)
                 let self key value = (get-key-value-args args)
                 `(fset self key value)
 
     inline gen-key-any-define (selftype fset)
-        box-ast-macro
+        box-spice-macro
             fn "define-symbol" (args)
                 let self key value = (get-key-value-args args)
                 if (sc_value_is_constant self)
@@ -385,7 +385,7 @@ do
     sc_type_set_symbol Scope 'define-symbol (gen-key-any-define Scope sc_scope_set_symbol)
 
 sc_type_set_symbol type 'pointer
-    box-ast-macro
+    box-spice-macro
         fn "type-pointer" (args)
             let argcount = (sc_argcount args)
             verify-count argcount 1 1
@@ -399,14 +399,14 @@ sc_type_set_symbol type 'pointer
 
 # tuple type constructor
 sc_type_set_symbol tuple '__typecall
-    box-ast-macro
+    box-spice-macro
         fn "tuple" (args)
             let argcount = (sc_argcount args)
             verify-count argcount 1 -1
             let pcount = (sub argcount 1)
-            ast-quote
+            spice-quote
                 let types = (alloca-array type pcount)
-                ast-unquote
+                spice-unquote
                     let body = (sc_expression_new (sc_get_active_anchor))
                     loop (i = 1)
                         if (icmp== i argcount)
@@ -426,7 +426,7 @@ sc_type_set_symbol tuple '__typecall
 
 # arguments type constructor
 sc_type_set_symbol Arguments '__typecall
-    box-ast-macro
+    box-spice-macro
         fn "Arguments" (args)
             let argcount = (sc_argcount args)
             verify-count argcount 1 -1
@@ -443,7 +443,7 @@ sc_type_set_symbol Arguments '__typecall
 
 # function pointer type constructor
 sc_type_set_symbol function '__typecall
-    box-ast-macro
+    box-spice-macro
         fn "function" (args)
             let argcount = (sc_argcount args)
             verify-count argcount 2 -1
@@ -469,9 +469,9 @@ sc_type_set_symbol function '__typecall
                     add i 1
                 box-pointer (sc_function_type rtype pcount types)
             else
-                ast-quote
+                spice-quote
                     let types = (alloca-array type pcount)
-                    ast-unquote
+                    spice-unquote
                         let expr = (sc_expression_new (sc_get_active_anchor))
                         loop (i = 2)
                             if (icmp== i argcount)
@@ -484,7 +484,7 @@ sc_type_set_symbol function '__typecall
                     sc_function_type rtype pcount types
 
 sc_type_set_symbol type 'raising
-    box-ast-macro
+    box-spice-macro
         fn "function-raising" (args)
             let argcount = (sc_argcount args)
             verify-count argcount 2 2
@@ -508,7 +508,7 @@ sc_type_set_symbol Symbol '__typecall
             sc_symbol_new str
 
 let none? =
-    ast-macro
+    spice-macro
         fn (args)
             let argcount = (sc_argcount args)
             verify-count argcount 1 1
@@ -524,7 +524,7 @@ fn unpack2 (args)
     return a b
 
 let const.icmp<=.i32.i32 =
-    ast-macro
+    spice-macro
         fn (args)
             let a b = (unpack2 args)
             if (sc_value_is_constant a)
@@ -536,7 +536,7 @@ let const.icmp<=.i32.i32 =
             compiler-error! "arguments must be constant"
 
 let const.add.i32.i32 =
-    ast-macro
+    spice-macro
         fn (args)
             let a b = (unpack2 args)
             if (sc_value_is_constant a)
@@ -548,7 +548,7 @@ let const.add.i32.i32 =
             compiler-error! "arguments must be constant"
 
 let constbranch =
-    ast-macro
+    spice-macro
         fn (args)
             let argcount = (sc_argcount args)
             verify-count argcount 3 3
@@ -562,7 +562,7 @@ let constbranch =
             `([(? value thenf elsef)])
 
 sc_type_set_symbol Value '__typecall
-    box-ast-macro
+    box-spice-macro
         fn (args)
             let argcount = (sc_argcount args)
             verify-count argcount 1 -1
@@ -582,7 +582,7 @@ sc_type_set_symbol Value '__typecall
                     sc_value_wrap T value
 
 let __unbox =
-    ast-macro
+    spice-macro
         fn (args)
             let argc = (sc_argcount args)
             verify-count argc 2 2
@@ -591,12 +591,12 @@ let __unbox =
             let T = (unbox-pointer T type)
             sc_value_unwrap T value
 let
-    type== = (ast-macro (type-comparison-func ptrcmp==))
-    type!= = (ast-macro (type-comparison-func ptrcmp!=))
-    type< = (ast-macro (type-comparison-func type<))
-    type<= = (ast-macro (type-comparison-func type<=))
-    type> = (ast-macro (type-comparison-func type>))
-    type>= = (ast-macro (type-comparison-func type>=))
+    type== = (spice-macro (type-comparison-func ptrcmp==))
+    type!= = (spice-macro (type-comparison-func ptrcmp!=))
+    type< = (spice-macro (type-comparison-func type<))
+    type<= = (spice-macro (type-comparison-func type<=))
+    type> = (spice-macro (type-comparison-func type>))
+    type>= = (spice-macro (type-comparison-func type>=))
 
 run-stage;
 
@@ -650,7 +650,7 @@ inline define-symbols (self values...)
     kind = sc_value_kind
     none? = (const-typify Value-none? Value)
     __repr = sc_value_repr
-    ast-repr = sc_value_ast_repr
+    spice-repr = sc_value_ast_repr
     dump =
         inline (self)
             sc_write (sc_value_ast_repr self)
@@ -797,13 +797,13 @@ let Generator = (sc_typename_type "Generator")
 'set-plain-storage Generator ('storageof Closure)
 
 # syntax macro type
-let SyntaxMacro = (sc_typename_type "SyntaxMacro")
-let SyntaxMacroFunction =
+let SugarMacro = (sc_typename_type "SugarMacro")
+let SugarMacroFunction =
     'pointer
         'raising
             function (Arguments list Scope) list list Scope
             Error
-'set-plain-storage SyntaxMacro SyntaxMacroFunction
+'set-plain-storage SugarMacro SugarMacroFunction
 
 # any extraction
 
@@ -826,15 +826,15 @@ fn value-as (vT T expr)
                     return `(Value expr)
                 compiler-error! "unsupported type"
 
-'set-symbols ASTMacro
+'set-symbols SpiceMacro
     __rimply =
         box-cast
-            fn "ASTMacro-rimply" (vT T expr)
-                if (ptrcmp== vT ASTMacroFunction)
+            fn "SpiceMacro-rimply" (vT T expr)
+                if (ptrcmp== vT SpiceMacroFunction)
                     return `(bitcast expr T)
                 elseif (ptrcmp== vT Closure)
                     if ('constant? expr)
-                        return `(ast-macro expr)
+                        return `(spice-macro expr)
                 compiler-error! "unsupported type"
 
 # integer casting
@@ -1005,7 +1005,7 @@ fn as-expr (vT T expr)
 
 let
     imply =
-        ast-macro
+        spice-macro
             fn "imply-dispatch" (args)
                 let argc = ('argcount args)
                 verify-count argc 2 2
@@ -1020,7 +1020,7 @@ let
                         \ "can't coerce value of type " vT T err
 
     as =
-        ast-macro
+        spice-macro
             fn "as-dispatch" (args)
                 let argc = ('argcount args)
                 verify-count argc 2 2
@@ -1166,24 +1166,24 @@ fn unary-sym-binary-op-label-macro (args usymbol ufriendly-op-name symbol rsymbo
         sym-binary-op-label-macro args symbol rsymbol friendly-op-name
 
 inline make-unary-op-dispatch (symbol friendly-op-name)
-    ast-macro (fn (args) (unary-op-label-macro args symbol friendly-op-name))
+    spice-macro (fn (args) (unary-op-label-macro args symbol friendly-op-name))
 
 inline make-unary-sym-binary-op-dispatch (usymbol ufriendly-op-name symbol rsymbol friendly-op-name)
-    ast-macro (fn (args) (unary-sym-binary-op-label-macro
+    spice-macro (fn (args) (unary-sym-binary-op-label-macro
         args usymbol ufriendly-op-name symbol rsymbol friendly-op-name))
 
 inline make-sym-binary-op-dispatch (symbol rsymbol friendly-op-name)
-    ast-macro (fn (args) (sym-binary-op-label-macro args symbol rsymbol friendly-op-name))
+    spice-macro (fn (args) (sym-binary-op-label-macro args symbol rsymbol friendly-op-name))
 
 inline make-asym-binary-op-dispatch (symbol rtype friendly-op-name)
-    ast-macro (fn (args) (asym-binary-op-label-macro args symbol rtype friendly-op-name))
+    spice-macro (fn (args) (asym-binary-op-label-macro args symbol rtype friendly-op-name))
 
 # support for calling macro functions directly
-'set-symbols SyntaxMacro
+'set-symbols SugarMacro
     __call =
         box-pointer
             inline (self at next scope)
-                (bitcast self SyntaxMacroFunction) at next scope
+                (bitcast self SugarMacroFunction) at next scope
 
 'define-symbols Symbol
     unique =
@@ -1196,7 +1196,7 @@ inline make-asym-binary-op-dispatch (symbol rtype friendly-op-name)
     __!= = (box-binary-op (single-binary-op-dispatch icmp!=))
     __imply =
         box-cast
-            fn "syntax-imply" (vT T expr)
+            fn "sugar-imply" (vT T expr)
                 if (ptrcmp== T string)
                     return `(sc_symbol_to_string expr)
                 compiler-error! "unsupported type"
@@ -1233,7 +1233,7 @@ inline single-signed-binary-op-dispatch (sf uf)
     fn (lhsT rhsT lhs rhs)
         if (ptrcmp== lhsT rhsT)
             return
-                ast-quote
+                spice-quote
                     call [
                         \ do
                             if ('signed? lhsT)
@@ -1278,7 +1278,7 @@ fn dispatch-and-or (args flip)
             single-signed-binary-op-dispatch
                 inline (a b) (fdiv (sitofp a f32) (sitofp b f32))
                 inline (a b) (fdiv (uitofp a f32) (uitofp b f32))
-    __rcp = (ast-quote (inline (self) (fdiv 1.0 (as self f32))))
+    __rcp = (spice-quote (inline (self) (fdiv 1.0 (as self f32))))
     __% = (box-binary-op (single-signed-binary-op-dispatch srem urem))
     __& = (box-binary-op (single-binary-op-dispatch band))
     __| = (box-binary-op (single-binary-op-dispatch bor))
@@ -1334,7 +1334,7 @@ inline floordiv (a b)
     __>= = (box-binary-op (single-binary-op-dispatch type>=))
     # (dispatch-attr T key thenf elsef)
     dispatch-attr =
-        box-ast-macro
+        box-spice-macro
             fn "type-dispatch-attr" (args)
                 let argc = ('argcount args)
                 verify-count argc 4 4
@@ -1351,7 +1351,7 @@ inline floordiv (a b)
                 except (err)
                     return `(elsef)
     __getattr =
-        box-ast-macro
+        box-spice-macro
             fn "type-getattr" (args)
                 let argc = ('argcount args)
                 verify-count argc 2 2
@@ -1368,7 +1368,7 @@ inline floordiv (a b)
 'set-symbols Scope
     __== = (box-binary-op (single-binary-op-dispatch ptrcmp==))
     __getattr =
-        box-ast-macro
+        box-spice-macro
             fn "scope-getattr" (args)
                 let argc = ('argcount args)
                 verify-count argc 2 2
@@ -1382,7 +1382,7 @@ inline floordiv (a b)
                         return (sc_scope_at self key)
                 `(sc_scope_at args)
     __typecall =
-        box-ast-macro
+        box-spice-macro
             fn "scope-typecall" (args)
                 """"There are four ways to create a new Scope:
                     ``Scope``
@@ -1441,8 +1441,8 @@ let NullType = (sc_typename_type "NullType")
                 compiler-error! "only pointers can be compared to null"
 
 let
-    and-branch = (ast-macro (fn (args) (dispatch-and-or args true)))
-    or-branch = (ast-macro (fn (args) (dispatch-and-or args false)))
+    and-branch = (spice-macro (fn (args) (dispatch-and-or args true)))
+    or-branch = (spice-macro (fn (args) (dispatch-and-or args false)))
     #implyfn = (const-typify implyfn type type)
     #asfn = (const-typify asfn type type)
     countof = (make-unary-op-dispatch '__countof "count")
@@ -1490,7 +1490,7 @@ let
                 compiler-error! "unequal types"
 
 let missing-constructor =
-    ast-macro
+    spice-macro
         fn "missing-constructor" (args)
             if false
                 return `[]
@@ -1506,29 +1506,29 @@ run-stage;
 
 let null = (nullof NullType)
 
-#inline Syntax-unbox (self destT)
+#inline sugar-unbox (self destT)
     imply ('datum self) destT
 
 inline not (value)
     bxor (imply value bool) true
 
-let function->SyntaxMacro =
+let function->SugarMacro =
     const-typify
-        fn "function->SyntaxMacro" (f)
-            bitcast f SyntaxMacro
-        SyntaxMacroFunction
+        fn "function->SugarMacro" (f)
+            bitcast f SugarMacro
+        SugarMacroFunction
 
-inline syntax-block-scope-macro (f)
-    function->SyntaxMacro (const-typify f list list Scope)
+inline sugar-block-scope-macro (f)
+    function->SugarMacro (const-typify f list list Scope)
 
-inline syntax-scope-macro (f)
-    syntax-block-scope-macro
+inline sugar-scope-macro (f)
+    sugar-block-scope-macro
         fn (at next scope)
             let at scope = (f ('next at) scope)
             return (cons (Value at) next) scope
 
-inline syntax-macro (f)
-    syntax-block-scope-macro
+inline sugar-macro (f)
+    sugar-block-scope-macro
         fn (at next scope)
             return (cons (Value (f ('next at))) next) scope
 
@@ -1610,7 +1610,7 @@ let print =
         box-cast
             fn "string-imply" (vT T expr)
                 let string->rawstring =
-                    ast-macro
+                    spice-macro
                         fn (args)
                             let argc = ('argcount args)
                             verify-count argc 1 1
@@ -1619,7 +1619,7 @@ let print =
                                 let s c = (sc_string_buffer (as str string))
                                 `s
                             else
-                                ast-quote
+                                spice-quote
                                     do
                                         let s c = (sc_string_buffer str)
                                         s
@@ -1631,7 +1631,7 @@ let print =
 # --------------------------------------------------------------------------
 
 let coerce-call-arguments =
-    box-ast-macro
+    box-spice-macro
         fn "coerce-call-arguments" (args)
             let argc = ('argcount args)
             verify-count argc 1 -1
@@ -1891,8 +1891,8 @@ fn list-handler (topexpr env)
         try
             '@ (as head type) '__macro
         except (err) head
-    if (== ('typeof head) SyntaxMacro)
-        let head = (as head SyntaxMacro)
+    if (== ('typeof head) SugarMacro)
+        let head = (as head SugarMacro)
         sc_set_active_anchor expr-anchor
         let expr env = (head expr topexpr-next env)
         return (as expr list) env
@@ -1916,7 +1916,7 @@ fn symbol-handler (topexpr env)
         let sz = (countof s)
         let expr =
             Value (split-dotted-symbol name 0:usize sz '())
-        #let expr = (Syntax-wrap name-anchor expr false)
+        #let expr = (sugar-wrap name-anchor expr false)
         return (cons expr next) env
     return topexpr env
 
@@ -1927,10 +1927,10 @@ inline quasiquote-any (ox)
     if (== T list)
         quasiquote-list (as x list)
     else
-        list syntax-quote ox
+        list sugar-quote ox
 fn quasiquote-list (x)
     if (empty? x)
-        return (list syntax-quote x)
+        return (list sugar-quote x)
     let aat next = ('decons x)
     let at = aat
     let T = ('typeof at)
@@ -2076,7 +2076,7 @@ fn extract-single-arg (args)
     'getarg args 0
 
 inline make-const-type-property-function (func)
-    ast-macro
+    spice-macro
         fn (args)
             let value = (extract-single-arg args)
             let val = (func (as value type))
@@ -2084,7 +2084,7 @@ inline make-const-type-property-function (func)
 
 let
     constant? =
-        ast-macro
+        spice-macro
             fn "constant?" (args)
                 let value = (extract-single-arg args)
                 Value ('constant? value)
@@ -2097,7 +2097,7 @@ let
 #del make-const-type-property-function
 
 let Closure->Generator =
-    ast-macro
+    spice-macro
         fn "Closure->Generator" (args)
             let argc = ('argcount args)
             verify-count argc 1 1
@@ -2118,7 +2118,7 @@ fn expand-define (expr)
 
 let
     qq =
-        syntax-macro
+        sugar-macro
             fn (args)
                 if (== (countof args) 1)
                     quasiquote-any ('@ args)
@@ -2127,11 +2127,11 @@ let
     # dot macro
     # (. value symbol ...)
     . =
-        syntax-macro
+        sugar-macro
             fn (args)
                 fn op (a b)
                     let sym = (as b Symbol)
-                    list getattr a (list syntax-quote sym)
+                    list getattr a (list sugar-quote sym)
                 let a rest = ('decons args)
                 let b rest = ('decons rest)
                 loop (rest result = rest (op a b))
@@ -2139,19 +2139,19 @@ let
                         break result
                     let c rest = ('decons rest)
                     _ rest (op result c)
-    and = (syntax-macro (make-expand-and-or and-branch))
-    or = (syntax-macro (make-expand-and-or or-branch))
-    define = (syntax-macro expand-define)
-    define-infix> = (syntax-scope-macro (make-expand-define-infix '>))
-    define-infix< = (syntax-scope-macro (make-expand-define-infix '<))
-    .. = (ast-macro (fn (args) (rtl-multiop args (Value ..))))
-    + = (ast-macro (fn (args) (ltr-multiop args (Value +))))
-    * = (ast-macro (fn (args) (ltr-multiop args (Value *))))
-    @ = (ast-macro (fn (args) (ltr-multiop args (Value @))))
-    va-option-branch = (ast-macro va-option-branch)
-    syntax-set-scope! =
-        syntax-scope-macro
-            fn (args syntax-scope)
+    and = (sugar-macro (make-expand-and-or and-branch))
+    or = (sugar-macro (make-expand-and-or or-branch))
+    define = (sugar-macro expand-define)
+    define-infix> = (sugar-scope-macro (make-expand-define-infix '>))
+    define-infix< = (sugar-scope-macro (make-expand-define-infix '<))
+    .. = (spice-macro (fn (args) (rtl-multiop args (Value ..))))
+    + = (spice-macro (fn (args) (ltr-multiop args (Value +))))
+    * = (spice-macro (fn (args) (ltr-multiop args (Value *))))
+    @ = (spice-macro (fn (args) (ltr-multiop args (Value @))))
+    va-option-branch = (spice-macro va-option-branch)
+    sugar-set-scope! =
+        sugar-scope-macro
+            fn (args sugar-scope)
                 raises-compile-error;
                 let scope rest = (decons args)
                 return
@@ -2169,7 +2169,7 @@ inline select-op-macro (sop fop numargs)
         if (type== ('superof ST) vector)
             'element@ ST 0
         else ST
-    ast-macro
+    spice-macro
         fn (args)
             let argc = ('argcount args)
             verify-count argc numargs numargs
@@ -2281,11 +2281,11 @@ inline char (s)
 
 # (va-option key args... else-body)
 let va-option =
-    syntax-macro
+    sugar-macro
         fn (args)
             let key va body = (decons args 2)
             let sym = (as key Symbol)
-            list va-option-branch (list syntax-quote sym)
+            list va-option-branch (list sugar-quote sym)
                 cons inline '() body
                 va
 
@@ -2300,7 +2300,7 @@ let va-option =
                 inline "get-iter-init" ()
                     _ iter init
     __call =
-        ast-macro
+        spice-macro
             fn (args)
                 let argc = ('argcount args)
                 verify-count argc 1 1
@@ -2328,7 +2328,7 @@ define for
     inline fdone ()
         break;
 
-    syntax-block-scope-macro
+    sugar-block-scope-macro
         fn "expand-for" (expr next-expr scope)
             let head args = (decons expr)
             let it params =
@@ -2342,17 +2342,17 @@ define for
                     _ it (cons sxat params)
             let generator-expr body = (decons it)
             let subscope = (Scope scope)
-            ast-quote
+            spice-quote
                 let iter start =
                     (as [(sc_expand generator-expr '() subscope)] Generator);
             return
                 cons
-                    ast-quote iter start # order expressions
+                    spice-quote iter start # order expressions
                         loop (next = start)
                             let next args... = (iter fdone next)
                             inline continue ()
                                 repeat next
-                            ast-unquote
+                            spice-unquote
                                 let expr =
                                     loop (params expr = params (list '= args...))
                                         if (empty? params)
@@ -2371,7 +2371,7 @@ define for
 #---------------------------------------------------------------------------
 
 let hash-storage =
-    ast-macro
+    spice-macro
         fn "hash-storage" (args)
             let argc = ('argcount args)
             verify-count argc 1 1
@@ -2423,7 +2423,7 @@ let hash-storage =
                         bitcast (hash1 a) u64
                         bitcast (hash1 b) u64
                     hash
-            ast-macro
+            spice-macro
                 fn "hash-typecall" (args)
                     let argc = ('argcount args)
                     verify-count argc 2 -1
@@ -2443,7 +2443,7 @@ va-lfold none
 #---------------------------------------------------------------------------
 
 let wrap-if-not-run-stage =
-    ast-macro
+    spice-macro
         fn (args)
             raises-compile-error;
             let argc = ('argcount args)
@@ -2477,7 +2477,7 @@ fn exec-module (expr eval-scope)
     loop (f = f)
         # build a wrapper
         let wrapf =
-            ast-quote
+            spice-quote
                 fn "exec-module-stage" ()
                     raises-compile-error;
                     wrap-if-not-run-stage (f)
@@ -2593,7 +2593,7 @@ fn require-from (base-dir name)
         return content
 
 let import =
-    syntax-scope-macro
+    sugar-scope-macro
         fn "import" (args scope)
             fn resolve-scope (scope namestr start)
                 let sz = (countof namestr)
@@ -2617,15 +2617,15 @@ let import =
     all the constant values in the immediate scope, and a scope that contains
     the runtime values.
 let locals =
-    syntax-scope-macro
+    sugar-scope-macro
         fn "locals" (args scope)
             raises-compile-error;
 
             fn stage-constant? (value)
-                ('pure? value) and (('typeof value) != ASTMacro)
+                ('pure? value) and (('typeof value) != SpiceMacro)
 
             let build-local =
-                ast-macro
+                spice-macro
                     fn (args)
                         let constant-scope = (('getarg args 0) as Scope)
                         let tmp = ('getarg args 1)
@@ -2641,12 +2641,12 @@ let locals =
                             let wrapvalue =
                                 if (('typeof value) == Value) value
                                 else (Value value)
-                            ast-quote
+                            spice-quote
                                 sc_scope_set_symbol tmp key wrapvalue
                                 sc_scope_set_docstring tmp key keydocstr
 
             let build-locals =
-                ast-macro
+                spice-macro
                     fn (args)
                         let scope = (('getarg args 0) as Scope)
                         let docstr = ('docstring scope unnamed)
@@ -2711,17 +2711,17 @@ fn merge-scope-symbols (source target filter)
     filter-contents source target filter
 
 let using =
-    syntax-scope-macro
-        fn "using" (args syntax-scope)
+    sugar-scope-macro
+        fn "using" (args sugar-scope)
             let name rest = (decons args)
             let nameval = name
             if ((('typeof nameval) == Symbol) and ((nameval as Symbol) == 'import))
-                let module-dir = (('@ syntax-scope 'module-dir) as string)
+                let module-dir = (('@ sugar-scope 'module-dir) as string)
                 let name rest = (decons rest)
                 let name = (name as Symbol)
                 let module = ((require-from module-dir name) as Scope)
                 return (list do none)
-                    .. module syntax-scope
+                    .. module sugar-scope
 
             let pattern =
                 if (empty? rest)
@@ -2738,15 +2738,15 @@ let using =
             inline process (src)
                 _ (list do)
                     if (empty? pattern)
-                        merge-scope-symbols src syntax-scope none
+                        merge-scope-symbols src sugar-scope none
                     else
-                        merge-scope-symbols src syntax-scope (('@ pattern) as string)
+                        merge-scope-symbols src sugar-scope (('@ pattern) as string)
             if (('typeof nameval) == Symbol)
                 let sym = (nameval as Symbol)
                 label skip
                     let src =
                         try
-                            ('@ syntax-scope sym) as Scope
+                            ('@ sugar-scope sym) as Scope
                         except (err)
                             merge skip
                     return (process src)
@@ -2755,25 +2755,25 @@ let using =
             compiler-error! "using: scope expeced"
             #return
                 list run-stage
-                    cons merge-scope-symbols name 'syntax-scope pattern
-                syntax-scope
+                    cons merge-scope-symbols name 'sugar-scope pattern
+                sugar-scope
 
 # (define-macro name expr ...)
 # implies builtin names:
     args : list
-define define-syntax-macro
-    syntax-macro
-        fn "expand-define-syntax-macro" (expr)
+define define-sugar-macro
+    sugar-macro
+        fn "expand-define-sugar-macro" (expr)
             raises-compile-error;
             let name body = (decons expr)
             list define name
-                list syntax-macro
+                list sugar-macro
                     cons fn '(args)
                         list raises-compile-error;
                         body
 
 let __assert =
-    ast-macro
+    spice-macro
         fn (args)
             fn check-assertion (result anchor msg)
                 if (not result)
@@ -2799,7 +2799,7 @@ let __assert =
                 `(check-assertion expr anchor msg)
 
 let vector-reduce =
-    ast-macro
+    spice-macro
         fn (args)
             let argc = ('argcount args)
             verify-count argc 2 2
@@ -2813,17 +2813,17 @@ let vector-reduce =
                 switch sz
                 case 1
                     break
-                        ast-quote
+                        spice-quote
                             extractelement v 0
                 case 2
                     break
-                        ast-quote
+                        spice-quote
                             f
                                 extractelement v 0
                                 extractelement v 1
                 case 3
                     break
-                        ast-quote
+                        spice-quote
                             f
                                 f
                                     extractelement v 0
@@ -2831,7 +2831,7 @@ let vector-reduce =
                                 extractelement v 2
                 case 4
                     break
-                        ast-quote
+                        spice-quote
                             f
                                 f
                                     extractelement v 0
@@ -2846,14 +2846,14 @@ let vector-reduce =
                         compiler-error! "vector size must be a power of two"
                     let hsz-value = (Value (hsz as usize))
                     repeat
-                        ast-quote
+                        spice-quote
                             f
                                 lslice v hsz-value
                                 rslice v hsz-value
                         hsz
 
 let __countof-aggregate =
-    ast-macro
+    spice-macro
         fn (args)
             let argc = ('argcount args)
             verify-count argc 1 1
@@ -2868,22 +2868,22 @@ run-stage;
 # implies builtin names:
     args : list
     scope : Scope
-define-syntax-macro define-syntax-scope-macro
+define-sugar-macro define-sugar-scope-macro
     let name body = (decons args)
     list define name
-        list syntax-scope-macro
-            cons fn '(args syntax-scope) body
+        list sugar-scope-macro
+            cons fn '(args sugar-scope) body
 
 # (define-block-scope-macro name expr ...)
 # implies builtin names:
     expr : list
     next-expr : list
     scope : Scope
-define-syntax-macro define-syntax-block-scope-macro
+define-sugar-macro define-sugar-block-scope-macro
     let name body = (decons args)
     list define name
-        list syntax-block-scope-macro
-            cons fn '(expr next-expr syntax-scope) body
+        list sugar-block-scope-macro
+            cons fn '(expr next-expr sugar-scope) body
 
 'set-symbols type
     symbols =
@@ -2980,7 +2980,7 @@ inline range (a b c)
         from
 
 let parse-compile-flags =
-    ast-macro
+    spice-macro
         fn (args)
             inline flag-error (flag)
                 compiler-error!
@@ -3013,7 +3013,7 @@ let parse-compile-flags =
                     default (flag-error flag)
                 _ (i + 1) (flags | flag)
 
-ast-quote
+spice-quote
     inline compile (func flags...)
         sc_compile func (parse-compile-flags flags...)
 
@@ -3023,7 +3023,7 @@ ast-quote
     inline compile-object (func table flags...)
         sc_compile_object func table (parse-compile-flags flags...)
 
-define-syntax-macro assert
+define-sugar-macro assert
     let cond msg body = (decons args 2)
     let msg =
         if ((countof args) == 2) msg
@@ -3034,7 +3034,7 @@ define-syntax-macro assert
                 `[(repr cond)]
     list __assert cond msg
 
-define-syntax-macro while
+define-sugar-macro while
     let cond body = (decons args)
     list loop '()
         list inline 'continue '()
@@ -3050,7 +3050,7 @@ define-syntax-macro while
 #-------------------------------------------------------------------------------
 
 inline make-unpack-function (extractf)
-    ast-macro
+    spice-macro
         fn (args)
             let argc = ('argcount args)
             verify-count argc 1 1
@@ -3073,7 +3073,7 @@ let __unpack-aggregate = (make-unpack-function extractvalue)
     __@ = extractvalue
 
 let tupleof =
-    ast-macro
+    spice-macro
         fn (args)
             let argc = ('argcount args)
             #verify-count argc 0 -1
@@ -3113,7 +3113,7 @@ let tupleof =
             sc_array_type element-type (size as usize)
 
 let arrayof =
-    ast-macro
+    spice-macro
         fn (args)
             let argc = ('argcount args)
             verify-count argc 1 -1
@@ -3148,7 +3148,7 @@ inline single-signed-vector-binary-op-dispatch (sf uf)
         if (ptrcmp== lhsT rhsT)
             let Ta = ('element@ lhsT 0)
             return
-                ast-quote
+                spice-quote
                     call [
                         \ do
                             if ('signed? Ta)
@@ -3219,7 +3219,7 @@ inline vector-binary-op-dispatch (symbol)
     __< = (vector-binary-op-dispatch '__vector<)
     __<= = (vector-binary-op-dispatch '__vector<=)
     __lslice =
-        ast-macro
+        spice-macro
             fn (args)
                 let argc = ('argcount args)
                 verify-count argc 2 2
@@ -3242,11 +3242,11 @@ inline vector-binary-op-dispatch (symbol)
                     i + 1
                 let maskT =
                     sc_vector_type i32 offset:usize
-                ast-quote
+                spice-quote
                     shufflevector self self
                         [ sc_const_aggregate_new maskT offset maskvals ]
     __rslice =
-        ast-macro
+        spice-macro
             fn (args)
                 let argc = ('argcount args)
                 verify-count argc 2 2
@@ -3273,7 +3273,7 @@ inline vector-binary-op-dispatch (symbol)
                     i + 1
                 let maskT =
                     sc_vector_type i32 total:usize
-                ast-quote
+                spice-quote
                     shufflevector self self
                         [ sc_const_aggregate_new maskT total maskvals ]
     __unpack = (Value (make-unpack-function extractelement))
@@ -3283,7 +3283,7 @@ inline vector-binary-op-dispatch (symbol)
         inline "vector.__typecall" (cls element-type size)
             sc_vector_type element-type (size as usize)
     #__typecall =
-        ast-macro
+        spice-macro
             fn "vector" (args)
                 let argc = ('argcount args)
                 verify-count argc 3 3
@@ -3298,7 +3298,7 @@ inline vector-binary-op-dispatch (symbol)
                 box-pointer (sc_vector_type ET size)
 
 let vectorof =
-    ast-macro
+    spice-macro
         fn (args)
             let argc = ('argcount args)
             verify-count argc 1 -1
@@ -3322,14 +3322,14 @@ let vectorof =
 
 let
     min =
-        ast-macro
+        spice-macro
             fn (args)
                 ltr-multiop args
                     Value
                         inline "min" (a b)
                             ? (<= a b) a b
     max =
-        ast-macro
+        spice-macro
             fn (args)
                 ltr-multiop args
                     Value
@@ -3363,7 +3363,7 @@ inline clamp (x mn mx)
                         sc_typify func sz args
                     let resultT = ('typeof result)
                     if (resultT != destT)
-                        syntax-error! ('anchor result)
+                        sugar-error! ('anchor result)
                             .. "function does not compile to type " (repr destT)
                                 \ "but has type " (repr resultT)
                     return result
@@ -3371,7 +3371,7 @@ inline clamp (x mn mx)
 
 let
     extern =
-        ast-macro
+        spice-macro
             fn (args)
                 let argc = ('argcount args)
                 verify-count argc 2 2
@@ -3383,7 +3383,7 @@ let
                 Value
                     sc_global_new (sc_get_active_anchor) sym T
     private =
-        ast-macro
+        spice-macro
             fn (args)
                 let argc = ('argcount args)
                 verify-count argc 1 1
@@ -3422,17 +3422,17 @@ fn next-head? (next)
     unnamed
 
 inline gen-match-block-parser (handle-case)
-    syntax-block-scope-macro
+    sugar-block-scope-macro
         fn (expr next scope)
             let head arg argrest = (decons expr 2)
             let arg argrest = (sc_expand arg argrest scope)
             let outnext = (alloca-array list 1)
             let outexpr next =
-                ast-quote
+                spice-quote
                     label ok-label
                         inline return-ok (args...)
                             merge ok-label args...
-                        ast-unquote
+                        spice-unquote
                             let outexpr = (sc_expression_new (sc_get_active_anchor))
                             loop (next = next)
                                 let head = (next-head? next)
@@ -3442,18 +3442,18 @@ inline gen-match-block-parser (handle-case)
                                     let expr = (expr as list)
                                     let head cond body = (decons expr 2)
                                     sc_expression_append outexpr
-                                        ast-quote
+                                        spice-quote
                                             label case-label
                                                 inline fail-case ()
                                                     merge case-label
                                                 let token = arg
-                                                ast-unquote
+                                                spice-unquote
                                                     let newscope = (Scope scope)
                                                     let unpack-expr =
                                                         handle-case fail-case token newscope cond
                                                     let body =
                                                         sc_expand (cons do body) '() newscope
-                                                    ast-quote
+                                                    spice-quote
                                                         unpack-expr
                                                         return-ok body
                                     repeat next
@@ -3470,7 +3470,7 @@ inline gen-match-block-parser (handle-case)
                                     compiler-error! "default branch missing"
             return (cons outexpr (load outnext)) scope
 
-fn gen-syntax-matcher (failfunc expr scope params)
+fn gen-sugar-matcher (failfunc expr scope params)
     if false
         return `[]
     let params = (params as list)
@@ -3486,11 +3486,11 @@ fn gen-syntax-matcher (failfunc expr scope params)
                 let arg next =
                     if variadic?
                         if (not (empty? rest))
-                            syntax-error! ('anchor paramv)
+                            sugar-error! ('anchor paramv)
                                 "variadic match pattern is not in last place"
                         _ next `[]
                     else
-                        ast-quote
+                        spice-quote
                             let arg next =
                                 sc_list_decons next
                         _ arg next
@@ -3501,11 +3501,11 @@ fn gen-syntax-matcher (failfunc expr scope params)
                 let param = (paramv as list)
                 let head head-rest = (decons param)
                 let mid mid-rest = (decons head-rest)
-                if ((('typeof head) == Symbol) and ((head as Symbol) == 'syntax-quote))
+                if ((('typeof head) == Symbol) and ((head as Symbol) == 'sugar-quote))
                     let head = (head as Symbol)
                     let sym = ((decons head-rest) as Symbol)
                     sc_expression_append outexpr
-                        ast-quote
+                        spice-quote
                             let arg next = (sc_list_decons next)
                             if (ptrcmp!= ('typeof arg) Symbol)
                                 failfunc;
@@ -3517,10 +3517,10 @@ fn gen-syntax-matcher (failfunc expr scope params)
                     let exprT = (sc_expand exprT '() scope)
                     let param = (head as Symbol)
                     if ('variadic? param)
-                        syntax-error! ('anchor head)
+                        sugar-error! ('anchor head)
                             "vararg parameter cannot be typed"
                     sc_expression_append outexpr
-                        ast-quote
+                        spice-quote
                             let arg next =
                                 sc_list_decons next
                             let arg =
@@ -3532,35 +3532,35 @@ fn gen-syntax-matcher (failfunc expr scope params)
                     repeat (i + 1) rest next varargs
                 else
                     sc_expression_append outexpr
-                        ast-quote
+                        spice-quote
                             let arg next = (sc_list_decons next)
                             let arg =
                                 if (ptrcmp!= ('typeof arg) list)
                                     failfunc;
                                 else
                                     arg as list
-                            ast-unquote
-                                gen-syntax-matcher failfunc arg scope param
+                            spice-unquote
+                                gen-sugar-matcher failfunc arg scope param
                     repeat (i + 1) rest next varargs
             else
-                syntax-error! ('anchor paramv)
+                sugar-error! ('anchor paramv)
                     "unsupported pattern"
         return
-            ast-quote
+            spice-quote
                 if (not (check-count (sc_list_count expr)
                         [(? varargs (sub paramcount 1) paramcount)]
                         [(? varargs -1 paramcount)]))
                     failfunc;
                 outexpr
 
-define syntax-match
-    gen-match-block-parser gen-syntax-matcher
+define sugar-match
+    gen-match-block-parser gen-sugar-matcher
 
 #-------------------------------------------------------------------------------
 
 define sugar
-    inline wrap-syntax-macro (f)
-        syntax-block-scope-macro
+    inline wrap-sugar-macro (f)
+        sugar-block-scope-macro
             fn (expr next scope)
                 let new-expr new-next = (f expr next scope)
                 return
@@ -3571,15 +3571,15 @@ define sugar
                             cons new-expr new-next
                     scope
 
-    syntax-block-scope-macro
+    sugar-block-scope-macro
         fn "expand-sugar" (expr next scope)
             raises-compile-error;
             let head expr = (decons expr)
             let name params body =
                 extract-name-params-body expr
             let func =
-                ast-quote
-                    inline (expr next-expr syntax-scope)
+                spice-quote
+                    inline (expr next-expr sugar-scope)
                         let head expr = (sc_list_decons expr)
                         label ok-label
                             inline return-ok (args...)
@@ -3587,17 +3587,17 @@ define sugar
                             label fail-label
                                 inline fail-case ()
                                     merge fail-label
-                                ast-unquote
+                                spice-unquote
                                     let subscope = (Scope scope)
                                     'set-symbols subscope
                                         next-expr = next-expr
-                                        syntax-scope = syntax-scope
+                                        sugar-scope = sugar-scope
                                         expr-head = head
                                     let unpack-expr =
-                                        gen-syntax-matcher fail-case expr subscope params
+                                        gen-sugar-matcher fail-case expr subscope params
                                     let body =
                                         sc_expand (cons do body) '() subscope
-                                    ast-quote
+                                    spice-quote
                                         unpack-expr
                                         return-ok body
                             compiler-error! "syntax error"
@@ -3605,10 +3605,10 @@ define sugar
                 if (('typeof name) == Symbol)
                     qq
                         [let name] =
-                            [wrap-syntax-macro func];
+                            [wrap-sugar-macro func];
                 else
                     qq
-                        [wrap-syntax-macro func];
+                        [wrap-sugar-macro func];
             return (cons outexpr next) scope
 
 #-------------------------------------------------------------------------------
@@ -3627,7 +3627,7 @@ fn uncomma (l)
             repeat next
     fn merge-lists (anchor current total)
         if ((countof current) == 0)
-            syntax-error! anchor "unexpected comma"
+            sugar-error! anchor "unexpected comma"
         cons
             if ((countof current) == 1) ('@ current)
             else (Value current)
@@ -3666,7 +3666,7 @@ fn gen-argument-matcher (failfunc expr scope params)
                 let arg =
                     if variadic?
                         if (not (empty? rest))
-                            syntax-error! ('anchor paramv)
+                            sugar-error! ('anchor paramv)
                                 "vararg parameter is not in last place"
                         `(sc_getarglist expr i)
                     else
@@ -3683,10 +3683,10 @@ fn gen-argument-matcher (failfunc expr scope params)
                     let exprT = (sc_expand exprT '() scope)
                     let param = (head as Symbol)
                     if ('variadic? param)
-                        syntax-error! ('anchor head)
+                        sugar-error! ('anchor head)
                             "vararg parameter cannot be typed"
                     sc_expression_append outexpr
-                        ast-quote
+                        spice-quote
                             let arg = (sc_getarg expr i)
                             let arg =
                                 try (imply-expr ('typeof arg) exprT arg)
@@ -3699,10 +3699,10 @@ fn gen-argument-matcher (failfunc expr scope params)
                     let exprT = (sc_expand exprT '() scope)
                     let param = (head as Symbol)
                     if ('variadic? param)
-                        syntax-error! ('anchor head)
+                        sugar-error! ('anchor head)
                             "vararg parameter cannot be typed"
                     sc_expression_append outexpr
-                        ast-quote
+                        spice-quote
                             let arg = (sc_getarg expr i)
                             let arg =
                                 if (('constant? arg) and (('typeof arg) == exprT))
@@ -3711,9 +3711,9 @@ fn gen-argument-matcher (failfunc expr scope params)
                                     failfunc;
                     'set-symbol scope param arg
                     repeat (i + 1) rest varargs
-            syntax-error! ('anchor paramv) "unsupported pattern"
+            sugar-error! ('anchor paramv) "unsupported pattern"
         return
-            ast-quote
+            spice-quote
                 if (not (check-count (sc_argcount expr)
                         [(? varargs (sub paramcount 1) paramcount)]
                         [(? varargs -1 paramcount)]))
@@ -3724,11 +3724,11 @@ define match-args
     gen-match-block-parser gen-argument-matcher
 
 #inline spice-macro (f)
-    ast-macro-verify-signature f
-    bitcast (const-typify f Value) ASTMacro
+    spice-macro-verify-signature f
+    bitcast (const-typify f Value) SpiceMacro
 
 define spice
-    syntax-macro
+    sugar-macro
         fn "expand-spice" (expr)
             raises-compile-error;
             let name params body =
@@ -3744,7 +3744,7 @@ define spice
                     let body =
                         if variadic?
                             if (not (empty? rest))
-                                syntax-error! ('anchor paramv)
+                                sugar-error! ('anchor paramv)
                                     "vararg parameter is not in last place"
                             cons
                                 qq
@@ -3769,17 +3769,17 @@ define spice
                     if (('typeof name) == Symbol)
                         qq
                             [let name] =
-                                [ast-macro]
+                                [spice-macro]
                                     [fn] [(name as Symbol as string)] (args)
-                                        [ast-quote]
-                                            [ast-unquote]
+                                        [spice-quote]
+                                            [spice-unquote]
                                                 [(cons inline content)] args
                     else
                         qq
-                            [ast-macro]
+                            [spice-macro]
                                 [fn name] (args)
-                                    [ast-quote]
-                                        [ast-unquote]
+                                    [spice-quote]
+                                        [spice-unquote]
                                             [(cons inline content)] args
 
 #-------------------------------------------------------------------------------
@@ -3787,31 +3787,31 @@ define spice
 fn gen-match-matcher
 
 fn gen-or-matcher (failfunc expr scope params)
-    ast-quote
+    spice-quote
         label or-ok
-            ast-unquote
+            spice-unquote
                 loop (prefix params = `[] params)
                     let at params = (decons params)
                     if (empty? params)
                         break
-                            ast-quote
+                            spice-quote
                                 prefix
-                                ast-unquote
+                                spice-unquote
                                     let unpack-expr =
                                         gen-match-matcher failfunc expr
                                             \ (Scope scope) at
-                                    ast-quote unpack-expr (merge or-ok)
+                                    spice-quote unpack-expr (merge or-ok)
                     repeat
-                        ast-quote
+                        spice-quote
                             label or-fail
                                 inline fail-case ()
                                     merge or-fail
                                 prefix
-                                ast-unquote
+                                spice-unquote
                                     let unpack-expr =
                                         gen-match-matcher fail-case expr
                                             \ (Scope scope) at
-                                    ast-quote unpack-expr (merge or-ok)
+                                    spice-quote unpack-expr (merge or-ok)
                         params
 
 fn gen-match-matcher (failfunc expr scope cond)
@@ -3842,11 +3842,11 @@ fn gen-match-matcher (failfunc expr scope cond)
             let token = (head as Symbol)
             if (token == 'or)
                 return (gen-or-matcher failfunc expr scope rest)
-        syntax-error! cond-anchor
+        sugar-error! cond-anchor
             .. "unsupported pattern: " (repr cond)
     let cond =
         sc_expand cond '() scope
-    ast-quote
+    spice-quote
         if (expr != cond)
             failfunc;
 
@@ -3917,7 +3917,7 @@ fn get-overloaded-fn-append ()
                 if ('function-pointer? fT)
                     if ((('kind f) != value-kind-function)
                         and (not ('constant? f)))
-                        syntax-error! ('anchor f) "argument must be constant or function"
+                        sugar-error! ('anchor f) "argument must be constant or function"
                     let fT = ('element@ fT 0)
                     let argcount = ('element-count fT)
                     loop (k types = 0 void)
@@ -3930,7 +3930,7 @@ fn get-overloaded-fn-append ()
                         break;
                 elseif (fT == type)
                     if (fT == outtype)
-                        syntax-error! ('anchor f) "cannot inherit from own type"
+                        sugar-error! ('anchor f) "cannot inherit from own type"
                     let fT = (f as type)
                     if (fT < OverloadedFunction)
                         let fns = ('@ fT 'templates)
@@ -3946,7 +3946,7 @@ fn get-overloaded-fn-append ()
                     sc_argument_list_append functions f
                     sc_argument_list_append functypes Variadic
                 else
-                    syntax-error! ('anchor f)
+                    sugar-error! ('anchor f)
                         .. "cannot embed argument of type "
                             repr ('typeof f)
                             " in overloaded function"
@@ -4017,7 +4017,7 @@ fn get-overloaded-fn-append ()
 sugar fn... (name...)
     let finalize-overloaded-fn = (get-overloaded-fn-append)
     let fn-name =
-        syntax-match name...
+        sugar-match name...
         case (name as Symbol;) name
         case (name as string;) (Symbol name)
         case () unnamed
@@ -4031,15 +4031,15 @@ sugar fn... (name...)
     'set-symbols outtype
         templates = (sc_argument_list_new anchor)
         parameter-types = (sc_argument_list_new anchor)
-    let bodyscope = (Scope syntax-scope)
-    syntax-match name...
+    let bodyscope = (Scope sugar-scope)
+    sugar-match name...
     case (name as Symbol;)
         'set-symbol bodyscope fn-name outtype
     default;
     loop (next = next-expr)
-        syntax-match next
+        sugar-match next
         case (('case 'using body...) rest...)
-            let obj = (sc_expand (cons do body...) '() syntax-scope)
+            let obj = (sc_expand (cons do body...) '() sugar-scope)
             sc_argument_list_append outargs obj
             sc_argument_list_append outargs `none
             repeat rest...
@@ -4049,18 +4049,18 @@ sugar fn... (name...)
                 sc_argument_list_append outargs tmpl
                 let scope = (Scope bodyscope)
                 loop (expr types = (uncomma (condv as list)) void)
-                    syntax-match expr
+                    sugar-match expr
                     case ()
                         let body = (sc_expand (cons do body...) '() scope)
                         sc_template_set_body tmpl body
                         sc_argument_list_append outargs types
                         break;
                     case ((arg as Symbol) ': T)
-                        syntax-error! ('anchor condv) "single typed parameter definition is missing trailing comma or semicolon"
+                        sugar-error! ('anchor condv) "single typed parameter definition is missing trailing comma or semicolon"
                     case ((arg as Symbol) rest...)
                         if ('variadic? arg)
                             if (not (empty? rest...))
-                                syntax-error! ('anchor condv) "variadic parameter must be in last place"
+                                sugar-error! ('anchor condv) "variadic parameter must be in last place"
                         let param = (sc_parameter_new ('anchor condv) arg)
                         sc_template_append_parameter tmpl param
                         'set-symbol scope arg param
@@ -4069,20 +4069,20 @@ sugar fn... (name...)
                                 ? ('variadic? arg) Variadic Unknown
                     case (((arg as Symbol) ': T) rest...)
                         if ('variadic? arg)
-                            syntax-error! ('anchor condv) "a typed parameter can't be variadic"
-                        let T = ((sc_expand T '() syntax-scope) as type)
+                            sugar-error! ('anchor condv) "a typed parameter can't be variadic"
+                        let T = ((sc_expand T '() sugar-scope) as type)
                         let param = (sc_parameter_new ('anchor condv) arg)
                         sc_template_append_parameter tmpl param
                         'set-symbol scope arg param
                         repeat rest...
                             sc_arguments_type_join types T
                     default
-                        syntax-error! ('anchor condv) "syntax: (parameter-name[: type], ...)"
+                        sugar-error! ('anchor condv) "syntax: (parameter-name[: type], ...)"
             repeat rest...
         default
-            syntax-match name...
+            sugar-match name...
             case (name as Symbol;)
-                'set-symbol syntax-scope fn-name outtype
+                'set-symbol sugar-scope fn-name outtype
             default;
             return
                 `(finalize-overloaded-fn outtype outargs)
@@ -4107,7 +4107,7 @@ sugar from (src 'let params...)
         let entry rest = (decons params)
         entry as Symbol
         cons
-            list syntax-quote entry
+            list sugar-quote entry
             quotify rest
 
     cons let
@@ -4118,7 +4118,7 @@ sugar from (src 'let params...)
 
 run-stage;
 
-define-syntax-block-scope-macro static-if
+define-sugar-block-scope-macro static-if
     fn process (body next-expr)
         if false
             return '() next-expr
@@ -4152,14 +4152,14 @@ define-syntax-block-scope-macro static-if
         cons
             cons do body
             next-expr
-        syntax-scope
+        sugar-scope
 
-define-syntax-block-scope-macro syntax-if
-    fn process (syntax-scope body next-expr)
+define-sugar-block-scope-macro sugar-if
+    fn process (sugar-scope body next-expr)
         if false
             return '() next-expr
         let cond body = (decons body)
-        let cond body = (sc_expand cond body syntax-scope)
+        let cond body = (sc_expand cond body sugar-scope)
         let elseexpr next-next-expr =
             if (empty? next-expr)
                 _ '() next-expr
@@ -4170,7 +4170,7 @@ define-syntax-block-scope-macro syntax-if
                     let kw = (kw as Symbol)
                     switch kw
                     case 'elseif
-                        process syntax-scope body next-next-expr
+                        process sugar-scope body next-next-expr
                     case 'else
                         _ body next-next-expr
                     default
@@ -4182,16 +4182,16 @@ define-syntax-block-scope-macro syntax-if
                 return body next-next-expr
             else
                 return elseexpr next-next-expr
-        syntax-error! ('anchor cond) "condition must be constant"
+        sugar-error! ('anchor cond) "condition must be constant"
     let kw body = (decons expr)
-    let body next-expr = (process syntax-scope body next-expr)
+    let body next-expr = (process sugar-scope body next-expr)
     return
         cons
             cons do body
             next-expr
-        syntax-scope
+        sugar-scope
 
-define-syntax-block-scope-macro @@
+define-sugar-block-scope-macro @@
     raises-compile-error;
     let kw body = (decons expr)
     let head = (kw as Symbol)
@@ -4222,9 +4222,9 @@ define-syntax-block-scope-macro @@
                     next-next-expr
     return
         cons result next-expr
-        syntax-scope
+        sugar-scope
 
-define-syntax-block-scope-macro vvv
+define-sugar-block-scope-macro vvv
     raises-compile-error;
     let kw body = (decons expr)
     let head = (kw as Symbol)
@@ -4245,9 +4245,9 @@ define-syntax-block-scope-macro vvv
                 next-next-expr
     return
         cons result next-expr
-        syntax-scope
+        sugar-scope
 
-define-syntax-macro decorate-*
+define-sugar-macro decorate-*
     raises-compile-error;
     let expr decorators = (decons args)
     loop (in out = decorators expr)
@@ -4257,7 +4257,7 @@ define-syntax-macro decorate-*
         repeat in
             Value (cons decorator (list out))
 
-define-syntax-macro decorate-fn
+define-sugar-macro decorate-fn
     raises-compile-error;
     let fnexpr decorators = (decons args)
     let kw name = (decons (fnexpr as list) 2)
@@ -4275,7 +4275,7 @@ define-syntax-macro decorate-fn
 
 let decorate-inline = decorate-fn
 
-define-syntax-macro decorate-let
+define-sugar-macro decorate-let
     raises-compile-error;
     let letexpr decorators = (decons args)
     let letexpr = (letexpr as list)
@@ -4324,12 +4324,12 @@ define-syntax-macro decorate-let
             repeat params
                 cons param out
 
-define-syntax-scope-macro syntax-eval
-    let subscope = (Scope syntax-scope)
-    'set-symbol subscope 'syntax-scope syntax-scope
+define-sugar-scope-macro sugar-eval
+    let subscope = (Scope sugar-scope)
+    'set-symbol subscope 'sugar-scope sugar-scope
     return
         exec-module (Value args) subscope
-        syntax-scope
+        sugar-scope
 
 let
     io-write! = sc_write
@@ -4357,11 +4357,11 @@ run-stage;
 #-------------------------------------------------------------------------------
 
 sugar unlet ((name as Symbol) names...)
-    sc_scope_del_symbol syntax-scope name
+    sc_scope_del_symbol sugar-scope name
     for name in names...
         let name = (name as Symbol)
-        getattr syntax-scope name
-        sc_scope_del_symbol syntax-scope name
+        getattr sugar-scope name
+        sc_scope_del_symbol sugar-scope name
     `[]
 
 #-------------------------------------------------------------------------------
@@ -4382,8 +4382,8 @@ sugar fold ((binding...) 'for expr...)
     let it params = (split-until expr... 'in "'in' expected")
     let init foldparams = (split-until binding... '= "'=' expected")
     let generator-expr body = (decons it)
-    let subscope = (Scope syntax-scope)
-    ast-quote
+    let subscope = (Scope sugar-scope)
+    spice-quote
         let iter start =
             (as [(sc_expand generator-expr '() subscope)] Generator);
     let next = ('unique Symbol "next")
@@ -4430,7 +4430,7 @@ sugar typedef (name body...)
                 let symname = (name as Symbol)
                 # see if we can find a forward declaration in the local scope
                 try
-                    let T = (getattr syntax-scope symname)
+                    let T = (getattr sugar-scope symname)
                     let T = (T as type)
                     assert (('opaque? T) and (('superof T) == typename))
                     # reuse type
@@ -4444,7 +4444,7 @@ sugar typedef (name body...)
 
     let expr =
         loop (inp outp = body... '())
-            syntax-match inp
+            sugar-match inp
             case ('< supertype rest...)
                 repeat rest...
                     cons (list sc_typename_type_set_super 'this-type supertype) outp
@@ -4500,15 +4500,15 @@ spice __init-copy (target source)
             getattr T '__init-copy
         except (err)
             return
-                ast-quote
+                spice-quote
                     __init target
                     target = source
     `(constructor target source)
 
-inline gen-allocator-syntax (name f)
+inline gen-allocator-sugar (name f)
     sugar "" (values...)
         spice local-copy-typed (T value)
-            ast-quote
+            spice-quote
                 let val = (ptrtoref (f T))
                 __init-copy val value
                 val
@@ -4516,11 +4516,11 @@ inline gen-allocator-syntax (name f)
             let T = ('typeof value)
             `(local-copy-typed T value)
         spice local-new (T args...)
-            ast-quote
+            spice-quote
                 let val = (ptrtoref (f T))
                 __init val args...
                 val
-        syntax-match values...
+        sugar-match values...
         case (name '= value)
             qq [let name] = ([local-copy value])
         case (name ': T '= value)
@@ -4533,9 +4533,9 @@ inline gen-allocator-syntax (name f)
             compiler-error!
                 .. "syntax: " name " <name> [: <type>] [= <value>]"
 
-let local = (gen-allocator-syntax "local" alloca)
-let new = (gen-allocator-syntax "new" malloc)
-let global = (gen-allocator-syntax "global" private)
+let local = (gen-allocator-sugar "local" alloca)
+let new = (gen-allocator-sugar "new" malloc)
+let global = (gen-allocator-sugar "global" private)
 
 fn delete (value)
     free (reftoptr value)
@@ -4628,7 +4628,7 @@ sugar struct (name body...)
                 qq [typedef] [name]
 
     let supertype body... =
-        syntax-match body...
+        sugar-match body...
         case ('union rest...)
             _ `CUnion rest...
         case ('< supertype rest...)
@@ -4678,7 +4678,7 @@ sugar enum (name values...)
             let key val = ('dekey arg)
             #print arg key val
             if (not ('constant? val))
-                syntax-error! anchor "all enum values must be constant"
+                sugar-error! anchor "all enum values must be constant"
             _ (i + 1)
                 if (key == unnamed)
                     # auto-numerical
@@ -4696,7 +4696,7 @@ sugar enum (name values...)
         let expr body = (decons body)
         cons
             if (('typeof expr) == Symbol)
-                Value (list syntax-quote expr)
+                Value (list sugar-quote expr)
             else expr
             if (empty? body)
                 '()
@@ -4856,7 +4856,7 @@ fn read-eval-print-loop ()
                 let expr =
                     Value
                         list
-                            list syntax-set-scope! eval-scope
+                            list sugar-set-scope! eval-scope
                             list let tmp '=
                                 cons embed
                                     expr as list

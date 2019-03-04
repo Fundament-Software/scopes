@@ -65,7 +65,7 @@ typedef FunctionChain : ('storageof type)
         let cls = (bitcast self type)
         let oldfn = cls.chain
         'set-symbol cls 'chain
-            @@ ast-quote
+            @@ spice-quote
             inline (cls args...)
                 oldfn cls args...
                 f args...
@@ -77,7 +77,7 @@ typedef FunctionChain : ('storageof type)
         let cls = (bitcast self type)
         let oldfn = cls.chain
         'set-symbol cls 'chain
-            @@ ast-quote
+            @@ spice-quote
             inline (cls args...)
                 f args...
                 oldfn cls args...
@@ -90,7 +90,7 @@ typedef FunctionChain : ('storageof type)
             'append self f
             f
 
-    @@ ast-quote
+    @@ spice-quote
     fn __typecall (cls name)
         let T = (typename (.. "<FunctionChain " name ">"))
         'set-symbol T 'chain
@@ -112,7 +112,7 @@ run-stage;
        in which it was declared.
 sugar fnchain ((name as Symbol))
     let namestr =
-        .. (syntax-scope.module-name as string) "." (name as string)
+        .. (sugar-scope.module-name as string) "." (name as string)
     list let name '= (list FunctionChain namestr)
 
 let decorate-fnchain = decorate-fn

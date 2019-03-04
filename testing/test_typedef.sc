@@ -23,7 +23,7 @@ typedef MyTupleType < MyTupleSuperType : (tuple i32 i32)
     # in this context, `this-type` is bound to the type we are defining
 
     # constructor
-    @@ ast-quote
+    @@ spice-quote
     inline __typecall (cls x y)
         bitcast
             tupleof (imply x i32) (imply y i32)

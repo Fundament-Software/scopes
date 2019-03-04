@@ -108,7 +108,7 @@ typedef refable < integer : i32
     fn value (self)
         storagecast self
 
-    @@ ast-quote
+    @@ spice-quote
     fn inced (self)
         bitcast
             (storagecast self) + 1

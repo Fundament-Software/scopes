@@ -1,7 +1,7 @@
 
 sugar isvar? ((key as Symbol))
     try
-        getattr syntax-scope key
+        getattr sugar-scope key
         true
     except (err)
         false

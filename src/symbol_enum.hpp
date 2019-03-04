@@ -253,7 +253,7 @@ namespace scopes {
     \
     /* keywords and macros */ \
     T(KW_CatRest, "::*") T(KW_CatOne, "::@") T(KW_Forward, "_") \
-    T(KW_SyntaxLog, "syntax-log") T(KW_DoIn, "embed") T(KW_Defer, "__defer") \
+    T(KW_SyntaxLog, "sugar-log") T(KW_DoIn, "embed") T(KW_Defer, "__defer") \
     T(KW_Assert, "assert") T(KW_Break, "break") T(KW_Label, "label") \
     T(KW_Call, "call") T(KW_RawCall, "rawcall") T(KW_CCCall, "cc/call") T(KW_Continue, "continue") \
     T(KW_Repeat, "repeat") T(KW_Raise, "raise") \
@@ -264,8 +264,8 @@ namespace scopes {
     T(KW_FnTypes, "fn-types") T(KW_FnCC, "fn/cc") T(KW_Globals, "globals") \
     T(KW_If, "if") T(KW_Switch, "switch") T(KW_In, "in") T(KW_Let, "let") T(KW_Loop, "loop") \
     T(KW_LoopFor, "loop-for") T(KW_None, "none") T(KW_Null, "null") \
-    T(KW_SyntaxQuote, "syntax-quote") T(KW_ASTQuote, "ast-quote") T(KW_ASTUnquote, "ast-unquote") \
-    T(KW_ASTUnquoteArguments, "ast-unquote-arguments") T(FN_Copy, "copy") \
+    T(KW_SyntaxQuote, "sugar-quote") T(KW_ASTQuote, "spice-quote") T(KW_ASTUnquote, "spice-unquote") \
+    T(KW_ASTUnquoteArguments, "spice-unquote-arguments") T(FN_Copy, "copy") \
     T(KW_Inline, "inline") T(KW_Recur, "recur") \
     T(KW_Merge, "merge") T(FN_Move, "move") \
     T(KW_Return, "return") T(KW_Splice, "splice") T(FN_Forget, "forget") \
@@ -437,18 +437,18 @@ namespace scopes {
     T(FN_SymbolEq, "Symbol==") T(FN_SymbolNew, "string->Symbol") \
     T(FN_StringToRawstring, "string->rawstring") \
     T(FN_IsSymbol, "symbol?") \
-    T(FN_SyntaxToAnchor, "syntax->anchor") T(FN_SyntaxToDatum, "syntax->datum") \
-    T(FN_SyntaxCons, "syntax-cons") T(FN_SyntaxDo, "syntax-do") \
-    T(FN_IsSyntaxHead, "syntax-head?") \
-    T(FN_SyntaxList, "syntax-list") \
-    T(FN_IsSyntaxQuoted, "syntax-quoted?") \
-    T(FN_SyntaxUnquote, "syntax-unquote") \
+    T(FN_SyntaxToAnchor, "sugar->anchor") T(FN_SyntaxToDatum, "sugar->datum") \
+    T(FN_SyntaxCons, "sugar-cons") T(FN_SyntaxDo, "sugar-do") \
+    T(FN_IsSyntaxHead, "sugar-head?") \
+    T(FN_SyntaxList, "sugar-list") \
+    T(FN_IsSyntaxQuoted, "sugar-quoted?") \
+    T(FN_SyntaxUnquote, "sugar-unquote") \
     T(FN_SymbolToString, "Symbol->string") \
     T(FN_StringMatch, "string-match?") \
     T(FN_SuperOf, "superof") \
-    T(FN_SyntaxNew, "Syntax-new") \
-    T(FN_SyntaxWrap, "Syntax-wrap") \
-    T(FN_SyntaxStrip, "Syntax-strip") \
+    T(FN_SyntaxNew, "sugar-new") \
+    T(FN_SyntaxWrap, "sugar-wrap") \
+    T(FN_SyntaxStrip, "sugar-strip") \
     T(FN_Translate, "translate") T(FN_ITrunc, "itrunc") \
     T(FN_ZExt, "zext") T(FN_SExt, "sext") \
     T(FN_TupleOf, "tupleof") T(FN_TypeNew, "type-new") T(FN_TypeName, "type-name") \
@@ -544,7 +544,7 @@ namespace scopes {
     T(SYM_FnCCForm, "form-fn-body") \
     T(SYM_QuoteForm, "form-quote") \
     T(SYM_DoForm, "form-do") \
-    T(SYM_SyntaxScope, "syntax-scope") \
+    T(SYM_SyntaxScope, "sugar-scope") \
     T(SYM_CallHandler, "__call") \
     T(SYM_ReturnHandler, "__return") \
     T(SYM_DropHandler, "__drop") \

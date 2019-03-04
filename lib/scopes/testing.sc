@@ -47,12 +47,12 @@ fn __test-modules (module-dir modules)
                 cons module failed-modules
 
 # (test-modules module ...)
-define-syntax-macro test-modules
+define-sugar-macro test-modules
     list __test-modules 'module-dir
-        list syntax-quote
+        list sugar-quote
             args
 
-define-syntax-macro assert-error
+define-sugar-macro assert-error
     inline test-function (f)
         try
             if true
@@ -69,7 +69,7 @@ define-syntax-macro assert-error
             .. "error assertion failed: "
                 if (== (typeof msg) string) msg
                 else (repr msg)
-        syntax-error! anchor assert-msg
+        sugar-error! anchor assert-msg
     let cond body = (decons args)
     let sxcond = cond
     let anchor = ('anchor sxcond)
@@ -91,7 +91,7 @@ define-syntax-macro assert-error
                             repr sxcond
                 else body
 
-define-syntax-macro assert-compiler-error
+define-sugar-macro assert-compiler-error
     inline test-function (f)
         try
             sc_compile (sc_typify f 0 null) 0:u64
@@ -107,7 +107,7 @@ define-syntax-macro assert-compiler-error
             .. "compiler error assertion failed: "
                 if (== (typeof msg) string) msg
                 else (repr msg)
-        syntax-error! anchor assert-msg
+        sugar-error! anchor assert-msg
     let cond body = (decons args)
     let sxcond = cond
     let anchor = ('anchor sxcond)

@@ -1,13 +1,13 @@
 
 spice kwok ()
-    ast-quote
+    spice-quote
         1 + 2
 
 dump kwok
 
 spice test ()
     dump kwok
-    ast-quote
+    spice-quote
         print
             kwok;
 

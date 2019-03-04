@@ -1,6 +1,6 @@
 
 spice gen-label-merge-test ()
-    ast-quote
+    spice-quote
         fn (k str)
             .. "test1-"
                 label test3

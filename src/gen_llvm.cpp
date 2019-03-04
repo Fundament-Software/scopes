@@ -277,7 +277,7 @@ struct LLVMIRGenerator {
         //active_function(nullptr),
         //active_function_value(nullptr),
         use_debug_info(true),
-        generate_object(true),
+        generate_object(false),
         active_function(nullptr),
         functions_generated(0) {
         static_init();
@@ -1864,7 +1864,7 @@ struct LLVMIRGenerator {
         auto LLT = SCOPES_GET_RESULT(type_to_llvm_type(node->get_type()));
         if (!node->value) {
             return LLVMConstPointerNull(LLT);
-        } else if (generate_object) {
+        } else if (!generate_object) {
             return LLVMConstIntToPtr(
                 LLVMConstInt(i64T, *(uint64_t*)&(node->value), false),
                 LLT);
@@ -2366,7 +2366,7 @@ SCOPES_RESULT(void) compile_object(const String *path, Scope *scope, uint64_t fl
 #endif
 
     LLVMIRGenerator ctx;
-    ctx.generate_object = false;
+    ctx.generate_object = true;
     if (flags & CF_NoDebugInfo) {
         ctx.use_debug_info = false;
     }

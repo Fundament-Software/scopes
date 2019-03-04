@@ -31,7 +31,7 @@ spice test-match (args...)
     default
         compiler-error! "wrong!"
 
-@@ ast-quote
+@@ spice-quote
 fn test-main ()
     test-match 1 2 3 4          # case 1
     test-match (4 - 3) 2 3 4    # case 2

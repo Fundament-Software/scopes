@@ -14,7 +14,7 @@ main;
 
 do
     define ascope
-        syntax-eval (Scope)
+        sugar-eval (Scope)
     fn print_stuff2 (x)
         print "line"
         'set-symbol ascope 'somefunc

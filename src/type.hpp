@@ -128,7 +128,7 @@ typedef std::vector<const Type *> Types;
     T(TYPE_Error, "Error") \
     \
     T(TYPE_Closure, "Closure") \
-    T(TYPE_ASTMacro, "ASTMacro") \
+    T(TYPE_ASTMacro, "SpiceMacro") \
     T(TYPE_CompileStage, "CompileStage") \
     \
     T(TYPE_USize, "usize") \

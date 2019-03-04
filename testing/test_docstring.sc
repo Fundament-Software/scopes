@@ -1,7 +1,7 @@
 """"a module docstring
 
 let scope =
-    syntax-eval syntax-scope
+    sugar-eval sugar-scope
 
 """"a docstring for x
 let x = 5
@@ -24,7 +24,7 @@ let scope =
         let x y
 
         let scope =
-            syntax-eval syntax-scope
+            sugar-eval sugar-scope
 
         assert
             ('docstring scope 'x) == "a docstring for x\n"
