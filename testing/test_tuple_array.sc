@@ -1,4 +1,8 @@
 
+let tuple_i8_i32 = (tuple i8 i32)
+
+run-stage;
+
 do
     let k =
         arrayof i32 1 2 3
@@ -10,7 +14,7 @@ do
 
 do
     let k =
-        arrayof (tuple i8 i32)
+        arrayof tuple_i8_i32
             tupleof (i8 1) 4
             tupleof (i8 2) 5
             tupleof (i8 3) 6

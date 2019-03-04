@@ -28,6 +28,7 @@ test-modules
     .test_from
     .test_fwdecl
     .test_glm
+    .test_global
     .test_glsl
     .test_hash
     .test_import
@@ -58,7 +59,6 @@ test-modules
     .test_semicolon
     .test_spice
     .test_spirv_loop
-    .test_static
     .test_string
     .test_struct
     .test_sugar
@@ -68,7 +68,6 @@ test-modules
     .test_tuple_array
     .test_typedef
     .test_union
-    .test_unique
     .test_using
     .test_value
     .test_varargs

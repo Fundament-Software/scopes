@@ -736,6 +736,9 @@ inline define-symbols (self values...)
     join = sc_string_join
     match? = sc_string_match
 
+'define-symbols Error
+    format = sc_format_error
+
 'define-symbols list
     __countof = sc_list_count
     join = sc_list_join
@@ -1284,6 +1287,7 @@ fn string@ (self i)
 
 'set-symbols list
     __.. = (box-binary-op (single-binary-op-dispatch sc_list_join))
+    __== = (box-binary-op (single-binary-op-dispatch sc_list_compare))
 
 inline single-signed-binary-op-dispatch (sf uf)
     fn (lhsT rhsT lhs rhs)
@@ -1372,8 +1376,7 @@ inline floordiv (a b)
 
 
 'set-symbols Value
-    __== = (box-binary-op (single-binary-op-dispatch ptrcmp==))
-    __!= = (box-binary-op (single-binary-op-dispatch ptrcmp!=))
+    __== = (box-binary-op (single-binary-op-dispatch sc_value_compare))
 
 'set-symbols Closure
     __== = (box-binary-op (single-binary-op-dispatch ptrcmp==))
@@ -2204,6 +2207,7 @@ let
     .. = (ast-macro (fn (args) (rtl-multiop args (Value ..))))
     + = (ast-macro (fn (args) (ltr-multiop args (Value +))))
     * = (ast-macro (fn (args) (ltr-multiop args (Value *))))
+    @ = (ast-macro (fn (args) (ltr-multiop args (Value @))))
     va-option-branch = (ast-macro va-option-branch)
     syntax-set-scope! =
         syntax-scope-macro
@@ -2850,6 +2854,8 @@ let __assert =
                 check-assertion val anchor msg
                 box-empty;
             else
+                if (('typeof msg) != string)
+                    compiler-error! "string expected as second argument"
                 `(check-assertion expr anchor msg)
 
 let vector-reduce =
@@ -2939,6 +2945,40 @@ define-syntax-macro define-syntax-block-scope-macro
         list syntax-block-scope-macro
             cons fn '(expr next-expr syntax-scope) body
 
+'set-symbols type
+    symbols =
+        inline "symbols" (self)
+            Generator
+                inline (fdone key)
+                    let key value =
+                        sc_type_next self key
+                    if (key == unnamed)
+                        fdone;
+                    else
+                        _ key key value
+                unnamed
+    elements =
+        inline "elements" (self)
+            let count = ('element-count self)
+            Generator
+                inline (fdone i)
+                    if (i == count)
+                        fdone;
+                    else
+                        _ (i + 1) ('element@ self i)
+                0
+
+inline scope-generator (self)
+    Generator
+        inline (fdone key)
+            let key value =
+                sc_scope_next self key
+            if (key == unnamed)
+                fdone;
+            else
+                _ key key value
+        unnamed
+
 inline list-generator (self)
     Generator
         inline (fdone cell)
@@ -2948,6 +2988,14 @@ inline list-generator (self)
                 let at next = (decons cell)
                 _ next at
         self
+
+'set-symbols Scope
+    __as =
+        box-cast
+            fn "scope-as" (vT T expr)
+                if (T == Generator)
+                    return `(scope-generator expr)
+                compiler-error! "unsupported type"
 
 'set-symbols list
     __as =
@@ -3053,8 +3101,10 @@ define-syntax-macro assert
     let msg =
         if ((countof args) == 2) msg
         else
-            Value
-                sc_list_repr (cond as list)
+            if (('typeof cond) == list)
+                `[(sc_list_repr (cond as list))]
+            else
+                `[(repr cond)]
     list __assert cond msg
 
 define-syntax-macro while
@@ -4371,7 +4421,6 @@ let
     set-anchor! = sc_set_active_anchor
     active-anchor = sc_get_active_anchor
     #eval = sc_eval
-    format-error = sc_format_error
     import-c = sc_import_c
 
 run-stage;
@@ -4901,7 +4950,7 @@ fn read-eval-print-loop ()
                 fptr;
             except (exc)
                 io-write!
-                    format-error exc
+                    'format exc
                 io-write! "\n"
                 _ eval-scope 0
         repeat "" "" (counter + count) eval-scope
@@ -4979,7 +5028,7 @@ fn run-main ()
         #except (err)
             print
                 default-styler style-error "error:"
-                format-error err
+                'format err
         exit 0
 
 raises-compile-error;

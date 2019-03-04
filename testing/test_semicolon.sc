@@ -1,5 +1,5 @@
 
-quote
+syntax-quote
     -1.0 1.0 +1.0 1.0 -1.0:f32 1.0:f32 +1.0:f32 1.0:f32
     -0x30 0x30 +0x30 0x30
     -0b10 0b01 +0x30 0x30
@@ -9,19 +9,19 @@ quote
 do
     assert
         ==
-            quote
+            syntax-quote
                 1 2; 3 4
             '((1 2) (3 4))
 
     assert
         ==
-            quote
+            syntax-quote
                 1 2; 3
             '((1 2) 3)
 
     assert
         ==
-            quote
+            syntax-quote
                 1 2; 3; 4 5
             '((1 2) (3) (4 5))
 

@@ -1045,8 +1045,11 @@ ConstPointer::ConstPointer(const Anchor *anchor, const Type *type, const void *_
     : Const(VK_ConstPointer, anchor, type), value(_pointer) {}
 
 bool ConstPointer::key_equal(const ConstPointer *other) const {
-    return (get_type() == other->get_type())
-        && value == other->value;
+    if (get_type() != other->get_type())
+        return false;
+    if (get_type() == TYPE_List)
+        return sc_list_compare((const List *)value, (const List *)other->value);
+    return value == other->value;
 }
 
 std::size_t ConstPointer::hash() const {

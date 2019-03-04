@@ -37,7 +37,7 @@ fn __test-modules (module-dir modules)
                 true
             except (err)
                 io-write!
-                    format-error err
+                    'format err
                 io-write! "\n"
                 false
         repeat modules
@@ -61,7 +61,7 @@ define-syntax-macro assert-error
         except (err)
             io-write! "ASSERT OK: "
             print
-                format-error err
+                'format err
             true
 
     inline assertion-error! (anchor msg)
@@ -99,7 +99,7 @@ define-syntax-macro assert-compiler-error
         except (err)
             io-write! "ASSERT OK: "
             print
-                format-error err
+                'format err
             true
 
     inline assertion-error! (anchor msg)

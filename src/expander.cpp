@@ -415,17 +415,6 @@ struct Expander {
         return break_label;
     }
 
-    static Value *strip_unused_extract_argument(Value *value) {
-        if (isa<TypedValue>(value))
-            return value;
-        if (!isa<ExtractArgument>(value))
-            return value;
-        auto node = cast<ExtractArgument>(value);
-        if (node->index > 0)
-            return value;
-        return node->value;
-    }
-
     static Value *extract_argument(const Anchor *anchor, Value *node, int index, bool vararg = false) {
         if (isa<Const>(node)) {
             assert(!is_arguments_type(cast<Const>(node)->get_type()));
@@ -435,7 +424,11 @@ struct Expander {
                 return ConstAggregate::none_from(anchor);
             }
         }
-        return ExtractArgumentTemplate::from(anchor, node, index, vararg);
+        auto result = ExtractArgumentTemplate::from(anchor, node, index, vararg);
+        if (!vararg) {
+            result = KeyedTemplate::from(anchor, SYM_Unnamed, result);
+        }
+        return result;
     }
 
     // (let x ... [= args ...])

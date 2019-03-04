@@ -44,9 +44,6 @@ assert
             third "line"
                 fourth line
 
-        # we're doing static compare of a string with
-            more than 32 characters, so do it at runtime.
-        unconst "first line\nsecond line\n\nthird \"line\"\n    fourth line\n"
-
-
+        # all string compares are done at runtime
+        "first line\nsecond line\n\nthird \"line\"\n    fourth line\n"
 

@@ -888,7 +888,22 @@ const sc_list_t *sc_list_next(const sc_list_t *l) {
 }
 
 const sc_list_t *sc_list_reverse(const sc_list_t *l) {
+    using namespace scopes;
     return reverse_list(l);
+}
+
+bool sc_list_compare(const sc_list_t *a, const sc_list_t *b) {
+    using namespace scopes;
+    if (a->count != b->count)
+        return false;
+    while (a) {
+        assert(a); assert(b);
+        if (!sc_value_compare(a->at, b->at))
+            return false;
+        a = a->next;
+        b = b->next;
+    }
+    return true;
 }
 
 // Closure
@@ -957,6 +972,11 @@ bool sc_value_is_constant(sc_value_t *value) {
 bool sc_value_is_pure (sc_value_t *value) {
     using namespace scopes;
     return isa<Pure>(value);
+}
+
+bool sc_value_compare (sc_value_t *a, sc_value_t *b) {
+    using namespace scopes;
+    return MemoKeyEqual{}(a,b);
 }
 
 int sc_value_kind (sc_value_t *value) {
@@ -1928,6 +1948,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_value_anchor, TYPE_Anchor, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_value_is_constant, TYPE_Bool, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_value_is_pure, TYPE_Bool, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_value_compare, TYPE_Bool, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_value_kind, TYPE_I32, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_value_wrap, TYPE_Value, TYPE_Type, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_value_unwrap, TYPE_Value, TYPE_Type, TYPE_Value);
@@ -2128,6 +2149,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_list_at, TYPE_Value, TYPE_List);
     DEFINE_EXTERN_C_FUNCTION(sc_list_next, TYPE_List, TYPE_List);
     DEFINE_EXTERN_C_FUNCTION(sc_list_reverse, TYPE_List, TYPE_List);
+    DEFINE_EXTERN_C_FUNCTION(sc_list_compare, TYPE_Bool, TYPE_List, TYPE_List);
 
     DEFINE_EXTERN_C_FUNCTION(sc_closure_get_docstring, TYPE_String, TYPE_Closure);
     DEFINE_EXTERN_C_FUNCTION(sc_closure_get_template, TYPE_Value, TYPE_Closure);

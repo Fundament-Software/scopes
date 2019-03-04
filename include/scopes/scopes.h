@@ -155,6 +155,7 @@ const sc_type_t *sc_value_qualified_type (sc_value_t *value);
 const sc_anchor_t *sc_value_anchor (sc_value_t *value);
 bool sc_value_is_constant (sc_value_t *value);
 bool sc_value_is_pure (sc_value_t *value);
+bool sc_value_compare (sc_value_t *a, sc_value_t *b);
 int sc_value_kind (sc_value_t *value);
 sc_value_t *sc_value_wrap(const sc_type_t *type, sc_value_t *value);
 sc_value_t *sc_value_unwrap(const sc_type_t *type, sc_value_t *value);
@@ -334,6 +335,7 @@ int sc_list_count(const sc_list_t *l);
 sc_value_t *sc_list_at(const sc_list_t *l);
 const sc_list_t *sc_list_next(const sc_list_t *l);
 const sc_list_t *sc_list_reverse(const sc_list_t *l);
+bool sc_list_compare(const sc_list_t *a, const sc_list_t *b);
 
 // closures
 
