@@ -46,6 +46,3 @@ run-stage;
 f;
 assert ((get_g_x) == 462)
 
-#let chain1 = (FunctionChain "test")
-#let chain2 = (FunctionChain "test")
-#assert (chain1 != chain2)

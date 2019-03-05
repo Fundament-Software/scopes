@@ -4,18 +4,23 @@
     See LICENSE.md for details.
 */
 
-#if 0
 #include "gen_spirv.hpp"
-#include "styled_stream.hpp"
-#include "string.hpp"
-#include "error.hpp"
-#include "scc.hpp"
+#include "source_file.hpp"
 #include "types.hpp"
 #include "anchor.hpp"
-#include "stream_label.hpp"
+#include "error.hpp"
+#include "execution.hpp"
+#include "gc.hpp"
+#include "scope.hpp"
 #include "timer.hpp"
+#include "value.hpp"
+#include "stream_ast.hpp"
 #include "compiler_flags.hpp"
+#include "prover.hpp"
 #include "hash.hpp"
+#include "qualifiers.hpp"
+#include "qualifier.inc"
+#include "verify_tools.inc"
 
 #include "glslang/SpvBuilder.h"
 #include "glslang/disassemble.h"
@@ -24,12 +29,14 @@
 #include "spirv-tools/libspirv.hpp"
 #include "spirv-tools/optimizer.hpp"
 
-#include <vector>
-
-#include "verify_tools.inc"
 #include "dyn_cast.inc"
 
+#pragma GCC diagnostic ignored "-Wvla-extension"
+
 namespace scopes {
+
+#define SCOPES_GEN_TARGET "SPIR-V"
+
 //------------------------------------------------------------------------------
 // IL->SPIR-V GENERATOR
 //------------------------------------------------------------------------------
@@ -115,70 +122,156 @@ static SCOPES_RESULT(void) verify_spirv(std::vector<unsigned int> &contents) {
         SCOPES_CERR << ss._ss.str();
         SCOPES_LOCATION_ERROR(String::from("SPIR-V validation found errors"));
     }
-    return true;
+    return {};
 }
 
-
 struct SPIRVGenerator {
-    struct HashFuncLabelPair {
-        size_t operator ()(const std::pair<spv::Function *, Label *> &value) const {
-            return
-                hash2(std::hash<spv::Function *>()(value.first),
-                    std::hash<Label *>()(value.second));
-        }
-    };
-
-    typedef std::pair<spv::Function *, Parameter *> ParamKey;
-    struct HashFuncParamPair {
-        size_t operator ()(const ParamKey &value) const {
-            return
-                hash2(std::hash<spv::Function *>()(value.first),
-                    std::hash<Parameter *>()(value.second));
-        }
-    };
-
-    typedef std::pair<const Type *, uint64_t> TypeKey;
+    typedef std::pair<const Type *, uint64_t> TypeFlagPair;
     struct HashTypeFlagsPair {
-        size_t operator ()(const TypeKey &value) const {
+        size_t operator ()(const TypeFlagPair &value) const {
             return
                 hash2(std::hash<const Type *>{}(value.first),
                     std::hash<uint64_t>{}(value.second));
         }
     };
 
+    struct ExecutionMode {
+        int values[3];
+
+        ExecutionMode() { values[0] = -1; values[1] = -1; values[2] = -1; }
+        ExecutionMode(int x) { values[0] = x; values[1] = -1; values[2] = -1; }
+        ExecutionMode(int x, int y) { values[0] = x; values[1] = y; values[2] = -1; }
+        ExecutionMode(int x, int y, int z) { values[0] = x; values[1] = y; values[2] = z; }
+    };
+
+    typedef std::vector<spv::Id> Ids;
+
+    //std::unordered_map<SourceFile *, LLVMMetadataRef> file2value;
+    //std::unordered_map<void *, LLVMValueRef> ptr2global;
+    std::unordered_map<ValueIndex, spv::Id, ValueIndex::Hash> ref2value;
+    std::unordered_map<Function *, spv::Function *> func2func;
+    //std::unordered_map<Function *, LLVMMetadataRef> func2md;
+    //std::unordered_map<Function *, Symbol> func_export_table;
+    //std::unordered_map<Global *, LLVMValueRef> global2global;
+    std::deque<Function *> function_todo;
+    //static Types type_todo;
+    std::unordered_map<TypeFlagPair, spv::Id, HashTypeFlagsPair> type_cache;
+
+    std::unordered_map<int, ExecutionMode> execution_modes;
+
+#if 0
+    static LLVMTypeRef voidT;
+    static LLVMTypeRef i1T;
+    static LLVMTypeRef i8T;
+    static LLVMTypeRef i16T;
+    static LLVMTypeRef i32T;
+    static LLVMTypeRef i64T;
+    static LLVMTypeRef f32T;
+    static LLVMTypeRef f32x2T;
+    static LLVMTypeRef f64T;
+    static LLVMTypeRef rawstringT;
+    static LLVMTypeRef noneT;
+    static LLVMValueRef noneV;
+    static LLVMValueRef falseV;
+    static LLVMValueRef trueV;
+    static LLVMAttributeRef attr_byval;
+    static LLVMAttributeRef attr_sret;
+    static LLVMAttributeRef attr_nonnull;
+    LLVMValueRef intrinsics[NumIntrinsics];
+#endif
+
     spv::SpvBuildLogger logger;
     spv::Builder builder;
-    SCCBuilder scc;
 
-    Label *active_function;
-    spv::Function *active_function_value;
     spv::Id glsl_ext_inst;
-
     bool use_debug_info;
+    Function *active_function;
+    int functions_generated;
 
-    std::unordered_map<Label *, spv::Function *> label2func;
-    std::unordered_map< std::pair<spv::Function *, Label *>,
-        spv::Block *, HashFuncLabelPair> label2bb;
-    std::vector< std::pair<Label *, Label *> > bb_label_todo;
+    static const Type *arguments_to_tuple(const Type *T) {
+        if (isa<ArgumentsType>(T)) {
+            return cast<ArgumentsType>(T)->to_tuple_type();
+        }
+        return T;
+    }
 
-    //std::unordered_map<Label *, LLVMValueRef> label2md;
-    //std::unordered_map<SourceFile *, LLVMValueRef> file2value;
-    std::unordered_map< ParamKey, spv::Id, HashFuncParamPair> param2value;
+    static const Type *abi_return_type(const FunctionType *ft) {
+        if (ft->has_exception()) {
+            Types types = { TYPE_Bool, ft->except_type };
+            if (is_returning_value(ft->return_type)) {
+                types.push_back(arguments_to_tuple(ft->return_type));
+            }
+            return tuple_type(types).assert_ok();
+        } else if (is_returning_value(ft->return_type)) {
+            return arguments_to_tuple(ft->return_type);
+        } else {
+            return empty_arguments_type();
+        }
+    }
 
-    std::unordered_map<std::pair<const Type *, uint64_t>,
-        spv::Id, HashTypeFlagsPair> type_cache;
+    struct TryInfo {
+        spv::Block *bb_except;
+        Ids except_values;
 
-    std::unordered_map<Any, spv::Id, Any::Hash> const_cache;
+        TryInfo() :
+            bb_except(nullptr)
+        {}
 
-    Label::UserMap user_map;
+        void clear() {
+            bb_except = nullptr;
+            except_values.clear();
+        }
+    };
+
+    TryInfo try_info;
+
+    struct LoopInfo {
+        LoopLabel *loop;
+        spv::Block *bb_loop;
+        Ids repeat_values;
+
+        LoopInfo() :
+            loop(nullptr),
+            bb_loop(nullptr)
+        {}
+    };
+
+    LoopInfo loop_info;
+
+    struct LabelInfo {
+        Label *label;
+        spv::Block *bb_merge;
+        Ids merge_values;
+
+        LabelInfo() :
+            label(nullptr),
+            bb_merge(nullptr)
+        {}
+    };
+
+    std::vector<LabelInfo> label_info_stack;
+
+#if 0
+    template<unsigned N>
+    static LLVMAttributeRef get_attribute(const char (&s)[N]) {
+        unsigned kind = LLVMGetEnumAttributeKindForName(s, N - 1);
+        assert(kind);
+        return LLVMCreateEnumAttribute(LLVMGetGlobalContext(), kind, 0);
+    }
+#endif
 
     SPIRVGenerator() :
         builder('S' << 24 | 'C' << 16 | 'O' << 8 | 'P', &logger),
-        active_function(nullptr),
-        active_function_value(nullptr),
         glsl_ext_inst(0),
-        use_debug_info(true) {
-
+        use_debug_info(true),
+        active_function(nullptr),
+        functions_generated(0) {
+        static_init();
+        #if 0
+        for (int i = 0; i < NumIntrinsics; ++i) {
+            intrinsics[i] = nullptr;
+        }
+        #endif
     }
 
     static SCOPES_RESULT(spv::Dim) dim_from_symbol(Symbol sym) {
@@ -197,7 +290,7 @@ struct SPIRVGenerator {
         return spv::DimMax;
     }
 
-    SCOPES_RESULT(spv::ImageFormat) image_format_from_symbol(Symbol sym) {
+    static SCOPES_RESULT(spv::ImageFormat) image_format_from_symbol(Symbol sym) {
         SCOPES_RESULT_TYPE(spv::ImageFormat);
         switch(sym.value()) {
         #define T(NAME) \
@@ -229,7 +322,7 @@ struct SPIRVGenerator {
         return spv::ExecutionModeMax;
     }
 
-    SCOPES_RESULT(spv::StorageClass) storage_class_from_extern_class(Symbol sym) {
+    static SCOPES_RESULT(spv::StorageClass) storage_class_from_extern_class(Symbol sym) {
         SCOPES_RESULT_TYPE(spv::StorageClass);
         switch(sym.value()) {
         #define T(NAME) \
@@ -251,1292 +344,311 @@ struct SPIRVGenerator {
         return spv::StorageClassMax;
     }
 
-    bool parameter_is_bound(Parameter *param) {
-        return param2value.find({active_function_value, param}) != param2value.end();
-    }
+    #if 0
+    LLVMValueRef get_intrinsic(Intrinsic op) {
+        if (!intrinsics[op]) {
+            LLVMValueRef result = nullptr;
+            switch(op) {
+#define LLVM_INTRINSIC_IMPL(ENUMVAL, RETTYPE, STRNAME, ...) \
+    case ENUMVAL: { \
+        LLVMTypeRef argtypes[] = {__VA_ARGS__}; \
+        result = LLVMAddFunction(module, STRNAME, LLVMFunctionType(RETTYPE, argtypes, sizeof(argtypes) / sizeof(LLVMTypeRef), false)); \
+    } break;
 
-    SCOPES_RESULT(spv::Id) resolve_parameter(Parameter *param) {
-        SCOPES_RESULT_TYPE(spv::Id);
-        auto it = param2value.find({active_function_value, param});
-        if (it == param2value.end()) {
-            assert(active_function_value);
-            if (param->label) {
-                location_message(param->label->anchor, String::from("declared here"));
+#define LLVM_INTRINSIC_IMPL_BEGIN(ENUMVAL, RETTYPE, STRNAME, ...) \
+    case ENUMVAL: { \
+        LLVMTypeRef argtypes[] = { __VA_ARGS__ }; \
+        result = LLVMAddFunction(module, STRNAME, \
+            LLVMFunctionType(f32T, argtypes, sizeof(argtypes) / sizeof(LLVMTypeRef), false)); \
+        LLVMSetLinkage(result, LLVMPrivateLinkage); \
+        auto bb = LLVMAppendBasicBlock(result, ""); \
+        auto oldbb = LLVMGetInsertBlock(builder); \
+        position_builder_at_end(bb);
+
+#define LLVM_INTRINSIC_IMPL_END() \
+        position_builder_at_end(oldbb); \
+    } break;
+
+            LLVM_INTRINSIC_IMPL(llvm_sin_f32, f32T, "llvm.sin.f32", f32T)
+            LLVM_INTRINSIC_IMPL(llvm_sin_f64, f64T, "llvm.sin.f64", f64T)
+            LLVM_INTRINSIC_IMPL(llvm_cos_f32, f32T, "llvm.cos.f32", f32T)
+            LLVM_INTRINSIC_IMPL(llvm_cos_f64, f64T, "llvm.cos.f64", f64T)
+
+            LLVM_INTRINSIC_IMPL(llvm_sqrt_f32, f32T, "llvm.sqrt.f32", f32T)
+            LLVM_INTRINSIC_IMPL(llvm_sqrt_f64, f64T, "llvm.sqrt.f64", f64T)
+            LLVM_INTRINSIC_IMPL(llvm_fabs_f32, f32T, "llvm.fabs.f32", f32T)
+            LLVM_INTRINSIC_IMPL(llvm_fabs_f64, f64T, "llvm.fabs.f64", f64T)
+            LLVM_INTRINSIC_IMPL(llvm_trunc_f32, f32T, "llvm.trunc.f32", f32T)
+            LLVM_INTRINSIC_IMPL(llvm_trunc_f64, f64T, "llvm.trunc.f64", f64T)
+            LLVM_INTRINSIC_IMPL(llvm_floor_f32, f32T, "llvm.floor.f32", f32T)
+            LLVM_INTRINSIC_IMPL(llvm_floor_f64, f64T, "llvm.floor.f64", f64T)
+            LLVM_INTRINSIC_IMPL(llvm_pow_f32, f32T, "llvm.pow.f32", f32T, f32T)
+            LLVM_INTRINSIC_IMPL(llvm_pow_f64, f64T, "llvm.pow.f64", f64T, f64T)
+            LLVM_INTRINSIC_IMPL(llvm_exp_f32, f32T, "llvm.exp.f32", f32T)
+            LLVM_INTRINSIC_IMPL(llvm_exp_f64, f64T, "llvm.exp.f64", f64T)
+            LLVM_INTRINSIC_IMPL(llvm_log_f32, f32T, "llvm.log.f32", f32T)
+            LLVM_INTRINSIC_IMPL(llvm_log_f64, f64T, "llvm.log.f64", f64T)
+            LLVM_INTRINSIC_IMPL(llvm_exp2_f32, f32T, "llvm.exp2.f32", f32T)
+            LLVM_INTRINSIC_IMPL(llvm_exp2_f64, f64T, "llvm.exp2.f64", f64T)
+            LLVM_INTRINSIC_IMPL(llvm_log2_f32, f32T, "llvm.log2.f32", f32T)
+            LLVM_INTRINSIC_IMPL(llvm_log2_f64, f64T, "llvm.log2.f64", f64T)
+            LLVM_INTRINSIC_IMPL_BEGIN(custom_fsign_f32, f32T, "custom.fsign.f32", f32T)
+                // (0 < val) - (val < 0)
+                LLVMValueRef val = LLVMGetParam(result, 0);
+                LLVMValueRef zero = LLVMConstReal(f32T, 0.0);
+                LLVMValueRef a = LLVMBuildZExt(builder, LLVMBuildFCmp(builder, LLVMRealOLT, zero, val, ""), i8T, "");
+                LLVMValueRef b = LLVMBuildZExt(builder, LLVMBuildFCmp(builder, LLVMRealOLT, val, zero, ""), i8T, "");
+                val = LLVMBuildSub(builder, a, b, "");
+                val = LLVMBuildSIToFP(builder, val, f32T, "");
+                LLVMBuildRet(builder, val);
+            LLVM_INTRINSIC_IMPL_END()
+            LLVM_INTRINSIC_IMPL_BEGIN(custom_fsign_f64, f64T, "custom.fsign.f64", f64T)
+                // (0 < val) - (val < 0)
+                LLVMValueRef val = LLVMGetParam(result, 0);
+                LLVMValueRef zero = LLVMConstReal(f64T, 0.0);
+                LLVMValueRef a = LLVMBuildZExt(builder, LLVMBuildFCmp(builder, LLVMRealOLT, zero, val, ""), i8T, "");
+                LLVMValueRef b = LLVMBuildZExt(builder, LLVMBuildFCmp(builder, LLVMRealOLT, val, zero, ""), i8T, "");
+                val = LLVMBuildSub(builder, a, b, "");
+                val = LLVMBuildSIToFP(builder, val, f64T, "");
+                LLVMBuildRet(builder, val);
+            LLVM_INTRINSIC_IMPL_END()
+            LLVM_INTRINSIC_IMPL_BEGIN(custom_radians_f32, f32T, "custom.radians.f32", f32T)
+                LLVMBuildRet(builder, LLVMBuildFMul(builder,
+                    LLVMGetParam(result, 0), LLVMConstReal(f32T, deg2rad), ""));
+            LLVM_INTRINSIC_IMPL_END()
+            LLVM_INTRINSIC_IMPL_BEGIN(custom_radians_f64, f64T, "custom.radians.f64", f64T)
+                LLVMBuildRet(builder, LLVMBuildFMul(builder,
+                    LLVMGetParam(result, 0), LLVMConstReal(f64T, deg2rad), ""));
+            LLVM_INTRINSIC_IMPL_END()
+            LLVM_INTRINSIC_IMPL_BEGIN(custom_degrees_f32, f32T, "custom.degrees.f32", f32T)
+                LLVMBuildRet(builder, LLVMBuildFMul(builder,
+                    LLVMGetParam(result, 0), LLVMConstReal(f32T, rad2deg), ""));
+            LLVM_INTRINSIC_IMPL_END()
+            LLVM_INTRINSIC_IMPL_BEGIN(custom_degrees_f64, f64T, "custom.degrees.f64", f64T)
+                LLVMBuildRet(builder, LLVMBuildFMul(builder,
+                    LLVMGetParam(result, 0), LLVMConstReal(f64T, rad2deg), ""));
+            LLVM_INTRINSIC_IMPL_END()
+#undef LLVM_INTRINSIC_IMPL
+#undef LLVM_INTRINSIC_IMPL_BEGIN
+#undef LLVM_INTRINSIC_IMPL_END
+            default: assert(false); break;
             }
-            StyledString ss;
-            ss.out << "IL->SPIR: can't access free variable " << param;
-            SCOPES_LOCATION_ERROR(ss.str());
+            intrinsics[op] = result;
         }
-        assert(it->second);
-        return it->second;
+        return intrinsics[op];
+    }
+    #endif
+
+    static void static_init() {
+        /*
+        if (voidT) return;
+        voidT = LLVMVoidType();
+        i1T = LLVMInt1Type();
+        i8T = LLVMInt8Type();
+        i16T = LLVMInt16Type();
+        i32T = LLVMInt32Type();
+        i64T = LLVMInt64Type();
+        f32T = LLVMFloatType();
+        f32x2T = LLVMVectorType(f32T, 2);
+        f64T = LLVMDoubleType();
+        noneV = LLVMConstStruct(nullptr, 0, false);
+        noneT = LLVMTypeOf(noneV);
+        rawstringT = LLVMPointerType(LLVMInt8Type(), 0);
+        falseV = LLVMConstInt(i1T, 0, false);
+        trueV = LLVMConstInt(i1T, 1, false);
+        attr_byval = get_attribute("byval");
+        attr_sret = get_attribute("sret");
+        attr_nonnull = get_attribute("nonnull");
+
+        LLVMContextSetDiagnosticHandler(LLVMGetGlobalContext(),
+            diag_handler,
+            nullptr);
+        */
     }
 
-    SCOPES_RESULT(spv::Id) argument_to_value(Any value) {
-        SCOPES_RESULT_TYPE(spv::Id);
-        if (value.type == TYPE_Parameter) {
-            return resolve_parameter(value.parameter);
-        }
-        if (value.type != TYPE_String) {
-            switch(value.type->kind()) {
-            case TK_Integer: {
-                auto it = cast<IntegerType>(value.type);
-                if (it->issigned) {
-                    switch(it->width) {
-                    case 8: return builder.makeIntConstant(
-                        builder.makeIntegerType(8, true), value.i8);
-                    case 16: return builder.makeIntConstant(
-                        builder.makeIntegerType(16, true), value.i16);
-                    case 32: return builder.makeIntConstant(value.i32);
-                    case 64: return builder.makeInt64Constant(value.i64);
-                    default: break;
-                    }
-                } else {
-                    switch(it->width) {
-                    case 1: return builder.makeBoolConstant(value.i1);
-                    case 8: return builder.makeIntConstant(
-                        builder.makeIntegerType(8, false), value.i8);
-                    case 16: return builder.makeIntConstant(
-                        builder.makeIntegerType(16, false), value.i16);
-                    case 32: return builder.makeUintConstant(value.u32);
-                    case 64: return builder.makeUint64Constant(value.u64);
-                    default: break;
-                    }
-                }
-                StyledString ss;
-                ss.out << "IL->SPIR: unsupported integer constant type " << value.type;
-                SCOPES_LOCATION_ERROR(ss.str());
+#if 0
+    static LLVMTypeRef abi_struct_type(const ABIClass *classes, size_t sz) {
+        LLVMTypeRef types[sz];
+        size_t k = 0;
+        for (size_t i = 0; i < sz; ++i) {
+            ABIClass cls = classes[i];
+            switch(cls) {
+            case ABI_CLASS_SSE: {
+                types[i] = f32x2T; k++;
             } break;
-            case TK_Real: {
-                auto rt = cast<RealType>(value.type);
-                switch(rt->width) {
-                case 32: return builder.makeFloatConstant(value.f32);
-                case 64: return builder.makeDoubleConstant(value.f64);
-                default: break;
-                }
-                StyledString ss;
-                ss.out << "IL->SPIR: unsupported real constant type " << value.type;
-                SCOPES_LOCATION_ERROR(ss.str());
+            case ABI_CLASS_SSESF: {
+                types[i] = f32T; k++;
             } break;
-            case TK_Pointer: {
-                if (is_function_pointer(value.type)) {
-                    StyledString ss;
-                    ss.out << "IL->SPIR: function pointer constants are unsupported";
-                    SCOPES_LOCATION_ERROR(ss.str());
-                }
-                auto pt = cast<PointerType>(value.type);
-                auto val = SCOPES_GET_RESULT(argument_to_value(SCOPES_GET_RESULT(pt->unpack(value.pointer))));
-                auto id = builder.createVariable(spv::StorageClassFunction,
-                    builder.getTypeId(val), nullptr);
-                builder.getInstruction(id)->addIdOperand(val);
-                return id;
+            case ABI_CLASS_SSEDF: {
+                types[i] = f64T; k++;
             } break;
-            case TK_Typename: {
-                auto tn = cast<TypenameType>(value.type);
-                assert(tn->finalized());
-                Any storage_value = value;
-                storage_value.type = tn->storage_type;
-                return argument_to_value(storage_value);
+            case ABI_CLASS_INTEGER: {
+                types[i] = i64T; k++;
             } break;
-            case TK_Array: {
-                auto ai = cast<ArrayType>(value.type);
-                size_t count = ai->count;
-                std::vector<spv::Id> values;
-                for (size_t i = 0; i < count; ++i) {
-                    values.push_back(SCOPES_GET_RESULT(argument_to_value(SCOPES_GET_RESULT(ai->unpack(value.pointer, i)))));
-                }
-                return builder.makeCompositeConstant(
-                    SCOPES_GET_RESULT(type_to_spirv_type(value.type)), values);
+            case ABI_CLASS_INTEGERSI: {
+                types[i] = i32T; k++;
             } break;
-            case TK_Vector: {
-                auto vi = cast<VectorType>(value.type);
-                size_t count = vi->count;
-                std::vector<spv::Id> values;
-                for (size_t i = 0; i < count; ++i) {
-                    values.push_back(SCOPES_GET_RESULT(argument_to_value(SCOPES_GET_RESULT(vi->unpack(value.pointer, i)))));
-                }
-                return builder.makeCompositeConstant(
-                    SCOPES_GET_RESULT(type_to_spirv_type(value.type)), values);
+            case ABI_CLASS_INTEGERSI16: {
+                types[i] = i16T; k++;
             } break;
-            case TK_Tuple: {
-                auto ti = cast<TupleType>(value.type);
-                size_t count = ti->types.size();
-                std::vector<spv::Id> values;
-                for (size_t i = 0; i < count; ++i) {
-                    values.push_back(SCOPES_GET_RESULT(argument_to_value(SCOPES_GET_RESULT(ti->unpack(value.pointer, i)))));
-                }
-                return builder.makeCompositeConstant(
-                    SCOPES_GET_RESULT(type_to_spirv_type(value.type)), values);
-            } break;
-            case TK_Union: {
-                auto ui = cast<UnionType>(value.type);
-                value.type = ui->tuple_type;
-                return argument_to_value(value);
+            case ABI_CLASS_INTEGERSI8: {
+                types[i] = i8T; k++;
             } break;
             default: {
-            } break;
-            }
-        }
-        auto it = const_cache.find(value);
-        if (it != const_cache.end()) {
-            return it->second;
-        }
-        auto id = SCOPES_GET_RESULT(create_spirv_value(value));
-        const_cache.insert({ value, id });
-        return id;
-    }
-
-    SCOPES_RESULT(spv::Id) create_spirv_value(Any value) {
-        SCOPES_RESULT_TYPE(spv::Id);
-        if (value.type == TYPE_String) {
-            return builder.createString(value.string->data);
-        }
-        switch(value.type->kind()) {
-        case TK_Extern: {
-            auto et = cast<ExternType>(value.type);
-            spv::StorageClass sc = SCOPES_GET_RESULT(storage_class_from_extern_class(
-                et->storage_class));
-            const char *name = nullptr;
-            spv::BuiltIn builtin = spv::BuiltInMax;
-            switch(value.symbol.value()) {
-            #define T(NAME) \
-            case SYM_SPIRV_BuiltIn ## NAME: \
-                builtin = spv::BuiltIn ## NAME; break;
-                B_SPIRV_BUILTINS()
-            #undef T
-                default:
-                    name = value.symbol.name()->data;
-                    break;
-            }
-            auto ty = SCOPES_GET_RESULT(type_to_spirv_type(et->type, et->flags));
-            auto id = builder.createVariable(sc, ty, name);
-            if (builtin != spv::BuiltInMax) {
-                builder.addDecoration(id, spv::DecorationBuiltIn, builtin);
-            }
-            switch(sc) {
-            case spv::StorageClassUniformConstant:
-            case spv::StorageClassUniform: {
-                //builder.addDecoration(id, spv::DecorationDescriptorSet, 0);
-                if (et->binding >= 0) {
-                    builder.addDecoration(id, spv::DecorationBinding, et->binding);
-                }
-                if (et->location >= 0) {
-                    builder.addDecoration(id, spv::DecorationLocation, et->location);
-                }
-                if (builder.isImageType(ty)) {
-                    auto flags = et->flags;
-                    if (flags & EF_Volatile) {
-                        builder.addDecoration(id, spv::DecorationVolatile);
-                    }
-                    if (flags & EF_Coherent) {
-                        builder.addDecoration(id, spv::DecorationCoherent);
-                    }
-                    if (flags & EF_Restrict) {
-                        builder.addDecoration(id, spv::DecorationRestrict);
-                    }
-                    if (flags & EF_NonWritable) {
-                        builder.addDecoration(id, spv::DecorationNonWritable);
-                    }
-                    if (flags & EF_NonReadable) {
-                        builder.addDecoration(id, spv::DecorationNonReadable);
-                    }
-                }
-            } break;
-            default: {
-                if (et->location >= 0) {
-                    builder.addDecoration(id, spv::DecorationLocation, et->location);
-                }
-            } break;
-            }
-            return id;
-        } break;
-        default: break;
-        };
-
-        StyledString ss;
-        ss.out << "IL->SPIR: cannot convert argument of type " << value.type;
-        SCOPES_LOCATION_ERROR(ss.str());
-        return 0;
-    }
-
-    bool is_bool(spv::Id value) {
-        auto T = builder.getTypeId(value);
-        return
-            (builder.isVectorType(T)
-             && builder.isBoolType(builder.getContainedTypeId(T)))
-            || builder.isBoolType(T);
-    }
-
-    SCOPES_RESULT(void) write_anchor(const Anchor *anchor) {
-        SCOPES_RESULT_TYPE(void);
-        assert(anchor);
-        assert(anchor->file);
-        if (use_debug_info) {
-            builder.addLine(
-                SCOPES_GET_RESULT(argument_to_value(anchor->path().name())),
-                anchor->lineno, anchor->column);
-        }
-        return true;
-    }
-
-    // set of processed SCC groups
-    std::unordered_set<size_t> handled_loops;
-
-    Label *lowest_common_ancestor(Label *a, Label *b, bool verbose = false) {
-        // walk both labels simultaneously and stop as soon as we find a
-        // collision with the other label's set
-        std::unordered_set<Label *> done[2];
-        Label *labels[2] = { a, b };
-        while (labels[0] || labels[1]) {
-            for (int i = 0; i < 2; ++i) {
-                Label *l = labels[i];
-                if (!l)
-                    continue;
-                if (!done[i].count(l)) {
-                    if (verbose) {
-                        StyledStream ss;
-                        ss << "argument " << i << std::endl;
-                        StreamLabelFormat fmt = StreamLabelFormat::single();
-                        fmt.anchors = StreamLabelFormat::Line;
-                        stream_label(ss, l, fmt);
-                    }
-                    if (done[(i+1)&1].count(l)) {
-                        return l;
-                    }
-                    done[i].insert(l);
-                    assert (l->is_basic_block_like());
-                    auto &&enter = l->body.enter;
-                    auto &&args = l->body.args;
-                    if ((enter.type == TYPE_Builtin)
-                        && (enter.builtin.value() == FN_Branch)) {
-                        assert(args.size() >= 4);
-                        Label *then_label = args[2].value;
-                        //Label *else_label = args[3].value;
-                        labels[i] = then_label;
-                        continue;
-                    } else if (!l->is_jumping()) {
-                        Any arg = l->body.args[0].value;
-                        if (arg.type == TYPE_Label) {
-                            labels[i] = arg;
-                            continue;
-                        }
-                    } else if (enter.type == TYPE_Label) {
-                        labels[i] = enter;
-                        continue;
-                    }
-                }
-                labels[i] = nullptr;
-            }
-        }
-
-        return nullptr;
-    }
-
-    SCOPES_RESULT(bool) handle_loop_label (Label *label,
-        Label *&continue_label,
-        Label *&break_label) {
-        SCOPES_RESULT_TYPE(bool);
-        auto &&group = scc.group(label);
-        if (group.labels.size() <= 1)
-            return false;
-        if (handled_loops.count(group.index))
-            return false;
-        handled_loops.insert(group.index);
-        auto &&labels = group.labels;
-        Label *header_label = label;
-        continue_label = nullptr;
-        break_label = nullptr;
-        std::unordered_set<Label *> break_labels;
-        size_t count = labels.size();
-        for (size_t i = 0; i < count; ++i) {
-            Label *l = labels[i];
-            if (l->is_calling(header_label)
-                || l->is_continuing_to(header_label)) {
-                if (continue_label) {
-                    StyledStream ss;
-                    ss << header_label->anchor << " for this loop" << std::endl;
-                    ss << continue_label->body.anchor << " previous continue is here" << std::endl;
-                    //stream_label(ss, continue_label, StreamLabelFormat::debug_single());
-                    //stream_label(ss, l, StreamLabelFormat::debug_single());
-                    set_active_anchor(l->body.anchor);
-                    SCOPES_LOCATION_ERROR(String::from(
-                        "IL->SPIR: duplicate continue label found. only one continue label is permitted per loop."));
-                }
-                continue_label = l;
-            }
-            auto &&enter = l->body.enter;
-            if ((enter.type == TYPE_Builtin)
-                && (enter.builtin.value() == FN_Branch)) {
-                auto &&args = l->body.args;
-                assert(args.size() >= 4);
-                Label *then_label = args[2].value;
-                Label *else_label = args[3].value;
-                if (scc.group_id(then_label) != group.index) {
-                    break_labels.insert(then_label);
-                } else if (scc.group_id(else_label) != group.index) {
-                    break_labels.insert(else_label);
-                }
-            }
-        }
-        assert(continue_label);
-        assert(continue_label->is_basic_block_like());
-
-        if (break_labels.empty()) {
-            SCOPES_LOCATION_ERROR(String::from(
-                "IL->SPIR: loop is infinite"));
-        }
-
-        // as long as the continue label is dominated by a single predecessor, the
-        // predecessor becomes the continue label; that way we move as much
-        // unconditional code as possible into the continue section
-        while (true) {
-            Label *label = get_single_caller(continue_label);
-            if (!label)
-                break;
-            continue_label = label;
-        }
-
-        if (break_labels.size() > 1) {
-            Label *lca = nullptr;
-            for (auto label : break_labels) {
-                if (!lca) {
-                    lca = label;
-                } else {
-                    lca = lowest_common_ancestor(lca, label);
-                    if (!lca)
-                        break;
-                }
-            }
-            if (!lca) {
+                // do nothing
+#if 0
                 StyledStream ss;
-                ss << header_label->anchor << " for this loop" << std::endl;
-                for (auto label : break_labels) {
-                    ss << label->anchor << " found exit point" << std::endl;
-                    label->anchor->stream_source_line(ss);
-                    if (!lca) {
-                        lca = label;
-                    } else {
-                        Label *old_lca = lca;
-                        lca = lowest_common_ancestor(lca, label);
-                        if (lca) {
-                            ss << lca->anchor << " found merge candidate" << std::endl;
-                            lca->anchor->stream_source_line(ss);
-                        } else {
-                            ss << label->anchor << " but exits function" << std::endl;
-                            lca = old_lca;
-                        }
-                    }
-                }
-                SCOPES_LOCATION_ERROR(String::from(
-                    "IL->SPIR: cannot merge multiple loop exit points."));
+                ss << "unhandled ABI class: " <<
+                    abi_class_to_string(cls) << std::endl;
+#endif
+            } break;
             }
-            break_label = lca;
-        } else {
-            break_label = *break_labels.begin();
         }
-
-        assert(break_label->is_basic_block_like());
-        #if 0
-        StyledStream ss;
-        ss << "loop found:" << std::endl;
-        ss << "    labels in group:";
-        for (size_t i = 0; i < count; ++i) {
-            ss << " " << labels[i];
-        }
-        ss << std::endl;
-        ss << "    entry: " << label << std::endl;
-        if (continue_label) {
-            ss << "    continue: " << continue_label << std::endl;
-        }
-        if (break_label) {
-            ss << "    break: " << break_label << std::endl;
-        }
-        #endif
-        return true;
+        if (k != sz) return nullptr;
+        return LLVMStructType(types, sz, false);
     }
+#endif
 
-    spv::Id build_extract_image(spv::Id value) {
-        spv::Id typeId = builder.getTypeId(value);
-        if (builder.isSampledImageType(typeId)) {
-            spv::Id imgtypeId = builder.getImageType(value);
-            return builder.createUnaryOp(spv::OpImage, imgtypeId, value);
+#if 0
+    SCOPES_RESULT(LLVMValueRef) abi_import_argument(const Type *param_type, LLVMValueRef func, size_t &k) {
+        SCOPES_RESULT_TYPE(LLVMValueRef);
+        ABIClass classes[MAX_ABI_CLASSES];
+        size_t sz = abi_classify(param_type, classes);
+        if (!sz) {
+            LLVMValueRef val = LLVMGetParam(func, k++);
+            return LLVMBuildLoad(builder, val, "");
         }
-        return value;
+        LLVMTypeRef T = SCOPES_GET_RESULT(type_to_llvm_type(param_type));
+        auto tk = LLVMGetTypeKind(T);
+        if (tk == LLVMStructTypeKind) {
+            auto ST = abi_struct_type(classes, sz);
+            if (ST) {
+                // reassemble from argument-sized bits
+                auto ptr = safe_alloca(ST);
+                auto zero = LLVMConstInt(i32T,0,false);
+                for (size_t i = 0; i < sz; ++i) {
+                    LLVMValueRef indices[] = {
+                        zero, LLVMConstInt(i32T,i,false),
+                    };
+                    auto dest = LLVMBuildGEP(builder, ptr, indices, 2, "");
+                    LLVMBuildStore(builder, LLVMGetParam(func, k++), dest);
+                }
+                ptr = LLVMBuildBitCast(builder, ptr, LLVMPointerType(T, 0), "");
+                return LLVMBuildLoad(builder, ptr, "");
+            }
+        }
+        LLVMValueRef val = LLVMGetParam(func, k++);
+        assert(val);
+        return val;
     }
+#endif
 
-    void bind_parameter(Parameter *param, spv::Id value) {
-        assert(value);
-        param2value[{active_function_value, param}] = value;
-    }
-
-    SCOPES_RESULT(void) write_label_body(Label *label) {
-    repeat:
+#if 0
+    SCOPES_RESULT(void) abi_export_argument(LLVMValueRef val, const Type *AT,
+        LLVMValueRefs &values, std::vector<size_t> &memptrs) {
         SCOPES_RESULT_TYPE(void);
-        assert(label->body.is_complete());
-
-        auto &&body = label->body;
-        auto &&enter = body.enter;
-        auto &&args = body.args;
-
-        set_active_anchor(label->body.anchor);
-
-        SCOPES_CHECK_RESULT(write_anchor(label->body.anchor));
-
-        Label *continue_label = nullptr;
-        Label *break_label = nullptr;
-        if (SCOPES_GET_RESULT(handle_loop_label(label, continue_label, break_label))) {
-            spv::Block *bb_continue = nullptr;
-            spv::Block *bb_merge = nullptr;
-            unsigned int control = spv::LoopControlMaskNone;
-            bb_continue = SCOPES_GET_RESULT(label_to_basic_block(continue_label, true));
-            bb_merge = SCOPES_GET_RESULT(label_to_basic_block(break_label, true));
-            builder.createLoopMerge(bb_merge, bb_continue, control);
-            auto bb = &builder.makeNewBlock();
-            builder.createBranch(bb);
-            builder.setBuildPoint(bb);
+        ABIClass classes[MAX_ABI_CLASSES];
+        size_t sz = abi_classify(AT, classes);
+        if (!sz) {
+            LLVMValueRef ptrval = safe_alloca(SCOPES_GET_RESULT(type_to_llvm_type(AT)));
+            LLVMBuildStore(builder, val, ptrval);
+            val = ptrval;
+            memptrs.push_back(values.size());
+            values.push_back(val);
+            return {};
         }
-
-        assert(!args.empty());
-        size_t argcount = args.size() - 1;
-        size_t argn = 1;
-#define READ_ANY(NAME) \
-        assert(argn <= argcount); \
-        Any &NAME = args[argn++].value;
-#define READ_VALUE(NAME) \
-        assert(argn <= argcount); \
-        auto && _arg_ ## NAME = args[argn++]; \
-        auto && _ ## NAME = _arg_ ## NAME .value; \
-        spv::Id NAME = SCOPES_GET_RESULT(argument_to_value(_ ## NAME));
-#define READ_LABEL_BLOCK(NAME) \
-        assert(argn <= argcount); \
-        spv::Block *NAME = SCOPES_GET_RESULT(label_to_basic_block(args[argn++].value)); \
-        assert(NAME);
-#define READ_TYPE(NAME) \
-        assert(argn <= argcount); \
-        assert(args[argn].value.type == TYPE_Type); \
-        spv::Id NAME = SCOPES_GET_RESULT(type_to_spirv_type(args[argn++].value.typeref));
-
-        spv::Id retvalue = 0;
-        ReturnTraits rtraits;
-        if (enter.type == TYPE_Builtin) {
-            switch(enter.builtin.value()) {
-            case FN_Sample: {
-                READ_VALUE(sampler);
-                READ_VALUE(coords);
-                spv::Builder::TextureParameters params;
-                memset(&params, 0, sizeof(params));
-                params.sampler = sampler;
-                params.coords = coords;
-                auto ST = SCOPES_GET_RESULT(storage_type(_sampler.indirect_type()));
-                if (ST->kind() == TK_SampledImage) {
-                    ST = SCOPES_GET_RESULT(storage_type(cast<SampledImageType>(ST)->type));
+        auto tk = LLVMGetTypeKind(LLVMTypeOf(val));
+        if (tk == LLVMStructTypeKind) {
+            auto ST = abi_struct_type(classes, sz);
+            if (ST) {
+                // break into argument-sized bits
+                auto ptr = safe_alloca(LLVMTypeOf(val));
+                auto zero = LLVMConstInt(i32T,0,false);
+                LLVMBuildStore(builder, val, ptr);
+                ptr = LLVMBuildBitCast(builder, ptr, LLVMPointerType(ST, 0), "");
+                for (size_t i = 0; i < sz; ++i) {
+                    LLVMValueRef indices[] = {
+                        zero, LLVMConstInt(i32T,i,false),
+                    };
+                    auto val = LLVMBuildGEP(builder, ptr, indices, 2, "");
+                    val = LLVMBuildLoad(builder, val, "");
+                    values.push_back(val);
                 }
-                auto resultType = SCOPES_GET_RESULT(type_to_spirv_type(cast<ImageType>(ST)->type));
-                bool sparse = false;
-                bool fetch = false;
-                bool proj = false;
-                bool gather = false;
-                bool explicitLod = false;
-                while (argn <= argcount) {
-                    READ_VALUE(value);
-                    switch (_arg_value.key.value()) {
-                        case SYM_SPIRV_ImageOperandLod: params.lod = value; break;
-                        case SYM_SPIRV_ImageOperandBias: params.bias = value; break;
-                        case SYM_SPIRV_ImageOperandDref: params.Dref = value; break;
-                        case SYM_SPIRV_ImageOperandProj: proj = true; break;
-                        case SYM_SPIRV_ImageOperandFetch: fetch = true; break;
-                        case SYM_SPIRV_ImageOperandGradX: params.gradX = value; break;
-                        case SYM_SPIRV_ImageOperandGradY: params.gradY = value; break;
-                        case SYM_SPIRV_ImageOperandOffset: params.offset = value; break;
-                        case SYM_SPIRV_ImageOperandConstOffsets: params.offsets = value; break;
-                        case SYM_SPIRV_ImageOperandMinLod: params.lodClamp = value; break;
-                        case SYM_SPIRV_ImageOperandSample: params.sample = value; break;
-                        case SYM_SPIRV_ImageOperandGather: {
-                            params.component = value;
-                            gather = true;
-                        } break;
-                        case SYM_SPIRV_ImageOperandSparse: {
-                            params.texelOut = value;
-                            sparse = true;
-                        } break;
-                        default: break;
-                    }
-                }
-                if (fetch) {
-                    params.sampler = build_extract_image(sampler);
-                }
-                retvalue = builder.createTextureCall(
-                    spv::NoPrecision, resultType, sparse, fetch, proj, gather,
-                    explicitLod, params);
-            } break;
-            case FN_ImageQuerySize: {
-                READ_VALUE(sampler);
-                spv::Builder::TextureParameters params;
-                memset(&params, 0, sizeof(params));
-                params.sampler = build_extract_image(sampler);
-                spv::Op op = spv::OpImageQuerySize;
-                while (argn <= argcount) {
-                    READ_VALUE(value);
-                    switch (_arg_value.key.value()) {
-                        case SYM_SPIRV_ImageOperandLod:
-                            op = spv::OpImageQuerySizeLod;
-                            params.lod = value; break;
-                        default: break;
-                    }
-                }
-                retvalue = builder.createTextureQueryCall(op, params, false);
-            } break;
-            case FN_ImageQueryLod: {
-                READ_VALUE(sampler);
-                READ_VALUE(coords);
-                spv::Builder::TextureParameters params;
-                memset(&params, 0, sizeof(params));
-                params.sampler = sampler;
-                params.coords = coords;
-                retvalue = builder.createTextureQueryCall(
-                    spv::OpImageQueryLod, params, false);
-            } break;
-            case FN_ImageQueryLevels: {
-                READ_VALUE(sampler);
-                spv::Builder::TextureParameters params;
-                memset(&params, 0, sizeof(params));
-                params.sampler = build_extract_image(sampler);
-                retvalue = builder.createTextureQueryCall(
-                    spv::OpImageQueryLevels, params, false);
-            } break;
-            case FN_ImageQuerySamples: {
-                READ_VALUE(sampler);
-                spv::Builder::TextureParameters params;
-                memset(&params, 0, sizeof(params));
-                params.sampler = build_extract_image(sampler);
-                retvalue = builder.createTextureQueryCall(
-                    spv::OpImageQuerySamples, params, false);
-            } break;
-            case FN_ImageRead: {
-                READ_VALUE(image);
-                READ_VALUE(coords);
-                auto ST = _image.indirect_type();
-                auto resultType = SCOPES_GET_RESULT(type_to_spirv_type(cast<ImageType>(ST)->type));
-                retvalue = builder.createBinOp(spv::OpImageRead,
-                    resultType, image, coords);
-            } break;
-            case FN_ImageWrite: {
-                READ_VALUE(image);
-                READ_VALUE(coords);
-                READ_VALUE(texel);
-                builder.createNoResultOp(spv::OpImageWrite, { image, coords, texel });
-            } break;
-            case FN_Branch: {
-                READ_VALUE(cond);
-                READ_LABEL_BLOCK(then_block);
-                READ_LABEL_BLOCK(else_block);
-                builder.createConditionalBranch(cond, then_block, else_block);
-                rtraits.terminated = true;
-            } break;
-            case OP_Tertiary: {
-                READ_VALUE(cond);
-                READ_VALUE(then_value);
-                READ_VALUE(else_value);
-                if (builder.isScalar(cond) && builder.isVector(then_value)) {
-                    // emulate LLVM's behavior for selecting full vectors with single booleans
-                    spv::Id elementT = builder.getTypeId(cond);
-                    spv::Id vectorT = builder.getTypeId(then_value);
-
-                    cond = builder.smearScalar(spv::NoPrecision, cond,
-                        builder.makeVectorType(elementT, builder.getNumTypeComponents(vectorT)));
-                }
-                retvalue = builder.createTriOp(spv::OpSelect,
-                    builder.getTypeId(then_value), cond,
-                    then_value, else_value);
-            } break;
-            case OP_FMix: {
-                READ_VALUE(a);
-                READ_VALUE(b);
-                READ_VALUE(x);
-                retvalue = builder.createBuiltinCall(
-                    builder.getTypeId(a),
-                    glsl_ext_inst, GLSLstd450FMix, { a, b, x });
-            } break;
-            case FN_Length:
-            case FN_Normalize:
-            case OP_Sin:
-            case OP_Cos:
-            case OP_Tan:
-            case OP_Asin:
-            case OP_Acos:
-            case OP_Atan:
-            case OP_Trunc:
-            case OP_Floor:
-            case OP_FAbs:
-            case OP_FSign:
-            case OP_Log:
-            case OP_Log2:
-            case OP_Exp:
-            case OP_Exp2:
-            case OP_Sqrt: {
-                READ_VALUE(val);
-                GLSLstd450 builtin = GLSLstd450Bad;
-                auto rtype = builder.getTypeId(val);
-                switch (enter.symbol.value()) {
-                case FN_Length:
-                    rtype = builder.getContainedTypeId(rtype);
-                    builtin = GLSLstd450Length; break;
-                case FN_Normalize: builtin = GLSLstd450Normalize; break;
-                case OP_Sin: builtin = GLSLstd450Sin; break;
-                case OP_Cos: builtin = GLSLstd450Cos; break;
-                case OP_Tan: builtin = GLSLstd450Tan; break;
-                case OP_Asin: builtin = GLSLstd450Asin; break;
-                case OP_Acos: builtin = GLSLstd450Acos; break;
-                case OP_Atan: builtin = GLSLstd450Atan; break;
-                case OP_Trunc: builtin = GLSLstd450Trunc; break;
-                case OP_Floor: builtin = GLSLstd450Floor; break;
-                case OP_FAbs: builtin = GLSLstd450FAbs; break;
-                case OP_FSign: builtin = GLSLstd450FSign; break;
-                case OP_Sqrt: builtin = GLSLstd450Sqrt; break;
-                case OP_Log: builtin = GLSLstd450Log; break;
-                case OP_Log2: builtin = GLSLstd450Log2; break;
-                case OP_Exp: builtin = GLSLstd450Exp; break;
-                case OP_Exp2: builtin = GLSLstd450Exp2; break;
-                default: {
-                    StyledString ss;
-                    ss.out << "IL->SPIR: unsupported unary intrinsic " << enter << " encountered";
-                    SCOPES_LOCATION_ERROR(ss.str());
-                } break;
-                }
-                retvalue = builder.createBuiltinCall(rtype, glsl_ext_inst, builtin, { val });
-            } break;
-            case FN_Cross:
-            case OP_Step:
-            case OP_Pow: {
-                READ_VALUE(a);
-                READ_VALUE(b);
-                GLSLstd450 builtin = GLSLstd450Bad;
-                auto rtype = builder.getTypeId(a);
-                switch (enter.symbol.value()) {
-                case OP_Step: builtin = GLSLstd450Step; break;
-                case OP_Pow: builtin = GLSLstd450Pow; break;
-                case FN_Cross: builtin = GLSLstd450Cross; break;
-                default: {
-                    StyledString ss;
-                    ss.out << "IL->SPIR: unsupported binary intrinsic " << enter << " encountered";
-                    SCOPES_LOCATION_ERROR(ss.str());
-                } break;
-                }
-                retvalue = builder.createBuiltinCall(rtype, glsl_ext_inst, builtin, { a, b });
-            } break;
-            case FN_Unconst: {
-                READ_VALUE(val);
-                retvalue = val;
-            } break;
-            case FN_ExtractValue: {
-                READ_VALUE(val);
-                READ_ANY(index);
-                int i = SCOPES_GET_RESULT(cast_number<unsigned>(index));
-                retvalue = builder.createCompositeExtract(val,
-                    builder.getContainedTypeId(builder.getTypeId(val), i),
-                    i);
-            } break;
-            case FN_InsertValue: {
-                READ_VALUE(val);
-                READ_VALUE(eltval);
-                READ_ANY(index);
-                retvalue = builder.createCompositeInsert(eltval, val,
-                    builder.getTypeId(val),
-                    SCOPES_GET_RESULT(cast_number<unsigned>(index)));
-            } break;
-            case FN_ExtractElement: {
-                READ_VALUE(val);
-                READ_VALUE(index);
-                if (_index.is_const()) {
-                    int i = SCOPES_GET_RESULT(cast_number<unsigned>(_index));
-                    retvalue = builder.createCompositeExtract(val,
-                        builder.getContainedTypeId(builder.getTypeId(val), i),
-                        i);
-                } else {
-                    retvalue = builder.createVectorExtractDynamic(val,
-                        builder.getContainedTypeId(builder.getTypeId(val)),
-                        index);
-                }
-            } break;
-            case FN_InsertElement: {
-                READ_VALUE(val);
-                READ_VALUE(eltval);
-                READ_VALUE(index);
-                if (_index.is_const()) {
-                    retvalue = builder.createCompositeInsert(eltval, val,
-                        builder.getTypeId(val),
-                        SCOPES_GET_RESULT(cast_number<unsigned>(_index)));
-                } else {
-                    retvalue = builder.createVectorInsertDynamic(val,
-                        builder.getTypeId(val), eltval, index);
-                }
-            } break;
-            case FN_ShuffleVector: {
-                READ_VALUE(v1);
-                READ_VALUE(v2);
-                READ_VALUE(mask);
-                auto ET = builder.getContainedTypeId(builder.getTypeId(v1));
-                auto sz = builder.getNumTypeComponents(builder.getTypeId(mask));
-                auto op = new spv::Instruction(
-                    builder.getUniqueId(),
-                    builder.makeVectorType(ET, sz),
-                    spv::OpVectorShuffle);
-                op->addIdOperand(v1);
-                op->addIdOperand(v2);
-                auto vt = cast<VectorType>(SCOPES_GET_RESULT(storage_type(_mask.type)));
-                for (int i = 0; i < sz; ++i) {
-                    op->addImmediateOperand(
-                        SCOPES_GET_RESULT(cast_number<unsigned int>(SCOPES_GET_RESULT(vt->unpack(_mask.pointer, i)))));
-                }
-                retvalue = op->getResultId();
-                builder.getBuildPoint()->addInstruction(
-                    std::unique_ptr<spv::Instruction>(op));
-            } break;
-            case FN_Undef: { READ_TYPE(ty);
-                retvalue = builder.createUndefined(ty); } break;
-            case FN_Alloca: { READ_TYPE(ty);
-                retvalue = builder.createVariable(
-                    spv::StorageClassFunction, ty); } break;
-            /*
-            case FN_AllocaArray: { READ_TYPE(ty); READ_VALUE(val);
-                retvalue = LLVMBuildArrayAlloca(builder, ty, val, ""); } break;
-            */
-            case FN_AllocaOf: {
-                READ_VALUE(val);
-                retvalue = builder.createVariable(spv::StorageClassFunction,
-                    builder.getTypeId(val));
-                builder.createStore(val, retvalue);
-            } break;
-            /*
-            case FN_Malloc: { READ_TYPE(ty);
-                retvalue = LLVMBuildMalloc(builder, ty, ""); } break;
-            case FN_MallocArray: { READ_TYPE(ty); READ_VALUE(val);
-                retvalue = LLVMBuildArrayMalloc(builder, ty, val, ""); } break;
-            case FN_Free: { READ_VALUE(val);
-                retvalue = LLVMBuildFree(builder, val); } break;
-            */
-            case SFXFN_ExecutionMode: {
-                assert(active_function_value);
-                READ_ANY(mode);
-                auto em = SCOPES_GET_RESULT(execution_mode_from_symbol(mode.symbol));
-                int values[3] = { -1, -1, -1 };
-                int c = 0;
-                while ((c < 3) && (argn <= argcount)) {
-                    READ_ANY(val);
-                    values[c] = SCOPES_GET_RESULT(cast_number<int>(val));
-                    c++;
-                }
-                builder.addExecutionMode(active_function_value, em,
-                    values[0], values[1], values[2]);
-            } break;
-            case FN_GetElementPtr: {
-                READ_VALUE(pointer);
-                assert(argcount > 1);
-                size_t count = argcount - 1;
-                std::vector<spv::Id> indices;
-                for (size_t i = 1; i < count; ++i) {
-                    indices.push_back(SCOPES_GET_RESULT(argument_to_value(args[argn + i].value)));
-                }
-
-                retvalue = builder.createAccessChain(
-                    builder.getTypeStorageClass(builder.getTypeId(pointer)),
-                    pointer, indices);
-            } break;
-            case FN_Bitcast:
-            case FN_IntToPtr:
-            case FN_PtrToInt:
-            case FN_ITrunc:
-            case FN_SExt:
-            case FN_ZExt:
-            case FN_FPTrunc:
-            case FN_FPExt:
-            case FN_FPToUI:
-            case FN_FPToSI:
-            case FN_UIToFP:
-            case FN_SIToFP:
-            {
-                READ_VALUE(val); READ_TYPE(ty);
-                spv::Op op = spv::OpMax;
-                switch(enter.builtin.value()) {
-                case FN_Bitcast:
-                    if (builder.getTypeId(val) == ty) {
-                        // do nothing
-                        retvalue = val;
-                    } else {
-                        op = spv::OpBitcast;
-                    }
-                    break;
-                case FN_IntToPtr: op = spv::OpConvertUToPtr; break;
-                case FN_PtrToInt: op = spv::OpConvertPtrToU; break;
-                case FN_SExt: op = spv::OpSConvert; break;
-                case FN_ZExt: op = spv::OpUConvert; break;
-                case FN_ITrunc: op = spv::OpSConvert; break;
-                case FN_FPTrunc: op = spv::OpFConvert; break;
-                case FN_FPExt: op = spv::OpFConvert; break;
-                case FN_FPToUI: op = spv::OpConvertFToU; break;
-                case FN_FPToSI: op = spv::OpConvertFToS; break;
-                case FN_UIToFP: op = spv::OpConvertUToF; break;
-                case FN_SIToFP: op = spv::OpConvertSToF; break;
-                default: break;
-                }
-                if (op != spv::OpMax) {
-                    retvalue = builder.createUnaryOp(op, ty, val);
-                }
-            } break;
-            case FN_VolatileLoad:
-            case FN_Load: {
-                READ_VALUE(ptr);
-                retvalue = builder.createLoad(ptr);
-                if (enter.builtin == FN_VolatileLoad) {
-                    builder.getInstruction(retvalue)->addImmediateOperand(
-                        1<<spv::MemoryAccessVolatileShift);
-                }
-            } break;
-            case FN_VolatileStore:
-            case FN_Store: {
-                READ_VALUE(val); READ_VALUE(ptr);
-                builder.createStore(val, ptr);
-                if (enter.builtin == FN_VolatileStore) {
-                    builder.getInstruction(retvalue)->addImmediateOperand(
-                        1<<spv::MemoryAccessVolatileShift);
-                }
-            } break;
-            case OP_ICmpEQ:
-            case OP_ICmpNE:
-            case OP_ICmpUGT:
-            case OP_ICmpUGE:
-            case OP_ICmpULT:
-            case OP_ICmpULE:
-            case OP_ICmpSGT:
-            case OP_ICmpSGE:
-            case OP_ICmpSLT:
-            case OP_ICmpSLE:
-            case OP_FCmpOEQ:
-            case OP_FCmpONE:
-            case OP_FCmpORD:
-            case OP_FCmpOGT:
-            case OP_FCmpOGE:
-            case OP_FCmpOLT:
-            case OP_FCmpOLE:
-            case OP_FCmpUEQ:
-            case OP_FCmpUNE:
-            case OP_FCmpUNO:
-            case OP_FCmpUGT:
-            case OP_FCmpUGE:
-            case OP_FCmpULT:
-            case OP_FCmpULE: { READ_VALUE(a); READ_VALUE(b);
-                spv::Op op = spv::OpMax;
-#define BOOL_OR_INT_OP(BOOL_OP, INT_OP) \
-    (is_bool(a)?(BOOL_OP):(INT_OP))
-                switch(enter.builtin.value()) {
-                case OP_ICmpEQ: op = BOOL_OR_INT_OP(spv::OpLogicalEqual, spv::OpIEqual); break;
-                case OP_ICmpNE: op = BOOL_OR_INT_OP(spv::OpLogicalNotEqual, spv::OpINotEqual); break;
-                case OP_ICmpUGT: op = spv::OpUGreaterThan; break;
-                case OP_ICmpUGE: op = spv::OpUGreaterThanEqual; break;
-                case OP_ICmpULT: op = spv::OpULessThan; break;
-                case OP_ICmpULE: op = spv::OpULessThanEqual; break;
-                case OP_ICmpSGT: op = spv::OpSGreaterThan; break;
-                case OP_ICmpSGE: op = spv::OpSGreaterThanEqual; break;
-                case OP_ICmpSLT: op = spv::OpSLessThan; break;
-                case OP_ICmpSLE: op = spv::OpSLessThanEqual; break;
-                case OP_FCmpOEQ: op = spv::OpFOrdEqual; break;
-                case OP_FCmpONE: op = spv::OpFOrdNotEqual; break;
-                case OP_FCmpORD: op = spv::OpOrdered; break;
-                case OP_FCmpOGT: op = spv::OpFOrdGreaterThan; break;
-                case OP_FCmpOGE: op = spv::OpFOrdGreaterThanEqual; break;
-                case OP_FCmpOLT: op = spv::OpFOrdLessThan; break;
-                case OP_FCmpOLE: op = spv::OpFOrdLessThanEqual; break;
-                case OP_FCmpUEQ: op = spv::OpFUnordEqual; break;
-                case OP_FCmpUNE: op = spv::OpFUnordNotEqual; break;
-                case OP_FCmpUNO: op = spv::OpUnordered; break;
-                case OP_FCmpUGT: op = spv::OpFUnordGreaterThan; break;
-                case OP_FCmpUGE: op = spv::OpFUnordGreaterThanEqual; break;
-                case OP_FCmpULT: op = spv::OpFUnordLessThan; break;
-                case OP_FCmpULE: op = spv::OpFUnordLessThanEqual; break;
-                default: break;
-                }
-#undef BOOL_OR_INT_OP
-                auto T = builder.getTypeId(a);
-                if (builder.isVectorType(T)) {
-                    T = builder.makeVectorType(builder.makeBoolType(),
-                        builder.getNumTypeComponents(T));
-                } else {
-                    T = builder.makeBoolType();
-                }
-                retvalue = builder.createBinOp(op, T, a, b); } break;
-            case OP_Add:
-            case OP_AddNUW:
-            case OP_AddNSW:
-            case OP_Sub:
-            case OP_SubNUW:
-            case OP_SubNSW:
-            case OP_Mul:
-            case OP_MulNUW:
-            case OP_MulNSW:
-            case OP_SDiv:
-            case OP_UDiv:
-            case OP_SRem:
-            case OP_URem:
-            case OP_Shl:
-            case OP_LShr:
-            case OP_AShr:
-            case OP_BAnd:
-            case OP_BOr:
-            case OP_BXor:
-            case OP_FAdd:
-            case OP_FSub:
-            case OP_FMul:
-            case OP_FDiv:
-            case OP_FRem: { READ_VALUE(a); READ_VALUE(b);
-                spv::Op op = spv::OpMax;
-                switch(enter.builtin.value()) {
-#define BOOL_OR_INT_OP(BOOL_OP, INT_OP) \
-    (is_bool(a)?(BOOL_OP):(INT_OP))
-                case OP_Add:
-                case OP_AddNUW:
-                case OP_AddNSW: op = spv::OpIAdd; break;
-                case OP_Sub:
-                case OP_SubNUW:
-                case OP_SubNSW: op = spv::OpISub; break;
-                case OP_Mul:
-                case OP_MulNUW:
-                case OP_MulNSW: op = spv::OpIMul; break;
-                case OP_SDiv: op = spv::OpSDiv; break;
-                case OP_UDiv: op = spv::OpUDiv; break;
-                case OP_SRem: op = spv::OpSRem; break;
-                case OP_URem: op = spv::OpUMod; break;
-                case OP_Shl: op = spv::OpShiftLeftLogical; break;
-                case OP_LShr: op = spv::OpShiftRightLogical; break;
-                case OP_AShr: op = spv::OpShiftRightArithmetic; break;
-                case OP_BAnd: op = BOOL_OR_INT_OP(spv::OpLogicalAnd, spv::OpBitwiseAnd); break;
-                case OP_BOr: op = BOOL_OR_INT_OP(spv::OpLogicalOr, spv::OpBitwiseOr); break;
-                case OP_BXor: op = BOOL_OR_INT_OP(spv::OpLogicalNotEqual, spv::OpBitwiseXor); break;
-                case OP_FAdd: op = spv::OpFAdd; break;
-                case OP_FSub: op = spv::OpFSub; break;
-                case OP_FMul: op = spv::OpFMul; break;
-                case OP_FDiv: op = spv::OpFDiv; break;
-                case OP_FRem: op = spv::OpFRem; break;
-                default: break;
-                }
-#undef BOOL_OR_INT_OP
-                retvalue = builder.createBinOp(op,
-                    builder.getTypeId(a), a, b); } break;
-            case SFXFN_Unreachable:
-                builder.makeUnreachable();
-                rtraits.terminated = true; break;
-            case SFXFN_Discard:
-                builder.makeDiscard();
-                rtraits.terminated = true; break;
-            default: {
-                StyledString ss;
-                ss.out << "IL->SPIR: unsupported builtin " << enter.builtin << " encountered";
-                SCOPES_LOCATION_ERROR(ss.str());
-            } break;
+                return {};
             }
-        } else if (enter.type == TYPE_Label) {
-            if (enter.label->is_basic_block_like()) {
-                auto block = SCOPES_GET_RESULT(label_to_basic_block(enter.label));
-                if (!block) {
-                    // no basic block was generated - just generate assignments
-                    auto &&params = enter.label->params;
-                    for (size_t i = 1; i < params.size(); ++i) {
-                        bind_parameter(params[i], SCOPES_GET_RESULT(argument_to_value(args[i].value)));
-                    }
-                    label = enter.label;
-                    goto repeat;
-                } else {
-                    auto bbfrom = builder.getBuildPoint();
-                    // assign phi nodes
-                    auto &&params = enter.label->params;
-                    bool single_caller = has_single_caller(enter.label);
-                    for (size_t i = 1; i < params.size(); ++i) {
-                        Parameter *param = params[i];
-                        auto value = SCOPES_GET_RESULT(argument_to_value(args[i].value));
-                        if (single_caller) {
-                            assert(!parameter_is_bound(param));
-                            bind_parameter(param, value);
-                        } else {
-                            auto phinode = SCOPES_GET_RESULT(argument_to_value(param));
-                            auto op = builder.getInstruction(phinode);
-                            assert(op);
-                            op->addIdOperand(value);
-                            op->addIdOperand(bbfrom->getId());
-                        }
-                    }
-                    builder.createBranch(block);
-                    rtraits.terminated = true;
-                }
-            } else {
-                /*if (use_debug_info) {
-                    LLVMSetCurrentDebugLocation(builder, diloc);
-                }*/
-                auto func = SCOPES_GET_RESULT(label_to_function(enter.label));
-                retvalue = SCOPES_GET_RESULT(build_call(
-                    enter.label->get_function_type(),
-                    func, args, rtraits));
-            }
-        } else if (enter.type == TYPE_Closure) {
-            StyledString ss;
-            ss.out << "IL->SPIR: invalid call of compile time closure at runtime";
-            SCOPES_LOCATION_ERROR(ss.str());
-        } else if (enter.type == TYPE_Parameter) {
-            assert (enter.parameter->type != TYPE_Nothing);
-            assert(enter.parameter->type != TYPE_Unknown);
-            std::vector<spv::Id> values;
-            for (size_t i = 0; i < argcount; ++i) {
-                values.push_back(SCOPES_GET_RESULT(argument_to_value(args[i + 1].value)));
-            }
-            // must be a return
-            assert(enter.parameter->index == 0);
-            // must be returning from this function
-            assert(enter.parameter->label == active_function);
-
-            //Label *label = enter.parameter->label;
-            if (argcount > 1) {
-                auto ilfunctype = cast<FunctionType>(active_function->get_function_type());
-                auto rettype = SCOPES_GET_RESULT(type_to_spirv_type(ilfunctype->return_type));
-                auto id = builder.createUndefined(rettype);
-                for (size_t i = 0; i < values.size(); ++i) {
-                    id = builder.createCompositeInsert(
-                        values[i], id, rettype, i);
-                }
-                builder.makeReturn(true, id);
-            } else if (argcount == 1) {
-                builder.makeReturn(true, values[0]);
-            } else {
-                builder.makeReturn(true, 0);
-            }
-            rtraits.terminated = true;
-        } else {
-            StyledString ss;
-            ss.out << "IL->SPIR: cannot translate call to " << enter;
-            SCOPES_LOCATION_ERROR(ss.str());
         }
-
-        Any contarg = args[0].value;
-        if (rtraits.terminated) {
-            // write nothing
-        } else if ((contarg.type == TYPE_Parameter)
-            && (contarg.parameter->type != TYPE_Nothing)) {
-            assert(contarg.parameter->type != TYPE_Unknown);
-            assert(contarg.parameter->index == 0);
-            assert(contarg.parameter->label == active_function);
-            //Label *label = contarg.parameter->label;
-            if (retvalue) {
-                builder.makeReturn(true, retvalue);
-            } else {
-                builder.makeReturn(true, 0);
-            }
-        } else if (contarg.type == TYPE_Label) {
-            auto bb = SCOPES_GET_RESULT(label_to_basic_block(contarg.label));
-#define UNPACK_RET_ARGS() \
-    if (rtraits.multiple_return_values) { \
-        assert(rtraits.rtype); \
-        auto &&values = rtraits.rtype->values; \
-        auto &&params = contarg.label->params; \
-        size_t pi = 1; \
-        for (size_t i = 0; i < values.size(); ++i) { \
-            if (pi >= params.size()) \
-                break; \
-            Parameter *param = params[pi]; \
-            auto &&arg = values[i]; \
-            if (is_unknown(arg.value)) { \
-                spv::Id incoval = builder.createCompositeExtract( \
-                    retvalue, \
-                    builder.getContainedTypeId(rtype, i), i); \
-                T(param, incoval); \
-                pi++; \
-            } \
-        } \
-    } else { \
-        auto &&params = contarg.label->params; \
-        if (params.size() > 1) { \
-            assert(params.size() == 2); \
-            Parameter *param = params[1]; \
-            T(param, retvalue); \
-        } \
+        values.push_back(val);
+        return {};
     }
-            if (bb) {
-                if (retvalue) {
-                    auto bbfrom = builder.getBuildPoint();
-                    // assign phi nodes
-                    auto rtype = builder.getTypeId(retvalue);
+#endif
 
-                    bool single_caller = has_single_caller(contarg.label);
-                    #define T(PARAM, VALUE) \
-                        if (single_caller) { \
-                            assert(!parameter_is_bound(PARAM)); \
-                            bind_parameter(PARAM, VALUE); \
-                        } else { \
-                            auto phinode = SCOPES_GET_RESULT(argument_to_value(PARAM)); \
-                            auto op = builder.getInstruction(phinode); \
-                            assert(op); \
-                            op->addIdOperand(VALUE); \
-                            op->addIdOperand(bbfrom->getId()); \
-                        }
-                    UNPACK_RET_ARGS()
-                    #undef T
-                }
-                builder.createBranch(bb);
-            } else {
-                if (retvalue) {
-                    // no basic block - just add assignments and continue
-                    auto rtype = builder.getTypeId(retvalue);
-                    #define T(PARAM, VALUE) \
-                        bind_parameter(PARAM, VALUE);
-                    UNPACK_RET_ARGS()
-                    #undef T
-                }
-                label = contarg.label;
-                goto repeat;
-            }
-#undef UNPACK_RET_ARGS
-        } else if (contarg.type == TYPE_Nothing) {
-            StyledStream ss(SCOPES_CERR);
-            stream_label(ss, label, StreamLabelFormat::debug_single());
-            SCOPES_LOCATION_ERROR(String::from("IL->SPIR: unexpected end of function"));
-        } else {
-            StyledStream ss(SCOPES_CERR);
-            stream_label(ss, label, StreamLabelFormat::debug_single());
-            SCOPES_LOCATION_ERROR(String::from("IL->SPIR: continuation is of invalid type"));
-        }
-
-        //LLVMSetCurrentDebugLocation(builder, nullptr);
-        return true;
-    }
-    #undef READ_ANY
-    #undef READ_VALUE
-    #undef READ_TYPE
-    #undef READ_LABEL_BLOCK
-
-    struct ReturnTraits {
-        bool multiple_return_values;
-        bool terminated;
-        const ReturnLabelType *rtype;
-
-        ReturnTraits() :
-            multiple_return_values(false),
-            terminated(false),
-            rtype(nullptr) {}
-    };
-
-    SCOPES_RESULT(spv::Id) build_call(const Type *functype, spv::Function* func, Args &args,
-        ReturnTraits &traits) {
-        SCOPES_RESULT_TYPE(spv::Id);
-        size_t argcount = args.size() - 1;
-
-        auto fi = cast<FunctionType>(functype);
-
-        std::vector<spv::Id> values;
-        for (size_t i = 0; i < argcount; ++i) {
-            auto &&arg = args[i + 1];
-            values.push_back(SCOPES_GET_RESULT(argument_to_value(arg.value)));
-        }
-
-        size_t fargcount = fi->argument_types.size();
-        assert(argcount >= fargcount);
-        if (fi->flags & FF_Variadic) {
-            SCOPES_LOCATION_ERROR(String::from("IL->SPIR: variadic calls not supported"));
-        }
-
-        auto ret = builder.createFunctionCall(func, values);
-        auto rlt = cast<ReturnLabelType>(fi->return_type);
-        traits.rtype = rlt;
-        traits.multiple_return_values = rlt->has_multiple_return_values();
-        if (rlt->return_type == TYPE_Void) {
-            return 0;
-        } else if (!rlt->is_returning()) {
-            builder.makeUnreachable();
-            traits.terminated = true;
-            return 0;
-        } else {
-            return ret;
-        }
-    }
-
-    void set_active_function(Label *l) {
-        if (active_function == l) return;
-        active_function = l;
-        if (l) {
-            auto it = label2func.find(l);
-            assert(it != label2func.end());
-            active_function_value = it->second;
-        } else {
-            active_function_value = nullptr;
-        }
-    }
-
-    SCOPES_RESULT(void) process_labels() {
+#if 0
+    static SCOPES_RESULT(void) abi_transform_parameter(const Type *AT,
+        LLVMTypeRefs &params) {
         SCOPES_RESULT_TYPE(void);
-        while (!bb_label_todo.empty()) {
-            auto it = bb_label_todo.back();
-            set_active_function(it.first);
-            Label *label = it.second;
-            bb_label_todo.pop_back();
-
-            auto it2 = label2bb.find({active_function_value, label});
-            assert(it2 != label2bb.end());
-            spv::Block *bb = it2->second;
-            builder.setBuildPoint(bb);
-
-            SCOPES_CHECK_RESULT(write_label_body(label));
+        ABIClass classes[MAX_ABI_CLASSES];
+        size_t sz = abi_classify(AT, classes);
+        auto T = SCOPES_GET_RESULT(type_to_llvm_type(AT));
+        if (!sz) {
+            params.push_back(LLVMPointerType(T, 0));
+            return {};
         }
-        return true;
+        auto tk = LLVMGetTypeKind(T);
+        if (tk == LLVMStructTypeKind) {
+            auto ST = abi_struct_type(classes, sz);
+            if (ST) {
+                for (size_t i = 0; i < sz; ++i) {
+                    params.push_back(LLVMStructGetTypeAtIndex(ST, i));
+                }
+                return {};
+            }
+        }
+        params.push_back(T);
+        return {};
     }
-
-    Label *get_single_caller(Label *l) {
-        auto it = user_map.label_map.find(l);
-        assert(it != user_map.label_map.end());
-        auto &&users = it->second;
-        if (users.size() != 1)
-            return nullptr;
-        Label *userl = *users.begin();
-        if (userl->body.enter == Any(l))
-            return userl;
-        if (userl->body.args[0] == Any(l))
-            return userl;
-        return nullptr;
-    }
-
-    bool has_single_caller(Label *l) {
-        Label *userl = get_single_caller(l);
-        return (userl != nullptr);
-    }
+#endif
 
     SCOPES_RESULT(spv::Id) create_struct_type(const Type *type, uint64_t flags,
         const TypenameType *tname = nullptr) {
         SCOPES_RESULT_TYPE(spv::Id);
         // todo: packed tuples
         auto ti = cast<TupleType>(type);
-        size_t count = ti->types.size();
+        size_t count = ti->values.size();
         std::vector<spv::Id> members;
         for (size_t i = 0; i < count; ++i) {
-            members.push_back(SCOPES_GET_RESULT(type_to_spirv_type(ti->types[i])));
+            members.push_back(SCOPES_GET_RESULT(
+                type_to_spirv_type(ti->values[i])));
         }
         const char *name = "tuple";
         if (tname) {
             name = tname->name()->data;
         }
         auto id = builder.makeStructType(members, name);
-        if (flags & EF_BufferBlock) {
+        if (flags & GF_BufferBlock) {
             builder.addDecoration(id, spv::DecorationBufferBlock);
-        } else if (flags & EF_Block) {
+        } else if (flags & GF_Block) {
             builder.addDecoration(id, spv::DecorationBlock);
         }
         for (size_t i = 0; i < count; ++i) {
-            builder.addMemberName(id, i, ti->values[i].key.name()->data);
-            if (flags & EF_Volatile) {
+            Symbol key = SYM_Unnamed;
+            auto kq = try_qualifier<KeyQualifier>(ti->values[i]);
+            if (kq) {
+                key = kq->key;
+            }
+            builder.addMemberName(id, i, key.name()->data);
+            if (flags & GF_Volatile) {
                 builder.addMemberDecoration(id, i, spv::DecorationVolatile);
             }
-            if (flags & EF_Coherent) {
+            if (flags & GF_Coherent) {
                 builder.addMemberDecoration(id, i, spv::DecorationCoherent);
             }
-            if (flags & EF_Restrict) {
+            if (flags & GF_Restrict) {
                 builder.addMemberDecoration(id, i, spv::DecorationRestrict);
             }
-            if (flags & EF_NonWritable) {
+            if (flags & GF_NonWritable) {
                 builder.addMemberDecoration(id, i, spv::DecorationNonWritable);
             }
-            if (flags & EF_NonReadable) {
+            if (flags & GF_NonReadable) {
                 builder.addMemberDecoration(id, i, spv::DecorationNonReadable);
             }
             builder.addMemberDecoration(id, i, spv::DecorationOffset, ti->offsets[i]);
@@ -1547,6 +659,19 @@ struct SPIRVGenerator {
     SCOPES_RESULT(spv::Id) create_spirv_type(const Type *type, uint64_t flags) {
         SCOPES_RESULT_TYPE(spv::Id);
         switch(type->kind()) {
+        case TK_Qualify: {
+            auto qt = cast<QualifyType>(type);
+            auto lltype = SCOPES_GET_RESULT(type_to_spirv_type(qt->type, flags));
+            auto rq = try_qualifier<ReferQualifier>(type);
+            if (rq) {
+                lltype =
+                    builder.makePointer(
+                        SCOPES_GET_RESULT(storage_class_from_extern_class(
+                            rq->storage_class)),
+                        lltype);
+            }
+            return lltype;
+        } break;
         case TK_Integer: {
             if (type == TYPE_Bool)
                 return builder.makeBoolType();
@@ -1584,19 +709,50 @@ struct SPIRVGenerator {
                 SCOPES_GET_RESULT(type_to_spirv_type(vi->element_type)),
                 vi->count);
         } break;
+        case TK_Arguments: {
+            if (type == empty_arguments_type())
+                return builder.makeVoidType();
+            return create_spirv_type(cast<ArgumentsType>(type)->to_tuple_type(), flags);
+        } break;
         case TK_Tuple: {
             return create_struct_type(type, flags);
         } break;
         case TK_Union: {
             auto ui = cast<UnionType>(type);
-            return type_to_spirv_type(ui->tuple_type);
+            return type_to_spirv_type(ui->tuple_type, flags);
         } break;
-        case TK_Extern: {
-            auto et = cast<ExternType>(type);
-            spv::StorageClass sc = SCOPES_GET_RESULT(storage_class_from_extern_class(
-                et->storage_class));
-            auto ty = SCOPES_GET_RESULT(type_to_spirv_type(et->type, et->flags));
-            return builder.makePointer(sc, ty);
+        case TK_Typename: {
+            if (type == TYPE_Sampler)
+                return builder.makeSamplerType();
+            auto tn = cast<TypenameType>(type);
+            if (tn->finalized()) {
+                if (tn->storage_type->kind() == TK_Tuple) {
+                    return create_struct_type(tn->storage_type, flags, tn);
+                } else {
+                    return SCOPES_GET_RESULT(type_to_spirv_type(tn->storage_type, flags));
+                }
+            } else {
+                SCOPES_LOCATION_ERROR(String::from("IL->SPIR: opaque types are not supported"));
+            }
+        } break;
+        case TK_Function: {
+            auto fi = cast<FunctionType>(type);
+            if (fi->vararg()) {
+                SCOPES_LOCATION_ERROR(String::from("IL->SPIR: vararg functions are not supported"));
+            }
+            size_t count = fi->argument_types.size();
+            auto rtype = abi_return_type(fi);
+            spv::Id rettype = SCOPES_GET_RESULT(type_to_spirv_type(rtype));
+            std::vector<spv::Id> elements;
+            for (size_t i = 0; i < count; ++i) {
+                auto AT = fi->argument_types[i];
+                elements.push_back(SCOPES_GET_RESULT(type_to_spirv_type(AT)));
+            }
+            return builder.makeFunctionType(rettype, elements);
+        } break;
+        case TK_SampledImage: {
+            auto sit = cast<SampledImageType>(type);
+            return builder.makeSampledImageType(SCOPES_GET_RESULT(type_to_spirv_type(sit->type)));
         } break;
         case TK_Image: {
             auto it = cast<ImageType>(type);
@@ -1612,44 +768,7 @@ struct SPIRVGenerator {
                 it->sampled,
                 SCOPES_GET_RESULT(image_format_from_symbol(it->format)));
         } break;
-        case TK_SampledImage: {
-            auto sit = cast<SampledImageType>(type);
-            return builder.makeSampledImageType(SCOPES_GET_RESULT(type_to_spirv_type(sit->type)));
-        } break;
-        case TK_Typename: {
-            if (type == TYPE_Void)
-                return builder.makeVoidType();
-            else if (type == TYPE_Sampler)
-                return builder.makeSamplerType();
-            auto tn = cast<TypenameType>(type);
-            if (tn->finalized()) {
-                if (tn->storage_type->kind() == TK_Tuple) {
-                    return create_struct_type(tn->storage_type, flags, tn);
-                } else {
-                    return SCOPES_GET_RESULT(type_to_spirv_type(tn->storage_type, flags));
-                }
-            } else {
-                SCOPES_LOCATION_ERROR(String::from("IL->SPIR: opaque types are not supported"));
-            }
-        } break;
-        case TK_ReturnLabel: {
-            auto rlt = cast<ReturnLabelType>(type);
-            return SCOPES_GET_RESULT(type_to_spirv_type(rlt->return_type));
-        } break;
-        case TK_Function: {
-            auto fi = cast<FunctionType>(type);
-            if (fi->vararg()) {
-                SCOPES_LOCATION_ERROR(String::from("IL->SPIR: vararg functions are not supported"));
-            }
-            size_t count = fi->argument_types.size();
-            spv::Id rettype = SCOPES_GET_RESULT(type_to_spirv_type(fi->return_type));
-            std::vector<spv::Id> elements;
-            for (size_t i = 0; i < count; ++i) {
-                auto AT = fi->argument_types[i];
-                elements.push_back(SCOPES_GET_RESULT(type_to_spirv_type(AT)));
-            }
-            return builder.makeFunctionType(rettype, elements);
-        } break;
+        default: break;
         };
 
         StyledString ss;
@@ -1669,169 +788,1400 @@ struct SPIRVGenerator {
         }
     }
 
-    SCOPES_RESULT(spv::Block *) label_to_basic_block(Label *label, bool force = false) {
-        SCOPES_RESULT_TYPE(spv::Block *);
-        auto old_bb = builder.getBuildPoint();
-        auto func = &old_bb->getParent();
-        auto it = label2bb.find({func, label});
-        if (it == label2bb.end()) {
-            bool single_caller = has_single_caller(label);
-            if (single_caller && !force) {
-                // not generating basic blocks for single user labels
-                return nullptr;
-            }
-            //const char *name = label->name.name()->data;
-            auto bb = &builder.makeNewBlock();
-            label2bb.insert({{func, label}, bb});
-            bb_label_todo.push_back({active_function, label});
-            builder.setBuildPoint(bb);
+#if 0
+    static Error *last_llvm_error;
+    static void fatal_error_handler(const char *Reason) {
+        last_llvm_error = make_location_error(String::from_cstr(Reason));
+    }
+#endif
 
-            auto &&params = label->params;
-            if (!params.empty()) {
-                size_t paramcount = label->params.size() - 1;
-                for (size_t i = 0; i < paramcount; ++i) {
-                    Parameter *param = params[i + 1];
-                    auto ptype = SCOPES_GET_RESULT(type_to_spirv_type(param->type));
-                    if (!single_caller) {
-                        auto op = new spv::Instruction(
-                            builder.getUniqueId(), ptype, spv::OpPhi);
-                        builder.addName(op->getResultId(), param->name.name()->data);
-                        bind_parameter(param, op->getResultId());
-                        bb->addInstruction(std::unique_ptr<spv::Instruction>(op));
-                    }
-                }
-            }
-
-            builder.setBuildPoint(old_bb);
-            return bb;
-        } else {
-            return it->second;
-        }
+    void bind(const ValueIndex &node, spv::Id value) {
+        assert(value);
+        ref2value.insert({node, value});
     }
 
-    SCOPES_RESULT(spv::Function *) label_to_function(Label *label,
+    SCOPES_RESULT(void) write_return(const Ids &values, bool is_except = false) {
+        SCOPES_RESULT_TYPE(void);
+        assert(active_function);
+        auto fi = extract_function_type(active_function->get_type());
+        auto rtype = abi_return_type(fi);
+        auto abiretT = SCOPES_GET_RESULT(type_to_spirv_type(rtype));
+        spv::Id value = 0;
+        if (fi->has_exception()) {
+            auto abivalue = builder.createUndefined(abiretT);
+            if (is_except) {
+                abivalue = builder.createCompositeInsert(
+                    builder.makeBoolConstant(false), abivalue,
+                    builder.getTypeId(abivalue), 0);
+                if (is_returning_value(fi->except_type)) {
+                    auto exceptT = SCOPES_GET_RESULT(type_to_spirv_type(fi->except_type));
+                    abivalue = builder.createCompositeInsert(
+                        values_to_struct(exceptT, values), abivalue,
+                        builder.getTypeId(abivalue), 1);
+                }
+            } else {
+                abivalue = builder.createCompositeInsert(
+                    builder.makeBoolConstant(true), abivalue,
+                    builder.getTypeId(abivalue), 0);
+                if (is_returning_value(fi->return_type)) {
+                    auto returnT = SCOPES_GET_RESULT(type_to_spirv_type(fi->return_type));
+                    abivalue = builder.createCompositeInsert(
+                        values_to_struct(returnT, values), abivalue,
+                        builder.getTypeId(abivalue), 2);
+                }
+            }
+            value = abivalue;
+        } else {
+            if (is_returning_value(fi->return_type)) {
+                auto returnT = SCOPES_GET_RESULT(type_to_spirv_type(fi->return_type));
+                value = values_to_struct(returnT, values);
+            }
+        }
+        if (rtype == empty_arguments_type()) {
+            builder.makeReturn(true, 0);
+        } else {
+            assert(value);
+            builder.makeReturn(true, value);
+        }
+        return {};
+    }
+
+    SCOPES_RESULT(void) write_return(const TypedValues &values, bool is_except = false) {
+        SCOPES_RESULT_TYPE(void);
+        Ids refs;
+        for (auto val : values) {
+            refs.push_back(SCOPES_GET_RESULT(ref_to_value(val)));
+        }
+        return write_return(refs, is_except);
+    }
+
+    SCOPES_RESULT(void) translate_Return(Return *node) {
+        SCOPES_RESULT_TYPE(void);
+        SCOPES_CHECK_RESULT(write_return(node->values));
+        return {};
+    }
+
+    SCOPES_RESULT(void) translate_Raise(Raise *node) {
+        SCOPES_RESULT_TYPE(void);
+        SCOPES_CHECK_RESULT(build_merge_phi(try_info.except_values, node->values));
+        builder.createBranch(try_info.bb_except);
+        return {};
+    }
+
+    SCOPES_RESULT(void) Function_finalize(Function *node) {
+        SCOPES_RESULT_TYPE(void);
+
+        functions_generated++;
+
+        active_function = node;
+        auto it = func2func.find(node);
+        assert(it != func2func.end());
+        spv::Function *func = it->second;
+        assert(func);
+        auto ilfunctype = node->get_type();
+        auto fi = extract_function_type(ilfunctype);
+        //auto rtype = abi_return_type(fi);
+
+        auto bb = func->getEntryBlock();
+
+        try_info.clear();
+
+        if (fi->has_exception()) {
+            try_info.bb_except = &builder.makeNewBlock();
+            position_builder_at_end(try_info.bb_except);
+            //if (use_debug_info)
+            //    set_debug_location(node->anchor());
+            SCOPES_CHECK_RESULT(build_phi(try_info.except_values, fi->except_type));
+            SCOPES_CHECK_RESULT(write_return(try_info.except_values, true));
+        }
+
+        position_builder_at_end(bb);
+
+        auto &&params = node->params;
+        size_t paramcount = params.size();
+
+        //if (use_debug_info)
+        //    set_debug_location(node->anchor());
+        //size_t k = 0;
+        for (size_t i = 0; i < paramcount; ++i) {
+            Parameter *param = params[i];
+            auto val = func->getParamId(i);
+            bind(param, val);
+        }
+        SCOPES_CHECK_RESULT(translate_block(node->body));
+        return {};
+    }
+
+    bool is_bool(spv::Id value) {
+        auto T = builder.getTypeId(value);
+        return
+            (builder.isVectorType(T)
+             && builder.isBoolType(builder.getContainedTypeId(T)))
+            || builder.isBoolType(T);
+    }
+
+    SCOPES_RESULT(void) write_anchor(const Anchor *anchor) {
+        //SCOPES_RESULT_TYPE(void);
+        #if 0
+        assert(anchor);
+        assert(anchor->file);
+        if (use_debug_info) {
+            builder.addLine(
+                SCOPES_GET_RESULT(
+                    argument_to_value(anchor->path().name())),
+                anchor->lineno, anchor->column);
+        }
+        #endif
+        return {};
+    }
+
+    SCOPES_RESULT(spv::Function *) Function_to_function(Function *node,
         bool root_function = false,
         Symbol funcname = SYM_Unnamed) {
         SCOPES_RESULT_TYPE(spv::Function *);
-        auto it = label2func.find(label);
-        if (it == label2func.end()) {
-
-            const Anchor *old_anchor = get_active_anchor();
-            set_active_anchor(label->anchor);
-            Label *last_function = active_function;
-
-            auto old_bb = builder.getBuildPoint();
-
-            if (funcname == SYM_Unnamed) {
-                funcname = label->name;
+        {
+            auto it = func2func.find(node);
+            if (it != func2func.end()) {
+                return it->second;
             }
+        }
 
-            const char *name;
-            if (root_function && (funcname == SYM_Unnamed)) {
-                name = "unnamed";
-            } else {
-                name = funcname.name()->data;
-            }
+        if (funcname == SYM_Unnamed) {
+            funcname = node->name;
+        }
 
-            SCOPES_CHECK_RESULT(label->verify_compilable());
-            auto ilfunctype = cast<FunctionType>(label->get_function_type());
-            //auto fi = cast<FunctionType>(ilfunctype);
-
-            auto rettype = SCOPES_GET_RESULT(type_to_spirv_type(ilfunctype->return_type));
-
-            spv::Block* bb;
-            std::vector<spv::Id> paramtypes;
-
-            auto &&argtypes = ilfunctype->argument_types;
-            for (auto it = argtypes.begin(); it != argtypes.end(); ++it) {
-                paramtypes.push_back(SCOPES_GET_RESULT(type_to_spirv_type(*it)));
-            }
-
-            std::vector<std::vector<spv::Decoration>> decorations;
-
-            auto func = builder.makeFunctionEntry(
-                spv::NoPrecision, rettype, name,
-                paramtypes, decorations, &bb);
-            //LLVMSetLinkage(func, LLVMPrivateLinkage);
-
-            label2func[label] = func;
-            set_active_function(label);
-
-            if (use_debug_info) {
-                // LLVMSetFunctionSubprogram(func, label_to_subprogram(label));
-            }
-
-            builder.setBuildPoint(bb);
-            SCOPES_CHECK_RESULT(write_anchor(label->anchor));
-
-            auto &&params = label->params;
-            size_t paramcount = params.size() - 1;
-            for (size_t i = 0; i < paramcount; ++i) {
-                Parameter *param = params[i + 1];
-                auto val = func->getParamId(i);
-                bind_parameter(param, val);
-            }
-
-            SCOPES_CHECK_RESULT(write_label_body(label));
-
-            builder.setBuildPoint(old_bb);
-
-            set_active_function(last_function);
-            set_active_anchor(old_anchor);
-            return func;
+        const char *name = nullptr;
+        if (root_function && (funcname == SYM_Unnamed)) {
+            name = "unnamed";
         } else {
-            return it->second;
+            name = funcname.name()->data;
+        }
+
+        auto ilfunctype = extract_function_type(node->get_type());
+        auto rtype = abi_return_type(ilfunctype);
+        auto rettype = SCOPES_GET_RESULT(type_to_spirv_type(rtype));
+
+        spv::Block* bb;
+        std::vector<spv::Id> paramtypes;
+        auto &&argtypes = ilfunctype->argument_types;
+        for (auto it = argtypes.begin(); it != argtypes.end(); ++it) {
+            paramtypes.push_back(SCOPES_GET_RESULT(type_to_spirv_type(*it)));
+        }
+
+        std::vector<std::vector<spv::Decoration>> decorations;
+
+        auto func = builder.makeFunctionEntry(
+            spv::NoPrecision, rettype, name,
+            paramtypes, decorations, &bb);
+        func2func[node] = func;
+
+        //if (use_debug_info) {
+        //    LLVMSetSubprogram(func, function_to_subprogram(node));
+        //}
+
+        function_todo.push_back(node);
+        return func;
+    }
+
+    SCOPES_RESULT(spv::Id) Function_to_value(Function *node) {
+        SCOPES_RESULT_TYPE(spv::Id);
+        SCOPES_EXPECT_ERROR(error_cannot_translate(SCOPES_GEN_TARGET, node));
+    }
+
+    SCOPES_RESULT(spv::Id) Parameter_to_value(Parameter *node) {
+        SCOPES_RESULT_TYPE(spv::Id);
+        SCOPES_EXPECT_ERROR(error_gen_unbound_symbol(SCOPES_GEN_TARGET, node));
+    }
+
+    SCOPES_RESULT(spv::Id) LoopLabelArguments_to_value(LoopLabelArguments *node) {
+        SCOPES_RESULT_TYPE(spv::Id);
+        SCOPES_EXPECT_ERROR(error_gen_unbound_symbol(SCOPES_GEN_TARGET, node));
+    }
+
+    SCOPES_RESULT(spv::Id) Exception_to_value(Exception *node) {
+        SCOPES_RESULT_TYPE(spv::Id);
+        SCOPES_EXPECT_ERROR(error_cannot_translate(SCOPES_GEN_TARGET, node));
+    }
+
+    SCOPES_RESULT(void) translate_block(const Block &node) {
+        SCOPES_RESULT_TYPE(void);
+        for (auto entry : node.body) {
+            SCOPES_CHECK_RESULT(translate_instruction(entry));
+        }
+        if (node.terminator) {
+            SCOPES_CHECK_RESULT(translate_instruction(node.terminator));
+        }
+        return {};
+    }
+
+    LabelInfo &find_label_info(Label *label) {
+        int i = label_info_stack.size();
+        while (i-- > 0) {
+            auto &&info = label_info_stack[i];
+            if (info.label == label)
+                return info;
+        }
+        assert(false);
+        return label_info_stack.back();
+    }
+
+    SCOPES_RESULT(void) build_merge_phi(
+        const Ids &phis, const TypedValues &values) {
+        SCOPES_RESULT_TYPE(void);
+        assert(phis.size() == values.size());
+
+        auto bb = builder.getBuildPoint();
+        assert(bb);
+        int count = phis.size();
+        for (int i = 0; i < count; ++i) {
+            auto phi = phis[i];
+            auto spirval = SCOPES_GET_RESULT(ref_to_value(values[i]));
+            auto op = builder.getInstruction(phi);
+            assert(op);
+            op->addIdOperand(spirval);
+            op->addIdOperand(bb->getId());
+        }
+        return {};
+    }
+
+    SCOPES_RESULT(void) build_merge(Label *label, const TypedValues &values) {
+        SCOPES_RESULT_TYPE(void);
+        auto &&label_info = find_label_info(label);
+        SCOPES_CHECK_RESULT(build_merge_phi(label_info.merge_values, values));
+        assert(label_info.bb_merge);
+        builder.createBranch(label_info.bb_merge);
+        return {};
+    }
+
+    SCOPES_RESULT(void) translate_Merge(Merge *node) {
+        SCOPES_RESULT_TYPE(void);
+        auto label = cast<Label>(node->label);
+        SCOPES_CHECK_RESULT(build_merge(label, node->values));
+        return {};
+    }
+
+    SCOPES_RESULT(void) translate_Repeat(Repeat *node) {
+        SCOPES_RESULT_TYPE(void);
+        SCOPES_CHECK_RESULT(build_merge_phi(loop_info.repeat_values, node->values));
+        builder.createBranch(loop_info.bb_loop);
+        return {};
+    }
+
+    SCOPES_RESULT(void) translate_Label(Label *node) {
+        SCOPES_RESULT_TYPE(void);
+        LabelInfo label_info;
+        label_info.label = node;
+        auto bb = builder.getBuildPoint();
+        label_info.bb_merge = nullptr;
+        auto rtype = node->get_type();
+        if (is_returning(rtype)) {
+            label_info.bb_merge = &builder.makeNewBlock();
+            position_builder_at_end(label_info.bb_merge);
+            SCOPES_CHECK_RESULT(build_phi(label_info.merge_values, node));
+        }
+        label_info_stack.push_back(label_info);
+        {
+            position_builder_at_end(bb);
+            SCOPES_CHECK_RESULT(translate_block(node->body));
+        }
+        if (label_info.bb_merge)
+            position_builder_at_end(label_info.bb_merge);
+        label_info_stack.pop_back();
+        return {};
+    }
+
+    SCOPES_RESULT(void) build_phi(Ids &refs, const Type *T) {
+        SCOPES_RESULT_TYPE(void);
+        assert(refs.empty());
+        int count = get_argument_count(T);
+        for (int i = 0; i < count; ++i) {
+            auto argT = SCOPES_GET_RESULT(type_to_spirv_type(get_argument(T, i)));
+            auto op = new spv::Instruction(
+                builder.getUniqueId(), argT, spv::OpPhi);
+            //builder.addName(op->getResultId(), param->name.name()->data);
+            builder.getBuildPoint()->addInstruction(
+                std::unique_ptr<spv::Instruction>(op));
+            refs.push_back(op->getResultId());
+        }
+        return {};
+    }
+
+    void map_phi(const Ids &refs, TypedValue *node) {
+        for (int i = 0; i < refs.size(); ++i) {
+            bind(ValueIndex(node, i), refs[i]);
         }
     }
 
-    SCOPES_RESULT(void) generate(std::vector<unsigned int> &result, Symbol target, Label *entry) {
+    SCOPES_RESULT(void) build_phi(Ids &refs, TypedValue *node) {
         SCOPES_RESULT_TYPE(void);
-        //assert(all_parameters_lowered(entry));
-        assert(!entry->is_basic_block_like());
+        SCOPES_CHECK_RESULT(build_phi(refs, node->get_type()));
+        map_phi(refs, node);
+        return {};
+    }
 
-        builder.setSource(spv::SourceLanguageGLSL, 450);
-        glsl_ext_inst = builder.import("GLSL.std.450");
+    SCOPES_RESULT(void) translate_LoopLabel(LoopLabel *node) {
+        SCOPES_RESULT_TYPE(void);
+        //auto rtype = node->get_type();
+        auto old_loop_info = loop_info;
+        loop_info.loop = node;
+        auto bb = builder.getBuildPoint();
+        loop_info.bb_loop = &builder.makeNewBlock();
+        loop_info.repeat_values.clear();
+        position_builder_at_end(loop_info.bb_loop);
+        SCOPES_CHECK_RESULT(build_phi(loop_info.repeat_values, node->args));
+        position_builder_at_end(bb);
+        SCOPES_CHECK_RESULT(build_merge_phi(loop_info.repeat_values, node->init));
+        builder.createBranch(loop_info.bb_loop);
+        position_builder_at_end(loop_info.bb_loop);
+        SCOPES_CHECK_RESULT(translate_block(node->body));
+        loop_info = old_loop_info;
+        return {};
+    }
 
-        auto needfi = Function(TYPE_Void, {}, 0);
-        auto hasfi = entry->get_function_type();
+    spv::Id values_to_struct(spv::Id T, const Ids &values) {
+        int count = (int)values.size();
+        if (count == 1) {
+            return values[0];
+        } else {
+            auto value = builder.createUndefined(T);
+            for (int i = 0; i < count; ++i) {
+                value = builder.createCompositeInsert(values[i], value, T, i);
+            }
+            return value;
+        }
+    }
+
+    void struct_to_values(Ids &values, const Type *T, spv::Id value) {
+        assert(value);
+        int count = get_argument_count(T);
+        if (count == 1) {
+            values.push_back(value);
+        } else {
+            auto spirvtype = builder.getTypeId(value);
+            for (int i = 0; i < count; ++i) {
+                values.push_back(builder.createCompositeExtract(value,
+                    builder.getContainedTypeId(spirvtype, i), i));
+            }
+        }
+    }
+
+    SCOPES_RESULT(spv::Id) node_to_spirv_type(Value *node) {
+        SCOPES_RESULT_TYPE(spv::Id);
+        return type_to_spirv_type(SCOPES_GET_RESULT(extract_type_constant(node)));
+    }
+
+    spv::Id build_extract_image(spv::Id value) {
+        spv::Id typeId = builder.getTypeId(value);
+        if (builder.isSampledImageType(typeId)) {
+            spv::Id imgtypeId = builder.getImageType(value);
+            return builder.createUnaryOp(spv::OpImage, imgtypeId, value);
+        }
+        return value;
+    }
+
+    SCOPES_RESULT(spv::Id) translate_builtin(Builtin builtin, const TypedValues &args) {
+        SCOPES_RESULT_TYPE(spv::Id);
+        size_t argcount = args.size();
+        size_t argn = 0;
+
+#define READ_VALUE(NAME) \
+        assert(argn < argcount); \
+        TypedValue * _ ## NAME = args[argn++]; \
+        spv::Id NAME = SCOPES_GET_RESULT(ref_to_value(_ ## NAME));
+
+#define READ_TYPE(NAME) \
+        assert(argn < argcount); \
+        spv::Id NAME = SCOPES_GET_RESULT(node_to_spirv_type(args[argn++]));
+
+#define READ_INT(NAME) \
+        assert(argn < argcount); \
+        TypedValue * _ ## NAME = args[argn++]; \
+        auto NAME = SCOPES_GET_RESULT(extract_integer_constant(_ ## NAME));
+
+#define READ_SYMBOL(NAME) \
+        assert(argn < argcount); \
+        TypedValue * _ ## NAME = args[argn++]; \
+        auto NAME = SCOPES_GET_RESULT(extract_symbol_constant(_ ## NAME));
+
+#define READ_VECTOR(NAME) \
+        assert(argn < argcount); \
+        auto NAME = SCOPES_GET_RESULT(extract_vector_constant(args[argn++]));
+
+        switch(builtin.value()) {
+        case FN_Annotate: {
+            return 0;
+        } break;
+        case FN_Sample: {
+            READ_VALUE(sampler);
+            READ_VALUE(coords);
+            spv::Builder::TextureParameters params;
+            memset(&params, 0, sizeof(params));
+            params.sampler = sampler;
+            params.coords = coords;
+            auto ST = SCOPES_GET_RESULT(storage_type(_sampler->get_type()));
+            if (ST->kind() == TK_SampledImage) {
+                ST = SCOPES_GET_RESULT(storage_type(cast<SampledImageType>(ST)->type));
+            }
+            auto resultType = SCOPES_GET_RESULT(type_to_spirv_type(cast<ImageType>(ST)->type));
+            bool sparse = false;
+            bool fetch = false;
+            bool proj = false;
+            bool gather = false;
+            bool explicitLod = false;
+            while (argn <= argcount) {
+                READ_VALUE(value);
+                Symbol key = type_key(_value->get_type())._0;
+                switch (key.value()) {
+                    case SYM_SPIRV_ImageOperandLod: params.lod = value; break;
+                    case SYM_SPIRV_ImageOperandBias: params.bias = value; break;
+                    case SYM_SPIRV_ImageOperandDref: params.Dref = value; break;
+                    case SYM_SPIRV_ImageOperandProj: proj = true; break;
+                    case SYM_SPIRV_ImageOperandFetch: fetch = true; break;
+                    case SYM_SPIRV_ImageOperandGradX: params.gradX = value; break;
+                    case SYM_SPIRV_ImageOperandGradY: params.gradY = value; break;
+                    case SYM_SPIRV_ImageOperandOffset: params.offset = value; break;
+                    case SYM_SPIRV_ImageOperandConstOffsets: params.offsets = value; break;
+                    case SYM_SPIRV_ImageOperandMinLod: params.lodClamp = value; break;
+                    case SYM_SPIRV_ImageOperandSample: params.sample = value; break;
+                    case SYM_SPIRV_ImageOperandGather: {
+                        params.component = value;
+                        gather = true;
+                    } break;
+                    case SYM_SPIRV_ImageOperandSparse: {
+                        params.texelOut = value;
+                        sparse = true;
+                    } break;
+                    default: break;
+                }
+            }
+            if (fetch) {
+                params.sampler = build_extract_image(sampler);
+            }
+            return builder.createTextureCall(
+                spv::NoPrecision, resultType, sparse, fetch, proj, gather,
+                explicitLod, params);
+        } break;
+        case FN_ImageQuerySize: {
+            READ_VALUE(sampler);
+            spv::Builder::TextureParameters params;
+            memset(&params, 0, sizeof(params));
+            params.sampler = build_extract_image(sampler);
+            spv::Op op = spv::OpImageQuerySize;
+            while (argn <= argcount) {
+                READ_VALUE(value);
+                Symbol key = type_key(_value->get_type())._0;
+                switch (key.value()) {
+                    case SYM_SPIRV_ImageOperandLod:
+                        op = spv::OpImageQuerySizeLod;
+                        params.lod = value; break;
+                    default: break;
+                }
+            }
+            return builder.createTextureQueryCall(op, params, false);
+        } break;
+        case FN_ImageQueryLod: {
+            READ_VALUE(sampler);
+            READ_VALUE(coords);
+            spv::Builder::TextureParameters params;
+            memset(&params, 0, sizeof(params));
+            params.sampler = sampler;
+            params.coords = coords;
+            return builder.createTextureQueryCall(
+                spv::OpImageQueryLod, params, false);
+        } break;
+        case FN_ImageQueryLevels: {
+            READ_VALUE(sampler);
+            spv::Builder::TextureParameters params;
+            memset(&params, 0, sizeof(params));
+            params.sampler = build_extract_image(sampler);
+            return builder.createTextureQueryCall(
+                spv::OpImageQueryLevels, params, false);
+        } break;
+        case FN_ImageQuerySamples: {
+            READ_VALUE(sampler);
+            spv::Builder::TextureParameters params;
+            memset(&params, 0, sizeof(params));
+            params.sampler = build_extract_image(sampler);
+            return builder.createTextureQueryCall(
+                spv::OpImageQuerySamples, params, false);
+        } break;
+        case FN_ImageRead: {
+            READ_VALUE(image);
+            READ_VALUE(coords);
+            auto ST = SCOPES_GET_RESULT(storage_type(_image->get_type()));
+            auto resultType = SCOPES_GET_RESULT(type_to_spirv_type(cast<ImageType>(ST)->type));
+            return builder.createBinOp(spv::OpImageRead,
+                resultType, image, coords);
+        } break;
+        case FN_ImageWrite: {
+            READ_VALUE(image);
+            READ_VALUE(coords);
+            READ_VALUE(texel);
+            builder.createNoResultOp(spv::OpImageWrite, { image, coords, texel });
+            return 0;
+        } break;
+        case SFXFN_ExecutionMode: {
+            READ_SYMBOL(mode);
+            auto em = SCOPES_GET_RESULT(execution_mode_from_symbol(mode));
+            ExecutionMode vals;
+            int c = 0;
+            while ((c < 3) && (argn <= argcount)) {
+                READ_INT(val);
+                vals.values[c] = val;
+                c++;
+            }
+            auto it = execution_modes.insert({ em, vals });
+            if (!it.second) {
+                it.first->second = vals;
+            }
+        } break;
+        case OP_Tertiary: {
+            READ_VALUE(cond);
+            READ_VALUE(then_value);
+            READ_VALUE(else_value);
+            if (builder.isScalar(cond) && builder.isVector(then_value)) {
+                // emulate LLVM's behavior for selecting full vectors with single booleans
+                spv::Id elementT = builder.getTypeId(cond);
+                spv::Id vectorT = builder.getTypeId(then_value);
+
+                cond = builder.smearScalar(spv::NoPrecision, cond,
+                    builder.makeVectorType(elementT, builder.getNumTypeComponents(vectorT)));
+            }
+            return builder.createTriOp(spv::OpSelect,
+                builder.getTypeId(then_value), cond,
+                then_value, else_value);
+        } break;
+        case FN_ExtractValue: {
+            READ_VALUE(val);
+            READ_INT(index);
+            return builder.createCompositeExtract(val,
+                builder.getContainedTypeId(builder.getTypeId(val), index),
+                index);
+        } break;
+        case FN_InsertValue: {
+            READ_VALUE(val);
+            READ_VALUE(eltval);
+            READ_INT(index);
+            return builder.createCompositeInsert(eltval, val,
+                builder.getTypeId(val), index);
+        } break;
+        case FN_ExtractElement: {
+            READ_VALUE(val);
+            READ_VALUE(index);
+            if (isa<ConstInt>(_index)) {
+                int i = extract_integer_constant(_index).assert_ok();
+                return builder.createCompositeExtract(val,
+                    builder.getContainedTypeId(builder.getTypeId(val), i), i);
+            } else {
+                return builder.createVectorExtractDynamic(val,
+                    builder.getContainedTypeId(builder.getTypeId(val)),
+                    index);
+            }
+        } break;
+        case FN_InsertElement: {
+            READ_VALUE(val);
+            READ_VALUE(eltval);
+            READ_VALUE(index);
+            if (isa<ConstInt>(_index)) {
+                int i = extract_integer_constant(_index).assert_ok();
+                return builder.createCompositeInsert(eltval, val,
+                    builder.getTypeId(val), i);
+            } else {
+                return builder.createVectorInsertDynamic(val,
+                    builder.getTypeId(val), eltval, index);
+            }
+        } break;
+        case FN_ShuffleVector: {
+            READ_VALUE(v1);
+            READ_VALUE(v2);
+            READ_VECTOR(mask);
+            auto ET = builder.getContainedTypeId(builder.getTypeId(v1));
+            auto sz = mask->values.size();
+            auto op = new spv::Instruction(
+                builder.getUniqueId(),
+                builder.makeVectorType(ET, sz),
+                spv::OpVectorShuffle);
+            op->addIdOperand(v1);
+            op->addIdOperand(v2);
+            for (int i = 0; i < sz; ++i) {
+                unsigned int k = SCOPES_GET_RESULT(
+                    extract_integer_constant(mask->values[i]));
+                op->addImmediateOperand(k);
+            }
+            builder.getBuildPoint()->addInstruction(
+                std::unique_ptr<spv::Instruction>(op));
+            return op->getResultId();
+        } break;
+        case FN_Move: {
+            READ_VALUE(val);
+            return val;
+        } break;
+        case FN_NullOf: {
+            READ_TYPE(ty);
+            auto op = new spv::Instruction(
+                builder.getUniqueId(), ty, spv::OpConstantNull);
+            builder.getBuildPoint()->addInstruction(
+                std::unique_ptr<spv::Instruction>(op));
+            return op->getResultId();
+        } break;
+        case FN_Undef: { READ_TYPE(ty);
+            return builder.createUndefined(ty); } break;
+        case FN_Alloca: { READ_TYPE(ty);
+            return builder.createVariable(
+                spv::StorageClassFunction, ty); } break;
+        /*
+        case FN_AllocaArray: { READ_TYPE(ty); READ_VALUE(val);
+            return safe_alloca(ty, val); } break;
+        case FN_Malloc: { READ_TYPE(ty);
+            return LLVMBuildMalloc(builder, ty, ""); } break;
+        case FN_MallocArray: { READ_TYPE(ty); READ_VALUE(val);
+            return LLVMBuildArrayMalloc(builder, ty, val, ""); } break;
+        case FN_Free: { READ_VALUE(val);
+            return LLVMBuildFree(builder, val); } break; */
+        case FN_GetElementRef: {
+            READ_VALUE(pointer);
+            assert(argcount > 1);
+            size_t count = argcount;
+            std::vector<spv::Id> indices;
+            for (size_t i = 1; i < count; ++i) {
+                auto val = SCOPES_GET_RESULT(ref_to_value(args[i]));
+                if (i == 1) {
+                    indices.push_back(
+                        builder.makeIntConstant(
+                            builder.getTypeId(val), 0, false));
+                }
+                indices.push_back(val);
+            }
+            return builder.createAccessChain(
+                builder.getTypeStorageClass(builder.getTypeId(pointer)),
+                pointer, indices);
+        } break;
+        case FN_GetElementPtr: {
+            READ_VALUE(pointer);
+            assert(argcount > 1);
+            size_t count = argcount - 1;
+            std::vector<spv::Id> indices;
+            for (size_t i = 0; i < count; ++i) {
+                indices.push_back(SCOPES_GET_RESULT(ref_to_value(args[argn + i])));
+            }
+            return builder.createAccessChain(
+                builder.getTypeStorageClass(builder.getTypeId(pointer)),
+                pointer, indices);
+        } break;
+        case FN_Bitcast:
+        case FN_IntToPtr:
+        case FN_PtrToInt:
+        case FN_ITrunc:
+        case FN_SExt:
+        case FN_ZExt:
+        case FN_FPTrunc:
+        case FN_FPExt:
+        case FN_FPToUI:
+        case FN_FPToSI:
+        case FN_UIToFP:
+        case FN_SIToFP:
+        {
+            READ_VALUE(val); READ_TYPE(ty);
+            spv::Op op = spv::OpMax;
+            switch(builtin.value()) {
+            case FN_Bitcast:
+                if (builder.getTypeId(val) == ty) {
+                    // do nothing
+                    return val;
+                } else {
+                    op = spv::OpBitcast;
+                }
+                break;
+            case FN_IntToPtr: op = spv::OpConvertUToPtr; break;
+            case FN_PtrToInt: op = spv::OpConvertPtrToU; break;
+            case FN_SExt: op = spv::OpSConvert; break;
+            case FN_ZExt: op = spv::OpUConvert; break;
+            case FN_ITrunc: op = spv::OpSConvert; break;
+            case FN_FPTrunc: op = spv::OpFConvert; break;
+            case FN_FPExt: op = spv::OpFConvert; break;
+            case FN_FPToUI: op = spv::OpConvertFToU; break;
+            case FN_FPToSI: op = spv::OpConvertFToS; break;
+            case FN_UIToFP: op = spv::OpConvertUToF; break;
+            case FN_SIToFP: op = spv::OpConvertSToF; break;
+            default: return 0;
+            }
+            return builder.createUnaryOp(op, ty, val);
+        } break;
+        case FN_Deref: {
+            READ_VALUE(ptr);
+            return builder.createLoad(ptr);
+        } break;
+        case FN_Assign: {
+            READ_VALUE(lhs);
+            READ_VALUE(rhs);
+            builder.createStore(lhs, rhs);
+            return 0;
+        } break;
+        case FN_PtrToRef: {
+            READ_VALUE(ptr);
+            return ptr;
+        } break;
+        case FN_RefToPtr: {
+            READ_VALUE(ptr);
+            return ptr;
+        } break;
+        case FN_VolatileLoad:
+        case FN_Load: {
+            READ_VALUE(ptr);
+            spv::Id retvalue = builder.createLoad(ptr);
+            if (builtin == FN_VolatileLoad) {
+                builder.getInstruction(retvalue)->addImmediateOperand(
+                    1<<spv::MemoryAccessVolatileShift);
+            }
+            return retvalue;
+        } break;
+        case FN_VolatileStore:
+        case FN_Store: {
+            READ_VALUE(val); READ_VALUE(ptr);
+            builder.createStore(val, ptr);
+            /*
+            if (builtin == FN_VolatileStore) {
+                builder.getInstruction(retvalue)->addImmediateOperand(
+                    1<<spv::MemoryAccessVolatileShift);
+            }
+            */
+            return 0;
+        } break;
+        case OP_ICmpEQ:
+        case OP_ICmpNE:
+        case OP_ICmpUGT:
+        case OP_ICmpUGE:
+        case OP_ICmpULT:
+        case OP_ICmpULE:
+        case OP_ICmpSGT:
+        case OP_ICmpSGE:
+        case OP_ICmpSLT:
+        case OP_ICmpSLE:
+        case OP_FCmpOEQ:
+        case OP_FCmpONE:
+        case OP_FCmpORD:
+        case OP_FCmpOGT:
+        case OP_FCmpOGE:
+        case OP_FCmpOLT:
+        case OP_FCmpOLE:
+        case OP_FCmpUEQ:
+        case OP_FCmpUNE:
+        case OP_FCmpUNO:
+        case OP_FCmpUGT:
+        case OP_FCmpUGE:
+        case OP_FCmpULT:
+        case OP_FCmpULE: { READ_VALUE(a); READ_VALUE(b);
+            spv::Op op = spv::OpMax;
+#define BOOL_OR_INT_OP(BOOL_OP, INT_OP) \
+    (is_bool(a)?(BOOL_OP):(INT_OP))
+            switch(builtin.value()) {
+            case OP_ICmpEQ: op = BOOL_OR_INT_OP(spv::OpLogicalEqual, spv::OpIEqual); break;
+            case OP_ICmpNE: op = BOOL_OR_INT_OP(spv::OpLogicalNotEqual, spv::OpINotEqual); break;
+            case OP_ICmpUGT: op = spv::OpUGreaterThan; break;
+            case OP_ICmpUGE: op = spv::OpUGreaterThanEqual; break;
+            case OP_ICmpULT: op = spv::OpULessThan; break;
+            case OP_ICmpULE: op = spv::OpULessThanEqual; break;
+            case OP_ICmpSGT: op = spv::OpSGreaterThan; break;
+            case OP_ICmpSGE: op = spv::OpSGreaterThanEqual; break;
+            case OP_ICmpSLT: op = spv::OpSLessThan; break;
+            case OP_ICmpSLE: op = spv::OpSLessThanEqual; break;
+            case OP_FCmpOEQ: op = spv::OpFOrdEqual; break;
+            case OP_FCmpONE: op = spv::OpFOrdNotEqual; break;
+            case OP_FCmpORD: op = spv::OpOrdered; break;
+            case OP_FCmpOGT: op = spv::OpFOrdGreaterThan; break;
+            case OP_FCmpOGE: op = spv::OpFOrdGreaterThanEqual; break;
+            case OP_FCmpOLT: op = spv::OpFOrdLessThan; break;
+            case OP_FCmpOLE: op = spv::OpFOrdLessThanEqual; break;
+            case OP_FCmpUEQ: op = spv::OpFUnordEqual; break;
+            case OP_FCmpUNE: op = spv::OpFUnordNotEqual; break;
+            case OP_FCmpUNO: op = spv::OpUnordered; break;
+            case OP_FCmpUGT: op = spv::OpFUnordGreaterThan; break;
+            case OP_FCmpUGE: op = spv::OpFUnordGreaterThanEqual; break;
+            case OP_FCmpULT: op = spv::OpFUnordLessThan; break;
+            case OP_FCmpULE: op = spv::OpFUnordLessThanEqual; break;
+            default: break;
+            }
+#undef BOOL_OR_INT_OP
+            auto T = builder.getTypeId(a);
+            if (builder.isVectorType(T)) {
+                T = builder.makeVectorType(builder.makeBoolType(),
+                    builder.getNumTypeComponents(T));
+            } else {
+                T = builder.makeBoolType();
+            }
+            return builder.createBinOp(op, T, a, b); } break;
+        case OP_Add:
+        case OP_AddNUW:
+        case OP_AddNSW:
+        case OP_Sub:
+        case OP_SubNUW:
+        case OP_SubNSW:
+        case OP_Mul:
+        case OP_MulNUW:
+        case OP_MulNSW:
+        case OP_SDiv:
+        case OP_UDiv:
+        case OP_SRem:
+        case OP_URem:
+        case OP_Shl:
+        case OP_LShr:
+        case OP_AShr:
+        case OP_BAnd:
+        case OP_BOr:
+        case OP_BXor:
+        case OP_FAdd:
+        case OP_FSub:
+        case OP_FMul:
+        case OP_FDiv:
+        case OP_FRem: { READ_VALUE(a); READ_VALUE(b);
+            spv::Op op = spv::OpMax;
+            switch(builtin.value()) {
+#define BOOL_OR_INT_OP(BOOL_OP, INT_OP) \
+    (is_bool(a)?(BOOL_OP):(INT_OP))
+            case OP_Add:
+            case OP_AddNUW:
+            case OP_AddNSW: op = spv::OpIAdd; break;
+            case OP_Sub:
+            case OP_SubNUW:
+            case OP_SubNSW: op = spv::OpISub; break;
+            case OP_Mul:
+            case OP_MulNUW:
+            case OP_MulNSW: op = spv::OpIMul; break;
+            case OP_SDiv: op = spv::OpSDiv; break;
+            case OP_UDiv: op = spv::OpUDiv; break;
+            case OP_SRem: op = spv::OpSRem; break;
+            case OP_URem: op = spv::OpUMod; break;
+            case OP_Shl: op = spv::OpShiftLeftLogical; break;
+            case OP_LShr: op = spv::OpShiftRightLogical; break;
+            case OP_AShr: op = spv::OpShiftRightArithmetic; break;
+            case OP_BAnd: op = BOOL_OR_INT_OP(spv::OpLogicalAnd, spv::OpBitwiseAnd); break;
+            case OP_BOr: op = BOOL_OR_INT_OP(spv::OpLogicalOr, spv::OpBitwiseOr); break;
+            case OP_BXor: op = BOOL_OR_INT_OP(spv::OpLogicalNotEqual, spv::OpBitwiseXor); break;
+            case OP_FAdd: op = spv::OpFAdd; break;
+            case OP_FSub: op = spv::OpFSub; break;
+            case OP_FMul: op = spv::OpFMul; break;
+            case OP_FDiv: op = spv::OpFDiv; break;
+            case OP_FRem: op = spv::OpFRem; break;
+            default: break;
+            }
+#undef BOOL_OR_INT_OP
+            return builder.createBinOp(op,
+                builder.getTypeId(a), a, b); } break;
+        case OP_FMix: {
+            READ_VALUE(a);
+            READ_VALUE(b);
+            READ_VALUE(x);
+            return builder.createBuiltinCall(
+                builder.getTypeId(a),
+                glsl_ext_inst, GLSLstd450FMix, { a, b, x });
+        } break;
+        case FN_Length:
+        case FN_Normalize:
+        case OP_Sin:
+        case OP_Cos:
+        case OP_Tan:
+        case OP_Asin:
+        case OP_Acos:
+        case OP_Atan:
+        case OP_Trunc:
+        case OP_Floor:
+        case OP_FAbs:
+        case OP_FSign:
+        case OP_Log:
+        case OP_Log2:
+        case OP_Exp:
+        case OP_Exp2:
+        case OP_Sqrt:
+        case OP_Radians:
+        case OP_Degrees: {
+            READ_VALUE(val);
+            GLSLstd450 _builtin = GLSLstd450Bad;
+            auto rtype = builder.getTypeId(val);
+            switch (builtin.value()) {
+            case FN_Length:
+                rtype = builder.getContainedTypeId(rtype);
+                _builtin = GLSLstd450Length; break;
+            case FN_Normalize: _builtin = GLSLstd450Normalize; break;
+            case OP_Sin: _builtin = GLSLstd450Sin; break;
+            case OP_Cos: _builtin = GLSLstd450Cos; break;
+            case OP_Tan: _builtin = GLSLstd450Tan; break;
+            case OP_Asin: _builtin = GLSLstd450Asin; break;
+            case OP_Acos: _builtin = GLSLstd450Acos; break;
+            case OP_Atan: _builtin = GLSLstd450Atan; break;
+            case OP_Trunc: _builtin = GLSLstd450Trunc; break;
+            case OP_Floor: _builtin = GLSLstd450Floor; break;
+            case OP_FAbs: _builtin = GLSLstd450FAbs; break;
+            case OP_FSign: _builtin = GLSLstd450FSign; break;
+            case OP_Log: _builtin = GLSLstd450Log; break;
+            case OP_Log2: _builtin = GLSLstd450Log2; break;
+            case OP_Exp: _builtin = GLSLstd450Exp; break;
+            case OP_Exp2: _builtin = GLSLstd450Exp2; break;
+            case OP_Sqrt: _builtin = GLSLstd450Sqrt; break;
+            case OP_Radians: _builtin = GLSLstd450Radians; break;
+            case OP_Degrees: _builtin = GLSLstd450Degrees; break;
+            default: {
+                StyledString ss;
+                ss.out << "IL->SPIR: unsupported unary intrinsic " << builtin << " encountered";
+                SCOPES_LOCATION_ERROR(ss.str());
+            } break;
+            }
+            return builder.createBuiltinCall(rtype, glsl_ext_inst, _builtin, { val });
+        } break;
+        case FN_Cross:
+        case OP_Step:
+        case OP_Pow: {
+            READ_VALUE(a);
+            READ_VALUE(b);
+            GLSLstd450 _builtin = GLSLstd450Bad;
+            auto rtype = builder.getTypeId(a);
+            switch (builtin.value()) {
+            case OP_Step: _builtin = GLSLstd450Step; break;
+            case OP_Pow: _builtin = GLSLstd450Pow; break;
+            case FN_Cross: _builtin = GLSLstd450Cross; break;
+            default: {
+                StyledString ss;
+                ss.out << "IL->SPIR: unsupported binary intrinsic " << builtin << " encountered";
+                SCOPES_LOCATION_ERROR(ss.str());
+            } break;
+            }
+            return builder.createBuiltinCall(rtype, glsl_ext_inst, _builtin, { a, b });
+        } break;
+        case SFXFN_Unreachable:
+            builder.makeUnreachable();
+            return 0;
+        case SFXFN_Discard:
+            builder.makeDiscard();
+            return 0;
+        default: {
+            StyledString ss;
+            ss.out << "IL->SPIR: unsupported builtin " << builtin << " encountered";
+            SCOPES_LOCATION_ERROR(ss.str());
+        } break;
+        }
+#undef READ_TYPE
+#undef READ_VALUE
+        return 0;
+    }
+
+    SCOPES_RESULT(void) translate_Call(Call *call) {
+        SCOPES_RESULT_TYPE(void);
+        auto callee = call->callee;
+        auto &&args = call->args;
+
+        SCOPES_CHECK_RESULT(write_anchor(call->anchor()));
+
+        auto T = try_get_const_type(callee);
+        const Type *rtype = callee->get_type();
+
+        if (is_function_pointer(rtype)) {
+            auto func =
+                SCOPES_GET_RESULT(Function_to_function(
+                    SCOPES_GET_RESULT(
+                        extract_function_constant(callee))));
+            SCOPES_CHECK_RESULT(build_call(call,
+                extract_function_type(rtype),
+                func, args));
+            return {};
+        } else if (T == TYPE_Builtin) {
+            auto builtin = SCOPES_GET_RESULT(
+                extract_builtin_constant(callee));
+            auto result = SCOPES_GET_RESULT(
+                translate_builtin(builtin, args));
+            if (result) {
+                map_phi({ result }, call);
+            }
+            return {};
+        }
+        SCOPES_ANCHOR(call->anchor());
+        SCOPES_EXPECT_ERROR(error_gen_invalid_call_type(SCOPES_GEN_TARGET, callee));
+    }
+
+    SCOPES_RESULT(void) translate_Switch(Switch *node) {
+        SCOPES_RESULT_TYPE(void);
+        auto expr = SCOPES_GET_RESULT(ref_to_value(node->expr));
+        auto bb = builder.getBuildPoint();
+        auto bbdefault = &builder.makeNewBlock();
+        position_builder_at_end(bb);
+        int count = (int)node->cases.size();
+        assert(count);
+        auto _sw = new spv::Instruction(
+            spv::NoResult, spv::NoType, spv::OpSwitch);
+        bb->addInstruction(std::unique_ptr<spv::Instruction>(_sw));
+        _sw->addIdOperand(expr);
+        _sw->addIdOperand(bbdefault->getId());
+        bbdefault->addPredecessor(bb);
+        int i = count;
+        spv::Block *lastbb = nullptr;
+        while (i-- > 0) {
+            auto &&_case = node->cases[i];
+            spv::Block *bbcase = nullptr;
+            if (_case.kind == CK_Default) {
+                position_builder_at_end(bbdefault);
+                bbcase = bbdefault;
+            } else if (_case.body.empty()) {
+                assert(lastbb);
+                auto lit = SCOPES_GET_RESULT(
+                    extract_integer_constant(_case.literal));
+
+                _sw->addImmediateOperand(lit);
+                _sw->addIdOperand(lastbb->getId());
+                continue;
+            } else {
+                auto lit = SCOPES_GET_RESULT(
+                    extract_integer_constant(_case.literal));
+                bbcase = &builder.makeNewBlock();
+
+                _sw->addImmediateOperand(lit);
+                _sw->addIdOperand(bbcase->getId());
+                bbcase->addPredecessor(bb);
+
+                position_builder_at_end(bbcase);
+            }
+            SCOPES_CHECK_RESULT(translate_block(_case.body));
+            if (!_case.body.terminator) {
+                assert(lastbb);
+                builder.createBranch(lastbb);
+            }
+            lastbb = bbcase;
+        }
+        return {};
+    }
+
+    void position_builder_at_end(spv::Block *bb) {
+        builder.setBuildPoint(bb);
+    }
+
+    SCOPES_RESULT(void) translate_CondBr(CondBr *node) {
+        SCOPES_RESULT_TYPE(void);
+
+        auto cond = SCOPES_GET_RESULT(ref_to_value(node->cond));
+        assert(cond);
+        auto bbthen = &builder.makeNewBlock();
+        auto bbelse = &builder.makeNewBlock();
+        builder.createConditionalBranch(cond, bbthen, bbelse);
+
+        // write then-block
+        {
+            position_builder_at_end(bbthen);
+            SCOPES_CHECK_RESULT(translate_block(node->then_body));
+        }
+        // write else-block
+        {
+            position_builder_at_end(bbelse);
+            SCOPES_CHECK_RESULT(translate_block(node->else_body));
+        }
+
+        return {};
+    }
+
+    SCOPES_RESULT(void) translate_instruction(Instruction *node) {
+        SCOPES_ANCHOR(node->anchor());
+        switch(node->kind()) {
+        #define T(NAME, BNAME, CLASS) \
+            case NAME: return translate_ ## CLASS(cast<CLASS>(node));
+        SCOPES_INSTRUCTION_VALUE_KIND()
+        #undef T
+            default: assert(false); break;
+        }
+        return {};
+    }
+
+    SCOPES_RESULT(spv::Id) ref_to_value(const ValueIndex &ref) {
+        SCOPES_RESULT_TYPE(spv::Id);
+        SCOPES_ANCHOR(ref.value->anchor());
+        auto it = ref2value.find(ref);
+        if (it != ref2value.end())
+            return it->second;
+        spv::Id value = 0;
+        switch(ref.value->kind()) {
+        #define T(NAME, BNAME, CLASS) \
+            case NAME: value = SCOPES_GET_RESULT(CLASS ## _to_value(cast<CLASS>(ref.value))); break;
+        SCOPES_PURE_VALUE_KIND()
+        #undef T
+            default: {
+                SCOPES_EXPECT_ERROR(error_cannot_translate(SCOPES_GEN_TARGET, ref.value));
+            } break;
+        }
+        ref2value.insert({ref,value});
+        return value;
+    }
+
+    SCOPES_RESULT(spv::Id) PureCast_to_value(PureCast *node) {
+        SCOPES_RESULT_TYPE(spv::Id);
+        auto LLT = SCOPES_GET_RESULT(type_to_spirv_type(node->get_type()));
+        auto val = SCOPES_GET_RESULT(ref_to_value(node->value));
+        if (builder.getTypeId(val) == LLT)
+            return val;
+        return builder.createUnaryOp(spv::OpBitcast, LLT, val);
+    }
+
+    SCOPES_RESULT(spv::Id) Global_to_value(Global *node) {
+        SCOPES_RESULT_TYPE(spv::Id);
+        spv::StorageClass sc = SCOPES_GET_RESULT(storage_class_from_extern_class(
+            node->storage_class));
+        const char *name = nullptr;
+        spv::BuiltIn builtin = spv::BuiltInMax;
+        switch(node->name.value()) {
+        #define T(NAME) \
+        case SYM_SPIRV_BuiltIn ## NAME: \
+            builtin = spv::BuiltIn ## NAME; break;
+            B_SPIRV_BUILTINS()
+        #undef T
+            default:
+                name = node->name.name()->data;
+                break;
+        }
+        auto ty = SCOPES_GET_RESULT(type_to_spirv_type(node->get_type(), node->flags));
+        auto id = builder.createVariable(sc, ty, name);
+        if (builtin != spv::BuiltInMax) {
+            builder.addDecoration(id, spv::DecorationBuiltIn, builtin);
+        }
+        switch(sc) {
+        case spv::StorageClassUniformConstant:
+        case spv::StorageClassUniform: {
+            //builder.addDecoration(id, spv::DecorationDescriptorSet, 0);
+            if (node->binding >= 0) {
+                builder.addDecoration(id, spv::DecorationBinding, node->binding);
+            }
+            if (node->location >= 0) {
+                builder.addDecoration(id, spv::DecorationLocation, node->location);
+            }
+            if (builder.isImageType(ty)) {
+                auto flags = node->flags;
+                if (flags & GF_Volatile) {
+                    builder.addDecoration(id, spv::DecorationVolatile);
+                }
+                if (flags & GF_Coherent) {
+                    builder.addDecoration(id, spv::DecorationCoherent);
+                }
+                if (flags & GF_Restrict) {
+                    builder.addDecoration(id, spv::DecorationRestrict);
+                }
+                if (flags & GF_NonWritable) {
+                    builder.addDecoration(id, spv::DecorationNonWritable);
+                }
+                if (flags & GF_NonReadable) {
+                    builder.addDecoration(id, spv::DecorationNonReadable);
+                }
+            }
+        } break;
+        default: {
+            if (node->location >= 0) {
+                builder.addDecoration(id, spv::DecorationLocation, node->location);
+            }
+        } break;
+        }
+        return id;
+    }
+
+    SCOPES_RESULT(spv::Id) ConstInt_to_value(ConstInt *node) {
+        SCOPES_RESULT_TYPE(spv::Id);
+        auto TT = SCOPES_GET_RESULT(storage_type(node->get_type()));
+        //auto T = SCOPES_GET_RESULT(type_to_spirv_type(node->get_type()));
+        auto it = cast<IntegerType>(TT);
+        if (it->issigned) {
+            int64_t value = node->value;
+            switch(it->width) {
+            case 8: return builder.makeIntConstant(
+                builder.makeIntegerType(8, true), value);
+            case 16: return builder.makeIntConstant(
+                builder.makeIntegerType(16, true), value);
+            case 32: return builder.makeIntConstant(value);
+            case 64: return builder.makeInt64Constant(value);
+            default: break;
+            }
+        } else {
+            uint64_t value = node->value;
+            switch(it->width) {
+            case 1: return builder.makeBoolConstant(value);
+            case 8: return builder.makeIntConstant(
+                builder.makeIntegerType(8, false), value);
+            case 16: return builder.makeIntConstant(
+                builder.makeIntegerType(16, false), value);
+            case 32: return builder.makeUintConstant(value);
+            case 64: return builder.makeUint64Constant(value);
+            default: break;
+            }
+        }
+        StyledString ss;
+        ss.out << "IL->SPIR: unsupported integer constant type " << node->get_type();
+        SCOPES_LOCATION_ERROR(ss.str());
+    }
+
+    SCOPES_RESULT(spv::Id) ConstReal_to_value(ConstReal *node) {
+        SCOPES_RESULT_TYPE(spv::Id);
+        auto TT = SCOPES_GET_RESULT(storage_type(node->get_type()));
+        //auto T = SCOPES_GET_RESULT(type_to_spirv_type(node->get_type()));
+        auto rt = cast<RealType>(TT);
+        double value = node->value;
+        switch(rt->width) {
+        case 32: return builder.makeFloatConstant(value);
+        case 64: return builder.makeDoubleConstant(value);
+        default: break;
+        }
+        StyledString ss;
+        ss.out << "IL->SPIR: unsupported real constant type " << node->get_type();
+        SCOPES_LOCATION_ERROR(ss.str());
+    }
+
+    SCOPES_RESULT(spv::Id) ConstPointer_to_value(ConstPointer *node) {
+        SCOPES_RESULT_TYPE(spv::Id);
+        SCOPES_EXPECT_ERROR(error_cannot_translate(SCOPES_GEN_TARGET, node));
+#if 0
+        auto TT = SCOPES_GET_RESULT(storage_type(node->get_type()));
+        auto LLT = SCOPES_GET_RESULT(type_to_spirv_type(node->get_type()));
+        if (is_function_pointer(TT)) {
+            StyledString ss;
+            ss.out << "IL->SPIR: function pointer constants are unsupported";
+            SCOPES_LOCATION_ERROR(ss.str());
+        }
+        auto pt = cast<PointerType>(TT);
+        auto val = SCOPES_GET_RESULT(ref_to_value(node->value));
+        auto id = builder.createVariable(spv::StorageClassFunction,
+            builder.getTypeId(val), nullptr);
+        builder.getInstruction(id)->addIdOperand(val);
+        return id;
+#endif
+    }
+
+    SCOPES_RESULT(spv::Id) ConstAggregate_to_value(ConstAggregate *node) {
+        SCOPES_RESULT_TYPE(spv::Id);
+        //auto TT = SCOPES_GET_RESULT(storage_type(node->get_type()));
+        auto LLT = SCOPES_GET_RESULT(type_to_spirv_type(node->get_type()));
+        size_t count = node->values.size();
+        Ids values;
+        for (size_t i = 0; i < count; ++i) {
+            values.push_back(SCOPES_GET_RESULT(
+                ref_to_value(node->values[i])));
+        }
+        return builder.makeCompositeConstant(LLT, values);
+    }
+
+    SCOPES_RESULT(void) build_call(Call *call,
+        const Type *functype, spv::Function *func, const TypedValues &args) {
+        SCOPES_RESULT_TYPE(void);
+        size_t argcount = args.size();
+
+        auto fi = cast<FunctionType>(functype);
+
+        //auto rtype = abi_return_type(fi);
+
+        Ids values;
+        values.reserve(argcount + 1);
+
+        //auto retT = SCOPES_GET_RESULT(type_to_spirv_type(rtype));
+
+        for (size_t i = 0; i < argcount; ++i) {
+            values.push_back(SCOPES_GET_RESULT(ref_to_value(args[i])));
+        }
+
+        size_t fargcount = fi->argument_types.size();
+        assert(argcount >= fargcount);
+        // make variadic calls C compatible
+        if (fi->flags & FF_Variadic) {
+            SCOPES_LOCATION_ERROR(String::from("IL->SPIR: variadic calls not supported"));
+        }
+
+        auto ret = builder.createFunctionCall(func, values);
+
+        if (fi->has_exception()) {
+            if (is_returning_value(fi->except_type)) {
+                assert(call->except);
+                auto except = builder.createCompositeExtract(ret,
+                    builder.getContainedTypeId(builder.getTypeId(ret), 1),
+                    1);
+                Ids values;
+                struct_to_values(values, fi->except_type, except);
+                map_phi(values, call->except);
+            }
+            auto ok = builder.createCompositeExtract(ret,
+                builder.getContainedTypeId(builder.getTypeId(ret), 0), 0);
+            auto old_bb = builder.getBuildPoint();
+            auto bb_except = &builder.makeNewBlock();
+            position_builder_at_end(bb_except);
+            SCOPES_CHECK_RESULT(translate_block(call->except_body));
+            position_builder_at_end(old_bb);
+            if (fi->return_type == TYPE_NoReturn) {
+                // always raises
+                builder.createBranch(bb_except);
+                return {};
+            } else {
+                auto bb = &builder.makeNewBlock();
+                builder.createConditionalBranch(ok, bb, bb_except);
+                position_builder_at_end(bb);
+                if (is_returning_value(fi->return_type)) {
+                    ret = builder.createCompositeExtract(ret,
+                        builder.getContainedTypeId(builder.getTypeId(ret), 2),
+                        2);
+                    Ids values;
+                    struct_to_values(values, fi->return_type, ret);
+                    map_phi(values, call);
+                }
+            }
+        } else if (!is_returning(fi->return_type)) {
+            builder.makeUnreachable();
+        } else {
+            Ids values;
+            struct_to_values(values, fi->return_type, ret);
+            map_phi(values, call);
+        }
+        return {};
+    }
+
+#if 0
+    LLVMMetadataRef anchor_to_location(const Anchor *anchor) {
+        assert(use_debug_info);
+
+        auto old_bb = LLVMGetInsertBlock(builder);
+        assert(old_bb);
+        LLVMValueRef func = LLVMGetBasicBlockParent(old_bb);
+        LLVMMetadataRef disp = LLVMGetSubprogram(func);
+
+        LLVMMetadataRef result = LLVMDIBuilderCreateDebugLocation(
+            LLVMGetGlobalContext(),
+            anchor->lineno, anchor->column, disp, nullptr);
+
+        return result;
+    }
+
+    LLVMMetadataRef set_debug_location(const Anchor *anchor) {
+        assert(use_debug_info);
+        LLVMMetadataRef diloc = anchor_to_location(anchor);
+        LLVMSetCurrentDebugLocation(builder,
+            LLVMMetadataAsValue(LLVMGetGlobalContext(), diloc));
+        return diloc;
+    }
+#endif
+
+    SCOPES_RESULT(void) process_functions() {
+        SCOPES_RESULT_TYPE(void);
+        while (!function_todo.empty()) {
+            Function *func = function_todo.front();
+            function_todo.pop_front();
+            SCOPES_CHECK_RESULT(Function_finalize(func));
+        }
+        return {};
+    }
+
+    SCOPES_RESULT(void) generate(std::vector<unsigned int> &result,
+        Symbol target, Function *entry) {
+        SCOPES_RESULT_TYPE(void);
+
+        auto needfi = native_ro_pointer_type(
+            function_type(empty_arguments_type(), {}));
+        auto hasfi = entry->get_type();
         if (hasfi != needfi) {
-            set_active_anchor(entry->anchor);
+            SCOPES_ANCHOR(entry->anchor());
             StyledString ss;
             ss.out << "Entry function must have type " << needfi
                 << " but has type " << hasfi;
             SCOPES_LOCATION_ERROR(ss.str());
         }
 
-        {
-            std::unordered_set<Label *> visited;
-            //Labels labels;
-            entry->build_reachable(visited, nullptr);
-            for (auto it = visited.begin(); it != visited.end(); ++it) {
-                (*it)->insert_into_usermap(user_map);
-            }
-        }
+        builder.setSource(spv::SourceLanguageGLSL, 450);
+        glsl_ext_inst = builder.import("GLSL.std.450");
 
-        scc.walk(entry);
-
-        //const char *name = entry->name.name()->data;
-        //module = LLVMModuleCreateWithName(name);
-
-        if (use_debug_info) {
-            /*
-            const char *DebugStr = "Debug Info Version";
-            LLVMValueRef DbgVer[3];
-            DbgVer[0] = LLVMConstInt(i32T, 1, 0);
-            DbgVer[1] = LLVMMDString(DebugStr, strlen(DebugStr));
-            DbgVer[2] = LLVMConstInt(i32T, 3, 0);
-            LLVMAddNamedMetadataOperand(module, "llvm.module.flags",
-                LLVMMDNode(DbgVer, 3));
-
-            LLVMDIBuilderCreateCompileUnit(di_builder,
-                llvm::dwarf::DW_LANG_C99, "file", "directory", "scopes",
-                false, "", 0, "", 0);*/
-        }
-
-        auto func = SCOPES_GET_RESULT(label_to_function(entry, true));
+        auto func = SCOPES_GET_RESULT(Function_to_function(entry));
 
         switch(target.value()) {
         case SYM_TargetVertex: {
@@ -1841,6 +2191,8 @@ struct SPIRVGenerator {
         case SYM_TargetFragment: {
             builder.addCapability(spv::CapabilityShader);
             builder.addEntryPoint(spv::ExecutionModelFragment, func, "main");
+            execution_modes.insert({ spv::ExecutionModeOriginLowerLeft,
+                 ExecutionMode() });
         } break;
         case SYM_TargetGeometry: {
             builder.addCapability(spv::CapabilityShader);
@@ -1861,16 +2213,22 @@ struct SPIRVGenerator {
         } break;
         }
 
-        SCOPES_CHECK_RESULT(process_labels());
+        SCOPES_CHECK_RESULT(process_functions());
 
-        //size_t k = finalize_types();
-        //assert(!k);
+        for (auto &&entry : execution_modes) {
+            builder.addExecutionMode(func, (spv::ExecutionMode)entry.first,
+                entry.second.values[0],
+                entry.second.values[1],
+                entry.second.values[2]);
+        }
 
         builder.dump(result);
 
         SCOPES_CHECK_RESULT(verify_spirv(result));
-        return true;
+
+        return {};
     }
+
 };
 
 //------------------------------------------------------------------------------
@@ -1944,14 +2302,14 @@ SCOPES_RESULT(void) optimize_spirv(std::vector<unsigned int> &result, int opt_le
     }
 
     SCOPES_CHECK_RESULT(verify_spirv(result));
-    return true;
+    return {};
 }
 
-SCOPES_RESULT(const String *) compile_spirv(Symbol target, Label *fn, uint64_t flags) {
+SCOPES_RESULT(const String *) compile_spirv(Symbol target, Function *fn, uint64_t flags) {
     SCOPES_RESULT_TYPE(const String *);
     Timer sum_compile_time(TIMER_CompileSPIRV);
 
-    SCOPES_CHECK_RESULT(fn->verify_compilable());
+    //SCOPES_CHECK_RESULT(fn->verify_compilable());
 
     SPIRVGenerator ctx;
     if (flags & CF_NoDebugInfo) {
@@ -1987,11 +2345,11 @@ SCOPES_RESULT(const String *) compile_spirv(Symbol target, Label *fn, uint64_t f
     return String::from((char *)&result[0], bytesize);
 }
 
-SCOPES_RESULT(const String *) compile_glsl(Symbol target, Label *fn, uint64_t flags) {
+SCOPES_RESULT(const String *) compile_glsl(Symbol target, Function *fn, uint64_t flags) {
     SCOPES_RESULT_TYPE(const String *);
     Timer sum_compile_time(TIMER_CompileSPIRV);
 
-    SCOPES_CHECK_RESULT(fn->verify_compilable());
+    //SCOPES_CHECK_RESULT(fn->verify_compilable());
 
     SPIRVGenerator ctx;
     if (flags & CF_NoDebugInfo) {
@@ -2054,5 +2412,5 @@ SCOPES_RESULT(const String *) compile_glsl(Symbol target, Label *fn, uint64_t fl
 
     return String::from_stdstring(source);
 }
+
 } // namespace scopes
-#endif

@@ -116,6 +116,7 @@ sc_value_raises_t convert_result(const Result<Template *> &_result) CRESULT;
 sc_value_raises_t convert_result(const Result<ConstPointer *> &_result) CRESULT;
 
 sc_type_raises_t convert_result(const Result<const Type *> &_result) CRESULT;
+sc_string_raises_t convert_result(const Result<const String *> &_result) CRESULT;
 
 sc_scope_raises_t convert_result(const Result<Scope *> &_result) CRESULT;
 
@@ -237,14 +238,16 @@ sc_value_raises_t sc_compile(sc_value_t *srcl, uint64_t flags) {
 
 sc_string_raises_t sc_compile_spirv(sc_symbol_t target, sc_value_t *srcl, uint64_t flags) {
     using namespace scopes;
-    //RETURN_RESULT(compile_spirv(target, srcl, flags));
-    return {true,nullptr,String::from("")};
+    SCOPES_RESULT_TYPE(const String *);
+    auto result = SCOPES_C_GET_RESULT(extract_function_constant(srcl));
+    return convert_result(compile_spirv(target, result, flags));
 }
 
 sc_string_raises_t sc_compile_glsl(sc_symbol_t target, sc_value_t *srcl, uint64_t flags) {
     using namespace scopes;
-    //RETURN_RESULT(compile_glsl(target, srcl, flags));
-    return {true,nullptr,String::from("")};
+    SCOPES_RESULT_TYPE(const String *);
+    auto result = SCOPES_C_GET_RESULT(extract_function_constant(srcl));
+    return convert_result(compile_glsl(target, result, flags));
 }
 
 sc_void_raises_t sc_compile_object(const sc_string_t *path, sc_scope_t *table, uint64_t flags) {

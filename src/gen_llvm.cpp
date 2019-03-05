@@ -169,7 +169,6 @@ struct LLVMIRGenerator {
     std::unordered_map<Function *, LLVMMetadataRef> func2md;
     std::unordered_map<Function *, Symbol> func_export_table;
     std::unordered_map<Global *, LLVMValueRef> global2global;
-    std::unordered_map<LLVMValueRef, LLVMBasicBlockRef> func_fail_label;
     std::deque<Function *> function_todo;
     static Types type_todo;
     static std::unordered_map<const Type *, LLVMTypeRef> type_cache;
@@ -475,8 +474,6 @@ struct LLVMIRGenerator {
             nullptr);
 
     }
-
-#undef DEFINE_BUILTIN
 
     static LLVMTypeRef abi_struct_type(const ABIClass *classes, size_t sz) {
         LLVMTypeRef types[sz];
@@ -1187,12 +1184,12 @@ struct LLVMIRGenerator {
         size_t argn = 0;
 
 #define READ_VALUE(NAME) \
-        assert(argn <= argcount); \
+        assert(argn < argcount); \
         TypedValue * _ ## NAME = args[argn++]; \
         LLVMValueRef NAME = SCOPES_GET_RESULT(ref_to_value(_ ## NAME));
 
 #define READ_TYPE(NAME) \
-        assert(argn <= argcount); \
+        assert(argn < argcount); \
         LLVMTypeRef NAME = SCOPES_GET_RESULT(node_to_llvm_type(args[argn++]));
 
         switch(builtin.value()) {
