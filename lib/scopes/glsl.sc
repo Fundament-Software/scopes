@@ -11,20 +11,26 @@
 
 using import glm
 
-let gl_Position =
-    extern 'spirv.Position vec4
-        storage = 'Output
-let gl_FragCoord =
-    extern 'spirv.FragCoord vec4
-        storage = 'Input
-let gl_VertexID =
-    extern 'spirv.VertexId i32
-        storage = 'Input
-let gl_FragDepth =
-    extern 'spirv.FragDepth f32
-        storage = 'Output
 
-syntax-extend
+let scope = (Scope)
+    do
+        let gl_Position =
+            extern 'spirv.Position vec4
+                storage = 'Output
+        let gl_FragCoord =
+            extern 'spirv.FragCoord vec4
+                storage = 'Input
+        let gl_VertexID =
+            extern 'spirv.VertexId i32
+                storage = 'Input
+        let gl_FragDepth =
+            extern 'spirv.FragDepth f32
+                storage = 'Output
+        locals;
+
+run-stage;
+
+do
     fn build-rtypes (f)
         # prefix    rtype
         f ""        vec4
@@ -44,8 +50,8 @@ syntax-extend
         f "2DMS"        '2D     0       1   2
         f "2DMSArray"   '2D     1       1   3
 
-    let gsampler = (typename "gsampler")
-    set-scope-symbol! syntax-scope 'gsampler gsampler
+    typedef gsampler
+    'set-symbol scope 'gsampler gsampler
 
     fn coord-type (ET coords)
         if (coords == 1) ET
@@ -60,130 +66,133 @@ syntax-extend
         else v
 
     fn make-gsampler (postfix dim arrayed ms coords)
-        let T = (typename (.. "gsampler" postfix) gsampler)
         let icoordT = (coord-type i32 coords)
         let fcoordT = (coord-type f32 coords)
         let fcoordProjT = (coord-type f32 (coords + 1))
         let fetch-has-lod-arg =
-            match dim
-                (or '1D '2D '3D)
-                    ms == 0
-                else false
-        set-type-symbol! T 'texture
+            switch dim
+            pass '1D
+            pass '2D
+            case '3D
+                ms == 0
+            default
+                false
+        typedef (.. "gsampler" postfix) < gsampler
+            let T = this-type
+
             fn... texture
-                (sampler : T, P : fcoordT)
-                    sample sampler P
-                (sampler : T, P : fcoordT, bias : f32)
-                    sample sampler P
-                        Bias = bias
-        set-type-symbol! T 'texture-offset
+            case (sampler : T, P : fcoordT)
+                sample sampler P
+            case (sampler : T, P : fcoordT, bias : f32)
+                sample sampler P
+                    Bias = bias
+
             fn... texture-offset
-                (sampler : T, P : fcoordT, offset : icoordT)
-                    sample sampler P
-                        Offset = offset
-                (sampler : T, P : fcoordT, offset : icoordT, bias : f32)
-                    sample sampler P
-                        Offset = offset
-                        Bias = bias
-        set-type-symbol! T 'texture-proj
+            case (sampler : T, P : fcoordT, offset : icoordT)
+                sample sampler P
+                    Offset = offset
+            case (sampler : T, P : fcoordT, offset : icoordT, bias : f32)
+                sample sampler P
+                    Offset = offset
+                    Bias = bias
+
             fn... texture-proj
-                (sampler : T, P : fcoordProjT)
-                    sample sampler P
-                        Proj = true
-                (sampler : T, P : fcoordProjT, bias : f32)
-                    sample sampler P
-                        Proj = true
-                        Bias = bias
-        set-type-symbol! T 'texture-gather
+            case (sampler : T, P : fcoordProjT)
+                sample sampler P
+                    Proj = true
+            case (sampler : T, P : fcoordProjT, bias : f32)
+                sample sampler P
+                    Proj = true
+                    Bias = bias
+
             fn... texture-gather
-                (sampler : T, P : fcoordT)
-                    sample sampler P
-                        Gather = 0
-                (sampler : T, P : fcoordT, comp : i32)
-                    sample sampler P
-                        Gather = comp
-        set-type-symbol! T 'texture-lod
+            case (sampler : T, P : fcoordT)
+                sample sampler P
+                    Gather = 0
+            case (sampler : T, P : fcoordT, comp : i32)
+                sample sampler P
+                    Gather = comp
+
             fn... texture-lod
-                (sampler : T, P : fcoordT, lod : f32)
-                    sample sampler P
-                        Lod = lod
-        set-type-symbol! T 'texture-size
-            if fetch-has-lod-arg
-                fn... texture-size
-                    (sampler : T, lod : i32)
+            case (sampler : T, P : fcoordT, lod : f32)
+                sample sampler P
+                    Lod = lod
+
+            let texture-size =
+                if fetch-has-lod-arg
+                    fn... texture-size
+                    case (sampler : T, lod : i32)
                         vector->vec-type
                             Image-query-size sampler
                                 Lod = lod
-            else
-                fn... texture-size
-                    (sampler : T)
+                else
+                    fn... texture-size
+                    case (sampler : T)
                         vector->vec-type
                             Image-query-size sampler
-        set-type-symbol! T 'texture-query-lod
+
             fn... texture-query-lod
-                (sampler : T, P : fcoordT)
-                    vector->vec-type
-                        Image-query-lod sampler P
-        set-type-symbol! T 'texture-levels Image-query-levels
-        set-type-symbol! T 'texture-samples Image-query-samples
-        set-type-symbol! T 'fetch
-            if fetch-has-lod-arg
-                fn... fetch
-                    (sampler : T, P : icoordT, lod : i32)
+            case (sampler : T, P : fcoordT)
+                vector->vec-type
+                    Image-query-lod sampler P
+
+            let texture-levels = Image-query-levels
+            let texture-samples = Image-query-samples
+
+            let fetch =
+                if fetch-has-lod-arg
+                    fn... fetch
+                    case (sampler : T, P : icoordT, lod : i32)
                         sample sampler P
                             Fetch = true
                             Lod = lod
-            elseif (ms == 1)
-                fn... fetch
-                    (sampler : T, P : icoordT, sampleid : i32)
+                elseif (ms == 1)
+                    fn... fetch
+                    case (sampler : T, P : icoordT, sampleid : i32)
                         sample sampler P
                             Fetch = true
                             Sample = sampleid
-            else
-                fn... fetch
-                    (sampler : T, P : icoordT)
+                else
+                    fn... fetch
+                    case (sampler : T, P : icoordT)
                         sample sampler P
                             Fetch = true
-        set-type-symbol! T 'fetch-offset
+
             fn... fetch-offset
-                (sampler : T, P : icoordT, lod : i32, offset : icoordT)
-                    sample sampler P
-                        Fetch = true
-                        Lod = lod
-                        Offset = offset
-        T
+            case (sampler : T, P : icoordT, lod : i32, offset : icoordT)
+                sample sampler P
+                    Fetch = true
+                    Lod = lod
+                    Offset = offset
 
     fn make-sampler (prefix return-type postfix dim arrayed ms coords)
-        let T =
-            typename (.. prefix "sampler" postfix)
-                super =
-                    make-gsampler postfix dim arrayed ms coords
-                storage =
-                    SampledImage-type
-                        Image-type return-type dim 0 arrayed ms 1 'Unknown unnamed
-        T
+        let super =
+            make-gsampler postfix dim arrayed ms coords
+        let storage =
+            SampledImage-type
+                Image-type return-type dim 0 arrayed ms 1 'Unknown unnamed
+        typedef (.. prefix "sampler" postfix) < super : storage
 
     build-dims
         fn (postfix dim arrayed ms coords)
             let T = (make-gsampler postfix dim arrayed ms coords)
-            set-scope-symbol! syntax-scope (Symbol (type-name T)) T
+            'set-symbol scope (Symbol ('string T)) T
 
     build-rtypes
         fn (prefix return-type)
             build-dims
                 fn (postfix dim arrayed ms coords)
-                    set-scope-symbol! syntax-scope
-                        Symbol (.. prefix "image" postfix)
+                    'set-symbol scope (Symbol (.. prefix "image" postfix))
                         fn (format)
                             Image-type return-type dim 0 arrayed ms 2 format unnamed
                     let samplerT = (make-sampler prefix return-type postfix dim arrayed ms coords)
-                    set-scope-symbol! syntax-scope
-                        Symbol (type-name samplerT)
-                        samplerT
-    syntax-scope
+                    'set-symbol scope (Symbol ('string samplerT)) samplerT
 
-let XVarType = (typename "xvar" extern)
-let XVarBridgeType = (typename "xvar-bridge")
+run-stage;
+
+typedef xvar
+
+typedef xvar-bridge
 
 typeinline XVarBridgeType '__imply (self destT)
     forward-imply self.in destT

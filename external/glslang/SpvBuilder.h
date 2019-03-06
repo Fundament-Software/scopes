@@ -233,6 +233,8 @@ public:
     // Turn the array of constants into a proper spv constant of the requested type.
     Id makeCompositeConstant(Id type, const std::vector<Id>& comps, bool specConst = false);
 
+    Id makeNullConstant(Id typeId);
+
     // Methods for adding information outside the CFG.
     Instruction* addEntryPoint(ExecutionModel, Function*, const char* name);
     void addExecutionMode(Function*, ExecutionMode mode, int value1 = -1, int value2 = -1, int value3 = -1);
@@ -627,6 +629,7 @@ protected:
      // not output, internally used for quick & dirty canonical (unique) creation
     std::vector<Instruction*> groupedConstants[OpConstant];  // all types appear before OpConstant
     std::vector<Instruction*> groupedTypes[OpConstant];
+    std::map<Id, Instruction*> nullConstants;
 
     // stack of switches
     std::stack<Block*> switchMerges;

@@ -970,10 +970,12 @@ struct SPIRVGenerator {
 
         std::vector<std::vector<spv::Decoration>> decorations;
 
+        auto old_bb = builder.getBuildPoint();
         auto func = builder.makeFunctionEntry(
             spv::NoPrecision, rettype, name,
             paramtypes, decorations, &bb);
         func2func[node] = func;
+        builder.setBuildPoint(old_bb);
 
         //if (use_debug_info) {
         //    LLVMSetSubprogram(func, function_to_subprogram(node));
@@ -1014,6 +1016,17 @@ struct SPIRVGenerator {
         return {};
     }
 
+    LabelInfo *find_label_info_by_kind(LabelKind kind) {
+        int i = label_info_stack.size();
+        while (i-- > 0) {
+            auto &&info = label_info_stack[i];
+            assert(info.label);
+            if (info.label->label_kind == kind)
+                return &info;
+        }
+        return nullptr;
+    }
+
     LabelInfo &find_label_info(Label *label) {
         int i = label_info_stack.size();
         while (i-- > 0) {
@@ -1023,6 +1036,22 @@ struct SPIRVGenerator {
         }
         assert(false);
         return label_info_stack.back();
+    }
+
+    void build_merge_phi(
+        const Ids &phis, const Ids &values) {
+        assert(phis.size() == values.size());
+
+        auto bb = builder.getBuildPoint();
+        assert(bb);
+        int count = phis.size();
+        for (int i = 0; i < count; ++i) {
+            auto phi = phis[i];
+            auto op = builder.getInstruction(phi);
+            assert(op);
+            op->addIdOperand(values[i]);
+            op->addIdOperand(bb->getId());
+        }
     }
 
     SCOPES_RESULT(void) build_merge_phi(
@@ -1121,18 +1150,42 @@ struct SPIRVGenerator {
 
     SCOPES_RESULT(void) translate_LoopLabel(LoopLabel *node) {
         SCOPES_RESULT_TYPE(void);
+        LabelInfo *li_break = find_label_info_by_kind(LK_Break);
         //auto rtype = node->get_type();
         auto old_loop_info = loop_info;
         loop_info.loop = node;
-        auto bb = builder.getBuildPoint();
-        loop_info.bb_loop = &builder.makeNewBlock();
         loop_info.repeat_values.clear();
+        // continue label
+        loop_info.bb_loop = &builder.makeNewBlock();
+
+        auto bb = builder.getBuildPoint();
+
+        // loop header label
+        auto bb_header = &builder.makeNewBlock();
+        position_builder_at_end(bb_header);
+        Ids headerphi;
+        SCOPES_CHECK_RESULT(build_phi(headerphi, node->args));
+        if (li_break) {
+            builder.createLoopMerge(li_break->bb_merge,
+                loop_info.bb_loop, spv::LoopControlMaskNone);
+        }
+        auto bb_subheader = &builder.makeNewBlock();
+        builder.createBranch(bb_subheader);
+        position_builder_at_end(bb_subheader);
+
+        // continue label
         position_builder_at_end(loop_info.bb_loop);
         SCOPES_CHECK_RESULT(build_phi(loop_info.repeat_values, node->args));
+        build_merge_phi(headerphi, loop_info.repeat_values);
+        builder.createBranch(bb_header);
+
+        // branch into header
         position_builder_at_end(bb);
-        SCOPES_CHECK_RESULT(build_merge_phi(loop_info.repeat_values, node->init));
-        builder.createBranch(loop_info.bb_loop);
-        position_builder_at_end(loop_info.bb_loop);
+        SCOPES_CHECK_RESULT(build_merge_phi(headerphi, node->init));
+        builder.createBranch(bb_header);
+
+        // loop body
+        position_builder_at_end(bb_subheader);
         SCOPES_CHECK_RESULT(translate_block(node->body));
         loop_info = old_loop_info;
         return {};
@@ -1418,11 +1471,7 @@ struct SPIRVGenerator {
         } break;
         case FN_NullOf: {
             READ_TYPE(ty);
-            auto op = new spv::Instruction(
-                builder.getUniqueId(), ty, spv::OpConstantNull);
-            builder.getBuildPoint()->addInstruction(
-                std::unique_ptr<spv::Instruction>(op));
-            return op->getResultId();
+            return builder.makeNullConstant(ty);
         } break;
         case FN_Undef: { READ_TYPE(ty);
             return builder.createUndefined(ty); } break;

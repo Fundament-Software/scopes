@@ -2232,6 +2232,7 @@ let
     &= = (make-inplace-op &)
     |= = (make-inplace-op |)
     ^= = (make-inplace-op ^)
+    ..= = (make-inplace-op ..)
 
 define-infix< 50 +=
 define-infix< 50 -=
@@ -2244,6 +2245,7 @@ define-infix< 50 <<=
 define-infix< 50 &=
 define-infix< 50 |=
 define-infix< 50 ^=
+define-infix< 50 ..=
 define-infix< 50 =
 
 define-infix> 100 or
@@ -3369,19 +3371,13 @@ inline clamp (x mn mx)
                     return result
                 compiler-error! "unsupported type"
 
+inline extern (name T attrs...)
+    let g = (sc_global_new (sc_get_active_anchor) name T)
+    sc_global_set_storage_class g
+        va-option storage attrs... unnamed
+    g
+
 let
-    extern =
-        spice-macro
-            fn (args)
-                let argc = ('argcount args)
-                verify-count argc 2 2
-                let sym T =
-                    'getarg args 0
-                    'getarg args 1
-                let sym = (sym as Symbol)
-                let T = (T as type)
-                Value
-                    sc_global_new (sc_get_active_anchor) sym T
     private =
         spice-macro
             fn (args)
