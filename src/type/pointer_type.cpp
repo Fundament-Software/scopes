@@ -45,8 +45,10 @@ void PointerType::stream_name(StyledStream &ss) const {
         ss << "*";
     } else if (is_readable()) {
         ss << "(*)";
-    } else {
+    } else if (is_writable()) {
         ss << "*!";
+    } else {
+        ss << "*?";
     }
     if (storage_class != SYM_Unnamed) {
         ss << "[" << storage_class.name()->data << "]";

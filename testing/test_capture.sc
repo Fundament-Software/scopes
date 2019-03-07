@@ -13,3 +13,13 @@ do
 
     assert ((f 1 2) == (+ 10 20 1 2))
 
+
+let T = (array i32 16)
+let f =
+    spice-capture [T] ()
+        dump T
+        `(nullof T)
+
+run-stage;
+
+print (f)

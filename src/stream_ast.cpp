@@ -157,6 +157,7 @@ struct StreamAST : StreamAnchors {
     }
 
     bool sameline(const Value *node) {
+        if (!node) return true;
         switch(node->kind()) {
         case VK_ConstInt:
         case VK_ConstReal:
@@ -174,6 +175,7 @@ struct StreamAST : StreamAnchors {
     }
 
     void walk_newline(const Value *node, int depth, int maxdepth) {
+        assert(node);
         stream_newline();
         stream_indent(depth);
         walk(node, depth, maxdepth);
@@ -599,6 +601,14 @@ struct StreamAST : StreamAnchors {
         } break;
         case VK_Keyed: {
             auto val = cast<Keyed>(node);
+            ss << node;
+            if (newlines) {
+                ss << " " << val->key;
+                walk_same_or_newline(val->value, depth+1, maxdepth);
+            }
+        } break;
+        case VK_KeyedTemplate: {
+            auto val = cast<KeyedTemplate>(node);
             ss << node;
             if (newlines) {
                 ss << " " << val->key;

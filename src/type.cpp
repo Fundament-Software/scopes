@@ -140,6 +140,8 @@ bool is_plain(const Type *T) {
     case TK_Integer:
     case TK_Real:
     case TK_Pointer:
+    case TK_Image:
+    case TK_SampledImage:
         return true;
     case TK_Array:
     case TK_Vector:
@@ -152,8 +154,6 @@ bool is_plain(const Type *T) {
     case TK_Typename:
         return cast<TypenameType>(T)->is_plain();
     case TK_Function:
-    case TK_Image:
-    case TK_SampledImage:
         return false;
     }
     return false;

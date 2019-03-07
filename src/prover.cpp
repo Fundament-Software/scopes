@@ -1069,6 +1069,10 @@ static SCOPES_RESULT(void) build_deref(
 #endif
 #define DEREF(NAME) \
         SCOPES_CHECK_RESULT(build_deref(ctx, call->anchor(), NAME));
+#define READ_VALUE(NAME) \
+        assert(argn < argcount); \
+        auto && NAME = values[argn++]; \
+        DEREF(NAME);
 #define READ_NODEREF_TYPEOF(NAME) \
         assert(argn < argcount); \
         auto &&_ ## NAME = values[argn++]; \
@@ -1100,6 +1104,10 @@ static SCOPES_RESULT(void) build_deref(
 #define READ_VECTOR_CONST(NAME) \
         assert(argn < argcount); \
         auto NAME = SCOPES_GET_RESULT(extract_vector_constant(values[argn++]));
+#define READ_SYMBOL_CONST(NAME) \
+        assert(argn < argcount); \
+        auto &&_ ## NAME = values[argn++]; \
+        auto NAME = SCOPES_GET_RESULT(extract_symbol_constant(_ ## NAME));
 
 static SCOPES_RESULT(const Type *) get_function_type(Function *fn) {
     SCOPES_RESULT_TYPE(const Type *);
@@ -1262,6 +1270,7 @@ repeat:
         size_t argn = 0;
         SCOPES_ANCHOR(call->anchor());
         switch(b.value()) {
+        /*** DEBUGGING ***/
         case FN_Dump: {
             StyledStream ss(SCOPES_CERR);
             ss << call->anchor() << " dump:";
@@ -1294,6 +1303,7 @@ repeat:
         case FN_Annotate: {
             return ARGTYPE0();
         } break;
+        /*** BORROW CHECKING ***/
         case FN_Move: {
             CHECKARGS(1, 1);
             READ_NODEREF_TYPEOF(X);
@@ -1305,6 +1315,7 @@ repeat:
             (void)X;
             return ARGTYPE0();
         } break;
+        /*** ARGUMENTS ***/
         case FN_VaCountOf: {
             return ConstInt::from(call->anchor(), TYPE_I32, argcount);
         } break;
@@ -1324,6 +1335,105 @@ repeat:
             READ_NODEREF_TYPEOF(A);
             return ConstPointer::type_from(call->anchor(), strip_qualifiers(A));
         } break;
+        /*** SPIR-V FORMS ***/
+        case FN_Sample: {
+            CHECKARGS(2, -1);
+            READ_STORAGETYPEOF(ST);
+            if (ST->kind() == TK_SampledImage) {
+                auto sit = cast<SampledImageType>(ST);
+                ST = SCOPES_GET_RESULT(storage_type(sit->type));
+            }
+            SCOPES_CHECK_RESULT(verify_kind<TK_Image>(ST));
+            auto it = cast<ImageType>(ST);
+            while (argn < argcount) {
+                READ_VALUE(val);
+            }
+            return NODEPS1(ARGTYPE1(it->type));
+        } break;
+        case FN_ImageQuerySize: {
+            CHECKARGS(1, -1);
+            READ_STORAGETYPEOF(ST);
+            if (ST->kind() == TK_SampledImage) {
+                auto sit = cast<SampledImageType>(ST);
+                ST = SCOPES_GET_RESULT(storage_type(sit->type));
+            }
+            SCOPES_CHECK_RESULT(verify_kind<TK_Image>(ST));
+            auto it = cast<ImageType>(ST);
+            int comps = 0;
+            switch(it->dim.value()) {
+            case SYM_SPIRV_Dim1D:
+            case SYM_SPIRV_DimBuffer:
+                comps = 1;
+                break;
+            case SYM_SPIRV_Dim2D:
+            case SYM_SPIRV_DimCube:
+            case SYM_SPIRV_DimRect:
+            case SYM_SPIRV_DimSubpassData:
+                comps = 2;
+                break;
+            case SYM_SPIRV_Dim3D:
+                comps = 3;
+                break;
+            default:
+                SCOPES_LOCATION_ERROR(String::from("unsupported dimensionality"));
+                break;
+            }
+            if (it->arrayed) {
+                comps++;
+            }
+            if (comps == 1) {
+                return NODEPS1(ARGTYPE1(TYPE_I32));
+            } else {
+                return NODEPS1(ARGTYPE1(vector_type(TYPE_I32, comps).assert_ok()));
+            }
+        } break;
+        case FN_ImageQueryLod: {
+            CHECKARGS(2, 2);
+            READ_STORAGETYPEOF(ST);
+            if (ST->kind() == TK_SampledImage) {
+                auto sit = cast<SampledImageType>(ST);
+                ST = SCOPES_GET_RESULT(storage_type(sit->type));
+            }
+            SCOPES_CHECK_RESULT(verify_kind<TK_Image>(ST));
+            return NODEPS1(ARGTYPE1(vector_type(TYPE_F32, 2).assert_ok()));
+        } break;
+        case FN_ImageQueryLevels:
+        case FN_ImageQuerySamples: {
+            CHECKARGS(1, 1);
+            READ_STORAGETYPEOF(ST);
+            if (ST->kind() == TK_SampledImage) {
+                auto sit = cast<SampledImageType>(ST);
+                ST = SCOPES_GET_RESULT(storage_type(sit->type));
+            }
+            SCOPES_CHECK_RESULT(verify_kind<TK_Image>(ST));
+            return NODEPS1(ARGTYPE1(TYPE_I32));
+        } break;
+        case FN_ImageRead: {
+            CHECKARGS(2, 2);
+            READ_STORAGETYPEOF(ST);
+            SCOPES_CHECK_RESULT(verify_kind<TK_Image>(ST));
+            auto it = cast<ImageType>(ST);
+            return NODEPS1(ARGTYPE1(it->type));
+        } break;
+        case SFXFN_ExecutionMode: {
+            CHECKARGS(1, 4);
+            READ_SYMBOL_CONST(sym);
+            switch(sym.value()) {
+            #define T(NAME) \
+                case SYM_SPIRV_ExecutionMode ## NAME: break;
+                B_SPIRV_EXECUTION_MODE()
+            #undef T
+                default:
+                    SCOPES_LOCATION_ERROR(String::from("unsupported execution mode"));
+                    break;
+            }
+            for (size_t i = 1; i < values.size(); ++i) {
+                READ_INT_CONST(x);
+                (void)x;
+            }
+            return NODEPS1(ARGTYPE0());
+        } break;
+        /*** MISC ***/
         case OP_Tertiary: {
             CHECKARGS(3, 3);
             READ_STORAGETYPEOF(T1);
@@ -1549,22 +1659,32 @@ repeat:
         case FN_ExtractValue: {
             CHECKARGS(2, 2);
             READ_NODEREF_STORAGETYPEOF(T);
-            READ_INT_CONST(idx);
+            READ_STORAGETYPEOF(idx);
             const Type *RT = nullptr;
             switch(T->kind()) {
             case TK_Array: {
                 auto ai = cast<ArrayType>(T);
-                RT = SCOPES_GET_RESULT(ai->type_at_index(idx));
+                auto rq = try_qualifier<ReferQualifier>(typeof_T);
+                if (rq) {
+                    SCOPES_CHECK_RESULT(verify_integer(idx));
+                    RT = SCOPES_GET_RESULT(ai->type_at_index(0));
+                } else {
+                    // index must be constant
+                    auto iidx = SCOPES_GET_RESULT(extract_integer_constant(_idx));
+                    RT = SCOPES_GET_RESULT(ai->type_at_index(iidx));
+                }
             } break;
             case TK_Tuple: {
+                auto iidx = SCOPES_GET_RESULT(extract_integer_constant(_idx));
                 auto ti = cast<TupleType>(T);
-                SCOPES_CHECK_RESULT(sanitize_tuple_index(call->anchor(), T, ti, idx, _idx));
-                RT = SCOPES_GET_RESULT(ti->type_at_index(idx));
+                SCOPES_CHECK_RESULT(sanitize_tuple_index(call->anchor(), T, ti, iidx, _idx));
+                RT = SCOPES_GET_RESULT(ti->type_at_index(iidx));
             } break;
             case TK_Union: {
+                auto iidx = SCOPES_GET_RESULT(extract_integer_constant(_idx));
                 auto ui = cast<UnionType>(T);
-                SCOPES_CHECK_RESULT(sanitize_tuple_index(call->anchor(), T, ui, idx, _idx));
-                RT = SCOPES_GET_RESULT(ui->type_at_index(idx));
+                SCOPES_CHECK_RESULT(sanitize_tuple_index(call->anchor(), T, ui, iidx, _idx));
+                RT = SCOPES_GET_RESULT(ui->type_at_index(iidx));
                 _idx = ConstInt::from(_idx->anchor(), TYPE_I32, 0);
                 auto TT = tuple_type({RT}).assert_ok();
                 RT = type_key(RT)._1;

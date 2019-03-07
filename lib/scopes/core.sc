@@ -141,6 +141,11 @@ let typify =
             let argcount = (sc_argcount args)
             verify-count argcount 1 -1
             let src_fn = (sc_getarg args 0)
+            let typifyfn =
+                if (ptrcmp== (sc_value_type src_fn) Closure)
+                    `sc_typify
+                else
+                    `sc_typify_template
             let typecount = (sub argcount 1)
             spice-quote
                 let types = (alloca-array type typecount)
@@ -156,7 +161,7 @@ let typify =
                             `(store ty (getelementptr types j))
                         _ (add i 1) (add j 1)
                     body
-                sc_typify src_fn typecount (bitcast types TypeArrayPointer)
+                typifyfn src_fn typecount (bitcast types TypeArrayPointer)
 
         build-typify-function typify
 
@@ -259,21 +264,13 @@ inline raises-compile-error ()
     if false
         compiler-error! "hidden"
 
-fn type< (T superT)
-    loop (T = T)
-        let value = (sc_typename_type_get_super T)
-        if (ptrcmp== value superT)
-            break true
-        elseif (ptrcmp== value typename)
-            break false
-        value
+inline type< (T superT)
+    sc_type_is_superof superT T
+
+let type> = sc_type_is_superof
 
 fn type<= (T superT)
-    if (ptrcmp== T superT) true
-    else (type< T superT)
-
-fn type> (superT T)
-    bxor (type<= T superT) true
+    bxor (type> T superT) true
 
 fn type>= (superT T)
     bxor (type< T superT) true
@@ -593,9 +590,7 @@ let __unbox =
 let
     type== = (spice-macro (type-comparison-func ptrcmp==))
     type!= = (spice-macro (type-comparison-func ptrcmp!=))
-    type< = (spice-macro (type-comparison-func type<))
     type<= = (spice-macro (type-comparison-func type<=))
-    type> = (spice-macro (type-comparison-func type>))
     type>= = (spice-macro (type-comparison-func type>=))
 
 run-stage;
@@ -687,6 +682,16 @@ inline define-symbols (self values...)
     decons = decons
     reverse = sc_list_reverse
     dump = sc_list_dump
+
+'define-symbols SampledImage
+    __typecall =
+        inline (cls ...)
+            sc_sampled_image_type ...
+
+'define-symbols Image
+    __typecall =
+        inline (cls ...)
+            sc_image_type ...
 
 'define-symbols type
     bitcount = sc_type_bitcountof
@@ -990,18 +995,22 @@ fn cast-expr (symbol rsymbol vT T expr)
         return (f vT T expr)
 
 fn imply-expr (vT T expr)
-    if (ptrcmp!= vT T)
-        cast-expr '__imply '__rimply vT T expr
-    else expr
+    if (ptrcmp== vT T)
+        return expr
+    if (sc_type_is_superof T vT)
+        return expr
+    cast-expr '__imply '__rimply vT T expr
 
 fn as-expr (vT T expr)
-    if (ptrcmp!= vT T)
-        try
-            # try implicit cast first
-            imply-expr vT T expr
-        except (imply-err)
-            cast-expr '__as '__ras vT T expr
-    else expr
+    if (ptrcmp== vT T)
+        return expr
+    if (sc_type_is_superof T vT)
+        return expr
+    try
+        # try implicit cast first
+        cast-expr '__imply '__rimply vT T expr
+    except (imply-err)
+        cast-expr '__as '__ras vT T expr
 
 let
     imply =
@@ -1468,7 +1477,7 @@ let
     >> = (make-sym-binary-op-dispatch '__>> '__r>> "apply right shift with")
     .. = (make-sym-binary-op-dispatch '__.. '__r.. "join")
     = = (make-sym-binary-op-dispatch '__= '__r= "apply assignment with")
-    @ = (make-asym-binary-op-dispatch '__@ usize "apply subscript operator with")
+    @ = (make-asym-binary-op-dispatch '__@ integer "apply subscript operator with")
     getattr = (make-asym-binary-op-dispatch '__getattr Symbol "get attribute from")
     lslice = (make-asym-binary-op-dispatch '__lslice usize "apply left-slice operator with")
     rslice = (make-asym-binary-op-dispatch '__rslice usize "apply right-slice operator with")
@@ -3124,9 +3133,10 @@ let arrayof =
             let ET = (('getarg args 0) as type)
             let numvals = (sub argc 1)
 
-            # generate insert instructions
             let TT = (sc_array_type ET (usize numvals))
-            loop (i result = 0 `(nullof TT))
+
+            # generate insert instructions
+            loop (i result = 0 `(undef TT))
                 if (i == numvals)
                     break result
                 let arg = ('getarg args (add i 1))
@@ -3372,10 +3382,8 @@ inline clamp (x mn mx)
                 compiler-error! "unsupported type"
 
 inline extern (name T attrs...)
-    let g = (sc_global_new (sc_get_active_anchor) name T)
-    sc_global_set_storage_class g
-        va-option storage attrs... unnamed
-    g
+    let storage-class = (va-option storage attrs... unnamed)
+    sc_global_new (sc_get_active_anchor) name T 0:u32 storage-class -1 -1
 
 let
     private =
@@ -3385,9 +3393,7 @@ let
                 verify-count argc 1 1
                 let T = ('getarg args 0)
                 let T = (T as type)
-                let g = (sc_global_new (sc_get_active_anchor) unnamed T)
-                sc_global_set_storage_class g 'Private
-                Value g
+                extern unnamed T (storage = 'Private)
 
 #-------------------------------------------------------------------------------
 
@@ -3645,78 +3651,87 @@ fn uncomma (l)
         return (merge-lists (process l))
     else l
 
-fn gen-argument-matcher (failfunc expr scope params)
-    if false
+inline parse-argument-matcher (failfunc expr scope params cb)
+    #if false
         return `[]
     let params = (params as list)
     let params = (uncomma params)
     let paramcount = (countof params)
-    let outexpr = (sc_expression_new (sc_get_active_anchor))
     loop (i rest varargs = 0 params false)
-        if (not (empty? rest))
-            let paramv rest = (decons rest)
-            let T = ('typeof paramv)
-            if (T == Symbol)
-                let param = (paramv as Symbol)
-                let variadic? = ('variadic? param)
-                let arg =
-                    if variadic?
-                        if (not (empty? rest))
-                            sugar-error! ('anchor paramv)
-                                "vararg parameter is not in last place"
-                        `(sc_getarglist expr i)
-                    else
-                        `(sc_getarg expr i)
-                sc_expression_append outexpr arg
-                'set-symbol scope param arg
-                repeat (i + 1) rest (| varargs variadic?)
-            elseif (T == list)
-                let param = (paramv as list)
-                let head head-rest = (decons param)
-                let mid mid-rest = (decons head-rest)
-                if ((('typeof mid) == Symbol) and ((mid as Symbol) == ':))
-                    let exprT = (decons mid-rest)
-                    let exprT = (sc_expand exprT '() scope)
-                    let param = (head as Symbol)
-                    if ('variadic? param)
-                        sugar-error! ('anchor head)
-                            "vararg parameter cannot be typed"
-                    sc_expression_append outexpr
-                        spice-quote
-                            let arg = (sc_getarg expr i)
-                            let arg =
-                                try (imply-expr ('typeof arg) exprT arg)
-                                except (err)
-                                    failfunc;
-                    'set-symbol scope param arg
-                    repeat (i + 1) rest varargs
-                elseif ((('typeof mid) == Symbol) and ((mid as Symbol) == 'as))
-                    let exprT = (decons mid-rest)
-                    let exprT = (sc_expand exprT '() scope)
-                    let param = (head as Symbol)
-                    if ('variadic? param)
-                        sugar-error! ('anchor head)
-                            "vararg parameter cannot be typed"
-                    sc_expression_append outexpr
-                        spice-quote
-                            let arg = (sc_getarg expr i)
-                            let arg =
-                                if (('constant? arg) and (('typeof arg) == exprT))
-                                    arg as exprT
-                                else
-                                    failfunc;
-                    'set-symbol scope param arg
-                    repeat (i + 1) rest varargs
-            sugar-error! ('anchor paramv) "unsupported pattern"
-        return
-            spice-quote
-                if (not (check-count (sc_argcount expr)
-                        [(? varargs (sub paramcount 1) paramcount)]
-                        [(? varargs -1 paramcount)]))
-                    failfunc;
-                outexpr
+        if (empty? rest)
+            return
+                spice-quote
+                    if (not (check-count (sc_argcount expr)
+                            [(? varargs (sub paramcount 1) paramcount)]
+                            [(? varargs -1 paramcount)]))
+                        failfunc;
+        let paramv rest = (decons rest)
+        let T = ('typeof paramv)
+        if (T == Symbol)
+            let param = (paramv as Symbol)
+            let variadic? = ('variadic? param)
+            let arg =
+                if variadic?
+                    if (not (empty? rest))
+                        sugar-error! ('anchor paramv)
+                            "vararg parameter is not in last place"
+                    `(sc_getarglist expr i)
+                else
+                    `(sc_getarg expr i)
+            cb param arg
+            repeat (i + 1) rest (| varargs variadic?)
+        elseif (T == list)
+            let param = (paramv as list)
+            let head head-rest = (decons param)
+            let mid mid-rest = (decons head-rest)
+            if ((('typeof mid) == Symbol) and ((mid as Symbol) == ':))
+                let exprT = (decons mid-rest)
+                let exprT = (sc_expand exprT '() scope)
+                let param = (head as Symbol)
+                if ('variadic? param)
+                    sugar-error! ('anchor head)
+                        "vararg parameter cannot be typed"
+                spice-quote
+                    let arg = (sc_getarg expr i)
+                    let arg =
+                        try (imply-expr ('typeof arg) exprT arg)
+                        except (err)
+                            failfunc;
+                cb param arg
+                repeat (i + 1) rest varargs
+            elseif ((('typeof mid) == Symbol) and ((mid as Symbol) == 'as))
+                let exprT = (decons mid-rest)
+                let exprT = (sc_expand exprT '() scope)
+                let param = (head as Symbol)
+                if ('variadic? param)
+                    sugar-error! ('anchor head)
+                        "vararg parameter cannot be typed"
+                spice-quote
+                    let arg = (sc_getarg expr i)
+                    let arg =
+                        if (('constant? arg) and (('typeof arg) == exprT))
+                            arg as exprT
+                        else
+                            failfunc;
+                cb param arg
+                repeat (i + 1) rest varargs
+        sugar-error! ('anchor paramv) "unsupported pattern"
 
-define match-args
+fn gen-argument-matcher (failfunc expr scope params)
+    let outexpr = (sc_expression_new (sc_get_active_anchor))
+    let outargs = (sc_argument_list_new (sc_get_active_anchor))
+    'set-symbol scope '*... outargs
+    let header =
+        parse-argument-matcher failfunc expr scope params
+            inline (param arg)
+                sc_expression_append outexpr arg
+                sc_argument_list_append outargs arg
+                'set-symbol scope param arg
+    spice-quote
+        header
+        outexpr
+
+define spice-match
     gen-match-block-parser gen-argument-matcher
 
 #inline spice-macro (f)

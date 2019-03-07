@@ -13,7 +13,12 @@ spice test (x y z args...)
     `(+ x y z u v w)
 
 spice test-match (args...)
-    match-args args...
+    # non-constant type
+    let T = ('typeof `5.0)
+    let i32T = ('typeof `5)
+    spice-match args...
+    case (a : T, b : T)
+        `(print "case0" *...)
     case (a as i32, b as i32, c...)
         # both a and b must be i32 constants and will be unwrapped as such.
         # we can precompute a + b here
@@ -38,6 +43,7 @@ fn test-main ()
     test-match 1:i8 2 3 4       # case 2
     test-match "a" "b" "c"      # case 3
     test-match "a" "b"          # case 4
+    test-match 3.5 4
 
     assert
         (test 1 2 3 4 5 6) == 21

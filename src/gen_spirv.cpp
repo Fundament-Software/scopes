@@ -183,6 +183,7 @@ struct SPIRVGenerator {
     spv::SpvBuildLogger logger;
     spv::Builder builder;
 
+    spv::Instruction *entry_point;
     spv::Id glsl_ext_inst;
     bool use_debug_info;
     Function *active_function;
@@ -262,6 +263,7 @@ struct SPIRVGenerator {
 
     SPIRVGenerator() :
         builder('S' << 24 | 'C' << 16 | 'O' << 8 | 'P', &logger),
+        entry_point(nullptr),
         glsl_ext_inst(0),
         use_debug_info(true),
         active_function(nullptr),
@@ -1281,7 +1283,7 @@ struct SPIRVGenerator {
             bool proj = false;
             bool gather = false;
             bool explicitLod = false;
-            while (argn <= argcount) {
+            while (argn < argcount) {
                 READ_VALUE(value);
                 Symbol key = type_key(_value->get_type())._0;
                 switch (key.value()) {
@@ -1320,7 +1322,7 @@ struct SPIRVGenerator {
             memset(&params, 0, sizeof(params));
             params.sampler = build_extract_image(sampler);
             spv::Op op = spv::OpImageQuerySize;
-            while (argn <= argcount) {
+            while (argn < argcount) {
                 READ_VALUE(value);
                 Symbol key = type_key(_value->get_type())._0;
                 switch (key.value()) {
@@ -1378,7 +1380,7 @@ struct SPIRVGenerator {
             auto em = SCOPES_GET_RESULT(execution_mode_from_symbol(mode));
             ExecutionMode vals;
             int c = 0;
-            while ((c < 3) && (argn <= argcount)) {
+            while ((c < 3) && (argn < argcount)) {
                 READ_INT(val);
                 vals.values[c] = val;
                 c++;
@@ -1494,11 +1496,6 @@ struct SPIRVGenerator {
             std::vector<spv::Id> indices;
             for (size_t i = 1; i < count; ++i) {
                 auto val = SCOPES_GET_RESULT(ref_to_value(args[i]));
-                if (i == 1) {
-                    indices.push_back(
-                        builder.makeIntConstant(
-                            builder.getTypeId(val), 0, false));
-                }
                 indices.push_back(val);
             }
             return builder.createAccessChain(
@@ -1509,8 +1506,9 @@ struct SPIRVGenerator {
             READ_VALUE(pointer);
             assert(argcount > 1);
             size_t count = argcount - 1;
+            // skip first index as we can't offset pointers in SPIR-V
             std::vector<spv::Id> indices;
-            for (size_t i = 0; i < count; ++i) {
+            for (size_t i = 1; i < count; ++i) {
                 indices.push_back(SCOPES_GET_RESULT(ref_to_value(args[argn + i])));
             }
             return builder.createAccessChain(
@@ -1980,12 +1978,17 @@ struct SPIRVGenerator {
                 name = node->name.name()->data;
                 break;
         }
-        auto ty = SCOPES_GET_RESULT(type_to_spirv_type(node->get_type(), node->flags));
+        auto ty = SCOPES_GET_RESULT(type_to_spirv_type(node->element_type, node->flags));
         auto id = builder.createVariable(sc, ty, name);
         if (builtin != spv::BuiltInMax) {
             builder.addDecoration(id, spv::DecorationBuiltIn, builtin);
         }
         switch(sc) {
+        case spv::StorageClassInput:
+        case spv::StorageClassOutput: {
+            assert(entry_point);
+            entry_point->addIdOperand(id);
+        } break;
         case spv::StorageClassUniformConstant:
         case spv::StorageClassUniform: {
             //builder.addDecoration(id, spv::DecorationDescriptorSet, 0);
@@ -2235,21 +2238,21 @@ struct SPIRVGenerator {
         switch(target.value()) {
         case SYM_TargetVertex: {
             builder.addCapability(spv::CapabilityShader);
-            builder.addEntryPoint(spv::ExecutionModelVertex, func, "main");
+            entry_point = builder.addEntryPoint(spv::ExecutionModelVertex, func, "main");
         } break;
         case SYM_TargetFragment: {
             builder.addCapability(spv::CapabilityShader);
-            builder.addEntryPoint(spv::ExecutionModelFragment, func, "main");
+            entry_point = builder.addEntryPoint(spv::ExecutionModelFragment, func, "main");
             execution_modes.insert({ spv::ExecutionModeOriginLowerLeft,
                  ExecutionMode() });
         } break;
         case SYM_TargetGeometry: {
             builder.addCapability(spv::CapabilityShader);
-            builder.addEntryPoint(spv::ExecutionModelGeometry, func, "main");
+            entry_point = builder.addEntryPoint(spv::ExecutionModelGeometry, func, "main");
         } break;
         case SYM_TargetCompute: {
             builder.addCapability(spv::CapabilityShader);
-            builder.addEntryPoint(spv::ExecutionModelGLCompute, func, "main");
+            entry_point = builder.addEntryPoint(spv::ExecutionModelGLCompute, func, "main");
         } break;
         default: {
             StyledString ss;

@@ -44,8 +44,10 @@ void ReferQualifier::stream_prefix(StyledStream &ss) const {
         ss << "&";
     } else if (pointer_flags_is_readable(flags)) {
         ss << "(&)";
+    } else if (pointer_flags_is_writable(flags)) {
+        ss << "&!";
     } else {
-        ss << "((&))";
+        ss << "&?";
     }
     if (storage_class != SYM_Unnamed) {
         ss << "[" << storage_class.name()->data << "]";

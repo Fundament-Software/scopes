@@ -836,6 +836,7 @@ struct Global : Pure {
         Symbol storage_class = SYM_Unnamed,
         int location = -1, int binding = -1);
 
+    const Type *element_type;
     Symbol name;
     size_t flags;
     Symbol storage_class;

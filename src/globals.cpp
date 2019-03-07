@@ -197,11 +197,13 @@ sc_value_raises_t sc_eval_inline(const sc_anchor_t *anchor, const sc_list_t *exp
 
 sc_value_raises_t sc_typify_template(sc_value_t *f, int numtypes, const sc_type_t **typeargs) {
     using namespace scopes;
+    SCOPES_RESULT_TYPE(TypedValue *);
+    if (!isa<Template>(f)) {
+        SCOPES_C_RETURN_ERROR(make_location_error(String::from("value must be template")));
+    }
     auto tf = cast<Template>(f);
     if (tf->is_inline()) {
-        return { false,
-            make_location_error(String::from("cannot typify inline function")),
-            nullptr };
+        SCOPES_C_RETURN_ERROR(make_location_error(String::from("cannot typify inline")));
     }
     Types types;
     for (int i = 0; i < numtypes; ++i) {
@@ -214,7 +216,7 @@ sc_value_raises_t sc_typify(sc_closure_t *srcl, int numtypes, const sc_type_t **
     using namespace scopes;
     SCOPES_RESULT_TYPE(TypedValue *);
     if (srcl->func->is_inline()) {
-        SCOPES_C_RETURN_ERROR(make_location_error(String::from("cannot typify function")));
+        SCOPES_C_RETURN_ERROR(make_location_error(String::from("cannot typify inline")));
     }
     Types types;
     for (int i = 0; i < numtypes; ++i) {
@@ -1145,43 +1147,12 @@ void sc_expression_append(sc_value_t *expr, sc_value_t *value) {
     cast<Expression>(expr)->append(value);
 }
 
-sc_value_t *sc_global_new(const sc_anchor_t *anchor, sc_symbol_t name, const sc_type_t *type) {
+sc_value_t *sc_global_new(const sc_anchor_t *anchor, sc_symbol_t name,
+    const sc_type_t *type, uint32_t flags, sc_symbol_t storage_class,
+    int location, int binding) {
     using namespace scopes;
     REWRITE_ANCHOR(anchor)
-    return Global::from(anchor, type, name);
-}
-void sc_global_set_flags(sc_value_t *value, uint32_t flags) {
-    using namespace scopes;
-    cast<Global>(value)->flags = flags;
-}
-uint32_t sc_global_get_flags(sc_value_t *value) {
-    using namespace scopes;
-    return cast<Global>(value)->flags;
-}
-void sc_global_set_storage_class(sc_value_t *value, sc_symbol_t storage_class) {
-    using namespace scopes;
-    cast<Global>(value)->storage_class = storage_class;
-}
-sc_symbol_t sc_global_get_storage_class(sc_value_t *value) {
-    using namespace scopes;
-    return cast<Global>(value)->storage_class;
-}
-void sc_global_set_location(sc_value_t *value, int32_t location) {
-    using namespace scopes;
-    cast<Global>(value)->location = location;
-}
-int32_t sc_global_get_location(sc_value_t *value) {
-    using namespace scopes;
-    return cast<Global>(value)->location;
-}
-
-void sc_global_set_binding(sc_value_t *value, int32_t binding) {
-    using namespace scopes;
-    cast<Global>(value)->binding = binding;
-}
-int32_t sc_global_get_binding(sc_value_t *value) {
-    using namespace scopes;
-    return cast<Global>(value)->binding;
+    return Global::from(anchor, type, name, flags, storage_class, location, binding);
 }
 
 sc_value_t *sc_if_new(const sc_anchor_t *anchor) {
@@ -1526,6 +1497,16 @@ sc_type_raises_t sc_type_storage(const sc_type_t *T) {
 bool sc_type_is_opaque(const sc_type_t *T) {
     using namespace scopes;
     return is_opaque(T);
+}
+
+bool sc_type_is_superof(const sc_type_t *super, const sc_type_t *T) {
+    using namespace scopes;
+    for (int i = 0; i < SCOPES_MAX_RECURSIONS; ++i) {
+        T = sc_typename_type_get_super(T);
+        if (T == super) return true;
+        if (T == TYPE_Typename) return false;
+    }
+    return false;
 }
 
 const sc_string_t *sc_type_string(const sc_type_t *T) {
@@ -1972,15 +1953,8 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_expression_new, TYPE_Value, TYPE_Anchor);
     DEFINE_EXTERN_C_FUNCTION(sc_expression_set_scoped, _void, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_expression_append, _void, TYPE_Value, TYPE_Value);
-    DEFINE_EXTERN_C_FUNCTION(sc_global_new, TYPE_Value, TYPE_Anchor, TYPE_Symbol, TYPE_Type);
-    DEFINE_EXTERN_C_FUNCTION(sc_global_set_flags, _void, TYPE_Value, TYPE_U32);
-    DEFINE_EXTERN_C_FUNCTION(sc_global_get_flags, TYPE_U32, TYPE_Value);
-    DEFINE_EXTERN_C_FUNCTION(sc_global_set_storage_class, _void, TYPE_Value, TYPE_Symbol);
-    DEFINE_EXTERN_C_FUNCTION(sc_global_get_storage_class, TYPE_Symbol, TYPE_Value);
-    DEFINE_EXTERN_C_FUNCTION(sc_global_set_location, _void, TYPE_Value, TYPE_I32);
-    DEFINE_EXTERN_C_FUNCTION(sc_global_get_location, TYPE_I32, TYPE_Value);
-    DEFINE_EXTERN_C_FUNCTION(sc_global_set_binding, _void, TYPE_Value, TYPE_I32);
-    DEFINE_EXTERN_C_FUNCTION(sc_global_get_binding, TYPE_I32, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_global_new, TYPE_Value, TYPE_Anchor, TYPE_Symbol, TYPE_Type,
+        TYPE_U32, TYPE_Symbol, TYPE_I32, TYPE_I32);
     DEFINE_EXTERN_C_FUNCTION(sc_if_new, TYPE_Value, TYPE_Anchor);
     DEFINE_EXTERN_C_FUNCTION(sc_if_append_then_clause, _void, TYPE_Value, TYPE_Anchor, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_if_append_else_clause, _void, TYPE_Value, TYPE_Anchor, TYPE_Value);
@@ -2090,6 +2064,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_type_debug_abi, _void, TYPE_Type);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_type_storage, TYPE_Type, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_type_is_opaque, TYPE_Bool, TYPE_Type);
+    DEFINE_EXTERN_C_FUNCTION(sc_type_is_superof, TYPE_Bool, TYPE_Type, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_type_string, TYPE_String, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_type_next, arguments_type({TYPE_Symbol, TYPE_Value}), TYPE_Type, TYPE_Symbol);
     DEFINE_EXTERN_C_FUNCTION(sc_type_set_symbol, _void, TYPE_Type, TYPE_Symbol, TYPE_Value);
@@ -2220,6 +2195,21 @@ B_TYPES()
     globals->bind(Symbol(BNAME), ConstInt::from(LINE_ANCHOR, TYPE_I32, (int32_t)NAME));
     SCOPES_VALUE_KIND()
 #undef T
+
+    globals->bind(Symbol("global-flag-buffer-block"),
+        ConstInt::from(LINE_ANCHOR, TYPE_U32, GF_BufferBlock));
+    globals->bind(Symbol("global-flag-non-writable"),
+        ConstInt::from(LINE_ANCHOR, TYPE_U32, GF_NonWritable));
+    globals->bind(Symbol("global-flag-non-readable"),
+        ConstInt::from(LINE_ANCHOR, TYPE_U32, GF_NonReadable));
+    globals->bind(Symbol("global-flag-volatile"),
+        ConstInt::from(LINE_ANCHOR, TYPE_U32, GF_Volatile));
+    globals->bind(Symbol("global-flag-coherent"),
+        ConstInt::from(LINE_ANCHOR, TYPE_U32, GF_Coherent));
+    globals->bind(Symbol("global-flag-restrict"),
+        ConstInt::from(LINE_ANCHOR, TYPE_U32, GF_Restrict));
+    globals->bind(Symbol("global-flag-block"),
+        ConstInt::from(LINE_ANCHOR, TYPE_U32, GF_Block));
 
     globals->bind(Symbol("pointer-flag-non-readable"),
         ConstInt::from(LINE_ANCHOR, TYPE_U64, (uint64_t)PTF_NonReadable));

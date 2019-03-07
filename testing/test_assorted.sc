@@ -1,14 +1,17 @@
 assert ((min integer i8) == i8)
 assert ((max 3 4 5) == 5)
 
-do
-    # make sure we can load symbols from the global C namespace
-    let C =
-        extern 'sc_write
-            function void string
-    dump C
-    C "hello from C!\n"
+# make sure we can load symbols from the global C namespace
+let C =
+    extern 'sc_write
+        function void string
 
+run-stage;
+
+dump C
+C "hello from C!\n"
+
+unlet C
 run-stage;
 
 assert

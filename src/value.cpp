@@ -476,7 +476,9 @@ static const Type *pointer_for_global_type(const Type *type, size_t flags, Symbo
 }
 
 Global::Global(const Anchor *anchor, const Type *type, Symbol _name, size_t _flags, Symbol _storage_class, int _location, int _binding)
-    : Pure(VK_Global, anchor, pointer_for_global_type(type, _flags, _storage_class)), name(_name), flags(_flags), storage_class(_storage_class), location(_location), binding(_binding) {
+    : Pure(VK_Global, anchor, pointer_for_global_type(type, _flags, _storage_class)),
+        element_type(type), name(_name), flags(_flags), storage_class(_storage_class), location(_location),
+        binding(_binding) {
 }
 
 bool Global::key_equal(const Global *other) const {

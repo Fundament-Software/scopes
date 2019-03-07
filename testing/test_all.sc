@@ -59,6 +59,7 @@ test-modules
     .test_scope
     .test_semicolon
     .test_spice
+    .test_spice_attrib
     .test_spirv_loop
     .test_string
     .test_struct

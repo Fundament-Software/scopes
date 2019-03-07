@@ -74,7 +74,6 @@ struct Type {
     bool lookup_local(Symbol name, Value *&dest) const;
 
     bool lookup_call_handler(Value *&dest) const;
-
     bool lookup_return_handler(Value *&dest) const;
 
     const Map &get_symbols() const;
