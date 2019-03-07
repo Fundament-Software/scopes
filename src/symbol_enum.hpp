@@ -15,12 +15,14 @@ namespace scopes {
 
 // list of symbols to be exposed as builtins to the default global namespace
 #define B_GLOBALS() \
-    T(FN_Branch) T(KW_Fn) T(KW_Label) T(KW_Quote) T(KW_Inline) T(KW_Forward) \
-    T(KW_Call) T(KW_RawCall) T(KW_CCCall) T(SYM_QuoteForm) T(FN_Dump) T(KW_Do) \
+    T(FN_Branch) T(KW_Fn) T(KW_Label) T(KW_SyntaxQuote) T(KW_Inline) T(KW_Forward) T(KW_Raise) \
+    T(KW_Call) T(KW_RawCall) T(KW_CCCall) T(SYM_QuoteForm) T(FN_Dump) T(FN_DumpTemplate) T(KW_Do) \
     T(FN_FunctionType) T(FN_TupleType) T(FN_UnionType) T(FN_Alloca) T(FN_AllocaOf) T(FN_Malloc) \
     T(FN_AllocaArray) T(FN_MallocArray) T(FN_ReturnLabelType) T(KW_DoIn) T(FN_AllocaExceptionPad) \
-    T(FN_StaticAlloc) \
-    T(FN_AnyExtract) T(FN_AnyWrap) T(FN_IsConstant) T(FN_Free) T(KW_Defer) \
+    T(FN_StaticAlloc) T(KW_Try) T(KW_Return) T(KW_Loop) T(KW_Repeat) T(KW_Break) \
+    T(KW_ASTQuote) T(KW_ASTUnquote) T(KW_ASTUnquoteArguments) T(KW_Merge) T(FN_Copy) \
+    T(FN_Move) T(FN_Forget) T(FN_Assign) T(FN_Deref) T(FN_PtrToRef) T(FN_RefToPtr) \
+    T(FN_AnyExtract) T(FN_AnyWrap) T(FN_Free) T(KW_Defer) T(FN_DumpAST) \
     T(OP_ICmpEQ) T(OP_ICmpNE) T(FN_Sample) T(FN_ImageRead) T(FN_ImageWrite) \
     T(FN_ImageQuerySize) T(FN_ImageQueryLod) T(FN_ImageQueryLevels) T(FN_ImageQuerySamples) \
     T(OP_ICmpUGT) T(OP_ICmpUGE) T(OP_ICmpULT) T(OP_ICmpULE) \
@@ -33,13 +35,13 @@ namespace scopes {
     T(FN_IntToPtr) T(FN_PtrToInt) T(FN_Load) T(FN_Store) \
     T(FN_VolatileLoad) T(FN_VolatileStore) T(SFXFN_ExecutionMode) \
     T(FN_ExtractElement) T(FN_InsertElement) T(FN_ShuffleVector) \
-    T(FN_ExtractValue) T(FN_InsertValue) T(FN_ITrunc) T(FN_ZExt) T(FN_SExt) \
+    T(FN_ExtractValue) T(FN_InsertValue) T(FN_ITrunc) T(FN_ZExt) T(FN_SExt) T(FN_GetElementRef) \
     T(FN_GetElementPtr) T(FN_OffsetOf) T(SFXFN_CompilerError) T(FN_VaCountOf) T(FN_VaAt) \
     T(FN_VaKeys) T(FN_VaKey) T(FN_VaValues) T(FN_CompilerMessage) T(FN_Undef) T(FN_NullOf) T(KW_Let) \
-    T(KW_If) T(SFXFN_SetTypeSymbol) T(SFXFN_DelTypeSymbol) T(FN_ExternSymbol) \
-    T(SFXFN_SetTypenameStorage) T(FN_ExternNew) \
+    T(KW_If) T(KW_Switch) T(SFXFN_DelTypeSymbol) T(FN_ExternSymbol) \
+    T(FN_ExternNew) T(FN_GetSyntaxScope) \
     T(SFXFN_Discard) \
-    T(FN_TypeAt) T(FN_TypeLocalAt) T(KW_SyntaxExtend) T(FN_Location) T(SFXFN_Unreachable) \
+    T(FN_TypeAt) T(FN_TypeLocalAt) T(KW_RunStage) T(FN_Location) T(SFXFN_Unreachable) \
     T(FN_FPTrunc) T(FN_FPExt) T(FN_ScopeOf) \
     T(FN_FPToUI) T(FN_FPToSI) \
     T(FN_UIToFP) T(FN_SIToFP) \
@@ -251,26 +253,29 @@ namespace scopes {
     \
     /* keywords and macros */ \
     T(KW_CatRest, "::*") T(KW_CatOne, "::@") T(KW_Forward, "_") \
-    T(KW_SyntaxLog, "syntax-log") T(KW_DoIn, "do-in") T(KW_Defer, "__defer") \
+    T(KW_SyntaxLog, "sugar-log") T(KW_DoIn, "embed") T(KW_Defer, "__defer") \
     T(KW_Assert, "assert") T(KW_Break, "break") T(KW_Label, "label") \
     T(KW_Call, "call") T(KW_RawCall, "rawcall") T(KW_CCCall, "cc/call") T(KW_Continue, "continue") \
+    T(KW_Repeat, "repeat") T(KW_Raise, "raise") \
     T(KW_Define, "define") T(KW_Do, "do") T(KW_DumpSyntax, "dump-syntax") \
     T(KW_Else, "else") T(KW_ElseIf, "elseif") T(KW_EmptyList, "empty-list") \
     T(KW_EmptyTuple, "empty-tuple") T(KW_Escape, "escape") \
     T(KW_Except, "except") T(KW_False, "false") T(KW_Fn, "fn") \
     T(KW_FnTypes, "fn-types") T(KW_FnCC, "fn/cc") T(KW_Globals, "globals") \
-    T(KW_If, "if") T(KW_In, "in") T(KW_Let, "let") T(KW_Loop, "loop") \
+    T(KW_If, "if") T(KW_Switch, "switch") T(KW_In, "in") T(KW_Let, "let") T(KW_Loop, "loop") \
     T(KW_LoopFor, "loop-for") T(KW_None, "none") T(KW_Null, "null") \
-    T(KW_QQuoteSyntax, "qquote-syntax") T(KW_Quote, "quote") T(KW_Inline, "inline") \
-    T(KW_QuoteSyntax, "quote-syntax") T(KW_Raise, "raise") T(KW_Recur, "recur") \
-    T(KW_Return, "return") T(KW_Splice, "splice") \
-    T(KW_SyntaxExtend, "syntax-extend") T(KW_True, "true") T(KW_Try, "try") \
+    T(KW_SyntaxQuote, "sugar-quote") T(KW_ASTQuote, "spice-quote") T(KW_ASTUnquote, "spice-unquote") \
+    T(KW_ASTUnquoteArguments, "spice-unquote-arguments") T(FN_Copy, "copy") \
+    T(KW_Inline, "inline") T(KW_Recur, "recur") \
+    T(KW_Merge, "merge") T(FN_Move, "move") \
+    T(KW_Return, "return") T(KW_Splice, "splice") T(FN_Forget, "forget") \
+    T(KW_RunStage, "run-stage") T(KW_True, "true") T(KW_Try, "try") \
     T(KW_Unquote, "unquote") T(KW_UnquoteSplice, "unquote-splice") T(KW_ListEmpty, "eol") \
     T(KW_With, "with") T(KW_XFn, "xfn") T(KW_XLet, "xlet") T(KW_Yield, "yield") \
     \
     /* builtin and global functions */ \
     T(FN_Alignof, "alignof") T(FN_OffsetOf, "offsetof") \
-    T(FN_Args, "args") T(FN_Alloc, "alloc") T(FN_Arrayof, "arrayof") \
+    T(FN_Alloc, "alloc") T(FN_Arrayof, "arrayof") \
     T(FN_AnchorPath, "Anchor-path") T(FN_AnchorLineNumber, "Anchor-line-number") \
     T(FN_AnchorColumn, "Anchor-column") T(FN_AnchorOffset, "Anchor-offset") \
     T(FN_AnchorSource, "Anchor-source") \
@@ -291,23 +296,23 @@ namespace scopes {
     T(FN_Bitcast, "bitcast") T(FN_IntToPtr, "inttoptr") T(FN_PtrToInt, "ptrtoint") \
     T(FN_BlockMacro, "block-macro") \
     T(FN_BlockScopeMacro, "block-scope-macro") T(FN_BoolEq, "bool==") \
-    T(FN_BuiltinEq, "Builtin==") \
+    T(FN_BuiltinEq, "Builtin==") T(KW_Case, "case") T(KW_Default, "default") \
     T(FN_Branch, "branch") T(FN_IsCallable, "callable?") T(FN_Cast, "cast") \
     T(FN_Concat, "concat") T(FN_Cons, "cons") T(FN_IsConstant, "constant?") \
-    T(FN_Countof, "countof") \
+    T(FN_Countof, "countof") T(KW_Pass, "pass") \
     T(FN_Compile, "__compile") T(FN_CompileSPIRV, "__compile-spirv") \
     T(FN_CompileGLSL, "__compile-glsl") \
     T(FN_CompileObject, "__compile-object") \
     T(FN_ElementIndex, "element-index") \
-    T(FN_ElementName, "element-name") \
+    T(FN_ElementName, "element-name") T(FN_Annotate, "annotate") \
     T(FN_CompilerMessage, "compiler-message") \
     T(FN_CStr, "cstr") T(FN_DatumToSyntax, "datum->syntax") \
     T(FN_DatumToQuotedSyntax, "datum->quoted-syntax") \
     T(FN_LabelDocString, "Label-docstring") \
     T(FN_LabelSetInline, "Label-set-inline!") \
     T(FN_DefaultStyler, "default-styler") T(FN_StyleToString, "style->string") \
-    T(FN_Disqualify, "disqualify") T(FN_Dump, "dump") \
-    T(FN_DumpLabel, "dump-label") \
+    T(FN_Disqualify, "disqualify") T(FN_Dump, "dump") T(FN_DumpTemplate, "dump-template") \
+    T(FN_DumpAST, "dump-ast") \
     T(FN_DumpList, "dump-list") \
     T(FN_DumpFrame, "dump-frame") \
     T(FN_ClosureLabel, "Closure-label") \
@@ -324,6 +329,7 @@ namespace scopes {
     T(FN_ExtractValue, "extractvalue") T(FN_InsertValue, "insertvalue") \
     T(FN_ExtractElement, "extractelement") T(FN_InsertElement, "insertelement") \
     T(FN_ShuffleVector, "shufflevector") T(FN_GetElementPtr, "getelementptr") \
+    T(FN_GetElementRef, "getelementref") \
     T(FN_FFISymbol, "ffi-symbol") T(FN_FFICall, "ffi-call") \
     T(FN_FrameEq, "Frame==") T(FN_Free, "free") \
     T(FN_GetExceptionHandler, "get-exception-handler") \
@@ -379,7 +385,8 @@ namespace scopes {
     T(FN_Macro, "macro") T(FN_Max, "max") T(FN_Min, "min") \
     T(FN_MemCopy, "memcopy") \
     T(FN_IsMutable, "mutable?") \
-    T(FN_IsNone, "none?") \
+    T(FN_IsNone, "none?") T(FN_Assign, "assign") \
+    T(FN_Deref, "deref") T(FN_PtrToRef, "ptrtoref") T(FN_RefToPtr, "reftoptr") \
     T(FN_IsNull, "null?") T(FN_OrderedBranch, "ordered-branch") \
     T(FN_ParameterEq, "Parameter==") \
     T(FN_ParameterNew, "Parameter-new") T(FN_ParameterName, "Parameter-name") \
@@ -408,7 +415,7 @@ namespace scopes {
     T(FN_Product, "product") T(FN_Prompt, "__prompt") T(FN_Qualify, "qualify") \
     T(FN_SetAutocompleteScope, "set-autocomplete-scope!") \
     T(FN_Range, "range") T(FN_RefNew, "ref-new") T(FN_RefAt, "ref@") \
-    T(FN_Repeat, "repeat") T(FN_Repr, "Any-repr") T(FN_AnyString, "Any-string") \
+    T(FN_Repr, "Any-repr") T(FN_AnyString, "Any-string") \
     T(FN_Require, "require") T(FN_ScopeOf, "scopeof") T(FN_ScopeAt, "Scope@") \
     T(FN_ScopeLocalAt, "Scope-local@") \
     T(FN_ScopeEq, "Scope==") \
@@ -430,18 +437,18 @@ namespace scopes {
     T(FN_SymbolEq, "Symbol==") T(FN_SymbolNew, "string->Symbol") \
     T(FN_StringToRawstring, "string->rawstring") \
     T(FN_IsSymbol, "symbol?") \
-    T(FN_SyntaxToAnchor, "syntax->anchor") T(FN_SyntaxToDatum, "syntax->datum") \
-    T(FN_SyntaxCons, "syntax-cons") T(FN_SyntaxDo, "syntax-do") \
-    T(FN_IsSyntaxHead, "syntax-head?") \
-    T(FN_SyntaxList, "syntax-list") T(FN_SyntaxQuote, "syntax-quote") \
-    T(FN_IsSyntaxQuoted, "syntax-quoted?") \
-    T(FN_SyntaxUnquote, "syntax-unquote") \
+    T(FN_SyntaxToAnchor, "sugar->anchor") T(FN_SyntaxToDatum, "sugar->datum") \
+    T(FN_SyntaxCons, "sugar-cons") T(FN_SyntaxDo, "sugar-do") \
+    T(FN_IsSyntaxHead, "sugar-head?") \
+    T(FN_SyntaxList, "sugar-list") \
+    T(FN_IsSyntaxQuoted, "sugar-quoted?") \
+    T(FN_SyntaxUnquote, "sugar-unquote") \
     T(FN_SymbolToString, "Symbol->string") \
     T(FN_StringMatch, "string-match?") \
     T(FN_SuperOf, "superof") \
-    T(FN_SyntaxNew, "Syntax-new") \
-    T(FN_SyntaxWrap, "Syntax-wrap") \
-    T(FN_SyntaxStrip, "Syntax-strip") \
+    T(FN_SyntaxNew, "sugar-new") \
+    T(FN_SyntaxWrap, "sugar-wrap") \
+    T(FN_SyntaxStrip, "sugar-strip") \
     T(FN_Translate, "translate") T(FN_ITrunc, "itrunc") \
     T(FN_ZExt, "zext") T(FN_SExt, "sext") \
     T(FN_TupleOf, "tupleof") T(FN_TypeNew, "type-new") T(FN_TypeName, "type-name") \
@@ -466,6 +473,7 @@ namespace scopes {
     T(FN_VectorOf, "vectorof") T(FN_XPCall, "xpcall") T(FN_Zip, "zip") \
     T(FN_VectorType, "vector-type") \
     T(FN_ZipFill, "zip-fill") \
+    T(FN_GetSyntaxScope, "__this-scope") \
     \
     /* builtin and global functions with side effects */ \
     T(SFXFN_CopyMemory, "copy-memory!") \
@@ -473,7 +481,6 @@ namespace scopes {
     T(SFXFN_Discard, "discard!") \
     T(SFXFN_Error, "__error!") \
     T(SFXFN_AnchorError, "__anchor-error!") \
-    T(SFXFN_Raise, "__raise!") \
     T(SFXFN_Abort, "abort!") \
     T(SFXFN_CompilerError, "compiler-error!") \
     T(SFXFN_SetAnchor, "set-anchor!") \
@@ -485,9 +492,7 @@ namespace scopes {
     T(SFXFN_SetGlobalApplyFallback, "set-global-apply-fallback!") \
     T(SFXFN_SetScopeSymbol, "__set-scope-symbol!") \
     T(SFXFN_DelScopeSymbol, "delete-scope-symbol!") \
-    T(SFXFN_SetTypeSymbol, "set-type-symbol!") \
     T(SFXFN_DelTypeSymbol, "delete-type-symbol!") \
-    T(SFXFN_SetTypenameStorage, "set-typename-storage!") \
     T(SFXFN_ExecutionMode, "set-execution-mode!") \
     T(SFXFN_TranslateLabelBody, "translate-label-body!") \
     \
@@ -539,8 +544,12 @@ namespace scopes {
     T(SYM_FnCCForm, "form-fn-body") \
     T(SYM_QuoteForm, "form-quote") \
     T(SYM_DoForm, "form-do") \
-    T(SYM_SyntaxScope, "syntax-scope") \
+    T(SYM_SyntaxScope, "sugar-scope") \
     T(SYM_CallHandler, "__call") \
+    T(SYM_ReturnHandler, "__return") \
+    T(SYM_DropHandler, "__drop") \
+    T(SYM_CopyHandler, "__copy") \
+    T(SYM_DerefHandler, "__deref") \
     \
     /* varargs */ \
     T(SYM_Parenthesis, "...") \
@@ -606,8 +615,11 @@ namespace scopes {
     T(TIMER_Generate, "generate()") \
     T(TIMER_GenerateSPIRV, "generate_spirv()") \
     T(TIMER_Optimize, "build_and_run_opt_passes()") \
-    T(TIMER_MCJIT, "mcjit()") \
     T(TIMER_ValidateScope, "validate_scope()") \
+    T(TIMER_Main, "main()") \
+    T(TIMER_Specialize, "specialize()") \
+    T(TIMER_Expand, "expand()") \
+    T(TIMER_Tracker, "track()") \
     \
     /* ad-hoc builtin names */ \
     T(SYM_ExecuteReturn, "execute-return") \

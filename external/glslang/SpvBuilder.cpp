@@ -882,6 +882,19 @@ Id Builder::findCompositeConstant(Op typeClass, const std::vector<Id>& comps) co
     return found ? constant->getResultId() : NoResult;
 }
 
+Id Builder::makeNullConstant(Id typeId) {
+    auto it = nullConstants.find(typeId);
+    if (it == nullConstants.end()) {
+        Instruction *c = new spv::Instruction(getUniqueId(), typeId, spv::OpConstantNull);
+        constantsTypesGlobals.push_back(std::unique_ptr<Instruction>(c));
+        //groupedConstants[typeClass].push_back(c);
+        nullConstants.insert({typeId, c});
+        module.mapInstruction(c);
+        return c->getResultId();
+    }
+    return it->second->getResultId();
+}
+
 // Comments in header
 Id Builder::makeCompositeConstant(Id typeId, const std::vector<Id>& members, bool specConstant)
 {

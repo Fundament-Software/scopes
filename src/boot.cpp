@@ -5,7 +5,9 @@
 */
 
 #include "boot.hpp"
-#include "scopes.h"
+#include "timer.hpp"
+#include "gc.hpp"
+#include "scopes/config.h"
 
 #ifdef SCOPES_WIN32
 #include "stdlib_ex.h"
@@ -20,18 +22,25 @@
 
 namespace scopes {
 
+static Timer *main_compile_time = nullptr;
+void on_startup() {
+    main_compile_time = new Timer(TIMER_Main);
+}
+
 void on_shutdown() {
+    delete main_compile_time;
 #if SCOPES_PRINT_TIMERS
-    print_profiler_info();
+    //print_profiler_info();
     Timer::print_timers();
-    std::cerr << "largest recorded stack size: " << g_largest_stack_size << std::endl;
+    StyledStream ss(SCOPES_CERR);
+    ss << "largest recorded stack size: " << g_largest_stack_size << std::endl;
 #endif
 }
 
 bool signal_abort = false;
 void f_abort() {
     on_shutdown();
-    if (SCOPES_EARLY_ABORT || signal_abort) {
+    if (signal_abort) {
         std::abort();
     } else {
         exit(1);

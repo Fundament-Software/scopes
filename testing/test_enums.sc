@@ -1,3 +1,14 @@
+spice make-enum (val)
+    spice-quote
+        enum [(.. (val as string) "-enum")]
+            X
+            Y = 5
+            Z
+            W = -1
+            'Q
+            R
+
+run-stage;
 
 do
     enum test-enum
@@ -24,21 +35,9 @@ do
     assert (not (test-enum.X == test-enum.Y))
     assert (test-enum.X != test-enum.Y)
 
-    assert (((unconst test-enum.R) == (unconst test-enum.R)) == true)
-    assert (not ((unconst test-enum.X) == (unconst test-enum.Y)))
-    assert ((unconst test-enum.X) != (unconst test-enum.Y))
-    assert (((unconst test-enum.R) != (unconst test-enum.R)) == false)
-
-
-
 do
     let T =
-        enum (do "test-enum") X
-            Y = 5
-            Z
-            W = -1
-            'Q
-            R
+        make-enum "test2"
 
     assert
         (superof T) == CEnum

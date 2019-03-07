@@ -7,17 +7,19 @@
 #ifndef SCOPES_GEN_LLVM_HPP
 #define SCOPES_GEN_LLVM_HPP
 
-#include "any.hpp"
+#include "result.hpp"
+
+#include <stdint.h>
 
 namespace scopes {
 
-struct Label;
+struct Function;
+struct String;
+struct ConstPointer;
+struct Scope;
 
-void compile_object(const String *path, Scope *scope, uint64_t flags);
-Any compile(Label *fn, uint64_t flags);
-void *local_aware_dlsym(Symbol name);
-
-extern void *global_c_namespace;
+SCOPES_RESULT(void) compile_object(const String *path, Scope *scope, uint64_t flags);
+SCOPES_RESULT(ConstPointer *) compile(Function *fn, uint64_t flags);
 
 } // namespace scopes
 

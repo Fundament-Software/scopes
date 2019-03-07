@@ -5,16 +5,13 @@
 */
 
 #include "platform_abi.hpp"
-#include "type.hpp"
+#include "types.hpp"
 #include "utils.hpp"
-#include "vector.hpp"
-#include "array.hpp"
-#include "union.hpp"
-#include "tuple.hpp"
-#include "return.hpp"
 #include "dyn_cast.inc"
 
 #include <assert.h>
+
+#pragma GCC diagnostic ignored "-Wvla-extension"
 
 namespace scopes {
 
@@ -73,6 +70,64 @@ static ABIClass merge_abi_classes(ABIClass class1, ABIClass class2) {
 
 static size_t classify(const Type *T, ABIClass *classes, size_t offset);
 
+static size_t classify_tuple_like(size_t size,
+    const Type **fields, size_t count, bool packed,
+    ABIClass *classes, size_t offset) {
+    const size_t UNITS_PER_WORD = 8;
+    size_t words = (size + UNITS_PER_WORD - 1) / UNITS_PER_WORD;
+    if (size > 32)
+        return 0;
+    for (size_t i = 0; i < MAX_ABI_CLASSES; i++)
+        classes[i] = ABI_CLASS_NO_CLASS;
+    if (!words) {
+        classes[0] = ABI_CLASS_NO_CLASS;
+        return 1;
+    }
+    ABIClass subclasses[MAX_ABI_CLASSES];
+    for (size_t i = 0; i < count; ++i) {
+        auto ET = strip_qualifiers(fields[i]);
+        if (!packed)
+            offset = align(offset, align_of(ET).assert_ok());
+        size_t num = classify (ET, subclasses, offset % 8);
+        if (!num) return 0;
+        for (size_t k = 0; k < num; ++k) {
+            size_t pos = offset / 8;
+            classes[k + pos] =
+                merge_abi_classes (subclasses[k], classes[k + pos]);
+        }
+        offset += size_of(ET).assert_ok();
+    }
+    if (words > 2) {
+        if (classes[0] != ABI_CLASS_SSE)
+            return 0;
+        for (size_t i = 1; i < words; ++i) {
+            if (classes[i] != ABI_CLASS_SSEUP)
+                return 0;
+        }
+    }
+    for (size_t i = 0; i < words; i++) {
+        if (classes[i] == ABI_CLASS_MEMORY)
+            return 0;
+
+        if (classes[i] == ABI_CLASS_SSEUP) {
+            assert(i > 0);
+            if (classes[i - 1] != ABI_CLASS_SSE
+                && classes[i - 1] != ABI_CLASS_SSEUP) {
+                classes[i] = ABI_CLASS_SSE;
+            }
+        }
+
+        if (classes[i] == ABI_CLASS_X87UP) {
+            assert(i > 0);
+            if(classes[i - 1] != ABI_CLASS_X87) {
+                return 0;
+            }
+        }
+    }
+    return words;
+
+}
+
 static size_t classify_array_like(size_t size,
     const Type *element_type, size_t count,
     ABIClass *classes, size_t offset) {
@@ -88,8 +143,8 @@ static size_t classify_array_like(size_t size,
     }
     auto ET = element_type;
     ABIClass subclasses[MAX_ABI_CLASSES];
-    size_t alignment = align_of(ET);
-    size_t esize = size_of(ET);
+    size_t alignment = align_of(ET).assert_ok();
+    size_t esize = size_of(ET).assert_ok();
     for (size_t i = 0; i < count; ++i) {
         offset = align(offset, alignment);
         size_t num = classify(ET, subclasses, offset % 8);
@@ -134,9 +189,8 @@ static size_t classify_array_like(size_t size,
 static size_t classify(const Type *T, ABIClass *classes, size_t offset) {
     switch(T->kind()) {
     case TK_Integer:
-    case TK_Extern:
     case TK_Pointer: {
-        size_t size = size_of(T) + offset;
+        size_t size = size_of(T).assert_ok() + offset;
         if (size <= 4) {
             classes[0] = ABI_CLASS_INTEGERSI;
             return 1;
@@ -156,7 +210,7 @@ static size_t classify(const Type *T, ABIClass *classes, size_t offset) {
         }
     } break;
     case TK_Real: {
-        size_t size = size_of(T);
+        size_t size = size_of(T).assert_ok();
         if (size == 4) {
             if (!(offset % 8))
                 classes[0] = ABI_CLASS_SSESF;
@@ -170,84 +224,37 @@ static size_t classify(const Type *T, ABIClass *classes, size_t offset) {
             assert(false && "illegal type");
         }
     } break;
-    case TK_ReturnLabel:
     case TK_Typename: {
         if (is_opaque(T)) {
             classes[0] = ABI_CLASS_NO_CLASS;
             return 1;
         } else {
-            return classify(storage_type(T), classes, offset);
+            return classify(storage_type(T).assert_ok(), classes, offset);
         }
     } break;
     case TK_Vector: {
         auto tt = cast<VectorType>(T);
-        return classify_array_like(size_of(T),
+        return classify_array_like(size_of(T).assert_ok(),
             tt->element_type, tt->count, classes, offset);
     } break;
     case TK_Array: {
         auto tt = cast<ArrayType>(T);
-        return classify_array_like(size_of(T),
+        return classify_array_like(size_of(T).assert_ok(),
             tt->element_type, tt->count, classes, offset);
     } break;
     case TK_Union: {
         auto ut = cast<UnionType>(T);
-        return classify(ut->types[ut->largest_field], classes, offset);
+        return classify(ut->values[ut->largest_field], classes, offset);
     } break;
     case TK_Tuple: {
-        const size_t UNITS_PER_WORD = 8;
-        size_t size = size_of(T);
-	    size_t words = (size + UNITS_PER_WORD - 1) / UNITS_PER_WORD;
-        if (size > 32)
-            return 0;
-        for (size_t i = 0; i < MAX_ABI_CLASSES; i++)
-	        classes[i] = ABI_CLASS_NO_CLASS;
-        if (!words) {
-            classes[0] = ABI_CLASS_NO_CLASS;
-            return 1;
-        }
         auto tt = cast<TupleType>(T);
-        ABIClass subclasses[MAX_ABI_CLASSES];
-        for (size_t i = 0; i < tt->types.size(); ++i) {
-            auto ET = tt->types[i];
-            if (!tt->packed)
-                offset = align(offset, align_of(ET));
-            size_t num = classify (ET, subclasses, offset % 8);
-            if (!num) return 0;
-            for (size_t k = 0; k < num; ++k) {
-                size_t pos = offset / 8;
-		        classes[k + pos] =
-		            merge_abi_classes (subclasses[k], classes[k + pos]);
-            }
-            offset += size_of(ET);
+        size_t count = tt->values.size();
+        const Type *fields[count];
+        for (size_t i = 0; i < tt->values.size(); ++i) {
+            fields[i] = tt->values[i];
         }
-        if (words > 2) {
-            if (classes[0] != ABI_CLASS_SSE)
-                return 0;
-            for (size_t i = 1; i < words; ++i) {
-                if (classes[i] != ABI_CLASS_SSEUP)
-                    return 0;
-            }
-        }
-        for (size_t i = 0; i < words; i++) {
-            if (classes[i] == ABI_CLASS_MEMORY)
-                return 0;
-
-            if (classes[i] == ABI_CLASS_SSEUP) {
-                assert(i > 0);
-                if (classes[i - 1] != ABI_CLASS_SSE
-                    && classes[i - 1] != ABI_CLASS_SSEUP) {
-                    classes[i] = ABI_CLASS_SSE;
-                }
-            }
-
-            if (classes[i] == ABI_CLASS_X87UP) {
-                assert(i > 0);
-                if(classes[i - 1] != ABI_CLASS_X87) {
-                    return 0;
-                }
-            }
-        }
-        return words;
+        return classify_tuple_like(size_of(T).assert_ok(),
+            fields, count, tt->packed, classes, offset);
     } break;
     default: {
         assert(false && "not supported in ABI");
@@ -259,15 +266,20 @@ static size_t classify(const Type *T, ABIClass *classes, size_t offset) {
 #endif // SCOPES_WIN32
 
 size_t abi_classify(const Type *T, ABIClass *classes) {
-#ifdef SCOPES_WIN32
-    if (T->kind() == TK_ReturnLabel) {
-        T = cast<ReturnLabelType>(T)->return_type;
+    T = strip_qualifiers(T);
+    if (T->kind() == TK_Arguments) {
+        if (T == empty_arguments_type()) {
+            classes[0] = ABI_CLASS_NO_CLASS;
+            return 1;
+        }
+        T = cast<ArgumentsType>(T)->to_tuple_type();
     }
+#ifdef SCOPES_WIN32
     classes[0] = ABI_CLASS_NO_CLASS;
     if (is_opaque(T))
         return 1;
-    T = storage_type(T);
-    size_t sz = size_of(T);
+    T = storage_type(T).assert_ok();
+    size_t sz = size_of(T).assert_ok();
     if (sz > 8)
         return 0;
     switch(T->kind()) {
@@ -284,10 +296,8 @@ size_t abi_classify(const Type *T, ABIClass *classes) {
             classes[0] = ABI_CLASS_INTEGER;
         return 1;
     case TK_Integer:
-    case TK_Extern:
     case TK_Pointer:
     case TK_Real:
-    case TK_ReturnLabel:
     case TK_Typename:
     case TK_Vector:
     default:

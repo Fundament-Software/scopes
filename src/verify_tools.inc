@@ -8,11 +8,18 @@
 #define SCOPES_VERIFY_TOOLS_INC
 
 #include "dyn_cast.inc"
+#include "error.hpp"
 
 namespace scopes {
 
 template<TypeKind tk>
-inline void verify_kind(const Type *T) {
+inline bool is_kind(const Type *T) {
+    return (T->kind() == tk);
+}
+
+template<TypeKind tk>
+inline SCOPES_RESULT(void) verify_kind(const Type *T) {
+    SCOPES_RESULT_TYPE(void);
     if (T->kind() != tk) {
         StyledString ss;
         ss.out << "value of ";
@@ -25,63 +32,34 @@ inline void verify_kind(const Type *T) {
         case TK_Tuple: ss.out << "tuple"; break;
         case TK_Union: ss.out << "union"; break;
         case TK_Typename: ss.out << "typename"; break;
-        case TK_ReturnLabel: ss.out << "return label"; break;
         case TK_Function: ss.out << "function"; break;
-        case TK_Extern: ss.out << "extern"; break;
         case TK_Image: ss.out << "image"; break;
         case TK_SampledImage: ss.out << "sampled image"; break;
         }
         ss.out << " kind expected, got " << T;
-        location_error(ss.str());
+        SCOPES_LOCATION_ERROR(ss.str());
     }
+    return {};
 }
 
-template<typename T>
-static T cast_number(const Any &value) {
-    auto ST = storage_type(value.type);
-    auto it = dyn_cast<IntegerType>(ST);
-    if (it) {
-        if (it->issigned) {
-            switch(it->width) {
-            case 8: return (T)value.i8;
-            case 16: return (T)value.i16;
-            case 32: return (T)value.i32;
-            case 64: return (T)value.i64;
-            default: break;
-            }
-        } else {
-            switch(it->width) {
-            case 1: return (T)value.i1;
-            case 8: return (T)value.u8;
-            case 16: return (T)value.u16;
-            case 32: return (T)value.u32;
-            case 64: return (T)value.u64;
-            default: break;
-            }
-        }
+template<ValueKind tk>
+inline SCOPES_RESULT(void) verify_kind(const Value *V) {
+    SCOPES_RESULT_TYPE(void);
+    if (V->kind() != tk) {
+        StyledString ss;
+        ss.out << "value of "
+            << Style_Keyword << get_value_class_name(tk) << Style_None
+             << " kind expected, got "
+            << Style_Keyword << get_value_class_name(V->kind()) << Style_None;
+        SCOPES_LOCATION_ERROR(ss.str());
     }
-    auto ft = dyn_cast<RealType>(ST);
-    if (ft) {
-        switch(ft->width) {
-        case 32: return (T)value.f32;
-        case 64: return (T)value.f64;
-        default: break;
-        }
-    }
-    StyledString ss;
-    ss.out << "can not extract constant from ";
-    if (value.is_const()) {
-        ss.out << "value of type " << value.type;
-    } else {
-        ss.out << "variable of type " << value.indirect_type();
-    }
-    location_error(ss.str());
-    return 0;
+    return {};
 }
 
 template<int mincount, int maxcount>
-inline int checkargs(size_t argsize, bool allow_overshoot = false) {
-    int count = (int)argsize - 1;
+inline SCOPES_RESULT(int) checkargs(size_t argsize, bool allow_overshoot = false) {
+    SCOPES_RESULT_TYPE(int);
+    int count = (int)argsize;
     if ((mincount <= 0) && (maxcount == -1)) {
         return count;
     }
@@ -90,12 +68,12 @@ inline int checkargs(size_t argsize, bool allow_overshoot = false) {
         if (allow_overshoot) {
             count = maxcount;
         } else {
-            location_error(
+            SCOPES_LOCATION_ERROR(
                 format("at most %i argument(s) expected, got %i", maxcount, count));
         }
     }
     if ((mincount >= 0) && (count < mincount)) {
-        location_error(
+        SCOPES_LOCATION_ERROR(
             format("at least %i argument(s) expected, got %i", mincount, count));
     }
     return count;

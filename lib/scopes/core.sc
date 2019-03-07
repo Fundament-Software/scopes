@@ -13,1434 +13,1663 @@
     The core module implements the remaining standard functions and macros,
     parses the command-line and optionally enters the REPL.
 
+# square list expressions are ast unquotes by default
+let square-list = spice-unquote-arguments
 
-""""A pass-through function that allows expressions to evaluate to multiple
-    arguments.
+# first we alias u64 to the integer type that can hold a pointer
+let intptr = u64
 
-let __typify = sc_typify
-let __compile = sc_compile
-let __compile-object = sc_compile_object
-let __compile-spirv = sc_compile_spirv
-let __compile-glsl = sc_compile_glsl
-let eval = sc_eval
-let compiler-version = sc_compiler_version
-let verify-stack! = sc_verify_stack
-let enter-solver-cli! = sc_enter_solver_cli
+# pointer comparison as a template function, because we'll compare pointers of many types
+fn ptrcmp!= (t1 t2)
+    icmp!= (ptrtoint t1 intptr) (ptrtoint t2 intptr)
 
-let default-styler = sc_default_styler
-let io-write! = sc_write
-let format-message = sc_format_message
-let __prompt = sc_prompt
-let set-autocomplete-scope! = sc_set_autocomplete_scope
+fn ptrcmp== (t1 t2)
+    icmp== (ptrtoint t1 intptr) (ptrtoint t2 intptr)
 
-let file? = sc_is_file
-let directory? = sc_is_directory
-let realpath = sc_realpath
-let dirname = sc_dirname
-let basename = sc_basename
+fn box-integer (value)
+    let T = (typeof value)
+    sc_const_int_new (sc_get_active_anchor) T
+        if (sc_integer_type_is_signed T)
+            sext value u64
+        else
+            zext value u64
 
-let globals = sc_get_globals
-let set-globals! = sc_set_globals
+# turn a symbol-like value (storage type u64) to an Any
+fn box-symbol (value)
+    sc_const_int_new (sc_get_active_anchor) (typeof value)
+        bitcast value u64
 
-let __error! = sc_error
-let __raise! = sc_raise
-let __anchor-error! = sc_anchor_error
-let set-exception-pad = sc_set_exception_pad
-let exception-value = sc_exception_value
-let exit = sc_exit
-let set-signal-abort! = sc_set_signal_abort
+# turn a pointer value into an Any
+fn box-pointer (value)
+    sc_const_pointer_new (sc_get_active_anchor) (typeof value)
+        bitcast value voidstar
 
-let __hash = sc_hash
-let __hash2x64 = sc_hash2x64
-let __hashbytes = sc_hashbytes
+fn error! (msg)
+    raise (sc_runtime_error_new msg)
 
-let set-anchor! = sc_set_active_anchor
-let active-anchor = sc_get_active_anchor
+fn sugar-error! (anchor msg)
+    raise (sc_location_error_new anchor msg)
 
-let import-c = sc_import_c
-let load-library = sc_load_library
+fn compiler-error! (value)
+    raise (sc_location_error_new (sc_get_active_anchor) value)
 
-let Scope@ = sc_scope_at
-let Scope-local@ = sc_scope_local_at
-let Scope-docstring = sc_scope_get_docstring
-let set-scope-docstring! = sc_scope_set_docstring
-let Scope-new = sc_scope_new
-let Scope-clone = sc_scope_clone
-let Scope-new-expand = sc_scope_new_subscope
-let Scope-clone-expand = sc_scope_clone_subscope
-let Scope-parent = sc_scope_get_parent
-let delete-scope-symbol! = sc_scope_del_symbol
-let Scope-next = sc_scope_next
-
-let string->Symbol = sc_symbol_new
-let Symbol->string = sc_symbol_to_string
-
-let string-join = sc_string_join
-let string-new = sc_string_new
-let string-match? = sc_string_match
-
-let Any-repr = sc_any_repr
-let Any-string = sc_any_string
-let Any== = sc_any_eq
-
-let list-cons = sc_list_cons
-let list-join = sc_list_join
-let list-dump = sc_list_dump
-
-let Syntax-new = sc_syntax_new
-let Syntax-wrap = sc_syntax_wrap
-let Syntax-strip = sc_syntax_strip
-let list-load = sc_syntax_from_path
-let list-parse = sc_syntax_from_string
-
-let element-type = sc_type_element_at
-let type-countof = sc_type_countof
-let sizeof = sc_type_sizeof
-let runtime-type@ = sc_type_at
-let element-index = sc_type_field_index
-let element-name = sc_type_field_name
-let type-kind = sc_type_kind
-let storageof = sc_type_storage
-let opaque? = sc_type_is_opaque
-let type-name = sc_type_string
-let type-next = sc_type_next
-
-let pointer-type = sc_pointer_type
-let pointer-type-set-element-type = sc_pointer_type_set_element_type
-let pointer-type-set-storage-class = sc_pointer_type_set_storage_class
-let pointer-type-set-flags = sc_pointer_type_set_flags
-let pointer-type-flags = sc_pointer_type_get_flags
-let pointer-type-set-storage-class = sc_pointer_type_set_storage_class
-let pointer-type-storage-class = sc_pointer_type_get_storage_class
-
-let extern-type-location = sc_extern_type_location
-let extern-type-binding = sc_extern_type_binding
-
-let bitcountof = sc_type_bitcountof
-
-let integer-type = sc_integer_type
-let signed? = sc_integer_type_is_signed
-
-let typename-type = sc_typename_type
-let set-typename-super! = sc_typename_type_set_super
-let superof = sc_typename_type_get_super
-
-let array-type = sc_array_type
-let vector-type = sc_vector_type
-
-let function-type-variadic? = sc_function_type_is_variadic
-
-let Image-type = sc_image_type
-let SampledImage-type = sc_sampled_image_type
-
-let Parameter-new = sc_parameter_new
-let Parameter-index = sc_parameter_index
-let Parameter-name = sc_parameter_name
-
-let Label-dump = sc_label_dump
-let Label-docstring = sc_label_docstring
-let Label-anchor = sc_label_anchor
-let Label-parameter-count = sc_label_parameter_count
-let Label-parameter = sc_label_parameter
-let Label-name = sc_label_name
-let Label-countof-reachable = sc_label_countof_reachable
-let Label-set-inline! = sc_label_set_inline
-let Label-enter = sc_label_get_enter
-let Label-set-enter! = sc_label_set_enter
-let Label-argument-count = sc_label_argument_count
-let Label-argument = sc_label_argument
-let Label-clear-arguments! = sc_label_clear_arguments
-let Label-append-argument! = sc_label_append_argument
-
-let Frame-dump = sc_frame_dump
-
-let Closure-label = sc_closure_label
-let Closure-frame = sc_closure_frame
-
-inline unconst-all (args...)
-    let loop (i result...) = (va-countof args...)
-    if (icmp== i 0)
-        result...
+# print an unboxing error given two types
+fn unbox-verify (value wantT)
+    let haveT = (sc_value_type value)
+    if (ptrcmp!= haveT wantT)
+        sugar-error! (sc_value_anchor value)
+            sc_string_join "can't unbox value of type "
+                sc_string_join
+                    sc_value_repr (box-pointer haveT)
+                    sc_string_join " as value of type "
+                        sc_value_repr (box-pointer wantT)
+    if (sc_value_is_constant value)
     else
-        let i = (sub i 1)
-        let arg = (va@ i args...)
-        loop i (unconst arg) result...
+        sugar-error! (sc_value_anchor value)
+            sc_string_join "constant of type "
+                sc_string_join
+                    sc_value_repr (box-pointer haveT)
+                    sc_string_join " expected, got expression of type "
+                        sc_value_repr (box-pointer wantT)
 
-inline tie-const (a b)
-    if (constant? a) b
-    else (unconst b)
+inline unbox-integer (value T)
+    unbox-verify value T
+    itrunc (sc_const_int_extract value) T
 
-inline cond-const (a b)
-    if a b
-    else (unconst b)
+inline unbox-symbol (value T)
+    unbox-verify value T
+    bitcast (sc_const_int_extract value) T
 
-inline pointer== (a b)
-    rawcall icmp== (rawcall ptrtoint a usize) (rawcall ptrtoint b usize)
+inline unbox-pointer (value T)
+    unbox-verify value T
+    bitcast (sc_const_pointer_extract value) T
 
-inline type? (T)
-    """".. fn:: (type? T)
-
-           returns `true` if ``T`` is a value of type `type`, otherwise
-           `false`.
-    rawcall icmp== (rawcall ptrtoint type usize) (rawcall ptrtoint (rawcall typeof T) usize)
-
-fn assert-type (T)
-    if (type? T)
-    else
-        rawcall compiler-error!
-            rawcall string-join "type expected, not " (rawcall Any-repr (rawcall Any-wrap T))
-inline type== (a b)
-    assert-type a
-    assert-type b
-    rawcall icmp== (rawcall ptrtoint a usize) (rawcall ptrtoint b usize)
-
-inline todo! (msg)
-    compiler-error!
-        string-join "TODO: " msg
-
-inline error! (msg)
-    __error! msg
-    unreachable!;
-
-inline typename-type? (T)
-    icmp== (type-kind T) type-kind-typename
-inline integer-type? (T)
-    icmp== (type-kind T) type-kind-integer
-inline real-type? (T)
-    icmp== (type-kind T) type-kind-real
-inline pointer-type? (T)
-    icmp== (type-kind T) type-kind-pointer
-inline function-type? (T)
-    icmp== (type-kind T) type-kind-function
-inline tuple-type? (T)
-    icmp== (type-kind T) type-kind-tuple
-inline array-type? (T)
-    icmp== (type-kind T) type-kind-array
-inline vector-type? (T)
-    icmp== (type-kind T) type-kind-vector
-inline extern-type? (T)
-    icmp== (type-kind T) type-kind-extern
-inline function-pointer-type? (T)
-    if (pointer-type? T)
-        function-type? (element-type T 0)
-    else (tie-const T false)
-inline typename? (val)
-    typename-type? (typeof val)
-inline integer? (val)
-    integer-type? (typeof val)
-inline real? (val)
-    real-type? (typeof val)
-inline pointer? (val)
-    pointer-type? (typeof val)
-inline array? (val)
-    array-type? (typeof val)
-inline vector? (T)
-    vector-type? (typeof T)
-inline tuple? (val)
-    tuple-type? (typeof val)
-inline extern? (val)
-    extern? (typeof val)
-inline function-pointer? (val)
-    function-pointer-type? (typeof val)
-inline Symbol? (val)
-    type== (typeof val) Symbol
-inline list? (val)
-    type== (typeof val) list
-inline none? (val)
-    type== (typeof val) Nothing
-
-inline gen-get-option (opts...)
-    """"Given a variadic list of keyed arguments, generate a function
-        ``(get-option name default)`` that either returns an option with the
-        given key from ``opts...`` or ``default`` if no such key exists.
-
-        If ``default`` is a function, then the function will be evaluated
-        and the result returned.
-    fn "get-option" (name default)
-        let val = (va@ name opts...)
-        if (none? val)
-            if (type== (typeof default) Closure)
-                default;
-            else default
-        else val
-
-fn Any-new (val)
-    inline construct (outval)
-        insertvalue (insertvalue (undef Any) (typeof val) 0) outval 1
-
-    if (type== (typeof val) Any) val
-    elseif (constant? val)
-        Any-wrap val
-    else
-        let T = (storageof (typeof val))
-        inline new-static-pointer ()
-            let ptr = (static-alloc T)
-            store val ptr
-            construct (ptrtoint ptr u64)
-        fn wrap-error ()
+fn verify-count (count mincount maxcount)
+    if (icmp>=s mincount 0)
+        if (icmp<s count mincount)
             compiler-error!
-                string-join "unable to wrap value of storage type "
-                    Any-repr (Any-wrap T)
-        let val =
-            if (tuple-type? T) val
-            else
-                bitcast val T
-        if (pointer-type? T)
-            #compiler-message "wrapping pointer"
-            construct
-                ptrtoint val u64
-        elseif (extern-type? T)
-            Any-new (unconst val)
-        elseif (bor (tuple-type? T) (array-type? T))
-            let count = (type-countof T)
-            if (icmp== count 0)
-                construct 0:u64
-            else
-                new-static-pointer;
-        elseif (integer-type? T)
-            construct
-                if (signed? (typeof val))
-                    sext val u64
+                sc_string_join "at least "
+                    sc_string_join (sc_value_repr (box-integer mincount))
+                        sc_string_join " argument(s) expected, got "
+                            sc_value_repr (box-integer count)
+    if (icmp>=s maxcount 0)
+        if (icmp>s count maxcount)
+            compiler-error!
+                sc_string_join "at most "
+                    sc_string_join (sc_value_repr (box-integer maxcount))
+                        sc_string_join " argument(s) expected, got "
+                            sc_value_repr (box-integer count)
+
+fn Value-none? (value)
+    ptrcmp== (sc_value_type value) Nothing
+
+# declare new pointer types at runtime
+let TypeArrayPointer =
+    sc_pointer_type type pointer-flag-non-writable unnamed
+let ValueArrayPointer =
+    sc_pointer_type Value pointer-flag-non-writable unnamed
+let SpiceMacroFunction = (sc_type_storage SpiceMacro)
+# dynamically construct a new symbol
+let ellipsis-symbol = (sc_symbol_new "...")
+
+# execute until here and treat the remainder as a new translation unit
+run-stage;
+
+# we can now access TypeArrayPointer as a compile time value
+let void =
+    sc_arguments_type 0 (nullof TypeArrayPointer)
+
+fn build-typify-function (f)
+    let types = (alloca-array type 1:usize)
+    store Value (getelementptr types 0)
+    let types = (bitcast types TypeArrayPointer)
+    let result = (sc_compile (sc_typify f 1 types) 0:u64)
+    let result-type = (sc_value_type result)
+    if (ptrcmp!= result-type SpiceMacroFunction)
+        compiler-error!
+            sc_string_join "AST macro must have type "
+                sc_string_join
+                    sc_value_repr (box-pointer SpiceMacroFunction)
+                    sc_string_join " but has type "
+                        sc_value_repr (box-pointer result-type)
+    let ptr = (sc_const_pointer_extract result)
+    bitcast ptr SpiceMacro
+
+let typify =
+    do
+        fn typify (args)
+            let argcount = (sc_argcount args)
+            verify-count argcount 1 -1
+            let src_fn = (sc_getarg args 0)
+            let typifyfn =
+                if (ptrcmp== (sc_value_type src_fn) Closure)
+                    `sc_typify
                 else
-                    zext val u64
-        elseif (vector-type? T)
-            new-static-pointer;
-        elseif (real-type? T)
-            if (type== T f32)
-                construct
-                    zext (bitcast val u32) u64
-            else
-                construct
-                    bitcast val u64
-        else
-            wrap-error;
+                    `sc_typify_template
+            let typecount = (sub argcount 1)
+            spice-quote
+                let types = (alloca-array type typecount)
+                spice-unquote
+                    let body = (sc_expression_new (sc_get_active_anchor))
+                    loop (i j = 1 0)
+                        if (icmp== i argcount)
+                            break;
+                        let ty = (sc_getarg args i)
+                        if (ptrcmp!= (sc_value_type ty) type)
+                            compiler-error! "type expected"
+                        sc_expression_append body
+                            `(store ty (getelementptr types j))
+                        _ (add i 1) (add j 1)
+                    body
+                typifyfn src_fn typecount (bitcast types TypeArrayPointer)
 
-inline raise! (value)
-    __raise! (Any-new value)
-    unreachable!;
+        build-typify-function typify
 
-inline va-empty? (...)
-    icmp== (va-countof ...) 0
+let const-typify =
+    do
+        fn const-typify (args)
+            let argcount = (sc_argcount args)
+            verify-count argcount 1 -1
+            let src_fn = (sc_getarg args 0)
+            let src_fn = (unbox-pointer src_fn Closure)
+            let typecount = (sub argcount 1)
+            let types = (alloca-array type typecount)
+            loop (i j = 1 0)
+                if (icmp== i argcount)
+                    break;
+                let ty = (sc_getarg args i)
+                store (unbox-pointer ty type) (getelementptr types j)
+                _ (add i 1) (add j 1)
+            sc_typify src_fn typecount (bitcast types TypeArrayPointer)
 
-inline va-types (params...)
-    let sz = (va-countof params...)
-    let loop (i result...) = sz
-    if (icmp== i 0)
-        return result...
-    let i = (sub i 1)
-    let arg = (va@ i params...)
-    loop i (typeof arg) result...
+        build-typify-function const-typify
 
-inline va-join (a...)
-    inline (out...)
-        let loop (i out...) = (va-countof a...) out...
-        if (icmp!= i 0)
-            let i = (sub i 1)
-            loop i (va@ i a...) out...
-        out...
+run-stage;
 
-inline cons (...)
-    let i = (va-countof ...)
-    if (icmp<s i 2)
-        compiler-error! "at least two parameters expected"
-    let i = (sub i 2)
-    let loop (i at tail) = i (va@ i ...)
-    if (icmp== i 0)
-        list-cons (Any at) tail
-    else
-        let i = (sub i 1)
-        loop i (va@ i ...)
-            list-cons (Any at) tail
+let spice-macro-verify-signature =
+    const-typify (fn "spice-macro-verify-signature" (f)) SpiceMacroFunction
 
-inline list-new (...)
-    inline loop (i tail)
-        if (icmp== i 0) tail
-        else
-            let val = (va@ (sub i 1) ...)
-            loop (sub i 1)
-                list-cons (Any-new val) tail
-    loop (va-countof ...) eol
+inline function->SpiceMacro (f)
+    spice-macro-verify-signature f
+    bitcast f SpiceMacro
 
-# forward decl
-inline as
-inline forward-as
-inline imply
-inline forward-imply
+fn box-empty ()
+    sc_argument_list_new (sc_get_active_anchor)
 
-inline not (x)
-    bxor (imply x bool) true
+fn box-none ()
+    sc_const_aggregate_new (sc_get_active_anchor) Nothing 0 (undef ValueArrayPointer)
 
-inline gen-type-op2 (f)
-    inline (a b flipped)
-        if (type== (typeof a) (typeof b))
-            f a b
-        elseif flipped
-            let result... = (forward-imply a (typeof b))
-            if (va-empty? result...)
-            else
-                f result... b
-        else
-            let result... = (forward-imply b (typeof a))
-            if (va-empty? result...)
-            else
-                f a result...
+# take closure l, typify and compile it and return a function of SpiceMacro type
+inline spice-macro (l)
+    function->SpiceMacro (const-typify l Value)
 
-syntax-extend
+inline box-spice-macro (l)
+    box-pointer (spice-macro l)
 
-    set-type-symbol! type '__call
-        inline (cls ...)
-            let val ok = (type@ cls '__typecall)
-            if ok
-                call val cls ...
-            else
+let va-lfold va-lifold =
+    do
+        fn va-lfold (args use-indices)
+            let argcount = (sc_argcount args)
+            verify-count argcount 2 -1
+            let init = (sc_getarg args 0)
+            let f = (sc_getarg args 1)
+            if (icmp== argcount 2)
+                return init
+            let ofs = (? use-indices 1 0)
+            loop (i ret = 2 init)
+                if (icmp== i argcount)
+                    break ret
+                let arg =
+                    sc_getarg args i
+                let k = (sc_type_key (sc_value_qualified_type arg))
+                let v = (sc_keyed_new (sc_value_anchor arg) unnamed arg)
+                _ (add i 1)
+                    if use-indices
+                        `(f [(sub i 2)] k v ret)
+                    else
+                        `(f k v ret)
+        _
+            spice-macro (fn "va-lfold" (args) (va-lfold args false))
+            spice-macro (fn "va-ilfold" (args) (va-lfold args true))
+
+let va-rfold va-rifold =
+    do
+        fn va-rfold (args use-indices)
+            let argcount = (sc_argcount args)
+            verify-count argcount 2 -1
+            let init = (sc_getarg args 0)
+            let f = (sc_getarg args 1)
+            if (icmp== argcount 2)
+                return init
+            let ofs = (? use-indices 1 0)
+            loop (i ret = argcount init)
+                if (icmp<=s i 2)
+                    break ret
+                let oi = i
+                let i = (sub i 1)
+                let arg =
+                    sc_getarg args i
+                let k = (sc_type_key (sc_value_qualified_type arg))
+                let v = (sc_keyed_new (sc_value_anchor arg) unnamed arg)
+                _ i
+                    if use-indices
+                        `(f [(sub i 2)] k v ret)
+                    else
+                        `(f k v ret)
+        _
+            spice-macro (fn "va-rfold" (args) (va-rfold args false))
+            spice-macro (fn "va-rifold" (args) (va-rfold args true))
+
+inline raises-compile-error ()
+    if false
+        compiler-error! "hidden"
+
+inline type< (T superT)
+    sc_type_is_superof superT T
+
+let type> = sc_type_is_superof
+
+fn type<= (T superT)
+    bxor (type> T superT) true
+
+fn type>= (superT T)
+    bxor (type< T superT) true
+
+fn compare-type (args f)
+    let argcount = (sc_argcount args)
+    verify-count argcount 2 2
+    let a = (sc_getarg args 0)
+    let b = (sc_getarg args 1)
+    if (sc_value_is_constant a)
+        if (sc_value_is_constant b)
+            return
+                box-integer
+                    f (unbox-pointer a type) (unbox-pointer b type)
+    `(f args)
+
+inline type-comparison-func (f)
+    fn (args) (compare-type args (const-typify f type type))
+
+let storagecast =
+    box-spice-macro
+        fn "storagecast" (args)
+            let argcount = (sc_argcount args)
+            verify-count argcount 1 1
+            let self = (sc_getarg args 0)
+            let T = (sc_type_storage (sc_value_type self))
+            return `(bitcast self T)
+
+# typecall
+sc_type_set_symbol type '__call
+    box-spice-macro
+        fn "type-call" (args)
+            let argcount = (sc_argcount args)
+            verify-count argcount 1 -1
+            let self = (sc_getarg args 0)
+            let T = (unbox-pointer self type)
+            let f = (sc_type_at T '__typecall)
+            return `(f args)
+
+# method call syntax
+sc_type_set_symbol Symbol '__call
+    box-spice-macro
+        fn "symbol-call" (args)
+            fn resolve-method (self symval)
+                let sym = (unbox-symbol symval Symbol)
+                let T = (sc_value_type self)
+                try
+                    return (sc_type_at T sym)
+                except (err)
+                # if calling method of type, try typemethod
+                if (ptrcmp== T type)
+                    if (sc_value_is_constant self)
+                        let self = (unbox-pointer self type)
+                        try
+                            return (sc_type_at self sym)
+                        except (err)
                 compiler-error!
-                    string-join "type "
-                        string-join
-                            Any-repr (Any-wrap cls)
-                            " has no apply-type attribute"
+                    sc_string_join "no method named "
+                        sc_string_join (sc_value_repr symval)
+                            sc_string_join " in value of type "
+                                sc_value_repr (box-pointer T)
 
-    set-type-symbol! list '__typecall
-        inline (cls ...)
-            list-new ...
-    set-type-symbol! extern '__typecall
-        inline (cls ...)
-            extern-new ...
-    set-type-symbol! Any '__typecall
-        inline (cls value)
-            Any-new value
-    set-type-symbol! Symbol '__typecall
-        inline (cls value)
-            string->Symbol value
-    set-type-symbol! Scope '__typecall
-        inline (cls parent clone)
-            """"There are four ways to create a new Scope:
-                ``Scope``
-                    creates an empty scope without parent
-                ``Scope parent``
-                    creates an empty scope descending from ``parent``
-                ``Scope none clone``
-                    duplicate ``clone`` without a parent
-                ``Scope parent clone``
-                    duplicate ``clone``, but descending from ``parent`` instead
+            let argcount = (sc_argcount args)
+            verify-count argcount 2 -1
+            let symval = (sc_getarg args 0)
+            let self = (sc_getarg args 1)
+            let expr = `([(resolve-method self symval)]
+                [(sc_extract_argument_list_new (sc_value_anchor args) args 1)])
+            expr
 
-            let new? = (type== (typeof clone) Nothing)
-            if (type== (typeof parent) Nothing)
-                if new?
-                    Scope-new;
-                else
-                    Scope-clone clone
+do
+    fn get-key-value-args (args)
+        let argcount = (sc_argcount args)
+        verify-count argcount 2 3
+        let self = (sc_getarg args 0)
+        if (icmp== argcount 3)
+            let key = (sc_getarg args 1)
+            let value = (sc_getarg args 2)
+            return self key value
+        else
+            let arg = (sc_getarg args 1)
+            let key = (sc_type_key (sc_value_qualified_type arg))
+            let arg = (sc_keyed_new (sc_value_anchor arg) unnamed arg)
+            return self (box-symbol key) arg
+
+    inline gen-key-any-set (selftype fset)
+        box-spice-macro
+            fn "set-symbol" (args)
+                let self key value = (get-key-value-args args)
+                `(fset self key value)
+
+    inline gen-key-any-define (selftype fset)
+        box-spice-macro
+            fn "define-symbol" (args)
+                let self key value = (get-key-value-args args)
+                if (sc_value_is_constant self)
+                    if (sc_value_is_constant key)
+                        if (sc_value_is_pure value)
+                            let self = (unbox-pointer self selftype)
+                            let key = (unbox-symbol key Symbol)
+                            fset self key value
+                            return `[]
+                compiler-error! "all arguments must be constant"
+
+    # quick assignment of type attributes
+    sc_type_set_symbol type 'set-symbol (gen-key-any-set type sc_type_set_symbol)
+    sc_type_set_symbol Scope 'set-symbol (gen-key-any-set Scope sc_scope_set_symbol)
+    sc_type_set_symbol type 'define-symbol (gen-key-any-define type sc_type_set_symbol)
+    sc_type_set_symbol Scope 'define-symbol (gen-key-any-define Scope sc_scope_set_symbol)
+
+sc_type_set_symbol type 'pointer
+    box-spice-macro
+        fn "type-pointer" (args)
+            let argcount = (sc_argcount args)
+            verify-count argcount 1 1
+            let self = (sc_getarg args 0)
+            if (sc_value_is_constant self)
+                let T = (unbox-pointer self type)
+                box-pointer
+                    sc_pointer_type T pointer-flag-non-writable unnamed
             else
-                if new?
-                    Scope-new-expand parent
+                `(sc_pointer_type self pointer-flag-non-writable unnamed)
+
+# tuple type constructor
+sc_type_set_symbol tuple '__typecall
+    box-spice-macro
+        fn "tuple" (args)
+            let argcount = (sc_argcount args)
+            verify-count argcount 1 -1
+            let pcount = (sub argcount 1)
+            spice-quote
+                let types = (alloca-array type pcount)
+                spice-unquote
+                    let body = (sc_expression_new (sc_get_active_anchor))
+                    loop (i = 1)
+                        if (icmp== i argcount)
+                            break;
+                        let arg = (sc_getarg args i)
+                        let k = (sc_type_key (sc_value_qualified_type arg))
+                        let arg = (sc_keyed_new (sc_value_anchor arg) unnamed arg)
+                        if (ptrcmp!= (sc_value_type arg) type)
+                            compiler-error! "type expected"
+                        sc_expression_append body
+                            `(store
+                                (sc_key_type k arg)
+                                (getelementptr types [(sub i 1)]))
+                        add i 1
+                    body
+                sc_tuple_type pcount types
+
+# arguments type constructor
+sc_type_set_symbol Arguments '__typecall
+    box-spice-macro
+        fn "Arguments" (args)
+            let argcount = (sc_argcount args)
+            verify-count argcount 1 -1
+            let pcount = (sub argcount 1)
+            let types = (alloca-array type pcount)
+            loop (i = 1)
+                if (icmp== i argcount)
+                    break;
+                let arg = (sc_getarg args i)
+                let T = (unbox-pointer arg type)
+                store T (getelementptr types (sub i 1))
+                add i 1
+            box-pointer (sc_arguments_type pcount types)
+
+# function pointer type constructor
+sc_type_set_symbol function '__typecall
+    box-spice-macro
+        fn "function" (args)
+            let argcount = (sc_argcount args)
+            verify-count argcount 2 -1
+            let pcount = (sub argcount 2)
+            let constant? =
+                loop (i = 1)
+                    if (icmp== i argcount)
+                        break true
+                    let arg = (sc_getarg args i)
+                    if (sc_value_is_constant arg)
+                        repeat (add i 1)
+                    break false
+            let rtype = (sc_getarg args 1)
+            if constant?
+                let rtype = (unbox-pointer rtype type)
+                let types = (alloca-array type pcount)
+                loop (i = 2)
+                    if (icmp== i argcount)
+                        break;
+                    let arg = (sc_getarg args i)
+                    let T = (unbox-pointer arg type)
+                    store T (getelementptr types (sub i 2))
+                    add i 1
+                box-pointer (sc_function_type rtype pcount types)
+            else
+                spice-quote
+                    let types = (alloca-array type pcount)
+                    spice-unquote
+                        let expr = (sc_expression_new (sc_get_active_anchor))
+                        loop (i = 2)
+                            if (icmp== i argcount)
+                                break;
+                            let arg = (sc_getarg args i)
+                            sc_expression_append expr
+                                `(store arg (getelementptr types [(sub i 2)]))
+                            add i 1
+                        expr
+                    sc_function_type rtype pcount types
+
+sc_type_set_symbol type 'raising
+    box-spice-macro
+        fn "function-raising" (args)
+            let argcount = (sc_argcount args)
+            verify-count argcount 2 2
+            let self = (sc_getarg args 0)
+            let except_type = (sc_getarg args 1)
+            let T = (unbox-pointer self type)
+            let exceptT = (unbox-pointer except_type type)
+            box-pointer
+                sc_function_type_raising T exceptT
+
+# closure constructor
+#sc_type_set_symbol Closure '__typecall
+    box-pointer
+        inline (cls func frame)
+            sc_closure_new func frame
+
+# symbol constructor
+sc_type_set_symbol Symbol '__typecall
+    box-pointer
+        inline (cls str)
+            sc_symbol_new str
+
+let none? =
+    spice-macro
+        fn (args)
+            let argcount = (sc_argcount args)
+            verify-count argcount 1 1
+            let value = (sc_getarg args 0)
+            box-integer
+                ptrcmp== (sc_value_type value) Nothing
+
+fn unpack2 (args)
+    let argcount = (sc_argcount args)
+    verify-count argcount 2 2
+    let a = (sc_getarg args 0)
+    let b = (sc_getarg args 1)
+    return a b
+
+let const.icmp<=.i32.i32 =
+    spice-macro
+        fn (args)
+            let a b = (unpack2 args)
+            if (sc_value_is_constant a)
+                if (sc_value_is_constant b)
+                    let a = (unbox-integer a i32)
+                    let b = (unbox-integer b i32)
+                    return
+                        box-integer (icmp<=s a b)
+            compiler-error! "arguments must be constant"
+
+let const.add.i32.i32 =
+    spice-macro
+        fn (args)
+            let a b = (unpack2 args)
+            if (sc_value_is_constant a)
+                if (sc_value_is_constant b)
+                    let a = (unbox-integer a i32)
+                    let b = (unbox-integer b i32)
+                    return
+                        box-integer (add a b)
+            compiler-error! "arguments must be constant"
+
+let constbranch =
+    spice-macro
+        fn (args)
+            let argcount = (sc_argcount args)
+            verify-count argcount 3 3
+            let cond = (sc_getarg args 0)
+            let thenf = (sc_getarg args 1)
+            let elsef = (sc_getarg args 2)
+            if (sc_value_is_constant cond)
+            else
+                compiler-error! "condition must be constant"
+            let value = (unbox-integer cond bool)
+            `([(? value thenf elsef)])
+
+sc_type_set_symbol Value '__typecall
+    box-spice-macro
+        fn (args)
+            let argcount = (sc_argcount args)
+            verify-count argcount 1 -1
+            if (icmp== argcount 1)
+                box-pointer (box-empty)
+            else
+                let value = (sc_getarg args 1)
+                let T = (sc_value_type value)
+                if (ptrcmp== T Value)
+                    value
+                elseif (sc_value_is_constant value)
+                    box-pointer value
+                elseif (ptrcmp== T Nothing)
+                    box-pointer
+                        box-none;
                 else
-                    Scope-clone-expand parent clone
-    set-type-symbol! Scope 'parent Scope-parent
+                    sc_value_wrap T value
 
-    set-type-symbol! type '__== (gen-type-op2 type==)
-    set-type-symbol! Any '__== (gen-type-op2 Any==)
-    set-type-symbol! Closure '__== (gen-type-op2 pointer==)
-    set-type-symbol! Label '__== (gen-type-op2 pointer==)
-    set-type-symbol! Frame '__== (gen-type-op2 pointer==)
+let __unbox =
+    spice-macro
+        fn (args)
+            let argc = (sc_argcount args)
+            verify-count argc 2 2
+            let value = (sc_getarg args 0)
+            let T = (sc_getarg args 1)
+            let T = (unbox-pointer T type)
+            sc_value_unwrap T value
+let
+    type== = (spice-macro (type-comparison-func ptrcmp==))
+    type!= = (spice-macro (type-comparison-func ptrcmp!=))
+    type<= = (spice-macro (type-comparison-func type<=))
+    type>= = (spice-macro (type-comparison-func type>=))
 
-    set-type-symbol! Frame 'dump
+run-stage;
+
+fn cons (values...)
+    va-rifold none
+        inline (i key value next)
+            constbranch (none? next)
+                inline ()
+                    value
+                inline ()
+                    sc_list_cons (Value value) next
+        values...
+
+inline make-list (values...)
+    va-rifold '()
+        inline (i key value result)
+            sc_list_cons (Value value) result
+        values...
+
+inline decons (self count)
+    let count =
+        constbranch (none? count)
+            inline () 1
+            inline () count
+    let at next = (sc_list_decons self)
+    _ at
+        constbranch (const.icmp<=.i32.i32 count 1)
+            inline () next
+            inline () (decons next (const.add.i32.i32 count -1))
+
+inline set-symbols (self values...)
+    va-lfold none
+        inline (key value)
+            'set-symbol self key value
+        values...
+
+inline define-symbols (self values...)
+    va-lfold none
+        inline (key value)
+            'define-symbol self key value
+        values...
+
+'define-symbol type 'set-symbols set-symbols
+'define-symbol Scope 'set-symbols set-symbols
+'define-symbol type 'define-symbols define-symbols
+'define-symbol Scope 'define-symbols define-symbols
+
+'define-symbols Value
+    constant? = sc_value_is_constant
+    pure? = sc_value_is_pure
+    kind = sc_value_kind
+    none? = (const-typify Value-none? Value)
+    __repr = sc_value_repr
+    spice-repr = sc_value_ast_repr
+    dump =
         inline (self)
-            Frame-dump self
-    set-type-symbol! Label 'dump
-        inline (self)
-            Label-dump self
-    set-type-symbol! Closure 'dump
-        inline (self)
-            'dump (Closure-label self)
+            sc_write (sc_value_ast_repr self)
+    typeof = sc_value_type
+    qualified-typeof = sc_value_qualified_type
+    anchor = sc_value_anchor
+    argcount = sc_argcount
+    getarg = sc_getarg
+    getarglist = sc_getarglist
+    dekey =
+        fn "dekey" (self)
+            let k = (sc_type_key ('qualified-typeof self))
+            _ k (sc_keyed_new (sc_value_anchor self) unnamed self)
 
-    set-type-symbol! string '__.. (gen-type-op2 string-join)
-    set-type-symbol! list '__.. (gen-type-op2 list-join)
+'define-symbols Scope
+    @ = sc_scope_at
+    next = sc_scope_next
+    docstring = sc_scope_get_docstring
+    set-docstring! = sc_scope_set_docstring
+    parent = sc_scope_get_parent
 
-    set-type-symbol! type '__getattr
+'define-symbols string
+    join = sc_string_join
+    match? = sc_string_match
+
+'define-symbols Error
+    format = sc_format_error
+
+'define-symbols list
+    __countof = sc_list_count
+    join = sc_list_join
+    @ = sc_list_at
+    next = sc_list_next
+    decons = decons
+    reverse = sc_list_reverse
+    dump = sc_list_dump
+
+'define-symbols SampledImage
+    __typecall =
+        inline (cls ...)
+            sc_sampled_image_type ...
+
+'define-symbols Image
+    __typecall =
+        inline (cls ...)
+            sc_image_type ...
+
+'define-symbols type
+    bitcount = sc_type_bitcountof
+    signed? = sc_integer_type_is_signed
+    element@ = sc_type_element_at
+    element-count = sc_type_countof
+    storageof = sc_type_storage
+    kind = sc_type_kind
+    sizeof = sc_type_sizeof
+    alignof = sc_type_alignof
+    @ = sc_type_at
+    local@ = sc_type_local_at
+    opaque? = sc_type_is_opaque
+    string = sc_type_string
+    superof = sc_typename_type_get_super
+    set-super = sc_typename_type_set_super
+    set-storage =
+        inline (type storage-type)
+            sc_typename_type_set_storage type storage-type 0:u32
+    set-plain-storage =
+        inline (type storage-type)
+            sc_typename_type_set_storage type storage-type typename-flag-plain
+    return-type = sc_function_type_return_type
+    key = sc_type_key
+    key-type =
+        inline (self key)
+            sc_key_type key self
+    refer? = sc_type_is_refer
+    variadic? = sc_function_type_is_variadic
+    pointer? =
+        fn (cls)
+            icmp== ('kind cls) type-kind-pointer
+    function? =
+        fn (cls)
+            icmp== ('kind cls) type-kind-function
+    function-pointer? =
+        fn (cls)
+            if ('pointer? cls)
+                if ('function? ('element@ cls 0))
+                    return true
+            return false
+    change-element-type =
+        fn (cls ET)
+            sc_pointer_type_set_element_type cls ET
+    change-storage-class =
+        fn (cls storage-class)
+            sc_pointer_type_set_storage_class cls storage-class
+    immutable =
+        fn (cls)
+            sc_pointer_type_set_flags cls
+                bor (sc_pointer_type_get_flags cls) pointer-flag-non-writable
+    mutable =
+        fn (cls)
+            sc_pointer_type_set_flags cls
+                band (sc_pointer_type_get_flags cls)
+                    bxor pointer-flag-non-writable -1:u64
+    strip-pointer-storage-class =
+        fn (cls)
+            sc_pointer_type_set_storage_class cls unnamed
+    pointer-storage-class =
+        fn (cls)
+            sc_pointer_type_get_storage_class cls
+    readable? =
+        fn (cls)
+            icmp== (band (sc_pointer_type_get_flags cls) pointer-flag-non-readable) 0:u64
+    writable? =
+        fn (cls)
+            icmp== (band (sc_pointer_type_get_flags cls) pointer-flag-non-writable) 0:u64
+    pointer->refer-type =
+        fn "pointer->refer-type" (cls)
+            sc_refer_type
+                sc_type_element_at cls 0
+                sc_pointer_type_get_flags cls
+                sc_pointer_type_get_storage_class cls
+
+#'define-symbols Closure
+    frame = sc_closure_frame
+    label = sc_closure_label
+
+let rawstring = ('pointer i8)
+
+inline box-cast (f)
+    box-pointer (const-typify f type type Value)
+
+inline not (value)
+    bxor value true
+
+# a supertype to be used for conversions
+let immutable = (sc_typename_type "immutable")
+sc_typename_type_set_super integer immutable
+sc_typename_type_set_super real immutable
+sc_typename_type_set_super vector immutable
+sc_typename_type_set_super Symbol immutable
+sc_typename_type_set_super CEnum immutable
+
+let aggregate = (sc_typename_type "aggregate")
+sc_typename_type_set_super array aggregate
+sc_typename_type_set_super tuple aggregate
+
+let opaquepointer = (sc_typename_type "opaquepointer")
+sc_typename_type_set_super string opaquepointer
+sc_typename_type_set_super type opaquepointer
+
+sc_typename_type_set_super usize integer
+
+# generator type
+let Generator = (sc_typename_type "Generator")
+'set-plain-storage Generator ('storageof Closure)
+
+# syntax macro type
+let SugarMacro = (sc_typename_type "SugarMacro")
+let SugarMacroFunction =
+    'pointer
+        'raising
+            function (Arguments list Scope) list list Scope
+            Error
+'set-plain-storage SugarMacro SugarMacroFunction
+
+# any extraction
+
+inline unbox (value T)
+    unbox-verify value T
+    __unbox value T
+
+fn value-as (vT T expr)
+    if true
+        return `(unbox expr T)
+    compiler-error! "unsupported type"
+
+'set-symbols Value
+    __as =
+        box-cast value-as
+    __rimply =
+        box-cast
+            fn "Value-rimply" (vT T expr)
+                if true
+                    return `(Value expr)
+                compiler-error! "unsupported type"
+
+'set-symbols SpiceMacro
+    __rimply =
+        box-cast
+            fn "SpiceMacro-rimply" (vT T expr)
+                if (ptrcmp== vT SpiceMacroFunction)
+                    return `(bitcast expr T)
+                elseif (ptrcmp== vT Closure)
+                    if ('constant? expr)
+                        return `(spice-macro expr)
+                compiler-error! "unsupported type"
+
+# integer casting
+
+fn integer-imply (vT T expr)
+    let ST =
+        if (ptrcmp== T usize) ('storageof T)
+        else T
+    let args... = expr T
+    if (icmp== ('kind ST) type-kind-integer)
+        # constant i32 auto-expands to usize if not negative
+        if ('constant? expr)
+            if (ptrcmp== vT i32)
+                let val = (unbox expr i32)
+                if (ptrcmp== T usize)
+                    if (icmp<s val 0)
+                        compiler-error! "signed integer is negative"
+                    return
+                        box-integer (sext val usize)
+        let valw = ('bitcount vT)
+        let destw = ('bitcount ST)
+        # must have same signed bit
+        if (icmp== ('signed? vT) ('signed? ST))
+            if (icmp== destw valw)
+                return `(bitcast args...)
+            elseif (icmp>s destw valw)
+                if ('signed? vT)
+                    return `(sext args...)
+                else
+                    return `(zext args...)
+    elseif (icmp== ('kind ST) type-kind-real)
+        # constant i32 auto-converts to real
+        if ('constant? expr)
+            if (ptrcmp== vT i32)
+                if ('signed? vT)
+                    return `(sitofp args...)
+                else
+                    return `(uitofp args...)
+    compiler-error! "unsupported type"
+
+fn integer-as (vT T expr)
+    let args... = expr T
+    let T =
+        if (ptrcmp== T usize) ('storageof T)
+        else T
+    if (icmp== ('kind T) type-kind-integer)
+        let valw = ('bitcount vT)
+        let destw = ('bitcount T)
+        if (icmp== destw valw)
+            return `(bitcast args...)
+        elseif (icmp>s destw valw)
+            if ('signed? vT)
+                return `(sext args...)
+            else
+                return `(zext args...)
+        else
+            return `(itrunc args...)
+    elseif (icmp== ('kind T) type-kind-real)
+        if ('signed? vT)
+            return `(sitofp args...)
+        else
+            return `(uitofp args...)
+    compiler-error! "unsupported type"
+
+# only perform safe casts: i.e. float to double
+fn real-imply (vT T expr)
+    if (icmp== ('kind T) type-kind-real)
+        let args... = expr T
+        let valw = ('bitcount vT)
+        let destw = ('bitcount T)
+        if (icmp== destw valw)
+            return `(bitcast args...)
+        elseif (icmp>s destw valw)
+            return `(fpext args...)
+    compiler-error! "unsupported type"
+
+# more aggressive cast that converts from all numerical types
+fn real-as (vT T expr)
+    let args... = expr T
+    let T =
+        if (ptrcmp== T usize) ('storageof T)
+        else T
+    let kind = ('kind T)
+    if (icmp== kind type-kind-real)
+        let valw destw = ('bitcount vT) ('bitcount T)
+        if (icmp== destw valw)
+            return `(bitcast args...)
+        elseif (icmp>s destw valw)
+            return `(fpext args...)
+        else
+            return `(fptrunc args...)
+    elseif (icmp== kind type-kind-integer)
+        if ('signed? T)
+            return `(fptosi args...)
+        else
+            return `(fptoui args...)
+    compiler-error! "unsupported type"
+
+
+inline box-binary-op (f)
+    box-pointer (const-typify f type type Value Value)
+
+inline single-binary-op-dispatch (destf)
+    fn (lhsT rhsT lhs rhs)
+        if (ptrcmp== lhsT rhsT)
+            return `(destf lhs rhs)
+        compiler-error! "unsupported type"
+
+inline cast-error! (intro-string vT T err)
+    compiler-error!
+        sc_string_join intro-string
+            sc_string_join ('__repr (box-pointer vT))
+                sc_string_join " to type "
+                    sc_string_join ('__repr (box-pointer T))
+                        sc_string_join ": "
+                            sc_format_error err
+
+# receive a source type, a destination type and an expression, and return an
+    untyped expression that transforms the value to said type, or raise an error
+let CastFunctionType =
+    'pointer ('raising (function Value type type Value) Error)
+
+fn unbox-cast-function-type (anyf)
+    unbox-pointer anyf CastFunctionType
+
+fn attribute-format-error! (T symbol err)
+    compiler-error!
+        'join "wrong format for attribute "
+            'join ('__repr (box-symbol symbol))
+                'join " of type "
+                    'join ('__repr (box-pointer T))
+                        'join ": "
+                            sc_format_error err
+
+fn cast-expr (symbol rsymbol vT T expr)
+    try
+        let anyf = ('@ vT symbol)
+        let f =
+            try (unbox-cast-function-type anyf)
+            except (err)
+                attribute-format-error! vT symbol err
+        return (f vT T expr)
+    except (lhs-err)
+        let anyf =
+            try
+                '@ T rsymbol
+            except (err)
+                raise lhs-err
+        let f =
+            try (unbox-cast-function-type anyf)
+            except (err)
+                attribute-format-error! T rsymbol err
+        return (f vT T expr)
+
+fn imply-expr (vT T expr)
+    if (ptrcmp== vT T)
+        return expr
+    if (sc_type_is_superof T vT)
+        return expr
+    cast-expr '__imply '__rimply vT T expr
+
+fn as-expr (vT T expr)
+    if (ptrcmp== vT T)
+        return expr
+    if (sc_type_is_superof T vT)
+        return expr
+    try
+        # try implicit cast first
+        cast-expr '__imply '__rimply vT T expr
+    except (imply-err)
+        cast-expr '__as '__ras vT T expr
+
+let
+    imply =
+        spice-macro
+            fn "imply-dispatch" (args)
+                let argc = ('argcount args)
+                verify-count argc 2 2
+                let value = ('getarg args 0)
+                let anyT = ('getarg args 1)
+                let vT = ('typeof value)
+                let T = (unbox-pointer anyT type)
+                try
+                    imply-expr vT T value
+                except (err)
+                    cast-error!
+                        \ "can't coerce value of type " vT T err
+
+    as =
+        spice-macro
+            fn "as-dispatch" (args)
+                let argc = ('argcount args)
+                verify-count argc 2 2
+                let value = ('getarg args 0)
+                let anyT = ('getarg args 1)
+                let vT = ('typeof value)
+                let T = (unbox-pointer anyT type)
+                try
+                    # then try explicit cast
+                    as-expr vT T value
+                except (err)
+                    cast-error! "can't cast value of type " vT T err
+
+let BinaryOpFunctionType =
+    'pointer ('raising (function Value type type Value Value) Error)
+
+fn unbox-binary-op-function-type (anyf)
+    unbox-pointer anyf BinaryOpFunctionType
+
+# assuming both types are the same
+fn binary-op-expr (symbol lhsT rhsT lhs rhs)
+    let anyf = ('@ lhsT symbol)
+    let f =
+        try (unbox-binary-op-function-type anyf)
+        except (err)
+            attribute-format-error! lhsT symbol err
+    f lhsT rhsT lhs rhs
+
+# assuming both types are different
+fn sym-binary-op-expr (symbol rsymbol lhsT rhsT lhs rhs)
+    try
+        return (binary-op-expr symbol lhsT rhsT lhs rhs)
+    except (lhs-err)
+        let anyf =
+            try
+                '@ rhsT rsymbol
+            except (geterr)
+                raise lhs-err
+        let f =
+            try (unbox-binary-op-function-type anyf)
+            except (err)
+                attribute-format-error! rhsT rsymbol err
+        f lhsT rhsT lhs rhs
+
+fn binary-op-error! (friendly-op-name lhsT rhsT err)
+    compiler-error!
+        'join "can't "
+            'join friendly-op-name
+                'join " values of types "
+                    'join ('__repr (box-pointer lhsT))
+                        'join " and "
+                            'join ('__repr (box-pointer rhsT))
+                                'join ": "
+                                    sc_format_error err
+
+# both types are typically the same
+fn sym-binary-op-label-macro (args symbol rsymbol friendly-op-name)
+    let argc = ('argcount args)
+    verify-count argc 2 2
+    let lhs rhs =
+        'getarg args 0
+        'getarg args 1
+    let lhsT = ('typeof lhs)
+    let rhsT = ('typeof rhs)
+    if (ptrcmp== lhsT rhsT)
+        try
+            # use simple version
+            return (binary-op-expr symbol lhsT lhsT lhs rhs)
+        except (err)
+            binary-op-error! friendly-op-name lhsT rhsT err
+    # asymmetrical types
+    # try direct operation first (from both sides)
+    let err =
+        try
+            return (sym-binary-op-expr symbol rsymbol lhsT rhsT lhs rhs)
+        except (err) err
+    # try other options
+    try
+        # can we cast rhsT to lhsT?
+        let rhs = (imply-expr rhsT lhsT rhs)
+        # try again
+        return (binary-op-expr symbol lhsT lhsT lhs rhs)
+    except (err)
+    try
+        # can we cast lhsT to rhsT?
+        let lhs = (imply-expr lhsT rhsT lhs)
+        # try again
+        return (binary-op-expr symbol rhsT rhsT lhs rhs)
+    except (err)
+    # we give up
+    binary-op-error! friendly-op-name lhsT rhsT err
+
+# right hand has fixed type
+fn asym-binary-op-label-macro (args symbol rtype friendly-op-name)
+    let argc = ('argcount args)
+    verify-count argc 2 2
+    let lhs rhs =
+        'getarg args 0
+        'getarg args 1
+    let lhsT = ('typeof lhs)
+    let rhsT = ('typeof rhs)
+    try
+        let f = ('@ lhsT symbol)
+        if (ptrcmp== rhsT rtype)
+            return `(f args)
+        # can we cast rhsT to rtype?
+        let rhs = (imply-expr rhsT rtype rhs)
+        return `(f lhs rhs)
+    except (err)
+        # we give up
+        compiler-error!
+            'join "can't "
+                'join friendly-op-name
+                    'join " values of types "
+                        'join ('__repr (box-pointer lhsT))
+                            'join " and "
+                                'join ('__repr (box-pointer rhsT))
+                                    'join ": "
+                                        sc_format_error err
+
+fn unary-op-label-macro (args symbol friendly-op-name)
+    let argc = ('argcount args)
+    verify-count argc 1 1
+    let lhs = ('getarg args 0)
+    let lhsT = ('typeof lhs)
+    try
+        let f = ('@ lhsT symbol)
+        return `(f args)
+    except (err)
+        compiler-error!
+            'join "can't "
+                'join friendly-op-name
+                    'join " value of type "
+                        'join ('__repr (box-pointer lhsT))
+                            'join ": "
+                                sc_format_error err
+
+fn unary-sym-binary-op-label-macro (args usymbol ufriendly-op-name symbol rsymbol friendly-op-name)
+    let argc = ('argcount args)
+    if (icmp== argc 1)
+        unary-op-label-macro args usymbol ufriendly-op-name
+    else
+        sym-binary-op-label-macro args symbol rsymbol friendly-op-name
+
+inline make-unary-op-dispatch (symbol friendly-op-name)
+    spice-macro (fn (args) (unary-op-label-macro args symbol friendly-op-name))
+
+inline make-unary-sym-binary-op-dispatch (usymbol ufriendly-op-name symbol rsymbol friendly-op-name)
+    spice-macro (fn (args) (unary-sym-binary-op-label-macro
+        args usymbol ufriendly-op-name symbol rsymbol friendly-op-name))
+
+inline make-sym-binary-op-dispatch (symbol rsymbol friendly-op-name)
+    spice-macro (fn (args) (sym-binary-op-label-macro args symbol rsymbol friendly-op-name))
+
+inline make-asym-binary-op-dispatch (symbol rtype friendly-op-name)
+    spice-macro (fn (args) (asym-binary-op-label-macro args symbol rtype friendly-op-name))
+
+# support for calling macro functions directly
+'set-symbols SugarMacro
+    __call =
+        box-pointer
+            inline (self at next scope)
+                (bitcast self SugarMacroFunction) at next scope
+
+'define-symbols Symbol
+    unique =
         inline (cls name)
-            let val ok = (type@ cls name)
-            if ok
-                return val
-            else
-                return;
+            sc_symbol_new_unique name
+    variadic? = sc_symbol_is_variadic
 
-    set-type-symbol! Symbol '__as
-        inline (self destT)
-            if (type== destT string)
-                Symbol->string self
+'set-symbols Symbol
+    __== = (box-binary-op (single-binary-op-dispatch icmp==))
+    __!= = (box-binary-op (single-binary-op-dispatch icmp!=))
+    __imply =
+        box-cast
+            fn "sugar-imply" (vT T expr)
+                if (ptrcmp== T string)
+                    return `(sc_symbol_to_string expr)
+                compiler-error! "unsupported type"
 
-    set-type-symbol! Symbol '__==
-        gen-type-op2
-            inline (a b)
-                icmp== (bitcast a u64) (bitcast b u64)
-    set-type-symbol! Builtin '__==
-        gen-type-op2
-            inline (a b)
-                icmp== (bitcast a u64) (bitcast b u64)
+fn string@ (self i)
+    let s = (sc_string_buffer self)
+    load (getelementptr s i)
 
-    set-type-symbol! Nothing '__==
-        inline (a b flipped)
-            type== (typeof a) (typeof b)
-    set-type-symbol! Nothing '__!=
-        inline (a b flipped)
-            bxor (type== (typeof a) (typeof b)) true
+'define-symbols string
+    buffer = sc_string_buffer
+    __countof = sc_string_count
+    __@ = string@
+    __lslice = sc_string_lslice
+    __rslice = sc_string_rslice
 
-    inline setup-int-type (T)
-        set-type-symbol! T '__== (gen-type-op2 icmp==)
-        set-type-symbol! T '__!= (gen-type-op2 icmp!=)
-        set-type-symbol! T '__+ (gen-type-op2 add)
-        set-type-symbol! T '__- (gen-type-op2 sub)
-        set-type-symbol! T '__neg
-            inline (self)
-                sub (nullof (typeof self)) self
-        set-type-symbol! T '__* (gen-type-op2 mul)
-        set-type-symbol! T '__<< (gen-type-op2 shl)
-        set-type-symbol! T '__& (gen-type-op2 band)
-        set-type-symbol! T '__| (gen-type-op2 bor)
-        set-type-symbol! T '__^ (gen-type-op2 bxor)
-        set-type-symbol! T '__~
-            inline (x)
-                bxor x ((typeof x) -1)
+'set-symbols string
+    __== = (box-binary-op (single-binary-op-dispatch ptrcmp==))
+    __!= = (box-binary-op (single-binary-op-dispatch ptrcmp!=))
+    __.. = (box-binary-op (single-binary-op-dispatch sc_string_join))
+    __< = (box-binary-op (single-binary-op-dispatch (inline (a b) (icmp<s (sc_string_compare a b) 0))))
+    __<= = (box-binary-op (single-binary-op-dispatch (inline (a b) (icmp<=s (sc_string_compare a b) 0))))
+    __> = (box-binary-op (single-binary-op-dispatch (inline (a b) (icmp>s (sc_string_compare a b) 0))))
+    __>= = (box-binary-op (single-binary-op-dispatch (inline (a b) (icmp>=s (sc_string_compare a b) 0))))
 
-        # more aggressive cast that converts from all numerical types
-            and usize.
-        set-type-symbol! T '__as
-            inline hardcast (val destT)
-                let vT = (typeof val)
-                let destST =
-                    if (type== destT usize) (storageof destT)
-                    else destT
-                if (integer-type? destST)
-                    let valw destw = (bitcountof vT) (bitcountof destST)
-                    if (icmp== destw valw)
-                        bitcast val destT
-                    elseif (icmp>s destw valw)
-                        if (signed? vT)
-                            sext val destT
-                        else
-                            zext val destT
-                    else
-                        itrunc val destT
-                elseif (real-type? destST)
-                    if (signed? vT)
-                        sitofp val destT
-                    else
-                        uitofp val destT
+'define-symbols list
+    __typecall =
+        inline (self args...)
+            make-list args...
+    __repr =
+        inline "list-repr" (self)
+            sc_list_repr self
 
-        # only perform safe casts i.e. integer / usize conversions that expand width
-        # unless the value is constant
-        set-type-symbol! T '__imply
-            inline (val destT)
-                if (constant? val)
-                    hardcast val destT
-                else
-                    let vT = (typeof val)
-                    let destST =
-                        if (type== destT usize) (storageof destT)
-                        else destT
-                    if (integer-type? destST)
-                        let valw destw = (bitcountof vT) (bitcountof destST)
-                        # must have same signed bit
-                        if (icmp== (signed? vT) (signed? destST))
-                            if (icmp== destw valw)
-                                bitcast val destT
-                            elseif (icmp>s destw valw)
-                                if (signed? vT)
-                                    sext val destT
-                                else
-                                    zext val destT
+'set-symbols list
+    __.. = (box-binary-op (single-binary-op-dispatch sc_list_join))
+    __== = (box-binary-op (single-binary-op-dispatch sc_list_compare))
 
-        # general constructor
-        set-type-symbol! T '__typecall
-            inline (destT val)
-                if (none? val)
-                    nullof destT
-                else
-                    as val destT
+inline single-signed-binary-op-dispatch (sf uf)
+    fn (lhsT rhsT lhs rhs)
+        if (ptrcmp== lhsT rhsT)
+            return
+                spice-quote
+                    call [
+                        \ do
+                            if ('signed? lhsT)
+                                Value sf
+                            else
+                                Value uf ]
+                        \ lhs rhs
+        compiler-error! "unsupported type"
 
-        inline ufdiv (a b)
-            fdiv (uitofp a f32) (uitofp b f32)
-
-        inline ufrcp (self)
-            fdiv 1.0 (uitofp self f32)
-
-        inline sfdiv (a b)
-            fdiv (sitofp a f32) (sitofp b f32)
-
-        inline sfrcp (self)
-            fdiv 1.0 (sitofp self f32)
-
-        if (signed? (storageof T))
-            set-type-symbol! T '__> (gen-type-op2 icmp>s)
-            set-type-symbol! T '__>= (gen-type-op2 icmp>=s)
-            set-type-symbol! T '__< (gen-type-op2 icmp<s)
-            set-type-symbol! T '__<= (gen-type-op2 icmp<=s)
-            set-type-symbol! T '__// (gen-type-op2 sdiv)
-            set-type-symbol! T '__/ sfdiv
-            set-type-symbol! T '__rcp sfrcp
-            set-type-symbol! T '__% (gen-type-op2 srem)
-            set-type-symbol! T '__>> (gen-type-op2 ashr)
-        else
-            set-type-symbol! T '__> (gen-type-op2 icmp>u)
-            set-type-symbol! T '__>= (gen-type-op2 icmp>=u)
-            set-type-symbol! T '__< (gen-type-op2 icmp<u)
-            set-type-symbol! T '__<= (gen-type-op2 icmp<=u)
-            set-type-symbol! T '__// (gen-type-op2 udiv)
-            set-type-symbol! T '__/ ufdiv
-            set-type-symbol! T '__rcp ufrcp
-            set-type-symbol! T '__% (gen-type-op2 urem)
-            set-type-symbol! T '__>> (gen-type-op2 lshr)
-
-    inline setup-real-type (T)
-        inline floordiv (a b)
-            sdiv (fptosi a i32) (fptosi b i32)
-
-        # only perform safe casts: i.e. float to double
-        set-type-symbol! T '__imply
-            inline (val destT)
-                let vT = (typeof val)
-                if (real-type? destT)
-                    let valw destw = (bitcountof vT) (bitcountof destT)
-                    if (icmp== destw valw)
-                        bitcast val destT
-                    elseif (icmp>s destw valw)
-                        fpext val destT
-
-        # more aggressive cast that converts from all numerical types
-        set-type-symbol! T '__as
-            inline hardcast (val destT)
-                let vT = (typeof val)
-                let destST =
-                    if (type== destT usize) (storageof destT)
-                    else destT
-                if (real-type? destST)
-                    let valw destw = (bitcountof vT) (bitcountof destST)
-                    if (icmp== destw valw)
-                        bitcast val destT
-                    elseif (icmp>s destw valw)
-                        fpext val destT
-                    else
-                        fptrunc val destT
-                elseif (integer-type? destST)
-                    if (signed? destST)
-                        fptosi val destT
-                    else
-                        fptoui val destT
-
-        set-type-symbol! T '__typecall
-            inline (destT val)
-                if (none? val)
-                    nullof destT
-                else
-                    as val destT
-
-        set-type-symbol! T '__== (gen-type-op2 fcmp==o)
-        set-type-symbol! T '__!= (gen-type-op2 fcmp!=u)
-        set-type-symbol! T '__> (gen-type-op2 fcmp>o)
-        set-type-symbol! T '__>= (gen-type-op2 fcmp>=o)
-        set-type-symbol! T '__< (gen-type-op2 fcmp<o)
-        set-type-symbol! T '__<= (gen-type-op2 fcmp<=o)
-        set-type-symbol! T '__+ (gen-type-op2 fadd)
-        set-type-symbol! T '__- (gen-type-op2 fsub)
-        set-type-symbol! T '__neg
-            inline (self)
-                fsub (nullof (typeof self)) self
-        set-type-symbol! T '__* (gen-type-op2 fmul)
-        set-type-symbol! T '__/ (gen-type-op2 fdiv)
-        set-type-symbol! T '__rcp
-            inline (self)
-                fdiv (imply 1 (typeof self)) self
-        set-type-symbol! T '__// (gen-type-op2 floordiv)
-        set-type-symbol! T '__% (gen-type-op2 frem)
-
-    setup-int-type bool
-    setup-int-type i8
-    setup-int-type i16
-    setup-int-type i32
-    setup-int-type i64
-    setup-int-type u8
-    setup-int-type u16
-    setup-int-type u32
-    setup-int-type u64
-
-    setup-int-type usize
-    set-typename-super! usize integer
-
-    setup-real-type f32
-    setup-real-type f64
-
-    syntax-scope
-
-inline string-repr (val)
-    Any-string (Any val)
-
-fn op-prettyname (symbol)
-    if (icmp== symbol '__=) "assignment"
-    elseif (icmp== symbol '__unpack) "unpacking"
-    elseif (icmp== symbol '__countof) "counting"
-    elseif (icmp== symbol '__@) "indexing"
-    elseif (icmp== symbol '__slice) "slicing"
-    elseif (icmp== symbol '__..) "joining"
-    elseif (icmp== symbol '__+) "addition"
-    elseif (icmp== symbol '__-) "subtraction"
-    elseif (icmp== symbol '__*) "multiplication"
-    elseif (icmp== symbol '__/) "division"
-    elseif (icmp== symbol '__%) "modulo operation"
-    elseif (icmp== symbol '__neg) "negation"
-    elseif (icmp== symbol '__rcp) "reciprocal"
-    elseif (icmp== symbol '__//) "integer division"
-    elseif (icmp== symbol '__>>) "right shift"
-    elseif (icmp== symbol '__<<) "left shift"
-    elseif (icmp== symbol '__&) "bitwise and"
-    elseif (icmp== symbol '__|) "bitwise or"
-    elseif (icmp== symbol '__^) "bitwise xor"
-    elseif (icmp== symbol '__==) "equal comparison"
-    elseif (icmp== symbol '__!=) "inequality comparison"
-    elseif (icmp== symbol '__>=) "greater-than/equal comparison"
-    elseif (icmp== symbol '__<=) "less-than/equal comparison"
-    elseif (icmp== symbol '__>) "greater-than comparison"
-    elseif (icmp== symbol '__<) "less-than comparison"
-    elseif (icmp== symbol '__+=) "in-place addition"
-    elseif (icmp== symbol '__-=) "in-place subtraction"
-    elseif (icmp== symbol '__*=) "in-place multiplication"
-    elseif (icmp== symbol '__/=) "in-place division"
-    elseif (icmp== symbol '__//=) "in-place integer division"
-    elseif (icmp== symbol '__%=) "in-place modulo operation"
-    elseif (icmp== symbol '__>>=) "in-place right shift"
-    elseif (icmp== symbol '__<<=) "in-place left shift"
-    elseif (icmp== symbol '__&=) "in-place bitwise and"
-    elseif (icmp== symbol '__|=) "in-place bitwise or"
-    elseif (icmp== symbol '__^=) "in-place bitwise xor"
+fn dispatch-and-or (args flip)
+    let argc = ('argcount args)
+    verify-count argc 2 2
+    let cond elsef =
+        'getarg args 0
+        'getarg args 1
+    let call-elsef = `(elsef)
+    if ('constant? cond)
+        let value = (unbox-integer cond bool)
+        return
+            if (bxor value flip) cond
+            else call-elsef
+    let anchor = (sc_get_active_anchor)
+    let ifval = (sc_if_new anchor)
+    if flip
+        sc_if_append_then_clause ifval anchor cond call-elsef
+        sc_if_append_else_clause ifval anchor cond
     else
-        string-join
-            Any-repr (Any-wrap symbol)
-            " operation"
+        sc_if_append_then_clause ifval anchor cond cond
+        sc_if_append_else_clause ifval anchor call-elsef
+    ifval
 
-inline opN-dispatch (symbol mincount maxcount)
-    let verify-argument-count =
-        if (none? mincount)
-            inline ()
-        else
-            inline (c)
-                if (icmp<s c mincount)
-                    compiler-error!
-                        string-join (op-prettyname symbol)
-                            string-join " requires at least "
-                                string-join (Any-repr (Any-wrap mincount))
-                                    string-join " arguments but got "
-                                        Any-repr (Any-wrap c)
-    let verify-argument-count =
-        if (none? maxcount) verify-argument-count
-        else
-            inline (c)
-                if (icmp>s c maxcount)
-                    compiler-error!
-                        string-join (op-prettyname symbol)
-                            string-join " accepts at most "
-                                string-join (Any-repr (Any-wrap maxcount))
-                                    string-join " arguments but got "
-                                        Any-repr (Any-wrap c)
-    inline (...)
-        verify-argument-count (va-countof ...)
-        let self ... = ...
-        let T = (typeof self)
-        let op success = (type@ T symbol)
-        if success
-            return (op self ...)
-        compiler-error!
-            string-join (op-prettyname symbol)
-                string-join " does not apply to value of type "
-                    Any-repr (Any-wrap T)
+'set-symbols integer
+    __imply = (box-cast integer-imply)
+    __as = (box-cast integer-as)
+    __+ = (box-binary-op (single-binary-op-dispatch add))
+    __- = (box-binary-op (single-binary-op-dispatch sub))
+    __neg = (box-pointer (inline (self) (sub (nullof (typeof self)) self)))
+    __* = (box-binary-op (single-binary-op-dispatch mul))
+    __// = (box-binary-op (single-signed-binary-op-dispatch sdiv udiv))
+    __/ =
+        box-binary-op
+            single-signed-binary-op-dispatch
+                inline (a b) (fdiv (sitofp a f32) (sitofp b f32))
+                inline (a b) (fdiv (uitofp a f32) (uitofp b f32))
+    __rcp = (spice-quote (inline (self) (fdiv 1.0 (as self f32))))
+    __% = (box-binary-op (single-signed-binary-op-dispatch srem urem))
+    __& = (box-binary-op (single-binary-op-dispatch band))
+    __| = (box-binary-op (single-binary-op-dispatch bor))
+    __^ = (box-binary-op (single-binary-op-dispatch bxor))
+    #__~ =
+    __<< = (box-binary-op (single-binary-op-dispatch shl))
+    __>> = (box-binary-op (single-signed-binary-op-dispatch ashr lshr))
+    __== = (box-binary-op (single-binary-op-dispatch icmp==))
+    __!= = (box-binary-op (single-binary-op-dispatch icmp!=))
+    __< = (box-binary-op (single-signed-binary-op-dispatch icmp<s icmp<u))
+    __<= = (box-binary-op (single-signed-binary-op-dispatch icmp<=s icmp<=u))
+    __> = (box-binary-op (single-signed-binary-op-dispatch icmp>s icmp>u))
+    __>= = (box-binary-op (single-signed-binary-op-dispatch icmp>=s icmp>=u))
 
-inline op1-dispatch (symbol)
-    opN-dispatch symbol 1 1
+inline floordiv (a b)
+    sdiv (fptosi a i32) (fptosi b i32)
 
-inline op2-dispatch (symbol)
-    inline (a b)
-        let Ta Tb = (typeof a) (typeof b)
-        let op success = (type@ Ta symbol)
-        if success
-            let result... = (op a b)
-            if (icmp== (va-countof result...) 0)
-            else
-                return result...
-        compiler-error!
-            string-join (op-prettyname symbol)
-                string-join " does not apply to values of type "
-                    string-join
-                        Any-repr (Any-wrap Ta)
-                        string-join " and "
-                            Any-repr (Any-wrap Tb)
+'set-symbols real
+    __imply = (box-cast real-imply)
+    __as = (box-cast real-as)
+    __== = (box-binary-op (single-binary-op-dispatch fcmp==o))
+    __!= = (box-binary-op (single-binary-op-dispatch fcmp!=u))
+    __> = (box-binary-op (single-binary-op-dispatch fcmp>o))
+    __>= = (box-binary-op (single-binary-op-dispatch fcmp>=o))
+    __< = (box-binary-op (single-binary-op-dispatch fcmp<o))
+    __<= = (box-binary-op (single-binary-op-dispatch fcmp<=o))
+    __+ = (box-binary-op (single-binary-op-dispatch fadd))
+    __- = (box-binary-op (single-binary-op-dispatch fsub))
+    __neg = (box-pointer (inline (self) (fsub (nullof (typeof self)) self)))
+    __* = (box-binary-op (single-binary-op-dispatch fmul))
+    __/ = (box-binary-op (single-binary-op-dispatch fdiv))
+    __rcp = (box-pointer (inline (self) (fdiv (uitofp 1 (typeof self)) self)))
+    __// = (box-binary-op (single-binary-op-dispatch floordiv))
+    __% = (box-binary-op (single-binary-op-dispatch frem))
 
-inline op2-dispatch-bidi (symbol fallback)
-    inline (...)
-        if (icmp<s (va-countof ...) 2)
+
+'set-symbols Value
+    __== = (box-binary-op (single-binary-op-dispatch sc_value_compare))
+
+'set-symbols Closure
+    __== = (box-binary-op (single-binary-op-dispatch ptrcmp==))
+    __!= = (box-binary-op (single-binary-op-dispatch ptrcmp!=))
+
+'define-symbols type
+    __@ = sc_type_element_at
+
+'set-symbols type
+    __== = (box-binary-op (single-binary-op-dispatch type==))
+    __!= = (box-binary-op (single-binary-op-dispatch type!=))
+    __< = (box-binary-op (single-binary-op-dispatch type<))
+    __<= = (box-binary-op (single-binary-op-dispatch type<=))
+    __> = (box-binary-op (single-binary-op-dispatch type>))
+    __>= = (box-binary-op (single-binary-op-dispatch type>=))
+    # (dispatch-attr T key thenf elsef)
+    dispatch-attr =
+        box-spice-macro
+            fn "type-dispatch-attr" (args)
+                let argc = ('argcount args)
+                verify-count argc 4 4
+                let self key thenf elsef =
+                    'getarg args 0
+                    'getarg args 1
+                    'getarg args 2
+                    'getarg args 3
+                let self = (unbox-pointer self type)
+                let key = (unbox-symbol key Symbol)
+                try
+                    let result = (sc_type_at self key)
+                    return `(thenf result)
+                except (err)
+                    return `(elsef)
+    __getattr =
+        box-spice-macro
+            fn "type-getattr" (args)
+                let argc = ('argcount args)
+                verify-count argc 2 2
+                let self key =
+                    'getarg args 0
+                    'getarg args 1
+                if ('constant? self)
+                    if ('constant? key)
+                        let self = (unbox-pointer self type)
+                        let key = (unbox-symbol key Symbol)
+                        return (sc_type_at self key)
+                `(sc_type_at args)
+
+'set-symbols Scope
+    __== = (box-binary-op (single-binary-op-dispatch ptrcmp==))
+    __getattr =
+        box-spice-macro
+            fn "scope-getattr" (args)
+                let argc = ('argcount args)
+                verify-count argc 2 2
+                let self key =
+                    'getarg args 0
+                    'getarg args 1
+                if ('constant? self)
+                    if ('constant? key)
+                        let self = (unbox-pointer self Scope)
+                        let key = (unbox-symbol key Symbol)
+                        return (sc_scope_at self key)
+                `(sc_scope_at args)
+    __typecall =
+        box-spice-macro
+            fn "scope-typecall" (args)
+                """"There are four ways to create a new Scope:
+                    ``Scope``
+                        creates an empty scope without parent
+                    ``Scope parent``
+                        creates an empty scope descending from ``parent``
+                    ``Scope none clone``
+                        duplicate ``clone`` without a parent
+                    ``Scope parent clone``
+                        duplicate ``clone``, but descending from ``parent`` instead
+                let argc = ('argcount args)
+                verify-count argc 1 3
+                switch argc
+                case 1
+                    `(sc_scope_new)
+                case 2
+                    `(sc_scope_new_subscope [ ('getarg args 1) ])
+                default
+                    # argc == 3
+                    let parent = ('getarg args 1)
+                    if (type== ('typeof parent) Nothing)
+                        `(sc_scope_clone [ ('getarg args 2) ])
+                    else
+                        `(sc_scope_clone_subscope
+                            [(sc_extract_argument_list_new (sc_value_anchor args) args 1)])
+
+#---------------------------------------------------------------------------
+# null type
+#---------------------------------------------------------------------------
+
+""""The type of the `null` constant. This type is uninstantiable.
+let NullType = (sc_typename_type "NullType")
+'set-plain-storage NullType ('pointer void)
+'set-symbols NullType
+    __repr =
+        box-pointer
+            inline (self)
+                sc_default_styler style-number "null"
+    __imply =
+        box-cast
+            fn "null-imply" (clsT T expr)
+                if (icmp== ('kind ('storageof T)) type-kind-pointer)
+                    return `(bitcast expr T)
+                compiler-error! "cannot convert to type"
+    __== =
+        box-binary-op
+            fn (lhsT rhsT lhs rhs)
+                if (icmp== ('kind ('storageof rhsT)) type-kind-pointer)
+                    return `(icmp== (ptrtoint rhs usize) 0:usize)
+                compiler-error! "only pointers can be compared to null"
+    __r== =
+        box-binary-op
+            fn (lhsT rhsT lhs rhs)
+                if (icmp== ('kind ('storageof lhsT)) type-kind-pointer)
+                    return `(icmp== (ptrtoint lhs usize) 0:usize)
+                compiler-error! "only pointers can be compared to null"
+
+let
+    and-branch = (spice-macro (fn (args) (dispatch-and-or args true)))
+    or-branch = (spice-macro (fn (args) (dispatch-and-or args false)))
+    #implyfn = (const-typify implyfn type type)
+    #asfn = (const-typify asfn type type)
+    countof = (make-unary-op-dispatch '__countof "count")
+    unpack = (make-unary-op-dispatch '__unpack "unpack")
+    hash1 = (make-unary-op-dispatch '__hash "hash")
+    ~ = (make-unary-op-dispatch '__~ "bitwise-negate")
+    == = (make-sym-binary-op-dispatch '__== '__r== "compare")
+    != = (make-sym-binary-op-dispatch '__!= '__r!= "compare")
+    < = (make-sym-binary-op-dispatch '__< '__r< "compare")
+    <= = (make-sym-binary-op-dispatch '__<= '__r<= "compare")
+    > = (make-sym-binary-op-dispatch '__> '__r> "compare")
+    >= = (make-sym-binary-op-dispatch '__>= '__r>= "compare")
+    + = (make-sym-binary-op-dispatch '__+ '__r+ "add")
+    - = (make-unary-sym-binary-op-dispatch '__neg "negate" '__- '__r- "subtract")
+    * = (make-sym-binary-op-dispatch '__* '__r* "multiply")
+    / = (make-unary-sym-binary-op-dispatch '__rcp "invert" '__/ '__r/ "real-divide")
+    // = (make-sym-binary-op-dispatch '__// '__r// "integer-divide")
+    % = (make-sym-binary-op-dispatch '__% '__r% "modulate")
+    & = (make-sym-binary-op-dispatch '__& '__r& "apply bitwise-and to")
+    | = (make-sym-binary-op-dispatch '__| '__r| "apply bitwise-or to")
+    ^ = (make-sym-binary-op-dispatch '__^ '__r^ "apply bitwise-xor to")
+    << = (make-sym-binary-op-dispatch '__<< '__r<< "apply left shift with")
+    >> = (make-sym-binary-op-dispatch '__>> '__r>> "apply right shift with")
+    .. = (make-sym-binary-op-dispatch '__.. '__r.. "join")
+    = = (make-sym-binary-op-dispatch '__= '__r= "apply assignment with")
+    @ = (make-asym-binary-op-dispatch '__@ integer "apply subscript operator with")
+    getattr = (make-asym-binary-op-dispatch '__getattr Symbol "get attribute from")
+    lslice = (make-asym-binary-op-dispatch '__lslice usize "apply left-slice operator with")
+    rslice = (make-asym-binary-op-dispatch '__rslice usize "apply right-slice operator with")
+
+'set-symbols typename
+    # inverted compare attempts regular compare
+    __!= =
+        box-binary-op
+            fn (lhsT rhsT lhs rhs)
+                if (ptrcmp== lhsT rhsT)
+                    return `(not (== lhs rhs))
+                compiler-error! "unequal types"
+    # default assignment operator
+    __= =
+        box-binary-op
+            fn (lhsT rhsT lhs rhs)
+                if (ptrcmp== lhsT rhsT)
+                    return `(assign rhs lhs)
+                compiler-error! "unequal types"
+
+let missing-constructor =
+    spice-macro
+        fn "missing-constructor" (args)
+            if false
+                return `[]
+            let argc = ('argcount args)
+            verify-count argc 1 -1
+            let cls = ('getarg args 0)
             compiler-error!
-                string-join (op-prettyname symbol)
-                    " requires at least two arguments"
-        let a b = ...
-        let Ta Tb = (typeof a) (typeof b)
-        let op success = (type@ Ta symbol)
-        if success
-            let result... = (op a b false)
-            if (icmp== (va-countof result...) 0)
-            else
-                return result...
-        let op success = (type@ Tb symbol)
-        if success
-            let result... = (op a b true)
-            if (icmp== (va-countof result...) 0)
-            else
-                return result...
-        if (type== (typeof fallback) Nothing)
-        else
-            return (fallback a b)
-        compiler-error!
-            string-join (op-prettyname symbol)
-                string-join " does not apply to values of type "
-                    string-join
-                        Any-repr (Any-wrap Ta)
-                        string-join " and "
-                            Any-repr (Any-wrap Tb)
+                sc_string_join "typename "
+                    sc_string_join ('__repr cls)
+                        " has no constructor"
 
-inline dispatch-unop-binop (f1 f2)
-    inline (...)
-        if (icmp<s (va-countof ...) 2)
-            f1 ...
-        else
-            f2 ...
+run-stage;
 
-inline op2-ltr-multiop (f)
-    inline (...)
-        if (icmp<=s (va-countof ...) 2)
-            return
-                f ...
-        let a b ... = ...
-        let sz = (va-countof ...)
-        let loop (i result...) = 0 (f a b)
-        if (icmp<s i sz)
-            let x = (va@ i ...)
-            loop (add i 1) (f result... x)
-        else result...
+let null = (nullof NullType)
 
-inline op2-rtl-multiop (f)
-    inline (...)
-        let sz = (va-countof ...)
-        if (icmp<=s sz 2)
-            return
-                f ...
-        let i = (sub sz 1)
-        let x = (va@ i ...)
-        let loop (i result...) = i x
-        if (icmp>s i 0)
-            let i = (sub i 1)
-            let x = (va@ i ...)
-            loop i (f x result...)
-        else result...
+#inline sugar-unbox (self destT)
+    imply ('datum self) destT
 
-let == = (op2-dispatch-bidi '__==)
-let != =
-    op2-dispatch-bidi '__!=
-        inline (...)
-            bxor true (== ...)
-let > = (op2-dispatch-bidi '__>)
-let >= = (op2-dispatch-bidi '__>=)
-let < = (op2-dispatch-bidi '__<)
-let <= = (op2-dispatch-bidi '__<=)
-let + = (op2-ltr-multiop (op2-dispatch-bidi '__+))
-let - =
-    dispatch-unop-binop
-        op1-dispatch '__neg
-        op2-dispatch-bidi '__-
-let * = (op2-ltr-multiop (op2-dispatch-bidi '__*))
-let / =
-    dispatch-unop-binop
-        op1-dispatch '__rcp
-        op2-dispatch-bidi '__/
-let // = (op2-dispatch-bidi '__//)
-let % = (op2-dispatch-bidi '__%)
-let & = (op2-dispatch-bidi '__&)
-let | = (op2-ltr-multiop (op2-dispatch-bidi '__|))
-let ^ = (op2-dispatch-bidi '__^)
-let ~ = (op1-dispatch '__~)
-let << = (op2-dispatch-bidi '__<<)
-let >> = (op2-dispatch-bidi '__>>)
-let .. = (op2-ltr-multiop (op2-dispatch-bidi '__..))
-let countof = (op1-dispatch '__countof)
-let unpack = (op1-dispatch '__unpack)
-inline at (obj key)
-    (op2-dispatch '__@) obj
-        if (constant? key)
-            if (integer? key)
-                if (signed? (typeof key))
-                    if (icmp<s key 0)
-                        add (i64 (countof obj)) (i64 key)
-                    else key
-                else key
-            else key
-        else key
-let @ = (op2-ltr-multiop at)
+inline not (value)
+    bxor (imply value bool) true
 
-let += = (op2-dispatch '__+=)
-let -= = (op2-dispatch '__-=)
-let *= = (op2-dispatch '__*=)
-let /= = (op2-dispatch '__/=)
-let //= = (op2-dispatch '__//=)
-let %= = (op2-dispatch '__%=)
-let >>= = (op2-dispatch '__>>=)
-let <<= = (op2-dispatch '__<<=)
-let &= = (op2-dispatch '__&=)
-let |= = (op2-dispatch '__|=)
-let ^= = (op2-dispatch '__^=)
+let function->SugarMacro =
+    const-typify
+        fn "function->SugarMacro" (f)
+            bitcast f SugarMacro
+        SugarMacroFunction
 
-fn repr
+inline sugar-block-scope-macro (f)
+    function->SugarMacro (const-typify f list list Scope)
 
-fn type-mismatch-string (want-T have-T)
-    .. "type " (repr want-T) " expected, not " (repr have-T)
+inline sugar-scope-macro (f)
+    sugar-block-scope-macro
+        fn (at next scope)
+            let at scope = (f ('next at) scope)
+            return (cons (Value at) next) scope
 
-inline assert-typeof (a T)
-    if (type== T (typeof a))
-    else
-        compiler-error!
-            type-mismatch-string T (typeof a)
+inline sugar-macro (f)
+    sugar-block-scope-macro
+        fn (at next scope)
+            return (cons (Value (f ('next at))) next) scope
 
-inline Any-typeof (val)
-    assert-typeof val Any
-    extractvalue val 0
+fn empty? (value)
+    == (countof value) 0
 
-inline Any-payload (val)
-    assert-typeof val Any
-    extractvalue val 1
+#fn cons (at next)
+    sc_list_cons (Value at) next
 
-inline forward-repr (value)
-    let op success = (type@ (typeof value) '__repr)
-    if success
-        op value
-    else
-        Any-repr (Any value)
+fn type-repr-needs-suffix? (CT)
+    if (== CT i32) false
+    elseif (== CT bool) false
+    elseif (== CT Nothing) false
+    elseif (== CT NullType) false
+    elseif (== CT f32) false
+    elseif (== CT string) false
+    elseif (== CT list) false
+    elseif (== CT Symbol) false
+    elseif (== CT type) false
+    elseif (== ('kind CT) type-kind-vector)
+        let ET = ('element@ CT 0)
+        if (== ET i32) false
+        elseif (== ET bool) false
+        elseif (== ET f32) false
+        else true
+    else true
+
+fn tostring (value)
+    'dispatch-attr (typeof value) '__tostring
+        inline (f)
+            f value
+        inline ()
+            sc_value_tostring (Value value)
 
 fn repr (value)
     let T = (typeof value)
-    let CT =
-        if (type== T Any)
-            Any-typeof value
-        else T
-    inline append-type? (truef falsef)
-        if (type== CT i32) (falsef)
-        elseif (type== CT bool) (falsef)
-        elseif (type== CT Nothing) (falsef)
-        elseif (type== CT f32) (falsef)
-        elseif (type== CT string) (falsef)
-        elseif (type== CT list) (falsef)
-        elseif (type== CT Symbol) (falsef)
-        elseif (type== CT type) (falsef)
-        elseif (vector-type? CT)
-            let ET = (element-type CT 0)
-            if (type== ET i32) (falsef)
-            elseif (type== ET bool) (falsef)
-            elseif (type== ET f32) (falsef)
-            else (truef)
-        else (truef)
-    let op success = (type@ T '__repr)
-    let text =
-        if success
-            op value
-        else
-            Any-repr (Any value)
-    append-type?
-        label ()
-            return
-                .. text
-                    default-styler style-operator ":"
-                    default-styler style-type (type-name CT)
-        inline ()
-            text
+    let s =
+        'dispatch-attr T '__repr
+            inline (f)
+                f value
+            inline ()
+                sc_value_repr (Value value)
+    if (type-repr-needs-suffix? T)
+        .. s
+            ..
+                sc_default_styler style-operator ":"
+                sc_default_styler style-type ('string T)
 
-inline scalar-type (T)
-    let ST = (storageof T)
-    if (type== (superof ST) vector)
-        element-type ST 0
-    else ST
-inline select-op (T sop fop)
-    let T = (scalar-type T)
-    if (type== (superof T) integer) sop
-    elseif (type== (superof T) real) fop
-    else
-        compiler-error!
-            string-join "invalid argument type: "
-                string-join (Any-repr (Any-wrap T))
-                    ". integer or real vector or scalar expected"
+    else s
 
-inline sabs (x)
-    let zero = ((typeof x) 0)
-    ? (icmp<s x zero) (sub zero x) x
+let print =
+    do
+        inline print-element (i key value)
+            constbranch (const.icmp<=.i32.i32 i 0)
+                inline ()
+                inline ()
+                    sc_write " "
+            constbranch (== (typeof value) string)
+                inline ()
+                    sc_write value
+                inline ()
+                    sc_write (repr value)
 
-inline abs (x)
-    (select-op (typeof x) sabs fabs) x
+        inline print (values...)
+            va-lifold none print-element values...
+            sc_write "\n"
+            values...
 
-inline sign (x)
-    (select-op (typeof x) ssign fsign) x
+'define-symbol integer '__typecall
+    inline (cls value)
+        as value cls
 
-inline powi (base exponent)
-    assert-typeof base i32
-    assert-typeof exponent i32
-    # special case for constant base 2
-    if (constant? base)
-        if (icmp== base 2)
-            return
-                shl 1 exponent
-    let loop (result cur exponent) =
-        tie-const exponent 1
-        tie-const exponent base
-        exponent
-    if (icmp== exponent 0) result
-    else
-        loop
-            if (icmp== (band exponent 1) 0) result
-            else
-                mul result cur
-            mul cur cur
-            lshr exponent 1
+'define-symbol real '__typecall
+    inline (cls value)
+        as value cls
 
-inline pow (x y)
-    (select-op (typeof x) powi powf) x y
+'set-symbols string
+    __imply =
+        box-cast
+            fn "string-imply" (vT T expr)
+                let string->rawstring =
+                    spice-macro
+                        fn (args)
+                            let argc = ('argcount args)
+                            verify-count argc 1 1
+                            let str = ('getarg args 0)
+                            if ('constant? str)
+                                let s c = (sc_string_buffer (as str string))
+                                `s
+                            else
+                                spice-quote
+                                    do
+                                        let s c = (sc_string_buffer str)
+                                        s
+                if (ptrcmp== T rawstring)
+                    return `(string->rawstring expr)
+                compiler-error! "unsupported type"
 
-inline forward-typeattr (T name)
-    let value success = (type@ T name)
-    if success
-        return value success
-    let op success = (type@ T '__typeattr)
-    if success
-        return (op T name)
+# implicit argument type coercion for functions, externs and typed labels
+# --------------------------------------------------------------------------
 
-inline forward-getattr (self name)
-    let T = (typeof self)
-    let op success = (type@ T '__getattr)
-    if success
-        return (op self name)
+let coerce-call-arguments =
+    box-spice-macro
+        fn "coerce-call-arguments" (args)
+            let argc = ('argcount args)
+            verify-count argc 1 -1
+            let self = ('getarg args 0)
+            let argc = (sub argc 1)
+            let fptrT = ('typeof self)
+            let fT = ('element@ fptrT 0)
+            let pcount = ('element-count fT)
+            if (== pcount argc)
+                let outargs = (sc_call_new (sc_get_active_anchor) self)
+                sc_call_set_rawcall outargs true
+                loop (i = 0)
+                    if (== i argc)
+                        break outargs
+                    let arg = ('getarg args (add i 1))
+                    let argT = ('typeof arg)
+                    let paramT = ('element@ fT i)
+                    let outarg =
+                        if (== argT paramT) arg
+                        else `(imply arg paramT)
+                    sc_call_append_argument outargs outarg
+                    + i 1
+            else `(rawcall self [('getarglist args 1)])
 
-inline typeattr (T name)
-    let result... = (forward-typeattr T name)
-    if (va-empty? result...)
-        compiler-error!
-            string-join "no such attribute "
-                string-join (Any-repr (Any-wrap name))
-                    string-join " in type "
-                        Any-repr (Any-wrap T)
-    else result...
-
-inline getattr (self name)
-    let result... = (forward-getattr self name)
-    if (va-empty? result...)
-        compiler-error!
-            string-join "no such attribute "
-                string-join (Any-repr (Any-wrap name))
-                    string-join " in value of type "
-                        Any-repr (Any-wrap (typeof self))
-    else result...
-
-inline empty? (x)
-    == (countof x) 0:usize
-
-inline type< (T superT)
-    let loop (T) = T
-    let value = (superof T)
-    if (type== value superT) (tie-const T true)
-    elseif (type== value typename) (tie-const T false)
-    else
-        loop value
-
-inline type<= (T superT)
-    if (type== T superT)
-        return true
-    type< T superT
-
-inline forward-as (value dest-type)
-    let T = (typeof value)
-    if (type<= T dest-type)
-        return value
-    let f ok = (type@ T '__imply)
-    if ok
-        let result... = (f value dest-type)
-        if (icmp!= (va-countof result...) 0)
-            return result...
-    let f ok = (type@ T '__as)
-    if ok
-        let result... = (f value dest-type)
-        if (icmp!= (va-countof result...) 0)
-            return result...
-
-inline as (value dest-type)
-    let T = (typeof value)
-    if (type<= T dest-type)
-        return value
-    let f ok = (type@ T '__imply)
-    if ok
-        let result... = (f value dest-type)
-        if (icmp!= (va-countof result...) 0)
-            return result...
-    let f ok = (type@ T '__as)
-    if ok
-        let result... = (f value dest-type)
-        if (icmp!= (va-countof result...) 0)
-            return result...
-    compiler-error!
-        string-join "cannot convert value of type "
-            string-join (Any-repr (Any-wrap T))
-                string-join " to "
-                    Any-repr (Any-wrap dest-type)
-
-inline forward-imply (value dest-type)
-    let T = (typeof value)
-    if (type<= T dest-type)
-        return value
-    let f ok = (type@ T '__imply)
-    if ok
-        let result... = (f value dest-type)
-        if (icmp!= (va-countof result...) 0)
-            return result...
-
-inline imply (value dest-type)
-    let T = (typeof value)
-    if (type<= T dest-type)
-        return value
-    let f ok = (type@ T '__imply)
-    if ok
-        let result... = (f value dest-type)
-        if (icmp!= (va-countof result...) 0)
-            return result...
-    compiler-error!
-        string-join "cannot implicitly convert value of type "
-            string-join (Any-repr (Any-wrap T))
-                string-join " to "
-                    Any-repr (Any-wrap dest-type)
-
-let hash = (typename-type "hash")
-set-typename-storage! hash u64
-
-inline forward-hash (value)
-    let T = (typeof value)
-    if (type== T hash)
-        return value
-    let f ok = (type@ T '__hash)
-    if ok
-        let result = (f value)
-        if (type== (typeof result) hash)
-            return result
-        else
-            compiler-error!
-                string-join "value of type "
-                    string-join (Any-repr (Any-wrap T))
-                        string-join "did not hash to type"
-                            Any-repr (Any-wrap hash)
-    let T =
-        if (opaque? T) T
-        else (storageof T)
-    if (integer-type? T)
-        bitcast
-            __hash
-                zext (bitcast value T) u64
-                sizeof T
-            hash
-    elseif (pointer-type? T)
-        bitcast
-            __hash
-                ptrtoint value u64
-                sizeof T
-            hash
-    elseif (type== T f32)
-        bitcast
-            __hash
-                zext (bitcast value u32) u64
-                sizeof T
-            hash
-    elseif (type== T f64)
-        bitcast
-            __hash
-                bitcast value u64
-                sizeof T
-            hash
-
-inline hash1 (value)
-    let result... = (forward-hash value)
-    if (va-empty? result...)
-        compiler-error!
-            string-join "cannot hash value of type "
-                Any-repr (Any-wrap (typeof value))
-    result...
-
-let hash2 =
-    op2-ltr-multiop
-        inline "hash2" (a b)
-            bitcast
-                __hash2x64
-                    bitcast (hash1 a) u64
-                    bitcast (hash1 b) u64
-                hash
-
-set-type-symbol! hash '__imply
-    inline "hash-imply" (self T)
-        if (type== T u64)
-            bitcast self u64
-
-set-type-symbol! hash '__typecall
-    inline "hash" (cls values...)
-        if (icmp<s (va-countof values...) 2)
-            hash1 values...
-        else
-            hash2 values...
-
-inline Any-extract (val T)
-    assert-typeof val Any
-    let valT = (Any-typeof val)
-    if (== valT T)
-        if (constant? val)
-            Any-extract-constant val
-        else
-            let payload = (Any-payload val)
-            let storageT = (storageof T)
-            if (pointer-type? storageT)
-                inttoptr payload T
-            elseif (integer-type? storageT)
-                itrunc payload T
-            elseif (real-type? storageT)
-                bitcast
-                    itrunc payload (integer-type (bitcountof storageT) false)
-                    T
-            elseif (bor (tuple-type? storageT) (array-type? storageT))
-                let count = (type-countof storageT)
-                load
-                    inttoptr payload
-                        pointer-type T pointer-flag-non-writable unnamed
-            else
-                compiler-error!
-                    .. "unable to extract value of type " (Any-repr (Any-wrap T))
-    elseif (constant? val)
-        compiler-error!
-            type-mismatch-string T valT
-    else
-        error!
-            .. "while extracting from Any at runtime: "
-                type-mismatch-string T valT
-
-inline string->rawstring (s)
-    assert-typeof s string
-    getelementptr s 0 1 0
-inline char (s)
-    load (string->rawstring s)
-
-inline Syntax-anchor (sx)
-    assert-typeof sx Syntax
-    extractvalue (load sx) 0
-inline Syntax->datum (sx)
-    assert-typeof sx Syntax
-    extractvalue (load sx) 1
-inline Syntax-quoted? (sx)
-    assert-typeof sx Syntax
-    extractvalue (load sx) 2
-
-inline Anchor-file (x)
-    assert-typeof x Anchor
-    extractvalue (load x) 0
-inline Anchor-lineno (x)
-    assert-typeof x Anchor
-    extractvalue (load x) 1
-inline Anchor-column (x)
-    assert-typeof x Anchor
-    extractvalue (load x) 2
-
-inline Exception-anchor (sx)
-    assert-typeof sx Exception
-    extractvalue (load sx) 0
-inline Exception-message (sx)
-    assert-typeof sx Exception
-    extractvalue (load sx) 1
-
-inline list-empty? (l)
-    assert-typeof l list
-    icmp== (ptrtoint l usize) 0:usize
-
-inline list-at (l)
-    assert-typeof l list
-    if (list-empty? l)
-        tie-const l (Any-wrap none)
-    else
-        extractvalue (load l) 0
-
-inline list-next (l)
-    assert-typeof l list
-    if (list-empty? l)
-        tie-const l eol
-    else
-        bitcast (extractvalue (load l) 1) list
-
-inline list-at-next (l)
-    assert-typeof l list
-    if (list-empty? l)
-        return
-            tie-const l (Any-wrap none)
-            tie-const l eol
-    else
-        return
-            extractvalue (load l) 0
-            bitcast (extractvalue (load l) 1) list
-
-inline decons (val count)
-    let at next = (list-at-next val)
-    if (type== (typeof count) Nothing)
-        return at next
-    elseif (icmp<=s count 1)
-        return at next
-    else
-        return at
-            decons next (sub count 1)
-
-inline list-countof (l)
-    assert-typeof l list
-    if (list-empty? l)
-        return
-            tie-const l 0:usize
-    else
-        return
-            extractvalue (load l) 2
-
-fn string-countof (s)
-    assert-typeof s string
-    extractvalue (load s) 0
-
-inline min (a b)
-    ? (<= a b) a b
-
-inline max (a b)
-    ? (>= a b) a b
-
-inline clamp (x mn mx)
-    ? (> x mx) mx
-        ? (< x mn) mn x
-
-inline slice (obj start-index end-index)
-    # todo: this should be isize
-    let zero count i0 = (i64 0) (i64 (countof obj)) (i64 start-index)
-    let i0 =
-        if (>= i0 zero) (min i0 count)
-        else (max (+ i0 count) 0:i64)
-    let i1 =
-        if (type== (typeof end-index) Nothing) count
-        else (i64 end-index)
-    let i1 =
-        max i0
-            if (>= i1 zero) i1
-            else (+ i1 count)
-    (opN-dispatch '__slice) obj (usize i0) (usize i1)
-
-fn string-compare (a b)
-    assert-typeof a string
-    assert-typeof b string
-    let ca = (string-countof a)
-    let cb = (string-countof b)
-    let cc =
-        if (< ca cb) (tie-const cb ca)
-        else (tie-const ca cb)
-    let pa pb =
-        bitcast (getelementptr a 0 1 0) (pointer i8)
-        bitcast (getelementptr b 0 1 0) (pointer i8)
-    let loop (i) =
-        tie-const cc 0:usize
-    if (== i cc)
-        if (< ca cb)
-            return (tie-const cc -1)
-        elseif (> ca cb)
-            return (tie-const cc 1)
-        else
-            return (tie-const cc 0)
-    let x y =
-        load (getelementptr pa i)
-        load (getelementptr pb i)
-    if (< x y)
-        return (tie-const cc -1)
-    elseif (> x y)
-        return (tie-const cc 1)
-    else
-        loop (+ i 1:usize)
-
-fn list-reverse (l tail)
-    assert-typeof l list
-    let tail =
-        if (type== (typeof tail) Nothing) eol
-        else tail
-    assert-typeof tail list
-    let loop (l next) = l (tie-const l tail)
-    if (list-empty? l) next
-    else
-        loop (list-next l) (list-cons (list-at l) next)
-
-fn set-scope-symbol! (scope sym value)
-    sc_scope_set_symbol scope sym (Any value)
-
-fn syntax-error! (anchor msg)
-    let T = (typeof anchor)
-    if (== T string)
-        if (none? msg)
-            __error! anchor
-            unreachable!;
-    set-anchor!
-        if (== T Any)
-            let T = (Any-typeof anchor)
-            if (== T Syntax)
-                Syntax-anchor (as anchor Syntax)
-            else
-                as anchor Anchor
-        elseif (== T Syntax)
-            Syntax-anchor anchor
-        else anchor
-    __anchor-error! msg
-    unreachable!;
-
-fn syntax-error! (anchor msg)
-    let T = (typeof anchor)
-    if (== T string)
-        if (none? msg)
-            __error! anchor
-            unreachable!;
-    set-anchor!
-        if (== T Any)
-            let T = (Any-typeof anchor)
-            if (== T Syntax)
-                Syntax-anchor (as anchor Syntax)
-            else
-                as anchor Anchor
-        elseif (== T Syntax)
-            Syntax-anchor anchor
-        else anchor
-    __anchor-error! msg
-    unreachable!;
-
-syntax-extend
-    # a supertype to be used for conversions
-    let immutable = (typename-type "immutable")
-    set-scope-symbol! syntax-scope 'immutable immutable
-    set-typename-super! integer immutable
-    set-typename-super! real immutable
-    set-typename-super! vector immutable
-    set-typename-super! Symbol immutable
-    set-typename-super! CEnum immutable
-
-    let aggregate = (typename-type "aggregate")
-    set-scope-symbol! syntax-scope 'aggregate aggregate
-    set-typename-super! array aggregate
-    set-typename-super! tuple aggregate
-    set-typename-super! Any tuple
-
-    let opaquepointer = (typename-type "opaquepointer")
-    set-scope-symbol! syntax-scope 'opaquepointer opaquepointer
-    set-typename-super! string opaquepointer
-    set-typename-super! type opaquepointer
-
-    set-type-symbol! integer '__typecall
-        fn (cls ...)
-            integer-type ...
-    #set-type-symbol! real '__typecall
-        fn (cls ...)
-            real-type ...
+#
     set-type-symbol! pointer 'set-element-type
         fn (cls ET)
             pointer-type-set-element-type cls ET
@@ -1459,831 +1688,564 @@ syntax-extend
     set-type-symbol! pointer 'strip-storage
         fn (cls ET)
             pointer-type-set-storage-class cls unnamed
-    set-type-symbol! pointer 'storage
+    set-type-symbol! pointer 'storageof
         fn (cls)
             pointer-type-storage-class cls
     set-type-symbol! pointer 'readable?
         fn (cls)
             == (& (pointer-type-flags cls) pointer-flag-non-readable) 0:u64
-    set-type-symbol! pointer 'writable?
-        fn (cls)
-            == (& (pointer-type-flags cls) pointer-flag-non-writable) 0:u64
-    set-type-symbol! pointer '__typecall
-        fn (cls T opt)
-            let flags =
-                if (none? opt)
-                    pointer-flag-non-writable
-                else
-                    assert-typeof opt Symbol
-                    if (icmp== opt 'mutable) 0:u64
-                    else
-                        compiler-error! "invalid option passed to pointer type constructor"
-            if (none? T)
-                if (type== cls pointer)
-                    compiler-error! "type expected"
-                else
-                    nullof cls
-            else
-                pointer-type T flags unnamed
-    fn assert-no-arguments (...)
-        if (icmp!= (va-countof ...) 0)
-            compiler-error! "default constructor takes no arguments"
-    set-type-symbol! array '__typecall
-        fn (cls ...)
-            if (type== cls array)
-                let T size = ...
-                array-type T (imply size usize)
-            else
-                assert-no-arguments ...
-                nullof cls
-    set-type-symbol! vector '__typecall
-        fn (cls ...)
-            if (type== cls vector)
-                let T size = ...
-                vector-type T (imply size usize)
-            else
-                assert-no-arguments ...
-                nullof cls
-    set-type-symbol! ReturnLabel '__typecall
-        fn (cls ...)
-            ReturnLabel-type ...
-    set-type-symbol! tuple '__typecall
-        fn (cls ...)
-            if (type== cls tuple)
-                tuple-type ...
-            else
-                assert-no-arguments ...
-                nullof cls
-    set-type-symbol! union '__typecall
-        fn (cls ...)
-            if (type== cls union)
-                union-type ...
-            else
-                assert-no-arguments ...
-                nullof cls
 
-    set-type-symbol! typename '__typecall
-        inline (cls args...)
-            if (type== cls typename)
-                let name super storage = args...
-                let T = (typename-type name)
-                if (not (none? super))
-                    set-typename-super! T super
-                if (not (none? storage))
-                    set-typename-storage! T storage
-                T
-            else
-                compiler-error!
-                    string-join "typename "
-                        string-join (repr cls)
-                            " has no constructor"
+fn pointer-type-imply? (src dest)
+    let ET = ('element@ src 0)
+    let ET =
+        if ('opaque? ET) ET
+        else ('storageof ET)
+    if (not (icmp== ('kind ET) type-kind-pointer))
+        # casts to voidstar are only permitted if we are not holding
+        # a ref to another pointer
+        if (type== dest voidstar)
+            return true
+        elseif (type== dest ('mutable voidstar))
+            if ('writable? src)
+                return true
+    if (type== dest ('strip-pointer-storage-class src))
+        return true
+    elseif (type== dest ('immutable src))
+        return true
+    elseif (type== dest ('strip-pointer-storage-class ('immutable src)))
+        return true
+    return false
 
-    set-type-symbol! function '__typecall
-        fn (cls ...)
-            function-type ...
+fn pointer-imply (vT T expr)
+    if (icmp== ('kind T) type-kind-pointer)
+        if (pointer-type-imply? vT T)
+            return `(bitcast expr T)
+    compiler-error! "unsupported type"
 
-    set-type-symbol! Any 'typeof Any-typeof
+'set-symbols pointer
+    __call = coerce-call-arguments
+    __imply = (box-cast pointer-imply)
 
-    set-type-symbol! Any '__imply
-        fn (src destT)
-            Any-extract src destT
+'define-symbols pointer
+    __typecall =
+        inline (cls T)
+            sc_pointer_type T pointer-flag-non-writable unnamed
 
-    set-type-symbol! Syntax '__imply
-        fn (src destT)
-            if (type== destT Any)
-                Syntax->datum src
-            elseif (type== destT Anchor)
-                Syntax-anchor src
-            else
-                let anyval = (Syntax->datum src)
-                let anyT = (Any-typeof anyval)
-                if (type== anyT destT)
-                    Any-extract anyval destT
-                else
-                    syntax-error! (Syntax-anchor src)
-                        .. (repr destT) " expected, not " (repr anyT)
+# dotted symbol expander
+# --------------------------------------------------------------------------
 
-    set-type-symbol! type '__@
-        inline (self key)
-            let keyT = (typeof key)
-            if (type== keyT Symbol)
-                type@ self key
-            elseif (type== keyT i32)
-                element-type self key
-            elseif (type== keyT Nothing)
-                element-type self 0
-    set-type-symbol! type '__countof type-countof
+let dot-char = 46:i8 # "."
+let dot-sym = '.
 
-    let empty-symbol = (Symbol "")
-
-    set-type-symbol! Parameter '__typecall
-        fn (cls params...)
-            let param1 param2 param3 = params...
-            let TT = (tuple (typeof param1) (typeof param2) (typeof param3))
-            if (type== TT (tuple Anchor Symbol type))
-                Parameter-new param1 param2 param3
-            elseif (type== TT (tuple Anchor Symbol Nothing))
-                Parameter-new param1 param2 Unknown
-            elseif (type== TT (tuple Symbol type Nothing))
-                Parameter-new (active-anchor) param1 param2
-            elseif (type== TT (tuple Symbol Nothing Nothing))
-                Parameter-new (active-anchor) param1 Unknown
-            else
-                compiler-error! "usage: Parameter [anchor] symbol [type]"
-
-    set-type-symbol! Parameter 'return-label?
-        fn (self)
-            icmp== (Parameter-index self) 0
-
-    set-type-symbol! Symbol '__call
-        inline "methodcall" (name self ...)
-            let T = (typeof self)
-            let T =
-                if (type== T type) self
-                else T
-            (typeattr T name) self ...
-
-    set-type-symbol! Scope '__getattr
-        inline (self key)
-            if (constant? self)
-                let value success = (Scope@ self key)
-                if success
-                    Any-extract-constant value
-            else
-                let value = (Scope@ self key)
-                return value
-
-    set-type-symbol! Scope '__@
-        fn (self key)
-            let value success = (Scope@ self key)
-            return
-                if (constant? self)
-                    Any-extract-constant value
-                else value
-                success
-
-    set-type-symbol! list '__countof list-countof
-    set-type-symbol! list '__getattr
-        fn (self name)
-            if (== name 'at)
-                list-at self
-            elseif (== name 'next)
-                list-next self
-            elseif (== name 'count)
-                list-countof self
-    set-type-symbol! list '__@
-        fn (self i)
-            let loop (x i) = (tie-const i self) (i32 i)
-            if (< i 0)
-                Any none
-            elseif (== i 0)
-                list-at x
-            else
-                loop (list-next x) (- i 1)
-    set-type-symbol! list '__slice
-        fn (self i0 i1)
-            # todo: use isize
-            let i0 i1 = (i64 i0) (i64 i1)
-            let skip-head (l i) =
-                tie-const i0 self
-                tie-const i0 (i64 0)
-            if (< i i0)
-                skip-head (list-next l) (+ i (i64 1))
-            let count = (i64 (list-countof l))
-            if (== (- i1 i0) count)
-                return l
-            let build-slice (l next i) =
-                tie-const i1 l
-                tie-const i1 eol
-                tie-const i1 i
-            if (== i i1)
-                list-reverse next
-            else
-                build-slice (list-next l) (list-cons (list-at l) next) (+ i 1:i64)
-
-    fn list== (a b)
-        dump a b
-        label xreturn (value m)
-            let k = (tie-const (tie-const a b) value)
-            dump return m value a b (constant? a) (constant? b) (constant? k)
-            return k
-        if (icmp!= (list-countof a) (list-countof b)) false
-        else
-            let loop (a b) = (tie-const b a) (tie-const a b)
-            if (list-empty? a) true
-            else
-                let u v = (list-at a) (list-at b)
-                let uT vT = ('typeof u) ('typeof v)
-                if (not (type== uT vT)) false
-                else
-                    let un vn = (list-next a) (list-next b)
-                    if (type== uT list)
-                        if (list== (imply u list) (imply v list))
-                            loop un vn
-                        else false
-                    elseif (Any== u v)
-                        loop un vn
-                    else false
-
-    set-type-symbol! list '__==
-        fn (a b flipped)
-            if (type== (typeof a) (typeof b))
-                list== a b
-
-    inline gen-string-cmp (op)
-        fn (a b flipped)
-            if (type== (typeof a) (typeof b))
-                op (string-compare a b) 0
-
-    set-type-symbol! string '__== (gen-string-cmp ==)
-    set-type-symbol! string '__!= (gen-string-cmp !=)
-    set-type-symbol! string '__< (gen-string-cmp <)
-    set-type-symbol! string '__<= (gen-string-cmp <=)
-    set-type-symbol! string '__> (gen-string-cmp >)
-    set-type-symbol! string '__>= (gen-string-cmp >=)
-
-    let rawstring = (pointer i8)
-    set-scope-symbol! syntax-scope 'rawstring (pointer i8)
-    set-type-symbol! string '__imply
-        fn (self destT)
-            if (type== destT rawstring)
-                getelementptr self 0 1 0
-
-    set-type-symbol! string '__hash
-        fn (self)
-            bitcast
-                __hashbytes
-                    getelementptr self 0 1 0
-                    string-countof self
-                hash
-
-    set-type-symbol! string 'from-cstr
-        fn (value)
-            let loop (i) = (unconst 0:usize)
-            let c = (load (getelementptr value i))
-            if (icmp== c 0:i8)
-                string-new value i
-            else
-                loop (add i 1:usize)
-
-    set-type-symbol! string '__countof string-countof
-    set-type-symbol! string '__@
-        fn string-at (s i)
-            assert-typeof s string
-            let i = (i64 i)
-            if (< i 0:i64)
-                return (tie-const i 0:i8)
-            let len = (i64 (string-countof s))
-            if (>= i len)
-                return (tie-const (tie-const len i) 0:i8)
-            let s = (bitcast (getelementptr s 0 1 0) (pointer i8))
-            load (getelementptr s i)
-    set-type-symbol! string '__slice
-        fn (self i0 i1)
-            string-new
-                getelementptr (string->rawstring self) i0
-                - i1 i0
-
-    set-scope-symbol! syntax-scope 'min (op2-ltr-multiop min)
-    set-scope-symbol! syntax-scope 'max (op2-ltr-multiop max)
-
-    syntax-scope
-
-fn Any-list? (val)
-    assert-typeof val Any
-    type== ('typeof val) list
-
-fn maybe-unsyntax (val)
-    if (type== ('typeof val) Syntax)
-        extractvalue (load (as val Syntax)) 1
-    else val
-
-# print function
-inline print (...)
-    inline print-element (val)
-        let T = (typeof val)
-        if (== T string)
-            io-write! val
-        else
-            io-write! (repr val)
-
-    let loop (i) = 0
-    if (< i (va-countof ...))
-        if (> i 0)
-            io-write! " "
-        let arg = (va@ i ...)
-        print-element arg
-        loop (+ i 1)
-    else
-        io-write! "\n"
-
-fn print-spaces (depth)
-    assert-typeof depth i32
-    if (icmp== depth 0)
-    else
-        io-write! "    "
-        print-spaces (sub depth 1)
-
-fn walk-list (on-leaf l depth)
-    let loop (l) = l
-    if (list-empty? l) true
-    else
-        let at next =
-            list-at-next l
-        let value =
-            maybe-unsyntax at
-        if (Any-list? value)
-            print-spaces depth
-            io-write! ";\n"
-            walk-list on-leaf
-                as value list
-                add depth 1
-        else
-            on-leaf value depth
-            true
-        loop next
-
-fn typify (f types...)
-    let vacount = (va-countof types...)
-    let loop (i types) = 0 (nullof (array-type type (usize vacount)))
-    if (== i vacount)
-        return
-            __typify f vacount (bitcast (allocaof types) (pointer type))
-    let T = (va@ i types...)
-    let types = (insertvalue types T i)
-    loop (+ i 1) types
-
-fn compile-flags (opts...)
-    let vacount = (va-countof opts...)
-    let loop (i flags) = 0 0:u64
-    if (== i vacount)
-        return flags
-    let flag = (va@ i opts...)
-    if (not (constant? flag))
-        compiler-error! "symbolic flags must be constant"
-    assert-typeof flag Symbol
-    loop (+ i 1)
-        | flags
-            if (== flag 'dump-disassembly) compile-flag-dump-disassembly
-            elseif (== flag 'dump-module) compile-flag-dump-module
-            elseif (== flag 'dump-function) compile-flag-dump-function
-            elseif (== flag 'dump-time) compile-flag-dump-time
-            elseif (== flag 'no-debug-info) compile-flag-no-debug-info
-            elseif (== flag 'O1) compile-flag-O1
-            elseif (== flag 'O2) compile-flag-O2
-            elseif (== flag 'O3) compile-flag-O3
-            else
-                compiler-error!
-                    .. "illegal flag: " (repr flag)
-                        ". try one of"
-                        \ " " (repr 'dump-disassembly)
-                        \ " " (repr 'dump-module)
-                        \ " " (repr 'dump-function)
-                        \ " " (repr 'dump-time)
-                        \ " " (repr 'no-debug-info)
-                        \ " " (repr 'O1)
-                        \ " " (repr 'O2)
-                        \ " " (repr 'O3)
-
-fn compile (f opts...)
-    __compile f
-        compile-flags opts...
-
-fn compile-object (path table opts...)
-    __compile-object path table
-        compile-flags opts...
-
-fn compile-spirv (f target opts...)
-    __compile-spirv f target
-        compile-flags opts...
-
-fn compile-glsl (f target opts...)
-    __compile-glsl f target
-        compile-flags opts...
-
-syntax-extend
-    inline gen-type-op2 (op)
-        fn (a b flipped)
-            if (type== (typeof a) (typeof b))
-                op a b
-    set-type-symbol! type '__< (gen-type-op2 type<)
-    set-type-symbol! type '__<=
-        gen-type-op2
-            fn (a b)
-                if (type== a b) true
-                else (type< a b)
-    set-type-symbol! type '__> (gen-type-op2 (fn (a b) (type< b a)))
-    set-type-symbol! type '__>=
-        gen-type-op2
-            fn (a b)
-                if (type== a b) true
-                else (type< b a)
-
-    let Macro = (typename "Macro")
-    let BlockScopeFunction =
-        pointer
-            function
-                ReturnLabel list Scope
-                \ list list Scope
-    set-typename-storage! Macro BlockScopeFunction
-    set-type-symbol! Macro '__typecall
-        fn (cls f)
-            assert-typeof f BlockScopeFunction
-            bitcast f Macro
-    set-type-symbol! Macro '__as
-        fn (self destT)
-            if (type== destT function)
-                bitcast self BlockScopeFunction
-            elseif (type== destT BlockScopeFunction)
-                bitcast self BlockScopeFunction
-    # support for calling macro functions directly
-    set-type-symbol! Macro '__call
-        fn (self at next scope)
-            (bitcast self BlockScopeFunction) at next scope
-
-    fn block-scope-macro (f)
-        Macro
-            as (compile (typify f list list Scope))
-                BlockScopeFunction
-    fn scope-macro (f)
-        block-scope-macro
-            fn (at next scope)
-                let at scope = (f (list-next at) scope)
-                return (cons at next) scope
-    fn macro (f)
-        block-scope-macro
-            fn (at next scope)
-                return (cons (f (list-next at)) next) scope
-
-    # dotted symbol expander
-    # --------------------------------------------------------------------------
-
-    fn dotted-symbol? (env head)
-        let s = (Symbol->string head)
-        let sz = (countof s)
-        let loop (i) = (unconst 0:usize)
+fn dotted-symbol? (env head)
+    if (== head dot-sym)
+        return false
+    let s = (as head string)
+    let sz = (countof s)
+    loop (i = 0:usize)
         if (== i sz)
-            return (unconst false)
-        elseif (== (@ s i) (char "."))
-            return (unconst true)
-        loop (+ i 1:usize)
+            return false
+        elseif (== (@ s i) dot-char)
+            return true
+        + i 1:usize
 
-    fn split-dotted-symbol (head start end tail)
-        let tail = (unconst tail)
-        let s = (Symbol->string head)
-        let loop (i) = (unconst start)
+fn split-dotted-symbol (head start end tail)
+    let s = (as head string)
+    loop (i = start)
         if (== i end)
             # did not find a dot
             if (== start 0:usize)
                 return (cons head tail)
             else
-                return (cons (Symbol (slice s start)) tail)
-        if (== (@ s i) (char "."))
+                return (cons (Symbol (rslice s start)) tail)
+        if (== (@ s i) dot-char)
             let tail =
                 # no remainder after dot
                 if (== i (- end 1:usize)) tail
                 else # remainder after dot, split the rest first
                     split-dotted-symbol head (+ i 1:usize) end tail
-            let dot = '.
+            let result = (cons dot-sym tail)
             if (== i 0:usize)
                 # no prefix before dot
-                return (cons (unconst dot) tail)
+                return result
             else
                 # prefix before dot
+                let size = (- i start)
                 return
-                    cons (Symbol (slice s start i)) dot tail
-        loop (+ i 1:usize)
+                    cons (Symbol (lslice (rslice s start) size)) result
+        + i 1:usize
 
-    # infix notation support
-    # --------------------------------------------------------------------------
+# infix notation support
+# --------------------------------------------------------------------------
 
-    fn get-ifx-symbol (name)
-        Symbol (.. "#ifx:" (Symbol->string name))
+fn get-ifx-symbol (name)
+    Symbol (.. "#ifx:" name)
 
-    inline make-expand-define-infix (order)
-        fn expand-define-infix (args scope)
-            let prec token func = (decons args 3)
-            let prec =
-                as (as prec Syntax) i32
-            let token =
-                as (as token Syntax) Symbol
-            let func =
-                if (== ('typeof func) Nothing) token
-                else
-                    as (as func Syntax) Symbol
-            set-scope-symbol! scope (get-ifx-symbol token)
-                list prec order func
-            return none scope
-
-    fn get-ifx-op (env op)
-        let sym = (Syntax->datum (as op Syntax))
-        if (== ('typeof sym) Symbol)
-            @ env (get-ifx-symbol (as sym Symbol))
+fn expand-define-infix (args scope order)
+    let prec rest = ('decons args)
+    let token rest = ('decons rest)
+    let func rest = ('decons rest)
+    let prec =
+        as prec i32
+    let token =
+        as token Symbol
+    let func =
+        if (== ('typeof func) Nothing) token
         else
-            return
-                unconst (Any none)
-                unconst false
+            as func Symbol
+    'set-symbol scope (get-ifx-symbol token)
+        Value (cons prec (cons order (cons func '())))
+    return none scope
 
-    fn has-infix-ops? (infix-table expr)
-        # any expression of which one odd argument matches an infix operator
-            has infix operations.
-        let loop (expr) = expr
-        if (< (countof expr) 3:usize)
-            return (unconst false)
-        let expr = (list-next expr)
-        let at next = (decons expr)
-        let result ok = (get-ifx-op infix-table at)
-        if ok
-            return (unconst true)
-        loop expr
+inline make-expand-define-infix (order)
+    fn (args scope)
+        expand-define-infix args scope order
 
-    fn unpack-infix-op (op)
-        let op-prec op-order op-func = (decons (as op list) 3)
-        return
-            as op-prec i32
-            as op-order Symbol
-            as op-func Symbol
+fn get-ifx-op (env op)
+    '@ env (get-ifx-symbol (as op Symbol))
 
-    fn infix-op (infix-table token prec pred)
-        let op ok =
-            get-ifx-op infix-table token
-        if ok
-            let op-prec = (unpack-infix-op op)
-            ? (pred op-prec prec) op (Any none)
-        else
-            syntax-error! token
+fn has-infix-ops? (infix-table expr)
+    # any expression of which one odd argument matches an infix operator
+        has infix operations.
+    loop (expr = expr)
+        if (< (countof expr) 3)
+            return false
+        let __ expr = ('decons expr)
+        let at next = ('decons expr)
+        try
+            get-ifx-op infix-table at
+            return true
+        except (err)
+            repeat expr
+
+fn unpack-infix-op (op)
+    let op = (as op list)
+    let op-prec rest = ('decons op)
+    let op-order rest = ('decons rest)
+    let op-func rest = ('decons rest)
+    return
+        as op-prec i32
+        as op-order Symbol
+        as op-func Symbol
+
+inline infix-op (pred)
+    fn infix-op (infix-table token prec)
+        let op =
+            try (get-ifx-op infix-table token)
+            except (err)
+                sc_set_active_anchor ('anchor token)
+                compiler-error!
+                    "unexpected token in infix expression"
+        let op-prec = (unpack-infix-op op)
+        ? (pred op-prec prec) op (Value none)
+
+let infix-op-gt = (infix-op >)
+let infix-op-ge = (infix-op >=)
+
+fn rtl-infix-op-eq (infix-table token prec)
+    let op =
+        try (get-ifx-op infix-table token)
+        except (err)
+            sc_set_active_anchor ('anchor token)
+            compiler-error!
                 "unexpected token in infix expression"
+    let op-prec op-order = (unpack-infix-op op)
+    if (== op-order '<)
+        ? (== op-prec prec) op (Value none)
+    else
+        Value none
 
-    fn rtl-infix-op (infix-table token prec pred)
-        let op ok =
-            get-ifx-op infix-table token
-        if ok
-            let op-prec op-order = (unpack-infix-op op)
-            if (== op-order '<)
-                ? (pred op-prec prec) op (Any none)
-            else
-                unconst (Any none)
-        else
-            syntax-error! token
-                "unexpected token in infix expression"
-
-    fn parse-infix-expr (infix-table lhs state mprec)
-        assert-typeof infix-table Scope
-        assert-typeof lhs Any
-        assert-typeof state list
-        assert-typeof mprec i32
-        let loop (lhs state) = lhs state
+fn parse-infix-expr (infix-table lhs state mprec)
+    loop (lhs state = lhs state)
         if (empty? state)
             return lhs state
-        let la next-state = (decons state)
-        let op = (infix-op infix-table la mprec >=)
+        let la next-state = ('decons state)
+        let op = (infix-op-ge infix-table la mprec)
         if (== ('typeof op) Nothing)
             return lhs state
         let op-prec op-order op-name = (unpack-infix-op op)
-        let rhs-loop (rhs state) = (decons next-state)
-        if (empty? state)
-            loop (Any (list op-name lhs rhs)) state
-        let ra = (list-at state)
-        let lop = (infix-op infix-table ra op-prec >)
-        let nextop =
-            if (== ('typeof lop) Nothing)
-                rtl-infix-op infix-table ra op-prec ==
-            else lop
-        if (== ('typeof nextop) Nothing)
-            loop (Any (list op-name lhs rhs)) state
-        let nextop-prec = (unpack-infix-op nextop)
-        let next-rhs next-state =
-            parse-infix-expr infix-table rhs state nextop-prec
-        rhs-loop next-rhs next-state
+        loop (rhs state = ('decons next-state))
+            if (empty? state)
+                break (Value (list op-name lhs rhs)) state
+            let ra __ = ('decons state)
+            let lop = (infix-op-gt infix-table ra op-prec)
+            let nextop =
+                if (== ('typeof lop) Nothing)
+                    rtl-infix-op-eq infix-table ra op-prec
+                else lop
+            if (== ('typeof nextop) Nothing)
+                break (Value (list op-name lhs rhs)) state
+            let nextop-prec = (unpack-infix-op nextop)
+            let next-rhs next-state =
+                parse-infix-expr infix-table rhs state nextop-prec
+            _ next-rhs next-state
 
-    #---------------------------------------------------------------------------
+let parse-infix-expr =
+    const-typify parse-infix-expr Scope Value list i32
 
-    # install general list hook for this scope
-    # is called for every list the expander would otherwise consider a call
-    fn list-handler (topexpr env)
-        let sxexpr = (as (list-at topexpr) Syntax)
-        let expr expr-anchor = (Syntax->datum sxexpr) (Syntax-anchor sxexpr)
-        if (!= ('typeof expr) list)
-            return topexpr env
-        let expr = (as expr list)
-        let head-key = (Syntax->datum (as (list-at expr) Syntax))
-        let head =
-            if (== ('typeof head-key) Symbol)
-                let head success = (@ env (as head-key Symbol))
-                if success head
-                else head-key
-            else head-key
-        let head =
-            if (== ('typeof head) type)
-                let attr ok = (runtime-type@ (as head type) '__macro)
-                if ok attr
-                else head
-            else head
-        if (== ('typeof head) Macro)
-            let head = (as head Macro)
-            let next = (list-next topexpr)
-            let expr env = (head expr next env)
-            let expr = (Syntax-wrap expr-anchor (Any expr) false)
-            return (as (as expr Syntax) list) env
-        elseif (has-infix-ops? env expr)
-            let at next = (decons expr)
-            let expr =
-                parse-infix-expr env at next (unconst 0)
-            let next = (list-next topexpr)
-            let expr = (Syntax-wrap expr-anchor expr false)
-            return (list-cons expr next) env
-        else
-            return topexpr env
+#---------------------------------------------------------------------------
 
-    # install general symbol hook for this scope
-    # is called for every symbol the expander could not resolve
-    fn symbol-handler (topexpr env)
-        let at next = (decons topexpr)
-        let sxname = (as at Syntax)
-        let name name-anchor = (as sxname Symbol) (Syntax-anchor sxname)
-        if (dotted-symbol? env name)
-            let s = (Symbol->string name)
-            let sz = (countof s)
-            let expr =
-                Any (split-dotted-symbol name (unconst 0:usize) sz eol)
-            let expr = (Syntax-wrap name-anchor expr false)
-            return (cons expr next) env
+# install general list hook for this scope
+# is called for every list the expander would otherwise consider a call
+fn list-handler (topexpr env)
+    let topexpr-at topexpr-next = ('decons topexpr)
+    let sxexpr = topexpr-at
+    let expr expr-anchor = sxexpr ('anchor sxexpr)
+    if (!= ('typeof expr) list)
+        return topexpr env
+    let expr = (as expr list)
+    let expr-at expr-next = ('decons expr)
+    let head-key = expr-at
+    let head =
+        try
+            '@ env (as head-key Symbol)
+        except (err) head-key
+    let head =
+        try
+            '@ (as head type) '__macro
+        except (err) head
+    if (== ('typeof head) SugarMacro)
+        let head = (as head SugarMacro)
+        sc_set_active_anchor expr-anchor
+        let expr env = (head expr topexpr-next env)
+        return (as expr list) env
+    elseif (has-infix-ops? env expr)
+        let at next = ('decons expr)
+        sc_set_active_anchor expr-anchor
+        let expr =
+            parse-infix-expr env at next 0
+        return (cons expr topexpr-next) env
+    else
         return topexpr env
 
-    set-scope-symbol! syntax-scope 'Macro Macro
-    set-scope-symbol! syntax-scope 'block-scope-macro block-scope-macro
-    set-scope-symbol! syntax-scope 'scope-macro scope-macro
-    set-scope-symbol! syntax-scope 'macro macro
-    set-scope-symbol! syntax-scope (Symbol "#list")
-        compile (typify list-handler list Scope)
-    set-scope-symbol! syntax-scope (Symbol "#symbol")
-        compile (typify symbol-handler list Scope)
+# install general symbol hook for this scope
+# is called for every symbol the expander could not resolve
+fn symbol-handler (topexpr env)
+    let at next = ('decons topexpr)
+    let sxname = at
+    let name name-anchor = (as sxname Symbol) ('anchor sxname)
+    if (dotted-symbol? env name)
+        let s = (as name string)
+        let sz = (countof s)
+        let expr =
+            Value (split-dotted-symbol name 0:usize sz '())
+        #let expr = (sugar-wrap name-anchor expr false)
+        return (cons expr next) env
+    return topexpr env
 
-    # (define name expr ...)
-    fn expand-define (expr)
-        let defname = (list-at expr)
-        let content = (list-next expr)
-        list syntax-extend
-            list set-scope-symbol! 'syntax-scope
-                list quote defname
-                cons do content
-            'syntax-scope
-
-    inline make-expand-and-or (flip)
-        fn (expr)
-            if (list-empty? expr)
-                syntax-error! "at least one argument expected"
-            elseif (== (list-countof expr) 1:usize)
-                return (list-at expr)
-            let expr = (list-reverse expr)
-            let loop (result head) = (decons expr)
-            if (list-empty? head)
-                return result
-            let tmp =
-                Parameter-new
-                    Syntax-anchor (as (list-at head) Syntax)
-                    \ 'tmp Unknown
-            loop
-                Any
-                    list do-in
-                        list let tmp '= (list-at head)
-                        list if tmp
-                            if flip tmp
-                            else result
-                        list 'else
-                            if flip result
-                            else tmp
-                list-next head
-
-    set-scope-symbol! syntax-scope 'define (macro expand-define)
-    set-scope-symbol! syntax-scope 'and (macro (make-expand-and-or false))
-    set-scope-symbol! syntax-scope 'or (macro (make-expand-and-or true))
-    set-scope-symbol! syntax-scope 'define-infix>
-        scope-macro (make-expand-define-infix '>)
-    set-scope-symbol! syntax-scope 'define-infix<
-        scope-macro (make-expand-define-infix '<)
-    syntax-scope
-
-# (define-macro name expr ...)
-# implies builtin names:
-    args : list
-define define-macro
-    macro
-        fn "expand-define-macro" (expr)
-            let name body = (decons expr)
-            list define name
-                list macro
-                    cons fn '(args) body
-
-# (define-scope-macro name expr ...)
-# implies builtin names:
-    args : list
-    scope : Scope
-define-macro define-scope-macro
-    let name body = (decons args)
-    list define name
-        list scope-macro
-            cons fn '(args syntax-scope) body
-
-# (define-block-scope-macro name expr ...)
-# implies builtin names:
-    expr : list
-    next-expr : list
-    scope : Scope
-define-macro define-block-scope-macro
-    let name body = (decons args)
-    list define name
-        list block-scope-macro
-            cons fn '(expr next-expr syntax-scope) body
-
-# (define-doc symbol string)
-define-scope-macro define-doc
-    let sxsym str = (decons args 2)
-    let sym = (as (as sxsym Syntax) Symbol)
-    let str = (as (as str Syntax) string)
-    let _ ok = (@ syntax-scope sym)
-    if ok
-        set-scope-symbol! syntax-scope (Symbol (.. "#doc:" (as sym string))) str
+fn quasiquote-list
+inline quasiquote-any (ox)
+    let x = ox
+    let T = ('typeof x)
+    if (== T list)
+        quasiquote-list (as x list)
     else
-        syntax-error! sxsym "cannot document unbound name"
-    return none
-        syntax-scope
+        list sugar-quote ox
+fn quasiquote-list (x)
+    if (empty? x)
+        return (list sugar-quote x)
+    let aat next = ('decons x)
+    let at = aat
+    let T = ('typeof at)
+    if (== T list)
+        let at = (as at list)
+        if (not (empty? at))
+            let at-at at-next = ('decons at)
+            if (== ('typeof at-at) Symbol)
+                let at-at = (as at-at Symbol)
+                if (== at-at 'unquote-splice)
+                    return
+                        list (Value sc_list_join)
+                            cons do at-next
+                            quasiquote-list next
+                elseif (== at-at 'square-list)
+                    if (> (countof at-next) 1)
+                        return
+                            list (Value sc_list_join)
+                                list list (cons _ at-next)
+                                quasiquote-list next
+    elseif (== T Symbol)
+        let at = (as at Symbol)
+        if (== at 'unquote)
+            return (cons do next)
+        elseif (== at 'square-list)
+            return (cons do next)
+        elseif (== at 'quasiquote)
+            return (quasiquote-list (quasiquote-list next))
+    return
+        list cons (quasiquote-any aat) (quasiquote-list next)
 
-define-block-scope-macro defer
-    let head f rest = (decons expr 2)
-    let oldf = (@ syntax-scope 'return)
-    let anchor = (Syntax-anchor (as f Syntax))
-    let tmp =
-        Parameter-new anchor 'tmp Unknown
-    let expr =
-        list
-            list let tmp '= f
-            list tmp
-                list
-                    cons inline "defer-wrapper" (list)
-                        list label 'return (list '...)
-                            list oldf
-                                list tmp '...
-                        list _
-                        next-expr
-    return expr
-        syntax-scope
+fn expand-and-or (expr f)
+    if (empty? expr)
+        compiler-error! "at least one argument expected"
+    elseif (== (countof expr) 1)
+        return ('@ expr)
+    let expr = ('reverse expr)
+    loop (result head = ('decons expr))
+        if (empty? head)
+            return result
+        let at next = ('decons head)
+        _ (Value (list f at (list inline '() result))) next
 
-define-macro assert
-    fn assertion-error! (constant anchor msg)
-        let assert-msg =
-            .. "assertion failed: "
-                if (== (typeof msg) string) msg
-                else (repr msg)
-        if constant
-            compiler-error! assert-msg
+inline make-expand-and-or (f)
+    fn (expr)
+        expand-and-or expr f
+
+fn ltr-multiop (args target)
+    let argc = ('argcount args)
+    verify-count argc 2 -1
+    if (== argc 2)
+        `(target args)
+    else
+        # call for multiple args
+        let lhs = ('getarg args 0)
+        loop (i lhs = 1 lhs)
+            let rhs = ('getarg args i)
+            let op = `(target lhs rhs)
+            let i = (+ i 1)
+            if (== i argc)
+                break op
+            _ i op
+
+fn rtl-multiop (args target)
+    let argc = ('argcount args)
+    verify-count argc 2 -1
+    if (== argc 2)
+        `(target args)
+    else
+        # call for multiple args
+        let lasti = (- argc 1)
+        let rhs = ('getarg args lasti)
+        loop (i rhs = lasti rhs)
+            let i = (- i 1)
+            let lhs = ('getarg args i)
+            let op = `(target lhs rhs)
+            if (== i 0)
+                break op
+            _ i op
+
+# extracting options from varargs
+
+# (va-option-branch key elsef args...)
+fn va-option-branch (args)
+    let argc = ('argcount args)
+    verify-count argc 2 -1
+    let key elsef =
+        'getarg args 0
+        'getarg args 1
+    let key = (unbox-symbol key Symbol)
+    loop (i = 2)
+        if (== i argc)
+            break;
+        let arg = ('getarg args i)
+        let argkey = ('key ('qualified-typeof arg))
+        if (== key argkey)
+            return
+                sc_keyed_new (sc_value_anchor arg) unnamed arg
+        + i 1
+    `(elsef)
+
+# modules
+####
+
+let package = (Scope)
+'set-symbols package
+    path =
+        Value
+            list
+                .. compiler-dir "/lib/scopes/?.sc"
+                .. compiler-dir "/lib/scopes/?/init.sc"
+    modules = (Value (Scope))
+
+fn clone-scope-contents (a b)
+    """"Join two scopes ``a`` and ``b`` into a new scope so that the
+        root of ``a`` descends from ``b``.
+    # search first upwards for the root scope of a, then clone a
+        piecewise with the cloned scopes as parents
+    let parent = ('parent a)
+    if (== parent (nullof Scope))
+        return (Scope b a)
+    Scope
+        clone-scope-contents parent b
+        a
+
+'define-symbols typename
+    __typecall =
+        inline (cls name)
+            constbranch (== cls typename)
+                inline ()
+                    sc_typename_type name
+                inline ()
+                    missing-constructor cls
+
+'set-symbols Scope
+    __.. =
+        box-binary-op
+            single-binary-op-dispatch clone-scope-contents
+
+fn extract-single-arg (args)
+    let argc = ('argcount args)
+    verify-count argc 1 1
+    'getarg args 0
+
+inline make-const-type-property-function (func)
+    spice-macro
+        fn (args)
+            let value = (extract-single-arg args)
+            let val = (func (as value type))
+            `val
+
+let
+    constant? =
+        spice-macro
+            fn "constant?" (args)
+                let value = (extract-single-arg args)
+                Value ('constant? value)
+    storageof = (make-const-type-property-function sc_type_storage)
+    superof = (make-const-type-property-function sc_typename_type_get_super)
+    sizeof = (make-const-type-property-function sc_type_sizeof)
+    alignof = (make-const-type-property-function sc_type_alignof)
+
+#del extract-single-arg
+#del make-const-type-property-function
+
+let Closure->Generator =
+    spice-macro
+        fn "Closure->Generator" (args)
+            let argc = ('argcount args)
+            verify-count argc 1 1
+            let self = ('getarg args 0)
+            if (not ('constant? self))
+                compiler-error! "Closure must be constant"
+            let self = (as self Closure)
+            let self = (bitcast self Generator)
+            Value self
+
+# (define name expr ...)
+fn expand-define (expr)
+    raises-compile-error;
+    let defname = ('@ expr)
+    let content = ('next expr)
+    list let defname '=
+        cons do content
+
+let
+    qq =
+        sugar-macro
+            fn (args)
+                if (== (countof args) 1)
+                    quasiquote-any ('@ args)
+                else
+                    quasiquote-list args
+    # dot macro
+    # (. value symbol ...)
+    . =
+        sugar-macro
+            fn (args)
+                fn op (a b)
+                    let sym = (as b Symbol)
+                    list getattr a (list sugar-quote sym)
+                let a rest = ('decons args)
+                let b rest = ('decons rest)
+                loop (rest result = rest (op a b))
+                    if (empty? rest)
+                        break result
+                    let c rest = ('decons rest)
+                    _ rest (op result c)
+    and = (sugar-macro (make-expand-and-or and-branch))
+    or = (sugar-macro (make-expand-and-or or-branch))
+    define = (sugar-macro expand-define)
+    define-infix> = (sugar-scope-macro (make-expand-define-infix '>))
+    define-infix< = (sugar-scope-macro (make-expand-define-infix '<))
+    .. = (spice-macro (fn (args) (rtl-multiop args (Value ..))))
+    + = (spice-macro (fn (args) (ltr-multiop args (Value +))))
+    * = (spice-macro (fn (args) (ltr-multiop args (Value *))))
+    @ = (spice-macro (fn (args) (ltr-multiop args (Value @))))
+    va-option-branch = (spice-macro va-option-branch)
+    sugar-set-scope! =
+        sugar-scope-macro
+            fn (args sugar-scope)
+                raises-compile-error;
+                let scope rest = (decons args)
+                return
+                    none
+                    as scope Scope
+
+'set-symbol (__this-scope) (Symbol "#list")
+    Value (const-typify list-handler list Scope)
+'set-symbol (__this-scope) (Symbol "#symbol")
+    Value (const-typify symbol-handler list Scope)
+
+inline select-op-macro (sop fop numargs)
+    inline scalar-type (T)
+        let ST = ('storageof T)
+        if (type== ('superof ST) vector)
+            'element@ ST 0
+        else ST
+    spice-macro
+        fn (args)
+            let argc = ('argcount args)
+            verify-count argc numargs numargs
+            let a b =
+                'getarg args 0; 'getarglist args 1
+            let T = (scalar-type ('typeof a))
+            let fun =
+                if (type== ('superof T) integer) `sop
+                elseif (type== ('superof T) real) `fop
+                else
+                    compiler-error!
+                        sc_string_join "invalid argument type: "
+                            sc_string_join (sc_value_repr (box-pointer T))
+                                ". integer or real vector or scalar expected"
+            `(fun a b)
+
+fn powi (base exponent)
+    # special case for constant base 2
+    if (icmp== base 2)
+        return
+            shl 1 exponent
+    loop (result cur exponent = 1 base exponent)
+        if (icmp== exponent 0)
+            return result
         else
-            syntax-error! anchor assert-msg
-    let cond body = (decons args)
-    let sxcond = (as cond Syntax)
-    let anchor = (Syntax-anchor sxcond)
-    let tmp =
-        Parameter-new anchor 'tmp Unknown
-    list do
-        list let tmp '= cond
-        list if tmp
-        list 'else
-            cons assertion-error!
-                list constant? tmp
-                active-anchor;
-                if (empty? body)
-                    list (repr (Syntax->datum sxcond))
-                else body
+            repeat
+                do
+                    if (icmp== (band exponent 1) 0) result
+                    else
+                        mul result cur
+                mul cur cur
+                lshr exponent 1
 
-define-scope-macro del
-    let loop (args)
-    let sxhead rest = (decons args)
-    let head = (as (as sxhead Syntax) Symbol)
-    let oldsym ok = (@ syntax-scope head)
-    if (not ok)
-        syntax-error! sxhead
-            .. "no such symbol in scope: " (repr head)
-    delete-scope-symbol! syntax-scope head
-    if (empty? rest)
-        return none syntax-scope
-    else
-        loop rest
+inline sabs (x)
+    let zero = (nullof (typeof x))
+    ? (icmp<s x zero) (sub zero x) x
 
-# (. value symbol ...)
-define-macro .
-    fn op (a b)
-        let sym = (as (as b Syntax) Symbol)
-        list getattr a (list quote sym)
-    let a b rest = (decons args 2)
-    let loop (rest result) = rest (op a b)
-    if (list-empty? rest) result
-    else
-        let c rest = (decons rest)
-        loop rest (op result c)
+let pow = (select-op-macro powi powf 2)
+let abs = (select-op-macro sabs fabs 1)
+let sign = (select-op-macro ssign fsign 1)
 
-inline = (obj value)
-    (op2-dispatch '__=) obj value
-    return;
+let hash = (sc_typename_type "hash")
+'set-plain-storage hash u64
+
+run-stage;
+
+inline make-inplace-op (op)
+    inline (lhs rhs)
+        = lhs (op lhs rhs)
+
+let
+    -= = (make-inplace-op -)
+    += = (make-inplace-op +)
+    *= = (make-inplace-op *)
+    /= = (make-inplace-op /)
+    //= = (make-inplace-op //)
+    %= = (make-inplace-op %)
+    >>= = (make-inplace-op >>)
+    <<= = (make-inplace-op <<)
+    &= = (make-inplace-op &)
+    |= = (make-inplace-op |)
+    ^= = (make-inplace-op ^)
+    ..= = (make-inplace-op ..)
 
 define-infix< 50 +=
 define-infix< 50 -=
@@ -2296,9 +2258,9 @@ define-infix< 50 <<=
 define-infix< 50 &=
 define-infix< 50 |=
 define-infix< 50 ^=
+define-infix< 50 ..=
 define-infix< 50 =
 
-#define-infix> 70 :
 define-infix> 100 or
 define-infix> 200 and
 
@@ -2324,2689 +2286,2474 @@ define-infix> 600 //
 define-infix> 600 *
 define-infix< 700 ** pow
 define-infix> 750 as
+define-infix> 780 :
 define-infix> 800 .
 define-infix> 800 @
-#define-infix> 800 .=
-#define-infix> 800 @=
-#define-infix> 800 =@
 
-#-------------------------------------------------------------------------------
-# documentation for builtin forms
-#-------------------------------------------------------------------------------
+inline char (s)
+    let s sz = (sc_string_buffer s)
+    load s
 
-define-doc let
-    """".. macro:: (let name ... _:= value ...)
+# (va-option key args... else-body)
+let va-option =
+    sugar-macro
+        fn (args)
+            let key va body = (decons args 2)
+            let sym = (as key Symbol)
+            list va-option-branch (list sugar-quote sym)
+                cons inline '() body
+                va
 
-        Binds a list of constants and variables specified on the right-hand
-        side to parameter names defined on the left-hand side.
+#---------------------------------------------------------------------------
+# for iterator
+#---------------------------------------------------------------------------
 
-        .. macro:: (let label-name (name ...) _:= value ...)
+'set-symbols Generator
+    __typecall =
+        inline "Generator-new" (cls iter init)
+            Closure->Generator
+                inline "get-iter-init" ()
+                    _ iter init
+    __call =
+        spice-macro
+            fn (args)
+                let argc = ('argcount args)
+                verify-count argc 1 1
+                let self = ('getarg args 0)
+                if (not ('constant? self))
+                    compiler-error! "Generator must be constant"
+                let self = (self as Generator)
+                let self = (bitcast self Closure)
+                `(self)
 
-        Performs the same function as the regular `let`, but associates the
-        entry point with a labelname that can be called to effectively produce
-        a tail-recursive loop. When some of the arguments on the right hand
-        side are not constant, the loop will be unrolled.
+# typical pattern for a generator:
+    inline make-generator (init end?)
+        Generator
+            inline (fdone x)
+                if (end? x)
+                    # terminate
+                    fdone;
+                else
+                    # return next iterator and result values
+                    _ ('next x) ('@ x)
+            init
 
-        .. macro:: (let name ...)
+# for <name> ... in <generator> body ...
+define for
+    inline fdone ()
+        break;
 
-        Rebinds names already defined in the parent scope to the local scope.
-        This becomes useful in conjunction with `locals`, when exporting
-        modules.
+    sugar-block-scope-macro
+        fn "expand-for" (expr next-expr scope)
+            let head args = (decons expr)
+            let it params =
+                loop (it params = args '())
+                    if (empty? it)
+                        compiler-error! "'in' expected"
+                    let sxat it = (decons it)
+                    let at = (sxat as Symbol)
+                    if (at == 'in)
+                        break it params
+                    _ it (cons sxat params)
+            let generator-expr body = (decons it)
+            let subscope = (Scope scope)
+            spice-quote
+                let iter start =
+                    (as [(sc_expand generator-expr '() subscope)] Generator);
+            return
+                cons
+                    spice-quote iter start # order expressions
+                        loop (next = start)
+                            let next args... = (iter fdone next)
+                            inline continue ()
+                                repeat next
+                            spice-unquote
+                                let expr =
+                                    loop (params expr = params (list '= args...))
+                                        if (empty? params)
+                                            break expr
+                                        let param next = (decons params)
+                                        _ next (cons param expr)
+                                let expr = (cons let expr)
+                                'set-symbol subscope 'continue continue
+                                sc_expand (cons do expr body) '() subscope
+                            next
+                    next-expr
+                scope
 
-#-------------------------------------------------------------------------------
-# type based function dispatch
-#-------------------------------------------------------------------------------
+#---------------------------------------------------------------------------
+# hashing
+#---------------------------------------------------------------------------
 
-# a lazily constructed type matcher that takes a target function, an error
-    function, and finally a set of arguments and calls the target function
-    if all arguments could be implicitly converted to the destination type,
-    otherwise it calls the error function with a function that returns an
-    error message, and a function that returns the original type arguments used.
-inline type-matcher (types...)
-    inline get-types ()
-        types...
-    let typesz = (va-countof types...)
-    inline "with-target" (f)
-        inline "with-error-fn" (f-error)
-            inline (args...)
-                let sz = (va-countof args...)
-                if (icmp!= sz typesz)
-                    return
-                        f-error
-                            inline ()
-                                .. "could not resolve overloaded function from number of arguments (expected "
-                                    repr typesz
-                                    " but got "
-                                    repr sz
-                                    ")"
-                            get-types
-                let loop (i outargs...) = sz
-                if (icmp== i 0)
-                    return
-                        f outargs...
-                let i = (sub i 1)
-                let T = (va@ i types...)
-                let arg = (va@ i args...)
-                let result... = (forward-imply arg T)
-                if (va-empty? result...)
-                    return
-                        f-error
-                            inline ()
-                                .. "couldn't convert type of argument "
-                                    repr (i + 1)
-                                    " from "
-                                    repr (typeof arg)
-                                    " to parameter type "
-                                    repr T
-                            get-types
-                loop i result... outargs...
-
-# formats a list of types to a string that can be used as readable function
-    type signature
-fn format-type-signature (types...)
-    let typesz = (va-countof types...)
-    let keys... = (va-keys types...)
-    let loop (i s) = 0 ""
-    if (icmp== i typesz)
-        return s
-    let T = (va@ i types...)
-    let k = (va@ i keys...)
-    loop (add i 1)
-        .. s
-            if (k == unnamed)
-                repr T
-            else
-                .. (k as string) ":" (repr T)
-            " "
-
-# takes two type matchers that have been specialized up to the function target
-    and returns a new type matcher that has also specialized up to the function
-    target, which tries to match f1 first, then f2, and otherwise passes
-    an error message to the error function, along with all previously attempted
-    type signature constructors to the error function.
-inline chain-fn-dispatch2 (f1 f2)
-    if (none? f2)
-        inline "with-error-fn" (f-error)
-            fn (args...)
-                call
-                    f1
-                        inline (msgf get-types...)
-                            f-error
-                                inline ()
-                                    .. "could not match arguments of types "
-                                        format-type-signature (va-types args...)
-                                        "to function"
-                                \ get-types...
-                    args...
-    else
-        inline "with-error-fn" (f-error)
-            inline (args...)
-                call
-                    f1
-                        inline (msgf get-types1)
-                            call
-                                f2
-                                    inline (msgf get-types...)
-                                        f-error
-                                            inline ()
-                                                .. "could not match arguments of types "
-                                                    format-type-signature (va-types args...)
-                                                    "to function"
-                                            \ get-types1 get-types...
-                                args...
-                    args...
-# same as the previous function, but takes an arbitrary number of arguments
-define chain-fn-dispatch (op2-rtl-multiop chain-fn-dispatch2)
-
-# a default error handling function that prints all type signatures and
-    produces a compiler error
-fn fn-dispatch-error-handler (msgf get-types...)
-    let msg =
-        .. (msgf) "\n"
-            "    Expected one of"
-    let sz = (va-countof get-types...)
-    let loop (i msg) = 0 msg
-    if (icmp== i sz)
-        compiler-error! msg
-    else
-        let get-types = (va@ i get-types...)
-        loop (add i 1)
-            .. msg "\n        "
-                format-type-signature (get-types)
-
-# composes multiple target-bound type matchers into a single function
-inline fn-dispatcher (args...)
-    (chain-fn-dispatch args...) fn-dispatch-error-handler
-
-# a safe immutable loop construct that never unrolls
-define-block-scope-macro loop
-    let syntaxmsg = "syntax: (loop (param ...) = arg ...)"
-    if ((countof expr) == 1)
-        return
-            cons
-                list 'let 'repeat '() '=
-                next-expr
-            syntax-scope
-    do
-        let head params sep args = (decons expr 3)
-        if ((countof expr) < 3)
-            syntax-error! head syntaxmsg
-        params as Syntax as list
-        if ((sep as Syntax as Symbol) != '=)
-            syntax-error! sep syntaxmsg
-        return
-            cons
-                cons 'let 'repeat params '=
-                    if (empty? args)
-                        unconst (list)
+let hash-storage =
+    spice-macro
+        fn "hash-storage" (args)
+            let argc = ('argcount args)
+            verify-count argc 1 1
+            let value = ('getarg args 0)
+            let OT = ('typeof value)
+            let T =
+                if ('opaque? OT) OT
+                else ('storageof OT)
+            let conv_u64 =
+                switch ('kind T)
+                case type-kind-integer
+                    `(zext (bitcast value T) u64)
+                case type-kind-pointer
+                    `(ptrtoint value u64)
+                default
+                    if (type== T f32)
+                        `(zext (bitcast value u32) u64)
+                    elseif (type== T f64)
+                        `(bitcast value u64)
                     else
-                        list
-                            cons unconst-all args
-                quote
-                    let repeat =
-                        label (...)
-                            repeat
-                                unconst-all ...
-                next-expr
-            syntax-scope
-
-# sugar for fn-dispatcher
-define-macro fn...
-    let sxname defs = (decons args)
-    let name = (sxname as Syntax as Symbol)
-    fn handle-argdef (argdef)
-        let argdef = (argdef as Syntax as list)
-        loop (i indefs argtypes argnames) = 0 argdef '() '()
-        if (empty? indefs)
-            return (list-reverse argtypes) (list-reverse argnames)
-        else
-            let indefs =
-                do
-                    if (i > 0)
-                        let comma indefs = (decons indefs)
-                        if ((comma as Syntax as Symbol) != ',)
-                            syntax-error! comma "',' separator expected"
-                        indefs
-                    else indefs
-            let argname sep argtype indefs = (decons indefs 3)
-            argname as Syntax as Symbol # verify argname is a symbol
-            if ((sep as Syntax as Symbol) != ':)
-                syntax-error! sep "syntax: (name : type, ...)"
-            repeat (i + 1) indefs
-                cons (list argname '= argtype) argtypes
-                cons argname argnames
-    fn handle-def (def)
-        let argdef body = (decons def)
-        let argtypes argnames = (handle-argdef argdef)
-        list
-            cons type-matcher argtypes
-            cons fn argnames body
-    loop (indefs outdefs) = defs '()
-    if (empty? indefs)
-        let args = (Parameter (Syntax-anchor (sxname as Syntax)) 'args...)
-        list fn name (list args)
-            list
-                cons fn-dispatcher
-                    list-reverse outdefs
-                args
-    else
-        let def indefs = (decons indefs)
-        let def = (def as Syntax as list)
-        repeat indefs
-            cons
-                handle-def def
-                outdefs
-
-#-------------------------------------------------------------------------------
-# references
-#-------------------------------------------------------------------------------
-
-fn construct
-fn copy-construct
-fn destruct
-fn move-construct
-
-let ref = (typename "ref")
-
-inline typeof& (self)
-    let T = (typeof self)
-    assert (T < ref)
-        .. "argument must be of reference type, but is of type " (repr T)
-    element-type T 0
-
-let voidstar = (pointer void)
-
-fn pointer-type-imply? (src dest)
-    let ET = (element-type src 0)
-    let ET =
-        if (opaque? ET) ET
-        else (storageof ET)
-    or
-        # casts to voidstar are only permitted if we are not holding
-        # a ref to another pointer
-        and (not (pointer-type? ET))
-            or
-                and
-                    type== dest ('mutable voidstar)
-                    'writable? src
-                type== dest voidstar
-        type== dest ('strip-storage src)
-        type== dest ('immutable src)
-        type== dest ('strip-storage ('immutable src))
-
-let ref-attribs-key = '__refattrs
-
-inline type@& (T name)
-    let repeat (T) = T
-    let attrs ok = (type-local@ T ref-attribs-key)
-    if ok
-        let val ok = (type@ attrs name)
-        if ok
-            return val ok
-    if (type== T typename)
-        return (tie-const T none) (tie-const T false)
-    repeat (superof T)
-
-inline set-type-symbol!& (T name value)
-    let attrs ok = (type-local@ T ref-attribs-key)
-    let attrs =
-        if ok attrs
-        else
-            let attrs = (typename (Symbol->string ref-attribs-key))
-            set-type-symbol! T ref-attribs-key attrs
-            attrs
-    set-type-symbol! attrs name value
-
-inline deref1 (value)
-    let T = (typeof value)
-    if (T < ref)
-        let op = (type@ T '__deref)
-        op value
-    else value
-
-inline deref (values...)
-    let repeat (i result...) = (va-countof values...)
-    if (i > 0)
-        let i = (i - 1)
-        let value = (va@ i values...)
-        repeat i
-            deref1 value
-            result...
-    result...
-
-set-type-symbol!& Any 'typeof
-    inline (self)
-        Any-typeof (deref self)
-
-set-type-symbol!& Any '__imply
-    inline (src destT)
-        Any-extract (deref src) destT
-
-do
-    inline passthru-overload (sym func)
-        set-type-symbol! ref sym (fn (a b flipped) (func (deref a) (deref b)))
-    passthru-overload '__== ==; passthru-overload '__!= !=
-    passthru-overload '__< <; passthru-overload '__<= <=
-    passthru-overload '__> >; passthru-overload '__>= >=
-    passthru-overload '__& &; passthru-overload '__| |; passthru-overload '__^ ^
-    passthru-overload '__+ +; passthru-overload '__- -
-    passthru-overload '__* *; passthru-overload '__/ /
-    passthru-overload '__** pow
-    passthru-overload '__// //
-    passthru-overload '__% %
-    passthru-overload '__<< <<; passthru-overload '__>> >>
-    passthru-overload '__.. ..
-
-    fn passthru-inplace-overload (methodname fallback)
-        set-type-symbol! ref methodname
-            inline (a b)
-                let ET = (typeof& a)
-                let op ok = (type@& ET methodname)
-                if ok
-                    return (op a b)
-                let op ok = (type@& ET '__deref)
-                if (not ok)
-                    compiler-error!
-                        .. (op-prettyname methodname)
-                            \ " of reference not supported by value of type " (repr ET)
-                    return;
-                = a (fallback a b)
-                true
-
-    passthru-inplace-overload '__+= +
-    passthru-inplace-overload '__-= -
-    passthru-inplace-overload '__*= *
-    passthru-inplace-overload '__/= /
-    passthru-inplace-overload '__//= //
-    passthru-inplace-overload '__%= %
-    passthru-inplace-overload '__>>= >>
-    passthru-inplace-overload '__<<= <<
-    passthru-inplace-overload '__&= &
-    passthru-inplace-overload '__|= |
-    passthru-inplace-overload '__^= ^
-
-    fn define-ref-forward (failedf methodname)
-        set-type-symbol! ref methodname
-            inline (self args...)
-                let ET = (typeof& self)
-                let op success = (type@& ET methodname)
-                if success
-                    return (op self args...)
-                let op ok = (type@& ET '__deref)
-                if (not ok)
-                    compiler-error!
-                        .. (op-prettyname methodname)
-                            \ " of reference not supported by value of type " (repr ET)
-                    return;
-                failedf (deref self) args...
-
-    fn define-ref-forward-failable (failedf methodname)
-        set-type-symbol! ref methodname
-            inline (self args...)
-                let ET = (typeof& self)
-                let op success = (type@& ET methodname)
-                if success
-                    let result... = (op self args...)
-                    if (not (va-empty? result...))
-                        return result...
-                let op ok = (type@& ET '__deref)
-                if (not ok)
-                    return;
-                failedf (deref self) args...
-
-    define-ref-forward (do -) '__neg
-    define-ref-forward (do /) '__rcp
-    define-ref-forward countof '__countof
-    define-ref-forward unpack '__unpack
-    define-ref-forward forward-hash '__hash
-    define-ref-forward (do @) '__@
-    define-ref-forward-failable forward-as '__as
-    define-ref-forward-failable forward-getattr '__getattr
-
-    set-type-symbol! ref '__repr
-        fn (self)
-            let ET = (typeof& self)
-            let op ok = (type@& ET '__repr)
-            if ok
-                return (op self)
-            let op ok = (type@& ET '__deref)
-            if ok
-                forward-repr (deref self)
-            else
-                string-repr
-                    bitcast self (storageof (typeof self))
-
-    set-type-symbol! ref '__deref
-        inline "ref-deref" (self)
-            let ET = (typeof& self)
-            let op ok = (type@& ET '__deref)
-            if ok
-                op self
-            else
-                compiler-error!
-                    .. "cannot dereference value of type " (repr ET)
-
-    set-type-symbol! ref '__typeattr
-        inline "ref-typeattr" (cls name)
-            let T = (storageof cls)
-            let ET = (element-type T 0)
-            let value success = (type@& ET name)
-            if success
-                return value
-            let op success = (type@& ET '__typeattr)
-            if success
-                let result... = (op ET name)
-                if (va-empty? result...)
-                else
-                    return result...
-
-    set-type-symbol! ref '__call
-        inline "ref-call" (self args...)
-            let ET = (typeof& self)
-            let op success = (type@& ET '__call)
-            if success
-                return (op self args...)
-            else
-                call (deref self) args...
-
-    set-type-symbol! ref '__imply
-        inline "ref-imply" (self destT)
-            let ptrtype = (storageof (typeof self))
-            if (type== destT ptrtype)
-                return (bitcast self ptrtype)
-            if (pointer-type-imply? ptrtype destT)
-                return (bitcast self destT)
-            let ET = (element-type ptrtype 0)
-            if (array-type? ET)
-                let ET = (element-type ET 0)
-                let aptrtype = (pointer ET)
-                if (type== destT aptrtype)
-                    return (bitcast self aptrtype)
-            # try to ask target type for implicit refcast
-            let op ok = (type@& ET '__imply)
-            if ok
-                let result... = (op self destT)
-                if (not (va-empty? result...))
-                    return result...
-            # dereference if target type can implicitly cast
-            let op ok = (type@& ET '__deref)
-            if ok
-                return
-                    forward-imply (deref self) destT
-
-    set-type-symbol! ref '__=
-        inline "ref=" (self value)
-            let ET = (typeof& self)
-            let op ok = (type@& ET '__=)
-            if ok
-                let result... = (op self value)
-                if (not (va-empty? result...))
-                    return result...
-            destruct self
-            copy-construct self value
-            true
-
-    fn make-ref-type (PT)
-        let ET = (element-type PT 0)
-        let class = ('storage PT)
-        let T =
-            typename
-                ..
-                    if ('writable? PT) "&"
-                    else "(&)"
-                    if (class != unnamed)
-                        .. "[" (Symbol->string class) "]"
-                    else ""
-                    type-name ET
-                ref
-                PT
-        set-type-symbol! T 'ElementType ET
-        T
-
-    set-type-symbol! ref '__typecall
-        inline "ref-typecall" (cls T)
-            assert-typeof T type
-            if (T < ref)
-                compiler-error!
-                    .. "cannot create reference type of reference type "
-                        repr T
-            make-ref-type T
-
-#var has been removed; use `local`
-
-#global has been removed; use `static`
-
-# (typefn[!][&] type 'symbol (params) body ...)
-define-macro typefn
-    let ty name params body = (decons args 3)
-    list set-type-symbol! ty name
-        cons fn params body
-define-macro typefn&
-    let ty name params body = (decons args 3)
-    list set-type-symbol!& ty name
-        cons fn params body
-define-macro typeinline
-    let ty name params body = (decons args 3)
-    list set-type-symbol! ty name
-        cons inline params body
-define-macro typeinline&
-    let ty name params body = (decons args 3)
-    list set-type-symbol!& ty name
-        cons inline params body
-
-inline bitcast& (self destT)
-    let T = (typeof self)
-    assert (T < ref) "argument must be of reference type"
-    let ST = (storageof T)
-    # todo: ensure types are compatible
-    (bitcast self ('set-element-type ST destT)) as ref
-
-#-------------------------------------------------------------------------------
-# default memory allocators
-#-------------------------------------------------------------------------------
-
-inline pointer-each (n op value args...)
-    let n = (imply n usize)
-    if (n == 1:usize)
-        op (value as ref) args...
-    else
-        # unroll only if <= 4 elements
-        let loop (i) =
-            if ((constant? n) and (n <= 4:usize)) 0:usize
-            else (unconst 0:usize)
-        if (i < n)
-            op
-                (getelementptr value i) as ref
-                args...
-            loop (i + 1:usize)
-    return;
-
-inline pointer-each2 (n op value other)
-    let n = (imply n usize)
-    if (n == 1:usize)
-        op (value as ref) (other as ref)
-    else
-        # unroll only if <= 4 elements
-        let loop (i) =
-            if ((constant? n) and (n <= 4:usize)) 0:usize
-            else (unconst 0:usize)
-        if (i < n)
-            op
-                (getelementptr value i) as ref
-                (getelementptr other i) as ref
-            loop (i + 1:usize)
-    return;
-
-inline construct (value args...)
-    """"Invokes the constructor for `value` of reference-like type,
-        passing along optional argument set `args...`.
-    let ET = (typeof& value)
-    let op ok = (type@& ET '__new)
-    if (not ok)
-        compiler-error!
-            .. "type " (repr ET) " has no constructor"
-    pointer-each 1 op value args...
-
-inline construct-array (n value args...)
-    """"Invokes the constructor for an array `value` of reference-like type,
-        assuming that value is a pointer to an array element, passing along
-        optional argument set `args...`.
-    let ET = (typeof& value)
-    let op ok = (type@& ET '__new)
-    if (not ok)
-        compiler-error!
-            .. "type " (repr ET) " has no constructor"
-    pointer-each n op value args...
-
-inline destruct (value)
-    """"Invokes the destructor for `value` of reference-like type.
-    let ET = (typeof& value)
-    let op ok = (type@& ET '__delete)
-    if (not ok)
-        compiler-error!
-            .. "type " (repr ET) " has no destructor"
-    pointer-each 1 op value
-
-inline destruct-array (n value)
-    """"Invokes the destructor for an array `value` of reference-like type,
-        assuming that value is a pointer to an array element.
-    let ET = (typeof& value)
-    let op ok = (type@& ET '__delete)
-    if (not ok)
-        compiler-error!
-            .. "type " (repr ET) " has no destructor"
-    pointer-each n op value
-
-inline copy-construct (value source)
-    """"Invokes the copy constructor for `value` of reference-like type if
-        present, passing `source` as a value from which to copy.
-
-        `source` does not have to be of reference type, but can also be of
-        immutable element type.
-    let ET = (typeof& value)
-    let op ok = (type@& ET '__copy)
-    if (not ok)
-        compiler-error!
-            .. "type " (repr ET) " has no copy constructor"
-    pointer-each 1 op value source
-
-inline copy-construct-array (n value source)
-    """"Invokes the copy constructor for an array `value` of reference-like type,
-        passing `source` as a value from which to copy.
-
-        `source` has to be the first (referenced) element of an array too.
-    let ET = (typeof& value)
-    let op ok = (type@& ET '__copy)
-    if (not ok)
-        compiler-error!
-            .. "type " (repr ET) " has no copy constructor"
-    assert ((typeof source) < ref)
-    pointer-each2 n op value source
-
-inline move-construct (value source)
-    """"Invokes the move constructor for `value` of reference-like type,
-        passing `source` as the reference from which to move.
-    let ET = (typeof& value)
-    let op ok = (type@& ET '__move)
-    if ok
-        pointer-each2 1 op value source
-    else
-        # try copy, then destruct source
-        copy-construct value source
-        destruct source
-
-inline move-construct-array (n value source)
-    """"Invokes the move constructor for an array of pointers `value`
-        passing `source` as an array of pointers from which to move.
-    let ET = (typeof& value)
-    let op ok = (type@& ET '__move)
-    if ok
-        pointer-each2 n op value source
-    else
-        copy-construct-array n value source
-        destruct-array n source
-
-let Memory = (typename "Memory")
-typeinline Memory '__typecall (cls T args...)
-    if (((typeof T) == Symbol) and (T == 'copy))
-        if ((va-countof args...) > 1)
-            compiler-error! "copy constructor only takes one argument"
-        (type@ cls 'copy) cls args...
-    else cls
-        (type@ cls 'new) cls T args...
-
-typeinline Memory 'delete (cls value)
-    destruct value
-    (type@ cls 'free) cls value
-
-typeinline Memory 'copy (cls value)
-    let T = (typeof value)
-    let ET =
-        if (T < ref)
-            element-type (storageof T) 0
-        else T
-    let self =
-        ((type@ cls 'allocate) cls ET) as ref
-    copy-construct self value
-    self
-
-typeinline Memory 'new (cls T args...)
-    let self =
-        ((type@ cls 'allocate) cls T) as ref
-    construct self args...
-    self
-
-let HeapMemory = (typename "HeapMemory" (super = Memory))
-typeinline HeapMemory 'allocate (cls T)
-    malloc T
-typeinline HeapMemory 'free (cls value)
-    free value
-    return;
-typeinline HeapMemory 'allocate-array (cls T count)
-    malloc-array T count
-typeinline HeapMemory 'free-array (cls value count)
-    free value
-    return;
-
-let FunctionMemory = (typename "FunctionMemory" (super = Memory))
-typeinline FunctionMemory 'allocate (cls T)
-    alloca T
-typeinline FunctionMemory 'free (cls value)
-    return;
-typeinline FunctionMemory 'allocate-array (cls T count)
-    alloca-array T count
-typeinline FunctionMemory 'free-array (cls value count)
-    return;
-
-let GlobalMemory = (typename "GlobalMemory" (super = Memory))
-typeinline GlobalMemory 'allocate (cls T)
-    static-alloc T
-typeinline GlobalMemory 'free (cls value)
-    return;
-typeinline GlobalMemory 'allocate-array (cls T count)
-    assert (constant? count) "count must be constant"
-    bitcast
-        static-alloc
-            array T count
-        'set-storage (pointer T 'mutable) 'Private
-typeinline GlobalMemory 'free-array (cls value count)
-    return;
-
-typefn ref '__delete (self)
-    let T = (typeof self)
-    let ptrT = (storageof T)
-    let class = ('storage ptrT)
-    if (class == unnamed)
-        'delete HeapMemory self
-    elseif (class == 'Function)
-        'delete FunctionMemory self
-    elseif (class == 'Private)
-        'delete GlobalMemory self
-    else
-        .. "cannot delete reference of type " (repr T)
-
-#-------------------------------------------------------------------------------
-# default constructors and destructors for basic types
-#-------------------------------------------------------------------------------
-
-do
-    inline simple-new (self args...)
-        let ET = (typeof& self)
-        if (va-empty? args...)
-            store (nullof ET) self
-        else
-            store (ET args...) self
-
-    inline simple-delete (self)
-        # todo: init value to deadbeef-style noise in debug mode?
-
-    inline simple-copy (self other)
-        let ET = (typeof& self)
-        store (imply other ET) self
-
-    inline simple-deref (self)
-        load self
-
-    fn setup-simple-type (T)
-        set-type-symbol!& T '__new simple-new
-        set-type-symbol!& T '__delete simple-delete
-        set-type-symbol!& T '__copy simple-copy
-        set-type-symbol!& T '__move simple-copy
-        set-type-symbol!& T '__deref simple-deref
-
-    setup-simple-type immutable
-    setup-simple-type pointer
-
-    set-type-symbol!& opaquepointer '__delete simple-delete
-    set-type-symbol!& opaquepointer '__copy simple-copy
-    set-type-symbol!& opaquepointer '__move simple-copy
-    set-type-symbol!& opaquepointer '__deref simple-deref
-
-#-------------------------------------------------------------------------------
-
-inline supercall (cls methodname self args...)
-    let cls = (imply cls type)
-    let methodname = (imply methodname Symbol)
-    let T = (typeof self)
-    if (T < ref)
-        assert ((typeof& self) <= cls)
-        let superT = (superof cls)
-        let f ok = (type@& superT methodname)
-        if (not ok)
-            compiler-error!
-                .. "supertype " (repr superT) " of type " (repr cls)
-                    \ " does not have a reference method " (repr methodname)
-        f self args...
-    else
-        assert (T <= cls)
-        let superT = (superof cls)
-        (typeattr superT methodname) self args...
-
-#-------------------------------------------------------------------------------
-# default value constructors
-#-------------------------------------------------------------------------------
-
-inline local (T args...)
-    FunctionMemory T args...
-
-inline new (T args...)
-    HeapMemory T args...
-
-inline static (T args...)
-    GlobalMemory T args...
-
-inline delete (self)
-    """"destructs and frees `value` of types that have the `__delete` method
-        implemented. The free method must also invoke the destructor.
-    let T = (typeof self)
-    let op ok = (type@ T '__delete)
-    if ok
-        op self
-        return;
-    else
-        .. "cannot delete value of type " (repr T)
-
-#-------------------------------------------------------------------------------
-# docstrings
-#-------------------------------------------------------------------------------
-
-fn docstring (f)
-    let T = (typeof f)
-    if (T == Closure)
-        Label-docstring (Closure-label f)
-    elseif (T == Scope)
-        Scope-docstring f
-    else
-        compiler-error! "this type does have a docstring"
-
-#-------------------------------------------------------------------------------
-# null type
-#-------------------------------------------------------------------------------
-
-""""The type of the `null` constant. This type is uninstantiable.
-let NullType = (typename "NullType")
-set-typename-storage! NullType (pointer void)
-set-type-symbol! NullType '__imply
-    fn (self destT)
-        if (pointer-type? destT)
-            nullof destT
-set-type-symbol! NullType '__==
-    fn (a b flipped)
-        if flipped
-            if (pointer-type? (storageof (typeof a)))
-                icmp== (ptrtoint a usize) 0:usize
-        else
-            if (pointer-type? (storageof (typeof b)))
-                icmp== (ptrtoint b usize) 0:usize
-
-""""A pointer constant of type `NullType` that is always zero and casts to
-    any pointer type.
-let null = (nullof NullType)
-
-#-------------------------------------------------------------------------------
+                        compiler-error!
+                            .. "can't hash storage of type " (repr OT)
+            `(bitcast (sc_hash conv_u64 [('sizeof T)]) hash)
+
+'set-symbols hash
+    __hash = (inline (self) self)
+    __== = integer.__==
+    __!= = integer.__!=
+    __as =
+        box-cast
+            fn "hash-as" (vT T expr)
+                let ST = ('storageof vT)
+                if (T == ST)
+                    return `(bitcast expr T)
+                elseif (T == integer)
+                    return `(bitcast expr ST)
+                compiler-error! "unsupported type"
+    __ras =
+        box-cast
+            fn "hash-as" (vT T expr)
+                if (vT == ('storageof vT))
+                    return `(bitcast expr T)
+                compiler-error! "unsupported type"
+    __typecall =
+        do
+            inline hash2 (a b)
+                bitcast
+                    sc_hash2x64
+                        bitcast (hash1 a) u64
+                        bitcast (hash1 b) u64
+                    hash
+            spice-macro
+                fn "hash-typecall" (args)
+                    let argc = ('argcount args)
+                    verify-count argc 2 -1
+                    let value = ('getarg args 1)
+                    if (argc == 2)
+                        `(hash1 value)
+                    else
+                        ltr-multiop ('getarglist args 1) hash2
+
+va-lfold none
+    inline (key T)
+        'set-symbol T '__hash hash-storage
+    \ integer pointer real type Closure Builtin Symbol string Scope
+
+#---------------------------------------------------------------------------
 # module loading
-#-------------------------------------------------------------------------------
+#---------------------------------------------------------------------------
 
-define package
-    let package = (Scope)
-    set-scope-symbol! package 'path
-        list
-            .. compiler-dir "/lib/scopes/?.sc"
-            .. compiler-dir "/lib/scopes/?/init.sc"
-    set-scope-symbol! package 'modules (Scope)
-    package
+let wrap-if-not-run-stage =
+    spice-macro
+        fn (args)
+            raises-compile-error;
+            let argc = ('argcount args)
+            if (argc == 1)
+                let arg = ('getarg args 0)
+                if (('typeof arg) == CompileStage)
+                    return arg
+            `(Value args)
 
-set-type-symbol! Scope '__..
-    inline "Scope-join" (a b)
-        """"Join two scopes ``a`` and ``b`` into a new scope so that the
-            root of ``a`` descends from ``b``.
-        fn clone-contents (a b)
-            # search first upwards for the root scope of a, then clone a
-                piecewise with the cloned scopes as parents
-            let parent = (Scope-parent a)
-            let b =
-                if (parent == null) b
-                else
-                    clone-contents parent b
-            Scope b a
-        clone-contents (unconst a) (unconst b)
+let incomplete = (typename "incomplete")
 
-syntax-extend
-    fn make-module-path (base-dir pattern name)
-        let sz = (countof pattern)
-        loop (i start result) = 0:usize 0:usize ""
+run-stage;
+
+fn make-module-path (pattern name)
+    let sz = (countof pattern)
+    loop (i start result = 0:usize 0:usize "")
         if (i == sz)
-            return (.. result (slice pattern start))
+            return (.. result (rslice pattern start))
         if ((@ pattern i) != (char "?"))
             repeat (i + 1:usize) start result
         else
             repeat (i + 1:usize) (i + 1:usize)
-                .. result (slice pattern start i) name
+                .. result (rslice (lslice pattern i) start) name
 
-    fn exec-module (expr eval-scope)
-        let expr-anchor = (Syntax-anchor expr)
-        let f = (compile (eval expr eval-scope))
-        let rettype =
-            element-type (element-type ('typeof f) 0) 0
-        let wanted-rettype = (ReturnLabel Any)
-        let ModuleFunctionType = (pointer (function wanted-rettype))
-        let fptr =
-            if (rettype == wanted-rettype)
-                f as ModuleFunctionType
-            elseif (rettype == noreturn)
-                # module will exit program
-                let fptr = (f as (pointer (function noreturn)))
-                fptr;
-                unreachable!;
-            else
-                # build a wrapper
-                let expr =
-                    list
-                        list let 'tmp '= (list f)
-                        list unconst (list Any-new 'tmp)
-                let expr = ((Syntax-wrap expr-anchor (Any expr) false) as Syntax)
-                let f = (compile (eval expr (globals)))
-                f as ModuleFunctionType
-        fptr;
+fn exec-module (expr eval-scope)
+    let ModuleFunctionType = ('pointer ('raising (function Value) Error))
+    let StageFunctionType = ('pointer ('raising (function CompileStage) Error))
+    let expr-anchor = ('anchor expr)
+    sc_set_active_anchor expr-anchor
+    let f = (sc_eval expr-anchor (expr as list) eval-scope)
+    loop (f = f)
+        # build a wrapper
+        let wrapf =
+            spice-quote
+                fn "exec-module-stage" ()
+                    raises-compile-error;
+                    wrap-if-not-run-stage (f)
+        let wrapf = (sc_typify_template wrapf 0 (undef TypeArrayPointer))
+        let f = (sc_compile wrapf 0:u64)
+        if (('typeof f) == StageFunctionType)
+            let fptr = (f as StageFunctionType)
+            repeat (bitcast (fptr) Value)
+        else
+            let fptr = (f as ModuleFunctionType)
+            break (fptr)
 
-    fn dots-to-slashes (pattern)
-        let sz = (countof pattern)
-        loop (i start result) = 0:usize 0:usize ""
+fn dots-to-slashes (pattern)
+    let sz = (countof pattern)
+    loop (i start result = 0:usize 0:usize "")
         if (i == sz)
-            return (.. result (slice pattern start))
+            return (.. result (rslice pattern start))
         let c = (@ pattern i)
         if (c == (char "/"))
-            error!
+            compiler-error!
                 .. "no slashes permitted in module name: " pattern
         elseif (c == (char "\\"))
-            error!
+            compiler-error!
                 .. "no slashes permitted in module name: " pattern
         elseif (c != (char "."))
             repeat (i + 1:usize) start result
         elseif (icmp== (i + 1:usize) sz)
-            error!
+            compiler-error!
                 .. "invalid dot at ending of module '" pattern "'"
         else
             if (icmp== i start)
                 if (icmp>u start 0:usize)
                     repeat (i + 1:usize) (i + 1:usize)
-                        .. result (slice pattern start i) "../"
+                        .. result (rslice (lslice pattern i) start) "../"
             repeat (i + 1:usize) (i + 1:usize)
-                .. result (slice pattern start i) "/"
+                .. result (rslice (lslice pattern i) start) "/"
 
-    fn load-module (module-name module-path opts...)
-        if (not (file? module-path))
-            error!
-                .. "no such module: " module-path
-        let module-path = (realpath module-path)
-        let module-dir = (dirname module-path)
-        let expr = (list-load module-path)
-        let eval-scope = (va@ 'scope opts...)
-        let eval-scope =
-            if (none? eval-scope)
-                Scope (globals)
-            else eval-scope
-        let main-module? = (va@ 'main-module? opts...)
-        set-scope-symbol! eval-scope 'main-module?
-            if (none? main-module?) false
-            else main-module?
-        set-scope-symbol! eval-scope 'module-path module-path
-        set-scope-symbol! eval-scope 'module-dir module-dir
-        set-scope-symbol! eval-scope 'module-name module-name
-        let content = (exec-module expr (Scope eval-scope))
-        return content (unconst true)
+fn load-module (module-name module-path opts...)
+    if (not (sc_is_file module-path))
+        compiler-error!
+            .. "no such module: " module-path
+    let module-path = (sc_realpath module-path)
+    let module-dir = (sc_dirname module-path)
+    let expr = (sc_parse_from_path module-path)
+    let eval-scope =
+        va-option scope opts...
+            do
+                let newscope = (Scope (sc_get_globals))
+                'set-docstring! newscope unnamed ""
+                newscope
+    'set-symbols eval-scope
+        main-module? =
+            va-option main-module? opts... false
+        module-path = module-path
+        module-dir = module-dir
+        module-name = module-name
+    exec-module expr (Scope eval-scope)
 
-    fn patterns-from-namestr (base-dir namestr)
-        # if namestr starts with a slash (because it started with a dot),
-            we only search base-dir
-        if ((@ namestr 0) == (char "/"))
-            unconst
-                list
-                    .. base-dir "?.sc"
-                    .. base-dir "?/init.sc"
-        else
-            let package = (unconst package)
-            package.path as list
+fn patterns-from-namestr (base-dir namestr)
+    # if namestr starts with a slash (because it started with a dot),
+        we only search base-dir
+    if ((@ namestr 0:usize) == (char "/"))
+        list
+            .. base-dir "?.sc"
+            .. base-dir "?/init.sc"
+    else
+        package.path as list
 
-    let incomplete = (typename "incomplete")
-    fn require-from (base-dir name)
-        let name = (unconst name)
-        let package = (unconst package)
-        assert-typeof name Symbol
-        let namestr = (Symbol->string name)
-        let namestr = (dots-to-slashes namestr)
-        inline load-module-from-symbol (name)
-            let modules = (package.modules as Scope)
-            let loop (patterns) = (patterns-from-namestr base-dir namestr)
-            if (empty? patterns)
-                return (unconst (Any none)) (unconst false)
-            let pattern patterns = (decons patterns)
-            let pattern = (pattern as string)
-            let module-path = (realpath (make-module-path base-dir pattern namestr))
-            if (empty? module-path)
-                loop patterns
-            let module-path-sym = (Symbol module-path)
-            let content ok = (@ modules module-path-sym)
-            if ok
-                if (('typeof content) == type)
-                    if (content == incomplete)
-                        error!
-                            .. "trying to import module " (repr name)
-                                " while it is being imported"
-                return content (unconst true)
-            if (not (file? module-path))
-                loop patterns
-            set-scope-symbol! modules module-path-sym incomplete
-            let content ok = (load-module (name as string) module-path)
-            set-scope-symbol! modules module-path-sym content
-            return content ok
-        let content ok = (load-module-from-symbol name)
-        if ok
-            return content
-        io-write! "no such module '"
-        io-write! (Symbol->string name)
-        io-write! "' in paths:\n"
-        let loop (patterns) = (patterns-from-namestr base-dir namestr)
+inline slice (value start end)
+    rslice (lslice value end) start
+
+fn require-from (base-dir name)
+    #assert-typeof name Symbol
+    let namestr = (dots-to-slashes (name as string))
+    let package = ((fn () package))
+    let modules = (package.modules as Scope)
+    let all-patterns = (patterns-from-namestr base-dir namestr)
+    loop (patterns = all-patterns)
         if (empty? patterns)
-            error! "failed to import module"
+            sc_write "no such module '"
+            sc_write (as name string)
+            sc_write "' in paths:\n"
+            loop (patterns = all-patterns)
+                if (empty? patterns)
+                    compiler-error! "failed to import module"
+                let pattern patterns = (decons patterns)
+                let pattern = (pattern as string)
+                let module-path = (make-module-path pattern namestr)
+                sc_write "    "
+                sc_write module-path
+                sc_write "\n"
+                patterns
         let pattern patterns = (decons patterns)
         let pattern = (pattern as string)
-        let module-path = (make-module-path base-dir pattern namestr)
-        io-write! "    "
-        io-write! module-path
-        io-write! "\n"
-        loop patterns
+        let module-path = (sc_realpath (make-module-path pattern namestr))
+        if (empty? module-path)
+            repeat patterns
+        let module-path-sym = (Symbol module-path)
+        let content =
+            try ('@ modules module-path-sym)
+            except (err)
+                if (not (sc_is_file module-path))
+                    repeat patterns
+                'set-symbol modules module-path-sym incomplete
+                let content = (load-module (name as string) module-path)
+                'set-symbol modules module-path-sym content
+                return content
+        if (('typeof content) == type)
+            if (content == incomplete)
+                compiler-error!
+                    .. "trying to import module " (repr name)
+                        " while it is being imported"
+        return content
 
-    set-scope-symbol! syntax-scope 'require-from require-from
-    set-scope-symbol! syntax-scope 'load-module load-module
-    syntax-scope
+let import =
+    sugar-scope-macro
+        fn "import" (args scope)
+            fn resolve-scope (scope namestr start)
+                let sz = (countof namestr)
+                loop (i start = start start)
+                    if (i == sz)
+                        return (Symbol (slice namestr start i))
+                    if ((@ namestr i) == (char "."))
+                        if (i == start)
+                            repeat (add i 1:usize) (add i 1:usize)
+                    repeat (add i 1:usize) start
+            let sxname rest = (decons args)
+            let name = (sxname as Symbol)
+            let namestr = (name as string)
+            let module-dir = (scope.module-dir as string)
+            let key = (resolve-scope scope namestr 0:usize)
+            let module = (require-from module-dir name)
+            'set-symbol scope key module
+            _ module scope
 
 """"export locals as a chain of two new scopes: a scope that contains
     all the constant values in the immediate scope, and a scope that contains
     the runtime values.
-define-scope-macro locals
-    let docstr = (Scope-docstring syntax-scope unnamed)
-    let constant-scope = (Scope)
-    if (not (empty? docstr))
-        set-scope-docstring! constant-scope unnamed docstr
-    let tmp = (Parameter 'tmp)
-    loop (last-key result) = unnamed (list tmp)
-    let key value =
-        Scope-next syntax-scope last-key
-    if (key == unnamed)
-        return
-            cons do
-                list let tmp '= (list Scope constant-scope)
-                result
-            syntax-scope
-    else
-        let keydocstr =
-            Scope-docstring syntax-scope key
+let locals =
+    sugar-scope-macro
+        fn "locals" (args scope)
+            raises-compile-error;
+
+            fn stage-constant? (value)
+                ('pure? value) and (('typeof value) != SpiceMacro)
+
+            let build-local =
+                spice-macro
+                    fn (args)
+                        let constant-scope = (('getarg args 0) as Scope)
+                        let tmp = ('getarg args 1)
+                        let key = ('getarg args 2)
+                        let value = ('getarg args 3)
+                        let keydocstr = (('getarg args 4) as string)
+                        if (stage-constant? value)
+                            let key = (key as Symbol)
+                            'set-symbol constant-scope key value
+                            'set-docstring! constant-scope key keydocstr
+                            `none
+                        else
+                            let wrapvalue =
+                                if (('typeof value) == Value) value
+                                else (Value value)
+                            spice-quote
+                                sc_scope_set_symbol tmp key wrapvalue
+                                sc_scope_set_docstring tmp key keydocstr
+
+            let build-locals =
+                spice-macro
+                    fn (args)
+                        let scope = (('getarg args 0) as Scope)
+                        let docstr = ('docstring scope unnamed)
+                        let constant-scope = (Scope)
+                        if (not (empty? docstr))
+                            'set-docstring! constant-scope unnamed docstr
+                        let tmp = `(Scope constant-scope)
+                        let block = (sc_expression_new (sc_get_active_anchor))
+                        sc_expression_append block tmp
+                        loop (last-key = unnamed)
+                            let key value = ('next scope last-key)
+                            if (key == unnamed)
+                                sc_expression_append block tmp
+                                return block
+                            #if (not (stage-constant? value))
+                            let keydocstr = ('docstring scope key)
+                            let value = (sc_extract_argument_new (sc_value_anchor value) value 0)
+                            sc_expression_append block
+                                `(build-local constant-scope tmp key value keydocstr)
+                            repeat key
+
+            return `(build-locals scope) scope
+
+fn set-symbols-from-scope (T scope)
+    loop (last-key = unnamed)
+        let key value =
+            'next scope last-key
+        if (key == unnamed)
+            return;
+        #let keydocstr = ('docstring scope key)
+        'set-symbol T key value
+        #'set-docstring! T key keydocstr
         repeat key
-            if (key == unnamed)
-                # skip
-                result
-            else
-                let keyT = ('typeof value)
-                if ((keyT == Parameter) or (keyT == Label))
-                    cons
-                        list set-scope-symbol! tmp (list quote key) value
-                        list set-scope-docstring! tmp (list quote key) keydocstr
-                        result
-                else
-                    set-scope-symbol! constant-scope key value
-                    set-scope-docstring! constant-scope key keydocstr
-                    result
 
-define-macro import
-    fn resolve-scope (scope namestr start)
-        let sz = (countof namestr)
-        loop (i start scope) = start start scope
-        if (i == sz)
-            return scope (Symbol (slice namestr start i))
-        if ((@ namestr i) == (char "."))
-            if (i == start)
-                repeat (add i 1:usize) (add i 1:usize) scope
-        repeat (add i 1:usize) start scope
-
-    let sxname rest = (decons args)
-    let name = (sxname as Syntax as Symbol)
-    let namestr = (name as string)
-    list syntax-extend
-        list let 'scope 'key '=
-            list resolve-scope 'syntax-scope namestr 0:usize
-        list set-scope-symbol! 'scope 'key
-            list 'require-from 'module-dir
-                list quote name
-        'syntax-scope
-
-let i8* = (pointer i8)
-let llvm.eh.sjlj.setjmp =
-    extern 'llvm.eh.sjlj.setjmp (function i32 i8*)
-let llvm.eh.sjlj.longjmp =
-    extern 'llvm.eh.sjlj.longjmp (function void i8*)
-let llvm.frameaddress =
-    extern 'llvm.frameaddress (function i8* i32)
-let llvm.stacksave =
-    extern 'llvm.stacksave (function i8*)
-
-inline xpcall (f errorf)
-    let pad = (alloca-exception-pad)
-    let old-pad =
-        set-exception-pad pad
-    if (== operating-system 'windows)
-        if ((sc_setjmp pad (nullof i8*)) != 0)
-            set-exception-pad old-pad
-            errorf (exception-value pad)
-        else
-            let result... = (f)
-            set-exception-pad old-pad
-            result...
-    else
-        if ((sc_setjmp pad) != 0)
-            set-exception-pad old-pad
-            errorf (exception-value pad)
-        else
-            let result... = (f)
-            set-exception-pad old-pad
-            result...
-
-#fn xpcall (f errorf)
-    let pad = (alloca exception-pad-type)
-    let old-pad =
-        set-exception-pad pad
-    let pad-target = (bitcast pad (pointer i8* 'mutable))
-    store (llvm.frameaddress 0) pad-target
-    store (llvm.stacksave) (getelementptr pad-target 2)
-    if ((llvm.eh.sjlj.setjmp (bitcast pad-target i8*)) != 0)
-        set-exception-pad old-pad
-        errorf (exception-value pad)
-    else
-        let result... = (f)
-        set-exception-pad old-pad
-        result...
-
-del i8*
-
-fn format-exception (exc)
-    if (('typeof exc) == Exception)
-        let exc = (exc as Exception)
-        format-message (Exception-anchor exc)
-            .. (default-styler style-error "error:")
-                \ " " (Exception-message exc)
-    else
-        .. "exception raised: " (repr exc) "\n"
-
-fn prompt (prefix preload)
-    __prompt prefix
-        if (none? preload) ""
-        else preload
-
-#-------------------------------------------------------------------------------
-# match
-#-------------------------------------------------------------------------------
-
-# earliest form of match macro - doesn't do elaborate patterns yet, just
-    simple switch-case style comparisons
-define-macro match
-    let value rest = (decons args)
-    let tmp = (Parameter 'tmp)
-
-    fn vardef? (val)
-        (('typeof val) == Symbol) and ((@ (val as Symbol as string) 0) == (char "$"))
-
-    fn match-pattern (src sxkey)
-        assert-typeof src Parameter
-        assert-typeof sxkey Syntax
-        let anchor = (sxkey as Anchor)
-        let key = (sxkey as Any)
-        let result =
-            if (('typeof key) == list)
-                let key = (key as list)
-                if (empty? key)
-                    list 'empty? src
-                else
-                    let head rest = (decons key)
-                    let head = (head as Syntax as Symbol)
-                    if (head == 'quote)
-                        list '== src sxkey
-                    # better support generic iterator
-                    #elseif (head == 'list)
-                        fn process-list-args (anchor src rest)
-                            if (empty? rest)
-                                list (list 'empty? src)
-                            else
-                                let tmp tmprest = (Parameter 'tmp) (Parameter 'rest)
-                                let x rest = (decons rest)
-                                cons
-                                    list 'not (list 'empty? src)
-                                    list do-in
-                                        list let tmp tmprest '= (list 'decons src)
-                                        match-pattern tmp (x as Syntax)
-                                    process-list-args anchor tmprest rest
-                        cons 'and
-                            list '== (list typeof src) list
-                            process-list-args anchor src rest
-                    elseif (head == 'or)
-                        if ((countof rest) < 2)
-                            error! "'or' needs two arguments"
-                        fn process-or-args (src rest)
-                            let a rest = (decons rest)
-                            if ((countof rest) <= 1)
-                                let b = (decons rest)
-                                list 'or
-                                    match-pattern src (a as Syntax)
-                                    match-pattern src (b as Syntax)
-                            else
-                                list 'or
-                                    match-pattern src (a as Syntax)
-                                    process-or-args src rest
-                        process-or-args src rest
-                    else
-                        error!
-                            .. "invalid pattern: " (repr key)
-            elseif (vardef? key)
-                let sym = (Symbol (slice (key as Symbol as string) 1))
-                list do-in
-                    list let sym '= src
-                    true
-            else
-                # simple comparison
-                list '== src key
-        #print result
-        Syntax-wrap anchor (Any result) false
-
-    fn process (i src expr)
-        if (empty? expr)
-            error! "else expected"
-        let pair rest = (decons expr)
-        let key dst = (decons (pair as Syntax as list))
-        let kkey = (key as Syntax as Any)
-        let keytype = ('typeof kkey)
-        if ((keytype == Symbol) and (kkey == 'else))
-            cons (cons 'else dst) '()
-        else
-            cons
-                cons
-                    ? (i == 0) 'if 'elseif
-                    match-pattern src (key as Syntax)
-                    dst
-                process (i + 1) src rest
-    cons do
-        list let tmp '= value
-        process (unconst 0) tmp rest
-
-#-------------------------------------------------------------------------------
-# various C related sugar
-#-------------------------------------------------------------------------------
-
-# labels safecast to function pointers
-typefn Closure '__imply (self destT)
-    if (function-pointer-type? destT)
-        let ET = (rawcall element-type destT 0)
-        let sz = (itrunc (rawcall type-countof ET) i32)
-        if (rawcall function-type-variadic? ET)
-            compiler-error! "cannot typify to variadic function"
-        let loop (i args...) = sz
-        if (icmp== i 1)
-            let result =
-                unconst (typify self args...)
-            if (destT != (typeof result))
-                syntax-error! (Label-anchor (Closure-label self))
-                    .. "function does not compile to type " (repr destT)
-                        \ " but has type " (repr (typeof result))
-            return result
-        else
-            let i-1 = (sub i 1)
-            loop i-1 (rawcall element-type ET i-1) args...
-
-# pointer comparisons
-typeinline pointer '__== (a b flipped)
-    if flipped
-        icmp== (ptrtoint (a as (typeof b)) usize) (ptrtoint b usize)
-    else
-        icmp== (ptrtoint a usize) (ptrtoint (b as (typeof a)) usize)
-
-# pointer cast to element type executes load
-typeinline pointer '__as (self destT)
-    if (type== destT (element-type (typeof self) 0))
-        load self
-
-# also supports mutable pointer safecast to immutable pointer
-typeinline pointer '__imply (self destT)
-    if (type== destT ref)
-        bitcast self (ref (typeof self))
-    elseif (pointer-type-imply? (typeof self) destT)
-        bitcast self destT
-
-# support getattr syntax
-typefn pointer '__getattr (self name)
-    let ET = (element-type (typeof self) 0)
-    let op success = (type@& ET '__getattr)
-    if success
-        let result... = (op (self as ref) name)
-        if (va-empty? result...)
-        else
-            return result...
-    forward-getattr (load self) name
-
-typefn& pointer '__getattr (self name)
-    '__getattr (deref self) name
-
-# support @
-typeinline pointer '__@ (self index)
-    let index =
-        if (none? index) 0:usize # simple dereference
-        else index
-    (getelementptr self (usize index)) as ref
-
-# extern cast to element type/pointer executes load/unconst
-typeinline extern '__imply (self destT)
-    let ET = (element-type (typeof self) 0)
-    if (type== destT ET)
-        unconst self
-    else
-        forward-imply (load self) destT
-
-typeinline extern '__getattr (self name)
-    let T = (typeof self)
-    let pET = (element-type T 0)
-    let ET = (element-type pET 0)
-    let op success = (type@& ET '__getattr)
-    if success
-        let result... = (op (unconst (bitcast self (storageof T))) name)
-        if (va-empty? result...)
-        else
-            return result...
-    forward-getattr (load self) name
-
-typeinline extern '__as (self destT)
-    forward-as (load self) destT
-
-# support assignment syntax for extern
-typeinline extern '__= (self value)
-    let ET = (element-type (element-type (typeof self) 0) 0)
-    store (imply value ET) self
-    true
-
-# support @ for extern
-typeinline extern '__@ (self value)
-    @ (unconst self) value
-
-do
-    fn get-op (self op)
-        let self = (load self)
-        let op ok = (type@ (typeof self) op)
-        return self op ok
-    fn forward-op (op)
-        typefn extern op (a b flipped)
-            let a b op ok =
-                if flipped
-                    _ a (get-op b op)
-                else
-                    let a op ok = (get-op a op)
-                    _ a b op ok
-            if ok
-                op a b flipped
-    let ops... = '__* '__/ '__// '__+ '__- '__**
-    let loop (i) = (va-countof ops...)
-    if (i > 0)
-        let i = (i - 1)
-        forward-op
-            va@ i ops...
-        loop i
-
-do
-    fn unenum (val)
-        let T = (typeof val)
-        if (T < CEnum)
-            bitcast val (storageof T)
-        else val
-
-    # support for downcast
-    typefn CEnum '__imply (self destT)
-        let ST = (storageof (typeof self))
-        if (type== destT ST)
-            bitcast self ST
-        elseif (type== destT i32)
-            bitcast self i32
-
-    typefn CEnum '__as (self destT)
-        let ST = (storageof (typeof self))
-        if (type== destT integer)
-            bitcast self ST
-
-    fn passthru-overload (sym func)
-        set-type-symbol! CEnum sym (fn (a b flipped) (func (unenum a) (unenum b)))
-    fn passthru-overload1 (sym func)
-        set-type-symbol! CEnum sym (fn (self) (func (unenum self)))
-
-    passthru-overload '__!= !=; passthru-overload '__== ==
-    passthru-overload '__< <; passthru-overload '__<= <=
-    passthru-overload '__> >; passthru-overload '__>= >=
-    passthru-overload '__+ +; passthru-overload '__- -
-    passthru-overload '__* *; passthru-overload '__/ /
-    passthru-overload '__// //; passthru-overload '__% %
-    passthru-overload '__<< <<; passthru-overload '__>> >>
-    passthru-overload '__| |
-    passthru-overload '__^ ^
-    passthru-overload '__& &
-    passthru-overload1 '__~ ~
-    passthru-overload1 '__rcp /
-    passthru-overload1 '__neg -
-
-typefn CStruct 'structof (cls args...)
-    let sz = (va-countof args...)
-    if (icmp== sz 0)
-        nullof cls
-    else
-        let T = (storageof cls)
-        let keys... = (va-keys args...)
-        let loop (i instance) = 0 (nullof cls)
-        if (icmp<s i sz)
-            let key = (va@ i keys...)
-            let arg = (va@ i args...)
-            let k =
-                if (key == unnamed) i
-                else
-                    element-index T key
-            let ET = (element-type T k)
-            loop (add i 1)
-                insertvalue instance (imply arg ET) k
-        else
-            instance
-
-inline CStruct->tuple (self)
-    bitcast& self (storageof (@ (typeof self)))
-
-typefn& CStruct '__new (self args...)
-    let sz = (va-countof args...)
-    let T = (typeof& self)
-    # construct as tuple
-    construct
-        CStruct->tuple self
-    if (icmp>s sz 0)
-        # todo: do a bit more efficient initialization, as right now we're first
-            default-initing, and then rewriting some of the values anyways
-        let keys... = (va-keys args...)
-        let loop (i) = 0
-        if (icmp<s i sz)
-            let key = (va@ i keys...)
-            let arg = (va@ i args...)
-            let k =
-                if (key == unnamed) i
-                else
-                    element-index T key
-            =
-                (getelementptr self 0 k) as ref
-                arg
-            loop (i + 1)
-
-typefn& CStruct '__copy (self other)
-    let ET = (typeof& self)
-    let self = (CStruct->tuple self)
-    let otherT = (typeof other)
-    let other =
-        if (otherT == ET)
-            bitcast other (storageof ET)
-        elseif (otherT < ref and (typeof& other) == ET)
-            CStruct->tuple other
-        else
-            compiler-error!
-                .. "can't copy-construct " (repr ET)
-                    \ " from type " (repr (typeof other))
-    copy-construct self other
-
-typeinline& CStruct '__delete (self)
-    destruct
-        CStruct->tuple self
-
-# support for C struct initializers
-typeinline CStruct '__typecall (cls args...)
-    if (cls == CStruct)
-        compiler-error! "CStruct type constructor is deprecated"
-    else
-        'structof cls args...
-
-# access reference to struct element from pointer/reference
-typeinline& CStruct '__getattr (self name)
-    let ET = (element-type (typeof self) 0)
-    let idx = (element-index ET name)
-    if (icmp>=s idx 0)
-        # cast result to reference
-        (getelementptr self 0 idx) as ref
-
-typeinline CStruct '__getattr (self name)
-    let idx = (element-index (typeof self) name)
-    if (icmp>=s idx 0)
-        extractvalue self idx
-
-#-------------------------------------------------------------------------------
-
-# support for basic C union initializer
-typefn CUnion '__typecall (cls)
-    nullof cls
-
-typefn& CUnion '__new (self)
-    let cls = (@ (typeof self))
-    store (nullof cls) self
-
-typefn& CUnion '__copy (self other)
-    let other =
-        if ((typeof other) < ref) (load other)
-        else other
-    store other self
-
-typefn& CUnion '__delete (self)
-
-# access reference to union element from pointer/reference
-typeinline& CUnion '__getattr (self name)
-    let ET = (element-type (typeof self) 0)
-    let idx = (element-index ET name)
-    if (icmp>=s idx 0)
-        let FT = (element-type ET idx)
-        let newPT =
-            'set-element-type (storageof (typeof self)) FT
-        # cast pointer to reference to alternative type
-        (bitcast self newPT) as ref
-
-typeinline CUnion '__getattr (self name)
-    let idx = (element-index (typeof self) name)
-    if (icmp>=s idx 0)
-        extractvalue self idx
-
-# extern call attempts to cast arguments to correct type
-typeinline extern '__call (self ...)
-    label docall (dest ET)
-        let sz = (va-countof ...)
-        let count = (itrunc (rawcall type-countof ET) i32)
-        let variadic = (rawcall function-type-variadic? ET)
-        let loop (i args...) = sz
-        if (icmp== i 0)
-            return
-                rawcall dest args...
-        else
-            let i-1 = (sub i 1)
-            let arg = (va@ i-1 ...)
-            if ((not variadic) or (icmp<s i count))
-                let argtype = (rawcall element-type ET i)
-                loop i-1 (imply arg argtype) args...
-            else
-                loop i-1 arg args...
-
-    let pET = (rawcall element-type (typeof self) 0)
-    let ET = (rawcall element-type pET 0)
-    let ST = (rawcall superof ET)
-    if (type== ST function)
-        docall self ET
-    elseif (function-pointer-type? ET) # can also call pointer to pointer to function
-        docall (load self) (rawcall element-type ET 0)
-    else
-        (load self) ...
-
-#-------------------------------------------------------------------------------
+#---------------------------------------------------------------------------
 # using
-#-------------------------------------------------------------------------------
+#---------------------------------------------------------------------------
 
 fn merge-scope-symbols (source target filter)
+    fn process-keys (source target filter)
+        loop (last-key = unnamed)
+            let key value = ('next source last-key)
+            if (key != unnamed)
+                if
+                    or
+                        none? filter
+                        do
+                            let keystr = (key as string)
+                            'match? filter keystr
+                    'set-symbol target key value
+                repeat key
+            else
+                break target
     fn filter-contents (source target filter)
-        let parent = (Scope-parent source)
-        let target =
-            if (parent == null) target
-            else
-                filter-contents parent target filter
-        let loop (last-key) = (unconst unnamed)
-        let key value =
-            Scope-next source last-key
-        if (key != unnamed)
-            if
-                or
-                    none? filter
-                    do
-                        let keystr = (key as string)
-                        string-match? filter keystr
-                set-scope-symbol! target key value
-            loop key
-        else
-            target
-    filter-contents (unconst source) (unconst target) filter
-
-define-scope-macro using
-    let name rest = (decons args)
-    let nameval = (name as Syntax as Any)
-    if ((('typeof nameval) == Symbol) and ((nameval as Symbol) == 'import))
-        let module-dir ok = (@ syntax-scope 'module-dir)
-        if (not ok)
-            error! "using import requires module-dir symbol in scope"
-        let module-dir = (module-dir as string)
-        let name rest = (decons rest)
-        let name = (name as Syntax as Symbol)
-        let module = ((require-from module-dir name) as Scope)
-        return (unconst (list do))
-            .. module syntax-scope
-    let pattern =
-        if (empty? rest)
-            unconst '()
-        else
-            let token pattern rest = (decons rest 2)
-            let token = (token as Syntax as Symbol)
-            if (token != 'filter)
-                syntax-error! (active-anchor)
-                    "syntax: using <scope> [filter <filter-string>]"
-            let pattern = (pattern as Syntax as string)
-            list pattern
-    # attempt to import directly if possible
-    label process (src)
-        return (unconst (list do))
-            if (empty? pattern)
-                merge-scope-symbols src syntax-scope
-            else
-                merge-scope-symbols src syntax-scope ((@ pattern 0) as string)
-    if (('typeof nameval) == Symbol)
-        let sym = (nameval as Symbol)
-        let src ok = (@ syntax-scope sym)
-        if (ok and (('typeof src) == Scope))
-            process (src as Scope)
-    elseif (('typeof nameval) == Scope)
-        process (nameval as Scope)
-    return
-        list syntax-extend
-            cons merge-scope-symbols name 'syntax-scope pattern
-        syntax-scope
-
-define-macro from
-    inline load-from (src keys...)
-        let loop (i result...) = (va-countof keys...)
-        if (i == 0)
-            result...
-        else
-            let i = (i - 1)
-            let key = (va@ i keys...)
-            loop i
-                src @ key
-                result...
-    let src kw params = (decons args 2)
-    if ((kw as Syntax as Symbol) != 'let)
-        syntax-error! kw "`let` keyword expected"
-    fn quotify (params)
-        if (empty? params)
-            unconst '()
-        else
-            let entry rest = (decons params)
-            entry as Syntax as Symbol
-            cons
-                list quote entry
-                quotify rest
-    cons let
-        .. params
-            list '=
-                cons load-from src
-                    quotify params
-
-#-------------------------------------------------------------------------------
-# struct declaration
-#-------------------------------------------------------------------------------
-
-define-scope-macro struct
-    inline begin-arg ()
-    inline end-args (f) (f)
-    inline append-arg (prevf x...)
-        inline (f)
-            prevf
-                inline ()
-                    return x... (f)
-
-    define struct-dsl
-        define-block-scope-macro :
-            let args = (list-next expr)
-            let lhs rhs = (decons args 2)
-            lhs as Syntax as Symbol
+        let parent = ('parent source)
+        if (parent == null)
             return
-                cons
-                    list let 'field-types '=
-                        list append-arg 'field-types (list lhs '= rhs)
-                    next-expr
-                syntax-scope
-        define-macro method
-            let name params body = (decons args 2)
-            list set-type-symbol! 'this-struct name
-                cons fn params body
-        define-macro method&
-            let name params body = (decons args 2)
-            list set-type-symbol!& 'this-struct name
-                cons fn params body
-        define-macro inlinemethod
-            let name params body = (decons args 2)
-            list set-type-symbol! 'this-struct name
-                cons inline params body
-        define-macro inlinemethod&
-            let name params body = (decons args 2)
-            list set-type-symbol!& 'this-struct name
-                cons inline params body
+                process-keys source target filter
+        process-keys source
+            filter-contents parent target filter
+            filter
+    filter-contents source target filter
 
-        define-infix> 70 :
-        locals;
+let using =
+    sugar-scope-macro
+        fn "using" (args sugar-scope)
+            let name rest = (decons args)
+            let nameval = name
+            if ((('typeof nameval) == Symbol) and ((nameval as Symbol) == 'import))
+                let module-dir = (('@ sugar-scope 'module-dir) as string)
+                let name rest = (decons rest)
+                let name = (name as Symbol)
+                let module = ((require-from module-dir name) as Scope)
+                return (list do none)
+                    .. module sugar-scope
 
-    fn finalize-struct (T field-types)
-        set-typename-storage! T
-            call
-                if (T < CStruct)
-                    tuple
+            let pattern =
+                if (empty? rest)
+                    '()
                 else
-                    union
-                field-types begin-arg
-        T
+                    let token pattern rest = (decons rest 2)
+                    let token = (token as Symbol)
+                    if (token != 'filter)
+                        compiler-error!
+                            "syntax: using <scope> [filter <filter-string>]"
+                    let pattern = (pattern as string)
+                    list pattern
+            # attempt to import directly if possible
+            inline process (src)
+                _ (list do)
+                    if (empty? pattern)
+                        merge-scope-symbols src sugar-scope none
+                    else
+                        merge-scope-symbols src sugar-scope (('@ pattern) as string)
+            if (('typeof nameval) == Symbol)
+                let sym = (nameval as Symbol)
+                label skip
+                    let src =
+                        try
+                            ('@ sugar-scope sym) as Scope
+                        except (err)
+                            merge skip
+                    return (process src)
+            elseif (('typeof nameval) == Scope)
+                return (process (nameval as Scope))
+            compiler-error! "using: scope expeced"
+            #return
+                list run-stage
+                    cons merge-scope-symbols name 'sugar-scope pattern
+                sugar-scope
 
-    let head body = (decons args)
-    let head = (head as Syntax)
-    let any-head = (head as Any)
-    fn complete-declaration ()
-    inline generate-expression (superT name body)
-        if (('typeof (name as Any)) == Symbol)
-            # constant
-            let symname = (name as Any as Symbol)
-            # see if we can find a forward declaration in the local scope
-            let T ok = (Scope-local@ syntax-scope symname)
-            fn completable-type? (T)
-                and
-                    (typeof T) == type
-                    typename-type? T
-                    opaque? T
-                    (superof T) == typename
+# (define-macro name expr ...)
+# implies builtin names:
+    args : list
+define define-sugar-macro
+    sugar-macro
+        fn "expand-define-sugar-macro" (expr)
+            raises-compile-error;
+            let name body = (decons expr)
+            list define name
+                list sugar-macro
+                    cons fn '(args)
+                        list raises-compile-error;
+                        body
 
-            return
-                if (empty? body)
-                    # forward declaration
-                    list let name '=
-                        list do
-                            list using struct-dsl
-                            list let 'this-struct '=
-                                list typename-type
-                                    symname as string
-                            'this-struct
-                else
-                    # body declaration
-                    list let name '=
-                        cons do
-                            list using struct-dsl
-                            list let 'this-struct '=
-                                list if (list completable-type? T) T
-                                list 'else
-                                    list typename-type
-                                        symname as string
-                            list let name '= 'this-struct
-                            list set-typename-super! 'this-struct superT
-                            list let 'field-types '= end-args
-                            ..
-                                cons do body
-                                list
-                                    list finalize-struct 'this-struct 'field-types
-                syntax-scope
-        else
-            # expression
-            return
-                cons do
-                    list using struct-dsl
-                    list let 'this-struct '=
-                        list typename-type
-                            list (do as) name string
-                    list set-typename-super! 'this-struct superT
-                    list let 'field-types '= end-args
-                    ..
-                        cons do body
-                        list
-                            list finalize-struct 'this-struct 'field-types
-                syntax-scope
+let __assert =
+    spice-macro
+        fn (args)
+            fn check-assertion (result anchor msg)
+                if (not result)
+                    sc_set_active_anchor anchor
+                    compiler-error!
+                        .. "assertion failed: " msg
+                return;
 
-    if (('typeof any-head) == Symbol and any-head as Symbol == 'union)
-        let head body = (decons body)
-        generate-expression CUnion (head as Syntax) body
-    else
-        generate-expression CStruct head body
-
-#-------------------------------------------------------------------------------
-# enum declaration
-#-------------------------------------------------------------------------------
-
-define-scope-macro enum
-    fn make-enum (T vals...)
-        set-typename-super! T CEnum
-        set-typename-storage! T i32
-        let count = (va-countof vals...)
-        let keys... = (va-keys vals...)
-        let loop (i nextval) = 0 0
-        if (i < count)
-            let key = (va@ i keys...)
-            let val = (va@ i vals...)
-            if (not (constant? val))
-                compiler-error! "all enum values must be constant"
-            loop (i + 1)
-                if (key == unnamed)
-                    # auto-numerical
-                    set-type-symbol! T val (bitcast (imply nextval i32) T)
-                    nextval + 1
-                else
-                    set-type-symbol! T key (bitcast (imply val i32) T)
-                    val + 1
-        T
-
-    fn convert-body (body)
-        let expr body = (decons body)
-        let anyexpr = (expr as Syntax as Any)
-        cons
-            if (('typeof anyexpr) == Symbol)
-                Any (list quote expr)
-            else expr
-            if (empty? body)
-                unconst '()
+            let argc = ('argcount args)
+            verify-count argc 2 2
+            let expr msg =
+                'getarg args 0
+                'getarg args 1
+            let anchor = (sc_get_active_anchor)
+            if ('constant? expr)
+                let msg = (msg as string)
+                let val = (expr as bool)
+                check-assertion val anchor msg
+                box-empty;
             else
-                convert-body body
+                if (('typeof msg) != string)
+                    compiler-error! "string expected as second argument"
+                `(check-assertion expr anchor msg)
 
+let vector-reduce =
+    spice-macro
+        fn (args)
+            let argc = ('argcount args)
+            verify-count argc 2 2
+            let f v =
+                'getarg args 0
+                'getarg args 1
+            let T = ('typeof v)
+            let sz = ('element-count T)
+            loop (v sz = v sz)
+                # special cases for low vector sizes
+                switch sz
+                case 1
+                    break
+                        spice-quote
+                            extractelement v 0
+                case 2
+                    break
+                        spice-quote
+                            f
+                                extractelement v 0
+                                extractelement v 1
+                case 3
+                    break
+                        spice-quote
+                            f
+                                f
+                                    extractelement v 0
+                                    extractelement v 1
+                                extractelement v 2
+                case 4
+                    break
+                        spice-quote
+                            f
+                                f
+                                    extractelement v 0
+                                    extractelement v 1
+                                f
+                                    extractelement v 2
+                                    extractelement v 3
+                default
+                    let hsz = (sz >> 1)
+                    let fsz = (hsz << 1)
+                    if (fsz != sz)
+                        compiler-error! "vector size must be a power of two"
+                    let hsz-value = (Value (hsz as usize))
+                    repeat
+                        spice-quote
+                            f
+                                lslice v hsz-value
+                                rslice v hsz-value
+                        hsz
+
+let __countof-aggregate =
+    spice-macro
+        fn (args)
+            let argc = ('argcount args)
+            verify-count argc 1 1
+            let self = ('getarg args 0)
+            let T = ('typeof self)
+            let sz = ('element-count T)
+            Value (sz as usize)
+
+run-stage;
+
+# (define-scope-macro name expr ...)
+# implies builtin names:
+    args : list
+    scope : Scope
+define-sugar-macro define-sugar-scope-macro
     let name body = (decons args)
-    let anyname = (name as Syntax as Any)
-    let newbody = (convert-body body)
-    return
-        if (('typeof anyname) == Symbol)
-            let namestr = (anyname as Symbol as string)
-            list let name '=
-                cons make-enum (list typename-type namestr) newbody
+    list define name
+        list sugar-scope-macro
+            cons fn '(args sugar-scope) body
+
+# (define-block-scope-macro name expr ...)
+# implies builtin names:
+    expr : list
+    next-expr : list
+    scope : Scope
+define-sugar-macro define-sugar-block-scope-macro
+    let name body = (decons args)
+    list define name
+        list sugar-block-scope-macro
+            cons fn '(expr next-expr sugar-scope) body
+
+'set-symbols type
+    symbols =
+        inline "symbols" (self)
+            Generator
+                inline (fdone key)
+                    let key value =
+                        sc_type_next self key
+                    if (key == unnamed)
+                        fdone;
+                    else
+                        _ key key value
+                unnamed
+    elements =
+        inline "elements" (self)
+            let count = ('element-count self)
+            Generator
+                inline (fdone i)
+                    if (i == count)
+                        fdone;
+                    else
+                        _ (i + 1) ('element@ self i)
+                0
+
+inline scope-generator (self)
+    Generator
+        inline (fdone key)
+            let key value =
+                sc_scope_next self key
+            if (key == unnamed)
+                fdone;
+            else
+                _ key key value
+        unnamed
+
+inline list-generator (self)
+    Generator
+        inline (fdone cell)
+            if (empty? cell)
+                fdone;
+            else
+                let at next = (decons cell)
+                _ next at
+        self
+
+'set-symbols Scope
+    __as =
+        box-cast
+            fn "scope-as" (vT T expr)
+                if (T == Generator)
+                    return `(scope-generator expr)
+                compiler-error! "unsupported type"
+
+'set-symbols list
+    __as =
+        box-cast
+            fn "list-as" (vT T expr)
+                if (T == Generator)
+                    return `(list-generator expr)
+                compiler-error! "unsupported type"
+
+'set-symbols Value
+    args =
+        inline "Value-args" (self)
+            let argc = ('argcount self)
+            Generator
+                inline (fdone x)
+                    if (x < argc)
+                        _ (x + 1) ('getarg self x)
+                    else
+                        fdone;
+                0
+
+inline range (a b c)
+    let num-type = (typeof a)
+    let step =
+        constbranch (none? c)
+            inline () (1 as num-type)
+            inline () c
+    let from =
+        constbranch (none? b)
+            inline () (0 as num-type)
+            inline () a
+    let to =
+        constbranch (none? b)
+            inline () a
+            inline () b
+    Generator
+        inline (fdone x)
+            if (x < to)
+                _ (x + step) x
+            else
+                fdone;
+        from
+
+let parse-compile-flags =
+    spice-macro
+        fn (args)
+            inline flag-error (flag)
+                compiler-error!
+                    .. "illegal flag: " (repr flag)
+                        ". try one of"
+                        \ " " (repr 'dump-disassembly)
+                        \ " " (repr 'dump-module)
+                        \ " " (repr 'dump-function)
+                        \ " " (repr 'dump-time)
+                        \ " " (repr 'no-debug-info)
+                        \ " " (repr 'O1)
+                        \ " " (repr 'O2)
+                        \ " " (repr 'O3)
+            let argc = ('argcount args)
+            loop (i flags = 0 0:u64)
+                if (i == argc)
+                    break `flags
+                let arg = ('getarg args i)
+                let flag = (arg as Symbol)
+                let flag =
+                    switch flag
+                    case 'dump-disassembly compile-flag-dump-disassembly
+                    case 'dump-module compile-flag-dump-module
+                    case 'dump-function compile-flag-dump-function
+                    case 'dump-time compile-flag-dump-time
+                    case 'no-debug-info compile-flag-no-debug-info
+                    case 'O1 compile-flag-O1
+                    case 'O2 compile-flag-O2
+                    case 'O3 compile-flag-O3
+                    default (flag-error flag)
+                _ (i + 1) (flags | flag)
+
+spice-quote
+    inline compile (func flags...)
+        sc_compile func (parse-compile-flags flags...)
+
+    inline compile-glsl (target func flags...)
+        sc_compile_glsl target func (parse-compile-flags flags...)
+
+    inline compile-object (func table flags...)
+        sc_compile_object func table (parse-compile-flags flags...)
+
+define-sugar-macro assert
+    let cond msg body = (decons args 2)
+    let msg =
+        if ((countof args) == 2) msg
         else
-            cons make-enum (list typename-type (list (do as) name string)) newbody
-        syntax-scope
+            if (('typeof cond) == list)
+                `[(sc_list_repr (cond as list))]
+            else
+                `[(repr cond)]
+    list __assert cond msg
 
-#-------------------------------------------------------------------------------
-# none
-#-------------------------------------------------------------------------------
-
-typefn Nothing '__hash (self)
-    hash Nothing 0
-
-#-------------------------------------------------------------------------------
-# aggregate
-#-------------------------------------------------------------------------------
-
-typefn& aggregate '__deref (self)
-    load self
+define-sugar-macro while
+    let cond body = (decons args)
+    list loop '()
+        list inline 'continue '()
+            list repeat
+        list if cond
+            cons do body
+            list repeat
+        list 'else
+            list break
 
 #-------------------------------------------------------------------------------
 # tuples
 #-------------------------------------------------------------------------------
 
-do
-    inline tuple-each (f)
-        fn (self)
-            let ET = (typeof& self)
-            let count = (i32 (type-countof ET))
-            let loop (i) = 0
-            if (icmp<s i count)
-                f ((getelementptr self 0 i) as ref)
-                loop (i + 1)
+inline make-unpack-function (extractf)
+    spice-macro
+        fn (args)
+            let argc = ('argcount args)
+            verify-count argc 1 1
+            let self = ('getarg args 0)
+            let T = ('typeof self)
+            let count = ('element-count T)
+            let outargs = (sc_argument_list_new (sc_get_active_anchor))
+            loop (i = 0)
+                if (icmp== i count)
+                    break outargs
+                sc_argument_list_append outargs `(extractf self i)
+                add i 1
 
-    inline tuple-each2 (f)
-        fn (self other)
-            let ET = (typeof& self)
-            let count = (i32 (type-countof ET))
-            if ((typeof other) < ref)
-                assert ((typeof& other) == ET)
-                let loop (i) = 0
-                if (icmp<s i count)
-                    f
-                        (getelementptr self 0 i) as ref
-                        (getelementptr other 0 i) as ref
-                    loop (i + 1)
-            else
-                # copy right-hand side by element
-                let other = (imply other ET)
-                let loop (i) = 0
-                if (icmp<s i count)
-                    f
-                        (getelementptr self 0 i) as ref
-                        extractvalue other i
-                    loop (i + 1)
+let __unpack-aggregate = (make-unpack-function extractvalue)
 
-    set-type-symbol!& tuple '__new (tuple-each construct)
-    set-type-symbol!& tuple '__delete (tuple-each destruct)
-    set-type-symbol!& tuple '__copy (tuple-each2 copy-construct)
-    set-type-symbol!& tuple '__move (tuple-each2 move-construct)
+'set-symbols tuple
+    __unpack = __unpack-aggregate
+    __countof = __countof-aggregate
+    __getattr = extractvalue
+    __@ = extractvalue
 
-typefn tuple '__hash (self)
-    # hash all tuple values
-    let T = (typeof self)
-    let count = (type-countof T)
-    let loop (i result) = 0:usize (hash tuple)
-    if (icmp<s i count)
-        loop (i + 1:usize)
-            hash result (extractvalue self i)
-    else
-        result
+let tupleof =
+    spice-macro
+        fn (args)
+            let argc = ('argcount args)
+            #verify-count argc 0 -1
+            raises-compile-error;
 
-typeinline tuple '__countof (self)
-    countof (typeof self)
+            # build tuple type
+            let field-types = (alloca-array type argc)
+            loop (i = 0)
+                if (i == argc)
+                    break;
+                let k arg = ('dekey ('getarg args i))
+                let T = ('key-type ('typeof arg) k)
+                store T (getelementptr field-types i)
+                i + 1
 
-typeinline tuple '__@ (self at)
-    let val = (at as integer)
-    extractvalue self val
-
-typeinline& tuple '__@ (self at)
-    let val = (at as integer)
-    (getelementptr self 0 val) as ref
-
-typeinline tuple '__unpack (self)
-    let T = (typeof self)
-    let count = (type-countof T)
-    let loop (i result...) = count
-    if (i == 0) result...
-    else
-        let i = (sub i 1)
-        loop i
-            va-key
-                element-name T i
-                extractvalue self i
-            result...
-
-typeinline& tuple '__unpack (self)
-    let T = (typeof& self)
-    let count = (type-countof T)
-    let loop (i result...) = count
-    if (i == 0) result...
-    else
-        let i = (sub i 1)
-        loop i
-            va-key
-                element-name T i
-                self @ i
-            result...
-
-# access reference to struct element from pointer/reference
-typeinline& tuple '__getattr (self name)
-    let ET = (element-type (typeof self) 0)
-    let idx = (element-index ET name)
-    if (icmp>=s idx 0)
-        # cast result to reference
-        let val = (getelementptr self 0 idx)
-        ref val
-
-typeinline tuple '__getattr (self name)
-    let idx = (element-index (typeof self) name)
-    if (icmp>=s idx 0)
-        extractvalue self idx
-
-inline tupleof (...)
-    let sz = (va-countof ...)
-    let keys... = (va-keys ...)
-    # build tuple type
-    let loop (i result...) = sz
-    if (icmp>s i 0)
-        let i = (sub i 1)
-        let T = (va@ i ...)
-        let key = (va@ i keys...)
-        loop i (va-key key (typeof T)) result...
-    else
-        # build tuple
-        let loop (i result) = 0 (nullof (tuple result...))
-        if (icmp<s i sz)
-            let T = (va@ i ...)
-            loop (add i 1)
-                insertvalue result T i
-        else
-            result
-
-#-------------------------------------------------------------------------------
-# compile time closures
-#-------------------------------------------------------------------------------
-
-let Capture = (typename "Capture")
-let MutableCapture = (typename "MutableCapture" Capture)
-
-typefn& MutableCapture '__copy (self other)
-    (type@& tuple '__copy) self other
-
-define-macro capture
-    fn make-typename (TT)
-        let T =
-            typename
-                .. "Capture"
-                    string-repr TT
-                super = Capture
-                storage = TT
-        T
-    inline convert (self TT)
-        unpack (bitcast self TT)
-    inline convert& (self TT)
-        unpack (bitcast& self TT)
-
-    let args params body = (decons args 2)
-    let arglist = (args as Syntax as Any as list)
-    let head arglist = (decons arglist)
-    if
-        or (('typeof (head as Syntax as Any)) != Symbol)
-            ((head as Syntax as Symbol) != 'square-list)
-        syntax-error! head "square brackets expected"
-    let params = (params as Syntax as list)
-    let T = (Parameter 'T)
-    let EV = (Parameter 'EV)
-    let TT = (Parameter 'TT)
-    let self = (Parameter 'self)
-    list do
-        list let EV '=
-            cons tupleof arglist
-        list let TT '= (list typeof EV)
-        list let T '=
-            list make-typename TT
-                list fn '()
-        list set-type-symbol! T (list quote '__call)
-            cons fn (cons self params)
-                cons let
-                    .. arglist
-                        list '= (list convert self TT)
-                body
-        list bitcast EV T
-
-define-macro capture&
-    fn make-typename (TT)
-        let T =
-            typename
-                .. "MutableCapture"
-                    string-repr TT
-                super = MutableCapture
-                storage = TT
-        T
-    inline convert& (self TT)
-        unpack (bitcast& self TT)
-
-    let args params body = (decons args 2)
-    let arglist = (args as Syntax as Any as list)
-    let head arglist = (decons arglist)
-    if
-        or (('typeof (head as Syntax as Any)) != Symbol)
-            ((head as Syntax as Symbol) != 'square-list)
-        syntax-error! head "square brackets expected"
-    let params = (params as Syntax as list)
-    let T = (Parameter 'T)
-    let EV = (Parameter 'EV)
-    let TT = (Parameter 'TT)
-    let self = (Parameter 'self)
-    list do
-        list let EV '=
-            cons tupleof arglist
-        list let TT '= (list typeof EV)
-        list let T '=
-            list make-typename TT
-                list fn '()
-        list set-type-symbol!& T (list quote '__call)
-            cons fn (cons self params)
-                cons let
-                    .. arglist
-                        list '= (list convert& self TT)
-                body
-        list local (list quote 'copy)
-            list bitcast EV T
+            # generate insert instructions
+            let TT = (sc_tuple_type argc field-types)
+            loop (i result = 0 `(nullof TT))
+                if (i == argc)
+                    break result
+                let arg = ('getarg args i)
+                _ (i + 1)
+                    `(insertvalue result arg i)
 
 #-------------------------------------------------------------------------------
 # arrays
 #-------------------------------------------------------------------------------
 
-do
-    inline array-each (f)
-        fn (self)
-            let ET = (typeof& self)
-            let count = (type-countof ET)
-            f count ((getelementptr self 0 0) as ref)
+'set-symbols array
+    __unpack = __unpack-aggregate
+    __countof = __countof-aggregate
+    __@ =
+        inline (self index)
+            extractvalue self index
+    __typecall =
+        inline "array.__typecall" (cls element-type size)
+            sc_array_type element-type (size as usize)
 
-    inline array-each2 (fsingle fmany)
-        fn (self other)
-            let ET = (typeof& self)
-            let count = (type-countof ET)
-            if ((typeof other) < ref)
-                assert ((typeof& other) == ET)
-                fmany count
-                    (getelementptr self 0 0) as ref
-                    (getelementptr other 0 0) as ref
-            else
-                # copy right-hand side by element
-                let other = (imply other ET)
-                let loop (i) = 0
-                if (icmp<s i count)
-                    fsingle
-                        (getelementptr self 0 i) as ref
-                        extractvalue other i
-                    loop (i + 1)
+let arrayof =
+    spice-macro
+        fn (args)
+            let argc = ('argcount args)
+            verify-count argc 1 -1
+            raises-compile-error;
 
-    set-type-symbol!& array '__new (array-each construct-array)
-    set-type-symbol!& array '__delete (array-each destruct-array)
-    set-type-symbol!& array '__copy (array-each2 copy-construct copy-construct-array)
-    set-type-symbol!& array '__move (array-each2 move-construct move-construct-array)
+            let ET = (('getarg args 0) as type)
+            let numvals = (sub argc 1)
 
-typefn array '__countof (self)
-    countof (typeof self)
+            let TT = (sc_array_type ET (usize numvals))
 
-typefn array '__unpack (self)
-    let count = (type-countof (typeof self))
-    let loop (i result...) = count
-    if (i == 0) result...
-    else
-        let i = (sub i 1)
-        loop i
-            extractvalue self i
-            result...
-
-typeinline& array '__unpack (self)
-    let count = (type-countof (typeof& self))
-    let loop (i result...) = count
-    if (i == 0) result...
-    else
-        let i = (sub i 1)
-        loop i
-            self @ i
-            result...
-
-typeinline& array '__imply (self destT)
-    let ET = (@ (typeof& self))
-    if ((destT < pointer) and ((@ destT) == ET))
-        bitcast self destT
-
-typefn array '__@ (self at)
-    let val = (at as integer)
-    if (constant? val)
-        extractvalue self val
-    else
-        compiler-error! "index into immutable array must be constant"
-
-typeinline& array '__@ (self at)
-    let val = (at as integer)
-    (getelementptr self 0 val) as ref
-
-fn arrayof (T ...)
-    let count = (va-countof ...)
-    let loop (i result) = 0 (nullof (array T (usize count)))
-    if (i < count)
-        let element = (va@ i ...)
-        loop (i + 1)
-            insertvalue result (imply element T) i
-    else result
-
-#-------------------------------------------------------------------------------
-# iterators
-#-------------------------------------------------------------------------------
-
-let Generator = (typename "Generator")
-set-typename-storage! Generator (storageof Closure)
-typeinline Generator '__typecall (cls iter init)
-    inline get-iter-init ()
-        return iter init
-    bitcast get-iter-init Generator
-typeinline Generator '__call (self)
-    if (not (constant? self))
-        compiler-error! "Generator must be constant"
-    let f = (bitcast self Closure)
-    call f
-
-typeinline typename 'symbols (self)
-    Generator
-        label (fret fdone key)
-            let key value =
-                type-next self key
-            if (key == unnamed)
-                fdone;
-            else
-                fret key key value
-        unconst unnamed
-
-typeinline typename 'elements (self)
-    let count =
-        type-countof self
-    Generator
-        label (fret fdone i)
-            if (i == count)
-                fdone;
-            else
-                fret (i + 1) (element-type self i)
-        tie-const self 0
-
-typeinline Scope '__as (self destT)
-    if (destT == Generator)
-        Generator
-            label (fret fdone key)
-                let key value =
-                    Scope-next self key
-                if (key == unnamed)
-                    fdone;
-                else
-                    fret key key value
-            unconst unnamed
-
-typeinline list '__as (self destT)
-    if (destT == Generator)
-        Generator
-            label (fret fdone cell)
-                if (empty? cell)
-                    fdone;
-                else
-                    let at next = (decons cell)
-                    fret next at
-            self
-
-inline va-each (values...)
-    let count = (va-countof values...)
-    Generator
-        label (fret fdone i)
-            if (i == count)
-                fdone;
-            else
-                fret (add i 1) (va@ i values...)
-        0
-
-inline va-each-reversed (values...)
-    let count = (va-countof values...)
-    Generator
-        label (fret fdone i)
-            if (i == 0)
-                fdone;
-            else
-                let i = (sub i 1)
-                fret i (va@ i values...)
-        count
-
-inline range (a b c)
-    let num-type = (typeof a)
-    let step =
-        if (c == none)
-            num-type 1
-        else c
-    let from =
-        if (b == none)
-            num-type 0
-        else a
-    let to =
-        if (b == none) a
-        else b
-    Generator
-        label (f fdone x)
-            if (x < to)
-                f (x + step) x
-            else
-                fdone;
-        unconst from
-
-inline multirange (size...)
-    let dims = (va-countof size...)
-    let size = (* size...)
-    let ET = (typeof size)
-    let one = (ET 1)
-    Generator
-        label (fret fdone x)
-            if (x == size)
-                fdone;
-            else
-                let repeat (i k result...) = 0 x
-                if (i < dims)
-                    let D = (va@ i size...)
-                    let u = (k % D)
-                    repeat (i + 1) ((k - u) // D) ((va-join result...) u)
-                fret (x + one) result...
-        unconst
-            ET 0
-
-inline unroll-range (a b c)
-    let num-type = (typeof a)
-    let step =
-        if (c == none)
-            num-type 1
-        else c
-    let from =
-        if (b == none)
-            num-type 0
-        else a
-    let to =
-        if (b == none) a
-        else b
-    assert (constant? to)
-    assert (constant? from)
-    assert (constant? step)
-    Generator
-        label (f fdone x)
-            if (x < to)
-                f (x + step) x
-            else
-                fdone;
-        from
-
-inline zip (a b)
-    let iter-a init-a = ((a as Generator))
-    let iter-b init-b = ((b as Generator))
-    Generator
-        label (fret fdone t)
-            let a = (@ t 0)
-            let b = (@ t 1)
-            iter-a
-                label (next-a at-a...)
-                    iter-b
-                        label (next-b at-b...)
-                            fret
-                                tupleof next-a next-b
-                                \ at-a... at-b...
-                        \ fdone b
-                \ fdone a
-        tupleof init-a init-b
-
-inline map (x f)
-    """"Maps function `f (skip values...)` to elements of iterable `x`.
-
-        `skip` is a function that can be called to purge the active element
-        from the output (allowing map to also act as a filter).
-    let iter init = ((x as Generator))
-    Generator
-        label (fret fdone value)
-            let skip (value) = value
-            iter
-                label (next values...)
-                    fret next
-                        f
-                            label ()
-                                skip next
-                            values...
-                fdone
-                value
-        init
-
-inline enumerate (x)
-    zip
-        unroll-range 0x7fffffff
-        x as Generator
-
-inline fold (init gen f)
-    let iter start = ((gen as Generator))
-    let loop (result next) = init start
-    label break ()
-        return result
-    iter
-        label (next args...)
-            loop
-                f break result args...
-                next
-        \ break next
-
-define-scope-macro breakable-block
-    let old-recur recur-ok = (@ syntax-scope 'recur)
-    let old-return ok = (@ syntax-scope 'return)
-    return
-        list
-            cons inline "breakable-block" '()
-                list let 'break '= 'return
-                if ok
-                    list let 'recur '= old-recur
-                else
-                    unconst (list del 'recur)
-                if ok
-                    list let 'return '= old-return
-                else
-                    unconst (list del 'return)
-                args
-        syntax-scope
-
-define-macro for
-    loop (it params) = args '()
-    if (empty? it)
-        error! "'in' expected"
-    let sxat it = (decons it)
-    let at = (sxat as Syntax as Symbol)
-    if (at != 'in)
-        repeat it (cons sxat params)
-    let generator-expr body = (decons it)
-    let params = (list-reverse params)
-    let iter = (Parameter 'iter)
-    let start = (Parameter 'start)
-    let next = (Parameter 'next)
-    let loopsym = (Symbol "#loop")
-    list breakable-block
-        list let iter start '= (list (list (do as) generator-expr Generator))
-        list iter
-            list label loopsym (cons next params)
-                list label 'continue '()
-                    list iter loopsym 'break next
-                cons do body
-                list 'continue
-            \ 'break start
-
-define-macro while
-    let cond-expr body = (decons args)
-    list breakable-block
-        list let 'continue '()
-        list if (list unconst cond-expr)
-            cons do body
-            list 'continue
-
-#-------------------------------------------------------------------------------
-# search utilities
-#-------------------------------------------------------------------------------
-
-fn bsearch (arr value)
-    """"binary-search array-like value `arr` for `value`
-    let count = (countof arr)
-    let T = (typeof count)
-    let one = (T 1)
-    loop (lo hi) = (T 0) (count - one)
-    let med = ((lo + hi) >> one)
-    if (lo > hi)
-        return med (unconst false)
-    let at = (arr @ med)
-    if (at == value)
-        return med (unconst true)
-    elseif (value > at)
-        repeat (med + one) hi
-    else
-        repeat lo (med - one)
-
-#-------------------------------------------------------------------------------
-# label utilities
-#-------------------------------------------------------------------------------
-
-set-type-symbol! Label 'clear-arguments! Label-clear-arguments!
-set-type-symbol! Label 'enter Label-enter
-set-type-symbol! Label 'set-enter! Label-set-enter!
-set-type-symbol! Label 'argument@ Label-argument
-
-typeinline Label 'return! (self args...)
-    let k v = (Label-argument self 0:usize)
-    Label-set-enter! self (Any _)
-    'set-arguments! self v args...
-
-typeinline Label 'set-arguments! (self args...)
-    Label-clear-arguments! self
-    let keys... = (va-keys args...)
-    let values... = (va-values args...)
-    for i in (unroll-range (va-countof args...))
-        let k = (va@ i keys...)
-        let v = (va@ i values...)
-        Label-append-argument! self k (Any v)
-
-typeinline Label 'continuation (self)
-    let k v = (Label-argument self 0:usize)
-    v
-
-typeinline Label 'parameters (self)
-    let count = (Label-parameter-count self)
-    Generator
-        label (fret fdone x)
-            if (x == count)
-                fdone;
-            else
-                fret (x + 1) (Label-parameter self x)
-        tie-const self 0:usize
-
-typeinline Label 'arguments (self)
-    let count = (Label-argument-count self)
-    Generator
-        label (fret fdone x)
-            if (x == count)
-                fdone;
-            else
-                fret (x + 1) (Label-argument self x)
-        tie-const self 0:usize
+            # generate insert instructions
+            loop (i result = 0 `(undef TT))
+                if (i == numvals)
+                    break result
+                let arg = ('getarg args (add i 1))
+                let arg =
+                    if ((sc_value_type arg) == ET) arg
+                    else `(arg as ET)
+                _ (i + 1)
+                    `(insertvalue result arg i)
 
 #-------------------------------------------------------------------------------
 # vectors
 #-------------------------------------------------------------------------------
-
-fn vectorof (T ...)
-    let count = (va-countof ...)
-    let loop (i result) = 0 (nullof (vector T (usize count)))
-    if (i < count)
-        let element = (va@ i ...)
-        loop (i + 1)
-            insertelement result (imply element T) i
-    else result
-
-inline vector-signed-dispatch (fsigned funsigned)
-    fn (a b)
-        if (signed? (element-type (typeof a) 0))
-            fsigned a b
-        else
-            funsigned a b
-
-set-type-symbol! integer '__vector+ add
-set-type-symbol! integer '__vector- sub
-set-type-symbol! integer '__vector* mul
-set-type-symbol! integer '__vector// (vector-signed-dispatch sdiv udiv)
-set-type-symbol! integer '__vector% (vector-signed-dispatch srem urem)
-set-type-symbol! integer '__vector& band
-set-type-symbol! integer '__vector| bor
-set-type-symbol! integer '__vector^ bxor
-set-type-symbol! integer '__vector<< shl
-set-type-symbol! integer '__vector>> (vector-signed-dispatch ashr lshr)
-set-type-symbol! integer '__vector== icmp==
-set-type-symbol! integer '__vector!= icmp!=
-set-type-symbol! integer '__vector> (vector-signed-dispatch icmp>s icmp>u)
-set-type-symbol! integer '__vector>= (vector-signed-dispatch icmp>s icmp>=u)
-set-type-symbol! integer '__vector< (vector-signed-dispatch icmp<s icmp<u)
-set-type-symbol! integer '__vector<= (vector-signed-dispatch icmp<=s icmp<=u)
-
-set-type-symbol! real '__vector+ fadd
-set-type-symbol! real '__vector- fsub
-set-type-symbol! real '__vector* fmul
-set-type-symbol! real '__vector/ fdiv
-set-type-symbol! real '__vector% frem
-set-type-symbol! real '__vector== fcmp==o
-set-type-symbol! real '__vector!= fcmp!=u
-set-type-symbol! real '__vector> fcmp>o
-set-type-symbol! real '__vector>= fcmp>=o
-set-type-symbol! real '__vector< fcmp<o
-set-type-symbol! real '__vector<= fcmp<=o
-
-inline vector-op2-dispatch (symbol)
-    fn (a b flipped)
-        if (type== (typeof a) (typeof b))
-            let Ta = (element-type (typeof a) 0)
-            let op success = (type@ Ta symbol)
-            if success
-                let result... = (op a b)
-                if (icmp== (va-countof result...) 0)
-                else
-                    return result...
-
-set-type-symbol! vector '__+ (vector-op2-dispatch '__vector+)
-set-type-symbol! vector '__- (vector-op2-dispatch '__vector-)
-set-type-symbol! vector '__* (vector-op2-dispatch '__vector*)
-set-type-symbol! vector '__/ (vector-op2-dispatch '__vector/)
-set-type-symbol! vector '__// (vector-op2-dispatch '__vector//)
-set-type-symbol! vector '__% (vector-op2-dispatch '__vector%)
-set-type-symbol! vector '__& (vector-op2-dispatch '__vector&)
-set-type-symbol! vector '__| (vector-op2-dispatch '__vector|)
-set-type-symbol! vector '__^ (vector-op2-dispatch '__vector^)
-set-type-symbol! vector '__== (vector-op2-dispatch '__vector==)
-set-type-symbol! vector '__!= (vector-op2-dispatch '__vector!=)
-set-type-symbol! vector '__> (vector-op2-dispatch '__vector>)
-set-type-symbol! vector '__>= (vector-op2-dispatch '__vector>=)
-set-type-symbol! vector '__< (vector-op2-dispatch '__vector<)
-set-type-symbol! vector '__<= (vector-op2-dispatch '__vector<=)
-
-typefn vector '__countof (self)
-    type-countof (typeof self)
-
-typefn vector '__repr (self)
-    let count = (type-countof (typeof self))
-    let loop (i result) = 0:usize ""
-    if (i < count)
-        loop (i + 1:usize)
-            .. result
-                if (i == 0:usize) "<"
-                else " "
-                repr (extractelement self i)
-    else
-        .. result ">"
-
-typefn vector '__unpack (v)
-    let count = (type-countof (typeof v))
-    let loop (i result...) = count
-    if (i == 0) result...
-    else
-        let i = (sub i 1)
-        loop i
-            extractelement v i
-            result...
-
-typefn vector '__@ (self x)
-    if ((typeof x) < integer)
-        extractelement self x
-
-typefn vector '__slice (self i0 i1)
-    if ((constant? i0) and (constant? i1))
-        let usz = (sub i1 i0)
-        let loop (i mask) = i0 (nullof (vector i32 usz))
-        if (icmp<u i i1)
-            loop (add i 1:usize) (insertelement mask (i32 i) (sub i i0))
-        else
-            shufflevector self self mask
-    else
-        compiler-error! "slice indices must be constant"
-
-fn vector-reduce (f v)
-    let loop (v) = v
-    let sz = (countof v)
-    # special cases for low vector sizes
-    if (sz == 1:usize)
-        extractelement v 0
-    elseif (sz == 2:usize)
-        f
-            extractelement v 0
-            extractelement v 1
-    elseif (sz == 3:usize)
-        f
-            f
-                extractelement v 0
-                extractelement v 1
-            extractelement v 2
-    elseif (sz == 4:usize)
-        f
-            f
-                extractelement v 0
-                extractelement v 1
-            f
-                extractelement v 2
-                extractelement v 3
-    else
-        let hsz = (sz >> 1:usize)
-        let fsz = (hsz << 1:usize)
-        if (fsz != sz)
-            compiler-error! "vector size must be a power of two"
-        let a = (slice v 0 hsz)
-        let b = (slice v hsz fsz)
-        loop (f a b)
 
 fn any? (v)
     vector-reduce bor v
 fn all? (v)
     vector-reduce band v
 
-typefn vector '__.. (a b flipped)
-    let Ta Tb = (typeof a) (typeof b)
-    if (not (vector-type? Ta))
-        return;
-    if (not (vector-type? Tb))
-        return;
-    let ET = (element-type Ta 0)
-    if (not (type== ET (element-type Tb 0)))
-        return;
-    if (type== Ta Tb)
-        let usz = (mul (type-countof (typeof a)) 2:usize)
-        let sz = (itrunc usz i32)
-        let loop (i mask) = 0 (nullof (vector i32 usz))
-        if (icmp<u i sz)
-            loop (add i 1) (insertelement mask i i)
-        else
-            shufflevector a b mask
+inline single-signed-vector-binary-op-dispatch (sf uf)
+    fn (lhsT rhsT lhs rhs)
+        if (ptrcmp== lhsT rhsT)
+            let Ta = ('element@ lhsT 0)
+            return
+                spice-quote
+                    call [
+                        \ do
+                            if ('signed? Ta)
+                                Value sf
+                            else
+                                Value uf ]
+                        \ lhs rhs
+        compiler-error! "unsupported type"
+
+'set-symbols integer
+    __vector+ = (box-binary-op (single-binary-op-dispatch add))
+    __vector- = (box-binary-op (single-binary-op-dispatch sub))
+    __vector* = (box-binary-op (single-binary-op-dispatch mul))
+    __vector// = (box-binary-op (single-signed-binary-op-dispatch sdiv udiv))
+    __vector% = (box-binary-op (single-signed-binary-op-dispatch srem urem))
+    __vector& = (box-binary-op (single-binary-op-dispatch band))
+    __vector| = (box-binary-op (single-binary-op-dispatch bor))
+    __vector^ = (box-binary-op (single-binary-op-dispatch bxor))
+    __vector<< = (box-binary-op (single-binary-op-dispatch shl))
+    __vector>> = (box-binary-op (single-signed-binary-op-dispatch ashr lshr))
+    __vector== = (box-binary-op (single-binary-op-dispatch icmp==))
+    __vector!= = (box-binary-op (single-binary-op-dispatch icmp!=))
+    __vector> = (box-binary-op (single-signed-binary-op-dispatch icmp>s icmp>u))
+    __vector>= = (box-binary-op (single-signed-binary-op-dispatch icmp>s icmp>=u))
+    __vector< = (box-binary-op (single-signed-binary-op-dispatch icmp<s icmp<u))
+    __vector<= = (box-binary-op (single-signed-binary-op-dispatch icmp<=s icmp<=u))
+
+'set-symbols real
+    __vector+ = (box-binary-op (single-binary-op-dispatch fadd))
+    __vector- = (box-binary-op (single-binary-op-dispatch fsub))
+    __vector* = (box-binary-op (single-binary-op-dispatch fmul))
+    __vector/ = (box-binary-op (single-binary-op-dispatch fdiv))
+    __vector% = (box-binary-op (single-binary-op-dispatch frem))
+    __vector== = (box-binary-op (single-binary-op-dispatch fcmp==o))
+    __vector!= = (box-binary-op (single-binary-op-dispatch fcmp!=u))
+    __vector> = (box-binary-op (single-binary-op-dispatch fcmp>o))
+    __vector>= = (box-binary-op (single-binary-op-dispatch fcmp>=o))
+    __vector< = (box-binary-op (single-binary-op-dispatch fcmp<o))
+    __vector<= = (box-binary-op (single-binary-op-dispatch fcmp<=o))
+
+fn vector-binary-op-expr (symbol lhsT rhsT lhs rhs)
+    let Ta = ('element@ lhsT 0)
+    let f =
+        try ('@ Ta symbol)
+        except (err)
+            compiler-error! "unsupported operation"
+    let f = (unbox-binary-op-function-type f)
+    return (f lhsT rhsT lhs rhs)
+
+inline vector-binary-op-dispatch (symbol)
+    box-binary-op
+        fn (lhsT rhsT lhs rhs) (vector-binary-op-expr symbol lhsT rhsT lhs rhs)
+
+'set-symbols vector
+    __+ = (vector-binary-op-dispatch '__vector+)
+    __- = (vector-binary-op-dispatch '__vector-)
+    __* = (vector-binary-op-dispatch '__vector*)
+    __/ = (vector-binary-op-dispatch '__vector/)
+    __// = (vector-binary-op-dispatch '__vector//)
+    __% = (vector-binary-op-dispatch '__vector%)
+    __& = (vector-binary-op-dispatch '__vector&)
+    __| = (vector-binary-op-dispatch '__vector|)
+    __^ = (vector-binary-op-dispatch '__vector^)
+    __== = (vector-binary-op-dispatch '__vector==)
+    __!= = (vector-binary-op-dispatch '__vector!=)
+    __> = (vector-binary-op-dispatch '__vector>)
+    __>= = (vector-binary-op-dispatch '__vector>=)
+    __< = (vector-binary-op-dispatch '__vector<)
+    __<= = (vector-binary-op-dispatch '__vector<=)
+    __lslice =
+        spice-macro
+            fn (args)
+                let argc = ('argcount args)
+                verify-count argc 2 2
+                let self offset =
+                    'getarg args 0
+                    'getarg args 1
+                if (not ('constant? offset))
+                    compiler-error! "slice offset must be constant"
+                let T = ('typeof self)
+                let sz = (('element-count T) as usize)
+                let offset:usize = (offset as usize)
+                if (offset:usize >= sz)
+                    return self
+                let offset = (offset:usize as i32)
+                let maskvals = (alloca-array Value offset)
+                loop (i = 0)
+                    if (i == offset)
+                        break;
+                    store (Value i) (getelementptr maskvals i)
+                    i + 1
+                let maskT =
+                    sc_vector_type i32 offset:usize
+                spice-quote
+                    shufflevector self self
+                        [ sc_const_aggregate_new maskT offset maskvals ]
+    __rslice =
+        spice-macro
+            fn (args)
+                let argc = ('argcount args)
+                verify-count argc 2 2
+                let self offset =
+                    'getarg args 0
+                    'getarg args 1
+                if (not ('constant? offset))
+                    compiler-error! "slice offset must be constant"
+                let T = ('typeof self)
+                let sz = (('element-count T) as usize)
+                let offset:usize = (offset as usize)
+                if (offset:usize == 0)
+                    return self
+                let offset:usize =
+                    ? (offset:usize > sz) sz offset:usize
+                let total:usize = (sz - offset:usize)
+                let offset = (offset:usize as i32)
+                let total = (total:usize as i32)
+                let maskvals = (alloca-array Value total)
+                loop (i = 0)
+                    if (i == total)
+                        break;
+                    store (Value (i + offset)) (getelementptr maskvals i)
+                    i + 1
+                let maskT =
+                    sc_vector_type i32 total:usize
+                spice-quote
+                    shufflevector self self
+                        [ sc_const_aggregate_new maskT total maskvals ]
+    __unpack = (Value (make-unpack-function extractelement))
+    __countof = __countof-aggregate
+    # vector type constructor
+    __typecall =
+        inline "vector.__typecall" (cls element-type size)
+            sc_vector_type element-type (size as usize)
+    #__typecall =
+        spice-macro
+            fn "vector" (args)
+                let argc = ('argcount args)
+                verify-count argc 3 3
+                let ET = (unbox-pointer ('getarg args 1) type)
+                let size = ('getarg args 2)
+                let sizeT = (sc_value_type size)
+                if (type< sizeT integer)
+                else
+                    unbox-verify size integer
+                let size =
+                    bitcast (sc_const_int_extract size) usize
+                box-pointer (sc_vector_type ET size)
+
+let vectorof =
+    spice-macro
+        fn (args)
+            let argc = ('argcount args)
+            verify-count argc 1 -1
+            raises-compile-error;
+
+            let ET = (('getarg args 0) as type)
+            let numvals = (sub argc 1)
+
+            # generate insert instructions
+            let TT = (sc_vector_type ET (usize numvals))
+            loop (i result = 0 `(nullof TT))
+                if (i == numvals)
+                    break result
+                let arg = ('getarg args (add i 1))
+                let arg =
+                    if ((sc_value_type arg) == ET) arg
+                    else `(arg as ET)
+                _ (i + 1) `(insertelement result arg i)
+
+#-------------------------------------------------------------------------------
+
+let
+    min =
+        spice-macro
+            fn (args)
+                ltr-multiop args
+                    Value
+                        inline "min" (a b)
+                            ? (<= a b) a b
+    max =
+        spice-macro
+            fn (args)
+                ltr-multiop args
+                    Value
+                        inline "max" (a b)
+                            ? (>= a b) a b
+
+inline clamp (x mn mx)
+    ? (> x mx) mx
+        ? (< x mn) mn x
+
+#-------------------------------------------------------------------------------
+# various C related sugar
+#-------------------------------------------------------------------------------
+
+# functions safecast to function pointers
+'set-symbols Closure
+    docstring = sc_closure_get_docstring
+    __imply =
+        box-cast
+            fn (srcT destT expr)
+                if ('function-pointer? destT)
+                    let funcT = ('element@ destT 0)
+                    let sz = ('element-count funcT)
+                    let func = (expr as Closure)
+                    if ('variadic? funcT)
+                        compiler-error! "cannot typify to variadic function"
+                    let args = (alloca-array type sz)
+                    for i in (range sz)
+                        store ('element@ funcT i) (getelementptr args i)
+                    let result =
+                        sc_typify func sz args
+                    let resultT = ('typeof result)
+                    if (resultT != destT)
+                        sugar-error! ('anchor result)
+                            .. "function does not compile to type " (repr destT)
+                                \ "but has type " (repr resultT)
+                    return result
+                compiler-error! "unsupported type"
+
+inline extern (name T attrs...)
+    let storage-class = (va-option storage attrs... unnamed)
+    sc_global_new (sc_get_active_anchor) name T 0:u32 storage-class -1 -1
+
+let
+    private =
+        spice-macro
+            fn (args)
+                let argc = ('argcount args)
+                verify-count argc 1 1
+                let T = ('getarg args 0)
+                let T = (T as type)
+                extern unnamed T (storage = 'Private)
+
+#-------------------------------------------------------------------------------
+
+fn extract-name-params-body (expr)
+    let arg body = (decons expr)
+    if (('typeof arg) == list)
+        return (Value "") (arg as list) body
     else
-        let asz = (type-countof (typeof a))
-        let bsz = (type-countof (typeof b))
-        let count = (add asz bsz)
-        let loop (i result) = 0:usize (nullof (vector ET count))
-        if (icmp<u i asz)
-            loop (add i 1:usize)
-                insertelement result (extractelement a i) i
-        elseif (icmp<u i count)
-            loop (add i 1:usize)
-                insertelement result (extractelement b (sub i asz)) i
-        else result
+        let params body = (decons body)
+        return arg (params as list) body
+
+fn check-count (count mincount maxcount)
+    if (icmp>=s mincount 0)
+        if (icmp<s count mincount)
+            return false
+    if (icmp>=s maxcount 0)
+        if (icmp>s count maxcount)
+            return false
+    return true
+
+fn next-head? (next)
+    if (not (empty? next))
+        let expr next = (decons next)
+        if (('typeof expr) == list)
+            let at = ('@ (expr as list))
+            if (('typeof at) == Symbol)
+                return (at as Symbol)
+    unnamed
+
+inline gen-match-block-parser (handle-case)
+    sugar-block-scope-macro
+        fn (expr next scope)
+            let head arg argrest = (decons expr 2)
+            let arg argrest = (sc_expand arg argrest scope)
+            let outnext = (alloca-array list 1)
+            let outexpr next =
+                spice-quote
+                    label ok-label
+                        inline return-ok (args...)
+                            merge ok-label args...
+                        spice-unquote
+                            let outexpr = (sc_expression_new (sc_get_active_anchor))
+                            loop (next = next)
+                                let head = (next-head? next)
+                                switch head
+                                case 'case
+                                    let expr next = (decons next)
+                                    let expr = (expr as list)
+                                    let head cond body = (decons expr 2)
+                                    sc_expression_append outexpr
+                                        spice-quote
+                                            label case-label
+                                                inline fail-case ()
+                                                    merge case-label
+                                                let token = arg
+                                                spice-unquote
+                                                    let newscope = (Scope scope)
+                                                    let unpack-expr =
+                                                        handle-case fail-case token newscope cond
+                                                    let body =
+                                                        sc_expand (cons do body) '() newscope
+                                                    spice-quote
+                                                        unpack-expr
+                                                        return-ok body
+                                    repeat next
+                                case 'default
+                                    let expr next = (decons next)
+                                    let expr = (expr as list)
+                                    let head body = (decons expr)
+                                    let body =
+                                        sc_expand (cons do body) '() scope
+                                    sc_expression_append outexpr `(return-ok body)
+                                    store next outnext
+                                    break outexpr
+                                default
+                                    compiler-error! "default branch missing"
+            return (cons outexpr (load outnext)) scope
+
+fn gen-sugar-matcher (failfunc expr scope params)
+    if false
+        return `[]
+    let params = (params as list)
+    let paramcount = (countof params)
+    let outexpr = (sc_expression_new (sc_get_active_anchor))
+    loop (i rest next varargs = 0 params expr false)
+        if (not (empty? rest))
+            let paramv rest = (decons rest)
+            let T = ('typeof paramv)
+            if (T == Symbol)
+                let param = (paramv as Symbol)
+                let variadic? = ('variadic? param)
+                let arg next =
+                    if variadic?
+                        if (not (empty? rest))
+                            sugar-error! ('anchor paramv)
+                                "variadic match pattern is not in last place"
+                        _ next `[]
+                    else
+                        spice-quote
+                            let arg next =
+                                sc_list_decons next
+                        _ arg next
+                sc_expression_append outexpr arg
+                'set-symbol scope param arg
+                repeat (i + 1) rest next (| varargs variadic?)
+            elseif (T == list)
+                let param = (paramv as list)
+                let head head-rest = (decons param)
+                let mid mid-rest = (decons head-rest)
+                if ((('typeof head) == Symbol) and ((head as Symbol) == 'sugar-quote))
+                    let head = (head as Symbol)
+                    let sym = ((decons head-rest) as Symbol)
+                    sc_expression_append outexpr
+                        spice-quote
+                            let arg next = (sc_list_decons next)
+                            if (ptrcmp!= ('typeof arg) Symbol)
+                                failfunc;
+                            if ((arg as Symbol) != sym)
+                                failfunc;
+                    repeat (i + 1) rest next varargs
+                elseif ((('typeof mid) == Symbol) and ((mid as Symbol) == 'as))
+                    let exprT = (decons mid-rest)
+                    let exprT = (sc_expand exprT '() scope)
+                    let param = (head as Symbol)
+                    if ('variadic? param)
+                        sugar-error! ('anchor head)
+                            "vararg parameter cannot be typed"
+                    sc_expression_append outexpr
+                        spice-quote
+                            let arg next =
+                                sc_list_decons next
+                            let arg =
+                                if (('constant? arg) and (('typeof arg) == exprT))
+                                    arg as exprT
+                                else
+                                    failfunc;
+                    'set-symbol scope param arg
+                    repeat (i + 1) rest next varargs
+                else
+                    sc_expression_append outexpr
+                        spice-quote
+                            let arg next = (sc_list_decons next)
+                            let arg =
+                                if (ptrcmp!= ('typeof arg) list)
+                                    failfunc;
+                                else
+                                    arg as list
+                            spice-unquote
+                                gen-sugar-matcher failfunc arg scope param
+                    repeat (i + 1) rest next varargs
+            else
+                sugar-error! ('anchor paramv)
+                    "unsupported pattern"
+        return
+            spice-quote
+                if (not (check-count (sc_list_count expr)
+                        [(? varargs (sub paramcount 1) paramcount)]
+                        [(? varargs -1 paramcount)]))
+                    failfunc;
+                outexpr
+
+define sugar-match
+    gen-match-block-parser gen-sugar-matcher
 
 #-------------------------------------------------------------------------------
-# constants
+
+define sugar
+    inline wrap-sugar-macro (f)
+        sugar-block-scope-macro
+            fn (expr next scope)
+                let new-expr new-next = (f expr next scope)
+                return
+                    constbranch (none? new-next)
+                        inline ()
+                            cons new-expr next
+                        inline ()
+                            cons new-expr new-next
+                    scope
+
+    sugar-block-scope-macro
+        fn "expand-sugar" (expr next scope)
+            raises-compile-error;
+            let head expr = (decons expr)
+            let name params body =
+                extract-name-params-body expr
+            let func =
+                spice-quote
+                    inline (expr next-expr sugar-scope)
+                        let head expr = (sc_list_decons expr)
+                        label ok-label
+                            inline return-ok (args...)
+                                merge ok-label args...
+                            label fail-label
+                                inline fail-case ()
+                                    merge fail-label
+                                spice-unquote
+                                    let subscope = (Scope scope)
+                                    'set-symbols subscope
+                                        next-expr = next-expr
+                                        sugar-scope = sugar-scope
+                                        expr-head = head
+                                    let unpack-expr =
+                                        gen-sugar-matcher fail-case expr subscope params
+                                    let body =
+                                        sc_expand (cons do body) '() subscope
+                                    spice-quote
+                                        unpack-expr
+                                        return-ok body
+                            compiler-error! "syntax error"
+            let outexpr =
+                if (('typeof name) == Symbol)
+                    qq
+                        [let name] =
+                            [wrap-sugar-macro func];
+                else
+                    qq
+                        [wrap-sugar-macro func];
+            return (cons outexpr next) scope
+
 #-------------------------------------------------------------------------------
 
-let pi:f32 = 3.141592653589793:f32
-let pi:f64 = 3.141592653589793:f64
-""""The number π, the ratio of a circle's circumference C to its diameter d.
-    Explicitly type-annotated versions of the constant are available as `pi:f32`
-    and `pi:f64`.
-let pi = pi:f32
+fn uncomma (l)
+    """"uncomma list l, wrapping all comma separated symbols as new lists
+        example:
+            (uncomma '(a , b c d , e f , g h)) -> '(a (b c d) (e f) (g h))
+    fn comma-separated? (l)
+        loop (next = l)
+            if (empty? next)
+                return false
+            let at next = (decons next)
+            if ((('typeof at) == Symbol) and ((at as Symbol) == ',))
+                return true
+            repeat next
+    fn merge-lists (anchor current total)
+        if ((countof current) == 0)
+            sugar-error! anchor "unexpected comma"
+        cons
+            if ((countof current) == 1) ('@ current)
+            else (Value current)
+            total
+    if (comma-separated? l)
+        fn process (l)
+            raises-compile-error;
+            if (empty? l)
+                return (nullof Anchor) '() '()
+            let at next = (decons l)
+            let anchor current total = (process next)
+            let anchor = ('anchor at)
+            if ((('typeof at) == Symbol) and ((at as Symbol) == ',))
+                if (empty? next)
+                    return anchor '() total
+                return anchor '() (merge-lists anchor current total)
+            else
+                return anchor (cons at current) total
+        return (merge-lists (process l))
+    else l
 
-let e:f32 = 2.718281828459045:f32
-let e:f64 = 2.718281828459045:f64
-""""Euler's number, also known as Napier's constant. Explicitly type-annotated
-    versions of the constant are available as `e:f32` and `e:f64`
-let e = e:f32
+inline parse-argument-matcher (failfunc expr scope params cb)
+    #if false
+        return `[]
+    let params = (params as list)
+    let params = (uncomma params)
+    let paramcount = (countof params)
+    loop (i rest varargs = 0 params false)
+        if (empty? rest)
+            return
+                spice-quote
+                    if (not (check-count (sc_argcount expr)
+                            [(? varargs (sub paramcount 1) paramcount)]
+                            [(? varargs -1 paramcount)]))
+                        failfunc;
+        let paramv rest = (decons rest)
+        let T = ('typeof paramv)
+        if (T == Symbol)
+            let param = (paramv as Symbol)
+            let variadic? = ('variadic? param)
+            let arg =
+                if variadic?
+                    if (not (empty? rest))
+                        sugar-error! ('anchor paramv)
+                            "vararg parameter is not in last place"
+                    `(sc_getarglist expr i)
+                else
+                    `(sc_getarg expr i)
+            cb param arg
+            repeat (i + 1) rest (| varargs variadic?)
+        elseif (T == list)
+            let param = (paramv as list)
+            let head head-rest = (decons param)
+            let mid mid-rest = (decons head-rest)
+            if ((('typeof mid) == Symbol) and ((mid as Symbol) == ':))
+                let exprT = (decons mid-rest)
+                let exprT = (sc_expand exprT '() scope)
+                let param = (head as Symbol)
+                if ('variadic? param)
+                    sugar-error! ('anchor head)
+                        "vararg parameter cannot be typed"
+                spice-quote
+                    let arg = (sc_getarg expr i)
+                    let arg =
+                        try (imply-expr ('typeof arg) exprT arg)
+                        except (err)
+                            failfunc;
+                cb param arg
+                repeat (i + 1) rest varargs
+            elseif ((('typeof mid) == Symbol) and ((mid as Symbol) == 'as))
+                let exprT = (decons mid-rest)
+                let exprT = (sc_expand exprT '() scope)
+                let param = (head as Symbol)
+                if ('variadic? param)
+                    sugar-error! ('anchor head)
+                        "vararg parameter cannot be typed"
+                spice-quote
+                    let arg = (sc_getarg expr i)
+                    let arg =
+                        if (('constant? arg) and (('typeof arg) == exprT))
+                            arg as exprT
+                        else
+                            failfunc;
+                cb param arg
+                repeat (i + 1) rest varargs
+        sugar-error! ('anchor paramv) "unsupported pattern"
+
+fn gen-argument-matcher (failfunc expr scope params)
+    let outexpr = (sc_expression_new (sc_get_active_anchor))
+    let outargs = (sc_argument_list_new (sc_get_active_anchor))
+    'set-symbol scope '*... outargs
+    let header =
+        parse-argument-matcher failfunc expr scope params
+            inline (param arg)
+                sc_expression_append outexpr arg
+                sc_argument_list_append outargs arg
+                'set-symbol scope param arg
+    spice-quote
+        header
+        outexpr
+
+define spice-match
+    gen-match-block-parser gen-argument-matcher
+
+#inline spice-macro (f)
+    spice-macro-verify-signature f
+    bitcast (const-typify f Value) SpiceMacro
+
+define spice
+    sugar-macro
+        fn "expand-spice" (expr)
+            raises-compile-error;
+            let name params body =
+                extract-name-params-body expr
+            let paramcount = ((countof params) as i32)
+
+            let args = (Symbol "#args")
+            loop (i rest body varargs = 0 params body false)
+                if (not (empty? rest))
+                    let paramv rest = (decons rest)
+                    let param = (paramv as Symbol)
+                    let variadic? = ('variadic? param)
+                    let body =
+                        if variadic?
+                            if (not (empty? rest))
+                                sugar-error! ('anchor paramv)
+                                    "vararg parameter is not in last place"
+                            cons
+                                qq
+                                    [let paramv] =
+                                        [`sc_getarglist args i];
+                                body
+                        else
+                            cons
+                                qq
+                                    [let paramv] =
+                                        [`sc_getarg args i];
+                                body
+                    repeat (i + 1) rest body (| varargs variadic?)
+                let content =
+                    cons (list args)
+                        qq
+                            [verify-count] ([`sc_argcount args])
+                                [(? varargs (sub paramcount 1) paramcount)]
+                                [(? varargs -1 paramcount)]
+                        body
+                break
+                    if (('typeof name) == Symbol)
+                        qq
+                            [let name] =
+                                [spice-macro]
+                                    [fn] [(name as Symbol as string)] (args)
+                                        [spice-quote]
+                                            [spice-unquote]
+                                                [(cons inline content)] args
+                    else
+                        qq
+                            [spice-macro]
+                                [fn name] (args)
+                                    [spice-quote]
+                                        [spice-unquote]
+                                            [(cons inline content)] args
 
 #-------------------------------------------------------------------------------
-# apply locals as globals
+
+fn gen-match-matcher
+
+fn gen-or-matcher (failfunc expr scope params)
+    spice-quote
+        label or-ok
+            spice-unquote
+                loop (prefix params = `[] params)
+                    let at params = (decons params)
+                    if (empty? params)
+                        break
+                            spice-quote
+                                prefix
+                                spice-unquote
+                                    let unpack-expr =
+                                        gen-match-matcher failfunc expr
+                                            \ (Scope scope) at
+                                    spice-quote unpack-expr (merge or-ok)
+                    repeat
+                        spice-quote
+                            label or-fail
+                                inline fail-case ()
+                                    merge or-fail
+                                prefix
+                                spice-unquote
+                                    let unpack-expr =
+                                        gen-match-matcher fail-case expr
+                                            \ (Scope scope) at
+                                    spice-quote unpack-expr (merge or-ok)
+                        params
+
+fn gen-match-matcher (failfunc expr scope cond)
+    """"features:
+        <constant> -> (input == <constant>)
+        (or <expr_a> <expr_b>) -> (or <expr_a> <expr_b>)
+
+        TODO:
+        (: x T) -> ((typeof input) == T), let x = input
+        <unknown symbol> -> unpack as symbol
+    if false
+        return `[]
+    let condT = ('typeof cond)
+    if (condT == list)
+        let cond-anchor = ('anchor cond)
+        let cond = (uncomma (cond as list))
+        let cond =
+            if (has-infix-ops? scope cond)
+                let at next = ('decons cond)
+                sc_set_active_anchor ('anchor at)
+                let expr =
+                    parse-infix-expr scope at next 0
+                expr as list
+            else cond
+        let head rest = (decons cond)
+        let T = ('typeof head)
+        if (T == Symbol)
+            let token = (head as Symbol)
+            if (token == 'or)
+                return (gen-or-matcher failfunc expr scope rest)
+        sugar-error! cond-anchor
+            .. "unsupported pattern: " (repr cond)
+    let cond =
+        sc_expand cond '() scope
+    spice-quote
+        if (expr != cond)
+            failfunc;
+
 #-------------------------------------------------------------------------------
 
-# cleanup
-del hash1
-del hash2
-del at
+define match
+    gen-match-block-parser gen-match-matcher
 
-set-globals!
-    .. (locals) (globals)
+let OverloadedFunction = (typename "OverloadedFunction")
+
+run-stage;
+
+let infinite-range =
+    Generator
+        inline (fdone x)
+            _ (x + 1) x
+        0
+
+inline zip (a b)
+    let iter-a init-a = ((a as Generator))
+    let iter-b init-b = ((b as Generator))
+    Generator
+        inline (fdone t)
+            let a = (@ t 0)
+            let b = (@ t 1)
+            let next-a at-a... = (iter-a fdone a)
+            let next-b at-b... = (iter-b fdone b)
+            _ (tupleof next-a next-b) at-a... at-b...
+        tupleof init-a init-b
+
+inline enumerate (x)
+    zip infinite-range x
+
+#-------------------------------------------------------------------------------
+# function memoization
+#-------------------------------------------------------------------------------
+
+inline memoize (f)
+    fn (args...)
+        let key = `[f args...]
+        let value = (sc_map_get key)
+        if (value == null)
+            let value =
+                `[(f args...)]
+            sc_map_set key value
+            value
+        else value
+
+inline type-factory (f)
+    let f = (memoize f)
+    fn (...)
+        ((f ...) as type)
+
+#-------------------------------------------------------------------------------
+# function overloading
+#-------------------------------------------------------------------------------
+
+fn get-overloaded-fn-append ()
+    spice "overloaded-fn-append" (T args...)
+        let outtype = (T as type)
+        let functions = ('@ outtype 'templates)
+        let functypes = ('@ outtype 'parameter-types)
+        for i in (range 0 ('argcount args...) 2)
+            let f = ('getarg args... i)
+            let ftype = ('getarg args... (i + 1))
+            if (('typeof ftype) == Nothing)
+                let fT = ('typeof f)
+                if ('function-pointer? fT)
+                    if ((('kind f) != value-kind-function)
+                        and (not ('constant? f)))
+                        sugar-error! ('anchor f) "argument must be constant or function"
+                    let fT = ('element@ fT 0)
+                    let argcount = ('element-count fT)
+                    loop (k types = 0 void)
+                        if (k < argcount)
+                            let argT = ('element@ fT k)
+                            repeat (k + 1)
+                                sc_arguments_type_join types argT
+                        sc_argument_list_append functions f
+                        sc_argument_list_append functypes types
+                        break;
+                elseif (fT == type)
+                    if (fT == outtype)
+                        sugar-error! ('anchor f) "cannot inherit from own type"
+                    let fT = (f as type)
+                    if (fT < OverloadedFunction)
+                        let fns = ('@ fT 'templates)
+                        let ftypes = ('@ fT 'parameter-types)
+                        # copy over existing options
+                        for func ftype in (zip ('args fns) ('args ftypes))
+                            sc_argument_list_append functions func
+                            sc_argument_list_append functypes ftype
+                elseif (fT == Closure)
+                    # ensure argument is constant
+                    f as Closure
+                    # append as templated option
+                    sc_argument_list_append functions f
+                    sc_argument_list_append functypes Variadic
+                else
+                    sugar-error! ('anchor f)
+                        .. "cannot embed argument of type "
+                            repr ('typeof f)
+                            " in overloaded function"
+            else
+                let T = (ftype as type)
+                sc_argument_list_append functions f
+                sc_argument_list_append functypes ftype
+        T
+
+'set-symbols OverloadedFunction
+    append = (get-overloaded-fn-append)
+    __typecall =
+        spice "dispatch-overloaded-function" (cls args...)
+            let T = (cls as type)
+            let fns = ('@ T 'templates)
+            let ftypes = ('@ T 'parameter-types)
+            let count = ('argcount args...)
+            for f FT in (zip ('args fns) ('args ftypes))
+                let FT = (FT as type)
+                let argcount = (sc_arguments_type_argcount FT)
+                let variadic? =
+                    (argcount > 0) and
+                        ((sc_arguments_type_getarg FT (argcount - 1)) == Variadic)
+                if variadic?
+                    if ((count + 1) < argcount)
+                        continue;
+                elseif (count != argcount)
+                    continue;
+                label break-next
+                    let outargs = (sc_call_new (sc_get_active_anchor) f)
+                    sc_call_set_rawcall outargs true
+                    let lasti = (argcount - 1)
+                    for i arg in (enumerate ('args args...))
+                        let argT = ('typeof arg)
+                        let paramT = (sc_arguments_type_getarg FT (min i lasti))
+                        let outarg =
+                            if (paramT == Unknown) arg
+                            elseif (paramT == Variadic) arg
+                            elseif (argT == paramT) arg
+                            else
+                                try (imply-expr argT paramT arg)
+                                except (err)
+                                    merge break-next
+                        sc_call_append_argument outargs outarg
+                    return outargs
+            # if we got here, there was no match
+            compiler-error!
+                .. "could not match argument types ("
+                    do
+                        loop (i str = 0 "")
+                            if (i < count)
+                                repeat (i + 1)
+                                    .. str
+                                        ? (i == 0) "" " "
+                                        repr ('typeof ('getarg args... i))
+                            break str
+                    ") to overloaded function with types"
+                    do
+                        let fcount = ('argcount ftypes)
+                        loop (i str = 0 "")
+                            if (i < fcount)
+                                repeat (i + 1)
+                                    .. str
+                                        "\n    "
+                                        repr (('getarg ftypes i) as type)
+                            break str
+
+sugar fn... (name...)
+    let finalize-overloaded-fn = (get-overloaded-fn-append)
+    let fn-name =
+        sugar-match name...
+        case (name as Symbol;) name
+        case (name as string;) (Symbol name)
+        case () unnamed
+        default
+            compiler-error!
+                """"syntax: (fn... name|"name") (case pattern body...) ...
+    let anchor = (sc_get_active_anchor)
+    let outargs = (sc_argument_list_new anchor)
+    let outtype = (sc_typename_type (fn-name as string))
+    'set-super outtype OverloadedFunction
+    'set-symbols outtype
+        templates = (sc_argument_list_new anchor)
+        parameter-types = (sc_argument_list_new anchor)
+    let bodyscope = (Scope sugar-scope)
+    sugar-match name...
+    case (name as Symbol;)
+        'set-symbol bodyscope fn-name outtype
+    default;
+    loop (next = next-expr)
+        sugar-match next
+        case (('case 'using body...) rest...)
+            let obj = (sc_expand (cons do body...) '() sugar-scope)
+            sc_argument_list_append outargs obj
+            sc_argument_list_append outargs `none
+            repeat rest...
+        case (('case condv body...) rest...)
+            do
+                let tmpl = (sc_template_new ('anchor condv) fn-name)
+                sc_argument_list_append outargs tmpl
+                let scope = (Scope bodyscope)
+                loop (expr types = (uncomma (condv as list)) void)
+                    sugar-match expr
+                    case ()
+                        let body = (sc_expand (cons do body...) '() scope)
+                        sc_template_set_body tmpl body
+                        sc_argument_list_append outargs types
+                        break;
+                    case ((arg as Symbol) ': T)
+                        sugar-error! ('anchor condv) "single typed parameter definition is missing trailing comma or semicolon"
+                    case ((arg as Symbol) rest...)
+                        if ('variadic? arg)
+                            if (not (empty? rest...))
+                                sugar-error! ('anchor condv) "variadic parameter must be in last place"
+                        let param = (sc_parameter_new ('anchor condv) arg)
+                        sc_template_append_parameter tmpl param
+                        'set-symbol scope arg param
+                        repeat rest...
+                            sc_arguments_type_join types
+                                ? ('variadic? arg) Variadic Unknown
+                    case (((arg as Symbol) ': T) rest...)
+                        if ('variadic? arg)
+                            sugar-error! ('anchor condv) "a typed parameter can't be variadic"
+                        let T = ((sc_expand T '() sugar-scope) as type)
+                        let param = (sc_parameter_new ('anchor condv) arg)
+                        sc_template_append_parameter tmpl param
+                        'set-symbol scope arg param
+                        repeat rest...
+                            sc_arguments_type_join types T
+                    default
+                        sugar-error! ('anchor condv) "syntax: (parameter-name[: type], ...)"
+            repeat rest...
+        default
+            sugar-match name...
+            case (name as Symbol;)
+                'set-symbol sugar-scope fn-name outtype
+            default;
+            return
+                `(finalize-overloaded-fn outtype outargs)
+                next
+
+sugar from (src 'let params...)
+    spice load-from (src keys...)
+        let args = (sc_argument_list_new (sc_get_active_anchor))
+        let count = ('argcount keys...)
+        loop (i = 0)
+            if (i == count)
+                break;
+            let key = ('getarg keys... i)
+            sc_argument_list_append args
+                `(getattr src key)
+            i + 1
+        args
+
+    fn quotify (params)
+        if (empty? params)
+            return '()
+        let entry rest = (decons params)
+        entry as Symbol
+        cons
+            list sugar-quote entry
+            quotify rest
+
+    cons let
+        .. params...
+            list '=
+                cons load-from src
+                    quotify params...
+
+run-stage;
+
+define-sugar-block-scope-macro static-if
+    fn process (body next-expr)
+        if false
+            return '() next-expr
+        let cond body = (decons body)
+        let elseexpr next-next-expr =
+            if (empty? next-expr)
+                _ '() next-expr
+            else
+                let else-expr next-next-expr = (decons next-expr)
+                if (('typeof else-expr) == list)
+                    let kw body = (decons (else-expr as list))
+                    let kw = (kw as Symbol)
+                    switch kw
+                    case 'elseif
+                        process body next-next-expr
+                    case 'else
+                        _ body next-next-expr
+                    default
+                        _ '() next-expr
+                else
+                    _ '() next-expr
+        return
+            list
+                list constbranch cond
+                    cons inline '() body
+                    cons inline '() elseexpr
+            next-next-expr
+    let kw body = (decons expr)
+    let body next-expr = (process body next-expr)
+    return
+        cons
+            cons do body
+            next-expr
+        sugar-scope
+
+define-sugar-block-scope-macro sugar-if
+    fn process (sugar-scope body next-expr)
+        if false
+            return '() next-expr
+        let cond body = (decons body)
+        let cond body = (sc_expand cond body sugar-scope)
+        let elseexpr next-next-expr =
+            if (empty? next-expr)
+                _ '() next-expr
+            else
+                let else-expr next-next-expr = (decons next-expr)
+                if (('typeof else-expr) == list)
+                    let kw body = (decons (else-expr as list))
+                    let kw = (kw as Symbol)
+                    switch kw
+                    case 'elseif
+                        process sugar-scope body next-next-expr
+                    case 'else
+                        _ body next-next-expr
+                    default
+                        _ '() next-expr
+                else
+                    _ '() next-expr
+        if ((('typeof cond) == bool) and ('constant? cond))
+            if (cond as bool)
+                return body next-next-expr
+            else
+                return elseexpr next-next-expr
+        sugar-error! ('anchor cond) "condition must be constant"
+    let kw body = (decons expr)
+    let body next-expr = (process sugar-scope body next-expr)
+    return
+        cons
+            cons do body
+            next-expr
+        sugar-scope
+
+define-sugar-block-scope-macro @@
+    raises-compile-error;
+    let kw body = (decons expr)
+    let head = (kw as Symbol)
+    let result next-expr =
+        loop (body next-expr result = body next-expr '())
+            if (empty? next-expr)
+                compiler-error! "decorator is not applied to anything"
+            let result =
+                cons
+                    if ((countof body) == 1)
+                        '@ body
+                    else
+                        `body
+                    result
+            let follow-expr next-next-expr = (decons next-expr)
+            if (('typeof follow-expr) != list)
+                compiler-error! "decorator must be applied to expression"
+            let kw body = (decons (follow-expr as list))
+            let kw = (kw as Symbol)
+            if (kw == head)
+                # more decorators
+                repeat body next-next-expr result
+            else
+                # terminating actual expression
+                let newkw = (Symbol (.. "decorate-" (kw as string)))
+                break
+                    cons newkw follow-expr result
+                    next-next-expr
+    return
+        cons result next-expr
+        sugar-scope
+
+define-sugar-block-scope-macro vvv
+    raises-compile-error;
+    let kw body = (decons expr)
+    let head = (kw as Symbol)
+    let result next-expr =
+        loop (body next-expr result = body next-expr '())
+            if (empty? next-expr)
+                compiler-error! "expression decorator is not applied to anything"
+            let result =
+                cons
+                    if ((countof body) == 1)
+                        '@ body
+                    else
+                        `body
+                    result
+            let follow-expr next-next-expr = (decons next-expr)
+            break
+                cons 'decorate-* follow-expr result
+                next-next-expr
+    return
+        cons result next-expr
+        sugar-scope
+
+define-sugar-macro decorate-*
+    raises-compile-error;
+    let expr decorators = (decons args)
+    loop (in out = decorators expr)
+        if (empty? in)
+            break out
+        let decorator in = (decons in)
+        repeat in
+            Value (cons decorator (list out))
+
+define-sugar-macro decorate-fn
+    raises-compile-error;
+    let fnexpr decorators = (decons args)
+    let kw name = (decons (fnexpr as list) 2)
+    let result =
+        loop (in out = decorators fnexpr)
+            if (empty? in)
+                break out
+            let decorator in = (decons in)
+            repeat in
+                Value (cons decorator (list out))
+    if (('typeof name) == Symbol)
+        Value (list let name '= result)
+    else
+        result
+
+let decorate-inline = decorate-fn
+
+define-sugar-macro decorate-let
+    raises-compile-error;
+    let letexpr decorators = (decons args)
+    let letexpr = (letexpr as list)
+    let kw entry = (decons letexpr 2)
+    if (('typeof entry) == list)
+        # map form: wrap each arg
+        let result =
+            loop (in out = ('next letexpr) '())
+                if (empty? in)
+                    break out
+                let entry in = (decons in)
+                let k eq val = (decons (entry as list) 2)
+                let result =
+                    loop (in out = decorators val)
+                        if (empty? in)
+                            break out
+                        let decorator in = (decons in)
+                        repeat in
+                            list (cons decorator out)
+                repeat in
+                    cons
+                        cons k eq result
+                        out
+        cons let ('reverse result)
+    else
+        # unpack form: wrap all args
+        let params values =
+            loop (expr params = letexpr '())
+                if (empty? expr)
+                    compiler-error! "reimport form not supported for decorate-let"
+                let val rest = (decons expr)
+                if ((('typeof val) == Symbol) and ((val as Symbol) == '=))
+                    break params rest
+                _ rest (cons val params)
+        let result =
+            loop (in out = decorators (cons _ values))
+                if (empty? in)
+                    break out
+                let decorator in = (decons in)
+                repeat in
+                    cons decorator (list out)
+        loop (in out = params (list '= result))
+            if (empty? in)
+                break out
+            let param params = (decons in)
+            repeat params
+                cons param out
+
+define-sugar-scope-macro sugar-eval
+    let subscope = (Scope sugar-scope)
+    'set-symbol subscope 'sugar-scope sugar-scope
+    return
+        exec-module (Value args) subscope
+        sugar-scope
+
+let
+    io-write! = sc_write
+    compiler-version = sc_compiler_version
+    default-styler = sc_default_styler
+    realpath = sc_realpath
+    globals = sc_get_globals
+    set-globals! = sc_set_globals
+    __prompt = sc_prompt
+    set-autocomplete-scope! = sc_set_autocomplete_scope
+    exit = sc_exit
+    launch-args = sc_launch_args
+    set-signal-abort! = sc_set_signal_abort
+    list-load = sc_parse_from_path
+    list-parse = sc_parse_from_string
+    set-anchor! = sc_set_active_anchor
+    active-anchor = sc_get_active_anchor
+    #eval = sc_eval
+    import-c = sc_import_c
+
+run-stage;
+
+#-------------------------------------------------------------------------------
+# unlet
+#-------------------------------------------------------------------------------
+
+sugar unlet ((name as Symbol) names...)
+    sc_scope_del_symbol sugar-scope name
+    for name in names...
+        let name = (name as Symbol)
+        getattr sugar-scope name
+        sc_scope_del_symbol sugar-scope name
+    `[]
+
+#-------------------------------------------------------------------------------
+# fold iteration
+#-------------------------------------------------------------------------------
+
+# fold (<name> ... = <init> ...) for <name> ... in <expr>
+sugar fold ((binding...) 'for expr...)
+    fn split-until (expr token errmsg)
+        loop (it params = expr '())
+            if (empty? it)
+                compiler-error! errmsg
+            let sxat it = (decons it)
+            let at = (sxat as Symbol)
+            if (at == token)
+                break it params
+            _ it (cons sxat params)
+    let it params = (split-until expr... 'in "'in' expected")
+    let init foldparams = (split-until binding... '= "'=' expected")
+    let generator-expr body = (decons it)
+    let subscope = (Scope sugar-scope)
+    spice-quote
+        let iter start =
+            (as [(sc_expand generator-expr '() subscope)] Generator);
+    let next = ('unique Symbol "next")
+    let bindings breakargs =
+        loop (inp bindings breakargs = foldparams (cons '= start init) '())
+            if (empty? inp)
+                break (cons next bindings) breakargs
+            let at next = (decons inp)
+            _ next (cons at bindings) (cons at breakargs)
+    let itercall =
+        qq [iter]
+            [inline] ()
+                [(cons break breakargs)]
+            [next]
+    let letexpr =
+        loop (inp letexpr = params (list '= itercall))
+            if (empty? inp)
+                break (cons let next letexpr)
+            let at next = (decons inp)
+            _ next (cons at letexpr)
+    let repeatexpr = (cons repeat next breakargs)
+    qq [loop] [bindings]
+        [letexpr]
+        [inline] repeat (...)
+            [repeat] [next] ...
+        [inline] continue () [repeatexpr]
+        [repeat] [next]
+            [(cons do body)]
+
+#-------------------------------------------------------------------------------
+# typedef
+#-------------------------------------------------------------------------------
+
+sugar typedef (name body...)
+    let declaration? = (('typeof name) == Symbol)
+    let typedecl =
+        label got-typedecl
+            if declaration?
+                if (empty? body...)
+                    # forward declaration - we build the type at syntax time
+                    return
+                        qq [let] [name] = [(typename (name as Symbol as string))]
+
+                let symname = (name as Symbol)
+                # see if we can find a forward declaration in the local scope
+                try
+                    let T = (getattr sugar-scope symname)
+                    let T = (T as type)
+                    assert (('opaque? T) and (('superof T) == typename))
+                    # reuse type
+                    merge got-typedecl `T
+                except (err)
+
+            let namestr =
+                if declaration? `[(name as Symbol as string)]
+                else name
+            `[(qq [typename] [namestr])]
+
+    let expr =
+        loop (inp outp = body... '())
+            sugar-match inp
+            case ('< supertype rest...)
+                repeat rest...
+                    cons (list sc_typename_type_set_super 'this-type supertype) outp
+            case (': storagetype rest...)
+                repeat rest...
+                    cons (list sc_typename_type_set_storage 'this-type storagetype typename-flag-plain) outp
+            case (':: storagetype rest...)
+                repeat rest...
+                    cons (list sc_typename_type_set_storage 'this-type storagetype 0:u32) outp
+            case ('do rest...)
+                break
+                    qq [do]
+                        [let] this-type = [typedecl]
+                        unquote-splice outp
+                        [do]
+                            unquote-splice rest...
+                        this-type
+            default
+                break
+                    qq [do]
+                        [let] this-type = [typedecl]
+                        unquote-splice outp
+                        [let] scope =
+                            [do]
+                                unquote-splice inp
+                                [locals];
+                        [set-symbols-from-scope] this-type ('parent scope)
+                        [set-symbols-from-scope] this-type scope
+                        this-type
+    if declaration?
+        qq [let] [name] = [expr]
+    else expr
+
+#-------------------------------------------------------------------------------
+# standard allocators
+#-------------------------------------------------------------------------------
+
+spice __init (target args...)
+    let T = ('typeof target)
+    let constructor =
+        try
+            getattr T '__init
+        except (err)
+            if (('argcount args...) > 0)
+                compiler-error! "default constructor takes no arguments"
+            return `(target = (nullof T))
+    `(constructor target args...)
+
+spice __init-copy (target source)
+    let T = ('typeof target)
+    let constructor =
+        try
+            getattr T '__init-copy
+        except (err)
+            return
+                spice-quote
+                    __init target
+                    target = source
+    `(constructor target source)
+
+spice __delete (target)
+    let T = ('typeof target)
+    let destructor =
+        try
+            getattr T '__delete
+        except (err)
+            return `[]
+    `(destructor target)
+
+inline gen-allocator-sugar (name f)
+    sugar "" (values...)
+        spice local-copy-typed (T value)
+            spice-quote
+                let val = (ptrtoref (f T))
+                __init-copy val value
+                val
+        spice local-copy (value)
+            let T = ('typeof value)
+            `(local-copy-typed T value)
+        spice local-new (T args...)
+            spice-quote
+                let val = (ptrtoref (f T))
+                __init val args...
+                val
+        sugar-match values...
+        case (name '= value)
+            qq [let name] = ([local-copy value])
+        case (name ': T '= value)
+            qq [let name] = ([local-copy-typed T value])
+        case (name ': T args...)
+            qq [let name] = ([local-new T] (unquote-splice args...))
+        case (T args...)
+            qq [local-new] [T] (unquote-splice args...)
+        default
+            compiler-error!
+                .. "syntax: " name " <name> [: <type>] [= <value>]"
+
+let local = (gen-allocator-sugar "local" alloca)
+let new = (gen-allocator-sugar "new" malloc)
+let global = (gen-allocator-sugar "global" private)
+
+fn delete (value)
+    free (reftoptr value)
+
+#-------------------------------------------------------------------------------
+
+define struct-dsl
+    sugar : (name T)
+        qq [=] field-types
+            [cons] (list '[name] [T]) field-types
+
+    define-infix> 70 :
+    locals;
+
+run-stage;
+
+#-------------------------------------------------------------------------------
+# C type support
+#-------------------------------------------------------------------------------
+
+# pointers
+#-------------------------------------------------------------------------------
+
+'set-symbols pointer
+    __@ =
+        inline (self index)
+            ptrtoref (getelementptr self index)
+    __getattr =
+        inline (self key)
+            getattr (ptrtoref self) key
+
+# unions
+#-------------------------------------------------------------------------------
+
+'set-symbols CUnion
+    __getattr = extractvalue
+    __typecall =
+        inline (cls)
+            nullof cls
+
+# structs
+#-------------------------------------------------------------------------------
+
+'set-symbols CStruct
+    __getattr = extractvalue
+    __typecall =
+        spice "CStruct-typecall" (cls args...)
+            if ((cls as type) == CStruct)
+                compiler-error! "CStruct type constructor is deprecated"
+            let cls = (cls as type)
+            let argc = ('argcount args...)
+            loop (i result = 0 `(nullof cls))
+                if (i == argc)
+                    break result
+                let k v = ('dekey ('getarg args... i))
+                let k =
+                    if (k == unnamed) i
+                    else
+                        sc_type_field_index cls k
+                let ET = (sc_type_element_at cls k)
+                let ET = (sc_strip_qualifiers ET)
+                let v =
+                    if (('pointer? ET) and ('refer? ('qualified-typeof v)))
+                        `(imply (reftoptr v) ET)
+                    else `(imply v ET)
+                _ (i + 1) `(insertvalue result v k)
+
+sugar struct (name body...)
+    fn finalize-struct (T field-types)
+        let numfields = (countof field-types)
+        let fields = (alloca-array type numfields)
+        for i field in (enumerate ('reverse field-types))
+            let k T = (decons (field as list) 2)
+            fields @ (usize i) = (sc_key_type (k as Symbol) (T as type))
+        if (T < CUnion)
+            'set-plain-storage T
+                sc_union_type numfields fields
+        elseif (T < CStruct)
+            'set-plain-storage T
+                sc_tuple_type numfields fields
+        else
+            compiler-error!
+                .. "type " (repr T) " must have CStruct or CUnion supertype"
+        T
+
+    if (('typeof name) == Symbol)
+        if (empty? body...)
+            # forward declaration
+            return
+                qq [typedef] [name]
+
+    let supertype body... =
+        sugar-match body...
+        case ('union rest...)
+            _ `CUnion rest...
+        case ('< supertype rest...)
+            _ supertype rest...
+        default
+            _ `CStruct body...
+
+    qq [typedef] [name] < [supertype] do
+        [local] field-types = [`(ptrtoref (alloca list))]
+        field-types = [null]
+        [using] [struct-dsl]
+        [let] scope =
+            [do]
+                unquote-splice body...
+                [locals];
+        [set-symbols-from-scope] this-type ('parent scope)
+        [set-symbols-from-scope] this-type scope
+        [finalize-struct] this-type field-types
+
+# enums
+#-------------------------------------------------------------------------------
+
+'set-symbols CEnum
+    __== = (box-binary-op (single-binary-op-dispatch icmp==))
+    __!= = (box-binary-op (single-binary-op-dispatch icmp!=))
+    __imply =
+        box-cast
+            fn "CEnum-imply" (vT T expr)
+                if (T == i32)
+                    return `(bitcast expr T)
+                compiler-error! "unsupported type"
+
+sugar enum (name values...)
+    spice make-enum (name vals...)
+        let T = (typename (name as string))
+        inline make-enumval (anchor val)
+            sc_const_int_new anchor T
+                sext (as val i32) u64
+        'set-super T CEnum
+        'set-storage T i32
+        let count = ('argcount vals...)
+        loop (i nextval = 0 0)
+            if (i >= count)
+                break;
+            let arg = ('getarg vals... i)
+            let anchor = ('anchor arg)
+            let key val = ('dekey arg)
+            #print arg key val
+            if (not ('constant? val))
+                sugar-error! anchor "all enum values must be constant"
+            _ (i + 1)
+                if (key == unnamed)
+                    # auto-numerical
+                    'set-symbol T (as val Symbol) (make-enumval anchor nextval)
+                    nextval + 1
+                else
+                    'set-symbol T key (make-enumval anchor val)
+                    (as val i32) + 1
+        T
+
+    fn convert-body (body)
+        if false
+            # hint return type
+            return '()
+        let expr body = (decons body)
+        cons
+            if (('typeof expr) == Symbol)
+                Value (list sugar-quote expr)
+            else expr
+            if (empty? body)
+                '()
+            else
+                convert-body body
+
+    let newbody = (convert-body values...)
+    if (('typeof name) == Symbol)
+        let namestr = (name as Symbol as string)
+        list let name '=
+            cons make-enum namestr newbody
+    else
+        cons make-enum name newbody
+
+run-stage;
+
+#-------------------------------------------------------------------------------
+
+set-globals! (__this-scope)
 
 #-------------------------------------------------------------------------------
 # REPL
 #-------------------------------------------------------------------------------
 
+# REPL and main loop must stay in core.sc to make sure that they remain
+    accessible even when there's no module loading support (for whatever reason)
+
 fn compiler-version-string ()
-    let vmin vmaj vpatch = (compiler-version)
-    .. "Scopes " (string-repr vmin) "." (string-repr vmaj)
+    let vmin vmaj vpatch = (sc_compiler_version)
+    .. "Scopes " (tostring vmin) "." (tostring vmaj)
         if (vpatch == 0) ""
         else
-            .. "." (string-repr vpatch)
+            .. "." (tostring vpatch)
         " ("
         if debug-build? "debug build, "
         else ""
@@ -5022,33 +4769,31 @@ fn print-logo ()
 
 fn read-eval-print-loop ()
     fn repeat-string (n c)
-        let loop (i s) =
-            tie-const n (usize 0)
-            tie-const n ""
-        if (i == n)
-            return s
-        loop (i + (usize 1))
-            .. s c
+        loop (i s = 0:usize "")
+            if (i == n)
+                return s
+            repeat (i + 1:usize)
+                .. s c
 
     fn leading-spaces (s)
-        let len = (i32 (countof s))
-        let loop (i) = (tie-const len 0)
-        if (i == len)
-            return s
-        let c = (@ s i)
-        if (c != (char " "))
-            return (string-new (string->rawstring s) (usize i))
-        loop (i + 1)
+        let len = (countof s)
+        loop (i = 0:usize)
+            if (i == len)
+                return s
+            let c = (@ s i)
+            if (c != (char " "))
+                let s = (sc_string_buffer s)
+                return (sc_string_new s i)
+            repeat (i + 1:usize)
 
     fn blank? (s)
-        let len = (i32 (countof s))
-        let loop (i) =
-            tie-const len 0
-        if (i == len)
-            return (unconst true)
-        if ((@ s i) != (char " "))
-            return (unconst false)
-        loop (i + 1)
+        let len = (countof s)
+        loop (i = 0:usize)
+            if (i == len)
+                return true
+            if ((@ s i) != (char " "))
+                return false
+            repeat (i + 1:usize)
 
     let cwd =
         realpath "."
@@ -5061,107 +4806,105 @@ fn read-eval-print-loop ()
     let eval-scope = (Scope global-scope)
     set-autocomplete-scope! eval-scope
 
-    set-scope-symbol! eval-scope 'module-dir cwd
-    loop (preload cmdlist counter eval-scope) = "" "" 0 eval-scope
-    #dump "loop"
-    fn make-idstr (counter)
-        .. "$" (string-repr counter)
+    'set-symbol eval-scope 'module-dir cwd
+    loop (preload cmdlist counter eval-scope = "" "" 0 eval-scope)
+        fn make-idstr (counter)
+            .. "$" (tostring counter)
 
-    let idstr = (make-idstr counter)
-    let promptstr =
-        .. idstr " "
-            default-styler style-comment "►"
-    let promptlen = ((countof idstr) + 2:usize)
-    let cmd success =
-        prompt
-            ..
-                if (empty? cmdlist) promptstr
-                else
-                    repeat-string promptlen "."
-                " "
-            preload
-    if (not success)
-        return;
-    fn endswith-blank (s)
-        let slen = (countof s)
-        if (slen == 0:usize) (unconst false)
-        else
-            (@ s (slen - 1:usize)) == (char " ")
-    let enter-multiline = (endswith-blank cmd)
-    #dump "loop 1"
-    let terminated? =
-        (blank? cmd) or
-            (empty? cmdlist) and (not enter-multiline)
-    let cmdlist =
-        .. cmdlist
-            if enter-multiline
-                slice cmd 0 -1
-            else cmd
-            "\n"
-    let preload =
-        if terminated? (unconst "")
-        else (leading-spaces cmd)
-    if (not terminated?)
-        repeat preload cmdlist counter eval-scope
+        let idstr = (make-idstr counter)
+        let promptstr =
+            .. idstr " "
+                default-styler style-comment "►"
+        let promptlen = ((countof idstr) + 2:usize)
+        let success cmd =
+            __prompt
+                ..
+                    if (empty? cmdlist) promptstr
+                    else
+                        repeat-string promptlen "."
+                    " "
+                preload
+        if (not success)
+            return;
+        fn endswith-blank (s)
+            let slen = (countof s)
+            if (slen == 0:usize) false
+            else
+                (@ s (slen - 1:usize)) == (char " ")
+        let enter-multiline = (endswith-blank cmd)
+        let terminated? =
+            (blank? cmd) or
+                (empty? cmdlist) and (not enter-multiline)
+        let cmdlist =
+            .. cmdlist
+                if enter-multiline
+                    lslice cmd ((countof cmd) - 1:usize)
+                else cmd
+                "\n"
+        let preload =
+            if terminated? ""
+            else (leading-spaces cmd)
+        if (not terminated?)
+            repeat preload cmdlist counter eval-scope
 
-    define-scope-macro set-scope!
-        let scope rest = (decons args)
-        return
-            none
-            scope as Syntax as Scope
+        fn handle-retargs (counter eval-scope local-scope vals...)
+            raises-compile-error;
+            let tmp = (Symbol "#result...")
+            # copy over values from local-scope
+            loop (key = unnamed)
+                let key value = ('next local-scope key)
+                if (key != unnamed)
+                    if (key != tmp)
+                        'set-symbol eval-scope key value
+                    repeat key
+                break;
+            let count =
+                va-lfold 0
+                    inline (key value k)
+                        let idstr = (make-idstr (counter + k))
+                        if (not (none? value))
+                            'set-symbol eval-scope (Symbol idstr) (Value value)
+                            print idstr "="
+                                repr value
+                            k + 1
+                        else k
+                    vals...
+            return eval-scope count
 
-    define-scope-macro get-scope
-        return
-            syntax-scope
-            syntax-scope
-
-    fn handle-retargs (counter eval-scope local-scope vals...)
-        # copy over values from local-scope
-        for k v in local-scope
-            set-scope-symbol! eval-scope k v
-        let count = (va-countof vals...)
-        let loop (i) = 0
-        if (i < count)
-            let x = (va@ i vals...)
-            let k = (counter + i)
-            let idstr = (make-idstr k)
-            set-scope-symbol! eval-scope (Symbol idstr) x
-            print idstr "="
-                repr x
-            loop (add i 1)
-        return
-            unconst eval-scope
-            unconst count
-
-    let eval-scope count =
-        xpcall
-            inline ()
+        let eval-scope count =
+            try
                 let expr = (list-parse cmdlist)
-                let expr-anchor = (Syntax-anchor expr)
-                let tmp = (Parameter 'vals...)
+                let expr-anchor = ('anchor expr)
+                set-anchor! expr-anchor
+                let tmp = (Symbol "#result...")
                 let expr =
-                    Syntax-wrap expr-anchor
-                        Any
-                            list
-                                list handle-retargs counter
-                                    cons do
-                                        list set-scope! eval-scope
-                                        list __defer (list tmp)
-                                            list _ (list get-scope) (list locals) tmp
-                                        expr as list
-                        false
-                let f = (compile (eval (expr as Syntax) eval-scope))
+                    Value
+                        list
+                            list sugar-set-scope! eval-scope
+                            list let tmp '=
+                                cons embed
+                                    expr as list
+                            #list __defer (list tmp)
+                                list _ (list get-scope) (list locals) tmp
+                            list handle-retargs counter
+                                list __this-scope
+                                list locals
+                                tmp
+                let f = (sc_compile (sc_eval expr-anchor (unbox-pointer expr list) eval-scope) 0:u64)
                 let fptr =
                     f as
-                        pointer (function (ReturnLabel Scope i32))
+                        'pointer
+                            'raising
+                                function (Arguments Scope i32)
+                                Error
                 set-anchor! expr-anchor
-                return (fptr)
-            inline (exc)
+                fptr;
+            except (exc)
                 io-write!
-                    format-exception exc
-                return eval-scope (unconst 0)
-    repeat "" "" (counter + count) eval-scope
-
+                    'format exc
+                io-write! "\n"
+                _ eval-scope 0
+        repeat "" "" (counter + count) eval-scope
 
 #-------------------------------------------------------------------------------
 # main
@@ -5177,60 +4920,69 @@ fn print-help (exename)
             -s, --signal-abort          raise SIGABRT when calling `abort!`.
             --                          terminate option list.
     exit 0
-    unreachable!;
 
 fn print-version ()
     print
         compiler-version-string;
     print "Executable path:" compiler-path
     exit 0
-    unreachable!;
 
-fn run-main (args...)
-    let argcount = (va-countof args...)
-    let loop (i sourcepath parse-options) = 1 none true
-    if (i < argcount)
+fn run-main ()
+    let argc argv = (launch-args)
+    let exename = (load (getelementptr argv 0))
+    let exename = (sc_string_new_from_cstr exename)
+    let sourcepath = (alloca string)
+    let parse-options = (alloca bool)
+    store "" sourcepath
+    store true parse-options
+    loop (i = 1)
+        if (i >= argc)
+            break;
         let k = (i + 1)
-        let arg = (va@ i args...)
-        if (parse-options and ((@ arg 0) == (char "-")))
+        let arg = (load (getelementptr argv i))
+        let arg = (sc_string_new_from_cstr arg)
+        if ((load parse-options) and ((@ arg 0:usize) == (char "-")))
             if ((arg == "--help") or (arg == "-h"))
-                print-help args...
+                print-help exename
             elseif ((== arg "--version") or (== arg "-v"))
                 print-version;
             elseif ((== arg "--signal-abort") or (== arg "-s"))
                 set-signal-abort! true
-                loop k sourcepath parse-options
             elseif (== arg "--")
-                loop k sourcepath false
+                store false parse-options
             else
                 print
                     .. "unrecognized option: " arg
                         \ ". Try --help for help."
                 exit 1
-                unreachable!;
-        elseif (sourcepath == none)
-            loop k arg parse-options
-        # remainder is passed on to script
-        #else
-            print
-                .. "unrecognized argument: " arg
-                    \ ". Try --help for help."
-            exit 1
-            unreachable!;
-    if (sourcepath == none)
+        elseif ((load sourcepath) == "")
+            store arg sourcepath
+            # remainder is passed on to script
+            break;
+        k
+    let sourcepath = (load sourcepath)
+    if (sourcepath == "")
         read-eval-print-loop;
     else
         let scope =
             Scope (globals)
-        set-scope-symbol! scope 'args
-            fn ()
-                return sourcepath (va@ i args...)
-        load-module "" sourcepath
-            scope = scope
-            main-module? = true
+        'set-docstring! scope unnamed ""
+        'set-symbols scope
+            script-launch-args =
+                fn ()
+                    return sourcepath argc argv
+        do  #try
+            load-module "" sourcepath
+                scope = scope
+                main-module? = true
+            _;
+        #except (err)
+            print
+                default-styler style-error "error:"
+                'format err
         exit 0
-        unreachable!;
 
-run-main (args)
-true
+raises-compile-error;
+run-main;
 
+return;

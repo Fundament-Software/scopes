@@ -1,22 +1,57 @@
 
+using import testing
 
-# todo
+# start out with general template
+fn testf (a b)
+    a * b
+let testf = (const-typify testf i32 i32)
 
-#print
-    tuple
-        va-types 1 2 "hi" (tupleof 1 true)
+# define overloaded function and expand existing testf
+fn... testf
+case (a : i32,)
+    testf a a
+# try the template last
+case using testf
 
-#    set-type-symbol! Parameter 'apply-type
-        fn (cls params...)
-            let param1 param2 param3 = params...
-            let TT = (tuple (typeof param1) (typeof param2) (typeof param3))
-            if (type== TT (tuple Anchor Symbol type))
-                Parameter-new param1 param2 param3
-            elseif (type== TT (tuple Anchor Symbol Nothing))
-                Parameter-new param1 param2 Unknown
-            elseif (type== TT (tuple Symbol type Nothing))
-                Parameter-new (active-anchor) param1 param2
-            elseif (type== TT (tuple Symbol Nothing Nothing))
-                Parameter-new (active-anchor) param1 Unknown
-            else
-                compiler-error! "usage: Parameter [anchor] symbol [type]"
+do
+    # expand overloaded function (in this scope only)
+    fn... testf
+    case (a : i32, b : i32, c : i32)
+        testf a (testf b c)
+    # try the previous testf last
+    case using testf
+
+    # matches testf (a : i32, b : i32, c : i32)
+    assert ((testf 4 3 2) == 24)
+    # matches testf (a : i32,)
+    assert ((testf 3) == 9)
+    # matches testf (a b)
+    assert ((testf 3 2) == 6)
+
+
+# error: could not match argument types (i32 i32 i32) to overloaded function
+  with types
+      λ(i32 Unknown)
+      λ(i32)
+assert-compiler-error (testf 4 5 6)
+
+# prints type
+print testf
+# prints function templates of the overloaded function
+print testf.templates
+# prints signatures of the overloaded function
+print testf.parameter-types
+
+fn... test2
+case (a : i32,)
+    a + a
+
+'append test2
+    # template
+    fn (a)
+        .. a a
+    # signature pattern
+    Arguments string
+
+assert ((test2 5) == 10)
+assert ((test2 "hi") == "hihi")

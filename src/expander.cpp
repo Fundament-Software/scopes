@@ -7,16 +7,20 @@
 #include "expander.hpp"
 #include "list.hpp"
 #include "error.hpp"
-#include "syntax.hpp"
-#include "argument.hpp"
 #include "type.hpp"
-#include "return.hpp"
-#include "pointer.hpp"
-#include "function.hpp"
-#include "label.hpp"
+#include "type/arguments_type.hpp"
+#include "type/pointer_type.hpp"
+#include "type/function_type.hpp"
 #include "scope.hpp"
 #include "stream_expr.hpp"
 #include "anchor.hpp"
+#include "value.hpp"
+#include "prover.hpp"
+#include "timer.hpp"
+#include "stream_ast.hpp"
+#include "gc.hpp"
+#include "dyn_cast.inc"
+#include "scopes/scopes.h"
 
 #include <assert.h>
 
@@ -25,222 +29,135 @@ namespace scopes {
 //------------------------------------------------------------------------------
 // MACRO EXPANDER
 //------------------------------------------------------------------------------
-// expands macros and generates the IL
+// expands macros and generates the AST
 
-static bool verify_list_parameter_count(const List *expr, int mincount, int maxcount) {
-    assert(expr != EOL);
-    if ((mincount <= 0) && (maxcount == -1)) {
-        return true;
+static SCOPES_RESULT(void) verify_list_parameter_count(const char *context, const List *expr, int mincount, int maxcount, int starti = 1) {
+    SCOPES_RESULT_TYPE(void);
+    if (!expr) {
+        SCOPES_LOCATION_ERROR(format("%s: expression is empty", context));
     }
-    int argcount = (int)expr->count - 1;
+    if ((mincount <= 0) && (maxcount == -1)) {
+        return {};
+    }
+    int argcount = (int)expr->count - starti;
 
     if ((maxcount >= 0) && (argcount > maxcount)) {
-        location_error(
-            format("excess argument. At most %i arguments expected", maxcount));
-        return false;
+        SCOPES_LOCATION_ERROR(
+            format("%s: excess argument. At most %i arguments expected", context, maxcount));
     }
     if ((mincount >= 0) && (argcount < mincount)) {
-        location_error(
-            format("at least %i arguments expected, got %i", mincount, argcount));
-        return false;
+        SCOPES_LOCATION_ERROR(
+            format("%s: at least %i arguments expected, got %i", context, mincount, argcount));
     }
-    return true;
+    return {};
+}
+
+//------------------------------------------------------------------------------
+
+static Symbol try_extract_symbol(Value *node) {
+    auto ptr = dyn_cast<ConstInt>(node);
+    if (ptr && (ptr->get_type() == TYPE_Symbol))
+        return Symbol::wrap(ptr->value);
+    return SYM_Unnamed;
 }
 
 //------------------------------------------------------------------------------
 
 struct Expander {
-    Label *state;
     Scope *env;
+    Template *astscope;
     const List *next;
     static bool verbose;
 
-    const Type *list_expander_func_type;
+    static const Type *list_expander_func_type;
 
-    Expander(Label *_state, Scope *_env, const List *_next = EOL) :
-        state(_state),
+    Expander(Scope *_env, Template *_astscope, const List *_next = EOL) :
         env(_env),
-        next(_next),
-        list_expander_func_type(nullptr) {
-        list_expander_func_type = Pointer(Function(
-            ReturnLabel({unknown_of(TYPE_List), unknown_of(TYPE_Scope)}),
-            {TYPE_List, TYPE_Scope}), PTF_NonWritable, SYM_Unnamed);
+        astscope(_astscope),
+        next(_next) {
+        if (!list_expander_func_type) {
+            list_expander_func_type = pointer_type(raising_function_type(
+                arguments_type({TYPE_List, TYPE_Scope}),
+                {TYPE_List, TYPE_Scope}), PTF_NonWritable, SYM_Unnamed);
+        }
     }
 
     ~Expander() {}
 
-    bool is_goto_label(Any enter) {
-        return (enter.type == TYPE_Label)
-            && (enter.label->params[0]->type == TYPE_Nothing);
-    }
-
-    // arguments must include continuation
-    // enter and args must be passed with syntax object removed
-    void br(Any enter, const Args &args, uint64_t flags = 0) {
-        assert(!args.empty());
-        const Anchor *anchor = get_active_anchor();
-        assert(anchor);
-        if (!state) {
-            set_active_anchor(anchor);
-            location_error(String::from("can not define body: continuation already exited."));
-            return;
-        }
-        assert(!is_goto_label(enter) || (args[0].value.type == TYPE_Nothing));
-        assert(state->body.enter.type == TYPE_Nothing);
-        assert(state->body.args.empty());
-        state->body.flags = flags;
-        state->body.enter = enter;
-        state->body.args = args;
-        state->body.anchor = anchor;
-        state = nullptr;
-    }
-
-    bool is_instanced_dest(Any val) {
-        return (val.type == TYPE_Parameter)
-            || (val.type == TYPE_Label)
-            || (val.type == TYPE_Nothing);
-    }
-
-    void verify_dest_not_none(Any dest) {
-        if (dest.type == TYPE_Nothing) {
-            location_error(String::from("attempting to implicitly return from label"));
-        }
-    }
-
-    Any write_dest(const Any &dest) {
-        if (dest.type == TYPE_Symbol) {
-            return none;
-        } else if (is_instanced_dest(dest)) {
-            if (last_expression()) {
-                verify_dest_not_none(dest);
-                br(dest, { none });
-            }
-            return none;
-        } else {
-            assert(false && "illegal dest type");
-        }
-        return none;
-    }
-
-    Any write_dest(const Any &dest, const Any &value) {
-        if (dest.type == TYPE_Symbol) {
-            return value;
-        } else if (is_instanced_dest(dest)) {
-            if (last_expression()) {
-                verify_dest_not_none(dest);
-                br(dest, { none, value });
-            }
-            return value;
-        } else {
-            assert(false && "illegal dest type");
-        }
-        return none;
-    }
-
-    void expand_block(const List *it, const Any &dest) {
-        assert(is_instanced_dest(dest));
-        if (it == EOL) {
-            br(dest, { none });
-        } else {
-            while (it) {
-                next = it->next;
-                const Syntax *sx = it->at;
-                Any expr = sx->datum;
-                if (!last_expression() && (expr.type == TYPE_String)) {
-                    env->set_doc(expr);
+    SCOPES_RESULT(Value *) expand_expression(const Anchor *anchor, const List *it) {
+        SCOPES_RESULT_TYPE(Value *);
+        Expression *expr = nullptr;
+        while (it) {
+            next = it->next;
+            if (!last_expression()) {
+                const String *doc = try_extract_string(it->at);
+                if (doc) {
+                    env->set_doc(doc);
                 }
-                expand(it->at, dest);
-                it = next;
             }
+            if (!expr) {
+                expr = Expression::from(anchor);
+            }
+            expr->append(SCOPES_GET_RESULT(expand(it->at)));
+            it = next;
         }
+        if (expr) {
+            #if 1
+            if (expr->body.empty())
+                return expr->value;
+            #endif
+            return expr;
+        }
+        return ArgumentListTemplate::from(anchor);
     }
 
-    Any expand_syntax_extend(const List *it, const Any &dest) {
+    SCOPES_RESULT(Value *) expand_run_stage(const List *it) {
+        SCOPES_RESULT_TYPE(Value *);
         auto _anchor = get_active_anchor();
 
-        verify_list_parameter_count(it, 1, -1);
+        SCOPES_CHECK_RESULT(verify_list_parameter_count("run-stage", it, 0, 0));
 
-        // skip head
-        it = it->next;
-
-        Label *func = Label::from(_anchor, Symbol(KW_SyntaxExtend));
-
-        auto retparam = Parameter::from(_anchor, Symbol(SYM_Unnamed), TYPE_Unknown);
-        auto scopeparam = Parameter::from(_anchor, Symbol(SYM_SyntaxScope), TYPE_Unknown);
-
-        func->append(retparam);
-        func->append(scopeparam);
-
-        Scope *subenv = Scope::from(env);
-        subenv->bind(Symbol(SYM_SyntaxScope), scopeparam);
-
-        Expander subexpr(func, subenv);
-
-        subexpr.expand_block(it, retparam);
-
-        set_active_anchor(_anchor);
-
-        Args args;
-        args.reserve(4);
-        Label *nextstate = nullptr;
-        Any result = none;
-        if (dest.type == TYPE_Symbol) {
-            nextstate = Label::continuation_from(_anchor, Symbol(SYM_Unnamed));
-            Parameter *param = Parameter::variadic_from(_anchor, Symbol(SYM_Unnamed), TYPE_Unknown);
-            nextstate->append(param);
-            args.push_back(nextstate);
-            result = param;
-        } else if (is_instanced_dest(dest)) {
-            args.push_back(dest);
-        } else {
-            assert(false && "syntax extend: illegal dest type");
-        }
-        args.push_back(func);
-        args.push_back(Syntax::from(_anchor, next));
-        args.push_back(env);
-        //state = subexp.state;
-        set_active_anchor(_anchor);
-        br(Builtin(KW_SyntaxExtend), args);
-        state = nextstate;
+        auto node = CompileStage::from(_anchor, next, env);
         next = EOL;
-        return result;
+        return node;
     }
 
-    Parameter *expand_parameter(Any value) {
-        const Syntax *sxvalue = value;
-        const Anchor *anchor = sxvalue->anchor;
-        Any _value = sxvalue->datum;
-        if (_value.type == TYPE_Parameter) {
-            return _value.parameter;
-        } else if (_value.type == TYPE_List && _value.list == EOL) {
-            return Parameter::from(anchor, Symbol(SYM_Unnamed), TYPE_Nothing);
+    SCOPES_RESULT(ParameterTemplate *) expand_parameter(Value *value, Value *node = nullptr) {
+        SCOPES_RESULT_TYPE(ParameterTemplate *);
+        const Anchor *anchor = value->anchor();
+        if (isa<ParameterTemplate>(value)) {
+            return cast<ParameterTemplate>(value);
         } else {
-            _value.verify(TYPE_Symbol);
-            Parameter *param = nullptr;
-            if (ends_with_parenthesis(_value.symbol)) {
-                param = Parameter::variadic_from(anchor, _value.symbol, TYPE_Unknown);
+            Symbol sym = SCOPES_GET_RESULT(extract_symbol_constant(value));
+            if (node && isa<Pure>(node)) {
+                env->bind(sym, node);
+                return nullptr;
             } else {
-                param = Parameter::from(anchor, _value.symbol, TYPE_Unknown);
+                ParameterTemplate *param = nullptr;
+                if (ends_with_parenthesis(sym)) {
+                    param = ParameterTemplate::variadic_from(anchor, sym);
+                } else {
+                    param = ParameterTemplate::from(anchor, sym);
+                }
+                env->bind(sym, param);
+                return param;
             }
-            env->bind(_value.symbol, param);
-            return param;
         }
     }
 
     struct ExpandFnSetup {
-        bool label;
         bool inlined;
 
         ExpandFnSetup() {
-            label = false;
             inlined = false;
         };
     };
 
-    Any expand_fn(const List *it, const Any &dest, const ExpandFnSetup &setup) {
+    SCOPES_RESULT(Value *) expand_fn(const List *it, const ExpandFnSetup &setup) {
+        SCOPES_RESULT_TYPE(Value *);
         auto _anchor = get_active_anchor();
 
-        verify_list_parameter_count(it, 1, -1);
+        SCOPES_CHECK_RESULT(verify_list_parameter_count("fn", it, 1, -1));
 
         // skip head
         it = it->next;
@@ -248,134 +165,89 @@ struct Expander {
         assert(it != EOL);
 
         bool continuing = false;
-        Label *func = nullptr;
-        Any tryfunc_name = unsyntax(it->at);
-        if (tryfunc_name.type == TYPE_Symbol) {
+        Template *func = nullptr;
+        Value *result = nullptr;
+        //Any tryfunc_name = SCOPES_GET_RESULT(unsyntax(it->at));
+        const Type *T = try_get_const_type(it->at);
+        if (T == TYPE_Symbol) {
+            auto sym = SCOPES_GET_RESULT(extract_symbol_constant(it->at));
             // named self-binding
             // see if we can find a forward declaration in the local scope
-            Any result = none;
-            if (env->lookup_local(tryfunc_name.symbol, result)
-                && (result.type == TYPE_Label)
-                && !result.label->is_valid()) {
-                func = result.label;
+            if (env->lookup_local(sym, result)
+                && isa<Template>(result)
+                && cast<Template>(result)->is_forward_decl()) {
+                func = cast<Template>(result);
                 continuing = true;
             } else {
-                func = Label::from(_anchor, tryfunc_name.symbol);
-                env->bind(tryfunc_name.symbol, func);
+                func = Template::from(_anchor, sym);
+                result = func;
+                env->bind(sym, func);
             }
             it = it->next;
-        } else if (tryfunc_name.type == TYPE_String) {
+        } else if (T == TYPE_String) {
+            auto str = try_extract_string(it->at);
+            assert(str);
             // named lambda
-            func = Label::from(_anchor, Symbol(tryfunc_name.string));
+            func = Template::from(_anchor, Symbol(str));
+            result = func;
             it = it->next;
         } else {
             // unnamed lambda
-            func = Label::from(_anchor, Symbol(SYM_Unnamed));
+            func = Template::from(_anchor, Symbol(SYM_Unnamed));
+            result = func;
         }
         if (setup.inlined)
             func->set_inline();
-
-        Parameter *retparam = nullptr;
-        if (continuing) {
-            assert(!func->params.empty());
-            retparam = func->params[0];
-        } else {
-            retparam = Parameter::from(_anchor, Symbol(SYM_Unnamed), setup.label?TYPE_Nothing:TYPE_Unknown);
-            func->append(retparam);
-        }
+        /*
+        if (setup.quoted)
+            result = ast_quote(func);
+        */
 
         if (it == EOL) {
             // forward declaration
-            if (tryfunc_name.type != TYPE_Symbol) {
-                location_error(setup.label?
-                    String::from("forward declared label must be named")
-                    :String::from("forward declared function must be named"));
+            if (T != TYPE_Symbol) {
+                SCOPES_LOCATION_ERROR(
+                    String::from("forward declared function must be named"));
             }
-
-            return write_dest(dest);
+            return result;
         }
 
-        const Syntax *sxplist = it->at;
-        const List *params = sxplist->datum;
+        const List *params = SCOPES_GET_RESULT(extract_list_constant(it->at));
 
         it = it->next;
 
         Scope *subenv = Scope::from(env);
-        // hidden self-binding for subsequent macros
-        subenv->bind(SYM_ThisFnCC, func);
-        Any subdest = none;
-        if (!setup.label) {
-            subenv->bind(KW_Recur, func);
-
-            subdest = retparam;
-            subenv->bind(KW_Return, retparam);
-        }
+        subenv->bind(KW_Recur, func);
         // ensure the local scope does not contain special symbols
         subenv = Scope::from(subenv);
 
-        Expander subexpr(func, subenv);
+        Expander subexpr(subenv, func);
 
         while (params != EOL) {
-            func->append(subexpr.expand_parameter(params->at));
+            func->append_param(SCOPES_GET_RESULT(subexpr.expand_parameter(params->at)));
             params = params->next;
         }
 
         if ((it != EOL) && (it->next != EOL)) {
-            Any val = unsyntax(it->at);
-            if (val.type == TYPE_String) {
-                func->docstring = val.string;
+            auto str = try_extract_string(it->at);
+            if (str) {
+                func->docstring = str;
                 it = it->next;
             }
         }
 
-        subexpr.expand_block(it, subdest);
+        func->value = SCOPES_GET_RESULT(subexpr.expand_expression(_anchor, it));
 
-        if (state) {
-            func->body.scope_label = state;
-        }
-
-        set_active_anchor(_anchor);
-        return write_dest(dest, func);
-    }
-
-    bool is_return_parameter(Any val) {
-        return (val.type == TYPE_Parameter) && (val.parameter->index == 0);
+        return result;
     }
 
     bool last_expression() {
         return next == EOL;
     }
 
-    Label *make_nextstate(const Any &dest, Any &result, Any &subdest) {
-        auto _anchor = get_active_anchor();
-        Label *nextstate = nullptr;
-        subdest = dest;
-        if (dest.type == TYPE_Symbol) {
-            nextstate = Label::continuation_from(_anchor, Symbol(SYM_Unnamed));
-            Parameter *param = Parameter::variadic_from(_anchor,
-                Symbol(SYM_Unnamed), TYPE_Unknown);
-            nextstate->append(param);
-            nextstate->set_inline();
-            if (state) {
-                nextstate->body.scope_label = state;
-            }
-            subdest = nextstate;
-            result = param;
-        } else if (is_instanced_dest(dest)) {
-            if (!last_expression()) {
-                nextstate = Label::continuation_from(_anchor, Symbol(SYM_Unnamed));
-                if (state) {
-                    nextstate->body.scope_label = state;
-                }
-                subdest = nextstate;
-            }
-        } else {
-            assert(false && "illegal dest type");
-        }
-        return nextstate;
-    }
-
-    Any expand_defer(const List *it, const Any &dest) {
+#if 0
+    SCOPES_RESULT(Any) expand_defer(const List *it, const Any &dest) {
+        SCOPES_RESULT_TYPE(Any);
         auto _anchor = get_active_anchor();
 
         it = it->next;
@@ -385,43 +257,71 @@ struct Expander {
 
         Label *nextstate = Label::continuation_from(_anchor, Symbol(SYM_Unnamed));
 
-        expand_block(block, nextstate);
+        SCOPES_CHECK_RESULT(expand_expression(block, nextstate));
 
         state = nextstate;
         // read parameter names
-        it = unsyntax(it->at);
+        it = SCOPES_GET_RESULT(unsyntax(it->at));
         while (it != EOL) {
-            nextstate->append(expand_parameter(it->at));
+            nextstate->append(SCOPES_GET_RESULT(expand_parameter(it->at)));
             it = it->next;
         }
         return expand_do(body, dest, false);
     }
+#endif
 
-    Any expand_do(const List *it, const Any &dest, bool new_scope) {
+    SCOPES_RESULT(Value *) expand_label(const List *it) {
+        SCOPES_RESULT_TYPE(Value *);
         auto _anchor = get_active_anchor();
 
         it = it->next;
 
-        Any result = none;
-        Any subdest = none;
-        Label *nextstate = make_nextstate(dest, result, subdest);
+        auto name = SCOPES_GET_RESULT(extract_symbol_constant(it->at));
+        it = it->next;
 
-        Label *func = Label::continuation_from(_anchor, Symbol(SYM_Unnamed));
-        Scope *subenv = env;
-        if (new_scope) {
-            subenv = Scope::from(env);
-        }
-        Expander subexpr(func, subenv);
-        subexpr.expand_block(it, subdest);
-
-        set_active_anchor(_anchor);
-        br(func, { none });
-        state = nextstate;
-        return result;
+        Scope *subenv = Scope::from(env);
+        auto label = LabelTemplate::from(_anchor, LK_User, name);
+        subenv->bind(name, label);
+        Expander subexpr(subenv, astscope);
+        label->value = SCOPES_GET_RESULT(subexpr.expand_expression(_anchor, it));
+        return label;
     }
 
-    bool is_equal_token(const Any &name) {
-        return (name.type == TYPE_Symbol) && (name.symbol == OP_Set);
+    SCOPES_RESULT(Value *) expand_do(const List *it) {
+        //SCOPES_RESULT_TYPE(Value *);
+        auto _anchor = get_active_anchor();
+
+        it = it->next;
+
+        Scope *subenv = Scope::from(env);
+        Expander subexpr(subenv, astscope);
+        return subexpr.expand_expression(_anchor, it);
+    }
+
+    SCOPES_RESULT(Value *) expand_inline_do(const List *it) {
+        SCOPES_RESULT_TYPE(Value *);
+        auto _anchor = get_active_anchor();
+
+        it = it->next;
+
+        Expander subexpr(env, astscope);
+        auto expr = SCOPES_GET_RESULT(subexpr.expand_expression(_anchor, it));
+        if (isa<Expression>(expr)) {
+            auto ex = cast<Expression>(expr);
+            ex->scoped = false;
+        }
+        env = subexpr.env;
+        return expr;
+    }
+
+    bool is_equal_token(Value *name) {
+        auto tok = try_extract_symbol(name);
+        return tok == OP_Set;
+    }
+
+    bool is_except_token(Value *name) {
+        auto tok = try_extract_symbol(name);
+        return tok == KW_Except;
     }
 
     void print_name_suggestions(Symbol name, StyledStream &ss) {
@@ -440,193 +340,248 @@ struct Expander {
         }
     }
 
-    // (let x ... [= args ...])
-    // (let name ([x ...]) [= args ...])
-    // ...
-    Any expand_let(const List *it, const Any &dest) {
+    // (loop ([x...] [= init...]) body...)
+    SCOPES_RESULT(Value *) expand_loop(const List *it) {
+        SCOPES_RESULT_TYPE(Value *);
 
-        verify_list_parameter_count(it, 1, -1);
+        /*
+        we're building this structure
+
+        label break
+            loop x... (init...)
+                body...
+
+        break labels never type themselves from their body
+        */
+
+        SCOPES_CHECK_RESULT(verify_list_parameter_count("loop", it, 1, -1));
         it = it->next;
 
         auto _anchor = get_active_anchor();
 
-        Symbol labelname = Symbol(SYM_Unnamed);
-        const List *params = nullptr;
+        const List *params = SCOPES_GET_RESULT(extract_list_constant(it->at));
         const List *values = nullptr;
+        const List *body = it->next;
+        auto endit = params;
+        while (endit) {
+            if (is_equal_token(endit->at))
+                break;
+            endit = endit->next;
+        }
+        if (endit != EOL)
+            values = endit->next;
 
+        it = values;
+
+        Values initargs;
         if (it) {
-            auto name = unsyntax(it->at);
-            auto nextit = it->next;
-            if ((name.type == TYPE_Symbol) && nextit) {
-                auto val = unsyntax(nextit->at);
-                if (val.type == TYPE_List) {
-                    labelname = name.symbol;
-                    params = val.list;
-                    nextit = nextit->next;
-                    it = params;
-                    if (nextit != EOL) {
-                        if (!is_equal_token(unsyntax(nextit->at))) {
-                            location_error(String::from("equal sign (=) expected"));
-                        }
-                        values = nextit;
+            Expander subexp(env, astscope, it->next);
+            SCOPES_CHECK_RESULT(subexp.expand_arguments(initargs, it));
+        }
+
+        Loop *loop = Loop::from(_anchor, ArgumentListTemplate::from(_anchor, initargs));
+        LabelTemplate *break_label = LabelTemplate::from(_anchor, LK_Break, KW_Break, loop);
+
+        Expander bodyexp(Scope::from(env), astscope);
+
+        auto expr = Expression::from(_anchor);
+        {
+            int index = 0;
+            it = params;
+            // read parameter names
+            while (it != endit) {
+                auto paramval = it->at;
+                Symbol sym = SCOPES_GET_RESULT(extract_symbol_constant(paramval));
+                Value *node = nullptr;
+                if (!ends_with_parenthesis(sym)) {
+                    node = extract_argument(paramval->anchor(), loop->args, index);
+                } else {
+                    if (it->next != endit) {
+                        SCOPES_ANCHOR(paramval->anchor());
+                        SCOPES_EXPECT_ERROR(error_variadic_symbol_not_in_last_place());
                     }
+                    node = extract_argument(paramval->anchor(), loop->args, index, true);
                 }
+                bodyexp.env->bind(sym, node);
+                expr->append(node);
+                it = it->next;
+                index++;
             }
         }
 
-        auto endit = EOL;
-        if (!params) {
-            endit = it;
+        auto value = SCOPES_GET_RESULT(bodyexp.expand_expression(_anchor, body));
+        expr->append(value);
+        loop->value = expr;
+        return break_label;
+    }
+
+    static Value *extract_argument(const Anchor *anchor, Value *node, int index, bool vararg = false) {
+        if (isa<Const>(node)) {
+            assert(!is_arguments_type(cast<Const>(node)->get_type()));
+            if (index == 0) {
+                return node;
+            } else {
+                return ConstAggregate::none_from(anchor);
+            }
+        }
+        auto result = ExtractArgumentTemplate::from(anchor, node, index, vararg);
+        if (!vararg) {
+            result = KeyedTemplate::from(anchor, SYM_Unnamed, result);
+        }
+        return result;
+    }
+
+    // (let x ... [= args ...])
+    // (let (x ... = args ...) ...
+    // ...
+    SCOPES_RESULT(Value *) expand_let(const List *it) {
+        SCOPES_RESULT_TYPE(Value *);
+
+        SCOPES_CHECK_RESULT(verify_list_parameter_count("let", it, 1, -1));
+        it = it->next;
+
+        auto _anchor = get_active_anchor();
+
+        Values exprs;
+        Values args;
+
+        const Type *T = try_get_const_type(it->at);
+        if (T == TYPE_List) {
+            // alternative format
+            const List *equit = it;
+            while (equit) {
+                SCOPES_ANCHOR(equit->at->anchor());
+                it = SCOPES_GET_RESULT(extract_list_constant(equit->at));
+                SCOPES_CHECK_RESULT(verify_list_parameter_count("=", it, 3, -1, 0));
+                auto paramval = it->at;
+                it = it->next;
+                if (!is_equal_token(it->at)) {
+                    SCOPES_ANCHOR(it->at->anchor());
+                    SCOPES_LOCATION_ERROR(String::from("= token expected"));
+                }
+                it = it->next;
+                // read init values
+                Expander subexp(env, astscope);
+                subexp.next = it->next;
+                Value *node = SCOPES_GET_RESULT(subexp.expand(it->at));
+                it = subexp.next;
+                env = subexp.env;
+                if (it) {
+                    SCOPES_ANCHOR(it->at->anchor());
+                    SCOPES_LOCATION_ERROR(String::from("extraneous argument"));
+                }
+                exprs.push_back(node);
+                Symbol sym = SCOPES_GET_RESULT(extract_symbol_constant(paramval));
+                if (!ends_with_parenthesis(sym)) {
+                    node = extract_argument(paramval->anchor(), node, 0);
+                }
+                args.push_back(node);
+                env->bind(sym, node);
+                equit = equit->next;
+            }
+        } else {
+            const List *values = nullptr;
+            auto endit = it;
             // read parameter names
             while (endit) {
-                auto name = unsyntax(endit->at);
-                if (is_equal_token(name))
+                if (is_equal_token(endit->at))
                     break;
                 endit = endit->next;
             }
             if (endit != EOL)
                 values = endit;
-        }
 
-        Label *nextstate = nullptr;
-        if (!values) {
-            // no assignments, reimport parameter names into local scope
-            if (labelname != SYM_Unnamed) {
-                nextstate = Label::continuation_from(_anchor, labelname);
-                env->bind(labelname, nextstate);
-            }
-
-            while (it != endit) {
-                auto name = unsyntax(it->at);
-                name.verify(TYPE_Symbol);
-                AnyDoc entry = { none, nullptr };
-                if (!env->lookup(name.symbol, entry)) {
-                    StyledString ss;
-                    ss.out << "no such name bound in parent scope: '"
-                        << name.symbol.name()->data << "'. ";
-                    print_name_suggestions(name.symbol, ss.out);
-                    location_error(ss.str());
-                }
-                env->bind_with_doc(name.symbol, entry);
-                it = it->next;
-            }
-
-            if (nextstate) {
-                br(nextstate, { none });
-                state = nextstate;
-            }
-
-            return write_dest(dest);
-        }
-
-        // small hack to simplify simple aliasing
-        if (labelname == SYM_Unnamed) {
-            // label is implicit
-            if ((it->count == 3) && (values->count == 2)) {
-                // single simple value is being assigned (k = v)
-                auto key = unsyntax(it->at);
-                auto val = unsyntax(values->next->at);
-                if ((key.type == TYPE_Symbol) && (val.type == TYPE_Symbol)) {
-                    Any value = none;
-                    if (env->lookup(val.symbol, value)) {
-                        env->bind(key.symbol, value);
-                        return write_dest(dest);
+            if (!values) {
+                // no assignments, reimport parameter names into local scope
+                Value *last_entry = nullptr;
+                while (it != endit) {
+                    auto name = SCOPES_GET_RESULT(extract_symbol_constant(it->at));
+                    ScopeEntry entry;
+                    if (!env->lookup(name, entry)) {
+                        SCOPES_ANCHOR(it->at->anchor());
+                        StyledString ss;
+                        ss.out << "no such name bound in parent scope: '"
+                            << name.name()->data << "'. ";
+                        print_name_suggestions(name, ss.out);
+                        SCOPES_LOCATION_ERROR(ss.str());
                     }
+                    env->bind_with_doc(name, entry);
+                    last_entry = entry.expr;
+                    it = it->next;
                 }
+                if (!last_entry) {
+                    last_entry = ConstAggregate::none_from(_anchor);
+                }
+                return last_entry;
             }
-        }
 
-        nextstate = Label::continuation_from(_anchor, labelname);
-        if (state) {
-            nextstate->body.scope_label = state;
-        }
-        if (labelname != SYM_Unnamed) {
-            env->bind(labelname, nextstate);
-        } else {
-            nextstate->set_inline();
-        }
+            const List *params = it;
 
-        size_t numparams = 0;
-        // bind to fresh env so the rhs expressions don't see the symbols yet
-        Scope *orig_env = env;
-        env = Scope::from();
-        // read parameter names
-        while (it != endit) {
-            nextstate->append(expand_parameter(it->at));
-            numparams++;
+            it = values;
             it = it->next;
-        }
-
-        if (nextstate->is_variadic()) {
-            // accepts maximum number of arguments
-            numparams = (size_t)-1;
-        }
-
-        it = values;
-
-        Args args;
-        args.reserve(it->count);
-        args.push_back(none);
-
-        it = it->next;
-
-        // read init values
-        Expander subexp(state, orig_env);
-        size_t numvalues = 0;
-        while (it) {
-            numvalues++;
-            if (numvalues > numparams) {
-                set_active_anchor(((const Syntax *)it->at)->anchor);
-                StyledString ss;
-                ss.out << "number of arguments exceeds number of defined names ("
-                    << numvalues << " > " << numparams << ")";
-                location_error(ss.str());
+            // read init values
+            Expander subexp(env, astscope);
+            while (it) {
+                subexp.next = it->next;
+                auto node = SCOPES_GET_RESULT(subexp.expand(it->at));
+                exprs.push_back(node);
+                it = subexp.next;
             }
-            subexp.next = it->next;
-            args.push_back(subexp.expand(it->at, Symbol(SYM_Unnamed)));
-            it = subexp.next;
+            env = subexp.env;
+
+            Value *srcval = ArgumentListTemplate::from(_anchor, exprs);
+
+            int index = 0;
+            //int lastarg = (int)args.size() - 1;
+            it = params;
+            // read parameter names
+            while (it != endit) {
+                auto paramval = it->at;
+                Symbol sym = SCOPES_GET_RESULT(extract_symbol_constant(paramval));
+                Value *node = nullptr;
+                if (!ends_with_parenthesis(sym)) {
+                    node = extract_argument(paramval->anchor(), srcval, index);
+                } else {
+                    if (it->next != endit) {
+                        SCOPES_ANCHOR(paramval->anchor());
+                        SCOPES_EXPECT_ERROR(error_variadic_symbol_not_in_last_place());
+                    }
+                    node = extract_argument(paramval->anchor(), srcval, index, true);
+                }
+                args.push_back(node);
+                env->bind(sym, node);
+                it = it->next;
+                index++;
+            }
         }
 
-        //
-        for (auto kv = env->map->begin(); kv != env->map->end(); ++kv) {
-            orig_env->bind(kv->first, kv->second.value);
-        }
-        env = orig_env;
-
-        set_active_anchor(_anchor);
-        state = subexp.state;
-        br(nextstate, args);
-        state = nextstate;
-
-        return write_dest(dest);
+        return Expression::from(_anchor, exprs,
+            ArgumentListTemplate::from(_anchor, args));
     }
 
     // quote <value> ...
-    Any expand_quote(const List *it, const Any &dest) {
-        //auto _anchor = get_active_anchor();
+    SCOPES_RESULT(Value *) expand_syntax_quote(const List *it) {
+        SCOPES_RESULT_TYPE(Value *);
+        auto _anchor = get_active_anchor();
 
-        verify_list_parameter_count(it, 1, -1);
+        SCOPES_CHECK_RESULT(verify_list_parameter_count("syntax-quote", it, 1, -1));
         it = it->next;
 
-        Any result = none;
         if (it->count == 1) {
-            result = it->at;
+            return it->at;
         } else {
-            result = it;
+            return ConstPointer::list_from(_anchor, it);
         }
-        return write_dest(dest, strip_syntax(result));
     }
 
-    Any expand_syntax_log(const List *it, const Any &dest) {
-        //auto _anchor = get_active_anchor();
+    SCOPES_RESULT(Value *) expand_syntax_log(const List *it) {
+        SCOPES_RESULT_TYPE(Value *);
+        auto _anchor = get_active_anchor();
 
-        verify_list_parameter_count(it, 1, 1);
+        SCOPES_CHECK_RESULT(verify_list_parameter_count("syntax-log", it, 1, 1));
         it = it->next;
 
-        Any val = unsyntax(it->at);
-        val.verify(TYPE_Symbol);
-
-        auto sym = val.symbol;
+        auto sym = SCOPES_GET_RESULT(extract_symbol_constant(it->at));
         if (sym == KW_True) {
             this->verbose = true;
         } else if (sym == KW_False) {
@@ -635,33 +590,172 @@ struct Expander {
             // ignore
         }
 
-        return write_dest(dest);
+        return ConstAggregate::none_from(_anchor);
+    }
+
+    // (try [x ...]) (except (param ...) [expr ...])
+    SCOPES_RESULT(Value *) expand_try(const List *it) {
+        SCOPES_RESULT_TYPE(Value *);
+
+        /*
+        # we're building this structure
+        label try
+            let except-param ... =
+                label except
+                    merge try
+                        do
+                            try-body ...
+                            (any raise merges to except)
+            except-body ...
+        */
+
+        SCOPES_CHECK_RESULT(verify_list_parameter_count("try", it, 0, -1));
+        it = it->next;
+
+        auto _anchor = get_active_anchor();
+
+        Expander subexp(Scope::from(env), astscope);
+
+        Value *try_value = SCOPES_GET_RESULT(subexp.expand_expression(_anchor, it));
+        LabelTemplate *try_label = LabelTemplate::try_from(_anchor);
+        LabelTemplate *except_label = LabelTemplate::except_from(_anchor,
+            MergeTemplate::from(_anchor, try_label, try_value));
+
+        if (next != EOL) {
+            auto _next_anchor = next->at->anchor();
+            SCOPES_ANCHOR(_next_anchor);
+            it = SCOPES_GET_RESULT(extract_list_constant(next->at));
+            if (it != EOL) {
+                if (is_except_token(it->at)) {
+                    SCOPES_CHECK_RESULT(verify_list_parameter_count("except", it, 1, -1));
+                    it = it->next;
+                    next = next->next;
+
+                    const List *params = SCOPES_GET_RESULT(extract_list_constant(it->at));
+                    const List *body = it->next;
+
+                    Expander subexp(Scope::from(env), astscope);
+                    auto expr = Expression::from(_next_anchor);
+                    expr->append(except_label);
+                    {
+                        int index = 0;
+                        it = params;
+                        // read parameter names
+                        while (it != EOL) {
+                            auto paramval = it->at;
+                            Symbol sym = SCOPES_GET_RESULT(extract_symbol_constant(paramval));
+                            Value *node = nullptr;
+                            if (!ends_with_parenthesis(sym)) {
+                                node = extract_argument(paramval->anchor(), except_label, index);
+                            } else {
+                                if (it->next != EOL) {
+                                    SCOPES_ANCHOR(paramval->anchor());
+                                    SCOPES_EXPECT_ERROR(error_variadic_symbol_not_in_last_place());
+                                }
+                                node = extract_argument(paramval->anchor(), except_label, index, true);
+                            }
+                            subexp.env->bind(sym, node);
+                            expr->append(node);
+                            it = it->next;
+                            index++;
+                        }
+                    }
+
+                    it = body;
+                    Value *except_value = SCOPES_GET_RESULT(subexp.expand_expression(_anchor, it));
+                    expr->append(except_value);
+                    try_label->value = expr;
+                    return try_label;
+                }
+            }
+            SCOPES_LOCATION_ERROR(String::from("except block expected"));
+        }
+        SCOPES_LOCATION_ERROR(String::from("except block expected"));
+    }
+
+    // (switch cond)
+    // [(case literal body ...)]
+    // (default body ...)
+    SCOPES_RESULT(Value *) expand_switch(const List *it) {
+        SCOPES_RESULT_TYPE(Value *);
+        auto _anchor = get_active_anchor();
+
+        SCOPES_CHECK_RESULT(verify_list_parameter_count("switch", it, 1, -1));
+        it = it->next;
+
+        Expander subexp(env, astscope);
+        assert(it);
+        subexp.next = it->next;
+        auto expr = SCOPES_GET_RESULT(subexp.expand(it->at));
+        it = subexp.next;
+
+        SwitchTemplate::Cases cases;
+
+        it = next;
+    collect_case:
+        if ((it == EOL) || (try_get_const_type(it->at) != TYPE_List)) {
+            SCOPES_EXPECT_ERROR(error_missing_default_case());
+        }
+        next = it->next;
+        auto _case = SwitchTemplate::Case();
+        _case.anchor = it->at->anchor();
+        it = SCOPES_GET_RESULT(extract_list_constant(it->at));
+        SCOPES_CHECK_RESULT(verify_list_parameter_count("case", it, 1, -1));
+        auto head = try_extract_symbol(it->at);
+        if ((head == KW_Case) || (head == KW_Pass)) {
+            if (head == KW_Pass) {
+                _case.kind = CK_Pass;
+            }
+
+            it = it->next;
+            subexp.next = it->next;
+            _case.literal = SCOPES_GET_RESULT(subexp.expand(it->at));
+            it = subexp.next;
+
+            Expander nativeexp(Scope::from(env), astscope);
+            _case.value = SCOPES_GET_RESULT(nativeexp.expand_expression(_case.anchor, it));
+            cases.push_back(_case);
+
+            it = next;
+            goto collect_case;
+        } else if (head == KW_Default) {
+            it = it->next;
+
+            _case.kind = CK_Default;
+
+            Expander nativeexp(Scope::from(env), astscope);
+            _case.value = SCOPES_GET_RESULT(nativeexp.expand_expression(_case.anchor, it));
+            cases.push_back(_case);
+        }
+
+        return SwitchTemplate::from(_anchor, expr, cases);
     }
 
     // (if cond body ...)
     // [(elseif cond body ...)]
     // [(else body ...)]
-    Any expand_if(const List *it, const Any &dest) {
+    SCOPES_RESULT(Value *) expand_if(const List *it) {
+        SCOPES_RESULT_TYPE(Value *);
         auto _anchor = get_active_anchor();
 
         std::vector<const List *> branches;
 
     collect_branch:
-        verify_list_parameter_count(it, 1, -1);
+        SCOPES_CHECK_RESULT(verify_list_parameter_count("if", it, 1, -1));
         branches.push_back(it);
 
         it = next;
         if (it != EOL) {
             auto itnext = it->next;
-            const Syntax *sx = it->at;
-            if (sx->datum.type == TYPE_List) {
-                it = sx->datum;
+            auto T = try_get_const_type(it->at);
+            if (T == TYPE_List) {
+                it = SCOPES_GET_RESULT(extract_list_constant(it->at));
                 if (it != EOL) {
-                    auto head = unsyntax(it->at);
-                    if (head == Symbol(KW_ElseIf)) {
+                    auto head = try_extract_symbol(it->at);
+                    if (head == KW_ElseIf) {
                         next = itnext;
                         goto collect_branch;
-                    } else if (head == Symbol(KW_Else)) {
+                    } else if (head == KW_Else) {
                         next = itnext;
                         branches.push_back(it);
                     } else {
@@ -677,247 +771,377 @@ struct Expander {
             branches.push_back(EOL);
         }
 
-        Any result = none;
-        Any subdest = none;
-        Label *nextstate = make_nextstate(dest, result, subdest);
-
-        if (subdest.type == TYPE_Label) {
-            subdest.label->unset_inline();
-            subdest.label->set_merge();
-        }
+        auto ifexpr = If::from(_anchor);
 
         int lastidx = (int)branches.size() - 1;
         for (int idx = 0; idx < lastidx; ++idx) {
             it = branches[idx];
+            const Anchor *anchor = it->at->anchor();
+            SCOPES_CHECK_RESULT(verify_list_parameter_count("branch", it, 1, -1));
             it = it->next;
 
-            Label *thenstate = Label::inline_from(_anchor, Symbol(SYM_Unnamed));
-            Label *elsestate = Label::inline_from(_anchor, Symbol(SYM_Unnamed));
-            if (state) {
-                thenstate->body.scope_label = state;
-                elsestate->body.scope_label = state;
-            }
-
-            Expander subexp(state, env);
+            Expander subexp(env, astscope);
+            assert(it);
             subexp.next = it->next;
-            Any cond = subexp.expand(it->at, Symbol(SYM_Unnamed));
+            Value *cond = SCOPES_GET_RESULT(subexp.expand(it->at));
             it = subexp.next;
 
-            set_active_anchor(_anchor);
-            state = subexp.state;
-
-            br(Builtin(FN_Branch), { subdest, cond, thenstate, elsestate });
-
             subexp.env = Scope::from(env);
-            subexp.state = thenstate;
-            subexp.expand_block(it, thenstate->params[0]);
-
-            state = elsestate;
+            ifexpr->append_then(anchor, cond,
+                SCOPES_GET_RESULT(subexp.expand_expression(anchor, it)));
         }
-
-        assert(!state->is_basic_block_like());
 
         it = branches[lastidx];
         if (it != EOL) {
+            const Anchor *anchor = it->at->anchor();
             it = it->next;
-            Expander subexp(state, Scope::from(env));
-            subexp.expand_block(it, state->params[0]);
-        } else {
-            br(state->params[0], { none });
+            Expander subexp(Scope::from(env), astscope);
+
+            ifexpr->append_else(anchor,
+                SCOPES_GET_RESULT(subexp.expand_expression(anchor, it)));
         }
 
-        state = nextstate;
-
-        return result;
+        return ifexpr;
     }
 
-    static bool get_kwargs(Any it, Argument &value) {
-        it = unsyntax(it);
-        if (it.type != TYPE_List) return false;
-        auto l = it.list;
+    static SCOPES_RESULT(bool) get_kwargs(Value *it, Symbol &key, Value *&value) {
+        SCOPES_RESULT_TYPE(bool);
+        auto T = try_get_const_type(it);
+        if (T != TYPE_List) return false;
+        auto l = SCOPES_GET_RESULT(extract_list_constant(it));
         if (l == EOL) return false;
         if (l->count != 3) return false;
-        it = unsyntax(l->at);
-        if (it.type != TYPE_Symbol) return false;
-        value.key = it.symbol;
+        it = l->at;
+        T = try_get_const_type(it);
+        if (T != TYPE_Symbol) return false;
+        key = SCOPES_GET_RESULT(extract_symbol_constant(it));
         l = l->next;
-        it = unsyntax(l->at);
-        if (it.type != TYPE_Symbol) return false;
-        if (it.symbol != OP_Set) return false;
+        it = l->at;
+        T = try_get_const_type(it);
+        if (T != TYPE_Symbol) return false;
+        auto sym = SCOPES_GET_RESULT(extract_symbol_constant(it));
+        if (sym != OP_Set) return false;
         l = l->next;
-        value.value = l->at;
+        value = l->at;
         return true;
     }
 
-    Any expand_call(const List *it, const Any &dest, bool rawcall = false) {
-        if (it == EOL)
-            return write_dest(dest, it);
-        auto _anchor = get_active_anchor();
-        Expander subexp(state, env, it->next);
-
-        Args args;
-        args.reserve(it->count);
-
-        Any result = none;
-        Any subdest = none;
-        Label *nextstate = make_nextstate(dest, result, subdest);
-        args.push_back(subdest);
-
-        Any enter = subexp.expand(it->at, Symbol(SYM_Unnamed));
-        if (is_return_parameter(enter)) {
-            assert(enter.parameter->type != TYPE_Nothing);
-            args[0] = none;
-            if (!last_expression()) {
-                location_error(
-                    String::from("return call must be last in statement list"));
+    SCOPES_RESULT(void) expand_arguments(Values &args, const List *it) {
+        SCOPES_RESULT_TYPE(void);
+        while (it) {
+            next = it->next;
+            Symbol key = SYM_Unnamed;
+            Value *value;
+            SCOPES_ANCHOR(it->at->anchor());
+            if (SCOPES_GET_RESULT(get_kwargs(it->at, key, value))) {
+                args.push_back(
+                    KeyedTemplate::from(get_active_anchor(), key,
+                        SCOPES_GET_RESULT(expand(value))));
+            } else {
+                args.push_back(SCOPES_GET_RESULT(expand(it->at)));
             }
-        } else if (is_goto_label(enter)) {
-            args[0] = none;
+            it = next;
         }
+        return {};
+    }
+
+    Value *ast_quote(Value *expr, const Anchor *anchor = nullptr) {
+        if (isa<Expression>(expr)) {
+            auto ex = cast<Expression>(expr);
+            ex->scoped = false;
+        }
+        return Quote::from(anchor?anchor:(expr->anchor()), expr);
+    }
+
+    SCOPES_RESULT(Value *) expand_ast_quote(const List *it) {
+        SCOPES_RESULT_TYPE(Value *);
+        auto _anchor = get_active_anchor();
+
+        it = it->next;
+
+        Expander subexpr(env, astscope);
+        auto expr = SCOPES_GET_RESULT(subexpr.expand_expression(_anchor, it));
+        return ast_quote(expr, _anchor);
+    }
+
+    SCOPES_RESULT(Value *) expand_ast_unquote(const List *it) {
+        SCOPES_RESULT_TYPE(Value *);
+        auto _anchor = get_active_anchor();
+        SCOPES_CHECK_RESULT(verify_list_parameter_count("ast-unquote", it, 0, -1));
+        it = it->next;
+        Expander subexp(env, astscope);
+        return Unquote::from(_anchor,
+            SCOPES_GET_RESULT(subexp.expand_expression(_anchor, it)));
+    }
+
+    SCOPES_RESULT(Value *) expand_ast_unquote_arguments(const List *it) {
+        SCOPES_RESULT_TYPE(Value *);
+        auto _anchor = get_active_anchor();
+        SCOPES_CHECK_RESULT(verify_list_parameter_count("ast-unquote-arguments", it, 0, -1));
+        it = it->next;
+        Values args;
+        if (it) {
+            Expander subexp(env, astscope, it->next);
+            SCOPES_CHECK_RESULT(subexp.expand_arguments(args, it));
+        }
+        return Unquote::from(_anchor, ArgumentListTemplate::from(_anchor, args));
+    }
+
+    template<typename T>
+    SCOPES_RESULT(Value *) build_terminator(const List *it) {
+        SCOPES_RESULT_TYPE(Value *);
+        auto _anchor = get_active_anchor();
+        Values args;
+        if (it) {
+            Expander subexp(env, astscope, it->next);
+            SCOPES_CHECK_RESULT(subexp.expand_arguments(args, it));
+        }
+        return T::from(_anchor, ArgumentListTemplate::from(_anchor, args));
+    }
+
+    template<typename T>
+    SCOPES_RESULT(Value *) build_terminator(const List *it, LabelTemplate *label) {
+        SCOPES_RESULT_TYPE(Value *);
+        auto _anchor = get_active_anchor();
+        Values args;
+        if (it) {
+            Expander subexp(env, astscope, it->next);
+            SCOPES_CHECK_RESULT(subexp.expand_arguments(args, it));
+        }
+        return T::from(_anchor, label, ArgumentListTemplate::from(_anchor, args));
+    }
+
+    SCOPES_RESULT(Value *) expand_return(const List *it) {
+        SCOPES_RESULT_TYPE(Value *);
+        SCOPES_CHECK_RESULT(verify_list_parameter_count("return", it, 0, -1));
+        it = it->next;
+        return build_terminator<ReturnTemplate>(it);
+    }
+
+    SCOPES_RESULT(Value *) expand_raise(const List *it) {
+        SCOPES_RESULT_TYPE(Value *);
+        SCOPES_CHECK_RESULT(verify_list_parameter_count("raise", it, 0, -1));
+        it = it->next;
+        return build_terminator<RaiseTemplate>(it);
+    }
+
+    SCOPES_RESULT(Value *) expand_break(const List *it) {
+        SCOPES_RESULT_TYPE(Value *);
+        SCOPES_CHECK_RESULT(verify_list_parameter_count("break", it, 0, -1));
+        it = it->next;
+        return build_terminator<Break>(it);
+    }
+
+    SCOPES_RESULT(Value *) expand_repeat(const List *it) {
+        SCOPES_RESULT_TYPE(Value *);
+        SCOPES_CHECK_RESULT(verify_list_parameter_count("repeat", it, 0, -1));
+        it = it->next;
+        return build_terminator<RepeatTemplate>(it);
+    }
+
+    SCOPES_RESULT(Value *) expand_merge(const List *it) {
+        SCOPES_RESULT_TYPE(Value *);
+        SCOPES_CHECK_RESULT(verify_list_parameter_count("merge", it, 1, -1));
+        it = it->next;
+
+        Expander subexp(Scope::from(env), astscope, it->next);
+        Value *label = SCOPES_GET_RESULT(subexp.expand(it->at));
+        it = subexp.next;
+
+        if (!isa<LabelTemplate>(label)) {
+            SCOPES_EXPECT_ERROR(error_label_expected(label));
+        }
+        return build_terminator<MergeTemplate>(it, cast<LabelTemplate>(label));
+    }
+
+    SCOPES_RESULT(Value *) expand_forward(const List *it) {
+        SCOPES_RESULT_TYPE(Value *);
+        auto _anchor = get_active_anchor();
+        SCOPES_CHECK_RESULT(verify_list_parameter_count("_", it, 0, -1));
+        it = it->next;
+        Values args;
+        if (it) {
+            Expander subexp(env, astscope, it->next);
+            SCOPES_CHECK_RESULT(subexp.expand_arguments(args, it));
+        }
+        return ArgumentListTemplate::from(_anchor, args);
+    }
+
+    SCOPES_RESULT(Value *) expand_call(const List *it, uint32_t flags = 0) {
+        SCOPES_RESULT_TYPE(Value *);
+
+        auto _anchor = get_active_anchor();
+        SCOPES_CHECK_RESULT(verify_list_parameter_count("call", it, 0, -1));
+        Expander subexp(env, astscope, it->next);
+        Value *enter = SCOPES_GET_RESULT(subexp.expand(it->at));
+
+        auto call = CallTemplate::from(_anchor, enter);
+        call->flags = flags;
 
         it = subexp.next;
-        while (it) {
-            subexp.next = it->next;
-            Argument value;
-            set_active_anchor(((const Syntax *)it->at)->anchor);
-            if (get_kwargs(it->at, value)) {
-                value.value = subexp.expand(
-                    value.value, Symbol(SYM_Unnamed));
-            } else {
-                value = subexp.expand(it->at, Symbol(SYM_Unnamed));
-            }
-            args.push_back(value);
-            it = subexp.next;
-        }
+        SCOPES_CHECK_RESULT(subexp.expand_arguments(call->args, it));
+        return call;
+    }
 
-        state = subexp.state;
-        set_active_anchor(_anchor);
-        br(enter, args, rawcall?LBF_RawCall:0);
-        state = nextstate;
+    SCOPES_RESULT(sc_list_scope_tuple_t) expand_symbol(Const *node) {
+        SCOPES_RESULT_TYPE(sc_list_scope_tuple_t);
+        Value *symbol_handler_node;
+        if (env->lookup(Symbol(SYM_SymbolWildcard), symbol_handler_node)) {
+            auto T = try_get_const_type(symbol_handler_node);
+            if (T != list_expander_func_type) {
+                StyledString ss;
+                ss.out << "custom symbol expander has wrong type "
+                    << T << ", must be " << list_expander_func_type;
+                SCOPES_LOCATION_ERROR(ss.str());
+            }
+            sc_syntax_wildcard_func_t f = (sc_syntax_wildcard_func_t)cast<ConstPointer>(symbol_handler_node)->value;
+            auto ok_result = f(List::from(node, next), env);
+            if (!ok_result.ok) {
+                SCOPES_RETURN_ERROR(ok_result.except);
+            }
+            return ok_result._0;
+        }
+        sc_list_scope_tuple_t result = { nullptr, nullptr };
         return result;
     }
 
-    Any expand(const Syntax *sx, const Any &dest) {
+    SCOPES_RESULT(Value *) expand(Value *anynode) {
+        SCOPES_RESULT_TYPE(Value *);
     expand_again:
-        set_active_anchor(sx->anchor);
-        if (sx->quoted) {
+        SCOPES_CHECK_RESULT(verify_stack());
+        SCOPES_ANCHOR(anynode->anchor());
+        if (!isa<Const>(anynode)) {
             if (verbose) {
-                StyledStream ss(std::cerr);
-                ss << "quoting ";
-                stream_expr(ss, sx, StreamExprFormat::debug_digest());
+                StyledStream ss(SCOPES_CERR);
+                ss << "ignoring " << anynode << std::endl;
             }
             // return as-is
-            return write_dest(dest, sx->datum);
+            return anynode;
         }
-        Any expr = sx->datum;
-        if (expr.type == TYPE_List) {
+        Const *node = cast<Const>(anynode);
+        auto T = node->get_type();
+        if (T == TYPE_List) {
             if (verbose) {
-                StyledStream ss(std::cerr);
-                ss << "expanding list ";
-                stream_expr(ss, sx, StreamExprFormat::debug_digest());
+                StyledStream ss(SCOPES_CERR);
+                ss << "expanding list " << node << std::endl;
             }
 
-            const List *list = expr.list;
+            const List *list = SCOPES_GET_RESULT(extract_list_constant(node));
             if (list == EOL) {
-                location_error(String::from("expression is empty"));
+                SCOPES_LOCATION_ERROR(String::from("expression is empty"));
             }
 
-            Any head = unsyntax(list->at);
+            Value *head = list->at;
+            if (isa<Const>(head)) {
+            }
 
+            auto headT = try_get_const_type(head);
             // resolve symbol
-            if (head.type == TYPE_Symbol) {
-                env->lookup(head.symbol, head);
+            if (headT == TYPE_Symbol) {
+                Value *headnode = nullptr;
+                if (env->lookup(SCOPES_GET_RESULT(extract_symbol_constant(head)), headnode)) {
+                    head = headnode;
+                    headT = try_get_const_type(head);
+                }
             }
 
-            if (head.type == TYPE_Builtin) {
-                Builtin func = head.builtin;
+            if (headT == TYPE_Builtin) {
+                Builtin func = SCOPES_GET_RESULT(extract_builtin_constant(head));
                 switch(func.value()) {
-                case KW_SyntaxLog: return expand_syntax_log(list, dest);
-                case KW_Fn: {
-                    return expand_fn(list, dest, ExpandFnSetup());
-                }
+                case FN_GetSyntaxScope:
+                    SCOPES_CHECK_RESULT(verify_list_parameter_count("this-scope", list, 0, 0));
+                    return ConstPointer::scope_from(node->anchor(), env);
+                case KW_SyntaxLog: return expand_syntax_log(list);
+                case KW_Fn: return expand_fn(list, ExpandFnSetup());
                 case KW_Inline: {
                     ExpandFnSetup setup;
                     setup.inlined = true;
-                    return expand_fn(list, dest, setup);
+                    return expand_fn(list, setup);
                 }
-                case KW_Label: {
-                    ExpandFnSetup setup;
-                    setup.label = true;
-                    return expand_fn(list, dest, setup);
-                }
-                case KW_SyntaxExtend: return expand_syntax_extend(list, dest);
-                case KW_Let: return expand_let(list, dest);
-                case KW_If: return expand_if(list, dest);
-                case KW_Quote: return expand_quote(list, dest);
-                case KW_Defer: return expand_defer(list, dest);
-                case KW_Do: return expand_do(list, dest, true);
-                case KW_DoIn: return expand_do(list, dest, false);
+                case KW_RunStage: return expand_run_stage(list);
+                case KW_Let: return expand_let(list);
+                case KW_Loop: return expand_loop(list);
+                case KW_Try: return expand_try(list);
+                case KW_If: return expand_if(list);
+                case KW_Switch: return expand_switch(list);
+                case KW_SyntaxQuote: return expand_syntax_quote(list);
+                case KW_ASTQuote: return expand_ast_quote(list);
+                case KW_ASTUnquote: return expand_ast_unquote(list);
+                case KW_ASTUnquoteArguments: return expand_ast_unquote_arguments(list);
+                case KW_Return: return expand_return(list);
+                case KW_Raise: return expand_raise(list);
+                case KW_Break: return expand_break(list);
+                case KW_Repeat: return expand_repeat(list);
+                case KW_Merge: return expand_merge(list);
+                case KW_Forward: return expand_forward(list);
+                //case KW_Defer: return expand_defer(list);
+                case KW_Do: return expand_do(list);
+                case KW_DoIn: return expand_inline_do(list);
+                case KW_Label: return expand_label(list);
                 case KW_RawCall:
                 case KW_Call: {
-                    verify_list_parameter_count(list, 1, -1);
+                    SCOPES_CHECK_RESULT(verify_list_parameter_count("special call", list, 1, -1));
                     list = list->next;
                     assert(list != EOL);
-                    return expand_call(list, dest, func.value() == KW_RawCall);
+                    uint32_t flags = 0;
+                    switch(func.value()) {
+                    case KW_RawCall: flags |= CF_RawCall; break;
+                    default: break;
+                    }
+                    return expand_call(list, flags);
                 } break;
                 default: break;
                 }
             }
 
-            Any list_handler = none;
-            if (env->lookup(Symbol(SYM_ListWildcard), list_handler)) {
-                if (list_handler.type != list_expander_func_type) {
+            Value *list_handler_node;
+            if (env->lookup(Symbol(SYM_ListWildcard), list_handler_node)) {
+                auto T = try_get_const_type(list_handler_node);
+                if (T != list_expander_func_type) {
                     StyledString ss;
                     ss.out << "custom list expander has wrong type "
-                        << list_handler.type << ", must be "
-                        << list_expander_func_type;
-                    location_error(ss.str());
+                        << T << ", must be " << list_expander_func_type;
+                    SCOPES_LOCATION_ERROR(ss.str());
                 }
-                struct ListScopePair { const List *topit; Scope *env; };
-                typedef ListScopePair (*HandlerFuncType)(const List *, Scope *);
-                HandlerFuncType f = (HandlerFuncType)list_handler.pointer;
-                auto result = f(List::from(sx, next), env);
-                const Syntax *newsx = result.topit->at;
-                if (newsx != sx) {
-                    sx = newsx;
-                    next = result.topit->next;
-                    env = result.env;
-                    goto expand_again;
-                } else if (verbose) {
-                    StyledStream ss(std::cerr);
-                    ss << "ignored by list handler" << std::endl;
+                sc_syntax_wildcard_func_t f =
+                    (sc_syntax_wildcard_func_t)cast<ConstPointer>(list_handler_node)->value;
+                auto ok_result = f(List::from(node, next), env);
+                if (!ok_result.ok) {
+                    SCOPES_RETURN_ERROR(ok_result.except);
                 }
-            }
-            return expand_call(list, dest);
-        } else if (expr.type == TYPE_Symbol) {
-            if (verbose) {
-                StyledStream ss(std::cerr);
-                ss << "expanding symbol ";
-                stream_expr(ss, sx, StreamExprFormat::debug_digest());
-            }
-
-            Symbol name = expr.symbol;
-
-            Any result = none;
-            if (!env->lookup(name, result)) {
-                Any symbol_handler = none;
-                if (env->lookup(Symbol(SYM_SymbolWildcard), symbol_handler)) {
-                    if (symbol_handler.type != list_expander_func_type) {
-                        StyledString ss;
-                        ss.out << "custom symbol expander has wrong type "
-                            << symbol_handler.type << ", must be "
-                            << list_expander_func_type;
-                        location_error(ss.str());
+                auto result = ok_result._0;
+                if (result._0) {
+                    Value *newnode = result._0->at;
+                    if (newnode != node) {
+                        anynode = newnode;
+                        next = result._0->next;
+                        env = result._1;
+                        goto expand_again;
+                    } else if (verbose) {
+                        StyledStream ss(SCOPES_CERR);
+                        ss << "ignored by list handler" << std::endl;
                     }
-                    struct ListScopePair { const List *topit; Scope *env; };
-                    typedef ListScopePair (*HandlerFuncType)(const List *, Scope *);
-                    HandlerFuncType f = (HandlerFuncType)symbol_handler.pointer;
-                    auto result = f(List::from(sx, next), env);
-                    const Syntax *newsx = result.topit->at;
-                    if (newsx != sx) {
-                        sx = newsx;
-                        next = result.topit->next;
-                        env = result.env;
+                }
+            }
+            SCOPES_ANCHOR(node->anchor());
+            return expand_call(list);
+        } else if (T == TYPE_Symbol) {
+            if (verbose) {
+                StyledStream ss(SCOPES_CERR);
+                ss << "expanding symbol " << node << std::endl;
+            }
+
+            Symbol name = SCOPES_GET_RESULT(extract_symbol_constant(node));
+
+            Value *result = nullptr;
+            if (!env->lookup(name, result)) {
+                sc_list_scope_tuple_t result = SCOPES_GET_RESULT(expand_symbol(node));
+                if (result._0) {
+                    Value *newnode = result._0->at;
+                    if (newnode != node) {
+                        anynode = newnode;
+                        next = result._0->next;
+                        env = result._1;
                         goto expand_again;
                     }
                 }
@@ -925,46 +1149,59 @@ struct Expander {
                 StyledString ss;
                 ss.out << "use of undeclared identifier '" << name.name()->data << "'. ";
                 print_name_suggestions(name, ss.out);
-                location_error(ss.str());
+                SCOPES_LOCATION_ERROR(ss.str());
             }
-            return write_dest(dest, result);
+            return result;
         } else {
             if (verbose) {
-                StyledStream ss(std::cerr);
-                ss << "ignoring ";
-                stream_expr(ss, sx, StreamExprFormat::debug_digest());
+                StyledStream ss(SCOPES_CERR);
+                ss << "ignoring " << node << std::endl;
             }
-            return write_dest(dest, expr);
+            return node;
         }
     }
 
 };
 
 bool Expander::verbose = false;
+const Type *Expander::list_expander_func_type = nullptr;
 
-Label *expand_module(Any expr, Scope *scope) {
-    const Anchor *anchor = get_active_anchor();
-    if (expr.type == TYPE_Syntax) {
-        anchor = expr.syntax->anchor;
-        set_active_anchor(anchor);
-        expr = expr.syntax->datum;
-    }
-    expr.verify(TYPE_List);
+SCOPES_RESULT(sc_value_list_scope_tuple_t) expand(Value *expr, const List *next, Scope *scope) {
+    SCOPES_RESULT_TYPE(sc_value_list_scope_tuple_t);
+    Scope *subenv = scope?scope:sc_get_globals();
+    Expander subexpr(subenv, nullptr, next);
+    Value *value = SCOPES_GET_RESULT(subexpr.expand(expr));
+    sc_value_list_scope_tuple_t result = { value, subexpr.next, subexpr.env };
+    return result;
+}
+
+SCOPES_RESULT(Template *) expand_inline(const Anchor *anchor, Template *astscope, const List *expr, Scope *scope) {
+    SCOPES_RESULT_TYPE(Template *);
+    Timer sum_expand_time(TIMER_Expand);
+    //const Anchor *anchor = expr->anchor();
+    //auto list = SCOPES_GET_RESULT(extract_list_constant(expr));
     assert(anchor);
-    Label *mainfunc = Label::function_from(anchor, anchor->path());
-    Any retparam = mainfunc->params[0];
+    Template *mainfunc = Template::from(anchor, SYM_Unnamed);
+    mainfunc->set_inline();
 
-    Scope *subenv = scope?scope:globals;
-    // can't insert the block below because it interplays badly with syntax-extend
-    #if 0
-    subenv = Scope::from(subenv);
-    //subenv->bind(KW_Return, retparam);
-    // ensure the local scope does not contain special symbols
-    subenv = Scope::from(subenv);
-    #endif
+    Scope *subenv = scope?scope:sc_get_globals();
+    Expander subexpr(subenv, astscope);
+    mainfunc->value = SCOPES_GET_RESULT(subexpr.expand_expression(anchor, expr));
 
-    Expander subexpr(mainfunc, subenv);
-    subexpr.expand_block(expr, retparam);
+    return mainfunc;
+}
+
+SCOPES_RESULT(Template *) expand_module(const Anchor *anchor, const List *expr, Scope *scope) {
+    SCOPES_RESULT_TYPE(Template *);
+    Timer sum_expand_time(TIMER_Expand);
+    //const Anchor *anchor = expr->anchor();
+    //auto list = SCOPES_GET_RESULT(extract_list_constant(expr));
+    assert(anchor);
+    Template *mainfunc = Template::from(anchor, anchor->path());
+
+    Scope *subenv = scope?scope:sc_get_globals();
+    Expander subexpr(subenv, mainfunc);
+    mainfunc->value = SCOPES_GET_RESULT(subexpr.expand_expression(anchor, expr));
 
     return mainfunc;
 }

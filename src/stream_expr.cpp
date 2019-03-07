@@ -7,10 +7,15 @@
 #include "stream_expr.hpp"
 #include "list.hpp"
 #include "anchor.hpp"
-#include "syntax.hpp"
+#include "value.hpp"
+#include "prover.hpp"
 #include "type.hpp"
+#include "stream_ast.hpp"
+#include "dyn_cast.inc"
 
 namespace scopes {
+
+static const char INDENT_SEP[] = "⁞";
 
 //------------------------------------------------------------------------------
 // EXPRESSION PRINTER
@@ -104,13 +109,14 @@ void StreamExpr::stream_indent(int depth) {
     }
 }
 
-bool StreamExpr::is_nested(const Any &_e) {
-    auto e = maybe_unsyntax(_e);
-    if (e.type == TYPE_List) {
-        auto it = e.list;
+bool StreamExpr::is_nested(Value *_e) {
+    auto T = try_get_const_type(_e);
+    if (T == TYPE_List) {
+        auto it = extract_list_constant(cast<TypedValue>(_e)).assert_ok();
         while (it != EOL) {
-            auto q = maybe_unsyntax(it->at);
-            if (q.type == TYPE_List) {
+            auto q = it->at;
+            auto qT = try_get_const_type(q);
+            if (qT == TYPE_List) {
                 return true;
             }
             it = it->next;
@@ -119,128 +125,137 @@ bool StreamExpr::is_nested(const Any &_e) {
     return false;
 }
 
-bool StreamExpr::is_list (const Any &_value) {
-    auto value = maybe_unsyntax(_value);
-    return value.type == TYPE_List;
+bool StreamExpr::is_list (Value *_value) {
+    return try_get_const_type(_value) == TYPE_List;
 }
 
-void StreamExpr::walk(Any e, int depth, int maxdepth, bool naked) {
-    bool quoted = false;
+void StreamExpr::walk(const Anchor *anchor, const List *l, int depth, int maxdepth, bool naked) {
+    if (naked) {
+        stream_indent(depth);
+    }
+    if (anchor) {
+        if (atom_anchors) {
+            stream_anchor(anchor);
+        }
 
-    const Anchor *anchor = nullptr;
-    if (e.type == TYPE_Syntax) {
-        anchor = e.syntax->anchor;
-        quoted = e.syntax->quoted;
-        e = e.syntax->datum;
+        if (naked && line_anchors && !atom_anchors) {
+            stream_anchor(anchor);
+        }
+    }
+
+    maxdepth = maxdepth - 1;
+
+    auto it = l;
+    if (it == EOL) {
+        ss << Style_Operator << "()" << Style_None;
+        if (naked) { ss << std::endl; }
+        return;
+    }
+    if (maxdepth == 0) {
+        ss << Style_Operator << "("
+            << Style_Comment << "<...>"
+            << Style_Operator << ")"
+            << Style_None;
+        if (naked) { ss << std::endl; }
+        return;
+    }
+    int offset = 0;
+    // int numsublists = 0;
+    if (naked) {
+        if (is_list(it->at)) {
+            ss << ";" << std::endl;
+            goto print_sparse;
+        }
+    print_terse:
+        walk(it->at, depth, maxdepth, false);
+        it = it->next;
+        offset = offset + 1;
+        while (it != EOL) {
+            if (is_nested(it->at)) {
+                break;
+            }
+            ss << " ";
+            walk(it->at, depth, maxdepth, false);
+            offset = offset + 1;
+            it = it->next;
+        }
+        ss << std::endl;
+    print_sparse:
+        int subdepth = depth + 1;
+        while (it != EOL) {
+            auto value = it->at;
+            if (!is_list(value) // not a list
+                && (offset >= 1)) { // not first element in list
+                stream_indent(subdepth);
+                ss << "\\ ";
+                goto print_terse;
+            }
+            if (offset >= fmt.maxlength) {
+                stream_indent(subdepth);
+                ss << "<...>" << std::endl;
+                return;
+            }
+            walk(value, subdepth, maxdepth, true);
+            offset = offset + 1;
+            it = it->next;
+        }
+        return;
+    } else {
+        depth = depth + 1;
+        ss << Style_Operator << "(" << Style_None;
+        while (it != EOL) {
+            if (offset > 0) {
+                ss << " ";
+            }
+            if (offset >= fmt.maxlength) {
+                ss << Style_Comment << "..." << Style_None;
+                break;
+            }
+            walk(it->at, depth, maxdepth, false);
+            offset = offset + 1;
+            it = it->next;
+        }
+        ss << Style_Operator << ")" << Style_None;
+    }
+    if (naked) { ss << std::endl; }
+}
+
+void StreamExpr::walk(Value *e, int depth, int maxdepth, bool naked) {
+    auto T = try_get_const_type(e);
+    if (T == TYPE_List) {
+        walk(e->anchor(), extract_list_constant(cast<TypedValue>(e)).assert_ok(), depth, maxdepth, naked);
+        return;
     }
 
     if (naked) {
         stream_indent(depth);
     }
+    const Anchor *anchor = e->anchor();
     if (atom_anchors) {
-        stream_anchor(anchor, quoted);
+        stream_anchor(anchor);
     }
 
-    if (e.type == TYPE_List) {
-        if (naked && line_anchors && !atom_anchors) {
-            stream_anchor(anchor, quoted);
-        }
-
-        maxdepth = maxdepth - 1;
-
-        auto it = e.list;
-        if (it == EOL) {
-            ss << Style_Operator << "()" << Style_None;
-            if (naked) { ss << std::endl; }
-            return;
-        }
-        if (maxdepth == 0) {
-            ss << Style_Operator << "("
-                << Style_Comment << "<...>"
-                << Style_Operator << ")"
-                << Style_None;
-            if (naked) { ss << std::endl; }
-            return;
-        }
-        int offset = 0;
-        // int numsublists = 0;
-        if (naked) {
-            if (is_list(it->at)) {
-                ss << ";" << std::endl;
-                goto print_sparse;
-            }
-        print_terse:
-            walk(it->at, depth, maxdepth, false);
-            it = it->next;
-            offset = offset + 1;
-            while (it != EOL) {
-                if (is_nested(it->at)) {
-                    break;
-                }
-                ss << " ";
-                walk(it->at, depth, maxdepth, false);
-                offset = offset + 1;
-                it = it->next;
-            }
-            ss << std::endl;
-        print_sparse:
-            int subdepth = depth + 1;
-            while (it != EOL) {
-                auto value = it->at;
-                if (!is_list(value) // not a list
-                    && (offset >= 1)) { // not first element in list
-                    stream_indent(subdepth);
-                    ss << "\\ ";
-                    goto print_terse;
-                }
-                if (offset >= fmt.maxlength) {
-                    stream_indent(subdepth);
-                    ss << "<...>" << std::endl;
-                    return;
-                }
-                walk(value, subdepth, maxdepth, true);
-                offset = offset + 1;
-                it = it->next;
-            }
-        } else {
-            depth = depth + 1;
-            ss << Style_Operator << "(" << Style_None;
-            while (it != EOL) {
-                if (offset > 0) {
-                    ss << " ";
-                }
-                if (offset >= fmt.maxlength) {
-                    ss << Style_Comment << "..." << Style_None;
-                    break;
-                }
-                walk(it->at, depth, maxdepth, false);
-                offset = offset + 1;
-                it = it->next;
-            }
-            ss << Style_Operator << ")" << Style_None;
-        }
+    if (T == TYPE_Symbol) {
+        auto sym = extract_symbol_constant(e).assert_ok();
+        ss << fmt.symbol_styler(sym);
+        sym.name()->stream(ss, SYMBOL_ESCAPE_CHARS);
+        ss << Style_None;
     } else {
-        if (e.type == TYPE_Symbol) {
-            ss << fmt.symbol_styler(e.symbol);
-            e.symbol.name()->stream(ss, SYMBOL_ESCAPE_CHARS);
-            ss << Style_None;
-        } else {
-            ss << e;
-        }
-        if (naked) { ss << std::endl; }
+        stream_ast(ss, e, StreamASTFormat::singleline());
     }
+    if (naked) { ss << std::endl; }
 }
 
-void StreamExpr::stream(const Any &e) {
-    walk(e, fmt.depth, fmt.maxdepth, fmt.naked);
+void StreamExpr::stream(const List *l) {
+    walk(nullptr, l, fmt.depth, fmt.maxdepth, fmt.naked);
 }
 
 //------------------------------------------------------------------------------
 
 void stream_expr(
-    StyledStream &_ss, const Any &e, const StreamExprFormat &_fmt) {
+    StyledStream &_ss, const List *l, const StreamExprFormat &_fmt) {
     StreamExpr streamer(_ss, _fmt);
-    streamer.stream(e);
+    streamer.stream(l);
 }
 
 StyledStream& operator<<(StyledStream& ost, const List *list) {

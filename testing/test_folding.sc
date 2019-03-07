@@ -7,29 +7,28 @@ inline print_stuff (x)
         print x
 
 fn main ()
-    let link = (print_stuff (unconst "hello"))
+    let link = (print_stuff "hello")
     link;
-
-#dump-label
-    typify main
 
 main;
 
 do
-    define ascope (Scope)
-    syntax-extend
-        fn print_stuff2 (x)
-            print "line"
-            set-scope-symbol! ascope 'somefunc
-                fn ()
-                    print x
+    define ascope
+        sugar-eval (Scope)
+    fn print_stuff2 (x)
+        print "line"
+        'set-symbol ascope 'somefunc
+            fn ()
+                print x
 
-        fn main2 ()
-            print_stuff2 (unconst "hello")
-        main2;
-        syntax-scope
+    fn main2 ()
+        print_stuff2 "hello"
+    main2;
+
+    run-stage;
 
     # this case is illegal
+    # error: non-constant value of type String is inaccessible from function
     assert-compiler-error
         ascope.somefunc;
 

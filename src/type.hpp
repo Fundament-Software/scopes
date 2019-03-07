@@ -8,7 +8,7 @@
 #define SCOPES_TYPE_HPP
 
 #include "symbol.hpp"
-#include "any.hpp"
+#include "result.hpp"
 
 #include <stddef.h>
 
@@ -18,28 +18,36 @@
 namespace scopes {
 
 struct StyledStream;
+struct TypedValue;
+
+#define SCOPES_TYPE_KEY(T, NAME) \
+    char NAME ## _buf[sizeof(T)]; \
+    T *NAME = reinterpret_cast<T *>(NAME ## _buf);
 
 //------------------------------------------------------------------------------
 // TYPE
 //------------------------------------------------------------------------------
 
 #define B_TYPE_KIND() \
-    T(TK_Integer, "type-kind-integer") \
-    T(TK_Real, "type-kind-real") \
-    T(TK_Pointer, "type-kind-pointer") \
-    T(TK_Array, "type-kind-array") \
-    T(TK_Vector, "type-kind-vector") \
-    T(TK_Tuple, "type-kind-tuple") \
-    T(TK_Union, "type-kind-union") \
-    T(TK_Typename, "type-kind-typename") \
-    T(TK_ReturnLabel, "type-kind-return-label") \
-    T(TK_Function, "type-kind-function") \
-    T(TK_Extern, "type-kind-extern") \
-    T(TK_Image, "type-kind-image") \
-    T(TK_SampledImage, "type-kind-sampled-image")
+    /* abstract types */ \
+    T(TK_Qualify, "type-kind-qualify", QualifyType) \
+    T(TK_Arguments, "type-kind-arguments", ArgumentsType) \
+    T(TK_Typename, "type-kind-typename", TypenameType) \
+    /* machine types */ \
+    T(TK_Integer, "type-kind-integer", IntegerType) \
+    T(TK_Real, "type-kind-real", RealType) \
+    T(TK_Pointer, "type-kind-pointer", PointerType) \
+    T(TK_Array, "type-kind-array", ArrayType) \
+    T(TK_Vector, "type-kind-vector", VectorType) \
+    T(TK_Tuple, "type-kind-tuple", TupleType) \
+    T(TK_Union, "type-kind-union", UnionType) \
+    T(TK_Function, "type-kind-function", FunctionType) \
+    /* additional GPU machine types */ \
+    T(TK_Image, "type-kind-image", ImageType) \
+    T(TK_SampledImage, "type-kind-sampled-image", SampledImageType)
 
 enum TypeKind {
-#define T(NAME, BNAME) \
+#define T(NAME, BNAME, CLASS) \
     NAME,
     B_TYPE_KIND()
 #undef T
@@ -48,26 +56,25 @@ enum TypeKind {
 //------------------------------------------------------------------------------
 
 struct Type {
-    typedef std::unordered_map<Symbol, Any, Symbol::Hash> Map;
+    typedef std::unordered_map<Symbol, Value *, Symbol::Hash> Map;
 
     TypeKind kind() const;
 
     Type(TypeKind kind);
     Type(const Type &other) = delete;
 
-    const String *name() const;
-
     StyledStream& stream(StyledStream& ost) const;
 
-    void bind(Symbol name, const Any &value);
+    void bind(Symbol name, Value *value);
 
     void del(Symbol name);
 
-    bool lookup(Symbol name, Any &dest) const;
+    bool lookup(Symbol name, Value *&dest) const;
 
-    bool lookup_local(Symbol name, Any &dest) const;
+    bool lookup_local(Symbol name, Value *&dest) const;
 
-    bool lookup_call_handler(Any &dest) const;
+    bool lookup_call_handler(Value *&dest) const;
+    bool lookup_return_handler(Value *&dest) const;
 
     const Map &get_symbols() const;
 
@@ -75,25 +82,24 @@ private:
     const TypeKind _kind;
 
 protected:
-    const String *_name;
-
     Map symbols;
 };
 
-typedef std::vector<const Type *> ArgTypes;
+typedef std::vector<const Type *> Types;
 
 //------------------------------------------------------------------------------
 
 #define B_TYPES() \
     /* types */ \
-    T(TYPE_Void, "void") \
     T(TYPE_Nothing, "Nothing") \
-    T(TYPE_Any, "Any") \
+    T(TYPE_NoReturn, "noreturn") \
     \
     T(TYPE_Type, "type") \
     T(TYPE_Unknown, "Unknown") \
+    T(TYPE_Variadic, "Variadic") \
     T(TYPE_Symbol, "Symbol") \
     T(TYPE_Builtin, "Builtin") \
+    T(TYPE_Value, "Value") \
     \
     T(TYPE_Bool, "bool") \
     \
@@ -113,19 +119,16 @@ typedef std::vector<const Type *> ArgTypes;
     T(TYPE_F80, "f80") \
     \
     T(TYPE_List, "list") \
-    T(TYPE_Syntax, "Syntax") \
     T(TYPE_Anchor, "Anchor") \
     T(TYPE_String, "string") \
     \
     T(TYPE_Scope, "Scope") \
     T(TYPE_SourceFile, "SourceFile") \
-    T(TYPE_Exception, "Exception") \
+    T(TYPE_Error, "Error") \
     \
-    T(TYPE_Parameter, "Parameter") \
-    T(TYPE_Label, "Label") \
-    T(TYPE_Frame, "Frame") \
     T(TYPE_Closure, "Closure") \
-    T(TYPE_LabelMacro, "LabelMacro") \
+    T(TYPE_ASTMacro, "SpiceMacro") \
+    T(TYPE_CompileStage, "CompileStage") \
     \
     T(TYPE_USize, "usize") \
     \
@@ -139,11 +142,12 @@ typedef std::vector<const Type *> ArgTypes;
     T(TYPE_Vector, "vector") \
     T(TYPE_Tuple, "tuple") \
     T(TYPE_Union, "union") \
+    T(TYPE_Qualify, "Qualify") \
     T(TYPE_Typename, "typename") \
-    T(TYPE_ReturnLabel, "ReturnLabel") \
+    T(TYPE_Arguments, "Arguments") \
+    T(TYPE_Raises, "Raises") \
     T(TYPE_Function, "function") \
     T(TYPE_Constant, "constant") \
-    T(TYPE_Extern, "extern") \
     T(TYPE_Image, "Image") \
     T(TYPE_SampledImage, "SampledImage") \
     T(TYPE_CStruct, "CStruct") \
@@ -158,23 +162,25 @@ B_TYPES()
 //------------------------------------------------------------------------------
 
 bool is_opaque(const Type *T);
-size_t size_of(const Type *T);
-size_t align_of(const Type *T);
-const Type *storage_type(const Type *T);
+SCOPES_RESULT(size_t) size_of(const Type *T);
+SCOPES_RESULT(size_t) align_of(const Type *T);
 const Type *superof(const Type *T);
-bool is_invalid_argument_type(const Type *T);
-
-Any wrap_pointer(const Type *type, void *ptr);
-void *get_pointer(const Type *type, Any &value, bool create = false);
+void stream_type_name(StyledStream &ss, const Type *T);
+bool is_returning(const Type *T);
+bool is_returning_value(const Type *T);
+SCOPES_RESULT(bool) types_compatible(const Type *paramT, const Type *argT);
+bool all_plain(const Types &types);
+// can be copied implicitly, without needing a copy constructor
+bool is_plain(const Type *T);
 
 //------------------------------------------------------------------------------
 // TYPE CHECK PREDICATES
 //------------------------------------------------------------------------------
 
-void verify(const Type *typea, const Type *typeb);
-void verify_integer(const Type *type);
-void verify_real(const Type *type);
-void verify_range(size_t idx, size_t count);
+SCOPES_RESULT(void) verify(const Type *typea, const Type *typeb);
+SCOPES_RESULT(void) verify_integer(const Type *type);
+SCOPES_RESULT(void) verify_real(const Type *type);
+SCOPES_RESULT(void) verify_range(size_t idx, size_t count);
 
 //------------------------------------------------------------------------------
 

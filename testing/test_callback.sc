@@ -3,14 +3,13 @@ fn main ()
     fn testf (a b)
         + a b
 
-    # unconst forces a translation to a C function pointer
-    let f = (unconst (typify testf i32 i32))
+    # force a translation to a C function pointer
+    let f = (const-typify testf i32 i32)
     assert ((f 2 3) == 5)
-    unconst true
+    true
 
-'dump
-    typify main
-
+dump-ast
+    const-typify main
 
 #fn testfunc (x y)
     x * y
@@ -23,6 +22,8 @@ let lib =
             }
         '()
 
+run-stage;
+
 fn testf (x y)
     + x y
 
@@ -30,4 +31,5 @@ let z =
     lib.call_testfunc testf 2 3
 print z
 assert (z == 5)
+
 

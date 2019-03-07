@@ -1,16 +1,22 @@
 
-define Name
-    let T = (typename "Name" (storage = (storageof string)))
-    fn apply-type (str)
-        bitcast str T
-    define-macro constructor
-        let name = (decons args)
-        list let name '= (list apply-type (name as Syntax as Symbol as string))
-    set-type-symbol! T '__macro constructor
-    typefn T '__as (self destT)
-        if (destT == string)
-            bitcast self destT
-    T
+typedef Name : (storageof string)
+    @@ box-cast
+    fn __as (vT T expr)
+        if (T == string)
+            return `(bitcast expr T)
+        compiler-error! "unsupported type"
+
+run-stage;
+
+'set-symbol Name '__macro
+    sugar "constructor" ((name as Symbol))
+        inline apply-type (str)
+            bitcast str Name
+        qq
+            let [name] =
+                [apply-type] [(name as Symbol as string)]
+
+run-stage;
 
 # Name is a type
 assert ((typeof Name) == type)
@@ -20,4 +26,3 @@ Name variable
 
 assert ((typeof variable) == Name)
 assert (variable as string == "variable")
-

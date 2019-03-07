@@ -12,6 +12,9 @@ namespace scopes {
 // BUILTIN
 //------------------------------------------------------------------------------
 
+Builtin::Builtin() : _name(SYM_Unnamed) {
+}
+
 Builtin::Builtin(Builtin::EnumT name) :
     _name(name) {
 }

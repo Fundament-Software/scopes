@@ -14,14 +14,12 @@
 namespace scopes {
 
 struct Anchor;
-struct Any;
 struct List;
+struct Value;
 
 //------------------------------------------------------------------------------
 // EXPRESSION PRINTER
 //------------------------------------------------------------------------------
-
-const char INDENT_SEP[] = "⁞";
 
 Style default_symbol_styler(Symbol name);
 
@@ -64,17 +62,18 @@ struct StreamExpr : StreamAnchors {
 
     void stream_indent(int depth = 0);
 
-    static bool is_nested(const Any &_e);
+    static bool is_nested(Value *_e);
 
-    static bool is_list (const Any &_value);
+    static bool is_list (Value *_value);
 
-    void walk(Any e, int depth, int maxdepth, bool naked);
+    void walk(const Anchor *anchor, const List *l, int depth, int maxdepth, bool naked);
+    void walk(Value *e, int depth, int maxdepth, bool naked);
 
-    void stream(const Any &e);
+    void stream(const List *l);
 };
 
 void stream_expr(
-    StyledStream &_ss, const Any &e, const StreamExprFormat &_fmt);
+    StyledStream &_ss, const List *l, const StreamExprFormat &_fmt);
 
 } // namespace scopes
 

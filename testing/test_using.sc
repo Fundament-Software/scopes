@@ -1,11 +1,10 @@
 
-syntax-extend
-    let s = (Scope)
-    set-scope-symbol! s 'test
-        fn ()
-            true
-    set-scope-symbol! syntax-scope 'S s
-    syntax-scope
+let S = (Scope)
+'set-symbols S
+    test =
+        fn () true
+
+run-stage;
 
 do
     using S filter "^test$"

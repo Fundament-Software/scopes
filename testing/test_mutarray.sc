@@ -2,45 +2,27 @@
 using import Array
 
 let TESTSIZE = (1:usize << 16:usize)
-let fullrange = (range (unconst TESTSIZE))
+let i32Arrayx65536 = (FixedArray i32 TESTSIZE)
+let i32Array = (GrowingArray i32)
+let i32Arrayx16 = (FixedArray i32 16)
+let i32Arrayx32 = (FixedArray i32 32)
 
-inline autodelete (x)
-    inline (...)
-        delete x
-        ...
+let i32ArrayArray = (GrowingArray i32Array)
+let i32Arrayx16Array = (GrowingArray i32Arrayx16)
+let i32ArrayArrayx16 = (FixedArray i32Array 16)
+let i32Arrayx16Arrayx16 = (FixedArray i32Arrayx16 16)
 
-fn test-array-of-array (x y)
-    dump "test-array-of-array" x y
-    print "test-array-of-array" x y
-    # array of array
-    let i32Array = (Array i32 y)
-    let i32ArrayArray = (Array i32Array x)
-    let a = (local i32ArrayArray)
-    # will also delete the nested array
-    defer (autodelete a)
-    for x in (range 16)
-        let b =
-            'emplace-append a
-        assert ((countof b) == 0)
-        for y in (range 16)
-            'append b (x * 16 + y)
-    print a
-    for x b in (enumerate a)
-        print b
-        for y n in (enumerate b)
-            assert ((x * 16 + y) == n)
+let StringArray = (GrowingArray string)
 
-test-array-of-array (x = 16) (y = 16)
-test-array-of-array (y = 16)
-test-array-of-array (x = 16)
-test-array-of-array;
+run-stage;
+
+let fullrange = (range TESTSIZE)
 
 do
     # mutable array with fixed upper capacity
-    let i32Arrayx65536 = (Array i32 TESTSIZE)
-    let a = (local i32Arrayx65536)
+    local a : i32Arrayx65536
+    print a
     assert (('capacity a) == TESTSIZE)
-    defer (autodelete a)
     for i in fullrange
         assert ((countof a) == i)
         'append a (i32 i)
@@ -52,61 +34,95 @@ do
 
 do
     # mutable array with dynamic capacity
-    let i32Array = (Array i32)
-    let a = (local i32Array (capacity = 12))
-    assert (('capacity a) == 12:usize)
-    defer (autodelete a)
+    local a : i32Array
+        capacity = 12
+    print a
+    assert (('capacity a) >= 12)
     for i in fullrange
         assert ((countof a) == i)
         'append a (i32 i)
-    #for i in fullrange
+    assert (('capacity a) >= TESTSIZE)
+    for i in fullrange
         assert ((a @ i) == (i32 i))
     # generator support
-    #for i k in (enumerate a)
+    for i k in (enumerate a)
         assert ((a @ i) == i)
 
-fn test-sort-array (T)
+inline test-array-of-array (Tx Ty)
+    dump "test-array-of-array" Tx Ty
+    print "test-array-of-array" Tx Ty
+    # array of array
+    let i32Array = Tx
+    let i32ArrayArray = Ty
+    local a : i32ArrayArray
+    for x in (range 16)
+        let b = ('emplace-append a)
+        assert ((countof b) == 0) (repr (countof b))
+        for y in (range 16)
+            'append b (x * 16 + y)
+    print a
+    for x b in (enumerate a)
+        print b
+        for y n in (enumerate b)
+            assert ((x * 16 + y) == n)
+
+test-array-of-array i32Arrayx16 i32Arrayx16Arrayx16
+test-array-of-array i32Arrayx16 i32Arrayx16Array
+test-array-of-array i32Array i32ArrayArrayx16
+test-array-of-array i32Array i32ArrayArray
+
+inline test-sort-array (T)
     dump "testing sorting" T
+
+    let sequence... = 3 1 9 5 0 7 12 3 99 -20
+    let sorted-sequence... = -20 0 1 3 3 5 7 9 12 99
+    let reverse-sorted-sequence... = 99 12 9 7 5 3 3 1 0 -20
+
     # sorting a fixed mutable array
-    let a = (local T)
-    defer (autodelete a)
-    for k in (va-each 3 1 9 5 0 7 12 3 99 -20)
-        'append a k
-    for i k in (enumerate (va-each 3 1 9 5 0 7 12 3 99 -20))
-        assert ((a @ i) == k)
-    'sort a
-    for i k in (enumerate (va-each -20 0 1 3 3 5 7 9 12 99))
-        assert ((a @ i) == k)
-    # custom sorting key
-    'sort a
-        fn (x)
-            - x
-    for i k in (enumerate (va-each 99 12 9 7 5 3 3 1 0 -20))
+    local a : T
+    va-lfold none
+        inline (key k)
+            'append a k
+        sequence...
+
+    inline verify-element (i key k)
         assert ((a @ i) == k)
 
-test-sort-array (Array i32 32)
-test-sort-array (Array i32)
+    va-lifold none verify-element sequence...
+
+    'sort a
+    va-lifold none verify-element sorted-sequence...
+
+    # custom sorting key
+    'sort a (inline (x) (- x))
+    va-lifold none verify-element reverse-sorted-sequence...
+
+test-sort-array i32Arrayx32
+test-sort-array i32Array
 
 dump "sorting a bunch of values"
 
 do
-    let a = (local (Array string))
-    defer (autodelete a)
-    let word = "yes"
-    for k in (va-each word "this" "is" "dog" "")
-        'append a k
+    let sequence... = "yes" "this" "is" "dog" ""
+    let sorted-sequence... = "" "dog" "is" "this" "yes"
+
+    local a : StringArray
+    va-lfold none
+        inline (key k)
+            'append a k
+        sequence...
     assert ((countof a) == 5)
-    for i k in (enumerate (va-each "yes" "this" "is" "dog" ""))
+    inline verify-element (i key k)
         assert ((a @ i) == k)
+    va-lifold none verify-element sequence...
     'sort a
-    for i k in (enumerate (va-each "" "dog" "is" "this" "yes"))
-        assert ((a @ i) == k)
+    va-lifold none verify-element sorted-sequence...
 
 dump "sorting big array"
 print "big sort"
 
 fn test-sort ()
-    let a = (local (Array i32))
+    local a : i32Array
     let N = 1000000
     for i in (range N)
         'append a
@@ -118,11 +134,11 @@ fn test-sort ()
     'sort a
     print "done."
     # verify the array is sorted
-    let x =
-        local 'copy (deref (a @ 0))
+    local x = (a @ 0)
     for k in a
-        let x1 = (deref k)
+        let x1 = k
         assert (x1 >= x)
         x = x1
 
 test-sort;
+

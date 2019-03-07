@@ -4,27 +4,30 @@
     See LICENSE.md for details.
 */
 
+#define SCOPESRT_IMPL
+
 #include "boot.hpp"
 #include "timer.hpp"
 #include "gc.hpp"
-#include "any.hpp"
 #include "source_file.hpp"
 #include "utils.hpp"
 #include "lexerparser.hpp"
 #include "type.hpp"
-#include "syntax.hpp"
 #include "list.hpp"
-#include "frame.hpp"
 #include "execution.hpp"
 #include "globals.hpp"
 #include "error.hpp"
 #include "scope.hpp"
 #include "expander.hpp"
-#include "specializer.hpp"
+#include "prover.hpp"
 #include "gen_llvm.hpp"
-#include "profiler.hpp"
+#include "stream_ast.hpp"
+#include "value.hpp"
+#include "compiler_flags.hpp"
+#include "dyn_cast.inc"
+#include "scopes/scopes.h"
 
-#include "scopes.h"
+#include "types.hpp"
 
 #ifdef SCOPES_WIN32
 #include "stdlib_ex.h"
@@ -35,8 +38,20 @@
 #endif
 #include <unistd.h>
 #include <libgen.h>
+#include <fcntl.h>
+
+#if SCOPES_USE_WCHAR
+#include <codecvt>
+#endif
 
 #include "llvm/ExecutionEngine/SectionMemoryManager.h"
+
+#include <iostream>
+#include <string>
+#include <vector>
+#include <algorithm>
+#include <ostream>
+#include <iterator>
 
 namespace scopes {
 
@@ -64,13 +79,13 @@ namespace scopes {
 
    */
 
-static Any load_custom_core(const char *executable_path) {
+static SCOPES_RESULT(Value *) load_custom_core(const char *executable_path) {
+    SCOPES_RESULT_TYPE(Value *);
     // attempt to read bootstrap expression from end of binary
     auto file = SourceFile::from_file(
         Symbol(String::from_cstr(executable_path)));
     if (!file) {
-        stb_fprintf(stderr, "could not open binary\n");
-        return none;
+        SCOPES_LOCATION_ERROR(String::from("could not open binary"));
     }
     auto ptr = file->strptr();
     auto size = file->size();
@@ -81,60 +96,34 @@ static Any load_custom_core(const char *executable_path) {
         // skip the trailing text formatting garbage
         // that win32 echo produces
         cursor--;
-        if (cursor < ptr) return none;
+        if (cursor < ptr) return nullptr;
     }
-    if (*cursor != ')') return none;
+    if (*cursor != ')') return nullptr;
     cursor--;
     // seek backwards to find beginning of expression
     while ((cursor >= ptr) && (*cursor != '('))
         cursor--;
-
     LexerParser footerParser(file, cursor - ptr);
-    auto expr = footerParser.parse();
-    if (expr.type == TYPE_Nothing) {
-        stb_fprintf(stderr, "could not parse footer expression\n");
-        return none;
+    auto expr = SCOPES_GET_RESULT(extract_list_constant(SCOPES_GET_RESULT(footerParser.parse())));
+    if (expr == EOL) {
+        SCOPES_LOCATION_ERROR(String::from("footer parser returned illegal structure"));
     }
-    expr = strip_syntax(expr);
-    if ((expr.type != TYPE_List) || (expr.list == EOL)) {
-        stb_fprintf(stderr, "footer parser returned illegal structure\n");
-        return none;
-    }
-    expr = ((const List *)expr)->at;
-    if (expr.type != TYPE_List)  {
-        stb_fprintf(stderr, "footer expression is not a symbolic list\n");
-        return none;
-    }
-    auto symlist = expr.list;
-    auto it = symlist;
+    auto it = SCOPES_GET_RESULT(extract_list_constant(expr->at));
     if (it == EOL) {
-        stb_fprintf(stderr, "footer expression is empty\n");
-        return none;
+        SCOPES_LOCATION_ERROR(String::from("footer expression is empty"));
     }
     auto head = it->at;
+    auto sym = SCOPES_GET_RESULT(extract_symbol_constant(head));
+    if (sym != Symbol("core-size"))  {
+        SCOPES_LOCATION_ERROR(String::from("footer expression does not begin with 'core-size'"));
+    }
     it = it->next;
-    if (head.type != TYPE_Symbol)  {
-        stb_fprintf(stderr, "footer expression does not begin with symbol\n");
-        return none;
-    }
-    if (head != Any(Symbol("core-size")))  {
-        stb_fprintf(stderr, "footer expression does not begin with 'core-size'\n");
-        return none;
-    }
     if (it == EOL) {
-        stb_fprintf(stderr, "footer expression needs two arguments\n");
-        return none;
+        SCOPES_LOCATION_ERROR(String::from("footer expression needs two arguments"));
     }
-    auto arg = it->at;
-    it = it->next;
-    if (arg.type != TYPE_I32)  {
-        stb_fprintf(stderr, "script-size argument is not of type i32\n");
-        return none;
-    }
-    auto script_size = arg.i32;
+    auto script_size = SCOPES_GET_RESULT(extract_integer_constant(it->at));
     if (script_size <= 0) {
-        stb_fprintf(stderr, "script-size must be larger than zero\n");
-        return none;
+        SCOPES_LOCATION_ERROR(String::from("script-size must be larger than zero"));
     }
     LexerParser parser(file, cursor - script_size - ptr, script_size);
     return parser.parse();
@@ -173,7 +162,17 @@ static void setup_stdio() {
         SetConsoleMode(hStdErr, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
         setbuf(stdout, 0);
         setbuf(stderr, 0);
-        SetConsoleOutputCP(65001);
+#if SCOPES_USE_WCHAR
+        _setmode(_fileno(stdout), _O_U16TEXT);
+        _setmode(_fileno(stderr), _O_U16TEXT);
+        //std::wcout.imbue(std::locale(std::locale("C"), new std::codecvt_utf8<wchar_t>));
+        //std::wcerr.imbue(std::locale(std::locale("C"), new std::codecvt_utf8<wchar_t>));
+#else
+        SetConsoleOutputCP(CP_UTF8);
+        _setmode(_fileno(stdout), _O_BINARY);
+        _setmode(_fileno(stderr), _O_BINARY);
+        //fcntl(_fileno(stdout), F_SETFL, fcntl(_fileno(stdout), F_GETFL) | O_NONBLOCK);
+#endif
         #endif
     }
 }
@@ -209,12 +208,15 @@ std::string GetExecutablePath(const char *Argv0) {
   return llvm::sys::fs::getMainExecutable(Argv0, MainAddr);
 }
 
-int main(int argc, char *argv[]) {
+using scopes::Result;
+
+SCOPES_RESULT(int) try_main(int argc, char *argv[]) {
+    SCOPES_RESULT_TYPE(int);
     using namespace scopes;
     uint64_t c = 0;
     g_stack_start = (char *)&c;
 
-    Frame::root = new Frame();
+    on_startup();
 
     Symbol::_init_symbols();
     init_llvm();
@@ -222,8 +224,6 @@ int main(int argc, char *argv[]) {
     setup_stdio();
     scopes_argc = argc;
     scopes_argv = argv;
-
-    scopes::global_c_namespace = dlopen(NULL, RTLD_LAZY);
 
     scopes_compiler_path = nullptr;
     scopes_compiler_dir = nullptr;
@@ -248,8 +248,8 @@ int main(int argc, char *argv[]) {
     init_types();
     init_globals(argc, argv);
 
-    Any expr = load_custom_core(scopes_compiler_path);
-    if (expr != none) {
+    Value *expr = SCOPES_GET_RESULT(load_custom_core(scopes_compiler_path));
+    if (expr) {
         goto skip_regular_load;
     }
 
@@ -267,32 +267,88 @@ int main(int argc, char *argv[]) {
 #endif
         sf = SourceFile::from_file(name);
         if (!sf) {
-            location_error(String::from("core missing\n"));
+            SCOPES_LOCATION_ERROR(String::from("core missing\n"));
         }
         LexerParser parser(sf);
-        expr = parser.parse();
+        expr = SCOPES_GET_RESULT(parser.parse());
     }
 
 skip_regular_load:
-    Label *fn = expand_module(expr, Scope::from(globals));
+    const Anchor *anchor = expr->anchor();
+    auto list = SCOPES_GET_RESULT(extract_list_constant(expr));
+    Template *tmpfn = SCOPES_GET_RESULT(expand_module(anchor, list, Scope::from(sc_get_globals())));
 
-#if SCOPES_DEBUG_CODEGEN
+#if 0 //SCOPES_DEBUG_CODEGEN
     StyledStream ss(std::cout);
     std::cout << "non-normalized:" << std::endl;
-    stream_label(ss, fn, StreamLabelFormat::debug_all());
+    stream_ast(ss, tmpfn, StreamASTFormat());
     std::cout << std::endl;
 #endif
 
-    fn = specialize(Frame::root, fn, {});
-#if SCOPES_DEBUG_CODEGEN
+    Function *fn = SCOPES_GET_RESULT(prove(nullptr, tmpfn, {}));
+
+    auto main_func_type = pointer_type(raising_function_type(
+        arguments_type({}), {}), PTF_NonWritable, SYM_Unnamed);
+
+    auto stage_func_type = pointer_type(raising_function_type(
+        arguments_type({TYPE_CompileStage}), {}), PTF_NonWritable, SYM_Unnamed);
+
+compile_stage:
+    if (fn->get_type() == stage_func_type) {
+        typedef sc_value_raises_t (*StageFuncType)();
+        StageFuncType fptr = (StageFuncType)SCOPES_GET_RESULT(compile(fn, 0))->value;
+        SCOPES_ANCHOR(fn->anchor());
+        auto result = fptr();
+        if (!result.ok) {
+            SCOPES_RETURN_ERROR(result.except);
+        }
+        auto value = result._0;
+        if (isa<Function>(value)) {
+            fn = cast<Function>(value);
+            goto compile_stage;
+        } else {
+            return 0;
+        }
+    }
+
+    if (fn->get_type() != main_func_type) {
+        SCOPES_ANCHOR(fn->anchor());
+        StyledString ss;
+        ss.out << "core module function has wrong type "
+            << fn->get_type() << ", must be " << main_func_type;
+        SCOPES_LOCATION_ERROR(ss.str());
+    }
+
+#if 0 //SCOPES_DEBUG_CODEGEN
     std::cout << "normalized:" << std::endl;
-    stream_label(ss, fn, StreamLabelFormat::debug_all());
+    stream_ast(ss, fn, StreamASTFormat());
     std::cout << std::endl;
+
+    auto flags = CF_DumpModule;
+#else
+    auto flags = 0;
 #endif
 
-    typedef void (*MainFuncType)();
-    MainFuncType fptr = (MainFuncType)compile(fn, 0).pointer;
-    fptr();
+    typedef sc_void_raises_t (*MainFuncType)();
+    MainFuncType fptr = (MainFuncType)SCOPES_GET_RESULT(compile(fn, flags))->value;
+    {
+        SCOPES_ANCHOR(fn->anchor());
+        auto result = fptr();
+        if (!result.ok) {
+            SCOPES_RETURN_ERROR(result.except);
+        }
+    }
 
+    return 0;
+}
+
+int main(int argc, char *argv[]) {
+    using namespace scopes;
+    auto result = try_main(argc, argv);
+    if (!result.ok()) {
+        print_error(result.assert_error());
+        f_exit(1);
+    }
+    f_exit(result.assert_ok());
     return 0;
 }

@@ -1,10 +1,11 @@
 
 fn test-va (x y args...)
-    assert ((va-countof args...) == 4)
-    assert ((va@ 0 args...) == 1)
-    assert ((va@ 1 args...) == 2)
-    assert ((va@ 2 args...) == 3)
-    assert ((va@ 3 args...) == 4)
+    let a b c d e = args...
+    assert (none? e)
+    assert (a == 1)
+    assert (b == 2)
+    assert (c == 3)
+    assert (d == 4)
     assert (x == 5)
     assert (y == 0)
 
@@ -21,14 +22,14 @@ test-keys (z = 3) 1 (y = 2) 4
 test-keys 1 (z = 3) 2 4
 
 fn test-kwva-keys (x y args...)
-    assert ((va-countof args...) == 4) (va-countof args...)
-    assert ((va@ 0 args...) == 1)
-    assert ((va@ 1 args...) == 2)
-    assert ((va@ 2 args...) == 3)
-    assert ((va@ 3 args...) == 4)
-
-    assert ((va@ 'z args...) == 1)
-    assert ((va@ 'w args...) == 4)
+    let a b c d e = args...
+    assert (none? e)
+    assert (a == 1)
+    assert (b == 2)
+    assert (c == 3)
+    assert (d == 4)
+    assert ((va-option z args... -1) == 1)
+    assert ((va-option w args... -1) == 4)
     assert (x == 5)
     assert (y == 0)
 
@@ -44,28 +45,38 @@ do
     # verify that trailing keyed arguments persist even for unknown arguments
 
     fn test (args...)
-        let k = (va@ 'x args...)
+        let k =
+            va-option x args...
+                assert false
+        assert ((typeof k) == i32)
+        return;
+
+    inline test2 (args...)
+        let k =
+            va-option x args...
+                assert false
         assert ((typeof k) == i32)
         return;
 
     test
         x = 0
-    test
-        x = (unconst 0)
+
+    test2
+        x = 0
 
 do
     # verify that single keyed arguments can be forwarded
 
     fn test2 (args...)
-        let x = (va@ 'x args...)
-        let y = (va@ 'y args...)
+        let x = (va-option x args... (assert false))
+        let y = (va-option y args... (assert false))
         assert ((typeof x) == i32)
         assert ((typeof y) == i32)
         return;
 
     fn test (x...)
         test2 x...
-            y = (unconst 2)
+            y = 2
     test
-        x = (unconst 1)
+        x = 1
 

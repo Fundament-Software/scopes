@@ -47,59 +47,76 @@
         last handler activated with argument 2
         handler activated with argument 3
 
+typedef FunctionChain : ('storageof type)
+    fn __repr (self)
+        repr (bitcast self type)
 
-let FunctionChain = (typename "FunctionChain")
+    fn clear (self)
+        """"Clear the function chain. When the function chain is applied next,
+            no functions will be called.
+        let cls = (bitcast self type)
+        'set-symbol cls 'chain
+            inline (cls args...)
+        self
 
-typefn FunctionChain 'clear (self)
-    """"Clear the function chain. When the function chain is applied next,
-        no functions will be called.
-    assert (not (type== self FunctionChain))
-    assert (constant? self)
-    typefn self '__typecall (self args...)
-    self
-typefn FunctionChain 'append (self f)
-    """"Append function `f` to function chain. When the function chain is called,
-        `f` will be called last. The return value of `f` will be ignored.
-    assert (not (type== self FunctionChain))
-    assert (constant? f)
-    assert (constant? self)
-    let oldfn = self.__typecall
-    typefn self '__typecall (self args...)
-        oldfn self args...
-        f args...
-    self
-typefn FunctionChain 'prepend (self f)
-    """"Prepend function `f` to function chain. When the function chain is called,
-        `f` will be called first. The return value of `f` will be ignored.
-    assert (not (type== self FunctionChain))
-    assert (constant? f)
-    assert (constant? self)
-    let oldfn = self.__typecall
-    typefn self '__typecall (self args...)
-        f args...
-        oldfn self args...
-    self
+    fn append (self f)
+        """"Append function `f` to function chain. When the function chain is called,
+            `f` will be called last. The return value of `f` will be ignored.
+        let cls = (bitcast self type)
+        let oldfn = cls.chain
+        'set-symbol cls 'chain
+            @@ spice-quote
+            inline (cls args...)
+                oldfn cls args...
+                f args...
+        self
 
-typeinline FunctionChain '__typecall (cls name)
-    let T = (typename (.. "<FunctionChain " name ">"))
-    set-typename-super! T cls
-    typefn T '__typecall (cls args...)
-    T
+    fn prepend (self f)
+        """"Prepend function `f` to function chain. When the function chain is called,
+            `f` will be called first. The return value of `f` will be ignored.
+        let cls = (bitcast self type)
+        let oldfn = cls.chain
+        'set-symbol cls 'chain
+            @@ spice-quote
+            inline (cls args...)
+                f args...
+                oldfn cls args...
+        self
+
+    inline on (self)
+        """"Returns a decorator that appends the provided function to the
+            function chain.
+        inline (f)
+            'append self f
+            f
+
+    @@ spice-quote
+    fn __typecall (cls name)
+        let T = (typename (.. "<FunctionChain " name ">"))
+        'set-symbol T 'chain
+            inline (cls args...)
+        bitcast T this-type
+
+run-stage;
+
+'set-symbol FunctionChain '__call
+    spice "call-fnchain" (self)
+        let self = (bitcast (self as FunctionChain) type)
+        let func = self.chain
+        `(func)
 
 """".. macro:: (fnchain name)
 
        Binds a new unique and empty function chain to identifier `name`. The
        function chain's typename is going to incorporate the name of the module
        in which it was declared.
-define-macro fnchain
-    let name = (decons args)
-    list let name '=
-        list FunctionChain
-            list (do ..)
-                'module-name
-                "."
-                name as Syntax as Symbol as string
+sugar fnchain ((name as Symbol))
+    let namestr =
+        .. (sugar-scope.module-name as string) "." (name as string)
+    list let name '= (list FunctionChain namestr)
+
+let decorate-fnchain = decorate-fn
 
 do
-    let FunctionChain fnchain
+    let FunctionChain fnchain decorate-fnchain
     locals;

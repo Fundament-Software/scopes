@@ -10,33 +10,37 @@
     related arithmetic operations which mimic the features available to shaders
     written in the GL shader language.
 
-let vec-type = (typename "vec-type" immutable)
-let mat-type = (typename "mat-type" immutable)
+typedef vec-type
+typedef mat-type
+typedef vec-type-accessor
+
+#run-stage;
 
 fn element-prefix (element-type)
     match element-type
-        bool "b"
-        i32 "i"
-        u32 "u"
-        f32 ""
-        f64 "d"
-        else
-            compiler-error! "illegal element type"
+    case bool "b"
+    case i32 "i"
+    case u32 "u"
+    case f32 ""
+    case f64 "d"
+    default
+        compiler-error! "illegal element type"
 
+@@ type-factory
 fn construct-vec-type (element-type size)
     assert ((typeof size) == i32)
     assert (size > 1)
     let prefix = (element-prefix element-type)
-    let T =
-        typename
-            .. prefix "vec" (string-repr size)
-            vec-type
-            vector element-type size
-    set-type-symbol! T 'ElementType element-type
-    set-type-symbol! T 'Count size
-    T
+    let VT = (vector element-type size)
+    typedef (.. prefix "vec" (tostring size)) < vec-type : VT
+        'set-symbols this-type
+            ElementType = element-type
+            Count = size
 
+@@ type-factory
 fn construct-mat-type (element-type cols rows)
+    if false # recursive function, hint return type
+        return type
     assert ((typeof cols) == i32)
     assert ((typeof rows) == i32)
     assert (cols > 1)
@@ -44,27 +48,20 @@ fn construct-mat-type (element-type cols rows)
     let prefix = (element-prefix element-type)
     let vecT =
         construct-vec-type element-type rows
-    let T =
-        typename
-            .. prefix "mat"
-                string-repr cols
-                "x"
-                string-repr rows
-            mat-type
-            array vecT cols
-    set-type-symbol! T 'ElementType element-type
-    set-type-symbol! T 'ColumnType vecT
-    set-type-symbol! T 'RowType
-        construct-vec-type element-type cols
-    set-type-symbol! T 'Columns cols
-    set-type-symbol! T 'Rows rows
-    if (cols == rows)
-        set-type-symbol! T 'TransposedType T
-    elseif (cols < rows)
-        let TT = (construct-mat-type element-type rows cols)
-        set-type-symbol! T 'TransposedType TT
-        set-type-symbol! TT 'TransposedType T
-    T
+    let MT = (array vecT cols)
+    typedef (.. prefix "mat" (tostring cols) "x" (tostring rows))
+        \ < mat-type : MT
+        'set-symbols this-type
+            ElementType = element-type
+            ColumnType = vecT
+            RowType = (construct-vec-type element-type cols)
+            Columns = cols; Rows = rows
+        if (cols == rows)
+            'set-symbol this-type 'TransposedType this-type
+        elseif (cols < rows)
+            let TT = ((type-factory construct-mat-type) element-type rows cols)
+            'set-symbol this-type 'TransposedType TT
+            'set-symbol TT 'TransposedType this-type
 
 fn construct-vec-types (count)
     let count = (i32 count)
@@ -104,373 +101,411 @@ let mat4x3 dmat4x3 imat4x3 umat4x3 bmat4x3 = (construct-mat-types 4 3)
 let mat4x4 dmat4x4 imat4x4 umat4x4 bmat4x4 = (construct-mat-types 4 4)
 let mat4 dmat4 imat4 umat4 bmat4 = mat4x4 dmat4x4 imat4x4 umat4x4 bmat4x4
 
-let element-set-xyzw = "^[xyzw]{1,4}$"
-let element-set-rgba = "^[rgba]{1,4}$"
-let element-set-stpq = "^[stpq]{1,4}$"
-let element-set-any = "^([xyzw]|[stpq]|[rgba]){1,4}$"
-
-set-type-symbol! vec-type '__repr
-    inline vec-type-repr (self)
-        repr (self as vector)
-
-set-type-symbol! vec-type '__@
-    inline "vec-type@" (self i)
-        extractelement self i
-
-set-type-symbol! vec-type '__as
-    inline vec-type-as (self destT)
-        let ST = (storageof (typeof self))
-        if ((destT == vector) or (destT == ST))
-            bitcast self ST
-        elseif (destT == Generator)
-            let count = (countof ST)
-            Generator
-                label (fret fdone index)
-                    if (index == count)
-                        fdone;
-                    else
-                        fret (index + 1:usize) (extractelement self index)
-                0:usize
-
-set-type-symbol! vec-type '__unpack
-    inline "vec-type-unpack" (self)
-        unpack
-            bitcast self (storageof (typeof self))
-
-set-type-symbol! vec-type '__typecall
-    inline vec-type-new (self ...)
-        if (self == vec-type)
-            let ET size = ...
-            construct-vec-type (imply ET type) (imply size i32)
-        else
-            let ET = (@ self)
-            let argsz = (va-countof ...)
-            let loop (i args...) = argsz
-            if (i != 0)
-                let i = (i - 1)
-                let arg = (va@ i ...)
-                let arg = (deref arg)
-                let argT = (typeof arg)
-                if (argT < vec-type)
-                    let argET argvecsz = (@ argT) ((countof argT) as i32)
-                    let flatten-loop (k args...) = argvecsz args...
-                    if (k != 0)
-                        let k = (k - 1)
-                        flatten-loop k ((extractelement arg k) as ET) args...
-                    loop i args...
-                loop i (arg as ET) args...
-            let argsz = (va-countof args...)
-            let vecsz = ((countof self) as i32)
-            if (argsz == 1)
-                # init all components with the same value
-                let arg = (va@ 0 args...)
-                let loop (i value) = 0 (nullof self)
-                if (i < vecsz)
-                    loop (i + 1) (insertelement value arg i)
-                value
-            elseif (argsz == vecsz)
-                let loop (i value) = 0 (nullof self)
-                if (i < vecsz)
-                    let arg = (va@ i args...)
-                    loop (i + 1) (insertelement value arg i)
-                value
-            else
-                compiler-error!
-                    .. "number of arguments (" (repr argsz)
-                        \ ") doesn't match number of elements (" (repr vecsz) ")"
-
-set-type-symbol! vec-type '__==
-    inline vec-type== (self other flipped)
-        if (type== (typeof self) (typeof other))
-            all? ((self as vector) == (other as vector))
-
-fn valid-element-type? (T)
-    (T < integer) or (T < real)
-
-inline vec-type-binop (f)
-    inline (a b flipped)
-        let T1 T2 = (typeof a) (typeof b)
-        label compute (a b)
-            return
-                if (type== (typeof a) (typeof b))
-                    let ET = (@ (typeof a))
-                    f ET a b
-        if flipped
-            if (T1 < vec-type)
-                compute a b
-            elseif (valid-element-type? T1)
-                compute ((typeof b) a) b
-        else
-            if (T2 < vec-type)
-                compute a b
-            elseif (valid-element-type? T2)
-                compute a ((typeof a) b)
-
-set-type-symbol! vec-type '__+
-    vec-type-binop
-        inline (ET a b)
-            if (ET < real)
-                fadd a b
-            elseif (ET < integer)
-                add a b
-
-set-type-symbol! vec-type '__-
-    vec-type-binop
-        inline (ET a b)
-            if (ET < real)
-                fsub a b
-            elseif (ET < integer)
-                sub a b
-
-set-type-symbol! vec-type '__neg
-    inline (self)
-        - ((typeof self) 0) self
-
-set-type-symbol! vec-type '__rcp
-    inline (self)
-        / ((typeof self) 1) self
-
-set-type-symbol! vec-type '__*
-    vec-type-binop
-        inline (ET a b)
-            if (ET < real)
-                fmul a b
-            elseif (ET < integer)
-                mul a b
-set-type-symbol! vec-type '__/
-    vec-type-binop
-        inline (ET a b)
-            if (ET < real)
-                fdiv a b
-set-type-symbol! vec-type '__//
-    vec-type-binop
-        inline (ET a b)
-            if (ET < integer)
-                if (signed? ET)
-                    sdiv a b
-                else
-                    udiv a b
-set-type-symbol! vec-type '__&
-    vec-type-binop
-        inline (ET a b)
-            if (ET < integer)
-                band a b
-set-type-symbol! vec-type '__|
-    vec-type-binop
-        inline (ET a b)
-            if (ET < integer)
-                bor a b
-set-type-symbol! vec-type '__^
-    vec-type-binop
-        inline (ET a b)
-            if (ET < integer)
-                bxor a b
-set-type-symbol! vec-type '__%
-    vec-type-binop
-        inline (ET a b)
-            if (ET < real)
-                frem a b
-            elseif (ET < integer)
-                if (signed? ET)
-                    srem a b
-                else
-                    urem a b
-
-fn set-vector-cmp-binop! (op ff fs fu)
-    set-type-symbol! vec-type op
-        vec-type-binop
-            inline (ET a b)
-                if (ET < real)
-                    ff a b
-                elseif (ET < integer)
-                    if (signed? ET)
-                        fs a b
-                    else
-                        fu a b
-set-vector-cmp-binop! '__< fcmp<o icmp<s icmp<u
-set-vector-cmp-binop! '__> fcmp>o icmp>s icmp>u
-set-vector-cmp-binop! '__<= fcmp<=o icmp<=s icmp<=u
-set-vector-cmp-binop! '__>= fcmp>=o icmp>=s icmp>=u
-
-fn build-access-mask (name)
-    let s = (name as string)
-    let set =
-        if (string-match? element-set-xyzw s) "xyzw"
-        elseif (string-match? element-set-rgba s) "rgba"
-        elseif (string-match? element-set-stpq s) "stpq"
-        else
-            return;
-    fn find-index (set c)
-        let setloop (k) = 0
-        let sc = (set @ k)
-        if (c != sc)
-            setloop (k + 1)
-        k
-    let sz = (countof s)
-    if (sz == 1:usize)
-        return (sz as i32) (find-index set (s @ 0))
-    elseif (sz <= 4:usize)
-        let loop (i mask...) = sz
-        if (i > 0:usize)
-            let i = (i - 1:usize)
-            let k = (find-index set (s @ i))
-            loop i k
-                mask...
-        return (sz as i32) (vectorof i32 mask...)
-
-typeinline vec-type '__getattr (self name)
-    let sz mask = (build-access-mask name)
-    if (none? sz)
-        return;
-    if (sz == 1)
-        extractelement self mask
-    elseif (sz <= 4)
-        bitcast
-            shufflevector self self mask
-            construct-vec-type (@ (typeof self)) sz
-
-fn expand-mask (lhsz rhsz)
-    let loop (i mask...) = lhsz
-    if (i > 0)
-        let i = (i - 1)
-        loop i (i % rhsz) mask...
-    vectorof i32 mask...
-
-fn range-mask (sz)
-    let loop (i mask...) = sz
-    if (i > 0)
-        let i = (i - 1)
-        loop i i mask...
-    vectorof i32 mask...
-
-fn assign-mask (lhsz mask)
-    let sz = (countof mask)
-    let loop (i assignmask) = 0:usize (range-mask lhsz)
-    if (i < sz)
-        loop (i + 1:usize)
-            insertelement assignmask ((lhsz + i) as i32) (mask @ i)
-    assignmask
-
-fn construct-getter-type (vecrefT mask)
-    let vecT = vecrefT.ElementType
-    let ET = vecT.ElementType
-    let storageT = (storageof vecrefT)
-    let T =
-        typename
-            .. (type-name vecrefT)
-                string-repr mask
-            super = ref
-            storage = storageT
-    if ((typeof mask) == i32)
-        let index = mask
-        typeinline T '__deref (self)
-            extractelement (load self) index
-        typeinline T '__imply (self destT)
-            if (destT == ET)
-                deref self
-        typeinline T '__= (self other)
-            let other = (imply other ET)
-            store
-                insertelement (load self) other index
-                self
-            true
-    else
-        let sz = (countof mask)
-        let lhsz = vecT.Count
-        let rhvecT = (construct-vec-type ET sz)
-        let expandmask = (expand-mask lhsz sz)
-        let assignmask = (assign-mask lhsz mask)
-        typeinline T '__deref (self)
-            let self = (load self)
-            bitcast
-                shufflevector self self mask
-                rhvecT
-        typeinline T '__imply (self destT)
-            if (destT == rhvecT)
-                deref self
-        if (sz == lhsz)
-            typefn T '__= (self other)
-                let other = (imply other rhvecT)
-                store
-                    shufflevector (load self) other assignmask
-                    self
-                true
-        else
-            typeinline T '__= (self other)
-                let other = (imply other rhvecT)
-                # expand or contract
-                let other =
-                    shufflevector other other expandmask
-                store
-                    shufflevector (load self) other assignmask
-                    self
-                true
-    T
-
-typeinline& vec-type '__getattr (self name)
-    let sz mask = (build-access-mask name)
-    if (none? sz)
-        return;
-    bitcast self
-        construct-getter-type (typeof self) mask
-
+#-------------------------------------------------------------------------------
+# VECTORS
 #-------------------------------------------------------------------------------
 
-set-type-symbol! mat-type '__unpack
-    inline "mat-type-unpack" (self)
-        unpack
-            bitcast self (storageof (typeof self))
+typedef vec-type-accessor
+    do
+        fn binary-op-expr (op lhsT rhsT lhs rhs)
+            raises-compile-error;
+            `(op (imply lhs vec-type) rhs)
 
-set-type-symbol! mat-type '__@
-    inline "mat-type@" (self i)
-        extractvalue self i
+        fn binary-op-expr-r (op lhsT rhsT lhs rhs)
+            raises-compile-error;
+            `(op lhs (imply rhs vec-type))
 
-set-type-symbol! mat-type '__as
-    inline "mat-type-as" (self destT)
-        let ST = (storageof (typeof self))
-        if ((destT == array) or (destT == ST))
-            bitcast self ST
-        elseif (destT == Generator)
-            let count = (countof ST)
-            Generator
-                label (fret fdone index)
-                    if (index == count)
-                        fdone;
+        inline binary-op-dispatch (lop rop op)
+            'set-symbol this-type lop
+                box-binary-op
+                    fn (lhsT rhsT lhs rhs)
+                        binary-op-expr op lhsT rhsT lhs rhs
+            'set-symbol this-type rop
+                box-binary-op
+                    fn (lhsT rhsT lhs rhs)
+                        binary-op-expr-r op lhsT rhsT lhs rhs
+
+        binary-op-dispatch '__+ '__r+ +
+        binary-op-dispatch '__- '__r- -
+        binary-op-dispatch '__* '__r* *
+        binary-op-dispatch '__/ '__r/ /
+        binary-op-dispatch '__// '__r// //
+        binary-op-dispatch '__& '__r& &
+        binary-op-dispatch '__| '__r| |
+        binary-op-dispatch '__^ '__r^ ^
+        binary-op-dispatch '__% '__r% %
+        binary-op-dispatch '__> '__r> >
+        binary-op-dispatch '__< '__r< <
+        binary-op-dispatch '__>= '__r>= >=
+        binary-op-dispatch '__<= '__r<= <=
+
+    @@ box-cast
+    fn __imply (vT T self)
+        let rhvecT = (vT.RHVectorType as type)
+        if ((T == rhvecT) or (T == vec-type))
+            let mask = vT.Mask
+            return `(bitcast (shufflevector self self mask) rhvecT)
+        compiler-error! "unsupported type"
+
+    @@ box-binary-op
+    fn __= (lhsT rhsT lhs rhs)
+        raises-compile-error;
+        let rhvecT = (lhsT.RHVectorType as type)
+        let assignmask = lhsT.AssignMask
+        let lhsz = ('element-count lhsT)
+        let sz = ('element-count rhvecT)
+        let vecT = ('superof rhvecT)
+        if (lhsz == sz)
+            `(assign
+                (shufflevector lhs (imply rhs rhvecT) assignmask)
+                lhs)
+        else
+            let expandmask = lhsT.ExpandMask
+            spice-quote
+                do
+                    let rhs = (imply rhs rhvecT)
+                    # expand or contract
+                    let rhs = (shufflevector rhs rhs expandmask)
+                    assign (shufflevector lhs rhs assignmask) lhs
+
+
+typedef vec-type < immutable
+    inline vec-type-constructor (element-type size)
+        construct-vec-type (imply element-type type) (imply size i32)
+
+    spice vec-constructor2 (self ...)
+        let self = (self as type)
+        let ET argsz =
+            'element@ self 0; 'argcount ...
+        # count sum of elements
+        let flatargsz =
+            fold (total = 0) for arg in ('args ...)
+                let argT = ('typeof arg)
+                + total
+                    if (argT < vec-type)
+                        'element-count argT
+                    else 1
+        let vecsz = ('element-count self)
+        let initval = `(nullof self)
+        if (flatargsz == 1)
+            # init all components with the same value
+            let arg = ('getarg ... 0)
+            let argT = ('typeof arg)
+            let arg =
+                if (argT < vec-type)
+                    `(extractelement arg 0)
+                else `(arg as ET)
+            loop (i value = 0 initval)
+                if (i == vecsz)
+                    break value
+                repeat (i + 1)
+                    `(insertelement value arg i)
+        elseif (flatargsz == vecsz)
+            let total value =
+                fold (total value = 0 initval) for arg in ('args ...)
+                    let argT = ('typeof arg)
+                    if (argT < vec-type)
+                        let argET argvecsz =
+                            'element@ argT 0; 'element-count argT
+                        fold (total value = total value) for k in (range argvecsz)
+                            _ (total + 1)
+                                `(insertelement value (extractelement arg k) total)
                     else
-                        fret (index + 1:usize) (extractvalue self index)
-                0:usize
+                        _ (total + 1)
+                            `(insertelement value (arg as ET) total)
+            value
+        else
+            compiler-error!
+                .. "number of arguments (" (repr flatargsz)
+                    \ ") doesn't match number of elements (" (repr vecsz) ")"
 
-fn empty-value (T)
-    nullof T
-fn make-diagonal-vector (VT i)
-    let vec = (empty-value VT)
-    if (i < VT.Count)
-        insertelement vec (VT.ElementType 1) i
-    else vec
+    spice __typecall (self ...)
+        let self = (self as type)
+        if (self == vec-type)
+            `(vec-type-constructor ...)
+        else
+            let args = (sc_argument_list_new (active-anchor))
+            for arg in ('args ...)
+                let argT = ('typeof arg)
+                sc_argument_list_append args
+                    if (argT < vec-type) arg
+                    elseif (argT < vec-type-accessor)
+                        `(imply arg vec-type)
+                    else arg
+            `(vec-constructor2 self args)
 
-set-type-symbol! mat-type '__typecall
-    inline "mat-type-new" (cls ...)
+    unlet vec-type-constructor vec-constructor2
+
+    spice _vec-repr (self)
+        let T = ('typeof self)
+        let sz = ('element-count T)
+        let s =
+            fold (s = (spice-quote "<")) for i in (range sz)
+                let txt = `(repr (extractelement self i))
+                if (i == 0)
+                    `(.. s txt)
+                else
+                    `(.. s " " txt)
+        `(.. s ">")
+
+    @@ spice-quote
+    fn __repr (self) (_vec-repr self)
+
+    unlet _vec-repr
+
+    inline __@ (self i)
+        extractelement self i
+
+    inline __unpack (self)
+        unpack (self as vector)
+
+    inline __neg (self)
+        - ((typeof self) 0) self
+
+    inline __rcp (self)
+        / ((typeof self) 1) self
+
+    do
+        fn vec-type-binary-op-expr (symbol lhsT rhsT lhs rhs)
+            let Ta = ('element@ lhsT 0)
+            let f =
+                try ('@ Ta symbol)
+                except (err)
+                    compiler-error! "unsupported operation"
+            let f = (unbox-binary-op-function-type f)
+
+            let rhs =
+                if (lhsT == rhsT) rhs
+                else
+                    `(lhsT [(imply-expr rhsT Ta rhs)])
+            return (f lhsT lhsT lhs rhs)
+
+        fn vec-type-binary-op-expr-r (symbol lhsT rhsT lhs rhs)
+            let Tb = ('element@ rhsT 0)
+            let f =
+                try ('@ Tb symbol)
+                except (err)
+                    compiler-error! "unsupported operation"
+            let f = (unbox-binary-op-function-type f)
+            let lhs =
+                if (lhsT == rhsT) lhs
+                else
+                    `(rhsT [(imply-expr lhsT Tb lhs)])
+            return (f rhsT rhsT lhs rhs)
+
+        inline vec-type-binary-op-dispatch (lop rop symbol)
+            'set-symbol this-type lop
+                box-binary-op
+                    fn (lhsT rhsT lhs rhs) (vec-type-binary-op-expr symbol lhsT rhsT lhs rhs)
+            'set-symbol this-type rop
+                box-binary-op
+                    fn (lhsT rhsT lhs rhs) (vec-type-binary-op-expr-r symbol lhsT rhsT lhs rhs)
+
+        vec-type-binary-op-dispatch '__+ '__r+ '__vector+
+        vec-type-binary-op-dispatch '__- '__r- '__vector-
+        vec-type-binary-op-dispatch '__* '__r* '__vector*
+        vec-type-binary-op-dispatch '__/ '__r/ '__vector/
+        vec-type-binary-op-dispatch '__// '__r// '__vector//
+        vec-type-binary-op-dispatch '__& '__r& '__vector&
+        vec-type-binary-op-dispatch '__| '__r| '__vector|
+        vec-type-binary-op-dispatch '__^ '__r^ '__vector^
+        vec-type-binary-op-dispatch '__% '__r% '__vector%
+
+        vec-type-binary-op-dispatch '__> '__r> '__vector>
+        vec-type-binary-op-dispatch '__< '__r< '__vector<
+        vec-type-binary-op-dispatch '__>= '__r>= '__vector>=
+        vec-type-binary-op-dispatch '__<= '__r<= '__vector<=
+
+    fn build-access-mask (name)
+        let element-set-xyzw = "^[xyzw]{1,4}$"
+        let element-set-rgba = "^[rgba]{1,4}$"
+        let element-set-stpq = "^[stpq]{1,4}$"
+        let element-set-any = "^([xyzw]|[stpq]|[rgba]){1,4}$"
+
+        let s = (name as string)
+        let sz = ((countof s) as i32)
+        if (sz > 4)
+            compiler-error! "too many characters in accessor (try 1 <= x <= 4)"
+        let set =
+            if ('match? element-set-xyzw s) "xyzw"
+            elseif ('match? element-set-rgba s) "rgba"
+            elseif ('match? element-set-stpq s) "stpq"
+            else
+                compiler-error! "try one of xyzw | rgba | stpq"
+        fn find-index (set c)
+            loop (k = 0)
+                let sc = (set @ (k as usize))
+                if (c == sc)
+                    break k
+                k + 1
+        if (sz == 1)
+            return sz `[(find-index set (s @ 0))]
+        # 2 - 4 arguments
+        let entries = (alloca-array Value sz)
+        for i in (range sz)
+            let ui = (i as usize)
+            let k = (find-index set (s @ ui))
+            entries @ ui = `k
+        let VT = (vector i32 sz)
+        return sz (sc_const_aggregate_new (active-anchor) VT sz entries)
+
+    @@ memoize
+    fn expand-mask (lhsz rhsz)
+        let entries = (alloca-array Value lhsz)
+        for i in (range lhsz)
+            let ui = (i as usize)
+            let k = (i % rhsz)
+            entries @ ui = `k
+        let VT = (vector i32 lhsz)
+        return (sc_const_aggregate_new (active-anchor) VT lhsz entries)
+
+    @@ memoize
+    fn range-mask (sz)
+        let entries = (alloca-array Value sz)
+        for i in (range sz)
+            let ui = (i as usize)
+            entries @ ui = `i
+        let VT = (vector i32 sz)
+        return (sc_const_aggregate_new (active-anchor) VT sz entries)
+
+    @@ memoize
+    fn assign-mask (lhsz mask)
+        let sz = ('element-count ('typeof mask))
+        let entries = (alloca-array Value lhsz)
+        for i in (range lhsz)
+            let ui = (i as usize)
+            entries @ ui = `i
+        for i in (range sz)
+            let ui = ((sc_const_extract_at mask i) as i32 as usize)
+            let k = (lhsz + i)
+            entries @ ui = `k
+        let VT = (vector i32 lhsz)
+        return (sc_const_aggregate_new (active-anchor) VT lhsz entries)
+
+    @@ type-factory
+    fn construct-getter-type (vecrefT mask)
+        let storageT = ('storageof vecrefT)
+        let ET = ('element@ storageT 0)
+        typedef (.. ('string vecrefT) (tostring mask)) < vec-type-accessor : storageT
+            let sz = ('element-count ('typeof mask))
+            let lhsz = ('element-count vecrefT)
+            'set-symbols this-type
+                RHVectorType = (construct-vec-type ET sz)
+                Mask = mask
+                AssignMask = (assign-mask lhsz mask)
+                ExpandMask = (expand-mask lhsz sz)
+
+    spice __getattr (self name)
+        let name = (name as Symbol as string)
+        let sz mask = (build-access-mask name)
+        let QT = ('qualified-typeof self)
+        if (sz == 1)
+            `(extractelement self mask)
+        elseif ('refer? QT)
+            spice-quote
+                bitcast self
+                    [(construct-getter-type ('typeof self) mask)]
+        else
+            spice-quote
+                bitcast
+                    shufflevector self self mask
+                    [(construct-vec-type ('element@ ('typeof self) 0) sz)]
+
+    unlet construct-getter-type assign-mask range-mask expand-mask
+        \ build-access-mask
+
+    @@ box-cast
+    fn __as (vT T self)
+        let ST = ('storageof vT)
+        if ((T == vector) or (T == ST))
+            `(bitcast self ST)
+        elseif (T == Generator)
+            let count = ('element-count ST)
+            spice-quote
+                Generator
+                    inline (fdone index)
+                        if (index == count)
+                            fdone;
+                        else
+                            _ (index + 1) (extractelement self index)
+                    0
+        else
+            compiler-error! "unsupported type"
+
+    @@ box-binary-op
+    fn __== (lhsT rhsT lhs rhs)
+        `(all? [(vector.__== lhsT rhsT lhs rhs)])
+
+fn dot (u v)
+    let w = (u * v)
+    vector-reduce (do +) (w as (storageof (typeof w)))
+
+#-------------------------------------------------------------------------------
+# MATRICES
+#-------------------------------------------------------------------------------
+
+typedef mat-type < immutable
+
+    inline __unpack (self)
+        unpack (self as array)
+
+    inline __@ (self index)
+        extractvalue self index
+
+    spice _mat-repr (self)
+        let T = ('typeof self)
+        let sz = (T.Columns as i32)
+        let s =
+            fold (s = (spice-quote "[")) for i in (range sz)
+                let txt = `('__repr (extractvalue self i))
+                if (i == 0)
+                    `(.. s txt)
+                else
+                    `(.. s " " txt)
+        `(.. s "]")
+
+    @@ spice-quote
+    fn __repr (self) (_mat-repr self)
+
+    unlet _mat-repr
+
+    #inline empty-value (T)
+        nullof T
+
+    spice row (self i)
+        let T = ('typeof self)
+        let rowT = (T.RowType as type)
+        let cols = ('element-count T)
+        fold (vec = `(nullof rowT)) for j in (range cols)
+            `(insertelement vec (extractelement (extractvalue self j) i) j)
+
+    fn make-diagonal-vector (VT i)
+        let vec = `(nullof VT)
+        if (i < ('element-count VT))
+            let ET = ('element@ VT 0)
+            `(insertelement vec (ET 1) i)
+        else vec
+
+    inline mat-type-constructor (element-type cols rows)
+        construct-mat-type
+            imply element-type type; imply cols i32; imply rows i32
+
+    spice __typecall (cls ...)
+        let cls = (cls as type)
         if (cls == mat-type)
-            let ET cols rows = ...
-            return
-                construct-mat-type
-                    imply ET type
-                    imply cols i32
-                    imply rows i32
-        let VT = cls.ColumnType
-        let argsz = (va-countof ...)
+            return `(mat-type-constructor ...)
+        let cols = ('element-count cls)
+        let VT = ('element@ cls 0)
+        let ET = ('element@ VT 0)
+        let rows = ('element-count VT)
+        let argsz = ('argcount ...)
         if (argsz == 0)
-            fold
-                empty-value cls
-                unroll-range cls.Columns
-                fn (break self i)
-                    insertvalue self
-                        make-diagonal-vector VT i
-                        i
+            fold (self = `(nullof cls)) for i in (range cols)
+                `(insertvalue self [(make-diagonal-vector VT i)] i)
         elseif (argsz == 1)
             # construct from scalar or matrix
-            let arg = (va@ 0 ...)
-            let argT = (typeof arg)
+            let arg = ('getarg ... 0)
+            let argT = ('typeof arg)
             if (argT < mat-type)
                 # construct from matrix
                 if (argT == cls)
@@ -478,205 +513,173 @@ set-type-symbol! mat-type '__typecall
                     arg
                 else
                     # build a matrix that is bigger or smaller
-                    let can-copy-vectors? = (argT.ColumnType == VT)
-                    fold
-                        empty-value cls
-                        unroll-range cls.Columns
-                        fn (break self i)
-                            if (i < argT.Columns)
-                                if can-copy-vectors?
-                                    insertvalue self
-                                        extractvalue arg i
-                                        i
-                                else
-                                    let ET = cls.ElementType
-                                    let argvec = (extractvalue arg i)
-                                    insertvalue self
-                                        # element-wise construction
-                                        fold
-                                            # start off with default diagonal vector
-                                            make-diagonal-vector VT i
-                                            unroll-range (min cls.Rows argT.Rows)
-                                            fn (break vec j)
-                                                insertelement vec ((extractelement argvec j) as ET) j
-                                        i
+                    let can-copy-vectors? = (('element@ argT 0) == VT)
+                    let argcols = ('element-count argT)
+                    let argrows = ('element-count ('element@ argT 0))
+                    let minrows = (min rows argrows)
+                    fold (self = `(nullof cls)) for i in (range cols)
+                        if (i < argcols)
+                            if can-copy-vectors?
+                                `(insertvalue self (extractvalue arg i) i)
                             else
-                                # build default diagonal vector
-                                insertvalue self (make-diagonal-vector VT i) i
+                                let argvec = `(extractvalue arg i)
+                                let vec = (make-diagonal-vector VT i)
+                                let vec =
+                                    # element-wise construction
+                                    # start off with default diagonal vector
+                                    fold (vec = vec) for j in (range minrows)
+                                        `(insertelement vec
+                                            ((extractelement argvec j) as ET) j)
+                                `(insertvalue self vec i)
+                        else
+                            # build default diagonal vector
+                            `(insertvalue self [(make-diagonal-vector VT i)] i)
             elseif (argT < vec-type)
                 compiler-error!
-                    .. (repr (i32 cls.Columns)) " column vectors required"
+                    .. (repr (i32 cols)) " column vectors required"
             else
                 # build a matrix with diagonal elements set to arg
-                let arg = (arg as cls.ElementType)
-                fold
-                    empty-value cls
-                    unroll-range cls.Columns
-                    inline (break self i)
-                        insertvalue self (insertelement (empty-value VT) arg i) i
+                let arg = `(arg as ET)
+                let emptyVT = `(nullof VT)
+                fold (self = `(nullof cls)) for i in (range cols)
+                    `(insertvalue self (insertelement emptyVT arg i) i)
         else
             # construct from arbitrary composition of vectors and elements,
                 which must nevertheless align to vector boundary size
             # unpack all elements and count offsets as we go
-            let f =
-                fold
-                    fn ()
-                        return (empty-value cls) (empty-value VT) 0:usize 0:usize
-                    va-each ...
-                    inline (break f arg)
-                        let self vec col row = (f)
-                        let argT = (typeof arg)
-                        let rows = cls.Rows
-                        let is-vector? = (argT < vec-type)
-                        let nextrow =
-                            + row
-                                if is-vector? argT.Count
-                                else 1:usize
-                        if (nextrow > rows)
-                            compiler-error! "too many arguments for column"
-                        let vec =
-                            if is-vector?
-                                if (argT == VT)
-                                    # same vector type
-                                    arg
-                                else
-                                    # insert values bit by bit
-                                    fold vec
-                                        enumerate arg
-                                        fn (break vec j value)
-                                            insertelement vec (value as cls.ElementType) (row + j)
-                            else
-                                # assume element type
-                                insertelement vec (arg as cls.ElementType) row
-                        if (nextrow == rows) # end of column
-                            fn ()
-                                return
-                                    insertvalue self vec col
-                                    empty-value VT
-                                    col + 1:usize
-                                    0:usize
-                        else # not arrived yet
-                            fn ()
-                                return self vec col nextrow
-            let self vec col row = (f)
-            if (row != 0:usize)
+            let emptyVT = `(nullof VT)
+            let self vec col row =
+                fold (self vec col row = `(nullof cls) emptyVT 0 0)
+                    \ for arg in ('args ...)
+
+                    let argT = ('typeof arg)
+                    let is-vector? = (argT < vec-type)
+                    let nextrow =
+                        + row
+                            if is-vector? ('element-count argT)
+                            else 1
+                    if (nextrow > rows)
+                        compiler-error! "too many arguments for column"
+                    let vec =
+                        if is-vector?
+                            if (argT == VT) arg # same vector type
+                            else # convert and insert values by element
+                                let vsz = ('element-count argT)
+                                fold (vec = vec) for j in (range vsz)
+                                    let value = `(extractelement arg j)
+                                    `(insertelement vec (value as ET) [(row + j)])
+                        else # assume element type
+                            `(insertelement vec (arg as ET) row)
+                    if (nextrow == rows) # end of column
+                        _ `(insertvalue self vec col) emptyVT (col + 1) 0
+                    else # not arrived yet
+                        _ self vec col nextrow
+            if (row != 0)
                 compiler-error!
                     .. "number of provided elements for last row (" (repr (i32 row))
-                        \ ") doesn't match number of elements required (" (repr (i32 cls.Rows)) ")"
-            if (col != cls.Columns)
+                        \ ") doesn't match number of elements required (" (repr (i32 rows)) ")"
+            if (col != cols)
                 compiler-error!
                     .. "number of provided columns (" (repr (i32 col))
-                        \ ") doesn't match number of columns required (" (repr (i32 cls.Columns)) ")"
+                        \ ") doesn't match number of columns required (" (repr (i32 cols)) ")"
             self
 
-set-type-symbol! mat-type '__==
-    inline "mat-type==" (self other flipped)
-        let T = (typeof self)
-        if (type== T (typeof other))
-            all?
-                fold
-                    empty-value (vector bool T.Columns)
-                    unroll-range T.Columns
-                    inline (break vec i)
-                        insertelement vec
-                            (extractvalue self i) == (extractvalue other i)
-                            i
+    unlet make-diagonal-vector mat-type-constructor
 
-inline mat-row (mat i)
-    let T = (typeof mat)
-    fold
-        nullof T.RowType
-        unroll-range T.Columns
-        inline (break vec j)
-            insertelement vec (extractelement (extractvalue mat j) i) j
-
-set-type-symbol! mat-type 'row mat-row
-
-fn dot (u v)
-    let w = (u * v)
-    vector-reduce (do +) (w as (storageof (typeof w)))
-
-fn transpose (m)
-    let T = (typeof m)
-    let TT = T.TransposedType
-    fold
-        nullof TT
-        unroll-range T.Rows
-        inline (break self i)
-            insertvalue self
-                mat-row m i
-                i
-
-inline mix (a b x)
-    let Ta = (typeof a)
-    let Tx = (typeof x)
-    if ((Tx == bool) or ((Tx < vec-type) and ((@ Tx) == bool)))
-        ? x b a
-    else
-        fmix a b
-            if (Tx < vec-type) x
-            else
-                Ta x
-
-set-type-symbol! mat-type '__*
-    inline "mat-type*" (a b flipped)
-        let Ta = (typeof a)
-        let Tb = (typeof b)
-        if ((Ta < mat-type) and (Tb < mat-type) and (Ta == Tb.TransposedType))
+    @@ box-binary-op
+    fn __* (lhsT rhsT lhs rhs)
+        let mat-row = row
+        if ((lhsT < mat-type)
+                and (rhsT < mat-type)
+                and (lhsT == (rhsT.TransposedType as type)))
             # mat(i,j) * mat(j,i) -> mat(j,j)
-            let sz = Ta.Rows
-            let destT = (construct-mat-type Ta.ElementType sz sz)
-            let VT = Ta.ColumnType
-            fold
-                nullof destT
-                unroll-range sz
-                inline (break mat i)
-                    let row = (mat-row a i)
-                    insertvalue mat
-                        fold
-                            nullof VT
-                            unroll-range sz
-                            inline (break vec j)
-                                insertelement vec
-                                    dot row (extractvalue b j)
-                                    j
-                        i
-        elseif (flipped and (Ta == Tb.ColumnType))
-            # vec(j) * mat(i,j) -> vec(i)
-            fold
-                nullof Tb.RowType
-                unroll-range Tb.Columns
-                inline (break vec i)
-                    insertelement vec
-                        dot a (extractvalue b i)
-                        i
-        elseif (Tb == Ta.RowType)
+            let VT = ('element@ lhsT 0)
+            let sz = ('element-count VT)
+            let ET = ('element@ VT 0)
+            let destT = (construct-mat-type ET sz sz)
+            fold (mat = `(nullof destT)) for i in (range sz)
+                let row = `(mat-row lhs i)
+                let vec =
+                    fold (vec = `(nullof VT)) for j in (range sz)
+                        `(insertelement vec (dot row (extractvalue rhs j)) j)
+                `(insertvalue mat vec i)
+        elseif (rhsT == (lhsT.RowType as type))
+            let VT = ('element@ lhsT 0)
+            let sz = ('element-count VT)
             # mat(i,j) * vec(i) -> vec(j)
-            fold
-                nullof Ta.ColumnType
-                unroll-range Ta.Rows
-                inline (break vec i)
-                    insertelement vec
-                        dot (mat-row a i) b
-                        i
+            fold (vec = `(nullof VT)) for i in (range sz)
+                `(insertelement vec (dot (mat-row lhs i) rhs) i)
+        else
+            compiler-error! "unsupported type"
 
-set-type-symbol! mat-type '__repr
-    inline "mat-type-repr" (self)
-        let sz = (i32 ((typeof self) . Columns))
-        let loop (i result...) = sz "]"
-        if (i != 0)
-            let i = (i - 1)
-            loop i
-                ? (i == 0) "" " "
-                repr ((extractvalue self i) as vector)
-                result...
-        .. "[" result...
+    @@ box-binary-op
+    fn __r* (lhsT rhsT lhs rhs)
+        if (lhsT == ('element@ rhsT 0))
+            # vec(j) * mat(i,j) -> vec(i)
+            let sz = ('element-count rhsT)
+            fold (vec = `(nullof rhsT.RowType)) for i in (range sz)
+                `(insertelement vec (dot lhs (extractvalue rhs i)) i)
+        else
+            compiler-error! "unsupported type"
+
+    @@ box-cast
+    fn __as (vT T self)
+        let ST = ('storageof vT)
+        if ((T == array) or (T == ST))
+            `(bitcast self ST)
+        elseif (T == Generator)
+            let count = ('element-count ST)
+            spice-quote
+                Generator
+                    inline (fdone index)
+                        if (index == count)
+                            fdone;
+                        else
+                            _ (index + 1) (extractvalue self index)
+                    0
+        else
+            compiler-error! "unsupported type"
+
+    @@ box-binary-op
+    fn __== (lhsT rhsT lhs rhs)
+        if (lhsT == rhsT)
+            let cols = ('element-count lhsT)
+            let VT = (vector bool cols)
+            let vec =
+                fold (vec = `(nullof VT)) for i in (range cols)
+                    let cmp =
+                        `((extractvalue lhs i) == (extractvalue rhs i))
+                    `(insertelement vec cmp i)
+            return `(all? vec)
+        compiler-error! "unsupported type"
+
+spice _transpose (m)
+    let T = ('typeof m)
+    assert (T < mat-type)
+    let TT = (T.TransposedType as type)
+    fold (self = `(nullof TT)) for i in (range (T.Rows as i32))
+        `(insertvalue self ('row m i) i)
+
+@@ spice-quote
+fn transpose (m)
+    _transpose m
+
+spice mix (a b x)
+    let Ta = ('typeof a)
+    let Tx = ('typeof x)
+    if ((Tx == bool) or ((Tx < vec-type) and (('element@ Tx 0) == bool)))
+        `(? x b a)
+    else
+        let x =
+            if (Tx < vec-type) x
+            else `(Ta x)
+        `(fmix a b x)
 
 #-------------------------------------------------------------------------------
 
-if main-module?
+#if main-module?
     assert
-        60 ==
+        60.0 ==
             dot
                 vec4 1 2 3 4
                 vec4 4 5 6 7

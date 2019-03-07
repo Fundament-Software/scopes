@@ -9,7 +9,7 @@ if os.is("linux") then
 elseif os.is("windows") then
     CLANG_PATH = MINGW_BASE_PATH .. "/bin"
 elseif os.is("macosx") then
-    CLANG_PATH = THISDIR .. "/clang/bin:/usr/local/opt/llvm/bin:/usr/local/bin:/usr/bin"
+    CLANG_PATH = "/clang/bin:" .. os.outputof("brew --prefix llvm|tr -d '\n'") .. "/bin"
 else
     error("unsupported os")
 end
@@ -76,7 +76,8 @@ local LLVM_CONFIG = toolpath("llvm-config", CLANG_PATH)
 
 local LLVM_LDFLAGS = pkg_config(LLVM_CONFIG .. " --ldflags")
 local LLVM_CXXFLAGS = pkg_config(LLVM_CONFIG .. " --cxxflags")
-local LLVM_LIBS = pkg_config(LLVM_CONFIG .. " --link-static --libs engine passes option objcarcopts coverage support lto coroutines")
+local LLVM_LIBS = pkg_config(LLVM_CONFIG .. " --link-static --libs orcjit engine passes option objcarcopts coverage support lto coroutines")
+local LLVM_INCLUDEDIR = pkg_config(LLVM_CONFIG .. " --includedir")
 
 if not os.is("windows") then
     premake.gcc.cxx = CLANG_CXX
@@ -94,9 +95,9 @@ project "scopesrt"
     language "C++"
     files {
         "src/globalsyms.c",
+        "src/value.cpp",
         "src/gc.cpp",
         "src/symbol_enum.cpp",
-        "src/none.cpp",
         "src/string.cpp",
         "src/styled_stream.cpp",
         "src/utils.cpp",
@@ -106,44 +107,38 @@ project "scopesrt"
         "src/anchor.cpp",
         "src/type.cpp",
         "src/builtin.cpp",
-        "src/any.cpp",
         "src/error.cpp",
-        "src/integer.cpp",
-        "src/real.cpp",
         "src/boot.cpp",
-        "src/pointer.cpp",
-        "src/profiler.cpp",
-        "src/sized_storage.cpp",
-        "src/array.cpp",
-        "src/vector.cpp",
-        "src/argument.cpp",
-        "src/tuple.cpp",
-        "src/union.cpp",
-        "src/extern.cpp",
-        "src/return.cpp",
-        "src/function.cpp",
-        "src/typename.cpp",
-        "src/typefactory.cpp",
-        "src/image.cpp",
-        "src/sampledimage.cpp",
+        "src/type/integer_type.cpp",
+        "src/type/real_type.cpp",
+        "src/type/pointer_type.cpp",
+        "src/type/sized_storage_type.cpp",
+        "src/type/array_type.cpp",
+        "src/type/vector_type.cpp",
+        "src/type/tuple_type.cpp",
+        "src/type/union_type.cpp",
+        "src/type/qualify_type.cpp",
+        "src/type/arguments_type.cpp",
+        "src/type/function_type.cpp",
+        "src/type/typename_type.cpp",
+        "src/type/image_type.cpp",
+        "src/type/sampledimage_type.cpp",
+        "src/qualifier/unique_qualifiers.cpp",
+        "src/qualifier/key_qualifier.cpp",
+        "src/qualifier/refer_qualifier.cpp",
         "src/scope.cpp",
         "src/list.cpp",
-        "src/syntax.cpp",
         "src/lexerparser.cpp",
         "src/stream_anchors.cpp",
         "src/stream_expr.cpp",
-        "src/parameter.cpp",
-        "src/body.cpp",
-        "src/label.cpp",
         "src/closure.cpp",
-        "src/frame.cpp",
-        "src/stream_label.cpp",
-        "src/stream_frame.cpp",
+        "src/stream_ast.cpp",
         "src/c_import.cpp",
         "src/execution.cpp",
-        "src/specializer.cpp",
+        "src/prover.cpp",
+        "src/tracker.cpp",
+        "src/quote.cpp",
         "src/platform_abi.cpp",
-        "src/scc.cpp",
         "src/gen_spirv.cpp",
         "src/gen_llvm.cpp",
         "src/expander.cpp",
@@ -157,6 +152,9 @@ project "scopesrt"
         "external/glslang/InReadableOrder.cpp",
         "external/glslang/disassemble.cpp",
         "external/glslang/doc.cpp",
+        --"external/coro/coro.c",
+        "SPIRV-Cross/spirv_cross_parsed_ir.cpp",
+        "SPIRV-Cross/spirv_parser.cpp",
         "SPIRV-Cross/spirv_glsl.cpp",
         "SPIRV-Cross/spirv_cross.cpp",
         "SPIRV-Cross/spirv_cfg.cpp",
@@ -164,7 +162,6 @@ project "scopesrt"
     includedirs {
         "external/linenoise-ng/include",
         "external",
-        "libffi/include",
         "SPIRV-Tools/include",
         "include",
         "."
@@ -197,7 +194,9 @@ project "scopesrt"
             "-pedantic",
             "-Wall",
             "-Wno-keyword-macro",
-            "-Wno-gnu-redeclared-enum"
+            "-Wno-gnu-redeclared-enum",
+            "-Werror=switch",
+            "-fdiagnostics-absolute-paths"
         }
 
         if USE_ASAN_UBSAN then
@@ -235,16 +234,15 @@ project "scopesrt"
             --"-Wl,--export-dynamic",
             --"-rdynamic",
 
-            THISDIR .. "/libffi/.libs/libffi.a",
             THISDIR .. "/SPIRV-Tools/build/source/opt/libSPIRV-Tools-opt.a",
             THISDIR .. "/SPIRV-Tools/build/source/libSPIRV-Tools.a"
         }
         linkoptions(LLVM_LDFLAGS)
         linkoptions {
+            "-lclangCodeGen",
             "-lclangFrontend",
             "-lclangDriver",
             "-lclangSerialization",
-            "-lclangCodeGen",
             "-lclangParse",
             "-lclangSema",
             "-lclangAnalysis",
@@ -298,8 +296,7 @@ project "scopesrt"
         }
 
         includedirs {
-            "src/win32",
-            MINGW_BASE_PATH .. "/lib/libffi-3.2.1/include"
+            "src/win32"
         }
 
         files {
@@ -317,7 +314,7 @@ project "scopesrt"
         }
 
         links {
-            "ffi", "uuid", "ole32", "psapi", "version", "stdc++",
+            "uuid", "ole32", "psapi", "version", "stdc++", "z",
         }
 
         linkoptions {
@@ -329,10 +326,10 @@ project "scopesrt"
         }
         linkoptions(LLVM_LDFLAGS)
         linkoptions {
+            "-lclangCodeGen",
             "-lclangFrontend",
             "-lclangDriver",
             "-lclangSerialization",
-            "-lclangCodeGen",
             "-lclangParse",
             "-lclangSema",
             "-lclangAnalysis",
@@ -347,7 +344,6 @@ project "scopesrt"
             local CP = toolpath("cp", MSYS_BIN_PATH)
 
             postbuildcommands {
-                CP .. " -v " .. dllpath("libffi-6") .. " " .. BINDIR,
                 CP .. " -v " .. dllpath("libgcc_s_seh-1") .. " " .. BINDIR,
                 CP .. " -v " .. dllpath("libstdc++-6") .. " " .. BINDIR,
                 CP .. " -v " .. dllpath("libwinpthread-1") .. " " .. BINDIR,
@@ -362,8 +358,7 @@ project "scopesrt"
         defines { "SCOPES_MACOS" }
 
         includedirs {
-            "clang/include",
-            "/usr/local/opt/llvm/include"
+			LLVM_INCLUDEDIR
         }
 
         buildoptions_cpp {
@@ -395,7 +390,6 @@ project "scopesrt"
         }
 
         linkoptions {
-            THISDIR .. "/libffi/lib/libffi.a",
             THISDIR .. "/SPIRV-Tools/build/source/opt/libSPIRV-Tools-opt.a",
             THISDIR .. "/SPIRV-Tools/build/source/libSPIRV-Tools.a"
         }
@@ -462,7 +456,8 @@ project "scopes"
             "-pedantic",
             "-Wall",
             "-Wno-keyword-macro",
-            "-Wno-gnu-redeclared-enum"
+            "-Wno-gnu-redeclared-enum",
+            "-fdiagnostics-absolute-paths"
         }
 
         defines {
@@ -550,6 +545,7 @@ project "scopes"
         defines { "SCOPES_MACOS" }
 
         includedirs {
+            LLVM_INCLUDEDIR
         }
 
         buildoptions_cpp {

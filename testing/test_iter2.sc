@@ -14,4 +14,39 @@ fn main ()
 
 main;
 
+#do
+    inline fold (init gen f)
+        let iter start = ((gen as Generator))
+        loop (result next = init start)
+            inline _break ()
+                break result
+            let next args... = (iter _break next)
+            repeat
+                f _break result args...
+                next
 
+    let k =
+        fold
+            0
+            range 1 10
+            inline (break a b)
+                print a b
+                a + b
+
+let q =
+    fold (x = 1) for c in (range 1 10)
+        if (c == 5)
+            # we can also break and repeat with a new value for x
+            # but continue is useful when you just want to skip to the next
+            # generator item without updating x
+            continue;
+        x * c
+
+assert (q == 72576)
+
+let x y =
+    fold (x y = 0 0) for c in (range 10)
+        _ (x + c) (y - c)
+
+assert (x == 45)
+assert (y == -45)

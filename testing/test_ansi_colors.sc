@@ -1,6 +1,6 @@
 
 
-quote
+sugar-quote
     fn test ()
         # comment
         123 true false

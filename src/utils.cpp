@@ -6,7 +6,8 @@
 
 #include "utils.hpp"
 
-#include "scopes.h"
+#include "symbol.hpp"
+#include "scopes/scopes.h"
 
 #include <assert.h>
 #include <stdio.h>

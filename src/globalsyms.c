@@ -4,7 +4,7 @@
     See LICENSE.md for details.
 */
 
-#include "scopes.h"
+#include "scopes/scopes.h"
 
 const char *scopes_compiler_path;
 const char *scopes_compiler_dir;

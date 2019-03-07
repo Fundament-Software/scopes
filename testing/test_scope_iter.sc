@@ -1,17 +1,17 @@
 
-syntax-extend
-    let t k = syntax-scope unnamed
-    let loop (last-key) = k
+let t = (__this-scope)
+loop (last-key = unnamed)
     let key value =
-        Scope-next t last-key
-    if (key != unnamed)
-        print key (repr value)
-        loop key
-    syntax-scope
+        sc_scope_next t last-key
+    if (key == unnamed)
+        break;
+    print key (repr value)
+    key
 
-let loop (scope) = (globals)
-if (scope != null)
+loop (scope = (globals))
+    if (scope == null)
+        break;
     for k v in scope
         #print k "=" v
         assert ((typeof k) == Symbol)
-    loop (Scope-parent scope)
+    sc_scope_get_parent scope

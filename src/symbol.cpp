@@ -6,12 +6,19 @@
 
 #include "symbol.hpp"
 #include "hash.hpp"
+#include "styled_stream.hpp"
 
 #include <memory.h>
 #include <string.h>
 #include <assert.h>
 
+#include <unordered_map>
+
 namespace scopes {
+
+static std::unordered_map<Symbol, const String *, Symbol::Hash> map_symbol_name;
+static std::unordered_map<const String *, Symbol> map_name_symbol;
+static uint64_t next_symbol_id = SYM_Count;
 
 //------------------------------------------------------------------------------
 // SYMBOL TYPE
@@ -23,30 +30,21 @@ std::size_t Symbol::Hash::operator()(const scopes::Symbol & s) const {
 
 //------------------------------------------------------------------------------
 
-std::size_t Symbol::StringKey::Hash::operator()(const StringKey &s) const {
-    return hash_bytes(s.str->data, s.str->count);
-}
-
-bool Symbol::StringKey::operator ==(const StringKey &rhs) const {
-    if (str->count == rhs.str->count) {
-        return !memcmp(str->data, rhs.str->data, str->count);
-    }
-    return false;
-}
-
-//------------------------------------------------------------------------------
-
 void Symbol::verify_unmapped(Symbol id, const String *name) {
     auto it = map_name_symbol.find({ name });
     if (it != map_name_symbol.end()) {
-        printf("known symbols %s and %s mapped to same string.\n",
-            get_known_symbol_name(id.known_value()),
-            get_known_symbol_name(it->second.known_value()));
+        StyledStream ss(SCOPES_CERR);
+        ss << "known symbols "
+            << get_known_symbol_name(id.known_value()) << " and "
+            << get_known_symbol_name(it->second.known_value())
+            << " mapped to same string ("
+            << name
+            << ")" << std::endl;
     }
 }
 
 void Symbol::map_symbol(Symbol id, const String *name) {
-    map_name_symbol[{ name }] = id;
+    map_name_symbol[name] = id;
     map_symbol_name[id] = name;
 }
 
@@ -56,13 +54,12 @@ void Symbol::map_known_symbol(Symbol id, const String *name) {
 }
 
 Symbol Symbol::get_symbol(const String *name) {
-    auto it = map_name_symbol.find({ name });
+    auto it = map_name_symbol.find(name);
     if (it != map_name_symbol.end()) {
         return it->second;
     }
     Symbol id = Symbol::wrap(++next_symbol_id);
-    // make copy
-    map_symbol(id, String::from(name->data, name->count));
+    map_symbol(id, name);
     return id;
 }
 
@@ -122,7 +119,7 @@ bool Symbol::operator !=(EnumT b) const {
 }
 
 std::size_t Symbol::hash() const {
-    return _value;
+    return hash_bytes((const char *)&_value, sizeof(_value));
 }
 
 uint64_t Symbol::value() const {
@@ -180,10 +177,6 @@ StyledStream& Symbol::stream(StyledStream& ost) const {
     ost << Style_None;
     return ost;
 }
-
-std::unordered_map<Symbol, const String *, Symbol::Hash> Symbol::map_symbol_name;
-std::unordered_map<Symbol::StringKey, Symbol, Symbol::StringKey::Hash> Symbol::map_name_symbol;
-uint64_t Symbol::next_symbol_id = SYM_Count;
 
 //------------------------------------------------------------------------------
 

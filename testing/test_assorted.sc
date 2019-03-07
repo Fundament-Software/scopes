@@ -1,36 +1,28 @@
+assert ((min integer i8) == i8)
+assert ((max 3 4 5) == 5)
+
+# make sure we can load symbols from the global C namespace
+let C =
+    extern 'sc_write
+        function void string
+
+run-stage;
+
+dump C
+C "hello from C!\n"
+
+unlet C
+run-stage;
 
 assert
     ==
         require-from module-dir '.module2
         require-from module-dir '.module2
 
-assert ((min integer i8) == i8)
-assert ((max 3 4 5) == 5)
-
-# since -rdynamic is disabled on linux, we can't do this anymore, for now
-#do
-    # make sure we can load symbols from the global C namespace
-    let C =
-        extern 'scopes_test_add
-            function i32 i32 i32
-    assert ((C 1 2) == 3)
-
 do
-    syntax-extend
-        syntax-extend
-            let sc = (Scope syntax-scope)
-            set-scope-symbol! sc 'injected-var 3
-            let m =
-                eval
-                    list-load
-                        .. compiler-dir "/testing/module.sc"
-                    \ sc
-            set-scope-symbol! sc 'm m
-            sc
-        set-scope-symbol! syntax-scope 't (m)
-        syntax-scope
+    using import .module2
     assert
-        7 == (t.compute 4)
+        7 == (compute 4 3)
 
 let a = 1
 let a = (a + 1)

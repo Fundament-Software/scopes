@@ -62,6 +62,8 @@ let lib =
             }
         '()
 
+run-stage;
+
 fn testf1 ()
     lib.testfunc_ivec2_ivec2
         lib.IVec2 1 2
@@ -86,11 +88,10 @@ fn testf4 ()
         lib.Vec3 4.0 5.0 6.0
 
 compile
-    typify testf1
+    `[(typify testf1)]
     'dump-module
 
 assert (1 == (testf4))
 assert (1 == (testf3))
 assert (1 == (testf2))
 assert (1 == (testf1))
-

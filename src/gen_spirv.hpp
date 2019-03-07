@@ -8,17 +8,17 @@
 #define SCOPES_GEN_SPIRV_HPP
 
 #include "symbol.hpp"
+#include "result.hpp"
 
 #include <vector>
 
 namespace scopes {
 
-struct Label;
-struct String;
+struct Function;
 
-void optimize_spirv(std::vector<unsigned int> &result, int opt_level);
-const String *compile_spirv(Symbol target, Label *fn, uint64_t flags);
-const String *compile_glsl(Symbol target, Label *fn, uint64_t flags);
+SCOPES_RESULT(void) optimize_spirv(std::vector<unsigned int> &result, int opt_level);
+SCOPES_RESULT(const String *) compile_spirv(Symbol target, Function *fn, uint64_t flags);
+SCOPES_RESULT(const String *) compile_glsl(Symbol target, Function *fn, uint64_t flags);
 
 } // namespace scopes
 
