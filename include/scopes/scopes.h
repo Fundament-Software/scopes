@@ -317,6 +317,7 @@ size_t sc_string_count(const sc_string_t *str);
 sc_rawstring_size_t_tuple_t sc_string_buffer(const sc_string_t *str);
 const sc_string_t *sc_string_lslice(const sc_string_t *str, size_t offset);
 const sc_string_t *sc_string_rslice(const sc_string_t *str, size_t offset);
+int sc_string_compare(const sc_string_t *a, const sc_string_t *b);
 
 // lists
 

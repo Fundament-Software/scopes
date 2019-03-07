@@ -733,17 +733,17 @@ inline define-symbols (self values...)
                 if ('function? ('element@ cls 0))
                     return true
             return false
-    set-pointer-element-type =
+    change-element-type =
         fn (cls ET)
             sc_pointer_type_set_element_type cls ET
-    set-pointer-storage-class =
+    change-storage-class =
         fn (cls storage-class)
             sc_pointer_type_set_storage_class cls storage-class
-    set-pointer-immutable =
+    immutable =
         fn (cls)
             sc_pointer_type_set_flags cls
                 bor (sc_pointer_type_get_flags cls) pointer-flag-non-writable
-    set-pointer-mutable =
+    mutable =
         fn (cls)
             sc_pointer_type_set_flags cls
                 band (sc_pointer_type_get_flags cls)
@@ -754,10 +754,10 @@ inline define-symbols (self values...)
     pointer-storage-class =
         fn (cls)
             sc_pointer_type_get_storage_class cls
-    pointer-readable? =
+    readable? =
         fn (cls)
             icmp== (band (sc_pointer_type_get_flags cls) pointer-flag-non-readable) 0:u64
-    pointer-writable? =
+    writable? =
         fn (cls)
             icmp== (band (sc_pointer_type_get_flags cls) pointer-flag-non-writable) 0:u64
     pointer->refer-type =
@@ -1225,6 +1225,10 @@ fn string@ (self i)
     __== = (box-binary-op (single-binary-op-dispatch ptrcmp==))
     __!= = (box-binary-op (single-binary-op-dispatch ptrcmp!=))
     __.. = (box-binary-op (single-binary-op-dispatch sc_string_join))
+    __< = (box-binary-op (single-binary-op-dispatch (inline (a b) (icmp<s (sc_string_compare a b) 0))))
+    __<= = (box-binary-op (single-binary-op-dispatch (inline (a b) (icmp<=s (sc_string_compare a b) 0))))
+    __> = (box-binary-op (single-binary-op-dispatch (inline (a b) (icmp>s (sc_string_compare a b) 0))))
+    __>= = (box-binary-op (single-binary-op-dispatch (inline (a b) (icmp>=s (sc_string_compare a b) 0))))
 
 'define-symbols list
     __typecall =
@@ -1701,14 +1705,14 @@ fn pointer-type-imply? (src dest)
         # a ref to another pointer
         if (type== dest voidstar)
             return true
-        elseif (type== dest ('set-pointer-mutable voidstar))
-            if ('pointer-writable? src)
+        elseif (type== dest ('mutable voidstar))
+            if ('writable? src)
                 return true
     if (type== dest ('strip-pointer-storage-class src))
         return true
-    elseif (type== dest ('set-pointer-immutable src))
+    elseif (type== dest ('immutable src))
         return true
-    elseif (type== dest ('strip-pointer-storage-class ('set-pointer-immutable src)))
+    elseif (type== dest ('strip-pointer-storage-class ('immutable src)))
         return true
     return false
 
@@ -4515,6 +4519,15 @@ spice __init-copy (target source)
                     __init target
                     target = source
     `(constructor target source)
+
+spice __delete (target)
+    let T = ('typeof target)
+    let destructor =
+        try
+            getattr T '__delete
+        except (err)
+            return `[]
+    `(destructor target)
 
 inline gen-allocator-sugar (name f)
     sugar "" (values...)

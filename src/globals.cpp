@@ -822,6 +822,15 @@ size_t sc_string_count(const sc_string_t *str) {
     return str->count;
 }
 
+int sc_string_compare(const sc_string_t *a, const sc_string_t *b) {
+    using namespace scopes;
+    auto c = memcmp(a->data, b->data, std::min(a->count, b->count));
+    if (c) return c;
+    if (a->count < b->count) return -1;
+    else if (a->count > b->count) return 1;
+    return 0;
+}
+
 sc_rawstring_size_t_tuple_t sc_string_buffer(const sc_string_t *str) {
     using namespace scopes;
     return {str->data, str->count};
@@ -2048,6 +2057,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_string_join, TYPE_String, TYPE_String, TYPE_String);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_string_match, TYPE_Bool, TYPE_String, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_string_count, TYPE_USize, TYPE_String);
+    DEFINE_EXTERN_C_FUNCTION(sc_string_compare, TYPE_I32, TYPE_String, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_string_buffer, arguments_type({rawstring, TYPE_USize}), TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_string_lslice, TYPE_String, TYPE_String, TYPE_USize);
     DEFINE_EXTERN_C_FUNCTION(sc_string_rslice, TYPE_String, TYPE_String, TYPE_USize);

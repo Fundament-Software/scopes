@@ -9,11 +9,9 @@
     Exports a configurable type for a mutable array that stores its elements
     on the heap rather than in registers or the stack.
 
-typedef Array < CStruct
-typedef FixedArray < Array
-typedef GrowingArray < Array
-
-run-stage;
+typedef Array
+typedef FixedArray
+typedef GrowingArray
 
 fn swap (a b)
     local t = b
@@ -29,15 +27,14 @@ fn iLeftChild (i)
 fn iRightChild (i)
     2:i64 * i + 2:i64
 
-do
-    let this-type = Array
+typedef Array < CStruct
 
     @@ box-cast
-    method '__as (cls T self)
+    fn __as (cls T self)
         if (T == Generator)
-            ast-quote
+            spice-quote
                 Generator
-                    label (fdone i)
+                    inline (fdone i)
                         if (i >= self._count)
                             fdone;
                         else
@@ -46,41 +43,38 @@ do
         else
             compiler-error! "unsupported type"
 
-    method inline '__countof (self)
+    inline __countof (self)
         deref self._count
 
-    method inline '__@ (self index)
+    fn __@ (self index)
         let index = (index as usize)
         assert (index < self._count) "index out of bounds"
-        getelementptr self._items index
+        self._items @ index
 
-    #typefn& T 'sort (self key)
+    inline gen-sort (key)
         let key =
-            if (none? key)
-                fn (x) x
+            static-if (none? key)
+                inline (x) x
             else key
-        assert (constant? key)
 
-        let count = ((deref self._count) as i64)
-        let items = (deref self._items)
-
-        inline siftDown (start end)
-            loop (root) = start
-            if ((iLeftChild root) <= end)
+        fn siftDown (items start end)
+            loop (root = start)
+                if ((iLeftChild root) > end)
+                    break;
                 let child = (iLeftChild root)
-                let v_root = ((getelementptr items root) as ref)
+                let v_root = (items @ root)
                 let k_root = (key v_root)
-                let v_child = ((getelementptr items child) as ref)
+                let v_child = (items @ child)
                 let k_child = (key v_child)
-                label step2 (iswap v_swap k_swap)
+                inline step2 (iswap v_swap k_swap)
                     if (iswap == root)
-                        return;
+                        break;
                     swap v_root v_swap
                     repeat iswap
-                label step1 (iswap v_swap k_swap)
+                inline step1 (iswap v_swap k_swap)
                     let child1 = (child + 1:i64)
                     if (child1 <= end)
-                        let v_child1 = ((getelementptr items child1) as ref)
+                        let v_child1 = (items @ child1)
                         let k_child1 = (key v_child1)
                         if (k_swap < k_child1)
                             step2 child1 v_child1 k_child1
@@ -90,72 +84,78 @@ do
                 else
                     step1 root v_root k_root
 
-        let count-1 = (count - 1:i64)
+        fn "sort-array" (items count)
+            let count-1 = (count - 1:i64)
 
-        inline heapify ()
-            loop (start) =
-                iParent count-1
-            if (start >= 0:i64)
-                siftDown start count-1
+            # heapify
+            loop (start = (iParent count-1))
+                if (start < 0:i64)
+                    break;
+                siftDown items start count-1
                 repeat (start - 1:i64)
 
-        heapify;
-        loop (end) = count-1
-        if (end > 0:i64)
-            let v_0 = ((getelementptr items 0) as ref)
-            let v_end = ((getelementptr items end) as ref)
-            swap v_0 v_end
-            let end = (end - 1:i64)
-            siftDown 0:i64 end
-            repeat end
+            loop (end = count-1)
+                if (end <= 0:i64)
+                    break;
+                let v_0 = (items @ 0)
+                let v_end = (items @ end)
+                swap v_0 v_end
+                let end = (end - 1:i64)
+                siftDown items 0:i64 end
+                repeat end
 
-    inline append-slots (self n)
+    inline sort (self key)
+        (gen-sort key) (deref self._items) ((deref self._count) as i64)
+
+    fn append-slots (self n)
         let idx = (deref self._count)
         let new-count = (idx + n)
         'reserve self new-count
         self._count = new-count
-        getelementptr self._items idx
+        self._items @ idx
 
-    #typefn& T 'emplace-append (self args...)
+    inline emplace-append (self args...)
         let dest = (append-slots self 1:usize)
-        construct dest args...
+        __init dest args...
         dest
 
-    #typefn& T 'append (self value)
+    fn append (self value)
         let dest = (append-slots self 1:usize)
-        copy-construct dest value
+        __init-copy dest value
         dest
 
-    #method 'clear (self)
-        destruct-array (deref self._count) ((deref self._items) as ref)
+    fn clear (self)
+        for idx in (range (deref self._count))
+            __delete (self._items @ idx)
         self._count = 0:usize
         return;
 
-    return;
+    fn __delete (self)
+        clear self
+        free self._items
 
 
-do
-    let this-type = FixedArray
-
-    method '__typecall (element-type capacity memory)
+typedef FixedArray < Array
+    fn __typecall (cls element-type capacity)
         let arrayT =
-            pointer element-type 'mutable
+            'mutable (pointer element-type)
 
         struct
-            .. "<Array "
-                string-repr element-type
+            .. "<FixedArray "
+                'string element-type
                 " x "
-                string-repr (i32 capacity)
+                tostring (i32 capacity)
                 ">"
+            \ < FixedArray
+
             _items : arrayT
             _count : usize
 
-            set-type-symbol! this-struct 'ElementType element-type
-            set-type-symbol! this-struct 'Capacity capacity
-            set-typename-super! this-struct FixedArray
-            set-type-symbol! this-struct 'Memory memory
+            let
+                ElementType = element-type
+                Capacity = capacity
 
-    method& '__repr (self)
+    fn __repr (self)
         ..
             "[count="
             repr self._count
@@ -163,140 +163,97 @@ do
             repr self._items
             "]"
 
-    method& 'capacity (self) capacity
+    inline capacity (self)
+        (typeof self) . Capacity
 
-    method& '__new (self)
-        self._items = ('allocate-array memory element-type capacity)
+    fn __init (self)
+        let T = (typeof self)
+        self._items = (malloc-array T.ElementType T.Capacity)
         self._count = 0:usize
 
-    method& '__copy (self other)
-        let count = (countof other)
-        assert (count <= capacity)
-            .. "cannot construct value of type " (repr (typeof& self))
-                \ " from value of type " (repr (typeof& other))
-                " because of insufficient capacity ("
-                \ (repr count) " > " (repr capacity) ")"
-        self._items = ('allocate-array memory element-type capacity)
-        self._count = count
-        copy-construct-array count
-            (deref self._items) as ref
-            (deref other._items) as ref
-        return;
+    #@@ box-binary-op
+    #fn __= (selfT otherT self other)
+        if false
+            return `[]
+        compiler-error! "unsupported type"
 
-    method& '__move (self other)
-        assert ((typeof& self) == (typeof& other))
+    #fn __init-copy (self other)
+        assert ((typeof self) == (typeof other))
         self._items = other._items
         self._count = other._count
 
-    method& '__delete (self)
-        destructor self self._items
-        'free memory (deref self._items)
+    fn reserve (self count)
+        let T = (typeof self)
+        assert (count <= T.Capacity) "capacity exceeded"
 
 
-do
-    let this-type = GrowingArray
+let DEFAULT_CAPACITY = (1:usize << 2:usize)
 
+typedef GrowingArray < Array
 
-method 'reserve (self count)
-    let T = (typeof self)
-    assert (count <= T.Capacity) "capacity exceeded"
+    fn __typecall (cls element-type)
+        let arrayT = ('mutable (pointer element-type))
 
-fn destructor (self items)
-    let T = (@ (typeof self))
-    let element-type = T.ElementType
-    let element-destructor ok = (type@& element-type '__delete)
-    if (not ok)
-        return;
-    let count =
-        deref self._count
-    let loop (i) = (unconst 0:usize)
-    if (i < count)
-        let ptr = (items @ i)
-        element-destructor ptr
-        loop (i + 1:usize)
+        struct
+            .. "<GrowingArray "
+                'string element-type
+                ">"
+            \ < GrowingArray
+            _items : arrayT
+            _count : usize
+            _capacity : usize
 
-#define-common-array-methods GrowingArray
-#typefn& GrowingArray 'reserve (self count)
-    if (count < self._capacity)
-        return;
-    let loop (new-capacity) = (deref self._capacity)
-    if (new-capacity < count)
-        loop (new-capacity * 27:usize // 10:usize)
-    let T = (@ (typeof self))
-    let memory = T.Memory
-    let element-type = T.ElementType
-    # multiply capacity by 2.7 (roughly e)
-    let count = (deref self._count)
-    let old-items = ((deref self._items) as ref)
-    let new-items =
-        ('allocate-array memory element-type new-capacity) as ref
-    move-construct-array count new-items old-items
-    self._items = new-items
-    self._capacity = new-capacity
-    'free memory old-items
-    return;
+            let
+                ElementType = element-type
 
-#let DEFAULT_CAPACITY = (1:usize << 2:usize)
-#fn VariableMutableArray (element-type memory)
-    let arrayT =
-        pointer element-type 'mutable
+    fn nearest-capacity (capacity count)
+        loop (new-capacity = capacity)
+            if (new-capacity < count)
+                repeat (new-capacity * 27:usize // 10:usize)
+            break new-capacity
 
-    struct
-        .. "<Array "
-            string-repr element-type
-            ">"
-        _items : arrayT
-        _count : usize
-        _capacity : usize
+    @@ spice-quote
+    fn __init (self opts...)
+        let T = (typeof self)
+        let capacity =
+            nearest-capacity DEFAULT_CAPACITY
+                (va-option capacity opts... DEFAULT_CAPACITY) as usize
+        self._items = (malloc-array T.ElementType capacity)
+        self._count = 0:usize
+        self._capacity = capacity
 
-        set-type-symbol! this-struct 'ElementType element-type
-        set-typename-super! this-struct GrowingArray
-        set-type-symbol! this-struct 'Memory memory
+    fn __repr (self)
+        ..
+            "[count="
+            repr self._count
+            " capacity="
+            repr self._capacity
+            " items="
+            repr self._items
+            "]"
 
-        method& '__repr (self)
-            ..
-                "[count="
-                repr self._count
-                " capacity="
-                repr self._capacity
-                " items="
-                repr self._items
-                "]"
+    inline capacity (self)
+        deref self._capacity
 
-        method& 'capacity (self)
-            deref self._capacity
-
-        method& '__new (self opts...)
-            let capacity = (va@ 'capacity opts...)
-            let capacity =
-                if (none? capacity) DEFAULT_CAPACITY
-                else capacity
-            self._items = ('allocate-array memory element-type capacity)
-            self._count = 0:usize
-            self._capacity = capacity
-
-        method& '__copy (self other)
-            let capacity = ('capacity other)
-            let count = (countof other)
-            self._items = ('allocate-array memory element-type capacity)
-            self._count = count
-            self._capacity = capacity
-            copy-construct-array count
-                (deref self._items) as ref
-                (deref other._items) as ref
+    fn reserve (self count)
+        if (count <= self._capacity)
             return;
+        # multiply capacity by 2.7 (roughly e) until we can carry the desired
+            count
+        let new-capacity =
+            nearest-capacity (deref self._capacity) count
+        let T = (typeof self)
+        let count = (deref self._count)
+        let old-items = (deref self._items)
+        let new-items = (malloc-array T.ElementType new-capacity)
+        for i in (range count)
+            new-items @ i = old-items @ i
+        free old-items
+        self._items = new-items
+        self._capacity = new-capacity
+        return;
 
-        method& '__move (self other)
-            assert ((typeof& self) == (typeof& other))
-            self._items = other._items
-            self._count = other._count
-            self._capacity = other._capacity
-
-        method& '__delete (self)
-            destructor self self._items
-            'free memory (deref self._items)
-
-typefn Array '__typecall (cls element-type capacity opts...)
+#typefn Array '__typecall (cls element-type capacity opts...)
     """"Construct a mutable array type of ``element-type`` with a variable or
         fixed maximum capacity.
 
