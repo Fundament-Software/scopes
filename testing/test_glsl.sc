@@ -2,66 +2,57 @@
 using import glm
 using import glsl
 
+let screen-tri-vertices =
+    arrayof vec2
+        vec2 -1 -1; vec2  3 -1; vec2 -1  3
+
+run-stage;
+
+inout uv : vec2
+    location = 0
+
 fn set-vertex-position ()
-    local screen-tri-vertices =
-        arrayof vec2
-            vec2 -1 -1
-            vec2  3 -1
-            vec2 -1  3
+    local screen-tri-vertices = screen-tri-vertices
     let pos = (screen-tri-vertices @ gl_VertexID)
     gl_Position = (vec4 pos.x pos.y 0 1)
     deref pos
 
-inout uv : vec2
-    location = 0
+fn vertex-shader ()
+    let half = (vec2 0.5 0.5)
+    let pos = (set-vertex-position)
+    uv.out =
+        (pos * half) + half
+    return;
+
+print
+    compile-glsl 'vertex
+        typify vertex-shader
+        #'O3
+        #'dump-module
+        #'no-opts
+
 uniform phase : f32
     location = 1
 uniform smp : sampler2D
     location = 2
 
-let vertex-code =
-    do
-        fn vertex-shader ()
-            let half = (vec2 0.5 0.5)
-            let pos = (set-vertex-position)
-            uv.out =
-                (pos * half) + half
-            return;
+out out_Color : vec4
 
-        let code =
-            compile-glsl 'vertex
-                typify vertex-shader
-                #'O3
-                #'dump-module
-                #'no-opts
-        print code
-        code
+fn make-phase ()
+    (sin phase) * 0.5 + 0.5
 
-let fragment-code =
-    do
-        out out_Color : vec4
+fn fragment-shader ()
+    let uv = uv.in
+    let size = (textureSize smp 0)
+    let color = (vec4 uv (make-phase) size.x)
+    out_Color = (color * (texture smp uv))
+    return;
 
-        fn make-phase ()
-            (sin (phase as immutable)) * 0.5 + 0.5
+#'dump
+    typify fragment-shader
 
-        fn fragment-shader ()
-            let uv = (uv as vec2)
-            #let uv = uv.in
-            let size = (textureSize smp 0)
-            assert ((typeof size) == ivec2)
-            let color = (vec4 uv.xy (make-phase) 1)
-            out_Color =
-                color *
-                    texture smp uv
-            return;
-
-        'dump
-            typify fragment-shader
-
-        let code =
-            compile-glsl 'fragment
-                typify fragment-shader
-                'dump-disassembly
-                #'no-opts
-        print code
-        code
+print
+    compile-glsl 'fragment
+        typify fragment-shader
+        #'dump-disassembly
+        #'no-opts

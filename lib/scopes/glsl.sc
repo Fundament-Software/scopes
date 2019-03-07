@@ -101,7 +101,7 @@ fn make-gsampler (postfix dim arrayed ms coords)
                         sample sampler P
                             Bias = bias
                 default
-                    compiler-error! "no overload available"
+                    compiler-error! "invalid arguments"
 
         let texture-size =
             if fetch-has-lod-arg
@@ -118,72 +118,95 @@ fn make-gsampler (postfix dim arrayed ms coords)
                     vector->vec-type
                         Image-query-size (imply sampler T)
 
-    #
+        let texture-offset =
+            spice-capture [T fcoordT icoordT] (args...)
+                spice-match args...
+                case (sampler : T, P : fcoordT, offset : icoordT)
+                    spice-quote
+                        sample sampler P
+                            Offset = offset
+                case (sampler : T, P : fcoordT, offset : icoordT, bias : f32)
+                    spice-quote
+                        sample sampler P
+                            Offset = offset
+                            Bias = bias
+                default
+                    compiler-error! "invalid arguments"
 
-        fn... texture-offset
-        case (sampler : T, P : fcoordT, offset : icoordT)
-            sample sampler P
-                Offset = offset
-        case (sampler : T, P : fcoordT, offset : icoordT, bias : f32)
-            sample sampler P
-                Offset = offset
-                Bias = bias
+        let texture-proj =
+            spice-capture [T fcoordProjT] (args...)
+                spice-match args...
+                case (sampler : T, P : fcoordProjT)
+                    spice-quote
+                        sample sampler P
+                            Proj = true
+                case (sampler : T, P : fcoordProjT, bias : f32)
+                    spice-quote
+                        sample sampler P
+                            Proj = true
+                            Bias = bias
+                default
+                    compiler-error! "invalid arguments"
 
-        fn... texture-proj
-        case (sampler : T, P : fcoordProjT)
-            sample sampler P
-                Proj = true
-        case (sampler : T, P : fcoordProjT, bias : f32)
-            sample sampler P
-                Proj = true
-                Bias = bias
+        let texture-gather =
+            spice-capture [T fcoordT] (args...)
+                spice-match args...
+                case (sampler : T, P : fcoordT)
+                    spice-quote
+                        sample sampler P
+                            Gather = 0
+                case (sampler : T, P : fcoordT, comp : i32)
+                    spice-quote
+                        sample sampler P
+                            Gather = comp
+                default
+                    compiler-error! "invalid arguments"
 
-        fn... texture-gather
-        case (sampler : T, P : fcoordT)
-            sample sampler P
-                Gather = 0
-        case (sampler : T, P : fcoordT, comp : i32)
-            sample sampler P
-                Gather = comp
+        #case (sampler : T, P : fcoordT, lod : f32)
+        @@ spice-quote
+        inline texture-lod (sampler P lod)
+            sample (imply sampler T) (imply P fcoordT)
+                Lod = (imply lod i32)
 
-        fn... texture-lod
-        case (sampler : T, P : fcoordT, lod : f32)
-            sample sampler P
-                Lod = lod
-
-        fn... texture-query-lod
-        case (sampler : T, P : fcoordT)
+        #case (sampler : T, P : fcoordT)
+        @@ spice-quote
+        inline texture-query-lod (sampler P)
             vector->vec-type
-                Image-query-lod sampler P
+                Image-query-lod (imply sampler T) (imply P fcoordT)
 
         let texture-levels = Image-query-levels
         let texture-samples = Image-query-samples
 
         let fetch =
             if fetch-has-lod-arg
-                fn... fetch
-                case (sampler : T, P : icoordT, lod : i32)
-                    sample sampler P
+                #case (sampler : T, P : icoordT, lod : i32)
+                @@ spice-quote
+                inline fetch (sampler P lod)
+                    sample (imply sampler T) (imply P T)
                         Fetch = true
-                        Lod = lod
+                        Lod = (imply lod i32)
             elseif (ms == 1)
-                fn... fetch
-                case (sampler : T, P : icoordT, sampleid : i32)
-                    sample sampler P
+                #case (sampler : T, P : icoordT, sampleid : i32)
+                @@ spice-quote
+                inline fetch (sampler P sampleid)
+                    sample (imply sampler T) (imply P icoordT)
                         Fetch = true
-                        Sample = sampleid
+                        Sample = (imply sampleid i32)
             else
-                fn... fetch
-                case (sampler : T, P : icoordT)
-                    sample sampler P
+                #case (sampler : T, P : icoordT)
+                @@ spice-quote
+                inline fetch (sampler P)
+                    sample (imply sampler P) (imply P icoordT)
                         Fetch = true
 
-        fn... fetch-offset
-        case (sampler : T, P : icoordT, lod : i32, offset : icoordT)
-            sample sampler P
+        #case (sampler : T, P : icoordT, lod : i32, offset : icoordT)
+        @@ spice-quote
+        inline fetch-offset (sampler P lod offset)
+            sample (imply sampler T) (imply P icoordT)
                 Fetch = true
-                Lod = lod
-                Offset = offset
+                Lod = (imply lod i32)
+                Offset = (imply offset icoordT)
+
 
 fn make-sampler (prefix return-type postfix dim arrayed ms coords)
     let super =
