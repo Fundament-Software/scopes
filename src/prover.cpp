@@ -1488,7 +1488,8 @@ repeat:
                 if (isa<Pure>(_SrcT)) {
                     return PureCast::from(call->anchor(), DestT, cast<Pure>(_SrcT));
                 } else {
-                    return NODEPS1(ARGTYPE1(DestT));
+                    return DEPS1(ARGTYPE1(DestT), _SrcT);
+                    //return NODEPS1(ARGTYPE1(DestT));
                 }
             }
         } break;

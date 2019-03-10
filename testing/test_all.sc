@@ -8,6 +8,7 @@ test-modules
     .test_ast_quote
     .test_branch
     .test_assorted
+    .test_borrowing
     .test_callback
     .test_capture
     .test_clang

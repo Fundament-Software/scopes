@@ -180,7 +180,7 @@ SCOPES_RESULT(void) error_argument_type_mismatch(const Type *expected, const Typ
 SCOPES_RESULT(void) error_value_moved(TypedValue *value, Value *mover, const char *by) {
     SCOPES_RESULT_TYPE(void);
     StyledString ss;
-    ss.out << by << " cannot move value of type " << value->get_type() << " out of function because it is still in use";
+    ss.out << by << " cannot move value of type " << value->get_type() << " out of function because it will be moved";
     SCOPES_LOCATION_DEF_ERROR(mover, ss.str());
 }
 

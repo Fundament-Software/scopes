@@ -719,6 +719,13 @@ inline define-symbols (self values...)
     key-type =
         inline (self key)
             sc_key_type key self
+    view-type =
+        inline (self id)
+            constbranch (none? id)
+                inline ()
+                    sc_view_type self -1
+                inline ()
+                    sc_view_type self id
     refer? = sc_type_is_refer
     variadic? = sc_function_type_is_variadic
     pointer? =

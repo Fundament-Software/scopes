@@ -430,6 +430,7 @@ struct Tracker {
     SCOPES_RESULT(void) track_Call(State &state, Call *node) {
         SCOPES_RESULT_TYPE(void);
         SCOPES_ANCHOR(node->anchor());
+        SCOPES_CHECK_RESULT(verify_deps(state, node, node->deps, node->get_type(), "call"));
         // special care needs to be taken with nonreturning functions, which
         // must move all their arguments.
         auto callee = node->callee;
@@ -496,7 +497,36 @@ struct Tracker {
                 return {};
             } break;
             default: {
-                SCOPES_CHECK_RESULT(visit_values(state, VM_FORCE_COPY_OR_DROP, node->args, "call"));
+                ValueIndexSet viewed;
+                //viewed.clear();
+
+                // collect arguments that are being viewed
+                auto T = node->get_type();
+                int count = get_argument_count(T);
+                auto &&kinds = node->deps.kinds;
+                for (int i = 0; i < count; ++i) {
+                    //auto ET = get_argument(T, i);
+                    //if (is_plain(ET))
+                    //    continue;
+                    assert(i < kinds.size());
+                    if (kinds[i] == DK_Viewed) {
+                        for (auto &&arg : node->deps.args[i]) {
+                            viewed.insert(arg);
+                        }
+                    }
+                }
+
+                // visit arguments and only copy/drop those that disappear here
+                int i = node->args.size();
+                while (i-- > 0) {
+                    auto mode = VM_FORCE_COPY_OR_DROP;
+                    auto vi = ValueIndex(node->args[i]);
+                    if (viewed.count(vi)) {
+                        mode = VM_FORCE_VIEW;
+                    }
+                    SCOPES_CHECK_RESULT(visit_argument(state, mode,
+                        vi, "call", -1));
+                }
             } break;
             }
         } else {
@@ -559,7 +589,8 @@ struct Tracker {
     }
     SCOPES_RESULT(void) track_Label(State &state, Label *node) {
         SCOPES_RESULT_TYPE(void);
-
+        SCOPES_CHECK_RESULT(verify_deps(state, node, node->deps, node->get_type(),
+            get_label_kind_name(node->label_kind)));
         bool do_drop = false;
         #if 0
         if (is_returning(node->get_type())) {
@@ -662,7 +693,7 @@ struct Tracker {
         SCOPES_CHECK_RESULT(verify_deps(root_state, function, deps,
             return_type, "return"));
         SCOPES_CHECK_RESULT(track_block(root_state));
-        {
+        if (is_returning_value(return_type)) {
             Types rettypes;
             int acount = get_argument_count(return_type);
             auto &&args = deps.args;
@@ -702,11 +733,11 @@ struct Tracker {
         }
         auto newT = native_ro_pointer_type(raising_function_type(
             fT->except_type, return_type, argtypes, fT->flags));
+        if (function->get_type() != newT) {
+            //ss << function->get_type() << " -> " << newT << std::endl;
+            function->change_type(newT);
+        }
         if (track_count++ == HALT_AT) {
-            if (function->get_type() != newT) {
-                ss << function->get_type() << " -> " << newT << std::endl;
-                function->change_type(newT);
-            }
             StyledStream ss;
             stream_ast(ss, function, StreamASTFormat());
             exit(0);
@@ -719,6 +750,11 @@ struct Tracker {
         const ValueIndex &arg, const char *context) {
         auto &data = state.ensure_data(arg);
         data.use(state.where);
+    }
+
+    void dump_function() {
+        StyledStream ss;
+        stream_ast(ss, function, StreamASTFormat());
     }
 
     SCOPES_RESULT(void) move_argument(State &state,
@@ -1088,7 +1124,15 @@ SCOPES_RESULT(void) track(ASTContext &ctx) {
     SCOPES_RESULT_TYPE(void);
     Timer sum_track_time(TIMER_Tracker);
     Tracker tracker(ctx);
-    SCOPES_CHECK_RESULT(tracker.process());
+    auto result = tracker.process();
+    if (!result.ok()) {
+        #if 0
+    #if SCOPES_ANNOTATE_TRACKING
+        tracker.dump_function();
+    #endif
+    #endif
+    }
+    SCOPES_CHECK_RESULT(result);
     return {};
 }
 

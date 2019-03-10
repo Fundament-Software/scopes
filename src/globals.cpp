@@ -1786,7 +1786,10 @@ const sc_type_t *sc_arguments_type_getarg(sc_type_t *T, int index) {
 
 const sc_type_t *sc_view_type(const sc_type_t *type, int id) {
     using namespace scopes;
-    return view_type(type, { id });
+    if (id < 0)
+        return view_type(type, {});
+    else
+        return view_type(type, { id });
 }
 
 const sc_type_t *sc_mutate_type(const sc_type_t *type) {
