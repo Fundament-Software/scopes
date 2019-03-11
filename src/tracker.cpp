@@ -756,7 +756,7 @@ struct Tracker {
 
     SCOPES_RESULT(void) write_return_destructors(State &state,
         int retdepth, Value *ignore_node, const char *context) {
-        SCOPES_RESULT_TYPE(void);
+        //SCOPES_RESULT_TYPE(void);
         assert(retdepth >= 0);
         // collect values to be moved later which are in the scopes we are
         // jumping out of
@@ -780,10 +780,12 @@ struct Tracker {
         }
         // finally generate destructors for those values
         state.block.insert_at_end();
+        #if 0
         for (auto &&entry : moved) {
             // data will be moved, so we need to write a destructor
             SCOPES_CHECK_RESULT(write_destructor(state, entry, context));
         }
+        #endif
 
         return {};
     }
@@ -813,7 +815,7 @@ struct Tracker {
     SCOPES_RESULT(void) drop_argument(State &state, const ValueIndex &arg, const char *context, int retdepth = -1) {
         SCOPES_RESULT_TYPE(void);
         SCOPES_CHECK_RESULT(move_argument(state, arg, context, retdepth));
-        return write_destructor(state, arg, context);
+        return {};
     }
 
     void write_annotation(State &state, const String *msg, Values values) {
@@ -828,6 +830,7 @@ struct Tracker {
         prove(ctx.with_block(state.block), expr).assert_ok();
     }
 
+#if 0
     SCOPES_RESULT(void) write_destructor(State &state, const ValueIndex &arg, const char *context) {
         SCOPES_RESULT_TYPE(void);
         if (state.test)
@@ -858,6 +861,7 @@ struct Tracker {
             prove(ctx.with_block(state.block), expr));
         return {};
     }
+#endif
 
     // tag a unique value as will_be_used; if this is the first time the value
     // is seen, generate a destructor for it and tag it as will_be_moved
