@@ -497,36 +497,7 @@ struct Tracker {
                 return {};
             } break;
             default: {
-                ValueIndexSet viewed;
-                //viewed.clear();
-
-                // collect arguments that are being viewed
-                auto T = node->get_type();
-                int count = get_argument_count(T);
-                auto &&kinds = node->deps.kinds;
-                for (int i = 0; i < count; ++i) {
-                    //auto ET = get_argument(T, i);
-                    //if (is_plain(ET))
-                    //    continue;
-                    assert(i < kinds.size());
-                    if (kinds[i] == DK_Viewed) {
-                        for (auto &&arg : node->deps.args[i]) {
-                            viewed.insert(arg);
-                        }
-                    }
-                }
-
-                // visit arguments and only copy/drop those that disappear here
-                int i = node->args.size();
-                while (i-- > 0) {
-                    auto mode = VM_FORCE_COPY_OR_DROP;
-                    auto vi = ValueIndex(node->args[i]);
-                    if (viewed.count(vi)) {
-                        mode = VM_FORCE_VIEW;
-                    }
-                    SCOPES_CHECK_RESULT(visit_argument(state, mode,
-                        vi, "call", -1));
-                }
+                SCOPES_CHECK_RESULT(visit_values(state, VM_FORCE_VIEW, node->args, "call"));
             } break;
             }
         } else {
