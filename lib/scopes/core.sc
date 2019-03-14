@@ -719,6 +719,7 @@ inline define-symbols (self values...)
     key-type =
         inline (self key)
             sc_key_type key self
+    unique-type = sc_unique_type
     view-type =
         inline (self id)
             constbranch (none? id)

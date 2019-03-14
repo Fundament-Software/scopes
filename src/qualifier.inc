@@ -25,6 +25,12 @@ static const T *try_qualifier(const Type *type) {
 }
 
 template<typename T>
+static const T *get_qualifier(const Type *type) {
+    auto q = get_qualifier(type, (QualifierKind)T::Kind);
+    return cast<T>(q);
+}
+
+template<typename T>
 static const Type *strip_qualifier(const Type *type) {
     return strip_qualifier(type, (QualifierKind)T::Kind);
 }

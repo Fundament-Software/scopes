@@ -14,9 +14,10 @@
 
 namespace scopes {
 
-// key=mutate(move(view(refer(T))))
+// key=mutate(view(unique(refer(T))))
 #define SCOPES_QUALIFIER_KIND() \
     T(QK_Refer, "qualifier-kind-refer", ReferQualifier) \
+    T(QK_Unique, "qualifier-kind-unique", UniqueQualifier) \
     T(QK_View, "qualifier-kind-view", ViewQualifier) \
     T(QK_Mutate, "qualifier-kind-mutate", MutateQualifier) \
     T(QK_Key, "qualifier-kind-key", KeyQualifier) \
@@ -32,6 +33,7 @@ enum QualifierKind {
 enum QualifierMask {
     QM_UniquenessTags =
           (1 << QK_View)
+        | (1 << QK_Unique)
         | (1 << QK_Mutate),
     QM_Annotations = QM_UniquenessTags
         | (1 << QK_Key),
@@ -73,6 +75,7 @@ struct QualifyType : Type {
 
 const Type *qualify(const Type *type, const Qualifiers &qualifiers);
 const Qualifier *find_qualifier(const Type *type, QualifierKind kind);
+const Qualifier *get_qualifier(const Type *type, QualifierKind kind);
 const Type *strip_qualifiers(const Type *T, uint32_t mask = 0xffffffff);
 bool has_qualifiers(const Type *T, uint32_t mask = ((1 << QualifierCount) - 1));
 const Type *strip_qualifier(const Type *T, QualifierKind kind);

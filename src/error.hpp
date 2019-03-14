@@ -92,6 +92,7 @@ SCOPES_RESULT(void) error_missing_default_case();
 SCOPES_RESULT(void) error_argument_count_mismatch(int needed, int got, const FunctionType *ft = nullptr);
 SCOPES_RESULT(void) error_invalid_operands(const Type *A, const Type *B);
 SCOPES_RESULT(void) error_argument_type_mismatch(const Type *expected, const Type *got);
+SCOPES_RESULT(void) error_something_expected(const char *want, Value *value);
 SCOPES_RESULT(void) error_constant_expected(const Type *want, Value *value);
 SCOPES_RESULT(void) error_unbound_symbol(Parameter *value);
 SCOPES_RESULT(void) error_unbound_symbol(Value *value);
@@ -109,6 +110,10 @@ SCOPES_RESULT(void) error_value_inaccessible_from_closure(TypedValue *value, con
 SCOPES_RESULT(void) error_cannot_deref_non_plain(const Type *T);
 
 // lifetime checker errors
+SCOPES_RESULT(void) error_cannot_view_moved(TypedValue *value);
+SCOPES_RESULT(void) error_cannot_access_moved(TypedValue *value);
+SCOPES_RESULT(void) error_cannot_return_view(TypedValue *value);
+SCOPES_RESULT(void) error_value_not_unique(TypedValue *value);
 SCOPES_RESULT(void) error_value_moved(TypedValue *value, Value *mover, const char *by);
 SCOPES_RESULT(void) error_value_in_use(TypedValue *value, Value *user, const char *by);
 SCOPES_RESULT(void) error_value_is_viewed(Value *value, Value *user, const char *by);

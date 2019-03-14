@@ -353,13 +353,13 @@ struct Tracker {
         const int count = node->cases.size();
         states.reserve(count);
         for (auto &&_case : node->cases) {
-            states.push_back(State(_case.body, state));
+            states.push_back(State(_case->body, state));
         }
         State *next_state = nullptr;
         ValueIndexSet moved;
         for (int i = count; i-- > 0;) {
             State &case_state = states[i];
-            auto &&_case = node->cases[i];
+            auto &_case = *node->cases[i];
             switch(_case.kind) {
             case CK_Case:
                  assert(false); // continue
@@ -381,7 +381,7 @@ struct Tracker {
         //SCOPES_CHECK_RESULT(collect(case_state));
         next_state = nullptr;
         for (int i = count; i-- > 0;) {
-            auto &&_case = node->cases[i];
+            auto &_case = *node->cases[i];
             auto &&case_state = states[i];
             switch(_case.kind) {
             case CK_Case:

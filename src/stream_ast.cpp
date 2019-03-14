@@ -421,7 +421,7 @@ struct StreamAST : StreamAnchors {
             if (newlines) {
                 walk_same_or_newline(val->expr, depth+1, maxdepth);
                 for (int i = 0; i < val->cases.size(); ++i) {
-                    auto &&_case = val->cases[i];
+                    auto &_case = *val->cases[i];
                     stream_newline();
                     stream_indent(depth);
                     switch(_case.kind) {

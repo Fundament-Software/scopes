@@ -411,6 +411,7 @@ const sc_type_t *sc_key_type(sc_symbol_t name, const sc_type_t *T);
 sc_symbol_type_tuple_t sc_type_key(const sc_type_t *T);
 bool sc_type_is_refer(const sc_type_t *T);
 const sc_type_t *sc_view_type(const sc_type_t *type, int id);
+const sc_type_t *sc_unique_type(const sc_type_t *type, int id);
 const sc_type_t *sc_mutate_type(const sc_type_t *type);
 const sc_type_t *sc_refer_type(const sc_type_t *type, uint64_t flags, sc_symbol_t storage_class);
 const sc_type_t *sc_strip_qualifiers(const sc_type_t *type);

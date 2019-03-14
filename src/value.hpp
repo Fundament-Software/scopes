@@ -12,9 +12,12 @@
 #include "builtin.hpp"
 #include "type.hpp"
 
+#include "qualifier/unique_qualifiers.hpp"
+
 #include <vector>
 #include <unordered_map>
 #include <unordered_set>
+
 
 namespace scopes {
 
@@ -211,6 +214,7 @@ struct TypedValue : Value {
 
     //bool is_typed() const;
     const Type *get_type() const;
+
 protected:
     const Type *_type;
 };
@@ -219,7 +223,7 @@ protected:
 
 struct Block {
     Block();
-    void append(TypedValue *node);
+    int append(TypedValue *node);
     bool empty() const;
     void migrate_from(Block &source);
     void clear();
@@ -228,11 +232,20 @@ struct Block {
     void insert_at(int index);
     void insert_at_end();
 
+    bool is_valid(int id) const;
+    bool is_valid(const IDSet &ids) const;
+    bool is_valid(const ValueIndex &value) const;
+    void move(int id);
+
     int depth;
     int insert_index;
     Instructions body;
     Instruction *terminator;
     Block *parent;
+    // set of unique ids that have been moved, dropped or forgotten
+    // we auto-drop all unique handles that remain in blocks that we are
+    // leaving via merge / repeat / raise / return
+    IDSet invalid;
 };
 
 //------------------------------------------------------------------------------
@@ -485,7 +498,7 @@ struct Switch : Instruction {
         Case() : kind(CK_Case), anchor(nullptr), literal(nullptr) {}
     };
 
-    typedef std::vector<Case> Cases;
+    typedef std::vector<Case *> Cases;
 
     static bool classof(const Value *T);
 
@@ -527,6 +540,8 @@ struct Parameter : TypedValue {
     static Parameter *from(const Anchor *anchor, Symbol name, const Type *type);
 
     void set_owner(Function *_owner, int _index);
+
+    void retype(const Type *T);
 
     Symbol name;
     Function *owner;
@@ -700,6 +715,16 @@ struct Const : Pure {
 //------------------------------------------------------------------------------
 
 struct Function : Pure {
+    struct UniqueInfo {
+        ValueIndex value;
+        // at which block depth was the unique defined?
+        int depth;
+
+        UniqueInfo(const ValueIndex& value);
+    };
+    // map of known uniques within the function (any state)
+    typedef std::unordered_map<int, UniqueInfo> UniqueMap;
+
     static bool classof(const Value *T);
 
     Function(const Anchor *anchor, Symbol name, const Parameters &params);
@@ -716,6 +741,12 @@ struct Function : Pure {
     bool key_equal(const Function *other) const;
     std::size_t hash() const;
 
+    int unique_id();
+    void bind_unique(const UniqueInfo &info);
+    void try_bind_unique(TypedValue *value);
+    int get_unique_depth(int id) const;
+    const UniqueInfo &get_unique_info(int id) const;
+
     Symbol name;
     Parameters params;
     Block body;
@@ -725,6 +756,7 @@ struct Function : Pure {
     Template *original;
     Label *label;
     bool complete;
+    int nextid;
 
     Types instance_args;
     void bind(Value *oldnode, TypedValue *newnode);
@@ -734,6 +766,8 @@ struct Function : Pure {
     std::unordered_map<Value *, TypedValue *> map;
     std::vector<Return *> returns;
     std::vector<Raise *> raises;
+
+    UniqueMap uniques;
 
     Depends deps;
 };

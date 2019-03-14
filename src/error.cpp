@@ -177,6 +177,36 @@ SCOPES_RESULT(void) error_argument_type_mismatch(const Type *expected, const Typ
     SCOPES_LOCATION_ERROR(ss.str());
 }
 
+SCOPES_RESULT(void) error_cannot_view_moved(TypedValue *value) {
+    SCOPES_RESULT_TYPE(void);
+    StyledString ss;
+    ss.out << "cannot view value of type " << value->get_type() << " because it has been moved";
+    SCOPES_LOCATION_ERROR(ss.str());
+    //SCOPES_LOCATION_DEF_ERROR(mover, ss.str());
+}
+
+SCOPES_RESULT(void) error_cannot_access_moved(TypedValue *value) {
+    SCOPES_RESULT_TYPE(void);
+    StyledString ss;
+    ss.out << "cannot access value of type " << value->get_type() << " because it has been moved";
+    SCOPES_LOCATION_ERROR(ss.str());
+    //SCOPES_LOCATION_DEF_ERROR(mover, ss.str());
+}
+
+SCOPES_RESULT(void) error_value_not_unique(TypedValue *value) {
+    SCOPES_RESULT_TYPE(void);
+    StyledString ss;
+    ss.out << "value of type " << value->get_type() << " is not unique";
+    SCOPES_LOCATION_ERROR(ss.str());
+}
+
+SCOPES_RESULT(void) error_cannot_return_view(TypedValue *value) {
+    SCOPES_RESULT_TYPE(void);
+    StyledString ss;
+    ss.out << "cannot return view of value of type " << value->get_type() << " because the value is local to scope";
+    SCOPES_LOCATION_ERROR(ss.str());
+}
+
 SCOPES_RESULT(void) error_value_moved(TypedValue *value, Value *mover, const char *by) {
     SCOPES_RESULT_TYPE(void);
     StyledString ss;
@@ -258,6 +288,17 @@ SCOPES_RESULT(void) error_missing_default_case() {
     StyledString ss;
     ss.out << "missing default case";
     SCOPES_LOCATION_ERROR(ss.str());
+}
+
+SCOPES_RESULT(void) error_something_expected(const char *want, Value *value) {
+    SCOPES_RESULT_TYPE(void);
+    StyledString ss;
+    ss.out << want << " expected, got "
+        << get_value_class_name(value->kind());
+    if (isa<TypedValue>(value)) {
+        ss.out << " of type " << cast<TypedValue>(value)->get_type();
+    }
+    SCOPES_LOCATION_DEF_ERROR(value, ss.str());
 }
 
 SCOPES_RESULT(void) error_constant_expected(const Type *want, Value *value) {

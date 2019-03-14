@@ -21,7 +21,7 @@ namespace scopes {
     T(FN_AllocaArray) T(FN_MallocArray) T(FN_ReturnLabelType) T(KW_DoIn) T(FN_AllocaExceptionPad) \
     T(FN_StaticAlloc) T(KW_Try) T(KW_Return) T(KW_Loop) T(KW_Repeat) T(KW_Break) \
     T(KW_ASTQuote) T(KW_ASTUnquote) T(KW_ASTUnquoteArguments) T(KW_Merge) T(FN_Copy) \
-    T(FN_Move) T(FN_Forget) T(FN_Assign) T(FN_Deref) T(FN_PtrToRef) T(FN_RefToPtr) \
+    T(FN_Move) T(FN_View) T(FN_Viewing) T(FN_Forget) T(FN_Assign) T(FN_Deref) T(FN_PtrToRef) T(FN_RefToPtr) \
     T(FN_AnyExtract) T(FN_AnyWrap) T(FN_Free) T(KW_Defer) T(FN_DumpAST) \
     T(OP_ICmpEQ) T(OP_ICmpNE) T(FN_Sample) T(FN_ImageRead) T(FN_ImageWrite) \
     T(FN_ImageQuerySize) T(FN_ImageQueryLod) T(FN_ImageQueryLevels) T(FN_ImageQuerySamples) \
@@ -267,7 +267,7 @@ namespace scopes {
     T(KW_SyntaxQuote, "sugar-quote") T(KW_ASTQuote, "spice-quote") T(KW_ASTUnquote, "spice-unquote") \
     T(KW_ASTUnquoteArguments, "spice-unquote-arguments") T(FN_Copy, "copy") \
     T(KW_Inline, "inline") T(KW_Recur, "recur") \
-    T(KW_Merge, "merge") T(FN_Move, "move") \
+    T(KW_Merge, "merge") T(FN_Move, "move") T(FN_View, "view") T(FN_Viewing, "viewing") \
     T(KW_Return, "return") T(KW_Splice, "splice") T(FN_Forget, "forget") \
     T(KW_RunStage, "run-stage") T(KW_True, "true") T(KW_Try, "try") \
     T(KW_Unquote, "unquote") T(KW_UnquoteSplice, "unquote-splice") T(KW_ListEmpty, "eol") \

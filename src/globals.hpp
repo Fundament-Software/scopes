@@ -26,6 +26,7 @@ namespace scopes {
     T(g_getelementref, "getelementref") \
     T(g_store, "store") \
     T(g_move, "move") \
+    T(g_view, "view") \
     T(g_copy, "copy") \
     T(g_getelementptr, "getelementptr") \
     T(g_zext, "zext") \

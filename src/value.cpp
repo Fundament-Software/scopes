@@ -374,17 +374,65 @@ Template *Template::from(
 
 //------------------------------------------------------------------------------
 
+Function::UniqueInfo::UniqueInfo(const ValueIndex& _value)
+    : value(_value) {
+    if (isa<Instruction>(_value.value)) {
+        auto instr = cast<Instruction>(_value.value);
+        const Block *block = instr->block;
+        assert(block);
+        depth = block->depth;
+    } else {
+        depth = 0;
+    }
+}
+
 Function::Function(const Anchor *anchor, Symbol _name, const Parameters &_params)
     : Pure(VK_Function, anchor, TYPE_Unknown),
         name(_name), params(_params),
         docstring(nullptr),
         frame(nullptr), boundary(nullptr), original(nullptr), label(nullptr),
-        complete(false) {
+        complete(false),
+        nextid(FirstUniquePrivate) {
     body.depth = 1;
     int index = 0;
     for (auto param : params) {
         param->set_owner(this, index++);
     }
+}
+
+int Function::get_unique_depth(int id) const {
+    auto it = uniques.find(id);
+    assert(it != uniques.end());
+    return it->second.depth;
+}
+
+const Function::UniqueInfo &Function::get_unique_info(int id) const {
+    auto it = uniques.find(id);
+    assert(it != uniques.end());
+    return it->second;
+}
+
+int Function::unique_id() {
+    return nextid++;
+}
+
+void Function::try_bind_unique(TypedValue *value) {
+    auto T = value->get_type();
+    int count = get_argument_count(T);
+    for (int i = 0; i < count; ++i) {
+        auto argT = get_argument(T, i);
+        if (is_unique(argT)) {
+            bind_unique(UniqueInfo(ValueIndex(value, i)));
+        }
+    }
+}
+
+void Function::bind_unique(const UniqueInfo &info) {
+    auto uq = get_unique(info.value.get_type());
+    auto result = uniques.insert({uq->id, info});
+    StyledStream ss;
+    ss << "insert " << uq->id << std::endl;
+    assert(result.second);
 }
 
 bool Function::key_equal(const Function *other) const {
@@ -415,6 +463,7 @@ void Function::change_type(const Type *type) {
 void Function::append_param(Parameter *sym) {
     sym->set_owner(this, params.size());
     params.push_back(sym);
+    try_bind_unique(sym);
 }
 
 TypedValue *Function::resolve_local(Value *node) const {
@@ -526,6 +575,45 @@ Block::Block()
     : depth(-1), insert_index(0), terminator(nullptr), parent(nullptr)
 {}
 
+bool Block::is_valid(const ValueIndex &value) const {
+    auto T = value.get_type();
+    auto vq = try_view(T);
+    if (vq) {
+        return is_valid(vq->ids);
+    }
+    auto uq = try_unique(T);
+    if (uq) {
+        return is_valid(uq->id);
+    }
+    return true;
+}
+
+bool Block::is_valid(const IDSet &ids) const {
+    const Block *block = this;
+    while (block) {
+        for (auto id : ids) {
+            if (block->invalid.count(id))
+                return false;
+        }
+        block = block->parent;
+    }
+    return true;
+}
+
+bool Block::is_valid(int id) const {
+    const Block *block = this;
+    while (block) {
+        if (block->invalid.count(id))
+            return false;
+        block = block->parent;
+    }
+    return true;
+}
+
+void Block::move(int id) {
+    invalid.insert(id);
+}
+
 void Block::set_parent(Block *_parent) {
     assert(!parent && _parent);
     parent = _parent;
@@ -536,6 +624,7 @@ void Block::set_parent(Block *_parent) {
 
 void Block::clear() {
     body.clear();
+    invalid.clear();
     terminator = nullptr;
     parent = nullptr;
 }
@@ -548,6 +637,9 @@ void Block::migrate_from(Block &source) {
     if (source.terminator) {
         terminator = source.terminator;
         terminator->block = this;
+    }
+    for (auto &&entry : source.invalid) {
+        invalid.insert(entry);
     }
     source.clear();
 }
@@ -565,26 +657,27 @@ void Block::insert_at_end() {
     insert_index = body.size();
 }
 
-void Block::append(TypedValue *node) {
+int Block::append(TypedValue *node) {
     // ensure that whatever an argument list or extract argument is pointing at
     // is definitely inserted into a block
     switch(node->kind()) {
     case VK_ArgumentList: {
         auto al = cast<ArgumentList>(node);
         int count = al->values.size();
+        int inserted = 0;
         for (int i = 0; i < count; ++i) {
-            append(al->values[i]);
+            inserted += append(al->values[i]);
         }
     } break;
     case VK_ExtractArgument: {
         auto ea = cast<ExtractArgument>(node);
-        append(ea->value);
+        return append(ea->value);
     } break;
     default: {
         if (isa<Instruction>(node)) {
             auto instr = cast<Instruction>(node);
             if (instr->block)
-                return;
+                return 0;
             instr->block = this;
             if (!is_returning(instr->get_type())) {
                 assert(!terminator);
@@ -594,9 +687,11 @@ void Block::append(TypedValue *node) {
                 body.insert(body.begin() + insert_index, instr);
                 insert_index++;
             }
+            return 1;
         }
     } break;
     }
+    return 0;
 }
 
 //------------------------------------------------------------------------------
@@ -724,21 +819,21 @@ Switch *Switch::from(const Anchor *anchor, TypedValue *expr, const Cases &cases)
 Switch::Case &Switch::append_pass(const Anchor *anchor, ConstInt *literal) {
     assert(anchor);
     assert(literal);
-    Case _case;
-    _case.kind = CK_Pass;
-    _case.anchor = anchor;
-    _case.literal = literal;
+    Case *_case = new Case();
+    _case->kind = CK_Pass;
+    _case->anchor = anchor;
+    _case->literal = literal;
     cases.push_back(_case);
-    return cases.back();
+    return *cases.back();
 }
 
 Switch::Case &Switch::append_default(const Anchor *anchor) {
     assert(anchor);
-    Case _case;
-    _case.kind = CK_Default;
-    _case.anchor = anchor;
+    Case *_case = new Case();
+    _case->kind = CK_Default;
+    _case->anchor = anchor;
     cases.push_back(_case);
-    return cases.back();
+    return *cases.back();
 }
 
 //------------------------------------------------------------------------------
@@ -781,6 +876,10 @@ void Parameter::set_owner(Function *_owner, int _index) {
     assert(!owner);
     owner = _owner;
     index = _index;
+}
+
+void Parameter::retype(const Type *T) {
+    _type = T;
 }
 
 //------------------------------------------------------------------------------
