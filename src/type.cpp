@@ -274,10 +274,6 @@ SCOPES_RESULT(bool) types_compatible(const Type *paramT, const Type *argT) {
         return true;
     if (!is_opaque(argT)) {
         argT = SCOPES_GET_RESULT(storage_type(argT));
-        /*
-        if (argT == paramT)
-            return true;
-        */
     }
     if (!is_opaque(paramT)) {
         paramT = SCOPES_GET_RESULT(storage_type(paramT));

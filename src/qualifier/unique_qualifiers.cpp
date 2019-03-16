@@ -76,6 +76,25 @@ void stream_id(StyledStream &ss, int id) {
 
 //------------------------------------------------------------------------------
 
+void map_unique_id(ID2SetMap &idmap, int fromid, int toid) {
+    auto result = idmap.insert({fromid, { toid }});
+    if (!result.second) {
+        result.first->second.insert(toid);
+    }
+}
+
+void dump_idmap(const ID2SetMap &idmap) {
+    StyledStream ss;
+    for (auto && entry : idmap) {
+        ss << entry.first << ": ";
+        for (auto && id : entry.second) {
+            ss << id << " ";
+        }
+        ss << std::endl;
+    }
+    ss << idmap.size() << " entries" << std::endl;
+}
+
 ViewQualifier::ViewQualifier(const IDSet &_ids)
     : Qualifier((QualifierKind)Kind), ids(_ids) {
     for (auto entry : ids) {

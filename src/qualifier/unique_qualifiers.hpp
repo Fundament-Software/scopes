@@ -45,6 +45,9 @@ typedef std::unordered_set<int> IDSet;
 typedef std::vector<int> IDs;
 typedef std::unordered_map<int, IDSet > ID2SetMap;
 
+void map_unique_id(ID2SetMap &idmap, int fromid, int toid);
+void dump_idmap(const ID2SetMap &idmap);
+
 struct ViewQualifier : Qualifier {
     enum { Kind = QK_View };
     static bool classof(const Qualifier *T);

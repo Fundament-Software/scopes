@@ -41,11 +41,14 @@ let
     VHandle1 = ('view-type Handle 1)
     VHandle2 = ('view-type Handle 2)
     VHandle3 = ('view-type Handle 3)
+    VHandle4 = ('view-type Handle 4)
 
     VHandle12 = ('view-type VHandle1 2)
+    VHandle34 = ('view-type VHandle3 4)
 
-    VHandle01 = ('view-type VHandle0 1)
-    VHandle012 = ('view-type VHandle01 2)
+    VHandle1234 = ('view-type ('view-type VHandle12 3) 4)
+
+    Vi321 = ('view-type i32 1)
 
 run-stage;
 
@@ -141,7 +144,7 @@ fn f (a b x)
 verify-type (typify f Handle Handle bool) VHandle12 VHandle1 VHandle2 bool
 
 # receives two handles and conditionally moves either one.
-    Handle<-(Handle Handle bool)(*)
+    R1:Handle<-(1:Handle 2:Handle bool)(*)
 fn f (a b x)
     if x (move a)
     else (move b)
@@ -149,7 +152,7 @@ verify-type (typify f Handle Handle bool) UHandleR1 UHandle1 UHandle2 bool
 
 # receives two handles, moves both into the function and conditionally
     moves either one.
-    Handle<-(Handle Handle bool)(*)
+    R2:Handle<-(1:Handle 2:Handle bool)(*)
 fn f (a b x)
     let a = (move a)
     let b = (move b)
@@ -182,18 +185,17 @@ fn f (a b x)
     else (move b)
 assert-error (typify f Handle Handle bool)
 
-print "ok"
-run-stage;
+# receives a handle and casts it to i32
+    %1:i32<-(%1:Handle)(*)
+fn f (h)
+    bitcast h i32
+verify-type (typify f Handle) Vi321 VHandle1
 
-
-# receives two handles and passes them to a function that conditionally returns one
-    <view:0|1>Handle<-(<view>Handle <view>Handle bool)(*)
-fn f (a b x)
-    fn ff (a b x)
-        if x a
-        else b
-    ff a b x
-verify-type (typify f Handle Handle bool) HandleView01 HandleView HandleView bool
+# receives a handle, casts it to i32 and back to Handle
+    %1:Handle<-(%1:Handle)(*)
+fn f (h)
+    bitcast (bitcast h i32) Handle
+verify-type (typify f Handle) VHandle1 VHandle1
 
 # receives four handles and conditionally returns one, switch version
     <view:0|1|2|3>Handle<-(<view>Handle <view>Handle bool)(*)
@@ -204,29 +206,17 @@ fn f (a b c d x)
     case 2 c
     default d
 verify-type (typify f Handle Handle Handle Handle i32)
-    \ HandleView0123 HandleView HandleView HandleView HandleView i32
+    \ VHandle1234 VHandle1 VHandle2 VHandle3 VHandle4 i32
 
-#fn f (x)
-    fn ff (x) x
-    let x = (move x)
-    _ x (ff x)
-#print (typify f Handle)
-
-# receives a handle and casts it to i32
-    <view:0>i32<-(<view>Handle)(*)
-fn f (h)
-    bitcast h i32
-verify-type (typify f Handle) i32View0 HandleView
-
-# receives a handle, casts it to i32 and back to Handle
-    <view:0>Handle<-(<view>Handle)(*)
-fn f (h)
-    bitcast (bitcast h i32) Handle
-verify-type (typify f Handle) HandleView0 HandleView
-
-#fn f (h)
-    bitcast (bitcast h i32) Handle
-#'dump (typify f Handle)
+# receives two handles and passes them to a function that conditionally returns one
+    %1|2:Handle<-(%1:Handle %2:Handle bool)(*)
+fn f (a b c d x)
+    fn ff (a b x)
+        if x a
+        else b
+    ff c d x
+verify-type (typify f Handle Handle Handle Handle bool)
+    \ VHandle34 VHandle1 VHandle2 VHandle3 VHandle4 bool
 
 # TODO: composition, decomposition
 

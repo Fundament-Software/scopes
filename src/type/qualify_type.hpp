@@ -35,8 +35,7 @@ enum QualifierMask {
           (1 << QK_View)
         | (1 << QK_Unique)
         | (1 << QK_Mutate),
-    QM_Annotations = QM_UniquenessTags
-        | (1 << QK_Key),
+    QM_Annotations = (1 << QK_Key),
 };
 
 //------------------------------------------------------------------------------

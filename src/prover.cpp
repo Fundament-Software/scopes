@@ -436,22 +436,17 @@ static SCOPES_RESULT(void) verify_valid(const ASTContext &ctx, TypedValue *val) 
     return {};
 }
 
-static SCOPES_RESULT(void) build_view(
+static void build_view(
     const ASTContext &ctx, const Anchor *anchor, TypedValue *&val) {
-    SCOPES_RESULT_TYPE(void);
     auto T = val->get_type();
     auto uq = try_unique(T);
     if (uq) {
-        if (ctx.block->is_valid(val)) {
-            auto retT = view_type(T, {});
-            auto call = Call::from(anchor, retT, g_view, { val });
-            ctx.append(call);
-            val = call;
-            return {};
-        }
-        SCOPES_EXPECT_ERROR(error_cannot_view_moved(val));
+        assert(ctx.block->is_valid(val));
+        auto retT = view_type(T, {});
+        auto call = Call::from(anchor, retT, g_view, { val });
+        ctx.append(call);
+        val = call;
     }
-    return {};
 }
 
 static SCOPES_RESULT(void) move_merge_values(const ASTContext &ctx,
@@ -460,9 +455,7 @@ static SCOPES_RESULT(void) move_merge_values(const ASTContext &ctx,
     assert(retdepth >= 0);
     IDSet saved;
     for (auto &&value : values) {
-        if (!ctx.block->is_valid(value)) {
-            SCOPES_LOCATION_ERROR(String::from("cannot access invalid value"));
-        }
+        SCOPES_CHECK_RESULT(verify_valid(ctx, value));
         auto T = value->get_type();
         auto uq = try_unique(T);
         if (uq) {
@@ -472,7 +465,7 @@ static SCOPES_RESULT(void) move_merge_values(const ASTContext &ctx,
                 saved.insert(uq->id);
             } else {
                 // will still be live, we can view
-                build_view(ctx, anchor, value).assert_ok();
+                build_view(ctx, anchor, value);
             }
             continue;
         }
@@ -1426,6 +1419,41 @@ SCOPES_RESULT(void) sanitize_tuple_index(const Anchor *anchor, const Type *ST, c
     return {};
 }
 
+const Type *remap_unique_return_arguments(
+    const ASTContext &ctx, ID2SetMap &idmap, const Type *rt) {
+    if (is_returning_value(rt)) {
+        // remap return type
+        int acount = get_argument_count(rt);
+        Types rettypes;
+        rettypes.reserve(acount);
+        for (int i = 0; i < acount; ++i) {
+            const Type *argT = get_argument(rt, i);
+            auto uq = try_unique(argT);
+            if (uq) {
+                auto newid = ctx.unique_id();
+                argT = unique_type(argT, newid);
+                map_unique_id(idmap, uq->id, newid);
+            } else {
+                auto vq = try_view(argT);
+                if (vq) {
+                    IDSet newids;
+                    for (auto vid : vq->ids) {
+                        auto it = idmap.find(vid);
+                        assert(it != idmap.end());
+                        for (auto destid : it->second) {
+                            newids.insert(destid);
+                        }
+                    }
+                    argT = view_type(strip_view(argT), newids);
+                }
+            }
+            rettypes.push_back(argT);
+        }
+        rt = arguments_type(rettypes);
+    }
+    return rt;
+}
+
 static SCOPES_RESULT(TypedValue *) prove_call_interior(const ASTContext &ctx, CallTemplate *call) {
     SCOPES_RESULT_TYPE(TypedValue *);
     SCOPES_ANCHOR(call->anchor());
@@ -1730,13 +1758,20 @@ repeat:
                     }
                 }
 
+                if (is_unique(SrcT)) {
+                    // moving a unique through a cast can potentially shadow
+                    // a destructor, so we only view
+                    build_view(ctx, call->anchor(), _SrcT);
+                    SrcT = _SrcT->get_type();
+                }
+
                 bool target_is_plain = is_plain(DestT);
 
                 DestT = strip_qualifiers(DestT);
                 auto vq = try_qualifier<ViewQualifier>(SrcT);
                 if (vq) {
                     DestT = view_type(DestT, vq->ids);
-                } else if (!target_is_plain || has_qualifier<UniqueQualifier>(SrcT)) {
+                } else if (!target_is_plain) {
                     DestT = unique_type(DestT, ctx.unique_id());
                 }
 
@@ -2278,35 +2313,66 @@ repeat:
             SCOPES_CHECK_RESULT(build_deref(ctx, call->anchor(), values[i]));
             Ta = values[i]->get_type();
         }
+        if (is_view(Tb) && !is_view(Ta)) {
+            build_view(ctx, call->anchor(), values[i]);
+            Ta = values[i]->get_type();
+            Tb = strip_view(Tb);
+            Ta = strip_view(Ta);
+        } else if (is_unique(Tb) && !is_view(Ta)) {
+            assert(is_unique(Ta));
+            Tb = strip_unique(Tb);
+            Ta = strip_unique(Ta);
+        }
         if (SCOPES_GET_RESULT(types_compatible(Tb, Ta))) {
             continue;
         }
         SCOPES_ANCHOR(values[i]->anchor());
         SCOPES_EXPECT_ERROR(error_argument_type_mismatch(Tb, Ta));
     }
-    const Type *art = aft->return_type;
-    const Type *rt = ft->return_type;
-    Call *newcall = Call::from(call->anchor(), rt, callee, values);
-    {
-        //int depth = ctx.block?ctx.block->depth:0;
-        int acount = get_argument_count(rt);
-        for (int i = 0; i < acount; ++i) {
-            const Type *argT = get_argument(art, i);
-            if (auto vq = try_qualifier<ViewQualifier>(argT)) {
-                for (auto idx : vq->sorted_ids) {
-                    assert((size_t)idx < values.size());
-                    merge_depends(ctx, newcall->deps, i, values[idx]);
+    // build id map
+    ID2SetMap idmap;
+    idmap.reserve(numargs);
+    // first map uniques
+    for (int i = 0; i < numargs; ++i) {
+        const Type *paramT = ft->argument_types[i];
+        if (is_unique(paramT)) {
+            const Type *argT = values[i]->get_type();
+            auto paramu = get_unique(paramT);
+            auto argu = get_unique(argT);
+            // argument will be moved into the function
+            ctx.block->move(argu->id);
+            map_unique_id(idmap, paramu->id, argu->id);
+        }
+    }
+    // then map views
+    for (int i = 0; i < numargs; ++i) {
+        const Type *paramT = ft->argument_types[i];
+        if (is_view(paramT)) {
+            const Type *argT = values[i]->get_type();
+            auto paramv = get_view(paramT);
+            auto argv = get_view(argT);
+            for (auto id : paramv->sorted_ids) {
+                auto it = idmap.find(id);
+                if (it != idmap.end())
+                    continue;
+                assert(!argv->ids.empty());
+                // unseen view id, map to argument ids
+                for (auto vid : argv->ids) {
+                    map_unique_id(idmap, id, vid);
                 }
-            } else {
-                newcall->deps.unique(i);
             }
         }
     }
+    //const Type *art = aft->return_type;
+    const Type *rt = remap_unique_return_arguments(ctx, idmap, ft->return_type);
+    Call *newcall = Call::from(call->anchor(), rt, callee, values);
     if (ft->has_exception()) {
-        auto exc = Exception::from(call->anchor(), ft->except_type);
-        newcall->except = exc;
+        // todo: remap exception type
         newcall->except_body.set_parent(ctx.block);
         auto exceptctx = ctx.with_block(newcall->except_body);
+        const Type *et = remap_unique_return_arguments(exceptctx, idmap, ft->except_type);
+        auto exc = Exception::from(call->anchor(), et);
+        newcall->except = exc;
         SCOPES_CHECK_RESULT(make_raise(exceptctx, call->anchor(), exc));
     }
     return newcall;
