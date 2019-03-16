@@ -200,6 +200,13 @@ SCOPES_RESULT(void) error_value_not_unique(TypedValue *value) {
     SCOPES_LOCATION_ERROR(ss.str());
 }
 
+SCOPES_RESULT(void) error_altering_parent_scope_in_pass(const Type *value_type) {
+    SCOPES_RESULT_TYPE(void);
+    StyledString ss;
+    ss.out << "skippable switch pass moved value of type " << value_type << " which is from a parent scope";
+    SCOPES_LOCATION_ERROR(ss.str());
+}
+
 SCOPES_RESULT(void) error_cannot_return_view(TypedValue *value) {
     SCOPES_RESULT_TYPE(void);
     StyledString ss;

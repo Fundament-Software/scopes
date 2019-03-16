@@ -205,6 +205,8 @@ struct Block {
     void clear();
     void set_parent(Block *parent);
 
+    bool is_terminated() const;
+
     void insert_at(int index);
     void insert_at_end();
 
@@ -691,8 +693,8 @@ struct Const : Pure {
 struct Function : Pure {
     struct UniqueInfo {
         ValueIndex value;
-        // at which block depth was the unique defined?
-        int depth;
+        // at which block depth is the unique defined?
+        int get_depth() const;
 
         UniqueInfo(const ValueIndex& value);
     };

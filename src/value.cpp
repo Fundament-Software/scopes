@@ -309,13 +309,16 @@ Template *Template::from(
 
 Function::UniqueInfo::UniqueInfo(const ValueIndex& _value)
     : value(_value) {
-    if (isa<Instruction>(_value.value)) {
-        auto instr = cast<Instruction>(_value.value);
+}
+
+int Function::UniqueInfo::get_depth() const {
+    if (isa<Instruction>(value.value)) {
+        auto instr = cast<Instruction>(value.value);
         const Block *block = instr->block;
         assert(block);
-        depth = block->depth;
+        return block->depth;
     } else {
-        depth = 0;
+        return 0;
     }
 }
 
@@ -336,7 +339,7 @@ Function::Function(const Anchor *anchor, Symbol _name, const Parameters &_params
 int Function::get_unique_depth(int id) const {
     auto it = uniques.find(id);
     assert(it != uniques.end());
-    return it->second.depth;
+    return it->second.get_depth();
 }
 
 const Function::UniqueInfo &Function::get_unique_info(int id) const {
@@ -363,8 +366,6 @@ void Function::try_bind_unique(TypedValue *value) {
 void Function::bind_unique(const UniqueInfo &info) {
     auto uq = get_unique(info.value.get_type());
     auto result = uniques.insert({uq->id, info});
-    StyledStream ss;
-    ss << "insert " << uq->id << std::endl;
     assert(result.second);
 }
 
@@ -545,6 +546,10 @@ bool Block::is_valid(int id) const {
 
 void Block::move(int id) {
     invalid.insert(id);
+}
+
+bool Block::is_terminated() const {
+    return terminator != nullptr;
 }
 
 void Block::set_parent(Block *_parent) {

@@ -228,6 +228,45 @@ fn f (a b)
     a
 assert-error (typify f Handle Handle)
 
+# attempting to move a parent value into a switch pass
+fn f ()
+    let x = (Handle 0)
+    switch 10
+    case 0
+    pass 1
+        move x
+        _;
+    pass 2
+    case 3
+    default
+        _;
+#'dump (typify f)
+assert-error (typify f)
+
+# state propagation through different kinds of scopes
+fn f (x)
+    let c = (Handle 0)
+    if false
+    elseif false
+    elseif false
+    elseif false
+    else
+        switch 10
+        case 0
+            label custom
+                merge custom
+                    do
+                        move x
+                        _;
+        pass 1
+        pass 2
+        case 3
+        default
+            _;
+verify-type (typify f Handle) void UHandle1
+
+# TODO: if switch drops in pass, it's dead in following cases
+
 # TODO: composition, decomposition
 
 # TODO: loops

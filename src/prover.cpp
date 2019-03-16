@@ -345,7 +345,11 @@ static void write_annotation(const ASTContext &ctx,
         CallTemplate::from(anchor,
             ConstInt::builtin_from(anchor, Builtin(FN_Annotate)),
                 values);
-    prove(ctx, expr).assert_ok();
+    auto result = prove(ctx, expr);
+    if (!result.ok()) {
+        print_error(result.assert_error());
+        assert(false && "error while annotating");
+    }
 }
 
 static SCOPES_RESULT(void) drop_value(const ASTContext &ctx,
@@ -360,13 +364,15 @@ static SCOPES_RESULT(void) drop_value(const ASTContext &ctx,
         #if SCOPES_ANNOTATE_TRACKING
         StyledString ss;
         ss.out << "forget";
-        write_annotation(ctx, anchor, ss.str(), { arg.value });
+        write_annotation(ctx, anchor, ss.str(), {
+            ConstPointer::type_from(anchor, arg.value->get_type()) });
         #endif
     } else {
         #if SCOPES_ANNOTATE_TRACKING
         StyledString ss;
         ss.out << "destruct";
-        write_annotation(ctx, anchor, ss.str(), { arg.value });
+        write_annotation(ctx, anchor, ss.str(), {
+            ConstPointer::type_from(anchor, arg.value->get_type()) });
         #endif
         auto expr =
             CallTemplate::from(anchor, handler, {
@@ -553,6 +559,65 @@ static SCOPES_RESULT(TypedValue *) make_raise(const ASTContext &ctx, const Ancho
     }
 }
 
+static SCOPES_RESULT(void) validate_pass_block(const ASTContext &ctx, const Block &src) {
+    SCOPES_RESULT_TYPE(void);
+    for (auto id : src.invalid) {
+        auto &&info = ctx.function->get_unique_info(id);
+        if (info.get_depth() >= src.depth) // it's local
+            continue;
+        SCOPES_EXPECT_ERROR(error_altering_parent_scope_in_pass(info.value.get_type()));
+    }
+    return {};
+}
+
+static void sync_child_block(const ASTContext &ctx, const Block &src, Block &dst) {
+    for (auto id : src.invalid) {
+        auto &&info = ctx.function->get_unique_info(id);
+        if (info.get_depth() >= src.depth) // it's local
+            continue;
+        dst.move(id);
+        #if SCOPES_ANNOTATE_TRACKING
+        StyledString ss;
+        ss.out << "inherit-forgetting " << id;
+        write_annotation(ctx.with_block(dst), get_active_anchor(), ss.str(), {});
+        #endif
+    }
+}
+
+static void sync_child_block(const ASTContext &ctx, const Block &src) {
+    if (src.parent) {
+        sync_child_block(ctx, src, *src.parent);
+    }
+}
+
+// make sure dst drops the same uniques that have been dropped in src
+static SCOPES_RESULT(void) sync_conditional_blocks(
+    const ASTContext &ctx, const Anchor *anchor, const Block &src, Block &dst) {
+    SCOPES_RESULT_TYPE(void);
+    IDs drop_ids;
+    drop_ids.reserve(src.invalid.size());
+    for (auto &&id : src.invalid) {
+        if (dst.invalid.count(id)) // we moved it too
+            continue;
+        auto &&info = ctx.function->get_unique_info(id);
+        if (info.get_depth() >= src.depth) // it's local
+            continue;
+        drop_ids.push_back(id);
+    }
+    // drop newest IDs first
+    std::sort(drop_ids.rbegin(), drop_ids.rend());
+    for (auto &&id : drop_ids) {
+        #if SCOPES_ANNOTATE_TRACKING
+        StyledString ss;
+        ss.out << "sync-dropping " << id;
+        write_annotation(ctx.with_block(dst), anchor, ss.str(), {});
+        #endif
+        auto &&info = ctx.function->get_unique_info(id);
+        SCOPES_CHECK_RESULT(drop_value(ctx.with_block(dst), anchor, info.value));
+    }
+    return {};
+}
+
 static SCOPES_RESULT(TypedValue *) prove_LabelTemplate(const ASTContext &ctx, LabelTemplate *node) {
     SCOPES_RESULT_TYPE(TypedValue *);
     Label *label = Label::from(node->anchor(), node->label_kind, node->name);
@@ -598,6 +663,14 @@ static SCOPES_RESULT(TypedValue *) prove_LabelTemplate(const ASTContext &ctx, La
         }
         #endif
         assert(!label->body.empty());
+        // patch merge labels before computing the final label type
+        int retdepth = label->body.depth - 1;
+        for (auto merge : label->merges) {
+            assert(merge->block);
+            SCOPES_CHECK_RESULT(move_merge_values(
+                ctx.with_block(*merge->block),
+                merge->anchor(), retdepth, merge->values));
+        }
         const Type *rtype = nullptr;
         for (auto merge : label->merges) {
             rtype = SCOPES_GET_RESULT(merge_value_type("label merge",
@@ -606,6 +679,8 @@ static SCOPES_RESULT(TypedValue *) prove_LabelTemplate(const ASTContext &ctx, La
         rtype = ctx.fix_type(rtype);
         label->change_type(rtype);
         ctx.append(label);
+        assert(label->body.parent);
+        sync_child_block(ctx, label->body);
         return label;
     }
 }
@@ -2321,48 +2396,6 @@ static Label *make_merge_label(const ASTContext &ctx, const Anchor *anchor) {
     return merge_label;
 }
 
-static void sync_child_block(const ASTContext &ctx, const Block &src, Block &dst) {
-    for (auto &&id : src.invalid) {
-        auto &&info = ctx.function->get_unique_info(id);
-        if (info.depth >= src.depth) // it's local
-            continue;
-        dst.move(id);
-        #if SCOPES_ANNOTATE_TRACKING
-        StyledString ss;
-        ss.out << "inherit-forgetting " << id;
-        write_annotation(ctx.with_block(dst), get_active_anchor(), ss.str(), {});
-        #endif
-    }
-}
-
-// make sure dst drops the same uniques that have been dropped in src
-static SCOPES_RESULT(void) sync_conditional_blocks(
-    const ASTContext &ctx, const Anchor *anchor, const Block &src, Block &dst) {
-    SCOPES_RESULT_TYPE(void);
-    IDs drop_ids;
-    drop_ids.reserve(src.invalid.size());
-    for (auto &&id : src.invalid) {
-        if (dst.invalid.count(id)) // we moved it too
-            continue;
-        auto &&info = ctx.function->get_unique_info(id);
-        if (info.depth >= src.depth) // it's local
-            continue;
-        drop_ids.push_back(id);
-    }
-    // drop newest IDs first
-    std::sort(drop_ids.rbegin(), drop_ids.rend());
-    for (auto &&id : drop_ids) {
-        #if SCOPES_ANNOTATE_TRACKING
-        StyledString ss;
-        ss.out << "sync-dropping " << id;
-        write_annotation(ctx.with_block(dst), anchor, ss.str(), {});
-        #endif
-        auto &&info = ctx.function->get_unique_info(id);
-        SCOPES_CHECK_RESULT(drop_value(ctx.with_block(dst), anchor, info.value));
-    }
-    return {};
-}
-
 static SCOPES_RESULT(TypedValue *) finalize_merge_label(const ASTContext &ctx, Label *merge_label, const char *by) {
     SCOPES_RESULT_TYPE(TypedValue *);
 
@@ -2399,9 +2432,7 @@ static SCOPES_RESULT(TypedValue *) finalize_merge_label(const ASTContext &ctx, L
     }
     merge_label->change_type(rtype);
 
-    if (merge_label->body.parent) {
-        sync_child_block(ctx, merge_label->body, *merge_label->body.parent);
-    }
+    sync_child_block(ctx, merge_label->body);
 
     return merge_label;
 }
@@ -2422,16 +2453,16 @@ static SCOPES_RESULT(TypedValue *) prove_SwitchTemplate(const ASTContext &ctx, S
     ASTContext subctx = ctx.with_block(merge_label->body);
     subctx.append(_switch);
 
-    bool has_default = false;
+    Switch::Case *defaultcase = nullptr;
     for (auto &&_case : node->cases) {
         SCOPES_ANCHOR(_case.anchor);
         Switch::Case *newcase = nullptr;
         if (_case.kind == CK_Default) {
-            if (has_default) {
+            if (defaultcase) {
                 SCOPES_EXPECT_ERROR(error_duplicate_default_case());
             }
-            has_default = true;
             newcase = &_switch->append_default(_case.anchor);
+            defaultcase = newcase;
         } else {
             auto newlit = SCOPES_GET_RESULT(prove(ctx, _case.literal));
             if (!isa<ConstInt>(newlit)) {
@@ -2444,16 +2475,40 @@ static SCOPES_RESULT(TypedValue *) prove_SwitchTemplate(const ASTContext &ctx, S
         assert(_case.value);
         ASTContext newctx;
         auto newvalue = SCOPES_GET_RESULT(prove_block(subctx, newcase->body, _case.value, newctx));
-        if (_case.kind != CK_Pass) {
+        if (_case.kind == CK_Pass) {
+            SCOPES_CHECK_RESULT(validate_pass_block(ctx, newcase->body));
+        } else {
             if (is_returning(newvalue->get_type())) {
                 make_merge(newctx, newvalue->anchor(), merge_label, newvalue);
             }
         }
     }
 
-    if (!has_default) {
+    if (!defaultcase) {
         SCOPES_EXPECT_ERROR(error_missing_default_case());
     }
+
+    // gather all operations in default case
+    for (auto &&_case : _switch->cases) {
+        if (_case == defaultcase)
+            continue;
+        if (!_case->body.is_terminated())
+            continue;
+        SCOPES_CHECK_RESULT(sync_conditional_blocks(ctx, defaultcase->anchor,
+            _case->body, defaultcase->body));
+    }
+
+    // write all operations back to other cases
+    for (auto &&_case : _switch->cases) {
+        if (_case == defaultcase)
+            continue;
+        if (!_case->body.is_terminated())
+            continue;
+        SCOPES_CHECK_RESULT(sync_conditional_blocks(ctx, _case->anchor,
+            defaultcase->body, _case->body));
+    }
+
+    sync_child_block(ctx, defaultcase->body);
 
     if (merge_label->merges.empty()) {
         // none of the paths are returning
