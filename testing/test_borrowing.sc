@@ -218,6 +218,16 @@ fn f (a b c d x)
 verify-type (typify f Handle Handle Handle Handle bool)
     \ VHandle34 VHandle1 VHandle2 VHandle3 VHandle4 bool
 
+# receives two handles and passes one to a function that moves the argument,
+    then attempts to access the moved argument
+    error: cannot access value
+fn f (a b)
+    fn ff (x) (move x)
+    ff b
+    dump b
+    a
+assert-error (typify f Handle Handle)
+
 # TODO: composition, decomposition
 
 # TODO: loops

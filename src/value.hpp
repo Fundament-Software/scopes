@@ -145,8 +145,6 @@ struct ValueIndex {
     bool operator ==(const ValueIndex &other) const;
 
     const Type *get_type() const;
-    const Set *deps() const;
-    bool has_deps() const;
 
     TypedValue *value;
     int index;
@@ -154,28 +152,6 @@ struct ValueIndex {
 
 typedef ValueIndex::Set ValueIndexSet;
 typedef std::vector<ValueIndex> ValueIndices;
-
-//------------------------------------------------------------------------------
-
-enum DependsKind {
-    DK_Undefined = 0,
-    DK_Unique = 1 << 0,
-    DK_Viewed = 1 << 1,
-    DK_Conflicted = DK_Unique | DK_Viewed,
-};
-
-struct Depends {
-    std::vector<ValueIndexSet> args;
-    std::vector<char> kinds;
-
-    void ensure_arg(int index);
-    void view(TypedValue *value);
-    void view(int index, ValueIndex value);
-    void unique(TypedValue *value);
-    void unique(int index);
-    bool empty() const;
-    bool empty(int index) const;
-};
 
 //------------------------------------------------------------------------------
 
@@ -257,8 +233,6 @@ struct Instruction : TypedValue {
 
     Symbol name;
     Block *block;
-
-    Depends deps;
 };
 
 //------------------------------------------------------------------------------
@@ -768,8 +742,6 @@ struct Function : Pure {
     std::vector<Raise *> raises;
 
     UniqueMap uniques;
-
-    Depends deps;
 };
 
 //------------------------------------------------------------------------------

@@ -4,6 +4,8 @@
     See LICENSE.md for details.
 */
 
+#if 0
+
 #include "tracker.hpp"
 #include "value.hpp"
 #include "error.hpp"
@@ -1112,3 +1114,5 @@ SCOPES_RESULT(void) track(ASTContext &ctx) {
 }
 
 } // scopes
+
+#endif // 0
