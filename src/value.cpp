@@ -523,25 +523,15 @@ bool Block::is_valid(const ValueIndex &value) const {
 }
 
 bool Block::is_valid(const IDSet &ids) const {
-    const Block *block = this;
-    while (block) {
-        for (auto id : ids) {
-            if (block->invalid.count(id))
-                return false;
-        }
-        block = block->parent;
+    for (auto id : ids) {
+        if (invalid.count(id))
+            return false;
     }
     return true;
 }
 
 bool Block::is_valid(int id) const {
-    const Block *block = this;
-    while (block) {
-        if (block->invalid.count(id))
-            return false;
-        block = block->parent;
-    }
-    return true;
+    return !invalid.count(id);
 }
 
 void Block::move(int id) {
@@ -557,6 +547,9 @@ void Block::set_parent(Block *_parent) {
     parent = _parent;
     if (_parent) {
         depth = _parent->depth + 1;
+        // copy invalids from parent
+        assert(invalid.empty());
+        invalid = _parent->invalid;
     }
 }
 

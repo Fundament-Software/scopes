@@ -164,17 +164,20 @@ fn f (a b x)
 verify-type (typify f Handle Handle bool) UHandleR1 UHandle1 UHandle2 bool
 
 # receives two handles, moves both into the function and conditionally
-    moves either one, but one handle is moved into a subscope.
-    error: cannot access value of type 1000:Handle because it has been moved
+    moves either one, but one handle is moved into a subscope, which
+    we are returning from.
+    R2:Handle<-(1:Handle 2:Handle bool)(*)
 fn f (a b x)
     let a = (move a)
-    let b = (move b)
     if x
+        # will drop b
         return (move a)
-    # a inaccessible
+    let b = (move b)
+    # a still accessible
     dump a
+    # will drop a
     b
-assert-error (typify f Handle Handle bool)
+verify-type (typify f Handle Handle bool) UHandleR1 UHandle1 UHandle2 bool
 
 # receives two handles and conditionally borrows one, but moves another.
     error: conflicting branch types %1:Handle and 1000:Handle
@@ -240,7 +243,6 @@ fn f ()
     case 3
     default
         _;
-#'dump (typify f)
 assert-error (typify f)
 
 # state propagation through different kinds of scopes
@@ -263,9 +265,81 @@ fn f (x)
         case 3
         default
             _;
+#'dump (typify f Handle)
 verify-type (typify f Handle) void UHandle1
 
-# TODO: if switch drops in pass, it's dead in following cases
+# TODO:
+    let c = (unique)
+    label done2
+        label done
+            if true
+                # label done2: c is marked as to be moved, so move c
+                merge done2
+            let d = (unique)
+            if true
+                move c
+                # label done2: mark c as to be moved
+                # auto-drop d as part of constructor rollup
+                merge done2
+            elseif true
+                move c
+                # label done: mark c as to be moved
+                # auto-drop d as part of constructor rollup
+                merge done
+            elseif true
+                # label done: c is marked as to be moved, so auto-drop c
+                # auto-drop d as part of constructor rollup
+                merge done
+            else
+                # we're continuing in parent block
+            # c not moved, so still available here
+
+            # implicit merge to done
+            # label done: c is marked as to be moved, so auto-drop c
+            # auto-drop d as part of constructor rollup
+            merge done
+        # c definitely moved here
+        # label done2: c is marked as to be moved, nothing to do
+        merge done2
+
+#let c = (unique)
+#label done
+    if cond1
+        # merging to done
+        # read tagged done: c to be moved, but is still alive, so drop c now
+            -- which means we need a local copy of the parent state that
+                isn't updated when the parent evolves.
+        merge done
+    let d = (move c)
+    # after above statement, c is marked as moved
+    if cond2
+        # merging to done
+        # auto-drop d
+        # read tagged done: c to be moved, which already happened
+        merge done
+
+    # implicitly merging to done
+    # auto-drop d
+    # tag done: c to be moved, which already happened
+# after above statement, c is marked as moved
+
+
+# WHAT ABOUT VALUES THAT WE MOVE UP?
+    probably not an issue since we only borrow upvars, and others require local
+    moves?
+#let c = (unique)
+#let d = (unique)
+#label done
+    if cond
+        move c
+        # c got moved, tag as moved
+        merge done d
+    else
+        # drop c - now we can't view c :/
+        merge done c
+
+
+
 
 # TODO: composition, decomposition
 

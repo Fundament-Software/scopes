@@ -744,6 +744,7 @@ struct Function : Pure {
     std::vector<Raise *> raises;
 
     UniqueMap uniques;
+    IDSet invalid;
 };
 
 //------------------------------------------------------------------------------

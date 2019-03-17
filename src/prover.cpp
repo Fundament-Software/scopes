@@ -410,6 +410,101 @@ static void build_view(
     }
 }
 
+static SCOPES_RESULT(void) validate_pass_block(const ASTContext &ctx, const Block &src) {
+    SCOPES_RESULT_TYPE(void);
+    for (auto id : src.invalid) {
+        auto &&info = ctx.function->get_unique_info(id);
+        if (info.get_depth() >= src.depth) // it's local
+            continue;
+        SCOPES_EXPECT_ERROR(error_altering_parent_scope_in_pass(info.value.get_type()));
+    }
+    return {};
+}
+
+static void merge_back_invalid(const ASTContext &ctx, IDSet &invalid) {
+    for (auto id : invalid) {
+        if (!ctx.block->is_valid(id))
+            continue;
+        ctx.block->move(id);
+        #if SCOPES_ANNOTATE_TRACKING
+        StyledString ss;
+        ss.out << "merge-forgetting " << id;
+        write_annotation(ctx, get_active_anchor(), ss.str(), {});
+        #endif
+    }
+}
+
+// blocks don't copy their invalid states to their parents - they copy them
+// from their parents.
+// only merge labels commit state changes to their parents
+
+// 3. generate destructors for all alive values interior to the label
+// 1. merge the states of all invalid values parent to the label in each
+//    merge instruction's parent block
+// 2. per merge instruction, check if any of the arguments depend on a
+//    value that is invalid in the set - that's an error
+// 4. generate destructors for the invalid set exterior to the label
+// 5. update the label's parent block with the invalid set
+
+static void collect_invalid_values(const ASTContext &ctx,
+    int retdepth, IDSet &invalid) {
+    for (auto id : ctx.block->invalid) {
+        auto &&info = ctx.function->get_unique_info(id);
+        if (info.get_depth() > retdepth) // it's local
+            continue;
+        /*
+        dst.move(id);
+        #if SCOPES_ANNOTATE_TRACKING
+        StyledString ss;
+        ss.out << "inherit-forgetting " << id;
+        write_annotation(ctx.with_block(dst), get_active_anchor(), ss.str(), {});
+        #endif
+        */
+       invalid.insert(id);
+    }
+}
+
+// check if any of the merge arguments depend on a value that is invalid in the set
+static SCOPES_RESULT(void) validate_merge_values(const IDSet &invalid, const TypedValues &values) {
+    SCOPES_RESULT_TYPE(void);
+    for (auto &&value : values) {
+        auto vq = try_view(value->get_type());
+        if (!vq) continue;
+        for (auto id : vq->ids) {
+            if (invalid.count(id)) {
+                SCOPES_EXPECT_ERROR(error_cannot_return_view(value));
+            }
+        }
+    }
+    return {};
+}
+
+static void sort_drop_ids(const IDSet &invalid, IDs &drop_ids) {
+    drop_ids.reserve(invalid.size());
+    for (auto id : invalid) {
+        drop_ids.push_back(id);
+    }
+    // drop newest IDs first
+    std::sort(drop_ids.rbegin(), drop_ids.rend());
+}
+
+static SCOPES_RESULT(void) merge_drop_values(const ASTContext &ctx,
+    const Anchor *anchor, const IDs &drop_ids) {
+    SCOPES_RESULT_TYPE(void);
+    for (auto &&id : drop_ids) {
+        if (!ctx.block->is_valid(id)) // already moved
+            continue;
+        #if SCOPES_ANNOTATE_TRACKING
+        StyledString ss;
+        ss.out << "merge-dropping " << id;
+        write_annotation(ctx, anchor, ss.str(), {});
+        #endif
+        auto &&info = ctx.function->get_unique_info(id);
+        SCOPES_CHECK_RESULT(drop_value(ctx, anchor, info.value));
+    }
+    return {};
+}
+
 static SCOPES_RESULT(void) move_merge_values(const ASTContext &ctx,
     const Anchor *anchor, int retdepth, TypedValues &values) {
     SCOPES_RESULT_TYPE(void);
@@ -475,6 +570,48 @@ static SCOPES_RESULT(void) move_merge_values(const ASTContext &ctx,
     return {};
 }
 
+// must be called before the return type is computed
+// don't forget to call merge_back_invalid(...) when the label has been added
+SCOPES_RESULT(void) finalize_merges(const ASTContext &ctx, Label *label, IDSet &invalid) {
+    SCOPES_RESULT_TYPE(void)
+    // patch merge labels before computing the final label type
+    int retdepth = label->body.depth - 1;
+    for (auto merge : label->merges) {
+        auto mctx = ctx.with_block(*merge->block);
+        assert(merge->block);
+        collect_invalid_values(mctx, retdepth, invalid);
+        SCOPES_CHECK_RESULT(move_merge_values(mctx,
+            merge->anchor(), retdepth, merge->values));
+    }
+    IDs drop_ids;
+    sort_drop_ids(invalid, drop_ids);
+    for (auto merge : label->merges) {
+        auto mctx = ctx.with_block(*merge->block);
+        SCOPES_CHECK_RESULT(validate_merge_values(invalid, merge->values));
+        SCOPES_CHECK_RESULT(merge_drop_values(mctx, merge->anchor(), drop_ids));
+    }
+    return {};
+}
+
+SCOPES_RESULT(void) finalize_returns_raises(const ASTContext &ctx) {
+    SCOPES_RESULT_TYPE(void);
+    auto &&invalid = ctx.function->invalid;
+    // patch merge labels before computing the final label type
+    IDs drop_ids;
+    sort_drop_ids(invalid, drop_ids);
+    for (auto merge : ctx.function->returns) {
+        auto mctx = ctx.with_block(*merge->block);
+        SCOPES_CHECK_RESULT(validate_merge_values(invalid, merge->values));
+        SCOPES_CHECK_RESULT(merge_drop_values(mctx, merge->anchor(), drop_ids));
+    }
+    for (auto merge : ctx.function->raises) {
+        auto mctx = ctx.with_block(*merge->block);
+        SCOPES_CHECK_RESULT(validate_merge_values(invalid, merge->values));
+        SCOPES_CHECK_RESULT(merge_drop_values(mctx, merge->anchor(), drop_ids));
+    }
+    return {};
+}
+
 static TypedValue *make_merge1(const ASTContext &ctx, const Anchor *anchor, Label *label, const TypedValues &values) {
     assert(label);
 
@@ -516,6 +653,7 @@ static TypedValue *make_repeat(const ASTContext &ctx, const Anchor *anchor, Loop
 
 static SCOPES_RESULT(TypedValue *) make_return1(const ASTContext &ctx, const Anchor *anchor, TypedValues values) {
     SCOPES_RESULT_TYPE(TypedValue *);
+    collect_invalid_values(ctx, 0, ctx.function->invalid);
     SCOPES_CHECK_RESULT(move_merge_values(ctx, anchor, 0, values));
 
     auto newreturn = Return::from(anchor, values);
@@ -540,6 +678,7 @@ static SCOPES_RESULT(TypedValue *) make_raise1(const ASTContext &ctx, const Anch
         return make_merge1(ctx,
             anchor, ctx.except, values);
     } else {
+        collect_invalid_values(ctx, 0, ctx.function->invalid);
         SCOPES_CHECK_RESULT(move_merge_values(ctx, anchor, 0, values));
 
         auto newraise = Raise::from(anchor, values);
@@ -557,65 +696,6 @@ static SCOPES_RESULT(TypedValue *) make_raise(const ASTContext &ctx, const Ancho
     } else {
         return value;
     }
-}
-
-static SCOPES_RESULT(void) validate_pass_block(const ASTContext &ctx, const Block &src) {
-    SCOPES_RESULT_TYPE(void);
-    for (auto id : src.invalid) {
-        auto &&info = ctx.function->get_unique_info(id);
-        if (info.get_depth() >= src.depth) // it's local
-            continue;
-        SCOPES_EXPECT_ERROR(error_altering_parent_scope_in_pass(info.value.get_type()));
-    }
-    return {};
-}
-
-static void sync_child_block(const ASTContext &ctx, const Block &src, Block &dst) {
-    for (auto id : src.invalid) {
-        auto &&info = ctx.function->get_unique_info(id);
-        if (info.get_depth() >= src.depth) // it's local
-            continue;
-        dst.move(id);
-        #if SCOPES_ANNOTATE_TRACKING
-        StyledString ss;
-        ss.out << "inherit-forgetting " << id;
-        write_annotation(ctx.with_block(dst), get_active_anchor(), ss.str(), {});
-        #endif
-    }
-}
-
-static void sync_child_block(const ASTContext &ctx, const Block &src) {
-    if (src.parent) {
-        sync_child_block(ctx, src, *src.parent);
-    }
-}
-
-// make sure dst drops the same uniques that have been dropped in src
-static SCOPES_RESULT(void) sync_conditional_blocks(
-    const ASTContext &ctx, const Anchor *anchor, const Block &src, Block &dst) {
-    SCOPES_RESULT_TYPE(void);
-    IDs drop_ids;
-    drop_ids.reserve(src.invalid.size());
-    for (auto &&id : src.invalid) {
-        if (dst.invalid.count(id)) // we moved it too
-            continue;
-        auto &&info = ctx.function->get_unique_info(id);
-        if (info.get_depth() >= src.depth) // it's local
-            continue;
-        drop_ids.push_back(id);
-    }
-    // drop newest IDs first
-    std::sort(drop_ids.rbegin(), drop_ids.rend());
-    for (auto &&id : drop_ids) {
-        #if SCOPES_ANNOTATE_TRACKING
-        StyledString ss;
-        ss.out << "sync-dropping " << id;
-        write_annotation(ctx.with_block(dst), anchor, ss.str(), {});
-        #endif
-        auto &&info = ctx.function->get_unique_info(id);
-        SCOPES_CHECK_RESULT(drop_value(ctx.with_block(dst), anchor, info.value));
-    }
-    return {};
 }
 
 static SCOPES_RESULT(TypedValue *) prove_LabelTemplate(const ASTContext &ctx, LabelTemplate *node) {
@@ -663,14 +743,8 @@ static SCOPES_RESULT(TypedValue *) prove_LabelTemplate(const ASTContext &ctx, La
         }
         #endif
         assert(!label->body.empty());
-        // patch merge labels before computing the final label type
-        int retdepth = label->body.depth - 1;
-        for (auto merge : label->merges) {
-            assert(merge->block);
-            SCOPES_CHECK_RESULT(move_merge_values(
-                ctx.with_block(*merge->block),
-                merge->anchor(), retdepth, merge->values));
-        }
+        IDSet invalid;
+        SCOPES_CHECK_RESULT(finalize_merges(ctx, label, invalid));
         const Type *rtype = nullptr;
         for (auto merge : label->merges) {
             rtype = SCOPES_GET_RESULT(merge_value_type("label merge",
@@ -679,8 +753,7 @@ static SCOPES_RESULT(TypedValue *) prove_LabelTemplate(const ASTContext &ctx, La
         rtype = ctx.fix_type(rtype);
         label->change_type(rtype);
         ctx.append(label);
-        assert(label->body.parent);
-        sync_child_block(ctx, label->body);
+        merge_back_invalid(ctx, invalid);
         return label;
     }
 }
@@ -1330,7 +1403,7 @@ static SCOPES_RESULT(const Type *) get_function_type(Function *fn) {
         auto param = fn->params[i];
         auto T = param->get_type();
         auto uq = try_unique(T);
-        if (uq && fn->body.is_valid(uq->id)) {
+        if (uq && !fn->invalid.count(uq->id)) {
             // has this parameter been spent? if not, it's a view
             T = view_type(T, {});
             param->retype(T);
@@ -2414,15 +2487,8 @@ static SCOPES_RESULT(TypedValue *) finalize_merge_label(const ASTContext &ctx, L
         }
     }
 
-    // patch merge labels before computing the final label type
-    int retdepth = merge_label->body.depth - 1;
-    for (auto merge : merge_label->merges) {
-        assert(merge->block);
-        SCOPES_CHECK_RESULT(move_merge_values(
-            ctx.with_block(*merge->block),
-            merge->anchor(), retdepth, merge->values));
-    }
-
+    IDSet invalid;
+    SCOPES_CHECK_RESULT(finalize_merges(ctx, merge_label, invalid));
     if (!rtype) {
         for (auto merge : merge_label->merges) {
             rtype = SCOPES_GET_RESULT(merge_value_type(by, rtype,
@@ -2431,8 +2497,8 @@ static SCOPES_RESULT(TypedValue *) finalize_merge_label(const ASTContext &ctx, L
         rtype = ctx.fix_type(rtype);
     }
     merge_label->change_type(rtype);
-
-    sync_child_block(ctx, merge_label->body);
+    ctx.append(merge_label);
+    merge_back_invalid(ctx, invalid);
 
     return merge_label;
 }
@@ -2488,28 +2554,6 @@ static SCOPES_RESULT(TypedValue *) prove_SwitchTemplate(const ASTContext &ctx, S
         SCOPES_EXPECT_ERROR(error_missing_default_case());
     }
 
-    // gather all operations in default case
-    for (auto &&_case : _switch->cases) {
-        if (_case == defaultcase)
-            continue;
-        if (!_case->body.is_terminated())
-            continue;
-        SCOPES_CHECK_RESULT(sync_conditional_blocks(ctx, defaultcase->anchor,
-            _case->body, defaultcase->body));
-    }
-
-    // write all operations back to other cases
-    for (auto &&_case : _switch->cases) {
-        if (_case == defaultcase)
-            continue;
-        if (!_case->body.is_terminated())
-            continue;
-        SCOPES_CHECK_RESULT(sync_conditional_blocks(ctx, _case->anchor,
-            defaultcase->body, _case->body));
-    }
-
-    sync_child_block(ctx, defaultcase->body);
-
     if (merge_label->merges.empty()) {
         // none of the paths are returning
         // cases do not need a merge label
@@ -2530,9 +2574,6 @@ static SCOPES_RESULT(TypedValue *) prove_If(const ASTContext &ctx, If *_if) {
     CondBr *last_condbr = nullptr;
     ASTContext subctx(ctx);
     Label *merge_label = make_merge_label(ctx, _if->anchor());
-    // appended in evaluation order
-    std::vector<CondBr *> branches;
-    branches.reserve(numclauses);
     for (int i = 0; i < numclauses; ++i) {
         auto &&clause = _if->clauses[i];
         assert(clause.anchor);
@@ -2546,7 +2587,6 @@ static SCOPES_RESULT(TypedValue *) prove_If(const ASTContext &ctx, If *_if) {
                 SCOPES_EXPECT_ERROR(error_invalid_condition_type(newcond));
             }
             CondBr *condbr = CondBr::from(clause.anchor, newcond);
-            branches.push_back(condbr);
             if (!first_condbr) {
                 first_condbr = condbr;
             }
@@ -2580,24 +2620,6 @@ static SCOPES_RESULT(TypedValue *) prove_If(const ASTContext &ctx, If *_if) {
         ASTContext elsectx = ctx.with_block(last_condbr->else_body);
         make_merge(elsectx, _if->anchor(), merge_label,
             ArgumentList::from(_if->anchor(), {}));
-    }
-
-    {
-        int i = branches.size();
-        while (i-- > 0) {
-            CondBr *branch = branches[i];
-            SCOPES_CHECK_RESULT(sync_conditional_blocks(ctx,
-                branch->anchor(), branch->then_body, branch->else_body));
-            SCOPES_CHECK_RESULT(sync_conditional_blocks(ctx,
-                branch->anchor(), branch->else_body, branch->then_body));
-            Block *parent = nullptr;
-            if (i > 0) {
-                parent = &branches[i - 1]->else_body;
-            } else {
-                parent = &merge_label->body;
-            }
-            sync_child_block(ctx, branch->then_body, *parent);
-        }
     }
 
     if (merge_label->merges.empty()) {
@@ -2833,6 +2855,7 @@ static SCOPES_RESULT(Function *) prove_body(Function *frame, Template *func, Typ
     }
 
     SCOPES_CHECK_RESULT(ensure_function_type(fn));
+    SCOPES_CHECK_RESULT(finalize_returns_raises(bodyctx));
     //SCOPES_CHECK_RESULT(track(fnctx));
     fn->complete = true;
     return fn;
