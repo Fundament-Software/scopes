@@ -765,20 +765,25 @@ static SCOPES_RESULT(TypedValue *) prove_Expression(const ASTContext &ctx, Expre
         for (int i = 0; i < count; ++i) {
             auto newsrc = SCOPES_GET_RESULT(prove(ctx, expr->body[i]));
             if (!is_returning(newsrc->get_type())) {
-                //StyledStream ss;
-                //stream_ast(ss, expr->body[i], StreamASTFormat());
                 SCOPES_ANCHOR(expr->body[i]->anchor());
                 SCOPES_CHECK_RESULT(error_noreturn_not_last_expression());
             }
         }
+        TypedValue *result = nullptr;
+        if (expr->value) {
+            result = SCOPES_GET_RESULT(prove(ctx, expr->value));
+        } else {
+            result = ArgumentList::from(expr->anchor(), {});
+        }
+        return result;
     } else {
         for (int i = 0; i < count; ++i) {
             SCOPES_CHECK_RESULT(prove(ctx, expr->body[i]));
         }
+        if (!expr->value)
+            return ArgumentList::from(expr->anchor(), {});
+        return SCOPES_GET_RESULT(prove(ctx, expr->value));
     }
-    if (!expr->value)
-        return ArgumentList::from(expr->anchor(), {});
-    return SCOPES_GET_RESULT(prove(ctx, expr->value));
 }
 
 static int find_key(const Symbols &symbols, Symbol key) {

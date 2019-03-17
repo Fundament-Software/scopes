@@ -19,7 +19,6 @@ typedef Handle :: i32
         repr (storagecast self)
 
     inline __drop (self)
-        dump "drop"
         refcount -= 1
         #print "drop handle" (storagecast self)
         _;
@@ -81,18 +80,27 @@ fn verify-type (f ret args...)
 
 #run-stage;
 
+inline test-refcount (f)
+    fn testfunc ()
+        f;
+        return;
+    assert (refcount == 0)
+    testfunc;
+    assert (refcount == 0)
 
 # receives handle but doesn't do anything with it:
     void<-(%1:Handle)(*)
 fn f (h)
     return;
 verify-type (typify f Handle) void VHandle1
+test-refcount (inline () (f (Handle 1)))
 
 # receives handle and passes it through.
     %1:Handle<-(%1:Handle)(*)
 fn f (h)
     h
 verify-type (typify f Handle) VHandle1 VHandle1
+test-refcount (inline () (f (Handle 1)))
 
 # receives handle, moves it and returns nothing.
     void<-(1:Handle)(*)
@@ -100,18 +108,21 @@ fn f (h)
     move h
     return;
 verify-type (typify f Handle) void UHandle1
+test-refcount (inline () (f (Handle 1)))
 
 # receives handle, moves and returns it.
     R1:Handle<-(1:Handle)(*)
 fn f (h)
     move h
 verify-type (typify f Handle) UHandleR1 UHandle1
+test-refcount (inline () (f (Handle 1)))
 
 # receives no arguments and returns new handle
     R1:Handle<-()(*)
 fn f ()
     Handle 0
 verify-type (typify f) UHandleR1
+test-refcount (inline () (f))
 
 # receives two handles and returns second handle and a new handle
     λ(%2:Handle R2:Handle)<-(%1:Handle %2:Handle)(*)
@@ -119,6 +130,7 @@ fn f (a b)
     viewing a b
     _ b (Handle 0)
 verify-type (typify f Handle Handle) (Arguments VHandle2 UHandleR2) VHandle1 VHandle2
+test-refcount (inline () (f (Handle 1) (Handle 2)))
 
 # receives two handles, conditionally resolves one and returns nothing.
     void<-(%1:Handle %2:Handle bool)(*)
@@ -127,6 +139,9 @@ fn f (a b x)
     else b
     return;
 verify-type (typify f Handle Handle bool) void VHandle1 VHandle2 bool
+test-refcount (inline ()
+    (f (Handle 1) (Handle 2) true)
+    (f (Handle 1) (Handle 2) false))
 
 # views two handles and conditionally returns one.
     %1|2:Handle<-(%1:Handle %2:Handle bool)(*)
@@ -134,6 +149,9 @@ fn f (a b x)
     if x a
     else b
 verify-type (typify f Handle Handle bool) VHandle12 VHandle1 VHandle2 bool
+test-refcount (inline ()
+    (f (Handle 1) (Handle 2) true)
+    (f (Handle 1) (Handle 2) false))
 
 # same setup, but alternative structure
     %1|2:Handle<-(%1:Handle %2:Handle bool)(*)
@@ -142,6 +160,9 @@ fn f (a b x)
         return a
     b
 verify-type (typify f Handle Handle bool) VHandle12 VHandle1 VHandle2 bool
+test-refcount (inline ()
+    (f (Handle 1) (Handle 2) true)
+    (f (Handle 1) (Handle 2) false))
 
 # receives two handles and conditionally moves either one.
     R1:Handle<-(1:Handle 2:Handle bool)(*)
@@ -149,6 +170,9 @@ fn f (a b x)
     if x (move a)
     else (move b)
 verify-type (typify f Handle Handle bool) UHandleR1 UHandle1 UHandle2 bool
+test-refcount (inline ()
+    (f (Handle 1) (Handle 2) true)
+    (f (Handle 1) (Handle 2) false))
 
 # receives two handles, moves both into the function and conditionally
     moves either one.
@@ -162,6 +186,9 @@ fn f (a b x)
     dump a b
     a
 verify-type (typify f Handle Handle bool) UHandleR1 UHandle1 UHandle2 bool
+test-refcount (inline ()
+    (f (Handle 1) (Handle 2) true)
+    (f (Handle 1) (Handle 2) false))
 
 # receives two handles, moves both into the function and conditionally
     moves either one, but one handle is moved into a subscope, which
@@ -178,6 +205,9 @@ fn f (a b x)
     # will drop a
     b
 verify-type (typify f Handle Handle bool) UHandleR1 UHandle1 UHandle2 bool
+test-refcount (inline ()
+    (f (Handle 1) (Handle 2) true)
+    (f (Handle 1) (Handle 2) false))
 
 # receives two handles and conditionally borrows one, but moves another.
     error: conflicting branch types %1:Handle and 1000:Handle
@@ -193,12 +223,14 @@ assert-error (typify f Handle Handle bool)
 fn f (h)
     bitcast h i32
 verify-type (typify f Handle) Vi321 VHandle1
+test-refcount (inline () (f (Handle 1)))
 
 # receives a handle, casts it to i32 and back to Handle
     %1:Handle<-(%1:Handle)(*)
 fn f (h)
     bitcast (bitcast h i32) Handle
 verify-type (typify f Handle) VHandle1 VHandle1
+test-refcount (inline () (f (Handle 1)))
 
 # receives four handles and conditionally returns one, switch version
     <view:0|1|2|3>Handle<-(<view>Handle <view>Handle bool)(*)
@@ -210,6 +242,11 @@ fn f (a b c d x)
     default d
 verify-type (typify f Handle Handle Handle Handle i32)
     \ VHandle1234 VHandle1 VHandle2 VHandle3 VHandle4 i32
+test-refcount (inline ()
+    (f (Handle 1) (Handle 2) (Handle 3) (Handle 4) 0)
+    (f (Handle 1) (Handle 2) (Handle 3) (Handle 4) 1)
+    (f (Handle 1) (Handle 2) (Handle 3) (Handle 4) 2)
+    (f (Handle 1) (Handle 2) (Handle 3) (Handle 4) 3))
 
 # receives two handles and passes them to a function that conditionally returns one
     %1|2:Handle<-(%1:Handle %2:Handle bool)(*)
@@ -220,6 +257,9 @@ fn f (a b c d x)
     ff c d x
 verify-type (typify f Handle Handle Handle Handle bool)
     \ VHandle34 VHandle1 VHandle2 VHandle3 VHandle4 bool
+test-refcount (inline ()
+    (f (Handle 1) (Handle 2) (Handle 3) (Handle 4) false)
+    (f (Handle 1) (Handle 2) (Handle 3) (Handle 4) true))
 
 # receives two handles and passes one to a function that moves the argument,
     then attempts to access the moved argument
@@ -267,6 +307,7 @@ fn f (x)
             _;
 #'dump (typify f Handle)
 verify-type (typify f Handle) void UHandle1
+test-refcount (inline () (f (Handle 0)))
 
 # TODO:
     let c = (unique)

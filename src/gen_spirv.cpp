@@ -1467,6 +1467,8 @@ struct SPIRVGenerator {
                 std::unique_ptr<spv::Instruction>(op));
             return op->getResultId();
         } break;
+        case FN_View:
+        case FN_Forget:
         case FN_Move: {
             READ_VALUE(val);
             return val;

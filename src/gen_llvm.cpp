@@ -1237,6 +1237,8 @@ struct LLVMIRGenerator {
             READ_VALUE(mask);
             return LLVMBuildShuffleVector(builder, v1, v2, mask, "");
         } break;
+        case FN_View:
+        case FN_Forget:
         case FN_Move: {
             READ_VALUE(val);
             return val;
