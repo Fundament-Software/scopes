@@ -95,6 +95,50 @@ void dump_idmap(const ID2SetMap &idmap) {
     ss << idmap.size() << " entries" << std::endl;
 }
 
+IDSet difference_idset(const IDSet &a, const IDSet &b) {
+    IDSet c;
+    c.reserve(a.size());
+    for (auto id : a) {
+        assert(id);
+        if (!b.count(id))
+            c.insert(id);
+    }
+    return c;
+}
+
+IDSet intersect_idset(const IDSet &a, const IDSet &b) {
+    IDSet c;
+    c.reserve(std::min(a.size(), b.size()));
+    for (auto id : a) {
+        assert(id);
+        if (b.count(id))
+            c.insert(id);
+    }
+    return c;
+}
+
+IDSet union_idset(const IDSet &a, const IDSet &b) {
+    IDSet c;
+    c.reserve(std::max(a.size(), b.size()));
+    for (auto id : a) {
+        assert(id);
+        c.insert(id);
+    }
+    for (auto id : b) {
+        assert(id);
+        c.insert(id);
+    }
+    return c;
+}
+
+void dump_idset(const IDSet &a) {
+    StyledStream ss;
+    for (auto id : a) {
+        ss << id << " ";
+    }
+    ss << std::endl;
+}
+
 ViewQualifier::ViewQualifier(const IDSet &_ids)
     : Qualifier((QualifierKind)Kind), ids(_ids) {
     for (auto entry : ids) {

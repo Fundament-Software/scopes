@@ -48,6 +48,15 @@ typedef std::unordered_map<int, IDSet > ID2SetMap;
 void map_unique_id(ID2SetMap &idmap, int fromid, int toid);
 void dump_idmap(const ID2SetMap &idmap);
 
+// a && b
+IDSet intersect_idset(const IDSet &a, const IDSet &b);
+// a || b
+IDSet union_idset(const IDSet &a, const IDSet &b);
+// a && !b
+IDSet difference_idset(const IDSet &a, const IDSet &b);
+void dump_idset(const IDSet &a);
+
+
 struct ViewQualifier : Qualifier {
     enum { Kind = QK_View };
     static bool classof(const Qualifier *T);

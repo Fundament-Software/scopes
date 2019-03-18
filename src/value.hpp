@@ -219,11 +219,8 @@ struct Block {
     int insert_index;
     Instructions body;
     Instruction *terminator;
-    Block *parent;
-    // set of unique ids that have been moved, dropped or forgotten
-    // we auto-drop all unique handles that remain in blocks that we are
-    // leaving via merge / repeat / raise / return
-    IDSet invalid;
+    // set of unique ids that are still valid in this scope
+    IDSet valid;
 };
 
 //------------------------------------------------------------------------------
@@ -720,7 +717,6 @@ struct Function : Pure {
     int unique_id();
     void bind_unique(const UniqueInfo &info);
     void try_bind_unique(TypedValue *value);
-    int get_unique_depth(int id) const;
     const UniqueInfo &get_unique_info(int id) const;
 
     Symbol name;
@@ -744,7 +740,8 @@ struct Function : Pure {
     std::vector<Raise *> raises;
 
     UniqueMap uniques;
-    IDSet invalid;
+    IDSet original_valid;
+    IDSet valid;
 };
 
 //------------------------------------------------------------------------------

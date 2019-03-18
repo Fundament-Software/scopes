@@ -336,13 +336,9 @@ Function::Function(const Anchor *anchor, Symbol _name, const Parameters &_params
     }
 }
 
-int Function::get_unique_depth(int id) const {
-    auto it = uniques.find(id);
-    assert(it != uniques.end());
-    return it->second.get_depth();
-}
-
 const Function::UniqueInfo &Function::get_unique_info(int id) const {
+    assert(id != 0);
+    assert(id < nextid);
     auto it = uniques.find(id);
     assert(it != uniques.end());
     return it->second;
@@ -397,7 +393,17 @@ void Function::change_type(const Type *type) {
 void Function::append_param(Parameter *sym) {
     sym->set_owner(this, params.size());
     params.push_back(sym);
-    try_bind_unique(sym);
+    auto T = sym->get_type();
+    int count = get_argument_count(T);
+    for (int i = 0; i < count; ++i) {
+        auto argT = get_argument(T, i);
+        auto uq = try_unique(argT);
+        if (uq) {
+            assert(uq->id);
+            bind_unique(UniqueInfo(ValueIndex(sym, i)));
+            valid.insert(uq->id);
+        }
+    }
 }
 
 TypedValue *Function::resolve_local(Value *node) const {
@@ -506,7 +512,7 @@ Pure *PureCast::from(const Anchor *anchor, const Type *type, Pure *value) {
 //------------------------------------------------------------------------------
 
 Block::Block()
-    : depth(-1), insert_index(0), terminator(nullptr), parent(nullptr)
+    : depth(-1), insert_index(0), terminator(nullptr)
 {}
 
 bool Block::is_valid(const ValueIndex &value) const {
@@ -524,18 +530,19 @@ bool Block::is_valid(const ValueIndex &value) const {
 
 bool Block::is_valid(const IDSet &ids) const {
     for (auto id : ids) {
-        if (invalid.count(id))
+        if (!valid.count(id))
             return false;
     }
     return true;
 }
 
 bool Block::is_valid(int id) const {
-    return !invalid.count(id);
+    return valid.count(id);
 }
 
 void Block::move(int id) {
-    invalid.insert(id);
+    assert(valid.count(id));
+    valid.erase(id);
 }
 
 bool Block::is_terminated() const {
@@ -543,21 +550,18 @@ bool Block::is_terminated() const {
 }
 
 void Block::set_parent(Block *_parent) {
-    assert(!parent && _parent);
-    parent = _parent;
-    if (_parent) {
-        depth = _parent->depth + 1;
-        // copy invalids from parent
-        assert(invalid.empty());
-        invalid = _parent->invalid;
-    }
+    assert(depth < 0);
+    assert(_parent);
+    depth = _parent->depth + 1;
+    // copy valids from parent
+    assert(valid.empty());
+    valid = _parent->valid;
 }
 
 void Block::clear() {
     body.clear();
-    invalid.clear();
+    valid.clear();
     terminator = nullptr;
-    parent = nullptr;
 }
 
 void Block::migrate_from(Block &source) {
@@ -569,9 +573,9 @@ void Block::migrate_from(Block &source) {
         terminator = source.terminator;
         terminator->block = this;
     }
-    for (auto &&entry : source.invalid) {
-        invalid.insert(entry);
-    }
+    // equivalent to removing all values no longer valid, and adding
+    // all values that have since been added
+    valid = source.valid;
     source.clear();
 }
 
@@ -615,6 +619,15 @@ int Block::append(TypedValue *node) {
                 assert(insert_index == body.size());
                 terminator = instr;
             } else {
+                auto T = instr->get_type();
+                auto count = get_argument_count(T);
+                for (int i = 0; i < count; ++i) {
+                    auto uq = try_unique(get_argument(T, i));
+                    if (uq) {
+                        assert(uq->id);
+                        valid.insert(uq->id);
+                    }
+                }
                 body.insert(body.begin() + insert_index, instr);
                 insert_index++;
             }
