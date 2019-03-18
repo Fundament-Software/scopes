@@ -317,6 +317,10 @@ int Function::UniqueInfo::get_depth() const {
         const Block *block = instr->block;
         assert(block);
         return block->depth;
+    } else if (isa<LoopLabelArguments>(value.value)) {
+        auto lla = cast<LoopLabelArguments>(value.value);
+        assert(lla->loop);
+        return lla->loop->body.depth;
     } else {
         return 0;
     }
@@ -588,8 +592,12 @@ void Block::set_parent(Block *_parent) {
     assert(_parent);
     depth = _parent->depth + 1;
     // copy valids from parent
-    assert(valid.empty());
-    valid = _parent->valid;
+    if (valid.empty()) {
+        valid = _parent->valid;
+    } else {
+        // block has some preconfigured values
+        valid = union_idset(valid, _parent->valid);
+    }
 }
 
 void Block::clear() {
@@ -871,11 +879,11 @@ LoopArguments *LoopArguments::from(const Anchor *anchor, Loop *loop) {
 
 //------------------------------------------------------------------------------
 
-LoopLabelArguments::LoopLabelArguments(const Anchor *anchor, const Type *type, LoopLabel *_loop)
-    : TypedValue(VK_LoopLabelArguments, anchor, type), loop(_loop) {}
+LoopLabelArguments::LoopLabelArguments(const Anchor *anchor, const Type *type)
+    : TypedValue(VK_LoopLabelArguments, anchor, type), loop(nullptr) {}
 
-LoopLabelArguments *LoopLabelArguments::from(const Anchor *anchor, const Type *type, LoopLabel *loop) {
-    return new LoopLabelArguments(anchor, type, loop);
+LoopLabelArguments *LoopLabelArguments::from(const Anchor *anchor, const Type *type) {
+    return new LoopLabelArguments(anchor, type);
 }
 
 //------------------------------------------------------------------------------
@@ -919,13 +927,14 @@ Call *Call::from(const Anchor *anchor, const Type *type, TypedValue *callee, con
 
 //------------------------------------------------------------------------------
 
-LoopLabel::LoopLabel(const Anchor *anchor, const TypedValues &_init)
-    : Instruction(VK_LoopLabel, anchor, TYPE_NoReturn), init(_init) {
-    args = LoopLabelArguments::from(anchor, arguments_type_from_typed_values(_init), this);
+LoopLabel::LoopLabel(const Anchor *anchor, const TypedValues &_init, LoopLabelArguments *_args)
+    : Instruction(VK_LoopLabel, anchor, TYPE_NoReturn), init(_init), args(_args) {
+    assert(args);
+    args->loop = this;
 }
 
-LoopLabel *LoopLabel::from(const Anchor *anchor, const TypedValues &init) {
-    return new LoopLabel(anchor, init);
+LoopLabel *LoopLabel::from(const Anchor *anchor, const TypedValues &init, LoopLabelArguments *args) {
+    return new LoopLabel(anchor, init, args);
 }
 
 //------------------------------------------------------------------------------
@@ -1314,7 +1323,8 @@ const Anchor *Value::anchor() const {
 
 int Value::get_depth() const {
     const Value *value = this;
-    if (isa<Parameter>(value)) {
+    switch(value->kind()) {
+    case VK_Parameter: {
         auto param = cast<Parameter>(value);
         assert(param->owner);
         if (param->block) {
@@ -1334,12 +1344,21 @@ int Value::get_depth() const {
             assert(false);
             return 0;
         }
-    } else if (isa<Instruction>(value)) {
-        //if (value->is_pure_in_function())
-        //    return 0;
-        auto instr = cast<Instruction>(value);
-        assert(instr->block);
-        return instr->block->depth;
+    } break;
+    case VK_LoopLabelArguments: {
+        auto lla = cast<LoopLabelArguments>(value);
+        assert(lla->loop);
+        return lla->loop->body.depth;
+    } break;
+    default: {
+        if (isa<Instruction>(value)) {
+            //if (value->is_pure_in_function())
+            //    return 0;
+            auto instr = cast<Instruction>(value);
+            assert(instr->block);
+            return instr->block->depth;
+        }
+    } break;
     }
     return 0;
 }

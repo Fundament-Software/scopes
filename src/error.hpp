@@ -115,6 +115,7 @@ SCOPES_RESULT(void) error_cannot_access_moved(TypedValue *value, const char *by)
 SCOPES_RESULT(void) error_cannot_return_view(TypedValue *value);
 SCOPES_RESULT(void) error_value_not_unique(TypedValue *value);
 SCOPES_RESULT(void) error_altering_parent_scope_in_pass(const Type *valuetype);
+SCOPES_RESULT(void) error_altering_parent_scope_in_loop(const Type *valuetype);
 SCOPES_RESULT(void) error_value_moved(TypedValue *value, Value *mover, const char *by);
 SCOPES_RESULT(void) error_value_in_use(TypedValue *value, Value *user, const char *by);
 SCOPES_RESULT(void) error_value_is_viewed(Value *value, Value *user, const char *by);

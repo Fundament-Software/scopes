@@ -538,8 +538,8 @@ struct LoopArguments : UntypedValue {
 struct LoopLabelArguments : TypedValue {
     static bool classof(const Value *T);
 
-    LoopLabelArguments(const Anchor *anchor, const Type *type, LoopLabel *loop);
-    static LoopLabelArguments *from(const Anchor *anchor, const Type *type, LoopLabel *loop);
+    LoopLabelArguments(const Anchor *anchor, const Type *type);
+    static LoopLabelArguments *from(const Anchor *anchor, const Type *type);
 
     LoopLabel *loop;
 };
@@ -653,9 +653,10 @@ struct Call : Instruction {
 struct LoopLabel : Instruction {
     static bool classof(const Value *T);
 
-    LoopLabel(const Anchor *anchor, const TypedValues &init);
+    LoopLabel(const Anchor *anchor, const TypedValues &init, LoopLabelArguments *args);
 
-    static LoopLabel *from(const Anchor *anchor, const TypedValues &init);
+    static LoopLabel *from(const Anchor *anchor, const TypedValues &init,
+        LoopLabelArguments *args);
 
     TypedValues init;
     Block body;

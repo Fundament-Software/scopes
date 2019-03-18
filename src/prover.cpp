@@ -264,11 +264,20 @@ ASTContext::ASTContext(Function *_function, Function *_frame,
 }
 
 const Type *ASTContext::fix_merge_type(const Type *T) const {
-    auto uq = try_unique(T);
-    if (uq) {
-        return unique_type(T, unique_id());
+    if (!is_returning_value(T))
+        return T;
+    int count = get_argument_count(T);
+    Types newtypes;
+    newtypes.reserve(count);
+    for (int i = 0; i < count; ++i) {
+        auto argT = get_argument(T, i);
+        auto uq = try_unique(argT);
+        if (uq) {
+            argT = unique_type(argT, unique_id());
+        }
+        newtypes.push_back(argT);
     }
-    return T;
+    return arguments_type(newtypes);
 }
 
 int ASTContext::unique_id() const {
@@ -298,16 +307,10 @@ ASTContext ASTContext::from_function(Function *fn) {
 
 static SCOPES_RESULT(TypedValue *) prove_inline(const ASTContext &ctx, const Closure *cl, const TypedValues &nodes);
 
-static SCOPES_RESULT(const Type *) merge_value_type(const char *context, const Type *T1, const Type *T2) {
-    SCOPES_RESULT_TYPE(const Type *);
+static const Type *merge_single_value_type(const char *context, const Type *T1, const Type *T2) {
+    assert(T1);
     assert(T2);
-    if (!T1)
-        return T2;
     if (T1 == T2)
-        return T1;
-    if (!is_returning(T1))
-        return T2;
-    if (!is_returning(T2))
         return T1;
     auto vq = try_view(T2);
     // are both types views of the same type?
@@ -320,6 +323,34 @@ static SCOPES_RESULT(const Type *) merge_value_type(const char *context, const T
         && (strip_unique(T1) == strip_unique(T2))) {
         // return stand-in unique tag
         return unique_type(T1, UnknownUnique);
+    }
+    return nullptr;
+}
+
+static SCOPES_RESULT(const Type *) merge_value_type(const char *context, const Type *T1, const Type *T2) {
+    SCOPES_RESULT_TYPE(const Type *);
+    assert(T2);
+    if (!T1)
+        return T2;
+    if (T1 == T2)
+        return T1;
+    if (!is_returning(T1))
+        return T2;
+    if (!is_returning(T2))
+        return T1;
+    auto count = get_argument_count(T1);
+    Types newargs;
+    if (get_argument_count(T2) == count) {
+        for (int i = 0; i < count; ++i) {
+            auto argT1 = get_argument(T1, i);
+            auto argT2 = get_argument(T2, i);
+            const Type *T = merge_single_value_type(context, argT1, argT2);
+            if (!T) {
+                SCOPES_EXPECT_ERROR(error_cannot_merge_expression_types(context, T1, T2));
+            }
+            newargs.push_back(T);
+        }
+        return arguments_type(newargs);
     }
     SCOPES_EXPECT_ERROR(error_cannot_merge_expression_types(context, T1, T2));
 }
@@ -340,6 +371,19 @@ static bool split_return_values(TypedValues &values, TypedValue *value) {
         values.push_back(ExtractArgument::from(value->anchor(), value, i));
     }
     return true;
+}
+
+void map_arguments_to_block(const ASTContext &ctx, TypedValue *src) {
+    const Type *T = src->get_type();
+    int count = get_argument_count(T);
+    for (int i = 0; i < count; ++i) {
+        auto argT = get_argument(T, i);
+        auto uq = try_unique(argT);
+        if (uq) {
+            ctx.function->bind_unique(Function::UniqueInfo(ValueIndex(src, i)));
+            ctx.block->valid.insert(uq->id);
+        }
+    }
 }
 
 static void write_annotation(const ASTContext &ctx,
@@ -369,14 +413,14 @@ static SCOPES_RESULT(void) drop_value(const ASTContext &ctx,
         StyledString ss;
         ss.out << "forget";
         write_annotation(ctx, anchor, ss.str(), {
-            ConstPointer::type_from(anchor, arg.value->get_type()) });
+            ConstPointer::type_from(anchor, arg.get_type()) });
         #endif
     } else {
         #if SCOPES_ANNOTATE_TRACKING
         StyledString ss;
         ss.out << "destruct";
         write_annotation(ctx, anchor, ss.str(), {
-            ConstPointer::type_from(anchor, arg.value->get_type()) });
+            ConstPointer::type_from(anchor, arg.get_type()) });
         #endif
         auto expr =
             CallTemplate::from(anchor, handler, {
@@ -583,9 +627,9 @@ static SCOPES_RESULT(TypedValue *) move_single_merge_value(const ASTContext &ctx
 // must be called before the return type is computed
 // don't forget to call merge_back_invalid(...) when the label has been added
 SCOPES_RESULT(void) finalize_merges(const ASTContext &ctx, Label *label, IDSet &valid, const char *by) {
-    SCOPES_RESULT_TYPE(void)
+    SCOPES_RESULT_TYPE(void);
     valid = ctx.block->valid;
-    // patch merge labels before computing the final label type
+    // patch merges
     int retdepth = label->body.depth - 1;
     for (auto merge : label->merges) {
         auto mctx = ctx.with_block(*merge->block);
@@ -605,6 +649,31 @@ SCOPES_RESULT(void) finalize_merges(const ASTContext &ctx, Label *label, IDSet &
         drop_ids.reserve(todrop.size());
         sort_drop_ids(todrop, drop_ids);
         SCOPES_CHECK_RESULT(merge_drop_values(mctx, merge->anchor(), drop_ids));
+    }
+    return {};
+}
+
+SCOPES_RESULT(void) finalize_repeats(const ASTContext &ctx, LoopLabel *label, const char *by) {
+    SCOPES_RESULT_TYPE(void);
+    IDSet valid = ctx.block->valid;
+    // patch repeats
+    int retdepth = label->body.depth - 1;
+    for (auto merge : label->repeats) {
+        auto mctx = ctx.with_block(*merge->block);
+        assert(merge->block);
+        SCOPES_CHECK_RESULT(move_merge_values(mctx,
+            merge->anchor(), retdepth, merge->values, by));
+        collect_valid_values(mctx, valid);
+    }
+    IDSet deleted = difference_idset(ctx.block->valid, valid);
+    if (!deleted.empty()) {
+        // parent values were deleted, which we can't repeat
+        int id = *deleted.begin();
+        auto info = ctx.function->get_unique_info(id);
+        SCOPES_EXPECT_ERROR(error_altering_parent_scope_in_loop(info.value.get_type()));
+    }
+    for (auto merge : label->repeats) {
+        SCOPES_CHECK_RESULT(validate_merge_values(valid, merge->values));
     }
     return {};
 }
@@ -1007,29 +1076,45 @@ static SCOPES_RESULT(TypedValue *) prove_ExtractArgumentTemplate(
 static SCOPES_RESULT(TypedValue *) prove_Loop(const ASTContext &ctx, Loop *loop) {
     SCOPES_RESULT_TYPE(TypedValue *);
     SCOPES_ANCHOR(loop->anchor());
-    auto init = SCOPES_GET_RESULT(prove(ctx, loop->init));
-    auto ltype = init->get_type();
-    if (!is_returning(ltype))
-        return init;
-    LoopLabel *newloop = nullptr;
-    if (isa<ArgumentList>(init)) {
-        newloop = LoopLabel::from(loop->anchor(), cast<ArgumentList>(init)->values);
-    } else if (!is_returning_value(ltype)) {
-        newloop = LoopLabel::from(loop->anchor(), {});
-    } else {
-        newloop = LoopLabel::from(loop->anchor(), { init });
+
+    TypedValues init_values;
+    auto noret = SCOPES_GET_RESULT(
+        prove_arguments(ctx, init_values, { loop->init }));
+    if (noret) return noret;
+
+    Types loop_types;
+    for (auto &&value : init_values) {
+        SCOPES_CHECK_RESULT(verify_valid(ctx, value, "loop init"));
+        auto T = value->get_type();
+        auto uq = try_unique(T);
+        if (uq) {
+            ctx.move(uq->id);
+            // move into loop
+            T = unique_type(T, ctx.unique_id());
+        }
+        loop_types.push_back(T);
     }
+
+    auto loopargs = LoopLabelArguments::from(
+        loop->anchor(), arguments_type(loop_types));
+
+    LoopLabel *newloop = LoopLabel::from(loop->anchor(), init_values, loopargs);
     // anchor loop to the local block to avoid it landing in the wrong place
     // ctx.append(newloop);
+    map_arguments_to_block(ctx.with_block(newloop->body), loopargs);
     ctx.frame->bind(loop->args, newloop->args);
+
     auto subctx = ctx.for_loop(newloop);
     ASTContext newctx;
     auto result = SCOPES_GET_RESULT(prove_block(subctx, newloop->body, loop->value, newctx));
     //auto rtype = result->get_type();
     make_repeat(newctx, result->anchor(), newloop, result);
 
+    SCOPES_CHECK_RESULT(finalize_repeats(ctx, newloop, "loop repeat"));
+
+    const Type *rtype = newloop->args->get_type();
     for (auto repeat : newloop->repeats) {
-        SCOPES_CHECK_RESULT(merge_value_type("loop repeat", ltype,
+        SCOPES_CHECK_RESULT(merge_value_type("loop repeat", rtype,
             arguments_type_from_typed_values(repeat->values)));
     }
 
@@ -1659,6 +1744,8 @@ repeat:
             for (auto id : ctx.block->valid) {
                 ss << " ";
                 ss << id;
+                auto info = ctx.function->get_unique_info(id);
+                ss << "[" << info.get_depth() << "](" << info.value << ")";
             }
             ss << std::endl;
             return ArgumentList::from(call->anchor(), values);
@@ -2511,15 +2598,7 @@ repeat:
         const Type *et = remap_unique_return_arguments(exceptctx, idmap, ft->except_type);
         auto exc = Exception::from(call->anchor(), et);
 
-        int count = get_argument_count(et);
-        for (int i = 0; i < count; ++i) {
-            auto argT = get_argument(et, i);
-            auto uq = try_unique(argT);
-            if (uq) {
-                ctx.function->bind_unique(Function::UniqueInfo(ValueIndex(exc, i)));
-                newcall->except_body.valid.insert(uq->id);
-            }
-        }
+        map_arguments_to_block(ctx.with_block(newcall->except_body), exc);
         newcall->except = exc;
 
         SCOPES_CHECK_RESULT(make_raise(exceptctx, call->anchor(), exc));

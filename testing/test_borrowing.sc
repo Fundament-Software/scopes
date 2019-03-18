@@ -315,6 +315,7 @@ fn f ()
 assert-error (typify f)
 
 # creating a local unique in a switch pass
+    void <- ()
 fn f ()
     let x = (Handle 0)
     switch 10
@@ -329,6 +330,7 @@ fn f ()
 test-refcount (inline () (f))
 
 # state propagation through different kinds of scopes
+    void <- (1:Handle)(*)
 fn f (x)
     let c = (Handle 0)
     if false
@@ -351,6 +353,8 @@ fn f (x)
 verify-type (typify f Handle) void UHandle1
 test-refcount (inline () (f (Handle 0)))
 
+# return or raise unique value
+    R1:Handle <-> E1:Handle (bool)(*)
 fn f-raises (k)
     let x y =
         Handle 1; Handle 2
@@ -359,6 +363,8 @@ fn f-raises (k)
     x
 verify-raising-type (typify f-raises bool) UHandleR1 UHandleE1 bool
 
+# call exception raising function which returns handles on all paths
+    R1:Handle <- (bool)(*)
 fn f (k)
     let z = (Handle 3)
     try
@@ -370,7 +376,32 @@ test-refcount (inline ()
     (f false)
     (f true))
 
+# take two unique parameters and move them through a loop, implicitly discarding
+    one and creating new ones occasionally
+fn f (x y)
+    loop (x i = x 0)
+        if (i == 10)
+            break x y
+        if ((i % 3) == 0)
+            repeat (Handle 2) (i + 1)
+        if ((i % 3) == 1)
+            repeat x (i + 1)
+        repeat x (i + 1)
+verify-type (typify f Handle Handle) (Arguments UHandleR1 UHandleR2) UHandle1 UHandle2
+test-refcount (inline () (f (Handle 0) (Handle 1)))
+
+# move a parameter inside a loop
+    error: loop moved value of type 2:Handle which is from a parent scope
+fn f (x y)
+    loop (x i = x 0)
+        if (i == 10)
+            break x
+        move y
+        repeat x (i + 1)
+assert-error (typify f Handle Handle)
+
+
 # TODO: composition, decomposition
 
-# TODO: loops
 
+# TODO: builtins
