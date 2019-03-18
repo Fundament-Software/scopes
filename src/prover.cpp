@@ -542,6 +542,22 @@ static SCOPES_RESULT(void) move_merge_values(const ASTContext &ctx,
     return {};
 }
 
+static SCOPES_RESULT(TypedValue *) move_single_merge_value(const ASTContext &ctx,
+    int retdepth, TypedValue *result) {
+    SCOPES_RESULT_TYPE(TypedValue *);
+    TypedValues values;
+    if (is_returning_value(result->get_type())
+        && split_return_values(values, result)) {
+        SCOPES_CHECK_RESULT(move_merge_values(ctx, result->anchor(),
+            retdepth, values));
+        result = ArgumentList::from(result->anchor(), values);
+    } else {
+        SCOPES_CHECK_RESULT(move_merge_values(ctx, result->anchor(),
+            retdepth, values));
+    }
+    return result;
+}
+
 // must be called before the return type is computed
 // don't forget to call merge_back_invalid(...) when the label has been added
 SCOPES_RESULT(void) finalize_merges(const ASTContext &ctx, Label *label, IDSet &valid) {
@@ -717,6 +733,8 @@ static SCOPES_RESULT(TypedValue *) prove_LabelTemplate(const ASTContext &ctx, La
     if (label->merges.empty()) {
         // label does not need a merge label
         assert(ctx.block);
+        result = SCOPES_GET_RESULT(
+            move_single_merge_value(labelctx, ctx.block->depth, result));
         ctx.merge_block(label->body);
         return result;
     } else {
@@ -765,16 +783,8 @@ static SCOPES_RESULT(TypedValue *) prove_Expression(const ASTContext &ctx, Expre
         } else {
             result = ArgumentList::from(expr->anchor(), {});
         }
-        TypedValues values;
-        if (is_returning_value(result->get_type())
-            && split_return_values(values, result)) {
-            SCOPES_CHECK_RESULT(move_merge_values(subctx, result->anchor(),
-                ctx.block->depth, values));
-            result = ArgumentList::from(result->anchor(), values);
-        } else {
-            SCOPES_CHECK_RESULT(move_merge_values(subctx, result->anchor(),
-                ctx.block->depth, values));
-        }
+        result = SCOPES_GET_RESULT(
+            move_single_merge_value(subctx, ctx.block->depth, result));
         ctx.merge_block(block);
         return result;
     } else {
@@ -2775,6 +2785,8 @@ static SCOPES_RESULT(TypedValue *) prove_inline_body(const ASTContext &ctx,
     if (label->merges.empty()) {
         // label does not need a merge label
         assert(ctx.block);
+        result_value = SCOPES_GET_RESULT(
+            move_single_merge_value(bodyctx, ctx.block->depth, result_value));
         ctx.merge_block(label->body);
         return result_value;
     } else {

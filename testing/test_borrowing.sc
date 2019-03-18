@@ -101,7 +101,7 @@ test-refcount (inline () (f (Handle 1)))
 fn f (h)
     h
 verify-type (typify f Handle) VHandle1 VHandle1
-test-refcount (inline () (f (Handle 1)))
+test-refcount (inline () (f (Handle 1)) (_))
 
 # receives handle, moves it and returns nothing.
     void<-(1:Handle)(*)
@@ -131,7 +131,7 @@ fn f (a b)
     viewing a b
     _ b (Handle 0)
 verify-type (typify f Handle Handle) (Arguments VHandle2 UHandleR2) VHandle1 VHandle2
-test-refcount (inline () (f (Handle 1) (Handle 2)))
+test-refcount (inline () (f (Handle 1) (Handle 2)) (_))
 
 # receives two handles, conditionally resolves one and returns nothing.
     void<-(%1:Handle %2:Handle bool)(*)
@@ -152,7 +152,8 @@ fn f (a b x)
 verify-type (typify f Handle Handle bool) VHandle12 VHandle1 VHandle2 bool
 test-refcount (inline ()
     (f (Handle 1) (Handle 2) true)
-    (f (Handle 1) (Handle 2) false))
+    (f (Handle 1) (Handle 2) false)
+    (_))
 
 # same setup, but alternative structure
     %1|2:Handle<-(%1:Handle %2:Handle bool)(*)
@@ -163,7 +164,8 @@ fn f (a b x)
 verify-type (typify f Handle Handle bool) VHandle12 VHandle1 VHandle2 bool
 test-refcount (inline ()
     (f (Handle 1) (Handle 2) true)
-    (f (Handle 1) (Handle 2) false))
+    (f (Handle 1) (Handle 2) false)
+    (_))
 
 # receives two handles and conditionally moves either one.
     R1:Handle<-(1:Handle 2:Handle bool)(*)
@@ -224,14 +226,14 @@ assert-error (typify f Handle Handle bool)
 fn f (h)
     bitcast h i32
 verify-type (typify f Handle) Vi321 VHandle1
-test-refcount (inline () (f (Handle 1)))
+test-refcount (inline () (f (Handle 1)) (_))
 
 # receives a handle, casts it to i32 and back to Handle
     %1:Handle<-(%1:Handle)(*)
 fn f (h)
     bitcast (bitcast h i32) Handle
 verify-type (typify f Handle) VHandle1 VHandle1
-test-refcount (inline () (f (Handle 1)))
+test-refcount (inline () (f (Handle 1)) (_))
 
 # receives four handles and conditionally returns one, switch version
     <view:0|1|2|3>Handle<-(<view>Handle <view>Handle bool)(*)
@@ -247,7 +249,8 @@ test-refcount (inline ()
     (f (Handle 1) (Handle 2) (Handle 3) (Handle 4) 0)
     (f (Handle 1) (Handle 2) (Handle 3) (Handle 4) 1)
     (f (Handle 1) (Handle 2) (Handle 3) (Handle 4) 2)
-    (f (Handle 1) (Handle 2) (Handle 3) (Handle 4) 3))
+    (f (Handle 1) (Handle 2) (Handle 3) (Handle 4) 3)
+    (_))
 
 # receives two handles and passes them to a function that conditionally returns one
     %1|2:Handle<-(%1:Handle %2:Handle bool)(*)
@@ -260,7 +263,8 @@ verify-type (typify f Handle Handle Handle Handle bool)
     \ VHandle34 VHandle1 VHandle2 VHandle3 VHandle4 bool
 test-refcount (inline ()
     (f (Handle 1) (Handle 2) (Handle 3) (Handle 4) false)
-    (f (Handle 1) (Handle 2) (Handle 3) (Handle 4) true))
+    (f (Handle 1) (Handle 2) (Handle 3) (Handle 4) true)
+    (_))
 
 # receives two handles and passes one to a function that moves the argument,
     then attempts to access the moved argument
