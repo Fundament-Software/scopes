@@ -1141,9 +1141,7 @@ void sc_template_set_inline(sc_value_t *fn) {
 sc_value_t *sc_expression_new(const sc_anchor_t *anchor) {
     using namespace scopes;
     REWRITE_ANCHOR(anchor)
-    auto block = Expression::from(anchor);
-    block->scoped = false;
-    return block;
+    return Expression::unscoped_from(anchor);
 }
 
 void sc_expression_set_scoped(sc_value_t *expr) {

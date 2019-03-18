@@ -749,8 +749,11 @@ static SCOPES_RESULT(TypedValue *) prove_Expression(const ASTContext &ctx, Expre
     SCOPES_RESULT_TYPE(TypedValue *);
     int count = (int)expr->body.size();
     if (expr->scoped) {
+        Block block;
+        block.set_parent(ctx.block);
+        ASTContext subctx = ctx.with_block(block);
         for (int i = 0; i < count; ++i) {
-            auto newsrc = SCOPES_GET_RESULT(prove(ctx, expr->body[i]));
+            auto newsrc = SCOPES_GET_RESULT(prove(subctx, expr->body[i]));
             if (!is_returning(newsrc->get_type())) {
                 SCOPES_ANCHOR(expr->body[i]->anchor());
                 SCOPES_CHECK_RESULT(error_noreturn_not_last_expression());
@@ -758,10 +761,21 @@ static SCOPES_RESULT(TypedValue *) prove_Expression(const ASTContext &ctx, Expre
         }
         TypedValue *result = nullptr;
         if (expr->value) {
-            result = SCOPES_GET_RESULT(prove(ctx, expr->value));
+            result = SCOPES_GET_RESULT(prove(subctx, expr->value));
         } else {
             result = ArgumentList::from(expr->anchor(), {});
         }
+        TypedValues values;
+        if (is_returning_value(result->get_type())
+            && split_return_values(values, result)) {
+            SCOPES_CHECK_RESULT(move_merge_values(subctx, result->anchor(),
+                ctx.block->depth, values));
+            result = ArgumentList::from(result->anchor(), values);
+        } else {
+            SCOPES_CHECK_RESULT(move_merge_values(subctx, result->anchor(),
+                ctx.block->depth, values));
+        }
+        ctx.merge_block(block);
         return result;
     } else {
         for (int i = 0; i < count; ++i) {

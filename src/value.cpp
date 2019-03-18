@@ -652,7 +652,7 @@ void Expression::append(Value *node) {
     value = node;
 }
 
-Expression *Expression::from(const Anchor *anchor, const Values &nodes, Value *value) {
+Expression *Expression::scoped_from(const Anchor *anchor, const Values &nodes, Value *value) {
     return new Expression(anchor, nodes, value);
 }
 

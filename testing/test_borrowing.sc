@@ -19,6 +19,7 @@ typedef Handle :: i32
         repr (storagecast self)
 
     inline __drop (self)
+        #dump "drop"
         refcount -= 1
         #print "drop handle" (storagecast self)
         _;

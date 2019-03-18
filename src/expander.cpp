@@ -84,7 +84,8 @@ struct Expander {
 
     ~Expander() {}
 
-    SCOPES_RESULT(Value *) expand_expression(const Anchor *anchor, const List *it) {
+    SCOPES_RESULT(Value *) expand_expression(
+        const Anchor *anchor, const List *it, bool scoped) {
         SCOPES_RESULT_TYPE(Value *);
         Expression *expr = nullptr;
         while (it) {
@@ -96,7 +97,10 @@ struct Expander {
                 }
             }
             if (!expr) {
-                expr = Expression::from(anchor);
+                if (scoped)
+                    expr = Expression::scoped_from(anchor);
+                else
+                    expr = Expression::unscoped_from(anchor);
             }
             expr->append(SCOPES_GET_RESULT(expand(it->at)));
             it = next;
@@ -236,7 +240,7 @@ struct Expander {
             }
         }
 
-        func->value = SCOPES_GET_RESULT(subexpr.expand_expression(_anchor, it));
+        func->value = SCOPES_GET_RESULT(subexpr.expand_expression(_anchor, it, false));
 
         return result;
     }
@@ -244,31 +248,6 @@ struct Expander {
     bool last_expression() {
         return next == EOL;
     }
-
-#if 0
-    SCOPES_RESULT(Any) expand_defer(const List *it, const Any &dest) {
-        SCOPES_RESULT_TYPE(Any);
-        auto _anchor = get_active_anchor();
-
-        it = it->next;
-        const List *body = it;
-        const List *block = next;
-        next = EOL;
-
-        Label *nextstate = Label::continuation_from(_anchor, Symbol(SYM_Unnamed));
-
-        SCOPES_CHECK_RESULT(expand_expression(block, nextstate));
-
-        state = nextstate;
-        // read parameter names
-        it = SCOPES_GET_RESULT(unsyntax(it->at));
-        while (it != EOL) {
-            nextstate->append(SCOPES_GET_RESULT(expand_parameter(it->at)));
-            it = it->next;
-        }
-        return expand_do(body, dest, false);
-    }
-#endif
 
     SCOPES_RESULT(Value *) expand_label(const List *it) {
         SCOPES_RESULT_TYPE(Value *);
@@ -283,7 +262,7 @@ struct Expander {
         auto label = LabelTemplate::from(_anchor, LK_User, name);
         subenv->bind(name, label);
         Expander subexpr(subenv, astscope);
-        label->value = SCOPES_GET_RESULT(subexpr.expand_expression(_anchor, it));
+        label->value = SCOPES_GET_RESULT(subexpr.expand_expression(_anchor, it, false));
         return label;
     }
 
@@ -295,7 +274,7 @@ struct Expander {
 
         Scope *subenv = Scope::from(env);
         Expander subexpr(subenv, astscope);
-        return subexpr.expand_expression(_anchor, it);
+        return subexpr.expand_expression(_anchor, it, true);
     }
 
     SCOPES_RESULT(Value *) expand_inline_do(const List *it) {
@@ -305,11 +284,7 @@ struct Expander {
         it = it->next;
 
         Expander subexpr(env, astscope);
-        auto expr = SCOPES_GET_RESULT(subexpr.expand_expression(_anchor, it));
-        if (isa<Expression>(expr)) {
-            auto ex = cast<Expression>(expr);
-            ex->scoped = false;
-        }
+        auto expr = SCOPES_GET_RESULT(subexpr.expand_expression(_anchor, it, false));
         env = subexpr.env;
         return expr;
     }
@@ -384,7 +359,7 @@ struct Expander {
 
         Expander bodyexp(Scope::from(env), astscope);
 
-        auto expr = Expression::from(_anchor);
+        auto expr = Expression::unscoped_from(_anchor);
         {
             int index = 0;
             it = params;
@@ -409,7 +384,7 @@ struct Expander {
             }
         }
 
-        auto value = SCOPES_GET_RESULT(bodyexp.expand_expression(_anchor, body));
+        auto value = SCOPES_GET_RESULT(bodyexp.expand_expression(_anchor, body, false));
         expr->append(value);
         loop->value = expr;
         return break_label;
@@ -555,7 +530,7 @@ struct Expander {
             }
         }
 
-        return Expression::from(_anchor, exprs,
+        return Expression::unscoped_from(_anchor, exprs,
             ArgumentListTemplate::from(_anchor, args));
     }
 
@@ -616,7 +591,7 @@ struct Expander {
 
         Expander subexp(Scope::from(env), astscope);
 
-        Value *try_value = SCOPES_GET_RESULT(subexp.expand_expression(_anchor, it));
+        Value *try_value = SCOPES_GET_RESULT(subexp.expand_expression(_anchor, it, false));
         LabelTemplate *try_label = LabelTemplate::try_from(_anchor);
         LabelTemplate *except_label = LabelTemplate::except_from(_anchor,
             MergeTemplate::from(_anchor, try_label, try_value));
@@ -635,7 +610,7 @@ struct Expander {
                     const List *body = it->next;
 
                     Expander subexp(Scope::from(env), astscope);
-                    auto expr = Expression::from(_next_anchor);
+                    auto expr = Expression::unscoped_from(_next_anchor);
                     expr->append(except_label);
                     {
                         int index = 0;
@@ -662,7 +637,7 @@ struct Expander {
                     }
 
                     it = body;
-                    Value *except_value = SCOPES_GET_RESULT(subexp.expand_expression(_anchor, it));
+                    Value *except_value = SCOPES_GET_RESULT(subexp.expand_expression(_anchor, it, false));
                     expr->append(except_value);
                     try_label->value = expr;
                     return try_label;
@@ -713,7 +688,7 @@ struct Expander {
             it = subexp.next;
 
             Expander nativeexp(Scope::from(env), astscope);
-            _case.value = SCOPES_GET_RESULT(nativeexp.expand_expression(_case.anchor, it));
+            _case.value = SCOPES_GET_RESULT(nativeexp.expand_expression(_case.anchor, it, false));
             cases.push_back(_case);
 
             it = next;
@@ -724,7 +699,7 @@ struct Expander {
             _case.kind = CK_Default;
 
             Expander nativeexp(Scope::from(env), astscope);
-            _case.value = SCOPES_GET_RESULT(nativeexp.expand_expression(_case.anchor, it));
+            _case.value = SCOPES_GET_RESULT(nativeexp.expand_expression(_case.anchor, it, false));
             cases.push_back(_case);
         }
 
@@ -788,7 +763,7 @@ struct Expander {
 
             subexp.env = Scope::from(env);
             ifexpr->append_then(anchor, cond,
-                SCOPES_GET_RESULT(subexp.expand_expression(anchor, it)));
+                SCOPES_GET_RESULT(subexp.expand_expression(anchor, it, false)));
         }
 
         it = branches[lastidx];
@@ -798,7 +773,7 @@ struct Expander {
             Expander subexp(Scope::from(env), astscope);
 
             ifexpr->append_else(anchor,
-                SCOPES_GET_RESULT(subexp.expand_expression(anchor, it)));
+                SCOPES_GET_RESULT(subexp.expand_expression(anchor, it, false)));
         }
 
         return ifexpr;
@@ -860,7 +835,7 @@ struct Expander {
         it = it->next;
 
         Expander subexpr(env, astscope);
-        auto expr = SCOPES_GET_RESULT(subexpr.expand_expression(_anchor, it));
+        auto expr = SCOPES_GET_RESULT(subexpr.expand_expression(_anchor, it, false));
         return ast_quote(expr, _anchor);
     }
 
@@ -871,7 +846,7 @@ struct Expander {
         it = it->next;
         Expander subexp(env, astscope);
         return Unquote::from(_anchor,
-            SCOPES_GET_RESULT(subexp.expand_expression(_anchor, it)));
+            SCOPES_GET_RESULT(subexp.expand_expression(_anchor, it, false)));
     }
 
     SCOPES_RESULT(Value *) expand_ast_unquote_arguments(const List *it) {
@@ -1186,7 +1161,7 @@ SCOPES_RESULT(Template *) expand_inline(const Anchor *anchor, Template *astscope
 
     Scope *subenv = scope?scope:sc_get_globals();
     Expander subexpr(subenv, astscope);
-    mainfunc->value = SCOPES_GET_RESULT(subexpr.expand_expression(anchor, expr));
+    mainfunc->value = SCOPES_GET_RESULT(subexpr.expand_expression(anchor, expr, false));
 
     return mainfunc;
 }
@@ -1201,7 +1176,7 @@ SCOPES_RESULT(Template *) expand_module(const Anchor *anchor, const List *expr, 
 
     Scope *subenv = scope?scope:sc_get_globals();
     Expander subexpr(subenv, mainfunc);
-    mainfunc->value = SCOPES_GET_RESULT(subexpr.expand_expression(anchor, expr));
+    mainfunc->value = SCOPES_GET_RESULT(subexpr.expand_expression(anchor, expr, false));
 
     return mainfunc;
 }

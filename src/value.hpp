@@ -376,7 +376,7 @@ struct Expression : UntypedValue {
     Expression(const Anchor *anchor, const Values &nodes, Value *value);
     void append(Value *node);
 
-    static Expression *from(const Anchor *anchor, const Values &nodes = {}, Value *value = nullptr);
+    static Expression *scoped_from(const Anchor *anchor, const Values &nodes = {}, Value *value = nullptr);
     static Expression *unscoped_from(const Anchor *anchor, const Values &nodes = {}, Value *value = nullptr);
 
     Values body;
