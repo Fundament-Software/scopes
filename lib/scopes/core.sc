@@ -487,10 +487,14 @@ sc_type_set_symbol type 'raising
             verify-count argcount 2 2
             let self = (sc_getarg args 0)
             let except_type = (sc_getarg args 1)
-            let T = (unbox-pointer self type)
-            let exceptT = (unbox-pointer except_type type)
-            box-pointer
-                sc_function_type_raising T exceptT
+            if (sc_value_is_constant self)
+                if (sc_value_is_constant except_type)
+                    let T = (unbox-pointer self type)
+                    let exceptT = (unbox-pointer except_type type)
+                    return
+                        box-pointer
+                            sc_function_type_raising T exceptT
+            `(sc_function_type_raising self except_type)
 
 # closure constructor
 #sc_type_set_symbol Closure '__typecall

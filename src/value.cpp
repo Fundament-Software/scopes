@@ -362,6 +362,12 @@ void Function::try_bind_unique(TypedValue *value) {
 void Function::bind_unique(const UniqueInfo &info) {
     auto uq = get_unique(info.value.get_type());
     auto result = uniques.insert({uq->id, info});
+    if (!result.second) {
+        StyledStream ss;
+        ss << "internal error: duplicate unique " << uq->id;
+        ss << " (was " << result.first->second.value;
+        ss << ", is " << info.value << ")" << std::endl;
+    }
     assert(result.second);
 }
 

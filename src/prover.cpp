@@ -263,9 +263,9 @@ ASTContext::ASTContext(Function *_function, Function *_frame,
     except(_except), _break(xbreak), block(_block) {
 }
 
-const Type *ASTContext::fix_type(const Type *T) const {
+const Type *ASTContext::fix_merge_type(const Type *T) const {
     auto uq = try_unique(T);
-    if (uq && (uq->id == UnknownUnique)) {
+    if (uq) {
         return unique_type(T, unique_id());
     }
     return T;
@@ -392,18 +392,18 @@ static SCOPES_RESULT(void) drop_value(const ASTContext &ctx,
     return {};
 }
 
-static SCOPES_RESULT(void) verify_valid(const ASTContext &ctx, TypedValue *val) {
+static SCOPES_RESULT(void) verify_valid(const ASTContext &ctx, TypedValue *val, const char *by) {
     SCOPES_RESULT_TYPE(void);
     if (!ctx.block->is_valid(val)) {
-        SCOPES_EXPECT_ERROR(error_cannot_access_moved(val));
+        SCOPES_EXPECT_ERROR(error_cannot_access_moved(val, by));
     }
     return {};
 }
 
-static SCOPES_RESULT(void) verify_valid(const ASTContext &ctx, const TypedValues &values) {
+static SCOPES_RESULT(void) verify_valid(const ASTContext &ctx, const TypedValues &values, const char *by) {
     SCOPES_RESULT_TYPE(void);
     for (auto &&value : values) {
-        SCOPES_CHECK_RESULT(verify_valid(ctx, value));
+        SCOPES_CHECK_RESULT(verify_valid(ctx, value, by));
     }
     return {};
 }
@@ -510,13 +510,13 @@ static SCOPES_RESULT(void) merge_drop_values(const ASTContext &ctx,
 }
 
 static SCOPES_RESULT(void) move_merge_values(const ASTContext &ctx,
-    const Anchor *anchor, int retdepth, TypedValues &values) {
+    const Anchor *anchor, int retdepth, TypedValues &values, const char *by) {
     SCOPES_RESULT_TYPE(void);
     SCOPES_ANCHOR(anchor);
     assert(retdepth >= 0);
     IDSet saved;
     for (auto &&value : values) {
-        SCOPES_CHECK_RESULT(verify_valid(ctx, value));
+        SCOPES_CHECK_RESULT(verify_valid(ctx, value, by));
         auto T = value->get_type();
         auto uq = try_unique(T);
         if (uq) {
@@ -565,24 +565,24 @@ static SCOPES_RESULT(void) move_merge_values(const ASTContext &ctx,
 }
 
 static SCOPES_RESULT(TypedValue *) move_single_merge_value(const ASTContext &ctx,
-    int retdepth, TypedValue *result) {
+    int retdepth, TypedValue *result, const char *by) {
     SCOPES_RESULT_TYPE(TypedValue *);
     TypedValues values;
     if (is_returning_value(result->get_type())
         && split_return_values(values, result)) {
         SCOPES_CHECK_RESULT(move_merge_values(ctx, result->anchor(),
-            retdepth, values));
+            retdepth, values, by));
         result = ArgumentList::from(result->anchor(), values);
     } else {
         SCOPES_CHECK_RESULT(move_merge_values(ctx, result->anchor(),
-            retdepth, values));
+            retdepth, values, by));
     }
     return result;
 }
 
 // must be called before the return type is computed
 // don't forget to call merge_back_invalid(...) when the label has been added
-SCOPES_RESULT(void) finalize_merges(const ASTContext &ctx, Label *label, IDSet &valid) {
+SCOPES_RESULT(void) finalize_merges(const ASTContext &ctx, Label *label, IDSet &valid, const char *by) {
     SCOPES_RESULT_TYPE(void)
     valid = ctx.block->valid;
     // patch merge labels before computing the final label type
@@ -591,7 +591,7 @@ SCOPES_RESULT(void) finalize_merges(const ASTContext &ctx, Label *label, IDSet &
         auto mctx = ctx.with_block(*merge->block);
         assert(merge->block);
         SCOPES_CHECK_RESULT(move_merge_values(mctx,
-            merge->anchor(), retdepth, merge->values));
+            merge->anchor(), retdepth, merge->values, by));
         collect_valid_values(mctx, valid);
     }
     // deleted values
@@ -678,7 +678,7 @@ static SCOPES_RESULT(TypedValue *) make_return1(const ASTContext &ctx, const Anc
     SCOPES_RESULT_TYPE(TypedValue *);
     assert(ctx.block);
     assert(ctx.function);
-    SCOPES_CHECK_RESULT(move_merge_values(ctx, anchor, 0, values));
+    SCOPES_CHECK_RESULT(move_merge_values(ctx, anchor, 0, values, "return"));
     collect_valid_function_values(ctx);
 
     auto newreturn = Return::from(anchor, values);
@@ -703,7 +703,7 @@ static SCOPES_RESULT(TypedValue *) make_raise1(const ASTContext &ctx, const Anch
         return make_merge1(ctx,
             anchor, ctx.except, values);
     } else {
-        SCOPES_CHECK_RESULT(move_merge_values(ctx, anchor, 0, values));
+        SCOPES_CHECK_RESULT(move_merge_values(ctx, anchor, 0, values, "raise"));
         collect_valid_function_values(ctx);
 
         auto newraise = Raise::from(anchor, values);
@@ -756,7 +756,7 @@ static SCOPES_RESULT(TypedValue *) prove_LabelTemplate(const ASTContext &ctx, La
         // label does not need a merge label
         assert(ctx.block);
         result = SCOPES_GET_RESULT(
-            move_single_merge_value(labelctx, ctx.block->depth, result));
+            move_single_merge_value(labelctx, ctx.block->depth, result, by));
         ctx.merge_block(label->body);
         return result;
     } else {
@@ -771,13 +771,13 @@ static SCOPES_RESULT(TypedValue *) prove_LabelTemplate(const ASTContext &ctx, La
         #endif
         assert(!label->body.empty());
         IDSet valid;
-        SCOPES_CHECK_RESULT(finalize_merges(ctx, label, valid));
+        SCOPES_CHECK_RESULT(finalize_merges(ctx, label, valid, by));
         const Type *rtype = nullptr;
         for (auto merge : label->merges) {
-            rtype = SCOPES_GET_RESULT(merge_value_type("label merge",
+            rtype = SCOPES_GET_RESULT(merge_value_type(by,
                 rtype, arguments_type_from_typed_values(merge->values)));
         }
-        rtype = ctx.fix_type(rtype);
+        rtype = ctx.fix_merge_type(rtype);
         label->change_type(rtype);
         merge_back_valid(ctx, valid);
         ctx.append(label);
@@ -806,7 +806,7 @@ static SCOPES_RESULT(TypedValue *) prove_Expression(const ASTContext &ctx, Expre
             result = ArgumentList::from(expr->anchor(), {});
         }
         result = SCOPES_GET_RESULT(
-            move_single_merge_value(subctx, block.depth - 1, result));
+            move_single_merge_value(subctx, block.depth - 1, result, "expression block"));
         ctx.merge_block(block);
         return result;
     } else {
@@ -1579,7 +1579,7 @@ static SCOPES_RESULT(TypedValue *) prove_call_interior(const ASTContext &ctx, Ca
     bool rawcall = call->is_rawcall();
     int redirections = 0;
 repeat:
-    SCOPES_CHECK_RESULT(verify_valid(ctx, callee));
+    SCOPES_CHECK_RESULT(verify_valid(ctx, callee, "callee"));
     const Type *T = callee->get_type();
     if (!rawcall) {
         assert(redirections < 16);
@@ -1597,7 +1597,7 @@ repeat:
         keys_from_function_type(keys, extract_function_type(T));
         SCOPES_CHECK_RESULT(map_keyed_arguments(call->anchor(), callee, args, values, keys, false));
         values = args;
-        SCOPES_CHECK_RESULT(verify_valid(ctx, values));
+        SCOPES_CHECK_RESULT(verify_valid(ctx, values, "function call"));
     } else if (T == TYPE_Closure) {
         const Closure *cl = SCOPES_GET_RESULT((extract_closure_constant(callee)));
         {
@@ -1610,7 +1610,7 @@ repeat:
         if (cl->func->is_inline()) {
             return SCOPES_GET_RESULT(prove_inline(ctx, cl, values));
         } else {
-            SCOPES_CHECK_RESULT(verify_valid(ctx, values));
+            SCOPES_CHECK_RESULT(verify_valid(ctx, values, "call"));
             Types types;
             for (auto &&arg : values) {
                 types.push_back(arg->get_type());
@@ -1626,7 +1626,7 @@ repeat:
     } else if (T == TYPE_ASTMacro) {
         auto fptr = SCOPES_GET_RESULT(extract_astmacro_constant(callee));
         assert(fptr);
-            SCOPES_CHECK_RESULT(verify_valid(ctx, values));
+            SCOPES_CHECK_RESULT(verify_valid(ctx, values, "spice call"));
         auto result = fptr(ArgumentList::from(call->anchor(), values));
         if (result.ok) {
             Value *value = result._0;
@@ -1650,7 +1650,7 @@ repeat:
             bool valid = ctx.block->is_valid(values[0]);
             return ConstInt::from(call->anchor(), TYPE_Bool, valid);
         }
-        SCOPES_CHECK_RESULT(verify_valid(ctx, values));
+        SCOPES_CHECK_RESULT(verify_valid(ctx, values, "builtin call"));
         switch(b.value()) {
         /*** DEBUGGING ***/
         case FN_DumpUniques: {
@@ -2510,7 +2510,18 @@ repeat:
         auto exceptctx = ctx.with_block(newcall->except_body);
         const Type *et = remap_unique_return_arguments(exceptctx, idmap, ft->except_type);
         auto exc = Exception::from(call->anchor(), et);
+
+        int count = get_argument_count(et);
+        for (int i = 0; i < count; ++i) {
+            auto argT = get_argument(et, i);
+            auto uq = try_unique(argT);
+            if (uq) {
+                ctx.function->bind_unique(Function::UniqueInfo(ValueIndex(exc, i)));
+                newcall->except_body.valid.insert(uq->id);
+            }
+        }
         newcall->except = exc;
+
         SCOPES_CHECK_RESULT(make_raise(exceptctx, call->anchor(), exc));
     }
     return newcall;
@@ -2553,13 +2564,13 @@ static SCOPES_RESULT(TypedValue *) finalize_merge_label(const ASTContext &ctx, L
     }
 
     IDSet valid;
-    SCOPES_CHECK_RESULT(finalize_merges(ctx, merge_label, valid));
+    SCOPES_CHECK_RESULT(finalize_merges(ctx, merge_label, valid, by));
     if (!rtype) {
         for (auto merge : merge_label->merges) {
             rtype = SCOPES_GET_RESULT(merge_value_type(by, rtype,
                 arguments_type_from_typed_values(merge->values)));
         }
-        rtype = ctx.fix_type(rtype);
+        rtype = ctx.fix_merge_type(rtype);
     }
     merge_label->change_type(rtype);
     merge_back_valid(ctx, valid);
@@ -2818,7 +2829,7 @@ static SCOPES_RESULT(TypedValue *) prove_inline_body(const ASTContext &ctx,
         // label does not need a merge label
         assert(ctx.block);
         result_value = SCOPES_GET_RESULT(
-            move_single_merge_value(bodyctx, ctx.block->depth, result_value));
+            move_single_merge_value(bodyctx, ctx.block->depth, result_value, "inline return"));
         ctx.merge_block(label->body);
         return result_value;
     } else {
@@ -2826,14 +2837,14 @@ static SCOPES_RESULT(TypedValue *) prove_inline_body(const ASTContext &ctx,
             make_merge(bodyctx, result_value->anchor(), label, result_value);
         }
         IDSet valid;
-        SCOPES_CHECK_RESULT(finalize_merges(ctx, label, valid));
+        SCOPES_CHECK_RESULT(finalize_merges(ctx, label, valid, "inline return"));
         const Type *rtype = nullptr;
         for (auto merge : label->merges) {
-            rtype = SCOPES_GET_RESULT(merge_value_type("label merge",
+            rtype = SCOPES_GET_RESULT(merge_value_type("inline return merge",
                 rtype,
                 arguments_type_from_typed_values(merge->values)));
         }
-        rtype = ctx.fix_type(rtype);
+        rtype = ctx.fix_merge_type(rtype);
         label->change_type(rtype);
         merge_back_valid(ctx, valid);
         ctx.append(label);

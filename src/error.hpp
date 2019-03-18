@@ -111,7 +111,7 @@ SCOPES_RESULT(void) error_cannot_deref_non_plain(const Type *T);
 
 // lifetime checker errors
 SCOPES_RESULT(void) error_cannot_view_moved(TypedValue *value);
-SCOPES_RESULT(void) error_cannot_access_moved(TypedValue *value);
+SCOPES_RESULT(void) error_cannot_access_moved(TypedValue *value, const char *by);
 SCOPES_RESULT(void) error_cannot_return_view(TypedValue *value);
 SCOPES_RESULT(void) error_value_not_unique(TypedValue *value);
 SCOPES_RESULT(void) error_altering_parent_scope_in_pass(const Type *valuetype);

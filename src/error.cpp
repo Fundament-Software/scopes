@@ -185,10 +185,10 @@ SCOPES_RESULT(void) error_cannot_view_moved(TypedValue *value) {
     //SCOPES_LOCATION_DEF_ERROR(mover, ss.str());
 }
 
-SCOPES_RESULT(void) error_cannot_access_moved(TypedValue *value) {
+SCOPES_RESULT(void) error_cannot_access_moved(TypedValue *value, const char *by) {
     SCOPES_RESULT_TYPE(void);
     StyledString ss;
-    ss.out << "cannot access value of type " << value->get_type() << " because it has been moved";
+    ss.out << by << " cannot access value of type " << value->get_type() << " because it has been moved";
     SCOPES_LOCATION_ERROR(ss.str());
     //SCOPES_LOCATION_DEF_ERROR(mover, ss.str());
 }
