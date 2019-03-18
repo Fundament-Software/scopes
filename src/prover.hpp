@@ -42,6 +42,7 @@ struct ASTContext {
 
     const Type *fix_type(const Type *T) const;
     int unique_id() const;
+    void move(int id) const;
 
     Function *function;
     Function *frame;

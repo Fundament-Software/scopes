@@ -718,6 +718,7 @@ struct Function : Pure {
     void bind_unique(const UniqueInfo &info);
     void try_bind_unique(TypedValue *value);
     const UniqueInfo &get_unique_info(int id) const;
+    void build_valids();
 
     Symbol name;
     Parameters params;

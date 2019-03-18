@@ -390,20 +390,48 @@ void Function::change_type(const Type *type) {
     _type = type;
 }
 
+void Function::build_valids() {
+    assert(valid.empty());
+    // add uniques
+    for (auto sym : params) {
+        auto T = sym->get_type();
+        int count = get_argument_count(T);
+        for (int i = 0; i < count; ++i) {
+            auto argT = get_argument(T, i);
+            auto uq = try_unique(argT);
+            if (uq) {
+                assert(uq->id);
+                bind_unique(UniqueInfo(ValueIndex(sym, i)));
+                valid.insert(uq->id);
+            }
+        }
+    }
+    // add views
+    for (auto sym : params) {
+        auto T = sym->get_type();
+        int count = get_argument_count(T);
+        for (int i = 0; i < count; ++i) {
+            auto argT = get_argument(T, i);
+            auto vq = try_view(argT);
+            if (vq) {
+                for (auto id : vq->ids) {
+                    assert(id);
+                    if (!valid.count(id)) {
+                        auto result = uniques.insert({id,
+                            UniqueInfo(ValueIndex(sym, i))});
+                        assert(result.second);
+                        valid.insert(id);
+                    }
+                }
+            }
+        }
+    }
+    original_valid = valid;
+}
+
 void Function::append_param(Parameter *sym) {
     sym->set_owner(this, params.size());
     params.push_back(sym);
-    auto T = sym->get_type();
-    int count = get_argument_count(T);
-    for (int i = 0; i < count; ++i) {
-        auto argT = get_argument(T, i);
-        auto uq = try_unique(argT);
-        if (uq) {
-            assert(uq->id);
-            bind_unique(UniqueInfo(ValueIndex(sym, i)));
-            valid.insert(uq->id);
-        }
-    }
 }
 
 TypedValue *Function::resolve_local(Value *node) const {

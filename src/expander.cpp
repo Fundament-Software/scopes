@@ -106,10 +106,8 @@ struct Expander {
             it = next;
         }
         if (expr) {
-            #if 1
-            if (expr->body.empty())
+            if (expr->body.empty() && !expr->scoped)
                 return expr->value;
-            #endif
             return expr;
         }
         return ArgumentListTemplate::from(anchor);

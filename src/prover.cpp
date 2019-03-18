@@ -275,6 +275,10 @@ int ASTContext::unique_id() const {
     return function->unique_id();
 }
 
+void ASTContext::move(int id) const {
+    block->move(id);
+}
+
 void ASTContext::merge_block(Block &_block) const {
     block->migrate_from(_block);
 }
@@ -384,7 +388,7 @@ static SCOPES_RESULT(void) drop_value(const ASTContext &ctx,
         }
     }
     assert(ctx.block);
-    ctx.block->move(id);
+    ctx.move(id);
     return {};
 }
 
@@ -417,6 +421,18 @@ static void build_view(
     }
 }
 
+static void build_move(
+    const ASTContext &ctx, const Anchor *anchor, TypedValue *&val) {
+    assert(ctx.block->is_valid(val));
+    auto T = val->get_type();
+    auto uq = get_unique(T);
+    auto retT = unique_type(T, ctx.unique_id());
+    auto call = Call::from(anchor, retT, g_move, { val });
+    ctx.append(call);
+    ctx.move(uq->id);
+    val = call;
+}
+
 static SCOPES_RESULT(void) validate_pass_block(const ASTContext &ctx, const Block &src) {
     SCOPES_RESULT_TYPE(void);
     // see if pass deleted any values
@@ -433,7 +449,7 @@ static SCOPES_RESULT(void) validate_pass_block(const ASTContext &ctx, const Bloc
 static void merge_back_valid(const ASTContext &ctx, IDSet &valid) {
     IDSet deleted = difference_idset(ctx.block->valid, valid);
     for (auto id : deleted) {
-        ctx.block->move(id);
+        ctx.move(id);
         #if SCOPES_ANNOTATE_TRACKING
         StyledString ss;
         ss.out << "merge-forgetting " << id;
@@ -445,6 +461,11 @@ static void merge_back_valid(const ASTContext &ctx, IDSet &valid) {
 // from a parent set of valid values, only keep the ones in both sets
 static void collect_valid_values(const ASTContext &ctx, IDSet &valid) {
     valid = intersect_idset(valid, ctx.block->valid);
+}
+
+// from a parent set of valid values, only keep the ones in both sets
+static void collect_valid_function_values(const ASTContext &ctx) {
+    ctx.function->valid = intersect_idset(ctx.function->valid, ctx.block->valid);
 }
 
 // check if all merge view arguments are still valid
@@ -501,13 +522,14 @@ static SCOPES_RESULT(void) move_merge_values(const ASTContext &ctx,
         if (uq) {
             auto info = ctx.function->get_unique_info(uq->id);
             int depth = info.get_depth();
-            if (depth > retdepth) {
-                // must save
-                saved.insert(uq->id);
-            } else {
-                // will still be live, we can view
-                build_view(ctx, anchor, value);
+            if (depth <= retdepth) {
+                // must move
+                build_move(ctx, anchor, value);
+                T = value->get_type();
+                uq = get_unique(T);
             }
+            // must save
+            saved.insert(uq->id);
             continue;
         }
         auto vq = try_view(T);
@@ -568,9 +590,9 @@ SCOPES_RESULT(void) finalize_merges(const ASTContext &ctx, Label *label, IDSet &
     for (auto merge : label->merges) {
         auto mctx = ctx.with_block(*merge->block);
         assert(merge->block);
-        collect_valid_values(mctx, valid);
         SCOPES_CHECK_RESULT(move_merge_values(mctx,
             merge->anchor(), retdepth, merge->values));
+        collect_valid_values(mctx, valid);
     }
     // deleted values
     IDSet deleted = difference_idset(ctx.block->valid, valid);
@@ -656,8 +678,8 @@ static SCOPES_RESULT(TypedValue *) make_return1(const ASTContext &ctx, const Anc
     SCOPES_RESULT_TYPE(TypedValue *);
     assert(ctx.block);
     assert(ctx.function);
-    ctx.function->valid = intersect_idset(ctx.function->valid, ctx.block->valid);
     SCOPES_CHECK_RESULT(move_merge_values(ctx, anchor, 0, values));
+    collect_valid_function_values(ctx);
 
     auto newreturn = Return::from(anchor, values);
 
@@ -681,8 +703,8 @@ static SCOPES_RESULT(TypedValue *) make_raise1(const ASTContext &ctx, const Anch
         return make_merge1(ctx,
             anchor, ctx.except, values);
     } else {
-        ctx.function->valid = intersect_idset(ctx.function->valid, ctx.block->valid);
         SCOPES_CHECK_RESULT(move_merge_values(ctx, anchor, 0, values));
+        collect_valid_function_values(ctx);
 
         auto newraise = Raise::from(anchor, values);
 
@@ -784,7 +806,7 @@ static SCOPES_RESULT(TypedValue *) prove_Expression(const ASTContext &ctx, Expre
             result = ArgumentList::from(expr->anchor(), {});
         }
         result = SCOPES_GET_RESULT(
-            move_single_merge_value(subctx, ctx.block->depth, result));
+            move_single_merge_value(subctx, block.depth - 1, result));
         ctx.merge_block(block);
         return result;
     } else {
@@ -1681,9 +1703,19 @@ repeat:
             if (!uq) {
                 SCOPES_CHECK_RESULT(error_value_not_unique(_X));
             }
-            ctx.block->move(uq->id);
-            X = unique_type(X, ctx.unique_id());
-            return ARGTYPE1(X);
+            build_move(ctx, call->anchor(), _X);
+            return _X;
+        } break;
+        case FN_View: {
+            CHECKARGS(1, 1);
+            READ_NODEREF_TYPEOF(X);
+            auto uq = try_unique(X);
+            if (!uq) {
+                // no effect
+                return _X;
+            }
+            build_view(ctx, call->anchor(), _X);
+            return _X;
         } break;
         case FN_Forget: {
             CHECKARGS(1, 1);
@@ -1868,11 +1900,9 @@ repeat:
                     }
                 }
 
-                if (is_unique(SrcT)) {
-                    // moving a unique through a cast can potentially shadow
-                    // a destructor, so we only view
-                    build_view(ctx, call->anchor(), _SrcT);
-                    SrcT = _SrcT->get_type();
+                auto uq = try_unique(SrcT);
+                if (uq) {
+                    ctx.move(uq->id);
                 }
 
                 bool target_is_plain = is_plain(DestT);
@@ -2419,9 +2449,11 @@ repeat:
             SCOPES_CHECK_RESULT(build_deref(ctx, call->anchor(), values[i]));
             Ta = values[i]->get_type();
         }
-        if (is_view(Tb) && !is_view(Ta)) {
-            build_view(ctx, call->anchor(), values[i]);
-            Ta = values[i]->get_type();
+        if (is_view(Tb)) {
+            if (!is_view(Ta)) {
+                build_view(ctx, call->anchor(), values[i]);
+                Ta = values[i]->get_type();
+            }
             Tb = strip_view(Tb);
             Ta = strip_view(Ta);
         } else if (is_unique(Tb) && !is_view(Ta)) {
@@ -2446,7 +2478,7 @@ repeat:
             auto paramu = get_unique(paramT);
             auto argu = get_unique(argT);
             // argument will be moved into the function
-            ctx.block->move(argu->id);
+            ctx.move(argu->id);
             map_unique_id(idmap, paramu->id, argu->id);
         }
     }
@@ -2878,7 +2910,7 @@ static SCOPES_RESULT(Function *) prove_body(Function *frame, Template *func, Typ
             fn->bind(oldparam, newparam);
         }
     }
-    fn->original_valid = fn->valid;
+    fn->build_valids();
     functions.insert(fn);
 
     ASTContext fnctx = ASTContext::from_function(fn);

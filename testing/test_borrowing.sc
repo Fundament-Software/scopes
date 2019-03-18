@@ -96,10 +96,10 @@ fn f (h)
 verify-type (typify f Handle) void VHandle1
 test-refcount (inline () (f (Handle 1)))
 
-# receives handle and passes it through.
+# receives handle and passes a view of it through.
     %1:Handle<-(%1:Handle)(*)
 fn f (h)
-    h
+    view h
 verify-type (typify f Handle) VHandle1 VHandle1
 test-refcount (inline () (f (Handle 1)) (_))
 
@@ -111,12 +111,19 @@ fn f (h)
 verify-type (typify f Handle) void UHandle1
 test-refcount (inline () (f (Handle 1)))
 
-# receives handle, moves and returns it.
+# receives handle and returns it.
     R1:Handle<-(1:Handle)(*)
 fn f (h)
-    move h
+    h
 verify-type (typify f Handle) UHandleR1 UHandle1
 test-refcount (inline () (f (Handle 1)))
+
+# receives handle, moves it locally and then attempts to reaccess
+    cannot access value of type 1:Handle because it has been moved
+fn f (h)
+    let hh = (do h)
+    h
+assert-error (typify f Handle)
 
 # receives no arguments and returns new handle
     R1:Handle<-()(*)
@@ -134,12 +141,12 @@ verify-type (typify f Handle Handle) (Arguments VHandle2 UHandleR2) VHandle1 VHa
 test-refcount (inline () (f (Handle 1) (Handle 2)) (_))
 
 # receives two handles, conditionally resolves one and returns nothing.
-    void<-(%1:Handle %2:Handle bool)(*)
+    void<-(1:Handle 2:Handle bool)(*)
 fn f (a b x)
     if x a
     else b
     return;
-verify-type (typify f Handle Handle bool) void VHandle1 VHandle2 bool
+verify-type (typify f Handle Handle bool) void UHandle1 UHandle2 bool
 test-refcount (inline ()
     (f (Handle 1) (Handle 2) true)
     (f (Handle 1) (Handle 2) false))
@@ -147,8 +154,8 @@ test-refcount (inline ()
 # views two handles and conditionally returns one.
     %1|2:Handle<-(%1:Handle %2:Handle bool)(*)
 fn f (a b x)
-    if x a
-    else b
+    if x (view a)
+    else (view b)
 verify-type (typify f Handle Handle bool) VHandle12 VHandle1 VHandle2 bool
 test-refcount (inline ()
     (f (Handle 1) (Handle 2) true)
@@ -156,12 +163,12 @@ test-refcount (inline ()
     (_))
 
 # same setup, but alternative structure
-    %1|2:Handle<-(%1:Handle %2:Handle bool)(*)
+    R1:Handle<-(1:Handle 2:Handle bool)(*)
 fn f (a b x)
     if x
         return a
     b
-verify-type (typify f Handle Handle bool) VHandle12 VHandle1 VHandle2 bool
+verify-type (typify f Handle Handle bool) UHandleR1 UHandle1 UHandle2 bool
 test-refcount (inline ()
     (f (Handle 1) (Handle 2) true)
     (f (Handle 1) (Handle 2) false)
@@ -170,8 +177,8 @@ test-refcount (inline ()
 # receives two handles and conditionally moves either one.
     R1:Handle<-(1:Handle 2:Handle bool)(*)
 fn f (a b x)
-    if x (move a)
-    else (move b)
+    if x a
+    else b
 verify-type (typify f Handle Handle bool) UHandleR1 UHandle1 UHandle2 bool
 test-refcount (inline ()
     (f (Handle 1) (Handle 2) true)
@@ -201,7 +208,7 @@ fn f (a b x)
     let a = (move a)
     if x
         # will drop b
-        return (move a)
+        return a
     let b = (move b)
     # a still accessible
     dump a
@@ -217,27 +224,35 @@ test-refcount (inline ()
     we could force move on `a` here but that would be an ambiguous guess
     of programmer intent.
 fn f (a b x)
-    if x a
-    else (move b)
+    if x (view a)
+    else b
 assert-error (typify f Handle Handle bool)
 
-# receives a handle and casts it to i32
+# receives a handle and casts a view to i32
     %1:i32<-(%1:Handle)(*)
 fn f (h)
-    bitcast h i32
+    bitcast (view h) i32
 verify-type (typify f Handle) Vi321 VHandle1
+test-refcount (inline () (f (Handle 1)) (_))
+
+# receives a handle and casts it to i32, then back to Handle
+    i32<-(1:Handle)(*)
+fn f (h)
+    bitcast (bitcast h i32) Handle
+verify-type (typify f Handle) UHandleR1 UHandle1
 test-refcount (inline () (f (Handle 1)) (_))
 
 # receives a handle, casts it to i32 and back to Handle
     %1:Handle<-(%1:Handle)(*)
 fn f (h)
-    bitcast (bitcast h i32) Handle
+    bitcast (bitcast (view h) i32) Handle
 verify-type (typify f Handle) VHandle1 VHandle1
 test-refcount (inline () (f (Handle 1)) (_))
 
 # receives four handles and conditionally returns one, switch version
     <view:0|1|2|3>Handle<-(<view>Handle <view>Handle bool)(*)
 fn f (a b c d x)
+    viewing a b c d
     switch x
     case 0 a
     case 1 b
@@ -255,6 +270,7 @@ test-refcount (inline ()
 # receives two handles and passes them to a function that conditionally returns one
     %1|2:Handle<-(%1:Handle %2:Handle bool)(*)
 fn f (a b c d x)
+    viewing a b c d
     fn ff (a b x)
         if x a
         else b
@@ -270,7 +286,7 @@ test-refcount (inline ()
     then attempts to access the moved argument
     error: cannot access value
 fn f (a b)
-    fn ff (x) (move x)
+    fn ff (x) x
     ff b
     dump b
     a
