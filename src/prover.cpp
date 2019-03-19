@@ -410,8 +410,11 @@ static SCOPES_RESULT(void) verify_valid(const ASTContext &ctx, int id, const cha
 
 static SCOPES_RESULT(void) verify_valid(const ASTContext &ctx, TypedValue *val, const char *by) {
     SCOPES_RESULT_TYPE(void);
+    auto T = val->get_type();
+    if (!is_returning_value(T))
+        return {};
     if (!ctx.block->is_valid(val)) {
-        SCOPES_EXPECT_ERROR(error_cannot_access_moved(val->get_type(), by));
+        SCOPES_EXPECT_ERROR(error_cannot_access_moved(T, by));
     }
     return {};
 }

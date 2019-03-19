@@ -1001,7 +1001,8 @@ struct Expander {
 
             const List *list = SCOPES_GET_RESULT(extract_list_constant(node));
             if (list == EOL) {
-                SCOPES_LOCATION_ERROR(String::from("expression is empty"));
+                // zero arguments
+                return ArgumentListTemplate::from(node->anchor());
             }
 
             Value *head = list->at;

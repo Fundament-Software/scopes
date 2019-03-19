@@ -54,28 +54,6 @@ let
 
 run-stage;
 
-# transform an i32 into a Handle, which is a tracked type; this works
-    because the storage type of Handle is also i32.
-
-    this is how we build constructors out of nothing.
-do
-    let h = (follow 0 Handle)
-    # we're leaving the scope, which invokes the destructor for h
-    _;
-
-do
-    # invoke Handle's constructor to produce a new handle
-    let h = (Handle 100)
-    # we lose h, thereby no longer tracking it, which means we are deliberately
-        leaking the handle.
-        lose returns the value of h cast to its storage type.
-    let q = (lose h)
-    assert (q == 100)
-    # track the handle again, un-leaking the handle
-    follow q Handle
-    # we're leaving the scope, which invokes the destructor for q
-    _;
-
 # function type constructor canonicalizes types
 fn verify-signature (Ta Tb)
     assert (Ta == Tb)
