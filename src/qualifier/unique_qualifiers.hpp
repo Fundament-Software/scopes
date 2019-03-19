@@ -101,6 +101,8 @@ const Type *strip_unique(const Type *T);
 const UniqueQualifier *get_unique(const Type *T);
 const UniqueQualifier *try_unique(const Type *T);
 
+const Type *strip_lifetime(const Type *T);
+
 } // namespace scopes
 
 #endif // SCOPES_UNIQUE_TYPE_HPP

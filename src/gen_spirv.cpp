@@ -1468,7 +1468,8 @@ struct SPIRVGenerator {
             return op->getResultId();
         } break;
         case FN_View:
-        case FN_Forget:
+        case FN_Lose:
+        case FN_Track:
         case FN_Move: {
             READ_VALUE(val);
             return val;

@@ -8,7 +8,7 @@ typedef Handle :: i32
     @@ spice-quote
     inline new-handle (idx)
         refcount += 1
-        bitcast idx this-type
+        follow idx this-type
 
     @@ spice-quote
     inline __typecall (cls idx)
@@ -53,6 +53,28 @@ let
     Vi321 = ('view-type i32 1)
 
 run-stage;
+
+# transform an i32 into a Handle, which is a tracked type; this works
+    because the storage type of Handle is also i32.
+
+    this is how we build constructors out of nothing.
+do
+    let h = (follow 0 Handle)
+    # we're leaving the scope, which invokes the destructor for h
+    _;
+
+do
+    # invoke Handle's constructor to produce a new handle
+    let h = (Handle 100)
+    # we lose h, thereby no longer tracking it, which means we are deliberately
+        leaking the handle.
+        lose returns the value of h cast to its storage type.
+    let q = (lose h)
+    assert (q == 100)
+    # track the handle again, un-leaking the handle
+    follow q Handle
+    # we're leaving the scope, which invokes the destructor for q
+    _;
 
 # function type constructor canonicalizes types
 fn verify-signature (Ta Tb)
@@ -242,17 +264,17 @@ fn f (h)
 verify-type (typify f Handle) Vi321 VHandle1
 test-refcount (inline () (f (Handle 1)) (_))
 
-# receives a handle and casts it to i32, then back to Handle
+# receives a handle and loses it, then back to Handle
     i32<-(1:Handle)(*)
 fn f (h)
-    bitcast (bitcast h i32) Handle
+    follow (lose h) Handle
 verify-type (typify f Handle) UHandleR1 UHandle1
 test-refcount (inline () (f (Handle 1)) (_))
 
 # receives a handle, casts it to i32 and back to Handle
     %1:Handle<-(%1:Handle)(*)
 fn f (h)
-    bitcast (bitcast (view h) i32) Handle
+    bitcast (bitcast h i32) Handle
 verify-type (typify f Handle) VHandle1 VHandle1
 test-refcount (inline () (f (Handle 1)) (_))
 
@@ -400,8 +422,25 @@ fn f (x y)
         repeat x (i + 1)
 assert-error (typify f Handle Handle)
 
+# receive a handle and stop following it
+fn f (x)
+    lose x
+verify-type (typify f Handle) i32 UHandle1
 
 # TODO: composition, decomposition
+
+fn f ()
+    let x y z =
+        Handle 0; Handle 1; Handle 2
+    let d = (? true x y)
+    let e = (? true d z)
+    dump e
+    dump-uniques;
+    #dump (nullof Handle)
+    return;
+
+verify-type (typify f) void
+
 
 
 # TODO: builtins

@@ -185,18 +185,40 @@ SCOPES_RESULT(void) error_cannot_view_moved(TypedValue *value) {
     //SCOPES_LOCATION_DEF_ERROR(mover, ss.str());
 }
 
-SCOPES_RESULT(void) error_cannot_access_moved(TypedValue *value, const char *by) {
+SCOPES_RESULT(void) error_cannot_access_moved(const Type *T, const char *by) {
     SCOPES_RESULT_TYPE(void);
     StyledString ss;
-    ss.out << by << " cannot access value of type " << value->get_type() << " because it has been moved";
+    ss.out << by << " cannot access value of type " << T << " because it has been moved";
     SCOPES_LOCATION_ERROR(ss.str());
     //SCOPES_LOCATION_DEF_ERROR(mover, ss.str());
+}
+
+SCOPES_RESULT(void) error_cannot_cast_plain_to_unique(const Type *SrcT, const Type *DestT) {
+    SCOPES_RESULT_TYPE(void);
+    StyledString ss;
+    ss.out << "cannot cast value of plain type " << SrcT << " to unique type " << DestT;
+    SCOPES_LOCATION_ERROR(ss.str());
+    //SCOPES_LOCATION_DEF_ERROR(mover, ss.str());
+}
+
+SCOPES_RESULT(void) error_plain_not_storage_of_unique(const Type *SrcT, const Type *DestT) {
+    SCOPES_RESULT_TYPE(void);
+    StyledString ss;
+    ss.out << "type " << SrcT << " is not the storage type of unique type " << DestT;
+    SCOPES_LOCATION_ERROR(ss.str());
 }
 
 SCOPES_RESULT(void) error_value_not_unique(TypedValue *value) {
     SCOPES_RESULT_TYPE(void);
     StyledString ss;
     ss.out << "value of type " << value->get_type() << " is not unique";
+    SCOPES_LOCATION_ERROR(ss.str());
+}
+
+SCOPES_RESULT(void) error_value_not_plain(TypedValue *value) {
+    SCOPES_RESULT_TYPE(void);
+    StyledString ss;
+    ss.out << "value of type " << value->get_type() << " is not plain";
     SCOPES_LOCATION_ERROR(ss.str());
 }
 

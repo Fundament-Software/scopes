@@ -219,6 +219,12 @@ const UniqueQualifier *try_unique(const Type *T) {
 
 //------------------------------------------------------------------------------
 
+const Type *strip_lifetime(const Type *T) {
+    return strip_qualifiers(T, QM_UniquenessTags);
+}
+
+//------------------------------------------------------------------------------
+
 static const MutateQualifier *_mutate_qualifier = nullptr;
 const Type *mutate_type(const Type *type) {
     if (has_qualifier<MutateQualifier>(type))

@@ -299,7 +299,7 @@ SCOPES_RESULT(bool) types_compatible(const Type *paramT, const Type *argT) {
 
 SCOPES_RESULT(void) verify(const Type *typea, const Type *typeb) {
     SCOPES_RESULT_TYPE(void);
-    if (typea != typeb) {
+    if (strip_lifetime(typea) != strip_lifetime(typeb)) {
         StyledString ss;
         ss.out << "type " << typea << " expected, got " << typeb;
         SCOPES_LOCATION_ERROR(ss.str());

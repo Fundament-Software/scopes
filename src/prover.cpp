@@ -271,8 +271,7 @@ const Type *ASTContext::fix_merge_type(const Type *T) const {
     newtypes.reserve(count);
     for (int i = 0; i < count; ++i) {
         auto argT = get_argument(T, i);
-        auto uq = try_unique(argT);
-        if (uq) {
+        if (!is_view(argT) && !is_plain(argT)) {
             argT = unique_type(argT, unique_id());
         }
         newtypes.push_back(argT);
@@ -400,6 +399,31 @@ static void write_annotation(const ASTContext &ctx,
     }
 }
 
+static SCOPES_RESULT(void) verify_valid(const ASTContext &ctx, int id, const char *by) {
+    SCOPES_RESULT_TYPE(void);
+    if (!ctx.block->is_valid(id)) {
+        auto info = ctx.function->get_unique_info(id);
+        SCOPES_EXPECT_ERROR(error_cannot_access_moved(info.value.get_type(), by));
+    }
+    return {};
+}
+
+static SCOPES_RESULT(void) verify_valid(const ASTContext &ctx, TypedValue *val, const char *by) {
+    SCOPES_RESULT_TYPE(void);
+    if (!ctx.block->is_valid(val)) {
+        SCOPES_EXPECT_ERROR(error_cannot_access_moved(val->get_type(), by));
+    }
+    return {};
+}
+
+static SCOPES_RESULT(void) verify_valid(const ASTContext &ctx, const TypedValues &values, const char *by) {
+    SCOPES_RESULT_TYPE(void);
+    for (auto &&value : values) {
+        SCOPES_CHECK_RESULT(verify_valid(ctx, value, by));
+    }
+    return {};
+}
+
 static SCOPES_RESULT(void) drop_value(const ASTContext &ctx,
     const Anchor *anchor, const ValueIndex &arg) {
     SCOPES_RESULT_TYPE(void);
@@ -430,25 +454,10 @@ static SCOPES_RESULT(void) drop_value(const ASTContext &ctx,
         if (!is_returning(RT) || is_returning_value(RT)) {
             SCOPES_LOCATION_ERROR(String::from("drop operation must evaluate to void"));
         }
+        SCOPES_CHECK_RESULT(verify_valid(ctx, id, "drop"));
     }
     assert(ctx.block);
     ctx.move(id);
-    return {};
-}
-
-static SCOPES_RESULT(void) verify_valid(const ASTContext &ctx, TypedValue *val, const char *by) {
-    SCOPES_RESULT_TYPE(void);
-    if (!ctx.block->is_valid(val)) {
-        SCOPES_EXPECT_ERROR(error_cannot_access_moved(val, by));
-    }
-    return {};
-}
-
-static SCOPES_RESULT(void) verify_valid(const ASTContext &ctx, const TypedValues &values, const char *by) {
-    SCOPES_RESULT_TYPE(void);
-    for (auto &&value : values) {
-        SCOPES_CHECK_RESULT(verify_valid(ctx, value, by));
-    }
     return {};
 }
 
@@ -1428,6 +1437,66 @@ static SCOPES_RESULT(void) build_deref(
     return {};
 }
 
+static const Type *unique_result_type(const ASTContext &ctx, const Type *T) {
+    T = strip_lifetime(T);
+    if (!is_plain(T)) {
+        return unique_type(T, ctx.unique_id());
+    }
+    return T;
+}
+
+static void collect_view_argument(const ASTContext &ctx, TypedValue *&arg, IDSet &ids) {
+    auto T = arg->get_type();
+    if (is_unique(T)) {
+        build_view(ctx, get_active_anchor(), arg);
+        T = arg->get_type();
+        assert(is_view(T));
+    }
+    auto vq = try_view(T);
+    if (vq) {
+        ids = union_idset(ids, vq->ids);
+    } else {
+        assert(is_plain(T));
+    }
+}
+
+static const Type *view_result_type(const Type *T, const IDSet &ids) {
+    T = strip_lifetime(T);
+    if (ids.empty()) {
+        if (!is_plain(T)) {
+            StyledStream ss;
+            ss << "internal error: " << T << " has no views" << std::endl;
+        }
+        assert(is_plain(T));
+        return T;
+    }
+    return view_type(T, ids);
+}
+
+static const Type *view_result_type(const ASTContext &ctx, const Type *T,
+    TypedValue *&arg1) {
+    IDSet ids;
+    collect_view_argument(ctx, arg1, ids);
+    return view_result_type(T, ids);
+}
+
+static const Type *view_result_type(const ASTContext &ctx, const Type *T,
+    TypedValue *&arg1, TypedValue *&arg2) {
+    IDSet ids;
+    collect_view_argument(ctx, arg1, ids);
+    collect_view_argument(ctx, arg2, ids);
+    return view_result_type(T, ids);
+}
+
+static const Type *view_result_type(const ASTContext &ctx, const Type *T,
+    TypedValue *&arg1, TypedValue *&arg2, TypedValue *&arg3) {
+    IDSet ids;
+    collect_view_argument(ctx, arg1, ids);
+    collect_view_argument(ctx, arg2, ids);
+    collect_view_argument(ctx, arg3, ids);
+    return view_result_type(T, ids);
+}
+
 #define CHECKARGS(MINARGS, MAXARGS) \
     SCOPES_CHECK_RESULT((checkargs<MINARGS, MAXARGS>(argcount)))
 #define ARGTYPE0() ({ \
@@ -1436,6 +1505,16 @@ static SCOPES_RESULT(void) build_deref(
     })
 #define ARGTYPE1(ARGT) ({ \
         Call *newcall = Call::from(call->anchor(), ARGT, callee, values); \
+        newcall; \
+    })
+#define NEW_ARGTYPE1(ARGT) ({ \
+        Call *newcall = Call::from(call->anchor(), \
+            unique_result_type(ctx, ARGT), callee, values); \
+        newcall; \
+    })
+#define DEP_ARGTYPE1(ARGT, ...) ({ \
+        const Type *_retT = view_result_type(ctx, ARGT, __VA_ARGS__); \
+        Call *newcall = Call::from(call->anchor(), _retT, callee, values); \
         newcall; \
     })
 #define DEREF(NAME) \
@@ -1654,6 +1733,14 @@ const Type *remap_unique_return_arguments(
     return rt;
 }
 
+SCOPES_RESULT(void) verify_cast_lifetime(const Type *SrcT, const Type *DestT) {
+    SCOPES_RESULT_TYPE(void);
+    if (!is_plain(DestT) && is_plain(SrcT) && !is_view(SrcT)) {
+        SCOPES_EXPECT_ERROR(error_cannot_cast_plain_to_unique(SrcT, DestT));
+    }
+    return {};
+}
+
 static SCOPES_RESULT(TypedValue *) prove_call_interior(const ASTContext &ctx, CallTemplate *call) {
     SCOPES_RESULT_TYPE(TypedValue *);
     SCOPES_ANCHOR(call->anchor());
@@ -1804,11 +1891,44 @@ repeat:
             build_view(ctx, call->anchor(), _X);
             return _X;
         } break;
-        case FN_Forget: {
+        case FN_Lose: {
             CHECKARGS(1, 1);
             READ_NODEREF_TYPEOF(X);
-            (void)X;
-            return ARGTYPE0();
+            auto uq = try_unique(X);
+            if (!uq) {
+                SCOPES_CHECK_RESULT(error_value_not_unique(_X));
+            }
+
+            const Type *DestT = SCOPES_GET_RESULT(storage_type(X));
+
+            auto rq = try_qualifier<ReferQualifier>(X);
+            if (rq) {
+                DestT = qualify(DestT, { rq });
+            }
+
+            ctx.move(uq->id);
+            return NEW_ARGTYPE1(DestT);
+        } break;
+        case FN_Track: {
+            CHECKARGS(2, 2);
+            READ_NODEREF_TYPEOF(SrcT);
+            READ_TYPE_CONST(DestT);
+
+            const Type *SDestT = SCOPES_GET_RESULT(storage_type(DestT));
+
+            DestT = strip_qualifiers(DestT);
+
+            if (strip_qualifier<ReferQualifier>(SrcT) != SDestT) {
+                SCOPES_CHECK_RESULT(error_plain_not_storage_of_unique(SrcT, DestT));
+            }
+
+            auto rq = try_qualifier<ReferQualifier>(SrcT);
+            if (rq) {
+                DestT = qualify(DestT, { rq });
+                _DestT = ConstPointer::type_from(_DestT->anchor(), DestT);
+            }
+
+            return NEW_ARGTYPE1(DestT);
         } break;
         case FN_Viewing: {
             for (size_t i = 0; i < values.size(); ++i) {
@@ -1828,13 +1948,12 @@ repeat:
         case FN_NullOf: {
             CHECKARGS(1, 1);
             READ_TYPE_CONST(T);
-            return ARGTYPE1(T);
-            //return SCOPES_GET_RESULT(nullof(call->anchor(), T));
+            return NEW_ARGTYPE1(T);
         } break;
         case FN_Undef: {
             CHECKARGS(1, 1);
             READ_TYPE_CONST(T);
-            return ARGTYPE1(T);
+            return NEW_ARGTYPE1(T);
         } break;
         case FN_TypeOf: {
             CHECKARGS(1, 1);
@@ -1854,7 +1973,7 @@ repeat:
             while (argn < argcount) {
                 READ_VALUE(val);
             }
-            return ARGTYPE1(it->type);
+            return DEP_ARGTYPE1(it->type, _ST);
         } break;
         case FN_ImageQuerySize: {
             CHECKARGS(1, -1);
@@ -1887,11 +2006,12 @@ repeat:
             if (it->arrayed) {
                 comps++;
             }
-            if (comps == 1) {
-                return ARGTYPE1(TYPE_I32);
-            } else {
-                return ARGTYPE1(vector_type(TYPE_I32, comps).assert_ok());
+
+            const Type *retT = TYPE_I32;
+            if (comps != 1) {
+                retT = vector_type(TYPE_I32, comps).assert_ok();
             }
+            return DEP_ARGTYPE1(retT, _ST);
         } break;
         case FN_ImageQueryLod: {
             CHECKARGS(2, 2);
@@ -1901,7 +2021,8 @@ repeat:
                 ST = SCOPES_GET_RESULT(storage_type(sit->type));
             }
             SCOPES_CHECK_RESULT(verify_kind<TK_Image>(ST));
-            return ARGTYPE1(vector_type(TYPE_F32, 2).assert_ok());
+
+            return DEP_ARGTYPE1(vector_type(TYPE_F32, 2).assert_ok(), _ST);
         } break;
         case FN_ImageQueryLevels:
         case FN_ImageQuerySamples: {
@@ -1912,14 +2033,14 @@ repeat:
                 ST = SCOPES_GET_RESULT(storage_type(sit->type));
             }
             SCOPES_CHECK_RESULT(verify_kind<TK_Image>(ST));
-            return ARGTYPE1(TYPE_I32);
+            return DEP_ARGTYPE1(TYPE_I32, _ST);
         } break;
         case FN_ImageRead: {
             CHECKARGS(2, 2);
             READ_STORAGETYPEOF(ST);
             SCOPES_CHECK_RESULT(verify_kind<TK_Image>(ST));
             auto it = cast<ImageType>(ST);
-            return ARGTYPE1(it->type);
+            return DEP_ARGTYPE1(it->type, _ST);
         } break;
         case SFXFN_ExecutionMode: {
             CHECKARGS(1, 4);
@@ -1951,7 +2072,7 @@ repeat:
                 auto ST2 = SCOPES_GET_RESULT(storage_type(T2));
                 SCOPES_CHECK_RESULT(verify_vector_sizes(T1, ST2));
             }
-            return ARGTYPE1(T2);
+            return DEP_ARGTYPE1(T2, _T1, _T2, _T3);
         } break;
         case FN_Bitcast: {
             CHECKARGS(2, 2);
@@ -1987,20 +2108,10 @@ repeat:
                     }
                 }
 
-                auto uq = try_unique(SrcT);
-                if (uq) {
-                    ctx.move(uq->id);
-                }
-
                 bool target_is_plain = is_plain(DestT);
 
                 DestT = strip_qualifiers(DestT);
-                auto vq = try_qualifier<ViewQualifier>(SrcT);
-                if (vq) {
-                    DestT = view_type(DestT, vq->ids);
-                } else if (!target_is_plain) {
-                    DestT = unique_type(DestT, ctx.unique_id());
-                }
+                SCOPES_CHECK_RESULT(verify_cast_lifetime(SrcT, DestT));
 
                 auto rq = try_qualifier<ReferQualifier>(SrcT);
                 if (rq) {
@@ -2010,7 +2121,7 @@ repeat:
                 if (isa<Pure>(_SrcT) && target_is_plain) {
                     return PureCast::from(call->anchor(), DestT, cast<Pure>(_SrcT));
                 } else {
-                    return ARGTYPE1(DestT);
+                    return DEP_ARGTYPE1(DestT, _SrcT);
                 }
             }
         } break;
