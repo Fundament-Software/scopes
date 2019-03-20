@@ -19,7 +19,7 @@ namespace scopes {
     T(KW_Call) T(KW_RawCall) T(KW_CCCall) T(SYM_QuoteForm) T(FN_Dump) T(FN_DumpTemplate) T(KW_Do) \
     T(FN_FunctionType) T(FN_TupleType) T(FN_UnionType) T(FN_Alloca) T(FN_AllocaOf) T(FN_Malloc) \
     T(FN_AllocaArray) T(FN_MallocArray) T(FN_ReturnLabelType) T(KW_DoIn) T(FN_AllocaExceptionPad) \
-    T(FN_StaticAlloc) T(KW_Try) T(KW_Return) T(KW_Loop) T(KW_Repeat) T(KW_Break) \
+    T(FN_StaticAlloc) T(KW_Try) T(KW_Return) T(KW_Loop) T(KW_Repeat) T(KW_Break) T(FN_Dupe) \
     T(KW_ASTQuote) T(KW_ASTUnquote) T(KW_ASTUnquoteArguments) T(KW_Merge) T(FN_Copy) T(FN_Track) \
     T(FN_Move) T(FN_View) T(FN_Viewing) T(FN_Lose) T(FN_Assign) T(FN_Deref) T(FN_PtrToRef) T(FN_RefToPtr) \
     T(FN_AnyExtract) T(FN_AnyWrap) T(FN_Free) T(KW_Defer) T(FN_DumpAST) T(FN_DumpUniques) T(FN_IsValid) \
@@ -268,7 +268,7 @@ namespace scopes {
     T(KW_ASTUnquoteArguments, "spice-unquote-arguments") T(FN_Copy, "copy") \
     T(KW_Inline, "inline") T(KW_Recur, "recur") T(FN_Track, "follow") \
     T(KW_Merge, "merge") T(FN_Move, "move") T(FN_View, "view") T(FN_Viewing, "viewing") \
-    T(KW_Return, "return") T(KW_Splice, "splice") T(FN_Lose, "lose") \
+    T(KW_Return, "return") T(KW_Splice, "splice") T(FN_Lose, "lose") T(FN_Dupe, "dupe") \
     T(KW_RunStage, "run-stage") T(KW_True, "true") T(KW_Try, "try") \
     T(KW_Unquote, "unquote") T(KW_UnquoteSplice, "unquote-splice") T(KW_ListEmpty, "eol") \
     T(KW_With, "with") T(KW_XFn, "xfn") T(KW_XLet, "xlet") T(KW_Yield, "yield") \

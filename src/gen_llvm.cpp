@@ -1240,6 +1240,7 @@ struct LLVMIRGenerator {
         case FN_View:
         case FN_Lose:
         case FN_Track:
+        case FN_Dupe:
         case FN_Move: {
             READ_VALUE(val);
             return val;

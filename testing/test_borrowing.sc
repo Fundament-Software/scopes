@@ -400,10 +400,15 @@ fn f (x y)
         repeat x (i + 1)
 assert-error (typify f Handle Handle)
 
-# receive a handle and stop following it
+# receive a handle, stop following it and return a copy of its storage
 fn f (x)
     lose x
 verify-type (typify f Handle) i32 UHandle1
+
+# receive a handle and make a copy of its storage
+fn f (x)
+    dupe x
+verify-type (typify f Handle) i32 VHandle1
 
 # TODO: composition, decomposition
 

@@ -1910,7 +1910,19 @@ repeat:
             }
 
             ctx.move(uq->id);
-            return NEW_ARGTYPE1(DestT);
+            return ARGTYPE1(DestT);
+        } break;
+        case FN_Dupe: {
+            CHECKARGS(1, 1);
+            READ_NODEREF_TYPEOF(X);
+
+            const Type *DestT = SCOPES_GET_RESULT(storage_type(X));
+
+            auto rq = try_qualifier<ReferQualifier>(X);
+            if (rq) {
+                DestT = qualify(DestT, { rq });
+            }
+            return ARGTYPE1(DestT);
         } break;
         case FN_Track: {
             CHECKARGS(2, 2);
