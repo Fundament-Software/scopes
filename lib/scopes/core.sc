@@ -791,6 +791,9 @@ inline box-cast (f)
 inline not (value)
     bxor value true
 
+# supertype for unique structs
+let Struct = (sc_typename_type "Struct")
+
 # a supertype to be used for conversions
 let immutable = (sc_typename_type "immutable")
 sc_typename_type_set_super integer immutable
@@ -4615,7 +4618,35 @@ run-stage;
         inline (cls)
             nullof cls
 
-# structs
+# native structs
+#-------------------------------------------------------------------------------
+
+'set-symbols Struct
+    __getattr = extractvalue
+    __typecall =
+        spice "Struct-typecall" (cls args...)
+            if ((cls as type) == Struct)
+                compiler-error! "Struct type constructor not available"
+            let cls = (cls as type)
+            let argc = ('argcount args...)
+            let st = ('storageof cls)
+            loop (i result = 0 `(nullof st))
+                if (i == argc)
+                    break `(follow result cls)
+                let k v = ('dekey ('getarg args... i))
+                let k =
+                    if (k == unnamed) i
+                    else
+                        sc_type_field_index cls k
+                let ET = (sc_type_element_at cls k)
+                let ET = (sc_strip_qualifiers ET)
+                let v =
+                    if (('pointer? ET) and ('refer? ('qualified-typeof v)))
+                        `(imply (reftoptr v) ET)
+                    else `(imply v ET)
+                _ (i + 1) `(insertvalue result v k)
+
+# C structs
 #-------------------------------------------------------------------------------
 
 'set-symbols CStruct
@@ -4649,15 +4680,19 @@ sugar struct (name body...)
         for i field in (enumerate ('reverse field-types))
             let k T = (decons (field as list) 2)
             fields @ (usize i) = (sc_key_type (k as Symbol) (T as type))
+        print T
         if (T < CUnion)
             'set-plain-storage T
                 sc_union_type numfields fields
         elseif (T < CStruct)
             'set-plain-storage T
                 sc_tuple_type numfields fields
+        elseif (T < Struct)
+            'set-plain-storage T
+                sc_tuple_type numfields fields
         else
             compiler-error!
-                .. "type " (repr T) " must have CStruct or CUnion supertype"
+                .. "type " (repr T) " must have Struct, CStruct or CUnion supertype"
         T
 
     if (('typeof name) == Symbol)
@@ -4670,10 +4705,12 @@ sugar struct (name body...)
         sugar-match body...
         case ('union rest...)
             _ `CUnion rest...
+        case ('plain rest...)
+            _ `CStruct rest...
         case ('< supertype rest...)
             _ supertype rest...
         default
-            _ `CStruct body...
+            _ `Struct body...
 
     qq [typedef] [name] < [supertype] do
         [local] field-types = [`(ptrtoref (alloca list))]

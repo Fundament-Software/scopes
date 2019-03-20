@@ -419,13 +419,22 @@ verify-type (typify f Handle) i32 VHandle1
 # allocate a mutable reference from constructor and from another handle
     and make a bunch of mutations
 fn f ()
+    # stack var, default constructor
     local x : Handle
-    local h = (Handle 0)
+    # stack var, init from immutable
+    local h = (Handle 0) # immutable is moved into h
+    # heap var, default constructor
     new q : Handle
+    # drop h, move immutable into h
     h = (Handle 1)
+    # drop x, move h into x
     x = h
-    return;
+    # auto-drop q and free its memory
+    # auto-drop x
+    ;
 test-refcount (inline () (f))
+
+
 
 # TODO: composition, decomposition
 

@@ -1269,7 +1269,8 @@ struct LLVMIRGenerator {
             LLVMTypeRef IT = nullptr;
             for (size_t i = 1; i < count; ++i) {
                 indices[i] = SCOPES_GET_RESULT(ref_to_value(args[i]));
-                assert(LLVMGetValueKind(indices[i]) == LLVMConstantIntValueKind);
+                //assert(LLVMGetValueKind(indices[i]) == LLVMConstantIntValueKind);
+                assert(LLVMGetTypeKind(LLVMTypeOf(indices[i])) == LLVMIntegerTypeKind);
                 IT = LLVMTypeOf(indices[i]);
             }
             assert(IT);
@@ -1647,11 +1648,6 @@ struct LLVMIRGenerator {
         auto callee = call->callee;
         auto &&args = call->args;
 
-        LLVMMetadataRef diloc = nullptr;
-        if (use_debug_info) {
-            diloc = set_debug_location(call->anchor());
-        }
-
         auto T = try_get_const_type(callee);
         const Type *rtype = callee->get_type();
         if (is_function_pointer(rtype)) {
@@ -1667,35 +1663,6 @@ struct LLVMIRGenerator {
             }
             return {};
         }
-#if 0
-        } else if (enter.type == TYPE_Parameter) {
-            assert (enter.parameter->type != TYPE_Nothing);
-            assert(enter.parameter->type != TYPE_Unknown);
-            LLVMValueRef values[argcount];
-            for (size_t i = 0; i < argcount; ++i) {
-                values[i] = SCOPES_GET_RESULT(argument_to_value(args[i + 1].value));
-            }
-            // must be a return
-            assert(enter.parameter->index == 0);
-            // must be returning from this function
-            assert(enter.parameter->label == active_function);
-
-            if (argcount > 1) {
-                LLVMTypeRef types[argcount];
-                for (size_t i = 0; i < argcount; ++i) {
-                    types[i] = LLVMTypeOf(values[i]);
-                }
-
-                retvalue = LLVMGetUndef(LLVMStructType(types, argcount, false));
-                for (size_t i = 0; i < argcount; ++i) {
-                    retvalue = LLVMBuildInsertValue(builder, retvalue, values[i], i, "");
-                }
-            } else if (argcount == 1) {
-                retvalue = values[0];
-            }
-            contarg = enter;
-        } else {
-#endif
         SCOPES_ANCHOR(call->anchor());
         SCOPES_EXPECT_ERROR(error_gen_invalid_call_type(SCOPES_GEN_TARGET, callee));
     }
@@ -1941,6 +1908,12 @@ struct LLVMIRGenerator {
         SCOPES_RESULT_TYPE(void);
         size_t argcount = args.size();
 
+        LLVMMetadataRef diloc = nullptr;
+        if (use_debug_info) {
+            diloc = set_debug_location(call->anchor());
+            assert(diloc);
+        }
+
         auto fi = cast<FunctionType>(functype);
 
         auto rtype = abi_return_type(fi);
@@ -1972,6 +1945,10 @@ struct LLVMIRGenerator {
                     values[i] = LLVMBuildFPExt(builder, value, f64T, "");
                 }
             }
+        }
+
+        if (use_debug_info) {
+            set_debug_location(diloc);
         }
 
         auto ret = LLVMBuildCall(builder, func, &values[0], values.size(), "");
@@ -2047,11 +2024,16 @@ struct LLVMIRGenerator {
         return result;
     }
 
+    void set_debug_location(LLVMMetadataRef diloc) {
+        assert(use_debug_info);
+        LLVMSetCurrentDebugLocation(builder,
+            LLVMMetadataAsValue(LLVMGetGlobalContext(), diloc));
+    }
+
     LLVMMetadataRef set_debug_location(const Anchor *anchor) {
         assert(use_debug_info);
         LLVMMetadataRef diloc = anchor_to_location(anchor);
-        LLVMSetCurrentDebugLocation(builder,
-            LLVMMetadataAsValue(LLVMGetGlobalContext(), diloc));
+        set_debug_location(diloc);
         return diloc;
     }
 
