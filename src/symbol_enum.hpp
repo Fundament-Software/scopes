@@ -23,7 +23,7 @@ namespace scopes {
     T(KW_ASTQuote) T(KW_ASTUnquote) T(KW_ASTUnquoteArguments) T(KW_Merge) T(FN_Copy) T(FN_Track) \
     T(FN_Move) T(FN_View) T(FN_Viewing) T(FN_Lose) T(FN_Assign) T(FN_Deref) T(FN_PtrToRef) T(FN_RefToPtr) \
     T(FN_AnyExtract) T(FN_AnyWrap) T(FN_Free) T(KW_Defer) T(FN_DumpAST) T(FN_DumpUniques) T(FN_IsValid) \
-    T(OP_ICmpEQ) T(OP_ICmpNE) T(FN_Sample) T(FN_ImageRead) T(FN_ImageWrite) \
+    T(OP_ICmpEQ) T(OP_ICmpNE) T(FN_Sample) T(FN_ImageRead) T(FN_ImageWrite) T(SYM_DropHandler) \
     T(FN_ImageQuerySize) T(FN_ImageQueryLod) T(FN_ImageQueryLevels) T(FN_ImageQuerySamples) \
     T(OP_ICmpUGT) T(OP_ICmpUGE) T(OP_ICmpULT) T(OP_ICmpULE) \
     T(OP_ICmpSGT) T(OP_ICmpSGE) T(OP_ICmpSLT) T(OP_ICmpSLE) \

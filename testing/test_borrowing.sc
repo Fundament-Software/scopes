@@ -10,6 +10,12 @@ typedef Handle :: i32
         refcount += 1
         follow idx this-type
 
+    inline __init (self)
+        refcount += 1
+
+    #inline __init-copy (self other)
+        assign other self
+
     @@ spice-quote
     inline __typecall (cls idx)
         #print "new handle" idx
@@ -410,23 +416,18 @@ fn f (x)
     dupe x
 verify-type (typify f Handle) i32 VHandle1
 
-# TODO: composition, decomposition
-
+# allocate a mutable reference from constructor and from another handle
+    and make a bunch of mutations
 fn f ()
-    print refcount
-    do
-        let x = (alloca Handle)
-        let x = (ptrtoref x)
-        dump-uniques;
-        let q = (Handle 0)
-        #dump (lose x) (lose q)
-        assign q (dupe x)
-        dump-uniques;
-        print refcount
-        ;
-    print refcount
-    #dump (nullof Handle)
+    local x : Handle
+    local h = (Handle 0)
+    new q : Handle
+    h = (Handle 1)
+    x = h
     return;
+test-refcount (inline () (f))
+
+# TODO: composition, decomposition
 
 f;
 

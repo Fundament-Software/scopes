@@ -28,6 +28,7 @@ namespace scopes {
     T(g_move, "move") \
     T(g_view, "view") \
     T(g_copy, "copy") \
+    T(g_free, "free") \
     T(g_getelementptr, "getelementptr") \
     T(g_zext, "zext") \
     T(g_sext, "sext") \

@@ -434,9 +434,9 @@ static SCOPES_RESULT(void) verify_valid(const ASTContext &ctx, const TypedValues
     return {};
 }
 
-static SCOPES_RESULT(void) build_drop(const ASTContext &ctx,
+static SCOPES_RESULT(TypedValue *) build_drop(const ASTContext &ctx,
     const Anchor *anchor, const ValueIndex &arg) {
-    SCOPES_RESULT_TYPE(void);
+    SCOPES_RESULT_TYPE(TypedValue *);
     // generate destructor
     auto argT = arg.get_type();
     IDSet ids;
@@ -444,7 +444,10 @@ static SCOPES_RESULT(void) build_drop(const ASTContext &ctx,
     if (uq) {
         ids.insert(uq->id);
     } else {
-        ids = get_view(argT)->ids;
+        auto vq = try_view(argT);
+        if (vq) {
+            ids = vq->ids;
+        }
     }
     argT = strip_qualifiers(argT);
     Value *handler;
@@ -455,6 +458,7 @@ static SCOPES_RESULT(void) build_drop(const ASTContext &ctx,
         write_annotation(ctx, anchor, ss.str(), {
             ConstPointer::type_from(anchor, arg.get_type()) });
         #endif
+        return ArgumentList::from(anchor, {});
     } else {
         #if SCOPES_ANNOTATE_TRACKING
         StyledString ss;
@@ -471,8 +475,25 @@ static SCOPES_RESULT(void) build_drop(const ASTContext &ctx,
             SCOPES_LOCATION_ERROR(String::from("drop operation must evaluate to void"));
         }
         SCOPES_CHECK_RESULT(verify_valid(ctx, ids, "drop"));
+        return result;
     }
-    return {};
+}
+
+static TypedValue *build_free(
+    const ASTContext &ctx, const Anchor *anchor, TypedValue *val) {
+    auto call = Call::from(anchor, empty_arguments_type(), g_free, { val });
+    ctx.append(call);
+    return call;
+}
+
+static bool needs_autofree(const Type *T) {
+    auto rq = try_qualifier<ReferQualifier>(T);
+    if (!rq) return false;
+    // must be default (heap) class
+    if (rq->storage_class != SYM_Unnamed) return false;
+    // must be writable
+    if (!pointer_flags_is_writable(rq->flags)) return false;
+    return true;
 }
 
 static SCOPES_RESULT(void) drop_value(const ASTContext &ctx,
@@ -481,6 +502,9 @@ static SCOPES_RESULT(void) drop_value(const ASTContext &ctx,
     SCOPES_CHECK_RESULT(build_drop(ctx, anchor, arg));
     auto argT = arg.get_type();
     int id = get_unique(argT)->id;
+    if (needs_autofree(argT)) {
+        build_free(ctx, anchor, ExtractArgument::from(anchor, arg.value, arg.index));
+    }
     ctx.move(id);
     return {};
 }
@@ -1452,6 +1476,10 @@ static void collect_view_argument(const ASTContext &ctx, TypedValue *&arg, IDSet
     if (vq) {
         ids = union_idset(ids, vq->ids);
     } else {
+        if (!is_plain(T)) {
+            StyledStream ss;
+            ss << "internal error: trying to view " << arg << " but it is untracked" << std::endl;
+        }
         assert(is_plain(T));
     }
 }
@@ -1510,6 +1538,26 @@ static SCOPES_RESULT(void) build_deref(
     return {};
 }
 
+static SCOPES_RESULT(void) build_deref_move(
+    const ASTContext &ctx, const Anchor *anchor, TypedValue *&val) {
+    SCOPES_RESULT_TYPE(void);
+    auto T = val->get_type();
+    auto rq = try_qualifier<ReferQualifier>(T);
+    if (rq) {
+        SCOPES_CHECK_RESULT(verify_readable(rq, T));
+        auto retT = strip_qualifier<ReferQualifier>(T);
+        auto uq = try_unique(T);
+        if (!uq) {
+            SCOPES_EXPECT_ERROR(error_value_not_unique(val));
+        }
+        auto call = Call::from(anchor, unique_result_type(ctx, retT), g_deref, { val });
+        ctx.append(call);
+        ctx.move(uq->id);
+        val = call;
+        return {};
+    }
+    return {};
+}
 
 #define CHECKARGS(MINARGS, MAXARGS) \
     SCOPES_CHECK_RESULT((checkargs<MINARGS, MAXARGS>(argcount)))
@@ -1533,6 +1581,8 @@ static SCOPES_RESULT(void) build_deref(
     })
 #define DEREF(NAME) \
         SCOPES_CHECK_RESULT(build_deref(ctx, call->anchor(), NAME));
+#define MOVE_DEREF(NAME) \
+        SCOPES_CHECK_RESULT(build_deref_move(ctx, call->anchor(), NAME));
 #define READ_VALUE(NAME) \
         assert(argn < argcount); \
         auto && NAME = values[argn++]; \
@@ -1555,6 +1605,12 @@ static SCOPES_RESULT(void) build_deref(
         assert(argn < argcount); \
         auto &&_ ## NAME = values[argn++]; \
         DEREF(_ ## NAME); \
+        const Type *typeof_ ## NAME = _ ## NAME->get_type(); \
+        const Type *NAME = SCOPES_GET_RESULT(storage_type(typeof_ ## NAME));
+#define MOVE_STORAGETYPEOF(NAME) \
+        assert(argn < argcount); \
+        auto &&_ ## NAME = values[argn++]; \
+        MOVE_DEREF(_ ## NAME); \
         const Type *typeof_ ## NAME = _ ## NAME->get_type(); \
         const Type *NAME = SCOPES_GET_RESULT(storage_type(typeof_ ## NAME));
 #define READ_INT_CONST(NAME) \
@@ -1893,6 +1949,12 @@ repeat:
             }
             build_move(ctx, call->anchor(), _X);
             return _X;
+        } break;
+        case SYM_DropHandler: {
+            CHECKARGS(1, 1);
+            READ_NODEREF_TYPEOF(X);
+            (void)X;
+            return SCOPES_GET_RESULT(build_drop(ctx, call->anchor(), _X));
         } break;
         case FN_View: {
             CHECKARGS(1, 1);
@@ -2473,7 +2535,7 @@ repeat:
         } break;
         case FN_Assign: {
             CHECKARGS(2, 2);
-            READ_STORAGETYPEOF(ElemT);
+            MOVE_STORAGETYPEOF(ElemT);
             READ_NODEREF_STORAGETYPEOF(DestT);
             auto rq = SCOPES_GET_RESULT(verify_refer(typeof_DestT));
             if (rq) {
@@ -2484,9 +2546,6 @@ repeat:
             SCOPES_CHECK_RESULT(
                 verify(ElemT, DestT));
 
-            if (!is_plain(typeof_DestT)) {
-                SCOPES_CHECK_RESULT(build_drop(ctx, call->anchor(), _DestT));
-            }
             if (!is_plain(typeof_ElemT)) {
                 auto uq = try_unique(typeof_ElemT);
                 if (!uq) {
@@ -2543,8 +2602,6 @@ repeat:
                 if (!uq) {
                     SCOPES_CHECK_RESULT(error_value_not_unique(_ElemT));
                 }
-                SCOPES_CHECK_RESULT(build_drop(ctx, call->anchor(), _DestT));
-                SCOPES_CHECK_RESULT(verify_valid(ctx, _ElemT, "assign"));
                 ctx.move(uq->id);
             }
             return ARGTYPE0();

@@ -1511,7 +1511,10 @@ let
         box-binary-op
             fn (lhsT rhsT lhs rhs)
                 if (ptrcmp== lhsT rhsT)
-                    return `(assign rhs lhs)
+                    return
+                        spice-quote
+                            __drop lhs
+                            assign rhs lhs
                 compiler-error! "unequal types"
 
 let missing-constructor =
@@ -4704,7 +4707,7 @@ sugar enum (name values...)
             sc_const_int_new anchor T
                 sext (as val i32) u64
         'set-super T CEnum
-        'set-storage T i32
+        'set-plain-storage T i32
         let count = ('argcount vals...)
         loop (i nextval = 0 0)
             if (i >= count)
