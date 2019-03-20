@@ -137,9 +137,10 @@ bool is_plain(const Type *T) {
     switch(T->kind()) {
     case TK_Qualify:
         return is_plain(cast<QualifyType>(T)->type);
+    case TK_Pointer:
+        //return is_plain(cast<PointerType>(T)->element_type);
     case TK_Integer:
     case TK_Real:
-    case TK_Pointer:
     case TK_Image:
     case TK_SampledImage:
         return true;

@@ -413,17 +413,22 @@ verify-type (typify f Handle) i32 VHandle1
 # TODO: composition, decomposition
 
 fn f ()
-    let x y z =
-        Handle 0; Handle 1; Handle 2
-    let d = (? true x y)
-    let e = (? true d z)
-    dump e
-    dump-uniques;
+    print refcount
+    do
+        let x = (alloca Handle)
+        let x = (ptrtoref x)
+        dump-uniques;
+        let q = (Handle 0)
+        #dump (lose x) (lose q)
+        assign q (dupe x)
+        dump-uniques;
+        print refcount
+        ;
+    print refcount
     #dump (nullof Handle)
     return;
 
-verify-type (typify f) void
-
+f;
 
 
 # TODO: builtins

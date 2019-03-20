@@ -25,7 +25,6 @@
 #include "quote.hpp"
 #include "scopes/scopes.h"
 #include "qualifier.inc"
-#include "tracker.hpp"
 
 #include <algorithm>
 #include <unordered_set>
@@ -408,6 +407,14 @@ static SCOPES_RESULT(void) verify_valid(const ASTContext &ctx, int id, const cha
     return {};
 }
 
+static SCOPES_RESULT(void) verify_valid(const ASTContext &ctx, const IDSet &ids, const char *by) {
+    SCOPES_RESULT_TYPE(void);
+    for (auto id : ids) {
+        SCOPES_CHECK_RESULT(verify_valid(ctx, id, by));
+    }
+    return {};
+}
+
 static SCOPES_RESULT(void) verify_valid(const ASTContext &ctx, TypedValue *val, const char *by) {
     SCOPES_RESULT_TYPE(void);
     auto T = val->get_type();
@@ -427,12 +434,18 @@ static SCOPES_RESULT(void) verify_valid(const ASTContext &ctx, const TypedValues
     return {};
 }
 
-static SCOPES_RESULT(void) drop_value(const ASTContext &ctx,
+static SCOPES_RESULT(void) build_drop(const ASTContext &ctx,
     const Anchor *anchor, const ValueIndex &arg) {
     SCOPES_RESULT_TYPE(void);
     // generate destructor
     auto argT = arg.get_type();
-    int id = get_unique(argT)->id;
+    IDSet ids;
+    auto uq = try_unique(argT);
+    if (uq) {
+        ids.insert(uq->id);
+    } else {
+        ids = get_view(argT)->ids;
+    }
     argT = strip_qualifiers(argT);
     Value *handler;
     if (!argT->lookup(SYM_DropHandler, handler)) {
@@ -457,9 +470,17 @@ static SCOPES_RESULT(void) drop_value(const ASTContext &ctx,
         if (!is_returning(RT) || is_returning_value(RT)) {
             SCOPES_LOCATION_ERROR(String::from("drop operation must evaluate to void"));
         }
-        SCOPES_CHECK_RESULT(verify_valid(ctx, id, "drop"));
+        SCOPES_CHECK_RESULT(verify_valid(ctx, ids, "drop"));
     }
-    assert(ctx.block);
+    return {};
+}
+
+static SCOPES_RESULT(void) drop_value(const ASTContext &ctx,
+    const Anchor *anchor, const ValueIndex &arg) {
+    SCOPES_RESULT_TYPE(void);
+    SCOPES_CHECK_RESULT(build_drop(ctx, anchor, arg));
+    auto argT = arg.get_type();
+    int id = get_unique(argT)->id;
     ctx.move(id);
     return {};
 }
@@ -1412,34 +1433,6 @@ static SCOPES_RESULT(void) verify_real_ops(const Type *a, const Type *b, const T
     return verify(a, c);
 }
 
-static SCOPES_RESULT(void) build_deref(
-    const ASTContext &ctx, const Anchor *anchor, TypedValue *&val) {
-    SCOPES_RESULT_TYPE(void);
-    auto T = val->get_type();
-    auto rq = try_qualifier<ReferQualifier>(T);
-    if (rq) {
-        SCOPES_CHECK_RESULT(verify_readable(rq, T));
-        if (is_plain(T)) {
-            auto retT = strip_qualifier<ReferQualifier>(T);
-            auto call = Call::from(anchor, retT, g_deref, { val });
-            ctx.append(call);
-            val = call;
-            return {};
-        }
-    #if 0
-        Value *handler = nullptr;
-        auto TT = strip_qualifiers(T);
-        if (TT->lookup(SYM_DerefHandler, handler)) {
-            auto call = Call::from(anchor, handler, { val });
-            val = SCOPES_GET_RESULT(prove(ctx.with_symbol_target(), call));
-            return {};
-        }
-    #endif
-        SCOPES_EXPECT_ERROR(error_cannot_deref_non_plain(T));
-    }
-    return {};
-}
-
 static const Type *unique_result_type(const ASTContext &ctx, const Type *T) {
     T = strip_lifetime(T);
     if (!is_plain(T)) {
@@ -1499,6 +1492,24 @@ static const Type *view_result_type(const ASTContext &ctx, const Type *T,
     collect_view_argument(ctx, arg3, ids);
     return view_result_type(T, ids);
 }
+
+static SCOPES_RESULT(void) build_deref(
+    const ASTContext &ctx, const Anchor *anchor, TypedValue *&val) {
+    SCOPES_RESULT_TYPE(void);
+    auto T = val->get_type();
+    auto rq = try_qualifier<ReferQualifier>(T);
+    if (rq) {
+        SCOPES_CHECK_RESULT(verify_readable(rq, T));
+        auto retT = strip_qualifier<ReferQualifier>(T);
+        retT = view_result_type(ctx, retT, val);
+        auto call = Call::from(anchor, retT, g_deref, { val });
+        ctx.append(call);
+        val = call;
+        return {};
+    }
+    return {};
+}
+
 
 #define CHECKARGS(MINARGS, MAXARGS) \
     SCOPES_CHECK_RESULT((checkargs<MINARGS, MAXARGS>(argcount)))
@@ -2146,7 +2157,7 @@ repeat:
             READ_TYPE_CONST(DestT);
             SCOPES_CHECK_RESULT(verify_integer(T));
             SCOPES_CHECK_RESULT((verify_kind<TK_Pointer>(SCOPES_GET_RESULT(storage_type(DestT)))));
-            return ARGTYPE1(DestT);
+            return DEP_ARGTYPE1(DestT, _T);
         } break;
         case FN_PtrToInt: {
             CHECKARGS(2, 2);
@@ -2154,7 +2165,7 @@ repeat:
             READ_TYPE_CONST(DestT);
             SCOPES_CHECK_RESULT(verify_kind<TK_Pointer>(T));
             SCOPES_CHECK_RESULT(verify_integer(SCOPES_GET_RESULT(storage_type(DestT))));
-            return ARGTYPE1(DestT);
+            return DEP_ARGTYPE1(DestT, _T);
         } break;
         case FN_ITrunc: {
             CHECKARGS(2, 2);
@@ -2162,7 +2173,7 @@ repeat:
             READ_TYPE_CONST(DestT);
             SCOPES_CHECK_RESULT(verify_integer(T));
             SCOPES_CHECK_RESULT(verify_integer(SCOPES_GET_RESULT(storage_type(DestT))));
-            return ARGTYPE1(DestT);
+            return DEP_ARGTYPE1(DestT, _T);
         } break;
         case FN_FPTrunc: {
             CHECKARGS(2, 2);
@@ -2173,7 +2184,7 @@ repeat:
             if (cast<RealType>(T)->width < cast<RealType>(DestT)->width) {
                 SCOPES_EXPECT_ERROR(error_invalid_operands(T, DestT));
             }
-            return ARGTYPE1(DestT);
+            return DEP_ARGTYPE1(DestT, _T);
         } break;
         case FN_FPExt: {
             CHECKARGS(2, 2);
@@ -2184,7 +2195,7 @@ repeat:
             if (cast<RealType>(T)->width > cast<RealType>(DestT)->width) {
                 SCOPES_EXPECT_ERROR(error_invalid_operands(T, DestT));
             }
-            return ARGTYPE1(DestT);
+            return DEP_ARGTYPE1(DestT, _T);
         } break;
         case FN_FPToUI:
         case FN_FPToSI: {
@@ -2196,7 +2207,7 @@ repeat:
             if ((T != TYPE_F32) && (T != TYPE_F64)) {
                 SCOPES_EXPECT_ERROR(error_invalid_operands(T, DestT));
             }
-            return ARGTYPE1(DestT);
+            return DEP_ARGTYPE1(DestT, _T);
         } break;
         case FN_UIToFP:
         case FN_SIToFP: {
@@ -2208,7 +2219,7 @@ repeat:
             if ((DestT != TYPE_F32) && (DestT != TYPE_F64)) {
                 SCOPES_CHECK_RESULT(error_invalid_operands(T, DestT));
             }
-            return ARGTYPE1(DestT);
+            return DEP_ARGTYPE1(DestT, _T);
         } break;
         case FN_ZExt:
         case FN_SExt: {
@@ -2217,7 +2228,7 @@ repeat:
             READ_TYPE_CONST(DestT);
             SCOPES_CHECK_RESULT(verify_integer(T));
             SCOPES_CHECK_RESULT(verify_integer(SCOPES_GET_RESULT(storage_type(DestT))));
-            return ARGTYPE1(DestT);
+            return DEP_ARGTYPE1(DestT, _T);
         } break;
         case FN_ExtractElement: {
             CHECKARGS(2, 2);
@@ -2229,9 +2240,10 @@ repeat:
             auto rq = try_qualifier<ReferQualifier>(typeof_T);
             auto RT = vi->element_type;
             if (rq) {
-                return Call::from(call->anchor(), qualify(RT, { rq }), g_getelementref, { _T, _idx });
+                const Type *retT = view_result_type(ctx, qualify(RT, { rq }), _T, _idx);
+                return Call::from(call->anchor(), retT, g_getelementref, { _T, _idx });
             } else {
-                return ARGTYPE1(RT);
+                return DEP_ARGTYPE1(RT, _T, _idx);
             }
         } break;
         case FN_InsertElement: {
@@ -2243,7 +2255,7 @@ repeat:
             SCOPES_CHECK_RESULT(verify_kind<TK_Vector>(T));
             auto vi = cast<VectorType>(T);
             SCOPES_CHECK_RESULT(verify(SCOPES_GET_RESULT(storage_type(vi->element_type)), ET));
-            return ARGTYPE1(_T->get_type());
+            return DEP_ARGTYPE1(typeof_T, _T, _ET, _idx);
         } break;
         case FN_ShuffleVector: {
             CHECKARGS(3, 3);
@@ -2265,23 +2277,24 @@ repeat:
                     cast<ConstInt>(mask->values[i])->value,
                     incount));
             }
-            return ARGTYPE1(SCOPES_GET_RESULT(vector_type(vi->element_type, outcount)));
+            return DEP_ARGTYPE1(
+                SCOPES_GET_RESULT(vector_type(vi->element_type, outcount)), _TV1, _TV2);
         } break;
         case FN_Length: {
             CHECKARGS(1, 1);
             READ_STORAGETYPEOF(T);
             SCOPES_CHECK_RESULT(verify_real_vector(T));
             if (T->kind() == TK_Vector) {
-                return ARGTYPE1(cast<VectorType>(T)->element_type);
+                return DEP_ARGTYPE1(cast<VectorType>(T)->element_type, _T);
             } else {
-                return ARGTYPE1(_T->get_type());
+                return DEP_ARGTYPE1(typeof_T, _T);
             }
         } break;
         case FN_Normalize: {
             CHECKARGS(1, 1);
             READ_TYPEOF(A);
             SCOPES_CHECK_RESULT(verify_real_ops(A));
-            return ARGTYPE1(A);
+            return DEP_ARGTYPE1(A, _A);
         } break;
         case FN_Cross: {
             CHECKARGS(2, 2);
@@ -2289,7 +2302,7 @@ repeat:
             READ_TYPEOF(B);
             SCOPES_CHECK_RESULT(verify_real_vector(A, 3));
             SCOPES_CHECK_RESULT(verify(typeof_A, B));
-            return ARGTYPE1(typeof_A);
+            return DEP_ARGTYPE1(typeof_A, _A);
         } break;
         case FN_Distance: {
             CHECKARGS(2, 2);
@@ -2298,9 +2311,9 @@ repeat:
             SCOPES_CHECK_RESULT(verify_real_ops(A, B));
             const Type *T = SCOPES_GET_RESULT(storage_type(A));
             if (T->kind() == TK_Vector) {
-                return ARGTYPE1(cast<VectorType>(T)->element_type);
+                return DEP_ARGTYPE1(cast<VectorType>(T)->element_type, _A, _B);
             } else {
-                return ARGTYPE1(A);
+                return DEP_ARGTYPE1(A, _A, _B);
             }
         } break;
         case FN_ExtractValue: {
@@ -2338,19 +2351,22 @@ repeat:
                 auto rq = try_qualifier<ReferQualifier>(typeof_T);
                 if (rq) {
                     TT = qualify(TT, {rq});
-                    auto newcall2 = Call::from(call->anchor(), TT, g_bitcast,
+                    auto retT = view_result_type(ctx, TT, _T);
+                    TypedValue *newcall2 = Call::from(call->anchor(), retT, g_bitcast,
                         { _T, ConstPointer::type_from(call->anchor(), TT) });
                     ctx.append(newcall2);
-                    auto newcall3 = Call::from(call->anchor(), qualify(RT, { rq }),
+                    retT = view_result_type(ctx, qualify(RT, { rq }), newcall2);
+                    auto newcall3 = Call::from(call->anchor(), retT,
                         g_getelementref, { newcall2, _idx });
                     ctx.append(newcall3);
                     return newcall3;
                 } else {
-                    auto newcall2 = Call::from(call->anchor(), TT, g_bitcast,
+                    auto retT = view_result_type(ctx, TT, _T);
+                    auto newcall2 = Call::from(call->anchor(), retT, g_bitcast,
                         { _T, ConstPointer::type_from(call->anchor(), TT) });
                     ctx.append(newcall2);
                     _T = newcall2;
-                    return ARGTYPE1(RT);
+                    return DEP_ARGTYPE1(RT, _T);
                 }
             } break;
             default: {
@@ -2362,11 +2378,12 @@ repeat:
             RT = type_key(RT)._1;
             auto rq = try_qualifier<ReferQualifier>(typeof_T);
             if (rq) {
-                auto newcall2 = Call::from(call->anchor(), qualify(RT, { rq }), g_getelementref, { _T, _idx });
+                auto retT = view_result_type(ctx, qualify(RT, { rq }), _T);
+                auto newcall2 = Call::from(call->anchor(), retT, g_getelementref, { _T, _idx });
                 ctx.append(newcall2);
                 return newcall2;
             } else {
-                return ARGTYPE1(RT);
+                return DEP_ARGTYPE1(RT, _T);
             }
         } break;
         case FN_InsertValue: {
@@ -2394,7 +2411,7 @@ repeat:
                 SCOPES_LOCATION_ERROR(ss.str());
             } break;
             }
-            return ARGTYPE1(AT);
+            return DEP_ARGTYPE1(AT, _AT, _ET);
         } break;
         case FN_GetElementRef:
         case FN_GetElementPtr: {
@@ -2446,7 +2463,7 @@ repeat:
             if (is_ref) {
                 T = SCOPES_GET_RESULT(ptr_to_ref(T));
             }
-            return ARGTYPE1(T);
+            return DEP_ARGTYPE1(T, dep);
         } break;
         case FN_Deref: {
             CHECKARGS(1, 1);
@@ -2466,26 +2483,41 @@ repeat:
             //strip_qualifiers(DestT);
             SCOPES_CHECK_RESULT(
                 verify(ElemT, DestT));
+
+            if (!is_plain(typeof_DestT)) {
+                SCOPES_CHECK_RESULT(build_drop(ctx, call->anchor(), _DestT));
+            }
+            if (!is_plain(typeof_ElemT)) {
+                auto uq = try_unique(typeof_ElemT);
+                if (!uq) {
+                    SCOPES_CHECK_RESULT(error_value_not_unique(_ElemT));
+                }
+                ctx.move(uq->id);
+            }
             return ARGTYPE0();
         } break;
         case FN_PtrToRef: {
             CHECKARGS(1, 1);
             READ_TYPEOF(T);
             auto NT = SCOPES_GET_RESULT(ptr_to_ref(T));
-            if (isa<Pure>(_T)) {
+            if (is_plain(T) && isa<Pure>(_T)) {
                 return PureCast::from(call->anchor(), NT, cast<Pure>(_T));
             } else {
-                return ARGTYPE1(NT);
+                if (!is_unique(T) && !is_view(T)) {
+                    return NEW_ARGTYPE1(NT);
+                } else {
+                    return DEP_ARGTYPE1(NT, _T);
+                }
             }
         } break;
         case FN_RefToPtr: {
             CHECKARGS(1, 1);
             READ_NODEREF_TYPEOF(T);
             auto NT = SCOPES_GET_RESULT(ref_to_ptr(T));
-            if (isa<Pure>(_T)) {
+            if (is_plain(T) && isa<Pure>(_T)) {
                 return PureCast::from(call->anchor(), NT, cast<Pure>(_T));
             } else {
-                return ARGTYPE1(NT);
+                return DEP_ARGTYPE1(NT, _T);
             }
         } break;
         case FN_VolatileLoad:
@@ -2494,7 +2526,7 @@ repeat:
             READ_STORAGETYPEOF(T);
             SCOPES_CHECK_RESULT(verify_kind<TK_Pointer>(T));
             SCOPES_CHECK_RESULT(verify_readable(T));
-            return ARGTYPE1(cast<PointerType>(T)->element_type);
+            return DEP_ARGTYPE1(cast<PointerType>(T)->element_type, _T);
         } break;
         case FN_VolatileStore:
         case FN_Store: {
@@ -2506,6 +2538,15 @@ repeat:
             auto pi = cast<PointerType>(DestT);
             SCOPES_CHECK_RESULT(
                 verify(SCOPES_GET_RESULT(storage_type(pi->element_type)), ElemT));
+            if (!is_plain(typeof_DestT)) {
+                auto uq = try_unique(typeof_ElemT);
+                if (!uq) {
+                    SCOPES_CHECK_RESULT(error_value_not_unique(_ElemT));
+                }
+                SCOPES_CHECK_RESULT(build_drop(ctx, call->anchor(), _DestT));
+                SCOPES_CHECK_RESULT(verify_valid(ctx, _ElemT, "assign"));
+                ctx.move(uq->id);
+            }
             return ARGTYPE0();
         } break;
         case FN_Alloca: {
@@ -2540,6 +2581,14 @@ repeat:
                 SCOPES_LOCATION_ERROR(String::from(
                     "pointer is not a heap pointer"));
             }
+            if (!is_plain(T)) {
+                auto uq = try_unique(T);
+                if (!uq) {
+                    SCOPES_CHECK_RESULT(error_value_not_unique(_T));
+                }
+                SCOPES_CHECK_RESULT(build_drop(ctx, call->anchor(), _T));
+                ctx.move(uq->id);
+            }
             return ARGTYPE0();
         } break;
         case FN_StaticAlloc: {
@@ -2561,7 +2610,7 @@ repeat:
             CHECKARGS(2, 2);
             READ_TYPEOF(A); READ_TYPEOF(B);
             SCOPES_CHECK_RESULT(verify_integer_ops(A, B));
-            return ARGTYPE1(SCOPES_GET_RESULT(bool_op_return_type(A)));
+            return DEP_ARGTYPE1(SCOPES_GET_RESULT(bool_op_return_type(A)), _A, _B);
         } break;
         case OP_FCmpOEQ:
         case OP_FCmpONE:
@@ -2580,7 +2629,7 @@ repeat:
             CHECKARGS(2, 2);
             READ_TYPEOF(A); READ_TYPEOF(B);
             SCOPES_CHECK_RESULT(verify_real_ops(A, B));
-            return ARGTYPE1(SCOPES_GET_RESULT(bool_op_return_type(A)));
+            return DEP_ARGTYPE1(SCOPES_GET_RESULT(bool_op_return_type(A)), _A, _B);
         } break;
 #define IARITH_NUW_NSW_OPS(NAME) \
         case OP_ ## NAME: \
@@ -2589,42 +2638,42 @@ repeat:
             CHECKARGS(2, 2); \
             READ_TYPEOF(A); READ_TYPEOF(B); \
             SCOPES_CHECK_RESULT(verify_integer_ops(A, B)); \
-            return ARGTYPE1(A); \
+            return DEP_ARGTYPE1(A, _A, _B); \
         } break;
 #define IARITH_OP(NAME, PFX) \
         case OP_ ## NAME: { \
             CHECKARGS(2, 2); \
             READ_TYPEOF(A); READ_TYPEOF(B); \
             SCOPES_CHECK_RESULT(verify_integer_ops(A, B)); \
-            return ARGTYPE1(A); \
+            return DEP_ARGTYPE1(A, _A, _B); \
         } break;
 #define FARITH_OP(NAME) \
         case OP_ ## NAME: { \
             CHECKARGS(2, 2); \
             READ_TYPEOF(A); READ_TYPEOF(B); \
             SCOPES_CHECK_RESULT(verify_real_ops(A, B)); \
-            return ARGTYPE1(A); \
+            return DEP_ARGTYPE1(A, _A, _B); \
         } break;
 #define FTRI_OP(NAME) \
         case OP_ ## NAME: { \
             CHECKARGS(3, 3); \
             READ_TYPEOF(A); READ_TYPEOF(B); READ_TYPEOF(C); \
             SCOPES_CHECK_RESULT(verify_real_ops(A, B, C)); \
-            return ARGTYPE1(A); \
+            return DEP_ARGTYPE1(A, _A, _B, _C); \
         } break;
 #define IUN_OP(NAME, PFX) \
         case OP_ ## NAME: { \
             CHECKARGS(1, 1); \
             READ_TYPEOF(A); \
             SCOPES_CHECK_RESULT(verify_integer_ops(A)); \
-            return ARGTYPE1(A); \
+            return DEP_ARGTYPE1(A, _A); \
         } break;
 #define FUN_OP(NAME) \
         case OP_ ## NAME: { \
             CHECKARGS(1, 1); \
             READ_TYPEOF(A); \
             SCOPES_CHECK_RESULT(verify_real_ops(A)); \
-            return ARGTYPE1(A); \
+            return DEP_ARGTYPE1(A, _A); \
         } break;
         SCOPES_ARITH_OPS()
 
