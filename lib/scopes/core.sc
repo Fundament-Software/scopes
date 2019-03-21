@@ -2328,10 +2328,10 @@ let va-option =
 
 'set-symbols Generator
     __typecall =
-        inline "Generator-new" (cls iter init)
+        inline "Generator-new" (cls start valid? at next)
             Closure->Generator
                 inline "get-iter-init" ()
-                    _ iter init
+                    _ start valid? at next
     __call =
         spice-macro
             fn (args)
@@ -2345,22 +2345,23 @@ let va-option =
                 `(self)
 
 # typical pattern for a generator:
-    inline make-generator (init end?)
+    inline make-generator (container)
         Generator
-            inline (fdone x)
-                if (end? x)
-                    # terminate
-                    fdone;
-                else
-                    # return next iterator and result values
-                    _ ('next x) ('@ x)
-            init
+            inline "start" ()
+                # return the first iterator of sequence (might not be valid)
+                'start container
+            inline "valid?" (it...)
+                # return true if the iterator is still valid
+                'valid-iterator? container it...
+            inline "at" (it...)
+                # return variadic result at iterator
+                '@ container it...
+            inline "next" (it...)
+                # return the next iterator in sequence
+                'next container it...
 
 # for <name> ... in <generator> body ...
 define for
-    inline fdone ()
-        break;
-
     sugar-block-scope-macro
         fn "expand-for" (expr next-expr scope)
             let head args = (decons expr)
@@ -2376,26 +2377,29 @@ define for
             let generator-expr body = (decons it)
             let subscope = (Scope scope)
             spice-quote
-                let iter start =
+                let start valid? at next =
                     (as [(sc_expand generator-expr '() subscope)] Generator);
             return
                 cons
-                    spice-quote iter start # order expressions
-                        loop (next = start)
-                            let next args... = (iter fdone next)
-                            inline continue ()
-                                repeat next
-                            spice-unquote
-                                let expr =
-                                    loop (params expr = params (list '= args...))
-                                        if (empty? params)
-                                            break expr
-                                        let param next = (decons params)
-                                        _ next (cons param expr)
-                                let expr = (cons let expr)
-                                'set-symbol subscope 'continue continue
-                                sc_expand (cons do expr body) '() subscope
-                            next
+                    spice-quote start valid? at next # order expressions
+                        loop (it... = (start))
+                            if (valid? it...)
+                                let args... = (at it...)
+                                inline continue ()
+                                    repeat (next it...)
+                                spice-unquote
+                                    let expr =
+                                        loop (params expr = params (list '= args...))
+                                            if (empty? params)
+                                                break expr
+                                            let param next = (decons params)
+                                            _ next (cons param expr)
+                                    let expr = (cons let expr)
+                                    'set-symbol subscope 'continue continue
+                                    sc_expand (cons do expr body) '() subscope
+                                continue;
+                            else
+                                break;
                     next-expr
                 scope
 
@@ -2922,45 +2926,32 @@ define-sugar-macro define-sugar-block-scope-macro
     symbols =
         inline "symbols" (self)
             Generator
-                inline (fdone key)
-                    let key value =
-                        sc_type_next self key
-                    if (key == unnamed)
-                        fdone;
-                    else
-                        _ key key value
-                unnamed
+                inline () (sc_type_next self unnamed)
+                inline (key value) (key == unnamed)
+                inline (key value) (_ key value)
+                inline (key value) (sc_type_next self key)
     elements =
         inline "elements" (self)
             let count = ('element-count self)
             Generator
-                inline (fdone i)
-                    if (i == count)
-                        fdone;
-                    else
-                        _ (i + 1) ('element@ self i)
-                0
+                inline () 0
+                inline (i) (i < count)
+                inline (i) ('element@ self i)
+                inline (i) (i + 1)
 
 inline scope-generator (self)
     Generator
-        inline (fdone key)
-            let key value =
-                sc_scope_next self key
-            if (key == unnamed)
-                fdone;
-            else
-                _ key key value
-        unnamed
+        inline () (sc_scope_next self unnamed)
+        inline (key value) (key == unnamed)
+        inline (key value) (_ key value)
+        inline (key value) (sc_scope_next self key)
 
 inline list-generator (self)
     Generator
-        inline (fdone cell)
-            if (empty? cell)
-                fdone;
-            else
-                let at next = (decons cell)
-                _ next at
-        self
+        inline () self
+        inline (cell) (not (empty? cell))
+        inline (cell) (sc_list_at cell)
+        inline (cell) (sc_list_next cell)
 
 'set-symbols Scope
     __as =
@@ -2983,12 +2974,10 @@ inline list-generator (self)
         inline "Value-args" (self)
             let argc = ('argcount self)
             Generator
-                inline (fdone x)
-                    if (x < argc)
-                        _ (x + 1) ('getarg self x)
-                    else
-                        fdone;
-                0
+                inline () 0
+                inline (x) (x < argc)
+                inline (x) ('getarg self x)
+                inline (x) (x + 1)
 
 inline range (a b c)
     let num-type = (typeof a)
@@ -3005,12 +2994,10 @@ inline range (a b c)
             inline () a
             inline () b
     Generator
-        inline (fdone x)
-            if (x < to)
-                _ (x + step) x
-            else
-                fdone;
-        from
+        inline () from
+        inline (x) (x < to)
+        inline (x) x
+        inline (x) (x + step)
 
 let parse-compile-flags =
     spice-macro
@@ -3151,12 +3138,10 @@ let tupleof =
                 let stackarr = (ptrtoref (alloca (typeof arr)))
                 stackarr = arr
                 Generator
-                    inline (fdone x)
-                        if (< x count)
-                            _ (+ x 1:usize) (@ stackarr x)
-                        else
-                            fdone;
-                    0:usize
+                    inline () 0:usize
+                    inline (x) (< x count)
+                    inline (x) (@ stackarr x)
+                    inline (x) (+ x 1:usize)
             box-cast
                 fn "array.__as" (vT T expr)
                     if (T == Generator)
@@ -3908,25 +3893,74 @@ define match
 
 let OverloadedFunction = (typename "OverloadedFunction")
 
+"""" (va-append-va (inline () (_ b ...)) a...) -> a... b...
+define va-append-va
+    spice-macro
+        fn "va-va-append" (args)
+            raises-compile-error;
+            let argc = ('argcount args)
+            verify-count argc 1 -1
+            let end = ('getarg args 0)
+            let newargs = (sc_argument_list_new (sc_get_active_anchor))
+            loop (i = 1)
+                if (i == argc)
+                    sc_argument_list_append newargs `(end)
+                    break newargs
+                sc_argument_list_append newargs ('getarg args i)
+                repeat (i + 1)
+
+"""" (va-split n a...) -> (inline () a...[n .. (va-countof a...)-1]) a...[0 .. n-1]
+define va-split
+    spice-macro
+        fn "va-split" (args)
+            raises-compile-error;
+            let argc = ('argcount args)
+            verify-count argc 1 -1
+            let pos = (('getarg args 0) as i32)
+            let largs = (sc_argument_list_new (sc_get_active_anchor))
+            let rargs = (sc_argument_list_new (sc_get_active_anchor))
+            loop (i = 1)
+                if (i > pos)
+                    break;
+                sc_argument_list_append largs ('getarg args i)
+                repeat (i + 1)
+            loop (i = (pos + 1))
+                if (i >= argc)
+                    break;
+                sc_argument_list_append rargs ('getarg args i)
+                repeat (i + 1)
+            `(_ (inline () largs) (inline () rargs))
+
 run-stage;
+
+inline va-join (a...)
+    inline (b...)
+        va-append-va (inline () b...) a...
 
 let infinite-range =
     Generator
-        inline (fdone x)
-            _ (x + 1) x
-        0
+        inline () 0
+        inline (x) true
+        inline (x) x
+        inline (x) (x + 1)
 
 inline zip (a b)
-    let iter-a init-a = ((a as Generator))
-    let iter-b init-b = ((b as Generator))
+    let start-a valid-a at-a next-a = ((a as Generator))
+    let start-b valid-b at-b next-b = ((b as Generator))
+    let start-a... = (start-a)
+    let lsize = (va-countof start-a...)
+    let start... = (va-append-va start-b start-a...)
     Generator
-        inline (fdone t)
-            let a = (@ t 0)
-            let b = (@ t 1)
-            let next-a at-a... = (iter-a fdone a)
-            let next-b at-b... = (iter-b fdone b)
-            _ (tupleof next-a next-b) at-a... at-b...
-        tupleof init-a init-b
+        inline () start...
+        inline (it...)
+            let it-a it-b = (va-split lsize it...)
+            (valid-a (it-a)) & (valid-b (it-b))
+        inline (it...)
+            let it-a it-b = (va-split lsize it...)
+            va-append-va (inline () (at-b (it-b))) (at-a (it-a))
+        inline (it...)
+            let it-a it-b = (va-split lsize it...)
+            va-append-va (inline () (next-b (it-b))) (next-a (it-a))
 
 inline enumerate (x)
     zip infinite-range x
@@ -4419,8 +4453,56 @@ sugar unlet ((name as Symbol) names...)
 # fold iteration
 #-------------------------------------------------------------------------------
 
+# for <name> ... in <generator> body ...
+#define for
+    sugar-block-scope-macro
+        fn "expand-for" (expr next-expr scope)
+            let head args = (decons expr)
+            let it params =
+                loop (it params = args '())
+                    if (empty? it)
+                        compiler-error! "'in' expected"
+                    let sxat it = (decons it)
+                    let at = (sxat as Symbol)
+                    if (at == 'in)
+                        break it params
+                    _ it (cons sxat params)
+            let generator-expr body = (decons it)
+            let subscope = (Scope scope)
+            spice-quote
+                let start valid? at next =
+                    (as [(sc_expand generator-expr '() subscope)] Generator);
+            return
+                cons
+                    spice-quote start valid? at next # order expressions
+                        loop (it... = (start))
+                            if (valid? it...)
+                                let args... = (at it...)
+                                inline continue ()
+                                    repeat (next it...)
+                                spice-unquote
+                                    let expr =
+                                        loop (params expr = params (list '= args...))
+                                            if (empty? params)
+                                                break expr
+                                            let param next = (decons params)
+                                            _ next (cons param expr)
+                                    let expr = (cons let expr)
+                                    'set-symbol subscope 'continue continue
+                                    sc_expand (cons do expr body) '() subscope
+                                continue;
+                            else
+                                break;
+                    next-expr
+                scope
+
 # fold (<name> ... = <init> ...) for <name> ... in <expr>
 sugar fold ((binding...) 'for expr...)
+    fn rjoin-list (lside rside)
+        loop (params expr = lside rside)
+            if (empty? params) (break expr)
+            let param next = (decons params)
+            _ next (cons param expr)
     fn split-until (expr token errmsg)
         loop (it params = expr '())
             if (empty? it)
@@ -4430,39 +4512,42 @@ sugar fold ((binding...) 'for expr...)
             if (at == token)
                 break it params
             _ it (cons sxat params)
-    let it params = (split-until expr... 'in "'in' expected")
+    let it itparams = (split-until expr... 'in "'in' expected")
     let init foldparams = (split-until binding... '= "'=' expected")
     let generator-expr body = (decons it)
     let subscope = (Scope sugar-scope)
-    spice-quote
-        let iter start =
-            (as [(sc_expand generator-expr '() subscope)] Generator);
-    let next = ('unique Symbol "next")
-    let bindings breakargs =
-        loop (inp bindings breakargs = foldparams (cons '= start init) '())
-            if (empty? inp)
-                break (cons next bindings) breakargs
-            let at next = (decons inp)
-            _ next (cons at bindings) (cons at breakargs)
-    let itercall =
-        qq [iter]
-            [inline] ()
-                [(cons break breakargs)]
-            [next]
-    let letexpr =
-        loop (inp letexpr = params (list '= itercall))
-            if (empty? inp)
-                break (cons let next letexpr)
-            let at next = (decons inp)
-            _ next (cons at letexpr)
-    let repeatexpr = (cons repeat next breakargs)
-    qq [loop] [bindings]
-        [letexpr]
-        [inline] repeat (...)
-            [repeat] [next] ...
-        [inline] continue () [repeatexpr]
-        [repeat] [next]
-            [(cons do body)]
+    return
+        spice-quote
+            let init... =
+                spice-unquote
+                    let expr = (sc_expand (cons _ init) '() subscope)
+                    expr
+            let gen =
+                spice-unquote
+                    let expr = (sc_expand generator-expr '() subscope)
+                    expr
+            let start valid? at next = ((as gen Generator))
+            let start... = (start)
+            let lsize = (va-countof start...)
+            loop (args... = (va-append-va (inline () init...) start...))
+                let it state = (va-split lsize args...)
+                let it... = (it)
+                if (valid? it...)
+                    inline continue ()
+                        repeat (va-append-va state (next it...))
+                    let args... = (va-append-va (inline () (at it...)) (state))
+                    let newstate... =
+                        spice-unquote
+                            let expr =
+                                cons let
+                                    rjoin-list foldparams
+                                        rjoin-list itparams (list '= args...)
+                            'set-symbol subscope 'continue continue
+                            let result = (sc_expand (cons do expr body) '() subscope)
+                            result
+                    repeat (va-append-va (inline () newstate...) (next it...))
+                else
+                    break (state)
 
 #-------------------------------------------------------------------------------
 # typedef
