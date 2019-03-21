@@ -3144,6 +3144,24 @@ let tupleof =
     __typecall =
         inline "array.__typecall" (cls element-type size)
             sc_array_type element-type (size as usize)
+    __as =
+        do
+            inline array-generator (arr)
+                let count = (countof arr)
+                let stackarr = (ptrtoref (alloca (typeof arr)))
+                stackarr = arr
+                Generator
+                    inline (fdone x)
+                        if (< x count)
+                            _ (+ x 1:usize) (@ stackarr x)
+                        else
+                            fdone;
+                    0:usize
+            box-cast
+                fn "array.__as" (vT T expr)
+                    if (T == Generator)
+                        return `(array-generator expr)
+                    compiler-error! "unsupported type"
 
 let arrayof =
     spice-macro
@@ -4734,6 +4752,12 @@ sugar struct (name body...)
         box-cast
             fn "CEnum-imply" (vT T expr)
                 if (T == i32)
+                    return `(bitcast expr T)
+                compiler-error! "unsupported type"
+    __rimply =
+        box-cast
+            fn "CEnum-imply" (vT T expr)
+                if (vT == i32)
                     return `(bitcast expr T)
                 compiler-error! "unsupported type"
 
