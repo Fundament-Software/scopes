@@ -27,19 +27,19 @@ fn iLeftChild (i)
 fn iRightChild (i)
     2:i64 * i + 2:i64
 
+inline array-generator (self)
+    Generator
+        inline () 0:usize
+        inline (i) (i < self._count)
+        inline (i) (self @ i)
+        inline (i) (i + 1:usize)
+
 typedef Array < CStruct
 
     @@ box-cast
     fn __as (cls T self)
         if (T == Generator)
-            spice-quote
-                Generator
-                    inline (fdone i)
-                        if (i >= self._count)
-                            fdone;
-                        else
-                            _ (i + 1:usize) (self @ i)
-                    0:usize
+            `(array-generator self)
         else
             compiler-error! "unsupported type"
 

@@ -1178,6 +1178,17 @@ struct LLVMIRGenerator {
         return type_to_llvm_type(SCOPES_GET_RESULT(extract_type_constant(node)));
     }
 
+    LLVMValueRef fix_named_struct_store(LLVMValueRef val, LLVMValueRef ptr) {
+        // fix struct vs named struct
+        auto ET = LLVMGetElementType(LLVMTypeOf(ptr));
+        auto ST = LLVMTypeOf(val);
+        if (ET != ST) {
+            assert(LLVMGetTypeKind(ET) == LLVMStructTypeKind);
+            ptr = LLVMBuildBitCast(builder, ptr, LLVMPointerType(ST, 0), "");
+        }
+        return ptr;
+    }
+
     SCOPES_RESULT(LLVMValueRef) translate_builtin(Builtin builtin, const TypedValues &args) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         size_t argcount = args.size();
@@ -1334,6 +1345,9 @@ struct LLVMIRGenerator {
         case FN_Assign: {
             READ_VALUE(lhs);
             READ_VALUE(rhs);
+
+            rhs = fix_named_struct_store(lhs, rhs);
+
             LLVMValueRef retvalue = LLVMBuildStore(builder, lhs, rhs);
             return retvalue;
         } break;
@@ -1353,6 +1367,9 @@ struct LLVMIRGenerator {
         } break;
         case FN_VolatileStore:
         case FN_Store: { READ_VALUE(val); READ_VALUE(ptr);
+
+            ptr = fix_named_struct_store(val, ptr);
+
             LLVMValueRef retvalue = LLVMBuildStore(builder, val, ptr);
             if (builtin.value() == FN_VolatileStore) { LLVMSetVolatile(retvalue, true); }
             return retvalue;

@@ -1546,15 +1546,13 @@ static SCOPES_RESULT(void) build_deref_move(
     if (rq) {
         SCOPES_CHECK_RESULT(verify_readable(rq, T));
         auto retT = strip_qualifier<ReferQualifier>(T);
-        auto uq = try_unique(T);
-        if (!uq) {
-            SCOPES_EXPECT_ERROR(error_value_not_unique(val));
-        }
         auto call = Call::from(anchor, unique_result_type(ctx, retT), g_deref, { val });
         ctx.append(call);
-        ctx.move(uq->id);
+        auto uq = try_unique(T);
+        if (uq) {
+            ctx.move(uq->id);
+        }
         val = call;
-        return {};
     }
     return {};
 }
@@ -1945,7 +1943,7 @@ repeat:
             READ_NODEREF_TYPEOF(X);
             auto uq = try_unique(X);
             if (!uq) {
-                SCOPES_CHECK_RESULT(error_value_not_unique(_X));
+                SCOPES_CHECK_RESULT(error_value_not_unique(_X, "move"));
             }
             build_move(ctx, call->anchor(), _X);
             return _X;
@@ -1972,7 +1970,7 @@ repeat:
             READ_NODEREF_TYPEOF(X);
             auto uq = try_unique(X);
             if (!uq) {
-                SCOPES_CHECK_RESULT(error_value_not_unique(_X));
+                SCOPES_CHECK_RESULT(error_value_not_unique(_X, "lose"));
             }
 
             const Type *DestT = SCOPES_GET_RESULT(storage_type(X));
@@ -2541,15 +2539,16 @@ repeat:
             if (rq) {
                 SCOPES_CHECK_RESULT(verify_writable(rq, typeof_DestT));
             }
+            typeof_DestT = strip_qualifier<ReferQualifier>(typeof_DestT);
             //strip_qualifiers(ElemT);
             //strip_qualifiers(DestT);
-            SCOPES_CHECK_RESULT(
-                verify(ElemT, DestT));
+
+            SCOPES_CHECK_RESULT(verify(ElemT, DestT));
 
             if (!is_plain(typeof_ElemT)) {
                 auto uq = try_unique(typeof_ElemT);
                 if (!uq) {
-                    SCOPES_CHECK_RESULT(error_value_not_unique(_ElemT));
+                    SCOPES_CHECK_RESULT(error_value_not_unique(_ElemT, "assign"));
                 }
                 ctx.move(uq->id);
             }
@@ -2600,7 +2599,7 @@ repeat:
             if (!is_plain(typeof_DestT)) {
                 auto uq = try_unique(typeof_ElemT);
                 if (!uq) {
-                    SCOPES_CHECK_RESULT(error_value_not_unique(_ElemT));
+                    SCOPES_CHECK_RESULT(error_value_not_unique(_ElemT, "store"));
                 }
                 ctx.move(uq->id);
             }
@@ -2641,7 +2640,7 @@ repeat:
             if (!is_plain(T)) {
                 auto uq = try_unique(T);
                 if (!uq) {
-                    SCOPES_CHECK_RESULT(error_value_not_unique(_T));
+                    SCOPES_CHECK_RESULT(error_value_not_unique(_T, "free"));
                 }
                 SCOPES_CHECK_RESULT(build_drop(ctx, call->anchor(), _T));
                 ctx.move(uq->id);

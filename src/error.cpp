@@ -208,10 +208,13 @@ SCOPES_RESULT(void) error_plain_not_storage_of_unique(const Type *SrcT, const Ty
     SCOPES_LOCATION_ERROR(ss.str());
 }
 
-SCOPES_RESULT(void) error_value_not_unique(TypedValue *value) {
+SCOPES_RESULT(void) error_value_not_unique(TypedValue *value, const char *by) {
     SCOPES_RESULT_TYPE(void);
     StyledString ss;
-    ss.out << "value of type " << value->get_type() << " is not unique";
+    ss.out << by << " value of type " << value->get_type() << " is not unique";
+    if (!is_plain(value->get_type())) {
+        ss.out << ", but type is unique" << std::endl;
+    }
     SCOPES_LOCATION_ERROR(ss.str());
 }
 

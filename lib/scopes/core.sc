@@ -816,6 +816,10 @@ sc_typename_type_set_super usize integer
 let Generator = (sc_typename_type "Generator")
 'set-plain-storage Generator ('storageof Closure)
 
+# collector type
+let Collector = (sc_typename_type "Collector")
+'set-plain-storage Collector ('storageof Closure)
+
 # syntax macro type
 let SugarMacro = (sc_typename_type "SugarMacro")
 let SugarMacroFunction =
@@ -2139,6 +2143,18 @@ let Closure->Generator =
             let self = (bitcast self Generator)
             Value self
 
+let Closure->Collector =
+    spice-macro
+        fn "Closure->Collector" (args)
+            let argc = ('argcount args)
+            verify-count argc 1 1
+            let self = ('getarg args 0)
+            if (not ('constant? self))
+                compiler-error! "Closure must be constant"
+            let self = (as self Closure)
+            let self = (bitcast self Collector)
+            Value self
+
 # (define name expr ...)
 fn expand-define (expr)
     raises-compile-error;
@@ -2321,6 +2337,28 @@ let va-option =
             list va-option-branch (list sugar-quote sym)
                 cons inline '() body
                 va
+
+#---------------------------------------------------------------------------
+# collector
+#---------------------------------------------------------------------------
+
+'set-symbols Collector
+    __typecall =
+        inline "Collector-new" (cls init valid? at collect)
+            Closure->Collector
+                inline "get-init" ()
+                    _ init valid? at collect
+    __call =
+        spice-macro
+            fn (args)
+                let argc = ('argcount args)
+                verify-count argc 1 1
+                let self = ('getarg args 0)
+                if (not ('constant? self))
+                    compiler-error! "Generator must be constant"
+                let self = (self as Collector)
+                let self = (bitcast self Closure)
+                `(self)
 
 #---------------------------------------------------------------------------
 # for iterator
@@ -2927,7 +2965,7 @@ define-sugar-macro define-sugar-block-scope-macro
         inline "symbols" (self)
             Generator
                 inline () (sc_type_next self unnamed)
-                inline (key value) (key == unnamed)
+                inline (key value) (key != unnamed)
                 inline (key value) (_ key value)
                 inline (key value) (sc_type_next self key)
     elements =
@@ -2939,35 +2977,84 @@ define-sugar-macro define-sugar-block-scope-macro
                 inline (i) ('element@ self i)
                 inline (i) (i + 1)
 
-inline scope-generator (self)
-    Generator
-        inline () (sc_scope_next self unnamed)
-        inline (key value) (key == unnamed)
-        inline (key value) (_ key value)
-        inline (key value) (sc_scope_next self key)
+do
+    inline scope-generator (self)
+        Generator
+            inline () (sc_scope_next self unnamed)
+            inline (key value) (key != unnamed)
+            inline (key value) (_ key value)
+            inline (key value)
+                sc_scope_next self key
 
-inline list-generator (self)
-    Generator
-        inline () self
-        inline (cell) (not (empty? cell))
-        inline (cell) (sc_list_at cell)
-        inline (cell) (sc_list_next cell)
+    'set-symbols Scope
+        __as =
+            box-cast
+                fn "scope-as" (vT T expr)
+                    if (T == Generator)
+                        return `(scope-generator expr)
+                    compiler-error! "unsupported type"
 
-'set-symbols Scope
-    __as =
-        box-cast
-            fn "scope-as" (vT T expr)
-                if (T == Generator)
-                    return `(scope-generator expr)
-                compiler-error! "unsupported type"
+do
+    inline string-generator (self)
+        let buf sz = ('buffer self)
+        Generator
+            inline () 0:usize
+            inline (i) (i < sz)
+            inline (i) (load (getelementptr buf i))
+            inline (i) (i + 1:usize)
 
-'set-symbols list
-    __as =
-        box-cast
-            fn "list-as" (vT T expr)
-                if (T == Generator)
-                    return `(list-generator expr)
-                compiler-error! "unsupported type"
+    fn i8->string(c)
+        let ptr = (alloca i8)
+        store c ptr
+        sc_string_new ptr 1
+
+    'set-symbols string
+        __ras =
+            box-cast
+                fn "string-as" (vT T expr)
+                    if (vT == i8)
+                        return `(i8->string expr)
+                    compiler-error! "unsupported type"
+        __as =
+            box-cast
+                fn "string-as" (vT T expr)
+                    if (T == Generator)
+                        return `(string-generator expr)
+                    compiler-error! "unsupported type"
+
+do
+    inline list-generator (self)
+        Generator
+            inline () self
+            inline (cell) (not (empty? cell))
+            inline (cell) (sc_list_at cell)
+            inline (cell) (sc_list_next cell)
+
+    inline list-collector (self)
+        Collector
+            inline () self
+            inline (it) true
+            inline (it) ('reverse it)
+            inline (src it)
+                cons (src) it
+
+    'set-symbols list
+        cons-collector =
+            inline "list-collector" (self)
+                Collector
+                    inline () self
+                    inline (it) true
+                    inline (it) it
+                    inline (src it)
+                        cons (src) it
+        __as =
+            box-cast
+                fn "list-as" (vT T expr)
+                    if (T == Generator)
+                        return `(list-generator expr)
+                    if (T == Collector)
+                        return `(list-collector expr)
+                    compiler-error! "unsupported type"
 
 'set-symbols Value
     args =
@@ -2978,6 +3065,16 @@ inline list-generator (self)
                 inline (x) (x < argc)
                 inline (x) ('getarg self x)
                 inline (x) (x + 1)
+    arg-appender =
+        inline "Value-args" (self)
+            let argc = ('argcount self)
+            Collector
+                inline () self
+                inline (self) true
+                inline (self) self
+                inline (src self)
+                    sc_argument_list_append self (src)
+                    self
 
 inline range (a b c)
     let num-type = (typeof a)
@@ -4201,6 +4298,8 @@ sugar from (src 'let params...)
                 cons load-from src
                     quotify params...
 
+define zip (spice-macro (fn (args) (ltr-multiop args (Value zip))))
+
 run-stage;
 
 define-sugar-block-scope-macro static-if
@@ -4453,49 +4552,6 @@ sugar unlet ((name as Symbol) names...)
 # fold iteration
 #-------------------------------------------------------------------------------
 
-# for <name> ... in <generator> body ...
-#define for
-    sugar-block-scope-macro
-        fn "expand-for" (expr next-expr scope)
-            let head args = (decons expr)
-            let it params =
-                loop (it params = args '())
-                    if (empty? it)
-                        compiler-error! "'in' expected"
-                    let sxat it = (decons it)
-                    let at = (sxat as Symbol)
-                    if (at == 'in)
-                        break it params
-                    _ it (cons sxat params)
-            let generator-expr body = (decons it)
-            let subscope = (Scope scope)
-            spice-quote
-                let start valid? at next =
-                    (as [(sc_expand generator-expr '() subscope)] Generator);
-            return
-                cons
-                    spice-quote start valid? at next # order expressions
-                        loop (it... = (start))
-                            if (valid? it...)
-                                let args... = (at it...)
-                                inline continue ()
-                                    repeat (next it...)
-                                spice-unquote
-                                    let expr =
-                                        loop (params expr = params (list '= args...))
-                                            if (empty? params)
-                                                break expr
-                                            let param next = (decons params)
-                                            _ next (cons param expr)
-                                    let expr = (cons let expr)
-                                    'set-symbol subscope 'continue continue
-                                    sc_expand (cons do expr body) '() subscope
-                                continue;
-                            else
-                                break;
-                    next-expr
-                scope
-
 # fold (<name> ... = <init> ...) for <name> ... in <expr>
 sugar fold ((binding...) 'for expr...)
     fn rjoin-list (lside rside)
@@ -4535,15 +4591,15 @@ sugar fold ((binding...) 'for expr...)
                 if (valid? it...)
                     inline continue ()
                         repeat (va-append-va state (next it...))
-                    let args... = (va-append-va (inline () (at it...)) (state))
+                    let at... = (at it...)
+                    let state... = (state)
                     let newstate... =
                         spice-unquote
-                            let expr =
-                                cons let
-                                    rjoin-list foldparams
-                                        rjoin-list itparams (list '= args...)
+                            let expr1 expr2 =
+                                cons let (rjoin-list itparams (list '= at...))
+                                cons let (rjoin-list foldparams (list '= state...))
                             'set-symbol subscope 'continue continue
-                            let result = (sc_expand (cons do expr body) '() subscope)
+                            let result = (sc_expand (cons do expr1 expr2 body) '() subscope)
                             result
                     repeat (va-append-va (inline () newstate...) (next it...))
                 else

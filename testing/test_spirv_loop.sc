@@ -1,6 +1,6 @@
 
 fn main ()
-    for i in (range 16)
+    for i j in (zip (range 16) (range 16))
     return;
 
 
