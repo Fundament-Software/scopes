@@ -1024,7 +1024,9 @@ sc_value_t *sc_value_wrap(const sc_type_t *type, sc_value_t *value) {
 sc_value_t *sc_value_unwrap(const sc_type_t *type, sc_value_t *value) {
     using namespace scopes;
     auto result = unwrap_value(type, value);
-    assert(result);
+    if (!result) {
+        result = ArgumentList::from(value->anchor(), {});
+    }
     return result;
 }
 

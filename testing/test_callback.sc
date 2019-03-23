@@ -1,4 +1,6 @@
 
+using import testing
+
 fn main ()
     fn testf (a b)
         + a b
@@ -32,4 +34,9 @@ let z =
 print z
 assert (z == 5)
 
+assert-error
+    print
+        as
+            compile (typify ((fn (x) x) as Closure) i32)
+            function i32 i32
 

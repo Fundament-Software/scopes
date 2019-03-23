@@ -590,6 +590,7 @@ let __unbox =
             let value = (sc_getarg args 0)
             let T = (sc_getarg args 1)
             let T = (unbox-pointer T type)
+            let VT = (sc_value_type value)
             sc_value_unwrap T value
 let
     type== = (spice-macro (type-comparison-func ptrcmp==))
