@@ -69,6 +69,7 @@ SCOPES_RESULT(void) map_keyed_arguments(const Anchor *anchor,
 
 SCOPES_RESULT(Function *) prove(Function *frame, Template *func, const Types &types);
 SCOPES_RESULT(TypedValue *) prove(const ASTContext &ctx, Value *node);
+SCOPES_RESULT(TypedValue *) prove(Value *node);
 
 } // namespace scopes
 

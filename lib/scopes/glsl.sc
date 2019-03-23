@@ -18,21 +18,25 @@ typedef InOutType : ('storageof type)
 
 run-stage;
 
+#spice inout-get-in (self destT)
+    let destT = (destT as type)
+    let T = (bitcast (self as InOutType) type)
+    let ET = (T.Type as type)
+    if ((destT == immutable) or (destT == (T.Type as type)))
+        return (getattr T 'in)
+    compiler-error! "unsupported type"
+
 'set-symbols InOutType
     __getattr =
         spice "__getattr" (self name)
             let T = (bitcast (self as InOutType) type)
             let name = (name as Symbol)
             return (getattr T name)
-    __as =
-        box-cast
-            fn "__as" (cls destT self)
-                let T = (bitcast (self as InOutType) type)
-                let ET = (T.Type as type)
-                if ((destT == immutable) or (destT == (T.Type as type)))
-                    return (getattr T 'in)
-                compiler-error! "unsupported type"
-    __= =
+    #__as =
+        spice-cast-macro
+            fn "__as" (cls destT)
+                return `(inline (self) (inout-get-in self destT))
+    #__= =
         box-binary-op
             fn "__=" (lhsT rhsT lhs rhs)
                 let _lhsT = (bitcast (lhs as InOutType) type)

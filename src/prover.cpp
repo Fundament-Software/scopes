@@ -234,6 +234,25 @@ static SCOPES_RESULT(Const *) nullof(const Anchor *anchor, const Type *T) {
 
 //------------------------------------------------------------------------------
 
+static const ASTContext *ast_context = nullptr;
+
+struct ScopedASTContext {
+    ScopedASTContext(const ASTContext &ctx) {
+        old_ctx = ast_context;
+        ast_context = &ctx;
+    }
+
+    ~ScopedASTContext() {
+        ast_context = old_ctx;
+    }
+
+    const ASTContext *old_ctx;
+};
+
+#define SCOPES_ASTCONTEXT(CTX) ScopedASTContext SCOPES_CAT(_scoped_ast_context, __LINE__)(CTX)
+
+//------------------------------------------------------------------------------
+
 ASTContext ASTContext::for_loop(LoopLabel *loop) const {
     return ASTContext(function, frame, loop, except, _break, block);
 }
@@ -1867,6 +1886,7 @@ repeat:
         auto fptr = SCOPES_GET_RESULT(extract_astmacro_constant(callee));
         assert(fptr);
             SCOPES_CHECK_RESULT(verify_valid(ctx, values, "spice call"));
+        SCOPES_ASTCONTEXT(ctx);
         auto result = fptr(ArgumentList::from(call->anchor(), values));
         if (result.ok) {
             Value *value = result._0;
@@ -3264,6 +3284,14 @@ SCOPES_RESULT(Function *) prove(Function *frame, Template *func, const Types &ty
     auto result = prove_body(frame, func, types);
     func->recursion--;
     return result;
+}
+
+SCOPES_RESULT(TypedValue *) prove(Value *node) {
+    SCOPES_RESULT_TYPE(TypedValue *);
+    if (!ast_context) {
+        SCOPES_LOCATION_ERROR(String::from("can't prove expressions outside of spice macros"));
+    }
+    return prove(*ast_context, node);
 }
 
 //------------------------------------------------------------------------------

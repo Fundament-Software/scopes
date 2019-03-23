@@ -1,10 +1,10 @@
 
 typedef Name : (storageof string)
-    @@ box-cast
-    fn __as (vT T expr)
+    @@ spice-cast-macro
+    fn __as (vT T)
         if (T == string)
-            return `(bitcast expr T)
-        compiler-error! "unsupported type"
+            return `(inline (self) (bitcast self T))
+        `()
 
 run-stage;
 

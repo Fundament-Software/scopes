@@ -36,12 +36,11 @@ inline array-generator (self)
 
 typedef Array < CStruct
 
-    @@ box-cast
-    fn __as (cls T self)
+    @@ spice-cast-macro
+    fn __as (cls T)
         if (T == Generator)
-            `(array-generator self)
-        else
-            compiler-error! "unsupported type"
+            return `array-generator
+        `()
 
     inline __countof (self)
         deref self._count

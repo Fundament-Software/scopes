@@ -372,7 +372,7 @@ do
                             let self = (unbox-pointer self selftype)
                             let key = (unbox-symbol key Symbol)
                             fset self key value
-                            return `[]
+                            return `()
                 compiler-error! "all arguments must be constant"
 
     # quick assignment of type attributes
@@ -548,7 +548,7 @@ let const.add.i32.i32 =
                         box-integer (add a b)
             compiler-error! "arguments must be constant"
 
-let constbranch =
+let static-branch =
     spice-macro
         fn (args)
             let argcount = (sc_argcount args)
@@ -602,7 +602,7 @@ run-stage;
 fn cons (values...)
     va-rifold none
         inline (i key value next)
-            constbranch (none? next)
+            static-branch (none? next)
                 inline ()
                     value
                 inline ()
@@ -617,12 +617,12 @@ inline make-list (values...)
 
 inline decons (self count)
     let count =
-        constbranch (none? count)
+        static-branch (none? count)
             inline () 1
             inline () count
     let at next = (sc_list_decons self)
     _ at
-        constbranch (const.icmp<=.i32.i32 count 1)
+        static-branch (const.icmp<=.i32.i32 count 1)
             inline () next
             inline () (decons next (const.add.i32.i32 count -1))
 
@@ -726,7 +726,7 @@ inline define-symbols (self values...)
     unique-type = sc_unique_type
     view-type =
         inline (self id)
-            constbranch (none? id)
+            static-branch (none? id)
                 inline ()
                     sc_view_type self -1
                 inline ()
@@ -779,14 +779,7 @@ inline define-symbols (self values...)
                 sc_pointer_type_get_flags cls
                 sc_pointer_type_get_storage_class cls
 
-#'define-symbols Closure
-    frame = sc_closure_frame
-    label = sc_closure_label
-
 let rawstring = ('pointer i8)
-
-inline box-cast (f)
-    box-pointer (const-typify f type type Value)
 
 inline not (value)
     bxor value true
@@ -840,104 +833,134 @@ fn value-as (vT T expr)
         return `(unbox expr T)
     compiler-error! "unsupported type"
 
-'set-symbols Value
+'define-symbols Value
     __as =
-        box-cast value-as
+        inline (vT T)
+            inline (self) (unbox self T)
     __rimply =
-        box-cast
-            fn "Value-rimply" (vT T expr)
-                if true
-                    return `(Value expr)
-                compiler-error! "unsupported type"
+        inline (vT T)
+            inline (self) (Value self)
+
+inline spice-cast-macro (f)
+    """"to be used for __as, __ras, __imply and __rimply
+        returns a callable converter (f value) that performs the cast or
+        no arguments if the cast can not be performed.
+    spice-macro
+        fn (args)
+            raises-compile-error;
+            let argc = (sc_argcount args)
+            verify-count argc 2 2
+            let source-type = (unbox-pointer (sc_getarg args 0) type)
+            let target-type = (unbox-pointer (sc_getarg args 1) type)
+            f source-type target-type
+
+inline spice-converter-macro (f)
+    """"to be used for converter that need to do additional
+        dispatch, e.g. do something else when the value is a constant
+        returns a quote that performs the cast (f value T)
+    spice-macro
+        fn (args)
+            raises-compile-error;
+            let argc = (sc_argcount args)
+            verify-count argc 2 2
+            let self = (sc_getarg args 0)
+            let T = (unbox-pointer (sc_getarg args 1) type)
+            f self T
 
 'set-symbols SpiceMacro
     __rimply =
-        box-cast
-            fn "SpiceMacro-rimply" (vT T expr)
-                if (ptrcmp== vT SpiceMacroFunction)
-                    return `(bitcast expr T)
-                elseif (ptrcmp== vT Closure)
-                    if ('constant? expr)
-                        return `(spice-macro expr)
-                compiler-error! "unsupported type"
+        box-pointer
+            spice-cast-macro
+                fn (vT T)
+                    if (ptrcmp== vT SpiceMacroFunction)
+                        return `(inline (self) (bitcast self T))
+                    elseif (ptrcmp== vT Closure)
+                        return `spice-macro
+                    `()
 
 # integer casting
 
-fn integer-imply (vT T expr)
-    let ST =
-        if (ptrcmp== T usize) ('storageof T)
-        else T
-    let args... = expr T
-    if (icmp== ('kind ST) type-kind-integer)
-        # constant i32 auto-expands to usize if not negative
-        if ('constant? expr)
-            if (ptrcmp== vT i32)
-                let val = (unbox expr i32)
-                if (ptrcmp== T usize)
+fn integer-imply (vT T)
+    let static-i32->real =
+        spice-converter-macro
+            inline (self T)
+                # constant i32 auto-converts to real
+                if ('constant? self)
+                    if ('signed? ('typeof self))
+                        return `(sitofp self T)
+                    else
+                        return `(uitofp self T)
+                compiler-error! "integer must be constant for implicit conversion"
+    let static-i32->usize =
+        spice-converter-macro
+            inline (self T)
+                # only used for i32 -> usize right now
+                if ('constant? self)
+                    let val = (unbox self i32)
                     if (icmp<s val 0)
                         compiler-error! "signed integer is negative"
                     return
                         box-integer (sext val usize)
+                compiler-error! "integer must be constant for implicit conversion"
+    let ST =
+        if (ptrcmp== T usize) ('storageof T)
+        else T
+    if (icmp== ('kind ST) type-kind-integer)
+        if (ptrcmp== vT i32)
+            if (ptrcmp== T usize)
+                return `(inline (self) (static-i32->usize self T))
         let valw = ('bitcount vT)
         let destw = ('bitcount ST)
         # must have same signed bit
         if (icmp== ('signed? vT) ('signed? ST))
             if (icmp== destw valw)
-                return `(bitcast args...)
+                return `(inline (self) (bitcast self T))
             elseif (icmp>s destw valw)
                 if ('signed? vT)
-                    return `(sext args...)
+                    return `(inline (self) (sext self T))
                 else
-                    return `(zext args...)
+                    return `(inline (self) (zext self T))
     elseif (icmp== ('kind ST) type-kind-real)
-        # constant i32 auto-converts to real
-        if ('constant? expr)
-            if (ptrcmp== vT i32)
-                if ('signed? vT)
-                    return `(sitofp args...)
-                else
-                    return `(uitofp args...)
-    compiler-error! "unsupported type"
+        if (ptrcmp== vT i32)
+            return `(inline (self) (static-i32->real self T))
+    `()
 
-fn integer-as (vT T expr)
-    let args... = expr T
-    let T =
+fn integer-as (vT T)
+    let ST =
         if (ptrcmp== T usize) ('storageof T)
         else T
-    if (icmp== ('kind T) type-kind-integer)
+    if (icmp== ('kind ST) type-kind-integer)
         let valw = ('bitcount vT)
-        let destw = ('bitcount T)
+        let destw = ('bitcount ST)
         if (icmp== destw valw)
-            return `(bitcast args...)
+            return `(inline (self) (bitcast self T))
         elseif (icmp>s destw valw)
             if ('signed? vT)
-                return `(sext args...)
+                return `(inline (self) (sext self T))
             else
-                return `(zext args...)
+                return `(inline (self) (zext self T))
         else
-            return `(itrunc args...)
-    elseif (icmp== ('kind T) type-kind-real)
+            return `(inline (self) (itrunc self T))
+    elseif (icmp== ('kind ST) type-kind-real)
         if ('signed? vT)
-            return `(sitofp args...)
+            return `(inline (self) (sitofp self T))
         else
-            return `(uitofp args...)
-    compiler-error! "unsupported type"
+            return `(inline (self) (uitofp self T))
+    `()
 
 # only perform safe casts: i.e. float to double
-fn real-imply (vT T expr)
+fn real-imply (vT T)
     if (icmp== ('kind T) type-kind-real)
-        let args... = expr T
         let valw = ('bitcount vT)
         let destw = ('bitcount T)
         if (icmp== destw valw)
-            return `(bitcast args...)
+            return `(inline (self) (bitcast self T))
         elseif (icmp>s destw valw)
-            return `(fpext args...)
-    compiler-error! "unsupported type"
+            return `(inline (self) (fpext self T))
+    `()
 
 # more aggressive cast that converts from all numerical types
-fn real-as (vT T expr)
-    let args... = expr T
+fn real-as (vT T)
     let T =
         if (ptrcmp== T usize) ('storageof T)
         else T
@@ -945,18 +968,17 @@ fn real-as (vT T expr)
     if (icmp== kind type-kind-real)
         let valw destw = ('bitcount vT) ('bitcount T)
         if (icmp== destw valw)
-            return `(bitcast args...)
+            return `(inline (self) (bitcast self T))
         elseif (icmp>s destw valw)
-            return `(fpext args...)
+            return `(inline (self) (fpext self T))
         else
-            return `(fptrunc args...)
+            return `(inline (self) (fptrunc self T))
     elseif (icmp== kind type-kind-integer)
         if ('signed? T)
-            return `(fptosi args...)
+            return `(inline (self) (fptosi self T))
         else
-            return `(fptoui args...)
-    compiler-error! "unsupported type"
-
+            return `(inline (self) (fptoui self T))
+    `()
 
 inline box-binary-op (f)
     box-pointer (const-typify f type type Value Value)
@@ -967,14 +989,11 @@ inline single-binary-op-dispatch (destf)
             return `(destf lhs rhs)
         compiler-error! "unsupported type"
 
-inline cast-error! (intro-string vT T err)
+inline cast-error! (intro-string vT T)
     compiler-error!
         sc_string_join intro-string
             sc_string_join ('__repr (box-pointer vT))
-                sc_string_join " to type "
-                    sc_string_join ('__repr (box-pointer T))
-                        sc_string_join ": "
-                            sc_format_error err
+                sc_string_join " to type " ('__repr (box-pointer T))
 
 # receive a source type, a destination type and an expression, and return an
     untyped expression that transforms the value to said type, or raise an error
@@ -993,74 +1012,61 @@ fn attribute-format-error! (T symbol err)
                         'join ": "
                             sc_format_error err
 
-fn cast-expr (symbol rsymbol vT T expr)
-    try
-        let anyf = ('@ vT symbol)
+fn converter-valid? (value)
+    ptrcmp!= ('typeof value) void
+
+fn cast-converter (symbol rsymbol vT T)
+    """"for two given types, find a matching conversion function
+        this function only works inside a spice macro
+    label next
         let f =
-            try (unbox-cast-function-type anyf)
-            except (err)
-                attribute-format-error! vT symbol err
-        return (f vT T expr)
-    except (lhs-err)
-        let anyf =
-            try
-                '@ T rsymbol
-            except (err)
-                raise lhs-err
+            try ('@ vT symbol)
+            except (err) (merge next)
+        let conv = (sc_prove `(f vT T))
+        if (converter-valid? conv) (return conv)
+    label next
         let f =
-            try (unbox-cast-function-type anyf)
-            except (err)
-                attribute-format-error! T rsymbol err
-        return (f vT T expr)
+            try ('@ T rsymbol)
+            except (err) (merge next)
+        let conv = (sc_prove `(f vT T))
+        if (converter-valid? conv) (return conv)
+    return (sc_empty_argument_list (sc_get_active_anchor))
 
-fn imply-expr (vT T expr)
+inline cast-identity (value) value
+
+fn imply-converter (vT T)
     if (ptrcmp== vT T)
-        return expr
+        return `cast-identity
     if (sc_type_is_superof T vT)
-        return expr
-    cast-expr '__imply '__rimply vT T expr
+        return `cast-identity
+    cast-converter '__imply '__rimply vT T
 
-fn as-expr (vT T expr)
+fn as-converter (vT T)
     if (ptrcmp== vT T)
-        return expr
+        return `cast-identity
     if (sc_type_is_superof T vT)
-        return expr
-    try
-        # try implicit cast first
-        cast-expr '__imply '__rimply vT T expr
-    except (imply-err)
-        cast-expr '__as '__ras vT T expr
+        return `cast-identity
+    let conv = (cast-converter '__as '__ras vT T)
+    if (converter-valid? conv) (return conv)
+    # try implicit cast last
+    cast-converter '__imply '__rimply vT T
 
-let
-    imply =
-        spice-macro
-            fn "imply-dispatch" (args)
-                let argc = ('argcount args)
-                verify-count argc 2 2
-                let value = ('getarg args 0)
-                let anyT = ('getarg args 1)
-                let vT = ('typeof value)
-                let T = (unbox-pointer anyT type)
-                try
-                    imply-expr vT T value
-                except (err)
-                    cast-error!
-                        \ "can't coerce value of type " vT T err
+inline gen-cast-op (f str)
+    spice-macro
+        fn "cast-op" (args)
+            let argc = ('argcount args)
+            verify-count argc 2 2
+            let value = ('getarg args 0)
+            let anyT = ('getarg args 1)
+            let vT = ('typeof value)
+            let T = (unbox-pointer anyT type)
+            let conv = (f vT T)
+            if (converter-valid? conv)
+                return `(conv value)
+            cast-error! str vT T
 
-    as =
-        spice-macro
-            fn "as-dispatch" (args)
-                let argc = ('argcount args)
-                verify-count argc 2 2
-                let value = ('getarg args 0)
-                let anyT = ('getarg args 1)
-                let vT = ('typeof value)
-                let T = (unbox-pointer anyT type)
-                try
-                    # then try explicit cast
-                    as-expr vT T value
-                except (err)
-                    cast-error! "can't cast value of type " vT T err
+let imply = (gen-cast-op imply-converter "can't coerce value of type ")
+let as = (gen-cast-op as-converter "can't cast value of type ")
 
 let BinaryOpFunctionType =
     'pointer ('raising (function Value type type Value Value) Error)
@@ -1128,15 +1134,17 @@ fn sym-binary-op-label-macro (args symbol rsymbol friendly-op-name)
     # try other options
     try
         # can we cast rhsT to lhsT?
-        let rhs = (imply-expr rhsT lhsT rhs)
-        # try again
-        return (binary-op-expr symbol lhsT lhsT lhs rhs)
+        let conv = (imply-converter rhsT lhsT)
+        if (converter-valid? conv)
+            # try again
+            return (binary-op-expr symbol lhsT lhsT lhs `(conv rhs))
     except (err)
     try
         # can we cast lhsT to rhsT?
-        let lhs = (imply-expr lhsT rhsT lhs)
-        # try again
-        return (binary-op-expr symbol rhsT rhsT lhs rhs)
+        let conv = (imply-converter lhsT rhsT)
+        if (converter-valid? conv)
+            # try again
+            return (binary-op-expr symbol rhsT rhsT `(conv lhs) rhs)
     except (err)
     # we give up
     binary-op-error! friendly-op-name lhsT rhsT err
@@ -1155,8 +1163,11 @@ fn asym-binary-op-label-macro (args symbol rtype friendly-op-name)
         if (ptrcmp== rhsT rtype)
             return `(f args)
         # can we cast rhsT to rtype?
-        let rhs = (imply-expr rhsT rtype rhs)
-        return `(f lhs rhs)
+        let conv = (imply-converter rhsT rtype)
+        if (converter-valid? conv)
+            return `(f lhs (conv rhs))
+        else
+            cast-error! "can't cast right hand side value of type " rhsT rtype
     except (err)
         # we give up
         compiler-error!
@@ -1223,11 +1234,12 @@ inline make-asym-binary-op-dispatch (symbol rtype friendly-op-name)
     __== = (box-binary-op (single-binary-op-dispatch icmp==))
     __!= = (box-binary-op (single-binary-op-dispatch icmp!=))
     __imply =
-        box-cast
-            fn "sugar-imply" (vT T expr)
-                if (ptrcmp== T string)
-                    return `(sc_symbol_to_string expr)
-                compiler-error! "unsupported type"
+        box-pointer
+            spice-cast-macro
+                inline (vT T)
+                    if (ptrcmp== T string)
+                        return `sc_symbol_to_string
+                    `()
 
 fn string@ (self i)
     let s = (sc_string_buffer self)
@@ -1298,8 +1310,8 @@ fn dispatch-and-or (args flip)
     ifval
 
 'set-symbols integer
-    __imply = (box-cast integer-imply)
-    __as = (box-cast integer-as)
+    __imply = (box-pointer (spice-cast-macro integer-imply))
+    __as = (box-pointer (spice-cast-macro integer-as))
     __+ = (box-binary-op (single-binary-op-dispatch add))
     __- = (box-binary-op (single-binary-op-dispatch sub))
     __neg = (box-pointer (inline (self) (sub (nullof (typeof self)) self)))
@@ -1329,8 +1341,8 @@ inline floordiv (a b)
     sdiv (fptosi a i32) (fptosi b i32)
 
 'set-symbols real
-    __imply = (box-cast real-imply)
-    __as = (box-cast real-as)
+    __imply = (box-pointer (spice-cast-macro real-imply))
+    __as = (box-pointer (spice-cast-macro real-as))
     __== = (box-binary-op (single-binary-op-dispatch fcmp==o))
     __!= = (box-binary-op (single-binary-op-dispatch fcmp!=u))
     __> = (box-binary-op (single-binary-op-dispatch fcmp>o))
@@ -1454,11 +1466,12 @@ let NullType = (sc_typename_type "NullType")
             inline (self)
                 sc_default_styler style-number "null"
     __imply =
-        box-cast
-            fn "null-imply" (clsT T expr)
-                if (icmp== ('kind ('storageof T)) type-kind-pointer)
-                    return `(bitcast expr T)
-                compiler-error! "cannot convert to type"
+        box-pointer
+            spice-cast-macro
+                fn "null-imply" (cls T)
+                    if (icmp== ('kind ('storageof T)) type-kind-pointer)
+                        return `(inline (self) (bitcast self T))
+                    `()
     __== =
         box-binary-op
             fn (lhsT rhsT lhs rhs)
@@ -1528,7 +1541,7 @@ let missing-constructor =
     spice-macro
         fn "missing-constructor" (args)
             if false
-                return `[]
+                return `()
             let argc = ('argcount args)
             verify-count argc 1 -1
             let cls = ('getarg args 0)
@@ -1617,11 +1630,11 @@ fn repr (value)
 let print =
     do
         inline print-element (i key value)
-            constbranch (const.icmp<=.i32.i32 i 0)
+            static-branch (const.icmp<=.i32.i32 i 0)
                 inline ()
                 inline ()
                     sc_write " "
-            constbranch (== (typeof value) string)
+            static-branch (== (typeof value) string)
                 inline ()
                     sc_write value
                 inline ()
@@ -1642,25 +1655,25 @@ let print =
 
 'set-symbols string
     __imply =
-        box-cast
-            fn "string-imply" (vT T expr)
-                let string->rawstring =
-                    spice-macro
-                        fn (args)
-                            let argc = ('argcount args)
-                            verify-count argc 1 1
-                            let str = ('getarg args 0)
-                            if ('constant? str)
-                                let s c = (sc_string_buffer (as str string))
-                                `s
-                            else
-                                spice-quote
-                                    do
+        box-pointer
+            spice-cast-macro
+                fn (vT T)
+                    let string->rawstring =
+                        spice-macro
+                            fn (args)
+                                let argc = ('argcount args)
+                                verify-count argc 1 1
+                                let str = ('getarg args 0)
+                                if ('constant? str)
+                                    let s c = (sc_string_buffer (as str string))
+                                    `s
+                                else
+                                    spice-quote
                                         let s c = (sc_string_buffer str)
                                         s
-                if (ptrcmp== T rawstring)
-                    return `(string->rawstring expr)
-                compiler-error! "unsupported type"
+                    if (ptrcmp== T rawstring)
+                        return `string->rawstring
+                    `()
 
 # implicit argument type coercion for functions, externs and typed labels
 # --------------------------------------------------------------------------
@@ -1738,15 +1751,15 @@ fn pointer-type-imply? (src dest)
         return true
     return false
 
-fn pointer-imply (vT T expr)
+fn pointer-imply (vT T)
     if (icmp== ('kind T) type-kind-pointer)
         if (pointer-type-imply? vT T)
-            return `(bitcast expr T)
-    compiler-error! "unsupported type"
+            return `(inline (self) (bitcast self T))
+    `()
 
 'set-symbols pointer
     __call = coerce-call-arguments
-    __imply = (box-cast pointer-imply)
+    __imply = (box-pointer (spice-cast-macro pointer-imply))
 
 'define-symbols pointer
     __typecall =
@@ -2094,7 +2107,7 @@ fn clone-scope-contents (a b)
 'define-symbols typename
     __typecall =
         inline (cls name)
-            constbranch (== cls typename)
+            static-branch (== cls typename)
                 inline ()
                     sc_typename_type name
                 inline ()
@@ -2476,20 +2489,20 @@ let hash-storage =
     __== = integer.__==
     __!= = integer.__!=
     __as =
-        box-cast
-            fn "hash-as" (vT T expr)
+        spice-cast-macro
+            fn "hash-as" (vT T)
                 let ST = ('storageof vT)
                 if (T == ST)
-                    return `(bitcast expr T)
+                    return `(inline (self) (bitcast self T))
                 elseif (T == integer)
-                    return `(bitcast expr ST)
-                compiler-error! "unsupported type"
+                    return `(inline (self) (bitcast self ST))
+                `()
     __ras =
-        box-cast
-            fn "hash-as" (vT T expr)
+        spice-cast-macro
+            fn "hash-as" (vT T)
                 if (vT == ('storageof vT))
-                    return `(bitcast expr T)
-                compiler-error! "unsupported type"
+                    return `(inline (self) (bitcast self T))
+                `()
     __typecall =
         do
             inline hash2 (a b)
@@ -2988,11 +3001,11 @@ do
 
     'set-symbols Scope
         __as =
-            box-cast
-                fn "scope-as" (vT T expr)
+            spice-cast-macro
+                fn "scope-as" (vT T)
                     if (T == Generator)
-                        return `(scope-generator expr)
-                    compiler-error! "unsupported type"
+                        return `scope-generator
+                    `()
 
 do
     inline string-generator (self)
@@ -3010,17 +3023,17 @@ do
 
     'set-symbols string
         __ras =
-            box-cast
-                fn "string-as" (vT T expr)
+            spice-cast-macro
+                fn "string-as" (vT T)
                     if (vT == i8)
-                        return `(i8->string expr)
-                    compiler-error! "unsupported type"
+                        return `i8->string
+                    `()
         __as =
-            box-cast
-                fn "string-as" (vT T expr)
+            spice-cast-macro
+                fn "string-as" (vT T)
                     if (T == Generator)
-                        return `(string-generator expr)
-                    compiler-error! "unsupported type"
+                        return `string-generator
+                    `()
 
 do
     inline list-generator (self)
@@ -3048,13 +3061,13 @@ do
                     inline (src it)
                         cons (src) it
         __as =
-            box-cast
-                fn "list-as" (vT T expr)
+            spice-cast-macro
+                fn "list-as" (vT T)
                     if (T == Generator)
-                        return `(list-generator expr)
-                    if (T == Collector)
-                        return `(list-collector expr)
-                    compiler-error! "unsupported type"
+                        return `list-generator
+                    elseif (T == Collector)
+                        return `list-collector
+                    `()
 
 'set-symbols Value
     args =
@@ -3079,15 +3092,15 @@ do
 inline range (a b c)
     let num-type = (typeof a)
     let step =
-        constbranch (none? c)
+        static-branch (none? c)
             inline () (1 as num-type)
             inline () c
     let from =
-        constbranch (none? b)
+        static-branch (none? b)
             inline () (0 as num-type)
             inline () a
     let to =
-        constbranch (none? b)
+        static-branch (none? b)
             inline () a
             inline () b
     Generator
@@ -3239,11 +3252,11 @@ let tupleof =
                     inline (x) (< x count)
                     inline (x) (@ stackarr x)
                     inline (x) (+ x 1:usize)
-            box-cast
-                fn "array.__as" (vT T expr)
+            spice-cast-macro
+                fn "array.__as" (vT T)
                     if (T == Generator)
-                        return `(array-generator expr)
-                    compiler-error! "unsupported type"
+                        return `array-generator
+                    `()
 
 let arrayof =
     spice-macro
@@ -3482,26 +3495,34 @@ inline clamp (x mn mx)
 'set-symbols Closure
     docstring = sc_closure_get_docstring
     __imply =
-        box-cast
-            fn (srcT destT expr)
+        spice-cast-macro
+            fn (srcT destT)
+                let func->closure =
+                    spice-macro
+                        fn (args)
+                            let argc = ('argcount args)
+                            verify-count argc 2 2
+                            let expr = ('getarg args 0)
+                            let destT = (('getarg args 1) as type)
+                            let funcT = ('element@ destT 0)
+                            let sz = ('element-count funcT)
+                            let func = (expr as Closure)
+                            if ('variadic? funcT)
+                                compiler-error! "cannot typify to variadic function"
+                            let args = (alloca-array type sz)
+                            for i in (range sz)
+                                store ('element@ funcT i) (getelementptr args i)
+                            let result =
+                                sc_typify func sz args
+                            let resultT = ('typeof result)
+                            if (resultT != destT)
+                                sugar-error! ('anchor result)
+                                    .. "function does not compile to type " (repr destT)
+                                        \ "but has type " (repr resultT)
+                            return result
                 if ('function-pointer? destT)
-                    let funcT = ('element@ destT 0)
-                    let sz = ('element-count funcT)
-                    let func = (expr as Closure)
-                    if ('variadic? funcT)
-                        compiler-error! "cannot typify to variadic function"
-                    let args = (alloca-array type sz)
-                    for i in (range sz)
-                        store ('element@ funcT i) (getelementptr args i)
-                    let result =
-                        sc_typify func sz args
-                    let resultT = ('typeof result)
-                    if (resultT != destT)
-                        sugar-error! ('anchor result)
-                            .. "function does not compile to type " (repr destT)
-                                \ "but has type " (repr resultT)
-                    return result
-                compiler-error! "unsupported type"
+                    return `(inline (self) (func->closure self destT))
+                `()
 
 inline extern (name T attrs...)
     let storage-class = (va-option storage attrs... unnamed)
@@ -3596,7 +3617,7 @@ inline gen-match-block-parser (handle-case)
 
 fn gen-sugar-matcher (failfunc expr scope params)
     if false
-        return `[]
+        return `()
     let params = (params as list)
     let paramcount = (countof params)
     let outexpr = (sc_expression_new (sc_get_active_anchor))
@@ -3688,7 +3709,7 @@ define sugar
             fn (expr next scope)
                 let new-expr new-next = (f expr next scope)
                 return
-                    constbranch (none? new-next)
+                    static-branch (none? new-next)
                         inline ()
                             cons new-expr next
                         inline ()
@@ -3775,7 +3796,7 @@ fn uncomma (l)
 
 inline parse-argument-matcher (failfunc expr scope params cb)
     #if false
-        return `[]
+        return `()
     let params = (params as list)
     let params = (uncomma params)
     let paramcount = (countof params)
@@ -3815,10 +3836,10 @@ inline parse-argument-matcher (failfunc expr scope params cb)
                         "vararg parameter cannot be typed"
                 spice-quote
                     let arg = (sc_getarg expr i)
+                    let conv = (imply-converter ('typeof arg) exprT)
                     let arg =
-                        try (imply-expr ('typeof arg) exprT arg)
-                        except (err)
-                            failfunc;
+                        if (converter-valid? conv) `(conv arg)
+                        else (failfunc)
                 cb param arg
                 repeat (i + 1) rest varargs
             elseif ((('typeof mid) == Symbol) and ((mid as Symbol) == 'as))
@@ -3956,7 +3977,7 @@ fn gen-match-matcher (failfunc expr scope cond)
         (: x T) -> ((typeof input) == T), let x = input
         <unknown symbol> -> unpack as symbol
     if false
-        return `[]
+        return `()
     let condT = ('typeof cond)
     if (condT == list)
         let cond-anchor = ('anchor cond)
@@ -4169,9 +4190,9 @@ fn get-overloaded-fn-append ()
                             elseif (paramT == Variadic) arg
                             elseif (argT == paramT) arg
                             else
-                                try (imply-expr argT paramT arg)
-                                except (err)
-                                    merge break-next
+                                let conv = (imply-converter argT paramT)
+                                if (converter-valid? conv) `(conv arg)
+                                else (merge break-next)
                         sc_call_append_argument outargs outarg
                     return outargs
             # if we got here, there was no match
@@ -4326,7 +4347,7 @@ define-sugar-block-scope-macro static-if
                     _ '() next-expr
         return
             list
-                list constbranch cond
+                list static-branch cond
                     cons inline '() body
                     cons inline '() elseexpr
             next-next-expr
@@ -4546,7 +4567,7 @@ sugar unlet ((name as Symbol) names...)
         let name = (name as Symbol)
         getattr sugar-scope name
         sc_scope_del_symbol sugar-scope name
-    `[]
+    `()
 
 #-------------------------------------------------------------------------------
 # fold iteration
@@ -4703,7 +4724,7 @@ spice __delete (target)
         try
             getattr T '__delete
         except (err)
-            return `[]
+            return `()
     `(destructor target)
 
 inline gen-allocator-sugar (name f)
@@ -4890,17 +4911,17 @@ sugar struct (name body...)
     __== = (box-binary-op (single-binary-op-dispatch icmp==))
     __!= = (box-binary-op (single-binary-op-dispatch icmp!=))
     __imply =
-        box-cast
-            fn "CEnum-imply" (vT T expr)
+        spice-cast-macro
+            fn "CEnum-imply" (vT T)
                 if (T == i32)
-                    return `(bitcast expr T)
-                compiler-error! "unsupported type"
+                    return `(inline (self) (bitcast self T))
+                `()
     __rimply =
-        box-cast
-            fn "CEnum-imply" (vT T expr)
+        spice-cast-macro
+            fn "CEnum-imply" (vT T)
                 if (vT == i32)
-                    return `(bitcast expr T)
-                compiler-error! "unsupported type"
+                    return `(inline (self) (bitcast self T))
+                `()
 
 sugar enum (name values...)
     spice make-enum (name vals...)

@@ -134,6 +134,7 @@ typedef sc_list_scope_raises_t (*sc_syntax_wildcard_func_t)(const sc_list_t *, s
 sc_i32_i32_i32_tuple_t sc_compiler_version();
 sc_value_list_scope_raises_t sc_expand(sc_value_t *expr, const sc_list_t *next, sc_scope_t *scope);
 sc_value_raises_t sc_eval(const sc_anchor_t *anchor, const sc_list_t *expr, sc_scope_t *scope);
+sc_value_raises_t sc_prove(sc_value_t *expr);
 sc_value_raises_t sc_typify_template(sc_value_t *f, int numtypes, const sc_type_t **typeargs);
 sc_value_raises_t sc_typify(sc_closure_t *srcl, int numtypes, const sc_type_t **typeargs);
 sc_value_raises_t sc_compile(sc_value_t *srcl, uint64_t flags);
@@ -162,6 +163,7 @@ sc_value_t *sc_value_unwrap(const sc_type_t *type, sc_value_t *value);
 
 sc_value_t *sc_keyed_new(const sc_anchor_t *anchor, sc_symbol_t key, sc_value_t *value);
 
+sc_value_t *sc_empty_argument_list(const sc_anchor_t *anchor);
 sc_value_t *sc_argument_list_new(const sc_anchor_t *anchor);
 void sc_argument_list_append(sc_value_t *alist, sc_value_t *value);
 sc_value_t *sc_extract_argument_new(const sc_anchor_t *anchor, sc_value_t *value, int index);

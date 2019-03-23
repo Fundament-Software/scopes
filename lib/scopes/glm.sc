@@ -139,13 +139,13 @@ typedef vec-type-accessor
         binary-op-dispatch '__>= '__r>= >=
         binary-op-dispatch '__<= '__r<= <=
 
-    @@ box-cast
-    fn __imply (vT T self)
+    @@ spice-cast-macro
+    fn __imply (vT T)
         let rhvecT = (vT.RHVectorType as type)
         if ((T == rhvecT) or (T == vec-type))
             let mask = vT.Mask
-            return `(bitcast (shufflevector self self mask) rhvecT)
-        compiler-error! "unsupported type"
+            return `(inline (self) (bitcast (shufflevector self self mask) rhvecT))
+        `()
 
     @@ box-binary-op
     fn __= (lhsT rhsT lhs rhs)
@@ -277,7 +277,9 @@ typedef vec-type < immutable
             let rhs =
                 if (lhsT == rhsT) rhs
                 else
-                    `(lhsT [(imply-expr rhsT Ta rhs)])
+                    let conv = (imply-converter rhsT Ta)
+                    if (converter-valid? conv) `(lhsT (conv rhs))
+                    else (cast-error! "cannot convert right hand side from " rhsT Ta)
             return (f lhsT lhsT lhs rhs)
 
         fn vec-type-binary-op-expr-r (symbol lhsT rhsT lhs rhs)
@@ -290,7 +292,9 @@ typedef vec-type < immutable
             let lhs =
                 if (lhsT == rhsT) lhs
                 else
-                    `(rhsT [(imply-expr lhsT Tb lhs)])
+                    let conv = (imply-converter lhsT Tb)
+                    if (converter-valid? conv) `(rhsT (conv lhs))
+                    else (cast-error! "cannot convert left hand side from " lhsT Tb)
             return (f rhsT rhsT lhs rhs)
 
         inline vec-type-binary-op-dispatch (lop rop symbol)
@@ -414,21 +418,22 @@ typedef vec-type < immutable
     unlet construct-getter-type assign-mask range-mask expand-mask
         \ build-access-mask
 
-    @@ box-cast
-    fn __as (vT T self)
+    @@ spice-cast-macro
+    fn __as (vT T)
+        inline vector-generator (self count)
+            Generator
+                inline () 0
+                inline (i) (i < count)
+                inline (i) (extractelement self i)
+                inline (i) (i + 1)
+
         let ST = ('storageof vT)
         if ((T == vector) or (T == ST))
-            `(bitcast self ST)
+            return `(inline (self) (bitcast self ST))
         elseif (T == Generator)
             let count = ('element-count ST)
-            spice-quote
-                Generator
-                    inline () 0
-                    inline (i) (i < count)
-                    inline (i) (extractelement self i)
-                    inline (i) (i + 1)
-        else
-            compiler-error! "unsupported type"
+            return `(inline (self) (vector-generator self count))
+        `()
 
     @@ box-binary-op
     fn __== (lhsT rhsT lhs rhs)
@@ -620,21 +625,22 @@ typedef mat-type < immutable
         else
             compiler-error! "unsupported type"
 
-    @@ box-cast
-    fn __as (vT T self)
+    @@ spice-cast-macro
+    fn __as (vT T)
+        inline matrix-generator (self count)
+            Generator
+                inline () 0
+                inline (i) (i < count)
+                inline (i) (extractvalue self i)
+                inline (i) (i + 1)
+
         let ST = ('storageof vT)
         if ((T == array) or (T == ST))
-            `(bitcast self ST)
+            return `(inline (self) (bitcast self ST))
         elseif (T == Generator)
             let count = ('element-count ST)
-            spice-quote
-                Generator
-                    inline () 0
-                    inline (i) (i < count)
-                    inline (i) (extractvalue self i)
-                    inline (i) (i + 1)
-        else
-            compiler-error! "unsupported type"
+            return `(inline (self) (matrix-generator self count))
+        `()
 
     @@ box-binary-op
     fn __== (lhsT rhsT lhs rhs)

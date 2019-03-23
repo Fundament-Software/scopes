@@ -187,6 +187,12 @@ sc_value_raises_t sc_eval(const sc_anchor_t *anchor, const sc_list_t *expr, sc_s
     return convert_result(prove(nullptr, module_result, {}));
 }
 
+sc_value_raises_t sc_prove(sc_value_t *expr) {
+    using namespace scopes;
+    //SCOPES_RESULT_TYPE(TypedValue *);
+    return convert_result(prove(expr));
+}
+
 sc_value_raises_t sc_eval_inline(const sc_anchor_t *anchor, const sc_list_t *expr, sc_scope_t *scope) {
     using namespace scopes;
     REWRITE_ANCHOR(anchor)
@@ -1019,6 +1025,11 @@ sc_value_t *sc_keyed_new(const sc_anchor_t *anchor, sc_symbol_t key, sc_value_t 
     using namespace scopes;
     REWRITE_ANCHOR(anchor)
     return KeyedTemplate::from(anchor, key, value);
+}
+
+sc_value_t *sc_empty_argument_list(const sc_anchor_t *anchor) {
+    using namespace scopes;
+    return ArgumentList::from(anchor, {});
 }
 
 sc_value_t *sc_argument_list_new(const sc_anchor_t *anchor) {
@@ -1922,6 +1933,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_compiler_version, arguments_type({TYPE_I32, TYPE_I32, TYPE_I32}));
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_expand, arguments_type({TYPE_Value, TYPE_List, TYPE_Scope}), TYPE_Value, TYPE_List, TYPE_Scope);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_eval, TYPE_Value, TYPE_Anchor, TYPE_List, TYPE_Scope);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_prove, TYPE_Value, TYPE_Value);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_eval_inline, TYPE_Anchor, TYPE_Value, TYPE_List, TYPE_Scope);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_typify_template, TYPE_Value, TYPE_Value, TYPE_I32, native_ro_pointer_type(TYPE_Type));
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_typify, TYPE_Value, TYPE_Closure, TYPE_I32, native_ro_pointer_type(TYPE_Type));
@@ -1952,6 +1964,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_value_wrap, TYPE_Value, TYPE_Type, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_value_unwrap, TYPE_Value, TYPE_Type, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_keyed_new, TYPE_Value, TYPE_Anchor, TYPE_Symbol, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_empty_argument_list, TYPE_Value, TYPE_Anchor);
     DEFINE_EXTERN_C_FUNCTION(sc_argument_list_new, TYPE_Value, TYPE_Anchor);
     DEFINE_EXTERN_C_FUNCTION(sc_argument_list_append, _void, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_extract_argument_new, TYPE_Value, TYPE_Anchor, TYPE_Value, TYPE_I32);
