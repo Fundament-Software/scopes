@@ -165,9 +165,9 @@ let typify =
 
         build-typify-function typify
 
-let const-typify =
+let static-typify =
     do
-        fn const-typify (args)
+        fn static-typify (args)
             let argcount = (sc_argcount args)
             verify-count argcount 1 -1
             let src_fn = (sc_getarg args 0)
@@ -182,12 +182,12 @@ let const-typify =
                 _ (add i 1) (add j 1)
             sc_typify src_fn typecount (bitcast types TypeArrayPointer)
 
-        build-typify-function const-typify
+        build-typify-function static-typify
 
 run-stage;
 
 let spice-macro-verify-signature =
-    const-typify (fn "spice-macro-verify-signature" (f)) SpiceMacroFunction
+    static-typify (fn "spice-macro-verify-signature" (f)) SpiceMacroFunction
 
 inline function->SpiceMacro (f)
     spice-macro-verify-signature f
@@ -201,7 +201,7 @@ fn box-none ()
 
 # take closure l, typify and compile it and return a function of SpiceMacro type
 inline spice-macro (l)
-    function->SpiceMacro (const-typify l Value)
+    function->SpiceMacro (static-typify l Value)
 
 inline box-spice-macro (l)
     box-pointer (spice-macro l)
@@ -288,7 +288,7 @@ fn compare-type (args f)
     `(f args)
 
 inline type-comparison-func (f)
-    fn (args) (compare-type args (const-typify f type type))
+    fn (args) (compare-type args (static-typify f type type))
 
 let storagecast =
     box-spice-macro
@@ -647,7 +647,7 @@ inline define-symbols (self values...)
     constant? = sc_value_is_constant
     pure? = sc_value_is_pure
     kind = sc_value_kind
-    none? = (const-typify Value-none? Value)
+    none? = (static-typify Value-none? Value)
     __repr = sc_value_repr
     spice-repr = sc_value_ast_repr
     dump =
@@ -981,7 +981,7 @@ fn real-as (vT T)
     `()
 
 inline box-binary-op (f)
-    box-pointer (const-typify f type type Value Value)
+    box-pointer (static-typify f type type Value Value)
 
 inline single-binary-op-dispatch (destf)
     fn (lhsT rhsT lhs rhs)
@@ -1488,8 +1488,8 @@ let NullType = (sc_typename_type "NullType")
 let
     and-branch = (spice-macro (fn (args) (dispatch-and-or args true)))
     or-branch = (spice-macro (fn (args) (dispatch-and-or args false)))
-    #implyfn = (const-typify implyfn type type)
-    #asfn = (const-typify asfn type type)
+    #implyfn = (static-typify implyfn type type)
+    #asfn = (static-typify asfn type type)
     countof = (make-unary-op-dispatch '__countof "count")
     unpack = (make-unary-op-dispatch '__unpack "unpack")
     hash1 = (make-unary-op-dispatch '__hash "hash")
@@ -1561,13 +1561,13 @@ inline not (value)
     bxor (imply value bool) true
 
 let function->SugarMacro =
-    const-typify
+    static-typify
         fn "function->SugarMacro" (f)
             bitcast f SugarMacro
         SugarMacroFunction
 
 inline sugar-block-scope-macro (f)
-    function->SugarMacro (const-typify f list list Scope)
+    function->SugarMacro (static-typify f list list Scope)
 
 inline sugar-scope-macro (f)
     sugar-block-scope-macro
@@ -1916,7 +1916,7 @@ fn parse-infix-expr (infix-table lhs state mprec)
             _ next-rhs next-state
 
 let parse-infix-expr =
-    const-typify parse-infix-expr Scope Value list i32
+    static-typify parse-infix-expr Scope Value list i32
 
 #---------------------------------------------------------------------------
 
@@ -2219,9 +2219,9 @@ let
                     as scope Scope
 
 'set-symbol (__this-scope) (Symbol "#list")
-    Value (const-typify list-handler list Scope)
+    Value (static-typify list-handler list Scope)
 'set-symbol (__this-scope) (Symbol "#symbol")
-    Value (const-typify symbol-handler list Scope)
+    Value (static-typify symbol-handler list Scope)
 
 inline select-op-macro (sop fop numargs)
     inline scalar-type (T)
@@ -3879,7 +3879,7 @@ define spice-match
 
 #inline spice-macro (f)
     spice-macro-verify-signature f
-    bitcast (const-typify f Value) SpiceMacro
+    bitcast (static-typify f Value) SpiceMacro
 
 define spice
     sugar-macro
