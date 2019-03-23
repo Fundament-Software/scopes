@@ -42,6 +42,14 @@ StreamASTFormat StreamASTFormat::singleline() {
     return fmt;
 }
 
+StreamASTFormat StreamASTFormat::content() {
+    auto fmt = StreamASTFormat();
+    fmt.anchors = None;
+    fmt.newlines = false;
+    fmt.content_only = true;
+    return fmt;
+}
+
 //------------------------------------------------------------------------------
 
 struct StreamAST : StreamAnchors {
@@ -50,6 +58,7 @@ struct StreamAST : StreamAnchors {
     bool atom_anchors;
     bool newlines;
     bool dependent_functions;
+    bool content_only;
     int nextid;
 
     std::unordered_map<const Value *, int> visited;
@@ -61,6 +70,7 @@ struct StreamAST : StreamAnchors {
         atom_anchors = (fmt.anchors == StreamASTFormat::All);
         newlines = fmt.newlines;
         dependent_functions = fmt.dependent_functions;
+        content_only = fmt.content_only;
     }
 
     void stream_newline() {
@@ -97,6 +107,8 @@ struct StreamAST : StreamAnchors {
     }
 
     void stream_type_suffix(const Type *T) {
+        if (content_only)
+            return;
         ss << Style_Operator << ":" << Style_None << T;
     }
 

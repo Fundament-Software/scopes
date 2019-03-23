@@ -1618,7 +1618,7 @@ fn repr (value)
             inline (f)
                 f value
             inline ()
-                sc_value_repr (Value value)
+                sc_value_content_repr (Value value)
     if (type-repr-needs-suffix? T)
         .. s
             ..

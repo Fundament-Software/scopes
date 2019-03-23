@@ -149,6 +149,7 @@ sc_rawstring_i32_array_tuple_t sc_launch_args();
 // value
 
 const sc_string_t *sc_value_repr (sc_value_t *value);
+const sc_string_t *sc_value_content_repr (sc_value_t *value);
 const sc_string_t *sc_value_ast_repr (sc_value_t *value);
 const sc_string_t *sc_value_tostring (sc_value_t *value);
 const sc_type_t *sc_value_type (sc_value_t *value);

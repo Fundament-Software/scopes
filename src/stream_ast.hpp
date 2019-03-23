@@ -32,11 +32,13 @@ struct StreamASTFormat {
     bool newlines;
     //bool data_dependency;
     bool dependent_functions;
+    bool content_only;
 
     StreamASTFormat();
 
     static StreamASTFormat debug();
     static StreamASTFormat singleline();
+    static StreamASTFormat content();
 };
 
 void stream_ast(
