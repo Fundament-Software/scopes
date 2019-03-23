@@ -137,9 +137,10 @@ bool is_plain(const Type *T) {
     switch(T->kind()) {
     case TK_Qualify:
         return is_plain(cast<QualifyType>(T)->type);
+    case TK_Pointer:
+        //return is_plain(cast<PointerType>(T)->element_type);
     case TK_Integer:
     case TK_Real:
-    case TK_Pointer:
     case TK_Image:
     case TK_SampledImage:
         return true;
@@ -274,10 +275,6 @@ SCOPES_RESULT(bool) types_compatible(const Type *paramT, const Type *argT) {
         return true;
     if (!is_opaque(argT)) {
         argT = SCOPES_GET_RESULT(storage_type(argT));
-        /*
-        if (argT == paramT)
-            return true;
-        */
     }
     if (!is_opaque(paramT)) {
         paramT = SCOPES_GET_RESULT(storage_type(paramT));
@@ -303,7 +300,7 @@ SCOPES_RESULT(bool) types_compatible(const Type *paramT, const Type *argT) {
 
 SCOPES_RESULT(void) verify(const Type *typea, const Type *typeb) {
     SCOPES_RESULT_TYPE(void);
-    if (typea != typeb) {
+    if (strip_lifetime(typea) != strip_lifetime(typeb)) {
         StyledString ss;
         ss.out << "type " << typea << " expected, got " << typeb;
         SCOPES_LOCATION_ERROR(ss.str());

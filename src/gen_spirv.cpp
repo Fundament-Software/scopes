@@ -1467,6 +1467,10 @@ struct SPIRVGenerator {
                 std::unique_ptr<spv::Instruction>(op));
             return op->getResultId();
         } break;
+        case FN_View:
+        case FN_Lose:
+        case FN_Track:
+        case FN_Dupe:
         case FN_Move: {
             READ_VALUE(val);
             return val;
@@ -1860,7 +1864,7 @@ struct SPIRVGenerator {
         int i = count;
         spv::Block *lastbb = nullptr;
         while (i-- > 0) {
-            auto &&_case = node->cases[i];
+            auto &_case = *node->cases[i];
             spv::Block *bbcase = nullptr;
             if (_case.kind == CK_Default) {
                 position_builder_at_end(bbdefault);

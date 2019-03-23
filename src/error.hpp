@@ -92,6 +92,7 @@ SCOPES_RESULT(void) error_missing_default_case();
 SCOPES_RESULT(void) error_argument_count_mismatch(int needed, int got, const FunctionType *ft = nullptr);
 SCOPES_RESULT(void) error_invalid_operands(const Type *A, const Type *B);
 SCOPES_RESULT(void) error_argument_type_mismatch(const Type *expected, const Type *got);
+SCOPES_RESULT(void) error_something_expected(const char *want, Value *value);
 SCOPES_RESULT(void) error_constant_expected(const Type *want, Value *value);
 SCOPES_RESULT(void) error_unbound_symbol(Parameter *value);
 SCOPES_RESULT(void) error_unbound_symbol(Value *value);
@@ -109,6 +110,15 @@ SCOPES_RESULT(void) error_value_inaccessible_from_closure(TypedValue *value, con
 SCOPES_RESULT(void) error_cannot_deref_non_plain(const Type *T);
 
 // lifetime checker errors
+SCOPES_RESULT(void) error_cannot_view_moved(TypedValue *value);
+SCOPES_RESULT(void) error_cannot_access_moved(const Type *T, const char *by);
+SCOPES_RESULT(void) error_cannot_return_view(TypedValue *value);
+SCOPES_RESULT(void) error_value_not_unique(TypedValue *value, const char *by);
+SCOPES_RESULT(void) error_value_not_plain(TypedValue *value);
+SCOPES_RESULT(void) error_altering_parent_scope_in_pass(const Type *valuetype);
+SCOPES_RESULT(void) error_altering_parent_scope_in_loop(const Type *valuetype);
+SCOPES_RESULT(void) error_cannot_cast_plain_to_unique(const Type *SrcT, const Type *DestT);
+SCOPES_RESULT(void) error_plain_not_storage_of_unique(const Type *SrcT, const Type *DestT);
 SCOPES_RESULT(void) error_value_moved(TypedValue *value, Value *mover, const char *by);
 SCOPES_RESULT(void) error_value_in_use(TypedValue *value, Value *user, const char *by);
 SCOPES_RESULT(void) error_value_is_viewed(Value *value, Value *user, const char *by);

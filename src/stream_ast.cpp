@@ -26,7 +26,6 @@ StreamASTFormat::StreamASTFormat() :
     anchors(None),
     depth(0),
     newlines(true),
-    data_dependency(true),
     dependent_functions(false)
 {}
 
@@ -50,7 +49,6 @@ struct StreamAST : StreamAnchors {
     bool line_anchors;
     bool atom_anchors;
     bool newlines;
-    bool data_dependency;
     bool dependent_functions;
     int nextid;
 
@@ -62,7 +60,6 @@ struct StreamAST : StreamAnchors {
         line_anchors = (fmt.anchors == StreamASTFormat::Line);
         atom_anchors = (fmt.anchors == StreamASTFormat::All);
         newlines = fmt.newlines;
-        data_dependency = fmt.data_dependency;
         dependent_functions = fmt.dependent_functions;
     }
 
@@ -209,52 +206,6 @@ struct StreamAST : StreamAnchors {
         stream_type_suffix(T);
     }
 
-    void stream_depends(const Depends &deps) {
-        auto &&args = deps.args;
-        auto &&kinds = deps.kinds;
-        if (args.empty())
-            return;
-        ss << Style_Operator << "<" << Style_None;
-        for (int i = 0; i < args.size(); ++i) {
-            if (i > 0)
-                ss << " ";
-            auto &&arg = args[i];
-            auto kind = kinds[i];
-            bool first = true;
-            switch(kind) {
-            case DK_Unique: ss << Style_Operator << "†" << Style_None; break;
-            case DK_Viewed: ss << Style_Operator << "%" << Style_None; break;
-            case DK_Conflicted: ss << Style_Error << "!" << Style_None; break;
-            case DK_Undefined: ss << Style_Error << "?" << Style_None; break;
-            }
-            for (auto &&dep : arg) {
-                if (!first) {
-                    ss << Style_Operator << "|" << Style_None;
-                }
-                first = false;
-                ValueIndex val = dep;
-                if (isa<Parameter>(val.value)) {
-                    walk_same_or_newline(val.value, 0, 0, true);
-                } else if (isa<Pure>(val.value)) {
-                    ss << Style_Keyword << get_value_class_name(val.value->kind()) << Style_None;
-                } else {
-                    auto it = visited.find(val.value);
-                    if (it == visited.end()) {
-                        ss << Style_Error << "?" << Style_None;
-                    } else {
-                        ss << Style_Operator << "%" << Style_None;
-                        ss << Style_Number;
-                        stream_address(ss, val.value);
-                        ss << Style_None;
-                    }
-                }
-                if (val.index != 0)
-                    ss << Style_Operator << "@" << Style_None << val.index;
-            }
-        }
-        ss << Style_Operator << ">" << Style_None << " ";
-    }
-
     static bool is_annotation(Value *value) {
         return isa<ConstInt>(value)
             && cast<ConstInt>(value)->get_type() == TYPE_Builtin
@@ -303,9 +254,6 @@ struct StreamAST : StreamAnchors {
                     stream_address(ss, node);
                     ss << Style_None;
                     ss << " " << Style_Operator << "=" << Style_None << " ";
-                    if (data_dependency && isa<Instruction>(node)) {
-                        stream_depends(cast<Instruction>(node)->deps);
-                    }
                 }
             } else {
                 ss << Style_Operator << "%" << Style_None;
@@ -354,9 +302,6 @@ struct StreamAST : StreamAnchors {
             if (newlines && is_new && (depth == 0)) {
                 ss << Style_Keyword << "Function" << Style_None;
                 ss << " ";
-                if (data_dependency) {
-                    stream_depends(val->deps);
-                }
             }
             ss << Style_Symbol << val->name.name()->data << "λ";
             stream_address(ss, val);
@@ -421,7 +366,7 @@ struct StreamAST : StreamAnchors {
             if (newlines) {
                 walk_same_or_newline(val->expr, depth+1, maxdepth);
                 for (int i = 0; i < val->cases.size(); ++i) {
-                    auto &&_case = val->cases[i];
+                    auto &_case = *val->cases[i];
                     stream_newline();
                     stream_indent(depth);
                     switch(_case.kind) {

@@ -86,73 +86,6 @@ const Type *ValueIndex::get_type() const {
     return get_argument(value->get_type(), index);
 }
 
-const ValueIndexSet *ValueIndex::deps() const {
-    if (isa<Instruction>(value)) {
-        auto instr = cast<Instruction>(value);
-        if (!instr->deps.empty(index)) {
-            const ValueIndexSet &args = instr->deps.args[index];
-            return &args;
-        }
-    }
-    return nullptr;
-}
-
-bool ValueIndex::has_deps() const {
-    return deps() != nullptr;
-}
-
-//------------------------------------------------------------------------------
-
-bool Depends::empty(int index) const {
-    if (index >= args.size()) return true;
-    return args[index].empty();
-}
-
-bool Depends::empty() const {
-    for (auto &&arg : args) {
-        if (!arg.empty())
-            return false;
-    }
-    return true;
-}
-
-void Depends::ensure_arg(int index) {
-    while(args.size() <= index) {
-        args.push_back(ValueIndexSet());
-        kinds.push_back(DK_Undefined);
-    }
-}
-
-void Depends::unique(TypedValue *value) {
-    auto T = value->get_type();
-    int count = get_argument_count(T);
-    for (int i = 0; i < count; ++i) {
-        unique(i);
-    }
-}
-
-void Depends::unique(int index) {
-    ensure_arg(index);
-    auto &&s = kinds[index];
-    s |= DK_Unique;
-}
-
-void Depends::view(TypedValue *value) {
-    auto T = value->get_type();
-    int count = get_argument_count(T);
-    for (int i = 0; i < count; ++i) {
-        view(i, ValueIndex(value, i));
-    }
-}
-
-void Depends::view(int index, ValueIndex value) {
-    ensure_arg(index);
-    ValueIndexSet &arg = args[index];
-    auto &&s = kinds[index];
-    s |= DK_Viewed;
-    arg.insert(value);
-}
-
 //------------------------------------------------------------------------------
 
 KeyedTemplate::KeyedTemplate(const Anchor *anchor, Symbol _key, Value *node)
@@ -374,17 +307,72 @@ Template *Template::from(
 
 //------------------------------------------------------------------------------
 
+Function::UniqueInfo::UniqueInfo(const ValueIndex& _value)
+    : value(_value) {
+}
+
+int Function::UniqueInfo::get_depth() const {
+    if (isa<Instruction>(value.value)) {
+        auto instr = cast<Instruction>(value.value);
+        const Block *block = instr->block;
+        assert(block);
+        return block->depth;
+    } else if (isa<LoopLabelArguments>(value.value)) {
+        auto lla = cast<LoopLabelArguments>(value.value);
+        assert(lla->loop);
+        return lla->loop->body.depth;
+    } else {
+        return 0;
+    }
+}
+
 Function::Function(const Anchor *anchor, Symbol _name, const Parameters &_params)
     : Pure(VK_Function, anchor, TYPE_Unknown),
         name(_name), params(_params),
         docstring(nullptr),
         frame(nullptr), boundary(nullptr), original(nullptr), label(nullptr),
-        complete(false) {
+        complete(false),
+        nextid(FirstUniquePrivate) {
     body.depth = 1;
     int index = 0;
     for (auto param : params) {
         param->set_owner(this, index++);
     }
+}
+
+const Function::UniqueInfo &Function::get_unique_info(int id) const {
+    assert(id != 0);
+    assert(id < nextid);
+    auto it = uniques.find(id);
+    assert(it != uniques.end());
+    return it->second;
+}
+
+int Function::unique_id() {
+    return nextid++;
+}
+
+void Function::try_bind_unique(TypedValue *value) {
+    auto T = value->get_type();
+    int count = get_argument_count(T);
+    for (int i = 0; i < count; ++i) {
+        auto argT = get_argument(T, i);
+        if (is_unique(argT)) {
+            bind_unique(UniqueInfo(ValueIndex(value, i)));
+        }
+    }
+}
+
+void Function::bind_unique(const UniqueInfo &info) {
+    auto uq = get_unique(info.value.get_type());
+    auto result = uniques.insert({uq->id, info});
+    if (!result.second) {
+        StyledStream ss;
+        ss << "internal error: duplicate unique " << uq->id;
+        ss << " (was " << result.first->second.value;
+        ss << ", is " << info.value << ")" << std::endl;
+    }
+    assert(result.second);
 }
 
 bool Function::key_equal(const Function *other) const {
@@ -410,6 +398,45 @@ void Function::change_type(const Type *type) {
     assert(is_typed());
     assert(type);
     _type = type;
+}
+
+void Function::build_valids() {
+    assert(valid.empty());
+    // add uniques
+    for (auto sym : params) {
+        auto T = sym->get_type();
+        int count = get_argument_count(T);
+        for (int i = 0; i < count; ++i) {
+            auto argT = get_argument(T, i);
+            auto uq = try_unique(argT);
+            if (uq) {
+                assert(uq->id);
+                bind_unique(UniqueInfo(ValueIndex(sym, i)));
+                valid.insert(uq->id);
+            }
+        }
+    }
+    // add views
+    for (auto sym : params) {
+        auto T = sym->get_type();
+        int count = get_argument_count(T);
+        for (int i = 0; i < count; ++i) {
+            auto argT = get_argument(T, i);
+            auto vq = try_view(argT);
+            if (vq) {
+                for (auto id : vq->ids) {
+                    assert(id);
+                    if (!valid.count(id)) {
+                        auto result = uniques.insert({id,
+                            UniqueInfo(ValueIndex(sym, i))});
+                        assert(result.second);
+                        valid.insert(id);
+                    }
+                }
+            }
+        }
+    }
+    original_valid = valid;
 }
 
 void Function::append_param(Parameter *sym) {
@@ -523,21 +550,60 @@ Pure *PureCast::from(const Anchor *anchor, const Type *type, Pure *value) {
 //------------------------------------------------------------------------------
 
 Block::Block()
-    : depth(-1), insert_index(0), terminator(nullptr), parent(nullptr)
+    : depth(-1), insert_index(0), terminator(nullptr)
 {}
 
+bool Block::is_valid(const ValueIndex &value) const {
+    auto T = value.get_type();
+    auto vq = try_view(T);
+    if (vq) {
+        return is_valid(vq->ids);
+    }
+    auto uq = try_unique(T);
+    if (uq) {
+        return is_valid(uq->id);
+    }
+    return true;
+}
+
+bool Block::is_valid(const IDSet &ids) const {
+    for (auto id : ids) {
+        if (!valid.count(id))
+            return false;
+    }
+    return true;
+}
+
+bool Block::is_valid(int id) const {
+    return valid.count(id);
+}
+
+void Block::move(int id) {
+    assert(valid.count(id));
+    valid.erase(id);
+}
+
+bool Block::is_terminated() const {
+    return terminator != nullptr;
+}
+
 void Block::set_parent(Block *_parent) {
-    assert(!parent && _parent);
-    parent = _parent;
-    if (_parent) {
-        depth = _parent->depth + 1;
+    assert(depth < 0);
+    assert(_parent);
+    depth = _parent->depth + 1;
+    // copy valids from parent
+    if (valid.empty()) {
+        valid = _parent->valid;
+    } else {
+        // block has some preconfigured values
+        valid = union_idset(valid, _parent->valid);
     }
 }
 
 void Block::clear() {
     body.clear();
+    valid.clear();
     terminator = nullptr;
-    parent = nullptr;
 }
 
 void Block::migrate_from(Block &source) {
@@ -549,6 +615,9 @@ void Block::migrate_from(Block &source) {
         terminator = source.terminator;
         terminator->block = this;
     }
+    // equivalent to removing all values no longer valid, and adding
+    // all values that have since been added
+    valid = source.valid;
     source.clear();
 }
 
@@ -565,38 +634,50 @@ void Block::insert_at_end() {
     insert_index = body.size();
 }
 
-void Block::append(TypedValue *node) {
+int Block::append(TypedValue *node) {
     // ensure that whatever an argument list or extract argument is pointing at
     // is definitely inserted into a block
     switch(node->kind()) {
     case VK_ArgumentList: {
         auto al = cast<ArgumentList>(node);
         int count = al->values.size();
+        int inserted = 0;
         for (int i = 0; i < count; ++i) {
-            append(al->values[i]);
+            inserted += append(al->values[i]);
         }
     } break;
     case VK_ExtractArgument: {
         auto ea = cast<ExtractArgument>(node);
-        append(ea->value);
+        return append(ea->value);
     } break;
     default: {
         if (isa<Instruction>(node)) {
             auto instr = cast<Instruction>(node);
             if (instr->block)
-                return;
+                return 0;
             instr->block = this;
             if (!is_returning(instr->get_type())) {
                 assert(!terminator);
                 assert(insert_index == body.size());
                 terminator = instr;
             } else {
+                auto T = instr->get_type();
+                auto count = get_argument_count(T);
+                for (int i = 0; i < count; ++i) {
+                    auto uq = try_unique(get_argument(T, i));
+                    if (uq) {
+                        assert(uq->id);
+                        valid.insert(uq->id);
+                    }
+                }
                 body.insert(body.begin() + insert_index, instr);
                 insert_index++;
             }
+            return 1;
         }
     } break;
     }
+    return 0;
 }
 
 //------------------------------------------------------------------------------
@@ -613,7 +694,7 @@ void Expression::append(Value *node) {
     value = node;
 }
 
-Expression *Expression::from(const Anchor *anchor, const Values &nodes, Value *value) {
+Expression *Expression::scoped_from(const Anchor *anchor, const Values &nodes, Value *value) {
     return new Expression(anchor, nodes, value);
 }
 
@@ -724,21 +805,21 @@ Switch *Switch::from(const Anchor *anchor, TypedValue *expr, const Cases &cases)
 Switch::Case &Switch::append_pass(const Anchor *anchor, ConstInt *literal) {
     assert(anchor);
     assert(literal);
-    Case _case;
-    _case.kind = CK_Pass;
-    _case.anchor = anchor;
-    _case.literal = literal;
+    Case *_case = new Case();
+    _case->kind = CK_Pass;
+    _case->anchor = anchor;
+    _case->literal = literal;
     cases.push_back(_case);
-    return cases.back();
+    return *cases.back();
 }
 
 Switch::Case &Switch::append_default(const Anchor *anchor) {
     assert(anchor);
-    Case _case;
-    _case.kind = CK_Default;
-    _case.anchor = anchor;
+    Case *_case = new Case();
+    _case->kind = CK_Default;
+    _case->anchor = anchor;
     cases.push_back(_case);
-    return cases.back();
+    return *cases.back();
 }
 
 //------------------------------------------------------------------------------
@@ -783,6 +864,10 @@ void Parameter::set_owner(Function *_owner, int _index) {
     index = _index;
 }
 
+void Parameter::retype(const Type *T) {
+    _type = T;
+}
+
 //------------------------------------------------------------------------------
 
 LoopArguments::LoopArguments(const Anchor *anchor, Loop *_loop)
@@ -794,11 +879,11 @@ LoopArguments *LoopArguments::from(const Anchor *anchor, Loop *loop) {
 
 //------------------------------------------------------------------------------
 
-LoopLabelArguments::LoopLabelArguments(const Anchor *anchor, const Type *type, LoopLabel *_loop)
-    : TypedValue(VK_LoopLabelArguments, anchor, type), loop(_loop) {}
+LoopLabelArguments::LoopLabelArguments(const Anchor *anchor, const Type *type)
+    : TypedValue(VK_LoopLabelArguments, anchor, type), loop(nullptr) {}
 
-LoopLabelArguments *LoopLabelArguments::from(const Anchor *anchor, const Type *type, LoopLabel *loop) {
-    return new LoopLabelArguments(anchor, type, loop);
+LoopLabelArguments *LoopLabelArguments::from(const Anchor *anchor, const Type *type) {
+    return new LoopLabelArguments(anchor, type);
 }
 
 //------------------------------------------------------------------------------
@@ -842,13 +927,14 @@ Call *Call::from(const Anchor *anchor, const Type *type, TypedValue *callee, con
 
 //------------------------------------------------------------------------------
 
-LoopLabel::LoopLabel(const Anchor *anchor, const TypedValues &_init)
-    : Instruction(VK_LoopLabel, anchor, TYPE_NoReturn), init(_init) {
-    args = LoopLabelArguments::from(anchor, arguments_type_from_typed_values(_init), this);
+LoopLabel::LoopLabel(const Anchor *anchor, const TypedValues &_init, LoopLabelArguments *_args)
+    : Instruction(VK_LoopLabel, anchor, TYPE_NoReturn), init(_init), args(_args) {
+    assert(args);
+    args->loop = this;
 }
 
-LoopLabel *LoopLabel::from(const Anchor *anchor, const TypedValues &init) {
-    return new LoopLabel(anchor, init);
+LoopLabel *LoopLabel::from(const Anchor *anchor, const TypedValues &init, LoopLabelArguments *args) {
+    return new LoopLabel(anchor, init, args);
 }
 
 //------------------------------------------------------------------------------
@@ -1237,7 +1323,8 @@ const Anchor *Value::anchor() const {
 
 int Value::get_depth() const {
     const Value *value = this;
-    if (isa<Parameter>(value)) {
+    switch(value->kind()) {
+    case VK_Parameter: {
         auto param = cast<Parameter>(value);
         assert(param->owner);
         if (param->block) {
@@ -1257,12 +1344,21 @@ int Value::get_depth() const {
             assert(false);
             return 0;
         }
-    } else if (isa<Instruction>(value)) {
-        //if (value->is_pure_in_function())
-        //    return 0;
-        auto instr = cast<Instruction>(value);
-        assert(instr->block);
-        return instr->block->depth;
+    } break;
+    case VK_LoopLabelArguments: {
+        auto lla = cast<LoopLabelArguments>(value);
+        assert(lla->loop);
+        return lla->loop->body.depth;
+    } break;
+    default: {
+        if (isa<Instruction>(value)) {
+            //if (value->is_pure_in_function())
+            //    return 0;
+            auto instr = cast<Instruction>(value);
+            assert(instr->block);
+            return instr->block->depth;
+        }
+    } break;
     }
     return 0;
 }

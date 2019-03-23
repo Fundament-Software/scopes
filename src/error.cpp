@@ -177,6 +177,75 @@ SCOPES_RESULT(void) error_argument_type_mismatch(const Type *expected, const Typ
     SCOPES_LOCATION_ERROR(ss.str());
 }
 
+SCOPES_RESULT(void) error_cannot_view_moved(TypedValue *value) {
+    SCOPES_RESULT_TYPE(void);
+    StyledString ss;
+    ss.out << "cannot view value of type " << value->get_type() << " because it has been moved";
+    SCOPES_LOCATION_ERROR(ss.str());
+    //SCOPES_LOCATION_DEF_ERROR(mover, ss.str());
+}
+
+SCOPES_RESULT(void) error_cannot_access_moved(const Type *T, const char *by) {
+    SCOPES_RESULT_TYPE(void);
+    StyledString ss;
+    ss.out << by << " cannot access value of type " << T << " because it has been moved";
+    SCOPES_LOCATION_ERROR(ss.str());
+    //SCOPES_LOCATION_DEF_ERROR(mover, ss.str());
+}
+
+SCOPES_RESULT(void) error_cannot_cast_plain_to_unique(const Type *SrcT, const Type *DestT) {
+    SCOPES_RESULT_TYPE(void);
+    StyledString ss;
+    ss.out << "cannot cast value of plain type " << SrcT << " to unique type " << DestT;
+    SCOPES_LOCATION_ERROR(ss.str());
+    //SCOPES_LOCATION_DEF_ERROR(mover, ss.str());
+}
+
+SCOPES_RESULT(void) error_plain_not_storage_of_unique(const Type *SrcT, const Type *DestT) {
+    SCOPES_RESULT_TYPE(void);
+    StyledString ss;
+    ss.out << "type " << SrcT << " is not the storage type of unique type " << DestT;
+    SCOPES_LOCATION_ERROR(ss.str());
+}
+
+SCOPES_RESULT(void) error_value_not_unique(TypedValue *value, const char *by) {
+    SCOPES_RESULT_TYPE(void);
+    StyledString ss;
+    ss.out << by << " value of type " << value->get_type() << " is not unique";
+    if (!is_plain(value->get_type())) {
+        ss.out << ", but type is unique" << std::endl;
+    }
+    SCOPES_LOCATION_ERROR(ss.str());
+}
+
+SCOPES_RESULT(void) error_value_not_plain(TypedValue *value) {
+    SCOPES_RESULT_TYPE(void);
+    StyledString ss;
+    ss.out << "value of type " << value->get_type() << " is not plain";
+    SCOPES_LOCATION_ERROR(ss.str());
+}
+
+SCOPES_RESULT(void) error_altering_parent_scope_in_pass(const Type *value_type) {
+    SCOPES_RESULT_TYPE(void);
+    StyledString ss;
+    ss.out << "skippable switch pass moved value of type " << value_type << " which is from a parent scope";
+    SCOPES_LOCATION_ERROR(ss.str());
+}
+
+SCOPES_RESULT(void) error_altering_parent_scope_in_loop(const Type *value_type) {
+    SCOPES_RESULT_TYPE(void);
+    StyledString ss;
+    ss.out << "loop moved value of type " << value_type << " which is from a parent scope";
+    SCOPES_LOCATION_ERROR(ss.str());
+}
+
+SCOPES_RESULT(void) error_cannot_return_view(TypedValue *value) {
+    SCOPES_RESULT_TYPE(void);
+    StyledString ss;
+    ss.out << "cannot return view of value of type " << value->get_type() << " because the value is local to scope";
+    SCOPES_LOCATION_ERROR(ss.str());
+}
+
 SCOPES_RESULT(void) error_value_moved(TypedValue *value, Value *mover, const char *by) {
     SCOPES_RESULT_TYPE(void);
     StyledString ss;
@@ -258,6 +327,17 @@ SCOPES_RESULT(void) error_missing_default_case() {
     StyledString ss;
     ss.out << "missing default case";
     SCOPES_LOCATION_ERROR(ss.str());
+}
+
+SCOPES_RESULT(void) error_something_expected(const char *want, Value *value) {
+    SCOPES_RESULT_TYPE(void);
+    StyledString ss;
+    ss.out << want << " expected, got "
+        << get_value_class_name(value->kind());
+    if (isa<TypedValue>(value)) {
+        ss.out << " of type " << cast<TypedValue>(value)->get_type();
+    }
+    SCOPES_LOCATION_DEF_ERROR(value, ss.str());
 }
 
 SCOPES_RESULT(void) error_constant_expected(const Type *want, Value *value) {

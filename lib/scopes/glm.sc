@@ -423,12 +423,10 @@ typedef vec-type < immutable
             let count = ('element-count ST)
             spice-quote
                 Generator
-                    inline (fdone index)
-                        if (index == count)
-                            fdone;
-                        else
-                            _ (index + 1) (extractelement self index)
-                    0
+                    inline () 0
+                    inline (i) (i < count)
+                    inline (i) (extractelement self i)
+                    inline (i) (i + 1)
         else
             compiler-error! "unsupported type"
 
@@ -631,12 +629,10 @@ typedef mat-type < immutable
             let count = ('element-count ST)
             spice-quote
                 Generator
-                    inline (fdone index)
-                        if (index == count)
-                            fdone;
-                        else
-                            _ (index + 1) (extractvalue self index)
-                    0
+                    inline () 0
+                    inline (i) (i < count)
+                    inline (i) (extractvalue self i)
+                    inline (i) (i + 1)
         else
             compiler-error! "unsupported type"
 

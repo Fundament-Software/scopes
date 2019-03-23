@@ -487,10 +487,14 @@ sc_type_set_symbol type 'raising
             verify-count argcount 2 2
             let self = (sc_getarg args 0)
             let except_type = (sc_getarg args 1)
-            let T = (unbox-pointer self type)
-            let exceptT = (unbox-pointer except_type type)
-            box-pointer
-                sc_function_type_raising T exceptT
+            if (sc_value_is_constant self)
+                if (sc_value_is_constant except_type)
+                    let T = (unbox-pointer self type)
+                    let exceptT = (unbox-pointer except_type type)
+                    return
+                        box-pointer
+                            sc_function_type_raising T exceptT
+            `(sc_function_type_raising self except_type)
 
 # closure constructor
 #sc_type_set_symbol Closure '__typecall
@@ -719,6 +723,7 @@ inline define-symbols (self values...)
     key-type =
         inline (self key)
             sc_key_type key self
+    unique-type = sc_unique_type
     view-type =
         inline (self id)
             constbranch (none? id)
@@ -786,6 +791,9 @@ inline box-cast (f)
 inline not (value)
     bxor value true
 
+# supertype for unique structs
+let Struct = (sc_typename_type "Struct")
+
 # a supertype to be used for conversions
 let immutable = (sc_typename_type "immutable")
 sc_typename_type_set_super integer immutable
@@ -807,6 +815,10 @@ sc_typename_type_set_super usize integer
 # generator type
 let Generator = (sc_typename_type "Generator")
 'set-plain-storage Generator ('storageof Closure)
+
+# collector type
+let Collector = (sc_typename_type "Collector")
+'set-plain-storage Collector ('storageof Closure)
 
 # syntax macro type
 let SugarMacro = (sc_typename_type "SugarMacro")
@@ -1506,7 +1518,10 @@ let
         box-binary-op
             fn (lhsT rhsT lhs rhs)
                 if (ptrcmp== lhsT rhsT)
-                    return `(assign rhs lhs)
+                    return
+                        spice-quote
+                            __drop lhs
+                            assign rhs lhs
                 compiler-error! "unequal types"
 
 let missing-constructor =
@@ -2128,6 +2143,18 @@ let Closure->Generator =
             let self = (bitcast self Generator)
             Value self
 
+let Closure->Collector =
+    spice-macro
+        fn "Closure->Collector" (args)
+            let argc = ('argcount args)
+            verify-count argc 1 1
+            let self = ('getarg args 0)
+            if (not ('constant? self))
+                compiler-error! "Closure must be constant"
+            let self = (as self Closure)
+            let self = (bitcast self Collector)
+            Value self
+
 # (define name expr ...)
 fn expand-define (expr)
     raises-compile-error;
@@ -2312,15 +2339,37 @@ let va-option =
                 va
 
 #---------------------------------------------------------------------------
+# collector
+#---------------------------------------------------------------------------
+
+'set-symbols Collector
+    __typecall =
+        inline "Collector-new" (cls init valid? at collect)
+            Closure->Collector
+                inline "get-init" ()
+                    _ init valid? at collect
+    __call =
+        spice-macro
+            fn (args)
+                let argc = ('argcount args)
+                verify-count argc 1 1
+                let self = ('getarg args 0)
+                if (not ('constant? self))
+                    compiler-error! "Generator must be constant"
+                let self = (self as Collector)
+                let self = (bitcast self Closure)
+                `(self)
+
+#---------------------------------------------------------------------------
 # for iterator
 #---------------------------------------------------------------------------
 
 'set-symbols Generator
     __typecall =
-        inline "Generator-new" (cls iter init)
+        inline "Generator-new" (cls start valid? at next)
             Closure->Generator
                 inline "get-iter-init" ()
-                    _ iter init
+                    _ start valid? at next
     __call =
         spice-macro
             fn (args)
@@ -2334,22 +2383,23 @@ let va-option =
                 `(self)
 
 # typical pattern for a generator:
-    inline make-generator (init end?)
+    inline make-generator (container)
         Generator
-            inline (fdone x)
-                if (end? x)
-                    # terminate
-                    fdone;
-                else
-                    # return next iterator and result values
-                    _ ('next x) ('@ x)
-            init
+            inline "start" ()
+                # return the first iterator of sequence (might not be valid)
+                'start container
+            inline "valid?" (it...)
+                # return true if the iterator is still valid
+                'valid-iterator? container it...
+            inline "at" (it...)
+                # return variadic result at iterator
+                '@ container it...
+            inline "next" (it...)
+                # return the next iterator in sequence
+                'next container it...
 
 # for <name> ... in <generator> body ...
 define for
-    inline fdone ()
-        break;
-
     sugar-block-scope-macro
         fn "expand-for" (expr next-expr scope)
             let head args = (decons expr)
@@ -2365,26 +2415,29 @@ define for
             let generator-expr body = (decons it)
             let subscope = (Scope scope)
             spice-quote
-                let iter start =
+                let start valid? at next =
                     (as [(sc_expand generator-expr '() subscope)] Generator);
             return
                 cons
-                    spice-quote iter start # order expressions
-                        loop (next = start)
-                            let next args... = (iter fdone next)
-                            inline continue ()
-                                repeat next
-                            spice-unquote
-                                let expr =
-                                    loop (params expr = params (list '= args...))
-                                        if (empty? params)
-                                            break expr
-                                        let param next = (decons params)
-                                        _ next (cons param expr)
-                                let expr = (cons let expr)
-                                'set-symbol subscope 'continue continue
-                                sc_expand (cons do expr body) '() subscope
-                            next
+                    spice-quote start valid? at next # order expressions
+                        loop (it... = (start))
+                            if (valid? it...)
+                                let args... = (at it...)
+                                inline continue ()
+                                    repeat (next it...)
+                                spice-unquote
+                                    let expr =
+                                        loop (params expr = params (list '= args...))
+                                            if (empty? params)
+                                                break expr
+                                            let param next = (decons params)
+                                            _ next (cons param expr)
+                                    let expr = (cons let expr)
+                                    'set-symbol subscope 'continue continue
+                                    sc_expand (cons do expr body) '() subscope
+                                continue;
+                            else
+                                break;
                     next-expr
                 scope
 
@@ -2911,73 +2964,117 @@ define-sugar-macro define-sugar-block-scope-macro
     symbols =
         inline "symbols" (self)
             Generator
-                inline (fdone key)
-                    let key value =
-                        sc_type_next self key
-                    if (key == unnamed)
-                        fdone;
-                    else
-                        _ key key value
-                unnamed
+                inline () (sc_type_next self unnamed)
+                inline (key value) (key != unnamed)
+                inline (key value) (_ key value)
+                inline (key value) (sc_type_next self key)
     elements =
         inline "elements" (self)
             let count = ('element-count self)
             Generator
-                inline (fdone i)
-                    if (i == count)
-                        fdone;
-                    else
-                        _ (i + 1) ('element@ self i)
-                0
+                inline () 0
+                inline (i) (i < count)
+                inline (i) ('element@ self i)
+                inline (i) (i + 1)
 
-inline scope-generator (self)
-    Generator
-        inline (fdone key)
-            let key value =
+do
+    inline scope-generator (self)
+        Generator
+            inline () (sc_scope_next self unnamed)
+            inline (key value) (key != unnamed)
+            inline (key value) (_ key value)
+            inline (key value)
                 sc_scope_next self key
-            if (key == unnamed)
-                fdone;
-            else
-                _ key key value
-        unnamed
 
-inline list-generator (self)
-    Generator
-        inline (fdone cell)
-            if (empty? cell)
-                fdone;
-            else
-                let at next = (decons cell)
-                _ next at
-        self
+    'set-symbols Scope
+        __as =
+            box-cast
+                fn "scope-as" (vT T expr)
+                    if (T == Generator)
+                        return `(scope-generator expr)
+                    compiler-error! "unsupported type"
 
-'set-symbols Scope
-    __as =
-        box-cast
-            fn "scope-as" (vT T expr)
-                if (T == Generator)
-                    return `(scope-generator expr)
-                compiler-error! "unsupported type"
+do
+    inline string-generator (self)
+        let buf sz = ('buffer self)
+        Generator
+            inline () 0:usize
+            inline (i) (i < sz)
+            inline (i) (load (getelementptr buf i))
+            inline (i) (i + 1:usize)
 
-'set-symbols list
-    __as =
-        box-cast
-            fn "list-as" (vT T expr)
-                if (T == Generator)
-                    return `(list-generator expr)
-                compiler-error! "unsupported type"
+    fn i8->string(c)
+        let ptr = (alloca i8)
+        store c ptr
+        sc_string_new ptr 1
+
+    'set-symbols string
+        __ras =
+            box-cast
+                fn "string-as" (vT T expr)
+                    if (vT == i8)
+                        return `(i8->string expr)
+                    compiler-error! "unsupported type"
+        __as =
+            box-cast
+                fn "string-as" (vT T expr)
+                    if (T == Generator)
+                        return `(string-generator expr)
+                    compiler-error! "unsupported type"
+
+do
+    inline list-generator (self)
+        Generator
+            inline () self
+            inline (cell) (not (empty? cell))
+            inline (cell) (sc_list_at cell)
+            inline (cell) (sc_list_next cell)
+
+    inline list-collector (self)
+        Collector
+            inline () self
+            inline (it) true
+            inline (it) ('reverse it)
+            inline (src it)
+                cons (src) it
+
+    'set-symbols list
+        cons-collector =
+            inline "list-collector" (self)
+                Collector
+                    inline () self
+                    inline (it) true
+                    inline (it) it
+                    inline (src it)
+                        cons (src) it
+        __as =
+            box-cast
+                fn "list-as" (vT T expr)
+                    if (T == Generator)
+                        return `(list-generator expr)
+                    if (T == Collector)
+                        return `(list-collector expr)
+                    compiler-error! "unsupported type"
 
 'set-symbols Value
     args =
         inline "Value-args" (self)
             let argc = ('argcount self)
             Generator
-                inline (fdone x)
-                    if (x < argc)
-                        _ (x + 1) ('getarg self x)
-                    else
-                        fdone;
-                0
+                inline () 0
+                inline (x) (x < argc)
+                inline (x) ('getarg self x)
+                inline (x) (x + 1)
+    arg-appender =
+        inline "Value-args" (self)
+            let argc = ('argcount self)
+            Collector
+                inline () self
+                inline (self) true
+                inline (self) self
+                inline (src self)
+                    sc_argument_list_append self (src)
+                    self
 
 inline range (a b c)
     let num-type = (typeof a)
@@ -2994,12 +3091,10 @@ inline range (a b c)
             inline () a
             inline () b
     Generator
-        inline (fdone x)
-            if (x < to)
-                _ (x + step) x
-            else
-                fdone;
-        from
+        inline () from
+        inline (x) (x < to)
+        inline (x) x
+        inline (x) (x + step)
 
 let parse-compile-flags =
     spice-macro
@@ -3133,6 +3228,22 @@ let tupleof =
     __typecall =
         inline "array.__typecall" (cls element-type size)
             sc_array_type element-type (size as usize)
+    __as =
+        do
+            inline array-generator (arr)
+                let count = (countof arr)
+                let stackarr = (ptrtoref (alloca (typeof arr)))
+                stackarr = arr
+                Generator
+                    inline () 0:usize
+                    inline (x) (< x count)
+                    inline (x) (@ stackarr x)
+                    inline (x) (+ x 1:usize)
+            box-cast
+                fn "array.__as" (vT T expr)
+                    if (T == Generator)
+                        return `(array-generator expr)
+                    compiler-error! "unsupported type"
 
 let arrayof =
     spice-macro
@@ -3879,25 +3990,74 @@ define match
 
 let OverloadedFunction = (typename "OverloadedFunction")
 
+"""" (va-append-va (inline () (_ b ...)) a...) -> a... b...
+define va-append-va
+    spice-macro
+        fn "va-va-append" (args)
+            raises-compile-error;
+            let argc = ('argcount args)
+            verify-count argc 1 -1
+            let end = ('getarg args 0)
+            let newargs = (sc_argument_list_new (sc_get_active_anchor))
+            loop (i = 1)
+                if (i == argc)
+                    sc_argument_list_append newargs `(end)
+                    break newargs
+                sc_argument_list_append newargs ('getarg args i)
+                repeat (i + 1)
+
+"""" (va-split n a...) -> (inline () a...[n .. (va-countof a...)-1]) a...[0 .. n-1]
+define va-split
+    spice-macro
+        fn "va-split" (args)
+            raises-compile-error;
+            let argc = ('argcount args)
+            verify-count argc 1 -1
+            let pos = (('getarg args 0) as i32)
+            let largs = (sc_argument_list_new (sc_get_active_anchor))
+            let rargs = (sc_argument_list_new (sc_get_active_anchor))
+            loop (i = 1)
+                if (i > pos)
+                    break;
+                sc_argument_list_append largs ('getarg args i)
+                repeat (i + 1)
+            loop (i = (pos + 1))
+                if (i >= argc)
+                    break;
+                sc_argument_list_append rargs ('getarg args i)
+                repeat (i + 1)
+            `(_ (inline () largs) (inline () rargs))
+
 run-stage;
+
+inline va-join (a...)
+    inline (b...)
+        va-append-va (inline () b...) a...
 
 let infinite-range =
     Generator
-        inline (fdone x)
-            _ (x + 1) x
-        0
+        inline () 0
+        inline (x) true
+        inline (x) x
+        inline (x) (x + 1)
 
 inline zip (a b)
-    let iter-a init-a = ((a as Generator))
-    let iter-b init-b = ((b as Generator))
+    let start-a valid-a at-a next-a = ((a as Generator))
+    let start-b valid-b at-b next-b = ((b as Generator))
+    let start-a... = (start-a)
+    let lsize = (va-countof start-a...)
+    let start... = (va-append-va start-b start-a...)
     Generator
-        inline (fdone t)
-            let a = (@ t 0)
-            let b = (@ t 1)
-            let next-a at-a... = (iter-a fdone a)
-            let next-b at-b... = (iter-b fdone b)
-            _ (tupleof next-a next-b) at-a... at-b...
-        tupleof init-a init-b
+        inline () start...
+        inline (it...)
+            let it-a it-b = (va-split lsize it...)
+            (valid-a (it-a)) & (valid-b (it-b))
+        inline (it...)
+            let it-a it-b = (va-split lsize it...)
+            va-append-va (inline () (at-b (it-b))) (at-a (it-a))
+        inline (it...)
+            let it-a it-b = (va-split lsize it...)
+            va-append-va (inline () (next-b (it-b))) (next-a (it-a))
 
 inline enumerate (x)
     zip infinite-range x
@@ -4137,6 +4297,8 @@ sugar from (src 'let params...)
             list '=
                 cons load-from src
                     quotify params...
+
+define zip (spice-macro (fn (args) (ltr-multiop args (Value zip))))
 
 run-stage;
 
@@ -4392,6 +4554,11 @@ sugar unlet ((name as Symbol) names...)
 
 # fold (<name> ... = <init> ...) for <name> ... in <expr>
 sugar fold ((binding...) 'for expr...)
+    fn rjoin-list (lside rside)
+        loop (params expr = lside rside)
+            if (empty? params) (break expr)
+            let param next = (decons params)
+            _ next (cons param expr)
     fn split-until (expr token errmsg)
         loop (it params = expr '())
             if (empty? it)
@@ -4401,39 +4568,42 @@ sugar fold ((binding...) 'for expr...)
             if (at == token)
                 break it params
             _ it (cons sxat params)
-    let it params = (split-until expr... 'in "'in' expected")
+    let it itparams = (split-until expr... 'in "'in' expected")
     let init foldparams = (split-until binding... '= "'=' expected")
     let generator-expr body = (decons it)
     let subscope = (Scope sugar-scope)
-    spice-quote
-        let iter start =
-            (as [(sc_expand generator-expr '() subscope)] Generator);
-    let next = ('unique Symbol "next")
-    let bindings breakargs =
-        loop (inp bindings breakargs = foldparams (cons '= start init) '())
-            if (empty? inp)
-                break (cons next bindings) breakargs
-            let at next = (decons inp)
-            _ next (cons at bindings) (cons at breakargs)
-    let itercall =
-        qq [iter]
-            [inline] ()
-                [(cons break breakargs)]
-            [next]
-    let letexpr =
-        loop (inp letexpr = params (list '= itercall))
-            if (empty? inp)
-                break (cons let next letexpr)
-            let at next = (decons inp)
-            _ next (cons at letexpr)
-    let repeatexpr = (cons repeat next breakargs)
-    qq [loop] [bindings]
-        [letexpr]
-        [inline] repeat (...)
-            [repeat] [next] ...
-        [inline] continue () [repeatexpr]
-        [repeat] [next]
-            [(cons do body)]
+    return
+        spice-quote
+            let init... =
+                spice-unquote
+                    let expr = (sc_expand (cons _ init) '() subscope)
+                    expr
+            let gen =
+                spice-unquote
+                    let expr = (sc_expand generator-expr '() subscope)
+                    expr
+            let start valid? at next = ((as gen Generator))
+            let start... = (start)
+            let lsize = (va-countof start...)
+            loop (args... = (va-append-va (inline () init...) start...))
+                let it state = (va-split lsize args...)
+                let it... = (it)
+                if (valid? it...)
+                    inline continue ()
+                        repeat (va-append-va state (next it...))
+                    let at... = (at it...)
+                    let state... = (state)
+                    let newstate... =
+                        spice-unquote
+                            let expr1 expr2 =
+                                cons let (rjoin-list itparams (list '= at...))
+                                cons let (rjoin-list foldparams (list '= state...))
+                            'set-symbol subscope 'continue continue
+                            let result = (sc_expand (cons do expr1 expr2 body) '() subscope)
+                            result
+                    repeat (va-append-va (inline () newstate...) (next it...))
+                else
+                    break (state)
 
 #-------------------------------------------------------------------------------
 # typedef
@@ -4607,7 +4777,35 @@ run-stage;
         inline (cls)
             nullof cls
 
-# structs
+# native structs
+#-------------------------------------------------------------------------------
+
+'set-symbols Struct
+    __getattr = extractvalue
+    __typecall =
+        spice "Struct-typecall" (cls args...)
+            if ((cls as type) == Struct)
+                compiler-error! "Struct type constructor not available"
+            let cls = (cls as type)
+            let argc = ('argcount args...)
+            let st = ('storageof cls)
+            loop (i result = 0 `(nullof st))
+                if (i == argc)
+                    break `(follow result cls)
+                let k v = ('dekey ('getarg args... i))
+                let k =
+                    if (k == unnamed) i
+                    else
+                        sc_type_field_index cls k
+                let ET = (sc_type_element_at cls k)
+                let ET = (sc_strip_qualifiers ET)
+                let v =
+                    if (('pointer? ET) and ('refer? ('qualified-typeof v)))
+                        `(imply (reftoptr v) ET)
+                    else `(imply v ET)
+                _ (i + 1) `(insertvalue result v k)
+
+# C structs
 #-------------------------------------------------------------------------------
 
 'set-symbols CStruct
@@ -4641,15 +4839,19 @@ sugar struct (name body...)
         for i field in (enumerate ('reverse field-types))
             let k T = (decons (field as list) 2)
             fields @ (usize i) = (sc_key_type (k as Symbol) (T as type))
+        print T
         if (T < CUnion)
             'set-plain-storage T
                 sc_union_type numfields fields
         elseif (T < CStruct)
             'set-plain-storage T
                 sc_tuple_type numfields fields
+        elseif (T < Struct)
+            'set-plain-storage T
+                sc_tuple_type numfields fields
         else
             compiler-error!
-                .. "type " (repr T) " must have CStruct or CUnion supertype"
+                .. "type " (repr T) " must have Struct, CStruct or CUnion supertype"
         T
 
     if (('typeof name) == Symbol)
@@ -4662,10 +4864,12 @@ sugar struct (name body...)
         sugar-match body...
         case ('union rest...)
             _ `CUnion rest...
+        case ('plain rest...)
+            _ `CStruct rest...
         case ('< supertype rest...)
             _ supertype rest...
         default
-            _ `CStruct body...
+            _ `Struct body...
 
     qq [typedef] [name] < [supertype] do
         [local] field-types = [`(ptrtoref (alloca list))]
@@ -4691,6 +4895,12 @@ sugar struct (name body...)
                 if (T == i32)
                     return `(bitcast expr T)
                 compiler-error! "unsupported type"
+    __rimply =
+        box-cast
+            fn "CEnum-imply" (vT T expr)
+                if (vT == i32)
+                    return `(bitcast expr T)
+                compiler-error! "unsupported type"
 
 sugar enum (name values...)
     spice make-enum (name vals...)
@@ -4699,7 +4909,7 @@ sugar enum (name values...)
             sc_const_int_new anchor T
                 sext (as val i32) u64
         'set-super T CEnum
-        'set-storage T i32
+        'set-plain-storage T i32
         let count = ('argcount vals...)
         loop (i nextval = 0 0)
             if (i >= count)

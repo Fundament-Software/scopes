@@ -1141,9 +1141,7 @@ void sc_template_set_inline(sc_value_t *fn) {
 sc_value_t *sc_expression_new(const sc_anchor_t *anchor) {
     using namespace scopes;
     REWRITE_ANCHOR(anchor)
-    auto block = Expression::from(anchor);
-    block->scoped = false;
-    return block;
+    return Expression::unscoped_from(anchor);
 }
 
 void sc_expression_set_scoped(sc_value_t *expr) {
@@ -1792,6 +1790,11 @@ const sc_type_t *sc_view_type(const sc_type_t *type, int id) {
         return view_type(type, { id });
 }
 
+const sc_type_t *sc_unique_type(const sc_type_t *type, int id) {
+    using namespace scopes;
+    return unique_type(type, id);
+}
+
 const sc_type_t *sc_mutate_type(const sc_type_t *type) {
     using namespace scopes;
     return mutate_type(type);
@@ -2117,6 +2120,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_arguments_type_getarg, TYPE_Type, TYPE_Type, TYPE_I32);
 
     DEFINE_EXTERN_C_FUNCTION(sc_view_type, TYPE_Type, TYPE_Type, TYPE_I32);
+    DEFINE_EXTERN_C_FUNCTION(sc_unique_type, TYPE_Type, TYPE_Type, TYPE_I32);
     DEFINE_EXTERN_C_FUNCTION(sc_mutate_type, TYPE_Type, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_refer_type, TYPE_Type, TYPE_Type, TYPE_U64, TYPE_Symbol);
     DEFINE_EXTERN_C_FUNCTION(sc_strip_qualifiers, TYPE_Type, TYPE_Type);

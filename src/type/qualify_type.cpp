@@ -142,6 +142,14 @@ const Type *copy_qualifiers(const Type *type, const Type *from) {
     return type;
 }
 
+const Qualifier *get_qualifier(const Type *type, QualifierKind kind) {
+    auto qt = cast<QualifyType>(type);
+    assert(kind < QualifierCount);
+    auto q = qt->qualifiers[kind];
+    assert(q);
+    return q;
+}
+
 const Qualifier *find_qualifier(const Type *type, QualifierKind kind) {
     if (isa<QualifyType>(type)) {
         auto qt = cast<QualifyType>(type);

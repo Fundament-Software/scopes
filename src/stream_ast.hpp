@@ -30,7 +30,7 @@ struct StreamASTFormat {
     Tagging anchors;
     int depth;
     bool newlines;
-    bool data_dependency;
+    //bool data_dependency;
     bool dependent_functions;
 
     StreamASTFormat();

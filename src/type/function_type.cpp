@@ -13,6 +13,9 @@
 #include "../dyn_cast.inc"
 #include "../hash.hpp"
 
+#include "../qualifier/unique_qualifiers.hpp"
+#include "../qualifier.inc"
+
 #include <assert.h>
 
 namespace scopes {
@@ -86,8 +89,72 @@ SCOPES_RESULT(const Type *) FunctionType::type_at_index(size_t i) const {
 
 //------------------------------------------------------------------------------
 
+static void canonicalize_unique_types(ID2SetMap &idmap, Types &types,
+    int idoffset = 0, int idscale = 1) {
+    int argcount = types.size();
+    // find and remap uniques
+    for (int i = 0; i < argcount; ++i) {
+        auto &&T = types[i];
+        auto vq = try_qualifier<ViewQualifier>(T);
+        if (vq) {
+            continue;
+        }
+        auto uq = try_qualifier<UniqueQualifier>(T);
+        if (uq) {
+            int id = i * idscale + idoffset;
+            auto result = idmap.insert({uq->id, { id } });
+            if (!result.second) {
+                result.first->second.insert(id);
+            }
+            T = unique_type(T, id);
+            continue;
+        } else if (!is_plain(T)) {
+            int id = i * idscale + idoffset;
+            T = unique_type(T, id);
+        }
+    }
+    // remap views with possibly local references
+    for (int i = 0; i < argcount; ++i) {
+        auto &&T = types[i];
+        auto vq = try_qualifier<ViewQualifier>(T);
+        if (!vq) continue;
+        if (vq->ids.empty()) {
+            int id = i * idscale + idoffset;
+            T = view_type(T, { id });
+            continue;
+        }
+        int idcount = vq->sorted_ids.size();
+        IDSet ids;
+        ids.reserve(idcount);
+        for (int k = 0; k < idcount; ++k) {
+            int id = vq->sorted_ids[k];
+            auto it = idmap.find(id);
+            if (it == idmap.end()) {
+                int newid = i * idscale + idoffset;
+                ids.insert(newid);
+                auto result = idmap.insert({id, { newid } });
+                if (!result.second) {
+                    result.first->second.insert(newid);
+                }
+            } else {
+                for (auto &&newid : it->second) {
+                    ids.insert(newid);
+                }
+            }
+        }
+        T = view_type(strip_qualifier<ViewQualifier>(T), ids);
+    }
+}
+
+//------------------------------------------------------------------------------
+
+void canonicalize_argument_types(Types &types) {
+    ID2SetMap idmap;
+    canonicalize_unique_types(idmap, types, 1);
+}
+
 const Type *raising_function_type(const Type *except_type, const Type *return_type,
-    const Types &argument_types, uint32_t flags) {
+    Types argument_types, uint32_t flags) {
 
     struct TypeArgs {
         const Type *except_type;
@@ -135,6 +202,7 @@ const Type *raising_function_type(const Type *except_type, const Type *return_ty
 
     static ArgMap map;
 
+#if 1
     TypeArgs ta(except_type, return_type, argument_types, flags);
     typename ArgMap::iterator it = map.find(ta);
     if (it == map.end()) {
@@ -144,6 +212,52 @@ const Type *raising_function_type(const Type *except_type, const Type *return_ty
     } else {
         return it->second;
     }
+#else
+    TypeArgs ta(except_type, return_type, argument_types, flags);
+    typename ArgMap::iterator it = map.find(ta);
+    if (it == map.end()) {
+        // bring unique arguments into canonical order
+        ID2SetMap idmap;
+        canonicalize_unique_types(idmap, argument_types, 1);
+
+        if (is_returning_value(except_type)) {
+            ID2SetMap idmap2 = idmap;
+            auto ecount = get_argument_count(except_type);
+            Types retargs;
+            retargs.reserve(ecount);
+            for (int i = 0; i < ecount; ++i) {
+                retargs.push_back(get_argument(except_type, i));
+            }
+            canonicalize_unique_types(idmap2, retargs, -257, -1);
+            except_type = arguments_type(retargs);
+        }
+        if (is_returning_value(return_type)) {
+            auto rcount = get_argument_count(return_type);
+            Types retargs;
+            retargs.reserve(rcount);
+            for (int i = 0; i < rcount; ++i) {
+                retargs.push_back(get_argument(return_type, i));
+            }
+            canonicalize_unique_types(idmap, retargs, -1, -1);
+            return_type = arguments_type(retargs);
+        }
+
+        TypeArgs tb(except_type, return_type, argument_types, flags);
+        it = map.find(tb);
+        if (it == map.end()) {
+            FunctionType *t = new FunctionType(except_type, return_type, argument_types, flags);
+            map.insert({ta, t});
+            if (!(ta == tb)) {
+                map.insert({tb, t});
+            }
+            return t;
+        } else {
+            return it->second;
+        }
+    } else {
+        return it->second;
+    }
+#endif
 }
 
 const Type *raising_function_type(const Type *return_type,

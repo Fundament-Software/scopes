@@ -40,6 +40,10 @@ struct ASTContext {
     void append(TypedValue *value) const;
     void merge_block(Block &_block) const;
 
+    const Type *fix_merge_type(const Type *T) const;
+    int unique_id() const;
+    void move(int id) const;
+
     Function *function;
     Function *frame;
     LoopLabel *loop;

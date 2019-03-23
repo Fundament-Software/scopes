@@ -12,9 +12,12 @@
 #include "builtin.hpp"
 #include "type.hpp"
 
+#include "qualifier/unique_qualifiers.hpp"
+
 #include <vector>
 #include <unordered_map>
 #include <unordered_set>
+
 
 namespace scopes {
 
@@ -142,8 +145,6 @@ struct ValueIndex {
     bool operator ==(const ValueIndex &other) const;
 
     const Type *get_type() const;
-    const Set *deps() const;
-    bool has_deps() const;
 
     TypedValue *value;
     int index;
@@ -151,28 +152,6 @@ struct ValueIndex {
 
 typedef ValueIndex::Set ValueIndexSet;
 typedef std::vector<ValueIndex> ValueIndices;
-
-//------------------------------------------------------------------------------
-
-enum DependsKind {
-    DK_Undefined = 0,
-    DK_Unique = 1 << 0,
-    DK_Viewed = 1 << 1,
-    DK_Conflicted = DK_Unique | DK_Viewed,
-};
-
-struct Depends {
-    std::vector<ValueIndexSet> args;
-    std::vector<char> kinds;
-
-    void ensure_arg(int index);
-    void view(TypedValue *value);
-    void view(int index, ValueIndex value);
-    void unique(TypedValue *value);
-    void unique(int index);
-    bool empty() const;
-    bool empty(int index) const;
-};
 
 //------------------------------------------------------------------------------
 
@@ -211,6 +190,7 @@ struct TypedValue : Value {
 
     //bool is_typed() const;
     const Type *get_type() const;
+
 protected:
     const Type *_type;
 };
@@ -219,20 +199,28 @@ protected:
 
 struct Block {
     Block();
-    void append(TypedValue *node);
+    int append(TypedValue *node);
     bool empty() const;
     void migrate_from(Block &source);
     void clear();
     void set_parent(Block *parent);
 
+    bool is_terminated() const;
+
     void insert_at(int index);
     void insert_at_end();
+
+    bool is_valid(int id) const;
+    bool is_valid(const IDSet &ids) const;
+    bool is_valid(const ValueIndex &value) const;
+    void move(int id);
 
     int depth;
     int insert_index;
     Instructions body;
     Instruction *terminator;
-    Block *parent;
+    // set of unique ids that are still valid in this scope
+    IDSet valid;
 };
 
 //------------------------------------------------------------------------------
@@ -244,8 +232,6 @@ struct Instruction : TypedValue {
 
     Symbol name;
     Block *block;
-
-    Depends deps;
 };
 
 //------------------------------------------------------------------------------
@@ -390,7 +376,7 @@ struct Expression : UntypedValue {
     Expression(const Anchor *anchor, const Values &nodes, Value *value);
     void append(Value *node);
 
-    static Expression *from(const Anchor *anchor, const Values &nodes = {}, Value *value = nullptr);
+    static Expression *scoped_from(const Anchor *anchor, const Values &nodes = {}, Value *value = nullptr);
     static Expression *unscoped_from(const Anchor *anchor, const Values &nodes = {}, Value *value = nullptr);
 
     Values body;
@@ -485,7 +471,7 @@ struct Switch : Instruction {
         Case() : kind(CK_Case), anchor(nullptr), literal(nullptr) {}
     };
 
-    typedef std::vector<Case> Cases;
+    typedef std::vector<Case *> Cases;
 
     static bool classof(const Value *T);
 
@@ -528,6 +514,8 @@ struct Parameter : TypedValue {
 
     void set_owner(Function *_owner, int _index);
 
+    void retype(const Type *T);
+
     Symbol name;
     Function *owner;
     Block *block;
@@ -550,8 +538,8 @@ struct LoopArguments : UntypedValue {
 struct LoopLabelArguments : TypedValue {
     static bool classof(const Value *T);
 
-    LoopLabelArguments(const Anchor *anchor, const Type *type, LoopLabel *loop);
-    static LoopLabelArguments *from(const Anchor *anchor, const Type *type, LoopLabel *loop);
+    LoopLabelArguments(const Anchor *anchor, const Type *type);
+    static LoopLabelArguments *from(const Anchor *anchor, const Type *type);
 
     LoopLabel *loop;
 };
@@ -665,9 +653,10 @@ struct Call : Instruction {
 struct LoopLabel : Instruction {
     static bool classof(const Value *T);
 
-    LoopLabel(const Anchor *anchor, const TypedValues &init);
+    LoopLabel(const Anchor *anchor, const TypedValues &init, LoopLabelArguments *args);
 
-    static LoopLabel *from(const Anchor *anchor, const TypedValues &init);
+    static LoopLabel *from(const Anchor *anchor, const TypedValues &init,
+        LoopLabelArguments *args);
 
     TypedValues init;
     Block body;
@@ -700,6 +689,16 @@ struct Const : Pure {
 //------------------------------------------------------------------------------
 
 struct Function : Pure {
+    struct UniqueInfo {
+        ValueIndex value;
+        // at which block depth is the unique defined?
+        int get_depth() const;
+
+        UniqueInfo(const ValueIndex& value);
+    };
+    // map of known uniques within the function (any state)
+    typedef std::unordered_map<int, UniqueInfo> UniqueMap;
+
     static bool classof(const Value *T);
 
     Function(const Anchor *anchor, Symbol name, const Parameters &params);
@@ -716,6 +715,12 @@ struct Function : Pure {
     bool key_equal(const Function *other) const;
     std::size_t hash() const;
 
+    int unique_id();
+    void bind_unique(const UniqueInfo &info);
+    void try_bind_unique(TypedValue *value);
+    const UniqueInfo &get_unique_info(int id) const;
+    void build_valids();
+
     Symbol name;
     Parameters params;
     Block body;
@@ -725,6 +730,7 @@ struct Function : Pure {
     Template *original;
     Label *label;
     bool complete;
+    int nextid;
 
     Types instance_args;
     void bind(Value *oldnode, TypedValue *newnode);
@@ -735,7 +741,9 @@ struct Function : Pure {
     std::vector<Return *> returns;
     std::vector<Raise *> raises;
 
-    Depends deps;
+    UniqueMap uniques;
+    IDSet original_valid;
+    IDSet valid;
 };
 
 //------------------------------------------------------------------------------
