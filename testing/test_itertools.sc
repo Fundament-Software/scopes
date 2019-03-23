@@ -70,21 +70,27 @@ assert
                 inline (x) (x != 10)
             cascade
                 take 3
-                'cons-collector '()
+                'cons-sink '()
             cascade
                 take 3
-                'cons-collector '()
-            'cons-collector '()
+                'cons-sink '()
+            'cons-sink '()
         '(((25) (24 23 22) (21 20 19))
         ((18 17 16) (15 14 13) (12 11 9))
         ((8 7 6) (5 4 3) (2 1 0)))
+
+print
+    ->> '(((25) (24 23 22) (21 20 19)) ((18 17 16) (15 14 13) (12 11 9)) ((8 7 6) (5 4 3) (2 1 0)))
+        map (inline (x) (x as list)); cat;
+        map (inline (x) (x as list)); cat;
+        'cons-sink '()
 
 spice va-map (f args...)
     ->>
         'args args...
         map
             inline (arg) `(f arg)
-        'arg-appender (sc_argument_list_new (active-anchor))
+        'append-sink (sc_argument_list_new (active-anchor))
 
 run-stage;
 

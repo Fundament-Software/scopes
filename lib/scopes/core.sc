@@ -3039,7 +3039,7 @@ do
                 cons (src) it
 
     'set-symbols list
-        cons-collector =
+        cons-sink =
             inline "list-collector" (self)
                 Collector
                     inline () self
@@ -3065,7 +3065,7 @@ do
                 inline (x) (x < argc)
                 inline (x) ('getarg self x)
                 inline (x) (x + 1)
-    arg-appender =
+    append-sink =
         inline "Value-args" (self)
             let argc = ('argcount self)
             Collector

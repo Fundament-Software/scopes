@@ -143,6 +143,17 @@ inline ->> (generator collector...)
                         value coll
                 collector...
 
+inline cat (coll)
+    """"treat input as a generator and forward its arguments individually
+    inline _cat (coll)
+        let init valid? at collect = ((coll as Collector))
+        Collector init valid? at
+            inline (src it...)
+                fold (state... = it...) for val... in (src)
+                    collect (inline () val...) state...
+    static-if (none? coll) _cat
+    else (_cat coll)
+
 inline flatten (coll)
     """"collect variadic input as individual single items
     inline _flatten (coll)
