@@ -2861,6 +2861,23 @@ define define-sugar-macro
                         list raises-compile-error;
                         body
 
+let __static-assert =
+    spice-macro
+        fn (args)
+            let argc = ('argcount args)
+            verify-count argc 2 2
+            let expr msg =
+                'getarg args 0
+                'getarg args 1
+            let anchor = (sc_get_active_anchor)
+            let msg = (msg as string)
+            let val = (expr as bool)
+            if (not val)
+                sc_set_active_anchor anchor
+                compiler-error!
+                    .. "assertion failed: " msg
+            `()
+
 let __assert =
     spice-macro
         fn (args)
@@ -2877,15 +2894,11 @@ let __assert =
                 'getarg args 0
                 'getarg args 1
             let anchor = (sc_get_active_anchor)
-            if ('constant? expr)
-                let msg = (msg as string)
-                let val = (expr as bool)
-                check-assertion val anchor msg
-                box-empty;
-            else
-                if (('typeof msg) != string)
-                    compiler-error! "string expected as second argument"
-                `(check-assertion expr anchor msg)
+            if (('typeof msg) != string)
+                compiler-error! "string expected as second argument"
+            spice-quote
+                check-assertion expr anchor msg
+                ;
 
 let vector-reduce =
     spice-macro
@@ -3154,15 +3167,22 @@ spice-quote
     inline compile-object (func table flags...)
         sc_compile_object func table (parse-compile-flags flags...)
 
+inline convert-assert-args (args cond msg)
+    if ((countof args) == 2) msg
+    else
+        if (('typeof cond) == list)
+            `[(sc_list_repr (cond as list))]
+        else
+            `[(repr cond)]
+
+define-sugar-macro static-assert
+    let cond msg body = (decons args 2)
+    let msg = (convert-assert-args args cond msg)
+    list __static-assert cond msg
+
 define-sugar-macro assert
     let cond msg body = (decons args 2)
-    let msg =
-        if ((countof args) == 2) msg
-        else
-            if (('typeof cond) == list)
-                `[(sc_list_repr (cond as list))]
-            else
-                `[(repr cond)]
+    let msg = (convert-assert-args args cond msg)
     list __assert cond msg
 
 define-sugar-macro while
