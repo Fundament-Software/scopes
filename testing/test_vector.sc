@@ -21,6 +21,11 @@ test-vector-ops;
 
 assert ((length (vectorof f32 2 10 11)) == 15.0)
 
+print
+    lslice (vectorof i32 0 1 2 3 4 5 6 7) 3
+print
+    rslice (vectorof i32 0 1 2 3 4 5 6 7) 4
+
 assert
     all?
         ==
@@ -36,3 +41,7 @@ assert
                 vectorof i16 1 0 3 0
                 vectorof i16 0 2 0 4
             vectorof i16 1 2 3 4
+
+# reduce on big vector sizes
+assert ((vector-reduce add (vectorof i32 1 2 3 4 5 6 7 8 9 10 11 12)) == 78)
+

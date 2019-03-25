@@ -107,23 +107,13 @@ let mat4 dmat4 imat4 umat4 bmat4 = mat4x4 dmat4x4 imat4x4 umat4x4 bmat4x4
 
 typedef vec-type-accessor
     do
-        fn binary-op-expr (op lhsT rhsT lhs rhs)
-            raises-compile-error;
-            `(op (imply lhs vec-type) rhs)
-
-        fn binary-op-expr-r (op lhsT rhsT lhs rhs)
-            raises-compile-error;
-            `(op lhs (imply rhs vec-type))
-
         inline binary-op-dispatch (lop rop op)
             'set-symbol this-type lop
-                box-binary-op
-                    fn (lhsT rhsT lhs rhs)
-                        binary-op-expr op lhsT rhsT lhs rhs
+                inline (lhsT rhsT)
+                    inline (lhs rhs) (op (imply lhs vec-type) rhs)
             'set-symbol this-type rop
-                box-binary-op
-                    fn (lhsT rhsT lhs rhs)
-                        binary-op-expr-r op lhsT rhsT lhs rhs
+                inline (lhsT rhsT)
+                    inline (lhs rhs) (op lhs (imply rhs vec-type))
 
         binary-op-dispatch '__+ '__r+ +
         binary-op-dispatch '__- '__r- -
@@ -147,27 +137,27 @@ typedef vec-type-accessor
             return `(inline (self) (bitcast (shufflevector self self mask) rhvecT))
         `()
 
-    @@ box-binary-op
-    fn __= (lhsT rhsT lhs rhs)
+    @@ spice-binary-op-macro
+    fn __= (lhsT rhsT)
         raises-compile-error;
+        inline sym-assign (lhs rhs rhvecT assignmask)
+            assign (shufflevector lhs (imply rhs rhvecT) assignmask) lhs
+        inline asym-assign (lhs rhs rhvecT assignmask expandmask)
+            let rhs = (imply rhs rhvecT)
+            # expand or contract
+            let rhs = (shufflevector rhs rhs expandmask)
+            assign (shufflevector lhs rhs assignmask) lhs
+
         let rhvecT = (lhsT.RHVectorType as type)
         let assignmask = lhsT.AssignMask
         let lhsz = ('element-count lhsT)
         let sz = ('element-count rhvecT)
         let vecT = ('superof rhvecT)
         if (lhsz == sz)
-            `(assign
-                (shufflevector lhs (imply rhs rhvecT) assignmask)
-                lhs)
+            `(inline (lhs rhs) (sym-assign lhs rhs rhvecT assignmask))
         else
             let expandmask = lhsT.ExpandMask
-            spice-quote
-                do
-                    let rhs = (imply rhs rhvecT)
-                    # expand or contract
-                    let rhs = (shufflevector rhs rhs expandmask)
-                    assign (shufflevector lhs rhs assignmask) lhs
-
+            `(inline (lhs rhs) (asym-assign lhs rhs rhvecT assignmask expandmask))
 
 typedef vec-type < immutable
     inline vec-type-constructor (element-type size)
@@ -266,44 +256,39 @@ typedef vec-type < immutable
         / ((typeof self) 1) self
 
     do
-        fn vec-type-binary-op-expr (symbol lhsT rhsT lhs rhs)
-            let Ta = ('element@ lhsT 0)
-            let f =
-                try ('@ Ta symbol)
-                except (err)
-                    compiler-error! "unsupported operation"
-            let f = (unbox-binary-op-function-type f)
+        fn vec-type-binary-op (symbol lhsT rhsT)
+            label next
+                let Ta = ('element@ lhsT 0)
+                let f =
+                    try ('@ Ta symbol)
+                    except (err) (merge next)
+                if (lhsT == rhsT)
+                    return f
+                let conv = (imply-converter rhsT Ta)
+                if (operator-valid? conv)
+                    return `(inline (lhs rhs) (f lhs (lhsT (conv rhs))))
+            `()
 
-            let rhs =
-                if (lhsT == rhsT) rhs
-                else
-                    let conv = (imply-converter rhsT Ta)
-                    if (converter-valid? conv) `(lhsT (conv rhs))
-                    else (cast-error! "cannot convert right hand side from " rhsT Ta)
-            return (f lhsT lhsT lhs rhs)
-
-        fn vec-type-binary-op-expr-r (symbol lhsT rhsT lhs rhs)
-            let Tb = ('element@ rhsT 0)
-            let f =
-                try ('@ Tb symbol)
-                except (err)
-                    compiler-error! "unsupported operation"
-            let f = (unbox-binary-op-function-type f)
-            let lhs =
-                if (lhsT == rhsT) lhs
-                else
-                    let conv = (imply-converter lhsT Tb)
-                    if (converter-valid? conv) `(rhsT (conv lhs))
-                    else (cast-error! "cannot convert left hand side from " lhsT Tb)
-            return (f rhsT rhsT lhs rhs)
+        fn vec-type-binary-op-r (symbol lhsT rhsT)
+            label next
+                let Tb = ('element@ rhsT 0)
+                let f =
+                    try ('@ Tb symbol)
+                    except (err) (merge next)
+                if (lhsT == rhsT)
+                    return f
+                let conv = (imply-converter lhsT Tb)
+                if (operator-valid? conv)
+                    return `(inline (lhs rhs) (f (rhsT (conv lhs)) rhs))
+            `()
 
         inline vec-type-binary-op-dispatch (lop rop symbol)
             'set-symbol this-type lop
-                box-binary-op
-                    fn (lhsT rhsT lhs rhs) (vec-type-binary-op-expr symbol lhsT rhsT lhs rhs)
+                spice-binary-op-macro
+                    inline (lhsT rhsT) (vec-type-binary-op symbol lhsT rhsT)
             'set-symbol this-type rop
-                box-binary-op
-                    fn (lhsT rhsT lhs rhs) (vec-type-binary-op-expr-r symbol lhsT rhsT lhs rhs)
+                spice-binary-op-macro
+                    inline (lhsT rhsT) (vec-type-binary-op-r symbol lhsT rhsT)
 
         vec-type-binary-op-dispatch '__+ '__r+ '__vector+
         vec-type-binary-op-dispatch '__- '__r- '__vector-
@@ -435,9 +420,10 @@ typedef vec-type < immutable
             return `(inline (self) (vector-generator self count))
         `()
 
-    @@ box-binary-op
-    fn __== (lhsT rhsT lhs rhs)
-        `(all? [(vector.__== lhsT rhsT lhs rhs)])
+    let __== =
+        simple-binary-op
+            inline (lhs rhs)
+                all? (== (storagecast lhs) (storagecast rhs))
 
 fn dot (u v)
     let w = (u * v)
@@ -589,8 +575,8 @@ typedef mat-type < immutable
 
     unlet make-diagonal-vector mat-type-constructor
 
-    @@ box-binary-op
-    fn __* (lhsT rhsT lhs rhs)
+    @@ spice-binary-op-macro
+    fn __* (lhsT rhsT)
         let mat-row = row
         if ((lhsT < mat-type)
                 and (rhsT < mat-type)
@@ -600,30 +586,39 @@ typedef mat-type < immutable
             let sz = ('element-count VT)
             let ET = ('element@ VT 0)
             let destT = (construct-mat-type ET sz sz)
-            fold (mat = `(nullof destT)) for i in (range sz)
-                let row = `(mat-row lhs i)
-                let vec =
-                    fold (vec = `(nullof VT)) for j in (range sz)
-                        `(insertelement vec (dot row (extractvalue rhs j)) j)
-                `(insertvalue mat vec i)
+            spice-quote
+                inline (lhs rhs)
+                    spice-unquote
+                        fold (mat = `(nullof destT)) for i in (range sz)
+                            let row = `(mat-row lhs i)
+                            let vec =
+                                fold (vec = `(nullof VT)) for j in (range sz)
+                                    `(insertelement vec (dot row (extractvalue rhs j)) j)
+                            `(insertvalue mat vec i)
         elseif (rhsT == (lhsT.RowType as type))
             let VT = ('element@ lhsT 0)
             let sz = ('element-count VT)
             # mat(i,j) * vec(i) -> vec(j)
-            fold (vec = `(nullof VT)) for i in (range sz)
-                `(insertelement vec (dot (mat-row lhs i) rhs) i)
+            spice-quote
+                inline (lhs rhs)
+                    spice-unquote
+                        fold (vec = `(nullof VT)) for i in (range sz)
+                            `(insertelement vec (dot (mat-row lhs i) rhs) i)
         else
-            compiler-error! "unsupported type"
+            `()
 
-    @@ box-binary-op
-    fn __r* (lhsT rhsT lhs rhs)
+    @@ spice-binary-op-macro
+    fn __r* (lhsT rhsT)
         if (lhsT == ('element@ rhsT 0))
             # vec(j) * mat(i,j) -> vec(i)
             let sz = ('element-count rhsT)
-            fold (vec = `(nullof rhsT.RowType)) for i in (range sz)
-                `(insertelement vec (dot lhs (extractvalue rhs i)) i)
+            spice-quote
+                inline (lhs rhs)
+                    spice-unquote
+                        fold (vec = `(nullof rhsT.RowType)) for i in (range sz)
+                            `(insertelement vec (dot lhs (extractvalue rhs i)) i)
         else
-            compiler-error! "unsupported type"
+            `()
 
     @@ spice-cast-macro
     fn __as (vT T)
@@ -642,18 +637,21 @@ typedef mat-type < immutable
             return `(inline (self) (matrix-generator self count))
         `()
 
-    @@ box-binary-op
-    fn __== (lhsT rhsT lhs rhs)
+    @@ spice-binary-op-macro
+    fn __== (lhsT rhsT)
         if (lhsT == rhsT)
             let cols = ('element-count lhsT)
             let VT = (vector bool cols)
-            let vec =
-                fold (vec = `(nullof VT)) for i in (range cols)
-                    let cmp =
-                        `((extractvalue lhs i) == (extractvalue rhs i))
-                    `(insertelement vec cmp i)
-            return `(all? vec)
-        compiler-error! "unsupported type"
+            spice-quote
+                inline (lhs rhs)
+                    all?
+                        spice-unquote
+                            fold (vec = `(nullof VT)) for i in (range cols)
+                                let cmp =
+                                    `((extractvalue lhs i) == (extractvalue rhs i))
+                                `(insertelement vec cmp i)
+        else
+            return `()
 
 spice _transpose (m)
     let T = ('typeof m)

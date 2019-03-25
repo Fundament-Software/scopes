@@ -981,14 +981,8 @@ fn real-as (vT T)
             return `(inline (self) (fptoui self T))
     `()
 
-inline box-binary-op (f)
-    box-pointer (static-typify f type type Value Value)
-
-inline single-binary-op-dispatch (destf)
-    fn (lhsT rhsT lhs rhs)
-        if (ptrcmp== lhsT rhsT)
-            return `(destf lhs rhs)
-        compiler-error! "unsupported type"
+# cast protocol
+#------------------------------------------------------------------------------
 
 inline cast-error! (intro-string vT T)
     compiler-error!
@@ -996,24 +990,7 @@ inline cast-error! (intro-string vT T)
             sc_string_join ('__repr (box-pointer vT))
                 sc_string_join " to type " ('__repr (box-pointer T))
 
-# receive a source type, a destination type and an expression, and return an
-    untyped expression that transforms the value to said type, or raise an error
-let CastFunctionType =
-    'pointer ('raising (function Value type type Value) Error)
-
-fn unbox-cast-function-type (anyf)
-    unbox-pointer anyf CastFunctionType
-
-fn attribute-format-error! (T symbol err)
-    compiler-error!
-        'join "wrong format for attribute "
-            'join ('__repr (box-symbol symbol))
-                'join " of type "
-                    'join ('__repr (box-pointer T))
-                        'join ": "
-                            sc_format_error err
-
-fn converter-valid? (value)
+fn operator-valid? (value)
     ptrcmp!= ('typeof value) void
 
 fn cast-converter (symbol rsymbol vT T)
@@ -1024,13 +1001,13 @@ fn cast-converter (symbol rsymbol vT T)
             try ('@ vT symbol)
             except (err) (merge next)
         let conv = (sc_prove `(f vT T))
-        if (converter-valid? conv) (return conv)
+        if (operator-valid? conv) (return conv)
     label next
         let f =
             try ('@ T rsymbol)
             except (err) (merge next)
         let conv = (sc_prove `(f vT T))
-        if (converter-valid? conv) (return conv)
+        if (operator-valid? conv) (return conv)
     return (sc_empty_argument_list (sc_get_active_anchor))
 
 inline cast-identity (value) value
@@ -1048,7 +1025,7 @@ fn as-converter (vT T)
     if (sc_type_is_superof T vT)
         return `cast-identity
     let conv = (cast-converter '__as '__ras vT T)
-    if (converter-valid? conv) (return conv)
+    if (operator-valid? conv) (return conv)
     # try implicit cast last
     cast-converter '__imply '__rimply vT T
 
@@ -1062,57 +1039,99 @@ inline gen-cast-op (f str)
             let vT = ('typeof value)
             let T = (unbox-pointer anyT type)
             let conv = (f vT T)
-            if (converter-valid? conv)
+            if (operator-valid? conv)
                 return `(conv value)
             cast-error! str vT T
 
 let imply = (gen-cast-op imply-converter "can't coerce value of type ")
 let as = (gen-cast-op as-converter "can't cast value of type ")
 
-let BinaryOpFunctionType =
-    'pointer ('raising (function Value type type Value Value) Error)
+# operator protocol
+#------------------------------------------------------------------------------
 
-fn unbox-binary-op-function-type (anyf)
-    unbox-pointer anyf BinaryOpFunctionType
-
-# assuming both types are the same
-fn binary-op-expr (symbol lhsT rhsT lhs rhs)
-    let anyf = ('@ lhsT symbol)
-    let f =
-        try (unbox-binary-op-function-type anyf)
-        except (err)
-            attribute-format-error! lhsT symbol err
-    f lhsT rhsT lhs rhs
-
-# assuming both types are different
-fn sym-binary-op-expr (symbol rsymbol lhsT rhsT lhs rhs)
-    try
-        return (binary-op-expr symbol lhsT rhsT lhs rhs)
-    except (lhs-err)
-        let anyf =
-            try
-                '@ rhsT rsymbol
-            except (geterr)
-                raise lhs-err
+fn unary-operator (symbol T)
+    """"for an operation performed on one variable argument type, find a
+        matching operator function. This function only works inside a spice
+        macro.
+    label next
         let f =
-            try (unbox-binary-op-function-type anyf)
-            except (err)
-                attribute-format-error! rhsT rsymbol err
-        f lhsT rhsT lhs rhs
+            try ('@ T symbol)
+            except (err) (merge next)
+        let op = (sc_prove `(f T))
+        if (operator-valid? op) (return op)
+    return (sc_empty_argument_list (sc_get_active_anchor))
 
-fn binary-op-error! (friendly-op-name lhsT rhsT err)
+fn binary-operator (symbol lhsT rhsT)
+    """"for an operation performed on two argument types, of which only
+        the left type can provide a suitable candidate, find a matching
+        operator function. This function only works inside a spice macro.
+    label next
+        let f =
+            try ('@ lhsT symbol)
+            except (err) (merge next)
+        let op = (sc_prove `(f lhsT rhsT))
+        if (operator-valid? op) (return op)
+    return (sc_empty_argument_list (sc_get_active_anchor))
+
+fn binary-operator-r (rsymbol lhsT rhsT)
+    """"for an operation performed on two argument types, of which only
+        the right type can provide a suitable candidate, find a matching
+        operator function. This function only works inside a spice macro.
+    label next
+        let f =
+            try ('@ rhsT rsymbol)
+            except (err) (merge next)
+        let op = (sc_prove `(f lhsT rhsT))
+        if (operator-valid? op) (return op)
+    return (sc_empty_argument_list (sc_get_active_anchor))
+
+fn balanced-binary-operator (symbol rsymbol lhsT rhsT)
+    """"for an operation performed on two argument types, of which either
+        type can provide a suitable candidate, return a matching operator.
+        This function only works inside a spice macro.
+    # try the left type
+    let op = (binary-operator symbol lhsT rhsT)
+    if (operator-valid? op) (return op)
+    if (ptrcmp!= lhsT rhsT)
+        # asymmetrical types
+
+        # try the right type
+        let op = (binary-operator-r rsymbol lhsT rhsT)
+        if (operator-valid? op) (return op)
+
+        # can we cast rhsT to lhsT?
+        let conv = (imply-converter rhsT lhsT)
+        if (operator-valid? conv)
+            # is symmetrical op supported for the left type?
+            let op = (binary-operator symbol lhsT lhsT)
+            if (operator-valid? op)
+                return `(inline (lhs rhs) (op lhs (conv rhs)))
+
+        # can we cast lhsT to rhsT?
+        let conv = (imply-converter lhsT rhsT)
+        if (operator-valid? conv)
+            # is symmetrical op supported for the right type?
+            let op = (binary-operator symbol rhsT rhsT)
+            if (operator-valid? op)
+                return `(inline (lhs rhs) (op (conv lhs) rhs))
+    return (sc_empty_argument_list (sc_get_active_anchor))
+
+fn unary-op-error! (friendly-op-name T)
+    compiler-error!
+        'join "can't "
+            'join friendly-op-name
+                'join " value of type" ('__repr (box-pointer T))
+
+fn binary-op-error! (friendly-op-name lhsT rhsT)
     compiler-error!
         'join "can't "
             'join friendly-op-name
                 'join " values of types "
                     'join ('__repr (box-pointer lhsT))
                         'join " and "
-                            'join ('__repr (box-pointer rhsT))
-                                'join ": "
-                                    sc_format_error err
+                            '__repr (box-pointer rhsT)
 
-# both types are typically the same
-fn sym-binary-op-label-macro (args symbol rsymbol friendly-op-name)
+fn balanced-binary-operation (args symbol rsymbol friendly-op-name)
     let argc = ('argcount args)
     verify-count argc 2 2
     let lhs rhs =
@@ -1120,38 +1139,13 @@ fn sym-binary-op-label-macro (args symbol rsymbol friendly-op-name)
         'getarg args 1
     let lhsT = ('typeof lhs)
     let rhsT = ('typeof rhs)
-    if (ptrcmp== lhsT rhsT)
-        try
-            # use simple version
-            return (binary-op-expr symbol lhsT lhsT lhs rhs)
-        except (err)
-            binary-op-error! friendly-op-name lhsT rhsT err
-    # asymmetrical types
-    # try direct operation first (from both sides)
-    let err =
-        try
-            return (sym-binary-op-expr symbol rsymbol lhsT rhsT lhs rhs)
-        except (err) err
-    # try other options
-    try
-        # can we cast rhsT to lhsT?
-        let conv = (imply-converter rhsT lhsT)
-        if (converter-valid? conv)
-            # try again
-            return (binary-op-expr symbol lhsT lhsT lhs `(conv rhs))
-    except (err)
-    try
-        # can we cast lhsT to rhsT?
-        let conv = (imply-converter lhsT rhsT)
-        if (converter-valid? conv)
-            # try again
-            return (binary-op-expr symbol rhsT rhsT `(conv lhs) rhs)
-    except (err)
-    # we give up
-    binary-op-error! friendly-op-name lhsT rhsT err
+    let op = (balanced-binary-operator symbol rsymbol lhsT rhsT)
+    if (operator-valid? op)
+        return `(op lhs rhs)
+    binary-op-error! friendly-op-name lhsT rhsT
 
-# right hand has fixed type
-fn asym-binary-op-label-macro (args symbol rtype friendly-op-name)
+# right hand has fixed type - this one doesn't need a dispatch step
+fn unbalanced-binary-operation (args symbol rtype friendly-op-name)
     let argc = ('argcount args)
     verify-count argc 2 2
     let lhs rhs =
@@ -1159,64 +1153,84 @@ fn asym-binary-op-label-macro (args symbol rtype friendly-op-name)
         'getarg args 1
     let lhsT = ('typeof lhs)
     let rhsT = ('typeof rhs)
-    try
-        let f = ('@ lhsT symbol)
-        if (ptrcmp== rhsT rtype)
-            return `(f args)
-        # can we cast rhsT to rtype?
-        let conv = (imply-converter rhsT rtype)
-        if (converter-valid? conv)
-            return `(f lhs (conv rhs))
+    let rhs =
+        if (ptrcmp== rhsT rtype) rhs
         else
-            cast-error! "can't cast right hand side value of type " rhsT rtype
-    except (err)
-        # we give up
-        compiler-error!
-            'join "can't "
-                'join friendly-op-name
-                    'join " values of types "
-                        'join ('__repr (box-pointer lhsT))
-                            'join " and "
-                                'join ('__repr (box-pointer rhsT))
-                                    'join ": "
-                                        sc_format_error err
+            # can we cast rhsT to rtype?
+            let conv = (imply-converter rhsT rtype)
+            if (operator-valid? conv)
+                `(conv rhs)
+            else
+                cast-error! "can't coerce secondary argument of type " rhsT rtype
+    let f =
+        try ('@ lhsT symbol)
+        except (err)
+            unary-op-error! friendly-op-name lhsT
+    `(f lhs rhs)
 
-fn unary-op-label-macro (args symbol friendly-op-name)
+# unary operations don't need a dispatch step either
+fn unary-operation (args symbol friendly-op-name)
     let argc = ('argcount args)
     verify-count argc 1 1
-    let lhs = ('getarg args 0)
-    let lhsT = ('typeof lhs)
-    try
-        let f = ('@ lhsT symbol)
-        return `(f args)
-    except (err)
-        compiler-error!
-            'join "can't "
-                'join friendly-op-name
-                    'join " value of type "
-                        'join ('__repr (box-pointer lhsT))
-                            'join ": "
-                                sc_format_error err
+    let u = ('getarg args 0)
+    let T = ('typeof u)
+    let f =
+        try ('@ T symbol)
+        except (err)
+            unary-op-error! friendly-op-name T
+    `(f u)
 
-fn unary-sym-binary-op-label-macro (args usymbol ufriendly-op-name symbol rsymbol friendly-op-name)
+fn unary-or-balanced-binary-operation (args usymbol ufriendly-op-name symbol rsymbol friendly-op-name)
     let argc = ('argcount args)
     if (icmp== argc 1)
-        unary-op-label-macro args usymbol ufriendly-op-name
+        unary-operation args usymbol ufriendly-op-name
     else
-        sym-binary-op-label-macro args symbol rsymbol friendly-op-name
+        balanced-binary-operation args symbol rsymbol friendly-op-name
 
-inline make-unary-op-dispatch (symbol friendly-op-name)
-    spice-macro (fn (args) (unary-op-label-macro args symbol friendly-op-name))
+inline unary-op-dispatch (symbol friendly-op-name)
+    spice-macro (fn (args) (unary-operation args symbol friendly-op-name))
 
-inline make-unary-sym-binary-op-dispatch (usymbol ufriendly-op-name symbol rsymbol friendly-op-name)
-    spice-macro (fn (args) (unary-sym-binary-op-label-macro
+inline unary-or-balanced-binary-op-dispatch (usymbol ufriendly-op-name symbol rsymbol friendly-op-name)
+    spice-macro (fn (args) (unary-or-balanced-binary-operation
         args usymbol ufriendly-op-name symbol rsymbol friendly-op-name))
 
-inline make-sym-binary-op-dispatch (symbol rsymbol friendly-op-name)
-    spice-macro (fn (args) (sym-binary-op-label-macro args symbol rsymbol friendly-op-name))
+inline balanced-binary-op-dispatch (symbol rsymbol friendly-op-name)
+    spice-macro (fn (args) (balanced-binary-operation args symbol rsymbol friendly-op-name))
 
-inline make-asym-binary-op-dispatch (symbol rtype friendly-op-name)
-    spice-macro (fn (args) (asym-binary-op-label-macro args symbol rtype friendly-op-name))
+inline unbalanced-binary-op-dispatch (symbol rtype friendly-op-name)
+    spice-macro (fn (args) (unbalanced-binary-operation args symbol rtype friendly-op-name))
+
+inline spice-binary-op-macro (f)
+    """"to be used for binary operators of which either type can
+        provide an operation. returns a callable operator (f lhs rhs) that
+        performs the operation or no arguments if the operation can not be
+        performed.
+    spice-macro
+        fn (args)
+            raises-compile-error;
+            let argc = (sc_argcount args)
+            verify-count argc 2 2
+            let lhs-type = (unbox-pointer (sc_getarg args 0) type)
+            let rhs-type = (unbox-pointer (sc_getarg args 1) type)
+            f lhs-type rhs-type
+
+inline simple-binary-op (f)
+    """"for cases where the type only interacts with itself
+    spice-binary-op-macro
+        inline (lhsT rhsT)
+            if (ptrcmp== lhsT rhsT)
+                return `f
+            `()
+
+inline simple-signed-binary-op (sf uf)
+    spice-binary-op-macro
+        inline (lhsT rhsT)
+            if (ptrcmp== lhsT rhsT)
+                if ('signed? lhsT)
+                    return `sf
+                else
+                    return `uf
+            `()
 
 # support for calling macro functions directly
 'set-symbols SugarMacro
@@ -1232,8 +1246,8 @@ inline make-asym-binary-op-dispatch (symbol rtype friendly-op-name)
     variadic? = sc_symbol_is_variadic
 
 'set-symbols Symbol
-    __== = (box-binary-op (single-binary-op-dispatch icmp==))
-    __!= = (box-binary-op (single-binary-op-dispatch icmp!=))
+    __== = (box-pointer (simple-binary-op icmp==))
+    __!= = (box-pointer (simple-binary-op icmp!=))
     __imply =
         box-pointer
             spice-cast-macro
@@ -1254,13 +1268,13 @@ fn string@ (self i)
     __rslice = sc_string_rslice
 
 'set-symbols string
-    __== = (box-binary-op (single-binary-op-dispatch ptrcmp==))
-    __!= = (box-binary-op (single-binary-op-dispatch ptrcmp!=))
-    __.. = (box-binary-op (single-binary-op-dispatch sc_string_join))
-    __< = (box-binary-op (single-binary-op-dispatch (inline (a b) (icmp<s (sc_string_compare a b) 0))))
-    __<= = (box-binary-op (single-binary-op-dispatch (inline (a b) (icmp<=s (sc_string_compare a b) 0))))
-    __> = (box-binary-op (single-binary-op-dispatch (inline (a b) (icmp>s (sc_string_compare a b) 0))))
-    __>= = (box-binary-op (single-binary-op-dispatch (inline (a b) (icmp>=s (sc_string_compare a b) 0))))
+    __== = (box-pointer (simple-binary-op ptrcmp==))
+    __!= = (box-pointer (simple-binary-op ptrcmp!=))
+    __.. = (box-pointer (simple-binary-op sc_string_join))
+    __< = (box-pointer (simple-binary-op (inline (a b) (icmp<s (sc_string_compare a b) 0))))
+    __<= = (box-pointer (simple-binary-op (inline (a b) (icmp<=s (sc_string_compare a b) 0))))
+    __> = (box-pointer (simple-binary-op (inline (a b) (icmp>s (sc_string_compare a b) 0))))
+    __>= = (box-pointer (simple-binary-op (inline (a b) (icmp>=s (sc_string_compare a b) 0))))
 
 'define-symbols list
     __typecall =
@@ -1271,22 +1285,8 @@ fn string@ (self i)
             sc_list_repr self
 
 'set-symbols list
-    __.. = (box-binary-op (single-binary-op-dispatch sc_list_join))
-    __== = (box-binary-op (single-binary-op-dispatch sc_list_compare))
-
-inline single-signed-binary-op-dispatch (sf uf)
-    fn (lhsT rhsT lhs rhs)
-        if (ptrcmp== lhsT rhsT)
-            return
-                spice-quote
-                    call [
-                        \ do
-                            if ('signed? lhsT)
-                                Value sf
-                            else
-                                Value uf ]
-                        \ lhs rhs
-        compiler-error! "unsupported type"
+    __.. = (box-pointer (simple-binary-op sc_list_join))
+    __== = (box-pointer (simple-binary-op sc_list_compare))
 
 fn dispatch-and-or (args flip)
     let argc = ('argcount args)
@@ -1313,30 +1313,30 @@ fn dispatch-and-or (args flip)
 'set-symbols integer
     __imply = (box-pointer (spice-cast-macro integer-imply))
     __as = (box-pointer (spice-cast-macro integer-as))
-    __+ = (box-binary-op (single-binary-op-dispatch add))
-    __- = (box-binary-op (single-binary-op-dispatch sub))
+    __+ = (box-pointer (simple-binary-op add))
+    __- = (box-pointer (simple-binary-op sub))
     __neg = (box-pointer (inline (self) (sub (nullof (typeof self)) self)))
-    __* = (box-binary-op (single-binary-op-dispatch mul))
-    __// = (box-binary-op (single-signed-binary-op-dispatch sdiv udiv))
+    __* = (box-pointer (simple-binary-op mul))
+    __// = (box-pointer (simple-signed-binary-op sdiv udiv))
     __/ =
-        box-binary-op
-            single-signed-binary-op-dispatch
+        box-pointer
+            simple-signed-binary-op
                 inline (a b) (fdiv (sitofp a f32) (sitofp b f32))
                 inline (a b) (fdiv (uitofp a f32) (uitofp b f32))
     __rcp = (spice-quote (inline (self) (fdiv 1.0 (as self f32))))
-    __% = (box-binary-op (single-signed-binary-op-dispatch srem urem))
-    __& = (box-binary-op (single-binary-op-dispatch band))
-    __| = (box-binary-op (single-binary-op-dispatch bor))
-    __^ = (box-binary-op (single-binary-op-dispatch bxor))
+    __% = (box-pointer (simple-signed-binary-op srem urem))
+    __& = (box-pointer (simple-binary-op band))
+    __| = (box-pointer (simple-binary-op bor))
+    __^ = (box-pointer (simple-binary-op bxor))
     #__~ =
-    __<< = (box-binary-op (single-binary-op-dispatch shl))
-    __>> = (box-binary-op (single-signed-binary-op-dispatch ashr lshr))
-    __== = (box-binary-op (single-binary-op-dispatch icmp==))
-    __!= = (box-binary-op (single-binary-op-dispatch icmp!=))
-    __< = (box-binary-op (single-signed-binary-op-dispatch icmp<s icmp<u))
-    __<= = (box-binary-op (single-signed-binary-op-dispatch icmp<=s icmp<=u))
-    __> = (box-binary-op (single-signed-binary-op-dispatch icmp>s icmp>u))
-    __>= = (box-binary-op (single-signed-binary-op-dispatch icmp>=s icmp>=u))
+    __<< = (box-pointer (simple-binary-op shl))
+    __>> = (box-pointer (simple-signed-binary-op ashr lshr))
+    __== = (box-pointer (simple-binary-op icmp==))
+    __!= = (box-pointer (simple-binary-op icmp!=))
+    __< = (box-pointer (simple-signed-binary-op icmp<s icmp<u))
+    __<= = (box-pointer (simple-signed-binary-op icmp<=s icmp<=u))
+    __> = (box-pointer (simple-signed-binary-op icmp>s icmp>u))
+    __>= = (box-pointer (simple-signed-binary-op icmp>=s icmp>=u))
 
 inline floordiv (a b)
     sdiv (fptosi a i32) (fptosi b i32)
@@ -1344,39 +1344,39 @@ inline floordiv (a b)
 'set-symbols real
     __imply = (box-pointer (spice-cast-macro real-imply))
     __as = (box-pointer (spice-cast-macro real-as))
-    __== = (box-binary-op (single-binary-op-dispatch fcmp==o))
-    __!= = (box-binary-op (single-binary-op-dispatch fcmp!=u))
-    __> = (box-binary-op (single-binary-op-dispatch fcmp>o))
-    __>= = (box-binary-op (single-binary-op-dispatch fcmp>=o))
-    __< = (box-binary-op (single-binary-op-dispatch fcmp<o))
-    __<= = (box-binary-op (single-binary-op-dispatch fcmp<=o))
-    __+ = (box-binary-op (single-binary-op-dispatch fadd))
-    __- = (box-binary-op (single-binary-op-dispatch fsub))
+    __== = (box-pointer (simple-binary-op fcmp==o))
+    __!= = (box-pointer (simple-binary-op fcmp!=u))
+    __> = (box-pointer (simple-binary-op fcmp>o))
+    __>= = (box-pointer (simple-binary-op fcmp>=o))
+    __< = (box-pointer (simple-binary-op fcmp<o))
+    __<= = (box-pointer (simple-binary-op fcmp<=o))
+    __+ = (box-pointer (simple-binary-op fadd))
+    __- = (box-pointer (simple-binary-op fsub))
     __neg = (box-pointer (inline (self) (fsub (nullof (typeof self)) self)))
-    __* = (box-binary-op (single-binary-op-dispatch fmul))
-    __/ = (box-binary-op (single-binary-op-dispatch fdiv))
+    __* = (box-pointer (simple-binary-op fmul))
+    __/ = (box-pointer (simple-binary-op fdiv))
     __rcp = (box-pointer (inline (self) (fdiv (uitofp 1 (typeof self)) self)))
-    __// = (box-binary-op (single-binary-op-dispatch floordiv))
-    __% = (box-binary-op (single-binary-op-dispatch frem))
+    __// = (box-pointer (simple-binary-op floordiv))
+    __% = (box-pointer (simple-binary-op frem))
 
 
 'set-symbols Value
-    __== = (box-binary-op (single-binary-op-dispatch sc_value_compare))
+    __== = (box-pointer (simple-binary-op sc_value_compare))
 
 'set-symbols Closure
-    __== = (box-binary-op (single-binary-op-dispatch ptrcmp==))
-    __!= = (box-binary-op (single-binary-op-dispatch ptrcmp!=))
+    __== = (box-pointer (simple-binary-op ptrcmp==))
+    __!= = (box-pointer (simple-binary-op ptrcmp!=))
 
 'define-symbols type
     __@ = sc_type_element_at
 
 'set-symbols type
-    __== = (box-binary-op (single-binary-op-dispatch type==))
-    __!= = (box-binary-op (single-binary-op-dispatch type!=))
-    __< = (box-binary-op (single-binary-op-dispatch type<))
-    __<= = (box-binary-op (single-binary-op-dispatch type<=))
-    __> = (box-binary-op (single-binary-op-dispatch type>))
-    __>= = (box-binary-op (single-binary-op-dispatch type>=))
+    __== = (box-pointer (simple-binary-op type==))
+    __!= = (box-pointer (simple-binary-op type!=))
+    __< = (box-pointer (simple-binary-op type<))
+    __<= = (box-pointer (simple-binary-op type<=))
+    __> = (box-pointer (simple-binary-op type>))
+    __>= = (box-pointer (simple-binary-op type>=))
     # (dispatch-attr T key thenf elsef)
     dispatch-attr =
         box-spice-macro
@@ -1411,7 +1411,7 @@ inline floordiv (a b)
                 `(sc_type_at args)
 
 'set-symbols Scope
-    __== = (box-binary-op (single-binary-op-dispatch ptrcmp==))
+    __== = (box-pointer (simple-binary-op ptrcmp==))
     __getattr =
         box-spice-macro
             fn "scope-getattr" (args)
@@ -1461,82 +1461,69 @@ inline floordiv (a b)
 """"The type of the `null` constant. This type is uninstantiable.
 let NullType = (sc_typename_type "NullType")
 'set-plain-storage NullType ('pointer void)
-'set-symbols NullType
-    __repr =
-        box-pointer
-            inline (self)
-                sc_default_styler style-number "null"
-    __imply =
-        box-pointer
-            spice-cast-macro
-                fn "null-imply" (cls T)
-                    if (icmp== ('kind ('storageof T)) type-kind-pointer)
-                        return `(inline (self) (bitcast self T))
-                    `()
-    __== =
-        box-binary-op
-            fn (lhsT rhsT lhs rhs)
-                if (icmp== ('kind ('storageof rhsT)) type-kind-pointer)
-                    return `(icmp== (ptrtoint rhs usize) 0:usize)
-                compiler-error! "only pointers can be compared to null"
-    __r== =
-        box-binary-op
-            fn (lhsT rhsT lhs rhs)
-                if (icmp== ('kind ('storageof lhsT)) type-kind-pointer)
-                    return `(icmp== (ptrtoint lhs usize) 0:usize)
-                compiler-error! "only pointers can be compared to null"
+do
+    inline null== (lhs rhs) (icmp== (ptrtoint rhs usize) 0:usize)
+    inline nullr== (lhs rhs) (icmp== (ptrtoint lhs usize) 0:usize)
+
+    'set-symbols NullType
+        __repr =
+            box-pointer
+                inline (self)
+                    sc_default_styler style-number "null"
+        __imply =
+            box-pointer
+                spice-cast-macro
+                    fn "null-imply" (cls T)
+                        if (icmp== ('kind ('storageof T)) type-kind-pointer)
+                            return `(inline (self) (bitcast self T))
+                        `()
+        __== =
+            box-pointer
+                spice-binary-op-macro
+                    inline (lhsT rhsT)
+                        if (icmp== ('kind ('storageof rhsT)) type-kind-pointer)
+                            return `null==
+                        `()
+        __r== =
+            box-pointer
+                spice-binary-op-macro
+                    inline (lhsT rhsT)
+                        if (icmp== ('kind ('storageof lhsT)) type-kind-pointer)
+                            return `nullr==
+                        `()
 
 let
     and-branch = (spice-macro (fn (args) (dispatch-and-or args true)))
     or-branch = (spice-macro (fn (args) (dispatch-and-or args false)))
     #implyfn = (static-typify implyfn type type)
     #asfn = (static-typify asfn type type)
-    countof = (make-unary-op-dispatch '__countof "count")
-    unpack = (make-unary-op-dispatch '__unpack "unpack")
-    hash1 = (make-unary-op-dispatch '__hash "hash")
-    ~ = (make-unary-op-dispatch '__~ "bitwise-negate")
-    == = (make-sym-binary-op-dispatch '__== '__r== "compare")
-    != = (make-sym-binary-op-dispatch '__!= '__r!= "compare")
-    < = (make-sym-binary-op-dispatch '__< '__r< "compare")
-    <= = (make-sym-binary-op-dispatch '__<= '__r<= "compare")
-    > = (make-sym-binary-op-dispatch '__> '__r> "compare")
-    >= = (make-sym-binary-op-dispatch '__>= '__r>= "compare")
-    + = (make-sym-binary-op-dispatch '__+ '__r+ "add")
-    - = (make-unary-sym-binary-op-dispatch '__neg "negate" '__- '__r- "subtract")
-    * = (make-sym-binary-op-dispatch '__* '__r* "multiply")
-    / = (make-unary-sym-binary-op-dispatch '__rcp "invert" '__/ '__r/ "real-divide")
-    // = (make-sym-binary-op-dispatch '__// '__r// "integer-divide")
-    % = (make-sym-binary-op-dispatch '__% '__r% "modulate")
-    & = (make-sym-binary-op-dispatch '__& '__r& "apply bitwise-and to")
-    | = (make-sym-binary-op-dispatch '__| '__r| "apply bitwise-or to")
-    ^ = (make-sym-binary-op-dispatch '__^ '__r^ "apply bitwise-xor to")
-    << = (make-sym-binary-op-dispatch '__<< '__r<< "apply left shift with")
-    >> = (make-sym-binary-op-dispatch '__>> '__r>> "apply right shift with")
-    .. = (make-sym-binary-op-dispatch '__.. '__r.. "join")
-    = = (make-sym-binary-op-dispatch '__= '__r= "apply assignment with")
-    @ = (make-asym-binary-op-dispatch '__@ integer "apply subscript operator with")
-    getattr = (make-asym-binary-op-dispatch '__getattr Symbol "get attribute from")
-    lslice = (make-asym-binary-op-dispatch '__lslice usize "apply left-slice operator with")
-    rslice = (make-asym-binary-op-dispatch '__rslice usize "apply right-slice operator with")
-
-'set-symbols typename
-    # inverted compare attempts regular compare
-    __!= =
-        box-binary-op
-            fn (lhsT rhsT lhs rhs)
-                if (ptrcmp== lhsT rhsT)
-                    return `(not (== lhs rhs))
-                compiler-error! "unequal types"
-    # default assignment operator
-    __= =
-        box-binary-op
-            fn (lhsT rhsT lhs rhs)
-                if (ptrcmp== lhsT rhsT)
-                    return
-                        spice-quote
-                            __drop lhs
-                            assign rhs lhs
-                compiler-error! "unequal types"
+    countof = (unary-op-dispatch '__countof "count")
+    unpack = (unary-op-dispatch '__unpack "unpack")
+    hash1 = (unary-op-dispatch '__hash "hash")
+    ~ = (unary-op-dispatch '__~ "bitwise-negate")
+    == = (balanced-binary-op-dispatch '__== '__r== "compare")
+    != = (balanced-binary-op-dispatch '__!= '__r!= "compare")
+    < = (balanced-binary-op-dispatch '__< '__r< "compare")
+    <= = (balanced-binary-op-dispatch '__<= '__r<= "compare")
+    > = (balanced-binary-op-dispatch '__> '__r> "compare")
+    >= = (balanced-binary-op-dispatch '__>= '__r>= "compare")
+    + = (balanced-binary-op-dispatch '__+ '__r+ "add")
+    - = (unary-or-balanced-binary-op-dispatch '__neg "negate" '__- '__r- "subtract")
+    * = (balanced-binary-op-dispatch '__* '__r* "multiply")
+    / = (unary-or-balanced-binary-op-dispatch '__rcp "invert" '__/ '__r/ "real-divide")
+    // = (balanced-binary-op-dispatch '__// '__r// "integer-divide")
+    % = (balanced-binary-op-dispatch '__% '__r% "modulate")
+    & = (balanced-binary-op-dispatch '__& '__r& "apply bitwise-and to")
+    | = (balanced-binary-op-dispatch '__| '__r| "apply bitwise-or to")
+    ^ = (balanced-binary-op-dispatch '__^ '__r^ "apply bitwise-xor to")
+    << = (balanced-binary-op-dispatch '__<< '__r<< "apply left shift with")
+    >> = (balanced-binary-op-dispatch '__>> '__r>> "apply right shift with")
+    .. = (balanced-binary-op-dispatch '__.. '__r.. "join")
+    = = (balanced-binary-op-dispatch '__= '__r= "apply assignment with")
+    @ = (unbalanced-binary-op-dispatch '__@ integer "apply subscript operator with")
+    getattr = (unbalanced-binary-op-dispatch '__getattr Symbol "get attribute from")
+    lslice = (unbalanced-binary-op-dispatch '__lslice usize "apply left-slice operator with")
+    rslice = (unbalanced-binary-op-dispatch '__rslice usize "apply right-slice operator with")
 
 let missing-constructor =
     spice-macro
@@ -1552,6 +1539,13 @@ let missing-constructor =
                         " has no constructor"
 
 run-stage;
+
+'set-symbols typename
+    # inverted compare attempts regular compare
+    __!= = (box-pointer (simple-binary-op (inline (lhs rhs) (not (== lhs rhs)))))
+    # default assignment operator
+    __= = (box-pointer (simple-binary-op (inline (lhs rhs) (__drop lhs) (assign rhs lhs))))
+
 
 let null = (nullof NullType)
 
@@ -2115,9 +2109,7 @@ fn clone-scope-contents (a b)
                     missing-constructor cls
 
 'set-symbols Scope
-    __.. =
-        box-binary-op
-            single-binary-op-dispatch clone-scope-contents
+    __.. = (box-pointer (simple-binary-op clone-scope-contents))
 
 fn extract-single-arg (args)
     let argc = ('argcount args)
@@ -2900,6 +2892,48 @@ let __assert =
                 check-assertion expr anchor msg
                 ;
 
+fn gen-vector-reduction (f v sz)
+    if false
+        return `[]
+    loop (v sz = v sz)
+        # special cases for low vector sizes
+        switch sz
+        case 1
+            break
+                spice-quote
+                    extractelement v 0
+        case 2
+            break
+                spice-quote
+                    f (extractelement v 0) (extractelement v 1)
+        case 3
+            break
+                spice-quote
+                    f (f (extractelement v 0) (extractelement v 1))
+                        extractelement v 2
+        case 4
+            break
+                spice-quote
+                    f
+                        f (extractelement v 0) (extractelement v 1)
+                        f (extractelement v 2) (extractelement v 3)
+        default
+            if ((sz & 1) == 0)
+                # clean pow2 slice
+                let hsz = (sz >> 1)
+                let hsz-value = (hsz as usize)
+                repeat
+                    spice-quote
+                        f
+                            lslice v hsz-value
+                            rslice v hsz-value
+                    hsz
+            else
+                # split into even sum and 1
+                let rhs = `(rslice v 1)
+                let rhs = (gen-vector-reduction f rhs (sz - 1))
+                break `(f (extractelement v 0) rhs)
+
 let vector-reduce =
     spice-macro
         fn (args)
@@ -2910,49 +2944,7 @@ let vector-reduce =
                 'getarg args 1
             let T = ('typeof v)
             let sz = ('element-count T)
-            loop (v sz = v sz)
-                # special cases for low vector sizes
-                switch sz
-                case 1
-                    break
-                        spice-quote
-                            extractelement v 0
-                case 2
-                    break
-                        spice-quote
-                            f
-                                extractelement v 0
-                                extractelement v 1
-                case 3
-                    break
-                        spice-quote
-                            f
-                                f
-                                    extractelement v 0
-                                    extractelement v 1
-                                extractelement v 2
-                case 4
-                    break
-                        spice-quote
-                            f
-                                f
-                                    extractelement v 0
-                                    extractelement v 1
-                                f
-                                    extractelement v 2
-                                    extractelement v 3
-                default
-                    let hsz = (sz >> 1)
-                    let fsz = (hsz << 1)
-                    if (fsz != sz)
-                        compiler-error! "vector size must be a power of two"
-                    let hsz-value = (Value (hsz as usize))
-                    repeat
-                        spice-quote
-                            f
-                                lslice v hsz-value
-                                rslice v hsz-value
-                        hsz
+            gen-vector-reduction f v sz
 
 let __countof-aggregate =
     spice-macro
@@ -3311,64 +3303,66 @@ fn any? (v)
 fn all? (v)
     vector-reduce band v
 
-inline single-signed-vector-binary-op-dispatch (sf uf)
-    fn (lhsT rhsT lhs rhs)
-        if (ptrcmp== lhsT rhsT)
-            let Ta = ('element@ lhsT 0)
-            return
-                spice-quote
-                    call [
-                        \ do
-                            if ('signed? Ta)
-                                Value sf
-                            else
-                                Value uf ]
-                        \ lhs rhs
-        compiler-error! "unsupported type"
+inline signed-vector-binary-op (sf uf)
+    spice-macro
+        fn (args)
+            raises-compile-error;
+            let argc = (sc_argcount args)
+            verify-count argc 2 2
+            let lhs = ('getarg args 0)
+            let rhs = ('getarg args 1)
+            let lhsT = ('typeof lhs)
+            let T = ('element@ lhsT 0)
+            if ('signed? T)
+                `(sf lhs rhs)
+            else
+                `(uf lhs rhs)
 
 'set-symbols integer
-    __vector+ = (box-binary-op (single-binary-op-dispatch add))
-    __vector- = (box-binary-op (single-binary-op-dispatch sub))
-    __vector* = (box-binary-op (single-binary-op-dispatch mul))
-    __vector// = (box-binary-op (single-signed-binary-op-dispatch sdiv udiv))
-    __vector% = (box-binary-op (single-signed-binary-op-dispatch srem urem))
-    __vector& = (box-binary-op (single-binary-op-dispatch band))
-    __vector| = (box-binary-op (single-binary-op-dispatch bor))
-    __vector^ = (box-binary-op (single-binary-op-dispatch bxor))
-    __vector<< = (box-binary-op (single-binary-op-dispatch shl))
-    __vector>> = (box-binary-op (single-signed-binary-op-dispatch ashr lshr))
-    __vector== = (box-binary-op (single-binary-op-dispatch icmp==))
-    __vector!= = (box-binary-op (single-binary-op-dispatch icmp!=))
-    __vector> = (box-binary-op (single-signed-binary-op-dispatch icmp>s icmp>u))
-    __vector>= = (box-binary-op (single-signed-binary-op-dispatch icmp>s icmp>=u))
-    __vector< = (box-binary-op (single-signed-binary-op-dispatch icmp<s icmp<u))
-    __vector<= = (box-binary-op (single-signed-binary-op-dispatch icmp<=s icmp<=u))
+    __vector+  = add
+    __vector-  = sub
+    __vector*  = mul
+    __vector// = (signed-vector-binary-op sdiv udiv)
+    __vector%  = (signed-vector-binary-op srem urem)
+    __vector&  = band
+    __vector|  = bor
+    __vector^  = bxor
+    __vector<< = shl
+    __vector>> = (simple-signed-binary-op ashr lshr)
+    __vector== = icmp==
+    __vector!= = icmp!=
+    __vector>  = (signed-vector-binary-op icmp>s icmp>u)
+    __vector>= = (signed-vector-binary-op icmp>s icmp>=u)
+    __vector<  = (signed-vector-binary-op icmp<s icmp<u)
+    __vector<= = (signed-vector-binary-op icmp<=s icmp<=u)
 
 'set-symbols real
-    __vector+ = (box-binary-op (single-binary-op-dispatch fadd))
-    __vector- = (box-binary-op (single-binary-op-dispatch fsub))
-    __vector* = (box-binary-op (single-binary-op-dispatch fmul))
-    __vector/ = (box-binary-op (single-binary-op-dispatch fdiv))
-    __vector% = (box-binary-op (single-binary-op-dispatch frem))
-    __vector== = (box-binary-op (single-binary-op-dispatch fcmp==o))
-    __vector!= = (box-binary-op (single-binary-op-dispatch fcmp!=u))
-    __vector> = (box-binary-op (single-binary-op-dispatch fcmp>o))
-    __vector>= = (box-binary-op (single-binary-op-dispatch fcmp>=o))
-    __vector< = (box-binary-op (single-binary-op-dispatch fcmp<o))
-    __vector<= = (box-binary-op (single-binary-op-dispatch fcmp<=o))
+    __vector+  = fadd
+    __vector-  = fsub
+    __vector*  = fmul
+    __vector/  = fdiv
+    __vector%  = frem
+    __vector== = fcmp==o
+    __vector!= = fcmp!=u
+    __vector>  = fcmp>o
+    __vector>= = fcmp>=o
+    __vector<  = fcmp<o
+    __vector<= = fcmp<=o
 
-fn vector-binary-op-expr (symbol lhsT rhsT lhs rhs)
-    let Ta = ('element@ lhsT 0)
-    let f =
-        try ('@ Ta symbol)
-        except (err)
-            compiler-error! "unsupported operation"
-    let f = (unbox-binary-op-function-type f)
-    return (f lhsT rhsT lhs rhs)
+fn vector-binary-operator (symbol lhsT rhsT)
+    label next
+        if (ptrcmp== lhsT rhsT)
+            let ET = ('element@ lhsT 0)
+            let f =
+                try ('@ ET symbol)
+                except (err)
+                    merge next
+            return f
+    `()
 
 inline vector-binary-op-dispatch (symbol)
-    box-binary-op
-        fn (lhsT rhsT lhs rhs) (vector-binary-op-expr symbol lhsT rhsT lhs rhs)
+    spice-binary-op-macro
+        inline (lhsT rhsT) (vector-binary-operator symbol lhsT rhsT)
 
 'set-symbols vector
     __+ = (vector-binary-op-dispatch '__vector+)
@@ -3410,9 +3404,9 @@ inline vector-binary-op-dispatch (symbol)
                     i + 1
                 let maskT =
                     sc_vector_type i32 offset:usize
-                spice-quote
-                    shufflevector self self
-                        [ sc_const_aggregate_new maskT offset maskvals ]
+                let mask = (sc_const_aggregate_new
+                    (sc_get_active_anchor) maskT offset maskvals)
+                `(shufflevector self self mask)
     __rslice =
         spice-macro
             fn (args)
@@ -3441,9 +3435,9 @@ inline vector-binary-op-dispatch (symbol)
                     i + 1
                 let maskT =
                     sc_vector_type i32 total:usize
-                spice-quote
-                    shufflevector self self
-                        [ sc_const_aggregate_new maskT total maskvals ]
+                let mask = (sc_const_aggregate_new
+                    (sc_get_active_anchor) maskT total maskvals)
+                `(shufflevector self self mask)
     __unpack = (Value (make-unpack-function extractelement))
     __countof = __countof-aggregate
     # vector type constructor
@@ -3859,7 +3853,7 @@ inline parse-argument-matcher (failfunc expr scope params cb)
                     let arg = (sc_getarg expr i)
                     let conv = (imply-converter ('typeof arg) exprT)
                     let arg =
-                        if (converter-valid? conv) `(conv arg)
+                        if (operator-valid? conv) `(conv arg)
                         else (failfunc)
                 cb param arg
                 repeat (i + 1) rest varargs
@@ -4212,7 +4206,7 @@ fn get-overloaded-fn-append ()
                             elseif (argT == paramT) arg
                             else
                                 let conv = (imply-converter argT paramT)
-                                if (converter-valid? conv) `(conv arg)
+                                if (operator-valid? conv) `(conv arg)
                                 else (merge break-next)
                         sc_call_append_argument outargs outarg
                     return outargs
@@ -4929,8 +4923,8 @@ sugar struct (name body...)
 #-------------------------------------------------------------------------------
 
 'set-symbols CEnum
-    __== = (box-binary-op (single-binary-op-dispatch icmp==))
-    __!= = (box-binary-op (single-binary-op-dispatch icmp!=))
+    __== = (simple-binary-op icmp==)
+    __!= = (simple-binary-op icmp!=)
     __imply =
         spice-cast-macro
             fn "CEnum-imply" (vT T)
