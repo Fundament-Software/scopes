@@ -43,13 +43,11 @@ struct Error {
 
     Error(const Anchor *_anchor, const String *_msg);
 
-    std::vector<Value *> trace;
     std::vector<Value *> definitions;
     std::vector<const String *> messages;
     const Anchor *anchor;
     const String *msg;
 
-    void append_error_trace(Value *value);
     void append_definition(Value *value);
 };
 

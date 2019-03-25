@@ -58,16 +58,6 @@ void Error::append_definition(Value *value) {
     definitions.push_back(value);
 }
 
-void Error::append_error_trace(Value *value) {
-    // only report deepest call
-    if (!trace.empty()) {
-        Value *last = trace.back();
-        if (isa<Call>(last) && isa<Call>(value))
-            return;
-    }
-    trace.push_back(value);
-}
-
 //------------------------------------------------------------------------------
 
 void location_message(const Anchor *anchor, const String* str) {
@@ -82,6 +72,7 @@ void stream_error_string(StyledStream &ss, const Error *exc) {
 }
 
 void stream_error(StyledStream &ss, const Error *exc) {
+#if 0
     size_t i = exc->trace.size();
     const Anchor *last_anchor = nullptr;
     while (i--) {
@@ -103,6 +94,7 @@ void stream_error(StyledStream &ss, const Error *exc) {
         ss << std::endl;
         value->anchor()->stream_source_line(ss);
     }
+#endif
     if (exc->anchor) {
         ss << exc->anchor << " ";
     }

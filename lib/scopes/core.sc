@@ -4763,6 +4763,8 @@ inline gen-allocator-sugar (name f)
         spice local-copy-typed (T value)
             spice-quote
                 let val = (ptrtoref (f T))
+                # TODO: temporary bug to track error reporting, take this out later
+                static-assert false
                 __init-copy val value
                 val
         spice local-copy (value)

@@ -1828,7 +1828,7 @@ SCOPES_RESULT(void) verify_cast_lifetime(const Type *SrcT, const Type *DestT) {
     return {};
 }
 
-static SCOPES_RESULT(TypedValue *) prove_call_interior(const ASTContext &ctx, CallTemplate *call) {
+static SCOPES_RESULT(TypedValue *) prove_CallTemplate(const ASTContext &ctx, CallTemplate *call) {
     SCOPES_RESULT_TYPE(TypedValue *);
     SCOPES_ANCHOR(call->anchor());
     TypedValue *callee = SCOPES_GET_RESULT(prove(ctx, call->callee));
@@ -2857,18 +2857,6 @@ repeat:
     return newcall;
 }
 
-static SCOPES_RESULT(TypedValue *) prove_CallTemplate(const ASTContext &ctx, CallTemplate *call) {
-    SCOPES_RESULT_TYPE(TypedValue *);
-    auto result = prove_call_interior(ctx, call);
-    if (result.ok()) {
-        return result;
-    } else {
-        auto err = result.assert_error();
-        err->append_error_trace(call);
-        SCOPES_RETURN_ERROR(err);
-    }
-}
-
 static Label *make_merge_label(const ASTContext &ctx, const Anchor *anchor) {
     Label *merge_label = Label::from(anchor, LK_BranchMerge);
     merge_label->body.set_parent(ctx.block);
@@ -3145,16 +3133,9 @@ static SCOPES_RESULT(TypedValue *) prove_inline_body(const ASTContext &ctx,
     ASTContext subctx = ctx.with_frame(fn);
     SCOPES_CHECK_RESULT(prove_inline_arguments(subctx, func->params, nodes));
     SCOPES_ANCHOR(fn->anchor());
-    TypedValue *result_value = nullptr;
     ASTContext bodyctx;
-    auto result = prove_block(subctx, label->body, func->value, bodyctx);
-    if (result.ok()) {
-        result_value = result.assert_ok();
-    } else {
-        auto err = result.assert_error();
-        err->append_error_trace(fn);
-        SCOPES_RETURN_ERROR(err);
-    }
+    TypedValue *result_value = SCOPES_GET_RESULT(
+        prove_block(subctx, label->body, func->value, bodyctx));
     if (label->merges.empty()) {
         // label does not need a merge label
         assert(ctx.block);
@@ -3258,16 +3239,8 @@ static SCOPES_RESULT(Function *) prove_body(Function *frame, Template *func, Typ
     SCOPES_ANCHOR(fn->anchor());
     ASTContext bodyctx = fnctx.with_block(fn->body);
     fn->body.valid = fn->valid;
-    auto result = prove(bodyctx, func->value);
-    if (result.ok()) {
-        auto expr = result.assert_ok();
-        SCOPES_CHECK_RESULT(make_return(bodyctx, expr->anchor(), expr));
-    } else {
-        auto err = result.assert_error();
-        err->append_error_trace(fn);
-        SCOPES_RETURN_ERROR(err);
-    }
-
+    auto expr = SCOPES_GET_RESULT(prove(bodyctx, func->value));
+    SCOPES_CHECK_RESULT(make_return(bodyctx, expr->anchor(), expr));
     SCOPES_CHECK_RESULT(ensure_function_type(fn));
     SCOPES_CHECK_RESULT(finalize_returns_raises(bodyctx));
     //SCOPES_CHECK_RESULT(track(fnctx));
