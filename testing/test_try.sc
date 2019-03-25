@@ -31,3 +31,22 @@ fn test-loop-xp ()
 
 test-loop-xp;
 
+# test void exception type
+try
+    print "in try"
+    raise;
+except (err)
+    static-assert (none? err)
+    print "in except"
+
+fn raise-void ()
+    print "in raise-void"
+    raise;
+
+fn try-catch-void ()
+    try
+        raise-void;
+    except ()
+        print "caught the void"
+
+try-catch-void;

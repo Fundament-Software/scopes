@@ -211,11 +211,18 @@ struct LLVMIRGenerator {
 
     static const Type *abi_return_type(const FunctionType *ft) {
         if (ft->has_exception()) {
-            Types types = { TYPE_Bool, ft->except_type };
-            if (is_returning_value(ft->return_type)) {
-                types.push_back(arguments_to_tuple(ft->return_type));
+            if (is_returning_value(ft->except_type)) {
+                Types types = { TYPE_Bool, ft->except_type };
+                if (is_returning_value(ft->return_type)) {
+                    types.push_back(arguments_to_tuple(ft->return_type));
+                }
+                return tuple_type(types).assert_ok();
+            } else if (is_returning_value(ft->return_type)) {
+                Types types = { TYPE_Bool, ft->return_type };
+                return tuple_type(types).assert_ok();
+            } else {
+                return TYPE_Bool;
             }
-            return tuple_type(types).assert_ok();
         } else if (is_returning_value(ft->return_type)) {
             return arguments_to_tuple(ft->return_type);
         } else {
@@ -816,23 +823,35 @@ struct LLVMIRGenerator {
         auto abiretT = SCOPES_GET_RESULT(type_to_llvm_type(rtype));
         LLVMValueRef value = nullptr;
         if (fi->has_exception()) {
-            auto abivalue = LLVMGetUndef(abiretT);
-            if (is_except) {
-                abivalue = LLVMBuildInsertValue(builder, abivalue, falseV, 0, "");
-                if (is_returning_value(fi->except_type)) {
-                    auto exceptT = SCOPES_GET_RESULT(type_to_llvm_type(fi->except_type));
-                    abivalue = LLVMBuildInsertValue(builder, abivalue,
-                        values_to_struct(exceptT, values), 1, "");
+            bool has_except_value = is_returning_value(fi->except_type);
+            bool has_return_value = is_returning_value(fi->return_type);
+
+            if (has_except_value || has_return_value) {
+                auto abivalue = LLVMGetUndef(abiretT);
+                if (is_except) {
+                    abivalue = LLVMBuildInsertValue(builder, abivalue, falseV, 0, "");
+                    if (is_returning_value(fi->except_type)) {
+                        auto exceptT = SCOPES_GET_RESULT(type_to_llvm_type(fi->except_type));
+                        abivalue = LLVMBuildInsertValue(builder, abivalue,
+                            values_to_struct(exceptT, values), 1, "");
+                    }
+                } else {
+                    abivalue = LLVMBuildInsertValue(builder, abivalue, trueV, 0, "");
+                    if (is_returning_value(fi->return_type)) {
+                        int retvalueindex = (has_except_value?2:1);
+                        auto returnT = SCOPES_GET_RESULT(type_to_llvm_type(fi->return_type));
+                        abivalue = LLVMBuildInsertValue(builder, abivalue,
+                            values_to_struct(returnT, values), retvalueindex, "");
+                    }
                 }
+                value = abivalue;
             } else {
-                abivalue = LLVMBuildInsertValue(builder, abivalue, trueV, 0, "");
-                if (is_returning_value(fi->return_type)) {
-                    auto returnT = SCOPES_GET_RESULT(type_to_llvm_type(fi->return_type));
-                    abivalue = LLVMBuildInsertValue(builder, abivalue,
-                        values_to_struct(returnT, values), 2, "");
+                if (is_except) {
+                    value = falseV;
+                } else {
+                    value = trueV;
                 }
             }
-            value = abivalue;
         } else {
             if (is_returning_value(fi->return_type)) {
                 auto returnT = SCOPES_GET_RESULT(type_to_llvm_type(fi->return_type));
@@ -1988,29 +2007,35 @@ struct LLVMIRGenerator {
         }
 
         if (fi->has_exception()) {
-            if (is_returning_value(fi->except_type)) {
+            bool has_except_value = is_returning_value(fi->except_type);
+            bool has_return_value = is_returning_value(fi->return_type);
+            if (has_except_value) {
                 assert(call->except);
                 auto except = LLVMBuildExtractValue(builder, ret, 1, "");
                 LLVMValueRefs values;
                 struct_to_values(values, fi->except_type, except);
                 map_phi(values, call->except);
             }
-            auto ok = LLVMBuildExtractValue(builder, ret, 0, "");
             auto old_bb = LLVMGetInsertBlock(builder);
             auto bb_except = LLVMAppendBasicBlock(LLVMGetBasicBlockParent(old_bb), "call_failed");
             position_builder_at_end(bb_except);
             SCOPES_CHECK_RESULT(translate_block(call->except_body));
             position_builder_at_end(old_bb);
-            if (fi->return_type == TYPE_NoReturn) {
+            if (!is_returning(fi->return_type)) {
                 // always raises
                 LLVMBuildBr(builder, bb_except);
                 return {};
             } else {
                 auto bb = LLVMAppendBasicBlock(LLVMGetBasicBlockParent(old_bb), "call_ok");
+                LLVMValueRef ok = ret;
+                if (has_except_value || has_return_value) {
+                    ok = LLVMBuildExtractValue(builder, ret, 0, "");
+                }
                 LLVMBuildCondBr(builder, ok, bb, bb_except);
                 position_builder_at_end(bb);
-                if (is_returning_value(fi->return_type)) {
-                    ret = LLVMBuildExtractValue(builder, ret, 2, "");
+                if (has_return_value) {
+                    int retvalue_index = (has_except_value?2:1);
+                    ret = LLVMBuildExtractValue(builder, ret, retvalue_index, "");
                     LLVMValueRefs values;
                     struct_to_values(values, fi->return_type, ret);
                     map_phi(values, call);

@@ -198,11 +198,18 @@ struct SPIRVGenerator {
 
     static const Type *abi_return_type(const FunctionType *ft) {
         if (ft->has_exception()) {
-            Types types = { TYPE_Bool, ft->except_type };
-            if (is_returning_value(ft->return_type)) {
-                types.push_back(arguments_to_tuple(ft->return_type));
+            if (is_returning_value(ft->except_type)) {
+                Types types = { TYPE_Bool, ft->except_type };
+                if (is_returning_value(ft->return_type)) {
+                    types.push_back(arguments_to_tuple(ft->return_type));
+                }
+                return tuple_type(types).assert_ok();
+            } else if (is_returning_value(ft->return_type)) {
+                Types types = { TYPE_Bool, ft->return_type };
+                return tuple_type(types).assert_ok();
+            } else {
+                return TYPE_Bool;
             }
-            return tuple_type(types).assert_ok();
         } else if (is_returning_value(ft->return_type)) {
             return arguments_to_tuple(ft->return_type);
         } else {
@@ -810,29 +817,41 @@ struct SPIRVGenerator {
         auto abiretT = SCOPES_GET_RESULT(type_to_spirv_type(rtype));
         spv::Id value = 0;
         if (fi->has_exception()) {
-            auto abivalue = builder.createUndefined(abiretT);
-            if (is_except) {
-                abivalue = builder.createCompositeInsert(
-                    builder.makeBoolConstant(false), abivalue,
-                    builder.getTypeId(abivalue), 0);
-                if (is_returning_value(fi->except_type)) {
-                    auto exceptT = SCOPES_GET_RESULT(type_to_spirv_type(fi->except_type));
+            bool has_except_value = is_returning_value(fi->except_type);
+            bool has_return_value = is_returning_value(fi->return_type);
+
+            if (has_except_value || has_return_value) {
+                auto abivalue = builder.createUndefined(abiretT);
+                if (is_except) {
                     abivalue = builder.createCompositeInsert(
-                        values_to_struct(exceptT, values), abivalue,
-                        builder.getTypeId(abivalue), 1);
+                        builder.makeBoolConstant(false), abivalue,
+                        builder.getTypeId(abivalue), 0);
+                    if (is_returning_value(fi->except_type)) {
+                        auto exceptT = SCOPES_GET_RESULT(type_to_spirv_type(fi->except_type));
+                        abivalue = builder.createCompositeInsert(
+                            values_to_struct(exceptT, values), abivalue,
+                            builder.getTypeId(abivalue), 1);
+                    }
+                } else {
+                    abivalue = builder.createCompositeInsert(
+                        builder.makeBoolConstant(true), abivalue,
+                        builder.getTypeId(abivalue), 0);
+                    if (is_returning_value(fi->return_type)) {
+                        int retvalueindex = (has_except_value?2:1);
+                        auto returnT = SCOPES_GET_RESULT(type_to_spirv_type(fi->return_type));
+                        abivalue = builder.createCompositeInsert(
+                            values_to_struct(returnT, values), abivalue,
+                            builder.getTypeId(abivalue), retvalueindex);
+                    }
                 }
+                value = abivalue;
             } else {
-                abivalue = builder.createCompositeInsert(
-                    builder.makeBoolConstant(true), abivalue,
-                    builder.getTypeId(abivalue), 0);
-                if (is_returning_value(fi->return_type)) {
-                    auto returnT = SCOPES_GET_RESULT(type_to_spirv_type(fi->return_type));
-                    abivalue = builder.createCompositeInsert(
-                        values_to_struct(returnT, values), abivalue,
-                        builder.getTypeId(abivalue), 2);
+                if (is_except) {
+                    value = builder.makeBoolConstant(false);
+                } else {
+                    value = builder.makeBoolConstant(true);
                 }
             }
-            value = abivalue;
         } else {
             if (is_returning_value(fi->return_type)) {
                 auto returnT = SCOPES_GET_RESULT(type_to_spirv_type(fi->return_type));
@@ -2141,7 +2160,9 @@ struct SPIRVGenerator {
         auto ret = builder.createFunctionCall(func, values);
 
         if (fi->has_exception()) {
-            if (is_returning_value(fi->except_type)) {
+            bool has_except_value = is_returning_value(fi->except_type);
+            bool has_return_value = is_returning_value(fi->return_type);
+            if (has_except_value) {
                 assert(call->except);
                 auto except = builder.createCompositeExtract(ret,
                     builder.getContainedTypeId(builder.getTypeId(ret), 1),
@@ -2150,25 +2171,29 @@ struct SPIRVGenerator {
                 struct_to_values(values, fi->except_type, except);
                 map_phi(values, call->except);
             }
-            auto ok = builder.createCompositeExtract(ret,
-                builder.getContainedTypeId(builder.getTypeId(ret), 0), 0);
             auto old_bb = builder.getBuildPoint();
             auto bb_except = &builder.makeNewBlock();
             position_builder_at_end(bb_except);
             SCOPES_CHECK_RESULT(translate_block(call->except_body));
             position_builder_at_end(old_bb);
-            if (fi->return_type == TYPE_NoReturn) {
+            if (!is_returning(fi->return_type)) {
                 // always raises
                 builder.createBranch(bb_except);
                 return {};
             } else {
                 auto bb = &builder.makeNewBlock();
+                auto ok = ret;
+                if (has_except_value || has_return_value) {
+                    ok = builder.createCompositeExtract(ret,
+                        builder.getContainedTypeId(builder.getTypeId(ret), 0), 0);
+                }
                 builder.createConditionalBranch(ok, bb, bb_except);
                 position_builder_at_end(bb);
-                if (is_returning_value(fi->return_type)) {
+                if (has_return_value) {
+                    int retvalue_index = (has_except_value?2:1);
                     ret = builder.createCompositeExtract(ret,
-                        builder.getContainedTypeId(builder.getTypeId(ret), 2),
-                        2);
+                        builder.getContainedTypeId(builder.getTypeId(ret), retvalue_index),
+                        retvalue_index);
                     Ids values;
                     struct_to_values(values, fi->return_type, ret);
                     map_phi(values, call);

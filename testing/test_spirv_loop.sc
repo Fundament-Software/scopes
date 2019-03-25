@@ -1,6 +1,16 @@
 
+fn function-with-exception ()
+    for k in (range 16)
+        if (k == 5)
+            raise;
+    10
+
 fn main ()
-    for i j in (zip (range 16) (range 16))
+    try
+        let count = (function-with-exception)
+        for i j in (zip (range count) (range 16))
+    except ()
+        # error raised
     return;
 
 let s =
@@ -14,6 +24,6 @@ compile-glsl 'fragment
     'dump-module
     'dump-disassembly
     'no-debug-info
-    'O2
+    #'O2
 
 true
