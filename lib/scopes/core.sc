@@ -1310,6 +1310,19 @@ fn dispatch-and-or (args flip)
         sc_if_append_else_clause ifval anchor call-elsef
     ifval
 
+let safe-shl =
+    spice-macro
+        fn (args)
+            let argc = ('argcount args)
+            verify-count argc 2 2
+            let lhs rhs = ('getarg args 0) ('getarg args 1)
+            let rhsT = ('typeof rhs)
+            let bits = ('bitcount ('typeof lhs))
+            let mask = (zext (sub bits 1) u64)
+            let mask = (sc_const_int_new (sc_get_active_anchor) rhsT mask)
+            # mask right hand side by bit width
+            `(shl lhs (band rhs mask))
+
 'set-symbols integer
     __imply = (box-pointer (spice-cast-macro integer-imply))
     __as = (box-pointer (spice-cast-macro integer-as))
@@ -1329,7 +1342,7 @@ fn dispatch-and-or (args flip)
     __| = (box-pointer (simple-binary-op bor))
     __^ = (box-pointer (simple-binary-op bxor))
     __~ = (box-pointer (inline (self) (bxor self (itrunc -1:u64 (typeof self)))))
-    __<< = (box-pointer (simple-binary-op shl))
+    __<< = (box-pointer (simple-binary-op safe-shl))
     __>> = (box-pointer (simple-signed-binary-op ashr lshr))
     __== = (box-pointer (simple-binary-op icmp==))
     __!= = (box-pointer (simple-binary-op icmp!=))
