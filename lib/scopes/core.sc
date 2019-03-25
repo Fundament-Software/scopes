@@ -1120,7 +1120,7 @@ fn unary-op-error! (friendly-op-name T)
     compiler-error!
         'join "can't "
             'join friendly-op-name
-                'join " value of type" ('__repr (box-pointer T))
+                'join " value of type " ('__repr (box-pointer T))
 
 fn binary-op-error! (friendly-op-name lhsT rhsT)
     compiler-error!
@@ -1328,7 +1328,7 @@ fn dispatch-and-or (args flip)
     __& = (box-pointer (simple-binary-op band))
     __| = (box-pointer (simple-binary-op bor))
     __^ = (box-pointer (simple-binary-op bxor))
-    #__~ =
+    __~ = (box-pointer (inline (self) (bxor self (itrunc -1:u64 (typeof self)))))
     __<< = (box-pointer (simple-binary-op shl))
     __>> = (box-pointer (simple-signed-binary-op ashr lshr))
     __== = (box-pointer (simple-binary-op icmp==))
