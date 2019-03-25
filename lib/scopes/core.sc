@@ -3169,6 +3169,9 @@ spice-quote
     inline compile-glsl (target func flags...)
         sc_compile_glsl target func (parse-compile-flags flags...)
 
+    inline compile-spirv (target func flags...)
+        sc_compile_spirv target func (parse-compile-flags flags...)
+
     inline compile-object (func table flags...)
         sc_compile_object func table (parse-compile-flags flags...)
 
