@@ -8,6 +8,7 @@
 #define SCOPES_SCOPE_HPP
 
 #include "symbol.hpp"
+#include "valueref.inc"
 
 #include <vector>
 #include <unordered_map>

@@ -9,7 +9,6 @@
 #include "type.hpp"
 #include "dyn_cast.inc"
 #include "types.hpp"
-#include "closure.hpp"
 
 #include <unordered_map>
 #include <queue>
@@ -61,8 +60,8 @@ struct StreamAST : StreamAnchors {
     bool content_only;
     int nextid;
 
-    std::unordered_map<const Value *, int> visited;
-    std::vector<const Value *> todo;
+    std::unordered_map<Value *, int> visited;
+    std::vector<ValueRef> todo;
 
     StreamAST(StyledStream &_ss, const StreamASTFormat &_fmt)
         : StreamAnchors(_ss), fmt(_fmt), nextid(0) {
@@ -99,6 +98,14 @@ struct StreamAST : StreamAnchors {
     }
 
     template<typename T>
+    void write_arguments(const std::vector< TValueRef<T> > &args, int depth, int maxdepth) {
+        for (int i = 0; i < args.size(); ++i) {
+            auto &&arg = args[i];
+            walk_same_or_newline(arg, depth+1, maxdepth);
+        }
+    }
+
+    template<typename T>
     void write_arguments(const std::vector<T *> &args, int depth, int maxdepth) {
         for (int i = 0; i < args.size(); ++i) {
             auto &&arg = args[i];
@@ -112,9 +119,9 @@ struct StreamAST : StreamAnchors {
         ss << Style_Operator << ":" << Style_None << T;
     }
 
-    void stream_type_suffix(const Value *node) {
-        if (isa<TypedValue>(node)) {
-            stream_type_suffix(cast<TypedValue>(node)->get_type());
+    void stream_type_suffix(const ValueRef &node) {
+        if (node.isa<TypedValue>()) {
+            stream_type_suffix(node.cast<TypedValue>()->get_type());
         }
     }
 
@@ -139,7 +146,7 @@ struct StreamAST : StreamAnchors {
         }
     }
 
-    void stream_block_result(const Block &block, const Value *value, int depth, int maxdepth) {
+    void stream_block_result(const Block &block, const ValueRef &value, int depth, int maxdepth) {
         if (!block.empty()) {
             stream_newline();
             stream_indent(depth);
@@ -165,7 +172,7 @@ struct StreamAST : StreamAnchors {
         walk(value, depth, maxdepth);
     }
 
-    bool sameline(const Value *node) {
+    bool sameline(const ValueRef &node) {
         if (!node) return true;
         switch(node->kind()) {
         case VK_ConstInt:
@@ -178,19 +185,19 @@ struct StreamAST : StreamAnchors {
             return true;
         default: break;
         }
-        if (visited.count(node))
+        if (visited.count(node.unref()))
             return true;
         return false;
     }
 
-    void walk_newline(const Value *node, int depth, int maxdepth) {
+    void walk_newline(const ValueRef &node, int depth, int maxdepth) {
         assert(node);
         stream_newline();
         stream_indent(depth);
         walk(node, depth, maxdepth);
     }
 
-    void walk_same_or_newline(const Value *node, int depth, int maxdepth, bool skip_space = false) {
+    void walk_same_or_newline(const ValueRef &node, int depth, int maxdepth, bool skip_space = false) {
         if (sameline(node)) {
             if (!skip_space) {
                 ss << " ";
@@ -206,7 +213,7 @@ struct StreamAST : StreamAnchors {
         auto oldtodos = todo;
         todo.clear();
         for (auto node : oldtodos) {
-            visited.erase(node);
+            visited.erase(node.unref());
             walk(node, depth, maxdepth);
             if (newlines)
                 stream_newline();
@@ -218,41 +225,40 @@ struct StreamAST : StreamAnchors {
         stream_type_suffix(T);
     }
 
-    static bool is_annotation(Value *value) {
-        return isa<ConstInt>(value)
-            && cast<ConstInt>(value)->get_type() == TYPE_Builtin
-            && cast<ConstInt>(value)->value == FN_Annotate;
+    static bool is_annotation(const ValueRef &value) {
+        return value.isa<ConstInt>()
+            && value.cast<ConstInt>()->get_type() == TYPE_Builtin
+            && value.cast<ConstInt>()->value == FN_Annotate;
     }
 
-    static bool can_assign_id(const Value *node) {
-
-        return isa<Instruction>(node)
-            || isa<LoopLabelArguments>(node)
-            || isa<LoopArguments>(node);
+    static bool can_assign_id(const ValueRef &node) {
+        return node.isa<Instruction>()
+            || node.isa<LoopLabelArguments>()
+            || node.isa<LoopArguments>();
      }
 
     // old Any printing reference:
     // https://bitbucket.org/duangle/scopes/src/dfb69b02546e859b702176c58e92a63de3461d77/src/any.cpp
 
-    void walk(const Value *node, int depth, int maxdepth) {
+    void walk(const ValueRef &node, int depth, int maxdepth) {
         if (!node) {
             ss << Style_Error << "<null>" << Style_None;
             return;
         }
 
-        const Anchor *anchor = node->anchor();
+        const Anchor *anchor = node.anchor();
         if (line_anchors) {
             stream_anchor(anchor);
         }
 
-        auto it = visited.find(node);
+        auto it = visited.find(node.unref());
         int id = -1;
         bool is_new = true;
         if (it == visited.end()) {
             if (can_assign_id(node)) {
                 id = nextid++;
             }
-            visited.insert({node, id});
+            visited.insert({node.unref(), id});
         } else {
             is_new = false;
             id = it->second;
@@ -260,17 +266,17 @@ struct StreamAST : StreamAnchors {
 
         if (newlines && can_assign_id(node)) {
             if (is_new) {
-                if (!isa<TypedValue>(node) || is_returning_value(cast<TypedValue>(node)->get_type())) {
+                if (!node.isa<TypedValue>() || is_returning_value(node.cast<TypedValue>()->get_type())) {
                     ss << Style_Operator << "%" << Style_None;
                     ss << Style_Number;
-                    stream_address(ss, node);
+                    stream_address(ss, node.unref());
                     ss << Style_None;
                     ss << " " << Style_Operator << "=" << Style_None << " ";
                 }
             } else {
                 ss << Style_Operator << "%" << Style_None;
                 ss << Style_Number;
-                stream_address(ss, node);
+                stream_address(ss, node.unref());
                 ss << Style_None;
                 stream_type_suffix(node);
                 return;
@@ -279,7 +285,7 @@ struct StreamAST : StreamAnchors {
 
         switch(node->kind()) {
         case VK_Template: {
-            auto val = cast<Template>(node);
+            auto val = node.cast<Template>();
             if (newlines && is_new && (depth == 0)) {
                 ss << Style_Keyword << "Template" << Style_None;
                 if (val->is_inline()) {
@@ -291,7 +297,7 @@ struct StreamAST : StreamAnchors {
                 ss << " ";
             }
             ss << Style_Symbol << val->name.name()->data << "λ";
-            stream_address(ss, val);
+            stream_address(ss, val.unref());
             ss << Style_None;
             stream_type_suffix(node);
             if (newlines && is_new) {
@@ -310,13 +316,13 @@ struct StreamAST : StreamAnchors {
             }
         } break;
         case VK_Function: {
-            auto val = cast<Function>(node);
+            auto val = node.cast<Function>();
             if (newlines && is_new && (depth == 0)) {
                 ss << Style_Keyword << "Function" << Style_None;
                 ss << " ";
             }
             ss << Style_Symbol << val->name.name()->data << "λ";
-            stream_address(ss, val);
+            stream_address(ss, val.unref());
             ss << Style_None;
             stream_type_suffix(node);
             if (newlines && is_new) {
@@ -333,7 +339,7 @@ struct StreamAST : StreamAnchors {
             }
         } break;
         case VK_Expression: {
-            auto val = cast<Expression>(node);
+            auto val = node.cast<Expression>();
             ss << node;
             if (!val->scoped) {
                 ss << " " << Style_Keyword << "inline" << Style_None;
@@ -344,7 +350,7 @@ struct StreamAST : StreamAnchors {
             walk_newline(val->value, depth+1, maxdepth);
         } break;
         case VK_SwitchTemplate: {
-            auto val = cast<SwitchTemplate>(node);
+            auto val = node.cast<SwitchTemplate>();
             ss << node;
             if (newlines) {
                 walk_same_or_newline(val->expr, depth+1, maxdepth);
@@ -373,7 +379,7 @@ struct StreamAST : StreamAnchors {
             }
         } break;
         case VK_Switch: {
-            auto val = cast<Switch>(node);
+            auto val = node.cast<Switch>();
             ss << node;
             if (newlines) {
                 walk_same_or_newline(val->expr, depth+1, maxdepth);
@@ -398,7 +404,7 @@ struct StreamAST : StreamAnchors {
             }
         } break;
         case VK_CondBr: {
-            auto val = cast<CondBr>(node);
+            auto val = node.cast<CondBr>();
             ss << node;
             if (newlines) {
                 walk_same_or_newline(val->cond, depth+1, maxdepth);
@@ -413,7 +419,7 @@ struct StreamAST : StreamAnchors {
             }
         } break;
         case VK_If: {
-            auto val = cast<If>(node);
+            auto val = node.cast<If>();
             ss << node;
             if (newlines) {
                 for (int i = 0; i < val->clauses.size(); ++i) {
@@ -436,16 +442,16 @@ struct StreamAST : StreamAnchors {
             }
         } break;
         case VK_Parameter: {
-            auto val = cast<Parameter>(node);
+            auto val = node.cast<Parameter>();
             ss << Style_Symbol << val->name.name()->data << "$";
-            stream_address(ss, val);
+            stream_address(ss, val.unref());
             ss << Style_None;
             stream_type_suffix(node);
         } break;
         case VK_ParameterTemplate: {
-            auto val = cast<ParameterTemplate>(node);
+            auto val = node.cast<ParameterTemplate>();
             ss << Style_Symbol << val->name.name()->data << "$";
-            stream_address(ss, val);
+            stream_address(ss, val.unref());
             ss << Style_None;
             if (val->is_variadic()) {
                 ss << Style_Keyword << "…" << Style_None;
@@ -455,17 +461,17 @@ struct StreamAST : StreamAnchors {
             ss << node;
         } break;
         case VK_CallTemplate: {
-            auto val = cast<CallTemplate>(node);
+            auto val = node.cast<CallTemplate>();
             if (newlines) {
                 if (is_annotation(val->callee)) {
                     ss << Style_Comment << "#" << Style_None;
                     for (int i = 0; i < val->args.size(); ++i) {
                         auto &&arg = val->args[i];
                         if ((i == 0)
-                            && isa<ConstPointer>(arg)
-                            && cast<ConstPointer>(arg)->get_type() == TYPE_String) {
+                            && arg.isa<ConstPointer>()
+                            && arg.cast<ConstPointer>()->get_type() == TYPE_String) {
                             ss << Style_Comment << " "
-                                << ((String *)cast<ConstPointer>(arg)->value)->data
+                                << ((String *)arg.cast<ConstPointer>()->value)->data
                                 << Style_None;
                         } else {
                             walk_newline(arg, depth+1, maxdepth);
@@ -484,17 +490,17 @@ struct StreamAST : StreamAnchors {
             }
         } break;
         case VK_Call: {
-            auto val = cast<Call>(node);
+            auto val = node.cast<Call>();
             if (newlines) {
                 if (is_annotation(val->callee)) {
                     ss << Style_Comment << "#" << Style_None;
                     for (int i = 0; i < val->args.size(); ++i) {
                         auto &&arg = val->args[i];
                         if ((i == 0)
-                            && isa<ConstPointer>(arg)
+                            && arg.isa<ConstPointer>()
                             && arg->get_type() == TYPE_String) {
                             ss << Style_Comment << " "
-                                << ((String *)cast<ConstPointer>(arg)->value)->data
+                                << ((String *)arg.cast<ConstPointer>()->value)->data
                                 << Style_None;
                         } else {
                             walk_same_or_newline(arg, depth+1, maxdepth);
@@ -513,7 +519,7 @@ struct StreamAST : StreamAnchors {
             }
         } break;
         case VK_ArgumentList: {
-            auto val = cast<ArgumentList>(node);
+            auto val = node.cast<ArgumentList>();
             ss << node;
             if (newlines) {
                 for (int i = 0; i < val->values.size(); ++i) {
@@ -522,7 +528,7 @@ struct StreamAST : StreamAnchors {
             }
         } break;
         case VK_ArgumentListTemplate: {
-            auto val = cast<ArgumentListTemplate>(node);
+            auto val = node.cast<ArgumentListTemplate>();
             ss << node;
             if (newlines) {
                 for (int i = 0; i < val->values.size(); ++i) {
@@ -531,7 +537,7 @@ struct StreamAST : StreamAnchors {
             }
         } break;
         case VK_ExtractArgument: {
-            auto val = cast<ExtractArgument>(node);
+            auto val = node.cast<ExtractArgument>();
             ss << node;
             if (newlines) {
                 ss << " " << val->index;
@@ -539,14 +545,14 @@ struct StreamAST : StreamAnchors {
             }
         } break;
         case VK_PureCast: {
-            auto val = cast<PureCast>(node);
+            auto val = node.cast<PureCast>();
             ss << node;
             if (newlines) {
                 walk_same_or_newline(val->value, depth+1, maxdepth);
             }
         } break;
         case VK_ExtractArgumentTemplate: {
-            auto val = cast<ExtractArgumentTemplate>(node);
+            auto val = node.cast<ExtractArgumentTemplate>();
             ss << node;
             if (newlines) {
                 ss << " " << val->index;
@@ -557,7 +563,7 @@ struct StreamAST : StreamAnchors {
             }
         } break;
         case VK_Keyed: {
-            auto val = cast<Keyed>(node);
+            auto val = node.cast<Keyed>();
             ss << node;
             if (newlines) {
                 ss << " " << val->key;
@@ -565,7 +571,7 @@ struct StreamAST : StreamAnchors {
             }
         } break;
         case VK_KeyedTemplate: {
-            auto val = cast<KeyedTemplate>(node);
+            auto val = node.cast<KeyedTemplate>();
             ss << node;
             if (newlines) {
                 ss << " " << val->key;
@@ -573,7 +579,7 @@ struct StreamAST : StreamAnchors {
             }
         } break;
         case VK_Loop: {
-            auto val = cast<Loop>(node);
+            auto val = node.cast<Loop>();
             ss << node;
             if (newlines) {
                 walk_same_or_newline(val->args, depth+1, maxdepth);
@@ -583,7 +589,7 @@ struct StreamAST : StreamAnchors {
             }
         } break;
         case VK_LoopLabel: {
-            auto val = cast<LoopLabel>(node);
+            auto val = node.cast<LoopLabel>();
             ss << node;
             if (newlines) {
                 walk_same_or_newline(val->args, depth+1, maxdepth);
@@ -595,7 +601,7 @@ struct StreamAST : StreamAnchors {
             }
         } break;
         case VK_LabelTemplate: {
-            auto val = cast<LabelTemplate>(node);
+            auto val = node.cast<LabelTemplate>();
             ss << node;
             ss << " ";
             ss << Style_Keyword << get_label_kind_name(val->label_kind);
@@ -607,7 +613,7 @@ struct StreamAST : StreamAnchors {
             }
         } break;
         case VK_Label: {
-            auto val = cast<Label>(node);
+            auto val = node.cast<Label>();
             ss << node;
             ss << " ";
             switch(val->label_kind) {
@@ -626,13 +632,13 @@ struct StreamAST : StreamAnchors {
             }
         } break;
         case VK_Global: {
-            auto val = cast<Global>(node);
+            auto val = node.cast<Global>();
             auto T = val->get_type();
             ss << val->name;
             stream_type_suffix(T);
         } break;
         case VK_ConstInt: {
-            auto val = cast<ConstInt>(node);
+            auto val = node.cast<ConstInt>();
             auto T = val->get_type();
             if ((T == TYPE_Builtin) || (T == TYPE_Symbol)) {
                 ss << Symbol::wrap(val->value);
@@ -656,19 +662,20 @@ struct StreamAST : StreamAnchors {
             }
         } break;
         case VK_ConstReal: {
-            auto val = cast<ConstReal>(node);
+            auto val = node.cast<ConstReal>();
             auto T = val->get_type();
             ss << val->value;
             if (T != TYPE_F32)
                 stream_type_suffix(T);
         } break;
         case VK_ConstPointer: {
-            auto val = cast<ConstPointer>(node);
+            auto val = node.cast<ConstPointer>();
             auto T = val->get_type();
             if (T == TYPE_Type) {
                 ss << (const Type *)val->value;
             } else if (T == TYPE_String) {
                 ss << (const String *)val->value;
+                #if 0
             } else if (T == TYPE_Closure) {
                 auto cl = (const Closure *)val->value;
                 ss << cl;
@@ -680,8 +687,10 @@ struct StreamAST : StreamAnchors {
                 }
             /*} else if (T == TYPE_List) {
                 ss << (const List *)val->value;*/
+                #endif
             } else if (T == TYPE_Value) {
-                stream_ast(ss, (Value *)val->value, StreamASTFormat::singleline());
+                stream_ast(ss, ref(val.anchor(), (Value *)val->value),
+                    StreamASTFormat::singleline());
                 stream_type_suffix(T);
             } else {
                 ss << "$";
@@ -690,21 +699,22 @@ struct StreamAST : StreamAnchors {
             }
         } break;
         case VK_ConstAggregate: {
-            auto val = cast<ConstAggregate>(node);
+            auto val = node.cast<ConstAggregate>();
             ss << node;
             for (int i = 0; i < val->values.size(); ++i) {
-                walk_same_or_newline(val->values[i], depth+1, maxdepth);
+                walk_same_or_newline(
+                    ref(val.anchor(), val->values[i]), depth+1, maxdepth);
             }
         } break;
         case VK_Break: {
-            auto val = cast<Break>(node);
+            auto val = node.cast<Break>();
             ss << node;
             if (newlines) {
                 walk_same_or_newline(val->value, depth+1, maxdepth);
             }
         } break;
         case VK_Repeat: {
-            auto val = cast<Repeat>(node);
+            auto val = node.cast<Repeat>();
             ss << node;
             if (newlines) {
                 for (int i = 0; i < val->values.size(); ++i) {
@@ -713,7 +723,7 @@ struct StreamAST : StreamAnchors {
             }
         } break;
         case VK_Return: {
-            auto val = cast<Return>(node);
+            auto val = node.cast<Return>();
             ss << node;
             if (newlines) {
                 for (int i = 0; i < val->values.size(); ++i) {
@@ -722,11 +732,11 @@ struct StreamAST : StreamAnchors {
             }
         } break;
         case VK_Merge: {
-            auto val = cast<Merge>(node);
+            auto val = node.cast<Merge>();
             ss << node;
             ss << " ";
             ss << Style_Symbol << val->label->name.name()->data << "@";
-            stream_address(ss, val->label);
+            stream_address(ss, val->label.unref());
             ss << Style_None;
             if (newlines) {
                 for (int i = 0; i < val->values.size(); ++i) {
@@ -735,51 +745,51 @@ struct StreamAST : StreamAnchors {
             }
         } break;
         case VK_MergeTemplate: {
-            auto val = cast<MergeTemplate>(node);
+            auto val = node.cast<MergeTemplate>();
             ss << node;
             ss << " ";
             ss << Style_Symbol << val->label->name.name()->data << "@";
-            stream_address(ss, val->label);
+            stream_address(ss, val->label.unref());
             ss << Style_None;
             if (newlines) {
                 walk_same_or_newline(val->value, depth+1, maxdepth);
             }
         } break;
         case VK_LoopLabelArguments: {
-            auto val = cast<LoopLabelArguments>(node);
+            auto val = node.cast<LoopLabelArguments>();
             ss << node;
             ss << " ";
             ss << Style_Symbol << "@";
-            stream_address(ss, val->loop);
+            stream_address(ss, val->loop.unref());
             ss << Style_None;
         } break;
         case VK_LoopArguments: {
-            auto val = cast<LoopArguments>(node);
+            auto val = node.cast<LoopArguments>();
             ss << node;
             ss << " ";
             ss << Style_Symbol << "@";
-            stream_address(ss, val->loop);
+            stream_address(ss, val->loop.unref());
             ss << Style_None;
         } break;
         case VK_Raise: {
-            auto val = cast<Raise>(node);
+            auto val = node.cast<Raise>();
             ss << node;
             for (int i = 0; i < val->values.size(); ++i) {
                 walk_same_or_newline(val->values[i], depth+1, maxdepth);
             }
         } break;
         case VK_Quote: {
-            auto val = cast<Quote>(node);
+            auto val = node.cast<Quote>();
             ss << node;
             walk_same_or_newline(val->value, depth+1, maxdepth);
         } break;
         case VK_Unquote: {
-            auto val = cast<Unquote>(node);
+            auto val = node.cast<Unquote>();
             ss << node;
             walk_same_or_newline(val->value, depth+1, maxdepth);
         } break;
         case VK_CompileStage: {
-            //auto val = cast<CompileStage>(node);
+            //auto val = node.cast<CompileStage>();
             ss << node;
         } break;
         default:
@@ -790,7 +800,7 @@ struct StreamAST : StreamAnchors {
         }
     }
 
-    void stream(const Value *node) {
+    void stream(const ValueRef &node) {
         visited.clear();
         todo.push_back(node);
         while (!todo.empty()) {
@@ -802,7 +812,7 @@ struct StreamAST : StreamAnchors {
 //------------------------------------------------------------------------------
 
 void stream_ast(
-    StyledStream &_ss, const Value *node, const StreamASTFormat &_fmt) {
+    StyledStream &_ss, const ValueRef &node, const StreamASTFormat &_fmt) {
     StreamAST streamer(_ss, _fmt);
     streamer.stream(node);
 }

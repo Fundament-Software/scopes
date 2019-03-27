@@ -10,6 +10,7 @@
 #include "styled_stream.hpp"
 #include "symbol.hpp"
 #include "stream_anchors.hpp"
+#include "valueref.inc"
 
 namespace scopes {
 

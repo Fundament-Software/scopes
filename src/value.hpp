@@ -445,10 +445,10 @@ struct Parameter : TypedValue {
 struct LoopArguments : UntypedValue {
     static bool classof(const Value *T);
 
-    LoopArguments(Loop *loop);
-    static LoopArguments *from(Loop *loop);
+    LoopArguments(const LoopRef &loop);
+    static LoopArguments *from(const LoopRef &loop);
 
-    Loop *loop;
+    LoopRef loop;
 };
 
 //------------------------------------------------------------------------------
@@ -461,7 +461,7 @@ struct LoopLabelArguments : TypedValue {
     LoopLabelArguments(const Type *type);
     static LoopLabelArguments *from(const Type *type);
 
-    LoopLabel *loop;
+    LoopLabelRef loop;
 };
 
 //------------------------------------------------------------------------------
