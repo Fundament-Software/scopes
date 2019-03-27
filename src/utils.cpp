@@ -7,6 +7,7 @@
 #include "utils.hpp"
 
 #include "symbol.hpp"
+#include "valueref.inc"
 #include "scopes/scopes.h"
 
 #include <assert.h>

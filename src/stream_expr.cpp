@@ -109,10 +109,10 @@ void StreamExpr::stream_indent(int depth) {
     }
 }
 
-bool StreamExpr::is_nested(Value *_e) {
+bool StreamExpr::is_nested(const ValueRef &_e) {
     auto T = try_get_const_type(_e);
     if (T == TYPE_List) {
-        auto it = extract_list_constant(cast<TypedValue>(_e)).assert_ok();
+        auto it = extract_list_constant(_e.cast<TypedValue>()).assert_ok();
         while (it != EOL) {
             auto q = it->at;
             auto qT = try_get_const_type(q);
@@ -125,7 +125,7 @@ bool StreamExpr::is_nested(Value *_e) {
     return false;
 }
 
-bool StreamExpr::is_list (Value *_value) {
+bool StreamExpr::is_list (const ValueRef &_value) {
     return try_get_const_type(_value) == TYPE_List;
 }
 
@@ -220,17 +220,17 @@ void StreamExpr::walk(const Anchor *anchor, const List *l, int depth, int maxdep
     if (naked) { ss << std::endl; }
 }
 
-void StreamExpr::walk(Value *e, int depth, int maxdepth, bool naked) {
+void StreamExpr::walk(const ValueRef &e, int depth, int maxdepth, bool naked) {
     auto T = try_get_const_type(e);
     if (T == TYPE_List) {
-        walk(e->anchor(), extract_list_constant(cast<TypedValue>(e)).assert_ok(), depth, maxdepth, naked);
+        walk(e.anchor(), extract_list_constant(e.cast<TypedValue>()).assert_ok(), depth, maxdepth, naked);
         return;
     }
 
     if (naked) {
         stream_indent(depth);
     }
-    const Anchor *anchor = e->anchor();
+    const Anchor *anchor = e.anchor();
     if (atom_anchors) {
         stream_anchor(anchor);
     }

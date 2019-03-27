@@ -1203,9 +1203,9 @@ static SCOPES_RESULT(TypedValueRef) prove_Loop(const ASTContext &ctx, const Loop
 static SCOPES_RESULT(TypedValueRef) prove_LoopArguments(const ASTContext &ctx, const ValueRef &node) { assert(false); return TypedValueRef(); }
 static SCOPES_RESULT(TypedValueRef) prove_ParameterTemplate(const ASTContext &ctx, const ValueRef &node) { assert(false); return TypedValueRef(); }
 
-const Type *try_get_const_type(Value *node) {
-    if (isa<Const>(node))
-        return cast<Const>(node)->get_type();
+const Type *try_get_const_type(const ValueRef &node) {
+    if (node.isa<Const>())
+        return node.cast<Const>()->get_type();
     return TYPE_Unknown;
 }
 

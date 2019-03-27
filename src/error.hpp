@@ -134,7 +134,7 @@ SCOPES_RESULT(void) error_illegal_break_outside_loop();
 SCOPES_RESULT(void) error_variadic_symbol_not_in_last_place(const ValueRef &value);
 SCOPES_RESULT(void) error_untyped_recursive_call(const FunctionRef &func);
 SCOPES_RESULT(void) error_recursive_function_changed_type(const FunctionRef &func, const Type *T1, const Type *T2);
-SCOPES_RESULT(void) error_value_inaccessible_from_closure(TypedValue *value, const FunctionRef &frame);
+SCOPES_RESULT(void) error_value_inaccessible_from_closure(const TypedValueRef &value, const FunctionRef &frame);
 SCOPES_RESULT(void) error_cannot_deref_non_plain(const Type *T);
 
 // lifetime checker errors

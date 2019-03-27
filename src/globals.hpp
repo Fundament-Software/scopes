@@ -13,7 +13,6 @@ namespace scopes {
 
 #define SCOPES_REIMPORT_SYMBOLS() \
     T(g_none, "none") \
-    T(g_set_active_anchor, "sc_set_active_anchor") \
     T(g_sc_const_pointer_new, "sc_const_pointer_new") \
     T(g_sc_const_int_new, "sc_const_int_new") \
     T(g_sc_const_real_new, "sc_const_real_new") \
@@ -54,7 +53,6 @@ namespace scopes {
     T(g_sc_template_set_body, "sc_template_set_body") \
     T(g_sc_template_set_inline, "sc_template_set_inline") \
     T(g_sc_parameter_new, "sc_parameter_new") \
-    T(g_sc_anchored_new, "sc_anchored_new") \
     T(g_sc_keyed_new, "sc_keyed_new") \
     T(g_sc_expression_new, "sc_expression_new") \
     T(g_sc_expression_append, "sc_expression_append") \

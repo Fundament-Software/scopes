@@ -46,17 +46,17 @@ SCOPES_RESULT(void) TypenameType::finalize(const Type *_type, uint32_t _flags) {
     if (finalized()) {
         StyledString ss;
         ss.out << "typename " << _type << " is already final";
-        SCOPES_LOCATION_ERROR(ss.str());
+        SCOPES_ERROR(ss.str());
     }
     if (isa<TypenameType>(_type)) {
         StyledString ss;
         ss.out << "cannot use typename " << _type << " as storage type";
-        SCOPES_LOCATION_ERROR(ss.str());
+        SCOPES_ERROR(ss.str());
     }
     if ((_flags & TNF_Plain) && !::scopes::is_plain(_type)) {
         StyledString ss;
         ss.out << "cannot tag typename as plain because storage type " << _type << " is not plain";
-        SCOPES_LOCATION_ERROR(ss.str());
+        SCOPES_ERROR(ss.str());
     }
     storage_type = _type;
     flags = _flags;
@@ -91,7 +91,7 @@ SCOPES_RESULT(const Type *) storage_type(const Type *T) {
         if (!tt->finalized()) {
             StyledString ss;
             ss.out << "type " << T << " is opaque";
-            SCOPES_LOCATION_ERROR(ss.str());
+            SCOPES_ERROR(ss.str());
         }
         return tt->storage_type;
     } break;

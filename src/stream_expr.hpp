@@ -10,6 +10,7 @@
 #include "styled_stream.hpp"
 #include "symbol.hpp"
 #include "stream_anchors.hpp"
+#include "valueref.inc"
 
 namespace scopes {
 
@@ -62,12 +63,12 @@ struct StreamExpr : StreamAnchors {
 
     void stream_indent(int depth = 0);
 
-    static bool is_nested(Value *_e);
+    static bool is_nested(const ValueRef &_e);
 
-    static bool is_list (Value *_value);
+    static bool is_list (const ValueRef &_value);
 
     void walk(const Anchor *anchor, const List *l, int depth, int maxdepth, bool naked);
-    void walk(Value *e, int depth, int maxdepth, bool naked);
+    void walk(const ValueRef &e, int depth, int maxdepth, bool naked);
 
     void stream(const List *l);
 };

@@ -147,7 +147,7 @@ SCOPES_RESULT(const Type *) tuple_type(const Types &values,
             StyledString ss;
             ss.out << "can not construct tuple type with field of opaque type "
                 << T;
-            SCOPES_LOCATION_ERROR(ss.str());
+            SCOPES_ERROR(ss.str());
         }
     }
     TupleType key(values, packed, alignment);

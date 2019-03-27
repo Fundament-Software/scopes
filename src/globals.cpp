@@ -66,8 +66,9 @@ SCOPES_REIMPORT_SYMBOLS()
 static void import_symbols() {
     auto globs = sc_get_original_globals();
 #define T(NAME, STR) \
-    NAME = sc_scope_at(globs, Symbol(STR))._0.cast<TypedValue>(); \
-    assert(NAME);
+    {   auto _tmp = sc_scope_at(globs, Symbol(STR))._0; \
+        assert(_tmp && STR); \
+        NAME = _tmp.cast<TypedValue>(); }
 SCOPES_REIMPORT_SYMBOLS()
 #undef T
 }
@@ -203,7 +204,7 @@ sc_valueref_raises_t sc_eval_inline(const sc_anchor_t *anchor, const sc_list_t *
     return convert_result(expand_inline(anchor, TemplateRef(), expr, scope));
 }
 
-sc_valueref_raises_t sc_typify_template(sc_valueref_t f, int numtypes, const sc_type_t **typeargs) {
+sc_valueref_raises_t sc_typify(sc_valueref_t f, int numtypes, const sc_type_t **typeargs) {
     using namespace scopes;
     SCOPES_RESULT_TYPE(TypedValueRef);
     if (f.isa<Template>()) {
@@ -1907,8 +1908,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_eval, TYPE_ValueRef, TYPE_Anchor, TYPE_List, TYPE_Scope);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_prove, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_eval_inline, TYPE_Anchor, TYPE_ValueRef, TYPE_List, TYPE_Scope);
-    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_typify_template, TYPE_ValueRef, TYPE_ValueRef, TYPE_I32, native_ro_pointer_type(TYPE_Type));
-    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_typify, TYPE_ValueRef, TYPE_Closure, TYPE_I32, native_ro_pointer_type(TYPE_Type));
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_typify, TYPE_ValueRef, TYPE_ValueRef, TYPE_I32, native_ro_pointer_type(TYPE_Type));
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_compile, TYPE_ValueRef, TYPE_ValueRef, TYPE_U64);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_compile_spirv, TYPE_String, TYPE_Symbol, TYPE_ValueRef, TYPE_U64);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_compile_glsl, TYPE_String, TYPE_Symbol, TYPE_ValueRef, TYPE_U64);

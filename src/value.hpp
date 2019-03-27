@@ -308,7 +308,7 @@ struct Expression : UntypedValue {
 struct CondBr : Instruction {
     static bool classof(const Value *T);
 
-    CondBr(const TypedValue &cond);
+    CondBr(const TypedValueRef &cond);
 
     static CondBr *from(const TypedValueRef &cond);
 
@@ -794,7 +794,7 @@ struct PureCast : Pure {
 struct Break : UntypedValue {
     static bool classof(const Value *T);
 
-    Break(Value *value);
+    Break(const ValueRef &value);
 
     static Break *from(const ValueRef &value);
 
@@ -933,18 +933,13 @@ struct CompileStage : UntypedValue {
 
 //------------------------------------------------------------------------------
 
-struct Closure : Const {
+struct Closure : Pure {
     static bool classof(const Value *T);
 
     Closure(Template *_func, Function *_frame);
 
-    struct Hash {
-        std::size_t operator()(const Closure &k) const;
-    };
-
-    bool operator ==(const Closure &k) const;
-
-    static std::unordered_map<Closure, const Closure *, Closure::Hash> map;
+    bool key_equal(const Closure *other) const;
+    std::size_t hash() const;
 
     Template *func;
     Function *frame;

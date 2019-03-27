@@ -79,13 +79,13 @@ namespace scopes {
 
    */
 
-static SCOPES_RESULT(Value *) load_custom_core(const char *executable_path) {
-    SCOPES_RESULT_TYPE(Value *);
+static SCOPES_RESULT(ValueRef) load_custom_core(const char *executable_path) {
+    SCOPES_RESULT_TYPE(ValueRef);
     // attempt to read bootstrap expression from end of binary
     auto file = SourceFile::from_file(
         Symbol(String::from_cstr(executable_path)));
     if (!file) {
-        SCOPES_LOCATION_ERROR(String::from("could not open binary"));
+        SCOPES_ERROR(String::from("could not open binary"));
     }
     auto ptr = file->strptr();
     auto size = file->size();
@@ -96,9 +96,9 @@ static SCOPES_RESULT(Value *) load_custom_core(const char *executable_path) {
         // skip the trailing text formatting garbage
         // that win32 echo produces
         cursor--;
-        if (cursor < ptr) return nullptr;
+        if (cursor < ptr) return ValueRef();
     }
-    if (*cursor != ')') return nullptr;
+    if (*cursor != ')') return ValueRef();
     cursor--;
     // seek backwards to find beginning of expression
     while ((cursor >= ptr) && (*cursor != '('))
@@ -106,24 +106,24 @@ static SCOPES_RESULT(Value *) load_custom_core(const char *executable_path) {
     LexerParser footerParser(file, cursor - ptr);
     auto expr = SCOPES_GET_RESULT(extract_list_constant(SCOPES_GET_RESULT(footerParser.parse())));
     if (expr == EOL) {
-        SCOPES_LOCATION_ERROR(String::from("footer parser returned illegal structure"));
+        SCOPES_ERROR(String::from("footer parser returned illegal structure"));
     }
     auto it = SCOPES_GET_RESULT(extract_list_constant(expr->at));
     if (it == EOL) {
-        SCOPES_LOCATION_ERROR(String::from("footer expression is empty"));
+        SCOPES_ERROR(String::from("footer expression is empty"));
     }
     auto head = it->at;
     auto sym = SCOPES_GET_RESULT(extract_symbol_constant(head));
     if (sym != Symbol("core-size"))  {
-        SCOPES_LOCATION_ERROR(String::from("footer expression does not begin with 'core-size'"));
+        SCOPES_ERROR(String::from("footer expression does not begin with 'core-size'"));
     }
     it = it->next;
     if (it == EOL) {
-        SCOPES_LOCATION_ERROR(String::from("footer expression needs two arguments"));
+        SCOPES_ERROR(String::from("footer expression needs two arguments"));
     }
     auto script_size = SCOPES_GET_RESULT(extract_integer_constant(it->at));
     if (script_size <= 0) {
-        SCOPES_LOCATION_ERROR(String::from("script-size must be larger than zero"));
+        SCOPES_ERROR(String::from("script-size must be larger than zero"));
     }
     LexerParser parser(file, cursor - script_size - ptr, script_size);
     return parser.parse();
@@ -248,7 +248,7 @@ SCOPES_RESULT(int) try_main(int argc, char *argv[]) {
     init_types();
     init_globals(argc, argv);
 
-    Value *expr = SCOPES_GET_RESULT(load_custom_core(scopes_compiler_path));
+    ValueRef expr = SCOPES_GET_RESULT(load_custom_core(scopes_compiler_path));
     if (expr) {
         goto skip_regular_load;
     }
@@ -267,16 +267,16 @@ SCOPES_RESULT(int) try_main(int argc, char *argv[]) {
 #endif
         sf = SourceFile::from_file(name);
         if (!sf) {
-            SCOPES_LOCATION_ERROR(String::from("core missing\n"));
+            SCOPES_ERROR(String::from("core missing\n"));
         }
         LexerParser parser(sf);
         expr = SCOPES_GET_RESULT(parser.parse());
     }
 
 skip_regular_load:
-    const Anchor *anchor = expr->anchor();
+    const Anchor *anchor = expr.anchor();
     auto list = SCOPES_GET_RESULT(extract_list_constant(expr));
-    Template *tmpfn = SCOPES_GET_RESULT(expand_module(anchor, list, Scope::from(sc_get_globals())));
+    TemplateRef tmpfn = SCOPES_GET_RESULT(expand_module(anchor, list, Scope::from(sc_get_globals())));
 
 #if 0 //SCOPES_DEBUG_CODEGEN
     StyledStream ss(std::cout);
@@ -285,7 +285,7 @@ skip_regular_load:
     std::cout << std::endl;
 #endif
 
-    Function *fn = SCOPES_GET_RESULT(prove(nullptr, tmpfn, {}));
+    FunctionRef fn = SCOPES_GET_RESULT(prove(FunctionRef(), tmpfn, {}));
 
     auto main_func_type = pointer_type(raising_function_type(
         arguments_type({}), {}), PTF_NonWritable, SYM_Unnamed);
@@ -297,14 +297,13 @@ compile_stage:
     if (fn->get_type() == stage_func_type) {
         typedef sc_value_raises_t (*StageFuncType)();
         StageFuncType fptr = (StageFuncType)SCOPES_GET_RESULT(compile(fn, 0))->value;
-        SCOPES_ANCHOR(fn->anchor());
         auto result = fptr();
         if (!result.ok) {
             SCOPES_RETURN_ERROR(result.except);
         }
         auto value = result._0;
         if (isa<Function>(value)) {
-            fn = cast<Function>(value);
+            fn = ref(fn.anchor(), cast<Function>(value));
             goto compile_stage;
         } else {
             return 0;
@@ -312,11 +311,10 @@ compile_stage:
     }
 
     if (fn->get_type() != main_func_type) {
-        SCOPES_ANCHOR(fn->anchor());
         StyledString ss;
         ss.out << "core module function has wrong type "
             << fn->get_type() << ", must be " << main_func_type;
-        SCOPES_LOCATION_ERROR(ss.str());
+        SCOPES_LOCATION_ERROR(fn.anchor(), ss.str());
     }
 
 #if 0 //SCOPES_DEBUG_CODEGEN
@@ -332,7 +330,6 @@ compile_stage:
     typedef sc_void_raises_t (*MainFuncType)();
     MainFuncType fptr = (MainFuncType)SCOPES_GET_RESULT(compile(fn, flags))->value;
     {
-        SCOPES_ANCHOR(fn->anchor());
         auto result = fptr();
         if (!result.ok) {
             SCOPES_RETURN_ERROR(result.except);

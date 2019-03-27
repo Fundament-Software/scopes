@@ -59,7 +59,7 @@ SCOPES_RESULT(const Type *) vector_type(const Type *element_type, size_t count) 
         StyledString ss;
         ss.out << "can not construct vector type for values of opaque type "
             << element_type;
-        SCOPES_LOCATION_ERROR(ss.str());
+        SCOPES_ERROR(ss.str());
     }
     auto result = new VectorType(element_type, count);
     vectors.insert(result);
@@ -74,7 +74,7 @@ SCOPES_RESULT(void) verify_integer_vector(const Type *type) {
     if (type->kind() != TK_Integer) {
         StyledString ss;
         ss.out << "integer scalar or vector type expected, got " << type;
-        SCOPES_LOCATION_ERROR(ss.str());
+        SCOPES_ERROR(ss.str());
     }
     return {};
 }
@@ -87,7 +87,7 @@ SCOPES_RESULT(void) verify_real_vector(const Type *type) {
     if (type->kind() != TK_Real) {
         StyledString ss;
         ss.out << "real scalar or vector type expected, got " << type;
-        SCOPES_LOCATION_ERROR(ss.str());
+        SCOPES_ERROR(ss.str());
     }
     return {};
 }
@@ -100,7 +100,7 @@ SCOPES_RESULT(void) verify_bool_vector(const Type *type) {
     if (type != TYPE_Bool) {
         StyledString ss;
         ss.out << "bool value or vector type expected, got " << type;
-        SCOPES_LOCATION_ERROR(ss.str());
+        SCOPES_ERROR(ss.str());
     }
     return {};
 }
@@ -114,7 +114,7 @@ SCOPES_RESULT(void) verify_real_vector(const Type *type, size_t fixedsz) {
     }
     StyledString ss;
     ss.out << "vector type of size " << fixedsz << " expected, got " << type;
-    SCOPES_LOCATION_ERROR(ss.str());
+    SCOPES_ERROR(ss.str());
 }
 
 SCOPES_RESULT(void) verify_vector_sizes(const Type *type1, const Type *type2) {
@@ -133,7 +133,7 @@ SCOPES_RESULT(void) verify_vector_sizes(const Type *type1, const Type *type2) {
     }
     StyledString ss;
     ss.out << "operands must be of scalar type or vector type of equal size";
-    SCOPES_LOCATION_ERROR(ss.str());
+    SCOPES_ERROR(ss.str());
 }
 
 } // namespace scopes

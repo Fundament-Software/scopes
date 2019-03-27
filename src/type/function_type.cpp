@@ -298,7 +298,7 @@ SCOPES_RESULT(void) verify_function_pointer(const Type *type) {
     if (!is_function_pointer(type)) {
         StyledString ss;
         ss.out << "function pointer expected, got " << type;
-        SCOPES_LOCATION_ERROR(ss.str());
+        SCOPES_ERROR(ss.str());
     }
     return {};
 }
