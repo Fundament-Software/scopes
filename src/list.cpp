@@ -8,6 +8,7 @@
 #include "hash.hpp"
 #include "value.hpp"
 #include "error.hpp"
+#include "globals.hpp"
 
 #include <unordered_set>
 
@@ -25,26 +26,28 @@ bool List::KeyEqual::operator()( const List *lhs, const List *rhs ) const {
 
 std::size_t List::Hash::operator()(const List *l) const {
     return hash2(
-        std::hash<Value *>{}(l->at),
-        std::hash<const List *>{}(l->next));
+        hash2(
+            std::hash<const Anchor *>{}(l->at.anchor()),
+            std::hash<Value *>{}(l->at.unref())
+        ), std::hash<const List *>{}(l->next));
 }
 
 static std::unordered_set<const List *, List::Hash, List::KeyEqual> list_map;
 
-List::List(Value *_at, const List *_next, size_t _count) :
+List::List(const ValueRef &_at, const List *_next, size_t _count) :
     at(_at),
     next(_next),
     count(_count) {}
 
-Value *List::first() const {
+ValueRef List::first() const {
     if (this == EOL) {
-        return ConstAggregate::none_from(get_active_anchor());
+        return g_none;
     } else {
         return at;
     }
 }
 
-const List *List::from(Value *_at, const List *_next) {
+const List *List::from(const ValueRef &_at, const List *_next) {
     List list(_at, _next, 0);
     auto it = list_map.find(&list);
     if (it != list_map.end()) {
@@ -55,7 +58,7 @@ const List *List::from(Value *_at, const List *_next) {
     return l;
 }
 
-const List *List::from(Value * const *values, int N) {
+const List *List::from(ValueRef const *values, int N) {
     const List *list = EOL;
     for (int i = N - 1; i >= 0; --i) {
         list = from(values[i], list);

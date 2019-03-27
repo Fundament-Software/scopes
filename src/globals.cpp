@@ -20,7 +20,6 @@
 #include "source_file.hpp"
 #include "lexerparser.hpp"
 #include "expander.hpp"
-#include "closure.hpp"
 #include "gen_llvm.hpp"
 #include "gen_spirv.hpp"
 #include "anchor.hpp"
@@ -60,14 +59,14 @@ namespace scopes {
 //------------------------------------------------------------------------------
 
 #define T(NAME, STR) \
-    TypedValue *NAME = nullptr;
+    TypedValueRef NAME;
 SCOPES_REIMPORT_SYMBOLS()
 #undef T
 
 static void import_symbols() {
     auto globs = sc_get_original_globals();
 #define T(NAME, STR) \
-    NAME = cast<TypedValue>(sc_scope_at(globs, Symbol(STR))._0); \
+    NAME = sc_scope_at(globs, Symbol(STR))._0.cast<TypedValue>(); \
     assert(NAME);
 SCOPES_REIMPORT_SYMBOLS()
 #undef T
@@ -76,7 +75,7 @@ SCOPES_REIMPORT_SYMBOLS()
 //------------------------------------------------------------------------------
 
 #if 0
-static void init_values_array(scopes::Values &dest, int numvalues, sc_value_t **values) {
+static void init_values_array(scopes::Values &dest, int numvalues, sc_valueref_t *values) {
     dest.reserve(numvalues);
     for (int i = 0; i < numvalues; ++i) {
         assert(values[i]);
@@ -87,11 +86,11 @@ static void init_values_array(scopes::Values &dest, int numvalues, sc_value_t **
 #endif
 
 template<typename T>
-static void init_values_arrayT(std::vector<T *> &dest, int numvalues, sc_value_t **values) {
+static void init_values_arrayT(std::vector< T * > &dest, int numvalues, sc_valueref_t *values) {
     dest.reserve(numvalues);
     for (int i = 0; i < numvalues; ++i) {
         assert(values[i]);
-        dest.push_back(cast<T>(values[i]));
+        dest.push_back(values[i].cast<T>().unref());
     }
 }
 
@@ -107,7 +106,7 @@ static Scope *original_globals = Scope::from();
 
 sc_void_raises_t convert_result(const Result<void> &_result) VOID_CRESULT;
 
-sc_value_list_scope_raises_t convert_result(const Result<sc_value_list_scope_tuple_t> &_result) CRESULT;
+sc_valueref_list_scope_raises_t convert_result(const Result<sc_valueref_list_scope_tuple_t> &_result) CRESULT;
 
 sc_value_raises_t convert_result(const Result<Value *> &_result) CRESULT;
 sc_value_raises_t convert_result(const Result<TypedValue *> &_result) CRESULT;
@@ -115,17 +114,28 @@ sc_value_raises_t convert_result(const Result<Function *> &_result) CRESULT;
 sc_value_raises_t convert_result(const Result<Template *> &_result) CRESULT;
 sc_value_raises_t convert_result(const Result<ConstPointer *> &_result) CRESULT;
 
+sc_valueref_raises_t convert_result(const Result<ValueRef> &_result) CRESULT;
+sc_valueref_raises_t convert_result(const Result<TypedValueRef> &_result) CRESULT;
+sc_valueref_raises_t convert_result(const Result<FunctionRef> &_result) CRESULT;
+sc_valueref_raises_t convert_result(const Result<TemplateRef> &_result) CRESULT;
+sc_valueref_raises_t convert_result(const Result<ConstPointerRef> &_result) CRESULT;
+
 sc_type_raises_t convert_result(const Result<const Type *> &_result) CRESULT;
 sc_string_raises_t convert_result(const Result<const String *> &_result) CRESULT;
 
 sc_scope_raises_t convert_result(const Result<Scope *> &_result) CRESULT;
 
+sc_bool_raises_t convert_result(const Result<bool> &_result) CRESULT;
+sc_int_raises_t convert_result(const Result<int> &_result) CRESULT;
 sc_size_raises_t convert_result(const Result<size_t> &_result) CRESULT;
 
 sc_symbol_raises_t convert_result(const Result<Symbol> &_result) CRESULT;
 
 #undef CRESULT
 #undef VOID_CRESULT
+
+#define SCOPES_C_RETURN(EXPR) \
+    return convert_result(Result<_result_type>((EXPR)));
 
 #define SCOPES_C_RETURN_ERROR(ERR) return convert_result(Result<_result_type>::raise(ERR));
 // if ok fails, return
@@ -150,12 +160,6 @@ sc_symbol_raises_t convert_result(const Result<Symbol> &_result) CRESULT;
 
 } // namespace scopes
 
-#if 1
-#define REWRITE_ANCHOR(X) X = get_active_anchor();
-#else
-#define REWRITE_ANCHOR(X)
-#endif
-
 extern "C" {
 
 // Compiler
@@ -174,84 +178,81 @@ sc_rawstring_i32_array_tuple_t sc_launch_args() {
     return {(int)scopes_argc, scopes_argv};
 }
 
-sc_value_list_scope_raises_t sc_expand(sc_value_t *expr, const sc_list_t *next, sc_scope_t *scope) {
+sc_valueref_list_scope_raises_t sc_expand(sc_valueref_t expr, const sc_list_t *next, sc_scope_t *scope) {
     using namespace scopes;
     return convert_result(expand(expr, next, scope));
 }
 
-sc_value_raises_t sc_eval(const sc_anchor_t *anchor, const sc_list_t *expr, sc_scope_t *scope) {
+sc_valueref_raises_t sc_eval(const sc_anchor_t *anchor, const sc_list_t *expr, sc_scope_t *scope) {
     using namespace scopes;
-    SCOPES_RESULT_TYPE(TypedValue *);
-    REWRITE_ANCHOR(anchor)
+    SCOPES_RESULT_TYPE(TypedValueRef);
     auto module_result = SCOPES_C_GET_RESULT(expand_module(anchor, expr, scope));
-    return convert_result(prove(nullptr, module_result, {}));
+    return convert_result(prove(FunctionRef(), module_result, {}));
 }
 
-sc_value_raises_t sc_prove(sc_value_t *expr) {
+sc_valueref_raises_t sc_prove(sc_valueref_t expr) {
     using namespace scopes;
     //SCOPES_RESULT_TYPE(TypedValue *);
     return convert_result(prove(expr));
 }
 
-sc_value_raises_t sc_eval_inline(const sc_anchor_t *anchor, const sc_list_t *expr, sc_scope_t *scope) {
+sc_valueref_raises_t sc_eval_inline(const sc_anchor_t *anchor, const sc_list_t *expr, sc_scope_t *scope) {
     using namespace scopes;
-    REWRITE_ANCHOR(anchor)
     //const Anchor *anchor = expr->anchor();
     //auto list = SCOPES_GET_RESULT(extract_list_constant(expr));
-    return convert_result(expand_inline(anchor, nullptr, expr, scope));
+    return convert_result(expand_inline(anchor, TemplateRef(), expr, scope));
 }
 
-sc_value_raises_t sc_typify_template(sc_value_t *f, int numtypes, const sc_type_t **typeargs) {
+sc_valueref_raises_t sc_typify_template(sc_valueref_t f, int numtypes, const sc_type_t **typeargs) {
     using namespace scopes;
-    SCOPES_RESULT_TYPE(TypedValue *);
-    if (!isa<Template>(f)) {
-        SCOPES_C_RETURN_ERROR(make_location_error(String::from("value must be template")));
+    SCOPES_RESULT_TYPE(TypedValueRef);
+    if (f.isa<Template>()) {
+        auto tf = f.cast<Template>();
+        if (tf->is_inline()) {
+            SCOPES_C_RETURN_ERROR(make_error(String::from("cannot typify inline")));
+        }
+        Types types;
+        for (int i = 0; i < numtypes; ++i) {
+            types.push_back(typeargs[i]);
+        }
+        return convert_result(prove(FunctionRef(), tf, types));
+    } else if (f.isa<Closure>()) {
+        auto srcl = f.cast<Closure>();
+        if (srcl->func->is_inline()) {
+            SCOPES_C_RETURN_ERROR(make_error(String::from("cannot typify inline")));
+        }
+        Types types;
+        for (int i = 0; i < numtypes; ++i) {
+            types.push_back(typeargs[i]);
+        }
+    #if 0 //SCOPES_DEBUG_CODEGEN
+        StyledStream ss(std::cout);
+        std::cout << "sc_typify non-normalized:" << std::endl;
+        stream_ast(ss, srcl->func, StreamASTFormat());
+        std::cout << std::endl;
+    #endif
+        return convert_result(prove(
+            ref(f.anchor(), srcl->frame),
+            ref(f.anchor(), srcl->func), types));
     }
-    auto tf = cast<Template>(f);
-    if (tf->is_inline()) {
-        SCOPES_C_RETURN_ERROR(make_location_error(String::from("cannot typify inline")));
-    }
-    Types types;
-    for (int i = 0; i < numtypes; ++i) {
-        types.push_back(typeargs[i]);
-    }
-    return convert_result(prove(nullptr, tf, types));
+    SCOPES_C_RETURN_ERROR(make_error(String::from("value must be template or closure")));
 }
 
-sc_value_raises_t sc_typify(sc_closure_t *srcl, int numtypes, const sc_type_t **typeargs) {
+sc_valueref_raises_t sc_compile(sc_valueref_t srcl, uint64_t flags) {
     using namespace scopes;
-    SCOPES_RESULT_TYPE(TypedValue *);
-    if (srcl->func->is_inline()) {
-        SCOPES_C_RETURN_ERROR(make_location_error(String::from("cannot typify inline")));
-    }
-    Types types;
-    for (int i = 0; i < numtypes; ++i) {
-        types.push_back(typeargs[i]);
-    }
-#if 0 //SCOPES_DEBUG_CODEGEN
-    StyledStream ss(std::cout);
-    std::cout << "sc_typify non-normalized:" << std::endl;
-    stream_ast(ss, srcl->func, StreamASTFormat());
-    std::cout << std::endl;
-#endif
-    return convert_result(prove(srcl->frame, srcl->func, types));
-}
-
-sc_value_raises_t sc_compile(sc_value_t *srcl, uint64_t flags) {
-    using namespace scopes;
-    SCOPES_RESULT_TYPE(ConstPointer *);
+    SCOPES_RESULT_TYPE(ConstPointerRef);
     auto result = SCOPES_C_GET_RESULT(extract_function_constant(srcl));
     return convert_result(compile(result, flags));
 }
 
-sc_string_raises_t sc_compile_spirv(sc_symbol_t target, sc_value_t *srcl, uint64_t flags) {
+sc_string_raises_t sc_compile_spirv(sc_symbol_t target, sc_valueref_t srcl, uint64_t flags) {
     using namespace scopes;
     SCOPES_RESULT_TYPE(const String *);
     auto result = SCOPES_C_GET_RESULT(extract_function_constant(srcl));
     return convert_result(compile_spirv(target, result, flags));
 }
 
-sc_string_raises_t sc_compile_glsl(sc_symbol_t target, sc_value_t *srcl, uint64_t flags) {
+sc_string_raises_t sc_compile_glsl(sc_symbol_t target, sc_valueref_t srcl, uint64_t flags) {
     using namespace scopes;
     SCOPES_RESULT_TYPE(const String *);
     auto result = SCOPES_C_GET_RESULT(extract_function_constant(srcl));
@@ -270,7 +271,8 @@ void sc_enter_solver_cli () {
 
 sc_size_raises_t sc_verify_stack () {
     using namespace scopes;
-    return convert_result(verify_stack());
+    SCOPES_RESULT_TYPE(size_t);
+    SCOPES_C_RETURN(verify_stack());
 }
 
 // stdin/out
@@ -327,7 +329,6 @@ void sc_set_autocomplete_scope(const sc_scope_t* scope) {
 
 const sc_string_t *sc_format_message(const sc_anchor_t *anchor, const sc_string_t *message) {
     using namespace scopes;
-    REWRITE_ANCHOR(anchor)
     StyledString ss;
     if (anchor) {
         ss.out << anchor << " ";
@@ -425,12 +426,11 @@ void sc_set_globals(sc_scope_t *s) {
 
 sc_error_t *sc_location_error_new(const sc_anchor_t *anchor, const sc_string_t *msg) {
     using namespace scopes;
-    REWRITE_ANCHOR(anchor)
     return make_location_error(anchor, msg);
 }
-sc_error_t *sc_runtime_error_new(const sc_string_t *msg) {
+sc_error_t *sc_error_new(const sc_string_t *msg) {
     using namespace scopes;
-    return make_runtime_error(msg);
+    return make_error(msg);
 }
 const sc_string_t *sc_format_error(const sc_error_t *err) {
     using namespace scopes;
@@ -473,8 +473,8 @@ struct MemoKeyEqual {
                 auto v = b->values[i];
                 if (u->kind() != v->kind())
                     return false;
-                if (isa<Pure>(u)) {
-                    if (!cast<Pure>(u)->key_equal(cast<Pure>(v)))
+                if (u.isa<Pure>()) {
+                    if (!u.cast<Pure>()->key_equal(v.cast<Pure>().unref()))
                         return false;
                 } else {
                     if (u != v)
@@ -490,8 +490,8 @@ struct MemoKeyEqual {
                 auto v = b->values[i];
                 if (u->kind() != v->kind())
                     return false;
-                if (isa<Pure>(u)) {
-                    if (!cast<Pure>(u)->key_equal(cast<Pure>(v)))
+                if (u.isa<Pure>()) {
+                    if (!u.cast<Pure>()->key_equal(v.cast<Pure>().unref()))
                         return false;
                 } else {
                     if (u != v)
@@ -514,10 +514,10 @@ struct MemoHash {
             uint64_t h = std::hash<const Type *>{}(alist->get_type());
             for (int i = 0; i < alist->values.size(); ++i) {
                 auto x = alist->values[i];
-                if (isa<Pure>(x)) {
-                    h = hash2(h, cast<Pure>(x)->hash());
+                if (x.isa<Pure>()) {
+                    h = hash2(h, x.cast<Pure>()->hash());
                 } else {
-                    h = hash2(h, std::hash<const TypedValue *>{}(x));
+                    h = hash2(h, std::hash<const TypedValue *>{}(x.unref()));
                 }
             }
             return h;
@@ -526,10 +526,10 @@ struct MemoHash {
             uint64_t h = 0;
             for (int i = 0; i < alist->values.size(); ++i) {
                 auto x = alist->values[i];
-                if (isa<Pure>(x)) {
-                    h = hash2(h, cast<Pure>(x)->hash());
+                if (x.isa<Pure>()) {
+                    h = hash2(h, x.cast<Pure>()->hash());
                 } else {
-                    h = hash2(h, std::hash<const Value *>{}(x));
+                    h = hash2(h, std::hash<const Value *>{}(x.unref()));
                 }
             }
             return h;
@@ -546,9 +546,9 @@ static MemoMap memo_map;
 
 }
 
-sc_value_t *sc_map_get(sc_value_t *key) {
+sc_value_t *sc_map_get(sc_valueref_t key) {
     using namespace scopes;
-    auto it = memo_map.find(key);
+    auto it = memo_map.find(key.unref());
     if (it != memo_map.end()) {
         return it->second;
     } else {
@@ -556,17 +556,17 @@ sc_value_t *sc_map_get(sc_value_t *key) {
     }
 }
 
-void sc_map_set(sc_value_t *key, sc_value_t *value) {
+void sc_map_set(sc_valueref_t key, sc_valueref_t value) {
     using namespace scopes;
     if (!value) {
-        auto it = memo_map.find(key);
+        auto it = memo_map.find(key.unref());
         if (it != memo_map.end()) {
             memo_map.erase(it);
         }
     } else {
-        auto ret = memo_map.insert({key, value});
+        auto ret = memo_map.insert({key.unref(), value.unref()});
         if (!ret.second) {
-            ret.first->second = value;
+            ret.first->second = value.unref();
         }
     }
 }
@@ -619,60 +619,49 @@ sc_void_raises_t sc_load_library(const sc_string_t *name) {
         if (err) {
             ss.out << ": " << err;
         }
-        return {false, make_location_error(ss.str()) };
+        return {false, make_error(ss.str()) };
     }
 #endif
     if (LLVMLoadLibraryPermanently(name->data)) {
         StyledString ss;
         ss.out << "error loading library " << name;
-        return {false, make_location_error(ss.str()) };
+        return {false, make_error(ss.str()) };
     }
     return {true,nullptr};
-}
-
-// Anchor
-////////////////////////////////////////////////////////////////////////////////
-
-void sc_set_active_anchor(const sc_anchor_t *anchor) {
-    using namespace scopes;
-    _set_active_anchor(anchor);
-}
-
-const sc_anchor_t *sc_get_active_anchor() {
-    using namespace scopes;
-    return get_active_anchor();
 }
 
 // Scope
 ////////////////////////////////////////////////////////////////////////////////
 
-void sc_scope_set_symbol(sc_scope_t *scope, sc_symbol_t sym, sc_value_t *value) {
+void sc_scope_set_symbol(sc_scope_t *scope, sc_symbol_t sym, sc_valueref_t value) {
     using namespace scopes;
     scope->bind(sym, value);
 }
 
-sc_value_raises_t sc_scope_at(sc_scope_t *scope, sc_symbol_t key) {
+sc_valueref_raises_t sc_scope_at(sc_scope_t *scope, sc_symbol_t key) {
     using namespace scopes;
-    Value *result = nullptr;
+    SCOPES_RESULT_TYPE(ValueRef);
+    ValueRef result;
     bool ok = scope->lookup(key, result);
     if (!ok) {
         StyledString ss;
         ss.out << "no attribute " << key << " in scope";
-        return { false, make_location_error(ss.str()), nullptr };
+        SCOPES_C_RETURN_ERROR(make_error(ss.str()));
     }
-    return { true, nullptr, result };
+    return convert_result(result);
 }
 
-sc_value_raises_t sc_scope_local_at(sc_scope_t *scope, sc_symbol_t key) {
+sc_valueref_raises_t sc_scope_local_at(sc_scope_t *scope, sc_symbol_t key) {
     using namespace scopes;
-    Value *result = nullptr;
+    SCOPES_RESULT_TYPE(ValueRef);
+    ValueRef result;
     bool ok = scope->lookup_local(key, result);
     if (!ok) {
         StyledString ss;
         ss.out << "no local attribute " << key << " in scope";
-        return { false, make_location_error(ss.str()), nullptr };
+        SCOPES_C_RETURN_ERROR(make_error(ss.str()));
     }
-    return { true, nullptr, result };
+    return convert_result(result);
 }
 
 const sc_string_t *sc_scope_get_docstring(sc_scope_t *scope, sc_symbol_t key) {
@@ -738,7 +727,7 @@ void sc_scope_del_symbol(sc_scope_t *scope, sc_symbol_t sym) {
     scope->del(sym);
 }
 
-sc_symbol_value_tuple_t sc_scope_next(sc_scope_t *scope, sc_symbol_t key) {
+sc_symbol_valueref_tuple_t sc_scope_next(sc_scope_t *scope, sc_symbol_t key) {
     using namespace scopes;
     auto &&map = *scope->map;
     Scope::Map::const_iterator it;
@@ -754,7 +743,7 @@ sc_symbol_value_tuple_t sc_scope_next(sc_scope_t *scope, sc_symbol_t key) {
         }
         it++;
     }
-    return { SYM_Unnamed, nullptr };
+    return { SYM_Unnamed, ValueRef() };
 }
 
 // Symbol
@@ -806,6 +795,7 @@ namespace scopes {
 }
 sc_bool_raises_t sc_string_match(const sc_string_t *pattern, const sc_string_t *text) {
     using namespace scopes;
+    SCOPES_RESULT_TYPE(bool);
     auto it = pattern_cache.find(pattern);
     regexp::Reprog *m = nullptr;
     if (it == pattern_cache.end()) {
@@ -814,13 +804,13 @@ sc_bool_raises_t sc_string_match(const sc_string_t *pattern, const sc_string_t *
         if (error) {
             const String *err = String::from_cstr(error);
             regexp::regfree(m);
-            return { false, make_location_error(err), false };
+            SCOPES_C_RETURN_ERROR(make_error(err));
         }
         pattern_cache.insert({ pattern, m });
     } else {
         m = it->second;
     }
-    return { true, nullptr, (regexp::regexec(m, text->data, nullptr, 0) == 0) };
+    SCOPES_C_RETURN(regexp::regexec(m, text->data, nullptr, 0) == 0);
 }
 
 size_t sc_string_count(const sc_string_t *str) {
@@ -860,7 +850,7 @@ const sc_string_t *sc_string_lslice(const sc_string_t *str, size_t offset) {
 // List
 ////////////////////////////////////////////////////////////////////////////////
 
-const sc_list_t *sc_list_cons(sc_value_t *at, const sc_list_t *next) {
+const sc_list_t *sc_list_cons(sc_valueref_t at, const sc_list_t *next) {
     using namespace scopes;
     return List::from(at, next);
 }
@@ -884,7 +874,7 @@ const sc_string_t *sc_list_repr(const sc_list_t *l) {
     return ss.str();
 }
 
-sc_value_list_tuple_t sc_list_decons(const sc_list_t *l) {
+sc_valueref_list_tuple_t sc_list_decons(const sc_list_t *l) {
     using namespace scopes;
     if (l)
         return { l->at, l->next };
@@ -897,9 +887,9 @@ int sc_list_count(const sc_list_t *l) {
     return l?l->count:0;
 }
 
-sc_value_t *sc_list_at(const sc_list_t *l) {
+sc_valueref_t sc_list_at(const sc_list_t *l) {
     using namespace scopes;
-    return l?l->at:g_none;
+    return l?l->at:ValueRef(g_none);
 }
 
 const sc_list_t *sc_list_next(const sc_list_t *l) {
@@ -929,91 +919,94 @@ bool sc_list_compare(const sc_list_t *a, const sc_list_t *b) {
 // Closure
 ////////////////////////////////////////////////////////////////////////////////
 
-const sc_string_t *sc_closure_get_docstring(sc_closure_t *func) {
-    return func->func->docstring;
+const sc_string_t *sc_closure_get_docstring(sc_valueref_t func) {
+    using namespace scopes;
+    return func.cast<Closure>()->func->docstring;
 }
 
-sc_value_t *sc_closure_get_template(sc_closure_t *func) {
-    return func->func;
+sc_value_t *sc_closure_get_template(sc_valueref_t func) {
+    using namespace scopes;
+    return func.cast<Closure>()->func;
 }
 
-sc_value_t *sc_closure_get_context(sc_closure_t *func) {
-    return func->frame;
+sc_value_t *sc_closure_get_context(sc_valueref_t func) {
+    using namespace scopes;
+    return func.cast<Closure>()->frame;
 }
 
 // Value
 ////////////////////////////////////////////////////////////////////////////////
 
-const sc_string_t *sc_value_repr (sc_value_t *value) {
+const sc_string_t *sc_value_repr (sc_valueref_t value) {
     using namespace scopes;
     StyledString ss;
     stream_ast(ss.out, value, StreamASTFormat::singleline());
     return ss.str();
 }
 
-const sc_string_t *sc_value_content_repr (sc_value_t *value) {
+const sc_string_t *sc_value_content_repr (sc_valueref_t value) {
     using namespace scopes;
     StyledString ss;
     stream_ast(ss.out, value, StreamASTFormat::content());
     return ss.str();
 }
 
-const sc_string_t *sc_value_ast_repr (sc_value_t *value) {
+const sc_string_t *sc_value_ast_repr (sc_valueref_t value) {
     using namespace scopes;
     StyledString ss;
     stream_ast(ss.out, value, StreamASTFormat());
     return ss.str();
 }
 
-const sc_string_t *sc_value_tostring (sc_value_t *value) {
+const sc_string_t *sc_value_tostring (sc_valueref_t value) {
     using namespace scopes;
     StyledString ss = StyledString::plain();
     stream_ast(ss.out, value, StreamASTFormat::content());
     return ss.str();
 }
 
-const sc_type_t *sc_value_type (sc_value_t *value) {
+const sc_type_t *sc_value_type (sc_valueref_t value) {
     using namespace scopes;
-    if (!isa<TypedValue>(value))
+    if (!value.isa<TypedValue>())
         return TYPE_Unknown;
-    return strip_qualifiers(cast<TypedValue>(value)->get_type());
+    return strip_qualifiers(value.cast<TypedValue>()->get_type());
 }
 
-const sc_type_t *sc_value_qualified_type (sc_value_t *value) {
+const sc_type_t *sc_value_qualified_type (sc_valueref_t value) {
     using namespace scopes;
-    if (!isa<TypedValue>(value))
+    if (!value.isa<TypedValue>())
         return TYPE_Unknown;
-    return cast<TypedValue>(value)->get_type();
+    return value.cast<TypedValue>()->get_type();
 }
 
-const sc_anchor_t *sc_value_anchor (sc_value_t *value) {
+const sc_anchor_t *sc_value_anchor (sc_valueref_t value) {
     using namespace scopes;
-    return value->anchor();
+    return value.anchor();
 }
 
-bool sc_value_is_constant(sc_value_t *value) {
+bool sc_value_is_constant(sc_valueref_t value) {
     using namespace scopes;
-    return isa<Const>(value);
+    return value.isa<Const>();
 }
 
-bool sc_value_is_pure (sc_value_t *value) {
+bool sc_value_is_pure (sc_valueref_t value) {
     using namespace scopes;
-    return isa<Pure>(value);
+    return value.isa<Pure>();
 }
 
-bool sc_value_compare (sc_value_t *a, sc_value_t *b) {
+bool sc_value_compare (sc_valueref_t a, sc_valueref_t b) {
     using namespace scopes;
-    return MemoKeyEqual{}(a,b);
+    return MemoKeyEqual{}(a.unref(),b.unref());
 }
 
-int sc_value_kind (sc_value_t *value) {
+int sc_value_kind (sc_valueref_t value) {
     using namespace scopes;
     return value->kind();
 }
 
-sc_value_t *sc_value_wrap(const sc_type_t *type, sc_value_t *value) {
+sc_valueref_t sc_value_wrap(const sc_type_t *type, sc_valueref_t value) {
     using namespace scopes;
-    if (isa<Const>(value)) {
+    if (value.isa<Const>()) {
         return value;
     }
     auto result = wrap_value(type, value);
@@ -1021,64 +1014,62 @@ sc_value_t *sc_value_wrap(const sc_type_t *type, sc_value_t *value) {
     return result;
 }
 
-sc_value_t *sc_value_unwrap(const sc_type_t *type, sc_value_t *value) {
+sc_valueref_t sc_value_unwrap(const sc_type_t *type, sc_valueref_t value) {
     using namespace scopes;
     auto result = unwrap_value(type, value);
     if (!result) {
-        result = ArgumentList::from(value->anchor(), {});
+        result = ref(value.anchor(), ArgumentList::from({}));
     }
     return result;
 }
 
-sc_value_t *sc_keyed_new(const sc_anchor_t *anchor, sc_symbol_t key, sc_value_t *value) {
+sc_valueref_t sc_keyed_new(sc_symbol_t key, sc_valueref_t value) {
     using namespace scopes;
-    REWRITE_ANCHOR(anchor)
-    return KeyedTemplate::from(anchor, key, value);
+    return KeyedTemplate::from(key, value);
 }
 
-sc_value_t *sc_empty_argument_list(const sc_anchor_t *anchor) {
+sc_value_t *sc_empty_argument_list() {
     using namespace scopes;
-    return ArgumentList::from(anchor, {});
+    return ArgumentList::from({});
 }
 
-sc_value_t *sc_argument_list_new(const sc_anchor_t *anchor) {
+sc_value_t *sc_argument_list_new() {
     using namespace scopes;
-    REWRITE_ANCHOR(anchor)
-    return ArgumentListTemplate::empty_from(anchor);
+    return ArgumentListTemplate::empty_from();
 }
 
-void sc_argument_list_append(sc_value_t *alist, sc_value_t *value) {
+void sc_argument_list_append(sc_valueref_t alist, sc_valueref_t value) {
     using namespace scopes;
     //SCOPES_RESULT_TYPE(void);
     //SCOPES_C_CHECK_RESULT(verify_kind<VK_ArgumentListTemplate>(alist));
-    cast<ArgumentListTemplate>(alist)->append(value);
+    alist.cast<ArgumentListTemplate>()->append(value);
     //return convert_result({});
 }
 
-int sc_argcount(sc_value_t *value) {
+int sc_argcount(sc_valueref_t value) {
     using namespace scopes;
     switch(value->kind()) {
     case VK_ArgumentList: {
-        return (int)cast<ArgumentList>(value)->values.size();
+        return (int)value.cast<ArgumentList>()->values.size();
     } break;
     case VK_ArgumentListTemplate: {
-        return (int)cast<ArgumentListTemplate>(value)->values.size();
+        return (int)value.cast<ArgumentListTemplate>()->values.size();
     } break;
     default: return 1;
     }
 }
 
-sc_value_t *sc_getarg(sc_value_t *value, int index) {
+sc_valueref_t sc_getarg(sc_valueref_t value, int index) {
     using namespace scopes;
     switch(value->kind()) {
     case VK_ArgumentList: {
-        auto al = cast<ArgumentList>(value);
+        auto al = value.cast<ArgumentList>();
         if (index < al->values.size()) {
             return al->values[index];
         }
     } break;
     case VK_ArgumentListTemplate: {
-        auto al = cast<ArgumentListTemplate>(value);
+        auto al = value.cast<ArgumentListTemplate>();
         if (index < al->values.size()) {
             return al->values[index];
         }
@@ -1087,296 +1078,268 @@ sc_value_t *sc_getarg(sc_value_t *value, int index) {
         if (index == 0) return value;
     } break;
     }
-    return ConstAggregate::none_from(value->anchor());
+    return ref(value.anchor(), ConstAggregate::none_from());
 }
 
-sc_value_t *sc_getarglist(sc_value_t *value, int index) {
+sc_valueref_t sc_getarglist(sc_valueref_t value, int index) {
     using namespace scopes;
     switch(value->kind()) {
     case VK_ArgumentList: {
-        auto al = cast<ArgumentList>(value);
+        auto al = value.cast<ArgumentList>();
         TypedValues values;
         for (int i = index; i < al->values.size(); ++i) {
             values.push_back(al->values[i]);
         }
-        return ArgumentList::from(value->anchor(), values);
+        return ref(value.anchor(), ArgumentList::from(values));
     } break;
     case VK_ArgumentListTemplate: {
-        auto al = cast<ArgumentListTemplate>(value);
+        auto al = value.cast<ArgumentListTemplate>();
         Values values;
         for (int i = index; i < al->values.size(); ++i) {
             values.push_back(al->values[i]);
         }
-        return ArgumentListTemplate::from(value->anchor(), values);
+        return ref(value.anchor(), ArgumentListTemplate::from(values));
     } break;
     default: {
         if (index == 0) {
             return value;
         } else {
-            return ArgumentList::from(value->anchor(), {});
+            return ref(value.anchor(), ArgumentList::from({}));
         }
     } break;
     }
 }
 
-sc_value_t *sc_extract_argument_new(const sc_anchor_t *anchor, sc_value_t *value, int index) {
+sc_valueref_t sc_extract_argument_new(sc_valueref_t value, int index) {
     using namespace scopes;
-    REWRITE_ANCHOR(anchor)
-    return ExtractArgumentTemplate::from(anchor, value, index);
+    return ExtractArgumentTemplate::from(value, index);
 }
 
-sc_value_t *sc_extract_argument_list_new(const sc_anchor_t *anchor, sc_value_t *value, int index) {
+sc_valueref_t sc_extract_argument_list_new(sc_valueref_t value, int index) {
     using namespace scopes;
-    REWRITE_ANCHOR(anchor)
-    return ExtractArgumentTemplate::from(anchor, value, index, true);
+    return ExtractArgumentTemplate::from(value, index, true);
 }
 
-sc_value_t *sc_template_new(const sc_anchor_t *anchor, sc_symbol_t name) {
+sc_value_t *sc_template_new(sc_symbol_t name) {
     using namespace scopes;
-    REWRITE_ANCHOR(anchor)
-    return Template::from(anchor, name);
+    return Template::from(name);
 }
-void sc_template_set_name(sc_value_t *fn, sc_symbol_t name) {
+void sc_template_set_name(sc_valueref_t fn, sc_symbol_t name) {
     using namespace scopes;
-    cast<Template>(fn)->name = name;
+    fn.cast<Template>()->name = name;
 }
-sc_symbol_t sc_template_get_name(sc_value_t *fn) {
+sc_symbol_t sc_template_get_name(sc_valueref_t fn) {
     using namespace scopes;
-    return cast<Template>(fn)->name;
+    return fn.cast<Template>()->name;
 }
-void sc_template_append_parameter(sc_value_t *fn, sc_value_t *symbol) {
+void sc_template_append_parameter(sc_valueref_t fn, sc_valueref_t symbol) {
     using namespace scopes;
-    cast<Template>(fn)->append_param(cast<ParameterTemplate>(symbol));
+    fn.cast<Template>()->append_param(symbol.cast<ParameterTemplate>());
 }
-void sc_template_set_body(sc_value_t *fn, sc_value_t *value) {
+void sc_template_set_body(sc_valueref_t fn, sc_valueref_t value) {
     using namespace scopes;
-    cast<Template>(fn)->value = value;
-}
-
-void sc_template_set_inline(sc_value_t *fn) {
-    using namespace scopes;
-    cast<Template>(fn)->set_inline();
+    fn.cast<Template>()->value = value;
 }
 
-sc_value_t *sc_expression_new(const sc_anchor_t *anchor) {
+void sc_template_set_inline(sc_valueref_t fn) {
     using namespace scopes;
-    REWRITE_ANCHOR(anchor)
-    return Expression::unscoped_from(anchor);
+    fn.cast<Template>()->set_inline();
 }
 
-void sc_expression_set_scoped(sc_value_t *expr) {
+sc_value_t *sc_expression_new() {
     using namespace scopes;
-    cast<Expression>(expr)->scoped = true;
+    return Expression::unscoped_from();
 }
 
-void sc_expression_append(sc_value_t *expr, sc_value_t *value) {
+void sc_expression_set_scoped(sc_valueref_t expr) {
     using namespace scopes;
-    cast<Expression>(expr)->append(value);
+    expr.cast<Expression>()->scoped = true;
 }
 
-sc_value_t *sc_global_new(const sc_anchor_t *anchor, sc_symbol_t name,
-    const sc_type_t *type, uint32_t flags, sc_symbol_t storage_class,
-    int location, int binding) {
+void sc_expression_append(sc_valueref_t expr, sc_valueref_t value) {
     using namespace scopes;
-    REWRITE_ANCHOR(anchor)
-    return Global::from(anchor, type, name, flags, storage_class, location, binding);
+    expr.cast<Expression>()->append(value);
 }
 
-sc_value_t *sc_if_new(const sc_anchor_t *anchor) {
+sc_value_t *sc_global_new(sc_symbol_t name, const sc_type_t *type,
+    uint32_t flags, sc_symbol_t storage_class, int location, int binding) {
     using namespace scopes;
-    REWRITE_ANCHOR(anchor)
-    return If::from(anchor);
-}
-void sc_if_append_then_clause(sc_value_t *value, const sc_anchor_t *anchor, sc_value_t *cond, sc_value_t *body) {
-    using namespace scopes;
-    REWRITE_ANCHOR(anchor)
-    cast<If>(value)->append_then(anchor, cond, body);
-}
-void sc_if_append_else_clause(sc_value_t *value, const sc_anchor_t *anchor, sc_value_t *body) {
-    using namespace scopes;
-    REWRITE_ANCHOR(anchor)
-    cast<If>(value)->append_else(anchor, body);
+    return Global::from(type, name, flags, storage_class, location, binding);
 }
 
-sc_value_t *sc_switch_new(const sc_anchor_t *anchor, sc_value_t *expr) {
+sc_value_t *sc_if_new() {
     using namespace scopes;
-    REWRITE_ANCHOR(anchor)
-    return SwitchTemplate::from(anchor, expr);
+    return If::from();
 }
-void sc_switch_append_case(sc_value_t *value, const sc_anchor_t *anchor, sc_value_t *literal, sc_value_t *body) {
+void sc_if_append_then_clause(sc_valueref_t value, sc_valueref_t cond, sc_valueref_t body) {
     using namespace scopes;
-    REWRITE_ANCHOR(anchor)
-    cast<SwitchTemplate>(value)->append_case(anchor, literal, body);
+    value.cast<If>()->append_then(cond, body);
 }
-void sc_switch_append_pass(sc_value_t *value, const sc_anchor_t *anchor, sc_value_t *literal, sc_value_t *body) {
+void sc_if_append_else_clause(sc_valueref_t value, sc_valueref_t body) {
     using namespace scopes;
-    REWRITE_ANCHOR(anchor)
-    cast<SwitchTemplate>(value)->append_pass(anchor, literal, body);
-}
-void sc_switch_append_default(sc_value_t *value, const sc_anchor_t *anchor, sc_value_t *body) {
-    using namespace scopes;
-    REWRITE_ANCHOR(anchor)
-    cast<SwitchTemplate>(value)->append_default(anchor, body);
+    value.cast<If>()->append_else(body);
 }
 
-sc_value_t *sc_parameter_new(const sc_anchor_t *anchor, sc_symbol_t name) {
+sc_value_t *sc_switch_new(sc_valueref_t expr) {
     using namespace scopes;
-    REWRITE_ANCHOR(anchor)
+    return SwitchTemplate::from(expr);
+}
+void sc_switch_append_case(sc_valueref_t value, sc_valueref_t literal, sc_valueref_t body) {
+    using namespace scopes;
+    value.cast<SwitchTemplate>()->append_case(literal, body);
+}
+void sc_switch_append_pass(sc_valueref_t value, sc_valueref_t literal, sc_valueref_t body) {
+    using namespace scopes;
+    value.cast<SwitchTemplate>()->append_pass(literal, body);
+}
+void sc_switch_append_default(sc_valueref_t value, sc_valueref_t body) {
+    using namespace scopes;
+    value.cast<SwitchTemplate>()->append_default(body);
+}
+
+sc_value_t *sc_parameter_new(sc_symbol_t name) {
+    using namespace scopes;
     if (ends_with_parenthesis(name)) {
-        return ParameterTemplate::variadic_from(anchor, name);
+        return ParameterTemplate::variadic_from(name);
     } else {
-        return ParameterTemplate::from(anchor, name);
+        return ParameterTemplate::from(name);
     }
 }
 
-bool sc_parameter_is_variadic(sc_value_t *param) {
+bool sc_parameter_is_variadic(sc_valueref_t param) {
     using namespace scopes;
-    return cast<ParameterTemplate>(param)->is_variadic();
+    return param.cast<ParameterTemplate>()->is_variadic();
 }
 
-sc_value_t *sc_call_new(const sc_anchor_t *anchor, sc_value_t *callee) {
+sc_value_t *sc_call_new(sc_valueref_t callee) {
     using namespace scopes;
-    REWRITE_ANCHOR(anchor)
-    return CallTemplate::from(anchor, callee);
+    return CallTemplate::from(callee);
 }
 
-void sc_call_append_argument(sc_value_t *call, sc_value_t *value) {
+void sc_call_append_argument(sc_valueref_t call, sc_valueref_t value) {
     using namespace scopes;
-    cast<CallTemplate>(call)->args.push_back(value);
+    call.cast<CallTemplate>()->args.push_back(value);
 }
 
-bool sc_call_is_rawcall(sc_value_t *value) {
+bool sc_call_is_rawcall(sc_valueref_t value) {
     using namespace scopes;
-    return cast<CallTemplate>(value)->is_rawcall();
+    return value.cast<CallTemplate>()->is_rawcall();
 }
 
-void sc_call_set_rawcall(sc_value_t *value, bool enable) {
+void sc_call_set_rawcall(sc_valueref_t value, bool enable) {
     using namespace scopes;
-    cast<CallTemplate>(value)->set_rawcall();
+    value.cast<CallTemplate>()->set_rawcall();
 }
 
-sc_value_t *sc_loop_new(const sc_anchor_t *anchor, sc_value_t *init) {
+sc_value_t *sc_loop_new(sc_valueref_t init) {
     using namespace scopes;
-    REWRITE_ANCHOR(anchor)
-    return Loop::from(anchor, init);
+    return Loop::from(init);
 }
 
-sc_value_t *sc_loop_arguments(sc_value_t *loop) {
+sc_valueref_t sc_loop_arguments(sc_valueref_t loop) {
     using namespace scopes;
-    return cast<Loop>(loop)->args;
+    return loop.cast<Loop>()->args;
 }
 
-void sc_loop_set_body(sc_value_t *loop, sc_value_t *body) {
+void sc_loop_set_body(sc_valueref_t loop, sc_valueref_t body) {
     using namespace scopes;
-    cast<Loop>(loop)->value = body;
+    loop.cast<Loop>()->value = body;
 }
 
-sc_value_t *sc_const_int_new(const sc_anchor_t *anchor, const sc_type_t *type, uint64_t value) {
+sc_value_t *sc_const_int_new(const sc_type_t *type, uint64_t value) {
     using namespace scopes;
-    REWRITE_ANCHOR(anchor)
-    return ConstInt::from(anchor, type, value);
+    return ConstInt::from(type, value);
 }
-sc_value_t *sc_const_real_new(const sc_anchor_t *anchor, const sc_type_t *type, double value) {
+sc_value_t *sc_const_real_new(const sc_type_t *type, double value) {
     using namespace scopes;
-    REWRITE_ANCHOR(anchor)
-    return ConstReal::from(anchor, type, value);
+    return ConstReal::from(type, value);
 }
-sc_value_t *sc_const_aggregate_new(const sc_anchor_t *anchor, const sc_type_t *type, int numconsts, sc_value_t **consts) {
+sc_value_t *sc_const_aggregate_new(const sc_type_t *type, int numconsts, sc_valueref_t *consts) {
     using namespace scopes;
-    REWRITE_ANCHOR(anchor)
-    Constants vals;
+    ConstantPtrs vals;
     init_values_arrayT(vals, numconsts, consts);
-    return ConstAggregate::from(anchor, type, vals);
+    return ConstAggregate::from(type, vals);
 }
-sc_value_t *sc_const_pointer_new(const sc_anchor_t *anchor, const sc_type_t *type, const void *pointer) {
+sc_value_t *sc_const_pointer_new(const sc_type_t *type, const void *pointer) {
     using namespace scopes;
-    REWRITE_ANCHOR(anchor)
-    return ConstPointer::from(anchor, type, pointer);
+    return ConstPointer::from(type, pointer);
 }
-uint64_t sc_const_int_extract(const sc_value_t *value) {
+uint64_t sc_const_int_extract(const sc_valueref_t value) {
     using namespace scopes;
-    return cast<ConstInt>(value)->value;
+    return value.cast<ConstInt>()->value;
 }
-double sc_const_real_extract(const sc_value_t *value) {
+double sc_const_real_extract(const sc_valueref_t value) {
     using namespace scopes;
-    return cast<ConstReal>(value)->value;
+    return value.cast<ConstReal>()->value;
 }
-sc_value_t *sc_const_extract_at(const sc_value_t *value, int index) {
+sc_valueref_t sc_const_extract_at(const sc_valueref_t value, int index) {
     using namespace scopes;
-    auto val = cast<ConstAggregate>(value);
+    auto val = value.cast<ConstAggregate>();
     assert(index < val->values.size());
-    return val->values[index];
+    return get_field(val, index);
 }
-const void *sc_const_pointer_extract(const sc_value_t *value) {
+const void *sc_const_pointer_extract(const sc_valueref_t value) {
     using namespace scopes;
-    return cast<ConstPointer>(value)->value;
-}
-
-sc_value_t *sc_break_new(const sc_anchor_t *anchor, sc_value_t *value) {
-    using namespace scopes;
-    REWRITE_ANCHOR(anchor)
-    return Break::from(anchor, value);
-}
-sc_value_t *sc_repeat_new(const sc_anchor_t *anchor, sc_value_t *value) {
-    using namespace scopes;
-    REWRITE_ANCHOR(anchor)
-    return RepeatTemplate::from(anchor, value);
-}
-sc_value_t *sc_return_new(const sc_anchor_t *anchor, sc_value_t *value) {
-    using namespace scopes;
-    REWRITE_ANCHOR(anchor)
-    return ReturnTemplate::from(anchor, value);
-}
-sc_value_t *sc_raise_new(const sc_anchor_t *anchor, sc_value_t *value) {
-    using namespace scopes;
-    REWRITE_ANCHOR(anchor)
-    return RaiseTemplate::from(anchor, value);
+    return value.cast<ConstPointer>()->value;
 }
 
-sc_value_t *sc_quote_new(const sc_anchor_t *anchor, sc_value_t *value) {
+sc_value_t *sc_break_new(sc_valueref_t value) {
     using namespace scopes;
-    REWRITE_ANCHOR(anchor)
-    return Quote::from(anchor, value);
+    return Break::from(value);
+}
+sc_value_t *sc_repeat_new(sc_valueref_t value) {
+    using namespace scopes;
+    return RepeatTemplate::from(value);
+}
+sc_value_t *sc_return_new(sc_valueref_t value) {
+    using namespace scopes;
+    return ReturnTemplate::from(value);
+}
+sc_value_t *sc_raise_new(sc_valueref_t value) {
+    using namespace scopes;
+    return RaiseTemplate::from(value);
 }
 
-sc_value_t *sc_unquote_new(const sc_anchor_t *anchor, sc_value_t *value) {
+sc_value_t *sc_quote_new(sc_valueref_t value) {
     using namespace scopes;
-    REWRITE_ANCHOR(anchor)
-    return Unquote::from(anchor, value);
+    return Quote::from(value);
 }
 
-sc_value_t *sc_label_new(const sc_anchor_t *anchor, int kind, sc_symbol_t name) {
+sc_value_t *sc_unquote_new(sc_valueref_t value) {
     using namespace scopes;
-    REWRITE_ANCHOR(anchor)
-    return LabelTemplate::from(anchor, (LabelKind)kind, name);
+    return Unquote::from(value);
 }
-void sc_label_set_body(sc_value_t *label, sc_value_t *body) {
+
+sc_value_t *sc_label_new(int kind, sc_symbol_t name) {
     using namespace scopes;
-    cast<LabelTemplate>(label)->value = body;
+    return LabelTemplate::from((LabelKind)kind, name);
 }
-sc_value_t *sc_merge_new(const sc_anchor_t *anchor, sc_value_t *label, sc_value_t *value) {
+void sc_label_set_body(sc_valueref_t label, sc_valueref_t body) {
     using namespace scopes;
-    REWRITE_ANCHOR(anchor)
-    return MergeTemplate::from(anchor, cast<LabelTemplate>(label), value);
+    label.cast<LabelTemplate>()->value = body;
+}
+sc_value_t *sc_merge_new(sc_valueref_t label, sc_valueref_t value) {
+    using namespace scopes;
+    return MergeTemplate::from(label.cast<LabelTemplate>(), value);
 }
 
 // Parser
 ////////////////////////////////////////////////////////////////////////////////
 
-sc_value_raises_t sc_parse_from_path(const sc_string_t *path) {
+sc_valueref_raises_t sc_parse_from_path(const sc_string_t *path) {
     using namespace scopes;
-    SCOPES_RESULT_TYPE(Value *);
+    SCOPES_RESULT_TYPE(ValueRef);
     auto sf = SourceFile::from_file(path);
     if (!sf) {
         StyledString ss;
         ss.out << "no such file: " << path;
-        SCOPES_C_RETURN_ERROR(make_location_error(ss.str()));
+        SCOPES_C_RETURN_ERROR(make_error(ss.str()));
     }
     LexerParser parser(sf);
     return convert_result(parser.parse());
 }
 
-sc_value_raises_t sc_parse_from_string(const sc_string_t *str) {
+sc_valueref_raises_t sc_parse_from_string(const sc_string_t *str) {
     using namespace scopes;
     auto sf = SourceFile::from_string(Symbol("<string>"), str);
     assert(sf);
@@ -1387,47 +1350,50 @@ sc_value_raises_t sc_parse_from_string(const sc_string_t *str) {
 // Types
 ////////////////////////////////////////////////////////////////////////////////
 
-sc_value_raises_t sc_type_at(const sc_type_t *T, sc_symbol_t key) {
+sc_valueref_raises_t sc_type_at(const sc_type_t *T, sc_symbol_t key) {
     using namespace scopes;
+    SCOPES_RESULT_TYPE(ValueRef);
     T = strip_qualifiers(T);
-    Value *result = nullptr;
+    ValueRef result;
     bool ok = T->lookup(key, result);
     if (!ok) {
         StyledString ss;
         ss.out << "no attribute " << key << " in type " << T;
-        return { false, make_location_error(ss.str()), nullptr };
+        SCOPES_C_RETURN_ERROR(make_error(ss.str()));
     }
-    return { true, nullptr, result };
+    return convert_result(result);
 }
 
-sc_value_raises_t sc_type_local_at(const sc_type_t *T, sc_symbol_t key) {
+sc_valueref_raises_t sc_type_local_at(const sc_type_t *T, sc_symbol_t key) {
     using namespace scopes;
+    SCOPES_RESULT_TYPE(ValueRef);
     T = strip_qualifiers(T);
-    Value *result = nullptr;
+    ValueRef result;
     bool ok = T->lookup_local(key, result);
     if (!ok) {
         StyledString ss;
         ss.out << "no local attribute " << key << " in type " << T;
-        return { false, make_location_error(ss.str()), nullptr };
+        SCOPES_C_RETURN_ERROR(make_error(ss.str()));
     }
-    return { true, nullptr, result };
+    return convert_result(result);
 }
 
 sc_size_raises_t sc_type_sizeof(const sc_type_t *T) {
     using namespace scopes;
-    return convert_result(size_of(T));
+    SCOPES_RESULT_TYPE(size_t);
+    SCOPES_C_RETURN(size_of(T));
 }
 
 sc_size_raises_t sc_type_alignof(const sc_type_t *T) {
     using namespace scopes;
-    return convert_result(align_of(T));
+    SCOPES_RESULT_TYPE(size_t);
+    SCOPES_C_RETURN(align_of(T));
 }
 
 sc_int_raises_t sc_type_countof(const sc_type_t *T) {
     using namespace scopes;
-    auto rT = storage_type(T);
-    if (!rT.ok()) return { false, rT.assert_error(), 0 };
-    T = rT.assert_ok();
+    SCOPES_RESULT_TYPE(int);
+    T = SCOPES_C_GET_RESULT(storage_type(T));
     switch(T->kind()) {
     case TK_Pointer:
     case TK_Image:
@@ -1442,7 +1408,7 @@ sc_int_raises_t sc_type_countof(const sc_type_t *T) {
     }
     StyledString ss;
     ss.out << "storage type " << T << " has no count";
-    return { false, make_location_error(ss.str()), 0 };
+    SCOPES_C_RETURN_ERROR(make_error(ss.str()));
 }
 
 sc_type_raises_t sc_type_element_at(const sc_type_t *T, int i) {
@@ -1462,17 +1428,16 @@ sc_type_raises_t sc_type_element_at(const sc_type_t *T, int i) {
     default: {
         StyledString ss;
         ss.out << "storage type " << T << " has no elements" << std::endl;
-        SCOPES_C_RETURN_ERROR(make_location_error(ss.str()));
+        SCOPES_C_RETURN_ERROR(make_error(ss.str()));
     } break;
     }
-    return convert_result(result);
+    SCOPES_C_RETURN(result);
 }
 
 sc_int_raises_t sc_type_field_index(const sc_type_t *T, sc_symbol_t name) {
     using namespace scopes;
-    auto rT = storage_type(T);
-    if (!rT.ok()) return { false, rT.assert_error(), -1 };
-    T = rT.assert_ok();
+    SCOPES_RESULT_TYPE(int);
+    T = SCOPES_C_GET_RESULT(storage_type(T));
     switch(T->kind()) {
     case TK_Tuple: return { true, nullptr, (int)cast<TupleType>(T)->field_index(name) };
     case TK_Union: return { true, nullptr, (int)cast<UnionType>(T)->field_index(name) };
@@ -1480,7 +1445,7 @@ sc_int_raises_t sc_type_field_index(const sc_type_t *T, sc_symbol_t name) {
     }
     StyledString ss;
     ss.out << "storage type " << T << " has no elements" << std::endl;
-    return { false, make_location_error(ss.str()), -1 };
+    SCOPES_C_RETURN_ERROR(make_error(ss.str()));
 }
 
 sc_symbol_raises_t sc_type_field_name(const sc_type_t *T, int index) {
@@ -1495,7 +1460,7 @@ sc_symbol_raises_t sc_type_field_name(const sc_type_t *T, int index) {
     }
     StyledString ss;
     ss.out << "storage type " << T << " has no elements" << std::endl;
-    SCOPES_C_RETURN_ERROR(make_location_error(ss.str()));
+    SCOPES_C_RETURN_ERROR(make_error(ss.str()));
 }
 
 int32_t sc_type_kind(const sc_type_t *T) {
@@ -1543,7 +1508,7 @@ const sc_string_t *sc_type_string(const sc_type_t *T) {
     return ss.str();
 }
 
-sc_symbol_value_tuple_t sc_type_next(const sc_type_t *type, sc_symbol_t key) {
+sc_symbol_valueref_tuple_t sc_type_next(const sc_type_t *type, sc_symbol_t key) {
     using namespace scopes;
     type = strip_qualifiers(type);
     auto &&map = type->get_symbols();
@@ -1557,10 +1522,10 @@ sc_symbol_value_tuple_t sc_type_next(const sc_type_t *type, sc_symbol_t key) {
     if (it != map.end()) {
         return { it->first, it->second };
     }
-    return { SYM_Unnamed, nullptr };
+    return { SYM_Unnamed, ValueRef() };
 }
 
-void sc_type_set_symbol(const sc_type_t *T, sc_symbol_t sym, sc_value_t *value) {
+void sc_type_set_symbol(const sc_type_t *T, sc_symbol_t sym, sc_valueref_t value) {
     using namespace scopes;
     T = strip_qualifiers(T);
     const_cast<Type *>(T)->bind(sym, value);
@@ -1691,7 +1656,7 @@ sc_void_raises_t sc_typename_type_set_super(const sc_type_t *T, const sc_type_t 
         if (S == T) {
             StyledString ss;
             ss.out << "typename " << ST << " can not be a supertype of " << T;
-            SCOPES_C_RETURN_ERROR(make_location_error(ss.str()));
+            SCOPES_C_RETURN_ERROR(make_error(ss.str()));
         }
         if (S == TYPE_Typename)
             break;
@@ -1904,16 +1869,20 @@ namespace scopes {
 // GLOBALS
 //------------------------------------------------------------------------------
 
-static void bind_extern(const Anchor *anchor, Symbol globalsym, Symbol externsym, const Type *T) {
-    globals->bind(globalsym, Global::from(anchor, T, externsym, GF_NonWritable));
+static void bind_extern(Symbol globalsym, Symbol externsym, const Type *T) {
+    globals->bind(globalsym, ref(builtin_anchor(), Global::from(T, externsym, GF_NonWritable)));
 }
 
-static void bind_symbol(const Anchor *anchor, Symbol sym, Symbol value) {
-    globals->bind(sym, ConstInt::symbol_from(anchor, value));
+static void bind_new_value(Symbol sym, Value *value) {
+    globals->bind(sym, ref(builtin_anchor(), value));
 }
 
-static void bind_extern(const Anchor *anchor, Symbol sym, const Type *T) {
-    bind_extern(anchor, sym, sym, T);
+static void bind_symbol(Symbol sym, Symbol value) {
+    bind_new_value(sym, ConstInt::symbol_from(value));
+}
+
+static void bind_extern(Symbol sym, const Type *T) {
+    bind_extern(sym, sym, T);
 }
 
 void init_globals(int argc, char *argv[]) {
@@ -1921,18 +1890,12 @@ void init_globals(int argc, char *argv[]) {
     scopes_argc = argc;
     scopes_argv = argv;
 
-#define LINE_ANCHOR Anchor::from(stub_file, __LINE__, 1)
-
 #define DEFINE_EXTERN_C_FUNCTION(FUNC, RETTYPE, ...) \
     (void)FUNC; /* ensure that the symbol is there */ \
-    bind_extern(LINE_ANCHOR, Symbol(#FUNC), function_type(RETTYPE, { __VA_ARGS__ }));
+    bind_extern(Symbol(#FUNC), function_type(RETTYPE, { __VA_ARGS__ }));
 #define DEFINE_RAISING_EXTERN_C_FUNCTION(FUNC, RETTYPE, ...) \
     (void)FUNC; /* ensure that the symbol is there */ \
-    bind_extern(LINE_ANCHOR, Symbol(#FUNC), raising_function_type(RETTYPE, { __VA_ARGS__ }));
-
-    auto stub_file = SourceFile::from_string(Symbol(__FILE__), String::from_cstr(""));
-    auto stub_anchor = Anchor::from(stub_file, 1, 1);
-    _set_active_anchor(stub_anchor);
+    bind_extern(Symbol(#FUNC), raising_function_type(RETTYPE, { __VA_ARGS__ }));
 
     const Type *rawstring = native_ro_pointer_type(TYPE_I8);
     const Type *TYPE_ValuePP = native_ro_pointer_type(TYPE_Value);
@@ -1940,15 +1903,15 @@ void init_globals(int argc, char *argv[]) {
     const Type *voidstar = native_ro_pointer_type(_void);
 
     DEFINE_EXTERN_C_FUNCTION(sc_compiler_version, arguments_type({TYPE_I32, TYPE_I32, TYPE_I32}));
-    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_expand, arguments_type({TYPE_Value, TYPE_List, TYPE_Scope}), TYPE_Value, TYPE_List, TYPE_Scope);
-    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_eval, TYPE_Value, TYPE_Anchor, TYPE_List, TYPE_Scope);
-    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_prove, TYPE_Value, TYPE_Value);
-    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_eval_inline, TYPE_Anchor, TYPE_Value, TYPE_List, TYPE_Scope);
-    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_typify_template, TYPE_Value, TYPE_Value, TYPE_I32, native_ro_pointer_type(TYPE_Type));
-    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_typify, TYPE_Value, TYPE_Closure, TYPE_I32, native_ro_pointer_type(TYPE_Type));
-    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_compile, TYPE_Value, TYPE_Value, TYPE_U64);
-    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_compile_spirv, TYPE_String, TYPE_Symbol, TYPE_Value, TYPE_U64);
-    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_compile_glsl, TYPE_String, TYPE_Symbol, TYPE_Value, TYPE_U64);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_expand, arguments_type({TYPE_ValueRef, TYPE_List, TYPE_Scope}), TYPE_Value, TYPE_List, TYPE_Scope);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_eval, TYPE_ValueRef, TYPE_Anchor, TYPE_List, TYPE_Scope);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_prove, TYPE_ValueRef, TYPE_ValueRef);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_eval_inline, TYPE_Anchor, TYPE_ValueRef, TYPE_List, TYPE_Scope);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_typify_template, TYPE_ValueRef, TYPE_ValueRef, TYPE_I32, native_ro_pointer_type(TYPE_Type));
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_typify, TYPE_ValueRef, TYPE_Closure, TYPE_I32, native_ro_pointer_type(TYPE_Type));
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_compile, TYPE_ValueRef, TYPE_ValueRef, TYPE_U64);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_compile_spirv, TYPE_String, TYPE_Symbol, TYPE_ValueRef, TYPE_U64);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_compile_glsl, TYPE_String, TYPE_Symbol, TYPE_ValueRef, TYPE_U64);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_compile_object, _void, TYPE_String, TYPE_Scope, TYPE_U64);
     DEFINE_EXTERN_C_FUNCTION(sc_enter_solver_cli, _void);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_verify_stack, TYPE_USize);
@@ -1973,62 +1936,62 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_value_kind, TYPE_I32, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_value_wrap, TYPE_Value, TYPE_Type, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_value_unwrap, TYPE_Value, TYPE_Type, TYPE_Value);
-    DEFINE_EXTERN_C_FUNCTION(sc_keyed_new, TYPE_Value, TYPE_Anchor, TYPE_Symbol, TYPE_Value);
-    DEFINE_EXTERN_C_FUNCTION(sc_empty_argument_list, TYPE_Value, TYPE_Anchor);
-    DEFINE_EXTERN_C_FUNCTION(sc_argument_list_new, TYPE_Value, TYPE_Anchor);
+    DEFINE_EXTERN_C_FUNCTION(sc_keyed_new, TYPE_Value, TYPE_Symbol, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_empty_argument_list, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_argument_list_new, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_argument_list_append, _void, TYPE_Value, TYPE_Value);
-    DEFINE_EXTERN_C_FUNCTION(sc_extract_argument_new, TYPE_Value, TYPE_Anchor, TYPE_Value, TYPE_I32);
-    DEFINE_EXTERN_C_FUNCTION(sc_extract_argument_list_new, TYPE_Value, TYPE_Anchor, TYPE_Value, TYPE_I32);
+    DEFINE_EXTERN_C_FUNCTION(sc_extract_argument_new, TYPE_Value, TYPE_Value, TYPE_I32);
+    DEFINE_EXTERN_C_FUNCTION(sc_extract_argument_list_new, TYPE_Value, TYPE_Value, TYPE_I32);
     DEFINE_EXTERN_C_FUNCTION(sc_argcount, TYPE_I32, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_getarg, TYPE_Value, TYPE_Value, TYPE_I32);
     DEFINE_EXTERN_C_FUNCTION(sc_getarglist, TYPE_Value, TYPE_Value, TYPE_I32);
-    DEFINE_EXTERN_C_FUNCTION(sc_template_new, TYPE_Value, TYPE_Anchor, TYPE_Symbol);
+    DEFINE_EXTERN_C_FUNCTION(sc_template_new, TYPE_Value, TYPE_Symbol);
     DEFINE_EXTERN_C_FUNCTION(sc_template_set_name, _void, TYPE_Value, TYPE_Symbol);
     DEFINE_EXTERN_C_FUNCTION(sc_template_get_name, TYPE_Symbol, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_template_append_parameter, _void, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_template_set_body, _void, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_template_set_inline, _void, TYPE_Value);
-    DEFINE_EXTERN_C_FUNCTION(sc_expression_new, TYPE_Value, TYPE_Anchor);
+    DEFINE_EXTERN_C_FUNCTION(sc_expression_new, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_expression_set_scoped, _void, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_expression_append, _void, TYPE_Value, TYPE_Value);
-    DEFINE_EXTERN_C_FUNCTION(sc_global_new, TYPE_Value, TYPE_Anchor, TYPE_Symbol, TYPE_Type,
+    DEFINE_EXTERN_C_FUNCTION(sc_global_new, TYPE_Value, TYPE_Symbol, TYPE_Type,
         TYPE_U32, TYPE_Symbol, TYPE_I32, TYPE_I32);
-    DEFINE_EXTERN_C_FUNCTION(sc_if_new, TYPE_Value, TYPE_Anchor);
-    DEFINE_EXTERN_C_FUNCTION(sc_if_append_then_clause, _void, TYPE_Value, TYPE_Anchor, TYPE_Value, TYPE_Value);
-    DEFINE_EXTERN_C_FUNCTION(sc_if_append_else_clause, _void, TYPE_Value, TYPE_Anchor, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_if_new, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_if_append_then_clause, _void, TYPE_Value, TYPE_Value, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_if_append_else_clause, _void, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_switch_new, TYPE_Value, TYPE_Anchor, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_switch_append_case, _void, TYPE_Value, TYPE_Anchor, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_switch_append_pass, _void, TYPE_Value, TYPE_Anchor, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_switch_append_default, _void, TYPE_Value, TYPE_Anchor, TYPE_Value);
-    DEFINE_EXTERN_C_FUNCTION(sc_parameter_new, TYPE_Value, TYPE_Anchor, TYPE_Symbol);
+    DEFINE_EXTERN_C_FUNCTION(sc_parameter_new, TYPE_Value, TYPE_Symbol);
     DEFINE_EXTERN_C_FUNCTION(sc_parameter_is_variadic, TYPE_Bool, TYPE_Value);
-    DEFINE_EXTERN_C_FUNCTION(sc_call_new, TYPE_Value, TYPE_Anchor, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_call_new, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_call_append_argument, _void, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_call_is_rawcall, TYPE_Bool, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_call_set_rawcall, _void, TYPE_Value, TYPE_Bool);
     DEFINE_EXTERN_C_FUNCTION(sc_loop_new, TYPE_Value, TYPE_Anchor, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_loop_arguments, TYPE_Value, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_loop_set_body, _void, TYPE_Value, TYPE_Value);
-    DEFINE_EXTERN_C_FUNCTION(sc_const_int_new, TYPE_Value, TYPE_Anchor, TYPE_Type, TYPE_U64);
-    DEFINE_EXTERN_C_FUNCTION(sc_const_real_new, TYPE_Value, TYPE_Anchor, TYPE_Type, TYPE_F64);
-    DEFINE_EXTERN_C_FUNCTION(sc_const_aggregate_new, TYPE_Value, TYPE_Anchor, TYPE_Type, TYPE_I32, TYPE_ValuePP);
-    DEFINE_EXTERN_C_FUNCTION(sc_const_pointer_new, TYPE_Value, TYPE_Anchor, TYPE_Type, voidstar);
+    DEFINE_EXTERN_C_FUNCTION(sc_const_int_new, TYPE_Value, TYPE_Type, TYPE_U64);
+    DEFINE_EXTERN_C_FUNCTION(sc_const_real_new, TYPE_Value, TYPE_Type, TYPE_F64);
+    DEFINE_EXTERN_C_FUNCTION(sc_const_aggregate_new, TYPE_Value, TYPE_Type, TYPE_I32, TYPE_ValuePP);
+    DEFINE_EXTERN_C_FUNCTION(sc_const_pointer_new, TYPE_Value, TYPE_Type, voidstar);
     DEFINE_EXTERN_C_FUNCTION(sc_const_int_extract, TYPE_U64, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_const_real_extract, TYPE_F64, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_const_extract_at, TYPE_Value, TYPE_Value, TYPE_I32);
     DEFINE_EXTERN_C_FUNCTION(sc_const_pointer_extract, voidstar, TYPE_Value);
 
-    DEFINE_EXTERN_C_FUNCTION(sc_break_new, TYPE_Value, TYPE_Anchor, TYPE_Value);
-    DEFINE_EXTERN_C_FUNCTION(sc_repeat_new, TYPE_Value, TYPE_Anchor, TYPE_Value);
-    DEFINE_EXTERN_C_FUNCTION(sc_return_new, TYPE_Value, TYPE_Anchor, TYPE_Value);
-    DEFINE_EXTERN_C_FUNCTION(sc_raise_new, TYPE_Value, TYPE_Anchor, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_break_new, TYPE_Value, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_repeat_new, TYPE_Value, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_return_new, TYPE_Value, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_raise_new, TYPE_Value, TYPE_Value);
 
-    DEFINE_EXTERN_C_FUNCTION(sc_quote_new, TYPE_Value, TYPE_Anchor, TYPE_Value);
-    DEFINE_EXTERN_C_FUNCTION(sc_unquote_new, TYPE_Value, TYPE_Anchor, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_quote_new, TYPE_Value, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_unquote_new, TYPE_Value, TYPE_Value);
 
-    DEFINE_EXTERN_C_FUNCTION(sc_label_new, TYPE_Value, TYPE_Anchor, TYPE_I32, TYPE_Symbol);
+    DEFINE_EXTERN_C_FUNCTION(sc_label_new, TYPE_Value, TYPE_I32, TYPE_Symbol);
     DEFINE_EXTERN_C_FUNCTION(sc_label_set_body, _void, TYPE_Value, TYPE_Value);
-    DEFINE_EXTERN_C_FUNCTION(sc_merge_new, TYPE_Value, TYPE_Anchor, TYPE_Value, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_merge_new, TYPE_Value, TYPE_Value, TYPE_Value);
 
     DEFINE_EXTERN_C_FUNCTION(sc_is_file, TYPE_Bool, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_is_directory, TYPE_Bool, TYPE_String);
@@ -2041,7 +2004,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_set_globals, _void, TYPE_Scope);
 
     DEFINE_EXTERN_C_FUNCTION(sc_location_error_new, TYPE_Error, TYPE_Anchor, TYPE_String);
-    DEFINE_EXTERN_C_FUNCTION(sc_runtime_error_new, TYPE_Error, TYPE_String);
+    DEFINE_EXTERN_C_FUNCTION(sc_error_new, TYPE_Error, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_format_error, TYPE_String, TYPE_Error);
 
     DEFINE_EXTERN_C_FUNCTION(sc_abort, TYPE_NoReturn);
@@ -2060,21 +2023,18 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_import_c, TYPE_Scope, TYPE_String, TYPE_String, TYPE_List);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_load_library, _void, TYPE_String);
 
-    DEFINE_EXTERN_C_FUNCTION(sc_get_active_anchor, TYPE_Anchor);
-    DEFINE_EXTERN_C_FUNCTION(sc_set_active_anchor, _void, TYPE_Anchor);
-
-    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_scope_at, TYPE_Value, TYPE_Scope, TYPE_Symbol);
-    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_scope_local_at, TYPE_Value, TYPE_Scope, TYPE_Symbol);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_scope_at, TYPE_ValueRef, TYPE_Scope, TYPE_Symbol);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_scope_local_at, TYPE_ValueRef, TYPE_Scope, TYPE_Symbol);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_get_docstring, TYPE_String, TYPE_Scope, TYPE_Symbol);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_set_docstring, _void, TYPE_Scope, TYPE_Symbol, TYPE_String);
-    DEFINE_EXTERN_C_FUNCTION(sc_scope_set_symbol, _void, TYPE_Scope, TYPE_Symbol, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_scope_set_symbol, _void, TYPE_Scope, TYPE_Symbol, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_new, TYPE_Scope);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_clone, TYPE_Scope, TYPE_Scope);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_new_subscope, TYPE_Scope, TYPE_Scope);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_clone_subscope, TYPE_Scope, TYPE_Scope, TYPE_Scope);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_get_parent, TYPE_Scope, TYPE_Scope);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_del_symbol, _void, TYPE_Scope, TYPE_Symbol);
-    DEFINE_EXTERN_C_FUNCTION(sc_scope_next, arguments_type({TYPE_Symbol, TYPE_Value}), TYPE_Scope, TYPE_Symbol);
+    DEFINE_EXTERN_C_FUNCTION(sc_scope_next, arguments_type({TYPE_Symbol, TYPE_ValueRef}), TYPE_Scope, TYPE_Symbol);
 
     DEFINE_EXTERN_C_FUNCTION(sc_symbol_new, TYPE_Symbol, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_symbol_new_unique, TYPE_Symbol, TYPE_String);
@@ -2105,7 +2065,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_type_is_opaque, TYPE_Bool, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_type_is_superof, TYPE_Bool, TYPE_Type, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_type_string, TYPE_String, TYPE_Type);
-    DEFINE_EXTERN_C_FUNCTION(sc_type_next, arguments_type({TYPE_Symbol, TYPE_Value}), TYPE_Type, TYPE_Symbol);
+    DEFINE_EXTERN_C_FUNCTION(sc_type_next, arguments_type({TYPE_Symbol, TYPE_ValueRef}), TYPE_Type, TYPE_Symbol);
     DEFINE_EXTERN_C_FUNCTION(sc_type_set_symbol, _void, TYPE_Type, TYPE_Symbol, TYPE_Value);
     DEFINE_EXTERN_C_FUNCTION(sc_type_is_refer, TYPE_Bool, TYPE_Type);
 
@@ -2158,20 +2118,20 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_function_type_raising, TYPE_Type, TYPE_Type, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_function_type_return_type, arguments_type({TYPE_Type, TYPE_Type}), TYPE_Type);
 
-    DEFINE_EXTERN_C_FUNCTION(sc_list_cons, TYPE_List, TYPE_Value, TYPE_List);
+    DEFINE_EXTERN_C_FUNCTION(sc_list_cons, TYPE_List, TYPE_ValueRef, TYPE_List);
     DEFINE_EXTERN_C_FUNCTION(sc_list_dump, TYPE_List, TYPE_List);
     DEFINE_EXTERN_C_FUNCTION(sc_list_repr, TYPE_String, TYPE_List);
     DEFINE_EXTERN_C_FUNCTION(sc_list_join, TYPE_List, TYPE_List, TYPE_List);
-    DEFINE_EXTERN_C_FUNCTION(sc_list_decons, arguments_type({TYPE_Value, TYPE_List}), TYPE_List);
+    DEFINE_EXTERN_C_FUNCTION(sc_list_decons, arguments_type({TYPE_ValueRef, TYPE_List}), TYPE_List);
     DEFINE_EXTERN_C_FUNCTION(sc_list_count, TYPE_I32, TYPE_List);
-    DEFINE_EXTERN_C_FUNCTION(sc_list_at, TYPE_Value, TYPE_List);
+    DEFINE_EXTERN_C_FUNCTION(sc_list_at, TYPE_ValueRef, TYPE_List);
     DEFINE_EXTERN_C_FUNCTION(sc_list_next, TYPE_List, TYPE_List);
     DEFINE_EXTERN_C_FUNCTION(sc_list_reverse, TYPE_List, TYPE_List);
     DEFINE_EXTERN_C_FUNCTION(sc_list_compare, TYPE_Bool, TYPE_List, TYPE_List);
 
     DEFINE_EXTERN_C_FUNCTION(sc_closure_get_docstring, TYPE_String, TYPE_Closure);
-    DEFINE_EXTERN_C_FUNCTION(sc_closure_get_template, TYPE_Value, TYPE_Closure);
-    DEFINE_EXTERN_C_FUNCTION(sc_closure_get_context, TYPE_Value, TYPE_Closure);
+    DEFINE_EXTERN_C_FUNCTION(sc_closure_get_template, TYPE_ValueRef, TYPE_Closure);
+    DEFINE_EXTERN_C_FUNCTION(sc_closure_get_context, TYPE_ValueRef, TYPE_Closure);
 
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_parse_from_path, TYPE_Value, TYPE_String);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_parse_from_string, TYPE_Value, TYPE_String);
@@ -2191,97 +2151,97 @@ void init_globals(int argc, char *argv[]) {
 #endif
 #endif
 #endif
-    bind_symbol(LINE_ANCHOR, Symbol("operating-system"), Symbol(SCOPES_SYM_OS));
+    bind_symbol(Symbol("operating-system"), Symbol(SCOPES_SYM_OS));
 #undef SCOPES_SYM_OS
 
-    globals->bind(Symbol("unroll-limit"),
-        ConstInt::from(LINE_ANCHOR, TYPE_I32, SCOPES_MAX_RECURSIONS));
-    globals->bind(KW_True, ConstInt::from(LINE_ANCHOR, TYPE_Bool, true));
-    globals->bind(KW_False, ConstInt::from(LINE_ANCHOR, TYPE_Bool, false));
-    globals->bind(Symbol("noreturn"),
-        ConstPointer::type_from(LINE_ANCHOR, TYPE_NoReturn));
-    globals->bind(KW_None, ConstAggregate::none_from(LINE_ANCHOR));
-    bind_symbol(LINE_ANCHOR, Symbol("unnamed"), Symbol(SYM_Unnamed));
-    globals->bind(SYM_CompilerDir,
-        ConstPointer::string_from(LINE_ANCHOR,
+    bind_new_value(Symbol("unroll-limit"),
+        ConstInt::from(TYPE_I32, SCOPES_MAX_RECURSIONS));
+    bind_new_value(KW_True, ConstInt::from(TYPE_Bool, true));
+    bind_new_value(KW_False, ConstInt::from(TYPE_Bool, false));
+    bind_new_value(Symbol("noreturn"),
+        ConstPointer::type_from(TYPE_NoReturn));
+    bind_new_value(KW_None, ConstAggregate::none_from());
+    bind_symbol(Symbol("unnamed"), Symbol(SYM_Unnamed));
+    bind_new_value(SYM_CompilerDir,
+        ConstPointer::string_from(
             String::from(scopes_compiler_dir, strlen(scopes_compiler_dir))));
-    globals->bind(SYM_CompilerPath,
-        ConstPointer::string_from(LINE_ANCHOR,
+    bind_new_value(SYM_CompilerPath,
+        ConstPointer::string_from(
             String::from(scopes_compiler_path, strlen(scopes_compiler_path))));
-    globals->bind(SYM_DebugBuild,
-        ConstInt::from(LINE_ANCHOR, TYPE_Bool, scopes_is_debug()));
-    globals->bind(SYM_CompilerTimestamp,
-        ConstPointer::string_from(LINE_ANCHOR,
+    bind_new_value(SYM_DebugBuild,
+        ConstInt::from(TYPE_Bool, scopes_is_debug()));
+    bind_new_value(SYM_CompilerTimestamp,
+        ConstPointer::string_from(
             String::from_cstr(scopes_compile_time_date())));
 
     for (uint64_t i = STYLE_FIRST; i <= STYLE_LAST; ++i) {
         Symbol sym = Symbol((KnownSymbol)i);
-        bind_symbol(LINE_ANCHOR, sym, sym);
+        bind_symbol(sym, sym);
     }
 
-    globals->bind(Symbol("voidstar"),
-        ConstPointer::type_from(LINE_ANCHOR, voidstar));
+    bind_new_value(Symbol("voidstar"),
+        ConstPointer::type_from(voidstar));
 #define T(TYPE, NAME) \
-    globals->bind(Symbol(NAME), ConstPointer::type_from(LINE_ANCHOR, TYPE));
+    bind_new_value(Symbol(NAME), ConstPointer::type_from(TYPE));
 B_TYPES()
 #undef T
 
 #define T(NAME, BNAME, CLASS) \
-    globals->bind(Symbol(BNAME), ConstInt::from(LINE_ANCHOR, TYPE_I32, (int32_t)NAME));
+    bind_new_value(Symbol(BNAME), ConstInt::from(TYPE_I32, (int32_t)NAME));
     B_TYPE_KIND()
 #undef T
 
 #define T(NAME, BNAME, CLASS) \
-    globals->bind(Symbol(BNAME), ConstInt::from(LINE_ANCHOR, TYPE_I32, (int32_t)NAME));
+    bind_new_value(Symbol(BNAME), ConstInt::from(TYPE_I32, (int32_t)NAME));
     SCOPES_VALUE_KIND()
 #undef T
 
-    globals->bind(Symbol("global-flag-buffer-block"),
-        ConstInt::from(LINE_ANCHOR, TYPE_U32, GF_BufferBlock));
-    globals->bind(Symbol("global-flag-non-writable"),
-        ConstInt::from(LINE_ANCHOR, TYPE_U32, GF_NonWritable));
-    globals->bind(Symbol("global-flag-non-readable"),
-        ConstInt::from(LINE_ANCHOR, TYPE_U32, GF_NonReadable));
-    globals->bind(Symbol("global-flag-volatile"),
-        ConstInt::from(LINE_ANCHOR, TYPE_U32, GF_Volatile));
-    globals->bind(Symbol("global-flag-coherent"),
-        ConstInt::from(LINE_ANCHOR, TYPE_U32, GF_Coherent));
-    globals->bind(Symbol("global-flag-restrict"),
-        ConstInt::from(LINE_ANCHOR, TYPE_U32, GF_Restrict));
-    globals->bind(Symbol("global-flag-block"),
-        ConstInt::from(LINE_ANCHOR, TYPE_U32, GF_Block));
+    bind_new_value(Symbol("global-flag-buffer-block"),
+        ConstInt::from(TYPE_U32, GF_BufferBlock));
+    bind_new_value(Symbol("global-flag-non-writable"),
+        ConstInt::from(TYPE_U32, GF_NonWritable));
+    bind_new_value(Symbol("global-flag-non-readable"),
+        ConstInt::from(TYPE_U32, GF_NonReadable));
+    bind_new_value(Symbol("global-flag-volatile"),
+        ConstInt::from(TYPE_U32, GF_Volatile));
+    bind_new_value(Symbol("global-flag-coherent"),
+        ConstInt::from(TYPE_U32, GF_Coherent));
+    bind_new_value(Symbol("global-flag-restrict"),
+        ConstInt::from(TYPE_U32, GF_Restrict));
+    bind_new_value(Symbol("global-flag-block"),
+        ConstInt::from(TYPE_U32, GF_Block));
 
-    globals->bind(Symbol("pointer-flag-non-readable"),
-        ConstInt::from(LINE_ANCHOR, TYPE_U64, (uint64_t)PTF_NonReadable));
-    globals->bind(Symbol("pointer-flag-non-writable"),
-        ConstInt::from(LINE_ANCHOR, TYPE_U64, (uint64_t)PTF_NonWritable));
+    bind_new_value(Symbol("pointer-flag-non-readable"),
+        ConstInt::from(TYPE_U64, (uint64_t)PTF_NonReadable));
+    bind_new_value(Symbol("pointer-flag-non-writable"),
+        ConstInt::from(TYPE_U64, (uint64_t)PTF_NonWritable));
 
-    globals->bind(Symbol("typename-flag-plain"),
-        ConstInt::from(LINE_ANCHOR, TYPE_U32, (uint32_t)TNF_Plain));
+    bind_new_value(Symbol("typename-flag-plain"),
+        ConstInt::from(TYPE_U32, (uint32_t)TNF_Plain));
 
-    globals->bind(Symbol(SYM_DumpDisassembly),
-        ConstInt::from(LINE_ANCHOR, TYPE_U64, (uint64_t)CF_DumpDisassembly));
-    globals->bind(Symbol(SYM_DumpModule),
-        ConstInt::from(LINE_ANCHOR, TYPE_U64, (uint64_t)CF_DumpModule));
-    globals->bind(Symbol(SYM_DumpFunction),
-        ConstInt::from(LINE_ANCHOR, TYPE_U64, (uint64_t)CF_DumpFunction));
-    globals->bind(Symbol(SYM_DumpTime),
-        ConstInt::from(LINE_ANCHOR, TYPE_U64, (uint64_t)CF_DumpTime));
-    globals->bind(Symbol(SYM_NoDebugInfo),
-        ConstInt::from(LINE_ANCHOR, TYPE_U64, (uint64_t)CF_NoDebugInfo));
-    globals->bind(Symbol(SYM_O1),
-        ConstInt::from(LINE_ANCHOR, TYPE_U64, (uint64_t)CF_O1));
-    globals->bind(Symbol(SYM_O2),
-        ConstInt::from(LINE_ANCHOR, TYPE_U64, (uint64_t)CF_O2));
-    globals->bind(Symbol(SYM_O3),
-        ConstInt::from(LINE_ANCHOR, TYPE_U64, (uint64_t)CF_O3));
+    bind_new_value(Symbol(SYM_DumpDisassembly),
+        ConstInt::from(TYPE_U64, (uint64_t)CF_DumpDisassembly));
+    bind_new_value(Symbol(SYM_DumpModule),
+        ConstInt::from(TYPE_U64, (uint64_t)CF_DumpModule));
+    bind_new_value(Symbol(SYM_DumpFunction),
+        ConstInt::from(TYPE_U64, (uint64_t)CF_DumpFunction));
+    bind_new_value(Symbol(SYM_DumpTime),
+        ConstInt::from(TYPE_U64, (uint64_t)CF_DumpTime));
+    bind_new_value(Symbol(SYM_NoDebugInfo),
+        ConstInt::from(TYPE_U64, (uint64_t)CF_NoDebugInfo));
+    bind_new_value(Symbol(SYM_O1),
+        ConstInt::from(TYPE_U64, (uint64_t)CF_O1));
+    bind_new_value(Symbol(SYM_O2),
+        ConstInt::from(TYPE_U64, (uint64_t)CF_O2));
+    bind_new_value(Symbol(SYM_O3),
+        ConstInt::from(TYPE_U64, (uint64_t)CF_O3));
 
-#define T(NAME) globals->bind(NAME, ConstInt::builtin_from(LINE_ANCHOR, Builtin(NAME)));
-#define T0(NAME, STR) globals->bind(NAME, ConstInt::builtin_from(LINE_ANCHOR, Builtin(NAME)));
+#define T(NAME) bind_new_value(NAME, ConstInt::builtin_from(Builtin(NAME)));
+#define T0(NAME, STR) bind_new_value(NAME, ConstInt::builtin_from(Builtin(NAME)));
 #define T1 T2
 #define T2T T2
 #define T2(UNAME, LNAME, PFIX, OP) \
-    globals->bind(FN_ ## UNAME ## PFIX, ConstInt::builtin_from(LINE_ANCHOR, Builtin(FN_ ## UNAME ## PFIX)));
+    bind_new_value(FN_ ## UNAME ## PFIX, ConstInt::builtin_from(Builtin(FN_ ## UNAME ## PFIX)));
     B_GLOBALS()
 #undef T
 #undef T0

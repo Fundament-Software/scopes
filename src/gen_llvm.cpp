@@ -169,7 +169,7 @@ struct LLVMIRGenerator {
     std::unordered_map<Function *, LLVMMetadataRef> func2md;
     std::unordered_map<Function *, Symbol> func_export_table;
     std::unordered_map<Global *, LLVMValueRef> global2global;
-    std::deque<Function *> function_todo;
+    std::deque<FunctionRef> function_todo;
     static Types type_todo;
     static std::unordered_map<const Type *, LLVMTypeRef> type_cache;
     static std::unordered_map<Function *, LLVMModuleRef> func_cache;
@@ -199,7 +199,7 @@ struct LLVMIRGenerator {
 
     bool use_debug_info;
     bool generate_object;
-    Function *active_function;
+    FunctionRef active_function;
     int functions_generated;
 
     static const Type *arguments_to_tuple(const Type *T) {
@@ -247,12 +247,11 @@ struct LLVMIRGenerator {
     TryInfo try_info;
 
     struct LoopInfo {
-        LoopLabel *loop;
+        LoopLabelRef loop;
         LLVMBasicBlockRef bb_loop;
         LLVMValueRefs repeat_values;
 
         LoopInfo() :
-            loop(nullptr),
             bb_loop(nullptr)
         {}
     };
@@ -260,12 +259,11 @@ struct LLVMIRGenerator {
     LoopInfo loop_info;
 
     struct LabelInfo {
-        Label *label;
+        LabelRef label;
         LLVMBasicBlockRef bb_merge;
         LLVMValueRefs merge_values;
 
         LabelInfo() :
-            label(nullptr),
             bb_merge(nullptr)
         {}
     };
@@ -284,7 +282,6 @@ struct LLVMIRGenerator {
         //active_function_value(nullptr),
         use_debug_info(true),
         generate_object(false),
-        active_function(nullptr),
         functions_generated(0) {
         static_init();
         for (int i = 0; i < NumIntrinsics; ++i) {
@@ -316,14 +313,14 @@ struct LLVMIRGenerator {
         return result;
     }
 
-    LLVMMetadataRef function_to_subprogram(Function *l) {
+    LLVMMetadataRef function_to_subprogram(const FunctionRef &l) {
         assert(use_debug_info);
 
-        auto it = func2md.find(l);
+        auto it = func2md.find(l.unref());
         if (it != func2md.end())
             return it->second;
 
-        const Anchor *anchor = l->anchor();
+        const Anchor *anchor = l.anchor();
 
         LLVMMetadataRef difile = source_file_to_scope(anchor->file);
 
@@ -343,7 +340,7 @@ struct LLVMIRGenerator {
             difile, anchor->lineno, disrt, false, true,
             anchor->lineno, LLVMDIFlagZero, false);
 
-        func2md.insert({ l, difunc });
+        func2md.insert({ l.unref(), difunc });
         return difunc;
     }
 
@@ -668,7 +665,7 @@ struct LLVMIRGenerator {
         } break;
         case TK_Typename: {
             if (type == TYPE_Sampler) {
-                SCOPES_LOCATION_ERROR(String::from(
+                SCOPES_ERROR(String::from(
                     "sampler type can not be used for native target"));
             }
             auto tn = cast<TypenameType>(type);
@@ -720,11 +717,11 @@ struct LLVMIRGenerator {
                 &elements[0], elements.size(), fi->vararg());
         } break;
         case TK_SampledImage: {
-            SCOPES_LOCATION_ERROR(String::from(
+            SCOPES_ERROR(String::from(
                 "sampled image type can not be used for native target"));
         } break;
         case TK_Image: {
-            SCOPES_LOCATION_ERROR(String::from(
+            SCOPES_ERROR(String::from(
                 "image type can not be used for native target"));
         } break;
         default: break;
@@ -732,7 +729,7 @@ struct LLVMIRGenerator {
 
         StyledString ss;
         ss.out << "IL->IR: cannot convert type " << type;
-        SCOPES_LOCATION_ERROR(ss.str());
+        SCOPES_ERROR(ss.str());
     }
 
     static SCOPES_RESULT(size_t) finalize_types() {
@@ -807,7 +804,7 @@ struct LLVMIRGenerator {
 
     static Error *last_llvm_error;
     static void fatal_error_handler(const char *Reason) {
-        last_llvm_error = make_location_error(String::from_cstr(Reason));
+        last_llvm_error = make_error(String::from_cstr(Reason));
     }
 
     void bind(const ValueIndex &node, LLVMValueRef value) {
@@ -889,26 +886,26 @@ struct LLVMIRGenerator {
         return write_return(refs, is_except);
     }
 
-    SCOPES_RESULT(void) translate_Return(Return *node) {
+    SCOPES_RESULT(void) translate_Return(const ReturnRef &node) {
         SCOPES_RESULT_TYPE(void);
         SCOPES_CHECK_RESULT(write_return(node->values));
         return {};
     }
 
-    SCOPES_RESULT(void) translate_Raise(Raise *node) {
+    SCOPES_RESULT(void) translate_Raise(const RaiseRef &node) {
         SCOPES_RESULT_TYPE(void);
         SCOPES_CHECK_RESULT(build_merge_phi(try_info.except_values, node->values));
         LLVMBuildBr(builder, try_info.bb_except);
         return {};
     }
 
-    SCOPES_RESULT(void) Function_finalize(Function *node) {
+    SCOPES_RESULT(void) Function_finalize(const FunctionRef &node) {
         SCOPES_RESULT_TYPE(void);
 
         functions_generated++;
 
         active_function = node;
-        auto it = ref2value.find(node);
+        auto it = ref2value.find(ValueIndex(node));
         assert(it != ref2value.end());
         LLVMValueRef func = it->second;
         assert(func);
@@ -924,7 +921,7 @@ struct LLVMIRGenerator {
             try_info.bb_except = LLVMAppendBasicBlock(func, "except");
             position_builder_at_end(try_info.bb_except);
             if (use_debug_info)
-                set_debug_location(node->anchor());
+                set_debug_location(node.anchor());
             SCOPES_CHECK_RESULT(build_phi(try_info.except_values, fi->except_type));
             SCOPES_CHECK_RESULT(write_return(try_info.except_values, true));
         }
@@ -942,25 +939,25 @@ struct LLVMIRGenerator {
         size_t paramcount = params.size();
 
         if (use_debug_info)
-            set_debug_location(node->anchor());
+            set_debug_location(node.anchor());
         size_t k = offset;
         for (size_t i = 0; i < paramcount; ++i) {
-            Parameter *param = params[i];
+            ParameterRef param = params[i];
             LLVMValueRef val = SCOPES_GET_RESULT(abi_import_argument(param->get_type(), func, k));
             assert(val);
-            bind(param, val);
+            bind(ValueIndex(param), val);
         }
         SCOPES_CHECK_RESULT(translate_block(node->body));
         return {};
     }
 
-    SCOPES_RESULT(LLVMValueRef) Function_to_value(Function *node) {
+    SCOPES_RESULT(LLVMValueRef) Function_to_value(const FunctionRef &node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
 
         bool is_export = false;
         const char *name = nullptr;
         {
-            auto it = func_export_table.find(node);
+            auto it = func_export_table.find(node.unref());
             if (it != func_export_table.end()) {
                 name = it->second.name()->data;
                 is_export = true;
@@ -975,7 +972,7 @@ struct LLVMIRGenerator {
             }
             size_t mangled_name_size = strlen(name) + 32;
             char *mangled_name = new char[mangled_name_size];
-            snprintf(mangled_name, mangled_name_size, "_scopes_jit_%s_%p", name, (void *)node);
+            snprintf(mangled_name, mangled_name_size, "_scopes_jit_%s_%p", name, (void *)node.unref());
             name = mangled_name;
         }
 
@@ -986,13 +983,13 @@ struct LLVMIRGenerator {
 
 #if SCOPES_LLVM_CACHE_FUNCTIONS
         if (!generate_object) {
-            auto it = func_cache.find(node);
+            auto it = func_cache.find(node.unref());
             if (it != func_cache.end()) {
                 assert(it->second != module);
                 return func;
             }
 
-            func_cache.insert({node, module});
+            func_cache.insert({node.unref(), module});
         }
 #endif
 
@@ -1012,19 +1009,19 @@ struct LLVMIRGenerator {
         return func;
     }
 
-    SCOPES_RESULT(LLVMValueRef) Parameter_to_value(Parameter *node) {
+    SCOPES_RESULT(LLVMValueRef) Parameter_to_value(const ParameterRef &node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         SCOPES_EXPECT_ERROR(error_gen_unbound_symbol(SCOPES_GEN_TARGET, node));
     }
 
-    SCOPES_RESULT(LLVMValueRef) LoopLabelArguments_to_value(LoopLabelArguments *node) {
+    SCOPES_RESULT(LLVMValueRef) LoopLabelArguments_to_value(const LoopLabelArgumentsRef &node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
-        SCOPES_EXPECT_ERROR(error_gen_unbound_symbol(SCOPES_GEN_TARGET, node));
+        SCOPES_EXPECT_ERROR(error_gen_unbound_symbol(SCOPES_GEN_TARGET, ValueRef(node)));
     }
 
-    SCOPES_RESULT(LLVMValueRef) Exception_to_value(Exception *node) {
+    SCOPES_RESULT(LLVMValueRef) Exception_to_value(const ExceptionRef &node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
-        SCOPES_EXPECT_ERROR(error_cannot_translate(SCOPES_GEN_TARGET, node));
+        SCOPES_EXPECT_ERROR(error_cannot_translate(SCOPES_GEN_TARGET, ValueRef(node)));
     }
 
     SCOPES_RESULT(void) translate_block(const Block &node) {
@@ -1039,7 +1036,7 @@ struct LLVMIRGenerator {
     }
 
 
-    LabelInfo &find_label_info(Label *label) {
+    LabelInfo &find_label_info(const LabelRef &label) {
         int i = label_info_stack.size();
         while (i-- > 0) {
             auto &&info = label_info_stack[i];
@@ -1076,7 +1073,7 @@ struct LLVMIRGenerator {
         return {};
     }
 
-    SCOPES_RESULT(LLVMValueRef) build_merge(Label *label, const TypedValues &values) {
+    SCOPES_RESULT(LLVMValueRef) build_merge(const LabelRef &label, const TypedValues &values) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         auto &&label_info = find_label_info(label);
         SCOPES_CHECK_RESULT(build_merge_phi(label_info.merge_values, values));
@@ -1084,21 +1081,21 @@ struct LLVMIRGenerator {
         return LLVMBuildBr(builder, label_info.bb_merge);
     }
 
-    SCOPES_RESULT(void) translate_Merge(Merge *node) {
+    SCOPES_RESULT(void) translate_Merge(const MergeRef &node) {
         SCOPES_RESULT_TYPE(void);
-        auto label = cast<Label>(node->label);
+        auto label = node->label.cast<Label>();
         SCOPES_CHECK_RESULT(build_merge(label, node->values));
         return {};
     }
 
-    SCOPES_RESULT(void) translate_Repeat(Repeat *node) {
+    SCOPES_RESULT(void) translate_Repeat(const RepeatRef &node) {
         SCOPES_RESULT_TYPE(void);
         SCOPES_CHECK_RESULT(build_merge_phi(loop_info.repeat_values, node->values));
         LLVMBuildBr(builder, loop_info.bb_loop);
         return {};
     }
 
-    SCOPES_RESULT(void) translate_Label(Label *node) {
+    SCOPES_RESULT(void) translate_Label(const LabelRef &node) {
         SCOPES_RESULT_TYPE(void);
         LabelInfo label_info;
         label_info.label = node;
@@ -1134,20 +1131,20 @@ struct LLVMIRGenerator {
         return {};
     }
 
-    void map_phi(const LLVMValueRefs &refs, TypedValue *node) {
+    void map_phi(const LLVMValueRefs &refs, const TypedValueRef &node) {
         for (int i = 0; i < refs.size(); ++i) {
             bind(ValueIndex(node, i), refs[i]);
         }
     }
 
-    SCOPES_RESULT(void) build_phi(LLVMValueRefs &refs, TypedValue *node) {
+    SCOPES_RESULT(void) build_phi(LLVMValueRefs &refs, const TypedValueRef &node) {
         SCOPES_RESULT_TYPE(void);
         SCOPES_CHECK_RESULT(build_phi(refs, node->get_type()));
         map_phi(refs, node);
         return {};
     }
 
-    SCOPES_RESULT(void) translate_LoopLabel(LoopLabel *node) {
+    SCOPES_RESULT(void) translate_LoopLabel(const LoopLabelRef &node) {
         SCOPES_RESULT_TYPE(void);
         //auto rtype = node->get_type();
         auto old_loop_info = loop_info;
@@ -1192,7 +1189,7 @@ struct LLVMIRGenerator {
         }
     }
 
-    SCOPES_RESULT(LLVMTypeRef) node_to_llvm_type(Value *node) {
+    SCOPES_RESULT(LLVMTypeRef) node_to_llvm_type(const ValueRef &node) {
         SCOPES_RESULT_TYPE(LLVMTypeRef);
         return type_to_llvm_type(SCOPES_GET_RESULT(extract_type_constant(node)));
     }
@@ -1215,7 +1212,7 @@ struct LLVMIRGenerator {
 
 #define READ_VALUE(NAME) \
         assert(argn < argcount); \
-        TypedValue * _ ## NAME = args[argn++]; \
+        TypedValueRef _ ## NAME = args[argn++]; \
         LLVMValueRef NAME = SCOPES_GET_RESULT(ref_to_value(_ ## NAME));
 
 #define READ_TYPE(NAME) \
@@ -1671,7 +1668,7 @@ struct LLVMIRGenerator {
         default: {
             StyledString ss;
             ss.out << "IL->IR: unsupported builtin " << builtin << " encountered";
-            SCOPES_LOCATION_ERROR(ss.str());
+            SCOPES_ERROR(ss.str());
         } break;
         }
 #undef READ_TYPE
@@ -1679,7 +1676,7 @@ struct LLVMIRGenerator {
         return nullptr;
     }
 
-    SCOPES_RESULT(void) translate_Call(Call *call) {
+    SCOPES_RESULT(void) translate_Call(const CallRef &call) {
         SCOPES_RESULT_TYPE(void);
         auto callee = call->callee;
         auto &&args = call->args;
@@ -1699,11 +1696,10 @@ struct LLVMIRGenerator {
             }
             return {};
         }
-        SCOPES_ANCHOR(call->anchor());
         SCOPES_EXPECT_ERROR(error_gen_invalid_call_type(SCOPES_GEN_TARGET, callee));
     }
 
-    SCOPES_RESULT(void) translate_Switch(Switch *node) {
+    SCOPES_RESULT(void) translate_Switch(const SwitchRef &node) {
         SCOPES_RESULT_TYPE(void);
         auto expr = SCOPES_GET_RESULT(ref_to_value(node->expr));
         LLVMBasicBlockRef bb = LLVMGetInsertBlock(builder);
@@ -1722,11 +1718,11 @@ struct LLVMIRGenerator {
                 position_builder_at_end(bbdefault);
                 bbcase = bbdefault;
             } else if (_case.body.empty()) {
-                auto lit = SCOPES_GET_RESULT(ref_to_value(_case.literal));
+                auto lit = SCOPES_GET_RESULT(ref_to_value(ValueIndex(_case.literal)));
                 LLVMAddCase(_sw, lit, lastbb);
                 continue;
             } else {
-                auto lit = SCOPES_GET_RESULT(ref_to_value(_case.literal));
+                auto lit = SCOPES_GET_RESULT(ref_to_value(ValueIndex(_case.literal)));
                 bbcase = LLVMAppendBasicBlock(func, "case");
                 position_builder_at_end(bbcase);
                 LLVMAddCase(_sw, lit, bbcase);
@@ -1745,7 +1741,7 @@ struct LLVMIRGenerator {
         LLVMPositionBuilderAtEnd(builder, bb);
     }
 
-    SCOPES_RESULT(void) translate_CondBr(CondBr *node) {
+    SCOPES_RESULT(void) translate_CondBr(const CondBrRef &node) {
         SCOPES_RESULT_TYPE(void);
         LLVMBasicBlockRef bb = LLVMGetInsertBlock(builder);
         LLVMValueRef func = LLVMGetBasicBlockParent(bb);
@@ -1769,11 +1765,10 @@ struct LLVMIRGenerator {
         return {};
     }
 
-    SCOPES_RESULT(void) translate_instruction(Instruction *node) {
-        SCOPES_ANCHOR(node->anchor());
+    SCOPES_RESULT(void) translate_instruction(const InstructionRef &node) {
         switch(node->kind()) {
         #define T(NAME, BNAME, CLASS) \
-            case NAME: return translate_ ## CLASS(cast<CLASS>(node));
+            case NAME: return translate_ ## CLASS(node.cast<CLASS>());
         SCOPES_INSTRUCTION_VALUE_KIND()
         #undef T
             default: assert(false); break;
@@ -1783,34 +1778,35 @@ struct LLVMIRGenerator {
 
     SCOPES_RESULT(LLVMValueRef) ref_to_value(const ValueIndex &ref) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
-        SCOPES_ANCHOR(ref.value->anchor());
         auto it = ref2value.find(ref);
         if (it != ref2value.end())
             return it->second;
         LLVMValueRef value = nullptr;
         switch(ref.value->kind()) {
         #define T(NAME, BNAME, CLASS) \
-            case NAME: value = SCOPES_GET_RESULT(CLASS ## _to_value(cast<CLASS>(ref.value))); break;
+            case NAME: value = SCOPES_GET_RESULT( \
+                CLASS ## _to_value(ref.value.cast<CLASS>())); break;
         SCOPES_PURE_VALUE_KIND()
         #undef T
             default: {
-                SCOPES_EXPECT_ERROR(error_cannot_translate(SCOPES_GEN_TARGET, ref.value));
+                SCOPES_EXPECT_ERROR(error_cannot_translate(
+                    SCOPES_GEN_TARGET, ref.value));
             } break;
         }
         ref2value.insert({ref,value});
         return value;
     }
 
-    SCOPES_RESULT(LLVMValueRef) PureCast_to_value(PureCast *node) {
+    SCOPES_RESULT(LLVMValueRef) PureCast_to_value(const PureCastRef &node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         LLVMTypeRef LLT = SCOPES_GET_RESULT(type_to_llvm_type(node->get_type()));
-        auto val = SCOPES_GET_RESULT(ref_to_value(node->value));
+        auto val = SCOPES_GET_RESULT(ref_to_value(ValueIndex(node->value)));
         return LLVMConstBitCast(val, LLT);
     }
 
-    SCOPES_RESULT(LLVMValueRef) Global_to_value(Global *node) {
+    SCOPES_RESULT(LLVMValueRef) Global_to_value(const GlobalRef &node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
-        auto it = global2global.find(node);
+        auto it = global2global.find(node.unref());
         if (it == global2global.end()) {
             auto pi = cast<PointerType>(node->get_type());
             LLVMTypeRef LLT = SCOPES_GET_RESULT(type_to_llvm_type(pi->element_type));
@@ -1839,31 +1835,36 @@ struct LLVMIRGenerator {
                     if (!ptr) {
                         StyledString ss;
                         ss.out << "could not resolve " << node;
-                        SCOPES_LOCATION_ERROR(ss.str());
+                        SCOPES_ERROR(ss.str());
                     }
                     result = LLVMAddGlobal(module, LLT, name);
                 }
             }
-            global2global.insert({ node, result });
+            global2global.insert({ node.unref(), result });
             return result;
         } else {
             return it->second;
         }
     }
 
-    SCOPES_RESULT(LLVMValueRef) ConstInt_to_value(ConstInt *node) {
+    SCOPES_RESULT(LLVMValueRef) ConstInt_to_value(const ConstIntRef &node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         auto T = SCOPES_GET_RESULT(type_to_llvm_type(node->get_type()));
         return LLVMConstInt(T, node->value, false);
     }
 
-    SCOPES_RESULT(LLVMValueRef) ConstReal_to_value(ConstReal *node) {
+    SCOPES_RESULT(LLVMValueRef) ConstReal_to_value(const ConstRealRef &node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         auto T = SCOPES_GET_RESULT(type_to_llvm_type(node->get_type()));
         return LLVMConstReal(T, node->value);
     }
 
-    SCOPES_RESULT(LLVMValueRef) ConstPointer_to_value(ConstPointer *node) {
+    SCOPES_RESULT(LLVMValueRef) Closure_to_value(const ClosureRef &node) {
+        return ConstPointer_to_value(
+            ref(node.anchor(), ConstPointer::closure_from(node.unref())));
+    }
+
+    SCOPES_RESULT(LLVMValueRef) ConstPointer_to_value(const ConstPointerRef &node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         auto LLT = SCOPES_GET_RESULT(type_to_llvm_type(node->get_type()));
         if (!node->value) {
@@ -1881,7 +1882,7 @@ struct LLVMIRGenerator {
                 StyledString ss;
                 ss.out << "IL->IR: constant pointer of type " << node->get_type()
                     << " points to unserializable memory";
-                SCOPES_LOCATION_ERROR(ss.str());
+                SCOPES_ERROR(ss.str());
             }
             LLVMValueRef basevalue = nullptr;
             auto it = ptr2global.find(baseptr);
@@ -1909,13 +1910,13 @@ struct LLVMIRGenerator {
         }
     }
 
-    SCOPES_RESULT(LLVMValueRef) ConstAggregate_to_value(ConstAggregate *node) {
+    SCOPES_RESULT(LLVMValueRef) ConstAggregate_to_value(const ConstAggregateRef &node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         LLVMTypeRef LLT = SCOPES_GET_RESULT(type_to_llvm_type(node->get_type()));
         size_t count = node->values.size();
         LLVMValueRef values[count];
         for (size_t i = 0; i < count; ++i) {
-            values[i] = SCOPES_GET_RESULT(ref_to_value(node->values[i]));
+            values[i] = SCOPES_GET_RESULT(ref_to_value(ValueIndex(get_field(node, i))));
         }
         switch(LLVMGetTypeKind(LLT)) {
         case LLVMStructTypeKind: {
@@ -1939,14 +1940,14 @@ struct LLVMIRGenerator {
         }
     }
 
-    SCOPES_RESULT(void) build_call(Call *call,
+    SCOPES_RESULT(void) build_call(const CallRef &call,
         const Type *functype, LLVMValueRef func, const TypedValues &args) {
         SCOPES_RESULT_TYPE(void);
         size_t argcount = args.size();
 
         LLVMMetadataRef diloc = nullptr;
         if (use_debug_info) {
-            diloc = set_debug_location(call->anchor());
+            diloc = set_debug_location(call.anchor());
             assert(diloc);
         }
 
@@ -2184,14 +2185,14 @@ struct LLVMIRGenerator {
     SCOPES_RESULT(void) process_functions() {
         SCOPES_RESULT_TYPE(void);
         while (!function_todo.empty()) {
-            Function *func = function_todo.front();
+            FunctionRef func = function_todo.front();
             function_todo.pop_front();
             SCOPES_CHECK_RESULT(Function_finalize(func));
         }
         return {};
     }
 
-    SCOPES_RESULT(void) teardown_generate(Function *entry = nullptr) {
+    SCOPES_RESULT(void) teardown_generate(const FunctionRef &entry = FunctionRef()) {
         SCOPES_RESULT_TYPE(void);
         SCOPES_CHECK_RESULT(process_functions());
 
@@ -2214,7 +2215,7 @@ struct LLVMIRGenerator {
                 stream_ast(ss, entry, fmt);
             }
             LLVMDumpModule(module);
-            SCOPES_LOCATION_ERROR(
+            SCOPES_ERROR(
                 String::join(
                     String::from("LLVM: "),
                     String::from_cstr(errmsg)));
@@ -2234,13 +2235,13 @@ struct LLVMIRGenerator {
         Scope *t = table;
         while (t) {
             for (auto it = t->map->begin(); it != t->map->end(); ++it) {
-                Value *val = it->second.expr;
+                ValueRef val = it->second.expr;
                 if (!val) continue;
                 Symbol name = it->first;
-                Function *fn = SCOPES_GET_RESULT(extract_function_constant(val));
-                func_export_table.insert({fn, name});
+                FunctionRef fn = SCOPES_GET_RESULT(extract_function_constant(val));
+                func_export_table.insert({fn.unref(), name});
 
-                SCOPES_CHECK_RESULT(ref_to_value(fn));
+                SCOPES_CHECK_RESULT(ref_to_value(ValueIndex(fn)));
             }
             t = t->parent;
         }
@@ -2249,13 +2250,13 @@ struct LLVMIRGenerator {
         return module;
     }
 
-    SCOPES_RESULT(ModuleValuePair) generate(Function *entry) {
+    SCOPES_RESULT(ModuleValuePair) generate(const FunctionRef &entry) {
         SCOPES_RESULT_TYPE(ModuleValuePair);
 
         const char *name = entry->name.name()->data;
         setup_generate(name);
 
-        auto func = SCOPES_GET_RESULT(ref_to_value(entry));
+        auto func = SCOPES_GET_RESULT(ref_to_value(ValueIndex(entry)));
         LLVMSetLinkage(func, LLVMExternalLinkage);
 
         SCOPES_CHECK_RESULT(teardown_generate(entry));
@@ -2424,7 +2425,7 @@ SCOPES_RESULT(void) compile_object(const String *path, Scope *scope, uint64_t fl
     char *path_cstr = strdup(path->data);
     if (LLVMTargetMachineEmitToFile(target_machine, module, path_cstr,
         LLVMObjectFile, &errormsg)) {
-        SCOPES_LOCATION_ERROR(String::from_cstr(errormsg));
+        SCOPES_ERROR(String::from_cstr(errormsg));
     }
     free(path_cstr);
     return {};
@@ -2434,8 +2435,8 @@ SCOPES_RESULT(void) compile_object(const String *path, Scope *scope, uint64_t fl
 static DisassemblyListener *disassembly_listener = nullptr;
 #endif
 
-SCOPES_RESULT(ConstPointer *) compile(Function *fn, uint64_t flags) {
-    SCOPES_RESULT_TYPE(ConstPointer *);
+SCOPES_RESULT(ConstPointerRef) compile(const FunctionRef &fn, uint64_t flags) {
+    SCOPES_RESULT_TYPE(ConstPointerRef);
     Timer sum_compile_time(TIMER_Compile);
 #if SCOPES_COMPILE_WITH_DEBUG_INFO
 #else
@@ -2522,7 +2523,7 @@ SCOPES_RESULT(ConstPointer *) compile(Function *fn, uint64_t flags) {
     }
 #endif
 
-    return ConstPointer::from(fn->anchor(), functype, pfunc);
+    return ref(fn.anchor(), ConstPointer::from(functype, pfunc));
 }
 
 } // namespace scopes

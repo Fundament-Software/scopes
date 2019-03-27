@@ -51,13 +51,14 @@ bool LexerParser::is_suffix(const char (&str)[N]) {
 SCOPES_RESULT(void) LexerParser::verify_good_taste(char c) {
     SCOPES_RESULT_TYPE(void);
     if (c == '\t') {
-        SCOPES_LOCATION_ERROR(String::from("please use spaces instead of tabs."));
+        next_token();
+        SCOPES_LOCATION_ERROR(anchor(),
+            String::from("please use spaces instead of tabs."));
     }
     return {};
 }
 
-LexerParser::LexerParser(SourceFile *_file, size_t offset, size_t length) :
-        value(nullptr) {
+LexerParser::LexerParser(SourceFile *_file, size_t offset, size_t length) {
     file = _file;
     input_stream = file->strptr() + offset;
     token = tok_eof;
@@ -147,14 +148,16 @@ SCOPES_RESULT(void) LexerParser::read_string(char terminator) {
     bool escape = false;
     while (true) {
         if (is_eof()) {
-            SCOPES_LOCATION_ERROR(String::from("unterminated sequence"));
+            SCOPES_LOCATION_ERROR(anchor(),
+                String::from("unterminated sequence"));
         }
         char c = SCOPES_GET_RESULT(next());
         if (c == '\n') {
             // 0.10
             //newline();
             // 0.11
-            SCOPES_LOCATION_ERROR(String::from("unexpected line break in string"));
+            SCOPES_LOCATION_ERROR(anchor(),
+                String::from("unexpected line break in string"));
         }
         if (escape) {
             escape = false;
@@ -215,7 +218,7 @@ SCOPES_RESULT(int) LexerParser::read_integer(const Type *TT, void (*strton)(T *,
         || (cend > eof)) {
         return RN_Invalid;
     }
-    value = ConstInt::from(anchor(), TT, srcval);
+    value = ref(anchor(), ConstInt::from(TT, srcval));
     next_cursor = cend;
     if ((cend != eof)
         && (!isspace(*cend))
@@ -224,7 +227,6 @@ SCOPES_RESULT(int) LexerParser::read_integer(const Type *TT, void (*strton)(T *,
         // suffix
         auto _lineno = lineno; auto _line = line; auto _cursor = cursor;
         next_token();
-        SCOPES_ANCHOR(anchor());
         SCOPES_CHECK_RESULT(read_symbol());
         lineno = _lineno; line = _line; cursor = _cursor;
         return RN_Typed;
@@ -245,7 +247,7 @@ SCOPES_RESULT(int) LexerParser::read_real(const Type *TT, void (*strton)(T *, co
         || (cend > eof)) {
         return RN_Invalid;
     }
-    value = ConstReal::from(anchor(), TT, srcval);
+    value = ref(anchor(), ConstReal::from(TT, srcval));
     next_cursor = cend;
     if ((cend != eof)
         && (!isspace(*cend))
@@ -253,7 +255,6 @@ SCOPES_RESULT(int) LexerParser::read_real(const Type *TT, void (*strton)(T *, co
         // suffix
         auto _lineno = lineno; auto _line = line; auto _cursor = cursor;
         next_token();
-        SCOPES_ANCHOR(anchor());
         SCOPES_CHECK_RESULT(read_symbol());
         lineno = _lineno; line = _line; cursor = _cursor;
         return RN_Typed;
@@ -270,7 +271,7 @@ SCOPES_RESULT(bool) LexerParser::select_integer_suffix() {
     SCOPES_RESULT_TYPE(bool);
     if (!has_suffix())
         return false;
-    assert(isa<ConstInt>(value));
+    assert(value.isa<ConstInt>());
     const Type *newtype = nullptr;
     if (is_suffix(":i8")) { newtype = TYPE_I8; }
     else if (is_suffix(":i16")) { newtype = TYPE_I16; }
@@ -286,10 +287,10 @@ SCOPES_RESULT(bool) LexerParser::select_integer_suffix() {
         StyledString ss;
         ss.out << "invalid suffix for integer literal: "
             << String::from(string, string_len);
-        SCOPES_LOCATION_ERROR(ss.str());
+        SCOPES_ERROR(ss.str());
     }
-    value = ConstInt::from(value->anchor(), newtype, cast<ConstInt>(value)->value);
-
+    value = ref(value.anchor(),
+        ConstInt::from(newtype, value.cast<ConstInt>()->value));
     return true;
 }
 
@@ -297,7 +298,7 @@ SCOPES_RESULT(bool) LexerParser::select_real_suffix() {
     SCOPES_RESULT_TYPE(bool);
     if (!has_suffix())
         return false;
-    assert(isa<ConstReal>(value));
+    assert(value.isa<ConstReal>());
     const Type *newtype = nullptr;
     if (is_suffix(":f32")) { newtype = TYPE_F32; }
     else if (is_suffix(":f64")) { newtype = TYPE_F64; }
@@ -305,9 +306,10 @@ SCOPES_RESULT(bool) LexerParser::select_real_suffix() {
         StyledString ss;
         ss.out << "invalid suffix for floating point literal: "
             << String::from(string, string_len);
-        SCOPES_LOCATION_ERROR(ss.str());
+        SCOPES_ERROR(ss.str());
     }
-    value = ConstInt::from(value->anchor(), newtype, cast<ConstReal>(value)->value);
+    value = ref(value.anchor(),
+        ConstInt::from(newtype, value.cast<ConstInt>()->value));
     return true;
 }
 
@@ -316,11 +318,11 @@ SCOPES_RESULT(bool) LexerParser::read_int64() {
     switch(SCOPES_GET_RESULT(read_integer(TYPE_I64, scopes_strtoll))) {
     case RN_Invalid: return false;
     case RN_Untyped: {
-        int64_t val = cast<ConstInt>(value)->value;
+        int64_t val = value.cast<ConstInt>()->value;
         if ((val >= -0x80000000ll) && (val <= 0x7fffffffll)) {
-            value = ConstInt::from(value->anchor(), TYPE_I32, val);
+            value = ref(value.anchor(), ConstInt::from(TYPE_I32, val));
         } else if ((val >= 0x80000000ll) && (val <= 0xffffffffll)) {
-            value = ConstInt::from(value->anchor(), TYPE_U32, val);
+            value = ref(value.anchor(), ConstInt::from(TYPE_U32, val));
         }
         return true;
     } break;
@@ -345,8 +347,8 @@ SCOPES_RESULT(bool) LexerParser::read_real64() {
     switch(SCOPES_GET_RESULT(read_real(TYPE_F64, scopes_strtod))) {
     case RN_Invalid: return false;
     case RN_Untyped:
-        value = ConstReal::from(
-            value->anchor(), TYPE_F32, cast<ConstReal>(value)->value);
+        value = ref(value.anchor(), ConstReal::from(TYPE_F32,
+            value.cast<ConstReal>()->value));
         return true;
     case RN_Typed:
         return select_real_suffix();
@@ -365,7 +367,6 @@ SCOPES_RESULT(Token) LexerParser::read_token() {
     char c;
 skip:
     next_token();
-    SCOPES_ANCHOR(anchor());
     if (is_eof()) { token = tok_eof; goto done; }
     c = SCOPES_GET_RESULT(next());
     if (c == '\n') { newline(); }
@@ -449,7 +450,7 @@ const String *LexerParser::get_block_string() {
     }
     return String::from(dest, p - dest);
 }
-Value *LexerParser::get_number() {
+ValueRef LexerParser::get_number() {
     return value;
 }
 #if 0
@@ -476,7 +477,7 @@ LexerParser::ListBuilder::ListBuilder(LexerParser &_lexer) :
     prev(EOL),
     eol(EOL) {}
 
-void LexerParser::ListBuilder::append(Value *value) {
+void LexerParser::ListBuilder::append(ValueRef value) {
     prev = List::from(value, prev);
 }
 
@@ -495,7 +496,8 @@ void LexerParser::ListBuilder::reset_start() {
 void LexerParser::ListBuilder::split(const Anchor *anchor) {
     // reverse what we have, up to last split point and wrap result
     // in cell
-    prev = List::from(ConstPointer::list_from(anchor, reverse_list(prev, eol)), eol);
+    prev = List::from(ref(anchor,
+        ConstPointer::list_from(reverse_list(prev, eol))), eol);
     reset_start();
 }
 
@@ -519,8 +521,7 @@ SCOPES_RESULT(const List *) LexerParser::parse_list(Token end_token) {
             SCOPES_CHECK_RESULT(this->read_token());
             builder.append(SCOPES_GET_RESULT(parse_naked(column, end_token)));
         } else if (this->token == tok_eof) {
-            SCOPES_ANCHOR(start_anchor);
-            SCOPES_LOCATION_ERROR(String::from("unclosed open bracket"));
+            SCOPES_LOCATION_ERROR(start_anchor, String::from("unclosed open bracket"));
         } else if (this->token == tok_statement) {
             builder.split(this->anchor());
             SCOPES_CHECK_RESULT(this->read_token());
@@ -534,70 +535,66 @@ SCOPES_RESULT(const List *) LexerParser::parse_list(Token end_token) {
 
 // parses the next sequence and returns it wrapped in a cell that points
 // to prev
-SCOPES_RESULT(Value *) LexerParser::parse_any() {
-    SCOPES_RESULT_TYPE(Value *);
+SCOPES_RESULT(ValueRef) LexerParser::parse_any() {
+    SCOPES_RESULT_TYPE(ValueRef);
     assert(this->token != tok_eof);
     const Anchor *anchor = this->anchor();
     if (this->token == tok_open) {
-        return ConstPointer::list_from(anchor,
-            SCOPES_GET_RESULT(parse_list(tok_close)));
+        return ValueRef(anchor, ConstPointer::list_from(
+            SCOPES_GET_RESULT(parse_list(tok_close))));
     } else if (this->token == tok_square_open) {
-        return ConstPointer::list_from(anchor,
+        return ValueRef(anchor, ConstPointer::list_from(
             List::from(
-                ConstInt::symbol_from(anchor, Symbol(SYM_SquareList)),
-                SCOPES_GET_RESULT(parse_list(tok_square_close))));
+                ref(anchor, ConstInt::symbol_from(Symbol(SYM_SquareList))),
+                SCOPES_GET_RESULT(parse_list(tok_square_close)))));
     } else if (this->token == tok_curly_open) {
-        return ConstPointer::list_from(anchor,
+        return ValueRef(anchor, ConstPointer::list_from(
             List::from(
-                ConstInt::symbol_from(anchor,Symbol(SYM_CurlyList)),
-                SCOPES_GET_RESULT(parse_list(tok_curly_close))));
+                ref(anchor, ConstInt::symbol_from(Symbol(SYM_CurlyList))),
+                SCOPES_GET_RESULT(parse_list(tok_curly_close)))));
     } else if ((this->token == tok_close)
         || (this->token == tok_square_close)
         || (this->token == tok_curly_close)) {
-        SCOPES_ANCHOR(anchor);
-        SCOPES_LOCATION_ERROR(String::from("stray closing bracket"));
+        SCOPES_LOCATION_ERROR(anchor, String::from("stray closing bracket"));
     } else if (this->token == tok_string) {
-        return ConstPointer::string_from(anchor, get_string());
+        return ValueRef(anchor, ConstPointer::string_from(get_string()));
     } else if (this->token == tok_block_string) {
-        return ConstPointer::string_from(anchor, get_block_string());
+        return ValueRef(anchor, ConstPointer::string_from(get_block_string()));
     } else if (this->token == tok_symbol) {
-        return ConstInt::symbol_from(anchor, get_symbol());
+        return ValueRef(anchor, ConstInt::symbol_from(get_symbol()));
     } else if (this->token == tok_number) {
         return get_number();
     } else if (this->token == tok_syntax_quote) {
         SCOPES_CHECK_RESULT(this->read_token());
         if (this->token == tok_eof) {
-            SCOPES_ANCHOR(anchor);
-            SCOPES_LOCATION_ERROR(
+            SCOPES_LOCATION_ERROR(anchor,
                 String::from("unexpected end of file after quote token"));
         }
-        return ConstPointer::list_from(anchor,
+        return ValueRef(anchor, ConstPointer::list_from(
             List::from(
-                ConstInt::symbol_from(anchor, Symbol(KW_SyntaxQuote)),
+                ref(anchor, ConstInt::symbol_from(Symbol(KW_SyntaxQuote))),
                 SCOPES_GET_RESULT(parse_any())
-                ));
+                )));
     } else if (this->token == tok_ast_quote) {
         SCOPES_CHECK_RESULT(this->read_token());
         if (this->token == tok_eof) {
-            SCOPES_ANCHOR(anchor);
-            SCOPES_LOCATION_ERROR(
+            SCOPES_LOCATION_ERROR(anchor,
                 String::from("unexpected end of file after quote token"));
         }
-        return ConstPointer::list_from(anchor,
+        return ValueRef(anchor, ConstPointer::list_from(
             List::from(
-                ConstInt::symbol_from(anchor, Symbol(KW_ASTQuote)),
+                ref(anchor, ConstInt::symbol_from(Symbol(KW_ASTQuote))),
                 SCOPES_GET_RESULT(parse_any())
-                ));
+                )));
     } else {
-        SCOPES_ANCHOR(anchor);
-        SCOPES_LOCATION_ERROR(format("unexpected token: %c (%i)",
+        SCOPES_LOCATION_ERROR(anchor, format("unexpected token: %c (%i)",
             this->cursor[0], (int)this->cursor[0]));
     }
-    return ConstAggregate::none_from(anchor);
+    return ValueRef(anchor, ConstAggregate::none_from());
 }
 
-SCOPES_RESULT(Value *) LexerParser::parse_naked(int column, Token end_token) {
-    SCOPES_RESULT_TYPE(Value *);
+SCOPES_RESULT(ValueRef) LexerParser::parse_naked(int column, Token end_token) {
+    SCOPES_RESULT_TYPE(ValueRef);
     int lineno = this->lineno;
 
     bool escape = false;
@@ -614,8 +611,7 @@ SCOPES_RESULT(Value *) LexerParser::parse_naked(int column, Token end_token) {
             escape = true;
             SCOPES_CHECK_RESULT(this->read_token());
             if (this->lineno <= lineno) {
-                SCOPES_ANCHOR(this->anchor());
-                SCOPES_LOCATION_ERROR(String::from(
+                SCOPES_LOCATION_ERROR(this->anchor(), String::from(
                     "escape character is not at end of line"));
             }
             lineno = this->lineno;
@@ -623,13 +619,12 @@ SCOPES_RESULT(Value *) LexerParser::parse_naked(int column, Token end_token) {
             if (subcolumn == 0) {
                 subcolumn = this->column();
             } else if (this->column() != subcolumn) {
-                SCOPES_ANCHOR(this->anchor());
-                SCOPES_LOCATION_ERROR(String::from("indentation mismatch"));
+                SCOPES_LOCATION_ERROR(this->anchor(),
+                    String::from("indentation mismatch"));
             }
             if (column != subcolumn) {
                 if ((column + 4) != subcolumn) {
-                    SCOPES_ANCHOR(this->anchor());
-                    SCOPES_LOCATION_ERROR(String::from(
+                    SCOPES_LOCATION_ERROR(this->anchor(), String::from(
                         "indentations must nest by 4 spaces."));
                 }
             }
@@ -663,12 +658,12 @@ SCOPES_RESULT(Value *) LexerParser::parse_naked(int column, Token end_token) {
     if (unwrap_single && result && result->count == 1) {
         return result->at;
     } else {
-        return ConstPointer::list_from(anchor, result);
+        return ValueRef(anchor, ConstPointer::list_from(result));
     }
 }
 
-SCOPES_RESULT(Value *) LexerParser::parse() {
-    SCOPES_RESULT_TYPE(Value *);
+SCOPES_RESULT(ValueRef) LexerParser::parse() {
+    SCOPES_RESULT_TYPE(ValueRef);
     SCOPES_CHECK_RESULT(this->read_token());
     int lineno = 0;
     //bool escape = false;
@@ -683,15 +678,13 @@ SCOPES_RESULT(Value *) LexerParser::parse() {
             //escape = true;
             SCOPES_CHECK_RESULT(this->read_token());
             if (this->lineno <= lineno) {
-                SCOPES_ANCHOR(this->anchor());
-                SCOPES_LOCATION_ERROR(String::from(
+                SCOPES_LOCATION_ERROR(this->anchor(), String::from(
                     "escape character is not at end of line"));
             }
             lineno = this->lineno;
         } else if (this->lineno > lineno) {
             if (this->column() != 1) {
-                SCOPES_ANCHOR(this->anchor());
-                SCOPES_LOCATION_ERROR(String::from(
+                SCOPES_LOCATION_ERROR(this->anchor(), String::from(
                     "indentation mismatch"));
             }
 
@@ -704,8 +697,7 @@ SCOPES_RESULT(Value *) LexerParser::parse() {
                 builder.append(SCOPES_GET_RESULT(parse_naked(1, tok_none)));
             }
         } else if (this->token == tok_statement) {
-            SCOPES_ANCHOR(this->anchor());
-            SCOPES_LOCATION_ERROR(String::from(
+            SCOPES_LOCATION_ERROR(this->anchor(), String::from(
                 "unexpected statement token"));
         } else {
             builder.append(SCOPES_GET_RESULT(parse_any()));
@@ -713,7 +705,7 @@ SCOPES_RESULT(Value *) LexerParser::parse() {
             SCOPES_CHECK_RESULT(this->read_token());
         }
     }
-    return ConstPointer::list_from(anchor, builder.get_result());
+    return ValueRef(anchor, ConstPointer::list_from(builder.get_result()));
 }
 
 

@@ -131,7 +131,6 @@ project "scopesrt"
         "src/lexerparser.cpp",
         "src/stream_anchors.cpp",
         "src/stream_expr.cpp",
-        "src/closure.cpp",
         "src/stream_ast.cpp",
         "src/c_import.cpp",
         "src/execution.cpp",

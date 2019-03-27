@@ -186,6 +186,14 @@ struct Quoter {
                 ConstInt::symbol_from(_anchor, node->key), value });
     }
 
+    SCOPES_RESULT(Value *) quote_Anchored(int level, Anchored *node) {
+        SCOPES_RESULT_TYPE(Value *);
+        auto value = SCOPES_GET_RESULT(quote(level, node->value));
+        auto _anchor = node->anchor;
+        return CallTemplate::from(_anchor, g_sc_anchored_new, {
+            ConstPointer::anchor_from(_anchor), value });
+    }
+
     SCOPES_RESULT(Value *) quote_CallTemplate(int level, CallTemplate *node) {
         SCOPES_RESULT_TYPE(Value *);
         auto _anchor = node->anchor();

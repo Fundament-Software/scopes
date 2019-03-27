@@ -20,26 +20,28 @@ struct SourceFile;
 
 struct Anchor {
 protected:
-    Anchor(SourceFile *_file, int _lineno, int _column, int _offset, const Anchor *_next);
+    Anchor(SourceFile *_file, int _lineno, int _column, int _offset);
 
 public:
     SourceFile *file;
     int lineno;
     int column;
     int offset;
-    const Anchor *next;
 
     Symbol path() const;
 
     bool is_same(const Anchor *other) const;
 
     static const Anchor *from(
-        SourceFile *_file, int _lineno, int _column, int _offset = 0, const Anchor *_next = nullptr);
+        SourceFile *_file, int _lineno, int _column, int _offset = 0);
 
     StyledStream& stream(StyledStream& ost) const;
 
     StyledStream &stream_source_line(StyledStream &ost, const char *indent = "    ") const;
 };
+
+const Anchor *builtin_anchor();
+const Anchor *unknown_anchor();
 
 } // namespace scopes
 

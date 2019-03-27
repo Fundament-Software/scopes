@@ -40,6 +40,21 @@ SCOPES_VALUE_KIND()
     }
 }
 
+#define T(CLASS) \
+    bool CLASS::has_def_anchor() const { \
+        return _def_anchor != nullptr; \
+    } \
+    const Anchor *CLASS::def_anchor() const { \
+        return _def_anchor; \
+    } \
+    void CLASS::set_def_anchor(const Anchor *anchor) { \
+        _def_anchor = anchor; \
+    } \
+
+
+SCOPES_DEFINED_VALUES()
+#undef T
+
 //------------------------------------------------------------------------------
 
 std::size_t ValueIndex::Hash::operator()(const ValueIndex & s) const {
@@ -88,43 +103,43 @@ const Type *ValueIndex::get_type() const {
 
 //------------------------------------------------------------------------------
 
-KeyedTemplate::KeyedTemplate(const Anchor *anchor, Symbol _key, Value *node)
-    : UntypedValue(VK_KeyedTemplate, anchor), key(_key), value(node)
+KeyedTemplate::KeyedTemplate(Symbol _key, const ValueRef &node)
+    : UntypedValue(VK_KeyedTemplate), key(_key), value(node)
 {
 }
 
-Value *KeyedTemplate::from(const Anchor *anchor, Symbol key, Value *node) {
+ValueRef KeyedTemplate::from(Symbol key, ValueRef node) {
     assert(node);
-    if (isa<TypedValue>(node)) {
-        return Keyed::from(anchor, key, cast<TypedValue>(node));
+    if (node.isa<TypedValue>()) {
+        return Keyed::from(anchor, key, node.cast<TypedValue>());
     } else {
-        if (isa<KeyedTemplate>(node)) {
-            node = cast<KeyedTemplate>(node)->value;
+        if (node.isa<KeyedTemplate>()) {
+            node = node.cast<KeyedTemplate>()->value;
         }
-        return new KeyedTemplate(anchor, key, node);
+        return ref(node.anchor(), new KeyedTemplate(anchor, key, node));
     }
 }
 
 //------------------------------------------------------------------------------
 
-Keyed::Keyed(const Anchor *anchor, const Type *type, Symbol _key, TypedValue *node)
-    : TypedValue(VK_Keyed, anchor, type), key(_key), value(node)
+Keyed::Keyed(const Type *type, Symbol _key, const TypedValueRef &node)
+    : TypedValue(VK_Keyed, type), key(_key), value(node)
 {
 }
 
-TypedValue *Keyed::from(const Anchor *anchor, Symbol key, TypedValue *node) {
+TypedValueRef Keyed::from(Symbol key, TypedValueRef node) {
     assert(node);
     if (isa<Keyed>(node)) {
-        node = cast<Keyed>(node)->value;
+        node = node.cast<Keyed>()->value;
     }
     auto T = node->get_type();
     auto NT = key_type(key, T);
     if (T == NT)
         return node;
-    if (isa<Pure>(node)) {
+    if (node.isa<Pure>()) {
         return PureCast::from(anchor, NT, cast<Pure>(node));
     } else {
-        return new Keyed(anchor, NT, key, node);
+        return ref(node.anchor(), new Keyed(anchor, NT, key, node));
     }
 }
 
@@ -207,31 +222,33 @@ TypedValue *ArgumentList::from(const Anchor *anchor, const TypedValues &values) 
 
 //------------------------------------------------------------------------------
 
-ExtractArgumentTemplate::ExtractArgumentTemplate(const Anchor *anchor, Value *_value, int _index, bool _vararg)
-    : UntypedValue(VK_ExtractArgumentTemplate, anchor), index(_index), value(_value), vararg(_vararg) {
+ExtractArgumentTemplate::ExtractArgumentTemplate(Value *_value, int _index, bool _vararg)
+    : UntypedValue(VK_ExtractArgumentTemplate), index(_index), value(_value), vararg(_vararg) {
     assert(index >= 0);
 }
 
-Value *ExtractArgumentTemplate::from(const Anchor *anchor, Value *value, int index, bool vararg) {
-    if (isa<TypedValue>(value)) {
+ValueRef ExtractArgumentTemplate::from(
+    const ValueRef &value, int index, bool vararg) {
+    if (value.isa<TypedValue>()) {
         if (vararg) {
-            return ExtractArgument::variadic_from(anchor, cast<TypedValue>(value), index);
+            return ExtractArgument::variadic_from(value.cast<TypedValue>(), index);
         } else {
-            return ExtractArgument::from(anchor, cast<TypedValue>(value), index);
+            return ExtractArgument::from(value.cast<TypedValue>(), index);
         }
     } else {
-        return new ExtractArgumentTemplate(anchor, value, index, vararg);
+        return ref(value.anchor(),
+            new ExtractArgumentTemplate(anchor, value, index, vararg));
     }
 }
 
 //------------------------------------------------------------------------------
 
-ExtractArgument::ExtractArgument(const Anchor *anchor, const Type *type, TypedValue *_value, int _index)
+ExtractArgument::ExtractArgument(const Type *type, const TypedValueRef &_value, int _index)
     : TypedValue(VK_ExtractArgument, anchor, type),
         index(_index), value(_value) {
 }
 
-TypedValue *ExtractArgument::variadic_from(const Anchor *anchor, TypedValue *value, int index) {
+TypedValueRef ExtractArgument::variadic_from(const TypedValueRef &value, int index) {
     if (!index) return value;
     auto T = value->get_type();
     if (!is_returning(T)) return value;
@@ -245,18 +262,18 @@ TypedValue *ExtractArgument::variadic_from(const Anchor *anchor, TypedValue *val
     } else {
         for (int i = index; i < count; ++i) {
             auto argT = get_argument(T, i);
-            values.push_back(new ExtractArgument(anchor, argT, value, i));
+            values.push_back(from(value, i));
         }
     }
-    return ArgumentList::from(get_active_anchor(), values);
+    return ref(value.anchor(), ArgumentList::from(values));
 }
 
-TypedValue *ExtractArgument::from(const Anchor *anchor, TypedValue *value, int index) {
+TypedValueRef ExtractArgument::from(const TypedValueRef &value, int index) {
     auto T = value->get_type();
     if (!is_returning(T)) return value;
     int count = get_argument_count(T);
     if (index >= count)
-        return ConstAggregate::none_from(anchor);
+        return ref(value.anchor(), ConstAggregate::none_from());
     if (isa<ArgumentList>(value)) {
         auto al = cast<ArgumentList>(value);
         assert (index < al->values.size());
@@ -265,7 +282,8 @@ TypedValue *ExtractArgument::from(const Anchor *anchor, TypedValue *value, int i
         return value;
     } else {
         auto argT = get_argument(T, index);
-        return new ExtractArgument(anchor, argT, value, index);
+        return ref(value.anchor(),
+            new ExtractArgument(anchor, argT, value, index));
     }
 }
 
@@ -538,13 +556,13 @@ std::size_t PureCast::hash() const {
     return value->hash();
 }
 
-Pure *PureCast::from(const Anchor *anchor, const Type *type, Pure *value) {
-    if (isa<PureCast>(value)) {
-        value = cast<PureCast>(value)->value;
+PureRef PureCast::from(const Anchor *anchor, const Type *type, PureRef value) {
+    if (value.isa<PureCast>()) {
+        value = value.cast<PureCast>()->value;
     }
     if (value->get_type() == type)
         return value;
-    return new PureCast(anchor, type, value);
+    return ref(value.anchor(), new PureCast(anchor, type, value));
 }
 
 //------------------------------------------------------------------------------
@@ -682,24 +700,24 @@ int Block::append(TypedValue *node) {
 
 //------------------------------------------------------------------------------
 
-Expression::Expression(const Anchor *anchor, const Values &_body, Value *_value)
+Expression::Expression(const Values &_body, const ValueRef &_value)
     : UntypedValue(VK_Expression, anchor), body(_body), value(_value), scoped(true) {
 }
 
-void Expression::append(Value *node) {
+void Expression::append(const ValueRef &node) {
     assert(node);
-    if (value && !isa<Pure>(value)) {
+    if (value && !value.isa<Pure>()) {
         body.push_back(value);
     }
     value = node;
 }
 
-Expression *Expression::scoped_from(const Anchor *anchor, const Values &nodes, Value *value) {
-    return new Expression(anchor, nodes, value);
+Expression *Expression::scoped_from(const Values &nodes, const ValueRef &value) {
+    return new Expression(nodes, value);
 }
 
-Expression *Expression::unscoped_from(const Anchor *anchor, const Values &nodes, Value *value) {
-    auto expr = new Expression(anchor, nodes, value);
+Expression *Expression::unscoped_from(const Values &nodes, const ValueRef &value) {
+    auto expr = new Expression(nodes, value);
     expr->scoped = false;
     return expr;
 }
@@ -1296,9 +1314,22 @@ CompileStage *CompileStage::from(const Anchor *anchor, const List *next, Scope *
 
 ValueKind Value::kind() const { return _kind; }
 
-Value::Value(ValueKind kind, const Anchor *anchor)
-    : _kind(kind),_anchor(anchor) {
-    assert(_anchor);
+Value::Value(ValueKind kind)
+    : _kind(kind),_origin(nullptr) {
+}
+
+bool Value::has_origin() const {
+    return _origin != nullptr;
+}
+
+const Value *Value::origin() const {
+    assert(_origin);
+    return _origin;
+}
+
+void Value::set_origin(Value *origin) {
+    assert(origin);
+    _origin = origin;
 }
 
 bool Value::is_accessible() const {
@@ -1315,10 +1346,6 @@ bool Value::is_accessible() const {
     default: break;
     }
     return isa<Pure>(this);
-}
-
-const Anchor *Value::anchor() const {
-    return _anchor;
 }
 
 int Value::get_depth() const {
@@ -1448,6 +1475,50 @@ Terminator::Terminator(ValueKind _kind, const Anchor *_anchor, const TypedValues
 {}
 
 //------------------------------------------------------------------------------
+
+std::unordered_map<Closure, const Closure *, Closure::Hash> Closure::map;
+
+Closure::Closure(Template *_func, Function *_frame) :
+    Const(VK_Closure, TYPE_Closure), func(_func), frame(_frame) {}
+
+std::size_t Closure::Hash::operator()(const Closure &k) const {
+    return hash2(
+        std::hash<Template *>{}(k.func),
+        std::hash<Function *>{}(k.frame));
+}
+
+bool Closure::operator ==(const Closure &k) const {
+    return (func == k.func)
+        && (frame == k.frame);
+}
+
+const Closure *Closure::from(Template *func, Function *frame) {
+    Closure cl(func, frame);
+    auto it = map.find(cl);
+    if (it != map.end()) {
+        return it->second;
+    }
+    const Closure *result = new Closure(func, frame);
+    map.insert({cl, result});
+    return result;
+}
+
+StyledStream &Closure::stream(StyledStream &ost) const {
+    ost << Style_Comment << "<" << Style_None;
+    if (frame)
+        ost << Style_Symbol << frame->name.name()->data << "λ" << (void *)frame << Style_None;
+    ost << Style_Comment << "::" << Style_None
+        << Style_Symbol << func->name.name()->data << "λ" << (void *)func << Style_None
+        << Style_Comment << ">" << Style_None;
+    return ost;
+}
+
+//------------------------------------------------------------------------------
+
+StyledStream& operator<<(StyledStream& ss, const Closure *closure) {
+    closure->stream(ss);
+    return ss;
+}
 
 StyledStream& operator<<(StyledStream& ost, Value *node) {
     ost << const_cast<const Value *>(node);

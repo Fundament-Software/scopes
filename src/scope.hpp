@@ -22,7 +22,7 @@ struct Value;
 struct String;
 
 struct ScopeEntry {
-    Value *expr;
+    ValueRef expr;
     const String *doc;
 };
 
@@ -52,7 +52,7 @@ public:
 
     void bind_with_doc(Symbol name, const ScopeEntry &entry);
 
-    void bind(Symbol name, Value *value);
+    void bind(Symbol name, const ValueRef &value);
 
     void del(Symbol name);
 
@@ -62,11 +62,11 @@ public:
 
     bool lookup(Symbol name, ScopeEntry &dest, size_t depth = -1) const;
 
-    bool lookup(Symbol name, Value *&dest, size_t depth = -1) const;
+    bool lookup(Symbol name, ValueRef &dest, size_t depth = -1) const;
 
     bool lookup_local(Symbol name, ScopeEntry &dest) const;
 
-    bool lookup_local(Symbol name, Value *&dest) const;
+    bool lookup_local(Symbol name, ValueRef &dest) const;
 
     StyledStream &stream(StyledStream &ss);
 

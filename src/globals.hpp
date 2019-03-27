@@ -7,6 +7,8 @@
 #ifndef SCOPES_GLOBALS_HPP
 #define SCOPES_GLOBALS_HPP
 
+#include "valueref.inc"
+
 namespace scopes {
 
 #define SCOPES_REIMPORT_SYMBOLS() \
@@ -52,6 +54,7 @@ namespace scopes {
     T(g_sc_template_set_body, "sc_template_set_body") \
     T(g_sc_template_set_inline, "sc_template_set_inline") \
     T(g_sc_parameter_new, "sc_parameter_new") \
+    T(g_sc_anchored_new, "sc_anchored_new") \
     T(g_sc_keyed_new, "sc_keyed_new") \
     T(g_sc_expression_new, "sc_expression_new") \
     T(g_sc_expression_append, "sc_expression_append") \
@@ -86,7 +89,7 @@ namespace scopes {
 
 struct TypedValue;
 #define T(NAME, STR) \
-    extern TypedValue *NAME;
+    extern TypedValueRef NAME;
 SCOPES_REIMPORT_SYMBOLS()
 #undef T
 

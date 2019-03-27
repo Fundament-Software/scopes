@@ -9,6 +9,7 @@
 
 #include "symbol.hpp"
 #include "result.hpp"
+#include "valueref.inc"
 
 #include <stddef.h>
 
@@ -56,7 +57,7 @@ enum TypeKind {
 //------------------------------------------------------------------------------
 
 struct Type {
-    typedef std::unordered_map<Symbol, Value *, Symbol::Hash> Map;
+    typedef std::unordered_map<Symbol, ValueRef, Symbol::Hash> Map;
 
     TypeKind kind() const;
 
@@ -65,16 +66,16 @@ struct Type {
 
     StyledStream& stream(StyledStream& ost) const;
 
-    void bind(Symbol name, Value *value);
+    void bind(Symbol name, const ValueRef &value);
 
     void del(Symbol name);
 
-    bool lookup(Symbol name, Value *&dest) const;
+    bool lookup(Symbol name, ValueRef &dest) const;
 
-    bool lookup_local(Symbol name, Value *&dest) const;
+    bool lookup_local(Symbol name, ValueRef &dest) const;
 
-    bool lookup_call_handler(Value *&dest) const;
-    bool lookup_return_handler(Value *&dest) const;
+    bool lookup_call_handler(ValueRef &dest) const;
+    bool lookup_return_handler(ValueRef &dest) const;
 
     const Map &get_symbols() const;
 
@@ -99,7 +100,8 @@ typedef std::vector<const Type *> Types;
     T(TYPE_Variadic, "Variadic") \
     T(TYPE_Symbol, "Symbol") \
     T(TYPE_Builtin, "Builtin") \
-    T(TYPE_Value, "Value") \
+    T(TYPE_Value, "_Value") \
+    T(TYPE_ValueRef, "Value") \
     \
     T(TYPE_Bool, "bool") \
     \

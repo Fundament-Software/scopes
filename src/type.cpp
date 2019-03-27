@@ -414,7 +414,7 @@ void init_types() {
     DEFINE_BASIC_TYPE("Symbol", Symbol, TYPE_Symbol, TYPE_U64);
     DEFINE_BASIC_TYPE("Builtin", Builtin, TYPE_Builtin, TYPE_U64);
 
-    DEFINE_OPAQUE_HANDLE_TYPE("Value", Value, TYPE_Value);
+    DEFINE_OPAQUE_HANDLE_TYPE("_Value", Value, TYPE_Value);
 
     DEFINE_OPAQUE_HANDLE_TYPE("SourceFile", SourceFile, TYPE_SourceFile);
     DEFINE_OPAQUE_HANDLE_TYPE("Scope", Scope, TYPE_Scope);
@@ -426,6 +426,17 @@ void init_types() {
     DEFINE_OPAQUE_HANDLE_TYPE("CompileStage", Value, TYPE_CompileStage);
 
     DEFINE_OPAQUE_HANDLE_TYPE("Anchor", Anchor, TYPE_Anchor);
+
+    DEFINE_TYPENAME("Value", TYPE_ValueRef);
+    {
+        cast<TypenameType>(const_cast<Type *>(TYPE_ValueRef))
+            ->finalize(
+                tuple_type({
+                    TYPE_Value,
+                    TYPE_Anchor
+                }).assert_ok(),
+                TNF_Plain).assert_ok();
+    }
 
     DEFINE_TYPENAME("SugarMacro", TYPE_ASTMacro);
     {

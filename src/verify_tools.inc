@@ -37,7 +37,7 @@ inline SCOPES_RESULT(void) verify_kind(const Type *T) {
         case TK_SampledImage: ss.out << "sampled image"; break;
         }
         ss.out << " kind expected, got " << T;
-        SCOPES_LOCATION_ERROR(ss.str());
+        SCOPES_ERROR(ss.str());
     }
     return {};
 }
@@ -51,7 +51,7 @@ inline SCOPES_RESULT(void) verify_kind(const Value *V) {
             << Style_Keyword << get_value_class_name(tk) << Style_None
              << " kind expected, got "
             << Style_Keyword << get_value_class_name(V->kind()) << Style_None;
-        SCOPES_LOCATION_ERROR(ss.str());
+        SCOPES_ERROR(ss.str());
     }
     return {};
 }
@@ -68,12 +68,12 @@ inline SCOPES_RESULT(int) checkargs(size_t argsize, bool allow_overshoot = false
         if (allow_overshoot) {
             count = maxcount;
         } else {
-            SCOPES_LOCATION_ERROR(
+            SCOPES_ERROR(
                 format("at most %i argument(s) expected, got %i", maxcount, count));
         }
     }
     if ((mincount >= 0) && (count < mincount)) {
-        SCOPES_LOCATION_ERROR(
+        SCOPES_ERROR(
             format("at least %i argument(s) expected, got %i", mincount, count));
     }
     return count;
