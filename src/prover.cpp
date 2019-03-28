@@ -123,9 +123,7 @@ static SCOPES_RESULT(const ReferQualifier *) verify_refer(const Type *T) {
     SCOPES_RESULT_TYPE(const ReferQualifier *);
     auto rq = try_qualifier<ReferQualifier>(T);
     if (!rq) {
-        StyledString ss;
-        ss.out << "value of type " << T << " must be reference";
-        SCOPES_ERROR(ss.str());
+        SCOPES_ERROR(ValueMustBeReference, T);
     }
     return rq;
 }
@@ -133,10 +131,7 @@ static SCOPES_RESULT(const ReferQualifier *) verify_refer(const Type *T) {
 static SCOPES_RESULT(void) verify_readable(const ReferQualifier *Q, const Type *T) {
     SCOPES_RESULT_TYPE(void);
     if (!pointer_flags_is_readable(Q->flags)) {
-        StyledString ss;
-        ss.out << "can not dereference value of type " << T
-            << " because the reference is non-readable";
-        SCOPES_ERROR(ss.str());
+        SCOPES_ERROR(NonReadableReference, T);
     }
     return {};
 }
@@ -144,10 +139,7 @@ static SCOPES_RESULT(void) verify_readable(const ReferQualifier *Q, const Type *
 static SCOPES_RESULT(void) verify_writable(const ReferQualifier *Q, const Type *T) {
     SCOPES_RESULT_TYPE(void);
     if (!pointer_flags_is_writable(Q->flags)) {
-        StyledString ss;
-        ss.out << "can not assign to value of type " << T
-            << " because the reference is non-writable";
-        SCOPES_ERROR(ss.str());
+        SCOPES_ERROR(NonWritableReference, T);
     }
     return {};
 }
@@ -156,10 +148,7 @@ static SCOPES_RESULT(void) verify_readable(const Type *T) {
     SCOPES_RESULT_TYPE(void);
     auto pi = cast<PointerType>(T);
     if (!pi->is_readable()) {
-        StyledString ss;
-        ss.out << "can not load value from address of type " << T
-            << " because the target is non-readable";
-        SCOPES_ERROR(ss.str());
+        SCOPES_ERROR(NonReadablePointer, T);
     }
     return {};
 }
@@ -168,10 +157,7 @@ static SCOPES_RESULT(void) verify_writable(const Type *T) {
     SCOPES_RESULT_TYPE(void);
     auto pi = cast<PointerType>(T);
     if (!pi->is_writable()) {
-        StyledString ss;
-        ss.out << "can not store value at address of type " << T
-            << " because the target is non-writable";
-        SCOPES_ERROR(ss.str());
+        SCOPES_ERROR(NonWritablePointer, T);
     }
     return {};
 }
@@ -365,13 +351,13 @@ static SCOPES_RESULT(const Type *) merge_value_type(const char *context, const T
             auto argT2 = get_argument(T2, i);
             const Type *T = merge_single_value_type(context, argT1, argT2);
             if (!T) {
-                SCOPES_EXPECT_ERROR(error_cannot_merge_expression_types(context, T1, T2));
+                SCOPES_ERROR(MergeConflict, context, T1, T2);
             }
             newargs.push_back(T);
         }
         return arguments_type(newargs);
     }
-    SCOPES_EXPECT_ERROR(error_cannot_merge_expression_types(context, T1, T2));
+    SCOPES_ERROR(MergeConflict, context, T1, T2);
 }
 
 SCOPES_RESULT(TypedValueRef) prove_block(const ASTContext &ctx, Block &block,
@@ -425,7 +411,7 @@ static SCOPES_RESULT(void) verify_valid(const ASTContext &ctx, int id, const cha
     SCOPES_RESULT_TYPE(void);
     if (!ctx.block->is_valid(id)) {
         auto info = ctx.function->get_unique_info(id);
-        SCOPES_EXPECT_ERROR(error_cannot_access_moved(info.value.get_type(), by));
+        SCOPES_ERROR(InaccessibleValue, info.value.get_type());
     }
     return {};
 }
@@ -444,7 +430,7 @@ static SCOPES_RESULT(void) verify_valid(const ASTContext &ctx, const TypedValueR
     if (!is_returning_value(T))
         return {};
     if (!ctx.block->is_valid(ValueIndex(val))) {
-        SCOPES_EXPECT_ERROR(error_cannot_access_moved(T, by));
+        SCOPES_ERROR(InaccessibleValue, T);
     }
     return {};
 }
@@ -495,7 +481,7 @@ static SCOPES_RESULT(TypedValueRef) build_drop(const ASTContext &ctx,
         auto result = SCOPES_GET_RESULT(prove(ctx, expr));
         auto RT = result->get_type();
         if (!is_returning(RT) || is_returning_value(RT)) {
-            SCOPES_ERROR(String::from("drop operation must evaluate to void"));
+            SCOPES_ERROR(DropReturnsArguments);
         }
         SCOPES_CHECK_RESULT(verify_valid(ctx, ids, "drop"));
         return result;
@@ -565,7 +551,7 @@ static SCOPES_RESULT(void) validate_pass_block(const ASTContext &ctx, const Bloc
         int id = *deleted.begin();
         auto info = ctx.function->get_unique_info(id);
         assert (info.get_depth() < src.depth);
-        SCOPES_EXPECT_ERROR(error_altering_parent_scope_in_pass(info.value.get_type()));
+        SCOPES_ERROR(SwitchPassMovedValue, info.value.get_type());
     }
     return {};
 }
@@ -600,7 +586,7 @@ static SCOPES_RESULT(void) validate_merge_values(const IDSet &valid, const Typed
         if (!vq) continue;
         for (auto id : vq->ids) {
             if (!valid.count(id)) {
-                SCOPES_EXPECT_ERROR(error_cannot_return_view(value));
+                SCOPES_ERROR(ViewExitingScope, value->get_type());
             }
         }
     }
@@ -662,7 +648,7 @@ static SCOPES_RESULT(void) move_merge_values(const ASTContext &ctx,
                 int depth = info.get_depth();
                 if (depth > retdepth) {
                     // cannot move id of value that is going to be deleted
-                    SCOPES_EXPECT_ERROR(error_cannot_return_view(value));
+                    SCOPES_ERROR(ViewExitingScope, value->get_type());
                 } else {
                     // will still be live
                 }
@@ -749,7 +735,7 @@ SCOPES_RESULT(void) finalize_repeats(const ASTContext &ctx, const LoopLabelRef &
         // parent values were deleted, which we can't repeat
         int id = *deleted.begin();
         auto info = ctx.function->get_unique_info(id);
-        SCOPES_EXPECT_ERROR(error_altering_parent_scope_in_loop(info.value.get_type()));
+        SCOPES_ERROR(LoopMovedValue, info.value.get_type());
     }
     for (auto merge : label->repeats) {
         SCOPES_CHECK_RESULT(validate_merge_values(valid, merge->values));
@@ -942,8 +928,7 @@ static SCOPES_RESULT(TypedValueRef) prove_Expression(const ASTContext &ctx, cons
         for (int i = 0; i < count; ++i) {
             auto newsrc = SCOPES_GET_RESULT(prove(subctx, expr->body[i]));
             if (!is_returning(newsrc->get_type())) {
-                //SCOPES_ANCHOR(expr->body[i]->anchor());
-                SCOPES_CHECK_RESULT(error_noreturn_not_last_expression());
+                SCOPES_ERROR(PrematureReturnFromExpression);
             }
         }
         TypedValueRef result;
@@ -1048,9 +1033,7 @@ SCOPES_RESULT(void) map_keyed_arguments(const Anchor *anchor, const TypedValueRe
                     outargs.push_back(TypedValueRef());
                 }
                 if (mapped[ki]) {
-                    StyledString ss;
-                    ss.out << "duplicate binding to parameter " << key;
-                    SCOPES_ERROR(ss.str());
+                    SCOPES_ERROR(DuplicateParameterKey, key);
                 }
                 index = ki;
                 // strip key from value
@@ -1065,26 +1048,7 @@ SCOPES_RESULT(void) map_keyed_arguments(const Anchor *anchor, const TypedValueRe
                 mapped.push_back(false);
                 outargs.push_back(TypedValueRef());
             } else {
-                StyledString ss;
-                ss.out << "no parameter named '" << key.name()->data << "'";
-                const Type *T = callee->get_type();
-                TemplateRef func;
-                if (is_function_pointer(T)) {
-                    ss.out << " in function of type " << T;
-                } else if (T == TYPE_Closure) {
-                    ClosureRef cl = SCOPES_GET_RESULT(extract_closure_constant(callee));
-                    func = ref(cl.anchor(), cl->func);
-                    ss.out << " in untyped function ";
-                    if (cl->func->name != SYM_Unnamed) {
-                        ss.out << cl->func->name.name()->data;
-                    }
-                }
-                ss.out << ". ";
-                print_name_suggestions(key, symbols, ss.out);
-                auto err = make_error(ss.str());
-                if (func)
-                    err->append_definition(func);
-                SCOPES_RETURN_ERROR(err);
+                SCOPES_ERROR(UnknownParameterKey, key);
             }
         }
         mapped[index] = true;
@@ -1219,7 +1183,7 @@ const String *try_extract_string(const ValueRef &node) {
 static SCOPES_RESULT(TypedValueRef) prove_Break(const ASTContext &ctx, const BreakRef &_break) {
     SCOPES_RESULT_TYPE(TypedValueRef);
     if (!ctx._break) {
-        SCOPES_EXPECT_ERROR(error_illegal_break_outside_loop());
+        SCOPES_ERROR(BreakOutsideLoop);
     }
     TypedValueRef value = SCOPES_GET_RESULT(prove(ctx, _break->value));
     return make_merge(ctx, _break.anchor(), ctx._break, value);
@@ -1228,7 +1192,7 @@ static SCOPES_RESULT(TypedValueRef) prove_Break(const ASTContext &ctx, const Bre
 static SCOPES_RESULT(TypedValueRef) prove_RepeatTemplate(const ASTContext &ctx, const RepeatTemplateRef &node) {
     SCOPES_RESULT_TYPE(TypedValueRef);
     if (!ctx.loop) {
-        SCOPES_EXPECT_ERROR(error_illegal_repeat_outside_loop());
+        SCOPES_ERROR(RepeatOutsideLoop);
     }
     TypedValueRef value = SCOPES_GET_RESULT(prove(ctx, node->value));
     return make_repeat(ctx, node.anchor(), ctx.loop, value);
@@ -1252,7 +1216,7 @@ static SCOPES_RESULT(TypedValueRef) prove_MergeTemplate(const ASTContext &ctx, c
     SCOPES_RESULT_TYPE(TypedValueRef);
     TypedValueRef label = SCOPES_GET_RESULT(ctx.frame->resolve(node->label, ctx.function));
     if (!label.isa<Label>()) {
-        SCOPES_EXPECT_ERROR(error_label_expected(label));
+        SCOPES_ERROR(LabelExpected, label->get_type());
     }
     TypedValueRef value = SCOPES_GET_RESULT(prove(ctx, node->value));
     if (!is_returning(value->get_type()))
@@ -1351,7 +1315,7 @@ static SCOPES_RESULT(TValueRef<T>) extract_constant(const Type *want, const Valu
     SCOPES_RESULT_TYPE(TValueRef<T>);
     auto constval = value.dyn_cast<T>();
     if (!constval) {
-        SCOPES_CHECK_RESULT(error_constant_expected(want, value));
+        SCOPES_ERROR(ConstantValueKindMismatch, want, value->kind());
     }
     return constval;
 }
@@ -1366,7 +1330,7 @@ static SCOPES_RESULT(TValueRef<T>) extract_typed_constant(const Type *want, Valu
     }
     auto constval = value.dyn_cast<T>();
     if (!constval) {
-        SCOPES_CHECK_RESULT(error_constant_expected(want, value));
+        SCOPES_ERROR(ConstantValueKindMismatch, want, value->kind());
     }
     if (!TT) {
         TT = constval->get_type();
@@ -1719,8 +1683,7 @@ static SCOPES_RESULT(const Type *) ensure_function_type(const FunctionRef &fn) {
     const Type *fT = SCOPES_GET_RESULT(get_function_type(fn));
     if (fn->is_typed()) {
         if (fT != fn->get_type()) {
-            SCOPES_EXPECT_ERROR(error_recursive_function_changed_type(
-                fn, fn->get_type(), fT));
+            SCOPES_ERROR(RecursiveFunctionChangedType, fn->get_type(), fT);
         }
     } else {
         fn->set_type(fT);
@@ -1771,9 +1734,7 @@ SCOPES_RESULT(void) sanitize_tuple_index(const Anchor *anchor, const Type *ST,
         auto sym = Symbol::wrap(arg);
         size_t idx = type->field_index(sym);
         if (idx == (size_t)-1) {
-            StyledString ss;
-            ss.out << "no such field " << sym << " in storage type " << ST;
-            SCOPES_ERROR(ss.str());
+            SCOPES_ERROR(UnknownField, sym, ST);
         }
         // rewrite field
         arg = idx;
@@ -1822,7 +1783,7 @@ const Type *remap_unique_return_arguments(
 SCOPES_RESULT(void) verify_cast_lifetime(const Type *SrcT, const Type *DestT) {
     SCOPES_RESULT_TYPE(void);
     if (!is_plain(DestT) && is_plain(SrcT) && !is_view(SrcT)) {
-        SCOPES_EXPECT_ERROR(error_cannot_cast_plain_to_unique(SrcT, DestT));
+        SCOPES_ERROR(PlainToUniqueCast, SrcT, DestT);
     }
     return {};
 }
@@ -1893,9 +1854,7 @@ repeat:
         if (result.ok) {
             ValueRef value = result._0;
             if (!value) {
-                StyledString ss;
-                ss.out << "spice macro returned illegal value";
-                SCOPES_ERROR(ss.str());
+                SCOPES_ERROR(SpiceMacroReturnedNull);
             }
             return prove(ctx, value);
         } else {
@@ -1964,7 +1923,7 @@ repeat:
             READ_NODEREF_TYPEOF(X);
             auto uq = try_unique(X);
             if (!uq) {
-                SCOPES_CHECK_RESULT(error_value_not_unique(_X, "move"));
+                SCOPES_ERROR(UniqueValueExpected, _X->get_type());
             }
             build_move(ctx, call.anchor(), _X);
             return _X;
@@ -1991,7 +1950,7 @@ repeat:
             READ_NODEREF_TYPEOF(X);
             auto uq = try_unique(X);
             if (!uq) {
-                SCOPES_CHECK_RESULT(error_value_not_unique(_X, "lose"));
+                SCOPES_ERROR(UniqueValueExpected, _X->get_type());
             }
 
             const Type *DestT = SCOPES_GET_RESULT(storage_type(X));
@@ -2026,7 +1985,7 @@ repeat:
             DestT = strip_qualifiers(DestT);
 
             if (strip_qualifier<ReferQualifier>(SrcT) != SDestT) {
-                SCOPES_CHECK_RESULT(error_plain_not_storage_of_unique(SrcT, DestT));
+                SCOPES_ERROR(IncompatibleStorageTypeForUnique, SrcT, DestT);
             }
 
             auto rq = try_qualifier<ReferQualifier>(SrcT);
@@ -2042,7 +2001,7 @@ repeat:
                 READ_VALUE(value);
                 auto param = value.dyn_cast<Parameter>();
                 if (!param) {
-                    SCOPES_EXPECT_ERROR(error_something_expected("parameter", value));
+                    SCOPES_ERROR(ValueKindMismatch, VK_Parameter, value->kind());
                 }
                 param->retype(view_type(param->get_type(), {}));
             }
@@ -2108,7 +2067,7 @@ repeat:
                 comps = 3;
                 break;
             default:
-                SCOPES_ERROR(String::from("unsupported dimensionality"));
+                SCOPES_ERROR(UnsupportedDimensionality, it->dim);
                 break;
             }
             if (it->arrayed) {
@@ -2159,7 +2118,7 @@ repeat:
                 B_SPIRV_EXECUTION_MODE()
             #undef T
                 default:
-                    SCOPES_ERROR(String::from("unsupported execution mode"));
+                    SCOPES_ERROR(UnsupportedExecutionMode, sym);
                     break;
             }
             for (size_t i = 1; i < values.size(); ++i) {
@@ -2194,23 +2153,15 @@ repeat:
                 const Type *SDestT = SCOPES_GET_RESULT(storage_type(DestT));
                 if (canonical_typekind(SSrcT->kind())
                         != canonical_typekind(SDestT->kind())) {
-                    StyledString ss;
-                    ss.out << "can not bitcast value of type " << SrcT
-                        << " to type " << DestT
-                        << " because storage types are not of compatible category";
-                    SCOPES_ERROR(ss.str());
+                    SCOPES_ERROR(CastCategoryError, SrcT, DestT);
                 }
                 if (SSrcT != SDestT) {
-                    switch (SDestT->kind()) {
+                    switch (SSrcT->kind()) {
                     case TK_Array:
                     //case TK_Vector:
                     case TK_Tuple:
                     case TK_Union: {
-                        StyledString ss;
-                        ss.out << "can not bitcast value of type " << SrcT
-                            << " to type " << DestT
-                            << " with aggregate storage type " << SDestT;
-                        SCOPES_ERROR(ss.str());
+                        SCOPES_ERROR(CastIncompatibleAggregateType, SSrcT);
                     } break;
                     default: break;
                     }
@@ -2265,7 +2216,7 @@ repeat:
             SCOPES_CHECK_RESULT(verify_real(T));
             SCOPES_CHECK_RESULT(verify_real(SCOPES_GET_RESULT(storage_type(DestT))));
             if (cast<RealType>(T)->width < cast<RealType>(DestT)->width) {
-                SCOPES_EXPECT_ERROR(error_invalid_operands(T, DestT));
+                SCOPES_ERROR(InvalidOperands, b, T, DestT);
             }
             return DEP_ARGTYPE1(DestT, _T);
         } break;
@@ -2276,7 +2227,7 @@ repeat:
             SCOPES_CHECK_RESULT(verify_real(T));
             SCOPES_CHECK_RESULT(verify_real(SCOPES_GET_RESULT(storage_type(DestT))));
             if (cast<RealType>(T)->width > cast<RealType>(DestT)->width) {
-                SCOPES_EXPECT_ERROR(error_invalid_operands(T, DestT));
+                SCOPES_ERROR(InvalidOperands, b, T, DestT);
             }
             return DEP_ARGTYPE1(DestT, _T);
         } break;
@@ -2288,7 +2239,7 @@ repeat:
             SCOPES_CHECK_RESULT(verify_real(T));
             SCOPES_CHECK_RESULT(verify_integer(SCOPES_GET_RESULT(storage_type(DestT))));
             if ((T != TYPE_F32) && (T != TYPE_F64)) {
-                SCOPES_EXPECT_ERROR(error_invalid_operands(T, DestT));
+                SCOPES_ERROR(InvalidOperands, b, T, DestT);
             }
             return DEP_ARGTYPE1(DestT, _T);
         } break;
@@ -2300,7 +2251,7 @@ repeat:
             SCOPES_CHECK_RESULT(verify_integer(T));
             SCOPES_CHECK_RESULT(verify_real(SCOPES_GET_RESULT(storage_type(DestT))));
             if ((DestT != TYPE_F32) && (DestT != TYPE_F64)) {
-                SCOPES_CHECK_RESULT(error_invalid_operands(T, DestT));
+                SCOPES_ERROR(InvalidOperands, b, T, DestT);
             }
             return DEP_ARGTYPE1(DestT, _T);
         } break;
@@ -2454,9 +2405,7 @@ repeat:
                 }
             } break;
             default: {
-                StyledString ss;
-                ss.out << "can not extract value from type " << T;
-                SCOPES_ERROR(ss.str());
+                SCOPES_ERROR(InvalidArgumentTypeForBuiltin, b, T);
             } break;
             }
             RT = type_key(RT)._1;
@@ -2491,9 +2440,7 @@ repeat:
                 SCOPES_CHECK_RESULT(verify(SCOPES_GET_RESULT(storage_type(SCOPES_GET_RESULT(ui->type_at_index(idx)))), ET));
             } break;
             default: {
-                StyledString ss;
-                ss.out << "can not insert value into type " << T;
-                SCOPES_ERROR(ss.str());
+                SCOPES_ERROR(InvalidArgumentTypeForBuiltin, b, T);
             } break;
             }
             return DEP_ARGTYPE1(AT, _AT, _ET);
@@ -2538,9 +2485,7 @@ repeat:
                     T = SCOPES_GET_RESULT(ti->type_at_index(arg));
                 } break;
                 default: {
-                    StyledString ss;
-                    ss.out << "can not get element pointer from type " << T;
-                    SCOPES_ERROR(ss.str());
+                    SCOPES_ERROR(InvalidArgumentTypeForBuiltin, b, T);
                 } break;
                 }
             }
@@ -2573,7 +2518,7 @@ repeat:
             if (!is_plain(typeof_ElemT)) {
                 auto uq = try_unique(typeof_ElemT);
                 if (!uq) {
-                    SCOPES_CHECK_RESULT(error_value_not_unique(_ElemT, "assign"));
+                    SCOPES_ERROR(UniqueValueExpected, _ElemT->get_type());
                 }
                 ctx.move(uq->id);
             }
@@ -2626,7 +2571,7 @@ repeat:
             if (!is_plain(typeof_DestT)) {
                 auto uq = try_unique(typeof_ElemT);
                 if (!uq) {
-                    SCOPES_CHECK_RESULT(error_value_not_unique(_ElemT, "store"));
+                    SCOPES_ERROR(UniqueValueExpected, _ElemT->get_type());
                 }
                 ctx.move(uq->id);
             }
@@ -2661,13 +2606,12 @@ repeat:
             READ_STORAGETYPEOF(T);
             SCOPES_CHECK_RESULT(verify_writable(T));
             if (cast<PointerType>(T)->storage_class != SYM_Unnamed) {
-                SCOPES_ERROR(String::from(
-                    "pointer is not a heap pointer"));
+                SCOPES_ERROR(InvalidArgumentTypeForBuiltin, b, T);
             }
             if (!is_plain(T)) {
                 auto uq = try_unique(T);
                 if (!uq) {
-                    SCOPES_CHECK_RESULT(error_value_not_unique(_T, "free"));
+                    SCOPES_ERROR(UniqueValueExpected, _T->get_type());
                 }
                 SCOPES_CHECK_RESULT(build_drop(ctx, call.anchor(), _T));
                 ctx.move(uq->id);
@@ -2768,21 +2712,27 @@ repeat:
 #undef FUN_OP
 #undef FTRI_OP
         default: {
-            SCOPES_EXPECT_ERROR(error_cannot_type_builtin(b));
+            SCOPES_ERROR(UnsupportedBuiltin, b);
         } break;
         }
 
         return ref(call.anchor(), ArgumentList::from({}));
     }
     if (!is_function_pointer(T)) {
-        SCOPES_EXPECT_ERROR(error_invalid_call_type(callee));
+        SCOPES_ERROR(InvalidCallee, callee->get_type());
     }
     const FunctionType *aft = extract_function_type(T);
     const FunctionType *ft = aft->strip_annotations();
     int numargs = (int)ft->argument_types.size();
     if ((!ft->vararg() && (values.size() != numargs))
         || (ft->vararg() && (values.size() < numargs))) {
-        SCOPES_EXPECT_ERROR(error_argument_count_mismatch(numargs, values.size(), ft));
+        if (values.size() > numargs) {
+            SCOPES_ERROR(TooManyFunctionArguments, ft, values.size());
+        } else if (values.size() < numargs) {
+            SCOPES_ERROR(NotEnoughFunctionArguments, ft, values.size());
+        } else {
+            assert(false && "how did we get here?");
+        }
     }
     // verify_function_argument_signature
     for (int i = 0; i < numargs; ++i) {
@@ -2808,7 +2758,7 @@ repeat:
         if (SCOPES_GET_RESULT(types_compatible(Tb, Ta))) {
             continue;
         }
-        SCOPES_EXPECT_ERROR(error_argument_type_mismatch(Tb, Ta));
+        SCOPES_ERROR(ParameterTypeMismatch, Tb, Ta);
     }
     // build id map
     ID2SetMap idmap;
@@ -2925,14 +2875,14 @@ static SCOPES_RESULT(TypedValueRef) prove_SwitchTemplate(const ASTContext &ctx,
         Switch::Case *newcase = nullptr;
         if (_case.kind == CK_Default) {
             if (defaultcase) {
-                SCOPES_EXPECT_ERROR(error_duplicate_default_case());
+                SCOPES_ERROR(DuplicateSwitchDefaultCase);
             }
             newcase = &_switch->append_default();
             defaultcase = newcase;
         } else {
             auto newlit = SCOPES_GET_RESULT(prove(ctx, _case.literal));
             if (!newlit.isa<ConstInt>()) {
-                SCOPES_EXPECT_ERROR(error_invalid_case_literal_type(newlit));
+                SCOPES_ERROR(ValueKindMismatch, VK_ConstInt, newlit->kind());
             }
             casetype = SCOPES_GET_RESULT(
                 merge_value_type("switch case literal", casetype, newlit->get_type()));
@@ -2951,7 +2901,7 @@ static SCOPES_RESULT(TypedValueRef) prove_SwitchTemplate(const ASTContext &ctx,
     }
 
     if (!defaultcase) {
-        SCOPES_EXPECT_ERROR(error_missing_default_case());
+        SCOPES_ERROR(MissingDefaultCase);
     }
 
     if (merge_label->merges.empty()) {
@@ -2984,7 +2934,7 @@ static SCOPES_RESULT(TypedValueRef) prove_If(const ASTContext &ctx, const IfRef 
                 ExtractArgument::from(newcond, 0));
             SCOPES_CHECK_RESULT(build_deref(ctx, newcond.anchor(), newcond));
             if (newcond->get_type() != TYPE_Bool) {
-                SCOPES_EXPECT_ERROR(error_invalid_condition_type(newcond));
+                SCOPES_ERROR(ConditionNotBool, newcond->get_type());
             }
             CondBrRef condbr = ref(newcond.anchor(), CondBr::from(newcond));
             if (!first_condbr) {
@@ -3050,7 +3000,7 @@ static SCOPES_RESULT(TypedValueRef) prove_Quote(const ASTContext &ctx, const Quo
 
 static SCOPES_RESULT(TypedValueRef) prove_Unquote(const ASTContext &ctx, const UnquoteRef &node) {
     SCOPES_RESULT_TYPE(TypedValueRef);
-    SCOPES_ERROR(String::from("unexpected unquote"));
+    SCOPES_ERROR(UnexpectedValueKind, node->kind());
 }
 
 SCOPES_RESULT(TypedValueRef) prove(const ASTContext &ctx, const ValueRef &node) {
@@ -3097,8 +3047,7 @@ static SCOPES_RESULT(void) prove_inline_arguments(const ASTContext &ctx,
         TypedValueRef newval;
         if (oldsym->is_variadic()) {
             if ((i + 1) < count) {
-                //SCOPES_ANCHOR(oldsym->anchor());
-                SCOPES_EXPECT_ERROR(error_variadic_symbol_not_in_last_place(oldsym));
+                SCOPES_ERROR(VariadicParameterNotLast);
             }
             if ((i + 1) == (int)tmpargs.size()) {
                 newval = tmpargs[i];
@@ -3173,7 +3122,7 @@ SCOPES_RESULT(TypedValueRef) prove_inline(const ASTContext &ctx,
     SCOPES_RESULT_TYPE(TypedValueRef);
     auto func = cl->func;
     if (func->recursion >= SCOPES_MAX_RECURSIONS) {
-        SCOPES_EXPECT_ERROR(error_recursion_overflow());
+        SCOPES_ERROR(RecursionOverflow, func->recursion);
     }
     func->recursion++;
     auto result = prove_inline_body(ctx, cl, nodes);
@@ -3204,7 +3153,7 @@ static SCOPES_RESULT(FunctionRef) prove_body(
         auto oldparam = func->params[i];
         if (oldparam->is_variadic()) {
             if ((i + 1) < count) {
-                SCOPES_EXPECT_ERROR(error_variadic_symbol_not_in_last_place(oldparam));
+                SCOPES_ERROR(VariadicParameterNotLast);
             }
             if ((i + 1) == (int)types.size()) {
                 auto newparam = ref(oldparam.anchor(),
@@ -3259,7 +3208,7 @@ static SCOPES_RESULT(FunctionRef) prove_body(
 SCOPES_RESULT(FunctionRef) prove(const FunctionRef &frame, const TemplateRef &func, const Types &types) {
     SCOPES_RESULT_TYPE(FunctionRef);
     if (func->recursion >= SCOPES_MAX_RECURSIONS) {
-        SCOPES_EXPECT_ERROR(error_recursion_overflow());
+        SCOPES_ERROR(RecursionOverflow, func->recursion);
     }
     func->recursion++;
     auto result = prove_body(frame, func, types);
@@ -3270,7 +3219,7 @@ SCOPES_RESULT(FunctionRef) prove(const FunctionRef &frame, const TemplateRef &fu
 SCOPES_RESULT(TypedValueRef) prove(const ValueRef &node) {
     SCOPES_RESULT_TYPE(TypedValueRef);
     if (!ast_context) {
-        SCOPES_ERROR(String::from("can't prove expressions outside of spice macros"));
+        SCOPES_ERROR(ProveOutsideOfMacro);
     }
     return prove(*ast_context, node);
 }

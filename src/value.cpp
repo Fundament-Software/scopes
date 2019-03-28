@@ -489,8 +489,7 @@ SCOPES_RESULT(TypedValueRef) Function::resolve(const ValueRef &node, const Funct
         auto val = fn->resolve_local(node);
         if (val) {
             if ((fn->boundary != _boundary) && !val->is_accessible()) {
-                SCOPES_EXPECT_ERROR(
-                    error_value_inaccessible_from_closure(val, _boundary));
+                SCOPES_ERROR(VariableOutOfScope, val->get_type());
             }
             return val;
         }

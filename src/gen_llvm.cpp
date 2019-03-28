@@ -665,8 +665,7 @@ struct LLVMIRGenerator {
         } break;
         case TK_Typename: {
             if (type == TYPE_Sampler) {
-                SCOPES_ERROR(String::from(
-                    "sampler type can not be used for native target"));
+                SCOPES_ERROR(CGenTypeUnsupportedInTarget, TYPE_Sampler);
             }
             auto tn = cast<TypenameType>(type);
             if (tn->finalized()) {
@@ -717,19 +716,15 @@ struct LLVMIRGenerator {
                 &elements[0], elements.size(), fi->vararg());
         } break;
         case TK_SampledImage: {
-            SCOPES_ERROR(String::from(
-                "sampled image type can not be used for native target"));
+            SCOPES_ERROR(CGenTypeUnsupportedInTarget, TYPE_SampledImage);
         } break;
         case TK_Image: {
-            SCOPES_ERROR(String::from(
-                "image type can not be used for native target"));
+            SCOPES_ERROR(CGenTypeUnsupportedInTarget, TYPE_Image);
         } break;
         default: break;
         };
 
-        StyledString ss;
-        ss.out << "IL->IR: cannot convert type " << type;
-        SCOPES_ERROR(ss.str());
+        SCOPES_ERROR(CGenFailedToTranslateType, type);
     }
 
     static SCOPES_RESULT(size_t) finalize_types() {
@@ -804,7 +799,7 @@ struct LLVMIRGenerator {
 
     static Error *last_llvm_error;
     static void fatal_error_handler(const char *Reason) {
-        last_llvm_error = make_error(String::from_cstr(Reason));
+        last_llvm_error = ErrorCGenBackendFailed::from(strdup(Reason));
     }
 
     void bind(const ValueIndex &node, LLVMValueRef value) {
@@ -1011,17 +1006,17 @@ struct LLVMIRGenerator {
 
     SCOPES_RESULT(LLVMValueRef) Parameter_to_value(const ParameterRef &node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
-        SCOPES_EXPECT_ERROR(error_gen_unbound_symbol(SCOPES_GEN_TARGET, node));
+        SCOPES_ERROR(CGenUnboundValue, node);
     }
 
     SCOPES_RESULT(LLVMValueRef) LoopLabelArguments_to_value(const LoopLabelArgumentsRef &node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
-        SCOPES_EXPECT_ERROR(error_gen_unbound_symbol(SCOPES_GEN_TARGET, ValueRef(node)));
+        SCOPES_ERROR(CGenUnboundValue, node);
     }
 
     SCOPES_RESULT(LLVMValueRef) Exception_to_value(const ExceptionRef &node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
-        SCOPES_EXPECT_ERROR(error_cannot_translate(SCOPES_GEN_TARGET, ValueRef(node)));
+        SCOPES_ERROR(CGenUnboundValue, node);
     }
 
     SCOPES_RESULT(void) translate_block(const Block &node) {
@@ -1666,9 +1661,7 @@ struct LLVMIRGenerator {
         case SFXFN_Unreachable:
             return LLVMBuildUnreachable(builder);
         default: {
-            StyledString ss;
-            ss.out << "IL->IR: unsupported builtin " << builtin << " encountered";
-            SCOPES_ERROR(ss.str());
+            SCOPES_ERROR(CGenUnsupportedBuiltin, builtin);
         } break;
         }
 #undef READ_TYPE
@@ -1696,7 +1689,7 @@ struct LLVMIRGenerator {
             }
             return {};
         }
-        SCOPES_EXPECT_ERROR(error_gen_invalid_call_type(SCOPES_GEN_TARGET, callee));
+        SCOPES_ERROR(CGenInvalidCallee, callee->get_type());
     }
 
     SCOPES_RESULT(void) translate_Switch(const SwitchRef &node) {
@@ -1789,8 +1782,7 @@ struct LLVMIRGenerator {
         SCOPES_PURE_VALUE_KIND()
         #undef T
             default: {
-                SCOPES_EXPECT_ERROR(error_cannot_translate(
-                    SCOPES_GEN_TARGET, ref.value));
+                SCOPES_ERROR(CGenFailedToTranslateValue, ref.value->kind());
             } break;
         }
         ref2value.insert({ref,value});
@@ -1833,9 +1825,7 @@ struct LLVMIRGenerator {
                         }
                     }
                     if (!ptr) {
-                        StyledString ss;
-                        ss.out << "could not resolve " << node;
-                        SCOPES_ERROR(ss.str());
+                        SCOPES_ERROR(CGenFailedToResolveExtern, node);
                     }
                     result = LLVMAddGlobal(module, LLT, name);
                 }
@@ -1879,10 +1869,7 @@ struct LLVMIRGenerator {
             void *baseptr;
             size_t alloc_size;
             if (!find_allocation((void *)node->value, baseptr, alloc_size)) {
-                StyledString ss;
-                ss.out << "IL->IR: constant pointer of type " << node->get_type()
-                    << " points to unserializable memory";
-                SCOPES_ERROR(ss.str());
+                SCOPES_ERROR(CGenCannotSerializeMemory, node->get_type());
             }
             LLVMValueRef basevalue = nullptr;
             auto it = ptr2global.find(baseptr);
@@ -2215,10 +2202,7 @@ struct LLVMIRGenerator {
                 stream_ast(ss, entry, fmt);
             }
             LLVMDumpModule(module);
-            SCOPES_ERROR(
-                String::join(
-                    String::from("LLVM: "),
-                    String::from_cstr(errmsg)));
+            SCOPES_ERROR(CGenBackendFailed, errmsg);
         }
         LLVMDisposeMessage(errmsg);
         return {};
@@ -2425,7 +2409,7 @@ SCOPES_RESULT(void) compile_object(const String *path, Scope *scope, uint64_t fl
     char *path_cstr = strdup(path->data);
     if (LLVMTargetMachineEmitToFile(target_machine, module, path_cstr,
         LLVMObjectFile, &errormsg)) {
-        SCOPES_ERROR(String::from_cstr(errormsg));
+        SCOPES_ERROR(CGenBackendFailed, errormsg);
     }
     free(path_cstr);
     return {};

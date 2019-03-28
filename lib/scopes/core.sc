@@ -28,7 +28,7 @@ fn ptrcmp== (t1 t2)
 
 fn box-integer (value)
     let T = (typeof value)
-    sc_const_int_new (sc_get_active_anchor) T
+    sc_const_int_new T
         if (sc_integer_type_is_signed T)
             sext value u64
         else
@@ -36,22 +36,22 @@ fn box-integer (value)
 
 # turn a symbol-like value (storage type u64) to an Any
 fn box-symbol (value)
-    sc_const_int_new (sc_get_active_anchor) (typeof value)
+    sc_const_int_new (typeof value)
         bitcast value u64
 
 # turn a pointer value into an Any
 fn box-pointer (value)
-    sc_const_pointer_new (sc_get_active_anchor) (typeof value)
+    sc_const_pointer_new (typeof value)
         bitcast value voidstar
 
 fn error! (msg)
-    raise (sc_runtime_error_new msg)
+    raise (sc_error_new msg)
 
 fn sugar-error! (anchor msg)
     raise (sc_location_error_new anchor msg)
 
 fn compiler-error! (value)
-    raise (sc_location_error_new (sc_get_active_anchor) value)
+    raise (sc_error_new value)
 
 # print an unboxing error given two types
 fn unbox-verify (value wantT)

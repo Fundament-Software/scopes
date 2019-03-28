@@ -85,9 +85,6 @@ struct Value {
 
 private:
     const ValueKind _kind;
-
-protected:
-    ValueRef _origin;
 };
 
 //------------------------------------------------------------------------------

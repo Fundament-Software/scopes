@@ -120,7 +120,7 @@ static SCOPES_RESULT(void) verify_spirv(std::vector<unsigned int> &contents) {
     if (!succeed) {
         disassemble_spirv(contents, true);
         SCOPES_CERR << ss._ss.str();
-        SCOPES_ERROR(String::from("SPIR-V validation found errors"));
+        SCOPES_ERROR(CGenBackendValidationFailed);
     }
     return {};
 }
@@ -282,9 +282,7 @@ struct SPIRVGenerator {
             B_SPIRV_DIM()
         #undef T
             default:
-                SCOPES_ERROR(
-                    String::from(
-                        "IL->SPIR: unsupported dimensionality"));
+                SCOPES_ERROR(CGenUnsupportedDimensionality, sym);
                 break;
         }
         return spv::DimMax;
@@ -298,9 +296,7 @@ struct SPIRVGenerator {
             B_SPIRV_IMAGE_FORMAT()
         #undef T
             default:
-                SCOPES_ERROR(
-                    String::from(
-                        "IL->SPIR: unsupported image format"));
+                SCOPES_ERROR(CGenUnsupportedImageFormat, sym);
                 break;
         }
         return spv::ImageFormatMax;
@@ -314,9 +310,7 @@ struct SPIRVGenerator {
             B_SPIRV_EXECUTION_MODE()
         #undef T
             default:
-                SCOPES_ERROR(
-                    String::from(
-                        "IL->SPIR: unsupported execution mode"));
+                SCOPES_ERROR(CGenUnsupportedExecutionMode, sym);
                 break;
         }
         return spv::ExecutionModeMax;
@@ -329,16 +323,8 @@ struct SPIRVGenerator {
             case SYM_SPIRV_StorageClass ## NAME: return spv::StorageClass ## NAME;
             B_SPIRV_STORAGE_CLASS()
         #undef T
-            case SYM_Unnamed:
-                SCOPES_ERROR(
-                    String::from(
-                        "IL->SPIR: pointers with C storage class"
-                        " are unsupported"));
-                break;
             default:
-                SCOPES_ERROR(
-                    String::from(
-                        "IL->SPIR: unsupported storage class for pointer"));
+                SCOPES_ERROR(CGenUnsupportedPointerStorageClass, sym);
                 break;
         }
         return spv::StorageClassMax;
@@ -471,13 +457,13 @@ struct SPIRVGenerator {
                     return SCOPES_GET_RESULT(type_to_spirv_type(tn->storage_type, flags));
                 }
             } else {
-                SCOPES_ERROR(String::from("IL->SPIR: opaque types are not supported"));
+                SCOPES_ERROR(CGenTypeUnsupportedInTarget, type);
             }
         } break;
         case TK_Function: {
             auto fi = cast<FunctionType>(type);
             if (fi->vararg()) {
-                SCOPES_ERROR(String::from("IL->SPIR: vararg functions are not supported"));
+                SCOPES_ERROR(CGenTypeUnsupportedInTarget, type);
             }
             size_t count = fi->argument_types.size();
             auto rtype = abi_return_type(fi);
@@ -509,10 +495,7 @@ struct SPIRVGenerator {
         } break;
         default: break;
         };
-
-        StyledString ss;
-        ss.out << "IL->SPIR: cannot convert type " << type;
-        SCOPES_ERROR(ss.str());
+        SCOPES_ERROR(CGenFailedToTranslateType, type);
     }
 
     SCOPES_RESULT(spv::Id) type_to_spirv_type(const Type *type, uint64_t flags = 0) {
@@ -526,13 +509,6 @@ struct SPIRVGenerator {
             return it->second;
         }
     }
-
-#if 0
-    static Error *last_llvm_error;
-    static void fatal_error_handler(const char *Reason) {
-        last_llvm_error = make_location_error(String::from_cstr(Reason));
-    }
-#endif
 
     void bind(const ValueIndex &node, spv::Id value) {
         assert(value);
@@ -738,22 +714,22 @@ struct SPIRVGenerator {
 
     SCOPES_RESULT(spv::Id) Function_to_value(const FunctionRef &node) {
         SCOPES_RESULT_TYPE(spv::Id);
-        SCOPES_EXPECT_ERROR(error_cannot_translate(SCOPES_GEN_TARGET, node));
+        SCOPES_ERROR(CGenFailedToTranslateValue, node->kind());
     }
 
     SCOPES_RESULT(spv::Id) Parameter_to_value(const ParameterRef &node) {
         SCOPES_RESULT_TYPE(spv::Id);
-        SCOPES_EXPECT_ERROR(error_gen_unbound_symbol(SCOPES_GEN_TARGET, node));
+        SCOPES_ERROR(CGenFailedToTranslateValue, node->kind());
     }
 
     SCOPES_RESULT(spv::Id) LoopLabelArguments_to_value(const LoopLabelArgumentsRef &node) {
         SCOPES_RESULT_TYPE(spv::Id);
-        SCOPES_EXPECT_ERROR(error_gen_unbound_symbol(SCOPES_GEN_TARGET, ValueRef(node)));
+        SCOPES_ERROR(CGenFailedToTranslateValue, node->kind());
     }
 
     SCOPES_RESULT(spv::Id) Exception_to_value(const ExceptionRef &node) {
         SCOPES_RESULT_TYPE(spv::Id);
-        SCOPES_EXPECT_ERROR(error_cannot_translate(SCOPES_GEN_TARGET, ValueRef(node)));
+        SCOPES_ERROR(CGenFailedToTranslateValue, node->kind());
     }
 
     SCOPES_RESULT(void) translate_block(const Block &node) {
@@ -1520,9 +1496,7 @@ struct SPIRVGenerator {
             case OP_Radians: _builtin = GLSLstd450Radians; break;
             case OP_Degrees: _builtin = GLSLstd450Degrees; break;
             default: {
-                StyledString ss;
-                ss.out << "IL->SPIR: unsupported unary intrinsic " << builtin << " encountered";
-                SCOPES_ERROR(ss.str());
+                SCOPES_ERROR(CGenUnsupportedBuiltin, builtin);
             } break;
             }
             return builder.createBuiltinCall(rtype, glsl_ext_inst, _builtin, { val });
@@ -1539,9 +1513,7 @@ struct SPIRVGenerator {
             case OP_Pow: _builtin = GLSLstd450Pow; break;
             case FN_Cross: _builtin = GLSLstd450Cross; break;
             default: {
-                StyledString ss;
-                ss.out << "IL->SPIR: unsupported binary intrinsic " << builtin << " encountered";
-                SCOPES_ERROR(ss.str());
+                SCOPES_ERROR(CGenUnsupportedBuiltin, builtin);
             } break;
             }
             return builder.createBuiltinCall(rtype, glsl_ext_inst, _builtin, { a, b });
@@ -1553,9 +1525,7 @@ struct SPIRVGenerator {
             builder.makeDiscard();
             return 0;
         default: {
-            StyledString ss;
-            ss.out << "IL->SPIR: unsupported builtin " << builtin << " encountered";
-            SCOPES_ERROR(ss.str());
+            SCOPES_ERROR(CGenUnsupportedBuiltin, builtin);
         } break;
         }
 #undef READ_TYPE
@@ -1592,7 +1562,7 @@ struct SPIRVGenerator {
             }
             return {};
         }
-        SCOPES_EXPECT_ERROR(error_gen_invalid_call_type(SCOPES_GEN_TARGET, callee));
+        SCOPES_ERROR(CGenInvalidCallee, callee->get_type());
     }
 
     SCOPES_RESULT(void) translate_Switch(const SwitchRef &node) {
@@ -1697,8 +1667,7 @@ struct SPIRVGenerator {
         SCOPES_PURE_VALUE_KIND()
         #undef T
             default: {
-                SCOPES_EXPECT_ERROR(
-                    error_cannot_translate(SCOPES_GEN_TARGET, ref.value));
+                SCOPES_ERROR(CGenFailedToTranslateValue, ref.value->kind());
             } break;
         }
         ref2value.insert({ref,value});
@@ -1807,9 +1776,7 @@ struct SPIRVGenerator {
             default: break;
             }
         }
-        StyledString ss;
-        ss.out << "IL->SPIR: unsupported integer constant type " << node->get_type();
-        SCOPES_ERROR(ss.str());
+        SCOPES_ERROR(CGenTypeUnsupportedInTarget, node->get_type());
     }
 
     SCOPES_RESULT(spv::Id) ConstReal_to_value(const ConstRealRef &node) {
@@ -1823,19 +1790,17 @@ struct SPIRVGenerator {
         case 64: return builder.makeDoubleConstant(value);
         default: break;
         }
-        StyledString ss;
-        ss.out << "IL->SPIR: unsupported real constant type " << node->get_type();
-        SCOPES_ERROR(ss.str());
+        SCOPES_ERROR(CGenTypeUnsupportedInTarget, node->get_type());
     }
 
     SCOPES_RESULT(spv::Id) Closure_to_value(const ClosureRef &node) {
         SCOPES_RESULT_TYPE(spv::Id);
-        SCOPES_EXPECT_ERROR(error_cannot_translate(SCOPES_GEN_TARGET, node));
+        SCOPES_ERROR(CGenFailedToTranslateValue, node->kind());
     }
 
     SCOPES_RESULT(spv::Id) ConstPointer_to_value(const ConstPointerRef &node) {
         SCOPES_RESULT_TYPE(spv::Id);
-        SCOPES_EXPECT_ERROR(error_cannot_translate(SCOPES_GEN_TARGET, node));
+        SCOPES_ERROR(CGenFailedToTranslateValue, node->kind());
 #if 0
         auto TT = SCOPES_GET_RESULT(storage_type(node->get_type()));
         auto LLT = SCOPES_GET_RESULT(type_to_spirv_type(node->get_type()));
@@ -1888,7 +1853,7 @@ struct SPIRVGenerator {
         assert(argcount >= fargcount);
         // make variadic calls C compatible
         if (fi->flags & FF_Variadic) {
-            SCOPES_ERROR(String::from("IL->SPIR: variadic calls not supported"));
+            SCOPES_ERROR(CGenTypeUnsupportedInTarget, functype);
         }
 
         auto ret = builder.createFunctionCall(func, values);
@@ -1961,10 +1926,7 @@ struct SPIRVGenerator {
             function_type(empty_arguments_type(), {}));
         auto hasfi = entry->get_type();
         if (hasfi != needfi) {
-            StyledString ss;
-            ss.out << "Entry function must have type " << needfi
-                << " but has type " << hasfi;
-            SCOPES_ERROR(ss.str());
+            SCOPES_ERROR(CGenEntryFunctionSignatureMismatch, needfi, hasfi);
         }
 
         builder.setSource(spv::SourceLanguageGLSL, 450);
@@ -1992,13 +1954,7 @@ struct SPIRVGenerator {
             entry_point = builder.addEntryPoint(spv::ExecutionModelGLCompute, func, "main");
         } break;
         default: {
-            StyledString ss;
-            ss.out << "IL->SPIR: unsupported target: " << target << ", try one of "
-                << Symbol(SYM_TargetVertex) << " "
-                << Symbol(SYM_TargetFragment) << " "
-                << Symbol(SYM_TargetGeometry) << " "
-                << Symbol(SYM_TargetCompute);
-            SCOPES_ERROR(ss.str());
+            SCOPES_ERROR(CGenUnsupportedTarget, target);
         } break;
         }
 
@@ -2086,8 +2042,7 @@ SCOPES_RESULT(void) optimize_spirv(std::vector<unsigned int> &result, int opt_le
     std::vector<unsigned int> oldresult = result;
     result.clear();
     if (!optimizer.Run(oldresult.data(), oldresult.size(), &result)) {
-        SCOPES_ERROR(String::from(
-            "IL->SPIR: error while running optimization passes"));
+        SCOPES_ERROR(CGenBackendOptimizationFailed);
     }
 
     SCOPES_CHECK_RESULT(verify_spirv(result));

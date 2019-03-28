@@ -203,9 +203,7 @@ SCOPES_RESULT(size_t) size_of(const Type *T) {
     default: break;
     }
 
-    StyledString ss;
-    ss.out << "opaque type " << T << " has no size";
-    SCOPES_ERROR(ss.str());
+    SCOPES_ERROR(OpaqueType, T);
 }
 
 SCOPES_RESULT(size_t) align_of(const Type *T) {
@@ -236,9 +234,7 @@ SCOPES_RESULT(size_t) align_of(const Type *T) {
     default: break;
     }
 
-    StyledString ss;
-    ss.out << "opaque type " << T << " has no alignment";
-    SCOPES_ERROR(ss.str());
+    SCOPES_ERROR(OpaqueType, T);
 }
 
 const Type *superof(const Type *T) {
@@ -301,9 +297,7 @@ SCOPES_RESULT(bool) types_compatible(const Type *paramT, const Type *argT) {
 SCOPES_RESULT(void) verify(const Type *typea, const Type *typeb) {
     SCOPES_RESULT_TYPE(void);
     if (strip_lifetime(typea) != strip_lifetime(typeb)) {
-        StyledString ss;
-        ss.out << "type " << typea << " expected, got " << typeb;
-        SCOPES_ERROR(ss.str());
+        SCOPES_ERROR(ParameterTypeMismatch, typea, typeb);
     }
     return {};
 }
@@ -311,9 +305,7 @@ SCOPES_RESULT(void) verify(const Type *typea, const Type *typeb) {
 SCOPES_RESULT(void) verify_integer(const Type *type) {
     SCOPES_RESULT_TYPE(void);
     if (type->kind() != TK_Integer) {
-        StyledString ss;
-        ss.out << "integer type expected, got " << type;
-        SCOPES_ERROR(ss.str());
+        SCOPES_ERROR(ParameterTypeMismatch, TYPE_Integer, type);
     }
     return {};
 }
@@ -321,9 +313,7 @@ SCOPES_RESULT(void) verify_integer(const Type *type) {
 SCOPES_RESULT(void) verify_real(const Type *type) {
     SCOPES_RESULT_TYPE(void);
     if (type->kind() != TK_Real) {
-        StyledString ss;
-        ss.out << "real type expected, got " << type;
-        SCOPES_ERROR(ss.str());
+        SCOPES_ERROR(ParameterTypeMismatch, TYPE_Real, type);
     }
     return {};
 }
@@ -331,10 +321,7 @@ SCOPES_RESULT(void) verify_real(const Type *type) {
 SCOPES_RESULT(void) verify_range(size_t idx, size_t count) {
     SCOPES_RESULT_TYPE(void);
     if (idx >= count) {
-        StyledString ss;
-        ss.out << "index out of range (" << idx
-            << " >= " << count << ")";
-        SCOPES_ERROR(ss.str());
+        SCOPES_ERROR(IndexOutOfRange, idx, count);
     }
     return {};
 }

@@ -423,7 +423,7 @@ project "scopesrt"
         }
 
     configuration "release"
-        defines { "NDEBUG" }
+        --defines { "NDEBUG" }
         flags { "Optimize" }
 
 project "scopes"
@@ -569,5 +569,5 @@ project "scopes"
         }
 
     configuration "release"
-        defines { "NDEBUG" }
+        --defines { "NDEBUG" }
         flags { "Optimize" }

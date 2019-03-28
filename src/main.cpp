@@ -85,7 +85,7 @@ static SCOPES_RESULT(ValueRef) load_custom_core(const char *executable_path) {
     auto file = SourceFile::from_file(
         Symbol(String::from_cstr(executable_path)));
     if (!file) {
-        SCOPES_ERROR(String::from("could not open binary"));
+        SCOPES_ERROR(MainInaccessibleBinary);
     }
     auto ptr = file->strptr();
     auto size = file->size();
@@ -106,24 +106,24 @@ static SCOPES_RESULT(ValueRef) load_custom_core(const char *executable_path) {
     LexerParser footerParser(file, cursor - ptr);
     auto expr = SCOPES_GET_RESULT(extract_list_constant(SCOPES_GET_RESULT(footerParser.parse())));
     if (expr == EOL) {
-        SCOPES_ERROR(String::from("footer parser returned illegal structure"));
+        SCOPES_ERROR(InvalidFooter);
     }
     auto it = SCOPES_GET_RESULT(extract_list_constant(expr->at));
     if (it == EOL) {
-        SCOPES_ERROR(String::from("footer expression is empty"));
+        SCOPES_ERROR(InvalidFooter);
     }
     auto head = it->at;
     auto sym = SCOPES_GET_RESULT(extract_symbol_constant(head));
     if (sym != Symbol("core-size"))  {
-        SCOPES_ERROR(String::from("footer expression does not begin with 'core-size'"));
+        SCOPES_ERROR(InvalidFooter);
     }
     it = it->next;
     if (it == EOL) {
-        SCOPES_ERROR(String::from("footer expression needs two arguments"));
+        SCOPES_ERROR(InvalidFooter);
     }
     auto script_size = SCOPES_GET_RESULT(extract_integer_constant(it->at));
     if (script_size <= 0) {
-        SCOPES_ERROR(String::from("script-size must be larger than zero"));
+        SCOPES_ERROR(InvalidFooter);
     }
     LexerParser parser(file, cursor - script_size - ptr, script_size);
     return parser.parse();
@@ -267,7 +267,7 @@ SCOPES_RESULT(int) try_main(int argc, char *argv[]) {
 #endif
         sf = SourceFile::from_file(name);
         if (!sf) {
-            SCOPES_ERROR(String::from("core missing\n"));
+            SCOPES_ERROR(CoreMissing, name);
         }
         LexerParser parser(sf);
         expr = SCOPES_GET_RESULT(parser.parse());
@@ -311,10 +311,7 @@ compile_stage:
     }
 
     if (fn->get_type() != main_func_type) {
-        StyledString ss;
-        ss.out << "core module function has wrong type "
-            << fn->get_type() << ", must be " << main_func_type;
-        SCOPES_LOCATION_ERROR(fn.anchor(), ss.str());
+        SCOPES_ERROR(CoreModuleFunctionTypeMismatch, fn->get_type(), main_func_type);
     }
 
 #if 0 //SCOPES_DEBUG_CODEGEN

@@ -34,7 +34,7 @@ namespace scopes {
 static SCOPES_RESULT(void) verify_list_parameter_count(const char *context, const List *expr, int mincount, int maxcount, int starti = 1) {
     SCOPES_RESULT_TYPE(void);
     if (!expr) {
-        SCOPES_ERROR(format("%s: expression is empty", context));
+        SCOPES_ERROR(SyntaxCallExpressionEmpty);
     }
     if ((mincount <= 0) && (maxcount == -1)) {
         return {};
@@ -42,12 +42,10 @@ static SCOPES_RESULT(void) verify_list_parameter_count(const char *context, cons
     int argcount = (int)expr->count - starti;
 
     if ((maxcount >= 0) && (argcount > maxcount)) {
-        SCOPES_ERROR(
-            format("%s: excess argument. At most %i arguments expected", context, maxcount));
+        SCOPES_ERROR(SyntaxTooManyArguments, maxcount);
     }
     if ((mincount >= 0) && (argcount < mincount)) {
-        SCOPES_ERROR(
-            format("%s: at least %i arguments expected, got %i", context, mincount, argcount));
+        SCOPES_ERROR(SyntaxNotEnoughArguments, mincount, argcount);
     }
     return {};
 }
@@ -208,8 +206,7 @@ struct Expander {
         if (it == EOL) {
             // forward declaration
             if (T != TYPE_Symbol) {
-                SCOPES_ERROR(
-                    String::from("forward declared function must be named"));
+                SCOPES_ERROR(SyntaxUnnamedForwardDeclaration);
             }
             return result;
         }
@@ -374,7 +371,7 @@ struct Expander {
                     node = ref(paramval.anchor(), extract_argument(loop->args, index));
                 } else {
                     if (it->next != endit) {
-                        SCOPES_EXPECT_ERROR(error_variadic_symbol_not_in_last_place(paramval));
+                        SCOPES_ERROR(SyntaxVariadicSymbolNotLast);
                     }
                     node = ref(paramval.anchor(), extract_argument(loop->args, index, true));
                 }
@@ -431,8 +428,7 @@ struct Expander {
                 auto paramval = it->at;
                 it = it->next;
                 if (!is_equal_token(it->at)) {
-                    SCOPES_DEF_ERROR(it->at,
-                        String::from("= token expected"));
+                    SCOPES_ERROR(SyntaxAssignmentTokenExpected);
                 }
                 it = it->next;
                 // read init values
@@ -442,8 +438,7 @@ struct Expander {
                 it = subexp.next;
                 env = subexp.env;
                 if (it) {
-                    SCOPES_DEF_ERROR(it->at,
-                        String::from("extraneous argument"));
+                    SCOPES_ERROR(SyntaxUnexpectedExtraToken);
                 }
                 exprs.push_back(node);
                 Symbol sym = SCOPES_GET_RESULT(extract_symbol_constant(paramval));
@@ -473,11 +468,7 @@ struct Expander {
                     auto name = SCOPES_GET_RESULT(extract_symbol_constant(it->at));
                     ScopeEntry entry;
                     if (!env->lookup(name, entry)) {
-                        StyledString ss;
-                        ss.out << "no such name bound in parent scope: '"
-                            << name.name()->data << "'. ";
-                        print_name_suggestions(name, ss.out);
-                        SCOPES_DEF_ERROR(it->at, ss.str());
+                        SCOPES_ERROR(SyntaxUndeclaredIdentifier, name);
                     }
                     env->bind_with_doc(name, entry);
                     last_entry = entry.expr;
@@ -517,8 +508,7 @@ struct Expander {
                     node = ref(paramval.anchor(), extract_argument(srcval, index));
                 } else {
                     if (it->next != endit) {
-                        SCOPES_EXPECT_ERROR(
-                            error_variadic_symbol_not_in_last_place(paramval));
+                        SCOPES_ERROR(SyntaxVariadicSymbolNotLast);
                     }
                     node = ref(paramval.anchor(), extract_argument(srcval, index, true));
                 }
@@ -623,7 +613,7 @@ struct Expander {
                                 node = ref(paramval.anchor(), extract_argument(except_label, index));
                             } else {
                                 if (it->next != EOL) {
-                                    SCOPES_EXPECT_ERROR(error_variadic_symbol_not_in_last_place(paramval));
+                                    SCOPES_ERROR(SyntaxVariadicSymbolNotLast);
                                 }
                                 node = ref(paramval.anchor(), extract_argument(except_label, index, true));
                             }
@@ -642,9 +632,8 @@ struct Expander {
                     return ValueRef(try_label);
                 }
             }
-            SCOPES_DEF_ERROR(_next_def, String::from("except block expected"));
         }
-        SCOPES_DEF_ERROR(src, String::from("except block expected"));
+        SCOPES_ERROR(SyntaxExceptBlockExpected);
     }
 
     // (switch cond)
@@ -667,7 +656,7 @@ struct Expander {
         it = next;
     collect_case:
         if ((it == EOL) || (try_get_const_type(it->at) != TYPE_List)) {
-            SCOPES_EXPECT_ERROR(error_missing_default_case());
+            SCOPES_ERROR(SyntaxMissingDefaultCase);
         }
         next = it->next;
         auto _case = SwitchTemplate::Case();
@@ -940,7 +929,7 @@ struct Expander {
         it = subexp.next;
 
         if (!label.isa<LabelTemplate>()) {
-            SCOPES_EXPECT_ERROR(error_label_expected(label));
+            SCOPES_ERROR(SyntaxLabelExpected, label->kind());
         }
         return build_terminator<MergeTemplate>(ref(anchor, it),
             label.cast<LabelTemplate>());
@@ -981,10 +970,9 @@ struct Expander {
         if (env->lookup(Symbol(SYM_SymbolWildcard), symbol_handler_node)) {
             auto T = try_get_const_type(symbol_handler_node);
             if (T != list_expander_func_type) {
-                StyledString ss;
-                ss.out << "custom symbol expander has wrong type "
-                    << T << ", must be " << list_expander_func_type;
-                SCOPES_DEF_ERROR(symbol_handler_node, ss.str());
+                SCOPES_ERROR(SyntaxSymbolExpanderTypeMismatch, 
+                    symbol_handler_node.cast<TypedValue>()->get_type(),
+                    list_expander_func_type);
             }
             sc_syntax_wildcard_func_t f =
                 (sc_syntax_wildcard_func_t)symbol_handler_node.cast<ConstPointer>()->value;
@@ -1092,10 +1080,9 @@ struct Expander {
             if (env->lookup(Symbol(SYM_ListWildcard), list_handler_node)) {
                 auto T = try_get_const_type(list_handler_node);
                 if (T != list_expander_func_type) {
-                    StyledString ss;
-                    ss.out << "custom list expander has wrong type "
-                        << T << ", must be " << list_expander_func_type;
-                    SCOPES_DEF_ERROR(list_handler_node, ss.str());
+                    SCOPES_ERROR(SyntaxListExpanderTypeMismatch, 
+                        list_handler_node.cast<TypedValue>()->get_type(),
+                        list_expander_func_type);
                 }
                 sc_syntax_wildcard_func_t f =
                     (sc_syntax_wildcard_func_t)list_handler_node.cast<ConstPointer>()->value;
@@ -1139,10 +1126,7 @@ struct Expander {
                     }
                 }
 
-                StyledString ss;
-                ss.out << "use of undeclared identifier '" << name.name()->data << "'. ";
-                print_name_suggestions(name, ss.out);
-                SCOPES_LOCATION_ERROR(anchor, ss.str());
+                SCOPES_ERROR(SyntaxUndeclaredIdentifier, name);
             }
             return result;
         } else {

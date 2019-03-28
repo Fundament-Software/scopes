@@ -138,6 +138,9 @@ sc_symbol_raises_t convert_result(const Result<Symbol> &_result) CRESULT;
 #define SCOPES_C_RETURN(EXPR) \
     return convert_result(Result<_result_type>((EXPR)));
 
+#define SCOPES_C_ERROR(CLASS, ...) \
+    return convert_result(Result<_result_type>::raise(Error ## CLASS::from(__VA_ARGS__)));
+
 #define SCOPES_C_RETURN_ERROR(ERR) return convert_result(Result<_result_type>::raise(ERR));
 // if ok fails, return
 #define SCOPES_C_CHECK_OK(OK, ERR) if (!OK) { SCOPES_C_RETURN_ERROR(ERR); }
@@ -210,7 +213,7 @@ sc_valueref_raises_t sc_typify(sc_valueref_t f, int numtypes, const sc_type_t **
     if (f.isa<Template>()) {
         auto tf = f.cast<Template>();
         if (tf->is_inline()) {
-            SCOPES_C_RETURN_ERROR(make_error(String::from("cannot typify inline")));
+            SCOPES_C_ERROR(CannotTypeInline);
         }
         Types types;
         for (int i = 0; i < numtypes; ++i) {
@@ -220,7 +223,7 @@ sc_valueref_raises_t sc_typify(sc_valueref_t f, int numtypes, const sc_type_t **
     } else if (f.isa<Closure>()) {
         auto srcl = f.cast<Closure>();
         if (srcl->func->is_inline()) {
-            SCOPES_C_RETURN_ERROR(make_error(String::from("cannot typify inline")));
+            SCOPES_C_ERROR(CannotTypeInline);
         }
         Types types;
         for (int i = 0; i < numtypes; ++i) {
@@ -236,7 +239,7 @@ sc_valueref_raises_t sc_typify(sc_valueref_t f, int numtypes, const sc_type_t **
             ref(f.anchor(), srcl->frame),
             ref(f.anchor(), srcl->func), types));
     }
-    SCOPES_C_RETURN_ERROR(make_error(String::from("value must be template or closure")));
+    SCOPES_C_ERROR(TypeFunctionMismatch);
 }
 
 sc_valueref_raises_t sc_compile(sc_valueref_t srcl, uint64_t flags) {
@@ -425,18 +428,14 @@ void sc_set_globals(sc_scope_t *s) {
 // Error Handling
 ////////////////////////////////////////////////////////////////////////////////
 
-sc_error_t *sc_location_error_new(const sc_anchor_t *anchor, const sc_string_t *msg) {
-    using namespace scopes;
-    return make_location_error(anchor, msg);
-}
 sc_error_t *sc_error_new(const sc_string_t *msg) {
     using namespace scopes;
-    return make_error(msg);
+    return ErrorUser::from(msg);
 }
 const sc_string_t *sc_format_error(const sc_error_t *err) {
     using namespace scopes;
     StyledString ss;
-    stream_error_string(ss.out, err);
+    stream_error_message(ss.out, err);
     return ss.str();
 }
 
@@ -609,26 +608,20 @@ sc_scope_raises_t sc_import_c(const sc_string_t *path,
 
 sc_void_raises_t sc_load_library(const sc_string_t *name) {
     using namespace scopes;
+    SCOPES_RESULT_TYPE(void);
 #ifdef SCOPES_WIN32
     // try to load library through regular interface first
     dlerror();
     void *handle = dlopen(name->data, RTLD_LAZY);
     if (!handle) {
-        StyledString ss;
-        ss.out << "error loading library " << name;
         char *err = dlerror();
-        if (err) {
-            ss.out << ": " << err;
-        }
-        return {false, make_error(ss.str()) };
+        SCOPES_C_ERROR(RTLoadLibraryFailed, name, strdup(err));
     }
 #endif
     if (LLVMLoadLibraryPermanently(name->data)) {
-        StyledString ss;
-        ss.out << "error loading library " << name;
-        return {false, make_error(ss.str()) };
+        SCOPES_C_ERROR(RTLoadLibraryFailed, name, "reason unknown");
     }
-    return {true,nullptr};
+    return convert_result({});
 }
 
 // Scope
@@ -645,9 +638,7 @@ sc_valueref_raises_t sc_scope_at(sc_scope_t *scope, sc_symbol_t key) {
     ValueRef result;
     bool ok = scope->lookup(key, result);
     if (!ok) {
-        StyledString ss;
-        ss.out << "no attribute " << key << " in scope";
-        SCOPES_C_RETURN_ERROR(make_error(ss.str()));
+        SCOPES_C_ERROR(RTMissingScopeAttribute, key);
     }
     return convert_result(result);
 }
@@ -658,9 +649,7 @@ sc_valueref_raises_t sc_scope_local_at(sc_scope_t *scope, sc_symbol_t key) {
     ValueRef result;
     bool ok = scope->lookup_local(key, result);
     if (!ok) {
-        StyledString ss;
-        ss.out << "no local attribute " << key << " in scope";
-        SCOPES_C_RETURN_ERROR(make_error(ss.str()));
+        SCOPES_C_ERROR(RTMissingLocalScopeAttribute, key);
     }
     return convert_result(result);
 }
@@ -805,7 +794,7 @@ sc_bool_raises_t sc_string_match(const sc_string_t *pattern, const sc_string_t *
         if (error) {
             const String *err = String::from_cstr(error);
             regexp::regfree(m);
-            SCOPES_C_RETURN_ERROR(make_error(err));
+            SCOPES_C_ERROR(RTRegExError, err);
         }
         pattern_cache.insert({ pattern, m });
     } else {
@@ -1332,9 +1321,7 @@ sc_valueref_raises_t sc_parse_from_path(const sc_string_t *path) {
     SCOPES_RESULT_TYPE(ValueRef);
     auto sf = SourceFile::from_file(path);
     if (!sf) {
-        StyledString ss;
-        ss.out << "no such file: " << path;
-        SCOPES_C_RETURN_ERROR(make_error(ss.str()));
+        SCOPES_C_ERROR(RTUnableToOpenFile, path);
     }
     LexerParser parser(sf);
     return convert_result(parser.parse());
@@ -1358,9 +1345,7 @@ sc_valueref_raises_t sc_type_at(const sc_type_t *T, sc_symbol_t key) {
     ValueRef result;
     bool ok = T->lookup(key, result);
     if (!ok) {
-        StyledString ss;
-        ss.out << "no attribute " << key << " in type " << T;
-        SCOPES_C_RETURN_ERROR(make_error(ss.str()));
+        SCOPES_C_ERROR(RTMissingTypeAttribute, key);
     }
     return convert_result(result);
 }
@@ -1372,9 +1357,7 @@ sc_valueref_raises_t sc_type_local_at(const sc_type_t *T, sc_symbol_t key) {
     ValueRef result;
     bool ok = T->lookup_local(key, result);
     if (!ok) {
-        StyledString ss;
-        ss.out << "no local attribute " << key << " in type " << T;
-        SCOPES_C_RETURN_ERROR(make_error(ss.str()));
+        SCOPES_C_ERROR(RTMissingLocalTypeAttribute, key);
     }
     return convert_result(result);
 }
@@ -1407,9 +1390,7 @@ sc_int_raises_t sc_type_countof(const sc_type_t *T) {
     case TK_Function:  return { true, nullptr, (int)(cast<FunctionType>(T)->argument_types.size()) };
     default: break;
     }
-    StyledString ss;
-    ss.out << "storage type " << T << " has no count";
-    SCOPES_C_RETURN_ERROR(make_error(ss.str()));
+    SCOPES_C_ERROR(RTUncountableStorageType, T);
 }
 
 sc_type_raises_t sc_type_element_at(const sc_type_t *T, int i) {
@@ -1427,9 +1408,7 @@ sc_type_raises_t sc_type_element_at(const sc_type_t *T, int i) {
     case TK_Image: result = cast<ImageType>(T)->type; break;
     case TK_SampledImage: result = cast<SampledImageType>(T)->type; break;
     default: {
-        StyledString ss;
-        ss.out << "storage type " << T << " has no elements" << std::endl;
-        SCOPES_C_RETURN_ERROR(make_error(ss.str()));
+        SCOPES_C_ERROR(RTNoElementsInStorageType, T);
     } break;
     }
     SCOPES_C_RETURN(result);
@@ -1444,9 +1423,7 @@ sc_int_raises_t sc_type_field_index(const sc_type_t *T, sc_symbol_t name) {
     case TK_Union: return { true, nullptr, (int)cast<UnionType>(T)->field_index(name) };
     default: break;
     }
-    StyledString ss;
-    ss.out << "storage type " << T << " has no elements" << std::endl;
-    SCOPES_C_RETURN_ERROR(make_error(ss.str()));
+    SCOPES_C_ERROR(RTNoNamedElementsInStorageType, T);
 }
 
 sc_symbol_raises_t sc_type_field_name(const sc_type_t *T, int index) {
@@ -1459,9 +1436,7 @@ sc_symbol_raises_t sc_type_field_name(const sc_type_t *T, int index) {
     case TK_Union: return convert_result(cast<UnionType>(T)->field_name(index));
     default: break;
     }
-    StyledString ss;
-    ss.out << "storage type " << T << " has no elements" << std::endl;
-    SCOPES_C_RETURN_ERROR(make_error(ss.str()));
+    SCOPES_C_ERROR(RTNoNamedElementsInStorageType, T);
 }
 
 int32_t sc_type_kind(const sc_type_t *T) {
@@ -1655,9 +1630,7 @@ sc_void_raises_t sc_typename_type_set_super(const sc_type_t *T, const sc_type_t 
     const Type *S = ST;
     while (S) {
         if (S == T) {
-            StyledString ss;
-            ss.out << "typename " << ST << " can not be a supertype of " << T;
-            SCOPES_C_RETURN_ERROR(make_error(ss.str()));
+            SCOPES_C_ERROR(RTIllegalSupertype, ST, T);
         }
         if (S == TYPE_Typename)
             break;
@@ -2003,7 +1976,6 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_get_original_globals, TYPE_Scope);
     DEFINE_EXTERN_C_FUNCTION(sc_set_globals, _void, TYPE_Scope);
 
-    DEFINE_EXTERN_C_FUNCTION(sc_location_error_new, TYPE_Error, TYPE_Anchor, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_error_new, TYPE_Error, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_format_error, TYPE_String, TYPE_Error);
 

@@ -54,7 +54,7 @@ static const Anchor *anchor_from_location(clang::SourceManager &SM, clang::Sourc
             SM.getFileOffset(loc));
     }
 
-    assert(nullptr);
+    assert(false);
     return nullptr;
 }
 
@@ -237,11 +237,9 @@ public:
         } else if (rd->isClass()) {
             struct_type = get_typename(name, named_classes);
         } else {
-            StyledString ss;
-            ss.out << "clang-bridge: can't translate record of unuspported type " << name;
-            SCOPES_LOCATION_ERROR(
+            SCOPES_ERROR(CImportUnsupportedRecordType,
                 anchorFromLocation(rd->getSourceRange().getBegin()),
-                ss.str());
+                name);
         }
 
         clang::RecordDecl * defn = rd->getDefinition();
@@ -250,11 +248,9 @@ public:
 
             auto tni = cast<TypenameType>(const_cast<Type *>(struct_type));
             if (tni->finalized()) {
-                StyledString ss;
-                ss.out << "clang-bridge: duplicate body defined for type " << struct_type;
-                SCOPES_LOCATION_ERROR(
+                SCOPES_ERROR(CImportDuplicateTypeDefinition,
                     anchorFromLocation(rd->getSourceRange().getBegin()),
-                    ss.str());
+                    struct_type);
             }
 
             SCOPES_CHECK_RESULT(GetFields(tni, defn));
@@ -546,9 +542,10 @@ public:
         default:
             break;
         }
-        SCOPES_ERROR(format("clang-bridge: cannot convert type: %s (%s)",
+
+        SCOPES_ERROR(CImportCannotConvertType,
             T.getAsString().c_str(),
-            Ty->getTypeClassName()));
+            Ty->getTypeClassName());
     }
 
     SCOPES_RESULT(const Type *) TranslateFuncType(const clang::FunctionType * f) {
@@ -909,7 +906,7 @@ SCOPES_RESULT(Scope *) import_c_module (
         SCOPES_CHECK_RESULT(add_module(M));
         return result;
     } else {
-        SCOPES_ERROR(String::from("compilation failed"));
+        SCOPES_ERROR(CImportCompilationFailed);
     }
 }
 

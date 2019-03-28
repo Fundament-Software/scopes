@@ -57,10 +57,7 @@ SCOPES_RESULT(const Type *) array_type(const Type *element_type, size_t count) {
     if (it != arrays.end())
         return *it;
     if (is_opaque(element_type)) {
-        StyledString ss;
-        ss.out << "can not construct array type for values of opaque type "
-            << element_type;
-        SCOPES_ERROR(ss.str());
+        SCOPES_ERROR(OpaqueType, element_type);
     }
     const ArrayType *result = new ArrayType(element_type, count);
     arrays.insert(result);

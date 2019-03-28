@@ -156,7 +156,7 @@ struct Quoter {
 
     SCOPES_RESULT(ValueRef) quote_CompileStage(int level, const CompileStageRef &node) {
         SCOPES_RESULT_TYPE(ValueRef);
-        SCOPES_ERROR(String::from("cannot quote compile stage"));
+        SCOPES_ERROR(QuoteUnsupportedValueKind, node->kind());
     }
 
     SCOPES_RESULT(CallTemplateRef) quote_KeyedTemplate(int level, const KeyedTemplateRef &node) {
@@ -190,7 +190,7 @@ struct Quoter {
         SCOPES_RESULT_TYPE(TypedValueRef);
         auto value = resolve(sym);
         if (!value) {
-            SCOPES_EXPECT_ERROR(error_unbound_symbol(ValueRef(sym)));
+            SCOPES_ERROR(QuoteUnboundValue, sym);
         }
         return value;
     }
@@ -199,7 +199,7 @@ struct Quoter {
         SCOPES_RESULT_TYPE(TypedValueRef);
         auto value = resolve(sym);
         if (!value) {
-            SCOPES_EXPECT_ERROR(error_unbound_symbol(ValueRef(sym)));
+            SCOPES_ERROR(QuoteUnboundValue, sym);
         }
         return value;
     }

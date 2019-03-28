@@ -33,7 +33,7 @@ SCOPES_RESULT(size_t) verify_stack() {
     SCOPES_RESULT_TYPE(size_t);
     size_t ssz = memory_stack_size();
     if (ssz >= SCOPES_MAX_STACK_SIZE) {
-        SCOPES_ERROR(String::from("stack overflow encountered"));
+        SCOPES_ERROR(StackOverflow);
     }
     return ssz;
 }
