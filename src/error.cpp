@@ -171,6 +171,19 @@ ErrorKind Error::kind() const { return _kind; }
 
 Error::Error(ErrorKind kind) : _kind(kind) {} 
 
+Error *Error::trace(const Backtrace &bt) {
+    if (bt.kind == BTK_Dummy)
+        return this;
+    auto ptr = new Backtrace(bt);
+    ptr->next = _trace;
+    _trace = ptr;
+    return this;
+}
+
+const Backtrace *Error::get_trace() const {
+    return _trace;
+}
+
 //------------------------------------------------------------------------------
 
 void stream_error_message(StyledStream &ss, const Error *err) {
@@ -183,7 +196,39 @@ SCOPES_ERROR_KIND()
     }
 }
 
+void stream_backtrace(StyledStream &ss, const Backtrace *bt) {
+    if (bt->kind == BTK_Dummy) return;
+    auto anchor = bt->context.anchor();
+    ss << anchor << " while ";
+    switch(bt->kind) {
+    case BTK_Dummy: break;
+    case BTK_Parser: {
+        ss << "parsing";
+    } break;
+    case BTK_Expander: {
+        ss << "expanding";
+    } break;
+    case BTK_Prover: {
+        ss << "proving";
+    } break;
+    }
+    ss << std::endl;
+    anchor->stream_source_line(ss);
+}
+
 void stream_error(StyledStream &ss, const Error *err) {
+    std::vector<const Backtrace *> traceback;
+    {
+        const Backtrace *bt = err->get_trace();
+        while (bt) {
+            traceback.push_back(bt);
+            bt = bt->next;
+        }
+    }
+    for (auto bt : traceback) {
+        stream_backtrace(ss, bt);
+    }
+
     ss << Style_Error << "error:" << Style_None << " ";
     stream_error_message(ss, err);
     ss << std::endl;
@@ -193,6 +238,10 @@ void print_error(const Error *value) {
     auto cerr = StyledStream(SCOPES_CERR);
     stream_error(cerr, value);    
 }
+
+//------------------------------------------------------------------------------
+
+Backtrace _backtrace = { nullptr, BTK_Dummy, ValueRef() };
 
 //------------------------------------------------------------------------------
 

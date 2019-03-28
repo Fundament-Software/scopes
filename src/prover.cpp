@@ -1791,6 +1791,7 @@ SCOPES_RESULT(void) verify_cast_lifetime(const Type *SrcT, const Type *DestT) {
 static SCOPES_RESULT(TypedValueRef) prove_CallTemplate(
     const ASTContext &ctx, const CallTemplateRef &call) {
     SCOPES_RESULT_TYPE(TypedValueRef);
+    SCOPES_TRACE_PROVER(call);
     TypedValueRef callee = SCOPES_GET_RESULT(prove(ctx, call->callee));
     TypedValues values;
     auto noret = SCOPES_GET_RESULT(prove_arguments(ctx, values, call->args));

@@ -44,20 +44,14 @@ fn box-pointer (value)
     sc_const_pointer_new (typeof value)
         bitcast value voidstar
 
-fn error! (msg)
+fn error (msg)
     raise (sc_error_new msg)
-
-fn sugar-error! (anchor msg)
-    raise (sc_location_error_new anchor msg)
-
-fn compiler-error! (value)
-    raise (sc_error_new value)
 
 # print an unboxing error given two types
 fn unbox-verify (value wantT)
     let haveT = (sc_value_type value)
     if (ptrcmp!= haveT wantT)
-        sugar-error! (sc_value_anchor value)
+        error
             sc_string_join "can't unbox value of type "
                 sc_string_join
                     sc_value_repr (box-pointer haveT)
@@ -65,7 +59,7 @@ fn unbox-verify (value wantT)
                         sc_value_repr (box-pointer wantT)
     if (sc_value_is_constant value)
     else
-        sugar-error! (sc_value_anchor value)
+        error
             sc_string_join "constant of type "
                 sc_string_join
                     sc_value_repr (box-pointer haveT)

@@ -422,13 +422,48 @@ enum ErrorKind {
 
 //------------------------------------------------------------------------------
 
+// what were we doing when the error occurred?
+enum BacktraceKind {
+    // signifies nothing
+    BTK_Dummy,
+    // context = none, location in anchor
+    BTK_Parser,
+    // context = symbol or expression being expanded 
+    BTK_Expander,
+    // context = expression or function being typechecked
+    BTK_Prover,
+};
+
+struct Backtrace {
+    const Backtrace *next;
+    BacktraceKind kind;
+    ValueRef context;
+};
+
+#define SCOPES_TRACE(KIND, VALUE) \
+    Backtrace _backtrace = { nullptr, BTK_ ## KIND, (VALUE) };
+// globals must be included for g_none
+#define SCOPES_TRACE_PARSER(ANCHOR) \
+    SCOPES_TRACE(Parser, ref((ANCHOR), g_none))
+#define SCOPES_TRACE_EXPANDER(VALUEREF) \
+    SCOPES_TRACE(Expander, (VALUEREF))
+#define SCOPES_TRACE_PROVER(VALUEREF) \
+    SCOPES_TRACE(Prover, (VALUEREF))
+
+extern Backtrace _backtrace;
+
+//------------------------------------------------------------------------------
+
 struct Error {
     ErrorKind kind() const;
 
     Error(ErrorKind _kind);
     Error(const Error &other) = delete;
 
+    Error *trace(const Backtrace &bt);
+    const Backtrace *get_trace() const;
 private:
+    const Backtrace *_trace = nullptr;
     const ErrorKind _kind;
 };
 
@@ -459,11 +494,30 @@ void stream_error(StyledStream &ss, const Error *value);
 #if SCOPES_EARLY_ABORT
 #define SCOPES_ERROR(CLASS, ...) \
     assert(false); \
-    return Result<_result_type>::raise(Error ## CLASS::from(__VA_ARGS__));
+    SCOPES_RETURN_ERROR(Error ## CLASS::from(__VA_ARGS__)->trace(_backtrace));
 #else
 #define SCOPES_ERROR(CLASS, ...) \
-    return Result<_result_type>::raise(Error ## CLASS::from(__VA_ARGS__));
+    SCOPES_RETURN_ERROR(Error ## CLASS::from(__VA_ARGS__)->trace(_backtrace));
 #endif
+
+// if ok fails, return
+#define SCOPES_CHECK_OK(OK, ERR) if (!OK) { SCOPES_RETURN_ERROR((ERR)->trace(_backtrace)); }
+// if an expression returning a result fails, return
+#define SCOPES_CHECK_RESULT(EXPR) { \
+    auto _result = (EXPR); \
+    SCOPES_CHECK_OK(_result.ok(), _result.unsafe_error()); \
+}
+// try to extract a value from a result or return
+#define SCOPES_GET_RESULT(EXPR) ({ \
+        auto _result = (EXPR); \
+        SCOPES_CHECK_OK(_result.ok(), _result.unsafe_error()); \
+        _result.unsafe_extract(); \
+    })
+#define SCOPES_CHECK_CAST(T, EXPR) ({ \
+        Result<T> _result = (EXPR); \
+        SCOPES_CHECK_OK(_result.ok(), _result.unsafe_error()); \
+        _result.unsafe_extract(); \
+    })
 
 } // namespace scopes
 

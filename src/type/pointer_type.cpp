@@ -6,6 +6,7 @@
 
 #include "pointer_type.hpp"
 #include "../hash.hpp"
+#include "../error.hpp"
 
 #include <assert.h>
 
