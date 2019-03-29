@@ -42,10 +42,8 @@ SCOPES_VALUE_KIND()
 }
 
 #define T(CLASS) \
-    bool CLASS::has_def_anchor() const { \
-        return _def_anchor != nullptr; \
-    } \
     const Anchor *CLASS::def_anchor() const { \
+        if (!_def_anchor) return unknown_anchor(); \
         return _def_anchor; \
     } \
     void CLASS::set_def_anchor(const Anchor *anchor) { \
@@ -1470,7 +1468,7 @@ struct Equal {
 static std::unordered_set<Closure *, ClosureSet::Hash, ClosureSet::Equal> closures;
 
 Closure::Closure(Template *_func, Function *_frame) :
-    Pure(VK_Closure, TYPE_Closure), func(_func), frame(_frame) {}
+    func(_func), frame(_frame) {}
 
 bool Closure::key_equal(const Closure *other) const {
     return (func == other->func) && (frame == other->frame);

@@ -40,6 +40,7 @@ struct StreamASTFormat {
     static StreamASTFormat debug();
     static StreamASTFormat singleline();
     static StreamASTFormat content();
+    static StreamASTFormat traceback();
 };
 
 void stream_ast(

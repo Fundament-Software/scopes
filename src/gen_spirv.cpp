@@ -1793,11 +1793,6 @@ struct SPIRVGenerator {
         SCOPES_ERROR(CGenTypeUnsupportedInTarget, node->get_type());
     }
 
-    SCOPES_RESULT(spv::Id) Closure_to_value(const ClosureRef &node) {
-        SCOPES_RESULT_TYPE(spv::Id);
-        SCOPES_ERROR(CGenFailedToTranslateValue, node->kind());
-    }
-
     SCOPES_RESULT(spv::Id) ConstPointer_to_value(const ConstPointerRef &node) {
         SCOPES_RESULT_TYPE(spv::Id);
         SCOPES_ERROR(CGenFailedToTranslateValue, node->kind());

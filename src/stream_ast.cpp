@@ -9,6 +9,7 @@
 #include "type.hpp"
 #include "dyn_cast.inc"
 #include "types.hpp"
+#include "anchor.hpp"
 
 #include <unordered_map>
 #include <queue>
@@ -27,6 +28,12 @@ StreamASTFormat::StreamASTFormat() :
     newlines(true),
     dependent_functions(false)
 {}
+
+StreamASTFormat StreamASTFormat::traceback() {
+    auto fmt = StreamASTFormat();
+    fmt.anchors = None;
+    return fmt;
+}
 
 StreamASTFormat StreamASTFormat::debug() {
     auto fmt = StreamASTFormat();
@@ -247,7 +254,7 @@ struct StreamAST : StreamAnchors {
         }
 
         const Anchor *anchor = node.anchor();
-        if (line_anchors) {
+        if (line_anchors && !anchor->is_boring()) {
             stream_anchor(anchor);
         }
 

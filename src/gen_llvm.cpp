@@ -1849,11 +1849,6 @@ struct LLVMIRGenerator {
         return LLVMConstReal(T, node->value);
     }
 
-    SCOPES_RESULT(LLVMValueRef) Closure_to_value(const ClosureRef &node) {
-        return ConstPointer_to_value(
-            ref(node.anchor(), ConstPointer::closure_from(node.unref())));
-    }
-
     SCOPES_RESULT(LLVMValueRef) ConstPointer_to_value(const ConstPointerRef &node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         auto LLT = SCOPES_GET_RESULT(type_to_llvm_type(node->get_type()));

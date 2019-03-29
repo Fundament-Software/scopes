@@ -43,7 +43,6 @@ namespace scopes {
     T(VK_Function, "value-kind-function", Function) \
     T(VK_Global, "value-kind-global", Global) \
     T(VK_PureCast, "value-kind-pure-cast", PureCast) \
-    T(VK_Closure, "value-kind-closure", Closure) \
     /* constants (Const::classof) */ \
     SCOPES_CONST_VALUE_KIND() \
 

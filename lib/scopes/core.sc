@@ -135,16 +135,11 @@ let typify =
             let argcount = (sc_argcount args)
             verify-count argcount 1 -1
             let src_fn = (sc_getarg args 0)
-            let typifyfn =
-                if (ptrcmp== (sc_value_type src_fn) Closure)
-                    `sc_typify
-                else
-                    `sc_typify_template
             let typecount = (sub argcount 1)
             spice-quote
                 let types = (alloca-array type typecount)
                 spice-unquote
-                    let body = (sc_expression_new (sc_get_active_anchor))
+                    let body = (sc_expression_new)
                     loop (i j = 1 0)
                         if (icmp== i argcount)
                             break;
@@ -155,7 +150,7 @@ let typify =
                             `(store ty (getelementptr types j))
                         _ (add i 1) (add j 1)
                     body
-                typifyfn src_fn typecount (bitcast types TypeArrayPointer)
+                sc_typify src_fn typecount (bitcast types TypeArrayPointer)
 
         build-typify-function typify
 

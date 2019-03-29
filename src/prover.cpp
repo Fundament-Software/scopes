@@ -310,7 +310,7 @@ ASTContext ASTContext::from_function(const FunctionRef &fn) {
 //------------------------------------------------------------------------------
 
 static SCOPES_RESULT(TypedValueRef) prove_inline(const ASTContext &ctx,
-    const ClosureRef &cl, const TypedValues &nodes);
+    const Closure *cl, const TypedValues &nodes);
 
 static const Type *merge_single_value_type(const char *context, const Type *T1, const Type *T2) {
     assert(T1);
@@ -1292,6 +1292,7 @@ static SCOPES_RESULT(TypedValueRef) prove_CompileStage(const ASTContext &ctx, co
     block->append(
         ref(anchor, CallTemplate::from(g_bitcast, {
             ref(anchor, CallTemplate::from(g_sc_eval, {
+                ref(anchor, ConstPointer::anchor_from(anchor)),
                 ref(anchor, ConstPointer::list_from(sx->next)),
                 tmp })),
             ref(anchor, ConstPointer::type_from(TYPE_CompileStage))
@@ -1345,9 +1346,10 @@ SCOPES_RESULT(const Type *) extract_type_constant(const ValueRef &value) {
     return (const Type *)x->value;
 }
 
-SCOPES_RESULT(ClosureRef) extract_closure_constant(const ValueRef &value) {
-    //SCOPES_RESULT_TYPE(ClosureRef);
-    return extract_constant<Closure>(TYPE_Closure, value);
+SCOPES_RESULT(const Closure *) extract_closure_constant(const ValueRef &value) {
+    SCOPES_RESULT_TYPE(const Closure *);
+    ConstPointerRef x = SCOPES_GET_RESULT(extract_typed_constant<ConstPointer>(TYPE_Closure, value));
+    return (const Closure *)x->value;
 }
 
 SCOPES_RESULT(FunctionRef) extract_function_constant(const ValueRef &value) {
@@ -1819,7 +1821,7 @@ repeat:
         values = args;
         SCOPES_CHECK_RESULT(verify_valid(ctx, values, "function call"));
     } else if (T == TYPE_Closure) {
-        ClosureRef cl = SCOPES_GET_RESULT((extract_closure_constant(callee)));
+        const Closure *cl = SCOPES_GET_RESULT((extract_closure_constant(callee)));
         {
             TypedValues args;
             Symbols keys;
@@ -1836,8 +1838,8 @@ repeat:
                 types.push_back(arg->get_type());
             }
             callee = SCOPES_GET_RESULT(prove(
-                ref(cl.anchor(), cl->frame),
-                ref(cl.anchor(), cl->func),
+                ref(callee.anchor(), cl->frame),
+                ref(callee.anchor(), cl->func),
                 types));
             FunctionRef f = callee.cast<Function>();
             if (f->complete) {
@@ -2987,7 +2989,8 @@ static SCOPES_RESULT(TypedValueRef) prove_If(const ASTContext &ctx, const IfRef 
 static SCOPES_RESULT(TypedValueRef) prove_Template(const ASTContext &ctx, const TemplateRef &_template) {
     FunctionRef frame = ctx.frame;
     assert(frame);
-    return TypedValueRef(_template.anchor(), Closure::from(_template.unref(), frame.unref()));
+    return TypedValueRef(_template.anchor(), ConstPointer::closure_from( 
+        Closure::from(_template.unref(), frame.unref())));
 }
 
 static SCOPES_RESULT(TypedValueRef) prove_Quote(const ASTContext &ctx, const QuoteRef &node) {
@@ -3021,6 +3024,17 @@ SCOPES_RESULT(TypedValueRef) prove(const ASTContext &ctx, const ValueRef &node) 
             SCOPES_UNTYPED_VALUE_KIND()
 #undef T
             default: assert(false);
+            }
+            if (result->get_type() == TYPE_Value) {
+                ctx.append(result);
+                auto anchor = node.anchor();
+                // convert to valueref
+                auto call = ref(anchor, Call::from(TYPE_ValueRef, 
+                    g_sc_valueref_new, {
+                    ref(anchor, ConstPointer::anchor_from(anchor)),
+                    result    
+                }));
+                result = call;
             }
             assert(result);
             ctx.frame->bind(node, result);
@@ -3071,17 +3085,19 @@ static SCOPES_RESULT(void) prove_inline_arguments(const ASTContext &ctx,
 }
 
 static SCOPES_RESULT(TypedValueRef) prove_inline_body(const ASTContext &ctx,
-    const ClosureRef &cl, const TypedValues &nodes) {
+    const Closure *cl, const TypedValues &nodes) {
     SCOPES_RESULT_TYPE(TypedValueRef);
     auto frame = cl->frame;
     auto func = cl->func;
     Timer sum_prove_time(TIMER_Specialize);
     assert(func);
+    auto anchor = func->def_anchor();
     //int count = (int)func->params.size();
-    FunctionRef fn = ref(cl.anchor(), Function::from(func->name, {}));
-    fn->original = ref(cl.anchor(), func);
-    fn->frame = ref(cl.anchor(), frame);
-    LabelRef label = ref(cl.anchor(), Label::from(LK_Inline, func->name));
+    FunctionRef fn = ref(anchor, Function::from(func->name, {}));
+    fn->set_def_anchor(anchor);
+    fn->original = ref(anchor, func);
+    fn->frame = ref(frame->def_anchor(), frame);
+    LabelRef label = ref(anchor, Label::from(LK_Inline, func->name));
     fn->label = label;
     fn->boundary = ctx.function;
 
@@ -3119,7 +3135,7 @@ static SCOPES_RESULT(TypedValueRef) prove_inline_body(const ASTContext &ctx,
 }
 
 SCOPES_RESULT(TypedValueRef) prove_inline(const ASTContext &ctx,
-    const ClosureRef &cl, const TypedValues &nodes) {
+    const Closure *cl, const TypedValues &nodes) {
     SCOPES_RESULT_TYPE(TypedValueRef);
     auto func = cl->func;
     if (func->recursion >= SCOPES_MAX_RECURSIONS) {

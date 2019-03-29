@@ -278,6 +278,9 @@ project "scopesrt"
         buildoptions_cpp {
             "-Wno-error=date-time",
             "-fmax-errors=1",
+            "-Wno-nonnull-compare",
+            "-Wno-unused-but-set-variable",
+            "-Wno-sign-compare",
             "-Wno-vla",
             "-Wno-enum-compare",
             "-Wno-comment",
@@ -316,6 +319,7 @@ project "scopesrt"
         }
 
         linkoptions {
+            "-Wl,--exclude-all-symbols",
             "-Wl,--stack,8388608"
         }
         linkoptions {
@@ -517,7 +521,7 @@ project "scopes"
 
         files {
             --"src/win32/mman.c",
-            "src/win32/realpath.c",
+            --"src/win32/realpath.c",
             --"src/win32/dlfcn.c",
         }
 
@@ -530,11 +534,19 @@ project "scopes"
         }
 
         links {
+            "uuid", 
+            "ole32", 
+            --"psapi", 
+            --"version", 
+            --"stdc++",
         }
 
+        linkoptions(LLVM_LDFLAGS)
         linkoptions {
             "-Wl,--stack,8388608"
         }
+
+        linkoptions(LLVM_LIBS)
 
         postbuildcommands {
         }

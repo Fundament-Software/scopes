@@ -30,6 +30,7 @@ public:
 
     Symbol path() const;
 
+    bool is_boring() const;
     bool is_same(const Anchor *other) const;
 
     static const Anchor *from(

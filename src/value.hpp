@@ -24,7 +24,6 @@ namespace scopes {
 
 // untyped, instructions, functions
 #define SCOPES_DEFINITION_ANCHOR_API() \
-    bool has_def_anchor() const; \
     const Anchor *def_anchor() const; \
     void set_def_anchor(const Anchor *anchor); \
 protected: const Anchor *_def_anchor = nullptr; \
@@ -930,9 +929,7 @@ struct CompileStage : UntypedValue {
 
 //------------------------------------------------------------------------------
 
-struct Closure : Pure {
-    static bool classof(const Value *T);
-
+struct Closure {
     Closure(Template *_func, Function *_frame);
 
     bool key_equal(const Closure *other) const;

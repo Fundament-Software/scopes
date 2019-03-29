@@ -198,22 +198,37 @@ SCOPES_ERROR_KIND()
 
 void stream_backtrace(StyledStream &ss, const Backtrace *bt) {
     if (bt->kind == BTK_Dummy) return;
-    auto anchor = bt->context.anchor();
-    ss << anchor << " while ";
+    auto &&value = bt->context;
+    auto anchor = value.anchor();
     switch(bt->kind) {
     case BTK_Dummy: break;
     case BTK_Parser: {
+        ss << anchor << " while ";
         ss << "parsing";
+        ss << std::endl;
+        anchor->stream_source_line(ss);
     } break;
     case BTK_Expander: {
+        ss << anchor << " while ";
         ss << "expanding";
+        ss << std::endl;
+        anchor->stream_source_line(ss);
     } break;
     case BTK_Prover: {
-        ss << "proving";
+        ss << "while proving" << std::endl;
+        if (value.isa<UntypedValue>()) {
+            auto uv = value.cast<UntypedValue>();
+            auto _anchor = uv->def_anchor();
+            if (_anchor != unknown_anchor())
+                anchor = uv->def_anchor();
+        }
+        stream_ast(ss, value, StreamASTFormat::traceback());
+        ss << std::endl;
+        ss << anchor << " generated here";
+        ss << std::endl;
+        anchor->stream_source_line(ss);
     } break;
     }
-    ss << std::endl;
-    anchor->stream_source_line(ss);
 }
 
 void stream_error(StyledStream &ss, const Error *err) {

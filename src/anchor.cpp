@@ -64,6 +64,10 @@ Symbol Anchor::path() const {
     return file->path;
 }
 
+bool Anchor::is_boring() const {
+    return this == builtin_anchor() || this == unknown_anchor();    
+}
+
 bool Anchor::is_same(const Anchor *other) const {
     return file->path == other->file->path
         && lineno == other->lineno

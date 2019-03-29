@@ -9,6 +9,7 @@
 
 #include "symbol_enum.hpp"
 #include "scopes/config.h"
+#include "valueref.inc"
 
 #include <iostream>
 
@@ -146,6 +147,20 @@ StyledStream& operator<<(StyledStream& ost, const Value *value);
 StyledStream& operator<<(StyledStream& ost, Value *value);
 StyledStream& operator<<(StyledStream& ost, const TypedValue *value);
 StyledStream& operator<<(StyledStream& ost, TypedValue *value);
+template<typename T>
+StyledStream& operator<<(StyledStream& ost, TValueRef<T> &value) {
+    if (value)
+        ost << value.anchor() << value.unref();
+    else
+        ost << Style_Error << "<null>" << Style_None;
+}
+template<typename T>
+StyledStream& operator<<(StyledStream& ost, const TValueRef<T> &value) {
+    if (value)
+        ost << value.anchor() << value.unref();
+    else
+        ost << Style_Error << "<null>" << Style_None;
+}
 
 void stream_uid(StyledStream &ss, uint64_t uid);
 void stream_address(StyledStream &ss, const void *ptr);

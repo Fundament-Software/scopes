@@ -140,8 +140,6 @@ formatters:
         int, int) \
     T(CannotTypeInline, \
         "inline can not be instantiated outside functions") \
-    T(TypeFunctionMismatch, \
-        "argument to be typed must be template or closure") \
     T(ValueMustBeReference, \
         "value of type %0 must be reference", \
         PType) \
@@ -232,7 +230,7 @@ formatters:
         "too many arguments (%1) in call to function of type %0", \
         PType, int) \
     T(NotEnoughFunctionArguments, \
-        "not enough arguments (%1) in call to function of type %1", \
+        "not enough arguments (%1) in call to function of type %0", \
         PType, int) \
     T(DuplicateSwitchDefaultCase, \
         "switch expression must only have one default case") \

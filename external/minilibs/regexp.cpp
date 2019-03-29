@@ -299,7 +299,7 @@ static int lexclass(void)
 {
 	int type = L_CCLASS;
 	int quoted, havesave, havedash;
-	Rune save;
+	Rune save = 0;
 
 	newcclass();
 

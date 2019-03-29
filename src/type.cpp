@@ -404,13 +404,11 @@ void init_types() {
     DEFINE_OPAQUE_HANDLE_TYPE("_Value", Value, TYPE_Value);
 
     DEFINE_OPAQUE_HANDLE_TYPE("SourceFile", SourceFile, TYPE_SourceFile);
-    DEFINE_OPAQUE_HANDLE_TYPE("Scope", Scope, TYPE_Scope);
     DEFINE_OPAQUE_HANDLE_TYPE("Closure", Closure, TYPE_Closure);
+    DEFINE_OPAQUE_HANDLE_TYPE("Scope", Scope, TYPE_Scope);
     DEFINE_OPAQUE_HANDLE_TYPE("String", String, TYPE_String);
     DEFINE_OPAQUE_HANDLE_TYPE("List", List, TYPE_List);
     DEFINE_OPAQUE_HANDLE_TYPE("Error", Error, TYPE_Error);
-
-    DEFINE_OPAQUE_HANDLE_TYPE("CompileStage", Value, TYPE_CompileStage);
 
     DEFINE_OPAQUE_HANDLE_TYPE("Anchor", Anchor, TYPE_Anchor);
 
@@ -424,6 +422,10 @@ void init_types() {
                 }).assert_ok(),
                 TNF_Plain).assert_ok();
     }
+
+    DEFINE_BASIC_TYPE("CompileStage", ValueRef, TYPE_CompileStage, 
+        storage_type(TYPE_ValueRef).assert_ok());
+
 
     DEFINE_TYPENAME("SugarMacro", TYPE_ASTMacro);
     {
