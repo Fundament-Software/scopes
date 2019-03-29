@@ -10,6 +10,8 @@
 #include "dyn_cast.inc"
 #include "types.hpp"
 #include "anchor.hpp"
+#include "symbol.hpp"
+#include "list.hpp"
 
 #include <unordered_map>
 #include <queue>
@@ -822,6 +824,49 @@ void stream_ast(
     StyledStream &_ss, const ValueRef &node, const StreamASTFormat &_fmt) {
     StreamAST streamer(_ss, _fmt);
     streamer.stream(node);
+}
+
+//------------------------------------------------------------------------------
+
+struct Value2ListConverter {
+
+typedef std::unordered_map<Value *, ValueRef> Map;
+
+Map map;
+
+#define LIST(...) ValueRef(_anchor, ConstPointer::list_from(List::from_arglist( __VA_ARGS__ )))
+#define SYMBOL(NAME) ValueRef(_anchor, ConstInt::symbol_from((NAME)))
+
+ValueRef convert_Function(const FunctionRef &node) {
+    auto _anchor = node.anchor();
+    return LIST(
+                SYMBOL(KW_Fn),
+                SYMBOL(node->name)
+                );
+}
+
+ValueRef convert(const ValueRef &node) {
+    switch(node->kind()) {
+    case VK_Function: return convert_Function(node.cast<Function>());
+#define T(NAME, BNAME, CLASS) \
+    //case NAME: return convert_ ## CLASS(node.cast<CLASS>());
+SCOPES_VALUE_KIND()
+#undef T
+    default:
+        StyledString ss;
+        ss.out << Style_Error << "<unhandled AST node type: "
+            << get_value_kind_name(node->kind())
+            << ">" << Style_None;
+        return ref(node.anchor(), ConstInt::symbol_from(Symbol(ss.str())));
+    }
+}
+
+};
+
+const List *ast_to_list(const ValueRef &node) {
+    Value2ListConverter converter;
+    auto val = converter.convert(node);
+    return List::from({val});
 }
 
 //------------------------------------------------------------------------------

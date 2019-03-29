@@ -46,7 +46,12 @@ struct TValueRef {
     }
     template<typename S>
     TValueRef<S> dyn_cast() const {
-        return TValueRef<S>(_anchor, llvm::dyn_cast<S>(_value));
+        auto ptr = llvm::dyn_cast<S>(_value);
+        if (ptr) {
+            return TValueRef<S>(_anchor, ptr);
+        } else {
+            return TValueRef<S>();
+        }
     }
     template<typename S>
     bool isa() const { return llvm::isa<S>(_value); }

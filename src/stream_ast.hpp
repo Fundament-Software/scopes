@@ -46,6 +46,8 @@ struct StreamASTFormat {
 void stream_ast(
     StyledStream &_ss, const ValueRef &node, const StreamASTFormat &_fmt);
 
+const List *ast_to_list(const ValueRef &node);
+
 } // namespace scopes
 
 #endif // SCOPES_STREAM_AST_HPP

@@ -44,6 +44,19 @@ public:
         return from(values, N);
     }
 
+    static const List *from_arglist() {
+        return nullptr;
+    }
+
+    static const List *from_arglist(const ValueRef &last) {
+        return from(last, nullptr);
+    }
+
+    template<class ... Args>
+    static const List *from_arglist(const ValueRef &first, Args ... args) {
+        return from(first, from_arglist(args ...));
+    }
+
     static const List *join(const List *a, const List *b);
 
     // these only work with lists that aren't EOL

@@ -12,6 +12,7 @@
 #include "stream_ast.hpp"
 #include "type/arguments_type.hpp"
 #include "type/function_type.hpp"
+#include "stream_expr.hpp"
 #include "dyn_cast.inc"
 
 #include "scopes/config.h"
@@ -222,8 +223,8 @@ void stream_backtrace(StyledStream &ss, const Backtrace *bt) {
             if (_anchor != unknown_anchor())
                 anchor = uv->def_anchor();
         }
-        stream_ast(ss, value, StreamASTFormat::traceback());
-        ss << std::endl;
+        const List *list = ast_to_list(value);
+        stream_expr(ss, list, StreamExprFormat::debug_digest());
         ss << anchor << " generated here";
         ss << std::endl;
         anchor->stream_source_line(ss);
