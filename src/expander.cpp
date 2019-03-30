@@ -198,6 +198,7 @@ struct Expander {
         }
         if (setup.inlined)
             func->set_inline();
+        func->set_def_anchor(anchor);
         /*
         if (setup.quoted)
             result = ast_quote(func);
@@ -958,6 +959,7 @@ struct Expander {
 
         auto call = CallTemplate::from(enter);
         call->flags = flags;
+        call->set_def_anchor(anchor);
 
         it = subexp.next;
         SCOPES_CHECK_RESULT(subexp.expand_arguments(call->args, it));
@@ -1115,7 +1117,7 @@ struct Expander {
 
             ValueRef result;
             if (!env->lookup(name, result)) {
-                SCOPES_TRACE_EXPANDER(anynode);
+                SCOPES_TRACE_EXPANDER(node);
                 sc_list_scope_tuple_t result = SCOPES_GET_RESULT(expand_symbol(node));
                 if (result._0) {
                     ValueRef newnode = result._0->at;
@@ -1129,7 +1131,7 @@ struct Expander {
 
                 SCOPES_ERROR(SyntaxUndeclaredIdentifier, name);
             }
-            return result;
+            return ref(anchor, result);
         } else {
             if (verbose) {
                 StyledStream ss(SCOPES_CERR);

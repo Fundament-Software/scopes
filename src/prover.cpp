@@ -1090,7 +1090,7 @@ static SCOPES_RESULT(TypedValueRef) prove_arguments(
                 value = ExtractArgument::from(value, 0);
             }
         }
-        outargs.push_back(value);
+        outargs.push_back(ref(values[i].anchor(), value));
     }
     return TypedValueRef();
 }
@@ -1272,7 +1272,7 @@ static SCOPES_RESULT(TypedValueRef) prove_CompileStage(const ASTContext &ctx, co
                 sc_scope_set_docstring(constant_scope, key, keydocstr);
             } else {
                 ValueRef wrapvalue;
-                if (typedvalue1->get_type() == TYPE_Value) {
+                if (typedvalue1->get_type() == TYPE_ValueRef) {
                     wrapvalue = typedvalue1;
                 } else {
                     wrapvalue = wrap_value(typedvalue1->get_type(), typedvalue1);
@@ -1311,12 +1311,13 @@ static SCOPES_RESULT(TypedValueRef) prove_KeyedTemplate(const ASTContext &ctx,
     return ref(keyed.anchor(), Keyed::from(keyed->key, value));
 }
 
-template<typename T>
-static SCOPES_RESULT(TValueRef<T>) extract_constant(const Type *want, const ValueRef &value) {
+template<typename T, ValueKind kind>
+static SCOPES_RESULT(TValueRef<T>) extract_constant(const ValueRef &value) {
     SCOPES_RESULT_TYPE(TValueRef<T>);
     auto constval = value.dyn_cast<T>();
     if (!constval) {
-        SCOPES_ERROR(ConstantValueKindMismatch, want, value->kind());
+        SCOPES_ERROR(ConstantValueKindMismatch, 
+            kind, value->kind());
     }
     return constval;
 }
@@ -1331,7 +1332,7 @@ static SCOPES_RESULT(TValueRef<T>) extract_typed_constant(const Type *want, Valu
     }
     auto constval = value.dyn_cast<T>();
     if (!constval) {
-        SCOPES_ERROR(ConstantValueKindMismatch, want, value->kind());
+        SCOPES_ERROR(TypedConstantValueKindMismatch, want, value->kind());
     }
     if (!TT) {
         TT = constval->get_type();
@@ -1353,7 +1354,11 @@ SCOPES_RESULT(const Closure *) extract_closure_constant(const ValueRef &value) {
 }
 
 SCOPES_RESULT(FunctionRef) extract_function_constant(const ValueRef &value) {
-    return extract_constant<Function>(TYPE_Function, value);
+    return extract_constant<Function, VK_Function>(value);
+}
+
+SCOPES_RESULT(TemplateRef) extract_template_constant(const ValueRef &value) {
+    return extract_constant<Template, VK_Template>(value);
 }
 
 SCOPES_RESULT(sc_ast_macro_func_t) extract_astmacro_constant(const ValueRef &value) {
@@ -1388,12 +1393,13 @@ SCOPES_RESULT(Symbol) extract_symbol_constant(const ValueRef &value) {
 
 SCOPES_RESULT(uint64_t) extract_integer_constant(const ValueRef &value) {
     SCOPES_RESULT_TYPE(uint64_t);
-    ConstIntRef x = SCOPES_GET_RESULT(extract_constant<ConstInt>(TYPE_Integer, value));
+    auto val = extract_constant<ConstInt, VK_ConstInt>(value);
+    ConstIntRef x = SCOPES_GET_RESULT(val);
     return x->value;
 }
 
 SCOPES_RESULT(ConstAggregateRef) extract_vector_constant(const ValueRef &value) {
-    return extract_constant<ConstAggregate>(TYPE_Vector, value);
+    return extract_constant<ConstAggregate, VK_ConstAggregate>(value);
 }
 
 static SCOPES_RESULT(const Type *) bool_op_return_type(const Type *T) {
@@ -1793,8 +1799,10 @@ SCOPES_RESULT(void) verify_cast_lifetime(const Type *SrcT, const Type *DestT) {
 static SCOPES_RESULT(TypedValueRef) prove_CallTemplate(
     const ASTContext &ctx, const CallTemplateRef &call) {
     SCOPES_RESULT_TYPE(TypedValueRef);
-    SCOPES_TRACE_PROVER(call);
-    TypedValueRef callee = SCOPES_GET_RESULT(prove(ctx, call->callee));
+    SCOPES_TRACE_PROVE_EXPR(call);
+    const Anchor *anchor = get_best_anchor(call);
+    TypedValueRef callee = ref(call->callee.anchor(),
+        SCOPES_GET_RESULT(prove(ctx, call->callee)));
     TypedValues values;
     auto noret = SCOPES_GET_RESULT(prove_arguments(ctx, values, call->args));
     if (noret) return noret;
@@ -1859,6 +1867,8 @@ repeat:
             if (!value) {
                 SCOPES_ERROR(SpiceMacroReturnedNull);
             }
+            value = ref(call.anchor(), result._0);
+            //set_best_anchor(value, anchor);
             return prove(ctx, value);
         } else {
             SCOPES_RETURN_ERROR(result.except);
@@ -2136,9 +2146,16 @@ repeat:
             READ_STORAGETYPEOF(T1);
             READ_TYPEOF(T2);
             READ_TYPEOF(T3);
-            SCOPES_CHECK_RESULT(verify_bool_vector(T1));
-            SCOPES_CHECK_RESULT(verify(T2, T3));
+            {
+                SCOPES_TRACE_PROVE_ARG(_T1);
+                SCOPES_CHECK_RESULT(verify_bool_vector(T1));
+            }
+            {
+                SCOPES_TRACE_PROVE_ARG(_T3);
+                SCOPES_CHECK_RESULT(verify(T2, T3));
+            }
             if (T1->kind() == TK_Vector) {
+                SCOPES_TRACE_PROVE_ARG(_T2);
                 auto ST2 = SCOPES_GET_RESULT(storage_type(T2));
                 SCOPES_CHECK_RESULT(verify_vector_sizes(T1, ST2));
             }
@@ -2715,6 +2732,8 @@ repeat:
 #undef FUN_OP
 #undef FTRI_OP
         default: {
+            SCOPES_TRACE_PROVE_ARG(callee);
+
             SCOPES_ERROR(UnsupportedBuiltin, b);
         } break;
         }
@@ -2739,6 +2758,7 @@ repeat:
     }
     // verify_function_argument_signature
     for (int i = 0; i < numargs; ++i) {
+        SCOPES_TRACE_PROVE_ARG(values[i]);
         const Type *Ta = strip_qualifiers(values[i]->get_type(),
             (1 << QK_Key));
         const Type *Tb = ft->argument_types[i];
@@ -2811,6 +2831,28 @@ repeat:
         newcall->except = exc;
 
         SCOPES_CHECK_RESULT(make_raise(exceptctx, call.anchor(), exc));
+    }
+    // hack: rewrite valuerefs returned by globals matching sc_*_new
+    //       to use the anchor of the calling expression
+    if (rt == TYPE_ValueRef) {
+        if (callee.isa<Global>()) {
+            auto g = callee.cast<Global>();
+            const char *name = g->name.name()->data;
+            auto sz = g->name.name()->count;
+            if (sz >= 7) {
+                if (name[0] == 's' && name[1] == 'c' && name[2] == '_'
+                    && name[sz-4] == '_' && name[sz-3] == 'n' && name[sz-2] == 'e' && name[sz-1] == 'w') {
+                    ctx.append(newcall);
+                    auto anchor = get_best_anchor(call);
+                    // convert to valueref
+                    newcall = ref(anchor, Call::from(TYPE_ValueRef, 
+                        g_sc_valueref_tag, {
+                        ref(anchor, ConstPointer::anchor_from(anchor)),
+                        newcall    
+                    }));
+                }
+            }
+        }
     }
     return TypedValueRef(newcall);
 }
@@ -2990,7 +3032,7 @@ static SCOPES_RESULT(TypedValueRef) prove_Template(const ASTContext &ctx, const 
     FunctionRef frame = ctx.frame;
     assert(frame);
     return TypedValueRef(_template.anchor(), ConstPointer::closure_from( 
-        Closure::from(_template.unref(), frame.unref())));
+        Closure::from(_template, frame)));
 }
 
 static SCOPES_RESULT(TypedValueRef) prove_Quote(const ASTContext &ctx, const QuoteRef &node) {
@@ -3024,17 +3066,6 @@ SCOPES_RESULT(TypedValueRef) prove(const ASTContext &ctx, const ValueRef &node) 
             SCOPES_UNTYPED_VALUE_KIND()
 #undef T
             default: assert(false);
-            }
-            if (result->get_type() == TYPE_Value) {
-                ctx.append(result);
-                auto anchor = node.anchor();
-                // convert to valueref
-                auto call = ref(anchor, Call::from(TYPE_ValueRef, 
-                    g_sc_valueref_new, {
-                    ref(anchor, ConstPointer::anchor_from(anchor)),
-                    result    
-                }));
-                result = call;
             }
             assert(result);
             ctx.frame->bind(node, result);
@@ -3089,6 +3120,7 @@ static SCOPES_RESULT(TypedValueRef) prove_inline_body(const ASTContext &ctx,
     SCOPES_RESULT_TYPE(TypedValueRef);
     auto frame = cl->frame;
     auto func = cl->func;
+    SCOPES_TRACE_PROVE_TEMPLATE(func);
     Timer sum_prove_time(TIMER_Specialize);
     assert(func);
     auto anchor = func->def_anchor();
@@ -3160,6 +3192,7 @@ static SCOPES_RESULT(FunctionRef) prove_body(
     auto it = functions.find(&key);
     if (it != functions.end())
         return ref(func.anchor(), *it);
+    SCOPES_TRACE_PROVE_TEMPLATE(func);
     int count = (int)func->params.size();
     FunctionRef fn = ref(func.anchor(), Function::from(func->name, {}));
     fn->original = func;

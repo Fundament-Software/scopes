@@ -12,6 +12,8 @@
 #include "anchor.hpp"
 #include "symbol.hpp"
 #include "list.hpp"
+#include "prover.hpp"
+#include "builtin.hpp"
 
 #include <unordered_map>
 #include <queue>
@@ -697,10 +699,12 @@ struct StreamAST : StreamAnchors {
             /*} else if (T == TYPE_List) {
                 ss << (const List *)val->value;*/
                 #endif
-            } else if (T == TYPE_Value) {
+            #if 0
+            } else if (T == TYPE_ValueRef) {
                 stream_ast(ss, ref(val.anchor(), (Value *)val->value),
                     StreamASTFormat::singleline());
                 stream_type_suffix(T);
+            #endif
             } else {
                 ss << "$";
                 stream_address(ss, val->value);
@@ -834,31 +838,168 @@ typedef std::unordered_map<Value *, ValueRef> Map;
 
 Map map;
 
-#define LIST(...) ValueRef(_anchor, ConstPointer::list_from(List::from_arglist( __VA_ARGS__ )))
-#define SYMBOL(NAME) ValueRef(_anchor, ConstInt::symbol_from((NAME)))
-
-ValueRef convert_Function(const FunctionRef &node) {
-    auto _anchor = node.anchor();
-    return LIST(
-                SYMBOL(KW_Fn),
-                SYMBOL(node->name)
-                );
+static Symbol remap_unnamed(Symbol sym) {
+    return (sym == SYM_Unnamed)?Symbol(String::from("#unnamed")):sym;
 }
 
-ValueRef convert(const ValueRef &node) {
-    switch(node->kind()) {
-    case VK_Function: return convert_Function(node.cast<Function>());
-#define T(NAME, BNAME, CLASS) \
-    //case NAME: return convert_ ## CLASS(node.cast<CLASS>());
-SCOPES_VALUE_KIND()
-#undef T
-    default:
-        StyledString ss;
-        ss.out << Style_Error << "<unhandled AST node type: "
-            << get_value_kind_name(node->kind())
-            << ">" << Style_None;
-        return ref(node.anchor(), ConstInt::symbol_from(Symbol(ss.str())));
+#define LIST(...) ValueRef(_anchor, ConstPointer::list_from(List::from_arglist( __VA_ARGS__ )))
+#define SYMBOL(NAME) ValueRef(_anchor, ConstInt::symbol_from(remap_unnamed(NAME)))
+#define STRING(NAME) ValueRef(_anchor, ConstPointer::string_from((NAME)))
+#define I32(NAME) ValueRef(_anchor, ConstInt::from(TYPE_I32, (NAME)))
+#define TYPE(NAME) ValueRef(_anchor, ConstPointer::type_from((NAME)))
+
+#define HANDLER(CLASS) \
+ValueRef convert_ ## CLASS(const CLASS ## Ref &node)
+
+HANDLER(ParameterTemplate) {
+    auto _anchor = node.anchor();
+    if (node->name == SYM_Unnamed) {
+        StyledString ss = StyledString::plain();
+        stream_address(ss.out, node.unref());
+        if (node->is_variadic()) {
+            ss.out << "...";
+        }
+        return SYMBOL(Symbol(ss.str()));
+    } else {
+        return SYMBOL(node->name);
     }
+}
+
+HANDLER(Template) {
+    auto _anchor = node.anchor();
+    const List *l = EOL;
+    int i = node->params.size();
+    while (i-- > 0) {
+        l = List::from(convert(node->params[i]), l);
+    }
+    if (node->value) {
+        return LIST(
+                    ((node->is_inline())?SYMBOL(KW_Inline):SYMBOL(KW_Fn)),
+                    SYMBOL(node->name),
+                    ConstPointer::list_from(l),
+                    convert(node->value)
+                    );
+    } else {
+        // forward declaration
+        return LIST(
+                    ((node->is_inline())?SYMBOL(KW_Inline):SYMBOL(KW_Fn)),
+                    SYMBOL(node->name)
+                    );
+    }
+}
+
+HANDLER(Global) { return node; }
+
+HANDLER(KeyedTemplate) {
+    auto _anchor = node.anchor();
+    return LIST(SYMBOL(node->key), SYMBOL(OP_Set), convert(node->value));
+}
+
+HANDLER(CallTemplate) {
+    auto _anchor = node.anchor();
+    const List *l = EOL;
+    int i = node->args.size();
+    while (i-- > 0) {
+        l = List::from(convert(node->args[i]), l);
+    }
+    l = List::from(convert(node->callee), l);
+    if (node->is_rawcall()) {
+        l = List::from(SYMBOL(KW_RawCall), l);
+    } else {       
+        //if (node->callee.isa<Global>())
+        //    goto skip;
+        if (node->callee.isa<Const>()) {
+            const Type *T = node->callee.cast<TypedValue>()->get_type();
+            if (T == TYPE_Builtin)
+                goto skip;
+            if (T == TYPE_Closure)
+                goto skip;
+        }
+        l = List::from(SYMBOL(KW_Call), l);
+    }
+skip:
+    return ValueRef(_anchor, ConstPointer::list_from(l));
+}
+
+HANDLER(Expression) {
+    auto _anchor = node.anchor();
+    const List *l = EOL;
+    if (node->value) {
+        l = List::from(convert(node->value), l);
+    }    
+    int i = node->body.size();
+    while (i-- > 0) {
+        l = List::from(convert(node->body[i]), l);
+    }
+    if (node->scoped) {
+        l = List::from(SYMBOL(KW_Do), l);
+    } else {
+        l = List::from(SYMBOL(KW_DoIn), l);
+    }
+    return ValueRef(_anchor, ConstPointer::list_from(l));
+}
+
+HANDLER(ExtractArgumentTemplate) {
+    auto _anchor = node.anchor();
+    return LIST(SYMBOL(FN_VaAt), I32(node->index), convert(node->value));
+}
+
+HANDLER(ConstAggregate) {
+    auto _anchor = node.anchor();
+    if (node->get_type() == TYPE_ValueRef) {
+        auto val = (Value *)cast<ConstPointer>(node->values[0])->value;
+        auto loc = (const Anchor *)cast<ConstPointer>(node->values[1])->value;
+        return LIST(SYMBOL(KW_ASTQuote), ref(loc, val));
+    }
+    return node;
+}
+
+HANDLER(ConstInt) {
+    auto _anchor = node.anchor();
+    if (node->get_type() == TYPE_Builtin) {
+        return SYMBOL(extract_builtin_constant(node).assert_ok().name());
+    }
+    return node;
+}
+
+HANDLER(ConstPointer) {
+    auto _anchor = node.anchor();
+    if (node->get_type() == TYPE_Closure) {
+        auto cl = extract_closure_constant(node).assert_ok();
+        return SYMBOL(cl->func->name);
+        //return LIST(SYMBOL(Symbol(String::from("closure"))), convert(cl->func));
+    }
+    return node;
+}
+
+#undef HANDLER
+#define CASE_HANDLER(CLASS) \
+    case VK_ ## CLASS: return convert_ ## CLASS(node.cast<CLASS>());
+ValueRef _convert(const ValueRef &node) {
+    auto _anchor = node.anchor();
+    switch(node->kind()) {
+    CASE_HANDLER(CallTemplate)
+    CASE_HANDLER(Template)
+    CASE_HANDLER(Global)
+    CASE_HANDLER(ParameterTemplate)
+    CASE_HANDLER(Expression)
+    CASE_HANDLER(KeyedTemplate)
+    CASE_HANDLER(ExtractArgumentTemplate)
+    CASE_HANDLER(ConstPointer)
+    CASE_HANDLER(ConstInt)
+    CASE_HANDLER(ConstAggregate)
+    default:
+        return node;
+    }
+}
+#undef CASE_HANDLER
+
+ValueRef convert(const ValueRef &node) {
+    auto it = map.find(node.unref());
+    if (it != map.end()) return ref(node.anchor(), it->second);
+    auto val = _convert(node);
+    map.insert({node.unref(), val});
+    return val;
 }
 
 };
@@ -866,7 +1007,11 @@ SCOPES_VALUE_KIND()
 const List *ast_to_list(const ValueRef &node) {
     Value2ListConverter converter;
     auto val = converter.convert(node);
-    return List::from({val});
+    if (val.isa<ConstPointer>() && (val.cast<ConstPointer>()->get_type() == TYPE_List)) {
+        return extract_list_constant(val).assert_ok();
+    } else {
+        return List::from({val});
+    }
 }
 
 //------------------------------------------------------------------------------

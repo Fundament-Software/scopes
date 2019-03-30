@@ -100,7 +100,7 @@ typedef std::vector<const Type *> Types;
     T(TYPE_Variadic, "Variadic") \
     T(TYPE_Symbol, "Symbol") \
     T(TYPE_Builtin, "Builtin") \
-    T(TYPE_Value, "_Value") \
+    T(TYPE__Value, "_Value") \
     T(TYPE_ValueRef, "Value") \
     \
     T(TYPE_Bool, "bool") \

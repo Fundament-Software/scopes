@@ -153,7 +153,7 @@ void StreamExpr::walk(const Anchor *anchor, const List *l, int depth, int maxdep
     }
     if (maxdepth == 0) {
         ss << Style_Operator << "("
-            << Style_Comment << "<...>"
+            << Style_Comment << "..."
             << Style_Operator << ")"
             << Style_None;
         if (naked) { ss << std::endl; }
@@ -171,7 +171,7 @@ void StreamExpr::walk(const Anchor *anchor, const List *l, int depth, int maxdep
         it = it->next;
         offset = offset + 1;
         while (it != EOL) {
-            if (is_nested(it->at)) {
+            if (is_nested(it->at) && (maxdepth > 1)) {
                 break;
             }
             ss << " ";
@@ -192,7 +192,7 @@ void StreamExpr::walk(const Anchor *anchor, const List *l, int depth, int maxdep
             }
             if (offset >= fmt.maxlength) {
                 stream_indent(subdepth);
-                ss << "<...>" << std::endl;
+                ss << Style_Comment << "..." << Style_None << std::endl;
                 return;
             }
             walk(value, subdepth, maxdepth, true);

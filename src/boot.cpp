@@ -279,15 +279,15 @@ skip_regular_load:
 
 compile_stage:
     if (fn->get_type() == stage_func_type) {
-        typedef sc_value_raises_t (*StageFuncType)();
+        typedef sc_valueref_raises_t (*StageFuncType)();
         StageFuncType fptr = (StageFuncType)SCOPES_GET_RESULT(compile(fn, 0))->value;
         auto result = fptr();
         if (!result.ok) {
             SCOPES_RETURN_ERROR(result.except);
         }
         auto value = result._0;
-        if (isa<Function>(value)) {
-            fn = ref(fn.anchor(), cast<Function>(value));
+        if (value.isa<Function>()) {
+            fn = value.cast<Function>();
             goto compile_stage;
         } else {
             return 0;

@@ -401,7 +401,7 @@ void init_types() {
     DEFINE_BASIC_TYPE("Symbol", Symbol, TYPE_Symbol, TYPE_U64);
     DEFINE_BASIC_TYPE("Builtin", Builtin, TYPE_Builtin, TYPE_U64);
 
-    DEFINE_OPAQUE_HANDLE_TYPE("_Value", Value, TYPE_Value);
+    DEFINE_OPAQUE_HANDLE_TYPE("_Value", Value, TYPE__Value);
 
     DEFINE_OPAQUE_HANDLE_TYPE("SourceFile", SourceFile, TYPE_SourceFile);
     DEFINE_OPAQUE_HANDLE_TYPE("Closure", Closure, TYPE_Closure);
@@ -417,7 +417,7 @@ void init_types() {
         cast<TypenameType>(const_cast<Type *>(TYPE_ValueRef))
             ->finalize(
                 tuple_type({
-                    TYPE_Value,
+                    TYPE__Value,
                     TYPE_Anchor
                 }).assert_ok(),
                 TNF_Plain).assert_ok();
@@ -427,13 +427,13 @@ void init_types() {
         storage_type(TYPE_ValueRef).assert_ok());
 
 
-    DEFINE_TYPENAME("SugarMacro", TYPE_ASTMacro);
+    DEFINE_TYPENAME("SpiceMacro", TYPE_ASTMacro);
     {
         cast<TypenameType>(const_cast<Type *>(TYPE_ASTMacro))
             ->finalize(
                 native_ro_pointer_type(
                     raising_function_type(
-                        TYPE_Value, { TYPE_Value })
+                        TYPE_ValueRef, { TYPE_ValueRef })
                 ),
                 TNF_Plain).assert_ok();
     }

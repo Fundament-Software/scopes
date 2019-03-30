@@ -166,17 +166,17 @@ bool ArgumentListTemplate::is_constant() const {
     return true;
 }
 
-Value *ArgumentListTemplate::empty_from() {
-    return new ArgumentListTemplate({});
+ValueRef ArgumentListTemplate::empty_from() {
+    return ref(unknown_anchor(), new ArgumentListTemplate({}));
 }
 
-Value *ArgumentListTemplate::from(const Values &values) {
+ValueRef ArgumentListTemplate::from(const Values &values) {
     if (values.size() == 1) {
-        return values[0].unref();
+        return values[0];
     }
     for (auto value : values) {
         if (value.isa<UntypedValue>()) {
-            return new ArgumentListTemplate(values);
+            return ref(unknown_anchor(), new ArgumentListTemplate(values));
         }
     }
     // all values are typed - promote to ArgumentList
@@ -185,7 +185,7 @@ Value *ArgumentListTemplate::from(const Values &values) {
     for (auto value : values) {
         typed_values.push_back(value.cast<TypedValue>());
     }
-    return ArgumentList::from(typed_values);
+    return ref(unknown_anchor(), ArgumentList::from(typed_values));
 }
 
 //------------------------------------------------------------------------------
@@ -212,11 +212,11 @@ bool ArgumentList::is_constant() const {
     return true;
 }
 
-TypedValue *ArgumentList::from(const TypedValues &values) {
+TypedValueRef ArgumentList::from(const TypedValues &values) {
     if (values.size() == 1) {
-        return values[0].unref();
+        return values[0];
     }
-    return new ArgumentList(values);
+    return ref(unknown_anchor(), new ArgumentList(values));
 }
 
 //------------------------------------------------------------------------------
@@ -316,9 +316,9 @@ void Template::append_param(const ParameterTemplateRef &sym) {
     params.push_back(sym);
 }
 
-Template *Template::from(Symbol name,
+TemplateRef Template::from(Symbol name,
     const ParameterTemplates &params, const ValueRef &value) {
-    return new Template(name, params, value);
+    return ref(unknown_anchor(), new Template(name, params, value));
 }
 
 //------------------------------------------------------------------------------
@@ -503,9 +503,9 @@ void Function::bind(const ValueRef &oldnode, const TypedValueRef &newnode) {
     }
 }
 
-Function *Function::from(Symbol name,
+FunctionRef Function::from(Symbol name,
     const Parameters &params) {
-    return new Function(name, params);
+    return ref(unknown_anchor(), new Function(name, params));
 }
 
 //------------------------------------------------------------------------------
@@ -533,12 +533,13 @@ std::size_t Global::hash() const {
     return std::hash<const Global *>{}(this);
 }
 
-Global *Global::from(const Type *type, Symbol name, size_t flags, Symbol storage_class, int location, int binding) {
+GlobalRef Global::from(const Type *type, Symbol name, size_t flags, Symbol storage_class, int location, int binding) {
     if ((storage_class == SYM_SPIRV_StorageClassUniform)
         && !(flags & GF_BufferBlock)) {
         flags |= GF_Block;
     }
-    return new Global(type, name, flags, storage_class, location, binding);
+    return ref(unknown_anchor(), 
+        new Global(type, name, flags, storage_class, location, binding));
 }
 
 //------------------------------------------------------------------------------
@@ -711,14 +712,14 @@ void Expression::append(const ValueRef &node) {
     value = node;
 }
 
-Expression *Expression::scoped_from(const Values &nodes, const ValueRef &value) {
-    return new Expression(nodes, value);
+ExpressionRef Expression::scoped_from(const Values &nodes, const ValueRef &value) {
+    return ref(unknown_anchor(), new Expression(nodes, value));
 }
 
-Expression *Expression::unscoped_from(const Values &nodes, const ValueRef &value) {
+ExpressionRef Expression::unscoped_from(const Values &nodes, const ValueRef &value) {
     auto expr = new Expression(nodes, value);
     expr->scoped = false;
-    return expr;
+    return ref(unknown_anchor(), expr);
 }
 
 //------------------------------------------------------------------------------
@@ -727,8 +728,8 @@ CondBr::CondBr(const TypedValueRef &_cond)
     : Instruction(VK_CondBr, TYPE_NoReturn), cond(_cond)
 {}
 
-CondBr *CondBr::from(const TypedValueRef &cond) {
-    return new CondBr(cond);
+CondBrRef CondBr::from(const TypedValueRef &cond) {
+    return ref(unknown_anchor(), new CondBr(cond));
 }
 
 //------------------------------------------------------------------------------
@@ -741,8 +742,8 @@ If::If(const Clauses &_clauses)
     : UntypedValue(VK_If), clauses(_clauses) {
 }
 
-If *If::from(const Clauses &_clauses) {
-    return new If(_clauses);
+IfRef If::from(const Clauses &_clauses) {
+    return ref(unknown_anchor(), new If(_clauses));
 }
 
 void If::append_then(const ValueRef &cond, const ValueRef &value) {
@@ -767,8 +768,8 @@ SwitchTemplate::SwitchTemplate(const ValueRef &_expr, const Cases &_cases)
     : UntypedValue(VK_SwitchTemplate), expr(_expr), cases(_cases)
 {}
 
-SwitchTemplate *SwitchTemplate::from(const ValueRef &expr, const Cases &cases) {
-    return new SwitchTemplate(expr, cases);
+SwitchTemplateRef SwitchTemplate::from(const ValueRef &expr, const Cases &cases) {
+    return ref(unknown_anchor(), new SwitchTemplate(expr, cases));
 }
 
 void SwitchTemplate::append_case(const ValueRef &literal, const ValueRef &value) {
@@ -805,8 +806,8 @@ Switch::Switch(const TypedValueRef &_expr, const Cases &_cases)
     : Instruction(VK_Switch, TYPE_NoReturn), expr(_expr), cases(_cases)
 {}
 
-Switch *Switch::from(const TypedValueRef &expr, const Cases &cases) {
-    return new Switch(expr, cases);
+SwitchRef Switch::from(const TypedValueRef &expr, const Cases &cases) {
+    return ref(unknown_anchor(), new Switch(expr, cases));
 }
 
 Switch::Case &Switch::append_pass(const ConstIntRef &literal) {
@@ -832,12 +833,12 @@ ParameterTemplate::ParameterTemplate(Symbol _name, bool _variadic)
         owner(TemplateRef()), index(-1) {
 }
 
-ParameterTemplate *ParameterTemplate::from(Symbol name) {
-    return new ParameterTemplate(name, false);
+ParameterTemplateRef ParameterTemplate::from(Symbol name) {
+    return ref(unknown_anchor(), new ParameterTemplate(name, false));
 }
 
-ParameterTemplate *ParameterTemplate::variadic_from(Symbol name) {
-    return new ParameterTemplate(name, true);
+ParameterTemplateRef ParameterTemplate::variadic_from(Symbol name) {
+    return ref(unknown_anchor(), new ParameterTemplate(name, true));
 }
 
 bool ParameterTemplate::is_variadic() const {
@@ -857,8 +858,8 @@ Parameter::Parameter(Symbol _name, const Type *_type)
         owner(FunctionRef()), block(nullptr), index(-1) {
 }
 
-Parameter *Parameter::from(Symbol name, const Type *type) {
-    return new Parameter(name, type);
+ParameterRef Parameter::from(Symbol name, const Type *type) {
+    return ref(unknown_anchor(), new Parameter(name, type));
 }
 
 void Parameter::set_owner(const FunctionRef &_owner, int _index) {
@@ -876,8 +877,8 @@ void Parameter::retype(const Type *T) {
 LoopArguments::LoopArguments(const LoopRef &_loop)
     : UntypedValue(VK_LoopArguments), loop(_loop) {}
 
-LoopArguments *LoopArguments::from(const LoopRef &loop) {
-    return new LoopArguments(loop);
+LoopArgumentsRef LoopArguments::from(const LoopRef &loop) {
+    return ref(unknown_anchor(), new LoopArguments(loop));
 }
 
 //------------------------------------------------------------------------------
@@ -885,8 +886,8 @@ LoopArguments *LoopArguments::from(const LoopRef &loop) {
 LoopLabelArguments::LoopLabelArguments(const Type *type)
     : TypedValue(VK_LoopLabelArguments, type), loop(LoopLabelRef()) {}
 
-LoopLabelArguments *LoopLabelArguments::from(const Type *type) {
-    return new LoopLabelArguments(type);
+LoopLabelArgumentsRef LoopLabelArguments::from(const Type *type) {
+    return ref(unknown_anchor(), new LoopLabelArguments(type));
 }
 
 //------------------------------------------------------------------------------
@@ -895,8 +896,8 @@ Exception::Exception(const Type *type)
     : TypedValue(VK_Exception, type) {
 }
 
-Exception *Exception::from(const Type *type) {
-    return new Exception(type);
+ExceptionRef Exception::from(const Type *type) {
+    return ref(unknown_anchor(), new Exception(type));
 }
 
 //------------------------------------------------------------------------------
@@ -913,8 +914,8 @@ void CallTemplate::set_rawcall() {
     flags |= CF_RawCall;
 }
 
-CallTemplate *CallTemplate::from(const ValueRef &callee, const Values &args) {
-    return new CallTemplate(callee, args);
+CallTemplateRef CallTemplate::from(const ValueRef &callee, const Values &args) {
+    return ref(unknown_anchor(), new CallTemplate(callee, args));
 }
 
 //------------------------------------------------------------------------------
@@ -924,8 +925,8 @@ Call::Call(const Type *type, const TypedValueRef &_callee, const TypedValues &_a
         except(ExceptionRef()) {
 }
 
-Call *Call::from(const Type *type, const TypedValueRef &callee, const TypedValues &args) {
-    return new Call(type, callee, args);
+CallRef Call::from(const Type *type, const TypedValueRef &callee, const TypedValues &args) {
+    return ref(unknown_anchor(), new Call(type, callee, args));
 }
 
 //------------------------------------------------------------------------------
@@ -936,8 +937,8 @@ LoopLabel::LoopLabel(const TypedValues &_init, const LoopLabelArgumentsRef &_arg
     args->loop = ref(unknown_anchor(), this);
 }
 
-LoopLabel *LoopLabel::from(const TypedValues &init, const LoopLabelArgumentsRef &args) {
-    return new LoopLabel(init, args);
+LoopLabelRef LoopLabel::from(const TypedValues &init, const LoopLabelArgumentsRef &args) {
+    return ref(unknown_anchor(), new LoopLabel(init, args));
 }
 
 //------------------------------------------------------------------------------
@@ -947,8 +948,8 @@ Loop::Loop(const ValueRef &_init, const ValueRef &_value)
     args = ref(unknown_anchor(), LoopArguments::from(ref(unknown_anchor(), this)));
 }
 
-Loop *Loop::from(const ValueRef &init, const ValueRef &value) {
-    return new Loop(init, value);
+LoopRef Loop::from(const ValueRef &init, const ValueRef &value) {
+    return ref(unknown_anchor(), new Loop(init, value));
 }
 
 //------------------------------------------------------------------------------
@@ -956,8 +957,8 @@ Loop *Loop::from(const ValueRef &init, const ValueRef &value) {
 Label::Label(LabelKind _kind, Symbol _name)
     : Instruction(VK_Label, empty_arguments_type()), name(_name), label_kind(_kind) {}
 
-Label *Label::from(LabelKind kind, Symbol name) {
-    return new Label(kind, name);
+LabelRef Label::from(LabelKind kind, Symbol name) {
+    return ref(unknown_anchor(), new Label(kind, name));
 }
 
 void Label::change_type(const Type *type) {
@@ -980,15 +981,15 @@ const char *get_label_kind_name(LabelKind kind) {
 LabelTemplate::LabelTemplate(LabelKind _kind, Symbol _name, const ValueRef &_value)
     : UntypedValue(VK_LabelTemplate), name(_name), value(_value), label_kind(_kind) {}
 
-LabelTemplate *LabelTemplate::from(LabelKind kind, Symbol name, const ValueRef &value) {
-    return new LabelTemplate(kind, name, value);
+LabelTemplateRef LabelTemplate::from(LabelKind kind, Symbol name, const ValueRef &value) {
+    return ref(unknown_anchor(), new LabelTemplate(kind, name, value));
 }
 
-LabelTemplate *LabelTemplate::try_from(const ValueRef &value) {
-    return new LabelTemplate(LK_Try, KW_Try, value);
+LabelTemplateRef LabelTemplate::try_from(const ValueRef &value) {
+    return ref(unknown_anchor(), new LabelTemplate(LK_Try, KW_Try, value));
 }
-LabelTemplate *LabelTemplate::except_from(const ValueRef &value) {
-    return new LabelTemplate(LK_Except, KW_Except, value);
+LabelTemplateRef LabelTemplate::except_from(const ValueRef &value) {
+    return ref(unknown_anchor(), new LabelTemplate(LK_Except, KW_Except, value));
 }
 
 //------------------------------------------------------------------------------
@@ -1064,16 +1065,16 @@ std::size_t ConstInt::hash() const {
     return std::hash<uint64_t>{}(value);
 }
 
-ConstInt *ConstInt::from(const Type *type, uint64_t value) {
-    return new ConstInt(type, value);
+ConstIntRef ConstInt::from(const Type *type, uint64_t value) {
+    return ref(unknown_anchor(), new ConstInt(type, value));
 }
 
-ConstInt *ConstInt::symbol_from(Symbol value) {
-    return new ConstInt(TYPE_Symbol, value.value());
+ConstIntRef ConstInt::symbol_from(Symbol value) {
+    return ref(unknown_anchor(), new ConstInt(TYPE_Symbol, value.value()));
 }
 
-ConstInt *ConstInt::builtin_from(Builtin value) {
-    return new ConstInt(TYPE_Builtin, value.value());
+ConstIntRef ConstInt::builtin_from(Builtin value) {
+    return ref(unknown_anchor(), new ConstInt(TYPE_Builtin, value.value()));
 }
 
 //------------------------------------------------------------------------------
@@ -1090,8 +1091,8 @@ std::size_t ConstReal::hash() const {
     return std::hash<double>{}(value);
 }
 
-ConstReal *ConstReal::from(const Type *type, double value) {
-    return new ConstReal(type, value);
+ConstRealRef ConstReal::from(const Type *type, double value) {
+    return ref(unknown_anchor(), new ConstReal(type, value));
 }
 
 //------------------------------------------------------------------------------
@@ -1120,12 +1121,17 @@ std::size_t ConstAggregate::hash() const {
     return h;
 }
 
-ConstAggregate *ConstAggregate::from(const Type *type, const ConstantPtrs &fields) {
-    return new ConstAggregate(type, fields);
+ConstAggregateRef ConstAggregate::from(const Type *type, const ConstantPtrs &fields) {
+    return ref(unknown_anchor(), new ConstAggregate(type, fields));
 }
 
-ConstAggregate *ConstAggregate::none_from() {
+ConstAggregateRef ConstAggregate::none_from() {
     return from(TYPE_Nothing, {});
+}
+
+ConstAggregateRef ConstAggregate::ast_from(const ValueRef &node) {
+    auto ptr = ConstPointer::from(TYPE__Value, node.unref()).unref();
+    return from(TYPE_ValueRef, { ptr, ConstPointer::anchor_from(node.anchor()).unref() });    
 }
 
 ConstRef get_field(const ConstAggregateRef &value, int i) {
@@ -1149,35 +1155,31 @@ std::size_t ConstPointer::hash() const {
     return std::hash<const void *>{}(value);
 }
 
-ConstPointer *ConstPointer::from(const Type *type, const void *pointer) {
-    return new ConstPointer(type, pointer);
+ConstPointerRef ConstPointer::from(const Type *type, const void *pointer) {
+    return ref(unknown_anchor(), new ConstPointer(type, pointer));
 }
 
-ConstPointer *ConstPointer::type_from(const Type *type) {
+ConstPointerRef ConstPointer::type_from(const Type *type) {
     return from(TYPE_Type, type);
 }
 
-ConstPointer *ConstPointer::closure_from(const Closure *closure) {
+ConstPointerRef ConstPointer::closure_from(const Closure *closure) {
     return from(TYPE_Closure, closure);
 }
 
-ConstPointer *ConstPointer::string_from(const String *str) {
+ConstPointerRef ConstPointer::string_from(const String *str) {
     return from(TYPE_String, str);
 }
 
-ConstPointer *ConstPointer::ast_from(Value *node) {
-    return from(TYPE_Value, node);
-}
-
-ConstPointer *ConstPointer::list_from(const List *list) {
+ConstPointerRef ConstPointer::list_from(const List *list) {
     return from(TYPE_List, list);
 }
 
-ConstPointer *ConstPointer::scope_from(Scope *scope) {
+ConstPointerRef ConstPointer::scope_from(Scope *scope) {
     return from(TYPE_Scope, scope);
 }
 
-ConstPointer *ConstPointer::anchor_from(const Anchor *anchor) {
+ConstPointerRef ConstPointer::anchor_from(const Anchor *anchor) {
     return from(TYPE_Anchor, anchor);
 }
 
@@ -1187,8 +1189,8 @@ Break::Break(const ValueRef &_value)
     : UntypedValue(VK_Break), value(_value) {
 }
 
-Break *Break::from(const ValueRef &value) {
-    return new Break(value);
+BreakRef Break::from(const ValueRef &value) {
+    return ref(unknown_anchor(), new Break(value));
 }
 
 //------------------------------------------------------------------------------
@@ -1196,8 +1198,8 @@ Break *Break::from(const ValueRef &value) {
 RepeatTemplate::RepeatTemplate(const ValueRef &_value)
     : UntypedValue(VK_RepeatTemplate), value(_value) {}
 
-RepeatTemplate *RepeatTemplate::from(const ValueRef &value) {
-    return new RepeatTemplate(value);
+RepeatTemplateRef RepeatTemplate::from(const ValueRef &value) {
+    return ref(unknown_anchor(), new RepeatTemplate(value));
 }
 
 //------------------------------------------------------------------------------
@@ -1206,8 +1208,8 @@ Repeat::Repeat(const LoopLabelRef &_loop, const TypedValues &values)
     : Terminator(VK_Repeat, values), loop(_loop) {
 }
 
-Repeat *Repeat::from(const LoopLabelRef &loop, const TypedValues &values) {
-    return new Repeat(loop, values);
+RepeatRef Repeat::from(const LoopLabelRef &loop, const TypedValues &values) {
+    return ref(unknown_anchor(), new Repeat(loop, values));
 }
 
 //------------------------------------------------------------------------------
@@ -1215,8 +1217,8 @@ Repeat *Repeat::from(const LoopLabelRef &loop, const TypedValues &values) {
 ReturnTemplate::ReturnTemplate(const ValueRef &_value)
     : UntypedValue(VK_ReturnTemplate), value(_value) {}
 
-ReturnTemplate *ReturnTemplate::from(const ValueRef &value) {
-    return new ReturnTemplate(value);
+ReturnTemplateRef ReturnTemplate::from(const ValueRef &value) {
+    return ref(unknown_anchor(), new ReturnTemplate(value));
 }
 
 //------------------------------------------------------------------------------
@@ -1225,8 +1227,8 @@ Return::Return(const TypedValues &values)
     : Terminator(VK_Return, values) {
 }
 
-Return *Return::from(const TypedValues &values) {
-    return new Return(values);
+ReturnRef Return::from(const TypedValues &values) {
+    return ref(unknown_anchor(), new Return(values));
 }
 
 //------------------------------------------------------------------------------
@@ -1235,8 +1237,8 @@ Merge::Merge(const LabelRef &_label, const TypedValues &values)
     : Terminator(VK_Merge, values), label(_label) {
 }
 
-Merge *Merge::from(const LabelRef &label, const TypedValues &values) {
-    return new Merge(label, values);
+MergeRef Merge::from(const LabelRef &label, const TypedValues &values) {
+    return ref(unknown_anchor(), new Merge(label, values));
 }
 
 //------------------------------------------------------------------------------
@@ -1244,8 +1246,8 @@ Merge *Merge::from(const LabelRef &label, const TypedValues &values) {
 MergeTemplate::MergeTemplate(const LabelTemplateRef &_label, const ValueRef &_value)
     : UntypedValue(VK_MergeTemplate), label(_label), value(_value) {}
 
-MergeTemplate *MergeTemplate::from(const LabelTemplateRef &label, const ValueRef &value) {
-    return new MergeTemplate(label, value);
+MergeTemplateRef MergeTemplate::from(const LabelTemplateRef &label, const ValueRef &value) {
+    return ref(unknown_anchor(), new MergeTemplate(label, value));
 }
 
 //------------------------------------------------------------------------------
@@ -1253,8 +1255,8 @@ MergeTemplate *MergeTemplate::from(const LabelTemplateRef &label, const ValueRef
 RaiseTemplate::RaiseTemplate(const ValueRef &_value)
     : UntypedValue(VK_RaiseTemplate), value(_value) {}
 
-RaiseTemplate *RaiseTemplate::from(const ValueRef &value) {
-    return new RaiseTemplate(value);
+RaiseTemplateRef RaiseTemplate::from(const ValueRef &value) {
+    return ref(unknown_anchor(), new RaiseTemplate(value));
 }
 
 //------------------------------------------------------------------------------
@@ -1263,8 +1265,8 @@ Raise::Raise(const TypedValues &values)
     : Terminator(VK_Raise, values) {
 }
 
-Raise *Raise::from(const TypedValues &values) {
-    return new Raise(values);
+RaiseRef Raise::from(const TypedValues &values) {
+    return ref(unknown_anchor(), new Raise(values));
 }
 
 //------------------------------------------------------------------------------
@@ -1273,8 +1275,8 @@ Quote::Quote(const ValueRef &_value)
     : UntypedValue(VK_Quote), value(_value) {
 }
 
-Quote *Quote::from(const ValueRef &value) {
-    return new Quote(value);
+QuoteRef Quote::from(const ValueRef &value) {
+    return ref(unknown_anchor(), new Quote(value));
 }
 
 //------------------------------------------------------------------------------
@@ -1283,8 +1285,8 @@ Unquote::Unquote(const ValueRef &_value)
     : UntypedValue(VK_Unquote), value(_value) {
 }
 
-Unquote *Unquote::from(const ValueRef &value) {
-    return new Unquote(value);
+UnquoteRef Unquote::from(const ValueRef &value) {
+    return ref(unknown_anchor(), new Unquote(value));
 }
 
 //------------------------------------------------------------------------------
@@ -1293,8 +1295,8 @@ CompileStage::CompileStage(const List *_next, Scope *_env)
     : UntypedValue(VK_CompileStage), next(_next), env(_env) {
 }
 
-CompileStage *CompileStage::from(const List *next, Scope *env) {
-    return new CompileStage(next, env);
+CompileStageRef CompileStage::from(const List *next, Scope *env) {
+    return ref(unknown_anchor(), new CompileStage(next, env));
 }
 
 //------------------------------------------------------------------------------
@@ -1369,6 +1371,32 @@ int Value::get_depth() const {
     }
 SCOPES_VALUE_KIND()
 #undef T
+
+const Anchor *get_best_anchor(const ValueRef &value) {
+    const Anchor *def_anchor = unknown_anchor();
+#define T(CLASS) \
+    if (value.isa<CLASS>()) { \
+        def_anchor = value.cast<CLASS>()->def_anchor(); \
+    } else
+    SCOPES_DEFINED_VALUES()
+#undef T  
+    {};
+    if (!def_anchor->is_boring()) {
+        return def_anchor;
+    }
+    return value.anchor();
+}
+
+void set_best_anchor(const ValueRef &value, const Anchor *anchor) {
+#define T(CLASS) \
+    if (value.isa<CLASS>()) { \
+        auto val = value.cast<CLASS>(); \
+        val->set_def_anchor(anchor); \
+    } else
+    SCOPES_DEFINED_VALUES()
+#undef T  
+    {};
+}
 
 //------------------------------------------------------------------------------
 
@@ -1467,7 +1495,7 @@ struct Equal {
 
 static std::unordered_set<Closure *, ClosureSet::Hash, ClosureSet::Equal> closures;
 
-Closure::Closure(Template *_func, Function *_frame) :
+Closure::Closure(const TemplateRef &_func, const FunctionRef &_frame) :
     func(_func), frame(_frame) {}
 
 bool Closure::key_equal(const Closure *other) const {
@@ -1476,11 +1504,11 @@ bool Closure::key_equal(const Closure *other) const {
 
 std::size_t Closure::hash() const {
     return hash2(
-        std::hash<Template *>{}(func),
-        std::hash<Function *>{}(frame));
+        std::hash<Template *>{}(func.unref()),
+        std::hash<Function *>{}(frame.unref()));
 }
 
-Closure *Closure::from(Template *func, Function *frame) {
+Closure *Closure::from(const TemplateRef &func, const FunctionRef &frame) {
     Closure cl(func, frame);
     auto it = closures.find(&cl);
     if (it != closures.end()) {
@@ -1494,9 +1522,9 @@ Closure *Closure::from(Template *func, Function *frame) {
 StyledStream &Closure::stream(StyledStream &ost) const {
     ost << Style_Comment << "<" << Style_None;
     if (frame)
-        ost << Style_Symbol << frame->name.name()->data << "λ" << (void *)frame << Style_None;
+        ost << Style_Symbol << frame->name.name()->data << "λ" << (void *)frame.unref() << Style_None;
     ost << Style_Comment << "::" << Style_None
-        << Style_Symbol << func->name.name()->data << "λ" << (void *)func << Style_None
+        << Style_Symbol << func->name.name()->data << "λ" << (void *)func.unref() << Style_None
         << Style_Comment << ">" << Style_None;
     return ost;
 }

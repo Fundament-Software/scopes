@@ -131,6 +131,9 @@ formatters:
         ValueKind, ValueKind) \
     T(ConstantValueKindMismatch, \
         "constant value of type %0 expected, got %1", \
+        ValueKind, ValueKind) \
+    T(TypedConstantValueKindMismatch, \
+        "constant value of type %0 expected, got %1", \
         PType, ValueKind) \
     T(TooManyArguments, \
         "at most %0 argument(s) expected, got %1", \
@@ -428,8 +431,12 @@ enum BacktraceKind {
     BTK_Parser,
     // context = symbol or expression being expanded 
     BTK_Expander,
-    // context = expression or function being typechecked
-    BTK_Prover,
+    // context = expression being typechecked
+    BTK_ProveExpression,
+    // context = template being typechecked
+    BTK_ProveTemplate,
+    // context = argument being typechecked
+    BTK_ProveArgument,
 };
 
 struct Backtrace {
@@ -445,8 +452,12 @@ struct Backtrace {
     SCOPES_TRACE(Parser, ref((ANCHOR), g_none))
 #define SCOPES_TRACE_EXPANDER(VALUEREF) \
     SCOPES_TRACE(Expander, (VALUEREF))
-#define SCOPES_TRACE_PROVER(VALUEREF) \
-    SCOPES_TRACE(Prover, (VALUEREF))
+#define SCOPES_TRACE_PROVE_EXPR(VALUEREF) \
+    SCOPES_TRACE(ProveExpression, (VALUEREF))
+#define SCOPES_TRACE_PROVE_TEMPLATE(VALUEREF) \
+    SCOPES_TRACE(ProveTemplate, (VALUEREF))
+#define SCOPES_TRACE_PROVE_ARG(VALUEREF) \
+    SCOPES_TRACE(ProveArgument, (VALUEREF))
 
 extern Backtrace _backtrace;
 

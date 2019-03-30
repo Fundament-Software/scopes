@@ -215,8 +215,40 @@ void stream_backtrace(StyledStream &ss, const Backtrace *bt) {
         ss << std::endl;
         anchor->stream_source_line(ss);
     } break;
-    case BTK_Prover: {
-        ss << "while proving" << std::endl;
+    case BTK_ProveTemplate: {
+        if (value.isa<UntypedValue>()) {
+            auto uv = value.cast<UntypedValue>();
+            auto _anchor = uv->def_anchor();
+            if (_anchor != unknown_anchor())
+                anchor = uv->def_anchor();
+        }
+        #if 0
+        const List *list = ast_to_list(value);
+        StreamExprFormat fmt;
+        fmt.maxdepth = 2;
+        fmt.depth = 1;
+        fmt.maxlength = 3;
+        stream_expr(ss, list, fmt);
+        #endif
+        ss << anchor << " in ";
+        ss << Style_Keyword;
+        if (value.cast<Template>()->is_inline()) {
+            ss << "inline";
+        } else {
+            ss << "fn";
+        }
+        ss << Style_None << " ";
+        ss << value.cast<Template>()->name.name()->data;
+        ss << std::endl;
+        anchor->stream_source_line(ss);
+    } break;
+    case BTK_ProveArgument: {
+        ss << anchor;
+        ss << " while checking type of argument" << std::endl;
+        anchor->stream_source_line(ss);
+    } break;
+    case BTK_ProveExpression: {
+        ss << "While checking expression" << std::endl;
         if (value.isa<UntypedValue>()) {
             auto uv = value.cast<UntypedValue>();
             auto _anchor = uv->def_anchor();
@@ -224,20 +256,31 @@ void stream_backtrace(StyledStream &ss, const Backtrace *bt) {
                 anchor = uv->def_anchor();
         }
         const List *list = ast_to_list(value);
-        stream_expr(ss, list, StreamExprFormat::debug_digest());
-        ss << anchor << " generated here";
+        StreamExprFormat fmt;
+        fmt.maxdepth = 3;
+        fmt.maxlength = 4;
+        stream_expr(ss, list, fmt);
+        ss << anchor << " defined here";
         ss << std::endl;
         anchor->stream_source_line(ss);
     } break;
     }
 }
 
+static bool good_delta(const Backtrace *newer, const Backtrace *older) {
+    return newer->kind != older->kind;
+}
+
 void stream_error(StyledStream &ss, const Error *err) {
     std::vector<const Backtrace *> traceback;
     {
         const Backtrace *bt = err->get_trace();
+        const Backtrace *last_bt = nullptr;
         while (bt) {
-            traceback.push_back(bt);
+            if (!last_bt || good_delta(last_bt, bt)) {
+                traceback.push_back(bt);
+            }
+            last_bt = bt;
             bt = bt->next;
         }
     }

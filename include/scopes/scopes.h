@@ -93,12 +93,12 @@ typedef struct sc_closure_ sc_closure_t;
 
 typedef uint64_t sc_symbol_t;
 
-typedef struct sc_valueref_ { sc_value_t *_1; const sc_anchor_t *_0; } sc_valueref_t;
+typedef struct sc_valueref_ { sc_value_t *_0; const sc_anchor_t *_1; } sc_valueref_t;
 
 #endif
 
 typedef struct sc_bool_string_tuple_ { bool _0; const sc_string_t *_1; } sc_bool_string_tuple_t;
-typedef struct sc_bool_value_tuple_ { bool _0; sc_value_t *_1; } sc_bool_value_tuple_t;
+typedef struct sc_bool_valueref_tuple_ { bool _0; sc_valueref_t _1; } sc_bool_valueref_tuple_t;
 
 typedef struct sc_valueref_list_tuple_ { sc_valueref_t _0; const sc_list_t *_1; } sc_valueref_list_tuple_t;
 typedef struct sc_valueref_list_scope_tuple_ { sc_valueref_t _0; const sc_list_t *_1; sc_scope_t *_2; } sc_valueref_list_scope_tuple_t;
@@ -122,7 +122,6 @@ typedef struct sc_void_raises_ { bool ok; sc_error_t *except; } sc_void_raises_t
 #define SCOPES_TYPEDEF_RESULT_RAISES(NAME, RESULT_TYPE) \
     typedef struct NAME ## _ { bool ok; sc_error_t *except; RESULT_TYPE _0; } NAME ## _t
 
-SCOPES_TYPEDEF_RESULT_RAISES(sc_value_raises, sc_value_t *);
 SCOPES_TYPEDEF_RESULT_RAISES(sc_valueref_raises, sc_valueref_t);
 SCOPES_TYPEDEF_RESULT_RAISES(sc_string_raises, const sc_string_t *);
 SCOPES_TYPEDEF_RESULT_RAISES(sc_size_raises, size_t);
@@ -152,6 +151,7 @@ SCOPES_LIBEXPORT sc_valueref_list_scope_raises_t sc_expand(sc_valueref_t expr, c
 SCOPES_LIBEXPORT sc_valueref_raises_t sc_eval(const sc_anchor_t *anchor, const sc_list_t *expr, sc_scope_t *scope);
 SCOPES_LIBEXPORT sc_valueref_raises_t sc_prove(sc_valueref_t expr);
 SCOPES_LIBEXPORT sc_valueref_raises_t sc_typify(const sc_closure_t *f, int numtypes, const sc_type_t **typeargs);
+SCOPES_LIBEXPORT sc_valueref_raises_t sc_typify_template(sc_valueref_t f, int numtypes, const sc_type_t **typeargs);
 SCOPES_LIBEXPORT sc_valueref_raises_t sc_compile(sc_valueref_t srcl, uint64_t flags);
 SCOPES_LIBEXPORT sc_string_raises_t sc_compile_spirv(sc_symbol_t target, sc_valueref_t srcl, uint64_t flags);
 SCOPES_LIBEXPORT sc_string_raises_t sc_compile_glsl(sc_symbol_t target, sc_valueref_t srcl, uint64_t flags);
@@ -170,7 +170,7 @@ SCOPES_LIBEXPORT const sc_string_t *sc_value_tostring (sc_valueref_t value);
 SCOPES_LIBEXPORT const sc_type_t *sc_value_type (sc_valueref_t value);
 SCOPES_LIBEXPORT const sc_type_t *sc_value_qualified_type (sc_valueref_t value);
 SCOPES_LIBEXPORT const sc_anchor_t *sc_value_anchor (sc_valueref_t value);
-SCOPES_LIBEXPORT sc_valueref_t sc_valueref_new(sc_anchor_t *anchor, sc_value_t *value);
+SCOPES_LIBEXPORT sc_valueref_t sc_valueref_tag(sc_anchor_t *anchor, sc_valueref_t value);
 SCOPES_LIBEXPORT bool sc_value_is_constant (sc_valueref_t value);
 SCOPES_LIBEXPORT bool sc_value_is_pure (sc_valueref_t value);
 SCOPES_LIBEXPORT bool sc_value_compare (sc_valueref_t a, sc_valueref_t b);
@@ -180,8 +180,8 @@ SCOPES_LIBEXPORT sc_valueref_t sc_value_unwrap(const sc_type_t *type, sc_valuere
 
 SCOPES_LIBEXPORT sc_valueref_t sc_keyed_new(sc_symbol_t key, sc_valueref_t value);
 
-SCOPES_LIBEXPORT sc_value_t *sc_empty_argument_list();
-SCOPES_LIBEXPORT sc_value_t *sc_argument_list_new();
+SCOPES_LIBEXPORT sc_valueref_t sc_empty_argument_list();
+SCOPES_LIBEXPORT sc_valueref_t sc_argument_list_new();
 SCOPES_LIBEXPORT void sc_argument_list_append(sc_valueref_t alist, sc_valueref_t value);
 SCOPES_LIBEXPORT sc_valueref_t sc_extract_argument_new(sc_valueref_t value, int index);
 SCOPES_LIBEXPORT sc_valueref_t sc_extract_argument_list_new(sc_valueref_t value, int index);
@@ -189,62 +189,62 @@ SCOPES_LIBEXPORT int sc_argcount(sc_valueref_t value);
 SCOPES_LIBEXPORT sc_valueref_t sc_getarg(sc_valueref_t value, int index);
 SCOPES_LIBEXPORT sc_valueref_t sc_getarglist(sc_valueref_t value, int index);
 
-SCOPES_LIBEXPORT sc_value_t *sc_template_new(sc_symbol_t name);
+SCOPES_LIBEXPORT sc_valueref_t sc_template_new(sc_symbol_t name);
 SCOPES_LIBEXPORT void sc_template_set_name(sc_valueref_t fn, sc_symbol_t name);
 SCOPES_LIBEXPORT sc_symbol_t sc_template_get_name(sc_valueref_t fn);
 SCOPES_LIBEXPORT void sc_template_append_parameter(sc_valueref_t fn, sc_valueref_t symbol);
 SCOPES_LIBEXPORT void sc_template_set_body(sc_valueref_t fn, sc_valueref_t value);
 SCOPES_LIBEXPORT void sc_template_set_inline(sc_valueref_t fn);
 
-SCOPES_LIBEXPORT sc_value_t *sc_expression_new();
+SCOPES_LIBEXPORT sc_valueref_t sc_expression_new();
 SCOPES_LIBEXPORT void sc_expression_append(sc_valueref_t expr, sc_valueref_t value);
 SCOPES_LIBEXPORT void sc_expression_set_scoped(sc_valueref_t expr);
 
-SCOPES_LIBEXPORT sc_value_t *sc_global_new(sc_symbol_t name,
+SCOPES_LIBEXPORT sc_valueref_t sc_global_new(sc_symbol_t name,
     const sc_type_t *type, uint32_t flags /* = 0 */, sc_symbol_t storage_class /* = unnamed */,
     int location /* = -1 */, int binding /* = -1 */);
 
-SCOPES_LIBEXPORT sc_value_t *sc_if_new();
+SCOPES_LIBEXPORT sc_valueref_t sc_if_new();
 SCOPES_LIBEXPORT void sc_if_append_then_clause(sc_valueref_t value, sc_valueref_t cond, sc_valueref_t body);
 SCOPES_LIBEXPORT void sc_if_append_else_clause(sc_valueref_t value, sc_valueref_t body);
 
-SCOPES_LIBEXPORT sc_value_t *sc_switch_new(sc_valueref_t expr);
+SCOPES_LIBEXPORT sc_valueref_t sc_switch_new(sc_valueref_t expr);
 SCOPES_LIBEXPORT void sc_switch_append_case(sc_valueref_t value, sc_valueref_t literal, sc_valueref_t body);
 SCOPES_LIBEXPORT void sc_switch_append_pass(sc_valueref_t value, sc_valueref_t literal, sc_valueref_t body);
 SCOPES_LIBEXPORT void sc_switch_append_default(sc_valueref_t value, sc_valueref_t body);
 
-SCOPES_LIBEXPORT sc_value_t *sc_parameter_new(sc_symbol_t name);
+SCOPES_LIBEXPORT sc_valueref_t sc_parameter_new(sc_symbol_t name);
 SCOPES_LIBEXPORT bool sc_parameter_is_variadic(sc_valueref_t param);
 
-SCOPES_LIBEXPORT sc_value_t *sc_call_new(sc_valueref_t callee);
+SCOPES_LIBEXPORT sc_valueref_t sc_call_new(sc_valueref_t callee);
 SCOPES_LIBEXPORT void sc_call_append_argument(sc_valueref_t call, sc_valueref_t value);
 SCOPES_LIBEXPORT bool sc_call_is_rawcall(sc_valueref_t value);
 SCOPES_LIBEXPORT void sc_call_set_rawcall(sc_valueref_t value, bool enable);
 
-SCOPES_LIBEXPORT sc_value_t *sc_loop_new(sc_valueref_t init);
+SCOPES_LIBEXPORT sc_valueref_t sc_loop_new(sc_valueref_t init);
 SCOPES_LIBEXPORT sc_valueref_t sc_loop_arguments(sc_valueref_t loop);
 SCOPES_LIBEXPORT void sc_loop_set_body(sc_valueref_t loop, sc_valueref_t body);
 
-SCOPES_LIBEXPORT sc_value_t *sc_const_int_new(const sc_type_t *type, uint64_t value);
-SCOPES_LIBEXPORT sc_value_t *sc_const_real_new(const sc_type_t *type, double value);
-SCOPES_LIBEXPORT sc_value_t *sc_const_aggregate_new(const sc_type_t *type, int numconsts, sc_valueref_t *consts);
-SCOPES_LIBEXPORT sc_value_t *sc_const_pointer_new(const sc_type_t *type, const void *pointer);
+SCOPES_LIBEXPORT sc_valueref_t sc_const_int_new(const sc_type_t *type, uint64_t value);
+SCOPES_LIBEXPORT sc_valueref_t sc_const_real_new(const sc_type_t *type, double value);
+SCOPES_LIBEXPORT sc_valueref_t sc_const_aggregate_new(const sc_type_t *type, int numconsts, sc_valueref_t *consts);
+SCOPES_LIBEXPORT sc_valueref_t sc_const_pointer_new(const sc_type_t *type, const void *pointer);
 SCOPES_LIBEXPORT uint64_t sc_const_int_extract(const sc_valueref_t value);
 SCOPES_LIBEXPORT double sc_const_real_extract(const sc_valueref_t value);
 SCOPES_LIBEXPORT sc_valueref_t sc_const_extract_at(const sc_valueref_t value, int index);
 SCOPES_LIBEXPORT const void *sc_const_pointer_extract(const sc_valueref_t value);
 
-SCOPES_LIBEXPORT sc_value_t *sc_break_new(sc_valueref_t value);
-SCOPES_LIBEXPORT sc_value_t *sc_repeat_new(sc_valueref_t value);
-SCOPES_LIBEXPORT sc_value_t *sc_return_new(sc_valueref_t value);
-SCOPES_LIBEXPORT sc_value_t *sc_raise_new(sc_valueref_t value);
+SCOPES_LIBEXPORT sc_valueref_t sc_break_new(sc_valueref_t value);
+SCOPES_LIBEXPORT sc_valueref_t sc_repeat_new(sc_valueref_t value);
+SCOPES_LIBEXPORT sc_valueref_t sc_return_new(sc_valueref_t value);
+SCOPES_LIBEXPORT sc_valueref_t sc_raise_new(sc_valueref_t value);
 
-SCOPES_LIBEXPORT sc_value_t *sc_quote_new(sc_valueref_t value);
-SCOPES_LIBEXPORT sc_value_t *sc_unquote_new(sc_valueref_t value);
+SCOPES_LIBEXPORT sc_valueref_t sc_quote_new(sc_valueref_t value);
+SCOPES_LIBEXPORT sc_valueref_t sc_unquote_new(sc_valueref_t value);
 
-SCOPES_LIBEXPORT sc_value_t *sc_label_new(int kind, sc_symbol_t name);
+SCOPES_LIBEXPORT sc_valueref_t sc_label_new(int kind, sc_symbol_t name);
 SCOPES_LIBEXPORT void sc_label_set_body(sc_valueref_t label, sc_valueref_t body);
-SCOPES_LIBEXPORT sc_value_t *sc_merge_new(sc_valueref_t label, sc_valueref_t value);
+SCOPES_LIBEXPORT sc_valueref_t sc_merge_new(sc_valueref_t label, sc_valueref_t value);
 
 // parsing
 
@@ -283,7 +283,7 @@ SCOPES_LIBEXPORT void sc_exit(int c);
 
 // memoization
 
-SCOPES_LIBEXPORT sc_value_t *sc_map_get(sc_valueref_t key);
+SCOPES_LIBEXPORT sc_valueref_t sc_map_get(sc_valueref_t key);
 SCOPES_LIBEXPORT void sc_map_set(sc_valueref_t key, sc_valueref_t value);
 
 // hashing
@@ -348,8 +348,8 @@ SCOPES_LIBEXPORT bool sc_list_compare(const sc_list_t *a, const sc_list_t *b);
 // closures
 
 SCOPES_LIBEXPORT const sc_string_t *sc_closure_get_docstring(const sc_closure_t *func);
-SCOPES_LIBEXPORT sc_value_t *sc_closure_get_template(const sc_closure_t *func);
-SCOPES_LIBEXPORT sc_value_t *sc_closure_get_context(const sc_closure_t *func);
+SCOPES_LIBEXPORT sc_valueref_t sc_closure_get_template(const sc_closure_t *func);
+SCOPES_LIBEXPORT sc_valueref_t sc_closure_get_context(const sc_closure_t *func);
 
 // types
 

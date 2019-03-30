@@ -299,10 +299,10 @@ struct Quoter {
     }
 
     ValueRef quote_typed(const TypedValueRef &node) {
-        if (node->get_type() == TYPE_Value)
+        if (node->get_type() == TYPE_ValueRef)
             return node;
         if (is_value_stage_constant(node)) {
-            return ref(node.anchor(), ConstPointer::ast_from(node.unref()));
+            return ConstAggregate::ast_from(node);
         } else if (node.isa<ArgumentList>()) {
             return quote_typed_argument_list(node.cast<ArgumentList>());
         } else {
@@ -450,8 +450,8 @@ struct Quoter {
     }
 
     #define T(NAME, BNAME, CLASS) \
-        SCOPES_RESULT(ConstPointerRef) quote_ ## CLASS(int level, const ValueRef &node) { \
-            return ref(node.anchor(), ConstPointer::ast_from(node.unref())); \
+        SCOPES_RESULT(ConstAggregateRef) quote_ ## CLASS(int level, const ValueRef &node) { \
+            return ConstAggregate::ast_from(node); \
         }
     SCOPES_PURE_VALUE_KIND()
     #undef T
@@ -544,9 +544,9 @@ ValueRef unwrap_value(const Type *T, const ValueRef &value) {
 ValueRef wrap_value(const Type *T, const ValueRef &value) {
     auto _anchor = value.anchor();
     if (value.isa<Const>()) {
-        if (T == TYPE_Value)
+        if (T == TYPE_ValueRef)
             return value;
-        return REF(ConstPointer::ast_from(value.unref()));
+        return ConstAggregate::ast_from(value);
     }
     if (!is_opaque(T)) {
         auto ST = storage_type(T).assert_ok();

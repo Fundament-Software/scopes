@@ -110,12 +110,6 @@ sc_void_raises_t convert_result(const Result<void> &_result) VOID_CRESULT;
 
 sc_valueref_list_scope_raises_t convert_result(const Result<sc_valueref_list_scope_tuple_t> &_result) CRESULT;
 
-sc_value_raises_t convert_result(const Result<Value *> &_result) CRESULT;
-sc_value_raises_t convert_result(const Result<TypedValue *> &_result) CRESULT;
-sc_value_raises_t convert_result(const Result<Function *> &_result) CRESULT;
-sc_value_raises_t convert_result(const Result<Template *> &_result) CRESULT;
-sc_value_raises_t convert_result(const Result<ConstPointer *> &_result) CRESULT;
-
 sc_valueref_raises_t convert_result(const Result<ValueRef> &_result) CRESULT;
 sc_valueref_raises_t convert_result(const Result<TypedValueRef> &_result) CRESULT;
 sc_valueref_raises_t convert_result(const Result<FunctionRef> &_result) CRESULT;
@@ -218,22 +212,23 @@ sc_valueref_raises_t sc_eval_inline(const sc_anchor_t *anchor, const sc_list_t *
     return convert_result(expand_inline(anchor, TemplateRef(), expr, scope));
 }
 
+sc_valueref_raises_t sc_typify_template(sc_valueref_t f, int numtypes, const sc_type_t **typeargs) {
+    using namespace scopes;
+    SCOPES_RESULT_TYPE(ValueRef);
+    auto tf = SCOPES_C_GET_RESULT(extract_template_constant(f));
+    if (tf->is_inline()) {
+        SCOPES_C_ERROR(CannotTypeInline);
+    }
+    Types types;
+    for (int i = 0; i < numtypes; ++i) {
+        types.push_back(typeargs[i]);
+    }
+    return convert_result(prove(FunctionRef(), tf, types));
+}
+
 sc_valueref_raises_t sc_typify(const sc_closure_t *srcl, int numtypes, const sc_type_t **typeargs) {
     using namespace scopes;
-    SCOPES_RESULT_TYPE(TypedValueRef);
-    /*
-    if (f.isa<Template>()) {
-        auto tf = f.cast<Template>();
-        if (tf->is_inline()) {
-            SCOPES_C_ERROR(CannotTypeInline);
-        }
-        Types types;
-        for (int i = 0; i < numtypes; ++i) {
-            types.push_back(typeargs[i]);
-        }
-        return convert_result(prove(FunctionRef(), tf, types));
-    } else 
-    */
+    SCOPES_RESULT_TYPE(ValueRef);
     if (srcl->func->is_inline()) {
         SCOPES_C_ERROR(CannotTypeInline);
     }
@@ -314,6 +309,10 @@ sc_bool_string_tuple_t sc_prompt(const sc_string_t *s, const sc_string_t *pre) {
         return { false, Symbol(SYM_Unnamed).name() };
     }
     linenoiseHistoryAdd(r);
+#ifdef SCOPES_WIN32
+    StyledStream ss;
+    ss << std::endl;
+#endif
     return { true, String::from_cstr(r) };
 }
 
@@ -552,18 +551,18 @@ struct MemoHash {
     }
 };
 
-typedef std::unordered_map<Value *, Value *, MemoHash, MemoKeyEqual> MemoMap;
+typedef std::unordered_map<Value *, ValueRef, MemoHash, MemoKeyEqual> MemoMap;
 static MemoMap memo_map;
 
 }
 
-sc_value_t *sc_map_get(sc_valueref_t key) {
+sc_valueref_t sc_map_get(sc_valueref_t key) {
     using namespace scopes;
     auto it = memo_map.find(key.unref());
     if (it != memo_map.end()) {
         return it->second;
     } else {
-        return nullptr;
+        return ValueRef();
     }
 }
 
@@ -575,9 +574,9 @@ void sc_map_set(sc_valueref_t key, sc_valueref_t value) {
             memo_map.erase(it);
         }
     } else {
-        auto ret = memo_map.insert({key.unref(), value.unref()});
+        auto ret = memo_map.insert({key.unref(), value});
         if (!ret.second) {
-            ret.first->second = value.unref();
+            ret.first->second = value;
         }
     }
 }
@@ -926,13 +925,13 @@ const sc_string_t *sc_closure_get_docstring(const sc_closure_t *func) {
     return func->func->docstring;
 }
 
-sc_value_t *sc_closure_get_template(const sc_closure_t *func) {
+sc_valueref_t sc_closure_get_template(const sc_closure_t *func) {
     using namespace scopes;
     assert(func);
     return func->func;
 }
 
-sc_value_t *sc_closure_get_context(const sc_closure_t *func) {
+sc_valueref_t sc_closure_get_context(const sc_closure_t *func) {
     using namespace scopes;
     assert(func);
     return func->frame;
@@ -988,8 +987,9 @@ const sc_anchor_t *sc_value_anchor (sc_valueref_t value) {
     return value.anchor();
 }
 
-sc_valueref_t sc_valueref_new(sc_anchor_t *anchor, sc_value_t *value) {
+sc_valueref_t sc_valueref_tag(sc_anchor_t *anchor, sc_valueref_t value) {
     using namespace scopes;
+    //set_best_anchor(value, anchor);
     return ref(anchor, value);
 }
 
@@ -1037,12 +1037,12 @@ sc_valueref_t sc_keyed_new(sc_symbol_t key, sc_valueref_t value) {
     return KeyedTemplate::from(key, value);
 }
 
-sc_value_t *sc_empty_argument_list() {
+sc_valueref_t sc_empty_argument_list() {
     using namespace scopes;
     return ArgumentList::from({});
 }
 
-sc_value_t *sc_argument_list_new() {
+sc_valueref_t sc_argument_list_new() {
     using namespace scopes;
     return ArgumentListTemplate::empty_from();
 }
@@ -1129,7 +1129,7 @@ sc_valueref_t sc_extract_argument_list_new(sc_valueref_t value, int index) {
     return ExtractArgumentTemplate::from(value, index, true);
 }
 
-sc_value_t *sc_template_new(sc_symbol_t name) {
+sc_valueref_t sc_template_new(sc_symbol_t name) {
     using namespace scopes;
     return Template::from(name);
 }
@@ -1155,7 +1155,7 @@ void sc_template_set_inline(sc_valueref_t fn) {
     fn.cast<Template>()->set_inline();
 }
 
-sc_value_t *sc_expression_new() {
+sc_valueref_t sc_expression_new() {
     using namespace scopes;
     return Expression::unscoped_from();
 }
@@ -1170,13 +1170,13 @@ void sc_expression_append(sc_valueref_t expr, sc_valueref_t value) {
     expr.cast<Expression>()->append(value);
 }
 
-sc_value_t *sc_global_new(sc_symbol_t name, const sc_type_t *type,
+sc_valueref_t sc_global_new(sc_symbol_t name, const sc_type_t *type,
     uint32_t flags, sc_symbol_t storage_class, int location, int binding) {
     using namespace scopes;
     return Global::from(type, name, flags, storage_class, location, binding);
 }
 
-sc_value_t *sc_if_new() {
+sc_valueref_t sc_if_new() {
     using namespace scopes;
     return If::from();
 }
@@ -1189,7 +1189,7 @@ void sc_if_append_else_clause(sc_valueref_t value, sc_valueref_t body) {
     value.cast<If>()->append_else(body);
 }
 
-sc_value_t *sc_switch_new(sc_valueref_t expr) {
+sc_valueref_t sc_switch_new(sc_valueref_t expr) {
     using namespace scopes;
     return SwitchTemplate::from(expr);
 }
@@ -1206,7 +1206,7 @@ void sc_switch_append_default(sc_valueref_t value, sc_valueref_t body) {
     value.cast<SwitchTemplate>()->append_default(body);
 }
 
-sc_value_t *sc_parameter_new(sc_symbol_t name) {
+sc_valueref_t sc_parameter_new(sc_symbol_t name) {
     using namespace scopes;
     if (ends_with_parenthesis(name)) {
         return ParameterTemplate::variadic_from(name);
@@ -1220,7 +1220,7 @@ bool sc_parameter_is_variadic(sc_valueref_t param) {
     return param.cast<ParameterTemplate>()->is_variadic();
 }
 
-sc_value_t *sc_call_new(sc_valueref_t callee) {
+sc_valueref_t sc_call_new(sc_valueref_t callee) {
     using namespace scopes;
     return CallTemplate::from(callee);
 }
@@ -1240,7 +1240,7 @@ void sc_call_set_rawcall(sc_valueref_t value, bool enable) {
     value.cast<CallTemplate>()->set_rawcall();
 }
 
-sc_value_t *sc_loop_new(sc_valueref_t init) {
+sc_valueref_t sc_loop_new(sc_valueref_t init) {
     using namespace scopes;
     return Loop::from(init);
 }
@@ -1255,21 +1255,21 @@ void sc_loop_set_body(sc_valueref_t loop, sc_valueref_t body) {
     loop.cast<Loop>()->value = body;
 }
 
-sc_value_t *sc_const_int_new(const sc_type_t *type, uint64_t value) {
+sc_valueref_t sc_const_int_new(const sc_type_t *type, uint64_t value) {
     using namespace scopes;
     return ConstInt::from(type, value);
 }
-sc_value_t *sc_const_real_new(const sc_type_t *type, double value) {
+sc_valueref_t sc_const_real_new(const sc_type_t *type, double value) {
     using namespace scopes;
     return ConstReal::from(type, value);
 }
-sc_value_t *sc_const_aggregate_new(const sc_type_t *type, int numconsts, sc_valueref_t *consts) {
+sc_valueref_t sc_const_aggregate_new(const sc_type_t *type, int numconsts, sc_valueref_t *consts) {
     using namespace scopes;
     ConstantPtrs vals;
     init_values_arrayT(vals, numconsts, consts);
     return ConstAggregate::from(type, vals);
 }
-sc_value_t *sc_const_pointer_new(const sc_type_t *type, const void *pointer) {
+sc_valueref_t sc_const_pointer_new(const sc_type_t *type, const void *pointer) {
     using namespace scopes;
     return ConstPointer::from(type, pointer);
 }
@@ -1292,34 +1292,34 @@ const void *sc_const_pointer_extract(const sc_valueref_t value) {
     return value.cast<ConstPointer>()->value;
 }
 
-sc_value_t *sc_break_new(sc_valueref_t value) {
+sc_valueref_t sc_break_new(sc_valueref_t value) {
     using namespace scopes;
     return Break::from(value);
 }
-sc_value_t *sc_repeat_new(sc_valueref_t value) {
+sc_valueref_t sc_repeat_new(sc_valueref_t value) {
     using namespace scopes;
     return RepeatTemplate::from(value);
 }
-sc_value_t *sc_return_new(sc_valueref_t value) {
+sc_valueref_t sc_return_new(sc_valueref_t value) {
     using namespace scopes;
     return ReturnTemplate::from(value);
 }
-sc_value_t *sc_raise_new(sc_valueref_t value) {
+sc_valueref_t sc_raise_new(sc_valueref_t value) {
     using namespace scopes;
     return RaiseTemplate::from(value);
 }
 
-sc_value_t *sc_quote_new(sc_valueref_t value) {
+sc_valueref_t sc_quote_new(sc_valueref_t value) {
     using namespace scopes;
     return Quote::from(value);
 }
 
-sc_value_t *sc_unquote_new(sc_valueref_t value) {
+sc_valueref_t sc_unquote_new(sc_valueref_t value) {
     using namespace scopes;
     return Unquote::from(value);
 }
 
-sc_value_t *sc_label_new(int kind, sc_symbol_t name) {
+sc_valueref_t sc_label_new(int kind, sc_symbol_t name) {
     using namespace scopes;
     return LabelTemplate::from((LabelKind)kind, name);
 }
@@ -1327,7 +1327,7 @@ void sc_label_set_body(sc_valueref_t label, sc_valueref_t body) {
     using namespace scopes;
     label.cast<LabelTemplate>()->value = body;
 }
-sc_value_t *sc_merge_new(sc_valueref_t label, sc_valueref_t value) {
+sc_valueref_t sc_merge_new(sc_valueref_t label, sc_valueref_t value) {
     using namespace scopes;
     return MergeTemplate::from(label.cast<LabelTemplate>(), value);
 }
@@ -1866,7 +1866,7 @@ static void bind_extern(Symbol globalsym, Symbol externsym, const Type *T) {
     globals->bind(globalsym, ref(builtin_anchor(), Global::from(T, externsym, GF_NonWritable)));
 }
 
-static void bind_new_value(Symbol sym, Value *value) {
+static void bind_new_value(Symbol sym, const ValueRef &value) {
     globals->bind(sym, ref(builtin_anchor(), value));
 }
 
@@ -1891,7 +1891,7 @@ void init_globals(int argc, char *argv[]) {
     bind_extern(Symbol(#FUNC), raising_function_type(RETTYPE, { __VA_ARGS__ }));
 
     const Type *rawstring = native_ro_pointer_type(TYPE_I8);
-    const Type *TYPE_ValuePP = native_ro_pointer_type(TYPE_Value);
+    const Type *TYPE_ValuePP = native_ro_pointer_type(TYPE_ValueRef);
     const Type *_void = empty_arguments_type();
     const Type *voidstar = native_ro_pointer_type(_void);
 
@@ -1900,6 +1900,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_eval, TYPE_ValueRef, TYPE_Anchor, TYPE_List, TYPE_Scope);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_prove, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_eval_inline, TYPE_Anchor, TYPE_ValueRef, TYPE_List, TYPE_Scope);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_typify_template, TYPE_ValueRef, TYPE_ValueRef, TYPE_I32, native_ro_pointer_type(TYPE_Type));
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_typify, TYPE_ValueRef, TYPE_Closure, TYPE_I32, native_ro_pointer_type(TYPE_Type));
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_compile, TYPE_ValueRef, TYPE_ValueRef, TYPE_U64);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_compile_spirv, TYPE_String, TYPE_Symbol, TYPE_ValueRef, TYPE_U64);
@@ -1922,7 +1923,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_value_type, TYPE_Type, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_value_qualified_type, TYPE_Type, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_value_anchor, TYPE_Anchor, TYPE_ValueRef);
-    DEFINE_EXTERN_C_FUNCTION(sc_valueref_new, TYPE_ValueRef, TYPE_Anchor, TYPE_ValueRef);
+    DEFINE_EXTERN_C_FUNCTION(sc_valueref_tag, TYPE_ValueRef, TYPE_Anchor, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_value_is_constant, TYPE_Bool, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_value_is_pure, TYPE_Bool, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_value_compare, TYPE_Bool, TYPE_ValueRef, TYPE_ValueRef);
@@ -1930,61 +1931,61 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_value_wrap, TYPE_ValueRef, TYPE_Type, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_value_unwrap, TYPE_ValueRef, TYPE_Type, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_keyed_new, TYPE_ValueRef, TYPE_Symbol, TYPE_ValueRef);
-    DEFINE_EXTERN_C_FUNCTION(sc_empty_argument_list, TYPE_Value);
-    DEFINE_EXTERN_C_FUNCTION(sc_argument_list_new, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_empty_argument_list, TYPE_ValueRef);
+    DEFINE_EXTERN_C_FUNCTION(sc_argument_list_new, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_argument_list_append, _void, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_extract_argument_new, TYPE_ValueRef, TYPE_ValueRef, TYPE_I32);
     DEFINE_EXTERN_C_FUNCTION(sc_extract_argument_list_new, TYPE_ValueRef, TYPE_ValueRef, TYPE_I32);
     DEFINE_EXTERN_C_FUNCTION(sc_argcount, TYPE_I32, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_getarg, TYPE_ValueRef, TYPE_ValueRef, TYPE_I32);
     DEFINE_EXTERN_C_FUNCTION(sc_getarglist, TYPE_ValueRef, TYPE_ValueRef, TYPE_I32);
-    DEFINE_EXTERN_C_FUNCTION(sc_template_new, TYPE_Value, TYPE_Symbol);
+    DEFINE_EXTERN_C_FUNCTION(sc_template_new, TYPE_ValueRef, TYPE_Symbol);
     DEFINE_EXTERN_C_FUNCTION(sc_template_set_name, _void, TYPE_ValueRef, TYPE_Symbol);
     DEFINE_EXTERN_C_FUNCTION(sc_template_get_name, TYPE_Symbol, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_template_append_parameter, _void, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_template_set_body, _void, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_template_set_inline, _void, TYPE_ValueRef);
-    DEFINE_EXTERN_C_FUNCTION(sc_expression_new, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_expression_new, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_expression_set_scoped, _void, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_expression_append, _void, TYPE_ValueRef, TYPE_ValueRef);
-    DEFINE_EXTERN_C_FUNCTION(sc_global_new, TYPE_Value, TYPE_Symbol, TYPE_Type,
+    DEFINE_EXTERN_C_FUNCTION(sc_global_new, TYPE_ValueRef, TYPE_Symbol, TYPE_Type,
         TYPE_U32, TYPE_Symbol, TYPE_I32, TYPE_I32);
-    DEFINE_EXTERN_C_FUNCTION(sc_if_new, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_if_new, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_if_append_then_clause, _void, TYPE_ValueRef, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_if_append_else_clause, _void, TYPE_ValueRef, TYPE_ValueRef);
-    DEFINE_EXTERN_C_FUNCTION(sc_switch_new, TYPE_Value, TYPE_ValueRef);
+    DEFINE_EXTERN_C_FUNCTION(sc_switch_new, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_switch_append_case, _void, TYPE_ValueRef, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_switch_append_pass, _void, TYPE_ValueRef, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_switch_append_default, _void, TYPE_ValueRef, TYPE_ValueRef);
-    DEFINE_EXTERN_C_FUNCTION(sc_parameter_new, TYPE_Value, TYPE_Symbol);
+    DEFINE_EXTERN_C_FUNCTION(sc_parameter_new, TYPE_ValueRef, TYPE_Symbol);
     DEFINE_EXTERN_C_FUNCTION(sc_parameter_is_variadic, TYPE_Bool, TYPE_ValueRef);
-    DEFINE_EXTERN_C_FUNCTION(sc_call_new, TYPE_Value, TYPE_ValueRef);
+    DEFINE_EXTERN_C_FUNCTION(sc_call_new, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_call_append_argument, _void, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_call_is_rawcall, TYPE_Bool, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_call_set_rawcall, _void, TYPE_ValueRef, TYPE_Bool);
-    DEFINE_EXTERN_C_FUNCTION(sc_loop_new, TYPE_Value, TYPE_ValueRef);
+    DEFINE_EXTERN_C_FUNCTION(sc_loop_new, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_loop_arguments, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_loop_set_body, _void, TYPE_ValueRef, TYPE_ValueRef);
-    DEFINE_EXTERN_C_FUNCTION(sc_const_int_new, TYPE_Value, TYPE_Type, TYPE_U64);
-    DEFINE_EXTERN_C_FUNCTION(sc_const_real_new, TYPE_Value, TYPE_Type, TYPE_F64);
-    DEFINE_EXTERN_C_FUNCTION(sc_const_aggregate_new, TYPE_Value, TYPE_Type, TYPE_I32, TYPE_ValuePP);
-    DEFINE_EXTERN_C_FUNCTION(sc_const_pointer_new, TYPE_Value, TYPE_Type, voidstar);
+    DEFINE_EXTERN_C_FUNCTION(sc_const_int_new, TYPE_ValueRef, TYPE_Type, TYPE_U64);
+    DEFINE_EXTERN_C_FUNCTION(sc_const_real_new, TYPE_ValueRef, TYPE_Type, TYPE_F64);
+    DEFINE_EXTERN_C_FUNCTION(sc_const_aggregate_new, TYPE_ValueRef, TYPE_Type, TYPE_I32, TYPE_ValuePP);
+    DEFINE_EXTERN_C_FUNCTION(sc_const_pointer_new, TYPE_ValueRef, TYPE_Type, voidstar);
     DEFINE_EXTERN_C_FUNCTION(sc_const_int_extract, TYPE_U64, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_const_real_extract, TYPE_F64, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_const_extract_at, TYPE_ValueRef, TYPE_ValueRef, TYPE_I32);
     DEFINE_EXTERN_C_FUNCTION(sc_const_pointer_extract, voidstar, TYPE_ValueRef);
 
-    DEFINE_EXTERN_C_FUNCTION(sc_break_new, TYPE_Value, TYPE_ValueRef);
-    DEFINE_EXTERN_C_FUNCTION(sc_repeat_new, TYPE_Value, TYPE_ValueRef);
-    DEFINE_EXTERN_C_FUNCTION(sc_return_new, TYPE_Value, TYPE_ValueRef);
-    DEFINE_EXTERN_C_FUNCTION(sc_raise_new, TYPE_Value, TYPE_ValueRef);
+    DEFINE_EXTERN_C_FUNCTION(sc_break_new, TYPE_ValueRef, TYPE_ValueRef);
+    DEFINE_EXTERN_C_FUNCTION(sc_repeat_new, TYPE_ValueRef, TYPE_ValueRef);
+    DEFINE_EXTERN_C_FUNCTION(sc_return_new, TYPE_ValueRef, TYPE_ValueRef);
+    DEFINE_EXTERN_C_FUNCTION(sc_raise_new, TYPE_ValueRef, TYPE_ValueRef);
 
-    DEFINE_EXTERN_C_FUNCTION(sc_quote_new, TYPE_Value, TYPE_ValueRef);
-    DEFINE_EXTERN_C_FUNCTION(sc_unquote_new, TYPE_Value, TYPE_ValueRef);
+    DEFINE_EXTERN_C_FUNCTION(sc_quote_new, TYPE_ValueRef, TYPE_ValueRef);
+    DEFINE_EXTERN_C_FUNCTION(sc_unquote_new, TYPE_ValueRef, TYPE_ValueRef);
 
-    DEFINE_EXTERN_C_FUNCTION(sc_label_new, TYPE_Value, TYPE_I32, TYPE_Symbol);
+    DEFINE_EXTERN_C_FUNCTION(sc_label_new, TYPE_ValueRef, TYPE_I32, TYPE_Symbol);
     DEFINE_EXTERN_C_FUNCTION(sc_label_set_body, _void, TYPE_ValueRef, TYPE_ValueRef);
-    DEFINE_EXTERN_C_FUNCTION(sc_merge_new, TYPE_Value, TYPE_ValueRef, TYPE_ValueRef);
+    DEFINE_EXTERN_C_FUNCTION(sc_merge_new, TYPE_ValueRef, TYPE_ValueRef, TYPE_ValueRef);
 
     DEFINE_EXTERN_C_FUNCTION(sc_is_file, TYPE_Bool, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_is_directory, TYPE_Bool, TYPE_String);
@@ -2005,7 +2006,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_set_signal_abort,
         _void, TYPE_Bool);
 
-    DEFINE_EXTERN_C_FUNCTION(sc_map_get, TYPE_Value, TYPE_ValueRef);
+    DEFINE_EXTERN_C_FUNCTION(sc_map_get, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_map_set, _void, TYPE_ValueRef, TYPE_ValueRef);
 
     DEFINE_EXTERN_C_FUNCTION(sc_hash, TYPE_U64, TYPE_U64, TYPE_USize);
@@ -2043,8 +2044,8 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_string_lslice, TYPE_String, TYPE_String, TYPE_USize);
     DEFINE_EXTERN_C_FUNCTION(sc_string_rslice, TYPE_String, TYPE_String, TYPE_USize);
 
-    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_type_at, TYPE_Value, TYPE_Type, TYPE_Symbol);
-    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_type_local_at, TYPE_Value, TYPE_Type, TYPE_Symbol);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_type_at, TYPE_ValueRef, TYPE_Type, TYPE_Symbol);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_type_local_at, TYPE_ValueRef, TYPE_Type, TYPE_Symbol);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_type_element_at, TYPE_Type, TYPE_Type, TYPE_I32);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_type_field_index, TYPE_I32, TYPE_Type, TYPE_Symbol);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_type_field_name, TYPE_Symbol, TYPE_Type, TYPE_I32);
@@ -2058,7 +2059,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_type_is_superof, TYPE_Bool, TYPE_Type, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_type_string, TYPE_String, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_type_next, arguments_type({TYPE_Symbol, TYPE_ValueRef}), TYPE_Type, TYPE_Symbol);
-    DEFINE_EXTERN_C_FUNCTION(sc_type_set_symbol, _void, TYPE_Type, TYPE_Symbol, TYPE_Value);
+    DEFINE_EXTERN_C_FUNCTION(sc_type_set_symbol, _void, TYPE_Type, TYPE_Symbol, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_type_is_refer, TYPE_Bool, TYPE_Type);
 
     DEFINE_EXTERN_C_FUNCTION(sc_type_key, arguments_type({TYPE_Symbol, TYPE_Type}), TYPE_Type);
@@ -2125,8 +2126,8 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_closure_get_template, TYPE_ValueRef, TYPE_Closure);
     DEFINE_EXTERN_C_FUNCTION(sc_closure_get_context, TYPE_ValueRef, TYPE_Closure);
 
-    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_parse_from_path, TYPE_Value, TYPE_String);
-    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_parse_from_string, TYPE_Value, TYPE_String);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_parse_from_path, TYPE_ValueRef, TYPE_String);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_parse_from_string, TYPE_ValueRef, TYPE_String);
 
 #undef DEFINE_EXTERN_C_FUNCTION
 

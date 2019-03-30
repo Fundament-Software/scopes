@@ -37,6 +37,12 @@ struct TValueRef {
         assert(value); assert(anchor); }
 
     template<typename S>
+    TValueRef (const Anchor *anchor, const TValueRef<S> &value)
+        : _value(value.unref()), _anchor(anchor) {
+            assert(anchor);
+    }
+
+    template<typename S>
     TValueRef (const TValueRef<S> &value)
         : _value(value.unref()), _anchor(value.unsafe_anchor()) {}
 
