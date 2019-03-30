@@ -990,6 +990,7 @@ struct Expander {
 
     SCOPES_RESULT(ValueRef) expand(ValueRef anynode) {
         SCOPES_RESULT_TYPE(ValueRef);
+        SCOPES_TRACE_EXPANDER(anynode);
     expand_again:
         SCOPES_CHECK_RESULT(verify_stack());
         const Anchor *anchor = anynode.anchor();
@@ -1117,7 +1118,6 @@ struct Expander {
 
             ValueRef result;
             if (!env->lookup(name, result)) {
-                SCOPES_TRACE_EXPANDER(node);
                 sc_list_scope_tuple_t result = SCOPES_GET_RESULT(expand_symbol(node));
                 if (result._0) {
                     ValueRef newnode = result._0->at;

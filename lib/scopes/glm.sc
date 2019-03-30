@@ -24,7 +24,7 @@ fn element-prefix (element-type)
     case f32 ""
     case f64 "d"
     default
-        compiler-error! "illegal element type"
+        error "illegal element type"
 
 @@ type-factory
 fn construct-vec-type (element-type size)
@@ -205,7 +205,7 @@ typedef vec-type < immutable
                             `(insertelement value (arg as ET) total)
             value
         else
-            compiler-error!
+            error
                 .. "number of arguments (" (repr flatargsz)
                     \ ") doesn't match number of elements (" (repr vecsz) ")"
 
@@ -214,7 +214,7 @@ typedef vec-type < immutable
         if (self == vec-type)
             `(vec-type-constructor ...)
         else
-            let args = (sc_argument_list_new (active-anchor))
+            let args = (sc_argument_list_new)
             for arg in ('args ...)
                 let argT = ('typeof arg)
                 sc_argument_list_append args
@@ -314,13 +314,13 @@ typedef vec-type < immutable
         let s = (name as string)
         let sz = ((countof s) as i32)
         if (sz > 4)
-            compiler-error! "too many characters in accessor (try 1 <= x <= 4)"
+            error "too many characters in accessor (try 1 <= x <= 4)"
         let set =
             if ('match? element-set-xyzw s) "xyzw"
             elseif ('match? element-set-rgba s) "rgba"
             elseif ('match? element-set-stpq s) "stpq"
             else
-                compiler-error! "try one of xyzw | rgba | stpq"
+                error "try one of xyzw | rgba | stpq"
         fn find-index (set c)
             loop (k = 0)
                 let sc = (set @ (k as usize))
@@ -336,7 +336,7 @@ typedef vec-type < immutable
             let k = (find-index set (s @ ui))
             entries @ ui = `k
         let VT = (vector i32 sz)
-        return sz (sc_const_aggregate_new (active-anchor) VT sz entries)
+        return sz (sc_const_aggregate_new VT sz entries)
 
     @@ memoize
     fn expand-mask (lhsz rhsz)
@@ -346,7 +346,7 @@ typedef vec-type < immutable
             let k = (i % rhsz)
             entries @ ui = `k
         let VT = (vector i32 lhsz)
-        return (sc_const_aggregate_new (active-anchor) VT lhsz entries)
+        return (sc_const_aggregate_new VT lhsz entries)
 
     @@ memoize
     fn range-mask (sz)
@@ -355,7 +355,7 @@ typedef vec-type < immutable
             let ui = (i as usize)
             entries @ ui = `i
         let VT = (vector i32 sz)
-        return (sc_const_aggregate_new (active-anchor) VT sz entries)
+        return (sc_const_aggregate_new VT sz entries)
 
     @@ memoize
     fn assign-mask (lhsz mask)
@@ -369,7 +369,7 @@ typedef vec-type < immutable
             let k = (lhsz + i)
             entries @ ui = `k
         let VT = (vector i32 lhsz)
-        return (sc_const_aggregate_new (active-anchor) VT lhsz entries)
+        return (sc_const_aggregate_new VT lhsz entries)
 
     @@ type-factory
     fn construct-getter-type (vecrefT mask)
@@ -524,7 +524,7 @@ typedef mat-type < immutable
                             # build default diagonal vector
                             `(insertvalue self [(make-diagonal-vector VT i)] i)
             elseif (argT < vec-type)
-                compiler-error!
+                error
                     .. (repr (i32 cols)) " column vectors required"
             else
                 # build a matrix with diagonal elements set to arg
@@ -548,7 +548,7 @@ typedef mat-type < immutable
                             if is-vector? ('element-count argT)
                             else 1
                     if (nextrow > rows)
-                        compiler-error! "too many arguments for column"
+                        error "too many arguments for column"
                     let vec =
                         if is-vector?
                             if (argT == VT) arg # same vector type
@@ -564,11 +564,11 @@ typedef mat-type < immutable
                     else # not arrived yet
                         _ self vec col nextrow
             if (row != 0)
-                compiler-error!
+                error
                     .. "number of provided elements for last row (" (repr (i32 row))
                         \ ") doesn't match number of elements required (" (repr (i32 rows)) ")"
             if (col != cols)
-                compiler-error!
+                error
                     .. "number of provided columns (" (repr (i32 col))
                         \ ") doesn't match number of columns required (" (repr (i32 cols)) ")"
             self

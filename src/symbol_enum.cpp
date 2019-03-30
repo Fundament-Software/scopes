@@ -49,6 +49,7 @@ B_SPIRV_IMAGE_OPERAND()
 #undef T
 case SYM_Count: return "SYM_Count";
     }
+    return "?";
 }
 
 } // namespace scopes

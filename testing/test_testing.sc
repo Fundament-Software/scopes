@@ -6,21 +6,21 @@ spice cause-compiler-error (msg)
     if false
         box-empty;
     else
-        compiler-error! "this is a compiler error!"
+        error "this is a compiler error!"
 
 run-stage;
 
 assert-compiler-error
     cause-compiler-error "this is a compiler error!"
 assert-error
-    error! "this is a runtime error!"
+    error "this is a runtime error!"
 assert-compiler-error (1 == "test")
 assert-error
     assert-compiler-error (1 == 1)
 
 assert-error
     assert-compiler-error
-        error! "this is a runtime error!"
+        error "this is a runtime error!"
 assert-compiler-error
     assert-error
         cause-compiler-error "this is a compiler error!"

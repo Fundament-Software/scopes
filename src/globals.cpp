@@ -168,7 +168,7 @@ sc_valueref_raises_t sc_load_from_executable(const char *path) {
 
 SCOPES_LIBEXPORT int sc_main(const char *exepath, int argc, char *argv[]) {
     using namespace scopes;
-    run_main(exepath, argc, argv);
+    return run_main(exepath, argc, argv);
 }
 
 // Compiler

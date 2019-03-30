@@ -849,6 +849,14 @@ static SCOPES_RESULT(TypedValueRef) make_raise1(const ASTContext &ctx, const Anc
 }
 
 static SCOPES_RESULT(TypedValueRef) make_raise(const ASTContext &ctx, const Anchor *anchor, const TypedValueRef &value) {
+    if (value->get_type() == TYPE_Error) {
+        // add info
+        auto tracecall = ref(anchor, Call::from(empty_arguments_type(), 
+            g_sc_error_append_calltrace, {
+            value, ConstAggregate::ast_from(value)
+        }));
+        ctx.append(tracecall);
+    }
     TypedValues results;
     if (split_return_values(results, value)) {
         return make_raise1(ctx, anchor, results);
@@ -1869,7 +1877,7 @@ repeat:
             }
             value = ref(call.anchor(), result._0);
             //set_best_anchor(value, anchor);
-            return prove(ctx, value);
+            return SCOPES_GET_RESULT(prove(ctx, value));
         } else {
             SCOPES_RETURN_ERROR(result.except);
         }
@@ -2820,6 +2828,7 @@ repeat:
     //const Type *art = aft->return_type;
     const Type *rt = remap_unique_return_arguments(ctx, idmap, ft->return_type);
     CallRef newcall = ref(call.anchor(), Call::from(rt, callee, values));
+    newcall->set_def_anchor(call->def_anchor());
     if (ft->has_exception()) {
         // todo: remap exception type
         newcall->except_body.set_parent(ctx.block);
@@ -2830,17 +2839,10 @@ repeat:
         map_arguments_to_block(exceptctx, exc);
         newcall->except = exc;
 
-        if (exc->get_type() == TYPE_Error) {
-            // add info
-            auto tracecall = ref(call.anchor(), Call::from(empty_arguments_type(), 
-                g_sc_error_append_calltrace, {
-                exc, ConstAggregate::ast_from(newcall)
-            }));
-            exceptctx.append(tracecall);
-        }
-
         SCOPES_CHECK_RESULT(make_raise(exceptctx, call.anchor(), exc));
     }
+
+    #if 1
     // hack: rewrite valuerefs returned by globals matching sc_*_new
     //       to use the anchor of the calling expression
     if (rt == TYPE_ValueRef) {
@@ -2863,6 +2865,7 @@ repeat:
             }
         }
     }
+    #endif
     return TypedValueRef(newcall);
 }
 

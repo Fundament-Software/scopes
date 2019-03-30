@@ -36,7 +36,7 @@ namespace scopes {
     T(FN_VolatileLoad) T(FN_VolatileStore) T(SFXFN_ExecutionMode) \
     T(FN_ExtractElement) T(FN_InsertElement) T(FN_ShuffleVector) \
     T(FN_ExtractValue) T(FN_InsertValue) T(FN_ITrunc) T(FN_ZExt) T(FN_SExt) T(FN_GetElementRef) \
-    T(FN_GetElementPtr) T(FN_OffsetOf) T(SFXFN_CompilerError) T(FN_VaCountOf) T(FN_VaAt) \
+    T(FN_GetElementPtr) T(FN_OffsetOf) T(FN_VaCountOf) T(FN_VaAt) \
     T(FN_VaKeys) T(FN_VaKey) T(FN_VaValues) T(FN_CompilerMessage) T(FN_Undef) T(FN_NullOf) T(KW_Let) \
     T(KW_If) T(KW_Switch) T(SFXFN_DelTypeSymbol) T(FN_ExternSymbol) \
     T(FN_ExternNew) T(FN_GetSyntaxScope) \

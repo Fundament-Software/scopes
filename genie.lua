@@ -286,7 +286,7 @@ project "scopesrt"
             "-Wno-comment",
             "-Wno-misleading-indentation",
             "-Wno-pragmas",
-            "-Wno-return-type",
+            --"-Wno-return-type",
             "-Wno-variadic-macros",
             "-Wno-int-in-bool-context"
         }
@@ -505,7 +505,7 @@ project "scopes"
             "-Wno-comment",
             "-Wno-misleading-indentation",
             "-Wno-pragmas",
-            "-Wno-return-type",
+            --"-Wno-return-type",
             "-Wno-variadic-macros",
             "-Wno-int-in-bool-context"
         }

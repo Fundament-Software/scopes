@@ -38,6 +38,7 @@ const char *get_token_name(Token tok) {
     B_TOKENS()
 #undef T
     }
+    return "?";
 }
 
 template<unsigned N>

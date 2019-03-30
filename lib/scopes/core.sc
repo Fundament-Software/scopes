@@ -239,7 +239,8 @@ let va-rfold va-rifold =
                 let arg =
                     sc_getarg args i
                 let k = (sc_type_key (sc_value_qualified_type arg))
-                let v = (sc_keyed_new unnamed arg)
+                let v = (sc_valueref_tag 
+                    (sc_value_anchor arg) (sc_keyed_new unnamed arg))
                 _ i
                     if use-indices
                         `(f [(sub i 2)] k v ret)
@@ -591,20 +592,20 @@ let
 
 run-stage;
 
-fn cons (values...)
+inline cons (values...)
     va-rifold none
         inline (i key value next)
             static-branch (none? next)
                 inline ()
                     value
                 inline ()
-                    sc_list_cons (Value value) next
+                    sc_list_cons `value next
         values...
 
 inline make-list (values...)
     va-rifold '()
         inline (i key value result)
-            sc_list_cons (Value value) result
+            sc_list_cons `value result
         values...
 
 inline decons (self count)
@@ -823,7 +824,7 @@ inline unbox (value T)
 fn value-as (vT T expr)
     if true
         return `(unbox expr T)
-    compiler-error! "unsupported type"
+    error "unsupported type"
 
 'define-symbols Value
     __as =
@@ -975,7 +976,7 @@ fn real-as (vT T)
 # cast protocol
 #------------------------------------------------------------------------------
 
-inline cast-error! (intro-string vT T)
+inline cast-error (intro-string vT T)
     error
         sc_string_join intro-string
             sc_string_join ('__repr (box-pointer vT))
@@ -1032,7 +1033,7 @@ inline gen-cast-op (f str)
             let conv = (f vT T)
             if (operator-valid? conv)
                 return `(conv value)
-            cast-error! str vT T
+            cast-error str vT T
 
 let imply = (gen-cast-op imply-converter "can't coerce value of type ")
 let as = (gen-cast-op as-converter "can't cast value of type ")
@@ -1107,13 +1108,13 @@ fn balanced-binary-operator (symbol rsymbol lhsT rhsT)
                 return `(inline (lhs rhs) (op (conv lhs) rhs))
     return (sc_empty_argument_list)
 
-fn unary-op-error! (friendly-op-name T)
+fn unary-op-error (friendly-op-name T)
     error
         'join "can't "
             'join friendly-op-name
                 'join " value of type " ('__repr (box-pointer T))
 
-fn binary-op-error! (friendly-op-name lhsT rhsT)
+fn binary-op-error (friendly-op-name lhsT rhsT)
     error
         'join "can't "
             'join friendly-op-name
@@ -1133,7 +1134,7 @@ fn balanced-binary-operation (args symbol rsymbol friendly-op-name)
     let op = (balanced-binary-operator symbol rsymbol lhsT rhsT)
     if (operator-valid? op)
         return `(op lhs rhs)
-    binary-op-error! friendly-op-name lhsT rhsT
+    binary-op-error friendly-op-name lhsT rhsT
 
 # right hand has fixed type - this one doesn't need a dispatch step
 fn unbalanced-binary-operation (args symbol rtype friendly-op-name)
@@ -1152,11 +1153,11 @@ fn unbalanced-binary-operation (args symbol rtype friendly-op-name)
             if (operator-valid? conv)
                 `(conv rhs)
             else
-                cast-error! "can't coerce secondary argument of type " rhsT rtype
+                cast-error "can't coerce secondary argument of type " rhsT rtype
     let f =
         try ('@ lhsT symbol)
         except (err)
-            unary-op-error! friendly-op-name lhsT
+            unary-op-error friendly-op-name lhsT
     `(f lhs rhs)
 
 # unary operations don't need a dispatch step either
@@ -1168,7 +1169,7 @@ fn unary-operation (args symbol friendly-op-name)
     let f =
         try ('@ T symbol)
         except (err)
-            unary-op-error! friendly-op-name T
+            unary-op-error friendly-op-name T
     `(f u)
 
 fn unary-or-balanced-binary-operation (args usymbol ufriendly-op-name symbol rsymbol friendly-op-name)
@@ -1965,13 +1966,14 @@ fn symbol-handler (topexpr env)
     return topexpr env
 
 fn quasiquote-list
-inline quasiquote-any (ox)
-    let x = ox
+inline quasiquote-any (x)
     let T = ('typeof x)
     if (== T list)
         quasiquote-list (as x list)
     else
-        list sugar-quote ox
+        list sc_valueref_tag
+            `[(sc_value_anchor x)]
+            list sugar-quote x
 fn quasiquote-list (x)
     if (empty? x)
         return (list sugar-quote x)
@@ -1986,13 +1988,13 @@ fn quasiquote-list (x)
                 let at-at = (as at-at Symbol)
                 if (== at-at 'unquote-splice)
                     return
-                        list (Value sc_list_join)
+                        list `sc_list_join
                             cons do at-next
                             quasiquote-list next
                 elseif (== at-at 'square-list)
                     if (> (countof at-next) 1)
                         return
-                            list (Value sc_list_join)
+                            list `sc_list_join
                                 list list (cons _ at-next)
                                 quasiquote-list next
     elseif (== T Symbol)
@@ -4734,8 +4736,6 @@ inline gen-allocator-sugar (name f)
         spice local-copy-typed (T value)
             spice-quote
                 let val = (ptrtoref (f T))
-                # TODO: temporary bug to track error reporting, take this out later
-                static-assert false
                 __init-copy val value
                 val
         spice local-copy (value)
@@ -4875,7 +4875,7 @@ sugar struct (name body...)
             'set-plain-storage T
                 sc_tuple_type numfields fields
         else
-            compiler-error!
+            error
                 .. "type " (repr T) " must have Struct, CStruct or CUnion supertype"
         T
 

@@ -273,8 +273,12 @@ void stream_backtrace(StyledStream &ss, const Backtrace *bt) {
 }
 
 static bool good_delta(const Backtrace *newer, const Backtrace *older) {
+#if 1
+    return newer->context.anchor() != older->context.anchor();
+#else
     if (older->kind == BTK_User) return true;
     return newer->kind != older->kind;
+#endif
 }
 
 void stream_error(StyledStream &ss, const Error *err) {
