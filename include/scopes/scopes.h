@@ -275,6 +275,7 @@ SCOPES_LIBEXPORT void sc_set_globals(sc_scope_t *s);
 
 // error handling
 
+SCOPES_LIBEXPORT void sc_error_append_calltrace(sc_error_t *err, sc_valueref_t callexpr);
 SCOPES_LIBEXPORT const sc_string_t *sc_format_error(const sc_error_t *err);
 SCOPES_LIBEXPORT sc_error_t *sc_error_new(const sc_string_t *msg);
 SCOPES_LIBEXPORT void sc_set_signal_abort(bool value);
@@ -283,7 +284,7 @@ SCOPES_LIBEXPORT void sc_exit(int c);
 
 // memoization
 
-SCOPES_LIBEXPORT sc_valueref_t sc_map_get(sc_valueref_t key);
+SCOPES_LIBEXPORT sc_valueref_raises_t sc_map_get(sc_valueref_t key);
 SCOPES_LIBEXPORT void sc_map_set(sc_valueref_t key, sc_valueref_t value);
 
 // hashing

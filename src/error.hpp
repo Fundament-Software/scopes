@@ -354,6 +354,8 @@ formatters:
     T(RTLoadLibraryFailed, \
         "runtime: error loading library %0: %1", \
         PString, Rawstring) \
+    T(RTMissingKey, \
+        "runtime: no such key in map") \
     T(RTMissingScopeAttribute, \
         "runtime: no attribute %0 in scope", \
         Symbol) \
@@ -437,6 +439,8 @@ enum BacktraceKind {
     BTK_ProveTemplate,
     // context = argument being typechecked
     BTK_ProveArgument,
+    // invoked in user code at runtime; context = call
+    BTK_User,
 };
 
 struct Backtrace {

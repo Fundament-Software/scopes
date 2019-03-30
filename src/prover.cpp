@@ -2827,8 +2827,17 @@ repeat:
         const Type *et = remap_unique_return_arguments(exceptctx, idmap, ft->except_type);
         auto exc = ref(call.anchor(), Exception::from(et));
 
-        map_arguments_to_block(ctx.with_block(newcall->except_body), exc);
+        map_arguments_to_block(exceptctx, exc);
         newcall->except = exc;
+
+        if (exc->get_type() == TYPE_Error) {
+            // add info
+            auto tracecall = ref(call.anchor(), Call::from(empty_arguments_type(), 
+                g_sc_error_append_calltrace, {
+                exc, ConstAggregate::ast_from(newcall)
+            }));
+            exceptctx.append(tracecall);
+        }
 
         SCOPES_CHECK_RESULT(make_raise(exceptctx, call.anchor(), exc));
     }

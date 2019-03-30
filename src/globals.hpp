@@ -49,6 +49,7 @@ namespace scopes {
     T(g_fptrunc, "fptrunc") \
     T(g_fpext, "fpext") \
     T(g_sc_valueref_tag, "sc_valueref_tag") \
+    T(g_sc_error_append_calltrace, "sc_error_append_calltrace") \
     T(g_sc_template_new, "sc_template_new") \
     T(g_sc_template_append_parameter, "sc_template_append_parameter") \
     T(g_sc_template_set_body, "sc_template_set_body") \

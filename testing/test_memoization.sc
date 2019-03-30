@@ -17,7 +17,6 @@ fn not-memoized ()
 
 assert
     (not-memoized) != (not-memoized)
-
 assert
     (memoized) == (memoized)
 

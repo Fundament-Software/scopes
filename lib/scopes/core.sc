@@ -2533,7 +2533,7 @@ let wrap-if-not-run-stage =
                 let arg = ('getarg args 0)
                 if (('typeof arg) == CompileStage)
                     return arg
-            `(Value args)
+            ``args
 
 let incomplete = (typename "incomplete")
 
@@ -4095,13 +4095,13 @@ inline enumerate (x)
 inline memoize (f)
     fn (args...)
         let key = `[f args...]
-        let value = (sc_map_get key)
-        if (value == null)
+        try
+            sc_map_get key
+        except (err)
             let value =
                 `[(f args...)]
             sc_map_set key value
             value
-        else value
 
 inline type-factory (f)
     let f = (memoize f)

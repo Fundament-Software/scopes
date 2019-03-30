@@ -438,6 +438,12 @@ void sc_set_globals(sc_scope_t *s) {
 // Error Handling
 ////////////////////////////////////////////////////////////////////////////////
 
+void sc_error_append_calltrace(sc_error_t *err, sc_valueref_t callexpr) {
+    using namespace scopes;
+    SCOPES_TRACE(User, callexpr);
+    err->trace(_backtrace);
+}
+
 sc_error_t *sc_error_new(const sc_string_t *msg) {
     using namespace scopes;
     return ErrorUser::from(msg);
@@ -556,13 +562,14 @@ static MemoMap memo_map;
 
 }
 
-sc_valueref_t sc_map_get(sc_valueref_t key) {
+sc_valueref_raises_t sc_map_get(sc_valueref_t key) {
     using namespace scopes;
+    SCOPES_RESULT_TYPE(ValueRef);
     auto it = memo_map.find(key.unref());
     if (it != memo_map.end()) {
-        return it->second;
+        return convert_result(it->second);
     } else {
-        return ValueRef();
+        SCOPES_C_ERROR(RTMissingKey);
     }
 }
 
@@ -1005,6 +1012,8 @@ bool sc_value_is_pure (sc_valueref_t value) {
 
 bool sc_value_compare (sc_valueref_t a, sc_valueref_t b) {
     using namespace scopes;
+    if (a == b) return true;
+    if (!a || !b) return false;
     return MemoKeyEqual{}(a.unref(),b.unref());
 }
 
@@ -1997,6 +2006,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_get_original_globals, TYPE_Scope);
     DEFINE_EXTERN_C_FUNCTION(sc_set_globals, _void, TYPE_Scope);
 
+    DEFINE_EXTERN_C_FUNCTION(sc_error_append_calltrace, _void, TYPE_Error, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_error_new, TYPE_Error, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_format_error, TYPE_String, TYPE_Error);
 
@@ -2006,7 +2016,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_set_signal_abort,
         _void, TYPE_Bool);
 
-    DEFINE_EXTERN_C_FUNCTION(sc_map_get, TYPE_ValueRef, TYPE_ValueRef);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_map_get, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_map_set, _void, TYPE_ValueRef, TYPE_ValueRef);
 
     DEFINE_EXTERN_C_FUNCTION(sc_hash, TYPE_U64, TYPE_U64, TYPE_USize);

@@ -247,6 +247,11 @@ void stream_backtrace(StyledStream &ss, const Backtrace *bt) {
         ss << " while checking type of argument" << std::endl;
         anchor->stream_source_line(ss);
     } break;
+    case BTK_User: {
+        ss << anchor;
+        ss << " while executing" << std::endl;
+        anchor->stream_source_line(ss);
+    } break;
     case BTK_ProveExpression: {
         ss << "While checking expression" << std::endl;
         if (value.isa<UntypedValue>()) {
@@ -268,6 +273,7 @@ void stream_backtrace(StyledStream &ss, const Backtrace *bt) {
 }
 
 static bool good_delta(const Backtrace *newer, const Backtrace *older) {
+    if (older->kind == BTK_User) return true;
     return newer->kind != older->kind;
 }
 

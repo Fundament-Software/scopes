@@ -64,12 +64,12 @@ define-sugar-macro assert-error
                 'format err
             true
 
-    inline assertion-error! (anchor msg)
+    inline assertion-error! (msg)
         let assert-msg =
             .. "error assertion failed: "
                 if (== (typeof msg) string) msg
                 else (repr msg)
-        sugar-error! anchor assert-msg
+        error assert-msg
     let cond body = (decons args)
     let sxcond = cond
     let anchor = ('anchor sxcond)
@@ -82,7 +82,6 @@ define-sugar-macro assert-error
         list if tmp
         list 'else
             cons assertion-error!
-                active-anchor;
                 if (empty? body)
                     list
                         if (('typeof sxcond) == list)
@@ -102,12 +101,12 @@ define-sugar-macro assert-compiler-error
                 'format err
             true
 
-    inline assertion-error! (anchor msg)
+    inline assertion-error! (msg)
         let assert-msg =
             .. "compiler error assertion failed: "
                 if (== (typeof msg) string) msg
                 else (repr msg)
-        sugar-error! anchor assert-msg
+        error assert-msg
     let cond body = (decons args)
     let sxcond = cond
     let anchor = ('anchor sxcond)
@@ -120,7 +119,6 @@ define-sugar-macro assert-compiler-error
         list if tmp
         list 'else
             cons assertion-error!
-                active-anchor;
                 if (empty? body)
                     list
                         if (('typeof sxcond) == list)
@@ -148,7 +146,7 @@ sugar features (args...)
     let header rest =
         loop (header rest = '() args...)
             if (empty? rest)
-                compiler-error! "-* expected"
+                error "-* expected"
             let arg rest = (decons rest)
             if (('typeof arg) == Symbol)
                 let s = (arg as Symbol as string)
