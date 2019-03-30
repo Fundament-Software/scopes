@@ -32,6 +32,7 @@
 #include <libgen.h>
 #include <fcntl.h>
 #include <cstdlib>
+#include <string.h>
 
 #if SCOPES_USE_WCHAR
 #include <codecvt>

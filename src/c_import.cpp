@@ -54,8 +54,7 @@ static const Anchor *anchor_from_location(clang::SourceManager &SM, clang::Sourc
             SM.getFileOffset(loc));
     }
 
-    assert(false);
-    return nullptr;
+    return unknown_anchor();
 }
 
 class CVisitor : public clang::RecursiveASTVisitor<CVisitor> {
