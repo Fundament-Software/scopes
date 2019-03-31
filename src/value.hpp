@@ -711,6 +711,7 @@ struct ConstAggregate : Const {
     static ConstAggregateRef ast_from(const ValueRef &node);
 
     ConstantPtrs values;
+    std::size_t _hash;
 };
 
 ConstRef get_field(const ConstAggregateRef &value, int i);

@@ -476,6 +476,7 @@ namespace scopes {
 
 struct MemoKeyEqual {
     bool operator()( Value *lhs, Value *rhs ) const {
+        if (lhs == rhs) return true;
         if (lhs->kind() != rhs->kind())
             return false;
         if (isa<ArgumentList>(lhs)) {
@@ -486,6 +487,7 @@ struct MemoKeyEqual {
             for (int i = 0; i < a->values.size(); ++i) {
                 auto u = a->values[i];
                 auto v = b->values[i];
+                if (u == v) continue;
                 if (u->kind() != v->kind())
                     return false;
                 if (u.isa<Pure>()) {
@@ -503,6 +505,7 @@ struct MemoKeyEqual {
             for (int i = 0; i < a->values.size(); ++i) {
                 auto u = a->values[i];
                 auto v = b->values[i];
+                if (u == v) continue;
                 if (u->kind() != v->kind())
                     return false;
                 if (u.isa<Pure>()) {
@@ -517,7 +520,7 @@ struct MemoKeyEqual {
         } else if (isa<Pure>(lhs)) {
             return cast<Pure>(lhs)->key_equal(cast<Pure>(rhs));
         } else {
-            return lhs == rhs;
+            return false;
         }
     }
 };
