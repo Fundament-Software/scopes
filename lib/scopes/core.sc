@@ -4981,11 +4981,13 @@ fn compiler-version-string ()
 
 fn print-logo ()
     io-write! "  "; io-write! (default-styler style-string "\\\\\\"); io-write! "\n"
-    io-write! "   "; io-write! (default-styler style-number "\\\\\\"); io-write! "\n"
+    io-write! "   "; io-write! (default-styler style-number "\\\\\\   ")
+    io-write! (compiler-version-string); io-write! "\n";
     io-write! " "; io-write! (default-styler style-comment "///")
-    io-write! (default-styler style-sfxfunction "\\\\\\"); io-write! "\n"
+    io-write! (default-styler style-sfxfunction "\\\\\\")
+    io-write! "  http://scopes.rocks"; io-write! "\n";
     io-write! (default-styler style-comment "///"); io-write! "  "
-    io-write! (default-styler style-function "\\\\\\")
+    io-write! (default-styler style-function "\\\\\\"); io-write! "\n"
 
 fn read-eval-print-loop ()
     fn repeat-string (n c)
@@ -5019,8 +5021,6 @@ fn read-eval-print-loop ()
         realpath "."
 
     print-logo;
-    print " "
-        compiler-version-string;
 
     let global-scope = (globals)
     let eval-scope = (Scope global-scope)
