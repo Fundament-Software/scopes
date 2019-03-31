@@ -296,22 +296,6 @@ struct Expander {
         return tok == KW_Except;
     }
 
-    void print_name_suggestions(Symbol name, StyledStream &ss) {
-        auto syms = env->find_closest_match(name);
-        if (!syms.empty()) {
-            ss << "Did you mean '" << syms[0].name()->data << "'";
-            for (size_t i = 1; i < syms.size(); ++i) {
-                if ((i + 1) == syms.size()) {
-                    ss << " or ";
-                } else {
-                    ss << ", ";
-                }
-                ss << "'" << syms[i].name()->data << "'";
-            }
-            ss << "?";
-        }
-    }
-
     // (loop ([x...] [= init...]) body...)
     SCOPES_RESULT(ValueRef) expand_loop(const List *it) {
         SCOPES_RESULT_TYPE(ValueRef);
@@ -469,7 +453,7 @@ struct Expander {
                     auto name = SCOPES_GET_RESULT(extract_symbol_constant(it->at));
                     ScopeEntry entry;
                     if (!env->lookup(name, entry)) {
-                        SCOPES_ERROR(SyntaxUndeclaredIdentifier, name);
+                        SCOPES_ERROR(SyntaxUndeclaredIdentifier, name, env);
                     }
                     env->bind_with_doc(name, entry);
                     last_entry = entry.expr;
@@ -1129,7 +1113,7 @@ struct Expander {
                     }
                 }
 
-                SCOPES_ERROR(SyntaxUndeclaredIdentifier, name);
+                SCOPES_ERROR(SyntaxUndeclaredIdentifier, name, env);
             }
             return ref(anchor, result);
         } else {

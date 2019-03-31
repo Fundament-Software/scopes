@@ -967,44 +967,6 @@ static int find_key(const Symbols &symbols, Symbol key) {
     return -1;
 }
 
-static std::vector<Symbol> find_closest_match(Symbol name, const Symbols &symbols) {
-    const String *s = name.name();
-    std::unordered_set<Symbol, Symbol::Hash> done;
-    done.insert(SYM_Unnamed);
-    std::vector<Symbol> best_syms;
-    size_t best_dist = (size_t)-1;
-    for (auto sym : symbols) {
-        if (done.count(sym))
-            continue;
-        size_t dist = distance(s, sym.name());
-        if (dist == best_dist) {
-            best_syms.push_back(sym);
-        } else if (dist < best_dist) {
-            best_dist = dist;
-            best_syms = { sym };
-        }
-        done.insert(sym);
-    }
-    std::sort(best_syms.begin(), best_syms.end());
-    return best_syms;
-}
-
-static void print_name_suggestions(Symbol name, const Symbols &symbols, StyledStream &ss) {
-    auto syms = find_closest_match(name, symbols);
-    if (!syms.empty()) {
-        ss << "Did you mean '" << syms[0].name()->data << "'";
-        for (size_t i = 1; i < syms.size(); ++i) {
-            if ((i + 1) == syms.size()) {
-                ss << " or ";
-            } else {
-                ss << ", ";
-            }
-            ss << "'" << syms[i].name()->data << "'";
-        }
-        ss << "?";
-    }
-}
-
 SCOPES_RESULT(void) map_keyed_arguments(const Anchor *anchor, const TypedValueRef &callee,
     TypedValues &outargs, const TypedValues &values, const Symbols &symbols, bool varargs) {
     SCOPES_RESULT_TYPE(void);
@@ -1056,7 +1018,7 @@ SCOPES_RESULT(void) map_keyed_arguments(const Anchor *anchor, const TypedValueRe
                 mapped.push_back(false);
                 outargs.push_back(TypedValueRef());
             } else {
-                SCOPES_ERROR(UnknownParameterKey, key);
+                SCOPES_ERROR(UnknownParameterKey, key, symbols);
             }
         }
         mapped[index] = true;
@@ -1879,7 +1841,7 @@ repeat:
             //set_best_anchor(value, anchor);
             return SCOPES_GET_RESULT(prove(ctx, value));
         } else {
-            SCOPES_RETURN_ERROR(result.except);
+            SCOPES_RETURN_TRACE_ERROR(result.except);
         }
     } else if (T == TYPE_Builtin) {
         //SCOPES_CHECK_RESULT(anycl.verify(TYPE_Builtin));

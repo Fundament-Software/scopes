@@ -307,29 +307,15 @@ sc_type_set_symbol Symbol '__call
             fn resolve-method (self symval)
                 let sym = (unbox-symbol symval Symbol)
                 let T = (sc_value_type self)
-                try
-                    return (sc_type_at T sym)
-                except (err)
-                # if calling method of type, try typemethod
-                if (ptrcmp== T type)
-                    if (sc_value_is_constant self)
-                        let self = (unbox-pointer self type)
-                        try
-                            return (sc_type_at self sym)
-                        except (err)
-                error
-                    sc_string_join "no method named "
-                        sc_string_join (sc_value_repr symval)
-                            sc_string_join " in value of type "
-                                sc_value_repr (box-pointer T)
+                return (sc_type_at T sym)
 
             let argcount = (sc_argcount args)
             verify-count argcount 2 -1
             let symval = (sc_getarg args 0)
             let self = (sc_getarg args 1)
-            let expr = `([(resolve-method self symval)]
-                [(sc_extract_argument_list_new args 1)])
-            expr
+            let method = (resolve-method self symval)
+            let arglist = (sc_extract_argument_list_new args 1)
+            `(method arglist)
 
 do
     fn get-key-value-args (args)
@@ -5141,6 +5127,8 @@ fn read-eval-print-loop ()
 #-------------------------------------------------------------------------------
 # main
 #-------------------------------------------------------------------------------
+
+'__nug 5
 
 fn print-help (exename)
     print "usage:" exename

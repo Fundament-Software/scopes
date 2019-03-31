@@ -29,6 +29,7 @@ typedef const Anchor *PAnchor;
 typedef const Type *PType;
 typedef const String *PString;
 typedef const char *Rawstring;
+typedef const Scope *PScope;
 
 /*
 formatters:
@@ -103,9 +104,9 @@ formatters:
         "syntax: assignment token (=) expected") \
     T(SyntaxUnexpectedExtraToken, \
         "syntax: unexpected extra token") \
-    T(SyntaxUndeclaredIdentifier, /* TODO: show name suggestions */ \
-        "syntax: identifier '%0' is not declared in scope", \
-        Symbol) \
+    T(SyntaxUndeclaredIdentifier, \
+        syntax_undeclared_identifier_print_suggestions, \
+        Symbol, PScope) \
     T(SyntaxExceptBlockExpected, \
         "syntax: except block expected") \
     T(SyntaxMissingDefaultCase, \
@@ -179,8 +180,8 @@ formatters:
         "duplicate parameter key '%0'", \
         Symbol) \
     T(UnknownParameterKey, \
-        "no parameter named '%0' in function", /* todo: print suggestions */ \
-        Symbol) \
+        unknown_parameter_key_print_suggestions, \
+        Symbol, Symbols) \
     T(BreakOutsideLoop, \
         "break can only be used within the scope of a loop") \
     T(RepeatOutsideLoop, \
@@ -363,8 +364,8 @@ formatters:
         "runtime: no attribute %0 in local scope", \
         Symbol) \
     T(RTMissingTypeAttribute, \
-        "runtime: no attribute %0 in type", \
-        Symbol) \
+        rt_missing_type_attribute_print_suggestions, \
+        Symbol, PType) \
     T(RTMissingLocalTypeAttribute, \
         "runtime: no attribute %0 in local type", \
         Symbol) \
@@ -431,7 +432,7 @@ enum BacktraceKind {
     BTK_Dummy,
     // context = none, location in anchor
     BTK_Parser,
-    // context = symbol or expression being expanded 
+    // context = symbol or expression being expanded
     BTK_Expander,
     // context = expression being typechecked
     BTK_ProveExpression,
@@ -490,7 +491,7 @@ private:
 */  Error ## CLASS();/*
 */  static Error ## CLASS *from(SCOPES_FOREACH_EXPR(TA, ##__VA_ARGS__)); /*
 */  void stream(StyledStream &ss) const;/*
-*/  SCOPES_FOREACH_STMT(TB, ##__VA_ARGS__); /* 
+*/  SCOPES_FOREACH_STMT(TB, ##__VA_ARGS__); /*
 */};
 
 SCOPES_ERROR_KIND()
@@ -504,17 +505,20 @@ void print_error(const Error *value);
 void stream_error_message(StyledStream &ss, const Error *value);
 void stream_error(StyledStream &ss, const Error *value);
 
+#define SCOPES_RETURN_TRACE_ERROR(ERR) \
+    SCOPES_RETURN_ERROR((ERR)->trace(_backtrace))
+
 #if SCOPES_EARLY_ABORT
 #define SCOPES_ERROR(CLASS, ...) \
     assert(false); \
-    SCOPES_RETURN_ERROR(Error ## CLASS::from(__VA_ARGS__)->trace(_backtrace));
+    SCOPES_RETURN_TRACE_ERROR(Error ## CLASS::from(__VA_ARGS__));
 #else
 #define SCOPES_ERROR(CLASS, ...) \
-    SCOPES_RETURN_ERROR(Error ## CLASS::from(__VA_ARGS__)->trace(_backtrace));
+    SCOPES_RETURN_TRACE_ERROR(Error ## CLASS::from(__VA_ARGS__));
 #endif
 
 // if ok fails, return
-#define SCOPES_CHECK_OK(OK, ERR) if (!OK) { SCOPES_RETURN_ERROR((ERR)->trace(_backtrace)); }
+#define SCOPES_CHECK_OK(OK, ERR) if (!OK) { SCOPES_RETURN_TRACE_ERROR(ERR); }
 // if an expression returning a result fails, return
 #define SCOPES_CHECK_RESULT(EXPR) { \
     auto _result = (EXPR); \

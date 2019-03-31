@@ -1378,7 +1378,7 @@ sc_valueref_raises_t sc_type_at(const sc_type_t *T, sc_symbol_t key) {
     ValueRef result;
     bool ok = T->lookup(key, result);
     if (!ok) {
-        SCOPES_C_ERROR(RTMissingTypeAttribute, key);
+        SCOPES_C_ERROR(RTMissingTypeAttribute, key, T);
     }
     return convert_result(result);
 }

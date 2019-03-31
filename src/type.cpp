@@ -15,6 +15,7 @@
 #include "qualifier.inc"
 
 #include <memory.h>
+#include <algorithm>
 
 namespace scopes {
 
@@ -88,6 +89,35 @@ bool Type::lookup_return_handler(ValueRef &dest) const {
 
 const Type::Map &Type::get_symbols() const {
     return symbols;
+}
+
+std::vector<Symbol> Type::find_closest_match(Symbol name) const {
+    const String *s = name.name();
+    std::unordered_set<Symbol, Symbol::Hash> done;
+    std::vector<Symbol> best_syms;
+    size_t best_dist = (size_t)-1;
+    const Type *self = this;
+    do {
+        auto &&map = self->symbols;
+        for (auto &&k : map) {
+            Symbol sym = k.first;
+            if (done.count(sym))
+                continue;
+            size_t dist = distance(s, sym.name());
+            if (dist == best_dist) {
+                best_syms.push_back(sym);
+            } else if (dist < best_dist) {
+                best_dist = dist;
+                best_syms = { sym };
+            }
+            done.insert(sym);
+        }
+        if (self == TYPE_Typename)
+            break;
+        self = superof(self);
+    } while (true);
+    std::sort(best_syms.begin(), best_syms.end());
+    return best_syms;
 }
 
 //------------------------------------------------------------------------------
@@ -423,7 +453,7 @@ void init_types() {
                 TNF_Plain).assert_ok();
     }
 
-    DEFINE_BASIC_TYPE("CompileStage", ValueRef, TYPE_CompileStage, 
+    DEFINE_BASIC_TYPE("CompileStage", ValueRef, TYPE_CompileStage,
         storage_type(TYPE_ValueRef).assert_ok());
 
 

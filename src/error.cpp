@@ -14,9 +14,11 @@
 #include "type/function_type.hpp"
 #include "stream_expr.hpp"
 #include "dyn_cast.inc"
+#include "scope.hpp"
 
 #include "scopes/config.h"
 
+#include <algorithm>
 #include <assert.h>
 
 namespace scopes {
@@ -135,6 +137,66 @@ static void format_error(StyledStream &ss, const char *msg, Types ... args) {
             ss << c;
         }
     }
+}
+
+// custom formatter
+template<class ... Types, class ... FuncTypes>
+static void format_error(StyledStream &ss, void (*f)(StyledStream&, FuncTypes ... ), Types ... args) {
+    f(ss, args ...);
+}
+
+static std::vector<Symbol> find_closest_match(Symbol name, const Symbols &symbols) {
+    const String *s = name.name();
+    std::unordered_set<Symbol, Symbol::Hash> done;
+    done.insert(SYM_Unnamed);
+    std::vector<Symbol> best_syms;
+    size_t best_dist = (size_t)-1;
+    for (auto sym : symbols) {
+        if (done.count(sym))
+            continue;
+        size_t dist = distance(s, sym.name());
+        if (dist == best_dist) {
+            best_syms.push_back(sym);
+        } else if (dist < best_dist) {
+            best_dist = dist;
+            best_syms = { sym };
+        }
+        done.insert(sym);
+    }
+    std::sort(best_syms.begin(), best_syms.end());
+    return best_syms;
+}
+
+static void print_name_suggestions(StyledStream &ss, const Symbols &syms) {
+    if (syms.empty()) return;
+    ss << ". Did you mean '" << syms[0].name()->data << "'";
+    for (size_t i = 1; i < syms.size(); ++i) {
+        if ((i + 1) == syms.size()) {
+            ss << " or ";
+        } else {
+            ss << ", ";
+        }
+        ss << "'" << syms[i].name()->data << "'";
+    }
+    ss << "?";
+}
+
+static void syntax_undeclared_identifier_print_suggestions(StyledStream &ss, Symbol symbol, PScope scope) {
+    ss << "syntax: identifier '" << symbol.name()->data;
+    ss << "' is not declared in scope";
+    print_name_suggestions(ss, scope->find_closest_match(symbol));
+}
+
+static void unknown_parameter_key_print_suggestions(StyledStream &ss, Symbol symbol, const Symbols &symbols) {
+    ss << "no parameter named '" << symbol.name()->data;
+    ss << "' in function";
+    print_name_suggestions(ss, find_closest_match(symbol, symbols));
+}
+
+static void rt_missing_type_attribute_print_suggestions(StyledStream &ss, Symbol symbol, PType type) {
+    ss << "runtime: no attribute named '" << symbol.name()->data;
+    ss << "' in type " << type;
+    print_name_suggestions(ss, type->find_closest_match(symbol));
 }
 
 //------------------------------------------------------------------------------
@@ -271,9 +333,10 @@ void stream_backtrace(StyledStream &ss, const Backtrace *bt) {
     }
 }
 
-static bool good_delta(const Backtrace *newer, const Backtrace *older) {
-#if 1
+static bool good_delta(const Backtrace *older, const Backtrace *newer) {
+#if 0
     return newer->context.anchor() != older->context.anchor();
+    //return true;
 #else
     if (older->kind == BTK_User) return true;
     return newer->kind != older->kind;
@@ -286,7 +349,11 @@ void stream_error(StyledStream &ss, const Error *err) {
         const Backtrace *bt = err->get_trace();
         const Backtrace *last_bt = nullptr;
         while (bt) {
-            if (!last_bt || good_delta(last_bt, bt)) {
+            if (last_bt && !good_delta(last_bt, bt)) {
+                // replace newer
+                traceback.back() = bt;
+            } else {
+                // append
                 traceback.push_back(bt);
             }
             last_bt = bt;
