@@ -5128,8 +5128,6 @@ fn read-eval-print-loop ()
 # main
 #-------------------------------------------------------------------------------
 
-'__nug 5
-
 fn print-help (exename)
     print "usage:" exename
         """"[option [...]] [filename]
