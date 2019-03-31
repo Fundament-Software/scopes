@@ -254,6 +254,11 @@ HANDLER(ConstAggregate) {
 
 HANDLER(ConstPointer) {
     auto _anchor = node.anchor();
+    if (!node->value) {
+        const List *l = List::from(TYPE(node->get_type()), EOL);
+        l = List::from(SYMBOL(FN_NullOf), l);
+        return ValueRef(_anchor, ConstPointer::list_from(l));
+    }
     if (node->get_type() == TYPE_Closure) {
         auto cl = extract_closure_constant(node).assert_ok();
         if (cl) {
@@ -488,10 +493,7 @@ void walk(const ValueRef &_e, int depth, int maxdepth, bool naked, bool types) {
         case VK_ConstPointer: {
             auto val = e.cast<ConstPointer>();
             auto T = val->get_type();
-            if (!val->value) {
-                ss << Style_Error << "?null?" << Style_None;
-                types = false;
-            } else if (T == TYPE_Type) {
+            if (T == TYPE_Type) {
                 ss << (const Type *)val->value;
             } else if (T == TYPE_String) {
                 ss << (const String *)val->value;
