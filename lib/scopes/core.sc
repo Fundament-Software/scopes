@@ -5097,7 +5097,7 @@ fn read-eval-print-loop ()
                     inline (key value k)
                         let idstr = (make-idstr (counter + k))
                         if (not (none? value))
-                            'set-symbol eval-scope (Symbol idstr) (Value value)
+                            'set-symbol eval-scope (Symbol idstr) `value
                             print idstr "="
                                 repr value
                             k + 1

@@ -645,6 +645,9 @@ sc_void_raises_t sc_load_library(const sc_string_t *name) {
 
 void sc_scope_set_symbol(sc_scope_t *scope, sc_symbol_t sym, sc_valueref_t value) {
     using namespace scopes;
+    // ignore null values; this can happen when such a value is explicitly
+    // created on the console
+    if (!value) return;
     scope->bind(sym, value);
 }
 

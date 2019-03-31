@@ -244,8 +244,10 @@ HANDLER(ConstAggregate) {
         return ValueRef(_anchor, ConstPointer::list_from(l));
     } else if (T == TYPE_ValueRef) {
         auto val = (Value *)cast<ConstPointer>(node->values[0])->value;
-        auto loc = (const Anchor *)cast<ConstPointer>(node->values[1])->value;
-        return LIST(SYMBOL(KW_ASTQuote), ref(loc, val));
+        if (val) {
+            auto loc = (const Anchor *)cast<ConstPointer>(node->values[1])->value;
+            return LIST(SYMBOL(KW_ASTQuote), ref(loc, val));
+        }
     }
     return node;
 }
@@ -254,7 +256,9 @@ HANDLER(ConstPointer) {
     auto _anchor = node.anchor();
     if (node->get_type() == TYPE_Closure) {
         auto cl = extract_closure_constant(node).assert_ok();
-        return SYMBOL(cl->func->name);
+        if (cl) {
+            return SYMBOL(cl->func->name);
+        }
         //return LIST(SYMBOL(Symbol(String::from("closure"))), cl->func);
     }
     return node;
@@ -287,6 +291,7 @@ ValueRef _convert(const ValueRef &node) {
 #undef TYPE
 
 ValueRef convert(const ValueRef &node) {
+    if (!node) return node;
     auto it = map.find(node.unref());
     if (it != map.end()) return ref(node.anchor(), it->second);
     auto val = _convert(node);
@@ -428,21 +433,28 @@ void stream_illegal_value_type(const std::string &name) {
 void walk(const ValueRef &_e, int depth, int maxdepth, bool naked, bool types) {
     ValueRef e = convert(_e);
 
-    auto T = try_get_const_type(e);
-    if (T == TYPE_List) {
-        walk(e.anchor(), extract_list_constant(e.cast<TypedValue>()).assert_ok(), depth, maxdepth, naked, types);
-        return;
+    const Type *T = nullptr;
+    if (e) {
+        T = try_get_const_type(e);
+        if (T == TYPE_List) {
+            walk(e.anchor(), extract_list_constant(e.cast<TypedValue>()).assert_ok(), depth, maxdepth, naked, types);
+            return;
+        }
     }
 
     if (naked) {
         stream_indent(depth);
     }
-    const Anchor *anchor = e.anchor();
-    if (atom_anchors) {
-        stream_anchor(anchor);
+    if (e) {
+        const Anchor *anchor = e.anchor();
+        if (atom_anchors) {
+            stream_anchor(anchor);
+        }
     }
 
-    if (T == TYPE_Symbol) {
+    if (!e) {
+        ss << Style_Error << "?illegal?" << Style_None;
+    } else if (T == TYPE_Symbol) {
         auto sym = extract_symbol_constant(e).assert_ok();
         ss << fmt.symbol_styler(sym);
         sym.name()->stream(ss, SYMBOL_ESCAPE_CHARS);
@@ -476,7 +488,10 @@ void walk(const ValueRef &_e, int depth, int maxdepth, bool naked, bool types) {
         case VK_ConstPointer: {
             auto val = e.cast<ConstPointer>();
             auto T = val->get_type();
-            if (T == TYPE_Type) {
+            if (!val->value) {
+                ss << Style_Error << "?null?" << Style_None;
+                types = false;
+            } else if (T == TYPE_Type) {
                 ss << (const Type *)val->value;
             } else if (T == TYPE_String) {
                 ss << (const String *)val->value;
