@@ -9,7 +9,7 @@
 #include "error.hpp"
 #include "scope.hpp"
 #include "types.hpp"
-#include "stream_ast.hpp"
+#include "stream_expr.hpp"
 #include "dyn_cast.inc"
 #include "qualifier.inc"
 #include "qualifiers.hpp"
@@ -538,7 +538,7 @@ GlobalRef Global::from(const Type *type, Symbol name, size_t flags, Symbol stora
         && !(flags & GF_BufferBlock)) {
         flags |= GF_Block;
     }
-    return ref(unknown_anchor(), 
+    return ref(unknown_anchor(),
         new Global(type, name, flags, storage_class, location, binding));
 }
 
@@ -1131,7 +1131,7 @@ ConstAggregateRef ConstAggregate::none_from() {
 
 ConstAggregateRef ConstAggregate::ast_from(const ValueRef &node) {
     auto ptr = ConstPointer::from(TYPE__Value, node.unref()).unref();
-    return from(TYPE_ValueRef, { ptr, ConstPointer::anchor_from(node.anchor()).unref() });    
+    return from(TYPE_ValueRef, { ptr, ConstPointer::anchor_from(node.anchor()).unref() });
 }
 
 ConstRef get_field(const ConstAggregateRef &value, int i) {
@@ -1338,7 +1338,7 @@ int Value::get_depth() const {
             auto instr = param->owner.cast<Instruction>();
             if (!instr->block) {
                 StyledStream ss;
-                stream_ast(ss, instr, StreamASTFormat());
+                stream_value(ss, instr);
             }
             assert(instr->block);
             return instr->block->depth;
@@ -1379,7 +1379,7 @@ const Anchor *get_best_anchor(const ValueRef &value) {
         def_anchor = value.cast<CLASS>()->def_anchor(); \
     } else
     SCOPES_DEFINED_VALUES()
-#undef T  
+#undef T
     {};
     if (!def_anchor->is_boring()) {
         return def_anchor;
@@ -1394,7 +1394,7 @@ void set_best_anchor(const ValueRef &value, const Anchor *anchor) {
         val->set_def_anchor(anchor); \
     } else
     SCOPES_DEFINED_VALUES()
-#undef T  
+#undef T
     {};
 }
 

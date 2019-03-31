@@ -9,7 +9,7 @@
 #include "type.hpp"
 #include "boot.hpp"
 #include "value.hpp"
-#include "stream_ast.hpp"
+#include "stream_expr.hpp"
 #include "type/arguments_type.hpp"
 #include "type/function_type.hpp"
 #include "stream_expr.hpp"
@@ -27,13 +27,13 @@ template<typename T> struct ArgFormatter {
 };
 
 template<> struct ArgFormatter<ValueKind> {
-    void value(StyledStream &ss, ValueKind arg) { 
+    void value(StyledStream &ss, ValueKind arg) {
         ss << get_value_class_name(arg);
     }
 };
 
 template<> struct ArgFormatter<TypeKind> {
-    void value(StyledStream &ss, TypeKind arg) { 
+    void value(StyledStream &ss, TypeKind arg) {
         switch(arg) {
         case TK_Integer: ss << "integer"; break;
         case TK_Real: ss << "real"; break;
@@ -52,7 +52,7 @@ template<> struct ArgFormatter<TypeKind> {
 };
 
 template<> struct ArgFormatter<const Anchor *> {
-    void value(StyledStream &ss, const Anchor *arg) { 
+    void value(StyledStream &ss, const Anchor *arg) {
         ss << std::endl << arg;
     }
 };
@@ -96,7 +96,7 @@ static void _format_token(StyledStream &ss, char c, int n) {
 }
 
 template<typename T, class ... Types>
-static void _format_token(StyledStream &ss, char c, int n, 
+static void _format_token(StyledStream &ss, char c, int n,
     const T &arg, Types ... args) {
     if (n)
         return _format_token(ss, c, n - 1, args ... );
@@ -170,7 +170,7 @@ SCOPES_ERROR_KIND()
 
 ErrorKind Error::kind() const { return _kind; }
 
-Error::Error(ErrorKind kind) : _kind(kind) {} 
+Error::Error(ErrorKind kind) : _kind(kind) {}
 
 Error *Error::trace(const Backtrace &bt) {
     if (bt.kind == BTK_Dummy)
@@ -260,11 +260,10 @@ void stream_backtrace(StyledStream &ss, const Backtrace *bt) {
             if (_anchor != unknown_anchor())
                 anchor = uv->def_anchor();
         }
-        const List *list = ast_to_list(value);
-        StreamExprFormat fmt;
+        StreamValueFormat fmt;
         fmt.maxdepth = 3;
         fmt.maxlength = 4;
-        stream_expr(ss, list, fmt);
+        stream_value(ss, value, fmt);
         ss << anchor << " defined here";
         ss << std::endl;
         anchor->stream_source_line(ss);
@@ -305,7 +304,7 @@ void stream_error(StyledStream &ss, const Error *err) {
 
 void print_error(const Error *value) {
     auto cerr = StyledStream(SCOPES_CERR);
-    stream_error(cerr, value);    
+    stream_error(cerr, value);
 }
 
 //------------------------------------------------------------------------------

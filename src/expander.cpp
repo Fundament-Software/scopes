@@ -17,7 +17,7 @@
 #include "value.hpp"
 #include "prover.hpp"
 #include "timer.hpp"
-#include "stream_ast.hpp"
+#include "stream_expr.hpp"
 #include "gc.hpp"
 #include "dyn_cast.inc"
 #include "scopes/scopes.h"
@@ -574,7 +574,7 @@ struct Expander {
 
         SCOPES_CHECK_RESULT(verify_list_parameter_count("try", it, 0, -1));
         auto try_anchor = it->at.anchor();
-        ValueRef src = it->at;
+        //ValueRef src = it->at;
         it = it->next;
 
         Expander subexp(Scope::from(env), astscope);
@@ -586,7 +586,7 @@ struct Expander {
             ref(try_anchor, MergeTemplate::from(try_label, try_value))));
 
         if (next != EOL) {
-            auto _next_def = next->at;
+            //auto _next_def = next->at;
             it = SCOPES_GET_RESULT(extract_list_constant(next->at));
             if (it != EOL) {
                 if (is_except_token(it->at)) {
@@ -972,7 +972,7 @@ struct Expander {
         if (env->lookup(Symbol(SYM_SymbolWildcard), symbol_handler_node)) {
             auto T = try_get_const_type(symbol_handler_node);
             if (T != list_expander_func_type) {
-                SCOPES_ERROR(SyntaxSymbolExpanderTypeMismatch, 
+                SCOPES_ERROR(SyntaxSymbolExpanderTypeMismatch,
                     symbol_handler_node.cast<TypedValue>()->get_type(),
                     list_expander_func_type);
             }
@@ -1083,7 +1083,7 @@ struct Expander {
             if (env->lookup(Symbol(SYM_ListWildcard), list_handler_node)) {
                 auto T = try_get_const_type(list_handler_node);
                 if (T != list_expander_func_type) {
-                    SCOPES_ERROR(SyntaxListExpanderTypeMismatch, 
+                    SCOPES_ERROR(SyntaxListExpanderTypeMismatch,
                         list_handler_node.cast<TypedValue>()->get_type(),
                         list_expander_func_type);
                 }

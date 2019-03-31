@@ -239,7 +239,7 @@ let va-rfold va-rifold =
                 let arg =
                     sc_getarg args i
                 let k = (sc_type_key (sc_value_qualified_type arg))
-                let v = (sc_valueref_tag 
+                let v = (sc_valueref_tag
                     (sc_value_anchor arg) (sc_keyed_new unnamed arg))
                 _ i
                     if use-indices
@@ -589,6 +589,8 @@ let
     type!= = (spice-macro (type-comparison-func ptrcmp!=))
     type<= = (spice-macro (type-comparison-func type<=))
     type>= = (spice-macro (type-comparison-func type>=))
+
+let NullType = (sc_typename_type "NullType")
 
 run-stage;
 
@@ -1463,7 +1465,6 @@ inline floordiv (a b)
 #---------------------------------------------------------------------------
 
 """"The type of the `null` constant. This type is uninstantiable.
-let NullType = (sc_typename_type "NullType")
 'set-plain-storage NullType ('pointer void)
 do
     inline null== (lhs rhs) (icmp== (ptrtoint rhs usize) 0:usize)
@@ -1542,6 +1543,31 @@ let missing-constructor =
                     sc_string_join ('__repr cls)
                         " has no constructor"
 
+let repr =
+    spice-macro
+        fn (args)
+            fn type-is-default-suffix? (CT)
+                if (sc_type_is_default_suffix CT) true
+                elseif (ptrcmp== CT NullType) true
+                else false
+            let argc = ('argcount args)
+            verify-count argc 1 1
+            let value = ('getarg args 0)
+            let T = ('typeof value)
+            let s =
+                try
+                    let f = (sc_type_at T '__repr)
+                    `(f value)
+                except (err)
+                    `(sc_value_content_repr value)
+            if (type-is-default-suffix? T) s
+            else
+                let suffix =
+                    sc_string_join
+                        sc_default_styler style-operator ":"
+                        sc_default_styler style-type ('string T)
+                `(sc_string_join s suffix)
+
 run-stage;
 
 'set-symbols typename
@@ -1585,46 +1611,12 @@ fn empty? (value)
 #fn cons (at next)
     sc_list_cons (Value at) next
 
-fn type-repr-needs-suffix? (CT)
-    if (== CT i32) false
-    elseif (== CT bool) false
-    elseif (== CT Nothing) false
-    elseif (== CT NullType) false
-    elseif (== CT f32) false
-    elseif (== CT string) false
-    elseif (== CT list) false
-    elseif (== CT Symbol) false
-    elseif (== CT type) false
-    elseif (== ('kind CT) type-kind-vector)
-        let ET = ('element@ CT 0)
-        if (== ET i32) false
-        elseif (== ET bool) false
-        elseif (== ET f32) false
-        else true
-    else true
-
 fn tostring (value)
     'dispatch-attr (typeof value) '__tostring
         inline (f)
             f value
         inline ()
-            sc_value_tostring (Value value)
-
-fn repr (value)
-    let T = (typeof value)
-    let s =
-        'dispatch-attr T '__repr
-            inline (f)
-                f value
-            inline ()
-                sc_value_content_repr (Value value)
-    if (type-repr-needs-suffix? T)
-        .. s
-            ..
-                sc_default_styler style-operator ":"
-                sc_default_styler style-type ('string T)
-
-    else s
+            sc_value_tostring `value
 
 let print =
     do

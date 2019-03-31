@@ -9,7 +9,7 @@
 #include "types.hpp"
 #include "qualifiers.hpp"
 #include "error.hpp"
-#include "stream_ast.hpp"
+#include "stream_expr.hpp"
 #include "hash.hpp"
 #include "timer.hpp"
 #include "gc.hpp"
@@ -851,7 +851,7 @@ static SCOPES_RESULT(TypedValueRef) make_raise1(const ASTContext &ctx, const Anc
 static SCOPES_RESULT(TypedValueRef) make_raise(const ASTContext &ctx, const Anchor *anchor, const TypedValueRef &value) {
     if (value->get_type() == TYPE_Error) {
         // add info
-        auto tracecall = ref(anchor, Call::from(empty_arguments_type(), 
+        auto tracecall = ref(anchor, Call::from(empty_arguments_type(),
             g_sc_error_append_calltrace, {
             value, ConstAggregate::ast_from(value)
         }));
@@ -905,9 +905,9 @@ static SCOPES_RESULT(TypedValueRef) prove_LabelTemplate(const ASTContext &ctx, c
         #if 1
         if (label->body.empty()) {
             StyledStream ss;
-            stream_ast(ss, label, StreamASTFormat());
-            stream_ast(ss, node, StreamASTFormat());
-            stream_ast(ss, result, StreamASTFormat());
+            stream_value(ss, label);
+            stream_value(ss, node);
+            stream_value(ss, result);
         }
         #endif
         assert(!label->body.empty());
@@ -1324,7 +1324,7 @@ static SCOPES_RESULT(TValueRef<T>) extract_constant(const ValueRef &value) {
     SCOPES_RESULT_TYPE(TValueRef<T>);
     auto constval = value.dyn_cast<T>();
     if (!constval) {
-        SCOPES_ERROR(ConstantValueKindMismatch, 
+        SCOPES_ERROR(ConstantValueKindMismatch,
             kind, value->kind());
     }
     return constval;
@@ -1808,7 +1808,7 @@ static SCOPES_RESULT(TypedValueRef) prove_CallTemplate(
     const ASTContext &ctx, const CallTemplateRef &call) {
     SCOPES_RESULT_TYPE(TypedValueRef);
     SCOPES_TRACE_PROVE_EXPR(call);
-    const Anchor *anchor = get_best_anchor(call);
+    //const Anchor *anchor = get_best_anchor(call);
     TypedValueRef callee = ref(call->callee.anchor(),
         SCOPES_GET_RESULT(prove(ctx, call->callee)));
     TypedValues values;
@@ -1911,7 +1911,7 @@ repeat:
             ss << call.anchor() << " dump:";
             for (auto arg : values) {
                 ss << " ";
-                stream_ast(ss, arg, StreamASTFormat::singleline());
+                stream_value(ss, arg, StreamValueFormat::singleline());
             }
             ss << std::endl;
             return ref(call.anchor(), ArgumentList::from(values));
@@ -1921,7 +1921,7 @@ repeat:
             ss << call.anchor() << " dump-ast:";
             for (auto arg : values) {
                 ss << std::endl;
-                stream_ast(ss, arg, StreamASTFormat());
+                stream_value(ss, arg);
             }
             ss << std::endl;
             return ref(call.anchor(), ArgumentList::from(values));
@@ -1931,7 +1931,7 @@ repeat:
             ss << call.anchor() << " dump-template:";
             for (auto arg : call->args) {
                 ss << std::endl;
-                stream_ast(ss, arg, StreamASTFormat());
+                stream_value(ss, arg);
             }
             return ref(call.anchor(), ArgumentList::from(values));
         } break;
@@ -2856,10 +2856,10 @@ repeat:
                     ctx.append(newcall);
                     auto anchor = get_best_anchor(call);
                     // convert to valueref
-                    newcall = ref(anchor, Call::from(TYPE_ValueRef, 
+                    newcall = ref(anchor, Call::from(TYPE_ValueRef,
                         g_sc_valueref_tag, {
                         ref(anchor, ConstPointer::anchor_from(anchor)),
-                        newcall    
+                        newcall
                     }));
                 }
             }
@@ -3043,7 +3043,7 @@ static SCOPES_RESULT(TypedValueRef) prove_If(const ASTContext &ctx, const IfRef 
 static SCOPES_RESULT(TypedValueRef) prove_Template(const ASTContext &ctx, const TemplateRef &_template) {
     FunctionRef frame = ctx.frame;
     assert(frame);
-    return TypedValueRef(_template.anchor(), ConstPointer::closure_from( 
+    return TypedValueRef(_template.anchor(), ConstPointer::closure_from(
         Closure::from(_template, frame)));
 }
 

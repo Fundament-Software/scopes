@@ -10,7 +10,7 @@
 #include "error.hpp"
 #include "prover.hpp"
 //#include "closure.hpp"
-#include "stream_ast.hpp"
+#include "stream_expr.hpp"
 //#include "hash.hpp"
 //#include "timer.hpp"
 //#include "gc.hpp"

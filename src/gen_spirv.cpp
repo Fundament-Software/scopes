@@ -14,7 +14,7 @@
 #include "scope.hpp"
 #include "timer.hpp"
 #include "value.hpp"
-#include "stream_ast.hpp"
+#include "stream_expr.hpp"
 #include "compiler_flags.hpp"
 #include "prover.hpp"
 #include "hash.hpp"

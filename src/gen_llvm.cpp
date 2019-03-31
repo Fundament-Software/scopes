@@ -15,7 +15,7 @@
 #include "scope.hpp"
 #include "timer.hpp"
 #include "value.hpp"
-#include "stream_ast.hpp"
+#include "stream_expr.hpp"
 #include "compiler_flags.hpp"
 #include "prover.hpp"
 #include "hash.hpp"
@@ -1051,7 +1051,7 @@ struct LLVMIRGenerator {
                 ss << std::endl;
             }
             for (auto value : values) {
-                stream_ast(ss, value, StreamASTFormat::singleline());
+                stream_value(ss, value, StreamValueFormat::singleline());
             }
         }
         assert(phis.size() == values.size());
@@ -2192,9 +2192,7 @@ struct LLVMIRGenerator {
         if (LLVMVerifyModule(module, LLVMReturnStatusAction, &errmsg)) {
             StyledStream ss(SCOPES_CERR);
             if (entry) {
-                StreamASTFormat fmt;
-                fmt.dependent_functions = true;
-                stream_ast(ss, entry, fmt);
+                stream_value(ss, entry);
             }
             LLVMDumpModule(module);
             SCOPES_ERROR(CGenBackendFailed, errmsg);

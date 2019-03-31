@@ -12,7 +12,6 @@
 #include "qualifier.inc"
 #include "c_import.hpp"
 #include "stream_expr.hpp"
-#include "stream_ast.hpp"
 #include "scope.hpp"
 #include "error.hpp"
 #include "globals.hpp"
@@ -870,14 +869,14 @@ const sc_list_t *sc_list_join(const sc_list_t *a, const sc_list_t *b) {
 const sc_list_t *sc_list_dump(const sc_list_t *l) {
     using namespace scopes;
     StyledStream ss(SCOPES_CERR);
-    stream_expr(ss, l, StreamExprFormat());
+    stream_list(ss, l);
     return l;
 }
 
 const sc_string_t *sc_list_repr(const sc_list_t *l) {
     using namespace scopes;
     StyledString ss;
-    stream_expr(ss.out, l, StreamExprFormat::singleline());
+    stream_list(ss.out, l, StreamListFormat::singleline());
     return ss.str();
 }
 
@@ -950,28 +949,28 @@ sc_valueref_t sc_closure_get_context(const sc_closure_t *func) {
 const sc_string_t *sc_value_repr (sc_valueref_t value) {
     using namespace scopes;
     StyledString ss;
-    stream_ast(ss.out, value, StreamASTFormat::singleline());
+    stream_value(ss.out, value, StreamValueFormat::singleline());
     return ss.str();
 }
 
 const sc_string_t *sc_value_content_repr (sc_valueref_t value) {
     using namespace scopes;
     StyledString ss;
-    stream_ast(ss.out, value, StreamASTFormat::content());
+    stream_value(ss.out, value, StreamValueFormat::content());
     return ss.str();
 }
 
 const sc_string_t *sc_value_ast_repr (sc_valueref_t value) {
     using namespace scopes;
     StyledString ss;
-    stream_ast(ss.out, value, StreamASTFormat());
+    stream_value(ss.out, value);
     return ss.str();
 }
 
 const sc_string_t *sc_value_tostring (sc_valueref_t value) {
     using namespace scopes;
     StyledString ss = StyledString::plain();
-    stream_ast(ss.out, value, StreamASTFormat::content());
+    stream_value(ss.out, value, StreamValueFormat::content());
     return ss.str();
 }
 
@@ -1503,6 +1502,11 @@ bool sc_type_is_superof(const sc_type_t *super, const sc_type_t *T) {
         if (T == TYPE_Typename) return false;
     }
     return false;
+}
+
+bool sc_type_is_default_suffix(const sc_type_t *T) {
+    using namespace scopes;
+    return is_default_suffix(T);
 }
 
 const sc_string_t *sc_type_string(const sc_type_t *T) {
@@ -2067,6 +2071,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_type_storage, TYPE_Type, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_type_is_opaque, TYPE_Bool, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_type_is_superof, TYPE_Bool, TYPE_Type, TYPE_Type);
+    DEFINE_EXTERN_C_FUNCTION(sc_type_is_default_suffix, TYPE_Bool, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_type_string, TYPE_String, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_type_next, arguments_type({TYPE_Symbol, TYPE_ValueRef}), TYPE_Type, TYPE_Symbol);
     DEFINE_EXTERN_C_FUNCTION(sc_type_set_symbol, _void, TYPE_Type, TYPE_Symbol, TYPE_ValueRef);

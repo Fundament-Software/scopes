@@ -131,7 +131,6 @@ project "scopesrt"
         "src/lexerparser.cpp",
         "src/stream_anchors.cpp",
         "src/stream_expr.cpp",
-        "src/stream_ast.cpp",
         "src/c_import.cpp",
         "src/execution.cpp",
         "src/prover.cpp",
@@ -534,10 +533,10 @@ project "scopes"
         }
 
         links {
-            "uuid", 
-            "ole32", 
-            --"psapi", 
-            --"version", 
+            "uuid",
+            "ole32",
+            --"psapi",
+            --"version",
             --"stdc++",
         }
 

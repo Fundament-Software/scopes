@@ -303,7 +303,7 @@ SCOPES_RESULT(bool) LexerParser::select_real_suffix() {
             String::from(string, string_len));
     }
     value = ref(value.anchor(),
-        ConstInt::from(newtype, value.cast<ConstReal>()->value));
+        ConstReal::from(newtype, value.cast<ConstReal>()->value));
     return true;
 }
 

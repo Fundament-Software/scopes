@@ -70,7 +70,7 @@ typedef scopes::Anchor sc_anchor_t;
 typedef scopes::Parameter sc_parameter_t;
 typedef scopes::Frame sc_frame_t;
 typedef scopes::Value sc_value_t;
-typedef scopes::Closure sc_closure_t; 
+typedef scopes::Closure sc_closure_t;
 
 typedef scopes::ValueRef sc_valueref_t;
 
@@ -367,6 +367,7 @@ SCOPES_LIBEXPORT void sc_type_debug_abi(const sc_type_t *T);
 SCOPES_LIBEXPORT sc_type_raises_t sc_type_storage(const sc_type_t *T);
 SCOPES_LIBEXPORT bool sc_type_is_opaque(const sc_type_t *T);
 SCOPES_LIBEXPORT bool sc_type_is_superof(const sc_type_t *super, const sc_type_t *T);
+SCOPES_LIBEXPORT bool sc_type_is_default_suffix(const sc_type_t *T);
 SCOPES_LIBEXPORT const sc_string_t *sc_type_string(const sc_type_t *T);
 SCOPES_LIBEXPORT sc_symbol_valueref_tuple_t sc_type_next(const sc_type_t *type, sc_symbol_t key);
 SCOPES_LIBEXPORT void sc_type_set_symbol(const sc_type_t *T, sc_symbol_t sym, sc_valueref_t value);
