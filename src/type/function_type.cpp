@@ -296,9 +296,7 @@ const FunctionType *extract_function_type(const Type *T) {
 SCOPES_RESULT(void) verify_function_pointer(const Type *type) {
     SCOPES_RESULT_TYPE(void);
     if (!is_function_pointer(type)) {
-        StyledString ss;
-        ss.out << "function pointer expected, got " << type;
-        SCOPES_LOCATION_ERROR(ss.str());
+        SCOPES_ERROR(FunctionPointerExpected, type);
     }
     return {};
 }

@@ -98,8 +98,10 @@ StyledStream &SourceFile::stream(StyledStream &ost, int offset,
     const char *indent) {
     auto str = strptr();
     if (offset >= length) {
+        #if 0
         ost << "<cannot display location in source file (offset "
             << offset << " is beyond length " << length << ")>" << std::endl;
+        #endif
         return ost;
     }
     auto start = offset;

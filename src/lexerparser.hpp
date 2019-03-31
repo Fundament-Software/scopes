@@ -8,6 +8,7 @@
 #define SCOPES_LEXERPARSER_HPP
 
 #include "result.hpp"
+#include "valueref.inc"
 
 #include <stddef.h>
 
@@ -64,7 +65,7 @@ struct LexerParser {
 
         ListBuilder(LexerParser &_lexer);
 
-        void append(Value *value);
+        void append(ValueRef value);
 
         bool is_empty() const;
 
@@ -137,7 +138,7 @@ struct LexerParser {
     Symbol get_symbol();
     const String *get_string();
     const String *get_block_string();
-    Value *get_number();
+    ValueRef get_number();
     //Const *get();
 
     // parses a list to its terminator and returns a handle to the first cell
@@ -145,11 +146,11 @@ struct LexerParser {
 
     // parses the next sequence and returns it wrapped in a cell that points
     // to prev
-    SCOPES_RESULT(Value *) parse_any();
+    SCOPES_RESULT(ValueRef) parse_any();
 
-    SCOPES_RESULT(Value *) parse_naked(int column, Token end_token);
+    SCOPES_RESULT(ValueRef) parse_naked(int column, Token end_token);
 
-    SCOPES_RESULT(Value *) parse();
+    SCOPES_RESULT(ValueRef) parse();
 
     Token token;
     int base_offset;
@@ -166,7 +167,7 @@ struct LexerParser {
     const char *string;
     int string_len;
 
-    Value *value;
+    ValueRef value;
 };
 
 

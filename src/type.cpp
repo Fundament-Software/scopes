@@ -40,7 +40,7 @@ StyledStream& Type::stream(StyledStream& ost) const {
     return ost;
 }
 
-void Type::bind(Symbol name, Value *value) {
+void Type::bind(Symbol name, const ValueRef &value) {
     auto ret = symbols.insert({ name, value });
     if (!ret.second) {
         ret.first->second = value;
@@ -54,7 +54,7 @@ void Type::del(Symbol name) {
     }
 }
 
-bool Type::lookup(Symbol name, Value *&dest) const {
+bool Type::lookup(Symbol name, ValueRef &dest) const {
     const Type *self = this;
     do {
         auto it = self->symbols.find(name);
@@ -69,7 +69,7 @@ bool Type::lookup(Symbol name, Value *&dest) const {
     return false;
 }
 
-bool Type::lookup_local(Symbol name, Value *&dest) const {
+bool Type::lookup_local(Symbol name, ValueRef &dest) const {
     auto it = symbols.find(name);
     if (it != symbols.end()) {
         dest = it->second;
@@ -78,11 +78,11 @@ bool Type::lookup_local(Symbol name, Value *&dest) const {
     return false;
 }
 
-bool Type::lookup_call_handler(Value *&dest) const {
+bool Type::lookup_call_handler(ValueRef &dest) const {
     return lookup(SYM_CallHandler, dest);
 }
 
-bool Type::lookup_return_handler(Value *&dest) const {
+bool Type::lookup_return_handler(ValueRef &dest) const {
     return lookup(SYM_ReturnHandler, dest);
 }
 
@@ -203,9 +203,7 @@ SCOPES_RESULT(size_t) size_of(const Type *T) {
     default: break;
     }
 
-    StyledString ss;
-    ss.out << "opaque type " << T << " has no size";
-    SCOPES_LOCATION_ERROR(ss.str());
+    SCOPES_ERROR(OpaqueType, T);
 }
 
 SCOPES_RESULT(size_t) align_of(const Type *T) {
@@ -236,9 +234,7 @@ SCOPES_RESULT(size_t) align_of(const Type *T) {
     default: break;
     }
 
-    StyledString ss;
-    ss.out << "opaque type " << T << " has no alignment";
-    SCOPES_LOCATION_ERROR(ss.str());
+    SCOPES_ERROR(OpaqueType, T);
 }
 
 const Type *superof(const Type *T) {
@@ -301,9 +297,7 @@ SCOPES_RESULT(bool) types_compatible(const Type *paramT, const Type *argT) {
 SCOPES_RESULT(void) verify(const Type *typea, const Type *typeb) {
     SCOPES_RESULT_TYPE(void);
     if (strip_lifetime(typea) != strip_lifetime(typeb)) {
-        StyledString ss;
-        ss.out << "type " << typea << " expected, got " << typeb;
-        SCOPES_LOCATION_ERROR(ss.str());
+        SCOPES_ERROR(ParameterTypeMismatch, typea, typeb);
     }
     return {};
 }
@@ -311,9 +305,7 @@ SCOPES_RESULT(void) verify(const Type *typea, const Type *typeb) {
 SCOPES_RESULT(void) verify_integer(const Type *type) {
     SCOPES_RESULT_TYPE(void);
     if (type->kind() != TK_Integer) {
-        StyledString ss;
-        ss.out << "integer type expected, got " << type;
-        SCOPES_LOCATION_ERROR(ss.str());
+        SCOPES_ERROR(ParameterTypeMismatch, TYPE_Integer, type);
     }
     return {};
 }
@@ -321,9 +313,7 @@ SCOPES_RESULT(void) verify_integer(const Type *type) {
 SCOPES_RESULT(void) verify_real(const Type *type) {
     SCOPES_RESULT_TYPE(void);
     if (type->kind() != TK_Real) {
-        StyledString ss;
-        ss.out << "real type expected, got " << type;
-        SCOPES_LOCATION_ERROR(ss.str());
+        SCOPES_ERROR(ParameterTypeMismatch, TYPE_Real, type);
     }
     return {};
 }
@@ -331,10 +321,7 @@ SCOPES_RESULT(void) verify_real(const Type *type) {
 SCOPES_RESULT(void) verify_range(size_t idx, size_t count) {
     SCOPES_RESULT_TYPE(void);
     if (idx >= count) {
-        StyledString ss;
-        ss.out << "index out of range (" << idx
-            << " >= " << count << ")";
-        SCOPES_LOCATION_ERROR(ss.str());
+        SCOPES_ERROR(IndexOutOfRange, idx, count);
     }
     return {};
 }
@@ -414,26 +401,39 @@ void init_types() {
     DEFINE_BASIC_TYPE("Symbol", Symbol, TYPE_Symbol, TYPE_U64);
     DEFINE_BASIC_TYPE("Builtin", Builtin, TYPE_Builtin, TYPE_U64);
 
-    DEFINE_OPAQUE_HANDLE_TYPE("Value", Value, TYPE_Value);
+    DEFINE_OPAQUE_HANDLE_TYPE("_Value", Value, TYPE__Value);
 
     DEFINE_OPAQUE_HANDLE_TYPE("SourceFile", SourceFile, TYPE_SourceFile);
-    DEFINE_OPAQUE_HANDLE_TYPE("Scope", Scope, TYPE_Scope);
     DEFINE_OPAQUE_HANDLE_TYPE("Closure", Closure, TYPE_Closure);
+    DEFINE_OPAQUE_HANDLE_TYPE("Scope", Scope, TYPE_Scope);
     DEFINE_OPAQUE_HANDLE_TYPE("String", String, TYPE_String);
     DEFINE_OPAQUE_HANDLE_TYPE("List", List, TYPE_List);
     DEFINE_OPAQUE_HANDLE_TYPE("Error", Error, TYPE_Error);
 
-    DEFINE_OPAQUE_HANDLE_TYPE("CompileStage", Value, TYPE_CompileStage);
-
     DEFINE_OPAQUE_HANDLE_TYPE("Anchor", Anchor, TYPE_Anchor);
 
-    DEFINE_TYPENAME("SugarMacro", TYPE_ASTMacro);
+    DEFINE_TYPENAME("Value", TYPE_ValueRef);
+    {
+        cast<TypenameType>(const_cast<Type *>(TYPE_ValueRef))
+            ->finalize(
+                tuple_type({
+                    TYPE__Value,
+                    TYPE_Anchor
+                }).assert_ok(),
+                TNF_Plain).assert_ok();
+    }
+
+    DEFINE_BASIC_TYPE("CompileStage", ValueRef, TYPE_CompileStage, 
+        storage_type(TYPE_ValueRef).assert_ok());
+
+
+    DEFINE_TYPENAME("SpiceMacro", TYPE_ASTMacro);
     {
         cast<TypenameType>(const_cast<Type *>(TYPE_ASTMacro))
             ->finalize(
                 native_ro_pointer_type(
                     raising_function_type(
-                        TYPE_Value, { TYPE_Value })
+                        TYPE_ValueRef, { TYPE_ValueRef })
                 ),
                 TNF_Plain).assert_ok();
     }

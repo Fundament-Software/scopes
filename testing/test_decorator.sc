@@ -25,7 +25,7 @@ typedef T
 
     @@ replace-result
     inline __typecall (cls x)
-        compiler-error! "should not see me"
+        error "should not see me"
 
     unlet replace-result
 

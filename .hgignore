@@ -28,4 +28,4 @@ syntax: regexp
 ^scopes[.]make$
 ^build/
 ^lib/clang/
-
+^[.]vscode/

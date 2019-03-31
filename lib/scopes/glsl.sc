@@ -24,7 +24,7 @@ run-stage;
     let ET = (T.Type as type)
     if ((destT == immutable) or (destT == (T.Type as type)))
         return (getattr T 'in)
-    compiler-error! "unsupported type"
+    error "unsupported type"
 
 'set-symbols InOutType
     __getattr =
@@ -42,7 +42,7 @@ run-stage;
                 let _lhsT = (bitcast (lhs as InOutType) type)
                 if (ptrcmp== (_lhsT.Type as type) rhsT)
                     return `(assign rhs _lhsT.out)
-                compiler-error! "unequal types"
+                error "unequal types"
 
 inline build-rtypes (f)
     # prefix    rtype
@@ -105,7 +105,7 @@ fn make-gsampler (postfix dim arrayed ms coords)
                         sample sampler P
                             Bias = bias
                 default
-                    compiler-error! "invalid arguments"
+                    error "invalid arguments"
 
         let texture-size =
             if fetch-has-lod-arg
@@ -135,7 +135,7 @@ fn make-gsampler (postfix dim arrayed ms coords)
                             Offset = offset
                             Bias = bias
                 default
-                    compiler-error! "invalid arguments"
+                    error "invalid arguments"
 
         let texture-proj =
             spice-capture [T fcoordProjT] (args...)
@@ -150,7 +150,7 @@ fn make-gsampler (postfix dim arrayed ms coords)
                             Proj = true
                             Bias = bias
                 default
-                    compiler-error! "invalid arguments"
+                    error "invalid arguments"
 
         let texture-gather =
             spice-capture [T fcoordT] (args...)
@@ -164,7 +164,7 @@ fn make-gsampler (postfix dim arrayed ms coords)
                         sample sampler P
                             Gather = comp
                 default
-                    compiler-error! "invalid arguments"
+                    error "invalid arguments"
 
         #case (sampler : T, P : fcoordT, lod : f32)
         @@ spice-quote
@@ -284,7 +284,7 @@ inline gen-xvar-sugar (name f)
         case ((name as Symbol) ': T layout...)
             qq [let] [name] = ([local-new] '[name] [T] (unquote-splice layout...))
         default
-            compiler-error!
+            error
                 .. "syntax: " name " <name> [: <type>] [location = i] [binding = j]"
 
 inline wrap-xvar-global (f)
@@ -302,8 +302,8 @@ fn config-xvar (flags storage name T layout)
         case 'binding
             binding = (v as i32)
         default
-            sugar-error! ('anchor arg) (.. "unsupported key: " (k as string))
-    sc_global_new (sc_get_active_anchor) name T flags storage location binding
+            error (.. "unsupported key: " (k as string))
+    sc_global_new name T flags storage location binding
 
 fn config-buffer (name T layout)
     config-xvar global-flag-buffer-block 'Uniform name T layout

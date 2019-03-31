@@ -90,7 +90,7 @@ void Scope::bind_with_doc(Symbol name, const ScopeEntry &entry) {
     }
 }
 
-void Scope::bind(Symbol name, Value *value) {
+void Scope::bind(Symbol name, const ValueRef &value) {
     assert(value);
     ScopeEntry entry = { value, next_doc };
     bind_with_doc(name, entry);
@@ -105,9 +105,9 @@ void Scope::del(Symbol name) {
         map->erase(it);
     } else {
         // otherwise check if it's contained at all
-        Value *dest = nullptr;
+        ValueRef dest;
         if (lookup(name, dest)) {
-            ScopeEntry entry = { nullptr, nullptr };
+            ScopeEntry entry = { ValueRef(), nullptr };
             // if yes, bind to nullpointer to mark it as deleted
             bind_with_doc(name, entry);
         }
@@ -189,7 +189,7 @@ bool Scope::lookup(Symbol name, ScopeEntry &dest, size_t depth) const {
     return false;
 }
 
-bool Scope::lookup(Symbol name, Value *&dest, size_t depth) const {
+bool Scope::lookup(Symbol name, ValueRef &dest, size_t depth) const {
     ScopeEntry entry;
     if (lookup(name, entry, depth)) {
         dest = entry.expr;
@@ -202,7 +202,7 @@ bool Scope::lookup_local(Symbol name, ScopeEntry &dest) const {
     return lookup(name, dest, 0);
 }
 
-bool Scope::lookup_local(Symbol name, Value *&dest) const {
+bool Scope::lookup_local(Symbol name, ValueRef &dest) const {
     return lookup(name, dest, 0);
 }
 

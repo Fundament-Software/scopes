@@ -22,54 +22,57 @@ struct Builtin;
 struct Symbol;
 
 struct ASTContext {
-    ASTContext for_loop(LoopLabel *loop) const;
+    ASTContext for_loop(const LoopLabelRef &loop) const;
 
-    ASTContext for_try(Label *except) const;
-    ASTContext for_break(Label *_break) const;
+    ASTContext for_try(const LabelRef &except) const;
+    ASTContext for_break(const LabelRef &_break) const;
 
     ASTContext with_block(Block &_block) const;
-    ASTContext with_frame(Function *frame) const;
+    ASTContext with_frame(const FunctionRef &frame) const;
 
     ASTContext();
 
-    ASTContext(Function *_function, Function *_frame,
-        LoopLabel *_loop, Label *_except, Label *_break, Block *_block);
+    ASTContext(const FunctionRef &_function, const FunctionRef &_frame,
+        const LoopLabelRef &_loop, const LabelRef &_except,
+        const LabelRef &_break,
+        Block *_block);
 
-    static ASTContext from_function(Function *fn);
+    static ASTContext from_function(const FunctionRef &fn);
 
-    void append(TypedValue *value) const;
+    void append(const TypedValueRef &value) const;
     void merge_block(Block &_block) const;
 
     const Type *fix_merge_type(const Type *T) const;
     int unique_id() const;
     void move(int id) const;
 
-    Function *function;
-    Function *frame;
-    LoopLabel *loop;
-    Label *except;
-    Label *_break;
+    FunctionRef function;
+    FunctionRef frame;
+    LoopLabelRef loop;
+    LabelRef except;
+    LabelRef _break;
     Block *block;
 };
 
-SCOPES_RESULT(const Type *) extract_type_constant(Value *value);
-SCOPES_RESULT(const Closure *) extract_closure_constant(Value *value);
-SCOPES_RESULT(const List *) extract_list_constant(Value *value);
-SCOPES_RESULT(const String *) extract_string_constant(Value *value);
-SCOPES_RESULT(Builtin) extract_builtin_constant(Value *value);
-SCOPES_RESULT(Symbol) extract_symbol_constant(Value *value);
-SCOPES_RESULT(uint64_t) extract_integer_constant(Value *value);
-SCOPES_RESULT(Function *) extract_function_constant(Value *value);
-SCOPES_RESULT(ConstAggregate *) extract_vector_constant(Value *value);
-const Type *try_get_const_type(Value *node);
-const String *try_extract_string(Value *node);
-bool is_value_stage_constant(Value *value);
+SCOPES_RESULT(const Type *) extract_type_constant(const ValueRef &value);
+SCOPES_RESULT(const Closure *) extract_closure_constant(const ValueRef &value);
+SCOPES_RESULT(const List *) extract_list_constant(const ValueRef &value);
+SCOPES_RESULT(const String *) extract_string_constant(const ValueRef &value);
+SCOPES_RESULT(Builtin) extract_builtin_constant(const ValueRef &value);
+SCOPES_RESULT(Symbol) extract_symbol_constant(const ValueRef &value);
+SCOPES_RESULT(uint64_t) extract_integer_constant(const ValueRef &value);
+SCOPES_RESULT(FunctionRef) extract_function_constant(const ValueRef &value);
+SCOPES_RESULT(TemplateRef) extract_template_constant(const ValueRef &value);
+SCOPES_RESULT(ConstAggregateRef) extract_vector_constant(const ValueRef &value);
+const Type *try_get_const_type(const ValueRef &node);
+const String *try_extract_string(const ValueRef &node);
+bool is_value_stage_constant(const ValueRef &value);
 SCOPES_RESULT(void) map_keyed_arguments(const Anchor *anchor,
     Values &outargs, const Values &values, const Symbols &symbols, bool varargs);
 
-SCOPES_RESULT(Function *) prove(Function *frame, Template *func, const Types &types);
-SCOPES_RESULT(TypedValue *) prove(const ASTContext &ctx, Value *node);
-SCOPES_RESULT(TypedValue *) prove(Value *node);
+SCOPES_RESULT(FunctionRef) prove(const FunctionRef &frame, const TemplateRef &func, const Types &types);
+SCOPES_RESULT(TypedValueRef) prove(const ASTContext &ctx, const ValueRef &node);
+SCOPES_RESULT(TypedValueRef) prove(const ValueRef &node);
 
 } // namespace scopes
 

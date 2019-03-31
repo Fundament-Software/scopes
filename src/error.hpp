@@ -11,6 +11,8 @@
 #include "builtin.hpp"
 #include "value.hpp"
 #include "scopes/config.h"
+#include "valueref.inc"
+#include "ppmacro.inc"
 
 #include <vector>
 
@@ -23,115 +25,512 @@ struct String;
 struct Anchor;
 struct StyledStream;
 
-void _set_active_anchor(const Anchor *anchor);
-const Anchor *get_active_anchor();
+typedef const Anchor *PAnchor;
+typedef const Type *PType;
+typedef const String *PString;
+typedef const char *Rawstring;
 
-struct ScopedAnchor {
-    ScopedAnchor(const Anchor *anchor);
-    ~ScopedAnchor();
-    const Anchor *parent_anchor;
+/*
+formatters:
+%n      nth value
+*/
+
+#define SCOPES_C_IMPORT_ERROR_KIND() \
+    T(CImportUnsupportedRecordType, \
+        "c-import: can't translate record of unuspported type %1" \
+        "%0 defined here", \
+        PAnchor, Symbol) \
+    T(CImportDuplicateTypeDefinition, \
+        "c-import: duplicate body defined for type %1" \
+        "%0 defined here", \
+        PAnchor, PType) \
+    T(CImportCannotConvertType, \
+        "c-import: cannot convert type: %0 (%1)", \
+        Rawstring, Rawstring) \
+    T(CImportCompilationFailed, \
+        "c-import: compilation failed") \
+
+// parser errors
+#define SCOPES_PARSER_ERROR_KIND() \
+    T(ParserBadTaste, \
+        "format: please use spaces instead of tabs") \
+    T(ParserUnterminatedSequence, \
+        "format: character sequence never ended") \
+    T(ParserUnexpectedLineBreak, \
+        "format: unexpected line break in character sequence") \
+    T(ParserInvalidIntegerSuffix, \
+        "format: invalid suffix for integer literal: '%0'", \
+        PString) \
+    T(ParserInvalidRealSuffix, \
+        "format: invalid suffix for real literal: '%0'", \
+        PString) \
+    T(ParserUnclosedOpenBracket, \
+        "format: parenthesis never closed" \
+        "%0 opened here", \
+        PAnchor) \
+    T(ParserStrayClosingBracket, \
+        "format: stray closing bracket") \
+    T(ParserUnterminatedQuote, \
+        "format: quote character quotes nothing") \
+    T(ParserUnexpectedToken, \
+        "format: unexpected token '%0' (%1)", \
+        char, int) \
+    T(ParserStrayEscapeToken, \
+        "format: list continuation character must be at beginning or end of sublist line") \
+    T(ParserIndentationMismatch, \
+        "format: indentation mismatch") \
+    T(ParserBadIndentationLevel, \
+        "format: indentations must nest by 4 spaces") \
+    T(ParserStrayStatementToken, \
+        "format: unexpected list separation character") \
+
+
+// expander errors
+#define SCOPES_SYNTAX_ERROR_KIND() \
+    T(SyntaxCallExpressionEmpty, \
+        "syntax: call expression is empty") \
+    T(SyntaxTooManyArguments, \
+        "syntax: excess argument. At most %0 arguments expected", \
+        int) \
+    T(SyntaxNotEnoughArguments, \
+        "syntax: at least %0 arguments expected, got %1", \
+        int, int) \
+    T(SyntaxUnnamedForwardDeclaration, \
+        "syntax: forward declared function must be named") \
+    T(SyntaxVariadicSymbolNotLast, \
+        "syntax: variadic symbol is not in last place") \
+    T(SyntaxAssignmentTokenExpected, \
+        "syntax: assignment token (=) expected") \
+    T(SyntaxUnexpectedExtraToken, \
+        "syntax: unexpected extra token") \
+    T(SyntaxUndeclaredIdentifier, /* TODO: show name suggestions */ \
+        "syntax: identifier '%0' is not declared in scope", \
+        Symbol) \
+    T(SyntaxExceptBlockExpected, \
+        "syntax: except block expected") \
+    T(SyntaxMissingDefaultCase, \
+        "syntax: missing default case") \
+    T(SyntaxLabelExpected, \
+        "syntax: label template expected, got %0", \
+        ValueKind) \
+    T(SyntaxSymbolExpanderTypeMismatch, \
+        "syntax: symbol expander has wrong type %0, must be %1", \
+        PType, PType) \
+    T(SyntaxListExpanderTypeMismatch, \
+        "syntax: symbol expander has wrong type %0, must be %1", \
+        PType, PType) \
+
+
+// typechecking
+#define SCOPES_TYPECHECK_ERROR_KIND() \
+    T(TypeKindMismatch, \
+        "type of %0 kind expected, got %1", \
+        TypeKind, PType) \
+    T(ValueKindMismatch, \
+        "value of %0 kind expected, got %1", \
+        ValueKind, ValueKind) \
+    T(ConstantValueKindMismatch, \
+        "constant value of type %0 expected, got %1", \
+        ValueKind, ValueKind) \
+    T(TypedConstantValueKindMismatch, \
+        "constant value of type %0 expected, got %1", \
+        PType, ValueKind) \
+    T(TooManyArguments, \
+        "at most %0 argument(s) expected, got %1", \
+        int, int) \
+    T(NotEnoughArguments, \
+        "at least %0 argument(s) expected, got %1", \
+        int, int) \
+    T(CannotTypeInline, \
+        "inline can not be instantiated outside functions") \
+    T(ValueMustBeReference, \
+        "value of type %0 must be reference", \
+        PType) \
+    T(NonReadableReference, \
+        "can not dereference value of type %0 because the reference is non-readable", \
+        PType) \
+    T(NonWritableReference, \
+        "can not dereference value of type %0 because the reference is non-writable", \
+        PType) \
+    T(NonReadablePointer, \
+        "can not load value of type %0 because the pointer type is non-readable", \
+        PType) \
+    T(NonWritablePointer, \
+        "can not store to value of type %0 because the pointer type is non-writable", \
+        PType) \
+    T(MergeConflict, \
+        "conflicting %0 types %1 and %2", \
+        Rawstring, PType, PType) \
+    T(InaccessibleValue, \
+        "cannot access value of type %0 because it has been moved", \
+        PType) \
+    T(DropReturnsArguments, \
+        "drop operation must not return any arguments") \
+    T(SwitchPassMovedValue, \
+        "skippable switch pass moved value of type %0 out of parent scope", \
+        PType) \
+    T(LoopMovedValue, \
+        "loop moved value of type %0 out of parent scope", \
+        PType) \
+    T(ViewExitingScope, \
+        "view of value of type %0 can not be moved out of its scope", \
+        PType) \
+    T(DuplicateParameterKey, \
+        "duplicate parameter key '%0'", \
+        Symbol) \
+    T(UnknownParameterKey, \
+        "no parameter named '%0' in function", /* todo: print suggestions */ \
+        Symbol) \
+    T(BreakOutsideLoop, \
+        "break can only be used within the scope of a loop") \
+    T(RepeatOutsideLoop, \
+        "repeat can only be used within the scope of a loop") \
+    T(LabelExpected, \
+        "label expected, got value of type %0", \
+        PType) \
+    T(RecursiveFunctionChangedType, \
+        "recursive function must not change type signature after first use (changed from %0 to %1)", \
+        PType, PType) \
+    T(UnknownField, /* todo: print suggestions */ \
+        "no field named '%0' in storage type %1", \
+        Symbol, PType) \
+    T(PlainToUniqueCast, \
+        "cannot cast value of plain type %0 to unique type %1", \
+        PType, PType) \
+    T(UniqueValueExpected, \
+        "value of type %0 must be unique", \
+        PType) \
+    T(IncompatibleStorageTypeForUnique, \
+        "type %0 is not the storage type of unique type %1", \
+        PType, PType) \
+    T(SpiceMacroReturnedNull, \
+        "spice macro returned null") \
+    T(UnsupportedDimensionality, \
+        "unsupported dimensionality: %0", \
+        Symbol) \
+    T(UnsupportedExecutionMode, \
+        "unsupported execution mode: %0", \
+        Symbol) \
+    T(CastCategoryError, \
+        "cannot cast value of type %0 to %1 because both types must be of same storage category", \
+        PType, PType) \
+    T(CastIncompatibleAggregateType, \
+        "cannot cast value of aggregate storage type %0", \
+        PType) \
+    T(InvalidOperands, \
+        "invalid operand types %1 and %2 for builtin %0", \
+        Builtin, PType, PType) \
+    T(InvalidArgumentTypeForBuiltin, \
+        "invalid argument type %1 for builtin %0", \
+        Builtin, PType) \
+    T(UnsupportedBuiltin, \
+        "builtin %0 is unimplemented or deprecated", \
+        Builtin) \
+    T(InvalidCallee, \
+        "cannot call value of type %0", \
+        PType) \
+    T(TooManyFunctionArguments, \
+        "too many arguments (%1) in call to function of type %0", \
+        PType, int) \
+    T(NotEnoughFunctionArguments, \
+        "not enough arguments (%1) in call to function of type %0", \
+        PType, int) \
+    T(DuplicateSwitchDefaultCase, \
+        "switch expression must only have one default case") \
+    T(MissingDefaultCase, \
+        "missing default case") \
+    T(VariadicParameterNotLast, \
+        "variadic function parameter is not in last place") \
+    T(RecursionOverflow, \
+        "exceeded maximum number of compile time recursions (%0)", \
+        int) \
+    T(ProveOutsideOfMacro, \
+        "expressions can only be typed while typing a function") \
+    T(ParameterTypeMismatch, \
+        "parameter is of type %0, but argument is of incompatible type %1", \
+        PType, PType) \
+    T(FunctionPointerExpected, \
+        "function pointer expected, but argument is of incompatible type %0", \
+        PType) \
+    T(ScalarOrVectorExpected, \
+        "scalar or vector of type %0 expected, but argument is of incompatible type %1", \
+        PType, PType) \
+    T(FixedVectorSizeMismatch, \
+        "vector of size %0 expected, but argument is of incompatible type %1", \
+        int, PType) \
+    T(VectorSizeMismatch, \
+        "arguments of type %0 and %1 must be of scalar type or vector type of equal size", \
+        PType, PType) \
+    T(ConditionNotBool, \
+        "branching condition must be of boolean type, but is of type %0", \
+        PType) \
+    T(UnexpectedValueKind, \
+        "unexpected %0", \
+        ValueKind) \
+    T(PrematureReturnFromExpression, \
+        "non-returning expression causes expression block to end before completion") \
+    T(OpaqueType, \
+        "opaque type %0 is non-aggregable and has no size, alignment or storage type", \
+        PType) \
+    T(IndexOutOfRange, \
+        "index %0 is out of range (%1)", \
+        int, int) \
+    T(TypenameIsFinal, \
+        "typename %0 already has storage type %1", \
+        PType, PType) \
+    T(StorageTypeExpected, \
+        "storage type expected, not typename %0", \
+        PType) \
+    T(PlainStorageTypeExpected, \
+        "plain storage type expected, not %0", \
+        PType) \
+    T(VariableOutOfScope, \
+        "value of type %0 is only known at compile time but outside of function scope. Only static values are accessible", \
+        PType) \
+
+// quoting
+#define SCOPES_QUOTE_ERROR_KIND() \
+    T(QuoteUnsupportedValueKind, \
+        "quote: cannot quote %0", \
+        ValueKind) \
+    T(QuoteUnboundValue, \
+        "quote: unbound value %0", \
+        ValueRef) \
+
+// code generation
+#define SCOPES_CODEGEN_ERROR_KIND() \
+    T(CGenTypeUnsupportedInTarget, \
+        "codegen: type %0 is unsupported for this target", \
+        PType) \
+    T(CGenFailedToTranslateType, \
+        "codegen: failed to translate type %0", \
+        PType) \
+    T(CGenUnboundValue, \
+        "codegen: value %0 is unbound", \
+        ValueRef) \
+    T(CGenUnsupportedBuiltin, \
+        "codegen: builtin %0 is unsupported for this target", \
+        Builtin) \
+    T(CGenUnsupportedTarget, \
+        "codegen: unsupported target: %0", /* todo: list supported targets */ \
+        Symbol) \
+    T(CGenInvalidCallee, \
+        "codegen: cannot translate call to value of type %0", \
+        PType) \
+    T(CGenFailedToTranslateValue, \
+        "codegen: failed to translate value of %0 kind", \
+        ValueKind) \
+    T(CGenFailedToResolveExtern, \
+        "codegen: failed to resolve %0", \
+        GlobalRef) \
+    T(CGenBackendFailed, \
+        "codegen backend failed: %0", \
+        Rawstring) \
+    T(CGenCannotSerializeMemory, \
+        "codegen: unable to serialize memory for value of type %0", \
+        PType) \
+    T(CGenBackendValidationFailed, \
+        "codegen: backend failed to validate generated code") \
+    T(CGenBackendOptimizationFailed, \
+        "codegen: backend failed to optimize generated code") \
+    T(CGenUnsupportedDimensionality, \
+        "codegen: unsupported dimensionality: %0", \
+        Symbol) \
+    T(CGenUnsupportedImageFormat, \
+        "codegen: unsupported image format: %0", \
+        Symbol) \
+    T(CGenUnsupportedExecutionMode, \
+        "codegen: unsupported execution mode: %0", \
+        Symbol) \
+    T(CGenUnsupportedPointerStorageClass, \
+        "codegen: unsupported pointer storage class: %0", \
+        Symbol) \
+    T(CGenEntryFunctionSignatureMismatch, \
+        "codegen: entry function must have type %0 but has type %1", \
+        PType, PType) \
+
+// runtime
+#define SCOPES_RUNTIME_ERROR_KIND() \
+    T(RTLoadLibraryFailed, \
+        "runtime: error loading library %0: %1", \
+        PString, Rawstring) \
+    T(RTMissingKey, \
+        "runtime: no such key in map") \
+    T(RTMissingScopeAttribute, \
+        "runtime: no attribute %0 in scope", \
+        Symbol) \
+    T(RTMissingLocalScopeAttribute, \
+        "runtime: no attribute %0 in local scope", \
+        Symbol) \
+    T(RTMissingTypeAttribute, \
+        "runtime: no attribute %0 in type", \
+        Symbol) \
+    T(RTMissingLocalTypeAttribute, \
+        "runtime: no attribute %0 in local type", \
+        Symbol) \
+    T(RTRegExError, \
+        "runtime: error in regular expression: %0", \
+        PString) \
+    T(RTUnableToOpenFile, \
+        "runtime: can't open file: %0", \
+        PString) \
+    T(RTUncountableStorageType, \
+        "runtime: storage type %0 has no count", \
+        PType) \
+    T(RTNoElementsInStorageType, \
+        "runtime: storage type %0 has no elements", \
+        PType) \
+    T(RTNoNamedElementsInStorageType, \
+        "runtime: storage type %0 has no named elements", \
+        PType) \
+    T(RTIllegalSupertype, \
+        "runtime: typename %0 can not be a supertype of %1", \
+        PType, PType) \
+
+// main
+#define SCOPES_MAIN_ERROR_KIND() \
+    T(MainInaccessibleBinary, \
+        "main: can't open executable file for reading") \
+    T(InvalidFooter, \
+        "main: invalid footer. Footer must have the format (core-size <size of script in bytes>)") \
+    T(CoreModuleFunctionTypeMismatch, \
+        "main: core function has wrong type %0, must be of type %1", \
+        PType, PType) \
+    T(CoreMissing, \
+        "main: no core module at tail of executable or at path %0", \
+        Symbol) \
+
+#define SCOPES_ERROR_KIND() \
+    T(User, "%0", PString) \
+    T(ExecutionEngineFailed, \
+        "execution engine failed: %0", \
+        Rawstring) \
+    T(StackOverflow, \
+        "stack overflow encountered") \
+    SCOPES_C_IMPORT_ERROR_KIND() \
+    SCOPES_SYNTAX_ERROR_KIND() \
+    SCOPES_TYPECHECK_ERROR_KIND() \
+    SCOPES_CODEGEN_ERROR_KIND() \
+    SCOPES_RUNTIME_ERROR_KIND() \
+    SCOPES_PARSER_ERROR_KIND() \
+    SCOPES_QUOTE_ERROR_KIND() \
+    SCOPES_MAIN_ERROR_KIND() \
+
+enum ErrorKind {
+#define T(CLASS, STR, ...) \
+    EK_ ## CLASS,
+    SCOPES_ERROR_KIND()
+#undef T
 };
 
-#define SCOPES_CAT(a, ...) SCOPES_PRIMITIVE_CAT(a, __VA_ARGS__)
-#define SCOPES_PRIMITIVE_CAT(a, ...) a ## __VA_ARGS__
-#define SCOPES_ANCHOR(ANCHOR) ScopedAnchor SCOPES_CAT(_scoped_anchor, __LINE__)(ANCHOR)
+//------------------------------------------------------------------------------
+
+// what were we doing when the error occurred?
+enum BacktraceKind {
+    // signifies nothing
+    BTK_Dummy,
+    // context = none, location in anchor
+    BTK_Parser,
+    // context = symbol or expression being expanded 
+    BTK_Expander,
+    // context = expression being typechecked
+    BTK_ProveExpression,
+    // context = template being typechecked
+    BTK_ProveTemplate,
+    // context = argument being typechecked
+    BTK_ProveArgument,
+    // invoked in user code at runtime; context = call
+    BTK_User,
+};
+
+struct Backtrace {
+    const Backtrace *next;
+    BacktraceKind kind;
+    ValueRef context;
+};
+
+#define SCOPES_TRACE(KIND, VALUE) \
+    Backtrace _backtrace = { nullptr, BTK_ ## KIND, (VALUE) };
+// globals must be included for g_none
+#define SCOPES_TRACE_PARSER(ANCHOR) \
+    SCOPES_TRACE(Parser, ref((ANCHOR), g_none))
+#define SCOPES_TRACE_EXPANDER(VALUEREF) \
+    SCOPES_TRACE(Expander, (VALUEREF))
+#define SCOPES_TRACE_PROVE_EXPR(VALUEREF) \
+    SCOPES_TRACE(ProveExpression, (VALUEREF))
+#define SCOPES_TRACE_PROVE_TEMPLATE(VALUEREF) \
+    SCOPES_TRACE(ProveTemplate, (VALUEREF))
+#define SCOPES_TRACE_PROVE_ARG(VALUEREF) \
+    SCOPES_TRACE(ProveArgument, (VALUEREF))
+
+extern Backtrace _backtrace;
 
 //------------------------------------------------------------------------------
 
 struct Error {
-    Error();
+    ErrorKind kind() const;
 
-    Error(const Anchor *_anchor, const String *_msg);
+    Error(ErrorKind _kind);
+    Error(const Error &other) = delete;
 
-    std::vector<Value *> trace;
-    std::vector<Value *> definitions;
-    std::vector<const String *> messages;
-    const Anchor *anchor;
-    const String *msg;
-
-    void append_error_trace(Value *value);
-    void append_definition(Value *value);
+    Error *trace(const Backtrace &bt);
+    const Backtrace *get_trace() const;
+private:
+    const Backtrace *_trace = nullptr;
+    const ErrorKind _kind;
 };
 
 //------------------------------------------------------------------------------
 
-void print_error(const Error *value);
-void stream_error(StyledStream &ss, const Error *value);
-void stream_error_string(StyledStream &ss, const Error *value);
+#define TA(N, CLS) CLS
+#define TB(N, CLS) CLS arg ## N
+#define T(CLASS, STR, ...) /*
+*/struct Error ## CLASS : Error { /*
+*/  static bool classof(const Error *T);/*
+*/  Error ## CLASS();/*
+*/  static Error ## CLASS *from(SCOPES_FOREACH_EXPR(TA, ##__VA_ARGS__)); /*
+*/  void stream(StyledStream &ss) const;/*
+*/  SCOPES_FOREACH_STMT(TB, ##__VA_ARGS__); /* 
+*/};
 
-Error *make_location_error(const String *msg);
-Error *make_location_error(const Anchor *anchor, const String *msg);
-Error *make_runtime_error(const String *msg);
+SCOPES_ERROR_KIND()
+#undef T
+#undef TA
+#undef TB
+
+//------------------------------------------------------------------------------
+
+void print_error(const Error *value);
+void stream_error_message(StyledStream &ss, const Error *value);
+void stream_error(StyledStream &ss, const Error *value);
 
 #if SCOPES_EARLY_ABORT
-#define SCOPES_LOCATION_ERROR(MSG) \
-    assert (false); \
-    return Result<_result_type>::raise(make_location_error((MSG)));
+#define SCOPES_ERROR(CLASS, ...) \
+    assert(false); \
+    SCOPES_RETURN_ERROR(Error ## CLASS::from(__VA_ARGS__)->trace(_backtrace));
 #else
-#define SCOPES_LOCATION_ERROR(MSG) \
-    return Result<_result_type>::raise(make_location_error((MSG)));
+#define SCOPES_ERROR(CLASS, ...) \
+    SCOPES_RETURN_ERROR(Error ## CLASS::from(__VA_ARGS__)->trace(_backtrace));
 #endif
 
-void location_message(const Anchor *anchor, const String* str);
-
-//------------------------------------------------------------------------------
-
-struct Value;
-struct Parameter;
-struct Template;
-struct Function;
-struct FunctionType;
-
-// specializer errors
-SCOPES_RESULT(void) error_invalid_call_type(TypedValue *callee);
-SCOPES_RESULT(void) error_invalid_condition_type(TypedValue *cond);
-SCOPES_RESULT(void) error_invalid_case_literal_type(TypedValue *lit);
-SCOPES_RESULT(void) error_label_expected(Value *value);
-SCOPES_RESULT(void) error_duplicate_default_case();
-SCOPES_RESULT(void) error_missing_default_case();
-SCOPES_RESULT(void) error_argument_count_mismatch(int needed, int got, const FunctionType *ft = nullptr);
-SCOPES_RESULT(void) error_invalid_operands(const Type *A, const Type *B);
-SCOPES_RESULT(void) error_argument_type_mismatch(const Type *expected, const Type *got);
-SCOPES_RESULT(void) error_something_expected(const char *want, Value *value);
-SCOPES_RESULT(void) error_constant_expected(const Type *want, Value *value);
-SCOPES_RESULT(void) error_unbound_symbol(Parameter *value);
-SCOPES_RESULT(void) error_unbound_symbol(Value *value);
-SCOPES_RESULT(void) error_cannot_merge_expression_types(const char *context, const Type *T1, const Type *T2);
-SCOPES_RESULT(void) error_noreturn_not_last_expression();
-SCOPES_RESULT(void) error_recursion_overflow();
-SCOPES_RESULT(void) error_noreturn_in_argument_list();
-SCOPES_RESULT(void) error_cannot_type_builtin(const Builtin &builtin);
-SCOPES_RESULT(void) error_illegal_repeat_outside_loop();
-SCOPES_RESULT(void) error_illegal_break_outside_loop();
-SCOPES_RESULT(void) error_variadic_symbol_not_in_last_place();
-SCOPES_RESULT(void) error_untyped_recursive_call(Function *func);
-SCOPES_RESULT(void) error_recursive_function_changed_type(Function *func, const Type *T1, const Type *T2);
-SCOPES_RESULT(void) error_value_inaccessible_from_closure(TypedValue *value, const Function *frame);
-SCOPES_RESULT(void) error_cannot_deref_non_plain(const Type *T);
-
-// lifetime checker errors
-SCOPES_RESULT(void) error_cannot_view_moved(TypedValue *value);
-SCOPES_RESULT(void) error_cannot_access_moved(const Type *T, const char *by);
-SCOPES_RESULT(void) error_cannot_return_view(TypedValue *value);
-SCOPES_RESULT(void) error_value_not_unique(TypedValue *value, const char *by);
-SCOPES_RESULT(void) error_value_not_plain(TypedValue *value);
-SCOPES_RESULT(void) error_altering_parent_scope_in_pass(const Type *valuetype);
-SCOPES_RESULT(void) error_altering_parent_scope_in_loop(const Type *valuetype);
-SCOPES_RESULT(void) error_cannot_cast_plain_to_unique(const Type *SrcT, const Type *DestT);
-SCOPES_RESULT(void) error_plain_not_storage_of_unique(const Type *SrcT, const Type *DestT);
-SCOPES_RESULT(void) error_value_moved(TypedValue *value, Value *mover, const char *by);
-SCOPES_RESULT(void) error_value_in_use(TypedValue *value, Value *user, const char *by);
-SCOPES_RESULT(void) error_value_is_viewed(Value *value, Value *user, const char *by);
-SCOPES_RESULT(void) error_cannot_merge_moves(const char *by);
-SCOPES_RESULT(void) error_nonreturning_function_must_move();
-
-// code generator errors
-SCOPES_RESULT(void) error_gen_invalid_call_type(const char *target, TypedValue *callee);
-SCOPES_RESULT(void) error_gen_unbound_symbol(const char *target, Parameter *value);
-SCOPES_RESULT(void) error_gen_unbound_symbol(const char *target, Value *value);
-SCOPES_RESULT(void) error_cannot_translate(const char *target, Value *value);
-
-//------------------------------------------------------------------------------
+// if ok fails, return
+#define SCOPES_CHECK_OK(OK, ERR) if (!OK) { SCOPES_RETURN_ERROR((ERR)->trace(_backtrace)); }
+// if an expression returning a result fails, return
+#define SCOPES_CHECK_RESULT(EXPR) { \
+    auto _result = (EXPR); \
+    SCOPES_CHECK_OK(_result.ok(), _result.unsafe_error()); \
+}
+// try to extract a value from a result or return
+#define SCOPES_GET_RESULT(EXPR) ({ \
+        auto _result = (EXPR); \
+        SCOPES_CHECK_OK(_result.ok(), _result.unsafe_error()); \
+        _result.unsafe_extract(); \
+    })
+#define SCOPES_CHECK_CAST(T, EXPR) ({ \
+        Result<T> _result = (EXPR); \
+        SCOPES_CHECK_OK(_result.ok(), _result.unsafe_error()); \
+        _result.unsafe_extract(); \
+    })
 
 } // namespace scopes
 

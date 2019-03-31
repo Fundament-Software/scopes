@@ -107,9 +107,7 @@ SCOPES_RESULT(const Type *) union_type(const Types &values) {
     for (size_t i = 0; i < values.size(); ++i) {
         const Type *T = values[i];
         if (is_opaque(T)) {
-            StyledString ss;
-            ss.out << "can not construct union type with field of opaque type " << T;
-            SCOPES_LOCATION_ERROR(ss.str());
+            SCOPES_ERROR(OpaqueType, T);
         }
     }
     auto result = new UnionType(values);

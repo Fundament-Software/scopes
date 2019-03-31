@@ -34,7 +34,7 @@ spice test-match (args...)
         # at least one argument
         `(print "case4" x "|" y...)
     default
-        compiler-error! "wrong!"
+        error "wrong!"
 
 @@ spice-quote
 fn test-main ()

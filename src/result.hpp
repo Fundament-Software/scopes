@@ -26,33 +26,9 @@ struct Error;
     typedef T _result_type;
 
 #define SCOPES_RETURN_ERROR(ERR) return Result<_result_type>::raise(ERR);
-// if ok fails, return
-#define SCOPES_CHECK_OK(OK, ERR) if (!OK) { SCOPES_RETURN_ERROR(ERR); }
-// if an expression returning a result fails, return
-#define SCOPES_CHECK_RESULT(EXPR) { \
-    auto _result = (EXPR); \
-    SCOPES_CHECK_OK(_result.ok(), _result.unsafe_error()); \
-}
-// execute expression and return an error
-#define SCOPES_EXPECT_ERROR(EXPR) {\
-    auto _tmp = (EXPR); \
-    assert(!_tmp.ok()); \
-    SCOPES_RETURN_ERROR(_tmp.unsafe_error()); \
-}
-// try to extract a value from a result or return
-#define SCOPES_GET_RESULT(EXPR) ({ \
-        auto _result = (EXPR); \
-        SCOPES_CHECK_OK(_result.ok(), _result.unsafe_error()); \
-        _result.unsafe_extract(); \
-    })
 #define SCOPES_ASSERT_CAST(T, EXPR) ({ \
         Result<T> _result = (EXPR); \
         _result.assert_ok(); \
-    })
-#define SCOPES_CHECK_CAST(T, EXPR) ({ \
-        Result<T> _result = (EXPR); \
-        SCOPES_CHECK_OK(_result.ok(), _result.unsafe_error()); \
-        _result.unsafe_extract(); \
     })
 
 template<typename T>

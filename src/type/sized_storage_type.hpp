@@ -8,6 +8,7 @@
 #define SCOPES_SIZED_STORAGE_HPP
 
 #include "../type.hpp"
+#include "../error.hpp"
 
 namespace scopes {
 

@@ -3,7 +3,7 @@ do
         try
             print 1
             if true
-                error! "runtime error"
+                error "runtime error"
             print 2
             true
         except (exc)
@@ -18,7 +18,7 @@ fn test-loop-xp ()
             return;
         try
             if (counter == 5)
-                error! "loop error"
+                error "loop error"
             print "success branch" counter
             true
         except (exc)

@@ -15,9 +15,9 @@ namespace scopes {
 
 struct ASTContext;
 
-Value *unwrap_value(const Type *T, Value *value);
-Value *wrap_value(const Type *T, Value *value);
-SCOPES_RESULT(TypedValue *) quote(const ASTContext &ctx, Value *node);
+ValueRef unwrap_value(const Type *T, const ValueRef &value);
+ValueRef wrap_value(const Type *T, const ValueRef &value);
+SCOPES_RESULT(TypedValueRef) quote(const ASTContext &ctx, const ValueRef &node);
 
 } // namespace scopes
 

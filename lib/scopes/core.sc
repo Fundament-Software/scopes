@@ -28,7 +28,7 @@ fn ptrcmp== (t1 t2)
 
 fn box-integer (value)
     let T = (typeof value)
-    sc_const_int_new (sc_get_active_anchor) T
+    sc_const_int_new T
         if (sc_integer_type_is_signed T)
             sext value u64
         else
@@ -36,28 +36,22 @@ fn box-integer (value)
 
 # turn a symbol-like value (storage type u64) to an Any
 fn box-symbol (value)
-    sc_const_int_new (sc_get_active_anchor) (typeof value)
+    sc_const_int_new (typeof value)
         bitcast value u64
 
 # turn a pointer value into an Any
 fn box-pointer (value)
-    sc_const_pointer_new (sc_get_active_anchor) (typeof value)
+    sc_const_pointer_new (typeof value)
         bitcast value voidstar
 
-fn error! (msg)
-    raise (sc_runtime_error_new msg)
-
-fn sugar-error! (anchor msg)
-    raise (sc_location_error_new anchor msg)
-
-fn compiler-error! (value)
-    raise (sc_location_error_new (sc_get_active_anchor) value)
+fn error (msg)
+    raise (sc_error_new msg)
 
 # print an unboxing error given two types
 fn unbox-verify (value wantT)
     let haveT = (sc_value_type value)
     if (ptrcmp!= haveT wantT)
-        sugar-error! (sc_value_anchor value)
+        error
             sc_string_join "can't unbox value of type "
                 sc_string_join
                     sc_value_repr (box-pointer haveT)
@@ -65,7 +59,7 @@ fn unbox-verify (value wantT)
                         sc_value_repr (box-pointer wantT)
     if (sc_value_is_constant value)
     else
-        sugar-error! (sc_value_anchor value)
+        error
             sc_string_join "constant of type "
                 sc_string_join
                     sc_value_repr (box-pointer haveT)
@@ -87,14 +81,14 @@ inline unbox-pointer (value T)
 fn verify-count (count mincount maxcount)
     if (icmp>=s mincount 0)
         if (icmp<s count mincount)
-            compiler-error!
+            error
                 sc_string_join "at least "
                     sc_string_join (sc_value_repr (box-integer mincount))
                         sc_string_join " argument(s) expected, got "
                             sc_value_repr (box-integer count)
     if (icmp>=s maxcount 0)
         if (icmp>s count maxcount)
-            compiler-error!
+            error
                 sc_string_join "at most "
                     sc_string_join (sc_value_repr (box-integer maxcount))
                         sc_string_join " argument(s) expected, got "
@@ -126,8 +120,8 @@ fn build-typify-function (f)
     let result = (sc_compile (sc_typify f 1 types) 0:u64)
     let result-type = (sc_value_type result)
     if (ptrcmp!= result-type SpiceMacroFunction)
-        compiler-error!
-            sc_string_join "AST macro must have type "
+        error
+            sc_string_join "spice macro must have type "
                 sc_string_join
                     sc_value_repr (box-pointer SpiceMacroFunction)
                     sc_string_join " but has type "
@@ -141,27 +135,22 @@ let typify =
             let argcount = (sc_argcount args)
             verify-count argcount 1 -1
             let src_fn = (sc_getarg args 0)
-            let typifyfn =
-                if (ptrcmp== (sc_value_type src_fn) Closure)
-                    `sc_typify
-                else
-                    `sc_typify_template
             let typecount = (sub argcount 1)
             spice-quote
                 let types = (alloca-array type typecount)
                 spice-unquote
-                    let body = (sc_expression_new (sc_get_active_anchor))
+                    let body = (sc_expression_new)
                     loop (i j = 1 0)
                         if (icmp== i argcount)
                             break;
                         let ty = (sc_getarg args i)
                         if (ptrcmp!= (sc_value_type ty) type)
-                            compiler-error! "type expected"
+                            error "type expected"
                         sc_expression_append body
                             `(store ty (getelementptr types j))
                         _ (add i 1) (add j 1)
                     body
-                typifyfn src_fn typecount (bitcast types TypeArrayPointer)
+                sc_typify src_fn typecount (bitcast types TypeArrayPointer)
 
         build-typify-function typify
 
@@ -194,10 +183,10 @@ inline function->SpiceMacro (f)
     bitcast f SpiceMacro
 
 fn box-empty ()
-    sc_argument_list_new (sc_get_active_anchor)
+    sc_argument_list_new;
 
 fn box-none ()
-    sc_const_aggregate_new (sc_get_active_anchor) Nothing 0 (undef ValueArrayPointer)
+    sc_const_aggregate_new Nothing 0 (undef ValueArrayPointer)
 
 # take closure l, typify and compile it and return a function of SpiceMacro type
 inline spice-macro (l)
@@ -222,7 +211,7 @@ let va-lfold va-lifold =
                 let arg =
                     sc_getarg args i
                 let k = (sc_type_key (sc_value_qualified_type arg))
-                let v = (sc_keyed_new (sc_value_anchor arg) unnamed arg)
+                let v = (sc_keyed_new unnamed arg)
                 _ (add i 1)
                     if use-indices
                         `(f [(sub i 2)] k v ret)
@@ -250,7 +239,8 @@ let va-rfold va-rifold =
                 let arg =
                     sc_getarg args i
                 let k = (sc_type_key (sc_value_qualified_type arg))
-                let v = (sc_keyed_new (sc_value_anchor arg) unnamed arg)
+                let v = (sc_valueref_tag
+                    (sc_value_anchor arg) (sc_keyed_new unnamed arg))
                 _ i
                     if use-indices
                         `(f [(sub i 2)] k v ret)
@@ -262,7 +252,7 @@ let va-rfold va-rifold =
 
 inline raises-compile-error ()
     if false
-        compiler-error! "hidden"
+        error "hidden"
 
 inline type< (T superT)
     sc_type_is_superof superT T
@@ -327,7 +317,7 @@ sc_type_set_symbol Symbol '__call
                         try
                             return (sc_type_at self sym)
                         except (err)
-                compiler-error!
+                error
                     sc_string_join "no method named "
                         sc_string_join (sc_value_repr symval)
                             sc_string_join " in value of type "
@@ -338,7 +328,7 @@ sc_type_set_symbol Symbol '__call
             let symval = (sc_getarg args 0)
             let self = (sc_getarg args 1)
             let expr = `([(resolve-method self symval)]
-                [(sc_extract_argument_list_new (sc_value_anchor args) args 1)])
+                [(sc_extract_argument_list_new args 1)])
             expr
 
 do
@@ -353,7 +343,7 @@ do
         else
             let arg = (sc_getarg args 1)
             let key = (sc_type_key (sc_value_qualified_type arg))
-            let arg = (sc_keyed_new (sc_value_anchor arg) unnamed arg)
+            let arg = (sc_keyed_new unnamed arg)
             return self (box-symbol key) arg
 
     inline gen-key-any-set (selftype fset)
@@ -373,7 +363,7 @@ do
                             let key = (unbox-symbol key Symbol)
                             fset self key value
                             return `()
-                compiler-error! "all arguments must be constant"
+                error "all arguments must be constant"
 
     # quick assignment of type attributes
     sc_type_set_symbol type 'set-symbol (gen-key-any-set type sc_type_set_symbol)
@@ -404,15 +394,15 @@ sc_type_set_symbol tuple '__typecall
             spice-quote
                 let types = (alloca-array type pcount)
                 spice-unquote
-                    let body = (sc_expression_new (sc_get_active_anchor))
+                    let body = (sc_expression_new)
                     loop (i = 1)
                         if (icmp== i argcount)
                             break;
                         let arg = (sc_getarg args i)
                         let k = (sc_type_key (sc_value_qualified_type arg))
-                        let arg = (sc_keyed_new (sc_value_anchor arg) unnamed arg)
+                        let arg = (sc_keyed_new unnamed arg)
                         if (ptrcmp!= (sc_value_type arg) type)
-                            compiler-error! "type expected"
+                            error "type expected"
                         sc_expression_append body
                             `(store
                                 (sc_key_type k arg)
@@ -469,7 +459,7 @@ sc_type_set_symbol function '__typecall
                 spice-quote
                     let types = (alloca-array type pcount)
                     spice-unquote
-                        let expr = (sc_expression_new (sc_get_active_anchor))
+                        let expr = (sc_expression_new)
                         loop (i = 2)
                             if (icmp== i argcount)
                                 break;
@@ -534,7 +524,7 @@ let const.icmp<=.i32.i32 =
                     let b = (unbox-integer b i32)
                     return
                         box-integer (icmp<=s a b)
-            compiler-error! "arguments must be constant"
+            error "arguments must be constant"
 
 let const.add.i32.i32 =
     spice-macro
@@ -546,7 +536,7 @@ let const.add.i32.i32 =
                     let b = (unbox-integer b i32)
                     return
                         box-integer (add a b)
-            compiler-error! "arguments must be constant"
+            error "arguments must be constant"
 
 let static-branch =
     spice-macro
@@ -558,7 +548,7 @@ let static-branch =
             let elsef = (sc_getarg args 2)
             if (sc_value_is_constant cond)
             else
-                compiler-error! "condition must be constant"
+                error "condition must be constant"
             let value = (unbox-integer cond bool)
             `([(? value thenf elsef)])
 
@@ -568,17 +558,19 @@ sc_type_set_symbol Value '__typecall
             let argcount = (sc_argcount args)
             verify-count argcount 1 -1
             if (icmp== argcount 1)
-                box-pointer (box-empty)
+                `()
             else
                 let value = (sc_getarg args 1)
                 let T = (sc_value_type value)
+                #sc_write
+                    sc_value_repr `T
+                #sc_write "\n"
                 if (ptrcmp== T Value)
                     value
-                elseif (sc_value_is_constant value)
-                    box-pointer value
                 elseif (ptrcmp== T Nothing)
-                    box-pointer
-                        box-none;
+                    ``none
+                elseif (sc_value_is_constant value)
+                    ``value
                 else
                     sc_value_wrap T value
 
@@ -598,22 +590,24 @@ let
     type<= = (spice-macro (type-comparison-func type<=))
     type>= = (spice-macro (type-comparison-func type>=))
 
+let NullType = (sc_typename_type "NullType")
+
 run-stage;
 
-fn cons (values...)
+inline cons (values...)
     va-rifold none
         inline (i key value next)
             static-branch (none? next)
                 inline ()
                     value
                 inline ()
-                    sc_list_cons (Value value) next
+                    sc_list_cons `value next
         values...
 
 inline make-list (values...)
     va-rifold '()
         inline (i key value result)
-            sc_list_cons (Value value) result
+            sc_list_cons `value result
         values...
 
 inline decons (self count)
@@ -663,7 +657,7 @@ inline define-symbols (self values...)
     dekey =
         fn "dekey" (self)
             let k = (sc_type_key ('qualified-typeof self))
-            _ k (sc_keyed_new (sc_value_anchor self) unnamed self)
+            _ k (sc_keyed_new unnamed self)
 
 'define-symbols Scope
     @ = sc_scope_at
@@ -832,7 +826,7 @@ inline unbox (value T)
 fn value-as (vT T expr)
     if true
         return `(unbox expr T)
-    compiler-error! "unsupported type"
+    error "unsupported type"
 
 'define-symbols Value
     __as =
@@ -891,7 +885,7 @@ fn integer-imply (vT T)
                         return `(sitofp self T)
                     else
                         return `(uitofp self T)
-                compiler-error! "integer must be constant for implicit conversion"
+                error "integer must be constant for implicit conversion"
     let static-i32->usize =
         spice-converter-macro
             inline (self T)
@@ -899,10 +893,10 @@ fn integer-imply (vT T)
                 if ('constant? self)
                     let val = (unbox self i32)
                     if (icmp<s val 0)
-                        compiler-error! "signed integer is negative"
+                        error "signed integer is negative"
                     return
                         box-integer (sext val usize)
-                compiler-error! "integer must be constant for implicit conversion"
+                error "integer must be constant for implicit conversion"
     let ST =
         if (ptrcmp== T usize) ('storageof T)
         else T
@@ -984,8 +978,8 @@ fn real-as (vT T)
 # cast protocol
 #------------------------------------------------------------------------------
 
-inline cast-error! (intro-string vT T)
-    compiler-error!
+inline cast-error (intro-string vT T)
+    error
         sc_string_join intro-string
             sc_string_join ('__repr (box-pointer vT))
                 sc_string_join " to type " ('__repr (box-pointer T))
@@ -1008,7 +1002,7 @@ fn cast-converter (symbol rsymbol vT T)
             except (err) (merge next)
         let conv = (sc_prove `(f vT T))
         if (operator-valid? conv) (return conv)
-    return (sc_empty_argument_list (sc_get_active_anchor))
+    return (sc_empty_argument_list)
 
 inline cast-identity (value) value
 
@@ -1041,7 +1035,7 @@ inline gen-cast-op (f str)
             let conv = (f vT T)
             if (operator-valid? conv)
                 return `(conv value)
-            cast-error! str vT T
+            cast-error str vT T
 
 let imply = (gen-cast-op imply-converter "can't coerce value of type ")
 let as = (gen-cast-op as-converter "can't cast value of type ")
@@ -1059,7 +1053,7 @@ fn unary-operator (symbol T)
             except (err) (merge next)
         let op = (sc_prove `(f T))
         if (operator-valid? op) (return op)
-    return (sc_empty_argument_list (sc_get_active_anchor))
+    return (sc_empty_argument_list)
 
 fn binary-operator (symbol lhsT rhsT)
     """"for an operation performed on two argument types, of which only
@@ -1071,7 +1065,7 @@ fn binary-operator (symbol lhsT rhsT)
             except (err) (merge next)
         let op = (sc_prove `(f lhsT rhsT))
         if (operator-valid? op) (return op)
-    return (sc_empty_argument_list (sc_get_active_anchor))
+    return (sc_empty_argument_list)
 
 fn binary-operator-r (rsymbol lhsT rhsT)
     """"for an operation performed on two argument types, of which only
@@ -1083,7 +1077,7 @@ fn binary-operator-r (rsymbol lhsT rhsT)
             except (err) (merge next)
         let op = (sc_prove `(f lhsT rhsT))
         if (operator-valid? op) (return op)
-    return (sc_empty_argument_list (sc_get_active_anchor))
+    return (sc_empty_argument_list)
 
 fn balanced-binary-operator (symbol rsymbol lhsT rhsT)
     """"for an operation performed on two argument types, of which either
@@ -1114,16 +1108,16 @@ fn balanced-binary-operator (symbol rsymbol lhsT rhsT)
             let op = (binary-operator symbol rhsT rhsT)
             if (operator-valid? op)
                 return `(inline (lhs rhs) (op (conv lhs) rhs))
-    return (sc_empty_argument_list (sc_get_active_anchor))
+    return (sc_empty_argument_list)
 
-fn unary-op-error! (friendly-op-name T)
-    compiler-error!
+fn unary-op-error (friendly-op-name T)
+    error
         'join "can't "
             'join friendly-op-name
                 'join " value of type " ('__repr (box-pointer T))
 
-fn binary-op-error! (friendly-op-name lhsT rhsT)
-    compiler-error!
+fn binary-op-error (friendly-op-name lhsT rhsT)
+    error
         'join "can't "
             'join friendly-op-name
                 'join " values of types "
@@ -1142,7 +1136,7 @@ fn balanced-binary-operation (args symbol rsymbol friendly-op-name)
     let op = (balanced-binary-operator symbol rsymbol lhsT rhsT)
     if (operator-valid? op)
         return `(op lhs rhs)
-    binary-op-error! friendly-op-name lhsT rhsT
+    binary-op-error friendly-op-name lhsT rhsT
 
 # right hand has fixed type - this one doesn't need a dispatch step
 fn unbalanced-binary-operation (args symbol rtype friendly-op-name)
@@ -1161,11 +1155,11 @@ fn unbalanced-binary-operation (args symbol rtype friendly-op-name)
             if (operator-valid? conv)
                 `(conv rhs)
             else
-                cast-error! "can't coerce secondary argument of type " rhsT rtype
+                cast-error "can't coerce secondary argument of type " rhsT rtype
     let f =
         try ('@ lhsT symbol)
         except (err)
-            unary-op-error! friendly-op-name lhsT
+            unary-op-error friendly-op-name lhsT
     `(f lhs rhs)
 
 # unary operations don't need a dispatch step either
@@ -1177,7 +1171,7 @@ fn unary-operation (args symbol friendly-op-name)
     let f =
         try ('@ T symbol)
         except (err)
-            unary-op-error! friendly-op-name T
+            unary-op-error friendly-op-name T
     `(f u)
 
 fn unary-or-balanced-binary-operation (args usymbol ufriendly-op-name symbol rsymbol friendly-op-name)
@@ -1300,14 +1294,13 @@ fn dispatch-and-or (args flip)
         return
             if (bxor value flip) cond
             else call-elsef
-    let anchor = (sc_get_active_anchor)
-    let ifval = (sc_if_new anchor)
+    let ifval = (sc_if_new)
     if flip
-        sc_if_append_then_clause ifval anchor cond call-elsef
-        sc_if_append_else_clause ifval anchor cond
+        sc_if_append_then_clause ifval cond call-elsef
+        sc_if_append_else_clause ifval cond
     else
-        sc_if_append_then_clause ifval anchor cond cond
-        sc_if_append_else_clause ifval anchor call-elsef
+        sc_if_append_then_clause ifval cond cond
+        sc_if_append_else_clause ifval call-elsef
     ifval
 
 let safe-shl =
@@ -1319,7 +1312,7 @@ let safe-shl =
             let rhsT = ('typeof rhs)
             let bits = ('bitcount ('typeof lhs))
             let mask = (zext (sub bits 1) u64)
-            let mask = (sc_const_int_new (sc_get_active_anchor) rhsT mask)
+            let mask = (sc_const_int_new rhsT mask)
             # mask right hand side by bit width
             `(shl lhs (band rhs mask))
 
@@ -1465,14 +1458,13 @@ inline floordiv (a b)
                         `(sc_scope_clone [ ('getarg args 2) ])
                     else
                         `(sc_scope_clone_subscope
-                            [(sc_extract_argument_list_new (sc_value_anchor args) args 1)])
+                            [(sc_extract_argument_list_new args 1)])
 
 #---------------------------------------------------------------------------
 # null type
 #---------------------------------------------------------------------------
 
 """"The type of the `null` constant. This type is uninstantiable.
-let NullType = (sc_typename_type "NullType")
 'set-plain-storage NullType ('pointer void)
 do
     inline null== (lhs rhs) (icmp== (ptrtoint rhs usize) 0:usize)
@@ -1546,10 +1538,35 @@ let missing-constructor =
             let argc = ('argcount args)
             verify-count argc 1 -1
             let cls = ('getarg args 0)
-            compiler-error!
+            error
                 sc_string_join "typename "
                     sc_string_join ('__repr cls)
                         " has no constructor"
+
+let repr =
+    spice-macro
+        fn (args)
+            fn type-is-default-suffix? (CT)
+                if (sc_type_is_default_suffix CT) true
+                elseif (ptrcmp== CT NullType) true
+                else false
+            let argc = ('argcount args)
+            verify-count argc 1 1
+            let value = ('getarg args 0)
+            let T = ('typeof value)
+            let s =
+                try
+                    let f = (sc_type_at T '__repr)
+                    `(f value)
+                except (err)
+                    `(sc_value_content_repr value)
+            if (type-is-default-suffix? T) s
+            else
+                let suffix =
+                    sc_string_join
+                        sc_default_styler style-operator ":"
+                        sc_default_styler style-type ('string T)
+                `(sc_string_join s suffix)
 
 run-stage;
 
@@ -1594,46 +1611,12 @@ fn empty? (value)
 #fn cons (at next)
     sc_list_cons (Value at) next
 
-fn type-repr-needs-suffix? (CT)
-    if (== CT i32) false
-    elseif (== CT bool) false
-    elseif (== CT Nothing) false
-    elseif (== CT NullType) false
-    elseif (== CT f32) false
-    elseif (== CT string) false
-    elseif (== CT list) false
-    elseif (== CT Symbol) false
-    elseif (== CT type) false
-    elseif (== ('kind CT) type-kind-vector)
-        let ET = ('element@ CT 0)
-        if (== ET i32) false
-        elseif (== ET bool) false
-        elseif (== ET f32) false
-        else true
-    else true
-
 fn tostring (value)
     'dispatch-attr (typeof value) '__tostring
         inline (f)
             f value
         inline ()
-            sc_value_tostring (Value value)
-
-fn repr (value)
-    let T = (typeof value)
-    let s =
-        'dispatch-attr T '__repr
-            inline (f)
-                f value
-            inline ()
-                sc_value_content_repr (Value value)
-    if (type-repr-needs-suffix? T)
-        .. s
-            ..
-                sc_default_styler style-operator ":"
-                sc_default_styler style-type ('string T)
-
-    else s
+            sc_value_tostring `value
 
 let print =
     do
@@ -1697,7 +1680,7 @@ let coerce-call-arguments =
             let fT = ('element@ fptrT 0)
             let pcount = ('element-count fT)
             if (== pcount argc)
-                let outargs = (sc_call_new (sc_get_active_anchor) self)
+                let outargs = (sc_call_new self)
                 sc_call_set_rawcall outargs true
                 loop (i = 0)
                     if (== i argc)
@@ -1876,8 +1859,8 @@ inline infix-op (pred)
         let op =
             try (get-ifx-op infix-table token)
             except (err)
-                sc_set_active_anchor ('anchor token)
-                compiler-error!
+                # TODO point
+                error
                     "unexpected token in infix expression"
         let op-prec = (unpack-infix-op op)
         ? (pred op-prec prec) op (Value none)
@@ -1889,8 +1872,8 @@ fn rtl-infix-op-eq (infix-table token prec)
     let op =
         try (get-ifx-op infix-table token)
         except (err)
-            sc_set_active_anchor ('anchor token)
-            compiler-error!
+            # TODO point
+            error
                 "unexpected token in infix expression"
     let op-prec op-order = (unpack-infix-op op)
     if (== op-order '<)
@@ -1949,12 +1932,10 @@ fn list-handler (topexpr env)
         except (err) head
     if (== ('typeof head) SugarMacro)
         let head = (as head SugarMacro)
-        sc_set_active_anchor expr-anchor
         let expr env = (head expr topexpr-next env)
         return (as expr list) env
     elseif (has-infix-ops? env expr)
         let at next = ('decons expr)
-        sc_set_active_anchor expr-anchor
         let expr =
             parse-infix-expr env at next 0
         return (cons expr topexpr-next) env
@@ -1977,13 +1958,14 @@ fn symbol-handler (topexpr env)
     return topexpr env
 
 fn quasiquote-list
-inline quasiquote-any (ox)
-    let x = ox
+inline quasiquote-any (x)
     let T = ('typeof x)
     if (== T list)
         quasiquote-list (as x list)
     else
-        list sugar-quote ox
+        list sc_valueref_tag
+            `[(sc_value_anchor x)]
+            list sugar-quote x
 fn quasiquote-list (x)
     if (empty? x)
         return (list sugar-quote x)
@@ -1998,13 +1980,13 @@ fn quasiquote-list (x)
                 let at-at = (as at-at Symbol)
                 if (== at-at 'unquote-splice)
                     return
-                        list (Value sc_list_join)
+                        list `sc_list_join
                             cons do at-next
                             quasiquote-list next
                 elseif (== at-at 'square-list)
                     if (> (countof at-next) 1)
                         return
-                            list (Value sc_list_join)
+                            list `sc_list_join
                                 list list (cons _ at-next)
                                 quasiquote-list next
     elseif (== T Symbol)
@@ -2020,7 +2002,7 @@ fn quasiquote-list (x)
 
 fn expand-and-or (expr f)
     if (empty? expr)
-        compiler-error! "at least one argument expected"
+        error "at least one argument expected"
     elseif (== (countof expr) 1)
         return ('@ expr)
     let expr = ('reverse expr)
@@ -2084,7 +2066,7 @@ fn va-option-branch (args)
         let argkey = ('key ('qualified-typeof arg))
         if (== key argkey)
             return
-                sc_keyed_new (sc_value_anchor arg) unnamed arg
+                sc_keyed_new unnamed arg
         + i 1
     `(elsef)
 
@@ -2157,7 +2139,7 @@ let Closure->Generator =
             verify-count argc 1 1
             let self = ('getarg args 0)
             if (not ('constant? self))
-                compiler-error! "Closure must be constant"
+                error "Closure must be constant"
             let self = (as self Closure)
             let self = (bitcast self Generator)
             Value self
@@ -2169,7 +2151,7 @@ let Closure->Collector =
             verify-count argc 1 1
             let self = ('getarg args 0)
             if (not ('constant? self))
-                compiler-error! "Closure must be constant"
+                error "Closure must be constant"
             let self = (as self Closure)
             let self = (bitcast self Collector)
             Value self
@@ -2246,7 +2228,7 @@ inline select-op-macro (sop fop numargs)
                 if (type== ('superof T) integer) `sop
                 elseif (type== ('superof T) real) `fop
                 else
-                    compiler-error!
+                    error
                         sc_string_join "invalid argument type: "
                             sc_string_join (sc_value_repr (box-pointer T))
                                 ". integer or real vector or scalar expected"
@@ -2374,7 +2356,7 @@ let va-option =
                 verify-count argc 1 1
                 let self = ('getarg args 0)
                 if (not ('constant? self))
-                    compiler-error! "Generator must be constant"
+                    error "Generator must be constant"
                 let self = (self as Collector)
                 let self = (bitcast self Closure)
                 `(self)
@@ -2396,7 +2378,7 @@ let va-option =
                 verify-count argc 1 1
                 let self = ('getarg args 0)
                 if (not ('constant? self))
-                    compiler-error! "Generator must be constant"
+                    error "Generator must be constant"
                 let self = (self as Generator)
                 let self = (bitcast self Closure)
                 `(self)
@@ -2425,7 +2407,7 @@ define for
             let it params =
                 loop (it params = args '())
                     if (empty? it)
-                        compiler-error! "'in' expected"
+                        error "'in' expected"
                     let sxat it = (decons it)
                     let at = (sxat as Symbol)
                     if (at == 'in)
@@ -2486,7 +2468,7 @@ let hash-storage =
                     elseif (type== T f64)
                         `(bitcast value u64)
                     else
-                        compiler-error!
+                        error
                             .. "can't hash storage of type " (repr OT)
             `(bitcast (sc_hash conv_u64 [('sizeof T)]) hash)
 
@@ -2545,7 +2527,7 @@ let wrap-if-not-run-stage =
                 let arg = ('getarg args 0)
                 if (('typeof arg) == CompileStage)
                     return arg
-            `(Value args)
+            ``args
 
 let incomplete = (typename "incomplete")
 
@@ -2566,7 +2548,6 @@ fn exec-module (expr eval-scope)
     let ModuleFunctionType = ('pointer ('raising (function Value) Error))
     let StageFunctionType = ('pointer ('raising (function CompileStage) Error))
     let expr-anchor = ('anchor expr)
-    sc_set_active_anchor expr-anchor
     let f = (sc_eval expr-anchor (expr as list) eval-scope)
     loop (f = f)
         # build a wrapper
@@ -2591,15 +2572,15 @@ fn dots-to-slashes (pattern)
             return (.. result (rslice pattern start))
         let c = (@ pattern i)
         if (c == (char "/"))
-            compiler-error!
+            error
                 .. "no slashes permitted in module name: " pattern
         elseif (c == (char "\\"))
-            compiler-error!
+            error
                 .. "no slashes permitted in module name: " pattern
         elseif (c != (char "."))
             repeat (i + 1:usize) start result
         elseif (icmp== (i + 1:usize) sz)
-            compiler-error!
+            error
                 .. "invalid dot at ending of module '" pattern "'"
         else
             if (icmp== i start)
@@ -2611,7 +2592,7 @@ fn dots-to-slashes (pattern)
 
 fn load-module (module-name module-path opts...)
     if (not (sc_is_file module-path))
-        compiler-error!
+        error
             .. "no such module: " module-path
     let module-path = (sc_realpath module-path)
     let module-dir = (sc_dirname module-path)
@@ -2656,7 +2637,7 @@ fn require-from (base-dir name)
             sc_write "' in paths:\n"
             loop (patterns = all-patterns)
                 if (empty? patterns)
-                    compiler-error! "failed to import module"
+                    error "failed to import module"
                 let pattern patterns = (decons patterns)
                 let pattern = (pattern as string)
                 let module-path = (make-module-path pattern namestr)
@@ -2681,7 +2662,7 @@ fn require-from (base-dir name)
                 return content
         if (('typeof content) == type)
             if (content == incomplete)
-                compiler-error!
+                error
                     .. "trying to import module " (repr name)
                         " while it is being imported"
         return content
@@ -2748,7 +2729,7 @@ let locals =
                         if (not (empty? docstr))
                             'set-docstring! constant-scope unnamed docstr
                         let tmp = `(Scope constant-scope)
-                        let block = (sc_expression_new (sc_get_active_anchor))
+                        let block = (sc_expression_new)
                         sc_expression_append block tmp
                         loop (last-key = unnamed)
                             let key value = ('next scope last-key)
@@ -2757,7 +2738,7 @@ let locals =
                                 return block
                             #if (not (stage-constant? value))
                             let keydocstr = ('docstring scope key)
-                            let value = (sc_extract_argument_new (sc_value_anchor value) value 0)
+                            let value = (sc_extract_argument_new value 0)
                             sc_expression_append block
                                 `(build-local constant-scope tmp key value keydocstr)
                             repeat key
@@ -2824,7 +2805,7 @@ let using =
                     let token pattern rest = (decons rest 2)
                     let token = (token as Symbol)
                     if (token != 'filter)
-                        compiler-error!
+                        error
                             "syntax: using <scope> [filter <filter-string>]"
                     let pattern = (pattern as string)
                     list pattern
@@ -2846,7 +2827,7 @@ let using =
                     return (process src)
             elseif (('typeof nameval) == Scope)
                 return (process (nameval as Scope))
-            compiler-error! "using: scope expeced"
+            error "using: scope expeced"
             #return
                 list run-stage
                     cons merge-scope-symbols name 'sugar-scope pattern
@@ -2874,22 +2855,19 @@ let __static-assert =
             let expr msg =
                 'getarg args 0
                 'getarg args 1
-            let anchor = (sc_get_active_anchor)
             let msg = (msg as string)
             let val = (expr as bool)
             if (not val)
-                sc_set_active_anchor anchor
-                compiler-error!
+                error
                     .. "assertion failed: " msg
             `()
 
 let __assert =
     spice-macro
         fn (args)
-            fn check-assertion (result anchor msg)
+            fn check-assertion (result msg)
                 if (not result)
-                    sc_set_active_anchor anchor
-                    compiler-error!
+                    error
                         .. "assertion failed: " msg
                 return;
 
@@ -2898,11 +2876,10 @@ let __assert =
             let expr msg =
                 'getarg args 0
                 'getarg args 1
-            let anchor = (sc_get_active_anchor)
             if (('typeof msg) != string)
-                compiler-error! "string expected as second argument"
+                error "string expected as second argument"
             spice-quote
-                check-assertion expr anchor msg
+                check-assertion expr msg
                 ;
 
 fn gen-vector-reduction (f v sz)
@@ -3132,7 +3109,7 @@ let parse-compile-flags =
     spice-macro
         fn (args)
             inline flag-error (flag)
-                compiler-error!
+                error
                     .. "illegal flag: " (repr flag)
                         ". try one of"
                         \ " " (repr 'dump-disassembly)
@@ -3216,7 +3193,7 @@ inline make-unpack-function (extractf)
             let self = ('getarg args 0)
             let T = ('typeof self)
             let count = ('element-count T)
-            let outargs = (sc_argument_list_new (sc_get_active_anchor))
+            let outargs = (sc_argument_list_new)
             loop (i = 0)
                 if (icmp== i count)
                     break outargs
@@ -3405,7 +3382,7 @@ inline vector-binary-op-dispatch (symbol)
                     'getarg args 0
                     'getarg args 1
                 if (not ('constant? offset))
-                    compiler-error! "slice offset must be constant"
+                    error "slice offset must be constant"
                 let T = ('typeof self)
                 let sz = (('element-count T) as usize)
                 let offset:usize = (offset as usize)
@@ -3420,8 +3397,7 @@ inline vector-binary-op-dispatch (symbol)
                     i + 1
                 let maskT =
                     sc_vector_type i32 offset:usize
-                let mask = (sc_const_aggregate_new
-                    (sc_get_active_anchor) maskT offset maskvals)
+                let mask = (sc_const_aggregate_new maskT offset maskvals)
                 `(shufflevector self self mask)
     __rslice =
         spice-macro
@@ -3432,7 +3408,7 @@ inline vector-binary-op-dispatch (symbol)
                     'getarg args 0
                     'getarg args 1
                 if (not ('constant? offset))
-                    compiler-error! "slice offset must be constant"
+                    error "slice offset must be constant"
                 let T = ('typeof self)
                 let sz = (('element-count T) as usize)
                 let offset:usize = (offset as usize)
@@ -3451,8 +3427,7 @@ inline vector-binary-op-dispatch (symbol)
                     i + 1
                 let maskT =
                     sc_vector_type i32 total:usize
-                let mask = (sc_const_aggregate_new
-                    (sc_get_active_anchor) maskT total maskvals)
+                let mask = (sc_const_aggregate_new maskT total maskvals)
                 `(shufflevector self self mask)
     __unpack = (Value (make-unpack-function extractelement))
     __countof = __countof-aggregate
@@ -3539,7 +3514,7 @@ inline clamp (x mn mx)
                             let sz = ('element-count funcT)
                             let func = (expr as Closure)
                             if ('variadic? funcT)
-                                compiler-error! "cannot typify to variadic function"
+                                error "cannot typify to variadic function"
                             let args = (alloca-array type sz)
                             for i in (range sz)
                                 store ('element@ funcT i) (getelementptr args i)
@@ -3547,7 +3522,7 @@ inline clamp (x mn mx)
                                 sc_typify func sz args
                             let resultT = ('typeof result)
                             if (resultT != destT)
-                                sugar-error! ('anchor result)
+                                error
                                     .. "function does not compile to type " (repr destT)
                                         \ "but has type " (repr resultT)
                             return result
@@ -3557,7 +3532,7 @@ inline clamp (x mn mx)
 
 inline extern (name T attrs...)
     let storage-class = (va-option storage attrs... unnamed)
-    sc_global_new (sc_get_active_anchor) name T 0:u32 storage-class -1 -1
+    sc_global_new name T 0:u32 storage-class -1 -1
 
 let
     private =
@@ -3609,7 +3584,7 @@ inline gen-match-block-parser (handle-case)
                         inline return-ok (args...)
                             merge ok-label args...
                         spice-unquote
-                            let outexpr = (sc_expression_new (sc_get_active_anchor))
+                            let outexpr = (sc_expression_new)
                             loop (next = next)
                                 let head = (next-head? next)
                                 switch head
@@ -3643,7 +3618,7 @@ inline gen-match-block-parser (handle-case)
                                     store next outnext
                                     break outexpr
                                 default
-                                    compiler-error! "default branch missing"
+                                    error "default branch missing"
             return (cons outexpr (load outnext)) scope
 
 fn gen-sugar-matcher (failfunc expr scope params)
@@ -3651,7 +3626,7 @@ fn gen-sugar-matcher (failfunc expr scope params)
         return `()
     let params = (params as list)
     let paramcount = (countof params)
-    let outexpr = (sc_expression_new (sc_get_active_anchor))
+    let outexpr = (sc_expression_new)
     loop (i rest next varargs = 0 params expr false)
         if (not (empty? rest))
             let paramv rest = (decons rest)
@@ -3662,7 +3637,7 @@ fn gen-sugar-matcher (failfunc expr scope params)
                 let arg next =
                     if variadic?
                         if (not (empty? rest))
-                            sugar-error! ('anchor paramv)
+                            error
                                 "variadic match pattern is not in last place"
                         _ next `[]
                     else
@@ -3693,7 +3668,7 @@ fn gen-sugar-matcher (failfunc expr scope params)
                     let exprT = (sc_expand exprT '() scope)
                     let param = (head as Symbol)
                     if ('variadic? param)
-                        sugar-error! ('anchor head)
+                        error
                             "vararg parameter cannot be typed"
                     sc_expression_append outexpr
                         spice-quote
@@ -3719,8 +3694,7 @@ fn gen-sugar-matcher (failfunc expr scope params)
                                 gen-sugar-matcher failfunc arg scope param
                     repeat (i + 1) rest next varargs
             else
-                sugar-error! ('anchor paramv)
-                    "unsupported pattern"
+                error "unsupported pattern"
         return
             spice-quote
                 if (not (check-count (sc_list_count expr)
@@ -3776,7 +3750,7 @@ define sugar
                                     spice-quote
                                         unpack-expr
                                         return-ok body
-                            compiler-error! "syntax error"
+                            error "syntax error"
             let outexpr =
                 if (('typeof name) == Symbol)
                     qq
@@ -3803,7 +3777,7 @@ fn uncomma (l)
             repeat next
     fn merge-lists (anchor current total)
         if ((countof current) == 0)
-            sugar-error! anchor "unexpected comma"
+            error "unexpected comma"
         cons
             if ((countof current) == 1) ('@ current)
             else (Value current)
@@ -3847,8 +3821,7 @@ inline parse-argument-matcher (failfunc expr scope params cb)
             let arg =
                 if variadic?
                     if (not (empty? rest))
-                        sugar-error! ('anchor paramv)
-                            "vararg parameter is not in last place"
+                        error "vararg parameter is not in last place"
                     `(sc_getarglist expr i)
                 else
                     `(sc_getarg expr i)
@@ -3863,8 +3836,7 @@ inline parse-argument-matcher (failfunc expr scope params cb)
                 let exprT = (sc_expand exprT '() scope)
                 let param = (head as Symbol)
                 if ('variadic? param)
-                    sugar-error! ('anchor head)
-                        "vararg parameter cannot be typed"
+                    error "vararg parameter cannot be typed"
                 spice-quote
                     let arg = (sc_getarg expr i)
                     let conv = (imply-converter ('typeof arg) exprT)
@@ -3878,8 +3850,7 @@ inline parse-argument-matcher (failfunc expr scope params cb)
                 let exprT = (sc_expand exprT '() scope)
                 let param = (head as Symbol)
                 if ('variadic? param)
-                    sugar-error! ('anchor head)
-                        "vararg parameter cannot be typed"
+                    error "vararg parameter cannot be typed"
                 spice-quote
                     let arg = (sc_getarg expr i)
                     let arg =
@@ -3889,11 +3860,11 @@ inline parse-argument-matcher (failfunc expr scope params cb)
                             failfunc;
                 cb param arg
                 repeat (i + 1) rest varargs
-        sugar-error! ('anchor paramv) "unsupported pattern"
+        error "unsupported pattern"
 
 fn gen-argument-matcher (failfunc expr scope params)
-    let outexpr = (sc_expression_new (sc_get_active_anchor))
-    let outargs = (sc_argument_list_new (sc_get_active_anchor))
+    let outexpr = (sc_expression_new)
+    let outargs = (sc_argument_list_new)
     'set-symbol scope '*... outargs
     let header =
         parse-argument-matcher failfunc expr scope params
@@ -3929,8 +3900,7 @@ define spice
                     let body =
                         if variadic?
                             if (not (empty? rest))
-                                sugar-error! ('anchor paramv)
-                                    "vararg parameter is not in last place"
+                                error "vararg parameter is not in last place"
                             cons
                                 qq
                                     [let paramv] =
@@ -4016,7 +3986,6 @@ fn gen-match-matcher (failfunc expr scope cond)
         let cond =
             if (has-infix-ops? scope cond)
                 let at next = ('decons cond)
-                sc_set_active_anchor ('anchor at)
                 let expr =
                     parse-infix-expr scope at next 0
                 expr as list
@@ -4027,8 +3996,7 @@ fn gen-match-matcher (failfunc expr scope cond)
             let token = (head as Symbol)
             if (token == 'or)
                 return (gen-or-matcher failfunc expr scope rest)
-        sugar-error! cond-anchor
-            .. "unsupported pattern: " (repr cond)
+        error (.. "unsupported pattern: " (repr cond))
     let cond =
         sc_expand cond '() scope
     spice-quote
@@ -4050,7 +4018,7 @@ define va-append-va
             let argc = ('argcount args)
             verify-count argc 1 -1
             let end = ('getarg args 0)
-            let newargs = (sc_argument_list_new (sc_get_active_anchor))
+            let newargs = (sc_argument_list_new)
             loop (i = 1)
                 if (i == argc)
                     sc_argument_list_append newargs `(end)
@@ -4066,8 +4034,8 @@ define va-split
             let argc = ('argcount args)
             verify-count argc 1 -1
             let pos = (('getarg args 0) as i32)
-            let largs = (sc_argument_list_new (sc_get_active_anchor))
-            let rargs = (sc_argument_list_new (sc_get_active_anchor))
+            let largs = (sc_argument_list_new)
+            let rargs = (sc_argument_list_new)
             loop (i = 1)
                 if (i > pos)
                     break;
@@ -4121,13 +4089,13 @@ inline enumerate (x)
 inline memoize (f)
     fn (args...)
         let key = `[f args...]
-        let value = (sc_map_get key)
-        if (value == null)
+        try
+            sc_map_get key
+        except (err)
             let value =
                 `[(f args...)]
             sc_map_set key value
             value
-        else value
 
 inline type-factory (f)
     let f = (memoize f)
@@ -4151,7 +4119,7 @@ fn get-overloaded-fn-append ()
                 if ('function-pointer? fT)
                     if ((('kind f) != value-kind-function)
                         and (not ('constant? f)))
-                        sugar-error! ('anchor f) "argument must be constant or function"
+                        error "argument must be constant or function"
                     let fT = ('element@ fT 0)
                     let argcount = ('element-count fT)
                     loop (k types = 0 void)
@@ -4164,7 +4132,7 @@ fn get-overloaded-fn-append ()
                         break;
                 elseif (fT == type)
                     if (fT == outtype)
-                        sugar-error! ('anchor f) "cannot inherit from own type"
+                        error "cannot inherit from own type"
                     let fT = (f as type)
                     if (fT < OverloadedFunction)
                         let fns = ('@ fT 'templates)
@@ -4180,7 +4148,7 @@ fn get-overloaded-fn-append ()
                     sc_argument_list_append functions f
                     sc_argument_list_append functypes Variadic
                 else
-                    sugar-error! ('anchor f)
+                    error
                         .. "cannot embed argument of type "
                             repr ('typeof f)
                             " in overloaded function"
@@ -4210,7 +4178,7 @@ fn get-overloaded-fn-append ()
                 elseif (count != argcount)
                     continue;
                 label break-next
-                    let outargs = (sc_call_new (sc_get_active_anchor) f)
+                    let outargs = (sc_call_new f)
                     sc_call_set_rawcall outargs true
                     let lasti = (argcount - 1)
                     for i arg in (enumerate ('args args...))
@@ -4227,7 +4195,7 @@ fn get-overloaded-fn-append ()
                         sc_call_append_argument outargs outarg
                     return outargs
             # if we got here, there was no match
-            compiler-error!
+            error
                 .. "could not match argument types ("
                     do
                         loop (i str = 0 "")
@@ -4256,15 +4224,14 @@ sugar fn... (name...)
         case (name as string;) (Symbol name)
         case () unnamed
         default
-            compiler-error!
+            error
                 """"syntax: (fn... name|"name") (case pattern body...) ...
-    let anchor = (sc_get_active_anchor)
-    let outargs = (sc_argument_list_new anchor)
+    let outargs = (sc_argument_list_new)
     let outtype = (sc_typename_type (fn-name as string))
     'set-super outtype OverloadedFunction
     'set-symbols outtype
-        templates = (sc_argument_list_new anchor)
-        parameter-types = (sc_argument_list_new anchor)
+        templates = (sc_argument_list_new)
+        parameter-types = (sc_argument_list_new)
     let bodyscope = (Scope sugar-scope)
     sugar-match name...
     case (name as Symbol;)
@@ -4279,7 +4246,7 @@ sugar fn... (name...)
             repeat rest...
         case (('case condv body...) rest...)
             do
-                let tmpl = (sc_template_new ('anchor condv) fn-name)
+                let tmpl = (sc_template_new fn-name)
                 sc_argument_list_append outargs tmpl
                 let scope = (Scope bodyscope)
                 loop (expr types = (uncomma (condv as list)) void)
@@ -4290,12 +4257,12 @@ sugar fn... (name...)
                         sc_argument_list_append outargs types
                         break;
                     case ((arg as Symbol) ': T)
-                        sugar-error! ('anchor condv) "single typed parameter definition is missing trailing comma or semicolon"
+                        error "single typed parameter definition is missing trailing comma or semicolon"
                     case ((arg as Symbol) rest...)
                         if ('variadic? arg)
                             if (not (empty? rest...))
-                                sugar-error! ('anchor condv) "variadic parameter must be in last place"
-                        let param = (sc_parameter_new ('anchor condv) arg)
+                                error "variadic parameter must be in last place"
+                        let param = (sc_parameter_new arg)
                         sc_template_append_parameter tmpl param
                         'set-symbol scope arg param
                         repeat rest...
@@ -4303,15 +4270,15 @@ sugar fn... (name...)
                                 ? ('variadic? arg) Variadic Unknown
                     case (((arg as Symbol) ': T) rest...)
                         if ('variadic? arg)
-                            sugar-error! ('anchor condv) "a typed parameter can't be variadic"
+                            error "a typed parameter can't be variadic"
                         let T = ((sc_expand T '() sugar-scope) as type)
-                        let param = (sc_parameter_new ('anchor condv) arg)
+                        let param = (sc_parameter_new arg)
                         sc_template_append_parameter tmpl param
                         'set-symbol scope arg param
                         repeat rest...
                             sc_arguments_type_join types T
                     default
-                        sugar-error! ('anchor condv) "syntax: (parameter-name[: type], ...)"
+                        error "syntax: (parameter-name[: type], ...)"
             repeat rest...
         default
             sugar-match name...
@@ -4324,7 +4291,7 @@ sugar fn... (name...)
 
 sugar from (src 'let params...)
     spice load-from (src keys...)
-        let args = (sc_argument_list_new (sc_get_active_anchor))
+        let args = (sc_argument_list_new)
         let count = ('argcount keys...)
         loop (i = 0)
             if (i == count)
@@ -4418,7 +4385,7 @@ define-sugar-block-scope-macro sugar-if
                 return body next-next-expr
             else
                 return elseexpr next-next-expr
-        sugar-error! ('anchor cond) "condition must be constant"
+        error "condition must be constant"
     let kw body = (decons expr)
     let body next-expr = (process sugar-scope body next-expr)
     return
@@ -4434,7 +4401,7 @@ define-sugar-block-scope-macro @@
     let result next-expr =
         loop (body next-expr result = body next-expr '())
             if (empty? next-expr)
-                compiler-error! "decorator is not applied to anything"
+                error "decorator is not applied to anything"
             let result =
                 cons
                     if ((countof body) == 1)
@@ -4444,7 +4411,7 @@ define-sugar-block-scope-macro @@
                     result
             let follow-expr next-next-expr = (decons next-expr)
             if (('typeof follow-expr) != list)
-                compiler-error! "decorator must be applied to expression"
+                error "decorator must be applied to expression"
             let kw body = (decons (follow-expr as list))
             let kw = (kw as Symbol)
             if (kw == head)
@@ -4467,7 +4434,7 @@ define-sugar-block-scope-macro vvv
     let result next-expr =
         loop (body next-expr result = body next-expr '())
             if (empty? next-expr)
-                compiler-error! "expression decorator is not applied to anything"
+                error "expression decorator is not applied to anything"
             let result =
                 cons
                     if ((countof body) == 1)
@@ -4541,7 +4508,7 @@ define-sugar-macro decorate-let
         let params values =
             loop (expr params = letexpr '())
                 if (empty? expr)
-                    compiler-error! "reimport form not supported for decorate-let"
+                    error "reimport form not supported for decorate-let"
                 let val rest = (decons expr)
                 if ((('typeof val) == Symbol) and ((val as Symbol) == '=))
                     break params rest
@@ -4581,8 +4548,6 @@ let
     set-signal-abort! = sc_set_signal_abort
     list-load = sc_parse_from_path
     list-parse = sc_parse_from_string
-    set-anchor! = sc_set_active_anchor
-    active-anchor = sc_get_active_anchor
     #eval = sc_eval
     import-c = sc_import_c
 
@@ -4614,7 +4579,7 @@ sugar fold ((binding...) 'for expr...)
     fn split-until (expr token errmsg)
         loop (it params = expr '())
             if (empty? it)
-                compiler-error! errmsg
+                error errmsg
             let sxat it = (decons it)
             let at = (sxat as Symbol)
             if (at == token)
@@ -4733,7 +4698,7 @@ spice __init (target args...)
             getattr T '__init
         except (err)
             if (('argcount args...) > 0)
-                compiler-error! "default constructor takes no arguments"
+                error "default constructor takes no arguments"
             return `(target = (nullof T))
     `(constructor target args...)
 
@@ -4783,7 +4748,7 @@ inline gen-allocator-sugar (name f)
         case (T args...)
             qq [local-new] [T] (unquote-splice args...)
         default
-            compiler-error!
+            error
                 .. "syntax: " name " <name> [: <type>] [= <value>]"
 
 let local = (gen-allocator-sugar "local" alloca)
@@ -4837,7 +4802,7 @@ run-stage;
     __typecall =
         spice "Struct-typecall" (cls args...)
             if ((cls as type) == Struct)
-                compiler-error! "Struct type constructor not available"
+                error "Struct type constructor not available"
             let cls = (cls as type)
             let argc = ('argcount args...)
             let st = ('storageof cls)
@@ -4865,7 +4830,7 @@ run-stage;
     __typecall =
         spice "CStruct-typecall" (cls args...)
             if ((cls as type) == CStruct)
-                compiler-error! "CStruct type constructor is deprecated"
+                error "CStruct type constructor is deprecated"
             let cls = (cls as type)
             let argc = ('argcount args...)
             loop (i result = 0 `(nullof cls))
@@ -4902,7 +4867,7 @@ sugar struct (name body...)
             'set-plain-storage T
                 sc_tuple_type numfields fields
         else
-            compiler-error!
+            error
                 .. "type " (repr T) " must have Struct, CStruct or CUnion supertype"
         T
 
@@ -4957,8 +4922,8 @@ sugar struct (name body...)
 sugar enum (name values...)
     spice make-enum (name vals...)
         let T = (typename (name as string))
-        inline make-enumval (anchor val)
-            sc_const_int_new anchor T
+        inline make-enumval (val)
+            sc_const_int_new T
                 sext (as val i32) u64
         'set-super T CEnum
         'set-plain-storage T i32
@@ -4971,14 +4936,14 @@ sugar enum (name values...)
             let key val = ('dekey arg)
             #print arg key val
             if (not ('constant? val))
-                sugar-error! anchor "all enum values must be constant"
+                error "all enum values must be constant"
             _ (i + 1)
                 if (key == unnamed)
                     # auto-numerical
-                    'set-symbol T (as val Symbol) (make-enumval anchor nextval)
+                    'set-symbol T (as val Symbol) (make-enumval nextval)
                     nextval + 1
                 else
-                    'set-symbol T key (make-enumval anchor val)
+                    'set-symbol T key (make-enumval val)
                     (as val i32) + 1
         T
 
@@ -5132,7 +5097,7 @@ fn read-eval-print-loop ()
                     inline (key value k)
                         let idstr = (make-idstr (counter + k))
                         if (not (none? value))
-                            'set-symbol eval-scope (Symbol idstr) (Value value)
+                            'set-symbol eval-scope (Symbol idstr) `value
                             print idstr "="
                                 repr value
                             k + 1
@@ -5144,7 +5109,6 @@ fn read-eval-print-loop ()
             try
                 let expr = (list-parse cmdlist)
                 let expr-anchor = ('anchor expr)
-                set-anchor! expr-anchor
                 let tmp = (Symbol "#result...")
                 let expr =
                     Value
@@ -5166,7 +5130,6 @@ fn read-eval-print-loop ()
                             'raising
                                 function (Arguments Scope i32)
                                 Error
-                set-anchor! expr-anchor
                 fptr;
             except (exc)
                 io-write!

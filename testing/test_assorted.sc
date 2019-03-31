@@ -53,7 +53,7 @@ assert
                 print "and#4"
                 false
             do
-                error! "should never see this"
+                error "should never see this"
                 false
         false
     "'and' for more than two arguments failed"
@@ -74,7 +74,7 @@ assert
                 print "or#4"
                 true
             do
-                error! "should never see this"
+                error "should never see this"
                 true
         true
     "'or' for more than two arguments failed"

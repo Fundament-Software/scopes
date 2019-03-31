@@ -7,6 +7,8 @@
 #ifndef SCOPES_LIST_HPP
 #define SCOPES_LIST_HPP
 
+#include "valueref.inc"
+
 #include <stddef.h>
 #include <cstddef>
 
@@ -20,25 +22,39 @@ struct Value;
 
 struct List {
 protected:
-    List(Value *_at, const List *_next, size_t _count);
+    List(const ValueRef &_at, const List *_next, size_t _count);
 
 public:
-    Value *at;
+    ValueRef at;
     const List *next;
     size_t count;
 
-    Value *first() const;
+    ValueRef first() const;
 
-    static const List *from(Value *_at, const List *_next);
+    static const List *from(const ValueRef &_at, const List *_next);
 
-    static const List *from(Value * const *values, int N);
+    static const List *from(ValueRef const *values, int N);
 
 
-    static inline const List *from(Value *v0, Value *v1) { Value *values[] = { v0, v1 }; return from(values, 2); }
+    static inline const List *from(const ValueRef &v0, const ValueRef &v1) {
+        ValueRef values[] = { v0, v1 }; return from(values, 2); }
 
     template<unsigned N>
-    static const List *from(Value * const (&values)[N]) {
+    static const List *from(ValueRef const (&values)[N]) {
         return from(values, N);
+    }
+
+    static const List *from_arglist() {
+        return nullptr;
+    }
+
+    static const List *from_arglist(const ValueRef &last) {
+        return from(last, nullptr);
+    }
+
+    template<class ... Args>
+    static const List *from_arglist(const ValueRef &first, Args ... args) {
+        return from(first, from_arglist(args ...));
     }
 
     static const List *join(const List *a, const List *b);

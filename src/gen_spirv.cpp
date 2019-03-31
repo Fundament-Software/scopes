@@ -14,7 +14,7 @@
 #include "scope.hpp"
 #include "timer.hpp"
 #include "value.hpp"
-#include "stream_ast.hpp"
+#include "stream_expr.hpp"
 #include "compiler_flags.hpp"
 #include "prover.hpp"
 #include "hash.hpp"
@@ -120,7 +120,7 @@ static SCOPES_RESULT(void) verify_spirv(std::vector<unsigned int> &contents) {
     if (!succeed) {
         disassemble_spirv(contents, true);
         SCOPES_CERR << ss._ss.str();
-        SCOPES_LOCATION_ERROR(String::from("SPIR-V validation found errors"));
+        SCOPES_ERROR(CGenBackendValidationFailed);
     }
     return {};
 }
@@ -146,15 +146,9 @@ struct SPIRVGenerator {
 
     typedef std::vector<spv::Id> Ids;
 
-    //std::unordered_map<SourceFile *, LLVMMetadataRef> file2value;
-    //std::unordered_map<void *, LLVMValueRef> ptr2global;
     std::unordered_map<ValueIndex, spv::Id, ValueIndex::Hash> ref2value;
     std::unordered_map<Function *, spv::Function *> func2func;
-    //std::unordered_map<Function *, LLVMMetadataRef> func2md;
-    //std::unordered_map<Function *, Symbol> func_export_table;
-    //std::unordered_map<Global *, LLVMValueRef> global2global;
-    std::deque<Function *> function_todo;
-    //static Types type_todo;
+    std::deque<FunctionRef> function_todo;
     std::unordered_map<TypeFlagPair, spv::Id, HashTypeFlagsPair> type_cache;
 
     std::unordered_map<int, ExecutionMode> execution_modes;
@@ -186,7 +180,7 @@ struct SPIRVGenerator {
     spv::Instruction *entry_point;
     spv::Id glsl_ext_inst;
     bool use_debug_info;
-    Function *active_function;
+    FunctionRef active_function;
     int functions_generated;
 
     static const Type *arguments_to_tuple(const Type *T) {
@@ -234,12 +228,11 @@ struct SPIRVGenerator {
     TryInfo try_info;
 
     struct LoopInfo {
-        LoopLabel *loop;
+        LoopLabelRef loop;
         spv::Block *bb_loop;
         Ids repeat_values;
 
         LoopInfo() :
-            loop(nullptr),
             bb_loop(nullptr)
         {}
     };
@@ -247,12 +240,11 @@ struct SPIRVGenerator {
     LoopInfo loop_info;
 
     struct LabelInfo {
-        Label *label;
+        LabelRef label;
         spv::Block *bb_merge;
         Ids merge_values;
 
         LabelInfo() :
-            label(nullptr),
             bb_merge(nullptr)
         {}
     };
@@ -273,7 +265,6 @@ struct SPIRVGenerator {
         entry_point(nullptr),
         glsl_ext_inst(0),
         use_debug_info(true),
-        active_function(nullptr),
         functions_generated(0) {
         static_init();
         #if 0
@@ -291,9 +282,7 @@ struct SPIRVGenerator {
             B_SPIRV_DIM()
         #undef T
             default:
-                SCOPES_LOCATION_ERROR(
-                    String::from(
-                        "IL->SPIR: unsupported dimensionality"));
+                SCOPES_ERROR(CGenUnsupportedDimensionality, sym);
                 break;
         }
         return spv::DimMax;
@@ -307,9 +296,7 @@ struct SPIRVGenerator {
             B_SPIRV_IMAGE_FORMAT()
         #undef T
             default:
-                SCOPES_LOCATION_ERROR(
-                    String::from(
-                        "IL->SPIR: unsupported image format"));
+                SCOPES_ERROR(CGenUnsupportedImageFormat, sym);
                 break;
         }
         return spv::ImageFormatMax;
@@ -323,9 +310,7 @@ struct SPIRVGenerator {
             B_SPIRV_EXECUTION_MODE()
         #undef T
             default:
-                SCOPES_LOCATION_ERROR(
-                    String::from(
-                        "IL->SPIR: unsupported execution mode"));
+                SCOPES_ERROR(CGenUnsupportedExecutionMode, sym);
                 break;
         }
         return spv::ExecutionModeMax;
@@ -338,284 +323,15 @@ struct SPIRVGenerator {
             case SYM_SPIRV_StorageClass ## NAME: return spv::StorageClass ## NAME;
             B_SPIRV_STORAGE_CLASS()
         #undef T
-            case SYM_Unnamed:
-                SCOPES_LOCATION_ERROR(
-                    String::from(
-                        "IL->SPIR: pointers with C storage class"
-                        " are unsupported"));
-                break;
             default:
-                SCOPES_LOCATION_ERROR(
-                    String::from(
-                        "IL->SPIR: unsupported storage class for pointer"));
+                SCOPES_ERROR(CGenUnsupportedPointerStorageClass, sym);
                 break;
         }
         return spv::StorageClassMax;
     }
 
-    #if 0
-    LLVMValueRef get_intrinsic(Intrinsic op) {
-        if (!intrinsics[op]) {
-            LLVMValueRef result = nullptr;
-            switch(op) {
-#define LLVM_INTRINSIC_IMPL(ENUMVAL, RETTYPE, STRNAME, ...) \
-    case ENUMVAL: { \
-        LLVMTypeRef argtypes[] = {__VA_ARGS__}; \
-        result = LLVMAddFunction(module, STRNAME, LLVMFunctionType(RETTYPE, argtypes, sizeof(argtypes) / sizeof(LLVMTypeRef), false)); \
-    } break;
-
-#define LLVM_INTRINSIC_IMPL_BEGIN(ENUMVAL, RETTYPE, STRNAME, ...) \
-    case ENUMVAL: { \
-        LLVMTypeRef argtypes[] = { __VA_ARGS__ }; \
-        result = LLVMAddFunction(module, STRNAME, \
-            LLVMFunctionType(f32T, argtypes, sizeof(argtypes) / sizeof(LLVMTypeRef), false)); \
-        LLVMSetLinkage(result, LLVMPrivateLinkage); \
-        auto bb = LLVMAppendBasicBlock(result, ""); \
-        auto oldbb = LLVMGetInsertBlock(builder); \
-        position_builder_at_end(bb);
-
-#define LLVM_INTRINSIC_IMPL_END() \
-        position_builder_at_end(oldbb); \
-    } break;
-
-            LLVM_INTRINSIC_IMPL(llvm_sin_f32, f32T, "llvm.sin.f32", f32T)
-            LLVM_INTRINSIC_IMPL(llvm_sin_f64, f64T, "llvm.sin.f64", f64T)
-            LLVM_INTRINSIC_IMPL(llvm_cos_f32, f32T, "llvm.cos.f32", f32T)
-            LLVM_INTRINSIC_IMPL(llvm_cos_f64, f64T, "llvm.cos.f64", f64T)
-
-            LLVM_INTRINSIC_IMPL(llvm_sqrt_f32, f32T, "llvm.sqrt.f32", f32T)
-            LLVM_INTRINSIC_IMPL(llvm_sqrt_f64, f64T, "llvm.sqrt.f64", f64T)
-            LLVM_INTRINSIC_IMPL(llvm_fabs_f32, f32T, "llvm.fabs.f32", f32T)
-            LLVM_INTRINSIC_IMPL(llvm_fabs_f64, f64T, "llvm.fabs.f64", f64T)
-            LLVM_INTRINSIC_IMPL(llvm_trunc_f32, f32T, "llvm.trunc.f32", f32T)
-            LLVM_INTRINSIC_IMPL(llvm_trunc_f64, f64T, "llvm.trunc.f64", f64T)
-            LLVM_INTRINSIC_IMPL(llvm_floor_f32, f32T, "llvm.floor.f32", f32T)
-            LLVM_INTRINSIC_IMPL(llvm_floor_f64, f64T, "llvm.floor.f64", f64T)
-            LLVM_INTRINSIC_IMPL(llvm_pow_f32, f32T, "llvm.pow.f32", f32T, f32T)
-            LLVM_INTRINSIC_IMPL(llvm_pow_f64, f64T, "llvm.pow.f64", f64T, f64T)
-            LLVM_INTRINSIC_IMPL(llvm_exp_f32, f32T, "llvm.exp.f32", f32T)
-            LLVM_INTRINSIC_IMPL(llvm_exp_f64, f64T, "llvm.exp.f64", f64T)
-            LLVM_INTRINSIC_IMPL(llvm_log_f32, f32T, "llvm.log.f32", f32T)
-            LLVM_INTRINSIC_IMPL(llvm_log_f64, f64T, "llvm.log.f64", f64T)
-            LLVM_INTRINSIC_IMPL(llvm_exp2_f32, f32T, "llvm.exp2.f32", f32T)
-            LLVM_INTRINSIC_IMPL(llvm_exp2_f64, f64T, "llvm.exp2.f64", f64T)
-            LLVM_INTRINSIC_IMPL(llvm_log2_f32, f32T, "llvm.log2.f32", f32T)
-            LLVM_INTRINSIC_IMPL(llvm_log2_f64, f64T, "llvm.log2.f64", f64T)
-            LLVM_INTRINSIC_IMPL_BEGIN(custom_fsign_f32, f32T, "custom.fsign.f32", f32T)
-                // (0 < val) - (val < 0)
-                LLVMValueRef val = LLVMGetParam(result, 0);
-                LLVMValueRef zero = LLVMConstReal(f32T, 0.0);
-                LLVMValueRef a = LLVMBuildZExt(builder, LLVMBuildFCmp(builder, LLVMRealOLT, zero, val, ""), i8T, "");
-                LLVMValueRef b = LLVMBuildZExt(builder, LLVMBuildFCmp(builder, LLVMRealOLT, val, zero, ""), i8T, "");
-                val = LLVMBuildSub(builder, a, b, "");
-                val = LLVMBuildSIToFP(builder, val, f32T, "");
-                LLVMBuildRet(builder, val);
-            LLVM_INTRINSIC_IMPL_END()
-            LLVM_INTRINSIC_IMPL_BEGIN(custom_fsign_f64, f64T, "custom.fsign.f64", f64T)
-                // (0 < val) - (val < 0)
-                LLVMValueRef val = LLVMGetParam(result, 0);
-                LLVMValueRef zero = LLVMConstReal(f64T, 0.0);
-                LLVMValueRef a = LLVMBuildZExt(builder, LLVMBuildFCmp(builder, LLVMRealOLT, zero, val, ""), i8T, "");
-                LLVMValueRef b = LLVMBuildZExt(builder, LLVMBuildFCmp(builder, LLVMRealOLT, val, zero, ""), i8T, "");
-                val = LLVMBuildSub(builder, a, b, "");
-                val = LLVMBuildSIToFP(builder, val, f64T, "");
-                LLVMBuildRet(builder, val);
-            LLVM_INTRINSIC_IMPL_END()
-            LLVM_INTRINSIC_IMPL_BEGIN(custom_radians_f32, f32T, "custom.radians.f32", f32T)
-                LLVMBuildRet(builder, LLVMBuildFMul(builder,
-                    LLVMGetParam(result, 0), LLVMConstReal(f32T, deg2rad), ""));
-            LLVM_INTRINSIC_IMPL_END()
-            LLVM_INTRINSIC_IMPL_BEGIN(custom_radians_f64, f64T, "custom.radians.f64", f64T)
-                LLVMBuildRet(builder, LLVMBuildFMul(builder,
-                    LLVMGetParam(result, 0), LLVMConstReal(f64T, deg2rad), ""));
-            LLVM_INTRINSIC_IMPL_END()
-            LLVM_INTRINSIC_IMPL_BEGIN(custom_degrees_f32, f32T, "custom.degrees.f32", f32T)
-                LLVMBuildRet(builder, LLVMBuildFMul(builder,
-                    LLVMGetParam(result, 0), LLVMConstReal(f32T, rad2deg), ""));
-            LLVM_INTRINSIC_IMPL_END()
-            LLVM_INTRINSIC_IMPL_BEGIN(custom_degrees_f64, f64T, "custom.degrees.f64", f64T)
-                LLVMBuildRet(builder, LLVMBuildFMul(builder,
-                    LLVMGetParam(result, 0), LLVMConstReal(f64T, rad2deg), ""));
-            LLVM_INTRINSIC_IMPL_END()
-#undef LLVM_INTRINSIC_IMPL
-#undef LLVM_INTRINSIC_IMPL_BEGIN
-#undef LLVM_INTRINSIC_IMPL_END
-            default: assert(false); break;
-            }
-            intrinsics[op] = result;
-        }
-        return intrinsics[op];
-    }
-    #endif
-
     static void static_init() {
-        /*
-        if (voidT) return;
-        voidT = LLVMVoidType();
-        i1T = LLVMInt1Type();
-        i8T = LLVMInt8Type();
-        i16T = LLVMInt16Type();
-        i32T = LLVMInt32Type();
-        i64T = LLVMInt64Type();
-        f32T = LLVMFloatType();
-        f32x2T = LLVMVectorType(f32T, 2);
-        f64T = LLVMDoubleType();
-        noneV = LLVMConstStruct(nullptr, 0, false);
-        noneT = LLVMTypeOf(noneV);
-        rawstringT = LLVMPointerType(LLVMInt8Type(), 0);
-        falseV = LLVMConstInt(i1T, 0, false);
-        trueV = LLVMConstInt(i1T, 1, false);
-        attr_byval = get_attribute("byval");
-        attr_sret = get_attribute("sret");
-        attr_nonnull = get_attribute("nonnull");
-
-        LLVMContextSetDiagnosticHandler(LLVMGetGlobalContext(),
-            diag_handler,
-            nullptr);
-        */
     }
-
-#if 0
-    static LLVMTypeRef abi_struct_type(const ABIClass *classes, size_t sz) {
-        LLVMTypeRef types[sz];
-        size_t k = 0;
-        for (size_t i = 0; i < sz; ++i) {
-            ABIClass cls = classes[i];
-            switch(cls) {
-            case ABI_CLASS_SSE: {
-                types[i] = f32x2T; k++;
-            } break;
-            case ABI_CLASS_SSESF: {
-                types[i] = f32T; k++;
-            } break;
-            case ABI_CLASS_SSEDF: {
-                types[i] = f64T; k++;
-            } break;
-            case ABI_CLASS_INTEGER: {
-                types[i] = i64T; k++;
-            } break;
-            case ABI_CLASS_INTEGERSI: {
-                types[i] = i32T; k++;
-            } break;
-            case ABI_CLASS_INTEGERSI16: {
-                types[i] = i16T; k++;
-            } break;
-            case ABI_CLASS_INTEGERSI8: {
-                types[i] = i8T; k++;
-            } break;
-            default: {
-                // do nothing
-#if 0
-                StyledStream ss;
-                ss << "unhandled ABI class: " <<
-                    abi_class_to_string(cls) << std::endl;
-#endif
-            } break;
-            }
-        }
-        if (k != sz) return nullptr;
-        return LLVMStructType(types, sz, false);
-    }
-#endif
-
-#if 0
-    SCOPES_RESULT(LLVMValueRef) abi_import_argument(const Type *param_type, LLVMValueRef func, size_t &k) {
-        SCOPES_RESULT_TYPE(LLVMValueRef);
-        ABIClass classes[MAX_ABI_CLASSES];
-        size_t sz = abi_classify(param_type, classes);
-        if (!sz) {
-            LLVMValueRef val = LLVMGetParam(func, k++);
-            return LLVMBuildLoad(builder, val, "");
-        }
-        LLVMTypeRef T = SCOPES_GET_RESULT(type_to_llvm_type(param_type));
-        auto tk = LLVMGetTypeKind(T);
-        if (tk == LLVMStructTypeKind) {
-            auto ST = abi_struct_type(classes, sz);
-            if (ST) {
-                // reassemble from argument-sized bits
-                auto ptr = safe_alloca(ST);
-                auto zero = LLVMConstInt(i32T,0,false);
-                for (size_t i = 0; i < sz; ++i) {
-                    LLVMValueRef indices[] = {
-                        zero, LLVMConstInt(i32T,i,false),
-                    };
-                    auto dest = LLVMBuildGEP(builder, ptr, indices, 2, "");
-                    LLVMBuildStore(builder, LLVMGetParam(func, k++), dest);
-                }
-                ptr = LLVMBuildBitCast(builder, ptr, LLVMPointerType(T, 0), "");
-                return LLVMBuildLoad(builder, ptr, "");
-            }
-        }
-        LLVMValueRef val = LLVMGetParam(func, k++);
-        assert(val);
-        return val;
-    }
-#endif
-
-#if 0
-    SCOPES_RESULT(void) abi_export_argument(LLVMValueRef val, const Type *AT,
-        LLVMValueRefs &values, std::vector<size_t> &memptrs) {
-        SCOPES_RESULT_TYPE(void);
-        ABIClass classes[MAX_ABI_CLASSES];
-        size_t sz = abi_classify(AT, classes);
-        if (!sz) {
-            LLVMValueRef ptrval = safe_alloca(SCOPES_GET_RESULT(type_to_llvm_type(AT)));
-            LLVMBuildStore(builder, val, ptrval);
-            val = ptrval;
-            memptrs.push_back(values.size());
-            values.push_back(val);
-            return {};
-        }
-        auto tk = LLVMGetTypeKind(LLVMTypeOf(val));
-        if (tk == LLVMStructTypeKind) {
-            auto ST = abi_struct_type(classes, sz);
-            if (ST) {
-                // break into argument-sized bits
-                auto ptr = safe_alloca(LLVMTypeOf(val));
-                auto zero = LLVMConstInt(i32T,0,false);
-                LLVMBuildStore(builder, val, ptr);
-                ptr = LLVMBuildBitCast(builder, ptr, LLVMPointerType(ST, 0), "");
-                for (size_t i = 0; i < sz; ++i) {
-                    LLVMValueRef indices[] = {
-                        zero, LLVMConstInt(i32T,i,false),
-                    };
-                    auto val = LLVMBuildGEP(builder, ptr, indices, 2, "");
-                    val = LLVMBuildLoad(builder, val, "");
-                    values.push_back(val);
-                }
-                return {};
-            }
-        }
-        values.push_back(val);
-        return {};
-    }
-#endif
-
-#if 0
-    static SCOPES_RESULT(void) abi_transform_parameter(const Type *AT,
-        LLVMTypeRefs &params) {
-        SCOPES_RESULT_TYPE(void);
-        ABIClass classes[MAX_ABI_CLASSES];
-        size_t sz = abi_classify(AT, classes);
-        auto T = SCOPES_GET_RESULT(type_to_llvm_type(AT));
-        if (!sz) {
-            params.push_back(LLVMPointerType(T, 0));
-            return {};
-        }
-        auto tk = LLVMGetTypeKind(T);
-        if (tk == LLVMStructTypeKind) {
-            auto ST = abi_struct_type(classes, sz);
-            if (ST) {
-                for (size_t i = 0; i < sz; ++i) {
-                    params.push_back(LLVMStructGetTypeAtIndex(ST, i));
-                }
-                return {};
-            }
-        }
-        params.push_back(T);
-        return {};
-    }
-#endif
 
     SCOPES_RESULT(spv::Id) create_struct_type(const Type *type, uint64_t flags,
         const TypenameType *tname = nullptr) {
@@ -741,13 +457,13 @@ struct SPIRVGenerator {
                     return SCOPES_GET_RESULT(type_to_spirv_type(tn->storage_type, flags));
                 }
             } else {
-                SCOPES_LOCATION_ERROR(String::from("IL->SPIR: opaque types are not supported"));
+                SCOPES_ERROR(CGenTypeUnsupportedInTarget, type);
             }
         } break;
         case TK_Function: {
             auto fi = cast<FunctionType>(type);
             if (fi->vararg()) {
-                SCOPES_LOCATION_ERROR(String::from("IL->SPIR: vararg functions are not supported"));
+                SCOPES_ERROR(CGenTypeUnsupportedInTarget, type);
             }
             size_t count = fi->argument_types.size();
             auto rtype = abi_return_type(fi);
@@ -779,10 +495,7 @@ struct SPIRVGenerator {
         } break;
         default: break;
         };
-
-        StyledString ss;
-        ss.out << "IL->SPIR: cannot convert type " << type;
-        SCOPES_LOCATION_ERROR(ss.str());
+        SCOPES_ERROR(CGenFailedToTranslateType, type);
     }
 
     SCOPES_RESULT(spv::Id) type_to_spirv_type(const Type *type, uint64_t flags = 0) {
@@ -796,13 +509,6 @@ struct SPIRVGenerator {
             return it->second;
         }
     }
-
-#if 0
-    static Error *last_llvm_error;
-    static void fatal_error_handler(const char *Reason) {
-        last_llvm_error = make_location_error(String::from_cstr(Reason));
-    }
-#endif
 
     void bind(const ValueIndex &node, spv::Id value) {
         assert(value);
@@ -876,26 +582,26 @@ struct SPIRVGenerator {
         return write_return(refs, is_except);
     }
 
-    SCOPES_RESULT(void) translate_Return(Return *node) {
+    SCOPES_RESULT(void) translate_Return(const ReturnRef &node) {
         SCOPES_RESULT_TYPE(void);
         SCOPES_CHECK_RESULT(write_return(node->values));
         return {};
     }
 
-    SCOPES_RESULT(void) translate_Raise(Raise *node) {
+    SCOPES_RESULT(void) translate_Raise(const RaiseRef &node) {
         SCOPES_RESULT_TYPE(void);
         SCOPES_CHECK_RESULT(build_merge_phi(try_info.except_values, node->values));
         builder.createBranch(try_info.bb_except);
         return {};
     }
 
-    SCOPES_RESULT(void) Function_finalize(Function *node) {
+    SCOPES_RESULT(void) Function_finalize(const FunctionRef &node) {
         SCOPES_RESULT_TYPE(void);
 
         functions_generated++;
 
         active_function = node;
-        auto it = func2func.find(node);
+        auto it = func2func.find(node.unref());
         assert(it != func2func.end());
         spv::Function *func = it->second;
         assert(func);
@@ -925,9 +631,9 @@ struct SPIRVGenerator {
         //    set_debug_location(node->anchor());
         //size_t k = 0;
         for (size_t i = 0; i < paramcount; ++i) {
-            Parameter *param = params[i];
+            ParameterRef param = params[i];
             auto val = func->getParamId(i);
-            bind(param, val);
+            bind(ValueIndex(param), val);
         }
         SCOPES_CHECK_RESULT(translate_block(node->body));
         return {};
@@ -956,12 +662,12 @@ struct SPIRVGenerator {
         return {};
     }
 
-    SCOPES_RESULT(spv::Function *) Function_to_function(Function *node,
+    SCOPES_RESULT(spv::Function *) Function_to_function(const FunctionRef &node,
         bool root_function = false,
         Symbol funcname = SYM_Unnamed) {
         SCOPES_RESULT_TYPE(spv::Function *);
         {
-            auto it = func2func.find(node);
+            auto it = func2func.find(node.unref());
             if (it != func2func.end()) {
                 return it->second;
             }
@@ -995,7 +701,7 @@ struct SPIRVGenerator {
         auto func = builder.makeFunctionEntry(
             spv::NoPrecision, rettype, name,
             paramtypes, decorations, &bb);
-        func2func[node] = func;
+        func2func[node.unref()] = func;
         builder.setBuildPoint(old_bb);
 
         //if (use_debug_info) {
@@ -1006,24 +712,24 @@ struct SPIRVGenerator {
         return func;
     }
 
-    SCOPES_RESULT(spv::Id) Function_to_value(Function *node) {
+    SCOPES_RESULT(spv::Id) Function_to_value(const FunctionRef &node) {
         SCOPES_RESULT_TYPE(spv::Id);
-        SCOPES_EXPECT_ERROR(error_cannot_translate(SCOPES_GEN_TARGET, node));
+        SCOPES_ERROR(CGenFailedToTranslateValue, node->kind());
     }
 
-    SCOPES_RESULT(spv::Id) Parameter_to_value(Parameter *node) {
+    SCOPES_RESULT(spv::Id) Parameter_to_value(const ParameterRef &node) {
         SCOPES_RESULT_TYPE(spv::Id);
-        SCOPES_EXPECT_ERROR(error_gen_unbound_symbol(SCOPES_GEN_TARGET, node));
+        SCOPES_ERROR(CGenFailedToTranslateValue, node->kind());
     }
 
-    SCOPES_RESULT(spv::Id) LoopLabelArguments_to_value(LoopLabelArguments *node) {
+    SCOPES_RESULT(spv::Id) LoopLabelArguments_to_value(const LoopLabelArgumentsRef &node) {
         SCOPES_RESULT_TYPE(spv::Id);
-        SCOPES_EXPECT_ERROR(error_gen_unbound_symbol(SCOPES_GEN_TARGET, node));
+        SCOPES_ERROR(CGenFailedToTranslateValue, node->kind());
     }
 
-    SCOPES_RESULT(spv::Id) Exception_to_value(Exception *node) {
+    SCOPES_RESULT(spv::Id) Exception_to_value(const ExceptionRef &node) {
         SCOPES_RESULT_TYPE(spv::Id);
-        SCOPES_EXPECT_ERROR(error_cannot_translate(SCOPES_GEN_TARGET, node));
+        SCOPES_ERROR(CGenFailedToTranslateValue, node->kind());
     }
 
     SCOPES_RESULT(void) translate_block(const Block &node) {
@@ -1048,7 +754,7 @@ struct SPIRVGenerator {
         return nullptr;
     }
 
-    LabelInfo &find_label_info(Label *label) {
+    LabelInfo &find_label_info(const LabelRef &label) {
         int i = label_info_stack.size();
         while (i-- > 0) {
             auto &&info = label_info_stack[i];
@@ -1094,7 +800,7 @@ struct SPIRVGenerator {
         return {};
     }
 
-    SCOPES_RESULT(void) build_merge(Label *label, const TypedValues &values) {
+    SCOPES_RESULT(void) build_merge(const LabelRef &label, const TypedValues &values) {
         SCOPES_RESULT_TYPE(void);
         auto &&label_info = find_label_info(label);
         SCOPES_CHECK_RESULT(build_merge_phi(label_info.merge_values, values));
@@ -1103,21 +809,21 @@ struct SPIRVGenerator {
         return {};
     }
 
-    SCOPES_RESULT(void) translate_Merge(Merge *node) {
+    SCOPES_RESULT(void) translate_Merge(const MergeRef &node) {
         SCOPES_RESULT_TYPE(void);
-        auto label = cast<Label>(node->label);
+        auto label = node->label.cast<Label>();
         SCOPES_CHECK_RESULT(build_merge(label, node->values));
         return {};
     }
 
-    SCOPES_RESULT(void) translate_Repeat(Repeat *node) {
+    SCOPES_RESULT(void) translate_Repeat(const RepeatRef &node) {
         SCOPES_RESULT_TYPE(void);
         SCOPES_CHECK_RESULT(build_merge_phi(loop_info.repeat_values, node->values));
         builder.createBranch(loop_info.bb_loop);
         return {};
     }
 
-    SCOPES_RESULT(void) translate_Label(Label *node) {
+    SCOPES_RESULT(void) translate_Label(const LabelRef &node) {
         SCOPES_RESULT_TYPE(void);
         LabelInfo label_info;
         label_info.label = node;
@@ -1156,20 +862,20 @@ struct SPIRVGenerator {
         return {};
     }
 
-    void map_phi(const Ids &refs, TypedValue *node) {
+    void map_phi(const Ids &refs, const TypedValueRef &node) {
         for (int i = 0; i < refs.size(); ++i) {
             bind(ValueIndex(node, i), refs[i]);
         }
     }
 
-    SCOPES_RESULT(void) build_phi(Ids &refs, TypedValue *node) {
+    SCOPES_RESULT(void) build_phi(Ids &refs, const TypedValueRef &node) {
         SCOPES_RESULT_TYPE(void);
         SCOPES_CHECK_RESULT(build_phi(refs, node->get_type()));
         map_phi(refs, node);
         return {};
     }
 
-    SCOPES_RESULT(void) translate_LoopLabel(LoopLabel *node) {
+    SCOPES_RESULT(void) translate_LoopLabel(const LoopLabelRef &node) {
         SCOPES_RESULT_TYPE(void);
         LabelInfo *li_break = find_label_info_by_kind(LK_Break);
         //auto rtype = node->get_type();
@@ -1239,7 +945,7 @@ struct SPIRVGenerator {
         }
     }
 
-    SCOPES_RESULT(spv::Id) node_to_spirv_type(Value *node) {
+    SCOPES_RESULT(spv::Id) node_to_spirv_type(const ValueRef &node) {
         SCOPES_RESULT_TYPE(spv::Id);
         return type_to_spirv_type(SCOPES_GET_RESULT(extract_type_constant(node)));
     }
@@ -1260,7 +966,7 @@ struct SPIRVGenerator {
 
 #define READ_VALUE(NAME) \
         assert(argn < argcount); \
-        TypedValue * _ ## NAME = args[argn++]; \
+        TypedValueRef _ ## NAME = args[argn++]; \
         spv::Id NAME = SCOPES_GET_RESULT(ref_to_value(_ ## NAME));
 
 #define READ_TYPE(NAME) \
@@ -1269,12 +975,12 @@ struct SPIRVGenerator {
 
 #define READ_INT(NAME) \
         assert(argn < argcount); \
-        TypedValue * _ ## NAME = args[argn++]; \
+        TypedValueRef _ ## NAME = args[argn++]; \
         auto NAME = SCOPES_GET_RESULT(extract_integer_constant(_ ## NAME));
 
 #define READ_SYMBOL(NAME) \
         assert(argn < argcount); \
-        TypedValue * _ ## NAME = args[argn++]; \
+        TypedValueRef _ ## NAME = args[argn++]; \
         auto NAME = SCOPES_GET_RESULT(extract_symbol_constant(_ ## NAME));
 
 #define READ_VECTOR(NAME) \
@@ -1442,7 +1148,7 @@ struct SPIRVGenerator {
         case FN_ExtractElement: {
             READ_VALUE(val);
             READ_VALUE(index);
-            if (isa<ConstInt>(_index)) {
+            if (_index.isa<ConstInt>()) {
                 int i = extract_integer_constant(_index).assert_ok();
                 return builder.createCompositeExtract(val,
                     builder.getContainedTypeId(builder.getTypeId(val), i), i);
@@ -1456,7 +1162,7 @@ struct SPIRVGenerator {
             READ_VALUE(val);
             READ_VALUE(eltval);
             READ_VALUE(index);
-            if (isa<ConstInt>(_index)) {
+            if (_index.isa<ConstInt>()) {
                 int i = extract_integer_constant(_index).assert_ok();
                 return builder.createCompositeInsert(eltval, val,
                     builder.getTypeId(val), i);
@@ -1479,7 +1185,7 @@ struct SPIRVGenerator {
             op->addIdOperand(v2);
             for (int i = 0; i < sz; ++i) {
                 unsigned int k = SCOPES_GET_RESULT(
-                    extract_integer_constant(mask->values[i]));
+                    extract_integer_constant(get_field(mask, i)));
                 op->addImmediateOperand(k);
             }
             builder.getBuildPoint()->addInstruction(
@@ -1790,9 +1496,7 @@ struct SPIRVGenerator {
             case OP_Radians: _builtin = GLSLstd450Radians; break;
             case OP_Degrees: _builtin = GLSLstd450Degrees; break;
             default: {
-                StyledString ss;
-                ss.out << "IL->SPIR: unsupported unary intrinsic " << builtin << " encountered";
-                SCOPES_LOCATION_ERROR(ss.str());
+                SCOPES_ERROR(CGenUnsupportedBuiltin, builtin);
             } break;
             }
             return builder.createBuiltinCall(rtype, glsl_ext_inst, _builtin, { val });
@@ -1809,9 +1513,7 @@ struct SPIRVGenerator {
             case OP_Pow: _builtin = GLSLstd450Pow; break;
             case FN_Cross: _builtin = GLSLstd450Cross; break;
             default: {
-                StyledString ss;
-                ss.out << "IL->SPIR: unsupported binary intrinsic " << builtin << " encountered";
-                SCOPES_LOCATION_ERROR(ss.str());
+                SCOPES_ERROR(CGenUnsupportedBuiltin, builtin);
             } break;
             }
             return builder.createBuiltinCall(rtype, glsl_ext_inst, _builtin, { a, b });
@@ -1823,9 +1525,7 @@ struct SPIRVGenerator {
             builder.makeDiscard();
             return 0;
         default: {
-            StyledString ss;
-            ss.out << "IL->SPIR: unsupported builtin " << builtin << " encountered";
-            SCOPES_LOCATION_ERROR(ss.str());
+            SCOPES_ERROR(CGenUnsupportedBuiltin, builtin);
         } break;
         }
 #undef READ_TYPE
@@ -1833,12 +1533,12 @@ struct SPIRVGenerator {
         return 0;
     }
 
-    SCOPES_RESULT(void) translate_Call(Call *call) {
+    SCOPES_RESULT(void) translate_Call(const CallRef &call) {
         SCOPES_RESULT_TYPE(void);
         auto callee = call->callee;
         auto &&args = call->args;
 
-        SCOPES_CHECK_RESULT(write_anchor(call->anchor()));
+        SCOPES_CHECK_RESULT(write_anchor(call.anchor()));
 
         auto T = try_get_const_type(callee);
         const Type *rtype = callee->get_type();
@@ -1862,11 +1562,10 @@ struct SPIRVGenerator {
             }
             return {};
         }
-        SCOPES_ANCHOR(call->anchor());
-        SCOPES_EXPECT_ERROR(error_gen_invalid_call_type(SCOPES_GEN_TARGET, callee));
+        SCOPES_ERROR(CGenInvalidCallee, callee->get_type());
     }
 
-    SCOPES_RESULT(void) translate_Switch(Switch *node) {
+    SCOPES_RESULT(void) translate_Switch(const SwitchRef &node) {
         SCOPES_RESULT_TYPE(void);
         auto expr = SCOPES_GET_RESULT(ref_to_value(node->expr));
         auto bb = builder.getBuildPoint();
@@ -1921,7 +1620,7 @@ struct SPIRVGenerator {
         builder.setBuildPoint(bb);
     }
 
-    SCOPES_RESULT(void) translate_CondBr(CondBr *node) {
+    SCOPES_RESULT(void) translate_CondBr(const CondBrRef &node) {
         SCOPES_RESULT_TYPE(void);
 
         auto cond = SCOPES_GET_RESULT(ref_to_value(node->cond));
@@ -1944,11 +1643,10 @@ struct SPIRVGenerator {
         return {};
     }
 
-    SCOPES_RESULT(void) translate_instruction(Instruction *node) {
-        SCOPES_ANCHOR(node->anchor());
+    SCOPES_RESULT(void) translate_instruction(const InstructionRef &node) {
         switch(node->kind()) {
         #define T(NAME, BNAME, CLASS) \
-            case NAME: return translate_ ## CLASS(cast<CLASS>(node));
+            case NAME: return translate_ ## CLASS(node.cast<CLASS>());
         SCOPES_INSTRUCTION_VALUE_KIND()
         #undef T
             default: assert(false); break;
@@ -1958,34 +1656,34 @@ struct SPIRVGenerator {
 
     SCOPES_RESULT(spv::Id) ref_to_value(const ValueIndex &ref) {
         SCOPES_RESULT_TYPE(spv::Id);
-        SCOPES_ANCHOR(ref.value->anchor());
         auto it = ref2value.find(ref);
         if (it != ref2value.end())
             return it->second;
         spv::Id value = 0;
         switch(ref.value->kind()) {
         #define T(NAME, BNAME, CLASS) \
-            case NAME: value = SCOPES_GET_RESULT(CLASS ## _to_value(cast<CLASS>(ref.value))); break;
+            case NAME: value = SCOPES_GET_RESULT( \
+                CLASS ## _to_value(ref.value.cast<CLASS>())); break;
         SCOPES_PURE_VALUE_KIND()
         #undef T
             default: {
-                SCOPES_EXPECT_ERROR(error_cannot_translate(SCOPES_GEN_TARGET, ref.value));
+                SCOPES_ERROR(CGenFailedToTranslateValue, ref.value->kind());
             } break;
         }
         ref2value.insert({ref,value});
         return value;
     }
 
-    SCOPES_RESULT(spv::Id) PureCast_to_value(PureCast *node) {
+    SCOPES_RESULT(spv::Id) PureCast_to_value(const PureCastRef &node) {
         SCOPES_RESULT_TYPE(spv::Id);
         auto LLT = SCOPES_GET_RESULT(type_to_spirv_type(node->get_type()));
-        auto val = SCOPES_GET_RESULT(ref_to_value(node->value));
+        auto val = SCOPES_GET_RESULT(ref_to_value(ValueIndex(node->value)));
         if (builder.getTypeId(val) == LLT)
             return val;
         return builder.createUnaryOp(spv::OpBitcast, LLT, val);
     }
 
-    SCOPES_RESULT(spv::Id) Global_to_value(Global *node) {
+    SCOPES_RESULT(spv::Id) Global_to_value(const GlobalRef &node) {
         SCOPES_RESULT_TYPE(spv::Id);
         spv::StorageClass sc = SCOPES_GET_RESULT(storage_class_from_extern_class(
             node->storage_class));
@@ -2049,7 +1747,7 @@ struct SPIRVGenerator {
         return id;
     }
 
-    SCOPES_RESULT(spv::Id) ConstInt_to_value(ConstInt *node) {
+    SCOPES_RESULT(spv::Id) ConstInt_to_value(const ConstIntRef &node) {
         SCOPES_RESULT_TYPE(spv::Id);
         auto TT = SCOPES_GET_RESULT(storage_type(node->get_type()));
         //auto T = SCOPES_GET_RESULT(type_to_spirv_type(node->get_type()));
@@ -2078,12 +1776,10 @@ struct SPIRVGenerator {
             default: break;
             }
         }
-        StyledString ss;
-        ss.out << "IL->SPIR: unsupported integer constant type " << node->get_type();
-        SCOPES_LOCATION_ERROR(ss.str());
+        SCOPES_ERROR(CGenTypeUnsupportedInTarget, node->get_type());
     }
 
-    SCOPES_RESULT(spv::Id) ConstReal_to_value(ConstReal *node) {
+    SCOPES_RESULT(spv::Id) ConstReal_to_value(const ConstRealRef &node) {
         SCOPES_RESULT_TYPE(spv::Id);
         auto TT = SCOPES_GET_RESULT(storage_type(node->get_type()));
         //auto T = SCOPES_GET_RESULT(type_to_spirv_type(node->get_type()));
@@ -2094,14 +1790,12 @@ struct SPIRVGenerator {
         case 64: return builder.makeDoubleConstant(value);
         default: break;
         }
-        StyledString ss;
-        ss.out << "IL->SPIR: unsupported real constant type " << node->get_type();
-        SCOPES_LOCATION_ERROR(ss.str());
+        SCOPES_ERROR(CGenTypeUnsupportedInTarget, node->get_type());
     }
 
-    SCOPES_RESULT(spv::Id) ConstPointer_to_value(ConstPointer *node) {
+    SCOPES_RESULT(spv::Id) ConstPointer_to_value(const ConstPointerRef &node) {
         SCOPES_RESULT_TYPE(spv::Id);
-        SCOPES_EXPECT_ERROR(error_cannot_translate(SCOPES_GEN_TARGET, node));
+        SCOPES_ERROR(CGenFailedToTranslateValue, node->kind());
 #if 0
         auto TT = SCOPES_GET_RESULT(storage_type(node->get_type()));
         auto LLT = SCOPES_GET_RESULT(type_to_spirv_type(node->get_type()));
@@ -2119,7 +1813,7 @@ struct SPIRVGenerator {
 #endif
     }
 
-    SCOPES_RESULT(spv::Id) ConstAggregate_to_value(ConstAggregate *node) {
+    SCOPES_RESULT(spv::Id) ConstAggregate_to_value(const ConstAggregateRef &node) {
         SCOPES_RESULT_TYPE(spv::Id);
         //auto TT = SCOPES_GET_RESULT(storage_type(node->get_type()));
         auto LLT = SCOPES_GET_RESULT(type_to_spirv_type(node->get_type()));
@@ -2127,12 +1821,12 @@ struct SPIRVGenerator {
         Ids values;
         for (size_t i = 0; i < count; ++i) {
             values.push_back(SCOPES_GET_RESULT(
-                ref_to_value(node->values[i])));
+                ref_to_value(ValueIndex(get_field(node, i)))));
         }
         return builder.makeCompositeConstant(LLT, values);
     }
 
-    SCOPES_RESULT(void) build_call(Call *call,
+    SCOPES_RESULT(void) build_call(const CallRef &call,
         const Type *functype, spv::Function *func, const TypedValues &args) {
         SCOPES_RESULT_TYPE(void);
         size_t argcount = args.size();
@@ -2154,7 +1848,7 @@ struct SPIRVGenerator {
         assert(argcount >= fargcount);
         // make variadic calls C compatible
         if (fi->flags & FF_Variadic) {
-            SCOPES_LOCATION_ERROR(String::from("IL->SPIR: variadic calls not supported"));
+            SCOPES_ERROR(CGenTypeUnsupportedInTarget, functype);
         }
 
         auto ret = builder.createFunctionCall(func, values);
@@ -2209,35 +1903,10 @@ struct SPIRVGenerator {
         return {};
     }
 
-#if 0
-    LLVMMetadataRef anchor_to_location(const Anchor *anchor) {
-        assert(use_debug_info);
-
-        auto old_bb = LLVMGetInsertBlock(builder);
-        assert(old_bb);
-        LLVMValueRef func = LLVMGetBasicBlockParent(old_bb);
-        LLVMMetadataRef disp = LLVMGetSubprogram(func);
-
-        LLVMMetadataRef result = LLVMDIBuilderCreateDebugLocation(
-            LLVMGetGlobalContext(),
-            anchor->lineno, anchor->column, disp, nullptr);
-
-        return result;
-    }
-
-    LLVMMetadataRef set_debug_location(const Anchor *anchor) {
-        assert(use_debug_info);
-        LLVMMetadataRef diloc = anchor_to_location(anchor);
-        LLVMSetCurrentDebugLocation(builder,
-            LLVMMetadataAsValue(LLVMGetGlobalContext(), diloc));
-        return diloc;
-    }
-#endif
-
     SCOPES_RESULT(void) process_functions() {
         SCOPES_RESULT_TYPE(void);
         while (!function_todo.empty()) {
-            Function *func = function_todo.front();
+            FunctionRef func = function_todo.front();
             function_todo.pop_front();
             SCOPES_CHECK_RESULT(Function_finalize(func));
         }
@@ -2245,18 +1914,14 @@ struct SPIRVGenerator {
     }
 
     SCOPES_RESULT(void) generate(std::vector<unsigned int> &result,
-        Symbol target, Function *entry) {
+        Symbol target, const FunctionRef &entry) {
         SCOPES_RESULT_TYPE(void);
 
         auto needfi = native_ro_pointer_type(
             function_type(empty_arguments_type(), {}));
         auto hasfi = entry->get_type();
         if (hasfi != needfi) {
-            SCOPES_ANCHOR(entry->anchor());
-            StyledString ss;
-            ss.out << "Entry function must have type " << needfi
-                << " but has type " << hasfi;
-            SCOPES_LOCATION_ERROR(ss.str());
+            SCOPES_ERROR(CGenEntryFunctionSignatureMismatch, needfi, hasfi);
         }
 
         builder.setSource(spv::SourceLanguageGLSL, 450);
@@ -2284,13 +1949,7 @@ struct SPIRVGenerator {
             entry_point = builder.addEntryPoint(spv::ExecutionModelGLCompute, func, "main");
         } break;
         default: {
-            StyledString ss;
-            ss.out << "IL->SPIR: unsupported target: " << target << ", try one of "
-                << Symbol(SYM_TargetVertex) << " "
-                << Symbol(SYM_TargetFragment) << " "
-                << Symbol(SYM_TargetGeometry) << " "
-                << Symbol(SYM_TargetCompute);
-            SCOPES_LOCATION_ERROR(ss.str());
+            SCOPES_ERROR(CGenUnsupportedTarget, target);
         } break;
         }
 
@@ -2378,15 +2037,14 @@ SCOPES_RESULT(void) optimize_spirv(std::vector<unsigned int> &result, int opt_le
     std::vector<unsigned int> oldresult = result;
     result.clear();
     if (!optimizer.Run(oldresult.data(), oldresult.size(), &result)) {
-        SCOPES_LOCATION_ERROR(String::from(
-            "IL->SPIR: error while running optimization passes"));
+        SCOPES_ERROR(CGenBackendOptimizationFailed);
     }
 
     SCOPES_CHECK_RESULT(verify_spirv(result));
     return {};
 }
 
-SCOPES_RESULT(const String *) compile_spirv(Symbol target, Function *fn, uint64_t flags) {
+SCOPES_RESULT(const String *) compile_spirv(Symbol target, const FunctionRef &fn, uint64_t flags) {
     SCOPES_RESULT_TYPE(const String *);
     Timer sum_compile_time(TIMER_CompileSPIRV);
 
@@ -2426,7 +2084,7 @@ SCOPES_RESULT(const String *) compile_spirv(Symbol target, Function *fn, uint64_
     return String::from((char *)&result[0], bytesize);
 }
 
-SCOPES_RESULT(const String *) compile_glsl(Symbol target, Function *fn, uint64_t flags) {
+SCOPES_RESULT(const String *) compile_glsl(Symbol target, const FunctionRef &fn, uint64_t flags) {
     SCOPES_RESULT_TYPE(const String *);
     Timer sum_compile_time(TIMER_CompileSPIRV);
 

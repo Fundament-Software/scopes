@@ -36,7 +36,7 @@ do
     if (let ok n = (get))
         assert (n == 303)
     else
-        error! "failed"
+        error "failed"
 
     assert (n == 303)
 

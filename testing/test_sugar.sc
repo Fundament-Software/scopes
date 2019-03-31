@@ -49,7 +49,7 @@ fn test-match (expr)
         print "case4" x y...
         return;
     default
-        compiler-error! "wrong!"
+        error "wrong!"
 
 test-match '((kwok 2 4 5 6) 3 4)
 test-match '(kwok kwok 20)

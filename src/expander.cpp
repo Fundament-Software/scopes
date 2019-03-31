@@ -17,7 +17,7 @@
 #include "value.hpp"
 #include "prover.hpp"
 #include "timer.hpp"
-#include "stream_ast.hpp"
+#include "stream_expr.hpp"
 #include "gc.hpp"
 #include "dyn_cast.inc"
 #include "scopes/scopes.h"
@@ -34,7 +34,7 @@ namespace scopes {
 static SCOPES_RESULT(void) verify_list_parameter_count(const char *context, const List *expr, int mincount, int maxcount, int starti = 1) {
     SCOPES_RESULT_TYPE(void);
     if (!expr) {
-        SCOPES_LOCATION_ERROR(format("%s: expression is empty", context));
+        SCOPES_ERROR(SyntaxCallExpressionEmpty);
     }
     if ((mincount <= 0) && (maxcount == -1)) {
         return {};
@@ -42,20 +42,18 @@ static SCOPES_RESULT(void) verify_list_parameter_count(const char *context, cons
     int argcount = (int)expr->count - starti;
 
     if ((maxcount >= 0) && (argcount > maxcount)) {
-        SCOPES_LOCATION_ERROR(
-            format("%s: excess argument. At most %i arguments expected", context, maxcount));
+        SCOPES_ERROR(SyntaxTooManyArguments, maxcount);
     }
     if ((mincount >= 0) && (argcount < mincount)) {
-        SCOPES_LOCATION_ERROR(
-            format("%s: at least %i arguments expected, got %i", context, mincount, argcount));
+        SCOPES_ERROR(SyntaxNotEnoughArguments, mincount, argcount);
     }
     return {};
 }
 
 //------------------------------------------------------------------------------
 
-static Symbol try_extract_symbol(Value *node) {
-    auto ptr = dyn_cast<ConstInt>(node);
+static Symbol try_extract_symbol(const ValueRef &node) {
+    auto ptr = node.dyn_cast<ConstInt>();
     if (ptr && (ptr->get_type() == TYPE_Symbol))
         return Symbol::wrap(ptr->value);
     return SYM_Unnamed;
@@ -65,13 +63,13 @@ static Symbol try_extract_symbol(Value *node) {
 
 struct Expander {
     Scope *env;
-    Template *astscope;
+    TemplateRef astscope;
     const List *next;
     static bool verbose;
 
     static const Type *list_expander_func_type;
 
-    Expander(Scope *_env, Template *_astscope, const List *_next = EOL) :
+    Expander(Scope *_env, const TemplateRef &_astscope, const List *_next = EOL) :
         env(_env),
         astscope(_astscope),
         next(_next) {
@@ -84,10 +82,10 @@ struct Expander {
 
     ~Expander() {}
 
-    SCOPES_RESULT(Value *) expand_expression(
-        const Anchor *anchor, const List *it, bool scoped) {
-        SCOPES_RESULT_TYPE(Value *);
-        Expression *expr = nullptr;
+    SCOPES_RESULT(ValueRef) expand_expression(const ListRef &src, bool scoped) {
+        SCOPES_RESULT_TYPE(ValueRef);
+        ExpressionRef expr;
+        const List *it = src.unref();
         while (it) {
             next = it->next;
             if (!last_expression()) {
@@ -98,9 +96,9 @@ struct Expander {
             }
             if (!expr) {
                 if (scoped)
-                    expr = Expression::scoped_from(anchor);
+                    expr = ref(src.anchor(), Expression::scoped_from());
                 else
-                    expr = Expression::unscoped_from(anchor);
+                    expr = ref(src.anchor(), Expression::unscoped_from());
             }
             expr->append(SCOPES_GET_RESULT(expand(it->at)));
             it = next;
@@ -108,38 +106,37 @@ struct Expander {
         if (expr) {
             if (expr->body.empty() && !expr->scoped)
                 return expr->value;
-            return expr;
+            return ValueRef(expr);
         }
-        return ArgumentListTemplate::from(anchor);
+        return ref(src.anchor(), ArgumentListTemplate::from());
     }
 
-    SCOPES_RESULT(Value *) expand_run_stage(const List *it) {
-        SCOPES_RESULT_TYPE(Value *);
-        auto _anchor = get_active_anchor();
-
+    SCOPES_RESULT(ValueRef) expand_run_stage(const List *it) {
+        SCOPES_RESULT_TYPE(ValueRef);
         SCOPES_CHECK_RESULT(verify_list_parameter_count("run-stage", it, 0, 0));
+        assert(it);
 
-        auto node = CompileStage::from(_anchor, next, env);
+        auto node = ref(it->at.anchor(), CompileStage::from(next, env));
         next = EOL;
-        return node;
+        return ValueRef(node);
     }
 
-    SCOPES_RESULT(ParameterTemplate *) expand_parameter(Value *value, Value *node = nullptr) {
-        SCOPES_RESULT_TYPE(ParameterTemplate *);
-        const Anchor *anchor = value->anchor();
-        if (isa<ParameterTemplate>(value)) {
-            return cast<ParameterTemplate>(value);
+    SCOPES_RESULT(ParameterTemplateRef) expand_parameter(
+        const ValueRef &value, const ValueRef &node = ValueRef()) {
+        SCOPES_RESULT_TYPE(ParameterTemplateRef);
+        if (value.isa<ParameterTemplate>()) {
+            return value.cast<ParameterTemplate>();
         } else {
             Symbol sym = SCOPES_GET_RESULT(extract_symbol_constant(value));
-            if (node && isa<Pure>(node)) {
+            if (node && node.isa<Pure>()) {
                 env->bind(sym, node);
-                return nullptr;
+                return ParameterTemplateRef();
             } else {
-                ParameterTemplate *param = nullptr;
+                ParameterTemplateRef param;
                 if (ends_with_parenthesis(sym)) {
-                    param = ParameterTemplate::variadic_from(anchor, sym);
+                    param = ref(value.anchor(), ParameterTemplate::variadic_from(sym));
                 } else {
-                    param = ParameterTemplate::from(anchor, sym);
+                    param = ref(value.anchor(), ParameterTemplate::from(sym));
                 }
                 env->bind(sym, param);
                 return param;
@@ -155,11 +152,11 @@ struct Expander {
         };
     };
 
-    SCOPES_RESULT(Value *) expand_fn(const List *it, const ExpandFnSetup &setup) {
-        SCOPES_RESULT_TYPE(Value *);
-        auto _anchor = get_active_anchor();
-
+    SCOPES_RESULT(ValueRef) expand_fn(const List *it, const ExpandFnSetup &setup) {
+        SCOPES_RESULT_TYPE(ValueRef);
         SCOPES_CHECK_RESULT(verify_list_parameter_count("fn", it, 1, -1));
+
+        auto anchor = it->at.anchor();
 
         // skip head
         it = it->next;
@@ -167,8 +164,8 @@ struct Expander {
         assert(it != EOL);
 
         bool continuing = false;
-        Template *func = nullptr;
-        Value *result = nullptr;
+        TemplateRef func;
+        ValueRef result;
         //Any tryfunc_name = SCOPES_GET_RESULT(unsyntax(it->at));
         const Type *T = try_get_const_type(it->at);
         if (T == TYPE_Symbol) {
@@ -176,12 +173,13 @@ struct Expander {
             // named self-binding
             // see if we can find a forward declaration in the local scope
             if (env->lookup_local(sym, result)
-                && isa<Template>(result)
-                && cast<Template>(result)->is_forward_decl()) {
-                func = cast<Template>(result);
+                && result.isa<Template>()
+                && result.cast<Template>()->is_forward_decl()) {
+                func = result.cast<Template>();
+                func = ref(anchor, func);
                 continuing = true;
             } else {
-                func = Template::from(_anchor, sym);
+                func = ref(anchor, Template::from(sym));
                 result = func;
                 env->bind(sym, func);
             }
@@ -190,16 +188,17 @@ struct Expander {
             auto str = try_extract_string(it->at);
             assert(str);
             // named lambda
-            func = Template::from(_anchor, Symbol(str));
+            func = ref(anchor, Template::from(Symbol(str)));
             result = func;
             it = it->next;
         } else {
             // unnamed lambda
-            func = Template::from(_anchor, Symbol(SYM_Unnamed));
+            func = ref(anchor, Template::from(Symbol(SYM_Unnamed)));
             result = func;
         }
         if (setup.inlined)
             func->set_inline();
+        func->set_def_anchor(anchor);
         /*
         if (setup.quoted)
             result = ast_quote(func);
@@ -208,8 +207,7 @@ struct Expander {
         if (it == EOL) {
             // forward declaration
             if (T != TYPE_Symbol) {
-                SCOPES_LOCATION_ERROR(
-                    String::from("forward declared function must be named"));
+                SCOPES_ERROR(SyntaxUnnamedForwardDeclaration);
             }
             return result;
         }
@@ -238,7 +236,8 @@ struct Expander {
             }
         }
 
-        func->value = SCOPES_GET_RESULT(subexpr.expand_expression(_anchor, it, false));
+        func->value = SCOPES_GET_RESULT(subexpr.expand_expression(
+            ref(anchor, it), false));
 
         return result;
     }
@@ -247,52 +246,52 @@ struct Expander {
         return next == EOL;
     }
 
-    SCOPES_RESULT(Value *) expand_label(const List *it) {
-        SCOPES_RESULT_TYPE(Value *);
-        auto _anchor = get_active_anchor();
-
+    SCOPES_RESULT(ValueRef) expand_label(const List *it) {
+        SCOPES_RESULT_TYPE(ValueRef);
         it = it->next;
 
         auto name = SCOPES_GET_RESULT(extract_symbol_constant(it->at));
+        auto anchor = it->at.anchor();
         it = it->next;
 
         Scope *subenv = Scope::from(env);
-        auto label = LabelTemplate::from(_anchor, LK_User, name);
+        auto label = ref(anchor, LabelTemplate::from(LK_User, name));
         subenv->bind(name, label);
         Expander subexpr(subenv, astscope);
-        label->value = SCOPES_GET_RESULT(subexpr.expand_expression(_anchor, it, false));
-        return label;
+        label->value = SCOPES_GET_RESULT(subexpr.expand_expression(
+            ref(anchor, it), false));
+        return ValueRef(label);
     }
 
-    SCOPES_RESULT(Value *) expand_do(const List *it) {
-        //SCOPES_RESULT_TYPE(Value *);
-        auto _anchor = get_active_anchor();
-
+    SCOPES_RESULT(ValueRef) expand_do(const List *it) {
+        //SCOPES_RESULT_TYPE(ValueRef);
+        assert(it);
+        auto anchor = it->at.anchor();
         it = it->next;
 
         Scope *subenv = Scope::from(env);
         Expander subexpr(subenv, astscope);
-        return subexpr.expand_expression(_anchor, it, true);
+        return subexpr.expand_expression(ref(anchor, it), true);
     }
 
-    SCOPES_RESULT(Value *) expand_inline_do(const List *it) {
-        SCOPES_RESULT_TYPE(Value *);
-        auto _anchor = get_active_anchor();
-
+    SCOPES_RESULT(ValueRef) expand_inline_do(const List *it) {
+        SCOPES_RESULT_TYPE(ValueRef);
+        auto anchor = it->at.anchor();
         it = it->next;
 
         Expander subexpr(env, astscope);
-        auto expr = SCOPES_GET_RESULT(subexpr.expand_expression(_anchor, it, false));
+        auto expr = SCOPES_GET_RESULT(
+            subexpr.expand_expression(ref(anchor, it), false));
         env = subexpr.env;
         return expr;
     }
 
-    bool is_equal_token(Value *name) {
+    bool is_equal_token(const ValueRef &name) {
         auto tok = try_extract_symbol(name);
         return tok == OP_Set;
     }
 
-    bool is_except_token(Value *name) {
+    bool is_except_token(const ValueRef &name) {
         auto tok = try_extract_symbol(name);
         return tok == KW_Except;
     }
@@ -314,8 +313,8 @@ struct Expander {
     }
 
     // (loop ([x...] [= init...]) body...)
-    SCOPES_RESULT(Value *) expand_loop(const List *it) {
-        SCOPES_RESULT_TYPE(Value *);
+    SCOPES_RESULT(ValueRef) expand_loop(const List *it) {
+        SCOPES_RESULT_TYPE(ValueRef);
 
         /*
         we're building this structure
@@ -328,14 +327,15 @@ struct Expander {
         */
 
         SCOPES_CHECK_RESULT(verify_list_parameter_count("loop", it, 1, -1));
+        auto anchor = it->at.anchor();
         it = it->next;
 
-        auto _anchor = get_active_anchor();
-
         const List *params = SCOPES_GET_RESULT(extract_list_constant(it->at));
+        auto param_anchor = it->at.anchor();
         const List *values = nullptr;
         const List *body = it->next;
         auto endit = params;
+
         while (endit) {
             if (is_equal_token(endit->at))
                 break;
@@ -352,12 +352,14 @@ struct Expander {
             SCOPES_CHECK_RESULT(subexp.expand_arguments(initargs, it));
         }
 
-        Loop *loop = Loop::from(_anchor, ArgumentListTemplate::from(_anchor, initargs));
-        LabelTemplate *break_label = LabelTemplate::from(_anchor, LK_Break, KW_Break, loop);
+        LoopRef loop = ref(anchor, Loop::from(ref(param_anchor,
+            ArgumentListTemplate::from(initargs))));
+        LabelTemplateRef break_label = ref(anchor,
+            LabelTemplate::from(LK_Break, KW_Break, loop));
 
         Expander bodyexp(Scope::from(env), astscope);
 
-        auto expr = Expression::unscoped_from(_anchor);
+        auto expr = Expression::unscoped_from();
         {
             int index = 0;
             it = params;
@@ -365,15 +367,14 @@ struct Expander {
             while (it != endit) {
                 auto paramval = it->at;
                 Symbol sym = SCOPES_GET_RESULT(extract_symbol_constant(paramval));
-                Value *node = nullptr;
+                ValueRef node;
                 if (!ends_with_parenthesis(sym)) {
-                    node = extract_argument(paramval->anchor(), loop->args, index);
+                    node = ref(paramval.anchor(), extract_argument(loop->args, index));
                 } else {
                     if (it->next != endit) {
-                        SCOPES_ANCHOR(paramval->anchor());
-                        SCOPES_EXPECT_ERROR(error_variadic_symbol_not_in_last_place());
+                        SCOPES_ERROR(SyntaxVariadicSymbolNotLast);
                     }
-                    node = extract_argument(paramval->anchor(), loop->args, index, true);
+                    node = ref(paramval.anchor(), extract_argument(loop->args, index, true));
                 }
                 bodyexp.env->bind(sym, node);
                 expr->append(node);
@@ -382,24 +383,25 @@ struct Expander {
             }
         }
 
-        auto value = SCOPES_GET_RESULT(bodyexp.expand_expression(_anchor, body, false));
+        auto value = SCOPES_GET_RESULT(bodyexp.expand_expression(
+            ref(anchor, body), false));
         expr->append(value);
-        loop->value = expr;
-        return break_label;
+        loop->value = ref(anchor, expr);
+        return ValueRef(break_label);
     }
 
-    static Value *extract_argument(const Anchor *anchor, Value *node, int index, bool vararg = false) {
-        if (isa<Const>(node)) {
-            assert(!is_arguments_type(cast<Const>(node)->get_type()));
+    static ValueRef extract_argument(const ValueRef &node, int index, bool vararg = false) {
+        if (node.isa<Const>()) {
+            assert(!is_arguments_type(node.cast<Const>()->get_type()));
             if (index == 0) {
                 return node;
             } else {
-                return ConstAggregate::none_from(anchor);
+                return ref(node.anchor(), ConstAggregate::none_from());
             }
         }
-        auto result = ExtractArgumentTemplate::from(anchor, node, index, vararg);
+        auto result = ExtractArgumentTemplate::from(node, index, vararg);
         if (!vararg) {
-            result = KeyedTemplate::from(anchor, SYM_Unnamed, result);
+            result = KeyedTemplate::from(SYM_Unnamed, result);
         }
         return result;
     }
@@ -407,13 +409,12 @@ struct Expander {
     // (let x ... [= args ...])
     // (let (x ... = args ...) ...
     // ...
-    SCOPES_RESULT(Value *) expand_let(const List *it) {
-        SCOPES_RESULT_TYPE(Value *);
+    SCOPES_RESULT(ValueRef) expand_let(const List *it) {
+        SCOPES_RESULT_TYPE(ValueRef);
 
         SCOPES_CHECK_RESULT(verify_list_parameter_count("let", it, 1, -1));
+        auto anchor = it->at.anchor();
         it = it->next;
-
-        auto _anchor = get_active_anchor();
 
         Values exprs;
         Values args;
@@ -423,30 +424,27 @@ struct Expander {
             // alternative format
             const List *equit = it;
             while (equit) {
-                SCOPES_ANCHOR(equit->at->anchor());
                 it = SCOPES_GET_RESULT(extract_list_constant(equit->at));
                 SCOPES_CHECK_RESULT(verify_list_parameter_count("=", it, 3, -1, 0));
                 auto paramval = it->at;
                 it = it->next;
                 if (!is_equal_token(it->at)) {
-                    SCOPES_ANCHOR(it->at->anchor());
-                    SCOPES_LOCATION_ERROR(String::from("= token expected"));
+                    SCOPES_ERROR(SyntaxAssignmentTokenExpected);
                 }
                 it = it->next;
                 // read init values
                 Expander subexp(env, astscope);
                 subexp.next = it->next;
-                Value *node = SCOPES_GET_RESULT(subexp.expand(it->at));
+                auto node = SCOPES_GET_RESULT(subexp.expand(it->at));
                 it = subexp.next;
                 env = subexp.env;
                 if (it) {
-                    SCOPES_ANCHOR(it->at->anchor());
-                    SCOPES_LOCATION_ERROR(String::from("extraneous argument"));
+                    SCOPES_ERROR(SyntaxUnexpectedExtraToken);
                 }
                 exprs.push_back(node);
                 Symbol sym = SCOPES_GET_RESULT(extract_symbol_constant(paramval));
                 if (!ends_with_parenthesis(sym)) {
-                    node = extract_argument(paramval->anchor(), node, 0);
+                    node = extract_argument(node, 0);
                 }
                 args.push_back(node);
                 env->bind(sym, node);
@@ -466,26 +464,21 @@ struct Expander {
 
             if (!values) {
                 // no assignments, reimport parameter names into local scope
-                Value *last_entry = nullptr;
+                ValueRef last_entry;
                 while (it != endit) {
                     auto name = SCOPES_GET_RESULT(extract_symbol_constant(it->at));
                     ScopeEntry entry;
                     if (!env->lookup(name, entry)) {
-                        SCOPES_ANCHOR(it->at->anchor());
-                        StyledString ss;
-                        ss.out << "no such name bound in parent scope: '"
-                            << name.name()->data << "'. ";
-                        print_name_suggestions(name, ss.out);
-                        SCOPES_LOCATION_ERROR(ss.str());
+                        SCOPES_ERROR(SyntaxUndeclaredIdentifier, name);
                     }
                     env->bind_with_doc(name, entry);
                     last_entry = entry.expr;
                     it = it->next;
                 }
                 if (!last_entry) {
-                    last_entry = ConstAggregate::none_from(_anchor);
+                    last_entry = ref(anchor, ConstAggregate::none_from());
                 }
-                return last_entry;
+                return ref(anchor, last_entry);
             }
 
             const List *params = it;
@@ -502,7 +495,7 @@ struct Expander {
             }
             env = subexp.env;
 
-            Value *srcval = ArgumentListTemplate::from(_anchor, exprs);
+            ValueRef srcval = ref(anchor, ArgumentListTemplate::from(exprs));
 
             int index = 0;
             //int lastarg = (int)args.size() - 1;
@@ -511,15 +504,14 @@ struct Expander {
             while (it != endit) {
                 auto paramval = it->at;
                 Symbol sym = SCOPES_GET_RESULT(extract_symbol_constant(paramval));
-                Value *node = nullptr;
+                ValueRef node;
                 if (!ends_with_parenthesis(sym)) {
-                    node = extract_argument(paramval->anchor(), srcval, index);
+                    node = ref(paramval.anchor(), extract_argument(srcval, index));
                 } else {
                     if (it->next != endit) {
-                        SCOPES_ANCHOR(paramval->anchor());
-                        SCOPES_EXPECT_ERROR(error_variadic_symbol_not_in_last_place());
+                        SCOPES_ERROR(SyntaxVariadicSymbolNotLast);
                     }
-                    node = extract_argument(paramval->anchor(), srcval, index, true);
+                    node = ref(paramval.anchor(), extract_argument(srcval, index, true));
                 }
                 args.push_back(node);
                 env->bind(sym, node);
@@ -528,30 +520,28 @@ struct Expander {
             }
         }
 
-        return Expression::unscoped_from(_anchor, exprs,
-            ArgumentListTemplate::from(_anchor, args));
+        return ValueRef(ref(anchor, Expression::unscoped_from(exprs,
+            ref(anchor, ArgumentListTemplate::from(args)))));
     }
 
     // quote <value> ...
-    SCOPES_RESULT(Value *) expand_syntax_quote(const List *it) {
-        SCOPES_RESULT_TYPE(Value *);
-        auto _anchor = get_active_anchor();
-
+    SCOPES_RESULT(ValueRef) expand_syntax_quote(const List *it) {
+        SCOPES_RESULT_TYPE(ValueRef);
         SCOPES_CHECK_RESULT(verify_list_parameter_count("syntax-quote", it, 1, -1));
+        auto anchor = it->at.anchor();
         it = it->next;
 
         if (it->count == 1) {
             return it->at;
         } else {
-            return ConstPointer::list_from(_anchor, it);
+            return ValueRef(ref(anchor, ConstPointer::list_from(it)));
         }
     }
 
-    SCOPES_RESULT(Value *) expand_syntax_log(const List *it) {
-        SCOPES_RESULT_TYPE(Value *);
-        auto _anchor = get_active_anchor();
-
+    SCOPES_RESULT(ValueRef) expand_syntax_log(const List *it) {
+        SCOPES_RESULT_TYPE(ValueRef);
         SCOPES_CHECK_RESULT(verify_list_parameter_count("syntax-log", it, 1, 1));
+        auto anchor = it->at.anchor();
         it = it->next;
 
         auto sym = SCOPES_GET_RESULT(extract_symbol_constant(it->at));
@@ -563,12 +553,12 @@ struct Expander {
             // ignore
         }
 
-        return ConstAggregate::none_from(_anchor);
+        return ValueRef(ref(anchor, ArgumentList::from({})));
     }
 
     // (try [x ...]) (except (param ...) [expr ...])
-    SCOPES_RESULT(Value *) expand_try(const List *it) {
-        SCOPES_RESULT_TYPE(Value *);
+    SCOPES_RESULT(ValueRef) expand_try(const List *it) {
+        SCOPES_RESULT_TYPE(ValueRef);
 
         /*
         # we're building this structure
@@ -583,24 +573,26 @@ struct Expander {
         */
 
         SCOPES_CHECK_RESULT(verify_list_parameter_count("try", it, 0, -1));
+        auto try_anchor = it->at.anchor();
+        //ValueRef src = it->at;
         it = it->next;
-
-        auto _anchor = get_active_anchor();
 
         Expander subexp(Scope::from(env), astscope);
 
-        Value *try_value = SCOPES_GET_RESULT(subexp.expand_expression(_anchor, it, false));
-        LabelTemplate *try_label = LabelTemplate::try_from(_anchor);
-        LabelTemplate *except_label = LabelTemplate::except_from(_anchor,
-            MergeTemplate::from(_anchor, try_label, try_value));
+        ValueRef try_value = SCOPES_GET_RESULT(subexp.expand_expression(
+            ref(try_anchor, it), false));
+        LabelTemplateRef try_label = ref(try_anchor, LabelTemplate::try_from());
+        LabelTemplateRef except_label = ref(try_anchor, LabelTemplate::except_from(
+            ref(try_anchor, MergeTemplate::from(try_label, try_value))));
 
         if (next != EOL) {
-            auto _next_anchor = next->at->anchor();
-            SCOPES_ANCHOR(_next_anchor);
+            //auto _next_def = next->at;
             it = SCOPES_GET_RESULT(extract_list_constant(next->at));
             if (it != EOL) {
                 if (is_except_token(it->at)) {
                     SCOPES_CHECK_RESULT(verify_list_parameter_count("except", it, 1, -1));
+                    auto except_anchor = it->at.anchor();
+                    except_label = ref(except_anchor, except_label);
                     it = it->next;
                     next = next->next;
 
@@ -608,7 +600,7 @@ struct Expander {
                     const List *body = it->next;
 
                     Expander subexp(Scope::from(env), astscope);
-                    auto expr = Expression::unscoped_from(_next_anchor);
+                    auto expr = Expression::unscoped_from();
                     expr->append(except_label);
                     {
                         int index = 0;
@@ -617,15 +609,14 @@ struct Expander {
                         while (it != EOL) {
                             auto paramval = it->at;
                             Symbol sym = SCOPES_GET_RESULT(extract_symbol_constant(paramval));
-                            Value *node = nullptr;
+                            ValueRef node;
                             if (!ends_with_parenthesis(sym)) {
-                                node = extract_argument(paramval->anchor(), except_label, index);
+                                node = ref(paramval.anchor(), extract_argument(except_label, index));
                             } else {
                                 if (it->next != EOL) {
-                                    SCOPES_ANCHOR(paramval->anchor());
-                                    SCOPES_EXPECT_ERROR(error_variadic_symbol_not_in_last_place());
+                                    SCOPES_ERROR(SyntaxVariadicSymbolNotLast);
                                 }
-                                node = extract_argument(paramval->anchor(), except_label, index, true);
+                                node = ref(paramval.anchor(), extract_argument(except_label, index, true));
                             }
                             subexp.env->bind(sym, node);
                             expr->append(node);
@@ -635,25 +626,24 @@ struct Expander {
                     }
 
                     it = body;
-                    Value *except_value = SCOPES_GET_RESULT(subexp.expand_expression(_anchor, it, false));
+                    ValueRef except_value = SCOPES_GET_RESULT(
+                        subexp.expand_expression(ref(except_anchor, it), false));
                     expr->append(except_value);
-                    try_label->value = expr;
-                    return try_label;
+                    try_label->value = ref(except_anchor, expr);
+                    return ValueRef(try_label);
                 }
             }
-            SCOPES_LOCATION_ERROR(String::from("except block expected"));
         }
-        SCOPES_LOCATION_ERROR(String::from("except block expected"));
+        SCOPES_ERROR(SyntaxExceptBlockExpected);
     }
 
     // (switch cond)
     // [(case literal body ...)]
     // (default body ...)
-    SCOPES_RESULT(Value *) expand_switch(const List *it) {
-        SCOPES_RESULT_TYPE(Value *);
-        auto _anchor = get_active_anchor();
-
+    SCOPES_RESULT(ValueRef) expand_switch(const List *it) {
+        SCOPES_RESULT_TYPE(ValueRef);
         SCOPES_CHECK_RESULT(verify_list_parameter_count("switch", it, 1, -1));
+        auto anchor = it->at.anchor();
         it = it->next;
 
         Expander subexp(env, astscope);
@@ -667,13 +657,14 @@ struct Expander {
         it = next;
     collect_case:
         if ((it == EOL) || (try_get_const_type(it->at) != TYPE_List)) {
-            SCOPES_EXPECT_ERROR(error_missing_default_case());
+            SCOPES_ERROR(SyntaxMissingDefaultCase);
         }
         next = it->next;
         auto _case = SwitchTemplate::Case();
-        _case.anchor = it->at->anchor();
+        //_case.anchor = it->at->anchor();
         it = SCOPES_GET_RESULT(extract_list_constant(it->at));
         SCOPES_CHECK_RESULT(verify_list_parameter_count("case", it, 1, -1));
+        auto case_anchor = it->at.anchor();
         auto head = try_extract_symbol(it->at);
         if ((head == KW_Case) || (head == KW_Pass)) {
             if (head == KW_Pass) {
@@ -686,7 +677,8 @@ struct Expander {
             it = subexp.next;
 
             Expander nativeexp(Scope::from(env), astscope);
-            _case.value = SCOPES_GET_RESULT(nativeexp.expand_expression(_case.anchor, it, false));
+            _case.value = SCOPES_GET_RESULT(
+                nativeexp.expand_expression(ref(case_anchor, it), false));
             cases.push_back(_case);
 
             it = next;
@@ -697,21 +689,23 @@ struct Expander {
             _case.kind = CK_Default;
 
             Expander nativeexp(Scope::from(env), astscope);
-            _case.value = SCOPES_GET_RESULT(nativeexp.expand_expression(_case.anchor, it, false));
+            _case.value = SCOPES_GET_RESULT(
+                nativeexp.expand_expression(ref(case_anchor, it), false));
             cases.push_back(_case);
         }
 
-        return SwitchTemplate::from(_anchor, expr, cases);
+        return ValueRef(ref(anchor, SwitchTemplate::from(expr, cases)));
     }
 
     // (if cond body ...)
     // [(elseif cond body ...)]
     // [(else body ...)]
-    SCOPES_RESULT(Value *) expand_if(const List *it) {
-        SCOPES_RESULT_TYPE(Value *);
-        auto _anchor = get_active_anchor();
-
+    SCOPES_RESULT(ValueRef) expand_if(const List *it) {
+        SCOPES_RESULT_TYPE(ValueRef);
         std::vector<const List *> branches;
+
+        assert(it);
+        auto anchor = it->at.anchor();
 
     collect_branch:
         SCOPES_CHECK_RESULT(verify_list_parameter_count("if", it, 1, -1));
@@ -744,40 +738,44 @@ struct Expander {
             branches.push_back(EOL);
         }
 
-        auto ifexpr = If::from(_anchor);
+        auto ifexpr = If::from();
 
         int lastidx = (int)branches.size() - 1;
         for (int idx = 0; idx < lastidx; ++idx) {
             it = branches[idx];
-            const Anchor *anchor = it->at->anchor();
+            //const Anchor *anchor = it->at->anchor();
             SCOPES_CHECK_RESULT(verify_list_parameter_count("branch", it, 1, -1));
+            auto branch_anchor = it->at.anchor();
             it = it->next;
 
             Expander subexp(env, astscope);
             assert(it);
             subexp.next = it->next;
-            Value *cond = SCOPES_GET_RESULT(subexp.expand(it->at));
+            ValueRef cond = SCOPES_GET_RESULT(subexp.expand(it->at));
             it = subexp.next;
 
             subexp.env = Scope::from(env);
-            ifexpr->append_then(anchor, cond,
-                SCOPES_GET_RESULT(subexp.expand_expression(anchor, it, false)));
+            ifexpr->append_then(cond,
+                SCOPES_GET_RESULT(
+                    subexp.expand_expression(ref(branch_anchor, it), false)));
         }
 
         it = branches[lastidx];
         if (it != EOL) {
-            const Anchor *anchor = it->at->anchor();
+            auto else_anchor = it->at.anchor();
             it = it->next;
             Expander subexp(Scope::from(env), astscope);
 
-            ifexpr->append_else(anchor,
-                SCOPES_GET_RESULT(subexp.expand_expression(anchor, it, false)));
+            ifexpr->append_else(
+                SCOPES_GET_RESULT(
+                    subexp.expand_expression(ref(else_anchor, it), false)));
         }
 
-        return ifexpr;
+        return ValueRef(ref(anchor, ifexpr));
     }
 
-    static SCOPES_RESULT(bool) get_kwargs(Value *it, Symbol &key, Value *&value) {
+    static SCOPES_RESULT(bool) get_kwargs(
+        ValueRef it, Symbol &key, ValueRef &value) {
         SCOPES_RESULT_TYPE(bool);
         auto T = try_get_const_type(it);
         if (T != TYPE_List) return false;
@@ -804,11 +802,11 @@ struct Expander {
         while (it) {
             next = it->next;
             Symbol key = SYM_Unnamed;
-            Value *value;
-            SCOPES_ANCHOR(it->at->anchor());
+            ValueRef value;
+            //SCOPES_ANCHOR(it->at->anchor());
             if (SCOPES_GET_RESULT(get_kwargs(it->at, key, value))) {
                 args.push_back(
-                    KeyedTemplate::from(get_active_anchor(), key,
+                    KeyedTemplate::from(key,
                         SCOPES_GET_RESULT(expand(value))));
             } else {
                 args.push_back(SCOPES_GET_RESULT(expand(it->at)));
@@ -818,156 +816,168 @@ struct Expander {
         return {};
     }
 
-    Value *ast_quote(Value *expr, const Anchor *anchor = nullptr) {
-        if (isa<Expression>(expr)) {
-            auto ex = cast<Expression>(expr);
+    ValueRef ast_quote(const ValueRef &expr) {
+        if (expr.isa<Expression>()) {
+            auto ex = expr.cast<Expression>();
             ex->scoped = false;
         }
-        return Quote::from(anchor?anchor:(expr->anchor()), expr);
+        return ref(expr.anchor(), Quote::from(expr));
     }
 
-    SCOPES_RESULT(Value *) expand_ast_quote(const List *it) {
-        SCOPES_RESULT_TYPE(Value *);
-        auto _anchor = get_active_anchor();
-
+    SCOPES_RESULT(ValueRef) expand_ast_quote(const List *it) {
+        SCOPES_RESULT_TYPE(ValueRef);
+        auto anchor = it->at.anchor();
         it = it->next;
 
         Expander subexpr(env, astscope);
-        auto expr = SCOPES_GET_RESULT(subexpr.expand_expression(_anchor, it, false));
-        return ast_quote(expr, _anchor);
+        auto expr = SCOPES_GET_RESULT(subexpr.expand_expression(
+            ref(anchor, it), false));
+        return ref(anchor, ast_quote(expr));
     }
 
-    SCOPES_RESULT(Value *) expand_ast_unquote(const List *it) {
-        SCOPES_RESULT_TYPE(Value *);
-        auto _anchor = get_active_anchor();
+    SCOPES_RESULT(ValueRef) expand_ast_unquote(const List *it) {
+        SCOPES_RESULT_TYPE(ValueRef);
         SCOPES_CHECK_RESULT(verify_list_parameter_count("ast-unquote", it, 0, -1));
+        auto anchor = it->at.anchor();
         it = it->next;
         Expander subexp(env, astscope);
-        return Unquote::from(_anchor,
-            SCOPES_GET_RESULT(subexp.expand_expression(_anchor, it, false)));
+        return ValueRef(ref(anchor, Unquote::from(
+            SCOPES_GET_RESULT(subexp.expand_expression(
+                ref(anchor, it), false)))));
     }
 
-    SCOPES_RESULT(Value *) expand_ast_unquote_arguments(const List *it) {
-        SCOPES_RESULT_TYPE(Value *);
-        auto _anchor = get_active_anchor();
+    SCOPES_RESULT(ValueRef) expand_ast_unquote_arguments(const List *it) {
+        SCOPES_RESULT_TYPE(ValueRef);
         SCOPES_CHECK_RESULT(verify_list_parameter_count("ast-unquote-arguments", it, 0, -1));
+        auto anchor = it->at.anchor();
         it = it->next;
         Values args;
         if (it) {
             Expander subexp(env, astscope, it->next);
             SCOPES_CHECK_RESULT(subexp.expand_arguments(args, it));
         }
-        return Unquote::from(_anchor, ArgumentListTemplate::from(_anchor, args));
+        return ValueRef(ref(anchor, Unquote::from(
+            ref(anchor, ArgumentListTemplate::from(args)))));
     }
 
     template<typename T>
-    SCOPES_RESULT(Value *) build_terminator(const List *it) {
-        SCOPES_RESULT_TYPE(Value *);
-        auto _anchor = get_active_anchor();
+    SCOPES_RESULT(ValueRef) build_terminator(const ListRef &src) {
+        SCOPES_RESULT_TYPE(ValueRef);
+        auto it = src.unref();
         Values args;
         if (it) {
             Expander subexp(env, astscope, it->next);
             SCOPES_CHECK_RESULT(subexp.expand_arguments(args, it));
         }
-        return T::from(_anchor, ArgumentListTemplate::from(_anchor, args));
+        return ValueRef(ref(src.anchor(), T::from(ref(src.anchor(),
+            ArgumentListTemplate::from(args)))));
     }
 
     template<typename T>
-    SCOPES_RESULT(Value *) build_terminator(const List *it, LabelTemplate *label) {
-        SCOPES_RESULT_TYPE(Value *);
-        auto _anchor = get_active_anchor();
+    SCOPES_RESULT(ValueRef) build_terminator(const ListRef &src,
+        const LabelTemplateRef &label) {
+        SCOPES_RESULT_TYPE(ValueRef);
+        auto it = src.unref();
         Values args;
         if (it) {
             Expander subexp(env, astscope, it->next);
             SCOPES_CHECK_RESULT(subexp.expand_arguments(args, it));
         }
-        return T::from(_anchor, label, ArgumentListTemplate::from(_anchor, args));
+        return ValueRef(ref(src.anchor(), T::from(label, ref(src.anchor(),
+                ArgumentListTemplate::from(args)))));
     }
 
-    SCOPES_RESULT(Value *) expand_return(const List *it) {
-        SCOPES_RESULT_TYPE(Value *);
+    SCOPES_RESULT(ValueRef) expand_return(const List *it) {
+        SCOPES_RESULT_TYPE(ValueRef);
         SCOPES_CHECK_RESULT(verify_list_parameter_count("return", it, 0, -1));
+        auto anchor = it->at.anchor();
         it = it->next;
-        return build_terminator<ReturnTemplate>(it);
+        return build_terminator<ReturnTemplate>(ref(anchor, it));
     }
 
-    SCOPES_RESULT(Value *) expand_raise(const List *it) {
-        SCOPES_RESULT_TYPE(Value *);
+    SCOPES_RESULT(ValueRef) expand_raise(const List *it) {
+        SCOPES_RESULT_TYPE(ValueRef);
         SCOPES_CHECK_RESULT(verify_list_parameter_count("raise", it, 0, -1));
+        auto anchor = it->at.anchor();
         it = it->next;
-        return build_terminator<RaiseTemplate>(it);
+        return build_terminator<RaiseTemplate>(ref(anchor, it));
     }
 
-    SCOPES_RESULT(Value *) expand_break(const List *it) {
-        SCOPES_RESULT_TYPE(Value *);
+    SCOPES_RESULT(ValueRef) expand_break(const List *it) {
+        SCOPES_RESULT_TYPE(ValueRef);
         SCOPES_CHECK_RESULT(verify_list_parameter_count("break", it, 0, -1));
+        auto anchor = it->at.anchor();
         it = it->next;
-        return build_terminator<Break>(it);
+        return build_terminator<Break>(ref(anchor, it));
     }
 
-    SCOPES_RESULT(Value *) expand_repeat(const List *it) {
-        SCOPES_RESULT_TYPE(Value *);
+    SCOPES_RESULT(ValueRef) expand_repeat(const List *it) {
+        SCOPES_RESULT_TYPE(ValueRef);
         SCOPES_CHECK_RESULT(verify_list_parameter_count("repeat", it, 0, -1));
+        auto anchor = it->at.anchor();
         it = it->next;
-        return build_terminator<RepeatTemplate>(it);
+        return build_terminator<RepeatTemplate>(ref(anchor, it));
     }
 
-    SCOPES_RESULT(Value *) expand_merge(const List *it) {
-        SCOPES_RESULT_TYPE(Value *);
+    SCOPES_RESULT(ValueRef) expand_merge(const List *it) {
+        SCOPES_RESULT_TYPE(ValueRef);
         SCOPES_CHECK_RESULT(verify_list_parameter_count("merge", it, 1, -1));
+        auto anchor = it->at.anchor();
         it = it->next;
 
         Expander subexp(Scope::from(env), astscope, it->next);
-        Value *label = SCOPES_GET_RESULT(subexp.expand(it->at));
+        ValueRef label = SCOPES_GET_RESULT(subexp.expand(it->at));
         it = subexp.next;
 
-        if (!isa<LabelTemplate>(label)) {
-            SCOPES_EXPECT_ERROR(error_label_expected(label));
+        if (!label.isa<LabelTemplate>()) {
+            SCOPES_ERROR(SyntaxLabelExpected, label->kind());
         }
-        return build_terminator<MergeTemplate>(it, cast<LabelTemplate>(label));
+        return build_terminator<MergeTemplate>(ref(anchor, it),
+            label.cast<LabelTemplate>());
     }
 
-    SCOPES_RESULT(Value *) expand_forward(const List *it) {
-        SCOPES_RESULT_TYPE(Value *);
-        auto _anchor = get_active_anchor();
+    SCOPES_RESULT(ValueRef) expand_forward(const List *it) {
+        SCOPES_RESULT_TYPE(ValueRef);
         SCOPES_CHECK_RESULT(verify_list_parameter_count("_", it, 0, -1));
+        auto anchor = it->at.anchor();
         it = it->next;
         Values args;
         if (it) {
             Expander subexp(env, astscope, it->next);
             SCOPES_CHECK_RESULT(subexp.expand_arguments(args, it));
         }
-        return ArgumentListTemplate::from(_anchor, args);
+        return ref(anchor, ArgumentListTemplate::from(args));
     }
 
-    SCOPES_RESULT(Value *) expand_call(const List *it, uint32_t flags = 0) {
-        SCOPES_RESULT_TYPE(Value *);
+    SCOPES_RESULT(ValueRef) expand_call(const List *it, uint32_t flags = 0) {
+        SCOPES_RESULT_TYPE(ValueRef);
 
-        auto _anchor = get_active_anchor();
         SCOPES_CHECK_RESULT(verify_list_parameter_count("call", it, 0, -1));
+        auto anchor = it->at.anchor();
         Expander subexp(env, astscope, it->next);
-        Value *enter = SCOPES_GET_RESULT(subexp.expand(it->at));
+        ValueRef enter = SCOPES_GET_RESULT(subexp.expand(it->at));
 
-        auto call = CallTemplate::from(_anchor, enter);
+        auto call = CallTemplate::from(enter);
         call->flags = flags;
+        call->set_def_anchor(anchor);
 
         it = subexp.next;
         SCOPES_CHECK_RESULT(subexp.expand_arguments(call->args, it));
-        return call;
+        return ValueRef(ref(anchor, call));
     }
 
-    SCOPES_RESULT(sc_list_scope_tuple_t) expand_symbol(Const *node) {
+    SCOPES_RESULT(sc_list_scope_tuple_t) expand_symbol(const ConstRef &node) {
         SCOPES_RESULT_TYPE(sc_list_scope_tuple_t);
-        Value *symbol_handler_node;
+        ValueRef symbol_handler_node;
         if (env->lookup(Symbol(SYM_SymbolWildcard), symbol_handler_node)) {
             auto T = try_get_const_type(symbol_handler_node);
             if (T != list_expander_func_type) {
-                StyledString ss;
-                ss.out << "custom symbol expander has wrong type "
-                    << T << ", must be " << list_expander_func_type;
-                SCOPES_LOCATION_ERROR(ss.str());
+                SCOPES_ERROR(SyntaxSymbolExpanderTypeMismatch,
+                    symbol_handler_node.cast<TypedValue>()->get_type(),
+                    list_expander_func_type);
             }
-            sc_syntax_wildcard_func_t f = (sc_syntax_wildcard_func_t)cast<ConstPointer>(symbol_handler_node)->value;
+            sc_syntax_wildcard_func_t f =
+                (sc_syntax_wildcard_func_t)symbol_handler_node.cast<ConstPointer>()->value;
             auto ok_result = f(List::from(node, next), env);
             if (!ok_result.ok) {
                 SCOPES_RETURN_ERROR(ok_result.except);
@@ -978,12 +988,13 @@ struct Expander {
         return result;
     }
 
-    SCOPES_RESULT(Value *) expand(Value *anynode) {
-        SCOPES_RESULT_TYPE(Value *);
+    SCOPES_RESULT(ValueRef) expand(ValueRef anynode) {
+        SCOPES_RESULT_TYPE(ValueRef);
+        SCOPES_TRACE_EXPANDER(anynode);
     expand_again:
         SCOPES_CHECK_RESULT(verify_stack());
-        SCOPES_ANCHOR(anynode->anchor());
-        if (!isa<Const>(anynode)) {
+        const Anchor *anchor = anynode.anchor();
+        if (!anynode.isa<Const>()) {
             if (verbose) {
                 StyledStream ss(SCOPES_CERR);
                 ss << "ignoring " << anynode << std::endl;
@@ -991,7 +1002,7 @@ struct Expander {
             // return as-is
             return anynode;
         }
-        Const *node = cast<Const>(anynode);
+        ConstRef node = anynode.cast<Const>();
         auto T = node->get_type();
         if (T == TYPE_List) {
             if (verbose) {
@@ -1002,19 +1013,18 @@ struct Expander {
             const List *list = SCOPES_GET_RESULT(extract_list_constant(node));
             if (list == EOL) {
                 // zero arguments
-                return ArgumentListTemplate::from(node->anchor());
+                return ref(anchor, ArgumentListTemplate::from());
             }
 
-            Value *head = list->at;
-            if (isa<Const>(head)) {
-            }
+            ValueRef head = list->at;
 
             auto headT = try_get_const_type(head);
             // resolve symbol
             if (headT == TYPE_Symbol) {
-                Value *headnode = nullptr;
-                if (env->lookup(SCOPES_GET_RESULT(extract_symbol_constant(head)), headnode)) {
-                    head = headnode;
+                ValueRef headnode;
+                if (env->lookup(
+                    SCOPES_GET_RESULT(extract_symbol_constant(head)), headnode)) {
+                    head = ref(head.anchor(), headnode);
                     headT = try_get_const_type(head);
                 }
             }
@@ -1024,7 +1034,7 @@ struct Expander {
                 switch(func.value()) {
                 case FN_GetSyntaxScope:
                     SCOPES_CHECK_RESULT(verify_list_parameter_count("this-scope", list, 0, 0));
-                    return ConstPointer::scope_from(node->anchor(), env);
+                    return ValueRef(ref(anchor, ConstPointer::scope_from(env)));
                 case KW_SyntaxLog: return expand_syntax_log(list);
                 case KW_Fn: return expand_fn(list, ExpandFnSetup());
                 case KW_Inline: {
@@ -1062,30 +1072,30 @@ struct Expander {
                     case KW_RawCall: flags |= CF_RawCall; break;
                     default: break;
                     }
-                    return expand_call(list, flags);
+                    return ValueRef(ref(anchor,
+                        SCOPES_GET_RESULT(expand_call(list, flags))));
                 } break;
                 default: break;
                 }
             }
 
-            Value *list_handler_node;
+            ValueRef list_handler_node;
             if (env->lookup(Symbol(SYM_ListWildcard), list_handler_node)) {
                 auto T = try_get_const_type(list_handler_node);
                 if (T != list_expander_func_type) {
-                    StyledString ss;
-                    ss.out << "custom list expander has wrong type "
-                        << T << ", must be " << list_expander_func_type;
-                    SCOPES_LOCATION_ERROR(ss.str());
+                    SCOPES_ERROR(SyntaxListExpanderTypeMismatch,
+                        list_handler_node.cast<TypedValue>()->get_type(),
+                        list_expander_func_type);
                 }
                 sc_syntax_wildcard_func_t f =
-                    (sc_syntax_wildcard_func_t)cast<ConstPointer>(list_handler_node)->value;
+                    (sc_syntax_wildcard_func_t)list_handler_node.cast<ConstPointer>()->value;
                 auto ok_result = f(List::from(node, next), env);
                 if (!ok_result.ok) {
                     SCOPES_RETURN_ERROR(ok_result.except);
                 }
                 auto result = ok_result._0;
                 if (result._0) {
-                    Value *newnode = result._0->at;
+                    ValueRef newnode = result._0->at;
                     if (newnode != node) {
                         anynode = newnode;
                         next = result._0->next;
@@ -1097,8 +1107,7 @@ struct Expander {
                     }
                 }
             }
-            SCOPES_ANCHOR(node->anchor());
-            return expand_call(list);
+            return ValueRef(ref(anchor, SCOPES_GET_RESULT(expand_call(list))));
         } else if (T == TYPE_Symbol) {
             if (verbose) {
                 StyledStream ss(SCOPES_CERR);
@@ -1107,11 +1116,11 @@ struct Expander {
 
             Symbol name = SCOPES_GET_RESULT(extract_symbol_constant(node));
 
-            Value *result = nullptr;
+            ValueRef result;
             if (!env->lookup(name, result)) {
                 sc_list_scope_tuple_t result = SCOPES_GET_RESULT(expand_symbol(node));
                 if (result._0) {
-                    Value *newnode = result._0->at;
+                    ValueRef newnode = result._0->at;
                     if (newnode != node) {
                         anynode = newnode;
                         next = result._0->next;
@@ -1120,18 +1129,15 @@ struct Expander {
                     }
                 }
 
-                StyledString ss;
-                ss.out << "use of undeclared identifier '" << name.name()->data << "'. ";
-                print_name_suggestions(name, ss.out);
-                SCOPES_LOCATION_ERROR(ss.str());
+                SCOPES_ERROR(SyntaxUndeclaredIdentifier, name);
             }
-            return result;
+            return ref(anchor, result);
         } else {
             if (verbose) {
                 StyledStream ss(SCOPES_CERR);
                 ss << "ignoring " << node << std::endl;
             }
-            return node;
+            return ValueRef(node);
         }
     }
 
@@ -1140,42 +1146,42 @@ struct Expander {
 bool Expander::verbose = false;
 const Type *Expander::list_expander_func_type = nullptr;
 
-SCOPES_RESULT(sc_value_list_scope_tuple_t) expand(Value *expr, const List *next, Scope *scope) {
-    SCOPES_RESULT_TYPE(sc_value_list_scope_tuple_t);
+SCOPES_RESULT(sc_valueref_list_scope_tuple_t) expand(const ValueRef &expr, const List *next, Scope *scope) {
+    SCOPES_RESULT_TYPE(sc_valueref_list_scope_tuple_t);
     Scope *subenv = scope?scope:sc_get_globals();
-    Expander subexpr(subenv, nullptr, next);
-    Value *value = SCOPES_GET_RESULT(subexpr.expand(expr));
-    sc_value_list_scope_tuple_t result = { value, subexpr.next, subexpr.env };
+    Expander subexpr(subenv, TemplateRef(), next);
+    ValueRef value = SCOPES_GET_RESULT(subexpr.expand(expr));
+    sc_valueref_list_scope_tuple_t result = { value, subexpr.next, subexpr.env };
     return result;
 }
 
-SCOPES_RESULT(Template *) expand_inline(const Anchor *anchor, Template *astscope, const List *expr, Scope *scope) {
-    SCOPES_RESULT_TYPE(Template *);
+SCOPES_RESULT(TemplateRef) expand_inline(const Anchor *anchor, const TemplateRef &astscope, const List *expr, Scope *scope) {
+    SCOPES_RESULT_TYPE(TemplateRef);
     Timer sum_expand_time(TIMER_Expand);
     //const Anchor *anchor = expr->anchor();
     //auto list = SCOPES_GET_RESULT(extract_list_constant(expr));
     assert(anchor);
-    Template *mainfunc = Template::from(anchor, SYM_Unnamed);
+    TemplateRef mainfunc = ref(anchor, Template::from(SYM_Unnamed));
     mainfunc->set_inline();
 
     Scope *subenv = scope?scope:sc_get_globals();
     Expander subexpr(subenv, astscope);
-    mainfunc->value = SCOPES_GET_RESULT(subexpr.expand_expression(anchor, expr, false));
+    mainfunc->value = SCOPES_GET_RESULT(subexpr.expand_expression(ref(anchor, expr), false));
 
     return mainfunc;
 }
 
-SCOPES_RESULT(Template *) expand_module(const Anchor *anchor, const List *expr, Scope *scope) {
-    SCOPES_RESULT_TYPE(Template *);
+SCOPES_RESULT(TemplateRef) expand_module(const Anchor *anchor, const List *expr, Scope *scope) {
+    SCOPES_RESULT_TYPE(TemplateRef);
     Timer sum_expand_time(TIMER_Expand);
     //const Anchor *anchor = expr->anchor();
     //auto list = SCOPES_GET_RESULT(extract_list_constant(expr));
     assert(anchor);
-    Template *mainfunc = Template::from(anchor, anchor->path());
+    TemplateRef mainfunc = ref(anchor, Template::from(anchor->path()));
 
     Scope *subenv = scope?scope:sc_get_globals();
     Expander subexpr(subenv, mainfunc);
-    mainfunc->value = SCOPES_GET_RESULT(subexpr.expand_expression(anchor, expr, false));
+    mainfunc->value = SCOPES_GET_RESULT(subexpr.expand_expression(ref(anchor, expr), false));
 
     return mainfunc;
 }

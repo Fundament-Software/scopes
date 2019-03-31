@@ -131,8 +131,6 @@ project "scopesrt"
         "src/lexerparser.cpp",
         "src/stream_anchors.cpp",
         "src/stream_expr.cpp",
-        "src/closure.cpp",
-        "src/stream_ast.cpp",
         "src/c_import.cpp",
         "src/execution.cpp",
         "src/prover.cpp",
@@ -279,12 +277,15 @@ project "scopesrt"
         buildoptions_cpp {
             "-Wno-error=date-time",
             "-fmax-errors=1",
+            "-Wno-nonnull-compare",
+            "-Wno-unused-but-set-variable",
+            "-Wno-sign-compare",
             "-Wno-vla",
             "-Wno-enum-compare",
             "-Wno-comment",
             "-Wno-misleading-indentation",
             "-Wno-pragmas",
-            "-Wno-return-type",
+            --"-Wno-return-type",
             "-Wno-variadic-macros",
             "-Wno-int-in-bool-context"
         }
@@ -317,6 +318,7 @@ project "scopesrt"
         }
 
         linkoptions {
+            "-Wl,--exclude-all-symbols",
             "-Wl,--stack,8388608"
         }
         linkoptions {
@@ -424,7 +426,7 @@ project "scopesrt"
         }
 
     configuration "release"
-        defines { "NDEBUG" }
+        --defines { "NDEBUG" }
         flags { "Optimize" }
 
 project "scopes"
@@ -502,7 +504,7 @@ project "scopes"
             "-Wno-comment",
             "-Wno-misleading-indentation",
             "-Wno-pragmas",
-            "-Wno-return-type",
+            --"-Wno-return-type",
             "-Wno-variadic-macros",
             "-Wno-int-in-bool-context"
         }
@@ -518,7 +520,7 @@ project "scopes"
 
         files {
             --"src/win32/mman.c",
-            "src/win32/realpath.c",
+            --"src/win32/realpath.c",
             --"src/win32/dlfcn.c",
         }
 
@@ -531,11 +533,19 @@ project "scopes"
         }
 
         links {
+            "uuid",
+            "ole32",
+            --"psapi",
+            --"version",
+            --"stdc++",
         }
 
+        linkoptions(LLVM_LDFLAGS)
         linkoptions {
             "-Wl,--stack,8388608"
         }
+
+        linkoptions(LLVM_LIBS)
 
         postbuildcommands {
         }
@@ -570,5 +580,5 @@ project "scopes"
         }
 
     configuration "release"
-        defines { "NDEBUG" }
+        --defines { "NDEBUG" }
         flags { "Optimize" }

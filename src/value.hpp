@@ -11,6 +11,8 @@
 #include "result.hpp"
 #include "builtin.hpp"
 #include "type.hpp"
+#include "value_kind.hpp"
+#include "valueref.inc"
 
 #include "qualifier/unique_qualifiers.hpp"
 
@@ -18,116 +20,32 @@
 #include <unordered_map>
 #include <unordered_set>
 
-
 namespace scopes {
+
+// untyped, instructions, functions
+#define SCOPES_DEFINITION_ANCHOR_API() \
+    const Anchor *def_anchor() const; \
+    void set_def_anchor(const Anchor *anchor); \
+protected: const Anchor *_def_anchor = nullptr; \
+public: \
+
 
 struct Anchor;
 struct List;
 struct Scope;
-
-#define SCOPES_UNTYPED_VALUE_KIND() \
-    T(VK_Template, "value-kind-template", Template) \
-    T(VK_LabelTemplate, "value-kind-label-template", LabelTemplate) \
-    T(VK_Loop, "value-kind-loop", Loop) \
-    T(VK_LoopArguments, "value-kind-loop-arguments", LoopArguments) \
-    T(VK_KeyedTemplate, "value-kind-keyed-template", KeyedTemplate) \
-    T(VK_Expression, "value-kind-expression", Expression) \
-    T(VK_Quote, "value-kind-quote", Quote) \
-    T(VK_Unquote, "value-kind-unquote", Unquote) \
-    T(VK_CompileStage, "value-kind-compile-stage", CompileStage) \
-    T(VK_If, "value-kind-if", If) \
-    T(VK_SwitchTemplate, "value-kind-switch-template", SwitchTemplate) \
-    T(VK_MergeTemplate, "value-kind-merge-template", MergeTemplate) \
-    T(VK_CallTemplate, "value-kind-call-template", CallTemplate) \
-    T(VK_RepeatTemplate, "value-kind-repeat-template", RepeatTemplate) \
-    T(VK_ReturnTemplate, "value-kind-return-template", ReturnTemplate) \
-    T(VK_RaiseTemplate, "value-kind-raise-template", RaiseTemplate) \
-    T(VK_Break, "value-kind-break", Break) \
-    T(VK_ArgumentListTemplate, "value-kind-argument-list-template", ArgumentListTemplate) \
-    T(VK_ExtractArgumentTemplate, "value-kind-extract-argument-template", ExtractArgumentTemplate) \
-    T(VK_ParameterTemplate, "value-kind-parameter-template", ParameterTemplate) \
-
-
-#define SCOPES_CONST_VALUE_KIND() \
-    T(VK_ConstInt, "value-kind-const-int", ConstInt) \
-    T(VK_ConstReal, "value-kind-const-real", ConstReal) \
-    T(VK_ConstAggregate, "value-kind-const-aggregate", ConstAggregate) \
-    T(VK_ConstPointer, "value-kind-const-pointer", ConstPointer) \
-
-
-#define SCOPES_PURE_VALUE_KIND() \
-    T(VK_Function, "value-kind-function", Function) \
-    T(VK_Global, "value-kind-global", Global) \
-    T(VK_PureCast, "value-kind-pure-cast", PureCast) \
-    /* constants (Const::classof) */ \
-    SCOPES_CONST_VALUE_KIND() \
-
-
-#define SCOPES_TERMINATOR_VALUE_KIND() \
-    T(VK_Merge, "value-kind-merge", Merge) \
-    T(VK_Repeat, "value-kind-repeat", Repeat) \
-    T(VK_Return, "value-kind-return", Return) \
-    T(VK_Raise, "value-kind-raise", Raise) \
-
-
-#define SCOPES_INSTRUCTION_VALUE_KIND() \
-    SCOPES_TERMINATOR_VALUE_KIND() \
-    T(VK_Label, "value-kind-label", Label) \
-    T(VK_LoopLabel, "value-kind-loop-label", LoopLabel) \
-    T(VK_CondBr, "value-kind-condbr", CondBr) \
-    T(VK_Switch, "value-kind-switch", Switch) \
-    T(VK_Call, "value-kind-call", Call) \
-
-
-#define SCOPES_TYPED_VALUE_KIND() \
-    T(VK_Keyed, "value-kind-keyed", Keyed) \
-    T(VK_Parameter, "value-kind-parameter", Parameter) \
-    T(VK_Exception, "value-kind-exception", Exception) \
-    T(VK_ArgumentList, "value-kind-argument-list", ArgumentList) \
-    T(VK_ExtractArgument, "value-kind-extract-argument", ExtractArgument) \
-    T(VK_LoopLabelArguments, "value-kind-loop-label-arguments", LoopLabelArguments) \
-    /* instructions (Instruction::classof) */ \
-    SCOPES_INSTRUCTION_VALUE_KIND() \
-    /* pure (Pure::classof), which includes constants */ \
-    SCOPES_PURE_VALUE_KIND() \
-
-
-#define SCOPES_VALUE_KIND() \
-    SCOPES_UNTYPED_VALUE_KIND() \
-    SCOPES_TYPED_VALUE_KIND() \
-
-
-enum ValueKind {
-#define T(NAME, BNAME, CLASS) \
-    NAME,
-    SCOPES_VALUE_KIND()
-#undef T
-};
-
-// forward declarations
-#define T(NAME, BNAME, CLASS) struct CLASS;
-    SCOPES_VALUE_KIND()
-#undef T
-
-struct Value;
-struct TypedValue;
 struct Block;
-struct Instruction;
-struct Const;
-struct Raise;
-struct Parameter;
-struct ParameterTemplate;
 
-typedef std::vector<Parameter *> Parameters;
-typedef std::vector<ParameterTemplate *> ParameterTemplates;
-typedef std::vector<Value *> Values;
-typedef std::vector<TypedValue *> TypedValues;
-typedef std::unordered_set<Value *> ValueSet;
-typedef std::unordered_set<TypedValue *> TypedValueSet;
-typedef std::vector<ValueSet> ValueSetArray;
-typedef std::vector<TypedValueSet> TypedValueSetArray;
-typedef std::vector<Instruction *> Instructions;
-typedef std::vector<Const *> Constants;
+typedef std::vector<ParameterRef> Parameters;
+typedef std::vector<ParameterTemplateRef> ParameterTemplates;
+typedef std::vector<ValueRef> Values;
+typedef std::vector<TypedValueRef> TypedValues;
+typedef std::vector<InstructionRef> Instructions;
+typedef std::vector<ConstRef> Constants;
+typedef std::vector<Const *> ConstantPtrs;
+typedef std::vector<MergeRef> Merges;
+typedef std::vector<RepeatRef> Repeats;
+typedef std::vector<ReturnRef> Returns;
+typedef std::vector<RaiseRef> Raises;
 typedef std::vector<Block *> Blocks;
 
 const char *get_value_kind_name(ValueKind kind);
@@ -141,12 +59,12 @@ struct ValueIndex {
     };
     typedef std::unordered_set<ValueIndex, ValueIndex::Hash> Set;
 
-    ValueIndex(TypedValue *_value, int _index = 0);
+    ValueIndex(const TypedValueRef &_value, int _index = 0);
     bool operator ==(const ValueIndex &other) const;
 
     const Type *get_type() const;
 
-    TypedValue *value;
+    TypedValueRef value;
     int index;
 };
 
@@ -158,27 +76,27 @@ typedef std::vector<ValueIndex> ValueIndices;
 struct Value {
     ValueKind kind() const;
 
-    Value(ValueKind _kind, const Anchor *_anchor);
+    Value(ValueKind _kind);
     Value(const Value &other) = delete;
-
-    const Anchor *anchor() const;
 
     bool is_accessible() const;
     int get_depth() const;
 
 private:
     const ValueKind _kind;
-
-protected:
-    const Anchor *_anchor;
 };
+
+const Anchor *get_best_anchor(const ValueRef &value);
+void set_best_anchor(const ValueRef &value, const Anchor *anchor);
 
 //------------------------------------------------------------------------------
 
 struct UntypedValue : Value {
     static bool classof(const Value *T);
 
-    UntypedValue(ValueKind _kind, const Anchor *_anchor);
+    SCOPES_DEFINITION_ANCHOR_API()
+
+    UntypedValue(ValueKind _kind);
 };
 
 //------------------------------------------------------------------------------
@@ -186,7 +104,7 @@ struct UntypedValue : Value {
 struct TypedValue : Value {
     static bool classof(const Value *T);
 
-    TypedValue(ValueKind _kind, const Anchor *_anchor, const Type *type);
+    TypedValue(ValueKind _kind, const Type *type);
 
     //bool is_typed() const;
     const Type *get_type() const;
@@ -199,7 +117,7 @@ protected:
 
 struct Block {
     Block();
-    int append(TypedValue *node);
+    int append(const TypedValueRef &node);
     bool empty() const;
     void migrate_from(Block &source);
     void clear();
@@ -218,7 +136,7 @@ struct Block {
     int depth;
     int insert_index;
     Instructions body;
-    Instruction *terminator;
+    InstructionRef terminator;
     // set of unique ids that are still valid in this scope
     IDSet valid;
 };
@@ -228,7 +146,9 @@ struct Block {
 struct Instruction : TypedValue {
     static bool classof(const Value *T);
 
-    Instruction(ValueKind _kind, const Anchor *_anchor, const Type *type);
+    Instruction(ValueKind _kind, const Type *type);
+
+    SCOPES_DEFINITION_ANCHOR_API()
 
     Symbol name;
     Block *block;
@@ -239,7 +159,7 @@ struct Instruction : TypedValue {
 struct Terminator : Instruction {
     static bool classof(const Value *T);
 
-    Terminator(ValueKind _kind, const Anchor *_anchor, const TypedValues &_values);
+    Terminator(ValueKind _kind, const TypedValues &_values);
 
     TypedValues values;
 };
@@ -249,12 +169,12 @@ struct Terminator : Instruction {
 struct KeyedTemplate : UntypedValue {
     static bool classof(const Value *T);
 
-    KeyedTemplate(const Anchor *anchor, Symbol key, Value *node);
+    KeyedTemplate(Symbol key, const ValueRef &node);
 
-    static Value *from(const Anchor *anchor, Symbol key, Value *node);
+    static ValueRef from(Symbol key, ValueRef node);
 
     Symbol key;
-    Value *value;
+    ValueRef value;
 };
 
 //------------------------------------------------------------------------------
@@ -262,12 +182,12 @@ struct KeyedTemplate : UntypedValue {
 struct Keyed : TypedValue {
     static bool classof(const Value *T);
 
-    Keyed(const Anchor *anchor, const Type *type, Symbol key, TypedValue *node);
+    Keyed(const Type *type, Symbol key, const TypedValueRef &node);
 
-    static TypedValue *from(const Anchor *anchor, Symbol key, TypedValue *node);
+    static TypedValueRef from(Symbol key, TypedValueRef node);
 
     Symbol key;
-    TypedValue *value;
+    TypedValueRef value;
 };
 
 //------------------------------------------------------------------------------
@@ -275,15 +195,15 @@ struct Keyed : TypedValue {
 struct ArgumentListTemplate : UntypedValue {
     static bool classof(const Value *T);
 
-    ArgumentListTemplate(const Anchor *anchor, const Values &values);
+    ArgumentListTemplate(const Values &values);
 
-    void append(Symbol key, Value *node);
-    void append(Value *node);
+    void append(Symbol key, const ValueRef &node);
+    void append(const ValueRef &node);
 
     bool is_constant() const;
 
-    static Value *empty_from(const Anchor *anchor);
-    static Value *from(const Anchor *anchor, const Values &values = {});
+    static ValueRef empty_from();
+    static ValueRef from(const Values &values = {});
 
     Values values;
 };
@@ -295,11 +215,11 @@ const Type *arguments_type_from_typed_values(const TypedValues &_values);
 struct ArgumentList : TypedValue {
     static bool classof(const Value *T);
 
-    ArgumentList(const Anchor *anchor, const TypedValues &values);
+    ArgumentList(const TypedValues &values);
 
     bool is_constant() const;
 
-    static TypedValue *from(const Anchor *anchor, const TypedValues &values);
+    static TypedValueRef from(const TypedValues &values);
 
     TypedValues values;
 };
@@ -309,13 +229,12 @@ struct ArgumentList : TypedValue {
 struct ExtractArgumentTemplate : UntypedValue {
     static bool classof(const Value *T);
 
-    ExtractArgumentTemplate(const Anchor *anchor, Value *value, int index, bool vararg);
+    ExtractArgumentTemplate(const ValueRef &value, int index, bool vararg);
 
-    static Value *from(const Anchor *anchor, Value *value, int index,
-        bool vararg = false);
+    static ValueRef from(const ValueRef &value, int index, bool vararg = false);
 
     int index;
-    Value *value;
+    ValueRef value;
     bool vararg;
 };
 
@@ -324,13 +243,13 @@ struct ExtractArgumentTemplate : UntypedValue {
 struct ExtractArgument : TypedValue {
     static bool classof(const Value *T);
 
-    ExtractArgument(const Anchor *anchor, const Type *type, TypedValue *value, int index);
+    ExtractArgument(const Type *type, const TypedValueRef &value, int index);
 
-    static TypedValue *variadic_from(const Anchor *anchor, TypedValue *value, int index);
-    static TypedValue *from(const Anchor *anchor, TypedValue *value, int index);
+    static TypedValueRef variadic_from(const TypedValueRef &value, int index);
+    static TypedValueRef from(const TypedValueRef &value, int index);
 
     int index;
-    TypedValue *value;
+    TypedValueRef value;
 };
 
 //------------------------------------------------------------------------------
@@ -341,7 +260,7 @@ struct Pure : TypedValue {
     bool key_equal(const Pure *other) const;
     std::size_t hash() const;
 
-    Pure(ValueKind _kind, const Anchor *anchor, const Type *type);
+    Pure(ValueKind _kind, const Type *type);
 };
 
 //------------------------------------------------------------------------------
@@ -349,20 +268,19 @@ struct Pure : TypedValue {
 struct Template : UntypedValue {
     static bool classof(const Value *T);
 
-    Template(const Anchor *anchor, Symbol name, const ParameterTemplates &params, Value *value);
+    Template(Symbol name, const ParameterTemplates &params, const ValueRef &value);
 
     bool is_forward_decl() const;
     void set_inline();
     bool is_inline() const;
-    void append_param(ParameterTemplate *sym);
+    void append_param(const ParameterTemplateRef &sym);
 
-    static Template *from(
-        const Anchor *anchor, Symbol name,
-        const ParameterTemplates &params = {}, Value *value = nullptr);
+    static TemplateRef from(Symbol name, const ParameterTemplates &params = {},
+        const ValueRef &value = ValueRef());
 
     Symbol name;
     ParameterTemplates params;
-    Value *value;
+    ValueRef value;
     bool _is_inline;
     const String *docstring;
     int recursion;
@@ -373,14 +291,14 @@ struct Template : UntypedValue {
 struct Expression : UntypedValue {
     static bool classof(const Value *T);
 
-    Expression(const Anchor *anchor, const Values &nodes, Value *value);
-    void append(Value *node);
+    Expression(const Values &nodes, const ValueRef &value);
+    void append(const ValueRef &node);
 
-    static Expression *scoped_from(const Anchor *anchor, const Values &nodes = {}, Value *value = nullptr);
-    static Expression *unscoped_from(const Anchor *anchor, const Values &nodes = {}, Value *value = nullptr);
+    static ExpressionRef scoped_from(const Values &nodes = {}, const ValueRef &value = ValueRef());
+    static ExpressionRef unscoped_from(const Values &nodes = {}, const ValueRef &value = ValueRef());
 
     Values body;
-    Value *value;
+    ValueRef value;
     bool scoped;
 };
 
@@ -389,11 +307,11 @@ struct Expression : UntypedValue {
 struct CondBr : Instruction {
     static bool classof(const Value *T);
 
-    CondBr(const Anchor *anchor, TypedValue *cond);
+    CondBr(const TypedValueRef &cond);
 
-    static CondBr *from(const Anchor *anchor, TypedValue *cond);
+    static CondBrRef from(const TypedValueRef &cond);
 
-    TypedValue *cond;
+    TypedValueRef cond;
     Block then_body;
     Block else_body;
 };
@@ -402,11 +320,10 @@ struct CondBr : Instruction {
 
 struct If : UntypedValue {
     struct Clause {
-        const Anchor *anchor;
-        Value *cond;
-        Value *value;
+        ValueRef cond;
+        ValueRef value;
 
-        Clause() : anchor(nullptr), cond(nullptr), value(nullptr) {}
+        Clause() {}
 
         bool is_then() const;
     };
@@ -415,12 +332,12 @@ struct If : UntypedValue {
 
     static bool classof(const Value *T);
 
-    If(const Anchor *anchor, const Clauses &clauses);
+    If(const Clauses &clauses);
 
-    static If *from(const Anchor *anchor, const Clauses &clauses = {});
+    static IfRef from(const Clauses &clauses = {});
 
-    void append_then(const Anchor *anchor, Value *cond, Value *value);
-    void append_else(const Anchor *anchor, Value *value);
+    void append_then(const ValueRef &cond, const ValueRef &value);
+    void append_else(const ValueRef &value);
 
     Clauses clauses;
 };
@@ -436,26 +353,25 @@ enum CaseKind {
 struct SwitchTemplate : UntypedValue {
     struct Case {
         CaseKind kind;
-        const Anchor *anchor;
-        Value *literal;
-        Value *value;
+        ValueRef literal;
+        ValueRef value;
 
-        Case() : kind(CK_Case), anchor(nullptr), literal(nullptr), value(nullptr) {}
+        Case() : kind(CK_Case) {}
     };
 
     typedef std::vector<Case> Cases;
 
     static bool classof(const Value *T);
 
-    SwitchTemplate(const Anchor *anchor, Value *expr, const Cases &cases);
+    SwitchTemplate(const ValueRef &expr, const Cases &cases);
 
-    static SwitchTemplate *from(const Anchor *anchor, Value *expr = nullptr, const Cases &cases = {});
+    static SwitchTemplateRef from(const ValueRef &expr = ValueRef(), const Cases &cases = {});
 
-    void append_case(const Anchor *anchor, Value *literal, Value *value);
-    void append_pass(const Anchor *anchor, Value *literal, Value *value);
-    void append_default(const Anchor *anchor, Value *value);
+    void append_case(const ValueRef &literal, const ValueRef &value);
+    void append_pass(const ValueRef &literal, const ValueRef &value);
+    void append_default(const ValueRef &value);
 
-    Value *expr;
+    ValueRef expr;
     Cases cases;
 };
 
@@ -464,25 +380,24 @@ struct SwitchTemplate : UntypedValue {
 struct Switch : Instruction {
     struct Case {
         CaseKind kind;
-        const Anchor *anchor;
-        ConstInt *literal;
+        ConstIntRef literal;
         Block body;
 
-        Case() : kind(CK_Case), anchor(nullptr), literal(nullptr) {}
+        Case() : kind(CK_Case) {}
     };
 
     typedef std::vector<Case *> Cases;
 
     static bool classof(const Value *T);
 
-    Switch(const Anchor *anchor, TypedValue *expr, const Cases &cases);
+    Switch(const TypedValueRef &expr, const Cases &cases);
 
-    static Switch *from(const Anchor *anchor, TypedValue *expr = nullptr, const Cases &cases = {});
+    static SwitchRef from(const TypedValueRef &expr = TypedValueRef(), const Cases &cases = {});
 
-    Case &append_pass(const Anchor *anchor, ConstInt *literal);
-    Case &append_default(const Anchor *anchor);
+    Case &append_pass(const ConstIntRef &literal);
+    Case &append_default();
 
-    TypedValue *expr;
+    TypedValueRef expr;
     Cases cases;
 };
 
@@ -491,16 +406,16 @@ struct Switch : Instruction {
 struct ParameterTemplate : UntypedValue {
     static bool classof(const Value *T);
 
-    ParameterTemplate(const Anchor *anchor, Symbol name, bool variadic);
-    static ParameterTemplate *from(const Anchor *anchor, Symbol name = SYM_Unnamed);
-    static ParameterTemplate *variadic_from(const Anchor *anchor, Symbol name = SYM_Unnamed);
+    ParameterTemplate(Symbol name, bool variadic);
+    static ParameterTemplateRef from(Symbol name = SYM_Unnamed);
+    static ParameterTemplateRef variadic_from(Symbol name = SYM_Unnamed);
 
     bool is_variadic() const;
-    void set_owner(Template *_owner, int _index);
+    void set_owner(const TemplateRef &_owner, int _index);
 
     Symbol name;
     bool variadic;
-    Template *owner;
+    TemplateRef owner;
     int index;
 };
 
@@ -509,15 +424,17 @@ struct ParameterTemplate : UntypedValue {
 struct Parameter : TypedValue {
     static bool classof(const Value *T);
 
-    Parameter(const Anchor *anchor, Symbol name, const Type *type);
-    static Parameter *from(const Anchor *anchor, Symbol name, const Type *type);
+    SCOPES_DEFINITION_ANCHOR_API()
 
-    void set_owner(Function *_owner, int _index);
+    Parameter(Symbol name, const Type *type);
+    static ParameterRef from(Symbol name, const Type *type);
+
+    void set_owner(const FunctionRef &_owner, int _index);
 
     void retype(const Type *T);
 
     Symbol name;
-    Function *owner;
+    FunctionRef owner;
     Block *block;
     int index;
 };
@@ -527,10 +444,10 @@ struct Parameter : TypedValue {
 struct LoopArguments : UntypedValue {
     static bool classof(const Value *T);
 
-    LoopArguments(const Anchor *anchor, Loop *loop);
-    static LoopArguments *from(const Anchor *anchor, Loop *loop);
+    LoopArguments(const LoopRef &loop);
+    static LoopArgumentsRef from(const LoopRef &loop);
 
-    Loop *loop;
+    LoopRef loop;
 };
 
 //------------------------------------------------------------------------------
@@ -538,10 +455,12 @@ struct LoopArguments : UntypedValue {
 struct LoopLabelArguments : TypedValue {
     static bool classof(const Value *T);
 
-    LoopLabelArguments(const Anchor *anchor, const Type *type);
-    static LoopLabelArguments *from(const Anchor *anchor, const Type *type);
+    SCOPES_DEFINITION_ANCHOR_API()
 
-    LoopLabel *loop;
+    LoopLabelArguments(const Type *type);
+    static LoopLabelArgumentsRef from(const Type *type);
+
+    LoopLabelRef loop;
 };
 
 //------------------------------------------------------------------------------
@@ -549,8 +468,10 @@ struct LoopLabelArguments : TypedValue {
 struct Exception : TypedValue {
     static bool classof(const Value *T);
 
-    Exception(const Anchor *anchor, const Type *type);
-    static Exception *from(const Anchor *anchor, const Type *type);
+    SCOPES_DEFINITION_ANCHOR_API()
+
+    Exception(const Type *type);
+    static ExceptionRef from(const Type *type);
 };
 
 //------------------------------------------------------------------------------
@@ -579,16 +500,14 @@ SCOPES_LABEL_KIND()
 struct Label : Instruction {
     static bool classof(const Value *T);
 
-    Label(const Anchor *anchor, LabelKind kind, Symbol name);
+    Label(LabelKind kind, Symbol name);
 
-    static Label *from(const Anchor *anchor,
-        LabelKind kind,
-        Symbol name = SYM_Unnamed);
+    static LabelRef from(LabelKind kind, Symbol name = SYM_Unnamed);
     void change_type(const Type *type);
 
     Symbol name;
     Block body;
-    std::vector<Merge *> merges;
+    Merges merges;
     LabelKind label_kind;
 };
 
@@ -599,19 +518,15 @@ const char *get_label_kind_name(LabelKind kind);
 struct LabelTemplate : UntypedValue {
     static bool classof(const Value *T);
 
-    LabelTemplate(const Anchor *anchor, LabelKind kind, Symbol name, Value *value);
+    LabelTemplate(LabelKind kind, Symbol name, const ValueRef &value);
 
-    static LabelTemplate *from(const Anchor *anchor,
-        LabelKind kind,
-        Symbol name = SYM_Unnamed,
-        Value *value = nullptr);
-    static LabelTemplate *try_from(const Anchor *anchor,
-        Value *value = nullptr);
-    static LabelTemplate *except_from(const Anchor *anchor,
-        Value *value = nullptr);
+    static LabelTemplateRef from(LabelKind kind, Symbol name = SYM_Unnamed,
+        const ValueRef &value = ValueRef());
+    static LabelTemplateRef try_from(const ValueRef &value = ValueRef());
+    static LabelTemplateRef except_from(const ValueRef &value = ValueRef());
 
     Symbol name;
-    Value *value;
+    ValueRef value;
     LabelKind label_kind;
 };
 
@@ -624,12 +539,12 @@ enum CallFlags {
 struct CallTemplate : UntypedValue {
     static bool classof(const Value *T);
 
-    CallTemplate(const Anchor *anchor, Value *callee, const Values &args);
-    static CallTemplate *from(const Anchor *anchor, Value *callee, const Values &args = {});
+    CallTemplate(const ValueRef &callee, const Values &args);
+    static CallTemplateRef from(const ValueRef &callee, const Values &args = {});
     bool is_rawcall() const;
     void set_rawcall();
 
-    Value *callee;
+    ValueRef callee;
     Values args;
     uint32_t flags;
 };
@@ -639,13 +554,13 @@ struct CallTemplate : UntypedValue {
 struct Call : Instruction {
     static bool classof(const Value *T);
 
-    Call(const Anchor *anchor, const Type *type, TypedValue *callee, const TypedValues &args);
-    static Call *from(const Anchor *anchor, const Type *type, TypedValue *callee, const TypedValues &args = {});
+    Call(const Type *type, const TypedValueRef &callee, const TypedValues &args);
+    static CallRef from(const Type *type, const TypedValueRef &callee, const TypedValues &args = {});
 
-    TypedValue *callee;
+    TypedValueRef callee;
     TypedValues args;
     Block except_body;
-    Exception *except;
+    ExceptionRef except;
 };
 
 //------------------------------------------------------------------------------
@@ -653,15 +568,15 @@ struct Call : Instruction {
 struct LoopLabel : Instruction {
     static bool classof(const Value *T);
 
-    LoopLabel(const Anchor *anchor, const TypedValues &init, LoopLabelArguments *args);
+    LoopLabel(const TypedValues &init, const LoopLabelArgumentsRef &args);
 
-    static LoopLabel *from(const Anchor *anchor, const TypedValues &init,
-        LoopLabelArguments *args);
+    static LoopLabelRef from(const TypedValues &init,
+        const LoopLabelArgumentsRef &args);
 
     TypedValues init;
     Block body;
-    std::vector<Repeat *> repeats;
-    LoopLabelArguments *args;
+    Repeats repeats;
+    LoopLabelArgumentsRef args;
 };
 
 //------------------------------------------------------------------------------
@@ -669,13 +584,14 @@ struct LoopLabel : Instruction {
 struct Loop : UntypedValue {
     static bool classof(const Value *T);
 
-    Loop(const Anchor *anchor, Value *init, Value *value);
+    Loop(const ValueRef &init, const ValueRef &value);
 
-    static Loop *from(const Anchor *anchor, Value *init = nullptr, Value *value = nullptr);
+    static LoopRef from(const ValueRef &init = ValueRef(),
+        const ValueRef &value = ValueRef());
 
-    Value *init;
-    Value *value;
-    LoopArguments *args;
+    ValueRef init;
+    ValueRef value;
+    LoopArgumentsRef args;
 };
 
 //------------------------------------------------------------------------------
@@ -683,7 +599,7 @@ struct Loop : UntypedValue {
 struct Const : Pure {
     static bool classof(const Value *T);
 
-    Const(ValueKind _kind, const Anchor *anchor, const Type *type);
+    Const(ValueKind _kind, const Type *type);
 };
 
 //------------------------------------------------------------------------------
@@ -701,13 +617,12 @@ struct Function : Pure {
 
     static bool classof(const Value *T);
 
-    Function(const Anchor *anchor, Symbol name, const Parameters &params);
+    Function(Symbol name, const Parameters &params);
 
-    static Function *from(
-        const Anchor *anchor, Symbol name,
+    static FunctionRef from(Symbol name,
         const Parameters &params);
 
-    void append_param(Parameter *sym);
+    void append_param(const ParameterRef &sym);
     void change_type(const Type *type);
     void set_type(const Type *type);
     bool is_typed() const;
@@ -717,29 +632,32 @@ struct Function : Pure {
 
     int unique_id();
     void bind_unique(const UniqueInfo &info);
-    void try_bind_unique(TypedValue *value);
+    void try_bind_unique(const TypedValueRef &value);
     const UniqueInfo &get_unique_info(int id) const;
     void build_valids();
+
+    SCOPES_DEFINITION_ANCHOR_API()
 
     Symbol name;
     Parameters params;
     Block body;
     const String *docstring;
-    Function *frame;
-    Function *boundary;
-    Template *original;
-    Label *label;
+    FunctionRef frame;
+    FunctionRef boundary;
+    TemplateRef original;
+    LabelRef label;
     bool complete;
     int nextid;
 
     Types instance_args;
-    void bind(Value *oldnode, TypedValue *newnode);
-    TypedValue *unsafe_resolve(Value *node) const;
-    TypedValue *resolve_local(Value *node) const;
-    SCOPES_RESULT(TypedValue *) resolve(Value *node, Function *boundary) const;
-    std::unordered_map<Value *, TypedValue *> map;
-    std::vector<Return *> returns;
-    std::vector<Raise *> raises;
+    void bind(const ValueRef &oldnode, const TypedValueRef &newnode);
+    TypedValueRef unsafe_resolve(const ValueRef &node) const;
+    TypedValueRef resolve_local(const ValueRef &node) const;
+    SCOPES_RESULT(TypedValueRef) resolve(const ValueRef &node,
+        const FunctionRef &boundary) const;
+    std::unordered_map<Value *, TypedValueRef> map;
+    Returns returns;
+    Raises raises;
 
     UniqueMap uniques;
     IDSet original_valid;
@@ -751,14 +669,14 @@ struct Function : Pure {
 struct ConstInt : Const {
     static bool classof(const Value *T);
 
-    ConstInt(const Anchor *anchor, const Type *type, uint64_t value);
+    ConstInt(const Type *type, uint64_t value);
 
     bool key_equal(const ConstInt *other) const;
     std::size_t hash() const;
 
-    static ConstInt *from(const Anchor *anchor, const Type *type, uint64_t value);
-    static ConstInt *symbol_from(const Anchor *anchor, Symbol value);
-    static ConstInt *builtin_from(const Anchor *anchor, Builtin value);
+    static ConstIntRef from(const Type *type, uint64_t value);
+    static ConstIntRef symbol_from(Symbol value);
+    static ConstIntRef builtin_from(Builtin value);
 
     uint64_t value;
 };
@@ -768,12 +686,12 @@ struct ConstInt : Const {
 struct ConstReal : Const {
     static bool classof(const Value *T);
 
-    ConstReal(const Anchor *anchor, const Type *type, double value);
+    ConstReal(const Type *type, double value);
 
     bool key_equal(const ConstReal *other) const;
     std::size_t hash() const;
 
-    static ConstReal *from(const Anchor *anchor, const Type *type, double value);
+    static ConstRealRef from(const Type *type, double value);
 
     double value;
 };
@@ -783,35 +701,38 @@ struct ConstReal : Const {
 struct ConstAggregate : Const {
     static bool classof(const Value *T);
 
-    ConstAggregate(const Anchor *anchor, const Type *type, const Constants &fields);
+    ConstAggregate(const Type *type, const ConstantPtrs &fields);
 
     bool key_equal(const ConstAggregate *other) const;
     std::size_t hash() const;
 
-    static ConstAggregate *from(const Anchor *anchor, const Type *type, const Constants &fields);
-    static ConstAggregate *none_from(const Anchor *anchor);
+    static ConstAggregateRef from(const Type *type, const ConstantPtrs &fields);
+    static ConstAggregateRef none_from();
+    static ConstAggregateRef ast_from(const ValueRef &node);
 
-    Constants values;
+    ConstantPtrs values;
+    std::size_t _hash;
 };
+
+ConstRef get_field(const ConstAggregateRef &value, int i);
 
 //------------------------------------------------------------------------------
 
 struct ConstPointer : Const {
     static bool classof(const Value *T);
 
-    ConstPointer(const Anchor *anchor, const Type *type, const void *pointer);
+    ConstPointer(const Type *type, const void *pointer);
 
     bool key_equal(const ConstPointer *other) const;
     std::size_t hash() const;
 
-    static ConstPointer *from(const Anchor *anchor, const Type *type, const void *pointer);
-    static ConstPointer *type_from(const Anchor *anchor, const Type *type);
-    static ConstPointer *closure_from(const Anchor *anchor, const Closure *closure);
-    static ConstPointer *string_from(const Anchor *anchor, const String *str);
-    static ConstPointer *ast_from(const Anchor *anchor, Value *node);
-    static ConstPointer *list_from(const Anchor *anchor, const List *list);
-    static ConstPointer *scope_from(const Anchor *anchor, Scope *scope);
-    static ConstPointer *anchor_from(const Anchor *anchor);
+    static ConstPointerRef from(const Type *type, const void *pointer);
+    static ConstPointerRef type_from(const Type *type);
+    static ConstPointerRef closure_from(const Closure *closure);
+    static ConstPointerRef string_from(const String *str);
+    static ConstPointerRef list_from(const List *list);
+    static ConstPointerRef scope_from(Scope *scope);
+    static ConstPointerRef anchor_from(const Anchor *anchor);
 
     const void *value;
 };
@@ -833,13 +754,15 @@ enum GlobalFlags {
 struct Global : Pure {
     static bool classof(const Value *T);
 
-    Global(const Anchor *anchor, const Type *type, Symbol name,
+    SCOPES_DEFINITION_ANCHOR_API()
+
+    Global(const Type *type, Symbol name,
         size_t flags, Symbol storage_class, int location, int binding);
 
     bool key_equal(const Global *other) const;
     std::size_t hash() const;
 
-    static Global *from(const Anchor *anchor, const Type *type, Symbol name,
+    static GlobalRef from(const Type *type, Symbol name,
         size_t flags = 0,
         Symbol storage_class = SYM_Unnamed,
         int location = -1, int binding = -1);
@@ -860,10 +783,10 @@ struct PureCast : Pure {
     bool key_equal(const PureCast *other) const;
     std::size_t hash() const;
 
-    PureCast(const Anchor *anchor, const Type *type, Pure *value);
-    static Pure *from(const Anchor *anchor, const Type *type, Pure *value);
+    PureCast(const Type *type, const PureRef &value);
+    static PureRef from(const Type *type, PureRef value);
 
-    Pure *value;
+    PureRef value;
 };
 
 //------------------------------------------------------------------------------
@@ -871,11 +794,11 @@ struct PureCast : Pure {
 struct Break : UntypedValue {
     static bool classof(const Value *T);
 
-    Break(const Anchor *anchor, Value *value);
+    Break(const ValueRef &value);
 
-    static Break *from(const Anchor *anchor, Value *value);
+    static BreakRef from(const ValueRef &value);
 
-    Value *value;
+    ValueRef value;
 };
 
 //------------------------------------------------------------------------------
@@ -883,11 +806,11 @@ struct Break : UntypedValue {
 struct Merge : Terminator {
     static bool classof(const Value *T);
 
-    Merge(const Anchor *anchor, Label *label, const TypedValues &values);
+    Merge(const LabelRef &label, const TypedValues &values);
 
-    static Merge *from(const Anchor *anchor, Label *label, const TypedValues &values);
+    static MergeRef from(const LabelRef &label, const TypedValues &values);
 
-    Label *label;
+    LabelRef label;
 };
 
 //------------------------------------------------------------------------------
@@ -895,12 +818,12 @@ struct Merge : Terminator {
 struct MergeTemplate : UntypedValue {
     static bool classof(const Value *T);
 
-    MergeTemplate(const Anchor *anchor, LabelTemplate *label, Value *value);
+    MergeTemplate(const LabelTemplateRef &label, const ValueRef &value);
 
-    static MergeTemplate *from(const Anchor *anchor, LabelTemplate *label, Value *value);
+    static MergeTemplateRef from(const LabelTemplateRef &label, const ValueRef &value);
 
-    LabelTemplate *label;
-    Value *value;
+    LabelTemplateRef label;
+    ValueRef value;
 };
 
 //------------------------------------------------------------------------------
@@ -908,11 +831,11 @@ struct MergeTemplate : UntypedValue {
 struct RepeatTemplate : UntypedValue {
     static bool classof(const Value *T);
 
-    RepeatTemplate(const Anchor *anchor, Value *value);
+    RepeatTemplate(const ValueRef &value);
 
-    static RepeatTemplate *from(const Anchor *anchor, Value *value);
+    static RepeatTemplateRef from(const ValueRef &value);
 
-    Value *value;
+    ValueRef value;
 };
 
 //------------------------------------------------------------------------------
@@ -920,11 +843,11 @@ struct RepeatTemplate : UntypedValue {
 struct Repeat : Terminator {
     static bool classof(const Value *T);
 
-    Repeat(const Anchor *anchor, LoopLabel *loop, const TypedValues &values);
+    Repeat(const LoopLabelRef &loop, const TypedValues &values);
 
-    static Repeat *from(const Anchor *anchor, LoopLabel *loop, const TypedValues &values);
+    static RepeatRef from(const LoopLabelRef &loop, const TypedValues &values);
 
-    LoopLabel *loop;
+    LoopLabelRef loop;
 };
 
 //------------------------------------------------------------------------------
@@ -932,11 +855,11 @@ struct Repeat : Terminator {
 struct ReturnTemplate : UntypedValue {
     static bool classof(const Value *T);
 
-    ReturnTemplate(const Anchor *anchor, Value *value);
+    ReturnTemplate(const ValueRef &value);
 
-    static ReturnTemplate *from(const Anchor *anchor, Value *value);
+    static ReturnTemplateRef from(const ValueRef &value);
 
-    Value *value;
+    ValueRef value;
 };
 
 //------------------------------------------------------------------------------
@@ -944,9 +867,9 @@ struct ReturnTemplate : UntypedValue {
 struct Return : Terminator {
     static bool classof(const Value *T);
 
-    Return(const Anchor *anchor, const TypedValues &values);
+    Return(const TypedValues &values);
 
-    static Return *from(const Anchor *anchor, const TypedValues &values);
+    static ReturnRef from(const TypedValues &values);
 };
 
 //------------------------------------------------------------------------------
@@ -954,11 +877,11 @@ struct Return : Terminator {
 struct RaiseTemplate : UntypedValue {
     static bool classof(const Value *T);
 
-    RaiseTemplate(const Anchor *anchor, Value *value);
+    RaiseTemplate(const ValueRef &value);
 
-    static RaiseTemplate *from(const Anchor *anchor, Value *value);
+    static RaiseTemplateRef from(const ValueRef &value);
 
-    Value *value;
+    ValueRef value;
 };
 
 //------------------------------------------------------------------------------
@@ -966,9 +889,9 @@ struct RaiseTemplate : UntypedValue {
 struct Raise : Terminator {
     static bool classof(const Value *T);
 
-    Raise(const Anchor *anchor, const TypedValues &values);
+    Raise(const TypedValues &values);
 
-    static Raise *from(const Anchor *anchor, const TypedValues &values);
+    static RaiseRef from(const TypedValues &values);
 };
 
 //------------------------------------------------------------------------------
@@ -976,11 +899,11 @@ struct Raise : Terminator {
 struct Quote : UntypedValue {
     static bool classof(const Value *T);
 
-    Quote(const Anchor *anchor, Value *value);
+    Quote(const ValueRef &value);
 
-    static Quote *from(const Anchor *anchor, Value *value);
+    static QuoteRef from(const ValueRef &value);
 
-    Value *value;
+    ValueRef value;
 };
 
 //------------------------------------------------------------------------------
@@ -988,11 +911,11 @@ struct Quote : UntypedValue {
 struct Unquote : UntypedValue {
     static bool classof(const Value *T);
 
-    Unquote(const Anchor *anchor, Value *value);
+    Unquote(const ValueRef &value);
 
-    static Unquote *from(const Anchor *anchor, Value *value);
+    static UnquoteRef from(const ValueRef &value);
 
-    Value *value;
+    ValueRef value;
 };
 
 //------------------------------------------------------------------------------
@@ -1000,12 +923,28 @@ struct Unquote : UntypedValue {
 struct CompileStage : UntypedValue {
     static bool classof(const Value *T);
 
-    CompileStage(const Anchor *anchor, const List *next, Scope *env);
+    CompileStage(const List *next, Scope *env);
 
-    static CompileStage *from(const Anchor *anchor, const List *next, Scope *env);
+    static CompileStageRef from(const List *next, Scope *env);
 
     const List *next;
     Scope *env;
+};
+
+//------------------------------------------------------------------------------
+
+struct Closure {
+    Closure(const TemplateRef &_func, const FunctionRef &_frame);
+
+    bool key_equal(const Closure *other) const;
+    std::size_t hash() const;
+
+    TemplateRef func;
+    FunctionRef frame;
+
+    static Closure *from(const TemplateRef &func, const FunctionRef &frame);
+
+    StyledStream &stream(StyledStream &ost) const;
 };
 
 //------------------------------------------------------------------------------

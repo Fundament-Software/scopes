@@ -188,7 +188,7 @@ SCOPES_RESULT(void) add_module(LLVMModuleRef module) {
 
         if (LLVMCreateMCJITCompilerForModule(&ee, module, &opts,
             sizeof(opts), &errormsg)) {
-            SCOPES_LOCATION_ERROR(String::from_cstr(errormsg));
+            SCOPES_ERROR(ExecutionEngineFailed, errormsg);
         }
     }
     LLVMAddModule(ee, module);

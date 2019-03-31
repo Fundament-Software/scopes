@@ -10,6 +10,7 @@
 #include "styled_stream.hpp"
 #include "symbol.hpp"
 #include "stream_anchors.hpp"
+#include "valueref.inc"
 
 namespace scopes {
 
@@ -31,6 +32,7 @@ struct StreamExprFormat {
     };
 
     bool naked;
+    bool types;
     Tagging anchors;
     int maxdepth;
     int maxlength;
@@ -51,29 +53,19 @@ struct StreamExprFormat {
 
     static StreamExprFormat singleline_digest();
 
+    // minimal repr, no type signatures
+    static StreamExprFormat content();
+
 };
 
-struct StreamExpr : StreamAnchors {
-    StreamExprFormat fmt;
-    bool line_anchors;
-    bool atom_anchors;
+typedef StreamExprFormat StreamListFormat;
+typedef StreamExprFormat StreamValueFormat;
 
-    StreamExpr(StyledStream &_ss, const StreamExprFormat &_fmt);
-
-    void stream_indent(int depth = 0);
-
-    static bool is_nested(Value *_e);
-
-    static bool is_list (Value *_value);
-
-    void walk(const Anchor *anchor, const List *l, int depth, int maxdepth, bool naked);
-    void walk(Value *e, int depth, int maxdepth, bool naked);
-
-    void stream(const List *l);
-};
-
-void stream_expr(
-    StyledStream &_ss, const List *l, const StreamExprFormat &_fmt);
+void stream_list(
+    StyledStream &_ss, const List *l, const StreamListFormat &_fmt = StreamListFormat());
+void stream_value(
+    StyledStream &_ss, const ValueRef &value, const StreamValueFormat &_fmt = StreamValueFormat());
+bool is_default_suffix(const Type *T);
 
 } // namespace scopes
 

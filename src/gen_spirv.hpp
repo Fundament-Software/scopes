@@ -9,6 +9,7 @@
 
 #include "symbol.hpp"
 #include "result.hpp"
+#include "valueref.inc"
 
 #include <vector>
 
@@ -17,8 +18,8 @@ namespace scopes {
 struct Function;
 
 SCOPES_RESULT(void) optimize_spirv(std::vector<unsigned int> &result, int opt_level);
-SCOPES_RESULT(const String *) compile_spirv(Symbol target, Function *fn, uint64_t flags);
-SCOPES_RESULT(const String *) compile_glsl(Symbol target, Function *fn, uint64_t flags);
+SCOPES_RESULT(const String *) compile_spirv(Symbol target, const FunctionRef &fn, uint64_t flags);
+SCOPES_RESULT(const String *) compile_glsl(Symbol target, const FunctionRef &fn, uint64_t flags);
 
 } // namespace scopes
 

@@ -54,7 +54,7 @@ static const Anchor *anchor_from_location(clang::SourceManager &SM, clang::Sourc
             SM.getFileOffset(loc));
     }
 
-    return get_active_anchor();
+    return unknown_anchor();
 }
 
 class CVisitor : public clang::RecursiveASTVisitor<CVisitor> {
@@ -236,10 +236,9 @@ public:
         } else if (rd->isClass()) {
             struct_type = get_typename(name, named_classes);
         } else {
-            SCOPES_ANCHOR(anchorFromLocation(rd->getSourceRange().getBegin()));
-            StyledString ss;
-            ss.out << "clang-bridge: can't translate record of unuspported type " << name;
-            SCOPES_LOCATION_ERROR(ss.str());
+            SCOPES_ERROR(CImportUnsupportedRecordType,
+                anchorFromLocation(rd->getSourceRange().getBegin()),
+                name);
         }
 
         clang::RecordDecl * defn = rd->getDefinition();
@@ -248,10 +247,9 @@ public:
 
             auto tni = cast<TypenameType>(const_cast<Type *>(struct_type));
             if (tni->finalized()) {
-                SCOPES_ANCHOR(anchorFromLocation(rd->getSourceRange().getBegin()));
-                StyledString ss;
-                ss.out << "clang-bridge: duplicate body defined for type " << struct_type;
-                SCOPES_LOCATION_ERROR(ss.str());
+                SCOPES_ERROR(CImportDuplicateTypeDefinition,
+                    anchorFromLocation(rd->getSourceRange().getBegin()),
+                    struct_type);
             }
 
             SCOPES_CHECK_RESULT(GetFields(tni, defn));
@@ -261,7 +259,8 @@ public:
                 ScopeEntry target;
                 // don't overwrite names already bound
                 if (!dest->lookup(name, target)) {
-                    dest->bind(name, ConstPointer::type_from(anchor, struct_type));
+                    dest->bind(name,
+                        ref(anchor, ConstPointer::type_from(struct_type)));
                 }
             }
         }
@@ -291,7 +290,8 @@ public:
                 auto &val = it->getInitVal();
 
                 auto name = Symbol(String::from_stdstring(it->getName().data()));
-                auto value = ConstInt::from(anchor, enum_type, val.getExtValue());
+                auto value = ref(anchor,
+                    ConstInt::from(enum_type, val.getExtValue()));
 
                 tni->bind(name, value);
                 dest->bind(name, value);
@@ -541,9 +541,10 @@ public:
         default:
             break;
         }
-        SCOPES_LOCATION_ERROR(format("clang-bridge: cannot convert type: %s (%s)",
+
+        SCOPES_ERROR(CImportCannotConvertType,
             T.getAsString().c_str(),
-            Ty->getTypeClassName()));
+            Ty->getTypeClassName());
     }
 
     SCOPES_RESULT(const Type *) TranslateFuncType(const clang::FunctionType * f) {
@@ -572,11 +573,11 @@ public:
     }
 
     void exportType(Symbol name, const Type *type, const Anchor *anchor) {
-        dest->bind(name, ConstPointer::type_from(anchor, type));
+        dest->bind(name, ref(anchor, ConstPointer::type_from(type)));
     }
 
     void exportExtern(Symbol name, const Type *type, const Anchor *anchor) {
-        dest->bind(name, Global::from(anchor, type, name));
+        dest->bind(name, ref(anchor, Global::from(type, name)));
     }
 
 #define SCOPES_COMBINE_RESULT(DEST, EXPR) { \
@@ -784,7 +785,7 @@ static void add_c_macro(clang::Preprocessor & PP,
         const String *value = String::from(svalue.c_str(), svalue.size());
         const Anchor *anchor = anchor_from_location(PP.getSourceManager(),
             MI->getDefinitionLoc());
-        scope->bind(Symbol(name), ConstPointer::string_from(anchor, value));
+        scope->bind(Symbol(name), ref(anchor, ConstPointer::string_from(value)));
         return;
     }
 
@@ -811,14 +812,14 @@ static void add_c_macro(clang::Preprocessor & PP,
         double V = Result.convertToDouble();
         if (negate)
             V = -V;
-        scope->bind(Symbol(name), ConstReal::from(anchor, TYPE_F64, V));
+        scope->bind(Symbol(name), ref(anchor, ConstReal::from(TYPE_F64, V)));
     } else {
         llvm::APInt Result(64,0);
         Literal.GetIntegerValue(Result);
         int64_t i = Result.getSExtValue();
         if (negate)
             i = -i;
-        scope->bind(Symbol(name), ConstInt::from(anchor, TYPE_I64, i));
+        scope->bind(Symbol(name), ref(anchor, ConstInt::from(TYPE_I64, i)));
     }
 }
 
@@ -885,7 +886,7 @@ SCOPES_RESULT(Scope *) import_c_module (
         while (!todo.empty()) {
             auto sz = todo.size();
             for (auto it = todo.begin(); it != todo.end();) {
-                Value *value;
+                ValueRef value;
                 if (result->lookup(it->second, value)) {
                     result->bind(it->first, value);
                     auto oldit = it++;
@@ -904,7 +905,7 @@ SCOPES_RESULT(Scope *) import_c_module (
         SCOPES_CHECK_RESULT(add_module(M));
         return result;
     } else {
-        SCOPES_LOCATION_ERROR(String::from("compilation failed"));
+        SCOPES_ERROR(CImportCompilationFailed);
     }
 }
 

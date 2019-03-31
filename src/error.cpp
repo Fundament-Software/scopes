@@ -9,9 +9,10 @@
 #include "type.hpp"
 #include "boot.hpp"
 #include "value.hpp"
-#include "stream_ast.hpp"
+#include "stream_expr.hpp"
 #include "type/arguments_type.hpp"
 #include "type/function_type.hpp"
+#include "stream_expr.hpp"
 #include "dyn_cast.inc"
 
 #include "scopes/config.h"
@@ -20,68 +21,306 @@
 
 namespace scopes {
 
+template<typename T> struct ArgFormatter {
+    // if you land here, a specialization is missing
+    //void value(StyledStream &ss, const T &arg);
+};
+
+template<> struct ArgFormatter<ValueKind> {
+    void value(StyledStream &ss, ValueKind arg) {
+        ss << get_value_class_name(arg);
+    }
+};
+
+template<> struct ArgFormatter<TypeKind> {
+    void value(StyledStream &ss, TypeKind arg) {
+        switch(arg) {
+        case TK_Integer: ss << "integer"; break;
+        case TK_Real: ss << "real"; break;
+        case TK_Pointer: ss << "pointer"; break;
+        case TK_Array: ss << "array"; break;
+        case TK_Vector: ss << "vector"; break;
+        case TK_Tuple: ss << "tuple"; break;
+        case TK_Union: ss << "union"; break;
+        case TK_Typename: ss << "typename"; break;
+        case TK_Function: ss << "function"; break;
+        case TK_Image: ss << "image"; break;
+        case TK_SampledImage: ss << "sampled image"; break;
+        default: ss << "?unknown type kind?"; break;
+        }
+    }
+};
+
+template<> struct ArgFormatter<const Anchor *> {
+    void value(StyledStream &ss, const Anchor *arg) {
+        ss << std::endl << arg;
+    }
+};
+
+template<> struct ArgFormatter<const char *> {
+    void value(StyledStream &ss, const char *arg) { ss << arg; }
+};
+
+template<> struct ArgFormatter<const String *> {
+    void value(StyledStream &ss, const String *arg) { ss << arg->data; }
+};
+
+template<> struct ArgFormatter<const Type *> {
+    void value(StyledStream &ss, const Type *arg) { ss << arg; }
+};
+
+template<> struct ArgFormatter<int> {
+    void value(StyledStream &ss, int arg) { ss << arg; }
+};
+
+template<> struct ArgFormatter<char> {
+    void value(StyledStream &ss, char arg) { ss << arg; }
+};
+
+template<> struct ArgFormatter<Symbol> {
+    void value(StyledStream &ss, Symbol arg) { ss << arg.name()->data; }
+};
+
+template<> struct ArgFormatter<Builtin> {
+    void value(StyledStream &ss, Builtin arg) { ss << arg; }
+};
+
+template<typename T> struct ArgFormatter< TValueRef<T> > {
+    void value(StyledStream &ss, const TValueRef<T> &arg) { ss << arg.unref(); }
+};
+
+
+static void _format_token(StyledStream &ss, char c, int n) {
+    // no match
+    ss << "?illegal index?";
+}
+
+template<typename T, class ... Types>
+static void _format_token(StyledStream &ss, char c, int n,
+    const T &arg, Types ... args) {
+    if (n)
+        return _format_token(ss, c, n - 1, args ... );
+    ArgFormatter<T> _a;
+    // handle it
+    switch(c) {
+    case 'V': _a.value(ss, arg); break;
+    default: ss << "?illegal control code?"; break;
+    }
+}
+
+template<class ... Types>
+static const char *format_token(StyledStream &ss, const char *tok, Types ... args) {
+    char c = *tok;
+    if (c) tok++;
+    char cn;
+    if (c >= '0' && c <= '9') {
+        cn = c;
+        c = 'V';
+    } else {
+        cn = *tok;
+        if (cn) tok++;
+    }
+    int n = cn - '0';
+    _format_token(ss, c, n, args ...);
+    return tok;
+}
+
+template<class ... Types>
+static void format_error(StyledStream &ss, const char *msg, Types ... args) {
+    const char *p = msg;
+    while(char c = *p++) {
+        if (c == '%') {
+            p = format_token(ss, p, args ...);
+        } else {
+            ss << c;
+        }
+    }
+}
+
+//------------------------------------------------------------------------------
+
+#define TA(N, CLS) CLS _arg ## N
+#define TC(N, CLS) err->arg ## N = _arg ## N
+#define TD(N, CLS) , arg ## N
+#define TDTOK()
+#define T(CLASS, STR, ...) /*
+*/bool Error ## CLASS::classof(const Error *T) {/*
+*/  return T->kind() == EK_ ## CLASS;/*
+*/}/*
+*/Error ## CLASS::Error ## CLASS() : Error(EK_ ## CLASS) {}/*
+*/Error ## CLASS *Error ## CLASS::from(SCOPES_FOREACH_EXPR(TA, ##__VA_ARGS__)) {/*
+*/  Error ## CLASS *err = new Error ## CLASS();/*
+*/  SCOPES_FOREACH_STMT(TC, ##__VA_ARGS__);/*
+*/  return err;/*
+*/}/*
+*/void Error ## CLASS::stream(StyledStream &ss) const {/*
+*/  format_error(ss, STR SCOPES_FOREACH(TD, TDTOK, ##__VA_ARGS__));/*
+*/}
+
+SCOPES_ERROR_KIND()
+#undef T
+#undef TA
+#undef TC
+#undef TD
+#undef TDTOK
+
 //------------------------------------------------------------------------------
 // ERROR HANDLING
 //------------------------------------------------------------------------------
 
-static const Anchor *_active_anchor = nullptr;
+ErrorKind Error::kind() const { return _kind; }
 
-void _set_active_anchor(const Anchor *anchor) {
-    assert(anchor);
-    _active_anchor = anchor;
+Error::Error(ErrorKind kind) : _kind(kind) {}
+
+Error *Error::trace(const Backtrace &bt) {
+    if (bt.kind == BTK_Dummy)
+        return this;
+    auto ptr = new Backtrace(bt);
+    ptr->next = _trace;
+    _trace = ptr;
+    return this;
 }
 
-const Anchor *get_active_anchor() {
-    return _active_anchor;
-}
-
-//------------------------------------------------------------------------------
-
-ScopedAnchor::ScopedAnchor(const Anchor *anchor) : parent_anchor(get_active_anchor()) {
-    _set_active_anchor(anchor);
-}
-ScopedAnchor::~ScopedAnchor() {
-    _set_active_anchor(parent_anchor);
+const Backtrace *Error::get_trace() const {
+    return _trace;
 }
 
 //------------------------------------------------------------------------------
 
-Error::Error() :
-    anchor(nullptr),
-    msg(nullptr) {}
-
-Error::Error(const Anchor *_anchor, const String *_msg) :
-    anchor(_anchor),
-    msg(_msg) {}
-
-void Error::append_definition(Value *value) {
-    definitions.push_back(value);
-}
-
-void Error::append_error_trace(Value *value) {
-    // only report deepest call
-    if (!trace.empty()) {
-        Value *last = trace.back();
-        if (isa<Call>(last) && isa<Call>(value))
-            return;
+void stream_error_message(StyledStream &ss, const Error *err) {
+    switch(err->kind()) {
+#define T(CLASS, STR, ...) \
+    case EK_ ## CLASS: cast<Error ## CLASS>(err)->stream(ss); break;
+SCOPES_ERROR_KIND()
+#undef T
+    default: ss << "?corrupted error object?"; break;
     }
-    trace.push_back(value);
+}
+
+void stream_backtrace(StyledStream &ss, const Backtrace *bt) {
+    if (bt->kind == BTK_Dummy) return;
+    auto &&value = bt->context;
+    auto anchor = value.anchor();
+    switch(bt->kind) {
+    case BTK_Dummy: break;
+    case BTK_Parser: {
+        ss << anchor << " while ";
+        ss << "parsing";
+        ss << std::endl;
+        anchor->stream_source_line(ss);
+    } break;
+    case BTK_Expander: {
+        ss << anchor << " while ";
+        ss << "expanding";
+        ss << std::endl;
+        anchor->stream_source_line(ss);
+    } break;
+    case BTK_ProveTemplate: {
+        if (value.isa<UntypedValue>()) {
+            auto uv = value.cast<UntypedValue>();
+            auto _anchor = uv->def_anchor();
+            if (_anchor != unknown_anchor())
+                anchor = uv->def_anchor();
+        }
+        #if 0
+        const List *list = ast_to_list(value);
+        StreamExprFormat fmt;
+        fmt.maxdepth = 2;
+        fmt.depth = 1;
+        fmt.maxlength = 3;
+        stream_expr(ss, list, fmt);
+        #endif
+        ss << anchor << " in ";
+        ss << Style_Keyword;
+        if (value.cast<Template>()->is_inline()) {
+            ss << "inline";
+        } else {
+            ss << "fn";
+        }
+        ss << Style_None << " ";
+        ss << value.cast<Template>()->name.name()->data;
+        ss << std::endl;
+        anchor->stream_source_line(ss);
+    } break;
+    case BTK_ProveArgument: {
+        ss << anchor;
+        ss << " while checking type of argument" << std::endl;
+        anchor->stream_source_line(ss);
+    } break;
+    case BTK_User: {
+        ss << anchor;
+        ss << " while executing" << std::endl;
+        anchor->stream_source_line(ss);
+    } break;
+    case BTK_ProveExpression: {
+        ss << "While checking expression" << std::endl;
+        if (value.isa<UntypedValue>()) {
+            auto uv = value.cast<UntypedValue>();
+            auto _anchor = uv->def_anchor();
+            if (_anchor != unknown_anchor())
+                anchor = uv->def_anchor();
+        }
+        StreamValueFormat fmt;
+        fmt.maxdepth = 3;
+        fmt.maxlength = 4;
+        stream_value(ss, value, fmt);
+        ss << anchor << " defined here";
+        ss << std::endl;
+        anchor->stream_source_line(ss);
+    } break;
+    }
+}
+
+static bool good_delta(const Backtrace *newer, const Backtrace *older) {
+#if 1
+    return newer->context.anchor() != older->context.anchor();
+#else
+    if (older->kind == BTK_User) return true;
+    return newer->kind != older->kind;
+#endif
+}
+
+void stream_error(StyledStream &ss, const Error *err) {
+    std::vector<const Backtrace *> traceback;
+    {
+        const Backtrace *bt = err->get_trace();
+        const Backtrace *last_bt = nullptr;
+        while (bt) {
+            if (!last_bt || good_delta(last_bt, bt)) {
+                traceback.push_back(bt);
+            }
+            last_bt = bt;
+            bt = bt->next;
+        }
+    }
+    for (auto bt : traceback) {
+        stream_backtrace(ss, bt);
+    }
+
+    ss << Style_Error << "error:" << Style_None << " ";
+    stream_error_message(ss, err);
+    ss << std::endl;
+}
+
+void print_error(const Error *value) {
+    auto cerr = StyledStream(SCOPES_CERR);
+    stream_error(cerr, value);
 }
 
 //------------------------------------------------------------------------------
 
-void location_message(const Anchor *anchor, const String* str) {
-    assert(anchor);
-    auto cerr = StyledStream(SCOPES_CERR);
-    cerr << anchor << str->data << std::endl;
-    anchor->stream_source_line(cerr);
-}
+Backtrace _backtrace = { nullptr, BTK_Dummy, ValueRef() };
 
-void stream_error_string(StyledStream &ss, const Error *exc) {
-    ss << exc->msg->data;
+//------------------------------------------------------------------------------
+
+#if 0
+void collect_trace(StyledStream &ss,
+    Values &values, ValueRef value) {
+    values.push_back(value);
 }
 
 void stream_error(StyledStream &ss, const Error *exc) {
+#if 0
     size_t i = exc->trace.size();
     const Anchor *last_anchor = nullptr;
     while (i--) {
@@ -103,6 +342,7 @@ void stream_error(StyledStream &ss, const Error *exc) {
         ss << std::endl;
         value->anchor()->stream_source_line(ss);
     }
+#endif
     if (exc->anchor) {
         ss << exc->anchor << " ";
     }
@@ -113,9 +353,34 @@ void stream_error(StyledStream &ss, const Error *exc) {
         exc->anchor->stream_source_line(ss);
     }
     */
+    Values values;
     for (auto def : exc->definitions) {
-        ss << def->anchor() << " defined here" << std::endl;
-        def->anchor()->stream_source_line(ss);
+        values.clear();
+        collect_trace(ss, values, def);
+        if (!values.size())
+            continue;
+        size_t i = values.size();
+        const Anchor *last_anchor = nullptr;
+        while (i--) {
+            auto value = values[i];
+            const Anchor *anchor = value.anchor();
+            if (last_anchor && anchor->is_same(last_anchor))
+                continue;
+            last_anchor = anchor;
+            ss << anchor << " in ";
+            if (value.isa<Function>()) {
+                auto fn = value.cast<Function>();
+                if (fn->name == SYM_Unnamed) {
+                    ss << Style_Function << "unnamed" << Style_None;
+                } else {
+                    ss << Style_Function << fn->name.name()->data << Style_None;
+                }
+            } else {
+                ss << "expression";
+            }
+            ss << std::endl;
+            anchor->stream_source_line(ss);
+        }
     }
 }
 
@@ -124,387 +389,13 @@ void print_error(const Error *value) {
     stream_error(cerr, value);
 }
 
-Error *make_location_error(const String *msg) {
-    return new Error(_active_anchor, msg);
-}
-
 Error *make_location_error(const Anchor *anchor, const String *msg) {
     return new Error(anchor, msg);
 }
 
-Error *make_runtime_error(const String *msg) {
+Error *make_error(const String *msg) {
     return new Error(nullptr, msg);
 }
-
-//------------------------------------------------------------------------------
-
-#define SCOPES_LOCATION_DEF_ERROR(DEF, MSG) { \
-    auto err = make_location_error((MSG)); \
-    err->append_definition((DEF)); \
-    return Result<_result_type>::raise(err); \
-}
-
-SCOPES_RESULT(void) error_invalid_call_type(TypedValue *callee) {
-    SCOPES_RESULT_TYPE(void);
-    StyledString ss;
-    ss.out << "unable to call value of type " << callee->get_type();
-    SCOPES_LOCATION_DEF_ERROR(callee, ss.str());
-}
-
-SCOPES_RESULT(void) error_argument_count_mismatch(int needed, int got, const FunctionType *ft) {
-    SCOPES_RESULT_TYPE(void);
-    StyledString ss;
-    if (got > needed)
-        ss.out << "too many";
-    else
-        ss.out << "not enough";
-    ss.out << " arguments in call";
-    if (ft) {
-        ss.out << " to function of type " << (const Type *)ft;
-    }
-    ss.out << " (";
-    if (ft && ft->vararg()) {
-        ss.out << "at least ";
-    }
-    ss.out << needed << " argument(s) expected, got " << got << ")";
-    SCOPES_LOCATION_ERROR(ss.str());
-}
-
-SCOPES_RESULT(void) error_argument_type_mismatch(const Type *expected, const Type *got) {
-    SCOPES_RESULT_TYPE(void);
-    StyledString ss;
-    ss.out << "parameter is of type " << expected << ", but argument is of type " << got;
-    SCOPES_LOCATION_ERROR(ss.str());
-}
-
-SCOPES_RESULT(void) error_cannot_view_moved(TypedValue *value) {
-    SCOPES_RESULT_TYPE(void);
-    StyledString ss;
-    ss.out << "cannot view value of type " << value->get_type() << " because it has been moved";
-    SCOPES_LOCATION_ERROR(ss.str());
-    //SCOPES_LOCATION_DEF_ERROR(mover, ss.str());
-}
-
-SCOPES_RESULT(void) error_cannot_access_moved(const Type *T, const char *by) {
-    SCOPES_RESULT_TYPE(void);
-    StyledString ss;
-    ss.out << by << " cannot access value of type " << T << " because it has been moved";
-    SCOPES_LOCATION_ERROR(ss.str());
-    //SCOPES_LOCATION_DEF_ERROR(mover, ss.str());
-}
-
-SCOPES_RESULT(void) error_cannot_cast_plain_to_unique(const Type *SrcT, const Type *DestT) {
-    SCOPES_RESULT_TYPE(void);
-    StyledString ss;
-    ss.out << "cannot cast value of plain type " << SrcT << " to unique type " << DestT;
-    SCOPES_LOCATION_ERROR(ss.str());
-    //SCOPES_LOCATION_DEF_ERROR(mover, ss.str());
-}
-
-SCOPES_RESULT(void) error_plain_not_storage_of_unique(const Type *SrcT, const Type *DestT) {
-    SCOPES_RESULT_TYPE(void);
-    StyledString ss;
-    ss.out << "type " << SrcT << " is not the storage type of unique type " << DestT;
-    SCOPES_LOCATION_ERROR(ss.str());
-}
-
-SCOPES_RESULT(void) error_value_not_unique(TypedValue *value, const char *by) {
-    SCOPES_RESULT_TYPE(void);
-    StyledString ss;
-    ss.out << by << " value of type " << value->get_type() << " is not unique";
-    if (!is_plain(value->get_type())) {
-        ss.out << ", but type is unique" << std::endl;
-    }
-    SCOPES_LOCATION_ERROR(ss.str());
-}
-
-SCOPES_RESULT(void) error_value_not_plain(TypedValue *value) {
-    SCOPES_RESULT_TYPE(void);
-    StyledString ss;
-    ss.out << "value of type " << value->get_type() << " is not plain";
-    SCOPES_LOCATION_ERROR(ss.str());
-}
-
-SCOPES_RESULT(void) error_altering_parent_scope_in_pass(const Type *value_type) {
-    SCOPES_RESULT_TYPE(void);
-    StyledString ss;
-    ss.out << "skippable switch pass moved value of type " << value_type << " which is from a parent scope";
-    SCOPES_LOCATION_ERROR(ss.str());
-}
-
-SCOPES_RESULT(void) error_altering_parent_scope_in_loop(const Type *value_type) {
-    SCOPES_RESULT_TYPE(void);
-    StyledString ss;
-    ss.out << "loop moved value of type " << value_type << " which is from a parent scope";
-    SCOPES_LOCATION_ERROR(ss.str());
-}
-
-SCOPES_RESULT(void) error_cannot_return_view(TypedValue *value) {
-    SCOPES_RESULT_TYPE(void);
-    StyledString ss;
-    ss.out << "cannot return view of value of type " << value->get_type() << " because the value is local to scope";
-    SCOPES_LOCATION_ERROR(ss.str());
-}
-
-SCOPES_RESULT(void) error_value_moved(TypedValue *value, Value *mover, const char *by) {
-    SCOPES_RESULT_TYPE(void);
-    StyledString ss;
-    ss.out << by << " cannot move value of type " << value->get_type() << " out of function because it will be moved";
-    SCOPES_LOCATION_DEF_ERROR(mover, ss.str());
-}
-
-SCOPES_RESULT(void) error_value_in_use(TypedValue *value, Value *user, const char *by) {
-    SCOPES_RESULT_TYPE(void);
-    StyledString ss;
-    ss.out << by << " cannot move value of type " << value->get_type() << " out of function because it is still in use";
-    SCOPES_LOCATION_DEF_ERROR(user, ss.str());
-}
-
-SCOPES_RESULT(void) error_value_is_viewed(Value *value, Value *user, const char *by) {
-    SCOPES_RESULT_TYPE(void);
-    StyledString ss;
-    ss.out << by << " cannot move view of unique value(s)";
-    SCOPES_LOCATION_DEF_ERROR(user, ss.str());
-}
-
-SCOPES_RESULT(void) error_cannot_merge_moves(const char *by) {
-    SCOPES_RESULT_TYPE(void);
-    StyledString ss;
-    ss.out << "conflicting attempt in " << by << " to move or view unique value(s)";
-    SCOPES_LOCATION_ERROR(ss.str());
-}
-
-SCOPES_RESULT(void) error_nonreturning_function_must_move() {
-    SCOPES_RESULT_TYPE(void);
-    StyledString ss;
-    ss.out << "non-returning function must acquire all arguments";
-    SCOPES_LOCATION_ERROR(ss.str());
-}
-
-SCOPES_RESULT(void) error_invalid_operands(const Type *A, const Type *B) {
-    SCOPES_RESULT_TYPE(void);
-    StyledString ss;
-    ss.out << "invalid operand types " << A << " and " << B;
-    SCOPES_LOCATION_ERROR(ss.str());
-}
-
-SCOPES_RESULT(void) error_invalid_condition_type(TypedValue *cond) {
-    SCOPES_RESULT_TYPE(void);
-    StyledString ss;
-    ss.out << "condition of if-clause must be value of type "
-        << TYPE_Bool << ", not value of type " << cond->get_type();
-    SCOPES_LOCATION_DEF_ERROR(cond, ss.str());
-}
-
-SCOPES_RESULT(void) error_invalid_case_literal_type(TypedValue *lit) {
-    SCOPES_RESULT_TYPE(void);
-    StyledString ss;
-    ss.out << "condition of switch-case must be constant of type "
-        << TYPE_Integer << ", not value of type " << lit->get_type();
-    SCOPES_LOCATION_DEF_ERROR(lit, ss.str());
-}
-
-SCOPES_RESULT(void) error_label_expected(Value *value) {
-    SCOPES_RESULT_TYPE(void);
-    StyledString ss;
-    if (isa<TypedValue>(value)) {
-        ss.out << "expected label, not value of type " << cast<TypedValue>(value)->get_type();
-    } else {
-        ss.out << "expected label, not untyped value";
-    }
-    SCOPES_LOCATION_DEF_ERROR(value, ss.str());
-}
-
-SCOPES_RESULT(void) error_duplicate_default_case() {
-    SCOPES_RESULT_TYPE(void);
-    StyledString ss;
-    ss.out << "duplicate default case";
-    SCOPES_LOCATION_ERROR(ss.str());
-}
-
-SCOPES_RESULT(void) error_missing_default_case() {
-    SCOPES_RESULT_TYPE(void);
-    StyledString ss;
-    ss.out << "missing default case";
-    SCOPES_LOCATION_ERROR(ss.str());
-}
-
-SCOPES_RESULT(void) error_something_expected(const char *want, Value *value) {
-    SCOPES_RESULT_TYPE(void);
-    StyledString ss;
-    ss.out << want << " expected, got "
-        << get_value_class_name(value->kind());
-    if (isa<TypedValue>(value)) {
-        ss.out << " of type " << cast<TypedValue>(value)->get_type();
-    }
-    SCOPES_LOCATION_DEF_ERROR(value, ss.str());
-}
-
-SCOPES_RESULT(void) error_constant_expected(const Type *want, Value *value) {
-    SCOPES_RESULT_TYPE(void);
-    StyledString ss;
-    ss.out << "constant";
-    if (want)
-        ss.out << " of type " << want;
-    ss.out << " expected, got "
-        << get_value_class_name(value->kind());
-    if (isa<TypedValue>(value)) {
-        ss.out << " of type " << cast<TypedValue>(value)->get_type();
-    }
-    SCOPES_LOCATION_DEF_ERROR(value, ss.str());
-}
-
-SCOPES_RESULT(void) error_unbound_symbol(Parameter *value) {
-    SCOPES_RESULT_TYPE(void);
-    StyledString ss;
-    ss.out << "symbol " << value->name << " is unbound in scope";
-    SCOPES_LOCATION_DEF_ERROR(value, ss.str());
-}
-
-SCOPES_RESULT(void) error_unbound_symbol(Value *value) {
-    SCOPES_RESULT_TYPE(void);
-    StyledString ss;
-    ss.out << "token " << value << " is unbound in scope";
-    SCOPES_LOCATION_DEF_ERROR(value, ss.str());
-}
-
-SCOPES_RESULT(void) error_cannot_merge_expression_types(const char *context, const Type *T1, const Type *T2) {
-    SCOPES_RESULT_TYPE(void);
-    StyledString ss;
-    ss.out << "conflicting " << context << " types " << T1 << " and " << T2;
-    SCOPES_LOCATION_ERROR(ss.str());
-}
-
-SCOPES_RESULT(void) error_noreturn_not_last_expression() {
-    SCOPES_RESULT_TYPE(void);
-    StyledString ss;
-    ss.out << "non-returning expression isn't last expression in sequence";
-    SCOPES_LOCATION_ERROR(ss.str());
-}
-
-SCOPES_RESULT(void) error_recursion_overflow() {
-    SCOPES_RESULT_TYPE(void);
-    StyledString ss;
-
-    ss.out << "maximum number of compile time recursions exceeded (> ";
-    ss.out << SCOPES_MAX_RECURSIONS;
-    ss.out << ")";
-    SCOPES_LOCATION_ERROR(ss.str());
-}
-
-SCOPES_RESULT(void) error_noreturn_in_argument_list() {
-    SCOPES_RESULT_TYPE(void);
-    StyledString ss;
-    ss.out << "non-returning expression in argument list";
-    SCOPES_LOCATION_ERROR(ss.str());
-}
-
-SCOPES_RESULT(void) error_cannot_type_builtin(const Builtin &builtin) {
-    SCOPES_RESULT_TYPE(void);
-    StyledString ss;
-    ss.out << "can not type builtin " << builtin;
-    SCOPES_LOCATION_ERROR(ss.str());
-}
-
-SCOPES_RESULT(void) error_illegal_repeat_outside_loop() {
-    SCOPES_RESULT_TYPE(void);
-    StyledString ss;
-    ss.out << "illegal repeat outside loop";
-    SCOPES_LOCATION_ERROR(ss.str());
-}
-
-SCOPES_RESULT(void) error_illegal_break_outside_loop() {
-    SCOPES_RESULT_TYPE(void);
-    StyledString ss;
-    ss.out << "illegal break outside loop";
-    SCOPES_LOCATION_ERROR(ss.str());
-}
-
-SCOPES_RESULT(void) error_variadic_symbol_not_in_last_place() {
-    SCOPES_RESULT_TYPE(void);
-    StyledString ss;
-    ss.out << "variadic symbol is not in last place";
-    SCOPES_LOCATION_ERROR(ss.str());
-}
-
-SCOPES_RESULT(void) error_untyped_recursive_call(Function *func) {
-    SCOPES_RESULT_TYPE(void);
-    StyledString ss;
-    ss.out << "recursive call to function " << func->name
-         << " can not be typed because the function has no return type yet";
-    SCOPES_LOCATION_DEF_ERROR(func, ss.str());
-}
-
-SCOPES_RESULT(void) error_recursive_function_changed_type(Function *func, const Type *T1, const Type *T2) {
-    SCOPES_RESULT_TYPE(void);
-    StyledString ss;
-    ss.out << "recursive function " << func->name
-         << " changed signature from " << T1 << " to " << T2 << " after first use";
-    SCOPES_LOCATION_DEF_ERROR(func, ss.str());
-}
-
-SCOPES_RESULT(void) error_value_inaccessible_from_closure(TypedValue *value,
-    const Function *frame) {
-    SCOPES_RESULT_TYPE(void);
-    StyledString ss;
-    ss.out << "non-constant value of type " << value->get_type()
-        << " is inaccessible from function";
-    if (frame) {
-        SCOPES_LOCATION_DEF_ERROR(const_cast<Function *>(frame), ss.str());
-    } else {
-        SCOPES_LOCATION_ERROR(ss.str());
-    }
-}
-
-SCOPES_RESULT(void) error_cannot_deref_non_plain(const Type *T) {
-    SCOPES_RESULT_TYPE(void)
-    StyledString ss;
-    ss.out << "can not implicitly dereference non-plain value of type " << T;
-    SCOPES_LOCATION_ERROR(ss.str());
-}
-
-//------------------------------------------------------------------------------
-
-SCOPES_RESULT(void) error_gen_invalid_call_type(const char *target, TypedValue *callee) {
-    SCOPES_RESULT_TYPE(void);
-    StyledString ss;
-    ss.out << target << ": cannot translate call to value of type " << callee->get_type();
-    SCOPES_LOCATION_DEF_ERROR(callee, ss.str());
-}
-
-SCOPES_RESULT(void) error_gen_unbound_symbol(const char *target, Parameter *value) {
-    SCOPES_RESULT_TYPE(void);
-    StyledString ss;
-    ss.out << target << ": symbol " << value->name << " is unbound";
-    SCOPES_LOCATION_DEF_ERROR(value, ss.str());
-}
-
-SCOPES_RESULT(void) error_gen_unbound_symbol(const char *target, Value *value) {
-    SCOPES_RESULT_TYPE(void);
-    StyledString ss;
-    ss.out << target << ": IL token " << value << " is unbound";
-    SCOPES_LOCATION_DEF_ERROR(value, ss.str());
-}
-
-SCOPES_RESULT(void) error_cannot_translate(const char *target, Value *value) {
-    SCOPES_RESULT_TYPE(void);
-    StyledString ss;
-    if (isa<Instruction>(value)) {
-        ss.out << target << ": instruction of kind "
-            << Style_Keyword << get_value_class_name(value->kind()) << Style_None
-            << " is referenced by argument but ";
-        if (cast<Instruction>(value)->block) {
-            ss.out << "its block has not been processed";
-        } else {
-            ss.out << "not associated with a block";
-        }
-    } else {
-        ss.out << target << ": cannot translate value of kind "
-            << Style_Keyword << get_value_class_name(value->kind()) << Style_None;
-    }
-    SCOPES_LOCATION_ERROR(ss.str());
-}
-
-//------------------------------------------------------------------------------
+#endif
 
 } // namespace scopes
