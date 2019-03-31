@@ -277,6 +277,7 @@ SCOPES_LIBEXPORT void sc_set_globals(sc_scope_t *s);
 
 SCOPES_LIBEXPORT void sc_error_append_calltrace(sc_error_t *err, sc_valueref_t callexpr);
 SCOPES_LIBEXPORT const sc_string_t *sc_format_error(const sc_error_t *err);
+SCOPES_LIBEXPORT void sc_dump_error(const sc_error_t *err);
 SCOPES_LIBEXPORT sc_error_t *sc_error_new(const sc_string_t *msg);
 SCOPES_LIBEXPORT void sc_set_signal_abort(bool value);
 SCOPES_LIBEXPORT void sc_abort();

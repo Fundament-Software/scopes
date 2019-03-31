@@ -454,6 +454,11 @@ const sc_string_t *sc_format_error(const sc_error_t *err) {
     return ss.str();
 }
 
+void sc_dump_error(const sc_error_t *err) {
+    using namespace scopes;
+    print_error(err);
+}
+
 void sc_set_signal_abort(bool value) {
     using namespace scopes;
     signal_abort = value;
@@ -2019,6 +2024,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_error_append_calltrace, _void, TYPE_Error, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_error_new, TYPE_Error, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_format_error, TYPE_String, TYPE_Error);
+    DEFINE_EXTERN_C_FUNCTION(sc_dump_error, _void, TYPE_Error);
 
     DEFINE_EXTERN_C_FUNCTION(sc_abort, TYPE_NoReturn);
     DEFINE_EXTERN_C_FUNCTION(sc_exit, TYPE_NoReturn, TYPE_I32);

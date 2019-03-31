@@ -5094,7 +5094,6 @@ fn read-eval-print-loop ()
         let eval-scope count =
             try
                 let expr = (list-parse cmdlist)
-                let expr-anchor = ('anchor expr)
                 let tmp = (Symbol "#result...")
                 let expr =
                     Value
@@ -5109,7 +5108,10 @@ fn read-eval-print-loop ()
                                 list __this-scope
                                 list locals
                                 tmp
-                let f = (sc_compile (sc_eval expr-anchor (unbox-pointer expr list) eval-scope) 0:u64)
+                let expression-anchor = ('anchor expr)
+                let list-expression = (unbox-pointer expr list)
+                let expression = (sc_eval expression-anchor list-expression eval-scope)
+                let f = (sc_compile expression 0:u64)
                 let fptr =
                     f as
                         'pointer
@@ -5118,9 +5120,7 @@ fn read-eval-print-loop ()
                                 Error
                 fptr;
             except (exc)
-                io-write!
-                    'format exc
-                io-write! "\n"
+                sc_dump_error exc
                 _ eval-scope 0
         repeat "" "" (counter + count) eval-scope
 
