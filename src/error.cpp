@@ -15,6 +15,7 @@
 #include "stream_expr.hpp"
 #include "dyn_cast.inc"
 #include "scope.hpp"
+#include "prover.hpp"
 
 #include "scopes/config.h"
 
@@ -311,7 +312,12 @@ void stream_backtrace(StyledStream &ss, const Backtrace *bt) {
     } break;
     case BTK_User: {
         ss << anchor;
-        ss << " while executing" << std::endl;
+        if (try_get_const_type(value) == TYPE_String) {
+            ss << " " << extract_string_constant(value).assert_ok()->data;
+        } else {
+            ss << " while executing";
+        }
+        ss << std::endl;
         anchor->stream_source_line(ss);
     } break;
     case BTK_ProveExpression: {
@@ -334,9 +340,9 @@ void stream_backtrace(StyledStream &ss, const Backtrace *bt) {
 }
 
 static bool good_delta(const Backtrace *older, const Backtrace *newer) {
-#if 0
-    return newer->context.anchor() != older->context.anchor();
-    //return true;
+#if 1
+    //return newer->context.anchor() != older->context.anchor();
+    return true;
 #else
     if (older->kind == BTK_User) return true;
     if (older->kind == BTK_Expander) {

@@ -1840,7 +1840,6 @@ repeat:
                 SCOPES_ERROR(SpiceMacroReturnedNull);
             }
             value = ref(call.anchor(), result._0);
-            //set_best_anchor(value, anchor);
             return SCOPES_GET_RESULT(prove(ctx, value));
         } else {
             SCOPES_RETURN_TRACE_ERROR(result.except);

@@ -1230,8 +1230,16 @@ inline simple-signed-binary-op (sf uf)
 'set-symbols SugarMacro
     __call =
         box-pointer
-            inline (self at next scope)
-                (bitcast self SugarMacroFunction) at next scope
+            spice-macro
+                fn (args)
+                    raises-compile-error;
+                    let argc = (sc_argcount args)
+                    verify-count argc 4 4
+                    let self = (sc_getarg args 0)
+                    let at = (sc_getarg args 1)
+                    let next = (sc_getarg args 2)
+                    let scope = (sc_getarg args 3)
+                    `((bitcast self SugarMacroFunction) at next scope)
 
 'define-symbols Symbol
     unique =
@@ -1937,7 +1945,15 @@ fn list-handler (topexpr env)
         except (err) head
     if (== ('typeof head) SugarMacro)
         let head = (as head SugarMacro)
-        let expr env = (head expr topexpr-next env)
+        let expr env =
+            try
+                hide-traceback;
+                head expr topexpr-next env
+            except (err)
+                hide-traceback;
+                let msg = `"while expanding sugar macro"
+                sc_error_append_calltrace err ('tag msg expr-anchor)
+                raise err
         return (as expr list) env
     elseif (has-infix-ops? env expr)
         let at next = ('decons expr)
@@ -2876,6 +2892,7 @@ let __static-assert =
             let msg = (msg as string)
             let val = (expr as bool)
             if (not val)
+                hide-traceback;
                 error
                     .. "assertion failed: " msg
             `()
@@ -2885,6 +2902,7 @@ let __assert =
         fn "__assert" (args)
             fn check-assertion (result msg)
                 if (not result)
+                    hide-traceback;
                     error
                         .. "assertion failed: " msg
                 return;
@@ -2896,9 +2914,7 @@ let __assert =
                 'getarg args 1
             if (('typeof msg) != string)
                 error "string expected as second argument"
-            spice-quote
-                check-assertion expr msg
-                ;
+            `(check-assertion expr msg)
 
 fn gen-vector-reduction (f v sz)
     if false
@@ -3176,12 +3192,13 @@ inline convert-assert-args (args cond msg)
         if (('typeof cond) == list)
             `[(sc_list_repr (cond as list))]
         else
-            `[(repr cond)]
+            `[('__repr cond)]
 
 define-sugar-macro static-assert
     let cond msg body = (decons args 2)
+    let anchor = ('anchor cond)
     let msg = (convert-assert-args args cond msg)
-    list __static-assert cond msg
+    list ('tag `__static-assert anchor) cond msg
 
 define-sugar-macro assert
     let cond msg body = (decons args 2)
