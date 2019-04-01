@@ -4859,7 +4859,6 @@ sugar struct (name body...)
         for i field in (enumerate ('reverse field-types))
             let k T = (decons (field as list) 2)
             fields @ (usize i) = (sc_key_type (k as Symbol) (T as type))
-        print T
         if (T < CUnion)
             'set-plain-storage T
                 sc_union_type numfields fields
