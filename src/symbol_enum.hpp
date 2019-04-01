@@ -22,8 +22,9 @@ namespace scopes {
     T(FN_StaticAlloc) T(KW_Try) T(KW_Return) T(KW_Loop) T(KW_Repeat) T(KW_Break) T(FN_Dupe) \
     T(KW_ASTQuote) T(KW_ASTUnquote) T(KW_ASTUnquoteArguments) T(KW_Merge) T(FN_Copy) T(FN_Track) \
     T(FN_Move) T(FN_View) T(FN_Viewing) T(FN_Lose) T(FN_Assign) T(FN_Deref) T(FN_PtrToRef) T(FN_RefToPtr) \
-    T(FN_AnyExtract) T(FN_AnyWrap) T(FN_Free) T(KW_Defer) T(FN_DumpAST) T(FN_DumpUniques) T(FN_IsValid) \
-    T(OP_ICmpEQ) T(OP_ICmpNE) T(FN_Sample) T(FN_ImageRead) T(FN_ImageWrite) T(SYM_DropHandler) \
+    T(FN_AnyExtract) T(FN_AnyWrap) T(FN_Free) T(KW_Defer) T(FN_DumpDebug) \
+    T(FN_DumpAST) T(FN_DumpUniques) T(FN_IsValid) T(OP_ICmpEQ) T(OP_ICmpNE) \
+    T(FN_Sample) T(FN_ImageRead) T(FN_ImageWrite) T(SYM_DropHandler) \
     T(FN_ImageQuerySize) T(FN_ImageQueryLod) T(FN_ImageQueryLevels) T(FN_ImageQuerySamples) \
     T(OP_ICmpUGT) T(OP_ICmpUGE) T(OP_ICmpULT) T(OP_ICmpULE) \
     T(OP_ICmpSGT) T(OP_ICmpSGE) T(OP_ICmpSLT) T(OP_ICmpSLE) \
@@ -311,8 +312,8 @@ namespace scopes {
     T(FN_LabelDocString, "Label-docstring") \
     T(FN_LabelSetInline, "Label-set-inline!") \
     T(FN_DefaultStyler, "default-styler") T(FN_StyleToString, "style->string") \
-    T(FN_Disqualify, "disqualify") T(FN_Dump, "dump") T(FN_DumpTemplate, "dump-template") \
-    T(FN_DumpAST, "dump-ast") T(FN_DumpUniques, "dump-uniques") T(FN_IsValid, "unique-visible?") \
+    T(FN_Disqualify, "disqualify") T(FN_Dump, "dump") T(FN_DumpDebug, "dump-debug") T(FN_DumpTemplate, "dump-template") \
+    T(FN_DumpAST, "dump-spice") T(FN_DumpUniques, "dump-uniques") T(FN_IsValid, "unique-visible?") \
     T(FN_DumpList, "dump-list") \
     T(FN_DumpFrame, "dump-frame") \
     T(FN_ClosureLabel, "Closure-label") \

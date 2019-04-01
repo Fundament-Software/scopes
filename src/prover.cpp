@@ -1878,6 +1878,16 @@ repeat:
             ss << std::endl;
             return ref(call.anchor(), ArgumentList::from(values));
         } break;
+        case FN_DumpDebug: {
+            StyledStream ss(SCOPES_CERR);
+            ss << call.anchor() << " dump-debug:";
+            for (auto arg : values) {
+                ss << std::endl;
+                stream_value(ss, arg, StreamValueFormat::debug());
+            }
+            ss << std::endl;
+            return ref(call.anchor(), ArgumentList::from(values));
+        } break;
         case FN_DumpAST: {
             StyledStream ss(SCOPES_CERR);
             ss << call.anchor() << " dump-ast:";

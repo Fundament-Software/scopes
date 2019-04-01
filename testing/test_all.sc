@@ -3,6 +3,7 @@ using import testing
 
 test-modules
     .test_abi
+    .test_anchor
     .test_ansi_colors
     .test_array
     .test_ast_quote

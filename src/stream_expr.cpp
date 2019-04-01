@@ -497,6 +497,8 @@ void walk(const ValueRef &_e, int depth, int maxdepth, bool naked, bool types) {
                 ss << (const Type *)val->value;
             } else if (T == TYPE_String) {
                 ss << (const String *)val->value;
+            } else if (T == TYPE_Anchor) {
+                ss << (const Anchor *)val->value;
             } else {
                 ss << "$";
                 stream_address(ss, val->value);

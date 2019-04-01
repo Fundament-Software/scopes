@@ -628,6 +628,9 @@ inline define-symbols (self values...)
     constant? = sc_value_is_constant
     pure? = sc_value_is_pure
     kind = sc_value_kind
+    tag =
+        inline (self anchor)
+            sc_valueref_tag anchor self
     none? = (static-typify Value-none? Value)
     __repr = sc_value_repr
     spice-repr = sc_value_ast_repr
@@ -1946,17 +1949,19 @@ fn symbol-handler (topexpr env)
 fn quasiquote-list
 inline quasiquote-any (x)
     let T = ('typeof x)
+    let anchor = ('anchor x)
     if (== T list)
         quasiquote-list (as x list)
     else
-        list sc_valueref_tag
-            `[(sc_value_anchor x)]
-            list sugar-quote x
+        list ('tag `sc_valueref_tag anchor)
+            ('tag `anchor anchor)
+            list ('tag `sugar-quote anchor) x
 fn quasiquote-list (x)
     if (empty? x)
         return (list sugar-quote x)
     let aat next = ('decons x)
     let at = aat
+    let anchor = ('anchor at)
     let T = ('typeof at)
     if (== T list)
         let at = (as at list)
@@ -1967,20 +1972,20 @@ fn quasiquote-list (x)
                 if (== at-at 'unquote-splice)
                     return
                         list `sc_list_join
-                            cons do at-next
+                            cons ('tag `do anchor) at-next
                             quasiquote-list next
                 elseif (== at-at 'square-list)
                     if (> (countof at-next) 1)
                         return
                             list `sc_list_join
-                                list list (cons _ at-next)
+                                list ('tag `list anchor) (cons ('tag `_ anchor) at-next)
                                 quasiquote-list next
     elseif (== T Symbol)
         let at = (as at Symbol)
         if (== at 'unquote)
-            return (cons do next)
+            return (cons ('tag `do anchor) next)
         elseif (== at 'square-list)
-            return (cons do next)
+            return (cons ('tag `do anchor) next)
         elseif (== at 'quasiquote)
             return (quasiquote-list (quasiquote-list next))
     return
