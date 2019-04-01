@@ -200,7 +200,7 @@ struct LLVMIRGenerator {
     bool use_debug_info;
     bool generate_object;
     FunctionRef active_function;
-    int functions_generated;
+    std::vector<LLVMValueRef> generated_symbols;
 
     static const Type *arguments_to_tuple(const Type *T) {
         if (isa<ArgumentsType>(T)) {
@@ -281,8 +281,7 @@ struct LLVMIRGenerator {
         //active_function(nullptr),
         //active_function_value(nullptr),
         use_debug_info(true),
-        generate_object(false),
-        functions_generated(0) {
+        generate_object(false) {
         static_init();
         for (int i = 0; i < NumIntrinsics; ++i) {
             intrinsics[i] = nullptr;
@@ -897,8 +896,6 @@ struct LLVMIRGenerator {
     SCOPES_RESULT(void) Function_finalize(const FunctionRef &node) {
         SCOPES_RESULT_TYPE(void);
 
-        functions_generated++;
-
         active_function = node;
         auto it = ref2value.find(ValueIndex(node));
         assert(it != ref2value.end());
@@ -949,32 +946,43 @@ struct LLVMIRGenerator {
     SCOPES_RESULT(LLVMValueRef) Function_to_value(const FunctionRef &node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
 
+        auto ilfunctype = extract_function_type(node->get_type());
+
         bool is_export = false;
-        const char *name = nullptr;
+        const String *name = nullptr;
         {
             auto it = func_export_table.find(node.unref());
             if (it != func_export_table.end()) {
-                name = it->second.name()->data;
+                name = it->second.name();
                 is_export = true;
             }
         }
         if (!name) {
             auto funcname = node->name;
+            StyledString ss = StyledString::plain();
             if (funcname == SYM_Unnamed) {
-                name = "unnamed";
+                ss.out << "unnamed";
             } else {
-                name = funcname.name()->data;
+                ss.out << funcname.name()->data;
             }
-            size_t mangled_name_size = strlen(name) + 32;
-            char *mangled_name = new char[mangled_name_size];
-            snprintf(mangled_name, mangled_name_size, "_scopes_jit_%s_%p", name, (void *)node.unref());
-            name = mangled_name;
+
+            ss.out << "<";
+            int index = 0;
+            for (auto T : ilfunctype->argument_types) {
+                if (index > 0)
+                    ss.out << ",";
+                stream_type_name(ss.out, T);
+                index++;
+            }
+            ss.out << ">";
+            stream_address(ss.out, node.unref());
+            name = ss.str();
         }
 
-        auto ilfunctype = extract_function_type(node->get_type());
         auto functype = SCOPES_GET_RESULT(type_to_llvm_type(ilfunctype));
 
-        auto func = LLVMAddFunction(module, name, functype);
+        auto func = LLVMAddFunction(module, name->data, functype);
+        generated_symbols.push_back(func);
 
 #if SCOPES_LLVM_CACHE_FUNCTIONS
         if (!generate_object) {
@@ -2269,7 +2277,7 @@ LLVMAttributeRef LLVMIRGenerator::attr_nonnull = nullptr;
 // IL COMPILER
 //------------------------------------------------------------------------------
 
-#if 0
+#if 1
 static void pprint(int pos, unsigned char *buf, int len, const char *disasm) {
   int i;
   printf("%04x:  ", pos);
@@ -2408,7 +2416,7 @@ SCOPES_RESULT(void) compile_object(const String *path, Scope *scope, uint64_t fl
     return {};
 }
 
-#if 0
+#if 1
 static DisassemblyListener *disassembly_listener = nullptr;
 #endif
 
@@ -2459,9 +2467,9 @@ SCOPES_RESULT(ConstPointerRef) compile(const FunctionRef &fn, uint64_t flags) {
     init_execution();
     SCOPES_CHECK_RESULT(add_module(module));
 
-#if 0
+#if 1
     if (!disassembly_listener && (flags & CF_DumpDisassembly)) {
-        llvm::ExecutionEngine *pEE = reinterpret_cast<llvm::ExecutionEngine*>(ee);
+        llvm::ExecutionEngine *pEE = reinterpret_cast<llvm::ExecutionEngine*>(get_execution_engine());
         disassembly_listener = new DisassemblyListener(pEE);
         pEE->RegisterJITEventListener(disassembly_listener);
     }
@@ -2484,15 +2492,25 @@ SCOPES_RESULT(ConstPointerRef) compile(const FunctionRef &fn, uint64_t flags) {
         LLVMDumpValue(func);
     }
 
+#if 1
+    for (auto sym : ctx.generated_symbols) {
+        void *ptr = get_pointer_to_global(sym);
+        size_t length = 0;
+        const char *name = LLVMGetValueName2(sym, &length);
+        set_address_name(ptr, String::from(name, length));
+    }
+#endif
+
     //LLVMDumpModule(module);
     void *pfunc = get_pointer_to_global(func);
-#if 0
+#if 1
     if (flags & CF_DumpDisassembly) {
         assert(disassembly_listener);
         //auto td = LLVMGetExecutionEngineTargetData(ee);
         auto it = disassembly_listener->sizes.find(pfunc);
         if (it != disassembly_listener->sizes.end()) {
             std::cout << "disassembly:\n";
+            auto target_machine = get_target_machine();
             do_disassemble(target_machine, pfunc, it->second);
         } else {
             std::cout << "no disassembly available\n";

@@ -275,6 +275,10 @@ const String *StyledString::str() const {
     return String::from_stdstring(_ss.str());
 }
 
+CppString StyledString::cppstr() const {
+    return _ss.str();
+}
+
 //------------------------------------------------------------------------------
 
 const String *vformat( const char *fmt, va_list va ) {

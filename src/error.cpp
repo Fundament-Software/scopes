@@ -339,7 +339,10 @@ static bool good_delta(const Backtrace *older, const Backtrace *newer) {
     //return true;
 #else
     if (older->kind == BTK_User) return true;
-    return newer->kind != older->kind;
+    if (older->kind == BTK_Expander) {
+        return newer->kind != older->kind;
+    }
+    return true;
 #endif
 }
 

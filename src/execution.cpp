@@ -171,7 +171,11 @@ void *get_pointer_to_global(LLVMValueRef g) {
 
 #else // !SCOPES_USE_ORCJIT
 
-LLVMExecutionEngineRef ee = nullptr;
+static LLVMExecutionEngineRef ee = nullptr;
+
+LLVMExecutionEngineRef get_execution_engine() {
+    return ee;
+}
 
 void init_execution() {
 }

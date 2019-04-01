@@ -9,6 +9,7 @@
 #define STB_SPRINTF_DECORATE(name) stb_##name
 #define STB_SPRINTF_NOUNALIGNED
 #include "stb_sprintf.h"
+#include "string.hpp"
 
 #pragma GCC diagnostic ignored "-Wvla-extension"
 
@@ -18,6 +19,7 @@
 #endif
 
 #include <assert.h>
+#include <unordered_map>
 
 namespace scopes {
 
@@ -307,9 +309,32 @@ void stream_uid(StyledStream &ss, uint64_t uid) {
 
 #endif
 
+#if 1
+static std::unordered_map<const void *, const String *> address_names;
+
+void set_address_name(const void *ptr, const String *name) {
+    if (!name) {
+        auto it = address_names.find(ptr);
+        if (it != address_names.end()) {
+            address_names.erase(it);
+        }
+    } else {
+        auto result = address_names.insert({ptr, name});
+        if (!result.second) {
+            result.first->second = name;
+        }
+    }
+}
+#endif
+
 void stream_address(StyledStream &ss, const void *ptr) {
-    uint64_t addr = (uint64_t)ptr;
-    stream_uid(ss, addr);
+    auto it = address_names.find(ptr);
+    if (it != address_names.end()) {
+        ss << it->second->data;
+    } else {
+        uint64_t addr = (uint64_t)ptr;
+        stream_uid(ss, addr);
+    }
 }
 
 

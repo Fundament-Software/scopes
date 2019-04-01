@@ -158,6 +158,7 @@ StyledStream& operator<<(StyledStream& ost, TValueRef<T> value) {
 
 void stream_uid(StyledStream &ss, uint64_t uid);
 void stream_address(StyledStream &ss, const void *ptr);
+void set_address_name(const void *ptr, const String *name);
 
 } // namespace scopes
 

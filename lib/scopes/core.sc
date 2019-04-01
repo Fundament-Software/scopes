@@ -1597,13 +1597,18 @@ inline sugar-block-scope-macro (f)
 inline sugar-scope-macro (f)
     sugar-block-scope-macro
         fn (at next scope)
+            let head = ('@ at)
+            let anchor = ('anchor head)
             let at scope = (f ('next at) scope)
-            return (cons (Value at) next) scope
+            return (cons ('tag `at anchor) next) scope
 
 inline sugar-macro (f)
     sugar-block-scope-macro
         fn (at next scope)
-            return (cons (Value (f ('next at))) next) scope
+            let head = ('@ at)
+            let anchor = ('anchor head)
+            let at = (f ('next at))
+            return (cons ('tag `at anchor) next) scope
 
 fn empty? (value)
     == (countof value) 0
@@ -1999,8 +2004,8 @@ fn quasiquote-list (x)
             return (cons ('tag `do anchor) next)
         elseif (== at 'quasiquote)
             return (quasiquote-list (quasiquote-list next))
-    return
-        list cons (quasiquote-any aat) (quasiquote-list next)
+    let val = (quasiquote-any aat)
+    list cons ('tag `val anchor) (quasiquote-list next)
 
 fn expand-and-or (expr f)
     if (empty? expr)
@@ -2557,15 +2562,24 @@ fn exec-module (expr eval-scope)
             spice-quote
                 fn "exec-module-stage" ()
                     raises-compile-error;
+                    hide-traceback;
                     wrap-if-not-run-stage (f)
         let wrapf = (sc_typify_template wrapf 0 (undef TypeArrayPointer))
         let f = (sc_compile wrapf 0:u64)
         if (('typeof f) == StageFunctionType)
             let fptr = (f as StageFunctionType)
-            repeat (bitcast (fptr) Value)
+            let result =
+                do
+                    hide-traceback;
+                    fptr;
+            repeat (bitcast result Value)
         else
             let fptr = (f as ModuleFunctionType)
-            break (fptr)
+            let result =
+                do
+                    hide-traceback;
+                    fptr;
+            break result
 
 fn dots-to-slashes (pattern)
     let sz = (countof pattern)
@@ -2612,6 +2626,7 @@ fn load-module (module-name module-path opts...)
         module-path = module-path
         module-dir = module-dir
         module-name = module-name
+    hide-traceback;
     exec-module expr (Scope eval-scope)
 
 fn patterns-from-namestr (base-dir namestr)
@@ -2852,7 +2867,7 @@ define define-sugar-macro
 
 let __static-assert =
     spice-macro
-        fn (args)
+        fn "__static-assert" (args)
             let argc = ('argcount args)
             verify-count argc 2 2
             let expr msg =
@@ -2867,7 +2882,7 @@ let __static-assert =
 
 let __assert =
     spice-macro
-        fn (args)
+        fn "__assert" (args)
             fn check-assertion (result msg)
                 if (not result)
                     error

@@ -9,6 +9,7 @@
 
 #include <llvm-c/OrcBindings.h>
 #include <llvm-c/TargetMachine.h>
+#include <llvm-c/ExecutionEngine.h>
 
 #include <stdint.h>
 
@@ -27,6 +28,7 @@ uint64_t get_address(const char *name);
 void *get_pointer_to_global(LLVMValueRef g);
 void *local_aware_dlsym(Symbol name);
 LLVMTargetMachineRef get_target_machine();
+LLVMExecutionEngineRef get_execution_engine();
 
 void init_llvm();
 

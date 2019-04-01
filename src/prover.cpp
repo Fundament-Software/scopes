@@ -1911,7 +1911,7 @@ repeat:
         } break;
         /*** ANNOTATION ***/
         case FN_Annotate: {
-            CHECKARGS(0, 0);
+            // takes any kind of argument
             return ARGTYPE0();
         } break;
         case FN_HideTraceback: {

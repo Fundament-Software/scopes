@@ -22,8 +22,10 @@ namespace scopes {
 //------------------------------------------------------------------------------
 
 #if SCOPES_USE_WCHAR
+typedef std::wstring CppString;
 typedef std::wstringstream StringStream;
 #else
+typedef std::string CppString;
 typedef std::stringstream StringStream;
 #endif
 
@@ -69,6 +71,7 @@ struct StyledString {
 
     static StyledString plain();
     const String *str() const;
+    CppString cppstr() const;
 };
 
 typedef std::vector<const String *> Strings;
