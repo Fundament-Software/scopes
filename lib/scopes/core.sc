@@ -45,6 +45,7 @@ fn box-pointer (value)
         bitcast value voidstar
 
 fn error (msg)
+    hide-traceback;
     raise (sc_error_new msg)
 
 # print an unboxing error given two types
@@ -2593,6 +2594,7 @@ fn dots-to-slashes (pattern)
 
 fn load-module (module-name module-path opts...)
     if (not (sc_is_file module-path))
+        hide-traceback;
         error
             .. "no such module: " module-path
     let module-path = (sc_realpath module-path)
@@ -5206,6 +5208,7 @@ fn run-main ()
                 fn ()
                     return sourcepath argc argv
         do  #try
+            hide-traceback;
             load-module "" sourcepath
                 scope = scope
                 main-module? = true
@@ -5217,6 +5220,7 @@ fn run-main ()
         exit 0
 
 raises-compile-error;
+hide-traceback;
 run-main;
 
 return;
