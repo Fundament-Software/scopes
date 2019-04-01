@@ -849,13 +849,15 @@ static SCOPES_RESULT(TypedValueRef) make_raise1(const ASTContext &ctx, const Anc
 }
 
 static SCOPES_RESULT(TypedValueRef) make_raise(const ASTContext &ctx, const Anchor *anchor, const TypedValueRef &value) {
-    if (value->get_type() == TYPE_Error) {
-        // add info
-        auto tracecall = ref(anchor, Call::from(empty_arguments_type(),
-            g_sc_error_append_calltrace, {
-            value, ConstAggregate::ast_from(value)
-        }));
-        ctx.append(tracecall);
+    if (ctx.block->tag_traceback) {
+        if (value->get_type() == TYPE_Error) {
+            // add info
+            auto tracecall = ref(anchor, Call::from(empty_arguments_type(),
+                g_sc_error_append_calltrace, {
+                value, ConstAggregate::ast_from(value)
+            }));
+            ctx.append(tracecall);
+        }
     }
     TypedValues results;
     if (split_return_values(results, value)) {
@@ -1907,8 +1909,15 @@ repeat:
             }
             return ref(call.anchor(), ArgumentList::from(values));
         } break;
+        /*** ANNOTATION ***/
         case FN_Annotate: {
+            CHECKARGS(0, 0);
             return ARGTYPE0();
+        } break;
+        case FN_HideTraceback: {
+            CHECKARGS(0, 0);
+            ctx.block->tag_traceback = false;
+            return ref(call.anchor(), ArgumentList::from({}));
         } break;
         /*** VIEW INFERENCE ***/
         case FN_Move: {

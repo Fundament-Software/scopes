@@ -304,7 +304,10 @@ sc_type_set_symbol type '__call
 sc_type_set_symbol Symbol '__call
     box-spice-macro
         fn "symbol-call" (args)
+            hide-traceback;
+
             fn resolve-method (self symval)
+                hide-traceback;
                 let sym = (unbox-symbol symval Symbol)
                 let T = (sc_value_type self)
                 try (return (sc_type_at T sym))
@@ -5122,6 +5125,7 @@ fn read-eval-print-loop ()
                                 tmp
                 let expression-anchor = ('anchor expr)
                 let list-expression = (unbox-pointer expr list)
+                hide-traceback;
                 let expression = (sc_eval expression-anchor list-expression eval-scope)
                 let f = (sc_compile expression 0:u64)
                 let fptr =

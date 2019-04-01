@@ -135,6 +135,7 @@ struct Block {
 
     int depth;
     int insert_index;
+    bool tag_traceback;
     Instructions body;
     InstructionRef terminator;
     // set of unique ids that are still valid in this scope

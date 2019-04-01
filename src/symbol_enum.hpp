@@ -22,7 +22,7 @@ namespace scopes {
     T(FN_StaticAlloc) T(KW_Try) T(KW_Return) T(KW_Loop) T(KW_Repeat) T(KW_Break) T(FN_Dupe) \
     T(KW_ASTQuote) T(KW_ASTUnquote) T(KW_ASTUnquoteArguments) T(KW_Merge) T(FN_Copy) T(FN_Track) \
     T(FN_Move) T(FN_View) T(FN_Viewing) T(FN_Lose) T(FN_Assign) T(FN_Deref) T(FN_PtrToRef) T(FN_RefToPtr) \
-    T(FN_AnyExtract) T(FN_AnyWrap) T(FN_Free) T(KW_Defer) T(FN_DumpDebug) \
+    T(FN_AnyExtract) T(FN_AnyWrap) T(FN_Free) T(KW_Defer) T(FN_DumpDebug) T(FN_HideTraceback) \
     T(FN_DumpAST) T(FN_DumpUniques) T(FN_IsValid) T(OP_ICmpEQ) T(OP_ICmpNE) \
     T(FN_Sample) T(FN_ImageRead) T(FN_ImageWrite) T(SYM_DropHandler) \
     T(FN_ImageQuerySize) T(FN_ImageQueryLod) T(FN_ImageQueryLevels) T(FN_ImageQuerySamples) \
@@ -300,7 +300,7 @@ namespace scopes {
     T(FN_BuiltinEq, "Builtin==") T(KW_Case, "case") T(KW_Default, "default") \
     T(FN_Branch, "branch") T(FN_IsCallable, "callable?") T(FN_Cast, "cast") \
     T(FN_Concat, "concat") T(FN_Cons, "cons") T(FN_IsConstant, "constant?") \
-    T(FN_Countof, "countof") T(KW_Pass, "pass") \
+    T(FN_Countof, "countof") T(KW_Pass, "pass")  T(FN_HideTraceback, "hide-traceback") \
     T(FN_Compile, "__compile") T(FN_CompileSPIRV, "__compile-spirv") \
     T(FN_CompileGLSL, "__compile-glsl") \
     T(FN_CompileObject, "__compile-object") \

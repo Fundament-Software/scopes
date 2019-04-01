@@ -568,7 +568,7 @@ PureRef PureCast::from(const Type *type, PureRef value) {
 //------------------------------------------------------------------------------
 
 Block::Block()
-    : depth(-1), insert_index(0), terminator(InstructionRef())
+    : depth(-1), insert_index(0), tag_traceback(true), terminator(InstructionRef())
 {}
 
 bool Block::is_valid(const ValueIndex &value) const {
@@ -609,6 +609,7 @@ void Block::set_parent(Block *_parent) {
     assert(depth < 0);
     assert(_parent);
     depth = _parent->depth + 1;
+    tag_traceback = _parent->tag_traceback;
     // copy valids from parent
     if (valid.empty()) {
         valid = _parent->valid;
