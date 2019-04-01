@@ -523,6 +523,13 @@ struct MemoKeyEqual {
             }
             return true;
         } else if (isa<Pure>(lhs)) {
+            if (isa<ConstPointer>(lhs)
+                && cast<ConstPointer>(lhs)->get_type() == TYPE_List
+                && cast<ConstPointer>(rhs)->get_type() == TYPE_List) {
+                return sc_list_compare(
+                    (const List *)cast<ConstPointer>(lhs)->value,
+                    (const List *)cast<ConstPointer>(rhs)->value);
+            }
             return cast<Pure>(lhs)->key_equal(cast<Pure>(rhs));
         } else {
             return false;
@@ -921,6 +928,8 @@ const sc_list_t *sc_list_reverse(const sc_list_t *l) {
 
 bool sc_list_compare(const sc_list_t *a, const sc_list_t *b) {
     using namespace scopes;
+    if (a == b)
+        return true;
     if (a->count != b->count)
         return false;
     while (a) {

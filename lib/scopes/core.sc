@@ -307,7 +307,14 @@ sc_type_set_symbol Symbol '__call
             fn resolve-method (self symval)
                 let sym = (unbox-symbol symval Symbol)
                 let T = (sc_value_type self)
-                return (sc_type_at T sym)
+                try (return (sc_type_at T sym))
+                except (err)
+                    # if calling method of type, try typemethod
+                    if (ptrcmp== T type)
+                        if (sc_value_is_constant self)
+                            let self = (unbox-pointer self type)
+                            return (sc_type_at self sym)
+                    raise err
 
             let argcount = (sc_argcount args)
             verify-count argcount 2 -1

@@ -10,7 +10,7 @@ fn main ()
     assert ((f 2 3) == 5)
     true
 
-dump-ast
+dump-spice
     static-typify main
 
 #fn testfunc (x y)
