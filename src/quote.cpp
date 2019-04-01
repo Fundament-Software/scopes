@@ -462,6 +462,7 @@ struct Quoter {
 
 ValueRef unwrap_value(const Type *T, const ValueRef &value) {
     auto _anchor = value.anchor();
+    //T = strip_qualifiers(T);
     auto ST = storage_type(T).assert_ok();
     auto kind = ST->kind();
     switch(kind) {
@@ -549,6 +550,7 @@ ValueRef wrap_value(const Type *T, const ValueRef &value) {
         return ConstAggregate::ast_from(value);
     }
     if (!is_opaque(T)) {
+        T = strip_qualifiers(T);
         auto ST = storage_type(T).assert_ok();
         auto kind = ST->kind();
         switch(kind) {

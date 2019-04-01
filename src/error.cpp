@@ -279,6 +279,10 @@ void stream_backtrace(StyledStream &ss, const Backtrace *bt) {
         anchor->stream_source_line(ss);
     } break;
     case BTK_ProveTemplate: {
+        auto templ = value.cast<Template>();
+        bool is_inline = templ->is_inline();
+        if (is_inline && templ->name == SYM_Unnamed)
+            return;
         if (value.isa<UntypedValue>()) {
             auto uv = value.cast<UntypedValue>();
             auto _anchor = uv->def_anchor();
@@ -295,19 +299,26 @@ void stream_backtrace(StyledStream &ss, const Backtrace *bt) {
         #endif
         ss << anchor << " in ";
         ss << Style_Keyword;
-        if (value.cast<Template>()->is_inline()) {
+        if (is_inline) {
             ss << "inline";
         } else {
             ss << "fn";
         }
         ss << Style_None << " ";
-        ss << value.cast<Template>()->name.name()->data;
+        ss << Style_Function;
+        ss << templ->name.name()->data;
+        ss << Style_None;
         ss << std::endl;
         anchor->stream_source_line(ss);
     } break;
     case BTK_ProveArgument: {
         ss << anchor;
         ss << " while checking type of argument" << std::endl;
+        anchor->stream_source_line(ss);
+    } break;
+    case BTK_ProveArgumentLifetime: {
+        ss << anchor;
+        ss << " while checking lifetime of argument" << std::endl;
         anchor->stream_source_line(ss);
     } break;
     case BTK_User: {
@@ -321,18 +332,24 @@ void stream_backtrace(StyledStream &ss, const Backtrace *bt) {
         anchor->stream_source_line(ss);
     } break;
     case BTK_ProveExpression: {
-        ss << "While checking expression" << std::endl;
+        #if 1
         if (value.isa<UntypedValue>()) {
             auto uv = value.cast<UntypedValue>();
             auto _anchor = uv->def_anchor();
             if (_anchor != unknown_anchor())
                 anchor = uv->def_anchor();
         }
+        #endif
+        #if 1
+        ss << "While checking expression" << std::endl;
         StreamValueFormat fmt;
         fmt.maxdepth = 3;
         fmt.maxlength = 4;
         stream_value(ss, value, fmt);
         ss << anchor << " defined here";
+        #else
+        ss << anchor << " while checking expression";
+        #endif
         ss << std::endl;
         anchor->stream_source_line(ss);
     } break;
@@ -340,13 +357,17 @@ void stream_backtrace(StyledStream &ss, const Backtrace *bt) {
 }
 
 static bool good_delta(const Backtrace *older, const Backtrace *newer) {
-#if 1
+    bool same_kind = (newer->kind == older->kind);
+    bool same_anchor = (newer->context.anchor() == older->context.anchor());
+#if 0
     //return newer->context.anchor() != older->context.anchor();
     return true;
 #else
     if (older->kind == BTK_User) return true;
-    if (older->kind == BTK_Expander) {
-        return newer->kind != older->kind;
+    if (same_kind) {
+        if (older->kind == BTK_Expander) return false;
+        else if (older->kind == BTK_ProveExpression)
+            return !same_anchor;
     }
     return true;
 #endif

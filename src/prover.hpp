@@ -44,7 +44,7 @@ struct ASTContext {
 
     const Type *fix_merge_type(const Type *T) const;
     int unique_id() const;
-    void move(int id) const;
+    void move(int id, const ValueRef &mover) const;
 
     FunctionRef function;
     FunctionRef frame;

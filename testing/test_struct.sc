@@ -29,7 +29,7 @@ do
 
 run-stage;
 
-struct AnotherStruct
+struct AnotherStruct plain
     x : i32
     y : i32
     z : i32
@@ -77,7 +77,7 @@ assert
 
 fn test-direct-self-reference ()
     # direct self reference
-    struct Cell
+    struct Cell plain
         at : i32
         next : (pointer this-type)
 
@@ -101,7 +101,7 @@ do
     let CellPtr =
         pointer Cell
 
-    struct Cell
+    struct Cell plain
         at : i32
         next : CellPtr
 
@@ -115,7 +115,7 @@ do
         cell1.next.next.at == 3
 
     # using a struct on the heap
-    struct Val
+    struct Val plain
         x : i32
         y : i32
 

@@ -129,6 +129,8 @@ struct Block {
     void insert_at_end();
 
     bool is_valid(int id) const;
+    bool is_valid(const IDSet &ids, int &id) const;
+    bool is_valid(const ValueIndex &value, int &id) const;
     bool is_valid(const IDSet &ids) const;
     bool is_valid(const ValueIndex &value) const;
     void move(int id);
@@ -663,6 +665,11 @@ struct Function : Pure {
     UniqueMap uniques;
     IDSet original_valid;
     IDSet valid;
+    // expressions that moved a unique
+    std::unordered_map<int, ValueRef> movers;
+
+    const Anchor *get_best_mover_anchor(int id);
+    void hint_mover(int id, const ValueRef &where);
 };
 
 //------------------------------------------------------------------------------

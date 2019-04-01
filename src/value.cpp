@@ -419,6 +419,22 @@ void Function::change_type(const Type *type) {
     _type = type;
 }
 
+const Anchor *Function::get_best_mover_anchor(int id) {
+    auto it = movers.find(id);
+    if (it != movers.end()) {
+        return it->second.anchor();
+    } else {
+        auto info = get_unique_info(id);
+        return info.value.value.anchor();
+    }
+}
+
+void Function::hint_mover(int id, const ValueRef &where) {
+    auto result = movers.insert({ id, where });
+    if (!result.second)
+        result.second = where;
+}
+
 void Function::build_valids() {
     assert(valid.empty());
     // add uniques
@@ -571,23 +587,38 @@ Block::Block()
     : depth(-1), insert_index(0), tag_traceback(true), terminator(InstructionRef())
 {}
 
+bool Block::is_valid(const IDSet &ids) const {
+    int _id = 0;
+    return is_valid(ids, _id);
+}
+
 bool Block::is_valid(const ValueIndex &value) const {
+    int _id = 0;
+    return is_valid(value, _id);
+}
+
+bool Block::is_valid(const ValueIndex &value, int &_id) const {
     auto T = value.get_type();
     auto vq = try_view(T);
     if (vq) {
-        return is_valid(vq->ids);
+        return is_valid(vq->ids, _id);
     }
     auto uq = try_unique(T);
     if (uq) {
-        return is_valid(uq->id);
+        if (!is_valid(uq->id)) {
+            _id = uq->id;
+            return false;
+        }
     }
     return true;
 }
 
-bool Block::is_valid(const IDSet &ids) const {
+bool Block::is_valid(const IDSet &ids, int &_id) const {
     for (auto id : ids) {
-        if (!valid.count(id))
+        if (!valid.count(id)) {
+            _id = id;
             return false;
+        }
     }
     return true;
 }

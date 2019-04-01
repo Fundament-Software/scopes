@@ -34,7 +34,7 @@ inline array-generator (self)
         inline (i) (self @ i)
         inline (i) (i + 1:usize)
 
-typedef Array < CStruct
+typedef Array < Struct
 
     @@ spice-cast-macro
     fn __as (cls T)

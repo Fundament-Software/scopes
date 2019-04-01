@@ -165,7 +165,17 @@ HANDLER(Template) {
     }
 }
 
-HANDLER(Global) { return node; }
+HANDLER(Global) {
+    auto _anchor = node.anchor();
+    if (node->storage_class == SYM_Unnamed) {
+        return LIST(
+                    SYMBOL(SYM_Extern),
+                    SYMBOL(node->name),
+                    SYMBOL(OP_Colon),
+                    TYPE(node->get_type()));
+    }
+    return node;
+}
 
 HANDLER(KeyedTemplate) {
     auto _anchor = node.anchor();
@@ -461,9 +471,13 @@ void walk(const ValueRef &_e, int depth, int maxdepth, bool naked, bool types) {
         ss << Style_Error << "?illegal?" << Style_None;
     } else if (T == TYPE_Symbol) {
         auto sym = extract_symbol_constant(e).assert_ok();
-        ss << fmt.symbol_styler(sym);
-        sym.name()->stream(ss, SYMBOL_ESCAPE_CHARS);
-        ss << Style_None;
+        if (sym == SYM_Unnamed) {
+            ss << "#unnamed";
+        } else {
+            ss << fmt.symbol_styler(sym);
+            sym.name()->stream(ss, SYMBOL_ESCAPE_CHARS);
+            ss << Style_None;
+        }
     } else {
         switch(e->kind()) {
         case VK_ConstInt: {

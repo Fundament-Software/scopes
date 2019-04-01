@@ -163,8 +163,9 @@ formatters:
         "conflicting %0 types %1 and %2", \
         Rawstring, PType, PType) \
     T(InaccessibleValue, \
-        "cannot access value of type %0 because it has been moved", \
-        PType) \
+        "cannot access value of type %0 because it has been moved" \
+        "%1 lifetime ended here", \
+        PType, PAnchor) \
     T(DropReturnsArguments, \
         "drop operation must not return any arguments") \
     T(SwitchPassMovedValue, \
@@ -440,6 +441,8 @@ enum BacktraceKind {
     BTK_ProveTemplate,
     // context = argument being typechecked
     BTK_ProveArgument,
+    // context = argument being lifetime checked
+    BTK_ProveArgumentLifetime,
     // invoked in user code at runtime; context = call
     BTK_User,
 };
@@ -463,6 +466,8 @@ struct Backtrace {
     SCOPES_TRACE(ProveTemplate, (VALUEREF))
 #define SCOPES_TRACE_PROVE_ARG(VALUEREF) \
     SCOPES_TRACE(ProveArgument, (VALUEREF))
+#define SCOPES_TRACE_PROVE_ARG_LIFETIME(VALUEREF) \
+    SCOPES_TRACE(ProveArgumentLifetime, (VALUEREF))
 
 extern Backtrace _backtrace;
 

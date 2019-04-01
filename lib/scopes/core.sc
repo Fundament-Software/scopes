@@ -831,10 +831,10 @@ fn value-as (vT T expr)
 'define-symbols Value
     __as =
         inline (vT T)
-            inline (self) (unbox self T)
+            inline "Value-as" (self) (unbox self T)
     __rimply =
         inline (vT T)
-            inline (self) (Value self)
+            inline "Value-rimply" (self) `self
 
 inline spice-cast-macro (f)
     """"to be used for __as, __ras, __imply and __rimply
@@ -1647,7 +1647,7 @@ let print =
         inline print (values...)
             va-lifold none print-element values...
             sc_write "\n"
-            values...
+            view values...
 
 'define-symbol integer '__typecall
     inline (cls value)
@@ -1693,7 +1693,7 @@ let coerce-call-arguments =
             let fT = ('element@ fptrT 0)
             let pcount = ('element-count fT)
             if (== pcount argc)
-                let outargs = (sc_call_new self)
+                let outargs = ('tag (sc_call_new self) ('anchor self))
                 sc_call_set_rawcall outargs true
                 loop (i = 0)
                     if (== i argc)
@@ -1703,10 +1703,11 @@ let coerce-call-arguments =
                     let paramT = ('element@ fT i)
                     let outarg =
                         if (== argT paramT) arg
-                        else `(imply arg paramT)
+                        else
+                            `(imply arg paramT)
                     sc_call_append_argument outargs outarg
                     + i 1
-            else `(rawcall self [('getarglist args 1)])
+            else ('tag `(rawcall self [('getarglist args 1)]) ('anchor args))
 
 #
     set-type-symbol! pointer 'set-element-type
@@ -4898,7 +4899,7 @@ sugar struct (name body...)
             'set-plain-storage T
                 sc_tuple_type numfields fields
         elseif (T < Struct)
-            'set-plain-storage T
+            'set-storage T
                 sc_tuple_type numfields fields
         else
             error
