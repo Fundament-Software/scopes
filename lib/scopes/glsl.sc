@@ -11,6 +11,7 @@
 
 using import glm
 using import Capture
+using import spicetools
 
 typedef InOutType : ('storageof type)
     fn __repr (self)

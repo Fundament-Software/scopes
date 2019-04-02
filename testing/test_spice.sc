@@ -1,3 +1,5 @@
+using import spicetools
+
 spice test (x y z args...)
     assert ((x as i32) == 1)
     assert ((y as i32) == 2)
