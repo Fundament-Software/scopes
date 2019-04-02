@@ -702,6 +702,10 @@ inline define-symbols (self values...)
 
 'define-symbols Error
     format = sc_format_error
+    inline append (self anchor traceback-msg)
+        sc_error_append_calltrace self
+            sc_valueref_tag anchor `traceback-msg
+        self
 
 'define-symbols list
     __countof = sc_list_count
@@ -889,8 +893,14 @@ inline spice-converter-macro (f)
             let argc = (sc_argcount args)
             verify-count argc 2 2
             let self = (sc_getarg args 0)
-            let T = (unbox-pointer (sc_getarg args 1) type)
-            f self T
+            let _T = (sc_getarg args 1)
+            let T = (unbox-pointer _T type)
+            try
+                f self T
+            except (err)
+                hide-traceback;
+                error@+ err (sc_value_anchor self)
+                    sc_string_join "while attempting to convert argument to " (sc_value_repr _T)
 
 'set-symbols SpiceMacro
     __rimply =
@@ -1948,7 +1958,7 @@ fn parse-infix-expr (infix-table lhs state mprec)
         loop (rhs state = ('decons next-state))
             if (empty? state)
                 break
-                    'tag `[(list op-name lhs rhs)] ('anchor lhs)
+                    'tag `[(list op-name lhs rhs)] ('anchor la)
                     state
             let ra __ = ('decons state)
             let lop = (infix-op-gt infix-table ra op-prec)
@@ -1958,7 +1968,7 @@ fn parse-infix-expr (infix-table lhs state mprec)
                 else lop
             if (== ('typeof nextop) Nothing)
                 break
-                    'tag `[(list op-name lhs rhs)] ('anchor lhs)
+                    'tag `[(list op-name lhs rhs)] ('anchor la)
                     state
             let nextop-prec = (unpack-infix-op nextop)
             let next-rhs next-state =
@@ -2093,35 +2103,39 @@ inline make-expand-and-or (f)
 fn ltr-multiop (args target)
     let argc = ('argcount args)
     verify-count argc 2 -1
-    if (== argc 2)
-        `(target args)
-    else
-        # call for multiple args
-        let lhs = ('getarg args 0)
-        loop (i lhs = 1 lhs)
-            let rhs = ('getarg args i)
-            let op = `(target lhs rhs)
-            let i = (+ i 1)
-            if (== i argc)
-                break op
-            _ i op
+    'tag
+        if (== argc 2)
+            `(target args)
+        else
+            # call for multiple args
+            let lhs = ('getarg args 0)
+            loop (i lhs = 1 lhs)
+                let rhs = ('getarg args i)
+                let op = `(target lhs rhs)
+                let i = (+ i 1)
+                if (== i argc)
+                    break op
+                _ i op
+        'anchor args
 
 fn rtl-multiop (args target)
     let argc = ('argcount args)
     verify-count argc 2 -1
-    if (== argc 2)
-        `(target args)
-    else
-        # call for multiple args
-        let lasti = (- argc 1)
-        let rhs = ('getarg args lasti)
-        loop (i rhs = lasti rhs)
-            let i = (- i 1)
-            let lhs = ('getarg args i)
-            let op = `(target lhs rhs)
-            if (== i 0)
-                break op
-            _ i op
+    'tag
+        if (== argc 2)
+            `(target args)
+        else
+            # call for multiple args
+            let lasti = (- argc 1)
+            let rhs = ('getarg args lasti)
+            loop (i rhs = lasti rhs)
+                let i = (- i 1)
+                let lhs = ('getarg args i)
+                let op = `(target lhs rhs)
+                if (== i 0)
+                    break op
+                _ i op
+        'anchor args
 
 # extracting options from varargs
 
@@ -5197,7 +5211,7 @@ fn read-eval-print-loop ()
 
         let eval-scope count =
             try
-                let expr = (list-parse cmdlist)
+                let user-expr = (list-parse cmdlist)
                 let tmp = (Symbol "#result...")
                 let expr =
                     Value
@@ -5205,14 +5219,14 @@ fn read-eval-print-loop ()
                             list sugar-set-scope! eval-scope
                             list let tmp '=
                                 cons embed
-                                    expr as list
+                                    user-expr as list
                             #list __defer (list tmp)
                                 list _ (list get-scope) (list locals) tmp
                             list handle-retargs counter
                                 list __this-scope
                                 list locals
                                 tmp
-                let expression-anchor = ('anchor expr)
+                let expression-anchor = ('anchor user-expr)
                 let list-expression = (unbox-pointer expr list)
                 hide-traceback;
                 let expression = (sc_eval expression-anchor list-expression eval-scope)

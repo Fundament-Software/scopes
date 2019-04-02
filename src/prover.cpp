@@ -856,6 +856,7 @@ static SCOPES_RESULT(TypedValueRef) make_raise1(const ASTContext &ctx, const Anc
 }
 
 static SCOPES_RESULT(TypedValueRef) make_raise(const ASTContext &ctx, const Anchor *anchor, const TypedValueRef &value) {
+    #if 1
     if (ctx.block->tag_traceback) {
         if (value->get_type() == TYPE_Error) {
             // add info
@@ -866,6 +867,7 @@ static SCOPES_RESULT(TypedValueRef) make_raise(const ASTContext &ctx, const Anch
             ctx.append(tracecall);
         }
     }
+    #endif
     TypedValues results;
     if (split_return_values(results, value)) {
         return make_raise1(ctx, anchor, results);
@@ -2847,6 +2849,8 @@ repeat:
     #if 1
     // hack: rewrite valuerefs returned by globals matching sc_*_new
     //       to use the anchor of the calling expression
+    //
+    //       this could also be performed by wrapper macros inside the language
     if (rt == TYPE_ValueRef) {
         if (callee.isa<Global>()) {
             auto g = callee.cast<Global>();
