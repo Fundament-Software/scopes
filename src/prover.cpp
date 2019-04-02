@@ -1946,13 +1946,13 @@ repeat:
             return SCOPES_GET_RESULT(build_drop(ctx, call.anchor(), _X));
         } break;
         case FN_View: {
-            CHECKARGS(1, -1);
+            CHECKARGS(0, -1);
             while (argn < argcount) {
                 READ_NODEREF_TYPEOF(X);
                 auto uq = try_unique(X);
                 if (!uq) {
                     // no effect
-                    return _X;
+                    continue;
                 }
                 build_view(ctx, call.anchor(), _X);
             }
