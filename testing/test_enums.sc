@@ -11,6 +11,13 @@ spice make-enum (val)
 run-stage;
 
 do
+    enum Mode Notch Low High Band Peak Count
+
+    print Mode.Notch
+    print Mode.Notch
+    print Mode.Notch
+
+do
     enum test-enum
         X
         Y = 5

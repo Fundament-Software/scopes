@@ -702,6 +702,7 @@ inline define-symbols (self values...)
 
 'define-symbols Error
     format = sc_format_error
+    dump = sc_dump_error
     inline append (self anchor traceback-msg)
         sc_error_append_calltrace self
             sc_valueref_tag anchor `traceback-msg
@@ -926,24 +927,37 @@ fn integer-imply (vT T)
                     else
                         return `(uitofp self T)
                 error "integer must be constant for implicit conversion"
-    let static-i32->usize =
+    let static-integer->integer =
         spice-converter-macro
             inline (self T)
-                # only used for i32 -> usize right now
+                let selfT = ('typeof self)
                 if ('constant? self)
-                    let val = (unbox self i32)
-                    if (icmp<s val 0)
-                        error "signed integer is negative"
-                    return
-                        box-integer (sext val usize)
-                error "integer must be constant for implicit conversion"
+                    # allow non-destructive conversions
+                    let selfST = ('storageof selfT)
+                    let ST = ('storageof T)
+                    let destw = ('bitcount ST)
+                    let u64val = (sc_const_int_extract self)
+                    if (icmp!= (band u64val 0x8000000000000000:u64) 0:u64)
+                        # if the sign bit is set, signedness matters
+                        if (icmp!= ('signed? selfST) ('signed? ST))
+                            error "implicit conversion of integer value requires same signedness"
+                    if (icmp>s 64 destw)
+                        let diff = (zext (sub 64 destw) u64)
+                        # check if truncation destroys bits
+                        let cmpval = (shl u64val diff)
+                        let cmpval =
+                            ? ('signed? ST) (ashr cmpval diff) (lshr cmpval diff)
+                        if (icmp!= u64val cmpval)
+                            error "integer value does not fit target type"
+                    return (sc_const_int_new T u64val)
+                error
+                    sc_string_join
+                        "can not implicitly convert non-constant integer of type "
+                        sc_value_repr `selfT
     let ST =
         if (ptrcmp== T usize) ('storageof T)
         else T
     if (icmp== ('kind ST) type-kind-integer)
-        if (ptrcmp== vT i32)
-            if (ptrcmp== T usize)
-                return `(inline (self) (static-i32->usize self T))
         let valw = ('bitcount vT)
         let destw = ('bitcount ST)
         # must have same signed bit
@@ -955,6 +969,8 @@ fn integer-imply (vT T)
                     return `(inline (self) (sext self T))
                 else
                     return `(inline (self) (zext self T))
+        # attempt a constant conversion
+        return `(inline (self) (static-integer->integer self T))
     elseif (icmp== ('kind ST) type-kind-real)
         if (ptrcmp== vT i32)
             return `(inline (self) (static-i32->real self T))
@@ -1019,6 +1035,7 @@ fn real-as (vT T)
 #------------------------------------------------------------------------------
 
 inline cast-error (intro-string vT T)
+    hide-traceback;
     error
         sc_string_join intro-string
             sc_string_join ('__repr (box-pointer vT))
@@ -1221,12 +1238,23 @@ fn unary-or-balanced-binary-operation (args usymbol ufriendly-op-name symbol rsy
     else
         balanced-binary-operation args symbol rsymbol friendly-op-name
 
+fn unary-or-unbalanced-binary-operation (args usymbol ufriendly-op-name symbol rtype friendly-op-name)
+    let argc = ('argcount args)
+    if (icmp== argc 1)
+        unary-operation args usymbol ufriendly-op-name
+    else
+        unbalanced-binary-operation args symbol rtype friendly-op-name
+
 inline unary-op-dispatch (symbol friendly-op-name)
     spice-macro (fn (args) (unary-operation args symbol friendly-op-name))
 
 inline unary-or-balanced-binary-op-dispatch (usymbol ufriendly-op-name symbol rsymbol friendly-op-name)
     spice-macro (fn (args) (unary-or-balanced-binary-operation
         args usymbol ufriendly-op-name symbol rsymbol friendly-op-name))
+
+inline unary-or-unbalanced-binary-op-dispatch (usymbol ufriendly-op-name symbol rtype friendly-op-name)
+    spice-macro (fn (args) (unary-or-unbalanced-binary-operation
+        args usymbol ufriendly-op-name symbol rtype friendly-op-name))
 
 inline balanced-binary-op-dispatch (symbol rsymbol friendly-op-name)
     spice-macro (fn (args) (balanced-binary-operation args symbol rsymbol friendly-op-name))
@@ -1565,14 +1593,14 @@ let
     / = (unary-or-balanced-binary-op-dispatch '__rcp "invert" '__/ '__r/ "real-divide")
     // = (balanced-binary-op-dispatch '__// '__r// "integer-divide")
     % = (balanced-binary-op-dispatch '__% '__r% "modulate")
-    & = (balanced-binary-op-dispatch '__& '__r& "apply bitwise-and to")
+    & = (unary-or-balanced-binary-op-dispatch '__toptr "reference" '__& '__r& "apply bitwise-and to")
     | = (balanced-binary-op-dispatch '__| '__r| "apply bitwise-or to")
     ^ = (balanced-binary-op-dispatch '__^ '__r^ "apply bitwise-xor to")
     << = (balanced-binary-op-dispatch '__<< '__r<< "apply left shift with")
     >> = (balanced-binary-op-dispatch '__>> '__r>> "apply right shift with")
     .. = (balanced-binary-op-dispatch '__.. '__r.. "join")
     = = (balanced-binary-op-dispatch '__= '__r= "apply assignment with")
-    @ = (unbalanced-binary-op-dispatch '__@ integer "apply subscript operator with")
+    @ = (unary-or-unbalanced-binary-op-dispatch '__toref "dereference" '__@ integer "apply subscript operator with")
     getattr = (unbalanced-binary-op-dispatch '__getattr Symbol "get attribute from")
     lslice = (unbalanced-binary-op-dispatch '__lslice usize "apply left-slice operator with")
     rslice = (unbalanced-binary-op-dispatch '__rslice usize "apply right-slice operator with")
@@ -1622,7 +1650,17 @@ run-stage;
     __!= = (box-pointer (simple-binary-op (inline (lhs rhs) (not (== lhs rhs)))))
     # default assignment operator
     __= = (box-pointer (simple-binary-op (inline (lhs rhs) (__drop lhs) (assign rhs lhs))))
-
+    # default dereference
+    __toptr =
+        box-pointer
+            spice-macro
+                fn (args)
+                    let argc = ('argcount args)
+                    verify-count argc 1 1
+                    let self = ('getarg args 0)
+                    if ('refer? ('qualified-typeof self))
+                        return ('tag `(reftoptr self) ('anchor args))
+                    error "can not convert immutable value to pointer"
 
 let null = (nullof NullType)
 
@@ -1648,6 +1686,7 @@ inline sugar-scope-macro (f)
             let at = (as at list)
             let head = ('@ at)
             let anchor = ('anchor head)
+            hide-traceback;
             let at scope = (f ('next at) scope)
             return (cons ('tag `at anchor) next) scope
 
@@ -1658,6 +1697,7 @@ inline sugar-macro (f)
             let at = (as at list)
             let head = ('@ at)
             let anchor = ('anchor head)
+            hide-traceback;
             let at = (f ('next at))
             return (cons ('tag `at anchor) next) scope
 
@@ -2100,11 +2140,11 @@ inline make-expand-and-or (f)
     fn (expr)
         expand-and-or expr f
 
-fn ltr-multiop (args target)
+fn ltr-multiop (args target mincount)
     let argc = ('argcount args)
-    verify-count argc 2 -1
+    verify-count argc mincount -1
     'tag
-        if (== argc 2)
+        if (<= argc mincount)
             `(target args)
         else
             # call for multiple args
@@ -2118,11 +2158,11 @@ fn ltr-multiop (args target)
                 _ i op
         'anchor args
 
-fn rtl-multiop (args target)
+fn rtl-multiop (args target mincount)
     let argc = ('argcount args)
-    verify-count argc 2 -1
+    verify-count argc mincount -1
     'tag
-        if (== argc 2)
+        if (<= argc mincount)
             `(target args)
         else
             # call for multiple args
@@ -2280,10 +2320,10 @@ let
     define = (sugar-macro expand-define)
     define-infix> = (sugar-scope-macro (make-expand-define-infix '>))
     define-infix< = (sugar-scope-macro (make-expand-define-infix '<))
-    .. = (spice-macro (fn (args) (rtl-multiop args (Value ..))))
-    + = (spice-macro (fn (args) (ltr-multiop args (Value +))))
-    * = (spice-macro (fn (args) (ltr-multiop args (Value *))))
-    @ = (spice-macro (fn (args) (ltr-multiop args (Value @))))
+    .. = (spice-macro (fn (args) (rtl-multiop args (Value ..) 2)))
+    + = (spice-macro (fn (args) (ltr-multiop args `+ 2)))
+    * = (spice-macro (fn (args) (ltr-multiop args `* 2)))
+    @ = (spice-macro (fn (args) (ltr-multiop args `@ 1)))
     va-option-branch = (spice-macro va-option-branch)
     sugar-set-scope! =
         sugar-scope-macro
@@ -2597,7 +2637,7 @@ let hash-storage =
                     if (argc == 2)
                         `(hash1 value)
                     else
-                        ltr-multiop ('getarglist args 1) hash2
+                        ltr-multiop ('getarglist args 1) hash2 2
 
 va-lfold none
     inline (key T)
@@ -2638,7 +2678,10 @@ fn exec-module (expr eval-scope)
     let ModuleFunctionType = ('pointer ('raising (function Value) Error))
     let StageFunctionType = ('pointer ('raising (function CompileStage) Error))
     let expr-anchor = ('anchor expr)
-    let f = (sc_eval expr-anchor (expr as list) eval-scope)
+    let f =
+        do
+            hide-traceback;
+            sc_eval expr-anchor (expr as list) eval-scope
     loop (f = f)
         # build a wrapper
         let wrapf =
@@ -2758,7 +2801,10 @@ fn require-from (base-dir name)
                 if (not (sc_is_file module-path))
                     repeat patterns
                 'set-symbol modules module-path-sym incomplete
-                let content = (load-module (name as string) module-path)
+                let content =
+                    do
+                        hide-traceback;
+                        load-module (name as string) module-path
                 'set-symbol modules module-path-sym content
                 return content
         if (('typeof content) == type)
@@ -2785,7 +2831,10 @@ let import =
             let namestr = (name as string)
             let module-dir = (scope.module-dir as string)
             let key = (resolve-scope scope namestr 0:usize)
-            let module = (require-from module-dir name)
+            let module =
+                do
+                    hide-traceback;
+                    require-from module-dir name
             'set-symbol scope key module
             _ module scope
 
@@ -2895,6 +2944,7 @@ let using =
                 let module-dir = (('@ sugar-scope 'module-dir) as string)
                 let name rest = (decons rest)
                 let name = (name as Symbol)
+                hide-traceback;
                 let module = ((require-from module-dir name) as Scope)
                 return (list do none)
                     .. module sugar-scope
@@ -2928,6 +2978,7 @@ let using =
                     return (process src)
             elseif (('typeof nameval) == Scope)
                 return (process (nameval as Scope))
+            hide-traceback;
             error "using: scope expeced"
             #return
                 list run-stage
@@ -3591,6 +3642,7 @@ let
                     Value
                         inline "min" (a b)
                             ? (<= a b) a b
+                    2
     max =
         spice-macro
             fn (args)
@@ -3598,6 +3650,7 @@ let
                     Value
                         inline "max" (a b)
                             ? (>= a b) a b
+                    2
 
 inline clamp (x mn mx)
     ? (> x mx) mx
@@ -4063,6 +4116,13 @@ define va-append-va
                 sc_argument_list_append newargs ('getarg args i)
                 repeat (i + 1)
 
+define va-empty?
+    spice-macro
+        fn "va-empty?" (args)
+            raises-compile-error;
+            let argc = ('argcount args)
+            'tag `[(argc == 0)] ('anchor args)
+
 """" (va-split n a...) -> (inline () a...[n .. (va-countof a...)-1]) a...[0 .. n-1]
 define va-split
     spice-macro
@@ -4364,7 +4424,7 @@ sugar from (src 'let params...)
                 cons load-from src
                     quotify params...
 
-define zip (spice-macro (fn (args) (ltr-multiop args (Value zip))))
+define zip (spice-macro (fn (args) (ltr-multiop args (Value zip) 2)))
 
 run-stage;
 
@@ -4597,6 +4657,7 @@ let
     list-parse = sc_parse_from_string
     #eval = sc_eval
     import-c = sc_import_c
+    load-library = sc_load_library
 
 run-stage;
 
@@ -4806,6 +4867,9 @@ run-stage;
     __@ =
         inline (self index)
             ptrtoref (getelementptr self index)
+    __toref =
+        inline (self)
+            ptrtoref self
     __getattr =
         inline (self key)
             getattr (ptrtoref self) key
@@ -4935,6 +4999,8 @@ sugar struct (name body...)
             fn "CEnum-imply" (vT T)
                 if (T == i32)
                     return `(inline (self) (bitcast self T))
+                elseif (T == integer)
+                    return `storagecast
                 `()
     __rimply =
         spice-cast-macro
@@ -4946,29 +5012,47 @@ sugar struct (name body...)
 sugar enum (name values...)
     spice make-enum (name vals...)
         let T = (typename (name as string))
-        inline make-enumval (val)
-            sc_const_int_new T
-                sext (as val i32) u64
-        'set-super T CEnum
-        'set-plain-storage T i32
-        let count = ('argcount vals...)
-        loop (i nextval = 0 0)
-            if (i >= count)
-                break;
-            let arg = ('getarg vals... i)
-            let anchor = ('anchor arg)
-            let key val = ('dekey arg)
-            #print arg key val
-            if (not ('constant? val))
-                error "all enum values must be constant"
-            _ (i + 1)
-                if (key == unnamed)
-                    # auto-numerical
-                    'set-symbol T (as val Symbol) (make-enumval nextval)
-                    nextval + 1
-                else
-                    'set-symbol T key (make-enumval val)
-                    (as val i32) + 1
+
+        inline build-type (self)
+            let repr-expr = (sc_expression_new)
+            inline make-enumval (key val)
+                let const = (sc_const_int_new T (sext (as val i32) u64))
+                'set-symbol T key const
+                let str = (sc_default_styler style-number (key as string))
+                sc_expression_append repr-expr
+                    spice-quote
+                        if (self == const) (return str)
+            'set-super T CEnum
+            'set-plain-storage T i32
+            let count = ('argcount vals...)
+            loop (i nextval = 0 0)
+                if (i >= count)
+                    break;
+                let arg = ('getarg vals... i)
+                let anchor = ('anchor arg)
+                let key val = ('dekey arg)
+                #print arg key val
+                if (not ('constant? val))
+                    error "all enum values must be constant"
+                _ (i + 1)
+                    if (key == unnamed)
+                        # auto-numerical
+                        make-enumval (as val Symbol) nextval
+                        nextval + 1
+                    else
+                        make-enumval key val
+                        (as val i32) + 1
+
+            sc_expression_append repr-expr
+                spice-quote
+                    return (repr (storagecast self))
+            repr-expr
+
+        spice-quote
+            fn enum-repr (self)
+                spice-unquote
+                    build-type self
+        'set-symbol T '__repr enum-repr
         T
 
     fn convert-body (body)
@@ -4992,6 +5076,25 @@ sugar enum (name values...)
             cons make-enum namestr newbody
     else
         cons make-enum name newbody
+
+#-------------------------------------------------------------------------------
+# constants
+#-------------------------------------------------------------------------------
+
+let pi:f32 = 3.141592653589793:f32
+let pi:f64 = 3.141592653589793:f64
+""""The number π, the ratio of a circle's circumference C to its diameter d.
+    Explicitly type-annotated versions of the constant are available as `pi:f32`
+    and `pi:f64`.
+let pi = pi:f32
+
+let e:f32 = 2.718281828459045:f32
+let e:f64 = 2.718281828459045:f64
+""""Euler's number, also known as Napier's constant. Explicitly type-annotated
+    versions of the constant are available as `e:f32` and `e:f64`
+let e = e:f32
+
+#-------------------------------------------------------------------------------
 
 run-stage;
 
@@ -5233,11 +5336,12 @@ fn run-main ()
             load-module "" sourcepath
                 scope = scope
                 main-module? = true
-            _;
+            ;
         #except (err)
-            print
+            #print
                 default-styler style-error "error:"
                 'format err
+            ;
         exit 0
 
 raises-compile-error;
