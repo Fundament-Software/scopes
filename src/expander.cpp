@@ -1019,33 +1019,33 @@ struct Expander {
                 case FN_GetSyntaxScope:
                     SCOPES_CHECK_RESULT(verify_list_parameter_count("this-scope", list, 0, 0));
                     return ValueRef(ref(anchor, ConstPointer::scope_from(env)));
-                case KW_SyntaxLog: return expand_syntax_log(list);
-                case KW_Fn: return expand_fn(list, ExpandFnSetup());
+                case KW_SyntaxLog: return SCOPES_GET_RESULT(expand_syntax_log(list));
+                case KW_Fn: return SCOPES_GET_RESULT(expand_fn(list, ExpandFnSetup()));
                 case KW_Inline: {
                     ExpandFnSetup setup;
                     setup.inlined = true;
-                    return expand_fn(list, setup);
+                    return SCOPES_GET_RESULT(expand_fn(list, setup));
                 }
-                case KW_RunStage: return expand_run_stage(list);
-                case KW_Let: return expand_let(list);
-                case KW_Loop: return expand_loop(list);
-                case KW_Try: return expand_try(list);
-                case KW_If: return expand_if(list);
-                case KW_Switch: return expand_switch(list);
-                case KW_SyntaxQuote: return expand_syntax_quote(list);
-                case KW_ASTQuote: return expand_ast_quote(list);
-                case KW_ASTUnquote: return expand_ast_unquote(list);
-                case KW_ASTUnquoteArguments: return expand_ast_unquote_arguments(list);
-                case KW_Return: return expand_return(list);
-                case KW_Raise: return expand_raise(list);
-                case KW_Break: return expand_break(list);
-                case KW_Repeat: return expand_repeat(list);
-                case KW_Merge: return expand_merge(list);
-                case KW_Forward: return expand_forward(list);
+                case KW_RunStage: return SCOPES_GET_RESULT(expand_run_stage(list));
+                case KW_Let: return SCOPES_GET_RESULT(expand_let(list));
+                case KW_Loop: return SCOPES_GET_RESULT(expand_loop(list));
+                case KW_Try: return SCOPES_GET_RESULT(expand_try(list));
+                case KW_If: return SCOPES_GET_RESULT(expand_if(list));
+                case KW_Switch: return SCOPES_GET_RESULT(expand_switch(list));
+                case KW_SyntaxQuote: return SCOPES_GET_RESULT(expand_syntax_quote(list));
+                case KW_ASTQuote: return SCOPES_GET_RESULT(expand_ast_quote(list));
+                case KW_ASTUnquote: return SCOPES_GET_RESULT(expand_ast_unquote(list));
+                case KW_ASTUnquoteArguments: return SCOPES_GET_RESULT(expand_ast_unquote_arguments(list));
+                case KW_Return: return SCOPES_GET_RESULT(expand_return(list));
+                case KW_Raise: return SCOPES_GET_RESULT(expand_raise(list));
+                case KW_Break: return SCOPES_GET_RESULT(expand_break(list));
+                case KW_Repeat: return SCOPES_GET_RESULT(expand_repeat(list));
+                case KW_Merge: return SCOPES_GET_RESULT(expand_merge(list));
+                case KW_Forward: return SCOPES_GET_RESULT(expand_forward(list));
                 //case KW_Defer: return expand_defer(list);
-                case KW_Do: return expand_do(list);
-                case KW_DoIn: return expand_inline_do(list);
-                case KW_Label: return expand_label(list);
+                case KW_Do: return SCOPES_GET_RESULT(expand_do(list));
+                case KW_DoIn: return SCOPES_GET_RESULT(expand_inline_do(list));
+                case KW_Label: return SCOPES_GET_RESULT(expand_label(list));
                 case KW_RawCall:
                 case KW_Call: {
                     SCOPES_CHECK_RESULT(verify_list_parameter_count("special call", list, 1, -1));
