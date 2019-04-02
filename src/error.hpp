@@ -287,7 +287,7 @@ formatters:
         "plain storage type expected, not %0", \
         PType) \
     T(VariableOutOfScope, \
-        "value of type %0 is only known at compile time but outside of function scope. Only static values are accessible", \
+        "value of type %0 is only known at run-time and outside of function scope", \
         PType) \
 
 // quoting

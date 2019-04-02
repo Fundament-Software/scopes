@@ -48,6 +48,22 @@ fn error (msg)
     hide-traceback;
     raise (sc_error_new msg)
 
+fn error@ (anchor traceback-msg error-msg)
+    """"usage example:
+        error@ ('anchor value) "while checking parameter" "error in value"
+    hide-traceback;
+    let err = (sc_error_new error-msg)
+    sc_error_append_calltrace err (sc_valueref_tag anchor `traceback-msg)
+    raise err
+
+fn error@+ (error anchor traceback-msg)
+    """"usage example:
+        except (err)
+            error@+ err ('anchor value) "while processing stream"
+    hide-traceback;
+    sc_error_append_calltrace error (sc_valueref_tag anchor `traceback-msg)
+    raise error
+
 # print an unboxing error given two types
 fn unbox-verify (value wantT)
     let haveT = (sc_value_type value)
@@ -194,7 +210,9 @@ inline spice-macro (l)
     function->SpiceMacro (static-typify l Value)
 
 inline box-spice-macro (l)
-    box-pointer (spice-macro l)
+    sc_valueref_tag
+        sc_value_anchor `l
+        box-pointer (spice-macro l)
 
 let va-lfold va-lifold =
     do
@@ -281,6 +299,18 @@ fn compare-type (args f)
 inline type-comparison-func (f)
     fn (args) (compare-type args (static-typify f type type))
 
+let static-error =
+    box-spice-macro
+        fn "static-error" (args)
+            if false
+                return `()
+            let argcount = (sc_argcount args)
+            verify-count argcount 1 1
+            let msg = (sc_getarg args 0)
+            let msg = (unbox-pointer msg string)
+            hide-traceback;
+            raise (sc_error_new msg)
+
 let storagecast =
     box-spice-macro
         fn "storagecast" (args)
@@ -299,7 +329,7 @@ sc_type_set_symbol type '__call
             let self = (sc_getarg args 0)
             let T = (unbox-pointer self type)
             let f = (sc_type_at T '__typecall)
-            return `(f args)
+            return (sc_valueref_tag (sc_value_anchor args) `(f args))
 
 # method call syntax
 sc_type_set_symbol Symbol '__call
@@ -326,7 +356,7 @@ sc_type_set_symbol Symbol '__call
             let self = (sc_getarg args 1)
             let method = (resolve-method self symval)
             let arglist = (sc_extract_argument_list_new args 1)
-            `(method arglist)
+            sc_valueref_tag (sc_value_anchor args) `(method arglist)
 
 do
     fn get-key-value-args (args)
@@ -813,7 +843,7 @@ let SugarMacro = (sc_typename_type "SugarMacro")
 let SugarMacroFunction =
     'pointer
         'raising
-            function (Arguments list Scope) list list Scope
+            function (Arguments list Scope) list Scope
             Error
 'set-plain-storage SugarMacro SugarMacroFunction
 
@@ -1135,7 +1165,7 @@ fn balanced-binary-operation (args symbol rsymbol friendly-op-name)
     let rhsT = ('typeof rhs)
     let op = (balanced-binary-operator symbol rsymbol lhsT rhsT)
     if (operator-valid? op)
-        return `(op lhs rhs)
+        return ('tag `(op lhs rhs) ('anchor args))
     binary-op-error friendly-op-name lhsT rhsT
 
 # right hand has fixed type - this one doesn't need a dispatch step
@@ -1234,12 +1264,11 @@ inline simple-signed-binary-op (sf uf)
                 fn (args)
                     raises-compile-error;
                     let argc = (sc_argcount args)
-                    verify-count argc 4 4
+                    verify-count argc 3 3
                     let self = (sc_getarg args 0)
-                    let at = (sc_getarg args 1)
-                    let next = (sc_getarg args 2)
-                    let scope = (sc_getarg args 3)
-                    `((bitcast self SugarMacroFunction) at next scope)
+                    let topexpr = (sc_getarg args 1)
+                    let scope = (sc_getarg args 2)
+                    `((bitcast self SugarMacroFunction) topexpr scope)
 
 'define-symbols Symbol
     unique =
@@ -1600,11 +1629,13 @@ let function->SugarMacro =
         SugarMacroFunction
 
 inline sugar-block-scope-macro (f)
-    function->SugarMacro (static-typify f list list Scope)
+    function->SugarMacro (static-typify f list Scope)
 
 inline sugar-scope-macro (f)
     sugar-block-scope-macro
-        fn (at next scope)
+        fn (topexpr scope)
+            let at next = (decons topexpr)
+            let at = (as at list)
             let head = ('@ at)
             let anchor = ('anchor head)
             let at scope = (f ('next at) scope)
@@ -1612,7 +1643,9 @@ inline sugar-scope-macro (f)
 
 inline sugar-macro (f)
     sugar-block-scope-macro
-        fn (at next scope)
+        fn (topexpr scope)
+            let at next = (decons topexpr)
+            let at = (as at list)
             let head = ('@ at)
             let anchor = ('anchor head)
             let at = (f ('next at))
@@ -1651,11 +1684,17 @@ let print =
 
 'define-symbol integer '__typecall
     inline (cls value)
-        as value cls
+        static-branch (none? value)
+            inline () (nullof cls)
+            inline ()
+                as value cls
 
 'define-symbol real '__typecall
     inline (cls value)
-        as value cls
+        static-branch (none? value)
+            inline () (nullof cls)
+            inline ()
+                as value cls
 
 'set-symbols string
     __imply =
@@ -1693,7 +1732,7 @@ let coerce-call-arguments =
             let fT = ('element@ fptrT 0)
             let pcount = ('element-count fT)
             if (== pcount argc)
-                let outargs = ('tag (sc_call_new self) ('anchor self))
+                let outargs = ('tag (sc_call_new self) ('anchor args))
                 sc_call_set_rawcall outargs true
                 loop (i = 0)
                     if (== i argc)
@@ -1704,7 +1743,7 @@ let coerce-call-arguments =
                     let outarg =
                         if (== argT paramT) arg
                         else
-                            `(imply arg paramT)
+                            ('tag `(imply arg paramT) ('anchor arg))
                     sc_call_append_argument outargs outarg
                     + i 1
             else ('tag `(rawcall self [('getarglist args 1)]) ('anchor args))
@@ -1871,11 +1910,12 @@ fn unpack-infix-op (op)
 inline infix-op (pred)
     fn infix-op (infix-table token prec)
         let op =
-            try (get-ifx-op infix-table token)
+            try  (get-ifx-op infix-table token)
             except (err)
-                # TODO point
-                error
-                    "unexpected token in infix expression"
+                hide-traceback;
+                error@ ('anchor token) "while attempting to parse infix token"
+                    .. "unexpected token '"
+                        .. (tostring token) "' in infix expression"
         let op-prec = (unpack-infix-op op)
         ? (pred op-prec prec) op (Value none)
 
@@ -1886,9 +1926,9 @@ fn rtl-infix-op-eq (infix-table token prec)
     let op =
         try (get-ifx-op infix-table token)
         except (err)
-            # TODO point
-            error
-                "unexpected token in infix expression"
+            error@ ('anchor token) "while attempting to parse infix token"
+                .. "unexpected token '"
+                    .. (tostring token) "' in infix expression"
     let op-prec op-order = (unpack-infix-op op)
     if (== op-order '<)
         ? (== op-prec prec) op (Value none)
@@ -1896,6 +1936,7 @@ fn rtl-infix-op-eq (infix-table token prec)
         Value none
 
 fn parse-infix-expr (infix-table lhs state mprec)
+    hide-traceback;
     loop (lhs state = lhs state)
         if (empty? state)
             return lhs state
@@ -1906,7 +1947,9 @@ fn parse-infix-expr (infix-table lhs state mprec)
         let op-prec op-order op-name = (unpack-infix-op op)
         loop (rhs state = ('decons next-state))
             if (empty? state)
-                break (Value (list op-name lhs rhs)) state
+                break
+                    'tag `[(list op-name lhs rhs)] ('anchor lhs)
+                    state
             let ra __ = ('decons state)
             let lop = (infix-op-gt infix-table ra op-prec)
             let nextop =
@@ -1914,7 +1957,9 @@ fn parse-infix-expr (infix-table lhs state mprec)
                     rtl-infix-op-eq infix-table ra op-prec
                 else lop
             if (== ('typeof nextop) Nothing)
-                break (Value (list op-name lhs rhs)) state
+                break
+                    'tag `[(list op-name lhs rhs)] ('anchor lhs)
+                    state
             let nextop-prec = (unpack-infix-op nextop)
             let next-rhs next-state =
                 parse-infix-expr infix-table rhs state nextop-prec
@@ -1949,7 +1994,7 @@ fn list-handler (topexpr env)
         let expr env =
             try
                 hide-traceback;
-                head expr topexpr-next env
+                head topexpr env
             except (err)
                 hide-traceback;
                 let msg = `"while expanding sugar macro"
@@ -1959,7 +2004,12 @@ fn list-handler (topexpr env)
     elseif (has-infix-ops? env expr)
         let at next = ('decons expr)
         let expr =
-            parse-infix-expr env at next 0
+            try
+                hide-traceback;
+                parse-infix-expr env at next 0
+            except (err)
+                hide-traceback;
+                error@+ err ('anchor topexpr-at) "while expanding infix expression"
         return (cons expr topexpr-next) env
     else
         return topexpr env
@@ -2426,7 +2476,9 @@ let va-option =
 # for <name> ... in <generator> body ...
 define for
     sugar-block-scope-macro
-        fn "expand-for" (expr next-expr scope)
+        fn "expand-for" (topexpr scope)
+            let expr next-expr = (decons topexpr)
+            let expr = (expr as list)
             let head args = (decons expr)
             let it params =
                 loop (it params = args '())
@@ -2773,7 +2825,7 @@ let locals =
                                 return block
                             #if (not (stage-constant? value))
                             let keydocstr = ('docstring scope key)
-                            let value = (sc_extract_argument_new value 0)
+                            let value = ('tag (sc_extract_argument_new value 0) ('anchor value))
                             sc_expression_append block
                                 `(build-local constant-scope tmp key value keydocstr)
                             repeat key
@@ -3002,7 +3054,10 @@ define-sugar-macro define-sugar-block-scope-macro
     let name body = (decons args)
     list define name
         list sugar-block-scope-macro
-            cons fn '(expr next-expr sugar-scope) body
+            cons fn '(topexpr sugar-scope)
+                list let 'expr 'next-expr '= (list decons 'topexpr)
+                list let 'expr '= (list (do as) 'expr list)
+                body
 
 'set-symbols type
     symbols =
@@ -3281,8 +3336,13 @@ let tupleof =
         inline (self index)
             extractvalue self index
     __typecall =
-        inline "array.__typecall" (cls element-type size)
-            sc_array_type element-type (size as usize)
+        inline "array.__typecall" (cls args...)
+            static-branch (type== cls array)
+                inline ()
+                    let element-type size = args...
+                    sc_array_type element-type (size as usize)
+                inline ()
+                    nullof cls
     __as =
         do
             inline array-generator (arr)
@@ -3610,7 +3670,9 @@ fn next-head? (next)
 
 inline gen-match-block-parser (handle-case)
     sugar-block-scope-macro
-        fn (expr next scope)
+        fn (topexpr scope)
+            let expr next = (decons topexpr)
+            let expr = (expr as list)
             let head arg argrest = (decons expr 2)
             let arg argrest = (sc_expand arg argrest scope)
             let outnext = (alloca-array list 1)
@@ -3747,26 +3809,30 @@ define sugar-match
 define sugar
     inline wrap-sugar-macro (f)
         sugar-block-scope-macro
-            fn (expr next scope)
-                let new-expr new-next = (f expr next scope)
+            fn (topexpr scope)
+                let new-expr new-next = (f topexpr scope)
                 return
                     static-branch (none? new-next)
                         inline ()
+                            let x next = (decons topexpr)
                             cons new-expr next
                         inline ()
                             cons new-expr new-next
                     scope
 
     sugar-block-scope-macro
-        fn "expand-sugar" (expr next scope)
+        fn "expand-sugar" (topexpr scope)
             raises-compile-error;
+            let expr next = (decons topexpr)
+            let expr = (expr as list)
             let head expr = (decons expr)
             let name params body =
                 extract-name-params-body expr
             let func =
                 spice-quote
-                    inline (expr next-expr sugar-scope)
-                        let head expr = (sc_list_decons expr)
+                    inline (topexpr sugar-scope)
+                        let _expr next-expr = (decons topexpr)
+                        let head expr = (sc_list_decons (_expr as list))
                         label ok-label
                             inline return-ok (args...)
                                 merge ok-label args...
@@ -3779,6 +3845,7 @@ define sugar
                                         next-expr = next-expr
                                         sugar-scope = sugar-scope
                                         expr-head = head
+                                        expression = _expr
                                     let unpack-expr =
                                         gen-sugar-matcher fail-case expr subscope params
                                     let body =
@@ -4214,7 +4281,7 @@ fn get-overloaded-fn-append ()
                 elseif (count != argcount)
                     continue;
                 label break-next
-                    let outargs = (sc_call_new f)
+                    let outargs = ('tag (sc_call_new f) ('anchor args))
                     sc_call_set_rawcall outargs true
                     let lasti = (argcount - 1)
                     for i arg in (enumerate ('args args...))
@@ -4253,6 +4320,8 @@ fn get-overloaded-fn-append ()
                             break str
 
 sugar fn... (name...)
+    let inline? =
+        (expr-head as Symbol) == 'inline...
     let finalize-overloaded-fn = (get-overloaded-fn-append)
     let fn-name =
         sugar-match name...
@@ -4282,7 +4351,9 @@ sugar fn... (name...)
             repeat rest...
         case (('case condv body...) rest...)
             do
-                let tmpl = (sc_template_new fn-name)
+                let tmpl = ('tag (sc_template_new fn-name) ('anchor condv))
+                if inline?
+                    sc_template_set_inline tmpl
                 sc_argument_list_append outargs tmpl
                 let scope = (Scope bodyscope)
                 loop (expr types = (uncomma (condv as list)) void)
@@ -4293,7 +4364,9 @@ sugar fn... (name...)
                         sc_argument_list_append outargs types
                         break;
                     case ((arg as Symbol) ': T)
-                        error "single typed parameter definition is missing trailing comma or semicolon"
+                        hide-traceback;
+                        error@ ('anchor condv) "while parsing pattern"
+                            "single typed parameter definition is missing trailing comma or semicolon"
                     case ((arg as Symbol) rest...)
                         if ('variadic? arg)
                             if (not (empty? rest...))
@@ -4314,7 +4387,9 @@ sugar fn... (name...)
                         repeat rest...
                             sc_arguments_type_join types T
                     default
-                        error "syntax: (parameter-name[: type], ...)"
+                        hide-traceback;
+                        error@ ('anchor condv) "while parsing pattern"
+                            "syntax: (parameter-name[: type], ...)"
             repeat rest...
         default
             sugar-match name...
@@ -4324,6 +4399,8 @@ sugar fn... (name...)
             return
                 `(finalize-overloaded-fn outtype outargs)
                 next
+
+let inline... = fn...
 
 sugar from (src 'let params...)
     spice load-from (src keys...)
@@ -4597,6 +4674,7 @@ sugar unlet ((name as Symbol) names...)
     sc_scope_del_symbol sugar-scope name
     for name in names...
         let name = (name as Symbol)
+        hide-traceback;
         getattr sugar-scope name
         sc_scope_del_symbol sugar-scope name
     `()
@@ -4727,44 +4805,12 @@ sugar typedef (name body...)
 # standard allocators
 #-------------------------------------------------------------------------------
 
-spice __init (target args...)
-    let T = ('typeof target)
-    let constructor =
-        try
-            getattr T '__init
-        except (err)
-            if (('argcount args...) > 0)
-                error "default constructor takes no arguments"
-            return `(target = (nullof T))
-    `(constructor target args...)
-
-spice __init-copy (target source)
-    let T = ('typeof target)
-    let constructor =
-        try
-            getattr T '__init-copy
-        except (err)
-            return
-                spice-quote
-                    __init target
-                    target = source
-    `(constructor target source)
-
-#spice __delete (target)
-    let T = ('typeof target)
-    let destructor =
-        try
-            getattr T '__delete
-        except (err)
-            return `()
-    `(destructor target)
-
 inline gen-allocator-sugar (name f)
     sugar "" (values...)
         spice local-copy-typed (T value)
             spice-quote
                 let val = (ptrtoref (f T))
-                __init-copy val value
+                assign (imply value T) val
                 val
         spice local-copy (value)
             let T = ('typeof value)
@@ -4772,20 +4818,29 @@ inline gen-allocator-sugar (name f)
         spice local-new (T args...)
             spice-quote
                 let val = (ptrtoref (f T))
-                __init val args...
+                assign (T args...) val
                 val
-        sugar-match values...
-        case (name '= value)
-            qq [let name] = ([local-copy value])
-        case (name ': T '= value)
-            qq [let name] = ([local-copy-typed T value])
-        case (name ': T args...)
-            qq [let name] = ([local-new T] (unquote-splice args...))
-        case (T args...)
-            qq [local-new] [T] (unquote-splice args...)
-        default
-            error
-                .. "syntax: " name " <name> [: <type>] [= <value>]"
+        let anchor = ('anchor expression)
+        let result =
+            sugar-match values...
+            case (name '= value)
+                let callexpr =
+                    'tag `[(qq ([local-copy value]))] anchor
+                qq [let name] = [callexpr]
+            case (name ': T '= value)
+                let callexpr =
+                    'tag `[(qq ([local-copy-typed T value]))] anchor
+                qq [let name] = [callexpr]
+            case (name ': T args...)
+                let callexpr =
+                    'tag `[(qq [local-new T] (unquote-splice args...))] anchor
+                qq [let name] = [callexpr]
+            case (T args...)
+                qq [local-new T] (unquote-splice args...)
+            default
+                error
+                    .. "syntax: " name " <name> [: <type>] [= <value>]"
+        'tag `result anchor
 
 let local = (gen-allocator-sugar "local" alloca)
 let new = (gen-allocator-sugar "new" malloc)

@@ -94,8 +94,6 @@ void set_best_anchor(const ValueRef &value, const Anchor *anchor);
 struct UntypedValue : Value {
     static bool classof(const Value *T);
 
-    SCOPES_DEFINITION_ANCHOR_API()
-
     UntypedValue(ValueKind _kind);
 };
 
@@ -150,8 +148,6 @@ struct Instruction : TypedValue {
     static bool classof(const Value *T);
 
     Instruction(ValueKind _kind, const Type *type);
-
-    SCOPES_DEFINITION_ANCHOR_API()
 
     Symbol name;
     Block *block;
@@ -427,8 +423,6 @@ struct ParameterTemplate : UntypedValue {
 struct Parameter : TypedValue {
     static bool classof(const Value *T);
 
-    SCOPES_DEFINITION_ANCHOR_API()
-
     Parameter(Symbol name, const Type *type);
     static ParameterRef from(Symbol name, const Type *type);
 
@@ -458,8 +452,6 @@ struct LoopArguments : UntypedValue {
 struct LoopLabelArguments : TypedValue {
     static bool classof(const Value *T);
 
-    SCOPES_DEFINITION_ANCHOR_API()
-
     LoopLabelArguments(const Type *type);
     static LoopLabelArgumentsRef from(const Type *type);
 
@@ -470,8 +462,6 @@ struct LoopLabelArguments : TypedValue {
 
 struct Exception : TypedValue {
     static bool classof(const Value *T);
-
-    SCOPES_DEFINITION_ANCHOR_API()
 
     Exception(const Type *type);
     static ExceptionRef from(const Type *type);
@@ -639,8 +629,6 @@ struct Function : Pure {
     const UniqueInfo &get_unique_info(int id) const;
     void build_valids();
 
-    SCOPES_DEFINITION_ANCHOR_API()
-
     Symbol name;
     Parameters params;
     Block body;
@@ -761,8 +749,6 @@ enum GlobalFlags {
 
 struct Global : Pure {
     static bool classof(const Value *T);
-
-    SCOPES_DEFINITION_ANCHOR_API()
 
     Global(const Type *type, Symbol name,
         size_t flags, Symbol storage_class, int location, int binding);

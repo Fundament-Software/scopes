@@ -173,6 +173,7 @@ struct LLVMIRGenerator {
     static Types type_todo;
     static std::unordered_map<const Type *, LLVMTypeRef> type_cache;
     static std::unordered_map<Function *, LLVMModuleRef> func_cache;
+    static std::unordered_map<Global *, LLVMModuleRef> global_cache;
 
     LLVMModuleRef module;
     LLVMBuilderRef builder;
@@ -982,7 +983,6 @@ struct LLVMIRGenerator {
         auto functype = SCOPES_GET_RESULT(type_to_llvm_type(ilfunctype));
 
         auto func = LLVMAddFunction(module, name->data, functype);
-        generated_symbols.push_back(func);
 
 #if SCOPES_LLVM_CACHE_FUNCTIONS
         if (!generate_object) {
@@ -995,6 +995,7 @@ struct LLVMIRGenerator {
             func_cache.insert({node.unref(), module});
         }
 #endif
+        generated_symbols.push_back(func);
 
         if (use_debug_info) {
             LLVMSetSubprogram(func, function_to_subprogram(node));
@@ -1811,13 +1812,36 @@ struct LLVMIRGenerator {
             auto pi = cast<PointerType>(node->get_type());
             LLVMTypeRef LLT = SCOPES_GET_RESULT(type_to_llvm_type(pi->element_type));
             LLVMValueRef result = nullptr;
-            const String *namestr = node->name.name();
-            const char *name = namestr->data;
-            assert(name);
             if (node->storage_class == SYM_SPIRV_StorageClassPrivate) {
-                result = LLVMAddGlobal(module, LLT, name);
+                auto globname = node->name;
+                StyledString ss = StyledString::plain();
+                if (globname == SYM_Unnamed) {
+                    ss.out << "unnamed";
+                } else {
+                    ss.out << globname.name()->data;
+                }
+                ss.out << "<";
+                stream_type_name(ss.out, pi->element_type);
+                ss.out << ">";
+                stream_address(ss.out, node.unref());
+                const String *name = ss.str();
+                result = LLVMAddGlobal(module, LLT, name->data);
+                global2global.insert({ node.unref(), result });
+                if (!generate_object) {
+                    auto it = global_cache.find(node.unref());
+                    if (it != global_cache.end()) {
+                        assert(it->second != module);
+                        return result;
+                    } else {
+                        global_cache.insert({node.unref(), module});
+                    }
+                }
                 LLVMSetInitializer(result, LLVMConstNull(LLT));
+                return result;
             } else {
+                const String *namestr = node->name.name();
+                const char *name = namestr->data;
+                assert(name);
                 if ((namestr->count > 5) && !strncmp(name, "llvm.", 5)) {
                     result = LLVMAddFunction(module, name, LLT);
                 } else {
@@ -1837,9 +1861,9 @@ struct LLVMIRGenerator {
                     }
                     result = LLVMAddGlobal(module, LLT, name);
                 }
+                global2global.insert({ node.unref(), result });
+                return result;
             }
-            global2global.insert({ node.unref(), result });
-            return result;
         } else {
             return it->second;
         }
@@ -2254,6 +2278,7 @@ struct LLVMIRGenerator {
 Error *LLVMIRGenerator::last_llvm_error = nullptr;
 std::unordered_map<const Type *, LLVMTypeRef> LLVMIRGenerator::type_cache;
 std::unordered_map<Function *, LLVMModuleRef> LLVMIRGenerator::func_cache;
+std::unordered_map<Global *, LLVMModuleRef> LLVMIRGenerator::global_cache;
 Types LLVMIRGenerator::type_todo;
 LLVMTypeRef LLVMIRGenerator::voidT = nullptr;
 LLVMTypeRef LLVMIRGenerator::i1T = nullptr;

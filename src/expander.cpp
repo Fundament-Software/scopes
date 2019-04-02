@@ -198,7 +198,7 @@ struct Expander {
         }
         if (setup.inlined)
             func->set_inline();
-        func->set_def_anchor(anchor);
+        //func->set_def_anchor(anchor);
         /*
         if (setup.quoted)
             result = ast_quote(func);
@@ -943,7 +943,7 @@ struct Expander {
 
         auto call = CallTemplate::from(enter);
         call->flags = flags;
-        call->set_def_anchor(anchor);
+        //call->set_def_anchor(anchor);
 
         it = subexp.next;
         SCOPES_CHECK_RESULT(subexp.expand_arguments(call->args, it));

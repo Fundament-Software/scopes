@@ -81,14 +81,7 @@ namespace scopes {
     SCOPES_TYPED_VALUE_KIND() \
 
 
-#define SCOPES_DEFINED_VALUES() \
-    T(UntypedValue) \
-    T(Instruction) \
-    T(Parameter) \
-    T(LoopLabelArguments) \
-    T(Exception) \
-    T(Function) \
-    T(Global) \
+#define SCOPES_DEFINED_VALUES()
 
 
 enum ValueKind {

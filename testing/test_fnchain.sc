@@ -2,9 +2,8 @@
 using import testing
 using import FunctionChain
 
-global g_x : i32
-g_x = 0
-fn get_g_x () g_x
+global g_x = 0
+inline get_g_x () g_x
 
 @@ print
 fnchain f

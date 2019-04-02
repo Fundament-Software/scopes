@@ -1799,6 +1799,7 @@ repeat:
         if (T->lookup_call_handler(dest)) {
             values.insert(values.begin(), callee);
             callee = SCOPES_GET_RESULT(prove(ctx, dest));
+            //call = ref(dest.anchor(), call);
             redirections++;
             goto repeat;
         }
@@ -1850,7 +1851,7 @@ repeat:
                 SCOPES_ERROR(SpiceMacroReturnedNull);
             }
             //value = ref(call.anchor(), result._0);
-            return ref(call.anchor(), SCOPES_GET_RESULT(prove(ctx, value)));
+            return SCOPES_GET_RESULT(prove(ctx, value));
         } else {
             SCOPES_RETURN_TRACE_ERROR(result.except);
         }
@@ -2526,9 +2527,12 @@ repeat:
             CHECKARGS(2, 2);
             MOVE_STORAGETYPEOF(ElemT);
             READ_NODEREF_STORAGETYPEOF(DestT);
-            auto rq = SCOPES_GET_RESULT(verify_refer(typeof_DestT));
-            if (rq) {
-                SCOPES_CHECK_RESULT(verify_writable(rq, typeof_DestT));
+            {
+                SCOPES_TRACE_PROVE_ARG(_DestT);
+                auto rq = SCOPES_GET_RESULT(verify_refer(typeof_DestT));
+                if (rq) {
+                    SCOPES_CHECK_RESULT(verify_writable(rq, typeof_DestT));
+                }
             }
             typeof_DestT = strip_qualifier<ReferQualifier>(typeof_DestT);
             //strip_qualifiers(ElemT);
@@ -2826,7 +2830,7 @@ repeat:
     //const Type *art = aft->return_type;
     const Type *rt = remap_unique_return_arguments(ctx, idmap, ft->return_type);
     CallRef newcall = ref(call.anchor(), Call::from(rt, callee, values));
-    newcall->set_def_anchor(call->def_anchor());
+    //newcall->set_def_anchor(call->def_anchor());
     if (ft->has_exception()) {
         // todo: remap exception type
         newcall->except_body.set_parent(ctx.block);
@@ -2852,7 +2856,7 @@ repeat:
                 if (name[0] == 's' && name[1] == 'c' && name[2] == '_'
                     && name[sz-4] == '_' && name[sz-3] == 'n' && name[sz-2] == 'e' && name[sz-1] == 'w') {
                     ctx.append(newcall);
-                    auto anchor = get_best_anchor(call);
+                    auto anchor = call.anchor();
                     // convert to valueref
                     newcall = ref(anchor, Call::from(TYPE_ValueRef,
                         g_sc_valueref_tag, {
@@ -3134,12 +3138,12 @@ static SCOPES_RESULT(TypedValueRef) prove_inline_body(const ASTContext &ctx,
     SCOPES_TRACE_PROVE_TEMPLATE(func);
     Timer sum_prove_time(TIMER_Specialize);
     assert(func);
-    auto anchor = func->def_anchor();
+    auto anchor = func.anchor();
     //int count = (int)func->params.size();
     FunctionRef fn = ref(anchor, Function::from(func->name, {}));
-    fn->set_def_anchor(anchor);
+    //fn->set_def_anchor(anchor);
     fn->original = ref(anchor, func);
-    fn->frame = ref(frame->def_anchor(), frame);
+    fn->frame = ref(frame.anchor(), frame);
     LabelRef label = ref(anchor, Label::from(LK_Inline, func->name));
     fn->label = label;
     fn->boundary = ctx.function;

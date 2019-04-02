@@ -10,12 +10,6 @@ typedef Handle :: i32
         refcount += 1
         follow idx this-type
 
-    inline __init (self)
-        refcount += 1
-
-    #inline __init-copy (self other)
-        assign other self
-
     @@ spice-quote
     inline __typecall (cls idx)
         #print "new handle" idx
@@ -420,11 +414,11 @@ verify-type (typify f Handle) i32 VHandle1
     and make a bunch of mutations
 fn f ()
     # stack var, default constructor
-    local x : Handle
+    local x : Handle 0
     # stack var, init from immutable
     local h = (Handle 0) # immutable is moved into h
     # heap var, default constructor
-    new q : Handle
+    new q : Handle 0
     # drop h, move immutable into h
     h = (Handle 1)
     # drop x, move h into x

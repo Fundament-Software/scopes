@@ -235,7 +235,7 @@ sc_valueref_raises_t sc_typify(const sc_closure_t *srcl, int numtypes, const sc_
     for (int i = 0; i < numtypes; ++i) {
         types.push_back(typeargs[i]);
     }
-    auto anchor = srcl->func->def_anchor();
+    auto anchor = srcl->func.anchor();
     #if 0 //SCOPES_DEBUG_CODEGEN
         StyledStream ss(std::cout);
         std::cout << "sc_typify non-normalized:" << std::endl;

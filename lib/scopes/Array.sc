@@ -123,14 +123,15 @@ typedef Array < Struct
         self._count = new-count
         self._items @ idx
 
-    inline emplace-append (self args...)
-        let dest = (append-slots self 1:usize)
-        __init dest args...
-        dest
-
     fn append (self value)
         let dest = (append-slots self 1:usize)
-        __init-copy dest value
+        assign (imply value ((typeof self) . ElementType)) dest
+        dest
+
+    inline emplace-append (self args...)
+        let dest = (append-slots self 1:usize)
+        let value = (((typeof self) . ElementType) args...)
+        assign value dest
         dest
 
     fn clear (self)
@@ -145,7 +146,7 @@ typedef Array < Struct
 
 
 typedef FixedArray < Array
-    fn __typecall (cls element-type capacity)
+    fn gen-type (cls element-type capacity)
         let arrayT =
             'mutable (pointer element-type)
 
@@ -164,6 +165,16 @@ typedef FixedArray < Array
                 ElementType = element-type
                 Capacity = capacity
 
+    inline... __typecall
+    case (cls : type, element-type : type, capacity)
+        gen-type cls element-type capacity
+    case (T : type,)
+        ((superof (superof T)) . __typecall) T
+            _items = (malloc-array T.ElementType T.Capacity)
+            _count = 0:usize
+
+    unlet gen-type
+
     fn __repr (self)
         ..
             "[count="
@@ -174,11 +185,6 @@ typedef FixedArray < Array
 
     inline capacity (self)
         (typeof self) . Capacity
-
-    fn __init (self)
-        let T = (typeof self)
-        self._items = (malloc-array T.ElementType T.Capacity)
-        self._count = 0:usize
 
     #@@ box-binary-op
     #fn __= (selfT otherT self other)
@@ -200,7 +206,7 @@ let DEFAULT_CAPACITY = (1:usize << 2:usize)
 
 typedef GrowingArray < Array
 
-    fn __typecall (cls element-type)
+    fn gen-type (cls element-type)
         let arrayT = ('mutable (pointer element-type))
 
         struct
@@ -222,14 +228,17 @@ typedef GrowingArray < Array
             break new-capacity
 
     @@ spice-quote
-    fn __init (self opts...)
-        let T = (typeof self)
-        let capacity =
-            nearest-capacity DEFAULT_CAPACITY
-                (va-option capacity opts... DEFAULT_CAPACITY) as usize
-        self._items = (malloc-array T.ElementType capacity)
-        self._count = 0:usize
-        self._capacity = capacity
+    inline __typecall (cls opts...)
+        static-if (cls == this-type)
+            gen-type cls opts...
+        else
+            let capacity =
+                nearest-capacity DEFAULT_CAPACITY
+                    (va-option capacity opts... DEFAULT_CAPACITY) as usize
+            Struct.__typecall cls
+                _items = (malloc-array cls.ElementType capacity)
+                _count = 0:usize
+                _capacity = capacity
 
     fn __repr (self)
         ..

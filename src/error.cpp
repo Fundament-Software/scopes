@@ -283,12 +283,7 @@ void stream_backtrace(StyledStream &ss, const Backtrace *bt) {
         bool is_inline = templ->is_inline();
         if (is_inline && templ->name == SYM_Unnamed)
             return;
-        if (value.isa<UntypedValue>()) {
-            auto uv = value.cast<UntypedValue>();
-            auto _anchor = uv->def_anchor();
-            if (_anchor != unknown_anchor())
-                anchor = uv->def_anchor();
-        }
+        anchor = get_best_anchor(value);
         #if 0
         const List *list = ast_to_list(value);
         StreamExprFormat fmt;
@@ -333,12 +328,7 @@ void stream_backtrace(StyledStream &ss, const Backtrace *bt) {
     } break;
     case BTK_ProveExpression: {
         #if 1
-        if (value.isa<UntypedValue>()) {
-            auto uv = value.cast<UntypedValue>();
-            auto _anchor = uv->def_anchor();
-            if (_anchor != unknown_anchor())
-                anchor = uv->def_anchor();
-        }
+        anchor = get_best_anchor(value);
         #endif
         #if 1
         ss << "While checking expression" << std::endl;
@@ -360,7 +350,6 @@ static bool good_delta(const Backtrace *older, const Backtrace *newer) {
     bool same_kind = (newer->kind == older->kind);
     bool same_anchor = (newer->context.anchor() == older->context.anchor());
 #if 0
-    //return newer->context.anchor() != older->context.anchor();
     return true;
 #else
     if (older->kind == BTK_User) return true;

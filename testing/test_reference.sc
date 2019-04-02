@@ -1,56 +1,4 @@
 
-#
-    local T args ...
-    local 'copy value
-
-    new T args ...
-    new 'copy value
-
-    static T args ...
-    static 'copy value
-
-    and then there's the question of array construction?
-
-    local (T args ...)
-
-    T args ... -> (inline (dest) ...)
-
-
-    copy local value
-    move local value
-    new local T args ...
-
-    copy [local] value
-    move [local] value
-    new [local] T args ...
-
-    local copy value
-    local move value
-    local Array args ...
-
-    new copy value
-    new move value
-    new Array args ...
-
-    static copy value
-    static move value
-    static Array args ...
-
-    local x = value
-    local x <- value
-    local x : Array args ...
-
-    new x = value
-    new x <- value
-    new x : Array args ...
-
-    static x = value
-    static x <- value
-    static x : Array args ...
-
-
-
-
 
 # `local` creates a stack variable of reference type
 local x = 5
@@ -93,14 +41,11 @@ x @ 4 = x @ 3 + 1
 assert ((x @ 4) == 5)
 
 typedef refable < integer : i32
-    inline __typecall (cls)
+    inline... __typecall
+    case (cls : type,)
         nullof cls
-
-    fn... __init
-    case (self)
-        (storagecast self) = 0
-    case (self, initval : i32)
-        (storagecast self) = initval
+    case (cls : type, initval : i32)
+        bitcast initval cls
 
     fn __init-copy (self other)
         (storagecast self) = other
