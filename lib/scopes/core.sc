@@ -4750,7 +4750,7 @@ spice __init-copy (target source)
                     target = source
     `(constructor target source)
 
-spice __delete (target)
+#spice __delete (target)
     let T = ('typeof target)
     let destructor =
         try

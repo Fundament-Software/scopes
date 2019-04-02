@@ -9,6 +9,16 @@
     Exports a configurable type for a mutable array that stores its elements
     on the heap rather than in registers or the stack.
 
+let mutable-rawstring = ('mutable rawstring)
+
+# declare void @llvm.memcpy.p0i8.p0i8.i64(i8* <dest>, i8* <src>,
+                                        i64 <len>, i1 <isvolatile>)
+let llvm.memcpy.p0i8.p0i8.i64 =
+    extern 'llvm.memcpy.p0i8.p0i8.i64
+        function void mutable-rawstring rawstring i64 bool
+
+run-stage;
+
 typedef Array
 typedef FixedArray
 typedef GrowingArray
@@ -125,11 +135,11 @@ typedef Array < Struct
 
     fn clear (self)
         for idx in (range (deref self._count))
-            __delete (self._items @ idx)
+            __drop (self._items @ idx)
         self._count = 0:usize
         return;
 
-    fn __delete (self)
+    inline __drop (self)
         clear self
         free self._items
 
@@ -237,19 +247,23 @@ typedef GrowingArray < Array
     fn reserve (self count)
         if (count <= self._capacity)
             return;
-        # multiply capacity by 2.7 (roughly e) until we can carry the desired
-            count
-        let new-capacity =
-            nearest-capacity (deref self._capacity) count
-        let T = (typeof self)
-        let count = (deref self._count)
-        let old-items = (deref self._items)
-        let new-items = (malloc-array T.ElementType new-capacity)
-        for i in (range count)
-            new-items @ i = old-items @ i
-        free old-items
-        self._items = new-items
-        self._capacity = new-capacity
+        do
+            # multiply capacity by 2.7 (roughly e) until we can carry the desired
+                count
+            let new-capacity =
+                nearest-capacity (deref self._capacity) count
+            let T = (typeof self)
+            let count = (deref self._count)
+            let old-items = (deref self._items)
+            let new-items = (malloc-array T.ElementType new-capacity)
+            llvm.memcpy.p0i8.p0i8.i64
+                bitcast new-items mutable-rawstring
+                bitcast old-items rawstring
+                (count * (sizeof T.ElementType)) as i64
+                false
+            free old-items
+            assign new-items self._items
+            self._capacity = new-capacity
         return;
 
 #typefn Array '__typecall (cls element-type capacity opts...)

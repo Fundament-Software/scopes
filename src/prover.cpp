@@ -1553,6 +1553,9 @@ static SCOPES_RESULT(void) build_deref_move(
         assert(argn < argcount); \
         auto && NAME = values[argn++]; \
         DEREF(NAME);
+#define READ_NODEREF_VALUE(NAME) \
+        assert(argn < argcount); \
+        auto && NAME = values[argn++];
 #define READ_NODEREF_TYPEOF(NAME) \
         assert(argn < argcount); \
         auto &&_ ## NAME = values[argn++]; \
@@ -2009,7 +2012,7 @@ repeat:
         } break;
         case FN_Viewing: {
             for (size_t i = 0; i < values.size(); ++i) {
-                READ_VALUE(value);
+                READ_NODEREF_VALUE(value);
                 auto param = value.dyn_cast<Parameter>();
                 if (!param) {
                     SCOPES_ERROR(ValueKindMismatch, VK_Parameter, value->kind());

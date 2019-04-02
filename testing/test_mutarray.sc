@@ -32,6 +32,33 @@ do
     for i k in (enumerate a)
         assert ((a @ i) == i)
 
+inline test-array-of-array (Tx Ty)
+    do
+        dump "test-array-of-array" Tx Ty
+        print "test-array-of-array" Tx Ty
+        # array of array
+        let i32Array = Tx
+        let i32ArrayArray = Ty
+        local a : i32ArrayArray
+        for x in (range 16)
+            let b = ('emplace-append a)
+            assert ((countof b) == 0) (repr (countof b))
+            for y in (range 16)
+                'append b (x * 16 + y)
+        assert ((countof a) == 16)
+        print a
+        for x b in (enumerate a)
+            print b
+            assert ((countof b) == 16)
+            for y n in (enumerate b)
+                assert ((x * 16 + y) == n)
+    print "done"
+
+test-array-of-array i32Arrayx16 i32Arrayx16Array
+test-array-of-array i32Arrayx16 i32Arrayx16Arrayx16
+test-array-of-array i32Array i32ArrayArrayx16
+test-array-of-array i32Array i32ArrayArray
+
 do
     # mutable array with dynamic capacity
     local a : i32Array
@@ -48,28 +75,6 @@ do
     for i k in (enumerate a)
         assert ((a @ i) == i)
 
-inline test-array-of-array (Tx Ty)
-    dump "test-array-of-array" Tx Ty
-    print "test-array-of-array" Tx Ty
-    # array of array
-    let i32Array = Tx
-    let i32ArrayArray = Ty
-    local a : i32ArrayArray
-    for x in (range 16)
-        let b = ('emplace-append a)
-        assert ((countof b) == 0) (repr (countof b))
-        for y in (range 16)
-            'append b (x * 16 + y)
-    print a
-    for x b in (enumerate a)
-        print b
-        for y n in (enumerate b)
-            assert ((x * 16 + y) == n)
-
-test-array-of-array i32Arrayx16 i32Arrayx16Arrayx16
-test-array-of-array i32Arrayx16 i32Arrayx16Array
-test-array-of-array i32Array i32ArrayArrayx16
-test-array-of-array i32Array i32ArrayArray
 
 inline test-sort-array (T)
     dump "testing sorting" T
