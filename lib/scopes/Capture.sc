@@ -66,4 +66,6 @@ sugar spice-capture (('square-list args...) (params...) body...)
 unlet unpack-capture pack-capture unpack-capture-spice pack-capture-spice
     \ finalize-capture-spice
 
-locals;
+do
+    let Capture capture spice-capture
+    locals;

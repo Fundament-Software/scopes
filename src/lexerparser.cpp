@@ -12,6 +12,7 @@
 #include "list.hpp"
 #include "value.hpp"
 #include "dyn_cast.inc"
+#include "globals.hpp"
 
 #include "scopes/scopes.h"
 
@@ -610,10 +611,12 @@ SCOPES_RESULT(ValueRef) LexerParser::parse_naked(int column, Token end_token) {
             if (subcolumn == 0) {
                 subcolumn = this->column();
             } else if (this->column() != subcolumn) {
+                SCOPES_TRACE_PARSER(this->anchor());
                 SCOPES_ERROR(ParserIndentationMismatch);
             }
             if (column != subcolumn) {
                 if ((column + 4) != subcolumn) {
+                    SCOPES_TRACE_PARSER(this->anchor());
                     SCOPES_ERROR(ParserBadIndentationLevel);
                 }
             }
@@ -672,6 +675,7 @@ SCOPES_RESULT(ValueRef) LexerParser::parse() {
             lineno = this->lineno;
         } else if (this->lineno > lineno) {
             if (this->column() != 1) {
+                SCOPES_TRACE_PARSER(this->anchor());
                 SCOPES_ERROR(ParserIndentationMismatch);
             }
 

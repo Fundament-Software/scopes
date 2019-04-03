@@ -558,7 +558,7 @@ void stream(const ValueRef &node) {
 
 //------------------------------------------------------------------------------
 
-static int _refcount = 0;
+static thread_local int _refcount = 0;
 
 void stream_list(
     StyledStream &_ss, const List *l, const StreamListFormat &_fmt) {

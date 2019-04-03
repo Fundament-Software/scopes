@@ -1865,6 +1865,8 @@ let dot-char = 46:i8 # "."
 let dot-sym = '.
 
 fn dotted-symbol? (env head)
+    if ('variadic? head)
+        return false
     if (== head dot-sym)
         return false
     let s = (as head string)
@@ -3692,7 +3694,7 @@ inline clamp (x mn mx)
                             if (resultT != destT)
                                 error
                                     .. "function does not compile to type " (repr destT)
-                                        \ "but has type " (repr resultT)
+                                        \ " but has type " (repr resultT)
                             return result
                 if ('function-pointer? destT)
                     return `(inline (self) (func->closure self destT))
