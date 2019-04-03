@@ -237,44 +237,6 @@ build-rtypes
                 let samplerT = (make-sampler prefix return-type postfix dim arrayed ms coords)
                 'set-symbol scope (Symbol ('string samplerT)) samplerT
 
-#
-    typeinline XVarBridgeType '__imply (self destT)
-        forward-imply self.in destT
-
-    typeinline XVarBridgeType '__as (self destT)
-        forward-as self.in destT
-
-    do
-        fn forward-op (op f)
-            typefn XVarBridgeType op (a b flipped)
-                if flipped
-                    let b ok = (type@ (typeof b) 'in)
-                    if ok
-                        f a b
-                else
-                    let a ok = (type@ (typeof a) 'in)
-                    if ok
-                        f a b
-        forward-op '__* *
-        forward-op '__/ /
-        forward-op '__// //
-        forward-op '__+ +
-        forward-op '__- -
-
-    typeinline XVarBridgeType '__getattr (self name)
-        let T = (typeof self)
-        let val success = (type@ T name)
-        if success
-            return val
-        forward-getattr (type@ T 'in) name
-
-    typeinline XVarBridgeType '__= (self value)
-        self.out = value
-        true
-
-    typeinline XVarBridgeType '__@ (self value)
-        @ self.in value
-
 inline gen-xvar-sugar (name f)
     sugar "def-xvar" (values...)
         spice local-new (name T layout...)

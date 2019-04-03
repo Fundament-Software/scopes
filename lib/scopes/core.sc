@@ -1522,10 +1522,8 @@ inline floordiv (a b)
                 let argc = ('argcount args)
                 verify-count argc 1 3
                 switch argc
-                case 1
-                    `(sc_scope_new)
-                case 2
-                    `(sc_scope_new_subscope [ ('getarg args 1) ])
+                case 1 `(sc_scope_new)
+                case 2 `(sc_scope_new_subscope [ ('getarg args 1) ])
                 default
                     # argc == 3
                     let parent = ('getarg args 1)

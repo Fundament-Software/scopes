@@ -4,14 +4,8 @@
 #-------------------------------------------------------------------------------
 
 typedef Capture
-typedef MutableCapture < Capture
 
 run-stage;
-
-#'set-symbols MutableCapture
-    __copy =
-        fn (self other)
-            (type@& tuple '__copy) self other
 
 spice unpack-capture (capture)
     let T = ('storageof ('typeof capture))
