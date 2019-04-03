@@ -2407,6 +2407,12 @@ let
     |= = (make-inplace-op |)
     ^= = (make-inplace-op ^)
     ..= = (make-inplace-op ..)
+    := =
+        sugar-macro
+            fn expand-infix-let (expr)
+                raises-compile-error;
+                let name value = (decons expr 2)
+                qq [let] [name] = [value]
 
 define-infix< 50 +=
 define-infix< 50 -=
@@ -2421,6 +2427,7 @@ define-infix< 50 |=
 define-infix< 50 ^=
 define-infix< 50 ..=
 define-infix< 50 =
+define-infix< 50 :=
 
 define-infix> 100 or
 define-infix> 200 and

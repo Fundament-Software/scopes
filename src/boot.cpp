@@ -18,6 +18,7 @@
 #include "expander.hpp"
 #include "types.hpp"
 #include "gen_llvm.hpp"
+#include "compiler_flags.hpp"
 
 #include "scopes/scopes.h"
 
@@ -278,10 +279,12 @@ skip_regular_load:
     auto stage_func_type = pointer_type(raising_function_type(
         arguments_type({TYPE_CompileStage}), {}), PTF_NonWritable, SYM_Unnamed);
 
+    const int compile_flags = 0;// CF_O3;
+
 compile_stage:
     if (fn->get_type() == stage_func_type) {
         typedef sc_valueref_raises_t (*StageFuncType)();
-        StageFuncType fptr = (StageFuncType)SCOPES_GET_RESULT(compile(fn, 0))->value;
+        StageFuncType fptr = (StageFuncType)SCOPES_GET_RESULT(compile(fn, compile_flags))->value;
         auto result = fptr();
         if (!result.ok) {
             SCOPES_RETURN_ERROR(result.except);
@@ -304,9 +307,9 @@ compile_stage:
     stream_ast(ss, fn, StreamASTFormat());
     std::cout << std::endl;
 
-    auto flags = CF_DumpModule;
+    auto flags = compile_flags|CF_DumpModule;
 #else
-    auto flags = 0;
+    auto flags = compile_flags;
 #endif
 
     typedef sc_void_raises_t (*MainFuncType)();
