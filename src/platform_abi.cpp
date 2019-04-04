@@ -235,28 +235,31 @@ static size_t classify(const Type *T, ABIClass *classes, size_t offset) {
     case TK_Vector: {
         auto tt = cast<VectorType>(T);
         return classify_array_like(size_of(T).assert_ok(),
-            tt->element_type, tt->count, classes, offset);
+            storage_type(tt->element_type).assert_ok(), tt->count, classes, offset);
     } break;
     case TK_Array: {
         auto tt = cast<ArrayType>(T);
         return classify_array_like(size_of(T).assert_ok(),
-            tt->element_type, tt->count, classes, offset);
+            storage_type(tt->element_type).assert_ok(), tt->count, classes, offset);
     } break;
     case TK_Union: {
         auto ut = cast<UnionType>(T);
-        return classify(ut->values[ut->largest_field], classes, offset);
+        return classify(
+            storage_type(ut->values[ut->largest_field]).assert_ok(), classes, offset);
     } break;
     case TK_Tuple: {
         auto tt = cast<TupleType>(T);
         size_t count = tt->values.size();
         const Type *fields[count];
         for (size_t i = 0; i < tt->values.size(); ++i) {
-            fields[i] = tt->values[i];
+            fields[i] = storage_type(tt->values[i]).assert_ok();
         }
         return classify_tuple_like(size_of(T).assert_ok(),
             fields, count, tt->packed, classes, offset);
     } break;
     default: {
+        StyledStream ss;
+        ss << "internal error: type " << T << " unsupported in ABI" << std::endl;
         assert(false && "not supported in ABI");
         return 0;
     } break;

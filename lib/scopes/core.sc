@@ -4742,6 +4742,17 @@ sugar fold ((binding...) 'for expr...)
 # typedef
 #-------------------------------------------------------------------------------
 
+sugar typedef+ (T body...)
+    qq [do]
+        [let] this-type = [T]
+        [let] scope =
+            [do]
+                unquote-splice body...
+                [locals];
+        [set-symbols-from-scope] this-type ('parent scope)
+        [set-symbols-from-scope] this-type scope
+        this-type
+
 sugar typedef (name body...)
     let declaration? = (('typeof name) == Symbol)
     let typedecl =
@@ -4880,6 +4891,10 @@ run-stage;
     __getattr =
         inline (self key)
             getattr (ptrtoref self) key
+    __== =
+        simple-binary-op
+            inline (a b)
+                icmp== (ptrtoint a intptr) (ptrtoint b intptr)
 
 # unions
 #-------------------------------------------------------------------------------
@@ -5004,7 +5019,8 @@ sugar struct (name body...)
     __imply =
         spice-cast-macro
             fn "CEnum-imply" (vT T)
-                if (T == i32)
+                let ST = ('storageof vT)
+                if (T == ST)
                     return `(inline (self) (bitcast self T))
                 elseif (T == integer)
                     return `storagecast
@@ -5012,7 +5028,8 @@ sugar struct (name body...)
     __rimply =
         spice-cast-macro
             fn "CEnum-imply" (vT T)
-                if (vT == i32)
+                let ST = ('storageof T)
+                if (vT == ST)
                     return `(inline (self) (bitcast self T))
                 `()
 
