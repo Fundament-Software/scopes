@@ -126,7 +126,7 @@ inline each (generator collector)
     static-if (none? collector) _each
     else (_each collector)
 
-inline comp (collector...)
+inline compose (collector...)
     inline (coll)
         va-rfold coll
             inline (key value coll)
