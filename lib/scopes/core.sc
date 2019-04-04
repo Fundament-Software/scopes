@@ -4435,6 +4435,24 @@ define zip (spice-macro (fn (args) (ltr-multiop args (Value zip) 2)))
 
 run-stage;
 
+'set-symbols list
+    rjoin =
+        fn "rjoin" (lside rside)
+            loop (params expr = lside rside)
+                if (empty? params) (break expr)
+                let param next = (decons params)
+                _ next (cons param expr)
+    token-split =
+        fn "token-split" (expr token errmsg)
+            loop (it params = expr '())
+                if (empty? it)
+                    error errmsg
+                let sxat it = (decons it)
+                let at = (sxat as Symbol)
+                if (at == token)
+                    break params it
+                _ it (cons sxat params)
+
 define-sugar-block-scope-macro static-if
     fn process (body next-expr)
         if false
@@ -4687,22 +4705,8 @@ sugar unlet ((name as Symbol) names...)
 
 # fold (<name> ... = <init> ...) for <name> ... in <expr>
 sugar fold ((binding...) 'for expr...)
-    fn rjoin-list (lside rside)
-        loop (params expr = lside rside)
-            if (empty? params) (break expr)
-            let param next = (decons params)
-            _ next (cons param expr)
-    fn split-until (expr token errmsg)
-        loop (it params = expr '())
-            if (empty? it)
-                error errmsg
-            let sxat it = (decons it)
-            let at = (sxat as Symbol)
-            if (at == token)
-                break it params
-            _ it (cons sxat params)
-    let it itparams = (split-until expr... 'in "'in' expected")
-    let init foldparams = (split-until binding... '= "'=' expected")
+    let itparams it = ('token-split expr... 'in "'in' expected")
+    let foldparams init = ('token-split binding... '= "'=' expected")
     let generator-expr body = (decons it)
     let subscope = (Scope sugar-scope)
     return
@@ -4729,8 +4733,8 @@ sugar fold ((binding...) 'for expr...)
                     let newstate... =
                         spice-unquote
                             let expr1 expr2 =
-                                cons let (rjoin-list itparams (list '= at...))
-                                cons let (rjoin-list foldparams (list '= state...))
+                                cons let ('rjoin itparams (list '= at...))
+                                cons let ('rjoin foldparams (list '= state...))
                             'set-symbol subscope 'continue continue
                             let result = (sc_expand (cons do expr1 expr2 body) '() subscope)
                             result

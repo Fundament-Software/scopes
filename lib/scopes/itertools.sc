@@ -385,6 +385,7 @@ inline demux (init-value f collector...)
                 inline ()
                 inline (src)
                     reduced = (f reduced (src))
+                    ;
 
         let muxed = (muxed sink)
         let init1 valid1? at1 collect1 = ((muxed as Collector))
@@ -411,6 +412,38 @@ inline demux (init-value f collector...)
     #static-if (none? coll) _demux
     #else (_demux coll)
 
-unlet cascade1 mux1
+inline va-mux1 (child coll)
+    """"output both child input and child output
+    inline _combine (coll)
+        let ch = (child coll)
+        let init1 valid1? at1 collect1 = ((ch as Collector))
+        let init2 valid2? at2 collect2 = ((coll as Collector))
+        Collector
+            init1
+            valid1?
+            at1
+            inline "append-collect" (src it...)
+                let src... = (src)
+                let src = (inline () src...)
+                let sink =
+                    Collector init2 valid2? at2
+                        inline (src2 it2...)
+                            collect2
+                                inline ()
+                                    va-append-va src2 src...
+                                it2...
+                let __ __ __ collect = (((child sink) as Collector))
+                collect src it...
+    static-if (none? coll) _combine
+    else (_combine coll)
+
+inline va-mux (...)
+    inline (coll)
+        va-rfold coll
+            inline (key value coll)
+                (va-mux1 value) coll
+            ...
+
+unlet cascade1 mux1 va-mux1
 
 locals;

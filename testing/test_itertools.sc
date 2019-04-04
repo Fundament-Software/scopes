@@ -122,3 +122,24 @@ print
         # record summed output to list
         '()
 
+# generate 10 numbers
+->> (range 10)
+    # preserve all existing inputs and outputs
+    va-mux
+        map
+            # receives range index
+            inline "op1" (x) (/ x)
+        map
+            # receives range index and output of op1, which we discard
+            inline "op2" (x) (/ (x * 2))
+        map
+            # receives range index and outputs of op1 & op2, which we discard
+            inline "op3" (x) (/ (x * 5))
+    map
+        # receives inputs and all output values computed in va-mux
+        inline (n args...)
+            # print sum of op1 + op2 + op3, range index and individual values
+            print (+ args...) "<-" n ":" args...
+    # /dev/null
+    drain
+
