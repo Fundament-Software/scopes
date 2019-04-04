@@ -141,7 +141,7 @@
                 },
                 {
                     "name": "support.function.itertools.scopes",
-				    "match": "(span|dim|bitdim|imap|collect|each|compose|->>|cat|flatten|reduce|drain|limit|gate|take|cascade)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
+				    "match": "(span|dim|bitdim|imap|collect|each|compose|(de)?mux|->>|cat|flatten|reduce|drain|limit|gate|take|cascade)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
                 },
                 {
                     "name": "support.function.sfx.api.scopes",

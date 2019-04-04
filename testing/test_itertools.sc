@@ -101,47 +101,104 @@ let x y z w =
 
 assert ((+ x y z w) == 20)
 
-
-#inline mux1 (c1 c2)
-    """"send input into two collectors and output the results in sequence
-    inline (coll)
+inline mux1 (c1 c2 coll)
+    """"send input into two collectors which fork the target collector
+    inline _mux (coll)
+        let c1 = (c1 coll)
+        let c2 = (c2 coll)
         let init1 valid1? at1 collect1 = ((c1 as Collector))
         let init2 valid2? at2 collect2 = ((c2 as Collector))
-        let init valid? at collect = ((coll as Collector))
-
         let init1... = (init1)
         let init2... = (init2)
-        let init... = (init)
-        let lsize = (va-countof init...)
-        let lsize1 = (va-countof init1...)
+        let lsize = (va-countof init1...)
+        let start... =
+            va-append-va (inline () init2...) init1...
         Collector
-            inline ()
-                va-append-va (inline () init2...)
-                    va-append-va (inline () init1...) init...
-            inline ()
-                let it state = (va-split lsize args...)
-
-
-            valid?
-            at
-            inline (src rest...)
+            inline "mux-init" () start...
+            inline "mux-valid?" (it...)
+                let it1 it2 = (va-split lsize it...)
+                (valid1? (it1)) & (valid2? (it2))
+            inline "mux-at" (it...)
+                let it1 it2 = (va-split lsize it...)
+                let at1... = (at1 (it1))
+                let at2... = (at2 (it2))
+                va-append-va (inline () at2...) at1...
+            inline "mux-collect" (src it...)
+                let it1 it2 = (va-split lsize it...)
                 let src... = (src)
-                if (f src...)
-                    collect (inline () src...) rest...
-                else
-                    rest...
-
-
+                let src = (inline () src...)
+                let it1... = (collect1 src (it1))
+                let it2... = (collect2 src (it2))
+                va-append-va (inline () it2...) it1...
     static-if (none? coll) _mux
     else (_mux coll)
 
-#print
+inline mux (collector...)
+    """"send input into multiple collectors which each fork the target collector
+    let c1 c2 c... = collector...
+    static-if (none? c2) c1
+    else
+        va-lfold (mux1 c1 c2)
+            inline (key c2 c1)
+                mux1 c1 c2
+            c...
+
+inline demux (init-value f collector...)
+    let muxed = (mux collector...)
+    """"a reducing sink for mux streams
+    inline _demux (coll)
+        local reduced = init-value
+        let sink =
+            Collector
+                inline ()
+                inline () true
+                inline ()
+                inline (src)
+                    reduced = (f reduced (src))
+
+        let muxed = (muxed sink)
+        let init1 valid1? at1 collect1 = ((muxed as Collector))
+        let init2 valid2? at2 collect2 = ((coll as Collector))
+        let init1... = (init1)
+        let init2... = (init2)
+        let lsize = (va-countof init1...)
+        let start... =
+            va-append-va (inline () init2...) init1...
+        Collector
+            inline "demux-init" () start...
+            inline "demux-valid?" (it...)
+                let it1 it2 = (va-split lsize it...)
+                (valid1? (it1)) & (valid2? (it2))
+            inline "demux-at" (it...)
+                let it1 it2 = (va-split lsize it...)
+                at2 (it2)
+            inline "demux-collect" (src it...)
+                let it1 it2 = (va-split lsize it...)
+                let it1... = (collect1 src (it1))
+                let it2... = (collect2 (inline () (deref reduced)) (it2))
+                reduced = init-value
+                va-append-va (inline () it2...) it1...
+    #static-if (none? coll) _demux
+    #else (_demux coll)
+
+print
+    # generate 10 sample indices
     ->> (range 10)
-        mux1
-            map
-                inline (x)
-                    x * x
-            map
-                inline (x)
-                    (x as f32) ** 0.5
-        'cons-sink '()
+        # convert index to float
+        map f32
+        # sum collector output into a temporary
+            a bit like reduce, but using a temporary stack variable
+        demux 0.0 (do +)
+            # feed input signal into each collector, forking the stream
+            mux
+                # sine curve from sample index
+                map sin
+                # cosine curve from sample index
+                map cos
+                # saw wave from sample index
+                map
+                    inline (x)
+                        (x % 1.0) * 2.0 - 1.0
+        # record summed output to list
+        '()
+
