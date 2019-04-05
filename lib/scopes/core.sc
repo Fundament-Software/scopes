@@ -2324,6 +2324,8 @@ let
     + = (spice-macro (fn (args) (ltr-multiop args `+ 2)))
     * = (spice-macro (fn (args) (ltr-multiop args `* 2)))
     @ = (spice-macro (fn (args) (ltr-multiop args `@ 1)))
+    | = (spice-macro (fn (args) (ltr-multiop args `| 2)))
+    & = (spice-macro (fn (args) (ltr-multiop args `& 1)))
     va-option-branch = (spice-macro va-option-branch)
     sugar-set-scope! =
         sugar-scope-macro
