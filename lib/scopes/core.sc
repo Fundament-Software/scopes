@@ -2426,7 +2426,14 @@ let
                 raises-compile-error;
                 let name value = (decons expr 2)
                 qq [let] [name] = [value]
+    <- =
+        sugar-macro
+            fn expand-apply (expr)
+                raises-compile-error;
+                let f args = (decons expr 2)
+                qq ([f] [args])
 
+define-infix< 50 -> inline
 define-infix< 50 +=
 define-infix< 50 -=
 define-infix< 50 *=
@@ -2470,6 +2477,7 @@ define-infix> 750 as
 define-infix> 780 :
 define-infix> 800 .
 define-infix> 800 @
+define-infix> 800 <-
 
 inline char (s)
     let s sz = (sc_string_buffer s)

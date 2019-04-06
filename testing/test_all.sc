@@ -16,6 +16,7 @@ test-modules
     .test_closure
     .test_conversion
     .test_convert
+    .test_currying
     .test_decorator
     #.test_defer # fix in 0.15
     .test_dispatch
