@@ -2435,7 +2435,7 @@ let
                 let f args = (decons expr 2)
                 qq ([f] [args])
 
-define-infix< 40 , _
+#define-infix< 40 , _
 
 define-infix< 50 -> inline
 define-infix< 50 +=
