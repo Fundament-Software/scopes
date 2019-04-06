@@ -166,6 +166,7 @@ B_TYPES()
 //------------------------------------------------------------------------------
 
 bool is_opaque(const Type *T);
+TypeKind storage_kind(const Type *T);
 SCOPES_RESULT(size_t) size_of(const Type *T);
 SCOPES_RESULT(size_t) align_of(const Type *T);
 const Type *superof(const Type *T);

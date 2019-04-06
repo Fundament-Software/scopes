@@ -579,7 +579,34 @@ PureRef PureCast::from(const Type *type, PureRef value) {
     }
     if (value->get_type() == type)
         return value;
-    return ref(value.anchor(), new PureCast(type, value));
+    if (value.isa<Const>()
+        && (storage_kind(type) == storage_kind(value->get_type()))) {
+        ConstRef result;
+        switch (value->kind()) {
+        case VK_ConstInt: {
+            auto node = value.cast<ConstInt>();
+            result = ConstInt::from(type, node->value);
+        } break;
+        case VK_ConstReal: {
+            auto node = value.cast<ConstReal>();
+            result = ConstReal::from(type, node->value);
+        } break;
+        case VK_ConstAggregate: {
+            auto node = value.cast<ConstAggregate>();
+            result = ConstAggregate::from(type, node->values);
+        } break;
+        case VK_ConstPointer: {
+            auto node = value.cast<ConstPointer>();
+            result = ConstPointer::from(type, node->value);
+        } break;
+        default:
+            assert (false && "unknown const kind");
+            break;
+        }
+        return PureRef(value.anchor(), result);
+    } else {
+        return ref(value.anchor(), new PureCast(type, value));
+    }
 }
 
 //------------------------------------------------------------------------------

@@ -190,6 +190,12 @@ bool is_plain(const Type *T) {
     return false;
 }
 
+TypeKind storage_kind(const Type *T) {
+    if (is_opaque(T))
+        return T->kind();
+    return storage_type(T).assert_ok()->kind();
+}
+
 bool is_opaque(const Type *T) {
     switch(T->kind()) {
     case TK_Qualify:
