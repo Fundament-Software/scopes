@@ -990,21 +990,33 @@ fn integer-imply (vT T)
     `()
 
 fn integer-as (vT T)
+    let static-integer->integer =
+        spice-converter-macro
+            inline (self T)
+                let selfT = ('typeof self)
+                let ST = ('storageof T)
+                let destw = ('bitcount ST)
+                if ('constant? self)
+                    # allow destructive conversions
+                    let selfST = ('storageof selfT)
+                    let u64val = (sc_const_int_extract self)
+                    return (sc_const_int_new T u64val)
+                let vT = selfT
+                let valw = ('bitcount vT)
+                if (icmp== destw valw)
+                    return `(bitcast self T)
+                elseif (icmp>s destw valw)
+                    if ('signed? vT)
+                        return `(sext self T)
+                    else
+                        return `(zext self T)
+                else
+                    return `(itrunc self T)
     let ST =
         if (ptrcmp== T usize) ('storageof T)
         else T
     if (icmp== ('kind ST) type-kind-integer)
-        let valw = ('bitcount vT)
-        let destw = ('bitcount ST)
-        if (icmp== destw valw)
-            return `(inline (self) (bitcast self T))
-        elseif (icmp>s destw valw)
-            if ('signed? vT)
-                return `(inline (self) (sext self T))
-            else
-                return `(inline (self) (zext self T))
-        else
-            return `(inline (self) (itrunc self T))
+        return `(inline (self) (static-integer->integer self T))
     elseif (icmp== ('kind ST) type-kind-real)
         if ('signed? vT)
             return `(inline (self) (sitofp self T))
@@ -3676,8 +3688,24 @@ inline vector-binary-op-dispatch (symbol)
     __countof = __countof-aggregate
     # vector type constructor
     __typecall =
-        inline "vector.__typecall" (cls element-type size)
-            sc_vector_type element-type (size as usize)
+        do
+            let vector_typecall =
+                spice-macro
+                    fn (args)
+                        let argc = ('argcount args)
+                        verify-count argc 2 2
+                        let element-type = ('getarg args 0)
+                        let size = ('getarg args 1)
+                        if ('constant? element-type)
+                            if ('constant? size)
+                                let element-type = (element-type as type)
+                                let size = (size as usize)
+                                let T = (sc_vector_type element-type size)
+                                return `T
+                        return `(sc_vector_type element-type size)
+            spice-quote
+                inline "vector.__typecall" (cls element-type size)
+                    vector_typecall element-type (size as usize)
     #__typecall =
         spice-macro
             fn "vector" (args)
