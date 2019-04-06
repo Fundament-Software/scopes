@@ -2006,8 +2006,9 @@ fn parse-infix-expr (infix-table lhs state mprec)
         let op-prec op-order op-name = (unpack-infix-op op)
         loop (rhs state = ('decons next-state))
             if (empty? state)
+                let anchor = ('anchor la)
                 break
-                    'tag `[(list op-name lhs rhs)] ('anchor la)
+                    'tag `[(list ('tag `op-name anchor) lhs rhs)] anchor
                     state
             let ra __ = ('decons state)
             let lop = (infix-op-gt infix-table ra op-prec)
@@ -2016,8 +2017,9 @@ fn parse-infix-expr (infix-table lhs state mprec)
                     rtl-infix-op-eq infix-table ra op-prec
                 else lop
             if (== ('typeof nextop) Nothing)
+                let anchor = ('anchor la)
                 break
-                    'tag `[(list op-name lhs rhs)] ('anchor la)
+                    'tag `[(list ('tag `op-name anchor) lhs rhs)] anchor
                     state
             let nextop-prec = (unpack-infix-op nextop)
             let next-rhs next-state =
@@ -2432,6 +2434,8 @@ let
                 raises-compile-error;
                 let f args = (decons expr 2)
                 qq ([f] [args])
+
+define-infix< 40 , _
 
 define-infix< 50 -> inline
 define-infix< 50 +=

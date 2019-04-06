@@ -1,4 +1,7 @@
 
+let x... = (_ 1 (_ 2 (_ 3 4)))
+assert ((list x...) == '(1 2 3 4))
+
 fn test-va (x y args...)
     let a b c d e = args...
     assert (none? e)

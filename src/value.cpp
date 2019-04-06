@@ -199,8 +199,23 @@ const Type *arguments_type_from_typed_values(const TypedValues &_values) {
 }
 
 ArgumentList::ArgumentList(const TypedValues &_values)
-    : TypedValue(VK_ArgumentList, arguments_type_from_typed_values(_values)),
-        values(_values) {
+    : TypedValue(VK_ArgumentList, arguments_type_from_typed_values(_values)) {
+    values.reserve(get_argument_count(get_type()));
+    int idx = 1;
+    for (auto value : _values) {
+        if (value.isa<ArgumentList>()) {
+            auto al = value.cast<ArgumentList>();
+            for (auto &&value : al->values) {
+                values.push_back(value);
+                if (idx != _values.size())
+                    break;
+            }
+        } else {
+            values.push_back(value);
+        }
+        idx++;
+    }
+    assert(get_argument_count(get_type()) == values.size());
 }
 
 bool ArgumentList::is_constant() const {
