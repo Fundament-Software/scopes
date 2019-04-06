@@ -261,10 +261,12 @@ let va-rfold va-rifold =
                 let v = (sc_valueref_tag
                     (sc_value_anchor arg) (sc_keyed_new unnamed arg))
                 _ i
-                    if use-indices
-                        `(f [(sub i 2)] k v ret)
-                    else
-                        `(f k v ret)
+                    sc_valueref_tag
+                        sc_value_anchor arg
+                        if use-indices
+                            `(f [(sub i 2)] k v ret)
+                        else
+                            `(f k v ret)
         _
             spice-macro (fn "va-rfold" (args) (va-rfold args false))
             spice-macro (fn "va-rifold" (args) (va-rfold args true))
@@ -3238,6 +3240,14 @@ do
                 inline (x) (x < argc)
                 inline (x) ('getarg self x)
                 inline (x) (x + 1)
+    reverse-args =
+        inline "Value-reverse-args" (self)
+            let argc = ('argcount self)
+            Generator
+                inline () argc
+                inline (x) (x > 0)
+                inline (x) ('getarg self (x - 1))
+                inline (x) (x - 1)
     append-sink =
         inline "Value-args" (self)
             let argc = ('argcount self)

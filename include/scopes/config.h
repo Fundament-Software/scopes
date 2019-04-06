@@ -31,7 +31,7 @@
 // if you think you need more, ask yourself if ad-hoc compiling a pure C function
 // that you can then use at compile time isn't the better choice;
 // 100% of the time, the answer is yes because the performance is much better.
-#define SCOPES_MAX_RECURSIONS 32
+#define SCOPES_MAX_RECURSIONS 64
 
 // maximum number of jump skips permitted
 #define SCOPES_MAX_SKIP_JUMPS 256

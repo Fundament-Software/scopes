@@ -126,8 +126,28 @@ inline each (generator collector)
     static-if (none? collector) _each
     else (_each collector)
 
-inline compose (collector...)
-    inline (coll)
+# this version of compose offers better traceback info
+spice compose (collector...)
+    spice compose-inner (coll collector...)
+        let expr = (sc_expression_new)
+        sc_expression_append expr coll
+        fold (coll = coll) for prevcoll in ('reverse-args collector...)
+            let coll =
+                try
+                    hide-traceback;
+                    sc_prove `(prevcoll coll)
+                except (err)
+                    hide-traceback;
+                    error@+ err ('anchor prevcoll) "while composing collector"
+            sc_expression_append expr coll
+            coll
+        expr
+    spice-quote
+        inline "compose" (coll)
+            compose-inner coll collector...
+
+#inline compose (collector...)
+    inline "compose" (coll)
         va-rfold coll
             inline (key value coll)
                 value coll
@@ -412,9 +432,12 @@ inline demux (init-value f collector...)
     #static-if (none? coll) _demux
     #else (_demux coll)
 
-inline va-mux1 (child coll)
+inline va-mux1 (child maplr coll)
+    let maplr =
+        static-if (none? maplr) (inline (...) (_ (inline () ...) (inline () ...)))
+        else maplr
     """"output both child input and child output
-    inline _combine (coll)
+    inline _va-mux1 (coll)
         let ch = (child coll)
         let init1 valid1? at1 collect1 = ((ch as Collector))
         let init2 valid2? at2 collect2 = ((coll as Collector))
@@ -424,18 +447,27 @@ inline va-mux1 (child coll)
             at1
             inline "append-collect" (src it...)
                 let src... = (src)
-                let src = (inline () src...)
+                let srcl srcr = (maplr src...)
                 let sink =
                     Collector init2 valid2? at2
                         inline (src2 it2...)
                             collect2
                                 inline ()
-                                    va-append-va src2 src...
+                                    va-append-va src2 (srcl)
                                 it2...
                 let __ __ __ collect = (((child sink) as Collector))
-                collect src it...
-    static-if (none? coll) _combine
-    else (_combine coll)
+                collect srcr it...
+    static-if (none? coll) _va-mux1
+    else (_va-mux1 coll)
+
+@@ spice-quote
+inline retain (maplr ...)
+    """"split input using maplr, which returns two closures which when applied
+        return the residual input argument to be returned, and the arguments
+        to be passed to the right hand composition;
+        when the right hand composition has completed, the residual left hand
+        arguments and the right hand result will be joined
+    va-mux1 (compose ...) maplr
 
 inline va-mux (...)
     inline (coll)
@@ -444,6 +476,10 @@ inline va-mux (...)
                 (va-mux1 value) coll
             ...
 
-unlet cascade1 mux1 va-mux1
+@@ spice-quote
+inline split-compose (...)
+    va-mux1 (compose ...)
+
+unlet cascade1 mux1
 
 locals;
