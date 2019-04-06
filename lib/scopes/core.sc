@@ -2656,6 +2656,9 @@ let hash-storage =
                         `(hash1 value)
                     else
                         ltr-multiop ('getarglist args 1) hash2 2
+    from-bytes =
+        inline "hash.from-bytes" (data size)
+            bitcast (sc_hashbytes data size) hash
 
 va-lfold none
     inline (key T)
@@ -3191,6 +3194,9 @@ do
         sc_string_new ptr 1
 
     'set-symbols string
+        __hash =
+            inline (self)
+                hash.from-bytes ('buffer self)
         __ras =
             spice-cast-macro
                 fn "string-as" (vT T)
