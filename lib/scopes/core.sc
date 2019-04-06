@@ -1780,23 +1780,30 @@ let coerce-call-arguments =
             let argc = (sub argc 1)
             let fptrT = ('typeof self)
             let fT = ('element@ fptrT 0)
-            let pcount = ('element-count fT)
-            if (== pcount argc)
-                let outargs = ('tag (sc_call_new self) ('anchor args))
-                sc_call_set_rawcall outargs true
-                loop (i = 0)
-                    if (== i argc)
-                        break outargs
-                    let arg = ('getarg args (add i 1))
-                    let argT = ('typeof arg)
-                    let paramT = ('element@ fT i)
-                    let outarg =
-                        if (== argT paramT) arg
+            if ('function? fT)
+                let variadic? = ('variadic? fT)
+                let pcount = ('element-count fT)
+                if (| (& (not variadic?) (== pcount argc))
+                      (& variadic? (<= pcount argc)))
+                    let outargs = ('tag (sc_call_new self) ('anchor args))
+                    sc_call_set_rawcall outargs true
+                    loop (i = 0)
+                        if (== i argc) (break)
+                        let arg = ('getarg args (add i 1))
+                        let argT = ('typeof arg)
+                        if (>= i pcount)
+                            sc_call_append_argument outargs arg
                         else
-                            ('tag `(imply arg paramT) ('anchor arg))
-                    sc_call_append_argument outargs outarg
-                    + i 1
-            else ('tag `(rawcall self [('getarglist args 1)]) ('anchor args))
+                            let paramT = ('element@ fT i)
+                            let outarg =
+                                if (== argT paramT) arg
+                                else
+                                    ('tag `(imply arg paramT) ('anchor arg))
+                            sc_call_append_argument outargs outarg
+                        + i 1
+                    return outargs
+            # let prover handle type error
+            'tag `(rawcall self [('getarglist args 1)]) ('anchor args)
 
 #
     set-type-symbol! pointer 'set-element-type
