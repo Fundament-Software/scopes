@@ -105,7 +105,7 @@ public:
         Types args;
         //auto anchors = new std::vector<Anchor>();
         //StyledStream ss;
-        //const Type *ST = tni;
+        const Type *ST = tni;
 
         size_t sz = 0;
         size_t al = 1;
@@ -193,6 +193,8 @@ public:
                 set_active_anchor(anchor);
                 location_error(String::from("clang-bridge: imported record doesn't fit"));
                 #endif
+#else
+                (void)ST;
 #endif
             }
         }

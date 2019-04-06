@@ -198,8 +198,9 @@ inline map (f coll)
     inline _map (coll)
         let init valid? at collect = ((coll as Collector))
         Collector init valid? at
-            inline (src args...)
-                collect (inline () (f (src))) args...
+            inline "map-push" (src args...)
+                let src... = (f (src))
+                collect (inline () src...) args...
     static-if (none? coll) _map
     else (_map coll)
 

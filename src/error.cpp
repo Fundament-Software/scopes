@@ -182,6 +182,19 @@ static void print_name_suggestions(StyledStream &ss, const Symbols &syms) {
     ss << "?";
 }
 
+static void print_all_suggestions(StyledStream &ss, const Symbols &syms) {
+    if (syms.empty()) return;
+    ss << ". Try '" << syms[0].name()->data << "'";
+    for (size_t i = 1; i < syms.size(); ++i) {
+        if ((i + 1) == syms.size()) {
+            ss << " or ";
+        } else {
+            ss << ", ";
+        }
+        ss << "'" << syms[i].name()->data << "'";
+    }
+}
+
 static void syntax_undeclared_identifier_print_suggestions(StyledStream &ss, Symbol symbol, PScope scope) {
     ss << "syntax: identifier '" << symbol.name()->data;
     ss << "' is not declared in scope";
@@ -191,7 +204,7 @@ static void syntax_undeclared_identifier_print_suggestions(StyledStream &ss, Sym
 static void unknown_parameter_key_print_suggestions(StyledStream &ss, Symbol symbol, const Symbols &symbols) {
     ss << "no parameter named '" << symbol.name()->data;
     ss << "' in function";
-    print_name_suggestions(ss, find_closest_match(symbol, symbols));
+    print_all_suggestions(ss, symbols);
 }
 
 static void rt_missing_type_attribute_print_suggestions(StyledStream &ss, Symbol symbol, PType type) {
@@ -310,6 +323,20 @@ void stream_backtrace(StyledStream &ss, const Backtrace *bt) {
         ss << anchor;
         ss << " while checking type of argument" << std::endl;
         anchor->stream_source_line(ss);
+    } break;
+    case BTK_ProveParamMap: {
+        ss << anchor;
+        ss << " while mapping arguments to function" << std::endl;
+        anchor->stream_source_line(ss);
+        if (value.isa<Const>()
+            && value.cast<Const>()->get_type() == TYPE_Closure) {
+            auto fanchor = extract_closure_constant(value).assert_ok()->func.anchor();
+            if (fanchor != anchor) {
+                ss << anchor;
+                ss << " defined here" << std::endl;
+                anchor->stream_source_line(ss);
+            }
+        }
     } break;
     case BTK_ProveArgumentLifetime: {
         ss << anchor;

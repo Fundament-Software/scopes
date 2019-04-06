@@ -4193,7 +4193,7 @@ define va-append-va
             let newargs = (sc_argument_list_new)
             loop (i = 1)
                 if (i == argc)
-                    sc_argument_list_append newargs `(end)
+                    sc_argument_list_append newargs ('tag `(end) ('anchor end))
                     break newargs
                 sc_argument_list_append newargs ('getarg args i)
                 repeat (i + 1)
@@ -4226,6 +4226,24 @@ define va-split
                 sc_argument_list_append rargs ('getarg args i)
                 repeat (i + 1)
             `(_ (inline () largs) (inline () rargs))
+
+"""" filter all keyed values
+define va-unnamed
+    spice-macro
+        fn "va-unnamed" (args)
+            raises-compile-error;
+            let argc = ('argcount args)
+            verify-count argc 0 -1
+            let outargs = (sc_argument_list_new)
+            loop (i = 0)
+                if (i == argc)
+                    break;
+                let arg = ('getarg args i)
+                let k = (sc_type_key ('qualified-typeof arg))
+                if (k == unnamed)
+                    sc_argument_list_append outargs arg
+                repeat (i + 1)
+            outargs
 
 run-stage;
 

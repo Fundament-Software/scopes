@@ -441,6 +441,8 @@ enum BacktraceKind {
     BTK_ProveTemplate,
     // context = argument being typechecked
     BTK_ProveArgument,
+    // context = target whose parameters are being mapped
+    BTK_ProveParamMap,
     // context = argument being lifetime checked
     BTK_ProveArgumentLifetime,
     // invoked in user code at runtime; context = call
@@ -466,6 +468,8 @@ struct Backtrace {
     SCOPES_TRACE(ProveTemplate, (VALUEREF))
 #define SCOPES_TRACE_PROVE_ARG(VALUEREF) \
     SCOPES_TRACE(ProveArgument, (VALUEREF))
+#define SCOPES_TRACE_PROVE_PARAM_MAP(VALUEREF) \
+    SCOPES_TRACE(ProveParamMap, (VALUEREF))
 #define SCOPES_TRACE_PROVE_ARG_LIFETIME(VALUEREF) \
     SCOPES_TRACE(ProveArgumentLifetime, (VALUEREF))
 

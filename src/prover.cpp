@@ -947,6 +947,7 @@ static SCOPES_RESULT(TypedValueRef) prove_Expression(const ASTContext &ctx, cons
         for (int i = 0; i < count; ++i) {
             auto newsrc = SCOPES_GET_RESULT(prove(subctx, expr->body[i]));
             if (!is_returning(newsrc->get_type())) {
+                SCOPES_TRACE_PROVE_ARG(expr->body[i]);
                 SCOPES_ERROR(PrematureReturnFromExpression);
             }
         }
@@ -962,7 +963,11 @@ static SCOPES_RESULT(TypedValueRef) prove_Expression(const ASTContext &ctx, cons
         return result;
     } else {
         for (int i = 0; i < count; ++i) {
-            SCOPES_CHECK_RESULT(prove(ctx, expr->body[i]));
+            auto newsrc = SCOPES_GET_RESULT(prove(ctx, expr->body[i]));
+            if (!is_returning(newsrc->get_type())) {
+                SCOPES_TRACE_PROVE_ARG(expr->body[i]);
+                SCOPES_ERROR(PrematureReturnFromExpression);
+            }
         }
         if (!expr->value)
             return ref(expr.anchor(), ArgumentList::from({}));
@@ -1014,6 +1019,7 @@ SCOPES_RESULT(void) map_keyed_arguments(const Anchor *anchor, const TypedValueRe
                     outargs.push_back(TypedValueRef());
                 }
                 if (mapped[ki]) {
+                    SCOPES_TRACE_PROVE_PARAM_MAP(callee);
                     SCOPES_ERROR(DuplicateParameterKey, key);
                 }
                 index = ki;
@@ -1029,6 +1035,7 @@ SCOPES_RESULT(void) map_keyed_arguments(const Anchor *anchor, const TypedValueRe
                 mapped.push_back(false);
                 outargs.push_back(TypedValueRef());
             } else {
+                SCOPES_TRACE_PROVE_PARAM_MAP(callee);
                 SCOPES_ERROR(UnknownParameterKey, key, symbols);
             }
         }
@@ -1797,6 +1804,7 @@ SCOPES_RESULT(void) verify_cast_lifetime(const Type *SrcT, const Type *DestT) {
 static SCOPES_RESULT(TypedValueRef) prove_CallTemplate(
     const ASTContext &ctx, const CallTemplateRef &call) {
     SCOPES_RESULT_TYPE(TypedValueRef);
+    auto callee_anchor = call->callee.anchor();
     //const Anchor *anchor = get_best_anchor(call);
     TypedValueRef callee = ref(call->callee.anchor(),
         SCOPES_GET_RESULT(prove(ctx, call->callee)));
@@ -1833,7 +1841,9 @@ repeat:
             TypedValues args;
             Symbols keys;
             bool vararg = keys_from_parameters(keys, cl->func->params);
-            SCOPES_CHECK_RESULT(map_keyed_arguments(call.anchor(), callee, args, values, keys, vararg));
+            SCOPES_CHECK_RESULT(map_keyed_arguments(call.anchor(),
+                ref(callee_anchor, callee),
+                args, values, keys, vararg));
             values = args;
         }
         if (cl->func->is_inline()) {

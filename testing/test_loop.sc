@@ -1,3 +1,4 @@
+using import testing
 
 # default form
 let x =
@@ -90,3 +91,12 @@ fn looper ()
     true
 
 assert (not (looper))
+
+assert-compiler-error
+    embed
+        # loop that never breaks
+        loop (i = 0)
+            repeat (i + 1)
+        true
+
+true
