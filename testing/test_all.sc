@@ -7,6 +7,7 @@ test-modules
     .test_ansi_colors
     .test_array
     .test_ast_quote
+    .test_bool
     .test_branch
     .test_assorted
     .test_borrowing

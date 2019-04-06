@@ -1487,6 +1487,20 @@ static const Type *view_result_type(const ASTContext &ctx, const Type *T,
     return view_result_type(T, ids);
 }
 
+static SCOPES_RESULT(void) build_tobool (
+    const ASTContext &ctx, const Anchor *anchor, TypedValueRef &val) {
+    SCOPES_RESULT_TYPE(void);
+    auto T = strip_qualifiers(val->get_type());
+    if (T != TYPE_Bool) {
+        ValueRef handler;
+        if (T->lookup(SYM_BoolHandler, handler)) {
+            auto expr = ref(anchor, CallTemplate::from(handler, { val }));
+            val = SCOPES_GET_RESULT(prove(ctx, expr));
+        }
+    }
+    return {};
+}
+
 static SCOPES_RESULT(void) build_deref(
     const ASTContext &ctx, const Anchor *anchor, TypedValueRef &val) {
     SCOPES_RESULT_TYPE(void);
@@ -3004,6 +3018,7 @@ static SCOPES_RESULT(TypedValueRef) prove_If(const ASTContext &ctx, const IfRef 
             TypedValueRef newcond = SCOPES_GET_RESULT(prove(subctx, clause.cond));
             newcond = ref(newcond.anchor(),
                 ExtractArgument::from(newcond, 0));
+            SCOPES_CHECK_RESULT(build_tobool(ctx, newcond.anchor(), newcond));
             SCOPES_CHECK_RESULT(build_deref(ctx, newcond.anchor(), newcond));
             auto condT = strip_qualifiers(newcond->get_type());
             if (condT != TYPE_Bool) {

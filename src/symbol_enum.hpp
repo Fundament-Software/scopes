@@ -551,6 +551,7 @@ namespace scopes {
     T(SYM_DropHandler, "__drop") \
     T(SYM_CopyHandler, "__copy") \
     T(SYM_DerefHandler, "__deref") \
+    T(SYM_BoolHandler, "__tobool") \
     \
     /* varargs */ \
     T(SYM_Parenthesis, "...") \

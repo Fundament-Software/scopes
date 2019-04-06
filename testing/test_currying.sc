@@ -3,7 +3,9 @@ f := (a b c) -> (d f) -> b * f
 
 assert (f <- (_ 1 2 3) <- (_ 4 5) == 10)
 
-u := (a b) -> a + b; v := (a b) -> a - b; w := () -> (_ u v)
+u := (a b) -> a + b
+v := (a b) -> a - b
+w := () -> (_ u v)
 
 assert ((u 2 3) == 5)
 assert ((v 2 3) == -1)
@@ -14,7 +16,7 @@ assert ((q 2 3) == -1)
 #let at next =
     decons
         sugar-quote
-            u := (a b) -> a + b, v := (a b) -> a - b
+            a and b or c
 #print
     parse-infix-expr (__this-scope) at next 0
 
@@ -26,3 +28,4 @@ assert ((list (op1 1 2 3)) == '(3 1))
 assert ((list (op2 1)) == '(1 1 3))
 
 assert ((op3 2 3) == 6)
+

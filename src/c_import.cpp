@@ -105,7 +105,7 @@ public:
         Types args;
         //auto anchors = new std::vector<Anchor>();
         //StyledStream ss;
-        const Type *ST = tni;
+        //const Type *ST = tni;
 
         size_t sz = 0;
         size_t al = 1;

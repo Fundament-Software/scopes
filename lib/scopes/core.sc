@@ -918,6 +918,17 @@ inline spice-converter-macro (f)
 
 # integer casting
 
+fn integer-tobool (args)
+    raises-compile-error;
+    let argc = (sc_argcount args)
+    verify-count argc 1 1
+    let self = (sc_getarg args 0)
+    if ('constant? self)
+        let result = (icmp!= (sc_const_int_extract self) 0:u64)
+        return `result
+    let T = ('typeof self)
+    return `(icmp!= self (nullof T))
+
 fn integer-imply (vT T)
     let static-i32->real =
         spice-converter-macro
@@ -1063,20 +1074,26 @@ fn cast-converter (symbol rsymbol vT T)
         if (operator-valid? conv) (return conv)
     return (sc_empty_argument_list)
 
-inline cast-identity (value) value
-
 fn imply-converter (vT T)
     if (ptrcmp== vT T)
-        return `cast-identity
+        return `_
     if (sc_type_is_superof T vT)
-        return `cast-identity
+        return `_
+    if (ptrcmp== T bool)
+        try
+            return ('@ vT '__tobool)
+        except (err)
     cast-converter '__imply '__rimply vT T
 
 fn as-converter (vT T)
     if (ptrcmp== vT T)
-        return `cast-identity
+        return `_
     if (sc_type_is_superof T vT)
-        return `cast-identity
+        return `_
+    if (ptrcmp== T bool)
+        try
+            return ('@ vT '__tobool)
+        except (err)
     let conv = (cast-converter '__as '__ras vT T)
     if (operator-valid? conv) (return conv)
     # try implicit cast last
@@ -1366,17 +1383,30 @@ fn dispatch-and-or (args flip)
         'getarg args 0
         'getarg args 1
     let call-elsef = `(elsef)
-    if ('constant? cond)
-        let value = (unbox-integer cond bool)
-        return
-            if (bxor value flip) cond
-            else call-elsef
+
+    let condT = ('typeof cond)
+    let conv = (imply-converter condT bool)
+    let condbool =
+        if (operator-valid? conv)
+            hide-traceback;
+            sc_prove ('tag `(conv cond) ('anchor cond))
+        else cond
+    if (ptrcmp== ('typeof condbool) bool)
+        if ('constant? condbool)
+            let value = (unbox-integer condbool bool)
+            return
+                if (bxor value flip) cond
+                else call-elsef
+    elseif flip
+        return call-elsef
+    else
+        return cond
     let ifval = (sc_if_new)
     if flip
-        sc_if_append_then_clause ifval cond call-elsef
+        sc_if_append_then_clause ifval condbool call-elsef
         sc_if_append_else_clause ifval cond
     else
-        sc_if_append_then_clause ifval cond cond
+        sc_if_append_then_clause ifval condbool cond
         sc_if_append_else_clause ifval call-elsef
     ifval
 
@@ -1394,6 +1424,7 @@ let safe-shl =
             `(shl lhs (band rhs mask))
 
 'set-symbols integer
+    __tobool = (box-pointer (spice-macro integer-tobool))
     __imply = (box-pointer (spice-cast-macro integer-imply))
     __as = (box-pointer (spice-cast-macro integer-as))
     __+ = (box-pointer (simple-binary-op add))
@@ -1534,6 +1565,13 @@ inline floordiv (a b)
                     else
                         `(sc_scope_clone_subscope
                             [(sc_extract_argument_list_new args 1)])
+
+#---------------------------------------------------------------------------
+# nothing type
+#---------------------------------------------------------------------------
+
+'set-symbols Nothing
+    __tobool = (box-pointer (inline () false))
 
 #---------------------------------------------------------------------------
 # null type
@@ -4514,7 +4552,8 @@ define-sugar-block-scope-macro static-if
                     _ '() next-expr
         return
             list
-                list static-branch cond
+                list static-branch
+                    'tag `[(list imply cond bool)] ('anchor cond)
                     cons inline '() body
                     cons inline '() elseexpr
             next-next-expr
