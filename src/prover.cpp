@@ -2044,6 +2044,9 @@ repeat:
             return TypedValueRef(call.anchor(),
                 ConstPointer::type_from(strip_qualifiers(A)));
         } break;
+        case KW_Forward: {
+            return ref(call.anchor(), ArgumentList::from(values));
+        } break;
         /*** SPIR-V FORMS ***/
         case FN_Sample: {
             CHECKARGS(2, -1);

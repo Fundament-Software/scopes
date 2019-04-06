@@ -125,13 +125,15 @@ print
 # generate 10 numbers
 ->> (range 10)
     # preserve all existing inputs and outputs
-    va-mux
+    retain _
         map
             # receives range index
             inline "op1" (x) (/ x)
+    retain _
         map
             # receives range index and output of op1, which we discard
             inline "op2" (x) (/ (x * 2))
+    retain _
         map
             # receives range index and outputs of op1 & op2, which we discard
             inline "op3" (x) (/ (x * 5))

@@ -432,54 +432,38 @@ inline demux (init-value f collector...)
     #static-if (none? coll) _demux
     #else (_demux coll)
 
-inline va-mux1 (child maplr coll)
-    let maplr =
-        static-if (none? maplr) (inline (...) (_ (inline () ...) (inline () ...)))
-        else maplr
+inline retain1 (mapl child coll)
+    let mapl =
+        static-if (none? mapl) (inline (...) ...)
+        else mapl
     """"output both child input and child output
-    inline _va-mux1 (coll)
+    inline _retain1 (coll)
         let ch = (child coll)
         let init1 valid1? at1 collect1 = ((ch as Collector))
         let init2 valid2? at2 collect2 = ((coll as Collector))
-        Collector
-            init1
-            valid1?
-            at1
+        Collector init1 valid1? at1
             inline "append-collect" (src it...)
                 let src... = (src)
-                let srcl srcr = (maplr src...)
                 let sink =
                     Collector init2 valid2? at2
                         inline (src2 it2...)
                             collect2
                                 inline ()
-                                    va-append-va src2 (srcl)
+                                    va-append-va src2 (mapl src...)
                                 it2...
                 let __ __ __ collect = (((child sink) as Collector))
-                collect srcr it...
-    static-if (none? coll) _va-mux1
-    else (_va-mux1 coll)
+                collect (inline () src...) it...
+    static-if (none? coll) _retain1
+    else (_retain1 coll)
 
 @@ spice-quote
-inline retain (maplr ...)
-    """"split input using maplr, which returns two closures which when applied
-        return the residual input argument to be returned, and the arguments
-        to be passed to the right hand composition;
-        when the right hand composition has completed, the residual left hand
-        arguments and the right hand result will be joined
-    va-mux1 (compose ...) maplr
+inline retain (mapl ...)
+    """"feeds the input through a composition of collectors and feeds the
+        input along with the composition output to the next collector.
+        if mapl is not none, it allows to specify the portion of the input that
+        will be passed to the end point.
+    retain1 mapl (compose ...)
 
-inline va-mux (...)
-    inline (coll)
-        va-rfold coll
-            inline (key value coll)
-                (va-mux1 value) coll
-            ...
-
-@@ spice-quote
-inline split-compose (...)
-    va-mux1 (compose ...)
-
-unlet cascade1 mux1
+unlet cascade1 retain1
 
 locals;
