@@ -2753,8 +2753,9 @@ repeat:
     const FunctionType *aft = extract_function_type(T);
     const FunctionType *ft = aft->strip_annotations();
     int numargs = (int)ft->argument_types.size();
-    if ((!ft->vararg() && (values.size() != numargs))
-        || (ft->vararg() && (values.size() < numargs))) {
+    bool variadic = ft->vararg();
+    if ((!variadic && (values.size() != numargs))
+        || (variadic && (values.size() < numargs))) {
         if (values.size() > numargs) {
             SCOPES_ERROR(TooManyFunctionArguments, ft, values.size());
         } else if (values.size() < numargs) {
@@ -2795,6 +2796,11 @@ repeat:
         }
         SCOPES_ERROR(ParameterTypeMismatch, Tb, Ta);
     }
+    // ensure variadic parameters aren't references
+    for (int i = numargs; i < values.size(); ++i) {
+        DEREF(values[i]);
+    }
+
     // build id map
     ID2SetMap idmap;
     idmap.reserve(numargs);
