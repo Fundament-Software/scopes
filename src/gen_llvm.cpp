@@ -1209,6 +1209,14 @@ struct LLVMIRGenerator {
         return ptr;
     }
 
+    LLVMValueRef build_struct_cast(LLVMValueRef val, LLVMTypeRef ty) {
+        // completely braindead, but what can you do
+        LLVMValueRef ptr = safe_alloca(LLVMTypeOf(val));
+        LLVMBuildStore(builder, val, ptr);
+        ptr = LLVMBuildBitCast(builder, ptr, LLVMPointerType(ty,0), "");
+        return LLVMBuildLoad(builder, ptr, "");
+    }
+
     SCOPES_RESULT(LLVMValueRef) translate_builtin(Builtin builtin, const TypedValues &args) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         size_t argcount = args.size();
@@ -1270,7 +1278,6 @@ struct LLVMIRGenerator {
         } break;
         case FN_View:
         case FN_Lose:
-        case FN_Track:
         case FN_Dupe:
         case FN_Move: {
             READ_VALUE(val);
@@ -1320,16 +1327,13 @@ struct LLVMIRGenerator {
             }
             return LLVMBuildGEP(builder, pointer, indices, count, "");
         } break;
+        case FN_Track:
         case FN_Bitcast: { READ_VALUE(val); READ_TYPE(ty);
             auto T = LLVMTypeOf(val);
             if (T == ty) {
                 return val;
             } else if (LLVMGetTypeKind(ty) == LLVMStructTypeKind) {
-                // completely braindead, but what can you do
-                LLVMValueRef ptr = safe_alloca(T);
-                LLVMBuildStore(builder, val, ptr);
-                ptr = LLVMBuildBitCast(builder, ptr, LLVMPointerType(ty,0), "");
-                return LLVMBuildLoad(builder, ptr, "");
+                return build_struct_cast(val, ty);
             } else {
                 return LLVMBuildBitCast(builder, val, ty, "");
             }

@@ -1194,7 +1194,6 @@ struct SPIRVGenerator {
         } break;
         case FN_View:
         case FN_Lose:
-        case FN_Track:
         case FN_Dupe:
         case FN_Move: {
             READ_VALUE(val);
@@ -1244,6 +1243,7 @@ struct SPIRVGenerator {
                 builder.getTypeStorageClass(builder.getTypeId(pointer)),
                 pointer, indices);
         } break;
+        case FN_Track:
         case FN_Bitcast:
         case FN_IntToPtr:
         case FN_PtrToInt:
@@ -1260,6 +1260,7 @@ struct SPIRVGenerator {
             READ_VALUE(val); READ_TYPE(ty);
             spv::Op op = spv::OpMax;
             switch(builtin.value()) {
+            case FN_Track:
             case FN_Bitcast:
                 if (builder.getTypeId(val) == ty) {
                     // do nothing
