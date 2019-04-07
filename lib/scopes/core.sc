@@ -650,7 +650,7 @@ let
     type<= = (spice-macro (type-comparison-func type<=))
     type>= = (spice-macro (type-comparison-func type>=))
 
-let NullType = (sc_typename_type "NullType")
+let NullType = (sc_typename_type "NullType" typename)
 
 run-stage;
 
@@ -774,7 +774,6 @@ inline define-symbols (self values...)
     opaque? = sc_type_is_opaque
     string = sc_type_string
     superof = sc_typename_type_get_super
-    set-super = sc_typename_type_set_super
     set-storage =
         inline (type storage-type)
             sc_typename_type_set_storage type storage-type 0:u32
@@ -864,36 +863,18 @@ inline not (value)
     bxor value true
 
 # supertype for unique structs
-let Struct = (sc_typename_type "Struct")
-
-# a supertype to be used for conversions
-let immutable = (sc_typename_type "immutable")
-sc_typename_type_set_super integer immutable
-sc_typename_type_set_super real immutable
-sc_typename_type_set_super vector immutable
-sc_typename_type_set_super Symbol immutable
-sc_typename_type_set_super CEnum immutable
-
-let aggregate = (sc_typename_type "aggregate")
-sc_typename_type_set_super array aggregate
-sc_typename_type_set_super tuple aggregate
-
-let opaquepointer = (sc_typename_type "opaquepointer")
-sc_typename_type_set_super string opaquepointer
-sc_typename_type_set_super type opaquepointer
-
-sc_typename_type_set_super usize integer
+let Struct = (sc_typename_type "Struct" typename)
 
 # generator type
-let Generator = (sc_typename_type "Generator")
+let Generator = (sc_typename_type "Generator" typename)
 'set-plain-storage Generator ('storageof Closure)
 
 # collector type
-let Collector = (sc_typename_type "Collector")
+let Collector = (sc_typename_type "Collector" typename)
 'set-plain-storage Collector ('storageof Closure)
 
 # syntax macro type
-let SugarMacro = (sc_typename_type "SugarMacro")
+let SugarMacro = (sc_typename_type "SugarMacro" typename)
 let SugarMacroFunction =
     pointer
         raises
@@ -1762,9 +1743,12 @@ run-stage;
                             sc_string_join "typename "
                                 sc_string_join ('__repr `cls)
                                     " has no constructor"
-                    verify-count argc 2 2
+                    verify-count argc 2 3
                     let name = (as ('getarg args 1) string)
-                    'tag `[(sc_typename_type name)] ('anchor args)
+                    let supertype =
+                        if (> argc 2) (as ('getarg args 2) type)
+                        else typename
+                    'tag `[(sc_typename_type name supertype)] ('anchor args)
 
 let null = (nullof NullType)
 
@@ -2461,7 +2445,7 @@ let pow = (select-op-macro powi powf 2)
 let abs = (select-op-macro sabs fabs 1)
 let sign = (select-op-macro ssign fsign 1)
 
-let hash = (sc_typename_type "hash")
+let hash = (sc_typename_type "hash" typename)
 'set-plain-storage hash u64
 
 run-stage;
@@ -4505,8 +4489,7 @@ sugar fn... (name...)
             error
                 """"syntax: (fn... name|"name") (case pattern body...) ...
     let outargs = (sc_argument_list_new)
-    let outtype = (sc_typename_type (fn-name as string))
-    'set-super outtype OverloadedFunction
+    let outtype = (sc_typename_type (fn-name as string) OverloadedFunction)
     'set-symbols outtype
         templates = (sc_argument_list_new)
         parameter-types = (sc_argument_list_new)
@@ -4932,35 +4915,43 @@ sugar typedef+ (T body...)
 
 sugar typedef (name body...)
     let declaration? = (('typeof name) == Symbol)
+
+    let expr supertype has-supertype-def? =
+        sugar-match body...
+        case ('< supertype rest...)
+            _ rest... supertype true
+        default
+            _ body... `typename false
+
     let typedecl =
         label got-typedecl
             if declaration?
-                if (empty? body...)
-                    # forward declaration - we build the type at syntax time
+                if (empty? expr)
+                    # forward declaration
                     return
-                        qq [let] [name] = [(typename.type (name as Symbol as string))]
+                        qq [let] [name] = (typename
+                            [(name as Symbol as string)]
+                            [supertype])
 
-                let symname = (name as Symbol)
-                # see if we can find a forward declaration in the local scope
-                try
-                    let T = (getattr sugar-scope symname)
-                    let T = (T as type)
-                    assert (('opaque? T) and (('superof T) == typename))
-                    # reuse type
-                    merge got-typedecl `T
-                except (err)
+                if (not has-supertype-def?)
+                    let symname = (name as Symbol)
+                    # see if we can find a forward declaration in the local scope
+                    try
+                        let T = (getattr sugar-scope symname)
+                        # reuse type
+                        merge got-typedecl `T
+                    except (err)
 
             let namestr =
                 if declaration? `[(name as Symbol as string)]
                 else name
-            `[(qq [typename.type] [namestr])]
+            `[(qq [typename.type] [namestr] [supertype])]
 
     let expr =
-        loop (inp outp = body... '())
+        loop (inp outp = expr '())
             sugar-match inp
             case ('< supertype rest...)
-                repeat rest...
-                    cons (list sc_typename_type_set_super 'this-type supertype) outp
+                error@ ('anchor supertype) "while matching pattern" "supertype must be in first place"
             case (': storagetype rest...)
                 repeat rest...
                     cons (list sc_typename_type_set_storage 'this-type storagetype typename-flag-plain) outp
@@ -5156,32 +5147,48 @@ sugar struct (name body...)
         else
             error
                 .. "type " (repr T) " must have Struct, CStruct or CUnion supertype"
+                    \ " but has supertype " (repr ('superof T))
         T
 
-    if (('typeof name) == Symbol)
-        if (empty? body...)
-            # forward declaration
-            return
-                qq [typedef] [name]
-
-    let supertype body... =
+    let supertype body has-supertype? =
         sugar-match body...
         case ('union rest...)
-            _ `CUnion rest...
+            _ `CUnion rest... true
         case ('plain rest...)
-            _ `CStruct rest...
+            _ `CStruct rest... true
         case ('< supertype rest...)
-            _ supertype rest...
+            _ supertype rest... true
         default
-            _ `Struct body...
+            _ `Struct body... false
 
-    qq [typedef] [name] < [supertype] do
+    let has-fwd-decl =
+        if (('typeof name) == Symbol)
+            if (empty? body)
+                # forward declaration
+                return
+                    qq [typedef] [name] < [supertype]
+
+            let symname = (name as Symbol)
+            # see if we can find a forward declaration in the local scope
+            try (getattr sugar-scope symname) true
+            except (err) false
+        else false
+
+    qq [typedef] [name]
+        unquote-splice
+            if has-fwd-decl
+                if has-supertype?
+                    hide-traceback;
+                    error "completing struct declaration must not define a supertype"
+                list 'do
+            else
+                qq < [supertype] do
         [local] field-types = [`(ptrtoref (alloca list))]
         field-types = [null]
         [using] [struct-dsl]
         [let] scope =
             [do]
-                unquote-splice body...
+                unquote-splice body
                 [locals];
         [set-symbols-from-scope] this-type ('parent scope)
         [set-symbols-from-scope] this-type scope
@@ -5212,7 +5219,7 @@ sugar struct (name body...)
 
 sugar enum (name values...)
     spice make-enum (name vals...)
-        let T = (typename.type (name as string))
+        let T = (typename.type (name as string) CEnum)
 
         inline build-type (self)
             let repr-expr = (sc_expression_new)
@@ -5223,7 +5230,6 @@ sugar enum (name values...)
                 sc_expression_append repr-expr
                     spice-quote
                         if (self == const) (return str)
-            'set-super T CEnum
             'set-plain-storage T i32
             let count = ('argcount vals...)
             loop (i nextval = 0 0)

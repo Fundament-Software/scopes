@@ -10,7 +10,7 @@ typedef MyHandleType :: i32
 assert (('storageof MyHandleType) == i32)
 
 # define MyIntType as plain 32-bit integer type with integer supertype
-typedef MyIntType : i32 < integer
+typedef MyIntType < integer : i32
 
 assert (('storageof MyIntType) == i32)
 assert (MyIntType < integer)
@@ -36,12 +36,12 @@ typedef MyTupleType < MyTupleSuperType : (tuple i32 i32)
             extractvalue self 1
 
 # forward declare self-ref type
-typedef SelfRefType
-assert (constant? SelfRefType)
+typedef SelfRefType < tuple
+static-assert (constant? SelfRefType)
 
 let SRT = SelfRefType
 
-typedef SelfRefType < tuple : (tuple.type i32 (pointer SelfRefType))
+typedef SelfRefType : (tuple.type i32 (pointer SelfRefType))
 
 assert (SelfRefType == SRT)
 assert (('superof SelfRefType) == tuple)

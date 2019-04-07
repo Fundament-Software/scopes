@@ -66,9 +66,9 @@ struct Type {
 
     StyledStream& stream(StyledStream& ost) const;
 
-    void bind(Symbol name, const ValueRef &value);
+    void bind(Symbol name, const ValueRef &value) const;
 
-    void del(Symbol name);
+    void del(Symbol name) const;
 
     bool lookup(Symbol name, ValueRef &dest) const;
 
@@ -85,7 +85,7 @@ private:
     const TypeKind _kind;
 
 protected:
-    Map symbols;
+    mutable Map symbols;
 };
 
 typedef std::vector<const Type *> Types;
@@ -139,6 +139,9 @@ typedef std::vector<const Type *> Types;
     T(TYPE_Sampler, "Sampler") \
     \
     /* supertypes */ \
+    T(TYPE_Immutable, "immutable") \
+    T(TYPE_Aggregate, "aggregate") \
+    T(TYPE_OpaquePointer, "opaquepointer") \
     T(TYPE_Integer, "integer") \
     T(TYPE_Real, "real") \
     T(TYPE_Pointer, "pointer") \

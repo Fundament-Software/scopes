@@ -669,13 +669,13 @@ struct LLVMIRGenerator {
             }
             auto tn = cast<TypenameType>(type);
             if (tn->finalized()) {
-                switch(tn->storage_type->kind()) {
+                switch(tn->storage()->kind()) {
                 case TK_Tuple:
                 case TK_Union: {
                     type_todo.push_back(type);
                 } break;
                 default: {
-                    return create_llvm_type(tn->storage_type);
+                    return create_llvm_type(tn->storage());
                 } break;
                 }
             }
@@ -737,7 +737,7 @@ struct LLVMIRGenerator {
             if (!tn->finalized())
                 continue;
             LLVMTypeRef LLT = SCOPES_GET_RESULT(_type_to_llvm_type(T));
-            const Type *ST = tn->storage_type;
+            const Type *ST = tn->storage();
             switch(ST->kind()) {
             case TK_Tuple: {
                 auto ti = cast<TupleType>(ST);

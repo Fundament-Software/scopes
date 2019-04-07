@@ -30,23 +30,26 @@ struct TypenameType : Type {
     const String *name() const;
     static bool classof(const Type *T);
 
-    TypenameType(const String *name);
+    TypenameType(const String *name, const Type *super_type);
 
-    SCOPES_RESULT(void) finalize(const Type *_type, uint32_t flags);
+    SCOPES_RESULT(void) finalize(const Type *_type, uint32_t flags) const;
 
     bool finalized() const;
     bool is_plain() const;
 
     const Type *super() const;
 
-    const Type *storage_type;
+    const Type *storage() const;
+
+protected:
+    mutable const Type *storage_type;
     const Type *super_type;
     const String *_name;
-    uint32_t flags;
+    mutable uint32_t flags;
 };
 
 // always generates a new type
-const Type *typename_type(const String *name);
+const TypenameType *typename_type(const String *name, const Type *supertype);
 
 SCOPES_RESULT(const Type *) storage_type(const Type *T);
 

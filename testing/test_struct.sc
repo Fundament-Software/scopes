@@ -96,12 +96,12 @@ run-stage;
 
 do
     # forward declaration
-    struct Cell
+    struct Cell plain
 
     let CellPtr =
         pointer Cell
 
-    struct Cell plain
+    struct Cell
         at : i32
         next : CellPtr
 

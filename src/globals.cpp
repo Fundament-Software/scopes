@@ -1668,29 +1668,15 @@ bool sc_integer_type_is_signed(const sc_type_t *T) {
 // Typename Type
 ////////////////////////////////////////////////////////////////////////////////
 
-const sc_type_t *sc_typename_type(const sc_string_t *str) {
+sc_type_raises_t sc_typename_type(const sc_string_t *str, const sc_type_t *supertype) {
     using namespace scopes;
-    return typename_type(str);
-}
-
-sc_void_raises_t sc_typename_type_set_super(const sc_type_t *T, const sc_type_t *ST) {
-    using namespace scopes;
-    SCOPES_RESULT_TYPE(void);
-    SCOPES_C_CHECK_RESULT(verify_kind<TK_Typename>(T));
-    SCOPES_C_CHECK_RESULT(verify_kind<TK_Typename>(ST));
-    // if T <=: ST, the operation is illegal
-    const Type *S = ST;
-    while (S) {
-        if (S == T) {
-            SCOPES_C_ERROR(RTIllegalSupertype, ST, T);
-        }
-        if (S == TYPE_Typename)
-            break;
-        S = superof(S);
+    SCOPES_RESULT_TYPE(const Type *);
+    SCOPES_C_CHECK_RESULT(verify_kind<TK_Typename>(supertype));
+    if (!is_opaque(supertype)) {
+        SCOPES_C_ERROR(RTIllegalSupertype, supertype);
     }
-    auto tn = cast<TypenameType>(T);
-    const_cast<TypenameType *>(tn)->super_type = ST;
-    return convert_result({});
+    auto T = typename_type(str, (supertype == TYPE_Typename) ? nullptr : supertype);
+    SCOPES_C_RETURN(T);
 }
 
 const sc_type_t *sc_typename_type_get_super(const sc_type_t *T) {
@@ -1702,7 +1688,7 @@ sc_void_raises_t sc_typename_type_set_storage(const sc_type_t *T, const sc_type_
     using namespace scopes;
     SCOPES_RESULT_TYPE(void);
     SCOPES_C_CHECK_RESULT(verify_kind<TK_Typename>(T));
-    return convert_result(cast<TypenameType>(const_cast<Type *>(T))->finalize(T2, flags));
+    return convert_result(cast<TypenameType>(T)->finalize(T2, flags));
 }
 
 // Array Type
@@ -2113,8 +2099,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_integer_type, TYPE_Type, TYPE_I32, TYPE_Bool);
     DEFINE_EXTERN_C_FUNCTION(sc_integer_type_is_signed, TYPE_Bool, TYPE_Type);
 
-    DEFINE_EXTERN_C_FUNCTION(sc_typename_type, TYPE_Type, TYPE_String);
-    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_typename_type_set_super, _void, TYPE_Type, TYPE_Type);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_typename_type, TYPE_Type, TYPE_String, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_typename_type_get_super, TYPE_Type, TYPE_Type);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_typename_type_set_storage, _void, TYPE_Type, TYPE_Type, TYPE_U32);
 

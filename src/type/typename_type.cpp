@@ -26,8 +26,8 @@ void TypenameType::stream_name(StyledStream &ss) const {
     ss << _name->data;
 }
 
-TypenameType::TypenameType(const String *name)
-    : Type(TK_Typename), storage_type(nullptr), super_type(nullptr),
+TypenameType::TypenameType(const String *name, const Type *_super_type)
+    : Type(TK_Typename), storage_type(nullptr), super_type(_super_type),
         _name(nullptr), flags(0) {
     auto newname = Symbol(name);
     size_t idx = 2;
@@ -41,7 +41,11 @@ TypenameType::TypenameType(const String *name)
     _name = newname.name();
 }
 
-SCOPES_RESULT(void) TypenameType::finalize(const Type *_type, uint32_t _flags) {
+const Type *TypenameType::storage() const {
+    return storage_type;
+}
+
+SCOPES_RESULT(void) TypenameType::finalize(const Type *_type, uint32_t _flags) const {
     SCOPES_RESULT_TYPE(void);
     if (finalized()) {
         SCOPES_ERROR(TypenameIsFinal, this, storage_type);
@@ -72,8 +76,8 @@ std::unordered_set<Symbol, Symbol::Hash> TypenameType::used_names;
 //------------------------------------------------------------------------------
 
 // always generates a new type
-const Type *typename_type(const String *name) {
-    return new TypenameType(name);
+const TypenameType *typename_type(const String *name, const Type *supertype) {
+    return new TypenameType(name, supertype);
 }
 
 SCOPES_RESULT(const Type *) storage_type(const Type *T) {
@@ -85,7 +89,7 @@ SCOPES_RESULT(const Type *) storage_type(const Type *T) {
         if (!tt->finalized()) {
             SCOPES_ERROR(OpaqueType, T);
         }
-        return tt->storage_type;
+        return tt->storage();
     } break;
     default: return T;
     }

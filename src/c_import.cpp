@@ -74,7 +74,7 @@ public:
     NamespaceMap typedefs;
 
     CVisitor() : dest(nullptr), Context(NULL) {
-        const Type *T = typename_type(String::from("__builtin_va_list"));
+        const Type *T = typename_type(String::from("__builtin_va_list"), nullptr);
         auto tnt = cast<TypenameType>(const_cast<Type*>(T));
         tnt->finalize(array_type(TYPE_I8, sizeof(va_list)).assert_ok(), TNF_Plain).assert_ok();
         typedefs.insert({Symbol("__builtin_va_list"), T });
@@ -90,16 +90,16 @@ public:
         dest = _dest;
     }
 
-    SCOPES_RESULT(void) GetFields(TypenameType *tni, clang::RecordDecl * rd) {
+    SCOPES_RESULT(void) GetFields(const TypenameType *tni, clang::RecordDecl * rd) {
         SCOPES_RESULT_TYPE(void);
         auto &rl = Context->getASTRecordLayout(rd);
 
         bool is_union = rd->isUnion();
 
         if (is_union) {
-            tni->super_type = TYPE_CUnion;
+            assert(tni->super() == TYPE_CUnion);
         } else {
-            tni->super_type = TYPE_CStruct;
+            assert(tni->super() == TYPE_CStruct);
         }
 
         Types args;
@@ -204,18 +204,18 @@ public:
         return {};
     }
 
-    const Type *get_typename(Symbol name, NamespaceMap &map) {
+    const Type *get_typename(Symbol name, NamespaceMap &map, const Type *supertype) {
         if (name != SYM_Unnamed) {
             auto it = map.find(name);
             if (it != map.end()) {
                 return it->second;
             }
-            const Type *T = typename_type(name.name());
+            const Type *T = typename_type(name.name(), supertype);
             auto ok = map.insert({name, T});
             assert(ok.second);
             return T;
         }
-        return typename_type(name.name());
+        return typename_type(name.name(), supertype);
     }
 
     SCOPES_RESULT(const Type *) TranslateRecord(clang::RecordDecl *rd) {
@@ -232,11 +232,11 @@ public:
 
         const Type *struct_type = nullptr;
         if (rd->isUnion()) {
-            struct_type = get_typename(name, named_unions);
+            struct_type = get_typename(name, named_unions, TYPE_CUnion);
         } else if (rd->isStruct()) {
-            struct_type = get_typename(name, named_structs);
+            struct_type = get_typename(name, named_structs, TYPE_CStruct);
         } else if (rd->isClass()) {
-            struct_type = get_typename(name, named_classes);
+            struct_type = get_typename(name, named_classes, TYPE_CStruct);
         } else {
             SCOPES_ERROR(CImportUnsupportedRecordType,
                 anchorFromLocation(rd->getSourceRange().getBegin()),
@@ -247,7 +247,7 @@ public:
         if (defn && !record_defined[rd]) {
             record_defined[rd] = true;
 
-            auto tni = cast<TypenameType>(const_cast<Type *>(struct_type));
+            auto tni = cast<TypenameType>(struct_type);
             if (tni->finalized()) {
                 SCOPES_ERROR(CImportDuplicateTypeDefinition,
                     anchorFromLocation(rd->getSourceRange().getBegin()),
@@ -275,7 +275,7 @@ public:
 
         Symbol name(String::from_stdstring(ed->getName()));
 
-        const Type *enum_type = get_typename(name, named_enums);
+        const Type *enum_type = get_typename(name, named_enums, TYPE_CEnum);
 
         clang::EnumDecl * defn = ed->getDefinition();
         if (defn && !enum_defined[ed]) {
@@ -283,8 +283,7 @@ public:
 
             auto tag_type = SCOPES_GET_RESULT(TranslateType(ed->getIntegerType()));
 
-            auto tni = cast<TypenameType>(const_cast<Type *>(enum_type));
-            tni->super_type = TYPE_CEnum;
+            auto tni = cast<TypenameType>(enum_type);
             SCOPES_CHECK_RESULT(tni->finalize(tag_type, TNF_Plain));
 
             for (auto it : ed->enumerators()) {

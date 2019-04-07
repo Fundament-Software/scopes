@@ -386,8 +386,8 @@ formatters:
         "runtime: storage type %0 has no named elements", \
         PType) \
     T(RTIllegalSupertype, \
-        "runtime: typename %0 can not be a supertype of %1", \
-        PType, PType) \
+        "runtime: typename %0 can not be a supertype because it is not opaque", \
+        PType) \
 
 // main
 #define SCOPES_MAIN_ERROR_KIND() \

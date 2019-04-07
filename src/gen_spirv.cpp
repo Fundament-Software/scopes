@@ -451,10 +451,10 @@ struct SPIRVGenerator {
                 return builder.makeSamplerType();
             auto tn = cast<TypenameType>(type);
             if (tn->finalized()) {
-                if (tn->storage_type->kind() == TK_Tuple) {
-                    return create_struct_type(tn->storage_type, flags, tn);
+                if (tn->storage()->kind() == TK_Tuple) {
+                    return create_struct_type(tn->storage(), flags, tn);
                 } else {
-                    return SCOPES_GET_RESULT(type_to_spirv_type(tn->storage_type, flags));
+                    return SCOPES_GET_RESULT(type_to_spirv_type(tn->storage(), flags));
                 }
             } else {
                 SCOPES_ERROR(CGenTypeUnsupportedInTarget, type);
