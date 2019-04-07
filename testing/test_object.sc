@@ -8,9 +8,9 @@ let C =
             #include <stdio.h>
         list;
 
-let i32x10 = (array i32 10:usize)
-
 run-stage;
+
+let i32x10 = (array i32 10)
 
 fn static-array-init ()
     private i32x10

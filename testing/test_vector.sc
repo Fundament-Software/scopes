@@ -14,7 +14,7 @@ fn test-vector-ops ()
         all?
             (shufflevector v w mask) == (vectorof i32 4 2 40 20)
 
-let VT = (vector i32 4:usize)
+let VT = (vector i32 4)
 
 # working with variables
 test-vector-ops;

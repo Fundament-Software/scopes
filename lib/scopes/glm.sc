@@ -31,7 +31,7 @@ fn construct-vec-type (element-type size)
     assert ((typeof size) == i32)
     assert (size > 1)
     let prefix = (element-prefix element-type)
-    let VT = (vector element-type size)
+    let VT = (vector.type element-type size)
     typedef (.. prefix "vec" (tostring size)) < vec-type : VT
         'set-symbols this-type
             ElementType = element-type
@@ -48,7 +48,7 @@ fn construct-mat-type (element-type cols rows)
     let prefix = (element-prefix element-type)
     let vecT =
         construct-vec-type element-type rows
-    let MT = (array vecT cols)
+    let MT = (array.type vecT cols)
     typedef (.. prefix "mat" (tostring cols) "x" (tostring rows))
         \ < mat-type : MT
         'set-symbols this-type
@@ -335,7 +335,7 @@ typedef vec-type < immutable
             let ui = (i as usize)
             let k = (find-index set (s @ ui))
             entries @ ui = `k
-        let VT = (vector i32 sz)
+        let VT = (vector.type i32 sz)
         return sz (sc_const_aggregate_new VT sz entries)
 
     @@ memoize
@@ -345,7 +345,7 @@ typedef vec-type < immutable
             let ui = (i as usize)
             let k = (i % rhsz)
             entries @ ui = `k
-        let VT = (vector i32 lhsz)
+        let VT = (vector.type i32 lhsz)
         return (sc_const_aggregate_new VT lhsz entries)
 
     @@ memoize
@@ -354,7 +354,7 @@ typedef vec-type < immutable
         for i in (range sz)
             let ui = (i as usize)
             entries @ ui = `i
-        let VT = (vector i32 sz)
+        let VT = (vector.type i32 sz)
         return (sc_const_aggregate_new VT sz entries)
 
     @@ memoize
@@ -368,7 +368,7 @@ typedef vec-type < immutable
             let ui = ((sc_const_extract_at mask i) as i32 as usize)
             let k = (lhsz + i)
             entries @ ui = `k
-        let VT = (vector i32 lhsz)
+        let VT = (vector.type i32 lhsz)
         return (sc_const_aggregate_new VT lhsz entries)
 
     @@ type-factory
@@ -641,7 +641,7 @@ typedef mat-type < immutable
     fn __== (lhsT rhsT)
         if (lhsT == rhsT)
             let cols = ('element-count lhsT)
-            let VT = (vector bool cols)
+            let VT = (vector.type bool cols)
             spice-quote
                 inline (lhs rhs)
                     all?

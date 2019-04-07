@@ -2,7 +2,7 @@
 do
     struct K union
         key : u32
-        vals : (array u8 4:usize)
+        vals : (array u8 4)
 
     run-stage;
 
@@ -20,7 +20,7 @@ do
     # union within a struct
     struct Color union
         rgba : u32
-        c : (array u8 4:usize)
+        c : (array u8 4)
 
     struct Leaf
         color : Color

@@ -68,7 +68,10 @@ fn error@+ (error anchor traceback-msg)
 fn unbox-verify (value wantT)
     let haveT = (sc_value_type value)
     if (ptrcmp!= haveT wantT)
-        error
+        hide-traceback;
+        error@
+            sc_value_anchor value
+            "while trying to unbox value"
             sc_string_join "can't unbox value of type "
                 sc_string_join
                     sc_value_repr (box-pointer haveT)
@@ -76,7 +79,10 @@ fn unbox-verify (value wantT)
                         sc_value_repr (box-pointer wantT)
     if (sc_value_is_constant value)
     else
-        error
+        hide-traceback;
+        error@
+            sc_value_anchor value
+            "while trying to unbox value"
             sc_string_join "constant of type "
                 sc_string_join
                     sc_value_repr (box-pointer haveT)
@@ -898,6 +904,7 @@ let SugarMacroFunction =
 # any extraction
 
 inline unbox (value T)
+    hide-traceback;
     unbox-verify value T
     __unbox value T
 
@@ -3504,14 +3511,26 @@ let tupleof =
     __@ =
         inline (self index)
             extractvalue self index
+    # dynamic array constructor
+    type =
+        inline "array.type" (element-type size)
+            sc_array_type element-type (size as usize)
+    # static array constructor
     __typecall =
-        inline "array.__typecall" (cls args...)
-            static-branch (type== cls array)
-                inline ()
-                    let element-type size = args...
-                    sc_array_type element-type (size as usize)
-                inline ()
-                    nullof cls
+        spice-macro
+            fn "array.__typecall" (args)
+                let argc = ('argcount args)
+                verify-count argc 1 3
+                raises-compile-error;
+                let cls = (('getarg args 0) as type)
+                if (cls == array)
+                    verify-count argc 3 3
+                    let element-type = (('getarg args 1) as type)
+                    let size = (('getarg args 2) as i32)
+                    `[(sc_array_type element-type (size as usize))]
+                else
+                    verify-count argc 1 1
+                    `(nullof cls)
     __as =
         do
             inline array-generator (arr)
@@ -3696,40 +3715,26 @@ inline vector-binary-op-dispatch (symbol)
                 `(shufflevector self self mask)
     __unpack = (Value (make-unpack-function extractelement))
     __countof = __countof-aggregate
-    # vector type constructor
+    # dynamic vector type constructor
+    type =
+        inline "vector.type" (element-type size)
+            sc_vector_type element-type (size as usize)
+    # static vector type constructor
     __typecall =
-        do
-            let vector_typecall =
-                spice-macro
-                    fn (args)
-                        let argc = ('argcount args)
-                        verify-count argc 2 2
-                        let element-type = ('getarg args 0)
-                        let size = ('getarg args 1)
-                        if ('constant? element-type)
-                            if ('constant? size)
-                                let element-type = (element-type as type)
-                                let size = (size as usize)
-                                let T = (sc_vector_type element-type size)
-                                return `T
-                        return `(sc_vector_type element-type size)
-            spice-quote
-                inline "vector.__typecall" (cls element-type size)
-                    vector_typecall element-type (size as usize)
-    #__typecall =
         spice-macro
-            fn "vector" (args)
+            fn "vector.__typecall" (args)
                 let argc = ('argcount args)
-                verify-count argc 3 3
-                let ET = (unbox-pointer ('getarg args 1) type)
-                let size = ('getarg args 2)
-                let sizeT = (sc_value_type size)
-                if (type< sizeT integer)
+                verify-count argc 1 3
+                raises-compile-error;
+                let cls = (('getarg args 0) as type)
+                if (cls == vector)
+                    verify-count argc 3 3
+                    let element-type = (('getarg args 1) as type)
+                    let size = (('getarg args 2) as i32)
+                    `[(sc_vector_type element-type (size as usize))]
                 else
-                    unbox-verify size integer
-                let size =
-                    bitcast (sc_const_int_extract size) usize
-                box-pointer (sc_vector_type ET size)
+                    verify-count argc 1 1
+                    `(nullof cls)
 
 let vectorof =
     spice-macro
