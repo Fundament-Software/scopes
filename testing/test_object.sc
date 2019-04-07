@@ -31,7 +31,7 @@ fn main (argc argv)
         load (reftoptr y)
     return 0
 
-let main = (typify main i32 ('pointer rawstring))
+let main = (typify main i32 (pointer rawstring))
 compile main
     'dump-module
     'no-debug-info

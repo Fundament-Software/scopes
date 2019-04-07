@@ -62,12 +62,12 @@ fn verify-signature (Ta Tb)
 
 fn verify-raising-type (f ret raises args...)
     let Ta = ('typeof f)
-    let Tb = ('pointer ('raising (function ret args...) raises))
+    let Tb = (pointer.type ('raises (function.type ret args...) raises))
     verify-signature Ta Tb
 
 fn verify-type (f ret args...)
     let Ta = ('typeof f)
-    let Tb = ('pointer (function ret args...))
+    let Tb = (pointer.type (function.type ret args...))
     verify-signature Ta Tb
 
 #do

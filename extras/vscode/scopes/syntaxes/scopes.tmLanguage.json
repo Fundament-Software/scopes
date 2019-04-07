@@ -38,7 +38,7 @@
 			"patterns": [
                 {
                     "name": "constant.language.builtins.scopes",
-                    "match": "(debug-build\\?|compiler-(path|timestamp|dir)|sugar-scope|this-type|pointer-flag-(non-(writable|readable))|type-kind-(extern|function|integer|real|pointer|vector|array|tuple|union|typename))(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
+                    "match": "(debug-build\\?|compiler-(path|timestamp|dir)|sugar-scope|this-type|pointer-flag-(non-(writable|readable))|type-kind-(function|integer|real|pointer|vector|array|tuple|union|typename))(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
                 },
                 {
                     "name": "constant.language.library.scopes",
@@ -109,7 +109,7 @@
             "patterns":[
                 {
                     "name": "support.type.builtin.scopes",
-                    "match": "(CompileStage|Error|Arguments|CEnum|CUnion|CStruct|noreturn|void(star)?|bool|(u|s)size|intptr|u8|u16|u32|u64|i8|i16|i32|i64|f32|f64|type|list|string|integer|real|pointer|array|vector|tuple|union|typename|function|(Sampled)?Image|Sampler|Symbol|Unknown|Label|Closure|Frame|Any|Value|Parameter|Syntax|Nothing|Scope|Anchor|Builtin|Exception|ReturnLabel|extern)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
+                    "match": "(CompileStage|Error|Arguments|CEnum|CUnion|CStruct|noreturn|void(star)?|bool|(u|s)size|intptr|u8|u16|u32|u64|i8|i16|i32|i64|f32|f64|type|list|string|integer|real|pointer|array|vector|tuple|union|typename|function|(Sampled)?Image|Sampler|Symbol|Unknown|Label|Closure|Frame|Any|Value|Parameter|Syntax|Nothing|Scope|Anchor|Builtin|Exception|ReturnLabel)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
                 },
                 {
                     "name": "support.type.library.scopes",
@@ -137,7 +137,7 @@
                 },
                 {
                     "name": "support.function.library.scopes",
-				    "match": "(spice-(cast|binary-op)-macro|memoize|type-factory|(any|all)\\?|error(\\@(\\+)?)?|mix|deref|refof|delete|sign|abs|(infinite-)?range|map|zip|enumerate|unpack|(tuple|vector|array)of|unknownof|va-(append-va|split|option-branch|(l|r)(i)?fold|empty\\?|types|join|each|each-reversed|key)|imply|forward-imply|forward-as|xpcall|require-from|char|getattr|typeattr|(de)?cons|[rl]?slice|(scope-|block-scope-)?macro|print|min|max|clamp|(tie|cond)-const|repr|(none|symbol|list|empty|type|integer|real|pointer|array|vector|extern|tuple|typename|Symbol|function-pointer)\\?|(integer|real|pointer|function|array|tuple|vector|extern|function-pointer|typename)-type\\?)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
+				    "match": "(extern|mutable|raises|spice-(cast|binary-op)-macro|memoize|type-factory|(any|all)\\?|error(\\@(\\+)?)?|mix|deref|refof|delete|sign|abs|(infinite-)?range|map|zip|enumerate|unpack|(tuple|vector|array)of|unknownof|va-(append-va|split|option-branch|(l|r)(i)?fold|empty\\?|types|join|each|each-reversed|key)|imply|forward-imply|forward-as|xpcall|require-from|char|getattr|typeattr|(de)?cons|[rl]?slice|(scope-|block-scope-)?macro|print|min|max|clamp|(tie|cond)-const|repr|(none|symbol|list|empty|type|integer|real|pointer|array|vector|extern|tuple|typename|Symbol|function-pointer)\\?|(integer|real|pointer|function|array|tuple|vector|extern|function-pointer|typename)-type\\?)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
                 },
                 {
                     "name": "support.function.itertools.scopes",

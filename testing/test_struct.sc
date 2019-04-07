@@ -79,7 +79,7 @@ fn test-direct-self-reference ()
     # direct self reference
     struct Cell plain
         at : i32
-        next : (pointer this-type)
+        next : (pointer.type this-type)
 
     run-stage;
 

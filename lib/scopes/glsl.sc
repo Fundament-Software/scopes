@@ -296,10 +296,10 @@ do
         uniform = (gen-xvar-sugar "uniform" (wrap-xvar-global config-uniform))
         inout = (gen-xvar-sugar "inout" config-inout)
 
-        gl_Position = `(ptrtoref [(extern 'spirv.Position vec4 (storage = 'Output))])
-        gl_FragCoord = `(ptrtoref [(extern 'spirv.FragCoord vec4 (storage = 'Input))])
-        gl_VertexID = `(ptrtoref [(extern 'spirv.VertexId i32 (storage = 'Input))])
-        gl_FragDepth = `(ptrtoref [(extern 'spirv.FragDepth f32 (storage = 'Output))])
+        gl_Position = `(ptrtoref [(extern 'spirv.Position vec4 (storage-class = 'Output))])
+        gl_FragCoord = `(ptrtoref [(extern 'spirv.FragCoord vec4 (storage-class = 'Input))])
+        gl_VertexID = `(ptrtoref [(extern 'spirv.VertexId i32 (storage-class = 'Input))])
+        gl_FragDepth = `(ptrtoref [(extern 'spirv.FragDepth f32 (storage-class = 'Output))])
 
     inline texelFetch (sampler P ...)
         'fetch (sampler as gsampler) P ...

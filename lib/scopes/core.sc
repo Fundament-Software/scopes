@@ -400,31 +400,53 @@ do
     sc_type_set_symbol type 'define-symbol (gen-key-any-define type sc_type_set_symbol)
     sc_type_set_symbol Scope 'define-symbol (gen-key-any-define Scope sc_scope_set_symbol)
 
-sc_type_set_symbol type 'pointer
+# static pointer type constructor
+sc_type_set_symbol pointer '__typecall
     box-spice-macro
-        fn "type-pointer" (args)
+        fn "pointer.__typecall" (args)
             let argcount = (sc_argcount args)
-            verify-count argcount 1 1
-            let self = (sc_getarg args 0)
-            if (sc_value_is_constant self)
-                let T = (unbox-pointer self type)
-                box-pointer
-                    sc_pointer_type T pointer-flag-non-writable unnamed
-            else
-                `(sc_pointer_type self pointer-flag-non-writable unnamed)
+            verify-count argcount 2 2
+            let self = (sc_getarg args 1)
+            let T = (unbox-pointer self type)
+            `[(sc_pointer_type T pointer-flag-non-writable unnamed)]
 
-# tuple type constructor
+# dynamic pointer type constructor
+sc_type_set_symbol pointer 'type
+    box-pointer
+        inline "pointer.type" (T)
+            sc_pointer_type T pointer-flag-non-writable unnamed
+
+# static tuple type constructor
 sc_type_set_symbol tuple '__typecall
     box-spice-macro
-        fn "tuple" (args)
+        fn "tuple.__typecall" (args)
             let argcount = (sc_argcount args)
             verify-count argcount 1 -1
             let pcount = (sub argcount 1)
+            let types = (alloca-array type pcount)
+            loop (i = 1)
+                if (icmp== i argcount)
+                    break;
+                let arg = (sc_getarg args i)
+                let k = (sc_type_key (sc_value_qualified_type arg))
+                let arg = (unbox-pointer arg type)
+                store (sc_key_type k arg)
+                    getelementptr types (sub i 1)
+                add i 1
+            sc_valueref_tag (sc_value_anchor args)
+                `[(sc_tuple_type pcount types)]
+
+# dynamic tuple type constructor
+sc_type_set_symbol tuple 'type
+    box-spice-macro
+        fn "tuple.type" (args)
+            let argcount = (sc_argcount args)
+            verify-count argcount 0 -1
             spice-quote
-                let types = (alloca-array type pcount)
+                let types = (alloca-array type argcount)
                 spice-unquote
                     let body = (sc_expression_new)
-                    loop (i = 1)
+                    loop (i = 0)
                         if (icmp== i argcount)
                             break;
                         let arg = (sc_getarg args i)
@@ -435,10 +457,10 @@ sc_type_set_symbol tuple '__typecall
                         sc_expression_append body
                             `(store
                                 (sc_key_type k arg)
-                                (getelementptr types [(sub i 1)]))
+                                (getelementptr types i))
                         add i 1
                     body
-                sc_tuple_type pcount types
+                sc_tuple_type argcount types
 
 # arguments type constructor
 sc_type_set_symbol Arguments '__typecall
@@ -457,62 +479,65 @@ sc_type_set_symbol Arguments '__typecall
                 add i 1
             box-pointer (sc_arguments_type pcount types)
 
-# function pointer type constructor
+# static function type constructor
 sc_type_set_symbol function '__typecall
     box-spice-macro
-        fn "function" (args)
+        fn "function.__typecall" (args)
             let argcount = (sc_argcount args)
             verify-count argcount 2 -1
             let pcount = (sub argcount 2)
-            let constant? =
-                loop (i = 1)
-                    if (icmp== i argcount)
-                        break true
-                    let arg = (sc_getarg args i)
-                    if (sc_value_is_constant arg)
-                        repeat (add i 1)
-                    break false
             let rtype = (sc_getarg args 1)
-            if constant?
-                let rtype = (unbox-pointer rtype type)
-                let types = (alloca-array type pcount)
-                loop (i = 2)
-                    if (icmp== i argcount)
-                        break;
-                    let arg = (sc_getarg args i)
-                    let T = (unbox-pointer arg type)
-                    store T (getelementptr types (sub i 2))
-                    add i 1
-                box-pointer (sc_function_type rtype pcount types)
-            else
-                spice-quote
-                    let types = (alloca-array type pcount)
-                    spice-unquote
-                        let expr = (sc_expression_new)
-                        loop (i = 2)
-                            if (icmp== i argcount)
-                                break;
-                            let arg = (sc_getarg args i)
-                            sc_expression_append expr
-                                `(store arg (getelementptr types [(sub i 2)]))
-                            add i 1
-                        expr
-                    sc_function_type rtype pcount types
+            let rtype = (unbox-pointer rtype type)
+            let types = (alloca-array type pcount)
+            loop (i = 2)
+                if (icmp== i argcount)
+                    break;
+                let arg = (sc_getarg args i)
+                let T = (unbox-pointer arg type)
+                store T (getelementptr types (sub i 2))
+                add i 1
+            box-pointer (sc_function_type rtype pcount types)
 
-sc_type_set_symbol type 'raising
+# dynamic function type constructor
+sc_type_set_symbol function 'type
     box-spice-macro
-        fn "function-raising" (args)
+        fn "function.type" (args)
+            let argcount = (sc_argcount args)
+            verify-count argcount 1 -1
+            let pcount = (sub argcount 1)
+            let rtype = (sc_getarg args 0)
+            spice-quote
+                let types = (alloca-array type pcount)
+                spice-unquote
+                    let expr = (sc_expression_new)
+                    loop (i = 1)
+                        if (icmp== i argcount)
+                            break;
+                        let arg = (sc_getarg args i)
+                        sc_expression_append expr
+                            `(store arg (getelementptr types [(sub i 1)]))
+                        add i 1
+                    expr
+                sc_function_type rtype pcount types
+
+let raises =
+    box-spice-macro
+        fn "raises" (args)
             let argcount = (sc_argcount args)
             verify-count argcount 2 2
             let self = (sc_getarg args 0)
             let except_type = (sc_getarg args 1)
-            if (sc_value_is_constant self)
-                if (sc_value_is_constant except_type)
-                    let T = (unbox-pointer self type)
-                    let exceptT = (unbox-pointer except_type type)
-                    return
-                        box-pointer
-                            sc_function_type_raising T exceptT
+            let T = (unbox-pointer self type)
+            let exceptT = (unbox-pointer except_type type)
+            `[(sc_function_type_raising T exceptT)]
+
+sc_type_set_symbol type 'raises
+    box-spice-macro
+        fn "'raises function" (args)
+            let argcount = (sc_argcount args)
+            verify-count argcount 2 2
+            let self = (sc_getarg args 0)
+            let except_type = (sc_getarg args 1)
             `(sc_function_type_raising self except_type)
 
 # closure constructor
@@ -811,7 +836,16 @@ inline define-symbols (self values...)
                 sc_pointer_type_get_flags cls
                 sc_pointer_type_get_storage_class cls
 
-let rawstring = ('pointer i8)
+let mutable =
+    spice-macro
+        fn (args)
+            let argc = (sc_argcount args)
+            verify-count argc 1 1
+            let self = (sc_getarg args 0)
+            let T = (unbox-pointer self type)
+            `[('mutable T)]
+
+let rawstring = (pointer i8)
 
 inline not (value)
     bxor value true
@@ -848,8 +882,8 @@ let Collector = (sc_typename_type "Collector")
 # syntax macro type
 let SugarMacro = (sc_typename_type "SugarMacro")
 let SugarMacroFunction =
-    'pointer
-        'raising
+    pointer
+        raises
             function (Arguments list Scope) list Scope
             Error
 'set-plain-storage SugarMacro SugarMacroFunction
@@ -1590,7 +1624,7 @@ inline floordiv (a b)
 #---------------------------------------------------------------------------
 
 """"The type of the `null` constant. This type is uninstantiable.
-'set-plain-storage NullType ('pointer void)
+'set-plain-storage NullType (pointer void)
 do
     inline null== (lhs rhs) (icmp== (ptrtoint rhs usize) 0:usize)
     inline nullr== (lhs rhs) (icmp== (ptrtoint lhs usize) 0:usize)
@@ -1855,32 +1889,6 @@ let coerce-call-arguments =
             # let prover handle type error
             'tag `(rawcall self [('getarglist args 1)]) ('anchor args)
 
-#
-    set-type-symbol! pointer 'set-element-type
-        fn (cls ET)
-            pointer-type-set-element-type cls ET
-    set-type-symbol! pointer 'set-storage
-        fn (cls storage)
-            pointer-type-set-storage-class cls storage
-    set-type-symbol! pointer 'immutable
-        fn (cls ET)
-            pointer-type-set-flags cls
-                bor (pointer-type-flags cls) pointer-flag-non-writable
-    set-type-symbol! pointer 'mutable
-        fn (cls ET)
-            pointer-type-set-flags cls
-                band (pointer-type-flags cls)
-                    bxor pointer-flag-non-writable -1:u64
-    set-type-symbol! pointer 'strip-storage
-        fn (cls ET)
-            pointer-type-set-storage-class cls unnamed
-    set-type-symbol! pointer 'storageof
-        fn (cls)
-            pointer-type-storage-class cls
-    set-type-symbol! pointer 'readable?
-        fn (cls)
-            == (& (pointer-type-flags cls) pointer-flag-non-readable) 0:u64
-
 fn pointer-type-imply? (src dest)
     let ET = ('element@ src 0)
     let ET =
@@ -1891,7 +1899,7 @@ fn pointer-type-imply? (src dest)
         # a ref to another pointer
         if (type== dest voidstar)
             return true
-        elseif (type== dest ('mutable voidstar))
+        elseif (type== dest (mutable voidstar))
             if ('writable? src)
                 return true
     if (type== dest ('strip-pointer-storage-class src))
@@ -1911,11 +1919,6 @@ fn pointer-imply (vT T)
 'set-symbols pointer
     __call = coerce-call-arguments
     __imply = (box-pointer (spice-cast-macro pointer-imply))
-
-'define-symbols pointer
-    __typecall =
-        inline (cls T)
-            sc_pointer_type T pointer-flag-non-writable unnamed
 
 # dotted symbol expander
 # --------------------------------------------------------------------------
@@ -2758,8 +2761,8 @@ fn make-module-path (pattern name)
                 .. result (rslice (lslice pattern i) start) name
 
 fn exec-module (expr eval-scope)
-    let ModuleFunctionType = ('pointer ('raising (function Value) Error))
-    let StageFunctionType = ('pointer ('raising (function CompileStage) Error))
+    let ModuleFunctionType = (pointer (raises (function Value) Error))
+    let StageFunctionType = (pointer (raises (function CompileStage) Error))
     let expr-anchor = ('anchor expr)
     let f =
         do
@@ -3803,9 +3806,51 @@ inline clamp (x mn mx)
                     return `(inline (self) (func->closure self destT))
                 `()
 
-inline extern (name T attrs...)
-    let storage-class = (va-option storage attrs... unnamed)
-    sc_global_new name T 0:u32 storage-class -1 -1
+inline extern-new (name T attrs...)
+    let flags = (va-option flags attrs... 0:u32)
+    let storage-class = (va-option storage-class attrs... unnamed)
+    let location = (va-option location attrs... -1)
+    let binding = (va-option location attrs... -1)
+    sc_global_new name T flags storage-class location binding
+
+let extern =
+    spice-macro
+        fn (args)
+            let argc = ('argcount args)
+            verify-count argc 2 -1
+            raises-compile-error;
+            let name = (('getarg args 0) as Symbol)
+            let T = (('getarg args 1) as type)
+            loop (i flags storage-class location binding = 2 0:u32 unnamed -1 -1)
+                if (i == argc)
+                    break
+                        `[(sc_global_new name T
+                            flags storage-class location binding)]
+                let arg = ('getarg args i)
+                let k v = ('dekey arg)
+                let flags storage-class location binding =
+                    if (k == unnamed)
+                        let k = (arg as Symbol)
+                        let newflag =
+                            if (k == 'buffer-block) global-flag-buffer-block
+                            elseif (k == 'non-writable) global-flag-non-writable
+                            elseif (k == 'non-readable) global-flag-non-readable
+                            elseif (k == 'volatile) global-flag-volatile
+                            elseif (k == 'coherent) global-flag-coherent
+                            elseif (k == 'restrict) global-flag-restrict
+                            elseif (k == 'block) global-flag-block
+                            else
+                                error ("unrecognized flag: " .. (repr k))
+                        _ (bor flags newflag) storage-class location binding
+                    elseif (k == 'storage-class)
+                        _ flags (arg as Symbol) location binding
+                    elseif (k == 'location)
+                        _ flags storage-class (arg as i32) binding
+                    elseif (k == 'binding)
+                        _ flags storage-class location (arg as i32)
+                    else
+                        error ("unrecognized key: " .. (repr k))
+                _ (i + 1) flags storage-class location binding
 
 let
     private =
@@ -3815,7 +3860,7 @@ let
                 verify-count argc 1 1
                 let T = ('getarg args 0)
                 let T = (T as type)
-                extern unnamed T (storage = 'Private)
+                extern-new unnamed T (storage-class = 'Private)
 
 #-------------------------------------------------------------------------------
 
@@ -5406,8 +5451,8 @@ fn read-eval-print-loop ()
                 let f = (sc_compile expression 0:u64)
                 let fptr =
                     f as
-                        'pointer
-                            'raising
+                        pointer
+                            raises
                                 function (Arguments Scope i32)
                                 Error
                 fptr;

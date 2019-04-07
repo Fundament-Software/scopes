@@ -9,15 +9,11 @@
     Exports a configurable type for a mutable array that stores its elements
     on the heap rather than in registers or the stack.
 
-let mutable-rawstring = ('mutable rawstring)
-
 # declare void @llvm.memcpy.p0i8.p0i8.i64(i8* <dest>, i8* <src>,
                                         i64 <len>, i1 <isvolatile>)
 let llvm.memcpy.p0i8.p0i8.i64 =
     extern 'llvm.memcpy.p0i8.p0i8.i64
-        function void mutable-rawstring rawstring i64 bool
-
-run-stage;
+        function void (mutable rawstring) rawstring i64 bool
 
 typedef Array
 typedef FixedArray
@@ -148,7 +144,7 @@ typedef Array < Struct
 typedef FixedArray < Array
     fn gen-type (cls element-type capacity)
         let arrayT =
-            'mutable (pointer element-type)
+            'mutable (pointer.type element-type)
 
         struct
             .. "<FixedArray "
@@ -207,7 +203,7 @@ let DEFAULT_CAPACITY = (1:usize << 2:usize)
 typedef GrowingArray < Array
 
     fn gen-type (cls element-type)
-        let arrayT = ('mutable (pointer element-type))
+        let arrayT = ('mutable (pointer.type element-type))
 
         struct
             .. "<GrowingArray "
@@ -266,7 +262,7 @@ typedef GrowingArray < Array
             let old-items = (deref self._items)
             let new-items = (malloc-array T.ElementType new-capacity)
             llvm.memcpy.p0i8.p0i8.i64
-                bitcast new-items mutable-rawstring
+                bitcast new-items (mutable rawstring)
                 bitcast old-items rawstring
                 (count * (sizeof T.ElementType)) as i64
                 false

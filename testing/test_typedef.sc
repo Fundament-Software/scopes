@@ -41,11 +41,11 @@ assert (constant? SelfRefType)
 
 let SRT = SelfRefType
 
-typedef SelfRefType < tuple : (tuple i32 (pointer SelfRefType))
+typedef SelfRefType < tuple : (tuple.type i32 (pointer SelfRefType))
 
 assert (SelfRefType == SRT)
 assert (('superof SelfRefType) == tuple)
-assert (('storageof SelfRefType) == (tuple i32 (pointer SelfRefType)))
+assert (('storageof SelfRefType) == (tuple.type i32 (pointer SelfRefType)))
 
 run-stage;
 

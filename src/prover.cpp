@@ -2287,11 +2287,15 @@ repeat:
             CHECKARGS(2, 2);
             READ_STORAGETYPEOF(T);
             READ_TYPE_CONST(DestT);
-            SCOPES_CHECK_RESULT(verify_real(T));
-            SCOPES_CHECK_RESULT(verify_integer(SCOPES_GET_RESULT(storage_type(DestT))));
+            SCOPES_CHECK_RESULT(verify_real_ops(T));
+            auto ST = SCOPES_GET_RESULT(storage_type(DestT));
+            SCOPES_CHECK_RESULT(verify_integer_ops(ST));
+            SCOPES_CHECK_RESULT(verify_vector_sizes(T, ST));
+            #if 0
             if ((T != TYPE_F32) && (T != TYPE_F64)) {
                 SCOPES_ERROR(InvalidOperands, b, T, DestT);
             }
+            #endif
             return DEP_ARGTYPE1(DestT, _T);
         } break;
         case FN_UIToFP:
@@ -2299,11 +2303,15 @@ repeat:
             CHECKARGS(2, 2);
             READ_STORAGETYPEOF(T);
             READ_TYPE_CONST(DestT);
-            SCOPES_CHECK_RESULT(verify_integer(T));
-            SCOPES_CHECK_RESULT(verify_real(SCOPES_GET_RESULT(storage_type(DestT))));
+            auto ST = SCOPES_GET_RESULT(storage_type(DestT));
+            SCOPES_CHECK_RESULT(verify_integer_ops(T));
+            SCOPES_CHECK_RESULT(verify_real_ops(ST));
+            SCOPES_CHECK_RESULT(verify_vector_sizes(T, ST));
+            #if 0
             if ((DestT != TYPE_F32) && (DestT != TYPE_F64)) {
                 SCOPES_ERROR(InvalidOperands, b, T, DestT);
             }
+            #endif
             return DEP_ARGTYPE1(DestT, _T);
         } break;
         case FN_ZExt:
