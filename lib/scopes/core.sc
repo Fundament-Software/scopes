@@ -3662,6 +3662,34 @@ inline vector-binary-op-dispatch (symbol)
     __>= = (vector-binary-op-dispatch '__vector>=)
     __< = (vector-binary-op-dispatch '__vector<)
     __<= = (vector-binary-op-dispatch '__vector<=)
+    smear =
+        spice-macro
+            fn (args)
+                let argc = ('argcount args)
+                verify-count argc 2 2
+                let value size =
+                    'getarg args 0
+                    'getarg args 1
+                let ET = ('typeof value)
+                let n = (size as i32)
+                let N = (n as usize)
+                let T = (sc_vector_type ET N)
+                if ('constant? value)
+                    let values = (alloca-array Value N)
+                    for i in (range N)
+                        store value (getelementptr values i)
+                    `[(sc_const_aggregate_new T n values)]
+                else
+                    let T1 = (sc_vector_type ET 1)
+                    let maskT = (sc_vector_type i32 N)
+                    let values = (alloca-array Value N)
+                    let zero = `0
+                    for i in (range N)
+                        store zero (getelementptr values i)
+                    let mask = (sc_const_aggregate_new maskT n values)
+                    spice-quote
+                        let vec = (insertelement (nullof T1) value 0)
+                        shufflevector vec vec mask
     __lslice =
         spice-macro
             fn (args)
