@@ -19,7 +19,7 @@ assert (x == 1)
 assert (y == 2)
 assert (z == 3)
 do
-    # a struct with name expression
+    # a struct with name expression - defined at runtime
     let T =
         struct (.. "my" "struct")
             x : i32
@@ -79,9 +79,10 @@ fn test-direct-self-reference ()
     # direct self reference
     struct Cell plain
         at : i32
-        next : (pointer.type this-type)
-
-    run-stage;
+        next : (pointer this-type)
+        # field types are stored in this member for the duration of the
+            declaration
+        dump this-type.__fields__
 
     local cell3 = (Cell 3 null)
     local cell2 = (Cell 2 cell3)
@@ -105,8 +106,6 @@ do
         at : i32
         next : CellPtr
 
-    run-stage;
-
     local cell3 = (Cell 3 null)
     local cell2 = (Cell 2 cell3)
     local cell1 = (Cell 1 cell2)
@@ -118,8 +117,6 @@ do
     struct Val plain
         x : i32
         y : i32
-
-    run-stage;
 
     new testval = (Val 1 2)
     assert (testval.x == 1)

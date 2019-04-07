@@ -91,7 +91,8 @@ define-sugar-macro assert-error
                 else body
 
 define-sugar-macro assert-compiler-error
-    inline test-function (f)
+    spice test-function (f)
+        let f = (f as Closure)
         try
             sc_compile (sc_typify f 0 null) 0:u64
             false
@@ -101,12 +102,13 @@ define-sugar-macro assert-compiler-error
                 'format err
             true
 
-    inline assertion-error! (msg)
+    inline assertion-error! (anchor msg)
         let assert-msg =
             .. "compiler error assertion failed: "
                 if (== (typeof msg) string) msg
                 else (repr msg)
-        error assert-msg
+        hide-traceback;
+        error@ anchor "while checking assertion" assert-msg
     let cond body = (decons args)
     let sxcond = cond
     let anchor = ('anchor sxcond)
@@ -118,7 +120,7 @@ define-sugar-macro assert-compiler-error
                 list fn '() cond
         list if tmp
         list 'else
-            cons assertion-error!
+            cons assertion-error! anchor
                 if (empty? body)
                     list
                         if (('typeof sxcond) == list)

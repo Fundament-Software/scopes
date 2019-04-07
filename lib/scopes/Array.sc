@@ -15,10 +15,6 @@ let llvm.memcpy.p0i8.p0i8.i64 =
     extern 'llvm.memcpy.p0i8.p0i8.i64
         function void (mutable rawstring) rawstring i64 bool
 
-typedef Array < Struct
-typedef FixedArray < Array
-typedef GrowingArray < Array
-
 fn swap (a b)
     local t = b
     b = a
@@ -40,7 +36,7 @@ inline array-generator (self)
         inline (i) (self @ i)
         inline (i) (i + 1:usize)
 
-typedef Array
+typedef Array < Struct
 
     @@ spice-cast-macro
     fn __as (cls T)
@@ -141,7 +137,8 @@ typedef Array
         free self._items
 
 
-typedef FixedArray
+typedef FixedArray < Array
+    let parent-type = this-type
     fn gen-type (cls element-type capacity)
         let arrayT =
             'mutable (pointer.type element-type)
@@ -152,7 +149,7 @@ typedef FixedArray
                 " x "
                 tostring (i32 capacity)
                 ">"
-            \ < FixedArray
+            \ < parent-type
 
             _items : arrayT
             _count : usize
@@ -200,7 +197,8 @@ typedef FixedArray
 
 let DEFAULT_CAPACITY = (1:usize << 2:usize)
 
-typedef GrowingArray
+typedef GrowingArray < Array
+    let parent-type = this-type
 
     fn gen-type (cls element-type)
         let arrayT = ('mutable (pointer.type element-type))
@@ -209,7 +207,7 @@ typedef GrowingArray
             .. "<GrowingArray "
                 'string element-type
                 ">"
-            \ < GrowingArray
+            \ < parent-type
             _items : arrayT
             _count : usize
             _capacity : usize

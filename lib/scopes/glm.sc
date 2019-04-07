@@ -12,7 +12,6 @@
 
 typedef vec-type < immutable
 typedef mat-type < immutable
-typedef vec-type-accessor
 
 #run-stage;
 
@@ -159,7 +158,7 @@ typedef vec-type-accessor
             let expandmask = lhsT.ExpandMask
             `(inline (lhs rhs) (asym-assign lhs rhs rhvecT assignmask expandmask))
 
-typedef vec-type
+typedef+ vec-type
     inline vec-type-constructor (element-type size)
         construct-vec-type (imply element-type type) (imply size i32)
 
@@ -433,7 +432,7 @@ fn dot (u v)
 # MATRICES
 #-------------------------------------------------------------------------------
 
-typedef mat-type
+typedef+ mat-type
 
     inline __unpack (self)
         unpack (self as array)

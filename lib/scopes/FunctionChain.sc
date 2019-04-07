@@ -47,7 +47,7 @@
         last handler activated with argument 2
         handler activated with argument 3
 
-typedef FunctionChain : ('storageof type)
+typedef FunctionChain : (storageof type)
     fn __repr (self)
         repr (bitcast self type)
 

@@ -2973,16 +2973,43 @@ let locals =
 
             return `(build-locals scope) scope
 
-fn set-symbols-from-scope (T scope)
-    loop (last-key = unnamed)
-        let key value =
-            'next scope last-key
-        if (key == unnamed)
-            return;
-        #let keydocstr = ('docstring scope key)
-        'set-symbol T key value
-        #'set-docstring! T key keydocstr
-        repeat key
+define define-symbols-from-scope
+    fn stage-constant? (value)
+        ('pure? value) and (('typeof value) != SpiceMacro)
+
+    spice-macro
+        fn (args)
+            let T = ('getarg args 0)
+            let scope = (('getarg args 1) as Scope)
+            let block = (sc_expression_new)
+            if ('constant? T)
+                let T = (T as type)
+                loop (last-key = unnamed)
+                    let key value = ('next scope last-key)
+                    if (key == unnamed)
+                        return block
+                    let value = ('tag (sc_extract_argument_new value 0) ('anchor value))
+                    let value = (sc_prove value)
+                    if (stage-constant? value)
+                        'set-symbol T key value
+                    else
+                        let wrapvalue =
+                            if (('typeof value) == Value) value
+                            else (Value value)
+                        sc_expression_append block
+                            spice-quote
+                                sc_type_set_symbol T key wrapvalue
+                    repeat key
+            else
+                loop (last-key = unnamed)
+                    let key value = ('next scope last-key)
+                    if (key == unnamed)
+                        return block
+                    let value = ('tag (sc_extract_argument_new value 0) ('anchor value))
+                    sc_expression_append block
+                        spice-quote
+                            sc_type_set_symbol T key value
+                    repeat key
 
 #---------------------------------------------------------------------------
 # using
@@ -4023,10 +4050,12 @@ define sugar
         sugar-block-scope-macro
             fn (topexpr scope)
                 let new-expr new-next = (f topexpr scope)
+                let x next = (decons topexpr)
+                let anchor = ('anchor x)
+                let new-expr =('tag `new-expr anchor)
                 return
                     static-branch (none? new-next)
                         inline ()
-                            let x next = (decons topexpr)
                             cons new-expr next
                         inline ()
                             cons new-expr new-next
@@ -4905,16 +4934,28 @@ sugar fold ((binding...) 'for expr...)
 sugar typedef+ (T body...)
     qq [do]
         [let] this-type = [T]
-        [let] scope =
+        [define-symbols-from-scope] this-type
             [do]
                 unquote-splice body...
-                [locals];
-        [set-symbols-from-scope] this-type ('parent scope)
-        [set-symbols-from-scope] this-type scope
+                ([__this-scope])
         this-type
 
+""""a type declaration syntax; when the name is a string, the type is declared
+    at runtime.
 sugar typedef (name body...)
     let declaration? = (('typeof name) == Symbol)
+
+    if declaration?
+        let name-exists =
+            try
+                getattr sugar-scope (name as Symbol)
+                true
+            except (err)
+                false
+        if name-exists
+            hide-traceback;
+            error@ ('anchor name) "while defining type"
+                .. "symbol '" (name as Symbol as string) "' already defined in scope"
 
     let expr supertype has-supertype-def? =
         sugar-match body...
@@ -4924,28 +4965,21 @@ sugar typedef (name body...)
             _ body... `typename false
 
     let typedecl =
-        label got-typedecl
-            if declaration?
-                if (empty? expr)
-                    # forward declaration
-                    return
-                        qq [let] [name] = (typename
-                            [(name as Symbol as string)]
-                            [supertype])
+        if declaration?
+            qq [typename] [(name as Symbol as string)] [supertype]
+        else
+            qq [typename.type] [name] [supertype]
 
-                if (not has-supertype-def?)
-                    let symname = (name as Symbol)
-                    # see if we can find a forward declaration in the local scope
-                    try
-                        let T = (getattr sugar-scope symname)
-                        # reuse type
-                        merge got-typedecl `T
-                    except (err)
+    spice set-storage (T ST flags)
+        let T = (T as type)
+        let ST = (ST as type)
+        let flags = (flags as u32)
+        sc_typename_type_set_storage T ST flags
+        `()
 
-            let namestr =
-                if declaration? `[(name as Symbol as string)]
-                else name
-            `[(qq [typename.type] [namestr] [supertype])]
+    let storage-setter =
+        if declaration? `set-storage
+        else `sc_typename_type_set_storage
 
     let expr =
         loop (inp outp = expr '())
@@ -4954,10 +4988,12 @@ sugar typedef (name body...)
                 error@ ('anchor supertype) "while matching pattern" "supertype must be in first place"
             case (': storagetype rest...)
                 repeat rest...
-                    cons (list sc_typename_type_set_storage 'this-type storagetype typename-flag-plain) outp
+                    cons (list storage-setter 'this-type
+                        storagetype typename-flag-plain) outp
             case (':: storagetype rest...)
                 repeat rest...
-                    cons (list sc_typename_type_set_storage 'this-type storagetype 0:u32) outp
+                    cons (list storage-setter 'this-type
+                        storagetype 0:u32) outp
             case ('do rest...)
                 break
                     qq [do]
@@ -4971,12 +5007,10 @@ sugar typedef (name body...)
                     qq [do]
                         [let] this-type = [typedecl]
                         unquote-splice outp
-                        [let] scope =
+                        [define-symbols-from-scope] this-type
                             [do]
                                 unquote-splice inp
-                                [locals];
-                        [set-symbols-from-scope] this-type ('parent scope)
-                        [set-symbols-from-scope] this-type scope
+                                ([__this-scope])
                         this-type
     if declaration?
         qq [let] [name] = [expr]
@@ -5034,8 +5068,23 @@ fn delete (value)
 
 define struct-dsl
     sugar : (name T)
-        qq [=] field-types
-            [cons] (list '[name] [T]) field-types
+        fn define-field-runtime (T name field-type)
+            let fields = ('@ T '__fields__)
+            sc_argument_list_append fields
+                sc_key_type (name as Symbol) (field-type as type)
+            sc_type_set_symbol T '__fields__ fields
+
+        spice define-field (struct-type name field-type)
+            if ('constant? struct-type)
+                let T = (struct-type as type)
+                define-field-runtime T name field-type
+                `()
+            else
+                'tag `(define-field-runtime struct-type `name `field-type)
+                    'anchor args
+
+        let anchor = ('anchor expression)
+        qq [define-field] [('tag `'this-type anchor)] '[name] [T]
 
     define-infix> 70 :
     locals;
@@ -5129,26 +5178,31 @@ run-stage;
                 _ (i + 1) `(insertvalue result v k)
 
 sugar struct (name body...)
-    fn finalize-struct (T field-types)
-        let numfields = (countof field-types)
-        let fields = (alloca-array type numfields)
-        for i field in (enumerate ('reverse field-types))
-            let k T = (decons (field as list) 2)
-            fields @ (usize i) = (sc_key_type (k as Symbol) (T as type))
-        if (T < CUnion)
-            'set-plain-storage T
-                sc_union_type numfields fields
-        elseif (T < CStruct)
-            'set-plain-storage T
-                sc_tuple_type numfields fields
-        elseif (T < Struct)
-            'set-storage T
-                sc_tuple_type numfields fields
+    spice finalize-struct (T)
+        fn finalize-struct-runtime (T)
+            let field-types = ('@ T '__fields__)
+            let numfields = ('argcount field-types)
+            let fields = (alloca-array type numfields)
+            for i field in (enumerate ('args field-types))
+                (ptrtoref (getelementptr fields i)) = (field as type)
+            if (T < CUnion)
+                'set-plain-storage T
+                    sc_union_type numfields fields
+            elseif (T < CStruct)
+                'set-plain-storage T
+                    sc_tuple_type numfields fields
+            elseif (T < Struct)
+                'set-storage T
+                    sc_tuple_type numfields fields
+            else
+                error
+                    .. "type " (repr T) " must have Struct, CStruct or CUnion supertype"
+                        \ " but has supertype " (repr ('superof T))
+        if ('constant? T)
+            finalize-struct-runtime (T as type)
+            `()
         else
-            error
-                .. "type " (repr T) " must have Struct, CStruct or CUnion supertype"
-                    \ " but has supertype " (repr ('superof T))
-        T
+            `(finalize-struct-runtime T)
 
     let supertype body has-supertype? =
         sugar-match body...
@@ -5174,25 +5228,32 @@ sugar struct (name body...)
             except (err) false
         else false
 
-    qq [typedef] [name]
+    spice init-fields (struct-type)
+        fn init-fields-runtime (T)
+            sc_type_set_symbol T '__fields__ (sc_argument_list_new)
+
+        if ('constant? struct-type)
+            init-fields-runtime (struct-type as type)
+            `()
+        else
+            `(init-fields-runtime struct-type)
+    qq
         unquote-splice
             if has-fwd-decl
                 if has-supertype?
                     hide-traceback;
                     error "completing struct declaration must not define a supertype"
-                list 'do
+                qq [typedef+] [name]
             else
-                qq < [supertype] do
-        [local] field-types = [`(ptrtoref (alloca list))]
-        field-types = [null]
+                qq [typedef] [name] < [supertype] do
+        [init-fields] this-type
         [using] [struct-dsl]
-        [let] scope =
+        [define-symbols-from-scope] this-type
             [do]
                 unquote-splice body
-                [locals];
-        [set-symbols-from-scope] this-type ('parent scope)
-        [set-symbols-from-scope] this-type scope
-        [finalize-struct] this-type field-types
+                ([__this-scope])
+        [finalize-struct] this-type
+        this-type
 
 # enums
 #-------------------------------------------------------------------------------
