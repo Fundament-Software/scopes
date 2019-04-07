@@ -6,14 +6,14 @@ inline unpack-type (f)
 @@ unpack-type
 @@ memoize
 fn memoized ()
-    typename "bang"
+    typename.type "bang"
 
 @@ type-factory
 fn memoized-clone ()
-    typename "bang"
+    typename.type "bang"
 
 fn not-memoized ()
-    typename "T"
+    typename.type "T"
 
 assert
     (not-memoized) != (not-memoized)

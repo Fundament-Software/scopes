@@ -1703,19 +1703,6 @@ let
     lslice = (unbalanced-binary-op-dispatch '__lslice usize "apply left-slice operator with")
     rslice = (unbalanced-binary-op-dispatch '__rslice usize "apply right-slice operator with")
 
-let missing-constructor =
-    spice-macro
-        fn "missing-constructor" (args)
-            if false
-                return `()
-            let argc = ('argcount args)
-            verify-count argc 1 -1
-            let cls = ('getarg args 0)
-            error
-                sc_string_join "typename "
-                    sc_string_join ('__repr cls)
-                        " has no constructor"
-
 let repr =
     spice-macro
         fn (args)
@@ -1759,11 +1746,27 @@ run-stage;
                     if ('refer? ('qualified-typeof self))
                         return ('tag `(reftoptr self) ('anchor args))
                     error "can not convert immutable value to pointer"
+    # dynamic typename constructor
+    type = `sc_typename_type
+    # static typename constructor
+    __typecall =
+        box-pointer
+            spice-macro
+                fn "typename.__typecall" (args)
+                    let argc = ('argcount args)
+                    verify-count argc 1 -1
+                    let cls = (as ('getarg args 0) type)
+                    if (!= cls typename)
+                        hide-traceback;
+                        error
+                            sc_string_join "typename "
+                                sc_string_join ('__repr `cls)
+                                    " has no constructor"
+                    verify-count argc 2 2
+                    let name = (as ('getarg args 1) string)
+                    'tag `[(sc_typename_type name)] ('anchor args)
 
 let null = (nullof NullType)
-
-#inline sugar-unbox (self destT)
-    imply ('datum self) destT
 
 inline not (value)
     bxor (imply value bool) true
@@ -2299,15 +2302,6 @@ fn clone-scope-contents (a b)
     Scope
         clone-scope-contents parent b
         a
-
-'define-symbols typename
-    __typecall =
-        inline (cls name)
-            static-branch (== cls typename)
-                inline ()
-                    sc_typename_type name
-                inline ()
-                    missing-constructor cls
 
 'set-symbols Scope
     __.. = (box-pointer (simple-binary-op clone-scope-contents))
@@ -3132,7 +3126,7 @@ let __assert =
                 'getarg args 1
             if (('typeof msg) != string)
                 error "string expected as second argument"
-            `(check-assertion expr msg)
+            'tag `(check-assertion expr msg) ('anchor args)
 
 fn gen-vector-reduction (f v sz)
     if false
@@ -4944,7 +4938,7 @@ sugar typedef (name body...)
                 if (empty? body...)
                     # forward declaration - we build the type at syntax time
                     return
-                        qq [let] [name] = [(typename (name as Symbol as string))]
+                        qq [let] [name] = [(typename.type (name as Symbol as string))]
 
                 let symname = (name as Symbol)
                 # see if we can find a forward declaration in the local scope
@@ -4959,7 +4953,7 @@ sugar typedef (name body...)
             let namestr =
                 if declaration? `[(name as Symbol as string)]
                 else name
-            `[(qq [typename] [namestr])]
+            `[(qq [typename.type] [namestr])]
 
     let expr =
         loop (inp outp = body... '())
@@ -5218,7 +5212,7 @@ sugar struct (name body...)
 
 sugar enum (name values...)
     spice make-enum (name vals...)
-        let T = (typename (name as string))
+        let T = (typename.type (name as string))
 
         inline build-type (self)
             let repr-expr = (sc_expression_new)

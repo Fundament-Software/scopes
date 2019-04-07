@@ -92,7 +92,7 @@ typedef FunctionChain : ('storageof type)
 
     @@ spice-quote
     fn __typecall (cls name)
-        let T = (typename (.. "<FunctionChain " name ">"))
+        let T = (typename.type (.. "<FunctionChain " name ">"))
         'set-symbol T 'chain
             inline (cls args...)
         bitcast T this-type
