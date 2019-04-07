@@ -840,10 +840,17 @@ let mutable =
     spice-macro
         fn (args)
             let argc = (sc_argcount args)
-            verify-count argc 1 1
-            let self = (sc_getarg args 0)
-            let T = (unbox-pointer self type)
-            `[('mutable T)]
+            verify-count argc 1 2
+            if (icmp== argc 1)
+                let self = (sc_getarg args 0)
+                let T = (unbox-pointer self type)
+                return `[('mutable T)]
+            elseif (ptrcmp== (unbox-pointer (sc_getarg args 0) type) pointer)
+                let self = (sc_getarg args 1)
+                let T = (unbox-pointer self type)
+                let T = (sc_pointer_type T pointer-flag-non-writable unnamed)
+                return `[('mutable T)]
+            error "syntax: (mutable pointer-type) or (mutable pointer type)"
 
 let rawstring = (pointer i8)
 
