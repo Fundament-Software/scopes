@@ -198,7 +198,7 @@ typedef+ vec-type
                             'element@ argT 0; 'element-count argT
                         fold (total value = total value) for k in (range argvecsz)
                             _ (total + 1)
-                                `(insertelement value (extractelement arg k) total)
+                                `(insertelement value ((extractelement arg k) as ET) total)
                     else
                         _ (total + 1)
                             `(insertelement value (arg as ET) total)

@@ -28,6 +28,8 @@ assert (v.rgb == (vec3 0 1 2))
 assert (v.st == (vec2 0 1))
 assert (v @ 2 == 2.0)
 
+assert ((ivec3 (vec3 5)) == (ivec3 5))
+
 assert ((vec4 v.xy v.xy) == v.xyxy)
 
 assert (v + v == (vec4 0 2 4 6))

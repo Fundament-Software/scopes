@@ -608,7 +608,9 @@ let static-branch =
             let elsef = (sc_getarg args 2)
             if (sc_value_is_constant cond)
             else
-                error "condition must be constant"
+                hide-traceback;
+                error@ (sc_value_anchor cond) "while checking condition"
+                    "condition must be constant"
             let value = (unbox-integer cond bool)
             `([(? value thenf elsef)])
 
@@ -859,6 +861,7 @@ let mutable =
 
 let rawstring = (pointer i8)
 
+# cheap version of `not` - to be replaced further down
 inline not (value)
     bxor value true
 
@@ -1344,6 +1347,28 @@ inline simple-binary-op (f)
                 return `f
             `()
 
+inline simple-folding-bool-binary-op (f unboxer)
+    spice-binary-op-macro
+        inline (lhsT rhsT)
+            let f =
+                spice-macro
+                    fn (args)
+                        let argc = ('argcount args)
+                        verify-count argc 2 2
+                        let lhs = ('getarg args 0)
+                        let rhs = ('getarg args 1)
+                        'tag
+                            if (band ('constant? lhs) ('constant? rhs))
+                                let lhs = (unboxer lhs)
+                                let rhs = (unboxer rhs)
+                                `[(f lhs rhs)]
+                            else
+                                `(f lhs rhs)
+                            'anchor args
+            if (ptrcmp== lhsT rhsT)
+                return `f
+            `()
+
 inline simple-signed-binary-op (sf uf)
     spice-binary-op-macro
         inline (lhsT rhsT)
@@ -1352,6 +1377,35 @@ inline simple-signed-binary-op (sf uf)
                     return `sf
                 else
                     return `uf
+            `()
+
+inline simple-folding-bool-signed-binary-op (sf uf unboxer)
+    spice-binary-op-macro
+        inline (lhsT rhsT)
+            let f =
+                spice-macro
+                    fn (args)
+                        let argc = ('argcount args)
+                        verify-count argc 2 2
+                        let lhs = ('getarg args 0)
+                        let rhs = ('getarg args 1)
+                        let lhsT = ('typeof lhs)
+                        let signed? = ('signed? lhsT)
+                        'tag
+                            if (band ('constant? lhs) ('constant? rhs))
+                                let lhs = (unboxer lhs)
+                                let rhs = (unboxer rhs)
+                                if signed?
+                                    `[(sf lhs rhs)]
+                                else
+                                    `[(uf lhs rhs)]
+                            elseif signed?
+                                `(sf lhs rhs)
+                            else
+                                `(uf lhs rhs)
+                            'anchor args
+            if (ptrcmp== lhsT rhsT)
+                return `f
             `()
 
 # support for calling macro functions directly
@@ -1486,12 +1540,12 @@ let safe-shl =
     __~ = (box-pointer (inline (self) (bxor self (itrunc -1:u64 (typeof self)))))
     __<< = (box-pointer (simple-binary-op safe-shl))
     __>> = (box-pointer (simple-signed-binary-op ashr lshr))
-    __== = (box-pointer (simple-binary-op icmp==))
-    __!= = (box-pointer (simple-binary-op icmp!=))
-    __< = (box-pointer (simple-signed-binary-op icmp<s icmp<u))
-    __<= = (box-pointer (simple-signed-binary-op icmp<=s icmp<=u))
-    __> = (box-pointer (simple-signed-binary-op icmp>s icmp>u))
-    __>= = (box-pointer (simple-signed-binary-op icmp>=s icmp>=u))
+    __== = (box-pointer (simple-folding-bool-binary-op icmp== sc_const_int_extract))
+    __!= = (box-pointer (simple-folding-bool-binary-op icmp!= sc_const_int_extract))
+    __< = (box-pointer (simple-folding-bool-signed-binary-op icmp<s icmp<u sc_const_int_extract))
+    __<= = (box-pointer (simple-folding-bool-signed-binary-op icmp<=s icmp<=u sc_const_int_extract))
+    __> = (box-pointer (simple-folding-bool-signed-binary-op icmp>s icmp>u sc_const_int_extract))
+    __>= = (box-pointer (simple-folding-bool-signed-binary-op icmp>=s icmp>=u sc_const_int_extract))
 
 inline floordiv (a b)
     sdiv (fptosi a i32) (fptosi b i32)
@@ -1752,6 +1806,7 @@ run-stage;
 
 let null = (nullof NullType)
 
+# slightly better not - to be replaced further down once more
 inline not (value)
     bxor (imply value bool) true
 
@@ -2447,6 +2502,24 @@ let sign = (select-op-macro ssign fsign 1)
 
 let hash = (sc_typename_type "hash" typename)
 'set-plain-storage hash u64
+
+# final `not` - this one folds the constant
+let not =
+    spice-macro
+        fn (args)
+            let argc = ('argcount args)
+            verify-count argc 1 1
+            let value = ('getarg args 0)
+            let conv = (imply-converter ('typeof value) bool)
+            let value =
+                if (operator-valid? conv)
+                    hide-traceback;
+                    sc_prove ('tag `(conv value) ('anchor value))
+                else value
+            if ('constant? value)
+                `[(not (unbox-integer value bool))]
+            else
+                `(not value)
 
 run-stage;
 
