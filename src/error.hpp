@@ -289,6 +289,9 @@ formatters:
     T(VariableOutOfScope, \
         "value of type %0 is only known at run-time and outside of function scope", \
         PType) \
+    T(UnboundValue, \
+        "value %0 is unbound", \
+        ValueRef) \
 
 // quoting
 #define SCOPES_QUOTE_ERROR_KIND() \

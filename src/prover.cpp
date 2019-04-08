@@ -1152,8 +1152,16 @@ static SCOPES_RESULT(TypedValueRef) prove_Loop(const ASTContext &ctx, const Loop
     return TypedValueRef(newloop);
 }
 
-static SCOPES_RESULT(TypedValueRef) prove_LoopArguments(const ASTContext &ctx, const ValueRef &node) { assert(false); return TypedValueRef(); }
-static SCOPES_RESULT(TypedValueRef) prove_ParameterTemplate(const ASTContext &ctx, const ValueRef &node) { assert(false); return TypedValueRef(); }
+static SCOPES_RESULT(TypedValueRef) prove_LoopArguments(const ASTContext &ctx, const ValueRef &node) {
+    SCOPES_RESULT_TYPE(TypedValueRef);
+    SCOPES_TRACE_PROVE_PARAM_MAP(node);
+    SCOPES_ERROR(UnboundValue, node);
+}
+static SCOPES_RESULT(TypedValueRef) prove_ParameterTemplate(const ASTContext &ctx, const ValueRef &node) {
+    SCOPES_RESULT_TYPE(TypedValueRef);
+    SCOPES_TRACE_PROVE_PARAM_MAP(node);
+    SCOPES_ERROR(UnboundValue, node);
+}
 
 const Type *try_get_const_type(const ValueRef &node) {
     if (node.isa<Const>())

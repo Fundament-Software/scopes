@@ -10,11 +10,8 @@
     related arithmetic operations which mimic the features available to shaders
     written in the GL shader language.
 
-typedef vec-type < immutable
-typedef mat-type < immutable
-
-fn element-prefix (element-type)
-    match element-type
+spice element-prefix (element-type)
+    match (element-type as type)
     case bool "b"
     case i32 "i"
     case u32 "u"
@@ -23,56 +20,60 @@ fn element-prefix (element-type)
     default
         error "illegal element type"
 
-@@ type-factory
-fn construct-vec-type (element-type size)
-    assert ((typeof size) == i32)
-    assert (size > 1)
+run-stage;
+
+typedef vec-type < immutable
+typedef mat-type < immutable
+
+@@ memo
+inline construct-vec-type (element-type size)
+    static-assert ((typeof size) == i32)
+    static-assert (size > 1)
     let prefix = (element-prefix element-type)
-    let VT = (vector.type element-type size)
+    let VT = (vector element-type size)
     typedef (.. prefix "vec" (tostring size)) < vec-type : VT
-        'set-symbols this-type
+        let
             ElementType = element-type
             Count = size
 
-@@ type-factory
-fn construct-mat-type (element-type cols rows)
-    if false # recursive function, hint return type
-        return type
-    assert ((typeof cols) == i32)
-    assert ((typeof rows) == i32)
+@@ memo
+inline construct-mat-type (element-type cols rows)
+    static-assert ((typeof cols) == i32)
+    static-assert ((typeof rows) == i32)
     assert (cols > 1)
     assert (rows > 1)
     let prefix = (element-prefix element-type)
     let vecT =
         construct-vec-type element-type rows
-    let MT = (array.type vecT cols)
+    let MT = (array vecT cols)
     typedef (.. prefix "mat" (tostring cols) "x" (tostring rows))
         \ < mat-type : MT
-        'set-symbols this-type
+        let
             ElementType = element-type
             ColumnType = vecT
             RowType = (construct-vec-type element-type cols)
             Columns = cols; Rows = rows
-        if (cols == rows)
-            'set-symbol this-type 'TransposedType this-type
-        elseif (cols < rows)
-            let TT = ((type-factory construct-mat-type) element-type rows cols)
-            'set-symbol this-type 'TransposedType TT
-            'set-symbol TT 'TransposedType this-type
+        do
+            static-if (cols == rows)
+                'define-symbol this-type 'TransposedType this-type
+            elseif (cols < rows)
+                let TT = ((memo construct-mat-type) element-type rows cols)
+                'define-symbol this-type 'TransposedType TT
+                'define-symbol TT 'TransposedType this-type
 
-fn construct-vec-types (count)
+inline construct-vec-types (count)
     let count = (i32 count)
-    return
+    _
         construct-vec-type f32 count
         construct-vec-type f64 count
         construct-vec-type i32 count
         construct-vec-type u32 count
         construct-vec-type bool count
 
-fn construct-mat-types (cols rows)
+inline construct-mat-types (cols rows)
     let cols = (i32 cols)
     let rows = (i32 rows)
-    return
+    _
         construct-mat-type f32 cols rows
         construct-mat-type f64 cols rows
         construct-mat-type i32 cols rows
@@ -157,9 +158,6 @@ typedef vec-type-accessor
             `(inline (lhs rhs) (asym-assign lhs rhs rhvecT assignmask expandmask))
 
 typedef+ vec-type
-    inline vec-type-constructor (element-type size)
-        construct-vec-type (imply element-type type) (imply size i32)
-
     spice vec-constructor2 (self ...)
         let self = (self as type)
         let ET argsz =
@@ -209,7 +207,7 @@ typedef+ vec-type
     spice __typecall (self ...)
         let self = (self as type)
         if (self == vec-type)
-            `(vec-type-constructor ...)
+            `(construct-vec-type ...)
         else
             let args = (sc_argument_list_new)
             for arg in ('args ...)
@@ -368,18 +366,20 @@ typedef+ vec-type
         let VT = (vector.type i32 lhsz)
         return (sc_const_aggregate_new VT lhsz entries)
 
-    @@ type-factory
+    @@ memoize
     fn construct-getter-type (vecrefT mask)
         let storageT = ('storageof vecrefT)
         let ET = ('element@ storageT 0)
-        typedef (.. ('string vecrefT) (tostring mask)) < vec-type-accessor : storageT
-            let sz = ('element-count ('typeof mask))
-            let lhsz = ('element-count vecrefT)
-            'set-symbols this-type
+        let sz = ('element-count ('typeof mask))
+        let lhsz = ('element-count vecrefT)
+        @@ spice-quote
+        typedef [(.. ('string vecrefT) (tostring mask))]
+            \ < vec-type-accessor : storageT
+            let
                 RHVectorType = (construct-vec-type ET sz)
                 Mask = mask
-                AssignMask = (assign-mask lhsz mask)
-                ExpandMask = (expand-mask lhsz sz)
+                AssignMask = [(assign-mask lhsz mask)]
+                ExpandMask = [(expand-mask lhsz sz)]
 
     spice __getattr (self name)
         let name = (name as Symbol as string)
@@ -395,7 +395,7 @@ typedef+ vec-type
             spice-quote
                 bitcast
                     shufflevector self self mask
-                    [(construct-vec-type ('element@ ('typeof self) 0) sz)]
+                    construct-vec-type [('element@ ('typeof self) 0)] sz
 
     unlet construct-getter-type assign-mask range-mask expand-mask
         \ build-access-mask
@@ -582,7 +582,7 @@ typedef+ mat-type
             let VT = ('element@ lhsT 0)
             let sz = ('element-count VT)
             let ET = ('element@ VT 0)
-            let destT = (construct-mat-type ET sz sz)
+            let destT = `(construct-mat-type ET sz sz)
             spice-quote
                 inline (lhs rhs)
                     spice-unquote

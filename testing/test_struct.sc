@@ -18,16 +18,19 @@ let x y z = (val begin-arg)
 assert (x == 1)
 assert (y == 2)
 assert (z == 3)
-do
-    # a struct with name expression - defined at runtime
-    let T =
-        struct (.. "my" "struct")
-            x : i32
-            y : i32
-    assert (('string T) == "mystruct")
-    assert (('storageof T) == (tuple (x = i32) (y = i32)))
+
+# a struct with name expression - defined at runtime
+let T =
+    @@ spice-quote
+    struct (.. "my" "struct")
+        x : i32
+        y : i32
+assert (not (constant? T))
 
 run-stage;
+
+assert (('string T) == "mystruct")
+assert (('storageof T) == (tuple (x = i32) (y = i32)))
 
 struct AnotherStruct plain
     x : i32

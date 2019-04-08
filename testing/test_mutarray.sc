@@ -2,6 +2,9 @@
 using import Array
 
 let TESTSIZE = (1:usize << 16:usize)
+
+run-stage;
+
 let i32Arrayx65536 = (FixedArray i32 TESTSIZE)
 let i32Array = (GrowingArray i32)
 let i32Arrayx16 = (FixedArray i32 16)
@@ -13,8 +16,6 @@ let i32ArrayArrayx16 = (FixedArray i32Array 16)
 let i32Arrayx16Arrayx16 = (FixedArray i32Arrayx16 16)
 
 let StringArray = (GrowingArray string)
-
-run-stage;
 
 let fullrange = (range TESTSIZE)
 

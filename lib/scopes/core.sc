@@ -752,16 +752,6 @@ inline define-symbols (self values...)
     reverse = sc_list_reverse
     dump = sc_list_dump
 
-'define-symbols SampledImage
-    __typecall =
-        inline (cls ...)
-            sc_sampled_image_type ...
-
-'define-symbols Image
-    __typecall =
-        inline (cls ...)
-            sc_image_type ...
-
 'define-symbols type
     bitcount = sc_type_bitcountof
     signed? = sc_integer_type_is_signed
@@ -1347,7 +1337,7 @@ inline simple-binary-op (f)
                 return `f
             `()
 
-inline simple-folding-bool-binary-op (f unboxer)
+inline simple-folding-autotype-binary-op (f unboxer)
     spice-binary-op-macro
         inline (lhsT rhsT)
             let f =
@@ -1379,7 +1369,7 @@ inline simple-signed-binary-op (sf uf)
                     return `uf
             `()
 
-inline simple-folding-bool-signed-binary-op (sf uf unboxer)
+inline simple-folding-autotype-signed-binary-op (sf uf unboxer)
     spice-binary-op-macro
         inline (lhsT rhsT)
             let f =
@@ -1453,7 +1443,8 @@ fn string@ (self i)
 'set-symbols string
     __== = (box-pointer (simple-binary-op ptrcmp==))
     __!= = (box-pointer (simple-binary-op ptrcmp!=))
-    __.. = (box-pointer (simple-binary-op sc_string_join))
+    __.. = (box-pointer (simple-folding-autotype-binary-op sc_string_join
+        (inline (x) (unbox-pointer x string))))
     __< = (box-pointer (simple-binary-op (inline (a b) (icmp<s (sc_string_compare a b) 0))))
     __<= = (box-pointer (simple-binary-op (inline (a b) (icmp<=s (sc_string_compare a b) 0))))
     __> = (box-pointer (simple-binary-op (inline (a b) (icmp>s (sc_string_compare a b) 0))))
@@ -1540,12 +1531,12 @@ let safe-shl =
     __~ = (box-pointer (inline (self) (bxor self (itrunc -1:u64 (typeof self)))))
     __<< = (box-pointer (simple-binary-op safe-shl))
     __>> = (box-pointer (simple-signed-binary-op ashr lshr))
-    __== = (box-pointer (simple-folding-bool-binary-op icmp== sc_const_int_extract))
-    __!= = (box-pointer (simple-folding-bool-binary-op icmp!= sc_const_int_extract))
-    __< = (box-pointer (simple-folding-bool-signed-binary-op icmp<s icmp<u sc_const_int_extract))
-    __<= = (box-pointer (simple-folding-bool-signed-binary-op icmp<=s icmp<=u sc_const_int_extract))
-    __> = (box-pointer (simple-folding-bool-signed-binary-op icmp>s icmp>u sc_const_int_extract))
-    __>= = (box-pointer (simple-folding-bool-signed-binary-op icmp>=s icmp>=u sc_const_int_extract))
+    __== = (box-pointer (simple-folding-autotype-binary-op icmp== sc_const_int_extract))
+    __!= = (box-pointer (simple-folding-autotype-binary-op icmp!= sc_const_int_extract))
+    __< = (box-pointer (simple-folding-autotype-signed-binary-op icmp<s icmp<u sc_const_int_extract))
+    __<= = (box-pointer (simple-folding-autotype-signed-binary-op icmp<=s icmp<=u sc_const_int_extract))
+    __> = (box-pointer (simple-folding-autotype-signed-binary-op icmp>s icmp>u sc_const_int_extract))
+    __>= = (box-pointer (simple-folding-autotype-signed-binary-op icmp>=s icmp>=u sc_const_int_extract))
 
 inline floordiv (a b)
     sdiv (fptosi a i32) (fptosi b i32)
@@ -1763,6 +1754,20 @@ let repr =
                         sc_default_styler style-type ('string T)
                 `(sc_string_join s suffix)
 
+let tostring =
+    box-spice-macro
+        fn (args)
+            let argc = ('argcount args)
+            verify-count argc 1 -1
+            let value = ('getarg args 0)
+            try
+                `([('@ ('typeof value) '__tostring)] value)
+            except (err)
+                if ('constant? value)
+                    `[(sc_value_tostring value)]
+                else
+                    `(sc_value_tostring value)
+
 run-stage;
 
 'set-symbols typename
@@ -1846,13 +1851,6 @@ fn empty? (value)
 
 #fn cons (at next)
     sc_list_cons (Value at) next
-
-fn tostring (value)
-    'dispatch-attr (typeof value) '__tostring
-        inline (f)
-            f value
-        inline ()
-            sc_value_tostring `value
 
 let print =
     do
@@ -1996,7 +1994,7 @@ fn dotted-symbol? (env head)
             return true
         + i 1:usize
 
-fn split-dotted-symbol (head start end tail)
+fn split-dotted-symbol (anchor head start end tail)
     let s = (as head string)
     loop (i = start)
         if (== i end)
@@ -2004,13 +2002,15 @@ fn split-dotted-symbol (head start end tail)
             if (== start 0:usize)
                 return (cons head tail)
             else
-                return (cons (Symbol (rslice s start)) tail)
+                let newtoken = (Symbol (rslice s start))
+                let newtoken = ('tag `newtoken anchor)
+                return (cons newtoken tail)
         if (== (@ s i) dot-char)
             let tail =
                 # no remainder after dot
                 if (== i (- end 1:usize)) tail
                 else # remainder after dot, split the rest first
-                    split-dotted-symbol head (+ i 1:usize) end tail
+                    split-dotted-symbol anchor head (+ i 1:usize) end tail
             let result = (cons dot-sym tail)
             if (== i 0:usize)
                 # no prefix before dot
@@ -2018,8 +2018,10 @@ fn split-dotted-symbol (head start end tail)
             else
                 # prefix before dot
                 let size = (- i start)
+                let newtoken = (Symbol (lslice (rslice s start) size))
+                let newtoken = ('tag `newtoken anchor)
                 return
-                    cons (Symbol (lslice (rslice s start) size)) result
+                    cons newtoken result
         + i 1:usize
 
 # infix notation support
@@ -2194,7 +2196,7 @@ fn symbol-handler (topexpr env)
         let s = (as name string)
         let sz = (countof s)
         let expr =
-            Value (split-dotted-symbol name 0:usize sz '())
+            Value (split-dotted-symbol name-anchor name 0:usize sz '())
         #let expr = (sugar-wrap name-anchor expr false)
         return (cons expr next) env
     return topexpr env
@@ -3045,44 +3047,6 @@ let locals =
                             repeat key
 
             return `(build-locals scope) scope
-
-define define-symbols-from-scope
-    fn stage-constant? (value)
-        ('pure? value) and (('typeof value) != SpiceMacro)
-
-    spice-macro
-        fn (args)
-            let T = ('getarg args 0)
-            let scope = (('getarg args 1) as Scope)
-            let block = (sc_expression_new)
-            if ('constant? T)
-                let T = (T as type)
-                loop (last-key = unnamed)
-                    let key value = ('next scope last-key)
-                    if (key == unnamed)
-                        return block
-                    let value = ('tag (sc_extract_argument_new value 0) ('anchor value))
-                    let value = (sc_prove value)
-                    if (stage-constant? value)
-                        'set-symbol T key value
-                    else
-                        let wrapvalue =
-                            if (('typeof value) == Value) value
-                            else (Value value)
-                        sc_expression_append block
-                            spice-quote
-                                sc_type_set_symbol T key wrapvalue
-                    repeat key
-            else
-                loop (last-key = unnamed)
-                    let key value = ('next scope last-key)
-                    if (key == unnamed)
-                        return block
-                    let value = ('tag (sc_extract_argument_new value 0) ('anchor value))
-                    sc_expression_append block
-                        spice-quote
-                            sc_type_set_symbol T key value
-                    repeat key
 
 #---------------------------------------------------------------------------
 # using
@@ -4269,13 +4233,13 @@ define spice
                             cons
                                 qq
                                     [let paramv] =
-                                        [`sc_getarglist args i];
+                                        [`sc_getarglist ('tag `args ('anchor paramv)) i];
                                 body
                         else
                             cons
                                 qq
                                     [let paramv] =
-                                        [`sc_getarg args i];
+                                        [`sc_getarg ('tag `args ('anchor paramv)) i];
                                 body
                     repeat (i + 1) rest body (| varargs variadic?)
                 let content =
@@ -4516,60 +4480,60 @@ spice memocall (f args...)
 # function overloading
 #-------------------------------------------------------------------------------
 
-fn get-overloaded-fn-append ()
-    spice "overloaded-fn-append" (T args...)
-        let outtype = (T as type)
-        let functions = ('@ outtype 'templates)
-        let functypes = ('@ outtype 'parameter-types)
-        for i in (range 0 ('argcount args...) 2)
-            let f = ('getarg args... i)
-            let ftype = ('getarg args... (i + 1))
-            if (('typeof ftype) == Nothing)
-                let fT = ('typeof f)
-                if ('function-pointer? fT)
-                    if ((('kind f) != value-kind-function)
-                        and (not ('constant? f)))
-                        error "argument must be constant or function"
-                    let fT = ('element@ fT 0)
-                    let argcount = ('element-count fT)
-                    loop (k types = 0 void)
-                        if (k < argcount)
-                            let argT = ('element@ fT k)
-                            repeat (k + 1)
-                                sc_arguments_type_join types argT
-                        sc_argument_list_append functions f
-                        sc_argument_list_append functypes types
-                        break;
-                elseif (fT == type)
-                    if (fT == outtype)
-                        error "cannot inherit from own type"
-                    let fT = (f as type)
-                    if (fT < OverloadedFunction)
-                        let fns = ('@ fT 'templates)
-                        let ftypes = ('@ fT 'parameter-types)
-                        # copy over existing options
-                        for func ftype in (zip ('args fns) ('args ftypes))
-                            sc_argument_list_append functions func
-                            sc_argument_list_append functypes ftype
-                elseif (fT == Closure)
-                    # ensure argument is constant
-                    f as Closure
-                    # append as templated option
+spice overloaded-fn-append (T args...)
+    let outtype = (T as type)
+    let functions = ('@ outtype 'templates)
+    let functypes = ('@ outtype 'parameter-types)
+    for i in (range 0 ('argcount args...) 2)
+        let f = ('getarg args... i)
+        let ftype = ('getarg args... (i + 1))
+        if (('typeof ftype) == Nothing)
+            # separator for (using ...)
+            let fT = ('typeof f)
+            if ('function-pointer? fT)
+                if ((('kind f) != value-kind-function)
+                    and (not ('constant? f)))
+                    error "argument must be constant or function"
+                let fT = ('element@ fT 0)
+                let argcount = ('element-count fT)
+                loop (k types = 0 void)
+                    if (k < argcount)
+                        let argT = ('element@ fT k)
+                        repeat (k + 1)
+                            sc_arguments_type_join types argT
                     sc_argument_list_append functions f
-                    sc_argument_list_append functypes Variadic
-                else
-                    error
-                        .. "cannot embed argument of type "
-                            repr ('typeof f)
-                            " in overloaded function"
-            else
-                let T = (ftype as type)
+                    sc_argument_list_append functypes types
+                    break;
+            elseif (fT == type)
+                if (fT == outtype)
+                    error "cannot inherit from own type"
+                let fT = (f as type)
+                if (fT < OverloadedFunction)
+                    let fns = ('@ fT 'templates)
+                    let ftypes = ('@ fT 'parameter-types)
+                    # copy over existing options
+                    for func ftype in (zip ('args fns) ('args ftypes))
+                        sc_argument_list_append functions func
+                        sc_argument_list_append functypes ftype
+            elseif (fT == Closure)
+                # ensure argument is constant
+                f as Closure
+                # append as templated option
                 sc_argument_list_append functions f
-                sc_argument_list_append functypes ftype
-        T
+                sc_argument_list_append functypes Variadic
+            else
+                error
+                    .. "cannot embed argument of type "
+                        repr ('typeof f)
+                        " in overloaded function"
+        else
+            let T = (ftype as type)
+            sc_argument_list_append functions f
+            sc_argument_list_append functypes ftype
+    T
 
 'set-symbols OverloadedFunction
-    append = (get-overloaded-fn-append)
+    append = overloaded-fn-append
     __typecall =
         spice "dispatch-overloaded-function" (cls args...)
             let T = (cls as type)
@@ -4627,9 +4591,16 @@ fn get-overloaded-fn-append ()
                             break str
 
 sugar fn... (name...)
+    spice init-overloaded-function (T)
+        let T = (T as type)
+        'set-symbols T
+            templates = (sc_argument_list_new)
+            parameter-types = (sc_argument_list_new)
+        T
+
     let inline? =
         (expr-head as Symbol) == 'inline...
-    let finalize-overloaded-fn = (get-overloaded-fn-append)
+    let finalize-overloaded-fn = overloaded-fn-append
     let fn-name =
         sugar-match name...
         case (name as Symbol;) name
@@ -4639,10 +4610,10 @@ sugar fn... (name...)
             error
                 """"syntax: (fn... name|"name") (case pattern body...) ...
     let outargs = (sc_argument_list_new)
-    let outtype = (sc_typename_type (fn-name as string) OverloadedFunction)
-    'set-symbols outtype
-        templates = (sc_argument_list_new)
-        parameter-types = (sc_argument_list_new)
+    let outtype =
+        spice-quote
+            init-overloaded-function
+                typename [(fn-name as string)] OverloadedFunction
     let bodyscope = (Scope sugar-scope)
     sugar-match name...
     case (name as Symbol;)
@@ -4662,12 +4633,13 @@ sugar fn... (name...)
                     sc_template_set_inline tmpl
                 sc_argument_list_append outargs tmpl
                 let scope = (Scope bodyscope)
-                loop (expr types = (uncomma (condv as list)) void)
+                let types = (sc_argument_list_new)
+                loop (expr = (uncomma (condv as list)))
                     sugar-match expr
                     case ()
                         let body = (sc_expand (cons do body...) '() scope)
                         sc_template_set_body tmpl body
-                        sc_argument_list_append outargs types
+                        sc_argument_list_append outargs `(Arguments types)
                         break;
                     case ((arg as Symbol) ': T)
                         hide-traceback;
@@ -4680,18 +4652,18 @@ sugar fn... (name...)
                         let param = (sc_parameter_new arg)
                         sc_template_append_parameter tmpl param
                         'set-symbol scope arg param
+                        sc_argument_list_append types
+                            ? ('variadic? arg) Variadic Unknown
                         repeat rest...
-                            sc_arguments_type_join types
-                                ? ('variadic? arg) Variadic Unknown
                     case (((arg as Symbol) ': T) rest...)
                         if ('variadic? arg)
                             error "a typed parameter can't be variadic"
-                        let T = ((sc_expand T '() sugar-scope) as type)
+                        let T = (sc_expand T '() sugar-scope)
                         let param = (sc_parameter_new arg)
                         sc_template_append_parameter tmpl param
                         'set-symbol scope arg param
+                        sc_argument_list_append types T
                         repeat rest...
-                            sc_arguments_type_join types T
                     default
                         hide-traceback;
                         error@ ('anchor condv) "while parsing pattern"
@@ -4888,13 +4860,13 @@ define-sugar-block-scope-macro vvv
                     result
             let follow-expr next-next-expr = (decons next-expr)
             break
-                cons 'decorate-* follow-expr result
+                cons 'decorate-vvv follow-expr result
                 next-next-expr
     return
         cons result next-expr
         sugar-scope
 
-define-sugar-macro decorate-*
+define-sugar-macro decorate-vvv
     raises-compile-error;
     let expr decorators = (decons args)
     loop (in out = decorators expr)
@@ -4920,7 +4892,10 @@ define-sugar-macro decorate-fn
     else
         result
 
-let decorate-inline = decorate-fn
+let
+    decorate-inline = decorate-fn
+    decorate-typedef = decorate-fn
+    decorate-struct = decorate-fn
 
 define-sugar-macro decorate-let
     raises-compile-error;
@@ -4996,6 +4971,22 @@ let
     import-c = sc_import_c
     load-library = sc_load_library
 
+sugar fold-locals (args...)
+    let scope = sugar-scope
+    let _1 _2 = (decons args...)
+    let init _2 = (sc_expand _1 _2 sugar-scope)
+    let _1 _2 = (decons _2)
+    let f = (sc_expand _1 _2 sugar-scope)
+    let block = (sc_expression_new)
+    sc_expression_append block init
+    loop (last-key outval = unnamed init)
+        let key value = ('next scope last-key)
+        if (key == unnamed)
+            return block
+        let expr = ('tag `(f outval key value) ('anchor expression))
+        sc_expression_append block expr
+        repeat key expr
+
 run-stage;
 
 #-------------------------------------------------------------------------------
@@ -5058,13 +5049,37 @@ sugar fold ((binding...) 'for expr...)
 # typedef
 #-------------------------------------------------------------------------------
 
+define append-to-type
+    fn stage-constant? (value)
+        ('pure? value) and (('typeof value) != SpiceMacro)
+
+    spice-macro
+        fn (args)
+            let T = ('getarg args 0)
+            let key = ('getarg args 1)
+            let value = ('getarg args 2)
+            if ('constant? T)
+                let T = (T as type)
+                if (stage-constant? value)
+                    let key = (key as Symbol)
+                    'set-symbol T key value
+                    `T
+                else
+                    let wrapvalue =
+                        if (('typeof value) == Value) value
+                        else (Value value)
+                    spice-quote
+                        embed (sc_type_set_symbol T key wrapvalue) T
+            else
+                spice-quote
+                    embed (sc_type_set_symbol T key value) T
+
 sugar typedef+ (T body...)
     qq [do]
         [let] this-type = [T]
-        [define-symbols-from-scope] this-type
-            [do]
-                unquote-splice body...
-                ([__this-scope])
+        [do]
+            unquote-splice body...
+            [fold-locals] this-type [append-to-type]
         this-type
 
 """"a type declaration syntax; when the name is a string, the type is declared
@@ -5092,10 +5107,13 @@ sugar typedef (name body...)
             _ body... `typename false
 
     let typedecl =
-        if declaration?
-            qq [typename] [(name as Symbol as string)] [supertype]
-        else
-            qq [typename.type] [name] [supertype]
+        qq [typename]
+            unquote
+                if declaration?
+                    `[(name as Symbol as string)]
+                else
+                    name
+            [supertype]
 
     spice set-storage (T ST flags)
         let T = (T as type)
@@ -5104,10 +5122,6 @@ sugar typedef (name body...)
         sc_typename_type_set_storage T ST flags
         `()
 
-    let storage-setter =
-        if declaration? `set-storage
-        else `sc_typename_type_set_storage
-
     let expr =
         loop (inp outp = expr '())
             sugar-match inp
@@ -5115,11 +5129,11 @@ sugar typedef (name body...)
                 error@ ('anchor supertype) "while matching pattern" "supertype must be in first place"
             case (': storagetype rest...)
                 repeat rest...
-                    cons (list storage-setter 'this-type
+                    cons (list set-storage 'this-type
                         storagetype typename-flag-plain) outp
             case (':: storagetype rest...)
                 repeat rest...
-                    cons (list storage-setter 'this-type
+                    cons (list set-storage 'this-type
                         storagetype 0:u32) outp
             case ('do rest...)
                 break
@@ -5134,10 +5148,9 @@ sugar typedef (name body...)
                     qq [do]
                         [let] this-type = [typedecl]
                         unquote-splice outp
-                        [define-symbols-from-scope] this-type
-                            [do]
-                                unquote-splice inp
-                                ([__this-scope])
+                        [do]
+                            unquote-splice inp
+                            [fold-locals] this-type [append-to-type]
                         this-type
     if declaration?
         qq [let] [name] = [expr]
@@ -5217,6 +5230,30 @@ define struct-dsl
     locals;
 
 run-stage;
+
+#-------------------------------------------------------------------------------
+# images
+#-------------------------------------------------------------------------------
+
+typedef+ SampledImage
+    spice __typecall (cls T)
+        let T = (T as type)
+        `[(sc_sampled_image_type T)]
+    let type = sc_sampled_image_type
+
+typedef+ Image
+    spice __typecall (cls T dim depth arrayed multisampled sampled format access)
+        let
+            dim = (dim as Symbol)
+            depth = (depth as i32)
+            arrayed = (arrayed as i32)
+            multisampled = (multisampled as i32)
+            sampled = (sampled as i32)
+            format = (format as Symbol)
+            access = (access as Symbol)
+        let T = (T as type)
+        `[(sc_image_type T dim depth arrayed multisampled sampled format access)]
+    let type = sc_image_type
 
 #-------------------------------------------------------------------------------
 # C type support
@@ -5375,10 +5412,9 @@ sugar struct (name body...)
                 qq [typedef] [name] < [supertype] do
         [init-fields] this-type
         [using] [struct-dsl]
-        [define-symbols-from-scope] this-type
-            [do]
-                unquote-splice body
-                ([__this-scope])
+        [do]
+            unquote-splice body
+            [fold-locals] this-type [append-to-type]
         [finalize-struct] this-type
         this-type
 

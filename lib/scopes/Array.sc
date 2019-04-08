@@ -139,34 +139,43 @@ typedef Array < Struct
 
 typedef FixedArray < Array
     let parent-type = this-type
-    fn gen-type (cls element-type capacity)
-        let arrayT =
-            'mutable (pointer.type element-type)
 
-        struct
-            .. "<FixedArray "
-                'string element-type
-                " x "
-                tostring (i32 capacity)
-                ">"
-            \ < parent-type
+    spice gen-fixed-array-type (element-type capacity)
+        let parent-type = this-type
+        let element-type = (element-type as type)
+        let capacity = (capacity as i32)
+        @@ memoize
+        fn _gen-fixed-array-type (element-type capacity)
+            let arrayT =
+                'mutable (pointer.type element-type)
 
-            _items : arrayT
-            _count : usize
+            @@ spice-quote
+            struct
+                spice-unquote
+                    .. "<FixedArray "
+                        'string element-type
+                        " x "
+                        tostring (i32 capacity)
+                        ">"
+                \ < parent-type
 
-            let
-                ElementType = element-type
-                Capacity = capacity
+                _items : arrayT
+                _count : usize
 
-    inline... __typecall
-    case (cls : type, element-type : type, capacity)
-        gen-type cls element-type capacity
-    case (T : type,)
-        ((superof (superof T)) . __typecall) T
-            _items = (malloc-array T.ElementType T.Capacity)
-            _count = 0:usize
+                let
+                    ElementType = element-type
+                    Capacity = capacity
+        _gen-fixed-array-type element-type capacity
 
-    unlet gen-type
+    @@ spice-quote
+    inline __typecall (cls opts...)
+        static-if (cls == this-type)
+            let element-type capacity = opts...
+            gen-fixed-array-type element-type (capacity as i32)
+        else
+            Struct.__typecall cls
+                _items = (malloc-array cls.ElementType cls.Capacity)
+                _count = 0:usize
 
     fn __repr (self)
         ..
@@ -200,20 +209,27 @@ let DEFAULT_CAPACITY = (1:usize << 2:usize)
 typedef GrowingArray < Array
     let parent-type = this-type
 
-    fn gen-type (cls element-type)
-        let arrayT = ('mutable (pointer.type element-type))
+    spice gen-growing-array-type (element-type)
+        let parent-type = this-type
+        let element-type = (element-type as type)
+        @@ memoize
+        fn _gen-growing-array-type (element-type)
+            let arrayT = ('mutable (pointer.type element-type))
 
-        struct
-            .. "<GrowingArray "
-                'string element-type
-                ">"
-            \ < parent-type
-            _items : arrayT
-            _count : usize
-            _capacity : usize
+            @@ spice-quote
+            struct
+                spice-unquote
+                    .. "<GrowingArray "
+                        'string element-type
+                        ">"
+                \ < parent-type
+                _items : arrayT
+                _count : usize
+                _capacity : usize
 
-            let
-                ElementType = element-type
+                let
+                    ElementType = element-type
+        _gen-growing-array-type element-type
 
     fn nearest-capacity (capacity count)
         loop (new-capacity = capacity)
@@ -224,7 +240,7 @@ typedef GrowingArray < Array
     @@ spice-quote
     inline __typecall (cls opts...)
         static-if (cls == this-type)
-            gen-type cls opts...
+            gen-growing-array-type opts...
         else
             let capacity =
                 nearest-capacity DEFAULT_CAPACITY

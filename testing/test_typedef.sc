@@ -17,8 +17,10 @@ typedef MyIntType < integer : i32
 assert (('storageof MyIntType) == i32)
 assert (MyIntType < integer)
 
+let name = "RuntimeType"
 let RuntimeType =
-    typedef "RuntimeType" < integer : i32
+    @@ spice-quote
+    typedef [name] < [(typename "new")] : i32
         inline func () true
 
 assert (not (constant? RuntimeType))
@@ -50,13 +52,26 @@ static-assert (constant? SelfRefType)
 assert (('superof SelfRefType) == tuple)
 assert (('storageof SelfRefType) == (tuple.type i32 (pointer SelfRefType)))
 
-let val = (MyTupleType 1 2)
-let u v = ('get val)
-assert ((u == 1) and (v == 2))
+do
+    let val = (MyTupleType 1 2)
+    let u v = ('get val)
+    assert ((u == 1) and (v == 2))
 
 run-stage;
 
+print RuntimeType (superof RuntimeType)
 assert ('func RuntimeType)
+
+spice make-type (name u v)
+    @@ spice-quote
+    typedef [(name as string)]
+        let x = u
+        let y = v
+
+run-stage;
+
+let T = (make-type "test" 1 2)
+print T T.x T.y
 
 
 true

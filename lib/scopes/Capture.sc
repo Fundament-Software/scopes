@@ -14,9 +14,11 @@ spice unpack-capture (capture)
 spice pack-capture (argtuple func)
     let T = ('typeof argtuple)
     let CaptureT =
-        typedef (.. "Capture" ('string T)) < Capture : T
-    'set-symbol CaptureT '__call func
-    `(bitcast argtuple CaptureT)
+        @@ spice-quote
+        typedef [(.. "Capture" ('string T))] < Capture : T
+            let __call = func
+    spice-quote
+        bitcast argtuple CaptureT
 
 # capture [var ...] (param ...) body ...
 sugar capture (('square-list args...) (params...) body...)
@@ -36,7 +38,8 @@ spice unpack-capture-spice (capture T)
 spice pack-capture-spice (argtuple)
     let T = ('typeof argtuple)
     let CaptureT =
-        typedef (.. "Capture" ('string T)) < Capture : T
+        @@ spice-quote
+        typedef [(.. "Capture" ('string T))] < Capture : T
     spice-quote
         _
             bitcast argtuple CaptureT
