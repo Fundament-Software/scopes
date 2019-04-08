@@ -4492,6 +4492,26 @@ inline type-factory (f)
     fn (...)
         ((f ...) as type)
 
+spice memocall (f args...)
+    if (not ('pure? f))
+        hide-traceback; error@ ('anchor f) "while checking callable"
+            "callable must be pure"
+    for arg in ('args args...)
+        if (not ('pure? arg))
+            hide-traceback; error@ ('anchor arg) "while checking argument"
+                "arguments must be pure"
+    let key = `[f args...]
+    let key = (sc_prove key)
+    try
+        sc_map_get key
+    except (err)
+        let value = (sc_prove `(f args...))
+        for arg in ('args value)
+            if (not ('pure? arg))
+                hide-traceback; error "all returned arguments must be pure"
+        sc_map_set key value
+        value
+
 #-------------------------------------------------------------------------------
 # function overloading
 #-------------------------------------------------------------------------------
@@ -4719,6 +4739,12 @@ sugar from (src 'let params...)
 define zip (spice-macro (fn (args) (ltr-multiop args (Value zip) 2)))
 
 run-stage;
+
+inline _memo (f)
+    inline (...)
+        memocall f ...
+
+inline memo (f) (memocall _memo f)
 
 'set-symbols list
     rjoin =
@@ -5464,6 +5490,8 @@ let e:f64 = 2.718281828459045:f64
 let e = e:f32
 
 #-------------------------------------------------------------------------------
+
+unlet _memo
 
 run-stage;
 
