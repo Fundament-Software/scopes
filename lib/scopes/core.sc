@@ -5292,24 +5292,24 @@ sugar include (args...)
             qq [let] [targetsym] = [scope]
 
     let modulename = (('@ sugar-scope 'module-path) as string)
-    loop (args targetsym filter modulename ext opts = args... unnamed "" modulename ".c" '())
+    loop (args targetsym filter modulename ext opts includestr = args... unnamed "" modulename ".c" '() "")
         sugar-match args
         case (('import (name as Symbol)) rest...)
             if (targetsym != unnamed)
                 error "duplicate 'import'"
             if (not (empty? filter))
                 error "can't use filter with 'import'"
-            repeat rest... name filter (.. modulename "." (name as string)) ext opts
+            repeat rest... name filter (.. modulename "." (name as string)) ext opts includestr
         case (('filter (pattern as string)) rest...)
             if (not (empty? filter))
                 error "duplicate 'filter'"
             if (targetsym != unnamed)
                 error "can't use filter with 'import'"
-            repeat rest... targetsym pattern modulename ext opts
+            repeat rest... targetsym pattern modulename ext opts includestr
         case (('extern "C++") rest...)
             if (modulename == ".cpp")
                 error "duplicate 'extern \"C++\"'"
-            repeat rest... targetsym filter modulename ".cpp" opts
+            repeat rest... targetsym filter modulename ".cpp" opts includestr
         case (('options opts...) rest...)
             let opts =
                 loop (outopts inopts = '() opts...)
@@ -5325,18 +5325,22 @@ sugar include (args...)
                         else
                             error "invalid option type"
                     repeat outopts next
-            repeat rest... targetsym filter modulename ext ('reverse opts)
-        case (s as string;)
-            hide-traceback;
-            # simple include string
-            let s =
-                "#include \"" .. s .. "\""
-            return
-                gen-code (.. modulename ext) targetsym filter s opts
-                next-expr
+            repeat rest... targetsym filter modulename ext ('reverse opts) includestr
+        case ((s as string) rest...)
+            if (not (empty? includestr))
+                error "duplicate include string"
+            repeat rest... targetsym filter modulename ext opts s
         case ()
-            # full source code
-            if (not (empty? next-expr))
+            if (not (empty? includestr))
+                # simple include string
+                let includestr =
+                    "#include \"" .. includestr .. "\""
+                hide-traceback;
+                return
+                    gen-code (.. modulename ext) targetsym filter includestr opts
+                    next-expr
+            elseif (not (empty? next-expr))
+                # full source code
                 let code rest = (decons next-expr)
                 if (('typeof code) == string)
                     hide-traceback;
