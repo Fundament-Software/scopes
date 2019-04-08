@@ -45,4 +45,39 @@ let a b t1 = (f g 2 3)
 let c d t2 = (f g 2 3)
 static-assert (t1 == t2)
 
+# single recursive memoization
+
+@@ memo
+inline frec0 (x)
+    dump "0" x
+    static-if (x < 10)
+        (memo frec0) (const.add.i32.i32 x 1)
+    else x
+
+frec0 1
+frec0 5
+frec0 7
+
+# cross recursive memoization
+
+inline frec2
+
+@@ memo
+inline frec (x)
+    dump "1" x
+    static-if (x < 10)
+        frec2 (const.add.i32.i32 x 1)
+    else x
+
+@@ memo
+inline frec2 (x)
+    dump "2" x
+    static-if (x < 10)
+        frec (const.add.i32.i32 x 1)
+    else x
+
+frec 1
+frec 5
+frec 7
+
 true
