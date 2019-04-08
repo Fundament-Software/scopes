@@ -1,14 +1,18 @@
 
-#fn testfunc (x y)
-    x * y
-let lib =
-    import-c "lib.c"
-        """"int testfunc (int x, int y) {
-                return x * y;
-            }
-        '()
+let
+    TESTVAL = "-DTESTVAL2"
 
-run-stage;
+include
+    filter "^t.*$"
+    options "-DTESTVAL" TESTVAL
+""""#ifndef TESTVAL
+        #error "expected define"
+    #endif
+    #ifndef TESTVAL2
+        #error "expected define 2"
+    #endif
+    int testfunc (int x, int y) {
+        return x * y;
+    }
 
-let testfunc = lib.testfunc
 assert ((testfunc 2 3) == 6)

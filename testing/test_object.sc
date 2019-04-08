@@ -2,13 +2,7 @@
 #let x = (unconst true)
 #global y = x
 
-let C =
-    import-c "libc.c"
-        """"
-            #include <stdio.h>
-        list;
-
-run-stage;
+include (import C) "stdio.h"
 
 let i32x10 = (array i32 10)
 

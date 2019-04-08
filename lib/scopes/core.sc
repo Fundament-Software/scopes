@@ -4050,6 +4050,16 @@ fn gen-sugar-matcher (failfunc expr scope params)
                 sc_expression_append outexpr arg
                 'set-symbol scope param arg
                 repeat (i + 1) rest next (| varargs variadic?)
+            elseif (T == string)
+                let str = (paramv as string)
+                sc_expression_append outexpr
+                    spice-quote
+                        let arg next = (sc_list_decons next)
+                        if (ptrcmp!= ('typeof arg) string)
+                            failfunc;
+                        if ((arg as string) != str)
+                            failfunc;
+                repeat (i + 1) rest next varargs
             elseif (T == list)
                 let param = (paramv as list)
                 let head head-rest = (decons param)
@@ -4096,7 +4106,8 @@ fn gen-sugar-matcher (failfunc expr scope params)
                                 gen-sugar-matcher failfunc arg scope param
                     repeat (i + 1) rest next varargs
             else
-                error "unsupported pattern"
+                hide-traceback;
+                error@ ('anchor paramv) "while parsing pattern" "unsupported pattern"
         return
             spice-quote
                 if (not (check-count (sc_list_count expr)
@@ -4817,6 +4828,7 @@ define-sugar-block-scope-macro @@
     let result next-expr =
         loop (body next-expr result = body next-expr '())
             if (empty? next-expr)
+                hide-traceback;
                 error "decorator is not applied to anything"
             let result =
                 cons
@@ -4826,18 +4838,22 @@ define-sugar-block-scope-macro @@
                         `body
                     result
             let follow-expr next-next-expr = (decons next-expr)
-            if (('typeof follow-expr) != list)
-                error "decorator must be applied to expression"
-            let kw body = (decons (follow-expr as list))
-            let kw = (kw as Symbol)
-            if (kw == head)
-                # more decorators
-                repeat body next-next-expr result
+            if (('typeof follow-expr) == list)
+                let kw body = (decons (follow-expr as list))
+                let kw = (kw as Symbol)
+                if (kw == head)
+                    # more decorators
+                    repeat body next-next-expr result
+                else
+                    # terminating actual expression
+                    let newkw = (Symbol (.. "decorate-" (kw as string)))
+                    break
+                        cons newkw follow-expr result
+                        next-next-expr
             else
-                # terminating actual expression
-                let newkw = (Symbol (.. "decorate-" (kw as string)))
+                # default decorator for arbitrary values
                 break
-                    cons newkw follow-expr result
+                    cons 'decorate-vvv follow-expr result
                     next-next-expr
     return
         cons result next-expr
@@ -4968,7 +4984,6 @@ let
     list-load = sc_parse_from_path
     list-parse = sc_parse_from_string
     #eval = sc_eval
-    import-c = sc_import_c
     load-library = sc_load_library
 
 sugar fold-locals (args...)
@@ -5258,6 +5273,79 @@ typedef+ Image
 #-------------------------------------------------------------------------------
 # C type support
 #-------------------------------------------------------------------------------
+
+# importing
+#-------------------------------------------------------------------------------
+
+sugar include (args...)
+    fn gen-code (cfilename targetsym filter code opts)
+        let scope =
+            do
+                hide-traceback;
+                (sc_import_c cfilename code opts)
+        if (targetsym == unnamed)
+            if (empty? filter)
+                qq [using] [scope]
+            else
+                qq [using] [scope] filter [filter]
+        else
+            qq [let] [targetsym] = [scope]
+
+    let modulename = (('@ sugar-scope 'module-path) as string)
+    loop (args targetsym filter modulename ext opts = args... unnamed "" modulename ".c" '())
+        sugar-match args
+        case (('import (name as Symbol)) rest...)
+            if (targetsym != unnamed)
+                error "duplicate 'import'"
+            if (not (empty? filter))
+                error "can't use filter with 'import'"
+            repeat rest... name filter (.. modulename "." (name as string)) ext opts
+        case (('filter (pattern as string)) rest...)
+            if (not (empty? filter))
+                error "duplicate 'filter'"
+            if (targetsym != unnamed)
+                error "can't use filter with 'import'"
+            repeat rest... targetsym pattern modulename ext opts
+        case (('extern "C++") rest...)
+            if (modulename == ".cpp")
+                error "duplicate 'extern \"C++\"'"
+            repeat rest... targetsym filter modulename ".cpp" opts
+        case (('options opts...) rest...)
+            let opts =
+                loop (outopts inopts = '() opts...)
+                    if (empty? inopts)
+                        break outopts
+                    let at next = (decons inopts)
+                    let T = ('typeof at)
+                    let outopts =
+                        if (T == Symbol)
+                            cons ('@ sugar-scope (at as Symbol)) outopts
+                        elseif ( T == string)
+                            cons at outopts
+                        else
+                            error "invalid option type"
+                    repeat outopts next
+            repeat rest... targetsym filter modulename ext ('reverse opts)
+        case (s as string;)
+            hide-traceback;
+            # simple include string
+            let s =
+                "#include \"" .. s .. "\""
+            return
+                gen-code (.. modulename ext) targetsym filter s opts
+                next-expr
+        case ()
+            # full source code
+            if (not (empty? next-expr))
+                let code rest = (decons next-expr)
+                if (('typeof code) == string)
+                    hide-traceback;
+                    return
+                        gen-code (.. modulename ext) targetsym filter (code as string) opts
+                        rest
+            error "string block expected as next expression"
+        default
+            error (.. "invalid syntax: " (repr args))
 
 # pointers
 #-------------------------------------------------------------------------------

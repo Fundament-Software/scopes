@@ -40,6 +40,11 @@ do
 
     assert (n == 303)
 
+let somefunc =
+    fn () true
+
+dump somefunc
+
 # ASSERT OK: no attribute 'x in scope
 assert-error
     do

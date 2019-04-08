@@ -626,15 +626,19 @@ uint64_t sc_hashbytes (const char *data, size_t size) {
 sc_scope_raises_t sc_import_c(const sc_string_t *path,
     const sc_string_t *content, const sc_list_t *arglist) {
     using namespace scopes;
+    SCOPES_RESULT_TYPE(Scope *);
     std::vector<std::string> args;
     while (arglist) {
-        auto value = extract_string_constant(arglist->at);
-        if (!value.ok())
-            return {false, nullptr};
-        args.push_back(value.assert_ok()->data);
+        if (arglist->at.isa<ConstPointer>()) {
+            auto value = SCOPES_C_GET_RESULT(extract_string_constant(arglist->at));
+            args.push_back(value->data);
+        } else {
+            auto value = SCOPES_C_GET_RESULT(extract_symbol_constant(arglist->at));
+            args.push_back(value.name()->data);
+        }
         arglist = arglist->next;
     }
-    return convert_result(import_c_module(path->data, args, content->data));
+    SCOPES_C_RETURN(import_c_module(path->data, args, content->data));
 }
 
 sc_void_raises_t sc_load_library(const sc_string_t *name) {

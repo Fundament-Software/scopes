@@ -15,22 +15,19 @@ dump-spice
 
 #fn testfunc (x y)
     x * y
-let lib =
-    import-c "callback.c"
-        """"
-            typedef int (*testfunc)(int x, int y);
-            int call_testfunc(testfunc f, int x, int y) {
-                return f(x,y);
-            }
-        '()
 
-run-stage;
+include;
+""""
+    typedef int (*testfunc)(int x, int y);
+    int call_testfunc(testfunc f, int x, int y) {
+        return f(x,y);
+    }
 
 fn testf (x y)
     + x y
 
 let z =
-    lib.call_testfunc testf 2 3
+    call_testfunc testf 2 3
 print z
 assert (z == 5)
 

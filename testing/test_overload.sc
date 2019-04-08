@@ -43,8 +43,12 @@ print testf.templates
 print testf.parameter-types
 
 fn... test2
-case (a : i32,)
-    a + a
+
+'append test2
+    fn (a)
+        a + a
+    # signature pattern
+    Arguments i32
 
 'append test2
     # template

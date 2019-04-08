@@ -406,7 +406,7 @@ public:
         return tuple_type(fields);
     }
 
-    SCOPES_RESULT(const Type *) TranslateType(clang::QualType T) {
+    SCOPES_RESULT(const Type *) _TranslateType(clang::QualType T) {
         SCOPES_RESULT_TYPE(const Type *);
         using namespace clang;
 
@@ -543,6 +543,22 @@ public:
             break;
         }
 
+        SCOPES_ERROR(CImportCannotConvertType,
+            T.getAsString().c_str(),
+            Ty->getTypeClassName());
+    }
+
+    SCOPES_RESULT(const Type *) TranslateType(clang::QualType T) {
+        SCOPES_RESULT_TYPE(const Type *);
+        using namespace clang;
+
+        const clang::Type *Ty = T.getTypePtr();
+
+        auto result = _TranslateType(T);
+        if (result.ok())
+            return result;
+        if (isa<ErrorCImportCannotConvertType>(result.assert_error()))
+            return result;
         SCOPES_ERROR(CImportCannotConvertType,
             T.getAsString().c_str(),
             Ty->getTypeClassName());
