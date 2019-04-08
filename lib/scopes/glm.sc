@@ -13,8 +13,6 @@
 typedef vec-type < immutable
 typedef mat-type < immutable
 
-#run-stage;
-
 fn element-prefix (element-type)
     match element-type
     case bool "b"
