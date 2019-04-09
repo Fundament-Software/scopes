@@ -624,9 +624,6 @@ sc_type_set_symbol Value '__typecall
             else
                 let value = (sc_getarg args 1)
                 let T = (sc_value_type value)
-                #sc_write
-                    sc_value_repr `T
-                #sc_write "\n"
                 if (ptrcmp== T Value)
                     value
                 elseif (ptrcmp== T Nothing)
@@ -654,23 +651,47 @@ let
 
 let NullType = (sc_typename_type "NullType" typename)
 
+let cons =
+    spice-macro
+        fn (args)
+            let argc = (sc_argcount args)
+            verify-count argc 1 -1
+            let block = (sc_expression_new)
+            let last = (sc_getarg args (sub argc 1))
+            sc_expression_append block last
+            loop (i last = (sub argc 1) last)
+                if (icmp== i 0)
+                    break block
+                let i = (sub i 1)
+                let arg = (sc_getarg args i)
+                let anchor = (sc_value_anchor arg)
+                let T = (sc_value_type arg)
+                let arg =
+                    if (ptrcmp== T Value) arg
+                    elseif (sc_value_is_pure arg) ``arg
+                    else (sc_value_wrap T arg)
+                let last =
+                    sc_valueref_tag anchor `(sc_list_cons arg last)
+                sc_expression_append block last
+                _ i last
+
+let list-constructor =
+    spice-macro
+        fn (args)
+            raises-compile-error;
+            let argc = (sc_argcount args)
+            let newargs = (sc_argument_list_new)
+            let anchor = (sc_value_anchor args)
+            loop (i = 1)
+                if (icmp== i argc)
+                    sc_argument_list_append newargs
+                        sc_valueref_tag anchor `'()
+                    break
+                        sc_valueref_tag anchor `(cons newargs)
+                sc_argument_list_append newargs (sc_getarg args i)
+                add i 1
+
 run-stage;
-
-inline cons (values...)
-    va-rifold none
-        inline (i key value next)
-            static-branch (none? next)
-                inline ()
-                    value
-                inline ()
-                    sc_list_cons `value next
-        values...
-
-inline make-list (values...)
-    va-rifold '()
-        inline (i key value result)
-            sc_list_cons `value result
-        values...
 
 inline decons (self count)
     let count =
@@ -1456,9 +1477,7 @@ fn string@ (self i)
     __>= = (box-pointer (simple-binary-op (inline (a b) (icmp>=s (sc_string_compare a b) 0))))
 
 'define-symbols list
-    __typecall =
-        inline (self args...)
-            make-list args...
+    __typecall = list-constructor
     __repr =
         inline "list-repr" (self)
             sc_list_repr self
@@ -4843,6 +4862,7 @@ define-sugar-block-scope-macro sugar-if
 define-sugar-block-scope-macro @@
     raises-compile-error;
     let kw body = (decons expr)
+    let anchor = ('anchor kw)
     let head = (kw as Symbol)
     let result next-expr =
         loop (body next-expr result = body next-expr '())
@@ -4854,7 +4874,7 @@ define-sugar-block-scope-macro @@
                     if ((countof body) == 1)
                         '@ body
                     else
-                        `body
+                        'tag `body anchor
                     result
             let follow-expr next-next-expr = (decons next-expr)
             if (('typeof follow-expr) == list)
@@ -4867,16 +4887,16 @@ define-sugar-block-scope-macro @@
                     # terminating actual expression
                     let newkw = (Symbol (.. "decorate-" (kw as string)))
                     break
-                        cons newkw follow-expr result
+                        cons
+                            'tag `newkw anchor
+                            \ follow-expr result
                         next-next-expr
             else
                 # default decorator for arbitrary values
                 break
                     cons 'decorate-vvv follow-expr result
                     next-next-expr
-    return
-        cons result next-expr
-        sugar-scope
+    return (cons result next-expr) sugar-scope
 
 define-sugar-block-scope-macro vvv
     raises-compile-error;
@@ -4895,7 +4915,7 @@ define-sugar-block-scope-macro vvv
                     result
             let follow-expr next-next-expr = (decons next-expr)
             break
-                cons 'decorate-vvv follow-expr result
+                cons ('tag `'decorate-vvv ('anchor kw)) follow-expr result
                 next-next-expr
     return
         cons result next-expr
@@ -4935,6 +4955,7 @@ let
 define-sugar-macro decorate-let
     raises-compile-error;
     let letexpr decorators = (decons args)
+    let anchor = ('anchor letexpr)
     let letexpr = (letexpr as list)
     let kw entry = (decons letexpr 2)
     if (('typeof entry) == list)
@@ -4944,6 +4965,7 @@ define-sugar-macro decorate-let
                 if (empty? in)
                     break out
                 let entry in = (decons in)
+                let entry-anchor = ('anchor entry)
                 let k eq val = (decons (entry as list) 2)
                 let result =
                     loop (in out = decorators val)
@@ -4951,10 +4973,11 @@ define-sugar-macro decorate-let
                             break out
                         let decorator in = (decons in)
                         repeat in
-                            list (cons decorator out)
+                            list
+                                'tag `[(cons decorator out)] entry-anchor
                 repeat in
                     cons
-                        cons k eq result
+                        'tag `[(cons k eq result)] anchor
                         out
         cons let ('reverse result)
     else
@@ -4974,7 +4997,7 @@ define-sugar-macro decorate-let
                 let decorator in = (decons in)
                 repeat in
                     cons decorator (list out)
-        loop (in out = params (list '= result))
+        loop (in out = params (list '= ('tag `result anchor)))
             if (empty? in)
                 break out
             let param params = (decons in)

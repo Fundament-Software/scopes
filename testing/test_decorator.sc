@@ -1,7 +1,7 @@
 
 inline debugprint (f)
     inline (...)
-        print (f ...)
+        report (f ...)
 
 inline multiply (z)
     inline (f)
@@ -20,7 +20,7 @@ typedef T
     inline replace-result (f)
         @@ spice-quote
         inline (cls x)
-            print f
+            report f
             x + 300
 
     @@ replace-result
@@ -29,7 +29,7 @@ typedef T
 
     unlet replace-result
 
-vvv print
+vvv report
 2 + 3
 
 do
@@ -37,7 +37,7 @@ do
         _
             x + 1; y + 1; z + 1
 
-    @@ print
+    @@ report
     @@ incby1x3
     let x y z = 3 4 5
 
@@ -49,7 +49,7 @@ do
     inline incby1 (x)
         x + 1
 
-    @@ print
+    @@ report
     @@ incby1
     let
         x = 3
@@ -63,4 +63,3 @@ do
 run-stage;
 
 assert ((T 3) == 303)
-

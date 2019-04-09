@@ -5,7 +5,7 @@ using import FunctionChain
 global g_x = 0
 inline get_g_x () g_x
 
-@@ print
+@@ report
 fnchain f
 
 # decorator syntax
