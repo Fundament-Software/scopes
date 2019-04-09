@@ -153,6 +153,9 @@ struct Instruction : TypedValue {
     Block *block;
 };
 
+void validate_instruction(const TypedValueRef &value);
+void validate_instructions(const TypedValues &values);
+
 //------------------------------------------------------------------------------
 
 struct Terminator : Instruction {

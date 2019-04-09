@@ -804,6 +804,7 @@ CondBr::CondBr(const TypedValueRef &_cond)
 {}
 
 CondBrRef CondBr::from(const TypedValueRef &cond) {
+    validate_instruction(cond);
     return ref(unknown_anchor(), new CondBr(cond));
 }
 
@@ -882,6 +883,7 @@ Switch::Switch(const TypedValueRef &_expr, const Cases &_cases)
 {}
 
 SwitchRef Switch::from(const TypedValueRef &expr, const Cases &cases) {
+    validate_instruction(expr);
     return ref(unknown_anchor(), new Switch(expr, cases));
 }
 
@@ -1001,6 +1003,8 @@ Call::Call(const Type *type, const TypedValueRef &_callee, const TypedValues &_a
 }
 
 CallRef Call::from(const Type *type, const TypedValueRef &callee, const TypedValues &args) {
+    validate_instruction(callee);
+    validate_instructions(args);
     return ref(unknown_anchor(), new Call(type, callee, args));
 }
 
@@ -1571,6 +1575,24 @@ SCOPES_INSTRUCTION_VALUE_KIND()
     }
 }
 
+void validate_instruction(const TypedValueRef &value) {
+#if 0
+    assert(value);
+    if (value.isa<Instruction>()) {
+        auto instr = value.cast<Instruction>();
+        assert(instr->block);
+    }
+#endif
+}
+
+void validate_instructions(const TypedValues &values) {
+#if 0
+    for (auto value : values) {
+        validate_instruction(value);
+    }
+#endif
+}
+
 //------------------------------------------------------------------------------
 
 bool Terminator::classof(const Value *T) {
@@ -1586,7 +1608,9 @@ SCOPES_TERMINATOR_VALUE_KIND()
 
 Terminator::Terminator(ValueKind _kind, const TypedValues &_values)
     : Instruction(_kind, TYPE_NoReturn), values(_values)
-{}
+{
+    validate_instructions(_values);
+}
 
 //------------------------------------------------------------------------------
 

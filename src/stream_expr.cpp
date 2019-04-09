@@ -182,6 +182,28 @@ HANDLER(KeyedTemplate) {
     return LIST(SYMBOL(node->key), SYMBOL(OP_Set), node->value);
 }
 
+HANDLER(Call) {
+    auto _anchor = node.anchor();
+    const List *l = EOL;
+    int i = node->args.size();
+    while (i-- > 0) {
+        l = List::from(node->args[i], l);
+    }
+    l = List::from(node->callee, l);
+    //if (node->callee.isa<Global>())
+    //    goto skip;
+    if (node->callee.isa<Const>()) {
+        const Type *T = node->callee.cast<TypedValue>()->get_type();
+        if (T == TYPE_Builtin)
+            goto skip;
+        if (T == TYPE_Closure)
+            goto skip;
+    }
+    l = List::from(SYMBOL(KW_Call), l);
+skip:
+    return ValueRef(_anchor, ConstPointer::list_from(l));
+}
+
 HANDLER(CallTemplate) {
     auto _anchor = node.anchor();
     const List *l = EOL;
@@ -286,6 +308,7 @@ ValueRef _convert(const ValueRef &node) {
     //auto _anchor = node.anchor();
     switch(node->kind()) {
     CASE_HANDLER(CallTemplate)
+    CASE_HANDLER(Call)
     CASE_HANDLER(Template)
     CASE_HANDLER(Global)
     CASE_HANDLER(ParameterTemplate)

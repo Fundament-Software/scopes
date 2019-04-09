@@ -946,6 +946,17 @@ bool sc_list_compare(const sc_list_t *a, const sc_list_t *b) {
     return true;
 }
 
+// Anchors
+////////////////////////////////////////////////////////////////////////////////
+
+const sc_anchor_t *sc_anchor_offset(const sc_anchor_t *anchor, int offset) {
+    using namespace scopes;
+
+    return Anchor::from(
+        anchor->file, anchor->lineno,
+        anchor->column + offset, anchor->offset + offset);
+}
+
 // Closure
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -2146,6 +2157,8 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_list_next, TYPE_List, TYPE_List);
     DEFINE_EXTERN_C_FUNCTION(sc_list_reverse, TYPE_List, TYPE_List);
     DEFINE_EXTERN_C_FUNCTION(sc_list_compare, TYPE_Bool, TYPE_List, TYPE_List);
+
+    DEFINE_EXTERN_C_FUNCTION(sc_anchor_offset, TYPE_Anchor, TYPE_Anchor, TYPE_I32);
 
     DEFINE_EXTERN_C_FUNCTION(sc_closure_get_docstring, TYPE_String, TYPE_Closure);
     DEFINE_EXTERN_C_FUNCTION(sc_closure_get_template, TYPE_ValueRef, TYPE_Closure);

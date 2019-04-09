@@ -2013,8 +2013,6 @@ let dot-char = 46:i8 # "."
 let dot-sym = '.
 
 fn dotted-symbol? (env head)
-    if ('variadic? head)
-        return false
     if (== head dot-sym)
         return false
     let s = (as head string)
@@ -2026,35 +2024,43 @@ fn dotted-symbol? (env head)
             return true
         + i 1:usize
 
-fn split-dotted-symbol (anchor head start end tail)
-    let s = (as head string)
-    loop (i = start)
-        if (== i end)
-            # did not find a dot
-            if (== start 0:usize)
-                return (cons head tail)
-            else
-                let newtoken = (Symbol (rslice s start))
-                let newtoken = ('tag `newtoken anchor)
-                return (cons newtoken tail)
+fn split-dotted-symbol (name)
+    let anchor = ('anchor name)
+    let s = (as (as name Symbol) string)
+    let sz = (countof s)
+    loop (i = sz)
+        if (== i 0:usize)
+            # did not find a dot - return as-is
+            return name
+        let _i = i
+        let i = (- i 1:usize)
         if (== (@ s i) dot-char)
-            let tail =
-                # no remainder after dot
-                if (== i (- end 1:usize)) tail
-                else # remainder after dot, split the rest first
-                    split-dotted-symbol anchor head (+ i 1:usize) end tail
-            let result = (cons dot-sym tail)
+            # skip trailing dot
+            if (== _i sz)
+                repeat i
+            # if a dot followed this dot, skip it
+            if (== (@ s _i) dot-char)
+                repeat i
+            # ignore prefix dot - return as-is
             if (== i 0:usize)
-                # no prefix before dot
-                return result
-            else
-                # prefix before dot
-                let size = (- i start)
-                let newtoken = (Symbol (lslice (rslice s start) size))
-                let newtoken = ('tag `newtoken anchor)
-                return
-                    cons newtoken result
-        + i 1:usize
+                return name
+            let k = (- i 1:usize)
+            # if a dot precedes this dot, skip it
+            if (== (@ s k) dot-char)
+                repeat i
+            # we found a good solo dot inbetween two characters
+            let ltoken = (Symbol (lslice s i))
+            let rtoken = (Symbol (rslice s _i))
+            let manchor = (sc_anchor_offset anchor (as i i32))
+            let ranchor = (sc_anchor_offset anchor (as _i i32))
+            # build expression
+            let expr =
+                list
+                    'tag `dot-sym manchor
+                    'tag `ltoken anchor
+                    'tag `rtoken ranchor
+            return ('tag `expr manchor)
+        i
 
 # infix notation support
 # --------------------------------------------------------------------------
@@ -2223,13 +2229,30 @@ fn list-handler (topexpr env)
 fn symbol-handler (topexpr env)
     let at next = ('decons topexpr)
     let sxname = at
-    let name name-anchor = (as sxname Symbol) ('anchor sxname)
+    let name = (as sxname Symbol)
+    let s = (as name string)
+    if (>= (countof s) 2:usize)
+        let ch = (@ s 0)
+        switch ch
+        #pass 126:i8 # ~
+        pass 64:i8 # @
+        #pass 47:i8 # /
+        pass 38:i8 # &
+        case 45:i8 # -
+            # split
+            let anchor = ('anchor sxname)
+            let lop = ('tag `[(Symbol (lslice s 1))] anchor)
+            let rop = ('tag `[(Symbol (rslice s 1))] (sc_anchor_offset anchor 1))
+            return
+                cons
+                    'tag `[(list lop rop)] anchor
+                    next
+                env
+        default
+            ;
     if (dotted-symbol? env name)
-        let s = (as name string)
-        let sz = (countof s)
         let expr =
-            Value (split-dotted-symbol name-anchor name 0:usize sz '())
-        #let expr = (sugar-wrap name-anchor expr false)
+            split-dotted-symbol sxname
         return (cons expr next) env
     return topexpr env
 
@@ -5804,11 +5827,36 @@ fn read-eval-print-loop ()
             if (key != tmp) (x + 1)
             else x
 
-        spice append-to-scope (scope key values...)
+        spice append-to-scope (scope key vals...)
             let tmp = (Symbol "#result...")
             if (key != tmp)
-                'set-symbol (scope as Scope) (key as Symbol) values...
+                if (('argcount vals...) != 1)
+                    let block = (sc_expression_new)
+                    let outargs = `(sc_argument_list_new)
+                    sc_expression_append block outargs
+                    for arg in ('args vals...)
+                        sc_expression_append block
+                            if (('typeof arg) == Value)
+                                `(sc_argument_list_append outargs ``arg)
+                            else
+                                `(sc_argument_list_append outargs `arg)
+                    sc_expression_append block
+                        `('set-symbol scope key outargs)
+                    sc_expression_append block scope
+                    return block
+                else
+                    return
+                        spice-quote
+                            'set-symbol scope key vals...
+                            scope
             scope
+
+        spice print-bound-names (key vals...)
+            let outargs = (sc_argument_list_new)
+            for arg in ('args vals...)
+                sc_argument_list_append outargs `(repr arg)
+            spice-quote
+                print key [(default-styler style-operator "=")] outargs
 
         spice handle-retargs (inserts counter eval-scope vals...)
             let inserts = (inserts as i32)
@@ -5825,11 +5873,17 @@ fn read-eval-print-loop ()
                             counter
             elseif (count != 0)
                 let outargs = (sc_argument_list_new)
+                let block = (sc_expression_new)
                 let eval-scope = (eval-scope as Scope)
                 fold (count = 0) for arg in ('args vals...)
                     let idstr = (make-idstr (counter + count))
-                    'set-symbol eval-scope (Symbol idstr) arg
                     sc_argument_list_append outargs `idstr
+                    let idstr = (Symbol idstr)
+                    sc_expression_append block
+                        if (('typeof arg) == Value)
+                            `('set-symbol eval-scope idstr ``arg)
+                        else
+                            `('set-symbol eval-scope idstr `arg)
                     count + 1
                 sc_argument_list_append outargs (default-styler style-operator "=")
                 for arg in ('args vals...)
@@ -5837,6 +5891,7 @@ fn read-eval-print-loop ()
                 let counter = (counter + count)
                 return
                     spice-quote
+                        block
                         print outargs
                         counter
             `counter
@@ -5864,8 +5919,7 @@ fn read-eval-print-loop ()
                     @@ spice-quote
                     fn expr ()
                         raises-compile-error;
-                        print bound-name [(default-styler style-operator "=")]
-                            repr bound-val
+                        print-bound-names bound-name bound-val
                     let f = (sc_compile (sc_typify_template expr 0 null) 0:u64)
                     let fptr = (f as (pointer (raises (function void) Error)))
                     fptr;

@@ -347,6 +347,10 @@ SCOPES_LIBEXPORT const sc_list_t *sc_list_next(const sc_list_t *l);
 SCOPES_LIBEXPORT const sc_list_t *sc_list_reverse(const sc_list_t *l);
 SCOPES_LIBEXPORT bool sc_list_compare(const sc_list_t *a, const sc_list_t *b);
 
+// anchors
+
+SCOPES_LIBEXPORT const sc_anchor_t *sc_anchor_offset(const sc_anchor_t *anchor, int offset);
+
 // closures
 
 SCOPES_LIBEXPORT const sc_string_t *sc_closure_get_docstring(const sc_closure_t *func);

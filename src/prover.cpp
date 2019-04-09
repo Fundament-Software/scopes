@@ -1936,7 +1936,7 @@ repeat:
         } break;
         case FN_DumpAST: {
             StyledStream ss(SCOPES_CERR);
-            ss << call.anchor() << " dump-ast:";
+            ss << call.anchor() << " dump-spice:";
             for (auto arg : values) {
                 ss << std::endl;
                 stream_value(ss, arg);

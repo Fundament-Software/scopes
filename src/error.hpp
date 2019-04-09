@@ -448,6 +448,8 @@ enum BacktraceKind {
     BTK_ProveParamMap,
     // context = argument being lifetime checked
     BTK_ProveArgumentLifetime,
+    // context = value being translated
+    BTK_Translate,
     // invoked in user code at runtime; context = call
     BTK_User,
 };
@@ -465,6 +467,8 @@ struct Backtrace {
     SCOPES_TRACE(Parser, ref((ANCHOR), g_none))
 #define SCOPES_TRACE_EXPANDER(VALUEREF) \
     SCOPES_TRACE(Expander, (VALUEREF))
+#define SCOPES_TRACE_CODEGEN(VALUEREF) \
+    SCOPES_TRACE(Translate, (VALUEREF))
 #define SCOPES_TRACE_PROVE_EXPR(VALUEREF) \
     SCOPES_TRACE(ProveExpression, (VALUEREF))
 #define SCOPES_TRACE_PROVE_TEMPLATE(VALUEREF) \

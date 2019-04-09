@@ -1787,6 +1787,7 @@ struct LLVMIRGenerator {
         auto it = ref2value.find(ref);
         if (it != ref2value.end())
             return it->second;
+        SCOPES_TRACE_CODEGEN(ref.value);
         LLVMValueRef value = nullptr;
         switch(ref.value->kind()) {
         #define T(NAME, BNAME, CLASS) \

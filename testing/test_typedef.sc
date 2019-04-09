@@ -28,6 +28,10 @@ assert (not (constant? RuntimeType))
 assert-compiler-error
     'func RuntimeType
 
+typedef K
+    let x y = (decons '(1 2 3))
+    let keys... = (decons '(1 2 3))
+
 # define opaque supertype
 typedef MyTupleSuperType
 
@@ -58,6 +62,8 @@ do
     assert ((u == 1) and (v == 2))
 
 run-stage;
+
+print K.x K.y K.keys...
 
 print RuntimeType (superof RuntimeType)
 assert ('func RuntimeType)

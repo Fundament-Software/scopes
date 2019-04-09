@@ -353,6 +353,23 @@ void stream_backtrace(StyledStream &ss, const Backtrace *bt) {
         ss << std::endl;
         anchor->stream_source_line(ss);
     } break;
+    case BTK_Translate: {
+        #if 1
+        anchor = get_best_anchor(value);
+        #endif
+        #if 1
+        ss << "While translating" << std::endl;
+        StreamValueFormat fmt;
+        fmt.maxdepth = 3;
+        fmt.maxlength = 4;
+        stream_value(ss, value, fmt);
+        ss << anchor << " defined here";
+        #else
+        ss << anchor << " while checking expression";
+        #endif
+        ss << std::endl;
+        anchor->stream_source_line(ss);
+    } break;
     case BTK_ProveExpression: {
         #if 1
         anchor = get_best_anchor(value);
