@@ -1337,7 +1337,7 @@ inline simple-binary-op (f)
                 return `f
             `()
 
-inline simple-folding-autotype-binary-op (f unboxer)
+inline simple-folding-binary-op (f unboxer boxer)
     spice-binary-op-macro
         inline (lhsT rhsT)
             let f =
@@ -1349,15 +1349,20 @@ inline simple-folding-autotype-binary-op (f unboxer)
                         let rhs = ('getarg args 1)
                         'tag
                             if (band ('constant? lhs) ('constant? rhs))
+                                let T = ('typeof lhs)
                                 let lhs = (unboxer lhs)
                                 let rhs = (unboxer rhs)
-                                `[(f lhs rhs)]
+                                boxer T (f lhs rhs)
                             else
                                 `(f lhs rhs)
                             'anchor args
             if (ptrcmp== lhsT rhsT)
                 return `f
             `()
+
+fn autoboxer (T x) `x
+inline simple-folding-autotype-binary-op (f unboxer)
+    simple-folding-binary-op f unboxer autoboxer
 
 inline simple-signed-binary-op (sf uf)
     spice-binary-op-macro
@@ -1526,7 +1531,7 @@ let safe-shl =
     __rcp = (spice-quote (inline (self) (fdiv 1.0 (as self f32))))
     __% = (box-pointer (simple-signed-binary-op srem urem))
     __& = (box-pointer (simple-binary-op band))
-    __| = (box-pointer (simple-binary-op bor))
+    __| = (box-pointer (simple-folding-binary-op bor sc_const_int_extract sc_const_int_new))
     __^ = (box-pointer (simple-binary-op bxor))
     __~ = (box-pointer (inline (self) (bxor self (itrunc -1:u64 (typeof self)))))
     __<< = (box-pointer (simple-binary-op safe-shl))
@@ -3109,6 +3114,11 @@ let using =
                         merge-scope-symbols src sugar-scope none
                     else
                         merge-scope-symbols src sugar-scope (('@ pattern) as string)
+            let nameval =
+                if (('typeof nameval) == list)
+                    let val = (sc_expand nameval '() sugar-scope)
+                    val
+                else nameval
             if (('typeof nameval) == Symbol)
                 let sym = (nameval as Symbol)
                 label skip
@@ -3121,7 +3131,7 @@ let using =
             elseif (('typeof nameval) == Scope)
                 return (process (nameval as Scope))
             hide-traceback;
-            error "using: scope expeced"
+            error "using: scope expected"
             #return
                 list run-stage
                     cons merge-scope-symbols name 'sugar-scope pattern
@@ -4020,6 +4030,7 @@ inline gen-match-block-parser (handle-case)
                                     store next outnext
                                     break outexpr
                                 default
+                                    hide-traceback;
                                     error "default branch missing"
             return (cons outexpr (load outnext)) scope
 
@@ -5513,25 +5524,37 @@ sugar struct (name body...)
 # enums
 #-------------------------------------------------------------------------------
 
-'set-symbols CEnum
-    __== = (simple-binary-op icmp==)
-    __!= = (simple-binary-op icmp!=)
-    __imply =
-        spice-cast-macro
-            fn "CEnum-imply" (vT T)
-                let ST = ('storageof vT)
-                if (T == ST)
-                    return `(inline (self) (bitcast self T))
-                elseif (T == integer)
-                    return `storagecast
-                `()
-    __rimply =
-        spice-cast-macro
-            fn "CEnum-imply" (vT T)
-                let ST = ('storageof T)
-                if (vT == ST)
-                    return `(inline (self) (bitcast self T))
-                `()
+do
+    inline simple-binary-storage-op (f)
+        simple-binary-op (inline (a b) (f (storagecast a) (storagecast b)))
+
+    'set-symbols CEnum
+        __== = (simple-binary-op icmp==)
+        __!= = (simple-binary-op icmp!=)
+        __+ = (simple-binary-storage-op (_ +))
+        __- = (simple-binary-storage-op (_ -))
+        __* = (simple-binary-storage-op (_ *))
+        __/ = (simple-binary-storage-op (_ /))
+        __// = (simple-binary-storage-op (_ //))
+        __| = (simple-binary-storage-op (_ |))
+        __& = (simple-binary-storage-op (_ &))
+        __^ = (simple-binary-storage-op (_ ^))
+        __imply =
+            spice-cast-macro
+                fn "CEnum-imply" (vT T)
+                    let ST = ('storageof vT)
+                    if (T == ST)
+                        return `(inline (self) (bitcast self T))
+                    elseif (T == integer)
+                        return `storagecast
+                    `()
+        __rimply =
+            spice-cast-macro
+                fn "CEnum-imply" (vT T)
+                    let ST = ('storageof T)
+                    if (vT == ST)
+                        return `(inline (self) (bitcast self T))
+                    `()
 
 sugar enum (name values...)
     spice make-enum (name vals...)
@@ -5599,6 +5622,17 @@ sugar enum (name values...)
             cons make-enum namestr newbody
     else
         cons make-enum name newbody
+
+#-------------------------------------------------------------------------------
+# string construction
+#-------------------------------------------------------------------------------
+
+typedef+ string
+    inline... __typecall
+    case (cls : type, buf : rawstring,)
+        sc_string_new_from_cstr buf
+    case (cls : type, buf : rawstring, size : usize)
+        sc_string_new buf size
 
 #-------------------------------------------------------------------------------
 # constants

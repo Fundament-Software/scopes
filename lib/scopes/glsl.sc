@@ -257,6 +257,7 @@ fn config-inout (name T layout)
     `(bitcast LT InOutType)
 
 do
+    let gsampler
     let
         in = (gen-xvar-sugar "in" (wrap-xvar-global (inline (...) (config-xvar 0:u32 'Input ...))))
         out = (gen-xvar-sugar "out" (wrap-xvar-global (inline (...) (config-xvar 0:u32 'Output ...))))

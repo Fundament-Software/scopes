@@ -26,6 +26,8 @@ do
         Q
         R
 
+    assert (test-enum.Y | test-enum.W == 29)
+
     assert ((superof test-enum) == CEnum)
     assert ((storageof test-enum) == i32)
 
