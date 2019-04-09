@@ -81,8 +81,8 @@ inline imap (gen f)
             f (at it...)
         next
 
-define zip (spice-macro (fn (args) (ltr-multiop args (Value zip) 2)))
-define span (spice-macro (fn (args) (rtl-multiop args (Value span) 2)))
+define zip (spice-macro (fn (args) (ltr-multiop args `zip 2)))
+define span (spice-macro (fn (args) (rtl-multiop args `span 2)))
 
 #---------------------------------------------------------------------------
 # collectors

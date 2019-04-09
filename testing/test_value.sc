@@ -11,11 +11,12 @@ run-stage;
 
 do
     let val =
-        Value
-            tupleof
-                1
-                2
-                3
+        spice-quote
+            spice-unquote
+                tupleof
+                    1
+                    2
+                    3
     assert (('typeof val) == tuple_i32_i32_i32)
     let val = (val as tuple_i32_i32_i32)
     assert ((val @ 0) == 1)
@@ -24,14 +25,16 @@ do
 
 do
     let val =
-        Value
-            vectorof f32 1 2.0 3
+        spice-quote
+            spice-unquote
+                vectorof f32 1 2.0 3
     print val
 
 do
     let val =
-        Value
-            arrayof i32 1 2 3
+        spice-quote
+            spice-unquote
+                arrayof i32 1 2 3
     let arrayT = i32x3
     assert (('typeof val) == arrayT)
     let val = (val as arrayT)
@@ -40,8 +43,7 @@ do
     assert ((val @ 2) == 3)
 
 do
-    let val =
-        Value (tupleof)
+    let val = `[(tupleof)]
     assert (('typeof val) == tuple_empty)
     let val = (val as tuple_empty)
     print val

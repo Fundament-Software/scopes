@@ -614,24 +614,14 @@ let static-branch =
             let value = (unbox-integer cond bool)
             `([(? value thenf elsef)])
 
-#sc_type_set_symbol Value '__typecall
+sc_type_set_symbol Value '__typecall
     box-spice-macro
         fn (args)
-            let argcount = (sc_argcount args)
-            verify-count argcount 1 -1
-            if (icmp== argcount 1)
-                `()
-            else
-                let value = (sc_getarg args 1)
-                let T = (sc_value_type value)
-                if (ptrcmp== T Value)
-                    value
-                elseif (ptrcmp== T Nothing)
-                    ``none
-                elseif (sc_value_is_constant value)
-                    ``value
-                else
-                    sc_value_wrap T value
+            raises-compile-error;
+            let args = (sc_getarglist args 1)
+            spice-quote
+                spice-quote
+                    spice-unquote args
 
 let __unbox =
     spice-macro
@@ -2381,11 +2371,10 @@ fn va-option-branch (args)
 let package = (Scope)
 'set-symbols package
     path =
-        spice-quote
-            spice-unquote
-                list
-                    .. compiler-dir "/lib/scopes/?.sc"
-                    .. compiler-dir "/lib/scopes/?/init.sc"
+        Value
+            list
+                .. compiler-dir "/lib/scopes/?.sc"
+                .. compiler-dir "/lib/scopes/?/init.sc"
     modules = `[(Scope)]
 
 fn clone-scope-contents (a b)
@@ -3894,19 +3883,17 @@ let
         spice-macro
             fn (args)
                 ltr-multiop args
-                    spice-quote
-                        spice-unquote
-                            inline "min" (a b)
-                                ? (<= a b) a b
+                    Value
+                        inline "min" (a b)
+                            ? (<= a b) a b
                     2
     max =
         spice-macro
             fn (args)
                 ltr-multiop args
-                    spice-quote
-                        spice-unquote
-                            inline "max" (a b)
-                                ? (>= a b) a b
+                    Value
+                        inline "max" (a b)
+                            ? (>= a b) a b
                     2
 
 inline clamp (x mn mx)
@@ -4329,16 +4316,14 @@ define spice
                             [let name] =
                                 [spice-macro]
                                     [fn] [(name as Symbol as string)] (args)
-                                        [spice-quote]
-                                            [spice-unquote]
-                                                [(cons inline content)] args
+                                        [Value]
+                                            [(cons inline content)] args
                     else
                         qq
                             [spice-macro]
                                 [fn name] (args)
-                                    [spice-quote]
-                                        [spice-unquote]
-                                            [(cons inline content)] args
+                                    [Value]
+                                        [(cons inline content)] args
 
 #-------------------------------------------------------------------------------
 
