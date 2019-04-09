@@ -333,7 +333,9 @@ static const Type *merge_single_value_type(const char *context, const Type *T1, 
     return nullptr;
 }
 
-static SCOPES_RESULT(const Type *) merge_value_type(const char *context, const Type *T1, const Type *T2) {
+static SCOPES_RESULT(const Type *) merge_value_type(
+    const char *context, const Type *T1, const Type *T2,
+    const Anchor *A1, const Anchor *A2) {
     SCOPES_RESULT_TYPE(const Type *);
     assert(T2);
     if (!T1)
@@ -352,13 +354,13 @@ static SCOPES_RESULT(const Type *) merge_value_type(const char *context, const T
             auto argT2 = get_argument(T2, i);
             const Type *T = merge_single_value_type(context, argT1, argT2);
             if (!T) {
-                SCOPES_ERROR(MergeConflict, context, T1, T2);
+                SCOPES_ERROR(MergeConflict, context, T1, T2, A1, A2);
             }
             newargs.push_back(T);
         }
         return arguments_type(newargs);
     }
-    SCOPES_ERROR(MergeConflict, context, T1, T2);
+    SCOPES_ERROR(MergeConflict, context, T1, T2, A1, A2);
 }
 
 SCOPES_RESULT(TypedValueRef) prove_block(const ASTContext &ctx, Block &block,
@@ -925,9 +927,12 @@ static SCOPES_RESULT(TypedValueRef) prove_LabelTemplate(const ASTContext &ctx, c
         IDSet valid;
         SCOPES_CHECK_RESULT(finalize_merges(ctx, label, valid, by));
         const Type *rtype = nullptr;
+        const Anchor *last_anchor = result.anchor();
         for (auto merge : label->merges) {
             rtype = SCOPES_GET_RESULT(merge_value_type(by,
-                rtype, arguments_type_from_typed_values(merge->values)));
+                rtype, arguments_type_from_typed_values(merge->values),
+                last_anchor, merge.anchor()));
+            last_anchor = merge.anchor();
         }
         rtype = ctx.fix_merge_type(rtype);
         label->change_type(rtype);
@@ -1144,9 +1149,12 @@ static SCOPES_RESULT(TypedValueRef) prove_Loop(const ASTContext &ctx, const Loop
     SCOPES_CHECK_RESULT(finalize_repeats(ctx, newloop, "loop repeat"));
 
     const Type *rtype = newloop->args->get_type();
+    const Anchor *last_anchor = result.anchor();
     for (auto repeat : newloop->repeats) {
         SCOPES_CHECK_RESULT(merge_value_type("loop repeat", rtype,
-            arguments_type_from_typed_values(repeat->values)));
+            arguments_type_from_typed_values(repeat->values),
+            last_anchor, repeat.anchor()));
+        last_anchor = repeat.anchor();
     }
 
     return TypedValueRef(newloop);
@@ -1684,15 +1692,21 @@ static SCOPES_RESULT(const Type *) get_function_type(const FunctionRef &fn) {
     }
 
     const Type *rettype = TYPE_NoReturn;
+    const Anchor *last_anchor = fn.anchor();
     for (auto _return : fn->returns) {
         rettype = SCOPES_GET_RESULT(merge_value_type("return", rettype,
-            arguments_type_from_typed_values(_return->values)));
+            arguments_type_from_typed_values(_return->values),
+            last_anchor, _return.anchor()));
+        last_anchor = _return.anchor();
     }
     rettype = canonical_return_type(fn, rettype);
     const Type *raisetype = TYPE_NoReturn;
+    last_anchor = fn.anchor();
     for (auto _raise : fn->raises) {
         raisetype = SCOPES_GET_RESULT(merge_value_type("raise", raisetype,
-            arguments_type_from_typed_values(_raise->values)));
+            arguments_type_from_typed_values(_raise->values),
+            last_anchor, _raise.anchor()));
+        last_anchor = _raise.anchor();
     }
     raisetype = canonical_return_type(fn, raisetype, true);
 
@@ -1812,6 +1826,7 @@ SCOPES_RESULT(void) verify_cast_lifetime(const Type *SrcT, const Type *DestT) {
 static SCOPES_RESULT(TypedValueRef) prove_CallTemplate(
     const ASTContext &ctx, const CallTemplateRef &call) {
     SCOPES_RESULT_TYPE(TypedValueRef);
+    SCOPES_TRACE_PROVE_EXPR(call);
     auto callee_anchor = call->callee.anchor();
     //const Anchor *anchor = get_best_anchor(call);
     TypedValueRef callee = ref(call->callee.anchor(),
@@ -1823,7 +1838,6 @@ static SCOPES_RESULT(TypedValueRef) prove_CallTemplate(
     int redirections = 0;
 repeat:
     SCOPES_CHECK_RESULT(verify_valid(ctx, callee, "callee"));
-    SCOPES_TRACE_PROVE_EXPR(call);
     const Type *T = callee->get_type();
     if (!rawcall) {
         assert(redirections < 16);
@@ -2952,9 +2966,12 @@ static SCOPES_RESULT(TypedValueRef) finalize_merge_label(const ASTContext &ctx,
     IDSet valid;
     SCOPES_CHECK_RESULT(finalize_merges(ctx, merge_label, valid, by));
     if (!rtype) {
+        const Anchor *last_anchor = merge_label.anchor();
         for (auto merge : merge_label->merges) {
             rtype = SCOPES_GET_RESULT(merge_value_type(by, rtype,
-                arguments_type_from_typed_values(merge->values)));
+                arguments_type_from_typed_values(merge->values),
+                last_anchor, merge.anchor()));
+            last_anchor = merge.anchor();
         }
         rtype = ctx.fix_merge_type(rtype);
     }
@@ -2974,6 +2991,7 @@ static SCOPES_RESULT(TypedValueRef) prove_SwitchTemplate(const ASTContext &ctx,
     SCOPES_CHECK_RESULT(build_deref(ctx, newexpr.anchor(), newexpr));
 
     const Type *casetype = newexpr->get_type();
+    const Anchor *last_anchor = newexpr.anchor();
 
     auto _switch = ref(node.anchor(), Switch::from(newexpr));
 
@@ -2983,6 +3001,7 @@ static SCOPES_RESULT(TypedValueRef) prove_SwitchTemplate(const ASTContext &ctx,
     subctx.append(_switch);
 
     Switch::Case *defaultcase = nullptr;
+
     for (auto &&_case : node->cases) {
         Switch::Case *newcase = nullptr;
         if (_case.kind == CK_Default) {
@@ -2997,7 +3016,8 @@ static SCOPES_RESULT(TypedValueRef) prove_SwitchTemplate(const ASTContext &ctx,
                 SCOPES_ERROR(ValueKindMismatch, VK_ConstInt, newlit->kind());
             }
             casetype = SCOPES_GET_RESULT(
-                merge_value_type("switch case literal", casetype, newlit->get_type()));
+                merge_value_type("switch case literal", casetype, newlit->get_type(),
+                last_anchor, newlit.anchor()));
             newcase = &_switch->append_pass(newlit.cast<ConstInt>());
         }
         assert(_case.value);
@@ -3222,10 +3242,13 @@ static SCOPES_RESULT(TypedValueRef) prove_inline_body(const ASTContext &ctx,
         IDSet valid;
         SCOPES_CHECK_RESULT(finalize_merges(ctx, label, valid, "inline return"));
         const Type *rtype = nullptr;
+        const Anchor *last_anchor = result_value.anchor();
         for (auto merge : label->merges) {
             rtype = SCOPES_GET_RESULT(merge_value_type("inline return merge",
                 rtype,
-                arguments_type_from_typed_values(merge->values)));
+                arguments_type_from_typed_values(merge->values),
+                last_anchor, merge.anchor()));
+            last_anchor = merge.anchor();
         }
         rtype = ctx.fix_merge_type(rtype);
         label->change_type(rtype);

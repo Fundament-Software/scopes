@@ -301,9 +301,7 @@ struct Quoter {
     ValueRef quote_typed(const TypedValueRef &node) {
         if (node->get_type() == TYPE_ValueRef)
             return node;
-        if (is_value_stage_constant(node)) {
-            return ConstAggregate::ast_from(node);
-        } else if (node.isa<ArgumentList>()) {
+        if (node.isa<ArgumentList>()) {
             return quote_typed_argument_list(node.cast<ArgumentList>());
         } else {
             auto result = wrap_value(node->get_type(), node);
@@ -544,9 +542,7 @@ ValueRef unwrap_value(const Type *T, const ValueRef &value) {
 
 ValueRef wrap_value(const Type *T, const ValueRef &value) {
     auto _anchor = value.anchor();
-    if (value.isa<Const>()) {
-        if (T == TYPE_ValueRef)
-            return value;
+    if (is_value_stage_constant(value)) {
         return ConstAggregate::ast_from(value);
     }
     if (!is_opaque(T)) {

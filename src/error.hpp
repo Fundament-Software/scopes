@@ -115,10 +115,10 @@ formatters:
         "syntax: label template expected, got %0", \
         ValueKind) \
     T(SyntaxSymbolExpanderTypeMismatch, \
-        "syntax: symbol expander has wrong type %0, must be %1", \
+        "syntax: symbol expander has wrong type %0, must be constant of type %1", \
         PType, PType) \
     T(SyntaxListExpanderTypeMismatch, \
-        "syntax: symbol expander has wrong type %0, must be %1", \
+        "syntax: list expander has wrong type %0, must be constant of type %1", \
         PType, PType) \
 
 
@@ -160,8 +160,10 @@ formatters:
         "can not store to value of type %0 because the pointer type is non-writable", \
         PType) \
     T(MergeConflict, \
-        "conflicting %0 types %1 and %2", \
-        Rawstring, PType, PType) \
+        "new %0 result type %2 conflicts with previous type %1" \
+        "%4 conflicting here" \
+        "%3 previously defined here", \
+        Rawstring, PType, PType, PAnchor, PAnchor) \
     T(InaccessibleValue, \
         "cannot access value of type %0 because it has been moved" \
         "%1 lifetime ended here", \
@@ -438,6 +440,8 @@ enum BacktraceKind {
     BTK_Parser,
     // context = symbol or expression being expanded
     BTK_Expander,
+    // context = function used as hook
+    BTK_InvokeHook,
     // context = expression being typechecked
     BTK_ProveExpression,
     // context = template being typechecked
@@ -467,6 +471,8 @@ struct Backtrace {
     SCOPES_TRACE(Parser, ref((ANCHOR), g_none))
 #define SCOPES_TRACE_EXPANDER(VALUEREF) \
     SCOPES_TRACE(Expander, (VALUEREF))
+#define SCOPES_TRACE_HOOK(VALUEREF) \
+    SCOPES_TRACE(InvokeHook, (VALUEREF))
 #define SCOPES_TRACE_CODEGEN(VALUEREF) \
     SCOPES_TRACE(Translate, (VALUEREF))
 #define SCOPES_TRACE_PROVE_EXPR(VALUEREF) \

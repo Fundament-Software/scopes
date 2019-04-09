@@ -319,6 +319,11 @@ void stream_backtrace(StyledStream &ss, const Backtrace *bt) {
         ss << std::endl;
         anchor->stream_source_line(ss);
     } break;
+    case BTK_InvokeHook: {
+        ss << anchor;
+        ss << " while attempting to invoke hook" << std::endl;
+        anchor->stream_source_line(ss);
+    } break;
     case BTK_ProveArgument: {
         ss << anchor;
         ss << " while checking type of argument" << std::endl;

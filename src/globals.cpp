@@ -1058,9 +1058,6 @@ int sc_value_kind (sc_valueref_t value) {
 
 sc_valueref_t sc_value_wrap(const sc_type_t *type, sc_valueref_t value) {
     using namespace scopes;
-    if (value.isa<Const>()) {
-        return value;
-    }
     auto result = wrap_value(type, value);
     assert(result);
     return result;

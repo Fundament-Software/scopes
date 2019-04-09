@@ -956,8 +956,9 @@ struct Expander {
         if (env->lookup(Symbol(SYM_SymbolWildcard), symbol_handler_node)) {
             auto T = try_get_const_type(symbol_handler_node);
             if (T != list_expander_func_type) {
-                SCOPES_ERROR(SyntaxSymbolExpanderTypeMismatch,
-                    symbol_handler_node.cast<TypedValue>()->get_type(),
+                SCOPES_TRACE_HOOK(symbol_handler_node);
+                // symbol_handler_node.cast<TypedValue>()->get_type()
+                SCOPES_ERROR(SyntaxSymbolExpanderTypeMismatch, T,
                     list_expander_func_type);
             }
             sc_syntax_wildcard_func_t f =
@@ -1067,8 +1068,9 @@ struct Expander {
             if (env->lookup(Symbol(SYM_ListWildcard), list_handler_node)) {
                 auto T = try_get_const_type(list_handler_node);
                 if (T != list_expander_func_type) {
-                    SCOPES_ERROR(SyntaxListExpanderTypeMismatch,
-                        list_handler_node.cast<TypedValue>()->get_type(),
+                    SCOPES_TRACE_HOOK(list_handler_node);
+                    //list_handler_node.cast<TypedValue>()->get_type(),
+                    SCOPES_ERROR(SyntaxListExpanderTypeMismatch, T,
                         list_expander_func_type);
                 }
                 sc_syntax_wildcard_func_t f =

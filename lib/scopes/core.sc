@@ -614,7 +614,7 @@ let static-branch =
             let value = (unbox-integer cond bool)
             `([(? value thenf elsef)])
 
-sc_type_set_symbol Value '__typecall
+#sc_type_set_symbol Value '__typecall
     box-spice-macro
         fn (args)
             let argcount = (sc_argcount args)
@@ -2081,7 +2081,7 @@ fn expand-define-infix (args scope order)
         else
             as func Symbol
     'set-symbol scope (get-ifx-symbol token)
-        Value (cons prec (cons order (cons func '())))
+        `[(cons prec (cons order (cons func '())))]
     return none scope
 
 inline make-expand-define-infix (order)
@@ -2125,7 +2125,7 @@ inline infix-op (pred)
                     .. "unexpected token '"
                         .. (tostring token) "' in infix expression"
         let op-prec = (unpack-infix-op op)
-        ? (pred op-prec prec) op (Value none)
+        ? (pred op-prec prec) op `none
 
 let infix-op-gt = (infix-op >)
 let infix-op-ge = (infix-op >=)
@@ -2139,9 +2139,9 @@ fn rtl-infix-op-eq (infix-table token prec)
                     .. (tostring token) "' in infix expression"
     let op-prec op-order = (unpack-infix-op op)
     if (== op-order '<)
-        ? (== op-prec prec) op (Value none)
+        ? (== op-prec prec) op `none
     else
-        Value none
+        `none
 
 fn parse-infix-expr (infix-table lhs state mprec)
     hide-traceback;
@@ -2311,7 +2311,7 @@ fn expand-and-or (expr f)
         if (empty? head)
             return result
         let at next = ('decons head)
-        _ (Value (list f at (list inline '() result))) next
+        _ `[(list f at (list inline '() result))] next
 
 inline make-expand-and-or (f)
     fn (expr)
@@ -2381,11 +2381,12 @@ fn va-option-branch (args)
 let package = (Scope)
 'set-symbols package
     path =
-        Value
-            list
-                .. compiler-dir "/lib/scopes/?.sc"
-                .. compiler-dir "/lib/scopes/?/init.sc"
-    modules = (Value (Scope))
+        spice-quote
+            spice-unquote
+                list
+                    .. compiler-dir "/lib/scopes/?.sc"
+                    .. compiler-dir "/lib/scopes/?/init.sc"
+    modules = `[(Scope)]
 
 fn clone-scope-contents (a b)
     """"Join two scopes ``a`` and ``b`` into a new scope so that the
@@ -2419,7 +2420,7 @@ let
         spice-macro
             fn "constant?" (args)
                 let value = (extract-single-arg args)
-                Value ('constant? value)
+                `[('constant? value)]
     storageof = (make-const-type-property-function sc_type_storage)
     superof = (make-const-type-property-function sc_typename_type_get_super)
     sizeof = (make-const-type-property-function sc_type_sizeof)
@@ -2438,7 +2439,7 @@ let Closure->Generator =
                 error "Closure must be constant"
             let self = (as self Closure)
             let self = (bitcast self Generator)
-            Value self
+            `self
 
 let Closure->Collector =
     spice-macro
@@ -2450,7 +2451,7 @@ let Closure->Collector =
                 error "Closure must be constant"
             let self = (as self Closure)
             let self = (bitcast self Collector)
-            Value self
+            `self
 
 # (define name expr ...)
 fn expand-define (expr)
@@ -2488,7 +2489,7 @@ let
     define = (sugar-macro expand-define)
     define-infix> = (sugar-scope-macro (make-expand-define-infix '>))
     define-infix< = (sugar-scope-macro (make-expand-define-infix '<))
-    .. = (spice-macro (fn (args) (rtl-multiop args (Value ..) 2)))
+    .. = (spice-macro (fn (args) (rtl-multiop args `.. 2)))
     + = (spice-macro (fn (args) (ltr-multiop args `+ 2)))
     * = (spice-macro (fn (args) (ltr-multiop args `* 2)))
     @ = (spice-macro (fn (args) (ltr-multiop args `@ 1)))
@@ -2505,9 +2506,11 @@ let
                     as scope Scope
 
 'set-symbol (__this-scope) (Symbol "#list")
-    Value (static-typify list-handler list Scope)
+    box-pointer
+        static-typify list-handler list Scope
 'set-symbol (__this-scope) (Symbol "#symbol")
-    Value (static-typify symbol-handler list Scope)
+    box-pointer
+        static-typify symbol-handler list Scope
 
 inline select-op-macro (sop fop numargs)
     inline scalar-type (T)
@@ -3071,11 +3074,8 @@ let locals =
                             'set-docstring! constant-scope key keydocstr
                             `none
                         else
-                            let wrapvalue =
-                                if (('typeof value) == Value) value
-                                else (Value value)
                             spice-quote
-                                sc_scope_set_symbol tmp key wrapvalue
+                                sc_scope_set_symbol tmp key `value
                                 sc_scope_set_docstring tmp key keydocstr
 
             let build-locals =
@@ -3298,7 +3298,7 @@ let __countof-aggregate =
             let self = ('getarg args 0)
             let T = ('typeof self)
             let sz = ('element-count T)
-            Value (sz as usize)
+            `[(sz as usize)]
 
 run-stage;
 
@@ -3807,7 +3807,7 @@ inline vector-binary-op-dispatch (symbol)
                 loop (i = 0)
                     if (i == offset)
                         break;
-                    store (Value i) (getelementptr maskvals i)
+                    store `i (getelementptr maskvals i)
                     i + 1
                 let maskT =
                     sc_vector_type i32 offset:usize
@@ -3837,13 +3837,13 @@ inline vector-binary-op-dispatch (symbol)
                 loop (i = 0)
                     if (i == total)
                         break;
-                    store (Value (i + offset)) (getelementptr maskvals i)
+                    store `[(i + offset)] (getelementptr maskvals i)
                     i + 1
                 let maskT =
                     sc_vector_type i32 total:usize
                 let mask = (sc_const_aggregate_new maskT total maskvals)
                 `(shufflevector self self mask)
-    __unpack = (Value (make-unpack-function extractelement))
+    __unpack = `[(make-unpack-function extractelement)]
     __countof = __countof-aggregate
     # dynamic vector type constructor
     type =
@@ -3894,17 +3894,19 @@ let
         spice-macro
             fn (args)
                 ltr-multiop args
-                    Value
-                        inline "min" (a b)
-                            ? (<= a b) a b
+                    spice-quote
+                        spice-unquote
+                            inline "min" (a b)
+                                ? (<= a b) a b
                     2
     max =
         spice-macro
             fn (args)
                 ltr-multiop args
-                    Value
-                        inline "max" (a b)
-                            ? (>= a b) a b
+                    spice-quote
+                        spice-unquote
+                            inline "max" (a b)
+                                ? (>= a b) a b
                     2
 
 inline clamp (x mn mx)
@@ -4009,7 +4011,7 @@ let
 fn extract-name-params-body (expr)
     let arg body = (decons expr)
     if (('typeof arg) == list)
-        return (Value "") (arg as list) body
+        return `"" (arg as list) body
     else
         let params body = (decons body)
         return arg (params as list) body
@@ -4261,7 +4263,7 @@ fn uncomma (l)
             error "unexpected comma"
         cons
             if ((countof current) == 1) ('@ current)
-            else (Value current)
+            else `current
             total
     if (comma-separated? l)
         fn process (l)
@@ -4780,7 +4782,7 @@ sugar from (src 'let params...)
                 cons load-from src
                     quotify params...
 
-define zip (spice-macro (fn (args) (ltr-multiop args (Value zip) 2)))
+define zip (spice-macro (fn (args) (ltr-multiop args `zip 2)))
 
 run-stage;
 
@@ -4952,7 +4954,7 @@ define-sugar-macro decorate-vvv
             break out
         let decorator in = (decons in)
         repeat in
-            Value (cons decorator (list out))
+            `[(cons decorator (list out))]
 
 define-sugar-macro decorate-fn
     raises-compile-error;
@@ -4964,9 +4966,9 @@ define-sugar-macro decorate-fn
                 break out
             let decorator in = (decons in)
             repeat in
-                Value (cons decorator (list out))
+                `[(cons decorator (list out))]
     if (('typeof name) == Symbol)
-        Value (list let name '= result)
+        `[(list let name '= result)]
     else
         result
 
@@ -5031,7 +5033,7 @@ define-sugar-scope-macro sugar-eval
     let subscope = (Scope sugar-scope)
     'set-symbol subscope 'sugar-scope sugar-scope
     return
-        exec-module (Value args) subscope
+        exec-module `args subscope
         sugar-scope
 
 let
@@ -5147,7 +5149,7 @@ define append-to-type
                 else
                     let wrapvalue =
                         if (('typeof value) == Value) value
-                        else (Value value)
+                        else `value
                     spice-quote
                         embed (sc_type_set_symbol T key wrapvalue) T
             else
@@ -5662,7 +5664,7 @@ sugar enum (name values...)
         let expr body = (decons body)
         cons
             if (('typeof expr) == Symbol)
-                Value (list sugar-quote expr)
+                `[(list sugar-quote expr)]
             else expr
             if (empty? body)
                 '()

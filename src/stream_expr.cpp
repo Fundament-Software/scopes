@@ -112,8 +112,13 @@ bool line_anchors;
 bool atom_anchors;
 
 typedef std::unordered_map<Value *, ValueRef> Map;
+typedef std::unordered_map<Value *, int> IDMap;
+typedef std::unordered_set<Value *> Set;
+int next_id = 1;
 
 Map map;
+IDMap ids;
+Set visited;
 
 static Symbol remap_unnamed(Symbol sym) {
     return (sym == SYM_Unnamed)?Symbol(String::from("#unnamed")):sym;
@@ -179,7 +184,12 @@ HANDLER(Global) {
 
 HANDLER(KeyedTemplate) {
     auto _anchor = node.anchor();
-    return LIST(SYMBOL(node->key), SYMBOL(OP_Set), node->value);
+    /*
+    if (node->key == SYM_Unnamed) {
+        return node->value;
+    } else {*/
+        return LIST(SYMBOL(node->key), SYMBOL(OP_Set), node->value);
+    //}
 }
 
 HANDLER(Call) {
@@ -227,6 +237,74 @@ HANDLER(CallTemplate) {
         l = List::from(SYMBOL(KW_Call), l);
     }
 skip:
+    return ValueRef(_anchor, ConstPointer::list_from(l));
+}
+
+HANDLER(ArgumentListTemplate) {
+    auto _anchor = node.anchor();
+    const List *l = EOL;
+    int i = node->values.size();
+    while (i-- > 0) {
+        l = List::from(node->values[i], l);
+    }
+    l = List::from(SYMBOL(KW_Forward), l);
+    return ValueRef(_anchor, ConstPointer::list_from(l));
+}
+
+HANDLER(LabelTemplate) {
+    auto _anchor = node.anchor();
+    return LIST(
+        SYMBOL(KW_Label),
+        SYMBOL(node->name),
+        node->value
+    );
+}
+
+HANDLER(MergeTemplate) {
+    auto _anchor = node.anchor();
+    return LIST(
+        SYMBOL(KW_Merge),
+        node->value
+    );
+}
+
+HANDLER(ReturnTemplate) {
+    auto _anchor = node.anchor();
+    return LIST(
+        SYMBOL(KW_Return),
+        node->value
+    );
+}
+
+HANDLER(Quote) {
+    auto _anchor = node.anchor();
+    return LIST(
+        SYMBOL(KW_ASTQuote),
+        node->value
+    );
+}
+
+HANDLER(Unquote) {
+    auto _anchor = node.anchor();
+    return LIST(
+        SYMBOL(KW_ASTUnquote),
+        node->value
+    );
+}
+
+HANDLER(If) {
+    auto _anchor = node.anchor();
+    const List *l = EOL;
+    int i = node->clauses.size();
+    while (i-- > 0) {
+        auto clause = node->clauses[i];
+        if (clause.cond) {
+            l = List::from(LIST(SYMBOL(KW_Case), clause.cond, clause.value), l);
+        } else {
+            l = List::from(LIST(SYMBOL(KW_Default), clause.value), l);
+        }
+    }
+    l = List::from(SYMBOL(KW_If), l);
     return ValueRef(_anchor, ConstPointer::list_from(l));
 }
 
@@ -286,7 +364,7 @@ HANDLER(ConstAggregate) {
 
 HANDLER(ConstPointer) {
     auto _anchor = node.anchor();
-    if (!node->value) {
+    if (!node->value && node->get_type() != TYPE_List) {
         const List *l = List::from(TYPE(node->get_type()), EOL);
         l = List::from(SYMBOL(FN_NullOf), l);
         return ValueRef(_anchor, ConstPointer::list_from(l));
@@ -308,34 +386,67 @@ ValueRef _convert(const ValueRef &node) {
     //auto _anchor = node.anchor();
     switch(node->kind()) {
     CASE_HANDLER(CallTemplate)
-    CASE_HANDLER(Call)
+    //CASE_HANDLER(Call)
     CASE_HANDLER(Template)
     CASE_HANDLER(Global)
+    CASE_HANDLER(If)
     CASE_HANDLER(ParameterTemplate)
     CASE_HANDLER(Expression)
+    CASE_HANDLER(LabelTemplate)
     CASE_HANDLER(KeyedTemplate)
+    CASE_HANDLER(MergeTemplate)
+    CASE_HANDLER(ReturnTemplate)
     CASE_HANDLER(ExtractArgumentTemplate)
     CASE_HANDLER(ConstPointer)
     CASE_HANDLER(ConstAggregate)
+    CASE_HANDLER(ArgumentListTemplate)
+    CASE_HANDLER(Quote)
+    CASE_HANDLER(Unquote)
     default:
         return node;
     }
 }
+
+bool node_can_selfref(const ValueRef &node) {
+    return !node.isa<Const>();
+}
+
+ValueRef convert(const ValueRef &node) {
+    if (!node) return node;
+    bool selfref = node_can_selfref(node);
+    auto it = map.find(node.unref());
+    if (it != map.end()) {
+        if (selfref && is_list(it->second) && visited.count(it->second.unref())) {
+            auto _anchor = node.anchor();
+            auto id_it = ids.find(node.unref());
+            assert(id_it != ids.end());
+            StyledString ss = StyledString::plain();
+            ss.out << "%" << id_it->second;
+            return ref(node.anchor(), SYMBOL(Symbol(ss.str())));
+        }
+        return ref(node.anchor(), it->second);
+    }
+    auto val = _convert(node);
+    if (selfref && is_list(val)) {
+        auto _anchor = node.anchor();
+        auto id = next_id++;
+        ids.insert({node.unref(), id});
+        auto it = extract_list_constant(val.cast<TypedValue>()).assert_ok();
+        StyledString ss = StyledString::plain();
+        ss.out << "%" << id << ":";
+        it = List::from(SYMBOL(Symbol(ss.str())), it);
+        val = ref(val.anchor(), ConstPointer::list_from(it));
+    }
+    map.insert({node.unref(), val});
+    return val;
+}
+
 #undef CASE_HANDLER
 #undef LIST
 #undef SYMBOL
 #undef STRING
 #undef I32
 #undef TYPE
-
-ValueRef convert(const ValueRef &node) {
-    if (!node) return node;
-    auto it = map.find(node.unref());
-    if (it != map.end()) return ref(node.anchor(), it->second);
-    auto val = _convert(node);
-    map.insert({node.unref(), val});
-    return val;
-}
 
 StreamExpr(StyledStream &_ss, const StreamExprFormat &_fmt) :
     StreamAnchors(_ss), fmt(_fmt) {
@@ -353,14 +464,12 @@ void stream_indent(int depth = 0) {
     }
 }
 
-static bool is_nested(const ValueRef &_e) {
-    auto T = try_get_const_type(_e);
-    if (T == TYPE_List) {
+bool is_nested(const ValueRef &_e) {
+    if (is_list(_e)) {
         auto it = extract_list_constant(_e.cast<TypedValue>()).assert_ok();
         while (it != EOL) {
-            auto q = it->at;
-            auto qT = try_get_const_type(q);
-            if (qT == TYPE_List) {
+            auto q = convert(it->at);
+            if (is_list(q)) {
                 return true;
             }
             it = it->next;
@@ -406,20 +515,21 @@ void walk(const Anchor *anchor, const List *l, int depth, int maxdepth, bool nak
     int offset = 0;
     // int numsublists = 0;
     if (naked) {
-        if (is_list(it->at)) {
+        if (is_list(convert(it->at))) {
             ss << ";" << std::endl;
             goto print_sparse;
         }
     print_terse:
-        walk(it->at, depth, maxdepth, false, true);
+        walk(convert(it->at), depth, maxdepth, false, true);
         it = it->next;
         offset = offset + 1;
         while (it != EOL) {
-            if (is_nested(it->at) && (maxdepth > 1)) {
+            auto at = convert(it->at);
+            if (is_nested(at) && (maxdepth > 1)) {
                 break;
             }
             ss << " ";
-            walk(it->at, depth, maxdepth, false, true);
+            walk(at, depth, maxdepth, false, true);
             offset = offset + 1;
             it = it->next;
         }
@@ -427,7 +537,7 @@ void walk(const Anchor *anchor, const List *l, int depth, int maxdepth, bool nak
     print_sparse:
         int subdepth = depth + 1;
         while (it != EOL) {
-            auto value = it->at;
+            auto value = convert(it->at);
             if (!is_list(value) // not a list
                 && (offset >= 1)) { // not first element in list
                 stream_indent(subdepth);
@@ -455,7 +565,7 @@ void walk(const Anchor *anchor, const List *l, int depth, int maxdepth, bool nak
                 ss << Style_Comment << "..." << Style_None;
                 break;
             }
-            walk(it->at, depth, maxdepth, false, true);
+            walk(convert(it->at), depth, maxdepth, false, true);
             offset = offset + 1;
             it = it->next;
         }
@@ -468,14 +578,15 @@ void stream_illegal_value_type(const std::string &name) {
     ss << Style_Error << "<illegal type for " << name << ">" << Style_None;
 }
 
-void walk(const ValueRef &_e, int depth, int maxdepth, bool naked, bool types) {
-    ValueRef e = convert(_e);
-
+void walk(const ValueRef &e, int depth, int maxdepth, bool naked, bool types) {
     const Type *T = nullptr;
     if (e) {
+        visited.insert(e.unref());
         T = try_get_const_type(e);
         if (T == TYPE_List) {
-            walk(e.anchor(), extract_list_constant(e.cast<TypedValue>()).assert_ok(), depth, maxdepth, naked, types);
+            walk(e.anchor(),
+                extract_list_constant(e.cast<TypedValue>()).assert_ok(),
+                depth, maxdepth, naked, types);
             return;
         }
     }
@@ -574,7 +685,8 @@ void stream(const List *l) {
 }
 
 void stream(const ValueRef &node) {
-    walk(node, fmt.depth, fmt.maxdepth, fmt.naked, fmt.types);
+    ValueRef e = convert(node);
+    walk(e, fmt.depth, fmt.maxdepth, fmt.naked, fmt.types);
 }
 
 }; // struct StreamExpr
