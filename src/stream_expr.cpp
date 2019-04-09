@@ -594,6 +594,7 @@ bool is_default_suffix(const Type *T) {
         return true;
     default: break;
     }
+    if (T == TYPE_Anchor) return true;
     if (T == TYPE_I32) return true;
     if (T == TYPE_F32) return true;
     if (T == TYPE_Bool) return true;

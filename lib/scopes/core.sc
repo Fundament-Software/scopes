@@ -1873,7 +1873,15 @@ let print =
         inline print (values...)
             va-lifold none print-element values...
             sc_write "\n"
-            view values...
+
+let report =
+    spice-macro
+        fn (args)
+            raises-compile-error;
+            let anchor = ('__repr `[('anchor args)])
+            spice-quote
+                print anchor args
+                view args
 
 'define-symbol integer '__typecall
     inline (cls value)
@@ -5727,7 +5735,7 @@ fn read-eval-print-loop ()
     set-autocomplete-scope! eval-scope
 
     'set-symbol eval-scope 'module-dir cwd
-    loop (preload cmdlist counter eval-scope = "" "" 0 eval-scope)
+    loop (preload cmdlist counter = "" "" 0)
         fn make-idstr (counter)
             .. "$" (tostring counter)
 
@@ -5765,65 +5773,103 @@ fn read-eval-print-loop ()
             if terminated? ""
             else (leading-spaces cmd)
         if (not terminated?)
-            repeat preload cmdlist counter eval-scope
+            repeat preload cmdlist counter
 
-        fn handle-retargs (counter eval-scope local-scope vals...)
-            raises-compile-error;
+        spice count-folds (x key values...)
+            let x = (x as i32)
             let tmp = (Symbol "#result...")
-            # copy over values from local-scope
-            loop (key = unnamed)
-                let key value = ('next local-scope key)
-                if (key != unnamed)
-                    if (key != tmp)
-                        'set-symbol eval-scope key value
-                    repeat key
-                break;
-            let count =
-                va-lfold 0
-                    inline (key value k)
-                        let idstr = (make-idstr (counter + k))
-                        if (not (none? value))
-                            'set-symbol eval-scope (Symbol idstr) `value
-                            print idstr "="
-                                repr value
-                            k + 1
-                        else k
-                    vals...
-            return eval-scope count
+            if (key != tmp) (x + 1)
+            else x
 
-        let eval-scope count =
+        spice append-to-scope (scope key values...)
+            let tmp = (Symbol "#result...")
+            if (key != tmp)
+                'set-symbol (scope as Scope) (key as Symbol) values...
+            scope
+
+        spice handle-retargs (inserts counter eval-scope vals...)
+            let inserts = (inserts as i32)
+            let counter = (counter as i32)
+            let count = ('argcount vals...)
+            if inserts
+                let outargs = (sc_argument_list_new)
+                if (count != 0)
+                    for arg in ('args vals...)
+                        sc_argument_list_append outargs `(repr arg)
+                    return
+                        spice-quote
+                            print outargs
+                            counter
+            elseif (count != 0)
+                let outargs = (sc_argument_list_new)
+                let eval-scope = (eval-scope as Scope)
+                fold (count = 0) for arg in ('args vals...)
+                    let idstr = (make-idstr (counter + count))
+                    'set-symbol eval-scope (Symbol idstr) arg
+                    sc_argument_list_append outargs `idstr
+                    count + 1
+                sc_argument_list_append outargs (default-styler style-operator "=")
+                for arg in ('args vals...)
+                    sc_argument_list_append outargs `(repr arg)
+                let counter = (counter + count)
+                return
+                    spice-quote
+                        print outargs
+                        counter
+            `counter
+
+        fn get-bound-name (eval-scope expr)
+            if ((countof expr) == 1)
+                let at = ('@ expr)
+                if (('typeof at) == Symbol)
+                    let at = (at as Symbol)
+                    try
+                        return at ('@ eval-scope at)
+                    except (err)
+            _ unnamed `()
+
+
+
+        let counter =
             try
                 let user-expr = (list-parse cmdlist)
-                let tmp = (Symbol "#result...")
-                let expr =
-                    Value
-                        list
-                            list sugar-set-scope! eval-scope
-                            list let tmp '=
-                                cons embed
-                                    user-expr as list
-                            #list __defer (list tmp)
-                                list _ (list get-scope) (list locals) tmp
-                            list handle-retargs counter
-                                list __this-scope
-                                list locals
-                                tmp
                 let expression-anchor = ('anchor user-expr)
-                let list-expression = (unbox-pointer expr list)
-                hide-traceback;
-                let expression = (sc_eval expression-anchor list-expression eval-scope)
-                let f = (sc_compile expression 0:u64)
-                let fptr =
-                    f as
-                        pointer
-                            raises
-                                function (Arguments Scope i32)
-                                Error
-                fptr;
+                let user-expr = (user-expr as list)
+                let bound-name bound-val = (get-bound-name eval-scope user-expr)
+                if (bound-name != unnamed)
+                    # just print the value
+                    @@ spice-quote
+                    fn expr ()
+                        raises-compile-error;
+                        print bound-name [(default-styler style-operator "=")]
+                            repr bound-val
+                    let f = (sc_compile (sc_typify_template expr 0 null) 0:u64)
+                    let fptr = (f as (pointer (raises (function void) Error)))
+                    fptr;
+                    counter
+                else
+                    let tmp = (Symbol "#result...")
+                    let list-expression =
+                        qq
+                            raises-compile-error;
+                            [let] [tmp] =
+                                [embed]
+                                    unquote-splice user-expr
+                            [fold-locals] [eval-scope] [append-to-scope]
+                            [handle-retargs]
+                                [fold-locals] 0 [count-folds]
+                                \ [counter] [eval-scope] [tmp]
+                    hide-traceback;
+                    let expression = (sc_eval
+                        expression-anchor list-expression (Scope eval-scope))
+                    let f = (sc_compile expression 0:u64)
+                    let fptr =
+                        f as (pointer (raises (function i32) Error))
+                    fptr;
             except (exc)
-                sc_dump_error exc
-                _ eval-scope 0
-        repeat "" "" (counter + count) eval-scope
+                'dump exc
+                counter
+        repeat "" "" counter
 
 #-------------------------------------------------------------------------------
 # main
