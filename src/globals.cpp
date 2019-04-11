@@ -165,10 +165,25 @@ sc_valueref_raises_t sc_load_from_executable(const char *path) {
     return convert_result(load_custom_core(path));
 }
 
-SCOPES_LIBEXPORT int sc_main(const char *exepath, int argc, char *argv[]) {
+int sc_main(const char *exepath, int argc, char *argv[]) {
     using namespace scopes;
     return run_main(exepath, argc, argv);
 }
+
+// symbols needed by LLVM on windows
+////////////////////////////////////////////////////////////////////////////////
+
+#ifdef SCOPES_WIN32
+SCOPES_LIBEXPORT void __cdecl sincos (double x, double *a, double *b) {
+    *a = sin(x);
+    *b = cos(x);
+}
+
+SCOPES_LIBEXPORT void __cdecl sincosf (float x, float *a, float *b) {
+    *a = sinf(x);
+    *b = cosf(x);
+}
+#endif
 
 // Compiler
 ////////////////////////////////////////////////////////////////////////////////

@@ -46,7 +46,8 @@
 #endif
 
 #ifdef SCOPES_WIN32
-#define SCOPES_USE_WCHAR 1
+//#define SCOPES_USE_WCHAR 1
+#define SCOPES_USE_WCHAR 0
 #else
 #define SCOPES_USE_WCHAR 0
 #endif

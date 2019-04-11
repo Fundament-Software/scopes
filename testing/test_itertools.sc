@@ -1,4 +1,3 @@
-
 using import itertools
 
 for x y z in (dim 1 2 3)
