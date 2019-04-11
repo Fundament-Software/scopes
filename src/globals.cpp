@@ -324,8 +324,10 @@ sc_bool_string_tuple_t sc_prompt(const sc_string_t *s, const sc_string_t *pre) {
     }
     linenoiseHistoryAdd(r);
 #ifdef SCOPES_WIN32
+#if SCOPES_USE_WCHAR
     StyledStream ss;
     ss << std::endl;
+#endif
 #endif
     return { true, String::from_cstr(r) };
 }
