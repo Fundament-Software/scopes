@@ -2572,6 +2572,13 @@ let not =
 
 run-stage;
 
+inline make-inplace-let-op (op)
+    sugar-macro
+        fn expand-infix-let (expr)
+            raises-compile-error;
+            let name value = (decons expr 2)
+            qq [let] [name] = ([op] [name] [value])
+
 inline make-inplace-op (op)
     inline (lhs rhs)
         = lhs (op lhs rhs)
@@ -2589,12 +2596,14 @@ let
     |= = (make-inplace-op |)
     ^= = (make-inplace-op ^)
     ..= = (make-inplace-op ..)
+    
     := =
         sugar-macro
             fn expand-infix-let (expr)
                 raises-compile-error;
                 let name value = (decons expr 2)
                 qq [let] [name] = [value]
+    as:= = (make-inplace-let-op as)
     <- =
         sugar-macro
             fn expand-apply (expr)
@@ -2605,20 +2614,15 @@ let
 #define-infix< 40 , _
 
 define-infix< 50 -> inline
-define-infix< 50 +=
-define-infix< 50 -=
-define-infix< 50 *=
-define-infix< 50 /=
-define-infix< 50 //=
-define-infix< 50 %=
-define-infix< 50 >>=
-define-infix< 50 <<=
-define-infix< 50 &=
-define-infix< 50 |=
-define-infix< 50 ^=
-define-infix< 50 ..=
 define-infix< 50 =
+define-infix< 50 +=; define-infix< 50 -=; define-infix< 50 *=; define-infix< 50 /=
+define-infix< 50 //=; define-infix< 50 %=
+define-infix< 50 >>=; define-infix< 50 <<=
+define-infix< 50 &=; define-infix< 50 |=; define-infix< 50 ^=
+define-infix< 50 ..=
+
 define-infix< 50 :=
+define-infix< 50 as:=
 
 define-infix> 100 or
 define-infix> 200 and
@@ -5366,18 +5370,18 @@ sugar include (args...)
             let opts =
                 loop (outopts inopts = '() opts...)
                     if (empty? inopts)
-                        break outopts
+                        break ('reverse outopts)
                     let at next = (decons inopts)
-                    let T = ('typeof at)
-                    let outopts =
-                        if (T == Symbol)
-                            cons ('@ sugar-scope (at as Symbol)) outopts
-                        elseif ( T == string)
-                            cons at outopts
-                        else
-                            error "invalid option type"
+                    let val = 
+                        do
+                            let expr = (sc_expand at '() sugar-scope)
+                            sc_prove expr
+                    if (('typeof val) != string)
+                        error "option arguments must evaluate to constant strings"
+                    val as:= string
+                    outopts := (cons val outopts)
                     repeat outopts next
-            repeat rest... targetsym filter modulename ext ('reverse opts) includestr
+            repeat rest... targetsym filter modulename ext opts includestr
         case ((s as string) rest...)
             if (not (empty? includestr))
                 error "duplicate include string"

@@ -3361,9 +3361,19 @@ SCOPES_RESULT(FunctionRef) prove(const FunctionRef &frame, const TemplateRef &fu
 SCOPES_RESULT(TypedValueRef) prove(const ValueRef &node) {
     SCOPES_RESULT_TYPE(TypedValueRef);
     if (!ast_context) {
-        SCOPES_ERROR(ProveOutsideOfMacro);
+        // fake one
+        FunctionRef fn = ref(node.anchor(), Function::from(SYM_Unnamed, {}));
+        fn->boundary = fn;
+        ASTContext fnctx = ASTContext::from_function(fn);
+        ASTContext bodyctx = fnctx.with_block(fn->body);
+        auto result = SCOPES_GET_RESULT(prove(bodyctx, node));
+        if (!result.isa<Pure>()) {
+            SCOPES_ERROR(ResultMustBePure);
+        }
+        return result;
+    } else {
+        return prove(*ast_context, node);
     }
-    return prove(*ast_context, node);
 }
 
 //------------------------------------------------------------------------------

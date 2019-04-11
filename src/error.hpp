@@ -248,8 +248,8 @@ formatters:
     T(RecursionOverflow, \
         "exceeded maximum number of compile time recursions (%0)", \
         int) \
-    T(ProveOutsideOfMacro, \
-        "expressions can only be typed while typing a function") \
+    T(ResultMustBePure, \
+        "result must be pure") \
     T(ParameterTypeMismatch, \
         "parameter is of type %0, but argument is of incompatible type %1", \
         PType, PType) \
