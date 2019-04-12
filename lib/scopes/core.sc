@@ -962,6 +962,56 @@ fn integer-tobool (args)
     let T = ('typeof self)
     return `(icmp!= self (nullof T))
 
+# as of yet unused
+inline safe-integer-cast (self T)
+    let selfT = ('typeof self)
+    if ('constant? self)
+        # allow non-destructive conversions
+        let selfST = ('storageof selfT)
+        let ST = ('storageof T)
+        let destw = ('bitcount ST)
+        let u64val = (sc_const_int_extract self)
+        if (icmp!= (band u64val 0x8000000000000000:u64) 0:u64)
+            # if the sign bit is set, signedness matters
+            if (icmp!= ('signed? selfST) ('signed? ST))
+                error "implicit conversion of integer value requires same signedness"
+        if (icmp>s 64 destw)
+            let diff = (zext (sub 64 destw) u64)
+            # check if truncation destroys bits
+            let cmpval = (shl u64val diff)
+            let cmpval =
+                ? ('signed? ST) (ashr cmpval diff) (lshr cmpval diff)
+            if (icmp!= u64val cmpval)
+                error "integer value does not fit target type"
+        return (sc_const_int_new T u64val)
+    error
+        sc_string_join
+            "can not implicitly convert non-constant integer of type "
+            sc_value_repr `selfT
+
+let static-integer->integer =
+    spice-converter-macro
+        inline (self T)
+            let selfT = ('typeof self)
+            let ST = ('storageof T)
+            let destw = ('bitcount ST)
+            if ('constant? self)
+                # allow destructive conversions
+                let selfST = ('storageof selfT)
+                let u64val = (sc_const_int_extract self)
+                return (sc_const_int_new T u64val)
+            let vT = selfT
+            let valw = ('bitcount vT)
+            if (icmp== destw valw)
+                return `(bitcast self T)
+            elseif (icmp>s destw valw)
+                if ('signed? vT)
+                    return `(sext self T)
+                else
+                    return `(zext self T)
+            else
+                return `(itrunc self T)
+
 fn integer-imply (vT T)
     let static-i32->real =
         spice-converter-macro
@@ -973,78 +1023,24 @@ fn integer-imply (vT T)
                     else
                         return `(uitofp self T)
                 error "integer must be constant for implicit conversion"
-    let static-integer->integer =
-        spice-converter-macro
-            inline (self T)
-                let selfT = ('typeof self)
-                if ('constant? self)
-                    # allow non-destructive conversions
-                    let selfST = ('storageof selfT)
-                    let ST = ('storageof T)
-                    let destw = ('bitcount ST)
-                    let u64val = (sc_const_int_extract self)
-                    if (icmp!= (band u64val 0x8000000000000000:u64) 0:u64)
-                        # if the sign bit is set, signedness matters
-                        if (icmp!= ('signed? selfST) ('signed? ST))
-                            error "implicit conversion of integer value requires same signedness"
-                    if (icmp>s 64 destw)
-                        let diff = (zext (sub 64 destw) u64)
-                        # check if truncation destroys bits
-                        let cmpval = (shl u64val diff)
-                        let cmpval =
-                            ? ('signed? ST) (ashr cmpval diff) (lshr cmpval diff)
-                        if (icmp!= u64val cmpval)
-                            error "integer value does not fit target type"
-                    return (sc_const_int_new T u64val)
-                error
-                    sc_string_join
-                        "can not implicitly convert non-constant integer of type "
-                        sc_value_repr `selfT
     let ST =
         if (ptrcmp== T usize) ('storageof T)
         else T
     if (icmp== ('kind ST) type-kind-integer)
         let valw = ('bitcount vT)
         let destw = ('bitcount ST)
-        # must have same signed bit
-        if (icmp== ('signed? vT) ('signed? ST))
-            if (icmp== destw valw)
-                return `(inline (self) (bitcast self T))
-            elseif (icmp>s destw valw)
-                if ('signed? vT)
-                    return `(inline (self) (sext self T))
-                else
-                    return `(inline (self) (zext self T))
-        # attempt a constant conversion
-        return `(inline (self) (static-integer->integer self T))
+        # must have larger size or equal size and same bitwidth
+        if (bor (icmp>s destw valw)
+                (band (icmp== destw valw)
+                      (icmp== ('signed? vT) ('signed? ST))))
+            # attempt a constant conversion
+            return `(inline (self) (static-integer->integer self T))
     elseif (icmp== ('kind ST) type-kind-real)
         if (ptrcmp== vT i32)
             return `(inline (self) (static-i32->real self T))
     `()
 
 fn integer-as (vT T)
-    let static-integer->integer =
-        spice-converter-macro
-            inline (self T)
-                let selfT = ('typeof self)
-                let ST = ('storageof T)
-                let destw = ('bitcount ST)
-                if ('constant? self)
-                    # allow destructive conversions
-                    let selfST = ('storageof selfT)
-                    let u64val = (sc_const_int_extract self)
-                    return (sc_const_int_new T u64val)
-                let vT = selfT
-                let valw = ('bitcount vT)
-                if (icmp== destw valw)
-                    return `(bitcast self T)
-                elseif (icmp>s destw valw)
-                    if ('signed? vT)
-                        return `(sext self T)
-                    else
-                        return `(zext self T)
-                else
-                    return `(itrunc self T)
     let ST =
         if (ptrcmp== T usize) ('storageof T)
         else T
@@ -1527,8 +1523,8 @@ let safe-shl =
     __tobool = (box-pointer (spice-macro integer-tobool))
     __imply = (box-pointer (spice-cast-macro integer-imply))
     __as = (box-pointer (spice-cast-macro integer-as))
-    __+ = (box-pointer (simple-binary-op add))
-    __- = (box-pointer (simple-binary-op sub))
+    __+ = (box-pointer (simple-folding-binary-op add sc_const_int_extract sc_const_int_new))
+    __- = (box-pointer (simple-folding-binary-op sub sc_const_int_extract sc_const_int_new))
     __neg = (box-pointer (inline (self) (sub (nullof (typeof self)) self)))
     __* = (box-pointer (simple-binary-op mul))
     __// = (box-pointer (simple-signed-binary-op sdiv udiv))

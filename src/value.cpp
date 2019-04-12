@@ -1178,6 +1178,20 @@ std::size_t ConstInt::hash() const {
 }
 
 ConstIntRef ConstInt::from(const Type *type, uint64_t value) {
+    auto T = cast<IntegerType>(storage_type(type).assert_ok());
+    // truncate value
+    auto w = T->width;
+    auto issigned = T->issigned;
+    if (w < 64) {
+        if (issigned) {
+            int64_t intval = value;
+            int shift = 64 - w;
+            intval = (intval << shift) >> shift;
+            value = intval;
+        } else {
+            value = value & ~(-1ull << w); 
+        }
+    }
     return constints.from(type, value);
 }
 
