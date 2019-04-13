@@ -18,6 +18,7 @@
 #include <windows.h>
 #endif
 
+#include <string.h>
 #include <assert.h>
 #include <unordered_map>
 
@@ -170,13 +171,27 @@ StyledStream& StyledStream::stream_number(uint8_t x) {
     return *this;
 }
 
+#define FLOAT_FMT "%f"
 StyledStream& StyledStream::stream_number(double x) {
-    size_t size = stb_snprintf( nullptr, 0, "%g", x );
+    size_t size = stb_snprintf( nullptr, 0, FLOAT_FMT, x );
     char dest[size+1];
-    stb_snprintf( dest, size + 1, "%g", x );
+    stb_snprintf( dest, size + 1, FLOAT_FMT, x );
+    // count exact characters
+    size = strlen(dest);
+    // truncate trailing zeroes up to one zero after the dot
+    size_t i = size;
+    while (i-- > 0) {
+        char c = dest[i];
+        if ((c == '0') && (i > 0) && (dest[i-1] != '.')) {
+            dest[i] = '\0';
+        } else {
+            break;
+        }
+    }
     _ssf(_ost, Style_Number); _ost << dest; _ssf(_ost, Style_None);
     return *this;
 }
+#undef FLOAT_FMT
 
 StyledStream& StyledStream::stream_number(float x) {
     return stream_number((double)x);

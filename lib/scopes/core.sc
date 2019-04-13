@@ -5773,7 +5773,12 @@ fn read-eval-print-loop ()
     let eval-scope = (Scope global-scope)
     set-autocomplete-scope! eval-scope
 
-    'set-symbol eval-scope 'module-dir cwd
+    'set-symbols eval-scope
+        module-dir = cwd
+        module-path = (cwd .. "/<console>.sc")
+        module-name = "<console>"
+        main-module? = true
+
     loop (preload cmdlist counter = "" "" 0)
         fn make-idstr (counter)
             .. "$" (tostring counter)
