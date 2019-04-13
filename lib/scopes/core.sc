@@ -1023,66 +1023,72 @@ fn integer-imply (vT T)
                     else
                         return `(uitofp self T)
                 error "integer must be constant for implicit conversion"
-    let ST =
-        if (ptrcmp== T usize) ('storageof T)
-        else T
-    if (icmp== ('kind ST) type-kind-integer)
-        let valw = ('bitcount vT)
-        let destw = ('bitcount ST)
-        # must have larger size or equal size and same bitwidth
-        if (bor (icmp>s destw valw)
-                (band (icmp== destw valw)
-                      (icmp== ('signed? vT) ('signed? ST))))
-            # attempt a constant conversion
-            return `(inline (self) (static-integer->integer self T))
-    elseif (icmp== ('kind ST) type-kind-real)
-        if (ptrcmp== vT i32)
-            return `(inline (self) (static-i32->real self T))
+    if (type< T integer)
+        let ST = ('storageof T)
+        if (icmp== ('kind ST) type-kind-integer)
+            let valw = ('bitcount vT)
+            let destw = ('bitcount ST)
+            # must have larger size or equal size and same bitwidth
+            if (bor (icmp>s destw valw)
+                    (band (icmp== destw valw)
+                        (icmp== ('signed? vT) ('signed? ST))))
+                # attempt a constant conversion
+                return `(inline (self) (static-integer->integer self T))
+    elseif (type< T real)
+        let ST = ('storageof T)
+        if (icmp== ('kind ST) type-kind-real)
+            if (ptrcmp== vT i32)
+                return `(inline (self) (static-i32->real self T))
     `()
 
 fn integer-as (vT T)
-    let ST =
-        if (ptrcmp== T usize) ('storageof T)
-        else T
-    if (icmp== ('kind ST) type-kind-integer)
-        return `(inline (self) (static-integer->integer self T))
-    elseif (icmp== ('kind ST) type-kind-real)
-        if ('signed? vT)
-            return `(inline (self) (sitofp self T))
-        else
-            return `(inline (self) (uitofp self T))
+    if (type< T integer)
+        let ST = ('storageof T)
+        if (icmp== ('kind ST) type-kind-integer)
+            return `(inline (self) (static-integer->integer self T))
+    elseif (type< T real)
+        let ST = ('storageof T)
+        if (icmp== ('kind ST) type-kind-real)
+            if ('signed? vT)
+                return `(inline (self) (sitofp self T))
+            else
+                return `(inline (self) (uitofp self T))
     `()
 
 # only perform safe casts: i.e. float to double
 fn real-imply (vT T)
-    if (icmp== ('kind T) type-kind-real)
-        let valw = ('bitcount vT)
-        let destw = ('bitcount T)
-        if (icmp== destw valw)
-            return `(inline (self) (bitcast self T))
-        elseif (icmp>s destw valw)
-            return `(inline (self) (fpext self T))
+    if (type< T real)
+        let ST = ('storageof T)
+        if (icmp== ('kind ST) type-kind-real)
+            let valw = ('bitcount vT)
+            let destw = ('bitcount ST)
+            if (icmp== destw valw)
+                return `(inline (self) (bitcast self T))
+            elseif (icmp>s destw valw)
+                return `(inline (self) (fpext self T))
     `()
 
 # more aggressive cast that converts from all numerical types
 fn real-as (vT T)
-    let T =
-        if (ptrcmp== T usize) ('storageof T)
-        else T
-    let kind = ('kind T)
-    if (icmp== kind type-kind-real)
-        let valw destw = ('bitcount vT) ('bitcount T)
-        if (icmp== destw valw)
-            return `(inline (self) (bitcast self T))
-        elseif (icmp>s destw valw)
-            return `(inline (self) (fpext self T))
-        else
-            return `(inline (self) (fptrunc self T))
-    elseif (icmp== kind type-kind-integer)
-        if ('signed? T)
-            return `(inline (self) (fptosi self T))
-        else
-            return `(inline (self) (fptoui self T))
+    if (type< T real)
+        let ST = ('storageof T)
+        let kind = ('kind ST)
+        if (icmp== kind type-kind-real)
+            let valw destw = ('bitcount vT) ('bitcount ST)
+            if (icmp== destw valw)
+                return `(inline (self) (bitcast self T))
+            elseif (icmp>s destw valw)
+                return `(inline (self) (fpext self T))
+            else
+                return `(inline (self) (fptrunc self T))
+    elseif (type< T integer)
+        let ST = ('storageof T)
+        let kind = ('kind ST)
+        if (icmp== kind type-kind-integer)
+            if ('signed? ST)
+                return `(inline (self) (fptosi self T))
+            else
+                return `(inline (self) (fptoui self T))
     `()
 
 # cast protocol

@@ -34,10 +34,7 @@ typedef+ T
     let x y = 1 2
     let z = (1 + 3)
 
-assert (T.x == 1)
-assert (T.y == 2)
-assert-compiler-error T.z
+static-assert (T.x == 1)
+static-assert (T.y == 2)
+static-assert (T.z == 4)
 
-run-stage;
-
-assert (T.z == 4)
