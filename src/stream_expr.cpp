@@ -636,7 +636,11 @@ void walk(const ValueRef &e, int depth, int maxdepth, bool naked, bool types) {
         } break;
         case VK_ConstReal: {
             auto val = e.cast<ConstReal>();
-            ss << val->value;
+            if (cast<RealType>(storage_type(val->get_type()).assert_ok())->width < 64) {
+                ss << (float)val->value;
+            } else {
+                ss << val->value;
+            }
         } break;
         case VK_ConstPointer: {
             auto val = e.cast<ConstPointer>();

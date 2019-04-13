@@ -171,11 +171,11 @@ StyledStream& StyledStream::stream_number(uint8_t x) {
     return *this;
 }
 
-#define FLOAT_FMT "%f"
-StyledStream& StyledStream::stream_number(double x) {
-    size_t size = stb_snprintf( nullptr, 0, FLOAT_FMT, x );
+
+StyledStream& StyledStream::stream_number(double x, const char *fmt) {
+    size_t size = stb_snprintf( nullptr, 0, fmt, x );
     char dest[size+1];
-    stb_snprintf( dest, size + 1, FLOAT_FMT, x );
+    stb_snprintf( dest, size + 1, fmt, x );
     // count exact characters
     size = strlen(dest);
     // truncate trailing zeroes up to one zero after the dot
@@ -191,10 +191,13 @@ StyledStream& StyledStream::stream_number(double x) {
     _ssf(_ost, Style_Number); _ost << dest; _ssf(_ost, Style_None);
     return *this;
 }
-#undef FLOAT_FMT
+
+StyledStream& StyledStream::stream_number(double x) {
+    return stream_number(x, "%.11f");
+}
 
 StyledStream& StyledStream::stream_number(float x) {
-    return stream_number((double)x);
+    return stream_number((double)x, "%f");
 }
 
 #if SCOPES_USE_WCHAR

@@ -79,6 +79,7 @@ struct StyledStream {
     StyledStream& stream_number(int8_t x);
     StyledStream& stream_number(uint8_t x);
 
+    StyledStream& stream_number(double x, const char *fmt);
     StyledStream& stream_number(double x);
     StyledStream& stream_number(float x);
 
