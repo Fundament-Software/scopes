@@ -829,14 +829,27 @@ static void add_c_macro(clang::Preprocessor & PP,
         double V = Result.convertToDouble();
         if (negate)
             V = -V;
-        scope->bind(Symbol(name), ref(anchor, ConstReal::from(TYPE_F64, V)));
+        ValueRef val;
+        if (Literal.isFloat) {
+            val = ConstReal::from(TYPE_F32, V);
+        } else {
+            val = ConstReal::from(TYPE_F64, V);
+        }
+        scope->bind(Symbol(name), ref(anchor, val));
     } else {
         llvm::APInt Result(64,0);
         Literal.GetIntegerValue(Result);
-        int64_t i = Result.getSExtValue();
-        if (negate)
-            i = -i;
-        scope->bind(Symbol(name), ref(anchor, ConstInt::from(TYPE_I64, i)));
+        ValueRef val;
+        if (Literal.isUnsigned) {
+            uint64_t i = Result.getZExtValue();
+            val = ConstInt::from((Literal.isLongLong?TYPE_U64:TYPE_U32), i);
+        } else {
+            int64_t i = Result.getSExtValue();
+            if (negate)
+                i = -i;
+            val = ConstInt::from((Literal.isLongLong?TYPE_I64:TYPE_I32), i);
+        }
+        scope->bind(Symbol(name), ref(anchor, val));
     }
 }
 
