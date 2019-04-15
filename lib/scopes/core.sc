@@ -906,6 +906,19 @@ fn value-as (vT T expr)
         inline (vT T)
             inline "Value-rimply" (self) `self
 
+inline spice-static-cast-macro (f)
+    """"to be used for __static-cast
+        returns the converted value or no arguments if no conversion
+        is possible.
+    spice-macro
+        fn (args)
+            raises-compile-error;
+            let argc = (sc_argcount args)
+            verify-count argc 2 2
+            let source-value = (sc_getarg args 0)
+            let target-type = (unbox-pointer (sc_getarg args 1) type)
+            f source-value target-type
+
 inline spice-cast-macro (f)
     """"to be used for __as, __ras, __imply and __rimply
         returns a callable converter (f value) that performs the cast or
@@ -966,11 +979,19 @@ fn integer-tobool (args)
 inline safe-integer-cast (self T)
     let selfT = ('typeof self)
     if ('constant? self)
-        # allow non-destructive conversions
-        let selfST = ('storageof selfT)
+    error
+        sc_string_join
+            "can not implicitly convert non-constant integer of type "
+            sc_value_repr `selfT
+
+fn integer-static-cast (self T)
+    let selfT = ('typeof self)
+    # allow non-destructive conversions
+    let selfST = ('storageof selfT)
+    let u64val = (sc_const_int_extract self)
+    if (type< T integer)
         let ST = ('storageof T)
         let destw = ('bitcount ST)
-        let u64val = (sc_const_int_extract self)
         if (icmp!= (band u64val 0x8000000000000000:u64) 0:u64)
             # if the sign bit is set, signedness matters
             if (icmp!= ('signed? selfST) ('signed? ST))
@@ -984,10 +1005,13 @@ inline safe-integer-cast (self T)
             if (icmp!= u64val cmpval)
                 error "integer value does not fit target type"
         return (sc_const_int_new T u64val)
-    error
-        sc_string_join
-            "can not implicitly convert non-constant integer of type "
-            sc_value_repr `selfT
+    elseif (type< T real)
+        return
+            if ('signed? selfT)
+                sc_const_real_new T (sitofp u64val f64)
+            else
+                sc_const_real_new T (uitofp u64val f64)
+    `()
 
 let static-integer->integer =
     spice-converter-macro
@@ -1013,16 +1037,6 @@ let static-integer->integer =
                 return `(itrunc self T)
 
 fn integer-imply (vT T)
-    let static-i32->real =
-        spice-converter-macro
-            inline (self T)
-                # constant i32 auto-converts to real
-                if ('constant? self)
-                    if ('signed? ('typeof self))
-                        return `(sitofp self T)
-                    else
-                        return `(uitofp self T)
-                error "integer must be constant for implicit conversion"
     if (type< T integer)
         let ST = ('storageof T)
         if (icmp== ('kind ST) type-kind-integer)
@@ -1032,13 +1046,7 @@ fn integer-imply (vT T)
             if (bor (icmp>s destw valw)
                     (band (icmp== destw valw)
                         (icmp== ('signed? vT) ('signed? ST))))
-                # attempt a constant conversion
                 return `(inline (self) (static-integer->integer self T))
-    elseif (type< T real)
-        let ST = ('storageof T)
-        if (icmp== ('kind ST) type-kind-real)
-            if (ptrcmp== vT i32)
-                return `(inline (self) (static-i32->real self T))
     `()
 
 fn integer-as (vT T)
@@ -1158,6 +1166,13 @@ inline gen-cast-op (f str)
             let conv = (f vT T)
             if (operator-valid? conv)
                 return `(conv value)
+            if ('constant? value)
+                label next
+                    let f =
+                        try ('@ vT '__static-cast)
+                        except (err) (merge next)
+                    let newvalue = (sc_prove `(f value anyT))
+                    if (operator-valid? newvalue) (return newvalue)
             cast-error str vT T
 
 let imply = (gen-cast-op imply-converter "can't coerce value of type ")
@@ -1528,6 +1543,7 @@ let safe-shl =
 'set-symbols integer
     __tobool = (box-pointer (spice-macro integer-tobool))
     __imply = (box-pointer (spice-cast-macro integer-imply))
+    __static-cast = (box-pointer (spice-static-cast-macro integer-static-cast))
     __as = (box-pointer (spice-cast-macro integer-as))
     __+ = (box-pointer (simple-folding-binary-op add sc_const_int_extract sc_const_int_new))
     __- = (box-pointer (simple-folding-binary-op sub sc_const_int_extract sc_const_int_new))
