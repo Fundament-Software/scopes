@@ -250,6 +250,28 @@ typedef+ vec-type
     inline __rcp (self)
         / ((typeof self) 1) self
 
+    fn do-rimply (vT T static?)
+        let ET = ('element@ T 0)
+        # can we cast vT to ET?
+        let conv = (imply-converter vT ET static?)
+        if (operator-valid? conv)
+            let sz = ('element-count T)
+            return
+                spice-quote
+                    inline (value)
+                        bitcast (vector.smear (conv value) sz) T
+        `()
+
+    @@ spice-cast-macro
+    fn __static-rimply (vT T)
+        do-rimply vT T true
+
+    @@ spice-cast-macro
+    fn __rimply (vT T)
+        do-rimply vT T false
+
+    unlet do-rimply
+
     do
         fn vec-type-binary-op (symbol lhsT rhsT)
             label next
@@ -259,9 +281,13 @@ typedef+ vec-type
                     except (err) (merge next)
                 if (lhsT == rhsT)
                     return f
-                let conv = (imply-converter rhsT Ta)
+            #
+                let conv = (imply-converter rhsT Ta false)
                 if (operator-valid? conv)
                     return `(inline (lhs rhs) (f lhs (lhsT (conv rhs))))
+                let conv = (imply-converter rhsT Ta true)
+                if (operator-valid? conv)
+                    return `(inline (lhs rhs) (f lhs (lhsT (conv (verify-constant rhs)))))
             `()
 
         fn vec-type-binary-op-r (symbol lhsT rhsT)
@@ -272,9 +298,13 @@ typedef+ vec-type
                     except (err) (merge next)
                 if (lhsT == rhsT)
                     return f
-                let conv = (imply-converter lhsT Tb)
+            #
+                let conv = (imply-converter lhsT Tb false)
                 if (operator-valid? conv)
                     return `(inline (lhs rhs) (f (rhsT (conv lhs)) rhs))
+                let conv = (imply-converter lhsT Tb true)
+                if (operator-valid? conv)
+                    return `(inline (lhs rhs) (f (rhsT (conv (verify-constant lhs))) rhs))
             `()
 
         inline vec-type-binary-op-dispatch (lop rop symbol)

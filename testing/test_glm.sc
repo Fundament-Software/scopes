@@ -19,6 +19,13 @@ assert ((vec4 1 (vec2 2 3) 4) == (vec4 1 2 3 4))
 assert ((vec4 (vec3 0) 1) == (vec4 0 0 0 1))
 assert ((vec4 1) == (vec4 1 1 1 1))
 
+# smear scalar by implicit cast
+assert ((imply 1.0 vec4) == (vec4 1 1 1 1))
+# smear constant scalar of convertible type by implicit cast
+let q = (imply 1 vec4)
+static-assert (constant? q)
+assert (q == (vec4 1 1 1 1))
+
 let v = (vec4 0 1 2 3)
 assert (v.xy == (vec2 0 1))
 assert (v.zwzw == (vec4 2 3 2 3))
@@ -33,6 +40,9 @@ assert ((ivec3 (vec3 5)) == (ivec3 5))
 assert ((vec4 v.xy v.xy) == v.xyxy)
 
 assert (v + v == (vec4 0 2 4 6))
+# operation with scalar of same element type
+assert (v + 1.0 == (vec4 1 2 3 4))
+# operation with scalar of similar element type
 assert (v + 1 == (vec4 1 2 3 4))
 assert (1 + v == (vec4 1 2 3 4))
 assert (v * v / 2 == (vec4 0 0.5 2 4.5))

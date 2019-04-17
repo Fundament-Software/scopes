@@ -906,19 +906,6 @@ fn value-as (vT T expr)
         inline (vT T)
             inline "Value-rimply" (self) `self
 
-inline spice-static-cast-macro (f)
-    """"to be used for __static-cast
-        returns the converted value or no arguments if no conversion
-        is possible.
-    spice-macro
-        fn (args)
-            raises-compile-error;
-            let argc = (sc_argcount args)
-            verify-count argc 2 2
-            let source-value = (sc_getarg args 0)
-            let target-type = (unbox-pointer (sc_getarg args 1) type)
-            f source-value target-type
-
 inline spice-cast-macro (f)
     """"to be used for __as, __ras, __imply and __rimply
         returns a callable converter (f value) that performs the cast or
@@ -984,36 +971,43 @@ inline safe-integer-cast (self T)
             "can not implicitly convert non-constant integer of type "
             sc_value_repr `selfT
 
-fn integer-static-cast (self T)
-    let selfT = ('typeof self)
-    # allow non-destructive conversions
-    let selfST = ('storageof selfT)
-    let u64val = (sc_const_int_extract self)
-    if (type< T integer)
-        let ST = ('storageof T)
-        let destw = ('bitcount ST)
-        if (icmp!= (band u64val 0x8000000000000000:u64) 0:u64)
-            # if the sign bit is set, signedness matters
-            if (icmp!= ('signed? selfST) ('signed? ST))
-                error "implicit conversion of integer value requires same signedness"
-        if (icmp>s 64 destw)
-            let diff = (zext (sub 64 destw) u64)
-            # check if truncation destroys bits
-            let cmpval = (shl u64val diff)
-            let cmpval =
-                ? ('signed? ST) (ashr cmpval diff) (lshr cmpval diff)
-            if (icmp!= u64val cmpval)
-                error "integer value does not fit target type"
-        return (sc_const_int_new T u64val)
-    elseif (type< T real)
-        return
-            if ('signed? selfT)
-                sc_const_real_new T (sitofp u64val f64)
-            else
-                sc_const_real_new T (uitofp u64val f64)
-    `()
-
 let static-integer->integer =
+    spice-converter-macro
+        inline (self T)
+            let selfT = ('typeof self)
+            # allow non-destructive conversions
+            let selfST = ('storageof selfT)
+            let u64val = (sc_const_int_extract self)
+            let ST = ('storageof T)
+            let destw = ('bitcount ST)
+            if (icmp!= (band u64val 0x8000000000000000:u64) 0:u64)
+                # if the sign bit is set, signedness matters
+                if (icmp!= ('signed? selfST) ('signed? ST))
+                    error "implicit conversion of integer value requires same signedness"
+            if (icmp>s 64 destw)
+                let diff = (zext (sub 64 destw) u64)
+                # check if truncation destroys bits
+                let cmpval = (shl u64val diff)
+                let cmpval =
+                    ? ('signed? ST) (ashr cmpval diff) (lshr cmpval diff)
+                if (icmp!= u64val cmpval)
+                    error "integer value does not fit target type"
+            return (sc_const_int_new T u64val)
+
+let static-integer->real =
+    spice-converter-macro
+        inline (self T)
+            let selfT = ('typeof self)
+            # allow non-destructive conversions
+            let selfST = ('storageof selfT)
+            let u64val = (sc_const_int_extract self)
+            return
+                if ('signed? selfT)
+                    sc_const_real_new T (sitofp u64val f64)
+                else
+                    sc_const_real_new T (uitofp u64val f64)
+
+let integer->integer =
     spice-converter-macro
         inline (self T)
             let selfT = ('typeof self)
@@ -1036,6 +1030,19 @@ let static-integer->integer =
             else
                 return `(itrunc self T)
 
+fn integer-static-imply (vT T)
+    if (type< T integer)
+        let ST = ('storageof T)
+        if (icmp== ('kind ST) type-kind-integer)
+            return `(inline (self) (static-integer->integer self T))
+    elseif (type< T real)
+        let ST = ('storageof T)
+        if (icmp== ('kind ST) type-kind-real)
+            let valw = ('bitcount vT)
+            let destw = ('bitcount ST)
+            return `(inline (self) (static-integer->real self T))
+    `()
+
 fn integer-imply (vT T)
     if (type< T integer)
         let ST = ('storageof T)
@@ -1046,14 +1053,14 @@ fn integer-imply (vT T)
             if (bor (icmp>s destw valw)
                     (band (icmp== destw valw)
                         (icmp== ('signed? vT) ('signed? ST))))
-                return `(inline (self) (static-integer->integer self T))
+                return `(inline (self) (integer->integer self T))
     `()
 
 fn integer-as (vT T)
     if (type< T integer)
         let ST = ('storageof T)
         if (icmp== ('kind ST) type-kind-integer)
-            return `(inline (self) (static-integer->integer self T))
+            return `(inline (self) (integer->integer self T))
     elseif (type< T real)
         let ST = ('storageof T)
         if (icmp== ('kind ST) type-kind-real)
@@ -1129,7 +1136,7 @@ fn cast-converter (symbol rsymbol vT T)
         if (operator-valid? conv) (return conv)
     return (sc_empty_argument_list)
 
-fn imply-converter (vT T)
+fn imply-converter (vT T static?)
     if (ptrcmp== vT T)
         return `_
     if (sc_type_is_superof T vT)
@@ -1138,9 +1145,13 @@ fn imply-converter (vT T)
         try
             return ('@ vT '__tobool)
         except (err)
+    if static?
+        let conv =
+            cast-converter '__static-imply '__static-rimply vT T
+        if (operator-valid? conv) (return conv)
     cast-converter '__imply '__rimply vT T
 
-fn as-converter (vT T)
+fn as-converter (vT T static?)
     if (ptrcmp== vT T)
         return `_
     if (sc_type_is_superof T vT)
@@ -1152,6 +1163,10 @@ fn as-converter (vT T)
     let conv = (cast-converter '__as '__ras vT T)
     if (operator-valid? conv) (return conv)
     # try implicit cast last
+    if static?
+        let conv =
+            cast-converter '__static-imply '__static-rimply vT T
+        if (operator-valid? conv) (return conv)
     cast-converter '__imply '__rimply vT T
 
 inline gen-cast-op (f str)
@@ -1163,16 +1178,9 @@ inline gen-cast-op (f str)
             let anyT = ('getarg args 1)
             let vT = ('typeof value)
             let T = (unbox-pointer anyT type)
-            let conv = (f vT T)
+            let conv = (f vT T ('constant? value))
             if (operator-valid? conv)
                 return `(conv value)
-            if ('constant? value)
-                label next
-                    let f =
-                        try ('@ vT '__static-cast)
-                        except (err) (merge next)
-                    let newvalue = (sc_prove `(f value anyT))
-                    if (operator-valid? newvalue) (return newvalue)
             cast-error str vT T
 
 let imply = (gen-cast-op imply-converter "can't coerce value of type ")
@@ -1217,7 +1225,7 @@ fn binary-operator-r (rsymbol lhsT rhsT)
         if (operator-valid? op) (return op)
     return (sc_empty_argument_list)
 
-fn balanced-binary-operator (symbol rsymbol lhsT rhsT)
+fn balanced-binary-operator (symbol rsymbol lhsT rhsT lhs-static? rhs-static?)
     """"for an operation performed on two argument types, of which either
         type can provide a suitable candidate, return a matching operator.
         This function only works inside a spice macro.
@@ -1232,7 +1240,7 @@ fn balanced-binary-operator (symbol rsymbol lhsT rhsT)
         if (operator-valid? op) (return op)
 
         # can we cast rhsT to lhsT?
-        let conv = (imply-converter rhsT lhsT)
+        let conv = (imply-converter rhsT lhsT rhs-static?)
         if (operator-valid? conv)
             # is symmetrical op supported for the left type?
             let op = (binary-operator symbol lhsT lhsT)
@@ -1240,7 +1248,7 @@ fn balanced-binary-operator (symbol rsymbol lhsT rhsT)
                 return `(inline (lhs rhs) (op lhs (conv rhs)))
 
         # can we cast lhsT to rhsT?
-        let conv = (imply-converter lhsT rhsT)
+        let conv = (imply-converter lhsT rhsT lhs-static?)
         if (operator-valid? conv)
             # is symmetrical op supported for the right type?
             let op = (binary-operator symbol rhsT rhsT)
@@ -1271,7 +1279,8 @@ fn balanced-binary-operation (args symbol rsymbol friendly-op-name)
         'getarg args 1
     let lhsT = ('typeof lhs)
     let rhsT = ('typeof rhs)
-    let op = (balanced-binary-operator symbol rsymbol lhsT rhsT)
+    let op = (balanced-binary-operator symbol rsymbol lhsT rhsT
+        ('constant? lhs) ('constant? rhs))
     if (operator-valid? op)
         return ('tag `(op lhs rhs) ('anchor args))
     binary-op-error friendly-op-name lhsT rhsT
@@ -1289,7 +1298,7 @@ fn unbalanced-binary-operation (args symbol rtype friendly-op-name)
         if (ptrcmp== rhsT rtype) rhs
         else
             # can we cast rhsT to rtype?
-            let conv = (imply-converter rhsT rtype)
+            let conv = (imply-converter rhsT rtype ('constant? rhs))
             if (operator-valid? conv)
                 `(conv rhs)
             else
@@ -1502,7 +1511,7 @@ fn dispatch-and-or (args flip)
     let call-elsef = `(elsef)
 
     let condT = ('typeof cond)
-    let conv = (imply-converter condT bool)
+    let conv = (imply-converter condT bool ('constant? cond))
     let condbool =
         if (operator-valid? conv)
             hide-traceback;
@@ -1543,7 +1552,7 @@ let safe-shl =
 'set-symbols integer
     __tobool = (box-pointer (spice-macro integer-tobool))
     __imply = (box-pointer (spice-cast-macro integer-imply))
-    __static-cast = (box-pointer (spice-static-cast-macro integer-static-cast))
+    __static-imply = (box-pointer (spice-cast-macro integer-static-imply))
     __as = (box-pointer (spice-cast-macro integer-as))
     __+ = (box-pointer (simple-folding-binary-op add sc_const_int_extract sc_const_int_new))
     __- = (box-pointer (simple-folding-binary-op sub sc_const_int_extract sc_const_int_new))
@@ -2577,7 +2586,7 @@ let not =
             let argc = ('argcount args)
             verify-count argc 1 1
             let value = ('getarg args 0)
-            let conv = (imply-converter ('typeof value) bool)
+            let conv = (imply-converter ('typeof value) bool ('constant? value))
             let value =
                 if (operator-valid? conv)
                     hide-traceback;
@@ -2614,7 +2623,7 @@ let
     |= = (make-inplace-op |)
     ^= = (make-inplace-op ^)
     ..= = (make-inplace-op ..)
-    
+
     := =
         sugar-macro
             fn expand-infix-let (expr)
@@ -4644,7 +4653,7 @@ spice overloaded-fn-append (T args...)
                             elseif (paramT == Variadic) arg
                             elseif (argT == paramT) arg
                             else
-                                let conv = (imply-converter argT paramT)
+                                let conv = (imply-converter argT paramT ('constant? arg))
                                 if (operator-valid? conv) `(conv arg)
                                 else (merge break-next)
                         sc_call_append_argument outargs outarg
@@ -5390,7 +5399,7 @@ sugar include (args...)
                     if (empty? inopts)
                         break ('reverse outopts)
                     let at next = (decons inopts)
-                    let val = 
+                    let val =
                         do
                             let expr = (sc_expand at '() sugar-scope)
                             sc_prove expr

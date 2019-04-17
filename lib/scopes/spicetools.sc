@@ -39,7 +39,7 @@ inline parse-argument-matcher (failfunc expr scope params cb)
                     error "vararg parameter cannot be typed"
                 spice-quote
                     let arg = (sc_getarg expr i)
-                    let conv = (imply-converter ('typeof arg) exprT)
+                    let conv = (imply-converter ('typeof arg) exprT ('constant? arg))
                     let arg =
                         if (operator-valid? conv) `(conv arg)
                         else (failfunc)
