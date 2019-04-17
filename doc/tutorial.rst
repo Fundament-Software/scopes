@@ -37,7 +37,7 @@ read-eval-print loop (REPL), also called a console. Here's an example:
       \\\
        \\\
      ///\\\
-    ///  \\\  Scopes 0.7 (debug build, Jul 22 2017, 10:51:02)
+    ///  \\\  Scopes 0.14 (Apr 17 2019, 19:43:48)
     $0 ▶
 
 Simple expressions can be written on a single line, followed by hitting the
@@ -118,7 +118,7 @@ integer result without the fractional part, use the floor division operator
 `//`::
 
     $0 ▶ 23 / 3 # regular division returns a real
-    $0 = 7.66667
+    $0 = 7.666667
     $1 ▶ 23 // 3 # floor division returns an integer
     $1 = 7
     $2 ▶ 23 % 3 # modulo returns the remainder
@@ -131,29 +131,23 @@ Binding Names
 
 Notice how the last example leveraged the auto-memorization function of the
 console to bind any result to a name for reuse. But we can also make use of
-`define` to bind values to specific names::
+`let` to bind values to specific names::
 
-    $0 ▶ define width 23
-    $0 ▶ define height 42
+    $0 ▶ let width = 23
+    23
+    $0 ▶ let height = 42
+    42
     $0 ▶ width * height
-    $0 = 966
-
-On a side note: `define` does not bind to free variables, which is not a problem
-in interactive mode. Scopes' main mechanism to bind computation results to names
-is `let`, which on the console can only be used in contiguous blocks::
-
-    $0 ▶ let width = 23#don't forget to enter space here
-    .... let height = 42
-    .... width * height
-    ....
     $0 = 966
 
 If a name isn't bound to anything, using it will give you an error, which is
 useful when you've just mistyped it::
 
-    $0 ▶ define color "red"
+    $0 ▶ let color = "red"
     $0 ▶ colour
-    <string>:1:1: error: use of undeclared identifier 'colour'. Did you mean 'color'?
+    <string>:1:1: while expanding
+        colour
+    error: syntax: identifier 'colour' is not declared in scope. Did you mean 'color'?
 
 Strings
 ```````
@@ -199,18 +193,18 @@ joined with the `..` operator::
     $1 ▶ .. "Sco" "pes" "!" # using prefix notation
     $1 = "Scopes!"
 
-The inverse operation, slicing strings, can be performed with the `slice`
-operation::
+The inverse operation, slicing strings, can be performed with the `lslice`,
+`rslice` and `slice` operations::
 
     $0 ▶ "scopes" # bind the string we're working on to $0
     $0 = "scopes"
-    $1 ▶ slice $0 1 # slice starting at the second character
+    $1 ▶ rslice $0 1 # slice right side starting at the second character
     $1 = "copes"
     $2 ▶ slice $0 1 5 # slice four letters from the center
     $2 = "cope"
-    $3 ▶ slice $0 0 -1 # a negative index selects from the back
+    $3 ▶ lslice $0 ((countof $0) - 1) # a negative index selects from the back
     $3 = "scope"
-    $4 ▶ slice $0 -2 # get the last two characters
+    $4 ▶ rslice $0 ((countof $0) - 2) # get the last two characters
     $4 = "es"
     $5 ▶ slice $0 2 3 # get the center character
     $5 = "o"
@@ -226,7 +220,6 @@ for example:
      | S | c | o | p | e | s |
      +---+---+---+---+---+---+
      0   1   2   3   4   5   6
-    -6  -5  -4  -3  -2  -1
 
 If we're interested in the byte value of a single character from a string, we
 can use the `@` operator, also called the at-operator, to extract it::
@@ -237,7 +230,7 @@ can use the `@` operator, also called the at-operator, to extract it::
     $1 = 98:i8
     $2 ▶ "abc" @ 2
     $2 = 99:i8
-    $3 ▶ "abc" @ -1 # get the last character
+    $3 ▶ "abc" @ ((countof "abc") - 1) # get the last character
     $3 = 99:i8
 
 The `countof` operation returns the byte length of a string::
@@ -256,10 +249,12 @@ Many calculations require repeating an operation several times, and of course
 Scopes can also do that. For instance, here is one of the typical examples
 for such a task, computing the first few numbers of the fibonacci sequence::
 
-    $0 ▶ loop (a b) = 0 1
-    .... if (b < 10)
-    ....     print b
-    ....     repeat b (a + b)
+    $0 ▶ loop (a b = 0 1)
+    ....     if (b < 10)
+    ....         print b
+    ....         repeat b (a + b)
+    ....     else
+    ....         break b
     ....
     1
     1
@@ -267,6 +262,7 @@ for such a task, computing the first few numbers of the fibonacci sequence::
     3
     5
     8
+    $0 = 13
 
 This example introduces several new features.
 
@@ -281,6 +277,9 @@ This example introduces several new features.
   indented block formed by lines three and four is only executed if the
   expression ``(b < 10)`` evaluates to `true`. In other words: we are going
   to be performing the loop as long as ``b`` is smaller than ``10``.
+* In line 5, we introduce the alternative block to be executed when ``b``
+  is greater or equal to ``10``.
+* In line 6, we break from the loop, returning the final value of ``b``.
 * Scopes offers a set of comparison operators for all basic types. You can
   compare any two numbers using `<` (less than), `>` (greater than),
   `==` (equal to), `<=` (less than or equal to), `>=` (greater than or equal to)
@@ -304,14 +303,14 @@ You have seen a small bit of `if` in that fibonacci example. `if` is your
 go-to solution for any task that requires the program to make decisions.
 Another example::
 
-    $0 ▶ prompt "please enter a word: "
+    $0 ▶ __prompt "please enter a word: " ""
     please enter a word: bang
-    $0 = "bang"
-    $1 ▶ if ($0 < "n")
+    $0 $1 = true "bang"
+    $2 ▶ if ($1 < "n")
     ....     print "early in the dictionary, good choice!"
-    .... elseif ($0 == "scopes")
+    .... elseif ($1 == "scopes")
     ....     print "oh, a very good word!"
-    .... elseif ($0 == "")
+    .... elseif ($1 == "")
     ....     print "that's no word at all!"
     .... else
     ....     print "late in the dictionary, nice!"
@@ -335,16 +334,19 @@ Let's generalize the fibonacci example from earlier to a function that can
 write numbers from the fibonacci sequence up to an arbitrary boundary::
 
     $0 ▶ fn fib (n) # write Fibonacci series up to n
-    ....     loop (a b) = 0 1
-    ....     if (a < n)
-    ....         io-write! (repr a)
-    ....         io-write! " "
-    ....         repeat b (a + b)
-    ....     io-write! "\n"
+    ....     loop (a b = 0 1)
+    ....         if (a < n)
+    ....             io-write! (repr a)
+    ....             io-write! " "
+    ....             repeat b (a + b)
+    ....         else
+    ....             io-write! "\n"
+    ....             break b
     ....
-    $0 = fib(n)▶?:Label
-    $1 ▶ fib 2000 # call the function we just defined
+    fib:Closure
+    $0 ▶ fib 2000 # call the function we just defined
     0 1 1 2 3 5 8 13 21 34 55 89 144 233 377 610 987 1597
+    $0 = 4181
 
 The keyword `fn` introduces a function definition. It must be followed by an
 optional name and a list of formal parameters. All expressions that follow

@@ -3,13 +3,14 @@ Architecture
 
 Scopes understands and transforms source code in multiple cleanly separated stages:
 
-=====  ===========  =======================  ====================
-Order  Stage        Through                  To
-=====  ===========  =======================  ====================
+=====  ===========  =======================  ======================
+Order  Stage        From                     To
+=====  ===========  =======================  ======================
 1      Parsing      Data Interchange Format  S-Expression Tree
-2      Expansion    Scopes Language          Special Forms Only
-3      Translation  Expanded Tree            Control Flow Graph
-4      Execution    Control Flow Form        Program Output
-=====  ===========  =======================  ====================
+2      Expansion    S-Expression Tree        Untyped Scopes AST
+3      Checking     Untyped Scopes AST       Typed Scopes IL
+4      Translation  Typed Scopes IL          LLVM IR / SPIR-V
+5      Execution    LLVM IR / SPIR-V         Program Output
+=====  ===========  =======================  ======================
 
 TODO
