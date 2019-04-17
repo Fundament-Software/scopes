@@ -1,0 +1,4 @@
+Example for generating changelog text for the wiki:
+
+hg log -r release-0.13:tip --template '{desc} [{node|short}]\n' > changelog.txt
+
