@@ -518,7 +518,7 @@ static SCOPES_RESULT(void) drop_value(const ASTContext &ctx,
     SCOPES_CHECK_RESULT(build_drop(ctx, anchor, arg));
     auto argT = arg.get_type();
     int id = get_unique(argT)->id;
-    #if 0
+    #if 1
     if (needs_autofree(argT)) {
         build_free(ctx, anchor, ref(anchor, ExtractArgument::from(arg.value, arg.index)));
     }
