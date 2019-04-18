@@ -279,7 +279,7 @@ skip_regular_load:
     auto stage_func_type = pointer_type(raising_function_type(
         arguments_type({TYPE_CompileStage}), {}), PTF_NonWritable, SYM_Unnamed);
 
-    const int compile_flags = 0;// CF_O3;
+    const int compile_flags = 0;// CF_O2;
 
 compile_stage:
     if (fn->get_type() == stage_func_type) {

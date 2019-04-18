@@ -38,7 +38,7 @@ let scope = (Scope)
 compile-object
     module-dir .. "/test.o"
     scope
-    'no-debug-info
+    #'no-debug-info
     'dump-module
 
 # execute with

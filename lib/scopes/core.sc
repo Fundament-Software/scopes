@@ -130,7 +130,7 @@ let SpiceMacroFunction = (sc_type_storage SpiceMacro)
 let ellipsis-symbol = (sc_symbol_new "...")
 
 # execute until here and treat the remainder as a new translation unit
-run-stage;
+run-stage; # 1
 
 # we can now access TypeArrayPointer as a compile time value
 let void =
@@ -196,7 +196,7 @@ let static-typify =
 
         build-typify-function static-typify
 
-run-stage;
+run-stage; # 2
 
 let spice-macro-verify-signature =
     static-typify (fn "spice-macro-verify-signature" (f)) SpiceMacroFunction
@@ -681,7 +681,7 @@ let list-constructor =
                 sc_argument_list_append newargs (sc_getarg args i)
                 add i 1
 
-run-stage;
+run-stage; # 3
 
 inline decons (self count)
     let count =
@@ -1809,7 +1809,7 @@ let tostring =
                 else
                     `(sc_value_tostring value)
 
-run-stage;
+run-stage; # 4
 
 'set-symbols typename
     # inverted compare attempts regular compare
@@ -2597,7 +2597,7 @@ let not =
             else
                 `(not value)
 
-run-stage;
+run-stage; # 5
 
 inline make-inplace-let-op (op)
     sugar-macro
@@ -2892,7 +2892,7 @@ let wrap-if-not-run-stage =
 
 let incomplete = (typename "incomplete")
 
-run-stage;
+run-stage; # 6
 
 fn make-module-path (pattern name)
     let sz = (countof pattern)
@@ -3320,7 +3320,7 @@ let __countof-aggregate =
             let sz = ('element-count T)
             `[(sz as usize)]
 
-run-stage;
+run-stage; # 7
 
 # (define-scope-macro name expr ...)
 # implies builtin names:
@@ -4492,7 +4492,7 @@ define va-unnamed
                 repeat (i + 1)
             outargs
 
-run-stage;
+run-stage; # 8
 
 inline va-join (a...)
     inline (b...)
@@ -4800,7 +4800,7 @@ sugar from (src 'let params...)
 
 define zip (spice-macro (fn (args) (ltr-multiop args `zip 2)))
 
-run-stage;
+run-stage; # 9
 
 inline _memo (f)
     inline (...)
@@ -5085,7 +5085,7 @@ sugar fold-locals (args...)
         sc_expression_append block expr
         repeat key expr
 
-run-stage;
+run-stage; # 10
 
 #-------------------------------------------------------------------------------
 # unlet
@@ -5327,7 +5327,7 @@ define struct-dsl
     define-infix> 70 :
     locals;
 
-run-stage;
+run-stage; # 11
 
 #-------------------------------------------------------------------------------
 # images
@@ -5727,7 +5727,7 @@ let e = e:f32
 
 unlet _memo
 
-run-stage;
+run-stage; # 12
 
 #-------------------------------------------------------------------------------
 
