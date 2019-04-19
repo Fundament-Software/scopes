@@ -116,14 +116,12 @@ fn print-entry (module parent key entry parent-name opts...)
             io-write! docstr
             io-write! "\n"
         else
-            if typemember?
-                io-write! ".. typefn:: ("
-                io-write! parent-name
-                io-write! " '"
-            elseif (sc_template_is_inline label)
+            if (sc_template_is_inline label)
                 io-write! ".. inline:: ("
             else
                 io-write! ".. fn:: ("
+            if typemember?
+                io-write! parent-name; io-write! "."
             io-write! key
             let count = (sc_template_parameter_count label)
             for i in (range count)

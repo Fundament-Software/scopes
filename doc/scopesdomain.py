@@ -134,17 +134,7 @@ class ScopesObject(ObjectDescription):
             name = expr
             paramlist = addnodes.desc_name(name, name)
             signode += paramlist
-        elif self.objtype in ('typefn',):
-            paramlist = addnodes.desc_parameterlist()
-            paramlist.child_text_separator = ' '
-            typename = expr[0]
-            member = expr[1]
-            name = typename + "." + member[1:]
-            signode += addnodes.desc_name(name, typename + " " + member + ' ')
-            for i,arg in enumerate(expr[2:]):
-                parse_arg(paramlist, arg)
-            signode += paramlist
-        elif self.objtype in ('sugar', 'spice'):
+        elif self.objtype in ('sugar',):
             paramlist = addnodes.desc_parameterlist()
             paramlist.child_text_separator = ' '
             name = expr[0]
@@ -222,7 +212,6 @@ class ScopesDomain(Domain):
         'symbol-prefix':    ObjType(l_('symbol-prefix'), 'symbol-prefix'),
         'fn': ObjType(l_('fn'), 'fn'),
         'inline': ObjType(l_('inline'), 'inline'),
-        'typefn': ObjType(l_('typefn'), 'typefn'),
         'compiledfn': ObjType(l_('compiledfn'), 'compiledfn'),
         'define': ObjType(l_('define'), 'define'),
         'type': ObjType(l_('type'), 'type'),
@@ -237,7 +226,6 @@ class ScopesDomain(Domain):
         'symbol-prefix': ScopesObject,
         'fn': ScopesObject,
         'inline': ScopesObject,
-        'typefn': ScopesObject,
         'compiledfn': ScopesObject,
         'define': ScopesObject,
         'type': ScopesObject,
@@ -246,7 +234,6 @@ class ScopesDomain(Domain):
     roles = {
         'fn' :  ScopesXRefRole(),
         'inline' :  ScopesXRefRole(),
-        'typefn' :  ScopesXRefRole(),
         'compiledfn' :  ScopesXRefRole(),
         'builtin' :  ScopesXRefRole(),
         'sugar' :  ScopesXRefRole(),
@@ -273,7 +260,6 @@ class ScopesDomain(Domain):
         'builtin',
         'type',
         'type-factory',
-        'typefn',
     ]
 
     initial_data = {

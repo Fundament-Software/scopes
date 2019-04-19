@@ -374,7 +374,7 @@ parses the command-line and optionally enters the REPL.
 .. type:: CUnion
 
    An opaque type.
-.. typefn:: (CUnion '__typecall cls)
+.. inline:: (CUnion.__typecall cls)
 .. type:: Closure
 
    A plain type of storage type `_Closure(*)`.
@@ -385,7 +385,7 @@ parses the command-line and optionally enters the REPL.
 
    A plain type of storage type `_Closure(*)`.
 .. spice:: (Collector.__call ...)
-.. typefn:: (Collector '__typecall cls init valid? at collect)
+.. inline:: (Collector.__typecall cls init valid? at collect)
 .. type:: CompileStage
 
    A plain type of storage type `{_Value Anchor}`.
@@ -396,7 +396,7 @@ parses the command-line and optionally enters the REPL.
 
    A plain type of storage type `_Closure(*)`.
 .. spice:: (Generator.__call ...)
-.. typefn:: (Generator '__typecall cls start valid? at next)
+.. inline:: (Generator.__typecall cls start valid? at next)
 .. type:: Image
 
    An opaque type.
@@ -453,8 +453,8 @@ parses the command-line and optionally enters the REPL.
 
    An external function of type ``Value<->Error(Scope Symbol)``.
 .. spice:: (Scope.define-symbol ...)
-.. typefn:: (Scope 'set-symbols self values...)
-.. typefn:: (Scope 'define-symbols self values...)
+.. inline:: (Scope.set-symbols self values...)
+.. inline:: (Scope.define-symbols self values...)
 .. type:: SourceFile
 
    A plain type of storage type `_SourceFile(*)`.
@@ -478,11 +478,11 @@ parses the command-line and optionally enters the REPL.
 .. type:: Symbol
 
    A plain type of supertype `immutable` and of storage type `u64`.
-.. typefn:: (Symbol '__typecall cls str)
+.. inline:: (Symbol.__typecall cls str)
 .. compiledfn:: (Symbol.variadic? ...)
 
    An external function of type ``bool<-(Symbol)``.
-.. typefn:: (Symbol 'unique cls name)
+.. inline:: (Symbol.unique cls name)
 .. spice:: (Symbol.__call ...)
 .. type:: TypeArrayPointer
 
@@ -493,12 +493,12 @@ parses the command-line and optionally enters the REPL.
 .. type:: Value
 
    A plain type of storage type `{_Value Anchor}`.
-.. typefn:: (Value 'append-sink self)
-.. typefn:: (Value 'args self)
+.. inline:: (Value.append-sink self)
+.. inline:: (Value.args self)
 .. compiledfn:: (Value.kind ...)
 
    An external function of type ``i32<-(Value)``.
-.. typefn:: (Value 'tag self anchor)
+.. inline:: (Value.tag self anchor)
 .. spice:: (Value.__typecall ...)
 .. compiledfn:: (Value.anchor ...)
 
@@ -506,11 +506,11 @@ parses the command-line and optionally enters the REPL.
 .. compiledfn:: (Value.none? ...)
 
    A compiled function of type ``bool<-(Value)``.
-.. typefn:: (Value 'dump self)
+.. inline:: (Value.dump self)
 .. compiledfn:: (Value.getarglist ...)
 
    An external function of type ``Value<-(Value i32)``.
-.. typefn:: (Value 'dekey self)
+.. fn:: (Value.dekey self)
 .. compiledfn:: (Value.constant? ...)
 
    An external function of type ``bool<-(Value)``.
@@ -529,7 +529,7 @@ parses the command-line and optionally enters the REPL.
 .. compiledfn:: (Value.argcount ...)
 
    An external function of type ``i32<-(Value)``.
-.. typefn:: (Value 'reverse-args self)
+.. inline:: (Value.reverse-args self)
 .. compiledfn:: (Value.getarg ...)
 
    An external function of type ``Value<-(Value i32)``.
@@ -546,7 +546,7 @@ parses the command-line and optionally enters the REPL.
 
    An opaque type of supertype `aggregate`.
 .. spice:: (array.__typecall ...)
-.. typefn:: (array 'type element-type size)
+.. inline:: (array.type element-type size)
 .. type:: bool
 
    A plain type of supertype `integer` and of storage type `bool`.
@@ -573,7 +573,7 @@ parses the command-line and optionally enters the REPL.
 .. type:: hash
 
    A plain type of storage type `u64`.
-.. typefn:: (hash 'from-bytes data size)
+.. inline:: (hash.from-bytes data size)
 .. spice:: (hash.__typecall ...)
 .. type:: i16
 
@@ -596,14 +596,14 @@ parses the command-line and optionally enters the REPL.
 .. type:: integer
 
    An opaque type of supertype `immutable`.
-.. typefn:: (integer '__typecall cls value)
+.. inline:: (integer.__typecall cls value)
 .. type:: intptr
 
    A plain type labeled ``u64`` of supertype `integer` and of storage type `u64`.
 .. type:: list
 
    A plain type labeled ``List`` of storage type `_List(*)`.
-.. typefn:: (list 'token-split expr token errmsg)
+.. fn:: (list.token-split expr token errmsg)
 .. spice:: (list.__typecall ...)
 .. compiledfn:: (list.dump ...)
 
@@ -614,12 +614,12 @@ parses the command-line and optionally enters the REPL.
 .. compiledfn:: (list.next ...)
 
    An external function of type ``List<-(List)``.
-.. typefn:: (list 'rjoin lside rside)
+.. fn:: (list.rjoin lside rside)
 .. compiledfn:: (list.@ ...)
 
    An external function of type ``Value<-(List)``.
-.. typefn:: (list 'cons-sink self)
-.. typefn:: (list 'decons self count)
+.. inline:: (list.cons-sink self)
+.. inline:: (list.decons self count)
 .. compiledfn:: (list.reverse ...)
 
    An external function of type ``List<-(List)``.
@@ -632,7 +632,7 @@ parses the command-line and optionally enters the REPL.
 .. type:: pointer
 
    An opaque type.
-.. typefn:: (pointer 'type T)
+.. inline:: (pointer.type T)
 .. spice:: (pointer.__typecall ...)
 .. spice:: (pointer.__call ...)
 .. type:: rawstring
@@ -641,7 +641,7 @@ parses the command-line and optionally enters the REPL.
 .. type:: real
 
    An opaque type of supertype `immutable`.
-.. typefn:: (real '__typecall cls value)
+.. inline:: (real.__typecall cls value)
 .. type:: string
 
    A plain type labeled ``String`` of supertype `opaquepointer` and of storage type `_String(*)`.
@@ -662,11 +662,11 @@ parses the command-line and optionally enters the REPL.
 .. type:: type
 
    A plain type of supertype `opaquepointer` and of storage type `_type(*)`.
-.. typefn:: (type 'elements self)
+.. inline:: (type.elements self)
 .. spice:: (type.dispatch-attr ...)
-.. typefn:: (type 'pointer->refer-type cls)
-.. typefn:: (type 'readable? cls)
-.. typefn:: (type 'strip-pointer-storage-class cls)
+.. fn:: (type.pointer->refer-type cls)
+.. fn:: (type.readable? cls)
+.. fn:: (type.strip-pointer-storage-class cls)
 .. compiledfn:: (type.alignof ...)
 
    An external function of type ``usize<->Error(type)``.
@@ -691,19 +691,19 @@ parses the command-line and optionally enters the REPL.
 .. compiledfn:: (type.element@ ...)
 
    An external function of type ``type<->Error(type i32)``.
-.. typefn:: (type 'symbols self)
+.. inline:: (type.symbols self)
 .. compiledfn:: (type.signed? ...)
 
    An external function of type ``bool<-(type)``.
 .. compiledfn:: (type.unique-type ...)
 
    An external function of type ``type<-(type i32)``.
-.. typefn:: (type 'immutable cls)
+.. fn:: (type.immutable cls)
 .. compiledfn:: (type.@ ...)
 
    An external function of type ``Value<->Error(type Symbol)``.
-.. typefn:: (type 'set-plain-storage type storage-type)
-.. typefn:: (type 'pointer-storage-class cls)
+.. inline:: (type.set-plain-storage type storage-type)
+.. fn:: (type.pointer-storage-class cls)
 .. spice:: (type.set-symbol ...)
 .. compiledfn:: (type.variadic? ...)
 
@@ -719,31 +719,31 @@ parses the command-line and optionally enters the REPL.
 .. compiledfn:: (type.refer? ...)
 
    An external function of type ``bool<-(type)``.
-.. typefn:: (type 'set-symbols self values...)
-.. typefn:: (type 'define-symbols self values...)
-.. typefn:: (type 'writable? cls)
-.. typefn:: (type 'view-type self id)
-.. typefn:: (type 'change-element-type cls ET)
+.. inline:: (type.set-symbols self values...)
+.. inline:: (type.define-symbols self values...)
+.. fn:: (type.writable? cls)
+.. inline:: (type.view-type self id)
+.. fn:: (type.change-element-type cls ET)
 .. compiledfn:: (type.opaque? ...)
 
    An external function of type ``bool<-(type)``.
-.. typefn:: (type 'key-type self key)
-.. typefn:: (type 'set-storage type storage-type)
+.. inline:: (type.key-type self key)
+.. inline:: (type.set-storage type storage-type)
 .. compiledfn:: (type.return-type ...)
 
    An external function of type ``λ(type type)<-(type)``.
-.. typefn:: (type 'change-storage-class cls storage-class)
+.. fn:: (type.change-storage-class cls storage-class)
 .. compiledfn:: (type.superof ...)
 
    An external function of type ``type<-(type)``.
-.. typefn:: (type 'pointer? cls)
+.. fn:: (type.pointer? cls)
 .. compiledfn:: (type.string ...)
 
    An external function of type ``String<-(type)``.
-.. typefn:: (type 'function-pointer? cls)
+.. fn:: (type.function-pointer? cls)
 .. spice:: (type.define-symbol ...)
-.. typefn:: (type 'function? cls)
-.. typefn:: (type 'mutable cls)
+.. fn:: (type.function? cls)
+.. fn:: (type.mutable cls)
 .. type:: typename
 
    An opaque type.
@@ -772,7 +772,7 @@ parses the command-line and optionally enters the REPL.
 .. type:: vector
 
    An opaque type of supertype `immutable`.
-.. typefn:: (vector 'type element-type size)
+.. inline:: (vector.type element-type size)
 .. spice:: (vector.__typecall ...)
 .. spice:: (vector.smear ...)
 .. type:: void
