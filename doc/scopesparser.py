@@ -277,7 +277,7 @@ def tokennaked(expr):
     elif nakedreserved.get(ch,False):
         error(ch + " is a reserved character")
     else:
-        t = expr.match("^[^][\\\\{(\s)}@,]+")
+        t = expr.match("^[^][\\\\{(\s)},]+")
         if t:
             return t, expr.subtoken(len(t)), expr
         else:
@@ -300,6 +300,7 @@ def tokenize(iter, path, opts=None):
     else:
         error("Unexpected stream type: " + str(type(iter)))
 
+    orig_part = part
     part = TokenStream(part, ParserAnchor(path=path,lineno=1,offset=0,column=1))
 
     if opts.get('strip_hashbang',False):
@@ -402,8 +403,6 @@ def parsenaked(tokens, t, anchor):
             lineno = anchor.lineno
             tt, anchor, t = parsenaked(tokens, t, anchor)
             result.append(tt)
-        elif t == "@":
-            anchor_error(anchor, "illegal character")
         else:
             tt = parseany(tokens, t, anchor)
             t, anchor = tokens(tokennaked)
@@ -442,8 +441,6 @@ def parseroot(tokens):
             lineno = anchor.lineno
             tt, anchor, t = parsenaked(tokens, t, anchor)
             result.append(tt)
-        elif t == "@":
-            anchor_error(anchor, "illegal character")
         else:
             tt = parseany(tokens, t, anchor)
             t, anchor = tokens(tokennaked)

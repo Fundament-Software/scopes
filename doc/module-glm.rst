@@ -6,140 +6,238 @@ related arithmetic operations which mimic the features available to shaders
 written in the GL shader language.
 
 .. type:: bmat2
-.. reftypefn:: (bmat2 '__new self args...)
+
+   ``bmat2x2`` < ``mat-type`` : ``[bvec2 x 2]`` 
 .. type:: bmat2x2
-.. reftypefn:: (bmat2x2 '__new self args...)
+
+   ``bmat2x2`` < ``mat-type`` : ``[bvec2 x 2]`` 
 .. type:: bmat2x3
-.. reftypefn:: (bmat2x3 '__new self args...)
+
+   ``bmat2x3`` < ``mat-type`` : ``[bvec3 x 2]`` 
 .. type:: bmat2x4
-.. reftypefn:: (bmat2x4 '__new self args...)
+
+   ``bmat2x4`` < ``mat-type`` : ``[bvec4 x 2]`` 
 .. type:: bmat3
-.. reftypefn:: (bmat3 '__new self args...)
+
+   ``bmat3x3`` < ``mat-type`` : ``[bvec3 x 3]`` 
 .. type:: bmat3x2
-.. reftypefn:: (bmat3x2 '__new self args...)
+
+   ``bmat3x2`` < ``mat-type`` : ``[bvec2 x 3]`` 
 .. type:: bmat3x3
-.. reftypefn:: (bmat3x3 '__new self args...)
+
+   ``bmat3x3`` < ``mat-type`` : ``[bvec3 x 3]`` 
 .. type:: bmat3x4
-.. reftypefn:: (bmat3x4 '__new self args...)
+
+   ``bmat3x4`` < ``mat-type`` : ``[bvec4 x 3]`` 
 .. type:: bmat4
-.. reftypefn:: (bmat4 '__new self args...)
+
+   ``bmat4x4`` < ``mat-type`` : ``[bvec4 x 4]`` 
 .. type:: bmat4x2
-.. reftypefn:: (bmat4x2 '__new self args...)
+
+   ``bmat4x2`` < ``mat-type`` : ``[bvec2 x 4]`` 
 .. type:: bmat4x3
-.. reftypefn:: (bmat4x3 '__new self args...)
+
+   ``bmat4x3`` < ``mat-type`` : ``[bvec3 x 4]`` 
 .. type:: bmat4x4
-.. reftypefn:: (bmat4x4 '__new self args...)
+
+   ``bmat4x4`` < ``mat-type`` : ``[bvec4 x 4]`` 
 .. type:: bvec2
+
+   ``bvec2`` < ``vec-type`` : ``<bool x 2>`` 
 .. type:: bvec3
+
+   ``bvec3`` < ``vec-type`` : ``<bool x 3>`` 
 .. type:: bvec4
+
+   ``bvec4`` < ``vec-type`` : ``<bool x 4>`` 
 .. type:: dmat2
-.. reftypefn:: (dmat2 '__new self args...)
+
+   ``dmat2x2`` < ``mat-type`` : ``[dvec2 x 2]`` 
 .. type:: dmat2x2
-.. reftypefn:: (dmat2x2 '__new self args...)
+
+   ``dmat2x2`` < ``mat-type`` : ``[dvec2 x 2]`` 
 .. type:: dmat2x3
-.. reftypefn:: (dmat2x3 '__new self args...)
+
+   ``dmat2x3`` < ``mat-type`` : ``[dvec3 x 2]`` 
 .. type:: dmat2x4
-.. reftypefn:: (dmat2x4 '__new self args...)
+
+   ``dmat2x4`` < ``mat-type`` : ``[dvec4 x 2]`` 
 .. type:: dmat3
-.. reftypefn:: (dmat3 '__new self args...)
+
+   ``dmat3x3`` < ``mat-type`` : ``[dvec3 x 3]`` 
 .. type:: dmat3x2
-.. reftypefn:: (dmat3x2 '__new self args...)
+
+   ``dmat3x2`` < ``mat-type`` : ``[dvec2 x 3]`` 
 .. type:: dmat3x3
-.. reftypefn:: (dmat3x3 '__new self args...)
+
+   ``dmat3x3`` < ``mat-type`` : ``[dvec3 x 3]`` 
 .. type:: dmat3x4
-.. reftypefn:: (dmat3x4 '__new self args...)
+
+   ``dmat3x4`` < ``mat-type`` : ``[dvec4 x 3]`` 
 .. type:: dmat4
-.. reftypefn:: (dmat4 '__new self args...)
+
+   ``dmat4x4`` < ``mat-type`` : ``[dvec4 x 4]`` 
 .. type:: dmat4x2
-.. reftypefn:: (dmat4x2 '__new self args...)
+
+   ``dmat4x2`` < ``mat-type`` : ``[dvec2 x 4]`` 
 .. type:: dmat4x3
-.. reftypefn:: (dmat4x3 '__new self args...)
+
+   ``dmat4x3`` < ``mat-type`` : ``[dvec3 x 4]`` 
 .. type:: dmat4x4
-.. reftypefn:: (dmat4x4 '__new self args...)
+
+   ``dmat4x4`` < ``mat-type`` : ``[dvec4 x 4]`` 
 .. type:: dvec2
+
+   ``dvec2`` < ``vec-type`` : ``<f64 x 2>`` 
 .. type:: dvec3
+
+   ``dvec3`` < ``vec-type`` : ``<f64 x 3>`` 
 .. type:: dvec4
+
+   ``dvec4`` < ``vec-type`` : ``<f64 x 4>`` 
 .. type:: imat2
-.. reftypefn:: (imat2 '__new self args...)
+
+   ``imat2x2`` < ``mat-type`` : ``[ivec2 x 2]`` 
 .. type:: imat2x2
-.. reftypefn:: (imat2x2 '__new self args...)
+
+   ``imat2x2`` < ``mat-type`` : ``[ivec2 x 2]`` 
 .. type:: imat2x3
-.. reftypefn:: (imat2x3 '__new self args...)
+
+   ``imat2x3`` < ``mat-type`` : ``[ivec3 x 2]`` 
 .. type:: imat2x4
-.. reftypefn:: (imat2x4 '__new self args...)
+
+   ``imat2x4`` < ``mat-type`` : ``[ivec4 x 2]`` 
 .. type:: imat3
-.. reftypefn:: (imat3 '__new self args...)
+
+   ``imat3x3`` < ``mat-type`` : ``[ivec3 x 3]`` 
 .. type:: imat3x2
-.. reftypefn:: (imat3x2 '__new self args...)
+
+   ``imat3x2`` < ``mat-type`` : ``[ivec2 x 3]`` 
 .. type:: imat3x3
-.. reftypefn:: (imat3x3 '__new self args...)
+
+   ``imat3x3`` < ``mat-type`` : ``[ivec3 x 3]`` 
 .. type:: imat3x4
-.. reftypefn:: (imat3x4 '__new self args...)
+
+   ``imat3x4`` < ``mat-type`` : ``[ivec4 x 3]`` 
 .. type:: imat4
-.. reftypefn:: (imat4 '__new self args...)
+
+   ``imat4x4`` < ``mat-type`` : ``[ivec4 x 4]`` 
 .. type:: imat4x2
-.. reftypefn:: (imat4x2 '__new self args...)
+
+   ``imat4x2`` < ``mat-type`` : ``[ivec2 x 4]`` 
 .. type:: imat4x3
-.. reftypefn:: (imat4x3 '__new self args...)
+
+   ``imat4x3`` < ``mat-type`` : ``[ivec3 x 4]`` 
 .. type:: imat4x4
-.. reftypefn:: (imat4x4 '__new self args...)
+
+   ``imat4x4`` < ``mat-type`` : ``[ivec4 x 4]`` 
 .. type:: ivec2
+
+   ``ivec2`` < ``vec-type`` : ``<i32 x 2>`` 
 .. type:: ivec3
+
+   ``ivec3`` < ``vec-type`` : ``<i32 x 3>`` 
 .. type:: ivec4
+
+   ``ivec4`` < ``vec-type`` : ``<i32 x 4>`` 
+.. type:: mat-type
+
+   ``mat-type`` < ``immutable`` 
+.. spice:: (mat-type.__typecall ...)
+.. spice:: (mat-type.row ...)
 .. type:: mat2
-.. reftypefn:: (mat2 '__new self args...)
+
+   ``mat2x2`` < ``mat-type`` : ``[vec2 x 2]`` 
 .. type:: mat2x2
-.. reftypefn:: (mat2x2 '__new self args...)
+
+   ``mat2x2`` < ``mat-type`` : ``[vec2 x 2]`` 
 .. type:: mat2x3
-.. reftypefn:: (mat2x3 '__new self args...)
+
+   ``mat2x3`` < ``mat-type`` : ``[vec3 x 2]`` 
 .. type:: mat2x4
-.. reftypefn:: (mat2x4 '__new self args...)
+
+   ``mat2x4`` < ``mat-type`` : ``[vec4 x 2]`` 
 .. type:: mat3
-.. reftypefn:: (mat3 '__new self args...)
+
+   ``mat3x3`` < ``mat-type`` : ``[vec3 x 3]`` 
 .. type:: mat3x2
-.. reftypefn:: (mat3x2 '__new self args...)
+
+   ``mat3x2`` < ``mat-type`` : ``[vec2 x 3]`` 
 .. type:: mat3x3
-.. reftypefn:: (mat3x3 '__new self args...)
+
+   ``mat3x3`` < ``mat-type`` : ``[vec3 x 3]`` 
 .. type:: mat3x4
-.. reftypefn:: (mat3x4 '__new self args...)
+
+   ``mat3x4`` < ``mat-type`` : ``[vec4 x 3]`` 
 .. type:: mat4
-.. reftypefn:: (mat4 '__new self args...)
+
+   ``mat4x4`` < ``mat-type`` : ``[vec4 x 4]`` 
 .. type:: mat4x2
-.. reftypefn:: (mat4x2 '__new self args...)
+
+   ``mat4x2`` < ``mat-type`` : ``[vec2 x 4]`` 
 .. type:: mat4x3
-.. reftypefn:: (mat4x3 '__new self args...)
+
+   ``mat4x3`` < ``mat-type`` : ``[vec3 x 4]`` 
 .. type:: mat4x4
-.. reftypefn:: (mat4x4 '__new self args...)
+
+   ``mat4x4`` < ``mat-type`` : ``[vec4 x 4]`` 
 .. type:: umat2
-.. reftypefn:: (umat2 '__new self args...)
+
+   ``umat2x2`` < ``mat-type`` : ``[uvec2 x 2]`` 
 .. type:: umat2x2
-.. reftypefn:: (umat2x2 '__new self args...)
+
+   ``umat2x2`` < ``mat-type`` : ``[uvec2 x 2]`` 
 .. type:: umat2x3
-.. reftypefn:: (umat2x3 '__new self args...)
+
+   ``umat2x3`` < ``mat-type`` : ``[uvec3 x 2]`` 
 .. type:: umat2x4
-.. reftypefn:: (umat2x4 '__new self args...)
+
+   ``umat2x4`` < ``mat-type`` : ``[uvec4 x 2]`` 
 .. type:: umat3
-.. reftypefn:: (umat3 '__new self args...)
+
+   ``umat3x3`` < ``mat-type`` : ``[uvec3 x 3]`` 
 .. type:: umat3x2
-.. reftypefn:: (umat3x2 '__new self args...)
+
+   ``umat3x2`` < ``mat-type`` : ``[uvec2 x 3]`` 
 .. type:: umat3x3
-.. reftypefn:: (umat3x3 '__new self args...)
+
+   ``umat3x3`` < ``mat-type`` : ``[uvec3 x 3]`` 
 .. type:: umat3x4
-.. reftypefn:: (umat3x4 '__new self args...)
+
+   ``umat3x4`` < ``mat-type`` : ``[uvec4 x 3]`` 
 .. type:: umat4
-.. reftypefn:: (umat4 '__new self args...)
+
+   ``umat4x4`` < ``mat-type`` : ``[uvec4 x 4]`` 
 .. type:: umat4x2
-.. reftypefn:: (umat4x2 '__new self args...)
+
+   ``umat4x2`` < ``mat-type`` : ``[uvec2 x 4]`` 
 .. type:: umat4x3
-.. reftypefn:: (umat4x3 '__new self args...)
+
+   ``umat4x3`` < ``mat-type`` : ``[uvec3 x 4]`` 
 .. type:: umat4x4
-.. reftypefn:: (umat4x4 '__new self args...)
+
+   ``umat4x4`` < ``mat-type`` : ``[uvec4 x 4]`` 
 .. type:: uvec2
+
+   ``uvec2`` < ``vec-type`` : ``<u32 x 2>`` 
 .. type:: uvec3
+
+   ``uvec3`` < ``vec-type`` : ``<u32 x 3>`` 
 .. type:: uvec4
+
+   ``uvec4`` < ``vec-type`` : ``<u32 x 4>`` 
+.. type:: vec-type
+
+   ``vec-type`` < ``immutable`` 
+.. spice:: (vec-type.__typecall ...)
 .. type:: vec2
+
+   ``vec2`` < ``vec-type`` : ``<f32 x 2>`` 
 .. type:: vec3
+
+   ``vec3`` < ``vec-type`` : ``<f32 x 3>`` 
 .. type:: vec4
-.. fn:: (construct-vec-type element-type size)
+
+   ``vec4`` < ``vec-type`` : ``<f32 x 4>`` 
 .. fn:: (dot u v)
-.. fn:: (transpose m)
+.. spice:: (mix ...)

@@ -21,9 +21,9 @@ Contents:
    intro
    tutorial
    dataformat
+   modules
 
 ..
-   modules
    architecture
    Scopeslang
    debugging

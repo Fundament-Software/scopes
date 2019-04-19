@@ -105,7 +105,7 @@ run-stage;
         let func = self.chain
         `(func)
 
-"""".. macro:: (fnchain name)
+"""".. sugar:: (fnchain name)
 
        Binds a new unique and empty function chain to identifier `name`. The
        function chain's typename is going to incorporate the name of the module

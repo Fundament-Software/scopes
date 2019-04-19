@@ -7,7 +7,10 @@ Module Reference
 
    module-core
    module-Array
+   module-Capture
    module-FunctionChain
    module-glm
    module-glsl
+   module-itertools
+   module-spicetools
    module-testing

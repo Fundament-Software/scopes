@@ -68,9 +68,9 @@ be reused::
     3
     $1 ▶
 
-A special keyboard shortcut (``Control-D`` on Unix, ``Control-Z`` on Windows)
-at the prompt exits the program. You can also exit the program by typing
-``exit 0`` followed by hitting the return key.
+A special keyboard shortcut (``Control+D``) at the prompt exits the program.
+You can also exit the program by typing ``exit;`` followed by hitting the
+return key.
 
 Launcher
 ````````

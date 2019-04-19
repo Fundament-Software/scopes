@@ -1,12 +1,18 @@
 #!/usr/bin/env scopes
 using import Array
 
-let scriptpath modulepath = (args)
-let module =
-    if (none? modulepath)
-        Any (globals)
+let argc argv = (launch-args)
+assert (argc >= 2)
+let scriptpath =
+    string (argv @ 1)
+let modulepath module =
+    if (argc < 3)
+        _ "core.sc" (globals)
     else
-        load-module "" modulepath
+        let modulepath =
+            string (argv @ 2)
+        _ modulepath
+            (require-from module-dir modulepath) as Scope
 
 let module = (module as Scope)
 
@@ -16,17 +22,19 @@ fn starts-with-letter (s)
         (c >= (char "a")) and (c <= (char "z"))
         (c >= (char "A")) and (c <= (char "Z"))
 
-let EntryT = (tuple (unknownof Symbol) (unknownof Any))
-let objs = (local (Array EntryT))
+let EntryT = (tuple Symbol Value)
+local objs : (GrowingArray EntryT)
 
-loop (scope) = module
-if (scope != null)
-    let a b = (Scope-parent scope)
+loop (scope = module)
+    if (scope == null)
+        break;
+    let parent = ('parent scope)
+    let a b = parent
     for k v in scope
         let T = ('typeof v)
         'append objs
             tupleof k v
-    repeat (Scope-parent scope)
+    repeat parent
 
 'sort objs
     fn (x)
@@ -37,8 +45,9 @@ if (scope != null)
             do
                 if (T == Closure) "C"
                 elseif (T == Builtin) "E"
-                elseif (T == Macro) "D"
-                elseif (function-pointer-type? T) "F"
+                elseif (T == SugarMacro) "D"
+                elseif (T == SpiceMacro) "F"
+                elseif ('function-pointer? T) "G"
                 elseif (T == type) "B"
                 else "A"
             if (starts-with-letter s) s
@@ -62,15 +71,13 @@ fn write-docstring (str)
                 io-write! "   "
 
 fn repeat-string (n c)
-    let loop (i s) =
-        tie-const n (usize 0)
-        tie-const n ""
-    if (i == n)
-        return s
-    loop (i + (usize 1))
-        .. s c
+    loop (i s = 0:usize "")
+        if (i == n)
+            return s
+        _ (i + 1:usize)
+            .. s c
 
-fn print-entry (parent key entry parent-name opts...)
+fn print-entry (module parent key entry parent-name opts...)
     let typemember? = ((typeof parent) == type)
     let sym = key
     let key = (key as string)
@@ -88,49 +95,42 @@ fn print-entry (parent key entry parent-name opts...)
                         sym == '__call
         return;
     let T = ('typeof entry)
-    fn getopt (name defvalue)
-        let val = (va@ name opts...)
-        if (none? val) defvalue
-        else val
-    let referenced? = (getopt 'referenced false)
     let docstr =
-        if typemember?
-            unconst ""
+        if typemember? ""
         else
-            Scope-docstring module sym
+            'docstring module sym
             #parent @ (Symbol (.. "#doc:" key))
     let has-docstr = (not (empty? docstr))
     let docstr =
         if has-docstr (docstr as string)
-        else (unconst "")
+        else ""
     if (docstring-is-complete docstr)
         io-write! docstr
         io-write! "\n"
         return;
     if (T == Closure)
         let func = (entry as Closure)
-        let docstr = (docstring func)
+        let docstr = ('docstring func)
         let label =
-            Closure-label func
+            sc_closure_get_template func
         if (docstring-is-complete docstr)
             io-write! docstr
             io-write! "\n"
         else
             if typemember?
-                if referenced?
-                    io-write! ".. reftypefn:: ("
-                else
-                    io-write! ".. typefn:: ("
+                io-write! ".. typefn:: ("
                 io-write! parent-name
                 io-write! " '"
+            elseif (sc_template_is_inline label)
+                io-write! ".. inline:: ("
             else
                 io-write! ".. fn:: ("
             io-write! key
-            for i param in (enumerate ('parameters label))
-                if (i > 0)
-                    io-write! " "
-                    io-write!
-                        (Parameter-name param) as string
+            let count = (sc_template_parameter_count label)
+            for i in (range count)
+                let param = (sc_template_parameter label i)
+                io-write! " "
+                io-write! ((sc_parameter_name param) as string)
             io-write! ")\n"
             write-docstring docstr
     elseif (T == Builtin)
@@ -139,8 +139,14 @@ fn print-entry (parent key entry parent-name opts...)
             io-write! parent-name; io-write! "."
         io-write! key
         io-write! " ...)\n"
-    elseif (T == Macro)
-        io-write! ".. macro:: ("
+    elseif (T == SugarMacro)
+        io-write! ".. sugar:: ("
+        if typemember?
+            io-write! parent-name; io-write! "."
+        io-write! key
+        io-write! " ...)\n"
+    elseif (T == SpiceMacro)
+        io-write! ".. spice:: ("
         if typemember?
             io-write! parent-name; io-write! "."
         io-write! key
@@ -148,33 +154,48 @@ fn print-entry (parent key entry parent-name opts...)
     elseif (T == type)
         if (typemember? and (not has-docstr))
             return;
+        let ty = (entry as type)
         io-write! ".. type:: "
         if typemember?
             io-write! parent-name; io-write! "."
         io-write! key
+        let superT = ('superof ty)
+        let ST =
+            if ('opaque? ty) Unknown
+            else ('storageof ty)
+        io-write! "\n\n   "
+        io-write! "``"
+        io-write! (tostring ty)
+        io-write! "`` "
+        if (superT != typename)
+            io-write! "< ``"
+            io-write! (tostring superT)
+            io-write! "`` "
+        if (ST != Unknown)
+            if (sc_type_is_plain ty)
+                io-write! ": "
+            else
+                io-write! ":: "
+            io-write! "``"
+            io-write! (tostring ST)
+            io-write! "`` "
         io-write! "\n"
         if (not typemember?)
-            let ty = (entry as type)
-            for k v in (typename.symbols ty)
-                print-entry ty k v key
-            let refty = (runtime-type@ ty ref-attribs-key)
-            if (('typeof refty) == type)
-                let refty = (refty as type)
-                for k v in (typename.symbols refty)
-                    print-entry ty k v key (referenced = true)
-
-    elseif (function-pointer-type? T)
-        let fntype = (@ T)
-        let params = (countof fntype)
+            for k v in ('symbols ty)
+                print-entry module ty k v key
+    elseif ('function-pointer? T)
+        let fntype = ('element@ T 0)
+        let params = ('element-count fntype)
         io-write! ".. compiledfn:: ("
         if typemember?
             io-write! parent-name; io-write! "."
         io-write! key
         io-write! " ...)\n\n"
         io-write! "   ``"
-        io-write! (string-repr fntype)
+        io-write! (tostring fntype)
         io-write! "``\n"
-    elseif (T < extern)
+    elseif (T == Unknown)
+        # a dreaded curse!
         return;
     else
         if (typemember? and (not has-docstr))
@@ -183,14 +204,21 @@ fn print-entry (parent key entry parent-name opts...)
         if typemember?
             io-write! parent-name; io-write! "."
         io-write! key
-        io-write! "\n"
+        if false
+            io-write! "\n"
+        else
+            io-write! "\n\n"
+            io-write! "   ``"
+            io-write! (tostring T)
+            io-write! "``\n"
     write-docstring docstr
 
-let moduledoc = (Scope-docstring module unnamed)
+let moduledoc = ('docstring module unnamed)
 if (not (empty? moduledoc))
     io-write! (moduledoc as string)
     io-write! "\n"
 
 for entry in objs
     let key entry = (unpack entry)
-    print-entry module (deref key) (deref entry)
+    print-entry module module (deref key) (deref entry) ""
+

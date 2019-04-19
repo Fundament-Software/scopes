@@ -43,20 +43,27 @@ Running this program will output:
     handler activated with argument 3
 
 .. type:: FunctionChain
-.. typefn:: (FunctionChain '__typecall cls name)
-.. typefn:: (FunctionChain 'prepend self f)
-   
-   Prepend function `f` to function chain. When the function chain is called,
-   `f` will be called first. The return value of `f` will be ignored.
+
+   ``FunctionChain`` : ``_type(*)`` 
+.. spice:: (FunctionChain.__call ...)
 .. typefn:: (FunctionChain 'append self f)
    
    Append function `f` to function chain. When the function chain is called,
    `f` will be called last. The return value of `f` will be ignored.
+.. typefn:: (FunctionChain 'on self)
+   
+   Returns a decorator that appends the provided function to the
+   function chain.
+.. typefn:: (FunctionChain 'prepend self f)
+   
+   Prepend function `f` to function chain. When the function chain is called,
+   `f` will be called first. The return value of `f` will be ignored.
 .. typefn:: (FunctionChain 'clear self)
    
    Clear the function chain. When the function chain is applied next,
    no functions will be called.
-.. macro:: (fnchain name)
+.. sugar:: (decorate-fnchain ...)
+.. sugar:: (fnchain name)
 
    Binds a new unique and empty function chain to identifier `name`. The
    function chain's typename is going to incorporate the name of the module

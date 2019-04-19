@@ -980,6 +980,8 @@ const sc_anchor_t *sc_anchor_offset(const sc_anchor_t *anchor, int offset) {
 const sc_string_t *sc_closure_get_docstring(const sc_closure_t *func) {
     using namespace scopes;
     assert(func);
+    if (!func->func->docstring)
+        return Symbol(SYM_Unnamed).name();
     return func->func->docstring;
 }
 
@@ -1212,6 +1214,21 @@ void sc_template_set_inline(sc_valueref_t fn) {
     fn.cast<Template>()->set_inline();
 }
 
+bool sc_template_is_inline(sc_valueref_t fn) {
+    using namespace scopes;
+    return fn.cast<Template>()->is_inline();
+}
+
+int sc_template_parameter_count(sc_valueref_t fn) {
+    using namespace scopes;
+    return fn.cast<Template>()->params.size();
+}
+
+sc_valueref_t sc_template_parameter(sc_valueref_t fn, int index) {
+    using namespace scopes;
+    return fn.cast<Template>()->params[index];
+}
+
 sc_valueref_t sc_expression_new() {
     using namespace scopes;
     return Expression::unscoped_from();
@@ -1275,6 +1292,16 @@ sc_valueref_t sc_parameter_new(sc_symbol_t name) {
 bool sc_parameter_is_variadic(sc_valueref_t param) {
     using namespace scopes;
     return param.cast<ParameterTemplate>()->is_variadic();
+}
+
+sc_symbol_t sc_parameter_name(sc_valueref_t value) {
+    using namespace scopes;
+    if (value.isa<ParameterTemplate>()) {
+        return value.cast<ParameterTemplate>()->name;
+    } else if (value.isa<Parameter>()) {
+        return value.cast<Parameter>()->name;
+    }
+    return SYM_Unnamed;
 }
 
 sc_valueref_t sc_call_new(sc_valueref_t callee) {
@@ -1536,6 +1563,11 @@ void sc_type_debug_abi(const sc_type_t *T) {
 sc_type_raises_t sc_type_storage(const sc_type_t *T) {
     using namespace scopes;
     return convert_result(storage_type(T));
+}
+
+bool sc_type_is_plain(const sc_type_t *T) {
+    using namespace scopes;
+    return is_plain(T);
 }
 
 bool sc_type_is_opaque(const sc_type_t *T) {
@@ -1993,6 +2025,9 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_template_append_parameter, _void, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_template_set_body, _void, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_template_set_inline, _void, TYPE_ValueRef);
+    DEFINE_EXTERN_C_FUNCTION(sc_template_is_inline, TYPE_Bool, TYPE_ValueRef);
+    DEFINE_EXTERN_C_FUNCTION(sc_template_parameter_count, TYPE_I32, TYPE_ValueRef);
+    DEFINE_EXTERN_C_FUNCTION(sc_template_parameter, TYPE_ValueRef, TYPE_ValueRef, TYPE_I32);
     DEFINE_EXTERN_C_FUNCTION(sc_expression_new, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_expression_set_scoped, _void, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_expression_append, _void, TYPE_ValueRef, TYPE_ValueRef);
@@ -2007,6 +2042,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_switch_append_default, _void, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_parameter_new, TYPE_ValueRef, TYPE_Symbol);
     DEFINE_EXTERN_C_FUNCTION(sc_parameter_is_variadic, TYPE_Bool, TYPE_ValueRef);
+    DEFINE_EXTERN_C_FUNCTION(sc_parameter_name, TYPE_Symbol, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_call_new, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_call_append_argument, _void, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_call_is_rawcall, TYPE_Bool, TYPE_ValueRef);
@@ -2106,6 +2142,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_type_debug_abi, _void, TYPE_Type);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_type_storage, TYPE_Type, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_type_is_opaque, TYPE_Bool, TYPE_Type);
+    DEFINE_EXTERN_C_FUNCTION(sc_type_is_plain, TYPE_Bool, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_type_is_superof, TYPE_Bool, TYPE_Type, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_type_is_default_suffix, TYPE_Bool, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_type_string, TYPE_String, TYPE_Type);

@@ -1,3 +1,13 @@
+#
+    The Scopes Compiler Infrastructure
+    This file is distributed under the MIT License.
+    See LICENSE.md for details.
+
+""""Capture
+    =======
+
+    A capture is a runtime closure that transparently captures (hence the name)
+    runtime values outside of the function.
 
 #-------------------------------------------------------------------------------
 # runtime closures

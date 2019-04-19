@@ -195,6 +195,9 @@ SCOPES_LIBEXPORT sc_symbol_t sc_template_get_name(sc_valueref_t fn);
 SCOPES_LIBEXPORT void sc_template_append_parameter(sc_valueref_t fn, sc_valueref_t symbol);
 SCOPES_LIBEXPORT void sc_template_set_body(sc_valueref_t fn, sc_valueref_t value);
 SCOPES_LIBEXPORT void sc_template_set_inline(sc_valueref_t fn);
+SCOPES_LIBEXPORT bool sc_template_is_inline(sc_valueref_t fn);
+SCOPES_LIBEXPORT int sc_template_parameter_count(sc_valueref_t fn);
+SCOPES_LIBEXPORT sc_valueref_t sc_template_parameter(sc_valueref_t fn, int index);
 
 SCOPES_LIBEXPORT sc_valueref_t sc_expression_new();
 SCOPES_LIBEXPORT void sc_expression_append(sc_valueref_t expr, sc_valueref_t value);
@@ -215,6 +218,7 @@ SCOPES_LIBEXPORT void sc_switch_append_default(sc_valueref_t value, sc_valueref_
 
 SCOPES_LIBEXPORT sc_valueref_t sc_parameter_new(sc_symbol_t name);
 SCOPES_LIBEXPORT bool sc_parameter_is_variadic(sc_valueref_t param);
+SCOPES_LIBEXPORT sc_symbol_t sc_parameter_name(sc_valueref_t value);
 
 SCOPES_LIBEXPORT sc_valueref_t sc_call_new(sc_valueref_t callee);
 SCOPES_LIBEXPORT void sc_call_append_argument(sc_valueref_t call, sc_valueref_t value);
@@ -371,6 +375,7 @@ SCOPES_LIBEXPORT int32_t sc_type_kind(const sc_type_t *T);
 SCOPES_LIBEXPORT void sc_type_debug_abi(const sc_type_t *T);
 SCOPES_LIBEXPORT sc_type_raises_t sc_type_storage(const sc_type_t *T);
 SCOPES_LIBEXPORT bool sc_type_is_opaque(const sc_type_t *T);
+SCOPES_LIBEXPORT bool sc_type_is_plain(const sc_type_t *T);
 SCOPES_LIBEXPORT bool sc_type_is_superof(const sc_type_t *super, const sc_type_t *T);
 SCOPES_LIBEXPORT bool sc_type_is_default_suffix(const sc_type_t *T);
 SCOPES_LIBEXPORT const sc_string_t *sc_type_string(const sc_type_t *T);

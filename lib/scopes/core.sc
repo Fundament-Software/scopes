@@ -49,17 +49,17 @@ fn error (msg)
     raise (sc_error_new msg)
 
 fn error@ (anchor traceback-msg error-msg)
-    """"usage example:
-        error@ ('anchor value) "while checking parameter" "error in value"
+    """"usage example::
+            error@ ('anchor value) "while checking parameter" "error in value"
     hide-traceback;
     let err = (sc_error_new error-msg)
     sc_error_append_calltrace err (sc_valueref_tag anchor `traceback-msg)
     raise err
 
 fn error@+ (error anchor traceback-msg)
-    """"usage example:
-        except (err)
-            error@+ err ('anchor value) "while processing stream"
+    """"usage example::
+            except (err)
+                error@+ err ('anchor value) "while processing stream"
     hide-traceback;
     sc_error_append_calltrace error (sc_valueref_tag anchor `traceback-msg)
     raise error
@@ -127,7 +127,10 @@ let ValueArrayPointer =
     sc_pointer_type Value pointer-flag-non-writable unnamed
 let SpiceMacroFunction = (sc_type_storage SpiceMacro)
 # dynamically construct a new symbol
-let ellipsis-symbol = (sc_symbol_new "...")
+let
+    ellipsis-symbol = (sc_symbol_new "...")
+    list-handler-symbol = (sc_symbol_new "#list")
+    symbol-handler-symbol = (sc_symbol_new "#symbol")
 
 # execute until here and treat the remainder as a new translation unit
 run-stage; # 1
@@ -400,11 +403,24 @@ do
                             return `()
                 error "all arguments must be constant"
 
+    inline gen-key-any-define-internal (selftype fset)
+        box-spice-macro
+            fn "define-internal-symbol" (args)
+                let self key value = (get-key-value-args args)
+                if (sc_value_is_constant self)
+                    if (sc_value_is_constant key)
+                        let self = (unbox-pointer self selftype)
+                        let key = (unbox-symbol key Symbol)
+                        fset self key value
+                        return `()
+                error "scope and key must be constant"
+
     # quick assignment of type attributes
     sc_type_set_symbol type 'set-symbol (gen-key-any-set type sc_type_set_symbol)
     sc_type_set_symbol Scope 'set-symbol (gen-key-any-set Scope sc_scope_set_symbol)
     sc_type_set_symbol type 'define-symbol (gen-key-any-define type sc_type_set_symbol)
     sc_type_set_symbol Scope 'define-symbol (gen-key-any-define Scope sc_scope_set_symbol)
+    sc_type_set_symbol Scope 'define-internal-symbol (gen-key-any-define-internal Scope sc_scope_set_symbol)
 
 # static pointer type constructor
 sc_type_set_symbol pointer '__typecall
@@ -766,6 +782,7 @@ inline define-symbols (self values...)
 'define-symbols type
     bitcount = sc_type_bitcountof
     signed? = sc_integer_type_is_signed
+    plain? = sc_type_is_plain
     element@ = sc_type_element_at
     element-count = sc_type_countof
     storageof = sc_type_storage
@@ -2517,16 +2534,13 @@ let
             fn (args sugar-scope)
                 raises-compile-error;
                 let scope rest = (decons args)
-                return
-                    none
+                return none
                     as scope Scope
 
-'set-symbol (__this-scope) (Symbol "#list")
-    box-pointer
-        static-typify list-handler list Scope
-'set-symbol (__this-scope) (Symbol "#symbol")
-    box-pointer
-        static-typify symbol-handler list Scope
+'define-internal-symbol (__this-scope) list-handler-symbol
+    box-pointer (static-typify list-handler list Scope)
+'define-internal-symbol (__this-scope) symbol-handler-symbol
+    box-pointer (static-typify symbol-handler list Scope)
 
 inline select-op-macro (sop fop numargs)
     inline scalar-type (T)
@@ -4266,7 +4280,8 @@ define sugar
 
 fn uncomma (l)
     """"uncomma list l, wrapping all comma separated symbols as new lists
-        example:
+        example::
+
             (uncomma '(a , b c d , e f , g h)) -> '(a (b c d) (e f) (g h))
     fn comma-separated? (l)
         loop (next = l)
@@ -5803,6 +5818,9 @@ fn read-eval-print-loop ()
         module-path = (cwd .. "/<console>.sc")
         module-name = "<console>"
         main-module? = true
+        exit =
+            typedef (do "Enter 'exit;' or Ctrl+D to exit")
+                inline __typecall () (if true (exit 0))
 
     loop (preload cmdlist counter = "" "" 0)
         fn make-idstr (counter)

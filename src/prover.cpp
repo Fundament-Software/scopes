@@ -1245,54 +1245,85 @@ static SCOPES_RESULT(TypedValueRef) prove_CompileStage(const ASTContext &ctx, co
     auto anchor = sx.anchor();
     auto scope = sx->env;
 
+    assert(scope);
+    auto parent = sc_scope_get_parent(scope);
     auto docstr = sc_scope_get_docstring(scope, SYM_Unnamed);
-    auto constant_scope = sc_scope_new_subscope(scope);
-    if (sc_string_count(docstr)) {
-        sc_scope_set_docstring(constant_scope, SYM_Unnamed, docstr);
+
+    ValueRef tmp;
+    if (parent) {
+        tmp = ref(anchor, CallTemplate::from(g_sc_scope_new_subscope,
+                { ref(anchor, ConstPointer::scope_from(parent)) }));
+    } else {
+        tmp = ref(anchor, CallTemplate::from(g_sc_scope_new, {}));
     }
-
-    Symbol last_key = SYM_Unnamed;
-    auto tmp =
-        ref(anchor, CallTemplate::from(g_sc_scope_new_subscope,
-            { ref(sx.anchor(), ConstPointer::scope_from(constant_scope)) }));
-
     auto block = ref(anchor, Expression::unscoped_from());
     block->append(tmp);
+    if (sc_string_count(docstr)) {
+        block->append(
+            ref(anchor, CallTemplate::from(g_sc_scope_set_docstring,
+                { tmp, ref(anchor, ConstInt::symbol_from(SYM_Unnamed)),
+                    ref(anchor, ConstPointer::string_from(docstr)) })));
+    }
+    Symbol last_key = SYM_Unnamed;
+    //StyledStream ss;
     while (true) {
         auto key_value = sc_scope_next(scope, last_key);
         auto key = key_value._0;
-        //StyledStream ss;
-        //ss << key << std::endl;
-        auto value = key_value._1;
+        auto untyped_value = key_value._1;
         if (key == SYM_Unnamed)
             break;
         last_key = key;
-        if (!is_value_stage_constant(value)) {
-            auto keydocstr = sc_scope_get_docstring(scope, key);
-            auto value1 = ref(value.anchor(), sc_extract_argument_new(value, 0));
-            auto typedvalue1 = SCOPES_GET_RESULT(prove(ctx, value1));
-            if (is_value_stage_constant(typedvalue1)) {
-                sc_scope_set_symbol(constant_scope, key, typedvalue1);
-                sc_scope_set_docstring(constant_scope, key, keydocstr);
-            } else {
-                ValueRef wrapvalue;
-                if (typedvalue1->get_type() == TYPE_ValueRef) {
-                    wrapvalue = typedvalue1;
+        auto keydocstr = sc_scope_get_docstring(scope, key);
+        auto value = SCOPES_GET_RESULT(prove(ctx, untyped_value));
+        //ss << "assigning " << key << " " << value << std::endl;
+        //ss << "assigning " << key << std::endl;
+
+        auto value_anchor = value.anchor();
+
+        auto outargs = ref(value_anchor, CallTemplate::from(g_sc_argument_list_new, {}));
+        block->append(outargs);
+        int argc = sc_argcount(value);
+        auto vkey = ref(anchor, ConstInt::symbol_from(key));
+        if (argc == 1) {
+            /*
+            if (sc_value_type(value) == TYPE_ValueRef) {
+                block->append(ref(anchor,
+                    CallTemplate::from(g_sc_scope_set_symbol, { tmp, vkey,
+                    ref(value_anchor, Quote::from(ref(value_anchor, Quote::from(value))))
+                    })));
+            } else*/ {
+                block->append(ref(anchor,
+                    CallTemplate::from(g_sc_scope_set_symbol, { tmp, vkey,
+                        ref(value_anchor, Quote::from(value))
+                    })));
+            }
+            block->append(ref(anchor,
+                CallTemplate::from(g_sc_scope_set_docstring, { tmp, vkey,
+                    ref(anchor, ConstPointer::string_from(keydocstr)) })));
+        } else {
+            for (int i = 0; i < argc; ++i) {
+                auto arg = sc_getarg(value, i);
+                auto arg_anchor = arg.anchor();
+                if (sc_value_type(arg) == TYPE_ValueRef) {
+                    block->append(ref(anchor,
+                        CallTemplate::from(g_sc_argument_list_append, { outargs,
+                            ref(arg_anchor, Quote::from(ref(arg_anchor, Quote::from(arg)))) })));
                 } else {
-                    wrapvalue = wrap_value(typedvalue1->get_type(), typedvalue1);
-                }
-                if (wrapvalue) {
-                    auto vkey = ref(anchor, ConstInt::symbol_from(key));
                     block->append(ref(anchor,
-                        CallTemplate::from(g_sc_scope_set_symbol, { tmp, vkey, wrapvalue })));
-                    block->append(ref(anchor,
-                        CallTemplate::from(g_sc_scope_set_docstring, { tmp, vkey,
-                            ref(anchor, ConstPointer::string_from(keydocstr)) })));
+                        CallTemplate::from(g_sc_argument_list_append, { outargs,
+                            ref(arg_anchor, Quote::from(arg)) })));
                 }
             }
+            block->append(ref(anchor,
+                CallTemplate::from(g_sc_scope_set_symbol, { tmp, vkey, outargs })));
+            block->append(ref(anchor,
+                CallTemplate::from(g_sc_scope_set_docstring, { tmp, vkey,
+                    ref(anchor, ConstPointer::string_from(keydocstr)) })));
         }
     }
+    //ss << "===" << std::endl;
 
+    tmp = ref(anchor, CallTemplate::from(g_sc_scope_new_subscope, { tmp }));
     block->append(
         ref(anchor, CallTemplate::from(g_bitcast, {
             ref(anchor, CallTemplate::from(g_sc_eval, {

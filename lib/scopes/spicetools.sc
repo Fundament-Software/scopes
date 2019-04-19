@@ -1,3 +1,13 @@
+#
+    The Scopes Compiler Infrastructure
+    This file is distributed under the MIT License.
+    See LICENSE.md for details.
+
+""""spicetools
+    ==========
+
+    spicetools provides various utilities which aid with the implementation
+    of new spices.
 
 inline parse-argument-matcher (failfunc expr scope params cb)
     #if false

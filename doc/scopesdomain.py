@@ -113,8 +113,6 @@ class ScopesObject(ObjectDescription):
                 plist += addnodes.desc_parameter(e, e)
 
         locname = self.objtype
-        if locname == 'reftypefn':
-            locname = 'typefn&'
 
         signode += addnodes.desc_annotation(self.objtype, locname)
 
@@ -136,7 +134,7 @@ class ScopesObject(ObjectDescription):
             name = expr
             paramlist = addnodes.desc_name(name, name)
             signode += paramlist
-        elif self.objtype in ('typefn','reftypefn'):
+        elif self.objtype in ('typefn',):
             paramlist = addnodes.desc_parameterlist()
             paramlist.child_text_separator = ' '
             typename = expr[0]
@@ -146,7 +144,7 @@ class ScopesObject(ObjectDescription):
             for i,arg in enumerate(expr[2:]):
                 parse_arg(paramlist, arg)
             signode += paramlist
-        elif self.objtype in ('macro',):
+        elif self.objtype in ('sugar', 'spice'):
             paramlist = addnodes.desc_parameterlist()
             paramlist.child_text_separator = ' '
             name = expr[0]
@@ -218,12 +216,13 @@ class ScopesDomain(Domain):
     label = 'Scopes'
     object_types = {
         'builtin': ObjType(l_('builtin'), 'builtin'),
-        'macro':    ObjType(l_('macro'),    'macro'),
+        'sugar':    ObjType(l_('sugar'),    'sugar'),
+        'spice':    ObjType(l_('spice'),    'spice'),
         'infix-macro':    ObjType(l_('infix-macro'), 'infix-macro'),
         'symbol-prefix':    ObjType(l_('symbol-prefix'), 'symbol-prefix'),
         'fn': ObjType(l_('fn'), 'fn'),
+        'inline': ObjType(l_('inline'), 'inline'),
         'typefn': ObjType(l_('typefn'), 'typefn'),
-        'reftypefn': ObjType(l_('reftypefn'), 'reftypefn'),
         'compiledfn': ObjType(l_('compiledfn'), 'compiledfn'),
         'define': ObjType(l_('define'), 'define'),
         'type': ObjType(l_('type'), 'type'),
@@ -232,12 +231,13 @@ class ScopesDomain(Domain):
 
     directives = {
         'builtin': ScopesObject,
-        'macro':    ScopesObject,
-        'infix-macro':    ScopesObject,
-        'symbol-prefix':    ScopesObject,
+        'sugar': ScopesObject,
+        'spice': ScopesObject,
+        'infix-macro': ScopesObject,
+        'symbol-prefix': ScopesObject,
         'fn': ScopesObject,
+        'inline': ScopesObject,
         'typefn': ScopesObject,
-        'reftypefn': ScopesObject,
         'compiledfn': ScopesObject,
         'define': ScopesObject,
         'type': ScopesObject,
@@ -245,11 +245,12 @@ class ScopesDomain(Domain):
     }
     roles = {
         'fn' :  ScopesXRefRole(),
+        'inline' :  ScopesXRefRole(),
         'typefn' :  ScopesXRefRole(),
-        'reftypefn' :  ScopesXRefRole(),
         'compiledfn' :  ScopesXRefRole(),
         'builtin' :  ScopesXRefRole(),
-        'macro' :  ScopesXRefRole(),
+        'sugar' :  ScopesXRefRole(),
+        'spice' :  ScopesXRefRole(),
         'infix-macro' :  ScopesXRefRole(),
         'symbol-prefix':    ScopesXRefRole(),
         'define':    ScopesXRefRole(),
@@ -264,14 +265,15 @@ class ScopesDomain(Domain):
 
     search_roles = [
         'define',
-        'macro',
+        'sugar',
+        'spice',
         'infix-macro',
         'fn',
+        'inline',
         'builtin',
         'type',
         'type-factory',
         'typefn',
-        'reftypefn',
     ]
 
     initial_data = {

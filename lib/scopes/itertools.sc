@@ -1,3 +1,14 @@
+#
+    The Scopes Compiler Infrastructure
+    This file is distributed under the MIT License.
+    See LICENSE.md for details.
+
+""""itertools
+    =========
+
+    itertools provides various utilities which simplify the composition of
+    generators and collectors.
+
 using import spicetools
 
 #---------------------------------------------------------------------------

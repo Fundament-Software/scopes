@@ -36,6 +36,7 @@ namespace scopes {
     T(g_u64, "u64") \
     T(g_f64, "f64") \
     T(g_alloca_array, "alloca-array") \
+    T(g_sc_scope_new, "sc_scope_new") \
     T(g_sc_scope_new_subscope, "sc_scope_new_subscope") \
     T(g_sc_scope_set_symbol, "sc_scope_set_symbol") \
     T(g_sc_scope_set_docstring, "sc_scope_set_docstring") \
