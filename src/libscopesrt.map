@@ -1,0 +1,4 @@
+LIBSCOPESRT_1.0 {
+    global: sc_*;
+    local: *;
+};

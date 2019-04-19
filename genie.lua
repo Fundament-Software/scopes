@@ -220,8 +220,10 @@ project "scopesrt"
         linkoptions {
             --"-Wl,--stack,8388608"
             --"-Wl,--stack,16777216"
-            "-Wl,-soname,libscopesrt.so"
+            "-Wl,-soname,libscopesrt.so",
+            "-Wl,--version-script=" .. THISDIR .. "/src/libscopesrt.map",
         }
+
         linkoptions {
             --"-Wl,--whole-archive",
             --"-l...",
@@ -466,7 +468,9 @@ project "scopes"
         }
 
         links {
-            "dl"
+            "dl",
+            "pthread",
+            "ncurses",
         }
 
         linkoptions {
@@ -474,6 +478,9 @@ project "scopes"
             --"-Wl,--stack,16777216"
             "-Wl,-rpath=\\$$ORIGIN"
         }
+
+        linkoptions(LLVM_LDFLAGS)
+        linkoptions(LLVM_LIBS)
 
         postbuildcommands {
         }

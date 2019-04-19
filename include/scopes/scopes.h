@@ -19,6 +19,8 @@ extern "C" {
 
 #ifdef SCOPES_WIN32
 #define SCOPES_LIBEXPORT __declspec(dllexport)
+#elif defined(SCOPES_LINUX)
+#define SCOPES_LIBEXPORT //__attribute__ ((visibility ("default")))
 #else
 #define SCOPES_LIBEXPORT
 #endif
