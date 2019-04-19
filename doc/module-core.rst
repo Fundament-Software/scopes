@@ -10,658 +10,658 @@ parses the command-line and optionally enters the REPL.
 
 .. define:: compile-flag-O1
 
-   ``u64``
+   A constant of type `u64`.
 .. define:: compile-flag-O2
 
-   ``u64``
+   A constant of type `u64`.
 .. define:: compile-flag-O3
 
-   ``u64``
+   A constant of type `u64`.
 .. define:: compile-flag-dump-disassembly
 
-   ``u64``
+   A constant of type `u64`.
 .. define:: compile-flag-dump-function
 
-   ``u64``
+   A constant of type `u64`.
 .. define:: compile-flag-dump-module
 
-   ``u64``
+   A constant of type `u64`.
 .. define:: compile-flag-dump-time
 
-   ``u64``
+   A constant of type `u64`.
 .. define:: compile-flag-no-debug-info
 
-   ``u64``
+   A constant of type `u64`.
 .. define:: compiler-dir
 
-   ``String``
+   A constant of type `String`.
 .. define:: compiler-path
 
-   ``String``
+   A constant of type `String`.
 .. define:: compiler-timestamp
 
-   ``String``
+   A constant of type `String`.
 .. define:: debug-build?
 
-   ``bool``
+   A constant of type `bool`.
 .. define:: dot-char
 
-   ``i8``
+   A constant of type `i8`.
 .. define:: dot-sym
 
-   ``Symbol``
+   A constant of type `Symbol`.
 .. define:: e
 
-   ``f32``
+   A constant of type `f32`.
    
    Euler's number, also known as Napier's constant. Explicitly type-annotated
    versions of the constant are available as `e:f32` and `e:f64`
 .. define:: e:f32
 
-   ``f32``
+   A constant of type `f32`.
 .. define:: e:f64
 
-   ``f64``
+   A constant of type `f64`.
 .. define:: ellipsis-symbol
 
-   ``Symbol``
+   A constant of type `Symbol`.
 .. define:: false
 
-   ``bool``
+   A constant of type `bool`.
 .. define:: global-flag-block
 
-   ``u32``
+   A constant of type `u32`.
 .. define:: global-flag-buffer-block
 
-   ``u32``
+   A constant of type `u32`.
 .. define:: global-flag-coherent
 
-   ``u32``
+   A constant of type `u32`.
 .. define:: global-flag-non-readable
 
-   ``u32``
+   A constant of type `u32`.
 .. define:: global-flag-non-writable
 
-   ``u32``
+   A constant of type `u32`.
 .. define:: global-flag-restrict
 
-   ``u32``
+   A constant of type `u32`.
 .. define:: global-flag-volatile
 
-   ``u32``
+   A constant of type `u32`.
 .. define:: infinite-range
 
-   ``Generator``
+   A constant of type `Generator`.
 .. define:: list-handler-symbol
 
-   ``Symbol``
+   A constant of type `Symbol`.
 .. define:: none
 
-   ``Nothing``
+   A constant of type `Nothing`.
 .. define:: null
 
-   ``NullType``
+   A constant of type `NullType`.
 .. define:: operating-system
 
-   ``Symbol``
+   A constant of type `Symbol`.
 .. define:: package
 
-   ``Scope``
+   A constant of type `Scope`.
 .. define:: pi
 
-   ``f32``
+   A constant of type `f32`.
    
    The number π, the ratio of a circle's circumference C to its diameter d.
    Explicitly type-annotated versions of the constant are available as `pi:f32`
    and `pi:f64`.
 .. define:: pi:f32
 
-   ``f32``
+   A constant of type `f32`.
 .. define:: pi:f64
 
-   ``f64``
+   A constant of type `f64`.
 .. define:: pointer-flag-non-readable
 
-   ``u64``
+   A constant of type `u64`.
 .. define:: pointer-flag-non-writable
 
-   ``u64``
+   A constant of type `u64`.
 .. define:: struct-dsl
 
-   ``Scope``
+   A constant of type `Scope`.
 .. define:: style-comment
 
-   ``Symbol``
+   A constant of type `Symbol`.
 .. define:: style-error
 
-   ``Symbol``
+   A constant of type `Symbol`.
 .. define:: style-function
 
-   ``Symbol``
+   A constant of type `Symbol`.
 .. define:: style-instruction
 
-   ``Symbol``
+   A constant of type `Symbol`.
 .. define:: style-keyword
 
-   ``Symbol``
+   A constant of type `Symbol`.
 .. define:: style-location
 
-   ``Symbol``
+   A constant of type `Symbol`.
 .. define:: style-none
 
-   ``Symbol``
+   A constant of type `Symbol`.
 .. define:: style-number
 
-   ``Symbol``
+   A constant of type `Symbol`.
 .. define:: style-operator
 
-   ``Symbol``
+   A constant of type `Symbol`.
 .. define:: style-sfxfunction
 
-   ``Symbol``
+   A constant of type `Symbol`.
 .. define:: style-string
 
-   ``Symbol``
+   A constant of type `Symbol`.
 .. define:: style-symbol
 
-   ``Symbol``
+   A constant of type `Symbol`.
 .. define:: style-type
 
-   ``Symbol``
+   A constant of type `Symbol`.
 .. define:: style-warning
 
-   ``Symbol``
+   A constant of type `Symbol`.
 .. define:: symbol-handler-symbol
 
-   ``Symbol``
+   A constant of type `Symbol`.
 .. define:: true
 
-   ``bool``
+   A constant of type `bool`.
 .. define:: type-kind-arguments
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: type-kind-array
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: type-kind-function
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: type-kind-image
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: type-kind-integer
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: type-kind-pointer
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: type-kind-qualify
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: type-kind-real
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: type-kind-sampled-image
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: type-kind-tuple
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: type-kind-typename
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: type-kind-union
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: type-kind-vector
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: typename-flag-plain
 
-   ``u32``
+   A constant of type `u32`.
 .. define:: unnamed
 
-   ``Symbol``
+   A constant of type `Symbol`.
 .. define:: unroll-limit
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: value-kind-argument-list
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: value-kind-argument-list-template
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: value-kind-break
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: value-kind-call
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: value-kind-call-template
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: value-kind-compile-stage
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: value-kind-condbr
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: value-kind-const-aggregate
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: value-kind-const-int
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: value-kind-const-pointer
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: value-kind-const-real
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: value-kind-exception
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: value-kind-expression
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: value-kind-extract-argument
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: value-kind-extract-argument-template
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: value-kind-function
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: value-kind-global
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: value-kind-if
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: value-kind-keyed
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: value-kind-keyed-template
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: value-kind-label
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: value-kind-label-template
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: value-kind-loop
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: value-kind-loop-arguments
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: value-kind-loop-label
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: value-kind-loop-label-arguments
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: value-kind-merge
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: value-kind-merge-template
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: value-kind-parameter
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: value-kind-parameter-template
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: value-kind-pure-cast
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: value-kind-quote
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: value-kind-raise
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: value-kind-raise-template
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: value-kind-repeat
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: value-kind-repeat-template
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: value-kind-return
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: value-kind-return-template
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: value-kind-switch
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: value-kind-switch-template
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: value-kind-template
 
-   ``i32``
+   A constant of type `i32`.
 .. define:: value-kind-unquote
 
-   ``i32``
+   A constant of type `i32`.
 .. type:: _Value
 
-   ``_Value`` : ``__Value(*)`` 
+   A plain type of storage type `__Value(*)`.
 .. type:: Anchor
 
-   ``Anchor`` : ``_Anchor(*)`` 
+   A plain type of storage type `_Anchor(*)`.
 .. type:: Arguments
 
-   ``Arguments`` 
+   An opaque type.
 .. spice:: (Arguments.__typecall ...)
 .. type:: Builtin
 
-   ``Builtin`` : ``u64`` 
+   A plain type of storage type `u64`.
 .. type:: CEnum
 
-   ``CEnum`` < ``immutable`` 
+   An opaque type of supertype `immutable`.
 .. type:: CStruct
 
-   ``CStruct`` 
+   An opaque type.
 .. spice:: (CStruct.__typecall ...)
 .. type:: CUnion
 
-   ``CUnion`` 
+   An opaque type.
 .. typefn:: (CUnion '__typecall cls)
 .. type:: Closure
 
-   ``Closure`` : ``_Closure(*)`` 
+   A plain type of storage type `_Closure(*)`.
 .. compiledfn:: (Closure.docstring ...)
 
-   ``String<-(Closure)``
+   An external function of type ``String<-(Closure)``.
 .. type:: Collector
 
-   ``Collector`` : ``_Closure(*)`` 
+   A plain type of storage type `_Closure(*)`.
 .. spice:: (Collector.__call ...)
 .. typefn:: (Collector '__typecall cls init valid? at collect)
 .. type:: CompileStage
 
-   ``CompileStage`` : ``{_Value Anchor}`` 
+   A plain type of storage type `{_Value Anchor}`.
 .. type:: Error
 
-   ``Error`` : ``_Error(*)`` 
+   A plain type of storage type `_Error(*)`.
 .. type:: Generator
 
-   ``Generator`` : ``_Closure(*)`` 
+   A plain type of storage type `_Closure(*)`.
 .. spice:: (Generator.__call ...)
 .. typefn:: (Generator '__typecall cls start valid? at next)
 .. type:: Image
 
-   ``Image`` 
+   An opaque type.
 .. spice:: (Image.__typecall ...)
 .. compiledfn:: (Image.type ...)
 
-   ``type<-(type Symbol i32 i32 i32 i32 Symbol Symbol)``
+   An external function of type ``type<-(type Symbol i32 i32 i32 i32 Symbol Symbol)``.
 .. type:: Nothing
 
-   ``Nothing`` : ``{}`` 
+   A plain type of storage type `{}`.
 .. type:: NullType
 
-   ``NullType`` : ``void(*)`` 
+   A plain type of storage type `void(*)`.
 .. type:: OverloadedFunction
 
-   ``OverloadedFunction`` 
+   An opaque type.
 .. spice:: (OverloadedFunction.__typecall ...)
 .. spice:: (OverloadedFunction.append ...)
 .. type:: Qualify
 
-   ``Qualify`` 
+   An opaque type.
 .. type:: Raises
 
-   ``Raises`` 
+   An opaque type.
 .. type:: SampledImage
 
-   ``SampledImage`` 
+   An opaque type.
 .. spice:: (SampledImage.__typecall ...)
 .. compiledfn:: (SampledImage.type ...)
 
-   ``type<-(type)``
+   An external function of type ``type<-(type)``.
 .. type:: Sampler
 
-   ``Sampler`` 
+   An opaque type.
 .. type:: Scope
 
-   ``Scope`` : ``_Scope(*)`` 
+   A plain type of storage type `_Scope(*)`.
 .. spice:: (Scope.__typecall ...)
 .. compiledfn:: (Scope.parent ...)
 
-   ``Scope<-(Scope)``
+   An external function of type ``Scope<-(Scope)``.
 .. compiledfn:: (Scope.next ...)
 
-   ``λ(Symbol Value)<-(Scope Symbol)``
+   An external function of type ``λ(Symbol Value)<-(Scope Symbol)``.
 .. spice:: (Scope.set-symbol ...)
 .. spice:: (Scope.define-internal-symbol ...)
 .. compiledfn:: (Scope.set-docstring! ...)
 
-   ``void<-(Scope Symbol String)``
+   An external function of type ``void<-(Scope Symbol String)``.
 .. compiledfn:: (Scope.docstring ...)
 
-   ``String<-(Scope Symbol)``
+   An external function of type ``String<-(Scope Symbol)``.
 .. compiledfn:: (Scope.@ ...)
 
-   ``Value<->Error(Scope Symbol)``
+   An external function of type ``Value<->Error(Scope Symbol)``.
 .. spice:: (Scope.define-symbol ...)
 .. typefn:: (Scope 'set-symbols self values...)
 .. typefn:: (Scope 'define-symbols self values...)
 .. type:: SourceFile
 
-   ``SourceFile`` : ``_SourceFile(*)`` 
+   A plain type of storage type `_SourceFile(*)`.
 .. type:: SpiceMacro
 
-   ``SpiceMacro`` : ``Value<->Error(Value)(*)`` 
+   A plain type of storage type `Value<->Error(Value)(*)`.
 .. type:: SpiceMacroFunction
 
-   ``Value<->Error(Value)(*)`` < ``pointer`` : ``Value<->Error(Value)(*)`` 
+   A plain type labeled ``Value<->Error(Value)(*)`` of supertype `pointer` and of storage type `Value<->Error(Value)(*)`.
 .. type:: Struct
 
-   ``Struct`` 
+   An opaque type.
 .. spice:: (Struct.__typecall ...)
 .. type:: SugarMacro
 
-   ``SugarMacro`` : ``λ(List Scope)<->Error(List Scope)(*)`` 
+   A plain type of storage type `λ(List Scope)<->Error(List Scope)(*)`.
 .. spice:: (SugarMacro.__call ...)
 .. type:: SugarMacroFunction
 
-   ``λ(List Scope)<->Error(List Scope)(*)`` < ``pointer`` : ``λ(List Scope)<->Error(List Scope)(*)`` 
+   A plain type labeled ``λ(List Scope)<->Error(List Scope)(*)`` of supertype `pointer` and of storage type `λ(List Scope)<->Error(List Scope)(*)`.
 .. type:: Symbol
 
-   ``Symbol`` < ``immutable`` : ``u64`` 
+   A plain type of supertype `immutable` and of storage type `u64`.
 .. typefn:: (Symbol '__typecall cls str)
 .. compiledfn:: (Symbol.variadic? ...)
 
-   ``bool<-(Symbol)``
+   An external function of type ``bool<-(Symbol)``.
 .. typefn:: (Symbol 'unique cls name)
 .. spice:: (Symbol.__call ...)
 .. type:: TypeArrayPointer
 
-   ``type(*)`` < ``pointer`` : ``type(*)`` 
+   A plain type labeled ``type(*)`` of supertype `pointer` and of storage type `type(*)`.
 .. type:: Unknown
 
-   ``Unknown`` : ``_type(*)`` 
+   A plain type of storage type `_type(*)`.
 .. type:: Value
 
-   ``Value`` : ``{_Value Anchor}`` 
+   A plain type of storage type `{_Value Anchor}`.
 .. typefn:: (Value 'append-sink self)
 .. typefn:: (Value 'args self)
 .. compiledfn:: (Value.kind ...)
 
-   ``i32<-(Value)``
+   An external function of type ``i32<-(Value)``.
 .. typefn:: (Value 'tag self anchor)
 .. spice:: (Value.__typecall ...)
 .. compiledfn:: (Value.anchor ...)
 
-   ``Anchor<-(Value)``
+   An external function of type ``Anchor<-(Value)``.
 .. compiledfn:: (Value.none? ...)
 
-   ``bool<-(Value)``
+   A compiled function of type ``bool<-(Value)``.
 .. typefn:: (Value 'dump self)
 .. compiledfn:: (Value.getarglist ...)
 
-   ``Value<-(Value i32)``
+   An external function of type ``Value<-(Value i32)``.
 .. typefn:: (Value 'dekey self)
 .. compiledfn:: (Value.constant? ...)
 
-   ``bool<-(Value)``
+   An external function of type ``bool<-(Value)``.
 .. compiledfn:: (Value.pure? ...)
 
-   ``bool<-(Value)``
+   An external function of type ``bool<-(Value)``.
 .. compiledfn:: (Value.spice-repr ...)
 
-   ``String<-(Value)``
+   An external function of type ``String<-(Value)``.
 .. compiledfn:: (Value.qualified-typeof ...)
 
-   ``type<-(Value)``
+   An external function of type ``type<-(Value)``.
 .. compiledfn:: (Value.typeof ...)
 
-   ``type<-(Value)``
+   An external function of type ``type<-(Value)``.
 .. compiledfn:: (Value.argcount ...)
 
-   ``i32<-(Value)``
+   An external function of type ``i32<-(Value)``.
 .. typefn:: (Value 'reverse-args self)
 .. compiledfn:: (Value.getarg ...)
 
-   ``Value<-(Value i32)``
+   An external function of type ``Value<-(Value i32)``.
 .. type:: ValueArrayPointer
 
-   ``Value(*)`` < ``pointer`` : ``Value(*)`` 
+   A plain type labeled ``Value(*)`` of supertype `pointer` and of storage type `Value(*)`.
 .. type:: Variadic
 
-   ``...`` 
+   An opaque type labeled ``...``.
 .. type:: aggregate
 
-   ``aggregate`` 
+   An opaque type.
 .. type:: array
 
-   ``array`` < ``aggregate`` 
+   An opaque type of supertype `aggregate`.
 .. spice:: (array.__typecall ...)
 .. typefn:: (array 'type element-type size)
 .. type:: bool
 
-   ``bool`` < ``integer`` : ``bool`` 
+   A plain type of supertype `integer` and of storage type `bool`.
 .. type:: constant
 
-   ``constant`` 
+   An opaque type.
 .. type:: f16
 
-   ``f16`` < ``real`` : ``f16`` 
+   A plain type of supertype `real` and of storage type `f16`.
 .. type:: f32
 
-   ``f32`` < ``real`` : ``f32`` 
+   A plain type of supertype `real` and of storage type `f32`.
 .. type:: f64
 
-   ``f64`` < ``real`` : ``f64`` 
+   A plain type of supertype `real` and of storage type `f64`.
 .. type:: f80
 
-   ``f80`` < ``real`` : ``f80`` 
+   A plain type of supertype `real` and of storage type `f80`.
 .. type:: function
 
-   ``function`` 
+   An opaque type.
 .. spice:: (function.type ...)
 .. spice:: (function.__typecall ...)
 .. type:: hash
 
-   ``hash`` : ``u64`` 
+   A plain type of storage type `u64`.
 .. typefn:: (hash 'from-bytes data size)
 .. spice:: (hash.__typecall ...)
 .. type:: i16
 
-   ``i16`` < ``integer`` : ``i16`` 
+   A plain type of supertype `integer` and of storage type `i16`.
 .. type:: i32
 
-   ``i32`` < ``integer`` : ``i32`` 
+   A plain type of supertype `integer` and of storage type `i32`.
 .. type:: i64
 
-   ``i64`` < ``integer`` : ``i64`` 
+   A plain type of supertype `integer` and of storage type `i64`.
 .. type:: i8
 
-   ``i8`` < ``integer`` : ``i8`` 
+   A plain type of supertype `integer` and of storage type `i8`.
 .. type:: immutable
 
-   ``immutable`` 
+   An opaque type.
 .. type:: incomplete
 
-   ``incomplete`` 
+   An opaque type.
 .. type:: integer
 
-   ``integer`` < ``immutable`` 
+   An opaque type of supertype `immutable`.
 .. typefn:: (integer '__typecall cls value)
 .. type:: intptr
 
-   ``u64`` < ``integer`` : ``u64`` 
+   A plain type labeled ``u64`` of supertype `integer` and of storage type `u64`.
 .. type:: list
 
-   ``List`` : ``_List(*)`` 
+   A plain type labeled ``List`` of storage type `_List(*)`.
 .. typefn:: (list 'token-split expr token errmsg)
 .. spice:: (list.__typecall ...)
 .. compiledfn:: (list.dump ...)
 
-   ``List<-(List)``
+   An external function of type ``List<-(List)``.
 .. compiledfn:: (list.join ...)
 
-   ``List<-(List List)``
+   An external function of type ``List<-(List List)``.
 .. compiledfn:: (list.next ...)
 
-   ``List<-(List)``
+   An external function of type ``List<-(List)``.
 .. typefn:: (list 'rjoin lside rside)
 .. compiledfn:: (list.@ ...)
 
-   ``Value<-(List)``
+   An external function of type ``Value<-(List)``.
 .. typefn:: (list 'cons-sink self)
 .. typefn:: (list 'decons self count)
 .. compiledfn:: (list.reverse ...)
 
-   ``List<-(List)``
+   An external function of type ``List<-(List)``.
 .. type:: noreturn
 
-   ``noreturn`` 
+   An opaque type.
 .. type:: opaquepointer
 
-   ``opaquepointer`` 
+   An opaque type.
 .. type:: pointer
 
-   ``pointer`` 
+   An opaque type.
 .. typefn:: (pointer 'type T)
 .. spice:: (pointer.__typecall ...)
 .. spice:: (pointer.__call ...)
 .. type:: rawstring
 
-   ``i8(*)`` < ``pointer`` : ``i8(*)`` 
+   A plain type labeled ``i8(*)`` of supertype `pointer` and of storage type `i8(*)`.
 .. type:: real
 
-   ``real`` < ``immutable`` 
+   An opaque type of supertype `immutable`.
 .. typefn:: (real '__typecall cls value)
 .. type:: string
 
-   ``String`` < ``opaquepointer`` : ``_String(*)`` 
+   A plain type labeled ``String`` of supertype `opaquepointer` and of storage type `_String(*)`.
 .. compiledfn:: (string.join ...)
 
-   ``String<-(String String)``
+   An external function of type ``String<-(String String)``.
 .. compiledfn:: (string.buffer ...)
 
-   ``λ(i8(*) usize)<-(String)``
+   An external function of type ``λ(i8(*) usize)<-(String)``.
 .. compiledfn:: (string.match? ...)
 
-   ``bool<->Error(String String)``
+   An external function of type ``bool<->Error(String String)``.
 .. type:: tuple
 
-   ``tuple`` < ``aggregate`` 
+   An opaque type of supertype `aggregate`.
 .. spice:: (tuple.__typecall ...)
 .. spice:: (tuple.type ...)
 .. type:: type
 
-   ``type`` < ``opaquepointer`` : ``_type(*)`` 
+   A plain type of supertype `opaquepointer` and of storage type `_type(*)`.
 .. typefn:: (type 'elements self)
 .. spice:: (type.dispatch-attr ...)
 .. typefn:: (type 'pointer->refer-type cls)
@@ -669,56 +669,56 @@ parses the command-line and optionally enters the REPL.
 .. typefn:: (type 'strip-pointer-storage-class cls)
 .. compiledfn:: (type.alignof ...)
 
-   ``usize<->Error(type)``
+   An external function of type ``usize<->Error(type)``.
 .. compiledfn:: (type.storageof ...)
 
-   ``type<->Error(type)``
+   An external function of type ``type<->Error(type)``.
 .. compiledfn:: (type.bitcount ...)
 
-   ``i32<-(type)``
+   An external function of type ``i32<-(type)``.
 .. compiledfn:: (type.local@ ...)
 
-   ``Value<->Error(type Symbol)``
+   An external function of type ``Value<->Error(type Symbol)``.
 .. compiledfn:: (type.kind ...)
 
-   ``i32<-(type)``
+   An external function of type ``i32<-(type)``.
 .. compiledfn:: (type.element-count ...)
 
-   ``i32<->Error(type)``
+   An external function of type ``i32<->Error(type)``.
 .. compiledfn:: (type.sizeof ...)
 
-   ``usize<->Error(type)``
+   An external function of type ``usize<->Error(type)``.
 .. compiledfn:: (type.element@ ...)
 
-   ``type<->Error(type i32)``
+   An external function of type ``type<->Error(type i32)``.
 .. typefn:: (type 'symbols self)
 .. compiledfn:: (type.signed? ...)
 
-   ``bool<-(type)``
+   An external function of type ``bool<-(type)``.
 .. compiledfn:: (type.unique-type ...)
 
-   ``type<-(type i32)``
+   An external function of type ``type<-(type i32)``.
 .. typefn:: (type 'immutable cls)
 .. compiledfn:: (type.@ ...)
 
-   ``Value<->Error(type Symbol)``
+   An external function of type ``Value<->Error(type Symbol)``.
 .. typefn:: (type 'set-plain-storage type storage-type)
 .. typefn:: (type 'pointer-storage-class cls)
 .. spice:: (type.set-symbol ...)
 .. compiledfn:: (type.variadic? ...)
 
-   ``bool<-(type)``
+   An external function of type ``bool<-(type)``.
 .. spice:: (type.__call ...)
 .. spice:: (type.raises ...)
 .. compiledfn:: (type.plain? ...)
 
-   ``bool<-(type)``
+   An external function of type ``bool<-(type)``.
 .. compiledfn:: (type.key ...)
 
-   ``λ(Symbol type)<-(type)``
+   An external function of type ``λ(Symbol type)<-(type)``.
 .. compiledfn:: (type.refer? ...)
 
-   ``bool<-(type)``
+   An external function of type ``bool<-(type)``.
 .. typefn:: (type 'set-symbols self values...)
 .. typefn:: (type 'define-symbols self values...)
 .. typefn:: (type 'writable? cls)
@@ -726,61 +726,61 @@ parses the command-line and optionally enters the REPL.
 .. typefn:: (type 'change-element-type cls ET)
 .. compiledfn:: (type.opaque? ...)
 
-   ``bool<-(type)``
+   An external function of type ``bool<-(type)``.
 .. typefn:: (type 'key-type self key)
 .. typefn:: (type 'set-storage type storage-type)
 .. compiledfn:: (type.return-type ...)
 
-   ``λ(type type)<-(type)``
+   An external function of type ``λ(type type)<-(type)``.
 .. typefn:: (type 'change-storage-class cls storage-class)
 .. compiledfn:: (type.superof ...)
 
-   ``type<-(type)``
+   An external function of type ``type<-(type)``.
 .. typefn:: (type 'pointer? cls)
 .. compiledfn:: (type.string ...)
 
-   ``String<-(type)``
+   An external function of type ``String<-(type)``.
 .. typefn:: (type 'function-pointer? cls)
 .. spice:: (type.define-symbol ...)
 .. typefn:: (type 'function? cls)
 .. typefn:: (type 'mutable cls)
 .. type:: typename
 
-   ``typename`` 
+   An opaque type.
 .. spice:: (typename.__typecall ...)
 .. compiledfn:: (typename.type ...)
 
-   ``type<->Error(String type)``
+   An external function of type ``type<->Error(String type)``.
 .. type:: u16
 
-   ``u16`` < ``integer`` : ``u16`` 
+   A plain type of supertype `integer` and of storage type `u16`.
 .. type:: u32
 
-   ``u32`` < ``integer`` : ``u32`` 
+   A plain type of supertype `integer` and of storage type `u32`.
 .. type:: u64
 
-   ``u64`` < ``integer`` : ``u64`` 
+   A plain type of supertype `integer` and of storage type `u64`.
 .. type:: u8
 
-   ``u8`` < ``integer`` : ``u8`` 
+   A plain type of supertype `integer` and of storage type `u8`.
 .. type:: union
 
-   ``union`` 
+   An opaque type.
 .. type:: usize
 
-   ``usize`` < ``integer`` : ``u64`` 
+   A plain type of supertype `integer` and of storage type `u64`.
 .. type:: vector
 
-   ``vector`` < ``immutable`` 
+   An opaque type of supertype `immutable`.
 .. typefn:: (vector 'type element-type size)
 .. spice:: (vector.__typecall ...)
 .. spice:: (vector.smear ...)
 .. type:: void
 
-   ``void`` < ``Arguments`` 
+   An opaque type of supertype `Arguments`.
 .. type:: voidstar
 
-   ``void(*)`` < ``pointer`` : ``void(*)`` 
+   A plain type labeled ``void(*)`` of supertype `pointer` and of storage type `void(*)`.
 .. inline:: (%= lhs rhs)
 .. inline:: (&= lhs rhs)
 .. inline:: (*= lhs rhs)
@@ -1357,664 +1357,664 @@ parses the command-line and optionally enters the REPL.
 .. spice:: (zip ...)
 .. compiledfn:: (compiler-version ...)
 
-   ``λ(i32 i32 i32)<-()``
+   An external function of type ``λ(i32 i32 i32)<-()``.
 .. compiledfn:: (default-styler ...)
 
-   ``String<-(Symbol String)``
+   An external function of type ``String<-(Symbol String)``.
 .. compiledfn:: (exit ...)
 
-   ``noreturn<-(i32)``
+   An external function of type ``noreturn<-(i32)``.
 .. compiledfn:: (function->SugarMacro ...)
 
-   ``SugarMacro<-(λ(List Scope)<->Error(List Scope)(*))``
+   A compiled function of type ``SugarMacro<-(λ(List Scope)<->Error(List Scope)(*))``.
 .. compiledfn:: (globals ...)
 
-   ``Scope<-()``
+   An external function of type ``Scope<-()``.
 .. compiledfn:: (io-write! ...)
 
-   ``void<-(String)``
+   An external function of type ``void<-(String)``.
 .. compiledfn:: (launch-args ...)
 
-   ``λ(i32 i8(*)(*))<-()``
+   An external function of type ``λ(i32 i8(*)(*))<-()``.
 .. compiledfn:: (list-load ...)
 
-   ``Value<->Error(String)``
+   An external function of type ``Value<->Error(String)``.
 .. compiledfn:: (list-parse ...)
 
-   ``Value<->Error(String)``
+   An external function of type ``Value<->Error(String)``.
 .. compiledfn:: (load-library ...)
 
-   ``void<->Error(String)``
+   An external function of type ``void<->Error(String)``.
 .. compiledfn:: (parse-infix-expr ...)
 
-   ``λ(Value List)<->Error(Scope Value List i32)``
+   A compiled function of type ``λ(Value List)<->Error(Scope Value List i32)``.
 .. compiledfn:: (realpath ...)
 
-   ``String<-(String)``
+   An external function of type ``String<-(String)``.
 .. compiledfn:: (sc_abort ...)
 
-   ``noreturn<-()``
+   An external function of type ``noreturn<-()``.
 .. compiledfn:: (sc_anchor_offset ...)
 
-   ``Anchor<-(Anchor i32)``
+   An external function of type ``Anchor<-(Anchor i32)``.
 .. compiledfn:: (sc_argcount ...)
 
-   ``i32<-(Value)``
+   An external function of type ``i32<-(Value)``.
 .. compiledfn:: (sc_argument_list_append ...)
 
-   ``void<-(Value Value)``
+   An external function of type ``void<-(Value Value)``.
 .. compiledfn:: (sc_argument_list_new ...)
 
-   ``Value<-()``
+   An external function of type ``Value<-()``.
 .. compiledfn:: (sc_arguments_type ...)
 
-   ``type<-(i32 type(*))``
+   An external function of type ``type<-(i32 type(*))``.
 .. compiledfn:: (sc_arguments_type_argcount ...)
 
-   ``i32<-(type)``
+   An external function of type ``i32<-(type)``.
 .. compiledfn:: (sc_arguments_type_getarg ...)
 
-   ``type<-(type i32)``
+   An external function of type ``type<-(type i32)``.
 .. compiledfn:: (sc_arguments_type_join ...)
 
-   ``type<-(type type)``
+   An external function of type ``type<-(type type)``.
 .. compiledfn:: (sc_array_type ...)
 
-   ``type<->Error(type usize)``
+   An external function of type ``type<->Error(type usize)``.
 .. compiledfn:: (sc_basename ...)
 
-   ``String<-(String)``
+   An external function of type ``String<-(String)``.
 .. compiledfn:: (sc_break_new ...)
 
-   ``Value<-(Value)``
+   An external function of type ``Value<-(Value)``.
 .. compiledfn:: (sc_call_append_argument ...)
 
-   ``void<-(Value Value)``
+   An external function of type ``void<-(Value Value)``.
 .. compiledfn:: (sc_call_is_rawcall ...)
 
-   ``bool<-(Value)``
+   An external function of type ``bool<-(Value)``.
 .. compiledfn:: (sc_call_new ...)
 
-   ``Value<-(Value)``
+   An external function of type ``Value<-(Value)``.
 .. compiledfn:: (sc_call_set_rawcall ...)
 
-   ``void<-(Value bool)``
+   An external function of type ``void<-(Value bool)``.
 .. compiledfn:: (sc_closure_get_context ...)
 
-   ``Value<-(Closure)``
+   An external function of type ``Value<-(Closure)``.
 .. compiledfn:: (sc_closure_get_docstring ...)
 
-   ``String<-(Closure)``
+   An external function of type ``String<-(Closure)``.
 .. compiledfn:: (sc_closure_get_template ...)
 
-   ``Value<-(Closure)``
+   An external function of type ``Value<-(Closure)``.
 .. compiledfn:: (sc_compile ...)
 
-   ``Value<->Error(Value u64)``
+   An external function of type ``Value<->Error(Value u64)``.
 .. compiledfn:: (sc_compile_glsl ...)
 
-   ``String<->Error(Symbol Value u64)``
+   An external function of type ``String<->Error(Symbol Value u64)``.
 .. compiledfn:: (sc_compile_object ...)
 
-   ``void<->Error(String Scope u64)``
+   An external function of type ``void<->Error(String Scope u64)``.
 .. compiledfn:: (sc_compile_spirv ...)
 
-   ``String<->Error(Symbol Value u64)``
+   An external function of type ``String<->Error(Symbol Value u64)``.
 .. compiledfn:: (sc_compiler_version ...)
 
-   ``λ(i32 i32 i32)<-()``
+   An external function of type ``λ(i32 i32 i32)<-()``.
 .. compiledfn:: (sc_const_aggregate_new ...)
 
-   ``Value<-(type i32 Value(*))``
+   An external function of type ``Value<-(type i32 Value(*))``.
 .. compiledfn:: (sc_const_extract_at ...)
 
-   ``Value<-(Value i32)``
+   An external function of type ``Value<-(Value i32)``.
 .. compiledfn:: (sc_const_int_extract ...)
 
-   ``u64<-(Value)``
+   An external function of type ``u64<-(Value)``.
 .. compiledfn:: (sc_const_int_new ...)
 
-   ``Value<-(type u64)``
+   An external function of type ``Value<-(type u64)``.
 .. compiledfn:: (sc_const_pointer_extract ...)
 
-   ``void(*)<-(Value)``
+   An external function of type ``void(*)<-(Value)``.
 .. compiledfn:: (sc_const_pointer_new ...)
 
-   ``Value<-(type void(*))``
+   An external function of type ``Value<-(type void(*))``.
 .. compiledfn:: (sc_const_real_extract ...)
 
-   ``f64<-(Value)``
+   An external function of type ``f64<-(Value)``.
 .. compiledfn:: (sc_const_real_new ...)
 
-   ``Value<-(type f64)``
+   An external function of type ``Value<-(type f64)``.
 .. compiledfn:: (sc_default_styler ...)
 
-   ``String<-(Symbol String)``
+   An external function of type ``String<-(Symbol String)``.
 .. compiledfn:: (sc_dirname ...)
 
-   ``String<-(String)``
+   An external function of type ``String<-(String)``.
 .. compiledfn:: (sc_dump_error ...)
 
-   ``void<-(Error)``
+   An external function of type ``void<-(Error)``.
 .. compiledfn:: (sc_empty_argument_list ...)
 
-   ``Value<-()``
+   An external function of type ``Value<-()``.
 .. compiledfn:: (sc_enter_solver_cli ...)
 
-   ``void<-()``
+   An external function of type ``void<-()``.
 .. compiledfn:: (sc_error_append_calltrace ...)
 
-   ``void<-(Error Value)``
+   An external function of type ``void<-(Error Value)``.
 .. compiledfn:: (sc_error_new ...)
 
-   ``Error<-(String)``
+   An external function of type ``Error<-(String)``.
 .. compiledfn:: (sc_eval ...)
 
-   ``Value<->Error(Anchor List Scope)``
+   An external function of type ``Value<->Error(Anchor List Scope)``.
 .. compiledfn:: (sc_eval_inline ...)
 
-   ``Anchor<->Error(Value List Scope)``
+   An external function of type ``Anchor<->Error(Value List Scope)``.
 .. compiledfn:: (sc_exit ...)
 
-   ``noreturn<-(i32)``
+   An external function of type ``noreturn<-(i32)``.
 .. compiledfn:: (sc_expand ...)
 
-   ``λ(Value List Scope)<->Error(Value List Scope)``
+   An external function of type ``λ(Value List Scope)<->Error(Value List Scope)``.
 .. compiledfn:: (sc_expression_append ...)
 
-   ``void<-(Value Value)``
+   An external function of type ``void<-(Value Value)``.
 .. compiledfn:: (sc_expression_new ...)
 
-   ``Value<-()``
+   An external function of type ``Value<-()``.
 .. compiledfn:: (sc_expression_set_scoped ...)
 
-   ``void<-(Value)``
+   An external function of type ``void<-(Value)``.
 .. compiledfn:: (sc_extract_argument_list_new ...)
 
-   ``Value<-(Value i32)``
+   An external function of type ``Value<-(Value i32)``.
 .. compiledfn:: (sc_extract_argument_new ...)
 
-   ``Value<-(Value i32)``
+   An external function of type ``Value<-(Value i32)``.
 .. compiledfn:: (sc_format_error ...)
 
-   ``String<-(Error)``
+   An external function of type ``String<-(Error)``.
 .. compiledfn:: (sc_format_message ...)
 
-   ``String<-(Anchor String)``
+   An external function of type ``String<-(Anchor String)``.
 .. compiledfn:: (sc_function_type ...)
 
-   ``type<-(type i32 type(*))``
+   An external function of type ``type<-(type i32 type(*))``.
 .. compiledfn:: (sc_function_type_is_variadic ...)
 
-   ``bool<-(type)``
+   An external function of type ``bool<-(type)``.
 .. compiledfn:: (sc_function_type_raising ...)
 
-   ``type<-(type type)``
+   An external function of type ``type<-(type type)``.
 .. compiledfn:: (sc_function_type_return_type ...)
 
-   ``λ(type type)<-(type)``
+   An external function of type ``λ(type type)<-(type)``.
 .. compiledfn:: (sc_get_globals ...)
 
-   ``Scope<-()``
+   An external function of type ``Scope<-()``.
 .. compiledfn:: (sc_get_original_globals ...)
 
-   ``Scope<-()``
+   An external function of type ``Scope<-()``.
 .. compiledfn:: (sc_getarg ...)
 
-   ``Value<-(Value i32)``
+   An external function of type ``Value<-(Value i32)``.
 .. compiledfn:: (sc_getarglist ...)
 
-   ``Value<-(Value i32)``
+   An external function of type ``Value<-(Value i32)``.
 .. compiledfn:: (sc_global_new ...)
 
-   ``Value<-(Symbol type u32 Symbol i32 i32)``
+   An external function of type ``Value<-(Symbol type u32 Symbol i32 i32)``.
 .. compiledfn:: (sc_hash ...)
 
-   ``u64<-(u64 usize)``
+   An external function of type ``u64<-(u64 usize)``.
 .. compiledfn:: (sc_hash2x64 ...)
 
-   ``u64<-(u64 u64)``
+   An external function of type ``u64<-(u64 u64)``.
 .. compiledfn:: (sc_hashbytes ...)
 
-   ``u64<-(i8(*) usize)``
+   An external function of type ``u64<-(i8(*) usize)``.
 .. compiledfn:: (sc_if_append_else_clause ...)
 
-   ``void<-(Value Value)``
+   An external function of type ``void<-(Value Value)``.
 .. compiledfn:: (sc_if_append_then_clause ...)
 
-   ``void<-(Value Value Value)``
+   An external function of type ``void<-(Value Value Value)``.
 .. compiledfn:: (sc_if_new ...)
 
-   ``Value<-()``
+   An external function of type ``Value<-()``.
 .. compiledfn:: (sc_image_type ...)
 
-   ``type<-(type Symbol i32 i32 i32 i32 Symbol Symbol)``
+   An external function of type ``type<-(type Symbol i32 i32 i32 i32 Symbol Symbol)``.
 .. compiledfn:: (sc_import_c ...)
 
-   ``Scope<->Error(String String List)``
+   An external function of type ``Scope<->Error(String String List)``.
 .. compiledfn:: (sc_integer_type ...)
 
-   ``type<-(i32 bool)``
+   An external function of type ``type<-(i32 bool)``.
 .. compiledfn:: (sc_integer_type_is_signed ...)
 
-   ``bool<-(type)``
+   An external function of type ``bool<-(type)``.
 .. compiledfn:: (sc_is_directory ...)
 
-   ``bool<-(String)``
+   An external function of type ``bool<-(String)``.
 .. compiledfn:: (sc_is_file ...)
 
-   ``bool<-(String)``
+   An external function of type ``bool<-(String)``.
 .. compiledfn:: (sc_key_type ...)
 
-   ``type<-(Symbol type)``
+   An external function of type ``type<-(Symbol type)``.
 .. compiledfn:: (sc_keyed_new ...)
 
-   ``Value<-(Symbol Value)``
+   An external function of type ``Value<-(Symbol Value)``.
 .. compiledfn:: (sc_label_new ...)
 
-   ``Value<-(i32 Symbol)``
+   An external function of type ``Value<-(i32 Symbol)``.
 .. compiledfn:: (sc_label_set_body ...)
 
-   ``void<-(Value Value)``
+   An external function of type ``void<-(Value Value)``.
 .. compiledfn:: (sc_launch_args ...)
 
-   ``λ(i32 i8(*)(*))<-()``
+   An external function of type ``λ(i32 i8(*)(*))<-()``.
 .. compiledfn:: (sc_list_at ...)
 
-   ``Value<-(List)``
+   An external function of type ``Value<-(List)``.
 .. compiledfn:: (sc_list_compare ...)
 
-   ``bool<-(List List)``
+   An external function of type ``bool<-(List List)``.
 .. compiledfn:: (sc_list_cons ...)
 
-   ``List<-(Value List)``
+   An external function of type ``List<-(Value List)``.
 .. compiledfn:: (sc_list_count ...)
 
-   ``i32<-(List)``
+   An external function of type ``i32<-(List)``.
 .. compiledfn:: (sc_list_decons ...)
 
-   ``λ(Value List)<-(List)``
+   An external function of type ``λ(Value List)<-(List)``.
 .. compiledfn:: (sc_list_dump ...)
 
-   ``List<-(List)``
+   An external function of type ``List<-(List)``.
 .. compiledfn:: (sc_list_join ...)
 
-   ``List<-(List List)``
+   An external function of type ``List<-(List List)``.
 .. compiledfn:: (sc_list_next ...)
 
-   ``List<-(List)``
+   An external function of type ``List<-(List)``.
 .. compiledfn:: (sc_list_repr ...)
 
-   ``String<-(List)``
+   An external function of type ``String<-(List)``.
 .. compiledfn:: (sc_list_reverse ...)
 
-   ``List<-(List)``
+   An external function of type ``List<-(List)``.
 .. compiledfn:: (sc_load_library ...)
 
-   ``void<->Error(String)``
+   An external function of type ``void<->Error(String)``.
 .. compiledfn:: (sc_loop_arguments ...)
 
-   ``Value<-(Value)``
+   An external function of type ``Value<-(Value)``.
 .. compiledfn:: (sc_loop_new ...)
 
-   ``Value<-(Value)``
+   An external function of type ``Value<-(Value)``.
 .. compiledfn:: (sc_loop_set_body ...)
 
-   ``void<-(Value Value)``
+   An external function of type ``void<-(Value Value)``.
 .. compiledfn:: (sc_map_get ...)
 
-   ``Value<->Error(Value)``
+   An external function of type ``Value<->Error(Value)``.
 .. compiledfn:: (sc_map_set ...)
 
-   ``void<-(Value Value)``
+   An external function of type ``void<-(Value Value)``.
 .. compiledfn:: (sc_merge_new ...)
 
-   ``Value<-(Value Value)``
+   An external function of type ``Value<-(Value Value)``.
 .. compiledfn:: (sc_mutate_type ...)
 
-   ``type<-(type)``
+   An external function of type ``type<-(type)``.
 .. compiledfn:: (sc_parameter_is_variadic ...)
 
-   ``bool<-(Value)``
+   An external function of type ``bool<-(Value)``.
 .. compiledfn:: (sc_parameter_name ...)
 
-   ``Symbol<-(Value)``
+   An external function of type ``Symbol<-(Value)``.
 .. compiledfn:: (sc_parameter_new ...)
 
-   ``Value<-(Symbol)``
+   An external function of type ``Value<-(Symbol)``.
 .. compiledfn:: (sc_parse_from_path ...)
 
-   ``Value<->Error(String)``
+   An external function of type ``Value<->Error(String)``.
 .. compiledfn:: (sc_parse_from_string ...)
 
-   ``Value<->Error(String)``
+   An external function of type ``Value<->Error(String)``.
 .. compiledfn:: (sc_pointer_type ...)
 
-   ``type<-(type u64 Symbol)``
+   An external function of type ``type<-(type u64 Symbol)``.
 .. compiledfn:: (sc_pointer_type_get_flags ...)
 
-   ``u64<-(type)``
+   An external function of type ``u64<-(type)``.
 .. compiledfn:: (sc_pointer_type_get_storage_class ...)
 
-   ``Symbol<-(type)``
+   An external function of type ``Symbol<-(type)``.
 .. compiledfn:: (sc_pointer_type_set_element_type ...)
 
-   ``type<-(type type)``
+   An external function of type ``type<-(type type)``.
 .. compiledfn:: (sc_pointer_type_set_flags ...)
 
-   ``type<-(type u64)``
+   An external function of type ``type<-(type u64)``.
 .. compiledfn:: (sc_pointer_type_set_storage_class ...)
 
-   ``type<-(type Symbol)``
+   An external function of type ``type<-(type Symbol)``.
 .. compiledfn:: (sc_prompt ...)
 
-   ``λ(bool String)<-(String String)``
+   An external function of type ``λ(bool String)<-(String String)``.
 .. compiledfn:: (sc_prove ...)
 
-   ``Value<->Error(Value)``
+   An external function of type ``Value<->Error(Value)``.
 .. compiledfn:: (sc_quote_new ...)
 
-   ``Value<-(Value)``
+   An external function of type ``Value<-(Value)``.
 .. compiledfn:: (sc_raise_new ...)
 
-   ``Value<-(Value)``
+   An external function of type ``Value<-(Value)``.
 .. compiledfn:: (sc_realpath ...)
 
-   ``String<-(String)``
+   An external function of type ``String<-(String)``.
 .. compiledfn:: (sc_refer_type ...)
 
-   ``type<-(type u64 Symbol)``
+   An external function of type ``type<-(type u64 Symbol)``.
 .. compiledfn:: (sc_repeat_new ...)
 
-   ``Value<-(Value)``
+   An external function of type ``Value<-(Value)``.
 .. compiledfn:: (sc_return_new ...)
 
-   ``Value<-(Value)``
+   An external function of type ``Value<-(Value)``.
 .. compiledfn:: (sc_sampled_image_type ...)
 
-   ``type<-(type)``
+   An external function of type ``type<-(type)``.
 .. compiledfn:: (sc_scope_at ...)
 
-   ``Value<->Error(Scope Symbol)``
+   An external function of type ``Value<->Error(Scope Symbol)``.
 .. compiledfn:: (sc_scope_clone ...)
 
-   ``Scope<-(Scope)``
+   An external function of type ``Scope<-(Scope)``.
 .. compiledfn:: (sc_scope_clone_subscope ...)
 
-   ``Scope<-(Scope Scope)``
+   An external function of type ``Scope<-(Scope Scope)``.
 .. compiledfn:: (sc_scope_del_symbol ...)
 
-   ``void<-(Scope Symbol)``
+   An external function of type ``void<-(Scope Symbol)``.
 .. compiledfn:: (sc_scope_get_docstring ...)
 
-   ``String<-(Scope Symbol)``
+   An external function of type ``String<-(Scope Symbol)``.
 .. compiledfn:: (sc_scope_get_parent ...)
 
-   ``Scope<-(Scope)``
+   An external function of type ``Scope<-(Scope)``.
 .. compiledfn:: (sc_scope_local_at ...)
 
-   ``Value<->Error(Scope Symbol)``
+   An external function of type ``Value<->Error(Scope Symbol)``.
 .. compiledfn:: (sc_scope_new ...)
 
-   ``Scope<-()``
+   An external function of type ``Scope<-()``.
 .. compiledfn:: (sc_scope_new_subscope ...)
 
-   ``Scope<-(Scope)``
+   An external function of type ``Scope<-(Scope)``.
 .. compiledfn:: (sc_scope_next ...)
 
-   ``λ(Symbol Value)<-(Scope Symbol)``
+   An external function of type ``λ(Symbol Value)<-(Scope Symbol)``.
 .. compiledfn:: (sc_scope_set_docstring ...)
 
-   ``void<-(Scope Symbol String)``
+   An external function of type ``void<-(Scope Symbol String)``.
 .. compiledfn:: (sc_scope_set_symbol ...)
 
-   ``void<-(Scope Symbol Value)``
+   An external function of type ``void<-(Scope Symbol Value)``.
 .. compiledfn:: (sc_set_autocomplete_scope ...)
 
-   ``void<-(Scope)``
+   An external function of type ``void<-(Scope)``.
 .. compiledfn:: (sc_set_globals ...)
 
-   ``void<-(Scope)``
+   An external function of type ``void<-(Scope)``.
 .. compiledfn:: (sc_set_signal_abort ...)
 
-   ``void<-(bool)``
+   An external function of type ``void<-(bool)``.
 .. compiledfn:: (sc_string_buffer ...)
 
-   ``λ(i8(*) usize)<-(String)``
+   An external function of type ``λ(i8(*) usize)<-(String)``.
 .. compiledfn:: (sc_string_compare ...)
 
-   ``i32<-(String String)``
+   An external function of type ``i32<-(String String)``.
 .. compiledfn:: (sc_string_count ...)
 
-   ``usize<-(String)``
+   An external function of type ``usize<-(String)``.
 .. compiledfn:: (sc_string_join ...)
 
-   ``String<-(String String)``
+   An external function of type ``String<-(String String)``.
 .. compiledfn:: (sc_string_lslice ...)
 
-   ``String<-(String usize)``
+   An external function of type ``String<-(String usize)``.
 .. compiledfn:: (sc_string_match ...)
 
-   ``bool<->Error(String String)``
+   An external function of type ``bool<->Error(String String)``.
 .. compiledfn:: (sc_string_new ...)
 
-   ``String<-(i8(*) usize)``
+   An external function of type ``String<-(i8(*) usize)``.
 .. compiledfn:: (sc_string_new_from_cstr ...)
 
-   ``String<-(i8(*))``
+   An external function of type ``String<-(i8(*))``.
 .. compiledfn:: (sc_string_rslice ...)
 
-   ``String<-(String usize)``
+   An external function of type ``String<-(String usize)``.
 .. compiledfn:: (sc_strip_qualifiers ...)
 
-   ``type<-(type)``
+   An external function of type ``type<-(type)``.
 .. compiledfn:: (sc_switch_append_case ...)
 
-   ``void<-(Value Value Value)``
+   An external function of type ``void<-(Value Value Value)``.
 .. compiledfn:: (sc_switch_append_default ...)
 
-   ``void<-(Value Value)``
+   An external function of type ``void<-(Value Value)``.
 .. compiledfn:: (sc_switch_append_pass ...)
 
-   ``void<-(Value Value Value)``
+   An external function of type ``void<-(Value Value Value)``.
 .. compiledfn:: (sc_switch_new ...)
 
-   ``Value<-(Value)``
+   An external function of type ``Value<-(Value)``.
 .. compiledfn:: (sc_symbol_is_variadic ...)
 
-   ``bool<-(Symbol)``
+   An external function of type ``bool<-(Symbol)``.
 .. compiledfn:: (sc_symbol_new ...)
 
-   ``Symbol<-(String)``
+   An external function of type ``Symbol<-(String)``.
 .. compiledfn:: (sc_symbol_new_unique ...)
 
-   ``Symbol<-(String)``
+   An external function of type ``Symbol<-(String)``.
 .. compiledfn:: (sc_symbol_to_string ...)
 
-   ``String<-(Symbol)``
+   An external function of type ``String<-(Symbol)``.
 .. compiledfn:: (sc_template_append_parameter ...)
 
-   ``void<-(Value Value)``
+   An external function of type ``void<-(Value Value)``.
 .. compiledfn:: (sc_template_get_name ...)
 
-   ``Symbol<-(Value)``
+   An external function of type ``Symbol<-(Value)``.
 .. compiledfn:: (sc_template_is_inline ...)
 
-   ``bool<-(Value)``
+   An external function of type ``bool<-(Value)``.
 .. compiledfn:: (sc_template_new ...)
 
-   ``Value<-(Symbol)``
+   An external function of type ``Value<-(Symbol)``.
 .. compiledfn:: (sc_template_parameter ...)
 
-   ``Value<-(Value i32)``
+   An external function of type ``Value<-(Value i32)``.
 .. compiledfn:: (sc_template_parameter_count ...)
 
-   ``i32<-(Value)``
+   An external function of type ``i32<-(Value)``.
 .. compiledfn:: (sc_template_set_body ...)
 
-   ``void<-(Value Value)``
+   An external function of type ``void<-(Value Value)``.
 .. compiledfn:: (sc_template_set_inline ...)
 
-   ``void<-(Value)``
+   An external function of type ``void<-(Value)``.
 .. compiledfn:: (sc_template_set_name ...)
 
-   ``void<-(Value Symbol)``
+   An external function of type ``void<-(Value Symbol)``.
 .. compiledfn:: (sc_tuple_type ...)
 
-   ``type<->Error(i32 type(*))``
+   An external function of type ``type<->Error(i32 type(*))``.
 .. compiledfn:: (sc_type_alignof ...)
 
-   ``usize<->Error(type)``
+   An external function of type ``usize<->Error(type)``.
 .. compiledfn:: (sc_type_at ...)
 
-   ``Value<->Error(type Symbol)``
+   An external function of type ``Value<->Error(type Symbol)``.
 .. compiledfn:: (sc_type_bitcountof ...)
 
-   ``i32<-(type)``
+   An external function of type ``i32<-(type)``.
 .. compiledfn:: (sc_type_countof ...)
 
-   ``i32<->Error(type)``
+   An external function of type ``i32<->Error(type)``.
 .. compiledfn:: (sc_type_debug_abi ...)
 
-   ``void<-(type)``
+   An external function of type ``void<-(type)``.
 .. compiledfn:: (sc_type_element_at ...)
 
-   ``type<->Error(type i32)``
+   An external function of type ``type<->Error(type i32)``.
 .. compiledfn:: (sc_type_field_index ...)
 
-   ``i32<->Error(type Symbol)``
+   An external function of type ``i32<->Error(type Symbol)``.
 .. compiledfn:: (sc_type_field_name ...)
 
-   ``Symbol<->Error(type i32)``
+   An external function of type ``Symbol<->Error(type i32)``.
 .. compiledfn:: (sc_type_is_default_suffix ...)
 
-   ``bool<-(type)``
+   An external function of type ``bool<-(type)``.
 .. compiledfn:: (sc_type_is_opaque ...)
 
-   ``bool<-(type)``
+   An external function of type ``bool<-(type)``.
 .. compiledfn:: (sc_type_is_plain ...)
 
-   ``bool<-(type)``
+   An external function of type ``bool<-(type)``.
 .. compiledfn:: (sc_type_is_refer ...)
 
-   ``bool<-(type)``
+   An external function of type ``bool<-(type)``.
 .. compiledfn:: (sc_type_is_superof ...)
 
-   ``bool<-(type type)``
+   An external function of type ``bool<-(type type)``.
 .. compiledfn:: (sc_type_key ...)
 
-   ``λ(Symbol type)<-(type)``
+   An external function of type ``λ(Symbol type)<-(type)``.
 .. compiledfn:: (sc_type_kind ...)
 
-   ``i32<-(type)``
+   An external function of type ``i32<-(type)``.
 .. compiledfn:: (sc_type_local_at ...)
 
-   ``Value<->Error(type Symbol)``
+   An external function of type ``Value<->Error(type Symbol)``.
 .. compiledfn:: (sc_type_next ...)
 
-   ``λ(Symbol Value)<-(type Symbol)``
+   An external function of type ``λ(Symbol Value)<-(type Symbol)``.
 .. compiledfn:: (sc_type_set_symbol ...)
 
-   ``void<-(type Symbol Value)``
+   An external function of type ``void<-(type Symbol Value)``.
 .. compiledfn:: (sc_type_sizeof ...)
 
-   ``usize<->Error(type)``
+   An external function of type ``usize<->Error(type)``.
 .. compiledfn:: (sc_type_storage ...)
 
-   ``type<->Error(type)``
+   An external function of type ``type<->Error(type)``.
 .. compiledfn:: (sc_type_string ...)
 
-   ``String<-(type)``
+   An external function of type ``String<-(type)``.
 .. compiledfn:: (sc_typename_type ...)
 
-   ``type<->Error(String type)``
+   An external function of type ``type<->Error(String type)``.
 .. compiledfn:: (sc_typename_type_get_super ...)
 
-   ``type<-(type)``
+   An external function of type ``type<-(type)``.
 .. compiledfn:: (sc_typename_type_set_storage ...)
 
-   ``void<->Error(type type u32)``
+   An external function of type ``void<->Error(type type u32)``.
 .. compiledfn:: (sc_typify ...)
 
-   ``Value<->Error(Closure i32 type(*))``
+   An external function of type ``Value<->Error(Closure i32 type(*))``.
 .. compiledfn:: (sc_typify_template ...)
 
-   ``Value<->Error(Value i32 type(*))``
+   An external function of type ``Value<->Error(Value i32 type(*))``.
 .. compiledfn:: (sc_union_type ...)
 
-   ``type<->Error(i32 type(*))``
+   An external function of type ``type<->Error(i32 type(*))``.
 .. compiledfn:: (sc_unique_type ...)
 
-   ``type<-(type i32)``
+   An external function of type ``type<-(type i32)``.
 .. compiledfn:: (sc_unquote_new ...)
 
-   ``Value<-(Value)``
+   An external function of type ``Value<-(Value)``.
 .. compiledfn:: (sc_value_anchor ...)
 
-   ``Anchor<-(Value)``
+   An external function of type ``Anchor<-(Value)``.
 .. compiledfn:: (sc_value_ast_repr ...)
 
-   ``String<-(Value)``
+   An external function of type ``String<-(Value)``.
 .. compiledfn:: (sc_value_compare ...)
 
-   ``bool<-(Value Value)``
+   An external function of type ``bool<-(Value Value)``.
 .. compiledfn:: (sc_value_content_repr ...)
 
-   ``String<-(Value)``
+   An external function of type ``String<-(Value)``.
 .. compiledfn:: (sc_value_is_constant ...)
 
-   ``bool<-(Value)``
+   An external function of type ``bool<-(Value)``.
 .. compiledfn:: (sc_value_is_pure ...)
 
-   ``bool<-(Value)``
+   An external function of type ``bool<-(Value)``.
 .. compiledfn:: (sc_value_kind ...)
 
-   ``i32<-(Value)``
+   An external function of type ``i32<-(Value)``.
 .. compiledfn:: (sc_value_qualified_type ...)
 
-   ``type<-(Value)``
+   An external function of type ``type<-(Value)``.
 .. compiledfn:: (sc_value_repr ...)
 
-   ``String<-(Value)``
+   An external function of type ``String<-(Value)``.
 .. compiledfn:: (sc_value_tostring ...)
 
-   ``String<-(Value)``
+   An external function of type ``String<-(Value)``.
 .. compiledfn:: (sc_value_type ...)
 
-   ``type<-(Value)``
+   An external function of type ``type<-(Value)``.
 .. compiledfn:: (sc_value_unwrap ...)
 
-   ``Value<-(type Value)``
+   An external function of type ``Value<-(type Value)``.
 .. compiledfn:: (sc_value_wrap ...)
 
-   ``Value<-(type Value)``
+   An external function of type ``Value<-(type Value)``.
 .. compiledfn:: (sc_valueref_tag ...)
 
-   ``Value<-(Anchor Value)``
+   An external function of type ``Value<-(Anchor Value)``.
 .. compiledfn:: (sc_vector_type ...)
 
-   ``type<->Error(type usize)``
+   An external function of type ``type<->Error(type usize)``.
 .. compiledfn:: (sc_verify_stack ...)
 
-   ``usize<->Error()``
+   An external function of type ``usize<->Error()``.
 .. compiledfn:: (sc_view_type ...)
 
-   ``type<-(type i32)``
+   An external function of type ``type<-(type i32)``.
 .. compiledfn:: (sc_write ...)
 
-   ``void<-(String)``
+   An external function of type ``void<-(String)``.
 .. compiledfn:: (set-autocomplete-scope! ...)
 
-   ``void<-(Scope)``
+   An external function of type ``void<-(Scope)``.
 .. compiledfn:: (set-globals! ...)
 
-   ``void<-(Scope)``
+   An external function of type ``void<-(Scope)``.
 .. compiledfn:: (set-signal-abort! ...)
 
-   ``void<-(bool)``
+   An external function of type ``void<-(bool)``.
 .. compiledfn:: (spice-macro-verify-signature ...)
 
-   ``void<-(Value<->Error(Value)(*))``
+   A compiled function of type ``void<-(Value<->Error(Value)(*))``.
 .. compiledfn:: (type> ...)
 
-   ``bool<-(type type)``
+   An external function of type ``bool<-(type type)``.

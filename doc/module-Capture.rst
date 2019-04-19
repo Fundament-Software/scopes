@@ -6,6 +6,6 @@ runtime values outside of the function.
 
 .. type:: Capture
 
-   ``Capture`` 
+   An opaque type.
 .. sugar:: (capture ...)
 .. sugar:: (spice-capture ...)

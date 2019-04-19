@@ -6,161 +6,161 @@ and access external variables for shader programs.
 
 .. type:: gsampler
 
-   ``gsampler`` 
+   An opaque type.
 .. type:: gsampler1D
 
-   ``gsampler1D`` < ``gsampler`` 
+   An opaque type of supertype `gsampler`.
 .. builtin:: (gsampler1D.texture-samples ...)
 .. builtin:: (gsampler1D.texture-levels ...)
 .. type:: gsampler1DArray
 
-   ``gsampler1DArray`` < ``gsampler`` 
+   An opaque type of supertype `gsampler`.
 .. builtin:: (gsampler1DArray.texture-samples ...)
 .. builtin:: (gsampler1DArray.texture-levels ...)
 .. type:: gsampler2D
 
-   ``gsampler2D`` < ``gsampler`` 
+   An opaque type of supertype `gsampler`.
 .. builtin:: (gsampler2D.texture-samples ...)
 .. builtin:: (gsampler2D.texture-levels ...)
 .. type:: gsampler2DArray
 
-   ``gsampler2DArray`` < ``gsampler`` 
+   An opaque type of supertype `gsampler`.
 .. builtin:: (gsampler2DArray.texture-samples ...)
 .. builtin:: (gsampler2DArray.texture-levels ...)
 .. type:: gsampler2DMS
 
-   ``gsampler2DMS`` < ``gsampler`` 
+   An opaque type of supertype `gsampler`.
 .. builtin:: (gsampler2DMS.texture-samples ...)
 .. builtin:: (gsampler2DMS.texture-levels ...)
 .. type:: gsampler2DMSArray
 
-   ``gsampler2DMSArray`` < ``gsampler`` 
+   An opaque type of supertype `gsampler`.
 .. builtin:: (gsampler2DMSArray.texture-samples ...)
 .. builtin:: (gsampler2DMSArray.texture-levels ...)
 .. type:: gsampler2DRect
 
-   ``gsampler2DRect`` < ``gsampler`` 
+   An opaque type of supertype `gsampler`.
 .. builtin:: (gsampler2DRect.texture-samples ...)
 .. builtin:: (gsampler2DRect.texture-levels ...)
 .. type:: gsampler3D
 
-   ``gsampler3D`` < ``gsampler`` 
+   An opaque type of supertype `gsampler`.
 .. builtin:: (gsampler3D.texture-samples ...)
 .. builtin:: (gsampler3D.texture-levels ...)
 .. type:: gsamplerBuffer
 
-   ``gsamplerBuffer`` < ``gsampler`` 
+   An opaque type of supertype `gsampler`.
 .. builtin:: (gsamplerBuffer.texture-samples ...)
 .. builtin:: (gsamplerBuffer.texture-levels ...)
 .. type:: gsamplerCube
 
-   ``gsamplerCube`` < ``gsampler`` 
+   An opaque type of supertype `gsampler`.
 .. builtin:: (gsamplerCube.texture-samples ...)
 .. builtin:: (gsamplerCube.texture-levels ...)
 .. type:: gsamplerCubeArray
 
-   ``gsamplerCubeArray`` < ``gsampler`` 
+   An opaque type of supertype `gsampler`.
 .. builtin:: (gsamplerCubeArray.texture-samples ...)
 .. builtin:: (gsamplerCubeArray.texture-levels ...)
 .. type:: isampler1D
 
-   ``isampler1D`` < ``gsampler1D$3`` 
+   An opaque type of supertype `gsampler1D$3`.
 .. type:: isampler1DArray
 
-   ``isampler1DArray`` < ``gsampler1DArray$3`` 
+   An opaque type of supertype `gsampler1DArray$3`.
 .. type:: isampler2D
 
-   ``isampler2D`` < ``gsampler2D$3`` 
+   An opaque type of supertype `gsampler2D$3`.
 .. type:: isampler2DArray
 
-   ``isampler2DArray`` < ``gsampler2DArray$3`` 
+   An opaque type of supertype `gsampler2DArray$3`.
 .. type:: isampler2DMS
 
-   ``isampler2DMS`` < ``gsampler2DMS$3`` 
+   An opaque type of supertype `gsampler2DMS$3`.
 .. type:: isampler2DMSArray
 
-   ``isampler2DMSArray`` < ``gsampler2DMSArray$3`` 
+   An opaque type of supertype `gsampler2DMSArray$3`.
 .. type:: isampler2DRect
 
-   ``isampler2DRect`` < ``gsampler2DRect$3`` 
+   An opaque type of supertype `gsampler2DRect$3`.
 .. type:: isampler3D
 
-   ``isampler3D`` < ``gsampler3D$3`` 
+   An opaque type of supertype `gsampler3D$3`.
 .. type:: isamplerBuffer
 
-   ``isamplerBuffer`` < ``gsamplerBuffer$3`` 
+   An opaque type of supertype `gsamplerBuffer$3`.
 .. type:: isamplerCube
 
-   ``isamplerCube`` < ``gsamplerCube$3`` 
+   An opaque type of supertype `gsamplerCube$3`.
 .. type:: isamplerCubeArray
 
-   ``isamplerCubeArray`` < ``gsamplerCubeArray$3`` 
+   An opaque type of supertype `gsamplerCubeArray$3`.
 .. type:: sampler1D
 
-   ``sampler1D`` < ``gsampler1D$2`` 
+   An opaque type of supertype `gsampler1D$2`.
 .. type:: sampler1DArray
 
-   ``sampler1DArray`` < ``gsampler1DArray$2`` 
+   An opaque type of supertype `gsampler1DArray$2`.
 .. type:: sampler2D
 
-   ``sampler2D`` < ``gsampler2D$2`` 
+   An opaque type of supertype `gsampler2D$2`.
 .. type:: sampler2DArray
 
-   ``sampler2DArray`` < ``gsampler2DArray$2`` 
+   An opaque type of supertype `gsampler2DArray$2`.
 .. type:: sampler2DMS
 
-   ``sampler2DMS`` < ``gsampler2DMS$2`` 
+   An opaque type of supertype `gsampler2DMS$2`.
 .. type:: sampler2DMSArray
 
-   ``sampler2DMSArray`` < ``gsampler2DMSArray$2`` 
+   An opaque type of supertype `gsampler2DMSArray$2`.
 .. type:: sampler2DRect
 
-   ``sampler2DRect`` < ``gsampler2DRect$2`` 
+   An opaque type of supertype `gsampler2DRect$2`.
 .. type:: sampler3D
 
-   ``sampler3D`` < ``gsampler3D$2`` 
+   An opaque type of supertype `gsampler3D$2`.
 .. type:: samplerBuffer
 
-   ``samplerBuffer`` < ``gsamplerBuffer$2`` 
+   An opaque type of supertype `gsamplerBuffer$2`.
 .. type:: samplerCube
 
-   ``samplerCube`` < ``gsamplerCube$2`` 
+   An opaque type of supertype `gsamplerCube$2`.
 .. type:: samplerCubeArray
 
-   ``samplerCubeArray`` < ``gsamplerCubeArray$2`` 
+   An opaque type of supertype `gsamplerCubeArray$2`.
 .. type:: usampler1D
 
-   ``usampler1D`` < ``gsampler1D$4`` 
+   An opaque type of supertype `gsampler1D$4`.
 .. type:: usampler1DArray
 
-   ``usampler1DArray`` < ``gsampler1DArray$4`` 
+   An opaque type of supertype `gsampler1DArray$4`.
 .. type:: usampler2D
 
-   ``usampler2D`` < ``gsampler2D$4`` 
+   An opaque type of supertype `gsampler2D$4`.
 .. type:: usampler2DArray
 
-   ``usampler2DArray`` < ``gsampler2DArray$4`` 
+   An opaque type of supertype `gsampler2DArray$4`.
 .. type:: usampler2DMS
 
-   ``usampler2DMS`` < ``gsampler2DMS$4`` 
+   An opaque type of supertype `gsampler2DMS$4`.
 .. type:: usampler2DMSArray
 
-   ``usampler2DMSArray`` < ``gsampler2DMSArray$4`` 
+   An opaque type of supertype `gsampler2DMSArray$4`.
 .. type:: usampler2DRect
 
-   ``usampler2DRect`` < ``gsampler2DRect$4`` 
+   An opaque type of supertype `gsampler2DRect$4`.
 .. type:: usampler3D
 
-   ``usampler3D`` < ``gsampler3D$4`` 
+   An opaque type of supertype `gsampler3D$4`.
 .. type:: usamplerBuffer
 
-   ``usamplerBuffer`` < ``gsamplerBuffer$4`` 
+   An opaque type of supertype `gsamplerBuffer$4`.
 .. type:: usamplerCube
 
-   ``usamplerCube`` < ``gsamplerCube$4`` 
+   An opaque type of supertype `gsamplerCube$4`.
 .. type:: usamplerCubeArray
 
-   ``usamplerCubeArray`` < ``gsamplerCubeArray$4`` 
+   An opaque type of supertype `gsamplerCubeArray$4`.
 .. inline:: (iimage1D format)
 .. inline:: (iimage1DArray format)
 .. inline:: (iimage2D format)
@@ -215,7 +215,7 @@ and access external variables for shader programs.
 .. sugar:: (uniform ...)
 .. compiledfn:: (packHalf2x16 ...)
 
-   ``u32<-(vec2)``
+   An external function of type ``u32<-(vec2)``.
 .. compiledfn:: (unpackHalf2x16 ...)
 
-   ``vec2<-(u32)``
+   An external function of type ``vec2<-(u32)``.

@@ -44,20 +44,20 @@ Running this program will output:
 
 .. type:: FunctionChain
 
-   ``FunctionChain`` : ``_type(*)`` 
-.. spice:: (FunctionChain.__call ...)
+   A plain type of storage type `_type(*)`.
 .. typefn:: (FunctionChain 'append self f)
    
    Append function `f` to function chain. When the function chain is called,
    `f` will be called last. The return value of `f` will be ignored.
-.. typefn:: (FunctionChain 'on self)
-   
-   Returns a decorator that appends the provided function to the
-   function chain.
+.. spice:: (FunctionChain.__call ...)
 .. typefn:: (FunctionChain 'prepend self f)
    
    Prepend function `f` to function chain. When the function chain is called,
    `f` will be called first. The return value of `f` will be ignored.
+.. typefn:: (FunctionChain 'on self)
+   
+   Returns a decorator that appends the provided function to the
+   function chain.
 .. typefn:: (FunctionChain 'clear self)
    
    Clear the function chain. When the function chain is applied next,

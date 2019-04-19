@@ -6,7 +6,7 @@ generators and collectors.
 
 .. define:: drain
 
-   ``Collector``
+   A constant of type `Collector`.
 .. inline:: (->> generator collector...)
 .. inline:: (cascade collector...)
    

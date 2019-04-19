@@ -90,7 +90,6 @@ fn print-entry (module parent key entry parent-name opts...)
             not
                 and typemember?
                     or
-                        sym == '__new
                         sym == '__typecall
                         sym == '__call
         return;
@@ -164,22 +163,33 @@ fn print-entry (module parent key entry parent-name opts...)
             if ('opaque? ty) Unknown
             else ('storageof ty)
         io-write! "\n\n   "
-        io-write! "``"
-        io-write! (tostring ty)
-        io-write! "`` "
-        if (superT != typename)
-            io-write! "< ``"
-            io-write! (tostring superT)
-            io-write! "`` "
-        if (ST != Unknown)
-            if (sc_type_is_plain ty)
-                io-write! ": "
+        let has-storage? = (ST != Unknown)
+        let plain? = ('plain? ty)
+        io-write! "A"
+        if has-storage?
+            if plain?
+                io-write! " plain"
             else
-                io-write! ":: "
+                io-write! "n unique"
+        else
+            io-write! "n opaque"
+        io-write! " type"
+        let tystr = (tostring ty)
+        if ((let tystr = (tostring ty)) != key)
+            io-write! " labeled ``"
+            io-write! (tostring ty)
             io-write! "``"
+        if (superT != typename)
+            io-write! " of supertype `"
+            io-write! (tostring superT)
+            io-write! "`"
+            if has-storage?
+                io-write! " and"
+        if has-storage?
+            io-write! " of storage type `"
             io-write! (tostring ST)
-            io-write! "`` "
-        io-write! "\n"
+            io-write! "`"
+        io-write! ".\n"
         if (not typemember?)
             for k v in ('symbols ty)
                 print-entry module ty k v key
@@ -191,9 +201,14 @@ fn print-entry (module parent key entry parent-name opts...)
             io-write! parent-name; io-write! "."
         io-write! key
         io-write! " ...)\n\n"
-        io-write! "   ``"
+        io-write! "   A"
+        if (('kind entry) == value-kind-global)
+            io-write! "n external"
+        else
+            io-write! " compiled"
+        io-write! " function of type ``"
         io-write! (tostring fntype)
-        io-write! "``\n"
+        io-write! "``.\n"
     elseif (T == Unknown)
         # a dreaded curse!
         return;
@@ -204,13 +219,10 @@ fn print-entry (module parent key entry parent-name opts...)
         if typemember?
             io-write! parent-name; io-write! "."
         io-write! key
-        if false
-            io-write! "\n"
-        else
-            io-write! "\n\n"
-            io-write! "   ``"
-            io-write! (tostring T)
-            io-write! "``\n"
+        io-write! "\n\n"
+        io-write! "   A constant of type `"
+        io-write! (tostring T)
+        io-write! "`.\n"
     write-docstring docstr
 
 let moduledoc = ('docstring module unnamed)
