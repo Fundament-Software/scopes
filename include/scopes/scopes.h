@@ -366,6 +366,8 @@ SCOPES_LIBEXPORT sc_valueref_t sc_closure_get_context(const sc_closure_t *func);
 
 SCOPES_LIBEXPORT sc_valueref_raises_t sc_type_at(const sc_type_t *T, sc_symbol_t key);
 SCOPES_LIBEXPORT sc_valueref_raises_t sc_type_local_at(const sc_type_t *T, sc_symbol_t key);
+SCOPES_LIBEXPORT const sc_string_t *sc_type_get_docstring(const sc_type_t *T, sc_symbol_t key);
+SCOPES_LIBEXPORT void sc_type_set_docstring(const sc_type_t *T, sc_symbol_t key, const sc_string_t *str);
 SCOPES_LIBEXPORT sc_size_raises_t sc_type_sizeof(const sc_type_t *T);
 SCOPES_LIBEXPORT sc_size_raises_t sc_type_alignof(const sc_type_t *T);
 SCOPES_LIBEXPORT sc_int_raises_t sc_type_countof(const sc_type_t *T);

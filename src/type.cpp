@@ -41,11 +41,16 @@ StyledStream& Type::stream(StyledStream& ost) const {
     return ost;
 }
 
-void Type::bind(Symbol name, const ValueRef &value) const {
-    auto ret = symbols.insert({ name, value });
+void Type::bind_with_doc(Symbol name, const TypeEntry &entry) const {
+    auto ret = symbols.insert({name, entry});
     if (!ret.second) {
-        ret.first->second = value;
+        ret.first->second = entry;
     }
+}
+
+void Type::bind(Symbol name, const ValueRef &value) const {
+    TypeEntry entry = { value, nullptr };
+    bind_with_doc(name, entry);
 }
 
 void Type::del(Symbol name) const {
@@ -55,7 +60,7 @@ void Type::del(Symbol name) const {
     }
 }
 
-bool Type::lookup(Symbol name, ValueRef &dest) const {
+bool Type::lookup(Symbol name, TypeEntry &dest) const {
     const Type *self = this;
     do {
         auto it = self->symbols.find(name);
@@ -70,10 +75,28 @@ bool Type::lookup(Symbol name, ValueRef &dest) const {
     return false;
 }
 
-bool Type::lookup_local(Symbol name, ValueRef &dest) const {
+bool Type::lookup(Symbol name, ValueRef &dest) const {
+    TypeEntry entry;
+    if (lookup(name, entry)) {
+        dest = entry.expr;
+        return true;
+    }
+    return false;
+}
+
+bool Type::lookup_local(Symbol name, TypeEntry &dest) const {
     auto it = symbols.find(name);
     if (it != symbols.end()) {
         dest = it->second;
+        return true;
+    }
+    return false;
+}
+
+bool Type::lookup_local(Symbol name, ValueRef &dest) const {
+    TypeEntry entry;
+    if (lookup_local(name, entry)) {
+        dest = entry.expr;
         return true;
     }
     return false;

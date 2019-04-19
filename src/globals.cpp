@@ -1484,6 +1484,25 @@ sc_valueref_raises_t sc_type_local_at(const sc_type_t *T, sc_symbol_t key) {
     return convert_result(result);
 }
 
+const sc_string_t *sc_type_get_docstring(const sc_type_t *T, sc_symbol_t key) {
+    using namespace scopes;
+    TypeEntry entry;
+    if (T->lookup(key, entry) && entry.doc) {
+        return entry.doc;
+    }
+    return Symbol(SYM_Unnamed).name();
+}
+
+void sc_type_set_docstring(const sc_type_t *T, sc_symbol_t key, const sc_string_t *str) {
+    using namespace scopes;
+    TypeEntry entry;
+    if (!T->lookup_local(key, entry)) {
+        return;
+    }
+    entry.doc = str;
+    T->bind_with_doc(key, entry);
+}
+
 sc_size_raises_t sc_type_sizeof(const sc_type_t *T) {
     using namespace scopes;
     SCOPES_RESULT_TYPE(size_t);
@@ -1628,7 +1647,7 @@ sc_symbol_valueref_tuple_t sc_type_next(const sc_type_t *type, sc_symbol_t key) 
         if (it != map.end()) it++;
     }
     if (it != map.end()) {
-        return { it->first, it->second };
+        return { it->first, it->second.expr };
     }
     return { SYM_Unnamed, ValueRef() };
 }
@@ -2152,6 +2171,8 @@ void init_globals(int argc, char *argv[]) {
 
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_type_at, TYPE_ValueRef, TYPE_Type, TYPE_Symbol);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_type_local_at, TYPE_ValueRef, TYPE_Type, TYPE_Symbol);
+    DEFINE_EXTERN_C_FUNCTION(sc_type_get_docstring, TYPE_String, TYPE_Type, TYPE_Symbol);
+    DEFINE_EXTERN_C_FUNCTION(sc_type_set_docstring, _void, TYPE_Type, TYPE_Symbol, TYPE_String);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_type_element_at, TYPE_Type, TYPE_Type, TYPE_I32);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_type_field_index, TYPE_I32, TYPE_Type, TYPE_Symbol);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_type_field_name, TYPE_Symbol, TYPE_Type, TYPE_I32);

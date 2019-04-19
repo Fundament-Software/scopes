@@ -816,6 +816,8 @@ inline define-symbols (self values...)
     opaque? = sc_type_is_opaque
     string = sc_type_string
     superof = sc_typename_type_get_super
+    docstring = sc_type_get_docstring
+    set-docstring! = sc_type_set_docstring
     set-storage =
         inline (type storage-type)
             sc_typename_type_set_storage type storage-type 0:u32
@@ -5035,7 +5037,9 @@ define-sugar-macro decorate-vvv
 define-sugar-macro decorate-fn
     raises-compile-error;
     let fnexpr decorators = (decons args)
-    let kw name = (decons (fnexpr as list) 2)
+    let kw name body = (decons (fnexpr as list) 2)
+    let name-is-symbol? = (('typeof name) == Symbol)
+    let fnexpr = `[(list do fnexpr)]
     let result =
         loop (in out = decorators fnexpr)
             if (empty? in)
@@ -5043,7 +5047,7 @@ define-sugar-macro decorate-fn
             let decorator in = (decons in)
             repeat in
                 `[(cons decorator (list out))]
-    if (('typeof name) == Symbol)
+    if name-is-symbol?
         `[(list let name '= result)]
     else
         result
@@ -5141,7 +5145,8 @@ sugar fold-locals (args...)
         let key value = ('next scope last-key)
         if (key == unnamed)
             return block
-        let expr = ('tag `(f outval key value) ('anchor expression))
+        let docstr = ('docstring scope key)
+        let expr = ('tag `(f outval key docstr value) ('anchor expression))
         sc_expression_append block expr
         repeat key expr
 
@@ -5215,22 +5220,30 @@ define append-to-type
         fn (args)
             let T = ('getarg args 0)
             let key = ('getarg args 1)
-            let value = ('getarg args 2)
+            let docstr = ('getarg args 2)
+            let value = ('getarg args 3)
             if ('constant? T)
                 let T = (T as type)
                 if (stage-constant? value)
                     let key = (key as Symbol)
                     'set-symbol T key value
+                    'set-docstring! T key (docstr as string)
                     `T
                 else
                     let wrapvalue =
                         if (('typeof value) == Value) value
                         else `value
                     spice-quote
-                        embed (sc_type_set_symbol T key wrapvalue) T
+                        embed
+                            sc_type_set_symbol T key wrapvalue
+                            sc_type_set_docstring T key docstr
+                            T
             else
                 spice-quote
-                    embed (sc_type_set_symbol T key value) T
+                    embed
+                        sc_type_set_symbol T key value
+                        sc_type_set_docstring T key docstr
+                        T
 
 sugar typedef+ (T body...)
     qq [do]
@@ -5918,7 +5931,7 @@ fn read-eval-print-loop ()
             if (key != tmp) (x + 1)
             else x
 
-        spice append-to-scope (scope key vals...)
+        spice append-to-scope (scope key docstr vals...)
             let tmp = (Symbol "#result...")
             if (key != tmp)
                 if (('argcount vals...) != 1)
@@ -5933,12 +5946,15 @@ fn read-eval-print-loop ()
                                 `(sc_argument_list_append outargs `arg)
                     sc_expression_append block
                         `('set-symbol scope key outargs)
+                    sc_expression_append block
+                        `('set-docstring! scope key docstr)
                     sc_expression_append block scope
                     return block
                 else
                     return
                         spice-quote
                             'set-symbol scope key vals...
+                            'set-docstring! scope key docstr
                             scope
             scope
 

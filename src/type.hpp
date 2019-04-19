@@ -56,8 +56,13 @@ enum TypeKind {
 
 //------------------------------------------------------------------------------
 
+struct TypeEntry {
+    ValueRef expr;
+    const String *doc;
+};
+
 struct Type {
-    typedef std::unordered_map<Symbol, ValueRef, Symbol::Hash> Map;
+    typedef std::unordered_map<Symbol, TypeEntry, Symbol::Hash> Map;
 
     TypeKind kind() const;
 
@@ -66,12 +71,15 @@ struct Type {
 
     StyledStream& stream(StyledStream& ost) const;
 
+    void bind_with_doc(Symbol name, const TypeEntry &entry) const;
     void bind(Symbol name, const ValueRef &value) const;
 
     void del(Symbol name) const;
 
+    bool lookup(Symbol name, TypeEntry &dest) const;
     bool lookup(Symbol name, ValueRef &dest) const;
 
+    bool lookup_local(Symbol name, TypeEntry &dest) const;
     bool lookup_local(Symbol name, ValueRef &dest) const;
 
     bool lookup_call_handler(ValueRef &dest) const;

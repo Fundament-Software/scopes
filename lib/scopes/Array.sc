@@ -36,17 +36,27 @@ inline array-generator (self)
         inline (i) (self @ i)
         inline (i) (i + 1:usize)
 
+""""The abstract supertype of both `FixedArray` and `GrowingArray` which
+    supplies methods shared by both implementations.
 typedef Array < Struct
 
+    """".. spice:: (__as cls T)
+
+           Implements support for the `as` operator. Arrays can be cast to
+           `Generator`, or directly passed to `for`.
     @@ spice-cast-macro
     fn __as (cls T)
         if (T == Generator)
             return `array-generator
         `()
 
+    """"Implements support for the `countof` operator. Returns the current
+        number of elements stored in `self` as a value of `usize` type.
     inline __countof (self)
         deref self._count
 
+    """"Implements support for the `@` operator. Returns a view reference to the
+        element at `index` of array `self`.
     fn __@ (self index)
         let index = (index as usize)
         assert (index < self._count) "index out of bounds"
@@ -105,6 +115,10 @@ typedef Array < Struct
                 siftDown items 0:i64 end
                 repeat end
 
+    """"Sort elements of array `self` from smallest to largest, either using
+        the `<` operator supplied by the element type, or by using the key
+        supplied by the callable `key`, which is expected to return a comparable
+        value for each element value supplied.
     inline sort (self key)
         (gen-sort key) (deref self._items) ((deref self._count) as i64)
 
@@ -115,28 +129,48 @@ typedef Array < Struct
         self._count = new-count
         self._items @ idx
 
+    """"Append `value` as an element to the array `self` and return a reference
+        to the new element. When the `array` is of `GrowingArray` type, this
+        operation will transparently resize the array's storage.
     fn append (self value)
         let dest = (append-slots self 1:usize)
         assign (imply value ((typeof self) . ElementType)) dest
         dest
 
+    """"Construct a new element with arguments `args...` directly in a newly
+        assigned slot of array `self`. When the `array` is of `GrowingArray`
+        type, this operation will transparently resize the array's storage.
     inline emplace-append (self args...)
         let dest = (append-slots self 1:usize)
         let value = (((typeof self) . ElementType) args...)
         assign value dest
         dest
 
+    """"Clear the array and reset its element count to zero. This will drop
+        all elements that have been previously contained by the array.
     fn clear (self)
         for idx in (range (deref self._count))
             __drop (self._items @ idx)
         self._count = 0:usize
         return;
 
+    """"Implements support for freeing the array's memory when it goes out
+        of scope.
     inline __drop (self)
         clear self
         free self._items
 
+    unlet gen-sort append-slots
 
+""""The supertype and constructor for arrays of fixed size.
+
+    To construct a new fixed array type::
+
+        FixedArray element-type capacity
+
+    Instantiate a new array with mutable memory::
+
+        local new-array : (FixedArray element-type capacity)
 typedef FixedArray < Array
     let parent-type = this-type
 
@@ -177,6 +211,7 @@ typedef FixedArray < Array
                 _items = (malloc-array cls.ElementType cls.Capacity)
                 _count = 0:usize
 
+    """"Implements support for the `repr` operation.
     fn __repr (self)
         ..
             "[count="
@@ -185,6 +220,7 @@ typedef FixedArray < Array
             repr self._items
             "]"
 
+    """"Returns the maximum capacity of array `self`, which is fixed.
     inline capacity (self)
         (typeof self) . Capacity
 
@@ -199,13 +235,30 @@ typedef FixedArray < Array
         self._items = other._items
         self._count = other._count
 
+    """"Internally used by the type. Ensures that array `self` can hold at least
+        `count` elements. A fixed array will raise an assertion when its
+        capacity has been exceeded.
     fn reserve (self count)
         let T = (typeof self)
         assert (count <= T.Capacity) "capacity exceeded"
 
+    unlet gen-fixed-array-type parent-type
+
+
 
 let DEFAULT_CAPACITY = (1:usize << 2:usize)
 
+""""The supertype and constructor for arrays of growing size. New instances
+    have a default capacity of 4, and grow by factor 2.7 each time their
+    capacity is exceeded.
+
+    To construct a new growing array type::
+
+        GrowingArray element-type
+
+    Instantiate a new array with mutable memory::
+
+        local new-array : (GrowingArray element-type) [(capacity = ...)]
 typedef GrowingArray < Array
     let parent-type = this-type
 
@@ -250,6 +303,7 @@ typedef GrowingArray < Array
                 _count = 0:usize
                 _capacity = capacity
 
+    """"Implements support for the `repr` operation.
     fn __repr (self)
         ..
             "[count="
@@ -260,9 +314,12 @@ typedef GrowingArray < Array
             repr self._items
             "]"
 
+    """"Returns the current maximum capacity of array `self`.
     inline capacity (self)
         deref self._capacity
 
+    """"Internally used by the type. Ensures that array `self` can hold at least
+        `count` elements. A growing array will always attempt to comply.
     fn reserve (self count)
         if (count <= self._capacity)
             return;
@@ -284,6 +341,8 @@ typedef GrowingArray < Array
             assign new-items self._items
             self._capacity = new-capacity
         return;
+
+    unlet gen-growing-array-type parent-type nearest-capacity
 
 #typefn Array '__typecall (cls element-type capacity opts...)
     """"Construct a mutable array type of ``element-type`` with a variable or

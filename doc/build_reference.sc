@@ -109,15 +109,16 @@ fn print-entry (module parent key entry parent-name opts...)
         return;
     elseif
         and (prefix2 == "__")
-            not
-                and typemember?
+            not typemember?
+                #and typemember?
                     or
                         sym == '__typecall
                         sym == '__call
         return;
     let T = ('typeof entry)
     let docstr =
-        if typemember? ""
+        static-if typemember?
+            'docstring parent sym
         else
             'docstring module sym
             #parent @ (Symbol (.. "#doc:" key))
@@ -132,16 +133,19 @@ fn print-entry (module parent key entry parent-name opts...)
         if typemember? "      "
         else "   "
     if (docstring-is-complete docstr)
-        io-write! docstr
-        io-write! "\n"
+        if typemember?
+            write-docstring indent docstr
+        else
+            io-write! docstr
+            io-write! "\n"
         return;
     if (T == Closure)
         let func = (entry as Closure)
-        let docstr = ('docstring func)
+        let docstr2 = ('docstring func)
         let label =
             sc_closure_get_template func
-        if (docstring-is-complete docstr)
-            io-write! docstr
+        if (docstring-is-complete docstr2)
+            io-write! docstr2
             io-write! "\n"
         else
             io-write! indent
@@ -156,7 +160,10 @@ fn print-entry (module parent key entry parent-name opts...)
                 io-write! " "
                 io-write! ((sc_parameter_name param) as string)
             io-write! ")\n"
-            write-docstring tab docstr
+            if (empty? docstr)
+                write-docstring tab docstr2
+            else
+                write-docstring tab docstr
         return;
     elseif (T == Builtin)
         io-write! indent
@@ -185,34 +192,38 @@ fn print-entry (module parent key entry parent-name opts...)
             if ('opaque? ty) Unknown
             else ('storageof ty)
         io-write! "\n\n"
-        io-write! tab
-        let has-storage? = (ST != Unknown)
-        let plain? = ('plain? ty)
-        io-write! "A"
-        if has-storage?
-            if plain?
-                io-write! " plain"
-            else
-                io-write! "n unique"
+        if has-docstr
+            write-docstring tab docstr
+            io-write! "\n"
         else
-            io-write! "n opaque"
-        io-write! " type"
-        let tystr = (tostring ty)
-        if ((let tystr = (tostring ty)) != key)
-            io-write! " labeled ``"
-            io-write! (tostring ty)
-            io-write! "``"
-        if (superT != typename)
-            io-write! " of supertype `"
-            io-write! (tostring superT)
-            io-write! "`"
+            io-write! tab
+            let has-storage? = (ST != Unknown)
+            let plain? = ('plain? ty)
+            io-write! "A"
             if has-storage?
-                io-write! " and"
-        if has-storage?
-            io-write! " of storage type `"
-            io-write! (tostring ST)
-            io-write! "`"
-        io-write! ".\n\n"
+                if plain?
+                    io-write! " plain"
+                else
+                    io-write! "n unique"
+            else
+                io-write! "n opaque"
+            io-write! " type"
+            let tystr = (tostring ty)
+            if ((let tystr = (tostring ty)) != key)
+                io-write! " labeled ``"
+                io-write! (tostring ty)
+                io-write! "``"
+            if (superT != typename)
+                io-write! " of supertype `"
+                io-write! (tostring superT)
+                io-write! "`"
+                if has-storage?
+                    io-write! " and"
+            if has-storage?
+                io-write! " of storage type `"
+                io-write! (tostring ST)
+                io-write! "`"
+            io-write! ".\n\n"
         if (not typemember?)
             local members : (GrowingArray EntryT)
             for k v in ('symbols ty)
@@ -224,6 +235,7 @@ fn print-entry (module parent key entry parent-name opts...)
                 let k = (dupe (deref k))
                 let v = (dupe (deref v))
                 print-entry module ty k v key
+        return;
     elseif ('function-pointer? T)
         let fntype = ('element@ T 0)
         let params = ('element-count fntype)
