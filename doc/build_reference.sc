@@ -25,15 +25,28 @@ fn starts-with-letter (s)
 let EntryT = (tuple Symbol Value)
 local objs : (GrowingArray EntryT)
 
+let used-keys = (Scope)
 loop (scope = module)
     if (scope == null)
         break;
     let parent = ('parent scope)
-    let a b = parent
+    let used = `true
+    for k in ('deleted scope)
+        try
+            '@ used-keys k
+            ;
+        except (err)
+            'set-symbol used-keys k used
     for k v in scope
-        let T = ('typeof v)
-        'append objs
-            tupleof k v
+        try
+            '@ used-keys k
+            ;
+        except (err)
+            'set-symbol used-keys k used
+            let T = ('typeof v)
+            'append objs
+                tupleof k v
+            ;
     repeat parent
 
 'sort objs
@@ -217,10 +230,12 @@ fn print-entry (module parent key entry parent-name opts...)
         if typemember?
             io-write! parent-name; io-write! "."
         io-write! key
-        io-write! "\n\n"
-        io-write! "   A constant of type `"
-        io-write! (tostring T)
-        io-write! "`.\n"
+        io-write! "\n"
+        if (not has-docstr)
+            io-write! "\n"
+            io-write! "   A constant of type `"
+            io-write! (tostring T)
+            io-write! "`.\n"
     write-docstring docstr
 
 let moduledoc = ('docstring module unnamed)

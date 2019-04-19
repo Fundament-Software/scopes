@@ -318,6 +318,7 @@ SCOPES_LIBEXPORT sc_scope_t *sc_scope_clone_subscope(sc_scope_t *scope, sc_scope
 SCOPES_LIBEXPORT sc_scope_t *sc_scope_get_parent(sc_scope_t *scope);
 SCOPES_LIBEXPORT void sc_scope_del_symbol(sc_scope_t *scope, sc_symbol_t sym);
 SCOPES_LIBEXPORT sc_symbol_valueref_tuple_t sc_scope_next(sc_scope_t *scope, sc_symbol_t key);
+SCOPES_LIBEXPORT sc_symbol_t sc_scope_next_deleted(sc_scope_t *scope, sc_symbol_t key);
 
 // symbols
 

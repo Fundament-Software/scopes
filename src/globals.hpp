@@ -39,6 +39,7 @@ namespace scopes {
     T(g_sc_scope_new, "sc_scope_new") \
     T(g_sc_scope_new_subscope, "sc_scope_new_subscope") \
     T(g_sc_scope_set_symbol, "sc_scope_set_symbol") \
+    T(g_sc_scope_del_symbol, "sc_scope_del_symbol") \
     T(g_sc_scope_set_docstring, "sc_scope_set_docstring") \
     T(g_sc_eval, "sc_eval") \
     T(g_itrunc, "itrunc") \

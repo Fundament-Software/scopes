@@ -791,6 +791,25 @@ sc_symbol_valueref_tuple_t sc_scope_next(sc_scope_t *scope, sc_symbol_t key) {
     return { SYM_Unnamed, ValueRef() };
 }
 
+sc_symbol_t sc_scope_next_deleted(sc_scope_t *scope, sc_symbol_t key) {
+    using namespace scopes;
+    auto &&map = *scope->map;
+    Scope::Map::const_iterator it;
+    if (key == SYM_Unnamed) {
+        it = map.begin();
+    } else {
+        it = map.find(key);
+        if (it != map.end()) it++;
+    }
+    while (it != map.end()) {
+        if (!it->second.expr) {
+            return it->first;
+        }
+        it++;
+    }
+    return SYM_Unnamed;
+}
+
 // Symbol
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -2114,6 +2133,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_scope_get_parent, TYPE_Scope, TYPE_Scope);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_del_symbol, _void, TYPE_Scope, TYPE_Symbol);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_next, arguments_type({TYPE_Symbol, TYPE_ValueRef}), TYPE_Scope, TYPE_Symbol);
+    DEFINE_EXTERN_C_FUNCTION(sc_scope_next_deleted, TYPE_Symbol, TYPE_Scope, TYPE_Symbol);
 
     DEFINE_EXTERN_C_FUNCTION(sc_symbol_new, TYPE_Symbol, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_symbol_new_unique, TYPE_Symbol, TYPE_String);

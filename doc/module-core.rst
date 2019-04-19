@@ -34,37 +34,28 @@ parses the command-line and optionally enters the REPL.
    A constant of type `u64`.
 .. define:: compiler-dir
 
-   A constant of type `String`.
+   A string containing the folder path to the compiler environment. Typically
+   the compiler environment is the folder that contains the ``bin`` folder
+   containing the compiler executable.
 .. define:: compiler-path
 
-   A constant of type `String`.
+   A string constant containing the file path to the compiler executable.
 .. define:: compiler-timestamp
 
-   A constant of type `String`.
+   A string constant indicating the time and date the compiler was built.
 .. define:: debug-build?
 
-   A constant of type `bool`.
-.. define:: dot-char
-
-   A constant of type `i8`.
-.. define:: dot-sym
-
-   A constant of type `Symbol`.
+   A boolean constant indicating if the compiler was built in debug mode.
 .. define:: e
 
-   A constant of type `f32`.
-   
    Euler's number, also known as Napier's constant. Explicitly type-annotated
    versions of the constant are available as `e:f32` and `e:f64`
 .. define:: e:f32
 
-   A constant of type `f32`.
+   See `e`.
 .. define:: e:f64
 
-   A constant of type `f64`.
-.. define:: ellipsis-symbol
-
-   A constant of type `Symbol`.
+   See `e`.
 .. define:: false
 
    A constant of type `bool`.
@@ -91,10 +82,10 @@ parses the command-line and optionally enters the REPL.
    A constant of type `u32`.
 .. define:: infinite-range
 
-   A constant of type `Generator`.
-.. define:: list-handler-symbol
-
-   A constant of type `Symbol`.
+   A `Generator` that iterates through all 32-bit signed integer values starting
+   at 0. This generator does never terminate; when it exceeds the maximum
+   positive integer value of 2147483647, it overflows and continues with the
+   minimum negative integer value of -2147483648.
 .. define:: none
 
    A constant of type `Nothing`.
@@ -103,23 +94,33 @@ parses the command-line and optionally enters the REPL.
    A constant of type `NullType`.
 .. define:: operating-system
 
-   A constant of type `Symbol`.
+   A string constant indicating the operating system the compiler was built
+   for. It equals to ``"linux"`` for Linux builds, ``"windows"`` for Windows
+   builds, ``"macos"`` for macOS builds and ``"unknown"`` otherwise.
 .. define:: package
 
-   A constant of type `Scope`.
+   A scope symbol table which holds configuration options and module contents.
+   It is managed by the module import system.
+
+   ``package.path`` holds a list of all search paths in the form of simple
+   string patterns. Changing it alters the way modules are searched for in
+   the next run stage.
+
+   ``package.modules`` is another scope symbol table mapping full module
+   paths to their contents. When a module is first imported, its contents
+   are cached in this table. Subsequent imports of the same module will be
+   resolved to these cached contents.
 .. define:: pi
 
-   A constant of type `f32`.
-   
    The number π, the ratio of a circle's circumference C to its diameter d.
    Explicitly type-annotated versions of the constant are available as `pi:f32`
    and `pi:f64`.
 .. define:: pi:f32
 
-   A constant of type `f32`.
+   See `pi`.
 .. define:: pi:f64
 
-   A constant of type `f64`.
+   See `pi`.
 .. define:: pointer-flag-non-readable
 
    A constant of type `u64`.
@@ -169,9 +170,6 @@ parses the command-line and optionally enters the REPL.
 
    A constant of type `Symbol`.
 .. define:: style-warning
-
-   A constant of type `Symbol`.
-.. define:: symbol-handler-symbol
 
    A constant of type `Symbol`.
 .. define:: true
@@ -434,27 +432,31 @@ parses the command-line and optionally enters the REPL.
 .. type:: Scope
 
    A plain type of storage type `_Scope(*)`.
+.. inline:: (Scope.deleted self)
+.. inline:: (Scope.set-symbols self values...)
+.. compiledfn:: (Scope.@ ...)
+
+   An external function of type ``Value<->Error(Scope Symbol)``.
+.. compiledfn:: (Scope.next-deleted ...)
+
+   An external function of type ``Symbol<-(Scope Symbol)``.
+.. spice:: (Scope.define-internal-symbol ...)
+.. inline:: (Scope.define-symbols self values...)
+.. compiledfn:: (Scope.set-docstring! ...)
+
+   An external function of type ``void<-(Scope Symbol String)``.
+.. spice:: (Scope.set-symbol ...)
+.. compiledfn:: (Scope.next ...)
+
+   An external function of type ``λ(Symbol Value)<-(Scope Symbol)``.
+.. compiledfn:: (Scope.docstring ...)
+
+   An external function of type ``String<-(Scope Symbol)``.
+.. spice:: (Scope.define-symbol ...)
 .. spice:: (Scope.__typecall ...)
 .. compiledfn:: (Scope.parent ...)
 
    An external function of type ``Scope<-(Scope)``.
-.. compiledfn:: (Scope.next ...)
-
-   An external function of type ``λ(Symbol Value)<-(Scope Symbol)``.
-.. spice:: (Scope.set-symbol ...)
-.. spice:: (Scope.define-internal-symbol ...)
-.. compiledfn:: (Scope.set-docstring! ...)
-
-   An external function of type ``void<-(Scope Symbol String)``.
-.. compiledfn:: (Scope.docstring ...)
-
-   An external function of type ``String<-(Scope Symbol)``.
-.. compiledfn:: (Scope.@ ...)
-
-   An external function of type ``Value<->Error(Scope Symbol)``.
-.. spice:: (Scope.define-symbol ...)
-.. inline:: (Scope.set-symbols self values...)
-.. inline:: (Scope.define-symbols self values...)
 .. type:: SourceFile
 
    A plain type of storage type `_SourceFile(*)`.
@@ -479,11 +481,11 @@ parses the command-line and optionally enters the REPL.
 
    A plain type of supertype `immutable` and of storage type `u64`.
 .. inline:: (Symbol.__typecall cls str)
+.. spice:: (Symbol.__call ...)
+.. inline:: (Symbol.unique cls name)
 .. compiledfn:: (Symbol.variadic? ...)
 
    An external function of type ``bool<-(Symbol)``.
-.. inline:: (Symbol.unique cls name)
-.. spice:: (Symbol.__call ...)
 .. type:: TypeArrayPointer
 
    A plain type labeled ``type(*)`` of supertype `pointer` and of storage type `type(*)`.
@@ -495,44 +497,44 @@ parses the command-line and optionally enters the REPL.
    A plain type of storage type `{_Value Anchor}`.
 .. inline:: (Value.append-sink self)
 .. inline:: (Value.args self)
+.. inline:: (Value.reverse-args self)
 .. compiledfn:: (Value.kind ...)
 
    An external function of type ``i32<-(Value)``.
 .. inline:: (Value.tag self anchor)
-.. spice:: (Value.__typecall ...)
-.. compiledfn:: (Value.anchor ...)
+.. compiledfn:: (Value.pure? ...)
 
-   An external function of type ``Anchor<-(Value)``.
+   An external function of type ``bool<-(Value)``.
+.. spice:: (Value.__typecall ...)
 .. compiledfn:: (Value.none? ...)
 
    A compiled function of type ``bool<-(Value)``.
 .. inline:: (Value.dump self)
-.. compiledfn:: (Value.getarglist ...)
+.. compiledfn:: (Value.anchor ...)
 
-   An external function of type ``Value<-(Value i32)``.
-.. fn:: (Value.dekey self)
-.. compiledfn:: (Value.constant? ...)
-
-   An external function of type ``bool<-(Value)``.
-.. compiledfn:: (Value.pure? ...)
-
-   An external function of type ``bool<-(Value)``.
-.. compiledfn:: (Value.spice-repr ...)
-
-   An external function of type ``String<-(Value)``.
-.. compiledfn:: (Value.qualified-typeof ...)
-
-   An external function of type ``type<-(Value)``.
-.. compiledfn:: (Value.typeof ...)
-
-   An external function of type ``type<-(Value)``.
-.. compiledfn:: (Value.argcount ...)
-
-   An external function of type ``i32<-(Value)``.
-.. inline:: (Value.reverse-args self)
+   An external function of type ``Anchor<-(Value)``.
 .. compiledfn:: (Value.getarg ...)
 
    An external function of type ``Value<-(Value i32)``.
+.. compiledfn:: (Value.getarglist ...)
+
+   An external function of type ``Value<-(Value i32)``.
+.. compiledfn:: (Value.constant? ...)
+
+   An external function of type ``bool<-(Value)``.
+.. compiledfn:: (Value.argcount ...)
+
+   An external function of type ``i32<-(Value)``.
+.. compiledfn:: (Value.spice-repr ...)
+
+   An external function of type ``String<-(Value)``.
+.. compiledfn:: (Value.typeof ...)
+
+   An external function of type ``type<-(Value)``.
+.. compiledfn:: (Value.qualified-typeof ...)
+
+   An external function of type ``type<-(Value)``.
+.. fn:: (Value.dekey self)
 .. type:: ValueArrayPointer
 
    A plain type labeled ``Value(*)`` of supertype `pointer` and of storage type `Value(*)`.
@@ -545,8 +547,8 @@ parses the command-line and optionally enters the REPL.
 .. type:: array
 
    An opaque type of supertype `aggregate`.
-.. spice:: (array.__typecall ...)
 .. inline:: (array.type element-type size)
+.. spice:: (array.__typecall ...)
 .. type:: bool
 
    A plain type of supertype `integer` and of storage type `bool`.
@@ -568,8 +570,9 @@ parses the command-line and optionally enters the REPL.
 .. type:: function
 
    An opaque type.
-.. spice:: (function.type ...)
-.. spice:: (function.__typecall ...)
+
+   .. spice:: (function.type ...)
+   .. spice:: (function.__typecall ...)
 .. type:: hash
 
    A plain type of storage type `u64`.
@@ -604,23 +607,23 @@ parses the command-line and optionally enters the REPL.
 
    A plain type labeled ``List`` of storage type `_List(*)`.
 .. fn:: (list.token-split expr token errmsg)
+.. fn:: (list.rjoin lside rside)
 .. spice:: (list.__typecall ...)
+.. inline:: (list.cons-sink self)
 .. compiledfn:: (list.dump ...)
 
    An external function of type ``List<-(List)``.
 .. compiledfn:: (list.join ...)
 
    An external function of type ``List<-(List List)``.
-.. compiledfn:: (list.next ...)
+.. compiledfn:: (list.reverse ...)
 
    An external function of type ``List<-(List)``.
-.. fn:: (list.rjoin lside rside)
 .. compiledfn:: (list.@ ...)
 
    An external function of type ``Value<-(List)``.
-.. inline:: (list.cons-sink self)
 .. inline:: (list.decons self count)
-.. compiledfn:: (list.reverse ...)
+.. compiledfn:: (list.next ...)
 
    An external function of type ``List<-(List)``.
 .. type:: noreturn
@@ -645,12 +648,12 @@ parses the command-line and optionally enters the REPL.
 .. type:: string
 
    A plain type labeled ``String`` of supertype `opaquepointer` and of storage type `_String(*)`.
-.. compiledfn:: (string.join ...)
-
-   An external function of type ``String<-(String String)``.
 .. compiledfn:: (string.buffer ...)
 
    An external function of type ``λ(i8(*) usize)<-(String)``.
+.. compiledfn:: (string.join ...)
+
+   An external function of type ``String<-(String String)``.
 .. compiledfn:: (string.match? ...)
 
    An external function of type ``bool<->Error(String String)``.
@@ -662,88 +665,88 @@ parses the command-line and optionally enters the REPL.
 .. type:: type
 
    A plain type of supertype `opaquepointer` and of storage type `_type(*)`.
+.. inline:: (type.symbols self)
 .. inline:: (type.elements self)
-.. spice:: (type.dispatch-attr ...)
 .. fn:: (type.pointer->refer-type cls)
+.. fn:: (type.writable? cls)
 .. fn:: (type.readable? cls)
 .. fn:: (type.strip-pointer-storage-class cls)
-.. compiledfn:: (type.alignof ...)
-
-   An external function of type ``usize<->Error(type)``.
-.. compiledfn:: (type.storageof ...)
-
-   An external function of type ``type<->Error(type)``.
-.. compiledfn:: (type.bitcount ...)
-
-   An external function of type ``i32<-(type)``.
-.. compiledfn:: (type.local@ ...)
-
-   An external function of type ``Value<->Error(type Symbol)``.
 .. compiledfn:: (type.kind ...)
 
    An external function of type ``i32<-(type)``.
-.. compiledfn:: (type.element-count ...)
+.. compiledfn:: (type.storageof ...)
 
-   An external function of type ``i32<->Error(type)``.
-.. compiledfn:: (type.sizeof ...)
-
-   An external function of type ``usize<->Error(type)``.
+   An external function of type ``type<->Error(type)``.
 .. compiledfn:: (type.element@ ...)
 
    An external function of type ``type<->Error(type i32)``.
-.. inline:: (type.symbols self)
+.. compiledfn:: (type.alignof ...)
+
+   An external function of type ``usize<->Error(type)``.
 .. compiledfn:: (type.signed? ...)
 
    An external function of type ``bool<-(type)``.
-.. compiledfn:: (type.unique-type ...)
-
-   An external function of type ``type<-(type i32)``.
 .. fn:: (type.immutable cls)
-.. compiledfn:: (type.@ ...)
+.. compiledfn:: (type.sizeof ...)
 
-   An external function of type ``Value<->Error(type Symbol)``.
+   An external function of type ``usize<->Error(type)``.
+.. compiledfn:: (type.bitcount ...)
+
+   An external function of type ``i32<-(type)``.
+.. fn:: (type.mutable cls)
+.. spice:: (type.__call ...)
 .. inline:: (type.set-plain-storage type storage-type)
-.. fn:: (type.pointer-storage-class cls)
+.. compiledfn:: (type.element-count ...)
+
+   An external function of type ``i32<->Error(type)``.
+.. inline:: (type.set-symbols self values...)
+.. fn:: (type.function-pointer? cls)
+.. spice:: (type.define-symbol ...)
+.. spice:: (type.dispatch-attr ...)
+.. spice:: (type.raises ...)
 .. spice:: (type.set-symbol ...)
 .. compiledfn:: (type.variadic? ...)
 
    An external function of type ``bool<-(type)``.
-.. spice:: (type.__call ...)
-.. spice:: (type.raises ...)
+.. inline:: (type.define-symbols self values...)
+.. compiledfn:: (type.@ ...)
+
+   An external function of type ``Value<->Error(type Symbol)``.
+.. inline:: (type.set-storage type storage-type)
+.. compiledfn:: (type.local@ ...)
+
+   An external function of type ``Value<->Error(type Symbol)``.
+.. compiledfn:: (type.unique-type ...)
+
+   An external function of type ``type<-(type i32)``.
+.. compiledfn:: (type.return-type ...)
+
+   An external function of type ``λ(type type)<-(type)``.
+.. compiledfn:: (type.string ...)
+
+   An external function of type ``String<-(type)``.
 .. compiledfn:: (type.plain? ...)
 
    An external function of type ``bool<-(type)``.
 .. compiledfn:: (type.key ...)
 
    An external function of type ``λ(Symbol type)<-(type)``.
-.. compiledfn:: (type.refer? ...)
-
-   An external function of type ``bool<-(type)``.
-.. inline:: (type.set-symbols self values...)
-.. inline:: (type.define-symbols self values...)
-.. fn:: (type.writable? cls)
-.. inline:: (type.view-type self id)
-.. fn:: (type.change-element-type cls ET)
-.. compiledfn:: (type.opaque? ...)
-
-   An external function of type ``bool<-(type)``.
+.. fn:: (type.pointer-storage-class cls)
 .. inline:: (type.key-type self key)
-.. inline:: (type.set-storage type storage-type)
-.. compiledfn:: (type.return-type ...)
-
-   An external function of type ``λ(type type)<-(type)``.
-.. fn:: (type.change-storage-class cls storage-class)
+.. inline:: (type.view-type self id)
 .. compiledfn:: (type.superof ...)
 
    An external function of type ``type<-(type)``.
-.. fn:: (type.pointer? cls)
-.. compiledfn:: (type.string ...)
+.. fn:: (type.change-element-type cls ET)
+.. compiledfn:: (type.refer? ...)
 
-   An external function of type ``String<-(type)``.
-.. fn:: (type.function-pointer? cls)
-.. spice:: (type.define-symbol ...)
+   An external function of type ``bool<-(type)``.
+.. fn:: (type.pointer? cls)
+.. compiledfn:: (type.opaque? ...)
+
+   An external function of type ``bool<-(type)``.
 .. fn:: (type.function? cls)
-.. fn:: (type.mutable cls)
+.. fn:: (type.change-storage-class cls storage-class)
 .. type:: typename
 
    An opaque type.
@@ -792,7 +795,6 @@ parses the command-line and optionally enters the REPL.
 .. inline:: (<<= lhs rhs)
 .. inline:: (>>= lhs rhs)
 .. inline:: (^= lhs rhs)
-.. inline:: (_memo f)
 .. inline:: (|= lhs rhs)
 .. fn:: (Value-none? value)
 .. fn:: (all? v)
@@ -803,18 +805,18 @@ parses the command-line and optionally enters the REPL.
 .. inline:: (balanced-binary-op-dispatch symbol rsymbol friendly-op-name)
 .. fn:: (balanced-binary-operation args symbol rsymbol friendly-op-name)
 .. fn:: (balanced-binary-operator symbol rsymbol lhsT rhsT lhs-static? rhs-static?)
-   
+
    for an operation performed on two argument types, of which either
    type can provide a suitable candidate, return a matching operator.
    This function only works inside a spice macro.
 .. fn:: (binary-op-error friendly-op-name lhsT rhsT)
 .. fn:: (binary-operator symbol lhsT rhsT)
-   
+
    for an operation performed on two argument types, of which only
    the left type can provide a suitable candidate, find a matching
    operator function. This function only works inside a spice macro.
 .. fn:: (binary-operator-r rsymbol lhsT rhsT)
-   
+
    for an operation performed on two argument types, of which only
    the right type can provide a suitable candidate, find a matching
    operator function. This function only works inside a spice macro.
@@ -826,7 +828,7 @@ parses the command-line and optionally enters the REPL.
 .. fn:: (box-symbol value)
 .. fn:: (build-typify-function f)
 .. fn:: (cast-converter symbol rsymbol vT T)
-   
+
    for two given types, find a matching conversion function
    this function only works inside a spice macro
 .. inline:: (cast-error intro-string vT T)
@@ -834,7 +836,7 @@ parses the command-line and optionally enters the REPL.
 .. fn:: (check-count count mincount maxcount)
 .. inline:: (clamp x mn mx)
 .. fn:: (clone-scope-contents a b)
-   
+
    Join two scopes ``a`` and ``b`` into a new scope so that the
    root of ``a`` descends from ``b``.
 .. fn:: (compare-type args f)
@@ -849,11 +851,11 @@ parses the command-line and optionally enters the REPL.
 .. inline:: (enumerate x)
 .. fn:: (error msg)
 .. fn:: (error@ anchor traceback-msg error-msg)
-   
+
    usage example::
        error@ ('anchor value) "while checking parameter" "error in value"
 .. fn:: (error@+ error anchor traceback-msg)
-   
+
    usage example::
        except (err)
            error@+ err ('anchor value) "while processing stream"
@@ -872,11 +874,11 @@ parses the command-line and optionally enters the REPL.
 .. inline:: (gen-cast-op f str)
 .. inline:: (gen-match-block-parser handle-case)
 .. fn:: (gen-match-matcher failfunc expr scope cond)
-   
+
    features:
    <constant> -> (input == <constant>)
    (or <expr_a> <expr_b>) -> (or <expr_a> <expr_b>)
-   
+
    TODO:
    (: x T) -> ((typeof input) == T), let x = input
    <unknown symbol> -> unpack as symbol
@@ -908,7 +910,6 @@ parses the command-line and optionally enters the REPL.
 .. inline:: (memoize f)
 .. fn:: (merge-scope-symbols source target filter)
 .. fn:: (next-head? next)
-.. inline:: (not value)
 .. fn:: (operator-valid? value)
 .. fn:: (patterns-from-namestr base-dir namestr)
 .. fn:: (pointer-imply vT T)
@@ -932,7 +933,7 @@ parses the command-line and optionally enters the REPL.
 .. inline:: (set-symbols self values...)
 .. inline:: (signed-vector-binary-op sf uf)
 .. inline:: (simple-binary-op f)
-   
+
    for cases where the type only interacts with itself
 .. inline:: (simple-folding-autotype-binary-op f unboxer)
 .. inline:: (simple-folding-autotype-signed-binary-op sf uf unboxer)
@@ -940,18 +941,18 @@ parses the command-line and optionally enters the REPL.
 .. inline:: (simple-signed-binary-op sf uf)
 .. inline:: (slice value start end)
 .. inline:: (spice-binary-op-macro f)
-   
+
    to be used for binary operators of which either type can
    provide an operation. returns a callable operator (f lhs rhs) that
    performs the operation or no arguments if the operation can not be
    performed.
 .. inline:: (spice-cast-macro f)
-   
+
    to be used for __as, __ras, __imply and __rimply
    returns a callable converter (f value) that performs the cast or
    no arguments if the cast can not be performed.
 .. inline:: (spice-converter-macro f)
-   
+
    to be used for converter that need to do additional
    dispatch, e.g. do something else when the value is a constant
    returns a quote that performs the cast (f value T)
@@ -969,7 +970,7 @@ parses the command-line and optionally enters the REPL.
 .. fn:: (unary-op-error friendly-op-name T)
 .. fn:: (unary-operation args symbol friendly-op-name)
 .. fn:: (unary-operator symbol T)
-   
+
    for an operation performed on one variable argument type, find a
    matching operator function. This function only works inside a spice
    macro.
@@ -985,10 +986,10 @@ parses the command-line and optionally enters the REPL.
 .. inline:: (unbox-symbol value T)
 .. fn:: (unbox-verify value wantT)
 .. fn:: (uncomma l)
-   
+
    uncomma list l, wrapping all comma separated symbols as new lists
    example::
-   
+
        (uncomma '(a , b c d , e f , g h)) -> '(a (b c d) (e f) (g h))
 .. fn:: (unpack-infix-op op)
 .. fn:: (unpack2 args)
@@ -1028,7 +1029,7 @@ parses the command-line and optionally enters the REPL.
 .. sugar:: (inline... ...)
 .. sugar:: (local ...)
 .. sugar:: (locals ...)
-   
+
    export locals as a chain of two new scopes: a scope that contains
    all the constant values in the immediate scope, and a scope that contains
    the runtime values.
@@ -1046,7 +1047,7 @@ parses the command-line and optionally enters the REPL.
 .. sugar:: (sugar-match ...)
 .. sugar:: (sugar-set-scope! ...)
 .. sugar:: (typedef ...)
-   
+
    a type declaration syntax; when the name is a string, the type is declared
    at runtime.
 .. sugar:: (typedef+ ...)
@@ -1108,7 +1109,6 @@ parses the command-line and optionally enters the REPL.
 .. builtin:: (embed ...)
 .. builtin:: (exp ...)
 .. builtin:: (exp2 ...)
-.. builtin:: (extern-new ...)
 .. builtin:: (extern-symbol ...)
 .. builtin:: (extractelement ...)
 .. builtin:: (extractvalue ...)
@@ -1253,10 +1253,7 @@ parses the command-line and optionally enters the REPL.
 .. builtin:: (zext ...)
 .. spice:: (% ...)
 .. spice:: (& ...)
-.. spice:: (& ...)
 .. spice:: (* ...)
-.. spice:: (* ...)
-.. spice:: (+ ...)
 .. spice:: (+ ...)
 .. spice:: (- ...)
 .. spice:: (/ ...)
@@ -1264,13 +1261,10 @@ parses the command-line and optionally enters the REPL.
 .. spice:: (= ...)
 .. spice:: (> ...)
 .. spice:: (@ ...)
-.. spice:: (@ ...)
 .. spice:: (^ ...)
-.. spice:: (| ...)
 .. spice:: (| ...)
 .. spice:: (~ ...)
 .. spice:: (!= ...)
-.. spice:: (.. ...)
 .. spice:: (.. ...)
 .. spice:: (// ...)
 .. spice:: (<< ...)
@@ -1283,7 +1277,7 @@ parses the command-line and optionally enters the REPL.
 .. spice:: (abs ...)
 .. spice:: (alignof ...)
 .. spice:: (and-branch ...)
-   
+
    The type of the `null` constant. This type is uninstantiable.
 .. spice:: (append-to-type ...)
 .. spice:: (arrayof ...)
@@ -1337,7 +1331,7 @@ parses the command-line and optionally enters the REPL.
 .. spice:: (typify ...)
 .. spice:: (unpack ...)
 .. spice:: (va-append-va ...)
-   
+
     (va-append-va (inline () (_ b ...)) a...) -> a... b...
 .. spice:: (va-empty? ...)
 .. spice:: (va-lfold ...)
@@ -1346,10 +1340,10 @@ parses the command-line and optionally enters the REPL.
 .. spice:: (va-rfold ...)
 .. spice:: (va-rifold ...)
 .. spice:: (va-split ...)
-   
+
     (va-split n a...) -> (inline () a...[n .. (va-countof a...)-1]) a...[0 .. n-1]
 .. spice:: (va-unnamed ...)
-   
+
     filter all keyed values
 .. spice:: (vector-reduce ...)
 .. spice:: (vectorof ...)
@@ -1763,6 +1757,9 @@ parses the command-line and optionally enters the REPL.
 .. compiledfn:: (sc_scope_next ...)
 
    An external function of type ``λ(Symbol Value)<-(Scope Symbol)``.
+.. compiledfn:: (sc_scope_next_deleted ...)
+
+   An external function of type ``Symbol<-(Scope Symbol)``.
 .. compiledfn:: (sc_scope_set_docstring ...)
 
    An external function of type ``void<-(Scope Symbol String)``.

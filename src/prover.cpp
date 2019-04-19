@@ -1264,9 +1264,21 @@ static SCOPES_RESULT(TypedValueRef) prove_CompileStage(const ASTContext &ctx, co
                 { tmp, ref(anchor, ConstInt::symbol_from(SYM_Unnamed)),
                     ref(anchor, ConstPointer::string_from(docstr)) })));
     }
-    Symbol last_key = SYM_Unnamed;
     //StyledStream ss;
+    Symbol last_key = SYM_Unnamed;
     while (true) {
+        // generate deletions
+        auto key = sc_scope_next_deleted(scope, last_key);
+        if (key == SYM_Unnamed)
+            break;
+        last_key = key;
+        auto vkey = ref(anchor, ConstInt::symbol_from(key));
+        block->append(ref(anchor,
+            CallTemplate::from(g_sc_scope_del_symbol, { tmp, vkey })));
+    }
+    last_key = SYM_Unnamed;
+    while (true) {
+        // generate insertions
         auto key_value = sc_scope_next(scope, last_key);
         auto key = key_value._0;
         auto untyped_value = key_value._1;

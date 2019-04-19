@@ -455,7 +455,11 @@ struct Expander {
                     if (!env->lookup(name, entry)) {
                         SCOPES_ERROR(SyntaxUndeclaredIdentifier, name, env);
                     }
-                    env->bind_with_doc(name, entry);
+                    if (!entry.doc) {
+                        env->bind(name, entry.expr);
+                    } else {
+                        env->bind_with_doc(name, entry);
+                    }
                     last_entry = entry.expr;
                     it = it->next;
                 }

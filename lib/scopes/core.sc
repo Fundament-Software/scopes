@@ -13,6 +13,27 @@
     The core module implements the remaining standard functions and macros,
     parses the command-line and optionally enters the REPL.
 
+""""A string containing the folder path to the compiler environment. Typically
+    the compiler environment is the folder that contains the ``bin`` folder
+    containing the compiler executable.
+let compiler-dir
+""""A string constant containing the file path to the compiler executable.
+let compiler-path
+""""A string constant indicating the time and date the compiler was built.
+let compiler-timestamp
+""""A boolean constant indicating if the compiler was built in debug mode.
+let debug-build?
+""""A string constant indicating the operating system the compiler was built
+    for. It equals to ``"linux"`` for Linux builds, ``"windows"`` for Windows
+    builds, ``"macos"`` for macOS builds and ``"unknown"`` otherwise.
+let operating-system
+""""A constant of type `i32` indicating the maximum number of recursions
+    permitted for an inline. When this number is exceeded, an error is raised
+    during typechecking. Currently, the limit is set at 64 recursions. This
+    restriction has been put in place to prevent the compiler from overflowing
+    its stack memory.
+let unroll-limit
+
 # square list expressions are ast unquotes by default
 let square-list = spice-unquote-arguments
 
@@ -754,6 +775,7 @@ inline define-symbols (self values...)
 'define-symbols Scope
     @ = sc_scope_at
     next = sc_scope_next
+    next-deleted = sc_scope_next_deleted
     docstring = sc_scope_get_docstring
     set-docstring! = sc_scope_set_docstring
     parent = sc_scope_get_parent
@@ -2412,6 +2434,17 @@ fn va-option-branch (args)
 # modules
 ####
 
+""""A symbol table of type `Scope` which holds configuration options and module
+    contents. It is managed by the module import system.
+
+    ``package.path`` holds a list of all search paths in the form of simple
+    string patterns. Changing it alters the way modules are searched for in
+    the next run stage.
+
+    ``package.modules`` is another scope symbol table mapping full module
+    paths to their contents. When a module is first imported, its contents
+    are cached in this table. Subsequent imports of the same module will be
+    resolved to these cached contents.
 let package = (Scope)
 'set-symbols package
     path =
@@ -3387,6 +3420,14 @@ do
                 sc_scope_next self key
 
     'set-symbols Scope
+        deleted =
+            inline (self)
+                Generator
+                    inline () (sc_scope_next_deleted self unnamed)
+                    inline (key) (key != unnamed)
+                    inline (key) key
+                    inline (key)
+                        sc_scope_next_deleted self key
         __as =
             spice-cast-macro
                 fn "scope-as" (vT T)
@@ -4513,6 +4554,10 @@ inline va-join (a...)
     inline (b...)
         va-append-va (inline () b...) a...
 
+""""A `Generator` that iterates through all 32-bit signed integer values starting
+    at 0. This generator does never terminate; when it exceeds the maximum
+    positive integer value of 2147483647, it overflows and continues with the
+    minimum negative integer value of -2147483648.
 let infinite-range =
     Generator
         inline () 0
@@ -5725,14 +5770,18 @@ typedef+ string
 # constants
 #-------------------------------------------------------------------------------
 
+""""See `pi`.
 let pi:f32 = 3.141592653589793:f32
+""""See `pi`.
 let pi:f64 = 3.141592653589793:f64
 """"The number π, the ratio of a circle's circumference C to its diameter d.
     Explicitly type-annotated versions of the constant are available as `pi:f32`
     and `pi:f64`.
 let pi = pi:f32
 
+""""See `e`.
 let e:f32 = 2.718281828459045:f32
+""""See `e`.
 let e:f64 = 2.718281828459045:f64
 """"Euler's number, also known as Napier's constant. Explicitly type-annotated
     versions of the constant are available as `e:f32` and `e:f64`
@@ -5740,7 +5789,8 @@ let e = e:f32
 
 #-------------------------------------------------------------------------------
 
-unlet _memo
+unlet _memo dot-char dot-sym ellipsis-symbol symbol-handler-symbol
+    \ list-handler-symbol struct-dsl _Value
 
 run-stage; # 12
 
