@@ -777,7 +777,7 @@ inline define-symbols (self values...)
     next = sc_scope_next
     next-deleted = sc_scope_next_deleted
     docstring = sc_scope_get_docstring
-    set-docstring! = sc_scope_set_docstring
+    set-docstring = sc_scope_set_docstring
     parent = sc_scope_get_parent
 
 'define-symbols string
@@ -817,7 +817,7 @@ inline define-symbols (self values...)
     string = sc_type_string
     superof = sc_typename_type_get_super
     docstring = sc_type_get_docstring
-    set-docstring! = sc_type_set_docstring
+    set-docstring = sc_type_set_docstring
     set-storage =
         inline (type storage-type)
             sc_typename_type_set_storage type storage-type 0:u32
@@ -910,7 +910,74 @@ inline not (value)
 # supertype for unique structs
 let Struct = (sc_typename_type "Struct" typename)
 
-# generator type
+""""Generators provide a protocol for iterating the contents of containers and
+    enumerating sequences. They are primarily used by `for` and `fold`, but can
+    also be used separately.
+
+    Each generator instance is equivalent to a closure that when called returns
+    four functions:
+
+    * A function ``state... <- fn start ()`` which returns the initial state of
+      the generator as an arbitrary number of arbitrarily typed values. The
+      initially returned state defines the format of the generators internal
+      state.
+    * A function ``bool <- fn valid? (state...)`` which takes the current
+      generator state and returns `true` when the generator can resolve the
+      state to a collection item, otherwise `false`, indicating that the
+      generator has been depleted.
+    * A function ``value... <- fn at (state...)`` which takes the current
+      generator state and returns the collection item this state maps to. The
+      function may not be called for a state for which ``valid?`` has reported
+      to be depleted.
+    * A function ``state... <- fn next (state...)`` which takes the current
+      generator state and returns the state mapping to the next item in the
+      collection. The new state must have the same type signature as the
+      previous state. The function may not be called for a state for which
+      ``valid?`` has reported to be depleted.
+
+    Generally, it is allowed to call any of these functions multiple times
+    with any valid state, effectively restarting the Generator at an arbitrary
+    point, as Generators are not expected to have side effects. In controlled
+    circumstances a Generator may choose to be impure, but should be documented
+    accordingly.
+
+    Here is a typical pattern for constructing a generator::
+
+        inline make-generator (container)
+            Generator
+                inline "start" ()
+                    # return the first iterator of sequence (might not be valid)
+                    'start container
+                inline "valid?" (it...)
+                    # return true if the iterator is still valid
+                    'valid-iterator? container it...
+                inline "at" (it...)
+                    # return variadic result at iterator
+                    '@ container it...
+                inline "next" (it...)
+                    # return the next iterator in sequence
+                    'next container it...
+
+    The generator can then be subsequently used like this::
+
+        # this example prints up to two elements returned by a generator
+        # generate a new instance bound to container
+        let gen = (make-generator container)
+        # extract all methods
+        let start valid? at next = (gen)
+        # get the init state
+        let state... = (start)
+        # check if the state is valid
+        if (valid? state...)
+            # container has at least one item; print it
+            print (at state...)
+            # advance to the next state
+            let state... = (next state...)
+            if (valid? state...)
+                # container has one more item; print it
+                print (at state...)
+        # we are done; no cleanup necessary
+
 let Generator = (sc_typename_type "Generator" typename)
 'set-plain-storage Generator ('storageof Closure)
 
@@ -2773,6 +2840,8 @@ let va-option =
 'set-symbols Generator
     __typecall =
         inline "Generator-new" (cls start valid? at next)
+            """"Takes four functions ``start``, ``valid?``, ``at`` and ``next``
+                and returns a new generator ready for use.
             Closure->Generator
                 inline "get-iter-init" ()
                     _ start valid? at next
@@ -2787,6 +2856,13 @@ let va-option =
                 let self = (self as Generator)
                 let self = (bitcast self Closure)
                 `(self)
+
+'set-docstring Generator '__call
+    """".. spice:: (__call self)
+
+           Returns, in this order, the four functions ``start``, ``valid?``,
+           ``init`` and ``next`` which are required to enumerate generator
+           `self`.
 
 # typical pattern for a generator:
     inline make-generator (container)
@@ -3024,7 +3100,7 @@ fn load-module (module-name module-path opts...)
         va-option scope opts...
             do
                 let newscope = (Scope (sc_get_globals))
-                'set-docstring! newscope unnamed ""
+                'set-docstring newscope unnamed ""
                 newscope
     'set-symbols eval-scope
         main-module? =
@@ -3140,7 +3216,7 @@ let locals =
                         if (stage-constant? value)
                             let key = (key as Symbol)
                             'set-symbol constant-scope key value
-                            'set-docstring! constant-scope key keydocstr
+                            'set-docstring constant-scope key keydocstr
                             `none
                         else
                             spice-quote
@@ -3154,7 +3230,7 @@ let locals =
                         let docstr = ('docstring scope unnamed)
                         let constant-scope = (Scope)
                         if (not (empty? docstr))
-                            'set-docstring! constant-scope unnamed docstr
+                            'set-docstring constant-scope unnamed docstr
                         let tmp = `(Scope constant-scope)
                         let block = (sc_expression_new)
                         sc_expression_append block tmp
@@ -5227,7 +5303,7 @@ define append-to-type
                 if (stage-constant? value)
                     let key = (key as Symbol)
                     'set-symbol T key value
-                    'set-docstring! T key (docstr as string)
+                    'set-docstring T key (docstr as string)
                     `T
                 else
                     let wrapvalue =
@@ -5947,14 +6023,14 @@ fn read-eval-print-loop ()
                     sc_expression_append block
                         `('set-symbol scope key outargs)
                     sc_expression_append block
-                        `('set-docstring! scope key docstr)
+                        `('set-docstring scope key docstr)
                     sc_expression_append block scope
                     return block
                 else
                     return
                         spice-quote
                             'set-symbol scope key vals...
-                            'set-docstring! scope key docstr
+                            'set-docstring scope key docstr
                             scope
             scope
 
@@ -6115,7 +6191,7 @@ fn run-main ()
     else
         let scope =
             Scope (globals)
-        'set-docstring! scope unnamed ""
+        'set-docstring scope unnamed ""
         'set-symbols scope
             script-launch-args =
                 fn ()

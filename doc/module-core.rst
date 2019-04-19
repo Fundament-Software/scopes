@@ -419,10 +419,85 @@ parses the command-line and optionally enters the REPL.
 
 .. type:: Generator
 
-   A plain type of storage type `_Closure(*)`.
+   
+   Generators provide a protocol for iterating the contents of containers and
+   enumerating sequences. They are primarily used by `for` and `fold`, but can
+   also be used separately.
+   
+   Each generator instance is equivalent to a closure that when called returns
+   four functions:
+   
+   * A function ``state... <- fn start ()`` which returns the initial state of
+     the generator as an arbitrary number of arbitrarily typed values. The
+     initially returned state defines the format of the generators internal
+     state.
+   * A function ``bool <- fn valid? (state...)`` which takes the current
+     generator state and returns `true` when the generator can resolve the
+     state to a collection item, otherwise `false`, indicating that the
+     generator has been depleted.
+   * A function ``value... <- fn at (state...)`` which takes the current
+     generator state and returns the collection item this state maps to. The
+     function may not be called for a state for which ``valid?`` has reported
+     to be depleted.
+   * A function ``state... <- fn next (state...)`` which takes the current
+     generator state and returns the state mapping to the next item in the
+     collection. The new state must have the same type signature as the
+     previous state. The function may not be called for a state for which
+     ``valid?`` has reported to be depleted.
+   
+   Generally, it is allowed to call any of these functions multiple times
+   with any valid state, effectively restarting the Generator at an arbitrary
+   point, as Generators are not expected to have side effects. In controlled
+   circumstances a Generator may choose to be impure, but should be documented
+   accordingly.
+   
+   Here is a typical pattern for constructing a generator::
+   
+       inline make-generator (container)
+           Generator
+               inline "start" ()
+                   # return the first iterator of sequence (might not be valid)
+                   'start container
+               inline "valid?" (it...)
+                   # return true if the iterator is still valid
+                   'valid-iterator? container it...
+               inline "at" (it...)
+                   # return variadic result at iterator
+                   '@ container it...
+               inline "next" (it...)
+                   # return the next iterator in sequence
+                   'next container it...
+   
+   The generator can then be subsequently used like this::
+   
+       # this example prints up to two elements returned by a generator
+       # generate a new instance bound to container
+       let gen = (make-generator container)
+       # extract all methods
+       let start valid? at next = (gen)
+       # get the init state
+       let state... = (start)
+       # check if the state is valid
+       if (valid? state...)
+           # container has at least one item; print it
+           print (at state...)
+           # advance to the next state
+           let state... = (next state...)
+           if (valid? state...)
+               # container has one more item; print it
+               print (at state...)
+       # we are done; no cleanup necessary
 
-   .. spice:: (__call ...)
+   
+   .. spice:: (__call self)
+   
+      Returns, in this order, the four functions ``start``, ``valid?``,
+      ``init`` and ``next`` which are required to enumerate generator
+      `self`.
    .. inline:: (__typecall cls start valid? at next)
+      
+      Takes four functions ``start``, ``valid?``, ``at`` and ``next``
+      and returns a new generator ready for use.
 .. type:: Image
 
    An opaque type.
@@ -499,7 +574,7 @@ parses the command-line and optionally enters the REPL.
    .. compiledfn:: (parent ...)
 
       An external function of type ``Scope<-(Scope)``.
-   .. compiledfn:: (set-docstring! ...)
+   .. compiledfn:: (set-docstring ...)
 
       An external function of type ``void<-(Scope Symbol String)``.
    .. spice:: (set-symbol ...)
@@ -944,7 +1019,7 @@ parses the command-line and optionally enters the REPL.
    .. compiledfn:: (return-type ...)
 
       An external function of type ``λ(type type)<-(type)``.
-   .. compiledfn:: (set-docstring! ...)
+   .. compiledfn:: (set-docstring ...)
 
       An external function of type ``void<-(type Symbol String)``.
    .. inline:: (set-plain-storage type storage-type)
