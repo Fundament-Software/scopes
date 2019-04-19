@@ -12,68 +12,68 @@ and access external variables for shader programs.
 
    An opaque type of supertype `gsampler`.
 
-   .. builtin:: (texture-samples ...)
    .. builtin:: (texture-levels ...)
+   .. builtin:: (texture-samples ...)
 .. type:: gsampler1DArray
 
    An opaque type of supertype `gsampler`.
 
-   .. builtin:: (texture-samples ...)
    .. builtin:: (texture-levels ...)
+   .. builtin:: (texture-samples ...)
 .. type:: gsampler2D
 
    An opaque type of supertype `gsampler`.
 
-   .. builtin:: (texture-samples ...)
    .. builtin:: (texture-levels ...)
+   .. builtin:: (texture-samples ...)
 .. type:: gsampler2DArray
 
    An opaque type of supertype `gsampler`.
 
-   .. builtin:: (texture-samples ...)
    .. builtin:: (texture-levels ...)
+   .. builtin:: (texture-samples ...)
 .. type:: gsampler2DMS
 
    An opaque type of supertype `gsampler`.
 
-   .. builtin:: (texture-samples ...)
    .. builtin:: (texture-levels ...)
+   .. builtin:: (texture-samples ...)
 .. type:: gsampler2DMSArray
 
    An opaque type of supertype `gsampler`.
 
-   .. builtin:: (texture-samples ...)
    .. builtin:: (texture-levels ...)
+   .. builtin:: (texture-samples ...)
 .. type:: gsampler2DRect
 
    An opaque type of supertype `gsampler`.
 
-   .. builtin:: (texture-samples ...)
    .. builtin:: (texture-levels ...)
+   .. builtin:: (texture-samples ...)
 .. type:: gsampler3D
 
    An opaque type of supertype `gsampler`.
 
-   .. builtin:: (texture-samples ...)
    .. builtin:: (texture-levels ...)
+   .. builtin:: (texture-samples ...)
 .. type:: gsamplerBuffer
 
    An opaque type of supertype `gsampler`.
 
-   .. builtin:: (texture-samples ...)
    .. builtin:: (texture-levels ...)
+   .. builtin:: (texture-samples ...)
 .. type:: gsamplerCube
 
    An opaque type of supertype `gsampler`.
 
-   .. builtin:: (texture-samples ...)
    .. builtin:: (texture-levels ...)
+   .. builtin:: (texture-samples ...)
 .. type:: gsamplerCubeArray
 
    An opaque type of supertype `gsampler`.
 
-   .. builtin:: (texture-samples ...)
    .. builtin:: (texture-levels ...)
+   .. builtin:: (texture-samples ...)
 .. type:: isampler1D
 
    An opaque type of supertype `gsampler1D$3`.

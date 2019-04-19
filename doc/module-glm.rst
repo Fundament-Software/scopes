@@ -189,8 +189,14 @@ written in the GL shader language.
 
    An opaque type of supertype `immutable`.
 
-   .. spice:: (row ...)
+   .. spice:: (__* ...)
+   .. spice:: (__== ...)
+   .. inline:: (__@ self index)
+   .. spice:: (__as ...)
+   .. spice:: (__r* ...)
    .. spice:: (__typecall ...)
+   .. inline:: (__unpack self)
+   .. spice:: (row ...)
 .. type:: mat2
 
    A plain type labeled ``mat2x2`` of supertype `mat-type` and of storage type `[vec2 x 2]`.
@@ -303,7 +309,42 @@ written in the GL shader language.
 
    An opaque type of supertype `immutable`.
 
+   .. spice:: (__% ...)
+   .. spice:: (__& ...)
+   .. spice:: (__* ...)
+   .. spice:: (__+ ...)
+   .. spice:: (__- ...)
+   .. spice:: (__/ ...)
+   .. spice:: (__// ...)
+   .. spice:: (__< ...)
+   .. spice:: (__<= ...)
+   .. spice:: (__== ...)
+   .. spice:: (__> ...)
+   .. spice:: (__>= ...)
+   .. inline:: (__@ self i)
+   .. spice:: (__^ ...)
+   .. spice:: (__as ...)
+   .. spice:: (__getattr ...)
+   .. inline:: (__neg self)
+   .. spice:: (__r% ...)
+   .. spice:: (__r& ...)
+   .. spice:: (__r* ...)
+   .. spice:: (__r+ ...)
+   .. spice:: (__r- ...)
+   .. spice:: (__r/ ...)
+   .. spice:: (__r// ...)
+   .. spice:: (__r< ...)
+   .. spice:: (__r<= ...)
+   .. spice:: (__r> ...)
+   .. spice:: (__r>= ...)
+   .. spice:: (__r^ ...)
+   .. inline:: (__rcp self)
+   .. spice:: (__rimply ...)
+   .. spice:: (__r| ...)
+   .. spice:: (__static-rimply ...)
    .. spice:: (__typecall ...)
+   .. inline:: (__unpack self)
+   .. spice:: (__| ...)
 .. type:: vec2
 
    A plain type of supertype `vec-type` and of storage type `<f32 x 2>`.

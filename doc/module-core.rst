@@ -363,24 +363,43 @@ parses the command-line and optionally enters the REPL.
 
    A plain type of storage type `u64`.
 
+   .. spice:: (__hash ...)
 .. type:: CEnum
 
    An opaque type of supertype `immutable`.
 
+   .. spice:: (__!= ...)
+   .. spice:: (__& ...)
+   .. spice:: (__* ...)
+   .. spice:: (__+ ...)
+   .. spice:: (__- ...)
+   .. spice:: (__/ ...)
+   .. spice:: (__// ...)
+   .. spice:: (__== ...)
+   .. spice:: (__^ ...)
+   .. spice:: (__imply ...)
+   .. spice:: (__rimply ...)
+   .. spice:: (__| ...)
 .. type:: CStruct
 
    An opaque type.
 
+   .. builtin:: (__getattr ...)
    .. spice:: (__typecall ...)
 .. type:: CUnion
 
    An opaque type.
 
+   .. builtin:: (__getattr ...)
    .. inline:: (__typecall cls)
 .. type:: Closure
 
    A plain type of storage type `_Closure(*)`.
 
+   .. spice:: (__!= ...)
+   .. spice:: (__== ...)
+   .. spice:: (__hash ...)
+   .. spice:: (__imply ...)
    .. compiledfn:: (docstring ...)
 
       An external function of type ``String<-(Closure)``.
@@ -416,10 +435,15 @@ parses the command-line and optionally enters the REPL.
 
    A plain type of storage type `{}`.
 
+   .. inline:: (__tobool)
 .. type:: NullType
 
    A plain type of storage type `void(*)`.
 
+   .. spice:: (__== ...)
+   .. spice:: (__imply ...)
+   .. spice:: (__r== ...)
+   .. inline:: (__repr self)
 .. type:: OverloadedFunction
 
    An opaque type.
@@ -453,6 +477,11 @@ parses the command-line and optionally enters the REPL.
    .. compiledfn:: (@ ...)
 
       An external function of type ``Value<->Error(Scope Symbol)``.
+   .. spice:: (__.. ...)
+   .. spice:: (__== ...)
+   .. spice:: (__as ...)
+   .. spice:: (__getattr ...)
+   .. spice:: (__hash ...)
    .. spice:: (__typecall ...)
    .. spice:: (define-internal-symbol ...)
    .. spice:: (define-symbol ...)
@@ -483,6 +512,7 @@ parses the command-line and optionally enters the REPL.
 
    A plain type of storage type `Value<->Error(Value)(*)`.
 
+   .. spice:: (__rimply ...)
 .. type:: SpiceMacroFunction
 
    A plain type labeled ``Value<->Error(Value)(*)`` of supertype `pointer` and of storage type `Value<->Error(Value)(*)`.
@@ -491,6 +521,7 @@ parses the command-line and optionally enters the REPL.
 
    An opaque type.
 
+   .. builtin:: (__getattr ...)
    .. spice:: (__typecall ...)
 .. type:: SugarMacro
 
@@ -505,7 +536,11 @@ parses the command-line and optionally enters the REPL.
 
    A plain type of supertype `immutable` and of storage type `u64`.
 
+   .. spice:: (__!= ...)
+   .. spice:: (__== ...)
    .. spice:: (__call ...)
+   .. spice:: (__hash ...)
+   .. spice:: (__imply ...)
    .. inline:: (__typecall cls str)
    .. inline:: (unique cls name)
    .. compiledfn:: (variadic? ...)
@@ -523,6 +558,12 @@ parses the command-line and optionally enters the REPL.
 
    A plain type of storage type `{_Value Anchor}`.
 
+   .. spice:: (__== ...)
+   .. inline:: (__as vT T)
+   .. compiledfn:: (__repr ...)
+
+      An external function of type ``String<-(Value)``.
+   .. inline:: (__rimply vT T)
    .. spice:: (__typecall ...)
    .. compiledfn:: (anchor ...)
 
@@ -579,7 +620,11 @@ parses the command-line and optionally enters the REPL.
 
    An opaque type of supertype `aggregate`.
 
+   .. inline:: (__@ self index)
+   .. spice:: (__as ...)
+   .. spice:: (__countof ...)
    .. spice:: (__typecall ...)
+   .. spice:: (__unpack ...)
    .. inline:: (type element-type size)
 .. type:: bool
 
@@ -615,6 +660,11 @@ parses the command-line and optionally enters the REPL.
 
    A plain type of storage type `u64`.
 
+   .. spice:: (__!= ...)
+   .. spice:: (__== ...)
+   .. spice:: (__as ...)
+   .. inline:: (__hash self)
+   .. spice:: (__ras ...)
    .. spice:: (__typecall ...)
    .. inline:: (from-bytes data size)
 .. type:: i16
@@ -645,7 +695,47 @@ parses the command-line and optionally enters the REPL.
 
    An opaque type of supertype `immutable`.
 
+   .. spice:: (__!= ...)
+   .. spice:: (__% ...)
+   .. spice:: (__& ...)
+   .. spice:: (__* ...)
+   .. spice:: (__+ ...)
+   .. spice:: (__- ...)
+   .. spice:: (__/ ...)
+   .. spice:: (__// ...)
+   .. spice:: (__< ...)
+   .. spice:: (__<< ...)
+   .. spice:: (__<= ...)
+   .. spice:: (__== ...)
+   .. spice:: (__> ...)
+   .. spice:: (__>= ...)
+   .. spice:: (__>> ...)
+   .. spice:: (__^ ...)
+   .. spice:: (__as ...)
+   .. spice:: (__hash ...)
+   .. spice:: (__imply ...)
+   .. inline:: (__neg self)
+   .. spice:: (__static-imply ...)
+   .. spice:: (__tobool ...)
    .. inline:: (__typecall cls value)
+   .. builtin:: (__vector!= ...)
+   .. spice:: (__vector% ...)
+   .. builtin:: (__vector& ...)
+   .. builtin:: (__vector* ...)
+   .. builtin:: (__vector+ ...)
+   .. builtin:: (__vector- ...)
+   .. spice:: (__vector// ...)
+   .. spice:: (__vector< ...)
+   .. builtin:: (__vector<< ...)
+   .. spice:: (__vector<= ...)
+   .. builtin:: (__vector== ...)
+   .. spice:: (__vector> ...)
+   .. spice:: (__vector>= ...)
+   .. spice:: (__vector>> ...)
+   .. builtin:: (__vector^ ...)
+   .. builtin:: (__vector| ...)
+   .. spice:: (__| ...)
+   .. inline:: (__~ self)
 .. type:: intptr
 
    A plain type labeled ``u64`` of supertype `integer` and of storage type `u64`.
@@ -657,6 +747,13 @@ parses the command-line and optionally enters the REPL.
    .. compiledfn:: (@ ...)
 
       An external function of type ``Value<-(List)``.
+   .. spice:: (__.. ...)
+   .. spice:: (__== ...)
+   .. spice:: (__as ...)
+   .. compiledfn:: (__countof ...)
+
+      An external function of type ``i32<-(List)``.
+   .. inline:: (__repr self)
    .. spice:: (__typecall ...)
    .. inline:: (cons-sink self)
    .. inline:: (decons self count)
@@ -686,7 +783,13 @@ parses the command-line and optionally enters the REPL.
 
    An opaque type.
 
+   .. spice:: (__== ...)
+   .. inline:: (__@ self index)
    .. spice:: (__call ...)
+   .. inline:: (__getattr self key)
+   .. spice:: (__hash ...)
+   .. spice:: (__imply ...)
+   .. inline:: (__toref self)
    .. spice:: (__typecall ...)
    .. inline:: (type T)
 .. type:: rawstring
@@ -697,11 +800,60 @@ parses the command-line and optionally enters the REPL.
 
    An opaque type of supertype `immutable`.
 
+   .. spice:: (__!= ...)
+   .. spice:: (__% ...)
+   .. spice:: (__* ...)
+   .. spice:: (__+ ...)
+   .. spice:: (__- ...)
+   .. spice:: (__/ ...)
+   .. spice:: (__// ...)
+   .. spice:: (__< ...)
+   .. spice:: (__<= ...)
+   .. spice:: (__== ...)
+   .. spice:: (__> ...)
+   .. spice:: (__>= ...)
+   .. spice:: (__as ...)
+   .. spice:: (__hash ...)
+   .. spice:: (__imply ...)
+   .. inline:: (__neg self)
+   .. inline:: (__rcp self)
    .. inline:: (__typecall cls value)
+   .. builtin:: (__vector!= ...)
+   .. builtin:: (__vector% ...)
+   .. builtin:: (__vector* ...)
+   .. builtin:: (__vector+ ...)
+   .. builtin:: (__vector- ...)
+   .. builtin:: (__vector/ ...)
+   .. builtin:: (__vector< ...)
+   .. builtin:: (__vector<= ...)
+   .. builtin:: (__vector== ...)
+   .. builtin:: (__vector> ...)
+   .. builtin:: (__vector>= ...)
 .. type:: string
 
    A plain type labeled ``String`` of supertype `opaquepointer` and of storage type `_String(*)`.
 
+   .. spice:: (__!= ...)
+   .. spice:: (__.. ...)
+   .. spice:: (__< ...)
+   .. spice:: (__<= ...)
+   .. spice:: (__== ...)
+   .. spice:: (__> ...)
+   .. spice:: (__>= ...)
+   .. fn:: (__@ self i)
+   .. spice:: (__as ...)
+   .. compiledfn:: (__countof ...)
+
+      An external function of type ``usize<-(String)``.
+   .. inline:: (__hash self)
+   .. spice:: (__imply ...)
+   .. compiledfn:: (__lslice ...)
+
+      An external function of type ``String<-(String usize)``.
+   .. spice:: (__ras ...)
+   .. compiledfn:: (__rslice ...)
+
+      An external function of type ``String<-(String usize)``.
    .. compiledfn:: (buffer ...)
 
       An external function of type ``λ(i8(*) usize)<-(String)``.
@@ -715,7 +867,11 @@ parses the command-line and optionally enters the REPL.
 
    An opaque type of supertype `aggregate`.
 
+   .. builtin:: (__@ ...)
+   .. spice:: (__countof ...)
+   .. builtin:: (__getattr ...)
    .. spice:: (__typecall ...)
+   .. spice:: (__unpack ...)
    .. spice:: (type ...)
 .. type:: type
 
@@ -724,7 +880,18 @@ parses the command-line and optionally enters the REPL.
    .. compiledfn:: (@ ...)
 
       An external function of type ``Value<->Error(type Symbol)``.
+   .. spice:: (__!= ...)
+   .. spice:: (__< ...)
+   .. spice:: (__<= ...)
+   .. spice:: (__== ...)
+   .. spice:: (__> ...)
+   .. spice:: (__>= ...)
+   .. compiledfn:: (__@ ...)
+
+      An external function of type ``type<->Error(type i32)``.
    .. spice:: (__call ...)
+   .. spice:: (__getattr ...)
+   .. spice:: (__hash ...)
    .. compiledfn:: (alignof ...)
 
       An external function of type ``usize<->Error(type)``.
@@ -736,6 +903,9 @@ parses the command-line and optionally enters the REPL.
    .. spice:: (define-symbol ...)
    .. inline:: (define-symbols self values...)
    .. spice:: (dispatch-attr ...)
+   .. compiledfn:: (docstring ...)
+
+      An external function of type ``String<-(type Symbol)``.
    .. compiledfn:: (element-count ...)
 
       An external function of type ``i32<->Error(type)``.
@@ -774,6 +944,9 @@ parses the command-line and optionally enters the REPL.
    .. compiledfn:: (return-type ...)
 
       An external function of type ``λ(type type)<-(type)``.
+   .. compiledfn:: (set-docstring! ...)
+
+      An external function of type ``void<-(type Symbol String)``.
    .. inline:: (set-plain-storage type storage-type)
    .. inline:: (set-storage type storage-type)
    .. spice:: (set-symbol ...)
@@ -807,6 +980,9 @@ parses the command-line and optionally enters the REPL.
 
    An opaque type.
 
+   .. spice:: (__!= ...)
+   .. spice:: (__= ...)
+   .. spice:: (__toptr ...)
    .. spice:: (__typecall ...)
    .. compiledfn:: (type ...)
 
@@ -839,7 +1015,26 @@ parses the command-line and optionally enters the REPL.
 
    An opaque type of supertype `immutable`.
 
+   .. spice:: (__!= ...)
+   .. spice:: (__% ...)
+   .. spice:: (__& ...)
+   .. spice:: (__* ...)
+   .. spice:: (__+ ...)
+   .. spice:: (__- ...)
+   .. spice:: (__/ ...)
+   .. spice:: (__// ...)
+   .. spice:: (__< ...)
+   .. spice:: (__<= ...)
+   .. spice:: (__== ...)
+   .. spice:: (__> ...)
+   .. spice:: (__>= ...)
+   .. spice:: (__^ ...)
+   .. spice:: (__countof ...)
+   .. spice:: (__lslice ...)
+   .. spice:: (__rslice ...)
    .. spice:: (__typecall ...)
+   .. spice:: (__unpack ...)
+   .. spice:: (__| ...)
    .. spice:: (smear ...)
    .. inline:: (type element-type size)
 .. type:: void
@@ -1949,6 +2144,9 @@ parses the command-line and optionally enters the REPL.
 .. compiledfn:: (sc_type_field_name ...)
 
    An external function of type ``Symbol<->Error(type i32)``.
+.. compiledfn:: (sc_type_get_docstring ...)
+
+   An external function of type ``String<-(type Symbol)``.
 .. compiledfn:: (sc_type_is_default_suffix ...)
 
    An external function of type ``bool<-(type)``.
@@ -1976,6 +2174,9 @@ parses the command-line and optionally enters the REPL.
 .. compiledfn:: (sc_type_next ...)
 
    An external function of type ``λ(Symbol Value)<-(type Symbol)``.
+.. compiledfn:: (sc_type_set_docstring ...)
+
+   An external function of type ``void<-(type Symbol String)``.
 .. compiledfn:: (sc_type_set_symbol ...)
 
    An external function of type ``void<-(type Symbol Value)``.
