@@ -7,22 +7,25 @@ on the heap rather than in registers or the stack.
 .. type:: Array
 
    An opaque type of supertype `Struct`.
-.. inline:: (Array.sort self key)
-.. fn:: (Array.append-slots self n)
-.. fn:: (Array.append self value)
-.. inline:: (Array.emplace-append self args...)
-.. fn:: (Array.clear self)
-.. inline:: (Array.gen-sort key)
+
+   .. fn:: (append-slots self n)
+   .. inline:: (gen-sort key)
+   .. inline:: (emplace-append self args...)
+   .. fn:: (clear self)
+   .. fn:: (append self value)
+   .. inline:: (sort self key)
 .. type:: FixedArray
 
    An opaque type of supertype `Array`.
-.. spice:: (FixedArray.gen-fixed-array-type ...)
-.. fn:: (FixedArray.reserve self count)
-.. inline:: (FixedArray.capacity self)
+
+   .. spice:: (gen-fixed-array-type ...)
+   .. fn:: (reserve self count)
+   .. inline:: (capacity self)
 .. type:: GrowingArray
 
    An opaque type of supertype `Array`.
-.. fn:: (GrowingArray.nearest-capacity capacity count)
-.. spice:: (GrowingArray.gen-growing-array-type ...)
-.. fn:: (GrowingArray.reserve self count)
-.. inline:: (GrowingArray.capacity self)
+
+   .. fn:: (reserve self count)
+   .. fn:: (nearest-capacity capacity count)
+   .. inline:: (capacity self)
+   .. spice:: (gen-growing-array-type ...)

@@ -8,236 +8,313 @@ written in the GL shader language.
 .. type:: bmat2
 
    A plain type labeled ``bmat2x2`` of supertype `mat-type` and of storage type `[bvec2 x 2]`.
+
 .. type:: bmat2x2
 
    A plain type of supertype `mat-type` and of storage type `[bvec2 x 2]`.
+
 .. type:: bmat2x3
 
    A plain type of supertype `mat-type` and of storage type `[bvec3 x 2]`.
+
 .. type:: bmat2x4
 
    A plain type of supertype `mat-type` and of storage type `[bvec4 x 2]`.
+
 .. type:: bmat3
 
    A plain type labeled ``bmat3x3`` of supertype `mat-type` and of storage type `[bvec3 x 3]`.
+
 .. type:: bmat3x2
 
    A plain type of supertype `mat-type` and of storage type `[bvec2 x 3]`.
+
 .. type:: bmat3x3
 
    A plain type of supertype `mat-type` and of storage type `[bvec3 x 3]`.
+
 .. type:: bmat3x4
 
    A plain type of supertype `mat-type` and of storage type `[bvec4 x 3]`.
+
 .. type:: bmat4
 
    A plain type labeled ``bmat4x4`` of supertype `mat-type` and of storage type `[bvec4 x 4]`.
+
 .. type:: bmat4x2
 
    A plain type of supertype `mat-type` and of storage type `[bvec2 x 4]`.
+
 .. type:: bmat4x3
 
    A plain type of supertype `mat-type` and of storage type `[bvec3 x 4]`.
+
 .. type:: bmat4x4
 
    A plain type of supertype `mat-type` and of storage type `[bvec4 x 4]`.
+
 .. type:: bvec2
 
    A plain type of supertype `vec-type` and of storage type `<bool x 2>`.
+
 .. type:: bvec3
 
    A plain type of supertype `vec-type` and of storage type `<bool x 3>`.
+
 .. type:: bvec4
 
    A plain type of supertype `vec-type` and of storage type `<bool x 4>`.
+
 .. type:: dmat2
 
    A plain type labeled ``dmat2x2`` of supertype `mat-type` and of storage type `[dvec2 x 2]`.
+
 .. type:: dmat2x2
 
    A plain type of supertype `mat-type` and of storage type `[dvec2 x 2]`.
+
 .. type:: dmat2x3
 
    A plain type of supertype `mat-type` and of storage type `[dvec3 x 2]`.
+
 .. type:: dmat2x4
 
    A plain type of supertype `mat-type` and of storage type `[dvec4 x 2]`.
+
 .. type:: dmat3
 
    A plain type labeled ``dmat3x3`` of supertype `mat-type` and of storage type `[dvec3 x 3]`.
+
 .. type:: dmat3x2
 
    A plain type of supertype `mat-type` and of storage type `[dvec2 x 3]`.
+
 .. type:: dmat3x3
 
    A plain type of supertype `mat-type` and of storage type `[dvec3 x 3]`.
+
 .. type:: dmat3x4
 
    A plain type of supertype `mat-type` and of storage type `[dvec4 x 3]`.
+
 .. type:: dmat4
 
    A plain type labeled ``dmat4x4`` of supertype `mat-type` and of storage type `[dvec4 x 4]`.
+
 .. type:: dmat4x2
 
    A plain type of supertype `mat-type` and of storage type `[dvec2 x 4]`.
+
 .. type:: dmat4x3
 
    A plain type of supertype `mat-type` and of storage type `[dvec3 x 4]`.
+
 .. type:: dmat4x4
 
    A plain type of supertype `mat-type` and of storage type `[dvec4 x 4]`.
+
 .. type:: dvec2
 
    A plain type of supertype `vec-type` and of storage type `<f64 x 2>`.
+
 .. type:: dvec3
 
    A plain type of supertype `vec-type` and of storage type `<f64 x 3>`.
+
 .. type:: dvec4
 
    A plain type of supertype `vec-type` and of storage type `<f64 x 4>`.
+
 .. type:: imat2
 
    A plain type labeled ``imat2x2`` of supertype `mat-type` and of storage type `[ivec2 x 2]`.
+
 .. type:: imat2x2
 
    A plain type of supertype `mat-type` and of storage type `[ivec2 x 2]`.
+
 .. type:: imat2x3
 
    A plain type of supertype `mat-type` and of storage type `[ivec3 x 2]`.
+
 .. type:: imat2x4
 
    A plain type of supertype `mat-type` and of storage type `[ivec4 x 2]`.
+
 .. type:: imat3
 
    A plain type labeled ``imat3x3`` of supertype `mat-type` and of storage type `[ivec3 x 3]`.
+
 .. type:: imat3x2
 
    A plain type of supertype `mat-type` and of storage type `[ivec2 x 3]`.
+
 .. type:: imat3x3
 
    A plain type of supertype `mat-type` and of storage type `[ivec3 x 3]`.
+
 .. type:: imat3x4
 
    A plain type of supertype `mat-type` and of storage type `[ivec4 x 3]`.
+
 .. type:: imat4
 
    A plain type labeled ``imat4x4`` of supertype `mat-type` and of storage type `[ivec4 x 4]`.
+
 .. type:: imat4x2
 
    A plain type of supertype `mat-type` and of storage type `[ivec2 x 4]`.
+
 .. type:: imat4x3
 
    A plain type of supertype `mat-type` and of storage type `[ivec3 x 4]`.
+
 .. type:: imat4x4
 
    A plain type of supertype `mat-type` and of storage type `[ivec4 x 4]`.
+
 .. type:: ivec2
 
    A plain type of supertype `vec-type` and of storage type `<i32 x 2>`.
+
 .. type:: ivec3
 
    A plain type of supertype `vec-type` and of storage type `<i32 x 3>`.
+
 .. type:: ivec4
 
    A plain type of supertype `vec-type` and of storage type `<i32 x 4>`.
+
 .. type:: mat-type
 
    An opaque type of supertype `immutable`.
-.. spice:: (mat-type.row ...)
-.. spice:: (mat-type.__typecall ...)
+
+   .. spice:: (row ...)
+   .. spice:: (__typecall ...)
 .. type:: mat2
 
    A plain type labeled ``mat2x2`` of supertype `mat-type` and of storage type `[vec2 x 2]`.
+
 .. type:: mat2x2
 
    A plain type of supertype `mat-type` and of storage type `[vec2 x 2]`.
+
 .. type:: mat2x3
 
    A plain type of supertype `mat-type` and of storage type `[vec3 x 2]`.
+
 .. type:: mat2x4
 
    A plain type of supertype `mat-type` and of storage type `[vec4 x 2]`.
+
 .. type:: mat3
 
    A plain type labeled ``mat3x3`` of supertype `mat-type` and of storage type `[vec3 x 3]`.
+
 .. type:: mat3x2
 
    A plain type of supertype `mat-type` and of storage type `[vec2 x 3]`.
+
 .. type:: mat3x3
 
    A plain type of supertype `mat-type` and of storage type `[vec3 x 3]`.
+
 .. type:: mat3x4
 
    A plain type of supertype `mat-type` and of storage type `[vec4 x 3]`.
+
 .. type:: mat4
 
    A plain type labeled ``mat4x4`` of supertype `mat-type` and of storage type `[vec4 x 4]`.
+
 .. type:: mat4x2
 
    A plain type of supertype `mat-type` and of storage type `[vec2 x 4]`.
+
 .. type:: mat4x3
 
    A plain type of supertype `mat-type` and of storage type `[vec3 x 4]`.
+
 .. type:: mat4x4
 
    A plain type of supertype `mat-type` and of storage type `[vec4 x 4]`.
+
 .. type:: umat2
 
    A plain type labeled ``umat2x2`` of supertype `mat-type` and of storage type `[uvec2 x 2]`.
+
 .. type:: umat2x2
 
    A plain type of supertype `mat-type` and of storage type `[uvec2 x 2]`.
+
 .. type:: umat2x3
 
    A plain type of supertype `mat-type` and of storage type `[uvec3 x 2]`.
+
 .. type:: umat2x4
 
    A plain type of supertype `mat-type` and of storage type `[uvec4 x 2]`.
+
 .. type:: umat3
 
    A plain type labeled ``umat3x3`` of supertype `mat-type` and of storage type `[uvec3 x 3]`.
+
 .. type:: umat3x2
 
    A plain type of supertype `mat-type` and of storage type `[uvec2 x 3]`.
+
 .. type:: umat3x3
 
    A plain type of supertype `mat-type` and of storage type `[uvec3 x 3]`.
+
 .. type:: umat3x4
 
    A plain type of supertype `mat-type` and of storage type `[uvec4 x 3]`.
+
 .. type:: umat4
 
    A plain type labeled ``umat4x4`` of supertype `mat-type` and of storage type `[uvec4 x 4]`.
+
 .. type:: umat4x2
 
    A plain type of supertype `mat-type` and of storage type `[uvec2 x 4]`.
+
 .. type:: umat4x3
 
    A plain type of supertype `mat-type` and of storage type `[uvec3 x 4]`.
+
 .. type:: umat4x4
 
    A plain type of supertype `mat-type` and of storage type `[uvec4 x 4]`.
+
 .. type:: uvec2
 
    A plain type of supertype `vec-type` and of storage type `<u32 x 2>`.
+
 .. type:: uvec3
 
    A plain type of supertype `vec-type` and of storage type `<u32 x 3>`.
+
 .. type:: uvec4
 
    A plain type of supertype `vec-type` and of storage type `<u32 x 4>`.
+
 .. type:: vec-type
 
    An opaque type of supertype `immutable`.
-.. spice:: (vec-type.__typecall ...)
+
+   .. spice:: (__typecall ...)
 .. type:: vec2
 
    A plain type of supertype `vec-type` and of storage type `<f32 x 2>`.
+
 .. type:: vec3
 
    A plain type of supertype `vec-type` and of storage type `<f32 x 3>`.
+
 .. type:: vec4
 
    A plain type of supertype `vec-type` and of storage type `<f32 x 4>`.
+
 .. fn:: (dot u v)
 .. spice:: (mix ...)

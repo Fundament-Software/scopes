@@ -2072,14 +2072,18 @@ repeat:
         case FN_Dupe: {
             CHECKARGS(1, 1);
             READ_NODEREF_TYPEOF(X);
+            if (is_plain(X)) {
+                const Type *DestT = strip_lifetime(X);
+                return ARGTYPE1(DestT);
+            } else {
+                const Type *DestT = SCOPES_GET_RESULT(storage_type(X));
 
-            const Type *DestT = SCOPES_GET_RESULT(storage_type(X));
-
-            auto rq = try_qualifier<ReferQualifier>(X);
-            if (rq) {
-                DestT = qualify(DestT, { rq });
+                auto rq = try_qualifier<ReferQualifier>(X);
+                if (rq) {
+                    DestT = qualify(DestT, { rq });
+                }
+                return ARGTYPE1(DestT);
             }
-            return ARGTYPE1(DestT);
         } break;
         case FN_Track: {
             CHECKARGS(2, 2);

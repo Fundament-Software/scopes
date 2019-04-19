@@ -45,23 +45,24 @@ Running this program will output:
 .. type:: FunctionChain
 
    A plain type of storage type `_type(*)`.
-.. fn:: (FunctionChain.append self f)
-   
-   Append function `f` to function chain. When the function chain is called,
-   `f` will be called last. The return value of `f` will be ignored.
-.. spice:: (FunctionChain.__call ...)
-.. fn:: (FunctionChain.prepend self f)
-   
-   Prepend function `f` to function chain. When the function chain is called,
-   `f` will be called first. The return value of `f` will be ignored.
-.. inline:: (FunctionChain.on self)
-   
-   Returns a decorator that appends the provided function to the
-   function chain.
-.. fn:: (FunctionChain.clear self)
-   
-   Clear the function chain. When the function chain is applied next,
-   no functions will be called.
+
+   .. spice:: (__call ...)
+   .. fn:: (append self f)
+      
+      Append function `f` to function chain. When the function chain is called,
+      `f` will be called last. The return value of `f` will be ignored.
+   .. inline:: (on self)
+      
+      Returns a decorator that appends the provided function to the
+      function chain.
+   .. fn:: (clear self)
+      
+      Clear the function chain. When the function chain is applied next,
+      no functions will be called.
+   .. fn:: (prepend self f)
+      
+      Prepend function `f` to function chain. When the function chain is called,
+      `f` will be called first. The return value of `f` will be ignored.
 .. sugar:: (decorate-fnchain ...)
 .. sugar:: (fnchain name)
 
