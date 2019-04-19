@@ -66,18 +66,19 @@ inline frec2
 inline frec (x)
     dump "1" x
     static-if (x < 10)
-        frec2 (const.add.i32.i32 x 1)
+        (memo frec2) (const.add.i32.i32 x 1)
     else x
 
-@@ memo
 inline frec2 (x)
     dump "2" x
     static-if (x < 10)
-        frec (const.add.i32.i32 x 1)
+        (memo frec) (const.add.i32.i32 x 1)
     else x
 
-frec 1
-frec 5
 frec 7
+dump "x"
+frec 5
+dump "x"
+frec 1
 
 true

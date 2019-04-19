@@ -3258,6 +3258,9 @@ static SCOPES_RESULT(TypedValueRef) prove_inline_body(const ASTContext &ctx,
     auto func = cl->func;
     SCOPES_TRACE_PROVE_TEMPLATE(func);
     Timer sum_prove_time(TIMER_Specialize);
+    if (func->is_forward_decl()) {
+        SCOPES_ERROR(CannotProveForwardDeclaration);
+    }
     assert(func);
     auto anchor = func.anchor();
     //int count = (int)func->params.size();
@@ -3332,6 +3335,9 @@ static SCOPES_RESULT(FunctionRef) prove_body(
     if (it != functions.end())
         return ref(func.anchor(), *it);
     SCOPES_TRACE_PROVE_TEMPLATE(func);
+    if (func->is_forward_decl()) {
+        SCOPES_ERROR(CannotProveForwardDeclaration);
+    }
     int count = (int)func->params.size();
     FunctionRef fn = ref(func.anchor(), Function::from(func->name, {}));
     fn->original = func;

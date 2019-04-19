@@ -294,6 +294,8 @@ formatters:
     T(UnboundValue, \
         "value %0 is unbound", \
         ValueRef) \
+    T(CannotProveForwardDeclaration, \
+        "cannot instantiate forward declared function") \
 
 // quoting
 #define SCOPES_QUOTE_ERROR_KIND() \
