@@ -935,9 +935,9 @@ let Struct = (sc_typename_type "Struct" typename)
       previous state. The function may not be called for a state for which
       ``valid?`` has reported to be depleted.
 
-    Generally, it is allowed to call any of these functions multiple times
-    with any valid state, effectively restarting the Generator at an arbitrary
-    point, as Generators are not expected to have side effects. In controlled
+    It is allowed to call any of these functions multiple times with any valid
+    state, effectively restarting the Generator at an arbitrary point, as
+    Generators are not expected to have side effects. In controlled
     circumstances a Generator may choose to be impure, but should be documented
     accordingly.
 
@@ -2880,7 +2880,33 @@ let va-option =
                 # return the next iterator in sequence
                 'next container it...
 
-# for <name> ... in <generator> body ...
+"""".. sugar:: (for name ... _:in gen body...)
+
+    Defines a loop that enumerates all elements in collection or sequence
+    `gen`, unpacking each element and binding its arguments to the names
+    defined by `name ...`.
+
+    `gen` must either be of type `Generator` or provide a cast to
+    `Generator`.
+
+    Within the loop body, special forms ``break`` and ``continue`` can be used
+    to abort the loop early or skip ahead to the next element. The loop
+    will always evaluate to no arguments.
+
+    For a loop form that permits you to maintain additional state and break
+    with a value, see `fold`.
+
+    Usage example::
+
+        # print numbers from 0 to 9, skipping number 5
+        for i in (range 100)
+            if (i == 10)
+                # abort the loop
+                break;
+            if (i == 5)
+                # skip this index
+                continue;
+            print i
 define for
     sugar-block-scope-macro
         fn "expand-for" (topexpr scope)
@@ -5245,7 +5271,34 @@ sugar unlet ((name as Symbol) names...)
 # fold iteration
 #-------------------------------------------------------------------------------
 
-# fold (<name> ... = <init> ...) for <name> ... in <expr>
+"""".. sugar:: (fold (state ... _:= init...) _:for name ... _:in gen body...)
+
+       This is a combination of the `loop` and `for` forms. It enumerates all
+       elements in collection or sequence `gen`, unpacking each element and
+       binding its arguments to the names defined by `name ...`, while
+       the loop state `state ...` is initialized from `init...`.
+
+       Similar to `loop`, the body expression must return the next state of
+       the loop. The state of `gen` is transparently maintained and does not
+       have to be managed.
+
+       Unlike `for`, `fold` requires both calls to ``break`` and ``continue``
+       to pass a state compatible with `state ...`. Otherwise they serve
+       the same function.
+
+       Usage example::
+
+            # add numbers from 0 to 9, skipping number 5, and print the result
+            print
+                fold (sum = 0) for i in (range 100)
+                    if (i == 10)
+                        # abort the loop
+                        break sum
+                    if (i == 5)
+                        # skip this index
+                        continue sum
+                    # continue with the next state for sum
+                    sum + i
 sugar fold ((binding...) 'for expr...)
     let itparams it = ('token-split expr... 'in "'in' expected")
     let foldparams init = ('token-split binding... '= "'=' expected")
