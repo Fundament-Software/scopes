@@ -1249,21 +1249,14 @@ static SCOPES_RESULT(TypedValueRef) prove_CompileStage(const ASTContext &ctx, co
     auto parent = sc_scope_get_parent(scope);
     auto docstr = sc_scope_get_docstring(scope, SYM_Unnamed);
 
-    ValueRef tmp;
-    if (parent) {
-        tmp = ref(anchor, CallTemplate::from(g_sc_scope_new_subscope,
-                { ref(anchor, ConstPointer::scope_from(parent)) }));
-    } else {
-        tmp = ref(anchor, CallTemplate::from(g_sc_scope_new, {}));
-    }
-    auto block = ref(anchor, Expression::unscoped_from());
-    block->append(tmp);
+    auto newscope = (parent?sc_scope_new_subscope(parent):sc_scope_new());
     if (sc_string_count(docstr)) {
-        block->append(
-            ref(anchor, CallTemplate::from(g_sc_scope_set_docstring,
-                { tmp, ref(anchor, ConstInt::symbol_from(SYM_Unnamed)),
-                    ref(anchor, ConstPointer::string_from(docstr)) })));
+        sc_scope_set_docstring(newscope, SYM_Unnamed, docstr);
     }
+
+    ValueRef tmp = ref(anchor, ConstPointer::scope_from(newscope));
+
+    auto block = ref(anchor, Expression::unscoped_from());
     //StyledStream ss;
     Symbol last_key = SYM_Unnamed;
     while (true) {
@@ -1272,9 +1265,7 @@ static SCOPES_RESULT(TypedValueRef) prove_CompileStage(const ASTContext &ctx, co
         if (key == SYM_Unnamed)
             break;
         last_key = key;
-        auto vkey = ref(anchor, ConstInt::symbol_from(key));
-        block->append(ref(anchor,
-            CallTemplate::from(g_sc_scope_del_symbol, { tmp, vkey })));
+        sc_scope_del_symbol(newscope, key);
     }
     last_key = SYM_Unnamed;
     while (true) {
@@ -1287,6 +1278,14 @@ static SCOPES_RESULT(TypedValueRef) prove_CompileStage(const ASTContext &ctx, co
         last_key = key;
         auto keydocstr = sc_scope_get_docstring(scope, key);
         auto value = SCOPES_GET_RESULT(prove(ctx, untyped_value));
+
+        if (is_value_stage_constant(value)) {
+            sc_scope_set_symbol(newscope, key, value);
+            if (sc_string_count(keydocstr))
+                sc_scope_set_docstring(newscope, key, keydocstr);
+            continue;
+        }
+
         //ss << "assigning " << key << " " << value << std::endl;
         //ss << "assigning " << key << std::endl;
 
