@@ -48,36 +48,36 @@
         handler activated with argument 3
 
 typedef FunctionChain : (storageof type)
-    fn __repr (self)
+    inline __repr (self)
         repr (bitcast self type)
 
-    fn clear (self)
+    inline clear (self)
         """"Clear the function chain. When the function chain is applied next,
             no functions will be called.
         let cls = (bitcast self type)
-        'set-symbol cls 'chain
+        'define-symbol cls 'chain
             inline (cls args...)
         self
 
-    fn append (self f)
+    inline append (self f)
         """"Append function `f` to function chain. When the function chain is called,
             `f` will be called last. The return value of `f` will be ignored.
         let cls = (bitcast self type)
+        static-assert (constant? cls)
         let oldfn = cls.chain
-        'set-symbol cls 'chain
-            @@ spice-quote
+        'define-symbol cls 'chain
             inline (cls args...)
                 oldfn cls args...
                 f args...
         self
 
-    fn prepend (self f)
+    inline prepend (self f)
         """"Prepend function `f` to function chain. When the function chain is called,
             `f` will be called first. The return value of `f` will be ignored.
         let cls = (bitcast self type)
+        static-assert (constant? cls)
         let oldfn = cls.chain
-        'set-symbol cls 'chain
-            @@ spice-quote
+        'define-symbol cls 'chain
             inline (cls args...)
                 f args...
                 oldfn cls args...
@@ -90,18 +90,16 @@ typedef FunctionChain : (storageof type)
             'append self f
             f
 
-    @@ spice-quote
-    fn __typecall (cls name)
+    spice __typecall (cls name)
+        let name = (name as string)
         let T = (typename.type (.. "<FunctionChain " name ">") typename)
+        'set-opaque T
         'set-symbol T 'chain
             inline (cls args...)
         bitcast T this-type
 
-run-stage;
-
-'set-symbol FunctionChain '__call
-    spice "call-fnchain" (self args...)
-        let self = (bitcast (self as FunctionChain) type)
+    spice __call (self args...)
+        let self = (bitcast (self as this-type) type)
         let func = self.chain
         `(func args...)
 

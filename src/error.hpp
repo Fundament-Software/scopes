@@ -360,6 +360,9 @@ formatters:
     T(CGenEntryFunctionSignatureMismatch, \
         "codegen: entry function must have type %0 but has type %1", \
         PType, PType) \
+    T(CGenUnsupportedVectorSize, \
+        "codegen: a vector of type %0 and size %1 is unsupported", \
+        PType, int) \
 
 // runtime
 #define SCOPES_RUNTIME_ERROR_KIND() \

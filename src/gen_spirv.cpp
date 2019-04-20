@@ -430,6 +430,9 @@ struct SPIRVGenerator {
         } break;
         case TK_Vector: {
             auto vi = cast<VectorType>(type);
+            if (vi->count <= 1) {
+                SCOPES_ERROR(CGenUnsupportedVectorSize, vi->element_type, vi->count);
+            }
             return builder.makeVectorType(
                 SCOPES_GET_RESULT(type_to_spirv_type(vi->element_type)),
                 vi->count);
@@ -1645,9 +1648,11 @@ struct SPIRVGenerator {
     }
 
     SCOPES_RESULT(void) translate_instruction(const InstructionRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        SCOPES_TRACE_CODEGEN(node);
         switch(node->kind()) {
         #define T(NAME, BNAME, CLASS) \
-            case NAME: return translate_ ## CLASS(node.cast<CLASS>());
+            case NAME: SCOPES_CHECK_RESULT(translate_ ## CLASS(node.cast<CLASS>())); break;
         SCOPES_INSTRUCTION_VALUE_KIND()
         #undef T
             default: assert(false); break;
@@ -1660,6 +1665,7 @@ struct SPIRVGenerator {
         auto it = ref2value.find(ref);
         if (it != ref2value.end())
             return it->second;
+        SCOPES_TRACE_CODEGEN(ref.value);
         spv::Id value = 0;
         switch(ref.value->kind()) {
         #define T(NAME, BNAME, CLASS) \

@@ -3993,7 +3993,8 @@ inline vector-binary-op-dispatch (symbol)
                         store value (getelementptr values i)
                     `[(sc_const_aggregate_new T n values)]
                 else
-                    let T1 = (sc_vector_type ET 1)
+                    # vector size must be at least 2 to be SPIR-V compliant
+                    let T1 = (sc_vector_type ET 2)
                     let maskT = (sc_vector_type i32 N)
                     let values = (alloca-array Value N)
                     let zero = `0
