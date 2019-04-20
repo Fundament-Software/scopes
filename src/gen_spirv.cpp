@@ -450,7 +450,7 @@ struct SPIRVGenerator {
             if (type == TYPE_Sampler)
                 return builder.makeSamplerType();
             auto tn = cast<TypenameType>(type);
-            if (tn->finalized()) {
+            if (!tn->is_opaque()) {
                 if (tn->storage()->kind() == TK_Tuple) {
                     return create_struct_type(tn->storage(), flags, tn);
                 } else {

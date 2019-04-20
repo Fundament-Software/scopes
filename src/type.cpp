@@ -225,15 +225,16 @@ bool is_opaque(const Type *T) {
         return is_opaque(cast<QualifyType>(T)->type);
     case TK_Typename: {
         const TypenameType *tt = cast<TypenameType>(T);
-        if (!tt->finalized()) {
+        if (tt->is_opaque()) {
             return true;
         } else {
+            // does this make sense?
             return is_opaque(tt->storage());
         }
     } break;
     case TK_Arguments:
     case TK_Image:
-    case TK_SampledImage:
+    //case TK_SampledImage: // can be loaded
     case TK_Function: return true;
     default: break;
     }
@@ -387,54 +388,53 @@ SCOPES_RESULT(void) verify_range(size_t idx, size_t count) {
 
 //------------------------------------------------------------------------------
 
-#define DEFINE_TYPENAME(NAME, T, SUPERT) \
-    T = typename_type(String::from(NAME), SUPERT);
+#define DEFINE_OPAQUE_TYPENAME(NAME, T, SUPERT) \
+    T = opaque_typename_type(String::from(NAME), SUPERT);
 
 #define DEFINE_BASIC_TYPE(NAME, CT, T, SUPERT, BODY) { \
-        auto tn = typename_type(String::from(NAME), SUPERT); \
-        tn->finalize(BODY, TNF_Plain).assert_ok(); \
+        auto tn = plain_typename_type(String::from(NAME), SUPERT, BODY).assert_ok(); \
         assert(sizeof(CT) == size_of(tn).assert_ok()); \
         T = tn; \
     }
 
 #define DEFINE_OPAQUE_HANDLE_TYPE(NAME, CT, T, SUPERT) { \
-        auto tn = typename_type(String::from(NAME), SUPERT); \
-        tn->finalize(native_ro_pointer_type( \
-            typename_type(String::from("_" NAME), nullptr)), TNF_Plain).assert_ok(); \
+        auto tn = plain_typename_type(String::from(NAME), SUPERT, \
+            native_opaque_pointer_type( \
+                opaque_typename_type(String::from("_" NAME), nullptr))).assert_ok(); \
         T = tn; \
     }
 
 void init_types() {
-    DEFINE_TYPENAME("typename", TYPE_Typename, nullptr);
+    DEFINE_OPAQUE_TYPENAME("typename", TYPE_Typename, nullptr);
 
-    DEFINE_TYPENAME("Nothing", TYPE_Nothing, nullptr);
-    DEFINE_TYPENAME("noreturn", TYPE_NoReturn, nullptr);
+    TYPE_Nothing = incomplete_typename_type(String::from("Nothing"), nullptr);
+    DEFINE_OPAQUE_TYPENAME("noreturn", TYPE_NoReturn, nullptr);
 
-    DEFINE_TYPENAME("immutable", TYPE_Immutable, nullptr);
-    DEFINE_TYPENAME("aggregate", TYPE_Aggregate, nullptr);
-    DEFINE_TYPENAME("opaquepointer", TYPE_OpaquePointer, nullptr);
+    DEFINE_OPAQUE_TYPENAME("immutable", TYPE_Immutable, nullptr);
+    DEFINE_OPAQUE_TYPENAME("aggregate", TYPE_Aggregate, nullptr);
+    DEFINE_OPAQUE_TYPENAME("opaquepointer", TYPE_OpaquePointer, nullptr);
 
-    DEFINE_TYPENAME("Sampler", TYPE_Sampler, nullptr);
+    DEFINE_OPAQUE_TYPENAME("Sampler", TYPE_Sampler, nullptr);
 
-    DEFINE_TYPENAME("integer", TYPE_Integer, TYPE_Immutable);
-    DEFINE_TYPENAME("real", TYPE_Real, TYPE_Immutable);
-    DEFINE_TYPENAME("vector", TYPE_Vector, TYPE_Immutable);
-    DEFINE_TYPENAME("CEnum", TYPE_CEnum, TYPE_Immutable);
+    DEFINE_OPAQUE_TYPENAME("integer", TYPE_Integer, TYPE_Immutable);
+    DEFINE_OPAQUE_TYPENAME("real", TYPE_Real, TYPE_Immutable);
+    DEFINE_OPAQUE_TYPENAME("vector", TYPE_Vector, TYPE_Immutable);
+    DEFINE_OPAQUE_TYPENAME("CEnum", TYPE_CEnum, TYPE_Immutable);
 
-    DEFINE_TYPENAME("array", TYPE_Array, TYPE_Aggregate);
-    DEFINE_TYPENAME("tuple", TYPE_Tuple, TYPE_Aggregate);
-    DEFINE_TYPENAME("union", TYPE_Union, nullptr);
+    DEFINE_OPAQUE_TYPENAME("array", TYPE_Array, TYPE_Aggregate);
+    DEFINE_OPAQUE_TYPENAME("tuple", TYPE_Tuple, TYPE_Aggregate);
+    DEFINE_OPAQUE_TYPENAME("union", TYPE_Union, nullptr);
 
-    DEFINE_TYPENAME("pointer", TYPE_Pointer, nullptr);
-    DEFINE_TYPENAME("Qualify", TYPE_Qualify, nullptr);
-    DEFINE_TYPENAME("Arguments", TYPE_Arguments, nullptr);
-    DEFINE_TYPENAME("Raises", TYPE_Raises, nullptr);
-    DEFINE_TYPENAME("constant", TYPE_Constant, nullptr);
-    DEFINE_TYPENAME("function", TYPE_Function, nullptr);
-    DEFINE_TYPENAME("Image", TYPE_Image, nullptr);
-    DEFINE_TYPENAME("SampledImage", TYPE_SampledImage, nullptr);
-    DEFINE_TYPENAME("CStruct", TYPE_CStruct, nullptr);
-    DEFINE_TYPENAME("CUnion", TYPE_CUnion, nullptr);
+    DEFINE_OPAQUE_TYPENAME("pointer", TYPE_Pointer, nullptr);
+    DEFINE_OPAQUE_TYPENAME("Qualify", TYPE_Qualify, nullptr);
+    DEFINE_OPAQUE_TYPENAME("Arguments", TYPE_Arguments, nullptr);
+    DEFINE_OPAQUE_TYPENAME("Raises", TYPE_Raises, nullptr);
+    DEFINE_OPAQUE_TYPENAME("constant", TYPE_Constant, nullptr);
+    DEFINE_OPAQUE_TYPENAME("function", TYPE_Function, nullptr);
+    DEFINE_OPAQUE_TYPENAME("Image", TYPE_Image, nullptr);
+    DEFINE_OPAQUE_TYPENAME("SampledImage", TYPE_SampledImage, nullptr);
+    DEFINE_OPAQUE_TYPENAME("CStruct", TYPE_CStruct, nullptr);
+    DEFINE_OPAQUE_TYPENAME("CUnion", TYPE_CUnion, nullptr);
 
     TYPE_Bool = integer_type(1, false);
 
@@ -455,14 +455,11 @@ void init_types() {
 
     DEFINE_BASIC_TYPE("usize", size_t, TYPE_USize, TYPE_Integer, TYPE_U64);
 
-    TYPE_Type = typename_type(String::from("type"), TYPE_OpaquePointer);
-    TYPE_Unknown = typename_type(String::from("Unknown"), nullptr);
-    TYPE_Variadic = typename_type(String::from("..."), nullptr);
-    const Type *_TypePtr = native_ro_pointer_type(typename_type(String::from("_type"),nullptr));
-    cast<TypenameType>(TYPE_Type)->finalize(_TypePtr, TNF_Plain).assert_ok();
-    cast<TypenameType>(TYPE_Unknown)->finalize(_TypePtr, TNF_Plain).assert_ok();
-
-    cast<TypenameType>(TYPE_Nothing)->finalize(tuple_type({}).assert_ok(), TNF_Plain).assert_ok();
+    const Type *_TypePtr = native_ro_pointer_type(opaque_typename_type(String::from("_type"),nullptr));
+    TYPE_Type = plain_typename_type(String::from("type"), TYPE_OpaquePointer, _TypePtr).assert_ok();
+    TYPE_Unknown = plain_typename_type(String::from("Unknown"), nullptr, _TypePtr).assert_ok();
+    TYPE_Variadic = opaque_typename_type(String::from("..."), nullptr);
+    cast<TypenameType>(TYPE_Nothing)->complete(tuple_type({}).assert_ok(), TNF_Plain).assert_ok();
 
     DEFINE_BASIC_TYPE("Symbol", Symbol, TYPE_Symbol, TYPE_Immutable, TYPE_U64);
     DEFINE_BASIC_TYPE("Builtin", Builtin, TYPE_Builtin, nullptr, TYPE_U64);
@@ -478,29 +475,18 @@ void init_types() {
 
     DEFINE_OPAQUE_HANDLE_TYPE("Anchor", Anchor, TYPE_Anchor, nullptr);
 
-    DEFINE_TYPENAME("Value", TYPE_ValueRef, nullptr);
-    {
-        cast<TypenameType>(TYPE_ValueRef)->finalize(
-                tuple_type({
-                    TYPE__Value,
-                    TYPE_Anchor
-                }).assert_ok(),
-                TNF_Plain).assert_ok();
-    }
+
+    DEFINE_BASIC_TYPE("Value", ValueRef, TYPE_ValueRef, nullptr,
+        tuple_type({ TYPE__Value, TYPE_Anchor }).assert_ok());
 
     DEFINE_BASIC_TYPE("CompileStage", ValueRef, TYPE_CompileStage,
         nullptr, storage_type(TYPE_ValueRef).assert_ok());
 
-
-    DEFINE_TYPENAME("SpiceMacro", TYPE_ASTMacro, nullptr);
-    {
-        cast<TypenameType>(TYPE_ASTMacro)->finalize(
-                native_ro_pointer_type(
-                    raising_function_type(
-                        TYPE_ValueRef, { TYPE_ValueRef })
-                ),
-                TNF_Plain).assert_ok();
-    }
+    DEFINE_BASIC_TYPE("SpiceMacro", void*, TYPE_ASTMacro, nullptr,
+        native_opaque_pointer_type(
+            raising_function_type(
+                TYPE_ValueRef, { TYPE_ValueRef })
+        ));
 
 #define T(TYPE, TYPENAME) \
     assert(TYPE);
@@ -508,7 +494,7 @@ void init_types() {
 #undef T
 }
 
-#undef DEFINE_TYPENAME
+#undef DEFINE_OPAQUE_TYPENAME
 #undef DEFINE_BASIC_TYPE
 #undef DEFINE_OPAQUE_HANDLE_TYPE
 

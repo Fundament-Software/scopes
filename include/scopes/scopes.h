@@ -410,6 +410,7 @@ SCOPES_LIBEXPORT bool sc_integer_type_is_signed(const sc_type_t *T);
 SCOPES_LIBEXPORT sc_type_raises_t sc_typename_type(const sc_string_t *str, const sc_type_t *supertype);
 SCOPES_LIBEXPORT const sc_type_t *sc_typename_type_get_super(const sc_type_t *T);
 SCOPES_LIBEXPORT sc_void_raises_t sc_typename_type_set_storage(const sc_type_t *T, const sc_type_t *T2, uint32_t flags);
+SCOPES_LIBEXPORT sc_void_raises_t sc_typename_type_set_opaque(const sc_type_t *T);
 
 // array types
 

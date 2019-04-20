@@ -818,6 +818,9 @@ inline define-symbols (self values...)
     superof = sc_typename_type_get_super
     docstring = sc_type_get_docstring
     set-docstring = sc_type_set_docstring
+    set-opaque =
+        inline (type)
+            sc_typename_type_set_opaque type
     set-storage =
         inline (type storage-type)
             sc_typename_type_set_storage type storage-type 0:u32
@@ -909,6 +912,7 @@ inline not (value)
 
 # supertype for unique structs
 let Struct = (sc_typename_type "Struct" typename)
+sc_typename_type_set_opaque Struct
 
 """"Generators provide a protocol for iterating the contents of containers and
     enumerating sequences. They are primarily used by `for` and `fold`, but can
@@ -1918,6 +1922,19 @@ let tostring =
                     `(sc_value_tostring value)
 
 run-stage; # 4
+
+let opaque =
+    spice-macro
+        fn "opaque" (args)
+            let argc = ('argcount args)
+            verify-count argc 1 2
+            let name = (as ('getarg args 0) string)
+            let supertype =
+                if (> argc 1) (as ('getarg args 1) type)
+                else typename
+            let TT = (sc_typename_type name supertype)
+            sc_typename_type_set_opaque TT
+            'tag `TT ('anchor args)
 
 'set-symbols typename
     # inverted compare attempts regular compare
@@ -4588,6 +4605,7 @@ define match
     gen-match-block-parser gen-match-matcher
 
 let OverloadedFunction = (typename "OverloadedFunction")
+'set-opaque OverloadedFunction
 
 """" (va-append-va (inline () (_ b ...)) a...) -> a... b...
 define va-append-va
@@ -5415,6 +5433,10 @@ sugar typedef (name body...)
                     name
             [supertype]
 
+    spice set-opaque (T)
+        sc_typename_type_set_opaque (T as type)
+        `()
+
     spice set-storage (T ST flags)
         let T = (T as type)
         let ST = (ST as type)
@@ -5422,19 +5444,32 @@ sugar typedef (name body...)
         sc_typename_type_set_storage T ST flags
         `()
 
+    fn check-no-storage (storage? storagetype)
+        if storage?
+            error@ ('anchor storagetype) "while matching pattern" "storage type already defined"
+
+    fn complete-outp (outp storage?)
+        if storage? outp
+        else
+            cons (list set-opaque 'this-type) outp
+
     let expr =
-        loop (inp outp = expr '())
+        loop (inp outp storage? = expr '() false)
             sugar-match inp
             case ('< supertype rest...)
                 error@ ('anchor supertype) "while matching pattern" "supertype must be in first place"
             case (': storagetype rest...)
+                check-no-storage storage? storagetype
                 repeat rest...
                     cons (list set-storage 'this-type
                         storagetype typename-flag-plain) outp
+                    true
             case (':: storagetype rest...)
+                check-no-storage storage? storagetype
                 repeat rest...
                     cons (list set-storage 'this-type
                         storagetype 0:u32) outp
+                    true
             case ('do rest...)
                 break
                     qq [do]
@@ -5444,6 +5479,7 @@ sugar typedef (name body...)
                             unquote-splice rest...
                         this-type
             default
+                let outp = (complete-outp outp storage?)
                 break
                     qq [do]
                         [let] this-type = [typedecl]
@@ -5761,7 +5797,7 @@ sugar struct (name body...)
             if (empty? body)
                 # forward declaration
                 return
-                    qq [typedef] [name] < [supertype]
+                    qq [typedef] [name] < [supertype] do
 
             let symname = (name as Symbol)
             # see if we can find a forward declaration in the local scope

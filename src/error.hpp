@@ -279,9 +279,12 @@ formatters:
     T(IndexOutOfRange, \
         "index %0 is out of range (%1)", \
         int, int) \
-    T(TypenameIsFinal, \
-        "typename %0 already has storage type %1", \
-        PType, PType) \
+    T(TypenameComplete, \
+        "typename %0 is already complete", \
+        PType) \
+    T(TypenameIncomplete, \
+        "attempting to use incomplete typename %0", \
+        PType) \
     T(StorageTypeExpected, \
         "storage type expected, not typename %0", \
         PType) \

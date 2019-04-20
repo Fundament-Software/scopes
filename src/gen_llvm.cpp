@@ -668,7 +668,7 @@ struct LLVMIRGenerator {
                 SCOPES_ERROR(CGenTypeUnsupportedInTarget, TYPE_Sampler);
             }
             auto tn = cast<TypenameType>(type);
-            if (tn->finalized()) {
+            if (!tn->is_opaque()) {
                 switch(tn->storage()->kind()) {
                 case TK_Tuple:
                 case TK_Union: {
@@ -734,7 +734,7 @@ struct LLVMIRGenerator {
             const Type *T = type_todo.back();
             type_todo.pop_back();
             auto tn = cast<TypenameType>(T);
-            if (!tn->finalized())
+            if (tn->is_opaque())
                 continue;
             LLVMTypeRef LLT = SCOPES_GET_RESULT(_type_to_llvm_type(T));
             const Type *ST = tn->storage();

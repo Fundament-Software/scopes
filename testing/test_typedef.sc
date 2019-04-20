@@ -20,7 +20,7 @@ assert (MyIntType < integer)
 let name = "RuntimeType"
 let RuntimeType =
     @@ spice-quote
-    typedef [name] < [(typename "new")] : i32
+    typedef [name] < [(opaque "new")] : i32
         inline func () true
 
 assert (not (constant? RuntimeType))

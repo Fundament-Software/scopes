@@ -45,10 +45,20 @@ const Type *TypenameType::storage() const {
     return storage_type;
 }
 
-SCOPES_RESULT(void) TypenameType::finalize(const Type *_type, uint32_t _flags) const {
+SCOPES_RESULT(void) TypenameType::complete() const {
     SCOPES_RESULT_TYPE(void);
-    if (finalized()) {
-        SCOPES_ERROR(TypenameIsFinal, this, storage_type);
+    if (is_complete()) {
+        SCOPES_ERROR(TypenameComplete, this);
+    }
+    flags = TNF_Complete;
+    return {};
+}
+
+SCOPES_RESULT(void) TypenameType::complete(const Type *_type, uint32_t _flags) const {
+    SCOPES_RESULT_TYPE(void);
+    _flags |= TNF_Complete;
+    if (is_complete()) {
+        SCOPES_ERROR(TypenameComplete, this);
     }
     if (isa<TypenameType>(_type)) {
         SCOPES_ERROR(StorageTypeExpected, _type);
@@ -61,10 +71,9 @@ SCOPES_RESULT(void) TypenameType::finalize(const Type *_type, uint32_t _flags) c
     return {};
 }
 
-bool TypenameType::finalized() const { return storage_type != nullptr; }
-bool TypenameType::is_plain() const {
-    return (flags & TNF_Plain) == TNF_Plain;
-}
+bool TypenameType::is_opaque() const { return storage_type == nullptr; }
+bool TypenameType::is_complete() const { return (flags & TNF_Complete) == TNF_Complete; }
+bool TypenameType::is_plain() const { return (flags & TNF_Plain) == TNF_Plain; }
 
 const Type *TypenameType::super() const {
     if (!super_type) return TYPE_Typename;
@@ -76,8 +85,28 @@ std::unordered_set<Symbol, Symbol::Hash> TypenameType::used_names;
 //------------------------------------------------------------------------------
 
 // always generates a new type
-const TypenameType *typename_type(const String *name, const Type *supertype) {
+const TypenameType *incomplete_typename_type(const String *name, const Type *supertype) {
     return new TypenameType(name, supertype);
+}
+
+const TypenameType *opaque_typename_type(const String *name, const Type *supertype) {
+    auto TT = incomplete_typename_type(name, supertype);
+    TT->complete().assert_ok();
+    return TT;
+}
+
+SCOPES_RESULT(const TypenameType *) plain_typename_type(const String *name, const Type *supertype, const Type *storage_type) {
+    SCOPES_RESULT_TYPE(const TypenameType *);
+    auto TT = incomplete_typename_type(name, supertype);
+    SCOPES_CHECK_RESULT(TT->complete(storage_type, TNF_Plain));
+    return TT;
+}
+
+SCOPES_RESULT(const TypenameType *) unique_typename_type(const String *name, const Type *supertype, const Type *storage_type) {
+    SCOPES_RESULT_TYPE(const TypenameType *);
+    auto TT = incomplete_typename_type(name, supertype);
+    SCOPES_CHECK_RESULT(TT->complete(storage_type, 0));
+    return TT;
 }
 
 SCOPES_RESULT(const Type *) storage_type(const Type *T) {
@@ -86,7 +115,10 @@ SCOPES_RESULT(const Type *) storage_type(const Type *T) {
     switch(T->kind()) {
     case TK_Typename: {
         const TypenameType *tt = cast<TypenameType>(T);
-        if (!tt->finalized()) {
+        if (!tt->is_complete()) {
+            SCOPES_ERROR(TypenameIncomplete, T);
+        }
+        if (tt->is_opaque()) {
             SCOPES_ERROR(OpaqueType, T);
         }
         return tt->storage();

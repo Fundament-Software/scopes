@@ -273,11 +273,11 @@ skip_regular_load:
 
     FunctionRef fn = SCOPES_GET_RESULT(prove(FunctionRef(), tmpfn, {}));
 
-    auto main_func_type = pointer_type(raising_function_type(
-        arguments_type({}), {}), PTF_NonWritable, SYM_Unnamed);
+    auto main_func_type = native_opaque_pointer_type(raising_function_type(
+        arguments_type({}), {}));
 
-    auto stage_func_type = pointer_type(raising_function_type(
-        arguments_type({TYPE_CompileStage}), {}), PTF_NonWritable, SYM_Unnamed);
+    auto stage_func_type = native_opaque_pointer_type(raising_function_type(
+        arguments_type({TYPE_CompileStage}), {}));
 
     const int compile_flags = 0;// CF_O2;
 

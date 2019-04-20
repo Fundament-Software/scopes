@@ -1752,7 +1752,7 @@ static SCOPES_RESULT(const Type *) get_function_type(const FunctionRef &fn) {
     }
     raisetype = canonical_return_type(fn, raisetype, true);
 
-    return native_ro_pointer_type(raising_function_type(raisetype, rettype, params));
+    return native_opaque_pointer_type(raising_function_type(raisetype, rettype, params));
 }
 
 static SCOPES_RESULT(const Type *) ensure_function_type(const FunctionRef &fn) {

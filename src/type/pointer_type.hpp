@@ -46,6 +46,8 @@ bool pointer_flags_is_writable(uint64_t flags);
 const Type *pointer_type(const Type *element_type, uint64_t flags,
     Symbol storage_class);
 
+const Type *native_opaque_pointer_type(const Type *element_type);
+
 const Type *native_ro_pointer_type(const Type *element_type);
 
 const Type *native_pointer_type(const Type *element_type);
@@ -57,6 +59,7 @@ const Type *local_pointer_type(const Type *element_type);
 const Type *static_pointer_type(const Type *element_type);
 
 uint64_t required_flags_for_storage_class(Symbol storage_class);
+uint64_t required_flags_for_element_type(const Type *element_type);
 
 bool pointer_storage_classes_compatible(Symbol need, Symbol got);
 bool pointer_flags_compatible(uint64_t need, uint64_t got);

@@ -543,7 +543,7 @@ FunctionRef Function::from(Symbol name,
 //------------------------------------------------------------------------------
 
 static const Type *pointer_for_global_type(const Type *type, size_t flags, Symbol storage_class) {
-    size_t ptrflags = required_flags_for_storage_class(storage_class);
+    size_t ptrflags = 0;
     if (flags & GF_NonWritable)
         ptrflags |= PTF_NonWritable;
     else if (flags & GF_NonReadable)
@@ -1189,7 +1189,7 @@ ConstIntRef ConstInt::from(const Type *type, uint64_t value) {
             intval = (intval << shift) >> shift;
             value = intval;
         } else {
-            value = value & ~(-1ull << w); 
+            value = value & ~(-1ull << w);
         }
     }
     return constints.from(type, value);

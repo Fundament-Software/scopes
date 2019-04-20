@@ -74,9 +74,8 @@ public:
     NamespaceMap typedefs;
 
     CVisitor() : dest(nullptr), Context(NULL) {
-        const Type *T = typename_type(String::from("__builtin_va_list"), nullptr);
-        auto tnt = cast<TypenameType>(const_cast<Type*>(T));
-        tnt->finalize(array_type(TYPE_I8, sizeof(va_list)).assert_ok(), TNF_Plain).assert_ok();
+        const Type *T = plain_typename_type(String::from("__builtin_va_list"), nullptr,
+            array_type(TYPE_I8, sizeof(va_list)).assert_ok()).assert_ok();
         typedefs.insert({Symbol("__builtin_va_list"), T });
     }
 
@@ -199,7 +198,7 @@ public:
             }
         }
 
-        SCOPES_CHECK_RESULT(tni->finalize(is_union?SCOPES_GET_RESULT(union_type(args)):
+        SCOPES_CHECK_RESULT(tni->complete(is_union?SCOPES_GET_RESULT(union_type(args)):
             SCOPES_GET_RESULT(tuple_type(args, packed, explicit_alignment?al:0)), TNF_Plain));
         return {};
     }
@@ -210,12 +209,12 @@ public:
             if (it != map.end()) {
                 return it->second;
             }
-            const Type *T = typename_type(name.name(), supertype);
+            const Type *T = incomplete_typename_type(name.name(), supertype);
             auto ok = map.insert({name, T});
             assert(ok.second);
             return T;
         }
-        return typename_type(name.name(), supertype);
+        return incomplete_typename_type(name.name(), supertype);
     }
 
     SCOPES_RESULT(const Type *) TranslateRecord(clang::RecordDecl *rd) {
@@ -248,7 +247,7 @@ public:
             record_defined[rd] = true;
 
             auto tni = cast<TypenameType>(struct_type);
-            if (tni->finalized()) {
+            if (!tni->is_opaque()) {
                 SCOPES_ERROR(CImportDuplicateTypeDefinition,
                     anchorFromLocation(rd->getSourceRange().getBegin()),
                     struct_type);
@@ -284,7 +283,7 @@ public:
             auto tag_type = SCOPES_GET_RESULT(TranslateType(ed->getIntegerType()));
 
             auto tni = cast<TypenameType>(enum_type);
-            SCOPES_CHECK_RESULT(tni->finalize(tag_type, TNF_Plain));
+            SCOPES_CHECK_RESULT(tni->complete(tag_type, TNF_Plain));
 
             for (auto it : ed->enumerators()) {
                 const Anchor *anchor = anchorFromLocation(it->getSourceRange().getBegin());
@@ -302,18 +301,21 @@ public:
         return enum_type;
     }
 
-    bool always_immutable(clang::QualType T) {
+    uint64_t PointerFlags(clang::QualType T) {
         using namespace clang;
+        uint64_t flags = 0;
+        if (T.isLocalConstQualified())
+            flags |= PTF_NonWritable;
         const clang::Type *Ty = T.getTypePtr();
         assert(Ty);
         switch (Ty->getTypeClass()) {
         case clang::Type::Elaborated: {
             const ElaboratedType *et = dyn_cast<ElaboratedType>(Ty);
-            return always_immutable(et->getNamedType());
+            flags |= PointerFlags(et->getNamedType());
         } break;
         case clang::Type::Paren: {
             const ParenType *pt = dyn_cast<ParenType>(Ty);
-            return always_immutable(pt->getInnerType());
+            flags |= PointerFlags(pt->getInnerType());
         } break;
         case clang::Type::Typedef:
         case clang::Type::Record:
@@ -354,7 +356,7 @@ public:
             break;
         case clang::Type::Decayed: {
             const clang::DecayedType *DTy = cast<clang::DecayedType>(Ty);
-            return always_immutable(DTy->getDecayedType());
+            flags |= PointerFlags(DTy->getDecayedType());
         } break;
         case clang::Type::Pointer:
         case clang::Type::VariableArray:
@@ -362,9 +364,13 @@ public:
         case clang::Type::ConstantArray:
             break;
         case clang::Type::ExtVector:
-        case clang::Type::Vector: return true;
+        case clang::Type::Vector: {
+            flags |= PTF_NonWritable;
+        } break;
         case clang::Type::FunctionNoProto:
-        case clang::Type::FunctionProto: return true;
+        case clang::Type::FunctionProto: {
+            flags |= PTF_NonWritable | PTF_NonReadable;
+        } break;
         case clang::Type::ObjCObject: break;
         case clang::Type::ObjCInterface: break;
         case clang::Type::ObjCObjectPointer: break;
@@ -374,15 +380,6 @@ public:
         default:
             break;
         }
-        if (T.isLocalConstQualified())
-            return true;
-        return false;
-    }
-
-    uint64_t PointerFlags(clang::QualType T) {
-        uint64_t flags = 0;
-        if (always_immutable(T))
-            flags |= PTF_NonWritable;
         return flags;
     }
 

@@ -5,6 +5,7 @@
 */
 
 #include "pointer_type.hpp"
+#include "typename_type.hpp"
 #include "../hash.hpp"
 #include "../error.hpp"
 
@@ -47,9 +48,9 @@ void PointerType::stream_name(StyledStream &ss) const {
     } else if (is_readable()) {
         ss << "(*)";
     } else if (is_writable()) {
-        ss << "*!";
+        ss << "!*!";
     } else {
-        ss << "*?";
+        ss << "<*>";
     }
     if (storage_class != SYM_Unnamed) {
         ss << "[" << storage_class.name()->data << "]";
@@ -84,8 +85,41 @@ bool PointerType::is_writable() const {
 
 //------------------------------------------------------------------------------
 
+uint64_t required_flags_for_element_type(const Type *element_type) {
+    if (isa<TypenameType>(element_type)
+        && !cast<TypenameType>(element_type)->is_complete())
+        return 0;
+    if (is_opaque(element_type)) {
+        return PTF_NonReadable | PTF_NonWritable;
+    }
+    return 0;
+}
+
+uint64_t required_flags_for_storage_class(Symbol storage_class) {
+    switch (storage_class.value()) {
+    case SYM_Unnamed: return 0;
+    case SYM_SPIRV_StorageClassUniformConstant: return PTF_NonWritable;
+    case SYM_SPIRV_StorageClassInput: return PTF_NonWritable;
+    case SYM_SPIRV_StorageClassUniform: return PTF_NonWritable;
+    case SYM_SPIRV_StorageClassOutput: return PTF_NonReadable;
+    case SYM_SPIRV_StorageClassWorkgroup: return 0;
+    case SYM_SPIRV_StorageClassCrossWorkgroup: return 0;
+    case SYM_SPIRV_StorageClassPrivate: return 0;
+    case SYM_SPIRV_StorageClassFunction: return 0;
+    case SYM_SPIRV_StorageClassGeneric: return 0;
+    case SYM_SPIRV_StorageClassPushConstant: return PTF_NonWritable;
+    case SYM_SPIRV_StorageClassAtomicCounter: return 0;
+    case SYM_SPIRV_StorageClassImage: return 0;
+    case SYM_SPIRV_StorageClassStorageBuffer: return 0; // ??
+    default: break;
+    }
+    return PTF_NonWritable | PTF_NonReadable;
+}
+
 const Type *pointer_type(const Type *element_type, uint64_t flags,
     Symbol storage_class) {
+    flags |= required_flags_for_storage_class(storage_class);
+    flags |= required_flags_for_element_type(element_type);
     SCOPES_TYPE_KEY(PointerType, key);
     key->element_type = element_type;
     key->flags = flags;
@@ -96,6 +130,10 @@ const Type *pointer_type(const Type *element_type, uint64_t flags,
     auto result = new PointerType(element_type, flags, storage_class);
     pointers.insert(result);
     return result;
+}
+
+const Type *native_opaque_pointer_type(const Type *element_type) {
+    return pointer_type(element_type, PTF_NonWritable|PTF_NonReadable, SYM_Unnamed);
 }
 
 const Type *native_ro_pointer_type(const Type *element_type) {
@@ -126,27 +164,6 @@ bool pointer_flags_is_readable(uint64_t flags) {
 
 bool pointer_flags_is_writable(uint64_t flags) {
     return !(flags & PTF_NonWritable);
-}
-
-uint64_t required_flags_for_storage_class(Symbol storage_class) {
-    switch (storage_class.value()) {
-    case SYM_Unnamed: return 0;
-    case SYM_SPIRV_StorageClassUniformConstant: return PTF_NonWritable;
-    case SYM_SPIRV_StorageClassInput: return PTF_NonWritable;
-    case SYM_SPIRV_StorageClassUniform: return PTF_NonWritable;
-    case SYM_SPIRV_StorageClassOutput: return PTF_NonReadable;
-    case SYM_SPIRV_StorageClassWorkgroup: return 0;
-    case SYM_SPIRV_StorageClassCrossWorkgroup: return 0;
-    case SYM_SPIRV_StorageClassPrivate: return 0;
-    case SYM_SPIRV_StorageClassFunction: return 0;
-    case SYM_SPIRV_StorageClassGeneric: return 0;
-    case SYM_SPIRV_StorageClassPushConstant: return PTF_NonWritable;
-    case SYM_SPIRV_StorageClassAtomicCounter: return 0;
-    case SYM_SPIRV_StorageClassImage: return 0;
-    case SYM_SPIRV_StorageClassStorageBuffer: return 0; // ??
-    default: break;
-    }
-    return PTF_NonWritable | PTF_NonReadable;
 }
 
 bool pointer_storage_classes_compatible(Symbol need, Symbol got) {
