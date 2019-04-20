@@ -355,6 +355,22 @@ let elementof =
             hide-traceback;
             `[(sc_type_element_at self index)]
 
+let locationof =
+    box-spice-macro
+        fn "locationof" (args)
+            let argcount = (sc_argcount args)
+            verify-count argcount 1 1
+            let self = (sc_getarg args 0)
+            `[(sc_global_location self)]
+
+let bindingof =
+    box-spice-macro
+        fn "locationof" (args)
+            let argcount = (sc_argcount args)
+            verify-count argcount 1 1
+            let self = (sc_getarg args 0)
+            `[(sc_global_binding self)]
+
 let storagecast =
     box-spice-macro
         fn "storagecast" (args)
@@ -1681,7 +1697,7 @@ let safe-shl =
     __+ = (box-pointer (simple-folding-binary-op add sc_const_int_extract sc_const_int_new))
     __- = (box-pointer (simple-folding-binary-op sub sc_const_int_extract sc_const_int_new))
     __neg = (box-pointer (inline (self) (sub (nullof (typeof self)) self)))
-    __* = (box-pointer (simple-binary-op mul))
+    __* = (box-pointer (simple-folding-binary-op mul sc_const_int_extract sc_const_int_new))
     __// = (box-pointer (simple-signed-binary-op sdiv udiv))
     __/ =
         box-pointer
@@ -1690,10 +1706,9 @@ let safe-shl =
                 inline (a b) (fdiv (uitofp a f32) (uitofp b f32))
     __rcp = (spice-quote (inline (self) (fdiv 1.0 (as self f32))))
     __% = (box-pointer (simple-signed-binary-op srem urem))
-    __& = (box-pointer (simple-binary-op band))
+    __& = (box-pointer (simple-folding-binary-op band sc_const_int_extract sc_const_int_new))
     __| = (box-pointer (simple-folding-binary-op bor sc_const_int_extract sc_const_int_new))
-    __^ = (box-pointer (simple-binary-op bxor))
-    __~ = (box-pointer (inline (self) (bxor self (itrunc -1:u64 (typeof self)))))
+    __^ = (box-pointer (simple-folding-binary-op bxor sc_const_int_extract sc_const_int_new))
     __<< = (box-pointer (simple-binary-op safe-shl))
     __>> = (box-pointer (simple-signed-binary-op ashr lshr))
     __== = (box-pointer (simple-folding-autotype-binary-op icmp== sc_const_int_extract))
@@ -1942,6 +1957,9 @@ let tostring =
                     `(sc_value_tostring value)
 
 run-stage; # 4
+
+'set-symbols integer
+    __~ = (box-pointer (inline (self) (^ self (as -1 (typeof self)))))
 
 let opaque =
     spice-macro

@@ -63,6 +63,7 @@ SCOPES_RESULT(Symbol) extract_symbol_constant(const ValueRef &value);
 SCOPES_RESULT(uint64_t) extract_integer_constant(const ValueRef &value);
 SCOPES_RESULT(FunctionRef) extract_function_constant(const ValueRef &value);
 SCOPES_RESULT(TemplateRef) extract_template_constant(const ValueRef &value);
+SCOPES_RESULT(GlobalRef) extract_global_constant(ValueRef value);
 SCOPES_RESULT(ConstAggregateRef) extract_vector_constant(const ValueRef &value);
 const Type *try_get_const_type(const ValueRef &node);
 const String *try_extract_string(const ValueRef &node);

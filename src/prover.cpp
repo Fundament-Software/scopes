@@ -1387,6 +1387,18 @@ static SCOPES_RESULT(TValueRef<T>) extract_typed_constant(const Type *want, Valu
     return constval;
 }
 
+SCOPES_RESULT(GlobalRef) extract_global_constant(ValueRef value) {
+    SCOPES_RESULT_TYPE(GlobalRef);
+    if (value.isa<PureCast>()) {
+        value = ref(value.anchor(), value.cast<PureCast>()->value);
+    }
+    auto constval = value.dyn_cast<Global>();
+    if (!constval) {
+        SCOPES_ERROR(ConstantValueKindMismatch, VK_Global, value->kind());
+    }
+    return constval;
+}
+
 SCOPES_RESULT(const Type *) extract_type_constant(const ValueRef &value) {
     SCOPES_RESULT_TYPE(const Type *);
     ConstPointerRef x = SCOPES_GET_RESULT(extract_typed_constant<ConstPointer>(TYPE_Type, value));
