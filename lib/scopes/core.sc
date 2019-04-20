@@ -5294,6 +5294,96 @@ sugar fold-locals (args...)
 run-stage; # 10
 
 #-------------------------------------------------------------------------------
+# static-match
+#-------------------------------------------------------------------------------
+
+sugar static-match (cond)
+    spice handle-static-match (cond args...)
+        let argc = ('argcount args...)
+        loop (i = 0)
+            i1 := i + 1
+            if (i1 < argc)
+                # at least two args
+                let test = ('getarg args... i)
+                let then = ('getarg args... i1)
+                let result = ('tag (sc_prove `(cond == test)) ('anchor test))
+                result as:= bool
+                if result
+                    return `(then)
+            else
+                # else-arg
+                let then = ('getarg args... i)
+                return `(then)
+            i1 + 1
+
+    let cond = (sc_expand cond '() sugar-scope)
+    let outargs = (sc_argument_list_new)
+    sc_argument_list_append outargs cond
+    loop (next-expr = next-expr)
+        sugar-match next-expr
+        case (('case it body...) rest...)
+            let it = (sc_expand it '() sugar-scope)
+            let body = (sc_expand (cons embed body...) '() sugar-scope)
+            sc_argument_list_append outargs it
+            sc_argument_list_append outargs `(inline () [body])
+            repeat rest...
+        case (('default body...) rest...)
+            let body = (sc_expand (cons embed body...) '() sugar-scope)
+            sc_argument_list_append outargs `(inline () [body])
+            return `(handle-static-match outargs) rest...
+        default
+            hide-traceback;
+            error "default branch missing"
+#
+    let expr = (expr as list)
+    let head arg argrest = (decons expr 2)
+    let arg argrest = (sc_expand arg argrest scope)
+    let outnext = (alloca-array list 1)
+    let outexpr next =
+        spice-quote
+            label ok-label
+                inline return-ok (args...)
+                    merge ok-label args...
+                spice-unquote
+                    let outexpr = (sc_expression_new)
+                    loop (next = next)
+                        let head = (next-head? next)
+                        switch head
+                        case 'case
+                            let expr next = (decons next)
+                            let expr = (expr as list)
+                            let head cond body = (decons expr 2)
+                            sc_expression_append outexpr
+                                spice-quote
+                                    label case-label
+                                        inline fail-case ()
+                                            merge case-label
+                                        let token = arg
+                                        spice-unquote
+                                            let newscope = (Scope scope)
+                                            let unpack-expr =
+                                                handle-case fail-case token newscope cond
+                                            let body =
+                                                sc_expand (cons do body) '() newscope
+                                            spice-quote
+                                                unpack-expr
+                                                return-ok body
+                            repeat next
+                        case 'default
+                            let expr next = (decons next)
+                            let expr = (expr as list)
+                            let head body = (decons expr)
+                            let body =
+                                sc_expand (cons do body) '() scope
+                            sc_expression_append outexpr `(return-ok body)
+                            store next outnext
+                            break outexpr
+                        default
+                            hide-traceback;
+                            error "default branch missing"
+    return (cons outexpr (load outnext)) scope
+
+#-------------------------------------------------------------------------------
 # unlet
 #-------------------------------------------------------------------------------
 
