@@ -274,7 +274,7 @@ formatters:
     T(PrematureReturnFromExpression, \
         "non-returning expression causes expression block to end before completion") \
     T(OpaqueType, \
-        "opaque type %0 is non-aggregable and has no size, alignment or storage type", \
+        "opaque type %0 is non-aggregable, has no size, alignment or storage type, and can not be passed as argument", \
         PType) \
     T(IndexOutOfRange, \
         "index %0 is out of range (%1)", \

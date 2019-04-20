@@ -1916,6 +1916,11 @@ repeat:
             SCOPES_CHECK_RESULT(verify_valid(ctx, args, "call"));
             Types types;
             for (auto &&arg : args) {
+                auto AT = arg->get_type();
+                if (is_opaque(AT)) {
+                    SCOPES_TRACE_PROVE_ARG(arg);
+                    SCOPES_ERROR(OpaqueType, AT);
+                }
                 types.push_back(arg->get_type());
             }
             callee = SCOPES_GET_RESULT(prove(
