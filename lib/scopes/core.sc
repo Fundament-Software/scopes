@@ -5334,54 +5334,6 @@ sugar static-match (cond)
         default
             hide-traceback;
             error "default branch missing"
-#
-    let expr = (expr as list)
-    let head arg argrest = (decons expr 2)
-    let arg argrest = (sc_expand arg argrest scope)
-    let outnext = (alloca-array list 1)
-    let outexpr next =
-        spice-quote
-            label ok-label
-                inline return-ok (args...)
-                    merge ok-label args...
-                spice-unquote
-                    let outexpr = (sc_expression_new)
-                    loop (next = next)
-                        let head = (next-head? next)
-                        switch head
-                        case 'case
-                            let expr next = (decons next)
-                            let expr = (expr as list)
-                            let head cond body = (decons expr 2)
-                            sc_expression_append outexpr
-                                spice-quote
-                                    label case-label
-                                        inline fail-case ()
-                                            merge case-label
-                                        let token = arg
-                                        spice-unquote
-                                            let newscope = (Scope scope)
-                                            let unpack-expr =
-                                                handle-case fail-case token newscope cond
-                                            let body =
-                                                sc_expand (cons do body) '() newscope
-                                            spice-quote
-                                                unpack-expr
-                                                return-ok body
-                            repeat next
-                        case 'default
-                            let expr next = (decons next)
-                            let expr = (expr as list)
-                            let head body = (decons expr)
-                            let body =
-                                sc_expand (cons do body) '() scope
-                            sc_expression_append outexpr `(return-ok body)
-                            store next outnext
-                            break outexpr
-                        default
-                            hide-traceback;
-                            error "default branch missing"
-    return (cons outexpr (load outnext)) scope
 
 #-------------------------------------------------------------------------------
 # unlet

@@ -1902,8 +1902,8 @@ repeat:
         SCOPES_CHECK_RESULT(verify_valid(ctx, values, "function call"));
     } else if (T == TYPE_Closure) {
         const Closure *cl = SCOPES_GET_RESULT((extract_closure_constant(callee)));
-        TypedValues args;
         {
+            TypedValues args;
             Symbols keys;
             bool vararg = keys_from_parameters(keys, cl->func->params);
             SCOPES_CHECK_RESULT(map_keyed_arguments(call.anchor(),
@@ -1912,11 +1912,11 @@ repeat:
             values = args;
         }
         if (cl->func->is_inline()) {
-            return SCOPES_GET_RESULT(prove_inline(ctx, cl, args));
+            return SCOPES_GET_RESULT(prove_inline(ctx, cl, values));
         } else {
-            SCOPES_CHECK_RESULT(verify_valid(ctx, args, "call"));
+            SCOPES_CHECK_RESULT(verify_valid(ctx, values, "call"));
             Types types;
-            for (auto &&arg : args) {
+            for (auto &&arg : values) {
                 auto AT = arg->get_type();
                 if (is_opaque(AT)) {
                     SCOPES_TRACE_PROVE_ARG(arg);
@@ -2877,8 +2877,7 @@ repeat:
     // verify_function_argument_signature
     for (int i = 0; i < numargs; ++i) {
         SCOPES_TRACE_PROVE_ARG(values[i]);
-        const Type *Ta = strip_qualifiers(values[i]->get_type(),
-            (1 << QK_Key));
+        const Type *Ta = values[i]->get_type();
         const Type *Tb = ft->argument_types[i];
         if (is_reference(Ta) && !is_reference(Tb)) {
             SCOPES_CHECK_RESULT(build_deref(ctx, call.anchor(), values[i]));
@@ -2901,9 +2900,12 @@ repeat:
             //Tb = strip_lifetime(Tb);
             Ta = strip_lifetime(Ta);
         }
+        Ta = strip_qualifier<KeyQualifier>(Ta);
         if (SCOPES_GET_RESULT(types_compatible(Tb, Ta))) {
             continue;
         }
+        StyledStream ss;
+        ss << Ta << " " << Tb << std::endl;
         SCOPES_ERROR(ParameterTypeMismatch, Tb, Ta);
     }
     // ensure variadic parameters aren't references
