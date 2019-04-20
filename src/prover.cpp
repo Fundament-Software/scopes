@@ -1901,8 +1901,8 @@ repeat:
         SCOPES_CHECK_RESULT(verify_valid(ctx, values, "function call"));
     } else if (T == TYPE_Closure) {
         const Closure *cl = SCOPES_GET_RESULT((extract_closure_constant(callee)));
+        TypedValues args;
         {
-            TypedValues args;
             Symbols keys;
             bool vararg = keys_from_parameters(keys, cl->func->params);
             SCOPES_CHECK_RESULT(map_keyed_arguments(call.anchor(),
@@ -1911,11 +1911,11 @@ repeat:
             values = args;
         }
         if (cl->func->is_inline()) {
-            return SCOPES_GET_RESULT(prove_inline(ctx, cl, values));
+            return SCOPES_GET_RESULT(prove_inline(ctx, cl, args));
         } else {
-            SCOPES_CHECK_RESULT(verify_valid(ctx, values, "call"));
+            SCOPES_CHECK_RESULT(verify_valid(ctx, args, "call"));
             Types types;
-            for (auto &&arg : values) {
+            for (auto &&arg : args) {
                 types.push_back(arg->get_type());
             }
             callee = SCOPES_GET_RESULT(prove(
@@ -1928,6 +1928,7 @@ repeat:
             } else {
                 T = SCOPES_GET_RESULT(ensure_function_type(f));
             }
+            //goto repeat;
         }
     } else if (T == TYPE_ASTMacro) {
         auto fptr = SCOPES_GET_RESULT(extract_astmacro_constant(callee));

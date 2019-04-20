@@ -2085,7 +2085,7 @@ let coerce-call-arguments =
                     loop (i = 0)
                         if (== i argc) (break)
                         let arg = ('getarg args (add i 1))
-                        let argT = ('typeof arg)
+                        let argT = ('qualified-typeof arg)
                         if (>= i pcount)
                             sc_call_append_argument outargs arg
                         else
