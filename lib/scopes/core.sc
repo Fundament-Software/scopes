@@ -4630,6 +4630,27 @@ define va-empty?
             let argc = ('argcount args)
             'tag `[(argc == 0)] ('anchor args)
 
+""""(va-map f ...)
+
+    Filter each argument in `...` through `f` and return the resulting list
+    of arguments. Arguments where `f` returns void are filtered from the result.
+define va-map
+    spice-macro
+        fn "va-map" (args)
+            #raises-compile-error;
+            let argc = ('argcount args)
+            verify-count argc 1 -1
+            let f = ('getarg args 0)
+            let outargs = (sc_argument_list_new)
+            loop (i = 1)
+                if (i == argc)
+                    break outargs
+                let arg = ('getarg args i)
+                let outarg = (sc_prove `(f arg))
+                if (('typeof outarg) != void)
+                    sc_argument_list_append outargs outarg
+                i + 1
+
 """" (va-split n a...) -> (inline () a...[n .. (va-countof a...)-1]) a...[0 .. n-1]
 define va-split
     spice-macro

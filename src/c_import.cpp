@@ -16,6 +16,7 @@
 #include "scope.hpp"
 #include "execution.hpp"
 #include "value.hpp"
+#include "prover.hpp"
 #include "dyn_cast.inc"
 
 #include "scopes/scopes.h"
@@ -594,6 +595,12 @@ public:
         dest->bind(name, ref(anchor, Global::from(type, name)));
     }
 
+    void exportExternRef(Symbol name, const Type *type, const Anchor *anchor) {
+        auto val = ref(anchor, Global::from(type, name));
+        auto conv = ref(anchor, PureCast::from(ptr_to_ref(val->get_type()).assert_ok(), val));
+        dest->bind(name, conv);
+    }
+
 #define SCOPES_COMBINE_RESULT(DEST, EXPR) { \
         auto _result = (EXPR); \
         if (!_result.ok()) \
@@ -624,7 +631,7 @@ public:
             auto type = TranslateType(vd->getType());
             SCOPES_COMBINE_RESULT(ok, type);
             if (!ok.ok()) return false;
-            exportExtern(
+            exportExternRef(
                 String::from_stdstring(vd->getName().data()),
                 type.assert_ok(),
                 anchor);

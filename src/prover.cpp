@@ -1786,7 +1786,7 @@ static bool keys_from_parameters(Symbols &keys, const ParameterTemplates &params
     return vararg;
 }
 
-static SCOPES_RESULT(const Type *) ptr_to_ref(const Type *T) {
+SCOPES_RESULT(const Type *) ptr_to_ref(const Type *T) {
     SCOPES_RESULT_TYPE(const Type *);
     T = SCOPES_GET_RESULT(storage_type(T));
     SCOPES_CHECK_RESULT(verify_kind<TK_Pointer>(T));
@@ -1795,7 +1795,7 @@ static SCOPES_RESULT(const Type *) ptr_to_ref(const Type *T) {
         pt->element_type, pt->flags, pt->storage_class);
 }
 
-static SCOPES_RESULT(const Type *) ref_to_ptr(const Type *T) {
+SCOPES_RESULT(const Type *) ref_to_ptr(const Type *T) {
     SCOPES_RESULT_TYPE(const Type *);
     auto rq = SCOPES_GET_RESULT(verify_refer(T));
     return copy_qualifiers(
@@ -1880,6 +1880,7 @@ static SCOPES_RESULT(TypedValueRef) prove_CallTemplate(
     int redirections = 0;
 repeat:
     SCOPES_CHECK_RESULT(verify_valid(ctx, callee, "callee"));
+    DEREF(callee);
     const Type *T = callee->get_type();
     if (!rawcall) {
         assert(redirections < 16);
