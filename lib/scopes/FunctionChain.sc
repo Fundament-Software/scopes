@@ -100,10 +100,10 @@ typedef FunctionChain : (storageof type)
 run-stage;
 
 'set-symbol FunctionChain '__call
-    spice "call-fnchain" (self)
+    spice "call-fnchain" (self args...)
         let self = (bitcast (self as FunctionChain) type)
         let func = self.chain
-        `(func)
+        `(func args...)
 
 """".. sugar:: (fnchain name)
 

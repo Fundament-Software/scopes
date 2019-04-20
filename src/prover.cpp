@@ -2887,6 +2887,9 @@ repeat:
             if (!is_view(Ta)) {
                 build_view(ctx, call.anchor(), values[i]);
                 Ta = values[i]->get_type();
+                if (!is_view(Ta)) {
+                    SCOPES_ERROR(ParameterTypeMismatch, Tb, Ta);
+                }
             }
             Tb = strip_view(Tb);
             Ta = strip_view(Ta);
@@ -2931,6 +2934,10 @@ repeat:
         const Type *paramT = ft->argument_types[i];
         if (is_view(paramT)) {
             const Type *argT = values[i]->get_type();
+            if (!is_view(argT)) {
+                StyledStream ss;
+                ss << paramT << " != " << argT << std::endl;
+            }
             auto paramv = get_view(paramT);
             auto argv = get_view(argT);
             for (auto id : paramv->sorted_ids) {

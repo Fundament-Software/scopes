@@ -4533,10 +4533,13 @@ define spice
                     repeat (i + 1) rest body (| varargs variadic?)
                 let content =
                     cons (list args)
-                        qq
-                            [verify-count] ([`sc_argcount args])
-                                [(? varargs (sub paramcount 1) paramcount)]
-                                [(? varargs -1 paramcount)]
+                        'tag
+                            Value
+                                qq
+                                    [verify-count] ([`sc_argcount args])
+                                        [(? varargs (sub paramcount 1) paramcount)]
+                                        [(? varargs -1 paramcount)]
+                            'anchor name
                         body
                 break
                     if (('typeof name) == Symbol)

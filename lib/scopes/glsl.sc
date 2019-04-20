@@ -209,10 +209,12 @@ inline gen-xvar-sugar (name f)
         spice local-new (name T layout...)
             let name = (name as Symbol)
             let T = (T as type)
-            f name T layout...
+            f ('anchor args) name T layout...
         sugar-match values...
         case ((name as Symbol) ': T layout...)
-            qq [let] [name] = ([local-new] '[name] [T] (unquote-splice layout...))
+            let expr = (qq [local-new] '[name] [T] (unquote-splice layout...))
+            let expr = ('tag `expr ('anchor expression))
+            qq [let] [name] = [expr]
         default
             error
                 .. "syntax: " name " <name> [: <type>] [location = i] [binding = j]"
@@ -221,7 +223,7 @@ inline wrap-xvar-global (f)
     fn (...)
         `(ptrtoref [(f ...)])
 
-fn config-xvar (flags storage name T layout)
+fn config-xvar (flags storage anchor name T layout)
     local location = -1
     local binding = -1
     for arg in ('args layout)
@@ -233,18 +235,18 @@ fn config-xvar (flags storage name T layout)
             binding = (v as i32)
         default
             error (.. "unsupported key: " (k as string))
-    sc_global_new name T flags storage location binding
+    'tag (sc_global_new name T flags storage location binding) anchor
 
-fn config-buffer (name T layout)
-    config-xvar global-flag-buffer-block 'Uniform name T layout
+fn config-buffer (anchor name T layout)
+    config-xvar global-flag-buffer-block 'Uniform anchor name T layout
 
-fn config-uniform (name T layout)
+fn config-uniform (anchor name T layout)
     let storage =
         if (('storageof T) < tuple) 'Uniform
         else 'UniformConstant
-    config-xvar 0:u32 storage name T layout
+    config-xvar 0:u32 storage anchor name T layout
 
-fn config-inout (name T layout)
+fn config-inout (anchor name T layout)
     let tname =
         .. "<inout " name " : " ('string T) ">"
     let f = (wrap-xvar-global config-xvar)
@@ -252,8 +254,8 @@ fn config-inout (name T layout)
         @@ spice-quote
         typedef (do tname)
             let Type = T
-            let in = [(f 0:u32 'Input name T layout)]
-            let out = [(f 0:u32 'Output name T layout)]
+            let in = [(f 0:u32 'Input anchor name T layout)]
+            let out = [(f 0:u32 'Output anchor name T layout)]
     `(bitcast LT InOutType)
 
 do
