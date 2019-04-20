@@ -4653,10 +4653,11 @@ define va-empty?
             let argc = ('argcount args)
             'tag `[(argc == 0)] ('anchor args)
 
-""""(va-map f ...)
+"""".. spice:: (va-map f ...)
 
-    Filter each argument in `...` through `f` and return the resulting list
-    of arguments. Arguments where `f` returns void are filtered from the result.
+       Filter each argument in `...` through `f` and return the resulting list
+       of arguments. Arguments where `f` returns void are filtered from the
+       result.
 define va-map
     spice-macro
         fn "va-map" (args)
@@ -4672,6 +4673,32 @@ define va-map
                 let outarg = (sc_prove `(f arg))
                 if (('typeof outarg) != void)
                     sc_argument_list_append outargs outarg
+                i + 1
+
+"""".. spice:: (va-range a b)
+
+       If `b` is not specified, returns a sequence of integers from zero to `b`,
+       otherwise a sequence of integers from `a` to `b`.
+define va-range
+    spice-macro
+        fn "va-range" (args)
+            #raises-compile-error;
+            let argc = ('argcount args)
+            verify-count argc 1 2
+            let a = (('getarg args 0) as i32)
+            let a b =
+                if (argc == 2)
+                    _ a (('getarg args 1) as i32)
+                else
+                    _ 0 a
+            if ((b - a) > unroll-limit)
+                hide-traceback;
+                error "too many elements specified for range"
+            let outargs = (sc_argument_list_new)
+            loop (i = a)
+                if (i == b)
+                    break outargs
+                sc_argument_list_append outargs `i
                 i + 1
 
 """" (va-split n a...) -> (inline () a...[n .. (va-countof a...)-1]) a...[0 .. n-1]
