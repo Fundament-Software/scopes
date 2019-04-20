@@ -2904,8 +2904,6 @@ repeat:
         if (SCOPES_GET_RESULT(types_compatible(Tb, Ta))) {
             continue;
         }
-        StyledStream ss;
-        ss << Ta << " " << Tb << std::endl;
         SCOPES_ERROR(ParameterTypeMismatch, Tb, Ta);
     }
     // ensure variadic parameters aren't references
