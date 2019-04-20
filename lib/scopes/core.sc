@@ -343,6 +343,18 @@ let static-error =
             hide-traceback;
             raise (sc_error_new msg)
 
+let elementof =
+    box-spice-macro
+        fn "elementof" (args)
+            let argcount = (sc_argcount args)
+            verify-count argcount 1 2
+            let self = (unbox-pointer (sc_getarg args 0) type)
+            let index =
+                if (icmp== argcount 2) (unbox-integer (sc_getarg args 1) i32)
+                else 0
+            hide-traceback;
+            `[(sc_type_element_at self index)]
+
 let storagecast =
     box-spice-macro
         fn "storagecast" (args)
@@ -1730,6 +1742,14 @@ inline floordiv (a b)
     __<= = (box-pointer (simple-binary-op type<=))
     __> = (box-pointer (simple-binary-op type>))
     __>= = (box-pointer (simple-binary-op type>=))
+    __countof =
+        box-spice-macro
+            fn "type-countof" (args)
+                let argc = ('argcount args)
+                verify-count argc 1 1
+                let self = ('getarg args 0)
+                hide-traceback;
+                `[(sc_type_countof (unbox-pointer self type))]
     # (dispatch-attr T key thenf elsef)
     dispatch-attr =
         box-spice-macro
