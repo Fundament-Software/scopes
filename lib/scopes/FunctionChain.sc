@@ -56,7 +56,7 @@ typedef FunctionChain : (storageof type)
             no functions will be called.
         let cls = (bitcast self type)
         'define-symbol cls 'chain
-            inline (cls args...)
+            inline (args...)
         self
 
     inline append (self f)
@@ -66,8 +66,8 @@ typedef FunctionChain : (storageof type)
         static-assert (constant? cls)
         let oldfn = cls.chain
         'define-symbol cls 'chain
-            inline (cls args...)
-                oldfn cls args...
+            inline (args...)
+                oldfn args...
                 f args...
         self
 
@@ -80,7 +80,7 @@ typedef FunctionChain : (storageof type)
         'define-symbol cls 'chain
             inline (cls args...)
                 f args...
-                oldfn cls args...
+                oldfn args...
         self
 
     inline on (self)
@@ -95,13 +95,13 @@ typedef FunctionChain : (storageof type)
         let T = (typename.type (.. "<FunctionChain " name ">") typename)
         'set-opaque T
         'set-symbol T 'chain
-            inline (cls args...)
+            inline (args...)
         bitcast T this-type
 
     spice __call (self args...)
         let self = (bitcast (self as this-type) type)
         let func = self.chain
-        `(func args...)
+        'tag `(func args...) ('anchor args)
 
 """".. sugar:: (fnchain name)
 
