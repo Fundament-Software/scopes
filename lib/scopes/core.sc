@@ -305,10 +305,11 @@ inline raises-compile-error ()
     if false
         error "hidden"
 
-inline type< (T superT)
+fn type< (T superT)
     sc_type_is_superof superT T
 
-let type> = sc_type_is_superof
+fn type> (superT T)
+    sc_type_is_superof superT T
 
 fn type<= (T superT)
     bxor (type> T superT) true
@@ -721,6 +722,8 @@ let
     type!= = (spice-macro (type-comparison-func ptrcmp!=))
     type<= = (spice-macro (type-comparison-func type<=))
     type>= = (spice-macro (type-comparison-func type>=))
+    type< = (spice-macro (type-comparison-func type<))
+    type> = (spice-macro (type-comparison-func type>))
 
 let NullType = (sc_typename_type "NullType" typename)
 
