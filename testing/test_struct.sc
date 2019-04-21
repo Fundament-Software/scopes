@@ -37,6 +37,8 @@ struct AnotherStruct plain
     y : i32
     z : i32
 
+    static-assert (super-type == CStruct)
+
     inline __typecall (cls x z y)
         CStruct.__typecall cls
             x = x

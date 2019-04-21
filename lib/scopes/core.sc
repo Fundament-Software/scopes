@@ -5579,6 +5579,7 @@ define append-to-type
 sugar typedef+ (T body...)
     qq [do]
         [let] this-type = [T]
+        [let] super-type = ([superof T])
         [do]
             unquote-splice body...
             [fold-locals] this-type [append-to-type]
@@ -5658,6 +5659,7 @@ sugar typedef (name body...)
                 break
                     qq [do]
                         [let] this-type = [typedecl]
+                        [let] super-type = [supertype]
                         unquote-splice outp
                         [do]
                             unquote-splice rest...
@@ -5667,6 +5669,7 @@ sugar typedef (name body...)
                 break
                     qq [do]
                         [let] this-type = [typedecl]
+                        [let] super-type = [supertype]
                         unquote-splice outp
                         [do]
                             unquote-splice inp

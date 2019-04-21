@@ -43,6 +43,8 @@ typedef MyTupleType < MyTupleSuperType : (tuple i32 i32)
             tupleof (imply x i32) (imply y i32)
             this-type
 
+    static-assert (super-type == MyTupleSuperType)
+
     # accessor
     inline get (self)
         return
@@ -79,5 +81,8 @@ run-stage;
 let T = (make-type "test" 1 2)
 print T T.x T.y
 
+
+typedef+ i32
+    static-assert (super-type == integer)
 
 true

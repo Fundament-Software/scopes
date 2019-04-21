@@ -38,7 +38,7 @@
 			"patterns": [
                 {
                     "name": "constant.language.builtins.scopes",
-                    "match": "(debug-build\\?|compiler-(path|timestamp|dir)|sugar-scope|this-type|pointer-flag-(non-(writable|readable))|type-kind-(function|integer|real|pointer|vector|array|tuple|union|typename))(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
+                    "match": "(debug-build\\?|compiler-(path|timestamp|dir)|sugar-scope|(this-|super-)type|pointer-flag-(non-(writable|readable))|type-kind-(function|integer|real|pointer|vector|array|tuple|union|typename))(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
                 },
                 {
                     "name": "constant.language.library.scopes",
