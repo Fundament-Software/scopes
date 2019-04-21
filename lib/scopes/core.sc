@@ -389,7 +389,13 @@ let &? =
             let argcount = (sc_argcount args)
             verify-count argcount 1 1
             let self = (sc_getarg args 0)
-            let isref = (sc_type_is_refer (sc_value_qualified_type self))
+            let selfT =
+                if (band
+                        (ptrcmp== (sc_value_type self) type)
+                        (sc_value_is_constant self))
+                    unbox-pointer self type
+                else (sc_value_qualified_type self)
+            let isref = (sc_type_is_refer selfT)
             `isref
 
 # typecall
@@ -1756,8 +1762,8 @@ inline floordiv (a b)
     __== = (box-pointer (simple-binary-op sc_value_compare))
 
 'set-symbols Closure
-    __== = (box-pointer (simple-binary-op ptrcmp==))
-    __!= = (box-pointer (simple-binary-op ptrcmp!=))
+    __== = (box-pointer (simple-folding-autotype-binary-op ptrcmp== sc_const_pointer_extract))
+    __!= = (box-pointer (simple-folding-autotype-binary-op ptrcmp!= sc_const_pointer_extract))
 
 'define-symbols type
     __@ = sc_type_element_at
@@ -1970,27 +1976,23 @@ let tostring =
 
 run-stage; # 4
 
-let imply? =
+inline gen-cast? (converterf)
     spice-macro
-        fn "opaque" (args)
+        fn "cast?" (args)
             let argc = ('argcount args)
             verify-count argc 2 2
             let value = ('getarg args 0)
             let T = (as ('getarg args 1) type)
-            let conv = (imply-converter ('typeof value) T ('constant? value))
+            let valueT constant =
+                if (band (== ('typeof value) type) ('constant? value))
+                    _ (as value type) false
+                else (_ ('typeof value) ('constant? value))
+            let conv = (imply-converter valueT T constant)
             let result = (operator-valid? conv)
             `result
 
-let as? =
-    spice-macro
-        fn "opaque" (args)
-            let argc = ('argcount args)
-            verify-count argc 2 2
-            let value = ('getarg args 0)
-            let T = (as ('getarg args 1) type)
-            let conv = (as-converter ('typeof value) T ('constant? value))
-            let result = (operator-valid? conv)
-            `result
+let imply? = (gen-cast? imply-converter)
+let as? = (gen-cast? as-converter)
 
 'set-symbols integer
     __~ = (box-pointer (inline (self) (^ self (as -1 (typeof self)))))
