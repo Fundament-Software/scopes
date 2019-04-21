@@ -3038,7 +3038,11 @@ define for
                             if (valid? it...)
                                 let args... = (at it...)
                                 inline continue ()
-                                    repeat (next it...)
+                                    spice-unquote
+                                        'tag
+                                            spice-quote
+                                                repeat (next it...)
+                                            'anchor generator-expr
                                 spice-unquote
                                     let expr =
                                         loop (params expr = params (list '= args...))

@@ -1147,6 +1147,7 @@ static SCOPES_RESULT(TypedValueRef) prove_Loop(const ASTContext &ctx, const Loop
     make_repeat(newctx, result.anchor(), newloop, result);
 
     SCOPES_CHECK_RESULT(finalize_repeats(ctx, newloop, "loop repeat"));
+    SCOPES_TRACE_PROVE_EXPR(loop);
 
     const Type *rtype = newloop->args->get_type();
     const Anchor *last_anchor = result.anchor();

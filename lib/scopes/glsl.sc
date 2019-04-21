@@ -205,6 +205,23 @@ build-rtypes
                 'set-symbol scope (Symbol ('string samplerT)) samplerT
 
 inline gen-xvar-sugar (name f)
+    fn parse-layout (layout)
+        loop (layout outp = layout '())
+            sugar-match layout
+            case ((key '= value) layout...)
+                let kv rest = (decons layout)
+                repeat rest
+                    cons kv outp
+            case ((value as Symbol) layout...)
+                let val rest = (decons layout)
+                repeat rest
+                    cons ('tag `[(qq [val] = true)] ('anchor val)) outp
+            case ()
+                # order is reversed, but should not matter
+                break outp
+            default
+                error "unrecognized layout attribute pattern"
+
     sugar "def-xvar" (values...)
         spice local-new (name T layout...)
             let name = (name as Symbol)
@@ -212,7 +229,8 @@ inline gen-xvar-sugar (name f)
             f ('anchor args) name T layout...
         sugar-match values...
         case ((name as Symbol) ': T layout...)
-            let expr = (qq [local-new] '[name] [T] (unquote-splice layout...))
+            let expr = (qq [local-new] '[name] [T]
+                (unquote-splice (parse-layout layout...)))
             let expr = ('tag `expr ('anchor expression))
             qq [let] [name] = [expr]
         default
@@ -226,6 +244,7 @@ inline wrap-xvar-global (f)
 fn config-xvar (flags storage anchor name T layout)
     local location = -1
     local binding = -1
+    local flags = flags
     for arg in ('args layout)
         let k v = ('dekey arg)
         switch k
@@ -233,6 +252,8 @@ fn config-xvar (flags storage anchor name T layout)
             location = (v as i32)
         case 'binding
             binding = (v as i32)
+        case 'readonly
+            flags
         default
             error (.. "unsupported key: " (k as string))
     'tag (sc_global_new name T flags storage location binding) anchor
