@@ -380,6 +380,18 @@ let storagecast =
             let T = (sc_type_storage (sc_value_type self))
             return `(bitcast self T)
 
+"""".. spice:: (&? value)
+
+       Returns `true` if `value` is a reference, otherwise `false`.
+let &? =
+    box-spice-macro
+        fn "&?" (args)
+            let argcount = (sc_argcount args)
+            verify-count argcount 1 1
+            let self = (sc_getarg args 0)
+            let isref = (sc_type_is_refer (sc_value_qualified_type self))
+            `isref
+
 # typecall
 sc_type_set_symbol type '__call
     box-spice-macro
@@ -1447,7 +1459,7 @@ fn unbalanced-binary-operation (args symbol rtype friendly-op-name)
         try ('@ lhsT symbol)
         except (err)
             unary-op-error friendly-op-name lhsT
-    `(f lhs rhs)
+    'tag `(f lhs rhs) ('anchor args)
 
 # unary operations don't need a dispatch step either
 fn unary-operation (args symbol friendly-op-name)
@@ -1813,7 +1825,7 @@ inline floordiv (a b)
                         let self = (unbox-pointer self Scope)
                         let key = (unbox-symbol key Symbol)
                         return (sc_scope_at self key)
-                `(sc_scope_at args)
+                'tag `(sc_scope_at args) ('anchor args)
     __typecall =
         box-spice-macro
             fn "scope-typecall" (args)
