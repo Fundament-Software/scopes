@@ -2509,11 +2509,16 @@ repeat:
                 auto rq = try_qualifier<ReferQualifier>(typeof_T);
                 if (rq) {
                     SCOPES_CHECK_RESULT(verify_integer(idx));
-                    RT = SCOPES_GET_RESULT(ai->type_at_index(0));
+                    if (ai->count) {
+                        RT = SCOPES_GET_RESULT(ai->type_at_index(0));
+                    }
                 } else {
                     // index must be constant
                     auto iidx = SCOPES_GET_RESULT(extract_integer_constant(_idx));
-                    RT = SCOPES_GET_RESULT(ai->type_at_index(iidx));
+                    if (ai->count) {
+                        // only check for sized arrays
+                        RT = SCOPES_GET_RESULT(ai->type_at_index(iidx));
+                    }
                 }
             } break;
             case TK_Tuple: {

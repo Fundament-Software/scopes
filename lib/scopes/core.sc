@@ -4900,6 +4900,31 @@ spice memocall (f args...)
         value
 
 #-------------------------------------------------------------------------------
+# static-compile*
+#-------------------------------------------------------------------------------
+
+spice _static-compile (func flags)
+    flags as:= u64
+    'tag `[(sc_compile func flags)] ('anchor args)
+
+inline gen-static-compile-shader (f)
+    spice _static-compile-glsl (target func flags)
+        target as:= Symbol
+        flags as:= u64
+        'tag `[(f target func flags)] ('anchor args)
+
+let _static-compile-glsl = (gen-static-compile-shader sc_compile_glsl)
+let _static-compile-spirv = (gen-static-compile-shader sc_compile_spirv)
+
+spice-quote
+    inline static-compile (func flags...)
+        _static-compile func (parse-compile-flags flags...)
+    inline static-compile-glsl (target func flags...)
+        _static-compile-glsl target func (parse-compile-flags flags...)
+    inline static-compile-spirv (target func flags...)
+        _static-compile-spirv target func (parse-compile-flags flags...)
+
+#-------------------------------------------------------------------------------
 # function overloading
 #-------------------------------------------------------------------------------
 
