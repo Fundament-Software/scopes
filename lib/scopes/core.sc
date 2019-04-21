@@ -2194,7 +2194,15 @@ fn pointer-type-imply? (src dest)
     let ET =
         if ('opaque? ET) ET
         else ('storageof ET)
-    if (not (icmp== ('kind ET) type-kind-pointer))
+    let ETkind = ('kind ET)
+    # [T x n](*) is interpreted as T(*)
+    let ET src =
+        if (icmp== ETkind type-kind-array)
+            let ET = ('element@ ET 0)
+            let src = ('change-element-type src ET)
+            _ ET src
+        else (_ ET src)
+    if (not (icmp== ETkind type-kind-pointer))
         # casts to voidstar are only permitted if we are not holding
         # a ref to another pointer
         if (type== dest voidstar)
@@ -2202,7 +2210,9 @@ fn pointer-type-imply? (src dest)
         elseif (type== dest (mutable voidstar))
             if ('writable? src)
                 return true
-    if (type== dest ('strip-pointer-storage-class src))
+    if (type== dest src)
+        return true
+    elseif (type== dest ('strip-pointer-storage-class src))
         return true
     elseif (type== dest ('immutable src))
         return true
