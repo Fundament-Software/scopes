@@ -1970,6 +1970,28 @@ let tostring =
 
 run-stage; # 4
 
+let imply? =
+    spice-macro
+        fn "opaque" (args)
+            let argc = ('argcount args)
+            verify-count argc 2 2
+            let value = ('getarg args 0)
+            let T = (as ('getarg args 1) type)
+            let conv = (imply-converter ('typeof value) T ('constant? value))
+            let result = (operator-valid? conv)
+            `result
+
+let as? =
+    spice-macro
+        fn "opaque" (args)
+            let argc = ('argcount args)
+            verify-count argc 2 2
+            let value = ('getarg args 0)
+            let T = (as ('getarg args 1) type)
+            let conv = (as-converter ('typeof value) T ('constant? value))
+            let result = (operator-valid? conv)
+            `result
+
 'set-symbols integer
     __~ = (box-pointer (inline (self) (^ self (as -1 (typeof self)))))
 
