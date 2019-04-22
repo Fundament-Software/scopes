@@ -1684,7 +1684,11 @@ struct SPIRVGenerator {
 
     SCOPES_RESULT(spv::Id) PureCast_to_value(const PureCastRef &node) {
         SCOPES_RESULT_TYPE(spv::Id);
-        auto LLT = SCOPES_GET_RESULT(type_to_spirv_type(node->get_type()));
+        uint64_t flags = 0;
+        if (node->value.isa<Global>()) {
+            flags = node->value.cast<Global>()->flags;
+        }
+        auto LLT = SCOPES_GET_RESULT(type_to_spirv_type(node->get_type(), flags));
         auto val = SCOPES_GET_RESULT(ref_to_value(ValueIndex(node->value)));
         if (builder.getTypeId(val) == LLT)
             return val;
