@@ -696,7 +696,7 @@ let static-branch =
                 error@ (sc_value_anchor cond) "while checking condition"
                     "condition must be constant"
             let value = (unbox-integer cond bool)
-            `([(? value thenf elsef)])
+            sc_valueref_tag (sc_value_anchor args) `([(? value thenf elsef)])
 
 sc_type_set_symbol Value '__typecall
     box-spice-macro
@@ -4969,12 +4969,14 @@ spice memocall (f args...)
 
 spice _static-compile (func flags)
     flags as:= u64
+    hide-traceback;
     'tag `[(sc_compile func flags)] ('anchor args)
 
 inline gen-static-compile-shader (f)
     spice _static-compile-glsl (target func flags)
         target as:= Symbol
         flags as:= u64
+        hide-traceback;
         'tag `[(f target func flags)] ('anchor args)
 
 let _static-compile-glsl = (gen-static-compile-shader sc_compile_glsl)
@@ -5249,7 +5251,7 @@ inline memo (f) (memocall _memo f)
                 _ it (cons sxat params)
 
 define-sugar-block-scope-macro static-if
-    fn process (body next-expr)
+    fn process (anchor body next-expr)
         if false
             return '() next-expr
         let cond body = (decons body)
@@ -5260,10 +5262,11 @@ define-sugar-block-scope-macro static-if
                 let else-expr next-next-expr = (decons next-expr)
                 if (('typeof else-expr) == list)
                     let kw body = (decons (else-expr as list))
+                    let anchor = ('anchor kw)
                     let kw = (kw as Symbol)
                     switch kw
                     case 'elseif
-                        process body next-next-expr
+                        process anchor body next-next-expr
                     case 'else
                         _ body next-next-expr
                     default
@@ -5272,13 +5275,16 @@ define-sugar-block-scope-macro static-if
                     _ '() next-expr
         return
             list
-                list static-branch
-                    'tag `[(list imply cond bool)] ('anchor cond)
-                    cons inline '() body
-                    cons inline '() elseexpr
+                'tag
+                    Value
+                        list static-branch
+                            'tag `[(list imply cond bool)] ('anchor cond)
+                            cons inline '() body
+                            cons inline '() elseexpr
+                    anchor
             next-next-expr
     let kw body = (decons expr)
-    let body next-expr = (process body next-expr)
+    let body next-expr = (process ('anchor kw) body next-expr)
     return
         cons
             cons do body

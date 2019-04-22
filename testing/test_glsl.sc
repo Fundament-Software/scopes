@@ -11,9 +11,16 @@ run-stage;
 inout uv : vec2
     location = 0
 
+fn multiple-return-values ()
+    if true
+        _ 1 2 3 4
+    else
+        _ 5 6 7 8
+
 fn set-vertex-position ()
     local screen-tri-vertices = screen-tri-vertices
     let pos = (screen-tri-vertices @ gl_VertexID)
+    multiple-return-values;
     gl_Position = (vec4 pos.x pos.y 0 1)
     deref pos
 

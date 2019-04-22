@@ -440,7 +440,7 @@ struct SPIRVGenerator {
         case TK_Arguments: {
             if (type == empty_arguments_type())
                 return builder.makeVoidType();
-            return create_spirv_type(cast<ArgumentsType>(type)->to_tuple_type(), flags);
+            return type_to_spirv_type(cast<ArgumentsType>(type)->to_tuple_type(), flags);
         } break;
         case TK_Tuple: {
             return create_struct_type(type, flags);
