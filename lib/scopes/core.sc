@@ -1176,7 +1176,7 @@ let integer->integer =
             let destw = ('bitcount ST)
             if ('constant? self)
                 # allow destructive conversions
-                let selfST = ('storageof selfT)
+                #let selfST = ('storageof selfT)
                 let u64val = (sc_const_int_extract self)
                 return (sc_const_int_new T u64val)
             let vT = selfT
@@ -1190,6 +1190,28 @@ let integer->integer =
                     return `(zext self T)
             else
                 return `(itrunc self T)
+
+let integer->real =
+    spice-converter-macro
+        inline (self T)
+            let selfT = ('typeof self)
+            let ST = ('storageof T)
+            let vT = selfT
+            let signed? = ('signed? vT)
+            if ('constant? self)
+                # allow destructive conversions
+                #let selfST = ('storageof selfT)
+                let u64val = (sc_const_int_extract self)
+                let f64val =
+                    if signed?
+                        sitofp u64val f64
+                    else
+                        uitofp u64val f64
+                return (sc_const_real_new T f64val)
+            if signed?
+                return `(sitofp self T)
+            else
+                return `(uitofp self T)
 
 fn integer-static-imply (vT T)
     if (type< T integer)
@@ -1225,11 +1247,48 @@ fn integer-as (vT T)
     elseif (type< T real)
         let ST = ('storageof T)
         if (icmp== ('kind ST) type-kind-real)
-            if ('signed? vT)
-                return `(inline (self) (sitofp self T))
-            else
-                return `(inline (self) (uitofp self T))
+            return `(inline (self) (integer->real self T))
     `()
+
+let real->real =
+    spice-converter-macro
+        inline (self T)
+            let selfT = ('typeof self)
+            let ST = ('storageof T)
+            let destw = ('bitcount ST)
+            if ('constant? self)
+                # allow destructive conversions
+                let f64val = (sc_const_real_extract self)
+                return (sc_const_real_new T f64val)
+            let vT = selfT
+            let valw = ('bitcount vT)
+            let kind = ('kind ST)
+            if (icmp== destw valw)
+                return `(bitcast self T)
+            elseif (icmp>s destw valw)
+                return `(fpext self T)
+            else
+                return `(fptrunc self T)
+
+let real->integer =
+    spice-converter-macro
+        inline (self T)
+            let selfT = ('typeof self)
+            let ST = ('storageof T)
+            let signed? = ('signed? ST)
+            if ('constant? self)
+                # allow destructive conversions
+                let f64val = (sc_const_real_extract self)
+                let u64val =
+                    if signed?
+                        fptosi f64val u64
+                    else
+                        fptoui f64val u64
+                return (sc_const_int_new T u64val)
+            if signed?
+                return `(fptosi self T)
+            else
+                return `(fptoui self T)
 
 # only perform safe casts: i.e. float to double
 fn real-imply (vT T)
@@ -1238,10 +1297,8 @@ fn real-imply (vT T)
         if (icmp== ('kind ST) type-kind-real)
             let valw = ('bitcount vT)
             let destw = ('bitcount ST)
-            if (icmp== destw valw)
-                return `(inline (self) (bitcast self T))
-            elseif (icmp>s destw valw)
-                return `(inline (self) (fpext self T))
+            if (icmp>=s destw valw)
+                return `(inline (self) (real->real self T))
     `()
 
 # more aggressive cast that converts from all numerical types
@@ -1250,21 +1307,12 @@ fn real-as (vT T)
         let ST = ('storageof T)
         let kind = ('kind ST)
         if (icmp== kind type-kind-real)
-            let valw destw = ('bitcount vT) ('bitcount ST)
-            if (icmp== destw valw)
-                return `(inline (self) (bitcast self T))
-            elseif (icmp>s destw valw)
-                return `(inline (self) (fpext self T))
-            else
-                return `(inline (self) (fptrunc self T))
+            return `(inline (self) (real->real self T))
     elseif (type< T integer)
         let ST = ('storageof T)
         let kind = ('kind ST)
         if (icmp== kind type-kind-integer)
-            if ('signed? ST)
-                return `(inline (self) (fptosi self T))
-            else
-                return `(inline (self) (fptoui self T))
+            return `(inline (self) (real->integer self T))
     `()
 
 # cast protocol
@@ -1572,7 +1620,7 @@ inline simple-signed-binary-op (sf uf)
                     return `uf
             `()
 
-inline simple-folding-autotype-signed-binary-op (sf uf unboxer)
+inline simple-folding-signed-binary-op (sf uf unboxer boxer)
     spice-binary-op-macro
         inline (lhsT rhsT)
             let f =
@@ -1589,9 +1637,9 @@ inline simple-folding-autotype-signed-binary-op (sf uf unboxer)
                                 let lhs = (unboxer lhs)
                                 let rhs = (unboxer rhs)
                                 if signed?
-                                    `[(sf lhs rhs)]
+                                    boxer lhsT (sf lhs rhs)
                                 else
-                                    `[(uf lhs rhs)]
+                                    boxer lhsT (uf lhs rhs)
                             elseif signed?
                                 `(sf lhs rhs)
                             else
@@ -1600,6 +1648,9 @@ inline simple-folding-autotype-signed-binary-op (sf uf unboxer)
             if (ptrcmp== lhsT rhsT)
                 return `f
             `()
+
+inline simple-folding-autotype-signed-binary-op (sf uf unboxer)
+    simple-folding-signed-binary-op sf uf unboxer autoboxer
 
 # support for calling macro functions directly
 'set-symbols SugarMacro
@@ -1703,10 +1754,17 @@ let safe-shl =
             let argc = ('argcount args)
             verify-count argc 2 2
             let lhs rhs = ('getarg args 0) ('getarg args 1)
+            let lhsT = ('typeof lhs)
             let rhsT = ('typeof rhs)
-            let bits = ('bitcount ('typeof lhs))
-            let mask = (zext (sub bits 1) u64)
-            let mask = (sc_const_int_new rhsT mask)
+            let bits = ('bitcount lhsT)
+            let maskval = (zext (sub bits 1) u64)
+            let mask = (sc_const_int_new rhsT maskval)
+            if ('constant? lhs)
+                if ('constant? rhs)
+                    let lhs = (sc_const_int_extract lhs)
+                    let rhs = (sc_const_int_extract rhs)
+                    let lhs = (shl lhs (band rhs maskval))
+                    return (sc_const_int_new lhsT lhs)
             # mask right hand side by bit width
             `(shl lhs (band rhs mask))
 
@@ -1717,21 +1775,20 @@ let safe-shl =
     __as = (box-pointer (spice-cast-macro integer-as))
     __+ = (box-pointer (simple-folding-binary-op add sc_const_int_extract sc_const_int_new))
     __- = (box-pointer (simple-folding-binary-op sub sc_const_int_extract sc_const_int_new))
-    __neg = (box-pointer (inline (self) (sub (nullof (typeof self)) self)))
     __* = (box-pointer (simple-folding-binary-op mul sc_const_int_extract sc_const_int_new))
-    __// = (box-pointer (simple-signed-binary-op sdiv udiv))
+    __// = (box-pointer (simple-folding-signed-binary-op sdiv udiv sc_const_int_extract sc_const_int_new))
     __/ =
         box-pointer
-            simple-signed-binary-op
+            simple-folding-autotype-signed-binary-op
                 inline (a b) (fdiv (sitofp a f32) (sitofp b f32))
                 inline (a b) (fdiv (uitofp a f32) (uitofp b f32))
-    __rcp = (spice-quote (inline (self) (fdiv 1.0 (as self f32))))
-    __% = (box-pointer (simple-signed-binary-op srem urem))
+                \ sc_const_int_extract
+    __% = (box-pointer (simple-folding-signed-binary-op srem urem sc_const_int_extract sc_const_int_new))
     __& = (box-pointer (simple-folding-binary-op band sc_const_int_extract sc_const_int_new))
     __| = (box-pointer (simple-folding-binary-op bor sc_const_int_extract sc_const_int_new))
     __^ = (box-pointer (simple-folding-binary-op bxor sc_const_int_extract sc_const_int_new))
     __<< = (box-pointer (simple-binary-op safe-shl))
-    __>> = (box-pointer (simple-signed-binary-op ashr lshr))
+    __>> = (box-pointer (simple-folding-signed-binary-op ashr lshr sc_const_int_extract sc_const_int_new))
     __== = (box-pointer (simple-folding-autotype-binary-op icmp== sc_const_int_extract))
     __!= = (box-pointer (simple-folding-autotype-binary-op icmp!= sc_const_int_extract))
     __< = (box-pointer (simple-folding-autotype-signed-binary-op icmp<s icmp<u sc_const_int_extract))
@@ -1745,20 +1802,18 @@ inline floordiv (a b)
 'set-symbols real
     __imply = (box-pointer (spice-cast-macro real-imply))
     __as = (box-pointer (spice-cast-macro real-as))
-    __== = (box-pointer (simple-binary-op fcmp==o))
-    __!= = (box-pointer (simple-binary-op fcmp!=u))
-    __> = (box-pointer (simple-binary-op fcmp>o))
-    __>= = (box-pointer (simple-binary-op fcmp>=o))
-    __< = (box-pointer (simple-binary-op fcmp<o))
-    __<= = (box-pointer (simple-binary-op fcmp<=o))
-    __+ = (box-pointer (simple-binary-op fadd))
-    __- = (box-pointer (simple-binary-op fsub))
-    __neg = (box-pointer (inline (self) (fsub (nullof (typeof self)) self)))
-    __* = (box-pointer (simple-binary-op fmul))
-    __/ = (box-pointer (simple-binary-op fdiv))
-    __rcp = (box-pointer (inline (self) (fdiv (uitofp 1 (typeof self)) self)))
-    __// = (box-pointer (simple-binary-op floordiv))
-    __% = (box-pointer (simple-binary-op frem))
+    __== = (box-pointer (simple-folding-autotype-binary-op fcmp==o sc_const_real_extract))
+    __!= = (box-pointer (simple-folding-autotype-binary-op fcmp!=u sc_const_real_extract))
+    __> = (box-pointer (simple-folding-autotype-binary-op fcmp>o sc_const_real_extract))
+    __>= = (box-pointer (simple-folding-autotype-binary-op fcmp>=o sc_const_real_extract))
+    __< = (box-pointer (simple-folding-autotype-binary-op fcmp<o sc_const_real_extract))
+    __<= = (box-pointer (simple-folding-autotype-binary-op fcmp<=o sc_const_real_extract))
+    __+ = (box-pointer (simple-folding-binary-op fadd sc_const_real_extract sc_const_real_new))
+    __- = (box-pointer (simple-folding-binary-op fsub sc_const_real_extract sc_const_real_new))
+    __* = (box-pointer (simple-folding-binary-op fmul sc_const_real_extract sc_const_real_new))
+    __/ = (box-pointer (simple-folding-binary-op fdiv sc_const_real_extract sc_const_real_new))
+    __// = (box-pointer (simple-folding-autotype-binary-op floordiv sc_const_real_extract))
+    __% = (box-pointer (simple-folding-binary-op frem sc_const_real_extract sc_const_real_new))
 
 
 'set-symbols Value
@@ -1999,6 +2054,13 @@ let as? = (gen-cast? as-converter)
 
 'set-symbols integer
     __~ = (box-pointer (inline (self) (^ self (as -1 (typeof self)))))
+    __neg = (box-pointer (inline (self) (- (as 0 (typeof self)) self)))
+    __rcp = (box-pointer (inline (self) (/ (as 1 (typeof self)) self)))
+
+'set-symbols real
+    __neg = (box-pointer (inline (self) (- (as 0 (typeof self)) self)))
+    __rcp = (box-pointer (inline (self) (/ (as 1 (typeof self)) self)))
+    __tobool = (box-pointer (inline (self) (!= self (as 0 (typeof self)))))
 
 let opaque =
     spice-macro
