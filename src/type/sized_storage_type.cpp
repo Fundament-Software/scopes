@@ -25,7 +25,7 @@ bool ArrayLikeType::classof(const Type *T) {
 ArrayLikeType::ArrayLikeType(TypeKind kind, const Type *_element_type, size_t _count)
     : CompositeType(kind), element_type(_element_type), count(_count) {
     stride = size_of(element_type).assert_ok();
-    size = stride * count;
+    size = (is_unsized()?0:(stride * count));
     align = align_of(element_type).assert_ok();
 }
 
@@ -39,6 +39,10 @@ SCOPES_RESULT(const Type *) ArrayLikeType::type_at_index(size_t i) const {
     SCOPES_RESULT_TYPE(const Type *);
     SCOPES_CHECK_RESULT(verify_range(i, count));
     return element_type;
+}
+
+bool ArrayLikeType::is_unsized() const {
+    return count == UNSIZED_COUNT;
 }
 
 //------------------------------------------------------------------------------

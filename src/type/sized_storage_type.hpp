@@ -21,6 +21,10 @@ struct CompositeType : Type {
 
 //------------------------------------------------------------------------------
 
+enum {
+    UNSIZED_COUNT = -1ull,
+};
+
 struct ArrayLikeType : CompositeType {
     static bool classof(const Type *T);
 
@@ -29,6 +33,8 @@ struct ArrayLikeType : CompositeType {
     SCOPES_RESULT(void *) getelementptr(void *src, size_t i) const;
 
     SCOPES_RESULT(const Type *) type_at_index(size_t i) const;
+
+    bool is_unsized() const;
 
     const Type *element_type;
     size_t count;

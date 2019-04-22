@@ -3913,9 +3913,11 @@ let tupleof =
                 raises-compile-error;
                 let cls = (('getarg args 0) as type)
                 if (cls == array)
-                    verify-count argc 3 3
+                    verify-count argc 2 3
                     let element-type = (('getarg args 1) as type)
-                    let size = (('getarg args 2) as i32)
+                    let size =
+                        if (argc == 2) -1
+                        else (('getarg args 2) as i32)
                     `[(sc_array_type element-type (size as usize))]
                 else
                     verify-count argc 1 1
