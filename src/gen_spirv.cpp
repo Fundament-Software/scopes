@@ -417,7 +417,7 @@ struct SPIRVGenerator {
             auto ai = cast<ArrayType>(type);
             auto etype = SCOPES_GET_RESULT(type_to_spirv_type(ai->element_type));
             spv::Id ty;
-            if (!ai->count) {
+            if (ai->is_unsized()) {
                 ty = builder.makeRuntimeArray(etype);
             } else {
                 ty = builder.makeArrayType(etype,
@@ -430,7 +430,8 @@ struct SPIRVGenerator {
         } break;
         case TK_Vector: {
             auto vi = cast<VectorType>(type);
-            if (vi->count <= 1) {
+
+            if ((vi->count <= 1) || (vi->is_unsized())) {
                 SCOPES_ERROR(CGenUnsupportedVectorSize, vi->element_type, vi->count);
             }
             return builder.makeVectorType(
