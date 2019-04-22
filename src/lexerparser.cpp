@@ -54,6 +54,7 @@ SCOPES_RESULT(void) LexerParser::verify_good_taste(char c) {
     SCOPES_RESULT_TYPE(void);
     if (c == '\t') {
         next_token();
+        SCOPES_TRACE_PARSER(this->anchor());
         SCOPES_ERROR(ParserBadTaste);
     }
     return {};
@@ -149,6 +150,7 @@ SCOPES_RESULT(void) LexerParser::read_string(char terminator) {
     bool escape = false;
     while (true) {
         if (is_eof()) {
+            SCOPES_TRACE_PARSER(this->anchor());
             SCOPES_ERROR(ParserUnterminatedSequence);
         }
         char c = SCOPES_GET_RESULT(next());
@@ -156,6 +158,7 @@ SCOPES_RESULT(void) LexerParser::read_string(char terminator) {
             // 0.10
             //newline();
             // 0.11
+            SCOPES_TRACE_PARSER(this->anchor());
             SCOPES_ERROR(ParserUnexpectedLineBreak);
         }
         if (escape) {
@@ -283,6 +286,7 @@ SCOPES_RESULT(bool) LexerParser::select_integer_suffix() {
     //else if (is_suffix(":isize")) { newtype = TYPE_ISize; }
     else if (is_suffix(":usize")) { newtype = TYPE_USize; }
     else {
+        SCOPES_TRACE_PARSER(this->anchor());
         SCOPES_ERROR(ParserInvalidIntegerSuffix,
             String::from(string, string_len));
     }
@@ -300,6 +304,7 @@ SCOPES_RESULT(bool) LexerParser::select_real_suffix() {
     if (is_suffix(":f32")) { newtype = TYPE_F32; }
     else if (is_suffix(":f64")) { newtype = TYPE_F64; }
     else {
+        SCOPES_TRACE_PARSER(this->anchor());
         SCOPES_ERROR(ParserInvalidRealSuffix,
             String::from(string, string_len));
     }
@@ -516,6 +521,7 @@ SCOPES_RESULT(const List *) LexerParser::parse_list(Token end_token) {
             SCOPES_CHECK_RESULT(this->read_token());
             builder.append(SCOPES_GET_RESULT(parse_naked(column, end_token)));
         } else if (this->token == tok_eof) {
+            SCOPES_TRACE_PARSER(this->anchor());
             SCOPES_ERROR(ParserUnclosedOpenBracket, start_anchor);
         } else if (this->token == tok_statement) {
             builder.split(this->anchor());
@@ -550,6 +556,7 @@ SCOPES_RESULT(ValueRef) LexerParser::parse_any() {
     } else if ((this->token == tok_close)
         || (this->token == tok_square_close)
         || (this->token == tok_curly_close)) {
+        SCOPES_TRACE_PARSER(this->anchor());
         SCOPES_ERROR(ParserStrayClosingBracket);
     } else if (this->token == tok_string) {
         return ValueRef(anchor, ConstPointer::string_from(get_string()));
@@ -562,6 +569,7 @@ SCOPES_RESULT(ValueRef) LexerParser::parse_any() {
     } else if (this->token == tok_syntax_quote) {
         SCOPES_CHECK_RESULT(this->read_token());
         if (this->token == tok_eof) {
+            SCOPES_TRACE_PARSER(this->anchor());
             SCOPES_ERROR(ParserUnterminatedQuote);
         }
         return ValueRef(anchor, ConstPointer::list_from(
@@ -572,6 +580,7 @@ SCOPES_RESULT(ValueRef) LexerParser::parse_any() {
     } else if (this->token == tok_ast_quote) {
         SCOPES_CHECK_RESULT(this->read_token());
         if (this->token == tok_eof) {
+            SCOPES_TRACE_PARSER(this->anchor());
             SCOPES_ERROR(ParserUnterminatedQuote);
         }
         return ValueRef(anchor, ConstPointer::list_from(
@@ -580,6 +589,7 @@ SCOPES_RESULT(ValueRef) LexerParser::parse_any() {
                 SCOPES_GET_RESULT(parse_any())
                 )));
     } else {
+        SCOPES_TRACE_PARSER(this->anchor());
         SCOPES_ERROR(ParserUnexpectedToken,
             this->cursor[0], (int)this->cursor[0]);
     }
@@ -604,6 +614,7 @@ SCOPES_RESULT(ValueRef) LexerParser::parse_naked(int column, Token end_token) {
             escape = true;
             SCOPES_CHECK_RESULT(this->read_token());
             if (this->lineno <= lineno) {
+                SCOPES_TRACE_PARSER(this->anchor());
                 SCOPES_ERROR(ParserStrayEscapeToken);
             }
             lineno = this->lineno;
@@ -670,6 +681,7 @@ SCOPES_RESULT(ValueRef) LexerParser::parse() {
             //escape = true;
             SCOPES_CHECK_RESULT(this->read_token());
             if (this->lineno <= lineno) {
+                SCOPES_TRACE_PARSER(this->anchor());
                 SCOPES_ERROR(ParserStrayEscapeToken);
             }
             lineno = this->lineno;
@@ -688,6 +700,7 @@ SCOPES_RESULT(ValueRef) LexerParser::parse() {
                 builder.append(SCOPES_GET_RESULT(parse_naked(1, tok_none)));
             }
         } else if (this->token == tok_statement) {
+            SCOPES_TRACE_PARSER(this->anchor());
             SCOPES_ERROR(ParserStrayStatementToken);
         } else {
             builder.append(SCOPES_GET_RESULT(parse_any()));
