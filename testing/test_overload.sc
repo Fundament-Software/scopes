@@ -60,7 +60,9 @@ fn... test2
 assert ((test2 5) == 10)
 assert ((test2 "hi") == "hihi")
 
-#fn... test3
-#case (a : i32 = 3, b = 1, c = -1)
-    _ a b c
+fn... test3
+case (a : i32 = 3, b = 1, c = -1, d...)
+    _ a b c d...
 
+assert ((list (test3)) == (list 3 1 -1))
+assert ((list (test3 5 6 7 8 9 0)) == (list 5 6 7 8 9 0))

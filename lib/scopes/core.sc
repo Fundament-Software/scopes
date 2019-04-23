@@ -4617,7 +4617,7 @@ fn uncomma (l)
             error "unexpected comma"
         cons
             if ((countof current) == 1) ('@ current)
-            else `current
+            else ('tag `current anchor)
             total
     if (comma-separated? l)
         fn process (l)
@@ -4997,15 +4997,17 @@ spice-quote
 # function overloading
 #-------------------------------------------------------------------------------
 
-let _nodefault = (opaque "nodefault")
+let nodefault = (opaque "nodefault")
 
 spice overloaded-fn-append (T args...)
     let outtype = (T as type)
     let functions = ('@ outtype 'templates)
     let functypes = ('@ outtype 'parameter-types)
-    for i in (range 0 ('argcount args...) 2)
+    let defaults = ('@ outtype 'parameter-defaults)
+    for i in (range 0 ('argcount args...) 3)
         let f = ('getarg args... i)
         let ftype = ('getarg args... (i + 1))
+        let fdefs = ('getarg args... (i + 2))
         if (('typeof ftype) == Nothing)
             # separator for (using ...)
             let fT = ('typeof f)
@@ -5022,6 +5024,7 @@ spice overloaded-fn-append (T args...)
                             sc_arguments_type_join types argT
                     sc_argument_list_append functions f
                     sc_argument_list_append functypes types
+                    sc_argument_list_append defaults `none
                     break;
             elseif (fT == type)
                 if (fT == outtype)
@@ -5030,16 +5033,20 @@ spice overloaded-fn-append (T args...)
                 if (fT < OverloadedFunction)
                     let fns = ('@ fT 'templates)
                     let ftypes = ('@ fT 'parameter-types)
+                    let fdefs = ('@ fT 'parameter-defaults)
                     # copy over existing options
-                    for func ftype in (zip ('args fns) ('args ftypes))
+                    for func ftype defs in (zip ('args fns)
+                        (zip ('args ftypes) ('args fdefs)))
                         sc_argument_list_append functions func
                         sc_argument_list_append functypes ftype
+                        sc_argument_list_append defaults defs
             elseif (fT == Closure)
                 # ensure argument is constant
                 f as Closure
                 # append as templated option
                 sc_argument_list_append functions f
                 sc_argument_list_append functypes Variadic
+                sc_argument_list_append defaults `none
             else
                 error
                     .. "cannot embed argument of type "
@@ -5049,6 +5056,7 @@ spice overloaded-fn-append (T args...)
             let T = (ftype as type)
             sc_argument_list_append functions f
             sc_argument_list_append functypes ftype
+            sc_argument_list_append defaults fdefs
     T
 
 'set-symbols OverloadedFunction
@@ -5058,34 +5066,90 @@ spice overloaded-fn-append (T args...)
             let T = (cls as type)
             let fns = ('@ T 'templates)
             let ftypes = ('@ T 'parameter-types)
+            let fdefaults = ('@ T 'parameter-defaults)
             let count = ('argcount args...)
-            for f FT in (zip ('args fns) ('args ftypes))
+            fn nodefault? (x)
+                (('typeof x) == type) and (x as type == nodefault)
+            for f FT defs in (zip ('args fns) (zip ('args ftypes) ('args fdefaults)))
                 let FT = (FT as type)
+                let has-defs? = (('typeof defs) != Nothing)
+                let defs =
+                    if has-defs? (sc_prove `(defs))
+                    else `()
                 let argcount = (sc_arguments_type_argcount FT)
                 let variadic? =
                     (argcount > 0) and
                         ((sc_arguments_type_getarg FT (argcount - 1)) == Variadic)
-                if variadic?
+                let defcount = ('argcount defs)
+                if has-defs?
+                    assert (argcount <= defcount)
+                        "number of defaults must match number of arguments"
+                    if ((not variadic?) & (count > argcount))
+                        continue;
+                elseif variadic?
                     if ((count + 1) < argcount)
                         continue;
                 elseif (count != argcount)
                     continue;
-                label break-next
-                    let outargs = ('tag (sc_call_new f) ('anchor args))
-                    sc_call_set_rawcall outargs true
-                    let lasti = (argcount - 1)
-                    for i arg in (enumerate ('args args...))
-                        let argT = ('typeof arg)
-                        let paramT = (sc_arguments_type_getarg FT (min i lasti))
-                        let outarg =
-                            if (paramT == Unknown) arg
-                            elseif (paramT == Variadic) arg
-                            elseif (argT == paramT) arg
-                            else
-                                let conv = (imply-converter argT paramT ('constant? arg))
-                                if (operator-valid? conv) `(conv arg)
-                                else (merge break-next)
-                        sc_call_append_argument outargs outarg
+                let failed = (ptrtoref (alloca bool))
+                failed = false
+                let explicit-argcount = (? variadic? (argcount - 1) argcount)
+                for i in (range explicit-argcount)
+                    inline no-match ()
+                        failed = true
+                        break;
+                    let arg =
+                        if (i < count) ('getarg args... i)
+                        elseif has-defs?
+                            let arg = ('getarg defs i)
+                            if (nodefault? arg) # argument missing
+                                no-match;
+                            arg
+                        else
+                            no-match;
+                    let argT = ('typeof arg)
+                    let paramT = (sc_arguments_type_getarg FT i)
+                    if (paramT == Unknown)
+                        continue;
+                    elseif (argT == paramT)
+                        continue;
+                    assert (paramT != Variadic)
+                    let conv = (imply-converter argT paramT ('constant? arg))
+                    if (not (operator-valid? conv))
+                        no-match;
+                if failed
+                    continue;
+                # success, generate call
+                let lasti = (argcount - 1)
+                let outargs = ('tag (sc_call_new f) ('anchor args))
+                sc_call_set_rawcall outargs true
+                for i arg in (enumerate ('args args...))
+                    let argT = ('typeof arg)
+                    let paramT = (sc_arguments_type_getarg FT (min i lasti))
+                    let outarg =
+                        if (paramT == Unknown) arg
+                        elseif (paramT == Variadic) arg
+                        elseif (argT == paramT) arg
+                        else
+                            let conv = (imply-converter argT paramT ('constant? arg))
+                            assert (operator-valid? conv)
+                            `(conv arg)
+                    sc_call_append_argument outargs outarg
+                # complete default values
+                for i in (range count explicit-argcount)
+                    let arg = ('getarg defs i)
+                    let argT = ('typeof arg)
+                    let paramT = (sc_arguments_type_getarg FT i)
+                    let outarg =
+                        if (paramT == Unknown) arg
+                        elseif (paramT == Variadic) arg
+                        elseif (argT == paramT) arg
+                        else
+                            let conv = (imply-converter argT paramT ('constant? arg))
+                            assert (operator-valid? conv)
+                            `(conv arg)
+                    sc_call_append_argument outargs outarg
+                if true
                     return outargs
             # if we got here, there was no match
             error
@@ -5145,6 +5209,7 @@ sugar fn... (name...)
             let obj = (sc_expand (cons do body...) '() sugar-scope)
             sc_argument_list_append outargs obj
             sc_argument_list_append outargs `none
+            sc_argument_list_append outargs `none
             repeat rest...
         case (('case condv body...) rest...)
             do
@@ -5154,17 +5219,23 @@ sugar fn... (name...)
                 sc_argument_list_append outargs tmpl
                 let scope = (Scope bodyscope)
                 let types = (sc_argument_list_new)
+                let defaults = (sc_argument_list_new)
                 loop (expr = (uncomma (condv as list)))
                     sugar-match expr
                     case ()
                         let body = (sc_expand (cons do body...) '() scope)
                         sc_template_set_body tmpl body
                         sc_argument_list_append outargs `(Arguments types)
+                        sc_argument_list_append outargs `(inline () defaults)
                         break;
-                    case ((arg as Symbol) ': T)
+                    case ((arg as Symbol) ': rest...)
                         hide-traceback;
                         error@ ('anchor condv) "while parsing pattern"
                             "single typed parameter definition is missing trailing comma or semicolon"
+                    case ((arg as Symbol) '= rest...)
+                        hide-traceback;
+                        error@ ('anchor condv) "while parsing pattern"
+                            "single default parameter definition is missing trailing comma or semicolon"
                     case ((arg as Symbol) rest...)
                         if ('variadic? arg)
                             if (not (empty? rest...))
@@ -5174,6 +5245,28 @@ sugar fn... (name...)
                         'set-symbol scope arg param
                         sc_argument_list_append types
                             ? ('variadic? arg) Variadic Unknown
+                        sc_argument_list_append defaults nodefault
+                        repeat rest...
+                    case (((arg as Symbol) '= def) rest...)
+                        if ('variadic? arg)
+                            error "variadic parameter can not have default value"
+                        let param = (sc_parameter_new arg)
+                        sc_template_append_parameter tmpl param
+                        'set-symbol scope arg param
+                        sc_argument_list_append types Unknown
+                        let def = (sc_expand def '() sugar-scope)
+                        sc_argument_list_append defaults def
+                        repeat rest...
+                    case (((arg as Symbol) ': T '= def) rest...)
+                        if ('variadic? arg)
+                            error "a typed parameter can't be variadic"
+                        let T = (sc_expand T '() sugar-scope)
+                        let param = (sc_parameter_new arg)
+                        sc_template_append_parameter tmpl param
+                        'set-symbol scope arg param
+                        sc_argument_list_append types T
+                        let def = (sc_expand def '() sugar-scope)
+                        sc_argument_list_append defaults def
                         repeat rest...
                     case (((arg as Symbol) ': T) rest...)
                         if ('variadic? arg)
@@ -5183,10 +5276,12 @@ sugar fn... (name...)
                         sc_template_append_parameter tmpl param
                         'set-symbol scope arg param
                         sc_argument_list_append types T
+                        sc_argument_list_append defaults nodefault
                         repeat rest...
                     default
+                        let at = (decons expr)
                         hide-traceback;
-                        error@ ('anchor condv) "while parsing pattern"
+                        error@ ('anchor at) "while parsing pattern"
                             "syntax: (parameter-name[: type], ...)"
             repeat rest...
         default
