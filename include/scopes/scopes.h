@@ -350,6 +350,7 @@ SCOPES_LIBEXPORT const sc_list_t *sc_list_cons(sc_valueref_t at, const sc_list_t
 SCOPES_LIBEXPORT const sc_list_t *sc_list_join(const sc_list_t *a, const sc_list_t *b);
 SCOPES_LIBEXPORT const sc_list_t *sc_list_dump(const sc_list_t *l);
 SCOPES_LIBEXPORT const sc_string_t *sc_list_repr(const sc_list_t *l);
+SCOPES_LIBEXPORT const sc_string_t *sc_list_serialize(const sc_list_t *l);
 SCOPES_LIBEXPORT sc_valueref_list_tuple_t sc_list_decons(const sc_list_t *l);
 SCOPES_LIBEXPORT int sc_list_count(const sc_list_t *l);
 SCOPES_LIBEXPORT sc_valueref_t sc_list_at(const sc_list_t *l);
