@@ -11,6 +11,7 @@
 #include "prover.hpp"
 #include "types.hpp"
 #include "gc.hpp"
+#include "symbol_enum.hpp"
 #include "dyn_cast.inc"
 
 #include <unordered_map>
@@ -27,14 +28,21 @@ Style default_symbol_styler(Symbol name) {
     if (!name.is_known())
         return Style_Symbol;
     auto val = name.known_value();
-    if ((val >= KEYWORD_FIRST) && (val <= KEYWORD_LAST))
+    switch(val) {
+#define T(NAME, STR) case NAME:
+    SCOPES_BUILTIN_SUGAR_SYMBOLS()
+    SCOPES_LIBRARY_SUGAR_SYMBOLS()
         return Style_Keyword;
-    else if ((val >= FUNCTION_FIRST) && (val <= FUNCTION_LAST))
+    SCOPES_BUILTIN_SPICE_SYMBOLS()
+    SCOPES_LIBRARY_SPICE_SYMBOLS()
         return Style_Function;
-    else if ((val >= SFXFUNCTION_FIRST) && (val <= SFXFUNCTION_LAST))
+    SCOPES_LIBRARY_SFXSPICE_SYMBOLS()
         return Style_SfxFunction;
-    else if ((val >= OPERATOR_FIRST) && (val <= OPERATOR_LAST))
+    SCOPES_LIBRARY_OPERATOR_SYMBOLS()
         return Style_Operator;
+#undef T
+    default: break;
+    }
     return Style_Symbol;
 }
 

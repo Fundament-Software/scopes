@@ -13,6 +13,7 @@
 #include <assert.h>
 
 #include <unordered_map>
+#include <unordered_set>
 
 namespace scopes {
 
@@ -137,7 +138,7 @@ void Symbol::_init_symbols() {
 #define T2T T2
 #define T2(UNAME, LNAME, PFIX, OP) \
     map_known_symbol(FN_ ## UNAME ## PFIX, String::from(#LNAME #OP));
-    B_MAP_SYMBOLS()
+    SCOPES_SYMBOLS()
 #undef T
 #undef T0
 #undef T1
@@ -167,6 +168,24 @@ void Symbol::_init_symbols() {
     map_known_symbol(SYM_SPIRV_ImageOperand ## NAME, String::from(#NAME));
     B_SPIRV_IMAGE_OPERAND()
 #undef T
+
+#if 0
+    std::unordered_set<Symbol, Symbol::Hash> defined;
+    StyledStream ss;
+#define T(NAME) \
+    ss << "T(" << #NAME << ", " << Symbol(NAME).name() << ") \\" << std::endl; \
+    defined.insert(Symbol(NAME));
+    SCOPES_BUILTIN_SYMBOLS()
+#undef T
+    ss << std::endl;
+#define T(NAME, STR) \
+    if (!defined.count(Symbol(NAME))) { \
+        ss << "T(" << #NAME << ", " << Symbol(NAME).name() << ") \\" << std::endl; \
+    }
+    SCOPES_SYMBOLS()
+#undef T
+    ss << std::endl;
+#endif
 }
 
 StyledStream& Symbol::stream(StyledStream& ost) const {

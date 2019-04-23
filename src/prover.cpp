@@ -2769,6 +2769,7 @@ repeat:
             }
             return ARGTYPE0();
         } break;
+        /*
         case FN_StaticAlloc: {
             CHECKARGS(1, 1);
             READ_TYPE_CONST(T);
@@ -2776,6 +2777,7 @@ repeat:
             return TypedValueRef(call.anchor(),
                 ConstPointer::from(static_pointer_type(T), dst));
         } break;
+        */
         case OP_ICmpEQ:
         case OP_ICmpNE:
         case OP_ICmpUGT:

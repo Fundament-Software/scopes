@@ -16,7 +16,7 @@ const char *get_known_symbol_name(KnownSymbol sym) {
 #define T2T T2
 #define T2(UNAME, LNAME, PFIX, OP) \
     case FN_ ## UNAME ## PFIX: return "FN_" #UNAME #PFIX;
-    B_MAP_SYMBOLS()
+    SCOPES_SYMBOLS()
 #undef T
 #undef T0
 #undef T1

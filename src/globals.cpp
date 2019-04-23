@@ -2332,10 +2332,10 @@ void init_globals(int argc, char *argv[]) {
         ConstPointer::string_from(
             String::from_cstr(scopes_compile_time_date())));
 
-    for (uint64_t i = STYLE_FIRST; i <= STYLE_LAST; ++i) {
-        Symbol sym = Symbol((KnownSymbol)i);
-        bind_symbol(sym, sym);
-    }
+#define T(NAME, STR) \
+    bind_symbol(Symbol(NAME), Symbol(NAME));
+SCOPES_STYLE_SYMBOLS()
+#undef T
 
     bind_new_value(Symbol("voidstar"),
         ConstPointer::type_from(voidstar));
@@ -2394,13 +2394,13 @@ B_TYPES()
     bind_new_value(Symbol(SYM_O3),
         ConstInt::from(TYPE_U64, (uint64_t)CF_O3));
 
-#define T(NAME) bind_new_value(NAME, ConstInt::builtin_from(Builtin(NAME)));
+#define T(NAME, STR) bind_new_value(NAME, ConstInt::builtin_from(Builtin(NAME)));
 #define T0(NAME, STR) bind_new_value(NAME, ConstInt::builtin_from(Builtin(NAME)));
 #define T1 T2
 #define T2T T2
 #define T2(UNAME, LNAME, PFIX, OP) \
     bind_new_value(FN_ ## UNAME ## PFIX, ConstInt::builtin_from(Builtin(FN_ ## UNAME ## PFIX)));
-    B_GLOBALS()
+    SCOPES_BUILTIN_SYMBOLS()
 #undef T
 #undef T0
 #undef T1

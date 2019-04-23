@@ -13,60 +13,6 @@ namespace scopes {
 // SYMBOL ENUM
 //------------------------------------------------------------------------------
 
-// list of symbols to be exposed as builtins to the default global namespace
-#define B_GLOBALS() \
-    T(FN_Branch) T(KW_Fn) T(KW_Label) T(KW_SyntaxQuote) T(KW_Inline) T(KW_Forward) T(KW_Raise) \
-    T(KW_Call) T(KW_RawCall) T(KW_CCCall) T(SYM_QuoteForm) T(FN_Dump) T(FN_DumpTemplate) T(KW_Do) \
-    T(FN_FunctionType) T(FN_TupleType) T(FN_UnionType) T(FN_Alloca) T(FN_AllocaOf) T(FN_Malloc) \
-    T(FN_AllocaArray) T(FN_MallocArray) T(FN_ReturnLabelType) T(KW_DoIn) T(FN_AllocaExceptionPad) \
-    T(FN_StaticAlloc) T(KW_Try) T(KW_Return) T(KW_Loop) T(KW_Repeat) T(KW_Break) T(FN_Dupe) \
-    T(KW_ASTQuote) T(KW_ASTUnquote) T(KW_ASTUnquoteArguments) T(KW_Merge) T(FN_Copy) T(FN_Track) \
-    T(FN_Move) T(FN_View) T(FN_Viewing) T(FN_Lose) T(FN_Assign) T(FN_Deref) T(FN_PtrToRef) T(FN_RefToPtr) \
-    T(FN_AnyExtract) T(FN_AnyWrap) T(FN_Free) T(KW_Defer) T(FN_DumpDebug) T(FN_HideTraceback) \
-    T(FN_DumpAST) T(FN_DumpUniques) T(FN_IsValid) T(OP_ICmpEQ) T(OP_ICmpNE) \
-    T(FN_Sample) T(FN_ImageRead) T(FN_ImageWrite) T(SYM_DropHandler) \
-    T(FN_ImageQuerySize) T(FN_ImageQueryLod) T(FN_ImageQueryLevels) T(FN_ImageQuerySamples) \
-    T(OP_ICmpUGT) T(OP_ICmpUGE) T(OP_ICmpULT) T(OP_ICmpULE) \
-    T(OP_ICmpSGT) T(OP_ICmpSGE) T(OP_ICmpSLT) T(OP_ICmpSLE) \
-    T(OP_FCmpOEQ) T(OP_FCmpONE) T(OP_FCmpORD) \
-    T(OP_FCmpOGT) T(OP_FCmpOGE) T(OP_FCmpOLT) T(OP_FCmpOLE) \
-    T(OP_FCmpUEQ) T(OP_FCmpUNE) T(OP_FCmpUNO) \
-    T(OP_FCmpUGT) T(OP_FCmpUGE) T(OP_FCmpULT) T(OP_FCmpULE) \
-    T(FN_Purify) T(FN_Unconst) T(FN_TypeOf) T(FN_Bitcast) \
-    T(FN_IntToPtr) T(FN_PtrToInt) T(FN_Load) T(FN_Store) \
-    T(FN_VolatileLoad) T(FN_VolatileStore) T(SFXFN_ExecutionMode) \
-    T(FN_ExtractElement) T(FN_InsertElement) T(FN_ShuffleVector) \
-    T(FN_ExtractValue) T(FN_InsertValue) T(FN_ITrunc) T(FN_ZExt) T(FN_SExt) T(FN_GetElementRef) \
-    T(FN_GetElementPtr) T(FN_OffsetOf) T(FN_VaCountOf) T(FN_VaAt) \
-    T(FN_VaKeys) T(FN_VaKey) T(FN_VaValues) T(FN_CompilerMessage) T(FN_Undef) T(FN_NullOf) T(KW_Let) \
-    T(KW_If) T(KW_Switch) T(SFXFN_DelTypeSymbol) T(FN_ExternSymbol) \
-    T(FN_ExternNew) T(FN_GetSyntaxScope) \
-    T(SFXFN_Discard) \
-    T(FN_TypeAt) T(FN_TypeLocalAt) T(KW_RunStage) T(FN_Location) T(SFXFN_Unreachable) \
-    T(FN_FPTrunc) T(FN_FPExt) T(FN_ScopeOf) \
-    T(FN_FPToUI) T(FN_FPToSI) \
-    T(FN_UIToFP) T(FN_SIToFP) \
-    T(OP_Add) T(OP_AddNUW) T(OP_AddNSW) \
-    T(OP_Sub) T(OP_SubNUW) T(OP_SubNSW) \
-    T(OP_Mul) T(OP_MulNUW) T(OP_MulNSW) \
-    T(OP_SDiv) T(OP_UDiv) \
-    T(OP_SRem) T(OP_URem) \
-    T(OP_Shl) T(OP_LShr) T(OP_AShr) \
-    T(OP_BAnd) T(OP_BOr) T(OP_BXor) \
-    T(OP_FAdd) T(OP_FSub) T(OP_FMul) T(OP_FDiv) T(OP_FRem) \
-    T(OP_Tertiary) T(KW_SyntaxLog) \
-    T(OP_FMix) T(OP_Step) T(OP_SmoothStep) \
-    T(FN_Round) T(FN_RoundEven) T(OP_Trunc) \
-    T(OP_FAbs) T(OP_FSign) T(OP_SSign) \
-    T(OP_Floor) T(FN_Ceil) T(FN_Fract) \
-    T(OP_Radians) T(OP_Degrees) \
-    T(OP_Sin) T(OP_Cos) T(OP_Tan) \
-    T(OP_Asin) T(OP_Acos) T(OP_Atan) T(OP_Atan2) \
-    T(OP_Exp) T(OP_Log) T(OP_Exp2) T(OP_Log2) \
-    T(OP_Pow) T(OP_Sqrt) T(OP_InverseSqrt) \
-    T(FN_Fma) T(FN_Frexp) T(FN_Ldexp) \
-    T(FN_Length) T(FN_Distance) T(FN_Cross) T(FN_Normalize)
-
 #define B_SPIRV_STORAGE_CLASS() \
     T(UniformConstant) \
     T(Input) \
@@ -249,151 +195,334 @@ namespace scopes {
     T(Gather) \
     T(Sparse)
 
-#define B_MAP_SYMBOLS() \
-    T(SYM_Unnamed, "") \
-    \
-    /* keywords and macros */ \
-    T(KW_CatRest, "::*") T(KW_CatOne, "::@") T(KW_Forward, "_") \
-    T(KW_SyntaxLog, "sugar-log") T(KW_DoIn, "embed") T(KW_Defer, "__defer") \
-    T(KW_Assert, "assert") T(KW_Break, "break") T(KW_Label, "label") \
-    T(KW_Call, "call") T(KW_RawCall, "rawcall") T(KW_CCCall, "cc/call") T(KW_Continue, "continue") \
-    T(KW_Repeat, "repeat") T(KW_Raise, "raise") \
-    T(KW_Define, "define") T(KW_Do, "do") T(KW_DumpSyntax, "dump-syntax") \
-    T(KW_Else, "else") T(KW_ElseIf, "elseif") T(KW_EmptyList, "empty-list") \
-    T(KW_EmptyTuple, "empty-tuple") T(KW_Escape, "escape") \
-    T(KW_Except, "except") T(KW_False, "false") T(KW_Fn, "fn") \
-    T(KW_FnTypes, "fn-types") T(KW_FnCC, "fn/cc") T(KW_Globals, "globals") \
-    T(KW_If, "if") T(KW_Switch, "switch") T(KW_In, "in") T(KW_Let, "let") T(KW_Loop, "loop") \
-    T(KW_LoopFor, "loop-for") T(KW_None, "none") T(KW_Null, "null") \
-    T(KW_SyntaxQuote, "sugar-quote") T(KW_ASTQuote, "spice-quote") T(KW_ASTUnquote, "spice-unquote") \
-    T(KW_ASTUnquoteArguments, "spice-unquote-arguments") T(FN_Copy, "copy") \
-    T(KW_Inline, "inline") T(KW_Recur, "recur") T(FN_Track, "follow") \
-    T(KW_Merge, "merge") T(FN_Move, "move") T(FN_View, "view") T(FN_Viewing, "viewing") \
-    T(KW_Return, "return") T(KW_Splice, "splice") T(FN_Lose, "lose") T(FN_Dupe, "dupe") \
-    T(KW_RunStage, "run-stage") T(KW_True, "true") T(KW_Try, "try") \
-    T(KW_Unquote, "unquote") T(KW_UnquoteSplice, "unquote-splice") T(KW_ListEmpty, "eol") \
-    T(KW_With, "with") T(KW_XFn, "xfn") T(KW_XLet, "xlet") T(KW_Yield, "yield") \
-    \
-    /* builtin and global functions */ \
-    T(FN_Alignof, "alignof") T(FN_OffsetOf, "offsetof") \
-    T(FN_Alloc, "alloc") T(FN_Arrayof, "arrayof") \
-    T(FN_AnchorPath, "Anchor-path") T(FN_AnchorLineNumber, "Anchor-line-number") \
-    T(FN_AnchorColumn, "Anchor-column") T(FN_AnchorOffset, "Anchor-offset") \
+// list of builtin symbols recognized as syntactical forms
+#define SCOPES_BUILTIN_SUGAR_SYMBOLS() \
+    T(KW_Fn, "fn") \
+    T(KW_Inline, "inline") \
+    T(KW_Label, "label") \
+    T(KW_SyntaxQuote, "sugar-quote") \
+    T(KW_Forward, "_") \
+    T(KW_Raise, "raise") \
+    T(KW_Call, "call") \
+    T(KW_RawCall, "rawcall") \
+    T(KW_Do, "do") \
+    T(KW_DoIn, "embed") \
+    T(KW_Try, "try") \
+    T(KW_Return, "return") \
+    T(KW_Loop, "loop") \
+    T(KW_Repeat, "repeat") \
+    T(KW_Break, "break") \
+    T(KW_Merge, "merge") \
+    T(KW_ASTQuote, "spice-quote") \
+    T(KW_ASTUnquote, "spice-unquote") \
+    T(KW_ASTUnquoteArguments, "spice-unquote-arguments") \
+    T(KW_Let, "let") \
+    T(KW_If, "if") \
+    T(KW_Switch, "switch") \
+    T(FN_GetSyntaxScope, "__this-scope") \
+    T(KW_RunStage, "run-stage") \
+    T(KW_SyntaxLog, "sugar-log") \
+
+// list of builtin symbols recognized as intrinsics
+#define SCOPES_BUILTIN_SPICE_SYMBOLS() \
+    T(FN_Branch, "branch") \
+    T(FN_Dump, "dump") \
+    T(FN_DumpTemplate, "dump-template") \
+    T(FN_DumpDebug, "dump-debug") \
+    T(FN_DumpAST, "dump-spice") \
+    T(FN_DumpUniques, "dump-uniques") \
+    T(FN_Alloca, "alloca") \
+    T(FN_Malloc, "malloc") \
+    T(FN_Free, "free") \
+    T(FN_AllocaArray, "alloca-array") \
+    T(FN_MallocArray, "malloc-array") \
+    T(FN_Dupe, "dupe") \
+    T(FN_Copy, "copy") \
+    T(FN_Track, "follow") \
+    T(FN_Move, "move") \
+    T(FN_View, "view") \
+    T(FN_Viewing, "viewing") \
+    T(FN_Lose, "lose") \
+    T(FN_Assign, "assign") \
+    T(FN_Deref, "deref") \
+    T(FN_PtrToRef, "ptrtoref") \
+    T(FN_RefToPtr, "reftoptr") \
+    T(FN_HideTraceback, "hide-traceback") \
+    T(FN_IsValid, "unique-visible?") \
+    T(OP_ICmpEQ, "icmp==") \
+    T(OP_ICmpNE, "icmp!=") \
+    T(FN_Sample, "sample") \
+    T(FN_ImageRead, "Image-read") \
+    T(FN_ImageWrite, "Image-write") \
+    T(SYM_DropHandler, "__drop") \
+    T(FN_ImageQuerySize, "Image-query-size") \
+    T(FN_ImageQueryLod, "Image-query-lod") \
+    T(FN_ImageQueryLevels, "Image-query-levels") \
+    T(FN_ImageQuerySamples, "Image-query-samples") \
+    T(OP_ICmpUGT, "icmp>u") \
+    T(OP_ICmpUGE, "icmp>=u") \
+    T(OP_ICmpULT, "icmp<u") \
+    T(OP_ICmpULE, "icmp<=u") \
+    T(OP_ICmpSGT, "icmp>s") \
+    T(OP_ICmpSGE, "icmp>=s") \
+    T(OP_ICmpSLT, "icmp<s") \
+    T(OP_ICmpSLE, "icmp<=s") \
+    T(OP_FCmpOEQ, "fcmp==o") \
+    T(OP_FCmpONE, "fcmp!=o") \
+    T(OP_FCmpORD, "fcmp-ord") \
+    T(OP_FCmpOGT, "fcmp>o") \
+    T(OP_FCmpOGE, "fcmp>=o") \
+    T(OP_FCmpOLT, "fcmp<o") \
+    T(OP_FCmpOLE, "fcmp<=o") \
+    T(OP_FCmpUEQ, "fcmp==u") \
+    T(OP_FCmpUNE, "fcmp!=u") \
+    T(OP_FCmpUNO, "fcmp-uno") \
+    T(OP_FCmpUGT, "fcmp>u") \
+    T(OP_FCmpUGE, "fcmp>=u") \
+    T(OP_FCmpULT, "fcmp<u") \
+    T(OP_FCmpULE, "fcmp<=u") \
+    T(FN_TypeOf, "typeof") \
+    T(FN_Bitcast, "bitcast") \
+    T(FN_IntToPtr, "inttoptr") \
+    T(FN_PtrToInt, "ptrtoint") \
+    T(FN_Load, "load") \
+    T(FN_Store, "store") \
+    T(FN_VolatileLoad, "volatile-load") \
+    T(FN_VolatileStore, "volatile-store") \
+    T(SFXFN_ExecutionMode, "set-execution-mode!") \
+    T(FN_ExtractElement, "extractelement") \
+    T(FN_InsertElement, "insertelement") \
+    T(FN_ShuffleVector, "shufflevector") \
+    T(FN_ExtractValue, "extractvalue") \
+    T(FN_InsertValue, "insertvalue") \
+    T(FN_ITrunc, "itrunc") \
+    T(FN_ZExt, "zext") \
+    T(FN_SExt, "sext") \
+    T(FN_GetElementRef, "getelementref") \
+    T(FN_GetElementPtr, "getelementptr") \
+    T(FN_OffsetOf, "offsetof") \
+    T(FN_VaCountOf, "va-countof") \
+    T(FN_Undef, "undef") \
+    T(FN_NullOf, "nullof") \
+    T(SFXFN_Discard, "discard!") \
+    T(SFXFN_Unreachable, "unreachable!") \
+    T(FN_FPTrunc, "fptrunc") \
+    T(FN_FPExt, "fpext") \
+    T(FN_FPToUI, "fptoui") \
+    T(FN_FPToSI, "fptosi") \
+    T(FN_UIToFP, "uitofp") \
+    T(FN_SIToFP, "sitofp") \
+    T(OP_Add, "add") \
+    T(OP_AddNUW, "add-nuw") \
+    T(OP_AddNSW, "add-nsw") \
+    T(OP_Sub, "sub") \
+    T(OP_SubNUW, "sub-nuw") \
+    T(OP_SubNSW, "sub-nsw") \
+    T(OP_Mul, "mul") \
+    T(OP_MulNUW, "mul-nuw") \
+    T(OP_MulNSW, "mul-nsw") \
+    T(OP_SDiv, "sdiv") \
+    T(OP_UDiv, "udiv") \
+    T(OP_SRem, "srem") \
+    T(OP_URem, "urem") \
+    T(OP_Shl, "shl") \
+    T(OP_LShr, "lshr") \
+    T(OP_AShr, "ashr") \
+    T(OP_BAnd, "band") \
+    T(OP_BOr, "bor") \
+    T(OP_BXor, "bxor") \
+    T(OP_FAdd, "fadd") \
+    T(OP_FSub, "fsub") \
+    T(OP_FMul, "fmul") \
+    T(OP_FDiv, "fdiv") \
+    T(OP_FRem, "frem") \
+    T(OP_Tertiary, "?") \
+    T(OP_FMix, "fmix") \
+    T(OP_Step, "step") \
+    T(OP_SmoothStep, "smoothstep") \
+    T(FN_Round, "round") \
+    T(FN_RoundEven, "roundeven") \
+    T(OP_Trunc, "trunc") \
+    T(OP_FAbs, "fabs") \
+    T(OP_FSign, "fsign") \
+    T(OP_SSign, "ssign") \
+    T(OP_Floor, "floor") \
+    T(FN_Ceil, "ceil") \
+    T(FN_Fract, "fract") \
+    T(OP_Radians, "radians") \
+    T(OP_Degrees, "degrees") \
+    T(OP_Sin, "sin") \
+    T(OP_Cos, "cos") \
+    T(OP_Tan, "tan") \
+    T(OP_Asin, "asin") \
+    T(OP_Acos, "acos") \
+    T(OP_Atan, "atan") \
+    T(OP_Atan2, "atan2") \
+    T(OP_Exp, "exp") \
+    T(OP_Log, "log") \
+    T(OP_Exp2, "exp2") \
+    T(OP_Log2, "log2") \
+    T(OP_Pow, "powf") \
+    T(OP_Sqrt, "sqrt") \
+    T(OP_InverseSqrt, "inversesqrt") \
+    T(FN_Fma, "fma") \
+    T(FN_Frexp, "frexp") \
+    T(FN_Ldexp, "ldexp") \
+    T(FN_Length, "length") \
+    T(FN_Distance, "distance") \
+    T(FN_Cross, "cross") \
+    T(FN_Normalize, "normalize") \
+
+// list of symbols to be exposed as builtins to the default global namespace
+#define SCOPES_BUILTIN_SYMBOLS() \
+    SCOPES_BUILTIN_SUGAR_SYMBOLS() \
+    SCOPES_BUILTIN_SPICE_SYMBOLS() \
+
+#define SCOPES_LIBRARY_SUGAR_SYMBOLS() \
+    T(KW_CatRest, "::*") \
+    T(KW_CatOne, "::@") \
+    T(KW_Assert, "assert") \
+    T(KW_Continue, "continue") \
+    T(KW_Define, "define") \
+    T(KW_DumpSyntax, "dump-syntax") \
+    T(KW_Else, "else") \
+    T(KW_ElseIf, "elseif") \
+    T(KW_EmptyList, "empty-list") \
+    T(KW_EmptyTuple, "empty-tuple") \
+    T(KW_Escape, "escape") \
+    T(KW_Except, "except") \
+    T(KW_False, "false") \
+    T(KW_FnTypes, "fn-types") \
+    T(KW_FnCC, "fn/cc") \
+    T(KW_Globals, "globals") \
+    T(KW_In, "in") \
+    T(KW_LoopFor, "loop-for") \
+    T(KW_None, "none") \
+    T(KW_Null, "null") \
+    T(KW_Recur, "recur") \
+    T(KW_Splice, "splice") \
+    T(KW_True, "true") \
+    T(KW_Unquote, "unquote") \
+    T(KW_UnquoteSplice, "unquote-splice") \
+    T(KW_ListEmpty, "eol") \
+    T(KW_With, "with") \
+    T(KW_XFn, "xfn") \
+    T(KW_XLet, "xlet") \
+    T(KW_Yield, "yield") \
+
+#define SCOPES_LIBRARY_SPICE_SYMBOLS() \
+    T(FN_VaAt, "va@") \
+    T(FN_Alignof, "alignof") \
+    T(FN_Alloc, "alloc") \
+    T(FN_Arrayof, "arrayof") \
+    T(FN_AnchorPath, "Anchor-path") \
+    T(FN_AnchorLineNumber, "Anchor-line-number") \
+    T(FN_AnchorColumn, "Anchor-column") \
+    T(FN_AnchorOffset, "Anchor-offset") \
     T(FN_AnchorSource, "Anchor-source") \
-    T(OP_FMix, "fmix") T(OP_Step, "step") T(OP_SmoothStep, "smoothstep") \
-    T(FN_Round, "round") T(FN_RoundEven, "roundeven") T(OP_Trunc, "trunc") \
-    T(OP_FAbs, "fabs") T(OP_FSign, "fsign") T(OP_SSign, "ssign") \
-    T(OP_Floor, "floor") T(FN_Ceil, "ceil") T(FN_Fract, "fract") \
-    T(OP_Radians, "radians") T(OP_Degrees, "degrees") \
-    T(OP_Sin, "sin") T(OP_Cos, "cos") T(OP_Tan, "tan") \
-    T(OP_Asin, "asin") T(OP_Acos, "acos") T(OP_Atan, "atan") T(OP_Atan2, "atan2") \
-    T(OP_Exp, "exp") T(OP_Log, "log") T(OP_Exp2, "exp2") T(OP_Log2, "log2") \
-    T(OP_Sqrt, "sqrt") T(OP_InverseSqrt, "inversesqrt") \
-    T(FN_Fma, "fma") T(FN_Frexp, "frexp") T(FN_Ldexp, "ldexp") \
-    T(FN_Length, "length") T(FN_Distance, "distance") T(FN_Cross, "cross") T(FN_Normalize, "normalize") \
-    T(FN_AnyExtract, "Any-extract-constant") T(FN_AnyWrap, "Any-wrap") \
-    T(FN_ActiveAnchor, "active-anchor") T(FN_ActiveFrame, "active-frame") \
-    T(FN_BitCountOf, "bitcountof") T(FN_IsSigned, "signed?") \
-    T(FN_Bitcast, "bitcast") T(FN_IntToPtr, "inttoptr") T(FN_PtrToInt, "ptrtoint") \
+    T(FN_ActiveAnchor, "active-anchor") \
+    T(FN_ActiveFrame, "active-frame") \
+    T(FN_BitCountOf, "bitcountof") \
+    T(FN_IsSigned, "signed?") \
     T(FN_BlockMacro, "block-macro") \
-    T(FN_BlockScopeMacro, "block-scope-macro") T(FN_BoolEq, "bool==") \
-    T(FN_BuiltinEq, "Builtin==") T(KW_Case, "case") T(KW_Default, "default") \
-    T(FN_Branch, "branch") T(FN_IsCallable, "callable?") T(FN_Cast, "cast") \
-    T(FN_Concat, "concat") T(FN_Cons, "cons") T(FN_IsConstant, "constant?") \
-    T(FN_Countof, "countof") T(KW_Pass, "pass")  T(FN_HideTraceback, "hide-traceback") \
-    T(FN_Compile, "__compile") T(FN_CompileSPIRV, "__compile-spirv") \
+    T(FN_BlockScopeMacro, "block-scope-macro") \
+    T(FN_BoolEq, "bool==") \
+    T(FN_BuiltinEq, "Builtin==") \
+    T(KW_Case, "case") \
+    T(KW_Default, "default") \
+    T(FN_IsCallable, "callable?") \
+    T(FN_Cast, "cast") \
+    T(FN_Concat, "concat") \
+    T(FN_Cons, "cons") \
+    T(FN_IsConstant, "constant?") \
+    T(FN_Countof, "countof") \
+    T(KW_Pass, "pass") \
+    T(FN_Compile, "__compile") \
+    T(FN_CompileSPIRV, "__compile-spirv") \
     T(FN_CompileGLSL, "__compile-glsl") \
     T(FN_CompileObject, "__compile-object") \
     T(FN_ElementIndex, "element-index") \
-    T(FN_ElementName, "element-name") T(FN_Annotate, "annotate") \
-    T(FN_CompilerMessage, "compiler-message") \
-    T(FN_CStr, "cstr") T(FN_DatumToSyntax, "datum->syntax") \
+    T(FN_ElementName, "element-name") \
+    T(FN_Annotate, "annotate") \
+    T(FN_CStr, "cstr") \
+    T(FN_DatumToSyntax, "datum->syntax") \
     T(FN_DatumToQuotedSyntax, "datum->quoted-syntax") \
     T(FN_LabelDocString, "Label-docstring") \
     T(FN_LabelSetInline, "Label-set-inline!") \
-    T(FN_DefaultStyler, "default-styler") T(FN_StyleToString, "style->string") \
-    T(FN_Disqualify, "disqualify") T(FN_Dump, "dump") T(FN_DumpDebug, "dump-debug") T(FN_DumpTemplate, "dump-template") \
-    T(FN_DumpAST, "dump-spice") T(FN_DumpUniques, "dump-uniques") T(FN_IsValid, "unique-visible?") \
+    T(FN_DefaultStyler, "default-styler") \
+    T(FN_StyleToString, "style->string") \
+    T(FN_Disqualify, "disqualify") \
     T(FN_DumpList, "dump-list") \
     T(FN_DumpFrame, "dump-frame") \
     T(FN_ClosureLabel, "Closure-label") \
     T(FN_ClosureFrame, "Closure-frame") \
     T(FN_FormatFrame, "Frame-format") \
-    T(FN_ElementType, "element-type") T(FN_IsEmpty, "empty?") \
+    T(FN_ElementType, "element-type") \
+    T(FN_IsEmpty, "empty?") \
     T(FN_TypeCountOf, "type-countof") \
-    T(FN_Enumerate, "enumerate") T(FN_Eval, "eval") \
-    T(FN_Exit, "exit") T(FN_Expand, "expand") \
+    T(FN_Enumerate, "enumerate") \
+    T(FN_Eval, "eval") \
+    T(FN_Exit, "exit") \
+    T(FN_Expand, "expand") \
     T(FN_ExternLibrary, "extern-library") \
-    T(FN_ExternSymbol, "extern-symbol") \
     T(FN_ExtractMemory, "extract-memory") \
     T(FN_EnterSolverCLI, "enter-solver-cli!") \
-    T(FN_ExtractValue, "extractvalue") T(FN_InsertValue, "insertvalue") \
-    T(FN_ExtractElement, "extractelement") T(FN_InsertElement, "insertelement") \
-    T(FN_ShuffleVector, "shufflevector") T(FN_GetElementPtr, "getelementptr") \
-    T(FN_GetElementRef, "getelementref") \
-    T(FN_FFISymbol, "ffi-symbol") T(FN_FFICall, "ffi-call") \
-    T(FN_FrameEq, "Frame==") T(FN_Free, "free") \
+    T(FN_FFISymbol, "ffi-symbol") \
+    T(FN_FFICall, "ffi-call") \
+    T(FN_FrameEq, "Frame==") \
     T(FN_GetExceptionHandler, "get-exception-handler") \
-    T(FN_GetScopeSymbol, "get-scope-symbol") T(FN_Hash, "__hash") \
-    T(FN_Hash2x64, "__hash2x64") T(FN_HashBytes, "__hashbytes") \
-    T(FN_Sample, "sample") \
-    T(FN_ImageRead, "Image-read") T(FN_ImageWrite, "Image-write") \
-    T(FN_ImageQuerySize, "Image-query-size") \
-    T(FN_ImageQueryLod, "Image-query-lod") \
-    T(FN_ImageQueryLevels, "Image-query-levels") \
-    T(FN_ImageQuerySamples, "Image-query-samples") \
+    T(FN_GetScopeSymbol, "get-scope-symbol") \
+    T(FN_Hash, "__hash") \
+    T(FN_Hash2x64, "__hash2x64") \
+    T(FN_HashBytes, "__hashbytes") \
     T(FN_RealPath, "realpath") \
-    T(FN_DirName, "dirname") T(FN_BaseName, "basename") \
-    T(OP_ICmpEQ, "icmp==") T(OP_ICmpNE, "icmp!=") \
-    T(OP_ICmpUGT, "icmp>u") T(OP_ICmpUGE, "icmp>=u") T(OP_ICmpULT, "icmp<u") T(OP_ICmpULE, "icmp<=u") \
-    T(OP_ICmpSGT, "icmp>s") T(OP_ICmpSGE, "icmp>=s") T(OP_ICmpSLT, "icmp<s") T(OP_ICmpSLE, "icmp<=s") \
-    T(OP_FCmpOEQ, "fcmp==o") T(OP_FCmpONE, "fcmp!=o") T(OP_FCmpORD, "fcmp-ord") \
-    T(OP_FCmpOGT, "fcmp>o") T(OP_FCmpOGE, "fcmp>=o") T(OP_FCmpOLT, "fcmp<o") T(OP_FCmpOLE, "fcmp<=o") \
-    T(OP_FCmpUEQ, "fcmp==u") T(OP_FCmpUNE, "fcmp!=u") T(OP_FCmpUNO, "fcmp-uno") \
-    T(OP_FCmpUGT, "fcmp>u") T(OP_FCmpUGE, "fcmp>=u") T(OP_FCmpULT, "fcmp<u") T(OP_FCmpULE, "fcmp<=u") \
-    T(OP_Add, "add") T(OP_AddNUW, "add-nuw") T(OP_AddNSW, "add-nsw") \
-    T(OP_Sub, "sub") T(OP_SubNUW, "sub-nuw") T(OP_SubNSW, "sub-nsw") \
-    T(OP_Mul, "mul") T(OP_MulNUW, "mul-nuw") T(OP_MulNSW, "mul-nsw") \
-    T(OP_SDiv, "sdiv") T(OP_UDiv, "udiv") \
-    T(OP_SRem, "srem") T(OP_URem, "urem") \
-    T(OP_Shl, "shl") T(OP_LShr, "lshr") T(OP_AShr, "ashr") \
-    T(OP_BAnd, "band") T(OP_BOr, "bor") T(OP_BXor, "bxor") \
-    T(FN_IsFile, "file?") T(FN_IsDirectory, "directory?") \
-    T(OP_FAdd, "fadd") T(OP_FSub, "fsub") T(OP_FMul, "fmul") T(OP_FDiv, "fdiv") T(OP_FRem, "frem") \
-    T(FN_FPTrunc, "fptrunc") T(FN_FPExt, "fpext") \
-    T(FN_FPToUI, "fptoui") T(FN_FPToSI, "fptosi") \
-    T(FN_UIToFP, "uitofp") T(FN_SIToFP, "sitofp") \
-    T(FN_ImportC, "import-c") T(FN_IsInteger, "integer?") \
+    T(FN_DirName, "dirname") \
+    T(FN_BaseName, "basename") \
+    T(FN_IsFile, "file?") \
+    T(FN_IsDirectory, "directory?") \
+    T(FN_ImportC, "import-c") \
+    T(FN_IsInteger, "integer?") \
     T(FN_IntegerType, "integer-type") \
     T(FN_CompilerVersion, "compiler-version") \
-    T(FN_Iter, "iter") T(FN_FormatMessage, "format-message") \
-    T(FN_IsIterator, "iterator?") T(FN_IsLabel, "label?") \
+    T(FN_Iter, "iter") \
+    T(FN_FormatMessage, "format-message") \
+    T(FN_IsIterator, "iterator?") \
+    T(FN_IsLabel, "label?") \
     T(FN_LabelEq, "Label==") \
-    T(FN_LabelNew, "Label-new") T(FN_LabelParameterCount, "Label-parameter-count") \
+    T(FN_LabelNew, "Label-new") \
+    T(FN_LabelParameterCount, "Label-parameter-count") \
     T(FN_LabelParameter, "Label-parameter") \
-    T(FN_LabelAnchor, "Label-anchor") T(FN_LabelName, "Label-name") \
-    T(FN_ClosureEq, "Closure==") T(FN_CheckStack, "verify-stack!") \
-    T(FN_ListAtom, "list-atom?") T(FN_ListCountOf, "list-countof") \
-    T(FN_ListLoad, "list-load") T(FN_ListJoin, "list-join") \
-    T(FN_ListParse, "list-parse") T(FN_IsList, "list?") T(FN_Load, "load") \
+    T(FN_LabelAnchor, "Label-anchor") \
+    T(FN_LabelName, "Label-name") \
+    T(FN_ClosureEq, "Closure==") \
+    T(FN_CheckStack, "verify-stack!") \
+    T(FN_ListAtom, "list-atom?") \
+    T(FN_ListCountOf, "list-countof") \
+    T(FN_ListLoad, "list-load") \
+    T(FN_ListJoin, "list-join") \
+    T(FN_ListParse, "list-parse") \
+    T(FN_IsList, "list?") \
     T(FN_LoadLibrary, "load-library") \
-    T(FN_VolatileLoad, "volatile-load") \
-    T(FN_VolatileStore, "volatile-store") \
     T(FN_LabelCountOfReachable, "Label-countof-reachable") \
-    T(FN_ListAt, "list-at") T(FN_ListNext, "list-next") T(FN_ListCons, "list-cons") \
+    T(FN_ListAt, "list-at") \
+    T(FN_ListNext, "list-next") \
+    T(FN_ListCons, "list-cons") \
     T(FN_IsListEmpty, "list-empty?") \
-    T(FN_Malloc, "malloc") T(FN_MallocArray, "malloc-array") T(FN_Unconst, "unconst") \
-    T(FN_Macro, "macro") T(FN_Max, "max") T(FN_Min, "min") \
+    T(FN_Macro, "macro") \
+    T(FN_Max, "max") \
+    T(FN_Min, "min") \
     T(FN_MemCopy, "memcopy") \
     T(FN_IsMutable, "mutable?") \
-    T(FN_IsNone, "none?") T(FN_Assign, "assign") \
-    T(FN_Deref, "deref") T(FN_PtrToRef, "ptrtoref") T(FN_RefToPtr, "reftoptr") \
-    T(FN_IsNull, "null?") T(FN_OrderedBranch, "ordered-branch") \
+    T(FN_IsNone, "none?") \
+    T(FN_IsNull, "null?") \
+    T(FN_OrderedBranch, "ordered-branch") \
     T(FN_ParameterEq, "Parameter==") \
-    T(FN_ParameterNew, "Parameter-new") T(FN_ParameterName, "Parameter-name") \
+    T(FN_ParameterNew, "Parameter-new") \
+    T(FN_ParameterName, "Parameter-name") \
     T(FN_ParameterAnchor, "Parameter-anchor") \
     T(FN_ParameterIndex, "Parameter-index") \
-    T(FN_ParseC, "parse-c") T(FN_PointerOf, "pointerof") \
+    T(FN_ParseC, "parse-c") \
+    T(FN_PointerOf, "pointerof") \
     T(FN_PointerType, "pointer-type") \
     T(FN_PointerFlags, "pointer-type-flags") \
     T(FN_PointerSetFlags, "pointer-type-set-flags") \
@@ -402,22 +531,24 @@ namespace scopes {
     T(FN_PointerSetElementType, "pointer-type-set-element-type") \
     T(FN_ExternLocation, "extern-type-location") \
     T(FN_ExternBinding, "extern-type-binding") \
-    T(FN_FunctionType, "function-type") \
     T(FN_FunctionTypeIsVariadic, "function-type-variadic?") \
-    T(FN_TupleType, "tuple-type") \
-    T(FN_UnionType, "union-type") \
-    T(FN_ReturnLabelType, "ReturnLabel-type") \
-    T(FN_ArrayType, "array-type") T(FN_ImageType, "Image-type") \
+    T(FN_ArrayType, "array-type") \
+    T(FN_ImageType, "Image-type") \
     T(FN_SampledImageType, "SampledImage-type") \
     T(FN_TypenameType, "typename-type") \
-    T(FN_Purify, "purify") \
     T(FN_Write, "io-write!") \
     T(FN_Flush, "io-flush") \
-    T(FN_Product, "product") T(FN_Prompt, "__prompt") T(FN_Qualify, "qualify") \
+    T(FN_Product, "product") \
+    T(FN_Prompt, "__prompt") \
+    T(FN_Qualify, "qualify") \
     T(FN_SetAutocompleteScope, "set-autocomplete-scope!") \
-    T(FN_Range, "range") T(FN_RefNew, "ref-new") T(FN_RefAt, "ref@") \
-    T(FN_Repr, "Any-repr") T(FN_AnyString, "Any-string") \
-    T(FN_Require, "require") T(FN_ScopeOf, "scopeof") T(FN_ScopeAt, "Scope@") \
+    T(FN_Range, "range") \
+    T(FN_RefNew, "ref-new") \
+    T(FN_RefAt, "ref@") \
+    T(FN_Repr, "Any-repr") \
+    T(FN_AnyString, "Any-string") \
+    T(FN_Require, "require") \
+    T(FN_ScopeAt, "Scope@") \
     T(FN_ScopeLocalAt, "Scope-local@") \
     T(FN_ScopeEq, "Scope==") \
     T(FN_ScopeNew, "Scope-new") \
@@ -427,19 +558,27 @@ namespace scopes {
     T(FN_ScopeNewSubscope, "Scope-new-expand") \
     T(FN_ScopeCopySubscope, "Scope-clone-expand") \
     T(FN_ScopeParent, "Scope-parent") \
-    T(FN_ScopeNext, "Scope-next") T(FN_SizeOf, "sizeof") \
+    T(FN_ScopeNext, "Scope-next") \
+    T(FN_SizeOf, "sizeof") \
     T(FN_TypeNext, "type-next") \
-    T(FN_Slice, "slice") T(FN_Store, "store") \
-    T(FN_StringAt, "string@") T(FN_StringCmp, "string-compare") \
-    T(FN_StringCountOf, "string-countof") T(FN_StringNew, "string-new") \
-    T(FN_StringJoin, "string-join") T(FN_StringSlice, "string-slice") \
-    T(FN_StructOf, "structof") T(FN_TypeStorage, "storageof") \
+    T(FN_Slice, "slice") \
+    T(FN_StringAt, "string@") \
+    T(FN_StringCmp, "string-compare") \
+    T(FN_StringCountOf, "string-countof") \
+    T(FN_StringNew, "string-new") \
+    T(FN_StringJoin, "string-join") \
+    T(FN_StringSlice, "string-slice") \
+    T(FN_StructOf, "structof") \
+    T(FN_TypeStorage, "storageof") \
     T(FN_IsOpaque, "opaque?") \
-    T(FN_SymbolEq, "Symbol==") T(FN_SymbolNew, "string->Symbol") \
+    T(FN_SymbolEq, "Symbol==") \
+    T(FN_SymbolNew, "string->Symbol") \
     T(FN_StringToRawstring, "string->rawstring") \
     T(FN_IsSymbol, "symbol?") \
-    T(FN_SyntaxToAnchor, "sugar->anchor") T(FN_SyntaxToDatum, "sugar->datum") \
-    T(FN_SyntaxCons, "sugar-cons") T(FN_SyntaxDo, "sugar-do") \
+    T(FN_SyntaxToAnchor, "sugar->anchor") \
+    T(FN_SyntaxToDatum, "sugar->datum") \
+    T(FN_SyntaxCons, "sugar-cons") \
+    T(FN_SyntaxDo, "sugar-do") \
     T(FN_IsSyntaxHead, "sugar-head?") \
     T(FN_SyntaxList, "sugar-list") \
     T(FN_IsSyntaxQuoted, "sugar-quoted?") \
@@ -450,36 +589,25 @@ namespace scopes {
     T(FN_SyntaxNew, "sugar-new") \
     T(FN_SyntaxWrap, "sugar-wrap") \
     T(FN_SyntaxStrip, "sugar-strip") \
-    T(FN_Translate, "translate") T(FN_ITrunc, "itrunc") \
-    T(FN_ZExt, "zext") T(FN_SExt, "sext") \
-    T(FN_TupleOf, "tupleof") T(FN_TypeNew, "type-new") T(FN_TypeName, "type-name") \
+    T(FN_Translate, "translate") \
+    T(FN_TupleOf, "tupleof") \
+    T(FN_TypeNew, "type-new") \
+    T(FN_TypeName, "type-name") \
     T(FN_TypeSizeOf, "type-sizeof") \
     T(FN_Typify, "__typify") \
-    T(FN_TypeEq, "type==") T(FN_IsType, "type?") T(FN_TypeOf, "typeof") \
+    T(FN_TypeEq, "type==") \
+    T(FN_IsType, "type?") \
     T(FN_TypeKind, "type-kind") \
     T(FN_TypeDebugABI, "type-debug-abi") \
-    T(FN_TypeAt, "type@") \
-    T(FN_TypeLocalAt, "type-local@") \
     T(FN_RuntimeTypeAt, "runtime-type@") \
-    T(FN_Undef, "undef") T(FN_NullOf, "nullof") T(FN_Alloca, "alloca") \
-    T(FN_AllocaExceptionPad, "alloca-exception-pad") \
-    T(FN_AllocaOf, "allocaof") \
-    T(FN_AllocaArray, "alloca-array") \
-    T(FN_StaticAlloc, "static-alloc") \
-    T(FN_Location, "compiler-anchor") \
-    T(FN_ExternNew, "extern-new") \
-    T(FN_VaCountOf, "va-countof") T(FN_VaKeys, "va-keys") \
-    T(FN_VaValues, "va-values") T(FN_VaAt, "va@") \
-    T(FN_VaKey, "va-key") \
-    T(FN_VectorOf, "vectorof") T(FN_XPCall, "xpcall") T(FN_Zip, "zip") \
+    T(FN_VectorOf, "vectorof") \
+    T(FN_XPCall, "xpcall") \
+    T(FN_Zip, "zip") \
     T(FN_VectorType, "vector-type") \
     T(FN_ZipFill, "zip-fill") \
-    T(FN_GetSyntaxScope, "__this-scope") \
-    \
-    /* builtin and global functions with side effects */ \
+
+#define SCOPES_LIBRARY_SFXSPICE_SYMBOLS() \
     T(SFXFN_CopyMemory, "copy-memory!") \
-    T(SFXFN_Unreachable, "unreachable!") \
-    T(SFXFN_Discard, "discard!") \
     T(SFXFN_Error, "__error!") \
     T(SFXFN_AnchorError, "__anchor-error!") \
     T(SFXFN_Abort, "abort!") \
@@ -493,21 +621,108 @@ namespace scopes {
     T(SFXFN_SetGlobalApplyFallback, "set-global-apply-fallback!") \
     T(SFXFN_SetScopeSymbol, "__set-scope-symbol!") \
     T(SFXFN_DelScopeSymbol, "delete-scope-symbol!") \
-    T(SFXFN_DelTypeSymbol, "delete-type-symbol!") \
-    T(SFXFN_ExecutionMode, "set-execution-mode!") \
     T(SFXFN_TranslateLabelBody, "translate-label-body!") \
-    \
-    /* builtin operator functions that can also be used as infix */ \
-    T(OP_NotEq, "!=") T(OP_Mod, "%") T(OP_InMod, "%=") T(OP_BitAnd, "&") T(OP_InBitAnd, "&=") \
-    T(OP_IFXMul, "*") T(OP_Pow, "powf") T(OP_InMul, "*=") T(OP_IFXAdd, "+") T(OP_Incr, "++") \
-    T(OP_InAdd, "+=") T(OP_Comma, ",") T(OP_IFXSub, "-") T(OP_Decr, "--") T(OP_InSub, "-=") \
-    T(OP_Dot, ".") T(OP_Join, "..") T(OP_Div, "/") T(OP_InDiv, "/=") \
-    T(OP_Colon, ":") T(OP_Let, ":=") T(OP_Less, "<") T(OP_LeftArrow, "<-") T(OP_Subtype, "<:") \
-    T(OP_ShiftL, "<<") T(OP_LessThan, "<=") T(OP_Set, "=") T(OP_Eq, "==") \
-    T(OP_Greater, ">") T(OP_GreaterThan, ">=") T(OP_ShiftR, ">>") T(OP_Tertiary, "?") \
-    T(OP_At, "@") T(OP_Xor, "^") T(OP_InXor, "^=") T(OP_And, "and") T(OP_Not, "not") \
-    T(OP_Or, "or") T(OP_BitOr, "|") T(OP_InBitOr, "|=") T(OP_BitNot, "~") \
+
+#define SCOPES_LIBRARY_OPERATOR_SYMBOLS() \
+    /* operator functions that can also be used as infix */ \
+    T(OP_NotEq, "!=") \
+    T(OP_Mod, "%") \
+    T(OP_InMod, "%=") \
+    T(OP_BitAnd, "&") \
+    T(OP_InBitAnd, "&=") \
+    T(OP_IFXMul, "*") \
+    T(OP_InMul, "*=") \
+    T(OP_IFXAdd, "+") \
+    T(OP_Incr, "++") \
+    T(OP_InAdd, "+=") \
+    T(OP_Comma, ",") \
+    T(OP_IFXSub, "-") \
+    T(OP_Decr, "--") \
+    T(OP_InSub, "-=") \
+    T(OP_Dot, ".") \
+    T(OP_Join, "..") \
+    T(OP_Div, "/") \
+    T(OP_InDiv, "/=") \
+    T(OP_Colon, ":") \
+    T(OP_Let, ":=") \
+    T(OP_Less, "<") \
+    T(OP_LeftArrow, "<-") \
+    T(OP_Subtype, "<:") \
+    T(OP_ShiftL, "<<") \
+    T(OP_LessThan, "<=") \
+    T(OP_Set, "=") \
+    T(OP_Eq, "==") \
+    T(OP_Greater, ">") \
+    T(OP_GreaterThan, ">=") \
+    T(OP_ShiftR, ">>") \
+    T(OP_At, "@") \
+    T(OP_Xor, "^") \
+    T(OP_InXor, "^=") \
+    T(OP_And, "and") \
+    T(OP_Not, "not") \
+    T(OP_Or, "or") \
+    T(OP_BitOr, "|") \
+    T(OP_InBitOr, "|=") \
+    T(OP_BitNot, "~") \
     T(OP_InBitNot, "~=") \
+
+#define SCOPES_LIBRARY_SYMBOLS() \
+    SCOPES_LIBRARY_SUGAR_SYMBOLS() \
+    SCOPES_LIBRARY_SPICE_SYMBOLS() \
+    SCOPES_LIBRARY_SFXSPICE_SYMBOLS() \
+    SCOPES_LIBRARY_OPERATOR_SYMBOLS() \
+
+// unused symbols
+#define SCOPES_LEGACY_SYMBOLS() \
+    T(KW_CCCall, "cc/call") \
+    T(SYM_QuoteForm, "form-quote") \
+    T(FN_FunctionType, "function-type") \
+    T(FN_TupleType, "tuple-type") \
+    T(FN_UnionType, "union-type") \
+    T(FN_AllocaOf, "allocaof") \
+    T(FN_ReturnLabelType, "ReturnLabel-type") \
+    T(FN_AllocaExceptionPad, "alloca-exception-pad") \
+    T(FN_StaticAlloc, "static-alloc") \
+    T(FN_AnyExtract, "Any-extract-constant") \
+    T(FN_AnyWrap, "Any-wrap") \
+    T(KW_Defer, "__defer") \
+    T(FN_Purify, "purify") \
+    T(FN_Unconst, "unconst") \
+    T(FN_VaKeys, "va-keys") \
+    T(FN_VaKey, "va-key") \
+    T(FN_VaValues, "va-values") \
+    T(FN_CompilerMessage, "compiler-message") \
+    T(SFXFN_DelTypeSymbol, "delete-type-symbol!") \
+    T(FN_ExternSymbol, "extern-symbol") \
+    T(FN_ExternNew, "extern-new") \
+    T(FN_TypeAt, "type@") \
+    T(FN_TypeLocalAt, "type-local@") \
+    T(FN_Location, "compiler-anchor") \
+    T(FN_ScopeOf, "scopeof") \
+
+#define SCOPES_STYLE_SYMBOLS() \
+    /* styles */ \
+    T(Style_None, "style-none") \
+    T(Style_Symbol, "style-symbol") \
+    T(Style_String, "style-string") \
+    T(Style_Number, "style-number") \
+    T(Style_Keyword, "style-keyword") \
+    T(Style_Function, "style-function") \
+    T(Style_SfxFunction, "style-sfxfunction") \
+    T(Style_Operator, "style-operator") \
+    T(Style_Instruction, "style-instruction") \
+    T(Style_Type, "style-type") \
+    T(Style_Comment, "style-comment") \
+    T(Style_Error, "style-error") \
+    T(Style_Warning, "style-warning") \
+    T(Style_Location, "style-location") \
+
+#define SCOPES_SYMBOLS() \
+    T(SYM_Unnamed, "") \
+    \
+    SCOPES_BUILTIN_SYMBOLS() \
+    \
+    SCOPES_LIBRARY_SYMBOLS() \
     \
     /* globals */ \
     T(SYM_DebugBuild, "debug-build?") \
@@ -525,30 +740,14 @@ namespace scopes {
     T(SYM_FNType, "fntype") \
     T(SYM_Extern, "extern") \
     \
-    /* styles */ \
-    T(Style_None, "style-none") \
-    T(Style_Symbol, "style-symbol") \
-    T(Style_String, "style-string") \
-    T(Style_Number, "style-number") \
-    T(Style_Keyword, "style-keyword") \
-    T(Style_Function, "style-function") \
-    T(Style_SfxFunction, "style-sfxfunction") \
-    T(Style_Operator, "style-operator") \
-    T(Style_Instruction, "style-instruction") \
-    T(Style_Type, "style-type") \
-    T(Style_Comment, "style-comment") \
-    T(Style_Error, "style-error") \
-    T(Style_Warning, "style-warning") \
-    T(Style_Location, "style-location") \
+    SCOPES_STYLE_SYMBOLS() \
     \
     /* builtins, forms, etc */ \
     T(SYM_FnCCForm, "form-fn-body") \
-    T(SYM_QuoteForm, "form-quote") \
     T(SYM_DoForm, "form-do") \
     T(SYM_SyntaxScope, "sugar-scope") \
     T(SYM_CallHandler, "__call") \
     T(SYM_ReturnHandler, "__return") \
-    T(SYM_DropHandler, "__drop") \
     T(SYM_CopyHandler, "__copy") \
     T(SYM_DerefHandler, "__deref") \
     T(SYM_BoolHandler, "__tobool") \
@@ -634,7 +833,8 @@ namespace scopes {
     T(SYM_CompareListNext, "compare-list-next") \
     T(SYM_ReturnSafecall, "return-safecall") \
     T(SYM_ReturnError, "return-error") \
-    T(SYM_XPCallReturn, "xpcall-return")
+    T(SYM_XPCallReturn, "xpcall-return") \
+
 
 enum KnownSymbol {
 #define T(sym, name) sym,
@@ -643,7 +843,7 @@ enum KnownSymbol {
 #define T2T T2
 #define T2(UNAME, LNAME, PFIX, OP) \
     FN_ ## UNAME ## PFIX,
-    B_MAP_SYMBOLS()
+    SCOPES_SYMBOLS()
 #undef T
 #undef T0
 #undef T1
@@ -674,23 +874,6 @@ SYM_SPIRV_StorageClass ## NAME,
     B_SPIRV_IMAGE_OPERAND()
 #undef T
     SYM_Count,
-};
-
-enum {
-    KEYWORD_FIRST = KW_CatRest,
-    KEYWORD_LAST = KW_Yield,
-
-    FUNCTION_FIRST = FN_Alignof,
-    FUNCTION_LAST = FN_ZipFill,
-
-    SFXFUNCTION_FIRST = SFXFN_CopyMemory,
-    SFXFUNCTION_LAST = SFXFN_TranslateLabelBody,
-
-    OPERATOR_FIRST = OP_NotEq,
-    OPERATOR_LAST = OP_InBitNot,
-
-    STYLE_FIRST = Style_None,
-    STYLE_LAST = Style_Location,
 };
 
 const char *get_known_symbol_name(KnownSymbol sym);
