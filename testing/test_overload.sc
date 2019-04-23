@@ -61,8 +61,17 @@ assert ((test2 5) == 10)
 assert ((test2 "hi") == "hihi")
 
 fn... test3
-case (a : i32 = 3, b = 1, c = -1, d...)
+case (a : integer = 3, b = 1, c = -1, d...)
     _ a b c d...
 
 assert ((list (test3)) == (list 3 1 -1))
 assert ((list (test3 5 6 7 8 9 0)) == (list 5 6 7 8 9 0))
+
+fn... test4
+case (a : integer, b : integer) (_ "int" (a + b))
+case (a : real, b : real) (_ "real" (a + b))
+
+assert ((test4 1 2) == "int")
+assert ((test4 1.0 2.0) == "real")
+assert ((test4 1 2.0) == "real")
+assert ((test4 1.0 2) == "real")

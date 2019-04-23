@@ -312,10 +312,10 @@ fn type> (superT T)
     sc_type_is_superof superT T
 
 fn type<= (T superT)
-    bxor (type> T superT) true
+    bor (type< T superT) (ptrcmp== T superT)
 
 fn type>= (superT T)
-    bxor (type< T superT) true
+    bor (type< T superT) (ptrcmp== T superT)
 
 fn compare-type (args f)
     let argcount = (sc_argcount args)
@@ -1224,6 +1224,8 @@ fn integer-static-imply (vT T)
             let valw = ('bitcount vT)
             let destw = ('bitcount ST)
             return `(inline (self) (static-integer->real self T))
+    elseif (type== T real)
+        return `(inline (self) (static-integer->real self f32))
     `()
 
 fn integer-imply (vT T)
@@ -5111,7 +5113,7 @@ spice overloaded-fn-append (T args...)
                     let paramT = (sc_arguments_type_getarg FT i)
                     if (paramT == Unknown)
                         continue;
-                    elseif (argT == paramT)
+                    elseif (argT <= paramT)
                         continue;
                     assert (paramT != Variadic)
                     let conv = (imply-converter argT paramT ('constant? arg))
@@ -5129,7 +5131,7 @@ spice overloaded-fn-append (T args...)
                     let outarg =
                         if (paramT == Unknown) arg
                         elseif (paramT == Variadic) arg
-                        elseif (argT == paramT) arg
+                        elseif (argT <= paramT) arg
                         else
                             let conv = (imply-converter argT paramT ('constant? arg))
                             assert (operator-valid? conv)
@@ -5180,7 +5182,7 @@ sugar fn... (name...)
                 if (nodefault? def) def
                 elseif (paramT == Unknown) def
                 elseif (paramT == Variadic) def
-                elseif (argT == paramT) def
+                elseif (argT <= paramT) def
                 else
                     let conv = (as-converter argT paramT true)
                     if (not (operator-valid? conv))
