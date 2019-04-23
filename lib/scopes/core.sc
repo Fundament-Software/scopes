@@ -2309,9 +2309,18 @@ fn pointer-imply (vT T)
             return `(inline (self) (bitcast self T))
     `()
 
+fn pointer-as (vT T)
+    if (type< T pointer)
+        let ST = ('storageof T)
+        if (icmp== ('kind ST) type-kind-pointer)
+            if (icmp== ('pointer-storage-class vT) ('pointer-storage-class T))
+                return `(inline (self) (bitcast self T))
+    `()
+
 'set-symbols pointer
     __call = coerce-call-arguments
     __imply = (box-pointer (spice-cast-macro pointer-imply))
+    __as = (box-pointer (spice-cast-macro pointer-as))
 
 # dotted symbol expander
 # --------------------------------------------------------------------------
