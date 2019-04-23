@@ -379,7 +379,7 @@ void stream_backtrace(StyledStream &ss, const Backtrace *bt) {
         #if 1
         anchor = get_best_anchor(value);
         #endif
-        #if 1
+        #ifdef SCOPES_DEBUG
         ss << "While checking expression" << std::endl;
         StreamValueFormat fmt;
         fmt.maxdepth = 3;

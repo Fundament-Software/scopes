@@ -75,3 +75,16 @@ assert ((test4 1 2) == "int")
 assert ((test4 1.0 2.0) == "real")
 assert ((test4 1 2.0) == "real")
 assert ((test4 1.0 2) == "real")
+
+fn... test5
+case (a : &i32,) true
+case (a : i32,) false
+case (a : &real,) 1
+case (a : real,) 2
+
+assert ((test5 1) == false)
+local y = 2
+assert ((test5 y) == true)
+assert ((test5 1.0) == 2)
+local z = 2.0
+assert ((test5 z) == 1)

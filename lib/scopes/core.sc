@@ -853,6 +853,7 @@ inline define-symbols (self values...)
 'define-symbols type
     bitcount = sc_type_bitcountof
     signed? = sc_integer_type_is_signed
+    strip-qualifiers = sc_strip_qualifiers
     plain? = sc_type_is_plain
     element@ = sc_type_element_at
     element-count = sc_type_countof
@@ -1843,6 +1844,19 @@ inline floordiv (a b)
                 let self = ('getarg args 0)
                 hide-traceback;
                 `[(sc_type_countof (unbox-pointer self type))]
+    __toptr =
+        box-pointer
+            spice-macro
+                fn (args)
+                    let argc = ('argcount args)
+                    verify-count argc 1 1
+                    let self = ('getarg args 0)
+                    'tag `[(sc_refer_type (unbox-pointer self type) 0:u64 unnamed)]
+                        'anchor args
+    __toref =
+        box-pointer
+            inline (self)
+                pointer self
     # (dispatch-attr T key thenf elsef)
     dispatch-attr =
         box-spice-macro
@@ -5109,11 +5123,15 @@ spice overloaded-fn-append (T args...)
                             continue;
                         else
                             no-match;
-                    let argT = ('typeof arg)
-                    let paramT = (sc_arguments_type_getarg FT i)
+                    let qargT = ('qualified-typeof arg)
+                    let argT = ('strip-qualifiers qargT)
+                    let qparamT = (sc_arguments_type_getarg FT i)
+                    let paramT = ('strip-qualifiers qparamT)
                     if (paramT == Unknown)
                         continue;
                     elseif (argT <= paramT)
+                        if (('refer? qparamT) & (not ('refer? qargT)))
+                            no-match;
                         continue;
                     assert (paramT != Variadic)
                     let conv = (imply-converter argT paramT ('constant? arg))
@@ -5126,8 +5144,10 @@ spice overloaded-fn-append (T args...)
                 let outargs = ('tag (sc_call_new f) ('anchor args))
                 sc_call_set_rawcall outargs true
                 for i arg in (enumerate ('args args...))
-                    let argT = ('typeof arg)
-                    let paramT = (sc_arguments_type_getarg FT (min i lasti))
+                    let qargT = ('qualified-typeof arg)
+                    let argT = ('strip-qualifiers qargT)
+                    let qparamT = (sc_arguments_type_getarg FT (min i lasti))
+                    let paramT = ('strip-qualifiers qparamT)
                     let outarg =
                         if (paramT == Unknown) arg
                         elseif (paramT == Variadic) arg
@@ -5141,7 +5161,6 @@ spice overloaded-fn-append (T args...)
                 for i in (range count explicit-argcount)
                     let arg = ('getarg defs i)
                     let argT = ('typeof arg)
-                    let paramT = (sc_arguments_type_getarg FT i)
                     sc_call_append_argument outargs arg
                 if true
                     return outargs
