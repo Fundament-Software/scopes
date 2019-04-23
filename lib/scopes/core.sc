@@ -5956,20 +5956,21 @@ inline gen-allocator-sugar (name f)
                 assign (T args...) val
                 val
         let anchor = ('anchor expression)
+        let _let = ('tag `let anchor)
         let result =
             sugar-match values...
             case (name '= value)
                 let callexpr =
                     'tag `[(qq ([local-copy value]))] anchor
-                qq [let name] = [callexpr]
+                qq [_let name] = [callexpr]
             case (name ': T '= value)
                 let callexpr =
                     'tag `[(qq ([local-copy-typed T value]))] anchor
-                qq [let name] = [callexpr]
+                qq [_let name] = [callexpr]
             case (name ': T args...)
                 let callexpr =
                     'tag `[(qq [local-new T] (unquote-splice args...))] anchor
-                qq [let name] = [callexpr]
+                qq [_let name] = [callexpr]
             case (T args...)
                 qq [local-new T] (unquote-splice args...)
             default
