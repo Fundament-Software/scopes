@@ -4998,6 +4998,8 @@ spice-quote
 #-------------------------------------------------------------------------------
 
 let nodefault = (opaque "nodefault")
+fn nodefault? (x)
+    (('typeof x) == type) and (x as type == nodefault)
 
 spice overloaded-fn-append (T args...)
     let outtype = (T as type)
@@ -5068,8 +5070,6 @@ spice overloaded-fn-append (T args...)
             let ftypes = ('@ T 'parameter-types)
             let fdefaults = ('@ T 'parameter-defaults)
             let count = ('argcount args...)
-            fn nodefault? (x)
-                (('typeof x) == type) and (x as type == nodefault)
             for f FT defs in (zip ('args fns) (zip ('args ftypes) ('args fdefaults)))
                 let FT = (FT as type)
                 let has-defs? = (('typeof defs) != Nothing)
@@ -5104,7 +5104,7 @@ spice overloaded-fn-append (T args...)
                             let arg = ('getarg defs i)
                             if (nodefault? arg) # argument missing
                                 no-match;
-                            arg
+                            continue;
                         else
                             no-match;
                     let argT = ('typeof arg)
@@ -5140,15 +5140,7 @@ spice overloaded-fn-append (T args...)
                     let arg = ('getarg defs i)
                     let argT = ('typeof arg)
                     let paramT = (sc_arguments_type_getarg FT i)
-                    let outarg =
-                        if (paramT == Unknown) arg
-                        elseif (paramT == Variadic) arg
-                        elseif (argT == paramT) arg
-                        else
-                            let conv = (imply-converter argT paramT ('constant? arg))
-                            assert (operator-valid? conv)
-                            `(conv arg)
-                    sc_call_append_argument outargs outarg
+                    sc_call_append_argument outargs arg
                 if true
                     return outargs
             # if we got here, there was no match
@@ -5174,6 +5166,36 @@ spice overloaded-fn-append (T args...)
                             break str
 
 sugar fn... (name...)
+    spice make-defaults (atypes defaults...)
+        let atypes = (atypes as type)
+        let outargs = (sc_argument_list_new)
+        for i def in (enumerate ('args defaults...))
+            let paramT = (sc_arguments_type_getarg atypes i)
+            if (not ('constant? def))
+                hide-traceback;
+                error@ ('anchor def) "while checking default argument"
+                    "default argument must be constant"
+            let argT = ('typeof def)
+            let def =
+                if (nodefault? def) def
+                elseif (paramT == Unknown) def
+                elseif (paramT == Variadic) def
+                elseif (argT == paramT) def
+                else
+                    let conv = (as-converter argT paramT true)
+                    if (not (operator-valid? conv))
+                        hide-traceback;
+                        error@ ('anchor def) "while checking default argument"
+                            "default argument does not match argument type"
+                    let def = (sc_prove `(conv def))
+                    if (not ('constant? def))
+                        hide-traceback;
+                        error@ ('anchor def) "while checking default argument"
+                            "default argument must be constant after conversion"
+                    def
+            sc_argument_list_append outargs def
+        `(inline () outargs)
+
     spice init-overloaded-function (T)
         let T = (T as type)
         'set-symbols T
@@ -5225,8 +5247,9 @@ sugar fn... (name...)
                     case ()
                         let body = (sc_expand (cons do body...) '() scope)
                         sc_template_set_body tmpl body
-                        sc_argument_list_append outargs `(Arguments types)
-                        sc_argument_list_append outargs `(inline () defaults)
+                        let atypes = `(Arguments types)
+                        sc_argument_list_append outargs atypes
+                        sc_argument_list_append outargs `(make-defaults atypes defaults)
                         break;
                     case ((arg as Symbol) ': rest...)
                         hide-traceback;
