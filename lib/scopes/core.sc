@@ -4997,6 +4997,8 @@ spice-quote
 # function overloading
 #-------------------------------------------------------------------------------
 
+let _nodefault = (opaque "nodefault")
+
 spice overloaded-fn-append (T args...)
     let outtype = (T as type)
     let functions = ('@ outtype 'templates)
@@ -5113,6 +5115,7 @@ sugar fn... (name...)
         'set-symbols T
             templates = (sc_argument_list_new)
             parameter-types = (sc_argument_list_new)
+            parameter-defaults = (sc_argument_list_new)
         T
 
     let inline? =
@@ -5408,7 +5411,15 @@ define-sugar-macro decorate-fn
     let fnexpr decorators = (decons args)
     let kw name body = (decons (fnexpr as list) 2)
     let name-is-symbol? = (('typeof name) == Symbol)
-    let fnexpr = `[(list do fnexpr)]
+    let fnexpr =
+        'tag
+            Value
+                cons kw
+                    if name-is-symbol?
+                        'tag `[(name as Symbol as string)] ('anchor name)
+                    else name
+                    body
+            'anchor fnexpr
     let result =
         loop (in out = decorators fnexpr)
             if (empty? in)

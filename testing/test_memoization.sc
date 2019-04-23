@@ -47,12 +47,12 @@ static-assert (t1 == t2)
 
 # single recursive memoization
 
-@@ memo
 inline frec0 (x)
     dump "0" x
     static-if (x < 10)
         (memo frec0) (const.add.i32.i32 x 1)
     else x
+let frec0 = (memo frec0)
 
 frec0 1
 frec0 5

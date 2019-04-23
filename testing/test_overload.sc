@@ -61,6 +61,6 @@ assert ((test2 5) == 10)
 assert ((test2 "hi") == "hihi")
 
 #fn... test3
-#case (a : i32, b = 1, c = -1)
+#case (a : i32 = 3, b = 1, c = -1)
     _ a b c
 

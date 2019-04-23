@@ -108,10 +108,18 @@ typedef FunctionChain : (storageof type)
        Binds a new unique and empty function chain to identifier `name`. The
        function chain's typename is going to incorporate the name of the module
        in which it was declared.
-sugar fnchain ((name as Symbol))
+sugar fnchain (name)
+    let symbol? = (('typeof name) == Symbol)
     let namestr =
-        .. (sugar-scope.module-name as string) "." (name as string)
-    list let name '= (list FunctionChain namestr)
+        if symbol? (name as Symbol as string)
+        else (name as string)
+    let namestr =
+        .. (sugar-scope.module-name as string) "." namestr
+    let expr = (list FunctionChain namestr)
+    if symbol?
+        list let name '= expr
+    else
+        expr
 
 let decorate-fnchain = decorate-fn
 

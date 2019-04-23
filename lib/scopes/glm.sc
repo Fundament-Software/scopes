@@ -36,7 +36,6 @@ inline construct-vec-type (element-type size)
             ElementType = element-type
             Count = size
 
-@@ memo
 inline construct-mat-type (element-type cols rows)
     static-assert ((typeof cols) == i32)
     static-assert ((typeof rows) == i32)
@@ -60,6 +59,7 @@ inline construct-mat-type (element-type cols rows)
                 let TT = ((memo construct-mat-type) element-type rows cols)
                 'define-symbol this-type 'TransposedType TT
                 'define-symbol TT 'TransposedType this-type
+let construct-mat-type = (memo construct-mat-type)
 
 inline construct-vec-types (count)
     let count = (i32 count)
