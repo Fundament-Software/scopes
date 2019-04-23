@@ -80,6 +80,12 @@ public:
         typedefs.insert({Symbol("__builtin_va_list"), T });
     }
 
+#define SCOPES_COMBINE_RESULT(DEST, EXPR) { \
+        auto _result = (EXPR); \
+        if (!_result.ok()) \
+            DEST = Result<void>::raise(_result.unsafe_error()); \
+    }
+
     const Anchor *anchorFromLocation(clang::SourceLocation loc) {
         auto &SM = Context->getSourceManager();
         return anchor_from_location(SM, loc);
@@ -244,8 +250,9 @@ public:
         }
 
         clang::RecordDecl * defn = rd->getDefinition();
-        if (defn && !record_defined[rd]) {
-            record_defined[rd] = true;
+        auto res = record_defined.insert({rd, false});
+        if (defn && !res.first->second) {
+            res.first->second = true;
 
             auto tni = cast<TypenameType>(struct_type);
             if (!tni->is_opaque()) {
@@ -601,12 +608,6 @@ public:
         dest->bind(name, conv);
     }
 
-#define SCOPES_COMBINE_RESULT(DEST, EXPR) { \
-        auto _result = (EXPR); \
-        if (!_result.ok()) \
-            DEST = Result<void>::raise(_result.unsafe_error()); \
-    }
-
     bool TraverseRecordDecl(clang::RecordDecl *rd) {
         if (!ok.ok()) return false;
         if (rd->isFreeStanding()) {
@@ -644,6 +645,8 @@ public:
         if (!ok.ok()) return false;
 
         //const Anchor *anchor = anchorFromLocation(td->getSourceRange().getBegin());
+
+        //clang::QualType QT = Context->getCanonicalType(td->getUnderlyingType());
 
         auto type_result = TranslateType(td->getUnderlyingType());
         SCOPES_COMBINE_RESULT(ok, type_result);

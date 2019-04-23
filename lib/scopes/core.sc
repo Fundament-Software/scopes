@@ -3291,7 +3291,10 @@ fn load-module (module-name module-path opts...)
             .. "no such module: " module-path
     let module-path = (sc_realpath module-path)
     let module-dir = (sc_dirname module-path)
-    let expr = (sc_parse_from_path module-path)
+    let expr =
+        do
+            hide-traceback;
+            sc_parse_from_path module-path
     let eval-scope =
         va-option scope opts...
             do
