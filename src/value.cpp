@@ -519,7 +519,7 @@ SCOPES_RESULT(TypedValueRef) Function::resolve(const ValueRef &node, const Funct
         if (val) {
             if ((fn->boundary != _boundary) && !val->is_accessible()) {
                 SCOPES_TRACE_PROVE_ARG(node);
-                SCOPES_ERROR(VariableOutOfScope, val->get_type());
+                SCOPES_ERROR(VariableOutOfScope, val->get_type(), val.anchor());
             }
             return val;
         }

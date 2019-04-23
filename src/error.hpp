@@ -292,8 +292,9 @@ formatters:
         "plain storage type expected, not %0", \
         PType) \
     T(VariableOutOfScope, \
-        "value of type %0 is only known at run-time and outside of function scope", \
-        PType) \
+        "value of type %0 is only known at run-time and outside of function scope" \
+        "%1: defined here", \
+        PType, PAnchor) \
     T(UnboundValue, \
         "value %0 is unbound", \
         ValueRef) \

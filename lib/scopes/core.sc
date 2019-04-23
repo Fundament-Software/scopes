@@ -5432,7 +5432,7 @@ define-sugar-block-scope-macro static-if
     let body next-expr = (process ('anchor kw) body next-expr)
     return
         cons
-            cons do body
+            cons ('tag `do ('anchor kw)) body
             next-expr
         sugar-scope
 
