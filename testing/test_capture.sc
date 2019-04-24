@@ -8,7 +8,7 @@ do
     let b = 20
 
     @@ report
-    capture cf {a b} (u v)
+    capture cf (u v) {a b}
         print a b u v
         + a b u v
 
@@ -18,7 +18,7 @@ do
     testf cf
 
 let T = (array.type i32 16)
-spice-capture f {T} ()
+spice-capture f () {T}
     dump T
     `(nullof T)
 

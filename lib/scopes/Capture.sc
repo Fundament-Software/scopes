@@ -27,12 +27,12 @@ inline capture-parser (macroname head body genf)
             _ "" (cons head body)
     let expr =
         sugar-match body
-        case (('curly-list args...) (params...) body...)
+        case ((params...) ('curly-list args...) body...)
             genf namestr args... params... body...
         default
             error
                 .. "syntax error: try (" macroname
-                    " name|\"name\"| {var ...} (param ...) body ...)"
+                    " name|\"name\"| (param ...) {var ...} body ...)"
     if symbol?
         list let head '= expr
     else
@@ -51,7 +51,7 @@ spice pack-capture (argtuple func)
     spice-quote
         bitcast argtuple CaptureT
 
-# capture name|"name"| {var ...} (param ...) body ...
+# capture name|"name"| (param ...) {var ...} body ...
 sugar capture (head body...)
     capture-parser "capture" head body...
         inline (namestr args params body)
@@ -84,7 +84,7 @@ spice finalize-capture-spice (capture func)
         'set-symbol T '__call func
         capture
 
-# spice-capture name|"name"| {var ...} (param ...) body ...
+# spice-capture name|"name"| (param ...) {var ...} body ...
 sugar spice-capture (head body...)
     capture-parser "spice-capture" head body...
         inline (namestr args params body)
