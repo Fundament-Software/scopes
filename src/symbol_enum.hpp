@@ -295,6 +295,7 @@ namespace scopes {
     T(FN_ShuffleVector, "shufflevector") \
     T(FN_ExtractValue, "extractvalue") \
     T(FN_InsertValue, "insertvalue") \
+    T(FN_SwapValue, "swapvalue") \
     T(FN_ITrunc, "itrunc") \
     T(FN_ZExt, "zext") \
     T(FN_SExt, "sext") \

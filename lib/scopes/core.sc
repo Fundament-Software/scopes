@@ -3990,12 +3990,27 @@ let tupleof =
 
             # generate insert instructions
             let TT = (sc_tuple_type argc field-types)
-            loop (i result = 0 `(nullof TT))
-                if (i == argc)
-                    break result
-                let arg = ('getarg args i)
-                _ (i + 1)
-                    `(insertvalue result arg i)
+
+            inline punchvalue (A E i)
+                let AA = (insertvalue A E i)
+                let AA = (follow (dupe AA) (typeof AA))
+                lose A; lose E
+                AA
+
+            if ('plain? TT)
+                loop (i result = 0 `(nullof TT))
+                    if (i == argc)
+                        break result
+                    let arg = ('getarg args i)
+                    _ (i + 1)
+                        `(insertvalue result arg i)
+            else
+                loop (i result = 0 `(nullof TT))
+                    if (i == argc)
+                        break result
+                    let arg = ('getarg args i)
+                    _ (i + 1)
+                        `(punchvalue result arg i)
 
 #-------------------------------------------------------------------------------
 # arrays
@@ -4068,6 +4083,28 @@ let arrayof =
                     else `(arg as ET)
                 _ (i + 1)
                     `(insertvalue result arg i)
+
+# destructors for aggregates
+
+'set-symbols aggregate
+    __drop =
+        spice-macro
+            fn (args)
+                let argc = ('argcount args)
+                verify-count argc 1 1
+                let self = ('getarg args 0)
+                let T = ('typeof self)
+                if (not ('plain? T))
+                    let block = (sc_expression_new)
+                    let count = ('element-count T)
+                    # extract all values and drop em
+                    loop (i = 0)
+                        if (i == count) (break)
+                        sc_expression_append block `(__drop (extractvalue self i))
+                        i + 1
+                    sc_expression_append block `()
+                    return block
+                `()
 
 #-------------------------------------------------------------------------------
 # vectors

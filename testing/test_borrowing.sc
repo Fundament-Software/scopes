@@ -16,7 +16,7 @@ typedef Handle :: i32
         new-handle idx
 
     inline __repr (self)
-        repr (storagecast self)
+        repr (dupe self)
 
     inline __drop (self)
         #dump "drop"
@@ -34,6 +34,8 @@ let
 
     UHandleR1 = ('unique-type Handle -1)
     UHandleR2 = ('unique-type Handle -2)
+
+    UHandleHandleR1 = ('unique-type (tuple Handle Handle) -1)
 
     UHandleE1 = ('unique-type Handle -257)
 
@@ -92,8 +94,12 @@ inline test-refcount (f)
     fn testfunc ()
         f;
         return;
+    if (refcount != 0)
+        print "pre-refcount should be zero but is" (deref refcount)
     assert (refcount == 0)
     testfunc;
+    if (refcount != 0)
+        print "post-refcount should be zero but is" (deref refcount)
     assert (refcount == 0)
 
 # receives handle but doesn't do anything with it:
@@ -427,12 +433,41 @@ fn f ()
     # auto-drop x
     ;
 test-refcount (inline () (f))
-
-
+f;
 
 # TODO: composition, decomposition
 
-f;
+inline swapvalue (a b i)
+    """"swap out element #i from collection `a` with `b`
+    # returns a view
+    let oldb = (extractvalue a i)
+    # also returns a view
+    let newa = (insertvalue a b i)
+    # turn views to new uniques
+    let newa = (follow (dupe newa) (typeof newa))
+    let oldb = (follow (dupe oldb) (typeof oldb))
+    # forget unique a, preventing a double free
+    lose a
+    # forget unique b, as it's part of newval now
+    lose b
+    # return new collection and old element
+    _ newa oldb
 
+fn f ()
+    let k = (undef (tuple Handle Handle))
+    let k _old = (swapvalue k (Handle 1) 0)
+    lose _old
+    let k _old = (swapvalue k (Handle 2) 1)
+    lose _old
+    k
+verify-type (typify f) UHandleHandleR1
+test-refcount (inline () (f))
+
+fn f ()
+    let k = (tupleof (Handle 1) (Handle 2))
+    ;
+test-refcount (inline () (f))
+
+# TODO: what happens when we pass view handles to tupleof?
 
 # TODO: builtins

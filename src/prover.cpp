@@ -1633,6 +1633,13 @@ static SCOPES_RESULT(void) build_deref_move(
             Call::from(unique_result_type(ctx, ARGT), callee, values)); \
         newcall; \
     })
+#define NEW_ARGTYPE2(ARGT1, ARGT2) ({ \
+        TypedValueRef newcall = ref(call.anchor(), \
+            Call::from(arguments_type({ \
+                unique_result_type(ctx, ARGT1), \
+                unique_result_type(ctx, ARGT2)}), callee, values)); \
+        newcall; \
+    })
 #define DEP_ARGTYPE1(ARGT, ...) ({ \
         const Type *_retT = view_result_type(ctx, ARGT, __VA_ARGS__); \
         TypedValueRef newcall = ref(call.anchor(), \

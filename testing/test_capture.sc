@@ -51,19 +51,17 @@ using import Array
 
 local callbacks : (GrowingArray (Capture (function void voidstar)))
 
+fn make-callback (x)
+    capture () {x}
+        print x
+        ;
+
 let a = "1!"
 let b = "2!"
-'append callbacks
-    capture () {a}
-        print a
-        ;
-'append callbacks
-    capture () {b}
-        print b
-        ;
+'append callbacks (make-callback a)
+'append callbacks (make-callback b)
 
 for cb in callbacks
     cb;
-
 
 ;
