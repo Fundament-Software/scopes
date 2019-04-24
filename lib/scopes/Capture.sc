@@ -14,6 +14,47 @@
 #-------------------------------------------------------------------------------
 
 typedef Capture
+    inline __call (self args...)
+        let f env = (unpack (storagecast self))
+        f env args...
+
+    @@ memo
+    inline make-type (ftype)
+        let ET = (elementof ftype)
+        static-assert (ET < function)
+        let ST = (tuple ftype voidstar)
+        typedef (.. "Capture<" (tostring ET) ">") < this-type :: ST
+
+    inline __drop (self)
+        let f env = (unpack (storagecast self))
+        free (bitcast (dupe env) (mutable pointer i8))
+
+    inline __typecall (cls args...)
+        static-if (cls == this-type)
+            let ftype = args...
+            make-type ftype
+        else
+            let f env = args...
+            let closure = (tupleof f (env as voidstar))
+            follow closure cls
+
+typedef CaptureTemplate
+    inline typify (self types...)
+        let T = (typeof self)
+        let T* = (pointer T)
+        let innerf = (T . __call)
+        let newf =
+            static-typify
+                fn (env args...)
+                    innerf
+                        load (bitcast env T*)
+                        args...
+                \ voidstar types...
+        let env = (malloc T)
+        store self env
+        (Capture (typeof newf)) newf env
+
+typedef SpiceCapture
 
 inline capture-parser (macroname head body genf)
     let T = ('typeof head)
@@ -46,7 +87,7 @@ spice pack-capture (argtuple func)
     let T = ('typeof argtuple)
     let CaptureT =
         @@ spice-quote
-        typedef [(.. "Capture" ('string T))] < Capture : T
+        typedef [(.. "CaptureT" ('string T))] < CaptureTemplate : T
             let __call = func
     spice-quote
         bitcast argtuple CaptureT
@@ -72,7 +113,7 @@ spice pack-capture-spice (argtuple)
     let T = ('typeof argtuple)
     let CaptureT =
         @@ spice-quote
-        typedef [(.. "Capture" ('string T))] < Capture : T
+        typedef [(.. "Capture" ('string T))] < SpiceCapture : T
     spice-quote
         _
             bitcast argtuple CaptureT
@@ -105,6 +146,6 @@ unlet unpack-capture pack-capture unpack-capture-spice pack-capture-spice
     \ finalize-capture-spice
 
 do
-    let Capture capture spice-capture
+    let Capture CaptureTemplate SpiceCapture capture spice-capture
     let decorate-capture = decorate-fn
     locals;

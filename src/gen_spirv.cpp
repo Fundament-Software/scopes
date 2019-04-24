@@ -1546,7 +1546,7 @@ struct SPIRVGenerator {
         SCOPES_CHECK_RESULT(write_anchor(call.anchor()));
 
         auto T = try_get_const_type(callee);
-        const Type *rtype = callee->get_type();
+        const Type *rtype = strip_lifetime(callee->get_type());
 
         if (is_function_pointer(rtype)) {
             auto func =

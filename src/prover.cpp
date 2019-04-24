@@ -1894,7 +1894,7 @@ static SCOPES_RESULT(TypedValueRef) prove_CallTemplate(
 repeat:
     SCOPES_CHECK_RESULT(verify_valid(ctx, callee, "callee"));
     DEREF(callee);
-    const Type *T = callee->get_type();
+    const Type *T = strip_lifetime(callee->get_type());
     if (!rawcall) {
         assert(redirections < 16);
         ValueRef dest;

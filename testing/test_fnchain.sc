@@ -1,7 +1,6 @@
 
 using import testing
 using import FunctionChain
-using import Capture
 
 global g_x = 0
 inline get_g_x () g_x

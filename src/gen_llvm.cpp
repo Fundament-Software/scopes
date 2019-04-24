@@ -1688,7 +1688,7 @@ struct LLVMIRGenerator {
         auto &&args = call->args;
 
         auto T = try_get_const_type(callee);
-        const Type *rtype = callee->get_type();
+        const Type *rtype = strip_lifetime(callee->get_type());
         if (is_function_pointer(rtype)) {
             SCOPES_CHECK_RESULT(build_call(call,
                 extract_function_type(rtype),
