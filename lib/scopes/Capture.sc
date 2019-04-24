@@ -34,7 +34,9 @@ typedef Capture
             let ftype = args...
             make-type ftype
         else
-            let f env = args...
+            let f envtuple = args...
+            let env = (malloc (typeof envtuple))
+            store envtuple env
             let closure = (tupleof f (env as voidstar))
             follow closure cls
 
@@ -50,9 +52,7 @@ typedef CaptureTemplate
                         load (bitcast env T*)
                         args...
                 \ voidstar types...
-        let env = (malloc T)
-        store self env
-        (Capture (typeof newf)) newf env
+        (Capture (typeof newf)) newf self
 
 typedef SpiceCapture
 

@@ -1893,8 +1893,7 @@ static SCOPES_RESULT(TypedValueRef) prove_CallTemplate(
     int redirections = 0;
 repeat:
     SCOPES_CHECK_RESULT(verify_valid(ctx, callee, "callee"));
-    DEREF(callee);
-    const Type *T = strip_lifetime(callee->get_type());
+    const Type *T = strip_qualifiers(callee->get_type());
     if (!rawcall) {
         assert(redirections < 16);
         ValueRef dest;
@@ -1906,6 +1905,7 @@ repeat:
             goto repeat;
         }
     }
+    DEREF(callee);
     if (is_function_pointer(T)) {
         TypedValues args;
         Symbols keys;
