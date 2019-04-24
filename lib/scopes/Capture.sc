@@ -15,7 +15,28 @@
 
 typedef Capture
 
-run-stage;
+inline capture-parser (macroname head body genf)
+    let T = ('typeof head)
+    let symbol? = (T == Symbol)
+    let namestr body =
+        if symbol?
+            _ (head as Symbol as string) body
+        elseif (T == string)
+            _ (head as string) body
+        else
+            _ "" (cons head body)
+    let expr =
+        sugar-match body
+        case (('curly-list args...) (params...) body...)
+            genf namestr args... params... body...
+        default
+            error
+                .. "syntax error: try (" macroname
+                    " name|\"name\"| {var ...} (param ...) body ...)"
+    if symbol?
+        list let head '= expr
+    else
+        expr
 
 spice unpack-capture (capture)
     let T = ('storageof ('typeof capture))
@@ -30,13 +51,15 @@ spice pack-capture (argtuple func)
     spice-quote
         bitcast argtuple CaptureT
 
-# capture [var ...] (param ...) body ...
-sugar capture (('square-list args...) (params...) body...)
-    qq [pack-capture] ([tupleof] (unquote-splice args...))
-        [fn] (self (unquote-splice params...))
-            [let] (unquote-splice args...) =
-                [unpack-capture] self
-            unquote-splice body...
+# capture name|"name"| {var ...} (param ...) body ...
+sugar capture (head body...)
+    capture-parser "capture" head body...
+        inline (namestr args params body)
+            qq [pack-capture] ([tupleof] (unquote-splice args))
+                [fn] [namestr] (self (unquote-splice params))
+                    [let] (unquote-splice args) =
+                        [unpack-capture] self
+                    unquote-splice body
 
 #-------------------------------------------------------------------------------
 
@@ -61,18 +84,20 @@ spice finalize-capture-spice (capture func)
         'set-symbol T '__call func
         capture
 
-# spice-capture [var ...] (param ...) body ...
-sugar spice-capture (('square-list args...) (params...) body...)
-    let payload = ('unique Symbol "payload")
-    let payload-type = ('unique Symbol "payload-type")
-    qq [do]
-        [let] [payload] [payload-type] =
-            [pack-capture-spice] ([tupleof] (unquote-splice args...))
-        [finalize-capture-spice] [payload]
-            [spice] "" (self (unquote-splice params...))
-                [let] (unquote-splice args...) =
-                    [unpack-capture-spice] self [payload-type]
-                unquote-splice body...
+# spice-capture name|"name"| {var ...} (param ...) body ...
+sugar spice-capture (head body...)
+    capture-parser "spice-capture" head body...
+        inline (namestr args params body)
+            let payload = ('unique Symbol "payload")
+            let payload-type = ('unique Symbol "payload-type")
+            qq [do]
+                [let] [payload] [payload-type] =
+                    [pack-capture-spice] ([tupleof] (unquote-splice args))
+                [finalize-capture-spice] [payload]
+                    [spice] [namestr] (self (unquote-splice params))
+                        [let] (unquote-splice args) =
+                            [unpack-capture-spice] self [payload-type]
+                        unquote-splice body
 
 #-------------------------------------------------------------------------------
 
@@ -81,4 +106,5 @@ unlet unpack-capture pack-capture unpack-capture-spice pack-capture-spice
 
 do
     let Capture capture spice-capture
+    let decorate-capture = decorate-fn
     locals;

@@ -4611,7 +4611,9 @@ define sugar
                                     spice-quote
                                         unpack-expr
                                         return-ok body
-                            error "syntax error"
+                            hide-traceback;
+                            error
+                                .. "syntax error: pattern does not match format " (repr params)
             let outexpr =
                 if (('typeof name) == Symbol)
                     qq
