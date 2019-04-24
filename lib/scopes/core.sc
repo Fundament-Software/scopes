@@ -356,6 +356,23 @@ let elementof =
             hide-traceback;
             `[(sc_type_element_at self index)]
 
+let elementsof =
+    box-spice-macro
+        fn "elementof" (args)
+            let argcount = (sc_argcount args)
+            verify-count argcount 1 1
+            let self = (unbox-pointer (sc_getarg args 0) type)
+            hide-traceback;
+            let outargs = (sc_argument_list_new)
+            let count = (sc_type_countof self)
+            loop (i = 0)
+                if (icmp== i count)
+                    break;
+                sc_argument_list_append outargs
+                    `[(sc_type_element_at self i)]
+                add i 1
+            outargs
+
 let locationof =
     box-spice-macro
         fn "locationof" (args)

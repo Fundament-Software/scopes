@@ -20,10 +20,10 @@ typedef Capture
 
     @@ memo
     inline make-type (ftype)
-        let ET = (elementof ftype)
-        static-assert (ET < function)
-        let ST = (tuple ftype voidstar)
-        typedef (.. "Capture<" (tostring ET) ">") < this-type :: ST
+        static-assert (ftype < function) "function type expected"
+        let ST = (tuple (pointer ftype) voidstar)
+        typedef (.. "Capture<" (tostring ftype) ">") < this-type :: ST
+            let FunctionType = ftype
 
     inline __drop (self)
         let f env = (unpack (storagecast self))
@@ -41,18 +41,38 @@ typedef Capture
             follow closure cls
 
 typedef CaptureTemplate
-    inline typify (self types...)
-        let T = (typeof self)
-        let T* = (pointer T)
-        let innerf = (T . __call)
-        let newf =
-            static-typify
-                fn (env args...)
-                    innerf
-                        load (bitcast env T*)
-                        args...
-                \ voidstar types...
-        (Capture (typeof newf)) newf self
+    @@ spice-cast-macro
+    fn __imply (selfT otherT)
+        if (otherT < Capture)
+            let ft = (('@ otherT 'FunctionType) as type)
+            let typeargs = (sc_argument_list_new)
+            let count = ('element-count ft)
+            loop (i = 1)
+                if (i == count)
+                    break;
+                sc_argument_list_append typeargs ('element@ ft i)
+                i + 1
+            let F = (sc_prove `('typify-function selfT typeargs))
+            if (('element@ ('typeof F) 0) == ft)
+                return `(inline (self) ('build-instance self F))
+        `()
+
+    inline typify-function (cls types...)
+        let T* = (pointer cls)
+        let innerf = (cls . __call)
+        static-typify
+            fn (env args...)
+                innerf
+                    load (bitcast env T*)
+                    args...
+            \ voidstar types...
+
+    inline build-instance (self f)
+        (Capture (elementof (typeof f))) f self
+
+    inline instance (self types...)
+        let newf = (typify-function (typeof self) types...)
+        build-instance self newf
 
 typedef SpiceCapture
 
