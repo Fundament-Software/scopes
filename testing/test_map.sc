@@ -29,6 +29,10 @@ iter-pairs
     inline (key value)
         'set map key value
 'dump map
+
+for k v in map
+    print k v
+
 iter-pairs
     inline (key value)
         if (('getdefault map key -1) == -1)
@@ -64,6 +68,8 @@ iter-pairs
     inline (key value)
         'insert set value
 'dump set
+for val in set
+    print val
 iter-pairs
     inline (key value)
         if (not ('in? set value))

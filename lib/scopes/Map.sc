@@ -260,6 +260,31 @@ typedef Map < Struct
                 auto-rehash self
                 return;
 
+    inline key-value-generator (self)
+        inline next (i)
+            let fin = (deref self._mask)
+            loop (i = i)
+                let i = (i + 1:u64)
+                if (i > fin)
+                    break i
+                if (valid-slot? self i)
+                    break i
+                i
+        Generator
+            inline ()
+                if (valid-slot? self 0:u64) 0:u64
+                else (next 0:u64)
+            inline (i) (i <= self._mask)
+            inline (i)
+                _ (deref (self._keys @ i)) (deref (self._values @ i))
+            next
+
+    inline __as (cls T)
+        static-if (T == Generator)
+            key-value-generator
+        else
+            ;
+
     fn dump (self)
         for i in (range 0:u64 (self._mask + 1:u64))
             if (valid-slot? self i)
@@ -329,7 +354,7 @@ typedef Map < Struct
             self
 
     unlet slot-valid? unset-slot rehash auto-rehash lookup insert_entry reserve
-        \ erase_pos
+        \ erase_pos key-value-generator
 
 #-------------------------------------------------------------------------------
 
@@ -550,6 +575,30 @@ typedef Set < Struct
             inline "fail" ()
                 return;
 
+    inline set-generator (self)
+        inline next (i)
+            let fin = (deref self._mask)
+            loop (i = i)
+                let i = (i + 1:u64)
+                if (i > fin)
+                    break i
+                if (valid-slot? self i)
+                    break i
+                i
+        Generator
+            inline ()
+                if (valid-slot? self 0:u64) 0:u64
+                else (next 0:u64)
+            inline (i) (i <= self._mask)
+            inline (i) (deref (self._keys @ i))
+            next
+
+    inline __as (cls T)
+        static-if (T == Generator)
+            set-generator
+        else
+            ;
+
     inline __countof (self)
         (deref self._count) as usize
 
@@ -577,7 +626,7 @@ typedef Set < Struct
             self
 
     unlet slot-valid? unset-slot rehash auto-rehash lookup insert_entry reserve
-        \ erase_pos
+        \ erase_pos set-generator
 
 do
     let Map MapError Set
