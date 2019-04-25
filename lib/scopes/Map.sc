@@ -89,9 +89,10 @@ typedef Map < Struct
         local key = key
         local keyhash = keyhash
         local value = value
+        let capacity = (mask + 1:u64)
         let pos = (keypos keyhash mask)
         loop (i dist = 0:u64 0:u64)
-            if (i == self._capacity)
+            if (i == capacity)
                 break;
             let index = (addpos pos i mask)
             if (valid-slot? self index) # already occupied
@@ -118,6 +119,33 @@ typedef Map < Struct
                 self._count += 1
                 break;
 
+    inline erase_pos (self pos mask)
+        let mask =
+            static-if (none? mask) self._mask
+            else mask
+        let capacity = (mask + 1:u64)
+        label done
+            loop (i = 1:u64)
+                if (i == capacity)
+                    merge done
+                let index = (addpos pos i mask)
+                let index_prev = (prevpos index mask)
+                let atkey = (self._keys @ index)
+                let atvalue = (self._values @ index)
+                let prev_key = (self._keys @ index_prev)
+                let prev_value = (self._values @ index_prev)
+                let pd = (keydistance ((hash atkey) as u64) index mask)
+                if ((pd == 0) or (not (valid-slot? self index)))
+                    unset-slot self index_prev
+                    __drop prev_key
+                    __drop prev_value
+                    merge done
+                assign atkey prev_key
+                assign atvalue prev_value
+                i + 1:u64
+        self._count = self._count - 1:u32
+        ;
+
     inline lookup (self key keyhash successf failf mask)
         """"finds the index and address of an entry associated with key or
             invokes label failf on failure
@@ -140,7 +168,7 @@ typedef Map < Struct
         let mask =
             max oldmask newmask
         # try simplest thing: reinsert slots not at their correct position
-        for i in (range 1:u64 (mask + 2:u64))
+        for i in (range 0:u64 (mask + 1:u64))
             if (not (valid-slot? self i))
                 continue;
             let key value = (self._keys @ i) (self._values @ i)
@@ -250,7 +278,7 @@ typedef Map < Struct
             inline "ok" (idx)
                 return (deref (self._values @ idx))
             inline "fail" ()
-                return value
+                return (view value)
 
     fn get (self key)
         """"returns the value associated with key or raises an error
@@ -259,6 +287,17 @@ typedef Map < Struct
                 return (deref (self._values @ idx))
             inline "fail" ()
                 raise MapError.KeyNotFound
+
+    fn discard (self key)
+        """"erases a key -> value association from the map; if the map
+            does not contain this key, nothing happens.
+        lookup self key ((hash key) as u64)
+            inline "ok" (idx)
+                erase_pos self idx
+                auto-rehash self
+                return;
+            inline "fail" ()
+                return;
 
     inline __countof (self)
         (deref self._count) as usize
@@ -289,6 +328,7 @@ typedef Map < Struct
             self
 
     unlet slot-valid? unset-slot rehash auto-rehash lookup insert_entry reserve
+        \ erase_pos
 
 do
     let Map MapError

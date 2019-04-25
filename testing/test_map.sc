@@ -2,29 +2,60 @@
 using import Map
 
 local map : (Map Symbol i32)
-'set map 'A 101
-'set map 'B 303
-'set map 'C 606
-'set map 'D 909
-'set map 'E 11
-'set map 'F 22
-'set map 'G 33
-'set map 'H 44
-'set map 'I 111
-'set map 'J 333
-'set map 'K 666
-'set map 'L 999
-'set map 'M 1111
-'set map 'N 2222
-'set map 'O 3333
-'set map 'P 4444
+inline iter-pairs1 (f)
+    f 'A 101
+    f 'B 303
+    f 'C 606
+    f 'D 909
+    f 'E 11
+    f 'F 22
+    f 'G 33
+    f 'H 44
+inline iter-pairs2 (f)
+    f 'I 111
+    f 'J 333
+    f 'K 666
+    f 'L 999
+    f 'M 1111
+    f 'N 2222
+    f 'O 3333
+    f 'P 4444
+inline iter-pairs (f)
+    iter-pairs1 f
+    iter-pairs2 f
+
 #print (countof map)
+iter-pairs
+    inline (key value)
+        'set map key value
 'dump map
-inline test-key (key)
-    print key ('getdefault map key -1)
-test-key 'A
-test-key 'B
-test-key 'C
+iter-pairs
+    inline (key value)
+        if (('getdefault map key -1) == -1)
+            print key value
+            error "key missing"
+iter-pairs1
+    inline (key value)
+        'discard map key
+iter-pairs1
+    inline (key value)
+        if (('getdefault map key -1) != -1)
+            print key value
+            error "key not deleted"
+iter-pairs2
+    inline (key value)
+        if (('getdefault map key -1) == -1)
+            print key value
+            error "key missing"
+iter-pairs2
+    inline (key value)
+        'discard map key
+iter-pairs2
+    inline (key value)
+        if (('getdefault map key -1) != -1)
+            print key value
+            error "key not deleted"
 
 ;
+
 
