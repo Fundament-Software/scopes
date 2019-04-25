@@ -56,6 +56,33 @@ iter-pairs2
             print key value
             error "key not deleted"
 
+#------------------------------------------------------------------------------
+
+# set set
+local set : (Set i32)
+iter-pairs
+    inline (key value)
+        'insert set value
+'dump set
+iter-pairs
+    inline (key value)
+        if (not ('in? set value))
+            print value
+            error "value missing"
+iter-pairs1
+    inline (key value)
+        'discard set value
+iter-pairs1
+    inline (key value)
+        if ('in? set value)
+            print value
+            error "value not discarded"
+iter-pairs2
+    inline (key value)
+        if (not ('in? set value))
+            print value
+            error "value missing"
+
 ;
 
 

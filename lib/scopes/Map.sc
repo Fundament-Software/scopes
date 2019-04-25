@@ -6,7 +6,8 @@
 """"Map
     ===
 
-    A container that uniquely maps keys to values.
+    This module implements a key -> value store and mathematical sets using
+    hashtables.
 
 # generic Hashmap implementing Robin Hood Hashing, see
      http://sebastiansylvan.com/2013/05/08/robin-hood-hashing-should-be-your-default-hash-table-implementation/
@@ -330,8 +331,256 @@ typedef Map < Struct
     unlet slot-valid? unset-slot rehash auto-rehash lookup insert_entry reserve
         \ erase_pos
 
+#-------------------------------------------------------------------------------
+
+typedef Set < Struct
+    let MinCapacity = 16:u64
+    let MinMask = (MinCapacity - 1:u64)
+    let BitfieldType = u64
+
+    @@ memo
+    inline gen-type (key-type value-type)
+        let parent-type = this-type
+        struct (.. "<Set " (tostring key-type) ">") < parent-type
+            let KeyType = key-type
+
+            _valid : (mutable pointer BitfieldType)
+            _keys : (mutable pointer KeyType)
+            _count : u64
+            _mask : u64
+            _capacity : u64
+
+    fn set-slot (self idx)
+        let flag = (1:u64 << (idx % 64:u64))
+        let ofs = (idx // 64:u64)
+        self._valid @ ofs |= flag
+        ;
+
+    fn unset-slot (self idx)
+        let flag = (1:u64 << (idx % 64:u64))
+        let ofs = (idx // 64:u64)
+        self._valid @ ofs &= (~ flag)
+        ;
+
+    fn valid-slot? (self idx)
+        let flag = (1:u64 << (idx % 64:u64))
+        let ofs = (idx // 64:u64)
+        ((self._valid @ ofs) & flag) == flag
+
+    fn terseness (self)
+        """"computes the hashmap load as a normal between 0.0 and 1.0
+        self._count / (self._mask + 1:u64)
+
+    inline insert_entry (self key keyhash mask)
+        let mask =
+            static-if (none? mask) (deref self._mask)
+            else mask
+        assert (self._count <= mask) "map full"
+        local key = key
+        local keyhash = keyhash
+        let capacity = (mask + 1:u64)
+        let pos = (keypos keyhash mask)
+        loop (i dist = 0:u64 0:u64)
+            if (i == capacity)
+                break;
+            let index = (addpos pos i mask)
+            if (valid-slot? self index) # already occupied
+                let pos_key = (deref (self._keys @ index))
+                let pos_keyhash = ((hash (deref pos_key)) as u64)
+                let pd = (keydistance pos_keyhash index mask)
+                repeat (i + 1:u64)
+                    + 1:u64
+                        if (dist > pd)
+                            # swap out
+                            self._keys @ index = key
+                            key = pos_key
+                            keyhash = pos_keyhash
+                            dupe pd
+                        else
+                            dist
+            else # free
+                set-slot self index
+                assign key (self._keys @ index)
+                self._count += 1
+                break;
+
+    inline erase_pos (self pos mask)
+        let mask =
+            static-if (none? mask) self._mask
+            else mask
+        let capacity = (mask + 1:u64)
+        label done
+            loop (i = 1:u64)
+                if (i == capacity)
+                    merge done
+                let index = (addpos pos i mask)
+                let index_prev = (prevpos index mask)
+                let atkey = (self._keys @ index)
+                let prev_key = (self._keys @ index_prev)
+                let pd = (keydistance ((hash atkey) as u64) index mask)
+                if ((pd == 0) or (not (valid-slot? self index)))
+                    unset-slot self index_prev
+                    __drop prev_key
+                    merge done
+                assign atkey prev_key
+                i + 1:u64
+        self._count = self._count - 1:u32
+        ;
+
+    inline lookup (self key keyhash successf failf mask)
+        """"finds the index and address of an entry associated with key or
+            invokes label failf on failure
+        let mask =
+            static-if (none? mask) (deref self._mask)
+            else mask
+        loop (pos dist = (keypos keyhash mask) 0:u64)
+            if (not (valid-slot? self pos))
+                return (failf)
+            let pos_key = (deref (self._keys @ pos))
+            if (pos_key == key)
+                return (successf pos)
+            elseif (dist > (keydistance ((hash pos_key) as u64) pos mask))
+                return (failf)
+            repeat (nextpos pos mask) (dist + 1:u64)
+
+    fn rehash (self newmask)
+        let oldmask = (deref self._mask)
+        self._mask = newmask
+        let mask =
+            max oldmask newmask
+        # try simplest thing: reinsert slots not at their correct position
+        for i in (range 0:u64 (mask + 1:u64))
+            if (not (valid-slot? self i))
+                continue;
+            let key = (self._keys @ i)
+            let keyhash = ((hash key) as u64)
+            lookup self key keyhash
+                inline "ok" (idx)
+                    assert (idx == i)
+                inline "fail" ()
+                    unset-slot self i
+                    self._count -= 1:u64
+                    # extract as new uniques
+                    let key = (deref key)
+                    insert_entry self key keyhash
+                newmask
+
+    fn reserve (self new-capacity)
+        let cls = (typeof self)
+        let capacity = (deref self._capacity)
+        let old-valid = (deref self._valid)
+        let old-keys = (deref self._keys)
+        let validsize = ((capacity + 63:u64) // 64:u64)
+        let new-validsize = ((new-capacity + 63:u64) // 64:u64)
+        let new-valid = (malloc-array BitfieldType new-validsize)
+        let new-keys = (malloc-array cls.KeyType new-capacity)
+        llvm.memcpy.p0i8.p0i8.i64
+            bitcast new-valid (mutable rawstring)
+            bitcast old-valid rawstring
+            (validsize * (sizeof BitfieldType)) as i64
+            false
+        llvm.memcpy.p0i8.p0i8.i64
+            bitcast new-keys (mutable rawstring)
+            bitcast old-keys rawstring
+            (capacity * (sizeof cls.KeyType)) as i64
+            false
+        for i in (range validsize new-validsize)
+            new-valid @ i = 0:u64
+        free old-valid
+        free old-keys
+        assign new-valid self._valid
+        assign new-keys self._keys
+        self._capacity = new-capacity
+        return;
+
+    fn auto-rehash (self)
+        let l = (terseness self)
+        let maxmask = (self._capacity - 1:u64)
+        if (l >= 0.9)
+            if (self._mask >= maxmask)
+                # we must expand capacity
+                reserve self (self._capacity << 1:u64)
+            # expand
+            rehash self ((self._mask << 1:u64) + 1:u64)
+        elseif ((l <= 0.225) and (self._mask > MinCapacity))
+            # compact
+            rehash self (self._mask >> 1:u64)
+
+    fn clear (self)
+        for i in (range 0:u64 (self._mask + 1:u64))
+            if (valid-slot? self i)
+                unset-slot self i
+                __drop (self._keys @ i)
+        self._count = 0:u64
+        self._mask = MinMask
+        return;
+
+    fn insert (self key)
+        """"inserts a new key into set
+        let keyhash = ((hash key) as u64)
+        lookup self key keyhash
+            inline "ok" (idx)
+                return;
+            inline "fail" ()
+                insert_entry self key keyhash
+                auto-rehash self
+                return;
+
+    fn dump (self)
+        for i in (range 0:u64 (self._mask + 1:u64))
+            if (valid-slot? self i)
+                print i (self._keys @ i)
+            else
+                print i "<empty>"
+        print "terseness" (terseness self) "mask" self._mask "count" self._count
+
+    fn in? (self key)
+        lookup self key ((hash key) as u64)
+            inline "ok" (idx) true
+            inline "fail" () false
+
+    fn discard (self key)
+        """"erases a key -> value association from the map; if the map
+            does not contain this key, nothing happens.
+        lookup self key ((hash key) as u64)
+            inline "ok" (idx)
+                erase_pos self idx
+                auto-rehash self
+                return;
+            inline "fail" ()
+                return;
+
+    inline __countof (self)
+        (deref self._count) as usize
+
+    inline __drop (self)
+        clear self
+        free self._valid
+        free self._keys
+
+    inline __typecall (cls opts...)
+        static-if (cls == this-type)
+            let key-type = opts...
+            gen-type key-type
+        else
+            let numsets = ((MinCapacity + 63:u64) // 64:u64)
+            let validset = (malloc-array BitfieldType numsets)
+            for i in (range 0:u64 numsets)
+                validset @ i = 0:u64
+            let self =
+                Struct.__typecall cls
+                    _valid = validset
+                    _keys = (malloc-array cls.KeyType MinCapacity)
+                    _count = 0:usize
+                    _mask = MinMask
+                    _capacity = MinCapacity
+            self
+
+    unlet slot-valid? unset-slot rehash auto-rehash lookup insert_entry reserve
+        \ erase_pos
+
 do
-    let Map MapError
+    let Map MapError Set
     locals;
 
 
