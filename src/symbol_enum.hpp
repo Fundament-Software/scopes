@@ -720,6 +720,7 @@ namespace scopes {
 
 #define SCOPES_SYMBOLS() \
     T(SYM_Unnamed, "") \
+    T(SYM_Corrupted, "?corrupted?") \
     \
     SCOPES_BUILTIN_SYMBOLS() \
     \

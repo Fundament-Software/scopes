@@ -66,7 +66,8 @@ Symbol Symbol::get_symbol(const String *name) {
 
 const String *Symbol::get_symbol_name(Symbol id) {
     auto it = map_symbol_name.find(id);
-    assert (it != map_symbol_name.end());
+    if (it == map_symbol_name.end())
+        it = map_symbol_name.find(SYM_Corrupted);
     return it->second;
 }
 

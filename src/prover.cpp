@@ -318,17 +318,17 @@ static const Type *merge_single_value_type(const char *context, const Type *T1, 
     assert(T2);
     if (T1 == T2)
         return T1;
-    auto vq = try_view(T2);
-    // are both types views of the same type?
-    if (vq && is_view(T1)
-        && (strip_view(T1) == strip_view(T2))) {
-        // merge all ids
-        return view_type(T1, vq->ids);
-    }
     if (is_unique(T1) && is_unique(T2)
         && (strip_unique(T1) == strip_unique(T2))) {
         // return stand-in unique tag
         return unique_type(T1, UnknownUnique);
+    }
+    auto vq = try_view(T2);
+    // is either value a view?
+    if ((vq || is_view(T1))
+        && (strip_view(T1) == strip_view(T2))) {
+        // merge all ids
+        return vq?view_type(T1, vq->ids):T1;
     }
     return nullptr;
 }

@@ -49,6 +49,7 @@ test-modules
     .test_locals
     .test_loop
     .test_macro
+    .test_map
     .test_match
     .test_memoization
     .test_mutarray
