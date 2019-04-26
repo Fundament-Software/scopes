@@ -512,10 +512,16 @@ sc_type_set_symbol pointer '__typecall
     box-spice-macro
         fn "pointer.__typecall" (args)
             let argcount = (sc_argcount args)
-            verify-count argcount 2 2
-            let self = (sc_getarg args 1)
-            let T = (unbox-pointer self type)
-            `[(sc_pointer_type T pointer-flag-non-writable unnamed)]
+            verify-count argcount 1 2
+            let cls = (sc_getarg args 0)
+            if (ptrcmp== (unbox-pointer cls type) pointer)
+                verify-count argcount 2 2
+                let self = (sc_getarg args 1)
+                let T = (unbox-pointer self type)
+                `[(sc_pointer_type T pointer-flag-non-writable unnamed)]
+            else
+                # default constructor
+                `(nullof cls)
 
 # dynamic pointer type constructor
 sc_type_set_symbol pointer 'type
@@ -6200,33 +6206,79 @@ sugar include (args...)
 # native structs
 #-------------------------------------------------------------------------------
 
+spice destructor (self)
+    let T = ('typeof self)
+    let numfields = ('element-count T)
+    # drop fields in order
+    let block = (sc_expression_new)
+    loop (i = 0)
+        if (i == numfields)
+            break;
+        sc_expression_append block
+            spice-quote
+                __drop (extractvalue self i)
+        i + 1
+    sc_expression_append block `()
+    block
+
+fn constructor (cls args...)
+    let cls = (cls as type)
+    let argc = ('argcount args...)
+    let numfields = ('element-count cls)
+    let fields = (malloc-array Value numfields)
+    loop (i = 0)
+        if (i == numfields)
+            break;
+        store (null as Value) (getelementptr fields i)
+        i + 1
+    # collect initializers from arguments
+    loop (i = 0)
+        if (i == argc)
+            break;
+        let arg = ('getarg args... i)
+        let k v = ('dekey arg)
+        let k =
+            if (k == unnamed) i
+            else
+                sc_type_field_index cls k
+        if ((load (getelementptr fields k)) != null)
+            error@ ('anchor arg) "while initializing struct fields"
+                "field is already initialized"
+        let ET = (sc_type_element_at cls k)
+        let ET = (sc_strip_qualifiers ET)
+        let v =
+            if (('pointer? ET) and ('refer? ('qualified-typeof v)))
+                `(imply (reftoptr v) ET)
+            else `(imply v ET)
+        store v (getelementptr fields k)
+        i + 1
+    let block = (sc_expression_new)
+    loop (i result = 0 `(nullof cls))
+        sc_expression_append block result
+        if (i == numfields)
+            break block
+        let elem =
+            if ((load (getelementptr fields i)) == null)
+                # default initializer
+                let ET = (sc_type_element_at cls i)
+                try
+                    sc_prove `(ET)
+                except (err)
+                    error
+                        .. "field " (repr ET) " has no default initializer"
+            else
+                load (getelementptr fields i)
+        let result = `(insertvalue result elem i)
+        _ (i + 1) result
+
 'set-symbols Struct
     __getattr = extractvalue
     __typecall =
         spice "Struct-typecall" (cls args...)
             if ((cls as type) == Struct)
                 error "Struct type constructor not available"
-            let cls = (cls as type)
-            let argc = ('argcount args...)
-            let block = (sc_expression_new)
-            loop (i result = 0 `(nullof cls))
-                if (i == argc)
-                    sc_expression_append block result
-                    break block
-                let k v = ('dekey ('getarg args... i))
-                let k =
-                    if (k == unnamed) i
-                    else
-                        sc_type_field_index cls k
-                let ET = (sc_type_element_at cls k)
-                let ET = (sc_strip_qualifiers ET)
-                let v =
-                    if (('pointer? ET) and ('refer? ('qualified-typeof v)))
-                        `(imply (reftoptr v) ET)
-                    else `(imply v ET)
-                let expr = `(insertvalue result v k)
-                sc_expression_append block expr
-                _ (i + 1) expr
+            constructor cls args...
+    __drop = destructor
 
 # C structs
 #-------------------------------------------------------------------------------
@@ -6237,27 +6289,8 @@ sugar include (args...)
         spice "CStruct-typecall" (cls args...)
             if ((cls as type) == CStruct)
                 error "CStruct type constructor is deprecated"
-            let cls = (cls as type)
-            let argc = ('argcount args...)
-            let block = (sc_expression_new)
-            loop (i result = 0 `(nullof cls))
-                if (i == argc)
-                    sc_expression_append block result
-                    break block
-                let k v = ('dekey ('getarg args... i))
-                let k =
-                    if (k == unnamed) i
-                    else
-                        sc_type_field_index cls k
-                let ET = (sc_type_element_at cls k)
-                let ET = (sc_strip_qualifiers ET)
-                let v =
-                    if (('pointer? ET) and ('refer? ('qualified-typeof v)))
-                        `(imply (reftoptr v) ET)
-                    else `(imply v ET)
-                let expr = `(insertvalue result v k)
-                sc_expression_append block expr
-                _ (i + 1) expr
+            constructor cls args...
+    __drop = destructor
 
 sugar struct (name body...)
     spice finalize-struct (T)
@@ -6473,7 +6506,7 @@ let e = e:f32
 #-------------------------------------------------------------------------------
 
 unlet _memo dot-char dot-sym ellipsis-symbol symbol-handler-symbol
-    \ list-handler-symbol struct-dsl _Value
+    \ list-handler-symbol struct-dsl _Value constructor destructor
 
 run-stage; # 12
 

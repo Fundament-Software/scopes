@@ -1,3 +1,6 @@
+
+using import testing
+
 inline begin-arg ()
 let val =
     inline (f)
@@ -15,9 +18,9 @@ let val = (append-val val 3)
 
 dump (val begin-arg)
 let x y z = (val begin-arg)
-assert (x == 1)
-assert (y == 2)
-assert (z == 3)
+test (x == 1)
+test (y == 2)
+test (z == 3)
 
 # a struct with name expression - defined at runtime
 let T =
@@ -25,12 +28,12 @@ let T =
     struct (.. "my" "struct")
         x : i32
         y : i32
-assert (not (constant? T))
+test (not (constant? T))
 
 run-stage;
 
-assert (('string T) == "mystruct")
-assert (('storageof T) == (tuple (x = i32) (y = i32)))
+test (('string T) == "mystruct")
+test (('storageof T) == (tuple (x = i32) (y = i32)))
 
 struct AnotherStruct plain
     x : i32
@@ -55,10 +58,10 @@ let q =
 
 dump q
 
-assert
+test
     ('sum q) == 7
 
-assert
+test
     and
         q.x == 3
         q.y == 0
@@ -66,7 +69,7 @@ assert
 
 # init struct reference from immutable
 local qq = q
-assert
+test
     and
         qq.x == 3
         qq.y == 0
@@ -74,7 +77,7 @@ assert
 
 # init struct reference from other struct reference
 local qqq = qq
-assert
+test
     and
         qqq.x == 3
         qqq.y == 0
@@ -93,7 +96,7 @@ fn test-direct-self-reference ()
     local cell2 = (Cell 2 cell3)
     local cell1 = (Cell 1 cell2)
 
-    assert
+    test
         cell1.next.next.at == 3
 
 test-direct-self-reference;
@@ -115,8 +118,12 @@ do
     local cell2 = (Cell 2 cell3)
     local cell1 = (Cell 1 cell2)
 
-    assert
+    test
         cell1.next.next.at == 3
+
+    let defaultcell = (Cell)
+    test (defaultcell.at == 0)
+    test (defaultcell.next == null)
 
     # using a struct on the heap
     struct Val plain
@@ -124,8 +131,28 @@ do
         y : i32
 
     new testval = (Val 1 2)
-    assert (testval.x == 1)
-    assert (testval.y == 2)
+    test (testval.x == 1)
+    test (testval.y == 2)
     delete testval
+
+global drop_count = 0
+do
+    # non-plain struct inside non-plain struct
+    struct Child
+        value : i32
+
+        inline __drop (self)
+            print "dropping"
+            drop_count += 1
+            super-type.__drop self
+
+    struct Parent
+        child1 : Child
+        child2 : Child
+
+    let parent = (Parent)
+    ;
+print (deref drop_count)
+test (drop_count == 2)
 
 none
