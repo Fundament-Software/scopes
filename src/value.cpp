@@ -326,6 +326,10 @@ bool Template::is_inline() const {
     return _is_inline;
 }
 
+bool Template::is_hidden() const {
+    return is_inline() && name == SYM_HiddenInline;
+}
+
 void Template::append_param(const ParameterTemplateRef &sym) {
     sym->set_owner(ref(unknown_anchor(), this), params.size());
     params.push_back(sym);

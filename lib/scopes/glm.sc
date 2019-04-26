@@ -56,7 +56,7 @@ inline construct-mat-type (element-type cols rows)
             static-if (cols == rows)
                 'define-symbol this-type 'TransposedType this-type
             elseif (cols < rows)
-                let TT = ((memo construct-mat-type) element-type rows cols)
+                let TT = ((memo this-function) element-type rows cols)
                 'define-symbol this-type 'TransposedType TT
                 'define-symbol TT 'TransposedType this-type
 let construct-mat-type = (memo construct-mat-type)

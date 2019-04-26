@@ -2,13 +2,13 @@
 
 using import testing
 
-fn test (...)
+fn testf (...)
     print "------------------"
     print ...
     print "------------------"
 # programmatically changing a function to inline
 # this is only executed at runtime though
-sc_template_set_inline (sc_closure_get_template test)
+sc_template_set_inline (sc_closure_get_template testf)
 
 fn gen-function ()
     fn () true
@@ -44,3 +44,31 @@ fn test-function5 (x)
         ((gen-function5 x)) == true
 test-function5 true
 
+# return in inline functions
+fn test-unhidden ()
+    let test-unhidden = this-function
+    inline unhidden ()
+        static-assert (this-function != test-unhidden)
+        if true
+            return 1
+        else
+            return 2
+    return 3 (unhidden)
+
+test ((test-unhidden) == 3)
+
+# hidden inline functions use the outer return
+fn test-hidden ()
+    let test-hidden = this-function
+    let hidden =
+        inline "#hidden" ()
+            static-assert (this-function == test-hidden)
+            if true
+                return 1
+            else
+                return 2
+    return 3 (hidden)
+
+test ((test-hidden) == 1)
+
+;

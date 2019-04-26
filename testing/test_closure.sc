@@ -46,7 +46,7 @@ fn test3 ()
         if true
             io-write! "\n"
         else
-            handle_events;
+            this-function;
     handle_events;
 
 dump-spice

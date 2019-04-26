@@ -399,7 +399,6 @@ namespace scopes {
     T(KW_LoopFor, "loop-for") \
     T(KW_None, "none") \
     T(KW_Null, "null") \
-    T(KW_Recur, "recur") \
     T(KW_Splice, "splice") \
     T(KW_True, "true") \
     T(KW_Unquote, "unquote") \
@@ -411,6 +410,7 @@ namespace scopes {
     T(KW_Yield, "yield") \
 
 #define SCOPES_LIBRARY_SPICE_SYMBOLS() \
+    T(KW_Recur, "this-function") \
     T(FN_VaAt, "va@") \
     T(FN_Alignof, "alignof") \
     T(FN_Alloc, "alloc") \
@@ -759,6 +759,7 @@ namespace scopes {
     T(SYM_ListWildcard, "#list") \
     T(SYM_SymbolWildcard, "#symbol") \
     T(SYM_ThisFnCC, "#this-fn/cc") \
+    T(SYM_HiddenInline, "#hidden") \
     \
     T(SYM_Compare, "compare") \
     T(SYM_Size, "size") \

@@ -164,6 +164,7 @@ struct Expander {
         assert(it != EOL);
 
         bool continuing = false;
+        Symbol bind_name = SYM_Unnamed;
         TemplateRef func;
         ValueRef result;
         //Any tryfunc_name = SCOPES_GET_RESULT(unsyntax(it->at));
@@ -181,7 +182,7 @@ struct Expander {
             } else {
                 func = ref(anchor, Template::from(sym));
                 result = func;
-                env->bind(sym, func);
+                bind_name = sym;
             }
             it = it->next;
         } else if (T == TYPE_String) {
@@ -206,9 +207,10 @@ struct Expander {
 
         if (it == EOL) {
             // forward declaration
-            if (T != TYPE_Symbol) {
+            if (bind_name == SYM_Unnamed) {
                 SCOPES_ERROR(SyntaxUnnamedForwardDeclaration);
             }
+            env->bind(bind_name, func);
             return result;
         }
 
@@ -217,9 +219,11 @@ struct Expander {
         it = it->next;
 
         Scope *subenv = Scope::from(env);
-        subenv->bind(KW_Recur, func);
-        // ensure the local scope does not contain special symbols
-        subenv = Scope::from(subenv);
+        if (!func->is_hidden()) {
+            subenv->bind(KW_Recur, func);
+            // ensure the local scope does not contain special symbols
+            subenv = Scope::from(subenv);
+        }
 
         Expander subexpr(subenv, func);
 
@@ -238,6 +242,9 @@ struct Expander {
 
         func->value = SCOPES_GET_RESULT(subexpr.expand_expression(
             ref(anchor, it), false));
+        if (bind_name != SYM_Unnamed) {
+            env->bind(bind_name, func);
+        }
 
         return result;
     }

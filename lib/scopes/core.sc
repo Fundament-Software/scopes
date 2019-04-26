@@ -790,18 +790,32 @@ let list-constructor =
                 sc_argument_list_append newargs (sc_getarg args i)
                 add i 1
 
-run-stage; # 3
+let decons =
+    spice-macro
+        fn (args)
+            raises-compile-error;
+            let argc = (sc_argcount args)
+            verify-count argc 1 2
+            let self = (sc_getarg args 0)
+            let count =
+                if (icmp== argc 2) (unbox-integer (sc_getarg args 1) i32)
+                else 1
+            let block = (sc_expression_new)
+            let retargs = (sc_argument_list_new)
+            loop (i next = 0 self)
+                let expr = `(sc_list_decons next)
+                sc_expression_append block expr
+                spice-quote
+                    let at next = expr
+                sc_argument_list_append retargs at
+                let i = (add i 1)
+                if (icmp== i count)
+                    sc_argument_list_append retargs next
+                    sc_expression_append block retargs
+                    break block
+                _ i next
 
-inline decons (self count)
-    let count =
-        static-branch (none? count)
-            inline () 1
-            inline () count
-    let at next = (sc_list_decons self)
-    _ at
-        static-branch (const.icmp<=.i32.i32 count 1)
-            inline () next
-            inline () (decons next (const.add.i32.i32 count -1))
+run-stage; # 3
 
 inline set-symbols (self values...)
     va-lfold none
@@ -2511,7 +2525,7 @@ fn parse-infix-expr (infix-table lhs state mprec)
                     state
             let nextop-prec = (unpack-infix-op nextop)
             let next-rhs next-state =
-                parse-infix-expr infix-table rhs state nextop-prec
+                this-function infix-table rhs state nextop-prec
             _ next-rhs next-state
 
 let parse-infix-expr =
@@ -2746,7 +2760,7 @@ fn clone-scope-contents (a b)
     if (== parent (nullof Scope))
         return (Scope b a)
     Scope
-        clone-scope-contents parent b
+        this-function parent b
         a
 
 'set-symbols Scope
@@ -3520,7 +3534,7 @@ fn merge-scope-symbols (source target filter)
             return
                 process-keys source target filter
         process-keys source
-            filter-contents parent target filter
+            this-function parent target filter
             filter
     filter-contents source target filter
 
@@ -3668,7 +3682,7 @@ fn gen-vector-reduction (f v sz)
             else
                 # split into even sum and 1
                 let rhs = `(rslice v 1)
-                let rhs = (gen-vector-reduction f rhs (sz - 1))
+                let rhs = (this-function f rhs (sz - 1))
                 break `(f (extractelement v 0) rhs)
 
 let vector-reduce =
@@ -4590,7 +4604,7 @@ fn gen-sugar-matcher (failfunc expr scope params)
                                 else
                                     arg as list
                             spice-unquote
-                                gen-sugar-matcher failfunc arg scope param
+                                this-function failfunc arg scope param
                     repeat (i + 1) rest next varargs
             else
                 hide-traceback;
@@ -4698,7 +4712,7 @@ fn uncomma (l)
             if (empty? l)
                 return (nullof Anchor) '() '()
             let at next = (decons l)
-            let anchor current total = (process next)
+            let anchor current total = (this-function next)
             let anchor = ('anchor at)
             if ((('typeof at) == Symbol) and ((at as Symbol) == ',))
                 if (empty? next)
@@ -5418,7 +5432,7 @@ sugar from (src 'let params...)
         entry as Symbol
         cons
             list sugar-quote entry
-            quotify rest
+            this-function rest
 
     cons let
         .. params...
@@ -5470,7 +5484,7 @@ define-sugar-block-scope-macro static-if
                     let kw = (kw as Symbol)
                     switch kw
                     case 'elseif
-                        process anchor body next-next-expr
+                        this-function anchor body next-next-expr
                     case 'else
                         _ body next-next-expr
                     default
@@ -5483,8 +5497,8 @@ define-sugar-block-scope-macro static-if
                     Value
                         list static-branch
                             'tag `[(list imply cond bool)] ('anchor cond)
-                            cons inline '() body
-                            cons inline '() elseexpr
+                            cons inline "#hidden" '() body
+                            cons inline "#hidden" '() elseexpr
                     anchor
             next-next-expr
     let kw body = (decons expr)
@@ -5511,7 +5525,7 @@ define-sugar-block-scope-macro sugar-if
                     let kw = (kw as Symbol)
                     switch kw
                     case 'elseif
-                        process sugar-scope body next-next-expr
+                        this-function sugar-scope body next-next-expr
                     case 'else
                         _ body next-next-expr
                     default
@@ -6461,7 +6475,7 @@ sugar enum (name values...)
             if (empty? body)
                 '()
             else
-                convert-body body
+                this-function body
 
     let newbody = (convert-body values...)
     if (('typeof name) == Symbol)

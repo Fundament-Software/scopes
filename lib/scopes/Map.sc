@@ -328,8 +328,11 @@ typedef Map < Struct
     inline __countof (self)
         (deref self._count) as usize
 
-    inline __drop (self)
-        clear self
+    fn __drop (self)
+        for i in (range 0:u64 (self._mask + 1:u64))
+            if (valid-slot? self i)
+                __drop (self._keys @ i)
+                __drop (self._values @ i)
         free self._valid
         free self._keys
         free self._values
@@ -358,6 +361,7 @@ typedef Map < Struct
 
 #-------------------------------------------------------------------------------
 
+let _dump = dump
 typedef Set < Struct
     let MinCapacity = 16:u64
     let MinMask = (MinCapacity - 1:u64)
@@ -602,10 +606,13 @@ typedef Set < Struct
     inline __countof (self)
         (deref self._count) as usize
 
-    inline __drop (self)
-        clear self
-        free self._valid
-        free self._keys
+    let __drop =
+        fn "__drop" (self)
+            for i in (range 0:u64 (self._mask + 1:u64))
+                if (valid-slot? self i)
+                    __drop (self._keys @ i)
+            free self._valid
+            free self._keys
 
     inline __typecall (cls opts...)
         static-if (cls == this-type)

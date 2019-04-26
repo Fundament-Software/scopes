@@ -1231,7 +1231,8 @@ static SCOPES_RESULT(TypedValueRef) prove_ReturnTemplate(const ASTContext &ctx, 
         // generate a merge
         return make_merge(ctx, node.anchor(), ctx.frame->label, value);
     } else {
-        assert(!(ctx.frame->original && ctx.frame->original->is_inline()));
+        assert(!ctx.frame->original || !ctx.frame->original->is_inline()
+            || ctx.frame->original->is_hidden());
         // generate a return
         return make_return(ctx, node.anchor(), value);
     }
@@ -3376,43 +3377,50 @@ static SCOPES_RESULT(TypedValueRef) prove_inline_body(const ASTContext &ctx,
     //fn->set_def_anchor(anchor);
     fn->original = ref(anchor, func);
     fn->frame = ref(frame.anchor(), frame);
-    LabelRef label = ref(anchor, Label::from(LK_Inline, func->name));
-    fn->label = label;
+    LabelRef label;
+    if (!func->is_hidden()) {
+        label = ref(anchor, Label::from(LK_Inline, func->name));
+        fn->label = label;
+    }
     fn->boundary = ctx.function;
 
     // inlines may escape caller loops
     ASTContext subctx = ctx.with_frame(fn);
     SCOPES_CHECK_RESULT(prove_inline_arguments(subctx, func->params, nodes));
     ASTContext bodyctx;
-    TypedValueRef result_value = SCOPES_GET_RESULT(
-        prove_block(subctx, label->body, func->value, bodyctx));
-    if (label->merges.empty()) {
-        // label does not need a merge label
-        assert(ctx.block);
-        result_value = SCOPES_GET_RESULT(
-            move_single_merge_value(bodyctx, ctx.block->depth, result_value, "inline return"));
-        ctx.merge_block(label->body);
-        return result_value;
+    if (label) {
+        TypedValueRef result_value = SCOPES_GET_RESULT(
+            prove_block(subctx, label->body, func->value, bodyctx));
+        if (label->merges.empty()) {
+            // label does not need a merge label
+            assert(ctx.block);
+            result_value = SCOPES_GET_RESULT(
+                move_single_merge_value(bodyctx, ctx.block->depth, result_value, "inline return"));
+            ctx.merge_block(label->body);
+            return result_value;
+        } else {
+            if (is_returning(result_value->get_type())) {
+                make_merge(bodyctx, result_value.anchor(), label, result_value);
+            }
+            IDSet valid;
+            SCOPES_CHECK_RESULT(finalize_merges(ctx, label, valid, "inline return"));
+            const Type *rtype = nullptr;
+            const Anchor *last_anchor = result_value.anchor();
+            for (auto merge : label->merges) {
+                rtype = SCOPES_GET_RESULT(merge_value_type("inline return merge",
+                    rtype,
+                    arguments_type_from_typed_values(merge->values),
+                    last_anchor, merge.anchor()));
+                last_anchor = merge.anchor();
+            }
+            rtype = ctx.fix_merge_type(rtype);
+            label->change_type(rtype);
+            merge_back_valid(ctx, valid, label);
+            ctx.append(label);
+            return TypedValueRef(label);
+        }
     } else {
-        if (is_returning(result_value->get_type())) {
-            make_merge(bodyctx, result_value.anchor(), label, result_value);
-        }
-        IDSet valid;
-        SCOPES_CHECK_RESULT(finalize_merges(ctx, label, valid, "inline return"));
-        const Type *rtype = nullptr;
-        const Anchor *last_anchor = result_value.anchor();
-        for (auto merge : label->merges) {
-            rtype = SCOPES_GET_RESULT(merge_value_type("inline return merge",
-                rtype,
-                arguments_type_from_typed_values(merge->values),
-                last_anchor, merge.anchor()));
-            last_anchor = merge.anchor();
-        }
-        rtype = ctx.fix_merge_type(rtype);
-        label->change_type(rtype);
-        merge_back_valid(ctx, valid, label);
-        ctx.append(label);
-        return TypedValueRef(label);
+        return prove(subctx, func->value);
     }
 }
 

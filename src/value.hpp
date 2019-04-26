@@ -276,6 +276,7 @@ struct Template : UntypedValue {
     void set_inline();
     bool is_inline() const;
     void append_param(const ParameterTemplateRef &sym);
+    bool is_hidden() const;
 
     static TemplateRef from(Symbol name, const ParameterTemplates &params = {},
         const ValueRef &value = ValueRef());
