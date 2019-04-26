@@ -38,7 +38,7 @@ typedef Capture
             let env = (malloc (typeof envtuple))
             store envtuple env
             let closure = (tupleof f (env as voidstar))
-            follow closure cls
+            bitcast closure cls
 
 typedef CaptureTemplate
     @@ spice-cast-macro

@@ -15,6 +15,8 @@
 namespace scopes {
 
 struct Error;
+// in error.hpp
+void print_error(const Error *value);
 
 // use this as return type; together with the attribute and the warning-as-error
 // setting above, we get a good trap for any ignores of result values
@@ -36,7 +38,12 @@ struct Result {
     Result(const T &value) : _value(value), _error(nullptr), _ok(true) {}
 
     inline bool ok() const { return _ok; }
-    inline const T &assert_ok() const { assert(_ok); return _value; }
+    inline const T &assert_ok() const {
+        #ifdef SCOPES_DEBUG
+        if (!_ok) { print_error(_error); }
+        #endif
+        assert(_ok); return _value;
+    }
     inline const T &unsafe_extract() const { return _value; }
     inline Error *assert_error() const { assert(!_ok); return _error; }
     inline Error *unsafe_error() const { return _error; }
@@ -56,7 +63,12 @@ struct Result<void> {
     Result(void) : _ok(true) {}
 
     inline bool ok() const { return _ok; }
-    inline void assert_ok() const { assert(_ok); }
+    inline void assert_ok() const {
+        #ifdef SCOPES_DEBUG
+        if (!_ok) { print_error(_error); }
+        #endif
+        assert(_ok);
+    }
     inline Error *assert_error() const { assert(!_ok); return _error; }
     inline Error *unsafe_error() const { return _error; }
 

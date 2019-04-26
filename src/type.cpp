@@ -187,19 +187,24 @@ bool all_plain(const Types &types) {
 }
 
 bool is_plain(const Type *T) {
+repeat:
     switch(T->kind()) {
     case TK_Qualify:
-        return is_plain(cast<QualifyType>(T)->type);
+        T = cast<QualifyType>(T)->type;
+        goto repeat;
     case TK_Pointer:
-        //return is_plain(cast<PointerType>(T)->element_type);
+        T = cast<PointerType>(T)->element_type;
+        goto repeat;
     case TK_Integer:
     case TK_Real:
     case TK_Image:
     case TK_SampledImage:
+    case TK_Function:
         return true;
     case TK_Array:
     case TK_Vector:
-        return is_plain(cast<ArrayLikeType>(T)->element_type);
+        T = cast<ArrayLikeType>(T)->element_type;
+        goto repeat;
     case TK_Tuple:
     case TK_Union:
         return cast<TupleLikeType>(T)->is_plain();
@@ -207,8 +212,6 @@ bool is_plain(const Type *T) {
         return all_plain(cast<ArgumentsType>(T)->values);
     case TK_Typename:
         return cast<TypenameType>(T)->is_plain();
-    case TK_Function:
-        return false;
     }
     return false;
 }

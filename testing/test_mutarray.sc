@@ -1,9 +1,8 @@
 
 using import Array
+using import testing
 
 let TESTSIZE = (1:usize << 16:usize)
-
-run-stage;
 
 let i32Arrayx65536 = (FixedArray i32 TESTSIZE)
 let i32Array = (GrowingArray i32)
@@ -22,7 +21,7 @@ let fullrange = (range TESTSIZE)
 do
     # mutable array with fixed upper capacity
     local a : i32Arrayx65536
-    print a
+    report a
     assert (('capacity a) == TESTSIZE)
     for i in fullrange
         assert ((countof a) == i)
@@ -36,7 +35,7 @@ do
 inline test-array-of-array (Tx Ty)
     do
         dump "test-array-of-array" Tx Ty
-        print "test-array-of-array" Tx Ty
+        report "test-array-of-array" Tx Ty
         # array of array
         let i32Array = Tx
         let i32ArrayArray = Ty
@@ -47,13 +46,13 @@ inline test-array-of-array (Tx Ty)
             for y in (range 16)
                 'append b (x * 16 + y)
         assert ((countof a) == 16)
-        print a
+        report a
         for x b in (enumerate a)
-            print b
+            report b
             assert ((countof b) == 16)
             for y n in (enumerate b)
                 assert ((x * 16 + y) == n)
-    print "done"
+    report "done"
 
 test-array-of-array i32Arrayx16 i32Arrayx16Array
 test-array-of-array i32Arrayx16 i32Arrayx16Arrayx16
@@ -64,7 +63,7 @@ do
     # mutable array with dynamic capacity
     local a : i32Array
         capacity = 12
-    print a
+    report a
     assert (('capacity a) >= 12)
     for i in fullrange
         assert ((countof a) == i)
@@ -125,7 +124,7 @@ do
     va-lifold none verify-element sorted-sequence...
 
 dump "sorting big array"
-print "big sort"
+report "big sort"
 
 fn test-sort ()
     local a : i32Array
@@ -136,9 +135,9 @@ fn test-sort ()
                 i
             else
                 N - i
-    print "sorting big array..."
+    report "sorting big array..."
     'sort a
-    print "done."
+    report "done."
     # verify the array is sorted
     local x = (a @ 0)
     for k in a
@@ -148,3 +147,28 @@ fn test-sort ()
 
 test-sort;
 
+fn test-one ()
+    One.test-refcount-balanced;
+
+    local a : (GrowingArray One)
+    let N = 1000
+    for i in (range N)
+        'append a
+            if ((i % 2) == 0)
+                One i
+            else
+                One (N - i)
+    report "sorting array of ones..."
+    'sort a
+    report "done."
+    # verify the array is sorted
+    local x = ('value (a @ 0))
+    for k in a
+        let x1 = ('value k)
+        test (x1 >= x)
+        x = x1
+    ;
+
+# handling of unique elements
+test-one;
+One.test-refcount-balanced;

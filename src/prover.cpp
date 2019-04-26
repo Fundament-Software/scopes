@@ -1059,6 +1059,18 @@ SCOPES_RESULT(void) map_keyed_arguments(const Anchor *anchor, const TypedValueRe
     return {};
 }
 
+static SCOPES_RESULT(void) verify_tracked(const Type *T) {
+    SCOPES_RESULT_TYPE(void);
+    if (is_plain(T))
+        return {};
+
+    auto uq = try_unique(T);
+    if (uq) return {};
+    auto vq = try_view(T);
+    if (vq) return {};
+    SCOPES_ERROR(UntrackedType, T);
+}
+
 // used by ArgumentList & Call
 static SCOPES_RESULT(TypedValueRef) prove_arguments(
     const ASTContext &ctx, TypedValues &outargs, const Values &values) {
@@ -1075,13 +1087,21 @@ static SCOPES_RESULT(TypedValueRef) prove_arguments(
                 // last argument is appended in full
                 int valcount = get_argument_count(T);
                 for (int j = 0; j < valcount; ++j) {
-                    outargs.push_back(
-                        ExtractArgument::from(value, j));
+                    auto elem = ExtractArgument::from(value, j);
+                    {
+                        SCOPES_TRACE_PROVE_ARG(elem);
+                        SCOPES_CHECK_RESULT(verify_tracked(elem->get_type()));
+                    }
+                    outargs.push_back(elem);
                 }
                 break;
             } else {
                 value = ExtractArgument::from(value, 0);
             }
+        }
+        {
+            SCOPES_TRACE_PROVE_ARG(value);
+            SCOPES_CHECK_RESULT(verify_tracked(value->get_type()));
         }
         outargs.push_back(ref(values[i].anchor(), value));
     }
@@ -1600,12 +1620,46 @@ static SCOPES_RESULT(void) build_deref_move(
     const ASTContext &ctx, const Anchor *anchor, TypedValueRef &val) {
     SCOPES_RESULT_TYPE(void);
     auto T = val->get_type();
+    if (!is_plain(T)) {
+        auto uq = try_unique(T);
+        if (!uq) {
+            SCOPES_ERROR(UniqueValueExpected, T);
+        }
+    }
     auto rq = try_qualifier<ReferQualifier>(T);
     if (rq) {
         SCOPES_CHECK_RESULT(verify_readable(rq, T));
         auto retT = strip_qualifier<ReferQualifier>(T);
         auto call = ref(anchor,
             Call::from(unique_result_type(ctx, retT), g_deref, { val }));
+        ctx.append(call);
+        auto uq = try_unique(T);
+        if (uq) {
+            ctx.move(uq->id, val);
+        }
+        val = call;
+    }
+    return {};
+}
+
+static SCOPES_RESULT(void) build_deref_automove(
+    const ASTContext &ctx, const Anchor *anchor, TypedValueRef &val) {
+    SCOPES_RESULT_TYPE(void);
+    auto T = val->get_type();
+    auto rq = try_qualifier<ReferQualifier>(T);
+    if (rq) {
+        SCOPES_CHECK_RESULT(verify_readable(rq, T));
+        auto retT = strip_qualifier<ReferQualifier>(T);
+        const Type *rtype = nullptr;
+        if (is_unique(T)) {
+            rtype = unique_result_type(ctx, retT);
+        } else if (is_view(T)) {
+            rtype = view_result_type(ctx, retT, val);
+        } else {
+            rtype = retT;
+        }
+        auto call = ref(anchor,
+            Call::from(rtype, g_deref, { val }));
         ctx.append(call);
         auto uq = try_unique(T);
         if (uq) {
@@ -1650,6 +1704,8 @@ static SCOPES_RESULT(void) build_deref_move(
         SCOPES_CHECK_RESULT(build_deref(ctx, call.anchor(), NAME));
 #define MOVE_DEREF(NAME) \
         SCOPES_CHECK_RESULT(build_deref_move(ctx, call.anchor(), NAME));
+#define AUTOMOVE_DEREF(NAME) \
+        SCOPES_CHECK_RESULT(build_deref_automove(ctx, call.anchor(), NAME));
 #define READ_VALUE(NAME) \
         assert(argn < argcount); \
         auto && NAME = values[argn++]; \
@@ -1666,6 +1722,11 @@ static SCOPES_RESULT(void) build_deref_move(
         auto &&_ ## NAME = values[argn++]; \
         DEREF(_ ## NAME); \
         const Type *NAME = _ ## NAME->get_type();
+#define READ_AUTOMOVE_TYPEOF(NAME) \
+        assert(argn < argcount); \
+        auto &&_ ## NAME = values[argn++]; \
+        AUTOMOVE_DEREF(_ ## NAME); \
+        const Type *NAME = _ ## NAME->get_type();
 #define READ_NODEREF_STORAGETYPEOF(NAME) \
         assert(argn < argcount); \
         auto &&_ ## NAME = values[argn++]; \
@@ -1677,7 +1738,13 @@ static SCOPES_RESULT(void) build_deref_move(
         DEREF(_ ## NAME); \
         const Type *typeof_ ## NAME = _ ## NAME->get_type(); \
         const Type *NAME = SCOPES_GET_RESULT(storage_type(typeof_ ## NAME));
-#define MOVE_STORAGETYPEOF(NAME) \
+#define READ_AUTOMOVE_STORAGETYPEOF(NAME) \
+        assert(argn < argcount); \
+        auto &&_ ## NAME = values[argn++]; \
+        AUTOMOVE_DEREF(_ ## NAME); \
+        const Type *typeof_ ## NAME = _ ## NAME->get_type(); \
+        const Type *NAME = SCOPES_GET_RESULT(storage_type(typeof_ ## NAME));
+#define READ_MOVE_STORAGETYPEOF(NAME) \
         assert(argn < argcount); \
         auto &&_ ## NAME = values[argn++]; \
         MOVE_DEREF(_ ## NAME); \
@@ -1877,14 +1944,6 @@ const Type *remap_unique_return_arguments(
     return rt;
 }
 
-SCOPES_RESULT(void) verify_cast_lifetime(const Type *SrcT, const Type *DestT) {
-    SCOPES_RESULT_TYPE(void);
-    if (!is_plain(DestT) && is_plain(SrcT) && !is_view(SrcT)) {
-        SCOPES_ERROR(PlainToUniqueCast, SrcT, DestT);
-    }
-    return {};
-}
-
 static SCOPES_RESULT(TypedValueRef) prove_CallTemplate(
     const ASTContext &ctx, const CallTemplateRef &call) {
     SCOPES_RESULT_TYPE(TypedValueRef);
@@ -2080,20 +2139,14 @@ repeat:
         case FN_Lose: {
             CHECKARGS(1, 1);
             READ_NODEREF_TYPEOF(X);
-            auto uq = try_unique(X);
-            if (!uq) {
-                SCOPES_ERROR(UniqueValueExpected, _X->get_type());
+            if (!is_plain(X)) {
+                auto uq = try_unique(X);
+                if (!uq) {
+                    SCOPES_ERROR(UniqueValueExpected, _X->get_type());
+                }
+                ctx.move(uq->id, call);
             }
-
-            const Type *DestT = SCOPES_GET_RESULT(storage_type(X));
-
-            auto rq = try_qualifier<ReferQualifier>(X);
-            if (rq) {
-                DestT = qualify(DestT, { rq });
-            }
-
-            ctx.move(uq->id, _X);
-            return ARGTYPE1(DestT);
+            return ref(call.anchor(), ArgumentList::from({}));
         } break;
         case FN_Dupe: {
             CHECKARGS(1, 1);
@@ -2102,35 +2155,20 @@ repeat:
                 const Type *DestT = strip_lifetime(X);
                 return ARGTYPE1(DestT);
             } else {
+                auto uq = try_unique(X);
+                if (uq) {
+                    ctx.move(uq->id, call);
+                }
                 const Type *DestT = SCOPES_GET_RESULT(storage_type(X));
-
+                if (!is_plain(DestT)) {
+                    SCOPES_ERROR(DupeUniqueStorage,DestT);
+                }
                 auto rq = try_qualifier<ReferQualifier>(X);
                 if (rq) {
                     DestT = qualify(DestT, { rq });
                 }
                 return ARGTYPE1(DestT);
             }
-        } break;
-        case FN_Track: {
-            CHECKARGS(2, 2);
-            READ_NODEREF_TYPEOF(SrcT);
-            READ_TYPE_CONST(DestT);
-
-            const Type *SDestT = SCOPES_GET_RESULT(storage_type(DestT));
-
-            DestT = strip_qualifiers(DestT);
-
-            if (strip_qualifier<ReferQualifier>(SrcT) != SDestT) {
-                SCOPES_ERROR(IncompatibleStorageTypeForUnique, SrcT, DestT);
-            }
-
-            auto rq = try_qualifier<ReferQualifier>(SrcT);
-            if (rq) {
-                DestT = qualify(DestT, { rq });
-                _DestT = ref(_DestT.anchor(), ConstPointer::type_from(DestT));
-            }
-
-            return NEW_ARGTYPE1(DestT);
         } break;
         case FN_Viewing: {
             for (size_t i = 0; i < values.size(); ++i) {
@@ -2313,21 +2351,31 @@ repeat:
                     }
                 }
 
+                DestT = strip_qualifiers(DestT);
                 bool target_is_plain = is_plain(DestT);
 
-                DestT = strip_qualifiers(DestT);
-                SCOPES_CHECK_RESULT(verify_cast_lifetime(SrcT, DestT));
+                if (is_view(SrcT)) {
+                    DestT = view_result_type(ctx, DestT, _SrcT);
+                } else if (!target_is_plain) {
+                    DestT = unique_result_type(ctx, DestT);
+                }
+
+                auto uq = try_unique(SrcT);
+                if (uq) {
+                    ctx.move(uq->id, call);
+                }
 
                 auto rq = try_qualifier<ReferQualifier>(SrcT);
                 if (rq) {
                     DestT = qualify(DestT, { rq });
-                    _DestT = ref(_DestT.anchor(), ConstPointer::type_from(DestT));
                 }
+                _DestT = ref(_DestT.anchor(), ConstPointer::type_from(DestT));
                 if (_SrcT.isa<Pure>() && target_is_plain) {
                     return TypedValueRef(ref(call.anchor(),
                         PureCast::from(DestT, _SrcT.cast<Pure>())));
                 } else {
-                    return DEP_ARGTYPE1(DestT, _SrcT);
+                    // DestT is already converted, no need to use NEW_ARGTYPE1 or DEP_ARGTYPE1
+                    return ARGTYPE1(DestT);
                 }
             }
         } break;
@@ -2577,9 +2625,12 @@ repeat:
         } break;
         case FN_InsertValue: {
             CHECKARGS(3, 3);
-            READ_TYPEOF(AT);
-            READ_STORAGETYPEOF(ET);
+            READ_AUTOMOVE_TYPEOF(AT);
+            READ_AUTOMOVE_STORAGETYPEOF(ET);
             READ_INT_CONST(idx);
+            if (is_movable(AT) != is_movable(typeof_ET)) {
+                SCOPES_ERROR(MovableTypeMismatch, AT, typeof_ET);
+            }
             auto T = SCOPES_GET_RESULT(storage_type(AT));
             switch(T->kind()) {
             case TK_Array: {
@@ -2598,7 +2649,15 @@ repeat:
                 SCOPES_ERROR(InvalidArgumentTypeForBuiltin, b, T);
             } break;
             }
-            return DEP_ARGTYPE1(AT, _AT, _ET);
+            if (is_movable(AT)) {
+                auto uq_AT = try_unique(AT);
+                if (uq_AT) ctx.move(uq_AT->id, call);
+                auto uq_ET = try_unique(typeof_ET);
+                if (uq_ET) ctx.move(uq_ET->id, call);
+                return NEW_ARGTYPE1(AT);
+            } else {
+                return DEP_ARGTYPE1(AT, _AT, _ET);
+            }
         } break;
         case FN_GetElementRef:
         case FN_GetElementPtr: {
@@ -2658,7 +2717,7 @@ repeat:
         } break;
         case FN_Assign: {
             CHECKARGS(2, 2);
-            MOVE_STORAGETYPEOF(ElemT);
+            READ_MOVE_STORAGETYPEOF(ElemT);
             READ_NODEREF_STORAGETYPEOF(DestT);
             {
                 SCOPES_TRACE_PROVE_ARG(_DestT);
@@ -2684,13 +2743,17 @@ repeat:
         } break;
         case FN_PtrToRef: {
             CHECKARGS(1, 1);
-            READ_TYPEOF(T);
+            READ_AUTOMOVE_TYPEOF(T);
             auto NT = SCOPES_GET_RESULT(ptr_to_ref(T));
             if (is_plain(T) && _T.isa<Pure>()) {
                 return TypedValueRef(
                     ref(call.anchor(), PureCast::from(NT, _T.cast<Pure>())));
             } else {
-                if (!is_unique(T) && !is_view(T)) {
+                auto uq = try_unique(T);
+                if (uq) {
+                    ctx.move(uq->id, call);
+                }
+                if (is_movable(T)) {
                     return NEW_ARGTYPE1(NT);
                 } else {
                     return DEP_ARGTYPE1(NT, _T);
@@ -2705,7 +2768,15 @@ repeat:
                 return TypedValueRef(
                     ref(call.anchor(), PureCast::from(NT, _T.cast<Pure>())));
             } else {
-                return DEP_ARGTYPE1(NT, _T);
+                auto uq = try_unique(T);
+                if (uq) {
+                    ctx.move(uq->id, call);
+                }
+                if (is_movable(T)) {
+                    return NEW_ARGTYPE1(NT);
+                } else {
+                    return DEP_ARGTYPE1(NT, _T);
+                }
             }
         } break;
         case FN_VolatileLoad:
@@ -2738,41 +2809,39 @@ repeat:
         case FN_Alloca: {
             CHECKARGS(1, 1);
             READ_TYPE_CONST(T);
-            return ARGTYPE1(local_pointer_type(T));
+            return NEW_ARGTYPE1(local_pointer_type(T));
         } break;
         case FN_AllocaArray: {
             CHECKARGS(2, 2);
             READ_TYPE_CONST(T);
             READ_STORAGETYPEOF(size);
             SCOPES_CHECK_RESULT(verify_integer(size));
-            return ARGTYPE1(local_pointer_type(T));
+            return NEW_ARGTYPE1(local_pointer_type(T));
         } break;
         case FN_Malloc: {
             CHECKARGS(1, 1);
             READ_TYPE_CONST(T);
-            return ARGTYPE1(native_pointer_type(T));
+            return NEW_ARGTYPE1(native_pointer_type(T));
         } break;
         case FN_MallocArray: {
             CHECKARGS(2, 2);
             READ_TYPE_CONST(T);
             READ_STORAGETYPEOF(size);
             SCOPES_CHECK_RESULT(verify_integer(size));
-            return ARGTYPE1(native_pointer_type(T));
+            return NEW_ARGTYPE1(native_pointer_type(T));
         } break;
         case FN_Free: {
             CHECKARGS(1, 1);
-            READ_STORAGETYPEOF(T);
+            READ_AUTOMOVE_STORAGETYPEOF(T);
             SCOPES_CHECK_RESULT(verify_writable(T));
             if (cast<PointerType>(T)->storage_class != SYM_Unnamed) {
                 SCOPES_ERROR(InvalidArgumentTypeForBuiltin, b, T);
             }
             if (!is_plain(T)) {
                 auto uq = try_unique(T);
-                if (!uq) {
-                    SCOPES_ERROR(UniqueValueExpected, _T->get_type());
+                if (uq) {
+                    ctx.move(uq->id, _T);
                 }
-                SCOPES_CHECK_RESULT(build_drop(ctx, call.anchor(), _T));
-                ctx.move(uq->id, _T);
             }
             return ARGTYPE0();
         } break;
@@ -3145,13 +3214,16 @@ static SCOPES_RESULT(TypedValueRef) prove_If(const ASTContext &ctx, const IfRef 
         //SCOPES_ANCHOR(clause.anchor);
         if (clause.is_then()) {
             TypedValueRef newcond = SCOPES_GET_RESULT(prove(subctx, clause.cond));
-            newcond = ref(newcond.anchor(),
-                ExtractArgument::from(newcond, 0));
-            SCOPES_CHECK_RESULT(build_tobool(ctx, newcond.anchor(), newcond));
-            SCOPES_CHECK_RESULT(build_deref(ctx, newcond.anchor(), newcond));
-            auto condT = strip_qualifiers(newcond->get_type());
-            if (condT != TYPE_Bool) {
-                SCOPES_ERROR(ConditionNotBool, newcond->get_type());
+            {
+                SCOPES_TRACE_PROVE_ARG(newcond);
+                newcond = ref(newcond.anchor(),
+                    ExtractArgument::from(newcond, 0));
+                SCOPES_CHECK_RESULT(build_tobool(ctx, newcond.anchor(), newcond));
+                SCOPES_CHECK_RESULT(build_deref(ctx, newcond.anchor(), newcond));
+                auto condT = strip_qualifiers(newcond->get_type());
+                if (condT != TYPE_Bool) {
+                    SCOPES_ERROR(ConditionNotBool, newcond->get_type());
+                }
             }
             CondBrRef condbr = ref(newcond.anchor(), CondBr::from(newcond));
             if (!first_condbr) {

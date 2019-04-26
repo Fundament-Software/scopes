@@ -14,7 +14,7 @@ fn gen-function ()
     fn () true
 
 # error: constant of type Closure expected, got Call of type Closure
-assert-compiler-error
+test-compiler-error
     (((gen-function)) == true)
 
 inline gen-function2 ()
@@ -28,7 +28,7 @@ inline gen-function4 (x)
 
 fn test-function4 (x)
     # ok: inline captures variable outside scope
-    assert (((gen-function4 x)) == true)
+    test (((gen-function4 x)) == true)
 
 test-function4 true
 
@@ -36,11 +36,11 @@ inline gen-function5 (x)
     fn () x
 
 # ok: function in inline captures constant outside scope
-assert (((gen-function5 true)) == true)
+test (((gen-function5 true)) == true)
 
 fn test-function5 (x)
     # error: non-constant value of type bool is inaccessible from function
-    assert-compiler-error
+    test-compiler-error
         ((gen-function5 x)) == true
 test-function5 true
 

@@ -3,8 +3,6 @@
 
 let u8x4 = (array u8 4)
 
-run-stage;
-
 # an array initialization template
 fn init-array (vals)
     """"initializes the mutable array-like `vals` with four integer elements

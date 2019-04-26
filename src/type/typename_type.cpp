@@ -73,7 +73,9 @@ SCOPES_RESULT(void) TypenameType::complete(const Type *_type, uint32_t _flags) c
 
 bool TypenameType::is_opaque() const { return storage_type == nullptr; }
 bool TypenameType::is_complete() const { return (flags & TNF_Complete) == TNF_Complete; }
-bool TypenameType::is_plain() const { return (flags & TNF_Plain) == TNF_Plain; }
+bool TypenameType::is_plain() const {
+    return is_opaque() || ((flags & TNF_Plain) == TNF_Plain);
+}
 
 const Type *TypenameType::super() const {
     if (!super_type) return TYPE_Typename;

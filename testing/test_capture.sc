@@ -1,5 +1,6 @@
 
 using import Capture
+using import testing
 
 do
     # immutable capture
@@ -13,7 +14,7 @@ do
         + a b u v
 
     fn testf (f)
-        assert ((f 1 2) == (+ 10 20 1 2))
+        test ((f 1 2) == (+ 10 20 1 2))
 
     testf cf
 
@@ -42,9 +43,9 @@ fn make (s a b)
             \ i32 i32
 
 let cf1 = (make true 10 20)
-assert ((cf1 1 2) == (+ 10 20 1 2))
+test ((cf1 1 2) == (+ 10 20 1 2))
 let cf2 = (make false 10 20)
-assert ((cf2 1 2) == (- (+ 10 20 1 2)))
+test ((cf2 1 2) == (- (+ 10 20 1 2)))
 
 # callback arrays
 using import Array

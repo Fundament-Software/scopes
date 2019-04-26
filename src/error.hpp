@@ -276,6 +276,15 @@ formatters:
     T(OpaqueType, \
         "opaque type %0 is non-aggregable, has no size, alignment or storage type, and can not be passed as argument", \
         PType) \
+    T(UntrackedType, \
+        "non-plain type %0 has no unique or view qualifier", \
+        PType) \
+    T(MovableTypeMismatch, \
+        "arguments of type %0 and %1 must both be movable", \
+        PType, PType) \
+    T(DupeUniqueStorage, \
+        "cannot dupe because storage type %0 is unique", \
+        PType) \
     T(IndexOutOfRange, \
         "index %0 is out of range (%1)", \
         int, int) \

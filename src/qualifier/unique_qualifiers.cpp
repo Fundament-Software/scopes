@@ -205,6 +205,10 @@ bool is_unique(const Type *T) {
     return has_qualifier<UniqueQualifier>(T);
 }
 
+bool is_movable(const Type *T) {
+    return is_unique(T) || is_plain(T);
+}
+
 const Type *strip_unique(const Type *T) {
     return strip_qualifier<UniqueQualifier>(T);
 }

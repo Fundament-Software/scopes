@@ -3606,12 +3606,12 @@ let __static-assert =
 let __assert =
     spice-macro
         fn "__assert" (args)
-            fn check-assertion (result msg)
+            inline check-assertion (result anchor msg)
                 if (not result)
-                    hide-traceback;
-                    error
+                    print anchor
                         .. "assertion failed: " msg
-                return;
+                    sc_set_signal_abort true
+                    sc_abort;
 
             let argc = ('argcount args)
             verify-count argc 2 2
@@ -3620,7 +3620,8 @@ let __assert =
                 'getarg args 1
             if (('typeof msg) != string)
                 error "string expected as second argument"
-            'tag `(check-assertion expr msg) ('anchor args)
+            let anchor = ('anchor args)
+            'tag `(check-assertion expr anchor msg) anchor
 
 fn gen-vector-reduction (f v sz)
     if false
@@ -3990,27 +3991,12 @@ let tupleof =
 
             # generate insert instructions
             let TT = (sc_tuple_type argc field-types)
-
-            inline punchvalue (A E i)
-                let AA = (insertvalue A E i)
-                let AA = (follow (dupe AA) (typeof AA))
-                lose A; lose E
-                AA
-
-            if ('plain? TT)
-                loop (i result = 0 `(nullof TT))
-                    if (i == argc)
-                        break result
-                    let arg = ('getarg args i)
-                    _ (i + 1)
-                        `(insertvalue result arg i)
-            else
-                loop (i result = 0 `(nullof TT))
-                    if (i == argc)
-                        break result
-                    let arg = ('getarg args i)
-                    _ (i + 1)
-                        `(punchvalue result arg i)
+            loop (i result = 0 `(nullof TT))
+                if (i == argc)
+                    break result
+                let arg = ('getarg args i)
+                _ (i + 1)
+                    `(insertvalue result arg i)
 
 #-------------------------------------------------------------------------------
 # arrays
@@ -4751,6 +4737,7 @@ define spice
                                         [`sc_getarg ('tag `args ('anchor paramv)) i];
                                 body
                     repeat (i + 1) rest body (| varargs variadic?)
+                let anchor = ('anchor name)
                 let content =
                     cons (list args)
                         'tag
@@ -4759,20 +4746,21 @@ define spice
                                     [verify-count] ([`sc_argcount args])
                                         [(? varargs (sub paramcount 1) paramcount)]
                                         [(? varargs -1 paramcount)]
-                            'anchor name
+                            anchor
                         body
+                let _fn = ('tag `fn anchor)
                 break
                     if (('typeof name) == Symbol)
                         qq
                             [let name] =
                                 [spice-macro]
-                                    [fn] [(name as Symbol as string)] (args)
+                                    [_fn] [(name as Symbol as string)] (args)
                                         [Value]
                                             [(cons inline content)] args
                     else
                         qq
                             [spice-macro]
-                                [fn name] (args)
+                                [_fn name] (args)
                                     [Value]
                                         [(cons inline content)] args
 
@@ -6220,10 +6208,11 @@ sugar include (args...)
                 error "Struct type constructor not available"
             let cls = (cls as type)
             let argc = ('argcount args...)
-            let st = ('storageof cls)
-            loop (i result = 0 `(nullof st))
+            let block = (sc_expression_new)
+            loop (i result = 0 `(nullof cls))
                 if (i == argc)
-                    break `(follow result cls)
+                    sc_expression_append block result
+                    break block
                 let k v = ('dekey ('getarg args... i))
                 let k =
                     if (k == unnamed) i
@@ -6235,7 +6224,9 @@ sugar include (args...)
                     if (('pointer? ET) and ('refer? ('qualified-typeof v)))
                         `(imply (reftoptr v) ET)
                     else `(imply v ET)
-                _ (i + 1) `(insertvalue result v k)
+                let expr = `(insertvalue result v k)
+                sc_expression_append block expr
+                _ (i + 1) expr
 
 # C structs
 #-------------------------------------------------------------------------------
@@ -6248,9 +6239,11 @@ sugar include (args...)
                 error "CStruct type constructor is deprecated"
             let cls = (cls as type)
             let argc = ('argcount args...)
+            let block = (sc_expression_new)
             loop (i result = 0 `(nullof cls))
                 if (i == argc)
-                    break result
+                    sc_expression_append block result
+                    break block
                 let k v = ('dekey ('getarg args... i))
                 let k =
                     if (k == unnamed) i
@@ -6262,7 +6255,9 @@ sugar include (args...)
                     if (('pointer? ET) and ('refer? ('qualified-typeof v)))
                         `(imply (reftoptr v) ET)
                     else `(imply v ET)
-                _ (i + 1) `(insertvalue result v k)
+                let expr = `(insertvalue result v k)
+                sc_expression_append block expr
+                _ (i + 1) expr
 
 sugar struct (name body...)
     spice finalize-struct (T)

@@ -18,7 +18,7 @@ inline Y (func T)
     func T
 
 inline N (func T)
-    assert-compiler-error
+    test-compiler-error
         func T
 
 # feature matrix syntax sugar

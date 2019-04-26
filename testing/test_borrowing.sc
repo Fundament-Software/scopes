@@ -8,7 +8,7 @@ typedef Handle :: i32
     @@ spice-quote
     inline new-handle (idx)
         refcount += 1
-        follow idx this-type
+        bitcast idx this-type
 
     @@ spice-quote
     inline __typecall (cls idx)
@@ -58,7 +58,7 @@ run-stage;
 
 # function type constructor canonicalizes types
 fn verify-signature (Ta Tb)
-    assert (Ta == Tb)
+    test (Ta == Tb)
         .. (repr Ta) "==" (repr Tb)
     print Ta "==" Tb
 
@@ -96,11 +96,11 @@ inline test-refcount (f)
         return;
     if (refcount != 0)
         print "pre-refcount should be zero but is" (deref refcount)
-    assert (refcount == 0)
+    test (refcount == 0)
     testfunc;
     if (refcount != 0)
         print "post-refcount should be zero but is" (deref refcount)
-    assert (refcount == 0)
+    test (refcount == 0)
 
 # receives handle but doesn't do anything with it:
     void<-(%1:Handle)(*)
@@ -136,7 +136,7 @@ test-refcount (inline () (f (Handle 1)))
 fn f (h)
     let hh = (do h)
     h
-assert-error (typify f Handle)
+test-error (typify f Handle)
 
 # receives no arguments and returns new handle
     R1:Handle<-()(*)
@@ -239,7 +239,7 @@ test-refcount (inline ()
 fn f (a b x)
     if x (view a)
     else b
-assert-error (typify f Handle Handle bool)
+test-error (typify f Handle Handle bool)
 
 # receives a handle and casts a view to i32
     %1:i32<-(%1:Handle)(*)
@@ -248,18 +248,25 @@ fn f (h)
 verify-type (typify f Handle) Vi321 VHandle1
 test-refcount (inline () (f (Handle 1)) (_))
 
-# receives a handle and loses it, then back to Handle
+# receives a handle and dupes it, then creates a new Handle
     i32<-(1:Handle)(*)
 fn f (h)
-    follow (lose h) Handle
+    bitcast (dupe h) Handle
 verify-type (typify f Handle) UHandleR1 UHandle1
 test-refcount (inline () (f (Handle 1)) (_))
 
-# receives a handle, casts it to i32 and back to Handle
+# receives a handle, casts a view to i32 and back to Handle
     %1:Handle<-(%1:Handle)(*)
 fn f (h)
-    bitcast (bitcast h i32) Handle
+    bitcast (bitcast (view h) i32) Handle
 verify-type (typify f Handle) VHandle1 VHandle1
+test-refcount (inline () (f (Handle 1)) (_))
+
+# receives a handle, casts it to i32 and back to Handle
+    R1:Handle<-(1:Handle)(*)
+fn f (h)
+    bitcast (bitcast h i32) Handle
+verify-type (typify f Handle) UHandleR1 UHandle1
 test-refcount (inline () (f (Handle 1)) (_))
 
 # receives four handles and conditionally returns one, switch version
@@ -303,7 +310,7 @@ fn f (a b)
     ff b
     dump b
     a
-assert-error (typify f Handle Handle)
+test-error (typify f Handle Handle)
 
 # attempting to move a parent value into a switch pass
     error: skippable switch pass moved value of type 1000:Handle which is from a parent scope
@@ -318,7 +325,7 @@ fn f ()
     case 3
     default
         _;
-assert-error (typify f)
+test-error (typify f)
 
 # creating a local unique in a switch pass
     void <- ()
@@ -404,17 +411,22 @@ fn f (x y)
             break x
         move y
         repeat x (i + 1)
-assert-error (typify f Handle Handle)
+test-error (typify f Handle Handle)
 
-# receive a handle, stop following it and return a copy of its storage
+# receive a handle, stop following it
 fn f (x)
     lose x
-verify-type (typify f Handle) i32 UHandle1
+verify-type (typify f Handle) void UHandle1
 
 # receive a handle and make a copy of its storage
 fn f (x)
-    dupe x
+    dupe (view x)
 verify-type (typify f Handle) i32 VHandle1
+
+# receive a handle and convert it to storage
+fn f (x)
+    dupe x
+verify-type (typify f Handle) i32 UHandle1
 
 # allocate a mutable reference from constructor and from another handle
     and make a bunch of mutations
@@ -441,15 +453,10 @@ inline swapvalue (a b i)
     """"swap out element #i from collection `a` with `b`
     # returns a view
     let oldb = (extractvalue a i)
-    # also returns a view
-    let newa = (insertvalue a b i)
-    # turn views to new uniques
-    let newa = (follow (dupe newa) (typeof newa))
-    let oldb = (follow (dupe oldb) (typeof oldb))
-    # forget unique a, preventing a double free
-    lose a
-    # forget unique b, as it's part of newval now
-    lose b
+    # turn old view to new unique
+    let oldb = (bitcast (dupe oldb) (typeof oldb))
+    # moves a and b, leaks existing value
+    let newa = (insertvalue (move a) (move b) i)
     # return new collection and old element
     _ newa oldb
 

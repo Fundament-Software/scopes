@@ -97,6 +97,7 @@ const ViewQualifier *get_view(const Type *T);
 const ViewQualifier *try_view(const Type *T);
 
 bool is_unique(const Type *T);
+bool is_movable(const Type *T);
 const Type *strip_unique(const Type *T);
 const UniqueQualifier *get_unique(const Type *T);
 const UniqueQualifier *try_unique(const Type *T);

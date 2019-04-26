@@ -31,7 +31,7 @@ fn test-inline-loop ()
 test-inline-loop;
 
 # maximum number of compile time recursions exceeded
-assert-compiler-error
+test-compiler-error
     do
         fn test-inline-loop ()
             inline finite-loop (x)
@@ -43,7 +43,7 @@ assert-compiler-error
         test-inline-loop;
 
 # maximum number of compile time recursions exceeded
-assert-compiler-error
+test-compiler-error
     do
         fn test-template-loop (x ...)
             if (x < 100)
@@ -60,7 +60,7 @@ fn test-late-head-recursion (x)
     else
         (test-late-head-recursion (x + 1)) * 2
 
-assert ((test-late-head-recursion 0) == 16777216)
+test ((test-late-head-recursion 0) == 16777216)
 
 fn test-early-head-recursion (x)
     # tag return type
@@ -70,7 +70,7 @@ fn test-early-head-recursion (x)
         (test-early-head-recursion (x + 1)) * 2
     else 1
 
-assert ((test-early-head-recursion 0) == 16777216)
+test ((test-early-head-recursion 0) == 16777216)
 
 fn test-hidden-infinite-recursion (x)
     if (x != 24)
@@ -81,7 +81,7 @@ fn test-hidden-infinite-recursion (x)
         (test-hidden-infinite-recursion (x + 1)) * 2
 
 # non-returning expression isn't last expression in sequence
-assert-compiler-error
+test-compiler-error
     do
         test-hidden-infinite-recursion 0
         print "ok"

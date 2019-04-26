@@ -4,18 +4,18 @@ using import testing
 # define opaque type MyType
 typedef MyType
 
-assert ((typeof MyType) == type)
+test ((typeof MyType) == type)
 
 # define MyHandleType as borrow checked handle of 32-bit integer storage type
 typedef MyHandleType :: i32
 
-assert (('storageof MyHandleType) == i32)
+test (('storageof MyHandleType) == i32)
 
 # define MyIntType as plain 32-bit integer type with integer supertype
 typedef MyIntType < integer : i32
 
-assert (('storageof MyIntType) == i32)
-assert (MyIntType < integer)
+test (('storageof MyIntType) == i32)
+test (MyIntType < integer)
 
 let name = "RuntimeType"
 let RuntimeType =
@@ -23,9 +23,9 @@ let RuntimeType =
     typedef [name] < [(opaque "new")] : i32
         inline func () true
 
-assert (not (constant? RuntimeType))
+test (not (constant? RuntimeType))
 
-assert-compiler-error
+test-compiler-error
     'func RuntimeType
 
 typedef K
@@ -55,8 +55,8 @@ typedef MyTupleType < MyTupleSuperType : (tuple i32 i32)
 typedef SelfRefType < tuple : (tuple i32 (pointer this-type))
 static-assert (constant? SelfRefType)
 
-assert (('superof SelfRefType) == tuple)
-assert (('storageof SelfRefType) == (tuple.type i32 (pointer SelfRefType)))
+test (('superof SelfRefType) == tuple)
+test (('storageof SelfRefType) == (tuple.type i32 (pointer SelfRefType)))
 
 do
     let val = (MyTupleType 1 2)
@@ -68,7 +68,7 @@ run-stage;
 print K.x K.y K.keys...
 
 print RuntimeType (superof RuntimeType)
-assert ('func RuntimeType)
+test ('func RuntimeType)
 
 spice make-type (name u v)
     @@ spice-quote

@@ -7,7 +7,7 @@ fn main ()
 
     # force a translation to a C function pointer
     let f = (static-typify testf i32 i32)
-    assert ((f 2 3) == 5)
+    test ((f 2 3) == 5)
     true
 
 dump-spice
@@ -29,9 +29,9 @@ fn testf (x y)
 let z =
     call_testfunc testf 2 3
 print z
-assert (z == 5)
+test (z == 5)
 
-assert-error
+test-error
     print
         as
             compile (typify ((fn (x) x) as Closure) i32)

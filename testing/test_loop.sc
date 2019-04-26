@@ -10,7 +10,7 @@ let x =
                 _ (i + 1) k
             else
                 break i
-assert (x == 64)
+test (x == 64)
 
 # while loop
 local i = 10
@@ -90,9 +90,9 @@ fn looper ()
             return false
     true
 
-assert (not (looper))
+test (not (looper))
 
-assert-compiler-error
+test-compiler-error
     embed
         # loop that never breaks
         loop (i = 0)

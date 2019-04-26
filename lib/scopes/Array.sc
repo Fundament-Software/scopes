@@ -16,9 +16,11 @@ let llvm.memcpy.p0i8.p0i8.i64 =
         function void (mutable rawstring) rawstring i64 bool
 
 fn swap (a b)
-    local t = b
-    b = a
-    a = t
+    let a = (dupe a)
+    let b = (dupe b)
+    let tmp = (deref b)
+    assign a b
+    assign tmp a
     return;
 
 fn iParent (i)
@@ -333,7 +335,7 @@ typedef GrowingArray < Array
             let old-items = (deref self._items)
             let new-items = (malloc-array T.ElementType new-capacity)
             llvm.memcpy.p0i8.p0i8.i64
-                bitcast new-items (mutable rawstring)
+                bitcast (view new-items) (mutable rawstring)
                 bitcast old-items rawstring
                 (count * (sizeof T.ElementType)) as i64
                 false

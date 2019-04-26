@@ -22,18 +22,18 @@ do
     case using testf
 
     # matches testf (a : i32, b : i32, c : i32)
-    assert ((testf 4 3 2) == 24)
+    test ((testf 4 3 2) == 24)
     # matches testf (a : i32,)
-    assert ((testf 3) == 9)
+    test ((testf 3) == 9)
     # matches testf (a b)
-    assert ((testf 3 2) == 6)
+    test ((testf 3 2) == 6)
 
 
 # error: could not match argument types (i32 i32 i32) to overloaded function
   with types
       λ(i32 Unknown)
       λ(i32)
-assert-compiler-error (testf 4 5 6)
+test-compiler-error (testf 4 5 6)
 
 # prints type
 print testf
@@ -57,24 +57,24 @@ fn... test2
     # signature pattern
     Arguments string
 
-assert ((test2 5) == 10)
-assert ((test2 "hi") == "hihi")
+test ((test2 5) == 10)
+test ((test2 "hi") == "hihi")
 
 fn... test3
 case (a : integer = 3, b = 1, c = -1, d...)
     _ a b c d...
 
-assert ((list (test3)) == (list 3 1 -1))
-assert ((list (test3 5 6 7 8 9 0)) == (list 5 6 7 8 9 0))
+test ((list (test3)) == (list 3 1 -1))
+test ((list (test3 5 6 7 8 9 0)) == (list 5 6 7 8 9 0))
 
 fn... test4
 case (a : integer, b : integer) (_ "int" (a + b))
 case (a : real, b : real) (_ "real" (a + b))
 
-assert ((test4 1 2) == "int")
-assert ((test4 1.0 2.0) == "real")
-assert ((test4 1 2.0) == "real")
-assert ((test4 1.0 2) == "real")
+test ((test4 1 2) == "int")
+test ((test4 1.0 2.0) == "real")
+test ((test4 1 2.0) == "real")
+test ((test4 1.0 2) == "real")
 
 fn... test5
 case (a : &i32,) true
@@ -82,9 +82,9 @@ case (a : i32,) false
 case (a : &real,) 1
 case (a : real,) 2
 
-assert ((test5 1) == false)
+test ((test5 1) == false)
 local y = 2
-assert ((test5 y) == true)
-assert ((test5 1.0) == 2)
+test ((test5 y) == true)
+test ((test5 1.0) == 2)
 local z = 2.0
-assert ((test5 z) == 1)
+test ((test5 z) == 1)

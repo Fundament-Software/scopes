@@ -30,7 +30,7 @@
                 },
                 {
                     "name": "keyword.control.testing.scopes",
-				    "match": "(test-modules|assert-error|assert-compiler-error|features)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
+				    "match": "(test(-modules|-error|-compiler-error)?|features)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
                 }
             ]
 		},

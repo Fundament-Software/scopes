@@ -8,7 +8,7 @@ run-stage;
 # impure compile time operations are only clearly determinable after the
     all-true blocks of a function have gone through, and their
     processing order isn't always clear
-fn test ()
+fn testf ()
     # force branching
     if true
         dump "branch A1"
@@ -23,18 +23,18 @@ fn test ()
         dump "branch B2"
         'define-symbol T 'x 3
 sugar-eval
-    assert
+    test
         do
             try
                 let x = ('@ T 'x)
                 false
             except (x)
                 true
-test;
-assert (T.x == 3)
+testf;
+test (T.x == 3)
 
 # attempting to retype branching expression
-assert-compiler-error
+test-compiler-error
     do
         fn test (x)
             print
@@ -46,7 +46,7 @@ assert-compiler-error
         test true
 
 # attempting to return polymorphic results from runtime-conditional branches
-assert-compiler-error
+test-compiler-error
     do
         fn test ()
             let k =

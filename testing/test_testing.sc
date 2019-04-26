@@ -10,19 +10,22 @@ spice cause-compiler-error (msg)
 
 run-stage;
 
-assert-compiler-error
-    cause-compiler-error "this is a compiler error!"
-assert-error
-    error "this is a runtime error!"
-assert-compiler-error (1 == "test")
-assert-error
-    assert-compiler-error (1 == 1)
+test-error
+    test false
 
-assert-error
-    assert-compiler-error
+test-compiler-error
+    cause-compiler-error "this is a compiler error!"
+test-error
+    error "this is a runtime error!"
+test-compiler-error (1 == "test")
+test-error
+    test-compiler-error (1 == 1)
+
+test-error
+    test-compiler-error
         error "this is a runtime error!"
-assert-compiler-error
-    assert-error
+test-compiler-error
+    test-error
         cause-compiler-error "this is a compiler error!"
 
 print "ok."

@@ -29,7 +29,7 @@ do
 
     # this case is illegal
     # error: non-constant value of type String is inaccessible from function
-    assert-compiler-error
+    test-compiler-error
         ascope.somefunc;
 
 true

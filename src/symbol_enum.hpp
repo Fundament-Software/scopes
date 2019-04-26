@@ -238,7 +238,6 @@ namespace scopes {
     T(FN_MallocArray, "malloc-array") \
     T(FN_Dupe, "dupe") \
     T(FN_Copy, "copy") \
-    T(FN_Track, "follow") \
     T(FN_Move, "move") \
     T(FN_View, "view") \
     T(FN_Viewing, "viewing") \

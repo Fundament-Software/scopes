@@ -1277,7 +1277,6 @@ struct LLVMIRGenerator {
             return LLVMBuildShuffleVector(builder, v1, v2, mask, "");
         } break;
         case FN_View:
-        case FN_Lose:
         case FN_Dupe:
         case FN_Move: {
             READ_VALUE(val);
@@ -1327,7 +1326,6 @@ struct LLVMIRGenerator {
             }
             return LLVMBuildGEP(builder, pointer, indices, count, "");
         } break;
-        case FN_Track:
         case FN_Bitcast: { READ_VALUE(val); READ_TYPE(ty);
             auto T = LLVMTypeOf(val);
             if (T == ty) {
