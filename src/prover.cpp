@@ -3387,8 +3387,8 @@ static SCOPES_RESULT(TypedValueRef) prove_inline_body(const ASTContext &ctx,
     // inlines may escape caller loops
     ASTContext subctx = ctx.with_frame(fn);
     SCOPES_CHECK_RESULT(prove_inline_arguments(subctx, func->params, nodes));
-    ASTContext bodyctx;
     if (label) {
+        ASTContext bodyctx;
         TypedValueRef result_value = SCOPES_GET_RESULT(
             prove_block(subctx, label->body, func->value, bodyctx));
         if (label->merges.empty()) {
@@ -3420,6 +3420,7 @@ static SCOPES_RESULT(TypedValueRef) prove_inline_body(const ASTContext &ctx,
             return TypedValueRef(label);
         }
     } else {
+        fn->label = ctx.frame->label;
         return prove(subctx, func->value);
     }
 }
