@@ -142,7 +142,6 @@ do
         value : i32
 
         inline __drop (self)
-            print "dropping"
             drop_count += 1
             super-type.__drop self
 
@@ -152,7 +151,19 @@ do
 
     let parent = (Parent)
     ;
-print (deref drop_count)
 test (drop_count == 2)
+
+
+# default values
+struct Defaults
+    x : (1 + 2)
+    y : i32 = 4:i8
+    z : 5
+
+let val = (Defaults)
+test (val.x == 3)
+test (val.y == 4)
+test (val.z == 5)
+
 
 none

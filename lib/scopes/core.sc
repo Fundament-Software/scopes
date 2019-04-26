@@ -5742,6 +5742,9 @@ sugar fold-locals (args...)
         sc_expression_append block expr
         repeat key expr
 
+let StructField = (typename "StructField")
+'set-plain-storage StructField (storageof type)
+
 run-stage; # 10
 
 #-------------------------------------------------------------------------------
@@ -6064,15 +6067,33 @@ define struct-dsl
     sugar : (name T)
         fn define-field-runtime (T name field-type)
             let fields = ('@ T '__fields__)
-            sc_argument_list_append fields
+            let field-type defaultval =
+                if (('typeof field-type) == type)
+                    _ (field-type as type) `none
+                else
+                    let value = (sc_prove field-type)
+                    if (not ('constant? value))
+                        error@ ('anchor value) "while checking default initializer"
+                            "initializer must be constant"
+                    _ ('typeof value) value
+            let FT = (typename.type
+                (.. "struct-field<" (name as Symbol as string) ":"
+                    (tostring (field-type as type)) ">")
+                typename)
+            'set-opaque FT
+            'set-symbol FT 'Type
                 sc_key_type (name as Symbol) (field-type as type)
+            if (('typeof defaultval) != Nothing)
+                'set-symbol FT 'Default defaultval
+            let FT = `[(bitcast FT StructField)]
+            sc_argument_list_append fields FT
             sc_type_set_symbol T '__fields__ fields
+            FT
 
         spice define-field (struct-type name field-type)
             if ('constant? struct-type)
                 let T = (struct-type as type)
                 define-field-runtime T name field-type
-                `()
             else
                 'tag `(define-field-runtime struct-type `name `field-type)
                     'anchor args
@@ -6237,6 +6258,7 @@ spice destructor (self)
 
 fn constructor (cls args...)
     let cls = (cls as type)
+    let struct-fields = ('@ cls '__fields__)
     let argc = ('argcount args...)
     let numfields = ('element-count cls)
     let fields = (malloc-array Value numfields)
@@ -6273,13 +6295,18 @@ fn constructor (cls args...)
             break block
         let elem =
             if ((load (getelementptr fields i)) == null)
-                # default initializer
-                let ET = (sc_type_element_at cls i)
-                try
-                    sc_prove `(ET)
-                except (err)
-                    error
-                        .. "field " (repr ET) " has no default initializer"
+                let field = ('getarg struct-fields i)
+                let field = (bitcast (field as StructField) type)
+                let elem =
+                    try ('@ field 'Default)
+                    except (err)
+                        # default initializer
+                        let ET = (sc_type_element_at cls i)
+                        try
+                            sc_prove `(ET)
+                        except (err)
+                            error
+                                .. "field " (repr ET) " has no default initializer"
             else
                 load (getelementptr fields i)
         let result = `(insertvalue result elem i)
@@ -6306,6 +6333,27 @@ fn constructor (cls args...)
             constructor cls args...
     __drop = destructor
 
+typedef+ StructField
+    spice setdefault (self other)
+        let self = (bitcast (self as StructField) type)
+        let has-default? =
+            try ('@ self 'Default) true
+            except (err) false
+        if has-default?
+            error@ ('anchor other) "while checking default initializer"
+                "field has a default initializer already"
+        let ET = ('strip-qualifiers (('@ self 'Type) as type))
+        hide-traceback;
+        let val = (sc_prove ('tag `(imply other ET) ('anchor other)))
+        if (not ('constant? val))
+            error@ ('anchor other) "while checking default initializer"
+                "default initializer must be constant"
+        'set-symbol self 'Default val
+        `()
+
+    spice __= (self other)
+        setdefault
+
 sugar struct (name body...)
     spice finalize-struct (T)
         fn finalize-struct-runtime (T)
@@ -6313,7 +6361,9 @@ sugar struct (name body...)
             let numfields = ('argcount field-types)
             let fields = (alloca-array type numfields)
             for i field in (enumerate ('args field-types))
-                (ptrtoref (getelementptr fields i)) = (field as type)
+                let field = (bitcast (field as StructField) type)
+                let field = (('@ field 'Type) as type)
+                (ptrtoref (getelementptr fields i)) = field
             if (T < CUnion)
                 'set-plain-storage T
                     sc_union_type numfields fields
