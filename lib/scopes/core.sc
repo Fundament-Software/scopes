@@ -3455,60 +3455,6 @@ let import =
             'set-symbol scope key module
             _ module scope
 
-""""export locals as a chain of two new scopes: a scope that contains
-    all the constant values in the immediate scope, and a scope that contains
-    the runtime values.
-let locals =
-    sugar-scope-macro
-        fn "locals" (args scope)
-            raising Error
-
-            fn stage-constant? (value)
-                ('pure? value) and (('typeof value) != SpiceMacro)
-
-            let build-local =
-                spice-macro
-                    fn (args)
-                        let constant-scope = (('getarg args 0) as Scope)
-                        let tmp = ('getarg args 1)
-                        let key = ('getarg args 2)
-                        let value = ('getarg args 3)
-                        let keydocstr = (('getarg args 4) as string)
-                        if (stage-constant? value)
-                            let key = (key as Symbol)
-                            'set-symbol constant-scope key value
-                            'set-docstring constant-scope key keydocstr
-                            `none
-                        else
-                            spice-quote
-                                sc_scope_set_symbol tmp key `value
-                                sc_scope_set_docstring tmp key keydocstr
-
-            let build-locals =
-                spice-macro
-                    fn (args)
-                        let scope = (('getarg args 0) as Scope)
-                        let docstr = ('docstring scope unnamed)
-                        let constant-scope = (Scope)
-                        if (not (empty? docstr))
-                            'set-docstring constant-scope unnamed docstr
-                        let tmp = `(Scope constant-scope)
-                        let block = (sc_expression_new)
-                        sc_expression_append block tmp
-                        loop (last-key = unnamed)
-                            let key value = ('next scope last-key)
-                            if (key == unnamed)
-                                sc_expression_append block tmp
-                                return block
-                            #if (not (stage-constant? value))
-                            let keydocstr = ('docstring scope key)
-                            let value = ('tag (sc_extract_argument_new value 0) ('anchor value))
-                            sc_expression_append block
-                                `(build-local constant-scope tmp key value keydocstr)
-                            repeat key
-
-            return `(build-locals scope) scope
-
 #---------------------------------------------------------------------------
 # using
 #---------------------------------------------------------------------------
@@ -5722,6 +5668,8 @@ let
     load-library = sc_load_library
 
 sugar fold-locals (args...)
+    fn stage-constant? (value)
+        ('pure? value) and (('typeof value) != SpiceMacro)
     let scope = sugar-scope
     let _1 _2 = (decons args...)
     let init _2 = (sc_expand _1 _2 sugar-scope)
@@ -5729,14 +5677,32 @@ sugar fold-locals (args...)
     let f = (sc_expand _1 _2 sugar-scope)
     let block = (sc_expression_new)
     sc_expression_append block init
-    loop (last-key outval = unnamed init)
+    let anchor = ('anchor expression)
+    # first go through the constants
+    let outval =
+        loop (last-key outval = unnamed init)
+            let key value = ('next scope last-key)
+            if (key == unnamed)
+                break outval
+            if (stage-constant? value)
+                let docstr = ('docstring scope key)
+                let expr = ('tag `(f outval key docstr value) anchor)
+                sc_expression_append block expr
+                repeat key expr
+            else
+                repeat key outval
+    # then go through the rest
+    loop (last-key outval = unnamed outval)
         let key value = ('next scope last-key)
         if (key == unnamed)
             return block
-        let docstr = ('docstring scope key)
-        let expr = ('tag `(f outval key docstr value) ('anchor expression))
-        sc_expression_append block expr
-        repeat key expr
+        if (not (stage-constant? value))
+            let docstr = ('docstring scope key)
+            let expr = ('tag `(f outval key docstr value) anchor)
+            sc_expression_append block expr
+            repeat key expr
+        else
+            repeat key outval
 
 sugar :: ((name as Symbol))
     let start-expr = next-expr
@@ -5913,6 +5879,62 @@ sugar bind (...)
             [let] (unquote-splice ...) = (unquote-splice next-expr)
             [nop]
         '()
+
+#-------------------------------------------------------------------------------
+# scope export
+#-------------------------------------------------------------------------------
+
+define append-to-scope
+    fn stage-constant? (value)
+        ('pure? value) and (('typeof value) != SpiceMacro)
+
+    spice-macro
+        fn (args)
+            let packedscope = ('getarg args 0)
+            let key = ('getarg args 1)
+            let docstr = ('getarg args 2)
+            let values = ('getarglist args 3)
+            let constant-scope? = ('constant? packedscope)
+            if (constant-scope? & (stage-constant? values))
+                let scope = (packedscope as Scope)
+                let key = (key as Symbol)
+                'set-symbol scope key values
+                'set-docstring scope key (docstr as string)
+                return packedscope
+            # for non-constant values, we need to create a new scope
+            let packedscope =
+                if constant-scope? `(Scope [(packedscope as Scope)])
+                else packedscope
+            if (('argcount values) != 1)
+                let block = (sc_expression_new)
+                let outargs = `(sc_argument_list_new)
+                sc_expression_append block outargs
+                for arg in ('args values)
+                    sc_expression_append block
+                        if (('typeof arg) == Value)
+                            `(sc_argument_list_append outargs ``arg)
+                        else
+                            `(sc_argument_list_append outargs `arg)
+                sc_expression_append block
+                    `('set-symbol packedscope key outargs)
+                sc_expression_append block
+                    `('set-docstring packedscope key docstr)
+                sc_expression_append block packedscope
+                block
+            else
+                spice-quote
+                    'set-symbol packedscope key values
+                    'set-docstring packedscope key docstr
+                    packedscope
+
+""""Export locals as a chain of up to two new scopes: a scope that contains
+    all the constant values in the immediate scope, and a scope that contains
+    the runtime values. If all values in the scope are constant, then the
+    resulting scope will also be constant.
+sugar locals ()
+    spice make-scope ()
+        `[(Scope)]
+    list fold-locals (list make-scope) append-to-scope
 
 #-------------------------------------------------------------------------------
 # typedef

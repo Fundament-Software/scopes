@@ -45,12 +45,31 @@ let somefunc =
 
 dump somefunc
 
+fn unconst (x) x
+
+do
+    let scope =
+        do
+            let x = true
+            locals;
+    static-assert scope.x
+
+# ASSERT OK: no attribute 'x in scope
+test-compiler-error
+    do
+        let scope =
+            do
+                let x y z w = 5 6 7 8
+                unlet x y z
+                locals;
+        scope.z
+
 # ASSERT OK: no attribute 'x in scope
 test-error
     do
         let scope =
             do
-                let x y z = 5 6 7
+                let x y z w = (unconst 5) (unconst 6) (unconst 7) (unconst 8)
                 unlet x y z
                 locals;
         scope.z
