@@ -860,6 +860,7 @@ inline define-symbols (self values...)
 
 'define-symbols Scope
     @ = sc_scope_at
+    local@ = sc_scope_local_at
     next = sc_scope_next
     next-deleted = sc_scope_next_deleted
     docstring = sc_scope_get_docstring
@@ -5742,9 +5743,6 @@ sugar fold-locals (args...)
         sc_expression_append block expr
         repeat key expr
 
-let StructField = (typename "StructField")
-'set-plain-storage StructField (storageof type)
-
 run-stage; # 10
 
 #-------------------------------------------------------------------------------
@@ -6064,45 +6062,97 @@ fn delete (value)
 #-------------------------------------------------------------------------------
 
 define struct-dsl
-    sugar : (name T)
-        fn define-field-runtime (T name field-type)
-            let fields = ('@ T '__fields__)
-            let field-type defaultval =
-                if (('typeof field-type) == type)
-                    _ (field-type as type) `none
-                else
-                    let value = (sc_prove field-type)
-                    if (not ('constant? value))
-                        error@ ('anchor value) "while checking default initializer"
-                            "initializer must be constant"
-                    _ ('typeof value) value
-            let FT = (typename.type
-                (.. "struct-field<" (name as Symbol as string) ":"
-                    (tostring (field-type as type)) ">")
-                typename)
-            'set-opaque FT
-            'set-symbol FT 'Type
-                sc_key_type (name as Symbol) (field-type as type)
-            if (('typeof defaultval) != Nothing)
-                'set-symbol FT 'Default defaultval
-            let FT = `[(bitcast FT StructField)]
-            sc_argument_list_append fields FT
-            sc_type_set_symbol T '__fields__ fields
-            FT
-
-        spice define-field (struct-type name field-type)
-            if ('constant? struct-type)
-                let T = (struct-type as type)
-                define-field-runtime T name field-type
+    let scope = (Scope)
+    fn define-field-runtime (T name field-type default-value)
+        let fields = ('@ T '__fields__)
+        let default-anchor = ('anchor default-value)
+        let field-type = (field-type as type)
+        let field-type default-value =
+            if (field-type == Unknown)
+                let value = (sc_prove default-value)
+                _ ('typeof value) value
+            elseif (('typeof default-value) != Nothing)
+                let value = (sc_prove ('tag
+                    `(imply default-value field-type) default-anchor))
+                _ field-type value
             else
-                'tag `(define-field-runtime struct-type `name `field-type)
-                    'anchor args
+                _ field-type default-value
+        if (not ('constant? default-value))
+            error@ default-anchor "while checking default initializer"
+                "initializer must be constant"
+        let FT = (typename.type
+            (.. "struct-field<" (name as Symbol as string) ":"
+                (tostring (field-type as type)) ">")
+            typename)
+        'set-opaque FT
+        'set-symbol FT 'Type
+            sc_key_type (name as Symbol) (field-type as type)
+        if (('typeof default-value) != Nothing)
+            'set-symbol FT 'Default default-value
+        let FT = `FT
+        sc_argument_list_append fields FT
+        sc_type_set_symbol T '__fields__ fields
+        FT
 
-        let anchor = ('anchor expression)
-        qq [define-field] [('tag `'this-type anchor)] '[name] [T]
+    spice define-field (struct-type name field-type default-value)
+        if ('constant? struct-type)
+            let T = (struct-type as type)
+            define-field-runtime T name field-type default-value
+        else
+            error "struct-type must be constant"
+            #'tag `(define-field-runtime struct-type
+                        `name `field-type `default-value)
+                'anchor args
 
-    define-infix> 70 :
-    locals;
+    fn struct-dsl-list-handler (topexpr env)
+        raises-compile-error;
+        # find parent handler
+        let dslsym = (Symbol "#STRUCT-DSL")
+
+        let parentenv level =
+            loop (env level = env 0)
+                try ('local@ env dslsym)
+                except (err)
+                    repeat ('parent env) (level + 1)
+                break ('parent env) level
+        let handler =
+            ('@ parentenv list-handler-symbol) as SugarMacroFunction
+        #if (level != 1)
+            # we only recognize these forms at the struct root level
+            return (handler topexpr env)
+        let expr next = (decons topexpr)
+        if (('typeof expr) == list)
+            let anchor = ('anchor expr)
+            let expr =
+                sugar-match (expr as list)
+                case ((name as Symbol) ': T)
+                    let newexpr =
+                        qq [define-field] [('tag `'this-type anchor)] '[name] [T] [none]
+                    `newexpr
+                case ((name as Symbol) ': T '= default...)
+                    let newexpr =
+                        qq [define-field] [('tag `'this-type anchor)] '[name] [T]
+                            unquote-splice default...
+                    `newexpr
+                case ((name as Symbol) '= default...)
+                    if (level == 1)
+                        let newexpr =
+                            qq [define-field] [('tag `'this-type anchor)] '[name] [Unknown]
+                                unquote-splice default...
+                        `newexpr
+                    else
+                        return (handler topexpr env)
+                default
+                    return (handler topexpr env)
+            handler (cons expr next) env
+        else
+            handler topexpr env
+
+    'set-symbol scope (Symbol "#STRUCT-DSL") true
+    'set-symbol scope list-handler-symbol
+        box-pointer (static-typify struct-dsl-list-handler list Scope)
+
+    scope
 
 run-stage; # 11
 
@@ -6296,7 +6346,7 @@ fn constructor (cls args...)
         let elem =
             if ((load (getelementptr fields i)) == null)
                 let field = ('getarg struct-fields i)
-                let field = (bitcast (field as StructField) type)
+                let field = (field as type)
                 let elem =
                     try ('@ field 'Default)
                     except (err)
@@ -6333,27 +6383,6 @@ fn constructor (cls args...)
             constructor cls args...
     __drop = destructor
 
-typedef+ StructField
-    spice setdefault (self other)
-        let self = (bitcast (self as StructField) type)
-        let has-default? =
-            try ('@ self 'Default) true
-            except (err) false
-        if has-default?
-            error@ ('anchor other) "while checking default initializer"
-                "field has a default initializer already"
-        let ET = ('strip-qualifiers (('@ self 'Type) as type))
-        hide-traceback;
-        let val = (sc_prove ('tag `(imply other ET) ('anchor other)))
-        if (not ('constant? val))
-            error@ ('anchor other) "while checking default initializer"
-                "default initializer must be constant"
-        'set-symbol self 'Default val
-        `()
-
-    spice __= (self other)
-        setdefault
-
 sugar struct (name body...)
     spice finalize-struct (T)
         fn finalize-struct-runtime (T)
@@ -6361,7 +6390,7 @@ sugar struct (name body...)
             let numfields = ('argcount field-types)
             let fields = (alloca-array type numfields)
             for i field in (enumerate ('args field-types))
-                let field = (bitcast (field as StructField) type)
+                let field = (field as type)
                 let field = (('@ field 'Type) as type)
                 (ptrtoref (getelementptr fields i)) = field
             if (T < CUnion)
