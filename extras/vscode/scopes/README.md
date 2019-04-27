@@ -8,6 +8,10 @@ This is an early release. Right now, only basic syntax highlighting is available
 
 ## Release Notes
 
+### 0.43.0
+
+* Added more keywords relevant to Scopes 0.15
+
 ### 0.42.0
 
 * Added more keywords relevant to Scopes 0.14
