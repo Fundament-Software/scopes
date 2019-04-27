@@ -910,7 +910,7 @@ struct LLVMIRGenerator {
 
         try_info.clear();
 
-        if (fi->has_exception()) {
+        if (!node->raises.empty()) {
             try_info.bb_except = LLVMAppendBasicBlock(func, "except");
             position_builder_at_end(try_info.bb_except);
             if (use_debug_info)

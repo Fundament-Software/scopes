@@ -1821,8 +1821,9 @@ static SCOPES_RESULT(const Type *) get_function_type(const FunctionRef &fn) {
         params.push_back(T);
     }
 
-    const Type *rettype = TYPE_NoReturn;
-    const Anchor *last_anchor = fn.anchor();
+    const Type *rettype = fn->returning_hint;
+    const Anchor *last_anchor =
+        fn->returning_anchor?fn->returning_anchor:fn.anchor();
     for (auto _return : fn->returns) {
         rettype = SCOPES_GET_RESULT(merge_value_type("return", rettype,
             arguments_type_from_typed_values(_return->values),
@@ -1830,8 +1831,9 @@ static SCOPES_RESULT(const Type *) get_function_type(const FunctionRef &fn) {
         last_anchor = _return.anchor();
     }
     rettype = canonical_return_type(fn, rettype);
-    const Type *raisetype = TYPE_NoReturn;
-    last_anchor = fn.anchor();
+    const Type *raisetype = fn->raising_hint;
+    last_anchor =
+        fn->raising_anchor?fn->raising_anchor:fn.anchor();
     for (auto _raise : fn->raises) {
         raisetype = SCOPES_GET_RESULT(merge_value_type("raise", raisetype,
             arguments_type_from_typed_values(_raise->values),
@@ -2180,6 +2182,36 @@ repeat:
                 }
                 param->retype(view_type(param->get_type(), {}));
             }
+            return ref(call.anchor(), ArgumentList::from({}));
+        } break;
+        case FN_Returning: {
+            Types types;
+            for (size_t i = 0; i < values.size(); ++i) {
+                READ_TYPE_CONST(T);
+                types.push_back(T);
+            }
+            auto rtype = arguments_type(types);
+            auto fn = ctx.function;
+            const Anchor *last_anchor =
+                fn->returning_anchor?fn->returning_anchor:fn.anchor();
+            fn->returning_hint = SCOPES_GET_RESULT(merge_value_type("returning",
+                fn->returning_hint, rtype, last_anchor, call.anchor()));
+            fn->returning_anchor = call.anchor();
+            return ref(call.anchor(), ArgumentList::from({}));
+        } break;
+        case FN_Raising: {
+            Types types;
+            for (size_t i = 0; i < values.size(); ++i) {
+                READ_TYPE_CONST(T);
+                types.push_back(T);
+            }
+            auto rtype = arguments_type(types);
+            auto fn = ctx.function;
+            const Anchor *last_anchor =
+                fn->raising_anchor?fn->raising_anchor:fn.anchor();
+            fn->raising_hint = SCOPES_GET_RESULT(merge_value_type("raising",
+                fn->raising_hint, rtype, last_anchor, call.anchor()));
+            fn->raising_anchor = call.anchor();
             return ref(call.anchor(), ArgumentList::from({}));
         } break;
         /*** ARGUMENTS ***/

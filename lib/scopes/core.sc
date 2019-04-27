@@ -305,10 +305,6 @@ let va-rfold va-rifold =
             spice-macro (fn "va-rfold" (args) (va-rfold args false))
             spice-macro (fn "va-rifold" (args) (va-rfold args true))
 
-inline raises-compile-error ()
-    if false
-        error "hidden"
-
 fn type< (T superT)
     sc_type_is_superof superT T
 
@@ -339,8 +335,7 @@ inline type-comparison-func (f)
 let static-error =
     box-spice-macro
         fn "static-error" (args)
-            if false
-                return `()
+            returning Value
             let argcount = (sc_argcount args)
             verify-count argcount 1 1
             let msg = (sc_getarg args 0)
@@ -728,7 +723,7 @@ let static-branch =
 sc_type_set_symbol Value '__typecall
     box-spice-macro
         fn (args)
-            raises-compile-error;
+            raising Error
             let args = (sc_getarglist args 1)
             spice-quote
                 spice-quote
@@ -781,7 +776,7 @@ let cons =
 let list-constructor =
     spice-macro
         fn (args)
-            raises-compile-error;
+            raising Error
             let argc = (sc_argcount args)
             let newargs = (sc_argument_list_new)
             let anchor = (sc_value_anchor args)
@@ -797,7 +792,7 @@ let list-constructor =
 let decons =
     spice-macro
         fn (args)
-            raises-compile-error;
+            raising Error
             let argc = (sc_argcount args)
             verify-count argc 1 2
             let self = (sc_getarg args 0)
@@ -1116,7 +1111,7 @@ inline spice-cast-macro (f)
         no arguments if the cast can not be performed.
     spice-macro
         fn (args)
-            raises-compile-error;
+            raising Error
             let argc = (sc_argcount args)
             verify-count argc 2 2
             let source-type = (unbox-pointer (sc_getarg args 0) type)
@@ -1129,7 +1124,7 @@ inline spice-converter-macro (f)
         returns a quote that performs the cast (f value T)
     spice-macro
         fn (args)
-            raises-compile-error;
+            raising Error
             let argc = (sc_argcount args)
             verify-count argc 2 2
             let self = (sc_getarg args 0)
@@ -1156,7 +1151,7 @@ inline spice-converter-macro (f)
 # integer casting
 
 fn integer-tobool (args)
-    raises-compile-error;
+    raising Error
     let argc = (sc_argcount args)
     verify-count argc 1 1
     let self = (sc_getarg args 0)
@@ -1613,7 +1608,7 @@ inline spice-binary-op-macro (f)
         performed.
     spice-macro
         fn (args)
-            raises-compile-error;
+            raising Error
             let argc = (sc_argcount args)
             verify-count argc 2 2
             let lhs-type = (unbox-pointer (sc_getarg args 0) type)
@@ -1703,7 +1698,7 @@ inline simple-folding-autotype-signed-binary-op (sf uf unboxer)
         box-pointer
             spice-macro
                 fn (args)
-                    raises-compile-error;
+                    raising Error
                     let argc = (sc_argcount args)
                     verify-count argc 3 3
                     let self = (sc_getarg args 0)
@@ -2235,7 +2230,7 @@ let print =
 let report =
     spice-macro
         fn (args)
-            raises-compile-error;
+            raising Error
             let anchor = ('__repr `[('anchor args)])
             spice-quote
                 print anchor args
@@ -2823,7 +2818,7 @@ let Closure->Collector =
 
 # (define name expr ...)
 fn expand-define (expr)
-    raises-compile-error;
+    raising Error
     let defname = ('@ expr)
     let content = ('next expr)
     list let defname '=
@@ -2867,7 +2862,7 @@ let
     sugar-set-scope! =
         sugar-scope-macro
             fn (args sugar-scope)
-                raises-compile-error;
+                raising Error
                 let scope rest = (decons args)
                 return none
                     as scope Scope
@@ -2951,7 +2946,7 @@ run-stage; # 5
 inline make-inplace-let-op (op)
     sugar-macro
         fn expand-infix-let (expr)
-            raises-compile-error;
+            raising Error
             let name value = (decons expr 2)
             qq [let] [name] = ([op] [name] [value])
 
@@ -2976,14 +2971,14 @@ let
     := =
         sugar-macro
             fn expand-infix-let (expr)
-                raises-compile-error;
+                raising Error
                 let name value = (decons expr 2)
                 qq [let] [name] = [value]
     as:= = (make-inplace-let-op as)
     <- =
         sugar-macro
             fn expand-apply (expr)
-                raises-compile-error;
+                raising Error
                 let f args = (decons expr 2)
                 qq ([f] [args])
 
@@ -3270,7 +3265,7 @@ va-lfold none
 let wrap-if-not-run-stage =
     spice-macro
         fn (args)
-            raises-compile-error;
+            raising Error
             let argc = ('argcount args)
             if (argc == 1)
                 let arg = ('getarg args 0)
@@ -3306,7 +3301,7 @@ fn exec-module (expr eval-scope)
         let wrapf =
             spice-quote
                 fn "exec-module-stage" ()
-                    raises-compile-error;
+                    raising Error
                     hide-traceback;
                     wrap-if-not-run-stage (f)
         let wrapf = (sc_typify_template wrapf 0 (undef TypeArrayPointer))
@@ -3466,7 +3461,7 @@ let import =
 let locals =
     sugar-scope-macro
         fn "locals" (args scope)
-            raises-compile-error;
+            raising Error
 
             fn stage-constant? (value)
                 ('pure? value) and (('typeof value) != SpiceMacro)
@@ -3604,12 +3599,12 @@ let using =
 define define-sugar-macro
     sugar-macro
         fn "expand-define-sugar-macro" (expr)
-            raises-compile-error;
+            raising Error
             let name body = (decons expr)
             list define name
                 list sugar-macro
                     cons fn '(args)
-                        list raises-compile-error;
+                        list raising Error
                         body
 
 let __static-assert =
@@ -3649,8 +3644,7 @@ let __assert =
             'tag `(check-assertion expr anchor msg) anchor
 
 fn gen-vector-reduction (f v sz)
-    if false
-        return `[]
+    returning Value
     loop (v sz = v sz)
         # special cases for low vector sizes
         switch sz
@@ -4002,7 +3996,7 @@ let tupleof =
         fn (args)
             let argc = ('argcount args)
             #verify-count argc 0 -1
-            raises-compile-error;
+            raising Error
 
             # build tuple type
             let field-types = (alloca-array type argc)
@@ -4043,7 +4037,7 @@ let tupleof =
             fn "array.__typecall" (args)
                 let argc = ('argcount args)
                 verify-count argc 1 3
-                raises-compile-error;
+                raising Error
                 let cls = (('getarg args 0) as type)
                 if (cls == array)
                     verify-count argc 2 3
@@ -4077,7 +4071,7 @@ let arrayof =
         fn (args)
             let argc = ('argcount args)
             verify-count argc 1 -1
-            raises-compile-error;
+            raising Error
 
             let ET = (('getarg args 0) as type)
             let numvals = (sub argc 1)
@@ -4129,7 +4123,7 @@ fn all? (v)
 inline signed-vector-binary-op (sf uf)
     spice-macro
         fn (args)
-            raises-compile-error;
+            raising Error
             let argc = (sc_argcount args)
             verify-count argc 2 2
             let lhs = ('getarg args 0)
@@ -4300,7 +4294,7 @@ inline vector-binary-op-dispatch (symbol)
             fn "vector.__typecall" (args)
                 let argc = ('argcount args)
                 verify-count argc 1 3
-                raises-compile-error;
+                raising Error
                 let cls = (('getarg args 0) as type)
                 if (cls == vector)
                     verify-count argc 3 3
@@ -4316,7 +4310,7 @@ let vectorof =
         fn (args)
             let argc = ('argcount args)
             verify-count argc 1 -1
-            raises-compile-error;
+            raising Error
 
             let ET = (('getarg args 0) as type)
             let numvals = (sub argc 1)
@@ -4405,7 +4399,7 @@ let extern =
         fn (args)
             let argc = ('argcount args)
             verify-count argc 2 -1
-            raises-compile-error;
+            raising Error
             let name = (('getarg args 0) as Symbol)
             let T = (('getarg args 1) as type)
             loop (i flags storage-class location binding = 2 0:u32 unnamed -1 -1)
@@ -4530,8 +4524,7 @@ inline gen-match-block-parser (handle-case)
             return (cons outexpr (load outnext)) scope
 
 fn gen-sugar-matcher (failfunc expr scope params)
-    if false
-        return `()
+    returning Value
     let params = (params as list)
     let paramcount = (countof params)
     let outexpr = (sc_expression_new)
@@ -4645,7 +4638,7 @@ define sugar
 
     sugar-block-scope-macro
         fn "expand-sugar" (topexpr scope)
-            raises-compile-error;
+            raising Error
             let expr next = (decons topexpr)
             let expr = (expr as list)
             let head expr = (decons expr)
@@ -4713,7 +4706,7 @@ fn uncomma (l)
             total
     if (comma-separated? l)
         fn process (l)
-            raises-compile-error;
+            raising Error
             if (empty? l)
                 return (nullof Anchor) '() '()
             let at next = (decons l)
@@ -4735,7 +4728,7 @@ fn uncomma (l)
 define spice
     sugar-macro
         fn "expand-spice" (expr)
-            raises-compile-error;
+            raising Error
             let name params body =
                 extract-name-params-body expr
             let paramcount = ((countof params) as i32)
@@ -4829,8 +4822,7 @@ fn gen-match-matcher (failfunc expr scope cond)
         TODO:
         (: x T) -> ((typeof input) == T), let x = input
         <unknown symbol> -> unpack as symbol
-    if false
-        return `()
+    returning Value
     let condT = ('typeof cond)
     if (condT == list)
         let cond-anchor = ('anchor cond)
@@ -4867,7 +4859,7 @@ let OverloadedFunction = (typename "OverloadedFunction")
 define va-append-va
     spice-macro
         fn "va-va-append" (args)
-            raises-compile-error;
+            raising Error
             let argc = ('argcount args)
             verify-count argc 1 -1
             let end = ('getarg args 0)
@@ -4882,7 +4874,7 @@ define va-append-va
 define va-empty?
     spice-macro
         fn "va-empty?" (args)
-            raises-compile-error;
+            raising Error
             let argc = ('argcount args)
             'tag `[(argc == 0)] ('anchor args)
 
@@ -4902,7 +4894,7 @@ define va@
 define va-map
     spice-macro
         fn "va-map" (args)
-            #raises-compile-error;
+            #raising Error
             let argc = ('argcount args)
             verify-count argc 1 -1
             let f = ('getarg args 0)
@@ -4923,7 +4915,7 @@ define va-map
 define va-range
     spice-macro
         fn "va-range" (args)
-            #raises-compile-error;
+            #raising Error
             let argc = ('argcount args)
             verify-count argc 1 2
             let a = (('getarg args 0) as i32)
@@ -4946,7 +4938,7 @@ define va-range
 define va-split
     spice-macro
         fn "va-split" (args)
-            raises-compile-error;
+            raising Error
             let argc = ('argcount args)
             verify-count argc 1 -1
             let pos = (('getarg args 0) as i32)
@@ -4968,7 +4960,7 @@ define va-split
 define va-unnamed
     spice-macro
         fn "va-unnamed" (args)
-            raises-compile-error;
+            raising Error
             let argc = ('argcount args)
             verify-count argc 0 -1
             let outargs = (sc_argument_list_new)
@@ -5475,8 +5467,7 @@ inline memo (f) (memocall _memo f)
 
 define-sugar-block-scope-macro static-if
     fn process (anchor body next-expr)
-        if false
-            return '() next-expr
+        returning list list
         let cond body = (decons body)
         let elseexpr next-next-expr =
             if (empty? next-expr)
@@ -5516,8 +5507,7 @@ define-sugar-block-scope-macro static-if
 
 define-sugar-block-scope-macro sugar-if
     fn process (sugar-scope body next-expr)
-        if false
-            return '() next-expr
+        returning list list
         let cond body = (decons body)
         let cond body = (sc_expand cond body sugar-scope)
         let elseexpr next-next-expr =
@@ -5552,7 +5542,7 @@ define-sugar-block-scope-macro sugar-if
         sugar-scope
 
 define-sugar-block-scope-macro @@
-    raises-compile-error;
+    raising Error
     let kw body = (decons expr)
     let anchor = ('anchor kw)
     let head = (kw as Symbol)
@@ -5591,7 +5581,7 @@ define-sugar-block-scope-macro @@
     return (cons result next-expr) sugar-scope
 
 define-sugar-block-scope-macro vvv
-    raises-compile-error;
+    raising Error
     let kw body = (decons expr)
     let head = (kw as Symbol)
     let result next-expr =
@@ -5615,7 +5605,7 @@ define-sugar-block-scope-macro vvv
         sugar-scope
 
 define-sugar-macro decorate-vvv
-    raises-compile-error;
+    raising Error
     let expr decorators = (decons args)
     loop (in out = decorators expr)
         if (empty? in)
@@ -5625,7 +5615,7 @@ define-sugar-macro decorate-vvv
             `[(cons decorator (list out))]
 
 define-sugar-macro decorate-fn
-    raises-compile-error;
+    raising Error
     let fnexpr decorators = (decons args)
     let kw name body = (decons (fnexpr as list) 2)
     let name-is-symbol? = (('typeof name) == Symbol)
@@ -5656,7 +5646,7 @@ let
     decorate-struct = decorate-fn
 
 define-sugar-macro decorate-let
-    raises-compile-error;
+    raising Error
     let letexpr decorators = (decons args)
     let anchor = ('anchor letexpr)
     let letexpr = (letexpr as list)
@@ -6581,9 +6571,7 @@ sugar enum (name values...)
         T
 
     fn convert-body (body)
-        if false
-            # hint return type
-            return '()
+        returning list
         let expr body = (decons body)
         cons
             if (('typeof expr) == Symbol)
@@ -6859,7 +6847,7 @@ fn read-eval-print-loop ()
                     # just print the value
                     @@ spice-quote
                     fn expr ()
-                        raises-compile-error;
+                        raising Error
                         print-bound-names bound-name bound-val
                     let f = (sc_compile (sc_typify_template expr 0 null) 0:u64)
                     let fptr = (f as (pointer (raises (function void) Error)))
@@ -6869,7 +6857,7 @@ fn read-eval-print-loop ()
                     let tmp = (Symbol "#result...")
                     let list-expression =
                         qq
-                            raises-compile-error;
+                            [raising] [Error]
                             [let] [tmp] =
                                 [embed]
                                     unquote-splice user-expr
@@ -6967,7 +6955,7 @@ fn run-main ()
             ;
         exit 0
 
-raises-compile-error;
+raising Error
 hide-traceback;
 run-main;
 

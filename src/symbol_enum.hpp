@@ -225,6 +225,8 @@ namespace scopes {
 
 // list of builtin symbols recognized as intrinsics
 #define SCOPES_BUILTIN_SPICE_SYMBOLS() \
+    T(FN_Returning, "returning") \
+    T(FN_Raising, "raising") \
     T(FN_Branch, "branch") \
     T(FN_Dump, "dump") \
     T(FN_DumpTemplate, "dump-template") \

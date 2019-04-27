@@ -137,7 +137,7 @@ typedef vec-type-accessor
 
     @@ spice-binary-op-macro
     fn __= (lhsT rhsT)
-        raises-compile-error;
+        raising Error
         inline sym-assign (lhs rhs rhvecT assignmask)
             assign (shufflevector lhs (imply rhs rhvecT) assignmask) lhs
         inline asym-assign (lhs rhs rhvecT assignmask expandmask)

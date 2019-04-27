@@ -370,7 +370,11 @@ Function::Function(Symbol _name, const Parameters &_params)
         original(TemplateRef()),
         label(LabelRef()),
         complete(false),
-        nextid(FirstUniquePrivate) {
+        nextid(FirstUniquePrivate),
+        returning_hint(TYPE_NoReturn),
+        raising_hint(TYPE_NoReturn),
+        returning_anchor(nullptr),
+        raising_anchor(nullptr) {
     body.depth = 1;
     int index = 0;
     for (auto param : params) {

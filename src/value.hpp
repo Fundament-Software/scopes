@@ -643,6 +643,10 @@ struct Function : Pure {
     LabelRef label;
     bool complete;
     int nextid;
+    const Type *returning_hint;
+    const Type *raising_hint;
+    const Anchor *returning_anchor;
+    const Anchor *raising_anchor;
 
     Types instance_args;
     void bind(const ValueRef &oldnode, const TypedValueRef &newnode);
