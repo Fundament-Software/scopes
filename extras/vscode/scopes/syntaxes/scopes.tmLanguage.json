@@ -133,7 +133,7 @@
                 },
                 {
                     "name": "support.function.library.scopes",
-				    "match": "(extern|mutable|raises|spice-(cast|binary-op)-macro|memo|memoize|type-factory|(any|all)\\?|error(\\@(\\+)?)?|mix|deref|refof|delete|sign|abs|(infinite-)?range|map|zip|enumerate|unpack|(tuple|vector|array)of|unknownof|va-(append-va|split|map|range|option-branch|(l|r)(i)?fold|empty\\?|types|join|each|each-reversed|key)|imply|forward-imply|forward-as|xpcall|require-from|char|getattr|typeattr|(de)?cons|[rl]?slice|(scope-|block-scope-)?macro|print|report|min|max|clamp|(tie|cond)-const|repr|(none|symbol|list|empty|type|integer|real|pointer|array|vector|extern|tuple|typename|Symbol|function-pointer)\\?|(integer|real|pointer|function|array|tuple|vector|extern|function-pointer|typename)-type\\?)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
+				    "match": "(drop|extern|mutable|raises|spice-(cast|binary-op)-macro|memo|memoize|type-factory|(any|all)\\?|error(\\@(\\+)?)?|mix|deref|refof|delete|sign|abs|(infinite-)?range|map|zip|enumerate|unpack|(tuple|vector|array)of|unknownof|va-(append-va|split|map|range|option-branch|(l|r)(i)?fold|empty\\?|types|join|each|each-reversed|key)|imply|forward-imply|forward-as|xpcall|require-from|char|getattr|typeattr|(de)?cons|[rl]?slice|(scope-|block-scope-)?macro|print|report|min|max|clamp|(tie|cond)-const|repr|(none|symbol|list|empty|type|integer|real|pointer|array|vector|extern|tuple|typename|Symbol|function-pointer)\\?|(integer|real|pointer|function|array|tuple|vector|extern|function-pointer|typename)-type\\?)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
                 },
                 {
                     "name": "support.function.itertools.scopes",

@@ -40,6 +40,10 @@ let square-list = spice-unquote-arguments
 # first we alias u64 to the integer type that can hold a pointer
 let intptr = u64
 
+inline drop (value)
+    __drop value
+    lose value
+
 # pointer comparison as a template function, because we'll compare pointers of many types
 fn ptrcmp!= (t1 t2)
     icmp!= (ptrtoint t1 intptr) (ptrtoint t2 intptr)
@@ -6094,15 +6098,14 @@ define struct-dsl
         sc_type_set_symbol T '__fields__ fields
         FT
 
-    spice define-field (struct-type name field-type default-value)
-        if ('constant? struct-type)
-            let T = (struct-type as type)
-            define-field-runtime T name field-type default-value
-        else
+    spice define-field (struct-type name field-type default-value...)
+        if (not ('constant? struct-type))
             error "struct-type must be constant"
-            #'tag `(define-field-runtime struct-type
-                        `name `field-type `default-value)
-                'anchor args
+        let T = (struct-type as type)
+        let default-value =
+            if (('argcount default-value...) == 0) `none
+            else default-value...
+        define-field-runtime T name field-type default-value
 
     fn struct-dsl-list-handler (topexpr env)
         raises-compile-error;
@@ -6149,6 +6152,7 @@ define struct-dsl
             handler topexpr env
 
     'set-symbol scope (Symbol "#STRUCT-DSL") true
+    'set-symbol scope 'define-field define-field
     'set-symbol scope list-handler-symbol
         box-pointer (static-typify struct-dsl-list-handler list Scope)
 
