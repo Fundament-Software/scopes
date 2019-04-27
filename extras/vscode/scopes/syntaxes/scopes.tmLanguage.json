@@ -18,7 +18,7 @@
 			"patterns": [
                 {
                     "name": "keyword.control.builtin.scopes",
-                    "match": "(_|switch|case|pass|default|run-stage|loop|repeat|break|raise|(square-|curly-)list|inline|(spice-|sugar-)?quote|spice-unquote|unquote-splice|do|embed|(static-|sugar-)?if|elseif|else|return|merge|(un)?let|fn|label|(raw)?call|syntax-log)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
+                    "match": "(_|then|switch|case|pass|default|run-stage|loop|repeat|break|raise|(square-|curly-)list|inline|(spice-|sugar-)?quote|spice-unquote|unquote-splice|do|embed|(static-|sugar-)?if|elseif|else|return|merge|(un)?let|fn|label|(raw)?call|syntax-log)(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
                 },
                 {
                     "name": "keyword.control.library.scopes",

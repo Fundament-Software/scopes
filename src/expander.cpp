@@ -293,6 +293,11 @@ struct Expander {
         return expr;
     }
 
+    bool is_then_token(const ValueRef &name) {
+        auto tok = try_extract_symbol(name);
+        return tok == KW_Then;
+    }
+
     bool is_equal_token(const ValueRef &name) {
         auto tok = try_extract_symbol(name);
         return tok == OP_Set;
@@ -741,18 +746,63 @@ struct Expander {
             //const Anchor *anchor = it->at->anchor();
             SCOPES_CHECK_RESULT(verify_list_parameter_count("branch", it, 1, -1));
             auto branch_anchor = it->at.anchor();
+
+            // check for new form
+            auto new_form = false;
+            {
+                auto subit = it->next;
+                while (subit != EOL) {
+                    if (is_then_token(subit->at)) {
+                        SCOPES_CHECK_RESULT(verify_list_parameter_count(
+                            "branch", it, 2, -1));
+                        new_form = true;
+                        break;
+                    }
+                    subit = subit->next;
+                }
+            }
             it = it->next;
 
-            Expander subexp(env, astscope);
-            assert(it);
-            subexp.next = it->next;
-            ValueRef cond = SCOPES_GET_RESULT(subexp.expand(it->at));
-            it = subexp.next;
+            if (new_form) {
+                Values condvals;
+                assert(it);
+                condvals.reserve(it->count);
+                auto cond_anchor = it->at.anchor();
+                while (it != EOL) {
+                    if (is_then_token(it->at)) {
+                        it = it->next;
+                        break;
+                    }
+                    condvals.push_back(it->at);
+                    it = it->next;
+                }
+                ValueRef condexpr;
+                if (condvals.size() == 1) {
+                    condexpr = condvals[0];
+                } else {
+                    condexpr = ref(cond_anchor,
+                        ConstPointer::list_from(
+                            List::from(&condvals[0], condvals.size())));
+                }
+                Expander subexp(env, astscope);
+                subexp.next = EOL;
+                ValueRef cond = SCOPES_GET_RESULT(subexp.expand(condexpr));
+                subexp.env = Scope::from(env);
+                ifexpr->append_then(cond,
+                    SCOPES_GET_RESULT(
+                        subexp.expand_expression(ref(branch_anchor, it), false)));
+            } else {
+                Expander subexp(env, astscope);
+                assert(it);
+                subexp.next = it->next;
+                ValueRef cond = SCOPES_GET_RESULT(subexp.expand(it->at));
+                it = subexp.next;
 
-            subexp.env = Scope::from(env);
-            ifexpr->append_then(cond,
-                SCOPES_GET_RESULT(
-                    subexp.expand_expression(ref(branch_anchor, it), false)));
+                subexp.env = Scope::from(env);
+                ifexpr->append_then(cond,
+                    SCOPES_GET_RESULT(
+                        subexp.expand_expression(ref(branch_anchor, it), false)));
+            }
         }
 
         it = branches[lastidx];

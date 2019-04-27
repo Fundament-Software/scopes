@@ -387,6 +387,7 @@ namespace scopes {
     T(KW_Continue, "continue") \
     T(KW_Define, "define") \
     T(KW_DumpSyntax, "dump-syntax") \
+    T(KW_Then, "then") \
     T(KW_Else, "else") \
     T(KW_ElseIf, "elseif") \
     T(KW_EmptyList, "empty-list") \
