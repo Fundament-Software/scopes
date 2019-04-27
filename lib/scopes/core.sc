@@ -6720,11 +6720,47 @@ fn read-eval-print-loop ()
     let eval-scope = (Scope global-scope)
     set-autocomplete-scope! eval-scope
 
+    sugar help ((value as Symbol))
+        let val =
+            try
+                '@ sugar-scope value
+            except (err)
+                print "no such symbol in scope"
+                return `()
+        if (('constant? val) and ('typeof val) == Closure)
+            let val = (val as Closure)
+            let docstr = ('docstring val)
+            let tmpl = (sc_closure_get_template val)
+            if (sc_template_is_inline tmpl)
+                sc_write (repr 'inline)
+            else
+                sc_write (repr 'fn)
+            sc_write " "
+            sc_write (value as string)
+            sc_write " ("
+            let count = (sc_template_parameter_count tmpl)
+            for i in (range count)
+                if (i != 0)
+                    sc_write " "
+                let param = (sc_template_parameter tmpl i)
+                sc_write (sc_parameter_name param)
+            sc_write ")\n\n"
+            if (not (empty? docstr))
+                sc_write docstr
+            return `()
+        let docstr = ('docstring sugar-scope value)
+        if (empty? docstr)
+            print "no help available"
+        else
+            sc_write docstr
+        `()
+
     'set-symbols eval-scope
         module-dir = cwd
         module-path = (cwd .. "/<console>.sc")
         module-name = "<console>"
         main-module? = true
+        help = help
         exit =
             typedef (do "Enter 'exit;' or Ctrl+D to exit")
                 inline __typecall () (if true (exit 0))
