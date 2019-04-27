@@ -5747,6 +5747,43 @@ sugar fold-locals (args...)
         sc_expression_append block expr
         repeat key expr
 
+sugar :: ((name as Symbol))
+    let start-expr = next-expr
+    # find end of scope
+    loop (body next-expr = '() next-expr)
+        if (empty? next-expr)
+            error
+                .. "missing `" name " ::` in block"
+        let at next = (decons next-expr)
+        let args =
+            label cont
+                if (('typeof at) == list)
+                    let atlist = (at as list)
+                    let head args = (decons atlist)
+                    if (('typeof head) == Symbol)
+                        if ((head as Symbol) == name)
+                            sugar-match args
+                            case ('::)
+                                merge cont '()
+                            case ((...) '::)
+                                merge cont ...
+                            default
+                                ;
+                repeat (cons at body) next
+        # found tail
+        let anchor = ('anchor at)
+        let body = ('reverse body)
+        let expr =
+            if (not (empty? args))
+                qq [embed]
+                    unquote
+                        'tag (Value (qq [let] (unquote-splice args) =
+                                ([label] [name] (unquote-splice body)))) anchor
+            else
+                qq [label] [name]
+                    unquote-splice body
+        return expr next
+
 run-stage; # 10
 
 #-------------------------------------------------------------------------------
@@ -6256,24 +6293,26 @@ fn constructor (cls args...)
             break block
         let elem =
             if ((load (getelementptr fields i)) == null)
-                label success
-                    label skip
-                        if (('typeof struct-fields) == Nothing)
-                            merge skip
-                        let field = ('getarg struct-fields i)
-                        let field = (field as type)
-                        let elem =
-                            try ('@ field 'Default)
-                            except (err)
-                                merge skip
-                        merge success elem
-                    # default initializer
-                    let ET = (sc_type_element_at cls i)
-                    try
-                        sc_prove `(ET)
+                :: success
+                :: skip
+                if (('typeof struct-fields) == Nothing)
+                    merge skip
+                let field = ('getarg struct-fields i)
+                let field = (field as type)
+                let elem =
+                    try ('@ field 'Default)
                     except (err)
-                        error
-                            .. "field " (repr ET) " has no default initializer"
+                        merge skip
+                merge success elem
+                skip ::
+                # default initializer
+                let ET = (sc_type_element_at cls i)
+                try
+                    sc_prove `(ET)
+                except (err)
+                    error
+                        .. "field " (repr ET) " has no default initializer"
+                success ::
             else
                 load (getelementptr fields i)
         let result = `(insertvalue result elem i)
