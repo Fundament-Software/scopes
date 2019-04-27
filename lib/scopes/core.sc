@@ -6063,101 +6063,6 @@ let global = (gen-allocator-sugar "global" private)
 fn delete (value)
     free (reftoptr value)
 
-#-------------------------------------------------------------------------------
-
-define struct-dsl
-    let scope = (Scope)
-    fn define-field-runtime (T name field-type default-value)
-        let fields = ('@ T '__fields__)
-        let default-anchor = ('anchor default-value)
-        let field-type = (field-type as type)
-        let field-type default-value =
-            if (field-type == Unknown)
-                let value = (sc_prove default-value)
-                _ ('typeof value) value
-            elseif (('typeof default-value) != Nothing)
-                let value = (sc_prove ('tag
-                    `(imply default-value field-type) default-anchor))
-                _ field-type value
-            else
-                _ field-type default-value
-        if (not ('constant? default-value))
-            error@ default-anchor "while checking default initializer"
-                "initializer must be constant"
-        let FT = (typename.type
-            (.. "struct-field<" (name as Symbol as string) ":"
-                (tostring (field-type as type)) ">")
-            typename)
-        'set-opaque FT
-        'set-symbol FT 'Type
-            sc_key_type (name as Symbol) (field-type as type)
-        if (('typeof default-value) != Nothing)
-            'set-symbol FT 'Default default-value
-        let FT = `FT
-        sc_argument_list_append fields FT
-        sc_type_set_symbol T '__fields__ fields
-        FT
-
-    spice define-field (struct-type name field-type default-value...)
-        if (not ('constant? struct-type))
-            error "struct-type must be constant"
-        let T = (struct-type as type)
-        let default-value =
-            if (('argcount default-value...) == 0) `none
-            else default-value...
-        define-field-runtime T name field-type default-value
-
-    fn struct-dsl-list-handler (topexpr env)
-        raises-compile-error;
-        # find parent handler
-        let dslsym = (Symbol "#STRUCT-DSL")
-
-        let parentenv level =
-            loop (env level = env 0)
-                try ('local@ env dslsym)
-                except (err)
-                    repeat ('parent env) (level + 1)
-                break ('parent env) level
-        let handler =
-            ('@ parentenv list-handler-symbol) as SugarMacroFunction
-        #if (level != 1)
-            # we only recognize these forms at the struct root level
-            return (handler topexpr env)
-        let expr next = (decons topexpr)
-        if (('typeof expr) == list)
-            let anchor = ('anchor expr)
-            let expr =
-                sugar-match (expr as list)
-                case ((name as Symbol) ': T)
-                    let newexpr =
-                        qq [define-field] [('tag `'this-type anchor)] '[name] [T] [none]
-                    `newexpr
-                case ((name as Symbol) ': T '= default...)
-                    let newexpr =
-                        qq [define-field] [('tag `'this-type anchor)] '[name] [T]
-                            unquote-splice default...
-                    `newexpr
-                case ((name as Symbol) '= default...)
-                    if (level == 1)
-                        let newexpr =
-                            qq [define-field] [('tag `'this-type anchor)] '[name] [Unknown]
-                                unquote-splice default...
-                        `newexpr
-                    else
-                        return (handler topexpr env)
-                default
-                    return (handler topexpr env)
-            handler (cons expr next) env
-        else
-            handler topexpr env
-
-    'set-symbol scope (Symbol "#STRUCT-DSL") true
-    'set-symbol scope 'define-field define-field
-    'set-symbol scope list-handler-symbol
-        box-pointer (static-typify struct-dsl-list-handler list Scope)
-
-    scope
-
 run-stage; # 11
 
 #-------------------------------------------------------------------------------
@@ -6312,7 +6217,9 @@ spice destructor (self)
 
 fn constructor (cls args...)
     let cls = (cls as type)
-    let struct-fields = ('@ cls '__fields__)
+    let struct-fields =
+        try ('@ cls '__fields__)
+        except (err) `none
     let argc = ('argcount args...)
     let numfields = ('element-count cls)
     let fields = (malloc-array Value numfields)
@@ -6349,18 +6256,24 @@ fn constructor (cls args...)
             break block
         let elem =
             if ((load (getelementptr fields i)) == null)
-                let field = ('getarg struct-fields i)
-                let field = (field as type)
-                let elem =
-                    try ('@ field 'Default)
+                label success
+                    label skip
+                        if (('typeof struct-fields) == Nothing)
+                            merge skip
+                        let field = ('getarg struct-fields i)
+                        let field = (field as type)
+                        let elem =
+                            try ('@ field 'Default)
+                            except (err)
+                                merge skip
+                        merge success elem
+                    # default initializer
+                    let ET = (sc_type_element_at cls i)
+                    try
+                        sc_prove `(ET)
                     except (err)
-                        # default initializer
-                        let ET = (sc_type_element_at cls i)
-                        try
-                            sc_prove `(ET)
-                        except (err)
-                            error
-                                .. "field " (repr ET) " has no default initializer"
+                        error
+                            .. "field " (repr ET) " has no default initializer"
             else
                 load (getelementptr fields i)
         let result = `(insertvalue result elem i)
@@ -6388,6 +6301,46 @@ fn constructor (cls args...)
     __drop = destructor
 
 sugar struct (name body...)
+    fn define-field-runtime (T name field-type default-value)
+        let fields = ('@ T '__fields__)
+        let default-anchor = ('anchor default-value)
+        let field-type = (field-type as type)
+        let field-type default-value =
+            if (field-type == Unknown)
+                let value = (sc_prove default-value)
+                _ ('typeof value) value
+            elseif (('typeof default-value) != Nothing)
+                let value = (sc_prove ('tag
+                    `(imply default-value field-type) default-anchor))
+                _ field-type value
+            else
+                _ field-type default-value
+        if (not ('constant? default-value))
+            error@ default-anchor "while checking default initializer"
+                "initializer must be constant"
+        let FT = (typename.type
+            (.. "struct-field<" (name as Symbol as string) ":"
+                (tostring (field-type as type)) ">")
+            typename)
+        'set-opaque FT
+        'set-symbol FT 'Type
+            sc_key_type (name as Symbol) (field-type as type)
+        if (('typeof default-value) != Nothing)
+            'set-symbol FT 'Default default-value
+        let FT = `FT
+        sc_argument_list_append fields FT
+        sc_type_set_symbol T '__fields__ fields
+        FT
+
+    spice define-field (struct-type name field-type default-value...)
+        if (not ('constant? struct-type))
+            error "struct-type must be constant"
+        let T = (struct-type as type)
+        let default-value =
+            if (('argcount default-value...) == 0) `none
+            else default-value...
+        define-field-runtime T name field-type default-value
+
     spice finalize-struct (T)
         fn finalize-struct-runtime (T)
             let field-types = ('@ T '__fields__)
@@ -6440,6 +6393,34 @@ sugar struct (name body...)
             except (err) false
         else false
 
+    # detect and rewrite top level field forms
+    let body =
+        loop (result body = '() body)
+            if (empty? body)
+                break ('reverse result)
+            let expr next = (decons body)
+            let expr =
+                if (('typeof expr) == list)
+                    let anchor = ('anchor expr)
+                    sugar-match (expr as list)
+                    case ((name as Symbol) ': T)
+                        let newexpr =
+                            qq [define-field] [('tag `'this-type anchor)] '[name] [T]
+                        `newexpr
+                    case ((name as Symbol) ': T '= default...)
+                        let newexpr =
+                            qq [define-field] [('tag `'this-type anchor)] '[name] [T]
+                                unquote-splice default...
+                        `newexpr
+                    case ((name as Symbol) '= default...)
+                        let newexpr =
+                            qq [define-field] [('tag `'this-type anchor)] '[name] [Unknown]
+                                unquote-splice default...
+                        `newexpr
+                    default expr
+                else expr
+            repeat (cons expr result) next
+
     spice init-fields (struct-type)
         fn init-fields-runtime (T)
             sc_type_set_symbol T '__fields__ (sc_argument_list_new)
@@ -6459,7 +6440,8 @@ sugar struct (name body...)
             else
                 qq [typedef] [name] < [supertype] do
         [init-fields] this-type
-        [using] [struct-dsl]
+        inline field (...)
+            [define-field] this-type ...
         [do]
             unquote-splice body
             [fold-locals] this-type [append-to-type]
@@ -6603,7 +6585,7 @@ let e = e:f32
 #-------------------------------------------------------------------------------
 
 unlet _memo dot-char dot-sym ellipsis-symbol symbol-handler-symbol
-    \ list-handler-symbol struct-dsl _Value constructor destructor
+    \ list-handler-symbol _Value constructor destructor
 
 run-stage; # 12
 

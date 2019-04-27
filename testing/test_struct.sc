@@ -38,10 +38,7 @@ test (('storageof T) == (tuple (x = i32) (y = i32)))
 struct AnotherStruct plain
     x : i32
     y : i32
-    static-if true
-        z : i32
-    else
-        w : i32
+    z : i32
 
     static-assert (super-type == CStruct)
 
@@ -156,25 +153,28 @@ do
     ;
 test (drop_count == 2)
 
-
 # default values
 struct Defaults
+    # member with default value
+    w : i32 = 10
+
     # members can be defined conditionally
+        but we must use the explicit form as we're not on the immediate level
     static-if false
-        y : i8 = 9:i8
+        field 'y i8 9:i8
     else
-        y : i32 = 4:i8
+        field 'y i32 4:i8
 
     # when the type is `Unknown`, it will be set from the default value
     z : Unknown = 5
 
-    # shorter syntax that's only permitted on the immediate level
     x = (1 + 2)
 
 let val = (Defaults)
 test (val.x == 3)
 test (val.y == 4)
 test (val.z == 5)
+test (val.w == 10)
 
 
 none
