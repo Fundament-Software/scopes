@@ -2568,7 +2568,7 @@ fn list-handler (topexpr env)
                 let msg = `"while expanding sugar macro"
                 sc_error_append_calltrace err ('tag msg expr-anchor)
                 raise err
-        return (as expr list) env
+        return expr env
     elseif (has-infix-ops? env expr)
         let at next = ('decons expr)
         let expr =
@@ -5595,18 +5595,19 @@ define-sugar-block-scope-macro vvv
     let kw body = (decons expr)
     let head = (kw as Symbol)
     let result next-expr =
-        loop (body next-expr result = body next-expr '())
+        do  #label ok (body next-expr result = body next-expr '())
             if (empty? next-expr)
                 error "expression decorator is not applied to anything"
             let result =
-                cons
+                list
                     if ((countof body) == 1)
                         '@ body
                     else
                         `body
-                    result
             let follow-expr next-next-expr = (decons next-expr)
-            break
+            let follow-expr next-next-expr =
+                sc_expand follow-expr next-next-expr sugar-scope
+            _
                 cons ('tag `'decorate-vvv ('anchor kw)) follow-expr result
                 next-next-expr
     return
@@ -5910,6 +5911,18 @@ sugar fold ((binding...) 'for expr...)
                     repeat (va-append-va (inline () newstate...) (next it...))
                 else
                     break (state)
+
+#-------------------------------------------------------------------------------
+# bind decorator
+#-------------------------------------------------------------------------------
+
+sugar bind (...)
+    inline nop ()
+    return
+        qq [embed]
+            [let] (unquote-splice ...) = (unquote-splice next-expr)
+            [nop]
+        '()
 
 #-------------------------------------------------------------------------------
 # typedef

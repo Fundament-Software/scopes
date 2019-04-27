@@ -54,10 +54,9 @@ do
 do
     # forward label form
 
-    print
-        :: ok
-        merge ok 1 2 3
-        ok (x y z) ::
+    :: ok
+    merge ok 1 2 3
+    ok (x y z) ::
     print x y z
 
     let select1 = (gen-label-merge-test)
