@@ -6838,6 +6838,17 @@ fn read-eval-print-loop ()
                             scope
             scope
 
+        sugar fold-imports ((eval-scope as Scope))
+            let stmt =
+                qq [fold-locals] [eval-scope] [append-to-scope]
+            loop (scope output = sugar-scope '())
+                if (scope == eval-scope)
+                    break (cons embed output)
+                if (scope == null)
+                    break (cons embed output)
+                let expr = (sc_expand stmt '() scope)
+                repeat ('parent scope) (cons expr output)
+
         spice print-bound-names (key vals...)
             let outargs = (sc_argument_list_new)
             for arg in ('args vals...)
@@ -6919,7 +6930,7 @@ fn read-eval-print-loop ()
                             [let] [tmp] =
                                 [embed]
                                     unquote-splice user-expr
-                            [fold-locals] [eval-scope] [append-to-scope]
+                            [fold-imports] [eval-scope]
                             [handle-retargs]
                                 [fold-locals] 0 [count-folds]
                                 \ [counter] [eval-scope] [tmp]
