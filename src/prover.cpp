@@ -3258,8 +3258,8 @@ static SCOPES_RESULT(TypedValueRef) prove_If(const ASTContext &ctx, const IfRef 
     assert(numclauses >= 1);
     CondBrRef first_condbr;
     CondBrRef last_condbr;
-    ASTContext subctx(ctx);
     LabelRef merge_label = make_merge_label(ctx, _if.anchor());
+    ASTContext subctx = ctx.with_block(merge_label->body);
     for (int i = 0; i < numclauses; ++i) {
         auto &&clause = _if->clauses[i];
         //assert(clause.anchor);
@@ -3270,8 +3270,8 @@ static SCOPES_RESULT(TypedValueRef) prove_If(const ASTContext &ctx, const IfRef 
                 SCOPES_TRACE_PROVE_ARG(newcond);
                 newcond = ref(newcond.anchor(),
                     ExtractArgument::from(newcond, 0));
-                SCOPES_CHECK_RESULT(build_tobool(ctx, newcond.anchor(), newcond));
-                SCOPES_CHECK_RESULT(build_deref(ctx, newcond.anchor(), newcond));
+                SCOPES_CHECK_RESULT(build_tobool(subctx, newcond.anchor(), newcond));
+                SCOPES_CHECK_RESULT(build_deref_automove(subctx, newcond, newcond));
                 auto condT = strip_qualifiers(newcond->get_type());
                 if (condT != TYPE_Bool) {
                     SCOPES_ERROR(ConditionNotBool, newcond->get_type());
