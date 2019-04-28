@@ -356,8 +356,8 @@ typedef Map < Struct
                     _capacity = MinCapacity
             self
 
-    unlet slot-valid? unset-slot rehash auto-rehash lookup insert_entry reserve
-        \ erase_pos key-value-generator
+    unlet unset-slot rehash auto-rehash lookup insert_entry reserve
+        \ erase_pos key-value-generator gen-type set-slot valid-slot?
 
 #-------------------------------------------------------------------------------
 
@@ -632,8 +632,8 @@ typedef Set < Struct
                     _capacity = MinCapacity
             self
 
-    unlet slot-valid? unset-slot rehash auto-rehash lookup insert_entry reserve
-        \ erase_pos set-generator
+    unlet unset-slot rehash auto-rehash lookup insert_entry reserve
+        \ erase_pos set-generator valid-slot? gen-type set-slot
 
 do
     let Map MapError Set

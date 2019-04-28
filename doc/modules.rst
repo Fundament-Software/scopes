@@ -12,5 +12,6 @@ Module Reference
    module-glm
    module-glsl
    module-itertools
+   module-Map
    module-spicetools
    module-testing

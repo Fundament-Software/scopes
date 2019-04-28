@@ -76,135 +76,135 @@ and access external variables for shader programs.
    .. builtin:: (texture-samples ...)
 .. type:: isampler1D
 
-   An opaque type of supertype `gsampler1D$3`.
+   A plain type of supertype `gsampler1D$3` and of storage type `<SampledImage <Image ivec4 '1D sampled 'Unknown>>`.
 
 .. type:: isampler1DArray
 
-   An opaque type of supertype `gsampler1DArray$3`.
+   A plain type of supertype `gsampler1DArray$3` and of storage type `<SampledImage <Image ivec4 '1D array sampled 'Unknown>>`.
 
 .. type:: isampler2D
 
-   An opaque type of supertype `gsampler2D$3`.
+   A plain type of supertype `gsampler2D$3` and of storage type `<SampledImage <Image ivec4 '2D sampled 'Unknown>>`.
 
 .. type:: isampler2DArray
 
-   An opaque type of supertype `gsampler2DArray$3`.
+   A plain type of supertype `gsampler2DArray$3` and of storage type `<SampledImage <Image ivec4 '2D array sampled 'Unknown>>`.
 
 .. type:: isampler2DMS
 
-   An opaque type of supertype `gsampler2DMS$3`.
+   A plain type of supertype `gsampler2DMS$3` and of storage type `<SampledImage <Image ivec4 '2D ms sampled 'Unknown>>`.
 
 .. type:: isampler2DMSArray
 
-   An opaque type of supertype `gsampler2DMSArray$3`.
+   A plain type of supertype `gsampler2DMSArray$3` and of storage type `<SampledImage <Image ivec4 '2D array ms sampled 'Unknown>>`.
 
 .. type:: isampler2DRect
 
-   An opaque type of supertype `gsampler2DRect$3`.
+   A plain type of supertype `gsampler2DRect$3` and of storage type `<SampledImage <Image ivec4 'Rect sampled 'Unknown>>`.
 
 .. type:: isampler3D
 
-   An opaque type of supertype `gsampler3D$3`.
+   A plain type of supertype `gsampler3D$3` and of storage type `<SampledImage <Image ivec4 '3D sampled 'Unknown>>`.
 
 .. type:: isamplerBuffer
 
-   An opaque type of supertype `gsamplerBuffer$3`.
+   A plain type of supertype `gsamplerBuffer$3` and of storage type `<SampledImage <Image ivec4 'Buffer sampled 'Unknown>>`.
 
 .. type:: isamplerCube
 
-   An opaque type of supertype `gsamplerCube$3`.
+   A plain type of supertype `gsamplerCube$3` and of storage type `<SampledImage <Image ivec4 'Cube sampled 'Unknown>>`.
 
 .. type:: isamplerCubeArray
 
-   An opaque type of supertype `gsamplerCubeArray$3`.
+   A plain type of supertype `gsamplerCubeArray$3` and of storage type `<SampledImage <Image ivec4 'Cube array sampled 'Unknown>>`.
 
 .. type:: sampler1D
 
-   An opaque type of supertype `gsampler1D$2`.
+   A plain type of supertype `gsampler1D$2` and of storage type `<SampledImage <Image vec4 '1D sampled 'Unknown>>`.
 
 .. type:: sampler1DArray
 
-   An opaque type of supertype `gsampler1DArray$2`.
+   A plain type of supertype `gsampler1DArray$2` and of storage type `<SampledImage <Image vec4 '1D array sampled 'Unknown>>`.
 
 .. type:: sampler2D
 
-   An opaque type of supertype `gsampler2D$2`.
+   A plain type of supertype `gsampler2D$2` and of storage type `<SampledImage <Image vec4 '2D sampled 'Unknown>>`.
 
 .. type:: sampler2DArray
 
-   An opaque type of supertype `gsampler2DArray$2`.
+   A plain type of supertype `gsampler2DArray$2` and of storage type `<SampledImage <Image vec4 '2D array sampled 'Unknown>>`.
 
 .. type:: sampler2DMS
 
-   An opaque type of supertype `gsampler2DMS$2`.
+   A plain type of supertype `gsampler2DMS$2` and of storage type `<SampledImage <Image vec4 '2D ms sampled 'Unknown>>`.
 
 .. type:: sampler2DMSArray
 
-   An opaque type of supertype `gsampler2DMSArray$2`.
+   A plain type of supertype `gsampler2DMSArray$2` and of storage type `<SampledImage <Image vec4 '2D array ms sampled 'Unknown>>`.
 
 .. type:: sampler2DRect
 
-   An opaque type of supertype `gsampler2DRect$2`.
+   A plain type of supertype `gsampler2DRect$2` and of storage type `<SampledImage <Image vec4 'Rect sampled 'Unknown>>`.
 
 .. type:: sampler3D
 
-   An opaque type of supertype `gsampler3D$2`.
+   A plain type of supertype `gsampler3D$2` and of storage type `<SampledImage <Image vec4 '3D sampled 'Unknown>>`.
 
 .. type:: samplerBuffer
 
-   An opaque type of supertype `gsamplerBuffer$2`.
+   A plain type of supertype `gsamplerBuffer$2` and of storage type `<SampledImage <Image vec4 'Buffer sampled 'Unknown>>`.
 
 .. type:: samplerCube
 
-   An opaque type of supertype `gsamplerCube$2`.
+   A plain type of supertype `gsamplerCube$2` and of storage type `<SampledImage <Image vec4 'Cube sampled 'Unknown>>`.
 
 .. type:: samplerCubeArray
 
-   An opaque type of supertype `gsamplerCubeArray$2`.
+   A plain type of supertype `gsamplerCubeArray$2` and of storage type `<SampledImage <Image vec4 'Cube array sampled 'Unknown>>`.
 
 .. type:: usampler1D
 
-   An opaque type of supertype `gsampler1D$4`.
+   A plain type of supertype `gsampler1D$4` and of storage type `<SampledImage <Image uvec4 '1D sampled 'Unknown>>`.
 
 .. type:: usampler1DArray
 
-   An opaque type of supertype `gsampler1DArray$4`.
+   A plain type of supertype `gsampler1DArray$4` and of storage type `<SampledImage <Image uvec4 '1D array sampled 'Unknown>>`.
 
 .. type:: usampler2D
 
-   An opaque type of supertype `gsampler2D$4`.
+   A plain type of supertype `gsampler2D$4` and of storage type `<SampledImage <Image uvec4 '2D sampled 'Unknown>>`.
 
 .. type:: usampler2DArray
 
-   An opaque type of supertype `gsampler2DArray$4`.
+   A plain type of supertype `gsampler2DArray$4` and of storage type `<SampledImage <Image uvec4 '2D array sampled 'Unknown>>`.
 
 .. type:: usampler2DMS
 
-   An opaque type of supertype `gsampler2DMS$4`.
+   A plain type of supertype `gsampler2DMS$4` and of storage type `<SampledImage <Image uvec4 '2D ms sampled 'Unknown>>`.
 
 .. type:: usampler2DMSArray
 
-   An opaque type of supertype `gsampler2DMSArray$4`.
+   A plain type of supertype `gsampler2DMSArray$4` and of storage type `<SampledImage <Image uvec4 '2D array ms sampled 'Unknown>>`.
 
 .. type:: usampler2DRect
 
-   An opaque type of supertype `gsampler2DRect$4`.
+   A plain type of supertype `gsampler2DRect$4` and of storage type `<SampledImage <Image uvec4 'Rect sampled 'Unknown>>`.
 
 .. type:: usampler3D
 
-   An opaque type of supertype `gsampler3D$4`.
+   A plain type of supertype `gsampler3D$4` and of storage type `<SampledImage <Image uvec4 '3D sampled 'Unknown>>`.
 
 .. type:: usamplerBuffer
 
-   An opaque type of supertype `gsamplerBuffer$4`.
+   A plain type of supertype `gsamplerBuffer$4` and of storage type `<SampledImage <Image uvec4 'Buffer sampled 'Unknown>>`.
 
 .. type:: usamplerCube
 
-   An opaque type of supertype `gsamplerCube$4`.
+   A plain type of supertype `gsamplerCube$4` and of storage type `<SampledImage <Image uvec4 'Cube sampled 'Unknown>>`.
 
 .. type:: usamplerCubeArray
 
-   An opaque type of supertype `gsamplerCubeArray$4`.
+   A plain type of supertype `gsamplerCubeArray$4` and of storage type `<SampledImage <Image uvec4 'Cube array sampled 'Unknown>>`.
 
 .. inline:: (iimage1D format)
 .. inline:: (iimage1DArray format)

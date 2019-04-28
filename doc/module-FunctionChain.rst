@@ -44,15 +44,16 @@ Running this program will output:
 
 .. type:: FunctionChain
 
-   A plain type of storage type `_type(*)`.
+   A plain type of storage type `_type<*>`.
 
    .. spice:: (__call ...)
-   .. fn:: (__repr self)
-   .. fn:: (append self f)
+   .. inline:: (__repr self)
+   .. spice:: (__typecall ...)
+   .. inline:: (append self f)
       
       Append function `f` to function chain. When the function chain is called,
       `f` will be called last. The return value of `f` will be ignored.
-   .. fn:: (clear self)
+   .. inline:: (clear self)
       
       Clear the function chain. When the function chain is applied next,
       no functions will be called.
@@ -60,7 +61,7 @@ Running this program will output:
       
       Returns a decorator that appends the provided function to the
       function chain.
-   .. fn:: (prepend self f)
+   .. inline:: (prepend self f)
       
       Prepend function `f` to function chain. When the function chain is called,
       `f` will be called first. The return value of `f` will be ignored.

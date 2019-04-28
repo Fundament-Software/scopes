@@ -8,5 +8,22 @@ runtime values outside of the function.
 
    An opaque type.
 
+   .. inline:: (__call self args...)
+   .. inline:: (__drop self)
+   .. inline:: (__typecall cls args...)
+   .. inline:: (make-type ...)
+.. type:: CaptureTemplate
+
+   An opaque type.
+
+   .. spice:: (__imply ...)
+   .. inline:: (build-instance self f)
+   .. inline:: (instance self types...)
+   .. inline:: (typify-function cls types...)
+.. type:: SpiceCapture
+
+   An opaque type.
+
 .. sugar:: (capture ...)
+.. sugar:: (decorate-capture ...)
 .. sugar:: (spice-capture ...)

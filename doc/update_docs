@@ -13,6 +13,8 @@ echo "generating core..." \
     && ./build_reference.sc glsl > module-glsl.rst \
     && echo "generating itertools..." \
     && ./build_reference.sc itertools > module-itertools.rst \
+    && echo "generating Map..." \
+    && ./build_reference.sc Map > module-Map.rst \
     && echo "generating spicetools..." \
     && ./build_reference.sc spicetools > module-spicetools.rst \
     && echo "generating testing..." \

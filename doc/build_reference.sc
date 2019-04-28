@@ -100,6 +100,7 @@ fn write-docstring (tab str)
                 io-write! tab
 
 fn print-entry (module parent key entry parent-name opts...)
+    let print-entry = this-function
     let typemember? = ((typeof parent) == type)
     let sym = key
     let key = (key as string)

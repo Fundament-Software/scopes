@@ -352,7 +352,7 @@ parses the command-line and optionally enters the REPL.
    A constant of type `i32`.
 .. type:: Anchor
 
-   A plain type of storage type `_Anchor(*)`.
+   A plain type of storage type `_Anchor<*>`.
 
 .. type:: Arguments
 
@@ -384,6 +384,7 @@ parses the command-line and optionally enters the REPL.
 
    An opaque type.
 
+   .. spice:: (__drop ...)
    .. builtin:: (__getattr ...)
    .. spice:: (__typecall ...)
 .. type:: CUnion
@@ -394,7 +395,7 @@ parses the command-line and optionally enters the REPL.
    .. inline:: (__typecall cls)
 .. type:: Closure
 
-   A plain type of storage type `_Closure(*)`.
+   A plain type of storage type `_Closure<*>`.
 
    .. spice:: (__!= ...)
    .. spice:: (__== ...)
@@ -405,7 +406,7 @@ parses the command-line and optionally enters the REPL.
       An external function of type ``String<-(Closure)``.
 .. type:: Collector
 
-   A plain type of storage type `_Closure(*)`.
+   A plain type of storage type `_Closure<*>`.
 
    .. spice:: (__call ...)
    .. inline:: (__typecall cls init valid? at collect)
@@ -415,7 +416,7 @@ parses the command-line and optionally enters the REPL.
 
 .. type:: Error
 
-   A plain type of storage type `_Error(*)`.
+   A plain type of storage type `_Error<*>`.
 
 .. type:: Generator
 
@@ -513,7 +514,7 @@ parses the command-line and optionally enters the REPL.
    .. inline:: (__tobool)
 .. type:: NullType
 
-   A plain type of storage type `void(*)`.
+   A plain type of storage type `void<*>`.
 
    .. spice:: (__== ...)
    .. spice:: (__imply ...)
@@ -547,7 +548,7 @@ parses the command-line and optionally enters the REPL.
 
 .. type:: Scope
 
-   A plain type of storage type `_Scope(*)`.
+   A plain type of storage type `_Scope<*>`.
 
    .. compiledfn:: (@ ...)
 
@@ -565,6 +566,9 @@ parses the command-line and optionally enters the REPL.
    .. compiledfn:: (docstring ...)
 
       An external function of type ``String<-(Scope Symbol)``.
+   .. compiledfn:: (local@ ...)
+
+      An external function of type ``Value<->Error(Scope Symbol)``.
    .. compiledfn:: (next ...)
 
       An external function of type ``λ(Symbol Value)<-(Scope Symbol)``.
@@ -581,31 +585,32 @@ parses the command-line and optionally enters the REPL.
    .. inline:: (set-symbols self values...)
 .. type:: SourceFile
 
-   A plain type of storage type `_SourceFile(*)`.
+   A plain type of storage type `_SourceFile<*>`.
 
 .. type:: SpiceMacro
 
-   A plain type of storage type `Value<->Error(Value)(*)`.
+   A plain type of storage type `Value<->Error(Value)<*>`.
 
    .. spice:: (__rimply ...)
 .. type:: SpiceMacroFunction
 
-   A plain type labeled ``Value<->Error(Value)(*)`` of supertype `pointer` and of storage type `Value<->Error(Value)(*)`.
+   A plain type labeled ``Value<->Error(Value)<*>`` of supertype `pointer` and of storage type `Value<->Error(Value)<*>`.
 
 .. type:: Struct
 
    An opaque type.
 
+   .. spice:: (__drop ...)
    .. builtin:: (__getattr ...)
    .. spice:: (__typecall ...)
 .. type:: SugarMacro
 
-   A plain type of storage type `λ(List Scope)<->Error(List Scope)(*)`.
+   A plain type of storage type `λ(List Scope)<->Error(List Scope)<*>`.
 
    .. spice:: (__call ...)
 .. type:: SugarMacroFunction
 
-   A plain type labeled ``λ(List Scope)<->Error(List Scope)(*)`` of supertype `pointer` and of storage type `λ(List Scope)<->Error(List Scope)(*)`.
+   A plain type labeled ``λ(List Scope)<->Error(List Scope)<*>`` of supertype `pointer` and of storage type `λ(List Scope)<->Error(List Scope)<*>`.
 
 .. type:: Symbol
 
@@ -627,7 +632,7 @@ parses the command-line and optionally enters the REPL.
 
 .. type:: Unknown
 
-   A plain type of storage type `_type(*)`.
+   A plain type of storage type `_type<*>`.
 
 .. type:: Value
 
@@ -691,6 +696,7 @@ parses the command-line and optionally enters the REPL.
 
    An opaque type.
 
+   .. spice:: (__drop ...)
 .. type:: array
 
    An opaque type of supertype `aggregate`.
@@ -790,6 +796,7 @@ parses the command-line and optionally enters the REPL.
    .. spice:: (__hash ...)
    .. spice:: (__imply ...)
    .. inline:: (__neg self)
+   .. inline:: (__rcp self)
    .. spice:: (__static-imply ...)
    .. spice:: (__tobool ...)
    .. inline:: (__typecall cls value)
@@ -817,7 +824,7 @@ parses the command-line and optionally enters the REPL.
 
 .. type:: list
 
-   A plain type labeled ``List`` of storage type `_List(*)`.
+   A plain type labeled ``List`` of storage type `_List<*>`.
 
    .. compiledfn:: (@ ...)
 
@@ -831,7 +838,7 @@ parses the command-line and optionally enters the REPL.
    .. inline:: (__repr self)
    .. spice:: (__typecall ...)
    .. inline:: (cons-sink self)
-   .. inline:: (decons self count)
+   .. spice:: (decons ...)
    .. compiledfn:: (dump ...)
 
       An external function of type ``List<-(List)``.
@@ -846,6 +853,10 @@ parses the command-line and optionally enters the REPL.
       An external function of type ``List<-(List)``.
    .. fn:: (rjoin lside rside)
    .. fn:: (token-split expr token errmsg)
+.. type:: nodefault
+
+   An opaque type.
+
 .. type:: noreturn
 
    An opaque type.
@@ -860,6 +871,7 @@ parses the command-line and optionally enters the REPL.
 
    .. spice:: (__== ...)
    .. inline:: (__@ self index)
+   .. spice:: (__as ...)
    .. spice:: (__call ...)
    .. inline:: (__getattr self key)
    .. spice:: (__hash ...)
@@ -892,6 +904,7 @@ parses the command-line and optionally enters the REPL.
    .. spice:: (__imply ...)
    .. inline:: (__neg self)
    .. inline:: (__rcp self)
+   .. inline:: (__tobool self)
    .. inline:: (__typecall cls value)
    .. builtin:: (__vector!= ...)
    .. builtin:: (__vector% ...)
@@ -906,7 +919,7 @@ parses the command-line and optionally enters the REPL.
    .. builtin:: (__vector>= ...)
 .. type:: string
 
-   A plain type labeled ``String`` of supertype `opaquepointer` and of storage type `_String(*)`.
+   A plain type labeled ``String`` of supertype `opaquepointer` and of storage type `_String<*>`.
 
    .. spice:: (__!= ...)
    .. spice:: (__.. ...)
@@ -950,7 +963,7 @@ parses the command-line and optionally enters the REPL.
    .. spice:: (type ...)
 .. type:: type
 
-   A plain type of supertype `opaquepointer` and of storage type `_type(*)`.
+   A plain type of supertype `opaquepointer` and of storage type `_type<*>`.
 
    .. compiledfn:: (@ ...)
 
@@ -965,8 +978,11 @@ parses the command-line and optionally enters the REPL.
 
       An external function of type ``type<->Error(type i32)``.
    .. spice:: (__call ...)
+   .. spice:: (__countof ...)
    .. spice:: (__getattr ...)
    .. spice:: (__hash ...)
+   .. spice:: (__toptr ...)
+   .. inline:: (__toref self)
    .. compiledfn:: (alignof ...)
 
       An external function of type ``usize<->Error(type)``.
@@ -1022,6 +1038,7 @@ parses the command-line and optionally enters the REPL.
    .. compiledfn:: (set-docstring ...)
 
       An external function of type ``void<-(type Symbol String)``.
+   .. inline:: (set-opaque type)
    .. inline:: (set-plain-storage type storage-type)
    .. inline:: (set-storage type storage-type)
    .. spice:: (set-symbol ...)
@@ -1039,6 +1056,9 @@ parses the command-line and optionally enters the REPL.
 
       An external function of type ``String<-(type)``.
    .. fn:: (strip-pointer-storage-class cls)
+   .. compiledfn:: (strip-qualifiers ...)
+
+      An external function of type ``type<-(type)``.
    .. compiledfn:: (superof ...)
 
       An external function of type ``type<-(type)``.
@@ -1118,7 +1138,7 @@ parses the command-line and optionally enters the REPL.
 
 .. type:: voidstar
 
-   A plain type labeled ``void(*)`` of supertype `pointer` and of storage type `void(*)`.
+   A plain type labeled ``void<*>`` of supertype `pointer` and of storage type `void<*>`.
 
 .. inline:: (%= lhs rhs)
 .. inline:: (&= lhs rhs)
@@ -1177,12 +1197,12 @@ parses the command-line and optionally enters the REPL.
    root of ``a`` descends from ``b``.
 .. fn:: (compare-type args f)
 .. inline:: (convert-assert-args args cond msg)
-.. inline:: (decons self count)
 .. inline:: (define-symbols self values...)
 .. fn:: (delete value)
 .. fn:: (dispatch-and-or args flip)
 .. fn:: (dots-to-slashes pattern)
 .. fn:: (dotted-symbol? env head)
+.. inline:: (drop value)
 .. fn:: (empty? value)
 .. inline:: (enumerate x)
 .. fn:: (error msg)
@@ -1208,6 +1228,7 @@ parses the command-line and optionally enters the REPL.
 .. inline:: (function->SpiceMacro f)
 .. inline:: (gen-allocator-sugar name f)
 .. inline:: (gen-cast-op f str)
+.. inline:: (gen-cast? converterf)
 .. inline:: (gen-match-block-parser handle-case)
 .. fn:: (gen-match-matcher failfunc expr scope cond)
    
@@ -1219,6 +1240,7 @@ parses the command-line and optionally enters the REPL.
    (: x T) -> ((typeof input) == T), let x = input
    <unknown symbol> -> unpack as symbol
 .. fn:: (gen-or-matcher failfunc expr scope params)
+.. inline:: (gen-static-compile-shader f)
 .. fn:: (gen-sugar-matcher failfunc expr scope params)
 .. fn:: (gen-vector-reduction f v sz)
 .. fn:: (get-ifx-op env op)
@@ -1246,8 +1268,10 @@ parses the command-line and optionally enters the REPL.
 .. inline:: (memoize f)
 .. fn:: (merge-scope-symbols source target filter)
 .. fn:: (next-head? next)
+.. fn:: (nodefault? x)
 .. fn:: (operator-valid? value)
 .. fn:: (patterns-from-namestr base-dir namestr)
+.. fn:: (pointer-as vT T)
 .. fn:: (pointer-imply vT T)
 .. fn:: (pointer-type-imply? src dest)
 .. fn:: (powi base exponent)
@@ -1256,7 +1280,6 @@ parses the command-line and optionally enters the REPL.
 .. fn:: (ptrcmp== t1 t2)
 .. inline:: (quasiquote-any x)
 .. fn:: (quasiquote-list x)
-.. inline:: (raises-compile-error)
 .. inline:: (range a b c)
 .. fn:: (real-as vT T)
 .. fn:: (real-imply vT T)
@@ -1274,6 +1297,7 @@ parses the command-line and optionally enters the REPL.
 .. inline:: (simple-folding-autotype-binary-op f unboxer)
 .. inline:: (simple-folding-autotype-signed-binary-op sf uf unboxer)
 .. inline:: (simple-folding-binary-op f unboxer boxer)
+.. inline:: (simple-folding-signed-binary-op sf uf unboxer boxer)
 .. inline:: (simple-signed-binary-op sf uf)
 .. inline:: (slice value start end)
 .. inline:: (spice-binary-op-macro f)
@@ -1301,7 +1325,6 @@ parses the command-line and optionally enters the REPL.
 .. fn:: (symbol-handler topexpr env)
 .. inline:: (type-comparison-func f)
 .. inline:: (type-factory f)
-.. inline:: (type< T superT)
 .. inline:: (unary-op-dispatch symbol friendly-op-name)
 .. fn:: (unary-op-error friendly-op-name T)
 .. fn:: (unary-operation args symbol friendly-op-name)
@@ -1335,12 +1358,14 @@ parses the command-line and optionally enters the REPL.
 .. fn:: (vector-binary-operator symbol lhsT rhsT)
 .. fn:: (verify-count count mincount maxcount)
 .. sugar:: (. ...)
+.. sugar:: (:: ...)
 .. sugar:: (:= ...)
 .. sugar:: (<- ...)
 .. sugar:: (@@ ...)
 .. sugar:: (and ...)
 .. sugar:: (as:= ...)
 .. sugar:: (assert ...)
+.. sugar:: (bind ...)
 .. sugar:: (decorate-fn ...)
 .. sugar:: (decorate-inline ...)
 .. sugar:: (decorate-let ...)
@@ -1421,9 +1446,10 @@ Usage example::
 .. sugar:: (local ...)
 .. sugar:: (locals ...)
    
-   export locals as a chain of two new scopes: a scope that contains
+   Export locals as a chain of up to two new scopes: a scope that contains
    all the constant values in the immediate scope, and a scope that contains
-   the runtime values.
+   the runtime values. If all values in the scope are constant, then the
+   resulting scope will also be constant.
 .. sugar:: (match ...)
 .. sugar:: (new ...)
 .. sugar:: (or ...)
@@ -1431,6 +1457,7 @@ Usage example::
 .. sugar:: (spice ...)
 .. sugar:: (static-assert ...)
 .. sugar:: (static-if ...)
+.. sugar:: (static-match ...)
 .. sugar:: (struct ...)
 .. sugar:: (sugar ...)
 .. sugar:: (sugar-eval ...)
@@ -1449,23 +1476,18 @@ Usage example::
 .. sugar:: (while ...)
 .. builtin:: (? ...)
 .. builtin:: (_ ...)
-.. builtin:: (Any-extract-constant ...)
-.. builtin:: (Any-wrap ...)
 .. builtin:: (Image-query-levels ...)
 .. builtin:: (Image-query-lod ...)
 .. builtin:: (Image-query-samples ...)
 .. builtin:: (Image-query-size ...)
 .. builtin:: (Image-read ...)
 .. builtin:: (Image-write ...)
-.. builtin:: (ReturnLabel-type ...)
 .. builtin:: (acos ...)
 .. builtin:: (add ...)
 .. builtin:: (add-nsw ...)
 .. builtin:: (add-nuw ...)
 .. builtin:: (alloca ...)
 .. builtin:: (alloca-array ...)
-.. builtin:: (alloca-exception-pad ...)
-.. builtin:: (allocaof ...)
 .. builtin:: (ashr ...)
 .. builtin:: (asin ...)
 .. builtin:: (assign ...)
@@ -1478,15 +1500,11 @@ Usage example::
 .. builtin:: (break ...)
 .. builtin:: (bxor ...)
 .. builtin:: (call ...)
-.. builtin:: (cc/call ...)
 .. builtin:: (ceil ...)
-.. builtin:: (compiler-anchor ...)
-.. builtin:: (compiler-message ...)
 .. builtin:: (copy ...)
 .. builtin:: (cos ...)
 .. builtin:: (cross ...)
 .. builtin:: (degrees ...)
-.. builtin:: (delete-type-symbol! ...)
 .. builtin:: (deref ...)
 .. builtin:: (discard! ...)
 .. builtin:: (distance ...)
@@ -1500,7 +1518,6 @@ Usage example::
 .. builtin:: (embed ...)
 .. builtin:: (exp ...)
 .. builtin:: (exp2 ...)
-.. builtin:: (extern-symbol ...)
 .. builtin:: (extractelement ...)
 .. builtin:: (extractvalue ...)
 .. builtin:: (fabs ...)
@@ -1525,8 +1542,6 @@ Usage example::
 .. builtin:: (fmix ...)
 .. builtin:: (fmul ...)
 .. builtin:: (fn ...)
-.. builtin:: (follow ...)
-.. builtin:: (form-quote ...)
 .. builtin:: (fpext ...)
 .. builtin:: (fptosi ...)
 .. builtin:: (fptoui ...)
@@ -1537,7 +1552,6 @@ Usage example::
 .. builtin:: (frexp ...)
 .. builtin:: (fsign ...)
 .. builtin:: (fsub ...)
-.. builtin:: (function-type ...)
 .. builtin:: (getelementptr ...)
 .. builtin:: (getelementref ...)
 .. builtin:: (hide-traceback ...)
@@ -1581,18 +1595,18 @@ Usage example::
 .. builtin:: (powf ...)
 .. builtin:: (ptrtoint ...)
 .. builtin:: (ptrtoref ...)
-.. builtin:: (purify ...)
 .. builtin:: (radians ...)
 .. builtin:: (raise ...)
+.. builtin:: (raising ...)
 .. builtin:: (rawcall ...)
 .. builtin:: (reftoptr ...)
 .. builtin:: (repeat ...)
 .. builtin:: (return ...)
+.. builtin:: (returning ...)
 .. builtin:: (round ...)
 .. builtin:: (roundeven ...)
 .. builtin:: (run-stage ...)
 .. builtin:: (sample ...)
-.. builtin:: (scopeof ...)
 .. builtin:: (sdiv ...)
 .. builtin:: (set-execution-mode! ...)
 .. builtin:: (sext ...)
@@ -1608,7 +1622,6 @@ Usage example::
 .. builtin:: (square-list ...)
 .. builtin:: (srem ...)
 .. builtin:: (ssign ...)
-.. builtin:: (static-alloc ...)
 .. builtin:: (step ...)
 .. builtin:: (store ...)
 .. builtin:: (sub ...)
@@ -1616,27 +1629,19 @@ Usage example::
 .. builtin:: (sub-nuw ...)
 .. builtin:: (sugar-log ...)
 .. builtin:: (sugar-quote ...)
+.. builtin:: (swapvalue ...)
 .. builtin:: (switch ...)
 .. builtin:: (tan ...)
 .. builtin:: (trunc ...)
 .. builtin:: (try ...)
-.. builtin:: (tuple-type ...)
-.. builtin:: (type-local@ ...)
-.. builtin:: (type@ ...)
 .. builtin:: (typeof ...)
 .. builtin:: (udiv ...)
 .. builtin:: (uitofp ...)
-.. builtin:: (unconst ...)
 .. builtin:: (undef ...)
-.. builtin:: (union-type ...)
 .. builtin:: (unique-visible? ...)
 .. builtin:: (unreachable! ...)
 .. builtin:: (urem ...)
 .. builtin:: (va-countof ...)
-.. builtin:: (va-key ...)
-.. builtin:: (va-keys ...)
-.. builtin:: (va-values ...)
-.. builtin:: (va@ ...)
 .. builtin:: (view ...)
 .. builtin:: (viewing ...)
 .. builtin:: (volatile-load ...)
@@ -1656,6 +1661,10 @@ Usage example::
 .. spice:: (| ...)
 .. spice:: (~ ...)
 .. spice:: (!= ...)
+.. spice:: (&? value)
+
+   Returns `true` if `value` is a reference, otherwise `false`.
+
 .. spice:: (.. ...)
 .. spice:: (// ...)
 .. spice:: (<< ...)
@@ -1663,6 +1672,9 @@ Usage example::
 .. spice:: (== ...)
 .. spice:: (>= ...)
 .. spice:: (>> ...)
+.. spice:: (_static-compile ...)
+.. spice:: (_static-compile-glsl ...)
+.. spice:: (_static-compile-spirv ...)
 .. spice:: (Closure->Collector ...)
 .. spice:: (Closure->Generator ...)
 .. spice:: (abs ...)
@@ -1670,22 +1682,31 @@ Usage example::
 .. spice:: (and-branch ...)
    
    The type of the `null` constant. This type is uninstantiable.
+.. spice:: (append-to-scope ...)
 .. spice:: (append-to-type ...)
 .. spice:: (arrayof ...)
 .. spice:: (as ...)
+.. spice:: (as? ...)
+.. spice:: (bindingof ...)
 .. spice:: (coerce-call-arguments ...)
 .. spice:: (cons ...)
 .. spice:: (const.add.i32.i32 ...)
 .. spice:: (const.icmp<=.i32.i32 ...)
 .. spice:: (constant? ...)
 .. spice:: (countof ...)
+.. spice:: (decons ...)
+.. spice:: (elementof ...)
+.. spice:: (elementsof ...)
 .. spice:: (extern ...)
 .. spice:: (getattr ...)
 .. spice:: (hash-storage ...)
 .. spice:: (hash1 ...)
 .. spice:: (imply ...)
+.. spice:: (imply? ...)
 .. spice:: (integer->integer ...)
+.. spice:: (integer->real ...)
 .. spice:: (list-constructor ...)
+.. spice:: (locationof ...)
 .. spice:: (lslice ...)
 .. spice:: (max ...)
 .. spice:: (memocall ...)
@@ -1693,12 +1714,15 @@ Usage example::
 .. spice:: (mutable ...)
 .. spice:: (none? ...)
 .. spice:: (not ...)
+.. spice:: (opaque ...)
 .. spice:: (or-branch ...)
 .. spice:: (overloaded-fn-append ...)
 .. spice:: (parse-compile-flags ...)
 .. spice:: (pow ...)
 .. spice:: (private ...)
 .. spice:: (raises ...)
+.. spice:: (real->integer ...)
+.. spice:: (real->real ...)
 .. spice:: (report ...)
 .. spice:: (repr ...)
 .. spice:: (rslice ...)
@@ -1716,8 +1740,10 @@ Usage example::
 .. spice:: (tostring ...)
 .. spice:: (tupleof ...)
 .. spice:: (type!= ...)
+.. spice:: (type< ...)
 .. spice:: (type<= ...)
 .. spice:: (type== ...)
+.. spice:: (type> ...)
 .. spice:: (type>= ...)
 .. spice:: (typify ...)
 .. spice:: (unpack ...)
@@ -1727,7 +1753,18 @@ Usage example::
 .. spice:: (va-empty? ...)
 .. spice:: (va-lfold ...)
 .. spice:: (va-lifold ...)
+.. spice:: (va-map f ...)
+
+   Filter each argument in `...` through `f` and return the resulting list
+   of arguments. Arguments where `f` returns void are filtered from the
+   result.
+
 .. spice:: (va-option-branch ...)
+.. spice:: (va-range a (? b))
+
+   If `b` is not specified, returns a sequence of integers from zero to `b`,
+   otherwise a sequence of integers from `a` to `b`.
+
 .. spice:: (va-rfold ...)
 .. spice:: (va-rifold ...)
 .. spice:: (va-split ...)
@@ -1736,6 +1773,7 @@ Usage example::
 .. spice:: (va-unnamed ...)
    
     filter all keyed values
+.. spice:: (va@ ...)
 .. spice:: (vector-reduce ...)
 .. spice:: (vectorof ...)
 .. spice:: (wrap-if-not-run-stage ...)
@@ -1751,7 +1789,7 @@ Usage example::
    An external function of type ``noreturn<-(i32)``.
 .. compiledfn:: (function->SugarMacro ...)
 
-   A compiled function of type ``SugarMacro<-(λ(List Scope)<->Error(List Scope)(*))``.
+   A compiled function of type ``SugarMacro<-(λ(List Scope)<->Error(List Scope)<*>)``.
 .. compiledfn:: (globals ...)
 
    An external function of type ``Scope<-()``.
@@ -1862,10 +1900,10 @@ Usage example::
    An external function of type ``Value<-(type u64)``.
 .. compiledfn:: (sc_const_pointer_extract ...)
 
-   An external function of type ``void(*)<-(Value)``.
+   An external function of type ``void<*><-(Value)``.
 .. compiledfn:: (sc_const_pointer_new ...)
 
-   An external function of type ``Value<-(type void(*))``.
+   An external function of type ``Value<-(type void<*>)``.
 .. compiledfn:: (sc_const_real_extract ...)
 
    An external function of type ``f64<-(Value)``.
@@ -1950,9 +1988,18 @@ Usage example::
 .. compiledfn:: (sc_getarglist ...)
 
    An external function of type ``Value<-(Value i32)``.
+.. compiledfn:: (sc_global_binding ...)
+
+   An external function of type ``i32<->Error(Value)``.
+.. compiledfn:: (sc_global_location ...)
+
+   An external function of type ``i32<->Error(Value)``.
 .. compiledfn:: (sc_global_new ...)
 
    An external function of type ``Value<-(Symbol type u32 Symbol i32 i32)``.
+.. compiledfn:: (sc_global_storage_class ...)
+
+   An external function of type ``Symbol<->Error(Value)``.
 .. compiledfn:: (sc_hash ...)
 
    An external function of type ``u64<-(u64 usize)``.
@@ -2034,6 +2081,9 @@ Usage example::
 .. compiledfn:: (sc_list_reverse ...)
 
    An external function of type ``List<-(List)``.
+.. compiledfn:: (sc_list_serialize ...)
+
+   An external function of type ``String<-(List)``.
 .. compiledfn:: (sc_load_library ...)
 
    An external function of type ``void<->Error(String)``.
@@ -2325,6 +2375,9 @@ Usage example::
 .. compiledfn:: (sc_typename_type_get_super ...)
 
    An external function of type ``type<-(type)``.
+.. compiledfn:: (sc_typename_type_set_opaque ...)
+
+   An external function of type ``void<->Error(type)``.
 .. compiledfn:: (sc_typename_type_set_storage ...)
 
    An external function of type ``void<->Error(type type u32)``.
@@ -2408,7 +2461,4 @@ Usage example::
    An external function of type ``void<-(bool)``.
 .. compiledfn:: (spice-macro-verify-signature ...)
 
-   A compiled function of type ``void<-(Value<->Error(Value)(*))``.
-.. compiledfn:: (type> ...)
-
-   An external function of type ``bool<-(type type)``.
+   A compiled function of type ``void<-(Value<->Error(Value)<*>)``.

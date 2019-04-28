@@ -6,9 +6,7 @@ on the heap rather than in registers or the stack.
 
 .. type:: Array
 
-   
-   The abstract supertype of both `FixedArray` and `GrowingArray` which
-   supplies methods shared by both implementations.
+   An opaque type of supertype `Struct`.
 
    .. fn:: (__@ self index)
       
@@ -27,6 +25,15 @@ on the heap rather than in registers or the stack.
       
       Implements support for freeing the array's memory when it goes out
       of scope.
+   .. inline:: (__typecall cls element-type capacity)
+      
+      Construct a mutable array type of ``element-type`` with a variable or
+      fixed maximum capacity.
+      
+      If ``capacity`` is defined, then it specifies the maximum number
+      of array elements permitted. If it is undefined, then an initial
+      capacity of 16 elements is assumed, which is doubled whenever
+      it is exceeded, allowing for an indefinite number of elements.
    .. fn:: (append self value)
       
       Append `value` as an element to the array `self` and return a reference
@@ -49,20 +56,12 @@ on the heap rather than in registers or the stack.
       value for each element value supplied.
 .. type:: FixedArray
 
-   
-   The supertype and constructor for arrays of fixed size.
-   
-   To construct a new fixed array type::
-   
-       FixedArray element-type capacity
-   
-   Instantiate a new array with mutable memory::
-   
-       local new-array : (FixedArray element-type capacity)
+   An opaque type of supertype `Array`.
 
    .. fn:: (__repr self)
       
       Implements support for the `repr` operation.
+   .. inline:: (__typecall cls opts...)
    .. inline:: (capacity self)
       
       Returns the maximum capacity of array `self`, which is fixed.
@@ -73,22 +72,12 @@ on the heap rather than in registers or the stack.
       capacity has been exceeded.
 .. type:: GrowingArray
 
-   
-   The supertype and constructor for arrays of growing size. New instances
-   have a default capacity of 4, and grow by factor 2.7 each time their
-   capacity is exceeded.
-   
-   To construct a new growing array type::
-   
-       GrowingArray element-type
-   
-   Instantiate a new array with mutable memory::
-   
-       local new-array : (GrowingArray element-type) [(capacity = ...)]
+   An opaque type of supertype `Array`.
 
    .. fn:: (__repr self)
       
       Implements support for the `repr` operation.
+   .. inline:: (__typecall cls opts...)
    .. inline:: (capacity self)
       
       Returns the current maximum capacity of array `self`.

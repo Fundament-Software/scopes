@@ -5678,6 +5678,13 @@ sugar fold-locals (args...)
     let block = (sc_expression_new)
     sc_expression_append block init
     let anchor = ('anchor expression)
+    let scope-docstr = ('docstring scope unnamed)
+    let init =
+        if (empty? scope-docstr) init
+        else
+            let expr = ('tag `(f init unnamed scope-docstr) anchor)
+            sc_expression_append block expr
+            expr
     # first go through the constants
     let outval =
         loop (last-key outval = unnamed init)
@@ -5891,13 +5898,16 @@ define append-to-scope
     spice-macro
         fn (args)
             let packedscope = ('getarg args 0)
-            let key = ('getarg args 1)
+            let packedkey = ('getarg args 1)
+            let key = (packedkey as Symbol)
             let docstr = ('getarg args 2)
             let values = ('getarglist args 3)
             let constant-scope? = ('constant? packedscope)
+            if (key == unnamed)
+                'set-docstring (packedscope as Scope) key (docstr as string)
+                return packedscope
             if (constant-scope? & (stage-constant? values))
                 let scope = (packedscope as Scope)
-                let key = (key as Symbol)
                 'set-symbol scope key values
                 'set-docstring scope key (docstr as string)
                 return packedscope
@@ -5916,15 +5926,15 @@ define append-to-scope
                         else
                             `(sc_argument_list_append outargs `arg)
                 sc_expression_append block
-                    `('set-symbol packedscope key outargs)
+                    `('set-symbol packedscope packedkey outargs)
                 sc_expression_append block
-                    `('set-docstring packedscope key docstr)
+                    `('set-docstring packedscope packedkey docstr)
                 sc_expression_append block packedscope
                 block
             else
                 spice-quote
-                    'set-symbol packedscope key values
-                    'set-docstring packedscope key docstr
+                    'set-symbol packedscope packedkey values
+                    'set-docstring packedscope packedkey docstr
                     packedscope
 
 """"Export locals as a chain of up to two new scopes: a scope that contains
@@ -5947,13 +5957,16 @@ define append-to-type
     spice-macro
         fn (args)
             let T = ('getarg args 0)
-            let key = ('getarg args 1)
+            let packedkey = ('getarg args 1)
+            let key = (packedkey as Symbol)
             let docstr = ('getarg args 2)
+            if (key == unnamed)
+                # ignore docstring
+                return T
             let value = ('getarg args 3)
             if ('constant? T)
                 let T = (T as type)
                 if (stage-constant? value)
-                    let key = (key as Symbol)
                     'set-symbol T key value
                     'set-docstring T key (docstr as string)
                     `T
@@ -5963,14 +5976,14 @@ define append-to-type
                         else `value
                     spice-quote
                         embed
-                            sc_type_set_symbol T key wrapvalue
-                            sc_type_set_docstring T key docstr
+                            sc_type_set_symbol T packedkey wrapvalue
+                            sc_type_set_docstring T packedkey docstr
                             T
             else
                 spice-quote
                     embed
-                        sc_type_set_symbol T key value
-                        sc_type_set_docstring T key docstr
+                        sc_type_set_symbol T packedkey value
+                        sc_type_set_docstring T packedkey docstr
                         T
 
 sugar typedef+ (T body...)
@@ -6813,7 +6826,7 @@ fn read-eval-print-loop ()
 
         spice append-to-scope (scope key docstr vals...)
             let tmp = (Symbol "#result...")
-            if (key != tmp)
+            if ((key != tmp) and (key != unnamed))
                 if (('argcount vals...) != 1)
                     let block = (sc_expression_new)
                     let outargs = `(sc_argument_list_new)
