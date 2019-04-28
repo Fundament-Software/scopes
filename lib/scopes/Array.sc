@@ -38,9 +38,13 @@ inline array-generator (self)
         inline (i) (self @ i)
         inline (i) (i + 1:usize)
 
+typedef Array < Struct
+typedef FixedArray < Array
+typedef GrowingArray < Array
+
 """"The abstract supertype of both `FixedArray` and `GrowingArray` which
     supplies methods shared by both implementations.
-typedef Array < Struct
+typedef+ Array
 
     """".. spice:: (__as cls T)
 
@@ -51,6 +55,20 @@ typedef Array < Struct
         if (T == Generator)
             return `array-generator
         `()
+
+    inline __typecall (cls element-type capacity)
+        """"Construct a mutable array type of ``element-type`` with a variable or
+            fixed maximum capacity.
+
+            If ``capacity`` is defined, then it specifies the maximum number
+            of array elements permitted. If it is undefined, then an initial
+            capacity of 16 elements is assumed, which is doubled whenever
+            it is exceeded, allowing for an indefinite number of elements.
+        static-assert (cls == Array)
+        static-if (none? capacity)
+            GrowingArray element-type
+        else
+            FixedArray element-type capacity
 
     """"Implements support for the `countof` operator. Returns the current
         number of elements stored in `self` as a value of `usize` type.
@@ -173,37 +191,29 @@ typedef Array < Struct
     Instantiate a new array with mutable memory::
 
         local new-array : (FixedArray element-type capacity)
-typedef FixedArray < Array
+typedef+ FixedArray
     let parent-type = this-type
 
-    spice gen-fixed-array-type (element-type capacity)
+    @@ memo
+    inline gen-fixed-array-type (element-type capacity)
+        static-assert ((typeof element-type) == type)
+        static-assert ((typeof capacity) == i32)
         let parent-type = this-type
-        let element-type = (element-type as type)
-        let capacity = (capacity as i32)
-        @@ memoize
-        fn _gen-fixed-array-type (element-type capacity)
-            let arrayT =
-                'mutable (pointer.type element-type)
+        struct
+            .. "<FixedArray "
+                tostring element-type
+                " x "
+                tostring capacity
+                ">"
+            \ < parent-type
 
-            @@ spice-quote
-            struct
-                spice-unquote
-                    .. "<FixedArray "
-                        'string element-type
-                        " x "
-                        tostring (i32 capacity)
-                        ">"
-                \ < parent-type
+            _items : (mutable pointer element-type)
+            _count : usize
 
-                _items : arrayT
-                _count : usize
+            let
+                ElementType = element-type
+                Capacity = capacity
 
-                let
-                    ElementType = element-type
-                    Capacity = capacity
-        _gen-fixed-array-type element-type capacity
-
-    @@ spice-quote
     inline __typecall (cls opts...)
         static-if (cls == this-type)
             let element-type capacity = opts...
@@ -261,30 +271,24 @@ let DEFAULT_CAPACITY = (1:usize << 2:usize)
     Instantiate a new array with mutable memory::
 
         local new-array : (GrowingArray element-type) [(capacity = ...)]
-typedef GrowingArray < Array
+typedef+ GrowingArray
     let parent-type = this-type
 
-    spice gen-growing-array-type (element-type)
+    @@ memo
+    inline gen-growing-array-type (element-type)
+        static-assert ((typeof element-type) == type)
         let parent-type = this-type
-        let element-type = (element-type as type)
-        @@ memoize
-        fn _gen-growing-array-type (element-type)
-            let arrayT = ('mutable (pointer.type element-type))
+        struct
+            .. "<GrowingArray "
+                tostring element-type
+                ">"
+            \ < parent-type
+            _items : (mutable pointer element-type)
+            _count : usize
+            _capacity : usize
 
-            @@ spice-quote
-            struct
-                spice-unquote
-                    .. "<GrowingArray "
-                        'string element-type
-                        ">"
-                \ < parent-type
-                _items : arrayT
-                _count : usize
-                _capacity : usize
-
-                let
-                    ElementType = element-type
-        _gen-growing-array-type element-type
+            let
+                ElementType = element-type
 
     fn nearest-capacity (capacity count)
         loop (new-capacity = capacity)
@@ -292,7 +296,6 @@ typedef GrowingArray < Array
                 repeat (new-capacity * 27:usize // 10:usize)
             break new-capacity
 
-    @@ spice-quote
     inline __typecall (cls opts...)
         static-if (cls == this-type)
             gen-growing-array-type opts...
@@ -345,28 +348,6 @@ typedef GrowingArray < Array
         return;
 
     unlet gen-growing-array-type parent-type nearest-capacity
-
-#typefn Array '__typecall (cls element-type capacity opts...)
-    """"Construct a mutable array type of ``element-type`` with a variable or
-        fixed maximum capacity.
-
-        If ``capacity`` is defined, then it specifies the maximum number
-        of array elements permitted. If it is undefined, then an initial
-        capacity of 16 elements is assumed, which is doubled whenever
-        it is exceeded, allowing for an indefinite number of elements.
-    if (cls == Array)
-        let memory =
-            va@ 'memory opts...
-        let memory =
-            if (none? memory) HeapMemory
-            else memory
-        if (none? capacity)
-            VariableMutableArray element-type memory
-        else
-            assert (constant? capacity) "capacity must be constant"
-            FixedMutableArray element-type (capacity as usize) memory
-    else
-        compiler-error! "arrays can not be constructed as immutable"
 
 do
     let Array FixedArray GrowingArray

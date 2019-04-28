@@ -4,17 +4,23 @@ using import testing
 
 let TESTSIZE = (1:usize << 16:usize)
 
-let i32Arrayx65536 = (FixedArray i32 TESTSIZE)
-let i32Array = (GrowingArray i32)
-let i32Arrayx16 = (FixedArray i32 16)
-let i32Arrayx32 = (FixedArray i32 32)
+let i32Arrayx65536 = (Array i32 TESTSIZE)
+let i32Arrayx65536_2 = (Array i32 TESTSIZE)
+static-assert (i32Arrayx65536 == i32Arrayx65536_2)
+static-assert (i32Arrayx65536 < FixedArray)
+let i32Array = (Array i32)
+let i32Array2 = (Array i32)
+static-assert (i32Array == i32Array2)
+static-assert (i32Array < GrowingArray)
+let i32Arrayx16 = (Array i32 16)
+let i32Arrayx32 = (Array i32 32)
 
-let i32ArrayArray = (GrowingArray i32Array)
-let i32Arrayx16Array = (GrowingArray i32Arrayx16)
-let i32ArrayArrayx16 = (FixedArray i32Array 16)
-let i32Arrayx16Arrayx16 = (FixedArray i32Arrayx16 16)
+let i32ArrayArray = (Array i32Array)
+let i32Arrayx16Array = (Array i32Arrayx16)
+let i32ArrayArrayx16 = (Array i32Array 16)
+let i32Arrayx16Arrayx16 = (Array i32Arrayx16 16)
 
-let StringArray = (GrowingArray string)
+let StringArray = (Array string)
 
 let fullrange = (range TESTSIZE)
 
@@ -150,7 +156,7 @@ test-sort;
 fn test-one ()
     One.test-refcount-balanced;
 
-    local a : (GrowingArray One)
+    local a : (Array One)
     let N = 1000
     for i in (range N)
         'append a
