@@ -141,6 +141,28 @@ static Symbol remap_unnamed(Symbol sym) {
 #define HANDLER(CLASS) \
 ValueRef convert_ ## CLASS(const CLASS ## Ref &node)
 
+static const List *convert_block(const List *l, const Block &block) {
+    if (block.terminator) {
+        l = List::from(block.terminator, l);
+    }
+
+    {
+        int i = block.body.size();
+        while (i-- > 0) {
+            l = List::from(block.body[i], l);
+        }
+    }
+    return l;
+}
+
+static const List *convert_args(const List *l, const TypedValues &args) {
+    int i = args.size();
+    while (i-- > 0) {
+        l = List::from(args[i], l);
+    }
+    return l;
+}
+
 HANDLER(ParameterTemplate) {
     auto _anchor = node.anchor();
     if (node->name == SYM_Unnamed) {
@@ -153,6 +175,63 @@ HANDLER(ParameterTemplate) {
     } else {
         return SYMBOL(node->name);
     }
+}
+
+HANDLER(CondBr) {
+    auto _anchor = node.anchor();
+
+    const List *l2 = EOL;
+    l2 = convert_block(l2, node->else_body);
+    l2 = List::from(SYMBOL(KW_Else), l2);
+
+    const List *l1 = EOL;
+    l1 = convert_block(l1, node->then_body);
+    l1 = List::from(SYMBOL(KW_Then), l1);
+
+    const List *l = EOL;
+    l = List::from(ConstPointer::list_from(l2), l);
+    l = List::from(ConstPointer::list_from(l1), l);
+    l = List::from(node->cond, l);
+    l = List::from(SYMBOL(KW_If), l);
+    return ConstPointer::list_from(l);
+}
+
+HANDLER(Label) {
+    auto _anchor = node.anchor();
+    const List *l = EOL;
+
+    l = convert_block(l, node->body);
+
+    l = List::from(TYPE(node->get_type()), l);
+    l = List::from(SYMBOL(OP_Colon), l);
+    l = List::from(SYMBOL(node->name), l);
+    auto key = Symbol(String::from_cstr(get_label_kind_name(node->label_kind)));
+    l = List::from(SYMBOL(key), l);
+
+    return ConstPointer::list_from(l);
+}
+
+HANDLER(Function) {
+    auto _anchor = node.anchor();
+    const List *l = EOL;
+
+    l = convert_block(l, node->body);
+
+    l = List::from(TYPE(node->get_type()), l);
+    l = List::from(SYMBOL(OP_Colon), l);
+    {
+        const List *parms = EOL;
+        int i = node->params.size();
+        while (i-- > 0) {
+            parms = List::from(node->params[i], parms);
+        }
+        l = List::from(ConstPointer::list_from(parms), l);
+    }
+
+    l = List::from(SYMBOL(node->name), l);
+    l = List::from(SYMBOL(KW_Fn), l);
+
+    return ConstPointer::list_from(l);
 }
 
 HANDLER(Template) {
@@ -203,10 +282,24 @@ HANDLER(KeyedTemplate) {
 HANDLER(Call) {
     auto _anchor = node.anchor();
     const List *l = EOL;
-    int i = node->args.size();
-    while (i-- > 0) {
-        l = List::from(node->args[i], l);
+
+    bool is_annotation = false;
+    auto ptr = node->callee.dyn_cast<ConstInt>();
+    if (ptr && (ptr->get_type() == TYPE_Builtin)
+        && (Symbol::wrap(ptr->value) == FN_Annotate)) {
+        is_annotation = true;
     }
+
+    if (!is_annotation) {
+        l = List::from(TYPE(node->get_type()), l);
+        l = List::from(SYMBOL(OP_Colon), l);
+    }
+    l = convert_args(l, node->args);
+    if (is_annotation) {
+        l = List::from(SYMBOL(FN_Annotate), l);
+        return ValueRef(_anchor, ConstPointer::list_from(l));
+    }
+
     l = List::from(node->callee, l);
     //if (node->callee.isa<Global>())
     //    goto skip;
@@ -220,6 +313,23 @@ HANDLER(Call) {
     l = List::from(SYMBOL(KW_Call), l);
 skip:
     return ValueRef(_anchor, ConstPointer::list_from(l));
+}
+
+HANDLER(Merge) {
+    auto _anchor = node.anchor();
+    const List *l = EOL;
+    l = convert_args(l, node->values);
+    l = List::from(node->label, l);
+    l = List::from(SYMBOL(KW_Merge), l);
+    return ConstPointer::list_from(l);
+}
+
+HANDLER(Return) {
+    auto _anchor = node.anchor();
+    const List *l = EOL;
+    l = convert_args(l, node->values);
+    l = List::from(SYMBOL(KW_Return), l);
+    return ConstPointer::list_from(l);
 }
 
 HANDLER(CallTemplate) {
@@ -410,13 +520,34 @@ ValueRef _convert(const ValueRef &node) {
     CASE_HANDLER(ArgumentListTemplate)
     CASE_HANDLER(Quote)
     CASE_HANDLER(Unquote)
+    CASE_HANDLER(Function)
+    CASE_HANDLER(Call)
+    CASE_HANDLER(Label)
+    CASE_HANDLER(CondBr)
+    CASE_HANDLER(Merge)
+    CASE_HANDLER(Return)
     default:
         return node;
     }
 }
 
 bool node_can_selfref(const ValueRef &node) {
-    return !node.isa<Const>();
+    if (node.isa<Const>())
+        return false;
+    if (node.isa<TypedValue>()) {
+        auto tv = node.cast<TypedValue>();
+        switch(tv->kind()) {
+        case VK_Merge:
+        case VK_Return:
+        case VK_CondBr:
+        case VK_Call: {
+            if (!is_returning_value(tv->get_type()))
+                return false;
+        } break;
+        default: break;
+        }
+    }
+    return true;
 }
 
 ValueRef convert(const ValueRef &node) {
@@ -519,6 +650,25 @@ void walk(const Anchor *anchor, const List *l, int depth, int maxdepth, bool nak
             << Style_None;
         if (naked) { ss << std::endl; }
         return;
+    }
+    if (naked && it->at.isa<ConstInt>()) {
+        auto ci = it->at.cast<ConstInt>();
+        if ((ci->get_type() == TYPE_Symbol)
+            && (Symbol::wrap(ci->value) == FN_Annotate)) {
+            ss << Style_Comment << "#" << Style_None;
+            it = it->next;
+            while (it) {
+                ss << " ";
+                if (try_get_const_type(it->at) == TYPE_String) {
+                    ss << ((const String *)it->at.cast<ConstPointer>()->value)->data;
+                } else {
+                    walk(it->at, depth, maxdepth, false, true);
+                }
+                it = it->next;
+            }
+            ss << std::endl;
+            return;
+        }
     }
     int offset = 0;
     // int numsublists = 0;

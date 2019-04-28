@@ -475,7 +475,7 @@ struct Exception : TypedValue {
 
 #define SCOPES_LABEL_KIND() \
     /* an user-created label */ \
-    T(LK_User, "merge") \
+    T(LK_User, "label") \
     /* the return label of an inline function */ \
     T(LK_Inline, "inline") \
     /* the try block of a try/except construct */ \
@@ -485,7 +485,7 @@ struct Exception : TypedValue {
     /* a break label of a loop */ \
     T(LK_Break, "break") \
     /* a merge label of a branch */ \
-    T(LK_BranchMerge, "branch-merge") \
+    T(LK_BranchMerge, "branch") \
 
 enum LabelKind {
 #define T(NAME, BNAME) \
