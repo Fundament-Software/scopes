@@ -212,6 +212,7 @@ typedef One :: (tuple i32 (mutable pointer i32))
         test balanced?
 
     inline __typecall (cls value)
+        static-assert (not (none? value))
         test (_refcount >= 0)
         _refcount += 1
         new one_is_the_loneliest_number : i32 = 1

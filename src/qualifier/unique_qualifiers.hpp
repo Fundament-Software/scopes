@@ -19,6 +19,7 @@ enum {
     UnknownUnique = 0,
     FirstUniqueInput = 1,
     LastUniqueInput = 256,
+    GlobalUnique = 999,
     FirstUniqueOutput = -1,
     LastUniqueOutput = -256,
     FirstUniqueError = -257,

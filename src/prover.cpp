@@ -412,6 +412,8 @@ static void write_annotation(const ASTContext &ctx,
 
 static SCOPES_RESULT(void) verify_valid(const ASTContext &ctx, int id, const char *by) {
     SCOPES_RESULT_TYPE(void);
+    if (id == GlobalUnique)
+        return {};
     if (!ctx.block->is_valid(id)) {
         auto info = ctx.function->get_unique_info(id);
         SCOPES_ERROR(InaccessibleValue, info.value.get_type(),
@@ -596,6 +598,8 @@ static SCOPES_RESULT(void) validate_merge_values(const IDSet &valid, const Typed
         auto vq = try_view(value->get_type());
         if (!vq) continue;
         for (auto id : vq->ids) {
+            if (id == GlobalUnique)
+                continue;
             if (!valid.count(id)) {
                 SCOPES_ERROR(ViewExitingScope, value->get_type());
             }
@@ -656,6 +660,8 @@ static SCOPES_RESULT(void) move_merge_values(const ASTContext &ctx,
         auto vq = try_view(T);
         if (vq) {
             for (auto &&id : vq->ids) {
+                if (id == GlobalUnique)
+                    continue;
                 auto info = ctx.function->get_unique_info(id);
                 int depth = info.get_depth();
                 if (depth > retdepth) {
@@ -1074,15 +1080,20 @@ SCOPES_RESULT(void) map_keyed_arguments(const Anchor *anchor, const TypedValueRe
     return {};
 }
 
-static SCOPES_RESULT(void) verify_tracked(const Type *T) {
-    SCOPES_RESULT_TYPE(void);
+static SCOPES_RESULT(TypedValueRef) ensure_tracked(TypedValueRef value) {
+    SCOPES_RESULT_TYPE(TypedValueRef);
+    auto T = value->get_type();
     if (is_plain(T))
-        return {};
-
+        return value;
     auto uq = try_unique(T);
-    if (uq) return {};
+    if (uq) return value;
     auto vq = try_view(T);
-    if (vq) return {};
+    if (vq) return value;
+    if (value.isa<Pure>()) {
+        return TypedValueRef(ref(value.anchor(),
+            PureCast::from(view_type(T, { GlobalUnique }),
+            value.cast<Pure>())));
+    }
     SCOPES_ERROR(UntrackedType, T);
 }
 
@@ -1105,7 +1116,7 @@ static SCOPES_RESULT(TypedValueRef) prove_arguments(
                     auto elem = ExtractArgument::from(value, j);
                     {
                         SCOPES_TRACE_PROVE_ARG(elem);
-                        SCOPES_CHECK_RESULT(verify_tracked(elem->get_type()));
+                        elem = SCOPES_GET_RESULT(ensure_tracked(elem));
                     }
                     outargs.push_back(elem);
                 }
@@ -1116,7 +1127,7 @@ static SCOPES_RESULT(TypedValueRef) prove_arguments(
         }
         {
             SCOPES_TRACE_PROVE_ARG(value);
-            SCOPES_CHECK_RESULT(verify_tracked(value->get_type()));
+            value = SCOPES_GET_RESULT(ensure_tracked(value));
         }
         outargs.push_back(ref(values[i].anchor(), value));
     }
@@ -1950,10 +1961,14 @@ const Type *remap_unique_return_arguments(
                 if (vq) {
                     IDSet newids;
                     for (auto vid : vq->ids) {
-                        auto it = idmap.find(vid);
-                        assert(it != idmap.end());
-                        for (auto destid : it->second) {
-                            newids.insert(destid);
+                        if (vid == GlobalUnique) {
+                            newids.insert(GlobalUnique);
+                        } else {
+                            auto it = idmap.find(vid);
+                            assert(it != idmap.end());
+                            for (auto destid : it->second) {
+                                newids.insert(destid);
+                            }
                         }
                     }
                     argT = view_type(strip_view(argT), newids);
@@ -2797,7 +2812,10 @@ repeat:
             CHECKARGS(1, 1);
             READ_AUTOMOVE_TYPEOF(T);
             auto NT = SCOPES_GET_RESULT(ptr_to_ref(T));
-            if (is_plain(T) && _T.isa<Pure>()) {
+            if (_T.isa<Pure>()) {
+                if (!is_plain(T)) {
+                    NT = view_type(NT, { GlobalUnique });
+                }
                 return TypedValueRef(
                     ref(call.anchor(), PureCast::from(NT, _T.cast<Pure>())));
             } else {

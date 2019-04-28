@@ -384,6 +384,7 @@ Function::Function(Symbol _name, const Parameters &_params)
 
 const Function::UniqueInfo &Function::get_unique_info(int id) const {
     assert(id != 0);
+    assert(id != GlobalUnique);
     assert(id < nextid);
     auto it = uniques.find(id);
     assert(it != uniques.end());
@@ -666,7 +667,7 @@ bool Block::is_valid(const ValueIndex &value, int &_id) const {
 
 bool Block::is_valid(const IDSet &ids, int &_id) const {
     for (auto id : ids) {
-        if (!valid.count(id)) {
+        if (!is_valid(id)) {
             _id = id;
             return false;
         }
@@ -675,11 +676,11 @@ bool Block::is_valid(const IDSet &ids, int &_id) const {
 }
 
 bool Block::is_valid(int id) const {
-    return valid.count(id);
+    return (id == GlobalUnique)?true:valid.count(id);
 }
 
 void Block::move(int id) {
-    assert(valid.count(id));
+    assert(is_valid(id));
     valid.erase(id);
 }
 

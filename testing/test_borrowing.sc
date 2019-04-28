@@ -477,4 +477,21 @@ test-refcount (inline () (f))
 
 # TODO: what happens when we pass view handles to tupleof?
 
+fn f ()
+    tupleof (view (One 100))
+    ;
+# error: arguments of type 1001:{One} and %1000:One must both be movable
+test-compiler-error (static-typify f)
+
+# globals
+
+global x : One 303
+fn get_x () x
+print (get_x)
+# global lives forever
+test-error (One.test-refcount-balanced)
+
 # TODO: builtins
+
+
+;
