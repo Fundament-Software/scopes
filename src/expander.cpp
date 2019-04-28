@@ -747,6 +747,7 @@ struct Expander {
             SCOPES_CHECK_RESULT(verify_list_parameter_count("branch", it, 1, -1));
             auto branch_anchor = it->at.anchor();
 
+            #if 0
             // check for new form
             auto new_form = false;
             {
@@ -761,8 +762,10 @@ struct Expander {
                     subit = subit->next;
                 }
             }
+            #endif
             it = it->next;
 
+            #if 0
             if (new_form) {
                 Values condvals;
                 assert(it);
@@ -791,7 +794,9 @@ struct Expander {
                 ifexpr->append_then(cond,
                     SCOPES_GET_RESULT(
                         subexp.expand_expression(ref(branch_anchor, it), false)));
-            } else {
+            } else
+            #endif
+            {
                 Expander subexp(env, astscope);
                 assert(it);
                 subexp.next = it->next;
