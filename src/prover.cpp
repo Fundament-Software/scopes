@@ -2023,7 +2023,7 @@ repeat:
             Symbols keys;
             bool vararg = keys_from_parameters(keys, cl->func->params);
             SCOPES_CHECK_RESULT(map_keyed_arguments(call.anchor(),
-                ref(callee_anchor, callee),
+                ref(cl->func.anchor(), callee),
                 args, values, keys, vararg));
             values = args;
         }
