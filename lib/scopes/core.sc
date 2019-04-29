@@ -40,10 +40,6 @@ let square-list = spice-unquote-arguments
 # first we alias u64 to the integer type that can hold a pointer
 let intptr = u64
 
-inline drop (value)
-    __drop value
-    lose value
-
 # pointer comparison as a template function, because we'll compare pointers of many types
 fn ptrcmp!= (t1 t2)
     icmp!= (ptrtoint t1 intptr) (ptrtoint t2 intptr)
@@ -350,14 +346,20 @@ let elementof =
             verify-count argcount 1 2
             let self = (unbox-pointer (sc_getarg args 0) type)
             let index =
-                if (icmp== argcount 2) (unbox-integer (sc_getarg args 1) i32)
+                if (icmp== argcount 2)
+                    let arg = (sc_getarg args 1)
+                    if (ptrcmp== (sc_value_type arg) Symbol)
+                        let sym = (unbox-integer arg Symbol)
+                        sc_type_field_index self sym
+                    else
+                        unbox-integer arg i32
                 else 0
             hide-traceback;
             `[(sc_type_element_at self index)]
 
 let elementsof =
     box-spice-macro
-        fn "elementof" (args)
+        fn "elementsof" (args)
             let argcount = (sc_argcount args)
             verify-count argcount 1 1
             let self = (unbox-pointer (sc_getarg args 0) type)
@@ -2046,6 +2048,18 @@ let
     lslice = (unbalanced-binary-op-dispatch '__lslice usize "apply left-slice operator with")
     rslice = (unbalanced-binary-op-dispatch '__rslice usize "apply right-slice operator with")
 
+let drop =
+    spice-macro
+        fn (args)
+            let argc = ('argcount args)
+            verify-count argc 1 1
+            let value = ('getarg args 0)
+            let block = (sc_expression_new)
+            let anchor = ('anchor args)
+            sc_expression_append block ('tag `(__drop value) anchor)
+            sc_expression_append block ('tag `(lose value) anchor)
+            block
+
 let repr =
     spice-macro
         fn (args)
@@ -2771,6 +2785,13 @@ fn extract-single-arg (args)
     verify-count argc 1 1
     'getarg args 0
 
+fn extract-single-type-arg (args)
+    let value = (extract-single-arg args)
+    if (== ('typeof value) type)
+        as value type
+    else
+        'typeof value
+
 inline make-const-type-property-function (func)
     spice-macro
         fn (args)
@@ -2793,6 +2814,8 @@ let
     superof = (make-const-type-property-function sc_typename_type_get_super)
     sizeof = (make-const-type-property-function sc_type_sizeof)
     alignof = (make-const-type-property-function sc_type_alignof)
+    unqualified = (make-const-type-property-function sc_strip_qualifiers)
+    keyof = (make-const-type-property-function sc_type_key)
     returnof =
         make-const-type-property-function
             fn (T)
@@ -3413,7 +3436,8 @@ fn require-from (base-dir name)
             sc_write "' in paths:\n"
             loop (patterns = all-patterns)
                 if (empty? patterns)
-                    error "failed to import module"
+                    error
+                        .. "failed to import module '" (repr name) "'"
                 let pattern patterns = (decons patterns)
                 let pattern = (pattern as string)
                 let module-path = (make-module-path pattern namestr)

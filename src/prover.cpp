@@ -2078,7 +2078,9 @@ repeat:
             bool valid = ctx.block->is_valid(ValueIndex(values[0]));
             return TypedValueRef(call.anchor(), ConstInt::from(TYPE_Bool, valid));
         }
-        SCOPES_CHECK_RESULT(verify_valid(ctx, values, "builtin call"));
+        if (b != FN_IsDropped) {
+            SCOPES_CHECK_RESULT(verify_valid(ctx, values, "builtin call"));
+        }
         switch(b.value()) {
         /*** DEBUGGING ***/
         case FN_DumpUniques: {
@@ -2184,6 +2186,11 @@ repeat:
                 ctx.move(uq->id, call);
             }
             return ref(call.anchor(), ArgumentList::from({}));
+        } break;
+        case FN_IsDropped: {
+            CHECKARGS(1, 1);
+            bool valid = ctx.block->is_valid(ValueIndex(values[0]));
+            return TypedValueRef(ref(call.anchor(), ConstInt::from(TYPE_Bool, !valid)));
         } break;
         case FN_Dupe: {
             CHECKARGS(1, 1);

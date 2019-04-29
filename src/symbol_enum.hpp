@@ -244,6 +244,7 @@ namespace scopes {
     T(FN_View, "view") \
     T(FN_Viewing, "viewing") \
     T(FN_Lose, "lose") \
+    T(FN_IsDropped, "dropped?") \
     T(FN_Assign, "assign") \
     T(FN_Deref, "deref") \
     T(FN_PtrToRef, "ptrtoref") \
