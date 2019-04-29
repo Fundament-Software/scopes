@@ -23,7 +23,9 @@ include
     #define ULONGVAL 0x3ull
     // eof
 
-assert ((testfunc 2 3) == 6)
+test ((testfunc 2 3) == 6)
+
+static-test ((returnof testfunc) == i32)
 
 static-assert ((typeof DOUBLEVAL) == f64)
 static-assert ((typeof FLOATVAL) == f32)

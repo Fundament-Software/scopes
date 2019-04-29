@@ -2775,7 +2775,12 @@ inline make-const-type-property-function (func)
     spice-macro
         fn (args)
             let value = (extract-single-arg args)
-            let val = (func (as value type))
+            let val =
+                if (== ('typeof value) type)
+                    as value type
+                else
+                    'typeof value
+            let val = (func val)
             `val
 
 let
@@ -2788,6 +2793,16 @@ let
     superof = (make-const-type-property-function sc_typename_type_get_super)
     sizeof = (make-const-type-property-function sc_type_sizeof)
     alignof = (make-const-type-property-function sc_type_alignof)
+    returnof =
+        make-const-type-property-function
+            fn (T)
+                let T =
+                    if ('function-pointer? T) ('element@ T 0)
+                    elseif ('function? T) T
+                    else
+                        hide-traceback;
+                        error "function type expected"
+                'return-type T
 
 #del extract-single-arg
 #del make-const-type-property-function
