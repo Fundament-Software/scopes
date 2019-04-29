@@ -2057,7 +2057,6 @@ repeat:
     } else if (T == TYPE_ASTMacro) {
         auto fptr = SCOPES_GET_RESULT(extract_astmacro_constant(callee));
         assert(fptr);
-            SCOPES_CHECK_RESULT(verify_valid(ctx, values, "spice call"));
         SCOPES_ASTCONTEXT(ctx);
         auto result = fptr(ref(call.anchor(), ArgumentList::from(values)));
         if (result.ok) {
