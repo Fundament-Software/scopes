@@ -517,16 +517,18 @@ static bool needs_autofree(const Type *T) {
 static SCOPES_RESULT(void) drop_value(const ASTContext &ctx,
     const ValueRef &mover, const ValueIndex &arg) {
     SCOPES_RESULT_TYPE(void);
-    auto anchor = mover.anchor();
-    SCOPES_CHECK_RESULT(build_drop(ctx, anchor, arg));
-    auto argT = arg.get_type();
-    int id = get_unique(argT)->id;
-    #if 1
-    if (needs_autofree(argT)) {
-        build_free(ctx, anchor, ref(anchor, ExtractArgument::from(arg.value, arg.index)));
+    if (ctx.block->is_valid(arg)) {
+        auto anchor = mover.anchor();
+        SCOPES_CHECK_RESULT(build_drop(ctx, anchor, arg));
+        auto argT = arg.get_type();
+        int id = get_unique(argT)->id;
+        #if 1
+        if (needs_autofree(argT)) {
+            build_free(ctx, anchor, ref(anchor, ExtractArgument::from(arg.value, arg.index)));
+        }
+        #endif
+        ctx.move(id, ref(anchor, mover));
     }
-    #endif
-    ctx.move(id, ref(anchor, mover));
     return {};
 }
 
