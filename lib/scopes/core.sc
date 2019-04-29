@@ -2054,11 +2054,14 @@ let drop =
             let argc = ('argcount args)
             verify-count argc 1 1
             let value = ('getarg args 0)
-            let block = (sc_expression_new)
             let anchor = ('anchor args)
-            sc_expression_append block ('tag `(__drop value) anchor)
-            sc_expression_append block ('tag `(lose value) anchor)
-            block
+            let dropped = (sc_prove ('tag `(dropped? value) anchor))
+            if (unbox-integer dropped bool) `()
+            else
+                let block = (sc_expression_new)
+                sc_expression_append block ('tag `(__drop value) anchor)
+                sc_expression_append block ('tag `(lose value) anchor)
+                block
 
 let repr =
     spice-macro
