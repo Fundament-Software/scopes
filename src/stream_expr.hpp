@@ -33,6 +33,7 @@ struct StreamExprFormat {
 
     bool naked;
     bool types;
+    bool showtabs;
     Tagging anchors;
     int maxdepth;
     int maxlength;
@@ -40,6 +41,8 @@ struct StreamExprFormat {
     int depth;
 
     StreamExprFormat();
+
+    static StreamExprFormat serialize();
 
     static StreamExprFormat debug();
 

@@ -51,12 +51,19 @@ Style default_symbol_styler(Symbol name) {
 StreamExprFormat::StreamExprFormat() :
     naked(true),
     types(true),
+    showtabs(true),
     anchors(None),
     maxdepth(1<<30),
     maxlength(1<<30),
     symbol_styler(default_symbol_styler),
     depth(0)
 {}
+
+StreamExprFormat StreamExprFormat::serialize() {
+    auto fmt = StreamExprFormat();
+    fmt.showtabs = false;
+    return fmt;
+}
 
 StreamExprFormat StreamExprFormat::debug() {
     auto fmt = StreamExprFormat();
@@ -595,11 +602,17 @@ StreamExpr(StyledStream &_ss, const StreamExprFormat &_fmt) :
 
 void stream_indent(int depth = 0) {
     if (depth >= 1) {
-        ss << Style_Comment << "    ";
-        for (int i = 2; i <= depth; ++i) {
-            ss << INDENT_SEP << "   ";
+        if (fmt.showtabs) {
+            ss << Style_Comment << "    ";
+            for (int i = 2; i <= depth; ++i) {
+                ss << INDENT_SEP << "   ";
+            }
+            ss << Style_None;
+        } else {
+            for (int i = 1; i <= depth; ++i) {
+                ss << "    ";
+            }
         }
-        ss << Style_None;
     }
 }
 

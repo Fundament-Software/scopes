@@ -1987,7 +1987,7 @@ static SCOPES_RESULT(TypedValueRef) prove_CallTemplate(
     const ASTContext &ctx, const CallTemplateRef &call) {
     SCOPES_RESULT_TYPE(TypedValueRef);
     SCOPES_TRACE_PROVE_EXPR(call);
-    auto callee_anchor = call->callee.anchor();
+    //auto callee_anchor = call->callee.anchor();
     //const Anchor *anchor = get_best_anchor(call);
     TypedValueRef callee = ref(call->callee.anchor(),
         SCOPES_GET_RESULT(prove(ctx, call->callee)));

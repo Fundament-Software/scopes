@@ -941,7 +941,10 @@ const sc_string_t *sc_list_repr(const sc_list_t *l) {
 const sc_string_t *sc_list_serialize(const sc_list_t *l) {
     using namespace scopes;
     StyledString ss = StyledString::plain();
-    stream_list(ss.out, l, StreamListFormat());
+    while (l) {
+        stream_value(ss.out, l->at, StreamValueFormat::serialize());
+        l = l->next;
+    }
     return ss.str();
 }
 
