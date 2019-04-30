@@ -24,6 +24,9 @@
 #include <llvm-c/ExecutionEngine.h>
 #endif
 
+#include "llvm/IR/Module.h"
+#include "llvm/ExecutionEngine/ExecutionEngine.h"
+
 #include <stdio.h>
 #include <assert.h>
 #include <vector>
@@ -196,6 +199,9 @@ SCOPES_RESULT(void) add_module(LLVMModuleRef module) {
         }
     }
     LLVMAddModule(ee, module);
+    llvm::ExecutionEngine *pEE = reinterpret_cast<llvm::ExecutionEngine*>(ee);
+    pEE->runStaticConstructorsDestructors(
+        *reinterpret_cast<llvm::Module *>(module), false);
     return {};
 }
 

@@ -1884,6 +1884,14 @@ struct LLVMIRGenerator {
         return LLVMConstReal(T, node->value);
     }
 
+    LLVMValueRef make_string_constant(const char *str) {
+        auto data = LLVMConstString(str, strlen(str)+1, true);
+        auto basevalue = LLVMAddGlobal(module, LLVMTypeOf(data), "");
+        LLVMSetInitializer(basevalue, data);
+        LLVMSetGlobalConstant(basevalue, true);
+        return basevalue;
+    }
+
     SCOPES_RESULT(LLVMValueRef) ConstPointer_to_value(const ConstPointerRef &node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         auto LLT = SCOPES_GET_RESULT(type_to_llvm_type(node->get_type()));
@@ -2270,6 +2278,36 @@ struct LLVMIRGenerator {
 
         auto func = SCOPES_GET_RESULT(ref_to_value(ValueIndex(entry)));
         LLVMSetLinkage(func, LLVMExternalLinkage);
+
+        #if 0
+        {
+            auto arg = LLVMPointerType(i8T, 0);
+            auto putsf = LLVMAddFunction(module, "puts",
+                LLVMFunctionType(i32T, &arg, 1, false));
+            LLVMSetLinkage(putsf, LLVMExternalLinkage);
+            StyledString ss;
+            ss.out << "hi from constructor " << (void *)putsf << std::endl;
+            auto msg = make_string_constant(ss.str()->data);
+
+            auto ftype = LLVMFunctionType(voidT, nullptr, 0, false);
+            auto func = LLVMAddFunction(module, ss.str()->data, ftype);
+            //LLVMSetLinkage(func, LLVMPrivateLinkage);
+            auto bb = LLVMAppendBasicBlock(func, "");
+            position_builder_at_end(bb);
+
+            auto msgptr = LLVMBuildBitCast(builder, msg, arg, "");
+            LLVMBuildCall(builder, putsf, &msgptr, 1, "");
+            LLVMBuildRetVoid(builder);
+            LLVMValueRef constvals[] = {
+                LLVMConstInt(i32T, 100, false),
+                func };
+            auto strct = LLVMConstStruct(constvals, 2, false);
+            auto arr = LLVMConstArray(LLVMTypeOf(strct), &strct, 1);
+            auto glob = LLVMAddGlobal(module, LLVMTypeOf(arr), "llvm.global_ctors");
+            LLVMSetInitializer(glob, arr);
+            LLVMSetLinkage(glob, LLVMAppendingLinkage);
+        }
+        #endif
 
         SCOPES_CHECK_RESULT(teardown_generate(entry));
 

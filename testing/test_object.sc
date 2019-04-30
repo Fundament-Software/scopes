@@ -21,14 +21,18 @@ fn main (argc argv)
     x @ 3 = 6
     y = 7
     C.printf ("hello world %i %i\n" as rawstring)
-        load (reftoptr (x @ 3))
-        load (reftoptr y)
+        deref (x @ 3)
+        deref y
+    #print "hello world"
+        deref (x @ 3)
+        deref y
     return 0
 
-let main = (typify main i32 (pointer rawstring))
-compile main
+let main = (static-typify main i32 (pointer rawstring))
+#compile main
     'dump-module
     'no-debug-info
+main 0 null
 
 print "-----------------"
 
