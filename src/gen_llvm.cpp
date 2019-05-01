@@ -56,6 +56,8 @@ namespace scopes {
 #define SCOPES_GEN_TARGET "IR"
 #define SCOPES_LLVM_CACHE_FUNCTIONS 1
 
+#define SCOPES_LLVM_SUPPORT_DISASSEMBLY 1
+
 //------------------------------------------------------------------------------
 // IL->LLVM IR GENERATOR
 //------------------------------------------------------------------------------
@@ -988,7 +990,13 @@ struct LLVMIRGenerator {
         if (!generate_object) {
             auto it = func_cache.find(node.unref());
             if (it != func_cache.end()) {
+                #if !SCOPES_USE_ORCJIT
+                // with eager evaluation, ORCJIT takes ownership of modules
+                // and eventually destroys them - so we can end up with the
+                // same module pointer even though these are different
+                // instances.
                 assert(it->second != module);
+                #endif
                 return func;
             }
 
@@ -1007,6 +1015,8 @@ struct LLVMIRGenerator {
         } else {
 #if !SCOPES_LLVM_CACHE_FUNCTIONS
             LLVMSetLinkage(func, LLVMPrivateLinkage);
+#else
+            //LLVMSetLinkage(func, LLVMExternalLinkage);
 #endif
         }
         function_todo.push_back(node);
@@ -1853,7 +1863,7 @@ struct LLVMIRGenerator {
                     if (!ptr) {
                         last_llvm_error = nullptr;
                         LLVMInstallFatalErrorHandler(fatal_error_handler);
-                        ptr = get_address(name);
+                        ptr = SCOPES_GET_RESULT(get_address(name));
                         LLVMResetFatalErrorHandler();
                         if (last_llvm_error) {
                             SCOPES_RETURN_ERROR(last_llvm_error);
@@ -2343,7 +2353,7 @@ LLVMAttributeRef LLVMIRGenerator::attr_nonnull = nullptr;
 // IL COMPILER
 //------------------------------------------------------------------------------
 
-#if 1
+#if SCOPES_LLVM_SUPPORT_DISASSEMBLY
 static void pprint(int pos, unsigned char *buf, int len, const char *disasm) {
   int i;
   printf("%04x:  ", pos);
@@ -2396,8 +2406,7 @@ static void do_disassemble(LLVMTargetMachineRef tm, void *fptr, int siz) {
 
 class DisassemblyListener : public llvm::JITEventListener {
 public:
-    llvm::ExecutionEngine *ee;
-    DisassemblyListener(llvm::ExecutionEngine *_ee) : ee(_ee) {}
+    DisassemblyListener() {}
 
     std::unordered_map<void *, size_t> sizes;
 
@@ -2408,7 +2417,7 @@ public:
             #if !defined(__arm__) && !defined(__linux__)
             name = name.substr(1);
             #endif
-            void * addr = (void*)ee->getFunctionAddress(name);
+            void * addr = (void *)get_address(name.data()).assert_ok();
             if(addr) {
                 assert(addr);
                 sizes[addr] = sz;
@@ -2419,6 +2428,8 @@ public:
     virtual void NotifyObjectEmitted(
         const llvm::object::ObjectFile &Obj,
         const llvm::RuntimeDyld::LoadedObjectInfo &L) {
+        StyledStream ss;
+        ss << "object emitted!" << std::endl;
         auto size_map = llvm::object::computeSymbolSizes(Obj);
         for(auto & S : size_map) {
             llvm::object::SymbolRef sym = S.first;
@@ -2482,7 +2493,7 @@ SCOPES_RESULT(void) compile_object(const String *path, Scope *scope, uint64_t fl
     return {};
 }
 
-#if 1
+#if SCOPES_LLVM_SUPPORT_DISASSEMBLY
 static DisassemblyListener *disassembly_listener = nullptr;
 #endif
 
@@ -2530,14 +2541,13 @@ SCOPES_RESULT(ConstPointerRef) compile(const FunctionRef &fn, uint64_t flags) {
     auto func = result.second;
     assert(func);
 
-    init_execution();
-    SCOPES_CHECK_RESULT(add_module(module));
+    SCOPES_CHECK_RESULT(init_execution());
 
-#if 1
+#if SCOPES_LLVM_SUPPORT_DISASSEMBLY
     if (!disassembly_listener && (flags & CF_DumpDisassembly)) {
-        llvm::ExecutionEngine *pEE = reinterpret_cast<llvm::ExecutionEngine*>(get_execution_engine());
-        disassembly_listener = new DisassemblyListener(pEE);
-        pEE->RegisterJITEventListener(disassembly_listener);
+        disassembly_listener = new DisassemblyListener();
+        llvm::JITEventListener *le = disassembly_listener;
+        add_jit_event_listener(reinterpret_cast<LLVMJITEventListenerRef>(le));
     }
 #endif
 
@@ -2558,18 +2568,34 @@ SCOPES_RESULT(ConstPointerRef) compile(const FunctionRef &fn, uint64_t flags) {
         LLVMDumpValue(func);
     }
 
+    std::string funcname;
+    {
+        size_t length = 0;
+        const char *name = LLVMGetValueName2(func, &length);
+        funcname = std::string(name, length);
+    }
+
 #if 1
+    std::vector< std::string > bindsyms;
     for (auto sym : ctx.generated_symbols) {
-        void *ptr = get_pointer_to_global(sym);
         size_t length = 0;
         const char *name = LLVMGetValueName2(sym, &length);
-        set_address_name(ptr, String::from(name, length));
+        bindsyms.push_back(std::string(name, length));
+    }
+#endif
+
+    SCOPES_CHECK_RESULT(add_module(module));
+
+#if 1
+    for (auto sym : bindsyms) {
+        void *ptr = (void *)SCOPES_GET_RESULT(get_address(sym.c_str()));
+        set_address_name(ptr, String::from(sym.c_str(), sym.size()));
     }
 #endif
 
     //LLVMDumpModule(module);
-    void *pfunc = get_pointer_to_global(func);
-#if 1
+    void *pfunc = (void *)SCOPES_GET_RESULT(get_address(funcname.c_str()));
+#if SCOPES_LLVM_SUPPORT_DISASSEMBLY
     if (flags & CF_DumpDisassembly) {
         assert(disassembly_listener);
         //auto td = LLVMGetExecutionEngineTargetData(ee);

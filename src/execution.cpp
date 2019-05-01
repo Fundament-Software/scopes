@@ -15,17 +15,16 @@
 #include <dlfcn.h>
 #endif
 
-#define SCOPES_USE_ORCJIT 0
-
 #include <llvm-c/Core.h>
 #include <llvm-c/TargetMachine.h>
 #include <llvm-c/Support.h>
-#if !SCOPES_USE_ORCJIT
+#if SCOPES_USE_ORCJIT
+#include <llvm-c/OrcBindings.h>
+#else
 #include <llvm-c/ExecutionEngine.h>
-#endif
-
 #include "llvm/IR/Module.h"
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
+#endif
 
 #include <stdio.h>
 #include <assert.h>
@@ -81,19 +80,24 @@ LLVMTargetMachineRef get_target_machine() {
     return target_machine;
 }
 
+void add_jit_event_listener(LLVMJITEventListenerRef listener) {
+    LLVMOrcRegisterJITEventListener(orc, listener);
+}
+
 uint64_t lazy_compile_callback(LLVMOrcJITStackRef orc, void *ctx) {
     printf("lazy_compile_callback ???\n");
     return 0;
 }
 
-void init_execution() {
-    if (orc) return;
+SCOPES_RESULT(void) init_execution() {
+    SCOPES_RESULT_TYPE(void);
+    if (orc) return {};
     char *triple = LLVMGetDefaultTargetTriple();
     //printf("triple: %s\n", triple);
     char *error_message = nullptr;
     LLVMTargetRef target = nullptr;
     if (LLVMGetTargetFromTriple(triple, &target, &error_message)) {
-        location_error(String::from_cstr(error_message));
+        SCOPES_ERROR(ExecutionEngineFailed, error_message);
     }
     assert(target);
     assert(LLVMTargetHasJIT(target));
@@ -131,6 +135,7 @@ void init_execution() {
     LLVMOrcErrorCode err = LLVMOrcCreateLazyCompileCallback(orc, &retaddr, lazy_compile_callback, nullptr);
     assert(err == LLVMOrcErrSuccess);
 #endif
+    return {};
 }
 
 static uint64_t orc_symbol_resolver(const char *name, void *ctx) {
@@ -142,45 +147,72 @@ static uint64_t orc_symbol_resolver(const char *name, void *ctx) {
 }
 
 static std::vector<LLVMOrcModuleHandle *> module_handles;
-void add_module(LLVMModuleRef module) {
+SCOPES_RESULT(void) add_module(LLVMModuleRef module) {
+    SCOPES_RESULT_TYPE(void);
     //LLVMDumpModule(module);
-    LLVMSharedModuleRef smod = LLVMOrcMakeSharedModule(module);
-    assert(smod);
     LLVMOrcModuleHandle *handle = new LLVMOrcModuleHandle();
     module_handles.push_back(handle);
-    LLVMOrcErrorCode err = LLVMOrcAddLazilyCompiledIR(orc, handle, smod, orc_symbol_resolver, nullptr);
-    assert(err == LLVMOrcErrSuccess);
+#if 0
+    // breaks tukan?
+    auto err = LLVMOrcAddLazilyCompiledIR(orc, handle, module,
+        orc_symbol_resolver, nullptr);
+#else
+    auto err = LLVMOrcAddEagerlyCompiledIR(orc, handle, module,
+        orc_symbol_resolver, nullptr);
+#endif
+    if (err) {
+        SCOPES_ERROR(ExecutionEngineFailed, LLVMGetErrorMessage(err));
+    }
+    return {};
 }
 
-uint64_t get_address(const char *name) {
-    assert(false);
-    return 0;
+SCOPES_RESULT(uint64_t) get_address(const char *name) {
+    SCOPES_RESULT_TYPE(uint64_t);
+    LLVMOrcTargetAddress addr = 0;
+    auto err = LLVMOrcGetSymbolAddress(orc, &addr, name);
+    if (err) {
+        SCOPES_ERROR(ExecutionEngineFailed, LLVMGetErrorMessage(err));
+    }
+    if (!addr) {
+        StyledStream ss;
+        ss << "get_address(): symbol missing '" << name << "'" << std::endl;
+    }
+    assert(addr);
+    return addr;
 }
 
-void *get_pointer_to_global(LLVMValueRef g) {
-    const char *sym_name = LLVMGetValueName(g);
+SCOPES_RESULT(void *) get_pointer_to_global(LLVMValueRef g) {
+    SCOPES_RESULT_TYPE(void *);
+    size_t length = 0;
+    const char *sym_name = LLVMGetValueName2(g, &length);
+    assert(length);
 #if 0
     char *mangled_sym_name = nullptr;
     LLVMOrcGetMangledSymbol(orc, &mangled_sym_name, sym_name);
     printf("mangled sym: %s\n", mangled_sym_name);
     LLVMOrcDisposeMangledSymbol(mangled_sym_name);
 #endif
-    LLVMOrcTargetAddress addr = 0;
-    LLVMOrcErrorCode err = LLVMOrcGetSymbolAddress(orc, &addr, sym_name);
-    assert(err == LLVMOrcErrSuccess);
-    assert(addr);
-    return reinterpret_cast<void *>(addr);
+    return (void *)SCOPES_GET_RESULT(get_address(sym_name));
 }
 
 #else // !SCOPES_USE_ORCJIT
 
 static LLVMExecutionEngineRef ee = nullptr;
 
+#if 0
 LLVMExecutionEngineRef get_execution_engine() {
     return ee;
 }
+#endif
 
-void init_execution() {
+void add_jit_event_listener(LLVMJITEventListenerRef listener) {
+    llvm::ExecutionEngine *pEE = reinterpret_cast<llvm::ExecutionEngine*>(ee);
+    pEE->RegisterJITEventListener(
+        reinterpret_cast<llvm::JITEventListener *>(listener));
+}
+
+SCOPES_RESULT(void) init_execution() {
+    return {};
 }
 
 SCOPES_RESULT(void) add_module(LLVMModuleRef module) {
@@ -205,11 +237,15 @@ SCOPES_RESULT(void) add_module(LLVMModuleRef module) {
     return {};
 }
 
-uint64_t get_address(const char *name) {
-    return LLVMGetGlobalValueAddress(ee, name);
+SCOPES_RESULT(uint64_t) get_address(const char *name) {
+    SCOPES_RESULT_TYPE(uint64_t);
+    auto ptr = LLVMGetGlobalValueAddress(ee, name);
+    if (ptr) return ptr;
+    llvm::ExecutionEngine *pEE = reinterpret_cast<llvm::ExecutionEngine*>(ee);
+    return pEE->getFunctionAddress(name);
 }
 
-void *get_pointer_to_global(LLVMValueRef g) {
+SCOPES_RESULT(void *) get_pointer_to_global(LLVMValueRef g) {
     return LLVMGetPointerToGlobal(ee, g);
 }
 

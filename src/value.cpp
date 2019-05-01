@@ -93,7 +93,7 @@ repeat:
 }
 
 bool ValueIndex::operator ==(const ValueIndex &other) const {
-    return value == other.value && index == other.index;
+    return value.unref() == other.value.unref() && index == other.index;
 }
 
 const Type *ValueIndex::get_type() const {
