@@ -990,13 +990,13 @@ struct LLVMIRGenerator {
         if (!generate_object) {
             auto it = func_cache.find(node.unref());
             if (it != func_cache.end()) {
-                #if !SCOPES_USE_ORCJIT
+                //#if !SCOPES_USE_ORCJIT
                 // with eager evaluation, ORCJIT takes ownership of modules
                 // and eventually destroys them - so we can end up with the
                 // same module pointer even though these are different
                 // instances.
                 assert(it->second != module);
-                #endif
+                //#endif
                 return func;
             }
 

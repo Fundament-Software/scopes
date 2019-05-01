@@ -152,6 +152,22 @@ SCOPES_RESULT(void) add_module(LLVMModuleRef module) {
     //LLVMDumpModule(module);
     LLVMOrcModuleHandle *handle = new LLVMOrcModuleHandle();
     module_handles.push_back(handle);
+#if 1
+    auto target_machine = get_target_machine();
+    assert(target_machine);
+
+    char *errormsg;
+    LLVMMemoryBufferRef membuf;
+    if (LLVMTargetMachineEmitToMemoryBuffer(target_machine, module,
+        LLVMObjectFile, &errormsg, &membuf)) {
+        SCOPES_ERROR(CGenBackendFailed, errormsg);
+    }
+
+    auto err = LLVMOrcAddObjectFile(orc, handle, membuf,
+        orc_symbol_resolver, nullptr);
+
+#else
+
 #if 0
     // breaks tukan?
     auto err = LLVMOrcAddLazilyCompiledIR(orc, handle, module,
@@ -159,6 +175,7 @@ SCOPES_RESULT(void) add_module(LLVMModuleRef module) {
 #else
     auto err = LLVMOrcAddEagerlyCompiledIR(orc, handle, module,
         orc_symbol_resolver, nullptr);
+#endif
 #endif
     if (err) {
         SCOPES_ERROR(ExecutionEngineFailed, LLVMGetErrorMessage(err));
