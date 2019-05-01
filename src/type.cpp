@@ -110,6 +110,10 @@ bool Type::lookup_return_handler(ValueRef &dest) const {
     return lookup(SYM_ReturnHandler, dest);
 }
 
+bool Type::lookup_quote_handler(ValueRef &dest) const {
+    return lookup(SYM_QuoteHandler, dest);
+}
+
 const Type::Map &Type::get_symbols() const {
     return symbols;
 }

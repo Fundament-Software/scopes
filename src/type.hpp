@@ -84,6 +84,7 @@ struct Type {
 
     bool lookup_call_handler(ValueRef &dest) const;
     bool lookup_return_handler(ValueRef &dest) const;
+    bool lookup_quote_handler(ValueRef &dest) const;
 
     std::vector<Symbol> find_closest_match(Symbol name) const;
 
