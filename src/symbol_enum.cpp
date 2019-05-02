@@ -48,7 +48,6 @@ B_SPIRV_IMAGE_FORMAT()
     case SYM_SPIRV_ImageOperand ## NAME: return "SYM_SPIRV_ImageOperand" #NAME;
 B_SPIRV_IMAGE_OPERAND()
 #undef T
-case SYM_Count: return "SYM_Count";
     }
     return "?";
 }

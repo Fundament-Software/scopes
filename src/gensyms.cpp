@@ -10,20 +10,29 @@
 #include "hash.hpp"
 
 #include <string.h>
+#include <assert.h>
 #include <iostream>
+#include <unordered_set>
 
-//#define NEWMODE
+#define NEWMODE
 
 using namespace std;
 
+static std::unordered_set<uint64_t> seen_hashes;
+
 void write_entry(const char *symbol, const char *str) {
     using namespace scopes;
-    auto id = hash_bytes(str, strlen(str));
+    auto len = strlen(str);
+    auto id = len?hash_bytes(str, len):0;
 #ifdef NEWMODE
     cout << "    " << symbol << " = " << id << "ull, /*" << str << "*/" << endl;
 #else
     cout << "    " << symbol << ", /*" << str << "*/" << endl;
 #endif
+    if (seen_hashes.count(id)) {
+        assert(false && "duplicate hash");
+    }
+    seen_hashes.insert(id);
 }
 
 int main(int argc, char *argv[]) {

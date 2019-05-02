@@ -29,7 +29,6 @@ const char SYMBOL_ESCAPE_CHARS[] = " []{}()\"";
 
 struct Symbol {
     typedef KnownSymbol EnumT;
-    enum { end_value = SYM_Count };
 
     struct Hash {
         std::size_t operator()(const scopes::Symbol & s) const;
