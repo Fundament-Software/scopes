@@ -27,6 +27,7 @@ syntax: regexp
 ^scopes[.]h$
 ^doc/_build/
 ^bin/
+^src/known_symbols.hpp
 ^Makefile$
 ^scopes[.]make$
 ^build/

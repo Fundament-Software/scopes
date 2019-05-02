@@ -5,6 +5,7 @@
 */
 
 #include "symbol_enum.hpp"
+#include "symbol_enum.inc"
 
 namespace scopes {
 

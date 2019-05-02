@@ -25,6 +25,7 @@
 #include "anchor.hpp"
 #include "scopes/scopes.h"
 #include "qualifier.inc"
+#include "symbol_enum.inc"
 
 #include <algorithm>
 #include <unordered_set>

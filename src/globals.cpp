@@ -30,6 +30,7 @@
 #include "prover.hpp"
 #include "quote.hpp"
 #include "boot.hpp"
+#include "symbol_enum.inc"
 
 #include "scopes/scopes.h"
 

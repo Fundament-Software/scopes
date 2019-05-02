@@ -10,6 +10,8 @@
 #pragma GCC diagnostic ignored "-Wgnu-zero-variadic-macro-arguments"
 #pragma GCC diagnostic ignored "-Wextra-semi"
 
+#define SCOPES_STRINGIFY(X) #X
+
 #define SCOPES_CAT(a, ...) SCOPES_PRIMITIVE_CAT(a, __VA_ARGS__)
 #define SCOPES_PRIMITIVE_CAT(a, ...) a ## __VA_ARGS__
 

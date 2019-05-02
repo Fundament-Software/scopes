@@ -7,6 +7,7 @@
 #include "symbol.hpp"
 #include "hash.hpp"
 #include "styled_stream.hpp"
+#include "symbol_enum.inc"
 
 #include <memory.h>
 #include <string.h>

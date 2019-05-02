@@ -90,6 +90,18 @@ solution "scopes"
     configurations { "debug", "release" }
     platforms { "native", "x64" }
 
+project "gensyms"
+    kind "ConsoleApp"
+    language "C++"
+    files {
+        "src/gensyms.cpp",
+    }
+    targetdir "bin"
+
+    postbuildcommands {
+        BINDIR .. "/gensyms > " .. THISDIR .. "/src/known_symbols.hpp"
+    }
+
 project "scopesrt"
     kind "SharedLib"
     language "C++"
