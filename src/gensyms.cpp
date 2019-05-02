@@ -7,12 +7,23 @@
 #include "symbol_enum.inc"
 #include "ppmacro.inc"
 
+#include "hash.hpp"
+
+#include <string.h>
 #include <iostream>
+
+//#define NEWMODE
 
 using namespace std;
 
 void write_entry(const char *symbol, const char *str) {
+    using namespace scopes;
+    auto id = hash_bytes(str, strlen(str));
+#ifdef NEWMODE
+    cout << "    " << symbol << " = " << id << "ull, /*" << str << "*/" << endl;
+#else
     cout << "    " << symbol << ", /*" << str << "*/" << endl;
+#endif
 }
 
 int main(int argc, char *argv[]) {
@@ -55,7 +66,9 @@ int main(int argc, char *argv[]) {
     B_SPIRV_IMAGE_OPERAND()
 #undef T
 
+#ifndef NEWMODE
     cout << "    SYM_Count," << endl;
+#endif
     cout << "};" << endl;
     cout << endl;
     cout << "} // namespace scopes" << endl;

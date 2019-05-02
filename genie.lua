@@ -94,13 +94,24 @@ project "gensyms"
     kind "ConsoleApp"
     language "C++"
     files {
+        "src/hash.cpp",
         "src/gensyms.cpp",
     }
     targetdir "bin"
 
+    includedirs {
+        "external",
+    }
+
     postbuildcommands {
         BINDIR .. "/gensyms > " .. THISDIR .. "/src/known_symbols.hpp"
     }
+
+    configuration { "linux" }
+        buildoptions_cpp {
+            "-ferror-limit=1",
+        }
+
 
 project "scopesrt"
     kind "SharedLib"
@@ -168,6 +179,16 @@ project "scopesrt"
         "SPIRV-Cross/spirv_cross.cpp",
         "SPIRV-Cross/spirv_cfg.cpp",
     }
+    links {
+        "gensyms"
+    }
+    --custombuildtask {
+    --    {
+    --        "src/symbol_enum.inc", "src/known_symbols.hpp",
+    --        { BINDIR .. "/gensyms", "src/gensyms.cpp", },
+    --        { "$(1) $(<) > $(@)" }
+    --    }
+    --}
     includedirs {
         "external/linenoise-ng/include",
         "external",
