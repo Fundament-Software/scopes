@@ -8,6 +8,7 @@
 #include "string.hpp"
 #include "error.hpp"
 #include "symbol.hpp"
+#include "cache.hpp"
 
 #ifdef SCOPES_WIN32
 #include "dlfcn.h"
@@ -20,6 +21,7 @@
 #include <llvm-c/Support.h>
 #if SCOPES_USE_ORCJIT
 #include <llvm-c/OrcBindings.h>
+#include <llvm-c/BitWriter.h>
 #else
 #include <llvm-c/ExecutionEngine.h>
 #include "llvm/IR/Module.h"
@@ -27,6 +29,7 @@
 #endif
 
 #include <stdio.h>
+#include <string.h>
 #include <assert.h>
 #include <vector>
 
@@ -146,37 +149,52 @@ static uint64_t orc_symbol_resolver(const char *name, void *ctx) {
     return reinterpret_cast<uint64_t>(ptr);
 }
 
-static std::vector<LLVMOrcModuleHandle *> module_handles;
+static std::vector<LLVMOrcModuleHandle> module_handles;
 SCOPES_RESULT(void) add_module(LLVMModuleRef module) {
     SCOPES_RESULT_TYPE(void);
-    //LLVMDumpModule(module);
-    LLVMOrcModuleHandle *handle = new LLVMOrcModuleHandle();
-    module_handles.push_back(handle);
-#if 1
-    auto target_machine = get_target_machine();
-    assert(target_machine);
+    LLVMMemoryBufferRef irbuf = nullptr;
+#if 0
+    irbuf = LLVMWriteBitcodeToMemoryBuffer(module);
+#else
+    char *s = LLVMPrintModuleToString(module);
+    irbuf = LLVMCreateMemoryBufferWithMemoryRangeCopy(s, strlen(s),
+        "irbuf");
+    LLVMDisposeMessage(s);
+#endif
 
-    char *errormsg;
-    LLVMMemoryBufferRef membuf;
-    if (LLVMTargetMachineEmitToMemoryBuffer(target_machine, module,
-        LLVMObjectFile, &errormsg, &membuf)) {
-        SCOPES_ERROR(CGenBackendFailed, errormsg);
+    auto key = get_cache_key(LLVMGetBufferStart(irbuf), LLVMGetBufferSize(irbuf));
+
+    LLVMMemoryBufferRef membuf = nullptr;
+
+    auto filepath = get_cache_file(key);
+    if (!filepath) {
+        auto target_machine = get_target_machine();
+        assert(target_machine);
+
+        char *errormsg;
+        if (LLVMTargetMachineEmitToMemoryBuffer(target_machine, module,
+            LLVMObjectFile, &errormsg, &membuf)) {
+            SCOPES_ERROR(CGenBackendFailed, errormsg);
+        }
+
+        set_cache(key, LLVMGetBufferStart(irbuf), LLVMGetBufferSize(irbuf),
+            LLVMGetBufferStart(membuf), LLVMGetBufferSize(membuf));
+    } else {
+        char *errormsg;
+        if (LLVMCreateMemoryBufferWithContentsOfFile(filepath, &membuf, &errormsg)) {
+            SCOPES_ERROR(CGenBackendFailed, errormsg);
+        }
     }
 
-    auto err = LLVMOrcAddObjectFile(orc, handle, membuf,
-        orc_symbol_resolver, nullptr);
+    LLVMDisposeMemoryBuffer(irbuf);
 
-#else
+    LLVMOrcModuleHandle newhandle = 0;
+    auto err = LLVMOrcAddObjectFile(orc, &newhandle, membuf,
+        orc_symbol_resolver, nullptr);
+    if (!err) {
+        module_handles.push_back(newhandle);
+    }
 
-#if 0
-    // breaks tukan?
-    auto err = LLVMOrcAddLazilyCompiledIR(orc, handle, module,
-        orc_symbol_resolver, nullptr);
-#else
-    auto err = LLVMOrcAddEagerlyCompiledIR(orc, handle, module,
-        orc_symbol_resolver, nullptr);
-#endif
-#endif
     if (err) {
         SCOPES_ERROR(ExecutionEngineFailed, LLVMGetErrorMessage(err));
     }

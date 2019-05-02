@@ -25,7 +25,7 @@
 #define SCOPES_EARLY_ABORT 0
 
 // print a list of cumulative timers on program exit
-#define SCOPES_PRINT_TIMERS 0
+#define SCOPES_PRINT_TIMERS 1
 
 // maximum number of recursions permitted during partial evaluation
 // if you think you need more, ask yourself if ad-hoc compiling a pure C function
@@ -35,6 +35,9 @@
 
 // maximum number of jump skips permitted
 #define SCOPES_MAX_SKIP_JUMPS 256
+
+// folder name in ~/.cache in which all cache files are stored
+#define SCOPES_CACHE_DIRNAME "scopes"
 
 // compile native code with debug info if not otherwise specified
 #define SCOPES_COMPILE_WITH_DEBUG_INFO 1

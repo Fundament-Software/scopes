@@ -164,6 +164,7 @@ project "scopesrt"
         "src/expander.cpp",
         "src/globals.cpp",
         "src/hash.cpp",
+        "src/cache.cpp",
         "external/linenoise-ng/src/linenoise.cpp",
         "external/linenoise-ng/src/ConvertUTF.cpp",
         "external/linenoise-ng/src/wcwidth.cpp",
