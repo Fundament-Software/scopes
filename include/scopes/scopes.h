@@ -146,9 +146,12 @@ typedef sc_list_scope_raises_t (*sc_syntax_wildcard_func_t)(const sc_list_t *, s
 SCOPES_LIBEXPORT sc_valueref_raises_t sc_load_from_executable(const char *path);
 SCOPES_LIBEXPORT int sc_main(const char *exepath, int argc, char *argv[]);
 
-// compiler
+// stats & info
 
 SCOPES_LIBEXPORT sc_i32_i32_i32_tuple_t sc_compiler_version();
+
+// compiler
+
 SCOPES_LIBEXPORT sc_valueref_list_scope_raises_t sc_expand(sc_valueref_t expr, const sc_list_t *next, sc_scope_t *scope);
 SCOPES_LIBEXPORT sc_valueref_raises_t sc_eval(const sc_anchor_t *anchor, const sc_list_t *expr, sc_scope_t *scope);
 SCOPES_LIBEXPORT sc_valueref_raises_t sc_prove(sc_valueref_t expr);
@@ -331,6 +334,7 @@ SCOPES_LIBEXPORT sc_symbol_t sc_symbol_new(const sc_string_t *str);
 SCOPES_LIBEXPORT sc_symbol_t sc_symbol_new_unique(const sc_string_t *str);
 SCOPES_LIBEXPORT const sc_string_t *sc_symbol_to_string(sc_symbol_t sym);
 SCOPES_LIBEXPORT bool sc_symbol_is_variadic(sc_symbol_t sym);
+SCOPES_LIBEXPORT size_t sc_symbol_count();
 
 // strings
 

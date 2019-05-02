@@ -80,6 +80,7 @@ public:
     const String *name() const;
 
     static void _init_symbols();
+    static size_t symbol_count();
 
     StyledStream& stream(StyledStream& ost) const;
 

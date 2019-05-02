@@ -836,6 +836,11 @@ sc_symbol_t sc_symbol_new_unique(const sc_string_t *str) {
     return Symbol(String::from_stdstring(ss.str()));
 }
 
+size_t sc_symbol_count() {
+    using namespace scopes;
+    return Symbol::symbol_count();
+}
+
 // String
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -2202,6 +2207,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_symbol_new_unique, TYPE_Symbol, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_symbol_to_string, TYPE_String, TYPE_Symbol);
     DEFINE_EXTERN_C_FUNCTION(sc_symbol_is_variadic, TYPE_Bool, TYPE_Symbol);
+    DEFINE_EXTERN_C_FUNCTION(sc_symbol_count, TYPE_USize);
 
     DEFINE_EXTERN_C_FUNCTION(sc_string_new, TYPE_String, native_ro_pointer_type(TYPE_I8), TYPE_USize);
     DEFINE_EXTERN_C_FUNCTION(sc_string_new_from_cstr, TYPE_String, native_ro_pointer_type(TYPE_I8));

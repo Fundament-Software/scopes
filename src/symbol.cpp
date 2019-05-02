@@ -31,6 +31,10 @@ std::size_t Symbol::Hash::operator()(const scopes::Symbol & s) const {
 
 //------------------------------------------------------------------------------
 
+size_t Symbol::symbol_count() {
+    return next_symbol_id;
+}
+
 void Symbol::verify_unmapped(Symbol id, const String *name) {
     auto it = map_name_symbol.find({ name });
     if (it != map_name_symbol.end()) {
