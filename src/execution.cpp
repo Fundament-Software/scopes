@@ -142,6 +142,13 @@ SCOPES_RESULT(void) init_execution() {
 }
 
 static uint64_t orc_symbol_resolver(const char *name, void *ctx) {
+    const PointerMap *map = (const PointerMap *)ctx;
+    if (map) {
+        auto it = map->find(std::string(name));
+        if (it != map->end()) {
+            return (uint64_t)it->second;
+        }
+    }
     void *ptr = retrieve_symbol(name);
     if (!ptr) {
         printf("ORC failed to resolve symbol: %s\n", name);
@@ -150,7 +157,8 @@ static uint64_t orc_symbol_resolver(const char *name, void *ctx) {
 }
 
 static std::vector<LLVMOrcModuleHandle> module_handles;
-SCOPES_RESULT(void) add_module(LLVMModuleRef module) {
+static std::vector<const PointerMap *> pointer_maps;
+SCOPES_RESULT(void) add_module(LLVMModuleRef module, const PointerMap &map) {
     SCOPES_RESULT_TYPE(void);
     LLVMMemoryBufferRef irbuf = nullptr;
 #if 0
@@ -189,11 +197,15 @@ SCOPES_RESULT(void) add_module(LLVMModuleRef module) {
     LLVMDisposeMemoryBuffer(irbuf);
 
     LLVMOrcModuleHandle newhandle = 0;
+    auto ptrmap = new PointerMap(map);
+    pointer_maps.push_back(ptrmap);
     auto err = LLVMOrcAddObjectFile(orc, &newhandle, membuf,
-        orc_symbol_resolver, nullptr);
+        orc_symbol_resolver, ptrmap);
     if (!err) {
         module_handles.push_back(newhandle);
     }
+
+    //assert(false);
 
     if (err) {
         SCOPES_ERROR(ExecutionEngineFailed, LLVMGetErrorMessage(err));

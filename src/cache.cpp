@@ -92,11 +92,14 @@ const char *get_cache_file(const String *key) {
         if( s.st_mode & S_IFDIR ) {
         } else if ( s.st_mode & S_IFREG ) {
             // exists
-            StyledStream ss;
-            ss << "reusing " << filepath << std::endl;
+            //StyledStream ss;
+            //ss << "reusing " << filepath << std::endl;
             return filepath;
         }
     }
+
+    StyledStream ss;
+    ss << "missing " << filepath << std::endl;
     return nullptr;
 }
 

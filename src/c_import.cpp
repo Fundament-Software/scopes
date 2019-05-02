@@ -939,7 +939,7 @@ SCOPES_RESULT(Scope *) import_c_module (
         M = (LLVMModuleRef)Act->takeModule().release();
         assert(M);
         llvm_c_modules.push_back(M);
-        SCOPES_CHECK_RESULT(add_module(M));
+        SCOPES_CHECK_RESULT(add_module(M, PointerMap()));
         return result;
     } else {
         SCOPES_ERROR(CImportCompilationFailed);

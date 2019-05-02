@@ -29,6 +29,8 @@
 #endif
 #include <libgen.h>
 
+#include <sstream>
+
 #include <llvm-c/Core.h>
 //#include <llvm-c/ExecutionEngine.h>
 #include <llvm-c/Analysis.h>
@@ -176,6 +178,8 @@ struct LLVMIRGenerator {
     static std::unordered_map<const Type *, LLVMTypeRef> type_cache;
     static std::unordered_map<Function *, LLVMModuleRef> func_cache;
     static std::unordered_map<Global *, LLVMModuleRef> global_cache;
+    static size_t next_pointer_id;
+    static std::unordered_map<const void *, size_t> ptr2id;
 
     LLVMModuleRef module;
     LLVMBuilderRef builder;
@@ -204,6 +208,18 @@ struct LLVMIRGenerator {
     bool generate_object;
     FunctionRef active_function;
     std::vector<LLVMValueRef> generated_symbols;
+
+    PointerMap pointer_map;
+
+    size_t get_pointer_id(const void *ptr) {
+        auto it = ptr2id.find(ptr);
+        if (it != ptr2id.end()) {
+            return it->second;
+        }
+        auto id = next_pointer_id++;
+        ptr2id.insert({ptr, id});
+        return id;
+    }
 
     static const Type *arguments_to_tuple(const Type *T) {
         if (isa<ArgumentsType>(T)) {
@@ -978,7 +994,7 @@ struct LLVMIRGenerator {
                 index++;
             }
             ss.out << ">";
-            stream_address(ss.out, node.unref());
+            stream_uid(ss.out, get_pointer_id(node.unref()));
             name = ss.str();
         }
 
@@ -1836,7 +1852,7 @@ struct LLVMIRGenerator {
                 ss.out << "<";
                 stream_type_name(ss.out, pi->element_type);
                 ss.out << ">";
-                stream_address(ss.out, node.unref());
+                stream_uid(ss.out, get_pointer_id(node.unref()));
                 const String *name = ss.str();
                 result = LLVMAddGlobal(module, LLT, name->data);
                 global2global.insert({ node.unref(), result });
@@ -1908,9 +1924,13 @@ struct LLVMIRGenerator {
         if (!node->value) {
             return LLVMConstPointerNull(LLT);
         } else if (!generate_object) {
-            return LLVMConstIntToPtr(
-                LLVMConstInt(i64T, *(uint64_t*)&(node->value), false),
-                LLT);
+            size_t ptrid = get_pointer_id(node->value);
+            std::stringstream ss;
+            ss << "_ptr_" << ptrid;
+            auto name = ss.str();
+            auto glob = LLVMAddGlobal(module, LLVMGetElementType(LLT), name.c_str());
+            pointer_map.insert({name, node->value});
+            return glob;
         } else {
             // to serialize a pointer, we serialize the allocation range
             // of the pointer as a global binary blob
@@ -2330,6 +2350,8 @@ Error *LLVMIRGenerator::last_llvm_error = nullptr;
 std::unordered_map<const Type *, LLVMTypeRef> LLVMIRGenerator::type_cache;
 std::unordered_map<Function *, LLVMModuleRef> LLVMIRGenerator::func_cache;
 std::unordered_map<Global *, LLVMModuleRef> LLVMIRGenerator::global_cache;
+size_t LLVMIRGenerator::next_pointer_id = 1;
+std::unordered_map<const void *, size_t> LLVMIRGenerator::ptr2id;
 Types LLVMIRGenerator::type_todo;
 LLVMTypeRef LLVMIRGenerator::voidT = nullptr;
 LLVMTypeRef LLVMIRGenerator::i1T = nullptr;
@@ -2584,7 +2606,7 @@ SCOPES_RESULT(ConstPointerRef) compile(const FunctionRef &fn, uint64_t flags) {
     }
 #endif
 
-    SCOPES_CHECK_RESULT(add_module(module));
+    SCOPES_CHECK_RESULT(add_module(module, ctx.pointer_map));
 
 #if 1
     for (auto sym : bindsyms) {
