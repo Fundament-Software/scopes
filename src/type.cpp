@@ -42,10 +42,7 @@ StyledStream& Type::stream(StyledStream& ost) const {
 }
 
 void Type::bind_with_doc(Symbol name, const TypeEntry &entry) const {
-    auto ret = symbols.insert({name, entry});
-    if (!ret.second) {
-        ret.first->second = entry;
-    }
+    symbols.replace(name, entry);
 }
 
 void Type::bind(Symbol name, const ValueRef &value) const {
@@ -53,19 +50,21 @@ void Type::bind(Symbol name, const ValueRef &value) const {
     bind_with_doc(name, entry);
 }
 
+/*
 void Type::del(Symbol name) const {
     auto it = symbols.find(name);
     if (it != symbols.end()) {
         symbols.erase(it);
     }
 }
+*/
 
 bool Type::lookup(Symbol name, TypeEntry &dest) const {
     const Type *self = this;
     do {
-        auto it = self->symbols.find(name);
-        if (it != self->symbols.end()) {
-            dest = it->second;
+        auto index = self->symbols.find_index(name);
+        if (index >= 0) {
+            dest = self->symbols.values[index];
             return true;
         }
         if (self == TYPE_Typename)
@@ -85,9 +84,9 @@ bool Type::lookup(Symbol name, ValueRef &dest) const {
 }
 
 bool Type::lookup_local(Symbol name, TypeEntry &dest) const {
-    auto it = symbols.find(name);
-    if (it != symbols.end()) {
-        dest = it->second;
+    auto index = symbols.find_index(name);
+    if (index >= 0) {
+        dest = symbols.values[index];
         return true;
     }
     return false;
@@ -126,8 +125,11 @@ std::vector<Symbol> Type::find_closest_match(Symbol name) const {
     const Type *self = this;
     do {
         auto &&map = self->symbols;
-        for (auto &&k : map) {
-            Symbol sym = k.first;
+        int count = map.keys.size();
+        auto &&keys = map.keys;
+        auto &&values = map.values;
+        for (int i = 0; i < count; ++i) {
+            Symbol sym = keys[i];
             if (done.count(sym))
                 continue;
             size_t dist = distance(s, sym.name());

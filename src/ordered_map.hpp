@@ -29,7 +29,7 @@ struct OrderedMap {
         }
     }
 
-    int find_index(Symbol key) {
+    int find_index(Symbol key) const {
         auto it = _symbol_index.find(key);
         if (it == _symbol_index.end())
             return -1;

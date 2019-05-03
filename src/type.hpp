@@ -10,6 +10,7 @@
 #include "symbol.hpp"
 #include "result.hpp"
 #include "valueref.inc"
+#include "ordered_map.hpp"
 
 #include <stddef.h>
 
@@ -62,7 +63,7 @@ struct TypeEntry {
 };
 
 struct Type {
-    typedef std::unordered_map<Symbol, TypeEntry, Symbol::Hash> Map;
+    typedef OrderedMap<TypeEntry> Map;
 
     TypeKind kind() const;
 
@@ -74,7 +75,7 @@ struct Type {
     void bind_with_doc(Symbol name, const TypeEntry &entry) const;
     void bind(Symbol name, const ValueRef &value) const;
 
-    void del(Symbol name) const;
+    //void del(Symbol name) const;
 
     bool lookup(Symbol name, TypeEntry &dest) const;
     bool lookup(Symbol name, ValueRef &dest) const;

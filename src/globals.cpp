@@ -1685,15 +1685,26 @@ sc_symbol_valueref_tuple_t sc_type_next(const sc_type_t *type, sc_symbol_t key) 
     using namespace scopes;
     type = strip_qualifiers(type);
     auto &&map = type->get_symbols();
-    Type::Map::const_iterator it;
+    int index;
+    int count = map.keys.size();
     if (key == SYM_Unnamed) {
-        it = map.begin();
+        index = 0;
     } else {
-        it = map.find(key);
-        if (it != map.end()) it++;
+        index = map.find_index(key);
+        if (index < 0)
+            index = count;
+        else
+            index++;
     }
-    if (it != map.end()) {
-        return { it->first, it->second.expr };
+    while (index != count) {
+        auto &&value = map.values[index];
+        if (value.expr) {
+            return { map.keys[index], value.expr };
+        }
+        index++;
+    }
+    if (index != count) {
+        return { map.keys[index], map.values[index].expr };
     }
     return { SYM_Unnamed, ValueRef() };
 }
