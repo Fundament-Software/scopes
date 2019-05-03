@@ -819,6 +819,7 @@ namespace scopes {
     T(TIMER_Expand, "expand()") \
     T(TIMER_Tracker, "track()") \
     T(TIMER_ImportC, "import_c()") \
+    T(TIMER_Unknown, "unknown") \
     \
     /* ad-hoc builtin names */ \
     T(SYM_ExecuteReturn, "execute-return") \

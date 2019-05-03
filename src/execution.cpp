@@ -226,8 +226,8 @@ SCOPES_RESULT(void) add_module(LLVMModuleRef module, const PointerMap &map,
     }
 
     if (cache && filepath) {
-        char *errormsg;
         #if 0
+        char *errormsg;
         if (LLVMCreateMemoryBufferWithContentsOfFile(filepath, &membuf, &errormsg)) {
             SCOPES_ERROR(CGenBackendFailed, errormsg);
         }

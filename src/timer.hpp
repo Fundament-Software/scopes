@@ -18,12 +18,16 @@ namespace scopes {
 //------------------------------------------------------------------------------
 
 struct Timer {
+    Timer *prev_timer;
     Symbol name;
     std::chrono::time_point<std::chrono::high_resolution_clock> start;
     std::chrono::time_point<std::chrono::high_resolution_clock> end;
 
     Timer(Symbol _name);
     ~Timer();
+
+    void pause();
+    void resume();
 
     static void print_timers();
 };
