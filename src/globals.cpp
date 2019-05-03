@@ -776,18 +776,23 @@ void sc_scope_del_symbol(sc_scope_t *scope, sc_symbol_t sym) {
 sc_symbol_valueref_tuple_t sc_scope_next(sc_scope_t *scope, sc_symbol_t key) {
     using namespace scopes;
     auto &&map = *scope->map;
-    Scope::Map::const_iterator it;
+    int index;
+    int count = map.keys.size();
     if (key == SYM_Unnamed) {
-        it = map.begin();
+        index = 0;
     } else {
-        it = map.find(key);
-        if (it != map.end()) it++;
+        index = map.find_index(key);
+        if (index < 0)
+            index = count;
+        else
+            index++;
     }
-    while (it != map.end()) {
-        if (it->second.expr) {
-            return { it->first, it->second.expr };
+    while (index != count) {
+        auto &&value = map.values[index];
+        if (value.expr) {
+            return { map.keys[index], value.expr };
         }
-        it++;
+        index++;
     }
     return { SYM_Unnamed, ValueRef() };
 }
@@ -795,18 +800,22 @@ sc_symbol_valueref_tuple_t sc_scope_next(sc_scope_t *scope, sc_symbol_t key) {
 sc_symbol_t sc_scope_next_deleted(sc_scope_t *scope, sc_symbol_t key) {
     using namespace scopes;
     auto &&map = *scope->map;
-    Scope::Map::const_iterator it;
+    int index;
+    int count = map.keys.size();
     if (key == SYM_Unnamed) {
-        it = map.begin();
+        index = 0;
     } else {
-        it = map.find(key);
-        if (it != map.end()) it++;
+        index = map.find_index(key);
+        if (index < 0)
+            index = count;
+        else
+            index++;
     }
-    while (it != map.end()) {
-        if (!it->second.expr) {
-            return it->first;
+    while (index != count) {
+        if (!map.values[index].expr) {
+            return map.keys[index];
         }
-        it++;
+        index++;
     }
     return SYM_Unnamed;
 }

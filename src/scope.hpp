@@ -9,6 +9,7 @@
 
 #include "symbol.hpp"
 #include "valueref.inc"
+#include "ordered_map.hpp"
 
 #include <vector>
 #include <unordered_map>
@@ -29,7 +30,7 @@ struct ScopeEntry {
 
 struct Scope {
 public:
-    typedef std::unordered_map<Symbol, ScopeEntry, Symbol::Hash> Map;
+    typedef OrderedMap<ScopeEntry> Map;
 protected:
     Scope(Scope *_parent = nullptr, Map *_map = nullptr);
 

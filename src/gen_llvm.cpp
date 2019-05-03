@@ -2302,10 +2302,13 @@ struct LLVMIRGenerator {
 
         Scope *t = table;
         while (t) {
-            for (auto it = t->map->begin(); it != t->map->end(); ++it) {
-                ValueRef val = it->second.expr;
+            int count = t->map->keys.size();
+            auto &&keys = t->map->keys;
+            auto &&values = t->map->values;
+            for (int i = 0; i < count; ++i) {
+                ValueRef val = values[i].expr;
                 if (!val) continue;
-                Symbol name = it->first;
+                Symbol name = keys[i];
                 FunctionRef fn = SCOPES_GET_RESULT(extract_function_constant(val));
                 func_export_table.insert({fn.unref(), name});
 
