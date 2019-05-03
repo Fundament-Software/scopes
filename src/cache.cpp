@@ -22,6 +22,8 @@
 #include <memory.h>
 #include <stdio.h>
 
+#include <zlib.h>
+
 #define SCOPES_CACHE_WRITE_KEY 0
 
 namespace scopes {
@@ -145,16 +147,16 @@ void set_cache(const String *key,
 
     snprintf(filepath, PATH_MAX, SCOPES_FILE_CACHE_PATTERN, cache_dir, key->data);
 
-    FILE *f = fopen(filepath, "wb");
+    auto f = gzopen(filepath, "wb9");
     if (!f) {
         StyledStream ss;
         ss << "unable to open " << filepath << " for writing" << std::endl;
         return;
     }
 
-    bool failed = (fwrite(content, size, 1, f) != 1);
+    bool failed = (gzfwrite(content, size, 1, f) != 1);
 
-    fclose(f);
+    gzclose(f);
 
     if (failed) {
         StyledStream ss;

@@ -36,6 +36,8 @@
 #include <assert.h>
 #include <vector>
 
+#include <zlib.h>
+
 #define SCOPES_CACHE_KEY_BITCODE 1
 
 namespace scopes {
@@ -225,9 +227,38 @@ SCOPES_RESULT(void) add_module(LLVMModuleRef module, const PointerMap &map,
 
     if (cache && filepath) {
         char *errormsg;
+        #if 0
         if (LLVMCreateMemoryBufferWithContentsOfFile(filepath, &membuf, &errormsg)) {
             SCOPES_ERROR(CGenBackendFailed, errormsg);
         }
+        #else
+
+        auto f = gzopen(filepath, "r");
+        if (!f) {
+            SCOPES_ERROR(CGenBackendFailed, "failed to open cache file for reading");
+        }
+
+        std::vector<char> data;
+    repeat:
+        char buf[8192];
+        int r = gzread(f, buf, sizeof(buf));
+        if (r < 0) {
+            SCOPES_ERROR(CGenBackendFailed, "failed to read from cache file");
+        }
+        if (r > 0) {
+            auto offset = data.size();
+            data.resize(offset + r);
+            memcpy(&data[offset], buf, r);
+        }
+        if (r == sizeof(buf))
+            goto repeat;
+
+        gzclose(f);
+
+        membuf = LLVMCreateMemoryBufferWithMemoryRangeCopy(
+            &data[0], data.size(), "");
+
+        #endif
     } else {
         auto target_machine = get_target_machine();
         assert(target_machine);
