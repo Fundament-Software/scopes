@@ -9,6 +9,7 @@
 #include "error.hpp"
 #include "symbol.hpp"
 #include "cache.hpp"
+#include "compiler_flags.hpp"
 
 #ifdef SCOPES_WIN32
 #include "dlfcn.h"
@@ -32,6 +33,8 @@
 #include <string.h>
 #include <assert.h>
 #include <vector>
+
+#define SCOPES_CACHE_KEY_BITCODE 0
 
 namespace scopes {
 
@@ -158,24 +161,39 @@ static uint64_t orc_symbol_resolver(const char *name, void *ctx) {
 
 static std::vector<LLVMOrcModuleHandle> module_handles;
 static std::vector<const PointerMap *> pointer_maps;
-SCOPES_RESULT(void) add_module(LLVMModuleRef module, const PointerMap &map) {
+SCOPES_RESULT(void) add_module(LLVMModuleRef module, const PointerMap &map,
+    uint64_t compiler_flags) {
     SCOPES_RESULT_TYPE(void);
+
+    bool cache = ((compiler_flags & CF_Cache) == CF_Cache);
+
     LLVMMemoryBufferRef irbuf = nullptr;
-#if 0
-    irbuf = LLVMWriteBitcodeToMemoryBuffer(module);
-#else
-    char *s = LLVMPrintModuleToString(module);
-    irbuf = LLVMCreateMemoryBufferWithMemoryRangeCopy(s, strlen(s),
-        "irbuf");
-    LLVMDisposeMessage(s);
-#endif
-
-    auto key = get_cache_key(LLVMGetBufferStart(irbuf), LLVMGetBufferSize(irbuf));
-
     LLVMMemoryBufferRef membuf = nullptr;
+    if (cache) {
+#if SCOPES_CACHE_KEY_BITCODE
+        irbuf = LLVMWriteBitcodeToMemoryBuffer(module);
+#else
+        char *s = LLVMPrintModuleToString(module);
+        irbuf = LLVMCreateMemoryBufferWithMemoryRangeCopy(s, strlen(s),
+            "irbuf");
+        LLVMDisposeMessage(s);
+#endif
+    }
 
-    auto filepath = get_cache_file(key);
-    if (!filepath) {
+    const String *key = nullptr;
+    const char *filepath = nullptr;
+    if (cache) {
+        assert(irbuf);
+        key = get_cache_key(LLVMGetBufferStart(irbuf), LLVMGetBufferSize(irbuf));
+        filepath = get_cache_file(key);
+    }
+
+    if (cache && filepath) {
+        char *errormsg;
+        if (LLVMCreateMemoryBufferWithContentsOfFile(filepath, &membuf, &errormsg)) {
+            SCOPES_ERROR(CGenBackendFailed, errormsg);
+        }
+    } else {
         auto target_machine = get_target_machine();
         assert(target_machine);
 
@@ -185,16 +203,16 @@ SCOPES_RESULT(void) add_module(LLVMModuleRef module, const PointerMap &map) {
             SCOPES_ERROR(CGenBackendFailed, errormsg);
         }
 
-        set_cache(key, LLVMGetBufferStart(irbuf), LLVMGetBufferSize(irbuf),
-            LLVMGetBufferStart(membuf), LLVMGetBufferSize(membuf));
-    } else {
-        char *errormsg;
-        if (LLVMCreateMemoryBufferWithContentsOfFile(filepath, &membuf, &errormsg)) {
-            SCOPES_ERROR(CGenBackendFailed, errormsg);
+        if (cache) {
+            assert(key && irbuf && membuf);
+            set_cache(key, LLVMGetBufferStart(irbuf), LLVMGetBufferSize(irbuf),
+                LLVMGetBufferStart(membuf), LLVMGetBufferSize(membuf));
         }
     }
 
-    LLVMDisposeMemoryBuffer(irbuf);
+    if (irbuf) {
+        LLVMDisposeMemoryBuffer(irbuf);
+    }
 
     LLVMOrcModuleHandle newhandle = 0;
     auto ptrmap = new PointerMap(map);

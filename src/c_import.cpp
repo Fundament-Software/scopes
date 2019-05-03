@@ -18,6 +18,7 @@
 #include "value.hpp"
 #include "prover.hpp"
 #include "dyn_cast.inc"
+#include "compiler_flags.hpp"
 
 #include "scopes/scopes.h"
 
@@ -939,7 +940,7 @@ SCOPES_RESULT(Scope *) import_c_module (
         M = (LLVMModuleRef)Act->takeModule().release();
         assert(M);
         llvm_c_modules.push_back(M);
-        SCOPES_CHECK_RESULT(add_module(M, PointerMap()));
+        SCOPES_CHECK_RESULT(add_module(M, PointerMap(), CF_Cache));
         return result;
     } else {
         SCOPES_ERROR(CImportCompilationFailed);

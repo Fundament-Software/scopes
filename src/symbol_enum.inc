@@ -780,16 +780,6 @@ namespace scopes {
     T(SYM_SquareList, "square-list") \
     T(SYM_CurlyList, "curly-list") \
     \
-    /* compile flags */ \
-    T(SYM_DumpDisassembly, "compile-flag-dump-disassembly") \
-    T(SYM_DumpModule, "compile-flag-dump-module") \
-    T(SYM_DumpFunction, "compile-flag-dump-function") \
-    T(SYM_DumpTime, "compile-flag-dump-time") \
-    T(SYM_NoDebugInfo, "compile-flag-no-debug-info") \
-    T(SYM_O1, "compile-flag-O1") \
-    T(SYM_O2, "compile-flag-O2") \
-    T(SYM_O3, "compile-flag-O3") \
-    \
     /* function flags */ \
     T(SYM_Variadic, "variadic") \
     T(SYM_Pure, "pure") \

@@ -29,8 +29,6 @@
 #endif
 #include <libgen.h>
 
-#include <sstream>
-
 #include <llvm-c/Core.h>
 //#include <llvm-c/ExecutionEngine.h>
 #include <llvm-c/Analysis.h>
@@ -180,6 +178,8 @@ struct LLVMIRGenerator {
     static std::unordered_map<Global *, LLVMModuleRef> global_cache;
     static size_t next_pointer_id;
     static std::unordered_map<const void *, size_t> ptr2id;
+    size_t next_local_pointer_id = 0;
+    std::unordered_map<const void *, size_t> localptr2id;
 
     LLVMModuleRef module;
     LLVMBuilderRef builder;
@@ -206,6 +206,7 @@ struct LLVMIRGenerator {
 
     bool use_debug_info;
     bool generate_object;
+    bool serialize_pointers;
     FunctionRef active_function;
     std::vector<LLVMValueRef> generated_symbols;
 
@@ -218,6 +219,16 @@ struct LLVMIRGenerator {
         }
         auto id = next_pointer_id++;
         ptr2id.insert({ptr, id});
+        return id;
+    }
+
+    size_t get_local_pointer_id(const void *ptr) {
+        auto it = localptr2id.find(ptr);
+        if (it != localptr2id.end()) {
+            return it->second;
+        }
+        auto id = next_local_pointer_id++;
+        localptr2id.insert({ptr, id});
         return id;
     }
 
@@ -300,7 +311,8 @@ struct LLVMIRGenerator {
         //active_function(nullptr),
         //active_function_value(nullptr),
         use_debug_info(true),
-        generate_object(false) {
+        generate_object(false),
+        serialize_pointers(false) {
         static_init();
         for (int i = 0; i < NumIntrinsics; ++i) {
             intrinsics[i] = nullptr;
@@ -994,7 +1006,7 @@ struct LLVMIRGenerator {
                 index++;
             }
             ss.out << ">";
-            stream_uid(ss.out, get_pointer_id(node.unref()));
+            ss.out << get_pointer_id(node.unref());
             name = ss.str();
         }
 
@@ -1852,7 +1864,7 @@ struct LLVMIRGenerator {
                 ss.out << "<";
                 stream_type_name(ss.out, pi->element_type);
                 ss.out << ">";
-                stream_uid(ss.out, get_pointer_id(node.unref()));
+                ss.out << get_pointer_id(node.unref());
                 const String *name = ss.str();
                 result = LLVMAddGlobal(module, LLT, name->data);
                 global2global.insert({ node.unref(), result });
@@ -1924,13 +1936,19 @@ struct LLVMIRGenerator {
         if (!node->value) {
             return LLVMConstPointerNull(LLT);
         } else if (!generate_object) {
-            size_t ptrid = get_pointer_id(node->value);
-            std::stringstream ss;
-            ss << "_ptr_" << ptrid;
-            auto name = ss.str();
-            auto glob = LLVMAddGlobal(module, LLVMGetElementType(LLT), name.c_str());
-            pointer_map.insert({name, node->value});
-            return glob;
+            if (serialize_pointers) {
+                size_t ptrid = get_pointer_id(node->value);
+                StyledString ss = StyledString::plain();
+                ss.out << "_ptr_" << ptrid;
+                auto name = ss.cppstr();
+                auto glob = LLVMAddGlobal(module, LLVMGetElementType(LLT), name.c_str());
+                pointer_map.insert({name, node->value});
+                return glob;
+            } else {
+                return LLVMConstIntToPtr(
+                    LLVMConstInt(i64T, *(uint64_t*)&(node->value), false),
+                    LLT);
+            }
         } else {
             // to serialize a pointer, we serialize the allocation range
             // of the pointer as a global binary blob
@@ -2537,6 +2555,9 @@ SCOPES_RESULT(ConstPointerRef) compile(const FunctionRef &fn, uint64_t flags) {
    const Type *functype = fn->get_type();
 
     LLVMIRGenerator ctx;
+    if (flags & CF_Cache) {
+        ctx.serialize_pointers = true;
+    }
     if (flags & CF_NoDebugInfo) {
         ctx.use_debug_info = false;
     }
@@ -2606,7 +2627,7 @@ SCOPES_RESULT(ConstPointerRef) compile(const FunctionRef &fn, uint64_t flags) {
     }
 #endif
 
-    SCOPES_CHECK_RESULT(add_module(module, ctx.pointer_map));
+    SCOPES_CHECK_RESULT(add_module(module, ctx.pointer_map, flags));
 
 #if 1
     for (auto sym : bindsyms) {

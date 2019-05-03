@@ -2372,20 +2372,11 @@ B_TYPES()
     SCOPES_VALUE_KIND()
 #undef T
 
-    bind_new_value(Symbol("global-flag-buffer-block"),
-        ConstInt::from(TYPE_U32, GF_BufferBlock));
-    bind_new_value(Symbol("global-flag-non-writable"),
-        ConstInt::from(TYPE_U32, GF_NonWritable));
-    bind_new_value(Symbol("global-flag-non-readable"),
-        ConstInt::from(TYPE_U32, GF_NonReadable));
-    bind_new_value(Symbol("global-flag-volatile"),
-        ConstInt::from(TYPE_U32, GF_Volatile));
-    bind_new_value(Symbol("global-flag-coherent"),
-        ConstInt::from(TYPE_U32, GF_Coherent));
-    bind_new_value(Symbol("global-flag-restrict"),
-        ConstInt::from(TYPE_U32, GF_Restrict));
-    bind_new_value(Symbol("global-flag-block"),
-        ConstInt::from(TYPE_U32, GF_Block));
+#define T(NAME, VALUE, SNAME) \
+    bind_new_value(Symbol(SNAME), \
+        ConstInt::from(TYPE_U32, NAME));
+SCOPES_GLOBAL_FLAGS()
+#undef T
 
     bind_new_value(Symbol("pointer-flag-non-readable"),
         ConstInt::from(TYPE_U64, (uint64_t)PTF_NonReadable));
@@ -2395,22 +2386,11 @@ B_TYPES()
     bind_new_value(Symbol("typename-flag-plain"),
         ConstInt::from(TYPE_U32, (uint32_t)TNF_Plain));
 
-    bind_new_value(Symbol(SYM_DumpDisassembly),
-        ConstInt::from(TYPE_U64, (uint64_t)CF_DumpDisassembly));
-    bind_new_value(Symbol(SYM_DumpModule),
-        ConstInt::from(TYPE_U64, (uint64_t)CF_DumpModule));
-    bind_new_value(Symbol(SYM_DumpFunction),
-        ConstInt::from(TYPE_U64, (uint64_t)CF_DumpFunction));
-    bind_new_value(Symbol(SYM_DumpTime),
-        ConstInt::from(TYPE_U64, (uint64_t)CF_DumpTime));
-    bind_new_value(Symbol(SYM_NoDebugInfo),
-        ConstInt::from(TYPE_U64, (uint64_t)CF_NoDebugInfo));
-    bind_new_value(Symbol(SYM_O1),
-        ConstInt::from(TYPE_U64, (uint64_t)CF_O1));
-    bind_new_value(Symbol(SYM_O2),
-        ConstInt::from(TYPE_U64, (uint64_t)CF_O2));
-    bind_new_value(Symbol(SYM_O3),
-        ConstInt::from(TYPE_U64, (uint64_t)CF_O3));
+#define T(NAME, VALUE, SNAME) \
+    bind_new_value(Symbol(SNAME), \
+        ConstInt::from(TYPE_U64, (uint64_t)NAME));
+SCOPES_COMPILER_FLAGS()
+#undef T
 
 #define T(NAME, STR) bind_new_value(NAME, ConstInt::builtin_from(Builtin(NAME)));
 #define T0(NAME, STR) bind_new_value(NAME, ConstInt::builtin_from(Builtin(NAME)));

@@ -22,6 +22,8 @@
 #include <memory.h>
 #include <stdio.h>
 
+#define SCOPES_CACHE_WRITE_KEY 1
+
 namespace scopes {
 
 static bool cache_inited = false;
@@ -108,12 +110,14 @@ void set_cache(const String *key,
     const char *content, size_t size) {
 
     char filepath[PATH_MAX];
+#if SCOPES_CACHE_WRITE_KEY
     {
         snprintf(filepath, PATH_MAX, SCOPES_FILE_CACHE_KEY_PATTERN, cache_dir, key->data);
         FILE *f = fopen(filepath, "wb");
         fwrite(key_content, key_size, 1, f);
         fclose(f);
     }
+#endif
 
     snprintf(filepath, PATH_MAX, SCOPES_FILE_CACHE_PATTERN, cache_dir, key->data);
 
