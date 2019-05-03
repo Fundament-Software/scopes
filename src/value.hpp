@@ -932,10 +932,11 @@ struct Unquote : UntypedValue {
 struct CompileStage : UntypedValue {
     static bool classof(const Value *T);
 
-    CompileStage(const List *next, Scope *env);
+    CompileStage(const Anchor *anchor, const List *next, Scope *env);
 
-    static CompileStageRef from(const List *next, Scope *env);
+    static CompileStageRef from(const Anchor *anchor, const List *next, Scope *env);
 
+    const Anchor *anchor;
     const List *next;
     Scope *env;
 };

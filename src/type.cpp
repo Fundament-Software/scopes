@@ -127,7 +127,7 @@ std::vector<Symbol> Type::find_closest_match(Symbol name) const {
         auto &&map = self->symbols;
         int count = map.keys.size();
         auto &&keys = map.keys;
-        auto &&values = map.values;
+        //auto &&values = map.values;
         for (int i = 0; i < count; ++i) {
             Symbol sym = keys[i];
             if (done.count(sym))

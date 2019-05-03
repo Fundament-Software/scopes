@@ -364,6 +364,9 @@ SCOPES_LIBEXPORT bool sc_list_compare(const sc_list_t *a, const sc_list_t *b);
 
 // anchors
 
+SCOPES_LIBEXPORT sc_symbol_t sc_anchor_path(const sc_anchor_t *anchor);
+SCOPES_LIBEXPORT int sc_anchor_lineno(const sc_anchor_t *anchor);
+SCOPES_LIBEXPORT int sc_anchor_column(const sc_anchor_t *anchor);
 SCOPES_LIBEXPORT const sc_anchor_t *sc_anchor_offset(const sc_anchor_t *anchor, int offset);
 
 // closures

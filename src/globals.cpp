@@ -1010,6 +1010,21 @@ bool sc_list_compare(const sc_list_t *a, const sc_list_t *b) {
 // Anchors
 ////////////////////////////////////////////////////////////////////////////////
 
+sc_symbol_t sc_anchor_path(const sc_anchor_t *anchor) {
+    using namespace scopes;
+    return anchor->path();
+}
+
+int sc_anchor_lineno(const sc_anchor_t *anchor) {
+    using namespace scopes;
+    return anchor->lineno;
+}
+
+int sc_anchor_column(const sc_anchor_t *anchor) {
+    using namespace scopes;
+    return anchor->column;
+}
+
 const sc_anchor_t *sc_anchor_offset(const sc_anchor_t *anchor, int offset) {
     using namespace scopes;
 
@@ -2323,6 +2338,9 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_list_reverse, TYPE_List, TYPE_List);
     DEFINE_EXTERN_C_FUNCTION(sc_list_compare, TYPE_Bool, TYPE_List, TYPE_List);
 
+    DEFINE_EXTERN_C_FUNCTION(sc_anchor_path, TYPE_Symbol, TYPE_Anchor);
+    DEFINE_EXTERN_C_FUNCTION(sc_anchor_lineno, TYPE_I32, TYPE_Anchor);
+    DEFINE_EXTERN_C_FUNCTION(sc_anchor_column, TYPE_I32, TYPE_Anchor);
     DEFINE_EXTERN_C_FUNCTION(sc_anchor_offset, TYPE_Anchor, TYPE_Anchor, TYPE_I32);
 
     DEFINE_EXTERN_C_FUNCTION(sc_closure_get_docstring, TYPE_String, TYPE_Closure);

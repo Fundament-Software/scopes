@@ -67,21 +67,45 @@ const String *get_cache_key(const char *content, size_t size) {
     } else {
         size_t part = size / 4;
         h[0] = hash_bytes(content, part);
-        h[1] = hash_bytes(content + part, part);
-        h[2] = hash_bytes(content + part * 2, part);
-        h[3] = hash_bytes(content + part * 3, size - 3 * part);
+        h[1] = hash2(h[0], hash_bytes(content + part, part));
+        h[2] = hash2(h[1], hash_bytes(content + part * 2, part));
+        h[3] = hash2(h[2], hash_bytes(content + part * 3, size - 3 * part));
     }
     char key[65];
     memset(key, 0, sizeof(key));
     snprintf(key, 17, "%016lx", h[0]);
-    snprintf(key + 16, 17, "%016lx", h[0]);
-    snprintf(key + 32, 17, "%016lx", h[0]);
-    snprintf(key + 48, 17, "%016lx", h[0]);
+    snprintf(key + 16, 17, "%016lx", h[1]);
+    snprintf(key + 32, 17, "%016lx", h[2]);
+    snprintf(key + 48, 17, "%016lx", h[3]);
     return String::from(key, 64);
 }
 
 #define SCOPES_FILE_CACHE_KEY_PATTERN "%s/%s.cache.key"
 #define SCOPES_FILE_CACHE_PATTERN "%s/%s.cache"
+
+const char *get_cache_key_file(const String *key) {
+#if SCOPES_CACHE_WRITE_KEY
+    init_cache();
+
+    static char filepath[PATH_MAX];
+    snprintf(filepath, PATH_MAX, SCOPES_FILE_CACHE_KEY_PATTERN, cache_dir, key->data);
+
+    struct stat s;
+    if( stat(filepath, &s) == 0 ) {
+        if( s.st_mode & S_IFDIR ) {
+        } else if ( s.st_mode & S_IFREG ) {
+            // exists
+            //StyledStream ss;
+            //ss << "reusing " << filepath << std::endl;
+            return filepath;
+        }
+    }
+
+    StyledStream ss;
+    ss << "missing " << filepath << std::endl;
+#endif
+    return nullptr;
+}
 
 const char *get_cache_file(const String *key) {
     init_cache();

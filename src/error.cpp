@@ -146,6 +146,7 @@ static void format_error(StyledStream &ss, void (*f)(StyledStream&, FuncTypes ..
     f(ss, args ...);
 }
 
+#if 0
 static std::vector<Symbol> find_closest_match(Symbol name, const Symbols &symbols) {
     const String *s = name.name();
     std::unordered_set<Symbol, Symbol::Hash> done;
@@ -167,6 +168,7 @@ static std::vector<Symbol> find_closest_match(Symbol name, const Symbols &symbol
     std::sort(best_syms.begin(), best_syms.end());
     return best_syms;
 }
+#endif
 
 static void print_name_suggestions(StyledStream &ss, const Symbols &syms) {
     if (syms.empty()) return;
