@@ -18,6 +18,7 @@
 #include "value.hpp"
 #include "prover.hpp"
 #include "dyn_cast.inc"
+#include "timer.hpp"
 #include "compiler_flags.hpp"
 
 #include "scopes/scopes.h"
@@ -866,6 +867,7 @@ SCOPES_RESULT(Scope *) import_c_module (
     const char *buffer) {
     using namespace clang;
     SCOPES_RESULT_TYPE(Scope *);
+    Timer sum_clang_time(TIMER_ImportC);
 
     std::vector<const char *> aargs;
     aargs.push_back("clang");
