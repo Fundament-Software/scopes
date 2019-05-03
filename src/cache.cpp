@@ -22,7 +22,7 @@
 #include <memory.h>
 #include <stdio.h>
 
-#define SCOPES_CACHE_WRITE_KEY 1
+#define SCOPES_CACHE_WRITE_KEY 0
 
 namespace scopes {
 
@@ -101,8 +101,8 @@ const char *get_cache_key_file(const String *key) {
         }
     }
 
-    StyledStream ss;
-    ss << "missing " << filepath << std::endl;
+    //StyledStream ss;
+    //ss << "missing " << filepath << std::endl;
 #endif
     return nullptr;
 }
@@ -125,7 +125,7 @@ const char *get_cache_file(const String *key) {
     }
 
     StyledStream ss;
-    ss << "missing " << filepath << std::endl;
+    ss << "generating " << filepath << std::endl;
     return nullptr;
 }
 

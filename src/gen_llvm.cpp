@@ -216,7 +216,7 @@ struct LLVMIRGenerator {
         auto it = pointer_namespaces.find(name);
         if (it != pointer_namespaces.end()) {
             if (!name) return it->second;
-            printf("namespace taken, retrying...\n");
+            //printf("namespace taken, retrying...\n");
             name = hash2(name, name);
             goto repeat;
         }
