@@ -29,12 +29,19 @@
 namespace scopes {
 
 static bool cache_inited = false;
-static char cache_dir[PATH_MAX];
+static char cache_dir[PATH_MAX+1];
 
 static void init_cache() {
     if (cache_inited) return;
     cache_inited = true;
 
+#ifdef SCOPES_WIN32
+    char *ptr = getenv("LocalAppData");
+    assert(ptr);
+    strcpy(cache_dir, ptr);
+#define SCOPES_MKDIR(PATH, MODE) mkdir((PATH))
+#else
+#define SCOPES_MKDIR(PATH, MODE) mkdir((PATH),(MODE))
     wordexp_t p;
     char** w;
     wordexp( "~/.cache", &p, 0 );
@@ -45,15 +52,16 @@ static void init_cache() {
         offset += strlen(w[i]);
     }
     wordfree( &p );
+#endif
 
-    if (mkdir(cache_dir, S_IRWXU)) {
+    if (SCOPES_MKDIR(cache_dir, S_IRWXU)) {
         if (errno != EEXIST) {
             assert(false && "can't create cache directory");
         }
     }
 
     strncat(cache_dir, "/" SCOPES_CACHE_DIRNAME, PATH_MAX);
-    if (mkdir(cache_dir, S_IRWXU)) {
+    if (SCOPES_MKDIR(cache_dir, S_IRWXU)) {
         if (errno != EEXIST) {
             assert(false && "can't create application cache directory");
         }
@@ -75,10 +83,15 @@ const String *get_cache_key(const char *content, size_t size) {
     }
     char key[65];
     memset(key, 0, sizeof(key));
-    snprintf(key, 17, "%016lx", h[0]);
-    snprintf(key + 16, 17, "%016lx", h[1]);
-    snprintf(key + 32, 17, "%016lx", h[2]);
-    snprintf(key + 48, 17, "%016lx", h[3]);
+#ifdef SCOPES_WIN32
+#define SCOPES_KEY16_FORMAT "%016llx"
+#else
+#define SCOPES_KEY16_FORMAT "%016lx"
+#endif
+    snprintf(key, 17, SCOPES_KEY16_FORMAT, h[0]);
+    snprintf(key + 16, 17, SCOPES_KEY16_FORMAT, h[1]);
+    snprintf(key + 32, 17, SCOPES_KEY16_FORMAT, h[2]);
+    snprintf(key + 48, 17, SCOPES_KEY16_FORMAT, h[3]);
     return String::from(key, 64);
 }
 
