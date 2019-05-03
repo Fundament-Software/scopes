@@ -743,16 +743,23 @@ struct ConstPointer : Const {
 
 //------------------------------------------------------------------------------
 
+#define SCOPES_GLOBAL_FLAGS() \
+    /* if storage class is 'Uniform, the value is a SSBO */ \
+    T(GF_BufferBlock, (1 << 0), "global-flag-buffer-block") \
+    T(GF_NonWritable, (1 << 1), "global-flag-non-writable") \
+    T(GF_NonReadable, (1 << 2), "global-flag-non-readable") \
+    T(GF_Volatile, (1 << 3), "global-flag-volatile") \
+    T(GF_Coherent, (1 << 4), "global-flag-coherent") \
+    T(GF_Restrict, (1 << 5), "global-flag-restrict") \
+    /* if storage class is 'Uniform, the value is a UBO */ \
+    T(GF_Block, (1 << 6), "global-flag-block") \
+
+
 enum GlobalFlags {
-    // if storage class is 'Uniform, the value is a SSBO
-    GF_BufferBlock = (1 << 0),
-    GF_NonWritable = (1 << 1),
-    GF_NonReadable = (1 << 2),
-    GF_Volatile = (1 << 3),
-    GF_Coherent = (1 << 4),
-    GF_Restrict = (1 << 5),
-    // if storage class is 'Uniform, the value is a UBO
-    GF_Block = (1 << 6),
+#define T(NAME, VALUE, SNAME) \
+    NAME = VALUE,
+SCOPES_GLOBAL_FLAGS()
+#undef T
 };
 
 struct Global : Pure {
@@ -925,10 +932,11 @@ struct Unquote : UntypedValue {
 struct CompileStage : UntypedValue {
     static bool classof(const Value *T);
 
-    CompileStage(const List *next, Scope *env);
+    CompileStage(const Anchor *anchor, const List *next, Scope *env);
 
-    static CompileStageRef from(const List *next, Scope *env);
+    static CompileStageRef from(const Anchor *anchor, const List *next, Scope *env);
 
+    const Anchor *anchor;
     const List *next;
     Scope *env;
 };

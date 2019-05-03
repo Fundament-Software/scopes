@@ -116,7 +116,8 @@ struct Expander {
         SCOPES_CHECK_RESULT(verify_list_parameter_count("run-stage", it, 0, 0));
         assert(it);
 
-        auto node = ref(it->at.anchor(), CompileStage::from(next, env));
+        auto anchor = it->at.anchor();
+        auto node = ref(anchor, CompileStage::from(anchor, next, env));
         next = EOL;
         return ValueRef(node);
     }
@@ -1229,7 +1230,9 @@ SCOPES_RESULT(TemplateRef) expand_module(const Anchor *anchor, const List *expr,
     //const Anchor *anchor = expr->anchor();
     //auto list = SCOPES_GET_RESULT(extract_list_constant(expr));
     assert(anchor);
-    TemplateRef mainfunc = ref(anchor, Template::from(anchor->path()));
+    StyledString ss = StyledString::plain();
+    ss.out << anchor->path() << ":" << anchor->lineno;
+    TemplateRef mainfunc = ref(anchor, Template::from(Symbol(ss.str())));
 
     Scope *subenv = scope?scope:sc_get_globals();
     Expander subexpr(subenv, mainfunc);

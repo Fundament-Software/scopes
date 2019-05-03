@@ -54,7 +54,8 @@
 namespace scopes {
 
 #define SCOPES_GEN_TARGET "IR"
-#define SCOPES_LLVM_CACHE_FUNCTIONS 1
+
+#define SCOPES_LLVM_SUPPORT_DISASSEMBLY 1
 
 //------------------------------------------------------------------------------
 // IL->LLVM IR GENERATOR
@@ -96,6 +97,33 @@ static void build_and_run_opt_passes(LLVMModuleRef module, int opt_level) {
 
 const double deg2rad = 0.017453292519943295;
 const double rad2deg = 57.29577951308232;
+
+struct PointerNamespace {
+
+    size_t name = 0;
+    size_t next_pointer_id = 1;
+    char kind = '?';
+    std::unordered_map<const void *, std::string> ptr2id;
+
+    std::string get_pointer_id(const void *ptr) {
+        auto it = ptr2id.find(ptr);
+        if (it != ptr2id.end()) {
+            return it->second;
+        }
+        auto id = next_pointer_id++;
+        StyledString ss = StyledString::plain();
+        ss.out << "$" << kind << std::hex << name << "_" << id << std::dec;
+        auto result = ss.cppstr();
+        ptr2id.insert({ptr, result});
+        return result;
+    }
+};
+
+struct PointerNamespaces {
+    PointerNamespace local;
+    PointerNamespace global;
+    PointerNamespace func;
+};
 
 struct LLVMIRGenerator {
     enum Intrinsic {
@@ -172,8 +200,36 @@ struct LLVMIRGenerator {
     std::deque<FunctionRef> function_todo;
     static Types type_todo;
     static std::unordered_map<const Type *, LLVMTypeRef> type_cache;
-    static std::unordered_map<Function *, LLVMModuleRef> func_cache;
-    static std::unordered_map<Global *, LLVMModuleRef> global_cache;
+    static std::unordered_map<Function *, std::string> func_cache;
+    static std::unordered_map<Global *, std::string> global_cache;
+
+    static std::unordered_map<size_t, PointerNamespaces *> pointer_namespaces;
+
+    PointerNamespaces *_ns;
+
+    void set_pointer_namespace(size_t name) {
+        _ns = get_pointer_namespaces(name);
+    }
+
+    static PointerNamespaces *get_pointer_namespaces(size_t name) {
+    repeat:
+        auto it = pointer_namespaces.find(name);
+        if (it != pointer_namespaces.end()) {
+            if (!name) return it->second;
+            //printf("namespace taken, retrying...\n");
+            name = hash2(name, name);
+            goto repeat;
+        }
+        PointerNamespaces *ns = new PointerNamespaces();
+        ns->local.name = name;
+        ns->local.kind = 'l';
+        ns->global.name = name;
+        ns->global.kind = 'g';
+        ns->func.name = name;
+        ns->func.kind = 'f';
+        pointer_namespaces.insert({name, ns});
+        return ns;
+    }
 
     LLVMModuleRef module;
     LLVMBuilderRef builder;
@@ -198,10 +254,27 @@ struct LLVMIRGenerator {
     static LLVMAttributeRef attr_nonnull;
     LLVMValueRef intrinsics[NumIntrinsics];
 
-    bool use_debug_info;
-    bool generate_object;
+    bool use_debug_info = true;
+    bool generate_object = false;
+    bool serialize_pointers = false;
     FunctionRef active_function;
     std::vector<LLVMValueRef> generated_symbols;
+
+    PointerMap pointer_map;
+
+    std::string get_local_pointer_id(const void *ptr) {
+        assert(_ns);
+        return _ns->local.get_pointer_id(ptr);
+    }
+
+    std::string get_global_pointer_id(const void *ptr) {
+        assert(_ns);
+        return _ns->global.get_pointer_id(ptr);
+    }
+    std::string get_func_pointer_id(const void *ptr) {
+        assert(_ns);
+        return _ns->func.get_pointer_id(ptr);
+    }
 
     static const Type *arguments_to_tuple(const Type *T) {
         if (isa<ArgumentsType>(T)) {
@@ -278,11 +351,7 @@ struct LLVMIRGenerator {
         return LLVMCreateEnumAttribute(LLVMGetGlobalContext(), kind, 0);
     }
 
-    LLVMIRGenerator() :
-        //active_function(nullptr),
-        //active_function_value(nullptr),
-        use_debug_info(true),
-        generate_object(false) {
+    LLVMIRGenerator() {
         static_init();
         for (int i = 0; i < NumIntrinsics; ++i) {
             intrinsics[i] = nullptr;
@@ -950,51 +1019,53 @@ struct LLVMIRGenerator {
         auto ilfunctype = extract_function_type(node->get_type());
 
         bool is_export = false;
-        const String *name = nullptr;
-        {
+        std::string name;
+        bool is_external = false;
+
+        if (generate_object) {
             auto it = func_export_table.find(node.unref());
             if (it != func_export_table.end()) {
-                name = it->second.name();
+                auto str = it->second.name();
+                name = std::string(str->data, str->count);
                 is_export = true;
             }
-        }
-        if (!name) {
-            auto funcname = node->name;
-            StyledString ss = StyledString::plain();
-            if (funcname == SYM_Unnamed) {
-                ss.out << "unnamed";
-            } else {
-                ss.out << funcname.name()->data;
-            }
+        } else {
+            auto it = func_cache.find(node.unref());
+            if (it == func_cache.end()) {
+                auto funcname = node->name;
+                StyledString ss = StyledString::plain();
+                if (funcname == SYM_Unnamed) {
+                    ss.out << "unnamed";
+                } else {
+                    ss.out << funcname.name()->data;
+                }
 
-            ss.out << "<";
-            int index = 0;
-            for (auto T : ilfunctype->argument_types) {
-                if (index > 0)
-                    ss.out << ",";
-                stream_type_name(ss.out, T);
-                index++;
+                ss.out << "<";
+                int index = 0;
+                for (auto T : ilfunctype->argument_types) {
+                    if (index > 0)
+                        ss.out << ",";
+                    stream_type_name(ss.out, T);
+                    index++;
+                }
+                ss.out << ">";
+                ss.out << get_func_pointer_id(node.unref());
+                name = ss.cppstr();
+
+                func_cache.insert({node.unref(), name});
+            } else {
+                name = it->second;
+                is_external = true;
             }
-            ss.out << ">";
-            stream_address(ss.out, node.unref());
-            name = ss.str();
         }
 
         auto functype = SCOPES_GET_RESULT(type_to_llvm_type(ilfunctype));
 
-        auto func = LLVMAddFunction(module, name->data, functype);
+        auto func = LLVMAddFunction(module, name.c_str(), functype);
 
-#if SCOPES_LLVM_CACHE_FUNCTIONS
-        if (!generate_object) {
-            auto it = func_cache.find(node.unref());
-            if (it != func_cache.end()) {
-                assert(it->second != module);
-                return func;
-            }
+        if (is_external)
+            return func;
 
-            func_cache.insert({node.unref(), module});
-        }
-#endif
         generated_symbols.push_back(func);
 
         if (use_debug_info) {
@@ -1004,10 +1075,6 @@ struct LLVMIRGenerator {
             LLVMSetLinkage(func, LLVMExternalLinkage);
         } else if (generate_object) {
             LLVMSetLinkage(func, LLVMPrivateLinkage);
-        } else {
-#if !SCOPES_LLVM_CACHE_FUNCTIONS
-            LLVMSetLinkage(func, LLVMPrivateLinkage);
-#endif
         }
         function_todo.push_back(node);
         return func;
@@ -1816,30 +1883,50 @@ struct LLVMIRGenerator {
             LLVMTypeRef LLT = SCOPES_GET_RESULT(type_to_llvm_type(pi->element_type));
             LLVMValueRef result = nullptr;
             if (node->storage_class == SYM_SPIRV_StorageClassPrivate) {
-                auto globname = node->name;
-                StyledString ss = StyledString::plain();
-                if (globname == SYM_Unnamed) {
-                    ss.out << "unnamed";
-                } else {
-                    ss.out << globname.name()->data;
-                }
-                ss.out << "<";
-                stream_type_name(ss.out, pi->element_type);
-                ss.out << ">";
-                stream_address(ss.out, node.unref());
-                const String *name = ss.str();
-                result = LLVMAddGlobal(module, LLT, name->data);
-                global2global.insert({ node.unref(), result });
-                if (!generate_object) {
-                    auto it = global_cache.find(node.unref());
-                    if (it != global_cache.end()) {
-                        assert(it->second != module);
-                        return result;
+
+                std::string name;
+                bool is_external = false;
+
+                if (generate_object) {
+                    auto globname = node->name;
+                    StyledString ss = StyledString::plain();
+                    if (globname == SYM_Unnamed) {
+                        ss.out << "unnamed";
                     } else {
-                        global_cache.insert({node.unref(), module});
+                        ss.out << globname.name()->data;
+                    }
+                    ss.out << "<";
+                    stream_type_name(ss.out, pi->element_type);
+                    ss.out << ">";
+                    stream_address(ss.out, node.unref());
+                    name = ss.cppstr();
+                } else {
+                    auto it = global_cache.find(node.unref());
+                    if (it == global_cache.end()) {
+                        auto globname = node->name;
+                        StyledString ss = StyledString::plain();
+                        if (globname == SYM_Unnamed) {
+                            ss.out << "unnamed";
+                        } else {
+                            ss.out << globname.name()->data;
+                        }
+                        ss.out << "<";
+                        stream_type_name(ss.out, pi->element_type);
+                        ss.out << ">";
+                        ss.out << get_global_pointer_id(node.unref());
+                        name = ss.cppstr();
+                        global_cache.insert({node.unref(), name});
+                    } else {
+                        name = it->second;
+                        is_external = true;
                     }
                 }
-                LLVMSetInitializer(result, LLVMConstNull(LLT));
+
+                result = LLVMAddGlobal(module, LLT, name.c_str());
+                global2global.insert({ node.unref(), result });
+                if (!is_external) {
+                    LLVMSetInitializer(result, LLVMConstNull(LLT));
+                }
                 return result;
             } else {
                 const String *namestr = node->name.name();
@@ -1853,7 +1940,7 @@ struct LLVMIRGenerator {
                     if (!ptr) {
                         last_llvm_error = nullptr;
                         LLVMInstallFatalErrorHandler(fatal_error_handler);
-                        ptr = get_address(name);
+                        ptr = SCOPES_GET_RESULT(get_address(name));
                         LLVMResetFatalErrorHandler();
                         if (last_llvm_error) {
                             SCOPES_RETURN_ERROR(last_llvm_error);
@@ -1898,9 +1985,16 @@ struct LLVMIRGenerator {
         if (!node->value) {
             return LLVMConstPointerNull(LLT);
         } else if (!generate_object) {
-            return LLVMConstIntToPtr(
-                LLVMConstInt(i64T, *(uint64_t*)&(node->value), false),
-                LLT);
+            if (serialize_pointers) {
+                auto name = get_local_pointer_id(node->value);
+                auto glob = LLVMAddGlobal(module, LLVMGetElementType(LLT), name.c_str());
+                pointer_map.insert({name, node->value});
+                return glob;
+            } else {
+                return LLVMConstIntToPtr(
+                    LLVMConstInt(i64T, *(uint64_t*)&(node->value), false),
+                    LLT);
+            }
         } else {
             // to serialize a pointer, we serialize the allocation range
             // of the pointer as a global binary blob
@@ -2254,10 +2348,13 @@ struct LLVMIRGenerator {
 
         Scope *t = table;
         while (t) {
-            for (auto it = t->map->begin(); it != t->map->end(); ++it) {
-                ValueRef val = it->second.expr;
+            int count = t->map->keys.size();
+            auto &&keys = t->map->keys;
+            auto &&values = t->map->values;
+            for (int i = 0; i < count; ++i) {
+                ValueRef val = values[i].expr;
                 if (!val) continue;
-                Symbol name = it->first;
+                Symbol name = keys[i];
                 FunctionRef fn = SCOPES_GET_RESULT(extract_function_constant(val));
                 func_export_table.insert({fn.unref(), name});
 
@@ -2318,8 +2415,9 @@ struct LLVMIRGenerator {
 
 Error *LLVMIRGenerator::last_llvm_error = nullptr;
 std::unordered_map<const Type *, LLVMTypeRef> LLVMIRGenerator::type_cache;
-std::unordered_map<Function *, LLVMModuleRef> LLVMIRGenerator::func_cache;
-std::unordered_map<Global *, LLVMModuleRef> LLVMIRGenerator::global_cache;
+std::unordered_map<Function *, std::string> LLVMIRGenerator::func_cache;
+std::unordered_map<Global *, std::string> LLVMIRGenerator::global_cache;
+std::unordered_map<size_t, PointerNamespaces *> LLVMIRGenerator::pointer_namespaces;
 Types LLVMIRGenerator::type_todo;
 LLVMTypeRef LLVMIRGenerator::voidT = nullptr;
 LLVMTypeRef LLVMIRGenerator::i1T = nullptr;
@@ -2343,7 +2441,7 @@ LLVMAttributeRef LLVMIRGenerator::attr_nonnull = nullptr;
 // IL COMPILER
 //------------------------------------------------------------------------------
 
-#if 1
+#if SCOPES_LLVM_SUPPORT_DISASSEMBLY
 static void pprint(int pos, unsigned char *buf, int len, const char *disasm) {
   int i;
   printf("%04x:  ", pos);
@@ -2396,8 +2494,7 @@ static void do_disassemble(LLVMTargetMachineRef tm, void *fptr, int siz) {
 
 class DisassemblyListener : public llvm::JITEventListener {
 public:
-    llvm::ExecutionEngine *ee;
-    DisassemblyListener(llvm::ExecutionEngine *_ee) : ee(_ee) {}
+    DisassemblyListener() {}
 
     std::unordered_map<void *, size_t> sizes;
 
@@ -2408,7 +2505,7 @@ public:
             #if !defined(__arm__) && !defined(__linux__)
             name = name.substr(1);
             #endif
-            void * addr = (void*)ee->getFunctionAddress(name);
+            void * addr = (void *)get_address(name.data()).assert_ok();
             if(addr) {
                 assert(addr);
                 sizes[addr] = sz;
@@ -2419,6 +2516,8 @@ public:
     virtual void NotifyObjectEmitted(
         const llvm::object::ObjectFile &Obj,
         const llvm::RuntimeDyld::LoadedObjectInfo &L) {
+        StyledStream ss;
+        ss << "object emitted!" << std::endl;
         auto size_map = llvm::object::computeSymbolSizes(Obj);
         for(auto & S : size_map) {
             llvm::object::SymbolRef sym = S.first;
@@ -2482,7 +2581,7 @@ SCOPES_RESULT(void) compile_object(const String *path, Scope *scope, uint64_t fl
     return {};
 }
 
-#if 1
+#if SCOPES_LLVM_SUPPORT_DISASSEMBLY
 static DisassemblyListener *disassembly_listener = nullptr;
 #endif
 
@@ -2504,6 +2603,12 @@ SCOPES_RESULT(ConstPointerRef) compile(const FunctionRef &fn, uint64_t flags) {
    const Type *functype = fn->get_type();
 
     LLVMIRGenerator ctx;
+    if (flags & CF_Cache) {
+        ctx.serialize_pointers = true;
+        ctx.set_pointer_namespace(fn->name.hash());
+    } else {
+        ctx.set_pointer_namespace(0);
+    }
     if (flags & CF_NoDebugInfo) {
         ctx.use_debug_info = false;
     }
@@ -2530,14 +2635,13 @@ SCOPES_RESULT(ConstPointerRef) compile(const FunctionRef &fn, uint64_t flags) {
     auto func = result.second;
     assert(func);
 
-    init_execution();
-    SCOPES_CHECK_RESULT(add_module(module));
+    SCOPES_CHECK_RESULT(init_execution());
 
-#if 1
+#if SCOPES_LLVM_SUPPORT_DISASSEMBLY
     if (!disassembly_listener && (flags & CF_DumpDisassembly)) {
-        llvm::ExecutionEngine *pEE = reinterpret_cast<llvm::ExecutionEngine*>(get_execution_engine());
-        disassembly_listener = new DisassemblyListener(pEE);
-        pEE->RegisterJITEventListener(disassembly_listener);
+        disassembly_listener = new DisassemblyListener();
+        llvm::JITEventListener *le = disassembly_listener;
+        add_jit_event_listener(reinterpret_cast<LLVMJITEventListenerRef>(le));
     }
 #endif
 
@@ -2558,18 +2662,34 @@ SCOPES_RESULT(ConstPointerRef) compile(const FunctionRef &fn, uint64_t flags) {
         LLVMDumpValue(func);
     }
 
+    std::string funcname;
+    {
+        size_t length = 0;
+        const char *name = LLVMGetValueName2(func, &length);
+        funcname = std::string(name, length);
+    }
+
 #if 1
+    std::vector< std::string > bindsyms;
     for (auto sym : ctx.generated_symbols) {
-        void *ptr = get_pointer_to_global(sym);
         size_t length = 0;
         const char *name = LLVMGetValueName2(sym, &length);
-        set_address_name(ptr, String::from(name, length));
+        bindsyms.push_back(std::string(name, length));
+    }
+#endif
+
+    SCOPES_CHECK_RESULT(add_module(module, ctx.pointer_map, flags));
+
+#if 1
+    for (auto sym : bindsyms) {
+        void *ptr = (void *)SCOPES_GET_RESULT(get_address(sym.c_str()));
+        set_address_name(ptr, String::from(sym.c_str(), sym.size()));
     }
 #endif
 
     //LLVMDumpModule(module);
-    void *pfunc = get_pointer_to_global(func);
-#if 1
+    void *pfunc = (void *)SCOPES_GET_RESULT(get_address(funcname.c_str()));
+#if SCOPES_LLVM_SUPPORT_DISASSEMBLY
     if (flags & CF_DumpDisassembly) {
         assert(disassembly_listener);
         //auto td = LLVMGetExecutionEngineTargetData(ee);

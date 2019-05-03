@@ -25,6 +25,7 @@
 #include "anchor.hpp"
 #include "scopes/scopes.h"
 #include "qualifier.inc"
+#include "symbol_enum.inc"
 
 #include <algorithm>
 #include <unordered_set>
@@ -1294,7 +1295,7 @@ bool is_value_stage_constant(const ValueRef &value) {
 static SCOPES_RESULT(TypedValueRef) prove_CompileStage(const ASTContext &ctx, const CompileStageRef &sx) {
     SCOPES_RESULT_TYPE(TypedValueRef);
 
-    auto anchor = sx.anchor();
+    auto anchor = sx->anchor;
     auto scope = sx->env;
 
     assert(scope);

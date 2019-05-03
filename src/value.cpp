@@ -93,7 +93,7 @@ repeat:
 }
 
 bool ValueIndex::operator ==(const ValueIndex &other) const {
-    return value == other.value && index == other.index;
+    return value.unref() == other.value.unref() && index == other.index;
 }
 
 const Type *ValueIndex::get_type() const {
@@ -1431,12 +1431,12 @@ UnquoteRef Unquote::from(const ValueRef &value) {
 
 //------------------------------------------------------------------------------
 
-CompileStage::CompileStage(const List *_next, Scope *_env)
-    : UntypedValue(VK_CompileStage), next(_next), env(_env) {
+CompileStage::CompileStage(const Anchor *_anchor, const List *_next, Scope *_env)
+    : UntypedValue(VK_CompileStage), anchor(_anchor), next(_next), env(_env) {
 }
 
-CompileStageRef CompileStage::from(const List *next, Scope *env) {
-    return ref(unknown_anchor(), new CompileStage(next, env));
+CompileStageRef CompileStage::from(const Anchor *anchor, const List *next, Scope *env) {
+    return ref(unknown_anchor(), new CompileStage(anchor, next, env));
 }
 
 //------------------------------------------------------------------------------

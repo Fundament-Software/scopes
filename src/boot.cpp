@@ -279,7 +279,7 @@ skip_regular_load:
     auto stage_func_type = native_opaque_pointer_type(raising_function_type(
         arguments_type({TYPE_CompileStage}), {}));
 
-    const int compile_flags = 0;// CF_O2;
+    const int compile_flags = CF_Cache;
 
 compile_stage:
     if (fn->get_type() == stage_func_type) {
@@ -307,13 +307,11 @@ compile_stage:
     stream_ast(ss, fn, StreamASTFormat());
     std::cout << std::endl;
 
-    auto flags = compile_flags|CF_DumpModule;
-#else
-    auto flags = compile_flags;
+    compile_flags |= CF_DumpModule;
 #endif
 
     typedef sc_void_raises_t (*MainFuncType)();
-    MainFuncType fptr = (MainFuncType)SCOPES_GET_RESULT(compile(fn, flags))->value;
+    MainFuncType fptr = (MainFuncType)SCOPES_GET_RESULT(compile(fn, compile_flags))->value;
     {
         auto result = fptr();
         if (!result.ok) {

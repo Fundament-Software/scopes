@@ -7,6 +7,7 @@
 #include "symbol.hpp"
 #include "hash.hpp"
 #include "styled_stream.hpp"
+#include "symbol_enum.inc"
 
 #include <memory.h>
 #include <string.h>
@@ -19,7 +20,8 @@ namespace scopes {
 
 static std::unordered_map<Symbol, const String *, Symbol::Hash> map_symbol_name;
 static std::unordered_map<const String *, Symbol> map_name_symbol;
-static uint64_t next_symbol_id = SYM_Count;
+
+static uint64_t num_symbols = 0;
 
 //------------------------------------------------------------------------------
 // SYMBOL TYPE
@@ -30,6 +32,10 @@ std::size_t Symbol::Hash::operator()(const scopes::Symbol & s) const {
 }
 
 //------------------------------------------------------------------------------
+
+size_t Symbol::symbol_count() {
+    return num_symbols;
+}
 
 void Symbol::verify_unmapped(Symbol id, const String *name) {
     auto it = map_name_symbol.find({ name });
@@ -57,9 +63,16 @@ void Symbol::map_known_symbol(Symbol id, const String *name) {
 Symbol Symbol::get_symbol(const String *name) {
     auto it = map_name_symbol.find(name);
     if (it != map_name_symbol.end()) {
+        auto oldname = get_symbol_name(it->second);
+        if (oldname != name) {
+            StyledStream ss(SCOPES_CERR);
+            ss << "internal error: symbol hash collision between "
+               << name << " and " << oldname << std::endl;
+        }
         return it->second;
     }
-    Symbol id = Symbol::wrap(++next_symbol_id);
+    num_symbols++;
+    Symbol id = Symbol::wrap(name->hash());
     map_symbol(id, name);
     return id;
 }
@@ -91,7 +104,30 @@ Symbol::Symbol(const String *str) :
 }
 
 bool Symbol::is_known() const {
-    return _value < end_value;
+    switch(_value) {
+#define T(sym, name) case sym: return true;
+    SCOPES_SYMBOLS()
+#undef T
+#define T(NAME) case SYM_SPIRV_StorageClass ## NAME: return true;
+    B_SPIRV_STORAGE_CLASS()
+#undef T
+#define T(NAME) case SYM_SPIRV_BuiltIn ## NAME: return true;
+    B_SPIRV_BUILTINS()
+#undef T
+#define T(NAME) case SYM_SPIRV_ExecutionMode ## NAME: return true;
+    B_SPIRV_EXECUTION_MODE()
+#undef T
+#define T(NAME) case SYM_SPIRV_Dim ## NAME: return true;
+    B_SPIRV_DIM()
+#undef T
+#define T(NAME) case SYM_SPIRV_ImageFormat ## NAME: return true;
+    B_SPIRV_IMAGE_FORMAT()
+#undef T
+#define T(NAME) case SYM_SPIRV_ImageOperand ## NAME: return true;
+    B_SPIRV_IMAGE_OPERAND()
+#undef T
+    default: return false;
+    }
 }
 
 Symbol::EnumT Symbol::known_value() const {
@@ -121,7 +157,7 @@ bool Symbol::operator !=(EnumT b) const {
 }
 
 std::size_t Symbol::hash() const {
-    return hash_bytes((const char *)&_value, sizeof(_value));
+    return _value;
 }
 
 uint64_t Symbol::value() const {
@@ -134,17 +170,8 @@ const String *Symbol::name() const {
 
 void Symbol::_init_symbols() {
 #define T(sym, name) map_known_symbol(sym, String::from(name));
-#define T0 T
-#define T1 T2
-#define T2T T2
-#define T2(UNAME, LNAME, PFIX, OP) \
-    map_known_symbol(FN_ ## UNAME ## PFIX, String::from(#LNAME #OP));
     SCOPES_SYMBOLS()
 #undef T
-#undef T0
-#undef T1
-#undef T2
-#undef T2T
 #define T(NAME) \
     map_known_symbol(SYM_SPIRV_StorageClass ## NAME, String::from(#NAME));
     B_SPIRV_STORAGE_CLASS()

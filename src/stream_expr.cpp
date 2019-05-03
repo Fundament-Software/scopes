@@ -13,6 +13,7 @@
 #include "gc.hpp"
 #include "symbol_enum.hpp"
 #include "dyn_cast.inc"
+#include "symbol_enum.inc"
 
 #include <unordered_map>
 

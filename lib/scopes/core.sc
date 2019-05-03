@@ -164,7 +164,7 @@ fn build-typify-function (f)
     let types = (alloca-array type 1:usize)
     store Value (getelementptr types 0)
     let types = (bitcast types TypeArrayPointer)
-    let result = (sc_compile (sc_typify f 1 types) 0:u64)
+    let result = (sc_compile (sc_typify f 1 types) compile-flag-cache)
     let result-type = (sc_value_type result)
     if (ptrcmp!= result-type SpiceMacroFunction)
         error
@@ -3337,7 +3337,7 @@ fn exec-module (expr eval-scope)
         do
             hide-traceback;
             sc_eval expr-anchor (expr as list) eval-scope
-    loop (f = f)
+    loop (f expr-anchor = f expr-anchor)
         # build a wrapper
         let wrapf =
             spice-quote
@@ -3345,15 +3345,20 @@ fn exec-module (expr eval-scope)
                     raising Error
                     hide-traceback;
                     wrap-if-not-run-stage (f)
+        let path =
+            .. ((sc_anchor_path expr-anchor) as string) ":"
+                tostring `[(sc_anchor_lineno expr-anchor)]
+        sc_template_set_name wrapf (Symbol path)
         let wrapf = (sc_typify_template wrapf 0 (undef TypeArrayPointer))
-        let f = (sc_compile wrapf 0:u64)
+        let f = (sc_compile wrapf compile-flag-cache)
         if (('typeof f) == StageFunctionType)
             let fptr = (f as StageFunctionType)
             let result =
                 do
                     hide-traceback;
                     fptr;
-            repeat (bitcast result Value)
+            let result = (bitcast result Value)
+            repeat result ('anchor result)
         else
             let fptr = (f as ModuleFunctionType)
             let result =
@@ -5688,8 +5693,9 @@ define-sugar-macro decorate-let
 define-sugar-scope-macro sugar-eval
     let subscope = (Scope sugar-scope)
     'set-symbol subscope 'sugar-scope sugar-scope
+    let at next = (decons args)
     return
-        exec-module `args subscope
+        exec-module ('tag `args ('anchor at)) subscope
         sugar-scope
 
 let

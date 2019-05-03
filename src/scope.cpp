@@ -45,9 +45,8 @@ size_t Scope::count() const {
     return map->size();
 #else
     size_t count = 0;
-    auto &&_map = *map;
-    for (auto &&k : _map) {
-        if (!k.second.expr)
+    for (auto &&k : map->values) {
+        if (!k.expr)
             continue;
         count++;
     }
@@ -84,10 +83,7 @@ void Scope::ensure_not_borrowed() {
 
 void Scope::bind_with_doc(Symbol name, const ScopeEntry &entry) {
     ensure_not_borrowed();
-    auto ret = map->insert({name, entry});
-    if (!ret.second) {
-        ret.first->second = entry;
-    }
+    map->replace(name, entry);
 }
 
 void Scope::bind(Symbol name, const ValueRef &value) {
@@ -99,18 +95,12 @@ void Scope::bind(Symbol name, const ValueRef &value) {
 
 void Scope::del(Symbol name) {
     ensure_not_borrowed();
-    auto it = map->find(name);
-    if (it != map->end()) {
-        // if in local map, we can delete it directly
-        map->erase(it);
-    } else {
-        // otherwise check if it's contained at all
-        ValueRef dest;
-        if (lookup(name, dest)) {
-            ScopeEntry entry = { ValueRef(), nullptr };
-            // if yes, bind to nullpointer to mark it as deleted
-            bind_with_doc(name, entry);
-        }
+    // check if value is contained
+    ValueRef dest;
+    if (lookup(name, dest)) {
+        ScopeEntry entry = { ValueRef(), nullptr };
+        // if yes, bind to nullpointer to mark it as deleted
+        bind_with_doc(name, entry);
     }
 }
 
@@ -121,12 +111,14 @@ std::vector<Symbol> Scope::find_closest_match(Symbol name) const {
     size_t best_dist = (size_t)-1;
     const Scope *self = this;
     do {
-        auto &&map = *self->map;
-        for (auto &&k : map) {
-            Symbol sym = k.first;
+        int count = self->map->keys.size();
+        auto &&keys = self->map->keys;
+        auto &&values = self->map->values;
+        for (int i = 0; i < count; ++i) {
+            Symbol sym = keys[i];
             if (done.count(sym))
                 continue;
-            if (k.second.expr) {
+            if (values[i].expr) {
                 size_t dist = distance(s, sym.name());
                 if (dist == best_dist) {
                     best_syms.push_back(sym);
@@ -150,12 +142,14 @@ std::vector<Symbol> Scope::find_elongations(Symbol name) const {
     std::vector<Symbol> found;
     const Scope *self = this;
     do {
-        auto &&map = *self->map;
-        for (auto &&k : map) {
-            Symbol sym = k.first;
+        int count = self->map->keys.size();
+        auto &&keys = self->map->keys;
+        auto &&values = self->map->values;
+        for (int i = 0; i < count; ++i) {
+            Symbol sym = keys[i];
             if (done.count(sym))
                 continue;
-            if (k.second.expr) {
+            if (values[i].expr) {
                 if (sym.name()->count >= s->count &&
                         (sym.name()->substr(0, s->count) == s))
                     found.push_back(sym);
@@ -172,10 +166,11 @@ std::vector<Symbol> Scope::find_elongations(Symbol name) const {
 bool Scope::lookup(Symbol name, ScopeEntry &dest, size_t depth) const {
     const Scope *self = this;
     do {
-        auto it = self->map->find(name);
-        if (it != self->map->end()) {
-            if (it->second.expr) {
-                dest = it->second;
+        auto idx = self->map->find_index(name);
+        if (idx >= 0) {
+            auto &&entry = self->map->values[idx];
+            if (entry.expr) {
+                dest = entry;
                 return true;
             } else {
                 return false;

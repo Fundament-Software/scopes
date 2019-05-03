@@ -30,6 +30,7 @@
 #include "prover.hpp"
 #include "quote.hpp"
 #include "boot.hpp"
+#include "symbol_enum.inc"
 
 #include "scopes/scopes.h"
 
@@ -775,18 +776,23 @@ void sc_scope_del_symbol(sc_scope_t *scope, sc_symbol_t sym) {
 sc_symbol_valueref_tuple_t sc_scope_next(sc_scope_t *scope, sc_symbol_t key) {
     using namespace scopes;
     auto &&map = *scope->map;
-    Scope::Map::const_iterator it;
+    int index;
+    int count = map.keys.size();
     if (key == SYM_Unnamed) {
-        it = map.begin();
+        index = 0;
     } else {
-        it = map.find(key);
-        if (it != map.end()) it++;
+        index = map.find_index(key);
+        if (index < 0)
+            index = count;
+        else
+            index++;
     }
-    while (it != map.end()) {
-        if (it->second.expr) {
-            return { it->first, it->second.expr };
+    while (index != count) {
+        auto &&value = map.values[index];
+        if (value.expr) {
+            return { map.keys[index], value.expr };
         }
-        it++;
+        index++;
     }
     return { SYM_Unnamed, ValueRef() };
 }
@@ -794,18 +800,22 @@ sc_symbol_valueref_tuple_t sc_scope_next(sc_scope_t *scope, sc_symbol_t key) {
 sc_symbol_t sc_scope_next_deleted(sc_scope_t *scope, sc_symbol_t key) {
     using namespace scopes;
     auto &&map = *scope->map;
-    Scope::Map::const_iterator it;
+    int index;
+    int count = map.keys.size();
     if (key == SYM_Unnamed) {
-        it = map.begin();
+        index = 0;
     } else {
-        it = map.find(key);
-        if (it != map.end()) it++;
+        index = map.find_index(key);
+        if (index < 0)
+            index = count;
+        else
+            index++;
     }
-    while (it != map.end()) {
-        if (!it->second.expr) {
-            return it->first;
+    while (index != count) {
+        if (!map.values[index].expr) {
+            return map.keys[index];
         }
-        it++;
+        index++;
     }
     return SYM_Unnamed;
 }
@@ -834,6 +844,11 @@ sc_symbol_t sc_symbol_new_unique(const sc_string_t *str) {
     std::stringstream ss;
     ss << "#" << counter++ << "#" << str->data;
     return Symbol(String::from_stdstring(ss.str()));
+}
+
+size_t sc_symbol_count() {
+    using namespace scopes;
+    return Symbol::symbol_count();
 }
 
 // String
@@ -994,6 +1009,21 @@ bool sc_list_compare(const sc_list_t *a, const sc_list_t *b) {
 
 // Anchors
 ////////////////////////////////////////////////////////////////////////////////
+
+sc_symbol_t sc_anchor_path(const sc_anchor_t *anchor) {
+    using namespace scopes;
+    return anchor->path();
+}
+
+int sc_anchor_lineno(const sc_anchor_t *anchor) {
+    using namespace scopes;
+    return anchor->lineno;
+}
+
+int sc_anchor_column(const sc_anchor_t *anchor) {
+    using namespace scopes;
+    return anchor->column;
+}
 
 const sc_anchor_t *sc_anchor_offset(const sc_anchor_t *anchor, int offset) {
     using namespace scopes;
@@ -1670,15 +1700,26 @@ sc_symbol_valueref_tuple_t sc_type_next(const sc_type_t *type, sc_symbol_t key) 
     using namespace scopes;
     type = strip_qualifiers(type);
     auto &&map = type->get_symbols();
-    Type::Map::const_iterator it;
+    int index;
+    int count = map.keys.size();
     if (key == SYM_Unnamed) {
-        it = map.begin();
+        index = 0;
     } else {
-        it = map.find(key);
-        if (it != map.end()) it++;
+        index = map.find_index(key);
+        if (index < 0)
+            index = count;
+        else
+            index++;
     }
-    if (it != map.end()) {
-        return { it->first, it->second.expr };
+    while (index != count) {
+        auto &&value = map.values[index];
+        if (value.expr) {
+            return { map.keys[index], value.expr };
+        }
+        index++;
+    }
+    if (index != count) {
+        return { map.keys[index], map.values[index].expr };
     }
     return { SYM_Unnamed, ValueRef() };
 }
@@ -2202,6 +2243,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_symbol_new_unique, TYPE_Symbol, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_symbol_to_string, TYPE_String, TYPE_Symbol);
     DEFINE_EXTERN_C_FUNCTION(sc_symbol_is_variadic, TYPE_Bool, TYPE_Symbol);
+    DEFINE_EXTERN_C_FUNCTION(sc_symbol_count, TYPE_USize);
 
     DEFINE_EXTERN_C_FUNCTION(sc_string_new, TYPE_String, native_ro_pointer_type(TYPE_I8), TYPE_USize);
     DEFINE_EXTERN_C_FUNCTION(sc_string_new_from_cstr, TYPE_String, native_ro_pointer_type(TYPE_I8));
@@ -2296,6 +2338,9 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_list_reverse, TYPE_List, TYPE_List);
     DEFINE_EXTERN_C_FUNCTION(sc_list_compare, TYPE_Bool, TYPE_List, TYPE_List);
 
+    DEFINE_EXTERN_C_FUNCTION(sc_anchor_path, TYPE_Symbol, TYPE_Anchor);
+    DEFINE_EXTERN_C_FUNCTION(sc_anchor_lineno, TYPE_I32, TYPE_Anchor);
+    DEFINE_EXTERN_C_FUNCTION(sc_anchor_column, TYPE_I32, TYPE_Anchor);
     DEFINE_EXTERN_C_FUNCTION(sc_anchor_offset, TYPE_Anchor, TYPE_Anchor, TYPE_I32);
 
     DEFINE_EXTERN_C_FUNCTION(sc_closure_get_docstring, TYPE_String, TYPE_Closure);
@@ -2365,20 +2410,11 @@ B_TYPES()
     SCOPES_VALUE_KIND()
 #undef T
 
-    bind_new_value(Symbol("global-flag-buffer-block"),
-        ConstInt::from(TYPE_U32, GF_BufferBlock));
-    bind_new_value(Symbol("global-flag-non-writable"),
-        ConstInt::from(TYPE_U32, GF_NonWritable));
-    bind_new_value(Symbol("global-flag-non-readable"),
-        ConstInt::from(TYPE_U32, GF_NonReadable));
-    bind_new_value(Symbol("global-flag-volatile"),
-        ConstInt::from(TYPE_U32, GF_Volatile));
-    bind_new_value(Symbol("global-flag-coherent"),
-        ConstInt::from(TYPE_U32, GF_Coherent));
-    bind_new_value(Symbol("global-flag-restrict"),
-        ConstInt::from(TYPE_U32, GF_Restrict));
-    bind_new_value(Symbol("global-flag-block"),
-        ConstInt::from(TYPE_U32, GF_Block));
+#define T(NAME, VALUE, SNAME) \
+    bind_new_value(Symbol(SNAME), \
+        ConstInt::from(TYPE_U32, NAME));
+SCOPES_GLOBAL_FLAGS()
+#undef T
 
     bind_new_value(Symbol("pointer-flag-non-readable"),
         ConstInt::from(TYPE_U64, (uint64_t)PTF_NonReadable));
@@ -2388,22 +2424,11 @@ B_TYPES()
     bind_new_value(Symbol("typename-flag-plain"),
         ConstInt::from(TYPE_U32, (uint32_t)TNF_Plain));
 
-    bind_new_value(Symbol(SYM_DumpDisassembly),
-        ConstInt::from(TYPE_U64, (uint64_t)CF_DumpDisassembly));
-    bind_new_value(Symbol(SYM_DumpModule),
-        ConstInt::from(TYPE_U64, (uint64_t)CF_DumpModule));
-    bind_new_value(Symbol(SYM_DumpFunction),
-        ConstInt::from(TYPE_U64, (uint64_t)CF_DumpFunction));
-    bind_new_value(Symbol(SYM_DumpTime),
-        ConstInt::from(TYPE_U64, (uint64_t)CF_DumpTime));
-    bind_new_value(Symbol(SYM_NoDebugInfo),
-        ConstInt::from(TYPE_U64, (uint64_t)CF_NoDebugInfo));
-    bind_new_value(Symbol(SYM_O1),
-        ConstInt::from(TYPE_U64, (uint64_t)CF_O1));
-    bind_new_value(Symbol(SYM_O2),
-        ConstInt::from(TYPE_U64, (uint64_t)CF_O2));
-    bind_new_value(Symbol(SYM_O3),
-        ConstInt::from(TYPE_U64, (uint64_t)CF_O3));
+#define T(NAME, VALUE, SNAME) \
+    bind_new_value(Symbol(SNAME), \
+        ConstInt::from(TYPE_U64, (uint64_t)NAME));
+SCOPES_COMPILER_FLAGS()
+#undef T
 
 #define T(NAME, STR) bind_new_value(NAME, ConstInt::builtin_from(Builtin(NAME)));
 #define T0(NAME, STR) bind_new_value(NAME, ConstInt::builtin_from(Builtin(NAME)));

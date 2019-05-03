@@ -21,6 +21,7 @@
 #include "qualifiers.hpp"
 #include "qualifier.inc"
 #include "verify_tools.inc"
+#include "symbol_enum.inc"
 
 #include "glslang/SpvBuilder.h"
 #include "glslang/disassemble.h"

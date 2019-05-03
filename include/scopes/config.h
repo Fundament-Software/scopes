@@ -36,6 +36,9 @@
 // maximum number of jump skips permitted
 #define SCOPES_MAX_SKIP_JUMPS 256
 
+// folder name in ~/.cache in which all cache files are stored
+#define SCOPES_CACHE_DIRNAME "scopes"
+
 // compile native code with debug info if not otherwise specified
 #define SCOPES_COMPILE_WITH_DEBUG_INFO 1
 
