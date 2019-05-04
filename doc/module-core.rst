@@ -17,6 +17,9 @@ parses the command-line and optionally enters the REPL.
 .. define:: compile-flag-O3
 
    A constant of type `u64`.
+.. define:: compile-flag-cache
+
+   A constant of type `u64`.
 .. define:: compile-flag-dump-disassembly
 
    A constant of type `u64`.
@@ -418,6 +421,12 @@ parses the command-line and optionally enters the REPL.
 
    A plain type of storage type `_Error<*>`.
 
+   .. compiledfn:: (dump ...)
+
+      An external function of type ``void<-(Error)``.
+   .. compiledfn:: (format ...)
+
+      An external function of type ``String<-(Error)``.
 .. type:: Generator
 
    
@@ -1202,7 +1211,6 @@ parses the command-line and optionally enters the REPL.
 .. fn:: (dispatch-and-or args flip)
 .. fn:: (dots-to-slashes pattern)
 .. fn:: (dotted-symbol? env head)
-.. inline:: (drop value)
 .. fn:: (empty? value)
 .. inline:: (enumerate x)
 .. fn:: (error msg)
@@ -1224,6 +1232,7 @@ parses the command-line and optionally enters the REPL.
 .. inline:: (extern-new name T attrs...)
 .. fn:: (extract-name-params-body expr)
 .. fn:: (extract-single-arg args)
+.. fn:: (extract-single-type-arg args)
 .. inline:: (floordiv a b)
 .. inline:: (function->SpiceMacro f)
 .. inline:: (gen-allocator-sugar name f)
@@ -1509,6 +1518,7 @@ Usage example::
 .. builtin:: (discard! ...)
 .. builtin:: (distance ...)
 .. builtin:: (do ...)
+.. builtin:: (dropped? ...)
 .. builtin:: (dump ...)
 .. builtin:: (dump-debug ...)
 .. builtin:: (dump-spice ...)
@@ -1695,6 +1705,7 @@ Usage example::
 .. spice:: (constant? ...)
 .. spice:: (countof ...)
 .. spice:: (decons ...)
+.. spice:: (drop ...)
 .. spice:: (elementof ...)
 .. spice:: (elementsof ...)
 .. spice:: (extern ...)
@@ -1705,6 +1716,7 @@ Usage example::
 .. spice:: (imply? ...)
 .. spice:: (integer->integer ...)
 .. spice:: (integer->real ...)
+.. spice:: (keyof ...)
 .. spice:: (list-constructor ...)
 .. spice:: (locationof ...)
 .. spice:: (lslice ...)
@@ -1725,6 +1737,7 @@ Usage example::
 .. spice:: (real->real ...)
 .. spice:: (report ...)
 .. spice:: (repr ...)
+.. spice:: (returnof ...)
 .. spice:: (rslice ...)
 .. spice:: (safe-shl ...)
 .. spice:: (sign ...)
@@ -1747,6 +1760,7 @@ Usage example::
 .. spice:: (type>= ...)
 .. spice:: (typify ...)
 .. spice:: (unpack ...)
+.. spice:: (unqualified ...)
 .. spice:: (va-append-va ...)
    
     (va-append-va (inline () (_ b ...)) a...) -> a... b...
@@ -1817,9 +1831,18 @@ Usage example::
 .. compiledfn:: (sc_abort ...)
 
    An external function of type ``noreturn<-()``.
+.. compiledfn:: (sc_anchor_column ...)
+
+   An external function of type ``i32<-(Anchor)``.
+.. compiledfn:: (sc_anchor_lineno ...)
+
+   An external function of type ``i32<-(Anchor)``.
 .. compiledfn:: (sc_anchor_offset ...)
 
    An external function of type ``Anchor<-(Anchor i32)``.
+.. compiledfn:: (sc_anchor_path ...)
+
+   An external function of type ``Symbol<-(Anchor)``.
 .. compiledfn:: (sc_argcount ...)
 
    An external function of type ``i32<-(Value)``.
@@ -2258,6 +2281,9 @@ Usage example::
 .. compiledfn:: (sc_switch_new ...)
 
    An external function of type ``Value<-(Value)``.
+.. compiledfn:: (sc_symbol_count ...)
+
+   An external function of type ``usize<-()``.
 .. compiledfn:: (sc_symbol_is_variadic ...)
 
    An external function of type ``bool<-(Symbol)``.
