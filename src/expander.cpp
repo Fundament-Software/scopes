@@ -1231,7 +1231,7 @@ SCOPES_RESULT(TemplateRef) expand_module(const Anchor *anchor, const List *expr,
     //auto list = SCOPES_GET_RESULT(extract_list_constant(expr));
     assert(anchor);
     StyledString ss = StyledString::plain();
-    ss.out << anchor->path() << ":" << anchor->lineno;
+    ss.out << anchor->path().name()->data << ":" << anchor->lineno;
     TemplateRef mainfunc = ref(anchor, Template::from(Symbol(ss.str())));
 
     Scope *subenv = scope?scope:sc_get_globals();
