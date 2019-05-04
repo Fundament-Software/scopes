@@ -1856,21 +1856,23 @@ struct LLVMIRGenerator {
     SCOPES_RESULT(LLVMValueRef) ref_to_value(const ValueIndex &ref) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         auto it = ref2value.find(ref);
-        if (it != ref2value.end())
-            return it->second;
-        SCOPES_TRACE_CODEGEN(ref.value);
         LLVMValueRef value = nullptr;
-        switch(ref.value->kind()) {
-        #define T(NAME, BNAME, CLASS) \
-            case NAME: value = SCOPES_GET_RESULT( \
-                CLASS ## _to_value(ref.value.cast<CLASS>())); break;
-        SCOPES_PURE_VALUE_KIND()
-        #undef T
-            default: {
-                SCOPES_ERROR(CGenFailedToTranslateValue, ref.value->kind());
-            } break;
+        if (it != ref2value.end()) {
+            value = it->second;
+        } else {
+            SCOPES_TRACE_CODEGEN(ref.value);
+            switch(ref.value->kind()) {
+            #define T(NAME, BNAME, CLASS) \
+                case NAME: value = SCOPES_GET_RESULT( \
+                    CLASS ## _to_value(ref.value.cast<CLASS>())); break;
+            SCOPES_PURE_VALUE_KIND()
+            #undef T
+                default: {
+                    SCOPES_ERROR(CGenFailedToTranslateValue, ref.value->kind());
+                } break;
+            }
+            ref2value.insert({ref,value});
         }
-        ref2value.insert({ref,value});
         return value;
     }
 
@@ -1993,7 +1995,8 @@ struct LLVMIRGenerator {
         } else if (!generate_object) {
             if (serialize_pointers) {
                 auto name = get_local_pointer_id(node->value);
-                auto glob = LLVMAddGlobal(module, LLVMGetElementType(LLT), name.c_str());
+                auto ET = LLVMGetElementType(LLT);
+                auto glob = LLVMAddGlobal(module, ET, name.c_str());
                 pointer_map.insert({name, node->value});
                 return glob;
             } else {
@@ -2334,9 +2337,9 @@ struct LLVMIRGenerator {
         char *errmsg = NULL;
         if (LLVMVerifyModule(module, LLVMReturnStatusAction, &errmsg)) {
             StyledStream ss(SCOPES_CERR);
-            if (entry) {
-                stream_value(ss, entry);
-            }
+            //if (entry) {
+            //    stream_value(ss, entry);
+            //}
             LLVMDumpModule(module);
             SCOPES_ERROR(CGenBackendFailed, errmsg);
         }

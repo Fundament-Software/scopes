@@ -16,8 +16,6 @@
 
 #include "result.hpp"
 
-#define SCOPES_USE_ORCJIT 1
-
 namespace scopes {
 
 struct Symbol;
@@ -31,7 +29,7 @@ SCOPES_RESULT(void) init_execution();
 SCOPES_RESULT(void) add_module(LLVMModuleRef module,
     const PointerMap &map, uint64_t compiler_flags);
 SCOPES_RESULT(uint64_t) get_address(const char *name);
-SCOPES_RESULT(void *) get_pointer_to_global(LLVMValueRef g);
+//SCOPES_RESULT(void *) get_pointer_to_global(LLVMValueRef g);
 void *local_aware_dlsym(Symbol name);
 LLVMTargetMachineRef get_target_machine();
 void add_jit_event_listener(LLVMJITEventListenerRef listener);

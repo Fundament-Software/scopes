@@ -20,14 +20,8 @@
 #include <llvm-c/Core.h>
 #include <llvm-c/TargetMachine.h>
 #include <llvm-c/Support.h>
-#if SCOPES_USE_ORCJIT
-#include <llvm-c/OrcBindings.h>
 #include <llvm-c/BitWriter.h>
-#else
-#include <llvm-c/ExecutionEngine.h>
-#include "llvm/IR/Module.h"
-#include "llvm/ExecutionEngine/ExecutionEngine.h"
-#endif
+#include <llvm-c/OrcBindings.h>
 
 #include <limits.h>
 
@@ -77,8 +71,6 @@ static void *retrieve_symbol(const char *name) {
 void *local_aware_dlsym(Symbol name) {
     return retrieve_symbol(name.name()->data);
 }
-
-#if SCOPES_USE_ORCJIT
 
 LLVMOrcJITStackRef orc = nullptr;
 LLVMTargetMachineRef target_machine = nullptr;
@@ -324,89 +316,10 @@ SCOPES_RESULT(uint64_t) get_address(const char *name) {
     return addr;
 }
 
-SCOPES_RESULT(void *) get_pointer_to_global(LLVMValueRef g) {
-    SCOPES_RESULT_TYPE(void *);
-    size_t length = 0;
-    const char *sym_name = LLVMGetValueName2(g, &length);
-    assert(length);
-#if 0
-    char *mangled_sym_name = nullptr;
-    LLVMOrcGetMangledSymbol(orc, &mangled_sym_name, sym_name);
-    printf("mangled sym: %s\n", mangled_sym_name);
-    LLVMOrcDisposeMangledSymbol(mangled_sym_name);
-#endif
-    return (void *)SCOPES_GET_RESULT(get_address(sym_name));
-}
-
-#else // !SCOPES_USE_ORCJIT
-
-static LLVMExecutionEngineRef ee = nullptr;
-
-#if 0
-LLVMExecutionEngineRef get_execution_engine() {
-    return ee;
-}
-#endif
-
-void add_jit_event_listener(LLVMJITEventListenerRef listener) {
-    llvm::ExecutionEngine *pEE = reinterpret_cast<llvm::ExecutionEngine*>(ee);
-    pEE->RegisterJITEventListener(
-        reinterpret_cast<llvm::JITEventListener *>(listener));
-}
-
-SCOPES_RESULT(void) init_execution() {
-    return {};
-}
-
-SCOPES_RESULT(void) add_module(LLVMModuleRef module) {
-    SCOPES_RESULT_TYPE(void);
-    if (!ee) {
-        char *errormsg = nullptr;
-
-        LLVMMCJITCompilerOptions opts;
-        LLVMInitializeMCJITCompilerOptions(&opts, sizeof(opts));
-        opts.OptLevel = 0;
-        opts.NoFramePointerElim = true;
-
-        if (LLVMCreateMCJITCompilerForModule(&ee, module, &opts,
-            sizeof(opts), &errormsg)) {
-            SCOPES_ERROR(ExecutionEngineFailed, errormsg);
-        }
-    }
-    LLVMAddModule(ee, module);
-    llvm::ExecutionEngine *pEE = reinterpret_cast<llvm::ExecutionEngine*>(ee);
-    pEE->runStaticConstructorsDestructors(
-        *reinterpret_cast<llvm::Module *>(module), false);
-    return {};
-}
-
-SCOPES_RESULT(uint64_t) get_address(const char *name) {
-    SCOPES_RESULT_TYPE(uint64_t);
-    auto ptr = LLVMGetGlobalValueAddress(ee, name);
-    if (ptr) return ptr;
-    llvm::ExecutionEngine *pEE = reinterpret_cast<llvm::ExecutionEngine*>(ee);
-    return pEE->getFunctionAddress(name);
-}
-
-SCOPES_RESULT(void *) get_pointer_to_global(LLVMValueRef g) {
-    return LLVMGetPointerToGlobal(ee, g);
-}
-
-LLVMTargetMachineRef get_target_machine() {
-    assert(ee);
-    return LLVMGetExecutionEngineTargetMachine(ee);
-}
-
-#endif // !SCOPES_USE_ORCJIT
-
 void init_llvm() {
     global_c_namespace = dlopen(NULL, RTLD_LAZY);
 
     LLVMEnablePrettyStackTrace();
-    #if !SCOPES_USE_ORCJIT
-        LLVMLinkInMCJIT();
-        //LLVMLinkInInterpreter();
-    #endif
     LLVMInitializeNativeTarget();
     LLVMInitializeNativeAsmParser();
     LLVMInitializeNativeAsmPrinter();
