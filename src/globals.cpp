@@ -458,6 +458,7 @@ void sc_set_globals(sc_scope_t *s) {
 void sc_error_append_calltrace(sc_error_t *err, sc_valueref_t callexpr) {
     using namespace scopes;
     SCOPES_TRACE(User, callexpr);
+    assert(err);
     err->trace(_backtrace);
 }
 

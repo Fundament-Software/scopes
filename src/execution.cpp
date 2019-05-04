@@ -140,6 +140,8 @@ SCOPES_RESULT(void) init_execution() {
     assert(target_machine);
     orc = LLVMOrcCreateInstance(target_machine);
     assert(orc);
+
+    LLVMOrcRegisterJITEventListener(orc, LLVMCreateGDBRegistrationListener());
 #if 0
     LLVMOrcTargetAddress retaddr = 0;
     LLVMOrcErrorCode err = LLVMOrcCreateLazyCompileCallback(orc, &retaddr, lazy_compile_callback, nullptr);
@@ -225,6 +227,10 @@ SCOPES_RESULT(void) add_module(LLVMModuleRef module, const PointerMap &map,
         }
     }
 
+    LLVMErrorRef err = nullptr;
+    LLVMOrcModuleHandle newhandle = 0;
+    auto ptrmap = new PointerMap(map);
+    pointer_maps.push_back(ptrmap);
     if (cache && filepath) {
         #if 0
         char *errormsg;
@@ -259,6 +265,9 @@ SCOPES_RESULT(void) add_module(LLVMModuleRef module, const PointerMap &map,
             &data[0], data.size(), "");
 
         #endif
+
+        err = LLVMOrcAddObjectFile(orc, &newhandle, membuf,
+            orc_symbol_resolver, ptrmap);
     } else {
         auto target_machine = get_target_machine();
         assert(target_machine);
@@ -274,22 +283,24 @@ SCOPES_RESULT(void) add_module(LLVMModuleRef module, const PointerMap &map,
             set_cache(key, LLVMGetBufferStart(irbuf), LLVMGetBufferSize(irbuf),
                 LLVMGetBufferStart(membuf), LLVMGetBufferSize(membuf));
         }
+
+        #if 1
+        err = LLVMOrcAddObjectFile(orc, &newhandle, membuf,
+            orc_symbol_resolver, ptrmap);
+        #else
+        LLVMDisposeMemoryBuffer(membuf);
+        err = LLVMOrcAddEagerlyCompiledIR(orc, &newhandle, module,
+            orc_symbol_resolver, ptrmap);
+        #endif
     }
 
     if (irbuf) {
         LLVMDisposeMemoryBuffer(irbuf);
     }
 
-    LLVMOrcModuleHandle newhandle = 0;
-    auto ptrmap = new PointerMap(map);
-    pointer_maps.push_back(ptrmap);
-    auto err = LLVMOrcAddObjectFile(orc, &newhandle, membuf,
-        orc_symbol_resolver, ptrmap);
     if (!err) {
         module_handles.push_back(newhandle);
     }
-
-    //assert(false);
 
     if (err) {
         SCOPES_ERROR(ExecutionEngineFailed, LLVMGetErrorMessage(err));

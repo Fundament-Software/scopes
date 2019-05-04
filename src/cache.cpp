@@ -88,10 +88,9 @@ const String *get_cache_key(const char *content, size_t size) {
 #else
 #define SCOPES_KEY16_FORMAT "%016lx"
 #endif
-    snprintf(key, 17, SCOPES_KEY16_FORMAT, h[0]);
-    snprintf(key + 16, 17, SCOPES_KEY16_FORMAT, h[1]);
-    snprintf(key + 32, 17, SCOPES_KEY16_FORMAT, h[2]);
-    snprintf(key + 48, 17, SCOPES_KEY16_FORMAT, h[3]);
+    for (int i = 0; i < 4; ++i) {
+        snprintf(key + i*16, 17, SCOPES_KEY16_FORMAT, h[i]);
+    }
     return String::from(key, 64);
 }
 

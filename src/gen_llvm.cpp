@@ -33,6 +33,7 @@
 //#include <llvm-c/ExecutionEngine.h>
 #include <llvm-c/Analysis.h>
 #include <llvm-c/Transforms/PassManagerBuilder.h>
+#include <llvm-c/Transforms/InstCombine.h>
 #include <llvm-c/Disassembler.h>
 #include <llvm-c/Support.h>
 #include <llvm-c/DebugInfo.h>
@@ -66,10 +67,15 @@ static void build_and_run_opt_passes(LLVMModuleRef module, int opt_level) {
 
     passBuilder = LLVMPassManagerBuilderCreate();
     LLVMPassManagerBuilderSetOptLevel(passBuilder, opt_level);
-    LLVMPassManagerBuilderSetSizeLevel(passBuilder, 0);
+    //LLVMPassManagerBuilderSetOptLevel(passBuilder, 1);
+    LLVMPassManagerBuilderSetSizeLevel(passBuilder, 2);
+    //LLVMPassManagerBuilderSetDisableUnrollLoops(passBuilder, true);
+    //LLVMAddInstructionCombiningPass(passBuilder);
+    #if 1
     if (opt_level >= 2) {
         LLVMPassManagerBuilderUseInlinerWithThreshold(passBuilder, 225);
     }
+    #endif
 
     LLVMPassManagerRef functionPasses =
       LLVMCreateFunctionPassManagerForModule(module);
