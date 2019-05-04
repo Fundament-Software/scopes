@@ -29,6 +29,10 @@
 
 // maximum size in bytes of object cache. by default, this is set to 100 MB
 #define SCOPES_MAX_CACHE_SIZE (100 << 20)
+// maximum number of inodes in cache directory
+// we keep this one friendly with FAT32, whose limit is 65534
+// and some versions of ext, where the limit is 64000
+#define SCOPES_MAX_CACHE_INODES 63000
 
 // maximum number of recursions permitted during partial evaluation
 // if you think you need more, ask yourself if ad-hoc compiling a pure C function

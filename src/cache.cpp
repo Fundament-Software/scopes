@@ -36,8 +36,9 @@ namespace scopes {
 static bool cache_inited = false;
 static char cache_dir[PATH_MAX+1];
 
-// delete half of all cache files to make space
-static void perform_thanos_finger_snap(size_t cache_size) {
+// delete half of all cache files to make space, and/or half of all inodes
+// to stay within filesystem limits.
+static void perform_thanos_finger_snap(size_t cache_size, size_t num_files) {
     auto extsize = strlen(SCOPES_FILE_CACHE_EXT);
     static char cachefile[PATH_MAX+1];
     strcpy(cachefile, cache_dir);
@@ -79,13 +80,15 @@ static void perform_thanos_finger_snap(size_t cache_size) {
     }
 
     size_t target_size = SCOPES_MAX_CACHE_SIZE / 2;
+    size_t target_num = SCOPES_MAX_CACHE_INODES / 2;
     // oldest entries first
     std::sort(cache_entries.begin(), cache_entries.end());
     for (auto &&entry : cache_entries) {
-        if (cache_size < target_size)
+        if ((cache_size <= target_size) && (num_files <= target_num))
             break;
         remove(entry.path.c_str());
         cache_size -= entry.size;
+        num_files--;
     }
 
 }
@@ -100,6 +103,7 @@ static void check_cache_size() {
     char *cachefile_fname = cachefile + cache_dir_len + 1;
 
     size_t cache_size = 0;
+    size_t num_files = 0;
     struct dirent *dir;
     DIR *d = opendir(cache_dir);
     if (d) {
@@ -113,6 +117,7 @@ static void check_cache_size() {
                     struct stat s;
                     if( stat(cachefile,&s) == 0 ) {
                         cache_size += s.st_size;
+                        num_files++;
                     }
                 }
             }
@@ -120,8 +125,9 @@ static void check_cache_size() {
         closedir(d);
     }
 
-    if (cache_size >= SCOPES_MAX_CACHE_SIZE) {
-        perform_thanos_finger_snap(cache_size);
+    if ((cache_size >= SCOPES_MAX_CACHE_SIZE)
+        || (num_files >= SCOPES_MAX_CACHE_INODES)) {
+        perform_thanos_finger_snap(cache_size, num_files);
     }
 }
 

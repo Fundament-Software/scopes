@@ -72,9 +72,9 @@ static void *retrieve_symbol(const char *name) {
     //} else {
     //    return it->second;
     //}
-    LLVMOrcTargetAddress addr = 0;
-    auto err = LLVMOrcGetSymbolAddress(orc, &addr, name);
-    if (addr) return (void *)addr;
+    //LLVMOrcTargetAddress addr = 0;
+    //auto err = LLVMOrcGetSymbolAddress(orc, &addr, name);
+    //if (addr) return (void *)addr;
 #else
     size_t i = loaded_libs.size();
     while (i--) {
