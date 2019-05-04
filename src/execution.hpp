@@ -33,6 +33,7 @@ SCOPES_RESULT(uint64_t) get_address(const char *name);
 void *local_aware_dlsym(Symbol name);
 LLVMTargetMachineRef get_target_machine();
 void add_jit_event_listener(LLVMJITEventListenerRef listener);
+SCOPES_RESULT(void) add_object(const char *path);
 
 void init_llvm();
 

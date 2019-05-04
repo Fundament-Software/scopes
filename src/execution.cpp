@@ -315,6 +315,26 @@ SCOPES_RESULT(void) add_module(LLVMModuleRef module, const PointerMap &map,
     return {};
 }
 
+SCOPES_RESULT(void) add_object(const char *path) {
+    SCOPES_RESULT_TYPE(void);
+    LLVMErrorRef err = nullptr;
+    LLVMOrcModuleHandle newhandle = 0;
+    LLVMMemoryBufferRef membuf = nullptr;
+    char *errormsg;
+    if (LLVMCreateMemoryBufferWithContentsOfFile(path, &membuf, &errormsg)) {
+        SCOPES_ERROR(CGenBackendFailed, errormsg);
+    }
+    err = LLVMOrcAddObjectFile(orc, &newhandle, membuf,
+        orc_symbol_resolver, nullptr);
+    if (!err) {
+        module_handles.push_back(newhandle);
+    } else {
+        SCOPES_ERROR(ExecutionEngineFailed, LLVMGetErrorMessage(err));
+    }
+
+    return {};
+}
+
 void init_llvm() {
     global_c_namespace = dlopen(NULL, RTLD_LAZY);
 

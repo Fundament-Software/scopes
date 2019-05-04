@@ -30,6 +30,7 @@
 #include "prover.hpp"
 #include "quote.hpp"
 #include "boot.hpp"
+#include "execution.hpp"
 #include "symbol_enum.inc"
 
 #include "scopes/scopes.h"
@@ -40,6 +41,8 @@
 #ifdef SCOPES_WIN32
 #include "stdlib_ex.h"
 #include "dlfcn.h"
+#else
+#include <dlfcn.h>
 #endif
 #include <libgen.h>
 
@@ -663,18 +666,26 @@ sc_scope_raises_t sc_import_c(const sc_string_t *path,
 sc_void_raises_t sc_load_library(const sc_string_t *name) {
     using namespace scopes;
     SCOPES_RESULT_TYPE(void);
-#ifdef SCOPES_WIN32
+//#ifdef SCOPES_WIN32
     // try to load library through regular interface first
+    // so we get better error reporting
     dlerror();
     void *handle = dlopen(name->data, RTLD_LAZY);
     if (!handle) {
         char *err = dlerror();
         SCOPES_C_ERROR(RTLoadLibraryFailed, name, strdup(err));
     }
-#endif
+//#endif
     if (LLVMLoadLibraryPermanently(name->data)) {
         SCOPES_C_ERROR(RTLoadLibraryFailed, name, "reason unknown");
     }
+    return convert_result({});
+}
+
+sc_void_raises_t sc_load_object(const sc_string_t *path) {
+    using namespace scopes;
+    SCOPES_RESULT_TYPE(void);
+    SCOPES_C_CHECK_RESULT(add_object(path->data));
     return convert_result({});
 }
 
@@ -2225,6 +2236,7 @@ void init_globals(int argc, char *argv[]) {
 
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_import_c, TYPE_Scope, TYPE_String, TYPE_String, TYPE_List);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_load_library, _void, TYPE_String);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_load_object, _void, TYPE_String);
 
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_scope_at, TYPE_ValueRef, TYPE_Scope, TYPE_Symbol);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_scope_local_at, TYPE_ValueRef, TYPE_Scope, TYPE_Symbol);

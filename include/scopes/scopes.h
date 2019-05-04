@@ -311,6 +311,7 @@ SCOPES_LIBEXPORT uint64_t sc_hashbytes (const char *data, size_t size);
 SCOPES_LIBEXPORT sc_scope_raises_t sc_import_c(const sc_string_t *path,
     const sc_string_t *content, const sc_list_t *arglist);
 SCOPES_LIBEXPORT sc_void_raises_t sc_load_library(const sc_string_t *name);
+SCOPES_LIBEXPORT sc_void_raises_t sc_load_object(const sc_string_t *path);
 
 // lexical scopes
 
