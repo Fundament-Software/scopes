@@ -17,19 +17,113 @@
 #else
 #include <wordexp.h>
 #endif
+#include <dirent.h>
 //#include <libgen.h>
 
+#include <algorithm>
 #include <memory.h>
 #include <stdio.h>
 
 #include <zlib.h>
 
 #define SCOPES_CACHE_WRITE_KEY 0
+#define SCOPES_FILE_CACHE_EXT ".cache"
+#define SCOPES_FILE_CACHE_KEY_PATTERN "%s/%s.cache.key"
+#define SCOPES_FILE_CACHE_PATTERN "%s/%s.cache"
 
 namespace scopes {
 
 static bool cache_inited = false;
 static char cache_dir[PATH_MAX+1];
+
+// delete half of all cache files to make space
+static void perform_thanos_finger_snap(size_t cache_size) {
+    auto extsize = strlen(SCOPES_FILE_CACHE_EXT);
+    static char cachefile[PATH_MAX+1];
+    strcpy(cachefile, cache_dir);
+    auto cache_dir_len = strlen(cache_dir);
+    cachefile[cache_dir_len] = '/';
+    char *cachefile_fname = cachefile + cache_dir_len + 1;
+
+    struct CacheEntry {
+        std::string path;
+        ssize_t atime;
+        ssize_t size;
+
+        bool operator <(const CacheEntry &other) const {
+            return atime < other.atime;
+        }
+    };
+    std::vector<CacheEntry> cache_entries;
+    cache_entries.reserve(1024);
+
+    struct dirent *dir;
+    DIR *d = opendir(cache_dir);
+    if (d) {
+        while ((dir = readdir(d)) != NULL) {
+            if ( dir->d_type == DT_REG ) {
+                auto len = strlen(dir->d_name);
+                auto offset = dir->d_name + len - extsize;
+                if ((len >= extsize)
+                    && !strcmp(offset, SCOPES_FILE_CACHE_EXT)) {
+                    strcpy(cachefile_fname, dir->d_name);
+                    struct stat s;
+                    if( stat(cachefile,&s) == 0 ) {
+                        cache_entries.push_back(
+                            {cachefile, s.st_atime, s.st_size});
+                    }
+                }
+            }
+        }
+        closedir(d);
+    }
+
+    size_t target_size = SCOPES_MAX_CACHE_SIZE / 2;
+    // oldest entries first
+    std::sort(cache_entries.begin(), cache_entries.end());
+    for (auto &&entry : cache_entries) {
+        if (cache_size < target_size)
+            break;
+        remove(entry.path.c_str());
+        cache_size -= entry.size;
+    }
+
+}
+
+// count cumulative size of cache files and clean up if too big
+static void check_cache_size() {
+    auto extsize = strlen(SCOPES_FILE_CACHE_EXT);
+    static char cachefile[PATH_MAX+1];
+    strcpy(cachefile, cache_dir);
+    auto cache_dir_len = strlen(cache_dir);
+    cachefile[cache_dir_len] = '/';
+    char *cachefile_fname = cachefile + cache_dir_len + 1;
+
+    size_t cache_size = 0;
+    struct dirent *dir;
+    DIR *d = opendir(cache_dir);
+    if (d) {
+        while ((dir = readdir(d)) != NULL) {
+            if ( dir->d_type == DT_REG ) {
+                auto len = strlen(dir->d_name);
+                auto offset = dir->d_name + len - extsize;
+                if ((len >= extsize)
+                    && !strcmp(offset, SCOPES_FILE_CACHE_EXT)) {
+                    strcpy(cachefile_fname, dir->d_name);
+                    struct stat s;
+                    if( stat(cachefile,&s) == 0 ) {
+                        cache_size += s.st_size;
+                    }
+                }
+            }
+        }
+        closedir(d);
+    }
+
+    if (cache_size >= SCOPES_MAX_CACHE_SIZE) {
+        perform_thanos_finger_snap(cache_size);
+    }
+}
 
 static void init_cache() {
     if (cache_inited) return;
@@ -66,6 +160,8 @@ static void init_cache() {
             assert(false && "can't create application cache directory");
         }
     }
+
+    check_cache_size();
 }
 
 const String *get_cache_key(const char *content, size_t size) {
@@ -93,9 +189,6 @@ const String *get_cache_key(const char *content, size_t size) {
     }
     return String::from(key, 64);
 }
-
-#define SCOPES_FILE_CACHE_KEY_PATTERN "%s/%s.cache.key"
-#define SCOPES_FILE_CACHE_PATTERN "%s/%s.cache"
 
 const char *get_cache_key_file(const String *key) {
 #if SCOPES_CACHE_WRITE_KEY

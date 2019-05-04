@@ -27,6 +27,9 @@
 // print a list of cumulative timers on program exit
 #define SCOPES_PRINT_TIMERS 0
 
+// maximum size in bytes of object cache. by default, this is set to 100 MB
+#define SCOPES_MAX_CACHE_SIZE (100 << 20)
+
 // maximum number of recursions permitted during partial evaluation
 // if you think you need more, ask yourself if ad-hoc compiling a pure C function
 // that you can then use at compile time isn't the better choice;
