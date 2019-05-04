@@ -463,7 +463,7 @@ project "scopesrt"
 
     configuration "release"
         --defines { "NDEBUG" }
-        flags { "Optimize" }
+        flags { "Optimize", "Symbols" }
 
 project "scopes"
     kind "ConsoleApp"
@@ -622,4 +622,4 @@ project "scopes"
 
     configuration "release"
         --defines { "NDEBUG" }
-        flags { "Optimize" }
+        flags { "Optimize", "Symbols" }
