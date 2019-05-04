@@ -379,6 +379,9 @@ formatters:
     T(RTLoadLibraryFailed, \
         "runtime: error loading library %0: %1", \
         PString, Rawstring) \
+    T(RTGetAddressFailed, \
+        "runtime: could not find symbol '%0' in C namespace", \
+        Symbol) \
     T(RTMissingKey, \
         "runtime: no such key in map") \
     T(RTMissingScopeAttribute, \

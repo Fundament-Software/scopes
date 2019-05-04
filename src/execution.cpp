@@ -309,10 +309,8 @@ SCOPES_RESULT(uint64_t) get_address(const char *name) {
         SCOPES_ERROR(ExecutionEngineFailed, LLVMGetErrorMessage(err));
     }
     if (!addr) {
-        StyledStream ss;
-        ss << "get_address(): symbol missing '" << name << "'" << std::endl;
+        SCOPES_ERROR(RTGetAddressFailed, Symbol(String::from_cstr(name)));
     }
-    assert(addr);
     return addr;
 }
 
