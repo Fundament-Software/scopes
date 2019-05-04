@@ -23,9 +23,18 @@ include
     #define UINTVAL 3u
     #define LONGVAL 3ll
     #define ULONGVAL 0x3ull
+
+    // initialized global
+    int test_clang_global = 303;
+    // uninitialized global
+    int test_clang_global2;
+
     // eof
 
 test ((testfunc 2 3) == 6)
+
+test (test_clang_global == 303)
+deref test_clang_global2
 
 static-assert ((returnof testfunc) == i32)
 

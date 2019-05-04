@@ -876,6 +876,7 @@ SCOPES_RESULT(Scope *) import_c_module (
     aargs.push_back(scopes_clang_include_dir);
     aargs.push_back("-I");
     aargs.push_back(scopes_include_dir);
+    aargs.push_back("-fno-common");
     for (size_t i = 0; i < args.size(); ++i) {
         aargs.push_back(args[i].c_str());
     }
@@ -942,6 +943,7 @@ SCOPES_RESULT(Scope *) import_c_module (
         M = (LLVMModuleRef)Act->takeModule().release();
         assert(M);
         llvm_c_modules.push_back(M);
+        //LLVMDumpModule(M);
         SCOPES_CHECK_RESULT(add_module(M, PointerMap(), CF_Cache));
         return result;
     } else {

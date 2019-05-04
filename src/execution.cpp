@@ -37,6 +37,23 @@
 namespace scopes {
 
 static void *global_c_namespace = nullptr;
+static LLVMOrcJITStackRef orc = nullptr;
+static LLVMTargetMachineRef target_machine = nullptr;
+//static std::vector<void *> loaded_libs;
+static std::unordered_map<Symbol, void *, Symbol::Hash> cached_dlsyms;
+
+SCOPES_RESULT(uint64_t) get_address(const char *name) {
+    SCOPES_RESULT_TYPE(uint64_t);
+    LLVMOrcTargetAddress addr = 0;
+    auto err = LLVMOrcGetSymbolAddress(orc, &addr, name);
+    if (err) {
+        SCOPES_ERROR(ExecutionEngineFailed, LLVMGetErrorMessage(err));
+    }
+    if (!addr) {
+        SCOPES_ERROR(RTGetAddressFailed, Symbol(String::from_cstr(name)));
+    }
+    return addr;
+}
 
 static void *retrieve_symbol(const char *name) {
 #if 1
@@ -55,6 +72,9 @@ static void *retrieve_symbol(const char *name) {
     //} else {
     //    return it->second;
     //}
+    LLVMOrcTargetAddress addr = 0;
+    auto err = LLVMOrcGetSymbolAddress(orc, &addr, name);
+    if (addr) return (void *)addr;
 #else
     size_t i = loaded_libs.size();
     while (i--) {
@@ -71,12 +91,6 @@ static void *retrieve_symbol(const char *name) {
 void *local_aware_dlsym(Symbol name) {
     return retrieve_symbol(name.name()->data);
 }
-
-LLVMOrcJITStackRef orc = nullptr;
-LLVMTargetMachineRef target_machine = nullptr;
-
-//static std::vector<void *> loaded_libs;
-static std::unordered_map<Symbol, void *, Symbol::Hash> cached_dlsyms;
 
 LLVMTargetMachineRef get_target_machine() {
     return target_machine;
@@ -154,7 +168,7 @@ static uint64_t orc_symbol_resolver(const char *name, void *ctx) {
     }
     void *ptr = retrieve_symbol(name);
     if (!ptr) {
-        printf("ORC failed to resolve symbol: %s\n", name);
+        //printf("ORC failed to resolve symbol: %s\n", name);
     }
     return reinterpret_cast<uint64_t>(ptr);
 }
@@ -299,19 +313,6 @@ SCOPES_RESULT(void) add_module(LLVMModuleRef module, const PointerMap &map,
     }
 
     return {};
-}
-
-SCOPES_RESULT(uint64_t) get_address(const char *name) {
-    SCOPES_RESULT_TYPE(uint64_t);
-    LLVMOrcTargetAddress addr = 0;
-    auto err = LLVMOrcGetSymbolAddress(orc, &addr, name);
-    if (err) {
-        SCOPES_ERROR(ExecutionEngineFailed, LLVMGetErrorMessage(err));
-    }
-    if (!addr) {
-        SCOPES_ERROR(RTGetAddressFailed, Symbol(String::from_cstr(name)));
-    }
-    return addr;
 }
 
 void init_llvm() {
