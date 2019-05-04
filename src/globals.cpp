@@ -166,9 +166,9 @@ sc_valueref_raises_t sc_load_from_executable(const char *path) {
     return convert_result(load_custom_core(path));
 }
 
-int sc_main(const char *exepath, int argc, char *argv[]) {
+int sc_main(void *c_main, int argc, char *argv[]) {
     using namespace scopes;
-    return run_main(exepath, argc, argv);
+    return run_main(c_main, argc, argv);
 }
 
 // symbols needed by LLVM on windows

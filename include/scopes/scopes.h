@@ -144,7 +144,7 @@ typedef sc_list_scope_raises_t (*sc_syntax_wildcard_func_t)(const sc_list_t *, s
 // booting
 
 SCOPES_LIBEXPORT sc_valueref_raises_t sc_load_from_executable(const char *path);
-SCOPES_LIBEXPORT int sc_main(const char *exepath, int argc, char *argv[]);
+SCOPES_LIBEXPORT int sc_main(void *c_main, int argc, char *argv[]);
 
 // stats & info
 

@@ -21,7 +21,7 @@ void f_exit(int c);
 
 SCOPES_RESULT(ValueRef) load_custom_core(const char *executable_path);
 
-int run_main(const char *exepath, int argc, char *argv[]);
+int run_main(void *c_main, int argc, char *argv[]);
 
 } // namespace scopes
 

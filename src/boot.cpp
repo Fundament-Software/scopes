@@ -39,6 +39,8 @@
 #include <codecvt>
 #endif
 
+#include "llvm/ExecutionEngine/SectionMemoryManager.h"
+
 namespace scopes {
 
 static Timer *main_compile_time = nullptr;
@@ -196,7 +198,7 @@ static void setup_stdio() {
     }
 }
 
-SCOPES_RESULT(int) try_main(const char *exepath, int argc, char *argv[]) {
+SCOPES_RESULT(int) try_main(void *c_main, int argc, char *argv[]) {
     SCOPES_RESULT_TYPE(int);
     using namespace scopes;
     uint64_t c = 0;
@@ -210,6 +212,8 @@ SCOPES_RESULT(int) try_main(const char *exepath, int argc, char *argv[]) {
     setup_stdio();
     scopes_argc = argc;
     scopes_argv = argv;
+
+    std::string exepath = llvm::sys::fs::getMainExecutable(argv[0], c_main);
 
     scopes_compiler_path = nullptr;
     scopes_compiler_dir = nullptr;
@@ -339,9 +343,9 @@ static void crash_handler(int sig) {
 #endif
 #endif
 
-int run_main(const char *exepath, int argc, char *argv[]) {
+int run_main(void *c_main, int argc, char *argv[]) {
     using namespace scopes;
-    auto result = try_main(exepath, argc, argv);
+    auto result = try_main(c_main, argc, argv);
     if (!result.ok()) {
         print_error(result.assert_error());
         f_exit(1);

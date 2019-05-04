@@ -482,7 +482,7 @@ project "scopes"
         defines { "SCOPES_LINUX" }
 
         includedirs {
-            "clang/include"
+            --"clang/include"
         }
 
         buildoptions_cpp {
@@ -502,9 +502,9 @@ project "scopes"
         }
 
         links {
-            "dl",
-            "pthread",
-            "ncurses",
+            --"dl",
+            --"pthread",
+            --"ncurses",
         }
 
         linkoptions {
@@ -512,9 +512,6 @@ project "scopes"
             --"-Wl,--stack,16777216"
             "-Wl,-rpath=\\$$ORIGIN"
         }
-
-        linkoptions(LLVM_LDFLAGS)
-        linkoptions(LLVM_LIBS)
 
         postbuildcommands {
         }
@@ -574,29 +571,19 @@ project "scopes"
         }
 
         links {
-            "uuid",
-            "ole32",
-            --"psapi",
-            --"version",
-            --"stdc++",
+            --"uuid",
+            --"ole32",
         }
 
-        linkoptions(LLVM_LDFLAGS)
         linkoptions {
             "-Wl,--stack,8388608"
         }
-
-        linkoptions(LLVM_LIBS)
 
         postbuildcommands {
         }
 
     configuration { "macosx" }
         defines { "SCOPES_MACOS" }
-
-        includedirs {
-            LLVM_INCLUDEDIR
-        }
 
         buildoptions_cpp {
             "-std=c++11",
