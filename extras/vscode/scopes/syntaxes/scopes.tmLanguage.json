@@ -22,7 +22,7 @@
                 },
                 {
                     "name": "keyword.control.library.scopes",
-                    "match": "(bind|include|__this-scope|static|plain|local|new|global|typedef(\\+)?|fold|\\:\\:|\\@\\@|vvv|qq|va-option|sugar|spice|(fn|inline)\\.\\.\\.|(spice-)?capture|struct|fnchain|enum|while|continue|for|in|(sugar-|spice-|static-)?match|from|using|filter|\\:|try|except|locals|import|defer|(static-)?assert|define|define-infix[\\<\\>])(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
+                    "match": "(options|bind|include|__this-scope|static|plain|local|new|global|typedef(\\+)?|fold|\\:\\:|\\@\\@|vvv|qq|va-option|sugar|spice|(fn|inline)\\.\\.\\.|(spice-)?capture|struct|fnchain|enum|while|continue|for|in|(sugar-|spice-|static-)?match|from|using|filter|\\:|try|except|locals|import|defer|(static-)?assert|define|define-infix[\\<\\>])(?=[\\s\\(\\)\\[\\]\\{\\}\\,\\;\\#])"
                 },
                 {
                     "name": "keyword.control.glsl.scopes",

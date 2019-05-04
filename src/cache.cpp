@@ -138,8 +138,8 @@ const char *get_cache_file(const String *key) {
         }
     }
 
-    StyledStream ss;
-    ss << "generating " << filepath << std::endl;
+    //StyledStream ss;
+    //ss << "generating " << filepath << std::endl;
     return nullptr;
 }
 
