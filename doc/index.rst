@@ -20,6 +20,7 @@ Contents:
    about
    intro
    tutorial
+   cpp_users
    dataformat
    modules
 
