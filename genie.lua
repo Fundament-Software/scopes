@@ -384,6 +384,7 @@ project "scopesrt"
                 CP .. " -v " .. dllpath("libgcc_s_seh-1") .. " " .. BINDIR,
                 CP .. " -v " .. dllpath("libstdc++-6") .. " " .. BINDIR,
                 CP .. " -v " .. dllpath("libwinpthread-1") .. " " .. BINDIR,
+                CP .. " -v " .. dllpath("zlib1") .. " " .. BINDIR,
             }
         end
 
