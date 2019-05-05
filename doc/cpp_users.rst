@@ -4,7 +4,7 @@ Scopes for C/C++ Users
 This is an introduction of Scopes for C/C++ users. We are going to highlight
 commonalities and differences between both languages. At the end of this
 introduction, you will have a better understanding of how C/C++ concepts
-translate to Scopes, and which idiosyncracies to expect.
+translate to Scopes, and which idiosyncrasies to expect.
 
 Execution
 ---------
