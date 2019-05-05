@@ -62,17 +62,15 @@ static void perform_thanos_finger_snap(size_t cache_size, size_t num_files) {
     DIR *d = opendir(cache_dir);
     if (d) {
         while ((dir = readdir(d)) != NULL) {
-            if ( dir->d_type == DT_REG ) {
-                auto len = strlen(dir->d_name);
-                auto offset = dir->d_name + len - extsize;
-                if ((len >= extsize)
-                    && !strcmp(offset, SCOPES_FILE_CACHE_EXT)) {
-                    strcpy(cachefile_fname, dir->d_name);
-                    struct stat s;
-                    if( stat(cachefile,&s) == 0 ) {
-                        cache_entries.push_back(
-                            {cachefile, s.st_atime, s.st_size});
-                    }
+            auto len = strlen(dir->d_name);
+            auto offset = dir->d_name + len - extsize;
+            if ((len >= extsize)
+                && !strcmp(offset, SCOPES_FILE_CACHE_EXT)) {
+                strcpy(cachefile_fname, dir->d_name);
+                struct stat s;
+                if( stat(cachefile,&s) == 0 ) {
+                    cache_entries.push_back(
+                        {cachefile, s.st_atime, s.st_size});
                 }
             }
         }
@@ -108,17 +106,15 @@ static void check_cache_size() {
     DIR *d = opendir(cache_dir);
     if (d) {
         while ((dir = readdir(d)) != NULL) {
-            if ( dir->d_type == DT_REG ) {
-                auto len = strlen(dir->d_name);
-                auto offset = dir->d_name + len - extsize;
-                if ((len >= extsize)
-                    && !strcmp(offset, SCOPES_FILE_CACHE_EXT)) {
-                    strcpy(cachefile_fname, dir->d_name);
-                    struct stat s;
-                    if( stat(cachefile,&s) == 0 ) {
-                        cache_size += s.st_size;
-                        num_files++;
-                    }
+            auto len = strlen(dir->d_name);
+            auto offset = dir->d_name + len - extsize;
+            if ((len >= extsize)
+                && !strcmp(offset, SCOPES_FILE_CACHE_EXT)) {
+                strcpy(cachefile_fname, dir->d_name);
+                struct stat s;
+                if( stat(cachefile,&s) == 0 ) {
+                    cache_size += s.st_size;
+                    num_files++;
                 }
             }
         }
