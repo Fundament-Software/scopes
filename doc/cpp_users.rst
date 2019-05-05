@@ -67,8 +67,8 @@ arguments.
 
 In Scopes, scoping is controlled either by parentheses or indentation. To
 permit users to freely exchange code without friction, the indentation level is
-fixed at four spaces, and the use of tab characters for indentation is not
-permitted.
+fixed at four spaces outside of parenthesed expressions, and the use of tab
+characters for indentation is not permitted.
 
 Symbols
 -------
@@ -327,14 +327,254 @@ during typechecking. Inlines must respect semantic structure and are not
 programmable, but can make use of spices to perform reflection and conditional
 code generation, as well as generate new functions.
 
-Argument Binding
-----------------
+Templates
+---------
+
+In C, every function must be typed as it is (forward) declared. C++ introduces
+the concept of templates, which are functions that can be lazily typed. As of
+C++14, templates can now also deduct their return type. Templates can be forward
+declared, but forward declared templates with automatic return type can not
+be instantiated.
+
+.. code-block:: c++
+
+    // forward declaration of typed function
+    int typed_forward_decl (int x, const char *text, bool toggle);
+
+    // declaration of typed function
+    int typed_decl (int x, const char *text, bool toggle) {
+        return 0;
+    }
+
+    // forward declaration of template
+    template<typename A, typename B, typename C>
+    void lazy_typed_decl_returns_void (A a, B b, C c);
+
+    void test1 () {
+        // forward declaration can be used
+        lazy_typed_decl_returns_void(1,2,3);
+    }
+
+    // forward declaration of template with auto return type
+    template<typename A, typename B, typename C>
+    auto lazy_typed_decl_returns_auto (A a, B b, C c);
+
+    void test2 () {
+        // error: use before deduction of ‘auto’
+        lazy_typed_decl_returns_auto(1,2,3);
+    }
+
+    // implementation of template with auto return type
+    template<typename A, typename B, typename C>
+    auto lazy_typed_decl_returns_auto (A a, B b, C c) {
+        return 0;
+    }
+
+In Scopes, all function declarations are lazily typed, and `static-typify` can
+be used to instantiate concrete functions at compile time. Forward declarations
+are possible but must be completed within the same scope::
+
+    # forward declarations can not be typed
+    #fn typed_forward_decl
+
+    fn typed_decl (x text toggle)
+        return 0
+
+    # create typed function
+    let typed_decl = (static-typify typed_decl i32 rawstring bool)
+
+    # forward declaration of template has no parameter list
+    fn lazy_typed_decl_returns_void
+
+    # test1 is another template
+    fn test1 ()
+        # legal because test1 is not instantiated yet
+        # note: lazy_typed_decl_returns_void must be implemented before
+                test1 is instantiated.
+        lazy_typed_decl_returns_void 1 2 3
+
+    # forward declaration of template with auto return type
+      note that all our forward declarations have no return type
+    fn lazy_typed_decl_returns_auto
+
+    fn test2 ()
+        # legal because test2 is not instantiated yet
+        lazy_typed_decl_returns_auto 1 2 3
+
+    # implementation of template with auto return type
+    fn lazy_typed_decl_returns_auto (a b c)
+        return 0
+
+    # instantiate test2
+    let test2 = (static-typify test2)
+
+Variadic Arguments
+------------------
+
+C introduced variadic arguments at runtime using the ``va_list`` type, in order
+to support variadic functions like ``printf()``. C++ improved upon this
+concept by introducing variadic template arguments. It remains difficult to
+perform reflection on variadic arguments, such as iteration or targeted
+capturing.
+
+Functions in Scopes do not support runtime variadic functions (although calling
+variadic C functions is supported), but support compile time variadic arguments.
+See the following example::
+
+    # any trailing parameter ending in '...' is interpreted to be variadic.
+    fn takes-varargs (x y rest...)
+        # count the number of arguments in rest...
+        let numargs = (va-countof rest...)
+
+        # use let's support for variadic values to split arguments into
+          first argument and remainder.
+        let z rest... = rest...
+
+        # get the 5th argument from rest...
+        let fifth_arg = (va@ 5 rest...)
+
+        # iterate through all arguments, perform an action on each one
+          and store the result in a new variadic value.
+        let processed... =
+            va-map
+                inline (value)
+                    print value
+                    value + 1
+                rest...
+
+        # return variadic result as multiple return values
+        return processed...
+
+Overloading
+-----------
+
+C++ allows overloading of functions by specifying multiple functions with
+the same name but different type signatures. On call, the call arguments types
+are used to deduce the correct function to use.
+
+.. code-block:: c++
+
+    int overloaded (int a, int b) { return 0; }
+    int overloaded (int a, float b) { return 1; }
+    int overloaded (float a, int b) { return 2; }
+
+    // this new form of overloaded could be specified in a different file
+    int overloaded (float a, float b) { return 3; }
+
+Scopes offers a similar mechanism as a library form, but requires that
+overloads must be grouped at the time of declaration. The first form that
+matches argument types implicitly is selected, in order of declaration::
+
+    fn... overloaded
+    case (a : i32, b : i32)
+        return 0
+    case (a : i32, b : f32)
+        return 1
+    case (a : f32, b : i32)
+        return 2
+
+    # expanding overloaded in a different file, limited to local scope
+
+    # overwrites the previous declaration
+    fn... overloaded
+    case using overloaded # chains the previous declaration
+    case (a : f32, b : f32) # will be tried last
+        return 3
+
+Code Generation
+---------------
+
+In C/C++, files are interpreted either as translation units (the root file of a
+compiler invocation) or as header files, which are type and forward declarations
+that typically do not generate code on their own, embedded into translation
+units. Fully declared functions are guaranteed to generate code, and will
+only be optimized out at linking stage.
+
+In Scopes, every invocation of `sc_compile`, typically through `compile` or
+`import`, opens a new translation unit. As function declarations are template
+declarations, so they do not generate any code, nor does any other compile time
+construct. Instantiating a function through `static-typify` does also not
+guarantee that code will be generated. Only actual first time use will generate
+code for whatever translation unit is currently active, and make that code
+available to every future translation unit. This guarantees that a particular
+template is only instantiated once.
+
+When objects are compiled through `compile-object`, only functions exported
+through the scope argument are guaranteed to be included, and all functions
+they depend on. Objects are complete. Previously generated functions will not
+be externally defined, but will be redefined as private functions within the
+objects translation unit. The same rules apply to global variables.
+
+Embedding Third Party Code
+--------------------------
+
+With C/C++, third party libraries are typically built in a separate build
+process provided by the libraries developer, either as static or shared
+libraries. Their definitions are made available through include files that one
+can embed into one's own translation units using the ``#include`` preprocessing
+command. The libraries' precompiled symbols are merged into the executable
+during linking or at runtime, either when the process is mapped into memory
+or function pointers are loaded manually from the library.
+
+Scopes provides a module system which allows shipping libraries as sources.
+Any scopes source file can be imported as a module. When a module is first
+imported using `import` or `using import`, its main body is compiled and
+executed. The returned scope which contains the modules' exported functions and
+types is cached under the modules name and returned to the importing program.
+The modules' functions and types are now available to the program and can be
+embedded directly into its translation unit. No code is generated until the
+libraries' functions are actually used.
+
+Scopes also supports embedding existing third party C libraries in the classical
+way, using `include`, `load-library` and `load-object`::
+
+    # how to create trivial bindings for a C library
+
+    # include thirdparty.h and make its declarations available as a scope object
+    include "thirdparty.h"
+        import thirdparty # when this is commented out, declarations will be
+                            directly imported into the local scope
+        # filter "^thirdparty_.*$" # when import is not specified, import only
+                                     functions matching this regular expression
+        options "-I" (module-dir .. "/../include") # specify options for clang
+
+    # access defines and constants from thirdparty.h
+    if thirdparty.USE_SHARED_LIBRARY
+        # load thirdparty as a shared library from system search paths
+        if (operating-system == 'windows)
+            load-library "thirdparty.dll"
+        else
+            load-library "libthirdparty.so"
+    else
+        # load thirdparty as a static library from an object file
+        load-object (module-dir .. "/../lib/thirdparty.o")
+
+    # return thirdparty scope object for this module
+    return thirdparty
 
 Types
 -----
 
+Classes
+-------
+
+Methods
+-------
+
+Template Classes
+----------------
+
+Destructors
+-----------
+
 Type Aliasing
 -------------
+
+Standard Library
+----------------
+
+Memory Handling
+---------------
 
 Closures
 --------
@@ -342,8 +582,6 @@ Closures
 Loops
 -----
 
-Embedding Third Party Code
---------------------------
 
 
 Targeting Shader Programs
@@ -355,8 +593,3 @@ Exceptions
 ABI Compliance
 --------------
 
-Templates
----------
-
-Variadic Arguments
-------------------

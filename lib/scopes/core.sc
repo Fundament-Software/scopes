@@ -5714,6 +5714,7 @@ let
     list-parse = sc_parse_from_string
     #eval = sc_eval
     load-library = sc_load_library
+    load-object = sc_load_object
 
 sugar fold-locals (args...)
     fn stage-constant? (value)
