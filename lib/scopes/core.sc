@@ -6869,8 +6869,12 @@ fn read-eval-print-loop ()
         spice count-folds (x key values...)
             let x = (x as i32)
             let tmp = (Symbol "#result...")
-            if (key != tmp) (x + 1)
-            else x
+            let key = (key as Symbol)
+            if (key == unnamed) # module docstring
+                return x
+            if (key == tmp)
+                return x
+            x + 1
 
         spice append-to-scope (scope key docstr vals...)
             let tmp = (Symbol "#result...")
@@ -6964,8 +6968,6 @@ fn read-eval-print-loop ()
                         return at ('@ eval-scope at)
                     except (err)
             _ unnamed `()
-
-
 
         let counter =
             try
