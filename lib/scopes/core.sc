@@ -3542,7 +3542,7 @@ let using =
                 let name = (name as Symbol)
                 hide-traceback;
                 let module = ((require-from module-dir name) as Scope)
-                return (list do none)
+                return (list)
                     .. module sugar-scope
 
             let pattern =
