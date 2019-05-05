@@ -505,8 +505,8 @@ they depend on. Objects are complete. Previously generated functions will not
 be externally defined, but will be redefined as private functions within the
 objects translation unit. The same rules apply to global variables.
 
-Embedding Third Party Code
---------------------------
+Using Third Party Libraries
+---------------------------
 
 With C/C++, third party libraries are typically built in a separate build
 process provided by the libraries developer, either as static or shared
@@ -563,6 +563,9 @@ Methods
 
 Template Classes
 ----------------
+
+Copy Constructors
+-----------------
 
 Destructors
 -----------
