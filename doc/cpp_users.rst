@@ -753,17 +753,17 @@ type based dispatch. Here is an example:
 
     template<typename T> struct to_int {
         // linker complains: missing symbol
-        int operator(T x);
+        int operator()(T x);
     };
 
     template<> struct to_int<int> {
-        int operator(int x) {
+        int operator()(int x) {
             return x;
         }
     };
 
     template<> struct to_int<const char *> {
-        int operator(const char *x) {
+        int operator()(const char *x) {
             return atoi(x);
         }
     };
