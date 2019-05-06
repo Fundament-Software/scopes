@@ -456,6 +456,8 @@ SCOPES_LIBEXPORT const sc_type_t *sc_view_type(const sc_type_t *type, int id);
 SCOPES_LIBEXPORT const sc_type_t *sc_unique_type(const sc_type_t *type, int id);
 SCOPES_LIBEXPORT const sc_type_t *sc_mutate_type(const sc_type_t *type);
 SCOPES_LIBEXPORT const sc_type_t *sc_refer_type(const sc_type_t *type, uint64_t flags, sc_symbol_t storage_class);
+SCOPES_LIBEXPORT uint64_t sc_refer_flags(const sc_type_t *type);
+SCOPES_LIBEXPORT sc_symbol_t sc_refer_storage_class(const sc_type_t *type);
 SCOPES_LIBEXPORT const sc_type_t *sc_strip_qualifiers(const sc_type_t *type);
 
 // function types

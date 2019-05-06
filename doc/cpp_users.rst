@@ -552,8 +552,31 @@ way, using `include`, `load-library` and `load-object`::
     # return thirdparty scope object for this module
     return thirdparty
 
-Types
------
+Type Primitives
+---------------
+
+C/C++'s type primitives map to Scopes in the following way:
+
+==============  =======================
+C++                              Scopes
+==============  =======================
+`bool`          `bool`
+`int8_t`        `i8`
+`int16_t`       `i16`
+`int32_t`       `i32`
+`int64_t`       `i64`
+`uint8_t`       `u8`
+`uint16_t`      `u16`
+`uint32_t`      `u32`
+`uint64_t`      `u64`
+`float`         `f32`
+`double`        `f64`
+`const T *`     `pointer T`
+`T *`           `mutable (pointer T)`
+`const T &`     `& T`
+`T *`           `mutable (& T)`
+==============  =======================
+
 
 Classes
 -------

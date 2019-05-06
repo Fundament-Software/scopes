@@ -1995,6 +1995,24 @@ const sc_type_t *sc_refer_type(const sc_type_t *type, uint64_t flags, sc_symbol_
     return refer_type(type, flags, storage_class);
 }
 
+uint64_t sc_refer_flags(const sc_type_t *type) {
+    using namespace scopes;
+    auto rq = try_qualifier<ReferQualifier>(type);
+    if (rq) {
+        return rq->flags;
+    }
+    return 0;
+}
+
+sc_symbol_t sc_refer_storage_class(const sc_type_t *type) {
+    using namespace scopes;
+    auto rq = try_qualifier<ReferQualifier>(type);
+    if (rq) {
+        return rq->storage_class;
+    }
+    return SYM_Unnamed;
+}
+
 const sc_type_t *sc_strip_qualifiers(const sc_type_t *type) {
     using namespace scopes;
     return strip_qualifiers(type);
@@ -2327,6 +2345,9 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_unique_type, TYPE_Type, TYPE_Type, TYPE_I32);
     DEFINE_EXTERN_C_FUNCTION(sc_mutate_type, TYPE_Type, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_refer_type, TYPE_Type, TYPE_Type, TYPE_U64, TYPE_Symbol);
+    DEFINE_EXTERN_C_FUNCTION(sc_refer_flags, TYPE_U64, TYPE_Type);
+    DEFINE_EXTERN_C_FUNCTION(sc_refer_storage_class, TYPE_Symbol, TYPE_Type);
+
     DEFINE_EXTERN_C_FUNCTION(sc_strip_qualifiers, TYPE_Type, TYPE_Type);
 
     DEFINE_EXTERN_C_FUNCTION(sc_image_type, TYPE_Type,

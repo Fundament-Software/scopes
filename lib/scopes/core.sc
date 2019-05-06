@@ -958,6 +958,12 @@ inline define-symbols (self values...)
             sc_pointer_type_set_flags cls
                 band (sc_pointer_type_get_flags cls)
                     bxor pointer-flag-non-writable -1:u64
+    mutable& =
+        fn (cls)
+            sc_refer_type cls
+                band (sc_refer_flags cls)
+                    bxor pointer-flag-non-writable -1:u64
+                sc_refer_storage_class cls
     strip-pointer-storage-class =
         fn (cls)
             sc_pointer_type_set_storage_class cls unnamed
@@ -985,7 +991,10 @@ let mutable =
             if (icmp== argc 1)
                 let self = (sc_getarg args 0)
                 let T = (unbox-pointer self type)
-                return `[('mutable T)]
+                if ('refer? T)
+                    return `[('mutable& T)]
+                else
+                    return `[('mutable T)]
             elseif (ptrcmp== (unbox-pointer (sc_getarg args 0) type) pointer)
                 let self = (sc_getarg args 1)
                 let T = (unbox-pointer self type)
@@ -1890,7 +1899,7 @@ inline floordiv (a b)
                     let argc = ('argcount args)
                     verify-count argc 1 1
                     let self = ('getarg args 0)
-                    'tag `[(sc_refer_type (unbox-pointer self type) 0:u64 unnamed)]
+                    'tag `[(sc_refer_type (unbox-pointer self type) pointer-flag-non-writable unnamed)]
                         'anchor args
     __toref =
         box-pointer
