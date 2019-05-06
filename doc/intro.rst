@@ -85,15 +85,19 @@ Building Scopes on Linux
 Building Scopes on macOS
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
+* Scopes builds on macOS Mojave (10.14) using either LLVM 7.0 or 8.0.
 * You'll need the following packages from `brew <https://brew.sh/>`_: `llvm`
   and `cmake`. Scopes' build system respects ``brew``'s standard installation
-  paths.
+  paths. Install `llvm@7` if you want to use LLVM 7.0.
 * Alternatively, provide your own clang distribution and symlink it to
   ``scopes-repo/clang``.
 * Put ``llvm-config`` in your ``$PATH``. Find it in `$(brew --prefix llvm)/bin`
   if using brew.
 * You'll also need an installation of the Xcode Command Line Tools:
   ``xcode-select --install``.
+* You may also need to force installation of the macOS SDK headers:
+  Open `macOS_SDK_headers_for_macOS_10.14.pkg` found in 
+  `/Library/Developer/CommandLineTools/Packages`
 * You also need the latest source distributions of
   `SPIRV-Tools <https://github.com/KhronosGroup/SPIRV-Tools>`_ and
   `SPIRV-Cross <https://github.com/KhronosGroup/SPIRV-Cross>`_ checked out or
