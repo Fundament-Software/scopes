@@ -598,6 +598,7 @@ project "scopes"
         }
 
         postbuildcommands {
+            "install_name_tool -change ../bin/libscopesrt.dylib @executable_path/libscopesrt.dylib " .. BINDIR .. "/scopes"
         }
 
     configuration "debug"
