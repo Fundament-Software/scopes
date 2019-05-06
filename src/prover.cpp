@@ -453,6 +453,19 @@ static SCOPES_RESULT(void) verify_valid(const ASTContext &ctx, const TypedValues
     return {};
 }
 
+static void build_view(
+    const ASTContext &ctx, const Anchor *anchor, TypedValueRef &val) {
+    auto T = val->get_type();
+    auto uq = try_unique(T);
+    if (uq) {
+        assert(ctx.block->is_valid(ValueIndex(val)));
+        auto retT = view_type(T, {});
+        auto call = ref(anchor, Call::from(retT, g_view, { val }));
+        ctx.append(call);
+        val = call;
+    }
+}
+
 static SCOPES_RESULT(TypedValueRef) build_drop(const ASTContext &ctx,
     const Anchor *anchor, const ValueIndex &arg) {
     SCOPES_RESULT_TYPE(TypedValueRef);
@@ -485,9 +498,10 @@ static SCOPES_RESULT(TypedValueRef) build_drop(const ASTContext &ctx,
         write_annotation(ctx, anchor, ss.str(), {
             ref(anchor, ConstPointer::type_from(arg.get_type())) });
         #endif
+        auto val = ref(anchor, ExtractArgument::from(arg.value, arg.index));
+        build_view(ctx, anchor, val);
         auto expr =
-            ref(anchor, CallTemplate::from(handler, {
-                ref(anchor, ExtractArgument::from(arg.value, arg.index)) }));
+            ref(anchor, CallTemplate::from(handler, { val }));
         auto result = SCOPES_GET_RESULT(prove(ctx, expr));
         auto RT = result->get_type();
         if (!is_returning(RT) || is_returning_value(RT)) {
@@ -531,19 +545,6 @@ static SCOPES_RESULT(void) drop_value(const ASTContext &ctx,
         ctx.move(id, ref(anchor, mover));
     }
     return {};
-}
-
-static void build_view(
-    const ASTContext &ctx, const Anchor *anchor, TypedValueRef &val) {
-    auto T = val->get_type();
-    auto uq = try_unique(T);
-    if (uq) {
-        assert(ctx.block->is_valid(ValueIndex(val)));
-        auto retT = view_type(T, {});
-        auto call = ref(anchor, Call::from(retT, g_view, { val }));
-        ctx.append(call);
-        val = call;
-    }
 }
 
 static void build_move(
