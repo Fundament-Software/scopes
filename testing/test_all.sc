@@ -52,6 +52,7 @@ test-modules
     .test_map
     .test_match
     .test_memoization
+    .test_memory
     .test_mutarray
     .test_namedargs
     .test_object

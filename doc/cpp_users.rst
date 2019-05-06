@@ -557,44 +557,307 @@ Type Primitives
 
 C/C++'s type primitives map to Scopes in the following way:
 
-==============  =======================
-C++                              Scopes
-==============  =======================
-`bool`          `bool`
-`int8_t`        `i8`
-`int16_t`       `i16`
-`int32_t`       `i32`
-`int64_t`       `i64`
-`uint8_t`       `u8`
-`uint16_t`      `u16`
-`uint32_t`      `u32`
-`uint64_t`      `u64`
-`float`         `f32`
-`double`        `f64`
-`const T *`     `pointer T`
-`T *`           `mutable (pointer T)`
-`const T &`     `& T`
-`T *`           `mutable (& T)`
-==============  =======================
+=============================================== =======================
+C++                                             Scopes
+=============================================== =======================
+`bool`                                          `bool`
+`int8_t`                                        `i8`
+`int16_t`                                       `i16`
+`int32_t`                                       `i32`
+`int64_t`                                       `i64`
+`uint8_t`                                       `u8`
+`uint16_t`                                      `u16`
+`uint32_t`                                      `u32`
+`uint64_t`                                      `u64`
+`float`                                         `f32`
+`double`                                        `f64`
+``typedef U V``                                 `let V = U`
+``using V = U``                                 `let V = U`
+`const T *`                                     `pointer T`
+`T *`                                           `mutable (pointer T)`
+`const T &`                                     `& T`
+`T &`                                           `mutable (& T)`
+``std::array<T, N>``                            `array T N`
+``std::tuple<T0, ..., Tn>``                     `tuple T0 ... Tn`
+``const T [N] __attribute__((aligned (16)))``   `vector T N`
+=============================================== =======================
 
+Initializer Lists
+-----------------
 
-Classes
+Scopes does not support initializer lists, but provides convenience constructors
+for arrays and tuple types.
+
+======================================== =========================
+C++                                      Scopes
+======================================== =========================
+`const T _[] = { arg0, ..., argN };`     `arrayof T arg0 ... argN`
+`const T _ = { arg0, ..., argN };`       `tupleof arg0 ... argN`
+======================================== =========================
+
+Structs
 -------
+
+Scopes supports structs in a format not unlike the one C/C++ provides, but does
+not permit composition by inheritance. Composition must be strictly explicit.
+
+Compare this C++ example, which makes use of recently introduced default
+initializers and designated initializers:
+
+.. code-block:: c++
+
+    struct Example {
+        int value;
+        // default initializers only supported in C++11 and up
+        bool choice = false;
+        const char *text = "";
+    };
+
+    // designated initializers only supported in C99
+    Example example = { .value = 100, .text = "test" };
+
+to this equivalent declaration in Scopes::
+
+    struct Example plain
+        value : i32
+        # type can be deduced from initializer
+        choice = false
+        text : rawstring = ""
+
+    global example : Example
+        value = 100
+        text = "test"
 
 Methods
 -------
 
+C++ introduced methods as a way to associate functions directly with structs
+and classes. In C++, the argument referencing the object argument is hidden
+and implicitly bound to the ``this`` symbol. Members and other methods of the
+struct are in the lexical scope of the method.
+
+.. code-block:: c++
+
+    // this example is a little contrived for illustrational purposes
+    struct Example {
+        int value;
+
+        // a method declaration
+        int get_add_value (int n) {
+            return this->value + n;
+        }
+
+        // another method declaration
+        void print_value_plus_one () {
+            printf("%i\n", get_add_value(1));
+        }
+    };
+
+    void use_example (Example example) {
+        example.print_value_plus_one();
+    }
+
+Scopes supports methods in a more explicit way that makes refactorings from
+function to method and back easier, both in declaration and in usage::
+
+    struct Example plain
+        value : i32
+
+        # note the explicit presence of the object parameter
+        fn get_add_value (self n)
+            self.value + n
+
+        fn print_value_plus_one (self)
+            print ('get_add_value self 1)
+
+    fn use_example (example)
+        'print_value_plus_one example
+
+What happens here is that we call a quoted symbol with arguments. The call
+handler for the `Symbol` type rewrites ``'methodname object arg0 ... argN``
+as ``(getattr (typeof object) 'methodname) object arg0 ... argN``.
+
+Virtual Methods
+---------------
+
+As Scopes doesn't provide an abstraction for composition by inheritance,
+virtual methods are not supported.
+
+Classes
+-------
+
+C++'s concept of classes is only indirectly supported through structs in Scopes.
+Access modifiers are not available, but methods can be made "private" by keeping
+their definition local. Fields can not be hidden, but they can be visibly
+marked as private by convention::
+
+    struct Example plain
+        # an underscore indicates that the attribute is not meant to be
+          accessed directly.
+        _value : i32
+
+        fn get_add_value (self n)
+            self._value + n
+
+        fn print_value_plus_one (self)
+            # use get_add_value directly
+            print (get_add_value self 1)
+
+        # unbind get_add_value from local scope to prevent it
+          from being added as an attribute to Example.
+        unlet get_add_value
+
+    fn use_example (example)
+        # this operation is not possible from here:
+        # 'get_add_value example 1
+        'print_value_plus_one example
+
 Template Classes
 ----------------
 
-Copy Constructors
------------------
+C++ supports generics in the form of template classes, which are lazily typed
+structs.
+
+.. code-block:: c++
+
+    template<typename T, int x>
+    struct Example {
+        T value;
+
+        bool compare () {
+            value == x;
+        }
+    };
+
+Scopes leverages constant expression folding and compile time closures to
+trivially provide this feature via `inline` functions::
+
+    # a function decorator memoizes the result so we get the same type for
+      the same arguments
+    @@ memo
+    inline Example (T x)
+        # construct type name from string
+        struct ("Example<" .. (tostring T) .. ">")
+            value : T
+
+            fn compare ()
+                value == x
+
+Partial template specialization allows to choose different implementations
+depending on instantiation arguments. The same mechanism is also used to do
+type based dispatch. Here is an example:
+
+.. code-block:: c++
+
+    #include <stdlib.h>
+
+    template<typename T> struct to_int {
+        // linker complains: missing symbol
+        int operator(T x);
+    };
+
+    template<> struct to_int<int> {
+        int operator(int x) {
+            return x;
+        }
+    };
+
+    template<> struct to_int<const char *> {
+        int operator(const char *x) {
+            return atoi(x);
+        }
+    };
+
+In Scopes, it is not necessary to create types in order to build single
+type based dispatch operators. Here are three ways to supply the same
+functionality::
+
+    include "stdlib.h"
+
+    # a function that generates a function
+    @@ memo
+    inline to_int1 (T)
+        static-match T
+        case i32 _
+        case rawstring atoi
+        default
+            static-error "unsupported type"
+
+    # a function that performs the operation directly
+    inline to_int2 (x)
+        let T = (typeof x)
+        static-if (T == i32) x
+        elseif (T == rawstring) (atoi x)
+        else
+            static-error "unsupported type"
+
+    # using the overloaded function abstraction
+    fn... to_int3
+    case (x : i32,) x
+    case (x : rawstring,) (atoi x)
+
+Constructors
+------------
+
+Scopes supports construction from type through the `__typecall` special method.
+A type implementing a method under this name becomes callable. By convention,
+it is used to construct both specialized types and to instantiate a type. Its
+first argument is the name of the type that has been called.
+
+Here is an example that changes the default constructor of a struct::
+
+    struct Example plain
+        _value : i32
+
+        inline __typecall (cls n)
+            # within the context of a struct definition, super-type is bound
+              to the super type of the struct we are defining. In this case
+              the supertype is `CStruct`.
+            super-type.__typecall cls
+                _value = (n * n)
 
 Destructors
 -----------
 
-Type Aliasing
--------------
+C++ provides so-called destructors which permit to execute code when a value goes
+out of scope. Destructors typically free resources, but can also be used to
+switch contexts.
+
+.. code-block:: c++
+
+    struct Handle {
+        void *_handle;
+
+        // constructor
+        Handle(void *handle) : _handle(handle) {}
+        // destructor
+        ~Handle() {
+            printf("destroying handle\n");
+            free(_handle);
+        }
+    };
+
+Values of non-plain type, so-called unique types, are guaranteed to be
+referenced only at a single point within a program. Because of this guarantee,
+a unique type is able to supply a destructor through the `__drop` special method
+that is automatically called when the value goes out of scope::
+
+    struct Handle
+        _handle : voidstar
+
+        # constructor
+        inline __typecall (cls handle)
+            super-type.__typecall cls handle
+
+        # destructor
+        inline __drop (self)
+            print "destroying handle"
+            free self._handle
+            return;
+
+
+Operator Overloading
+--------------------
 
 Standard Library
 ----------------
