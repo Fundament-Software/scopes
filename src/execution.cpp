@@ -159,6 +159,10 @@ SCOPES_RESULT(void) init_execution() {
 static std::vector<const PointerMap *> pointer_maps;
 
 static uint64_t orc_symbol_resolver(const char *name, void *ctx) {
+#if SCOPES_MACOS
+	assert(*name == '_');
+	name++;
+#endif
     const PointerMap *map = (const PointerMap *)ctx;
     if (map) {
         auto it = map->find(name);
