@@ -2793,17 +2793,19 @@ fn extract-single-type-arg (args)
     if (== ('typeof value) type)
         as value type
     else
-        'typeof value
+        'qualified-typeof value
+
+inline make-const-value-property-function (func)
+    spice-macro
+        fn (args)
+            let value = (extract-single-arg args)
+            let val = (func value)
+            `val
 
 inline make-const-type-property-function (func)
     spice-macro
         fn (args)
-            let value = (extract-single-arg args)
-            let val =
-                if (== ('typeof value) type)
-                    as value type
-                else
-                    'typeof value
+            let val = (extract-single-type-arg args)
             let val = (func val)
             `val
 
@@ -2818,6 +2820,7 @@ let
     sizeof = (make-const-type-property-function sc_type_sizeof)
     alignof = (make-const-type-property-function sc_type_alignof)
     unqualified = (make-const-type-property-function sc_strip_qualifiers)
+    qualifiersof = (make-const-value-property-function sc_value_qualified_type)
     keyof = (make-const-type-property-function sc_type_key)
     returnof =
         make-const-type-property-function

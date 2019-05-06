@@ -491,7 +491,7 @@ units. Fully declared functions are guaranteed to generate code, and will
 only be optimized out at linking stage.
 
 In Scopes, every invocation of `sc_compile`, typically through `compile` or
-`import`, opens a new translation unit. As function declarations are template
+`import`, opens a new translation unit. Function declarations are template
 declarations, so they do not generate any code, nor does any other compile time
 construct. Instantiating a function through `static-typify` does also not
 guarantee that code will be generated. Only actual first time use will generate
