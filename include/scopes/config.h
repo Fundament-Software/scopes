@@ -8,7 +8,7 @@
 #define SCOPES_CONFIG_H
 
 #define SCOPES_VERSION_MAJOR 0
-#define SCOPES_VERSION_MINOR 15
+#define SCOPES_VERSION_MINOR 16
 #define SCOPES_VERSION_PATCH 0
 
 // trace partial evaluation and code generation
