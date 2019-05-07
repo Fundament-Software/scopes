@@ -734,6 +734,7 @@ namespace scopes {
     T(SYM_CompilerDir, "compiler-dir") \
     T(SYM_CompilerPath, "compiler-path") \
     T(SYM_CompilerTimestamp, "compiler-timestamp") \
+    T(SYM_CacheDir, "cache-dir") \
     \
     /* parse-c keywords */ \
     T(SYM_Struct, "struct") \

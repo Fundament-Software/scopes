@@ -267,6 +267,8 @@ SCOPES_LIBEXPORT sc_valueref_raises_t sc_parse_from_string(const sc_string_t *st
 
 SCOPES_LIBEXPORT const sc_string_t *sc_default_styler(sc_symbol_t style, const sc_string_t *str);
 SCOPES_LIBEXPORT sc_bool_string_tuple_t sc_prompt(const sc_string_t *s, const sc_string_t *pre);
+SCOPES_LIBEXPORT void sc_save_history(const sc_string_t *path);
+SCOPES_LIBEXPORT void sc_load_history(const sc_string_t *path);
 SCOPES_LIBEXPORT void sc_set_autocomplete_scope(const sc_scope_t* scope);
 SCOPES_LIBEXPORT const sc_string_t *sc_format_message(const sc_anchor_t *anchor, const sc_string_t *message);
 SCOPES_LIBEXPORT void sc_write(const sc_string_t *value);

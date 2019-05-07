@@ -6792,7 +6792,11 @@ fn read-eval-print-loop ()
 
     let global-scope = (globals)
     let eval-scope = (Scope global-scope)
+    let history-path =
+        .. cache-dir "/repl.history"
+
     set-autocomplete-scope! eval-scope
+    sc_load_history history-path
 
     sugar help ((value as Symbol))
         let val =
@@ -6876,6 +6880,7 @@ fn read-eval-print-loop ()
                         repeat-string promptlen "."
                     " "
                 preload
+        sc_save_history history-path
         if (not success)
             return;
         fn endswith-blank (s)

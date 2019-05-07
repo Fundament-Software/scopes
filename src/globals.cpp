@@ -31,6 +31,7 @@
 #include "quote.hpp"
 #include "boot.hpp"
 #include "execution.hpp"
+#include "cache.hpp"
 #include "symbol_enum.inc"
 
 #include "scopes/scopes.h"
@@ -334,6 +335,16 @@ sc_bool_string_tuple_t sc_prompt(const sc_string_t *s, const sc_string_t *pre) {
 #endif
 #endif
     return { true, String::from_cstr(r) };
+}
+
+void sc_save_history(const sc_string_t *path) {
+    using namespace scopes;
+    linenoiseHistorySave(path->data);
+}
+
+void sc_load_history(const sc_string_t *path) {
+    using namespace scopes;
+    linenoiseHistoryLoad(path->data);
 }
 
 namespace scopes {
@@ -2143,6 +2154,8 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_launch_args, arguments_type({TYPE_I32,native_ro_pointer_type(rawstring)}));
 
     DEFINE_EXTERN_C_FUNCTION(sc_prompt, arguments_type({TYPE_Bool, TYPE_String}), TYPE_String, TYPE_String);
+    DEFINE_EXTERN_C_FUNCTION(sc_save_history, _void, TYPE_String);
+    DEFINE_EXTERN_C_FUNCTION(sc_load_history, _void, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_set_autocomplete_scope, _void, TYPE_Scope);
     DEFINE_EXTERN_C_FUNCTION(sc_default_styler, TYPE_String, TYPE_Symbol, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_format_message, TYPE_String, TYPE_Anchor, TYPE_String);
@@ -2412,6 +2425,8 @@ void init_globals(int argc, char *argv[]) {
         ConstPointer::type_from(TYPE_NoReturn));
     bind_new_value(KW_None, ConstAggregate::none_from());
     bind_symbol(Symbol("unnamed"), Symbol(SYM_Unnamed));
+    bind_new_value(SYM_CacheDir,
+        ConstPointer::string_from(String::from_cstr(get_cache_dir())));
     bind_new_value(SYM_CompilerDir,
         ConstPointer::string_from(
             String::from(scopes_compiler_dir, strlen(scopes_compiler_dir))));

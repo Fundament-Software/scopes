@@ -167,6 +167,11 @@ static void init_cache() {
     check_cache_size();
 }
 
+const char *get_cache_dir() {
+    init_cache();
+    return cache_dir;
+}
+
 const String *get_cache_key(const char *content, size_t size) {
     // split into four parts, hash each part -> 256 bits
     uint64_t h[4];
