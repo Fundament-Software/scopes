@@ -24,6 +24,7 @@ test-modules
     .test_docstring
     .test_dots
     .test_embed
+    .test_escaping
     .test_enums
     .test_extraparams
     .test_feature_matrix

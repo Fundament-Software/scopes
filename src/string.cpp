@@ -114,7 +114,7 @@ static int escapestrcb(vsformatcb_t cb, void *user, char *buf,
 #define VSFCB_PRINT(MAXCOUNT, FMT, SRC) { \
         VSFCB_CHECKWRITE(MAXCOUNT+1); \
         p += snprintf(p, B_SNFORMAT - (p - buf), FMT, SRC); }
-    for(;;) {
+    for(int i = 0; i < strcount; ++i) {
         char c = *fmt;
         switch(c) {
         case '\n': VSFCB_CHECKWRITE(2); *p++ = '\\'; *p++ = 'n'; break;
@@ -127,10 +127,13 @@ static int escapestrcb(vsformatcb_t cb, void *user, char *buf,
                 VSFCB_PRINT(4, "\\x%02x", (unsigned char)c);
             } else {
                 if ((c == '\\') || (quote_chars && strchr(quote_chars, c))) {
-                    VSFCB_CHECKWRITE(1);
+                    VSFCB_CHECKWRITE(2);
                     *p++ = '\\';
+                    *p++ = c;
+                } else {
+                    VSFCB_CHECKWRITE(1);
+                    *p++ = c;
                 }
-                *p++ = c;
             }
             break;
         }
