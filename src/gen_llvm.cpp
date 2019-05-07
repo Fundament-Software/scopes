@@ -2577,7 +2577,7 @@ SCOPES_RESULT(void) compile_object(const String *path, Scope *scope, uint64_t fl
         LLVMDumpModule(module);
     }
 
-    auto target_machine = get_target_machine();
+    auto target_machine = get_object_target_machine();
     assert(target_machine);
 
     char *errormsg = nullptr;
@@ -2705,7 +2705,7 @@ SCOPES_RESULT(ConstPointerRef) compile(const FunctionRef &fn, uint64_t flags) {
         auto it = disassembly_listener->sizes.find(pfunc);
         if (it != disassembly_listener->sizes.end()) {
             std::cout << "disassembly:\n";
-            auto target_machine = get_target_machine();
+            auto target_machine = get_jit_target_machine();
             do_disassemble(target_machine, pfunc, it->second);
         } else {
             std::cout << "no disassembly available\n";

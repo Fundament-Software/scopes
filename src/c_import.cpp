@@ -873,7 +873,14 @@ SCOPES_RESULT(Scope *) import_c_module (
     aargs.push_back("-I");
     aargs.push_back(scopes_include_dir);
     aargs.push_back("-fno-common");
-    for (size_t i = 0; i < args.size(); ++i) {
+    auto argcount = args.size();
+    std::string object_file;
+    for (size_t i = 0; i < argcount; ++i) {
+        if ((args[i] == "-c") && ((i + 1) < argcount)) {
+            object_file = args[i + 1];
+            i += 2;
+            continue;
+        }
         aargs.push_back(args[i].c_str());
     }
 
@@ -939,7 +946,18 @@ SCOPES_RESULT(Scope *) import_c_module (
         M = (LLVMModuleRef)Act->takeModule().release();
         assert(M);
         llvm_c_modules.push_back(M);
-        //LLVMDumpModule(M);
+        if (!object_file.empty()) {
+            auto target_machine = get_object_target_machine();
+            assert(target_machine);
+
+            char *errormsg;
+            static char filename[PATH_MAX];
+            strncpy(filename, object_file.c_str(), PATH_MAX);
+            if (LLVMTargetMachineEmitToFile(target_machine, M,
+                filename, LLVMObjectFile, &errormsg)) {
+                SCOPES_ERROR(CGenBackendFailed, errormsg);
+            }
+        }
         SCOPES_CHECK_RESULT(add_module(M, PointerMap(), CF_Cache));
         return result;
     } else {

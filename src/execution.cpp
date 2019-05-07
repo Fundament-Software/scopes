@@ -38,7 +38,8 @@ namespace scopes {
 
 static void *global_c_namespace = nullptr;
 static LLVMOrcJITStackRef orc = nullptr;
-static LLVMTargetMachineRef target_machine = nullptr;
+static LLVMTargetMachineRef jit_target_machine = nullptr;
+static LLVMTargetMachineRef object_target_machine = nullptr;
 //static std::vector<void *> loaded_libs;
 static std::unordered_map<Symbol, void *, Symbol::Hash> cached_dlsyms;
 
@@ -92,8 +93,12 @@ void *local_aware_dlsym(Symbol name) {
     return retrieve_symbol(name.name()->data);
 }
 
-LLVMTargetMachineRef get_target_machine() {
-    return target_machine;
+LLVMTargetMachineRef get_jit_target_machine() {
+    return jit_target_machine;
+}
+
+LLVMTargetMachineRef get_object_target_machine() {
+    return object_target_machine;
 }
 
 void add_jit_event_listener(LLVMJITEventListenerRef listener) {
@@ -139,12 +144,17 @@ SCOPES_RESULT(void) init_execution() {
         //LLVMCodeModelMedium;
         //LLVMCodeModelLarge;
 
+    object_target_machine = LLVMCreateTargetMachine(target, triple,
+        nullptr, nullptr,
+        LLVMCodeGenLevelDefault, LLVMRelocStatic, LLVMCodeModelDefault);
+    assert(object_target_machine);
+
     const char *CPU = nullptr;
     const char *Features = nullptr;
-    target_machine = LLVMCreateTargetMachine(target, triple, CPU, Features,
+    jit_target_machine = LLVMCreateTargetMachine(target, triple, CPU, Features,
         optlevel, reloc, codemodel);
-    assert(target_machine);
-    orc = LLVMOrcCreateInstance(target_machine);
+    assert(jit_target_machine);
+    orc = LLVMOrcCreateInstance(jit_target_machine);
     assert(orc);
 
     LLVMOrcRegisterJITEventListener(orc, LLVMCreateGDBRegistrationListener());
@@ -286,7 +296,7 @@ SCOPES_RESULT(void) add_module(LLVMModuleRef module, const PointerMap &map,
     }
 skip_cache:
     {
-        auto target_machine = get_target_machine();
+        auto target_machine = get_jit_target_machine();
         assert(target_machine);
 
         char *errormsg;

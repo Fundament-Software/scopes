@@ -31,7 +31,8 @@ SCOPES_RESULT(void) add_module(LLVMModuleRef module,
 SCOPES_RESULT(uint64_t) get_address(const char *name);
 //SCOPES_RESULT(void *) get_pointer_to_global(LLVMValueRef g);
 void *local_aware_dlsym(Symbol name);
-LLVMTargetMachineRef get_target_machine();
+LLVMTargetMachineRef get_jit_target_machine();
+LLVMTargetMachineRef get_object_target_machine();
 void add_jit_event_listener(LLVMJITEventListenerRef listener);
 SCOPES_RESULT(void) add_object(const char *path);
 
