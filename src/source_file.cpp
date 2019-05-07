@@ -38,15 +38,16 @@ SourceFile::~SourceFile() {
 }
 
 void SourceFile::close() {
-    assert(!_str);
-    if (ptr != MAP_FAILED) {
-        munmap(ptr, length);
-        ptr = MAP_FAILED;
-        length = 0;
-    }
-    if (fd >= 0) {
-        ::close(fd);
-        fd = -1;
+    if (!_str) {
+        if (ptr != MAP_FAILED) {
+            munmap(ptr, length);
+            ptr = MAP_FAILED;
+            length = 0;
+        }
+        if (fd >= 0) {
+            ::close(fd);
+            fd = -1;
+        }
     }
 }
 
