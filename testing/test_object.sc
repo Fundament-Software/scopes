@@ -40,6 +40,7 @@ let scope = (Scope)
 'set-symbol scope 'main main
 
 compile-object
+    default-target-triple
     module-dir .. "/test.o"
     scope
     #'no-debug-info

@@ -24,6 +24,8 @@ syntax: regexp
 ^scopes$
 ^testing/myscopes$
 ^testing/test$
+^testing/test\.o$
+^testing/test\.wasm$
 ^scopes[.]h$
 ^doc/_build/
 ^bin/

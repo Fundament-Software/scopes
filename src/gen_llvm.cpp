@@ -1078,9 +1078,13 @@ struct LLVMIRGenerator {
             LLVMSetSubprogram(func, function_to_subprogram(node));
         }
         if (is_export) {
+            LLVMDumpValue(func);
             LLVMSetLinkage(func, LLVMExternalLinkage);
+            //LLVMSetDLLStorageClass(func, LLVMDLLExportStorageClass);
+            LLVMSetVisibility(func, LLVMDefaultVisibility);
         } else if (generate_object) {
             LLVMSetLinkage(func, LLVMPrivateLinkage);
+            LLVMSetVisibility(func, LLVMHiddenVisibility);
         }
         function_todo.push_back(node);
         return func;
@@ -2539,7 +2543,8 @@ public:
 };
 #endif
 
-SCOPES_RESULT(void) compile_object(const String *path, Scope *scope, uint64_t flags) {
+SCOPES_RESULT(void) compile_object(const String *triple,
+    const String *path, Scope *scope, uint64_t flags) {
     SCOPES_RESULT_TYPE(void);
     Timer sum_compile_time(TIMER_Compile);
 #if SCOPES_COMPILE_WITH_DEBUG_INFO
@@ -2577,16 +2582,28 @@ SCOPES_RESULT(void) compile_object(const String *path, Scope *scope, uint64_t fl
         LLVMDumpModule(module);
     }
 
-    auto target_machine = get_object_target_machine();
-    assert(target_machine);
+    auto tt = LLVMNormalizeTargetTriple(triple->data);
+    static char triplestr[1024];
+    strncpy(triplestr, tt, 1024);
+    LLVMDisposeMessage(tt);
 
-    char *errormsg = nullptr;
-    char *path_cstr = strdup(path->data);
-    if (LLVMTargetMachineEmitToFile(target_machine, module, path_cstr,
-        LLVMObjectFile, &errormsg)) {
-        SCOPES_ERROR(CGenBackendFailed, errormsg);
+    char *error_message = nullptr;
+    LLVMTargetRef target = nullptr;
+    if (LLVMGetTargetFromTriple(triplestr, &target, &error_message)) {
+        SCOPES_ERROR(CGenBackendFailed, error_message);
     }
+
+    auto tm = LLVMCreateTargetMachine(target, triplestr, nullptr, nullptr,
+        LLVMCodeGenLevelDefault, LLVMRelocStatic, LLVMCodeModelDefault);
+    assert(tm);
+
+    char *path_cstr = strdup(path->data);
+    auto failed = LLVMTargetMachineEmitToFile(tm, module, path_cstr,
+        LLVMObjectFile, &error_message);
     free(path_cstr);
+    if (failed) {
+        SCOPES_ERROR(CGenBackendFailed, error_message);
+    }
     return {};
 }
 

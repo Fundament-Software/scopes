@@ -34,6 +34,8 @@ let operating-system
     its stack memory.
 let unroll-limit
 
+let default-target-triple = (sc_default_target_triple)
+
 # square list expressions are ast unquotes by default
 let square-list = spice-unquote-arguments
 
@@ -3936,8 +3938,8 @@ spice-quote
     inline compile-spirv (target func flags...)
         sc_compile_spirv target func (parse-compile-flags flags...)
 
-    inline compile-object (func table flags...)
-        sc_compile_object func table (parse-compile-flags flags...)
+    inline compile-object (target path table flags...)
+        sc_compile_object target path table (parse-compile-flags flags...)
 
 inline convert-assert-args (args cond msg)
     if ((countof args) == 2) msg

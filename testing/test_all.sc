@@ -83,4 +83,5 @@ test-modules
     .test_value
     .test_varargs
     .test_vector
+    .test_wasm
     .test_while

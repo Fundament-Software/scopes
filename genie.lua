@@ -76,7 +76,9 @@ local LLVM_CONFIG = toolpath("llvm-config", CLANG_PATH)
 
 local LLVM_LDFLAGS = pkg_config(LLVM_CONFIG .. " --ldflags")
 local LLVM_CXXFLAGS = pkg_config(LLVM_CONFIG .. " --cxxflags")
-local LLVM_LIBS = pkg_config(LLVM_CONFIG .. " --link-static --libs orcjit engine passes option objcarcopts coverage support lto coroutines")
+local LLVM_LIBS = pkg_config(LLVM_CONFIG .. " --link-static --libs orcjit"
+    .. " engine passes option objcarcopts coverage support lto coroutines"
+    .. " webassembly")
 local LLVM_INCLUDEDIR = pkg_config(LLVM_CONFIG .. " --includedir")
 
 if not os.is("windows") then

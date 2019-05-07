@@ -1,0 +1,32 @@
+<html>
+<head>
+<title>WASM Test</title>
+</head>
+<body>
+<script>
+const memory = new WebAssembly.Memory({ initial: 256, maximum: 256 });
+const importObj = {
+    env: {
+        abortStackOverflow: () => { throw new Error('overflow'); },
+        __indirect_function_table: new WebAssembly.Table({
+            initial: 1,
+            maximum: 1,
+            element: 'anyfunc' }),
+        tableBase: 0,
+        __linear_memory: memory,
+        memoryBase: 1024,
+        STACKTOP: 0,
+        STACK_MAX: memory.buffer.byteLength,
+    }
+};
+fetch('test.wasm').then(response =>
+  response.arrayBuffer()
+).then(bytes =>
+  WebAssembly.instantiate(bytes, importObj)
+).then(results => {
+    console.log(results.instance.exports);
+    results.instance.exports[0](2,3);
+});
+</script>
+</body>
+</html>

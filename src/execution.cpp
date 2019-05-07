@@ -43,6 +43,17 @@ static LLVMTargetMachineRef object_target_machine = nullptr;
 //static std::vector<void *> loaded_libs;
 static std::unordered_map<Symbol, void *, Symbol::Hash> cached_dlsyms;
 
+const String *get_default_target_triple() {
+    auto str = LLVMGetDefaultTargetTriple();
+    auto result = String::from_cstr(str);
+    LLVMDisposeMessage(str);
+    return result;
+}
+
+/** Normalize a target triple. The result needs to be disposed with
+  LLVMDisposeMessage. */
+//char* LLVMNormalizeTargetTriple(const char* triple);
+
 SCOPES_RESULT(uint64_t) get_address(const char *name) {
     SCOPES_RESULT_TYPE(uint64_t);
     LLVMOrcTargetAddress addr = 0;
@@ -362,9 +373,26 @@ void init_llvm() {
 
     LLVMEnablePrettyStackTrace();
     LLVMInitializeNativeTarget();
-    LLVMInitializeNativeAsmParser();
     LLVMInitializeNativeAsmPrinter();
+    LLVMInitializeNativeAsmParser();
     LLVMInitializeNativeDisassembler();
+    LLVMInitializeWebAssemblyTargetInfo();
+    LLVMInitializeWebAssemblyTarget();
+    LLVMInitializeWebAssemblyTargetMC();
+    LLVMInitializeWebAssemblyAsmPrinter();
+    LLVMInitializeWebAssemblyAsmParser();
+    LLVMInitializeWebAssemblyDisassembler();
+
+#if 0
+    auto targ = LLVMGetFirstTarget();
+    while (targ) {
+        /** Returns the name of a target. See llvm::Target::getName */
+        printf("%s\n", LLVMGetTargetName(targ));
+
+        targ = LLVMGetNextTarget(targ);
+    }
+#endif
+
 }
 
 } // namespace scopes

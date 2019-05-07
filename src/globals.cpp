@@ -288,9 +288,15 @@ sc_string_raises_t sc_compile_glsl(sc_symbol_t target, sc_valueref_t srcl, uint6
     return convert_result(compile_glsl(target, result, flags));
 }
 
-sc_void_raises_t sc_compile_object(const sc_string_t *path, sc_scope_t *table, uint64_t flags) {
+const sc_string_t *sc_default_target_triple() {
     using namespace scopes;
-    return convert_result(compile_object(path, table, flags));
+    return get_default_target_triple();
+}
+
+sc_void_raises_t sc_compile_object(const sc_string_t *target_triple,
+    const sc_string_t *path, sc_scope_t *table, uint64_t flags) {
+    using namespace scopes;
+    return convert_result(compile_object(target_triple, path, table, flags));
 }
 
 void sc_enter_solver_cli () {
@@ -2148,7 +2154,8 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_compile, TYPE_ValueRef, TYPE_ValueRef, TYPE_U64);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_compile_spirv, TYPE_String, TYPE_Symbol, TYPE_ValueRef, TYPE_U64);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_compile_glsl, TYPE_String, TYPE_Symbol, TYPE_ValueRef, TYPE_U64);
-    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_compile_object, _void, TYPE_String, TYPE_Scope, TYPE_U64);
+    DEFINE_EXTERN_C_FUNCTION(sc_default_target_triple, TYPE_String);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_compile_object, _void, TYPE_String, TYPE_String, TYPE_Scope, TYPE_U64);
     DEFINE_EXTERN_C_FUNCTION(sc_enter_solver_cli, _void);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_verify_stack, TYPE_USize);
     DEFINE_EXTERN_C_FUNCTION(sc_launch_args, arguments_type({TYPE_I32,native_ro_pointer_type(rawstring)}));
