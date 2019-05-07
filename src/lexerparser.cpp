@@ -658,7 +658,7 @@ SCOPES_RESULT(ValueRef) LexerParser::parse_naked(int column, Token end_token) {
     }
 
     auto result = builder.get_result();
-    if (unwrap_single && result && result->count == 1) {
+    if (unwrap_single && result && List::count(result) == 1) {
         return result->at;
     } else {
         return ValueRef(anchor, ConstPointer::list_from(result));

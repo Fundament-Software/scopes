@@ -985,7 +985,7 @@ sc_valueref_list_tuple_t sc_list_decons(const sc_list_t *l) {
 
 int sc_list_count(const sc_list_t *l) {
     using namespace scopes;
-    return l?l->count:0;
+    return List::count(l);
 }
 
 sc_valueref_t sc_list_at(const sc_list_t *l) {
@@ -1007,7 +1007,8 @@ bool sc_list_compare(const sc_list_t *a, const sc_list_t *b) {
     using namespace scopes;
     if (a == b)
         return true;
-    if (a->count != b->count)
+
+    if (List::count(a) != List::count(b))
         return false;
     while (a) {
         assert(a); assert(b);

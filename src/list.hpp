@@ -25,9 +25,7 @@ protected:
     List(const ValueRef &_at, const List *_next, size_t _count);
 
 public:
-    ValueRef at;
-    const List *next;
-    size_t count;
+    static size_t count(const List *l);
 
     ValueRef first() const;
 
@@ -69,6 +67,11 @@ public:
         std::size_t operator()(const List *l) const;
     };
 
+public:
+    ValueRef at;
+    const List *next;
+protected:
+    size_t _count;
 };
 
 const List * const EOL = nullptr;

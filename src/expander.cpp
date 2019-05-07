@@ -39,7 +39,7 @@ static SCOPES_RESULT(void) verify_list_parameter_count(const char *context, cons
     if ((mincount <= 0) && (maxcount == -1)) {
         return {};
     }
-    int argcount = (int)expr->count - starti;
+    int argcount = (int)List::count(expr) - starti;
 
     if ((maxcount >= 0) && (argcount > maxcount)) {
         SCOPES_ERROR(SyntaxTooManyArguments, maxcount);
@@ -532,7 +532,7 @@ struct Expander {
         auto anchor = it->at.anchor();
         it = it->next;
 
-        if (it->count == 1) {
+        if (List::count(it) == 1) {
             return it->at;
         } else {
             return ValueRef(ref(anchor, ConstPointer::list_from(it)));
@@ -832,7 +832,7 @@ struct Expander {
         if (T != TYPE_List) return false;
         auto l = SCOPES_GET_RESULT(extract_list_constant(it));
         if (l == EOL) return false;
-        if (l->count != 3) return false;
+        if (List::count(l) != 3) return false;
         it = l->at;
         T = try_get_const_type(it);
         if (T != TYPE_Symbol) return false;

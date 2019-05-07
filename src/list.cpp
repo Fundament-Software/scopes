@@ -34,10 +34,10 @@ std::size_t List::Hash::operator()(const List *l) const {
 
 static std::unordered_set<const List *, List::Hash, List::KeyEqual> list_map;
 
-List::List(const ValueRef &_at, const List *_next, size_t _count) :
+List::List(const ValueRef &_at, const List *_next, size_t count) :
     at(_at),
     next(_next),
-    count(_count) {}
+    _count(count) {}
 
 ValueRef List::first() const {
     if (this == EOL) {
@@ -53,9 +53,13 @@ const List *List::from(const ValueRef &_at, const List *_next) {
     if (it != list_map.end()) {
         return *it;
     }
-    const List *l = new List(_at, _next, (_next != EOL)?(_next->count + 1):1);
+    const List *l = new List(_at, _next, (_next != EOL)?(List::count(_next) + 1):1);
     list_map.insert(l);
     return l;
+}
+
+size_t List::count(const List *l) {
+    return l?l->_count:0;
 }
 
 const List *List::from(ValueRef const *values, int N) {
