@@ -35,10 +35,6 @@ SourceFile::SourceFile(Symbol _path) :
 
 void SourceFile::close() {
     assert(!_str);
-    auto it = file_cache.find(path);
-    if (it != file_cache.end()) {
-        file_cache.erase(it);
-    }
     if (ptr != MAP_FAILED) {
         munmap(ptr, length);
         ptr = MAP_FAILED;
@@ -60,10 +56,6 @@ const char *SourceFile::strptr() {
 }
 
 SourceFile *SourceFile::from_file(Symbol _path) {
-    auto it = file_cache.find(_path);
-    if (it != file_cache.end()) {
-        return it->second;
-    }
     SourceFile *file = new SourceFile(_path);
     file->fd = ::open(_path.name()->data, O_RDONLY);
     if (file->fd >= 0) {
@@ -71,7 +63,6 @@ SourceFile *SourceFile::from_file(Symbol _path) {
         file->ptr = mmap(nullptr,
             file->length, PROT_READ, MAP_PRIVATE, file->fd, 0);
         if (file->ptr != MAP_FAILED) {
-            file_cache[_path] = file;
             return file;
         }
         file->close();
@@ -139,7 +130,5 @@ StyledStream &SourceFile::stream(StyledStream &ost, int offset,
     }
     return ost;
 }
-
-std::unordered_map<Symbol, SourceFile *, Symbol::Hash> SourceFile::file_cache;
 
 } // namespace scopes

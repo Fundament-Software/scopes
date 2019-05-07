@@ -19,8 +19,6 @@ namespace scopes {
 
 struct SourceFile {
 protected:
-    static std::unordered_map<Symbol, SourceFile *, Symbol::Hash> file_cache;
-
     SourceFile(Symbol _path);
 
 public:
