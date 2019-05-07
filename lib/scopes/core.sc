@@ -6829,11 +6829,31 @@ fn read-eval-print-loop ()
             sc_write docstr
         `()
 
+    sugar sh (values...)
+        let system = (extern 'system (function i32 rawstring))
+        let block = (sc_expression_new)
+        let str = `""
+        sc_expression_append block str
+        fold (str = str) for elem in values...
+            let str =
+                if (('typeof elem) == string)
+                    `(.. str elem " ")
+                elseif (('typeof elem) == Symbol)
+                    `(.. str [(elem as Symbol as string)] " ")
+                else
+                    `(.. str (tostring elem) " ")
+            sc_expression_append block str
+            str
+        qq [embed]
+            [let] $? = ([system] [block])
+            ;
+
     'set-symbols eval-scope
         module-dir = cwd
         module-path = (cwd .. "/<console>.sc")
         module-name = "<console>"
         main-module? = true
+        sh = sh
         help = help
         exit =
             typedef (do "Enter 'exit;' or Ctrl+D to exit")
