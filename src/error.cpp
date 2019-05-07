@@ -21,6 +21,7 @@
 
 #include <algorithm>
 #include <assert.h>
+#include <string.h>
 
 namespace scopes {
 
@@ -92,6 +93,9 @@ template<typename T> struct ArgFormatter< TValueRef<T> > {
     void value(StyledStream &ss, const TValueRef<T> &arg) { ss << arg.unref(); }
 };
 
+template<> struct ArgFormatter<ErrnoValue> {
+    void value(StyledStream &ss, ErrnoValue arg) { ss << strerror(arg.value); }
+};
 
 static void _format_token(StyledStream &ss, char c, int n) {
     // no match

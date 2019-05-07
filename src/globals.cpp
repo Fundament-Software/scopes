@@ -1025,7 +1025,7 @@ bool sc_list_compare(const sc_list_t *a, const sc_list_t *b) {
 
 sc_symbol_t sc_anchor_path(const sc_anchor_t *anchor) {
     using namespace scopes;
-    return anchor->path();
+    return anchor->path;
 }
 
 int sc_anchor_lineno(const sc_anchor_t *anchor) {
@@ -1042,8 +1042,9 @@ const sc_anchor_t *sc_anchor_offset(const sc_anchor_t *anchor, int offset) {
     using namespace scopes;
 
     return Anchor::from(
-        anchor->file, anchor->lineno,
-        anchor->column + offset, anchor->offset + offset);
+        anchor->path, anchor->lineno,
+        anchor->column + offset, anchor->offset + offset,
+        anchor->buffer);
 }
 
 // Closure
@@ -1519,7 +1520,7 @@ sc_valueref_raises_t sc_parse_from_path(const sc_string_t *path) {
     if (!sf) {
         SCOPES_C_ERROR(RTUnableToOpenFile, path);
     }
-    LexerParser parser(sf);
+    LexerParser parser(std::move(sf));
     return convert_result(parser.parse());
 }
 
@@ -1527,7 +1528,7 @@ sc_valueref_raises_t sc_parse_from_string(const sc_string_t *str) {
     using namespace scopes;
     auto sf = SourceFile::from_string(Symbol("<string>"), str);
     assert(sf);
-    LexerParser parser(sf);
+    LexerParser parser(std::move(sf));
     return convert_result(parser.parse());
 }
 

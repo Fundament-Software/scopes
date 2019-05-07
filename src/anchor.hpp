@@ -20,21 +20,22 @@ struct SourceFile;
 
 struct Anchor {
 protected:
-    Anchor(SourceFile *_file, int _lineno, int _column, int _offset);
+    Anchor(Symbol _path, int _lineno, int _column, int _offset, const String *buffer);
 
 public:
-    SourceFile *file;
+    Symbol path;
     int lineno;
     int column;
     int offset;
-
-    Symbol path() const;
+    const String *buffer;
 
     bool is_boring() const;
     bool is_same(const Anchor *other) const;
 
     static const Anchor *from(
-        SourceFile *_file, int _lineno, int _column, int _offset = 0);
+        Symbol _path, int _lineno, int _column, int _offset = 0, const String *buffer = nullptr);
+    static const Anchor *from(
+        const std::unique_ptr<SourceFile> &file, int _lineno, int _column, int _offset = 0);
 
     StyledStream& stream(StyledStream& ost) const;
 

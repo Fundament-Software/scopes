@@ -49,11 +49,7 @@ static const Anchor *anchor_from_location(clang::SourceManager &SM, clang::Sourc
         auto fname = PLoc.getFilename();
         const String *strpath = String::from_cstr(fname);
         Symbol key(strpath);
-        SourceFile *sf = SourceFile::from_file(key);
-        if (!sf) {
-            sf = SourceFile::from_string(key, Symbol(SYM_Unnamed).name());
-        }
-        return Anchor::from(sf, PLoc.getLine(), PLoc.getColumn(),
+        return Anchor::from(key, PLoc.getLine(), PLoc.getColumn(),
             SM.getFileOffset(loc));
     }
 

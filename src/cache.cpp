@@ -23,6 +23,7 @@
 #include <algorithm>
 #include <memory.h>
 #include <stdio.h>
+#include <string.h>
 
 #include <zlib.h>
 
@@ -256,18 +257,24 @@ void set_cache(const String *key,
 
     auto f = gzopen(filepath, "wb9");
     if (!f) {
+        auto e = errno;
         StyledStream ss;
-        ss << "unable to open " << filepath << " for writing" << std::endl;
+        ss << "unable to open " << filepath << " for writing ("
+            << strerror(e)
+            << ")" << std::endl;
         return;
     }
 
     bool failed = (gzfwrite(content, size, 1, f) != 1);
+    auto e = errno;
 
     gzclose(f);
 
     if (failed) {
         StyledStream ss;
-        ss << "unable to write cache to " << filepath << std::endl;
+        ss << "unable to write cache to " << filepath << " ("
+            << strerror(e)
+            << ")" << std::endl;
         remove(filepath);
     }
 }

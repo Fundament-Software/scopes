@@ -33,6 +33,10 @@ SourceFile::SourceFile(Symbol _path) :
     _str(nullptr) {
 }
 
+SourceFile::~SourceFile() {
+    close();
+}
+
 void SourceFile::close() {
     assert(!_str);
     if (ptr != MAP_FAILED) {
@@ -55,8 +59,8 @@ const char *SourceFile::strptr() {
     return (const char *)ptr;
 }
 
-SourceFile *SourceFile::from_file(Symbol _path) {
-    SourceFile *file = new SourceFile(_path);
+std::unique_ptr<SourceFile> SourceFile::from_file(Symbol _path) {
+    auto file = std::unique_ptr<SourceFile>(new SourceFile(_path));
     file->fd = ::open(_path.name()->data, O_RDONLY);
     if (file->fd >= 0) {
         file->length = lseek(file->fd, 0, SEEK_END);
@@ -68,26 +72,24 @@ SourceFile *SourceFile::from_file(Symbol _path) {
         file->close();
     }
     file->close();
-    delete file;
     return nullptr;
 }
 
-SourceFile *SourceFile::from_string(Symbol _path, const String *str) {
+std::unique_ptr<SourceFile> SourceFile::from_string(Symbol _path, const String *str) {
     SourceFile *file = new SourceFile(_path);
     // loading from string buffer rather than file
     file->ptr = (void *)str->data;
     file->length = str->count;
     file->_str = str;
-    return file;
+    return std::unique_ptr<SourceFile>(file);
 }
 
 size_t SourceFile::size() const {
     return length;
 }
 
-StyledStream &SourceFile::stream(StyledStream &ost, int offset,
-    const char *indent) {
-    auto str = strptr();
+StyledStream &SourceFile::stream_buffer(StyledStream &ost, int offset,
+    const char *str, int length, const char *indent) {
     if (offset >= length) {
         #if 0
         ost << "<cannot display location in source file (offset "
@@ -129,6 +131,11 @@ StyledStream &SourceFile::stream(StyledStream &ost, int offset,
         ost << Style_Operator << "^" << Style_None << std::endl;
     }
     return ost;
+}
+
+StyledStream &SourceFile::stream(StyledStream &ost, int offset,
+    const char *indent) {
+    return stream_buffer(ost, offset, strptr(), length, indent);
 }
 
 } // namespace scopes

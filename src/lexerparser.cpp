@@ -60,8 +60,8 @@ SCOPES_RESULT(void) LexerParser::verify_good_taste(char c) {
     return {};
 }
 
-LexerParser::LexerParser(SourceFile *_file, size_t offset, size_t length) {
-    file = _file;
+LexerParser::LexerParser(std::unique_ptr<SourceFile> _file, size_t offset, size_t length)
+    : file(std::move(_file)) {
     input_stream = file->strptr() + offset;
     token = tok_eof;
     base_offset = (int)offset;

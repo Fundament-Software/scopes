@@ -83,7 +83,7 @@ struct LexerParser {
 
     SCOPES_RESULT(void) verify_good_taste(char c);
 
-    LexerParser(SourceFile *_file, size_t offset = 0, size_t length = 0);
+    LexerParser(std::unique_ptr<SourceFile> _file, size_t offset = 0, size_t length = 0);
 
     int offset();
 
@@ -154,7 +154,7 @@ struct LexerParser {
 
     Token token;
     int base_offset;
-    SourceFile *file;
+    std::unique_ptr<SourceFile> file;
     const char *input_stream;
     const char *eof;
     const char *cursor;

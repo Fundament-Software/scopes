@@ -251,7 +251,8 @@ SCOPES_RESULT(void) add_module(LLVMModuleRef module, const PointerMap &map,
 
         auto f = gzopen(filepath, "r");
         if (!f) {
-            SCOPES_ERROR(CGenBackendFailed, "failed to open cache file for reading");
+            printf("failed to open cache file for reading (%s)\n", strerror(errno));
+            goto skip_cache;
         }
 
         std::vector<char> data;
@@ -259,7 +260,8 @@ SCOPES_RESULT(void) add_module(LLVMModuleRef module, const PointerMap &map,
         char buf[8192];
         int r = gzread(f, buf, sizeof(buf));
         if (r < 0) {
-            SCOPES_ERROR(CGenBackendFailed, "failed to read from cache file");
+            printf("failed to read from cache file (%s)\n", strerror(errno));
+            goto skip_cache;
         }
         if (r > 0) {
             auto offset = data.size();
@@ -278,7 +280,12 @@ SCOPES_RESULT(void) add_module(LLVMModuleRef module, const PointerMap &map,
 
         err = LLVMOrcAddObjectFile(orc, &newhandle, membuf,
             orc_symbol_resolver, ptrmap);
+        goto done;
     } else {
+        goto skip_cache;
+    }
+skip_cache:
+    {
         auto target_machine = get_target_machine();
         assert(target_machine);
 
@@ -304,6 +311,7 @@ SCOPES_RESULT(void) add_module(LLVMModuleRef module, const PointerMap &map,
         #endif
     }
 
+done:
     if (irbuf) {
         LLVMDisposeMemoryBuffer(irbuf);
     }

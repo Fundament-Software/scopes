@@ -99,7 +99,7 @@ SCOPES_RESULT(ValueRef) load_custom_core(const char *executable_path) {
     // seek backwards to find beginning of expression
     while ((cursor >= ptr) && (*cursor != '('))
         cursor--;
-    LexerParser footerParser(file, cursor - ptr);
+    LexerParser footerParser(std::move(file), cursor - ptr);
     auto expr = SCOPES_GET_RESULT(extract_list_constant(SCOPES_GET_RESULT(footerParser.parse())));
     if (expr == EOL) {
         SCOPES_ERROR(InvalidFooter);
@@ -121,7 +121,7 @@ SCOPES_RESULT(ValueRef) load_custom_core(const char *executable_path) {
     if (script_size <= 0) {
         SCOPES_ERROR(InvalidFooter);
     }
-    LexerParser parser(file, cursor - script_size - ptr, script_size);
+    LexerParser parser(std::move(file), cursor - script_size - ptr, script_size);
     return parser.parse();
 }
 
@@ -244,7 +244,6 @@ SCOPES_RESULT(int) try_main(void *c_main, int argc, char *argv[]) {
     }
 
     {
-        SourceFile *sf = nullptr;
 #if 0
         Symbol name = format("%s/lib/scopes/%i.%i.%i/core.sc",
             scopes_compiler_dir,
@@ -255,11 +254,11 @@ SCOPES_RESULT(int) try_main(void *c_main, int argc, char *argv[]) {
         Symbol name = format("%s/lib/scopes/core.sc",
             scopes_compiler_dir);
 #endif
-        sf = SourceFile::from_file(name);
+        auto sf = SourceFile::from_file(name);
         if (!sf) {
             SCOPES_ERROR(CoreMissing, name);
         }
-        LexerParser parser(sf);
+        LexerParser parser(std::move(sf));
         expr = SCOPES_GET_RESULT(parser.parse());
     }
 

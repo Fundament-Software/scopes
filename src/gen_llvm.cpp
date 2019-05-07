@@ -197,7 +197,7 @@ struct LLVMIRGenerator {
     typedef std::vector<LLVMValueRef> LLVMValueRefs;
     typedef std::vector<LLVMTypeRef> LLVMTypeRefs;
 
-    std::unordered_map<SourceFile *, LLVMMetadataRef> file2value;
+    std::unordered_map<Symbol, LLVMMetadataRef, Symbol::Hash> file2value;
     std::unordered_map<void *, LLVMValueRef> ptr2global;
     std::unordered_map<ValueIndex, LLVMValueRef, ValueIndex::Hash> ref2value;
     std::unordered_map<Function *, LLVMMetadataRef> func2md;
@@ -364,24 +364,24 @@ struct LLVMIRGenerator {
         }
     }
 
-    LLVMMetadataRef source_file_to_scope(SourceFile *sf) {
+    LLVMMetadataRef source_file_to_scope(Symbol sf) {
         assert(use_debug_info);
 
         auto it = file2value.find(sf);
         if (it != file2value.end())
             return it->second;
 
-        char *dn = strdup(sf->path.name()->data);
-        char *bn = strdup(dn);
+        static char _fname[PATH_MAX];
+        static char _dname[PATH_MAX];
+        auto str = sf.name();
+        strncpy(_fname, str->data, PATH_MAX);
+        strncpy(_dname, str->data, PATH_MAX);
 
-        char *fname = basename(bn);
-        char *dname = dirname(dn);
+        char *fname = basename(_fname);
+        char *dname = dirname(_dname);
 
         LLVMMetadataRef result = LLVMDIBuilderCreateFile(di_builder,
             fname, strlen(fname), dname, strlen(dname));
-
-        free(dn);
-        free(bn);
 
         file2value.insert({ sf, result });
 
@@ -397,7 +397,7 @@ struct LLVMIRGenerator {
 
         const Anchor *anchor = l.anchor();
 
-        LLVMMetadataRef difile = source_file_to_scope(anchor->file);
+        LLVMMetadataRef difile = source_file_to_scope(anchor->path);
 
         /*
         LLVMMetadataRef subroutinevalues[] = {

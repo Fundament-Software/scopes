@@ -15,9 +15,11 @@ namespace scopes {
 namespace AnchorSet {
 struct Hash {
     std::size_t operator()(const Anchor *s) const {
-        std::size_t h = std::hash<SourceFile *>{}(s->file);
+        std::size_t h = s->path.hash();
         h = hash2(h, std::hash<int>{}(s->lineno));
         h = hash2(h, std::hash<int>{}(s->column));
+        h = hash2(h, std::hash<int>{}(s->offset));
+        h = hash2(h, std::hash<const String *>{}(s->buffer));
         return h;
     }
 };
@@ -36,16 +38,14 @@ static const Anchor *_unknown_anchor = nullptr;
 
 const Anchor *builtin_anchor() {
     if (!_builtin_anchor) {
-        auto stub_file = SourceFile::from_string(Symbol("builtin"), String::from_cstr(""));
-        _builtin_anchor = Anchor::from(stub_file, 1, 1);
+        _builtin_anchor = Anchor::from(Symbol("builtin"), 1, 1);
     }
     return _builtin_anchor;
 }
 
 const Anchor *unknown_anchor() {
     if (!_unknown_anchor) {
-        auto stub_file = SourceFile::from_string(Symbol("unknown"), String::from_cstr(""));
-        _unknown_anchor = Anchor::from(stub_file, 1, 1);
+        _unknown_anchor = Anchor::from(Symbol("unknown"), 1, 1);
     }
     return _unknown_anchor;
 }
@@ -54,47 +54,62 @@ const Anchor *unknown_anchor() {
 // ANCHOR
 //------------------------------------------------------------------------------
 
-Anchor::Anchor(SourceFile *_file, int _lineno, int _column, int _offset) :
-    file(_file),
+Anchor::Anchor(Symbol _path, int _lineno, int _column, int _offset, const String *_buffer) :
+    path(_path),
     lineno(_lineno),
     column(_column),
-    offset(_offset) {}
-
-Symbol Anchor::path() const {
-    return file->path;
-}
+    offset(_offset),
+    buffer(_buffer) {}
 
 bool Anchor::is_boring() const {
-    return this == builtin_anchor() || this == unknown_anchor();    
+    return this == builtin_anchor() || this == unknown_anchor();
 }
 
 bool Anchor::is_same(const Anchor *other) const {
-    return file->path == other->file->path
+    return path == other->path
         && lineno == other->lineno
-        && column == other->column;
+        && column == other->column
+        && offset == other->offset
+        && buffer == other->buffer;
 }
 
 const Anchor *Anchor::from(
-    SourceFile *_file, int _lineno, int _column, int _offset) {
-    Anchor key(_file, _lineno, _column, _offset);
+    Symbol _path, int _lineno, int _column, int _offset, const String *_buffer) {
+    Anchor key(_path, _lineno, _column, _offset, _buffer);
     auto it = anchors.find(&key);
     if (it != anchors.end())
         return *it;
-    auto result = new Anchor(_file, _lineno, _column, _offset);
+    auto result = new Anchor(_path, _lineno, _column, _offset, _buffer);
     anchors.insert(result);
     return result;
+}
+
+const Anchor *Anchor::from(
+    const std::unique_ptr<SourceFile> &file, int _lineno, int _column, int _offset) {
+    if (file->_str) {
+        return Anchor::from(file->path, _lineno, _column, _offset, file->_str);
+    } else {
+        return Anchor::from(file->path, _lineno, _column, _offset);
+    }
 }
 
 StyledStream& Anchor::stream(StyledStream& ost) const {
     ost << Style_Location;
     auto ss = StyledStream::plain(ost);
-    ss << path().name()->data << ":" << lineno << ":" << column << ":";
+    ss << path.name()->data << ":" << lineno << ":" << column << ":";
     ost << Style_None;
     return ost;
 }
 
 StyledStream &Anchor::stream_source_line(StyledStream &ost, const char *indent) const {
-    file->stream(ost, offset, indent);
+    if (buffer) {
+        SourceFile::stream_buffer(ost, offset, buffer->data, buffer->count);
+    } else {
+        auto file = SourceFile::from_file(path);
+        if (file) {
+            file->stream(ost, offset, indent);
+        }
+    }
     return ost;
 }
 

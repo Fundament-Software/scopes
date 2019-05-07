@@ -31,6 +31,13 @@ typedef const String *PString;
 typedef const char *Rawstring;
 typedef const Scope *PScope;
 
+struct ErrnoValue {
+    int value;
+
+    ErrnoValue() {}
+    ErrnoValue(int _value) : value(_value) {}
+};
+
 /*
 formatters:
 %n      nth value
@@ -348,6 +355,9 @@ formatters:
     T(CGenBackendFailed, \
         "codegen backend failed: %0", \
         Rawstring) \
+    T(CGenBackendFailedErrno, \
+        "codegen backend failed: %0 (%1)", \
+        Rawstring, ErrnoValue) \
     T(CGenCannotSerializeMemory, \
         "codegen: unable to serialize memory for value of type %0", \
         PType) \
