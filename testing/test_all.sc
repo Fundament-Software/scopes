@@ -20,7 +20,7 @@ test-modules
     .test_convert
     .test_currying
     .test_decorator
-    #.test_defer # fix in 0.15
+    .test_defer
     .test_dispatch
     .test_docstring
     .test_dots
@@ -45,7 +45,7 @@ test-modules
     .test_inplace_arithmetic
     .test_intrinsics
     .test_iter2
-    .test_itertools # crashes on win64
+    .test_itertools
     .test_label
     .test_let
     .test_local
