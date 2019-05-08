@@ -2927,7 +2927,7 @@ let
 'define-internal-symbol (__this-scope) symbol-handler-symbol
     box-pointer (static-typify symbol-handler list Scope)
 
-inline select-op-macro (sop fop numargs)
+inline select-op-macro (sop uop fop numargs)
     inline scalar-type (T)
         let ST = ('storageof T)
         if (type== ('superof ST) vector)
@@ -2941,7 +2941,9 @@ inline select-op-macro (sop fop numargs)
                 'getarg args 0; 'getarglist args 1
             let T = (scalar-type ('typeof a))
             let fun =
-                if (type== ('superof T) integer) `sop
+                if (type== ('superof T) integer)
+                    if ('signed? T) `sop
+                    else `uop
                 elseif (type== ('superof T) real) `fop
                 else
                     error
@@ -2967,13 +2969,24 @@ fn powi (base exponent)
                 mul cur cur
                 lshr exponent 1
 
-inline sabs (x)
-    let zero = (nullof (typeof x))
-    ? (icmp<s x zero) (sub zero x) x
+let sabs =
+    spice-macro
+        fn (args)
+            let argc = ('argcount args)
+            verify-count argc 1 1
+            let arg = ('getarg args 0)
+            let T = ('storageof ('typeof arg))
+            if (not (< T integer))
+                error "integer expected"
+            let bits = ('bitcount T)
+            let shift = (sc_const_int_new T (as (- bits 1) u64))
+            spice-quote
+                let mask = (ashr arg shift)
+                sub (bxor arg mask) mask
 
-let pow = (select-op-macro powi powf 2)
-let abs = (select-op-macro sabs fabs 1)
-let sign = (select-op-macro ssign fsign 1)
+let pow = (select-op-macro powi powi powf 2)
+let abs = (select-op-macro sabs _ fabs 1)
+let sign = (select-op-macro ssign ssign fsign 1)
 
 let hash = (sc_typename_type "hash" typename)
 'set-plain-storage hash u64
