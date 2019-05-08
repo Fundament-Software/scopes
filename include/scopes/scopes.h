@@ -161,7 +161,7 @@ SCOPES_LIBEXPORT sc_valueref_raises_t sc_compile(sc_valueref_t srcl, uint64_t fl
 SCOPES_LIBEXPORT sc_string_raises_t sc_compile_spirv(sc_symbol_t target, sc_valueref_t srcl, uint64_t flags);
 SCOPES_LIBEXPORT sc_string_raises_t sc_compile_glsl(sc_symbol_t target, sc_valueref_t srcl, uint64_t flags);
 SCOPES_LIBEXPORT const sc_string_t *sc_default_target_triple();
-SCOPES_LIBEXPORT sc_void_raises_t sc_compile_object(const sc_string_t *target_triple, const sc_string_t *path, sc_scope_t *table, uint64_t flags);
+SCOPES_LIBEXPORT sc_void_raises_t sc_compile_object(const sc_string_t *target_triple, int file_kind, const sc_string_t *path, sc_scope_t *table, uint64_t flags);
 SCOPES_LIBEXPORT void sc_enter_solver_cli ();
 SCOPES_LIBEXPORT sc_size_raises_t sc_verify_stack ();
 SCOPES_LIBEXPORT sc_valueref_raises_t sc_eval_inline(const sc_anchor_t *anchor, const sc_list_t *expr, sc_scope_t *scope);

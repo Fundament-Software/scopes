@@ -24,7 +24,10 @@ fn main (argc argv)
 #-----------------
 
 objfile := bin-dir .. "/newscopes.o"
-compile-object objfile
+compile-object 
+    default-target-triple
+    compiler-file-kind-object
+    objfile
     do
         let main =
             static-typify main i32 (mutable (@ (mutable (@ i8))))

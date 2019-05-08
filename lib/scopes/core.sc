@@ -3951,8 +3951,8 @@ spice-quote
     inline compile-spirv (target func flags...)
         sc_compile_spirv target func (parse-compile-flags flags...)
 
-    inline compile-object (target path table flags...)
-        sc_compile_object target path table (parse-compile-flags flags...)
+    inline compile-object (target file-kind path table flags...)
+        sc_compile_object target file-kind path table (parse-compile-flags flags...)
 
 inline convert-assert-args (args cond msg)
     if ((countof args) == 2) msg

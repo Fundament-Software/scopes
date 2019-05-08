@@ -41,6 +41,7 @@ let scope = (Scope)
 
 compile-object
     default-target-triple
+    compiler-file-kind-object
     module-dir .. "/test.o"
     scope
     #'no-debug-info

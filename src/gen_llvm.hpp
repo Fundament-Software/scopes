@@ -19,8 +19,20 @@ struct String;
 struct ConstPointer;
 struct Scope;
 
+#define SCOPES_COMPILER_FILE_KIND() \
+    T(CFK_Object, "compiler-file-kind-object") \
+    T(CFK_ASM, "compiler-file-kind-asm") \
+    T(CFK_BC, "compiler-file-kind-bc") \
+    T(CFK_LLVM, "compiler-file-kind-llvm") \
+
+enum CompilerFileKind {
+#define T(NAME, KNAME) NAME,
+SCOPES_COMPILER_FILE_KIND()
+#undef T
+};
+
 SCOPES_RESULT(void) compile_object(const String *triple,
-    const String *path, Scope *scope, uint64_t flags);
+    CompilerFileKind kind, const String *path, Scope *scope, uint64_t flags);
 SCOPES_RESULT(ConstPointerRef) compile(const FunctionRef &fn, uint64_t flags);
 
 } // namespace scopes

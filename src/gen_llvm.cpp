@@ -37,6 +37,7 @@
 #include <llvm-c/Disassembler.h>
 #include <llvm-c/Support.h>
 #include <llvm-c/DebugInfo.h>
+#include <llvm-c/BitWriter.h>
 
 #include "llvm/IR/Module.h"
 //#include "llvm/IR/DebugInfoMetadata.h"
@@ -1078,7 +1079,6 @@ struct LLVMIRGenerator {
             LLVMSetSubprogram(func, function_to_subprogram(node));
         }
         if (is_export) {
-            LLVMDumpValue(func);
             LLVMSetLinkage(func, LLVMExternalLinkage);
             //LLVMSetDLLStorageClass(func, LLVMDLLExportStorageClass);
             LLVMSetVisibility(func, LLVMDefaultVisibility);
@@ -2359,6 +2359,8 @@ struct LLVMIRGenerator {
 
         setup_generate(name->data);
 
+        std::vector<LLVMValueRef> exported_globals;
+
         Scope *t = table;
         while (t) {
             int count = t->map->keys.size();
@@ -2370,10 +2372,24 @@ struct LLVMIRGenerator {
                 Symbol name = keys[i];
                 FunctionRef fn = SCOPES_GET_RESULT(extract_function_constant(val));
                 func_export_table.insert({fn.unref(), name});
-
-                SCOPES_CHECK_RESULT(ref_to_value(ValueIndex(fn)));
+                LLVMValueRef func = SCOPES_GET_RESULT(ref_to_value(ValueIndex(fn)));
+                exported_globals.push_back(func);
             }
             t = t->parent;
+        }
+
+        {
+            // build llvm.used
+            auto count = exported_globals.size();
+            LLVMValueRef constvals[count];
+            for (int i = 0; i < count; ++i) {
+                LLVMValueRef func = exported_globals[i];
+                constvals[i] = LLVMConstBitCast(func, rawstringT);
+            };
+            auto arr = LLVMConstArray(rawstringT, constvals, count);
+            auto glob = LLVMAddGlobal(module, LLVMTypeOf(arr), "llvm.used");
+            LLVMSetInitializer(glob, arr);
+            LLVMSetLinkage(glob, LLVMAppendingLinkage);
         }
 
         SCOPES_CHECK_RESULT(teardown_generate());
@@ -2544,7 +2560,7 @@ public:
 #endif
 
 SCOPES_RESULT(void) compile_object(const String *triple,
-    const String *path, Scope *scope, uint64_t flags) {
+    CompilerFileKind kind, const String *path, Scope *scope, uint64_t flags) {
     SCOPES_RESULT_TYPE(void);
     Timer sum_compile_time(TIMER_Compile);
 #if SCOPES_COMPILE_WITH_DEBUG_INFO
@@ -2598,8 +2614,27 @@ SCOPES_RESULT(void) compile_object(const String *triple,
     assert(tm);
 
     char *path_cstr = strdup(path->data);
-    auto failed = LLVMTargetMachineEmitToFile(tm, module, path_cstr,
-        LLVMObjectFile, &error_message);
+    LLVMBool failed = false;
+    switch(kind) {
+    case CFK_Object: {
+        failed = LLVMTargetMachineEmitToFile(tm, module, path_cstr,
+            LLVMObjectFile, &error_message);
+    } break;
+    case CFK_ASM: {
+        failed = LLVMTargetMachineEmitToFile(tm, module, path_cstr,
+            LLVMAssemblyFile, &error_message);
+    } break;
+    case CFK_BC: {
+        failed = LLVMWriteBitcodeToFile(module, path_cstr);
+    } break;
+    case CFK_LLVM: {
+        failed = LLVMPrintModuleToFile(module, path_cstr, &error_message);
+    } break;
+    default: {
+        free(path_cstr);
+        SCOPES_ERROR(CGenBackendFailed, "unknown file kind");
+    } break;
+    }
     free(path_cstr);
     if (failed) {
         SCOPES_ERROR(CGenBackendFailed, error_message);
