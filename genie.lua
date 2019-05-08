@@ -2,6 +2,14 @@
 local THISDIR = os.getcwd()
 local CLANG_PATH
 local MSYS_BASE_PATH = "C:/msys64"
+if os.is("windows") then
+    -- try to find msys/usr/bin
+    local testpath = os.pathsearch("msys-2.0.dll", os.getenv("PATH"))
+    if testpath then
+        MSYS_BASE_PATH = path.getabsolute(testpath .. "/../..")
+    end
+    print("MSYS_BASE_PATH = " .. MSYS_BASE_PATH)
+end
 local MINGW_BASE_PATH = MSYS_BASE_PATH .. "/mingw64"
 local MSYS_BIN_PATH = MSYS_BASE_PATH .. "/usr/bin"
 if os.is("linux") then
