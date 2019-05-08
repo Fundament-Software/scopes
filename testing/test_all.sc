@@ -39,6 +39,7 @@ test-modules
     .test_global
     .test_glsl
     .test_hash
+    .test_iching
     .test_import
     .test_inline
     .test_inplace_arithmetic

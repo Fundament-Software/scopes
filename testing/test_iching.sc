@@ -1,12 +1,8 @@
 
-let C =
-    import-c "iching.c" "
-        #include <stdlib.h>
-        #include <time.h>
-        "
-        '()
-
-
+include
+    import C
+""""#include <stdlib.h>
+    #include <time.h>
 
 C.srand
     u32
