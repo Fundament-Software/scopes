@@ -1,5 +1,5 @@
 
-fn testfuncT (x y)
+fn testfunc (x y)
     x + y
 
 # generate webassembly
@@ -8,10 +8,11 @@ compile-object
     compiler-file-kind-object
     module-dir .. "/_test.wasm"
     do
-        let testfunc =
-            static-typify testfuncT i32 i32
-        let testfunc2 =
-            static-typify testfuncT f32 f32
+        let 
+            testfunc =
+                static-typify testfunc i32 i32
+            testfunc2 =
+                static-typify testfunc f32 f32
         locals;
     #'no-debug-info
     'dump-module

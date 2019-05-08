@@ -47,9 +47,11 @@ let
     VHandle3 = ('view-type Handle 3)
     VHandle4 = ('view-type Handle 4)
 
+let
     VHandle12 = ('view-type VHandle1 2)
     VHandle34 = ('view-type VHandle3 4)
 
+let
     VHandle1234 = ('view-type ('view-type VHandle12 3) 4)
 
     Vi321 = ('view-type i32 1)

@@ -418,7 +418,10 @@ struct Expander {
 
         const Type *T = try_get_const_type(it->at);
         if (T == TYPE_List) {
-            // alternative format
+            // alternative format where the symbols are only bound
+            // after all expressions have been evaluated.
+            std::vector< std::pair<Symbol, ValueRef> > late_bound;
+            late_bound.reserve(List::count(it));
             const List *equit = it;
             while (equit) {
                 it = SCOPES_GET_RESULT(extract_list_constant(equit->at));
@@ -444,8 +447,11 @@ struct Expander {
                     node = extract_argument(node, 0);
                 }
                 args.push_back(node);
-                env->bind(sym, node);
+                late_bound.push_back({sym, node});
                 equit = equit->next;
+            }
+            for (auto entry : late_bound) {
+                env->bind(entry.first, entry.second);
             }
         } else {
             const List *values = nullptr;
