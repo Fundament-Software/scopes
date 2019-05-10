@@ -144,26 +144,23 @@ TypedValueRef Keyed::from(Symbol key, TypedValueRef node) {
 
 //------------------------------------------------------------------------------
 
-ArgumentListTemplate::ArgumentListTemplate(const Values &_values)
-    : UntypedValue(VK_ArgumentListTemplate), values(_values) {
-}
+// when joining two argument lists, all but the last argument can be flattened
 
-void ArgumentListTemplate::append(const ValueRef &node) {
-    values.push_back(node);
-}
-
-void ArgumentListTemplate::append(Symbol key, const ValueRef &node) {
-    assert(false); // todo: store key
-    values.push_back(node);
+ArgumentListTemplate::ArgumentListTemplate(const Values &values)
+    : UntypedValue(VK_ArgumentListTemplate), _values(values) {
 }
 
 bool ArgumentListTemplate::is_constant() const {
-    for (auto val : values) {
+    for (auto val : _values) {
         assert(val);
         if (!val.isa<Const>())
             return false;
     }
     return true;
+}
+
+const Values &ArgumentListTemplate::values() const {
+    return _values;
 }
 
 ValueRef ArgumentListTemplate::empty_from() {

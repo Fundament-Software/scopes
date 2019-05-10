@@ -80,8 +80,7 @@ SCOPES_REIMPORT_SYMBOLS()
 
 //------------------------------------------------------------------------------
 
-#if 0
-static void init_values_array(scopes::Values &dest, int numvalues, sc_valueref_t *values) {
+static void init_values_array(scopes::Values &dest, int numvalues, const sc_valueref_t *values) {
     dest.reserve(numvalues);
     for (int i = 0; i < numvalues; ++i) {
         assert(values[i]);
@@ -89,10 +88,9 @@ static void init_values_array(scopes::Values &dest, int numvalues, sc_valueref_t
         dest.push_back(values[i]);
     }
 }
-#endif
 
 template<typename T>
-static void init_values_arrayT(std::vector< T * > &dest, int numvalues, sc_valueref_t *values) {
+static void init_values_arrayT(std::vector< T * > &dest, int numvalues, const sc_valueref_t *values) {
     dest.reserve(numvalues);
     for (int i = 0; i < numvalues; ++i) {
         assert(values[i]);
@@ -546,9 +544,11 @@ struct MemoKeyEqual {
         } else if (isa<ArgumentListTemplate>(lhs)) {
             auto a = cast<ArgumentListTemplate>(lhs);
             auto b = cast<ArgumentListTemplate>(rhs);
-            for (int i = 0; i < a->values.size(); ++i) {
-                auto u = a->values[i];
-                auto v = b->values[i];
+            auto &&a_values = a->values();
+            auto &&b_values = b->values();
+            for (int i = 0; i < a_values.size(); ++i) {
+                auto u = a_values[i];
+                auto v = b_values[i];
                 if (u == v) continue;
                 if (u->kind() != v->kind())
                     return false;
@@ -593,8 +593,9 @@ struct MemoHash {
         } else if (isa<ArgumentListTemplate>(l)) {
             auto alist = cast<ArgumentListTemplate>(l);
             uint64_t h = 0;
-            for (int i = 0; i < alist->values.size(); ++i) {
-                auto x = alist->values[i];
+            auto &&values = alist->values();
+            for (int i = 0; i < values.size(); ++i) {
+                auto x = values[i];
                 if (x.isa<Pure>()) {
                     h = hash2(h, x.cast<Pure>()->hash());
                 } else {
@@ -1165,6 +1166,10 @@ int sc_value_kind (sc_valueref_t value) {
     return value->kind();
 }
 
+sc_valueref_t sc_identity(sc_valueref_t value) {
+    return value;
+}
+
 sc_valueref_t sc_value_wrap(const sc_type_t *type, sc_valueref_t value) {
     using namespace scopes;
     auto result = wrap_value(type, value);
@@ -1181,6 +1186,11 @@ sc_valueref_t sc_value_unwrap(const sc_type_t *type, sc_valueref_t value) {
     return result;
 }
 
+const sc_string_t *sc_value_kind_string(int kind) {
+    using namespace scopes;
+    return String::from_cstr(get_value_kind_name((ValueKind)kind));
+}
+
 sc_valueref_t sc_keyed_new(sc_symbol_t key, sc_valueref_t value) {
     using namespace scopes;
     return KeyedTemplate::from(key, value);
@@ -1191,17 +1201,11 @@ sc_valueref_t sc_empty_argument_list() {
     return ArgumentList::from({});
 }
 
-sc_valueref_t sc_argument_list_new() {
+sc_valueref_t sc_argument_list_new(int count, const sc_valueref_t *values) {
     using namespace scopes;
-    return ArgumentListTemplate::empty_from();
-}
-
-void sc_argument_list_append(sc_valueref_t alist, sc_valueref_t value) {
-    using namespace scopes;
-    //SCOPES_RESULT_TYPE(void);
-    //SCOPES_C_CHECK_RESULT(verify_kind<VK_ArgumentListTemplate>(alist));
-    alist.cast<ArgumentListTemplate>()->append(value);
-    //return convert_result({});
+    Values valueslist;
+    init_values_array(valueslist, count, values);
+    return ArgumentListTemplate::from(valueslist);
 }
 
 int sc_argcount(sc_valueref_t value) {
@@ -1211,7 +1215,7 @@ int sc_argcount(sc_valueref_t value) {
         return (int)value.cast<ArgumentList>()->values.size();
     } break;
     case VK_ArgumentListTemplate: {
-        return (int)value.cast<ArgumentListTemplate>()->values.size();
+        return (int)value.cast<ArgumentListTemplate>()->values().size();
     } break;
     default: return 1;
     }
@@ -1228,8 +1232,9 @@ sc_valueref_t sc_getarg(sc_valueref_t value, int index) {
     } break;
     case VK_ArgumentListTemplate: {
         auto al = value.cast<ArgumentListTemplate>();
-        if (index < al->values.size()) {
-            return al->values[index];
+        auto &&values = al->values();
+        if (index < values.size()) {
+            return values[index];
         }
     } break;
     default: {
@@ -1252,9 +1257,10 @@ sc_valueref_t sc_getarglist(sc_valueref_t value, int index) {
     } break;
     case VK_ArgumentListTemplate: {
         auto al = value.cast<ArgumentListTemplate>();
+        auto &&al_values = al->values();
         Values values;
-        for (int i = index; i < al->values.size(); ++i) {
-            values.push_back(al->values[i]);
+        for (int i = index; i < al_values.size(); ++i) {
+            values.push_back(al_values[i]);
         }
         return ref(value.anchor(), ArgumentListTemplate::from(values));
     } break;
@@ -2180,12 +2186,14 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_value_is_pure, TYPE_Bool, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_value_compare, TYPE_Bool, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_value_kind, TYPE_I32, TYPE_ValueRef);
+    DEFINE_EXTERN_C_FUNCTION(sc_identity, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_value_wrap, TYPE_ValueRef, TYPE_Type, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_value_unwrap, TYPE_ValueRef, TYPE_Type, TYPE_ValueRef);
+    DEFINE_EXTERN_C_FUNCTION(sc_value_kind_string, TYPE_String, TYPE_I32);
+    
     DEFINE_EXTERN_C_FUNCTION(sc_keyed_new, TYPE_ValueRef, TYPE_Symbol, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_empty_argument_list, TYPE_ValueRef);
-    DEFINE_EXTERN_C_FUNCTION(sc_argument_list_new, TYPE_ValueRef);
-    DEFINE_EXTERN_C_FUNCTION(sc_argument_list_append, _void, TYPE_ValueRef, TYPE_ValueRef);
+    DEFINE_EXTERN_C_FUNCTION(sc_argument_list_new, TYPE_ValueRef, TYPE_I32, TYPE_ValuePP);
     DEFINE_EXTERN_C_FUNCTION(sc_extract_argument_new, TYPE_ValueRef, TYPE_ValueRef, TYPE_I32);
     DEFINE_EXTERN_C_FUNCTION(sc_extract_argument_list_new, TYPE_ValueRef, TYPE_ValueRef, TYPE_I32);
     DEFINE_EXTERN_C_FUNCTION(sc_argcount, TYPE_I32, TYPE_ValueRef);

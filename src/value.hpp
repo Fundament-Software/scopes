@@ -199,15 +199,15 @@ struct ArgumentListTemplate : UntypedValue {
 
     ArgumentListTemplate(const Values &values);
 
-    void append(Symbol key, const ValueRef &node);
-    void append(const ValueRef &node);
-
     bool is_constant() const;
 
     static ValueRef empty_from();
     static ValueRef from(const Values &values = {});
 
-    Values values;
+    const Values &values() const;
+
+protected:
+    Values _values;
 };
 
 //------------------------------------------------------------------------------

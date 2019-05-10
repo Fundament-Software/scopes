@@ -42,21 +42,23 @@ inline span (a b)
                 va-append-va (inline () start-b...) (next-a (it-a))
 
 spice unpack-dim (n size...)
-    let args = (sc_argument_list_new)
-    fold (expr = n) for S in ('args size...)
+    let acount = ('argcount size...)
+    let values = (alloca-array Value acount)
+    fold (expr = n) for i S in (enumerate ('args size...))
         let arg = `(expr % S)
-        sc_argument_list_append args arg
+        values @ i = arg
         _ `(expr // S)
-    args
+    sc_argument_list_new acount values
 
 spice unpack-bitdim (n size...)
-    let args = (sc_argument_list_new)
+    let acount = ('argcount size...)
+    let values = (alloca-array Value acount)
     let _1 = `(1 as (typeof n))
-    fold (expr = n) for S in ('args size...)
+    fold (expr = n) for i S in (enumerate ('args size...))
         let arg = `(expr & ((_1 << S) - _1))
-        sc_argument_list_append args arg
+        values @ i = arg
         _ `(expr >> S)
-    args
+    sc_argument_list_new acount values
 
 # a branchless generator that iterates multidimensional coordinates
 @@ spice-quote

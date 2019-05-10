@@ -89,7 +89,7 @@ spice va-map (f args...)
         'args args...
         map
             inline (arg) `(f arg)
-        'append-sink (sc_argument_list_new)
+        Value.arglist-sink ('argcount args...)
 
 run-stage;
 

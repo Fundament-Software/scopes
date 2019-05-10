@@ -1141,7 +1141,7 @@ static SCOPES_RESULT(TypedValueRef) prove_arguments(
 static SCOPES_RESULT(TypedValueRef) prove_ArgumentListTemplate(const ASTContext &ctx, const ArgumentListTemplateRef &nlist) {
     SCOPES_RESULT_TYPE(TypedValueRef);
     TypedValues values;
-    TypedValueRef noret = SCOPES_GET_RESULT(prove_arguments(ctx, values, nlist->values));
+    TypedValueRef noret = SCOPES_GET_RESULT(prove_arguments(ctx, values, nlist->values()));
     if (noret) {
         return noret;
     }
@@ -1345,18 +1345,10 @@ static SCOPES_RESULT(TypedValueRef) prove_CompileStage(const ASTContext &ctx, co
 
         auto value_anchor = value.anchor();
 
-        auto outargs = ref(value_anchor, CallTemplate::from(g_sc_argument_list_new, {}));
-        block->append(outargs);
         int argc = sc_argcount(value);
         auto vkey = ref(anchor, ConstInt::symbol_from(key));
         if (argc == 1) {
-            /*
-            if (sc_value_type(value) == TYPE_ValueRef) {
-                block->append(ref(anchor,
-                    CallTemplate::from(g_sc_scope_set_symbol, { tmp, vkey,
-                    ref(value_anchor, Quote::from(ref(value_anchor, Quote::from(value))))
-                    })));
-            } else*/ {
+            {
                 block->append(ref(anchor,
                     CallTemplate::from(g_sc_scope_set_symbol, { tmp, vkey,
                         ref(value_anchor, Quote::from(value))
@@ -1366,19 +1358,20 @@ static SCOPES_RESULT(TypedValueRef) prove_CompileStage(const ASTContext &ctx, co
                 CallTemplate::from(g_sc_scope_set_docstring, { tmp, vkey,
                     ref(anchor, ConstPointer::string_from(keydocstr)) })));
         } else {
+            Values newvalues;
+            newvalues.reserve(argc);
             for (int i = 0; i < argc; ++i) {
                 auto arg = sc_getarg(value, i);
                 auto arg_anchor = arg.anchor();
                 if (sc_value_type(arg) == TYPE_ValueRef) {
-                    block->append(ref(anchor,
-                        CallTemplate::from(g_sc_argument_list_append, { outargs,
-                            ref(arg_anchor, Quote::from(ref(arg_anchor, Quote::from(arg)))) })));
+                    newvalues.push_back(
+                        ref(arg_anchor, Quote::from(ref(arg_anchor, Quote::from(arg)))));
                 } else {
-                    block->append(ref(anchor,
-                        CallTemplate::from(g_sc_argument_list_append, { outargs,
-                            ref(arg_anchor, Quote::from(arg)) })));
+                    newvalues.push_back(
+                        ref(arg_anchor, Quote::from(arg)));
                 }
             }
+            auto outargs = build_quoted_argument_list(anchor, newvalues);
             block->append(ref(anchor,
                 CallTemplate::from(g_sc_scope_set_symbol, { tmp, vkey, outargs })));
             block->append(ref(anchor,

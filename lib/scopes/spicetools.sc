@@ -74,14 +74,15 @@ inline parse-argument-matcher (failfunc expr scope params cb)
 
 fn gen-argument-matcher (failfunc expr scope params)
     let outexpr = (sc_expression_new)
-    let outargs = (sc_argument_list_new)
-    'set-symbol scope '*... outargs
+    local outargs = (sc_argument_list_new 0 null)
     let header =
         parse-argument-matcher failfunc expr scope params
             inline (param arg)
                 sc_expression_append outexpr arg
-                sc_argument_list_append outargs arg
+                outargs = 
+                    sc_argument_list_join_values outargs arg
                 'set-symbol scope param arg
+    'set-symbol scope '*... (deref outargs)
     spice-quote
         header
         outexpr

@@ -45,13 +45,12 @@ typedef CaptureTemplate
     fn __imply (selfT otherT)
         if (otherT < Capture)
             let ft = (('@ otherT 'FunctionType) as type)
-            let typeargs = (sc_argument_list_new)
             let count = ('element-count ft)
-            loop (i = 1)
-                if (i == count)
-                    break;
-                sc_argument_list_append typeargs ('element@ ft i)
-                i + 1
+            let typeargs = 
+                sc_argument_list_map_new (count - 1)
+                    inline (i)
+                        let i = (i + 1)
+                        'element@ ft i
             let F = (sc_prove `('typify-function selfT typeargs))
             if (('element@ ('typeof F) 0) == ft)
                 return `(inline (self) ('build-instance self F))

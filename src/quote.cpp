@@ -22,25 +22,53 @@
 //#include "list.hpp"
 //#include "expander.hpp"
 #include "globals.hpp"
+#include "anchor.hpp"
 #include "scopes/scopes.h"
+
+
 
 //#pragma GCC diagnostic ignored "-Wvla-extension"
 
 namespace scopes {
+
+#define REF(X) ref(_anchor, (X))
+
+#define LOCALREF(X) \
+    ref(Anchor::from(Symbol(String::from(__FILE__)), __LINE__, 1), (X))
+
+static ValueRef canonicalize(const ExpressionRef &expr) {
+    if (expr->body.empty())
+        return expr->value;
+    return expr;
+}
+
+ValueRef build_quoted_argument_list(const Anchor *_anchor, const Values &values) {
+    auto result = REF(Expression::unscoped_from());
+    auto numvals = (int)values.size();
+    auto numelems = REF(ConstInt::from(TYPE_I32, numvals));
+    auto buf = REF(CallTemplate::from(g_alloca_array, {
+            REF(ConstPointer::type_from(TYPE_ValueRef)),
+            numelems
+        }));
+    result->append(buf);
+    for (int i = 0; i < numvals; ++i) {
+        auto idx = REF(ConstInt::from(TYPE_I32, i));
+        result->append(
+            REF(CallTemplate::from(g_store, {
+                REF(CallTemplate::from(g_sc_identity, { values[i] })),
+                REF(CallTemplate::from(g_getelementptr, { buf, idx }))
+            })));
+    }
+    result->append(REF(CallTemplate::from(g_sc_argument_list_new,
+        { numelems, buf })));
+    return canonicalize(result);
+}
 
 //------------------------------------------------------------------------------
 
 struct Quoter {
     Quoter(const ASTContext  &_ctx) :
         ctx(_ctx) {}
-
-    ValueRef canonicalize(const ExpressionRef &expr) {
-        if (expr->body.empty())
-            return expr->value;
-        return expr;
-    }
-
-#define REF(X) ref(_anchor, (X))
 
     SCOPES_RESULT(ValueRef) quote_Expression(int level, const ExpressionRef &node) {
         SCOPES_RESULT_TYPE(ValueRef);
@@ -65,16 +93,15 @@ struct Quoter {
         /*if (node->values.size() == 1) {
             return quote(level, node->values[0]);
         } else*/ {
-            auto _anchor = node.anchor();
-            auto value = REF(CallTemplate::from(g_sc_argument_list_new, {}));
-            auto expr = REF(Expression::unscoped_from());
-            int count = (int)node->values.size();
+            Values newvalues;
+            auto &&values = node->values();
+            int count = (int)values.size();
+            newvalues.reserve(count);
             for (int i = 0; i < count; ++i) {
-                expr->append(REF(CallTemplate::from(g_sc_argument_list_append,
-                    { value, SCOPES_GET_RESULT(quote(level, node->values[i])) })));
+                newvalues.push_back(SCOPES_GET_RESULT(quote(level, values[i])));
             }
-            expr->append(value);
-            return canonicalize(expr);
+            auto _anchor = node.anchor();
+            return build_quoted_argument_list(_anchor, newvalues);
         }
     }
 
@@ -285,16 +312,14 @@ struct Quoter {
         /*if (node->values.size() == 1) {
             return quote_typed(node->values[0]);
         } else*/ {
+            Values newvalues;
             auto _anchor = node.anchor();
-            auto value = REF(CallTemplate::from(g_sc_argument_list_new, {}));
-            auto expr = REF(Expression::unscoped_from());
             int count = (int)node->values.size();
+            newvalues.reserve(count);
             for (int i = 0; i < count; ++i) {
-                expr->append(REF(CallTemplate::from(g_sc_argument_list_append,
-                    { value, quote_typed(node->values[i]) })));
+                newvalues.push_back(quote_typed(node->values[i]));
             }
-            expr->append(value);
-            return canonicalize(expr);
+            return build_quoted_argument_list(_anchor, newvalues);
         }
     }
 
@@ -320,16 +345,13 @@ struct Quoter {
                 auto at = cast<ArgumentsType>(T);
                 auto _anchor = node.anchor();
                 {
-                    auto result = REF(CallTemplate::from(g_sc_argument_list_new, {}));
-                    auto expr = REF(Expression::unscoped_from());
+                    Values newvalues;
                     int count = (int)at->values.size();
+                    newvalues.reserve(count);
                     for (int i = 0; i < count; ++i) {
-                        expr->append(REF(CallTemplate::from(g_sc_argument_list_append,
-                            { result,
-                                ExtractArgument::from(value, i) })));
+                        newvalues.push_back(ExtractArgument::from(value, i));
                     }
-                    expr->append(result);
-                    return canonicalize(expr);
+                    return build_quoted_argument_list(_anchor, newvalues);
                 }
             } else {
                 return quote_typed(value);

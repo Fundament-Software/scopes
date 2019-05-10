@@ -169,16 +169,17 @@ fn read-eval-print-loop ()
             if ((key != tmp) and (key != unnamed))
                 if (('argcount vals...) != 1)
                     let block = (sc_expression_new)
-                    let outargs = `(sc_argument_list_new)
+                    let acount = ('args vals...)
+                    let outargs = `(alloca-array Value acount)
                     sc_expression_append block outargs
-                    for arg in ('args vals...)
+                    for i arg in (enumerate ('args vals...))
                         sc_expression_append block
                             if (('typeof arg) == Value)
-                                `(sc_argument_list_append outargs ``arg)
+                                `(store ``arg (getelementptr outargs i))
                             else
-                                `(sc_argument_list_append outargs `arg)
+                                `(store `arg (getelementptr outargs i))
                     sc_expression_append block
-                        `('set-symbol scope key outargs)
+                        `('set-symbol scope key (sc_argument_list_new acount outargs))
                     sc_expression_append block
                         `('set-docstring scope key docstr)
                     sc_expression_append block scope
@@ -203,9 +204,11 @@ fn read-eval-print-loop ()
                 repeat ('parent scope) (cons expr output)
 
         spice print-bound-names (key vals...)
-            let outargs = (sc_argument_list_new)
-            for arg in ('args vals...)
-                sc_argument_list_append outargs `(repr arg)
+            let outargs =
+                sc_argument_list_map_new ('argcount vals...)
+                    inline (i)
+                        let arg = ('getarg vals... i)
+                        `(repr arg)
             spice-quote
                 print key [(default-styler style-operator "=")] outargs
 
@@ -214,31 +217,37 @@ fn read-eval-print-loop ()
             let counter = (counter as i32)
             let count = ('argcount vals...)
             if inserts
-                let outargs = (sc_argument_list_new)
                 if (count != 0)
-                    for arg in ('args vals...)
-                        sc_argument_list_append outargs `(repr arg)
+                    let outargs =
+                        sc_argument_list_map_new ('argcount vals...)
+                            inline (i)
+                                let arg = ('getarg vals... i)
+                                `(repr arg)
                     return
                         spice-quote
                             print outargs
                             counter
             elseif (count != 0)
-                let outargs = (sc_argument_list_new)
-                let block = (sc_expression_new)
                 let eval-scope = (eval-scope as Scope)
-                fold (count = 0) for arg in ('args vals...)
-                    let idstr = (make-idstr (counter + count))
-                    sc_argument_list_append outargs `idstr
-                    let idstr = (Symbol idstr)
-                    sc_expression_append block
-                        if (('typeof arg) == Value)
-                            `('set-symbol eval-scope idstr ``arg)
-                        else
-                            `('set-symbol eval-scope idstr `arg)
-                    count + 1
-                sc_argument_list_append outargs (default-styler style-operator "=")
-                for arg in ('args vals...)
-                    sc_argument_list_append outargs `(repr arg)
+                let block = (sc_expression_new)
+                let outargs = 
+                    sc_argument_list_map_new (count * 2 + 1)
+                        inline (i)
+                            if (i == count)
+                                return `[(default-styler style-operator "=")]
+                            elseif (i > count)
+                                let i = (i - count - 1)
+                                let arg = ('getarg vals... i)
+                                return `(repr arg)    
+                            let arg = ('getarg vals... i)
+                            let idstr = (make-idstr (counter + i))
+                            let idsym = (Symbol idstr)
+                            sc_expression_append block
+                                if (('typeof arg) == Value)
+                                    `('set-symbol eval-scope idsym ``arg)
+                                else
+                                    `('set-symbol eval-scope idsym `arg)
+                            `idstr
                 let counter = (counter + count)
                 return
                     spice-quote

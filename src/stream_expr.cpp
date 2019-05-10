@@ -369,9 +369,10 @@ skip:
 HANDLER(ArgumentListTemplate) {
     auto _anchor = node.anchor();
     const List *l = EOL;
-    int i = node->values.size();
+    auto &&values = node->values();
+    int i = values.size();
     while (i-- > 0) {
-        l = List::from(node->values[i], l);
+        l = List::from(values[i], l);
     }
     l = List::from(SYMBOL(KW_Forward), l);
     return ValueRef(_anchor, ConstPointer::list_from(l));

@@ -231,12 +231,6 @@ inline function->SpiceMacro (f)
     spice-macro-verify-signature f
     bitcast f SpiceMacro
 
-fn box-empty ()
-    sc_argument_list_new;
-
-fn box-none ()
-    sc_const_aggregate_new Nothing 0 (undef ValueArrayPointer)
-
 # take closure l, typify and compile it and return a function of SpiceMacro type
 inline spice-macro (l)
     function->SpiceMacro (static-typify l Value)
@@ -359,6 +353,45 @@ let elementof =
             hide-traceback;
             `[(sc_type_element_at self index)]
 
+inline sc_argument_list_map_new (N mapf)
+    let values = (alloca-array Value N)
+    loop (i = 0)
+        if (icmp== i N)
+            break;
+        store (sc_identity (mapf i)) (getelementptr values i)
+        add i 1
+    sc_argument_list_new N values
+
+inline sc_argument_list_map_filter_new (maxN mapf)
+    let values = (alloca-array Value maxN)
+    loop (i k = 0 0)
+        if (icmp== i maxN)
+            break
+                sc_argument_list_new k values
+        let ok value = (mapf i)
+        if ok
+            store (sc_identity value) (getelementptr values k)
+            repeat (add i 1) (add k 1)
+        else
+            repeat (add i 1) k
+
+fn sc_argument_list_join (a b)
+    let A = (sc_argcount a)
+    let B = (sc_argcount b)
+    let N = (add A B)
+    let values = (alloca-array Value N)
+    loop (i = 0)
+        if (icmp== i A)
+            break;
+        store (sc_getarg a i) (getelementptr values i)
+        add i 1
+    loop (i = A)
+        if (icmp== i N)
+            break;
+        store (sc_getarg b (sub i A)) (getelementptr values i)
+        add i 1
+    sc_argument_list_new N values
+
 let elementsof =
     box-spice-macro
         fn "elementsof" (args)
@@ -366,15 +399,10 @@ let elementsof =
             verify-count argcount 1 1
             let self = (unbox-pointer (sc_getarg args 0) type)
             hide-traceback;
-            let outargs = (sc_argument_list_new)
             let count = (sc_type_countof self)
-            loop (i = 0)
-                if (icmp== i count)
-                    break;
-                sc_argument_list_append outargs
+            sc_argument_list_map_new count
+                inline (i)
                     `[(sc_type_element_at self i)]
-                add i 1
-            outargs
 
 let locationof =
     box-spice-macro
@@ -782,16 +810,16 @@ let list-constructor =
         fn (args)
             raising Error
             let argc = (sc_argcount args)
-            let newargs = (sc_argument_list_new)
             let anchor = (sc_value_anchor args)
-            loop (i = 1)
-                if (icmp== i argc)
-                    sc_argument_list_append newargs
-                        sc_valueref_tag anchor `'()
-                    break
-                        sc_valueref_tag anchor `(cons newargs)
-                sc_argument_list_append newargs (sc_getarg args i)
-                add i 1
+            let newargs =
+                sc_argument_list_map_new argc
+                    inline (i)
+                        let i = (add i 1)
+                        if (icmp== i argc)
+                            sc_valueref_tag anchor `'()
+                        else
+                            sc_getarg args i
+            sc_valueref_tag anchor `(cons newargs)
 
 let decons =
     spice-macro
@@ -804,17 +832,19 @@ let decons =
                 if (icmp== argc 2) (unbox-integer (sc_getarg args 1) i32)
                 else 1
             let block = (sc_expression_new)
-            let retargs = (sc_argument_list_new)
+            let argcount = (add count 1)
+            let retargs = (alloca-array Value argcount)
             loop (i next = 0 self)
                 let expr = `(sc_list_decons next)
                 sc_expression_append block expr
                 spice-quote
                     let at next = expr
-                sc_argument_list_append retargs at
+                store at (getelementptr retargs i)
                 let i = (add i 1)
                 if (icmp== i count)
-                    sc_argument_list_append retargs next
-                    sc_expression_append block retargs
+                    store next (getelementptr retargs i)
+                    sc_expression_append block 
+                        sc_argument_list_new argcount retargs
                     break block
                 _ i next
 
@@ -3876,16 +3906,17 @@ do
                 inline (x) (x > 0)
                 inline (x) ('getarg self (x - 1))
                 inline (x) (x - 1)
-    append-sink =
-        inline "Value-args" (self)
-            let argc = ('argcount self)
+    arglist-sink =
+        inline "arglist-sink" (N)
+            let values = (alloca-array Value N)
             Collector
-                inline () self
-                inline (self) true
-                inline (self) self
-                inline (src self)
-                    sc_argument_list_append self (src)
-                    self
+                inline () 0
+                inline (i) (i < N)
+                inline (i)
+                    sc_argument_list_new i values
+                inline (src i)
+                    store (sc_identity (src)) (getelementptr values i)
+                    add i 1
 
 inline range (a b c)
     let num-type = (typeof a)
@@ -3996,12 +4027,9 @@ inline make-unpack-function (extractf)
             let self = ('getarg args 0)
             let T = ('typeof self)
             let count = ('element-count T)
-            let outargs = (sc_argument_list_new)
-            loop (i = 0)
-                if (icmp== i count)
-                    break outargs
-                sc_argument_list_append outargs `(extractf self i)
-                add i 1
+            sc_argument_list_map_new count
+                inline (i)
+                    `(extractf self i)
 
 let __unpack-aggregate = (make-unpack-function extractvalue)
 
@@ -4883,13 +4911,13 @@ define va-append-va
             let argc = ('argcount args)
             verify-count argc 1 -1
             let end = ('getarg args 0)
-            let newargs = (sc_argument_list_new)
-            loop (i = 1)
-                if (i == argc)
-                    sc_argument_list_append newargs ('tag `(end) ('anchor end))
-                    break newargs
-                sc_argument_list_append newargs ('getarg args i)
-                repeat (i + 1)
+            sc_argument_list_map_new argc
+                inline (i)
+                    let i = (add i 1)
+                    if (i == argc)
+                        'tag `(end) ('anchor end)
+                    else
+                        'getarg args i
 
 define va-empty?
     spice-macro
@@ -4918,15 +4946,12 @@ define va-map
             let argc = ('argcount args)
             verify-count argc 1 -1
             let f = ('getarg args 0)
-            let outargs = (sc_argument_list_new)
-            loop (i = 1)
-                if (i == argc)
-                    break outargs
-                let arg = ('getarg args i)
-                let outarg = (sc_prove `(f arg))
-                if (('typeof outarg) != void)
-                    sc_argument_list_append outargs outarg
-                i + 1
+            sc_argument_list_map_filter_new (argc - 1)
+                inline (i)
+                    let i = (i + 1)                    
+                    let arg = ('getarg args i)
+                    let outarg = (sc_prove `(f arg))
+                    _ (('typeof outarg) != void) outarg
 
 """".. spice:: (va-range a (? b))
 
@@ -4947,12 +4972,11 @@ define va-range
             if ((b - a) > unroll-limit)
                 hide-traceback;
                 error "too many elements specified for range"
-            let outargs = (sc_argument_list_new)
-            loop (i = a)
-                if (i == b)
-                    break outargs
-                sc_argument_list_append outargs `i
-                i + 1
+            let count = (b - a)
+            sc_argument_list_map_new count
+                inline (i)
+                    let i = (i + a)
+                    `i
 
 """" (va-split n a...) -> (inline () a...[n .. (va-countof a...)-1]) a...[0 .. n-1]
 define va-split
@@ -4962,18 +4986,18 @@ define va-split
             let argc = ('argcount args)
             verify-count argc 1 -1
             let pos = (('getarg args 0) as i32)
-            let largs = (sc_argument_list_new)
-            let rargs = (sc_argument_list_new)
-            loop (i = 1)
-                if (i > pos)
-                    break;
-                sc_argument_list_append largs ('getarg args i)
-                repeat (i + 1)
-            loop (i = (pos + 1))
-                if (i >= argc)
-                    break;
-                sc_argument_list_append rargs ('getarg args i)
-                repeat (i + 1)
+            let largs =
+                sc_argument_list_map_new pos
+                    inline (i)
+                        let i = (i + 1)
+                        'getarg args i
+            let rcount = (argc - pos - 1)
+            let rcount = (? (rcount < 0) 0 rcount)
+            let rargs =
+                sc_argument_list_map_new rcount
+                    inline (i)
+                        let i = (i + pos + 1)
+                        'getarg args i
             `(_ (inline () largs) (inline () rargs))
 
 """" filter all keyed values
@@ -4983,16 +5007,11 @@ define va-unnamed
             raising Error
             let argc = ('argcount args)
             verify-count argc 0 -1
-            let outargs = (sc_argument_list_new)
-            loop (i = 0)
-                if (i == argc)
-                    break;
-                let arg = ('getarg args i)
-                let k = (sc_type_key ('qualified-typeof arg))
-                if (k == unnamed)
-                    sc_argument_list_append outargs arg
-                repeat (i + 1)
-            outargs
+            sc_argument_list_map_filter_new argc
+                inline (i)
+                    let arg = ('getarg args i)
+                    let k = (sc_type_key ('qualified-typeof arg))
+                    _ (k == unnamed) arg
 
 run-stage; # 8
 
@@ -5103,68 +5122,96 @@ spice-quote
 # function overloading
 #-------------------------------------------------------------------------------
 
+fn sc_argument_list_join_values (a b...)
+    let A = (sc_argcount a)
+    let B = (va-countof b...)
+    let N = (add A B)
+    let values = (alloca-array Value N)
+    loop (i = 0)
+        if (icmp== i A)
+            break;
+        store (sc_getarg a i) (getelementptr values i)
+        add i 1
+    va-map
+        inline (i)
+            store (sc_identity (va@ i b...)) (getelementptr values (A + i))
+        va-range B
+    sc_argument_list_new N values
+
 let nodefault = (opaque "nodefault")
 fn nodefault? (x)
     (('typeof x) == type) and (x as type == nodefault)
 
 spice overloaded-fn-append (T args...)
     let outtype = (T as type)
+    let acount = ('argcount args...)
     let functions = ('@ outtype 'templates)
     let functypes = ('@ outtype 'parameter-types)
     let defaults = ('@ outtype 'parameter-defaults)
-    for i in (range 0 ('argcount args...) 3)
-        let f = ('getarg args... i)
-        let ftype = ('getarg args... (i + 1))
-        let fdefs = ('getarg args... (i + 2))
-        if (('typeof ftype) == Nothing)
-            # separator for (using ...)
-            let fT = ('typeof f)
-            if ('function-pointer? fT)
-                if ((('kind f) != value-kind-function)
-                    and (not ('constant? f)))
-                    error "argument must be constant or function"
-                let fT = ('element@ fT 0)
-                let argcount = ('element-count fT)
-                loop (k types = 0 void)
-                    if (k < argcount)
-                        let argT = ('element@ fT k)
-                        repeat (k + 1)
-                            sc_arguments_type_join types argT
-                    sc_argument_list_append functions f
-                    sc_argument_list_append functypes types
-                    sc_argument_list_append defaults `none
-                    break;
-            elseif (fT == type)
-                if (fT == outtype)
-                    error "cannot inherit from own type"
-                let fT = (f as type)
-                if (fT < OverloadedFunction)
-                    let fns = ('@ fT 'templates)
-                    let ftypes = ('@ fT 'parameter-types)
-                    let fdefs = ('@ fT 'parameter-defaults)
-                    # copy over existing options
-                    for func ftype defs in (zip ('args fns)
-                        (zip ('args ftypes) ('args fdefs)))
-                        sc_argument_list_append functions func
-                        sc_argument_list_append functypes ftype
-                        sc_argument_list_append defaults defs
-            elseif (fT == Closure)
-                # ensure argument is constant
-                f as Closure
-                # append as templated option
-                sc_argument_list_append functions f
-                sc_argument_list_append functypes Variadic
-                sc_argument_list_append defaults `none
-            else
+    let functions functypes defaults =
+        loop (i functions functypes defaults = 0 functions functypes defaults)
+            if (i >= acount)
+                break functions functypes defaults
+            let f = ('getarg args... i)
+            let ftype = ('getarg args... (i + 1))
+            let fdefs = ('getarg args... (i + 2))
+            let i = (i + 3)
+            if (('typeof ftype) == Nothing)
+                # separator for (using ...)
+                let fT = ('typeof f)
+                if ('function-pointer? fT)
+                    if ((('kind f) != value-kind-function)
+                        and (not ('constant? f)))
+                        error "argument must be constant or function"
+                    let fT = ('element@ fT 0)
+                    let argcount = ('element-count fT)
+                    let types = 
+                        loop (k types = 0 void)
+                            if (k == argcount)
+                                break types
+                            let argT = ('element@ fT k)
+                            repeat (k + 1)
+                                sc_arguments_type_join types argT
+                    repeat i
+                        sc_argument_list_join_values functions f
+                        sc_argument_list_join_values functypes types
+                        sc_argument_list_join_values defaults `none
+                elseif (fT == type)
+                    if (fT == outtype)
+                        error "cannot inherit from own type"
+                    let fT = (f as type)
+                    if (fT < OverloadedFunction)
+                        let fns = ('@ fT 'templates)
+                        let ftypes = ('@ fT 'parameter-types)
+                        let fdefs = ('@ fT 'parameter-defaults)
+                        if (not (('argcount fns) == ('argcount ftypes) == ('argcount fdefs)))
+                            error "argument list size mismatch"
+                        # copy over existing options
+                        repeat i
+                            sc_argument_list_join functions fns
+                            sc_argument_list_join functypes ftypes
+                            sc_argument_list_join defaults fdefs
+                elseif (fT == Closure)
+                    # ensure argument is constant
+                    f as Closure
+                    # append as templated option
+                    repeat i
+                        sc_argument_list_join_values functions f
+                        sc_argument_list_join_values functypes Variadic
+                        sc_argument_list_join_values defaults `none
                 error
                     .. "cannot embed argument of type "
                         repr ('typeof f)
                         " in overloaded function"
-        else
-            let T = (ftype as type)
-            sc_argument_list_append functions f
-            sc_argument_list_append functypes ftype
-            sc_argument_list_append defaults fdefs
+            else
+                let T = (ftype as type)
+                repeat i
+                    sc_argument_list_join_values functions f
+                    sc_argument_list_join_values functypes ftype
+                    sc_argument_list_join_values defaults fdefs
+    'set-symbol outtype 'templates functions 
+    'set-symbol outtype 'parameter-types functypes
+    'set-symbol outtype 'parameter-defaults defaults 
     T
 
 'set-symbols OverloadedFunction
@@ -5279,40 +5326,40 @@ spice overloaded-fn-append (T args...)
 sugar fn... (name...)
     spice make-defaults (atypes defaults...)
         let atypes = (atypes as type)
-        let outargs = (sc_argument_list_new)
-        for i def in (enumerate ('args defaults...))
-            let paramT = (sc_arguments_type_getarg atypes i)
-            if (not ('constant? def))
-                hide-traceback;
-                error@ ('anchor def) "while checking default argument"
-                    "default argument must be constant"
-            let argT = ('typeof def)
-            let def =
-                if (nodefault? def) def
-                elseif (paramT == Unknown) def
-                elseif (paramT == Variadic) def
-                elseif (argT <= paramT) def
-                else
-                    let conv = (as-converter argT paramT true)
-                    if (not (operator-valid? conv))
-                        hide-traceback;
-                        error@ ('anchor def) "while checking default argument"
-                            "default argument does not match argument type"
-                    let def = (sc_prove `(conv def))
+        let outargs =
+            sc_argument_list_map_new ('argcount defaults...)
+                inline (i)
+                    let def = ('getarg defaults... i)
+                    let paramT = (sc_arguments_type_getarg atypes i)
                     if (not ('constant? def))
                         hide-traceback;
                         error@ ('anchor def) "while checking default argument"
-                            "default argument must be constant after conversion"
-                    def
-            sc_argument_list_append outargs def
+                            "default argument must be constant"
+                    let argT = ('typeof def)
+                    if (nodefault? def) def
+                    elseif (paramT == Unknown) def
+                    elseif (paramT == Variadic) def
+                    elseif (argT <= paramT) def
+                    else
+                        let conv = (as-converter argT paramT true)
+                        if (not (operator-valid? conv))
+                            hide-traceback;
+                            error@ ('anchor def) "while checking default argument"
+                                "default argument does not match argument type"
+                        let def = (sc_prove `(conv def))
+                        if (not ('constant? def))
+                            hide-traceback;
+                            error@ ('anchor def) "while checking default argument"
+                                "default argument must be constant after conversion"
+                        def                    
         `(inline () outargs)
 
     spice init-overloaded-function (T)
         let T = (T as type)
         'set-symbols T
-            templates = (sc_argument_list_new)
-            parameter-types = (sc_argument_list_new)
-            parameter-defaults = (sc_argument_list_new)
+            templates = (sc_argument_list_new 0 null)
+            parameter-types = (sc_argument_list_new 0 null)
+            parameter-defaults = (sc_argument_list_new 0 null)
         T
 
     let inline? =
@@ -5326,7 +5373,6 @@ sugar fn... (name...)
         default
             error
                 """"syntax: (fn... name|"name") (case pattern body...) ...
-    let outargs = (sc_argument_list_new)
     let outtype =
         spice-quote
             init-overloaded-function
@@ -5336,32 +5382,31 @@ sugar fn... (name...)
     case (name as Symbol;)
         'set-symbol bodyscope fn-name outtype
     default;
-    loop (next = next-expr)
+    loop (next outargs = next-expr (sc_argument_list_new 0 null))
         sugar-match next
         case (('case 'using body...) rest...)
             let obj = (sc_expand (cons do body...) '() sugar-scope)
-            sc_argument_list_append outargs obj
-            sc_argument_list_append outargs `none
-            sc_argument_list_append outargs `none
             repeat rest...
+                sc_argument_list_join_values outargs obj `none `none
         case (('case condv body...) rest...)
-            do
-                let tmpl = ('tag (sc_template_new fn-name) ('anchor condv))
-                if inline?
-                    sc_template_set_inline tmpl
-                sc_argument_list_append outargs tmpl
-                let scope = (Scope bodyscope)
-                let types = (sc_argument_list_new)
-                let defaults = (sc_argument_list_new)
-                loop (expr = (uncomma (condv as list)))
+            let tmpl = ('tag (sc_template_new fn-name) ('anchor condv))
+            if inline?
+                sc_template_set_inline tmpl
+            let scope = (Scope bodyscope)
+            repeat rest...
+                loop
+                    expr types defaults = 
+                        uncomma (condv as list)
+                        sc_argument_list_new 0 null
+                        sc_argument_list_new 0 null
                     sugar-match expr
                     case ()
                         let body = (sc_expand (cons do body...) '() scope)
                         sc_template_set_body tmpl body
                         let atypes = `(Arguments types)
-                        sc_argument_list_append outargs atypes
-                        sc_argument_list_append outargs `(make-defaults atypes defaults)
-                        break;
+                        break
+                            sc_argument_list_join_values outargs 
+                                \ tmpl atypes `(make-defaults atypes defaults)
                     case ((arg as Symbol) ': rest...)
                         hide-traceback;
                         error@ ('anchor condv) "while parsing pattern"
@@ -5377,20 +5422,20 @@ sugar fn... (name...)
                         let param = (sc_parameter_new arg)
                         sc_template_append_parameter tmpl param
                         'set-symbol scope arg param
-                        sc_argument_list_append types
-                            ? ('variadic? arg) Variadic Unknown
-                        sc_argument_list_append defaults nodefault
                         repeat rest...
+                            sc_argument_list_join_values types
+                                ? ('variadic? arg) Variadic Unknown
+                            sc_argument_list_join_values defaults nodefault
                     case (((arg as Symbol) '= def) rest...)
                         if ('variadic? arg)
                             error "variadic parameter can not have default value"
                         let param = (sc_parameter_new arg)
                         sc_template_append_parameter tmpl param
                         'set-symbol scope arg param
-                        sc_argument_list_append types Unknown
                         let def = (sc_expand def '() sugar-scope)
-                        sc_argument_list_append defaults def
                         repeat rest...
+                            sc_argument_list_join_values types Unknown
+                            sc_argument_list_join_values defaults def
                     case (((arg as Symbol) ': T '= def) rest...)
                         if ('variadic? arg)
                             error "a typed parameter can't be variadic"
@@ -5398,10 +5443,10 @@ sugar fn... (name...)
                         let param = (sc_parameter_new arg)
                         sc_template_append_parameter tmpl param
                         'set-symbol scope arg param
-                        sc_argument_list_append types T
                         let def = (sc_expand def '() sugar-scope)
-                        sc_argument_list_append defaults def
                         repeat rest...
+                            sc_argument_list_join_values types T
+                            sc_argument_list_join_values defaults def
                     case (((arg as Symbol) ': T) rest...)
                         if ('variadic? arg)
                             error "a typed parameter can't be variadic"
@@ -5409,15 +5454,14 @@ sugar fn... (name...)
                         let param = (sc_parameter_new arg)
                         sc_template_append_parameter tmpl param
                         'set-symbol scope arg param
-                        sc_argument_list_append types T
-                        sc_argument_list_append defaults nodefault
                         repeat rest...
+                            sc_argument_list_join_values types T
+                            sc_argument_list_join_values defaults nodefault
                     default
                         let at = (decons expr)
                         hide-traceback;
                         error@ ('anchor at) "while parsing pattern"
                             "syntax: (parameter-name[: type], ...)"
-            repeat rest...
         default
             sugar-match name...
             case (name as Symbol;)
@@ -5431,16 +5475,11 @@ let inline... = fn...
 
 sugar from (src 'let params...)
     spice load-from (src keys...)
-        let args = (sc_argument_list_new)
         let count = ('argcount keys...)
-        loop (i = 0)
-            if (i == count)
-                break;
-            let key = ('getarg keys... i)
-            sc_argument_list_append args
+        sc_argument_list_map_new count
+            inline (i)
+                let key = ('getarg keys... i)
                 `(getattr src key)
-            i + 1
-        args
 
     fn quotify (params)
         if (empty? params)
@@ -5850,19 +5889,20 @@ sugar static-match (cond)
             i1 + 1
 
     let cond = (sc_expand cond '() sugar-scope)
-    let outargs = (sc_argument_list_new)
-    sc_argument_list_append outargs cond
-    loop (next-expr = next-expr)
+    let outargs =
+        sc_argument_list_map_new 1
+            inline (i) cond 
+    loop (next-expr outargs = next-expr outargs)
         sugar-match next-expr
         case (('case it body...) rest...)
             let it = (sc_expand it '() sugar-scope)
             let body = (sc_expand (cons embed body...) '() sugar-scope)
-            sc_argument_list_append outargs it
-            sc_argument_list_append outargs `(inline () [body])
             repeat rest...
+                sc_argument_list_join_values outargs it `(inline () [body]) 
         case (('default body...) rest...)
             let body = (sc_expand (cons embed body...) '() sugar-scope)
-            sc_argument_list_append outargs `(inline () [body])
+            let outargs =
+                sc_argument_list_join_values outargs `(inline () [body]) 
             return `(handle-static-match outargs) rest...
         default
             hide-traceback;
@@ -5918,6 +5958,7 @@ sugar fold ((binding...) 'for expr...)
     let foldparams init = ('token-split binding... '= "'=' expected")
     let generator-expr body = (decons it)
     let subscope = (Scope sugar-scope)
+    let anchor = ('anchor expression)
     return
         spice-quote
             let init... =
@@ -5944,8 +5985,10 @@ sugar fold ((binding...) 'for expr...)
                             let expr1 expr2 =
                                 cons let ('rjoin itparams (list '= at...))
                                 cons let ('rjoin foldparams (list '= state...))
+                            let expr1 = ('tag `expr1 anchor)
+                            let expr2 = ('tag `expr2 anchor)
                             'set-symbol subscope 'continue continue
-                            let result = (sc_expand (cons do expr1 expr2 body) '() subscope)
+                            let result = (sc_expand (cons ('tag `do anchor) expr1 expr2 body) '() subscope)
                             result
                     repeat (va-append-va (inline () newstate...) (next it...))
                 else
@@ -5993,16 +6036,17 @@ define append-to-scope
                 else packedscope
             if (('argcount values) != 1)
                 let block = (sc_expression_new)
-                let outargs = `(sc_argument_list_new)
+                let acount = ('argcount values)
+                let outargs = `(alloca-array Value acount)
                 sc_expression_append block outargs
-                for arg in ('args values)
+                for i arg in (enumerate ('args values))
                     sc_expression_append block
                         if (('typeof arg) == Value)
-                            `(sc_argument_list_append outargs ``arg)
+                            `(store ``arg (getelementptr outargs i))
                         else
-                            `(sc_argument_list_append outargs `arg)
+                            `(store `arg (getelementptr outargs i))
                 sc_expression_append block
-                    `('set-symbol packedscope packedkey outargs)
+                    `('set-symbol packedscope packedkey (sc_argument_list_new acount outargs))
                 sc_expression_append block
                     `('set-docstring packedscope packedkey docstr)
                 sc_expression_append block packedscope
@@ -6481,7 +6525,8 @@ sugar struct (name body...)
         if (('typeof default-value) != Nothing)
             'set-symbol FT 'Default default-value
         let FT = `FT
-        sc_argument_list_append fields FT
+        let fields =
+            sc_argument_list_join_values fields FT
         sc_type_set_symbol T '__fields__ fields
         FT
 
@@ -6576,7 +6621,7 @@ sugar struct (name body...)
 
     spice init-fields (struct-type)
         fn init-fields-runtime (T)
-            sc_type_set_symbol T '__fields__ (sc_argument_list_new)
+            sc_type_set_symbol T '__fields__ (sc_argument_list_new 0 null)
 
         if ('constant? struct-type)
             init-fields-runtime (struct-type as type)

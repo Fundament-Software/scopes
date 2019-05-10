@@ -181,14 +181,15 @@ SCOPES_LIBEXPORT bool sc_value_is_constant (sc_valueref_t value);
 SCOPES_LIBEXPORT bool sc_value_is_pure (sc_valueref_t value);
 SCOPES_LIBEXPORT bool sc_value_compare (sc_valueref_t a, sc_valueref_t b);
 SCOPES_LIBEXPORT int sc_value_kind (sc_valueref_t value);
+SCOPES_LIBEXPORT sc_valueref_t sc_identity(sc_valueref_t value);
 SCOPES_LIBEXPORT sc_valueref_t sc_value_wrap(const sc_type_t *type, sc_valueref_t value);
 SCOPES_LIBEXPORT sc_valueref_t sc_value_unwrap(const sc_type_t *type, sc_valueref_t value);
+SCOPES_LIBEXPORT const sc_string_t *sc_value_kind_string(int kind);
 
 SCOPES_LIBEXPORT sc_valueref_t sc_keyed_new(sc_symbol_t key, sc_valueref_t value);
 
 SCOPES_LIBEXPORT sc_valueref_t sc_empty_argument_list();
-SCOPES_LIBEXPORT sc_valueref_t sc_argument_list_new();
-SCOPES_LIBEXPORT void sc_argument_list_append(sc_valueref_t alist, sc_valueref_t value);
+SCOPES_LIBEXPORT sc_valueref_t sc_argument_list_new(int count, const sc_valueref_t *values);
 SCOPES_LIBEXPORT sc_valueref_t sc_extract_argument_new(sc_valueref_t value, int index);
 SCOPES_LIBEXPORT sc_valueref_t sc_extract_argument_list_new(sc_valueref_t value, int index);
 SCOPES_LIBEXPORT int sc_argcount(sc_valueref_t value);

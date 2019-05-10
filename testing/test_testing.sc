@@ -4,7 +4,7 @@ using import testing
 spice cause-compiler-error (msg)
     let msg = (msg as string)
     if false
-        box-empty;
+        `()
     else
         error "this is a compiler error!"
 

@@ -209,14 +209,15 @@ typedef+ vec-type
         if (self == vec-type)
             `(construct-vec-type ...)
         else
-            let args = (sc_argument_list_new)
-            for arg in ('args ...)
-                let argT = ('typeof arg)
-                sc_argument_list_append args
-                    if (argT < vec-type) arg
-                    elseif (argT < vec-type-accessor)
-                        `(imply arg vec-type)
-                    else arg
+            let args = 
+                sc_argument_list_map_new ('argcount ...)
+                    inline (i)
+                        let arg = ('getarg ... i)
+                        let argT = ('typeof arg)
+                        if (argT < vec-type) arg
+                        elseif (argT < vec-type-accessor)
+                            `(imply arg vec-type)
+                        else arg
             `(vec-constructor2 self args)
 
     unlet vec-type-constructor vec-constructor2
