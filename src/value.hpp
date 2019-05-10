@@ -199,9 +199,10 @@ struct ArgumentListTemplate : UntypedValue {
 
     ArgumentListTemplate(const Values &values);
 
-    bool is_constant() const;
+    //bool is_constant() const;
+    bool empty() const;
 
-    static ValueRef empty_from();
+    //static ValueRef empty_from();
     static ValueRef from(const Values &values = {});
 
     const Values &values() const;

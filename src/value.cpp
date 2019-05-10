@@ -150,6 +150,7 @@ ArgumentListTemplate::ArgumentListTemplate(const Values &values)
     : UntypedValue(VK_ArgumentListTemplate), _values(values) {
 }
 
+/*
 bool ArgumentListTemplate::is_constant() const {
     for (auto val : _values) {
         assert(val);
@@ -158,34 +159,69 @@ bool ArgumentListTemplate::is_constant() const {
     }
     return true;
 }
+*/
+
+bool ArgumentListTemplate::empty() const {
+    return _values.empty();
+}
 
 const Values &ArgumentListTemplate::values() const {
     return _values;
-}
-
-ValueRef ArgumentListTemplate::empty_from() {
-    return ref(unknown_anchor(), new ArgumentListTemplate({}));
 }
 
 ValueRef ArgumentListTemplate::from(const Values &values) {
     if (values.size() == 1) {
         return values[0];
     }
+    bool is_typed = true;
     for (auto value : values) {
         if (value.isa<UntypedValue>()) {
-            return ref(unknown_anchor(), new ArgumentListTemplate(values));
+            is_typed = false;
+            break;
         }
     }
-    // all values are typed - promote to ArgumentList
-    TypedValues typed_values;
-    typed_values.reserve(values.size());
-    for (auto value : values) {
-        typed_values.push_back(value.cast<TypedValue>());
+    if (is_typed) {
+        // all values are typed - promote to ArgumentList
+        TypedValues typed_values;
+        typed_values.reserve(values.size());
+        for (auto value : values) {
+            typed_values.push_back(value.cast<TypedValue>());
+        }
+        return ref(unknown_anchor(), ArgumentList::from(typed_values));
+    } else {
+        assert(!values.empty());
+        Values newvalues;
+        newvalues.reserve(values.size());
+        int count = (int)values.size() - 1;
+        // truncate all but last argument
+        for (int i = 0; i < count; ++i) {
+            auto &&arg = values[i];
+            if (arg.isa<ArgumentListTemplate>() || arg.isa<ArgumentList>()) {
+                newvalues.push_back(ref(arg.anchor(), ExtractArgumentTemplate::from(arg, 0)));
+            } else {
+                newvalues.push_back(arg);
+            }
+        }
+        auto &&arg = values.back();
+        /*if (arg.isa<ArgumentListTemplate>()) {
+            for (auto &&val : (arg.cast<ArgumentListTemplate>())->values()) {
+                newvalues.push_back(val);
+            }
+        } else if (arg.isa<ArgumentList>()) {
+            auto al = arg.cast<ArgumentList>();
+            for (auto &&val : al->values) {
+                newvalues.push_back(val);
+            }
+        } else*/ {
+            newvalues.push_back(arg);
+        }
+        return ref(unknown_anchor(), new ArgumentListTemplate(newvalues));
     }
-    return ref(unknown_anchor(), ArgumentList::from(typed_values));
 }
 
 //------------------------------------------------------------------------------
+
+static TypedValueRef _empty_argument_list;
 
 const Type *arguments_type_from_typed_values(const TypedValues &_values) {
     Types types;
@@ -225,7 +261,11 @@ bool ArgumentList::is_constant() const {
 }
 
 TypedValueRef ArgumentList::from(const TypedValues &values) {
-    if (values.size() == 1) {
+    if (values.size() == 0) {
+        if (!_empty_argument_list)
+            _empty_argument_list = ref(unknown_anchor(), new ArgumentList(values)); 
+        return _empty_argument_list;
+    } else if (values.size() == 1) {
         return values[0];
     }
     return ref(unknown_anchor(), new ArgumentList(values));
@@ -239,17 +279,52 @@ ExtractArgumentTemplate::ExtractArgumentTemplate(const ValueRef &_value, int _in
 }
 
 ValueRef ExtractArgumentTemplate::from(
-    const ValueRef &value, int index, bool vararg) {
+    const ValueRef &_value, int index, bool vararg) {
+    ValueRef value = _value;
+repeat:
     if (value.isa<TypedValue>()) {
         if (vararg) {
             return ExtractArgument::variadic_from(value.cast<TypedValue>(), index);
         } else {
             return ExtractArgument::from(value.cast<TypedValue>(), index);
         }
-    } else {
-        return ref(value.anchor(),
-            new ExtractArgumentTemplate(value, index, vararg));
+    } else if (value.isa<ArgumentListTemplate>()) {
+        auto al = value.cast<ArgumentListTemplate>();
+        auto &&values = al->values();
+        if (vararg) {
+            if ((index == 0) || values.empty()) {
+                return value;
+            }
+        } else {
+            if (values.empty()) {
+                return ref(value.anchor(), ConstAggregate::none_from());
+            }
+            if ((index + 1) < values.size()) {
+                // we can extract directly
+                return values[index];
+            }
+            auto lastkind = values.back()->kind();
+            if ((lastkind == VK_ArgumentListTemplate) || (lastkind == VK_ArgumentList)) {
+                // continue searching in next list
+                value = values.back();
+                index = index + 1 - (int)values.size();
+                goto repeat;
+            }
+        }
+    } else if (!vararg && value.isa<ExtractArgumentTemplate>()) {      
+        auto eat = value.cast<ExtractArgumentTemplate>();
+        if (eat->vararg) {
+            value = eat->value;
+            index += eat->index;
+            goto repeat;
+        } else if (index == 0) {
+            return value;
+        } else {
+            return ref(value.anchor(), ConstAggregate::none_from());
+        }
     }
+    return ref(value.anchor(),
+        new ExtractArgumentTemplate(value, index, vararg));
 }
 
 //------------------------------------------------------------------------------
