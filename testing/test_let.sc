@@ -31,6 +31,21 @@ do
     test (w == 3)
 
 do
+    fn ret2 (x y)
+        _ x y
+
+    let k0 k1 k2 k3 =
+        ret2 1 2
+        ret2 3 4
+        ret2 5 6
+        ret2 7 8
+
+    test ((va-countof k0) == 1)
+    test ((va-countof k1) == 1)
+    test ((va-countof k2) == 1)
+    test ((va-countof k3) == 1)
+
+do
     # if condition block scope is accessible in subsequent blocks
     fn get () (_ true 303)
     if (let ok n = (get))

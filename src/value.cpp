@@ -288,7 +288,9 @@ repeat:
         } else {
             return ExtractArgument::from(value.cast<TypedValue>(), index);
         }
-    } else if (value.isa<ArgumentListTemplate>()) {
+    }
+    // doesn't work right: we might be un-singling mrv's
+    /* else if (value.isa<ArgumentListTemplate>()) {
         auto al = value.cast<ArgumentListTemplate>();
         auto &&values = al->values();
         if (vararg) {
@@ -311,7 +313,7 @@ repeat:
                 goto repeat;
             }
         }
-    } else if (!vararg && value.isa<ExtractArgumentTemplate>()) {      
+    } */ else if (!vararg && value.isa<ExtractArgumentTemplate>()) {      
         auto eat = value.cast<ExtractArgumentTemplate>();
         if (eat->vararg) {
             value = eat->value;
