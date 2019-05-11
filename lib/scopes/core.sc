@@ -3496,20 +3496,17 @@ fn require-from (base-dir name)
     let all-patterns = (patterns-from-namestr base-dir namestr)
     loop (patterns = all-patterns)
         if (empty? patterns)
-            sc_write "no such module '"
-            sc_write (as name string)
-            sc_write "' in paths:\n"
-            loop (patterns = all-patterns)
-                if (empty? patterns)
-                    error
-                        .. "failed to import module '" (repr name) "'"
-                let pattern patterns = (decons patterns)
-                let pattern = (pattern as string)
-                let module-path = (make-module-path pattern namestr)
-                sc_write "    "
-                sc_write module-path
-                sc_write "\n"
-                patterns
+            error
+                .. "failed to import module '" (repr name) "'\n"
+                    \ "no such module '" (as name string) "' in paths:"
+                    loop (patterns str = all-patterns "")
+                        if (empty? patterns)
+                            break str
+                        let pattern patterns = (decons patterns)
+                        let pattern = (pattern as string)
+                        let module-path = (make-module-path pattern namestr)
+                        repeat patterns
+                            .. str "\n"  "    " module-path
         let pattern patterns = (decons patterns)
         let pattern = (pattern as string)
         let module-path = (sc_realpath (make-module-path pattern namestr))
