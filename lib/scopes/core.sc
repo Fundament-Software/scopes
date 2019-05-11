@@ -4069,6 +4069,11 @@ let tupleof =
 # arrays
 #-------------------------------------------------------------------------------
 
+fn extract-integer (value)
+    if (('kind value) == value-kind-const-int)
+        return (sc_const_int_extract value)
+    error@ ('anchor value) "while extracting integer" "integer constant expected"
+
 'set-symbols array
     __unpack = __unpack-aggregate
     __countof = __countof-aggregate
@@ -4091,8 +4096,8 @@ let tupleof =
                     verify-count argc 2 3
                     let element-type = (('getarg args 1) as type)
                     let size =
-                        if (argc == 2) -1
-                        else (('getarg args 2) as i32)
+                        if (argc == 2) -1:u64
+                        else (extract-integer ('getarg args 2))
                     `[(sc_array_type element-type (size as usize))]
                 else
                     verify-count argc 1 1
@@ -4347,7 +4352,7 @@ inline vector-binary-op-dispatch (symbol)
                 if (cls == vector)
                     verify-count argc 3 3
                     let element-type = (('getarg args 1) as type)
-                    let size = (('getarg args 2) as i32)
+                    let size = (extract-integer ('getarg args 2))
                     `[(sc_vector_type element-type (size as usize))]
                 else
                     verify-count argc 1 1
