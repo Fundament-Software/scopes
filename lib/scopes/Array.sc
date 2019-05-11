@@ -180,6 +180,10 @@ typedef+ Array
         clear self
         free self._items
 
+    """"Safely swap the contents of two indices.
+    fn swap (self a b)
+        swap (self._items @ a) (self._items @ b)
+
     unlet gen-sort append-slots
 
 """"The supertype and constructor for arrays of fixed size.
