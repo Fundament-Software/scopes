@@ -2781,7 +2781,7 @@ repeat:
         } break;
         case FN_Deref: {
             CHECKARGS(1, 1);
-            READ_TYPEOF(T);
+            READ_AUTOMOVE_TYPEOF(T);
             (void)T;
             return _T;
         } break;

@@ -14,7 +14,7 @@ namespace scopes {
 struct String;
 
 const String *get_cache_key(const char *content, size_t size);
-
+int get_cache_misses();
 const char *get_cache_dir();
 const char *get_cache_file(const String *key);
 const char *get_cache_key_file(const String *key);

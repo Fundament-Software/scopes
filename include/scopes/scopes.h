@@ -149,6 +149,7 @@ SCOPES_LIBEXPORT int sc_main(void *c_main, int argc, char *argv[]);
 // stats & info
 
 SCOPES_LIBEXPORT sc_i32_i32_i32_tuple_t sc_compiler_version();
+SCOPES_LIBEXPORT int sc_cache_misses();
 
 // compiler
 

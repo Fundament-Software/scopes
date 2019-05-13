@@ -34,9 +34,15 @@
 
 namespace scopes {
 
+static int cache_misses = 0;
 static bool cache_inited = false;
 static char cache_dir[PATH_MAX+1];
 
+int get_cache_misses() {
+    int val = cache_misses;
+    cache_misses = 0;
+    return val;
+}
 // delete half of all cache files to make space, and/or half of all inodes
 // to stay within filesystem limits.
 static void perform_thanos_finger_snap(size_t cache_size, size_t num_files) {
@@ -241,6 +247,7 @@ const char *get_cache_file(const String *key) {
 
     //StyledStream ss;
     //ss << "generating " << filepath << std::endl;
+    cache_misses++;
     return nullptr;
 }
 

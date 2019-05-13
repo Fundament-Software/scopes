@@ -199,6 +199,11 @@ sc_i32_i32_i32_tuple_t sc_compiler_version() {
         SCOPES_VERSION_PATCH };
 }
 
+int sc_cache_misses() {
+    using namespace scopes;
+    return get_cache_misses();
+}
+
 sc_rawstring_i32_array_tuple_t sc_launch_args() {
     using namespace scopes;
     return {(int)scopes_argc, scopes_argv};
@@ -2151,6 +2156,7 @@ void init_globals(int argc, char *argv[]) {
     const Type *voidstar = native_ro_pointer_type(_void);
 
     DEFINE_EXTERN_C_FUNCTION(sc_compiler_version, arguments_type({TYPE_I32, TYPE_I32, TYPE_I32}));
+    DEFINE_EXTERN_C_FUNCTION(sc_cache_misses, TYPE_I32);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_expand, arguments_type({TYPE_ValueRef, TYPE_List, TYPE_Scope}), TYPE_ValueRef, TYPE_List, TYPE_Scope);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_eval, TYPE_ValueRef, TYPE_Anchor, TYPE_List, TYPE_Scope);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_prove, TYPE_ValueRef, TYPE_ValueRef);

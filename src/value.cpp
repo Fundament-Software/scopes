@@ -189,6 +189,7 @@ ValueRef ArgumentListTemplate::from(const Values &values) {
         }
         return ref(unknown_anchor(), ArgumentList::from(typed_values));
     } else {
+        #if 0
         assert(!values.empty());
         Values newvalues;
         newvalues.reserve(values.size());
@@ -215,7 +216,8 @@ ValueRef ArgumentListTemplate::from(const Values &values) {
         } else*/ {
             newvalues.push_back(arg);
         }
-        return ref(unknown_anchor(), new ArgumentListTemplate(newvalues));
+        #endif
+        return ref(unknown_anchor(), new ArgumentListTemplate(values));
     }
 }
 
@@ -281,7 +283,7 @@ ExtractArgumentTemplate::ExtractArgumentTemplate(const ValueRef &_value, int _in
 ValueRef ExtractArgumentTemplate::from(
     const ValueRef &_value, int index, bool vararg) {
     ValueRef value = _value;
-repeat:
+//repeat:
     if (value.isa<TypedValue>()) {
         if (vararg) {
             return ExtractArgument::variadic_from(value.cast<TypedValue>(), index);
@@ -313,7 +315,7 @@ repeat:
                 goto repeat;
             }
         }
-    } */ else if (!vararg && value.isa<ExtractArgumentTemplate>()) {      
+    } else if (!vararg && value.isa<ExtractArgumentTemplate>()) {      
         auto eat = value.cast<ExtractArgumentTemplate>();
         if (eat->vararg) {
             value = eat->value;
@@ -325,6 +327,7 @@ repeat:
             return ref(value.anchor(), ConstAggregate::none_from());
         }
     }
+    */ 
     return ref(value.anchor(),
         new ExtractArgumentTemplate(value, index, vararg));
 }
