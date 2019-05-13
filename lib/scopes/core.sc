@@ -3496,6 +3496,7 @@ fn require-from (base-dir name)
     let all-patterns = (patterns-from-namestr base-dir namestr)
     loop (patterns = all-patterns)
         if (empty? patterns)
+            hide-traceback;
             error
                 .. "failed to import module '" (repr name) "'\n"
                     \ "no such module '" (as name string) "' in paths:"
@@ -5538,13 +5539,16 @@ define-sugar-block-scope-macro static-if
                 if (('typeof else-expr) == list)
                     let kw body = (decons (else-expr as list))
                     let anchor = ('anchor kw)
-                    let kw = (kw as Symbol)
-                    switch kw
-                    case 'elseif
-                        this-function anchor body next-next-expr
-                    case 'else
-                        _ body next-next-expr
-                    default
+                    if (('typeof kw) == Symbol)
+                        let kw = (kw as Symbol)
+                        switch kw
+                        case 'elseif
+                            this-function anchor body next-next-expr
+                        case 'else
+                            _ body next-next-expr
+                        default
+                            _ '() next-expr
+                    else
                         _ '() next-expr
                 else
                     _ '() next-expr
