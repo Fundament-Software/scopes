@@ -212,7 +212,6 @@ repeat:
         T = cast<ArrayLikeType>(T)->element_type;
         goto repeat;
     case TK_Tuple:
-    case TK_Union:
         return cast<TupleLikeType>(T)->is_plain();
     case TK_Arguments:
         return all_plain(cast<ArgumentsType>(T)->values);
@@ -267,7 +266,6 @@ SCOPES_RESULT(size_t) size_of(const Type *T) {
     case TK_Array: return cast<ArrayType>(T)->size;
     case TK_Vector: return cast<VectorType>(T)->size;
     case TK_Tuple: return cast<TupleType>(T)->size;
-    case TK_Union: return cast<UnionType>(T)->size;
     case TK_Typename: return size_of(SCOPES_GET_RESULT(storage_type(T)));
     default: break;
     }
@@ -298,7 +296,6 @@ SCOPES_RESULT(size_t) align_of(const Type *T) {
     case TK_Array: return cast<ArrayType>(T)->align;
     case TK_Vector: return cast<VectorType>(T)->align;
     case TK_Tuple: return cast<TupleType>(T)->align;
-    case TK_Union: return cast<UnionType>(T)->align;
     case TK_Typename: return align_of(SCOPES_GET_RESULT(storage_type(T)));
     default: break;
     }
@@ -316,7 +313,6 @@ const Type *superof(const Type *T) {
     case TK_Array: return TYPE_Array;
     case TK_Vector: return TYPE_Vector;
     case TK_Tuple: return TYPE_Tuple;
-    case TK_Union: return TYPE_Union;
     case TK_Typename: return cast<TypenameType>(T)->super();
     case TK_Function: return TYPE_Function;
     case TK_Image: return TYPE_Image;

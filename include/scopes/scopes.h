@@ -440,10 +440,7 @@ SCOPES_LIBEXPORT sc_type_raises_t sc_vector_type(const sc_type_t *element_type, 
 // tuple types
 
 SCOPES_LIBEXPORT sc_type_raises_t sc_tuple_type(int numtypes, const sc_type_t **types);
-
-// union types
-
-SCOPES_LIBEXPORT sc_type_raises_t sc_union_type(int numtypes, const sc_type_t **types);
+SCOPES_LIBEXPORT sc_type_raises_t sc_union_storage_type(int numtypes, const sc_type_t **types);
 
 // argument types
 

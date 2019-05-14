@@ -45,7 +45,6 @@ template<> struct ArgFormatter<TypeKind> {
         case TK_Array: ss << "array"; break;
         case TK_Vector: ss << "vector"; break;
         case TK_Tuple: ss << "tuple"; break;
-        case TK_Union: ss << "union"; break;
         case TK_Typename: ss << "typename"; break;
         case TK_Function: ss << "function"; break;
         case TK_Image: ss << "image"; break;

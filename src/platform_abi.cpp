@@ -242,11 +242,6 @@ static size_t classify(const Type *T, ABIClass *classes, size_t offset) {
         return classify_array_like(size_of(T).assert_ok(),
             storage_type(tt->element_type).assert_ok(), tt->count, classes, offset);
     } break;
-    case TK_Union: {
-        auto ut = cast<UnionType>(T);
-        return classify(
-            storage_type(ut->values[ut->largest_field]).assert_ok(), classes, offset);
-    } break;
     case TK_Tuple: {
         auto tt = cast<TupleType>(T);
         size_t count = tt->values.size();

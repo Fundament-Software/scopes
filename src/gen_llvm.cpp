@@ -735,10 +735,6 @@ struct LLVMIRGenerator {
             }
             return LLVMStructType(elements, count, ti->packed);
         } break;
-        case TK_Union: {
-            auto ui = cast<UnionType>(type);
-            return _type_to_llvm_type(ui->tuple_type);
-        } break;
         case TK_Typename: {
             if (type == TYPE_Sampler) {
                 SCOPES_ERROR(CGenTypeUnsupportedInTarget, TYPE_Sampler);
@@ -746,8 +742,7 @@ struct LLVMIRGenerator {
             auto tn = cast<TypenameType>(type);
             if (!tn->is_opaque()) {
                 switch(tn->storage()->kind()) {
-                case TK_Tuple:
-                case TK_Union: {
+                case TK_Tuple: {
                     type_todo.push_back(type);
                 } break;
                 default: {
@@ -823,30 +818,6 @@ struct LLVMIRGenerator {
                     elements[i] = SCOPES_GET_RESULT(_type_to_llvm_type(ti->values[i]));
                 }
                 LLVMStructSetBody(LLT, elements, count, false);
-            } break;
-            case TK_Union: {
-                auto ui = cast<UnionType>(ST);
-                size_t count = ui->values.size();
-                size_t sz = ui->size;
-                size_t al = ui->align;
-                // find member with the same alignment
-                for (size_t i = 0; i < count; ++i) {
-                    const Type *ET = ui->values[i];
-                    size_t etal = SCOPES_GET_RESULT(align_of(ET));
-                    if (etal == al) {
-                        size_t remsz = sz - SCOPES_GET_RESULT(size_of(ET));
-                        LLVMTypeRef values[2];
-                        values[0] = SCOPES_GET_RESULT(_type_to_llvm_type(ET));
-                        if (remsz) {
-                            // too small, add padding
-                            values[1] = LLVMArrayType(i8T, remsz);
-                            LLVMStructSetBody(LLT, values, 2, false);
-                        } else {
-                            LLVMStructSetBody(LLT, values, 1, false);
-                        }
-                        break;
-                    }
-                }
             } break;
             default: assert(false); break;
             }

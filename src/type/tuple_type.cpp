@@ -9,6 +9,7 @@
 #include "../utils.hpp"
 #include "../hash.hpp"
 #include "../qualifier/key_qualifier.hpp"
+#include "array_type.hpp"
 
 #include <assert.h>
 
@@ -154,6 +155,32 @@ SCOPES_RESULT(const Type *) tuple_type(const Types &values,
     auto result = new TupleType(values, packed, alignment);
     tuples.insert(result);
     return result;
+}
+
+SCOPES_RESULT(const Type *) union_storage_type(const Types &types,
+    bool packed, size_t alignment) {
+    SCOPES_RESULT_TYPE(const Type *);
+    size_t sz = 0;
+    size_t al = 0;
+    const Type *most_aligned_field = nullptr;
+    // build an argument list, find alignment and size
+    for (auto ET : types) {
+        auto newsz = SCOPES_GET_RESULT(size_of(ET));
+        sz = std::max(sz, newsz);
+        auto newal = SCOPES_GET_RESULT(align_of(ET));
+        if (newal > al) {
+            most_aligned_field = ET;
+            al = newal; 
+        }
+    }
+    assert(most_aligned_field);
+    Types fields = { most_aligned_field };
+    auto fieldsz = size_of(most_aligned_field).assert_ok();
+    if (fieldsz < sz) {
+        // pad out
+        fields.push_back(array_type(TYPE_I8, sz - fieldsz).assert_ok());
+    }
+    return tuple_type(fields, packed, alignment);
 }
 
 } // namespace scopes

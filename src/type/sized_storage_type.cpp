@@ -50,7 +50,6 @@ bool ArrayLikeType::is_unsized() const {
 bool TupleLikeType::classof(const Type *T) {
     switch(T->kind()) {
     case TK_Tuple:
-    case TK_Union:
         return true;
     default: break;
     }

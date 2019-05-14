@@ -758,6 +758,7 @@ namespace scopes {
     T(SYM_DerefHandler, "__deref") \
     T(SYM_BoolHandler, "__tobool") \
     T(SYM_QuoteHandler, "__quote") \
+    T(SYM_UnionFields, "__fields") \
     \
     /* varargs */ \
     T(SYM_Parenthesis, "...") \

@@ -117,8 +117,6 @@ static std::unordered_set<Function *, FunctionSet::Hash, FunctionSet::KeyEqual> 
 static TypeKind canonical_typekind(TypeKind k) {
     if (k == TK_Real)
         return TK_Integer;
-    if (k == TK_Union)
-        return TK_Tuple;
     return k;
 }
 
@@ -2407,14 +2405,6 @@ repeat:
                 //DEREF(_SrcT);
                 const Type *SSrcT = SCOPES_GET_RESULT(storage_type(SrcT));
                 const Type *SDestT = SCOPES_GET_RESULT(storage_type(DestT));
-                if (SDestT->kind() == TK_Union) {
-                    // if one of the fields matches, it's a valid cast
-                    auto ut = cast<UnionType>(SDestT);
-                    for (auto value : ut->values) {
-                        if (SSrcT == storage_type(value).assert_ok())
-                            goto fine;
-                    }   
-                }
                 if (canonical_typekind(SSrcT->kind())
                         != canonical_typekind(SDestT->kind())) {
                     SCOPES_ERROR(CastCategoryError, SrcT, DestT);
@@ -2423,14 +2413,12 @@ repeat:
                     switch (SSrcT->kind()) {
                     case TK_Array:
                     //case TK_Vector:
-                    case TK_Tuple:
-                    case TK_Union: {
+                    case TK_Tuple: {
                         SCOPES_ERROR(CastIncompatibleAggregateType, SSrcT);
                     } break;
                     default: break;
                     }
                 }
-                fine:
 
                 DestT = strip_qualifiers(DestT);
                 bool target_is_plain = is_plain(DestT);
@@ -2658,35 +2646,6 @@ repeat:
                 auto ti = cast<TupleType>(T);
                 SCOPES_CHECK_RESULT(sanitize_tuple_index(call.anchor(), T, ti, iidx, _idx));
                 RT = SCOPES_GET_RESULT(ti->type_at_index(iidx));
-            } break;
-            case TK_Union: {
-                auto iidx = SCOPES_GET_RESULT(extract_integer_constant(_idx));
-                auto ui = cast<UnionType>(T);
-                SCOPES_CHECK_RESULT(sanitize_tuple_index(call.anchor(), T, ui, iidx, _idx));
-                RT = SCOPES_GET_RESULT(ui->type_at_index(iidx));
-                _idx = ref(_idx.anchor(), ConstInt::from(TYPE_I32, 0));
-                auto TT = tuple_type({RT}).assert_ok();
-                RT = type_key(RT)._1;
-                auto rq = try_qualifier<ReferQualifier>(typeof_T);
-                if (rq) {
-                    TT = qualify(TT, {rq});
-                    auto retT = view_result_type(ctx, TT, _T);
-                    TypedValueRef newcall2 = ref(call.anchor(), Call::from(retT, g_bitcast,
-                        { _T, ref(call.anchor(), ConstPointer::type_from(TT)) }));
-                    ctx.append(newcall2);
-                    retT = view_result_type(ctx, qualify(RT, { rq }), newcall2);
-                    TypedValueRef newcall3 = ref(call.anchor(), Call::from(retT,
-                        g_getelementref, { newcall2, _idx }));
-                    ctx.append(newcall3);
-                    return newcall3;
-                } else {
-                    auto retT = view_result_type(ctx, TT, _T);
-                    TypedValueRef newcall2 = ref(call.anchor(), Call::from(retT, g_bitcast,
-                        { _T, ref(call.anchor(), ConstPointer::type_from(TT)) }));
-                    ctx.append(newcall2);
-                    _T = newcall2;
-                    return DEP_ARGTYPE1(RT, _T);
-                }
             } break;
             default: {
                 SCOPES_ERROR(InvalidArgumentTypeForBuiltin, b, T);

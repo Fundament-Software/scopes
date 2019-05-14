@@ -250,6 +250,7 @@ let va-lfold va-lifold =
             if (icmp== argcount 2)
                 return init
             let ofs = (? use-indices 1 0)
+            let anchor = (sc_value_anchor args)
             loop (i ret = 2 init)
                 if (icmp== i argcount)
                     break ret
@@ -261,7 +262,7 @@ let va-lfold va-lifold =
                     if use-indices
                         `(f [(sub i 2)] k v ret)
                     else
-                        `(f k v ret)
+                        sc_valueref_tag anchor `(f k v ret)
         _
             spice-macro (fn "va-lfold" (args) (va-lfold args false))
             spice-macro (fn "va-ilfold" (args) (va-lfold args true))
@@ -492,17 +493,25 @@ do
         let self = (sc_getarg args 0)
         if (icmp== argcount 3)
             let key = (sc_getarg args 1)
+            if (sc_value_is_constant key)
+                if (icmp== (unbox-symbol key Symbol) unnamed)
+                    hide-traceback;
+                    error "value is missing key"
             let value = (sc_getarg args 2)
             return self key value
         else
             let arg = (sc_getarg args 1)
             let key = (sc_type_key (sc_value_qualified_type arg))
+            if (icmp== key unnamed)
+                hide-traceback;
+                error "value is missing key"
             let arg = (sc_keyed_new unnamed arg)
             return self (box-symbol key) arg
 
     inline gen-key-any-set (selftype fset)
         box-spice-macro
             fn "set-symbol" (args)
+                hide-traceback;
                 let self key value = (get-key-value-args args)
                 `(fset self key value)
 
@@ -560,21 +569,21 @@ sc_type_set_symbol pointer 'type
         inline "pointer.type" (T)
             sc_pointer_type T pointer-flag-non-writable unnamed
 
-inline aggregate-type-constructor (f)
+inline aggregate-type-constructor (start f)
     box-spice-macro
         fn "aggregate-type-constructor" (args)
             let argcount = (sc_argcount args)
-            verify-count argcount 1 -1
-            let pcount = (sub argcount 1)
+            verify-count argcount start -1
+            let pcount = (sub argcount start)
             let types = (alloca-array type pcount)
-            loop (i = 1)
+            loop (i = start)
                 if (icmp== i argcount)
                     break;
                 let arg = (sc_getarg args i)
                 let k = (sc_type_key (sc_value_qualified_type arg))
                 let arg = (unbox-pointer arg type)
                 store (sc_key_type k arg)
-                    getelementptr types (sub i 1)
+                    getelementptr types (sub i start)
                 add i 1
             sc_valueref_tag (sc_value_anchor args)
                 `[(f pcount types)]
@@ -604,13 +613,13 @@ inline runtime-aggregate-type-constructor (f)
                     body
                 f argcount types
 
-# static tuple and union type constructor
-sc_type_set_symbol tuple '__typecall (aggregate-type-constructor sc_tuple_type)
-sc_type_set_symbol union '__typecall (aggregate-type-constructor sc_union_type)
+# static tuple type constructor
+sc_type_set_symbol tuple '__typecall (aggregate-type-constructor 1 sc_tuple_type)
+let union-storageof = (aggregate-type-constructor 0 sc_union_storage_type)
 
-# dynamic tuple and union type constructor
+# dynamic tuple type constructor
 sc_type_set_symbol tuple 'type (runtime-aggregate-type-constructor sc_tuple_type)
-sc_type_set_symbol union 'type (runtime-aggregate-type-constructor sc_union_type)
+let union-storage-type = (runtime-aggregate-type-constructor sc_union_storage_type)
 
 # arguments type constructor
 sc_type_set_symbol Arguments '__typecall
@@ -913,10 +922,11 @@ inline define-symbols (self values...)
 'define-symbols Error
     format = sc_format_error
     dump = sc_dump_error
-    inline append (self anchor traceback-msg)
-        sc_error_append_calltrace self
-            sc_valueref_tag anchor `traceback-msg
-        self
+    append =
+        inline "append" (self anchor traceback-msg)
+            sc_error_append_calltrace self
+                sc_valueref_tag anchor `traceback-msg
+            self
 
 'define-symbols list
     __countof = sc_list_count
@@ -955,7 +965,7 @@ inline define-symbols (self values...)
         inline (type storage-type)
             sc_typename_type_set_storage type storage-type typename-flag-plain
     return-type = sc_function_type_return_type
-    key = sc_type_key
+    keyof = sc_type_key
     key-type =
         inline (self key)
             sc_key_type key self
@@ -1014,6 +1024,12 @@ inline define-symbols (self values...)
     writable? =
         fn (cls)
             icmp== (band (sc_pointer_type_get_flags cls) pointer-flag-non-writable) 0:u64
+    refer->pointer-type =
+        fn "refer->pointer-type" (cls)
+            sc_pointer_type
+                sc_strip_qualifiers cls
+                sc_refer_flags cls
+                sc_refer_storage_class cls
     pointer->refer-type =
         fn "pointer->refer-type" (cls)
             sc_refer_type
@@ -2785,7 +2801,7 @@ fn va-option-branch (args)
         if (== i argc)
             break;
         let arg = ('getarg args i)
-        let argkey = ('key ('qualified-typeof arg))
+        let argkey = ('keyof ('qualified-typeof arg))
         if (== key argkey)
             return
                 sc_keyed_new unnamed arg
@@ -6411,15 +6427,6 @@ sugar include (args...)
             inline (a b)
                 icmp== (ptrtoint a intptr) (ptrtoint b intptr)
 
-# unions
-#-------------------------------------------------------------------------------
-
-'set-symbols CUnion
-    __getattr = extractvalue
-    __typecall =
-        inline (cls)
-            nullof cls
-
 # native structs
 #-------------------------------------------------------------------------------
 
@@ -6577,8 +6584,10 @@ sugar struct (name body...)
                 let field = (('@ field 'Type) as type)
                 (ptrtoref (getelementptr fields i)) = field
             if (T < CUnion)
+                'set-symbol T '__fields
+                    sc_tuple_type numfields fields
                 'set-plain-storage T
-                    sc_union_type numfields fields
+                    sc_union_storage_type numfields fields
             elseif (T < CStruct)
                 'set-plain-storage T
                     sc_tuple_type numfields fields
@@ -6674,6 +6683,37 @@ sugar struct (name body...)
         [finalize-struct] this-type
         this-type
 
+# unions
+#-------------------------------------------------------------------------------
+
+typedef+ CUnion
+    inline __typecall (cls)
+        nullof cls
+
+    spice __getattr (self name)
+        let qcls = ('qualified-typeof self)
+        let cls = ('strip-qualifiers qcls)
+        let fields = (('@ cls '__fields) as type)
+        let i = 
+            do
+                hide-traceback;
+                sc_type_field_index fields (name as Symbol)
+        let ET = ('key-type ('element@ fields i) unnamed)
+        if ('refer? qcls)
+            let ptrT = ('refer->pointer-type qcls)
+            let ptrET = ('change-element-type ptrT ET)
+            spice-quote
+                let ptr = (reftoptr self)
+                let ptr = (bitcast ptr ptrET)
+                ptrtoref ptr
+        else
+            let ptrET = ('change-storage-class ('mutable (pointer.type ET)) 'Function)
+            spice-quote
+                let ptr = (alloca cls)
+                store self ptr
+                let ptr = (bitcast ptr ptrET)
+                load ptr
+
 # enums (classical C enums or tagged unions)
 #-------------------------------------------------------------------------------
 
@@ -6711,74 +6751,6 @@ do
                     if (vT == ST)
                         return `(inline (self) (bitcast self T))
                     `()
-
-#sugar enum (name values...)
-    spice make-enum (name vals...)
-        let T = (typename.type (name as string) CEnum)
-
-        inline build-type (self)
-            let repr-expr = (sc_expression_new)
-            inline make-enumval (key val)
-                let const = (sc_const_int_new T (sext (as val i32) u64))
-                'set-symbol T key const
-                let str = (sc_default_styler style-number (key as string))
-                sc_expression_append repr-expr
-                    spice-quote
-                        if (self == const) (return str)
-            'set-plain-storage T i32
-            let count = ('argcount vals...)
-            loop (i nextval = 0 0)
-                if (i >= count)
-                    break;
-                let arg = ('getarg vals... i)
-                let anchor = ('anchor arg)
-                let key val = ('dekey arg)
-                #print arg key val
-                if (not ('constant? val))
-                    error "all enum values must be constant"
-                _ (i + 1)
-                    if (key == unnamed)
-                        # auto-numerical
-                        make-enumval (as val Symbol) nextval
-                        nextval + 1
-                    else
-                        make-enumval key val
-                        (as val i32) + 1
-
-            sc_expression_append repr-expr
-                spice-quote
-                    return (repr (storagecast self))
-            repr-expr
-
-        spice-quote
-            fn enum-repr (self)
-                spice-unquote
-                    build-type self
-        'set-symbol T '__repr enum-repr
-        T
-
-    let newbody =
-        loop (body outp = values... '())
-            sugar-match body
-            case (expr is Symbol; rest...)
-                repeat rest...
-                    cons `[(list sugar-quote expr)] outp
-            case ((expr is Symbol; ': T) rest...)
-                repeat rest... 
-                    cons (list expr '= T) outp
-            case (expr rest...)
-                repeat rest...
-                    cons expr outp
-            case ()
-                break ('reverse outp)
-            default
-                error "unsupported syntax"
-    if (('typeof name) == Symbol)
-        let namestr = (name as Symbol as string)
-        list let name '=
-            cons make-enum namestr newbody
-    else
-        cons make-enum name newbody
 
 sugar enum (name body...)
     fn define-field-runtime (T name field-type index-value)
@@ -6914,7 +6886,7 @@ sugar enum (name body...)
                     let field = (('getarg field-types i) as type)
                     let field-type = (('@ field 'Type) as type)
                     store field-type (getelementptr fields i)
-                let payload-type = (sc_union_type numfields fields)
+                let payload-type = (sc_tuple_type numfields fields)
                 'set-storage T
                     tuple.type index-type payload-type
                 let consts = (alloca-array Value 2)

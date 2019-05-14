@@ -12,7 +12,6 @@
 #include "type/array_type.hpp"
 #include "type/vector_type.hpp"
 #include "type/tuple_type.hpp"
-#include "type/union_type.hpp"
 #include "type/arguments_type.hpp"
 #include "type/function_type.hpp"
 #include "type/image_type.hpp"

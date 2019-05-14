@@ -40,6 +40,8 @@ struct TupleType : TupleLikeType {
 
 SCOPES_RESULT(const Type *) tuple_type(const Types &types,
     bool packed = false, size_t alignment = 0);
+SCOPES_RESULT(const Type *) union_storage_type(const Types &types,
+    bool packed = false, size_t alignment = 0);
 
 } // namespace scopes
 

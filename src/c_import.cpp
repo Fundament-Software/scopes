@@ -203,8 +203,16 @@ public:
             }
         }
 
-        SCOPES_CHECK_RESULT(tni->complete(is_union?SCOPES_GET_RESULT(union_type(args)):
-            SCOPES_GET_RESULT(tuple_type(args, packed, explicit_alignment?al:0)), TNF_Plain));
+        if (is_union) {
+            tni->bind(SYM_UnionFields, 
+                ConstPointer::type_from(SCOPES_GET_RESULT(tuple_type(args))));
+            SCOPES_CHECK_RESULT(tni->complete(SCOPES_GET_RESULT(
+                union_storage_type(args, packed, explicit_alignment?al:0)), TNF_Plain));
+        } else {
+            SCOPES_CHECK_RESULT(tni->complete(SCOPES_GET_RESULT(
+                tuple_type(args, packed, explicit_alignment?al:0)), TNF_Plain));
+        }
+
         return {};
     }
 

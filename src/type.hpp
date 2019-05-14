@@ -42,7 +42,6 @@ struct TypedValue;
     T(TK_Array, "type-kind-array", ArrayType) \
     T(TK_Vector, "type-kind-vector", VectorType) \
     T(TK_Tuple, "type-kind-tuple", TupleType) \
-    T(TK_Union, "type-kind-union", UnionType) \
     T(TK_Function, "type-kind-function", FunctionType) \
     /* additional GPU machine types */ \
     T(TK_Image, "type-kind-image", ImageType) \

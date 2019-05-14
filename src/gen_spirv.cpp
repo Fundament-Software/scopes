@@ -447,10 +447,6 @@ struct SPIRVGenerator {
         case TK_Tuple: {
             return create_struct_type(type, flags);
         } break;
-        case TK_Union: {
-            auto ui = cast<UnionType>(type);
-            return type_to_spirv_type(ui->tuple_type, flags);
-        } break;
         case TK_Typename: {
             if (type == TYPE_Sampler)
                 return builder.makeSamplerType();

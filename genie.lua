@@ -149,7 +149,6 @@ project "scopesrt"
         "src/type/array_type.cpp",
         "src/type/vector_type.cpp",
         "src/type/tuple_type.cpp",
-        "src/type/union_type.cpp",
         "src/type/qualify_type.cpp",
         "src/type/arguments_type.cpp",
         "src/type/function_type.cpp",

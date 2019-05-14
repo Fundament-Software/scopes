@@ -1630,7 +1630,6 @@ sc_int_raises_t sc_type_countof(const sc_type_t *T) {
     case TK_Array: return { true, nullptr, (int)cast<ArrayType>(T)->count };
     case TK_Vector: return { true, nullptr, (int)cast<VectorType>(T)->count };
     case TK_Tuple: return { true, nullptr, (int)cast<TupleType>(T)->values.size() };
-    case TK_Union: return { true, nullptr, (int)cast<UnionType>(T)->values.size() };
     case TK_Function:  return { true, nullptr, (int)(cast<FunctionType>(T)->argument_types.size()) };
     default: break;
     }
@@ -1647,7 +1646,6 @@ sc_type_raises_t sc_type_element_at(const sc_type_t *T, int i) {
     case TK_Array: result = cast<ArrayType>(T)->element_type; break;
     case TK_Vector: result = cast<VectorType>(T)->element_type; break;
     case TK_Tuple: result = SCOPES_C_GET_RESULT(cast<TupleType>(T)->type_at_index(i)); break;
-    case TK_Union: result = SCOPES_C_GET_RESULT(cast<UnionType>(T)->type_at_index(i)); break;
     case TK_Function: result = SCOPES_C_GET_RESULT(cast<FunctionType>(T)->type_at_index(i)); break;
     case TK_Image: result = cast<ImageType>(T)->type; break;
     case TK_SampledImage: result = cast<SampledImageType>(T)->type; break;
@@ -1664,7 +1662,6 @@ sc_int_raises_t sc_type_field_index(const sc_type_t *T, sc_symbol_t name) {
     T = SCOPES_C_GET_RESULT(storage_type(T));
     switch(T->kind()) {
     case TK_Tuple: return { true, nullptr, (int)cast<TupleType>(T)->field_index(name) };
-    case TK_Union: return { true, nullptr, (int)cast<UnionType>(T)->field_index(name) };
     default: break;
     }
     SCOPES_C_ERROR(RTNoNamedElementsInStorageType, T);
@@ -1677,7 +1674,6 @@ sc_symbol_raises_t sc_type_field_name(const sc_type_t *T, int index) {
     Symbol symbol;
     switch(T->kind()) {
     case TK_Tuple: return convert_result(cast<TupleType>(T)->field_name(index));
-    case TK_Union: return convert_result(cast<UnionType>(T)->field_name(index));
     default: break;
     }
     SCOPES_C_ERROR(RTNoNamedElementsInStorageType, T);
@@ -1943,17 +1939,14 @@ sc_type_raises_t sc_tuple_type(int numtypes, const sc_type_t **typeargs) {
     return convert_result(tuple_type(types));
 }
 
-// Union Type
-////////////////////////////////////////////////////////////////////////////////
-
-sc_type_raises_t sc_union_type(int numtypes, const sc_type_t **typeargs) {
+sc_type_raises_t sc_union_storage_type(int numtypes, const sc_type_t **typeargs) {
     using namespace scopes;
     Types types;
     types.reserve(numtypes);
     for (int i = 0; i < numtypes; ++i) {
         types.push_back(typeargs[i]);
     }
-    return convert_result(union_type(types));
+    return convert_result(union_storage_type(types));
 }
 
 // Arguments Type
@@ -2369,8 +2362,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_vector_type, TYPE_Type, TYPE_Type, TYPE_USize);
 
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_tuple_type, TYPE_Type, TYPE_I32, native_ro_pointer_type(TYPE_Type));
-
-    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_union_type, TYPE_Type, TYPE_I32, native_ro_pointer_type(TYPE_Type));
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_union_storage_type, TYPE_Type, TYPE_I32, native_ro_pointer_type(TYPE_Type));
 
     DEFINE_EXTERN_C_FUNCTION(sc_arguments_type, TYPE_Type, TYPE_I32, native_ro_pointer_type(TYPE_Type));
     DEFINE_EXTERN_C_FUNCTION(sc_arguments_type_join, TYPE_Type, TYPE_Type, TYPE_Type);
