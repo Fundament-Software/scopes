@@ -4643,6 +4643,22 @@ fn gen-sugar-matcher (failfunc expr scope params)
                                     failfunc;
                     'set-symbol scope param arg
                     repeat (i + 1) rest next varargs
+                elseif ((('typeof mid) == Symbol) and ((mid as Symbol) == 'is))
+                    # check that argument is of constant type, but don't unbox
+                    let exprT = (decons mid-rest)
+                    let exprT = (sc_expand exprT '() scope)
+                    let param = (head as Symbol)
+                    if ('variadic? param)
+                        error
+                            "vararg parameter cannot be typed"
+                    sc_expression_append outexpr
+                        spice-quote
+                            let arg next =
+                                sc_list_decons next
+                            if (not (('constant? arg) and (('typeof arg) == exprT)))
+                                failfunc;
+                    'set-symbol scope param arg
+                    repeat (i + 1) rest next varargs
                 else
                     sc_expression_append outexpr
                         spice-quote
@@ -6652,8 +6668,11 @@ sugar struct (name body...)
         [finalize-struct] this-type
         this-type
 
-# enums
+# enums (classical C enums or tagged unions)
 #-------------------------------------------------------------------------------
+
+# tagged union / sum type
+typedef Enum
 
 do
     inline simple-binary-storage-op (f)
@@ -6734,15 +6753,18 @@ sugar enum (name values...)
 
     fn convert-body (body)
         returning list
-        let expr body = (decons body)
-        cons
-            if (('typeof expr) == Symbol)
-                `[(list sugar-quote expr)]
-            else expr
-            if (empty? body)
-                '()
-            else
-                this-function body
+        loop (body outp = body '())
+            sugar-match body
+            case (expr is Symbol; rest...)
+                repeat rest...
+                    cons `[(list sugar-quote expr)] outp
+            case (expr rest...)
+                repeat rest...
+                    cons expr outp
+            case ()
+                return ('reverse outp)
+            default
+                error "unsupported syntax"
 
     let newbody = (convert-body values...)
     if (('typeof name) == Symbol)
