@@ -1,24 +1,28 @@
+
+using import testing
+
 spice make-enum (val)
     spice-quote
-        enum [(.. (val as string) "-enum")]
+        enum [(.. (val as string) "-enum")] plain
             X
             Y = 5
             Z
             W = -1
-            'Q
+            tag 'Q
             R
 
 run-stage;
 
 do
-    enum Mode Notch Low High Band Peak Count
+    enum Mode plain 
+        \ Notch Low High Band Peak Count
 
     print Mode.Notch
-    print Mode.Notch
-    print Mode.Notch
+    print Mode.Low
+    print Mode.Band
 
 do
-    enum test-enum
+    enum test-enum plain
         X
         Y = 5
         Z
@@ -26,47 +30,73 @@ do
         Q
         R
 
-    assert (test-enum.Y | test-enum.W == 29)
+    test (test-enum.Y | test-enum.W == 29)
 
-    assert ((superof test-enum) == CEnum)
-    assert ((storageof test-enum) == i32)
+    test ((superof test-enum) == CEnum)
+    test ((storageof test-enum) == i32)
 
-    assert ((typeof test-enum.X) == test-enum)
-    assert (test-enum.X == 0)
-    assert (test-enum.Y == 5)
-    assert (test-enum.Z == 6)
-    assert (test-enum.W == 25)
-    assert (test-enum.Q == 26)
-    assert (test-enum.R == 27)
+    test ((typeof test-enum.X) == test-enum)
+    test (test-enum.X == 0)
+    test (test-enum.Y == 5)
+    test (test-enum.Z == 6)
+    test (test-enum.W == 25)
+    test (test-enum.Q == 26)
+    test (test-enum.R == 27)
 
-    assert ((test-enum.R != test-enum.R) == false)
-    assert ((test-enum.R == test-enum.R) == true)
-    assert (not (test-enum.X == test-enum.Y))
-    assert (test-enum.X != test-enum.Y)
+    test ((test-enum.R != test-enum.R) == false)
+    test ((test-enum.R == test-enum.R) == true)
+    test (not (test-enum.X == test-enum.Y))
+    test (test-enum.X != test-enum.Y)
 
 do
     let T =
         make-enum "test2"
 
-    assert
+    test
         (superof T) == CEnum
-    assert
+    test
         (storageof T) == i32
 
-    assert ((typeof T.X) == T)
-    assert
+    test ((typeof T.X) == T)
+    test
         T.X == 0
-    assert
+    test
         T.Y == 5
-    assert
+    test
         T.Z == 6
-    assert
+    test
         T.W == -1
-    assert
+    test
         T.Q == 0
-    assert
+    test
         T.R == 1
+    
+    print T.Q T.X
 
+do
+    # sum | tagged enum type
+    enum sum1
+        # classic tag
+        Empty
+        # tag name : field type
+        Byte : i8
+        Tuple2xi32 : (tuple i32 i32)
+        TupleXYi : (tuple (x = i32) (y = i32))
+        Tuple2xf32 : (tuple f32 f32)
+        Message : string
 
+    test
+        (superof sum1) == Enum
 
+    test ((typeof sum1.Empty) == sum1)
+    test (constant? sum1.Empty)
 
+    #print (extractvalue sum1.Empty 1)
+
+    #print
+        sum1.Byte 120
+
+    #print
+        sum1.Message "hello"
+
+;

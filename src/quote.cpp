@@ -517,6 +517,7 @@ ValueRef unwrap_value(const Type *T, const ValueRef &value) {
             auto arg =
                 REF(CallTemplate::from(g_sc_const_extract_at, { value, idx }));
             auto unwrapped_arg = unwrap_value(argT, arg);
+            assert(unwrapped_arg);
             result = REF(CallTemplate::from(g_insertelement, { result, unwrapped_arg, idx }));
         }
         return result;
@@ -534,6 +535,7 @@ ValueRef unwrap_value(const Type *T, const ValueRef &value) {
             auto arg =
                 REF(CallTemplate::from(g_sc_const_extract_at, { value, idx }));
             auto unwrapped_arg = unwrap_value(argT, arg);
+            assert(unwrapped_arg);
             result = REF(CallTemplate::from(g_insertvalue, { result, unwrapped_arg, idx }));
         }
         return result;
@@ -550,6 +552,7 @@ ValueRef unwrap_value(const Type *T, const ValueRef &value) {
                 REF(CallTemplate::from(g_sc_const_extract_at, { value, idx }));
             auto argT = tt->values[i];
             auto unwrapped_arg = unwrap_value(argT, arg);
+            assert(unwrapped_arg);
             result = REF(CallTemplate::from(g_insertvalue, { result, unwrapped_arg, idx }));
         }
         //StyledStream ss;
@@ -607,6 +610,7 @@ ValueRef wrap_value(const Type *T, const ValueRef &value) {
                 auto arg =
                     REF(CallTemplate::from(g_extractelement, { value, idx }));
                 auto wrapped_arg = wrap_value(ET, arg);
+                assert(wrapped_arg);
                 result->append(
                     REF(CallTemplate::from(g_store, {
                         wrapped_arg,
@@ -633,12 +637,38 @@ ValueRef wrap_value(const Type *T, const ValueRef &value) {
                 auto arg =
                     REF(CallTemplate::from(g_extractvalue, { value, idx }));
                 auto wrapped_arg = wrap_value(ET, arg);
+                assert(wrapped_arg);
                 result->append(
                     REF(CallTemplate::from(g_store, {
                         wrapped_arg,
                         REF(CallTemplate::from(g_getelementptr, { buf, idx }))
                     })));
             }
+            result->append(REF(CallTemplate::from(g_sc_const_aggregate_new,
+                { REF(ConstPointer::type_from(T)), numelems, buf })));
+            return result;
+        } break;
+        case TK_Union: {
+            auto ut = cast<UnionType>(ST);
+            auto result = REF(Expression::unscoped_from());
+            auto numelems = REF(ConstInt::from(TYPE_I32, 1));
+            auto buf = REF(CallTemplate::from(g_alloca_array, {
+                    REF(ConstPointer::type_from(TYPE_ValueRef)),
+                    numelems
+                }));
+            result->append(buf);
+            int i = (int)ut->largest_field;
+            auto idx = REF(ConstInt::from(TYPE_I32, i));
+            auto arg =
+                REF(CallTemplate::from(g_extractvalue, { value, idx }));
+            auto argT = ut->values[i];
+            auto wrapped_arg = wrap_value(argT, arg);
+            assert(wrapped_arg);
+            result->append(
+                REF(CallTemplate::from(g_store, {
+                    wrapped_arg,
+                    REF(CallTemplate::from(g_getelementptr, { buf, idx }))
+                })));
             result->append(REF(CallTemplate::from(g_sc_const_aggregate_new,
                 { REF(ConstPointer::type_from(T)), numelems, buf })));
             return result;
@@ -658,6 +688,7 @@ ValueRef wrap_value(const Type *T, const ValueRef &value) {
                     REF(CallTemplate::from(g_extractvalue, { value, idx }));
                 auto argT = tt->values[i];
                 auto wrapped_arg = wrap_value(argT, arg);
+                assert(wrapped_arg);
                 result->append(
                     REF(CallTemplate::from(g_store, {
                         wrapped_arg,

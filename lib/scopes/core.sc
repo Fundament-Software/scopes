@@ -560,10 +560,9 @@ sc_type_set_symbol pointer 'type
         inline "pointer.type" (T)
             sc_pointer_type T pointer-flag-non-writable unnamed
 
-# static tuple type constructor
-sc_type_set_symbol tuple '__typecall
+inline aggregate-type-constructor (f)
     box-spice-macro
-        fn "tuple.__typecall" (args)
+        fn "aggregate-type-constructor" (args)
             let argcount = (sc_argcount args)
             verify-count argcount 1 -1
             let pcount = (sub argcount 1)
@@ -578,12 +577,11 @@ sc_type_set_symbol tuple '__typecall
                     getelementptr types (sub i 1)
                 add i 1
             sc_valueref_tag (sc_value_anchor args)
-                `[(sc_tuple_type pcount types)]
+                `[(f pcount types)]
 
-# dynamic tuple type constructor
-sc_type_set_symbol tuple 'type
+inline runtime-aggregate-type-constructor (f)
     box-spice-macro
-        fn "tuple.type" (args)
+        fn "runtime-aggregate-type-constructor" (args)
             let argcount = (sc_argcount args)
             verify-count argcount 0 -1
             spice-quote
@@ -604,7 +602,15 @@ sc_type_set_symbol tuple 'type
                                 (getelementptr types i))
                         add i 1
                     body
-                sc_tuple_type argcount types
+                f argcount types
+
+# static tuple and union type constructor
+sc_type_set_symbol tuple '__typecall (aggregate-type-constructor sc_tuple_type)
+sc_type_set_symbol union '__typecall (aggregate-type-constructor sc_union_type)
+
+# dynamic tuple and union type constructor
+sc_type_set_symbol tuple 'type (runtime-aggregate-type-constructor sc_tuple_type)
+sc_type_set_symbol union 'type (runtime-aggregate-type-constructor sc_union_type)
 
 # arguments type constructor
 sc_type_set_symbol Arguments '__typecall
@@ -6706,7 +6712,7 @@ do
                         return `(inline (self) (bitcast self T))
                     `()
 
-sugar enum (name values...)
+#sugar enum (name values...)
     spice make-enum (name vals...)
         let T = (typename.type (name as string) CEnum)
 
@@ -6751,28 +6757,287 @@ sugar enum (name values...)
         'set-symbol T '__repr enum-repr
         T
 
-    fn convert-body (body)
-        returning list
-        loop (body outp = body '())
+    let newbody =
+        loop (body outp = values... '())
             sugar-match body
             case (expr is Symbol; rest...)
                 repeat rest...
                     cons `[(list sugar-quote expr)] outp
+            case ((expr is Symbol; ': T) rest...)
+                repeat rest... 
+                    cons (list expr '= T) outp
             case (expr rest...)
                 repeat rest...
                     cons expr outp
             case ()
-                return ('reverse outp)
+                break ('reverse outp)
             default
                 error "unsupported syntax"
-
-    let newbody = (convert-body values...)
     if (('typeof name) == Symbol)
         let namestr = (name as Symbol as string)
         list let name '=
             cons make-enum namestr newbody
     else
         cons make-enum name newbody
+
+sugar enum (name body...)
+    fn define-field-runtime (T name field-type index-value)
+        let fields = ('@ T '__fields__)
+        let index = (('@ T '__index__) as u64)
+        let index-anchor = ('anchor index-value)
+        let index-value =
+            if (('typeof index-value) == Nothing) index
+            else (extract-integer index-value)
+        let next-index = (index-value + 1)
+        let FT = (typename.type
+            (.. "enum-field<" (name as Symbol as string) ":"
+                (tostring (field-type as type)) "=" (tostring index-value) ">")
+            typename)
+        'set-opaque FT
+        'set-symbols FT
+            Name = name
+            Type = field-type
+            Index = index-value
+        let FT = `FT
+        let fields =
+            sc_argument_list_join_values fields FT
+        sc_type_set_symbol T '__fields__ fields
+        sc_type_set_symbol T '__index__ next-index
+        index-value
+
+    spice define-field (enum-type name opts...)
+        if (not ('constant? enum-type))
+            error "enum-type must be constant"
+        let T = (enum-type as type)
+        let argc = ('argcount opts...)
+        let field-type index-value =
+            if (argc == 0) (_ `Nothing `none)
+            elseif (argc == 1) (_ ('getarg opts... 0) `none)
+            else (_ ('getarg opts... 0) ('getarglist opts... 1))
+        define-field-runtime T name field-type index-value
+
+    spice finalize-enum (T)
+        fn finalize-enum-runtime (T)
+            let field-types = ('@ T '__fields__)
+            let field-type-args = ('args field-types)
+            # figure out integer bit width and signedness for the enumerator
+            let width signed =
+                fold (width signed = 0 false) for field in field-type-args
+                    let field = (field as type)
+                    let index = (('@ field 'Index) as u64 as i64)
+                    let signed = (signed | (index < 0))
+                    let iwidth =
+                        if signed
+                            if ((index >= -0x80) and (index < 0x80)) 8
+                            elseif ((index >= -0x8000) and (index < 0x8000)) 16
+                            elseif ((index >= -0x80000000) and (index < 0x80000000)) 32
+                            else 64
+                        else
+                            if (index <= 1) 1
+                            if (index <= 0xff) 8
+                            elseif (index <= 0xffff) 16
+                            elseif (index <= 0xffffffff) 32
+                            else 64
+                    _ (max width iwidth) signed
+            let classic? =
+                if (T < CEnum) true
+                elseif (T < Enum) false
+                else
+                    error
+                        .. "type " (repr T) " must have Enum or CEnum supertype"
+                            \ " but has supertype " (repr ('superof T))
+            fn shabbysort (buf sz)
+                for i in (range sz)
+                    for j in (range (i + 1) sz)
+                        let a = (load (getelementptr buf i))
+                        let ak = (extractvalue a 0)
+                        let b = (load (getelementptr buf j))
+                        let bk = (extractvalue b 0)
+                        if (ak > bk)
+                            # swap
+                            store b (getelementptr buf i)
+                            store a (getelementptr buf j)
+            if classic?
+                'set-plain-storage T i32
+                # enum is integer
+                for field in field-type-args
+                    let field = (field as type)
+                    let name = (('@ field 'Name) as Symbol)
+                    let index = (('@ field 'Index) as u64)
+                    let field-type = (('@ field 'Type) as type)
+                    if (field-type != Nothing)
+                        error "plain enums can't have tagged fields"
+                    'set-symbol T name (sc_const_int_new T index)
+                # build repr function
+                spice-quote
+                    inline __repr (self)
+                        spice-unquote
+                            let sw = (sc_switch_new self)
+                            let numfields = ('argcount field-types)
+                            let sorted = (alloca-array (tuple u64 type) numfields)
+                            for i in (range numfields)
+                                let field = (('getarg field-types i) as type)
+                                let field = (field as type)
+                                let index = (('@ field 'Index) as u64)
+                                store (tupleof index field) (getelementptr sorted i)
+                            # sort array so duplicates are next to each other and merge names
+                            shabbysort sorted numfields
+                            loop (i = 0)
+                                if (i == numfields)
+                                    break;
+                                let index field = (unpack (load (getelementptr sorted i)))
+                                let lit = (sc_const_int_new T index)
+                                let name = (('@ field 'Name) as Symbol as string)
+                                # accumulate all fields with the same index
+                                let i name =
+                                    loop (i name = (i + 1) name)
+                                        if (i == numfields)
+                                            break i name
+                                        let index2 field2 = (unpack (load (getelementptr sorted i)))
+                                        if (index2 == index)
+                                            let name2 = (('@ field2 'Name) as Symbol as string)
+                                            repeat (i + 1) (.. name "|" name2) 
+                                        else
+                                            break i name
+                                let name =
+                                    sc_default_styler style-number name
+                                sc_switch_append_case sw lit name
+                                i
+                            sc_switch_append_default sw "?invalid?"
+                            sw
+                'set-symbol T '__repr __repr 
+            else
+                let index-type = (sc_integer_type width signed)
+                let numfields = ('argcount field-types)
+                let fields = (alloca-array type numfields)
+                for i in (range numfields)
+                    let field = (('getarg field-types i) as type)
+                    let field-type = (('@ field 'Type) as type)
+                    store field-type (getelementptr fields i)
+                let payload-type = (sc_union_type numfields fields)
+                'set-storage T
+                    tuple.type index-type payload-type
+                let consts = (alloca-array Value 2)
+                # build value constructors
+                for i _field in (enumerate field-type-args)
+                    let field = (_field as type)
+                    let name = (('@ field 'Name) as Symbol)
+                    let index = (('@ field 'Index) as u64)
+                    let field-type = (('@ field 'Type) as type)
+                    let index-value = (sc_const_int_new index-type index)
+                    if (field-type == Nothing)
+                        # can provide a constant 
+                        store index-value (getelementptr consts 0)
+                        store `none (getelementptr consts 1)
+                        'set-symbol T name
+                            sc_const_aggregate_new T 2 consts
+                    #else
+                        let TT = (tuple.type field-type)
+                        spice-quote
+                            inline constructor (args...)
+                                let payload = (field-type args...)
+                                let payload = (bitcast payload payload-type)
+                                let value = (undef T)
+                                let value = (insertvalue value index-value 0)
+                                insertvalue value payload 1
+                        sc_template_set_name constructor name
+                        # must provide a constructor
+                        'set-symbol T name constructor
+
+        if ('constant? T)
+            finalize-enum-runtime (T as type)
+            `()
+        else
+            `(finalize-enum-runtime T)
+
+    let supertype body has-supertype? =
+        sugar-match body...
+        case ('plain rest...)
+            _ `CEnum rest... true
+        case ('< supertype rest...)
+            _ supertype rest... true
+        default
+            _ `Enum body... false
+
+    let has-fwd-decl =
+        if (('typeof name) == Symbol)
+            if (empty? body)
+                # forward declaration
+                return
+                    qq [typedef] [name] < [supertype] do
+
+            let symname = (name as Symbol)
+            # see if we can find a forward declaration in the local scope
+            try (getattr sugar-scope symname) true
+            except (err) false
+        else false
+
+    # detect and rewrite top level field forms
+    let body =
+        loop (result body = '() body)
+            if (empty? body)
+                break ('reverse result)
+            let expr next = (decons body)
+            let anchor = ('anchor expr)
+            inline this-type ()
+                'tag `'this-type anchor
+            let exprT = ('typeof expr)
+            let expr =
+                if (exprT == Symbol)
+                    let newexpr =
+                        qq [let] [expr] =
+                            [define-field] [(this-type)] '[expr] [Nothing]
+                    `newexpr
+                elseif (exprT == list)
+                    sugar-match (expr as list)
+                    case ((name is Symbol) ': T)
+                        let newexpr =
+                            qq [let] [name] =
+                                [define-field] [(this-type)] '[name] [T]
+                        `newexpr
+                    case ((name is Symbol) ': T '= index...)
+                        let newexpr =
+                            qq [let] [name] =
+                                [define-field] [(this-type)] '[name] [T]
+                                    unquote-splice index...
+                        `newexpr
+                    case ((name is Symbol) '= index...)
+                        let newexpr =                            
+                            qq [let] [name] =
+                                [define-field] [(this-type)] '[name] [Nothing]
+                                    unquote-splice index...
+                        `newexpr
+                    default expr
+                else expr
+            repeat (cons expr result) next
+
+    spice init-fields (enum-type)
+        fn init-fields-runtime (T)
+            sc_type_set_symbol T '__fields__ (sc_argument_list_new 0 null)
+            sc_type_set_symbol T '__index__ (sc_const_int_new u64 0:u64)
+
+        if ('constant? enum-type)
+            init-fields-runtime (enum-type as type)
+            `()
+        else
+            `(init-fields-runtime enum-type)
+    qq
+        unquote-splice
+            if has-fwd-decl
+                if has-supertype?
+                    hide-traceback;
+                    error "completing enum declaration must not define a supertype"
+                qq [typedef+] [name]
+            else
+                qq [typedef] [name] < [supertype] do
+        [init-fields] this-type
+        inline tag (...)
+            [define-field] this-type ...
+        [do]
+            unquote-splice body
+            [fold-locals] this-type [append-to-type]
+        [finalize-enum] this-type
+        this-type
 
 #-------------------------------------------------------------------------------
 # string construction

@@ -117,6 +117,8 @@ static std::unordered_set<Function *, FunctionSet::Hash, FunctionSet::KeyEqual> 
 static TypeKind canonical_typekind(TypeKind k) {
     if (k == TK_Real)
         return TK_Integer;
+    if (k == TK_Union)
+        return TK_Tuple;
     return k;
 }
 
@@ -2405,6 +2407,14 @@ repeat:
                 //DEREF(_SrcT);
                 const Type *SSrcT = SCOPES_GET_RESULT(storage_type(SrcT));
                 const Type *SDestT = SCOPES_GET_RESULT(storage_type(DestT));
+                if (SDestT->kind() == TK_Union) {
+                    // if one of the fields matches, it's a valid cast
+                    auto ut = cast<UnionType>(SDestT);
+                    for (auto value : ut->values) {
+                        if (SSrcT == storage_type(value).assert_ok())
+                            goto fine;
+                    }   
+                }
                 if (canonical_typekind(SSrcT->kind())
                         != canonical_typekind(SDestT->kind())) {
                     SCOPES_ERROR(CastCategoryError, SrcT, DestT);
@@ -2420,6 +2430,7 @@ repeat:
                     default: break;
                     }
                 }
+                fine:
 
                 DestT = strip_qualifiers(DestT);
                 bool target_is_plain = is_plain(DestT);
@@ -2711,10 +2722,11 @@ repeat:
                 auto ti = cast<TupleType>(T);
                 SCOPES_CHECK_RESULT(verify(SCOPES_GET_RESULT(storage_type(SCOPES_GET_RESULT(ti->type_at_index(idx)))), ET));
             } break;
+            /*
             case TK_Union: {
                 auto ui = cast<UnionType>(T);
                 SCOPES_CHECK_RESULT(verify(SCOPES_GET_RESULT(storage_type(SCOPES_GET_RESULT(ui->type_at_index(idx)))), ET));
-            } break;
+            } break; */
             default: {
                 SCOPES_ERROR(InvalidArgumentTypeForBuiltin, b, T);
             } break;
