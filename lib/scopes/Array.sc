@@ -9,6 +9,8 @@
     Exports a configurable type for a mutable array that stores its elements
     on the heap rather than in registers or the stack.
 
+using import struct
+
 # declare void @llvm.memcpy.p0i8.p0i8.i64(i8* <dest>, i8* <src>,
                                         i64 <len>, i1 <isvolatile>)
 let llvm.memcpy.p0i8.p0i8.i64 =

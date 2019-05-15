@@ -13,6 +13,7 @@
      http://sebastiansylvan.com/2013/05/08/robin-hood-hashing-should-be-your-default-hash-table-implementation/
 
 using import enum
+using import struct
 
 # declare void @llvm.memcpy.p0i8.p0i8.i64(i8* <dest>, i8* <src>,
                                         i64 <len>, i1 <isvolatile>)

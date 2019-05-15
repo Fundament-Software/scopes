@@ -50,199 +50,207 @@ typedef Enum
                 sc_switch_append_case sw lit `(arg extracted)
         sw
 
-sugar enum (name body...)
-    fn define-field-runtime (T name field-type index-value)
-        let fields = ('@ T '__fields__)
-        let index = (('@ T '__index__) as u64)
-        let index-anchor = ('anchor index-value)
-        let index-value =
-            if (('typeof index-value) == Nothing) index
-            else (extract-integer index-value)
-        let next-index = (index-value + 1)
-        let FT = (typename.type
-            (.. "enum-field<" (name as Symbol as string) ":"
-                (tostring (field-type as type)) "=" (tostring index-value) ">")
-            typename)
-        'set-opaque FT
-        'set-symbols FT
-            Name = name
-            Type = field-type
-            Index = index-value
-        let FT = `FT
-        let fields =
-            sc_argument_list_join_values fields FT
-        sc_type_set_symbol T '__fields__ fields
-        sc_type_set_symbol T '__index__ next-index
-        index-value
+fn define-field-runtime (T name field-type index-value)
+    let fields = ('@ T '__fields__)
+    let index = (('@ T '__index__) as u64)
+    let index-anchor = ('anchor index-value)
+    let index-value =
+        if (('typeof index-value) == Nothing) index
+        else (extract-integer index-value)
+    let next-index = (index-value + 1)
+    let FT = (typename.type
+        (.. "enum-field<" (name as Symbol as string) ":"
+            (tostring (field-type as type)) "=" (tostring index-value) ">")
+        typename)
+    'set-opaque FT
+    'set-symbols FT
+        Name = name
+        Type = field-type
+        Index = index-value
+    let FT = `FT
+    let fields =
+        sc_argument_list_join_values fields FT
+    sc_type_set_symbol T '__fields__ fields
+    sc_type_set_symbol T '__index__ next-index
+    index-value
 
-    spice define-field (enum-type name opts...)
-        if (not ('constant? enum-type))
-            error "enum-type must be constant"
-        let T = (enum-type as type)
-        let argc = ('argcount opts...)
-        let field-type index-value =
-            if (argc == 0) (_ `Nothing `none)
-            elseif (argc == 1) (_ ('getarg opts... 0) `none)
-            else (_ ('getarg opts... 0) ('getarglist opts... 1))
-        define-field-runtime T name field-type index-value
+spice define-field (enum-type name opts...)
+    if (not ('constant? enum-type))
+        error "enum-type must be constant"
+    let T = (enum-type as type)
+    let argc = ('argcount opts...)
+    let field-type index-value =
+        if (argc == 0) (_ `Nothing `none)
+        elseif (argc == 1) (_ ('getarg opts... 0) `none)
+        else (_ ('getarg opts... 0) ('getarglist opts... 1))
+    define-field-runtime T name field-type index-value
 
-    spice finalize-enum (T)
-        fn finalize-enum-runtime (T)
-            let field-types = ('@ T '__fields__)
-            let field-type-args = ('args field-types)
-            # figure out integer bit width and signedness for the enumerator
-            let width signed =
-                fold (width signed = 0 false) for field in field-type-args
-                    let field = (field as type)
-                    let index = (('@ field 'Index) as u64 as i64)
-                    let signed = (signed | (index < 0))
-                    let iwidth =
-                        if signed
-                            if ((index >= -0x80) and (index < 0x80)) 8
-                            elseif ((index >= -0x8000) and (index < 0x8000)) 16
-                            elseif ((index >= -0x80000000) and (index < 0x80000000)) 32
-                            else 64
-                        else
-                            if (index <= 1) 1
-                            if (index <= 0xff) 8
-                            elseif (index <= 0xffff) 16
-                            elseif (index <= 0xffffffff) 32
-                            else 64
-                    _ (max width iwidth) signed
-            let classic? =
-                if (T < CEnum) true
-                elseif (T < Enum) false
+fn shabbysort (buf sz)
+    for i in (range sz)
+        for j in (range (i + 1) sz)
+            let a = (load (getelementptr buf i))
+            let ak = (extractvalue a 0)
+            let b = (load (getelementptr buf j))
+            let bk = (extractvalue b 0)
+            if (ak > bk)
+                # swap
+                store b (getelementptr buf i)
+                store a (getelementptr buf j)
+
+fn build-repr-switch-case (litT self field-types allow-dupes?)
+    let sw = (sc_switch_new self)
+    let numfields = ('argcount field-types)
+    let sorted = (alloca-array (tuple u64 type) numfields)
+    for i in (range numfields)
+        let field = (('getarg field-types i) as type)
+        let field = (field as type)
+        let index = (('@ field 'Index) as u64)
+        store (tupleof index field) (getelementptr sorted i)
+    # sort array so duplicates are next to each other and merge names
+    shabbysort sorted numfields
+    loop (i = 0)
+        if (i == numfields)
+            break;
+        let index field = (unpack (load (getelementptr sorted i)))
+        let lit = (sc_const_int_new litT index)
+        let name = (('@ field 'Name) as Symbol as string)
+        # accumulate all fields with the same index
+        let i name =
+            loop (i name = (i + 1) name)
+                if (i == numfields)
+                    break i name
+                let index2 field2 = (unpack (load (getelementptr sorted i)))
+                if (index2 == index)
+                    if (not allow-dupes?)
+                        error "duplicate tags not permitted for tagged unions"
+                    let name2 = (('@ field2 'Name) as Symbol as string)
+                    repeat (i + 1) (.. name "|" name2) 
                 else
-                    error
-                        .. "type " (repr T) " must have Enum or CEnum supertype"
-                            \ " but has supertype " (repr ('superof T))
-            fn shabbysort (buf sz)
-                for i in (range sz)
-                    for j in (range (i + 1) sz)
-                        let a = (load (getelementptr buf i))
-                        let ak = (extractvalue a 0)
-                        let b = (load (getelementptr buf j))
-                        let bk = (extractvalue b 0)
-                        if (ak > bk)
-                            # swap
-                            store b (getelementptr buf i)
-                            store a (getelementptr buf j)
-            fn build-repr-switch-case (litT self field-types allow-dupes?)
-                let sw = (sc_switch_new self)
-                let numfields = ('argcount field-types)
-                let sorted = (alloca-array (tuple u64 type) numfields)
-                for i in (range numfields)
-                    let field = (('getarg field-types i) as type)
-                    let field = (field as type)
-                    let index = (('@ field 'Index) as u64)
-                    store (tupleof index field) (getelementptr sorted i)
-                # sort array so duplicates are next to each other and merge names
-                shabbysort sorted numfields
-                loop (i = 0)
-                    if (i == numfields)
-                        break;
-                    let index field = (unpack (load (getelementptr sorted i)))
-                    let lit = (sc_const_int_new litT index)
-                    let name = (('@ field 'Name) as Symbol as string)
-                    # accumulate all fields with the same index
-                    let i name =
-                        loop (i name = (i + 1) name)
-                            if (i == numfields)
-                                break i name
-                            let index2 field2 = (unpack (load (getelementptr sorted i)))
-                            if (index2 == index)
-                                if (not allow-dupes?)
-                                    error "duplicate tags not permitted for tagged unions"
-                                let name2 = (('@ field2 'Name) as Symbol as string)
-                                repeat (i + 1) (.. name "|" name2) 
-                            else
-                                break i name
-                    let name =
-                        sc_default_styler style-number name
-                    sc_switch_append_case sw lit name
-                    i
-                sc_switch_append_default sw "?invalid?"
-                sw
-            if classic?
-                'set-plain-storage T i32
-                # enum is integer
-                for field in field-type-args
-                    let field = (field as type)
-                    let name = (('@ field 'Name) as Symbol)
-                    let index = (('@ field 'Index) as u64)
-                    let field-type = (('@ field 'Type) as type)
-                    if (field-type != Nothing)
-                        error "plain enums can't have tagged fields"
-                    'set-symbol T name (sc_const_int_new T index)
-                # build repr function
-                spice-quote
-                    inline __repr (self)
-                        spice-unquote
-                            build-repr-switch-case T self field-types true
-                'set-symbol T '__repr __repr 
-            else
-                let index-type = (sc_integer_type width signed)
-                # build repr function
-                spice-quote
-                    inline __repr (self)
-                        let val = (extractvalue self 0)
-                        spice-unquote
-                            build-repr-switch-case index-type val field-types false
-                # build match function
-                spice-quote
-                'set-symbols T
-                    __repr = __repr
-                let numfields = ('argcount field-types)
-                let fields = (alloca-array type numfields)
-                for i in (range numfields)
-                    let field = (('getarg field-types i) as type)
-                    let name = (('@ field 'Name) as Symbol)
-                    let field-type = (('@ field 'Type) as type)
-                    let field-type = ('key-type field-type name)
-                    store field-type (getelementptr fields i)
-                'set-symbols T
-                    __fields = (sc_tuple_type numfields fields)
-                let payload-type = (sc_union_storage_type numfields fields)
-                'set-storage T
-                    tuple.type index-type payload-type
-                let consts = (alloca-array Value 2)
-                # build value constructors
-                for i _field in (enumerate field-type-args)
-                    let field = (_field as type)
-                    let name = (('@ field 'Name) as Symbol)
-                    let index = (('@ field 'Index) as u64)
-                    let field-type = (('@ field 'Type) as type)
-                    let index-value = (sc_const_int_new index-type index)
-                    'set-symbol field 'Literal index-value
-                    if (field-type == Nothing)
-                        # can provide a constant 
-                        store index-value (getelementptr consts 0)
-                        store (sc_const_null_new payload-type) (getelementptr consts 1)
-                        'set-symbol T name
-                            sc_const_aggregate_new T 2 consts
-                    else
-                        let TT = ('change-storage-class
-                                ('mutable (pointer.type field-type)) 'Function)
-                        spice-quote
-                            inline constructor (value)
-                                let payload = (alloca payload-type)
-                                let PT = (typeof payload)
-                                let destptr = (bitcast payload TT)
-                                let payload = (value as field-type)
-                                store payload destptr
-                                let payload = (load (bitcast destptr PT))
-                                let value = (undef T)
-                                let value = (insertvalue value index-value 0)
-                                insertvalue value payload 1
-                        sc_template_set_name constructor name
-                        # must provide a constructor
-                        'set-symbol T name constructor
+                    break i name
+        let name =
+            sc_default_styler style-number name
+        sc_switch_append_case sw lit name
+        i
+    sc_switch_append_default sw "?invalid?"
+    sw
 
-        if ('constant? T)
-            finalize-enum-runtime (T as type)
-            `()
+inline tag-constructor (value 
+    enum-type index-value payload-type field-type field-pointer-type)
+    let payload = (alloca payload-type)
+    let PT = (typeof payload)
+    let destptr = (bitcast payload field-pointer-type)
+    let payload = (value as field-type)
+    store payload destptr
+    let payload = (load (bitcast destptr PT))
+    let value = (undef enum-type)
+    let value = (insertvalue value index-value 0)
+    insertvalue value payload 1
+
+fn finalize-enum-runtime (T)
+    let field-types = ('@ T '__fields__)
+    let field-type-args = ('args field-types)
+    # figure out integer bit width and signedness for the enumerator
+    let width signed =
+        fold (width signed = 0 false) for field in field-type-args
+            let field = (field as type)
+            let index = (('@ field 'Index) as u64 as i64)
+            let signed = (signed | (index < 0))
+            let iwidth =
+                if signed
+                    if ((index >= -0x80) and (index < 0x80)) 8
+                    elseif ((index >= -0x8000) and (index < 0x8000)) 16
+                    elseif ((index >= -0x80000000) and (index < 0x80000000)) 32
+                    else 64
+                else
+                    if (index <= 1) 1
+                    if (index <= 0xff) 8
+                    elseif (index <= 0xffff) 16
+                    elseif (index <= 0xffffffff) 32
+                    else 64
+            _ (max width iwidth) signed
+    let classic? =
+        if (T < CEnum) true
+        elseif (T < Enum) false
         else
-            `(finalize-enum-runtime T)
+            error
+                .. "type " (repr T) " must have Enum or CEnum supertype"
+                    \ " but has supertype " (repr ('superof T))
+    if classic?
+        'set-plain-storage T i32
+        # enum is integer
+        for field in field-type-args
+            let field = (field as type)
+            let name = (('@ field 'Name) as Symbol)
+            let index = (('@ field 'Index) as u64)
+            let field-type = (('@ field 'Type) as type)
+            if (field-type != Nothing)
+                error "plain enums can't have tagged fields"
+            'set-symbol T name (sc_const_int_new T index)
+        # build repr function
+        spice-quote
+            inline __repr (self)
+                spice-unquote
+                    build-repr-switch-case T self field-types true
+        'set-symbol T '__repr __repr 
+    else
+        let index-type = (sc_integer_type width signed)
+        # build repr function
+        spice-quote
+            inline __repr (self)
+                let val = (extractvalue self 0)
+                spice-unquote
+                    build-repr-switch-case index-type val field-types false
+        # build match function
+        spice-quote
+        'set-symbols T
+            __repr = __repr
+        let numfields = ('argcount field-types)
+        let fields = (alloca-array type numfields)
+        for i in (range numfields)
+            let field = (('getarg field-types i) as type)
+            let name = (('@ field 'Name) as Symbol)
+            let field-type = (('@ field 'Type) as type)
+            let field-type = ('key-type field-type name)
+            store field-type (getelementptr fields i)
+        'set-symbols T
+            __fields = (sc_tuple_type numfields fields)
+        let payload-type = (sc_union_storage_type numfields fields)
+        'set-storage T
+            tuple.type index-type payload-type
+        let consts = (alloca-array Value 2)
+        # build value constructors
+        for i _field in (enumerate field-type-args)
+            let field = (_field as type)
+            let name = (('@ field 'Name) as Symbol)
+            let index = (('@ field 'Index) as u64)
+            let field-type = (('@ field 'Type) as type)
+            let index-value = (sc_const_int_new index-type index)
+            'set-symbol field 'Literal index-value
+            if (field-type == Nothing)
+                # can provide a constant 
+                store index-value (getelementptr consts 0)
+                store (sc_const_null_new payload-type) (getelementptr consts 1)
+                'set-symbol T name
+                    sc_const_aggregate_new T 2 consts
+            else
+                let TT = ('change-storage-class
+                        ('mutable (pointer.type field-type)) 'Function)
+                spice-quote
+                    inline constructor (value)
+                        tag-constructor value T index-value payload-type field-type TT
+                sc_template_set_name constructor name
+                # must provide a constructor
+                'set-symbol T name constructor
+
+spice finalize-enum (T)
+
+    if ('constant? T)
+        finalize-enum-runtime (T as type)
+        `()
+    else
+        `(finalize-enum-runtime T)
+
+sugar enum (name body...)
 
     let supertype body has-supertype? =
         sugar-match body...
@@ -265,10 +273,6 @@ sugar enum (name body...)
             try (getattr sugar-scope symname) true
             except (err) false
         else false
-
-    fn gen-implicit-tupledef (params)
-        let params = (uncomma params)
-        loop (start)
 
     # detect and rewrite top level field forms
     let body =

@@ -1,3 +1,6 @@
+
+using import struct
+
 struct Handle
     _handle : voidstar
 

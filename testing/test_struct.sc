@@ -1,5 +1,6 @@
 
 using import testing
+using import struct
 
 inline begin-arg ()
 let val =

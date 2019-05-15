@@ -1,4 +1,6 @@
 
+using import struct
+
 do
     struct K union
         key : u32
