@@ -82,7 +82,7 @@ do
         # tag name : field type
         Byte : i8
         Tuple2xi32 : (tuple i32 i32)
-        TupleXYi : (tuple (x = i32) (y = i32))
+        TupleXYi : (tuple (x = i32) (y = i32) (z = i32))
         Tuple2xf32 : (tuple f32 f32)
         Message : string
 
@@ -105,7 +105,7 @@ do
                     print "got Tuple2xi32" (unpack x)
             TupleXYi =
                 inline (x)
-                    print "got TupleXYi" x.x x.y
+                    print "got TupleXYi" x.x x.y x.z
             Tuple2xf32 =
                 inline (x)
                     print "got Tuple2xf32" (unpack x)
@@ -118,9 +118,9 @@ do
     dispatch-sum1
         sum1.Byte 120
     dispatch-sum1
-        sum1.Tuple2xi32 (tupleof 10 20)
+        sum1.Tuple2xi32 10 20
     dispatch-sum1
-        sum1.TupleXYi (tupleof (x = 10) (y = 20))
+        sum1.TupleXYi (y = 20) (x = 10)
     dispatch-sum1 
         sum1.Message "hello"
 

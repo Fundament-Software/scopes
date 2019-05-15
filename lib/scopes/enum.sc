@@ -134,12 +134,12 @@ fn build-repr-switch-case (litT self field-types allow-dupes?)
     sc_switch_append_default sw "?invalid?"
     sw
 
-inline tag-constructor (value 
-    enum-type index-value payload-type field-type field-pointer-type)
+inline tag-constructor (
+    enum-type index-value payload-type field-type field-pointer-type ...)
     let payload = (alloca payload-type)
     let PT = (typeof payload)
     let destptr = (bitcast payload field-pointer-type)
-    let payload = (value as field-type)
+    let payload = (field-type ...)
     store payload destptr
     let payload = (load (bitcast destptr PT))
     let value = (undef enum-type)
@@ -236,8 +236,8 @@ fn finalize-enum-runtime (T)
                 let TT = ('change-storage-class
                         ('mutable (pointer.type field-type)) 'Function)
                 spice-quote
-                    inline constructor (value)
-                        tag-constructor value T index-value payload-type field-type TT
+                    inline constructor (...)
+                        tag-constructor T index-value payload-type field-type TT ...
                 sc_template_set_name constructor name
                 # must provide a constructor
                 'set-symbol T name constructor

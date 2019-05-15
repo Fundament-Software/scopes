@@ -6520,6 +6520,63 @@ fn constructor (cls args...)
             constructor cls args...
     __drop = destructor
 
+# tuple construction
+#-------------------------------------------------------------------------------
+
+typedef+ tuple
+    # extend type constructor with value constructor
+    spice __typecall (cls args...)
+        let cls = (cls as type)
+        if (cls == this-type)
+            return `([tuple.__typecall] cls args...)
+        let argc = ('argcount args...)
+        let numfields = ('element-count cls)
+        let fields = (malloc-array Value numfields)
+        loop (i = 0)
+            if (i == numfields)
+                break;
+            store (null as Value) (getelementptr fields i)
+            i + 1
+        # collect initializers from arguments
+        loop (i = 0)
+            if (i == argc)
+                break;
+            let arg = ('getarg args... i)
+            let k v = ('dekey arg)
+            let k =
+                if (k == unnamed) i
+                else
+                    sc_type_field_index cls k
+            if ((load (getelementptr fields k)) != null)
+                error@ ('anchor arg) "while initializing tuple fields"
+                    "field is already initialized"
+            let ET = (sc_type_element_at cls k)
+            let ET = (sc_strip_qualifiers ET)
+            let v =
+                if (('pointer? ET) and ('refer? ('qualified-typeof v)))
+                    `(imply (reftoptr v) ET)
+                else `(imply v ET)
+            store v (getelementptr fields k)
+            i + 1
+        let block = (sc_expression_new)
+        loop (i result = 0 `(nullof cls))
+            sc_expression_append block result
+            if (i == numfields)
+                break block
+            let elem =
+                if ((load (getelementptr fields i)) == null)
+                    # default initializer
+                    let ET = (sc_type_element_at cls i)
+                    try
+                        sc_prove `(ET)
+                    except (err)
+                        error
+                            .. "field " (repr ET) " has no default initializer"
+                else
+                    load (getelementptr fields i)
+            let result = `(insertvalue result elem i)
+            _ (i + 1) result
+
 # C structs
 #-------------------------------------------------------------------------------
 
