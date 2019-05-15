@@ -117,6 +117,7 @@ sc_valueref_raises_t convert_result(const Result<TypedValueRef> &_result) CRESUL
 sc_valueref_raises_t convert_result(const Result<FunctionRef> &_result) CRESULT;
 sc_valueref_raises_t convert_result(const Result<TemplateRef> &_result) CRESULT;
 sc_valueref_raises_t convert_result(const Result<ConstPointerRef> &_result) CRESULT;
+sc_valueref_raises_t convert_result(const Result<ConstRef> &_result) CRESULT;
 
 sc_type_raises_t convert_result(const Result<const Type *> &_result) CRESULT;
 sc_string_raises_t convert_result(const Result<const String *> &_result) CRESULT;
@@ -1479,6 +1480,10 @@ sc_valueref_t sc_const_pointer_new(const sc_type_t *type, const void *pointer) {
     using namespace scopes;
     return ConstPointer::from(type, pointer);
 }
+sc_valueref_raises_t sc_const_null_new(const sc_type_t *type) {
+    using namespace scopes;
+    return convert_result(nullof(type));
+}
 uint64_t sc_const_int_extract(const sc_valueref_t value) {
     using namespace scopes;
     return value.cast<ConstInt>()->value;
@@ -2236,6 +2241,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_const_real_new, TYPE_ValueRef, TYPE_Type, TYPE_F64);
     DEFINE_EXTERN_C_FUNCTION(sc_const_aggregate_new, TYPE_ValueRef, TYPE_Type, TYPE_I32, TYPE_ValuePP);
     DEFINE_EXTERN_C_FUNCTION(sc_const_pointer_new, TYPE_ValueRef, TYPE_Type, voidstar);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_const_null_new, TYPE_ValueRef, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_const_int_extract, TYPE_U64, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_const_real_extract, TYPE_F64, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_const_extract_at, TYPE_ValueRef, TYPE_ValueRef, TYPE_I32);

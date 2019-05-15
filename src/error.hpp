@@ -137,6 +137,9 @@ formatters:
     T(ValueKindMismatch, \
         "value of %0 kind expected, got %1", \
         ValueKind, ValueKind) \
+    T(CannotCreateConstantOf, \
+        "cannot create constant of type %0", \
+        PType) \
     T(ConstantValueKindMismatch, \
         "constant value of type %0 expected, got %1", \
         ValueKind, ValueKind) \

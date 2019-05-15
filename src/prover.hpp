@@ -78,6 +78,8 @@ SCOPES_RESULT(TypedValueRef) prove(const ValueRef &node);
 SCOPES_RESULT(const Type *) ptr_to_ref(const Type *T);
 SCOPES_RESULT(const Type *) ref_to_ptr(const Type *T);
 
+SCOPES_RESULT(ConstRef) nullof(const Type *T);
+
 } // namespace scopes
 
 #endif // SCOPES_AST_PROVER_HPP

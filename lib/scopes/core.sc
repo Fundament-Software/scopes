@@ -6719,6 +6719,45 @@ typedef+ CUnion
 
 # tagged union / sum type
 typedef Enum
+    spice __dispatch (self handlers...)
+        let qcls = ('qualified-typeof self)
+        let cls = ('strip-qualifiers qcls)
+        let payload-cls = ('element@ cls 1)
+        let fields = (('@ cls '__fields) as type)
+        let field-types = ('@ cls '__fields__)
+        let field-type-args = ('args field-types)
+        let expression = 
+        let tag = `(extractvalue self 0)
+        let sw = (sc_switch_new tag)
+        let refer = ('refer? qcls)
+        let ptrT = ('refer->pointer-type qcls)
+        for arg in ('args handlers...)
+            let key arg = ('dekey arg)
+            if (key == unnamed)
+                sc_switch_append_default sw `(arg)
+            else
+                let i = (sc_type_field_index fields key)
+                let ET = ('key-type ('element@ fields i) unnamed)
+                let field = (('getarg field-types i) as type)
+                let lit = ('@ field 'Literal)
+                let payload = `(extractvalue self 1)
+                let extracted =
+                    if refer
+                        let ptrET = ('change-element-type ptrT ET)
+                        spice-quote
+                            let ptr = (reftoptr payload)
+                            let ptr = (bitcast ptr ptrET)
+                            ptrtoref ptr
+                    else
+                        let ptrET = ('change-storage-class 
+                            ('mutable (pointer.type ET)) 'Function)
+                        spice-quote
+                            let ptr = (alloca payload-cls)
+                            store payload ptr
+                            let ptr = (bitcast ptr ptrET)
+                            load ptr
+                sc_switch_append_case sw lit `(arg extracted)
+        sw
 
 do
     inline simple-binary-storage-op (f)
@@ -6829,6 +6868,42 @@ sugar enum (name body...)
                             # swap
                             store b (getelementptr buf i)
                             store a (getelementptr buf j)
+            fn build-repr-switch-case (litT self field-types allow-dupes?)
+                let sw = (sc_switch_new self)
+                let numfields = ('argcount field-types)
+                let sorted = (alloca-array (tuple u64 type) numfields)
+                for i in (range numfields)
+                    let field = (('getarg field-types i) as type)
+                    let field = (field as type)
+                    let index = (('@ field 'Index) as u64)
+                    store (tupleof index field) (getelementptr sorted i)
+                # sort array so duplicates are next to each other and merge names
+                shabbysort sorted numfields
+                loop (i = 0)
+                    if (i == numfields)
+                        break;
+                    let index field = (unpack (load (getelementptr sorted i)))
+                    let lit = (sc_const_int_new litT index)
+                    let name = (('@ field 'Name) as Symbol as string)
+                    # accumulate all fields with the same index
+                    let i name =
+                        loop (i name = (i + 1) name)
+                            if (i == numfields)
+                                break i name
+                            let index2 field2 = (unpack (load (getelementptr sorted i)))
+                            if (index2 == index)
+                                if (not allow-dupes?)
+                                    error "duplicate tags not permitted for tagged unions"
+                                let name2 = (('@ field2 'Name) as Symbol as string)
+                                repeat (i + 1) (.. name "|" name2) 
+                            else
+                                break i name
+                    let name =
+                        sc_default_styler style-number name
+                    sc_switch_append_case sw lit name
+                    i
+                sc_switch_append_default sw "?invalid?"
+                sw
             if classic?
                 'set-plain-storage T i32
                 # enum is integer
@@ -6844,49 +6919,31 @@ sugar enum (name body...)
                 spice-quote
                     inline __repr (self)
                         spice-unquote
-                            let sw = (sc_switch_new self)
-                            let numfields = ('argcount field-types)
-                            let sorted = (alloca-array (tuple u64 type) numfields)
-                            for i in (range numfields)
-                                let field = (('getarg field-types i) as type)
-                                let field = (field as type)
-                                let index = (('@ field 'Index) as u64)
-                                store (tupleof index field) (getelementptr sorted i)
-                            # sort array so duplicates are next to each other and merge names
-                            shabbysort sorted numfields
-                            loop (i = 0)
-                                if (i == numfields)
-                                    break;
-                                let index field = (unpack (load (getelementptr sorted i)))
-                                let lit = (sc_const_int_new T index)
-                                let name = (('@ field 'Name) as Symbol as string)
-                                # accumulate all fields with the same index
-                                let i name =
-                                    loop (i name = (i + 1) name)
-                                        if (i == numfields)
-                                            break i name
-                                        let index2 field2 = (unpack (load (getelementptr sorted i)))
-                                        if (index2 == index)
-                                            let name2 = (('@ field2 'Name) as Symbol as string)
-                                            repeat (i + 1) (.. name "|" name2) 
-                                        else
-                                            break i name
-                                let name =
-                                    sc_default_styler style-number name
-                                sc_switch_append_case sw lit name
-                                i
-                            sc_switch_append_default sw "?invalid?"
-                            sw
+                            build-repr-switch-case T self field-types true
                 'set-symbol T '__repr __repr 
             else
                 let index-type = (sc_integer_type width signed)
+                # build repr function
+                spice-quote
+                    inline __repr (self)
+                        let val = (extractvalue self 0)
+                        spice-unquote
+                            build-repr-switch-case index-type val field-types false
+                # build match function
+                spice-quote
+                'set-symbols T
+                    __repr = __repr
                 let numfields = ('argcount field-types)
                 let fields = (alloca-array type numfields)
                 for i in (range numfields)
                     let field = (('getarg field-types i) as type)
+                    let name = (('@ field 'Name) as Symbol)
                     let field-type = (('@ field 'Type) as type)
+                    let field-type = ('key-type field-type name)
                     store field-type (getelementptr fields i)
-                let payload-type = (sc_tuple_type numfields fields)
+                'set-symbols T
+                    __fields = (sc_tuple_type numfields fields)
+                let payload-type = (sc_union_storage_type numfields fields)
                 'set-storage T
                     tuple.type index-type payload-type
                 let consts = (alloca-array Value 2)
@@ -6897,18 +6954,24 @@ sugar enum (name body...)
                     let index = (('@ field 'Index) as u64)
                     let field-type = (('@ field 'Type) as type)
                     let index-value = (sc_const_int_new index-type index)
+                    'set-symbol field 'Literal index-value
                     if (field-type == Nothing)
                         # can provide a constant 
                         store index-value (getelementptr consts 0)
-                        store `none (getelementptr consts 1)
+                        store (sc_const_null_new payload-type) (getelementptr consts 1)
                         'set-symbol T name
                             sc_const_aggregate_new T 2 consts
-                    #else
-                        let TT = (tuple.type field-type)
+                    else
+                        let TT = ('change-storage-class
+                                ('mutable (pointer.type field-type)) 'Function)
                         spice-quote
-                            inline constructor (args...)
-                                let payload = (field-type args...)
-                                let payload = (bitcast payload payload-type)
+                            inline constructor (value)
+                                let payload = (alloca payload-type)
+                                let PT = (typeof payload)
+                                let destptr = (bitcast payload TT)
+                                let payload = (value as field-type)
+                                store payload destptr
+                                let payload = (load (bitcast destptr PT))
                                 let value = (undef T)
                                 let value = (insertvalue value index-value 0)
                                 insertvalue value payload 1
@@ -6944,6 +7007,10 @@ sugar enum (name body...)
             except (err) false
         else false
 
+    fn gen-implicit-tupledef (params)
+        let params = (uncomma params)
+        loop (start)
+
     # detect and rewrite top level field forms
     let body =
         loop (result body = '() body)
@@ -6951,32 +7018,32 @@ sugar enum (name body...)
                 break ('reverse result)
             let expr next = (decons body)
             let anchor = ('anchor expr)
-            inline this-type ()
+            let this-type =
                 'tag `'this-type anchor
             let exprT = ('typeof expr)
             let expr =
                 if (exprT == Symbol)
                     let newexpr =
                         qq [let] [expr] =
-                            [define-field] [(this-type)] '[expr] [Nothing]
+                            [define-field] [this-type] '[expr] [Nothing]
                     `newexpr
                 elseif (exprT == list)
                     sugar-match (expr as list)
                     case ((name is Symbol) ': T)
                         let newexpr =
                             qq [let] [name] =
-                                [define-field] [(this-type)] '[name] [T]
+                                [define-field] [this-type] '[name] [T]
                         `newexpr
                     case ((name is Symbol) ': T '= index...)
                         let newexpr =
                             qq [let] [name] =
-                                [define-field] [(this-type)] '[name] [T]
+                                [define-field] [this-type] '[name] [T]
                                     unquote-splice index...
                         `newexpr
                     case ((name is Symbol) '= index...)
                         let newexpr =                            
                             qq [let] [name] =
-                                [define-field] [(this-type)] '[name] [Nothing]
+                                [define-field] [this-type] '[name] [Nothing]
                                     unquote-splice index...
                         `newexpr
                     default expr

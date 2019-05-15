@@ -244,6 +244,7 @@ SCOPES_LIBEXPORT sc_valueref_t sc_const_int_new(const sc_type_t *type, uint64_t 
 SCOPES_LIBEXPORT sc_valueref_t sc_const_real_new(const sc_type_t *type, double value);
 SCOPES_LIBEXPORT sc_valueref_t sc_const_aggregate_new(const sc_type_t *type, int numconsts, sc_valueref_t *consts);
 SCOPES_LIBEXPORT sc_valueref_t sc_const_pointer_new(const sc_type_t *type, const void *pointer);
+SCOPES_LIBEXPORT sc_valueref_raises_t sc_const_null_new(const sc_type_t *type);
 SCOPES_LIBEXPORT uint64_t sc_const_int_extract(const sc_valueref_t value);
 SCOPES_LIBEXPORT double sc_const_real_extract(const sc_valueref_t value);
 SCOPES_LIBEXPORT sc_valueref_t sc_const_extract_at(const sc_valueref_t value, int index);

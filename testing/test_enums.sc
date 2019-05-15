@@ -91,12 +91,36 @@ do
     test ((typeof sum1.Empty) == sum1)
     test (constant? sum1.Empty)
 
-    #print (extractvalue sum1.Empty 1)
+    fn dispatch-sum1 (val)
+        '__dispatch val
+            Empty =
+                inline ()
+                    print "got empty!"
+            Byte =
+                inline (x)  
+                    print "got byte" x
+            Tuple2xi32 =
+                inline (x)
+                    print "got Tuple2xi32" (unpack x)
+            TupleXYi =
+                inline (x)
+                    print "got TupleXYi" x.x x.y
+            Tuple2xf32 =
+                inline (x)
+                    print "got Tuple2xf32" (unpack x)
+            Message =
+                inline (x)
+                    print "got Message" x
+            inline ()
+                print "default!"
 
-    #print
+    dispatch-sum1
         sum1.Byte 120
-
-    #print
+    dispatch-sum1
+        sum1.Tuple2xi32 (tupleof 10 20)
+    dispatch-sum1
+        sum1.TupleXYi (tupleof (x = 10) (y = 20))
+    dispatch-sum1 
         sum1.Message "hello"
 
 ;

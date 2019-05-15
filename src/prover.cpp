@@ -163,61 +163,48 @@ static SCOPES_RESULT(void) verify_writable(const Type *T) {
     return {};
 }
 
-#if 0
-static SCOPES_RESULT(Const *) nullof(const Anchor *anchor, const Type *T) {
-    SCOPES_RESULT_TYPE(Const *);
-    SCOPES_ANCHOR(anchor);
+SCOPES_RESULT(ConstRef) nullof(const Type *T) {
+    SCOPES_RESULT_TYPE(ConstRef);
     const Type *ST = SCOPES_GET_RESULT(storage_type(T));
     switch(ST->kind()) {
-    case TK_Integer: return ConstInt::from(anchor, T, 0);
-    case TK_Real: return ConstReal::from(anchor, T, 0.0);
-    case TK_Pointer: return ConstPointer::from(anchor, T, nullptr);
+    case TK_Integer: return ConstRef(ConstInt::from(T, 0));
+    case TK_Real: return ConstRef(ConstReal::from(T, 0.0));
+    case TK_Pointer: return ConstRef(ConstPointer::from(T, nullptr));
     case TK_Array: {
         auto at = cast<ArrayType>(ST);
-        Constants fields;
+        ConstantPtrs fields;
         if (at->count) {
-            auto elem = SCOPES_GET_RESULT(nullof(anchor, at->element_type));
+            auto elem = SCOPES_GET_RESULT(nullof(at->element_type));
             for (size_t i = 0; i < at->count; ++i) {
-                fields.push_back(elem);
+                fields.push_back(elem.unref());
             }
         }
-        return ConstAggregate::from(anchor, T, fields);
+        return ConstRef(ConstAggregate::from(T, fields));
     } break;
     case TK_Vector: {
         auto at = cast<VectorType>(ST);
-        Constants fields;
+        ConstantPtrs fields;
         if (at->count) {
-            auto elem = SCOPES_GET_RESULT(nullof(anchor, at->element_type));
+            auto elem = SCOPES_GET_RESULT(nullof(at->element_type));
             for (size_t i = 0; i < at->count; ++i) {
-                fields.push_back(elem);
+                fields.push_back(elem.unref());
             }
         }
-        return ConstAggregate::from(anchor, T, fields);
+        return ConstRef(ConstAggregate::from(T, fields));
     } break;
     case TK_Tuple: {
         auto at = cast<TupleType>(ST);
-        Constants fields;
+        ConstantPtrs fields;
         for (auto valT : at->values) {
-            fields.push_back(SCOPES_GET_RESULT(nullof(anchor, valT)));
+            fields.push_back(SCOPES_GET_RESULT(nullof(valT)).unref());
         }
-        return ConstAggregate::from(anchor, T, fields);
-    } break;
-    case TK_Tuple: {
-        auto at = cast<TupleType>(ST);
-        Constants fields;
-        for (auto valT : at->values) {
-            fields.push_back(SCOPES_GET_RESULT(nullof(anchor, valT)));
-        }
-        return ConstAggregate::from(anchor, T, fields);
+        return ConstRef(ConstAggregate::from(T, fields));
     } break;
     default: {
-        SCOPES_LOCATION_ERROR(String::from(
-            "can't create constant of type"));
+        SCOPES_ERROR(CannotCreateConstantOf, T);
     } break;
     }
-    return nullptr;
 }
-#endif
 
 //------------------------------------------------------------------------------
 
