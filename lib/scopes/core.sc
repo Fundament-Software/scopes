@@ -3776,6 +3776,15 @@ let __countof-aggregate =
             let sz = ('element-count T)
             `[(sz as usize)]
 
+let key =
+    spice-macro
+        fn (args)
+            let argc = ('argcount args)
+            verify-count argc 2 2
+            let sym = (('getarg args 0) as Symbol)
+            let value = ('getarg args 1)
+            sc_keyed_new sym value
+
 run-stage; # 7
 
 # (define-scope-macro name expr ...)
@@ -4049,11 +4058,25 @@ inline make-unpack-function (extractf)
             let count = ('element-count T)
             sc_argument_list_map_new count
                 inline (i)
+                    let argT = ('element@ T i)
                     `(extractf self i)
 
 let __unpack-aggregate = (make-unpack-function extractvalue)
 
 'set-symbols tuple
+    unpack-keyed = 
+        spice-macro
+            fn (args)
+                let argc = ('argcount args)
+                verify-count argc 1 1
+                let self = ('getarg args 0)
+                let T = ('typeof self)
+                let count = ('element-count T)
+                sc_argument_list_map_new count
+                    inline (i)
+                        let argT = ('element@ T i)
+                        let key = ('keyof argT)
+                        sc_keyed_new key `(extractvalue self i)
     __unpack = __unpack-aggregate
     __countof = __countof-aggregate
     __getattr = extractvalue
