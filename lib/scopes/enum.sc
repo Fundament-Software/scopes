@@ -49,10 +49,9 @@ typedef Enum
                             load ptr
                 let ET = ('strip-qualifiers ET)
                 let extracted =
-                    try 
-                        let unpackf = ('@ ET '__unpack)
+                    if (ET < tuple)
                         `(unpack extracted)
-                    except (err) extracted
+                    else extracted
                 sc_switch_append_case sw lit `(arg extracted)
         sw
 
@@ -298,19 +297,13 @@ sugar enum (name body...)
                     `newexpr
                 elseif (exprT == list)
                     sugar-match (expr as list)
-                    case ((name is Symbol) ': T)
+                    case ((name is Symbol) ': T...)
                         let newexpr =
                             qq [let] [name] =
-                                [define-field] [this-type] '[name] [T]
-                        `newexpr
-                    case ((name is Symbol) ': T '= index...)
-                        let newexpr =
-                            qq [let] [name] =
-                                [define-field] [this-type] '[name] [T]
-                                    unquote-splice index...
+                                [define-field] [this-type] '[name] ([tuple] (unquote-splice T...))
                         `newexpr
                     case ((name is Symbol) '= index...)
-                        let newexpr =                            
+                        let newexpr =
                             qq [let] [name] =
                                 [define-field] [this-type] '[name] [Nothing]
                                     unquote-splice index...

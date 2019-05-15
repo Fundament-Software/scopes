@@ -79,11 +79,13 @@ do
     enum sum1
         # classic tag
         Empty
-        # tag name : field type
+        # tag name : argument types
         Byte : i8
-        Tuple2xi32 : (tuple i32 i32)
-        TupleXYi : (tuple (x = i32) (y = i32) (z = i32))
-        Tuple2xf32 : (tuple f32 f32)
+        # compile time expression
+        tag 'Tuple2xi32 (tuple i32 i32) 
+        TupleXYi :
+            x = i32; y = i32; z = i32
+        Tuple2xf32 : f32 f32
         Message : string
 
     test
