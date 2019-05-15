@@ -1,5 +1,6 @@
 
 using import testing
+using import enum
 
 spice make-enum (val)
     spice-quote
