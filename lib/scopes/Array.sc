@@ -18,10 +18,8 @@ let llvm.memcpy.p0i8.p0i8.i64 =
         function void (mutable rawstring) rawstring i64 bool
 
 fn swap (a b)
-    let a = (dupe a)
-    let b = (dupe b)
-    let tmp = (deref b)
-    assign a b
+    let tmp = (deref (dupe b))
+    assign (dupe a) b
     assign tmp a
     return;
 

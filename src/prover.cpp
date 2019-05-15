@@ -2178,23 +2178,15 @@ repeat:
         case FN_Dupe: {
             CHECKARGS(1, 1);
             READ_NODEREF_TYPEOF(X);
+            const Type *DestT = strip_lifetime(X);
             if (is_plain(X)) {
-                const Type *DestT = strip_lifetime(X);
                 return ARGTYPE1(DestT);
             } else {
                 auto uq = try_unique(X);
                 if (uq) {
                     ctx.move(uq->id, call);
                 }
-                const Type *DestT = SCOPES_GET_RESULT(storage_type(X));
-                if (!is_plain(DestT)) {
-                    SCOPES_ERROR(DupeUniqueStorage,DestT);
-                }
-                auto rq = try_qualifier<ReferQualifier>(X);
-                if (rq) {
-                    DestT = qualify(DestT, { rq });
-                }
-                return ARGTYPE1(DestT);
+                return NEW_ARGTYPE1(DestT);
             }
         } break;
         case FN_Viewing: {

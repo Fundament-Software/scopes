@@ -422,12 +422,12 @@ verify-type (typify f Handle) void UHandle1
 
 # receive a handle and make a copy of its storage
 fn f (x)
-    dupe (view x)
+    dupe (storagecast (view x))
 verify-type (typify f Handle) i32 VHandle1
 
 # receive a handle and convert it to storage
 fn f (x)
-    dupe x
+    dupe (storagecast x)
 verify-type (typify f Handle) i32 UHandle1
 
 # allocate a mutable reference from constructor and from another handle
