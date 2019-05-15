@@ -93,27 +93,21 @@ do
     test (constant? sum1.Empty)
 
     fn dispatch-sum1 (val)
-        '__dispatch val
-            Empty =
-                inline ()
-                    print "got empty!"
-            Byte =
-                inline (x)  
-                    print "got byte" x
-            Tuple2xi32 =
-                inline (x)
-                    print "got Tuple2xi32" (unpack x)
-            TupleXYi =
-                inline (x)
-                    print "got TupleXYi" x.x x.y x.z
-            Tuple2xf32 =
-                inline (x)
-                    print "got Tuple2xf32" (unpack x)
-            Message =
-                inline (x)
-                    print "got Message" x
-            inline ()
-                print "default!"
+        dispatch val
+        case Empty ()
+            print "got empty!"
+        case Byte (x)
+            print "got byte" x
+        case Tuple2xi32 (x y)
+            print "got Tuple2xi32" x y
+        case TupleXYi (z y x)
+            print "got TupleXYi" x y z
+        case Tuple2xf32 (x y)
+            print "got Tuple2xf32" x y
+        case Message (x)
+            print "got Message" x
+        default
+            print "default!"
 
     dispatch-sum1
         sum1.Byte 120

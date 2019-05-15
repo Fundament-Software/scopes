@@ -47,6 +47,12 @@ typedef Enum
                             store payload ptr
                             let ptr = (bitcast ptr ptrET)
                             load ptr
+                let ET = ('strip-qualifiers ET)
+                let extracted =
+                    try 
+                        let unpackf = ('@ ET '__unpack)
+                        `(unpack extracted)
+                    except (err) extracted
                 sc_switch_append_case sw lit `(arg extracted)
         sw
 
@@ -341,6 +347,23 @@ sugar enum (name body...)
         [finalize-enum] this-type
         this-type
 
+sugar dispatch (value)
+    loop (next outp = next-expr '())
+        sugar-match next
+        case (('case (name is Symbol) (args...) body...) rest...)
+            repeat rest...
+                cons
+                    qq [name] =
+                        [inline] "#hidden" [args...] (unquote-splice body...)
+                    outp
+        case (('default body...) rest...)
+            return
+                qq '__dispatch [value] (unquote-splice ('reverse outp))
+                    [inline] "#hidden" () (unquote-splice body...)
+                rest...
+        default
+            error "missing default case"
+
 do
-    let enum Enum
+    let enum dispatch Enum
     locals;
