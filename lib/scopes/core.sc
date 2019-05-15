@@ -3640,21 +3640,16 @@ let using =
                         merge-scope-symbols src sugar-scope none
                     else
                         merge-scope-symbols src sugar-scope (('@ pattern) as string)
-            let nameval =
-                if (('typeof nameval) == list)
-                    let val = (sc_expand nameval '() sugar-scope)
-                    val
+            let nameval = (sc_expand nameval '() sugar-scope)
+            if (('typeof nameval) == Scope)
+                return (process (nameval as Scope))
+            let nameval = (sc_prove nameval)
+            let nameval = 
+                if (('typeof nameval) == type)
+                    hide-traceback;
+                    '@ (nameval as type) '__using
                 else nameval
-            if (('typeof nameval) == Symbol)
-                let sym = (nameval as Symbol)
-                label skip
-                    let src =
-                        try
-                            ('@ sugar-scope sym) as Scope
-                        except (err)
-                            merge skip
-                    return (process src)
-            elseif (('typeof nameval) == Scope)
+            if (('typeof nameval) == Scope)
                 return (process (nameval as Scope))
             hide-traceback;
             error "using: scope expected"

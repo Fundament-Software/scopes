@@ -180,6 +180,8 @@ fn finalize-enum-runtime (T)
             error
                 .. "type " (repr T) " must have Enum or CEnum supertype"
                     \ " but has supertype " (repr ('superof T))
+    let using-scope = (Scope)
+    'set-symbol T '__using using-scope
     if classic?
         'set-plain-storage T i32
         # enum is integer
@@ -190,7 +192,9 @@ fn finalize-enum-runtime (T)
             let field-type = (('@ field 'Type) as type)
             if (field-type != Nothing)
                 error "plain enums can't have tagged fields"
-            'set-symbol T name (sc_const_int_new T index)
+            let value = (sc_const_int_new T index)
+            'set-symbol T name value
+            'set-symbol using-scope name value
         # build repr function
         spice-quote
             inline __repr (self)
@@ -231,21 +235,24 @@ fn finalize-enum-runtime (T)
             let field-type = (('@ field 'Type) as type)
             let index-value = (sc_const_int_new index-type index)
             'set-symbol field 'Literal index-value
-            if (field-type == Nothing)
-                # can provide a constant 
-                store index-value (getelementptr consts 0)
-                store (sc_const_null_new payload-type) (getelementptr consts 1)
-                'set-symbol T name
+            let value = 
+                if (field-type == Nothing)
+                    # can provide a constant 
+                    store index-value (getelementptr consts 0)
+                    store (sc_const_null_new payload-type) (getelementptr consts 1)
                     sc_const_aggregate_new T 2 consts
-            else
-                let TT = ('change-storage-class
-                        ('mutable (pointer.type field-type)) 'Function)
-                spice-quote
-                    inline constructor (...)
-                        tag-constructor T index-value payload-type field-type TT ...
-                sc_template_set_name constructor name
-                # must provide a constructor
-                'set-symbol T name constructor
+                else
+                    # must provide a constructor
+                    let TT = ('change-storage-class
+                            ('mutable (pointer.type field-type)) 'Function)
+                    spice-quote
+                        inline constructor (...)
+                            tag-constructor T index-value payload-type field-type TT ...
+                    sc_template_set_name constructor name
+                    constructor
+            'set-symbol T name value
+            'set-symbol using-scope name value
+
 
 spice finalize-enum (T)
 

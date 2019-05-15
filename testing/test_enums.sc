@@ -111,13 +111,15 @@ do
         default
             print "default!"
 
+    using sum1
     dispatch-sum1
-        sum1.Byte 120
+        Byte 120
     dispatch-sum1
-        sum1.Tuple2xi32 10 20
+        Tuple2xi32 10 20
     dispatch-sum1
-        sum1.TupleXYi (y = 20) (x = 10)
+        TupleXYi (y = 20) (x = 10)
     dispatch-sum1 
-        sum1.Message "hello"
+        Message "hello"
+
 
 ;
