@@ -488,6 +488,8 @@ enum BacktraceKind {
     BTK_ProveArgumentLifetime,
     // context = value being translated
     BTK_Translate,
+    // context = foreign type as string
+    BTK_ConvertForeignType,
     // invoked in user code at runtime; context = call
     BTK_User,
 };
@@ -509,6 +511,8 @@ struct Backtrace {
     SCOPES_TRACE(InvokeHook, (VALUEREF))
 #define SCOPES_TRACE_CODEGEN(VALUEREF) \
     SCOPES_TRACE(Translate, (VALUEREF))
+#define SCOPES_TRACE_CONVERT_FOREIGN_TYPE(VALUEREF) \
+    SCOPES_TRACE(ConvertForeignType, (VALUEREF))
 #define SCOPES_TRACE_PROVE_EXPR(VALUEREF) \
     SCOPES_TRACE(ProveExpression, (VALUEREF))
 #define SCOPES_TRACE_PROVE_TEMPLATE(VALUEREF) \

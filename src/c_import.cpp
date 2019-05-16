@@ -568,13 +568,14 @@ public:
         const clang::Type *Ty = T.getTypePtr();
 
         auto result = _TranslateType(T);
-        if (result.ok())
-            return result;
-        if (isa<ErrorCImportCannotConvertType>(result.assert_error()))
-            return result;
-        SCOPES_ERROR(CImportCannotConvertType,
-            T.getAsString().c_str(),
-            Ty->getTypeClassName());
+        if (!result.ok()) {
+            StyledString ss;
+            ss.out << T.getAsString().c_str() << " (" << Ty->getTypeClassName() << ")";
+            auto val = ConstPointer::string_from(ss.str());
+            SCOPES_TRACE_CONVERT_FOREIGN_TYPE(val);
+            result.assert_error()->trace(_backtrace);
+        }
+        return result;
     }
 
     SCOPES_RESULT(const Type *) TranslateFuncType(const clang::FunctionType * f) {

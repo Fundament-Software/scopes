@@ -380,6 +380,13 @@ void stream_backtrace(StyledStream &ss, const Backtrace *bt) {
         ss << std::endl;
         anchor->stream_source_line(ss);
     } break;
+    case BTK_ConvertForeignType: {
+        ss << anchor;
+        ss << " while converting foreign type ";
+        ss << extract_string_constant(value).assert_ok()->data;
+        ss << std::endl;
+        anchor->stream_source_line(ss);
+    } break;
     case BTK_ProveExpression: {
         #if 1
         anchor = get_best_anchor(value);
