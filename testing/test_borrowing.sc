@@ -438,7 +438,7 @@ fn f ()
     # stack var, init from immutable
     local h = (Handle 0) # immutable is moved into h
     # heap var, default constructor
-    new q : Handle 0
+    local q : Handle 0
     # drop h, move immutable into h
     h = (Handle 1)
     # drop x, move h into x

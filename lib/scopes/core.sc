@@ -6318,11 +6318,7 @@ inline gen-allocator-sugar (name f)
         'tag `result anchor
 
 let local = (gen-allocator-sugar "local" alloca)
-let new = (gen-allocator-sugar "new" malloc)
 let global = (gen-allocator-sugar "global" private)
-
-fn delete (value)
-    free (reftoptr value)
 
 run-stage; # 11
 

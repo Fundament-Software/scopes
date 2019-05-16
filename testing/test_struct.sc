@@ -131,10 +131,10 @@ do
         x : i32
         y : i32
 
-    new testval = (Val 1 2)
+    local testval = (Val 1 2)
     test (testval.x == 1)
     test (testval.y == 2)
-    delete testval
+    drop testval
 
 global drop_count = 0
 do

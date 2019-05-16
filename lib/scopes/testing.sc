@@ -215,8 +215,9 @@ typedef One :: (tuple i32 (mutable pointer i32))
         static-assert (not (none? value))
         test (_refcount >= 0)
         _refcount += 1
-        new one_is_the_loneliest_number : i32 = 1
-        bitcast (tupleof value &one_is_the_loneliest_number) this-type
+        let one_is_the_loneliest_number = (malloc i32)
+        store 1 one_is_the_loneliest_number
+        bitcast (tupleof value one_is_the_loneliest_number) this-type
 
     fn __repr (self)
         let vals = (storagecast self)

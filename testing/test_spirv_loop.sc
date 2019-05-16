@@ -19,7 +19,7 @@ let s =
         'O2
 assert (not (empty? s))
 
-compile-glsl 'fragment
+compile-glsl 0 'fragment
     typify main
     'dump-module
     'dump-disassembly
