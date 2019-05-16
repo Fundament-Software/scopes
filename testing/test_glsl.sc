@@ -32,7 +32,7 @@ fn vertex-shader ()
     return;
 
 print
-    compile-glsl 'vertex
+    compile-glsl 0 'vertex
         typify vertex-shader
         #'O3
         #'dump-module
@@ -59,7 +59,7 @@ fn fragment-shader ()
     typify fragment-shader
 
 print
-    compile-glsl 'fragment
+    compile-glsl 0 'fragment
         typify fragment-shader
         #'dump-disassembly
         #'no-opts

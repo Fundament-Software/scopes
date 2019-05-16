@@ -2090,7 +2090,7 @@ SCOPES_RESULT(const String *) compile_spirv(Symbol target, const FunctionRef &fn
     return String::from((char *)&result[0], bytesize);
 }
 
-SCOPES_RESULT(const String *) compile_glsl(Symbol target, const FunctionRef &fn, uint64_t flags) {
+SCOPES_RESULT(const String *) compile_glsl(int version, Symbol target, const FunctionRef &fn, uint64_t flags) {
     SCOPES_RESULT_TYPE(const String *);
     Timer sum_compile_time(TIMER_CompileSPIRV);
 
@@ -2143,10 +2143,9 @@ SCOPES_RESULT(const String *) compile_glsl(Symbol target, const FunctionRef &fn,
     */
 
     // Set some options.
-    /*
     spirv_cross::CompilerGLSL::Options options;
-    options.version = 450;
-    glsl.set_options(options);*/
+    options.version = (version <= 0)?450:version;
+    glsl.set_common_options(options);
 
     // Compile to GLSL, ready to give to GL driver.
     std::string source = glsl.compile();

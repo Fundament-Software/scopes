@@ -858,7 +858,7 @@ let decons =
                 let i = (add i 1)
                 if (icmp== i count)
                     store next (getelementptr retargs i)
-                    sc_expression_append block 
+                    sc_expression_append block
                         sc_argument_list_new argcount retargs
                     break block
                 _ i next
@@ -3644,7 +3644,7 @@ let using =
             if (('typeof nameval) == Scope)
                 return (process (nameval as Scope))
             let nameval = (sc_prove nameval)
-            let nameval = 
+            let nameval =
                 if (('typeof nameval) == type)
                     hide-traceback;
                     '@ (nameval as type) '__using
@@ -4000,8 +4000,8 @@ spice-quote
     inline compile (func flags...)
         sc_compile func (parse-compile-flags flags...)
 
-    inline compile-glsl (target func flags...)
-        sc_compile_glsl target func (parse-compile-flags flags...)
+    inline compile-glsl (version target func flags...)
+        sc_compile_glsl version target func (parse-compile-flags flags...)
 
     inline compile-spirv (target func flags...)
         sc_compile_spirv target func (parse-compile-flags flags...)
@@ -4058,7 +4058,7 @@ inline make-unpack-function (extractf)
 
 let __unpack-aggregate = (make-unpack-function extractvalue)
 
-let __unpack-keyed-aggregate = 
+let __unpack-keyed-aggregate =
     spice-macro
         fn (args)
             let argc = ('argcount args)
@@ -5008,7 +5008,7 @@ define va-map
             let f = ('getarg args 0)
             sc_argument_list_map_filter_new (argc - 1)
                 inline (i)
-                    let i = (i + 1)                    
+                    let i = (i + 1)
                     let arg = ('getarg args i)
                     let outarg = (sc_prove `(f arg))
                     _ (('typeof outarg) != void) outarg
@@ -5160,21 +5160,24 @@ spice _static-compile (func flags)
     hide-traceback;
     'tag `[(sc_compile func flags)] ('anchor args)
 
-inline gen-static-compile-shader (f)
-    spice _static-compile-glsl (target func flags)
-        target as:= Symbol
-        flags as:= u64
-        hide-traceback;
-        'tag `[(f target func flags)] ('anchor args)
+spice _static-compile-glsl (version target func flags)
+    version as:= i32
+    target as:= Symbol
+    flags as:= u64
+    hide-traceback;
+    'tag `[(sc_compile_glsl version target func flags)] ('anchor args)
 
-let _static-compile-glsl = (gen-static-compile-shader sc_compile_glsl)
-let _static-compile-spirv = (gen-static-compile-shader sc_compile_spirv)
+spice _static-compile-spirv (target func flags)
+    target as:= Symbol
+    flags as:= u64
+    hide-traceback;
+    'tag `[(sc_compile_spirv target func flags)] ('anchor args)
 
 spice-quote
     inline static-compile (func flags...)
         _static-compile func (parse-compile-flags flags...)
-    inline static-compile-glsl (target func flags...)
-        _static-compile-glsl target func (parse-compile-flags flags...)
+    inline static-compile-glsl (version target func flags...)
+        _static-compile-glsl version target func (parse-compile-flags flags...)
     inline static-compile-spirv (target func flags...)
         _static-compile-spirv target func (parse-compile-flags flags...)
 
@@ -5225,7 +5228,7 @@ spice overloaded-fn-append (T args...)
                         error "argument must be constant or function"
                     let fT = ('element@ fT 0)
                     let argcount = ('element-count fT)
-                    let types = 
+                    let types =
                         loop (k types = 0 void)
                             if (k == argcount)
                                 break types
@@ -5269,9 +5272,9 @@ spice overloaded-fn-append (T args...)
                     sc_argument_list_join_values functions f
                     sc_argument_list_join_values functypes ftype
                     sc_argument_list_join_values defaults fdefs
-    'set-symbol outtype 'templates functions 
+    'set-symbol outtype 'templates functions
     'set-symbol outtype 'parameter-types functypes
-    'set-symbol outtype 'parameter-defaults defaults 
+    'set-symbol outtype 'parameter-defaults defaults
     T
 
 'set-symbols OverloadedFunction
@@ -5411,7 +5414,7 @@ sugar fn... (name...)
                             hide-traceback;
                             error@ ('anchor def) "while checking default argument"
                                 "default argument must be constant after conversion"
-                        def                    
+                        def
         `(inline () outargs)
 
     spice init-overloaded-function (T)
@@ -5455,7 +5458,7 @@ sugar fn... (name...)
             let scope = (Scope bodyscope)
             repeat rest...
                 loop
-                    expr types defaults = 
+                    expr types defaults =
                         uncomma (condv as list)
                         sc_argument_list_new 0 null
                         sc_argument_list_new 0 null
@@ -5465,7 +5468,7 @@ sugar fn... (name...)
                         sc_template_set_body tmpl body
                         let atypes = `(Arguments types)
                         break
-                            sc_argument_list_join_values outargs 
+                            sc_argument_list_join_values outargs
                                 \ tmpl atypes `(make-defaults atypes defaults)
                     case ((arg as Symbol) ': rest...)
                         hide-traceback;
@@ -5954,18 +5957,18 @@ sugar static-match (cond)
     let cond = (sc_expand cond '() sugar-scope)
     let outargs =
         sc_argument_list_map_new 1
-            inline (i) cond 
+            inline (i) cond
     loop (next-expr outargs = next-expr outargs)
         sugar-match next-expr
         case (('case it body...) rest...)
             let it = (sc_expand it '() sugar-scope)
             let body = (sc_expand (cons embed body...) '() sugar-scope)
             repeat rest...
-                sc_argument_list_join_values outargs it `(inline () [body]) 
+                sc_argument_list_join_values outargs it `(inline () [body])
         case (('default body...) rest...)
             let body = (sc_expand (cons embed body...) '() sugar-scope)
             let outargs =
-                sc_argument_list_join_values outargs `(inline () [body]) 
+                sc_argument_list_join_values outargs `(inline () [body])
             return `(handle-static-match outargs) rest...
         default
             hide-traceback;
@@ -6619,7 +6622,7 @@ typedef+ CUnion
         let qcls = ('qualified-typeof self)
         let cls = ('strip-qualifiers qcls)
         let fields = (('@ cls '__fields) as type)
-        let i = 
+        let i =
             do
                 hide-traceback;
                 sc_type_field_index fields (name as Symbol)
