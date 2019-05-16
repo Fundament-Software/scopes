@@ -44,3 +44,13 @@ static-assert ((typeof INTVAL) == i32)
 static-assert ((typeof UINTVAL) == u32)
 static-assert ((typeof LONGVAL) == i64)
 static-assert ((typeof ULONGVAL) == u64)
+
+include
+    import Test
+""""typedef struct X Y;
+
+    struct X {
+        int x,y;
+    };
+
+    struct X;

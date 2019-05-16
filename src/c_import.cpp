@@ -204,7 +204,7 @@ public:
         }
 
         if (is_union) {
-            tni->bind(SYM_UnionFields, 
+            tni->bind(SYM_UnionFields,
                 ConstPointer::type_from(SCOPES_GET_RESULT(tuple_type(args))));
             SCOPES_CHECK_RESULT(tni->complete(SCOPES_GET_RESULT(
                 union_storage_type(args, packed, explicit_alignment?al:0)), TNF_Plain));
@@ -256,26 +256,28 @@ public:
         }
 
         clang::RecordDecl * defn = rd->getDefinition();
-        auto res = record_defined.insert({rd, false});
-        if (defn && !res.first->second) {
-            res.first->second = true;
+        if (defn) {
+            auto res = record_defined.insert({defn, false});
+            if (!res.first->second) {
+                res.first->second = true;
 
-            auto tni = cast<TypenameType>(struct_type);
-            if (!tni->is_opaque()) {
-                SCOPES_ERROR(CImportDuplicateTypeDefinition,
-                    anchorFromLocation(rd->getSourceRange().getBegin()),
-                    struct_type);
-            }
+                auto tni = cast<TypenameType>(struct_type);
+                if (tni->is_opaque()) {
+                    SCOPES_CHECK_RESULT(GetFields(tni, defn));
 
-            SCOPES_CHECK_RESULT(GetFields(tni, defn));
-
-            if (name != SYM_Unnamed) {
-                const Anchor *anchor = anchorFromLocation(rd->getSourceRange().getBegin());
-                ScopeEntry target;
-                // don't overwrite names already bound
-                if (!dest->lookup(name, target)) {
-                    dest->bind(name,
-                        ref(anchor, ConstPointer::type_from(struct_type)));
+                    if (name != SYM_Unnamed) {
+                        const Anchor *anchor = anchorFromLocation(rd->getSourceRange().getBegin());
+                        ScopeEntry target;
+                        // don't overwrite names already bound
+                        if (!dest->lookup(name, target)) {
+                            dest->bind(name,
+                                ref(anchor, ConstPointer::type_from(struct_type)));
+                        }
+                    }
+                } else {
+                    SCOPES_ERROR(CImportDuplicateTypeDefinition,
+                        anchorFromLocation(rd->getSourceRange().getBegin()),
+                        struct_type);
                 }
             }
         }
