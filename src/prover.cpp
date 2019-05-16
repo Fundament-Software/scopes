@@ -2660,11 +2660,6 @@ repeat:
                 auto ti = cast<TupleType>(T);
                 SCOPES_CHECK_RESULT(verify(SCOPES_GET_RESULT(storage_type(SCOPES_GET_RESULT(ti->type_at_index(idx)))), ET));
             } break;
-            /*
-            case TK_Union: {
-                auto ui = cast<UnionType>(T);
-                SCOPES_CHECK_RESULT(verify(SCOPES_GET_RESULT(storage_type(SCOPES_GET_RESULT(ui->type_at_index(idx)))), ET));
-            } break; */
             default: {
                 SCOPES_ERROR(InvalidArgumentTypeForBuiltin, b, T);
             } break;

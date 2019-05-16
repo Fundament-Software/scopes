@@ -282,7 +282,6 @@ size_t abi_classify(const Type *T, ABIClass *classes) {
         return 0;
     switch(T->kind()) {
     case TK_Array:
-    case TK_Union:
     case TK_Tuple:
         if (sz <= 1)
             classes[0] = ABI_CLASS_INTEGERSI8;
