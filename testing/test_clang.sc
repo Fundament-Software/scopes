@@ -45,6 +45,7 @@ static-assert ((typeof UINTVAL) == u32)
 static-assert ((typeof LONGVAL) == i64)
 static-assert ((typeof ULONGVAL) == u64)
 
+# bug: forward declaration after definition
 include
     import Test
 """"typedef struct X Y;
@@ -54,3 +55,20 @@ include
     };
 
     struct X;
+
+# bug: attempting to use incomplete typename $4
+include
+    import Test
+""""
+    typedef struct {
+        int x;
+        int y;
+        long z;
+    } U,K;
+
+    typedef struct X {
+    K k;
+    int x;
+    int y;
+    } KK;
+

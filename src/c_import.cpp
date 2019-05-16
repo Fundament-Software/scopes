@@ -64,8 +64,8 @@ public:
     Scope *dest;
     clang::ASTContext *Context;
     Result<void> ok;
-    std::unordered_map<clang::RecordDecl *, bool> record_defined;
-    std::unordered_map<clang::EnumDecl *, bool> enum_defined;
+    std::unordered_map<clang::RecordDecl *, const Type *> record_defined;
+    std::unordered_map<clang::EnumDecl *, const Type *> enum_defined;
     NamespaceMap named_structs;
     NamespaceMap named_classes;
     NamespaceMap named_unions;
@@ -233,6 +233,14 @@ public:
     SCOPES_RESULT(const Type *) TranslateRecord(clang::RecordDecl *rd) {
         SCOPES_RESULT_TYPE(const Type *);
         Symbol name = SYM_Unnamed;
+        clang::RecordDecl * defn = rd->getDefinition();
+        if (defn) {
+            rd = defn;
+            auto it = record_defined.find(defn);
+            if (it != record_defined.end())
+                return it->second;
+        }
+
         if (rd->isAnonymousStructOrUnion()) {
             auto tdn = rd->getTypedefNameForAnonDecl();
             if (tdn) {
@@ -255,30 +263,25 @@ public:
                 name);
         }
 
-        clang::RecordDecl * defn = rd->getDefinition();
         if (defn) {
-            auto res = record_defined.insert({defn, false});
-            if (!res.first->second) {
-                res.first->second = true;
+            record_defined.insert({defn, struct_type});
+            auto tni = cast<TypenameType>(struct_type);
+            if (tni->is_opaque()) {
+                SCOPES_CHECK_RESULT(GetFields(tni, defn));
 
-                auto tni = cast<TypenameType>(struct_type);
-                if (tni->is_opaque()) {
-                    SCOPES_CHECK_RESULT(GetFields(tni, defn));
-
-                    if (name != SYM_Unnamed) {
-                        const Anchor *anchor = anchorFromLocation(rd->getSourceRange().getBegin());
-                        ScopeEntry target;
-                        // don't overwrite names already bound
-                        if (!dest->lookup(name, target)) {
-                            dest->bind(name,
-                                ref(anchor, ConstPointer::type_from(struct_type)));
-                        }
+                if (name != SYM_Unnamed) {
+                    const Anchor *anchor = anchorFromLocation(rd->getSourceRange().getBegin());
+                    ScopeEntry target;
+                    // don't overwrite names already bound
+                    if (!dest->lookup(name, target)) {
+                        dest->bind(name,
+                            ref(anchor, ConstPointer::type_from(struct_type)));
                     }
-                } else {
-                    SCOPES_ERROR(CImportDuplicateTypeDefinition,
-                        anchorFromLocation(rd->getSourceRange().getBegin()),
-                        struct_type);
                 }
+            } else {
+                SCOPES_ERROR(CImportDuplicateTypeDefinition,
+                    anchorFromLocation(rd->getSourceRange().getBegin()),
+                    struct_type);
             }
         }
 
@@ -288,13 +291,20 @@ public:
     SCOPES_RESULT(const Type *) TranslateEnum(clang::EnumDecl *ed) {
         SCOPES_RESULT_TYPE(const Type *);
 
+        clang::EnumDecl * defn = ed->getDefinition();
+        if (defn) {
+            ed = defn;
+            auto it = enum_defined.find(defn);
+            if (it != enum_defined.end())
+                return it->second;
+        }
+
         Symbol name(String::from_stdstring(ed->getName()));
 
         const Type *enum_type = get_typename(name, named_enums, TYPE_CEnum);
 
-        clang::EnumDecl * defn = ed->getDefinition();
-        if (defn && !enum_defined[ed]) {
-            enum_defined[ed] = true;
+        if (defn) {
+            enum_defined.insert({ed, enum_type});
 
             auto tag_type = SCOPES_GET_RESULT(TranslateType(ed->getIntegerType()));
 
@@ -562,7 +572,7 @@ public:
     }
 
     SCOPES_RESULT(const Type *) TranslateType(clang::QualType T) {
-        SCOPES_RESULT_TYPE(const Type *);
+        //SCOPES_RESULT_TYPE(const Type *);
         using namespace clang;
 
         const clang::Type *Ty = T.getTypePtr();
