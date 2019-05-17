@@ -9,6 +9,7 @@
 #include "string.hpp"
 #include "scopes/config.h"
 
+#include <inttypes.h>
 #include <limits.h>
 //#include <string.h>
 #include <sys/stat.h>
@@ -193,13 +194,8 @@ const String *get_cache_key(const char *content, size_t size) {
     }
     char key[65];
     memset(key, 0, sizeof(key));
-#ifdef SCOPES_WIN32
-#define SCOPES_KEY16_FORMAT "%016llx"
-#else
-#define SCOPES_KEY16_FORMAT "%016lx"
-#endif
     for (int i = 0; i < 4; ++i) {
-        snprintf(key + i*16, 17, SCOPES_KEY16_FORMAT, h[i]);
+        snprintf(key + i*16, 17, "%016" PRIx64, h[i]);
     }
     return String::from(key, 64);
 }
