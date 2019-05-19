@@ -551,6 +551,10 @@ public:
             uint64_t n = VT->getNumElements();
             return vector_type(at, n);
         } break;
+        case clang::Type::BlockPointer: {
+            const clang::BlockPointerType *BT = cast<clang::BlockPointerType>(Ty);
+	    return _TranslateType(BT->getPointeeType());
+	} break;
         case clang::Type::FunctionNoProto:
         case clang::Type::FunctionProto: {
             const clang::FunctionType *FT = cast<clang::FunctionType>(Ty);
@@ -559,7 +563,6 @@ public:
         case clang::Type::ObjCObject: break;
         case clang::Type::ObjCInterface: break;
         case clang::Type::ObjCObjectPointer: break;
-        case clang::Type::BlockPointer:
         case clang::Type::MemberPointer:
         case clang::Type::Atomic:
         default:
