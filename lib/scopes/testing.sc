@@ -114,7 +114,7 @@ define-sugar-macro test-error
                             repr sxcond
                 else body
 
-define-sugar-macro test-compiler-error
+sugar test-compiler-error (args...)
     spice test-function (f)
         let f = (f as Closure)
         try
@@ -133,7 +133,14 @@ define-sugar-macro test-compiler-error
                 else (repr msg)
         hide-traceback;
         error@ anchor "while checking assertion" assert-msg
-    let cond body = (decons args)
+    let cond body = (decons args...)
+    let cond =
+        try (sc_expand cond '() sugar-scope)
+        except (err)
+            io-write! "ASSERT OK (while expanding): "
+            print
+                'format err
+            return '()
     let sxcond = cond
     let anchor = ('anchor sxcond)
     let tmp =

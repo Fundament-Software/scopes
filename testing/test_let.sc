@@ -89,3 +89,7 @@ test-error
                 locals;
         scope.z
 
+# too many arguments on right hand side
+test-compiler-error
+    do
+        let a = (1 + 2) + 3

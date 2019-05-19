@@ -127,7 +127,8 @@ formatters:
     T(SyntaxListExpanderTypeMismatch, \
         "syntax: list expander has wrong type %0, must be constant of type %1", \
         PType, PType) \
-
+    T(SyntaxExcessBindingArgument, \
+        "syntax: excess argument is not bound to a name") \
 
 // typechecking
 #define SCOPES_TYPECHECK_ERROR_KIND() \

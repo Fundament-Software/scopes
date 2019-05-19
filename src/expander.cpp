@@ -505,6 +505,7 @@ struct Expander {
             ValueRef srcval = ref(anchor, ArgumentListTemplate::from(exprs));
 
             int index = 0;
+            bool variadic = false;
             //int lastarg = (int)args.size() - 1;
             it = params;
             // read parameter names
@@ -519,12 +520,19 @@ struct Expander {
                         SCOPES_ERROR(SyntaxVariadicSymbolNotLast);
                     }
                     node = ref(paramval.anchor(), extract_argument(srcval, index, true));
+                    variadic = true;
                 }
                 args.push_back(node);
                 env->bind(sym, node);
                 it = it->next;
                 index++;
             }
+
+            if (!variadic && (index < exprs.size())) {
+                SCOPES_TRACE_EXPANDER(exprs[index]);
+                SCOPES_ERROR(SyntaxExcessBindingArgument);
+            }
+
         }
 
         return ValueRef(ref(anchor, Expression::unscoped_from(exprs,
