@@ -4241,7 +4241,7 @@ inline signed-vector-binary-op (sf uf)
     __vector== = icmp==
     __vector!= = icmp!=
     __vector>  = (signed-vector-binary-op icmp>s icmp>u)
-    __vector>= = (signed-vector-binary-op icmp>s icmp>=u)
+    __vector>= = (signed-vector-binary-op icmp>=s icmp>=u)
     __vector<  = (signed-vector-binary-op icmp<s icmp<u)
     __vector<= = (signed-vector-binary-op icmp<=s icmp<=u)
 
