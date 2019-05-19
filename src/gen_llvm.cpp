@@ -2579,9 +2579,9 @@ SCOPES_RESULT(void) compile_object(const String *triple,
     if (LLVMGetTargetFromTriple(triplestr, &target, &error_message)) {
         SCOPES_ERROR(CGenBackendFailed, error_message);
     }
-
+    // code model must be JIT default for reasons beyond my comprehension
     auto tm = LLVMCreateTargetMachine(target, triplestr, nullptr, nullptr,
-        LLVMCodeGenLevelDefault, LLVMRelocPIC, LLVMCodeModelDefault);
+        LLVMCodeGenLevelDefault, LLVMRelocPIC, LLVMCodeModelJITDefault);
     assert(tm);
 
     char *path_cstr = strdup(path->data);
