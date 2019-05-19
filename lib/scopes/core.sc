@@ -4376,6 +4376,9 @@ inline vector-binary-op-dispatch (symbol)
                 `(shufflevector self self mask)
     __unpack = `[(make-unpack-function extractelement)]
     __countof = __countof-aggregate
+    __@ =
+        inline (self index)
+            extractvalue self index
     # dynamic vector type constructor
     type =
         inline "vector.type" (element-type size)
