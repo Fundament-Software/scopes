@@ -2581,7 +2581,7 @@ SCOPES_RESULT(void) compile_object(const String *triple,
     }
 
     auto tm = LLVMCreateTargetMachine(target, triplestr, nullptr, nullptr,
-        LLVMCodeGenLevelDefault, LLVMRelocStatic, LLVMCodeModelDefault);
+        LLVMCodeGenLevelDefault, LLVMRelocPIC, LLVMCodeModelDefault);
     assert(tm);
 
     char *path_cstr = strdup(path->data);
