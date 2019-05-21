@@ -83,6 +83,7 @@ test-modules
     .test_typedef
     .test_union
     .test_using
+    .test_utf8
     .test_value
     .test_varargs
     .test_vector
