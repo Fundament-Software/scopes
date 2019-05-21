@@ -109,6 +109,8 @@ formatters:
         "syntax: variadic symbol is not in last place") \
     T(SyntaxAssignmentTokenExpected, \
         "syntax: assignment token (=) expected") \
+    T(SyntaxKeyedArgumentMismatch, \
+        "syntax: keyed call argument must be singular") \
     T(SyntaxUnexpectedExtraToken, \
         "syntax: unexpected extra token") \
     T(SyntaxUndeclaredIdentifier, \

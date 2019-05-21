@@ -499,23 +499,6 @@ static SCOPES_RESULT(TypedValueRef) build_drop(const ASTContext &ctx,
     }
 }
 
-static TypedValueRef build_free(
-    const ASTContext &ctx, const Anchor *anchor, const TypedValueRef &val) {
-    auto call = ref(anchor, Call::from(empty_arguments_type(), g_free, { val }));
-    ctx.append(call);
-    return call;
-}
-
-static bool needs_autofree(const Type *T) {
-    auto rq = try_qualifier<ReferQualifier>(T);
-    if (!rq) return false;
-    // must be default (heap) class
-    if (rq->storage_class != SYM_Unnamed) return false;
-    // must be writable
-    if (!pointer_flags_is_writable(rq->flags)) return false;
-    return true;
-}
-
 static SCOPES_RESULT(void) drop_value(const ASTContext &ctx,
     const ValueRef &mover, const ValueIndex &arg) {
     SCOPES_RESULT_TYPE(void);

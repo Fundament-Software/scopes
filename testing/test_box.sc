@@ -14,7 +14,7 @@ using import Box
 
 do
     let a = (Box.wrap (One 303))
-    let b = ((Box One) 303)
+    let b = (Box.new One 303)
 
     'check a
 

@@ -846,18 +846,23 @@ struct Expander {
         if (T != TYPE_List) return false;
         auto l = SCOPES_GET_RESULT(extract_list_constant(it));
         if (l == EOL) return false;
-        if (List::count(l) != 3) return false;
         it = l->at;
         T = try_get_const_type(it);
         if (T != TYPE_Symbol) return false;
         key = SCOPES_GET_RESULT(extract_symbol_constant(it));
         l = l->next;
+        if (l == EOL) return false;
         it = l->at;
         T = try_get_const_type(it);
         if (T != TYPE_Symbol) return false;
         auto sym = SCOPES_GET_RESULT(extract_symbol_constant(it));
         if (sym != OP_Set) return false;
         l = l->next;
+        if (l == EOL) return false;
+        if (List::count(l) > 1) {
+            SCOPES_TRACE_EXPANDER(it);
+            SCOPES_ERROR(SyntaxKeyedArgumentMismatch);
+        }
         value = l->at;
         return true;
     }
