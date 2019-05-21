@@ -1,51 +1,42 @@
 
-using import enum
 
-# declare i8   @llvm.ctlz.i8  (i8   <src>, i1 <is_zero_undef>)
-let llvm.ctlz.i8 =
-    extern 'llvm.ctlz.i8
-        function i8 i8 bool
+using import itertools
+using import testing
 
-enum UTF8
-    # a codepoint has been read successfully
-    Codepoint : u32
-    # an illegal byte was encountered
-    IllegalByte : i8
-    # a byte from the middle of a stream was encountered
-    Partial : i8
-    # the stream ended before the codepoint was complete
-    Incomplete
+import UTF-8
 
-inline decoder (gen)
-    """"Decode a i8 character stream encoded as UTF-8 as UTF8 enum value
-    let init valid? at next = ((gen as Generator))
+inline string-buffer-sink (maxsize)
+    let buf = (alloca-array i8 maxsize)
+    Collector
+        inline () 0
+        inline (n) (n < maxsize)
+        inline (n)
+            sc_string_new buf (n as usize)
+        inline (src n)
+            let c srcbuf = (src)
+            loop (i n = 0 n)
+                if ((i == c) | (n == maxsize))
+                    break n
+                store (srcbuf @ i) (getelementptr buf n)
+                _ (i + 1) (n + 1)
 
-    Generator
-        inline ()
-            init
-        inline (state...)
-            valid? state...
-        inline (state...)
-            let c = ((at state...) as i8)
-            switch (llvm.ctlz.i8 (~ c) true)
-            case 0
-                # 1 byte
-                c as u32
-            case 1
-                # in the middle of a stream
-                raise (UTF8Error.Incomplete c)
-            case 2
-                # 2 bytes
+let srcstr = "🤔Thö Quöck Brüwn Föx🤔"
+let dststr =
+    ->> 
+        # iterate string characters
+        srcstr
+        # build codepoints
+        UTF-8.decoder
+        # filter codepoints
+        map
+            inline (ok? cp)
+                if ok? cp
+                else
+                    error "illegal byte in UTF-8 stream"
+        # build bytestream
+        UTF-8.encoder
+        # build string
+        string-buffer-sink 256
 
-            case 3
-                # 3 bytes
-            case 4
-                # 4 bytes
-
-            default
-                # illegal
-                raise (UTF8Error.IllegalByte c)
-        next
-
-for ch in (decoder "Thö Quöck Brüwn Föx")
-    print ch
+print dststr
+test (dststr == srcstr)
