@@ -14,6 +14,9 @@ typedef Box
     case (cls, T : type)
         gen-type T
 
+    inline new (T args...)
+        (gen-type T) args...
+
     inline wrap (value)
         let ET = (typeof value)
         let ptr = (malloc ET)
@@ -22,6 +25,12 @@ typedef Box
 
     inline view (self)
         ptrtoref (storagecast (view self))
+
+    inline __countof (self)
+        countof (view self)
+
+    inline __@ (self keys...)
+        @ (view self) keys...
 
     spice __methodcall (symbol self args...)
         'tag `(symbol (view self) args...) ('anchor args)
