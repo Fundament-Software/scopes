@@ -2138,6 +2138,19 @@ let drop =
                 sc_expression_append block ('tag `(lose value) anchor)
                 block
 
+let forward-repr =
+    spice-macro
+        fn (args)
+            let argc = ('argcount args)
+            verify-count argc 1 1
+            let value = ('getarg args 0)
+            let T = ('typeof value)
+            try
+                let f = (sc_type_at T '__repr)
+                `(f value)
+            except (err)
+                `(sc_value_content_repr value)
+
 let repr =
     spice-macro
         fn (args)
@@ -2149,14 +2162,10 @@ let repr =
             verify-count argc 1 1
             let value = ('getarg args 0)
             let T = ('typeof value)
-            let s =
-                try
-                    let f = (sc_type_at T '__repr)
-                    `(f value)
-                except (err)
-                    `(sc_value_content_repr value)
+            let s = `(forward-repr value)
             if (type-is-default-suffix? T) s
             else
+
                 let suffix =
                     sc_string_join
                         sc_default_styler style-operator ":"

@@ -9,6 +9,7 @@ test-modules
     .test_array
     .test_ast_quote
     .test_bool
+    .test_box
     .test_branch
     .test_assorted
     .test_borrowing
