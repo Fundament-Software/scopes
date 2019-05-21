@@ -459,10 +459,22 @@ sc_type_set_symbol type '__call
             let f = (sc_type_at T '__typecall)
             return (sc_valueref_tag (sc_value_anchor args) `(f args))
 
-# method call syntax
+# methodcall
 sc_type_set_symbol Symbol '__call
     box-spice-macro
         fn "symbol-call" (args)
+            hide-traceback;
+            let argcount = (sc_argcount args)
+            verify-count argcount 2 -1
+            let self = (sc_getarg args 1)
+            let T = (sc_value_type self)
+            let f = (sc_type_at T '__methodcall)
+            sc_valueref_tag (sc_value_anchor args) `(f args)
+
+# methodcall for any type
+sc_type_set_symbol typename '__methodcall
+    box-spice-macro
+        fn "typename-methodcall" (args)
             hide-traceback;
 
             fn resolve-method (self symval)
@@ -2293,6 +2305,7 @@ fn empty? (value)
 let print =
     do
         inline print-element (i key value)
+            let value = (view value)
             static-branch (const.icmp<=.i32.i32 i 0)
                 inline ()
                 inline ()
