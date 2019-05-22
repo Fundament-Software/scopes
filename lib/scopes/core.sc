@@ -1068,6 +1068,17 @@ let mutable =
                 return `[('mutable T)]
             error "syntax: (mutable pointer-type) or (mutable pointer type)"
 
+let protect =
+    spice-macro
+        fn (args)
+            let argc = (sc_argcount args)
+            verify-count argc 1 1
+            let self = (sc_getarg args 0)
+            let T = (sc_value_type self)
+            if (type< T pointer)
+                return `(bitcast self [('immutable T)])
+            error "syntax: (protect pointer-value)"
+
 let rawstring = (pointer i8)
 
 # cheap version of `not` - to be replaced further down

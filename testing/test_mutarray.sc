@@ -108,8 +108,15 @@ inline test-sort-array (T)
     'sort a (inline (x) (- x))
     va-lifold none verify-element reverse-sorted-sequence...
 
-test-sort-array i32Arrayx32
-test-sort-array i32Array
+    print "POINTER" (imply a pointer)
+    print "POINTER" (imply a voidstar)
+    print "POINTER" (imply a (pointer i32))
+
+    ;
+
+do
+    test-sort-array i32Arrayx32
+    test-sort-array i32Array
 
 dump "sorting a bunch of values"
 

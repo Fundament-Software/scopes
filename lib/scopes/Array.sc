@@ -46,15 +46,22 @@ typedef GrowingArray < Array
     supplies methods shared by both implementations.
 typedef+ Array
 
-    """".. spice:: (__as cls T)
+    """"Implements support for the `as` operator. Arrays can be cast to
+        `Generator`, or directly passed to `for`.
+    inline __as (cls T)
+        static-if (T == Generator) array-generator
 
-           Implements support for the `as` operator. Arrays can be cast to
-           `Generator`, or directly passed to `for`.
-    @@ spice-cast-macro
-    fn __as (cls T)
-        if (T == Generator)
-            return `array-generator
-        `()
+    """"Implements support for pointer casts, to pass the array to C functions
+        for example.
+    inline __imply (cls T)
+        static-match T
+        case pointer
+            inline (self) (self._items as cls.PointerType)
+        case voidstar
+            inline (self) (self._items as voidstar)
+        case cls.PointerType
+            inline (self) (self._items as cls.PointerType)
+        default ()
 
     inline __typecall (cls element-type capacity)
         """"Construct a mutable array type of ``element-type`` with a variable or
@@ -177,7 +184,8 @@ typedef+ Array
     """"Implements support for freeing the array's memory when it goes out
         of scope.
     inline __drop (self)
-        clear self
+        for idx in (range (deref self._count))
+            __drop (self._items @ idx)
         free self._items
 
     """"Safely swap the contents of two indices.
@@ -216,6 +224,7 @@ typedef+ FixedArray
 
             let
                 ElementType = element-type
+                PointerType = (pointer element-type)
                 Capacity = capacity
 
     inline __typecall (cls opts...)
@@ -239,17 +248,6 @@ typedef+ FixedArray
     """"Returns the maximum capacity of array `self`, which is fixed.
     inline capacity (self)
         (typeof self) . Capacity
-
-    #@@ box-binary-op
-    #fn __= (selfT otherT self other)
-        if false
-            return `[]
-        compiler-error! "unsupported type"
-
-    #fn __init-copy (self other)
-        assert ((typeof self) == (typeof other))
-        self._items = other._items
-        self._count = other._count
 
     """"Internally used by the type. Ensures that array `self` can hold at least
         `count` elements. A fixed array will raise an assertion when its
@@ -293,6 +291,7 @@ typedef+ GrowingArray
 
             let
                 ElementType = element-type
+                PointerType = (pointer element-type)
 
     fn nearest-capacity (capacity count)
         loop (new-capacity = capacity)
