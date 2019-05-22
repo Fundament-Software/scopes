@@ -74,7 +74,7 @@ inline decoder (coll)
                 done state...
             inline (src cp state...)
                 let c = (imply (src) i8)
-                # full state: expected byte (bits 4-5) and leading bits (bits 0-3)
+                # full state: expected byte (bits 30-31) and leading bits (bits 0-3)
                 let b = (cp & BYTE_MASK)
                 let st = (b | (ctlz (~ c)))
                 let skip =
