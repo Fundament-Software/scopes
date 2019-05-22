@@ -15,13 +15,15 @@ inline ctlz-u32 (c)
     llvm.ctlz.u32 c false
 
 inline encoder (coll)
-    """"convert a u32 codepoint as i8 byte array chunks
+    """"convert an integer codepoint to i8 byte array chunks of 1 to 4 bytes length
+        the collector forwards two arguments, the number of bytes required
+        and a buffer containing those bytes, which is only valid for this call.
     inline _encoder (coll)
         let init full? done push = ((coll as Collector))
         let tmp = (alloca-array i8 4)
         Collector init full? done
             inline (src state...)
-                let c = (imply (src) u32)
+                let c = ((src) as u32)
                 # number of bytes required
                 let nm = (ctlz-u32 c)
                 let bytecount =
@@ -51,58 +53,68 @@ inline encoder (coll)
     static-if (none? coll) _encoder
     else (_encoder coll)
 
+let BYTE_STEP = (1:u32 << 30:u32)
+let BYTE_MASK = (BYTE_STEP | (BYTE_STEP << 1:u32))
 inline decoder (coll)
-    """"convert a i8 character stream as UTF-8 codepoints
+    """"convert a i8 character stream as UTF-8 codepoints of type i32.
+        invalid bytes are forwarded as negative numbers; negating the number
+        yields the offending byte character.
     inline _decoder (coll)
         let init full? done push = ((coll as Collector))
         Collector
             inline ()
-                # which byte we expect and the codepoint we are building
-                _ 0:i8 0:u32 (init)
-            inline (b cp state...)
+                #   bits 30-31: which nth byte we expect,
+                    bits 0-20: the codepoint we are building
+                    every time we append to the codepoint,
+                    the upper bits are cleared implicitly
+                _ 0:u32 (init)
+            inline (cp state...)
                 full? state...
-            inline (b cp state...)
+            inline (cp state...)
                 done state...
-            inline (src b cp state...)
+            inline (src cp state...)
                 let c = (imply (src) i8)
                 # full state: expected byte (bits 4-5) and leading bits (bits 0-3)
+                let b = (cp & BYTE_MASK)
                 let st = (b | (ctlz (~ c)))
-                let b cp ok? result =
+                let skip =
+                    inline "#hidden" (cp)
+                        return cp state...
+                let cp result =
                     switch st
                     # expecting new codepoint, 1 byte header
-                    case 0b000000:i8
+                    case 0:u32
                         # 7 bits, reset
-                        _ 0b000000:i8 0:u32 true (c as u32) 
+                        _ 0:u32 (c as u32)
                     # expecting new codepoint, 2 byte header
-                    case 0b000010:i8
+                    case 2:u32
                         # 11 bits; start with bits 6-10, expect byte 1
-                        return 0b010000:i8 ((c & 0b11111:i8) as u32) state... 
+                        skip (BYTE_STEP | ((c & 0b11111:i8) as u32))
                     # expecting new codepoint, 3 byte header
-                    case 0b000011:i8
+                    case 3:u32
                         # 16 bits; start with bits 12-15, expect byte 2
-                        return 0b100000:i8 ((c & 0b1111:i8) as u32) state... 
+                        skip ((BYTE_STEP * 2:u32) | ((c & 0b1111:i8) as u32))
                     # expecting new codepoint, 4 byte header
-                    case 0b000100:i8
+                    case 4:u32
                         # 21 bits; start with bits 18-20, expect byte 3
-                        return 0b110000:i8 ((c & 0b111:i8) as u32) state... 
+                        skip ((BYTE_STEP * 3:u32) | ((c & 0b111:i8) as u32))
                     # expecting byte 3, cont header
                     # expecting byte 2, cont header
-                    pass 0b110001:i8
-                    case 0b100001:i8
+                    pass ((BYTE_STEP * 3:u32) | 1:u32)
+                    case ((BYTE_STEP * 2:u32) | 1:u32)
                         # read 6 bits, count down by 1
-                        return (b - 0b10000:i8) 
-                            (cp << 6:u32) | ((c & 0b111111:i8) as u32)
-                            state... 
+                        skip ((b - BYTE_STEP) | (cp << 6:u32) |
+                            ((c & 0b111111:i8) as u32))
                     # expecting byte 1, cont header
-                    case 0b010001:i8
+                    case (BYTE_STEP | 1:u32)
                         # read 6 bits, complete & reset
                         let cp = ((cp << 6:u32) | ((c & 0b111111:i8) as u32))
-                        _ 0b000000:i8 0:u32 true cp 
+                        _ 0:u32 cp
                     # illegal
                     default
                         # reset
-                        _ 0b000000:i8 0:u32 false (c as u32)
-                return b cp (push (inline () (_ ok? result)) state...) 
+                        _ 0:u32 (- (c as u32))
+                return cp (push (inline () (result as i32)) state...)
     static-if (none? coll) _decoder
     else (_decoder coll)
 

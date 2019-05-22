@@ -22,17 +22,17 @@ inline string-buffer-sink (maxsize)
 
 let srcstr = "🤔Thö Quöck Brüwn Föx🤔"
 let dststr =
-    ->> 
+    ->>
         # iterate string characters
         srcstr
         # build codepoints
         UTF-8.decoder
         # filter codepoints
         map
-            inline (ok? cp)
-                if ok? cp
-                else
+            inline (cp)
+                if (cp < 0)
                     error "illegal byte in UTF-8 stream"
+                cp
         # build bytestream
         UTF-8.encoder
         # build string
