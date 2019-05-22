@@ -3394,9 +3394,9 @@ static SCOPES_RESULT(TypedValueRef) prove_inline_body(const ASTContext &ctx,
         if (label->merges.empty()) {
             // label does not need a merge label
             assert(ctx.block);
-            result_value = SCOPES_GET_RESULT(
+            /* result_value = SCOPES_GET_RESULT(
                 move_single_merge_value(bodyctx, ctx.block->depth,
-                    result_value, "inline return"));
+                    result_value, "inline return")); */
             ctx.merge_block(label->body);
             return result_value;
         } else {
