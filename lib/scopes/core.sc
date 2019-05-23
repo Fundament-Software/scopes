@@ -1801,8 +1801,8 @@ inline simple-folding-autotype-signed-binary-op (sf uf unboxer)
     variadic? = sc_symbol_is_variadic
 
 'set-symbols Symbol
-    __== = (box-pointer (simple-binary-op icmp==))
-    __!= = (box-pointer (simple-binary-op icmp!=))
+    __== = (box-pointer (simple-folding-autotype-binary-op icmp== sc_const_int_extract))
+    __!= = (box-pointer (simple-folding-autotype-binary-op icmp!= sc_const_int_extract))
     __imply =
         box-pointer
             spice-cast-macro

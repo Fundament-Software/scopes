@@ -13,7 +13,11 @@
 spice element-prefix (element-type)
     match (element-type as type)
     case bool "b"
+    case i8 "i8"
+    case i16 "i16"
     case i32 "i"
+    case u8 "u8"
+    case u16 "u16"
     case u32 "u"
     case f32 ""
     case f64 "d"
@@ -209,7 +213,7 @@ typedef+ vec-type
         if (self == vec-type)
             `(construct-vec-type ...)
         else
-            let args = 
+            let args =
                 sc_argument_list_map_new ('argcount ...)
                     inline (i)
                         let arg = ('getarg ... i)
