@@ -2316,11 +2316,8 @@ inline sugar-macro (f)
             let at = (f ('next at))
             return (cons ('tag `at anchor) next) scope
 
-fn empty? (value)
+inline empty? (value)
     == (countof value) 0
-
-#fn cons (at next)
-    sc_list_cons (Value at) next
 
 let print =
     do
@@ -6357,6 +6354,39 @@ let local = (gen-allocator-sugar "local" alloca)
 let global = (gen-allocator-sugar "global" private)
 
 run-stage; # 11
+
+#-------------------------------------------------------------------------------
+# list constant expression folding
+#-------------------------------------------------------------------------------
+
+typedef+ list
+    spice __countof (self)
+        if ('constant? self)
+            `[(sc_list_count (self as list))]
+        else
+            `(sc_list_count self)
+
+    spice __unpack (self)
+        if (not ('constant? self))
+            error "can only unpack constant lists"
+        let self = (self as list)
+        let count = (countof self)
+        if (count == 0)
+            return `()
+        let values = (alloca-array Value count)
+        loop (i self = 0 self)
+            if (empty? self)
+                break;
+            let at next = (decons self)
+            store
+                # can unpack constants right away
+                if ('constant? at) at
+                else
+                    # keep impure values as values
+                    ``at
+                getelementptr values i
+            repeat (i + 1) next
+        sc_argument_list_new count values
 
 #-------------------------------------------------------------------------------
 # images
