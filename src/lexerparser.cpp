@@ -285,7 +285,15 @@ SCOPES_RESULT(bool) LexerParser::select_integer_suffix() {
     else if (is_suffix(":u64")) { newtype = TYPE_U64; }
     //else if (is_suffix(":isize")) { newtype = TYPE_ISize; }
     else if (is_suffix(":usize")) { newtype = TYPE_USize; }
-    else {
+    else if (is_suffix(":f32")) {
+        value = ref(value.anchor(),
+            ConstReal::from(TYPE_F32, (int64_t)value.cast<ConstInt>()->value));
+        return true;
+    } else if (is_suffix(":f64")) {
+        value = ref(value.anchor(),
+            ConstReal::from(TYPE_F64, (int64_t)value.cast<ConstInt>()->value));
+        return true;
+    } else {
         SCOPES_TRACE_PARSER(this->anchor());
         SCOPES_ERROR(ParserInvalidIntegerSuffix,
             String::from(string, string_len));
