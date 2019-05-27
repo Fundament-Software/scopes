@@ -214,6 +214,10 @@ SCOPES_LIBEXPORT void sc_expression_set_scoped(sc_valueref_t expr);
 SCOPES_LIBEXPORT sc_valueref_t sc_global_new(sc_symbol_t name,
     const sc_type_t *type, uint32_t flags /* = 0 */, sc_symbol_t storage_class /* = unnamed */,
     int location /* = -1 */, int binding /* = -1 */);
+SCOPES_LIBEXPORT sc_void_raises_t sc_global_set_initializer(sc_valueref_t value,
+    sc_valueref_t init);
+SCOPES_LIBEXPORT sc_void_raises_t sc_global_set_constructor(sc_valueref_t value,
+    sc_valueref_t func);
 SCOPES_LIBEXPORT sc_int_raises_t sc_global_location(sc_valueref_t value);
 SCOPES_LIBEXPORT sc_int_raises_t sc_global_binding(sc_valueref_t value);
 SCOPES_LIBEXPORT sc_symbol_raises_t sc_global_storage_class(sc_valueref_t value);

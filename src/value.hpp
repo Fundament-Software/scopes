@@ -778,6 +778,8 @@ struct Global : Pure {
         int location = -1, int binding = -1);
 
     const Type *element_type;
+    PureRef initializer;
+    FunctionRef constructor;
     Symbol name;
     size_t flags;
     Symbol storage_class;

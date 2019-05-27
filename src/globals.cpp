@@ -1352,6 +1352,28 @@ sc_valueref_t sc_global_new(sc_symbol_t name, const sc_type_t *type,
     return Global::from(type, name, flags, storage_class, location, binding);
 }
 
+sc_void_raises_t sc_global_set_initializer(sc_valueref_t value,
+    sc_valueref_t init) {
+    using namespace scopes;
+    SCOPES_RESULT_TYPE(void);
+    auto glob = SCOPES_C_GET_RESULT(extract_global_constant(value));
+    auto pure = init.dyn_cast<Pure>();
+    if (!pure) {
+        SCOPES_C_ERROR(GlobalInitializerMustBePure);
+    }
+    glob->initializer = pure;
+    return convert_result({});
+}
+
+sc_void_raises_t sc_global_set_constructor(sc_valueref_t value,
+    sc_valueref_t func) {
+    using namespace scopes;
+    SCOPES_RESULT_TYPE(void);
+    auto glob = SCOPES_C_GET_RESULT(extract_global_constant(value));
+    glob->constructor = SCOPES_C_GET_RESULT(extract_function_constant(func));
+    return convert_result({});
+}
+
 sc_int_raises_t sc_global_location(sc_valueref_t value) {
     using namespace scopes;
     SCOPES_RESULT_TYPE(int);
@@ -2217,6 +2239,8 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_expression_append, _void, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_global_new, TYPE_ValueRef, TYPE_Symbol, TYPE_Type,
         TYPE_U32, TYPE_Symbol, TYPE_I32, TYPE_I32);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_global_set_initializer, _void, TYPE_ValueRef, TYPE_ValueRef);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_global_set_constructor, _void, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_global_location, TYPE_I32, TYPE_ValueRef);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_global_binding, TYPE_I32, TYPE_ValueRef);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_global_storage_class, TYPE_Symbol, TYPE_ValueRef);

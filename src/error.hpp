@@ -263,6 +263,8 @@ formatters:
         int) \
     T(ResultMustBePure, \
         "result must be pure") \
+    T(GlobalInitializerMustBePure, \
+        "global initializer must be pure") \
     T(ParameterTypeMismatch, \
         "parameter is of type %0, but argument is of incompatible type %1", \
         PType, PType) \

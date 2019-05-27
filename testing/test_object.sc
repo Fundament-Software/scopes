@@ -15,11 +15,17 @@ compile
     'no-debug-info
 
 global x : i32x10
-global y : i32
+# global constructor syntax
+global y : i32 =
+    inline ()
+        C.printf "y constructor called\n"
+        7
+
+print "y=" (deref y)
 
 fn main (argc argv)
     x @ 3 = 6
-    y = 7
+    #y = 7
     C.printf ("hello world %i %i\n" as rawstring)
         deref (x @ 3)
         deref y
@@ -31,7 +37,7 @@ fn main (argc argv)
 let main = (static-typify main i32 (pointer rawstring))
 #compile main
     'dump-module
-    'no-debug-info
+    #'no-debug-info
 main 0 null
 
 print "-----------------"

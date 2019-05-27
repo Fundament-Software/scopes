@@ -6312,46 +6312,79 @@ sugar typedef (name body...)
 # standard allocators
 #-------------------------------------------------------------------------------
 
-inline gen-allocator-sugar (name f)
+inline gen-allocator-sugar (name copyf newf)
     sugar "" (values...)
-        spice local-copy-typed (T value)
-            spice-quote
-                let val = (ptrtoref (f T))
-                assign (imply value T) val
-                val
-        spice local-copy (value)
+        spice copy-by-value (value)
             let T = ('typeof value)
-            `(local-copy-typed T value)
-        spice local-new (T args...)
-            spice-quote
-                let val = (ptrtoref (f T))
-                assign (T args...) val
-                val
+            `(copyf T value)
         let anchor = ('anchor expression)
         let _let = ('tag `let anchor)
         let result =
             sugar-match values...
             case (name '= value)
                 let callexpr =
-                    'tag `[(qq ([local-copy value]))] anchor
+                    'tag `[(qq ([copy-by-value value]))] anchor
                 qq [_let name] = [callexpr]
             case (name ': T '= value)
                 let callexpr =
-                    'tag `[(qq ([local-copy-typed T value]))] anchor
+                    'tag `[(qq ([copyf T value]))] anchor
                 qq [_let name] = [callexpr]
             case (name ': T args...)
                 let callexpr =
-                    'tag `[(qq [local-new T] (unquote-splice args...))] anchor
+                    'tag `[(qq [newf T] (unquote-splice args...))] anchor
                 qq [_let name] = [callexpr]
             case (T args...)
-                qq [local-new T] (unquote-splice args...)
+                qq [newf T] (unquote-splice args...)
             default
                 error
                     .. "syntax: " name " <name> [: <type>] [= <value>]"
         'tag `result anchor
 
-let local = (gen-allocator-sugar "local" alloca)
-let global = (gen-allocator-sugar "global" private)
+let local =
+    gen-allocator-sugar "local"
+        spice "local-copy" (T value)
+            spice-quote
+                let val = (alloca T)
+                store (imply value T) val
+                ptrtoref val
+        spice "local-new" (T args...)
+            spice-quote
+                let val = (alloca T)
+                store (T args...) val
+                ptrtoref val
+let global =
+    gen-allocator-sugar "global"
+        spice "global-copy" (T value)
+            let val = (extern-new unnamed (T as type) (storage-class = 'Private))
+            if (('constant? value) and (('typeof value) == Closure))
+                # constructor, build function
+                let f = (value as Closure)
+                spice-quote
+                    fn constructor ()
+                        store (f) val
+                        ;
+                let constructor = (sc_typify_template constructor 0 null)
+                sc_global_set_constructor val constructor
+                `(ptrtoref val)
+            else
+                let init = (sc_prove `(imply value T))
+                if ('pure? init)
+                    hide-traceback;
+                    sc_global_set_initializer val init
+                spice-quote
+                    store init val
+                    ptrtoref val
+
+        spice "global-new" (T args...)
+            let T = (T as type)
+            let val = (extern-new unnamed (T as type) (storage-class = 'Private))
+            let init = (sc_prove `(T args...))
+            if ('pure? init)
+                hide-traceback;
+                sc_global_set_initializer val init
+            spice-quote
+                store init val
+                ptrtoref val
 
 run-stage; # 11
 

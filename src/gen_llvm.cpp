@@ -204,6 +204,8 @@ struct LLVMIRGenerator {
     std::unordered_map<Function *, LLVMMetadataRef> func2md;
     std::unordered_map<Function *, Symbol> func_export_table;
     std::unordered_map<Global *, LLVMValueRef> global2global;
+    std::vector<LLVMValueRef> constructors;
+    LLVMValueRef constructor_function = nullptr;
     std::deque<FunctionRef> function_todo;
     static Types type_todo;
     static std::unordered_map<const Type *, LLVMTypeRef> type_cache;
@@ -265,6 +267,7 @@ struct LLVMIRGenerator {
     bool generate_object = false;
     bool serialize_pointers = false;
     FunctionRef active_function;
+    FunctionRef entry_function;
     std::vector<LLVMValueRef> generated_symbols;
 
     PointerMap pointer_map;
@@ -967,6 +970,9 @@ struct LLVMIRGenerator {
         }
 
         position_builder_at_end(bb);
+        if ((node == entry_function) && constructor_function) {
+            LLVMBuildCall(builder, constructor_function, nullptr, 0, "");
+        }
 
         auto &&params = node->params;
         size_t offset = 0;
@@ -1908,7 +1914,23 @@ struct LLVMIRGenerator {
                 result = LLVMAddGlobal(module, LLT, name.c_str());
                 global2global.insert({ node.unref(), result });
                 if (!is_external) {
-                    LLVMSetInitializer(result, LLVMConstNull(LLT));
+
+                    LLVMValueRef init = nullptr;
+
+                    if (node->initializer) {
+                        init = SCOPES_GET_RESULT(
+                            ref_to_value(TypedValueRef(node->initializer)));
+                    } else {
+                        init = LLVMConstNull(LLT);
+                    }
+                    LLVMSetInitializer(result, init);
+
+                    if (node->constructor) {
+                        constructors.push_back(
+                            SCOPES_GET_RESULT(
+                                ref_to_value(
+                                    TypedValueRef(node->constructor))));
+                    }
                 }
                 return result;
             } else {
@@ -2297,8 +2319,6 @@ struct LLVMIRGenerator {
 
     SCOPES_RESULT(void) teardown_generate(const FunctionRef &entry = FunctionRef()) {
         SCOPES_RESULT_TYPE(void);
-        SCOPES_CHECK_RESULT(process_functions());
-
         size_t k = SCOPES_GET_RESULT(finalize_types());
         assert(!k);
 
@@ -2323,6 +2343,38 @@ struct LLVMIRGenerator {
     }
 
     typedef std::pair<LLVMModuleRef, LLVMValueRef> ModuleValuePair;
+
+    void build_constructor_function() {
+        assert(constructor_function);
+        auto func = constructor_function;
+        //LLVMSetLinkage(func, LLVMPrivateLinkage);
+        auto bb = LLVMAppendBasicBlock(func, "");
+        position_builder_at_end(bb);
+
+        for (auto val : constructors) {
+            LLVMBuildCall(builder, val, nullptr, 0, "");
+        }
+
+        LLVMBuildRetVoid(builder);
+    }
+
+    void build_constructors() {
+        if (constructors.empty()) {
+            return;
+        }
+        auto count = constructors.size();
+        LLVMValueRef structs[count];
+        int i = 0;
+        for (auto val : constructors) {
+            LLVMValueRef constvals[] = { LLVMConstInt(i32T, i, false), val };
+            structs[i] = LLVMConstStruct(constvals, 2, false);
+            i++;
+        }
+        auto arr = LLVMConstArray(LLVMTypeOf(structs[0]), structs, count);
+        auto glob = LLVMAddGlobal(module, LLVMTypeOf(arr), "llvm.global_ctors");
+        LLVMSetInitializer(glob, arr);
+        LLVMSetLinkage(glob, LLVMAppendingLinkage);
+    }
 
     // for generating object files
     SCOPES_RESULT(LLVMModuleRef) generate(const String *name, Scope *table) {
@@ -2349,6 +2401,10 @@ struct LLVMIRGenerator {
             t = t->parent;
         }
 
+        SCOPES_CHECK_RESULT(process_functions());
+
+        build_constructors();
+
         {
             // build llvm.used
             auto count = exported_globals.size();
@@ -2373,39 +2429,18 @@ struct LLVMIRGenerator {
         const char *name = entry->name.name()->data;
         setup_generate(name);
 
+        {
+            constructor_function = LLVMAddFunction(module, "",
+                LLVMFunctionType(voidT, nullptr, 0, false));
+        }
+
+        entry_function = entry;
+
         auto func = SCOPES_GET_RESULT(ref_to_value(ValueIndex(entry)));
         LLVMSetLinkage(func, LLVMExternalLinkage);
 
-        #if 0
-        {
-            auto arg = LLVMPointerType(i8T, 0);
-            auto putsf = LLVMAddFunction(module, "puts",
-                LLVMFunctionType(i32T, &arg, 1, false));
-            LLVMSetLinkage(putsf, LLVMExternalLinkage);
-            StyledString ss;
-            ss.out << "hi from constructor " << (void *)putsf << std::endl;
-            auto msg = make_string_constant(ss.str()->data);
-
-            auto ftype = LLVMFunctionType(voidT, nullptr, 0, false);
-            auto func = LLVMAddFunction(module, ss.str()->data, ftype);
-            //LLVMSetLinkage(func, LLVMPrivateLinkage);
-            auto bb = LLVMAppendBasicBlock(func, "");
-            position_builder_at_end(bb);
-
-            auto msgptr = LLVMBuildBitCast(builder, msg, arg, "");
-            LLVMBuildCall(builder, putsf, &msgptr, 1, "");
-            LLVMBuildRetVoid(builder);
-            LLVMValueRef constvals[] = {
-                LLVMConstInt(i32T, 100, false),
-                func };
-            auto strct = LLVMConstStruct(constvals, 2, false);
-            auto arr = LLVMConstArray(LLVMTypeOf(strct), &strct, 1);
-            auto glob = LLVMAddGlobal(module, LLVMTypeOf(arr), "llvm.global_ctors");
-            LLVMSetInitializer(glob, arr);
-            LLVMSetLinkage(glob, LLVMAppendingLinkage);
-        }
-        #endif
-
+        SCOPES_CHECK_RESULT(process_functions());
+        build_constructor_function();
         SCOPES_CHECK_RESULT(teardown_generate(entry));
 
         return ModuleValuePair(module, func);
