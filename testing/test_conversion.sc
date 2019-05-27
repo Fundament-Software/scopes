@@ -1,5 +1,7 @@
 
-assert
+using import testing
+
+test
     (f32 5) == 5.0
-assert
+test
     (i32 5.0) == 5

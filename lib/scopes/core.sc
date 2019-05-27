@@ -6825,8 +6825,7 @@ let e = e:f32
 
 #-------------------------------------------------------------------------------
 
-unlet _memo dot-char dot-sym ellipsis-symbol symbol-handler-symbol
-    \ list-handler-symbol _Value constructor destructor
+unlet _memo dot-char dot-sym ellipsis-symbol _Value constructor destructor
 
 run-stage; # 12
 

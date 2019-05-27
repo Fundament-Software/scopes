@@ -18,10 +18,300 @@
 
 #include <string.h>
 #include <assert.h>
+#include <cmath>
 
 #pragma GCC diagnostic ignored "-Wvla-extension"
 
 namespace scopes {
+
+//------------------------------------------------------------------------------
+
+/*
+flag: explicit sign
+flag: explicit base
+flag: explicit dot
+flag: explicit exponent
+flag: explicit suffix
+sign: + or -
+base (2, 8, 10, 16)
+numbers: std::vector<uchar>
+position of dot
+exponent sign
+suffix symbol
+
+void scopes_strtoll(int64_t *v, const char* str, char** endptr) {
+*/
+
+struct NumberParser {
+    enum {
+        NPF_Sign             = (1 << 0),
+        NPF_Negative         = (1 << 1),
+        NPF_Base             = (1 << 2),
+        NPF_Dot              = (1 << 3),
+        NPF_Exponent         = (1 << 4),
+        NPF_ExponentSign     = (1 << 5),
+        NPF_ExponentNegative = (1 << 6),
+        NPF_Inf              = (1 << 7),
+        NPF_NaN              = (1 << 8),
+        NPF_Real = NPF_Dot | NPF_Exponent | NPF_Inf | NPF_NaN,
+    };
+    uint16_t flags = 0;
+    int base = 10;
+    int dot = 0;
+    std::vector<uint8_t> digits;
+    std::vector<uint8_t> exponent_digits;
+
+    bool is_real() const {
+        return (flags & NPF_Real) != 0;
+    }
+
+    bool is_signed() const {
+        return (flags & NPF_Sign) != 0;
+    }
+
+    bool is_negative() const {
+        return (flags & NPF_Negative) != 0;
+    }
+
+    bool is_exponent_negative() const {
+        return (flags & NPF_ExponentNegative) != 0;
+    }
+
+    bool has_exponent() const {
+        return (flags & NPF_Exponent) != 0;
+    }
+
+    bool is_inf() const {
+        return (flags & NPF_Inf) != 0;
+    }
+
+    bool is_nan() const {
+        return (flags & NPF_NaN) != 0;
+    }
+
+    int64_t exponent_as_int64() const {
+        int i = exponent_digits.size();
+        assert(i <= exponent_digits.size());
+        int64_t exp = 1;
+        int64_t result = 0;
+        while (i-- > 0) {
+            result += (int64_t)exponent_digits[i] * exp;
+            exp *= 10ll;
+        }
+        return is_exponent_negative()?-result:result;
+    }
+
+    double as_double() const {
+        double result = 0.0;
+        if (is_nan()) {
+            result = nan("");
+        } else if (is_inf()) {
+            result = INFINITY;
+        } else {
+            int i = digits.size();
+            while (i-- > 0) {
+                double exp = std::pow((double)base, (double)(dot - i - 1));
+                result += (double)digits[i] * exp;
+            }
+            if (has_exponent()) {
+                int64_t e = exponent_as_int64();
+                if (base == 10) {
+                    result *= std::pow(10.0, (double)e);
+                } else {
+                    result *= std::exp2(e);
+                }
+            }
+        }
+        return is_negative()?-result:result;
+    }
+
+    template<typename T>
+    T as_integer() const {
+        int i = dot;
+        assert(i <= digits.size());
+        T exp = 1;
+        T result = 0;
+        while (i-- > 0) {
+            result += (T)digits[i] * exp;
+            exp *= (T)base;
+        }
+        return is_negative()?-result:result;
+    }
+    int64_t as_int64() const {
+        return as_integer<int64_t>();
+    }
+
+    uint64_t as_uint64() const {
+        return as_integer<uint64_t>();
+    }
+
+    bool parse(const char *&str) {
+        enum State {
+            State_UnknownSign = 0,
+            State_UnknownBase = 1,
+            State_ExpectBase = 2,
+            State_ExpectNumber = 3,
+            State_ExpectExponentSign = 4,
+            State_ExpectExponent = 5,
+        };
+        State state = State_UnknownSign;
+        while (auto c = *str) {
+        repeat:
+            switch(state) {
+            case State_UnknownSign:
+                state = State_UnknownBase;
+                switch(c) {
+                case '+':
+                    flags |= NPF_Sign;
+                    break;
+                case '-':
+                    flags |= NPF_Sign | NPF_Negative;
+                    break;
+                default:
+                    goto repeat;
+                }
+                break;
+            case State_UnknownBase:
+                switch(c) {
+                case 'n':
+                case 'N': // nan?
+                    if (str[1] && (str[1] == 'a' || str[1] == 'A')
+                        && str[2] && (str[2] == 'n' || str[2] == 'N')) {
+                        str += 3;
+                        flags |= NPF_NaN;
+                        return true;
+                    } else return false;
+                case 'i':
+                case 'I': // inf?
+                    if (str[1] && (str[1] == 'n' || str[1] == 'N')
+                        && str[2] && (str[2] == 'f' || str[2] == 'F')) {
+                        str += 3;
+                        flags |= NPF_Inf;
+                        return true;
+                    } else return false;
+                case '0':
+                    state = State_ExpectBase;
+                    break;
+                default:
+                    state = State_ExpectNumber;
+                    goto repeat;
+                }
+                break;
+            case State_ExpectBase:
+                state = State_ExpectNumber;
+                switch(c) {
+                case 'x':
+                    base = 16;
+                    flags |= NPF_Base;
+                    break;
+                case 'b':
+                    base = 2;
+                    flags |= NPF_Base;
+                    break;
+                case 'o':
+                    base = 8;
+                    flags |= NPF_Base;
+                    break;
+                default:
+                    // we parsed a zero already
+                    digits.push_back(0);
+                    goto repeat;
+                }
+                break;
+            case State_ExpectNumber:
+                switch(c) {
+                case '.':
+                    // duplicate dot or dot after exponent
+                    if (flags & (NPF_Dot|NPF_Exponent)) goto done;
+                    dot = digits.size();
+                    flags |= NPF_Dot;
+                    break;
+                case 'p':
+                    // exponent already defined
+                    if (flags & NPF_Exponent) goto done;
+                    // base is not 16
+                    if (base != 16) goto done;
+                    state = State_ExpectExponentSign;
+                    flags |= NPF_Exponent;
+                    break;
+                case 'e':
+                    if (base != 16) {
+                        // exponent already defined
+                        if (flags & NPF_Exponent) goto done;
+                        // no digits have been defined yet
+                        if (digits.empty()) goto done;
+                        state = State_ExpectExponentSign;
+                        flags |= NPF_Exponent;
+                        break;
+                    }
+                    // fall-through
+                default: {
+                    uint8_t digit = 0;
+                    switch(base) {
+                    case 2: {
+                        if ((c >= '0') && (c <= '1')) {
+                            digit = c - '0';
+                        } else goto done;
+                    } break;
+                    case 8: {
+                        if ((c >= '0') && (c <= '7')) {
+                            digit = c - '0';
+                        } else goto done;
+                    } break;
+                    case 10: {
+                        if ((c >= '0') && (c <= '9')) {
+                            digit = c - '0';
+                        } else goto done;
+                    } break;
+                    case 16: {
+                        if ((c >= '0') && (c <= '9')) {
+                            digit = c - '0';
+                        } else if ((c >= 'A') && (c <= 'F')) {
+                            digit = c - 'A' + 10;
+                        } else if ((c >= 'a') && (c <= 'f')) {
+                            digit = c - 'a' + 10;
+                        } else goto done;
+                    } break;
+                    default: goto done;
+                    }
+                    digits.push_back(digit);
+                } break;
+                }
+                break;
+            case State_ExpectExponentSign:
+                state = State_ExpectExponent;
+                switch(c) {
+                case '+':
+                    flags |= NPF_ExponentSign;
+                    break;
+                case '-':
+                    flags |= NPF_ExponentSign | NPF_ExponentNegative;
+                    break;
+                default:
+                    goto repeat;
+                }
+                break;
+            case State_ExpectExponent:
+                if ((c >= '0') && (c <= '9')) {
+                    exponent_digits.push_back(c - '0');
+                } else goto done; // unrecognized digit
+                break;
+            }
+            str++;
+        }
+    done:
+        if (!(flags & NPF_Dot))
+            dot = digits.size();
+        if (digits.empty()) return false;
+        if (flags & NPF_Exponent)
+            if (exponent_digits.empty())
+                return false;
+        return true;
+    }
+
+};
+
+//------------------------------------------------------------------------------
 
 enum {
     RN_Invalid = 0,
@@ -208,63 +498,6 @@ SCOPES_RESULT(void) LexerParser::read_comment() {
     return {};
 }
 
-template<typename T>
-SCOPES_RESULT(int) LexerParser::read_integer(const Type *TT, void (*strton)(T *, const char*, char**)) {
-    SCOPES_RESULT_TYPE(int);
-    char *cend;
-    errno = 0;
-    T srcval;
-    strton(&srcval, cursor, &cend);
-    if ((cend == cursor)
-        || (errno == ERANGE)
-        || (cend > eof)) {
-        return RN_Invalid;
-    }
-    value = ref(anchor(), ConstInt::from(TT, srcval));
-    next_cursor = cend;
-    if ((cend != eof)
-        && (!isspace(*cend))
-        && (!strchr(TOKEN_TERMINATORS, *cend))) {
-        if (strchr(".e", *cend)) return false;
-        // suffix
-        auto _lineno = lineno; auto _line = line; auto _cursor = cursor;
-        next_token();
-        SCOPES_CHECK_RESULT(read_symbol());
-        lineno = _lineno; line = _line; cursor = _cursor;
-        return RN_Typed;
-    } else {
-        return RN_Untyped;
-    }
-}
-
-template<typename T>
-SCOPES_RESULT(int) LexerParser::read_real(const Type *TT, void (*strton)(T *, const char*, char**, int)) {
-    SCOPES_RESULT_TYPE(int);
-    char *cend;
-    errno = 0;
-    T srcval;
-    strton(&srcval, cursor, &cend, 0);
-    if ((cend == cursor)
-        || (errno == ERANGE)
-        || (cend > eof)) {
-        return RN_Invalid;
-    }
-    value = ref(anchor(), ConstReal::from(TT, srcval));
-    next_cursor = cend;
-    if ((cend != eof)
-        && (!isspace(*cend))
-        && (!strchr(TOKEN_TERMINATORS, *cend))) {
-        // suffix
-        auto _lineno = lineno; auto _line = line; auto _cursor = cursor;
-        next_token();
-        SCOPES_CHECK_RESULT(read_symbol());
-        lineno = _lineno; line = _line; cursor = _cursor;
-        return RN_Typed;
-    } else {
-        return RN_Untyped;
-    }
-}
-
 bool LexerParser::has_suffix() const {
     return (string_len >= 1) && (string[0] == ':');
 }
@@ -321,46 +554,61 @@ SCOPES_RESULT(bool) LexerParser::select_real_suffix() {
     return true;
 }
 
-SCOPES_RESULT(bool) LexerParser::read_int64() {
+SCOPES_RESULT(bool) LexerParser::read_number() {
     SCOPES_RESULT_TYPE(bool);
-    switch(SCOPES_GET_RESULT(read_integer(TYPE_I64, scopes_strtoll))) {
-    case RN_Invalid: return false;
-    case RN_Untyped: {
-        int64_t val = value.cast<ConstInt>()->value;
+
+    NumberParser number;
+    const char *cend = cursor;
+    if (!number.parse(cend)
+        || (cend == cursor)
+        || (cend > eof))
+        return false;
+    next_cursor = cend;
+    if (number.is_real()) {
+        value = ref(anchor(), ConstReal::from(TYPE_F32, number.as_double()));
+    } else if (number.is_signed()) {
+        int64_t val = number.as_int64();
+        const Type *T = TYPE_I64;
         if ((val >= -0x80000000ll) && (val <= 0x7fffffffll)) {
-            value = ref(value.anchor(), ConstInt::from(TYPE_I32, val));
-        } else if ((val >= 0x80000000ll) && (val <= 0xffffffffll)) {
-            value = ref(value.anchor(), ConstInt::from(TYPE_U32, val));
+            T = TYPE_I32;
         }
-        return true;
-    } break;
-    case RN_Typed:
-        return select_integer_suffix();
-    default: assert(false); return false;
+        value = ref(anchor(), ConstInt::from(T, val));
+    } else {
+        uint64_t val = number.as_uint64();
+        const Type *T = TYPE_U64;
+        if (val <= 0x7fffffffull) {
+            T = TYPE_I32;
+        } else if (val <= 0xffffffffll) {
+            T = TYPE_U32;
+        } else if (val <= 0x7fffffffffffffffull) {
+            T = TYPE_I64;
+        } else {
+            T = TYPE_U64;
+        }
+        value = ref(anchor(), ConstInt::from(T, val));
     }
-}
-SCOPES_RESULT(bool) LexerParser::read_uint64() {
-    SCOPES_RESULT_TYPE(bool);
-    switch(SCOPES_GET_RESULT(read_integer(TYPE_U64, scopes_strtoull))) {
-    case RN_Invalid: return false;
-    case RN_Untyped:
+    if ((cend == eof)
+        || isspace(*cend)
+        || strchr(TOKEN_TERMINATORS, *cend)) {
+        // no suffix, guess type from value
         return true;
-    case RN_Typed:
-        return select_integer_suffix();
-    default: assert(false); return false;
     }
-}
-SCOPES_RESULT(bool) LexerParser::read_real64() {
-    SCOPES_RESULT_TYPE(bool);
-    switch(SCOPES_GET_RESULT(read_real(TYPE_F64, scopes_strtod))) {
-    case RN_Invalid: return false;
-    case RN_Untyped:
-        value = ref(value.anchor(), ConstReal::from(TYPE_F32,
-            value.cast<ConstReal>()->value));
-        return true;
-    case RN_Typed:
+    // doesn't start with a suffix
+    if (*cend != ':')
+        return false;
+    // suffix
+    auto _lineno = lineno; auto _line = line; auto _cursor = cursor;
+    next_token();
+    SCOPES_CHECK_RESULT(read_symbol());
+    lineno = _lineno; line = _line; cursor = _cursor;
+
+    if (value.isa<ConstInt>()) {
+        return select_integer_suffix();
+    } else if (value.isa<ConstReal>()) {
         return select_real_suffix();
-    default: assert(false); return false;
+    } else {
+        assert(false);
+        return false;
     }
 }
 
@@ -403,9 +651,7 @@ skip:
     else if (c == '\'') { token = tok_syntax_quote; }
     else if (c == '`') { token = tok_ast_quote; }
     else if (c == ',') { token = tok_symbol; read_single_symbol(); }
-    else if (SCOPES_GET_RESULT(read_int64())
-        || SCOPES_GET_RESULT(read_uint64())
-        || SCOPES_GET_RESULT(read_real64())) { token = tok_number; }
+    else if (SCOPES_GET_RESULT(read_number())) { token = tok_number; }
     else { token = tok_symbol; SCOPES_CHECK_RESULT(read_symbol()); }
 done:
     return token;

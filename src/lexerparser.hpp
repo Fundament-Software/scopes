@@ -115,21 +115,13 @@ struct LexerParser {
 
     SCOPES_RESULT(void) read_comment();
 
-    template<typename T>
-    SCOPES_RESULT(int) read_integer(const Type *TT, void (*strton)(T *, const char*, char**));
-
-    template<typename T>
-    SCOPES_RESULT(int) read_real(const Type *TT, void (*strton)(T *, const char*, char**, int));
-
     bool has_suffix() const;
 
     SCOPES_RESULT(bool) select_integer_suffix();
 
     SCOPES_RESULT(bool) select_real_suffix();
 
-    SCOPES_RESULT(bool) read_int64();
-    SCOPES_RESULT(bool) read_uint64();
-    SCOPES_RESULT(bool) read_real64();
+    SCOPES_RESULT(bool) read_number();
 
     void next_token();
 

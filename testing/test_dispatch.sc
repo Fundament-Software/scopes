@@ -1,3 +1,6 @@
+
+using import testing
+
 #do
     let m =
         fn-dispatcher
@@ -32,9 +35,9 @@ do
     # reference type will be implicitly converted to value type
     let x = (ptrtoref (alloca i32))
     x = 1
-    assert ((add3 x 2 3) == 6)
-    assert ((add3 1.0 2.0 3.0) == 6.0)
-    assert ((add3 "a" "b" "c") == "abc")
+    test ((add3 x 2 3) == 6)
+    test ((add3 1.0 2.0 3.0) == 6.0)
+    test ((add3 "a" "b" "c") == "abc")
 
     #dump
         add3 true
@@ -51,10 +54,10 @@ do
     case (a : f32, b : i32)
         div2 a (f32 b)
 
-    assert ((div2 4.0 2.0) == 2.0)
-    assert ((div2 4   2  ) == 2.0)
-    assert ((div2 4.0 2  ) == 2.0)
-    assert ((div2 4   2.0) == 2.0)
+    test ((div2 4.0 2.0) == 2.0)
+    test ((div2 4   2  ) == 2.0)
+    test ((div2 4.0 2  ) == 2.0)
+    test ((div2 4   2.0) == 2.0)
 
 
 false

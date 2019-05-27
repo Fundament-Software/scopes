@@ -1,4 +1,7 @@
 
+using import testing
+
+
 # testing C ABI
 
 #fn testfunc (x y)
@@ -87,7 +90,7 @@ compile
     `[(typify testf1)]
     'dump-module
 
-assert (1 == (testf4))
-assert (1 == (testf3))
-assert (1 == (testf2))
-assert (1 == (testf1))
+test (1 == (testf4))
+test (1 == (testf3))
+test (1 == (testf2))
+test (1 == (testf1))
