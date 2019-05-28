@@ -26,22 +26,6 @@ namespace scopes {
 
 //------------------------------------------------------------------------------
 
-/*
-flag: explicit sign
-flag: explicit base
-flag: explicit dot
-flag: explicit exponent
-flag: explicit suffix
-sign: + or -
-base (2, 8, 10, 16)
-numbers: std::vector<uchar>
-position of dot
-exponent sign
-suffix symbol
-
-void scopes_strtoll(int64_t *v, const char* str, char** endptr) {
-*/
-
 struct NumberParser {
     enum {
         NPF_Sign             = (1 << 0),

@@ -2911,6 +2911,7 @@ let
     storageof = (make-const-type-property-function sc_type_storage)
     superof = (make-const-type-property-function sc_typename_type_get_super)
     sizeof = (make-const-type-property-function sc_type_sizeof)
+    bitcountof = (make-const-type-property-function sc_type_bitcountof)
     alignof = (make-const-type-property-function sc_type_alignof)
     unqualified = (make-const-type-property-function sc_strip_qualifiers)
     qualifiersof = (make-const-value-property-function sc_value_qualified_type)
@@ -6801,6 +6802,51 @@ spice defer (f args...)
                 inline ()
                     f args...
         ;
+
+#-------------------------------------------------------------------------------
+# hex/oct/bin conversion
+#-------------------------------------------------------------------------------
+
+fn integer->string (value base)
+    let N = 65
+    let T = (typeof value)
+    let digits = (alloca-array i8 N)
+    let absvalue = (abs value)
+    let neg? = (value != absvalue)
+    loop (i value = N absvalue)
+        if (i == 0)
+            break (string digits N)
+        let i = (i - 1)
+        let digit = ((value % base) as i8)
+        digits @ i =
+            + digit
+                ? (digit >= 10:i8) (97:i8 - 10:i8) 48:i8
+        let value = (value // base)
+        if (value == (0 as T))
+            let i =
+                if ((i > 0) & neg?)
+                    let i = (i - 1)
+                    digits @ i = 45:i8
+                    i
+                else i
+            break (string (& (digits @ i)) ((N - i) as usize))
+        repeat i value
+
+fn bin (value)
+    let value = (value as integer)
+    integer->string value (2 as (typeof value))
+
+fn oct (value)
+    let value = (value as integer)
+    integer->string value (8 as (typeof value))
+
+fn dec (value)
+    let value = (value as integer)
+    integer->string value (10 as (typeof value))
+
+fn hex (value)
+    let value = (value as integer)
+    integer->string value (16 as (typeof value))
 
 #-------------------------------------------------------------------------------
 # constants
