@@ -6804,6 +6804,21 @@ spice defer (f args...)
         ;
 
 #-------------------------------------------------------------------------------
+# type initializers
+#-------------------------------------------------------------------------------
+
+typedef TypeInitializer
+    inline __static-imply (cls T)
+        inline (value)
+            (bitcast value Closure) T
+
+inline typeinit (...)
+    bitcast
+        inline (T)
+            T ...
+        typedef "typeinit" < TypeInitializer : (storageof Closure)
+
+#-------------------------------------------------------------------------------
 # hex/oct/bin conversion
 #-------------------------------------------------------------------------------
 
