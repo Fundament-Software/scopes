@@ -346,6 +346,7 @@ SCOPES_LIBEXPORT sc_symbol_t sc_symbol_new_unique(const sc_string_t *str);
 SCOPES_LIBEXPORT const sc_string_t *sc_symbol_to_string(sc_symbol_t sym);
 SCOPES_LIBEXPORT bool sc_symbol_is_variadic(sc_symbol_t sym);
 SCOPES_LIBEXPORT size_t sc_symbol_count();
+SCOPES_LIBEXPORT sc_symbol_t sc_symbol_style(sc_symbol_t name);
 
 // strings
 

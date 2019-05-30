@@ -887,6 +887,12 @@ size_t sc_symbol_count() {
     return Symbol::symbol_count();
 }
 
+sc_symbol_t sc_symbol_style(sc_symbol_t name) {
+    using namespace scopes;
+    auto val = default_symbol_styler(name);
+    return Symbol::wrap(val);
+}
+
 // String
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -2334,6 +2340,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_symbol_to_string, TYPE_String, TYPE_Symbol);
     DEFINE_EXTERN_C_FUNCTION(sc_symbol_is_variadic, TYPE_Bool, TYPE_Symbol);
     DEFINE_EXTERN_C_FUNCTION(sc_symbol_count, TYPE_USize);
+    DEFINE_EXTERN_C_FUNCTION(sc_symbol_style, TYPE_Symbol, TYPE_Symbol);
 
     DEFINE_EXTERN_C_FUNCTION(sc_string_new, TYPE_String, native_ro_pointer_type(TYPE_I8), TYPE_USize);
     DEFINE_EXTERN_C_FUNCTION(sc_string_new_from_cstr, TYPE_String, native_ro_pointer_type(TYPE_I8));
