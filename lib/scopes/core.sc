@@ -2210,7 +2210,7 @@ inline gen-cast? (converterf)
                 if (band (== ('typeof value) type) ('constant? value))
                     _ (as value type) false
                 else (_ ('typeof value) ('constant? value))
-            let conv = (imply-converter valueT T constant)
+            let conv = (converterf valueT T constant)
             let result = (operator-valid? conv)
             `result
 
