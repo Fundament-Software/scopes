@@ -182,6 +182,7 @@ SCOPES_LIBEXPORT bool sc_value_is_constant (sc_valueref_t value);
 SCOPES_LIBEXPORT bool sc_value_is_pure (sc_valueref_t value);
 SCOPES_LIBEXPORT bool sc_value_compare (sc_valueref_t a, sc_valueref_t b);
 SCOPES_LIBEXPORT int sc_value_kind (sc_valueref_t value);
+SCOPES_LIBEXPORT int sc_value_block_depth (sc_valueref_t value);
 SCOPES_LIBEXPORT sc_valueref_t sc_identity(sc_valueref_t value);
 SCOPES_LIBEXPORT sc_valueref_t sc_value_wrap(const sc_type_t *type, sc_valueref_t value);
 SCOPES_LIBEXPORT sc_valueref_t sc_value_unwrap(const sc_type_t *type, sc_valueref_t value);

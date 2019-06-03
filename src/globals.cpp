@@ -1178,6 +1178,11 @@ int sc_value_kind (sc_valueref_t value) {
     return value->kind();
 }
 
+int sc_value_block_depth (sc_valueref_t value) {
+    using namespace scopes;
+    return value->get_depth();
+}
+
 sc_valueref_t sc_identity(sc_valueref_t value) {
     return value;
 }
@@ -2218,6 +2223,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_value_is_pure, TYPE_Bool, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_value_compare, TYPE_Bool, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_value_kind, TYPE_I32, TYPE_ValueRef);
+    DEFINE_EXTERN_C_FUNCTION(sc_value_block_depth, TYPE_I32, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_identity, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_value_wrap, TYPE_ValueRef, TYPE_Type, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_value_unwrap, TYPE_ValueRef, TYPE_Type, TYPE_ValueRef);

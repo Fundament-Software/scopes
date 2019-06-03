@@ -265,7 +265,7 @@ bool ArgumentList::is_constant() const {
 TypedValueRef ArgumentList::from(const TypedValues &values) {
     if (values.size() == 0) {
         if (!_empty_argument_list)
-            _empty_argument_list = ref(unknown_anchor(), new ArgumentList(values)); 
+            _empty_argument_list = ref(unknown_anchor(), new ArgumentList(values));
         return _empty_argument_list;
     } else if (values.size() == 1) {
         return values[0];
@@ -315,7 +315,7 @@ ValueRef ExtractArgumentTemplate::from(
                 goto repeat;
             }
         }
-    } else if (!vararg && value.isa<ExtractArgumentTemplate>()) {      
+    } else if (!vararg && value.isa<ExtractArgumentTemplate>()) {
         auto eat = value.cast<ExtractArgumentTemplate>();
         if (eat->vararg) {
             value = eat->value;
@@ -327,7 +327,7 @@ ValueRef ExtractArgumentTemplate::from(
             return ref(value.anchor(), ConstAggregate::none_from());
         }
     }
-    */ 
+    */
     return ref(value.anchor(),
         new ExtractArgumentTemplate(value, index, vararg));
 }
@@ -424,18 +424,7 @@ Function::UniqueInfo::UniqueInfo(const ValueIndex& _value)
 }
 
 int Function::UniqueInfo::get_depth() const {
-    if (value.value.isa<Instruction>()) {
-        auto instr = value.value.cast<Instruction>();
-        const Block *block = instr->block;
-        assert(block);
-        return block->depth;
-    } else if (value.value.isa<LoopLabelArguments>()) {
-        auto lla = value.value.cast<LoopLabelArguments>();
-        assert(lla->loop);
-        return lla->loop->body.depth;
-    } else {
-        return 0;
-    }
+    return value.value->get_depth();
 }
 
 Function::Function(Symbol _name, const Parameters &_params)
@@ -1541,45 +1530,18 @@ bool Value::is_accessible() const {
 }
 
 int Value::get_depth() const {
-    const Value *value = this;
-    switch(value->kind()) {
-    case VK_Parameter: {
-        auto param = cast<Parameter>(value);
-        assert(param->owner);
-        if (param->block) {
-            return param->block->depth;
-        } if (param->owner.isa<Function>()) {
-            // outside of function
-            return 0;
-        } else if (param->owner.isa<Instruction>()) {
-            auto instr = param->owner.cast<Instruction>();
-            if (!instr->block) {
-                StyledStream ss;
-                stream_value(ss, instr);
-            }
-            assert(instr->block);
-            return instr->block->depth;
-        } else {
-            assert(false);
-            return 0;
-        }
-    } break;
-    case VK_LoopLabelArguments: {
-        auto lla = cast<LoopLabelArguments>(value);
+    if (isa<Instruction>(this)) {
+        auto instr = cast<Instruction>(this);
+        const Block *block = instr->block;
+        assert(block);
+        return block->depth;
+    } else if (isa<LoopLabelArguments>(this)) {
+        auto lla = cast<LoopLabelArguments>(this);
         assert(lla->loop);
         return lla->loop->body.depth;
-    } break;
-    default: {
-        if (isa<Instruction>(value)) {
-            //if (value->is_pure_in_function())
-            //    return 0;
-            auto instr = cast<Instruction>(value);
-            assert(instr->block);
-            return instr->block->depth;
-        }
-    } break;
+    } else {
+        return 0;
     }
-    return 0;
 }
 
 #define T(NAME, BNAME, CLASS) \
