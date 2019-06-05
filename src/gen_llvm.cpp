@@ -1289,23 +1289,6 @@ struct LLVMIRGenerator {
         case FN_Annotate: {
             return nullptr;
         } break;
-        case FN_ExtractElement: {
-            READ_VALUE(val);
-            READ_VALUE(index);
-            return LLVMBuildExtractElement(builder, val, index, "");
-        } break;
-        case FN_InsertElement: {
-            READ_VALUE(val);
-            READ_VALUE(eltval);
-            READ_VALUE(index);
-            return LLVMBuildInsertElement(builder, val, eltval, index, "");
-        } break;
-        case FN_ShuffleVector: {
-            READ_VALUE(v1);
-            READ_VALUE(v2);
-            READ_VALUE(mask);
-            return LLVMBuildShuffleVector(builder, v1, v2, mask, "");
-        } break;
         case FN_View:
         case FN_Dupe:
         case FN_Move: {
@@ -1700,6 +1683,47 @@ struct LLVMIRGenerator {
             SCOPES_GET_RESULT(ref_to_value(node->value)),
             SCOPES_GET_RESULT(ref_to_value(node->element)),
             node->index, "");
+        map_phi({ val }, node);
+        return {};
+    }
+
+    SCOPES_RESULT(void) translate_ExtractElement(const ExtractElementRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        auto val = LLVMBuildExtractElement(builder,
+            SCOPES_GET_RESULT(ref_to_value(node->value)),
+            SCOPES_GET_RESULT(ref_to_value(node->index)),
+            "");
+        map_phi({ val }, node);
+        return {};
+    }
+
+    SCOPES_RESULT(void) translate_InsertElement(const InsertElementRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        auto val = LLVMBuildInsertElement(builder,
+            SCOPES_GET_RESULT(ref_to_value(node->value)),
+            SCOPES_GET_RESULT(ref_to_value(node->element)),
+            SCOPES_GET_RESULT(ref_to_value(node->index)),
+            "");
+        map_phi({ val }, node);
+        return {};
+    }
+
+    SCOPES_RESULT(void) translate_ShuffleVector(const ShuffleVectorRef &node) {
+        SCOPES_RESULT_TYPE(void);
+
+        auto &&mask = node->mask;
+
+        int count = mask.size();
+        LLVMValueRef indices[count];
+        for (int i = 0; i < count; ++i) {
+            indices[i] = LLVMConstInt(i32T, mask[i], false);
+        }
+        auto maskv = LLVMConstVector(indices, count);
+        auto val = LLVMBuildShuffleVector(builder,
+            SCOPES_GET_RESULT(ref_to_value(node->v1)),
+            SCOPES_GET_RESULT(ref_to_value(node->v2)),
+            maskv,
+            "");
         map_phi({ val }, node);
         return {};
     }

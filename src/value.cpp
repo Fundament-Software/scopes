@@ -1158,6 +1158,7 @@ static const Type *value_type_at_index(const Type *T, int index) {
     T = storage_type(T).assert_ok();
     switch(T->kind()) {
     case TK_Array: return cast<ArrayType>(T)->element_type;
+    case TK_Vector: return cast<VectorType>(T)->element_type;
     case TK_Tuple: return cast<TupleType>(T)->type_at_index(index).assert_ok();
     default: {
         assert(false);
@@ -1183,6 +1184,27 @@ InsertValue::InsertValue(const TypedValueRef &_value, const TypedValueRef &_elem
 
 InsertValueRef InsertValue::from(const TypedValueRef &value, const TypedValueRef &element, uint32_t index) {
     return ref(unknown_anchor(), new InsertValue(value, element, index));
+}
+
+//------------------------------------------------------------------------------
+
+ExtractElement::ExtractElement(const TypedValueRef &_value, const TypedValueRef &_index)
+    : Instruction(VK_ExtractElement, value_type_at_index(_value->get_type(), 0)), value(_value), index(_index) {}
+ExtractElementRef ExtractElement::from(const TypedValueRef &value, const TypedValueRef &index) {
+    return ref(unknown_anchor(), new ExtractElement(value, index));
+}
+
+InsertElement::InsertElement(const TypedValueRef &_value, const TypedValueRef &_element, const TypedValueRef &_index)
+    : Instruction(VK_InsertElement, _value->get_type()), value(_value), element(_element), index(_index) {}
+InsertElementRef InsertElement::from(const TypedValueRef &value, const TypedValueRef &element, const TypedValueRef &index) {
+    return ref(unknown_anchor(), new InsertElement(value, element, index));
+}
+
+ShuffleVector::ShuffleVector(const TypedValueRef &_v1, const TypedValueRef &_v2, const std::vector<uint32_t> &_mask)
+    : Instruction(VK_ShuffleVector, vector_type(value_type_at_index(_v1->get_type(), 0), _mask.size()).assert_ok()),
+    v1(_v1), v2(_v2), mask(_mask) {}
+ShuffleVectorRef ShuffleVector::from(const TypedValueRef &v1, const TypedValueRef &v2, const std::vector<uint32_t> &mask) {
+    return ref(unknown_anchor(), new ShuffleVector(v1, v2, mask));
 }
 
 //------------------------------------------------------------------------------

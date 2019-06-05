@@ -2554,7 +2554,10 @@ repeat:
                 op->hack_change_value(retT);
                 return op;
             } else {
-                return DEP_ARGTYPE1(RT, _T, _idx);
+                auto op = TypedValueRef(call.anchor(),
+                    ExtractElement::from(_T, _idx));
+                op->hack_change_value(VIEWTYPE1(RT, _T, _idx));
+                return op;
             }
         } break;
         case FN_InsertElement: {
@@ -2566,7 +2569,10 @@ repeat:
             SCOPES_CHECK_RESULT(verify_kind<TK_Vector>(T));
             auto vi = cast<VectorType>(T);
             SCOPES_CHECK_RESULT(verify(SCOPES_GET_RESULT(storage_type(vi->element_type)), ET));
-            return DEP_ARGTYPE1(typeof_T, _T, _ET, _idx);
+            auto op = TypedValueRef(call.anchor(),
+                InsertElement::from(_T, _ET, _idx));
+            op->hack_change_value(VIEWTYPE1(typeof_T, _T, _ET, _idx));
+            return op;
         } break;
         case FN_ShuffleVector: {
             CHECKARGS(3, 3);
@@ -2583,13 +2589,17 @@ repeat:
             SCOPES_CHECK_RESULT(verify(TYPE_I32, mask_vi->element_type));
             size_t incount = vi->count * 2;
             size_t outcount = mask_vi->count;
+            std::vector<uint32_t> outmask;
+            outmask.reserve(outcount);
             for (size_t i = 0; i < outcount; ++i) {
-                SCOPES_CHECK_RESULT(verify_range(
-                    cast<ConstInt>(mask->values[i])->value,
-                    incount));
+                auto k = cast<ConstInt>(mask->values[i])->value;
+                SCOPES_CHECK_RESULT(verify_range(k, incount));
+                outmask.push_back(k);
             }
-            return DEP_ARGTYPE1(
-                SCOPES_GET_RESULT(vector_type(vi->element_type, outcount)), _TV1, _TV2);
+            auto op = TypedValueRef(call.anchor(),
+                ShuffleVector::from(_TV1, _TV2, outmask));
+            op->hack_change_value(VIEWTYPE1(op->get_type(), _TV1, _TV2));
+            return op;
         } break;
         case FN_Length: {
             CHECKARGS(1, 1);

@@ -81,6 +81,9 @@ namespace scopes {
     T(VK_ExtractValue, "value-kind-extract-value", ExtractValue) \
     T(VK_InsertValue, "value-kind-insert-value", InsertValue) \
     T(VK_GetElementPtr, "value-kind-get-element-ptr", GetElementPtr) \
+    T(VK_ExtractElement, "value-kind-extract-element", ExtractElement) \
+    T(VK_InsertElement, "value-kind-insert-element", InsertElement) \
+    T(VK_ShuffleVector, "value-kind-shuffle-vector", ShuffleVector) \
     /* casts (Cast::classof) */ \
     SCOPES_CAST_VALUE_KIND() \
 

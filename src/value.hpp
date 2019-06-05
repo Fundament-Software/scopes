@@ -623,6 +623,37 @@ struct InsertValue : Instruction {
 
 //------------------------------------------------------------------------------
 
+struct ExtractElement : Instruction {
+    static bool classof(const Value *T);
+
+    ExtractElement(const TypedValueRef &value, const TypedValueRef &index);
+    static ExtractElementRef from(const TypedValueRef &value, const TypedValueRef &index);
+    TypedValueRef value;
+    TypedValueRef index;
+};
+
+struct InsertElement : Instruction {
+    static bool classof(const Value *T);
+
+    InsertElement(const TypedValueRef &value, const TypedValueRef &element, const TypedValueRef &index);
+    static InsertElementRef from(const TypedValueRef &value, const TypedValueRef &element, const TypedValueRef &index);
+    TypedValueRef value;
+    TypedValueRef element;
+    TypedValueRef index;
+};
+
+struct ShuffleVector : Instruction {
+    static bool classof(const Value *T);
+
+    ShuffleVector(const TypedValueRef &v1, const TypedValueRef &v2, const std::vector<uint32_t> &mask);
+    static ShuffleVectorRef from(const TypedValueRef &v1, const TypedValueRef &v2, const std::vector<uint32_t> &mask);
+    TypedValueRef v1;
+    TypedValueRef v2;
+    std::vector<uint32_t> mask;
+};
+
+//------------------------------------------------------------------------------
+
 struct PtrToRef {
     static BitcastRef from(const TypedValueRef &value);
 };

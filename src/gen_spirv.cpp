@@ -1116,53 +1116,6 @@ struct SPIRVGenerator {
                 it.first->second = vals;
             }
         } break;
-        case FN_ExtractElement: {
-            READ_VALUE(val);
-            READ_VALUE(index);
-            if (_index.isa<ConstInt>()) {
-                int i = extract_integer_constant(_index).assert_ok();
-                return builder.createCompositeExtract(val,
-                    builder.getContainedTypeId(builder.getTypeId(val), i), i);
-            } else {
-                return builder.createVectorExtractDynamic(val,
-                    builder.getContainedTypeId(builder.getTypeId(val)),
-                    index);
-            }
-        } break;
-        case FN_InsertElement: {
-            READ_VALUE(val);
-            READ_VALUE(eltval);
-            READ_VALUE(index);
-            if (_index.isa<ConstInt>()) {
-                int i = extract_integer_constant(_index).assert_ok();
-                return builder.createCompositeInsert(eltval, val,
-                    builder.getTypeId(val), i);
-            } else {
-                return builder.createVectorInsertDynamic(val,
-                    builder.getTypeId(val), eltval, index);
-            }
-        } break;
-        case FN_ShuffleVector: {
-            READ_VALUE(v1);
-            READ_VALUE(v2);
-            READ_VECTOR(mask);
-            auto ET = builder.getContainedTypeId(builder.getTypeId(v1));
-            auto sz = mask->values.size();
-            auto op = new spv::Instruction(
-                builder.getUniqueId(),
-                builder.makeVectorType(ET, sz),
-                spv::OpVectorShuffle);
-            op->addIdOperand(v1);
-            op->addIdOperand(v2);
-            for (int i = 0; i < sz; ++i) {
-                unsigned int k = SCOPES_GET_RESULT(
-                    extract_integer_constant(get_field(mask, i)));
-                op->addImmediateOperand(k);
-            }
-            builder.getBuildPoint()->addInstruction(
-                std::unique_ptr<spv::Instruction>(op));
-            return op->getResultId();
-        } break;
         case FN_View:
         case FN_Dupe:
         case FN_Move: {
@@ -1500,6 +1453,65 @@ struct SPIRVGenerator {
             SCOPES_GET_RESULT(ref_to_value(node->element)),
             value,
             builder.getTypeId(value), node->index);
+        map_phi({ val }, node);
+        return {};
+    }
+
+    SCOPES_RESULT(void) translate_ExtractElement(const ExtractElementRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        auto value = SCOPES_GET_RESULT(ref_to_value(node->value));
+        spv::Id val;
+        if (node->index.isa<ConstInt>()) {
+            int i = extract_integer_constant(node->index).assert_ok();
+            val = builder.createCompositeExtract(value,
+                builder.getContainedTypeId(builder.getTypeId(value), i), i);
+        } else {
+            val = builder.createVectorExtractDynamic(value,
+                builder.getContainedTypeId(builder.getTypeId(value)),
+                SCOPES_GET_RESULT(ref_to_value(node->index)));
+        }
+        map_phi({ val }, node);
+        return {};
+    }
+
+    SCOPES_RESULT(void) translate_InsertElement(const InsertElementRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        auto value = SCOPES_GET_RESULT(ref_to_value(node->value));
+        auto element = SCOPES_GET_RESULT(ref_to_value(node->element));
+        spv::Id val;
+        if (node->index.isa<ConstInt>()) {
+            int i = extract_integer_constant(node->index).assert_ok();
+            val = builder.createCompositeInsert(element, value,
+                builder.getTypeId(value), i);
+        } else {
+            val = builder.createVectorInsertDynamic(value,
+                builder.getTypeId(value), element,
+                SCOPES_GET_RESULT(ref_to_value(node->index)));
+        }
+        map_phi({ val }, node);
+        return {};
+    }
+
+    SCOPES_RESULT(void) translate_ShuffleVector(const ShuffleVectorRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        auto v1 = SCOPES_GET_RESULT(ref_to_value(node->v1));
+        auto v2 = SCOPES_GET_RESULT(ref_to_value(node->v2));
+        auto &&mask = node->mask;
+
+        auto ET = builder.getContainedTypeId(builder.getTypeId(v1));
+        auto sz = mask.size();
+        auto op = new spv::Instruction(
+            builder.getUniqueId(),
+            builder.makeVectorType(ET, sz),
+            spv::OpVectorShuffle);
+        op->addIdOperand(v1);
+        op->addIdOperand(v2);
+        for (int i = 0; i < sz; ++i) {
+            op->addImmediateOperand(mask[i]);
+        }
+        builder.getBuildPoint()->addInstruction(
+            std::unique_ptr<spv::Instruction>(op));
+        auto val = op->getResultId();
         map_phi({ val }, node);
         return {};
     }
