@@ -106,6 +106,7 @@ struct TypedValue : Value {
 
     //bool is_typed() const;
     const Type *get_type() const;
+    void hack_change_value(const Type *T);
 
 protected:
     const Type *_type;
@@ -573,6 +574,20 @@ struct CLASS : Cast { \
 };
 SCOPES_CAST_VALUE_KIND()
 #undef T
+
+//------------------------------------------------------------------------------
+
+struct Select : Instruction {
+    static bool classof(const Value *T);
+
+    Select(const TypedValueRef &cond,
+        const TypedValueRef &value1, const TypedValueRef &value2);
+    static SelectRef from(const TypedValueRef &cond,
+        const TypedValueRef &value1, const TypedValueRef &value2);
+    TypedValueRef cond;
+    TypedValueRef value1;
+    TypedValueRef value2;
+};
 
 //------------------------------------------------------------------------------
 

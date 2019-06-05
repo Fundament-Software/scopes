@@ -1100,6 +1100,18 @@ CallTemplateRef CallTemplate::from(const ValueRef &callee, const Values &args) {
 
 //------------------------------------------------------------------------------
 
+Select::Select(const TypedValueRef &_cond,
+    const TypedValueRef &_value1, const TypedValueRef &_value2)
+    : Instruction(VK_Select, _value2->get_type()), cond(_cond), value1(_value1), value2(_value2)
+{}
+
+SelectRef Select::from(const TypedValueRef &cond,
+    const TypedValueRef &value1, const TypedValueRef &value2) {
+    return ref(unknown_anchor(), new Select(cond, value1, value2));
+}
+
+//------------------------------------------------------------------------------
+
 Call::Call(const Type *type, const TypedValueRef &_callee, const TypedValues &_args)
     : Instruction(VK_Call, type), callee(_callee), args(_args),
         except(ExceptionRef()) {
@@ -1665,6 +1677,11 @@ SCOPES_TYPED_VALUE_KIND()
 TypedValue::TypedValue(ValueKind _kind, const Type *type)
     : Value(_kind), _type(type) {
     assert(_type);
+}
+
+void TypedValue::hack_change_value(const Type *T) {
+    assert(T);
+    _type = T;
 }
 
 const Type *TypedValue::get_type() const {

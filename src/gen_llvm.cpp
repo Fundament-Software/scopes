@@ -1289,13 +1289,6 @@ struct LLVMIRGenerator {
         case FN_Annotate: {
             return nullptr;
         } break;
-        case OP_Tertiary: {
-            READ_VALUE(cond);
-            READ_VALUE(then_value);
-            READ_VALUE(else_value);
-            return LLVMBuildSelect(
-                builder, cond, then_value, else_value, "");
-        } break;
         case FN_ExtractValue: {
             READ_VALUE(val);
             READ_VALUE(index);
@@ -1719,6 +1712,19 @@ struct LLVMIRGenerator {
             return {};
         }
         SCOPES_ERROR(CGenInvalidCallee, callee->get_type());
+    }
+
+    SCOPES_RESULT(void) translate_Select(const SelectRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        auto val =
+            LLVMBuildSelect(
+                builder,
+                SCOPES_GET_RESULT(ref_to_value(node->cond)),
+                SCOPES_GET_RESULT(ref_to_value(node->value1)),
+                SCOPES_GET_RESULT(ref_to_value(node->value2)),
+                "");
+        map_phi({ val }, node);
+        return {};
     }
 
     SCOPES_RESULT(void) translate_Bitcast(const BitcastRef &node) {

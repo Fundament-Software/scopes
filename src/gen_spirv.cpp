@@ -1116,22 +1116,6 @@ struct SPIRVGenerator {
                 it.first->second = vals;
             }
         } break;
-        case OP_Tertiary: {
-            READ_VALUE(cond);
-            READ_VALUE(then_value);
-            READ_VALUE(else_value);
-            if (builder.isScalar(cond) && builder.isVector(then_value)) {
-                // emulate LLVM's behavior for selecting full vectors with single booleans
-                spv::Id elementT = builder.getTypeId(cond);
-                spv::Id vectorT = builder.getTypeId(then_value);
-
-                cond = builder.smearScalar(spv::NoPrecision, cond,
-                    builder.makeVectorType(elementT, builder.getNumTypeComponents(vectorT)));
-            }
-            return builder.createTriOp(spv::OpSelect,
-                builder.getTypeId(then_value), cond,
-                then_value, else_value);
-        } break;
         case FN_ExtractValue: {
             READ_VALUE(val);
             READ_INT(index);
@@ -1517,6 +1501,24 @@ struct SPIRVGenerator {
             return {};
         }
         SCOPES_ERROR(CGenInvalidCallee, callee->get_type());
+    }
+
+    SCOPES_RESULT(void) translate_Select(const SelectRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        auto cond = SCOPES_GET_RESULT(ref_to_value(node->cond));
+        auto value1 = SCOPES_GET_RESULT(ref_to_value(node->value1));
+        auto value2 = SCOPES_GET_RESULT(ref_to_value(node->value2));
+        if (builder.isScalar(cond) && builder.isVector(value1)) {
+            // emulate LLVM's behavior for selecting full vectors with single booleans
+            spv::Id elementT = builder.getTypeId(cond);
+            spv::Id vectorT = builder.getTypeId(value1);
+            cond = builder.smearScalar(spv::NoPrecision, cond,
+                builder.makeVectorType(elementT, builder.getNumTypeComponents(vectorT)));
+        }
+        auto val = builder.createTriOp(spv::OpSelect,
+            builder.getTypeId(value1), cond, value1, value2);
+        map_phi({ val }, node);
+        return {};
     }
 
     SCOPES_RESULT(void) translate_Bitcast(const BitcastRef &node) {

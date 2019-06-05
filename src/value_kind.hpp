@@ -77,6 +77,7 @@ namespace scopes {
     T(VK_CondBr, "value-kind-condbr", CondBr) \
     T(VK_Switch, "value-kind-switch", Switch) \
     T(VK_Call, "value-kind-call", Call) \
+    T(VK_Select, "value-kind-select", Select) \
     /* casts (Cast::classof) */ \
     SCOPES_CAST_VALUE_KIND() \
 

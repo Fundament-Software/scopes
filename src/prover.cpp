@@ -2364,7 +2364,9 @@ repeat:
                 auto ST2 = SCOPES_GET_RESULT(storage_type(T2));
                 SCOPES_CHECK_RESULT(verify_vector_sizes(T1, ST2));
             }
-            return DEP_ARGTYPE1(T2, _T1, _T2, _T3);
+            auto op = Select::from(_T1, _T2, _T3);
+            op->hack_change_value(VIEWTYPE1(T2, _T1, _T2, _T3));
+            return TypedValueRef(call.anchor(), op);
         } break;
         case FN_Bitcast: {
             CHECKARGS(2, 2);
