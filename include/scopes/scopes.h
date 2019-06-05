@@ -141,6 +141,8 @@ SCOPES_TYPEDEF_RESULT_RAISES(sc_list_scope_raises, sc_list_scope_tuple_t);
 typedef sc_valueref_raises_t (*sc_ast_macro_func_t)(sc_valueref_t);
 typedef sc_list_scope_raises_t (*sc_syntax_wildcard_func_t)(const sc_list_t *, sc_scope_t *);
 
+
+
 // booting
 
 SCOPES_LIBEXPORT sc_valueref_raises_t sc_load_from_executable(const char *path);

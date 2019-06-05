@@ -1199,12 +1199,6 @@ struct SPIRVGenerator {
             READ_VALUE(val);
             return val;
         } break;
-        case FN_NullOf: {
-            READ_TYPE(ty);
-            return builder.makeNullConstant(ty);
-        } break;
-        case FN_Undef: { READ_TYPE(ty);
-            return builder.createUndefined(ty); } break;
         case FN_Alloca: { READ_TYPE(ty);
             return builder.createVariable(
                 spv::StorageClassFunction, ty); } break;
@@ -1687,6 +1681,12 @@ struct SPIRVGenerator {
         if (builder.getTypeId(val) == LLT)
             return val;
         return builder.createUnaryOp(spv::OpBitcast, LLT, val);
+    }
+
+    SCOPES_RESULT(spv::Id) Undef_to_value(const UndefRef &node) {
+        SCOPES_RESULT_TYPE(spv::Id);
+        auto ty = SCOPES_GET_RESULT(type_to_spirv_type(node->get_type()));
+        return builder.createUndefined(ty);
     }
 
     SCOPES_RESULT(spv::Id) Global_to_value(const GlobalRef &node) {

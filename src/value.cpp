@@ -669,7 +669,9 @@ PureRef PureCast::from(const Type *type, PureRef value) {
     }
     if (value->get_type() == type)
         return value;
-    if (value.isa<Const>()
+    if (value.isa<Undef>()) {
+        return Undef::from(type);
+    } else if (value.isa<Const>()
         && (storage_kind(type) == storage_kind(value->get_type()))) {
         ConstRef result;
         switch (value->kind()) {
@@ -697,6 +699,24 @@ PureRef PureCast::from(const Type *type, PureRef value) {
     } else {
         return ref(value.anchor(), new PureCast(type, value));
     }
+}
+
+//------------------------------------------------------------------------------
+
+bool Undef::key_equal(const Undef *other) const {
+    return type == other->type;
+}
+
+std::size_t Undef::hash() const {
+    return std::hash<const Type *>{}(type);
+}
+
+Undef::Undef(const Type *_type)
+    : Pure(VK_Undef, _type), type(_type) {
+}
+
+UndefRef Undef::from(const Type *type) {
+    return ref(unknown_anchor(), new Undef(type));
 }
 
 //------------------------------------------------------------------------------
@@ -846,6 +866,14 @@ int Block::append(const TypedValueRef &node) {
     } break;
     }
     return 0;
+}
+
+Block::DataMap &Block::get_channel(Symbol name) {
+    DataMap *&map = channels[name];
+    if (!map) {
+        map = new DataMap();
+    }
+    return *map;
 }
 
 //------------------------------------------------------------------------------
@@ -1180,7 +1208,8 @@ std::size_t Pure::hash() const {
     switch(kind()) {
     #define T(KIND, NAME, CLASS) \
         case KIND: \
-            return cast<CLASS>(this)->hash();
+            return hash2(std::hash<int>{}(kind()), cast<CLASS>(this)->hash());
+            //return cast<CLASS>(this)->hash();
     SCOPES_PURE_VALUE_KIND()
     #undef T
     default: assert(false); return 0;

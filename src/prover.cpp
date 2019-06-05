@@ -1909,6 +1909,13 @@ SCOPES_RESULT(void) sanitize_tuple_index(const Anchor *anchor, const Type *ST,
     return {};
 }
 
+// if it's legal to make a starting copy of this value
+static bool is_template_like_constant(const TypedValueRef &value) {
+    if (value.isa<Undef>()) return true;
+    if (value.isa<Const>()) return true;
+    return false;
+}
+
 const Type *remap_unique_return_arguments(
     const ASTContext &ctx, ID2SetMap &idmap, const Type *rt) {
     if (is_returning_value(rt)) {
@@ -2114,6 +2121,7 @@ repeat:
         case FN_Move: {
             CHECKARGS(1, 1);
             READ_NODEREF_TYPEOF(X);
+            if (is_template_like_constant(_X)) return _X;
             auto uq = try_unique(X);
             if (!uq) {
                 SCOPES_ERROR(UniqueValueExpected, _X->get_type());
@@ -2220,12 +2228,12 @@ repeat:
         case FN_NullOf: {
             CHECKARGS(1, 1);
             READ_TYPE_CONST(T);
-            return NEW_ARGTYPE1(T);
+            return TypedValueRef(call.anchor(), SCOPES_GET_RESULT(nullof(T)));
         } break;
         case FN_Undef: {
             CHECKARGS(1, 1);
             READ_TYPE_CONST(T);
-            return NEW_ARGTYPE1(T);
+            return TypedValueRef(call.anchor(), Undef::from(T));
         } break;
         case FN_TypeOf: {
             CHECKARGS(1, 1);
@@ -2630,7 +2638,9 @@ repeat:
             READ_AUTOMOVE_TYPEOF(AT);
             READ_AUTOMOVE_STORAGETYPEOF(ET);
             READ_INT_CONST(idx);
-            if (is_movable(AT) != is_movable(typeof_ET)) {
+            bool movable = is_template_like_constant(_AT)
+                || is_movable(AT);
+            if (movable != is_movable(typeof_ET)) {
                 SCOPES_ERROR(MovableTypeMismatch, AT, typeof_ET);
             }
             auto T = SCOPES_GET_RESULT(storage_type(AT));
@@ -2647,7 +2657,7 @@ repeat:
                 SCOPES_ERROR(InvalidArgumentTypeForBuiltin, b, T);
             } break;
             }
-            if (is_movable(AT)) {
+            if (movable) {
                 auto uq_AT = try_unique(AT);
                 if (uq_AT) ctx.move(uq_AT->id, call);
                 auto uq_ET = try_unique(typeof_ET);

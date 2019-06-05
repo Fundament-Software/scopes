@@ -47,7 +47,7 @@ namespace scopes {
     T(g_sc_const_int_extract, "sc_const_int_extract") \
     T(g_sc_const_real_extract, "sc_const_real_extract") \
     T(g_sc_const_extract_at, "sc_const_extract_at") \
-    T(g_undef, "undef") \
+    /*T(g_undef, "undef")*/ \
     T(g_fptrunc, "fptrunc") \
     T(g_fpext, "fpext") \
     T(g_sc_identity, "sc_identity") \

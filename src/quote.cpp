@@ -509,9 +509,7 @@ ValueRef unwrap_value(const Type *T, const ValueRef &value) {
         auto argT = vt->element_type;
         auto numvals = (int)vt->count;
         //auto numelems = ConstInt::from(anchor, TYPE_I32, numvals);
-        auto result = REF(CallTemplate::from(g_undef, {
-                REF(ConstPointer::type_from(T))
-            }));
+        ValueRef result = REF(Undef::from(T));
         for (int i = 0; i < numvals; ++i) {
             auto idx = REF(ConstInt::from(TYPE_I32, i));
             auto arg =
@@ -527,9 +525,7 @@ ValueRef unwrap_value(const Type *T, const ValueRef &value) {
         auto argT = at->element_type;
         auto numvals = (int)at->count;
         //auto numelems = ConstInt::from(anchor, TYPE_I32, numvals);
-        auto result = REF(CallTemplate::from(g_undef, {
-                REF(ConstPointer::type_from(T))
-            }));
+        ValueRef result = REF(Undef::from(T));
         for (int i = 0; i < numvals; ++i) {
             auto idx = REF(ConstInt::from(TYPE_I32, i));
             auto arg =
@@ -543,9 +539,7 @@ ValueRef unwrap_value(const Type *T, const ValueRef &value) {
     case TK_Tuple: {
         auto tt = cast<TupleType>(ST);
         //auto numelems = ConstInt::from(anchor, TYPE_I32, tt->values.size());
-        auto result = REF(CallTemplate::from(g_undef, {
-                REF(ConstPointer::type_from(T))
-            }));
+        ValueRef result = REF(Undef::from(T));
         for (int i = 0; i < tt->values.size(); ++i) {
             auto idx = REF(ConstInt::from(TYPE_I32, i));
             auto arg =

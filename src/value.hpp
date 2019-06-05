@@ -114,6 +114,8 @@ protected:
 //------------------------------------------------------------------------------
 
 struct Block {
+    typedef std::unordered_map<TypedValue *, ConstRef> DataMap;
+
     Block();
     int append(const TypedValueRef &node);
     bool empty() const;
@@ -132,6 +134,10 @@ struct Block {
     bool is_valid(const IDSet &ids) const;
     bool is_valid(const ValueIndex &value) const;
     void move(int id);
+
+    DataMap &get_channel(Symbol name);
+
+    std::unordered_map<Symbol, DataMap *, Symbol::Hash> channels;
 
     int depth;
     int insert_index;
@@ -799,6 +805,20 @@ struct PureCast : Pure {
     static PureRef from(const Type *type, PureRef value);
 
     PureRef value;
+};
+
+//------------------------------------------------------------------------------
+
+struct Undef : Pure {
+    static bool classof(const Value *T);
+
+    bool key_equal(const Undef *other) const;
+    std::size_t hash() const;
+
+    Undef(const Type *type);
+    static UndefRef from(const Type *type);
+
+    const Type *type;
 };
 
 //------------------------------------------------------------------------------

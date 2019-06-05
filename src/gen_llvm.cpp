@@ -1336,10 +1336,6 @@ struct LLVMIRGenerator {
             READ_VALUE(val);
             return val;
         } break;
-        case FN_NullOf: { READ_TYPE(ty);
-            return LLVMConstNull(ty); } break;
-        case FN_Undef: { READ_TYPE(ty);
-            return LLVMGetUndef(ty); } break;
         case FN_Alloca: { READ_TYPE(ty);
             return safe_alloca(ty);
         } break;
@@ -1862,6 +1858,12 @@ struct LLVMIRGenerator {
         LLVMTypeRef LLT = SCOPES_GET_RESULT(type_to_llvm_type(node->get_type()));
         auto val = SCOPES_GET_RESULT(ref_to_value(ValueIndex(node->value)));
         return LLVMConstBitCast(val, LLT);
+    }
+
+    SCOPES_RESULT(LLVMValueRef) Undef_to_value(const UndefRef &node) {
+        SCOPES_RESULT_TYPE(LLVMValueRef);
+        LLVMTypeRef LLT = SCOPES_GET_RESULT(type_to_llvm_type(node->get_type()));
+        return LLVMGetUndef(LLT);
     }
 
     SCOPES_RESULT(LLVMValueRef) Global_to_value(const GlobalRef &node) {

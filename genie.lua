@@ -166,6 +166,7 @@ project "scopesrt"
         "src/c_import.cpp",
         "src/execution.cpp",
         "src/prover.cpp",
+        "src/lifetime.cpp",
         "src/quote.cpp",
         "src/platform_abi.cpp",
         "src/gen_spirv.cpp",
