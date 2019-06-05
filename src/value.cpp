@@ -704,15 +704,15 @@ PureRef PureCast::from(const Type *type, PureRef value) {
 //------------------------------------------------------------------------------
 
 bool Undef::key_equal(const Undef *other) const {
-    return type == other->type;
+    return get_type() == other->get_type();
 }
 
 std::size_t Undef::hash() const {
-    return std::hash<const Type *>{}(type);
+    return std::hash<const Type *>{}(get_type());
 }
 
 Undef::Undef(const Type *_type)
-    : Pure(VK_Undef, _type), type(_type) {
+    : Pure(VK_Undef, _type) {
 }
 
 UndefRef Undef::from(const Type *type) {

@@ -817,8 +817,6 @@ struct Undef : Pure {
 
     Undef(const Type *type);
     static UndefRef from(const Type *type);
-
-    const Type *type;
 };
 
 //------------------------------------------------------------------------------
