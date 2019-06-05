@@ -71,7 +71,7 @@ fn read-eval-print-loop ()
                 if (i != 0)
                     sc_write " "
                 let param = (sc_template_parameter tmpl i)
-                sc_write (sc_parameter_name param)
+                sc_write ((sc_parameter_name param) as string)
             sc_write ")\n\n"
             if (not (empty? docstr))
                 sc_write docstr
@@ -230,7 +230,7 @@ fn read-eval-print-loop ()
             elseif (count != 0)
                 let eval-scope = (eval-scope as Scope)
                 let block = (sc_expression_new)
-                let outargs = 
+                let outargs =
                     sc_argument_list_map_new (count * 2 + 1)
                         inline (i)
                             if (i == count)
@@ -238,7 +238,7 @@ fn read-eval-print-loop ()
                             elseif (i > count)
                                 let i = (i - count - 1)
                                 let arg = ('getarg vals... i)
-                                return `(repr arg)    
+                                return `(repr arg)
                             let arg = ('getarg vals... i)
                             let idstr = (make-idstr (counter + i))
                             let idsym = (Symbol idstr)

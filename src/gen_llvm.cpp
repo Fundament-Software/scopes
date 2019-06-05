@@ -1289,23 +1289,6 @@ struct LLVMIRGenerator {
         case FN_Annotate: {
             return nullptr;
         } break;
-        case FN_ExtractValue: {
-            READ_VALUE(val);
-            READ_VALUE(index);
-            assert(LLVMIsConstant(index));
-            assert(LLVMGetTypeKind(LLVMTypeOf(index)) == LLVMIntegerTypeKind);
-            auto index_value = LLVMConstIntGetZExtValue(index);
-            return LLVMBuildExtractValue(builder, val, index_value, "");
-        } break;
-        case FN_InsertValue: {
-            READ_VALUE(val);
-            READ_VALUE(eltval);
-            READ_VALUE(index);
-            assert(LLVMIsConstant(index));
-            assert(LLVMGetTypeKind(LLVMTypeOf(index)) == LLVMIntegerTypeKind);
-            auto index_value = LLVMConstIntGetZExtValue(index);
-            return LLVMBuildInsertValue(builder, val, eltval, index_value, "");
-        } break;
         case FN_ExtractElement: {
             READ_VALUE(val);
             READ_VALUE(index);
@@ -1712,6 +1695,25 @@ struct LLVMIRGenerator {
             return {};
         }
         SCOPES_ERROR(CGenInvalidCallee, callee->get_type());
+    }
+
+    SCOPES_RESULT(void) translate_ExtractValue(const ExtractValueRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        auto val = LLVMBuildExtractValue(builder,
+            SCOPES_GET_RESULT(ref_to_value(node->value)),
+            node->index, "");
+        map_phi({ val }, node);
+        return {};
+    }
+
+    SCOPES_RESULT(void) translate_InsertValue(const InsertValueRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        auto val = LLVMBuildInsertValue(builder,
+            SCOPES_GET_RESULT(ref_to_value(node->value)),
+            SCOPES_GET_RESULT(ref_to_value(node->element)),
+            node->index, "");
+        map_phi({ val }, node);
+        return {};
     }
 
     SCOPES_RESULT(void) translate_Select(const SelectRef &node) {

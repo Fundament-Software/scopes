@@ -1116,20 +1116,6 @@ struct SPIRVGenerator {
                 it.first->second = vals;
             }
         } break;
-        case FN_ExtractValue: {
-            READ_VALUE(val);
-            READ_INT(index);
-            return builder.createCompositeExtract(val,
-                builder.getContainedTypeId(builder.getTypeId(val), index),
-                index);
-        } break;
-        case FN_InsertValue: {
-            READ_VALUE(val);
-            READ_VALUE(eltval);
-            READ_INT(index);
-            return builder.createCompositeInsert(eltval, val,
-                builder.getTypeId(val), index);
-        } break;
         case FN_ExtractElement: {
             READ_VALUE(val);
             READ_VALUE(index);
@@ -1501,6 +1487,29 @@ struct SPIRVGenerator {
             return {};
         }
         SCOPES_ERROR(CGenInvalidCallee, callee->get_type());
+    }
+
+    SCOPES_RESULT(void) translate_ExtractValue(const ExtractValueRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        auto value = SCOPES_GET_RESULT(ref_to_value(node->value));
+        auto index = node->index;
+        auto val = builder.createCompositeExtract(
+                value,
+                builder.getContainedTypeId(builder.getTypeId(value), index),
+                index);
+        map_phi({ val }, node);
+        return {};
+    }
+
+    SCOPES_RESULT(void) translate_InsertValue(const InsertValueRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        auto value = SCOPES_GET_RESULT(ref_to_value(node->value));
+        auto val = builder.createCompositeInsert(
+            SCOPES_GET_RESULT(ref_to_value(node->element)),
+            value,
+            builder.getTypeId(value), node->index);
+        map_phi({ val }, node);
+        return {};
     }
 
     SCOPES_RESULT(void) translate_Select(const SelectRef &node) {

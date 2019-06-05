@@ -591,6 +591,27 @@ struct Select : Instruction {
 
 //------------------------------------------------------------------------------
 
+struct ExtractValue : Instruction {
+    static bool classof(const Value *T);
+
+    ExtractValue(const TypedValueRef &value, uint32_t index);
+    static ExtractValueRef from(const TypedValueRef &value, uint32_t index);
+    TypedValueRef value;
+    uint32_t index;
+};
+
+struct InsertValue : Instruction {
+    static bool classof(const Value *T);
+
+    InsertValue(const TypedValueRef &value, const TypedValueRef &element, uint32_t index);
+    static InsertValueRef from(const TypedValueRef &value, const TypedValueRef &element, uint32_t index);
+    TypedValueRef value;
+    TypedValueRef element;
+    uint32_t index;
+};
+
+//------------------------------------------------------------------------------
+
 struct Call : Instruction {
     static bool classof(const Value *T);
 

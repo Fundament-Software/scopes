@@ -1112,6 +1112,39 @@ SelectRef Select::from(const TypedValueRef &cond,
 
 //------------------------------------------------------------------------------
 
+static const Type *value_type_at_index(const Type *T, int index) {
+    T = storage_type(T).assert_ok();
+    switch(T->kind()) {
+    case TK_Array: return cast<ArrayType>(T)->element_type;
+    case TK_Tuple: return cast<TupleType>(T)->type_at_index(index).assert_ok();
+    default: {
+        assert(false);
+        return nullptr;
+    } break;
+    }
+}
+
+ExtractValue::ExtractValue(const TypedValueRef &_value, uint32_t _index)
+    : Instruction(VK_ExtractValue,
+        value_type_at_index(_value->get_type(), _index)),
+    value(_value), index(_index) {}
+
+ExtractValueRef ExtractValue::from(const TypedValueRef &value, uint32_t index) {
+    return ref(unknown_anchor(), new ExtractValue(value, index));
+}
+
+//------------------------------------------------------------------------------
+
+InsertValue::InsertValue(const TypedValueRef &_value, const TypedValueRef &_element, uint32_t _index)
+    : Instruction(VK_InsertValue, _value->get_type()),
+        value(_value), element(_element), index(_index) {}
+
+InsertValueRef InsertValue::from(const TypedValueRef &value, const TypedValueRef &element, uint32_t index) {
+    return ref(unknown_anchor(), new InsertValue(value, element, index));
+}
+
+//------------------------------------------------------------------------------
+
 Call::Call(const Type *type, const TypedValueRef &_callee, const TypedValues &_args)
     : Instruction(VK_Call, type), callee(_callee), args(_args),
         except(ExceptionRef()) {

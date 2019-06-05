@@ -1680,16 +1680,18 @@ static SCOPES_RESULT(void) build_deref_automove(
             Call::from(ARGT, callee, values)); \
         newcall; \
     })
+#define UNIQUETYPE1(ARGT) unique_result_type(ctx, ARGT)
 #define NEW_ARGTYPE1(ARGT) ({ \
         TypedValueRef newcall = ref(call.anchor(), \
-            Call::from(unique_result_type(ctx, ARGT), callee, values)); \
+            Call::from(UNIQUETYPE1(ARGT), callee, values)); \
         newcall; \
     })
+#define UNIQUETYPE2(ARGT1, ARGT2) arguments_type({ \
+    unique_result_type(ctx, ARGT1), \
+    unique_result_type(ctx, ARGT2)})
 #define NEW_ARGTYPE2(ARGT1, ARGT2) ({ \
         TypedValueRef newcall = ref(call.anchor(), \
-            Call::from(arguments_type({ \
-                unique_result_type(ctx, ARGT1), \
-                unique_result_type(ctx, ARGT2)}), callee, values)); \
+            Call::from(UNIQUETYPE2(ARGT1, ARGT2), callee, values)); \
         newcall; \
     })
 #define VIEWTYPE1(ARGT, ...) view_result_type(ctx, ARGT, __VA_ARGS__)
@@ -2613,6 +2615,7 @@ repeat:
             READ_NODEREF_STORAGETYPEOF(T);
             READ_STORAGETYPEOF(idx);
             const Type *RT = nullptr;
+            uint64_t iidx = -1ull;
             switch(T->kind()) {
             case TK_Array: {
                 auto ai = cast<ArrayType>(T);
@@ -2622,13 +2625,13 @@ repeat:
                     RT = SCOPES_GET_RESULT(ai->type_at_index(0));
                 } else {
                     // index must be constant
-                    auto iidx = SCOPES_GET_RESULT(extract_integer_constant(_idx));
+                    iidx = SCOPES_GET_RESULT(extract_integer_constant(_idx));
                     // only check for sized arrays
                     RT = SCOPES_GET_RESULT(ai->type_at_index(iidx));
                 }
             } break;
             case TK_Tuple: {
-                auto iidx = SCOPES_GET_RESULT(extract_integer_constant(_idx));
+                iidx = SCOPES_GET_RESULT(extract_integer_constant(_idx));
                 auto ti = cast<TupleType>(T);
                 SCOPES_CHECK_RESULT(sanitize_tuple_index(call.anchor(), T, ti, iidx, _idx));
                 RT = SCOPES_GET_RESULT(ti->type_at_index(iidx));
@@ -2646,7 +2649,10 @@ repeat:
                 ctx.append(newcall2);
                 return newcall2;
             } else {
-                return DEP_ARGTYPE1(RT, _T);
+                assert(iidx != -1ull);
+                auto op = ExtractValue::from(_T, iidx);
+                op->hack_change_value(VIEWTYPE1(RT, _T));
+                return TypedValueRef(call.anchor(), op);
             }
         } break;
         case FN_InsertValue: {
@@ -2673,15 +2679,17 @@ repeat:
                 SCOPES_ERROR(InvalidArgumentTypeForBuiltin, b, T);
             } break;
             }
+            auto op = InsertValue::from(_AT, _ET, idx);
             if (movable) {
                 auto uq_AT = try_unique(AT);
                 if (uq_AT) ctx.move(uq_AT->id, call);
                 auto uq_ET = try_unique(typeof_ET);
                 if (uq_ET) ctx.move(uq_ET->id, call);
-                return NEW_ARGTYPE1(AT);
+                op->hack_change_value(UNIQUETYPE1(AT));
             } else {
-                return DEP_ARGTYPE1(AT, _AT, _ET);
+                op->hack_change_value(VIEWTYPE1(AT, _AT, _ET));
             }
+            return TypedValueRef(call.anchor(), op);
         } break;
         case FN_GetElementRef:
         case FN_GetElementPtr: {

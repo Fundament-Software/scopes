@@ -78,6 +78,8 @@ namespace scopes {
     T(VK_Switch, "value-kind-switch", Switch) \
     T(VK_Call, "value-kind-call", Call) \
     T(VK_Select, "value-kind-select", Select) \
+    T(VK_ExtractValue, "value-kind-extract-value", ExtractValue) \
+    T(VK_InsertValue, "value-kind-insert-value", InsertValue) \
     /* casts (Cast::classof) */ \
     SCOPES_CAST_VALUE_KIND() \
 
