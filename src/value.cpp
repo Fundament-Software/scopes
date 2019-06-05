@@ -1113,6 +1113,16 @@ CallRef Call::from(const Type *type, const TypedValueRef &callee, const TypedVal
 
 //------------------------------------------------------------------------------
 
+Bitcast::Bitcast(const TypedValueRef &_value, const Type *type)
+    : Instruction(VK_Bitcast, type), value(_value) {
+}
+
+BitcastRef Bitcast::from(const TypedValueRef &value, const Type *type) {
+    return ref(unknown_anchor(), new Bitcast(value, type));
+}
+
+//------------------------------------------------------------------------------
+
 LoopLabel::LoopLabel(const TypedValues &_init, const LoopLabelArgumentsRef &_args)
     : Instruction(VK_LoopLabel, TYPE_NoReturn), init(_init), args(_args) {
     assert(args);

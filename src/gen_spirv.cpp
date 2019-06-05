@@ -1237,7 +1237,6 @@ struct SPIRVGenerator {
                 builder.getTypeStorageClass(builder.getTypeId(pointer)),
                 pointer, indices);
         } break;
-        case FN_Bitcast:
         case FN_IntToPtr:
         case FN_PtrToInt:
         case FN_ITrunc:
@@ -1253,14 +1252,6 @@ struct SPIRVGenerator {
             READ_VALUE(val); READ_TYPE(ty);
             spv::Op op = spv::OpMax;
             switch(builtin.value()) {
-            case FN_Bitcast:
-                if (builder.getTypeId(val) == ty) {
-                    // do nothing
-                    return val;
-                } else {
-                    op = spv::OpBitcast;
-                }
-                break;
             case FN_IntToPtr: op = spv::OpConvertUToPtr; break;
             case FN_PtrToInt: op = spv::OpConvertPtrToU; break;
             case FN_SExt: op = spv::OpSConvert; break;
@@ -1556,6 +1547,19 @@ struct SPIRVGenerator {
             return {};
         }
         SCOPES_ERROR(CGenInvalidCallee, callee->get_type());
+    }
+
+    SCOPES_RESULT(void) translate_Bitcast(const BitcastRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        auto val = SCOPES_GET_RESULT(ref_to_value(node->value));
+        auto ty = SCOPES_GET_RESULT(type_to_spirv_type(node->get_type()));
+        if (builder.getTypeId(val) == ty) {
+            // do nothing
+        } else {
+            val = builder.createUnaryOp(spv::OpBitcast, ty, val);
+        }
+        map_phi({ val }, node);
+        return {};
     }
 
     SCOPES_RESULT(void) translate_Switch(const SwitchRef &node) {

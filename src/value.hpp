@@ -555,6 +555,17 @@ struct CallTemplate : UntypedValue {
 
 //------------------------------------------------------------------------------
 
+struct Bitcast : Instruction {
+    static bool classof(const Value *T);
+
+    Bitcast(const TypedValueRef &value, const Type *type);
+    static BitcastRef from(const TypedValueRef &value, const Type *type);
+
+    TypedValueRef value;
+};
+
+//------------------------------------------------------------------------------
+
 struct Call : Instruction {
     static bool classof(const Value *T);
 

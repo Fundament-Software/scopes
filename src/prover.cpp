@@ -2408,13 +2408,14 @@ repeat:
                 if (rq) {
                     DestT = qualify(DestT, { rq });
                 }
-                _DestT = ref(_DestT.anchor(), ConstPointer::type_from(DestT));
+                //_DestT = ref(_DestT.anchor(), ConstPointer::type_from(DestT));
                 if (_SrcT.isa<Pure>() && target_is_plain) {
                     return TypedValueRef(ref(call.anchor(),
                         PureCast::from(DestT, _SrcT.cast<Pure>())));
                 } else {
                     // DestT is already converted, no need to use NEW_ARGTYPE1 or DEP_ARGTYPE1
-                    return ARGTYPE1(DestT);
+                    return TypedValueRef(ref(call.anchor(),
+                        Bitcast::from(_SrcT, DestT)));
                 }
             }
         } break;

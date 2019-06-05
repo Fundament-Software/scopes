@@ -1376,16 +1376,6 @@ struct LLVMIRGenerator {
             }
             return LLVMBuildGEP(builder, pointer, indices, count, "");
         } break;
-        case FN_Bitcast: { READ_VALUE(val); READ_TYPE(ty);
-            auto T = LLVMTypeOf(val);
-            if (T == ty) {
-                return val;
-            } else if (LLVMGetTypeKind(ty) == LLVMStructTypeKind) {
-                return build_struct_cast(val, ty);
-            } else {
-                return LLVMBuildBitCast(builder, val, ty, "");
-            }
-        } break;
         case FN_IntToPtr: { READ_VALUE(val); READ_TYPE(ty);
             return LLVMBuildIntToPtr(builder, val, ty, ""); } break;
         case FN_PtrToInt: { READ_VALUE(val); READ_TYPE(ty);
@@ -1751,6 +1741,21 @@ struct LLVMIRGenerator {
             return {};
         }
         SCOPES_ERROR(CGenInvalidCallee, callee->get_type());
+    }
+
+    SCOPES_RESULT(void) translate_Bitcast(const BitcastRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        LLVMValueRef val = SCOPES_GET_RESULT(ref_to_value(node->value));
+        auto ty = SCOPES_GET_RESULT(type_to_llvm_type(node->get_type()));
+        auto T = LLVMTypeOf(val);
+        if (T == ty) {
+        } else if (LLVMGetTypeKind(ty) == LLVMStructTypeKind) {
+            val = build_struct_cast(val, ty);
+        } else {
+            val = LLVMBuildBitCast(builder, val, ty, "");
+        }
+        map_phi({ val }, node);
+        return {};
     }
 
     SCOPES_RESULT(void) translate_Switch(const SwitchRef &node) {

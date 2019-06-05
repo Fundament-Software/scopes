@@ -62,6 +62,7 @@ namespace scopes {
     T(VK_CondBr, "value-kind-condbr", CondBr) \
     T(VK_Switch, "value-kind-switch", Switch) \
     T(VK_Call, "value-kind-call", Call) \
+    T(VK_Bitcast, "value-kind-bitcast", Bitcast) \
 
 
 #define SCOPES_TYPED_VALUE_KIND() \
