@@ -46,6 +46,9 @@ struct ASTContext {
     int unique_id() const;
     void move(int id, const ValueRef &mover) const;
 
+    TypedValueRef getelementref(const Anchor *anchor,
+        const TypedValueRef &value, const TypedValues &indices) const;
+
     FunctionRef function;
     FunctionRef frame;
     LoopLabelRef loop;

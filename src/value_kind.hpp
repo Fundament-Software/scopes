@@ -80,6 +80,7 @@ namespace scopes {
     T(VK_Select, "value-kind-select", Select) \
     T(VK_ExtractValue, "value-kind-extract-value", ExtractValue) \
     T(VK_InsertValue, "value-kind-insert-value", InsertValue) \
+    T(VK_GetElementPtr, "value-kind-get-element-ptr", GetElementPtr) \
     /* casts (Cast::classof) */ \
     SCOPES_CAST_VALUE_KIND() \
 

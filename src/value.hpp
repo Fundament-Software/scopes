@@ -591,6 +591,17 @@ struct Select : Instruction {
 
 //------------------------------------------------------------------------------
 
+struct GetElementPtr : Instruction {
+    static bool classof(const Value *T);
+
+    GetElementPtr(const TypedValueRef &value, const TypedValues &indices);
+    static GetElementPtrRef from(const TypedValueRef &value, const TypedValues &indices);
+    TypedValueRef value;
+    TypedValues indices;
+};
+
+//------------------------------------------------------------------------------
+
 struct ExtractValue : Instruction {
     static bool classof(const Value *T);
 
@@ -608,6 +619,15 @@ struct InsertValue : Instruction {
     TypedValueRef value;
     TypedValueRef element;
     uint32_t index;
+};
+
+//------------------------------------------------------------------------------
+
+struct PtrToRef {
+    static BitcastRef from(const TypedValueRef &value);
+};
+struct RefToPtr {
+    static BitcastRef from(const TypedValueRef &value);
 };
 
 //------------------------------------------------------------------------------

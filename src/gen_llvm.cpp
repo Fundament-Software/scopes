@@ -1323,35 +1323,6 @@ struct LLVMIRGenerator {
             return LLVMBuildArrayMalloc(builder, ty, val, ""); } break;
         case FN_Free: { READ_VALUE(val);
             return LLVMBuildFree(builder, val); } break;
-        case FN_GetElementRef: {
-            READ_VALUE(pointer);
-            assert(LLVMGetTypeKind(LLVMTypeOf(pointer)) == LLVMPointerTypeKind);
-            assert(argcount > 1);
-            size_t count = argcount;
-            LLVMValueRef indices[count];
-            LLVMTypeRef IT = nullptr;
-            for (size_t i = 1; i < count; ++i) {
-                indices[i] = SCOPES_GET_RESULT(ref_to_value(args[i]));
-                //assert(LLVMGetValueKind(indices[i]) == LLVMConstantIntValueKind);
-                assert(LLVMGetTypeKind(LLVMTypeOf(indices[i])) == LLVMIntegerTypeKind);
-                IT = LLVMTypeOf(indices[i]);
-            }
-            assert(IT);
-            indices[0] = LLVMConstInt(IT, 0, false);
-            return LLVMBuildGEP(builder, pointer, indices, count, "");
-        } break;
-        case FN_GetElementPtr: {
-            READ_VALUE(pointer);
-            assert(LLVMGetTypeKind(LLVMTypeOf(pointer)) == LLVMPointerTypeKind);
-            assert(argcount > 1);
-            size_t count = argcount - 1;
-            LLVMValueRef indices[count];
-            for (size_t i = 0; i < count; ++i) {
-                indices[i] = SCOPES_GET_RESULT(ref_to_value(args[argn + i]));
-                assert(LLVMGetTypeKind(LLVMTypeOf(indices[i])) == LLVMIntegerTypeKind);
-            }
-            return LLVMBuildGEP(builder, pointer, indices, count, "");
-        } break;
         case FN_Deref: {
             READ_VALUE(ptr);
             assert(LLVMGetTypeKind(LLVMTypeOf(ptr)) == LLVMPointerTypeKind);
@@ -1695,6 +1666,23 @@ struct LLVMIRGenerator {
             return {};
         }
         SCOPES_ERROR(CGenInvalidCallee, callee->get_type());
+    }
+
+    SCOPES_RESULT(void) translate_GetElementPtr(const GetElementPtrRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        auto pointer = SCOPES_GET_RESULT(ref_to_value(node->value));
+        assert(LLVMGetTypeKind(LLVMTypeOf(pointer)) == LLVMPointerTypeKind);
+        auto &&src_indices = node->indices;
+        size_t count = src_indices.size();
+        assert(count);
+        LLVMValueRef indices[count];
+        for (size_t i = 0; i < count; ++i) {
+            indices[i] = SCOPES_GET_RESULT(ref_to_value(src_indices[i]));
+            assert(LLVMGetTypeKind(LLVMTypeOf(indices[i])) == LLVMIntegerTypeKind);
+        }
+        auto val = LLVMBuildGEP(builder, pointer, indices, count, "");
+        map_phi({ val }, node);
+        return {};
     }
 
     SCOPES_RESULT(void) translate_ExtractValue(const ExtractValueRef &node) {

@@ -15,6 +15,7 @@
 #include "qualifiers.hpp"
 #include "hash.hpp"
 #include "anchor.hpp"
+#include "prover.hpp"
 
 #include <assert.h>
 #include <unordered_set>
@@ -1112,6 +1113,47 @@ SelectRef Select::from(const TypedValueRef &cond,
 
 //------------------------------------------------------------------------------
 
+static const Type *get_element_pointer_type(const Type *T, const TypedValues &indices) {
+    T = storage_type(T).assert_ok();
+    assert(isa<PointerType>(T));
+    auto pi = cast<PointerType>(T);
+    T = pi->element_type;
+    int count = indices.size();
+    for (int i = 1; i < count; ++i) {
+        const Type *ST = storage_type(T).assert_ok();
+        switch(ST->kind()) {
+        case TK_Array: {
+            auto ai = cast<ArrayType>(ST);
+            T = ai->element_type;
+        } break;
+        case TK_Vector: {
+            auto vi = cast<VectorType>(ST);
+            T = vi->element_type;
+        } break;
+        case TK_Tuple: {
+            auto ti = cast<TupleType>(ST);
+            assert(indices[i].isa<ConstInt>());
+            auto idx = indices[i].cast<ConstInt>()->value;
+            T = ti->type_at_index(idx).assert_ok();
+        } break;
+        default: {
+            assert(false);
+        } break;
+        }
+    }
+    return pointer_type(T, pi->flags, pi->storage_class);
+}
+
+GetElementPtr::GetElementPtr(const TypedValueRef &_value, const TypedValues &_indices)
+    : Instruction(VK_GetElementPtr, get_element_pointer_type(_value->get_type(), _indices)),
+    value(_value), indices(_indices) {}
+
+GetElementPtrRef GetElementPtr::from(const TypedValueRef &value, const TypedValues &indices) {
+    return ref(unknown_anchor(), new GetElementPtr(value, indices));
+}
+
+//------------------------------------------------------------------------------
+
 static const Type *value_type_at_index(const Type *T, int index) {
     T = storage_type(T).assert_ok();
     switch(T->kind()) {
@@ -1141,6 +1183,16 @@ InsertValue::InsertValue(const TypedValueRef &_value, const TypedValueRef &_elem
 
 InsertValueRef InsertValue::from(const TypedValueRef &value, const TypedValueRef &element, uint32_t index) {
     return ref(unknown_anchor(), new InsertValue(value, element, index));
+}
+
+//------------------------------------------------------------------------------
+
+BitcastRef PtrToRef::from(const TypedValueRef &value) {
+    return Bitcast::from(value, ptr_to_ref(value->get_type()).assert_ok());
+}
+
+BitcastRef RefToPtr::from(const TypedValueRef &value) {
+    return Bitcast::from(value, ref_to_ptr(value->get_type()).assert_ok());
 }
 
 //------------------------------------------------------------------------------

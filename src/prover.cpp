@@ -296,6 +296,21 @@ ASTContext ASTContext::from_function(const FunctionRef &fn) {
     return ASTContext(fn, fn, LoopLabelRef(), LabelRef(), LabelRef(), nullptr);
 }
 
+TypedValueRef ASTContext::getelementref(const Anchor *anchor,
+    const TypedValueRef &value, const TypedValues &indices) const {
+    TypedValueRef op = ref(anchor, RefToPtr::from(value));
+    append(op);
+    TypedValues idxs;
+    idxs.reserve(indices.size() + 1);
+    idxs.push_back(ConstInt::from(TYPE_I32, 0));
+    for (auto val : indices) {
+        idxs.push_back(val);
+    }
+    op = ref(anchor, GetElementPtr::from(op, idxs));
+    append(op);
+    return ref(anchor, PtrToRef::from(op));
+}
+
 //------------------------------------------------------------------------------
 
 static SCOPES_RESULT(TypedValueRef) prove_inline(const ASTContext &ctx,
@@ -2534,8 +2549,10 @@ repeat:
             auto RT = vi->element_type;
             if (rq) {
                 const Type *retT = view_result_type(ctx, qualify(RT, { rq }), _T, _idx);
-                return TypedValueRef(call.anchor(),
-                    Call::from(retT, g_getelementref, { _T, _idx }));
+                auto op = TypedValueRef(call.anchor(),
+                    ctx.getelementref(call.anchor(), _T, { _idx }));
+                op->hack_change_value(retT);
+                return op;
             } else {
                 return DEP_ARGTYPE1(RT, _T, _idx);
             }
@@ -2644,10 +2661,9 @@ repeat:
             auto rq = try_qualifier<ReferQualifier>(typeof_T);
             if (rq) {
                 auto retT = view_result_type(ctx, qualify(RT, { rq }), _T);
-                TypedValueRef newcall2 = ref(call.anchor(),
-                    Call::from(retT, g_getelementref, { _T, _idx }));
-                ctx.append(newcall2);
-                return newcall2;
+                auto op = TypedValueRef(call.anchor(), ctx.getelementref(call.anchor(), _T, { _idx }));
+                op->hack_change_value(retT);
+                return op;
             } else {
                 assert(iidx != -1ull);
                 auto op = ExtractValue::from(_T, iidx);
@@ -2697,9 +2713,10 @@ repeat:
             const Type *T;
             bool is_ref = (b.value() == FN_GetElementRef);
             TypedValueRef dep;
+            const Type *Tptr = nullptr;
             if (is_ref) {
                 READ_NODEREF_TYPEOF(argT);
-                T = SCOPES_GET_RESULT(ref_to_ptr(argT));
+                T = Tptr = SCOPES_GET_RESULT(ref_to_ptr(argT));
                 dep = _argT;
             } else {
                 READ_STORAGETYPEOF(argT);
@@ -2709,11 +2726,14 @@ repeat:
             SCOPES_CHECK_RESULT(verify_kind<TK_Pointer>(T));
             auto pi = cast<PointerType>(T);
             T = pi->element_type;
+            TypedValues indices;
+            indices.reserve(argcount);
             if (!is_ref) {
                 // first argument is pointer offset
                 // not applicable to references
                 READ_STORAGETYPEOF(arg);
                 SCOPES_CHECK_RESULT(verify_integer(arg));
+                indices.push_back(_arg);
             }
             while (argn < argcount) {
                 const Type *ST = SCOPES_GET_RESULT(storage_type(T));
@@ -2723,12 +2743,14 @@ repeat:
                     T = ai->element_type;
                     READ_STORAGETYPEOF(arg);
                     SCOPES_CHECK_RESULT(verify_integer(arg));
+                    indices.push_back(_arg);
                 } break;
                 case TK_Tuple: {
                     auto ti = cast<TupleType>(ST);
                     READ_INT_CONST(arg);
                     SCOPES_CHECK_RESULT(sanitize_tuple_index(call.anchor(), ST, ti, arg, _arg));
                     T = SCOPES_GET_RESULT(ti->type_at_index(arg));
+                    indices.push_back(ConstInt::from(TYPE_I32, arg));
                 } break;
                 default: {
                     SCOPES_ERROR(InvalidArgumentTypeForBuiltin, b, T);
@@ -2736,10 +2758,15 @@ repeat:
                 }
             }
             T = pointer_type(T, pi->flags, pi->storage_class);
+            TypedValueRef op;
             if (is_ref) {
-                T = SCOPES_GET_RESULT(ptr_to_ref(T));
+                assert(Tptr);
+                op = ctx.getelementref(call.anchor(), dep, indices);
+            } else {
+                op = GetElementPtr::from(dep, indices);
             }
-            return DEP_ARGTYPE1(T, dep);
+            op->hack_change_value(VIEWTYPE1(op->get_type(), dep));
+            return TypedValueRef(call.anchor(), op);
         } break;
         case FN_Deref: {
             CHECKARGS(1, 1);

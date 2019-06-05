@@ -1181,32 +1181,6 @@ struct SPIRVGenerator {
             return LLVMBuildArrayMalloc(builder, ty, val, ""); } break;
         case FN_Free: { READ_VALUE(val);
             return LLVMBuildFree(builder, val); } break; */
-        case FN_GetElementRef: {
-            READ_VALUE(pointer);
-            assert(argcount > 1);
-            size_t count = argcount;
-            std::vector<spv::Id> indices;
-            for (size_t i = 1; i < count; ++i) {
-                auto val = SCOPES_GET_RESULT(ref_to_value(args[i]));
-                indices.push_back(val);
-            }
-            return builder.createAccessChain(
-                builder.getTypeStorageClass(builder.getTypeId(pointer)),
-                pointer, indices);
-        } break;
-        case FN_GetElementPtr: {
-            READ_VALUE(pointer);
-            assert(argcount > 1);
-            size_t count = argcount - 1;
-            // skip first index as we can't offset pointers in SPIR-V
-            std::vector<spv::Id> indices;
-            for (size_t i = 1; i < count; ++i) {
-                indices.push_back(SCOPES_GET_RESULT(ref_to_value(args[argn + i])));
-            }
-            return builder.createAccessChain(
-                builder.getTypeStorageClass(builder.getTypeId(pointer)),
-                pointer, indices);
-        } break;
         case FN_Deref: {
             READ_VALUE(ptr);
             return builder.createLoad(ptr);
@@ -1487,6 +1461,24 @@ struct SPIRVGenerator {
             return {};
         }
         SCOPES_ERROR(CGenInvalidCallee, callee->get_type());
+    }
+
+    SCOPES_RESULT(void) translate_GetElementPtr(const GetElementPtrRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        auto pointer = SCOPES_GET_RESULT(ref_to_value(node->value));
+        auto &&src_indices = node->indices;
+        size_t count = src_indices.size();
+        assert(count);
+        // skip first index as we can't offset pointers in SPIR-V
+        std::vector<spv::Id> indices;
+        for (size_t i = 1; i < count; ++i) {
+            indices.push_back(SCOPES_GET_RESULT(ref_to_value(src_indices[i])));
+        }
+        auto val = builder.createAccessChain(
+            builder.getTypeStorageClass(builder.getTypeId(pointer)),
+            pointer, indices);
+        map_phi({ val }, node);
+        return {};
     }
 
     SCOPES_RESULT(void) translate_ExtractValue(const ExtractValueRef &node) {
