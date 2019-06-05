@@ -1237,36 +1237,6 @@ struct SPIRVGenerator {
                 builder.getTypeStorageClass(builder.getTypeId(pointer)),
                 pointer, indices);
         } break;
-        case FN_IntToPtr:
-        case FN_PtrToInt:
-        case FN_ITrunc:
-        case FN_SExt:
-        case FN_ZExt:
-        case FN_FPTrunc:
-        case FN_FPExt:
-        case FN_FPToUI:
-        case FN_FPToSI:
-        case FN_UIToFP:
-        case FN_SIToFP:
-        {
-            READ_VALUE(val); READ_TYPE(ty);
-            spv::Op op = spv::OpMax;
-            switch(builtin.value()) {
-            case FN_IntToPtr: op = spv::OpConvertUToPtr; break;
-            case FN_PtrToInt: op = spv::OpConvertPtrToU; break;
-            case FN_SExt: op = spv::OpSConvert; break;
-            case FN_ZExt: op = spv::OpUConvert; break;
-            case FN_ITrunc: op = spv::OpSConvert; break;
-            case FN_FPTrunc: op = spv::OpFConvert; break;
-            case FN_FPExt: op = spv::OpFConvert; break;
-            case FN_FPToUI: op = spv::OpConvertFToU; break;
-            case FN_FPToSI: op = spv::OpConvertFToS; break;
-            case FN_UIToFP: op = spv::OpConvertUToF; break;
-            case FN_SIToFP: op = spv::OpConvertSToF; break;
-            default: return 0;
-            }
-            return builder.createUnaryOp(op, ty, val);
-        } break;
         case FN_Deref: {
             READ_VALUE(ptr);
             return builder.createLoad(ptr);
@@ -1561,6 +1531,28 @@ struct SPIRVGenerator {
         map_phi({ val }, node);
         return {};
     }
+
+#define TRANSLATE_CAST(CLASS, OP) \
+    SCOPES_RESULT(void) translate_ ## CLASS(const CLASS ## Ref &node) { \
+        SCOPES_RESULT_TYPE(void); \
+        auto val = SCOPES_GET_RESULT(ref_to_value(node->value)); \
+        auto ty = SCOPES_GET_RESULT(type_to_spirv_type(node->get_type())); \
+        val = builder.createUnaryOp(OP, ty, val); \
+        map_phi({ val }, node); \
+        return {}; \
+    }
+
+    TRANSLATE_CAST(IntToPtr, spv::OpConvertUToPtr);
+    TRANSLATE_CAST(PtrToInt, spv::OpConvertPtrToU);
+    TRANSLATE_CAST(SExt, spv::OpSConvert);
+    TRANSLATE_CAST(ITrunc, spv::OpSConvert);
+    TRANSLATE_CAST(ZExt, spv::OpUConvert);
+    TRANSLATE_CAST(FPTrunc, spv::OpFConvert);
+    TRANSLATE_CAST(FPExt, spv::OpFConvert);
+    TRANSLATE_CAST(FPToUI, spv::OpConvertFToU);
+    TRANSLATE_CAST(FPToSI, spv::OpConvertFToS);
+    TRANSLATE_CAST(UIToFP, spv::OpConvertUToF);
+    TRANSLATE_CAST(SIToFP, spv::OpConvertSToF);
 
     SCOPES_RESULT(void) translate_Switch(const SwitchRef &node) {
         SCOPES_RESULT_TYPE(void);

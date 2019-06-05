@@ -1692,8 +1692,9 @@ static SCOPES_RESULT(void) build_deref_automove(
                 unique_result_type(ctx, ARGT2)}), callee, values)); \
         newcall; \
     })
+#define VIEWTYPE1(ARGT, ...) view_result_type(ctx, ARGT, __VA_ARGS__)
 #define DEP_ARGTYPE1(ARGT, ...) ({ \
-        const Type *_retT = view_result_type(ctx, ARGT, __VA_ARGS__); \
+        const Type *_retT = VIEWTYPE1(ARGT, __VA_ARGS__); \
         TypedValueRef newcall = ref(call.anchor(), \
             Call::from(_retT, callee, values)); \
         newcall; \
@@ -2425,7 +2426,7 @@ repeat:
             READ_TYPE_CONST(DestT);
             SCOPES_CHECK_RESULT(verify_integer(T));
             SCOPES_CHECK_RESULT((verify_kind<TK_Pointer>(SCOPES_GET_RESULT(storage_type(DestT)))));
-            return DEP_ARGTYPE1(DestT, _T);
+            return TypedValueRef(call.anchor(), IntToPtr::from(_T, VIEWTYPE1(DestT, _T)));
         } break;
         case FN_PtrToInt: {
             CHECKARGS(2, 2);
@@ -2433,7 +2434,7 @@ repeat:
             READ_TYPE_CONST(DestT);
             SCOPES_CHECK_RESULT(verify_kind<TK_Pointer>(T));
             SCOPES_CHECK_RESULT(verify_integer(SCOPES_GET_RESULT(storage_type(DestT))));
-            return DEP_ARGTYPE1(DestT, _T);
+            return TypedValueRef(call.anchor(), PtrToInt::from(_T, VIEWTYPE1(DestT, _T)));
         } break;
         case FN_ITrunc: {
             CHECKARGS(2, 2);
@@ -2441,7 +2442,7 @@ repeat:
             READ_TYPE_CONST(DestT);
             SCOPES_CHECK_RESULT(verify_integer(T));
             SCOPES_CHECK_RESULT(verify_integer(SCOPES_GET_RESULT(storage_type(DestT))));
-            return DEP_ARGTYPE1(DestT, _T);
+            return TypedValueRef(call.anchor(), ITrunc::from(_T, VIEWTYPE1(DestT, _T)));
         } break;
         case FN_FPTrunc: {
             CHECKARGS(2, 2);
@@ -2452,7 +2453,7 @@ repeat:
             if (cast<RealType>(T)->width < cast<RealType>(DestT)->width) {
                 SCOPES_ERROR(InvalidOperands, b, T, DestT);
             }
-            return DEP_ARGTYPE1(DestT, _T);
+            return TypedValueRef(call.anchor(), FPTrunc::from(_T, VIEWTYPE1(DestT, _T)));
         } break;
         case FN_FPExt: {
             CHECKARGS(2, 2);
@@ -2463,7 +2464,7 @@ repeat:
             if (cast<RealType>(T)->width > cast<RealType>(DestT)->width) {
                 SCOPES_ERROR(InvalidOperands, b, T, DestT);
             }
-            return DEP_ARGTYPE1(DestT, _T);
+            return TypedValueRef(call.anchor(), FPExt::from(_T, VIEWTYPE1(DestT, _T)));
         } break;
         case FN_FPToUI:
         case FN_FPToSI: {
@@ -2479,7 +2480,11 @@ repeat:
                 SCOPES_ERROR(InvalidOperands, b, T, DestT);
             }
             #endif
-            return DEP_ARGTYPE1(DestT, _T);
+            if (b.value() == FN_FPToUI) {
+                return TypedValueRef(call.anchor(), FPToUI::from(_T, VIEWTYPE1(DestT, _T)));
+            } else {
+                return TypedValueRef(call.anchor(), FPToSI::from(_T, VIEWTYPE1(DestT, _T)));
+            }
         } break;
         case FN_UIToFP:
         case FN_SIToFP: {
@@ -2495,7 +2500,11 @@ repeat:
                 SCOPES_ERROR(InvalidOperands, b, T, DestT);
             }
             #endif
-            return DEP_ARGTYPE1(DestT, _T);
+            if (b.value() == FN_UIToFP) {
+                return TypedValueRef(call.anchor(), UIToFP::from(_T, VIEWTYPE1(DestT, _T)));
+            } else {
+                return TypedValueRef(call.anchor(), SIToFP::from(_T, VIEWTYPE1(DestT, _T)));
+            }
         } break;
         case FN_ZExt:
         case FN_SExt: {
@@ -2504,7 +2513,11 @@ repeat:
             READ_TYPE_CONST(DestT);
             SCOPES_CHECK_RESULT(verify_integer(T));
             SCOPES_CHECK_RESULT(verify_integer(SCOPES_GET_RESULT(storage_type(DestT))));
-            return DEP_ARGTYPE1(DestT, _T);
+            if (b.value() == FN_ZExt) {
+                return TypedValueRef(call.anchor(), ZExt::from(_T, VIEWTYPE1(DestT, _T)));
+            } else {
+                return TypedValueRef(call.anchor(), SExt::from(_T, VIEWTYPE1(DestT, _T)));
+            }
         } break;
         case FN_ExtractElement: {
             CHECKARGS(2, 2);

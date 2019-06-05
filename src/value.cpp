@@ -1113,13 +1113,30 @@ CallRef Call::from(const Type *type, const TypedValueRef &callee, const TypedVal
 
 //------------------------------------------------------------------------------
 
-Bitcast::Bitcast(const TypedValueRef &_value, const Type *type)
-    : Instruction(VK_Bitcast, type), value(_value) {
+bool Cast::classof(const Value *T) {
+    switch(T->kind()) {
+#define T(NAME, BNAME, CLASS) \
+    case NAME:
+SCOPES_CAST_VALUE_KIND()
+#undef T
+        return true;
+    default: return false;
+    }
 }
 
-BitcastRef Bitcast::from(const TypedValueRef &value, const Type *type) {
-    return ref(unknown_anchor(), new Bitcast(value, type));
+Cast::Cast(ValueKind _kind, const TypedValueRef &_value, const Type *type)
+    : Instruction(_kind, type), value(_value) {}
+
+//------------------------------------------------------------------------------
+
+#define T(NAME, BNAME, CLASS) \
+CLASS::CLASS(const TypedValueRef &_value, const Type *type) : Cast(NAME, _value, type) {} \
+ \
+CLASS ## Ref CLASS::from(const TypedValueRef &value, const Type *type) { \
+    return ref(unknown_anchor(), new CLASS(value, type)); \
 }
+SCOPES_CAST_VALUE_KIND()
+#undef T
 
 //------------------------------------------------------------------------------
 

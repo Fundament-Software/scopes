@@ -55,6 +55,21 @@ namespace scopes {
     T(VK_Raise, "value-kind-raise", Raise) \
 
 
+#define SCOPES_CAST_VALUE_KIND() \
+    T(VK_Bitcast, "value-kind-bitcast", Bitcast) \
+    T(VK_IntToPtr, "value-kind-inttoptr", IntToPtr) \
+    T(VK_PtrToInt, "value-kind-ptrotint", PtrToInt) \
+    T(VK_SExt, "value-kind-sext", SExt) \
+    T(VK_ITrunc, "value-kind-itrunc", ITrunc) \
+    T(VK_ZExt, "value-kind-zext", ZExt) \
+    T(VK_FPTrunc, "value-kind-fptrunc", FPTrunc) \
+    T(VK_FPExt, "value-kind-fpext", FPExt) \
+    T(VK_FPToUI, "value-kind-fptoui", FPToUI) \
+    T(VK_FPToSI, "value-kind-fptosi", FPToSI) \
+    T(VK_UIToFP, "value-kind-uitofp", UIToFP) \
+    T(VK_SIToFP, "value-kind-sitofp", SIToFP) \
+
+
 #define SCOPES_INSTRUCTION_VALUE_KIND() \
     SCOPES_TERMINATOR_VALUE_KIND() \
     T(VK_Label, "value-kind-label", Label) \
@@ -62,7 +77,8 @@ namespace scopes {
     T(VK_CondBr, "value-kind-condbr", CondBr) \
     T(VK_Switch, "value-kind-switch", Switch) \
     T(VK_Call, "value-kind-call", Call) \
-    T(VK_Bitcast, "value-kind-bitcast", Bitcast) \
+    /* casts (Cast::classof) */ \
+    SCOPES_CAST_VALUE_KIND() \
 
 
 #define SCOPES_TYPED_VALUE_KIND() \

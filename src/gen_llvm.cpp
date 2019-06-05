@@ -1376,28 +1376,6 @@ struct LLVMIRGenerator {
             }
             return LLVMBuildGEP(builder, pointer, indices, count, "");
         } break;
-        case FN_IntToPtr: { READ_VALUE(val); READ_TYPE(ty);
-            return LLVMBuildIntToPtr(builder, val, ty, ""); } break;
-        case FN_PtrToInt: { READ_VALUE(val); READ_TYPE(ty);
-            return LLVMBuildPtrToInt(builder, val, ty, ""); } break;
-        case FN_ITrunc: { READ_VALUE(val); READ_TYPE(ty);
-            return LLVMBuildTrunc(builder, val, ty, ""); } break;
-        case FN_SExt: { READ_VALUE(val); READ_TYPE(ty);
-            return LLVMBuildSExt(builder, val, ty, ""); } break;
-        case FN_ZExt: { READ_VALUE(val); READ_TYPE(ty);
-            return LLVMBuildZExt(builder, val, ty, ""); } break;
-        case FN_FPTrunc: { READ_VALUE(val); READ_TYPE(ty);
-            return LLVMBuildFPTrunc(builder, val, ty, ""); } break;
-        case FN_FPExt: { READ_VALUE(val); READ_TYPE(ty);
-            return LLVMBuildFPExt(builder, val, ty, ""); } break;
-        case FN_FPToUI: { READ_VALUE(val); READ_TYPE(ty);
-            return LLVMBuildFPToUI(builder, val, ty, ""); } break;
-        case FN_FPToSI: { READ_VALUE(val); READ_TYPE(ty);
-            return LLVMBuildFPToSI(builder, val, ty, ""); } break;
-        case FN_UIToFP: { READ_VALUE(val); READ_TYPE(ty);
-            return LLVMBuildUIToFP(builder, val, ty, ""); } break;
-        case FN_SIToFP: { READ_VALUE(val); READ_TYPE(ty);
-            return LLVMBuildSIToFP(builder, val, ty, ""); } break;
         case FN_Deref: {
             READ_VALUE(ptr);
             assert(LLVMGetTypeKind(LLVMTypeOf(ptr)) == LLVMPointerTypeKind);
@@ -1757,6 +1735,28 @@ struct LLVMIRGenerator {
         map_phi({ val }, node);
         return {};
     }
+
+#define TRANSLATE_CAST(CLASS, OP) \
+    SCOPES_RESULT(void) translate_ ## CLASS(const CLASS ## Ref &node) { \
+        SCOPES_RESULT_TYPE(void); \
+        LLVMValueRef val = SCOPES_GET_RESULT(ref_to_value(node->value)); \
+        auto ty = SCOPES_GET_RESULT(type_to_llvm_type(node->get_type())); \
+        val = OP(builder, val, ty, ""); \
+        map_phi({ val }, node); \
+        return {}; \
+    }
+
+    TRANSLATE_CAST(IntToPtr, LLVMBuildIntToPtr);
+    TRANSLATE_CAST(PtrToInt, LLVMBuildPtrToInt);
+    TRANSLATE_CAST(SExt, LLVMBuildSExt);
+    TRANSLATE_CAST(ITrunc, LLVMBuildTrunc);
+    TRANSLATE_CAST(ZExt, LLVMBuildZExt);
+    TRANSLATE_CAST(FPTrunc, LLVMBuildFPTrunc);
+    TRANSLATE_CAST(FPExt, LLVMBuildFPExt);
+    TRANSLATE_CAST(FPToUI, LLVMBuildFPToUI);
+    TRANSLATE_CAST(FPToSI, LLVMBuildFPToSI);
+    TRANSLATE_CAST(UIToFP, LLVMBuildUIToFP);
+    TRANSLATE_CAST(SIToFP, LLVMBuildSIToFP);
 
     SCOPES_RESULT(void) translate_Switch(const SwitchRef &node) {
         SCOPES_RESULT_TYPE(void);
