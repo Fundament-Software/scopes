@@ -1803,7 +1803,7 @@ inline simple-folding-autotype-signed-binary-op (sf uf unboxer)
 'set-symbols Symbol
     __== = (box-pointer (simple-folding-autotype-binary-op icmp== sc_const_int_extract))
     __!= = (box-pointer (simple-folding-autotype-binary-op icmp!= sc_const_int_extract))
-    __imply =
+    __as =
         box-pointer
             spice-cast-macro
                 inline (vT T)
@@ -2529,7 +2529,7 @@ fn split-dotted-symbol (name)
 # --------------------------------------------------------------------------
 
 fn get-ifx-symbol (name)
-    Symbol (.. "#ifx:" name)
+    Symbol (.. "#ifx:" (as name string))
 
 fn expand-define-infix (args scope order)
     let prec rest = ('decons args)
@@ -5932,7 +5932,7 @@ sugar :: ((name as Symbol))
     loop (body next-expr = '() next-expr)
         if (empty? next-expr)
             error
-                .. "missing `" name " ::` in block"
+                .. "missing `" (name as string) " ::` in block"
         let at next = (decons next-expr)
         let args =
             label cont

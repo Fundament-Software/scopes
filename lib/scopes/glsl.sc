@@ -269,7 +269,7 @@ fn config-uniform (anchor name T layout)
 
 fn config-inout (anchor name T layout)
     let tname =
-        .. "<inout " name " : " ('string T) ">"
+        .. "<inout " (name as string) " : " ('string T) ">"
     let f = (wrap-xvar-global config-xvar)
     let LT =
         @@ spice-quote
