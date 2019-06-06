@@ -136,15 +136,6 @@ struct SPIRVGenerator {
         }
     };
 
-    struct ExecutionMode {
-        int values[3];
-
-        ExecutionMode() { values[0] = -1; values[1] = -1; values[2] = -1; }
-        ExecutionMode(int x) { values[0] = x; values[1] = -1; values[2] = -1; }
-        ExecutionMode(int x, int y) { values[0] = x; values[1] = y; values[2] = -1; }
-        ExecutionMode(int x, int y, int z) { values[0] = x; values[1] = y; values[2] = z; }
-    };
-
     typedef std::vector<spv::Id> Ids;
 
     std::unordered_map<ValueIndex, spv::Id, ValueIndex::Hash> ref2value;
@@ -152,7 +143,7 @@ struct SPIRVGenerator {
     std::deque<FunctionRef> function_todo;
     std::unordered_map<TypeFlagPair, spv::Id, HashTypeFlagsPair> type_cache;
 
-    std::unordered_map<int, ExecutionMode> execution_modes;
+    std::unordered_map<int, ExecutionMode *> execution_modes;
 
 #if 0
     static LLVMTypeRef voidT;
@@ -960,175 +951,14 @@ struct SPIRVGenerator {
         return value;
     }
 
-    SCOPES_RESULT(spv::Id) translate_builtin(Builtin builtin, const TypedValues &args) {
-        SCOPES_RESULT_TYPE(spv::Id);
-        size_t argcount = args.size();
-        size_t argn = 0;
+    SCOPES_RESULT(void) translate_Unreachable(const UnreachableRef &node) {
+        builder.makeUnreachable();
+        return {};
+    }
 
-#define READ_VALUE(NAME) \
-        assert(argn < argcount); \
-        TypedValueRef _ ## NAME = args[argn++]; \
-        spv::Id NAME = SCOPES_GET_RESULT(ref_to_value(_ ## NAME));
-
-#define READ_TYPE(NAME) \
-        assert(argn < argcount); \
-        spv::Id NAME = SCOPES_GET_RESULT(node_to_spirv_type(args[argn++]));
-
-#define READ_INT(NAME) \
-        assert(argn < argcount); \
-        TypedValueRef _ ## NAME = args[argn++]; \
-        auto NAME = SCOPES_GET_RESULT(extract_integer_constant(_ ## NAME));
-
-#define READ_SYMBOL(NAME) \
-        assert(argn < argcount); \
-        TypedValueRef _ ## NAME = args[argn++]; \
-        auto NAME = SCOPES_GET_RESULT(extract_symbol_constant(_ ## NAME));
-
-#define READ_VECTOR(NAME) \
-        assert(argn < argcount); \
-        auto NAME = SCOPES_GET_RESULT(extract_vector_constant(args[argn++]));
-
-        switch(builtin.value()) {
-        case FN_Annotate: {
-            return 0;
-        } break;
-        case FN_Sample: {
-            READ_VALUE(sampler);
-            READ_VALUE(coords);
-            spv::Builder::TextureParameters params;
-            memset(&params, 0, sizeof(params));
-            params.sampler = sampler;
-            params.coords = coords;
-            auto ST = SCOPES_GET_RESULT(storage_type(_sampler->get_type()));
-            if (ST->kind() == TK_SampledImage) {
-                ST = SCOPES_GET_RESULT(storage_type(cast<SampledImageType>(ST)->type));
-            }
-            auto resultType = SCOPES_GET_RESULT(type_to_spirv_type(cast<ImageType>(ST)->type));
-            bool sparse = false;
-            bool fetch = false;
-            bool proj = false;
-            bool gather = false;
-            bool explicitLod = false;
-            while (argn < argcount) {
-                READ_VALUE(value);
-                Symbol key = type_key(_value->get_type())._0;
-                switch (key.value()) {
-                    case SYM_SPIRV_ImageOperandLod: params.lod = value; break;
-                    case SYM_SPIRV_ImageOperandBias: params.bias = value; break;
-                    case SYM_SPIRV_ImageOperandDref: params.Dref = value; break;
-                    case SYM_SPIRV_ImageOperandProj: proj = true; break;
-                    case SYM_SPIRV_ImageOperandFetch: fetch = true; break;
-                    case SYM_SPIRV_ImageOperandGradX: params.gradX = value; break;
-                    case SYM_SPIRV_ImageOperandGradY: params.gradY = value; break;
-                    case SYM_SPIRV_ImageOperandOffset: params.offset = value; break;
-                    case SYM_SPIRV_ImageOperandConstOffsets: params.offsets = value; break;
-                    case SYM_SPIRV_ImageOperandMinLod: params.lodClamp = value; break;
-                    case SYM_SPIRV_ImageOperandSample: params.sample = value; break;
-                    case SYM_SPIRV_ImageOperandGather: {
-                        params.component = value;
-                        gather = true;
-                    } break;
-                    case SYM_SPIRV_ImageOperandSparse: {
-                        params.texelOut = value;
-                        sparse = true;
-                    } break;
-                    default: break;
-                }
-            }
-            if (fetch) {
-                params.sampler = build_extract_image(sampler);
-            }
-            return builder.createTextureCall(
-                spv::NoPrecision, resultType, sparse, fetch, proj, gather,
-                explicitLod, params);
-        } break;
-        case FN_ImageQuerySize: {
-            READ_VALUE(sampler);
-            spv::Builder::TextureParameters params;
-            memset(&params, 0, sizeof(params));
-            params.sampler = build_extract_image(sampler);
-            spv::Op op = spv::OpImageQuerySize;
-            while (argn < argcount) {
-                READ_VALUE(value);
-                Symbol key = type_key(_value->get_type())._0;
-                switch (key.value()) {
-                    case SYM_SPIRV_ImageOperandLod:
-                        op = spv::OpImageQuerySizeLod;
-                        params.lod = value; break;
-                    default: break;
-                }
-            }
-            return builder.createTextureQueryCall(op, params, false);
-        } break;
-        case FN_ImageQueryLod: {
-            READ_VALUE(sampler);
-            READ_VALUE(coords);
-            spv::Builder::TextureParameters params;
-            memset(&params, 0, sizeof(params));
-            params.sampler = sampler;
-            params.coords = coords;
-            return builder.createTextureQueryCall(
-                spv::OpImageQueryLod, params, false);
-        } break;
-        case FN_ImageQueryLevels: {
-            READ_VALUE(sampler);
-            spv::Builder::TextureParameters params;
-            memset(&params, 0, sizeof(params));
-            params.sampler = build_extract_image(sampler);
-            return builder.createTextureQueryCall(
-                spv::OpImageQueryLevels, params, false);
-        } break;
-        case FN_ImageQuerySamples: {
-            READ_VALUE(sampler);
-            spv::Builder::TextureParameters params;
-            memset(&params, 0, sizeof(params));
-            params.sampler = build_extract_image(sampler);
-            return builder.createTextureQueryCall(
-                spv::OpImageQuerySamples, params, false);
-        } break;
-        case FN_ImageRead: {
-            READ_VALUE(image);
-            READ_VALUE(coords);
-            auto ST = SCOPES_GET_RESULT(storage_type(_image->get_type()));
-            auto resultType = SCOPES_GET_RESULT(type_to_spirv_type(cast<ImageType>(ST)->type));
-            return builder.createBinOp(spv::OpImageRead,
-                resultType, image, coords);
-        } break;
-        case FN_ImageWrite: {
-            READ_VALUE(image);
-            READ_VALUE(coords);
-            READ_VALUE(texel);
-            builder.createNoResultOp(spv::OpImageWrite, { image, coords, texel });
-            return 0;
-        } break;
-        case SFXFN_ExecutionMode: {
-            READ_SYMBOL(mode);
-            auto em = SCOPES_GET_RESULT(execution_mode_from_symbol(mode));
-            ExecutionMode vals;
-            int c = 0;
-            while ((c < 3) && (argn < argcount)) {
-                READ_INT(val);
-                vals.values[c] = val;
-                c++;
-            }
-            auto it = execution_modes.insert({ em, vals });
-            if (!it.second) {
-                it.first->second = vals;
-            }
-        } break;
-        case SFXFN_Unreachable:
-            builder.makeUnreachable();
-            return 0;
-        case SFXFN_Discard:
-            builder.makeDiscard();
-            return 0;
-        default: {
-            SCOPES_ERROR(CGenUnsupportedBuiltin, builtin);
-        } break;
-        }
-#undef READ_TYPE
-#undef READ_VALUE
-        return 0;
+    SCOPES_RESULT(void) translate_Discard(const DiscardRef &node) {
+        builder.makeDiscard();
+        return {};
     }
 
     SCOPES_RESULT(void) translate_Call(const CallRef &call) {
@@ -1138,29 +968,160 @@ struct SPIRVGenerator {
 
         SCOPES_CHECK_RESULT(write_anchor(call.anchor()));
 
-        auto T = try_get_const_type(callee);
         const Type *rtype = strip_lifetime(callee->get_type());
 
-        if (is_function_pointer(rtype)) {
-            auto func =
-                SCOPES_GET_RESULT(Function_to_function(
-                    SCOPES_GET_RESULT(
-                        extract_function_constant(callee))));
-            SCOPES_CHECK_RESULT(build_call(call,
-                extract_function_type(rtype),
-                func, args));
-            return {};
-        } else if (T == TYPE_Builtin) {
-            auto builtin = SCOPES_GET_RESULT(
-                extract_builtin_constant(callee));
-            auto result = SCOPES_GET_RESULT(
-                translate_builtin(builtin, args));
-            if (result) {
-                map_phi({ result }, call);
-            }
-            return {};
+        if (!is_function_pointer(rtype)) {
+            SCOPES_ERROR(CGenInvalidCallee, callee->get_type());
         }
-        SCOPES_ERROR(CGenInvalidCallee, callee->get_type());
+        auto func =
+            SCOPES_GET_RESULT(Function_to_function(
+                SCOPES_GET_RESULT(
+                    extract_function_constant(callee))));
+        SCOPES_CHECK_RESULT(build_call(call,
+            extract_function_type(rtype),
+            func, args));
+        return {};
+    }
+
+    SCOPES_RESULT(void) translate_Sample(const SampleRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        auto sampler = SCOPES_GET_RESULT(ref_to_value(node->sampler));
+        auto coords = SCOPES_GET_RESULT(ref_to_value(node->coords));
+        spv::Builder::TextureParameters params;
+        memset(&params, 0, sizeof(params));
+        params.sampler = sampler;
+        params.coords = coords;
+        auto ST = SCOPES_GET_RESULT(storage_type(node->sampler->get_type()));
+        if (ST->kind() == TK_SampledImage) {
+            ST = SCOPES_GET_RESULT(storage_type(cast<SampledImageType>(ST)->type));
+        }
+        auto resultType = SCOPES_GET_RESULT(type_to_spirv_type(cast<ImageType>(ST)->type));
+        bool sparse = false;
+        bool fetch = false;
+        bool proj = false;
+        bool gather = false;
+        bool explicitLod = false;
+        for (auto &&opt : node->options) {
+            Symbol key = opt.first;
+            spv::Id value = 0;
+            if (opt.second) {
+                value = SCOPES_GET_RESULT(ref_to_value(opt.second));
+            }
+            switch (key.value()) {
+                case SYM_SPIRV_ImageOperandLod: params.lod = value; break;
+                case SYM_SPIRV_ImageOperandBias: params.bias = value; break;
+                case SYM_SPIRV_ImageOperandDref: params.Dref = value; break;
+                case SYM_SPIRV_ImageOperandProj: proj = true; break;
+                case SYM_SPIRV_ImageOperandFetch: fetch = true; break;
+                case SYM_SPIRV_ImageOperandGradX: params.gradX = value; break;
+                case SYM_SPIRV_ImageOperandGradY: params.gradY = value; break;
+                case SYM_SPIRV_ImageOperandOffset: params.offset = value; break;
+                case SYM_SPIRV_ImageOperandConstOffsets: params.offsets = value; break;
+                case SYM_SPIRV_ImageOperandMinLod: params.lodClamp = value; break;
+                case SYM_SPIRV_ImageOperandSample: params.sample = value; break;
+                case SYM_SPIRV_ImageOperandGather: {
+                    params.component = value;
+                    gather = true;
+                } break;
+                case SYM_SPIRV_ImageOperandSparse: {
+                    params.texelOut = value;
+                    sparse = true;
+                } break;
+                default: break;
+            }
+        }
+        if (fetch) {
+            params.sampler = build_extract_image(sampler);
+        }
+        auto val = builder.createTextureCall(
+            spv::NoPrecision, resultType, sparse, fetch, proj, gather,
+            explicitLod, params);
+        map_phi({ val }, node);
+        return {};
+    }
+
+    SCOPES_RESULT(void) translate_ImageQuerySize(const ImageQuerySizeRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        auto sampler = SCOPES_GET_RESULT(ref_to_value(node->sampler));
+        spv::Builder::TextureParameters params;
+        memset(&params, 0, sizeof(params));
+        params.sampler = build_extract_image(sampler);
+        spv::Op op = spv::OpImageQuerySize;
+        if (node->has_lod()) {
+            op = spv::OpImageQuerySizeLod;
+            params.lod = SCOPES_GET_RESULT(ref_to_value(node->lod));
+        }
+        auto val = builder.createTextureQueryCall(op, params, false);
+        map_phi({ val }, node);
+        return {};
+    }
+
+    SCOPES_RESULT(void) translate_ImageQueryLod(const ImageQueryLodRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        auto sampler = SCOPES_GET_RESULT(ref_to_value(node->sampler));
+        auto coords = SCOPES_GET_RESULT(ref_to_value(node->coords));
+        spv::Builder::TextureParameters params;
+        memset(&params, 0, sizeof(params));
+        params.sampler = sampler;
+        params.coords = coords;
+        auto val = builder.createTextureQueryCall(
+            spv::OpImageQueryLod, params, false);
+        map_phi({ val }, node);
+        return {};
+    }
+
+    SCOPES_RESULT(void) translate_ImageQueryLevels(const ImageQueryLevelsRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        auto sampler = SCOPES_GET_RESULT(ref_to_value(node->sampler));
+        spv::Builder::TextureParameters params;
+        memset(&params, 0, sizeof(params));
+        params.sampler = build_extract_image(sampler);
+        auto val = builder.createTextureQueryCall(
+            spv::OpImageQueryLevels, params, false);
+        map_phi({ val }, node);
+        return {};
+    }
+
+    SCOPES_RESULT(void) translate_ImageQuerySamples(const ImageQuerySamplesRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        auto sampler = SCOPES_GET_RESULT(ref_to_value(node->sampler));
+        spv::Builder::TextureParameters params;
+        memset(&params, 0, sizeof(params));
+        params.sampler = build_extract_image(sampler);
+        auto val = builder.createTextureQueryCall(
+            spv::OpImageQuerySamples, params, false);
+        map_phi({ val }, node);
+        return {};
+    }
+
+    SCOPES_RESULT(void) translate_ImageRead(const ImageReadRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        auto image = SCOPES_GET_RESULT(ref_to_value(node->image));
+        auto coords = SCOPES_GET_RESULT(ref_to_value(node->coords));
+        auto ST = SCOPES_GET_RESULT(storage_type(node->image->get_type()));
+        auto resultType = SCOPES_GET_RESULT(type_to_spirv_type(cast<ImageType>(ST)->type));
+        auto val = builder.createBinOp(spv::OpImageRead, resultType, image, coords);
+        map_phi({ val }, node);
+        return {};
+    }
+
+    SCOPES_RESULT(void) translate_ImageWrite(const ImageWriteRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        auto image = SCOPES_GET_RESULT(ref_to_value(node->image));
+        auto coords = SCOPES_GET_RESULT(ref_to_value(node->coords));
+        auto texel = SCOPES_GET_RESULT(ref_to_value(node->texel));
+        builder.createNoResultOp(spv::OpImageWrite, { image, coords, texel });
+        return {};
+    }
+
+    SCOPES_RESULT(void) translate_ExecutionMode(const ExecutionModeRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        auto em = SCOPES_GET_RESULT(execution_mode_from_symbol(node->mode));
+        auto it = execution_modes.insert({ em, node.unref() });
+        if (!it.second) {
+            it.first->second = node.unref();
+        }
+        return {};
     }
 
     SCOPES_RESULT(void) translate_GetElementPtr(const GetElementPtrRef &node) {
@@ -1303,6 +1264,10 @@ struct SPIRVGenerator {
         auto value = SCOPES_GET_RESULT(ref_to_value(node->value));
         auto ptr = SCOPES_GET_RESULT(ref_to_value(node->target));
         builder.createStore(value, ptr);
+        return {};
+    }
+
+    SCOPES_RESULT(void) translate_Annotate(const AnnotateRef &node) {
         return {};
     }
 
@@ -1920,7 +1885,7 @@ struct SPIRVGenerator {
             builder.addCapability(spv::CapabilityShader);
             entry_point = builder.addEntryPoint(spv::ExecutionModelFragment, func, "main");
             execution_modes.insert({ spv::ExecutionModeOriginLowerLeft,
-                 ExecutionMode() });
+                 nullptr });
         } break;
         case SYM_TargetGeometry: {
             builder.addCapability(spv::CapabilityShader);
@@ -1938,10 +1903,14 @@ struct SPIRVGenerator {
         SCOPES_CHECK_RESULT(process_functions());
 
         for (auto &&entry : execution_modes) {
-            builder.addExecutionMode(func, (spv::ExecutionMode)entry.first,
-                entry.second.values[0],
-                entry.second.values[1],
-                entry.second.values[2]);
+            if (entry.second) {
+                builder.addExecutionMode(func, (spv::ExecutionMode)entry.first,
+                    entry.second->values[0],
+                    entry.second->values[1],
+                    entry.second->values[2]);
+            } else {
+                builder.addExecutionMode(func, (spv::ExecutionMode)entry.first);
+            }
         }
 
         builder.dump(result);

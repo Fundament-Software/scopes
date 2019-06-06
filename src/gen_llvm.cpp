@@ -1271,20 +1271,15 @@ struct LLVMIRGenerator {
         return LLVMBuildLoad(builder, ptr, "");
     }
 
-    SCOPES_RESULT(LLVMValueRef) translate_builtin(Builtin builtin, const TypedValues &args) {
-        SCOPES_RESULT_TYPE(LLVMValueRef);
+    SCOPES_RESULT(void) translate_Unreachable(const UnreachableRef &node) {
+        LLVMBuildUnreachable(builder);
+        return {};
+    }
 
-        switch(builtin.value()) {
-        case FN_Annotate: {
-            return nullptr;
-        } break;
-        case SFXFN_Unreachable:
-            return LLVMBuildUnreachable(builder);
-        default: {
-            SCOPES_ERROR(CGenUnsupportedBuiltin, builtin);
-        } break;
-        }
-        return nullptr;
+    SCOPES_RESULT(void) translate_Discard(const DiscardRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        SCOPES_ERROR(CGenUnsupportedBuiltin, SFXFN_Discard);
+        return {};
     }
 
     SCOPES_RESULT(void) translate_Call(const CallRef &call) {
@@ -1292,22 +1287,54 @@ struct LLVMIRGenerator {
         auto callee = call->callee;
         auto &&args = call->args;
 
-        auto T = try_get_const_type(callee);
         const Type *rtype = strip_lifetime(callee->get_type());
-        if (is_function_pointer(rtype)) {
-            SCOPES_CHECK_RESULT(build_call(call,
-                extract_function_type(rtype),
-                SCOPES_GET_RESULT(ref_to_value(callee)), args));
-            return {};
-        } else if (T == TYPE_Builtin) {
-            auto builtin = SCOPES_GET_RESULT(extract_builtin_constant(callee));
-            auto result = SCOPES_GET_RESULT(translate_builtin(builtin, args));
-            if (result) {
-                map_phi({ result }, call);
-            }
-            return {};
+        if (!is_function_pointer(rtype)) {
+            SCOPES_ERROR(CGenInvalidCallee, callee->get_type());
         }
-        SCOPES_ERROR(CGenInvalidCallee, callee->get_type());
+        SCOPES_CHECK_RESULT(build_call(call,
+            extract_function_type(rtype),
+            SCOPES_GET_RESULT(ref_to_value(callee)), args));
+        return {};
+    }
+
+    SCOPES_RESULT(void) translate_Sample(const SampleRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        SCOPES_ERROR(CGenUnsupportedImageOp);
+    }
+
+    SCOPES_RESULT(void) translate_ImageQuerySize(const ImageQuerySizeRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        SCOPES_ERROR(CGenUnsupportedImageOp);
+    }
+
+    SCOPES_RESULT(void) translate_ImageQueryLod(const ImageQueryLodRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        SCOPES_ERROR(CGenUnsupportedImageOp);
+    }
+
+    SCOPES_RESULT(void) translate_ImageQueryLevels(const ImageQueryLevelsRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        SCOPES_ERROR(CGenUnsupportedImageOp);
+    }
+
+    SCOPES_RESULT(void) translate_ImageQuerySamples(const ImageQuerySamplesRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        SCOPES_ERROR(CGenUnsupportedImageOp);
+    }
+
+    SCOPES_RESULT(void) translate_ImageRead(const ImageReadRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        SCOPES_ERROR(CGenUnsupportedImageOp);
+    }
+
+    SCOPES_RESULT(void) translate_ImageWrite(const ImageWriteRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        SCOPES_ERROR(CGenUnsupportedImageOp);
+    }
+
+    SCOPES_RESULT(void) translate_ExecutionMode(const ExecutionModeRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        SCOPES_ERROR(CGenUnsupportedImageOp);
     }
 
     SCOPES_RESULT(void) translate_GetElementPtr(const GetElementPtrRef &node) {
@@ -1441,6 +1468,10 @@ struct LLVMIRGenerator {
         if (node->is_volatile) {
             LLVMSetVolatile(val, true);
         }
+        return {};
+    }
+
+    SCOPES_RESULT(void) translate_Annotate(const AnnotateRef &node) {
         return {};
     }
 

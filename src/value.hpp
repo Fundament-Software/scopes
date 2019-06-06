@@ -745,6 +745,106 @@ struct TriOp : Instruction {
 
 //------------------------------------------------------------------------------
 
+struct Sample : Instruction {
+    typedef std::pair<Symbol, TypedValueRef> Option;
+    typedef std::vector<Option> Options;
+
+    static bool classof(const Value *T);
+
+    Sample(const TypedValueRef &_sampler, const TypedValueRef &_coords, const std::vector<Option> &_options);
+    static SampleRef from(const TypedValueRef &sampler, const TypedValueRef &coords, const std::vector<Option> &options);
+
+    TypedValueRef sampler;
+    TypedValueRef coords;
+    std::vector<Option> options;
+};
+
+struct ImageQuerySize : Instruction {
+    static bool classof(const Value *T);
+
+    ImageQuerySize(const TypedValueRef &_sampler, const TypedValueRef &_lod);
+    bool has_lod() const;
+    static ImageQuerySizeRef from(const TypedValueRef &sampler);
+    static ImageQuerySizeRef from(const TypedValueRef &sampler, const TypedValueRef &lod);
+
+    TypedValueRef sampler;
+    TypedValueRef lod;
+};
+
+struct ImageQueryLod : Instruction {
+    static bool classof(const Value *T);
+
+    ImageQueryLod(const TypedValueRef &_sampler, const TypedValueRef &_coords);
+    static ImageQueryLodRef from(const TypedValueRef &sampler, const TypedValueRef &coords);
+
+    TypedValueRef sampler;
+    TypedValueRef coords;
+};
+
+struct ImageQueryLevels : Instruction {
+    static bool classof(const Value *T);
+
+    ImageQueryLevels(const TypedValueRef &_sampler);
+    static ImageQueryLevelsRef from(const TypedValueRef &sampler);
+
+    TypedValueRef sampler;
+};
+
+struct ImageQuerySamples : Instruction {
+    static bool classof(const Value *T);
+
+    ImageQuerySamples(const TypedValueRef &_sampler);
+    static ImageQuerySamplesRef from(const TypedValueRef &sampler);
+
+    TypedValueRef sampler;
+};
+
+struct ImageRead : Instruction {
+    static bool classof(const Value *T);
+
+    ImageRead(const TypedValueRef &_image, const TypedValueRef &_coords);
+    static ImageReadRef from(const TypedValueRef &image, const TypedValueRef &coords);
+
+    TypedValueRef image;
+    TypedValueRef coords;
+};
+
+struct ImageWrite : Instruction {
+    static bool classof(const Value *T);
+
+    ImageWrite(const TypedValueRef &_image, const TypedValueRef &_coords, const TypedValueRef &_texel);
+    static ImageWriteRef from(const TypedValueRef &image, const TypedValueRef &coords, const TypedValueRef &texel);
+
+    TypedValueRef image;
+    TypedValueRef coords;
+    TypedValueRef texel;
+};
+
+struct ExecutionMode : Instruction {
+    static bool classof(const Value *T);
+
+    ExecutionMode(Symbol _mode, int v0, int v1, int v2);
+    static ExecutionModeRef from(Symbol mode);
+    static ExecutionModeRef from(Symbol mode, int v0);
+    static ExecutionModeRef from(Symbol mode, int v0, int v1);
+    static ExecutionModeRef from(Symbol mode, int v0, int v1, int v2);
+
+    Symbol mode;
+    int values[3];
+};
+
+//------------------------------------------------------------------------------
+
+struct Annotate : Instruction {
+    static bool classof(const Value *T);
+
+    Annotate(const TypedValues &_values);
+    static AnnotateRef from(const TypedValues &values);
+    TypedValues values;
+};
+
+//------------------------------------------------------------------------------
+
 struct Select : Instruction {
     static bool classof(const Value *T);
 
@@ -1249,6 +1349,24 @@ struct Raise : Terminator {
     Raise(const TypedValues &values);
 
     static RaiseRef from(const TypedValues &values);
+};
+
+//------------------------------------------------------------------------------
+
+struct Unreachable : Terminator {
+    static bool classof(const Value *T);
+
+    Unreachable();
+    static UnreachableRef from();
+};
+
+//------------------------------------------------------------------------------
+
+struct Discard : Terminator {
+    static bool classof(const Value *T);
+
+    Discard();
+    static DiscardRef from();
 };
 
 //------------------------------------------------------------------------------

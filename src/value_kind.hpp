@@ -53,6 +53,8 @@ namespace scopes {
     T(VK_Repeat, "value-kind-repeat", Repeat) \
     T(VK_Return, "value-kind-return", Return) \
     T(VK_Raise, "value-kind-raise", Raise) \
+    T(VK_Unreachable, "value-kind-unreachable", Unreachable) \
+    T(VK_Discard, "value-kind-discard", Discard) \
 
 
 #define SCOPES_CAST_VALUE_KIND() \
@@ -94,6 +96,15 @@ namespace scopes {
     T(VK_UnOp, "value-kind-unop", UnOp) \
     T(VK_BinOp, "value-kind-binop", BinOp) \
     T(VK_TriOp, "value-kind-triop", TriOp) \
+    T(VK_Annotate, "value-kind-annotate", Annotate) \
+    T(VK_Sample, "value-kind-sample", Sample) \
+    T(VK_ImageQuerySize, "value-kind-image-query-size", ImageQuerySize) \
+    T(VK_ImageQueryLod, "value-kind-image-query-lod", ImageQueryLod) \
+    T(VK_ImageQueryLevels, "value-kind-image-query-levels", ImageQueryLevels) \
+    T(VK_ImageQuerySamples, "value-kind-image-query-samples", ImageQuerySamples) \
+    T(VK_ImageRead, "value-kind-image-read", ImageRead) \
+    T(VK_ImageWrite, "value-kind-image-write", ImageWrite) \
+    T(VK_ExecutionMode, "value-kind-execution-mode", ExecutionMode) \
     /* casts (Cast::classof) */ \
     SCOPES_CAST_VALUE_KIND() \
 

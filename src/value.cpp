@@ -1152,6 +1152,126 @@ TriOpRef TriOp::from(TriOpKind op, const TypedValueRef &value1, const TypedValue
 
 //------------------------------------------------------------------------------
 
+static const ImageType *sampler_image_type(const Type *T) {
+    auto ST = storage_type(T).assert_ok();
+    if (ST->kind() == TK_SampledImage) {
+        auto sit = cast<SampledImageType>(ST);
+        ST = storage_type(sit->type).assert_ok();
+    }
+    return cast<ImageType>(ST);
+}
+
+static const Type *sampler_comp_type(const Type *T) {
+    return sampler_image_type(T)->type;
+}
+
+Sample::Sample(const TypedValueRef &_sampler, const TypedValueRef &_coords, const std::vector<Option> &_options)
+    : Instruction(VK_Sample, sampler_comp_type(_sampler->get_type())), sampler(_sampler), coords(_coords), options(_options) {}
+SampleRef Sample::from(const TypedValueRef &sampler, const TypedValueRef &coords, const std::vector<Option> &options) {
+    return ref(unknown_anchor(), new Sample(sampler, coords, options));
+}
+
+static const Type *sampler_comp_size_type(const Type *T) {
+    auto it = sampler_image_type(T);
+    int comps = 0;
+    switch(it->dim.value()) {
+    case SYM_SPIRV_Dim1D:
+    case SYM_SPIRV_DimBuffer:
+        comps = 1;
+        break;
+    case SYM_SPIRV_Dim2D:
+    case SYM_SPIRV_DimCube:
+    case SYM_SPIRV_DimRect:
+    case SYM_SPIRV_DimSubpassData:
+        comps = 2;
+        break;
+    case SYM_SPIRV_Dim3D:
+        comps = 3;
+        break;
+    default: assert(false); break;
+    }
+    if (it->arrayed) {
+        comps++;
+    }
+    const Type *retT = TYPE_I32;
+    if (comps != 1) {
+        return vector_type(TYPE_I32, comps).assert_ok();
+    } else {
+        return retT;
+    }
+}
+
+ImageQuerySize::ImageQuerySize(const TypedValueRef &_sampler, const TypedValueRef &_lod)
+    : Instruction(VK_ImageQuerySize, sampler_comp_size_type(_sampler->get_type())), sampler(_sampler), lod(_lod) {}
+bool ImageQuerySize::has_lod() const {
+    return lod;
+}
+ImageQuerySizeRef ImageQuerySize::from(const TypedValueRef &sampler) {
+    return ref(unknown_anchor(), new ImageQuerySize(sampler, TypedValueRef()));
+}
+ImageQuerySizeRef ImageQuerySize::from(const TypedValueRef &sampler, const TypedValueRef &lod) {
+    return ref(unknown_anchor(), new ImageQuerySize(sampler, lod));
+}
+
+ImageQueryLod::ImageQueryLod(const TypedValueRef &_sampler, const TypedValueRef &_coords)
+    : Instruction(VK_ImageQueryLod, vector_type(TYPE_F32, 2).assert_ok()), sampler(_sampler), coords(_coords) {}
+ImageQueryLodRef ImageQueryLod::from(const TypedValueRef &sampler, const TypedValueRef &coords) {
+    return ref(unknown_anchor(), new ImageQueryLod(sampler, coords));
+}
+
+ImageQueryLevels::ImageQueryLevels(const TypedValueRef &_sampler)
+    : Instruction(VK_ImageQueryLevels, TYPE_I32), sampler(_sampler) {}
+ImageQueryLevelsRef ImageQueryLevels::from(const TypedValueRef &sampler) {
+    return ref(unknown_anchor(), new ImageQueryLevels(sampler));
+}
+
+ImageQuerySamples::ImageQuerySamples(const TypedValueRef &_sampler)
+    : Instruction(VK_ImageQuerySamples, TYPE_I32), sampler(_sampler) {}
+ImageQuerySamplesRef ImageQuerySamples::from(const TypedValueRef &sampler) {
+    return ref(unknown_anchor(), new ImageQuerySamples(sampler));
+}
+
+ImageRead::ImageRead(const TypedValueRef &_image, const TypedValueRef &_coords)
+    : Instruction(VK_ImageRead, sampler_comp_type(_image->get_type())), image(_image), coords(_coords) {}
+ImageReadRef ImageRead::from(const TypedValueRef &image, const TypedValueRef &coords) {
+    return ref(unknown_anchor(), new ImageRead(image, coords));
+}
+
+ImageWrite::ImageWrite(const TypedValueRef &_image, const TypedValueRef &_coords, const TypedValueRef &_texel)
+    : Instruction(VK_ImageWrite, empty_arguments_type()), image(_image), coords(_coords), texel(_texel) {}
+ImageWriteRef ImageWrite::from(const TypedValueRef &image, const TypedValueRef &coords, const TypedValueRef &texel) {
+    return ref(unknown_anchor(), new ImageWrite(image, coords, texel));
+}
+
+ExecutionMode::ExecutionMode(Symbol _mode, int v0, int v1, int v2)
+    : Instruction(VK_ExecutionMode, empty_arguments_type()), mode(_mode) {
+    values[0] = v0;
+    values[1] = v1;
+    values[2] = v2;
+}
+ExecutionModeRef ExecutionMode::from(Symbol mode) {
+    return ref(unknown_anchor(), new ExecutionMode(mode,-1,-1,-1));
+}
+ExecutionModeRef ExecutionMode::from(Symbol mode, int v0) {
+    return ref(unknown_anchor(), new ExecutionMode(mode,v0,-1,-1));
+}
+ExecutionModeRef ExecutionMode::from(Symbol mode, int v0, int v1) {
+    return ref(unknown_anchor(), new ExecutionMode(mode,v0,v1,-1));
+}
+ExecutionModeRef ExecutionMode::from(Symbol mode, int v0, int v1, int v2) {
+    return ref(unknown_anchor(), new ExecutionMode(mode,v0,v1,v2));
+}
+
+//------------------------------------------------------------------------------
+
+Annotate::Annotate(const TypedValues &_values)
+    : Instruction(VK_Annotate, empty_arguments_type()), values(_values) {}
+AnnotateRef Annotate::from(const TypedValues &values) {
+    return ref(unknown_anchor(), new Annotate(values));
+}
+
+//------------------------------------------------------------------------------
+
 Select::Select(const TypedValueRef &_cond,
     const TypedValueRef &_value1, const TypedValueRef &_value2)
     : Instruction(VK_Select, _value2->get_type()), cond(_cond), value1(_value1), value2(_value2)
@@ -1744,6 +1864,22 @@ Raise::Raise(const TypedValues &values)
 
 RaiseRef Raise::from(const TypedValues &values) {
     return ref(unknown_anchor(), new Raise(values));
+}
+
+//------------------------------------------------------------------------------
+
+Unreachable::Unreachable()
+    : Terminator(VK_Unreachable, {}) {}
+UnreachableRef Unreachable::from() {
+    return ref(unknown_anchor(), new Unreachable());
+}
+
+//------------------------------------------------------------------------------
+
+Discard::Discard()
+    : Terminator(VK_Discard, {}) {}
+DiscardRef Discard::from() {
+    return ref(unknown_anchor(), new Discard());
 }
 
 //------------------------------------------------------------------------------

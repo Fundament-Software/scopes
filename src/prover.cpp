@@ -2147,7 +2147,7 @@ repeat:
         /*** ANNOTATION ***/
         case FN_Annotate: {
             // takes any kind of argument
-            return ARGTYPE0();
+            return TypedValueRef(call.anchor(), Annotate::from(values));
         } break;
         case FN_HideTraceback: {
             CHECKARGS(0, 0);
@@ -2286,16 +2286,23 @@ repeat:
         case FN_Sample: {
             CHECKARGS(2, -1);
             READ_STORAGETYPEOF(ST);
+            READ_STORAGETYPEOF(coords);
+            (void)coords;
             if (ST->kind() == TK_SampledImage) {
                 auto sit = cast<SampledImageType>(ST);
                 ST = SCOPES_GET_RESULT(storage_type(sit->type));
             }
             SCOPES_CHECK_RESULT(verify_kind<TK_Image>(ST));
-            auto it = cast<ImageType>(ST);
+            Sample::Options opts;
+            opts.reserve(argcount);
             while (argn < argcount) {
                 READ_VALUE(val);
+                Symbol key = type_key(val->get_type())._0;
+                opts.push_back(Sample::Option(key, val));
             }
-            return DEP_ARGTYPE1(it->type, _ST);
+            auto op = Sample::from(_ST, _coords, opts);
+            op->hack_change_value(VIEWTYPE1(op->get_type(), _ST));
+            return TypedValueRef(call.anchor(), op);
         } break;
         case FN_ImageQuerySize: {
             CHECKARGS(1, -1);
@@ -2305,46 +2312,31 @@ repeat:
                 ST = SCOPES_GET_RESULT(storage_type(sit->type));
             }
             SCOPES_CHECK_RESULT(verify_kind<TK_Image>(ST));
-            auto it = cast<ImageType>(ST);
-            int comps = 0;
-            switch(it->dim.value()) {
-            case SYM_SPIRV_Dim1D:
-            case SYM_SPIRV_DimBuffer:
-                comps = 1;
-                break;
-            case SYM_SPIRV_Dim2D:
-            case SYM_SPIRV_DimCube:
-            case SYM_SPIRV_DimRect:
-            case SYM_SPIRV_DimSubpassData:
-                comps = 2;
-                break;
-            case SYM_SPIRV_Dim3D:
-                comps = 3;
-                break;
-            default:
-                SCOPES_ERROR(UnsupportedDimensionality, it->dim);
-                break;
+            TypedValueRef lod;
+            while (argn < argcount) {
+                READ_VALUE(val);
+                Symbol key = type_key(val->get_type())._0;
+                if (key == SYM_SPIRV_ImageOperandLod) {
+                    lod = val;
+                }
             }
-            if (it->arrayed) {
-                comps++;
-            }
-
-            const Type *retT = TYPE_I32;
-            if (comps != 1) {
-                retT = vector_type(TYPE_I32, comps).assert_ok();
-            }
-            return DEP_ARGTYPE1(retT, _ST);
+            auto op = ImageQuerySize::from(_ST, lod);
+            op->hack_change_value(VIEWTYPE1(op->get_type(), _ST));
+            return TypedValueRef(call.anchor(), op);
         } break;
         case FN_ImageQueryLod: {
             CHECKARGS(2, 2);
             READ_STORAGETYPEOF(ST);
+            READ_STORAGETYPEOF(coords);
+            (void)coords;
             if (ST->kind() == TK_SampledImage) {
                 auto sit = cast<SampledImageType>(ST);
                 ST = SCOPES_GET_RESULT(storage_type(sit->type));
             }
             SCOPES_CHECK_RESULT(verify_kind<TK_Image>(ST));
-
-            return DEP_ARGTYPE1(vector_type(TYPE_F32, 2).assert_ok(), _ST);
+            auto op = ImageQueryLod::from(_ST, _coords);
+            op->hack_change_value(VIEWTYPE1(op->get_type(), _ST));
+            return TypedValueRef(call.anchor(), op);
         } break;
         case FN_ImageQueryLevels:
         case FN_ImageQuerySamples: {
@@ -2355,14 +2347,35 @@ repeat:
                 ST = SCOPES_GET_RESULT(storage_type(sit->type));
             }
             SCOPES_CHECK_RESULT(verify_kind<TK_Image>(ST));
-            return DEP_ARGTYPE1(TYPE_I32, _ST);
+            TypedValueRef op;
+            if (b.value() == FN_ImageQueryLevels) {
+                op = TypedValueRef(call.anchor(), ImageQueryLevels::from(_ST));
+            } else {
+                op = TypedValueRef(call.anchor(), ImageQuerySamples::from(_ST));
+            }
+            op->hack_change_value(VIEWTYPE1(op->get_type(), _ST));
+            return op;
         } break;
         case FN_ImageRead: {
             CHECKARGS(2, 2);
             READ_STORAGETYPEOF(ST);
+            READ_STORAGETYPEOF(coords);
+            (void)coords;
             SCOPES_CHECK_RESULT(verify_kind<TK_Image>(ST));
-            auto it = cast<ImageType>(ST);
-            return DEP_ARGTYPE1(it->type, _ST);
+            auto op = ImageRead::from(_ST, _coords);
+            op->hack_change_value(VIEWTYPE1(op->get_type(), _ST));
+            return TypedValueRef(call.anchor(), op);
+        } break;
+        case FN_ImageWrite: {
+            CHECKARGS(3, 3);
+            READ_STORAGETYPEOF(ST);
+            READ_STORAGETYPEOF(coords);
+            (void)coords;
+            READ_STORAGETYPEOF(texel);
+            (void)texel;
+            SCOPES_CHECK_RESULT(verify_kind<TK_Image>(ST));
+            auto op = ImageWrite::from(_ST, _coords, _texel);
+            return TypedValueRef(call.anchor(), op);
         } break;
         case SFXFN_ExecutionMode: {
             CHECKARGS(1, 4);
@@ -2376,13 +2389,25 @@ repeat:
                     SCOPES_ERROR(UnsupportedExecutionMode, sym);
                     break;
             }
+            int c = 0;
+            int v[3] = { -1, -1, -1 };
             for (size_t i = 1; i < values.size(); ++i) {
                 READ_INT_CONST(x);
-                (void)x;
+                v[c++] = x;
+                if (c == 3) break;
             }
-            return ARGTYPE0();
+            return TypedValueRef(call.anchor(),
+                ExecutionMode::from(sym, v[0], v[1], v[2]));
         } break;
         /*** MISC ***/
+        case SFXFN_Discard: {
+            CHECKARGS(0, 0);
+            return TypedValueRef(call.anchor(), Discard::from());
+        } break;
+        case SFXFN_Unreachable: {
+            CHECKARGS(0, 0);
+            return TypedValueRef(call.anchor(), Unreachable::from());
+        } break;
         case OP_Tertiary: {
             CHECKARGS(3, 3);
             READ_STORAGETYPEOF(T1);

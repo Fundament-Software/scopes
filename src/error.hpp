@@ -358,6 +358,8 @@ formatters:
         "codegen: binary operator unsupported for this target") \
     T(CGenUnsupportedTriOp, \
         "codegen: ternary operator unsupported for this target") \
+    T(CGenUnsupportedImageOp, \
+        "codegen: image operator unsupported for this target") \
     T(CGenUnsupportedTarget, \
         "codegen: unsupported target: %0", /* todo: list supported targets */ \
         Symbol) \
