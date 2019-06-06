@@ -292,14 +292,33 @@ void ASTContext::append(const TypedValueRef &value) const {
     }
 }
 
+void ASTContext::unchecked_append(const TypedValueRef &value) const {
+    assert(block);
+    block->append(value);
+}
+
 ASTContext ASTContext::from_function(const FunctionRef &fn) {
     return ASTContext(fn, fn, LoopLabelRef(), LabelRef(), LabelRef(), nullptr);
 }
 
-TypedValueRef ASTContext::getelementref(const Anchor *anchor,
+TypedValueRef ASTContext::build_deref(const Anchor *anchor,
+    const TypedValueRef &value) const {
+    TypedValueRef op = ref(anchor, RefToPtr::from(value));
+    unchecked_append(op);
+    return ref(anchor, Load::from(op));
+}
+
+TypedValueRef ASTContext::build_assign(const Anchor *anchor,
+    const TypedValueRef &value, const TypedValueRef &target) const {
+    TypedValueRef op = ref(anchor, RefToPtr::from(target));
+    unchecked_append(op);
+    return ref(anchor, Store::from(value, op));
+}
+
+TypedValueRef ASTContext::build_getelementref(const Anchor *anchor,
     const TypedValueRef &value, const TypedValues &indices) const {
     TypedValueRef op = ref(anchor, RefToPtr::from(value));
-    append(op);
+    unchecked_append(op);
     TypedValues idxs;
     idxs.reserve(indices.size() + 1);
     idxs.push_back(ConstInt::from(TYPE_I32, 0));
@@ -307,7 +326,7 @@ TypedValueRef ASTContext::getelementref(const Anchor *anchor,
         idxs.push_back(val);
     }
     op = ref(anchor, GetElementPtr::from(op, idxs));
-    append(op);
+    unchecked_append(op);
     return ref(anchor, PtrToRef::from(op));
 }
 
@@ -1619,7 +1638,8 @@ static SCOPES_RESULT(void) build_deref(
         SCOPES_CHECK_RESULT(verify_readable(rq, T));
         auto retT = strip_qualifier<ReferQualifier>(T);
         retT = view_result_type(ctx, retT, val);
-        auto call = ref(anchor, Call::from(retT, g_deref, { val }));
+        auto call = ctx.build_deref(anchor, val);
+        call->hack_change_value(retT);
         ctx.append(call);
         val = call;
         return {};
@@ -1642,8 +1662,8 @@ static SCOPES_RESULT(void) build_deref_move(
     if (rq) {
         SCOPES_CHECK_RESULT(verify_readable(rq, T));
         auto retT = strip_qualifier<ReferQualifier>(T);
-        auto call = ref(anchor,
-            Call::from(unique_result_type(ctx, retT), g_deref, { val }));
+        auto call = ctx.build_deref(anchor, val);
+        call->hack_change_value(unique_result_type(ctx, retT));
         ctx.append(call);
         auto uq = try_unique(T);
         if (uq) {
@@ -1671,8 +1691,8 @@ static SCOPES_RESULT(void) build_deref_automove(
         } else {
             rtype = retT;
         }
-        auto call = ref(anchor,
-            Call::from(rtype, g_deref, { val }));
+        auto call = ctx.build_deref(anchor, val);
+        call->hack_change_value(rtype);
         ctx.append(call);
         auto uq = try_unique(T);
         if (uq) {
@@ -2550,7 +2570,7 @@ repeat:
             if (rq) {
                 const Type *retT = view_result_type(ctx, qualify(RT, { rq }), _T, _idx);
                 auto op = TypedValueRef(call.anchor(),
-                    ctx.getelementref(call.anchor(), _T, { _idx }));
+                    ctx.build_getelementref(call.anchor(), _T, { _idx }));
                 op->hack_change_value(retT);
                 return op;
             } else {
@@ -2671,7 +2691,7 @@ repeat:
             auto rq = try_qualifier<ReferQualifier>(typeof_T);
             if (rq) {
                 auto retT = view_result_type(ctx, qualify(RT, { rq }), _T);
-                auto op = TypedValueRef(call.anchor(), ctx.getelementref(call.anchor(), _T, { _idx }));
+                auto op = TypedValueRef(call.anchor(), ctx.build_getelementref(call.anchor(), _T, { _idx }));
                 op->hack_change_value(retT);
                 return op;
             } else {
@@ -2771,7 +2791,7 @@ repeat:
             TypedValueRef op;
             if (is_ref) {
                 assert(Tptr);
-                op = ctx.getelementref(call.anchor(), dep, indices);
+                op = ctx.build_getelementref(call.anchor(), dep, indices);
             } else {
                 op = GetElementPtr::from(dep, indices);
             }
@@ -2808,7 +2828,7 @@ repeat:
                 }
                 ctx.move(uq->id, call);
             }
-            return ARGTYPE0();
+            return ctx.build_assign(call.anchor(), _ElemT, _DestT);
         } break;
         case FN_PtrToRef: {
             CHECKARGS(1, 1);
@@ -2825,11 +2845,13 @@ repeat:
                 if (uq) {
                     ctx.move(uq->id, call);
                 }
+                auto op = PtrToRef::from(_T);
                 if (is_movable(T)) {
-                    return NEW_ARGTYPE1(NT);
+                    op->hack_change_value(UNIQUETYPE1(NT));
                 } else {
-                    return DEP_ARGTYPE1(NT, _T);
+                    op->hack_change_value(VIEWTYPE1(NT, _T));
                 }
+                return TypedValueRef(call.anchor(), op);
             }
         } break;
         case FN_RefToPtr: {
@@ -2844,11 +2866,13 @@ repeat:
                 if (uq) {
                     ctx.move(uq->id, call);
                 }
+                auto op = RefToPtr::from(_T);
                 if (is_movable(T)) {
-                    return NEW_ARGTYPE1(NT);
+                    op->hack_change_value(UNIQUETYPE1(NT));
                 } else {
-                    return DEP_ARGTYPE1(NT, _T);
+                    op->hack_change_value(VIEWTYPE1(NT, _T));
                 }
+                return TypedValueRef(call.anchor(), op);
             }
         } break;
         case FN_VolatileLoad:

@@ -1122,24 +1122,6 @@ struct SPIRVGenerator {
             READ_VALUE(val);
             return val;
         } break;
-        case FN_Deref: {
-            READ_VALUE(ptr);
-            return builder.createLoad(ptr);
-        } break;
-        case FN_Assign: {
-            READ_VALUE(lhs);
-            READ_VALUE(rhs);
-            builder.createStore(lhs, rhs);
-            return 0;
-        } break;
-        case FN_PtrToRef: {
-            READ_VALUE(ptr);
-            return ptr;
-        } break;
-        case FN_RefToPtr: {
-            READ_VALUE(ptr);
-            return ptr;
-        } break;
         case OP_ICmpEQ:
         case OP_ICmpNE:
         case OP_ICmpUGT:
