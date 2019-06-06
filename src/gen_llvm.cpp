@@ -1295,68 +1295,6 @@ struct LLVMIRGenerator {
             READ_VALUE(val);
             return val;
         } break;
-        case OP_ICmpEQ:
-        case OP_ICmpNE:
-        case OP_ICmpUGT:
-        case OP_ICmpUGE:
-        case OP_ICmpULT:
-        case OP_ICmpULE:
-        case OP_ICmpSGT:
-        case OP_ICmpSGE:
-        case OP_ICmpSLT:
-        case OP_ICmpSLE: {
-            READ_VALUE(a); READ_VALUE(b);
-            LLVMIntPredicate pred = LLVMIntEQ;
-            switch(builtin.value()) {
-                case OP_ICmpEQ: pred = LLVMIntEQ; break;
-                case OP_ICmpNE: pred = LLVMIntNE; break;
-                case OP_ICmpUGT: pred = LLVMIntUGT; break;
-                case OP_ICmpUGE: pred = LLVMIntUGE; break;
-                case OP_ICmpULT: pred = LLVMIntULT; break;
-                case OP_ICmpULE: pred = LLVMIntULE; break;
-                case OP_ICmpSGT: pred = LLVMIntSGT; break;
-                case OP_ICmpSGE: pred = LLVMIntSGE; break;
-                case OP_ICmpSLT: pred = LLVMIntSLT; break;
-                case OP_ICmpSLE: pred = LLVMIntSLE; break;
-                default: assert(false); break;
-            }
-            return LLVMBuildICmp(builder, pred, a, b, "");
-        } break;
-        case OP_FCmpOEQ:
-        case OP_FCmpONE:
-        case OP_FCmpORD:
-        case OP_FCmpOGT:
-        case OP_FCmpOGE:
-        case OP_FCmpOLT:
-        case OP_FCmpOLE:
-        case OP_FCmpUEQ:
-        case OP_FCmpUNE:
-        case OP_FCmpUNO:
-        case OP_FCmpUGT:
-        case OP_FCmpUGE:
-        case OP_FCmpULT:
-        case OP_FCmpULE: {
-            READ_VALUE(a); READ_VALUE(b);
-            LLVMRealPredicate pred = LLVMRealOEQ;
-            switch(builtin.value()) {
-                case OP_FCmpOEQ: pred = LLVMRealOEQ; break;
-                case OP_FCmpONE: pred = LLVMRealONE; break;
-                case OP_FCmpORD: pred = LLVMRealORD; break;
-                case OP_FCmpOGT: pred = LLVMRealOGT; break;
-                case OP_FCmpOGE: pred = LLVMRealOGE; break;
-                case OP_FCmpOLT: pred = LLVMRealOLT; break;
-                case OP_FCmpOLE: pred = LLVMRealOLE; break;
-                case OP_FCmpUEQ: pred = LLVMRealUEQ; break;
-                case OP_FCmpUNE: pred = LLVMRealUNE; break;
-                case OP_FCmpUNO: pred = LLVMRealUNO; break;
-                case OP_FCmpUGT: pred = LLVMRealUGT; break;
-                case OP_FCmpUGE: pred = LLVMRealUGE; break;
-                case OP_FCmpULT: pred = LLVMRealULT; break;
-                case OP_FCmpULE: pred = LLVMRealULE; break;
-                default: assert(false); break;
-            }
-            return LLVMBuildFCmp(builder, pred, a, b, "");
-        } break;
         case OP_Add: { READ_VALUE(a); READ_VALUE(b);
             return LLVMBuildAdd(builder, a, b, ""); } break;
         case OP_AddNUW: { READ_VALUE(a); READ_VALUE(b);
@@ -1745,6 +1683,56 @@ struct LLVMIRGenerator {
                 SCOPES_GET_RESULT(ref_to_value(node->value1)),
                 SCOPES_GET_RESULT(ref_to_value(node->value2)),
                 "");
+        map_phi({ val }, node);
+        return {};
+    }
+
+    SCOPES_RESULT(void) translate_ICmp(const ICmpRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        auto a = SCOPES_GET_RESULT(ref_to_value(node->value1));
+        auto b = SCOPES_GET_RESULT(ref_to_value(node->value2));
+        LLVMIntPredicate pred = LLVMIntEQ;
+        switch(node->cmp_kind) {
+            case ICmpEQ: pred = LLVMIntEQ; break;
+            case ICmpNE: pred = LLVMIntNE; break;
+            case ICmpUGT: pred = LLVMIntUGT; break;
+            case ICmpUGE: pred = LLVMIntUGE; break;
+            case ICmpULT: pred = LLVMIntULT; break;
+            case ICmpULE: pred = LLVMIntULE; break;
+            case ICmpSGT: pred = LLVMIntSGT; break;
+            case ICmpSGE: pred = LLVMIntSGE; break;
+            case ICmpSLT: pred = LLVMIntSLT; break;
+            case ICmpSLE: pred = LLVMIntSLE; break;
+            default: assert(false); break;
+        }
+        auto val = LLVMBuildICmp(builder, pred, a, b, "");
+        map_phi({ val }, node);
+        return {};
+    }
+
+    SCOPES_RESULT(void) translate_FCmp(const FCmpRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        auto a = SCOPES_GET_RESULT(ref_to_value(node->value1));
+        auto b = SCOPES_GET_RESULT(ref_to_value(node->value2));
+        LLVMRealPredicate pred = LLVMRealOEQ;
+        switch(node->cmp_kind) {
+            case FCmpOEQ: pred = LLVMRealOEQ; break;
+            case FCmpONE: pred = LLVMRealONE; break;
+            case FCmpORD: pred = LLVMRealORD; break;
+            case FCmpOGT: pred = LLVMRealOGT; break;
+            case FCmpOGE: pred = LLVMRealOGE; break;
+            case FCmpOLT: pred = LLVMRealOLT; break;
+            case FCmpOLE: pred = LLVMRealOLE; break;
+            case FCmpUEQ: pred = LLVMRealUEQ; break;
+            case FCmpUNE: pred = LLVMRealUNE; break;
+            case FCmpUNO: pred = LLVMRealUNO; break;
+            case FCmpUGT: pred = LLVMRealUGT; break;
+            case FCmpUGE: pred = LLVMRealUGE; break;
+            case FCmpULT: pred = LLVMRealULT; break;
+            case FCmpULE: pred = LLVMRealULE; break;
+            default: assert(false); break;
+        }
+        auto val = LLVMBuildFCmp(builder, pred, a, b, "");
         map_phi({ val }, node);
         return {};
     }

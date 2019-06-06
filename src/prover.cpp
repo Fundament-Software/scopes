@@ -1511,7 +1511,7 @@ SCOPES_RESULT(ConstAggregateRef) extract_vector_constant(const ValueRef &value) 
     return extract_constant<ConstAggregate, VK_ConstAggregate>(value);
 }
 
-static SCOPES_RESULT(const Type *) bool_op_return_type(const Type *T) {
+SCOPES_RESULT(const Type *) bool_op_return_type(const Type *T) {
     SCOPES_RESULT_TYPE(const Type *);
     T = SCOPES_GET_RESULT(storage_type(T));
     if (T->kind() == TK_Vector) {
@@ -2965,7 +2965,16 @@ repeat:
             CHECKARGS(2, 2);
             READ_TYPEOF(A); READ_TYPEOF(B);
             SCOPES_CHECK_RESULT(verify_integer_ops(A, B));
-            return DEP_ARGTYPE1(SCOPES_GET_RESULT(bool_op_return_type(A)), _A, _B);
+            ICmpKind pred;
+            switch(b.value()) {
+            #define T(NAME, BNAME) case OP_ ## NAME: pred = NAME; break;
+            ICMP_KIND()
+            #undef T
+            default: assert(false); break;
+            }
+            auto op = ICmp::from(pred, _A, _B);
+            op->hack_change_value(VIEWTYPE1(op->get_type(), _A, _B));
+            return TypedValueRef(call.anchor(), op);
         } break;
         case OP_FCmpOEQ:
         case OP_FCmpONE:
@@ -2984,7 +2993,16 @@ repeat:
             CHECKARGS(2, 2);
             READ_TYPEOF(A); READ_TYPEOF(B);
             SCOPES_CHECK_RESULT(verify_real_ops(A, B));
-            return DEP_ARGTYPE1(SCOPES_GET_RESULT(bool_op_return_type(A)), _A, _B);
+            FCmpKind pred;
+            switch(b.value()) {
+            #define T(NAME, BNAME) case OP_ ## NAME: pred = NAME; break;
+            FCMP_KIND()
+            #undef T
+            default: assert(false); break;
+            }
+            auto op = FCmp::from(pred, _A, _B);
+            op->hack_change_value(VIEWTYPE1(op->get_type(), _A, _B));
+            return TypedValueRef(call.anchor(), op);
         } break;
 #define IARITH_NUW_NSW_OPS(NAME) \
         case OP_ ## NAME: \

@@ -577,6 +577,68 @@ SCOPES_CAST_VALUE_KIND()
 
 //------------------------------------------------------------------------------
 
+#define ICMP_KIND() \
+    T(ICmpEQ, "icmp-kind-eq") \
+    T(ICmpNE, "icmp-kind-ne") \
+    T(ICmpUGT, "icmp-kind-ugt") \
+    T(ICmpUGE, "icmp-kind-uge") \
+    T(ICmpULT, "icmp-kind-ult") \
+    T(ICmpULE, "icmp-kind-ule") \
+    T(ICmpSGT, "icmp-kind-sgt") \
+    T(ICmpSGE, "icmp-kind-sge") \
+    T(ICmpSLT, "icmp-kind-slt") \
+    T(ICmpSLE, "icmp-kind-sle") \
+
+enum ICmpKind {
+#define T(NAME, BNAME) NAME,
+ICMP_KIND()
+#undef T
+};
+
+#define FCMP_KIND() \
+    T(FCmpOEQ, "fcmp-kind-oeq") \
+    T(FCmpONE, "fcmp-kind-one") \
+    T(FCmpORD, "fcmp-kind-ord") \
+    T(FCmpOGT, "fcmp-kind-ogt") \
+    T(FCmpOGE, "fcmp-kind-oge") \
+    T(FCmpOLT, "fcmp-kind-olt") \
+    T(FCmpOLE, "fcmp-kind-ole") \
+    T(FCmpUEQ, "fcmp-kind-ueq") \
+    T(FCmpUNE, "fcmp-kind-une") \
+    T(FCmpUNO, "fcmp-kind-uno") \
+    T(FCmpUGT, "fcmp-kind-ugt") \
+    T(FCmpUGE, "fcmp-kind-uge") \
+    T(FCmpULT, "fcmp-kind-ult") \
+    T(FCmpULE, "fcmp-kind-ule") \
+
+enum FCmpKind {
+#define T(NAME, BNAME) NAME,
+FCMP_KIND()
+#undef T
+};
+
+struct ICmp : Instruction {
+    static bool classof(const Value *T);
+
+    ICmp(ICmpKind cmp_kind, const TypedValueRef &value1, const TypedValueRef &value2);
+    static ICmpRef from(ICmpKind cmp_kind, const TypedValueRef &value1, const TypedValueRef &value2);
+    ICmpKind cmp_kind;
+    TypedValueRef value1;
+    TypedValueRef value2;
+};
+
+struct FCmp : Instruction {
+    static bool classof(const Value *T);
+
+    FCmp(FCmpKind cmp_kind, const TypedValueRef &value1, const TypedValueRef &value2);
+    static FCmpRef from(FCmpKind cmp_kind, const TypedValueRef &value1, const TypedValueRef &value2);
+    FCmpKind cmp_kind;
+    TypedValueRef value1;
+    TypedValueRef value2;
+};
+
+//------------------------------------------------------------------------------
+
 struct Select : Instruction {
     static bool classof(const Value *T);
 

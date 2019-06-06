@@ -89,6 +89,8 @@ namespace scopes {
     T(VK_Free, "value-kind-free", Free) \
     T(VK_Load, "value-kind-load", Load) \
     T(VK_Store, "value-kind-store", Store) \
+    T(VK_ICmp, "value-kind-icmp", ICmp) \
+    T(VK_FCmp, "value-kind-fcmp", FCmp) \
     /* casts (Cast::classof) */ \
     SCOPES_CAST_VALUE_KIND() \
 

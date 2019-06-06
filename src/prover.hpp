@@ -78,6 +78,7 @@ const String *try_extract_string(const ValueRef &node);
 bool is_value_stage_constant(const ValueRef &value);
 SCOPES_RESULT(void) map_keyed_arguments(const Anchor *anchor,
     Values &outargs, const Values &values, const Symbols &symbols, bool varargs);
+SCOPES_RESULT(const Type *) bool_op_return_type(const Type *T);
 
 SCOPES_RESULT(FunctionRef) prove(const FunctionRef &frame, const TemplateRef &func, const Types &types);
 SCOPES_RESULT(TypedValueRef) prove(const ASTContext &ctx, const ValueRef &node);

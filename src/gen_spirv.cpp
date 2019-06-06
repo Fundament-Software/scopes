@@ -1122,69 +1122,6 @@ struct SPIRVGenerator {
             READ_VALUE(val);
             return val;
         } break;
-        case OP_ICmpEQ:
-        case OP_ICmpNE:
-        case OP_ICmpUGT:
-        case OP_ICmpUGE:
-        case OP_ICmpULT:
-        case OP_ICmpULE:
-        case OP_ICmpSGT:
-        case OP_ICmpSGE:
-        case OP_ICmpSLT:
-        case OP_ICmpSLE:
-        case OP_FCmpOEQ:
-        case OP_FCmpONE:
-        case OP_FCmpORD:
-        case OP_FCmpOGT:
-        case OP_FCmpOGE:
-        case OP_FCmpOLT:
-        case OP_FCmpOLE:
-        case OP_FCmpUEQ:
-        case OP_FCmpUNE:
-        case OP_FCmpUNO:
-        case OP_FCmpUGT:
-        case OP_FCmpUGE:
-        case OP_FCmpULT:
-        case OP_FCmpULE: { READ_VALUE(a); READ_VALUE(b);
-            spv::Op op = spv::OpMax;
-#define BOOL_OR_INT_OP(BOOL_OP, INT_OP) \
-    (is_bool(a)?(BOOL_OP):(INT_OP))
-            switch(builtin.value()) {
-            case OP_ICmpEQ: op = BOOL_OR_INT_OP(spv::OpLogicalEqual, spv::OpIEqual); break;
-            case OP_ICmpNE: op = BOOL_OR_INT_OP(spv::OpLogicalNotEqual, spv::OpINotEqual); break;
-            case OP_ICmpUGT: op = spv::OpUGreaterThan; break;
-            case OP_ICmpUGE: op = spv::OpUGreaterThanEqual; break;
-            case OP_ICmpULT: op = spv::OpULessThan; break;
-            case OP_ICmpULE: op = spv::OpULessThanEqual; break;
-            case OP_ICmpSGT: op = spv::OpSGreaterThan; break;
-            case OP_ICmpSGE: op = spv::OpSGreaterThanEqual; break;
-            case OP_ICmpSLT: op = spv::OpSLessThan; break;
-            case OP_ICmpSLE: op = spv::OpSLessThanEqual; break;
-            case OP_FCmpOEQ: op = spv::OpFOrdEqual; break;
-            case OP_FCmpONE: op = spv::OpFOrdNotEqual; break;
-            case OP_FCmpORD: op = spv::OpOrdered; break;
-            case OP_FCmpOGT: op = spv::OpFOrdGreaterThan; break;
-            case OP_FCmpOGE: op = spv::OpFOrdGreaterThanEqual; break;
-            case OP_FCmpOLT: op = spv::OpFOrdLessThan; break;
-            case OP_FCmpOLE: op = spv::OpFOrdLessThanEqual; break;
-            case OP_FCmpUEQ: op = spv::OpFUnordEqual; break;
-            case OP_FCmpUNE: op = spv::OpFUnordNotEqual; break;
-            case OP_FCmpUNO: op = spv::OpUnordered; break;
-            case OP_FCmpUGT: op = spv::OpFUnordGreaterThan; break;
-            case OP_FCmpUGE: op = spv::OpFUnordGreaterThanEqual; break;
-            case OP_FCmpULT: op = spv::OpFUnordLessThan; break;
-            case OP_FCmpULE: op = spv::OpFUnordLessThanEqual; break;
-            default: break;
-            }
-#undef BOOL_OR_INT_OP
-            auto T = builder.getTypeId(a);
-            if (builder.isVectorType(T)) {
-                T = builder.makeVectorType(builder.makeBoolType(),
-                    builder.getNumTypeComponents(T));
-            } else {
-                T = builder.makeBoolType();
-            }
-            return builder.createBinOp(op, T, a, b); } break;
         case OP_Add:
         case OP_AddNUW:
         case OP_AddNSW:
@@ -1521,6 +1458,74 @@ struct SPIRVGenerator {
         }
         auto val = builder.createTriOp(spv::OpSelect,
             builder.getTypeId(value1), cond, value1, value2);
+        map_phi({ val }, node);
+        return {};
+    }
+
+    SCOPES_RESULT(void) translate_ICmp(const ICmpRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        auto a = SCOPES_GET_RESULT(ref_to_value(node->value1));
+        auto b = SCOPES_GET_RESULT(ref_to_value(node->value2));
+
+        spv::Op op = spv::OpMax;
+#define BOOL_OR_INT_OP(BOOL_OP, INT_OP) (is_bool(a)?(BOOL_OP):(INT_OP))
+        switch(node->cmp_kind) {
+        case ICmpEQ: op = BOOL_OR_INT_OP(spv::OpLogicalEqual, spv::OpIEqual); break;
+        case ICmpNE: op = BOOL_OR_INT_OP(spv::OpLogicalNotEqual, spv::OpINotEqual); break;
+        case ICmpUGT: op = spv::OpUGreaterThan; break;
+        case ICmpUGE: op = spv::OpUGreaterThanEqual; break;
+        case ICmpULT: op = spv::OpULessThan; break;
+        case ICmpULE: op = spv::OpULessThanEqual; break;
+        case ICmpSGT: op = spv::OpSGreaterThan; break;
+        case ICmpSGE: op = spv::OpSGreaterThanEqual; break;
+        case ICmpSLT: op = spv::OpSLessThan; break;
+        case ICmpSLE: op = spv::OpSLessThanEqual; break;
+        default: break;
+        }
+#undef BOOL_OR_INT_OP
+        auto T = builder.getTypeId(a);
+        if (builder.isVectorType(T)) {
+            T = builder.makeVectorType(builder.makeBoolType(),
+                builder.getNumTypeComponents(T));
+        } else {
+            T = builder.makeBoolType();
+        }
+        auto val = builder.createBinOp(op, T, a, b);
+        map_phi({ val }, node);
+        return {};
+    }
+
+    SCOPES_RESULT(void) translate_FCmp(const FCmpRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        auto a = SCOPES_GET_RESULT(ref_to_value(node->value1));
+        auto b = SCOPES_GET_RESULT(ref_to_value(node->value2));
+
+        spv::Op op = spv::OpMax;
+        switch(node->cmp_kind) {
+        case FCmpOEQ: op = spv::OpFOrdEqual; break;
+        case FCmpONE: op = spv::OpFOrdNotEqual; break;
+        case FCmpORD: op = spv::OpOrdered; break;
+        case FCmpOGT: op = spv::OpFOrdGreaterThan; break;
+        case FCmpOGE: op = spv::OpFOrdGreaterThanEqual; break;
+        case FCmpOLT: op = spv::OpFOrdLessThan; break;
+        case FCmpOLE: op = spv::OpFOrdLessThanEqual; break;
+        case FCmpUEQ: op = spv::OpFUnordEqual; break;
+        case FCmpUNE: op = spv::OpFUnordNotEqual; break;
+        case FCmpUNO: op = spv::OpUnordered; break;
+        case FCmpUGT: op = spv::OpFUnordGreaterThan; break;
+        case FCmpUGE: op = spv::OpFUnordGreaterThanEqual; break;
+        case FCmpULT: op = spv::OpFUnordLessThan; break;
+        case FCmpULE: op = spv::OpFUnordLessThanEqual; break;
+        default: break;
+        }
+        auto T = builder.getTypeId(a);
+        if (builder.isVectorType(T)) {
+            T = builder.makeVectorType(builder.makeBoolType(),
+                builder.getNumTypeComponents(T));
+        } else {
+            T = builder.makeBoolType();
+        }
+        auto val = builder.createBinOp(op, T, a, b);
         map_phi({ val }, node);
         return {};
     }

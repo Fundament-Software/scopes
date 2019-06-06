@@ -1101,6 +1101,24 @@ CallTemplateRef CallTemplate::from(const ValueRef &callee, const Values &args) {
 
 //------------------------------------------------------------------------------
 
+static const Type *get_cmp_type(const Type *T) {
+    return bool_op_return_type(T).assert_ok();
+}
+
+ICmp::ICmp(ICmpKind _cmp_kind, const TypedValueRef &_value1, const TypedValueRef &_value2)
+    : Instruction(VK_ICmp, get_cmp_type(_value1->get_type())), cmp_kind(_cmp_kind), value1(_value1), value2(_value2) {}
+ICmpRef ICmp::from(ICmpKind cmp_kind, const TypedValueRef &value1, const TypedValueRef &value2) {
+    return ref(unknown_anchor(), new ICmp(cmp_kind, value1, value2));
+}
+
+FCmp::FCmp(FCmpKind _cmp_kind, const TypedValueRef &_value1, const TypedValueRef &_value2)
+    : Instruction(VK_FCmp, get_cmp_type(_value1->get_type())), cmp_kind(_cmp_kind), value1(_value1), value2(_value2) {}
+FCmpRef FCmp::from(FCmpKind cmp_kind, const TypedValueRef &value1, const TypedValueRef &value2) {
+    return ref(unknown_anchor(), new FCmp(cmp_kind, value1, value2));
+}
+
+//------------------------------------------------------------------------------
+
 Select::Select(const TypedValueRef &_cond,
     const TypedValueRef &_value1, const TypedValueRef &_value2)
     : Instruction(VK_Select, _value2->get_type()), cond(_cond), value1(_value1), value2(_value2)
