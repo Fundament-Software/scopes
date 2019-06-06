@@ -654,6 +654,57 @@ struct ShuffleVector : Instruction {
 
 //------------------------------------------------------------------------------
 
+struct Alloca : Instruction {
+    static bool classof(const Value *T);
+
+    Alloca(const Type *T, const TypedValueRef &count);
+    static AllocaRef from(const Type *T);
+    static AllocaRef from(const Type *T, const TypedValueRef &count);
+    bool is_array() const;
+    const Type *type;
+    TypedValueRef count;
+};
+
+struct Malloc : Instruction {
+    static bool classof(const Value *T);
+
+    Malloc(const Type *T, const TypedValueRef &count);
+    static MallocRef from(const Type *T);
+    static MallocRef from(const Type *T, const TypedValueRef &count);
+    bool is_array() const;
+    const Type *type;
+    TypedValueRef count;
+};
+
+struct Free : Instruction {
+    static bool classof(const Value *T);
+
+    Free(const TypedValueRef &value);
+    static FreeRef from(const TypedValueRef &value);
+    TypedValueRef value;
+};
+
+struct Load : Instruction {
+    static bool classof(const Value *T);
+
+    Load(const TypedValueRef &value, bool is_volatile);
+    static LoadRef from(const TypedValueRef &value, bool is_volatile = false);
+    TypedValueRef value;
+    bool is_volatile;
+};
+
+struct Store : Instruction {
+    static bool classof(const Value *T);
+
+    Store(const TypedValueRef &value, const TypedValueRef &target, bool is_volatile);
+    static StoreRef from(const TypedValueRef &value, const TypedValueRef &target, bool is_volatile = false);
+    TypedValueRef value;
+    TypedValueRef target;
+    bool is_volatile;
+};
+
+//------------------------------------------------------------------------------
+
 struct PtrToRef {
     static BitcastRef from(const TypedValueRef &value);
 };

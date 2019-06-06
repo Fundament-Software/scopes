@@ -2857,7 +2857,9 @@ repeat:
             READ_STORAGETYPEOF(T);
             SCOPES_CHECK_RESULT(verify_kind<TK_Pointer>(T));
             SCOPES_CHECK_RESULT(verify_readable(T));
-            return DEP_ARGTYPE1(cast<PointerType>(T)->element_type, _T);
+            auto op = Load::from(_T, b.value() == FN_VolatileLoad);
+            op->hack_change_value(VIEWTYPE1(op->get_type(), _T));
+            return TypedValueRef(call.anchor(), op);
         } break;
         case FN_VolatileStore:
         case FN_Store: {
@@ -2876,31 +2878,40 @@ repeat:
                 }
                 ctx.move(uq->id, call);
             }
-            return ARGTYPE0();
+            auto op = Store::from(_ElemT, _DestT, b.value() == FN_VolatileStore);
+            return TypedValueRef(call.anchor(), op);
         } break;
         case FN_Alloca: {
             CHECKARGS(1, 1);
             READ_TYPE_CONST(T);
-            return NEW_ARGTYPE1(local_pointer_type(T));
+            auto op = Alloca::from(T);
+            op->hack_change_value(UNIQUETYPE1(op->get_type()));
+            return TypedValueRef(call.anchor(), op);
         } break;
         case FN_AllocaArray: {
             CHECKARGS(2, 2);
             READ_TYPE_CONST(T);
             READ_STORAGETYPEOF(size);
             SCOPES_CHECK_RESULT(verify_integer(size));
-            return NEW_ARGTYPE1(local_pointer_type(T));
+            auto op = Alloca::from(T, _size);
+            op->hack_change_value(UNIQUETYPE1(op->get_type()));
+            return TypedValueRef(call.anchor(), op);
         } break;
         case FN_Malloc: {
             CHECKARGS(1, 1);
             READ_TYPE_CONST(T);
-            return NEW_ARGTYPE1(native_pointer_type(T));
+            auto op = Malloc::from(T);
+            op->hack_change_value(UNIQUETYPE1(op->get_type()));
+            return TypedValueRef(call.anchor(), op);
         } break;
         case FN_MallocArray: {
             CHECKARGS(2, 2);
             READ_TYPE_CONST(T);
             READ_STORAGETYPEOF(size);
             SCOPES_CHECK_RESULT(verify_integer(size));
-            return NEW_ARGTYPE1(native_pointer_type(T));
+            auto op = Malloc::from(T, _size);
+            op->hack_change_value(UNIQUETYPE1(op->get_type()));
+            return TypedValueRef(call.anchor(), op);
         } break;
         case FN_Free: {
             CHECKARGS(1, 1);
@@ -2915,17 +2926,8 @@ repeat:
                     ctx.move(uq->id, call);
                 }
             }
-            return ARGTYPE0();
+            return TypedValueRef(call.anchor(), Free::from(_T));
         } break;
-        /*
-        case FN_StaticAlloc: {
-            CHECKARGS(1, 1);
-            READ_TYPE_CONST(T);
-            void *dst = tracked_malloc(SCOPES_GET_RESULT(size_of(T)));
-            return TypedValueRef(call.anchor(),
-                ConstPointer::from(static_pointer_type(T), dst));
-        } break;
-        */
         case OP_ICmpEQ:
         case OP_ICmpNE:
         case OP_ICmpUGT:

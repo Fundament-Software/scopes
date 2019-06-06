@@ -1122,18 +1122,6 @@ struct SPIRVGenerator {
             READ_VALUE(val);
             return val;
         } break;
-        case FN_Alloca: { READ_TYPE(ty);
-            return builder.createVariable(
-                spv::StorageClassFunction, ty); } break;
-        /*
-        case FN_AllocaArray: { READ_TYPE(ty); READ_VALUE(val);
-            return safe_alloca(ty, val); } break;
-        case FN_Malloc: { READ_TYPE(ty);
-            return LLVMBuildMalloc(builder, ty, ""); } break;
-        case FN_MallocArray: { READ_TYPE(ty); READ_VALUE(val);
-            return LLVMBuildArrayMalloc(builder, ty, val, ""); } break;
-        case FN_Free: { READ_VALUE(val);
-            return LLVMBuildFree(builder, val); } break; */
         case FN_Deref: {
             READ_VALUE(ptr);
             return builder.createLoad(ptr);
@@ -1151,28 +1139,6 @@ struct SPIRVGenerator {
         case FN_RefToPtr: {
             READ_VALUE(ptr);
             return ptr;
-        } break;
-        case FN_VolatileLoad:
-        case FN_Load: {
-            READ_VALUE(ptr);
-            spv::Id retvalue = builder.createLoad(ptr);
-            if (builtin == FN_VolatileLoad) {
-                builder.getInstruction(retvalue)->addImmediateOperand(
-                    1<<spv::MemoryAccessVolatileShift);
-            }
-            return retvalue;
-        } break;
-        case FN_VolatileStore:
-        case FN_Store: {
-            READ_VALUE(val); READ_VALUE(ptr);
-            builder.createStore(val, ptr);
-            /*
-            if (builtin == FN_VolatileStore) {
-                builder.getInstruction(retvalue)->addImmediateOperand(
-                    1<<spv::MemoryAccessVolatileShift);
-            }
-            */
-            return 0;
         } break;
         case OP_ICmpEQ:
         case OP_ICmpNE:
@@ -1513,6 +1479,49 @@ struct SPIRVGenerator {
             std::unique_ptr<spv::Instruction>(op));
         auto val = op->getResultId();
         map_phi({ val }, node);
+        return {};
+    }
+
+    SCOPES_RESULT(void) translate_Alloca(const AllocaRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        auto ty = SCOPES_GET_RESULT(type_to_spirv_type(node->type));
+        if (node->is_array()) {
+            SCOPES_ERROR(CGenUnsupportedArrayAlloc);
+        }
+        auto val = builder.createVariable(spv::StorageClassFunction, ty);
+        map_phi({ val }, node);
+        return {};
+    }
+
+    SCOPES_RESULT(void) translate_Malloc(const MallocRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        SCOPES_ERROR(CGenUnsupportedMalloc);
+        return {};
+    }
+
+    SCOPES_RESULT(void) translate_Free(const FreeRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        SCOPES_ERROR(CGenUnsupportedMalloc);
+        return {};
+    }
+
+    SCOPES_RESULT(void) translate_Load(const LoadRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        auto ptr = SCOPES_GET_RESULT(ref_to_value(node->value));
+        auto val = builder.createLoad(ptr);
+        if (node->is_volatile) {
+            builder.getInstruction(val)->addImmediateOperand(
+                1<<spv::MemoryAccessVolatileShift);
+        }
+        map_phi({ val }, node);
+        return {};
+    }
+
+    SCOPES_RESULT(void) translate_Store(const StoreRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        auto value = SCOPES_GET_RESULT(ref_to_value(node->value));
+        auto ptr = SCOPES_GET_RESULT(ref_to_value(node->target));
+        builder.createStore(value, ptr);
         return {};
     }
 

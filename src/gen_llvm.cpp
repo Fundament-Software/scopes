@@ -1295,17 +1295,6 @@ struct LLVMIRGenerator {
             READ_VALUE(val);
             return val;
         } break;
-        case FN_Alloca: { READ_TYPE(ty);
-            return safe_alloca(ty);
-        } break;
-        case FN_AllocaArray: { READ_TYPE(ty); READ_VALUE(val);
-            return safe_alloca(ty, val); } break;
-        case FN_Malloc: { READ_TYPE(ty);
-            return LLVMBuildMalloc(builder, ty, ""); } break;
-        case FN_MallocArray: { READ_TYPE(ty); READ_VALUE(val);
-            return LLVMBuildArrayMalloc(builder, ty, val, ""); } break;
-        case FN_Free: { READ_VALUE(val);
-            return LLVMBuildFree(builder, val); } break;
         case FN_Deref: {
             READ_VALUE(ptr);
             assert(LLVMGetTypeKind(LLVMTypeOf(ptr)) == LLVMPointerTypeKind);
@@ -1328,21 +1317,6 @@ struct LLVMIRGenerator {
         case FN_RefToPtr: {
             READ_VALUE(ptr);
             return ptr;
-        } break;
-        case FN_VolatileLoad:
-        case FN_Load: { READ_VALUE(ptr);
-            LLVMValueRef retvalue = LLVMBuildLoad(builder, ptr, "");
-            if (builtin.value() == FN_VolatileLoad) { LLVMSetVolatile(retvalue, true); }
-            return retvalue;
-        } break;
-        case FN_VolatileStore:
-        case FN_Store: { READ_VALUE(val); READ_VALUE(ptr);
-
-            ptr = fix_named_struct_store(val, ptr);
-
-            LLVMValueRef retvalue = LLVMBuildStore(builder, val, ptr);
-            if (builtin.value() == FN_VolatileStore) { LLVMSetVolatile(retvalue, true); }
-            return retvalue;
         } break;
         case OP_ICmpEQ:
         case OP_ICmpNE:
@@ -1725,6 +1699,63 @@ struct LLVMIRGenerator {
             maskv,
             "");
         map_phi({ val }, node);
+        return {};
+    }
+
+    SCOPES_RESULT(void) translate_Alloca(const AllocaRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        auto ty = SCOPES_GET_RESULT(type_to_llvm_type(node->type));
+        LLVMValueRef val;
+        if (node->is_array()) {
+            auto count = SCOPES_GET_RESULT(ref_to_value(node->count));
+            val = safe_alloca(ty, count);
+        } else {
+            val = safe_alloca(ty);
+        }
+        map_phi({ val }, node);
+        return {};
+    }
+
+    SCOPES_RESULT(void) translate_Malloc(const MallocRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        auto ty = SCOPES_GET_RESULT(type_to_llvm_type(node->type));
+        LLVMValueRef val;
+        if (node->is_array()) {
+            auto count = SCOPES_GET_RESULT(ref_to_value(node->count));
+            val = LLVMBuildArrayMalloc(builder, ty, count, "");
+        } else {
+            val = LLVMBuildMalloc(builder, ty, "");
+        }
+        map_phi({ val }, node);
+        return {};
+    }
+
+    SCOPES_RESULT(void) translate_Free(const FreeRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        LLVMBuildFree(builder,
+            SCOPES_GET_RESULT(ref_to_value(node->value)));
+        return {};
+    }
+
+    SCOPES_RESULT(void) translate_Load(const LoadRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        auto val = LLVMBuildLoad(builder, SCOPES_GET_RESULT(ref_to_value(node->value)), "");
+        if (node->is_volatile) {
+            LLVMSetVolatile(val, true);
+        }
+        map_phi({ val }, node);
+        return {};
+    }
+
+    SCOPES_RESULT(void) translate_Store(const StoreRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        auto value = SCOPES_GET_RESULT(ref_to_value(node->value));
+        auto ptr = SCOPES_GET_RESULT(ref_to_value(node->target));
+        ptr = fix_named_struct_store(value, ptr);
+        auto val = LLVMBuildStore(builder, value, ptr);
+        if (node->is_volatile) {
+            LLVMSetVolatile(val, true);
+        }
         return {};
     }
 

@@ -1157,6 +1157,7 @@ GetElementPtrRef GetElementPtr::from(const TypedValueRef &value, const TypedValu
 static const Type *value_type_at_index(const Type *T, int index) {
     T = storage_type(T).assert_ok();
     switch(T->kind()) {
+    case TK_Pointer: return cast<PointerType>(T)->element_type;
     case TK_Array: return cast<ArrayType>(T)->element_type;
     case TK_Vector: return cast<VectorType>(T)->element_type;
     case TK_Tuple: return cast<TupleType>(T)->type_at_index(index).assert_ok();
@@ -1205,6 +1206,50 @@ ShuffleVector::ShuffleVector(const TypedValueRef &_v1, const TypedValueRef &_v2,
     v1(_v1), v2(_v2), mask(_mask) {}
 ShuffleVectorRef ShuffleVector::from(const TypedValueRef &v1, const TypedValueRef &v2, const std::vector<uint32_t> &mask) {
     return ref(unknown_anchor(), new ShuffleVector(v1, v2, mask));
+}
+
+//------------------------------------------------------------------------------
+
+Alloca::Alloca(const Type *T, const TypedValueRef &_count)
+    : Instruction(VK_Alloca, local_pointer_type(T)), type(T), count(_count) {}
+AllocaRef Alloca::from(const Type *T) {
+    return ref(unknown_anchor(), new Alloca(T, TypedValueRef()));
+}
+AllocaRef Alloca::from(const Type *T, const TypedValueRef &count) {
+    return ref(unknown_anchor(), new Alloca(T, count));
+}
+bool Alloca::is_array() const {
+    return count;
+}
+
+Malloc::Malloc(const Type *T, const TypedValueRef &_count)
+    : Instruction(VK_Malloc, native_pointer_type(T)), type(T), count(_count) {}
+MallocRef Malloc::from(const Type *T) {
+    return ref(unknown_anchor(), new Malloc(T, TypedValueRef()));
+}
+MallocRef Malloc::from(const Type *T, const TypedValueRef &count) {
+    return ref(unknown_anchor(), new Malloc(T, count));
+}
+bool Malloc::is_array() const {
+    return count;
+}
+
+Free::Free(const TypedValueRef &_value)
+    : Instruction(VK_Free, empty_arguments_type()), value(_value) {}
+FreeRef Free::from(const TypedValueRef &value) {
+    return ref(unknown_anchor(), new Free(value));
+}
+
+Load::Load(const TypedValueRef &_value, bool _is_volatile)
+    : Instruction(VK_Load, value_type_at_index(_value->get_type(),0)), value(_value), is_volatile(_is_volatile) {}
+LoadRef Load::from(const TypedValueRef &value, bool is_volatile) {
+    return ref(unknown_anchor(), new Load(value, is_volatile));
+}
+
+Store::Store(const TypedValueRef &_value, const TypedValueRef &_target, bool _is_volatile)
+    : Instruction(VK_Store, empty_arguments_type()), value(_value), target(_target), is_volatile(_is_volatile) {}
+StoreRef Store::from(const TypedValueRef &value, const TypedValueRef &target, bool is_volatile) {
+    return ref(unknown_anchor(), new Store(value, target, is_volatile));
 }
 
 //------------------------------------------------------------------------------

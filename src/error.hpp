@@ -348,6 +348,10 @@ formatters:
     T(CGenUnsupportedBuiltin, \
         "codegen: builtin %0 is unsupported for this target", \
         Builtin) \
+    T(CGenUnsupportedArrayAlloc, \
+        "codegen: array allocations are unsupported for this target") \
+    T(CGenUnsupportedMalloc, \
+        "codegen: heap allocations are unsupported for this target") \
     T(CGenUnsupportedTarget, \
         "codegen: unsupported target: %0", /* todo: list supported targets */ \
         Symbol) \
