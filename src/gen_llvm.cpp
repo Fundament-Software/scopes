@@ -1273,27 +1273,10 @@ struct LLVMIRGenerator {
 
     SCOPES_RESULT(LLVMValueRef) translate_builtin(Builtin builtin, const TypedValues &args) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
-        size_t argcount = args.size();
-        size_t argn = 0;
-
-#define READ_VALUE(NAME) \
-        assert(argn < argcount); \
-        TypedValueRef _ ## NAME = args[argn++]; \
-        LLVMValueRef NAME = SCOPES_GET_RESULT(ref_to_value(_ ## NAME));
-
-#define READ_TYPE(NAME) \
-        assert(argn < argcount); \
-        LLVMTypeRef NAME = SCOPES_GET_RESULT(node_to_llvm_type(args[argn++]));
 
         switch(builtin.value()) {
         case FN_Annotate: {
             return nullptr;
-        } break;
-        case FN_View:
-        case FN_Dupe:
-        case FN_Move: {
-            READ_VALUE(val);
-            return val;
         } break;
         case SFXFN_Unreachable:
             return LLVMBuildUnreachable(builder);
@@ -1301,8 +1284,6 @@ struct LLVMIRGenerator {
             SCOPES_ERROR(CGenUnsupportedBuiltin, builtin);
         } break;
         }
-#undef READ_TYPE
-#undef READ_VALUE
         return nullptr;
     }
 

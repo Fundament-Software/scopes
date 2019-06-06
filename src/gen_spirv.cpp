@@ -1116,12 +1116,6 @@ struct SPIRVGenerator {
                 it.first->second = vals;
             }
         } break;
-        case FN_View:
-        case FN_Dupe:
-        case FN_Move: {
-            READ_VALUE(val);
-            return val;
-        } break;
         case SFXFN_Unreachable:
             builder.makeUnreachable();
             return 0;

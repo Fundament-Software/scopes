@@ -480,7 +480,7 @@ static void build_view(
     if (uq) {
         assert(ctx.block->is_valid(ValueIndex(val)));
         auto retT = view_type(T, {});
-        auto call = ref(anchor, Call::from(retT, g_view, { val }));
+        auto call = ref(anchor, Bitcast::from(val, retT));
         ctx.append(call);
         val = call;
     }
@@ -557,7 +557,7 @@ static void build_move(
     auto T = val->get_type();
     auto uq = get_unique(T);
     auto retT = unique_type(T, ctx.unique_id());
-    auto call = ref(anchor, Call::from(retT, g_move, { val }));
+    auto call = ref(anchor, Bitcast::from(val, retT));
     ctx.append(call);
     ctx.move(uq->id, mover);
     val = call;
@@ -2166,12 +2166,6 @@ repeat:
             build_move(ctx, call, _X);
             return _X;
         } break;
-        case SYM_DropHandler: {
-            CHECKARGS(1, 1);
-            READ_NODEREF_TYPEOF(X);
-            (void)X;
-            return SCOPES_GET_RESULT(build_drop(ctx, call.anchor(), _X));
-        } break;
         case FN_View: {
             CHECKARGS(0, -1);
             while (argn < argcount) {
@@ -2184,7 +2178,28 @@ repeat:
                 build_view(ctx, call.anchor(), _X);
             }
             return ref(call.anchor(), ArgumentList::from(values));
-            //return _X;
+        } break;
+        case FN_Dupe: {
+            CHECKARGS(1, 1);
+            READ_NODEREF_TYPEOF(X);
+            const Type *DestT = strip_lifetime(X);
+            auto op = Bitcast::from(_X, DestT);
+            if (is_plain(X)) {
+                return TypedValueRef(call.anchor(), op);
+            } else {
+                auto uq = try_unique(X);
+                if (uq) {
+                    ctx.move(uq->id, call);
+                }
+                op->hack_change_value(UNIQUETYPE1(DestT));
+                return TypedValueRef(call.anchor(), op);
+            }
+        } break;
+        case SYM_DropHandler: {
+            CHECKARGS(1, 1);
+            READ_NODEREF_TYPEOF(X);
+            (void)X;
+            return SCOPES_GET_RESULT(build_drop(ctx, call.anchor(), _X));
         } break;
         case FN_Lose: {
             CHECKARGS(1, 1);
@@ -2202,20 +2217,6 @@ repeat:
             CHECKARGS(1, 1);
             bool valid = ctx.block->is_valid(ValueIndex(values[0]));
             return TypedValueRef(ref(call.anchor(), ConstInt::from(TYPE_Bool, !valid)));
-        } break;
-        case FN_Dupe: {
-            CHECKARGS(1, 1);
-            READ_NODEREF_TYPEOF(X);
-            const Type *DestT = strip_lifetime(X);
-            if (is_plain(X)) {
-                return ARGTYPE1(DestT);
-            } else {
-                auto uq = try_unique(X);
-                if (uq) {
-                    ctx.move(uq->id, call);
-                }
-                return NEW_ARGTYPE1(DestT);
-            }
         } break;
         case FN_Viewing: {
             for (size_t i = 0; i < values.size(); ++i) {
