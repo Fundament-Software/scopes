@@ -1119,6 +1119,39 @@ FCmpRef FCmp::from(FCmpKind cmp_kind, const TypedValueRef &value1, const TypedVa
 
 //------------------------------------------------------------------------------
 
+static const Type *get_unop_type(UnOpKind _op, const Type *T) {
+    switch(_op) {
+    case UnOpLength: {
+        auto ST = storage_type(T).assert_ok();
+        if (isa<VectorType>(ST)) {
+            return cast<VectorType>(ST)->element_type;
+        }
+    } break;
+    default: break;
+    }
+    return T;
+}
+
+UnOp::UnOp(UnOpKind _op, const TypedValueRef &_value)
+    : Instruction(VK_UnOp, get_unop_type(_op, _value->get_type())), op(_op), value(_value) {}
+UnOpRef UnOp::from(UnOpKind op, const TypedValueRef &value) {
+    return ref(unknown_anchor(), new UnOp(op, value));
+}
+
+BinOp::BinOp(BinOpKind _op, const TypedValueRef &_value1, const TypedValueRef &_value2)
+    : Instruction(VK_BinOp, _value1->get_type()), op(_op), value1(_value1), value2(_value2) {}
+BinOpRef BinOp::from(BinOpKind op, const TypedValueRef &value1, const TypedValueRef &value2) {
+    return ref(unknown_anchor(), new BinOp(op, value1, value2));
+}
+
+TriOp::TriOp(TriOpKind _op, const TypedValueRef &_value1, const TypedValueRef &_value2, const TypedValueRef &_value3)
+    : Instruction(VK_TriOp, _value1->get_type()), op(_op), value1(_value1), value2(_value2), value3(_value3) {}
+TriOpRef TriOp::from(TriOpKind op, const TypedValueRef &value1, const TypedValueRef &value2, const TypedValueRef &value3) {
+    return ref(unknown_anchor(), new TriOp(op, value1, value2, value3));
+}
+
+//------------------------------------------------------------------------------
+
 Select::Select(const TypedValueRef &_cond,
     const TypedValueRef &_value1, const TypedValueRef &_value2)
     : Instruction(VK_Select, _value2->get_type()), cond(_cond), value1(_value1), value2(_value2)

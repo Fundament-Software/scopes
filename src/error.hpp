@@ -352,6 +352,12 @@ formatters:
         "codegen: array allocations are unsupported for this target") \
     T(CGenUnsupportedMalloc, \
         "codegen: heap allocations are unsupported for this target") \
+    T(CGenUnsupportedUnOp, \
+        "codegen: unary operator unsupported for this target") \
+    T(CGenUnsupportedBinOp, \
+        "codegen: binary operator unsupported for this target") \
+    T(CGenUnsupportedTriOp, \
+        "codegen: ternary operator unsupported for this target") \
     T(CGenUnsupportedTarget, \
         "codegen: unsupported target: %0", /* todo: list supported targets */ \
         Symbol) \

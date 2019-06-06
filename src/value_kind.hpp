@@ -91,6 +91,9 @@ namespace scopes {
     T(VK_Store, "value-kind-store", Store) \
     T(VK_ICmp, "value-kind-icmp", ICmp) \
     T(VK_FCmp, "value-kind-fcmp", FCmp) \
+    T(VK_UnOp, "value-kind-unop", UnOp) \
+    T(VK_BinOp, "value-kind-binop", BinOp) \
+    T(VK_TriOp, "value-kind-triop", TriOp) \
     /* casts (Cast::classof) */ \
     SCOPES_CAST_VALUE_KIND() \
 

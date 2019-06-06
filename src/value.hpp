@@ -577,7 +577,7 @@ SCOPES_CAST_VALUE_KIND()
 
 //------------------------------------------------------------------------------
 
-#define ICMP_KIND() \
+#define SCOPES_ICMP_KIND() \
     T(ICmpEQ, "icmp-kind-eq") \
     T(ICmpNE, "icmp-kind-ne") \
     T(ICmpUGT, "icmp-kind-ugt") \
@@ -591,11 +591,11 @@ SCOPES_CAST_VALUE_KIND()
 
 enum ICmpKind {
 #define T(NAME, BNAME) NAME,
-ICMP_KIND()
+SCOPES_ICMP_KIND()
 #undef T
 };
 
-#define FCMP_KIND() \
+#define SCOPES_FCMP_KIND() \
     T(FCmpOEQ, "fcmp-kind-oeq") \
     T(FCmpONE, "fcmp-kind-one") \
     T(FCmpORD, "fcmp-kind-ord") \
@@ -613,7 +613,7 @@ ICMP_KIND()
 
 enum FCmpKind {
 #define T(NAME, BNAME) NAME,
-FCMP_KIND()
+SCOPES_FCMP_KIND()
 #undef T
 };
 
@@ -635,6 +635,112 @@ struct FCmp : Instruction {
     FCmpKind cmp_kind;
     TypedValueRef value1;
     TypedValueRef value2;
+};
+
+//------------------------------------------------------------------------------
+
+#define SCOPES_UNOP_KIND() \
+    T(UnOpSin, "unop-kind-sin") \
+    T(UnOpCos, "unop-kind-cos") \
+    T(UnOpTan, "unop-kind-tan") \
+    T(UnOpAsin, "unop-kind-asin") \
+    T(UnOpAcos, "unop-kind-acos") \
+    T(UnOpAtan, "unop-kind-atan") \
+    T(UnOpTrunc, "unop-kind-trunc") \
+    T(UnOpFloor, "unop-kind-floor") \
+    T(UnOpFAbs, "unop-kind-fabs") \
+    T(UnOpFSign, "unop-kind-fsign") \
+    T(UnOpLog, "unop-kind-log") \
+    T(UnOpLog2, "unop-kind-log2") \
+    T(UnOpExp, "unop-kind-exp") \
+    T(UnOpExp2, "unop-kind-exp2") \
+    T(UnOpSqrt, "unop-kind-sqrt") \
+    T(UnOpRadians, "unop-kind-radians") \
+    T(UnOpDegrees, "unop-kind-degrees") \
+    T(UnOpLength, "unop-kind-length") \
+    T(UnOpNormalize, "unop-kind-normalize") \
+
+
+enum UnOpKind {
+#define T(NAME, BNAME) NAME,
+SCOPES_UNOP_KIND()
+#undef T
+};
+
+#define SCOPES_BINOP_KIND() \
+    T(BinOpAdd, "binop-kind-add") \
+    T(BinOpAddNUW, "binop-kind-add-nuw") \
+    T(BinOpAddNSW, "binop-kind-add-nsw") \
+    T(BinOpSub, "binop-kind-sub") \
+    T(BinOpSubNUW, "binop-kind-sub-nuw") \
+    T(BinOpSubNSW, "binop-kind-sub-nsw") \
+    T(BinOpMul, "binop-kind-mul") \
+    T(BinOpMulNUW, "binop-kind-mul-nuw") \
+    T(BinOpMulNSW, "binop-kind-mul-nsw") \
+    T(BinOpUDiv, "binop-kind-udiv") \
+    T(BinOpSDiv, "binop-kind-sdiv") \
+    T(BinOpURem, "binop-kind-urem") \
+    T(BinOpSRem, "binop-kind-srem") \
+    T(BinOpShl, "binop-kind-shl") \
+    T(BinOpLShr, "binop-kind-lshr") \
+    T(BinOpAShr, "binop-kind-ashr") \
+    T(BinOpBAnd, "binop-kind-band") \
+    T(BinOpBOr, "binop-kind-bor") \
+    T(BinOpBXor, "binop-kind-bxor") \
+    T(BinOpFAdd, "binop-kind-fadd") \
+    T(BinOpFSub, "binop-kind-fsub") \
+    T(BinOpFMul, "binop-kind-fmul") \
+    T(BinOpFDiv, "binop-kind-fdiv") \
+    T(BinOpFRem, "binop-kind-frem") \
+    T(BinOpCross, "binop-kind-cross") \
+    T(BinOpStep, "binop-kind-step") \
+    T(BinOpPow, "binop-kind-pow") \
+
+
+enum BinOpKind {
+#define T(NAME, BNAME) NAME,
+SCOPES_BINOP_KIND()
+#undef T
+};
+
+#define SCOPES_TRIOP_KIND() \
+    T(TriOpFMix, "triop-kind-fmix") \
+
+
+enum TriOpKind {
+#define T(NAME, BNAME) NAME,
+SCOPES_TRIOP_KIND()
+#undef T
+};
+
+struct UnOp : Instruction {
+    static bool classof(const Value *T);
+
+    UnOp(UnOpKind op, const TypedValueRef &value);
+    static UnOpRef from(UnOpKind op, const TypedValueRef &value);
+    UnOpKind op;
+    TypedValueRef value;
+};
+
+struct BinOp : Instruction {
+    static bool classof(const Value *T);
+
+    BinOp(BinOpKind op, const TypedValueRef &value1, const TypedValueRef &value2);
+    static BinOpRef from(BinOpKind op, const TypedValueRef &value1, const TypedValueRef &value2);
+    BinOpKind op;
+    TypedValueRef value1;
+    TypedValueRef value2;
+};
+
+struct TriOp : Instruction {
+    static bool classof(const Value *T);
+
+    TriOp(TriOpKind op, const TypedValueRef &value1, const TypedValueRef &value2, const TypedValueRef &value3);
+    static TriOpRef from(TriOpKind op, const TypedValueRef &value1, const TypedValueRef &value2, const TypedValueRef &value3);
+    TriOpKind op;
+    TypedValueRef value1;
+    TypedValueRef value2;
+    TypedValueRef value3;
 };
 
 //------------------------------------------------------------------------------

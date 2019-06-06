@@ -68,15 +68,14 @@ namespace scopes {
     \
     FUN_OP(FAbs) \
     \
-    IUN_OP(SSign, i) \
     FUN_OP(FSign) \
     \
     FUN_OP(Radians) FUN_OP(Degrees) \
     FUN_OP(Sin) FUN_OP(Cos) FUN_OP(Tan) \
-    FUN_OP(Asin) FUN_OP(Acos) FUN_OP(Atan) FARITH_OP(Atan2) \
+    FUN_OP(Asin) FUN_OP(Acos) FUN_OP(Atan) \
     FUN_OP(Exp) FUN_OP(Log) FUN_OP(Exp2) FUN_OP(Log2) \
     FUN_OP(Trunc) FUN_OP(Floor) FARITH_OP(Step) \
-    FARITH_OP(Pow) FUN_OP(Sqrt) FUN_OP(InverseSqrt) \
+    FARITH_OP(Pow) FUN_OP(Sqrt) \
     \
     FTRI_OP(FMix)
 
@@ -2625,17 +2624,17 @@ repeat:
             CHECKARGS(1, 1);
             READ_STORAGETYPEOF(T);
             SCOPES_CHECK_RESULT(verify_real_vector(T));
-            if (T->kind() == TK_Vector) {
-                return DEP_ARGTYPE1(cast<VectorType>(T)->element_type, _T);
-            } else {
-                return DEP_ARGTYPE1(typeof_T, _T);
-            }
+            auto op = UnOp::from(UnOpLength, _T);
+            op->hack_change_value(VIEWTYPE1(op->get_type(), _T));
+            return TypedValueRef(call.anchor(), op);
         } break;
         case FN_Normalize: {
             CHECKARGS(1, 1);
             READ_TYPEOF(A);
             SCOPES_CHECK_RESULT(verify_real_ops(A));
-            return DEP_ARGTYPE1(A, _A);
+            auto op = UnOp::from(UnOpNormalize, _A);
+            op->hack_change_value(VIEWTYPE1(op->get_type(), _A));
+            return TypedValueRef(call.anchor(), op);
         } break;
         case FN_Cross: {
             CHECKARGS(2, 2);
@@ -2643,19 +2642,9 @@ repeat:
             READ_TYPEOF(B);
             SCOPES_CHECK_RESULT(verify_real_vector(A, 3));
             SCOPES_CHECK_RESULT(verify(typeof_A, B));
-            return DEP_ARGTYPE1(typeof_A, _A);
-        } break;
-        case FN_Distance: {
-            CHECKARGS(2, 2);
-            READ_TYPEOF(A);
-            READ_TYPEOF(B);
-            SCOPES_CHECK_RESULT(verify_real_ops(A, B));
-            const Type *T = SCOPES_GET_RESULT(storage_type(A));
-            if (T->kind() == TK_Vector) {
-                return DEP_ARGTYPE1(cast<VectorType>(T)->element_type, _A, _B);
-            } else {
-                return DEP_ARGTYPE1(A, _A, _B);
-            }
+            auto op = BinOp::from(BinOpCross, _A, _B);
+            op->hack_change_value(VIEWTYPE1(op->get_type(), _A));
+            return TypedValueRef(call.anchor(), op);
         } break;
         case FN_ExtractValue: {
             CHECKARGS(2, 2);
@@ -2968,7 +2957,7 @@ repeat:
             ICmpKind pred;
             switch(b.value()) {
             #define T(NAME, BNAME) case OP_ ## NAME: pred = NAME; break;
-            ICMP_KIND()
+            SCOPES_ICMP_KIND()
             #undef T
             default: assert(false); break;
             }
@@ -2996,7 +2985,7 @@ repeat:
             FCmpKind pred;
             switch(b.value()) {
             #define T(NAME, BNAME) case OP_ ## NAME: pred = NAME; break;
-            FCMP_KIND()
+            SCOPES_FCMP_KIND()
             #undef T
             default: assert(false); break;
             }
@@ -3011,42 +3000,61 @@ repeat:
             CHECKARGS(2, 2); \
             READ_TYPEOF(A); READ_TYPEOF(B); \
             SCOPES_CHECK_RESULT(verify_integer_ops(A, B)); \
-            return DEP_ARGTYPE1(A, _A, _B); \
+            BinOpKind opkind = (BinOpKind)0; \
+            switch(b.value()) { \
+            case OP_ ## NAME: opkind = BinOp ## NAME; break; \
+            case OP_ ## NAME ## NUW: opkind = BinOp ## NAME ## NUW; break; \
+            case OP_ ## NAME ## NSW: opkind = BinOp ## NAME ## NSW; break; \
+            default: break; \
+            } \
+            auto op = BinOp::from(opkind, _A, _B); \
+            op->hack_change_value(VIEWTYPE1(A, _A, _B)); \
+            return TypedValueRef(call.anchor(), op); \
         } break;
 #define IARITH_OP(NAME, PFX) \
         case OP_ ## NAME: { \
             CHECKARGS(2, 2); \
             READ_TYPEOF(A); READ_TYPEOF(B); \
             SCOPES_CHECK_RESULT(verify_integer_ops(A, B)); \
-            return DEP_ARGTYPE1(A, _A, _B); \
+            auto op = BinOp::from(BinOp ## NAME, _A, _B); \
+            op->hack_change_value(VIEWTYPE1(A, _A, _B)); \
+            return TypedValueRef(call.anchor(), op); \
         } break;
 #define FARITH_OP(NAME) \
         case OP_ ## NAME: { \
             CHECKARGS(2, 2); \
             READ_TYPEOF(A); READ_TYPEOF(B); \
             SCOPES_CHECK_RESULT(verify_real_ops(A, B)); \
-            return DEP_ARGTYPE1(A, _A, _B); \
+            auto op = BinOp::from(BinOp ## NAME, _A, _B); \
+            op->hack_change_value(VIEWTYPE1(A, _A, _B)); \
+            return TypedValueRef(call.anchor(), op); \
         } break;
 #define FTRI_OP(NAME) \
         case OP_ ## NAME: { \
             CHECKARGS(3, 3); \
             READ_TYPEOF(A); READ_TYPEOF(B); READ_TYPEOF(C); \
             SCOPES_CHECK_RESULT(verify_real_ops(A, B, C)); \
-            return DEP_ARGTYPE1(A, _A, _B, _C); \
+            auto op = TriOp::from(TriOp ## NAME, _A, _B, _C); \
+            op->hack_change_value(VIEWTYPE1(A, _A, _B, _C)); \
+            return TypedValueRef(call.anchor(), op); \
         } break;
 #define IUN_OP(NAME, PFX) \
         case OP_ ## NAME: { \
             CHECKARGS(1, 1); \
             READ_TYPEOF(A); \
             SCOPES_CHECK_RESULT(verify_integer_ops(A)); \
-            return DEP_ARGTYPE1(A, _A); \
+            auto op = UnOp::from(UnOp ## NAME, _A); \
+            op->hack_change_value(VIEWTYPE1(A, _A)); \
+            return TypedValueRef(call.anchor(), op); \
         } break;
 #define FUN_OP(NAME) \
         case OP_ ## NAME: { \
             CHECKARGS(1, 1); \
             READ_TYPEOF(A); \
             SCOPES_CHECK_RESULT(verify_real_ops(A)); \
-            return DEP_ARGTYPE1(A, _A); \
+            auto op = UnOp::from(UnOp ## NAME, _A); \
+            op->hack_change_value(VIEWTYPE1(A, _A)); \
+            return TypedValueRef(call.anchor(), op); \
         } break;
         SCOPES_ARITH_OPS()
 

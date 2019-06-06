@@ -1122,138 +1122,6 @@ struct SPIRVGenerator {
             READ_VALUE(val);
             return val;
         } break;
-        case OP_Add:
-        case OP_AddNUW:
-        case OP_AddNSW:
-        case OP_Sub:
-        case OP_SubNUW:
-        case OP_SubNSW:
-        case OP_Mul:
-        case OP_MulNUW:
-        case OP_MulNSW:
-        case OP_SDiv:
-        case OP_UDiv:
-        case OP_SRem:
-        case OP_URem:
-        case OP_Shl:
-        case OP_LShr:
-        case OP_AShr:
-        case OP_BAnd:
-        case OP_BOr:
-        case OP_BXor:
-        case OP_FAdd:
-        case OP_FSub:
-        case OP_FMul:
-        case OP_FDiv:
-        case OP_FRem: { READ_VALUE(a); READ_VALUE(b);
-            spv::Op op = spv::OpMax;
-            switch(builtin.value()) {
-#define BOOL_OR_INT_OP(BOOL_OP, INT_OP) \
-    (is_bool(a)?(BOOL_OP):(INT_OP))
-            case OP_Add:
-            case OP_AddNUW:
-            case OP_AddNSW: op = spv::OpIAdd; break;
-            case OP_Sub:
-            case OP_SubNUW:
-            case OP_SubNSW: op = spv::OpISub; break;
-            case OP_Mul:
-            case OP_MulNUW:
-            case OP_MulNSW: op = spv::OpIMul; break;
-            case OP_SDiv: op = spv::OpSDiv; break;
-            case OP_UDiv: op = spv::OpUDiv; break;
-            case OP_SRem: op = spv::OpSRem; break;
-            case OP_URem: op = spv::OpUMod; break;
-            case OP_Shl: op = spv::OpShiftLeftLogical; break;
-            case OP_LShr: op = spv::OpShiftRightLogical; break;
-            case OP_AShr: op = spv::OpShiftRightArithmetic; break;
-            case OP_BAnd: op = BOOL_OR_INT_OP(spv::OpLogicalAnd, spv::OpBitwiseAnd); break;
-            case OP_BOr: op = BOOL_OR_INT_OP(spv::OpLogicalOr, spv::OpBitwiseOr); break;
-            case OP_BXor: op = BOOL_OR_INT_OP(spv::OpLogicalNotEqual, spv::OpBitwiseXor); break;
-            case OP_FAdd: op = spv::OpFAdd; break;
-            case OP_FSub: op = spv::OpFSub; break;
-            case OP_FMul: op = spv::OpFMul; break;
-            case OP_FDiv: op = spv::OpFDiv; break;
-            case OP_FRem: op = spv::OpFRem; break;
-            default: break;
-            }
-#undef BOOL_OR_INT_OP
-            return builder.createBinOp(op,
-                builder.getTypeId(a), a, b); } break;
-        case OP_FMix: {
-            READ_VALUE(a);
-            READ_VALUE(b);
-            READ_VALUE(x);
-            return builder.createBuiltinCall(
-                builder.getTypeId(a),
-                glsl_ext_inst, GLSLstd450FMix, { a, b, x });
-        } break;
-        case FN_Length:
-        case FN_Normalize:
-        case OP_Sin:
-        case OP_Cos:
-        case OP_Tan:
-        case OP_Asin:
-        case OP_Acos:
-        case OP_Atan:
-        case OP_Trunc:
-        case OP_Floor:
-        case OP_FAbs:
-        case OP_FSign:
-        case OP_Log:
-        case OP_Log2:
-        case OP_Exp:
-        case OP_Exp2:
-        case OP_Sqrt:
-        case OP_Radians:
-        case OP_Degrees: {
-            READ_VALUE(val);
-            GLSLstd450 _builtin = GLSLstd450Bad;
-            auto rtype = builder.getTypeId(val);
-            switch (builtin.value()) {
-            case FN_Length:
-                rtype = builder.getContainedTypeId(rtype);
-                _builtin = GLSLstd450Length; break;
-            case FN_Normalize: _builtin = GLSLstd450Normalize; break;
-            case OP_Sin: _builtin = GLSLstd450Sin; break;
-            case OP_Cos: _builtin = GLSLstd450Cos; break;
-            case OP_Tan: _builtin = GLSLstd450Tan; break;
-            case OP_Asin: _builtin = GLSLstd450Asin; break;
-            case OP_Acos: _builtin = GLSLstd450Acos; break;
-            case OP_Atan: _builtin = GLSLstd450Atan; break;
-            case OP_Trunc: _builtin = GLSLstd450Trunc; break;
-            case OP_Floor: _builtin = GLSLstd450Floor; break;
-            case OP_FAbs: _builtin = GLSLstd450FAbs; break;
-            case OP_FSign: _builtin = GLSLstd450FSign; break;
-            case OP_Log: _builtin = GLSLstd450Log; break;
-            case OP_Log2: _builtin = GLSLstd450Log2; break;
-            case OP_Exp: _builtin = GLSLstd450Exp; break;
-            case OP_Exp2: _builtin = GLSLstd450Exp2; break;
-            case OP_Sqrt: _builtin = GLSLstd450Sqrt; break;
-            case OP_Radians: _builtin = GLSLstd450Radians; break;
-            case OP_Degrees: _builtin = GLSLstd450Degrees; break;
-            default: {
-                SCOPES_ERROR(CGenUnsupportedBuiltin, builtin);
-            } break;
-            }
-            return builder.createBuiltinCall(rtype, glsl_ext_inst, _builtin, { val });
-        } break;
-        case FN_Cross:
-        case OP_Step:
-        case OP_Pow: {
-            READ_VALUE(a);
-            READ_VALUE(b);
-            GLSLstd450 _builtin = GLSLstd450Bad;
-            auto rtype = builder.getTypeId(a);
-            switch (builtin.value()) {
-            case OP_Step: _builtin = GLSLstd450Step; break;
-            case OP_Pow: _builtin = GLSLstd450Pow; break;
-            case FN_Cross: _builtin = GLSLstd450Cross; break;
-            default: {
-                SCOPES_ERROR(CGenUnsupportedBuiltin, builtin);
-            } break;
-            }
-            return builder.createBuiltinCall(rtype, glsl_ext_inst, _builtin, { a, b });
-        } break;
         case SFXFN_Unreachable:
             builder.makeUnreachable();
             return 0;
@@ -1526,6 +1394,113 @@ struct SPIRVGenerator {
             T = builder.makeBoolType();
         }
         auto val = builder.createBinOp(op, T, a, b);
+        map_phi({ val }, node);
+        return {};
+    }
+
+    SCOPES_RESULT(void) translate_UnOp(const UnOpRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        auto x = SCOPES_GET_RESULT(ref_to_value(node->value));
+        GLSLstd450 _builtin = GLSLstd450Bad;
+        auto rtype = builder.getTypeId(x);
+        switch (node->op) {
+        case UnOpLength:
+            rtype = builder.getContainedTypeId(rtype);
+            _builtin = GLSLstd450Length; break;
+        case UnOpNormalize: _builtin = GLSLstd450Normalize; break;
+        case UnOpSin: _builtin = GLSLstd450Sin; break;
+        case UnOpCos: _builtin = GLSLstd450Cos; break;
+        case UnOpTan: _builtin = GLSLstd450Tan; break;
+        case UnOpAsin: _builtin = GLSLstd450Asin; break;
+        case UnOpAcos: _builtin = GLSLstd450Acos; break;
+        case UnOpAtan: _builtin = GLSLstd450Atan; break;
+        case UnOpTrunc: _builtin = GLSLstd450Trunc; break;
+        case UnOpFloor: _builtin = GLSLstd450Floor; break;
+        case UnOpFAbs: _builtin = GLSLstd450FAbs; break;
+        case UnOpFSign: _builtin = GLSLstd450FSign; break;
+        case UnOpLog: _builtin = GLSLstd450Log; break;
+        case UnOpLog2: _builtin = GLSLstd450Log2; break;
+        case UnOpExp: _builtin = GLSLstd450Exp; break;
+        case UnOpExp2: _builtin = GLSLstd450Exp2; break;
+        case UnOpSqrt: _builtin = GLSLstd450Sqrt; break;
+        case UnOpRadians: _builtin = GLSLstd450Radians; break;
+        case UnOpDegrees: _builtin = GLSLstd450Degrees; break;
+        default: {
+            SCOPES_ERROR(CGenUnsupportedUnOp);
+        } break;
+        }
+        auto val = builder.createBuiltinCall(rtype, glsl_ext_inst, _builtin, { x });
+        map_phi({ val }, node);
+        return {};
+    }
+
+    SCOPES_RESULT(void) translate_BinOp(const BinOpRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        auto a = SCOPES_GET_RESULT(ref_to_value(node->value1));
+        auto b = SCOPES_GET_RESULT(ref_to_value(node->value2));
+
+        auto rtype = builder.getTypeId(a);
+        spv::Id val = 0;
+        GLSLstd450 _builtin = GLSLstd450Bad;
+        spv::Op op = spv::OpMax;
+        switch(node->op) {
+#define BOOL_OR_INT_OP(BOOL_OP, INT_OP) \
+    (is_bool(a)?(BOOL_OP):(INT_OP))
+        case BinOpAdd:
+        case BinOpAddNUW:
+        case BinOpAddNSW: op = spv::OpIAdd; break;
+        case BinOpSub:
+        case BinOpSubNUW:
+        case BinOpSubNSW: op = spv::OpISub; break;
+        case BinOpMul:
+        case BinOpMulNUW:
+        case BinOpMulNSW: op = spv::OpIMul; break;
+        case BinOpSDiv: op = spv::OpSDiv; break;
+        case BinOpUDiv: op = spv::OpUDiv; break;
+        case BinOpSRem: op = spv::OpSRem; break;
+        case BinOpURem: op = spv::OpUMod; break;
+        case BinOpShl: op = spv::OpShiftLeftLogical; break;
+        case BinOpLShr: op = spv::OpShiftRightLogical; break;
+        case BinOpAShr: op = spv::OpShiftRightArithmetic; break;
+        case BinOpBAnd: op = BOOL_OR_INT_OP(spv::OpLogicalAnd, spv::OpBitwiseAnd); break;
+        case BinOpBOr: op = BOOL_OR_INT_OP(spv::OpLogicalOr, spv::OpBitwiseOr); break;
+        case BinOpBXor: op = BOOL_OR_INT_OP(spv::OpLogicalNotEqual, spv::OpBitwiseXor); break;
+        case BinOpFAdd: op = spv::OpFAdd; break;
+        case BinOpFSub: op = spv::OpFSub; break;
+        case BinOpFMul: op = spv::OpFMul; break;
+        case BinOpFDiv: op = spv::OpFDiv; break;
+        case BinOpFRem: op = spv::OpFRem; break;
+#undef BOOL_OR_INT_OP
+        case BinOpStep: _builtin = GLSLstd450Step; goto defbuiltin;
+        case BinOpPow: _builtin = GLSLstd450Pow; goto defbuiltin;
+        case BinOpCross: _builtin = GLSLstd450Cross; goto defbuiltin;
+        default: {
+            SCOPES_ERROR(CGenUnsupportedBinOp);
+        } break;
+        }
+        val = builder.createBinOp(op, rtype, a, b);
+        goto done;
+    defbuiltin:
+        val = builder.createBuiltinCall(rtype, glsl_ext_inst, _builtin, { a, b });
+    done:
+        map_phi({ val }, node);
+        return {};
+    }
+
+    SCOPES_RESULT(void) translate_TriOp(const TriOpRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        auto a = SCOPES_GET_RESULT(ref_to_value(node->value1));
+        auto b = SCOPES_GET_RESULT(ref_to_value(node->value2));
+        auto c = SCOPES_GET_RESULT(ref_to_value(node->value3));
+        GLSLstd450 _builtin = GLSLstd450Bad;
+        switch(node->op) {
+        case TriOpFMix: _builtin = GLSLstd450FMix; break;
+        default: {
+            SCOPES_ERROR(CGenUnsupportedTriOp);
+        } break;
+        }
+        auto val = builder.createBuiltinCall(
+            builder.getTypeId(a), glsl_ext_inst, _builtin, { a, b, c });
         map_phi({ val }, node);
         return {};
     }
