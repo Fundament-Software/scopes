@@ -1239,42 +1239,6 @@ const String *try_extract_string(const ValueRef &node) {
     return nullptr;
 }
 
-static SCOPES_RESULT(TypedValueRef) prove_break(const ASTContext &ctx, const Anchor *anchor, const TypedValues &values) {
-    SCOPES_RESULT_TYPE(TypedValueRef);
-    if (!ctx._break) {
-        SCOPES_ERROR(BreakOutsideLoop);
-    }
-    return make_merge1(ctx, anchor, ctx._break, values);
-}
-
-static SCOPES_RESULT(TypedValueRef) prove_repeat(const ASTContext &ctx, const Anchor *anchor, const TypedValues &values) {
-    SCOPES_RESULT_TYPE(TypedValueRef);
-    if (!ctx.loop) {
-        SCOPES_ERROR(RepeatOutsideLoop);
-    }
-    return make_repeat1(ctx, anchor, ctx.loop, values);
-}
-
-static SCOPES_RESULT(TypedValueRef) prove_return(const ASTContext &ctx,
-    const Anchor *anchor, const ValueRef &mover, const TypedValues &values) {
-    if (ctx.frame->label) {
-        assert(ctx.frame->original && ctx.frame->original->is_inline());
-        // generate a merge
-        return make_merge1(ctx, anchor, ctx.frame->label, values);
-    } else {
-        assert(!ctx.frame->original || !ctx.frame->original->is_inline()
-            || ctx.frame->original->is_hidden());
-        // generate a return
-        return make_return1(ctx, mover, values);
-    }
-}
-
-static SCOPES_RESULT(TypedValueRef) prove_raise(const ASTContext &ctx,
-    const Anchor *anchor, const ValueRef &mover, const TypedValues &values) {
-    assert(ctx.frame);
-    return make_raise1(ctx, mover, values);
-}
-
 static SCOPES_RESULT(TypedValueRef) prove_MergeTemplate(const ASTContext &ctx, const MergeTemplateRef &node) {
     SCOPES_RESULT_TYPE(TypedValueRef);
     TypedValueRef label = SCOPES_GET_RESULT(ctx.frame->resolve(node->label, ctx.function));
@@ -2378,16 +2342,32 @@ repeat:
             return TypedValueRef(call.anchor(), Unreachable::from());
         } break;
         case KW_Return: {
-            return SCOPES_GET_RESULT(prove_return(ctx, call.anchor(), call, values));
+            if (ctx.frame->label) {
+                assert(ctx.frame->original && ctx.frame->original->is_inline());
+                // generate a merge
+                return make_merge1(ctx, call.anchor(), ctx.frame->label, values);
+            } else {
+                assert(!ctx.frame->original || !ctx.frame->original->is_inline()
+                    || ctx.frame->original->is_hidden());
+                // generate a return
+                return SCOPES_GET_RESULT(make_return1(ctx, call, values));
+            }
         } break;
         case KW_Raise: {
-            return SCOPES_GET_RESULT(prove_raise(ctx, call.anchor(), call, values));
+            assert(ctx.frame);
+            return SCOPES_GET_RESULT(make_raise1(ctx, call, values));
         } break;
         case KW_Break: {
-            return SCOPES_GET_RESULT(prove_break(ctx, call.anchor(), values));
+            if (!ctx._break) {
+                SCOPES_ERROR(BreakOutsideLoop);
+            }
+            return make_merge1(ctx, call.anchor(), ctx._break, values);
         } break;
         case KW_Repeat: {
-            return SCOPES_GET_RESULT(prove_repeat(ctx, call.anchor(), values));
+            if (!ctx.loop) {
+                SCOPES_ERROR(RepeatOutsideLoop);
+            }
+            return make_repeat1(ctx, call.anchor(), ctx.loop, values);
         } break;
         /*** MISC ***/
         case OP_Tertiary: {
