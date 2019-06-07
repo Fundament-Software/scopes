@@ -1704,37 +1704,11 @@ static SCOPES_RESULT(void) build_deref_automove(
 
 #define CHECKARGS(MINARGS, MAXARGS) \
     SCOPES_CHECK_RESULT((checkargs<MINARGS, MAXARGS>(argcount)))
-#define ARGTYPE0() ({ \
-        TypedValueRef newcall = ref(call.anchor(), \
-            Call::from(empty_arguments_type(), callee, values)); \
-        newcall; \
-    })
-#define ARGTYPE1(ARGT) ({ \
-        TypedValueRef newcall = ref(call.anchor(), \
-            Call::from(ARGT, callee, values)); \
-        newcall; \
-    })
 #define UNIQUETYPE1(ARGT) unique_result_type(ctx, ARGT)
-#define NEW_ARGTYPE1(ARGT) ({ \
-        TypedValueRef newcall = ref(call.anchor(), \
-            Call::from(UNIQUETYPE1(ARGT), callee, values)); \
-        newcall; \
-    })
 #define UNIQUETYPE2(ARGT1, ARGT2) arguments_type({ \
     unique_result_type(ctx, ARGT1), \
     unique_result_type(ctx, ARGT2)})
-#define NEW_ARGTYPE2(ARGT1, ARGT2) ({ \
-        TypedValueRef newcall = ref(call.anchor(), \
-            Call::from(UNIQUETYPE2(ARGT1, ARGT2), callee, values)); \
-        newcall; \
-    })
 #define VIEWTYPE1(ARGT, ...) view_result_type(ctx, ARGT, __VA_ARGS__)
-#define DEP_ARGTYPE1(ARGT, ...) ({ \
-        const Type *_retT = VIEWTYPE1(ARGT, __VA_ARGS__); \
-        TypedValueRef newcall = ref(call.anchor(), \
-            Call::from(_retT, callee, values)); \
-        newcall; \
-    })
 #define DEREF(NAME) \
         SCOPES_CHECK_RESULT(build_deref(ctx, call.anchor(), NAME));
 #define MOVE_DEREF(NAME) \
@@ -2191,7 +2165,7 @@ repeat:
                 if (uq) {
                     ctx.move(uq->id, call);
                 }
-                op->hack_change_value(UNIQUETYPE1(DestT));
+                op->hack_change_value(UNIQUETYPE1(op->get_type()));
                 return TypedValueRef(call.anchor(), op);
             }
         } break;
@@ -2427,7 +2401,7 @@ repeat:
                 SCOPES_CHECK_RESULT(verify_vector_sizes(T1, ST2));
             }
             auto op = Select::from(_T1, _T2, _T3);
-            op->hack_change_value(VIEWTYPE1(T2, _T1, _T2, _T3));
+            op->hack_change_value(VIEWTYPE1(op->get_type(), _T1, _T2, _T3));
             return TypedValueRef(call.anchor(), op);
         } break;
         case FN_Bitcast: {
@@ -2478,7 +2452,7 @@ repeat:
                     return TypedValueRef(ref(call.anchor(),
                         PureCast::from(DestT, _SrcT.cast<Pure>())));
                 } else {
-                    // DestT is already converted, no need to use NEW_ARGTYPE1 or DEP_ARGTYPE1
+                    // DestT is already converted
                     return TypedValueRef(ref(call.anchor(),
                         Bitcast::from(_SrcT, DestT)));
                 }
@@ -2588,20 +2562,19 @@ repeat:
             READ_NODEREF_STORAGETYPEOF(T);
             READ_STORAGETYPEOF(idx);
             SCOPES_CHECK_RESULT(verify_kind<TK_Vector>(T));
-            auto vi = cast<VectorType>(T);
             SCOPES_CHECK_RESULT(verify_integer(idx));
             auto rq = try_qualifier<ReferQualifier>(typeof_T);
-            auto RT = vi->element_type;
             if (rq) {
-                const Type *retT = view_result_type(ctx, qualify(RT, { rq }), _T, _idx);
                 auto op = TypedValueRef(call.anchor(),
                     ctx.build_getelementref(call.anchor(), _T, { _idx }));
+                const Type *retT = view_result_type(ctx,
+                    qualify(op->get_type(), { rq }), _T, _idx);
                 op->hack_change_value(retT);
                 return op;
             } else {
                 auto op = TypedValueRef(call.anchor(),
                     ExtractElement::from(_T, _idx));
-                op->hack_change_value(VIEWTYPE1(RT, _T, _idx));
+                op->hack_change_value(VIEWTYPE1(op->get_type(), _T, _idx));
                 return op;
             }
         } break;
@@ -2616,7 +2589,7 @@ repeat:
             SCOPES_CHECK_RESULT(verify(SCOPES_GET_RESULT(storage_type(vi->element_type)), ET));
             auto op = TypedValueRef(call.anchor(),
                 InsertElement::from(_T, _ET, _idx));
-            op->hack_change_value(VIEWTYPE1(typeof_T, _T, _ET, _idx));
+            op->hack_change_value(VIEWTYPE1(op->get_type(), _T, _ET, _idx));
             return op;
         } break;
         case FN_ShuffleVector: {
@@ -2676,7 +2649,6 @@ repeat:
             CHECKARGS(2, 2);
             READ_NODEREF_STORAGETYPEOF(T);
             READ_STORAGETYPEOF(idx);
-            const Type *RT = nullptr;
             uint64_t iidx = -1ull;
             switch(T->kind()) {
             case TK_Array: {
@@ -2684,35 +2656,33 @@ repeat:
                 auto rq = try_qualifier<ReferQualifier>(typeof_T);
                 if (rq) {
                     SCOPES_CHECK_RESULT(verify_integer(idx));
-                    RT = SCOPES_GET_RESULT(ai->type_at_index(0));
                 } else {
                     // index must be constant
                     iidx = SCOPES_GET_RESULT(extract_integer_constant(_idx));
                     // only check for sized arrays
-                    RT = SCOPES_GET_RESULT(ai->type_at_index(iidx));
+                    SCOPES_GET_RESULT(ai->type_at_index(iidx));
                 }
             } break;
             case TK_Tuple: {
                 iidx = SCOPES_GET_RESULT(extract_integer_constant(_idx));
                 auto ti = cast<TupleType>(T);
                 SCOPES_CHECK_RESULT(sanitize_tuple_index(call.anchor(), T, ti, iidx, _idx));
-                RT = SCOPES_GET_RESULT(ti->type_at_index(iidx));
+                SCOPES_GET_RESULT(ti->type_at_index(iidx));
             } break;
             default: {
                 SCOPES_ERROR(InvalidArgumentTypeForBuiltin, b, T);
             } break;
             }
-            RT = type_key(RT)._1;
             auto rq = try_qualifier<ReferQualifier>(typeof_T);
             if (rq) {
-                auto retT = view_result_type(ctx, qualify(RT, { rq }), _T);
                 auto op = TypedValueRef(call.anchor(), ctx.build_getelementref(call.anchor(), _T, { _idx }));
+                auto retT = view_result_type(ctx, qualify(op->get_type(), { rq }), _T);
                 op->hack_change_value(retT);
                 return op;
             } else {
                 assert(iidx != -1ull);
                 auto op = ExtractValue::from(_T, iidx);
-                op->hack_change_value(VIEWTYPE1(RT, _T));
+                op->hack_change_value(VIEWTYPE1(op->get_type(), _T));
                 return TypedValueRef(call.anchor(), op);
             }
         } break;
@@ -2746,9 +2716,9 @@ repeat:
                 if (uq_AT) ctx.move(uq_AT->id, call);
                 auto uq_ET = try_unique(typeof_ET);
                 if (uq_ET) ctx.move(uq_ET->id, call);
-                op->hack_change_value(UNIQUETYPE1(AT));
+                op->hack_change_value(UNIQUETYPE1(op->get_type()));
             } else {
-                op->hack_change_value(VIEWTYPE1(AT, _AT, _ET));
+                op->hack_change_value(VIEWTYPE1(op->get_type(), _AT, _ET));
             }
             return TypedValueRef(call.anchor(), op);
         } break;
@@ -2862,9 +2832,9 @@ repeat:
                 }
                 auto op = PtrToRef::from(_T);
                 if (is_movable(T)) {
-                    op->hack_change_value(UNIQUETYPE1(NT));
+                    op->hack_change_value(UNIQUETYPE1(op->get_type()));
                 } else {
-                    op->hack_change_value(VIEWTYPE1(NT, _T));
+                    op->hack_change_value(VIEWTYPE1(op->get_type(), _T));
                 }
                 return TypedValueRef(call.anchor(), op);
             }
@@ -2883,9 +2853,9 @@ repeat:
                 }
                 auto op = RefToPtr::from(_T);
                 if (is_movable(T)) {
-                    op->hack_change_value(UNIQUETYPE1(NT));
+                    op->hack_change_value(UNIQUETYPE1(op->get_type()));
                 } else {
-                    op->hack_change_value(VIEWTYPE1(NT, _T));
+                    op->hack_change_value(VIEWTYPE1(op->get_type(), _T));
                 }
                 return TypedValueRef(call.anchor(), op);
             }
@@ -3034,7 +3004,7 @@ repeat:
             default: break; \
             } \
             auto op = BinOp::from(opkind, _A, _B); \
-            op->hack_change_value(VIEWTYPE1(A, _A, _B)); \
+            op->hack_change_value(VIEWTYPE1(op->get_type(), _A, _B)); \
             return TypedValueRef(call.anchor(), op); \
         } break;
 #define IARITH_OP(NAME, PFX) \
@@ -3043,7 +3013,7 @@ repeat:
             READ_TYPEOF(A); READ_TYPEOF(B); \
             SCOPES_CHECK_RESULT(verify_integer_ops(A, B)); \
             auto op = BinOp::from(BinOp ## NAME, _A, _B); \
-            op->hack_change_value(VIEWTYPE1(A, _A, _B)); \
+            op->hack_change_value(VIEWTYPE1(op->get_type(), _A, _B)); \
             return TypedValueRef(call.anchor(), op); \
         } break;
 #define FARITH_OP(NAME) \
@@ -3052,7 +3022,7 @@ repeat:
             READ_TYPEOF(A); READ_TYPEOF(B); \
             SCOPES_CHECK_RESULT(verify_real_ops(A, B)); \
             auto op = BinOp::from(BinOp ## NAME, _A, _B); \
-            op->hack_change_value(VIEWTYPE1(A, _A, _B)); \
+            op->hack_change_value(VIEWTYPE1(op->get_type(), _A, _B)); \
             return TypedValueRef(call.anchor(), op); \
         } break;
 #define FTRI_OP(NAME) \
@@ -3061,7 +3031,7 @@ repeat:
             READ_TYPEOF(A); READ_TYPEOF(B); READ_TYPEOF(C); \
             SCOPES_CHECK_RESULT(verify_real_ops(A, B, C)); \
             auto op = TriOp::from(TriOp ## NAME, _A, _B, _C); \
-            op->hack_change_value(VIEWTYPE1(A, _A, _B, _C)); \
+            op->hack_change_value(VIEWTYPE1(op->get_type(), _A, _B, _C)); \
             return TypedValueRef(call.anchor(), op); \
         } break;
 #define IUN_OP(NAME, PFX) \
@@ -3070,7 +3040,7 @@ repeat:
             READ_TYPEOF(A); \
             SCOPES_CHECK_RESULT(verify_integer_ops(A)); \
             auto op = UnOp::from(UnOp ## NAME, _A); \
-            op->hack_change_value(VIEWTYPE1(A, _A)); \
+            op->hack_change_value(VIEWTYPE1(op->get_type(), _A)); \
             return TypedValueRef(call.anchor(), op); \
         } break;
 #define FUN_OP(NAME) \
@@ -3079,7 +3049,7 @@ repeat:
             READ_TYPEOF(A); \
             SCOPES_CHECK_RESULT(verify_real_ops(A)); \
             auto op = UnOp::from(UnOp ## NAME, _A); \
-            op->hack_change_value(VIEWTYPE1(A, _A)); \
+            op->hack_change_value(VIEWTYPE1(op->get_type(), _A)); \
             return TypedValueRef(call.anchor(), op); \
         } break;
         SCOPES_ARITH_OPS()

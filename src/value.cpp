@@ -1305,7 +1305,7 @@ static const Type *get_element_pointer_type(const Type *T, const TypedValues &in
             auto ti = cast<TupleType>(ST);
             assert(indices[i].isa<ConstInt>());
             auto idx = indices[i].cast<ConstInt>()->value;
-            T = ti->type_at_index(idx).assert_ok();
+            T = type_key(ti->type_at_index(idx).assert_ok())._1;
         } break;
         default: {
             assert(false);
@@ -1331,7 +1331,7 @@ static const Type *value_type_at_index(const Type *T, int index) {
     case TK_Pointer: return cast<PointerType>(T)->element_type;
     case TK_Array: return cast<ArrayType>(T)->element_type;
     case TK_Vector: return cast<VectorType>(T)->element_type;
-    case TK_Tuple: return cast<TupleType>(T)->type_at_index(index).assert_ok();
+    case TK_Tuple: return type_key(cast<TupleType>(T)->type_at_index(index).assert_ok())._1;
     default: {
         assert(false);
         return nullptr;
