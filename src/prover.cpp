@@ -285,49 +285,57 @@ void ASTContext::merge_block(Block &_block) const {
     block->migrate_from(_block);
 }
 
-void ASTContext::append(const TypedValueRef &value) const {
-    assert(block);
-    if (block->append(value)) {
-        function->try_bind_unique(value);
-    }
-}
-
-void ASTContext::unchecked_append(const TypedValueRef &value) const {
+SCOPES_RESULT(void) ASTContext::append(const InstructionRef &value) const {
+    SCOPES_RESULT_TYPE(void);
     assert(block);
     block->append(value);
+    SCOPES_CHECK_RESULT(tag_instruction(*this, value));
+    function->try_bind_unique(value);
+    return {};
+}
+
+SCOPES_RESULT(void) ASTContext::unchecked_append(const InstructionRef &value) const {
+    SCOPES_RESULT_TYPE(void);
+    assert(block);
+    block->append(value);
+    SCOPES_CHECK_RESULT(tag_instruction(*this, value));
+    return {};
 }
 
 ASTContext ASTContext::from_function(const FunctionRef &fn) {
     return ASTContext(fn, fn, LoopLabelRef(), LabelRef(), LabelRef(), nullptr);
 }
 
-TypedValueRef ASTContext::build_deref(const Anchor *anchor,
+SCOPES_RESULT(InstructionRef) ASTContext::build_deref(const Anchor *anchor,
     const TypedValueRef &value) const {
-    TypedValueRef op = ref(anchor, RefToPtr::from(value));
-    unchecked_append(op);
-    return ref(anchor, Load::from(op));
+    SCOPES_RESULT_TYPE(InstructionRef);
+    auto op = ref(anchor, RefToPtr::from(value));
+    SCOPES_CHECK_RESULT(unchecked_append(op));
+    return InstructionRef(anchor, Load::from(op));
 }
 
-TypedValueRef ASTContext::build_assign(const Anchor *anchor,
+SCOPES_RESULT(InstructionRef) ASTContext::build_assign(const Anchor *anchor,
     const TypedValueRef &value, const TypedValueRef &target) const {
-    TypedValueRef op = ref(anchor, RefToPtr::from(target));
-    unchecked_append(op);
-    return ref(anchor, Store::from(value, op));
+    SCOPES_RESULT_TYPE(InstructionRef);
+    auto op = ref(anchor, RefToPtr::from(target));
+    SCOPES_CHECK_RESULT(unchecked_append(op));
+    return InstructionRef(anchor, Store::from(value, op));
 }
 
-TypedValueRef ASTContext::build_getelementref(const Anchor *anchor,
+SCOPES_RESULT(InstructionRef) ASTContext::build_getelementref(const Anchor *anchor,
     const TypedValueRef &value, const TypedValues &indices) const {
-    TypedValueRef op = ref(anchor, RefToPtr::from(value));
-    unchecked_append(op);
+    SCOPES_RESULT_TYPE(InstructionRef);
+    auto op = ref(anchor, RefToPtr::from(value));
+    SCOPES_CHECK_RESULT(unchecked_append(op));
     TypedValues idxs;
     idxs.reserve(indices.size() + 1);
     idxs.push_back(ConstInt::from(TYPE_I32, 0));
     for (auto val : indices) {
         idxs.push_back(val);
     }
-    op = ref(anchor, GetElementPtr::from(op, idxs));
-    unchecked_append(op);
-    return ref(anchor, PtrToRef::from(op));
+    auto op2 = ref(anchor, GetElementPtr::from(op, idxs));
+    SCOPES_CHECK_RESULT(unchecked_append(op2));
+    return InstructionRef(anchor, PtrToRef::from(op2));
 }
 
 //------------------------------------------------------------------------------
@@ -474,17 +482,19 @@ static SCOPES_RESULT(void) verify_valid(const ASTContext &ctx, const TypedValues
     return {};
 }
 
-static void build_view(
+static SCOPES_RESULT(void) build_view(
     const ASTContext &ctx, const Anchor *anchor, TypedValueRef &val) {
+    SCOPES_RESULT_TYPE(void);
     auto T = val->get_type();
     auto uq = try_unique(T);
     if (uq) {
         assert(ctx.block->is_valid(ValueIndex(val)));
         auto retT = view_type(T, {});
         auto call = ref(anchor, Cast::from(CastBitcast, val, retT));
-        ctx.append(call);
+        SCOPES_CHECK_RESULT(ctx.append(call));
         val = call;
     }
+    return {};
 }
 
 static SCOPES_RESULT(TypedValueRef) build_drop(const ASTContext &ctx,
@@ -520,7 +530,7 @@ static SCOPES_RESULT(TypedValueRef) build_drop(const ASTContext &ctx,
             ref(anchor, ConstPointer::type_from(arg.get_type())) });
         #endif
         auto val = ref(anchor, ExtractArgument::from(arg.value, arg.index));
-        build_view(ctx, anchor, val);
+        SCOPES_CHECK_RESULT(build_view(ctx, anchor, val));
         auto expr =
             ref(anchor, CallTemplate::from(handler, { val }));
         auto result = SCOPES_GET_RESULT(prove(ctx, expr));
@@ -551,17 +561,19 @@ static SCOPES_RESULT(void) drop_value(const ASTContext &ctx,
     return {};
 }
 
-static void build_move(
+static SCOPES_RESULT(void) build_move(
     const ASTContext &ctx, const ValueRef &mover, TypedValueRef &val) {
+    SCOPES_RESULT_TYPE(void);
     assert(ctx.block->is_valid(ValueIndex(val)));
     auto anchor = mover.anchor();
     auto T = val->get_type();
     auto uq = get_unique(T);
     auto retT = unique_type(T, ctx.unique_id());
     auto call = ref(anchor, Cast::from(CastBitcast, val, retT));
-    ctx.append(call);
+    SCOPES_CHECK_RESULT(ctx.append(call));
     ctx.move(uq->id, mover);
     val = call;
+    return {};
 }
 
 static SCOPES_RESULT(void) validate_pass_block(const ASTContext &ctx, const Block &src) {
@@ -657,7 +669,7 @@ static SCOPES_RESULT(void) move_merge_values(const ASTContext &ctx,
             int depth = info.get_depth();
             if (depth <= retdepth) {
                 // must move
-                build_move(ctx, mover, value);
+                SCOPES_CHECK_RESULT(build_move(ctx, mover, value));
                 T = value->get_type();
                 uq = get_unique(T);
             }
@@ -798,18 +810,19 @@ SCOPES_RESULT(void) finalize_returns_raises(const ASTContext &ctx) {
     return {};
 }
 
-static TypedValueRef make_merge1(const ASTContext &ctx, const Anchor *anchor, const LabelRef &label, const TypedValues &values) {
+static SCOPES_RESULT(TypedValueRef) make_merge1(const ASTContext &ctx, const Anchor *anchor, const LabelRef &label, const TypedValues &values) {
+    SCOPES_RESULT_TYPE(TypedValueRef);
     assert(label);
 
     auto newmerge = ref(anchor, Merge::from(label, values));
 
-    ctx.append(newmerge);
+    SCOPES_CHECK_RESULT(ctx.append(newmerge));
     label->merges.push_back(newmerge);
 
-    return newmerge;
+    return TypedValueRef(newmerge);
 }
 
-static TypedValueRef make_merge(const ASTContext &ctx, const Anchor *anchor, const LabelRef &label, const TypedValueRef &value) {
+static SCOPES_RESULT(TypedValueRef) make_merge(const ASTContext &ctx, const Anchor *anchor, const LabelRef &label, const TypedValueRef &value) {
     TypedValues results;
     if (split_return_values(results, value)) {
         return make_merge1(ctx, anchor, label, results);
@@ -818,19 +831,20 @@ static TypedValueRef make_merge(const ASTContext &ctx, const Anchor *anchor, con
     }
 }
 
-static TypedValueRef make_repeat1(const ASTContext &ctx, const Anchor *anchor, const LoopLabelRef &label, const TypedValues &values) {
+static SCOPES_RESULT(TypedValueRef) make_repeat1(const ASTContext &ctx, const Anchor *anchor, const LoopLabelRef &label, const TypedValues &values) {
+    SCOPES_RESULT_TYPE(TypedValueRef);
     assert(label);
 
     auto newrepeat = ref(anchor, Repeat::from(label, values));
 
-    ctx.append(newrepeat);
+    SCOPES_CHECK_RESULT(ctx.append(newrepeat));
     label->repeats.push_back(newrepeat);
 
-    return newrepeat;
+    return TypedValueRef(newrepeat);
 }
 
 
-static TypedValueRef make_repeat(const ASTContext &ctx, const Anchor *anchor, const LoopLabelRef &label, const TypedValueRef &value) {
+static SCOPES_RESULT(TypedValueRef) make_repeat(const ASTContext &ctx, const Anchor *anchor, const LoopLabelRef &label, const TypedValueRef &value) {
     TypedValues results;
     if (split_return_values(results, value)) {
         return make_repeat1(ctx, anchor, label, results);
@@ -850,7 +864,7 @@ static SCOPES_RESULT(TypedValueRef) make_return1(
 
     auto newreturn = ref(anchor, Return::from(values));
 
-    ctx.append(newreturn);
+    SCOPES_CHECK_RESULT(ctx.append(newreturn));
     ctx.function->returns.push_back(newreturn);
     return TypedValueRef(newreturn);
 }
@@ -877,7 +891,7 @@ static SCOPES_RESULT(TypedValueRef) make_raise1(
 
         auto newraise = ref(anchor, Raise::from(values));
 
-        ctx.append(newraise);
+        SCOPES_CHECK_RESULT(ctx.append(newraise));
         ctx.function->raises.push_back(newraise);
         return TypedValueRef(newraise);
     }
@@ -885,6 +899,7 @@ static SCOPES_RESULT(TypedValueRef) make_raise1(
 
 static SCOPES_RESULT(TypedValueRef) make_raise(const ASTContext &ctx,
     const ValueRef &mover, const TypedValueRef &value) {
+    SCOPES_RESULT_TYPE(TypedValueRef);
     auto anchor = mover.anchor();
     #if 1
     if (ctx.block->tag_traceback) {
@@ -894,7 +909,7 @@ static SCOPES_RESULT(TypedValueRef) make_raise(const ASTContext &ctx,
                 g_sc_error_append_calltrace, {
                 value, ConstAggregate::ast_from(value)
             }));
-            ctx.append(tracecall);
+            SCOPES_CHECK_RESULT(ctx.append(tracecall));
         }
     }
     #endif
@@ -942,7 +957,7 @@ static SCOPES_RESULT(TypedValueRef) prove_LabelTemplate(const ASTContext &ctx, c
         ctx.merge_block(label->body);
         return result;
     } else {
-        make_merge(labelctx, result.anchor(), label, result);
+        SCOPES_CHECK_RESULT(make_merge(labelctx, result.anchor(), label, result));
         #if 1
         if (label->body.empty()) {
             StyledStream ss;
@@ -965,7 +980,7 @@ static SCOPES_RESULT(TypedValueRef) prove_LabelTemplate(const ASTContext &ctx, c
         rtype = ctx.fix_merge_type(rtype);
         label->change_type(rtype);
         merge_back_valid(ctx, valid, label);
-        ctx.append(label);
+        SCOPES_CHECK_RESULT(ctx.append(label));
         return TypedValueRef(label);
     }
 }
@@ -1199,7 +1214,7 @@ static SCOPES_RESULT(TypedValueRef) prove_Loop(const ASTContext &ctx, const Loop
     ASTContext newctx;
     auto result = SCOPES_GET_RESULT(prove_block(subctx, newloop->body, loop->value, newctx));
     //auto rtype = result->get_type();
-    make_repeat(newctx, result.anchor(), newloop, result);
+    SCOPES_CHECK_RESULT(make_repeat(newctx, result.anchor(), newloop, result));
 
     SCOPES_CHECK_RESULT(finalize_repeats(ctx, newloop, "loop repeat"));
     SCOPES_TRACE_PROVE_EXPR(loop);
@@ -1521,7 +1536,7 @@ static const Type *unique_result_type(const ASTContext &ctx, const Type *T) {
 static void collect_view_argument(const ASTContext &ctx, TypedValueRef &arg, IDSet &ids) {
     auto T = arg->get_type();
     if (is_unique(T)) {
-        build_view(ctx, arg.anchor(), arg);
+        build_view(ctx, arg.anchor(), arg).assert_ok();
         T = arg->get_type();
         assert(is_view(T));
     }
@@ -1597,9 +1612,9 @@ static SCOPES_RESULT(void) build_deref(
         SCOPES_CHECK_RESULT(verify_readable(rq, T));
         auto retT = strip_qualifier<ReferQualifier>(T);
         retT = view_result_type(ctx, retT, val);
-        auto call = ctx.build_deref(anchor, val);
+        auto call = SCOPES_GET_RESULT(ctx.build_deref(anchor, val));
         call->hack_change_value(retT);
-        ctx.append(call);
+        SCOPES_CHECK_RESULT(ctx.append(call));
         val = call;
         return {};
     }
@@ -1621,9 +1636,9 @@ static SCOPES_RESULT(void) build_deref_move(
     if (rq) {
         SCOPES_CHECK_RESULT(verify_readable(rq, T));
         auto retT = strip_qualifier<ReferQualifier>(T);
-        auto call = ctx.build_deref(anchor, val);
+        auto call = SCOPES_GET_RESULT(ctx.build_deref(anchor, val));
         call->hack_change_value(unique_result_type(ctx, retT));
-        ctx.append(call);
+        SCOPES_CHECK_RESULT(ctx.append(call));
         auto uq = try_unique(T);
         if (uq) {
             ctx.move(uq->id, mover);
@@ -1650,9 +1665,9 @@ static SCOPES_RESULT(void) build_deref_automove(
         } else {
             rtype = retT;
         }
-        auto call = ctx.build_deref(anchor, val);
+        auto call = SCOPES_GET_RESULT(ctx.build_deref(anchor, val));
         call->hack_change_value(rtype);
-        ctx.append(call);
+        SCOPES_CHECK_RESULT(ctx.append(call));
         auto uq = try_unique(T);
         if (uq) {
             ctx.move(uq->id, mover);
@@ -2097,7 +2112,7 @@ repeat:
             if (!uq) {
                 SCOPES_ERROR(UniqueValueExpected, _X->get_type());
             }
-            build_move(ctx, call, _X);
+            SCOPES_CHECK_RESULT(build_move(ctx, call, _X));
             return _X;
         } break;
         case FN_View: {
@@ -2109,7 +2124,7 @@ repeat:
                     // no effect
                     continue;
                 }
-                build_view(ctx, call.anchor(), _X);
+                SCOPES_CHECK_RESULT(build_view(ctx, call.anchor(), _X));
             }
             return ref(call.anchor(), ArgumentList::from(values));
         } break;
@@ -2555,7 +2570,7 @@ repeat:
             auto rq = try_qualifier<ReferQualifier>(typeof_T);
             if (rq) {
                 auto op = TypedValueRef(call.anchor(),
-                    ctx.build_getelementref(call.anchor(), _T, { _idx }));
+                    SCOPES_GET_RESULT(ctx.build_getelementref(call.anchor(), _T, { _idx })));
                 const Type *retT = view_result_type(ctx,
                     qualify(op->get_type(), { rq }), _T, _idx);
                 op->hack_change_value(retT);
@@ -2664,7 +2679,8 @@ repeat:
             }
             auto rq = try_qualifier<ReferQualifier>(typeof_T);
             if (rq) {
-                auto op = TypedValueRef(call.anchor(), ctx.build_getelementref(call.anchor(), _T, { _idx }));
+                auto op = TypedValueRef(call.anchor(),
+                    SCOPES_GET_RESULT(ctx.build_getelementref(call.anchor(), _T, { _idx })));
                 auto retT = view_result_type(ctx, qualify(op->get_type(), { rq }), _T);
                 op->hack_change_value(retT);
                 return op;
@@ -2765,7 +2781,7 @@ repeat:
             TypedValueRef op;
             if (is_ref) {
                 assert(Tptr);
-                op = ctx.build_getelementref(call.anchor(), dep, indices);
+                op = SCOPES_GET_RESULT(ctx.build_getelementref(call.anchor(), dep, indices));
             } else {
                 op = GetElementPtr::from(dep, indices);
             }
@@ -2802,7 +2818,7 @@ repeat:
                 }
                 ctx.move(uq->id, call);
             }
-            return ctx.build_assign(call.anchor(), _ElemT, _DestT);
+            return TypedValueRef(SCOPES_GET_RESULT(ctx.build_assign(call.anchor(), _ElemT, _DestT)));
         } break;
         case FN_PtrToRef: {
             CHECKARGS(1, 1);
@@ -3086,7 +3102,7 @@ repeat:
         }
         if (is_view(Tb)) {
             if (!is_view(Ta)) {
-                build_view(ctx, call.anchor(), values[i]);
+                SCOPES_CHECK_RESULT(build_view(ctx, call.anchor(), values[i]));
                 Ta = values[i]->get_type();
                 if (!is_view(Ta)) {
                     SCOPES_ERROR(ParameterTypeMismatch, Tb, Ta);
@@ -3183,7 +3199,7 @@ repeat:
             if (sz >= 7) {
                 if (name[0] == 's' && name[1] == 'c' && name[2] == '_'
                     && name[sz-4] == '_' && name[sz-3] == 'n' && name[sz-2] == 'e' && name[sz-1] == 'w') {
-                    ctx.append(newcall);
+                    SCOPES_CHECK_RESULT(ctx.append(newcall));
                     auto anchor = call.anchor();
                     // convert to valueref
                     newcall = ref(anchor, Call::from(TYPE_ValueRef,
@@ -3238,7 +3254,7 @@ static SCOPES_RESULT(TypedValueRef) finalize_merge_label(const ASTContext &ctx,
     }
     merge_label->change_type(rtype);
     merge_back_valid(ctx, valid, merge_label);
-    ctx.append(merge_label);
+    SCOPES_CHECK_RESULT(ctx.append(merge_label));
 
     return TypedValueRef(merge_label);
 }
@@ -3259,7 +3275,7 @@ static SCOPES_RESULT(TypedValueRef) prove_SwitchTemplate(const ASTContext &ctx,
     LabelRef merge_label = make_merge_label(ctx, node.anchor());
 
     ASTContext subctx = ctx.with_block(merge_label->body);
-    subctx.append(_switch);
+    SCOPES_CHECK_RESULT(subctx.append(_switch));
 
     Switch::Case *defaultcase = nullptr;
 
@@ -3288,7 +3304,7 @@ static SCOPES_RESULT(TypedValueRef) prove_SwitchTemplate(const ASTContext &ctx,
             SCOPES_CHECK_RESULT(validate_pass_block(subctx, newcase->body));
         } else {
             if (is_returning(newvalue->get_type())) {
-                make_merge(newctx, newvalue.anchor(), merge_label, newvalue);
+                SCOPES_CHECK_RESULT(make_merge(newctx, newvalue.anchor(), merge_label, newvalue));
             }
         }
     }
@@ -3343,7 +3359,7 @@ static SCOPES_RESULT(TypedValueRef) prove_If(const ASTContext &ctx, const IfRef 
             auto thenctx = subctx.with_block(condbr->then_body);
             auto thenresult = SCOPES_GET_RESULT(prove(thenctx, clause.value));
             if (is_returning(thenresult->get_type())) {
-                make_merge(thenctx, thenresult.anchor(), merge_label, thenresult);
+                SCOPES_CHECK_RESULT(make_merge(thenctx, thenresult.anchor(), merge_label, thenresult));
             }
             if (last_condbr) {
                 last_condbr->else_body.append(condbr);
@@ -3358,7 +3374,7 @@ static SCOPES_RESULT(TypedValueRef) prove_If(const ASTContext &ctx, const IfRef 
             auto elseresult = SCOPES_GET_RESULT(prove(subctx, clause.value));
             if (is_returning(elseresult->get_type())) {
                 ASTContext elsectx = ctx.with_block(last_condbr->else_body);
-                make_merge(elsectx, _if.anchor(), merge_label, elseresult);
+                SCOPES_CHECK_RESULT(make_merge(elsectx, _if.anchor(), merge_label, elseresult));
             }
             last_condbr = CondBrRef();
         }
@@ -3366,8 +3382,8 @@ static SCOPES_RESULT(TypedValueRef) prove_If(const ASTContext &ctx, const IfRef 
     if (last_condbr) {
         // last else value missing
         ASTContext elsectx = ctx.with_block(last_condbr->else_body);
-        make_merge(elsectx, _if.anchor(), merge_label,
-            ref(_if.anchor(), ArgumentList::from({})));
+        SCOPES_CHECK_RESULT(make_merge(elsectx, _if.anchor(), merge_label,
+            ref(_if.anchor(), ArgumentList::from({}))));
     }
 
     if (merge_label->merges.empty()) {
@@ -3429,7 +3445,12 @@ SCOPES_RESULT(TypedValueRef) prove(const ASTContext &ctx, const ValueRef &node) 
                 stream_ast(ss, result, StreamASTFormat());
             }
             #endif
-            ctx.append(result);
+            if (result.isa<Instruction>()) {
+                auto instr = result.cast<Instruction>();
+                if (!instr->block) {
+                    SCOPES_CHECK_RESULT(ctx.append(instr));
+                }
+            }
 
         }
     }
@@ -3509,7 +3530,7 @@ static SCOPES_RESULT(TypedValueRef) prove_inline_body(const ASTContext &ctx,
             return result_value;
         } else {
             if (is_returning(result_value->get_type())) {
-                make_merge(bodyctx, result_value.anchor(), label, result_value);
+                SCOPES_CHECK_RESULT(make_merge(bodyctx, result_value.anchor(), label, result_value));
             }
             IDSet valid;
             SCOPES_CHECK_RESULT(finalize_merges(ctx, label, valid, "inline return"));
@@ -3525,7 +3546,7 @@ static SCOPES_RESULT(TypedValueRef) prove_inline_body(const ASTContext &ctx,
             rtype = ctx.fix_merge_type(rtype);
             label->change_type(rtype);
             merge_back_valid(ctx, valid, label);
-            ctx.append(label);
+            SCOPES_CHECK_RESULT(ctx.append(label));
             return TypedValueRef(label);
         }
     } else {

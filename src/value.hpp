@@ -118,7 +118,7 @@ struct Block {
     typedef std::unordered_map<TypedValue *, ConstRef> DataMap;
 
     Block();
-    int append(const TypedValueRef &node);
+    void append(const InstructionRef &node);
     bool empty() const;
     void migrate_from(Block &source);
     void clear();

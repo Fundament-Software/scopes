@@ -12,7 +12,9 @@
 
 namespace scopes {
 
-SCOPES_RESULT(void) tag_instruction(const InstructionRef &node);
+struct ASTContext;
+
+SCOPES_RESULT(void) tag_instruction(const ASTContext &ctx, const InstructionRef &node);
 
 } // namespace scopes
 

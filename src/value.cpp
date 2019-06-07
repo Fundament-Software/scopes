@@ -823,50 +823,26 @@ void Block::insert_at_end() {
     insert_index = body.size();
 }
 
-int Block::append(const TypedValueRef &node) {
-    // ensure that whatever an argument list or extract argument is pointing at
-    // is definitely inserted into a block
-    switch(node->kind()) {
-    case VK_ArgumentList: {
-        auto al = node.cast<ArgumentList>();
-        int count = al->values.size();
-        int inserted = 0;
+void Block::append(const InstructionRef &node) {
+    assert(!node->block);
+    node->block = this;
+    if (!is_returning(node->get_type())) {
+        assert(!terminator);
+        assert(insert_index == body.size());
+        terminator = node;
+    } else {
+        auto T = node->get_type();
+        auto count = get_argument_count(T);
         for (int i = 0; i < count; ++i) {
-            inserted += append(al->values[i]);
-        }
-    } break;
-    case VK_ExtractArgument: {
-        auto ea = node.cast<ExtractArgument>();
-        return append(ea->value);
-    } break;
-    default: {
-        if (node.isa<Instruction>()) {
-            auto instr = node.cast<Instruction>();
-            if (instr->block)
-                return 0;
-            instr->block = this;
-            if (!is_returning(instr->get_type())) {
-                assert(!terminator);
-                assert(insert_index == body.size());
-                terminator = instr;
-            } else {
-                auto T = instr->get_type();
-                auto count = get_argument_count(T);
-                for (int i = 0; i < count; ++i) {
-                    auto uq = try_unique(get_argument(T, i));
-                    if (uq) {
-                        assert(uq->id);
-                        valid.insert(uq->id);
-                    }
-                }
-                body.insert(body.begin() + insert_index, instr);
-                insert_index++;
+            auto uq = try_unique(get_argument(T, i));
+            if (uq) {
+                assert(uq->id);
+                valid.insert(uq->id);
             }
-            return 1;
         }
-    } break;
+        body.insert(body.begin() + insert_index, node);
+        insert_index++;
     }
-    return 0;
 }
 
 Block::DataMap &Block::get_channel(Symbol name) {
