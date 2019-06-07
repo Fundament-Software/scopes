@@ -1464,40 +1464,36 @@ struct SPIRVGenerator {
         return {};
     }
 
-    SCOPES_RESULT(void) translate_Bitcast(const BitcastRef &node) {
+    SCOPES_RESULT(void) translate_Cast(const CastRef &node) {
         SCOPES_RESULT_TYPE(void);
         auto val = SCOPES_GET_RESULT(ref_to_value(node->value));
         auto ty = SCOPES_GET_RESULT(type_to_spirv_type(node->get_type()));
-        if (builder.getTypeId(val) == ty) {
-            // do nothing
-        } else {
-            val = builder.createUnaryOp(spv::OpBitcast, ty, val);
+        if (builder.getTypeId(val) != ty) {
+            spv::Op op = spv::Op::OpMax;
+            switch(node->op) {
+#define CAST_OP(SRC, OP) case SRC: op = OP; break;
+            CAST_OP(CastBitcast, spv::OpBitcast)
+            CAST_OP(CastIntToPtr, spv::OpConvertUToPtr)
+            CAST_OP(CastPtrToInt, spv::OpConvertPtrToU)
+            CAST_OP(CastSExt, spv::OpSConvert)
+            CAST_OP(CastITrunc, spv::OpSConvert)
+            CAST_OP(CastZExt, spv::OpUConvert)
+            CAST_OP(CastFPTrunc, spv::OpFConvert)
+            CAST_OP(CastFPExt, spv::OpFConvert)
+            CAST_OP(CastFPToUI, spv::OpConvertFToU)
+            CAST_OP(CastFPToSI, spv::OpConvertFToS)
+            CAST_OP(CastUIToFP, spv::OpConvertUToF)
+            CAST_OP(CastSIToFP, spv::OpConvertSToF)
+#undef CAST_OP
+            default: {
+                SCOPES_ERROR(CGenUnsupportedCastOp);
+            } break;
+            }
+            val = builder.createUnaryOp(op, ty, val);
         }
         map_phi({ val }, node);
         return {};
     }
-
-#define TRANSLATE_CAST(CLASS, OP) \
-    SCOPES_RESULT(void) translate_ ## CLASS(const CLASS ## Ref &node) { \
-        SCOPES_RESULT_TYPE(void); \
-        auto val = SCOPES_GET_RESULT(ref_to_value(node->value)); \
-        auto ty = SCOPES_GET_RESULT(type_to_spirv_type(node->get_type())); \
-        val = builder.createUnaryOp(OP, ty, val); \
-        map_phi({ val }, node); \
-        return {}; \
-    }
-
-    TRANSLATE_CAST(IntToPtr, spv::OpConvertUToPtr);
-    TRANSLATE_CAST(PtrToInt, spv::OpConvertPtrToU);
-    TRANSLATE_CAST(SExt, spv::OpSConvert);
-    TRANSLATE_CAST(ITrunc, spv::OpSConvert);
-    TRANSLATE_CAST(ZExt, spv::OpUConvert);
-    TRANSLATE_CAST(FPTrunc, spv::OpFConvert);
-    TRANSLATE_CAST(FPExt, spv::OpFConvert);
-    TRANSLATE_CAST(FPToUI, spv::OpConvertFToU);
-    TRANSLATE_CAST(FPToSI, spv::OpConvertFToS);
-    TRANSLATE_CAST(UIToFP, spv::OpConvertUToF);
-    TRANSLATE_CAST(SIToFP, spv::OpConvertSToF);
 
     SCOPES_RESULT(void) translate_Switch(const SwitchRef &node) {
         SCOPES_RESULT_TYPE(void);

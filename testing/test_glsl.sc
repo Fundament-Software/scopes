@@ -63,3 +63,16 @@ print
         typify fragment-shader
         #'dump-disassembly
         #'no-opts
+
+# TODO: fix this case
+#let default-vs =
+    do
+        uniform mvp : mat4
+        in position : vec4
+
+        fn main ()
+            (gl_Position = position * mvp)
+
+        (compile-glsl 330 'vertex (typify main))
+
+;

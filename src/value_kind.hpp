@@ -53,21 +53,6 @@ namespace scopes {
     T(VK_Discard, "value-kind-discard", Discard) \
 
 
-#define SCOPES_CAST_VALUE_KIND() \
-    T(VK_Bitcast, "value-kind-bitcast", Bitcast) \
-    T(VK_IntToPtr, "value-kind-inttoptr", IntToPtr) \
-    T(VK_PtrToInt, "value-kind-ptrotint", PtrToInt) \
-    T(VK_SExt, "value-kind-sext", SExt) \
-    T(VK_ITrunc, "value-kind-itrunc", ITrunc) \
-    T(VK_ZExt, "value-kind-zext", ZExt) \
-    T(VK_FPTrunc, "value-kind-fptrunc", FPTrunc) \
-    T(VK_FPExt, "value-kind-fpext", FPExt) \
-    T(VK_FPToUI, "value-kind-fptoui", FPToUI) \
-    T(VK_FPToSI, "value-kind-fptosi", FPToSI) \
-    T(VK_UIToFP, "value-kind-uitofp", UIToFP) \
-    T(VK_SIToFP, "value-kind-sitofp", SIToFP) \
-
-
 #define SCOPES_INSTRUCTION_VALUE_KIND() \
     SCOPES_TERMINATOR_VALUE_KIND() \
     T(VK_Label, "value-kind-label", Label) \
@@ -101,8 +86,7 @@ namespace scopes {
     T(VK_ImageRead, "value-kind-image-read", ImageRead) \
     T(VK_ImageWrite, "value-kind-image-write", ImageWrite) \
     T(VK_ExecutionMode, "value-kind-execution-mode", ExecutionMode) \
-    /* casts (Cast::classof) */ \
-    SCOPES_CAST_VALUE_KIND() \
+    T(VK_Cast, "value-kind-cast", Cast) \
 
 
 #define SCOPES_TYPED_VALUE_KIND() \

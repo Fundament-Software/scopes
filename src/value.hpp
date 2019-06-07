@@ -556,24 +556,36 @@ struct CallTemplate : UntypedValue {
 
 //------------------------------------------------------------------------------
 
+#define SCOPES_CAST_KIND() \
+    T(CastBitcast, "cast-kind-bitcast") \
+    T(CastIntToPtr, "cast-kind-inttoptr") \
+    T(CastPtrToInt, "cast-kind-ptrotint") \
+    T(CastSExt, "cast-kind-sext") \
+    T(CastITrunc, "cast-kind-itrunc") \
+    T(CastZExt, "cast-kind-zext") \
+    T(CastFPTrunc, "cast-kind-fptrunc") \
+    T(CastFPExt, "cast-kind-fpext") \
+    T(CastFPToUI, "cast-kind-fptoui") \
+    T(CastFPToSI, "cast-kind-fptosi") \
+    T(CastUIToFP, "cast-kind-uitofp") \
+    T(CastSIToFP, "cast-kind-sitofp") \
+
+
+enum CastKind {
+#define T(NAME, BNAME) NAME,
+SCOPES_CAST_KIND()
+#undef T
+};
+
 struct Cast : Instruction {
     static bool classof(const Value *T);
 
-    Cast(ValueKind _kind, const TypedValueRef &value, const Type *type);
+    Cast(CastKind _op, const TypedValueRef &_value, const Type *_type);
+    static CastRef from(CastKind op, const TypedValueRef &value, const Type *type);
 
+    CastKind op;
     TypedValueRef value;
 };
-
-//------------------------------------------------------------------------------
-
-#define T(NAME, BNAME, CLASS) \
-struct CLASS : Cast { \
-    static bool classof(const Value *T); \
-    CLASS(const TypedValueRef &value, const Type *type); \
-    static CLASS ## Ref from(const TypedValueRef &value, const Type *type); \
-};
-SCOPES_CAST_VALUE_KIND()
-#undef T
 
 //------------------------------------------------------------------------------
 
@@ -974,10 +986,10 @@ struct Store : Instruction {
 //------------------------------------------------------------------------------
 
 struct PtrToRef {
-    static BitcastRef from(const TypedValueRef &value);
+    static CastRef from(const TypedValueRef &value);
 };
 struct RefToPtr {
-    static BitcastRef from(const TypedValueRef &value);
+    static CastRef from(const TypedValueRef &value);
 };
 
 //------------------------------------------------------------------------------

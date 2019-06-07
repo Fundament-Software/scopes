@@ -26,6 +26,7 @@
 #include "scopes/scopes.h"
 #include "qualifier.inc"
 #include "symbol_enum.inc"
+#include "lifetime.hpp"
 
 #include <algorithm>
 #include <unordered_set>
@@ -480,7 +481,7 @@ static void build_view(
     if (uq) {
         assert(ctx.block->is_valid(ValueIndex(val)));
         auto retT = view_type(T, {});
-        auto call = ref(anchor, Bitcast::from(val, retT));
+        auto call = ref(anchor, Cast::from(CastBitcast, val, retT));
         ctx.append(call);
         val = call;
     }
@@ -557,7 +558,7 @@ static void build_move(
     auto T = val->get_type();
     auto uq = get_unique(T);
     auto retT = unique_type(T, ctx.unique_id());
-    auto call = ref(anchor, Bitcast::from(val, retT));
+    auto call = ref(anchor, Cast::from(CastBitcast, val, retT));
     ctx.append(call);
     ctx.move(uq->id, mover);
     val = call;
@@ -2116,7 +2117,7 @@ repeat:
             CHECKARGS(1, 1);
             READ_NODEREF_TYPEOF(X);
             const Type *DestT = strip_lifetime(X);
-            auto op = Bitcast::from(_X, DestT);
+            auto op = Cast::from(CastBitcast, _X, DestT);
             if (is_plain(X)) {
                 return TypedValueRef(call.anchor(), op);
             } else {
@@ -2442,7 +2443,7 @@ repeat:
                 } else {
                     // DestT is already converted
                     return TypedValueRef(ref(call.anchor(),
-                        Bitcast::from(_SrcT, DestT)));
+                        Cast::from(CastBitcast, _SrcT, DestT)));
                 }
             }
         } break;
@@ -2452,7 +2453,7 @@ repeat:
             READ_TYPE_CONST(DestT);
             SCOPES_CHECK_RESULT(verify_integer(T));
             SCOPES_CHECK_RESULT((verify_kind<TK_Pointer>(SCOPES_GET_RESULT(storage_type(DestT)))));
-            return TypedValueRef(call.anchor(), IntToPtr::from(_T, VIEWTYPE1(DestT, _T)));
+            return TypedValueRef(call.anchor(), Cast::from(CastIntToPtr, _T, VIEWTYPE1(DestT, _T)));
         } break;
         case FN_PtrToInt: {
             CHECKARGS(2, 2);
@@ -2460,7 +2461,7 @@ repeat:
             READ_TYPE_CONST(DestT);
             SCOPES_CHECK_RESULT(verify_kind<TK_Pointer>(T));
             SCOPES_CHECK_RESULT(verify_integer(SCOPES_GET_RESULT(storage_type(DestT))));
-            return TypedValueRef(call.anchor(), PtrToInt::from(_T, VIEWTYPE1(DestT, _T)));
+            return TypedValueRef(call.anchor(), Cast::from(CastPtrToInt, _T, VIEWTYPE1(DestT, _T)));
         } break;
         case FN_ITrunc: {
             CHECKARGS(2, 2);
@@ -2468,7 +2469,7 @@ repeat:
             READ_TYPE_CONST(DestT);
             SCOPES_CHECK_RESULT(verify_integer(T));
             SCOPES_CHECK_RESULT(verify_integer(SCOPES_GET_RESULT(storage_type(DestT))));
-            return TypedValueRef(call.anchor(), ITrunc::from(_T, VIEWTYPE1(DestT, _T)));
+            return TypedValueRef(call.anchor(), Cast::from(CastITrunc, _T, VIEWTYPE1(DestT, _T)));
         } break;
         case FN_FPTrunc: {
             CHECKARGS(2, 2);
@@ -2479,7 +2480,7 @@ repeat:
             if (cast<RealType>(T)->width < cast<RealType>(DestT)->width) {
                 SCOPES_ERROR(InvalidOperands, b, T, DestT);
             }
-            return TypedValueRef(call.anchor(), FPTrunc::from(_T, VIEWTYPE1(DestT, _T)));
+            return TypedValueRef(call.anchor(), Cast::from(CastFPTrunc, _T, VIEWTYPE1(DestT, _T)));
         } break;
         case FN_FPExt: {
             CHECKARGS(2, 2);
@@ -2490,7 +2491,7 @@ repeat:
             if (cast<RealType>(T)->width > cast<RealType>(DestT)->width) {
                 SCOPES_ERROR(InvalidOperands, b, T, DestT);
             }
-            return TypedValueRef(call.anchor(), FPExt::from(_T, VIEWTYPE1(DestT, _T)));
+            return TypedValueRef(call.anchor(), Cast::from(CastFPExt, _T, VIEWTYPE1(DestT, _T)));
         } break;
         case FN_FPToUI:
         case FN_FPToSI: {
@@ -2507,9 +2508,9 @@ repeat:
             }
             #endif
             if (b.value() == FN_FPToUI) {
-                return TypedValueRef(call.anchor(), FPToUI::from(_T, VIEWTYPE1(DestT, _T)));
+                return TypedValueRef(call.anchor(), Cast::from(CastFPToUI, _T, VIEWTYPE1(DestT, _T)));
             } else {
-                return TypedValueRef(call.anchor(), FPToSI::from(_T, VIEWTYPE1(DestT, _T)));
+                return TypedValueRef(call.anchor(), Cast::from(CastFPToSI, _T, VIEWTYPE1(DestT, _T)));
             }
         } break;
         case FN_UIToFP:
@@ -2527,9 +2528,9 @@ repeat:
             }
             #endif
             if (b.value() == FN_UIToFP) {
-                return TypedValueRef(call.anchor(), UIToFP::from(_T, VIEWTYPE1(DestT, _T)));
+                return TypedValueRef(call.anchor(), Cast::from(CastUIToFP, _T, VIEWTYPE1(DestT, _T)));
             } else {
-                return TypedValueRef(call.anchor(), SIToFP::from(_T, VIEWTYPE1(DestT, _T)));
+                return TypedValueRef(call.anchor(), Cast::from(CastSIToFP, _T, VIEWTYPE1(DestT, _T)));
             }
         } break;
         case FN_ZExt:
@@ -2540,9 +2541,9 @@ repeat:
             SCOPES_CHECK_RESULT(verify_integer(T));
             SCOPES_CHECK_RESULT(verify_integer(SCOPES_GET_RESULT(storage_type(DestT))));
             if (b.value() == FN_ZExt) {
-                return TypedValueRef(call.anchor(), ZExt::from(_T, VIEWTYPE1(DestT, _T)));
+                return TypedValueRef(call.anchor(), Cast::from(CastZExt, _T, VIEWTYPE1(DestT, _T)));
             } else {
-                return TypedValueRef(call.anchor(), SExt::from(_T, VIEWTYPE1(DestT, _T)));
+                return TypedValueRef(call.anchor(), Cast::from(CastSExt, _T, VIEWTYPE1(DestT, _T)));
             }
         } break;
         case FN_ExtractElement: {

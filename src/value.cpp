@@ -1425,12 +1425,12 @@ StoreRef Store::from(const TypedValueRef &value, const TypedValueRef &target, bo
 
 //------------------------------------------------------------------------------
 
-BitcastRef PtrToRef::from(const TypedValueRef &value) {
-    return Bitcast::from(value, ptr_to_ref(value->get_type()).assert_ok());
+CastRef PtrToRef::from(const TypedValueRef &value) {
+    return Cast::from(CastBitcast, value, ptr_to_ref(value->get_type()).assert_ok());
 }
 
-BitcastRef RefToPtr::from(const TypedValueRef &value) {
-    return Bitcast::from(value, ref_to_ptr(value->get_type()).assert_ok());
+CastRef RefToPtr::from(const TypedValueRef &value) {
+    return Cast::from(CastBitcast, value, ref_to_ptr(value->get_type()).assert_ok());
 }
 
 //------------------------------------------------------------------------------
@@ -1448,30 +1448,12 @@ CallRef Call::from(const Type *type, const TypedValueRef &callee, const TypedVal
 
 //------------------------------------------------------------------------------
 
-bool Cast::classof(const Value *T) {
-    switch(T->kind()) {
-#define T(NAME, BNAME, CLASS) \
-    case NAME:
-SCOPES_CAST_VALUE_KIND()
-#undef T
-        return true;
-    default: return false;
-    }
+Cast::Cast(CastKind _op, const TypedValueRef &_value, const Type *_type)
+    : Instruction(VK_Cast, _type), op(_op), value(_value) {}
+
+CastRef Cast::from(CastKind op, const TypedValueRef &value, const Type *type) {
+    return ref(unknown_anchor(), new Cast(op, value,  type));
 }
-
-Cast::Cast(ValueKind _kind, const TypedValueRef &_value, const Type *type)
-    : Instruction(_kind, type), value(_value) {}
-
-//------------------------------------------------------------------------------
-
-#define T(NAME, BNAME, CLASS) \
-CLASS::CLASS(const TypedValueRef &_value, const Type *type) : Cast(NAME, _value, type) {} \
- \
-CLASS ## Ref CLASS::from(const TypedValueRef &value, const Type *type) { \
-    return ref(unknown_anchor(), new CLASS(value, type)); \
-}
-SCOPES_CAST_VALUE_KIND()
-#undef T
 
 //------------------------------------------------------------------------------
 
