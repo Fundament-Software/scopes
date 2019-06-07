@@ -1782,40 +1782,12 @@ ConstPointerRef ConstPointer::anchor_from(const Anchor *anchor) {
 
 //------------------------------------------------------------------------------
 
-Break::Break(const ValueRef &_value)
-    : UntypedValue(VK_Break), value(_value) {
-}
-
-BreakRef Break::from(const ValueRef &value) {
-    return ref(unknown_anchor(), new Break(value));
-}
-
-//------------------------------------------------------------------------------
-
-RepeatTemplate::RepeatTemplate(const ValueRef &_value)
-    : UntypedValue(VK_RepeatTemplate), value(_value) {}
-
-RepeatTemplateRef RepeatTemplate::from(const ValueRef &value) {
-    return ref(unknown_anchor(), new RepeatTemplate(value));
-}
-
-//------------------------------------------------------------------------------
-
 Repeat::Repeat(const LoopLabelRef &_loop, const TypedValues &values)
     : Terminator(VK_Repeat, values), loop(_loop) {
 }
 
 RepeatRef Repeat::from(const LoopLabelRef &loop, const TypedValues &values) {
     return ref(unknown_anchor(), new Repeat(loop, values));
-}
-
-//------------------------------------------------------------------------------
-
-ReturnTemplate::ReturnTemplate(const ValueRef &_value)
-    : UntypedValue(VK_ReturnTemplate), value(_value) {}
-
-ReturnTemplateRef ReturnTemplate::from(const ValueRef &value) {
-    return ref(unknown_anchor(), new ReturnTemplate(value));
 }
 
 //------------------------------------------------------------------------------
@@ -1845,15 +1817,6 @@ MergeTemplate::MergeTemplate(const LabelTemplateRef &_label, const ValueRef &_va
 
 MergeTemplateRef MergeTemplate::from(const LabelTemplateRef &label, const ValueRef &value) {
     return ref(unknown_anchor(), new MergeTemplate(label, value));
-}
-
-//------------------------------------------------------------------------------
-
-RaiseTemplate::RaiseTemplate(const ValueRef &_value)
-    : UntypedValue(VK_RaiseTemplate), value(_value) {}
-
-RaiseTemplateRef RaiseTemplate::from(const ValueRef &value) {
-    return ref(unknown_anchor(), new RaiseTemplate(value));
 }
 
 //------------------------------------------------------------------------------

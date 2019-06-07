@@ -149,38 +149,6 @@ struct Quoter {
         return canonicalize(expr);
     }
 
-    SCOPES_RESULT(CallTemplateRef) quote_Break(int level, const BreakRef &node) {
-        SCOPES_RESULT_TYPE(CallTemplateRef);
-        auto _anchor = node.anchor();
-        return REF(CallTemplate::from(g_sc_break_new, {
-            SCOPES_GET_RESULT(quote(level, node->value))
-        }));
-    }
-
-    SCOPES_RESULT(CallTemplateRef) quote_RepeatTemplate(int level, const RepeatTemplateRef &node) {
-        SCOPES_RESULT_TYPE(CallTemplateRef);
-        auto _anchor = node.anchor();
-        return REF(CallTemplate::from(g_sc_repeat_new, {
-            SCOPES_GET_RESULT(quote(level, node->value))
-        }));
-    }
-
-    SCOPES_RESULT(CallTemplateRef) quote_ReturnTemplate(int level, const ReturnTemplateRef &node) {
-        SCOPES_RESULT_TYPE(CallTemplateRef);
-        auto _anchor = node.anchor();
-        return REF(CallTemplate::from(g_sc_return_new, {
-            SCOPES_GET_RESULT(quote(level, node->value))
-        }));
-    }
-
-    SCOPES_RESULT(CallTemplateRef) quote_RaiseTemplate(int level, const RaiseTemplateRef &node) {
-        SCOPES_RESULT_TYPE(CallTemplateRef);
-        auto _anchor = node.anchor();
-        return REF(CallTemplate::from(g_sc_raise_new, {
-            SCOPES_GET_RESULT(quote(level, node->value))
-        }));
-    }
-
     SCOPES_RESULT(ValueRef) quote_CompileStage(int level, const CompileStageRef &node) {
         SCOPES_RESULT_TYPE(ValueRef);
         SCOPES_ERROR(QuoteUnsupportedValueKind, node->kind());

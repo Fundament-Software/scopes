@@ -1536,23 +1536,6 @@ const void *sc_const_pointer_extract(const sc_valueref_t value) {
     return value.cast<ConstPointer>()->value;
 }
 
-sc_valueref_t sc_break_new(sc_valueref_t value) {
-    using namespace scopes;
-    return Break::from(value);
-}
-sc_valueref_t sc_repeat_new(sc_valueref_t value) {
-    using namespace scopes;
-    return RepeatTemplate::from(value);
-}
-sc_valueref_t sc_return_new(sc_valueref_t value) {
-    using namespace scopes;
-    return ReturnTemplate::from(value);
-}
-sc_valueref_t sc_raise_new(sc_valueref_t value) {
-    using namespace scopes;
-    return RaiseTemplate::from(value);
-}
-
 sc_valueref_t sc_quote_new(sc_valueref_t value) {
     using namespace scopes;
     return Quote::from(value);
@@ -2282,11 +2265,6 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_const_real_extract, TYPE_F64, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_const_extract_at, TYPE_ValueRef, TYPE_ValueRef, TYPE_I32);
     DEFINE_EXTERN_C_FUNCTION(sc_const_pointer_extract, voidstar, TYPE_ValueRef);
-
-    DEFINE_EXTERN_C_FUNCTION(sc_break_new, TYPE_ValueRef, TYPE_ValueRef);
-    DEFINE_EXTERN_C_FUNCTION(sc_repeat_new, TYPE_ValueRef, TYPE_ValueRef);
-    DEFINE_EXTERN_C_FUNCTION(sc_return_new, TYPE_ValueRef, TYPE_ValueRef);
-    DEFINE_EXTERN_C_FUNCTION(sc_raise_new, TYPE_ValueRef, TYPE_ValueRef);
 
     DEFINE_EXTERN_C_FUNCTION(sc_quote_new, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_unquote_new, TYPE_ValueRef, TYPE_ValueRef);

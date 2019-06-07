@@ -1248,18 +1248,6 @@ struct Undef : Pure {
 
 //------------------------------------------------------------------------------
 
-struct Break : UntypedValue {
-    static bool classof(const Value *T);
-
-    Break(const ValueRef &value);
-
-    static BreakRef from(const ValueRef &value);
-
-    ValueRef value;
-};
-
-//------------------------------------------------------------------------------
-
 struct Merge : Terminator {
     static bool classof(const Value *T);
 
@@ -1285,18 +1273,6 @@ struct MergeTemplate : UntypedValue {
 
 //------------------------------------------------------------------------------
 
-struct RepeatTemplate : UntypedValue {
-    static bool classof(const Value *T);
-
-    RepeatTemplate(const ValueRef &value);
-
-    static RepeatTemplateRef from(const ValueRef &value);
-
-    ValueRef value;
-};
-
-//------------------------------------------------------------------------------
-
 struct Repeat : Terminator {
     static bool classof(const Value *T);
 
@@ -1309,36 +1285,12 @@ struct Repeat : Terminator {
 
 //------------------------------------------------------------------------------
 
-struct ReturnTemplate : UntypedValue {
-    static bool classof(const Value *T);
-
-    ReturnTemplate(const ValueRef &value);
-
-    static ReturnTemplateRef from(const ValueRef &value);
-
-    ValueRef value;
-};
-
-//------------------------------------------------------------------------------
-
 struct Return : Terminator {
     static bool classof(const Value *T);
 
     Return(const TypedValues &values);
 
     static ReturnRef from(const TypedValues &values);
-};
-
-//------------------------------------------------------------------------------
-
-struct RaiseTemplate : UntypedValue {
-    static bool classof(const Value *T);
-
-    RaiseTemplate(const ValueRef &value);
-
-    static RaiseTemplateRef from(const ValueRef &value);
-
-    ValueRef value;
 };
 
 //------------------------------------------------------------------------------

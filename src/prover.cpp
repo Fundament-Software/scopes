@@ -828,6 +828,7 @@ static TypedValueRef make_repeat1(const ASTContext &ctx, const Anchor *anchor, c
     return newrepeat;
 }
 
+
 static TypedValueRef make_repeat(const ASTContext &ctx, const Anchor *anchor, const LoopLabelRef &label, const TypedValueRef &value) {
     TypedValues results;
     if (split_return_values(results, value)) {
@@ -1238,38 +1239,40 @@ const String *try_extract_string(const ValueRef &node) {
     return nullptr;
 }
 
-static SCOPES_RESULT(TypedValueRef) prove_Break(const ASTContext &ctx, const BreakRef &_break) {
+static SCOPES_RESULT(TypedValueRef) prove_break(const ASTContext &ctx, const Anchor *anchor, const TypedValues &values) {
     SCOPES_RESULT_TYPE(TypedValueRef);
     if (!ctx._break) {
         SCOPES_ERROR(BreakOutsideLoop);
     }
-    TypedValueRef value = SCOPES_GET_RESULT(prove(ctx, _break->value));
-    return make_merge(ctx, _break.anchor(), ctx._break, value);
+    return make_merge1(ctx, anchor, ctx._break, values);
 }
 
-static SCOPES_RESULT(TypedValueRef) prove_RepeatTemplate(const ASTContext &ctx, const RepeatTemplateRef &node) {
+static SCOPES_RESULT(TypedValueRef) prove_repeat(const ASTContext &ctx, const Anchor *anchor, const TypedValues &values) {
     SCOPES_RESULT_TYPE(TypedValueRef);
     if (!ctx.loop) {
         SCOPES_ERROR(RepeatOutsideLoop);
     }
-    TypedValueRef value = SCOPES_GET_RESULT(prove(ctx, node->value));
-    return make_repeat(ctx, node.anchor(), ctx.loop, value);
+    return make_repeat1(ctx, anchor, ctx.loop, values);
 }
 
-static SCOPES_RESULT(TypedValueRef) prove_ReturnTemplate(const ASTContext &ctx,
-    const ReturnTemplateRef &node) {
-    SCOPES_RESULT_TYPE(TypedValueRef);
-    TypedValueRef value = SCOPES_GET_RESULT(prove(ctx, node->value));
+static SCOPES_RESULT(TypedValueRef) prove_return(const ASTContext &ctx,
+    const Anchor *anchor, const ValueRef &mover, const TypedValues &values) {
     if (ctx.frame->label) {
         assert(ctx.frame->original && ctx.frame->original->is_inline());
         // generate a merge
-        return make_merge(ctx, node.anchor(), ctx.frame->label, value);
+        return make_merge1(ctx, anchor, ctx.frame->label, values);
     } else {
         assert(!ctx.frame->original || !ctx.frame->original->is_inline()
             || ctx.frame->original->is_hidden());
         // generate a return
-        return make_return(ctx, node, value);
+        return make_return1(ctx, mover, values);
     }
+}
+
+static SCOPES_RESULT(TypedValueRef) prove_raise(const ASTContext &ctx,
+    const Anchor *anchor, const ValueRef &mover, const TypedValues &values) {
+    assert(ctx.frame);
+    return make_raise1(ctx, mover, values);
 }
 
 static SCOPES_RESULT(TypedValueRef) prove_MergeTemplate(const ASTContext &ctx, const MergeTemplateRef &node) {
@@ -1282,14 +1285,6 @@ static SCOPES_RESULT(TypedValueRef) prove_MergeTemplate(const ASTContext &ctx, c
     if (!is_returning(value->get_type()))
         return value;
     return make_merge(ctx, node.anchor(), label.cast<Label>(), value);
-}
-
-static SCOPES_RESULT(TypedValueRef) prove_RaiseTemplate(const ASTContext &ctx,
-    const RaiseTemplateRef &node) {
-    SCOPES_RESULT_TYPE(TypedValueRef);
-    assert(ctx.frame);
-    TypedValueRef value = SCOPES_GET_RESULT(prove(ctx, node->value));
-    return make_raise(ctx, node, value);
 }
 
 bool is_value_stage_constant(const ValueRef &value) {
@@ -2373,7 +2368,7 @@ repeat:
             return TypedValueRef(call.anchor(),
                 ExecutionMode::from(sym, v[0], v[1], v[2]));
         } break;
-        /*** MISC ***/
+        /*** terminators ***/
         case SFXFN_Discard: {
             CHECKARGS(0, 0);
             return TypedValueRef(call.anchor(), Discard::from());
@@ -2382,6 +2377,19 @@ repeat:
             CHECKARGS(0, 0);
             return TypedValueRef(call.anchor(), Unreachable::from());
         } break;
+        case KW_Return: {
+            return SCOPES_GET_RESULT(prove_return(ctx, call.anchor(), call, values));
+        } break;
+        case KW_Raise: {
+            return SCOPES_GET_RESULT(prove_raise(ctx, call.anchor(), call, values));
+        } break;
+        case KW_Break: {
+            return SCOPES_GET_RESULT(prove_break(ctx, call.anchor(), values));
+        } break;
+        case KW_Repeat: {
+            return SCOPES_GET_RESULT(prove_repeat(ctx, call.anchor(), values));
+        } break;
+        /*** MISC ***/
         case OP_Tertiary: {
             CHECKARGS(3, 3);
             READ_STORAGETYPEOF(T1);

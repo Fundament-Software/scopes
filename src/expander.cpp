@@ -957,38 +957,6 @@ struct Expander {
                 ArgumentListTemplate::from(args)))));
     }
 
-    SCOPES_RESULT(ValueRef) expand_return(const List *it) {
-        SCOPES_RESULT_TYPE(ValueRef);
-        SCOPES_CHECK_RESULT(verify_list_parameter_count("return", it, 0, -1));
-        auto anchor = it->at.anchor();
-        it = it->next;
-        return build_terminator<ReturnTemplate>(ref(anchor, it));
-    }
-
-    SCOPES_RESULT(ValueRef) expand_raise(const List *it) {
-        SCOPES_RESULT_TYPE(ValueRef);
-        SCOPES_CHECK_RESULT(verify_list_parameter_count("raise", it, 0, -1));
-        auto anchor = it->at.anchor();
-        it = it->next;
-        return build_terminator<RaiseTemplate>(ref(anchor, it));
-    }
-
-    SCOPES_RESULT(ValueRef) expand_break(const List *it) {
-        SCOPES_RESULT_TYPE(ValueRef);
-        SCOPES_CHECK_RESULT(verify_list_parameter_count("break", it, 0, -1));
-        auto anchor = it->at.anchor();
-        it = it->next;
-        return build_terminator<Break>(ref(anchor, it));
-    }
-
-    SCOPES_RESULT(ValueRef) expand_repeat(const List *it) {
-        SCOPES_RESULT_TYPE(ValueRef);
-        SCOPES_CHECK_RESULT(verify_list_parameter_count("repeat", it, 0, -1));
-        auto anchor = it->at.anchor();
-        it = it->next;
-        return build_terminator<RepeatTemplate>(ref(anchor, it));
-    }
-
     SCOPES_RESULT(ValueRef) expand_merge(const List *it) {
         SCOPES_RESULT_TYPE(ValueRef);
         SCOPES_CHECK_RESULT(verify_list_parameter_count("merge", it, 1, -1));
@@ -1123,10 +1091,6 @@ struct Expander {
                 case KW_ASTQuote: return SCOPES_GET_RESULT(expand_ast_quote(list));
                 case KW_ASTUnquote: return SCOPES_GET_RESULT(expand_ast_unquote(list));
                 case KW_ASTUnquoteArguments: return SCOPES_GET_RESULT(expand_ast_unquote_arguments(list));
-                case KW_Return: return SCOPES_GET_RESULT(expand_return(list));
-                case KW_Raise: return SCOPES_GET_RESULT(expand_raise(list));
-                case KW_Break: return SCOPES_GET_RESULT(expand_break(list));
-                case KW_Repeat: return SCOPES_GET_RESULT(expand_repeat(list));
                 case KW_Merge: return SCOPES_GET_RESULT(expand_merge(list));
                 case KW_Forward: return SCOPES_GET_RESULT(expand_forward(list));
                 //case KW_Defer: return expand_defer(list);

@@ -395,14 +395,6 @@ HANDLER(MergeTemplate) {
     );
 }
 
-HANDLER(ReturnTemplate) {
-    auto _anchor = node.anchor();
-    return LIST(
-        SYMBOL(KW_Return),
-        node->value
-    );
-}
-
 HANDLER(Quote) {
     auto _anchor = node.anchor();
     return LIST(
@@ -522,7 +514,6 @@ ValueRef _convert(const ValueRef &node) {
     CASE_HANDLER(LabelTemplate)
     CASE_HANDLER(KeyedTemplate)
     CASE_HANDLER(MergeTemplate)
-    CASE_HANDLER(ReturnTemplate)
     CASE_HANDLER(ExtractArgumentTemplate)
     CASE_HANDLER(ConstPointer)
     CASE_HANDLER(ConstAggregate)

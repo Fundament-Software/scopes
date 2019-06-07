@@ -257,11 +257,6 @@ SCOPES_LIBEXPORT double sc_const_real_extract(const sc_valueref_t value);
 SCOPES_LIBEXPORT sc_valueref_t sc_const_extract_at(const sc_valueref_t value, int index);
 SCOPES_LIBEXPORT const void *sc_const_pointer_extract(const sc_valueref_t value);
 
-SCOPES_LIBEXPORT sc_valueref_t sc_break_new(sc_valueref_t value);
-SCOPES_LIBEXPORT sc_valueref_t sc_repeat_new(sc_valueref_t value);
-SCOPES_LIBEXPORT sc_valueref_t sc_return_new(sc_valueref_t value);
-SCOPES_LIBEXPORT sc_valueref_t sc_raise_new(sc_valueref_t value);
-
 SCOPES_LIBEXPORT sc_valueref_t sc_quote_new(sc_valueref_t value);
 SCOPES_LIBEXPORT sc_valueref_t sc_unquote_new(sc_valueref_t value);
 

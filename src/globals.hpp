@@ -75,10 +75,6 @@ namespace scopes {
     T(g_sc_loop_new, "sc_loop_new") \
     T(g_sc_loop_arguments, "sc_loop_arguments") \
     T(g_sc_loop_set_body, "sc_loop_set_body") \
-    T(g_sc_break_new, "sc_break_new") \
-    T(g_sc_repeat_new, "sc_repeat_new") \
-    T(g_sc_return_new, "sc_return_new") \
-    T(g_sc_raise_new, "sc_raise_new") \
     T(g_sc_argument_list_new, "sc_argument_list_new") \
     T(g_sc_extract_argument_new, "sc_extract_argument_new") \
     T(g_sc_extract_argument_list_new, "sc_extract_argument_list_new") \

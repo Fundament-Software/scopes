@@ -23,10 +23,6 @@ namespace scopes {
     T(VK_SwitchTemplate, "value-kind-switch-template", SwitchTemplate) \
     T(VK_MergeTemplate, "value-kind-merge-template", MergeTemplate) \
     T(VK_CallTemplate, "value-kind-call-template", CallTemplate) \
-    T(VK_RepeatTemplate, "value-kind-repeat-template", RepeatTemplate) \
-    T(VK_ReturnTemplate, "value-kind-return-template", ReturnTemplate) \
-    T(VK_RaiseTemplate, "value-kind-raise-template", RaiseTemplate) \
-    T(VK_Break, "value-kind-break", Break) \
     T(VK_ArgumentListTemplate, "value-kind-argument-list-template", ArgumentListTemplate) \
     T(VK_ExtractArgumentTemplate, "value-kind-extract-argument-template", ExtractArgumentTemplate) \
     T(VK_ParameterTemplate, "value-kind-parameter-template", ParameterTemplate) \
