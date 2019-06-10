@@ -546,11 +546,6 @@ do
         let self = (sc_getarg args 0)
         if (icmp== argcount 3)
             let key = (sc_getarg args 1)
-            let key =
-                if (sc_value_is_constant key)
-                    if (ptrcmp!= (sc_value_type key) Value) ``key
-                    else key
-                else key
             let value = (sc_getarg args 2)
             return self key value
         else
@@ -560,14 +555,14 @@ do
                 hide-traceback;
                 error "value is missing key"
             let arg = (sc_keyed_new unnamed arg)
-            return self `[(box-symbol key)] arg
+            return self (box-symbol key) arg
 
     inline gen-key-scope-set (selftype fset)
         box-spice-macro
             fn "set-symbol" (args)
                 hide-traceback;
                 let self key value = (get-key-value-scope-args args)
-                `(fset self key value)
+                `(fset self `key value)
 
     inline gen-key-scope-define (selftype fset)
         box-spice-macro
@@ -579,7 +574,12 @@ do
                             let self = (unbox-pointer self selftype)
                             fset self key value
                             return `()
-                error "all arguments must be constant"
+                        else
+                            error "value argument must be constant"
+                    else
+                        error "key argument must be constant"
+                else
+                    error "scope must be constant"
 
     inline gen-key-scope-define-internal (selftype fset)
         box-spice-macro
