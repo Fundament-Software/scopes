@@ -55,7 +55,7 @@ int main(int argc, char *argv[]) {
 #undef T
 
 #define T(sym) \
-    write_entry(SCOPES_STRINGIFY(SYM_SPIRV_BuiltIn ## sym), #sym);
+    write_entry(SCOPES_STRINGIFY(SYM_SPIRV_BuiltIn ## sym), "spirv." #sym);
     B_SPIRV_BUILTINS()
 #undef T
 #define T(sym) \
