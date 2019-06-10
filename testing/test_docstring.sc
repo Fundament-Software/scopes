@@ -1,5 +1,7 @@
 """"a module docstring
 
+using import testing
+
 let scope =
     sugar-eval sugar-scope
 
@@ -9,13 +11,12 @@ let x = 5
 """"a docstring for y
 let y = 6
 
-assert
+test
     ('docstring scope 'x) == "a docstring for x\n"
-assert
+test
     ('docstring scope 'y) == "a docstring for y\n"
 print ('docstring scope unnamed)
-#FIXME
-assert
+test
     ('docstring scope unnamed) == "a module docstring\n"
 
 let scope =
@@ -26,22 +27,22 @@ let scope =
         let scope =
             sugar-eval sugar-scope
 
-        assert
+        test
             ('docstring scope 'x) == "a docstring for x\n"
-        assert
+        test
             ('docstring scope 'y) == "a docstring for y\n"
         # locals should also export docstrings
         locals;
 
-assert
+test
     ('docstring scope 'x) == "a docstring for x\n"
-assert
+test
     ('docstring scope 'y) == "a docstring for y\n"
 
 fn testfun (x y)
     """"a function docstring
     true
 
-assert (('docstring testfun) == "a function docstring\n")
+test (('docstring testfun) == "a function docstring\n")
 
 true

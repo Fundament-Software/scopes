@@ -79,10 +79,10 @@ fn gen-argument-matcher (failfunc expr scope params)
         parse-argument-matcher failfunc expr scope params
             inline (param arg)
                 sc_expression_append outexpr arg
-                outargs = 
+                outargs =
                     sc_argument_list_join_values outargs arg
-                'set-symbol scope param arg
-    'set-symbol scope '*... (deref outargs)
+                'bind scope param arg
+    'bind scope '*... (deref outargs)
     spice-quote
         header
         outexpr

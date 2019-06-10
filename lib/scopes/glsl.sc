@@ -192,17 +192,17 @@ let scope = (Scope)
 build-dims
     inline (postfix dim arrayed ms coords)
         let T = (make-gsampler postfix dim arrayed ms coords)
-        'set-symbol scope (Symbol ('string T)) T
+        'bind scope (Symbol ('string T)) T
 
 build-rtypes
     inline (prefix return-type)
         build-dims
             inline (postfix dim arrayed ms coords)
-                'set-symbol scope (Symbol (.. prefix "image" postfix))
+                'bind scope (Symbol (.. prefix "image" postfix))
                     inline (format)
                         Image return-type dim 0 arrayed ms 2 format unnamed
                 let samplerT = (make-sampler prefix return-type postfix dim arrayed ms coords)
-                'set-symbol scope (Symbol ('string samplerT)) samplerT
+                'bind scope (Symbol ('string samplerT)) samplerT
 
 inline gen-xvar-sugar (name f)
     fn parse-layout (layout)

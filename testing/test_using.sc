@@ -1,6 +1,6 @@
 
 let S = (Scope)
-'set-symbols S
+'bind S
     test =
         fn () true
 

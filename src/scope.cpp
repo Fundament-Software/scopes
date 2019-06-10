@@ -81,19 +81,19 @@ void Scope::ensure_not_borrowed() {
     borrowed = false;
 }
 
-void Scope::bind_with_doc(Symbol name, const ScopeEntry &entry) {
+void Scope::bind_with_doc(const ConstRef &name, const ScopeEntry &entry) {
     ensure_not_borrowed();
-    map->replace(name, entry);
+    map->replace(name.unref(), entry);
 }
 
-void Scope::bind(Symbol name, const ValueRef &value) {
+void Scope::bind(const ConstRef &name, const ValueRef &value) {
     assert(value);
     ScopeEntry entry = { value, next_doc };
     bind_with_doc(name, entry);
     next_doc = nullptr;
 }
 
-void Scope::del(Symbol name) {
+void Scope::del(const ConstRef &name) {
     ensure_not_borrowed();
     // check if value is contained
     ValueRef dest;
@@ -115,7 +115,10 @@ std::vector<Symbol> Scope::find_closest_match(Symbol name) const {
         auto &&keys = self->map->keys;
         auto &&values = self->map->values;
         for (int i = 0; i < count; ++i) {
-            Symbol sym = keys[i];
+            auto &&key = keys[i];
+            if (key->get_type() != TYPE_Symbol)
+                continue;
+            Symbol sym = Symbol::wrap(cast<ConstInt>(key)->value);
             if (done.count(sym))
                 continue;
             if (values[i].expr) {
@@ -146,7 +149,10 @@ std::vector<Symbol> Scope::find_elongations(Symbol name) const {
         auto &&keys = self->map->keys;
         auto &&values = self->map->values;
         for (int i = 0; i < count; ++i) {
-            Symbol sym = keys[i];
+            auto &&key = keys[i];
+            if (key->get_type() != TYPE_Symbol)
+                continue;
+            Symbol sym = Symbol::wrap(cast<ConstInt>(key)->value);
             if (done.count(sym))
                 continue;
             if (values[i].expr) {
@@ -163,10 +169,10 @@ std::vector<Symbol> Scope::find_elongations(Symbol name) const {
     return found;
 }
 
-bool Scope::lookup(Symbol name, ScopeEntry &dest, size_t depth) const {
+bool Scope::lookup(const ConstRef &name, ScopeEntry &dest, size_t depth) const {
     const Scope *self = this;
     do {
-        auto idx = self->map->find_index(name);
+        auto idx = self->map->find_index(name.unref());
         if (idx >= 0) {
             auto &&entry = self->map->values[idx];
             if (entry.expr) {
@@ -184,7 +190,7 @@ bool Scope::lookup(Symbol name, ScopeEntry &dest, size_t depth) const {
     return false;
 }
 
-bool Scope::lookup(Symbol name, ValueRef &dest, size_t depth) const {
+bool Scope::lookup(const ConstRef &name, ValueRef &dest, size_t depth) const {
     ScopeEntry entry;
     if (lookup(name, entry, depth)) {
         dest = entry.expr;
@@ -193,11 +199,11 @@ bool Scope::lookup(Symbol name, ValueRef &dest, size_t depth) const {
     return false;
 }
 
-bool Scope::lookup_local(Symbol name, ScopeEntry &dest) const {
+bool Scope::lookup_local(const ConstRef & name, ScopeEntry &dest) const {
     return lookup(name, dest, 0);
 }
 
-bool Scope::lookup_local(Symbol name, ValueRef &dest) const {
+bool Scope::lookup_local(const ConstRef & name, ValueRef &dest) const {
     return lookup(name, dest, 0);
 }
 

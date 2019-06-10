@@ -71,7 +71,7 @@ SCOPES_REIMPORT_SYMBOLS()
 static void import_symbols() {
     auto globs = sc_get_original_globals();
 #define T(NAME, STR) \
-    {   auto _tmp = sc_scope_at(globs, Symbol(STR))._0; \
+    {   auto _tmp = sc_scope_at(globs, ConstInt::symbol_from(STR))._0; \
         assert(_tmp && STR); \
         NAME = _tmp.cast<TypedValue>(); }
 SCOPES_REIMPORT_SYMBOLS()
@@ -716,58 +716,59 @@ sc_void_raises_t sc_load_object(const sc_string_t *path) {
 // Scope
 ////////////////////////////////////////////////////////////////////////////////
 
-void sc_scope_set_symbol(sc_scope_t *scope, sc_symbol_t sym, sc_valueref_t value) {
+void sc_scope_bind(sc_scope_t *scope, sc_valueref_t sym, sc_valueref_t value) {
     using namespace scopes;
     // ignore null values; this can happen when such a value is explicitly
     // created on the console
     if (!value) return;
-    scope->bind(sym, value);
+    scope->bind(sym.cast<Const>(), value);
 }
 
-sc_valueref_raises_t sc_scope_at(sc_scope_t *scope, sc_symbol_t key) {
+sc_valueref_raises_t sc_scope_at(sc_scope_t *scope, sc_valueref_t key) {
     using namespace scopes;
     SCOPES_RESULT_TYPE(ValueRef);
     ValueRef result;
-    bool ok = scope->lookup(key, result);
+    bool ok = scope->lookup(key.cast<Const>(), result);
     if (!ok) {
         SCOPES_C_ERROR(RTMissingScopeAttribute, key);
     }
     return convert_result(result);
 }
 
-sc_valueref_raises_t sc_scope_local_at(sc_scope_t *scope, sc_symbol_t key) {
+sc_valueref_raises_t sc_scope_local_at(sc_scope_t *scope, sc_valueref_t key) {
     using namespace scopes;
     SCOPES_RESULT_TYPE(ValueRef);
     ValueRef result;
-    bool ok = scope->lookup_local(key, result);
+    bool ok = scope->lookup_local(key.cast<Const>(), result);
     if (!ok) {
         SCOPES_C_ERROR(RTMissingLocalScopeAttribute, key);
     }
     return convert_result(result);
 }
 
-const sc_string_t *sc_scope_get_docstring(sc_scope_t *scope, sc_symbol_t key) {
+const sc_string_t *sc_scope_get_docstring(sc_scope_t *scope, sc_valueref_t key) {
     using namespace scopes;
-    if (key == SYM_Unnamed) {
+    if ((try_get_const_type(key) == TYPE_Symbol) && (key.cast<ConstInt>()->value == SYM_Unnamed)) {
         if (scope->doc) return scope->doc;
     } else {
         ScopeEntry entry;
-        if (scope->lookup(key, entry) && entry.doc) {
+        if (scope->lookup(key.cast<Const>(), entry) && entry.doc) {
             return entry.doc;
         }
     }
     return Symbol(SYM_Unnamed).name();
 }
 
-void sc_scope_set_docstring(sc_scope_t *scope, sc_symbol_t key, const sc_string_t *str) {
+void sc_scope_set_docstring(sc_scope_t *scope, sc_valueref_t key, const sc_string_t *str) {
     using namespace scopes;
-    if (key == SYM_Unnamed) {
+    if ((try_get_const_type(key) == TYPE_Symbol) && (key.cast<ConstInt>()->value == SYM_Unnamed)) {
         if (str && !str->count)
             str = nullptr;
         scope->doc = str;
     } else {
         ScopeEntry entry;
-        if (!scope->lookup_local(key, entry)) {
+        auto _key = key.cast<Const>();
+        if (!scope->lookup_local(_key, entry)) {
             return;
             /*
             location_error(
@@ -775,7 +776,7 @@ void sc_scope_set_docstring(sc_scope_t *scope, sc_symbol_t key, const sc_string_
             */
         }
         entry.doc = str;
-        scope->bind_with_doc(key, entry);
+        scope->bind_with_doc(_key, entry);
     }
 }
 
@@ -804,56 +805,40 @@ sc_scope_t *sc_scope_get_parent(sc_scope_t *scope) {
     return scope->parent;
 }
 
-void sc_scope_del_symbol(sc_scope_t *scope, sc_symbol_t sym) {
+void sc_scope_unbind(sc_scope_t *scope, sc_valueref_t key) {
     using namespace scopes;
-    scope->del(sym);
+    scope->del(key.cast<Const>());
 }
 
-sc_symbol_valueref_tuple_t sc_scope_next(sc_scope_t *scope, sc_symbol_t key) {
+sc_valueref_valueref_i32_tuple_t sc_scope_next(sc_scope_t *scope, int index) {
     using namespace scopes;
     auto &&map = *scope->map;
-    int index;
     int count = map.keys.size();
-    if (key == SYM_Unnamed) {
-        index = 0;
-    } else {
-        index = map.find_index(key);
-        if (index < 0)
-            index = count;
-        else
-            index++;
-    }
-    while (index != count) {
+    index++;
+    while ((size_t)index < count) {
         auto &&value = map.values[index];
+
         if (value.expr) {
-            return { map.keys[index], value.expr };
+            return { ref(unknown_anchor(), const_cast<Const *>(map.keys[index])), value.expr, index };
         }
         index++;
     }
-    return { SYM_Unnamed, ValueRef() };
+    return { g_none, g_none, -1 };
 }
 
-sc_symbol_t sc_scope_next_deleted(sc_scope_t *scope, sc_symbol_t key) {
+sc_valueref_i32_tuple_t sc_scope_next_deleted(sc_scope_t *scope, int index) {
     using namespace scopes;
     auto &&map = *scope->map;
-    int index;
     int count = map.keys.size();
-    if (key == SYM_Unnamed) {
-        index = 0;
-    } else {
-        index = map.find_index(key);
-        if (index < 0)
-            index = count;
-        else
-            index++;
-    }
-    while (index != count) {
-        if (!map.values[index].expr) {
-            return map.keys[index];
+    index++;
+    while ((size_t)index < count) {
+        auto &&value = map.values[index];
+        if (!value.expr) {
+            return { ref(unknown_anchor(), const_cast<Const *>(map.keys[index])), index };
         }
         index++;
     }
-    return SYM_Unnamed;
+    return { g_none, -1 };
 }
 
 // Symbol
@@ -2137,11 +2122,11 @@ namespace scopes {
 //------------------------------------------------------------------------------
 
 static void bind_extern(Symbol globalsym, Symbol externsym, const Type *T) {
-    globals->bind(globalsym, ref(builtin_anchor(), Global::from(T, externsym, GF_NonWritable)));
+    globals->bind(ConstInt::symbol_from(globalsym), ref(builtin_anchor(), Global::from(T, externsym, GF_NonWritable)));
 }
 
 static void bind_new_value(Symbol sym, const ValueRef &value) {
-    globals->bind(sym, ref(builtin_anchor(), value));
+    globals->bind(ConstInt::symbol_from(sym), ref(builtin_anchor(), value));
 }
 
 static void bind_symbol(Symbol sym, Symbol value) {
@@ -2305,19 +2290,19 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_load_library, _void, TYPE_String);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_load_object, _void, TYPE_String);
 
-    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_scope_at, TYPE_ValueRef, TYPE_Scope, TYPE_Symbol);
-    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_scope_local_at, TYPE_ValueRef, TYPE_Scope, TYPE_Symbol);
-    DEFINE_EXTERN_C_FUNCTION(sc_scope_get_docstring, TYPE_String, TYPE_Scope, TYPE_Symbol);
-    DEFINE_EXTERN_C_FUNCTION(sc_scope_set_docstring, _void, TYPE_Scope, TYPE_Symbol, TYPE_String);
-    DEFINE_EXTERN_C_FUNCTION(sc_scope_set_symbol, _void, TYPE_Scope, TYPE_Symbol, TYPE_ValueRef);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_scope_at, TYPE_ValueRef, TYPE_Scope, TYPE_ValueRef);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_scope_local_at, TYPE_ValueRef, TYPE_Scope, TYPE_ValueRef);
+    DEFINE_EXTERN_C_FUNCTION(sc_scope_get_docstring, TYPE_String, TYPE_Scope, TYPE_ValueRef);
+    DEFINE_EXTERN_C_FUNCTION(sc_scope_set_docstring, _void, TYPE_Scope, TYPE_ValueRef, TYPE_String);
+    DEFINE_EXTERN_C_FUNCTION(sc_scope_bind, _void, TYPE_Scope, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_new, TYPE_Scope);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_clone, TYPE_Scope, TYPE_Scope);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_new_subscope, TYPE_Scope, TYPE_Scope);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_clone_subscope, TYPE_Scope, TYPE_Scope, TYPE_Scope);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_get_parent, TYPE_Scope, TYPE_Scope);
-    DEFINE_EXTERN_C_FUNCTION(sc_scope_del_symbol, _void, TYPE_Scope, TYPE_Symbol);
-    DEFINE_EXTERN_C_FUNCTION(sc_scope_next, arguments_type({TYPE_Symbol, TYPE_ValueRef}), TYPE_Scope, TYPE_Symbol);
-    DEFINE_EXTERN_C_FUNCTION(sc_scope_next_deleted, TYPE_Symbol, TYPE_Scope, TYPE_Symbol);
+    DEFINE_EXTERN_C_FUNCTION(sc_scope_unbind, _void, TYPE_Scope, TYPE_ValueRef);
+    DEFINE_EXTERN_C_FUNCTION(sc_scope_next, arguments_type({TYPE_ValueRef, TYPE_ValueRef, TYPE_I32}), TYPE_Scope, TYPE_I32);
+    DEFINE_EXTERN_C_FUNCTION(sc_scope_next_deleted, arguments_type({TYPE_ValueRef, TYPE_I32}), TYPE_Scope, TYPE_I32);
 
     DEFINE_EXTERN_C_FUNCTION(sc_symbol_new, TYPE_Symbol, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_symbol_new_unique, TYPE_Symbol, TYPE_String);

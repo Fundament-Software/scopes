@@ -520,14 +520,14 @@ do
             let arg = (sc_keyed_new unnamed arg)
             return self (box-symbol key) arg
 
-    inline gen-key-any-set (selftype fset)
+    inline gen-key-type-set (selftype fset)
         box-spice-macro
             fn "set-symbol" (args)
                 hide-traceback;
                 let self key value = (get-key-value-args args)
                 `(fset self key value)
 
-    inline gen-key-any-define (selftype fset)
+    inline gen-key-type-define (selftype fset)
         box-spice-macro
             fn "define-symbol" (args)
                 let self key value = (get-key-value-args args)
@@ -540,24 +540,64 @@ do
                             return `()
                 error "all arguments must be constant"
 
-    inline gen-key-any-define-internal (selftype fset)
+    fn get-key-value-scope-args (args)
+        let argcount = (sc_argcount args)
+        verify-count argcount 2 3
+        let self = (sc_getarg args 0)
+        if (icmp== argcount 3)
+            let key = (sc_getarg args 1)
+            let key =
+                if (sc_value_is_constant key)
+                    if (ptrcmp!= (sc_value_type key) Value) ``key
+                    else key
+                else key
+            let value = (sc_getarg args 2)
+            return self key value
+        else
+            let arg = (sc_getarg args 1)
+            let key = (sc_type_key (sc_value_qualified_type arg))
+            if (icmp== key unnamed)
+                hide-traceback;
+                error "value is missing key"
+            let arg = (sc_keyed_new unnamed arg)
+            return self `[(box-symbol key)] arg
+
+    inline gen-key-scope-set (selftype fset)
+        box-spice-macro
+            fn "set-symbol" (args)
+                hide-traceback;
+                let self key value = (get-key-value-scope-args args)
+                `(fset self key value)
+
+    inline gen-key-scope-define (selftype fset)
+        box-spice-macro
+            fn "define-symbol" (args)
+                let self key value = (get-key-value-scope-args args)
+                if (sc_value_is_constant self)
+                    if (sc_value_is_constant key)
+                        if (sc_value_is_pure value)
+                            let self = (unbox-pointer self selftype)
+                            fset self key value
+                            return `()
+                error "all arguments must be constant"
+
+    inline gen-key-scope-define-internal (selftype fset)
         box-spice-macro
             fn "define-internal-symbol" (args)
-                let self key value = (get-key-value-args args)
+                let self key value = (get-key-value-scope-args args)
                 if (sc_value_is_constant self)
                     if (sc_value_is_constant key)
                         let self = (unbox-pointer self selftype)
-                        let key = (unbox-symbol key Symbol)
                         fset self key value
                         return `()
                 error "scope and key must be constant"
 
     # quick assignment of type attributes
-    sc_type_set_symbol type 'set-symbol (gen-key-any-set type sc_type_set_symbol)
-    sc_type_set_symbol Scope 'set-symbol (gen-key-any-set Scope sc_scope_set_symbol)
-    sc_type_set_symbol type 'define-symbol (gen-key-any-define type sc_type_set_symbol)
-    sc_type_set_symbol Scope 'define-symbol (gen-key-any-define Scope sc_scope_set_symbol)
-    sc_type_set_symbol Scope 'define-internal-symbol (gen-key-any-define-internal Scope sc_scope_set_symbol)
+    sc_type_set_symbol type 'set-symbol (gen-key-type-set type sc_type_set_symbol)
+    sc_type_set_symbol type 'define-symbol (gen-key-type-define type sc_type_set_symbol)
+    sc_type_set_symbol Scope 'bind (gen-key-scope-set Scope sc_scope_bind)
+    sc_type_set_symbol Scope 'define (gen-key-scope-define Scope sc_scope_bind)
+    sc_type_set_symbol Scope 'define-internal (gen-key-scope-define-internal Scope sc_scope_bind)
 
 # static pointer type constructor
 sc_type_set_symbol pointer '__typecall
@@ -877,22 +917,31 @@ let decons =
 
 run-stage; # 3
 
-inline set-symbols (self values...)
-    va-lfold none
-        inline (key value)
-            'set-symbol self key value
-        values...
+'define-symbol type 'set-symbols
+    inline "set-symbols" (self values...)
+        va-lfold none
+            inline (key value)
+                'set-symbol self key value
+            values...
+'define-symbol type 'define-symbols
+    inline "define-symbols" (self values...)
+        va-lfold none
+            inline (key value)
+                'define-symbol self key value
+            values...
 
-inline define-symbols (self values...)
-    va-lfold none
-        inline (key value)
-            'define-symbol self key value
-        values...
-
-'define-symbol type 'set-symbols set-symbols
-'define-symbol Scope 'set-symbols set-symbols
-'define-symbol type 'define-symbols define-symbols
-'define-symbol Scope 'define-symbols define-symbols
+'define-symbol Scope 'bind-symbols
+    inline "bind-symbols" (self values...)
+        va-lfold none
+            inline (key value)
+                'bind self key value
+            values...
+'define-symbol Scope 'define-symbols
+    inline "define-symbols" (self values...)
+        va-lfold none
+            inline (key value)
+                'define self key value
+            values...
 
 'define-symbols Value
     constant? = sc_value_is_constant
@@ -2028,7 +2077,6 @@ inline floordiv (a b)
                 if ('constant? self)
                     if ('constant? key)
                         let self = (unbox-pointer self Scope)
-                        let key = (unbox-symbol key Symbol)
                         return (sc_scope_at self key)
                 'tag `(sc_scope_at args) ('anchor args)
     __typecall =
@@ -2543,7 +2591,7 @@ fn expand-define-infix (args scope order)
         if (== ('typeof func) Nothing) token
         else
             as func Symbol
-    'set-symbol scope (get-ifx-symbol token)
+    'bind scope `[(get-ifx-symbol token)]
         `[(cons prec (cons order (cons func '())))]
     return none scope
 
@@ -2552,7 +2600,7 @@ inline make-expand-define-infix (order)
         expand-define-infix args scope order
 
 fn get-ifx-op (env op)
-    '@ env (get-ifx-symbol (as op Symbol))
+    '@ env `[(get-ifx-symbol (as op Symbol))]
 
 fn has-infix-ops? (infix-table expr)
     # any expression of which one odd argument matches an infix operator
@@ -2656,7 +2704,7 @@ fn list-handler (topexpr env)
     let head-key = expr-at
     let head =
         try
-            '@ env (as head-key Symbol)
+            '@ env `[(as head-key Symbol)]
         except (err) head-key
     let head =
         try
@@ -2853,7 +2901,7 @@ fn va-option-branch (args)
     are cached in this table. Subsequent imports of the same module will be
     resolved to these cached contents.
 let package = (Scope)
-'set-symbols package
+'bind-symbols package
     path =
         Value
             list
@@ -3005,9 +3053,9 @@ let
                 return none
                     as scope Scope
 
-'define-internal-symbol (__this-scope) list-handler-symbol
+'define-internal (__this-scope) `list-handler-symbol
     box-pointer (static-typify list-handler list Scope)
-'define-internal-symbol (__this-scope) symbol-handler-symbol
+'define-internal (__this-scope) `symbol-handler-symbol
     box-pointer (static-typify symbol-handler list Scope)
 
 inline select-op-macro (sop uop fop numargs)
@@ -3326,7 +3374,7 @@ define for
                                             let param next = (decons params)
                                             _ next (cons param expr)
                                     let expr = (cons let expr)
-                                    'set-symbol subscope 'continue continue
+                                    'bind subscope 'continue continue
                                     sc_expand (cons do expr body) '() subscope
                                 continue;
                             else
@@ -3519,7 +3567,7 @@ fn load-module (module-name module-path opts...)
                 let newscope = (Scope (sc_get_globals))
                 'set-docstring newscope unnamed ""
                 newscope
-    'set-symbols eval-scope
+    'bind-symbols eval-scope
         main-module? =
             va-option main-module? opts... false
         module-path = module-path
@@ -3572,12 +3620,12 @@ fn require-from (base-dir name)
             except (err)
                 if (not (sc_is_file module-path))
                     repeat patterns
-                'set-symbol modules module-path-sym incomplete
+                'bind modules module-path-sym incomplete
                 let content =
                     do
                         hide-traceback;
                         load-module (name as string) module-path
-                'set-symbol modules module-path-sym content
+                'bind modules module-path-sym content
                 return content
         if (('typeof content) == type)
             if (content == incomplete)
@@ -3607,7 +3655,7 @@ let import =
                 do
                     hide-traceback;
                     require-from module-dir name
-            'set-symbol scope key module
+            'bind scope key module
             _ module scope
 
 #---------------------------------------------------------------------------
@@ -3616,19 +3664,20 @@ let import =
 
 fn merge-scope-symbols (source target filter)
     fn process-keys (source target filter)
-        loop (last-key = unnamed)
-            let key value = ('next source last-key)
-            if (key != unnamed)
+        loop (last-index = -1)
+            let key value index = ('next source last-index)
+            if (index < 0)
+                break target
+            else
                 if
                     or
                         none? filter
-                        do
-                            let keystr = (key as string)
-                            'match? filter keystr
-                    'set-symbol target key value
-                repeat key
-            else
-                break target
+                        and (('typeof key) == Symbol)
+                            do
+                                let keystr = (key as Symbol as string)
+                                'match? filter keystr
+                    'bind target key value
+                repeat index
     fn filter-contents (source target filter)
         let parent = ('parent source)
         if (parent == null)
@@ -3857,21 +3906,21 @@ define-sugar-macro define-sugar-block-scope-macro
 do
     inline scope-generator (self)
         Generator
-            inline () (sc_scope_next self unnamed)
-            inline (key value) (key != unnamed)
-            inline (key value) (_ key value)
-            inline (key value)
-                sc_scope_next self key
+            inline () (sc_scope_next self -1)
+            inline (key value index) (index >= 0)
+            inline (key value index) (_ key value)
+            inline (key value index)
+                sc_scope_next self index
 
     'set-symbols Scope
         deleted =
             inline (self)
                 Generator
-                    inline () (sc_scope_next_deleted self unnamed)
-                    inline (key) (key != unnamed)
-                    inline (key) key
-                    inline (key)
-                        sc_scope_next_deleted self key
+                    inline () (sc_scope_next_deleted self -1)
+                    inline (key index) (index >= 0)
+                    inline (key index) key
+                    inline (key index)
+                        sc_scope_next_deleted self index
         __as =
             spice-cast-macro
                 fn "scope-as" (vT T)
@@ -4673,7 +4722,7 @@ fn gen-sugar-matcher (failfunc expr scope params)
                                 sc_list_decons next
                         _ arg next
                 sc_expression_append outexpr arg
-                'set-symbol scope param arg
+                'bind scope param arg
                 repeat (i + 1) rest next (| varargs variadic?)
             elseif (T == string)
                 let str = (paramv as string)
@@ -4716,7 +4765,7 @@ fn gen-sugar-matcher (failfunc expr scope params)
                                     arg as exprT
                                 else
                                     failfunc;
-                    'set-symbol scope param arg
+                    'bind scope param arg
                     repeat (i + 1) rest next varargs
                 elseif ((('typeof mid) == Symbol) and ((mid as Symbol) == 'is))
                     # check that argument is of constant type, but don't unbox
@@ -4732,7 +4781,7 @@ fn gen-sugar-matcher (failfunc expr scope params)
                                 sc_list_decons next
                             if (not (('constant? arg) and (('typeof arg) == exprT)))
                                 failfunc;
-                    'set-symbol scope param arg
+                    'bind scope param arg
                     repeat (i + 1) rest next varargs
                 else
                     sc_expression_append outexpr
@@ -4799,7 +4848,7 @@ define sugar
                                     merge fail-label
                                 spice-unquote
                                     let subscope = (Scope scope)
-                                    'set-symbols subscope
+                                    'bind-symbols subscope
                                         next-expr = next-expr
                                         sugar-scope = sugar-scope
                                         expr-head = head
@@ -5477,7 +5526,7 @@ sugar fn... (name...)
     let bodyscope = (Scope sugar-scope)
     sugar-match name...
     case (name as Symbol;)
-        'set-symbol bodyscope fn-name outtype
+        'bind bodyscope fn-name outtype
     default;
     loop (next outargs = next-expr (sc_argument_list_new 0 null))
         sugar-match next
@@ -5518,7 +5567,7 @@ sugar fn... (name...)
                                 error "variadic parameter must be in last place"
                         let param = (sc_parameter_new arg)
                         sc_template_append_parameter tmpl param
-                        'set-symbol scope arg param
+                        'bind scope arg param
                         repeat rest...
                             sc_argument_list_join_values types
                                 ? ('variadic? arg) Variadic Unknown
@@ -5528,7 +5577,7 @@ sugar fn... (name...)
                             error "variadic parameter can not have default value"
                         let param = (sc_parameter_new arg)
                         sc_template_append_parameter tmpl param
-                        'set-symbol scope arg param
+                        'bind scope arg param
                         let def = (sc_expand def '() sugar-scope)
                         repeat rest...
                             sc_argument_list_join_values types Unknown
@@ -5539,7 +5588,7 @@ sugar fn... (name...)
                         let T = (sc_expand T '() sugar-scope)
                         let param = (sc_parameter_new arg)
                         sc_template_append_parameter tmpl param
-                        'set-symbol scope arg param
+                        'bind scope arg param
                         let def = (sc_expand def '() sugar-scope)
                         repeat rest...
                             sc_argument_list_join_values types T
@@ -5550,7 +5599,7 @@ sugar fn... (name...)
                         let T = (sc_expand T '() sugar-scope)
                         let param = (sc_parameter_new arg)
                         sc_template_append_parameter tmpl param
-                        'set-symbol scope arg param
+                        'bind scope arg param
                         repeat rest...
                             sc_argument_list_join_values types T
                             sc_argument_list_join_values defaults nodefault
@@ -5562,7 +5611,7 @@ sugar fn... (name...)
         default
             sugar-match name...
             case (name as Symbol;)
-                'set-symbol sugar-scope fn-name outtype
+                'bind sugar-scope fn-name outtype
             default;
             return
                 `(finalize-overloaded-fn outtype outargs)
@@ -5858,7 +5907,7 @@ define-sugar-macro decorate-let
 
 define-sugar-scope-macro sugar-eval
     let subscope = (Scope sugar-scope)
-    'set-symbol subscope 'sugar-scope sugar-scope
+    'bind subscope 'sugar-scope sugar-scope
     let at next = (decons args)
     return
         exec-module ('tag `args ('anchor at)) subscope
@@ -5902,29 +5951,29 @@ sugar fold-locals (args...)
             expr
     # first go through the constants
     let outval =
-        loop (last-key outval = unnamed init)
-            let key value = ('next scope last-key)
-            if (key == unnamed)
+        loop (index outval = -1 init)
+            let key value index = ('next scope index)
+            if (index < 0)
                 break outval
             if (stage-constant? value)
                 let docstr = ('docstring scope key)
                 let expr = ('tag `(f outval key docstr value) anchor)
                 sc_expression_append block expr
-                repeat key expr
+                repeat index expr
             else
-                repeat key outval
+                repeat index outval
     # then go through the rest
-    loop (last-key outval = unnamed outval)
-        let key value = ('next scope last-key)
-        if (key == unnamed)
+    loop (index outval = -1 outval)
+        let key value index = ('next scope index)
+        if (index < 0)
             return block
         if (not (stage-constant? value))
             let docstr = ('docstring scope key)
             let expr = ('tag `(f outval key docstr value) anchor)
             sc_expression_append block expr
-            repeat key expr
+            repeat index expr
         else
-            repeat key outval
+            repeat index outval
 
 sugar :: ((name as Symbol))
     let start-expr = next-expr
@@ -6013,12 +6062,12 @@ sugar static-match (cond)
 #-------------------------------------------------------------------------------
 
 sugar unlet ((name as Symbol) names...)
-    sc_scope_del_symbol sugar-scope name
+    sc_scope_unbind sugar-scope name
     for name in names...
         let name = (name as Symbol)
         hide-traceback;
         getattr sugar-scope name
-        sc_scope_del_symbol sugar-scope name
+        sc_scope_unbind sugar-scope name
     `()
 
 #-------------------------------------------------------------------------------
@@ -6087,7 +6136,7 @@ sugar fold ((binding...) 'for expr...)
                                 cons let ('rjoin foldparams (list '= state...))
                             let expr1 = ('tag `expr1 anchor)
                             let expr2 = ('tag `expr2 anchor)
-                            'set-symbol subscope 'continue continue
+                            'bind subscope 'continue continue
                             let result = (sc_expand (cons ('tag `do anchor) expr1 expr2 body) '() subscope)
                             result
                     repeat (va-append-va (inline () newstate...) (next it...))
@@ -6117,17 +6166,16 @@ define append-to-scope
     spice-macro
         fn (args)
             let packedscope = ('getarg args 0)
-            let packedkey = ('getarg args 1)
-            let key = (packedkey as Symbol)
+            let key = ('getarg args 1)
             let docstr = ('getarg args 2)
             let values = ('getarglist args 3)
             let constant-scope? = ('constant? packedscope)
-            if (key == unnamed)
+            if ((('typeof key) == Symbol) and (key as Symbol == unnamed))
                 'set-docstring (packedscope as Scope) key (docstr as string)
                 return packedscope
             if (constant-scope? & (stage-constant? values))
                 let scope = (packedscope as Scope)
-                'set-symbol scope key values
+                'bind scope key values
                 'set-docstring scope key (docstr as string)
                 return packedscope
             # for non-constant values, we need to create a new scope
@@ -6146,15 +6194,15 @@ define append-to-scope
                         else
                             `(store `arg (getelementptr outargs i))
                 sc_expression_append block
-                    `('set-symbol packedscope packedkey (sc_argument_list_new acount outargs))
+                    `('bind packedscope key (sc_argument_list_new acount outargs))
                 sc_expression_append block
-                    `('set-docstring packedscope packedkey docstr)
+                    `('set-docstring packedscope key docstr)
                 sc_expression_append block packedscope
                 block
             else
                 spice-quote
-                    'set-symbol packedscope packedkey values
-                    'set-docstring packedscope packedkey docstr
+                    'bind packedscope key values
+                    'set-docstring packedscope key docstr
                     packedscope
 
 """"Export locals as a chain of up to two new scopes: a scope that contains
@@ -6177,16 +6225,19 @@ define append-to-type
     spice-macro
         fn (args)
             let T = ('getarg args 0)
-            let packedkey = ('getarg args 1)
-            let key = (packedkey as Symbol)
+            let key = ('getarg args 1)
             let docstr = ('getarg args 2)
-            if (key == unnamed)
+            if (('typeof key) != Symbol)
+                # ignore non-keys
+                return T
+            if (key as Symbol == unnamed)
                 # ignore docstring
                 return T
             let value = ('getarg args 3)
             if ('constant? T)
                 let T = (T as type)
                 if (stage-constant? value)
+                    let key = (key as Symbol)
                     'set-symbol T key value
                     'set-docstring T key (docstr as string)
                     `T
@@ -6196,14 +6247,14 @@ define append-to-type
                         else `value
                     spice-quote
                         embed
-                            sc_type_set_symbol T packedkey wrapvalue
-                            sc_type_set_docstring T packedkey docstr
+                            sc_type_set_symbol T key wrapvalue
+                            sc_type_set_docstring T key docstr
                             T
             else
                 spice-quote
                     embed
-                        sc_type_set_symbol T packedkey value
-                        sc_type_set_docstring T packedkey docstr
+                        sc_type_set_symbol T key value
+                        sc_type_set_docstring T key docstr
                         T
 
 sugar typedef+ (T body...)
@@ -6982,7 +7033,7 @@ fn run-main ()
     let scope =
         Scope (globals)
     'set-docstring scope unnamed ""
-    'set-symbols scope
+    'bind-symbols scope
         script-launch-args =
             fn ()
                 return sourcepath argc argv

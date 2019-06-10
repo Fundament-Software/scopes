@@ -17,7 +17,7 @@ do
         sugar-eval (Scope)
     fn print_stuff2 (x)
         print "line"
-        'set-symbol ascope 'somefunc
+        'bind ascope 'somefunc
             fn ()
                 print x
 

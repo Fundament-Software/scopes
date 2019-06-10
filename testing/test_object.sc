@@ -43,7 +43,7 @@ main 0 null
 print "-----------------"
 
 let scope = (Scope)
-'set-symbol scope 'main main
+'bind scope 'main main
 
 compile-object
     default-target-triple

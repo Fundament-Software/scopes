@@ -10,10 +10,10 @@ assert
             true
     "module loaded twice"
 
-'set-symbol package 'test_module2 true
+'bind package 'test_module2 true
 
 let env = (Scope)
-'set-symbol env 'compute
+'bind env 'compute
     fn (x y)
         x + y
 

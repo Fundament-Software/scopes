@@ -130,7 +130,7 @@ struct Expander {
         } else {
             Symbol sym = SCOPES_GET_RESULT(extract_symbol_constant(value));
             if (node && node.isa<Pure>()) {
-                env->bind(sym, node);
+                env->bind(ConstInt::symbol_from(sym), node);
                 return ParameterTemplateRef();
             } else {
                 ParameterTemplateRef param;
@@ -139,7 +139,7 @@ struct Expander {
                 } else {
                     param = ref(value.anchor(), ParameterTemplate::from(sym));
                 }
-                env->bind(sym, param);
+                env->bind(ConstInt::symbol_from(sym), param);
                 return param;
             }
         }
@@ -174,7 +174,7 @@ struct Expander {
             auto sym = SCOPES_GET_RESULT(extract_symbol_constant(it->at));
             // named self-binding
             // see if we can find a forward declaration in the local scope
-            if (env->lookup_local(sym, result)
+            if (env->lookup_local(ConstInt::symbol_from(sym), result)
                 && result.isa<Template>()
                 && result.cast<Template>()->is_forward_decl()) {
                 func = result.cast<Template>();
@@ -211,7 +211,7 @@ struct Expander {
             if (bind_name == SYM_Unnamed) {
                 SCOPES_ERROR(SyntaxUnnamedForwardDeclaration);
             }
-            env->bind(bind_name, func);
+            env->bind(ConstInt::symbol_from(bind_name), func);
             return result;
         }
 
@@ -221,7 +221,7 @@ struct Expander {
 
         Scope *subenv = Scope::from(env);
         if (!func->is_hidden()) {
-            subenv->bind(KW_Recur, func);
+            subenv->bind(ConstInt::symbol_from(KW_Recur), func);
             // ensure the local scope does not contain special symbols
             subenv = Scope::from(subenv);
         }
@@ -244,7 +244,7 @@ struct Expander {
         func->value = SCOPES_GET_RESULT(subexpr.expand_expression(
             ref(anchor, it), false));
         if (bind_name != SYM_Unnamed) {
-            env->bind(bind_name, func);
+            env->bind(ConstInt::symbol_from(bind_name), func);
         }
 
         return result;
@@ -264,7 +264,7 @@ struct Expander {
 
         Scope *subenv = Scope::from(env);
         auto label = ref(anchor, LabelTemplate::from(LK_User, name));
-        subenv->bind(name, label);
+        subenv->bind(ConstInt::symbol_from(name), label);
         Expander subexpr(subenv, astscope);
         label->value = SCOPES_GET_RESULT(subexpr.expand_expression(
             ref(anchor, it), false));
@@ -373,7 +373,7 @@ struct Expander {
                     }
                     node = ref(paramval.anchor(), extract_argument(loop->args, index, true));
                 }
-                bodyexp.env->bind(sym, node);
+                bodyexp.env->bind(ConstInt::symbol_from(sym), node);
                 expr->append(node);
                 it = it->next;
                 index++;
@@ -451,7 +451,7 @@ struct Expander {
                 equit = equit->next;
             }
             for (auto entry : late_bound) {
-                env->bind(entry.first, entry.second);
+                env->bind(ConstInt::symbol_from(entry.first), entry.second);
             }
         } else {
             const List *values = nullptr;
@@ -470,14 +470,15 @@ struct Expander {
                 ValueRef last_entry;
                 while (it != endit) {
                     auto name = SCOPES_GET_RESULT(extract_symbol_constant(it->at));
+                    auto _name = ConstInt::symbol_from(name);
                     ScopeEntry entry;
-                    if (!env->lookup(name, entry)) {
+                    if (!env->lookup(_name, entry)) {
                         SCOPES_ERROR(SyntaxUndeclaredIdentifier, name, env);
                     }
                     if (!entry.doc) {
-                        env->bind(name, entry.expr);
+                        env->bind(_name, entry.expr);
                     } else {
-                        env->bind_with_doc(name, entry);
+                        env->bind_with_doc(_name, entry);
                     }
                     last_entry = entry.expr;
                     it = it->next;
@@ -523,7 +524,7 @@ struct Expander {
                     variadic = true;
                 }
                 args.push_back(node);
-                env->bind(sym, node);
+                env->bind(ConstInt::symbol_from(sym), node);
                 it = it->next;
                 index++;
             }
@@ -633,7 +634,7 @@ struct Expander {
                                 }
                                 node = ref(paramval.anchor(), extract_argument(except_label, index, true));
                             }
-                            subexp.env->bind(sym, node);
+                            subexp.env->bind(ConstInt::symbol_from(sym), node);
                             expr->append(node);
                             it = it->next;
                             index++;
@@ -1007,7 +1008,7 @@ struct Expander {
     SCOPES_RESULT(sc_list_scope_tuple_t) expand_symbol(const ConstRef &node) {
         SCOPES_RESULT_TYPE(sc_list_scope_tuple_t);
         ValueRef symbol_handler_node;
-        if (env->lookup(Symbol(SYM_SymbolWildcard), symbol_handler_node)) {
+        if (env->lookup(ConstInt::symbol_from(SYM_SymbolWildcard), symbol_handler_node)) {
             auto T = try_get_const_type(symbol_handler_node);
             if (T != list_expander_func_type) {
                 SCOPES_TRACE_HOOK(symbol_handler_node);
@@ -1061,8 +1062,7 @@ struct Expander {
             // resolve symbol
             if (headT == TYPE_Symbol) {
                 ValueRef headnode;
-                if (env->lookup(
-                    SCOPES_GET_RESULT(extract_symbol_constant(head)), headnode)) {
+                if (env->lookup(head.cast<Const>(), headnode)) {
                     head = ref(head.anchor(), headnode);
                     headT = try_get_const_type(head);
                 }
@@ -1115,7 +1115,7 @@ struct Expander {
             }
 
             ValueRef list_handler_node;
-            if (env->lookup(Symbol(SYM_ListWildcard), list_handler_node)) {
+            if (env->lookup(ConstInt::symbol_from(Symbol(SYM_ListWildcard)), list_handler_node)) {
                 auto T = try_get_const_type(list_handler_node);
                 if (T != list_expander_func_type) {
                     SCOPES_TRACE_HOOK(list_handler_node);
@@ -1153,7 +1153,7 @@ struct Expander {
             Symbol name = SCOPES_GET_RESULT(extract_symbol_constant(node));
 
             ValueRef result;
-            if (!env->lookup(name, result)) {
+            if (!env->lookup(node.cast<ConstInt>(), result)) {
                 sc_list_scope_tuple_t result = SCOPES_GET_RESULT(expand_symbol(node));
                 if (result._0) {
                     ValueRef newnode = result._0->at;

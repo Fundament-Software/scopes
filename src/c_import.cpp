@@ -272,9 +272,10 @@ public:
                 if (name != SYM_Unnamed) {
                     const Anchor *anchor = anchorFromLocation(rd->getSourceRange().getBegin());
                     ScopeEntry target;
+                    auto _name = ConstInt::symbol_from(name);
                     // don't overwrite names already bound
-                    if (!dest->lookup(name, target)) {
-                        dest->bind(name,
+                    if (!dest->lookup(_name, target)) {
+                        dest->bind(_name,
                             ref(anchor, ConstPointer::type_from(struct_type)));
                     }
                 }
@@ -319,8 +320,9 @@ public:
                 auto value = ref(anchor,
                     ConstInt::from(enum_type, val.getExtValue()));
 
+                auto _name = ConstInt::symbol_from(name);
                 tni->bind(name, value);
-                dest->bind(name, value);
+                dest->bind(_name, value);
             }
         }
 
@@ -617,17 +619,17 @@ public:
     }
 
     void exportType(Symbol name, const Type *type, const Anchor *anchor) {
-        dest->bind(name, ref(anchor, ConstPointer::type_from(type)));
+        dest->bind(ConstInt::symbol_from(name), ref(anchor, ConstPointer::type_from(type)));
     }
 
     void exportExtern(Symbol name, const Type *type, const Anchor *anchor) {
-        dest->bind(name, ref(anchor, Global::from(type, name)));
+        dest->bind(ConstInt::symbol_from(name), ref(anchor, Global::from(type, name)));
     }
 
     void exportExternRef(Symbol name, const Type *type, const Anchor *anchor) {
         auto val = ref(anchor, Global::from(type, name));
         auto conv = ref(anchor, PureCast::from(ptr_to_ref(val->get_type()).assert_ok(), val));
-        dest->bind(name, conv);
+        dest->bind(ConstInt::symbol_from(name), conv);
     }
 
     bool TraverseRecordDecl(clang::RecordDecl *rd) {
@@ -831,7 +833,7 @@ static void add_c_macro(clang::Preprocessor & PP,
         const String *value = String::from(svalue.c_str(), svalue.size());
         const Anchor *anchor = anchor_from_location(PP.getSourceManager(),
             MI->getDefinitionLoc());
-        scope->bind(Symbol(name), ref(anchor, ConstPointer::string_from(value)));
+        scope->bind(ConstInt::symbol_from(name), ref(anchor, ConstPointer::string_from(value)));
         return;
     }
 
@@ -864,7 +866,7 @@ static void add_c_macro(clang::Preprocessor & PP,
         } else {
             val = ConstReal::from(TYPE_F64, V);
         }
-        scope->bind(Symbol(name), ref(anchor, val));
+        scope->bind(ConstInt::symbol_from(name), ref(anchor, val));
     } else {
         llvm::APInt Result(64,0);
         Literal.GetIntegerValue(Result);
@@ -878,7 +880,7 @@ static void add_c_macro(clang::Preprocessor & PP,
                 i = -i;
             val = ConstInt::from((Literal.isLongLong?TYPE_I64:TYPE_I32), i);
         }
-        scope->bind(Symbol(name), ref(anchor, val));
+        scope->bind(ConstInt::symbol_from(name), ref(anchor, val));
     }
 }
 
@@ -955,8 +957,8 @@ SCOPES_RESULT(Scope *) import_c_module (
             auto sz = todo.size();
             for (auto it = todo.begin(); it != todo.end();) {
                 ValueRef value;
-                if (result->lookup(it->second, value)) {
-                    result->bind(it->first, value);
+                if (result->lookup(ConstInt::symbol_from(it->second), value)) {
+                    result->bind(ConstInt::symbol_from(it->first), value);
                     auto oldit = it++;
                     todo.erase(oldit);
                 } else {

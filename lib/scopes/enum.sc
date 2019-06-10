@@ -17,7 +17,7 @@ typedef Enum
         let fields = (('@ cls '__fields) as type)
         let field-types = ('@ cls '__fields__)
         let field-type-args = ('args field-types)
-        let expression = 
+        let expression =
         let tag = `(extractvalue self 0)
         let sw = (sc_switch_new tag)
         let refer = ('refer? qcls)
@@ -40,7 +40,7 @@ typedef Enum
                             let ptr = (bitcast ptr ptrET)
                             ptrtoref ptr
                     else
-                        let ptrET = ('change-storage-class 
+                        let ptrET = ('change-storage-class
                             ('mutable (pointer.type ET)) 'Function)
                         spice-quote
                             let ptr = (alloca payload-cls)
@@ -129,7 +129,7 @@ fn build-repr-switch-case (litT self field-types allow-dupes?)
                     if (not allow-dupes?)
                         error "duplicate tags not permitted for tagged unions"
                     let name2 = (('@ field2 'Name) as Symbol as string)
-                    repeat (i + 1) (.. name "|" name2) 
+                    repeat (i + 1) (.. name "|" name2)
                 else
                     break i name
         let name =
@@ -194,13 +194,13 @@ fn finalize-enum-runtime (T)
                 error "plain enums can't have tagged fields"
             let value = (sc_const_int_new T index)
             'set-symbol T name value
-            'set-symbol using-scope name value
+            'bind using-scope name value
         # build repr function
         spice-quote
             inline __repr (self)
                 spice-unquote
                     build-repr-switch-case T self field-types true
-        'set-symbol T '__repr __repr 
+        'set-symbol T '__repr __repr
     else
         let index-type = (sc_integer_type width signed)
         # build repr function
@@ -235,9 +235,9 @@ fn finalize-enum-runtime (T)
             let field-type = (('@ field 'Type) as type)
             let index-value = (sc_const_int_new index-type index)
             'set-symbol field 'Literal index-value
-            let value = 
+            let value =
                 if (field-type == Nothing)
-                    # can provide a constant 
+                    # can provide a constant
                     store index-value (getelementptr consts 0)
                     store (sc_const_null_new payload-type) (getelementptr consts 1)
                     sc_const_aggregate_new T 2 consts
@@ -251,7 +251,7 @@ fn finalize-enum-runtime (T)
                     sc_template_set_name constructor name
                     constructor
             'set-symbol T name value
-            'set-symbol using-scope name value
+            'bind using-scope name value
 
 
 spice finalize-enum (T)

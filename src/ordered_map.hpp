@@ -12,7 +12,7 @@
 
 namespace scopes {
 
-template<typename KeyType, typename ValueType, typename KeyHash>
+template<typename KeyType, typename ValueType, typename KeyHash = std::hash<KeyType> >
 struct OrderedMap {
     void replace(const KeyType &key, const ValueType &value) {
         auto it = _key_index.find(key);

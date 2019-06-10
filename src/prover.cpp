@@ -1279,40 +1279,40 @@ static SCOPES_RESULT(TypedValueRef) prove_CompileStage(const ASTContext &ctx, co
 
     assert(scope);
     auto parent = sc_scope_get_parent(scope);
-    auto docstr = sc_scope_get_docstring(scope, SYM_Unnamed);
+    auto docstr = sc_scope_get_docstring(scope, ConstInt::symbol_from(SYM_Unnamed));
 
     auto newscope = (parent?sc_scope_new_subscope(parent):sc_scope_new());
     if (sc_string_count(docstr)) {
-        sc_scope_set_docstring(newscope, SYM_Unnamed, docstr);
+        sc_scope_set_docstring(newscope, ConstInt::symbol_from(SYM_Unnamed), docstr);
     }
 
     ValueRef tmp = ref(anchor, ConstPointer::scope_from(newscope));
 
     auto block = ref(anchor, Expression::unscoped_from());
     //StyledStream ss;
-    Symbol last_key = SYM_Unnamed;
+    int last_key = -1;
     while (true) {
         // generate deletions
-        auto key = sc_scope_next_deleted(scope, last_key);
-        if (key == SYM_Unnamed)
+        auto next = sc_scope_next_deleted(scope, last_key);
+        if (next._1 < 0)
             break;
-        last_key = key;
-        sc_scope_del_symbol(newscope, key);
+        last_key = next._1;
+        sc_scope_unbind(newscope, next._0);
     }
-    last_key = SYM_Unnamed;
+    last_key = -1;
     while (true) {
         // generate insertions
         auto key_value = sc_scope_next(scope, last_key);
         auto key = key_value._0;
         auto untyped_value = key_value._1;
-        if (key == SYM_Unnamed)
+        if (key_value._2 < 0)
             break;
-        last_key = key;
+        last_key = key_value._2;
         auto keydocstr = sc_scope_get_docstring(scope, key);
         auto value = SCOPES_GET_RESULT(prove(ctx, untyped_value));
 
         if (is_value_stage_constant(value)) {
-            sc_scope_set_symbol(newscope, key, value);
+            sc_scope_bind(newscope, key, value);
             if (sc_string_count(keydocstr))
                 sc_scope_set_docstring(newscope, key, keydocstr);
             continue;
@@ -1324,11 +1324,11 @@ static SCOPES_RESULT(TypedValueRef) prove_CompileStage(const ASTContext &ctx, co
         auto value_anchor = value.anchor();
 
         int argc = sc_argcount(value);
-        auto vkey = ref(anchor, ConstInt::symbol_from(key));
+        auto vkey = ref(anchor, Quote::from(key));
         if (argc == 1) {
             {
                 block->append(ref(anchor,
-                    CallTemplate::from(g_sc_scope_set_symbol, { tmp, vkey,
+                    CallTemplate::from(g_sc_scope_bind, { tmp,  vkey,
                         ref(value_anchor, Quote::from(value))
                     })));
             }
@@ -1351,7 +1351,7 @@ static SCOPES_RESULT(TypedValueRef) prove_CompileStage(const ASTContext &ctx, co
             }
             auto outargs = build_quoted_argument_list(anchor, newvalues);
             block->append(ref(anchor,
-                CallTemplate::from(g_sc_scope_set_symbol, { tmp, vkey, outargs })));
+                CallTemplate::from(g_sc_scope_bind, { tmp, vkey, outargs })));
             block->append(ref(anchor,
                 CallTemplate::from(g_sc_scope_set_docstring, { tmp, vkey,
                     ref(anchor, ConstPointer::string_from(keydocstr)) })));

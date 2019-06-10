@@ -30,7 +30,7 @@ struct ScopeEntry {
 
 struct Scope {
 public:
-    typedef OrderedMap<Symbol, ScopeEntry, Symbol::Hash> Map;
+    typedef OrderedMap<const Const *, ScopeEntry> Map;
 protected:
     Scope(Scope *_parent = nullptr, Map *_map = nullptr);
 
@@ -52,23 +52,23 @@ public:
 
     void ensure_not_borrowed();
 
-    void bind_with_doc(Symbol name, const ScopeEntry &entry);
+    void bind_with_doc(const ConstRef &name, const ScopeEntry &entry);
 
-    void bind(Symbol name, const ValueRef &value);
+    void bind(const ConstRef &name, const ValueRef &value);
 
-    void del(Symbol name);
+    void del(const ConstRef &name);
 
     std::vector<Symbol> find_closest_match(Symbol name) const;
 
     std::vector<Symbol> find_elongations(Symbol name) const;
 
-    bool lookup(Symbol name, ScopeEntry &dest, size_t depth = -1) const;
+    bool lookup(const ConstRef &name, ScopeEntry &dest, size_t depth = -1) const;
 
-    bool lookup(Symbol name, ValueRef &dest, size_t depth = -1) const;
+    bool lookup(const ConstRef &name, ValueRef &dest, size_t depth = -1) const;
 
-    bool lookup_local(Symbol name, ScopeEntry &dest) const;
+    bool lookup_local(const ConstRef &name, ScopeEntry &dest) const;
 
-    bool lookup_local(Symbol name, ValueRef &dest) const;
+    bool lookup_local(const ConstRef &name, ValueRef &dest) const;
 
     StyledStream &stream(StyledStream &ss);
 

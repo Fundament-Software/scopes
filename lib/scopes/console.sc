@@ -102,7 +102,7 @@ fn read-eval-print-loop ()
             [let] $? = ([system] [block])
             ;
 
-    'set-symbols eval-scope
+    'bind-symbols eval-scope
         module-dir = cwd
         module-path = (cwd .. "/<console>.sc")
         module-name = "<console>"
@@ -179,7 +179,7 @@ fn read-eval-print-loop ()
                             else
                                 `(store `arg (getelementptr outargs i))
                     sc_expression_append block
-                        `('set-symbol scope key (sc_argument_list_new acount outargs))
+                        `('bind scope key (sc_argument_list_new acount outargs))
                     sc_expression_append block
                         `('set-docstring scope key docstr)
                     sc_expression_append block scope
@@ -187,7 +187,7 @@ fn read-eval-print-loop ()
                 else
                     return
                         spice-quote
-                            'set-symbol scope key vals...
+                            'bind scope key vals...
                             'set-docstring scope key docstr
                             scope
             scope
@@ -244,9 +244,9 @@ fn read-eval-print-loop ()
                             let idsym = (Symbol idstr)
                             sc_expression_append block
                                 if (('typeof arg) == Value)
-                                    `('set-symbol eval-scope idsym ``arg)
+                                    `('bind eval-scope idsym ``arg)
                                 else
-                                    `('set-symbol eval-scope idsym `arg)
+                                    `('bind eval-scope idsym `arg)
                             `idstr
                 let counter = (counter + count)
                 return

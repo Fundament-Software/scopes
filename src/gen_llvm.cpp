@@ -2411,7 +2411,9 @@ struct LLVMIRGenerator {
             for (int i = 0; i < count; ++i) {
                 ValueRef val = values[i].expr;
                 if (!val) continue;
-                Symbol name = keys[i];
+                auto &&key = keys[i];
+                if (key->get_type() != TYPE_Symbol) continue;
+                Symbol name = Symbol::wrap(cast<ConstInt>(key)->value);
                 FunctionRef fn = SCOPES_GET_RESULT(extract_function_constant(val));
                 func_export_table.insert({fn.unref(), name});
                 LLVMValueRef func = SCOPES_GET_RESULT(ref_to_value(ValueIndex(fn)));

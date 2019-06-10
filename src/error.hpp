@@ -418,10 +418,10 @@ formatters:
         "runtime: no such key in map") \
     T(RTMissingScopeAttribute, \
         "runtime: no attribute %0 in scope", \
-        Symbol) \
+        ValueRef) \
     T(RTMissingLocalScopeAttribute, \
         "runtime: no attribute %0 in local scope", \
-        Symbol) \
+        ValueRef) \
     T(RTMissingTypeAttribute, \
         rt_missing_type_attribute_print_suggestions, \
         Symbol, PType) \

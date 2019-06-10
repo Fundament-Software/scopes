@@ -1620,11 +1620,11 @@ ConstIntRef ConstInt::from(const Type *type, uint64_t value) {
 }
 
 ConstIntRef ConstInt::symbol_from(Symbol value) {
-    return ref(unknown_anchor(), new ConstInt(TYPE_Symbol, value.value()));
+    return from(TYPE_Symbol, value.value());
 }
 
 ConstIntRef ConstInt::builtin_from(Builtin value) {
-    return ref(unknown_anchor(), new ConstInt(TYPE_Builtin, value.value()));
+    return from(TYPE_Builtin, value.value());
 }
 
 //------------------------------------------------------------------------------
