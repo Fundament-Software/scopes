@@ -62,7 +62,7 @@ struct TypeEntry {
 };
 
 struct Type {
-    typedef OrderedMap<TypeEntry> Map;
+    typedef OrderedMap<Symbol, TypeEntry, Symbol::Hash> Map;
 
     TypeKind kind() const;
 

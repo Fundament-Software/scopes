@@ -12,16 +12,16 @@
 
 namespace scopes {
 
-template<typename ValueType>
+template<typename KeyType, typename ValueType, typename KeyHash>
 struct OrderedMap {
-    void replace(Symbol key, const ValueType &value) {
-        auto it = _symbol_index.find(key);
-        if (it == _symbol_index.end()) {
+    void replace(const KeyType &key, const ValueType &value) {
+        auto it = _key_index.find(key);
+        if (it == _key_index.end()) {
             // new insertion
             int index = keys.size();
             keys.push_back(key);
             values.push_back(value);
-            _symbol_index.insert({ key, index });
+            _key_index.insert({ key, index });
         } else {
             // update
             int index = it->second;
@@ -29,16 +29,16 @@ struct OrderedMap {
         }
     }
 
-    int find_index(Symbol key) const {
-        auto it = _symbol_index.find(key);
-        if (it == _symbol_index.end())
+    int find_index(const KeyType &key) const {
+        auto it = _key_index.find(key);
+        if (it == _key_index.end())
             return -1;
         return it->second;
     }
 
-    std::vector<Symbol> keys;
+    std::vector<KeyType> keys;
     std::vector<ValueType> values;
-    std::unordered_map<Symbol, int, Symbol::Hash> _symbol_index;
+    std::unordered_map<KeyType, int, KeyHash> _key_index;
 };
 
 } // namespace scopes

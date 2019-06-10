@@ -30,7 +30,7 @@ struct ScopeEntry {
 
 struct Scope {
 public:
-    typedef OrderedMap<ScopeEntry> Map;
+    typedef OrderedMap<Symbol, ScopeEntry, Symbol::Hash> Map;
 protected:
     Scope(Scope *_parent = nullptr, Map *_map = nullptr);
 
