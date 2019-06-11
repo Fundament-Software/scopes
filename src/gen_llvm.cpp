@@ -1748,6 +1748,8 @@ struct LLVMIRGenerator {
                     val = LLVMBuildBitCast(builder, val, ty, "");
                 }
             } break;
+            case CastPtrToRef: break;
+            case CastRefToPtr: break;
 #define CAST_OP(SRC, OP) case SRC: val = OP(builder, val, ty, ""); break;
             CAST_OP(CastIntToPtr, LLVMBuildIntToPtr);
             CAST_OP(CastPtrToInt, LLVMBuildPtrToInt);

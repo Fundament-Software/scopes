@@ -1402,11 +1402,11 @@ StoreRef Store::from(const TypedValueRef &value, const TypedValueRef &target, bo
 //------------------------------------------------------------------------------
 
 CastRef PtrToRef::from(const TypedValueRef &value) {
-    return Cast::from(CastBitcast, value, ptr_to_ref(value->get_type()).assert_ok());
+    return Cast::from(CastPtrToRef, value, ptr_to_ref(value->get_type()).assert_ok());
 }
 
 CastRef RefToPtr::from(const TypedValueRef &value) {
-    return Cast::from(CastBitcast, value, ref_to_ptr(value->get_type()).assert_ok());
+    return Cast::from(CastRefToPtr, value, ref_to_ptr(value->get_type()).assert_ok());
 }
 
 //------------------------------------------------------------------------------

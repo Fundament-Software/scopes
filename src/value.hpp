@@ -569,6 +569,8 @@ struct CallTemplate : UntypedValue {
     T(CastFPToSI, "cast-kind-fptosi") \
     T(CastUIToFP, "cast-kind-uitofp") \
     T(CastSIToFP, "cast-kind-sitofp") \
+    T(CastPtrToRef, "cast-kind-ptrtoref") \
+    T(CastRefToPtr, "cast-kind-reftoptr") \
 
 
 enum CastKind {

@@ -1471,6 +1471,8 @@ struct SPIRVGenerator {
         if (builder.getTypeId(val) != ty) {
             spv::Op op = spv::Op::OpMax;
             switch(node->op) {
+            case CastPtrToRef: break;
+            case CastRefToPtr: break;
 #define CAST_OP(SRC, OP) case SRC: op = OP; break;
             CAST_OP(CastBitcast, spv::OpBitcast)
             CAST_OP(CastIntToPtr, spv::OpConvertUToPtr)
@@ -1489,7 +1491,9 @@ struct SPIRVGenerator {
                 SCOPES_ERROR(CGenUnsupportedCastOp);
             } break;
             }
-            val = builder.createUnaryOp(op, ty, val);
+            if (op != spv::Op::OpMax) {
+                val = builder.createUnaryOp(op, ty, val);
+            }
         }
         map_phi({ val }, node);
         return {};
