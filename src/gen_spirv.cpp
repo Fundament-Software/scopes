@@ -1373,6 +1373,12 @@ struct SPIRVGenerator {
         case UnOpAsin: _builtin = GLSLstd450Asin; break;
         case UnOpAcos: _builtin = GLSLstd450Acos; break;
         case UnOpAtan: _builtin = GLSLstd450Atan; break;
+        case UnOpSinh: _builtin = GLSLstd450Sinh; break;
+        case UnOpCosh: _builtin = GLSLstd450Cosh; break;
+        case UnOpTanh: _builtin = GLSLstd450Tanh; break;
+        case UnOpASinh: _builtin = GLSLstd450Asinh; break;
+        case UnOpACosh: _builtin = GLSLstd450Acosh; break;
+        case UnOpATanh: _builtin = GLSLstd450Atanh; break;
         case UnOpTrunc: _builtin = GLSLstd450Trunc; break;
         case UnOpFloor: _builtin = GLSLstd450Floor; break;
         case UnOpFAbs: _builtin = GLSLstd450FAbs; break;

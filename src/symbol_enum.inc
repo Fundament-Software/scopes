@@ -360,6 +360,12 @@ namespace scopes {
     T(OP_Asin, "asin") \
     T(OP_Acos, "acos") \
     T(OP_Atan, "atan") \
+    T(OP_Sinh, "sinh") \
+    T(OP_Cosh, "cosh") \
+    T(OP_Tanh, "tanh") \
+    T(OP_ASinh, "asinh") \
+    T(OP_ACosh, "acosh") \
+    T(OP_ATanh, "atanh") \
     T(OP_Atan2, "atan2") \
     T(OP_Exp, "exp") \
     T(OP_Log, "log") \

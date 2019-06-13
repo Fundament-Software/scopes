@@ -660,6 +660,12 @@ struct FCmp : Instruction {
     T(UnOpAsin, "unop-kind-asin") \
     T(UnOpAcos, "unop-kind-acos") \
     T(UnOpAtan, "unop-kind-atan") \
+    T(UnOpSinh, "unop-kind-sinh") \
+    T(UnOpCosh, "unop-kind-cosh") \
+    T(UnOpTanh, "unop-kind-tanh") \
+    T(UnOpASinh, "unop-kind-asinh") \
+    T(UnOpACosh, "unop-kind-acosh") \
+    T(UnOpATanh, "unop-kind-atanh") \
     T(UnOpTrunc, "unop-kind-trunc") \
     T(UnOpFloor, "unop-kind-floor") \
     T(UnOpFAbs, "unop-kind-fabs") \

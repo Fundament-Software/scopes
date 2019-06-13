@@ -74,6 +74,8 @@ namespace scopes {
     FUN_OP(Radians) FUN_OP(Degrees) \
     FUN_OP(Sin) FUN_OP(Cos) FUN_OP(Tan) \
     FUN_OP(Asin) FUN_OP(Acos) FUN_OP(Atan) \
+    FUN_OP(Sinh) FUN_OP(Cosh) FUN_OP(Tanh) \
+    FUN_OP(ASinh) FUN_OP(ACosh) FUN_OP(ATanh) \
     FUN_OP(Exp) FUN_OP(Log) FUN_OP(Exp2) FUN_OP(Log2) \
     FUN_OP(Trunc) FUN_OP(Floor) FARITH_OP(Step) \
     FARITH_OP(Pow) FUN_OP(Sqrt) \
