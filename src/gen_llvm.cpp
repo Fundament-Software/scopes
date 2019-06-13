@@ -156,12 +156,37 @@ struct LLVMIRGenerator {
         llvm_exp2_f64,
         llvm_log2_f32,
         llvm_log2_f64,
+
         custom_fsign_f32,
         custom_fsign_f64,
         custom_radians_f32,
         custom_radians_f64,
         custom_degrees_f32,
         custom_degrees_f64,
+
+        libc_tan_f32,
+        libc_tan_f64,
+        libc_asin_f32,
+        libc_asin_f64,
+        libc_acos_f32,
+        libc_acos_f64,
+        libc_atan_f32,
+        libc_atan_f64,
+        libc_atan2_f32,
+        libc_atan2_f64,
+        libc_sinh_f32,
+        libc_sinh_f64,
+        libc_cosh_f32,
+        libc_cosh_f64,
+        libc_tanh_f32,
+        libc_tanh_f64,
+        libc_asinh_f32,
+        libc_asinh_f64,
+        libc_acosh_f32,
+        libc_acosh_f64,
+        libc_atanh_f32,
+        libc_atanh_f64,
+
         NumIntrinsics,
     };
 
@@ -486,6 +511,30 @@ struct LLVMIRGenerator {
             LLVM_INTRINSIC_IMPL(llvm_exp2_f64, f64T, "llvm.exp2.f64", f64T)
             LLVM_INTRINSIC_IMPL(llvm_log2_f32, f32T, "llvm.log2.f32", f32T)
             LLVM_INTRINSIC_IMPL(llvm_log2_f64, f64T, "llvm.log2.f64", f64T)
+
+            LLVM_INTRINSIC_IMPL(libc_tan_f32, f32T, "tanf", f32T)
+            LLVM_INTRINSIC_IMPL(libc_tan_f64, f64T, "tan", f64T)
+            LLVM_INTRINSIC_IMPL(libc_asin_f32, f32T, "asinf", f32T)
+            LLVM_INTRINSIC_IMPL(libc_asin_f64, f64T, "asin", f64T)
+            LLVM_INTRINSIC_IMPL(libc_acos_f32, f32T, "acosf", f32T)
+            LLVM_INTRINSIC_IMPL(libc_acos_f64, f64T, "acos", f64T)
+            LLVM_INTRINSIC_IMPL(libc_atan_f32, f32T, "atanf", f32T)
+            LLVM_INTRINSIC_IMPL(libc_atan_f64, f64T, "atan", f64T)
+            LLVM_INTRINSIC_IMPL(libc_atan2_f32, f32T, "atan2f", f32T, f32T)
+            LLVM_INTRINSIC_IMPL(libc_atan2_f64, f64T, "atan2", f64T, f64T)
+            LLVM_INTRINSIC_IMPL(libc_sinh_f32, f32T, "sinhf", f32T)
+            LLVM_INTRINSIC_IMPL(libc_sinh_f64, f64T, "sinh", f64T)
+            LLVM_INTRINSIC_IMPL(libc_cosh_f32, f32T, "coshf", f32T)
+            LLVM_INTRINSIC_IMPL(libc_cosh_f64, f64T, "cosh", f64T)
+            LLVM_INTRINSIC_IMPL(libc_tanh_f32, f32T, "tanhf", f32T)
+            LLVM_INTRINSIC_IMPL(libc_tanh_f64, f64T, "tanh", f64T)
+            LLVM_INTRINSIC_IMPL(libc_asinh_f32, f32T, "asinhf", f32T)
+            LLVM_INTRINSIC_IMPL(libc_asinh_f64, f64T, "asinh", f64T)
+            LLVM_INTRINSIC_IMPL(libc_acosh_f32, f32T, "acoshf", f32T)
+            LLVM_INTRINSIC_IMPL(libc_acosh_f64, f64T, "acosh", f64T)
+            LLVM_INTRINSIC_IMPL(libc_atanh_f32, f32T, "atanhf", f32T)
+            LLVM_INTRINSIC_IMPL(libc_atanh_f64, f64T, "atanh", f64T)
+
             LLVM_INTRINSIC_IMPL_BEGIN(custom_fsign_f32, f32T, "custom.fsign.f32", f32T)
                 // (0 < val) - (val < 0)
                 LLVMValueRef val = LLVMGetParam(result, 0);
@@ -1588,6 +1637,16 @@ struct LLVMIRGenerator {
     case SRC: { op = (ET == f64T)?FUNC ## _f64:FUNC ## _f32; } break;
             UNOP(UnOpSin, llvm_sin)
             UNOP(UnOpCos, llvm_cos)
+            UNOP(UnOpTan, libc_tan)
+            UNOP(UnOpAsin, libc_asin)
+            UNOP(UnOpAcos, libc_acos)
+            UNOP(UnOpAtan, libc_atan)
+            UNOP(UnOpSinh, libc_sinh)
+            UNOP(UnOpCosh, libc_cosh)
+            UNOP(UnOpTanh, libc_tanh)
+            UNOP(UnOpASinh, libc_asinh)
+            UNOP(UnOpACosh, libc_acosh)
+            UNOP(UnOpATanh, libc_atanh)
             UNOP(UnOpSqrt, llvm_sqrt)
             UNOP(UnOpFAbs, llvm_fabs)
             UNOP(UnOpTrunc, llvm_trunc)
@@ -1625,13 +1684,44 @@ struct LLVMIRGenerator {
         return {};
     }
 
+    LLVMValueRef build_intrinsic_binop(Intrinsic op, LLVMValueRef a, LLVMValueRef b) {
+        auto T = LLVMTypeOf(a);
+        LLVMValueRef func = nullptr;
+        func = get_intrinsic(op);
+        assert(func);
+        if (LLVMGetTypeKind(T) == LLVMVectorTypeKind) {
+            auto count = LLVMGetVectorSize(T);
+            LLVMValueRef retvalue = LLVMGetUndef(T);
+            for (unsigned i = 0; i < count; ++i) {
+                LLVMValueRef idx = LLVMConstInt(i32T, i, false);
+                LLVMValueRef values[] = {
+                    LLVMBuildExtractElement(builder, a, idx, ""),
+                    LLVMBuildExtractElement(builder, b, idx, "")
+                };
+                LLVMValueRef eltval = LLVMBuildCall(builder, func, values, 2, "");
+                retvalue = LLVMBuildInsertElement(builder, retvalue, eltval, idx, "");
+            }
+            return retvalue;
+        } else {
+            LLVMValueRef values[] = { a, b };
+            return LLVMBuildCall(builder, func, values, 2, "");
+        }
+    }
+
     SCOPES_RESULT(void) translate_BinOp(const BinOpRef &node) {
         SCOPES_RESULT_TYPE(void);
         auto a = SCOPES_GET_RESULT(ref_to_value(node->value1));
         auto b = SCOPES_GET_RESULT(ref_to_value(node->value2));
+        auto T = LLVMTypeOf(a);
+        auto ET = T;
+        if (LLVMGetTypeKind(T) == LLVMVectorTypeKind) {
+            ET = LLVMGetElementType(T);
+        }
         LLVMValueRef val = nullptr;
         switch(node->op) {
 #define BINOP(SRC, FUNC) case SRC: val = FUNC(builder, a, b, ""); break;
+#define INTRINSIC_BINOP(SRC, FUNC) \
+    case SRC: { val = build_intrinsic_binop((ET == f64T)?FUNC ## _f64:FUNC ## _f32, a, b); } break;
         BINOP(BinOpAdd, LLVMBuildAdd)
         BINOP(BinOpAddNUW, LLVMBuildNUWAdd)
         BINOP(BinOpAddNSW, LLVMBuildNSWAdd)
@@ -1656,6 +1746,8 @@ struct LLVMIRGenerator {
         BINOP(BinOpFMul, LLVMBuildFMul)
         BINOP(BinOpFDiv, LLVMBuildFDiv)
         BINOP(BinOpFRem, LLVMBuildFRem)
+        INTRINSIC_BINOP(BinOpAtan2, libc_atan2)
+        INTRINSIC_BINOP(BinOpPow, llvm_pow)
         case BinOpCross: {
             auto T = LLVMTypeOf(a);
             assert (LLVMGetTypeKind(T) == LLVMVectorTypeKind);
@@ -1678,37 +1770,12 @@ struct LLVMIRGenerator {
                 LLVMBuildFCmp(builder, LLVMRealOGT, a, b, ""),
                 zero, one, "");
         } break;
-        case BinOpPow: {
-            auto T = LLVMTypeOf(a);
-            auto ET = T;
-            if (LLVMGetTypeKind(T) == LLVMVectorTypeKind) {
-                ET = LLVMGetElementType(T);
-            }
-            LLVMValueRef func = nullptr;
-            Intrinsic op = (ET == f64T)?llvm_pow_f64:llvm_pow_f32;
-            func = get_intrinsic(op);
-            assert(func);
-            if (LLVMGetTypeKind(T) == LLVMVectorTypeKind) {
-                auto count = LLVMGetVectorSize(T);
-                LLVMValueRef retvalue = LLVMGetUndef(T);
-                for (unsigned i = 0; i < count; ++i) {
-                    LLVMValueRef idx = LLVMConstInt(i32T, i, false);
-                    LLVMValueRef values[] = {
-                        LLVMBuildExtractElement(builder, a, idx, ""),
-                        LLVMBuildExtractElement(builder, b, idx, "")
-                    };
-                    LLVMValueRef eltval = LLVMBuildCall(builder, func, values, 2, "");
-                    retvalue = LLVMBuildInsertElement(builder, retvalue, eltval, idx, "");
-                }
-                val = retvalue;
-            } else {
-                LLVMValueRef values[] = { a, b };
-                val = LLVMBuildCall(builder, func, values, 2, "");
-            }
-        } break;
 #undef BINOP
-        default: assert(false); break;
+        default: {
+            SCOPES_ERROR(CGenUnsupportedBinOp);
+        } break;
         }
+
         map_phi({ val }, node);
         return {};
     }
@@ -1728,7 +1795,9 @@ struct LLVMIRGenerator {
                 LLVMBuildFMul(builder, b, c, ""),
                 "");
         } break;
-        default: assert(false); break;
+        default: {
+            SCOPES_ERROR(CGenUnsupportedTriOp);
+        } break;
         }
         map_phi({ val }, node);
         return {};

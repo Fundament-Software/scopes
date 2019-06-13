@@ -78,7 +78,7 @@ namespace scopes {
     FUN_OP(ASinh) FUN_OP(ACosh) FUN_OP(ATanh) \
     FUN_OP(Exp) FUN_OP(Log) FUN_OP(Exp2) FUN_OP(Log2) \
     FUN_OP(Trunc) FUN_OP(Floor) FARITH_OP(Step) \
-    FARITH_OP(Pow) FUN_OP(Sqrt) \
+    FARITH_OP(Atan2) FARITH_OP(Pow) FUN_OP(Sqrt) \
     \
     FTRI_OP(FMix)
 

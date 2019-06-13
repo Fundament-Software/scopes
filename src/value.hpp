@@ -712,6 +712,7 @@ SCOPES_UNOP_KIND()
     T(BinOpFMul, "binop-kind-fmul") \
     T(BinOpFDiv, "binop-kind-fdiv") \
     T(BinOpFRem, "binop-kind-frem") \
+    T(BinOpAtan2, "binop-kind-atan2") \
     T(BinOpCross, "binop-kind-cross") \
     T(BinOpStep, "binop-kind-step") \
     T(BinOpPow, "binop-kind-pow") \

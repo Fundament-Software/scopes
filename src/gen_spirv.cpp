@@ -1436,6 +1436,7 @@ struct SPIRVGenerator {
         case BinOpFDiv: op = spv::OpFDiv; break;
         case BinOpFRem: op = spv::OpFRem; break;
 #undef BOOL_OR_INT_OP
+        case BinOpAtan2: _builtin = GLSLstd450Atan2; goto defbuiltin;
         case BinOpStep: _builtin = GLSLstd450Step; goto defbuiltin;
         case BinOpPow: _builtin = GLSLstd450Pow; goto defbuiltin;
         case BinOpCross: _builtin = GLSLstd450Cross; goto defbuiltin;
