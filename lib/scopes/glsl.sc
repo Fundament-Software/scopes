@@ -253,7 +253,17 @@ fn config-xvar (flags storage anchor name T layout)
         case 'binding
             binding = (v as i32)
         case 'readonly
-            flags
+            if (flags & global-flag-non-readable)
+                error "value is already tagged writeonly"
+            flags = flags | global-flag-non-writable
+        case 'writeonly
+            if (flags & global-flag-non-writable)
+                error "value is already tagged readonly"
+            flags = flags | global-flag-non-readable
+        case 'coherent
+            flags = flags | global-flag-coherent
+        case 'restrict
+            flags = flags | global-flag-restrict
         default
             error (.. "unsupported key: " (k as string))
     'tag (sc_global_new name T flags storage location binding) anchor
