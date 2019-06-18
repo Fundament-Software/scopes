@@ -304,6 +304,16 @@ inline gen-signed-atomic-func (sop uop)
             else uop
             \ memptr (imply data ET)
 
+let
+    FindILsb_u32 = (extern 'GLSL.std.450.FindILsb (function u32 u32))
+    FindILsb_uvec2 = (extern 'GLSL.std.450.FindILsb (function uvec2 uvec2))
+    FindILsb_uvec3 = (extern 'GLSL.std.450.FindILsb (function uvec3 uvec3))
+    FindILsb_uvec4 = (extern 'GLSL.std.450.FindILsb (function uvec4 uvec4))
+    FindILsb_i32 = (extern 'GLSL.std.450.FindILsb (function i32 i32))
+    FindILsb_ivec2 = (extern 'GLSL.std.450.FindILsb (function ivec2 ivec2))
+    FindILsb_ivec3 = (extern 'GLSL.std.450.FindILsb (function ivec3 ivec3))
+    FindILsb_ivec4 = (extern 'GLSL.std.450.FindILsb (function ivec4 ivec4))
+
 do
     let gsampler
     let
@@ -362,6 +372,24 @@ do
 
     let packHalf2x16 = (extern 'GLSL.std.450.PackHalf2x16 (function u32 vec2))
     let unpackHalf2x16 = (extern 'GLSL.std.450.UnpackHalf2x16 (function vec2 u32))
+
+    inline... findLSB
+    case (value : u32,)
+        FindILsb_u32 value
+    case (value : uvec2,)
+        FindILsb_uvec2 value
+    case (value : uvec3,)
+        FindILsb_uvec3 value
+    case (value : uvec4,)
+        FindILsb_uvec4 value
+    case (value : i32,)
+        FindILsb_i32 value
+    case (value : ivec2,)
+        FindILsb_ivec2 value
+    case (value : ivec3,)
+        FindILsb_ivec3 value
+    case (value : ivec4,)
+        FindILsb_ivec4 value
 
     let
         atomicExchange = (gen-atomic-func xchg)
