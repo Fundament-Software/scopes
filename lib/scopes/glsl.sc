@@ -289,6 +289,21 @@ fn config-inout (anchor name T layout)
             let out = [(f 0:u32 'Output anchor name T layout)]
     `(bitcast LT InOutType)
 
+inline gen-atomic-func (op)
+    inline "atomicfn" (mem data)
+        let memptr = (& mem)
+        let ET = (elementof (typeof memptr))
+        atomicrmw op memptr (imply data ET)
+
+inline gen-signed-atomic-func (sop uop)
+    inline "atomicsfn" (mem data)
+        let memptr = (& mem)
+        let ET = (elementof (typeof memptr))
+        atomicrmw
+            static-if (signed? ET) sop
+            else uop
+            \ memptr (imply data ET)
+
 do
     let gsampler
     let
@@ -348,40 +363,13 @@ do
     let packHalf2x16 = (extern 'glsl.std.450.PackHalf2x16 (function u32 vec2))
     let unpackHalf2x16 = (extern 'glsl.std.450.UnpackHalf2x16 (function vec2 u32))
 
-    inline atomicAdd (mem data)
-        let memptr = (& mem)
-        let ET = (elementof (typeof memptr))
-        atomicrmw add memptr (imply data ET)
-
-    inline atomicOr (mem data)
-        let memptr = (& mem)
-        let ET = (elementof (typeof memptr))
-        atomicrmw bor memptr (imply data ET)
-
-    inline atomicXor (mem data)
-        let memptr = (& mem)
-        let ET = (elementof (typeof memptr))
-        atomicrmw bxor memptr (imply data ET)
-
-    inline atomicMin (mem data)
-        let memptr = (& mem)
-        let ET = (elementof (typeof memptr))
-        atomicrmw
-            static-if (signed? ET) smin
-            else umin
-            \ memptr (imply data ET)
-
-    inline atomicMax (mem data)
-        let memptr = (& mem)
-        let ET = (elementof (typeof memptr))
-        atomicrmw
-            static-if (signed? ET) smax
-            else umax
-            \ memptr (imply data ET)
-
-    inline atomicExchange (mem data)
-        let memptr = (& mem)
-        let ET = (elementof (typeof memptr))
-        atomicrmw xchg memptr (imply data ET)
+    let
+        atomicExchange = (gen-atomic-func xchg)
+        atomicAdd = (gen-atomic-func add)
+        atomicAnd = (gen-atomic-func band)
+        atomicOr = (gen-atomic-func bor)
+        atomicXor = (gen-atomic-func bxor)
+        atomicMin = (gen-signed-atomic-func smin umin)
+        atomicMax = (gen-signed-atomic-func smax umax)
 
     scope .. (locals)
