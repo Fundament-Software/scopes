@@ -1399,6 +1399,11 @@ StoreRef Store::from(const TypedValueRef &value, const TypedValueRef &target, bo
     return ref(unknown_anchor(), new Store(value, target, is_volatile));
 }
 
+AtomicRMW::AtomicRMW(AtomicRMWOpKind _op, const TypedValueRef &_target, const TypedValueRef &_value)
+    : Instruction(VK_AtomicRMW, _value->get_type()), op(_op), target(_target), value(_value) {}
+AtomicRMWRef AtomicRMW::from(AtomicRMWOpKind op, const TypedValueRef &target, const TypedValueRef &value) {
+    return ref(unknown_anchor(), new AtomicRMW(op, target, value));
+}
 //------------------------------------------------------------------------------
 
 CastRef PtrToRef::from(const TypedValueRef &value) {

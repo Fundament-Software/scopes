@@ -992,6 +992,38 @@ struct Store : Instruction {
     bool is_volatile;
 };
 
+#define SCOPES_ATOMICRMW_OP_KIND() \
+    T(AtomicRMWOpXchg, OP_Xchg, "atomicrmw-kind-xchg") \
+    T(AtomicRMWOpAdd, OP_Add, "atomicrmw-kind-add") \
+    T(AtomicRMWOpSub, OP_Sub, "atomicrmw-kind-sub") \
+    T(AtomicRMWOpAnd, OP_BAnd, "atomicrmw-kind-band") \
+    T(AtomicRMWOpNAnd, OP_BNAnd, "atomicrmw-kind-bnand") \
+    T(AtomicRMWOpOr, OP_BOr, "atomicrmw-kind-bor") \
+    T(AtomicRMWOpXor, OP_BXor, "atomicrmw-kind-bxor") \
+    T(AtomicRMWOpSMin, OP_SMin, "atomicrmw-kind-smin") \
+    T(AtomicRMWOpSMax, OP_SMax, "atomicrmw-kind-smax") \
+    T(AtomicRMWOpUMin, OP_UMin, "atomicrmw-kind-umin") \
+    T(AtomicRMWOpUMax, OP_UMax, "atomicrmw-kind-umax") \
+    T(AtomicRMWOpFAdd, OP_FAdd, "atomicrmw-kind-fadd") \
+    T(AtomicRMWOpFSub, OP_FSub, "atomicrmw-kind-fsub") \
+
+
+enum AtomicRMWOpKind {
+#define T(NAME, OPNAME, BNAME) NAME,
+SCOPES_ATOMICRMW_OP_KIND()
+#undef T
+};
+
+struct AtomicRMW : Instruction {
+    static bool classof(const Value *T);
+
+    AtomicRMW(AtomicRMWOpKind op, const TypedValueRef &target, const TypedValueRef &value);
+    static AtomicRMWRef from(AtomicRMWOpKind op, const TypedValueRef &target, const TypedValueRef &value);
+    AtomicRMWOpKind op;
+    TypedValueRef target;
+    TypedValueRef value;
+};
+
 //------------------------------------------------------------------------------
 
 struct PtrToRef {

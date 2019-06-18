@@ -8,6 +8,7 @@ test-modules
     .test_ansi_colors
     .test_array
     .test_ast_quote
+    .test_atomic
     .test_bool
     .test_box
     .test_branch

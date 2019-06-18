@@ -261,6 +261,11 @@ namespace scopes {
     T(FN_ImageQueryLod, "Image-query-lod") \
     T(FN_ImageQueryLevels, "Image-query-levels") \
     T(FN_ImageQuerySamples, "Image-query-samples") \
+    T(FN_ImageTexelPointer, "Image-texel-pointer") \
+    T(OP_CmpXchg, "cmpxchg") \
+    T(OP_AtomicRMW, "atomicrmw") \
+    T(SYM_Atomic, "atomic") \
+    T(SYM_Volatile, "volatile") \
     T(OP_ICmpUGT, "icmp>u") \
     T(OP_ICmpUGE, "icmp>=u") \
     T(OP_ICmpULT, "icmp<u") \
@@ -339,6 +344,12 @@ namespace scopes {
     T(OP_FMul, "fmul") \
     T(OP_FDiv, "fdiv") \
     T(OP_FRem, "frem") \
+    T(OP_BNAnd, "bnand") \
+    T(OP_SMin, "smin") \
+    T(OP_SMax, "smax") \
+    T(OP_UMin, "umin") \
+    T(OP_UMax, "umax") \
+    T(OP_Xchg, "xchg") \
     T(OP_Tertiary, "?") \
     T(OP_FMix, "fmix") \
     T(OP_Step, "step") \
@@ -804,7 +815,7 @@ namespace scopes {
     T(SYM_Storage, "storage") \
     T(SYM_Buffer, "buffer") \
     T(SYM_Coherent, "coherent") \
-    T(SYM_Volatile, "volatile") \
+    /* T(SYM_Volatile, "volatile") */ \
     T(SYM_Restrict, "restrict") \
     T(SYM_ReadOnly, "readonly") \
     T(SYM_WriteOnly, "writeonly") \

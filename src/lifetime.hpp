@@ -12,10 +12,6 @@
 
 namespace scopes {
 
-struct ASTContext;
-
-SCOPES_RESULT(void) tag_instruction(const ASTContext &ctx, const InstructionRef &node);
-
 } // namespace scopes
 
 #endif // SCOPES_LIFETIME_HPP

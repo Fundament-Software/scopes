@@ -362,6 +362,8 @@ formatters:
         "codegen: image operator unsupported for this target") \
     T(CGenUnsupportedCastOp, \
         "codegen: cast operator unsupported for this target") \
+    T(CGenUnsupportedAtomicOp, \
+        "codegen: atomic operator unsupported for this target") \
     T(CGenUnsupportedTarget, \
         "codegen: unsupported target: %0", /* todo: list supported targets */ \
         Symbol) \

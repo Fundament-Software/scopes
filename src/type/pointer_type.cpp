@@ -100,7 +100,7 @@ uint64_t required_flags_for_storage_class(Symbol storage_class) {
     case SYM_Unnamed: return 0;
     case SYM_SPIRV_StorageClassUniformConstant: return PTF_NonWritable;
     case SYM_SPIRV_StorageClassInput: return PTF_NonWritable;
-    case SYM_SPIRV_StorageClassUniform: return PTF_NonWritable;
+    case SYM_SPIRV_StorageClassUniform: return 0;
     case SYM_SPIRV_StorageClassOutput: return PTF_NonReadable;
     case SYM_SPIRV_StorageClassWorkgroup: return 0;
     case SYM_SPIRV_StorageClassCrossWorkgroup: return 0;

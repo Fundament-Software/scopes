@@ -288,19 +288,19 @@ void ASTContext::merge_block(Block &_block) const {
 }
 
 SCOPES_RESULT(void) ASTContext::append(const InstructionRef &value) const {
-    SCOPES_RESULT_TYPE(void);
+    //SCOPES_RESULT_TYPE(void);
     assert(block);
     block->append(value);
-    SCOPES_CHECK_RESULT(tag_instruction(*this, value));
+    //SCOPES_CHECK_RESULT(tag_instruction(*this, value));
     function->try_bind_unique(value);
     return {};
 }
 
 SCOPES_RESULT(void) ASTContext::unchecked_append(const InstructionRef &value) const {
-    SCOPES_RESULT_TYPE(void);
+    //SCOPES_RESULT_TYPE(void);
     assert(block);
     block->append(value);
-    SCOPES_CHECK_RESULT(tag_instruction(*this, value));
+    //SCOPES_CHECK_RESULT(tag_instruction(*this, value));
     return {};
 }
 
@@ -1744,6 +1744,10 @@ static SCOPES_RESULT(void) build_deref_automove(
         assert(argn < argcount); \
         auto &&_ ## NAME = values[argn++]; \
         auto NAME = SCOPES_GET_RESULT(extract_type_constant(_ ## NAME));
+#define READ_BUILTIN_CONST(NAME) \
+        assert(argn < argcount); \
+        auto &&_ ## NAME = values[argn++]; \
+        auto NAME = SCOPES_GET_RESULT(extract_builtin_constant(_ ## NAME));
 #define READ_VECTOR_CONST(NAME) \
         assert(argn < argcount); \
         auto NAME = SCOPES_GET_RESULT(extract_vector_constant(values[argn++]));
@@ -2895,6 +2899,38 @@ repeat:
                 ctx.move(uq->id, call);
             }
             auto op = Store::from(_ElemT, _DestT, b.value() == FN_VolatileStore);
+            return TypedValueRef(call.anchor(), op);
+        } break;
+        case OP_AtomicRMW: {
+            CHECKARGS(3, 3);
+            READ_BUILTIN_CONST(Op);
+            READ_STORAGETYPEOF(DestT);
+            READ_STORAGETYPEOF(ElemT);
+            SCOPES_CHECK_RESULT(verify_kind<TK_Pointer>(DestT));
+            SCOPES_CHECK_RESULT(verify_readable(DestT));
+            SCOPES_CHECK_RESULT(verify_writable(DestT));
+            auto pi = cast<PointerType>(DestT);
+            auto ET = SCOPES_GET_RESULT(storage_type(pi->element_type));
+            SCOPES_CHECK_RESULT(verify(ET, ElemT));
+            if (!is_plain(typeof_DestT)) {
+                auto uq = try_unique(typeof_ElemT);
+                if (!uq) {
+                    SCOPES_ERROR(UniqueValueExpected, _ElemT->get_type());
+                }
+                ctx.move(uq->id, call);
+            }
+            AtomicRMWOpKind opkind;
+            switch(Op.value()) {
+            #define T(NAME, OPNAME, BNAME) \
+                case OPNAME: opkind = NAME; break;
+                SCOPES_ATOMICRMW_OP_KIND()
+            #undef T
+                default: {
+                    SCOPES_ERROR(UnsupportedBuiltin, Op);
+                } break;
+            }
+            auto op = AtomicRMW::from(opkind, _DestT, _ElemT);
+            op->hack_change_value(UNIQUETYPE1(op->get_type()));
             return TypedValueRef(call.anchor(), op);
         } break;
         case FN_Alloca: {

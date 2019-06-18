@@ -1520,6 +1520,35 @@ struct LLVMIRGenerator {
         return {};
     }
 
+    SCOPES_RESULT(void) translate_AtomicRMW(const AtomicRMWRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        auto ptr = SCOPES_GET_RESULT(ref_to_value(node->target));
+        auto value = SCOPES_GET_RESULT(ref_to_value(node->value));
+        LLVMAtomicRMWBinOp op;
+        switch(node->op) {
+        case AtomicRMWOpXchg: op = LLVMAtomicRMWBinOpXchg; break;
+        case AtomicRMWOpAdd: op = LLVMAtomicRMWBinOpAdd; break;
+        case AtomicRMWOpSub: op = LLVMAtomicRMWBinOpSub; break;
+        case AtomicRMWOpAnd: op = LLVMAtomicRMWBinOpAnd; break;
+        case AtomicRMWOpNAnd: op = LLVMAtomicRMWBinOpNand; break;
+        case AtomicRMWOpOr: op = LLVMAtomicRMWBinOpOr; break;
+        case AtomicRMWOpXor: op = LLVMAtomicRMWBinOpXor; break;
+        case AtomicRMWOpSMin: op = LLVMAtomicRMWBinOpMin; break;
+        case AtomicRMWOpSMax: op = LLVMAtomicRMWBinOpMax; break;
+        case AtomicRMWOpUMin: op = LLVMAtomicRMWBinOpUMin; break;
+        case AtomicRMWOpUMax: op = LLVMAtomicRMWBinOpUMax; break;
+        default: {
+            SCOPES_ERROR(CGenUnsupportedAtomicOp);
+        } break;
+        }
+        auto val = LLVMBuildAtomicRMW(builder, op,
+            ptr, value,
+            LLVMAtomicOrderingSequentiallyConsistent,
+            false);
+        map_phi({ val }, node);
+        return {};
+    }
+
     SCOPES_RESULT(void) translate_Annotate(const AnnotateRef &node) {
         return {};
     }

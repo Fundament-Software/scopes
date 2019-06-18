@@ -1267,6 +1267,45 @@ struct SPIRVGenerator {
         return {};
     }
 
+    SCOPES_RESULT(void) translate_AtomicRMW(const AtomicRMWRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        auto ty = SCOPES_GET_RESULT(type_to_spirv_type(node->get_type()));
+        auto ptr = SCOPES_GET_RESULT(ref_to_value(node->target));
+        auto value = SCOPES_GET_RESULT(ref_to_value(node->value));
+        spv::Op op = spv::OpMax;
+        switch(node->op) {
+        case AtomicRMWOpXchg: op = spv::OpAtomicExchange; break;
+        case AtomicRMWOpAdd: op = spv::OpAtomicIAdd; break;
+        case AtomicRMWOpSub: op = spv::OpAtomicISub; break;
+        case AtomicRMWOpAnd: op = spv::OpAtomicAnd; break;
+        case AtomicRMWOpOr: op = spv::OpAtomicOr; break;
+        case AtomicRMWOpXor: op = spv::OpAtomicXor; break;
+        case AtomicRMWOpSMin: op = spv::OpAtomicSMin; break;
+        case AtomicRMWOpSMax: op = spv::OpAtomicSMax; break;
+        case AtomicRMWOpUMin: op = spv::OpAtomicUMin; break;
+        case AtomicRMWOpUMax: op = spv::OpAtomicUMax; break;
+        default: {
+            SCOPES_ERROR(CGenUnsupportedAtomicOp);
+        } break;
+        }
+        auto instr = new spv::Instruction(builder.getUniqueId(), ty, op);
+        instr->addIdOperand(ptr);
+        auto scope = spv::ScopeCrossDevice;
+        auto memory_access =
+            (1 << spv::MemorySemanticsSequentiallyConsistentShift)
+            | (1 << spv::MemorySemanticsSubgroupMemoryShift)
+            | (1 << spv::MemorySemanticsWorkgroupMemoryShift)
+            | (1 << spv::MemorySemanticsCrossWorkgroupMemoryShift);
+        instr->addIdOperand(builder.makeUintConstant(scope));
+        instr->addIdOperand(builder.makeUintConstant(memory_access));
+        instr->addIdOperand(value);
+        builder.getBuildPoint()->addInstruction(
+            std::unique_ptr<spv::Instruction>(instr));
+        auto val = instr->getResultId();
+        map_phi({ val }, node);
+        return {};
+    }
+
     SCOPES_RESULT(void) translate_Annotate(const AnnotateRef &node) {
         return {};
     }
