@@ -348,4 +348,40 @@ do
     let packHalf2x16 = (extern 'glsl.std.450.PackHalf2x16 (function u32 vec2))
     let unpackHalf2x16 = (extern 'glsl.std.450.UnpackHalf2x16 (function vec2 u32))
 
+    inline atomicAdd (mem data)
+        let memptr = (& mem)
+        let ET = (elementof (typeof memptr))
+        atomicrmw add memptr (imply data ET)
+
+    inline atomicOr (mem data)
+        let memptr = (& mem)
+        let ET = (elementof (typeof memptr))
+        atomicrmw bor memptr (imply data ET)
+
+    inline atomicXor (mem data)
+        let memptr = (& mem)
+        let ET = (elementof (typeof memptr))
+        atomicrmw bxor memptr (imply data ET)
+
+    inline atomicMin (mem data)
+        let memptr = (& mem)
+        let ET = (elementof (typeof memptr))
+        atomicrmw
+            static-if (signed? ET) smin
+            else umin
+            \ memptr (imply data ET)
+
+    inline atomicMax (mem data)
+        let memptr = (& mem)
+        let ET = (elementof (typeof memptr))
+        atomicrmw
+            static-if (signed? ET) smax
+            else umax
+            \ memptr (imply data ET)
+
+    inline atomicExchange (mem data)
+        let memptr = (& mem)
+        let ET = (elementof (typeof memptr))
+        atomicrmw xchg memptr (imply data ET)
+
     scope .. (locals)

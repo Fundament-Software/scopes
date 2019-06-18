@@ -2956,6 +2956,14 @@ let
             fn "constant?" (args)
                 let value = (extract-single-arg args)
                 `[('constant? value)]
+    signed? =
+        make-const-type-property-function
+            fn (T)
+                if (== ('kind T) type-kind-integer)
+                    'signed? T
+                else
+                    hide-traceback;
+                    error "integer type expected"
     storageof = (make-const-type-property-function sc_type_storage)
     superof = (make-const-type-property-function sc_typename_type_get_super)
     sizeof = (make-const-type-property-function sc_type_sizeof)
