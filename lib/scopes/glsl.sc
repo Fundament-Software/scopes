@@ -360,8 +360,8 @@ do
     inline local_size (x y z)
         set-execution-mode! 'LocalSize x y z
 
-    let packHalf2x16 = (extern 'glsl.std.450.PackHalf2x16 (function u32 vec2))
-    let unpackHalf2x16 = (extern 'glsl.std.450.UnpackHalf2x16 (function vec2 u32))
+    let packHalf2x16 = (extern 'GLSL.std.450.PackHalf2x16 (function u32 vec2))
+    let unpackHalf2x16 = (extern 'GLSL.std.450.UnpackHalf2x16 (function vec2 u32))
 
     let
         atomicExchange = (gen-atomic-func xchg)

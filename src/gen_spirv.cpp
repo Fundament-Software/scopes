@@ -248,7 +248,7 @@ struct SPIRVGenerator {
         spv::Id result = 0;
         // prefix: GLSLstd450
         #define T(NAME) \
-            if (!strncmp(str->data, "glsl.std.450." #NAME, sizeof("glsl.std.450." #NAME))) { \
+            if (!strncmp(str->data, "GLSL.std.450." #NAME, sizeof("GLSL.std.450." #NAME))) { \
                 result = GLSLstd450 ## NAME; \
             } else
         SCOPES_GLSL_STD_450_FUNCS()
