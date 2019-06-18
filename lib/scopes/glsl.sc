@@ -372,4 +372,9 @@ do
         atomicMin = (gen-signed-atomic-func smin umin)
         atomicMax = (gen-signed-atomic-func smax umax)
 
+    inline atomicCompSwap (mem compare data)
+        let memptr = (& mem)
+        let ET = (elementof (typeof memptr))
+        cmpxchg memptr (imply compare ET) (imply data ET)
+
     scope .. (locals)

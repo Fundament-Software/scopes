@@ -61,7 +61,7 @@ fn fragment-shader ()
     let uv = uv.in
     let size = (textureSize smp 0)
     let color = (vec4 uv (make-phase) size.x)
-    let k j = (cmpxchg &m.value 10:u32 20:u32)
+    let k j = (atomicCompSwap m.value 10 20)
     if j
         true
     else;
