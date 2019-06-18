@@ -38,6 +38,90 @@ namespace scopes {
 
 #define SCOPES_GEN_TARGET "SPIR-V"
 
+// prefix: GLSLstd450
+#define SCOPES_GLSL_STD_450_FUNCS() \
+    T(Round) \
+    T(RoundEven) \
+    T(Trunc) \
+    T(FAbs) \
+    T(SAbs) \
+    T(FSign) \
+    T(SSign) \
+    T(Floor) \
+    T(Ceil) \
+    T(Fract) \
+    T(Radians) \
+    T(Degrees) \
+    T(Sin) \
+    T(Cos) \
+    T(Tan) \
+    T(Asin) \
+    T(Acos) \
+    T(Atan) \
+    T(Sinh) \
+    T(Cosh) \
+    T(Tanh) \
+    T(Asinh) \
+    T(Acosh) \
+    T(Atanh) \
+    T(Atan2) \
+    T(Pow) \
+    T(Exp) \
+    T(Log) \
+    T(Exp2) \
+    T(Log2) \
+    T(Sqrt) \
+    T(InverseSqrt) \
+    T(Determinant) \
+    T(MatrixInverse) \
+    T(Modf) \
+    T(ModfStruct) \
+    T(FMin) \
+    T(UMin) \
+    T(SMin) \
+    T(FMax) \
+    T(UMax) \
+    T(SMax) \
+    T(FClamp) \
+    T(UClamp) \
+    T(SClamp) \
+    T(FMix) \
+    T(IMix) \
+    T(Step) \
+    T(SmoothStep) \
+    T(Fma) \
+    T(Frexp) \
+    T(FrexpStruct) \
+    T(Ldexp) \
+    T(PackSnorm4x8) \
+    T(PackUnorm4x8) \
+    T(PackSnorm2x16) \
+    T(PackUnorm2x16) \
+    T(PackHalf2x16) \
+    T(PackDouble2x32) \
+    T(UnpackSnorm2x16) \
+    T(UnpackUnorm2x16) \
+    T(UnpackHalf2x16) \
+    T(UnpackSnorm4x8) \
+    T(UnpackUnorm4x8) \
+    T(UnpackDouble2x32) \
+    T(Length) \
+    T(Distance) \
+    T(Cross) \
+    T(Normalize) \
+    T(FaceForward) \
+    T(Reflect) \
+    T(Refract) \
+    T(FindILsb) \
+    T(FindSMsb) \
+    T(FindUMsb) \
+    T(InterpolateAtCentroid) \
+    T(InterpolateAtSample) \
+    T(InterpolateAtOffset) \
+    T(NMin) \
+    T(NMax) \
+    T(NClamp) \
+
 //------------------------------------------------------------------------------
 // IL->SPIR-V GENERATOR
 //------------------------------------------------------------------------------
@@ -145,26 +229,7 @@ struct SPIRVGenerator {
 
     std::unordered_map<int, ExecutionMode *> execution_modes;
 
-#if 0
-    static LLVMTypeRef voidT;
-    static LLVMTypeRef i1T;
-    static LLVMTypeRef i8T;
-    static LLVMTypeRef i16T;
-    static LLVMTypeRef i32T;
-    static LLVMTypeRef i64T;
-    static LLVMTypeRef f32T;
-    static LLVMTypeRef f32x2T;
-    static LLVMTypeRef f64T;
-    static LLVMTypeRef rawstringT;
-    static LLVMTypeRef noneT;
-    static LLVMValueRef noneV;
-    static LLVMValueRef falseV;
-    static LLVMValueRef trueV;
-    static LLVMAttributeRef attr_byval;
-    static LLVMAttributeRef attr_sret;
-    static LLVMAttributeRef attr_nonnull;
-    LLVMValueRef intrinsics[NumIntrinsics];
-#endif
+    std::unordered_map<Symbol, spv::Id, Symbol::Hash> intrinsics;
 
     spv::SpvBuildLogger logger;
     spv::Builder builder;
@@ -174,6 +239,27 @@ struct SPIRVGenerator {
     bool use_debug_info;
     FunctionRef active_function;
     int functions_generated;
+
+    spv::Id get_intrinsic(Symbol name) {
+        auto it = intrinsics.find(name);
+        if (it != intrinsics.end())
+            return it->second;
+        auto str = name.name();
+        spv::Id result = 0;
+        // prefix: GLSLstd450
+        #define T(NAME) \
+            if (!strncmp(str->data, "glsl.std.450." #NAME, sizeof("glsl.std.450." #NAME))) { \
+                result = GLSLstd450 ## NAME; \
+            } else
+        SCOPES_GLSL_STD_450_FUNCS()
+        #undef T
+        /* else */ {}
+        if (result) {
+            intrinsics.insert({name, result});
+        }
+        return result;
+
+    }
 
     static const Type *arguments_to_tuple(const Type *T) {
         if (isa<ArgumentsType>(T)) {
@@ -973,13 +1059,31 @@ struct SPIRVGenerator {
         if (!is_function_pointer(rtype)) {
             SCOPES_ERROR(CGenInvalidCallee, callee->get_type());
         }
-        auto func =
-            SCOPES_GET_RESULT(Function_to_function(
-                SCOPES_GET_RESULT(
-                    extract_function_constant(callee))));
-        SCOPES_CHECK_RESULT(build_call(call,
-            extract_function_type(rtype),
-            func, args));
+        if (callee.isa<Global>()) {
+            auto name = callee.cast<Global>()->name;
+            int ep = get_intrinsic(name);
+            if (!ep) {
+                SCOPES_ERROR(CGenUnsupportedIntrinsic, name);
+            }
+            auto ty = SCOPES_GET_RESULT(type_to_spirv_type(call->get_type()));
+            size_t argcount = args.size();
+            Ids values;
+            values.reserve(argcount);
+            for (size_t i = 0; i < argcount; ++i) {
+                values.push_back(SCOPES_GET_RESULT(ref_to_value(args[i])));
+            }
+            auto val = builder.createBuiltinCall(
+                ty, glsl_ext_inst, ep, values);
+            map_phi({ val }, call);
+        } else {
+            auto func =
+                SCOPES_GET_RESULT(Function_to_function(
+                    SCOPES_GET_RESULT(
+                        extract_function_constant(callee))));
+            SCOPES_CHECK_RESULT(build_call(call,
+                extract_function_type(rtype),
+                func, args));
+        }
         return {};
     }
 

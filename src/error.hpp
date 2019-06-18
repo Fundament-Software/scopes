@@ -401,6 +401,9 @@ formatters:
     T(CGenUnsupportedPointerStorageClass, \
         "codegen: unsupported pointer storage class: %0", \
         Symbol) \
+    T(CGenUnsupportedIntrinsic, \
+        "codegen: unspported intrinsic function: '%0'", \
+        Symbol) \
     T(CGenEntryFunctionSignatureMismatch, \
         "codegen: entry function must have type %0 but has type %1", \
         PType, PType) \

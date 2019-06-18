@@ -44,6 +44,7 @@ uniform smp : sampler2D
     location = 2
 
 out out_Color : vec4
+out out_UInt : u32
 
 fn make-phase ()
     (sin phase) * 0.5 + 0.5
@@ -52,6 +53,8 @@ fn fragment-shader ()
     let uv = uv.in
     let size = (textureSize smp 0)
     let color = (vec4 uv (make-phase) size.x)
+    # use of intrinsic
+    out_UInt = (packHalf2x16 uv)
     out_Color = (color * (texture smp uv))
     return;
 
