@@ -1742,6 +1742,18 @@ struct SPIRVGenerator {
         assert(cond);
         auto bbthen = &builder.makeNewBlock();
         auto bbelse = &builder.makeNewBlock();
+
+        spv::Block *merge_block = nullptr;
+        for (auto it = label_info_stack.rbegin(); it != label_info_stack.rend(); ++it) {
+            if (it->label->splitpoints.count(node.unref()) && it->bb_merge) {
+                merge_block = it->bb_merge;
+                break;
+            }
+        }
+
+        if (merge_block) {
+            builder.createSelectionMerge(merge_block, 0);
+        }
         builder.createConditionalBranch(cond, bbthen, bbelse);
 
         // write then-block

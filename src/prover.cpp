@@ -3277,7 +3277,8 @@ repeat:
     return TypedValueRef(newcall);
 }
 
-static LabelRef make_merge_label(const ASTContext &ctx, const Anchor *anchor) {
+static LabelRef make_merge_label(
+    const ASTContext &ctx, const Anchor *anchor) {
     LabelRef merge_label = ref(anchor, Label::from(LK_BranchMerge));
     merge_label->body.set_parent(ctx.block);
     return merge_label;
@@ -3335,6 +3336,7 @@ static SCOPES_RESULT(TypedValueRef) prove_SwitchTemplate(const ASTContext &ctx,
     auto _switch = ref(node.anchor(), Switch::from(newexpr));
 
     LabelRef merge_label = make_merge_label(ctx, node.anchor());
+    merge_label->splitpoints.insert(_switch.unref());
 
     ASTContext subctx = ctx.with_block(merge_label->body);
     SCOPES_CHECK_RESULT(subctx.append(_switch));
@@ -3415,6 +3417,7 @@ static SCOPES_RESULT(TypedValueRef) prove_If(const ASTContext &ctx, const IfRef 
             CondBrRef condbr = ref(newcond.anchor(), CondBr::from(newcond));
             if (!first_condbr) {
                 first_condbr = condbr;
+                merge_label->splitpoints.insert(condbr.unref());
             }
             condbr->then_body.set_parent(&merge_label->body);
             condbr->else_body.set_parent(&merge_label->body);

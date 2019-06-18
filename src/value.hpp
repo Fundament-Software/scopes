@@ -514,6 +514,7 @@ struct Label : Instruction {
     Block body;
     Merges merges;
     LabelKind label_kind;
+    std::unordered_set<TypedValue *> splitpoints;
 };
 
 const char *get_label_kind_name(LabelKind kind);
