@@ -1024,6 +1024,17 @@ struct AtomicRMW : Instruction {
     TypedValueRef value;
 };
 
+struct CmpXchg : Instruction {
+    static bool classof(const Value *T);
+
+    CmpXchg(const TypedValueRef &target, const TypedValueRef &cmp, const TypedValueRef &value);
+    static CmpXchgRef from(const TypedValueRef &target, const TypedValueRef &cmp, const TypedValueRef &value);
+    TypedValueRef target;
+    TypedValueRef cmp;
+    TypedValueRef value;
+};
+
+
 //------------------------------------------------------------------------------
 
 struct PtrToRef {

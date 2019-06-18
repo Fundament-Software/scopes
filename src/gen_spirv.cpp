@@ -1410,6 +1410,37 @@ struct SPIRVGenerator {
         return {};
     }
 
+    SCOPES_RESULT(void) translate_CmpXchg(const CmpXchgRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        auto T = node->get_type();
+        auto ty = SCOPES_GET_RESULT(type_to_spirv_type(get_argument(T, 0)));
+        auto ptr = SCOPES_GET_RESULT(ref_to_value(node->target));
+        auto cmp = SCOPES_GET_RESULT(ref_to_value(node->cmp));
+        auto value = SCOPES_GET_RESULT(ref_to_value(node->value));
+        auto instr = new spv::Instruction(builder.getUniqueId(), ty,
+            spv::OpAtomicCompareExchange);
+        instr->addIdOperand(ptr);
+        auto scope = spv::ScopeCrossDevice;
+        auto memory_access =
+            (1 << spv::MemorySemanticsSequentiallyConsistentShift)
+            | (1 << spv::MemorySemanticsSubgroupMemoryShift)
+            | (1 << spv::MemorySemanticsWorkgroupMemoryShift)
+            | (1 << spv::MemorySemanticsCrossWorkgroupMemoryShift);
+        instr->addIdOperand(builder.makeUintConstant(scope));
+        instr->addIdOperand(builder.makeUintConstant(memory_access));
+        instr->addIdOperand(builder.makeUintConstant(memory_access));
+        instr->addIdOperand(value);
+        instr->addIdOperand(cmp);
+        builder.getBuildPoint()->addInstruction(
+            std::unique_ptr<spv::Instruction>(instr));
+        auto val = instr->getResultId();
+        auto eq = builder.createBinOp(
+            (is_bool(cmp)?spv::OpLogicalEqual:spv::OpIEqual),
+            builder.makeBoolType(), val, cmp);
+        map_phi({ val, eq }, node);
+        return {};
+    }
+
     SCOPES_RESULT(void) translate_Annotate(const AnnotateRef &node) {
         return {};
     }

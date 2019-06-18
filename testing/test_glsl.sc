@@ -1,6 +1,7 @@
 
 using import glm
 using import glsl
+using import struct
 
 let screen-tri-vertices =
     arrayof vec2
@@ -43,6 +44,13 @@ uniform phase : f32
 uniform smp : sampler2D
     location = 2
 
+
+
+buffer m :
+    struct MutableData plain
+        value : u32
+    binding = 5
+
 out out_Color : vec4
 out out_UInt : u32
 
@@ -53,6 +61,10 @@ fn fragment-shader ()
     let uv = uv.in
     let size = (textureSize smp 0)
     let color = (vec4 uv (make-phase) size.x)
+    let k j = (cmpxchg &m.value 10:u32 20:u32)
+    if j
+        true
+    else;
     # use of intrinsic
     out_UInt = (packHalf2x16 uv)
     out_Color = (color * (texture smp uv))

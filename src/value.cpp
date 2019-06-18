@@ -1400,10 +1400,19 @@ StoreRef Store::from(const TypedValueRef &value, const TypedValueRef &target, bo
 }
 
 AtomicRMW::AtomicRMW(AtomicRMWOpKind _op, const TypedValueRef &_target, const TypedValueRef &_value)
-    : Instruction(VK_AtomicRMW, _value->get_type()), op(_op), target(_target), value(_value) {}
+    : Instruction(VK_AtomicRMW, value_type_at_index(_target->get_type(),0)), op(_op), target(_target), value(_value) {}
 AtomicRMWRef AtomicRMW::from(AtomicRMWOpKind op, const TypedValueRef &target, const TypedValueRef &value) {
     return ref(unknown_anchor(), new AtomicRMW(op, target, value));
 }
+
+CmpXchg::CmpXchg(const TypedValueRef &_target, const TypedValueRef &_cmp, const TypedValueRef &_value)
+    : Instruction(VK_CmpXchg,
+        arguments_type({value_type_at_index(_target->get_type(),0), TYPE_Bool})),
+        target(_target), cmp(_cmp), value(_value) {}
+CmpXchgRef CmpXchg::from(const TypedValueRef &target, const TypedValueRef &cmp, const TypedValueRef &value) {
+    return ref(unknown_anchor(), new CmpXchg(target, cmp, value));
+}
+
 //------------------------------------------------------------------------------
 
 CastRef PtrToRef::from(const TypedValueRef &value) {

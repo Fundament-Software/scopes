@@ -2901,6 +2901,30 @@ repeat:
             auto op = Store::from(_ElemT, _DestT, b.value() == FN_VolatileStore);
             return TypedValueRef(call.anchor(), op);
         } break;
+        case OP_CmpXchg: {
+            CHECKARGS(3, 3);
+            READ_STORAGETYPEOF(DestT);
+            READ_STORAGETYPEOF(Cmp);
+            READ_STORAGETYPEOF(ElemT);
+            SCOPES_CHECK_RESULT(verify_kind<TK_Pointer>(DestT));
+            SCOPES_CHECK_RESULT(verify_readable(DestT));
+            SCOPES_CHECK_RESULT(verify_writable(DestT));
+            auto pi = cast<PointerType>(DestT);
+            auto ET = SCOPES_GET_RESULT(storage_type(pi->element_type));
+            SCOPES_CHECK_RESULT(verify(ET, Cmp));
+            SCOPES_CHECK_RESULT(verify(ET, ElemT));
+            if (!is_plain(typeof_DestT)) {
+                auto uq = try_unique(typeof_ElemT);
+                if (!uq) {
+                    SCOPES_ERROR(UniqueValueExpected, _ElemT->get_type());
+                }
+                ctx.move(uq->id, call);
+            }
+            auto op = CmpXchg::from(_DestT, _Cmp, _ElemT);
+            auto T = op->get_type();
+            op->hack_change_value(UNIQUETYPE2(get_argument(T, 0), get_argument(T, 1)));
+            return TypedValueRef(call.anchor(), op);
+        } break;
         case OP_AtomicRMW: {
             CHECKARGS(3, 3);
             READ_BUILTIN_CONST(Op);

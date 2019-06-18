@@ -1549,6 +1549,22 @@ struct LLVMIRGenerator {
         return {};
     }
 
+    SCOPES_RESULT(void) translate_CmpXchg(const CmpXchgRef &node) {
+        SCOPES_RESULT_TYPE(void);
+        auto ptr = SCOPES_GET_RESULT(ref_to_value(node->target));
+        auto cmp = SCOPES_GET_RESULT(ref_to_value(node->cmp));
+        auto value = SCOPES_GET_RESULT(ref_to_value(node->value));
+        auto val = LLVMBuildAtomicCmpXchg(builder,
+            ptr, cmp, value,
+            LLVMAtomicOrderingSequentiallyConsistent,
+            LLVMAtomicOrderingSequentiallyConsistent,
+            false);
+        auto val0 = LLVMBuildExtractValue(builder, val, 0, "");
+        auto val1 = LLVMBuildExtractValue(builder, val, 1, "");
+        map_phi({ val0, val1 }, node);
+        return {};
+    }
+
     SCOPES_RESULT(void) translate_Annotate(const AnnotateRef &node) {
         return {};
     }
