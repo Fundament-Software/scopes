@@ -2506,6 +2506,11 @@ SCOPES_COMPILER_FLAGS()
 SCOPES_COMPILER_FILE_KIND()
 #undef T
 
+#define T(NAME, SNAME) \
+    bind_new_value(Symbol(SNAME), \
+        ConstInt::from(TYPE_I32, NAME));
+SCOPES_BARRIER_KIND()
+#undef T
 #define T(NAME, STR) bind_new_value(NAME, ConstInt::builtin_from(Builtin(NAME)));
 #define T0(NAME, STR) bind_new_value(NAME, ConstInt::builtin_from(Builtin(NAME)));
 #define T1 T2

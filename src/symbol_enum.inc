@@ -263,6 +263,7 @@ namespace scopes {
     T(FN_ImageQuerySamples, "Image-query-samples") \
     T(FN_ImageTexelPointer, "Image-texel-pointer") \
     T(OP_CmpXchg, "cmpxchg") \
+    T(OP_Barrier, "__barrier") \
     T(OP_AtomicRMW, "atomicrmw") \
     T(SYM_Atomic, "atomic") \
     T(SYM_Volatile, "volatile") \

@@ -1441,6 +1441,66 @@ struct SPIRVGenerator {
         return {};
     }
 
+    SCOPES_RESULT(void) translate_Barrier(const BarrierRef &node) {
+        //SCOPES_RESULT_TYPE(void);
+
+        // these are pretty much just hacked together to make SPIRV-Cross
+        // emit the right instruction. it's possibly all wrong.
+
+        spv::Scope execution = spv::ScopeCrossDevice;
+        spv::Scope memory_scope = spv::ScopeCrossDevice;
+        unsigned memory_semantics = 0;
+        bool control = false;
+
+        switch(node->kind) {
+        case BarrierControl: {
+            execution = spv::ScopeWorkgroup;
+            memory_scope = spv::ScopeDevice;
+            control = true;
+        } break;
+        case BarrierMemory: {
+            execution = spv::ScopeDevice;
+            memory_semantics =
+                spv::MemorySemanticsSequentiallyConsistentMask
+                | spv::MemorySemanticsUniformMemoryMask
+                | spv::MemorySemanticsSubgroupMemoryMask
+                | spv::MemorySemanticsWorkgroupMemoryMask
+                | spv::MemorySemanticsCrossWorkgroupMemoryMask
+                | spv::MemorySemanticsAtomicCounterMemoryMask
+                | spv::MemorySemanticsImageMemoryMask;
+        } break;
+        case BarrierMemoryGroup: {
+            execution = spv::ScopeWorkgroup;
+            memory_semantics = spv::MemorySemanticsCrossWorkgroupMemoryMask;
+        } break;
+        case BarrierMemoryImage: {
+            execution = spv::ScopeDevice;
+            memory_semantics = spv::MemorySemanticsImageMemoryMask;
+        } break;
+        case BarrierMemoryBuffer: {
+            execution = spv::ScopeDevice;
+            memory_semantics = spv::MemorySemanticsUniformMemoryMask;
+        } break;
+        case BarrierMemoryShared: {
+            execution = spv::ScopeDevice;
+            memory_semantics = spv::MemorySemanticsWorkgroupMemoryMask;
+        } break;
+        default: {
+            // ignore
+            return {};
+        } break;
+        }
+
+        if (control) {
+            builder.createControlBarrier(execution, memory_scope,
+                (spv::MemorySemanticsMask)memory_semantics);
+        } else {
+            builder.createMemoryBarrier(execution, memory_semantics);
+        }
+
+        return {};
+    }
+
     SCOPES_RESULT(void) translate_Annotate(const AnnotateRef &node) {
         return {};
     }

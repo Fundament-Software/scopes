@@ -2957,6 +2957,12 @@ repeat:
             op->hack_change_value(UNIQUETYPE1(op->get_type()));
             return TypedValueRef(call.anchor(), op);
         } break;
+        case OP_Barrier: {
+            CHECKARGS(1, 1);
+            READ_INT_CONST(kind);
+            auto op = Barrier::from((BarrierKind)kind);
+            return TypedValueRef(call.anchor(), op);
+        } break;
         case FN_Alloca: {
             CHECKARGS(1, 1);
             READ_TYPE_CONST(T);

@@ -79,6 +79,23 @@ print
         #'dump-disassembly
         #'no-opts
 
+fn compute-shader ()
+    local_size 1 1 1
+    barrier;
+    memoryBarrier;
+    groupMemoryBarrier;
+    memoryBarrierImage;
+    memoryBarrierBuffer;
+    memoryBarrierShared;
+
+
+print
+    compile-glsl 0 'compute
+        typify compute-shader
+        #'dump-disassembly
+        #'no-opts
+
+
 # TODO: fix this case
 #let default-vs =
     do

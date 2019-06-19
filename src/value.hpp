@@ -1036,6 +1036,29 @@ struct CmpXchg : Instruction {
 };
 
 
+#define SCOPES_BARRIER_KIND() \
+    T(BarrierControl, "barrier-kind-control") \
+    T(BarrierMemory, "barrier-kind-memory") \
+    T(BarrierMemoryGroup, "barrier-kind-memory-group") \
+    T(BarrierMemoryImage, "barrier-kind-memory-image") \
+    T(BarrierMemoryBuffer, "barrier-kind-memory-buffer") \
+    T(BarrierMemoryShared, "barrier-kind-memory-shared") \
+
+
+enum BarrierKind {
+#define T(NAME, BNAME) NAME,
+SCOPES_BARRIER_KIND()
+#undef T
+};
+
+struct Barrier : Instruction {
+    static bool classof(const Value *T);
+
+    Barrier(BarrierKind _kind);
+    static BarrierRef from(BarrierKind kind);
+    BarrierKind kind;
+};
+
 //------------------------------------------------------------------------------
 
 struct PtrToRef {

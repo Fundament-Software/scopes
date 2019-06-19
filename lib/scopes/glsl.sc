@@ -412,4 +412,17 @@ do
         let ET = (elementof (typeof memptr))
         cmpxchg memptr (imply compare ET) (imply data ET)
 
+    inline barrier ()
+        __barrier barrier-kind-control
+    inline memoryBarrier ()
+        __barrier barrier-kind-memory
+    inline groupMemoryBarrier ()
+        __barrier barrier-kind-memory-group
+    inline memoryBarrierImage ()
+        __barrier barrier-kind-memory-image
+    inline memoryBarrierBuffer ()
+        __barrier barrier-kind-memory-buffer
+    inline memoryBarrierShared ()
+        __barrier barrier-kind-memory-shared
+
     scope .. (locals)

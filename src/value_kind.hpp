@@ -74,6 +74,7 @@ namespace scopes {
     T(VK_Store, "value-kind-store", Store) \
     T(VK_AtomicRMW, "value-kind-atomicrmw", AtomicRMW) \
     T(VK_CmpXchg, "value-kind-cmpxchg", CmpXchg) \
+    T(VK_Barrier, "value-kind-barrier", Barrier) \
     T(VK_ICmp, "value-kind-icmp", ICmp) \
     T(VK_FCmp, "value-kind-fcmp", FCmp) \
     T(VK_UnOp, "value-kind-unop", UnOp) \

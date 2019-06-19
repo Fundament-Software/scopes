@@ -1565,6 +1565,12 @@ struct LLVMIRGenerator {
         return {};
     }
 
+    SCOPES_RESULT(void) translate_Barrier(const BarrierRef &node) {
+        //SCOPES_RESULT_TYPE(void);
+        // just ignore
+        return {};
+    }
+
     SCOPES_RESULT(void) translate_Annotate(const AnnotateRef &node) {
         return {};
     }

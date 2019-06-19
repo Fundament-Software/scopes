@@ -1413,6 +1413,12 @@ CmpXchgRef CmpXchg::from(const TypedValueRef &target, const TypedValueRef &cmp, 
     return ref(unknown_anchor(), new CmpXchg(target, cmp, value));
 }
 
+Barrier::Barrier(BarrierKind _kind)
+    : Instruction(VK_Barrier, empty_arguments_type()), kind(_kind) {}
+BarrierRef Barrier::from(BarrierKind kind) {
+    return ref(unknown_anchor(), new Barrier(kind));
+}
+
 //------------------------------------------------------------------------------
 
 CastRef PtrToRef::from(const TypedValueRef &value) {
