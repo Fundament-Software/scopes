@@ -323,11 +323,16 @@ do
         uniform = (gen-xvar-sugar "uniform" (wrap-xvar-global config-uniform))
         inout = (gen-xvar-sugar "inout" config-inout)
 
+        # gl_PerVertex
         gl_Position = (ptrtoref (extern 'spirv.Position vec4 (storage-class = 'Output)))
+        gl_PointSize = (ptrtoref (extern 'spirv.PointSize f32 (storage-class = 'Output)))
+        gl_ClipDistance = (ptrtoref (extern 'spirv.ClipDistance (array f32) (storage-class = 'Output)))
+
         gl_FragDepth = (ptrtoref (extern 'spirv.FragDepth f32 (storage-class = 'Output)))
 
         gl_FragCoord = (ptrtoref (extern 'spirv.FragCoord vec4 (storage-class = 'Input)))
         gl_VertexID = (ptrtoref (extern 'spirv.VertexId i32 (storage-class = 'Input)))
+        gl_InstanceID = (ptrtoref (extern 'spirv.InstanceId i32 (storage-class = 'Input)))
 
         gl_NumWorkGroups = (ptrtoref (extern 'spirv.NumWorkgroups uvec3 (storage-class = 'Input)))
         gl_WorkGroupID = (ptrtoref (extern 'spirv.WorkgroupId uvec3 (storage-class = 'Input)))
