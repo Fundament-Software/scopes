@@ -1708,12 +1708,18 @@ struct SPIRVGenerator {
     SCOPES_RESULT(void) translate_Cast(const CastRef &node) {
         SCOPES_RESULT_TYPE(void);
         auto val = SCOPES_GET_RESULT(ref_to_value(node->value));
+        // prevent generating type
+        switch(node->op) {
+        case CastPtrToRef:
+        case CastRefToPtr:
+            map_phi({ val }, node);
+            return {};
+        default: break;
+        };
         auto ty = SCOPES_GET_RESULT(type_to_spirv_type(node->get_type()));
         if (builder.getTypeId(val) != ty) {
             spv::Op op = spv::Op::OpMax;
             switch(node->op) {
-            case CastPtrToRef: break;
-            case CastRefToPtr: break;
 #define CAST_OP(SRC, OP) case SRC: op = OP; break;
             CAST_OP(CastBitcast, spv::OpBitcast)
             CAST_OP(CastIntToPtr, spv::OpConvertUToPtr)
