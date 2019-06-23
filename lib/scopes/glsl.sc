@@ -336,6 +336,12 @@ inline gen-signed-atomic-func (sop uop)
             \ memptr (imply data ET)
 
 let
+    ceil_f32 = (extern 'GLSL.std.450.Ceil (function f32 f32))
+    ceil_vec2 = (extern 'GLSL.std.450.Ceil (function vec2 vec2))
+    ceil_vec3 = (extern 'GLSL.std.450.Ceil (function vec3 vec3))
+    ceil_vec4 = (extern 'GLSL.std.450.Ceil (function vec4 vec4))
+
+let
     FindILsb_u32 = (extern 'GLSL.std.450.FindILsb (function u32 u32))
     FindILsb_uvec2 = (extern 'GLSL.std.450.FindILsb (function uvec2 uvec2))
     FindILsb_uvec3 = (extern 'GLSL.std.450.FindILsb (function uvec3 uvec3))
@@ -433,6 +439,16 @@ do
         FindILsb_ivec3 value
     case (value : ivec4,)
         FindILsb_ivec4 value
+
+    inline... ceil
+    case (value : f32,)
+        ceil_f32 value
+    case (value : vec2,)
+        ceil_vec2 value
+    case (value : vec3,)
+        ceil_vec3 value
+    case (value : vec4,)
+        ceil_vec4 value
 
     let
         atomicExchange = (gen-atomic-func xchg)
