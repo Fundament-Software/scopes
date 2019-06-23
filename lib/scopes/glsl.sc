@@ -189,6 +189,20 @@ inline make-sampler (prefix return-type postfix dim arrayed ms coords)
     typedef (.. prefix "sampler" postfix) < super : storage
 
 let scope = (Scope)
+
+va-map
+    inline (postfix)
+        va-map 
+            inline (prefix)
+                let name = 
+                    Symbol (.. prefix postfix)
+                'bind scope name name
+            \ "R" "Rg" "Rgba"
+
+    \ "8" "8i" "8ui" "8Snorm"
+    \ "16" "16i" "16ui" "16f" "16Snorm"
+    \ "32" "32i" "32ui" "32f"
+
 build-dims
     inline (postfix dim arrayed ms coords)
         let T = (make-gsampler postfix dim arrayed ms coords)
