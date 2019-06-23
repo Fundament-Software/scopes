@@ -620,10 +620,14 @@ FunctionRef Function::from(Symbol name,
 
 static const Type *pointer_for_global_type(const Type *type, size_t flags, Symbol storage_class) {
     size_t ptrflags = 0;
-    if (flags & GF_NonWritable)
-        ptrflags |= PTF_NonWritable;
-    else if (flags & GF_NonReadable)
-        ptrflags |= PTF_NonReadable;
+    if (storage_class == SYM_SPIRV_StorageClassUniformConstant) {
+        // regular uniforms are always readonly, even though the underlying sampler may have other flags
+    } else {
+        if (flags & GF_NonWritable)
+            ptrflags |= PTF_NonWritable;
+        else if (flags & GF_NonReadable)
+            ptrflags |= PTF_NonReadable;
+    }
     return pointer_type(type, ptrflags, storage_class);
 }
 

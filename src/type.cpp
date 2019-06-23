@@ -241,7 +241,7 @@ bool is_opaque(const Type *T) {
         }
     } break;
     case TK_Arguments:
-    case TK_Image:
+    //case TK_Image: // can be loaded
     //case TK_SampledImage: // can be loaded
     case TK_Function: return true;
     default: break;
