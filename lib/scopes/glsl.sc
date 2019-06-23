@@ -190,23 +190,40 @@ inline make-sampler (prefix return-type postfix dim arrayed ms coords)
 
 let scope = (Scope)
 
-va-map
-    inline (postfix)
-        va-map 
-            inline (prefix)
-                let name = 
-                    Symbol (.. prefix postfix)
-                'bind scope name name
-            \ "R" "Rg" "Rgba"
+do
+    let srcpostfixes... =
+        \ "8" "8i" "8ui" "8Snorm"
+        \ "16" "16i" "16ui" "16f" "16Snorm"
+        \ "32" "32i" "32ui" "32f"
 
-    \ "8" "8i" "8ui" "8Snorm"
-    \ "16" "16i" "16ui" "16f" "16Snorm"
-    \ "32" "32i" "32ui" "32f"
+    let dstpostfixes... = 
+        \ "8" "8i" "8ui" "8_snorm"
+        \ "16" "16i" "16ui" "16f" "16_snorm"
+        \ "32" "32i" "32ui" "32f"
 
-build-dims
-    inline (postfix dim arrayed ms coords)
-        let T = (make-gsampler postfix dim arrayed ms coords)
-        'bind scope (Symbol ('string T)) T
+    let srcprefixes... =
+        \ "R" "Rg" "Rgba"
+    let dstprefixes... =
+        \ "r" "rg" "rgba"
+
+    va-map
+        inline (i)
+            let srcpostfix = (va@ i srcpostfixes...)
+            let dstpostfix = (va@ i dstpostfixes...)
+            va-map 
+                inline (k)
+                    let srcprefix = (va@ k srcprefixes...)
+                    let dstprefix = (va@ k dstprefixes...)
+                    let srcname = (Symbol (.. srcprefix srcpostfix))
+                    let dstname = (Symbol (.. dstprefix dstpostfix))
+                    'bind scope dstname srcname
+                va-range (va-countof srcprefixes...)
+        va-range (va-countof srcpostfixes...)
+
+    build-dims
+        inline (postfix dim arrayed ms coords)
+            let T = (make-gsampler postfix dim arrayed ms coords)
+            'bind scope (Symbol ('string T)) T
 
 build-rtypes
     inline (prefix return-type)
