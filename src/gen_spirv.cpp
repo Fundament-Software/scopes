@@ -1571,7 +1571,8 @@ struct SPIRVGenerator {
         case FCmpOLT: op = spv::OpFOrdLessThan; break;
         case FCmpOLE: op = spv::OpFOrdLessThanEqual; break;
         case FCmpUEQ: op = spv::OpFUnordEqual; break;
-        case FCmpUNE: op = spv::OpFUnordNotEqual; break;
+        //case FCmpUNE: op = spv::OpFUnordNotEqual; break; // not supported
+        case FCmpUNE: op = spv::OpFOrdNotEqual; break;
         case FCmpUNO: op = spv::OpUnordered; break;
         case FCmpUGT: op = spv::OpFUnordGreaterThan; break;
         case FCmpUGE: op = spv::OpFUnordGreaterThanEqual; break;
