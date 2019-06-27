@@ -196,7 +196,7 @@ do
         \ "16" "16i" "16ui" "16f" "16Snorm"
         \ "32" "32i" "32ui" "32f"
 
-    let dstpostfixes... = 
+    let dstpostfixes... =
         \ "8" "8i" "8ui" "8_snorm"
         \ "16" "16i" "16ui" "16f" "16_snorm"
         \ "32" "32i" "32ui" "32f"
@@ -210,7 +210,7 @@ do
         inline (i)
             let srcpostfix = (va@ i srcpostfixes...)
             let dstpostfix = (va@ i dstpostfixes...)
-            va-map 
+            va-map
                 inline (k)
                     let srcprefix = (va@ k srcprefixes...)
                     let dstprefix = (va@ k dstprefixes...)
@@ -419,8 +419,18 @@ do
     inline local_size (x y z)
         set-execution-mode! 'LocalSize x y z
 
-    let packHalf2x16 = (extern 'GLSL.std.450.PackHalf2x16 (function u32 vec2))
-    let unpackHalf2x16 = (extern 'GLSL.std.450.UnpackHalf2x16 (function vec2 u32))
+    let
+        packHalf2x16 = (extern 'GLSL.std.450.PackHalf2x16 (function u32 vec2))
+        packUnorm2x16 = (extern 'GLSL.std.450.PackUnorm2x16 (function u32 vec2))
+        packSnorm2x16 = (extern 'GLSL.std.450.PackSnorm2x16 (function u32 vec2))
+        packUnorm4x8 = (extern 'GLSL.std.450.PackUnorm4x8 (function u32 vec4))
+        packSnorm4x8 = (extern 'GLSL.std.450.PackSnorm4x8 (function u32 vec4))
+
+        unpackHalf2x16 = (extern 'GLSL.std.450.UnpackHalf2x16 (function vec2 u32))
+        unpackUnorm2x16 = (extern 'GLSL.std.450.UnpackUnorm2x16 (function vec2 u32))
+        unpackSnorm2x16 = (extern 'GLSL.std.450.UnpackSnorm2x16 (function vec2 u32))
+        unpackUnorm4x8 = (extern 'GLSL.std.450.UnpackUnorm4x8 (function vec4 u32))
+        unpackSnorm4x8 = (extern 'GLSL.std.450.UnpackSnorm4x8 (function vec4 u32))
 
     inline... findLSB
     case (value : u32,)

@@ -4325,7 +4325,7 @@ inline signed-vector-binary-op (sf uf)
     __vector|  = bor
     __vector^  = bxor
     __vector<< = shl
-    __vector>> = (simple-signed-binary-op ashr lshr)
+    __vector>> = (signed-vector-binary-op ashr lshr)
     __vector== = icmp==
     __vector!= = icmp!=
     __vector>  = (signed-vector-binary-op icmp>s icmp>u)
@@ -4371,6 +4371,8 @@ inline vector-binary-op-dispatch (symbol)
     __& = (vector-binary-op-dispatch '__vector&)
     __| = (vector-binary-op-dispatch '__vector|)
     __^ = (vector-binary-op-dispatch '__vector^)
+    __<< = (vector-binary-op-dispatch '__vector<<)
+    __>> = (vector-binary-op-dispatch '__vector>>)
     __== = (vector-binary-op-dispatch '__vector==)
     __!= = (vector-binary-op-dispatch '__vector!=)
     __> = (vector-binary-op-dispatch '__vector>)
