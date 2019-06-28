@@ -563,6 +563,7 @@ struct SPIRVGenerator {
             if (builder.isVectorType(ty)) {
                 ty = builder.getContainedTypeId(ty);
             }
+            builder.addCapability(spv::CapabilityStorageImageExtendedFormats);
             return builder.makeImageType(ty,
                 SCOPES_GET_RESULT(dim_from_symbol(it->dim)),
                 (it->depth == 1),
