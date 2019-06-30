@@ -335,6 +335,25 @@ inline gen-signed-atomic-func (sop uop)
             else uop
             \ memptr (imply data ET)
 
+let shared =
+    gen-allocator-sugar "shared"
+        spice "shared-copy" (T value)
+            if true
+                hide-traceback;
+                error "shared variables can't have initializers"
+            let val = (extern-new unnamed (T as type) (storage-class = 'Workgroup))
+            spice-quote
+                ptrtoref val
+
+        spice "shared-new" (T args...)
+            let T = (T as type)
+            let val = (extern-new unnamed (T as type) (storage-class = 'Workgroup))
+            if ('argcount args...)
+                hide-traceback;
+                error "shared variables can't have initializers"
+            spice-quote
+                ptrtoref val
+
 let
     ceil_f32 = (extern 'GLSL.std.450.Ceil (function f32 f32))
     ceil_vec2 = (extern 'GLSL.std.450.Ceil (function vec2 vec2))
@@ -352,7 +371,7 @@ let
     FindILsb_ivec4 = (extern 'GLSL.std.450.FindILsb (function ivec4 ivec4))
 
 do
-    let gsampler
+    let gsampler shared
     let
         in = (gen-xvar-sugar "in" (wrap-xvar-global (inline (...) (config-xvar 0:u32 'Input ...))))
         out = (gen-xvar-sugar "out" (wrap-xvar-global (inline (...) (config-xvar 0:u32 'Output ...))))

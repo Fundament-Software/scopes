@@ -6414,6 +6414,7 @@ let local =
                 let val = (alloca T)
                 store (T args...) val
                 ptrtoref val
+
 let global =
     gen-allocator-sugar "global"
         spice "global-copy" (T value)

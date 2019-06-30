@@ -79,8 +79,11 @@ print
         #'dump-disassembly
         #'no-opts
 
+shared shared-value : i32
+
 fn compute-shader ()
     local_size 1 1 1
+    shared-value = 1
     barrier;
     memoryBarrier;
     groupMemoryBarrier;
