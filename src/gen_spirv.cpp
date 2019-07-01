@@ -38,6 +38,12 @@ namespace scopes {
 
 #define SCOPES_GEN_TARGET "SPIR-V"
 
+// prefix: spirv
+#define SCOPES_GLSL_SPIRV_OPS() \
+    T(OpEmitVertex) \
+    T(OpEndPrimitive) \
+
+
 // prefix: GLSLstd450
 #define SCOPES_GLSL_STD_450_FUNCS() \
     T(Round) \
@@ -240,6 +246,26 @@ struct SPIRVGenerator {
     FunctionRef active_function;
     int functions_generated;
 
+    spv::Id get_op_ex(Symbol name) {
+        auto it = intrinsics.find(name);
+        if (it != intrinsics.end())
+            return it->second;
+        auto str = name.name();
+        spv::Id result = 0;
+        // prefix: spirv
+        #define T(NAME) \
+            if (!strncmp(str->data, "spirv." #NAME, sizeof("spirv." #NAME))) { \
+                result = spv::NAME; \
+            } else
+        SCOPES_GLSL_SPIRV_OPS()
+        #undef T
+        /* else */ {}
+        if (result) {
+            intrinsics.insert({name, result});
+        }
+        return result;
+    }
+
     spv::Id get_intrinsic(Symbol name) {
         auto it = intrinsics.find(name);
         if (it != intrinsics.end())
@@ -258,7 +284,6 @@ struct SPIRVGenerator {
             intrinsics.insert({name, result});
         }
         return result;
-
     }
 
     static const Type *arguments_to_tuple(const Type *T) {
@@ -1062,20 +1087,44 @@ struct SPIRVGenerator {
         }
         if (callee.isa<Global>()) {
             auto name = callee.cast<Global>()->name;
-            int ep = get_intrinsic(name);
-            if (!ep) {
-                SCOPES_ERROR(CGenUnsupportedIntrinsic, name);
+            spv::Id ep = get_op_ex(name);
+            if (ep) {
+                auto T = call->get_type();
+                spv::Instruction *op;
+                bool is_void = (T == empty_arguments_type());
+                if (is_void) {
+                    op = new spv::Instruction((spv::Op)ep);
+                } else {
+                    auto ty = SCOPES_GET_RESULT(type_to_spirv_type(T));
+                    op = new spv::Instruction(
+                        builder.getUniqueId(), ty, (spv::Op)ep);
+                }
+                size_t argcount = args.size();
+                for (int i = 0; i < argcount; ++i) {
+                    op->addIdOperand(SCOPES_GET_RESULT(ref_to_value(args[i])));
+                }
+                builder.getBuildPoint()->addInstruction(
+                    std::unique_ptr<spv::Instruction>(op));
+                if (!is_void) {
+                    auto val = op->getResultId();
+                    map_phi({ val }, call);
+                }
+            } else {
+                ep = get_intrinsic(name);
+                if (!ep) {
+                    SCOPES_ERROR(CGenUnsupportedIntrinsic, name);
+                }
+                auto ty = SCOPES_GET_RESULT(type_to_spirv_type(call->get_type()));
+                size_t argcount = args.size();
+                Ids values;
+                values.reserve(argcount);
+                for (size_t i = 0; i < argcount; ++i) {
+                    values.push_back(SCOPES_GET_RESULT(ref_to_value(args[i])));
+                }
+                auto val = builder.createBuiltinCall(
+                    ty, glsl_ext_inst, ep, values);
+                map_phi({ val }, call);
             }
-            auto ty = SCOPES_GET_RESULT(type_to_spirv_type(call->get_type()));
-            size_t argcount = args.size();
-            Ids values;
-            values.reserve(argcount);
-            for (size_t i = 0; i < argcount; ++i) {
-                values.push_back(SCOPES_GET_RESULT(ref_to_value(args[i])));
-            }
-            auto val = builder.createBuiltinCall(
-                ty, glsl_ext_inst, ep, values);
-            map_phi({ val }, call);
         } else {
             auto func =
                 SCOPES_GET_RESULT(Function_to_function(
@@ -2156,6 +2205,7 @@ struct SPIRVGenerator {
         } break;
         case SYM_TargetGeometry: {
             builder.addCapability(spv::CapabilityShader);
+            builder.addCapability(spv::CapabilityGeometry);
             entry_point = builder.addEntryPoint(spv::ExecutionModelGeometry, func, "main");
         } break;
         case SYM_TargetCompute: {

@@ -320,6 +320,19 @@ fn config-inout (anchor name T layout)
             let out = [(f 0:u32 'Output anchor name T layout)]
     `(bitcast LT InOutType)
 
+fn config-inout-geometry (anchor name T layout)
+    let tname =
+        .. "<inout-geometry " (name as string) " : " ('string T) ">"
+    let f = (wrap-xvar-global config-xvar)
+    let LT =
+        @@ spice-quote
+        typedef (do tname)
+            let Type = T
+            let in = [(f 0:u32 'Input anchor name (array.type T -1) layout)]
+            let out = [(f 0:u32 'Output anchor name T layout)]
+    `(bitcast LT InOutType)
+
+
 inline gen-atomic-func (op)
     inline "atomicfn" (mem data)
         let memptr = (& mem)
@@ -370,14 +383,45 @@ let
     FindILsb_ivec3 = (extern 'GLSL.std.450.FindILsb (function ivec3 ivec3))
     FindILsb_ivec4 = (extern 'GLSL.std.450.FindILsb (function ivec4 ivec4))
 
+# geometry shader layout
+
+sugar output_primitive (name ...)
+    inline _output_primitive (output_primitive max_vertices)
+        set-execution-mode! output_primitive
+        set-execution-mode! 'OutputVertices max_vertices
+    let name = (name as Symbol)
+    let prim =
+        switch name
+        case 'points 'OutputPoints
+        case 'line_strip 'OutputLineStrip
+        case 'triangle_strip 'OutputTriangleStrip
+        default
+            error "unknown output primitive"
+    qq [_output_primitive] '[prim] (unquote-splice ...)
+
+sugar input_primitive (name)
+    let name = (name as Symbol)
+    let prim =
+        switch name
+        case 'points 'InputPoints
+        case 'lines 'InputLines
+        case 'lines_adjacency 'InputLinesAdjacency
+        case 'triangles 'Triangles
+        case 'triangles_adjacency 'InputTrianglesAdjacency
+        default
+            error "unknown input primitive"
+    `(set-execution-mode! prim)
+
 do
-    let gsampler shared
+    let gsampler shared input_primitive output_primitive
     let
         in = (gen-xvar-sugar "in" (wrap-xvar-global (inline (...) (config-xvar 0:u32 'Input ...))))
         out = (gen-xvar-sugar "out" (wrap-xvar-global (inline (...) (config-xvar 0:u32 'Output ...))))
         buffer = (gen-xvar-sugar "buffer" (wrap-xvar-global config-buffer))
         uniform = (gen-xvar-sugar "uniform" (wrap-xvar-global config-uniform))
         inout = (gen-xvar-sugar "inout" config-inout)
+        # output is an unsized array
+        inout-geometry = (gen-xvar-sugar "inout-geometry" config-inout-geometry)
 
         # gl_PerVertex
         gl_Position = (ptrtoref (extern 'spirv.Position vec4 (storage-class = 'Output)))
@@ -435,8 +479,13 @@ do
     inline imageStore (image coord data)
         Image-write (image as Image) coord data
 
+    # compute shader layout
     inline local_size (x y z)
         set-execution-mode! 'LocalSize x y z
+
+    let
+        EmitVertex = (extern 'spirv.OpEmitVertex (function void))
+        EndPrimitive = (extern 'spirv.OpEndPrimitive (function void))
 
     let
         packHalf2x16 = (extern 'GLSL.std.450.PackHalf2x16 (function u32 vec2))
