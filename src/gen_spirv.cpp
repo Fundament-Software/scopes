@@ -39,7 +39,7 @@ namespace scopes {
 #define SCOPES_GEN_TARGET "SPIR-V"
 
 // prefix: spirv
-#define SCOPES_GLSL_SPIRV_OPS() \
+#define SCOPES_INTR_SPIRV_OPS() \
     T(OpEmitVertex) \
     T(OpEndPrimitive) \
 
@@ -236,6 +236,7 @@ struct SPIRVGenerator {
     std::unordered_map<int, ExecutionMode *> execution_modes;
 
     std::unordered_map<Symbol, spv::Id, Symbol::Hash> intrinsics;
+    std::unordered_map<Symbol, spv::Id, Symbol::Hash> intrinsic_ops;
 
     spv::SpvBuildLogger logger;
     spv::Builder builder;
@@ -247,8 +248,8 @@ struct SPIRVGenerator {
     int functions_generated;
 
     spv::Id get_op_ex(Symbol name) {
-        auto it = intrinsics.find(name);
-        if (it != intrinsics.end())
+        auto it = intrinsic_ops.find(name);
+        if (it != intrinsic_ops.end())
             return it->second;
         auto str = name.name();
         spv::Id result = 0;
@@ -257,11 +258,11 @@ struct SPIRVGenerator {
             if (!strncmp(str->data, "spirv." #NAME, sizeof("spirv." #NAME))) { \
                 result = spv::NAME; \
             } else
-        SCOPES_GLSL_SPIRV_OPS()
+        SCOPES_INTR_SPIRV_OPS()
         #undef T
         /* else */ {}
         if (result) {
-            intrinsics.insert({name, result});
+            intrinsic_ops.insert({name, result});
         }
         return result;
     }
@@ -1110,7 +1111,7 @@ struct SPIRVGenerator {
                     map_phi({ val }, call);
                 }
             } else {
-                ep = get_intrinsic(name);
+                spv::Id ep = get_intrinsic(name);
                 if (!ep) {
                     SCOPES_ERROR(CGenUnsupportedIntrinsic, name);
                 }
