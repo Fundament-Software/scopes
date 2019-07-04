@@ -436,6 +436,7 @@ do
 
         gl_NumWorkGroups = (ptrtoref (extern 'spirv.NumWorkgroups uvec3 (storage-class = 'Input)))
         gl_WorkGroupID = (ptrtoref (extern 'spirv.WorkgroupId uvec3 (storage-class = 'Input)))
+        gl_WorkGroupSize = (ptrtoref (extern 'spirv.WorkgroupSize uvec3 (storage-class = 'Input)))
         gl_LocalInvocationID = (ptrtoref (extern 'spirv.LocalInvocationId uvec3 (storage-class = 'Input)))
         gl_GlobalInvocationID = (ptrtoref (extern 'spirv.GlobalInvocationId uvec3 (storage-class = 'Input)))
         gl_LocalInvocationIndex = (ptrtoref (extern 'spirv.LocalInvocationIndex u32 (storage-class = 'Input)))
