@@ -295,6 +295,8 @@ fn config-xvar (flags storage anchor name T layout)
             flags = flags | global-flag-coherent
         case 'restrict
             flags = flags | global-flag-restrict
+        case 'flat
+            flags = flags | global-flag-flat
         default
             error (.. "unsupported key: " (k as string))
     'tag (sc_global_new name T flags storage location binding) anchor

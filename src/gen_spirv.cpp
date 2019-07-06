@@ -458,6 +458,9 @@ struct SPIRVGenerator {
         } else if (flags & GF_Block) {
             builder.addDecoration(id, spv::DecorationBlock);
         }
+        /* if (flags & GF_Flat) {
+            builder.addDecoration(id, spv::DecorationFlat);
+        } */
         for (size_t i = 0; i < count; ++i) {
             Symbol key = SYM_Unnamed;
             auto kq = try_qualifier<KeyQualifier>(ti->values[i]);
@@ -480,6 +483,9 @@ struct SPIRVGenerator {
             if (flags & GF_NonReadable) {
                 builder.addMemberDecoration(id, i, spv::DecorationNonReadable);
             }
+            /* if (flags & GF_Flat) {
+                builder.addMemberDecoration(id, i, spv::DecorationFlat);
+            } */
             builder.addMemberDecoration(id, i, spv::DecorationOffset, ti->offsets[i]);
         }
         return id;
@@ -1973,6 +1979,13 @@ struct SPIRVGenerator {
         case spv::StorageClassOutput: {
             assert(entry_point);
             entry_point->addIdOperand(id);
+            auto flags = node->flags;
+            if (node->location >= 0) {
+                builder.addDecoration(id, spv::DecorationLocation, node->location);
+            }
+            if (flags & GF_Flat) {
+                builder.addDecoration(id, spv::DecorationFlat);
+            }
         } break;
         case spv::StorageClassUniformConstant:
         case spv::StorageClassUniform: {

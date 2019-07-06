@@ -1275,7 +1275,8 @@ struct ConstPointer : Const {
     T(GF_Restrict, (1 << 5), "global-flag-restrict") \
     /* if storage class is 'Uniform, the value is a UBO */ \
     T(GF_Block, (1 << 6), "global-flag-block") \
-
+    /* if storage class is 'Input or 'Output, the value is not to be interpolated */ \
+    T(GF_Flat, (1 << 7), "global-flag-flat") \
 
 enum GlobalFlags {
 #define T(NAME, VALUE, SNAME) \
