@@ -459,7 +459,7 @@ typedef+ vec-type
             inline (lhs rhs)
                 all? (== (storagecast lhs) (storagecast rhs))
 
-fn dot (u v)
+inline dot (u v)
     let w = (u * v)
     vector-reduce (do +) (w as (storageof (typeof w)))
 
@@ -695,7 +695,7 @@ spice _transpose (m)
         `(insertvalue self ('row m i) i)
 
 @@ spice-quote
-fn transpose (m)
+inline transpose (m)
     _transpose m
 
 spice mix (a b x)
