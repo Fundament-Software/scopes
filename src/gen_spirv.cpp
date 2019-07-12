@@ -42,6 +42,9 @@ namespace scopes {
 #define SCOPES_INTR_SPIRV_OPS() \
     T(OpEmitVertex) \
     T(OpEndPrimitive) \
+    T(OpDPdx) \
+    T(OpDPdy) \
+    T(OpFwidth) \
 
 
 // prefix: GLSLstd450

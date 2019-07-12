@@ -385,6 +385,36 @@ let
     FindILsb_ivec3 = (extern 'GLSL.std.450.FindILsb (function ivec3 ivec3))
     FindILsb_ivec4 = (extern 'GLSL.std.450.FindILsb (function ivec4 ivec4))
 
+let
+    dFdx_f32 = (extern 'spirv.OpDPdx (function f32 f32))
+    dFdx_vec2 = (extern 'spirv.OpDPdx (function vec2 vec2))
+    dFdx_vec3 = (extern 'spirv.OpDPdx (function vec3 vec3))
+    dFdx_vec4 = (extern 'spirv.OpDPdx (function vec4 vec4))
+
+    dFdy_f32 = (extern 'spirv.OpDPdy (function f32 f32))
+    dFdy_vec2 = (extern 'spirv.OpDPdy (function vec2 vec2))
+    dFdy_vec3 = (extern 'spirv.OpDPdy (function vec3 vec3))
+    dFdy_vec4 = (extern 'spirv.OpDPdy (function vec4 vec4))
+
+    fwidth_f32 = (extern 'spirv.OpFwidth (function f32 f32))
+    fwidth_vec2 = (extern 'spirv.OpFwidth (function vec2 vec2))
+    fwidth_vec3 = (extern 'spirv.OpFwidth (function vec3 vec3))
+    fwidth_vec4 = (extern 'spirv.OpFwidth (function vec4 vec4))
+
+# fragment depth layout
+
+sugar fragment_depth (name ...)
+    let name = (name as Symbol)
+    let mode =
+        switch name
+        case 'depth_any 'DepthReplacing
+        case 'depth_greater 'DepthGreater
+        case 'depth_less 'DepthLess
+        case 'depth_unchanged 'DepthUnchanged
+        default
+            error "unknown fragment depth layout"
+    `(set-execution-mode! mode)
+
 # geometry shader layout
 
 sugar output_primitive (name ...)
@@ -415,7 +445,7 @@ sugar input_primitive (name)
     `(set-execution-mode! prim)
 
 do
-    let gsampler shared input_primitive output_primitive
+    let gsampler shared input_primitive output_primitive fragment_depth
     let
         in = (gen-xvar-sugar "in" (wrap-xvar-global (inline (...) (config-xvar 0:u32 'Input ...))))
         out = (gen-xvar-sugar "out" (wrap-xvar-global (inline (...) (config-xvar 0:u32 'Output ...))))
@@ -502,6 +532,36 @@ do
         unpackSnorm2x16 = (extern 'GLSL.std.450.UnpackSnorm2x16 (function vec2 u32))
         unpackUnorm4x8 = (extern 'GLSL.std.450.UnpackUnorm4x8 (function vec4 u32))
         unpackSnorm4x8 = (extern 'GLSL.std.450.UnpackSnorm4x8 (function vec4 u32))
+
+    inline... dFdx
+    case (value : f32,)
+        dFdx_f32 value
+    case (value : vec2,)
+        dFdx_vec2 value
+    case (value : vec3,)
+        dFdx_vec3 value
+    case (value : vec4,)
+        dFdx_vec4 value
+
+    inline... dFdy
+    case (value : f32,)
+        dFdy_f32 value
+    case (value : vec2,)
+        dFdy_vec2 value
+    case (value : vec3,)
+        dFdy_vec3 value
+    case (value : vec4,)
+        dFdy_vec4 value
+
+    inline... fwidth
+    case (value : f32,)
+        fwidth_f32 value
+    case (value : vec2,)
+        fwidth_vec2 value
+    case (value : vec3,)
+        fwidth_vec3 value
+    case (value : vec4,)
+        fwidth_vec4 value
 
     inline... findLSB
     case (value : u32,)
