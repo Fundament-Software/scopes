@@ -297,7 +297,7 @@ namespace scopes {
     T(FN_Store, "store") \
     T(FN_VolatileLoad, "volatile-load") \
     T(FN_VolatileStore, "volatile-store") \
-    T(SFXFN_ExecutionMode, "set-execution-mode!") \
+    T(SFXFN_ExecutionMode, "set-execution-mode") \
     T(FN_ExtractElement, "extractelement") \
     T(FN_InsertElement, "insertelement") \
     T(FN_ShuffleVector, "shufflevector") \
@@ -313,8 +313,8 @@ namespace scopes {
     T(FN_VaCountOf, "va-countof") \
     T(FN_Undef, "undef") \
     T(FN_NullOf, "nullof") \
-    T(SFXFN_Discard, "discard!") \
-    T(SFXFN_Unreachable, "unreachable!") \
+    T(SFXFN_Discard, "discard") \
+    T(SFXFN_Unreachable, "unreachable") \
     T(FN_FPTrunc, "fptrunc") \
     T(FN_FPExt, "fpext") \
     T(FN_FPToUI, "fptoui") \
@@ -470,7 +470,7 @@ namespace scopes {
     T(FN_DatumToSyntax, "datum->syntax") \
     T(FN_DatumToQuotedSyntax, "datum->quoted-syntax") \
     T(FN_LabelDocString, "Label-docstring") \
-    T(FN_LabelSetInline, "Label-set-inline!") \
+    T(FN_LabelSetInline, "Label-set-inline") \
     T(FN_DefaultStyler, "default-styler") \
     T(FN_StyleToString, "style->string") \
     T(FN_Disqualify, "disqualify") \
@@ -488,7 +488,7 @@ namespace scopes {
     T(FN_Expand, "expand") \
     T(FN_ExternLibrary, "extern-library") \
     T(FN_ExtractMemory, "extract-memory") \
-    T(FN_EnterSolverCLI, "enter-solver-cli!") \
+    T(FN_EnterSolverCLI, "enter-solver-cli") \
     T(FN_FFISymbol, "ffi-symbol") \
     T(FN_FFICall, "ffi-call") \
     T(FN_FrameEq, "Frame==") \
@@ -517,7 +517,7 @@ namespace scopes {
     T(FN_LabelAnchor, "Label-anchor") \
     T(FN_LabelName, "Label-name") \
     T(FN_ClosureEq, "Closure==") \
-    T(FN_CheckStack, "verify-stack!") \
+    T(FN_CheckStack, "verify-stack") \
     T(FN_ListAtom, "list-atom?") \
     T(FN_ListCountOf, "list-countof") \
     T(FN_ListLoad, "list-load") \
@@ -558,12 +558,12 @@ namespace scopes {
     T(FN_ImageType, "Image-type") \
     T(FN_SampledImageType, "SampledImage-type") \
     T(FN_TypenameType, "typename-type") \
-    T(FN_Write, "io-write!") \
+    T(FN_Write, "io-write") \
     T(FN_Flush, "io-flush") \
     T(FN_Product, "product") \
     T(FN_Prompt, "__prompt") \
     T(FN_Qualify, "qualify") \
-    T(FN_SetAutocompleteScope, "set-autocomplete-scope!") \
+    T(FN_SetAutocompleteScope, "set-autocomplete-scope") \
     T(FN_Range, "range") \
     T(FN_RefNew, "ref-new") \
     T(FN_RefAt, "ref@") \
@@ -576,7 +576,7 @@ namespace scopes {
     T(FN_ScopeNew, "Scope-new") \
     T(FN_ScopeCopy, "Scope-clone") \
     T(FN_ScopeDocString, "Scope-docstring") \
-    T(FN_SetScopeDocString, "set-scope-docstring!") \
+    T(FN_SetScopeDocString, "set-scope-docstring") \
     T(FN_ScopeNewSubscope, "Scope-new-expand") \
     T(FN_ScopeCopySubscope, "Scope-clone-expand") \
     T(FN_ScopeParent, "Scope-parent") \
@@ -629,21 +629,21 @@ namespace scopes {
     T(FN_ZipFill, "zip-fill") \
 
 #define SCOPES_LIBRARY_SFXSPICE_SYMBOLS() \
-    T(SFXFN_CopyMemory, "copy-memory!") \
-    T(SFXFN_Error, "__error!") \
-    T(SFXFN_AnchorError, "__anchor-error!") \
-    T(SFXFN_Abort, "abort!") \
-    T(SFXFN_CompilerError, "compiler-error!") \
-    T(SFXFN_SetAnchor, "set-anchor!") \
-    T(SFXFN_LabelAppendParameter, "label-append-parameter!") \
-    T(SFXFN_RefSet, "ref-set!") \
-    T(SFXFN_SetExceptionHandler, "set-exception-handler!") \
-    T(SFXFN_SetGlobals, "set-globals!") \
-    T(SFXFN_SetTypenameSuper, "set-typename-super!") \
-    T(SFXFN_SetGlobalApplyFallback, "set-global-apply-fallback!") \
-    T(SFXFN_SetScopeSymbol, "__set-scope-symbol!") \
-    T(SFXFN_DelScopeSymbol, "delete-scope-symbol!") \
-    T(SFXFN_TranslateLabelBody, "translate-label-body!") \
+    T(SFXFN_CopyMemory, "copy-memory") \
+    T(SFXFN_Error, "__error") \
+    T(SFXFN_AnchorError, "__anchor-error") \
+    T(SFXFN_Abort, "abort") \
+    T(SFXFN_CompilerError, "compiler-error") \
+    T(SFXFN_SetAnchor, "set-anchor") \
+    T(SFXFN_LabelAppendParameter, "label-append-parameter") \
+    T(SFXFN_RefSet, "ref-set") \
+    T(SFXFN_SetExceptionHandler, "set-exception-handler") \
+    T(SFXFN_SetGlobals, "set-globals") \
+    T(SFXFN_SetTypenameSuper, "set-typename-super") \
+    T(SFXFN_SetGlobalApplyFallback, "set-global-apply-fallback") \
+    T(SFXFN_SetScopeSymbol, "__set-scope-symbol") \
+    T(SFXFN_DelScopeSymbol, "delete-scope-symbol") \
+    T(SFXFN_TranslateLabelBody, "translate-label-body") \
 
 #define SCOPES_LIBRARY_OPERATOR_SYMBOLS() \
     /* operator functions that can also be used as infix */ \
@@ -714,7 +714,7 @@ namespace scopes {
     T(FN_VaKey, "va-key") \
     T(FN_VaValues, "va-values") \
     T(FN_CompilerMessage, "compiler-message") \
-    T(SFXFN_DelTypeSymbol, "delete-type-symbol!") \
+    T(SFXFN_DelTypeSymbol, "delete-type-symbol") \
     T(FN_ExternSymbol, "extern-symbol") \
     T(FN_ExternNew, "extern-new") \
     T(FN_TypeAt, "type@") \

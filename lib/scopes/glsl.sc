@@ -413,14 +413,14 @@ sugar fragment_depth (name ...)
         case 'depth_unchanged 'DepthUnchanged
         default
             error "unknown fragment depth layout"
-    `(set-execution-mode! mode)
+    `(set-execution-mode mode)
 
 # geometry shader layout
 
 sugar output_primitive (name ...)
     inline _output_primitive (output_primitive max_vertices)
-        set-execution-mode! output_primitive
-        set-execution-mode! 'OutputVertices max_vertices
+        set-execution-mode output_primitive
+        set-execution-mode 'OutputVertices max_vertices
     let name = (name as Symbol)
     let prim =
         switch name
@@ -442,7 +442,7 @@ sugar input_primitive (name)
         case 'triangles_adjacency 'InputTrianglesAdjacency
         default
             error "unknown input primitive"
-    `(set-execution-mode! prim)
+    `(set-execution-mode prim)
 
 do
     let gsampler shared input_primitive output_primitive fragment_depth
@@ -514,7 +514,7 @@ do
 
     # compute shader layout
     inline local_size (x y z)
-        set-execution-mode! 'LocalSize x y z
+        set-execution-mode 'LocalSize x y z
 
     let
         EmitVertex = (extern 'spirv.OpEmitVertex (function void))
