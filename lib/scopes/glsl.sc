@@ -370,6 +370,12 @@ let shared =
                 ptrtoref val
 
 let
+    smoothstep_f32 = (extern 'GLSL.std.450.SmoothStep (function f32 f32 f32 f32))
+    smoothstep_vec2 = (extern 'GLSL.std.450.SmoothStep (function vec2 vec2 vec2 vec2))
+    smoothstep_vec3 = (extern 'GLSL.std.450.SmoothStep (function vec3 vec3 vec3 vec3))
+    smoothstep_vec4 = (extern 'GLSL.std.450.SmoothStep (function vec4 vec4 vec4 vec4))
+
+let
     ceil_f32 = (extern 'GLSL.std.450.Ceil (function f32 f32))
     ceil_vec2 = (extern 'GLSL.std.450.Ceil (function vec2 vec2))
     ceil_vec3 = (extern 'GLSL.std.450.Ceil (function vec3 vec3))
@@ -532,6 +538,16 @@ do
         unpackSnorm2x16 = (extern 'GLSL.std.450.UnpackSnorm2x16 (function vec2 u32))
         unpackUnorm4x8 = (extern 'GLSL.std.450.UnpackUnorm4x8 (function vec4 u32))
         unpackSnorm4x8 = (extern 'GLSL.std.450.UnpackSnorm4x8 (function vec4 u32))
+
+    inline... smoothstep
+    case (edge0 : f32, edge1 : f32, x : f32)
+        smoothstep_f32 edge0 edge1 x
+    case (edge0 : vec2, edge1 : vec2, x : vec2)
+        smoothstep_vec2 edge0 edge1 x
+    case (edge0 : vec3, edge1 : vec3, x : vec3)
+        smoothstep_vec3 edge0 edge1 x
+    case (edge0 : vec4, edge1 : vec4, x : vec4)
+        smoothstep_vec4 edge0 edge1 x
 
     inline... dFdx
     case (value : f32,)
