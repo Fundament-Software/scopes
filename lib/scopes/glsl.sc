@@ -382,6 +382,12 @@ let
     ceil_vec4 = (extern 'GLSL.std.450.Ceil (function vec4 vec4))
 
 let
+    fract_f32 = (extern 'GLSL.std.450.Fract (function f32 f32))
+    fract_vec2 = (extern 'GLSL.std.450.Fract (function vec2 vec2))
+    fract_vec3 = (extern 'GLSL.std.450.Fract (function vec3 vec3))
+    fract_vec4 = (extern 'GLSL.std.450.Fract (function vec4 vec4))
+
+let
     FindILsb_u32 = (extern 'GLSL.std.450.FindILsb (function u32 u32))
     FindILsb_uvec2 = (extern 'GLSL.std.450.FindILsb (function uvec2 uvec2))
     FindILsb_uvec3 = (extern 'GLSL.std.450.FindILsb (function uvec3 uvec3))
@@ -606,6 +612,16 @@ do
         ceil_vec3 value
     case (value : vec4,)
         ceil_vec4 value
+
+    inline... fract
+    case (value : f32,)
+        fract_f32 value
+    case (value : vec2,)
+        fract_vec2 value
+    case (value : vec3,)
+        fract_vec3 value
+    case (value : vec4,)
+        fract_vec4 value
 
     let
         atomicExchange = (gen-atomic-func xchg)
