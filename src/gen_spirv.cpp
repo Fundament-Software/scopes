@@ -2314,7 +2314,7 @@ SCOPES_RESULT(void) optimize_spirv(std::vector<unsigned int> &result, int opt_le
     if (opt_level == 3) {
         optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
     }
-    optimizer.RegisterPass(spvtools::CreateCommonUniformElimPass());
+    //optimizer.RegisterPass(spvtools::CreateCommonUniformElimPass());
 
     optimizer.RegisterPass(spvtools::CreateFlattenDecorationPass());
     //optimizer.RegisterPass(spvtools::CreateCompactIdsPass());
