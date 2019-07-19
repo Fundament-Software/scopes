@@ -176,7 +176,9 @@ typedef+ vec-type
                     else 1
         let vecsz = ('element-count self)
         let initval = `(nullof self)
-        if (flatargsz == 1)
+        if (flatargsz == 0)
+            initval
+        elseif (flatargsz == 1)
             # init all components with the same value
             let arg = ('getarg ... 0)
             let argT = ('typeof arg)
