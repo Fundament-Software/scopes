@@ -393,6 +393,18 @@ fn sc_argument_list_join (a b)
         add i 1
     sc_argument_list_new N values
 
+let argumentsof =
+    box-spice-macro
+        fn "argumentsof" (args)
+            let argcount = (sc_argcount args)
+            verify-count argcount 1 1
+            let self = (unbox-pointer (sc_getarg args 0) type)
+            hide-traceback;
+            let count = (sc_arguments_type_argcount self)
+            sc_argument_list_map_new count
+                inline (i)
+                    `[(sc_arguments_type_getarg self i)]
+
 let elementsof =
     box-spice-macro
         fn "elementsof" (args)

@@ -24,6 +24,7 @@ struct ArgumentsType : Type {
     void stream_name(StyledStream &ss) const;
     ArgumentsType(const Types &_values);
     const TupleType *to_tuple_type() const;
+    SCOPES_RESULT(const Type *) type_at_index(size_t i) const;
 
     Types values;
 };

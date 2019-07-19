@@ -73,6 +73,12 @@ ArgumentsType::ArgumentsType(const Types &_values) :
     Type(TK_Arguments), values(_values) {
 }
 
+SCOPES_RESULT(const Type *) ArgumentsType::type_at_index(size_t i) const {
+    SCOPES_RESULT_TYPE(const Type *);
+    SCOPES_CHECK_RESULT(verify_range(i, values.size()));
+    return values[i];
+}
+
 const Type *arguments_type(const Types &values) {
     if (values.size() == 1)
         return values[0];
