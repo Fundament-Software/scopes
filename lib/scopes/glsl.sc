@@ -12,6 +12,7 @@
 using import glm
 using import Capture
 using import spicetools
+using import struct
 
 typedef InOutType : (storageof type)
     fn __repr (self)
@@ -649,5 +650,16 @@ do
         __barrier barrier-kind-memory-buffer
     inline memoryBarrierShared ()
         __barrier barrier-kind-memory-shared
+
+    struct DispatchIndirectCommand plain
+        num_groups_x : u32 = 1
+        num_groups_y : u32 = 1
+        num_groups_z : u32 = 1
+
+    struct DrawArraysIndirectCommand plain
+        count : u32 = 0
+        instanceCount : u32 = 0
+        first : u32 = 0
+        baseInstance : u32 = 0
 
     scope .. (locals)

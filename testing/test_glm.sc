@@ -15,6 +15,9 @@ do
     v.y = 2
     test (v == (vec2 4 2))
 
+# default init
+test ((vec4) == (vec4 0 0 0 0))
+
 test ((vec4 1 2 3 4) == (vec4 1 2 3 4))
 test ((vec4 1 (vec2 2 3) 4) == (vec4 1 2 3 4))
 test ((vec4 (vec3 0) 1) == (vec4 0 0 0 1))

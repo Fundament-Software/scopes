@@ -1173,7 +1173,15 @@ struct LLVMIRGenerator {
         int count = phis.size();
         for (int i = 0; i < count; ++i) {
             auto phi = phis[i];
+            auto ty = LLVMTypeOf(phi);
             auto llvmval = SCOPES_GET_RESULT(ref_to_value(values[i]));
+            if (LLVMTypeOf(llvmval) != ty) {
+                if (LLVMGetTypeKind(ty) == LLVMStructTypeKind) {
+                    llvmval = build_struct_cast(llvmval, ty);
+                } else {
+                    // should not happen
+                }
+            }
             LLVMValueRef incovals[] = { llvmval };
             LLVMAddIncoming(phi, incovals, incobbs, 1);
         }
