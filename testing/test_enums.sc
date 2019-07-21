@@ -128,12 +128,20 @@ do
 
     enum Explicit : i32
         A
-
+    
     test ((storageof Implicit) == (storageof Explicit))
+
+    # only types allowed
+    test-compiler-error
+        let z = 0
+        enum OddlyTyped : z
+            A
+
     # the type after `:` must be a storage type
     test-compiler-error 
         enum NonStorageEnum : Implicit
             A
+
     # enum storage type must be of integer type
     test-compiler-error
         enum PointerTypeEnum : rawstring
