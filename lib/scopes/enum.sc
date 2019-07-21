@@ -151,7 +151,7 @@ inline tag-constructor (
     let value = (insertvalue value index-value 0)
     insertvalue value payload 1
 
-fn finalize-enum-runtime (T)
+fn finalize-enum-runtime (T storage)
     let field-types = ('@ T '__fields__)
     let field-type-args = ('args field-types)
     # figure out integer bit width and signedness for the enumerator
@@ -183,7 +183,15 @@ fn finalize-enum-runtime (T)
     let using-scope = (Scope)
     'set-symbol T '__using using-scope
     if classic?
-        'set-plain-storage T i32
+        # no storage definition means `plain` was used.
+        let storage =
+            if (('typeof storage) == type)
+                storage as type
+            else
+                i32
+        if (not (storage < integer))
+            error "enum storage must be of integer type."
+        'set-plain-storage T storage
         # enum is integer
         for field in field-type-args
             let field = (field as type)
@@ -254,24 +262,26 @@ fn finalize-enum-runtime (T)
             'bind using-scope name value
 
 
-spice finalize-enum (T)
+spice finalize-enum (T storage)
 
     if ('constant? T)
-        finalize-enum-runtime (T as type)
+        finalize-enum-runtime (T as type) storage
         `()
     else
-        `(finalize-enum-runtime T)
+        `(finalize-enum-runtime T storage)
 
 sugar enum (name body...)
 
-    let supertype body has-supertype? =
+    let supertype body has-supertype? storage =
         sugar-match body...
         case ('plain rest...)
-            _ `CEnum rest... true
+            _ `CEnum rest... true `none
+        case (': storage rest...)
+            _ `CEnum rest... true `storage
         case ('< supertype rest...)
-            _ supertype rest... true
+            _ supertype rest... true `none
         default
-            _ `Enum body... false
+            _ `Enum body... false `none
 
     let has-fwd-decl =
         if (('typeof name) == Symbol)
@@ -344,7 +354,7 @@ sugar enum (name body...)
         [do]
             unquote-splice body
             [fold-locals] this-type [append-to-type]
-        [finalize-enum] this-type
+        [finalize-enum] this-type [storage]
         this-type
 
 sugar dispatch (value)

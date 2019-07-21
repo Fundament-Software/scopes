@@ -121,5 +121,37 @@ do
     dispatch-sum1 
         Message "hello"
 
+do
+    # plain enums have i32 storage by default
+    enum Implicit plain
+        A
 
+    enum Explicit : i32
+        A
+
+    test ((storageof Implicit) == (storageof Explicit))
+    # the type after `:` must be a storage type
+    test-compiler-error 
+        enum NonStorageEnum : Implicit
+            A
+    # enum storage type must be of integer type
+    enum PointerTypeEnum : rawstring
+        A
+
+    enum ByteEnum : i8
+        a   = 0x61
+        # ...
+        EOS = 0x00
+
+    test ((sizeof ByteEnum.a) == 1:usize)
+    let str = ("abcde" as rawstring)
+    let count =
+        loop (char-count = 0:usize)
+            let c = (str @ char-count)
+            if (c == ByteEnum.EOS)
+                break char-count
+            else
+                _ (char-count + 1)
+    test (count == 5:usize)
+        
 ;
