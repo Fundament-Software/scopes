@@ -135,8 +135,9 @@ do
         enum NonStorageEnum : Implicit
             A
     # enum storage type must be of integer type
-    enum PointerTypeEnum : rawstring
-        A
+    test-compiler-error
+        enum PointerTypeEnum : rawstring
+            A
 
     enum ByteEnum : i8
         a   = 0x61
