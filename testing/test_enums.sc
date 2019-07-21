@@ -133,9 +133,10 @@ do
 
     # only types allowed
     test-compiler-error
-        let z = 0
-        enum OddlyTyped : z
-            A
+        do
+            let z = 0
+            enum OddlyTyped : z
+                A
 
     # the type after `:` must be a storage type
     test-compiler-error 
