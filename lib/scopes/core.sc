@@ -3604,6 +3604,7 @@ fn patterns-from-namestr (base-dir namestr)
             .. base-dir "?.sc"
             .. base-dir "?/init.sc"
     else
+        let package = ((fn () package))
         package.path as list
 
 inline slice (value start end)
