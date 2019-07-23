@@ -1957,6 +1957,28 @@ let safe-shl =
             # mask right hand side by bit width
             `(shl lhs (band rhs mask))
 
+fn powi (base exponent)
+    let T = (typeof base)
+    let
+        0T = (nullof T)
+        1T = (zext 1 T)
+        2T = (zext 2 T)
+    # special case for constant base 2
+    if (icmp== base 2T)
+        return
+            shl 1T exponent
+    loop (result cur exponent = 1T base exponent)
+        if (icmp== exponent 0T)
+            return result
+        else
+            repeat
+                do
+                    if (icmp== (band exponent 1T) 0T) result
+                    else
+                        mul result cur
+                mul cur cur
+                lshr exponent 1T
+
 'set-symbols integer
     __tobool = (box-pointer (spice-macro integer-tobool))
     __imply = (box-pointer (spice-cast-macro integer-imply))
@@ -1965,6 +1987,7 @@ let safe-shl =
     __+ = (box-pointer (simple-folding-binary-op add sc_const_int_extract sc_const_int_new))
     __- = (box-pointer (simple-folding-binary-op sub sc_const_int_extract sc_const_int_new))
     __* = (box-pointer (simple-folding-binary-op mul sc_const_int_extract sc_const_int_new))
+    __** = (box-pointer (simple-folding-binary-op powi sc_const_int_extract sc_const_int_new))
     __// = (box-pointer (simple-folding-signed-binary-op sdiv udiv sc_const_int_extract sc_const_int_new))
     __/ =
         box-pointer
@@ -2003,7 +2026,7 @@ inline floordiv (a b)
     __/ = (box-pointer (simple-folding-binary-op fdiv sc_const_real_extract sc_const_real_new))
     __// = (box-pointer (simple-folding-autotype-binary-op floordiv sc_const_real_extract))
     __% = (box-pointer (simple-folding-binary-op frem sc_const_real_extract sc_const_real_new))
-
+    __** = (box-pointer (simple-folding-binary-op powf sc_const_real_extract sc_const_real_new))
 
 'set-symbols Value
     __== = (box-pointer (simple-binary-op sc_value_compare))
@@ -2179,6 +2202,7 @@ let
     + = (balanced-binary-op-dispatch '__+ '__r+ "add")
     - = (unary-or-balanced-binary-op-dispatch '__neg "negate" '__- '__r- "subtract")
     * = (balanced-binary-op-dispatch '__* '__r* "multiply")
+    ** = (balanced-binary-op-dispatch '__** '__r** "exponentiate")
     / = (unary-or-balanced-binary-op-dispatch '__rcp "invert" '__/ '__r/ "real-divide")
     // = (balanced-binary-op-dispatch '__// '__r// "integer-divide")
     % = (balanced-binary-op-dispatch '__% '__r% "modulate")
@@ -3103,23 +3127,6 @@ inline select-op-macro (sop uop fop numargs)
                                 ". integer or real vector or scalar expected"
             `(fun a b)
 
-fn powi (base exponent)
-    # special case for constant base 2
-    if (icmp== base 2)
-        return
-            shl 1 exponent
-    loop (result cur exponent = 1 base exponent)
-        if (icmp== exponent 0)
-            return result
-        else
-            repeat
-                do
-                    if (icmp== (band exponent 1) 0) result
-                    else
-                        mul result cur
-                mul cur cur
-                lshr exponent 1
-
 let sabs =
     spice-macro
         fn (args)
@@ -3135,7 +3142,7 @@ let sabs =
                 let mask = (ashr arg shift)
                 sub (bxor arg mask) mask
 
-let pow = (select-op-macro powi powi powf 2)
+let pow = **
 let abs = (select-op-macro sabs _ fabs 1)
 let sign = (select-op-macro ssign ssign fsign 1)
 
