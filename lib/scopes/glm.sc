@@ -120,6 +120,7 @@ typedef vec-type-accessor
         binary-op-dispatch '__+ '__r+ +
         binary-op-dispatch '__- '__r- -
         binary-op-dispatch '__* '__r* *
+        binary-op-dispatch '__** '__r** **
         binary-op-dispatch '__/ '__r/ /
         binary-op-dispatch '__// '__r// //
         binary-op-dispatch '__& '__r& &
@@ -325,6 +326,7 @@ typedef+ vec-type
         vec-type-binary-op-dispatch '__+ '__r+ '__vector+
         vec-type-binary-op-dispatch '__- '__r- '__vector-
         vec-type-binary-op-dispatch '__* '__r* '__vector*
+        vec-type-binary-op-dispatch '__** '__r** '__vector**
         vec-type-binary-op-dispatch '__/ '__r/ '__vector/
         vec-type-binary-op-dispatch '__// '__r// '__vector//
         vec-type-binary-op-dispatch '__& '__r& '__vector&

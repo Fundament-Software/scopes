@@ -4357,6 +4357,7 @@ inline signed-vector-binary-op (sf uf)
     __vector+  = fadd
     __vector-  = fsub
     __vector*  = fmul
+    __vector** = powf
     __vector/  = fdiv
     __vector%  = frem
     __vector== = fcmp==o
@@ -4385,6 +4386,7 @@ inline vector-binary-op-dispatch (symbol)
     __+ = (vector-binary-op-dispatch '__vector+)
     __- = (vector-binary-op-dispatch '__vector-)
     __* = (vector-binary-op-dispatch '__vector*)
+    __** = (vector-binary-op-dispatch '__vector**)
     __/ = (vector-binary-op-dispatch '__vector/)
     __// = (vector-binary-op-dispatch '__vector//)
     __% = (vector-binary-op-dispatch '__vector%)
