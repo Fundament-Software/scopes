@@ -174,21 +174,6 @@ int sc_main(void *c_main, int argc, char *argv[]) {
     return run_main(c_main, argc, argv);
 }
 
-// symbols needed by LLVM on windows
-////////////////////////////////////////////////////////////////////////////////
-
-#ifdef SCOPES_WIN32
-SCOPES_LIBEXPORT void __cdecl sincos (double x, double *a, double *b) {
-    *a = sin(x);
-    *b = cos(x);
-}
-
-SCOPES_LIBEXPORT void __cdecl sincosf (float x, float *a, float *b) {
-    *a = sinf(x);
-    *b = cosf(x);
-}
-#endif
-
 // Compiler
 ////////////////////////////////////////////////////////////////////////////////
 

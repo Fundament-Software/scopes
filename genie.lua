@@ -360,7 +360,7 @@ project "scopesrt"
         }
 
         links {
-            "uuid", "ole32", "psapi", "version", "stdc++", "z",
+            "uuid", "ole32", "psapi", "version", "stdc++", "z", "mingwex"
         }
 
         linkoptions {

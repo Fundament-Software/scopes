@@ -383,6 +383,16 @@ void init_llvm() {
     LLVMInitializeWebAssemblyAsmParser();
     LLVMInitializeWebAssemblyDisassembler();
 
+#ifdef SCOPES_WIN32
+    // from mingwex.a
+    LLVMAddSymbol("ldexpl", (void *)&ldexpl);
+    LLVMAddSymbol("ldexpf", (void *)&ldexpf);
+    // required by LLVM
+    LLVMAddSymbol("sincos", (void *)&sincos);
+    LLVMAddSymbol("sincosf", (void *)&sincosf);
+
+#endif
+
 #if 0
     auto targ = LLVMGetFirstTarget();
     while (targ) {
