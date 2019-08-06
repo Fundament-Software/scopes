@@ -43,6 +43,7 @@ uniform phase : f32
     location = 1
 uniform smp : sampler2D
     location = 2
+    set = 0
 
 buffer m :
     struct MutableData plain

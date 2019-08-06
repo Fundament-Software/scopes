@@ -4598,8 +4598,13 @@ inline extern-new (name T attrs...)
     let flags = (va-option flags attrs... 0:u32)
     let storage-class = (va-option storage-class attrs... unnamed)
     let location = (va-option location attrs... -1)
-    let binding = (va-option location attrs... -1)
-    sc_global_new name T flags storage-class location binding
+    let binding = (va-option binding attrs... -1)
+    let set = (va-option set attrs... -1)
+    let glob = (sc_global_new name T flags storage-class)
+    if (location > -1) (sc_global_set_location glob location)
+    if (binding > -1) (sc_global_set_binding glob binding)
+    if (set > -1) (sc_global_set_descriptor_set glob set)
+    glob
 
 let extern =
     spice-macro
@@ -4609,14 +4614,31 @@ let extern =
             raising Error
             let name = (('getarg args 0) as Symbol)
             let T = (('getarg args 1) as type)
-            loop (i flags storage-class location binding = 2 0:u32 unnamed -1 -1)
+            loop (i flags storage-class location binding set = 2 0:u32 unnamed -1 -1 -1)
                 if (i == argc)
-                    break
-                        `[(sc_global_new name T
-                            flags storage-class location binding)]
+                    let expr = `[(sc_global_new name T flags storage-class)]
+                    let expr =
+                        if (location > -1)
+                            spice-quote
+                                sc_global_set_location expr location
+                                expr
+                        else expr
+                    let expr =
+                        if (binding > -1)
+                            spice-quote
+                                sc_global_set_binding expr binding
+                                expr
+                        else expr
+                    let expr =
+                        if (set > -1)
+                            spice-quote
+                                sc_global_set_descriptor_set expr set
+                                expr
+                        else expr
+                    break expr
                 let arg = ('getarg args i)
                 let k v = ('dekey arg)
-                let flags storage-class location binding =
+                let flags storage-class location binding set =
                     if (k == unnamed)
                         let k = (arg as Symbol)
                         let newflag =
@@ -4629,16 +4651,18 @@ let extern =
                             elseif (k == 'block) global-flag-block
                             else
                                 error ("unrecognized flag: " .. (repr k))
-                        _ (bor flags newflag) storage-class location binding
+                        _ (bor flags newflag) storage-class location binding set
                     elseif (k == 'storage-class)
-                        _ flags (arg as Symbol) location binding
+                        _ flags (arg as Symbol) location binding set
                     elseif (k == 'location)
-                        _ flags storage-class (arg as i32) binding
+                        _ flags storage-class (arg as i32) binding set
                     elseif (k == 'binding)
-                        _ flags storage-class location (arg as i32)
+                        _ flags storage-class location (arg as i32) set
+                    elseif (k == 'set)
+                        _ flags storage-class location binding (arg as i32)
                     else
                         error ("unrecognized key: " .. (repr k))
-                _ (i + 1) flags storage-class location binding
+                _ (i + 1) flags storage-class location binding set
 
 let
     private =

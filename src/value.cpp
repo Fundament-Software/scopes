@@ -631,10 +631,9 @@ static const Type *pointer_for_global_type(const Type *type, size_t flags, Symbo
     return pointer_type(type, ptrflags, storage_class);
 }
 
-Global::Global(const Type *type, Symbol _name, size_t _flags, Symbol _storage_class, int _location, int _binding)
+Global::Global(const Type *type, Symbol _name, size_t _flags, Symbol _storage_class)
     : Pure(VK_Global, pointer_for_global_type(type, _flags, _storage_class)),
-        element_type(type), name(_name), flags(_flags), storage_class(_storage_class), location(_location),
-        binding(_binding) {
+        element_type(type), name(_name), flags(_flags), storage_class(_storage_class) {
 }
 
 bool Global::key_equal(const Global *other) const {
@@ -645,13 +644,12 @@ std::size_t Global::hash() const {
     return std::hash<const Global *>{}(this);
 }
 
-GlobalRef Global::from(const Type *type, Symbol name, size_t flags, Symbol storage_class, int location, int binding) {
+GlobalRef Global::from(const Type *type, Symbol name, size_t flags, Symbol storage_class) {
     if ((storage_class == SYM_SPIRV_StorageClassUniform)
         && !(flags & GF_BufferBlock)) {
         flags |= GF_Block;
     }
-    return ref(unknown_anchor(),
-        new Global(type, name, flags, storage_class, location, binding));
+    return ref(unknown_anchor(), new Global(type, name, flags, storage_class));
 }
 
 //------------------------------------------------------------------------------
