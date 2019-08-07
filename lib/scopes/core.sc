@@ -4252,13 +4252,16 @@ fn extract-integer (value)
     __as =
         do
             inline array-generator (arr)
+                # arr must be a reference
+                static-branch (&? arr)
+                    inline ()
+                    inline ()
+                        static-error "only array references can be cast to generator"
                 let count = (countof arr)
-                let stackarr = (ptrtoref (alloca (typeof arr)))
-                stackarr = arr
                 Generator
                     inline () 0:usize
                     inline (x) (< x count)
-                    inline (x) (@ stackarr x)
+                    inline (x) (@ arr x)
                     inline (x) (+ x 1:usize)
             spice-cast-macro
                 fn "array.__as" (vT T)
