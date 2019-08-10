@@ -265,7 +265,7 @@ let va-lfold va-lifold =
                         sc_valueref_tag anchor `(f k v ret)
         _
             spice-macro (fn "va-lfold" (args) (va-lfold args false))
-            spice-macro (fn "va-ilfold" (args) (va-lfold args true))
+            spice-macro (fn "va-lifold" (args) (va-lfold args true))
 
 let va-rfold va-rifold =
     do
