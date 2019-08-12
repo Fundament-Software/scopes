@@ -874,6 +874,13 @@ let cons =
                 let i = (sub i 1)
                 let arg = (sc_getarg args i)
                 let anchor = (sc_value_anchor arg)
+                # if both arguments are constant, produce a constant list
+                if (sc_value_is_constant last)
+                    if (sc_value_is_constant arg)
+                        let last = (sc_list_cons arg (unbox-pointer last list))
+                        let last = (sc_valueref_tag anchor `last)
+                        sc_expression_append block last
+                        repeat i last
                 let T = (sc_value_type arg)
                 let arg =
                     if (ptrcmp== T Value) arg
