@@ -139,6 +139,12 @@ fn build-repr-switch-case (litT self field-types allow-dupes?)
     sc_switch_append_default sw "?invalid?"
     sw
 
+# constructor for unit tags without payload
+inline unit-tag-constructor (enum-type index-value payload-type)
+    let value = (undef enum-type)
+    let value = (insertvalue value index-value 0)
+    insertvalue value (nullof payload-type) 1
+
 inline tag-constructor (
     enum-type index-value payload-type field-type field-pointer-type ...)
     let payload = (alloca payload-type)
@@ -249,12 +255,12 @@ fn finalize-enum-runtime (T storage)
             'set-symbol field 'Literal index-value
             let value =
                 if (field-type == Nothing)
-                    # can provide a constant
-                    store index-value (getelementptr consts 0)
-                    store (sc_const_null_new payload-type) (getelementptr consts 1)
-                    sc_const_aggregate_new T 2 consts
+                    spice-quote
+                        inline constructor ()
+                            unit-tag-constructor T index-value payload-type
+                    sc_template_set_name constructor name
+                    constructor
                 else
-                    # must provide a constructor
                     let TT = ('change-storage-class
                             ('mutable (pointer.type field-type)) 'Function)
                     spice-quote
