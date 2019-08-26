@@ -169,9 +169,14 @@ sc_valueref_raises_t sc_load_from_executable(const char *path) {
     return convert_result(load_custom_core(path));
 }
 
-int sc_main(void *c_main, int argc, char *argv[]) {
+void sc_init(void *c_main, int argc, char *argv[]) {
     using namespace scopes;
-    return run_main(c_main, argc, argv);
+    init(c_main, argc, argv);
+}
+
+int sc_main() {
+    using namespace scopes;
+    return run_main();
 }
 
 // Compiler
@@ -291,12 +296,6 @@ sc_void_raises_t sc_compile_object(const sc_string_t *target_triple,
 void sc_enter_solver_cli () {
     using namespace scopes;
     //enable_specializer_step_debugger();
-}
-
-sc_size_raises_t sc_verify_stack () {
-    using namespace scopes;
-    SCOPES_RESULT_TYPE(size_t);
-    SCOPES_C_RETURN(verify_stack());
 }
 
 // stdin/out
@@ -2184,7 +2183,6 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_default_target_triple, TYPE_String);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_compile_object, _void, TYPE_String, TYPE_I32, TYPE_String, TYPE_Scope, TYPE_U64);
     DEFINE_EXTERN_C_FUNCTION(sc_enter_solver_cli, _void);
-    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_verify_stack, TYPE_USize);
     DEFINE_EXTERN_C_FUNCTION(sc_launch_args, arguments_type({TYPE_I32,native_ro_pointer_type(rawstring)}));
 
     DEFINE_EXTERN_C_FUNCTION(sc_prompt, arguments_type({TYPE_Bool, TYPE_String}), TYPE_String, TYPE_String);

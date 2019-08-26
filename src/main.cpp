@@ -12,5 +12,6 @@ void *get_executable_function_pointer() {
 }
 
 int main(int argc, char *argv[]) {
-    return sc_main(get_executable_function_pointer(), argc, argv);
+    sc_init(get_executable_function_pointer(), argc, argv);
+    return sc_main();
 }
