@@ -49,6 +49,8 @@ void ArrayType::stream_name(StyledStream &ss) const {
 
 ArrayType::ArrayType(const Type *_element_type, size_t _count)
     : ArrayLikeType(TK_Array, _element_type, _count) {
+    size = (is_unsized()?0:(stride * count));
+    align = align_of(element_type).assert_ok();
 }
 
 //------------------------------------------------------------------------------

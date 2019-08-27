@@ -25,8 +25,6 @@ bool ArrayLikeType::classof(const Type *T) {
 ArrayLikeType::ArrayLikeType(TypeKind kind, const Type *_element_type, size_t _count)
     : CompositeType(kind), element_type(_element_type), count(_count) {
     stride = size_of(element_type).assert_ok();
-    size = (is_unsized()?0:(stride * count));
-    align = align_of(element_type).assert_ok();
 }
 
 SCOPES_RESULT(void *) ArrayLikeType::getelementptr(void *src, size_t i) const {
