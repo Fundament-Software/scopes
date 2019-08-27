@@ -22,13 +22,16 @@
 #include <assert.h>
 #include <unordered_map>
 
+#pragma GCC diagnostic ignored "-Wunused-function"
+#pragma GCC diagnostic ignored "-Wunused-const-variable"
+
 namespace scopes {
 
 //------------------------------------------------------------------------------
 // ANSI COLOR FORMATTING
 //------------------------------------------------------------------------------
 
-#define RGBCOLORS
+//#define RGBCOLORS
 
 namespace ANSI {
 static const char RESET[]           = "\033[0m";
@@ -96,10 +99,10 @@ void ansi_from_style(OStream &ost, Style style) {
 #else
     case Style_None: ost << ANSI::RESET; break;
     case Style_Symbol: ost << ANSI::COLOR_GRAY60; break;
-    case Style_String: ost << ANSI::COLOR_XMAGENTA; break;
-    case Style_Number: ost << ANSI::COLOR_XGREEN; break;
-    case Style_Keyword: ost << ANSI::COLOR_XBLUE; break;
-    case Style_Function: ost << ANSI::COLOR_GREEN; break;
+    case Style_String: ost << ANSI::COLOR_GREEN; break;
+    case Style_Number: ost << ANSI::COLOR_YELLOW; break;
+    case Style_Keyword: ost << ANSI::COLOR_XMAGENTA; break;
+    case Style_Function: ost << ANSI::COLOR_XBLUE; break;
     case Style_SfxFunction: ost << ANSI::COLOR_RED; break;
     case Style_Operator: ost << ANSI::COLOR_XCYAN; break;
     case Style_Instruction: ost << ANSI::COLOR_YELLOW; break;
