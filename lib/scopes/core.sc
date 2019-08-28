@@ -679,10 +679,12 @@ inline runtime-aggregate-type-constructor (f)
 
 # static tuple type constructor
 sc_type_set_symbol tuple '__typecall (aggregate-type-constructor 1 sc_tuple_type)
+sc_type_set_symbol tuple 'packed (aggregate-type-constructor 1 sc_packed_tuple_type)
 let union-storageof = (aggregate-type-constructor 0 sc_union_storage_type)
 
 # dynamic tuple type constructor
 sc_type_set_symbol tuple 'type (runtime-aggregate-type-constructor sc_tuple_type)
+sc_type_set_symbol tuple 'packed-type (runtime-aggregate-type-constructor sc_packed_tuple_type)
 let union-storage-type = (runtime-aggregate-type-constructor sc_union_storage_type)
 
 # arguments type constructor

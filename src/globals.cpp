@@ -1960,6 +1960,16 @@ sc_type_raises_t sc_tuple_type(int numtypes, const sc_type_t **typeargs) {
     return convert_result(tuple_type(types));
 }
 
+sc_type_raises_t sc_packed_tuple_type(int numtypes, const sc_type_t **typeargs) {
+    using namespace scopes;
+    Types types;
+    types.reserve(numtypes);
+    for (int i = 0; i < numtypes; ++i) {
+        types.push_back(typeargs[i]);
+    }
+    return convert_result(tuple_type(types, true));
+}
+
 sc_type_raises_t sc_union_storage_type(int numtypes, const sc_type_t **typeargs) {
     using namespace scopes;
     Types types;
@@ -2385,6 +2395,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_vector_type, TYPE_Type, TYPE_Type, TYPE_USize);
 
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_tuple_type, TYPE_Type, TYPE_I32, native_ro_pointer_type(TYPE_Type));
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_packed_tuple_type, TYPE_Type, TYPE_I32, native_ro_pointer_type(TYPE_Type));
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_union_storage_type, TYPE_Type, TYPE_I32, native_ro_pointer_type(TYPE_Type));
 
     DEFINE_EXTERN_C_FUNCTION(sc_arguments_type, TYPE_Type, TYPE_I32, native_ro_pointer_type(TYPE_Type));
