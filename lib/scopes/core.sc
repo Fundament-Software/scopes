@@ -4072,7 +4072,7 @@ inline range (a b c)
             inline () a
             inline () b
     Generator
-        inline () from
+        inline () (deref from)
         inline (x) (x < to)
         inline (x) x
         inline (x) (x + step)
