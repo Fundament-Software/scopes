@@ -4195,7 +4195,7 @@ let __unpack-keyed-aggregate =
     __getattr = extractvalue
     __@ = extractvalue
 
-let tupleof =
+inline gen-tupleof (type-func)
     spice-macro
         fn (args)
             let argc = ('argcount args)
@@ -4213,13 +4213,16 @@ let tupleof =
                 i + 1
 
             # generate insert instructions
-            let TT = (sc_tuple_type argc field-types)
+            let TT = (type-func argc field-types)
             loop (i result = 0 `(nullof TT))
                 if (i == argc)
                     break result
                 let arg = ('getarg args i)
                 _ (i + 1)
                     `(insertvalue result arg i)
+
+let tupleof = (gen-tupleof sc_tuple_type)
+let packedtupleof = (gen-tupleof sc_packed_tuple_type)
 
 #-------------------------------------------------------------------------------
 # arrays
@@ -7007,6 +7010,7 @@ let e = e:f32
 #-------------------------------------------------------------------------------
 
 unlet _memo dot-char dot-sym ellipsis-symbol _Value constructor destructor
+    \ gen-tupleof
 
 run-stage; # 12
 
