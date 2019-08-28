@@ -45,6 +45,7 @@ namespace scopes {
     T(OpDPdx) \
     T(OpDPdy) \
     T(OpFwidth) \
+    T(OpSampledImage) \
 
 
 // prefix: GLSLstd450
