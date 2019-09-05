@@ -144,3 +144,9 @@ print
     # /dev/null
     drain
 
+# chain expressions
+--> "test"
+    .. "blah"
+    .. __ "bleh"
+    __ == "blahtestbleh"
+    assert
