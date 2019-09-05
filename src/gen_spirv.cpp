@@ -45,6 +45,7 @@ namespace scopes {
     T(OpDPdx) \
     T(OpDPdy) \
     T(OpFwidth) \
+    T(OpSampledImage) \
 
 
 // prefix: GLSLstd450
@@ -1998,6 +1999,9 @@ struct SPIRVGenerator {
             }
             if (node->location >= 0) {
                 builder.addDecoration(id, spv::DecorationLocation, node->location);
+            }
+            if (node->descriptor_set >= 0) {
+                builder.addDecoration(id, spv::DecorationDescriptorSet, node->descriptor_set);
             }
             if (builder.isImageType(ty)) {
                 auto flags = node->flags;

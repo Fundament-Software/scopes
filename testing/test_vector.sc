@@ -47,3 +47,17 @@ test
 # reduce on big vector sizes
 test ((vector-reduce add (vectorof i32 1 2 3 4 5 6 7 8 9 10 11 12)) == 78)
 
+# test alignment
+inline test-alignment (T)
+    assert
+        == (alignof T)
+            ptrtoint (getelementptr (nullof (mutable pointer (tuple bool T))) 0 1) u64
+    assert
+        == (sizeof T)
+            ptrtoint (getelementptr (nullof (mutable pointer T)) 1) u64
+
+test-alignment (vector f32 3)
+test-alignment (vector i8 3)
+test-alignment (vector f32 9)
+test-alignment (vector i8 11)
+

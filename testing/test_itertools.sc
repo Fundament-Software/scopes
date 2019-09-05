@@ -7,13 +7,14 @@ for x y z in (bitdim 2 1 1)
     print x y z
 
 let binary-range = (range 2)
+local arr =
+    arrayof string "yes" "this" "is" "dog?"
 let gen =
     zip
         imap
             infinite-range
             inline (x) (x * 2)
-        span
-            arrayof string "yes" "this" "is" "dog?"
+        span arr
             binary-range
             binary-range
 

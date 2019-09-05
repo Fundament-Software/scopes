@@ -177,5 +177,13 @@ test (val.y == 4)
 test (val.z == 5)
 test (val.w == 10)
 
+# test packing
+do
+    struct K plain packed
+        w : i8
+        k : i32
+
+    assert ((sizeof K) == 5)
+
 
 none

@@ -50,8 +50,8 @@ sugar struct (name body...)
             else default-value...
         define-field-runtime T name field-type default-value
 
-    spice finalize-struct (T)
-        fn finalize-struct-runtime (T)
+    spice finalize-struct (T packed?)
+        fn finalize-struct-runtime (T packed?)
             let field-types = ('@ T '__fields__)
             let numfields = ('argcount field-types)
             let fields = (alloca-array type numfields)
@@ -60,25 +60,33 @@ sugar struct (name body...)
                 let field = (('@ field 'Type) as type)
                 (ptrtoref (getelementptr fields i)) = field
             if (T < CUnion)
+                if packed?
+                    error "unions can't be packed"
                 'set-symbol T '__fields
                     sc_tuple_type numfields fields
                 'set-plain-storage T
                     sc_union_storage_type numfields fields
             elseif (T < CStruct)
                 'set-plain-storage T
-                    sc_tuple_type numfields fields
+                    if packed?
+                        sc_packed_tuple_type numfields fields
+                    else
+                        sc_tuple_type numfields fields
             elseif (T < Struct)
                 'set-storage T
-                    sc_tuple_type numfields fields
+                    if packed?
+                        sc_packed_tuple_type numfields fields
+                    else
+                        sc_tuple_type numfields fields
             else
                 error
                     .. "type " (repr T) " must have Struct, CStruct or CUnion supertype"
                         \ " but has supertype " (repr ('superof T))
         if ('constant? T)
-            finalize-struct-runtime (T as type)
+            finalize-struct-runtime (T as type) (packed? as bool)
             `()
         else
-            `(finalize-struct-runtime T)
+            `(finalize-struct-runtime T packed?)
 
     let supertype body has-supertype? =
         sugar-match body...
@@ -103,6 +111,13 @@ sugar struct (name body...)
             try (getattr sugar-scope symname) true
             except (err) false
         else false
+
+    let packed? body =
+        sugar-match body
+        case ('packed rest...)
+            _ true rest...
+        default
+            _ false body
 
     # detect and rewrite top level field forms
     let body =
@@ -156,7 +171,7 @@ sugar struct (name body...)
         [do]
             unquote-splice body
             [fold-locals] this-type [append-to-type]
-        [finalize-struct] this-type
+        [finalize-struct] this-type [packed?]
         this-type
 
 do

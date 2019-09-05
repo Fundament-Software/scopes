@@ -15,7 +15,7 @@ spice make-enum (val)
 run-stage;
 
 do
-    enum Mode plain 
+    enum Mode plain
         \ Notch Low High Band Peak Count
 
     print Mode.Notch
@@ -71,18 +71,18 @@ do
         T.Q == 0
     test
         T.R == 1
-    
+
     print T.Q T.X
 
 do
     # sum | tagged enum type
     enum sum1
-        # classic tag
+        # classic unit tag
         Empty
         # tag name : argument types
         Byte : i8
         # compile time expression
-        tag 'Tuple2xi32 (tuple i32 i32) 
+        tag 'Tuple2xi32 (tuple i32 i32)
         TupleXYi :
             x = i32; y = i32; z = i32
         Tuple2xf32 : f32 f32
@@ -91,8 +91,9 @@ do
     test
         (superof sum1) == Enum
 
-    test ((typeof sum1.Empty) == sum1)
-    test (constant? sum1.Empty)
+    # unit tags must also be instantiated
+    test ((typeof (sum1.Empty)) == sum1)
+    test (not (constant? (sum1.Empty)))
 
     fn dispatch-sum1 (val)
         dispatch val
@@ -118,7 +119,7 @@ do
         Tuple2xi32 10 20
     dispatch-sum1
         TupleXYi (y = 20) (x = 10)
-    dispatch-sum1 
+    dispatch-sum1
         Message "hello"
 
 do
@@ -128,7 +129,7 @@ do
 
     enum Explicit : i32
         A
-    
+
     test ((storageof Implicit) == (storageof Explicit))
 
     # only types allowed
@@ -139,7 +140,7 @@ do
                 A
 
     # the type after `:` must be a storage type
-    test-compiler-error 
+    test-compiler-error
         enum NonStorageEnum : Implicit
             A
 
@@ -163,5 +164,15 @@ do
             else
                 _ (char-count + 1)
     test (count == 5:usize)
-        
+
+do
+    enum A
+        a : i32
+        b
+
+    dump
+        arrayof A
+            A.a 0
+            A.b;
+
 ;

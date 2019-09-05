@@ -21,6 +21,18 @@ inline size_t align(size_t offset, size_t align) {
     return (offset + align - 1) & ~(align - 1);
 }
 
+inline size_t ceilpow2 (size_t v) {
+    v--;
+    v |= (v >> 1);
+    v |= (v >> 2);
+    v |= (v >> 4);
+    v |= (v >> 8);
+    v |= (v >> 16);
+    v |= (v >> 32);
+    v++;
+    return v;
+}
+
 template <typename R, typename... Args>
 inline std::function<R (Args...)> memoize(R (*fn)(Args...)) {
     std::map<std::tuple<Args...>, R> table;

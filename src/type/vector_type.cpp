@@ -8,6 +8,7 @@
 #include "../error.hpp"
 #include "../dyn_cast.inc"
 #include "../hash.hpp"
+#include "../utils.hpp"
 
 #include <unordered_set>
 
@@ -45,6 +46,13 @@ void VectorType::stream_name(StyledStream &ss) const {
 
 VectorType::VectorType(const Type *_element_type, size_t _count)
     : ArrayLikeType(TK_Vector, _element_type, _count) {
+    if (is_unsized()) {
+        size = 0;
+        align = align_of(element_type).assert_ok();
+    } else {
+        size = ceilpow2(stride * count);
+        align = size;
+    }
 }
 
 SCOPES_RESULT(const Type *) vector_type(const Type *element_type, size_t count) {

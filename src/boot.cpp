@@ -198,12 +198,8 @@ static void setup_stdio() {
     }
 }
 
-SCOPES_RESULT(int) try_main(void *c_main, int argc, char *argv[]) {
-    SCOPES_RESULT_TYPE(int);
+void init(void *c_main, int argc, char *argv[]) {
     using namespace scopes;
-    uint64_t c = 0;
-    g_stack_start = (char *)&c;
-
     on_startup();
 
     Symbol::_init_symbols();
@@ -237,6 +233,11 @@ SCOPES_RESULT(int) try_main(void *c_main, int argc, char *argv[]) {
 
     init_types();
     init_globals(argc, argv);
+}
+
+SCOPES_RESULT(int) try_main() {
+    SCOPES_RESULT_TYPE(int);
+    using namespace scopes;
 
     ValueRef expr = SCOPES_GET_RESULT(load_custom_core(scopes_compiler_path));
     if (expr) {
@@ -342,9 +343,9 @@ static void crash_handler(int sig) {
 #endif
 #endif
 
-int run_main(void *c_main, int argc, char *argv[]) {
+int run_main() {
     using namespace scopes;
-    auto result = try_main(c_main, argc, argv);
+    auto result = try_main();
     if (!result.ok()) {
         print_error(result.assert_error());
         f_exit(1);

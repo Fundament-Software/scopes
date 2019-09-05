@@ -276,6 +276,7 @@ inline wrap-xvar-global (f)
 fn config-xvar (flags storage anchor name T layout)
     local location = -1
     local binding = -1
+    local set = -1
     local flags = flags
     for arg in ('args layout)
         let k v = ('dekey arg)
@@ -284,6 +285,8 @@ fn config-xvar (flags storage anchor name T layout)
             location = (v as i32)
         case 'binding
             binding = (v as i32)
+        case 'set
+            set = (v as i32)
         case 'readonly
             if (flags & global-flag-non-readable)
                 error "value is already tagged writeonly"
@@ -300,7 +303,12 @@ fn config-xvar (flags storage anchor name T layout)
             flags = flags | global-flag-flat
         default
             error (.. "unsupported key: " (k as string))
-    'tag (sc_global_new name T flags storage location binding) anchor
+    let glob =
+        'tag (sc_global_new name T flags storage) anchor
+    if (location > -1) (sc_global_set_location glob location)
+    if (binding > -1) (sc_global_set_binding glob binding)
+    if (set > -1) (sc_global_set_descriptor_set glob set)
+    glob
 
 fn config-buffer (anchor name T layout)
     config-xvar global-flag-buffer-block 'Uniform anchor name T layout

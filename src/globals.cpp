@@ -169,9 +169,14 @@ sc_valueref_raises_t sc_load_from_executable(const char *path) {
     return convert_result(load_custom_core(path));
 }
 
-int sc_main(void *c_main, int argc, char *argv[]) {
+void sc_init(void *c_main, int argc, char *argv[]) {
     using namespace scopes;
-    return run_main(c_main, argc, argv);
+    init(c_main, argc, argv);
+}
+
+int sc_main() {
+    using namespace scopes;
+    return run_main();
 }
 
 // Compiler
@@ -291,12 +296,6 @@ sc_void_raises_t sc_compile_object(const sc_string_t *target_triple,
 void sc_enter_solver_cli () {
     using namespace scopes;
     //enable_specializer_step_debugger();
-}
-
-sc_size_raises_t sc_verify_stack () {
-    using namespace scopes;
-    SCOPES_RESULT_TYPE(size_t);
-    SCOPES_C_RETURN(verify_stack());
 }
 
 // stdin/out
@@ -1328,9 +1327,33 @@ void sc_expression_append(sc_valueref_t expr, sc_valueref_t value) {
 }
 
 sc_valueref_t sc_global_new(sc_symbol_t name, const sc_type_t *type,
-    uint32_t flags, sc_symbol_t storage_class, int location, int binding) {
+    uint32_t flags, sc_symbol_t storage_class) {
     using namespace scopes;
-    return Global::from(type, name, flags, storage_class, location, binding);
+    return Global::from(type, name, flags, storage_class);
+}
+
+sc_void_raises_t sc_global_set_location(sc_valueref_t value, int location) {
+    using namespace scopes;
+    SCOPES_RESULT_TYPE(void);
+    auto glob = SCOPES_C_GET_RESULT(extract_global_constant(value));
+    glob->location = location;
+    return convert_result({});
+}
+
+sc_void_raises_t sc_global_set_binding(sc_valueref_t value, int binding) {
+    using namespace scopes;
+    SCOPES_RESULT_TYPE(void);
+    auto glob = SCOPES_C_GET_RESULT(extract_global_constant(value));
+    glob->binding = binding;
+    return convert_result({});
+}
+
+sc_void_raises_t sc_global_set_descriptor_set(sc_valueref_t value, int set) {
+    using namespace scopes;
+    SCOPES_RESULT_TYPE(void);
+    auto glob = SCOPES_C_GET_RESULT(extract_global_constant(value));
+    glob->descriptor_set = set;
+    return convert_result({});
 }
 
 sc_void_raises_t sc_global_set_initializer(sc_valueref_t value,
@@ -1367,6 +1390,13 @@ sc_int_raises_t sc_global_binding(sc_valueref_t value) {
     SCOPES_RESULT_TYPE(int);
     auto glob = SCOPES_C_GET_RESULT(extract_global_constant(value));
     SCOPES_C_RETURN(glob->binding);
+}
+
+sc_int_raises_t sc_global_descriptor_set(sc_valueref_t value) {
+    using namespace scopes;
+    SCOPES_RESULT_TYPE(int);
+    auto glob = SCOPES_C_GET_RESULT(extract_global_constant(value));
+    SCOPES_C_RETURN(glob->descriptor_set);
 }
 
 sc_symbol_raises_t sc_global_storage_class(sc_valueref_t value) {
@@ -1930,6 +1960,16 @@ sc_type_raises_t sc_tuple_type(int numtypes, const sc_type_t **typeargs) {
     return convert_result(tuple_type(types));
 }
 
+sc_type_raises_t sc_packed_tuple_type(int numtypes, const sc_type_t **typeargs) {
+    using namespace scopes;
+    Types types;
+    types.reserve(numtypes);
+    for (int i = 0; i < numtypes; ++i) {
+        types.push_back(typeargs[i]);
+    }
+    return convert_result(tuple_type(types, true));
+}
+
 sc_type_raises_t sc_union_storage_type(int numtypes, const sc_type_t **typeargs) {
     using namespace scopes;
     Types types;
@@ -2153,7 +2193,6 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_default_target_triple, TYPE_String);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_compile_object, _void, TYPE_String, TYPE_I32, TYPE_String, TYPE_Scope, TYPE_U64);
     DEFINE_EXTERN_C_FUNCTION(sc_enter_solver_cli, _void);
-    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_verify_stack, TYPE_USize);
     DEFINE_EXTERN_C_FUNCTION(sc_launch_args, arguments_type({TYPE_I32,native_ro_pointer_type(rawstring)}));
 
     DEFINE_EXTERN_C_FUNCTION(sc_prompt, arguments_type({TYPE_Bool, TYPE_String}), TYPE_String, TYPE_String);
@@ -2202,12 +2241,15 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_expression_new, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_expression_set_scoped, _void, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_expression_append, _void, TYPE_ValueRef, TYPE_ValueRef);
-    DEFINE_EXTERN_C_FUNCTION(sc_global_new, TYPE_ValueRef, TYPE_Symbol, TYPE_Type,
-        TYPE_U32, TYPE_Symbol, TYPE_I32, TYPE_I32);
+    DEFINE_EXTERN_C_FUNCTION(sc_global_new, TYPE_ValueRef, TYPE_Symbol, TYPE_Type, TYPE_U32, TYPE_Symbol);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_global_set_initializer, _void, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_global_set_constructor, _void, TYPE_ValueRef, TYPE_ValueRef);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_global_set_location, _void, TYPE_ValueRef, TYPE_I32);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_global_set_binding, _void, TYPE_ValueRef, TYPE_I32);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_global_set_descriptor_set, _void, TYPE_ValueRef, TYPE_I32);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_global_location, TYPE_I32, TYPE_ValueRef);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_global_binding, TYPE_I32, TYPE_ValueRef);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_global_descriptor_set, TYPE_I32, TYPE_ValueRef);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_global_storage_class, TYPE_Symbol, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_if_new, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_if_append_then_clause, _void, TYPE_ValueRef, TYPE_ValueRef, TYPE_ValueRef);
@@ -2353,6 +2395,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_vector_type, TYPE_Type, TYPE_Type, TYPE_USize);
 
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_tuple_type, TYPE_Type, TYPE_I32, native_ro_pointer_type(TYPE_Type));
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_packed_tuple_type, TYPE_Type, TYPE_I32, native_ro_pointer_type(TYPE_Type));
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_union_storage_type, TYPE_Type, TYPE_I32, native_ro_pointer_type(TYPE_Type));
 
     DEFINE_EXTERN_C_FUNCTION(sc_arguments_type, TYPE_Type, TYPE_I32, native_ro_pointer_type(TYPE_Type));

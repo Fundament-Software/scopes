@@ -149,7 +149,8 @@ typedef sc_list_scope_raises_t (*sc_syntax_wildcard_func_t)(const sc_list_t *, s
 // booting
 
 SCOPES_LIBEXPORT sc_valueref_raises_t sc_load_from_executable(const char *path);
-SCOPES_LIBEXPORT int sc_main(void *c_main, int argc, char *argv[]);
+SCOPES_LIBEXPORT void sc_init(void *c_main, int argc, char *argv[]);
+SCOPES_LIBEXPORT int sc_main();
 
 // stats & info
 
@@ -169,7 +170,6 @@ SCOPES_LIBEXPORT sc_string_raises_t sc_compile_glsl(int version, sc_symbol_t tar
 SCOPES_LIBEXPORT const sc_string_t *sc_default_target_triple();
 SCOPES_LIBEXPORT sc_void_raises_t sc_compile_object(const sc_string_t *target_triple, int file_kind, const sc_string_t *path, sc_scope_t *table, uint64_t flags);
 SCOPES_LIBEXPORT void sc_enter_solver_cli ();
-SCOPES_LIBEXPORT sc_size_raises_t sc_verify_stack ();
 SCOPES_LIBEXPORT sc_valueref_raises_t sc_eval_inline(const sc_anchor_t *anchor, const sc_list_t *expr, sc_scope_t *scope);
 SCOPES_LIBEXPORT sc_rawstring_i32_array_tuple_t sc_launch_args();
 
@@ -218,14 +218,17 @@ SCOPES_LIBEXPORT void sc_expression_append(sc_valueref_t expr, sc_valueref_t val
 SCOPES_LIBEXPORT void sc_expression_set_scoped(sc_valueref_t expr);
 
 SCOPES_LIBEXPORT sc_valueref_t sc_global_new(sc_symbol_t name,
-    const sc_type_t *type, uint32_t flags /* = 0 */, sc_symbol_t storage_class /* = unnamed */,
-    int location /* = -1 */, int binding /* = -1 */);
+    const sc_type_t *type, uint32_t flags /* = 0 */, sc_symbol_t storage_class /* = unnamed */);
 SCOPES_LIBEXPORT sc_void_raises_t sc_global_set_initializer(sc_valueref_t value,
     sc_valueref_t init);
 SCOPES_LIBEXPORT sc_void_raises_t sc_global_set_constructor(sc_valueref_t value,
     sc_valueref_t func);
+SCOPES_LIBEXPORT sc_void_raises_t sc_global_set_location(sc_valueref_t value, int location);
+SCOPES_LIBEXPORT sc_void_raises_t sc_global_set_binding(sc_valueref_t value, int binding);
+SCOPES_LIBEXPORT sc_void_raises_t sc_global_set_descriptor_set(sc_valueref_t value, int set);
 SCOPES_LIBEXPORT sc_int_raises_t sc_global_location(sc_valueref_t value);
 SCOPES_LIBEXPORT sc_int_raises_t sc_global_binding(sc_valueref_t value);
+SCOPES_LIBEXPORT sc_int_raises_t sc_global_descriptor_set(sc_valueref_t value);
 SCOPES_LIBEXPORT sc_symbol_raises_t sc_global_storage_class(sc_valueref_t value);
 
 SCOPES_LIBEXPORT sc_valueref_t sc_if_new();
@@ -447,6 +450,7 @@ SCOPES_LIBEXPORT sc_type_raises_t sc_vector_type(const sc_type_t *element_type, 
 // tuple types
 
 SCOPES_LIBEXPORT sc_type_raises_t sc_tuple_type(int numtypes, const sc_type_t **types);
+SCOPES_LIBEXPORT sc_type_raises_t sc_packed_tuple_type(int numtypes, const sc_type_t **types);
 SCOPES_LIBEXPORT sc_type_raises_t sc_union_storage_type(int numtypes, const sc_type_t **types);
 
 // argument types

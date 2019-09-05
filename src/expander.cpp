@@ -1032,7 +1032,6 @@ struct Expander {
         SCOPES_RESULT_TYPE(ValueRef);
         SCOPES_TRACE_EXPANDER(anynode);
     expand_again:
-        SCOPES_CHECK_RESULT(verify_stack());
         const Anchor *anchor = anynode.anchor();
         if (!anynode.isa<Const>()) {
             if (verbose) {

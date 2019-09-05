@@ -1289,15 +1289,14 @@ struct Global : Pure {
     static bool classof(const Value *T);
 
     Global(const Type *type, Symbol name,
-        size_t flags, Symbol storage_class, int location, int binding);
+        size_t flags, Symbol storage_class);
 
     bool key_equal(const Global *other) const;
     std::size_t hash() const;
 
     static GlobalRef from(const Type *type, Symbol name,
         size_t flags = 0,
-        Symbol storage_class = SYM_Unnamed,
-        int location = -1, int binding = -1);
+        Symbol storage_class = SYM_Unnamed);
 
     const Type *element_type;
     PureRef initializer;
@@ -1305,8 +1304,9 @@ struct Global : Pure {
     Symbol name;
     size_t flags;
     Symbol storage_class;
-    int location;
-    int binding;
+    int location = -1;
+    int binding = -1;
+    int descriptor_set = -1;
 };
 
 //------------------------------------------------------------------------------
