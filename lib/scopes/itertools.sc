@@ -94,8 +94,8 @@ inline imap (gen f)
             f (at it...)
         next
 
-# when collector a is exhausted, continue with collector b
-    both collectors must yield the same value type
+# when generator a is exhausted, continue with generator b
+    both generators must yield the same value type
 inline join (a b)
     let start-a valid-a at-a next-a = ((a as Generator))
     let start-b valid-b at-b next-b = ((b as Generator))
