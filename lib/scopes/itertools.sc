@@ -94,8 +94,42 @@ inline imap (gen f)
             f (at it...)
         next
 
+# when collector a is exhausted, continue with collector b
+    both collectors must yield the same value type
+inline join (a b)
+    let start-a valid-a at-a next-a = ((a as Generator))
+    let start-b valid-b at-b next-b = ((b as Generator))
+    let start-a... = (start-a)
+    let lsize = (va-countof start-a...)
+    let start... = (va-append-va start-b start-a...)
+    Generator
+        inline () start...
+        inline (it...)
+            let it-a it-b = (va-split lsize it...)
+            (valid-a (it-a)) | (valid-b (it-b))
+        inline (it...)
+            let it-a it-b = (va-split lsize it...)
+            let it-a... = (it-a)
+            if (valid-a it-a...)
+                at-a it-a...
+            else
+                at-b (it-b)
+        inline (it...)
+            let it-a it-b = (va-split lsize it...)
+            let it-a... = (it-a)
+            let valid? = (valid-a it-a...)
+            va-append-va
+                inline ()
+                    let it-b... = (it-b)
+                    if valid? it-b...
+                    else
+                        next-b it-b...
+                if valid? (next-a it-a...)
+                else it-a...
+
 define zip (spice-macro (fn (args) (ltr-multiop args `zip 2)))
 define span (spice-macro (fn (args) (rtl-multiop args `span 2)))
+define join (spice-macro (fn (args) (rtl-multiop args `join 2)))
 
 #---------------------------------------------------------------------------
 # collectors
