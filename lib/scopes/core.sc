@@ -3941,6 +3941,14 @@ define-sugar-macro define-sugar-block-scope-macro
                 inline (i) (i + 1)
 
 do
+    inline lineage-generator (self)
+        Generator
+            inline () self
+            inline (self) (self != null)
+            inline (self) self
+            inline (self)
+                sc_scope_get_parent self
+
     inline scope-generator (self)
         Generator
             inline () (sc_scope_next self -1)
@@ -3950,6 +3958,7 @@ do
                 sc_scope_next self index
 
     'set-symbols Scope
+        lineage = lineage-generator
         deleted =
             inline (self)
                 Generator
