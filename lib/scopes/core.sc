@@ -3974,6 +3974,21 @@ do
             inline (i) (load (getelementptr buf i))
             inline (i) (i + 1:usize)
 
+    inline string-generator-range (self start end)
+        start := start as usize
+        let buf sz = ('buffer self)
+        let end =
+            static-branch (none? end)
+                inline () sz
+                inline () 
+                    end := end as usize
+                    ? (sz < end) sz end
+        Generator
+            inline () start
+            inline (i) (i < end)
+            inline (i) (load (getelementptr buf i))
+            inline (i) (i + 1:usize)
+
     inline string-collector (maxsize)
         let buf = (alloca-array i8 maxsize)
         Collector
@@ -3992,6 +4007,7 @@ do
 
     'set-symbols string
         collector = string-collector
+        range = string-generator-range
         __hash =
             inline (self)
                 hash.from-bytes ('buffer self)
