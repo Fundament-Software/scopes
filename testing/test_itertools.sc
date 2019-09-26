@@ -43,23 +43,12 @@ print
         flatten
         '()
 
-inline string-buffer-sink (maxsize)
-    let buf = (alloca-array i8 maxsize)
-    Collector
-        inline () 0
-        inline (n) (n < maxsize)
-        inline (n)
-            sc_string_new buf (n as usize)
-        inline (src n)
-            store (src) (getelementptr buf n)
-            n + 1
-
 print
     ->>
         "the quick brown fox jumped over the lazy dog"
         cascade
             limit (inline (x) (x != 32))
-            string-buffer-sink 256
+            string.collector 256
         '()
 
 assert

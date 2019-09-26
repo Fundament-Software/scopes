@@ -3974,12 +3974,24 @@ do
             inline (i) (load (getelementptr buf i))
             inline (i) (i + 1:usize)
 
+    inline string-collector (maxsize)
+        let buf = (alloca-array i8 maxsize)
+        Collector
+            inline () 0
+            inline (n) (n < maxsize)
+            inline (n)
+                sc_string_new buf (n as usize)
+            inline (src n)
+                store (src) (getelementptr buf n)
+                n + 1
+
     fn i8->string(c)
         let ptr = (alloca i8)
         store c ptr
         sc_string_new ptr 1
 
     'set-symbols string
+        collector = string-collector
         __hash =
             inline (self)
                 hash.from-bytes ('buffer self)
