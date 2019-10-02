@@ -3941,6 +3941,14 @@ define-sugar-macro define-sugar-block-scope-macro
                 inline (i) (i + 1)
 
 do
+    inline lineage-generator (self)
+        Generator
+            inline () self
+            inline (self) (self != null)
+            inline (self) self
+            inline (self)
+                sc_scope_get_parent self
+
     inline scope-generator (self)
         Generator
             inline () (sc_scope_next self -1)
@@ -3950,6 +3958,7 @@ do
                 sc_scope_next self index
 
     'set-symbols Scope
+        lineage = lineage-generator
         deleted =
             inline (self)
                 Generator
@@ -3974,12 +3983,40 @@ do
             inline (i) (load (getelementptr buf i))
             inline (i) (i + 1:usize)
 
+    inline string-generator-range (self start end)
+        start := start as usize
+        let buf sz = ('buffer self)
+        let end =
+            static-branch (none? end)
+                inline () sz
+                inline () 
+                    end := end as usize
+                    ? (sz < end) sz end
+        Generator
+            inline () start
+            inline (i) (i < end)
+            inline (i) (load (getelementptr buf i))
+            inline (i) (i + 1:usize)
+
+    inline string-collector (maxsize)
+        let buf = (alloca-array i8 maxsize)
+        Collector
+            inline () 0
+            inline (n) (n < maxsize)
+            inline (n)
+                sc_string_new buf (n as usize)
+            inline (src n)
+                store (src) (getelementptr buf n)
+                n + 1
+
     fn i8->string(c)
         let ptr = (alloca i8)
         store c ptr
         sc_string_new ptr 1
 
     'set-symbols string
+        collector = string-collector
+        range = string-generator-range
         __hash =
             inline (self)
                 hash.from-bytes ('buffer self)

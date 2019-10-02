@@ -9,10 +9,7 @@ loop (index = -1)
     print key value
     index
 
-loop (scope = (globals))
-    if (scope == null)
-        break;
+for scope in ('lineage (globals))
     for k v in scope
-        #print k "=" v
+        print k "=" v
         assert (('typeof k) == Symbol)
-    sc_scope_get_parent scope
