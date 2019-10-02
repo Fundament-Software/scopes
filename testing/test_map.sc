@@ -89,6 +89,30 @@ iter-pairs2
             print value
             error "value missing"
 
+run-stage;
+
+do
+    # test for LLVM struct type conversion error
+    using import Map
+
+    let SomeMap = (Map i32 i32)
+
+    # this works:
+    # inline make-some-map ()
+    #     (SomeMap)
+
+    # this doesn't work:
+    fn make-some-map ()
+        (SomeMap)
+
+    # this works only in some circumstances. Seems to fail on a Struct initializer, for example.
+    # fn make-some-map ()
+    #     local m = (SomeMap)
+    #     deref m
+
+    let sm = (make-some-map)
+    ;
+
 ;
 
 

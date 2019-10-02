@@ -952,7 +952,9 @@ struct LLVMIRGenerator {
         LLVMValueRef parentfunc = LLVMGetBasicBlockParent(LLVMGetInsertBlock(builder));
         bool use_sret = is_memory_class(rtype);
         if (use_sret) {
-            LLVMBuildStore(builder, value, LLVMGetParam(parentfunc, 0));
+            auto ptr = LLVMGetParam(parentfunc, 0);
+            ptr = fix_named_struct_store(value, ptr);
+            LLVMBuildStore(builder, value, ptr);
             return LLVMBuildRetVoid(builder);
         } else if (rtype == empty_arguments_type()) {
             return LLVMBuildRetVoid(builder);
