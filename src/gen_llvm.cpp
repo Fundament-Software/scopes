@@ -1177,13 +1177,7 @@ struct LLVMIRGenerator {
             auto phi = phis[i];
             auto ty = LLVMTypeOf(phi);
             auto llvmval = SCOPES_GET_RESULT(ref_to_value(values[i]));
-            if (LLVMTypeOf(llvmval) != ty) {
-                if (LLVMGetTypeKind(ty) == LLVMStructTypeKind) {
-                    llvmval = build_struct_cast(llvmval, ty);
-                } else {
-                    // should not happen
-                }
-            }
+            llvmval = build_struct_cast(llvmval, ty);
             LLVMValueRef incovals[] = { llvmval };
             LLVMAddIncoming(phi, incovals, incobbs, 1);
         }
@@ -1323,11 +1317,16 @@ struct LLVMIRGenerator {
     }
 
     LLVMValueRef build_struct_cast(LLVMValueRef val, LLVMTypeRef ty) {
-        // completely braindead, but what can you do
-        LLVMValueRef ptr = safe_alloca(LLVMTypeOf(val));
-        LLVMBuildStore(builder, val, ptr);
-        ptr = LLVMBuildBitCast(builder, ptr, LLVMPointerType(ty,0), "");
-        return LLVMBuildLoad(builder, ptr, "");
+        if (LLVMTypeOf(val) != ty) {
+            if (LLVMGetTypeKind(ty) == LLVMStructTypeKind) {
+                // completely braindead, but what can you do
+                LLVMValueRef ptr = safe_alloca(LLVMTypeOf(val));
+                LLVMBuildStore(builder, val, ptr);
+                ptr = LLVMBuildBitCast(builder, ptr, LLVMPointerType(ty,0), "");
+                return LLVMBuildLoad(builder, ptr, "");
+            }
+        }
+        return val;
     }
 
     SCOPES_RESULT(void) translate_Unreachable(const UnreachableRef &node) {
@@ -1424,9 +1423,16 @@ struct LLVMIRGenerator {
 
     SCOPES_RESULT(void) translate_InsertValue(const InsertValueRef &node) {
         SCOPES_RESULT_TYPE(void);
-        auto val = LLVMBuildInsertValue(builder,
-            SCOPES_GET_RESULT(ref_to_value(node->value)),
-            SCOPES_GET_RESULT(ref_to_value(node->element)),
+        auto srcval = SCOPES_GET_RESULT(ref_to_value(node->value));
+        auto elm = SCOPES_GET_RESULT(ref_to_value(node->element));
+        auto elmtype = LLVMTypeOf(srcval);
+        if (LLVMGetTypeKind(elmtype) == LLVMStructTypeKind) {
+            elmtype = LLVMStructGetTypeAtIndex(elmtype, node->index);
+        } else {
+            elmtype = LLVMGetElementType(elmtype);
+        }
+        elm = build_struct_cast(elm, elmtype);
+        auto val = LLVMBuildInsertValue(builder, srcval, elm,
             node->index, "");
         map_phi({ val }, node);
         return {};
@@ -1872,10 +1878,11 @@ struct LLVMIRGenerator {
         if (T != ty) {
             switch(node->op) {
             case CastBitcast: {
-                if (LLVMGetTypeKind(ty) == LLVMStructTypeKind) {
-                    val = build_struct_cast(val, ty);
-                } else {
+                auto newval = build_struct_cast(val, ty);
+                if (newval == val) {
                     val = LLVMBuildBitCast(builder, val, ty, "");
+                } else {
+                    val = newval;
                 }
             } break;
             case CastPtrToRef: break;

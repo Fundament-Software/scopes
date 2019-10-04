@@ -93,8 +93,6 @@ run-stage;
 
 do
     # test for LLVM struct type conversion error
-    using import Map
-
     let SomeMap = (Map i32 i32)
 
     # this works:
@@ -112,6 +110,26 @@ do
 
     let sm = (make-some-map)
     ;
+
+do
+    # another test for LLVM struct type conversion error
+    let SomeMap = (Map string u32)
+
+    using import struct
+    struct A
+        m : SomeMap
+        fn fill-m ()
+            local m = (SomeMap)
+            'set m "a" 0:u32
+            deref m
+        inline __typecall (cls)
+            Struct.__typecall cls
+                m = (fill-m)
+
+    # codegen backend failure
+    let a = (A)
+    ;
+
 
 ;
 
