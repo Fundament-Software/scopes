@@ -314,7 +314,7 @@ typedef Map < Struct
             inline "ok" (idx)
                 return (deref (self._values @ idx))
             inline "fail" ()
-                raise MapError.KeyNotFound
+                raise (MapError.KeyNotFound)
 
     fn discard (self key)
         """"erases a key -> value association from the map; if the map
