@@ -677,12 +677,15 @@ struct Expander {
         }
         next = it->next;
         auto _case = SwitchTemplate::Case();
-        //_case.anchor = it->at->anchor();
+        _case.anchor = it->at.anchor();
         it = SCOPES_GET_RESULT(extract_list_constant(it->at));
-        SCOPES_CHECK_RESULT(verify_list_parameter_count("case", it, 1, -1));
+        if (it == EOL) {
+            SCOPES_ERROR(SyntaxCaseBlockExpected);
+        }
         auto case_anchor = it->at.anchor();
         auto head = try_extract_symbol(it->at);
         if ((head == KW_Case) || (head == KW_Pass)) {
+            SCOPES_CHECK_RESULT(verify_list_parameter_count("case", it, 1, -1));
             if (head == KW_Pass) {
                 _case.kind = CK_Pass;
             }
@@ -699,10 +702,26 @@ struct Expander {
 
             it = next;
             goto collect_case;
+        } else if (head == KW_Do) {
+            it = it->next;
+
+            _case.kind = CK_Do;
+
+            Expander nativeexp(Scope::from(env), astscope);
+            _case.value = SCOPES_GET_RESULT(
+                nativeexp.expand_expression(ref(case_anchor, it), false));
+            cases.push_back(_case);
+
+            it = next;
+            goto collect_case;
         } else if (head == KW_Default) {
             it = it->next;
 
-            _case.kind = CK_Default;
+            if (head == KW_Do) {
+                _case.kind = CK_Do;
+            } else {
+                _case.kind = CK_Default;
+            }
 
             Expander nativeexp(Scope::from(env), astscope);
             _case.value = SCOPES_GET_RESULT(

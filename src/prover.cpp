@@ -3348,16 +3348,28 @@ static SCOPES_RESULT(TypedValueRef) prove_SwitchTemplate(const ASTContext &ctx,
     SCOPES_CHECK_RESULT(subctx.append(_switch));
 
     Switch::Case *defaultcase = nullptr;
+    Switch::Case *passcase = nullptr;
 
     for (auto &&_case : node->cases) {
+        SCOPES_TRACE_PROVE_EXPR(ref(_case.anchor, g_none));
         Switch::Case *newcase = nullptr;
         if (_case.kind == CK_Default) {
             if (defaultcase) {
                 SCOPES_ERROR(DuplicateSwitchDefaultCase);
             }
-            newcase = &_switch->append_default();
+            newcase = &_switch->append_default(_case.anchor);
             defaultcase = newcase;
+            passcase = nullptr;
+        } else if (_case.kind == CK_Do) {
+            if (!passcase) {
+                SCOPES_ERROR(DoWithoutPass);
+            }
+            newcase = passcase;
+            passcase = nullptr;
         } else {
+            if (passcase && (_case.kind == CK_Case)) {
+                SCOPES_ERROR(UnclosedPass);
+            }
             auto newlit = SCOPES_GET_RESULT(prove(ctx, _case.literal));
             if (!newlit.isa<ConstInt>()) {
                 SCOPES_ERROR(ValueKindMismatch, VK_ConstInt, newlit->kind());
@@ -3365,12 +3377,20 @@ static SCOPES_RESULT(TypedValueRef) prove_SwitchTemplate(const ASTContext &ctx,
             casetype = SCOPES_GET_RESULT(
                 merge_value_type("switch case literal", casetype, newlit->get_type(),
                 last_anchor, newlit.anchor()));
-            newcase = &_switch->append_pass(newlit.cast<ConstInt>());
+            newcase = &_switch->append_pass(_case.anchor, newlit.cast<ConstInt>());
         }
         assert(_case.value);
         ASTContext newctx;
-        auto newvalue = SCOPES_GET_RESULT(prove_block(subctx, newcase->body, _case.value, newctx));
+        TypedValueRef newvalue;
+        if (_case.kind == CK_Do) {
+            // append to last case
+            newctx = ctx.with_block(newcase->body);
+            newvalue = SCOPES_GET_RESULT(prove(newctx, _case.value));
+        } else {
+            newvalue = SCOPES_GET_RESULT(prove_block(subctx, newcase->body, _case.value, newctx));
+        }
         if (_case.kind == CK_Pass) {
+            passcase = newcase;
             SCOPES_CHECK_RESULT(validate_pass_block(subctx, newcase->body));
         } else {
             if (is_returning(newvalue->get_type())) {

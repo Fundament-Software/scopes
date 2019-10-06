@@ -88,7 +88,8 @@ inline make-gsampler (postfix dim arrayed ms coords)
         switch dim
         pass '1D
         pass '2D
-        case '3D
+        pass '3D
+        do
             ms == 0
         default
             false

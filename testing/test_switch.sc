@@ -10,8 +10,9 @@ print
         print "two or larger"
     pass 3
         print "three or larger"
-    case 4
+    pass 4
         print "two to four"
+    do;
     case 5
         print "five"
     default

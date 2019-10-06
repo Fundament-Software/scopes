@@ -2794,7 +2794,8 @@ fn symbol-handler (topexpr env)
         pass 64:i8 # @
         #pass 47:i8 # /
         pass 38:i8 # &
-        case 45:i8 # -
+        pass 45:i8 # -
+        do
             # split
             let anchor = ('anchor sxname)
             let lop = ('tag `[(Symbol (lslice s 1))] anchor)
@@ -3989,7 +3990,7 @@ do
         let end =
             static-branch (none? end)
                 inline () sz
-                inline () 
+                inline ()
                     end := end as usize
                     ? (sz < end) sz end
         Generator

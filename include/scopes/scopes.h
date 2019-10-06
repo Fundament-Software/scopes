@@ -238,6 +238,7 @@ SCOPES_LIBEXPORT void sc_if_append_else_clause(sc_valueref_t value, sc_valueref_
 SCOPES_LIBEXPORT sc_valueref_t sc_switch_new(sc_valueref_t expr);
 SCOPES_LIBEXPORT void sc_switch_append_case(sc_valueref_t value, sc_valueref_t literal, sc_valueref_t body);
 SCOPES_LIBEXPORT void sc_switch_append_pass(sc_valueref_t value, sc_valueref_t literal, sc_valueref_t body);
+SCOPES_LIBEXPORT void sc_switch_append_do(sc_valueref_t value, sc_valueref_t body);
 SCOPES_LIBEXPORT void sc_switch_append_default(sc_valueref_t value, sc_valueref_t body);
 
 SCOPES_LIBEXPORT sc_valueref_t sc_parameter_new(sc_symbol_t name);

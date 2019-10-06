@@ -1431,6 +1431,10 @@ void sc_switch_append_pass(sc_valueref_t value, sc_valueref_t literal, sc_valuer
     using namespace scopes;
     value.cast<SwitchTemplate>()->append_pass(literal, body);
 }
+void sc_switch_append_do(sc_valueref_t value, sc_valueref_t body) {
+    using namespace scopes;
+    value.cast<SwitchTemplate>()->append_do(body);
+}
 void sc_switch_append_default(sc_valueref_t value, sc_valueref_t body) {
     using namespace scopes;
     value.cast<SwitchTemplate>()->append_default(body);
@@ -2257,6 +2261,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_switch_new, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_switch_append_case, _void, TYPE_ValueRef, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_switch_append_pass, _void, TYPE_ValueRef, TYPE_ValueRef, TYPE_ValueRef);
+    DEFINE_EXTERN_C_FUNCTION(sc_switch_append_do, _void, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_switch_append_default, _void, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_parameter_new, TYPE_ValueRef, TYPE_Symbol);
     DEFINE_EXTERN_C_FUNCTION(sc_parameter_is_variadic, TYPE_Bool, TYPE_ValueRef);

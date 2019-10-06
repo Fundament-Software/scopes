@@ -934,6 +934,7 @@ void SwitchTemplate::append_case(const ValueRef &literal, const ValueRef &value)
     assert(literal);
     assert(value);
     Case _case;
+    _case.anchor = value.anchor();
     _case.kind = CK_Case;
     _case.literal = literal;
     _case.value = value;
@@ -944,8 +945,18 @@ void SwitchTemplate::append_pass(const ValueRef &literal, const ValueRef &value)
     assert(literal);
     assert(value);
     Case _case;
+    _case.anchor = value.anchor();
     _case.kind = CK_Pass;
     _case.literal = literal;
+    _case.value = value;
+    cases.push_back(_case);
+}
+
+void SwitchTemplate::append_do(const ValueRef &value) {
+    assert(value);
+    Case _case;
+    _case.anchor = value.anchor();
+    _case.kind = CK_Do;
     _case.value = value;
     cases.push_back(_case);
 }
@@ -953,6 +964,7 @@ void SwitchTemplate::append_pass(const ValueRef &literal, const ValueRef &value)
 void SwitchTemplate::append_default(const ValueRef &value) {
     assert(value);
     Case _case;
+    _case.anchor = value.anchor();
     _case.kind = CK_Default;
     _case.value = value;
     cases.push_back(_case);
@@ -969,17 +981,19 @@ SwitchRef Switch::from(const TypedValueRef &expr, const Cases &cases) {
     return ref(unknown_anchor(), new Switch(expr, cases));
 }
 
-Switch::Case &Switch::append_pass(const ConstIntRef &literal) {
+Switch::Case &Switch::append_pass(const Anchor *anchor, const ConstIntRef &literal) {
     assert(literal);
     Case *_case = new Case();
+    _case->anchor = anchor;
     _case->kind = CK_Pass;
     _case->literal = literal;
     cases.push_back(_case);
     return *cases.back();
 }
 
-Switch::Case &Switch::append_default() {
+Switch::Case &Switch::append_default(const Anchor *anchor) {
     Case *_case = new Case();
+    _case->anchor = anchor;
     _case->kind = CK_Default;
     cases.push_back(_case);
     return *cases.back();

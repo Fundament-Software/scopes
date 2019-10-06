@@ -101,7 +101,8 @@ inline decoder (coll)
                     # expecting byte 3, cont header
                     # expecting byte 2, cont header
                     pass ((BYTE_STEP * 3:u32) | 1:u32)
-                    case ((BYTE_STEP * 2:u32) | 1:u32)
+                    pass ((BYTE_STEP * 2:u32) | 1:u32)
+                    do
                         # read 6 bits, count down by 1
                         skip ((b - BYTE_STEP) | (cp << 6:u32) |
                             ((c & 0b111111:i8) as u32))

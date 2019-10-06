@@ -358,16 +358,18 @@ struct If : UntypedValue {
 enum CaseKind {
     CK_Case = 0,
     CK_Pass,
+    CK_Do,
     CK_Default
 };
 
 struct SwitchTemplate : UntypedValue {
     struct Case {
+        const Anchor *anchor;
         CaseKind kind;
         ValueRef literal;
         ValueRef value;
 
-        Case() : kind(CK_Case) {}
+        Case() : anchor(nullptr), kind(CK_Case) {}
     };
 
     typedef std::vector<Case> Cases;
@@ -380,6 +382,7 @@ struct SwitchTemplate : UntypedValue {
 
     void append_case(const ValueRef &literal, const ValueRef &value);
     void append_pass(const ValueRef &literal, const ValueRef &value);
+    void append_do(const ValueRef &value);
     void append_default(const ValueRef &value);
 
     ValueRef expr;
@@ -390,11 +393,12 @@ struct SwitchTemplate : UntypedValue {
 
 struct Switch : Instruction {
     struct Case {
+        const Anchor *anchor;
         CaseKind kind;
         ConstIntRef literal;
         Block body;
 
-        Case() : kind(CK_Case) {}
+        Case() : anchor(nullptr), kind(CK_Case) {}
     };
 
     typedef std::vector<Case *> Cases;
@@ -405,8 +409,8 @@ struct Switch : Instruction {
 
     static SwitchRef from(const TypedValueRef &expr = TypedValueRef(), const Cases &cases = {});
 
-    Case &append_pass(const ConstIntRef &literal);
-    Case &append_default();
+    Case &append_pass(const Anchor *anchor, const ConstIntRef &literal);
+    Case &append_default(const Anchor *anchor);
 
     TypedValueRef expr;
     Cases cases;

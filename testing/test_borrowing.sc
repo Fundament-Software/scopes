@@ -339,7 +339,8 @@ fn f ()
         let y = (Handle 1)
         dump y
     pass 2
-    case 3
+    pass 3
+    do;
     default
         _;
 test-refcount (inline () (f))
@@ -362,7 +363,8 @@ fn f (x)
                         _;
         pass 1
         pass 2
-        case 3
+        pass 3
+        do;
         default
             _;
 verify-type (typify f Handle) void UHandle1

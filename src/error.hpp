@@ -120,6 +120,8 @@ formatters:
         "syntax: except block expected") \
     T(SyntaxMissingDefaultCase, \
         "syntax: missing default case") \
+    T(SyntaxCaseBlockExpected, \
+        "syntax: case, pass, do or default block expected") \
     T(SyntaxLabelExpected, \
         "syntax: label template expected, got %0", \
         ValueKind) \
@@ -256,6 +258,10 @@ formatters:
         "switch expression must only have one default case") \
     T(MissingDefaultCase, \
         "missing default case") \
+    T(UnclosedPass, \
+        "pass block must be followed by pass, do or default block") \
+    T(DoWithoutPass, \
+        "do block must follow pass block") \
     T(VariadicParameterNotLast, \
         "variadic function parameter is not in last place") \
     T(RecursionOverflow, \
