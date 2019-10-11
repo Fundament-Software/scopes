@@ -855,12 +855,24 @@ static SCOPES_RESULT(TypedValueRef) make_repeat(const ASTContext &ctx, const Anc
     }
 }
 
+static SCOPES_RESULT(void) build_deref_automove(
+    const ASTContext &ctx, const ValueRef &mover, TypedValueRef &val);
+
 static SCOPES_RESULT(TypedValueRef) make_return1(
     const ASTContext &ctx, const ValueRef &mover, TypedValues values) {
     SCOPES_RESULT_TYPE(TypedValueRef);
     assert(ctx.block);
     assert(ctx.function);
     auto anchor = mover.anchor();
+
+    for (size_t i = 0; i < values.size(); ++i) {
+        auto T = values[i]->get_type();
+        auto rq = try_qualifier<ReferQualifier>(T);
+        if (rq && (rq->storage_class == SYM_SPIRV_StorageClassFunction)) {
+            SCOPES_CHECK_RESULT(build_deref_automove(ctx, mover, values[i]));
+        }
+    }
+
     SCOPES_CHECK_RESULT(move_merge_values(ctx, mover, 0, values, "return"));
     collect_valid_function_values(ctx);
 

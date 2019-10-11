@@ -73,3 +73,14 @@ local q : refable -1
 assert (('value q) == -1)
 assert (('value ('inc q)) == 0)
 assert (('value q) == 0)
+
+do
+    # returning local references from functions will automatically deref
+
+    fn makeref ()
+        local k = 1
+        k
+
+    assert (not (&? (returnof (static-typify makeref))))
+
+;

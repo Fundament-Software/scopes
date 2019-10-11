@@ -102,6 +102,9 @@ inline decoder (coll)
                     # expecting byte 2, cont header
                     pass ((BYTE_STEP * 3:u32) | 1:u32)
                     pass ((BYTE_STEP * 2:u32) | 1:u32)
+                    # AFTER: `pass` fallthrough sections must end in a `do` or
+                        `default` block, which allows us to prefix all switch
+                        options with `pass`.
                     do
                         # read 6 bits, count down by 1
                         skip ((b - BYTE_STEP) | (cp << 6:u32) |
