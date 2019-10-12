@@ -1030,6 +1030,7 @@ run-stage; # 3
     kind = sc_type_kind
     sizeof = sc_type_sizeof
     alignof = sc_type_alignof
+    offsetof = sc_type_offsetof
     @ = sc_type_at
     local@ = sc_type_local_at
     opaque? = sc_type_is_opaque
@@ -2996,6 +2997,11 @@ inline make-const-type-property-function (func)
             let val = (func val)
             `val
 
+fn extract-integer (value)
+    if (== ('kind value) value-kind-const-int)
+        return (sc_const_int_extract value)
+    error@ ('anchor value) "while extracting integer" "integer constant expected"
+
 let
     constant? =
         spice-macro
@@ -3028,6 +3034,25 @@ let
                         hide-traceback;
                         error "function type expected"
                 'return-type T
+    offsetof =
+        spice-macro
+            fn (args)
+                let argc = ('argcount args)
+                verify-count argc 2 2
+                let value = ('getarg args 0)
+                let T =
+                    if (== ('typeof value) type)
+                        as value type
+                    else
+                        'qualified-typeof value
+                let index = ('getarg args 1)
+                let index =
+                    if (== ('typeof index) Symbol)
+                        sc_type_field_index T (as index Symbol)
+                    else
+                        as index i32
+                let offset = (sc_type_offsetof T index)
+                `offset
 
 #del extract-single-arg
 #del make-const-type-property-function
@@ -4265,11 +4290,6 @@ let packedtupleof = (gen-tupleof sc_packed_tuple_type)
 #-------------------------------------------------------------------------------
 # arrays
 #-------------------------------------------------------------------------------
-
-fn extract-integer (value)
-    if (('kind value) == value-kind-const-int)
-        return (sc_const_int_extract value)
-    error@ ('anchor value) "while extracting integer" "integer constant expected"
 
 'set-symbols array
     __unpack = __unpack-aggregate

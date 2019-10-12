@@ -1643,6 +1643,24 @@ sc_size_raises_t sc_type_alignof(const sc_type_t *T) {
     SCOPES_C_RETURN(align_of(T));
 }
 
+sc_size_raises_t sc_type_offsetof(const sc_type_t *T, int index) {
+    using namespace scopes;
+    SCOPES_RESULT_TYPE(size_t);
+    T = SCOPES_C_GET_RESULT(storage_type(T));
+    void *result = nullptr;
+    switch(T->kind()) {
+    case TK_Pointer: result = SCOPES_C_GET_RESULT(cast<PointerType>(T)->getelementptr(nullptr, (size_t)index)); break;
+    case TK_Array: result = SCOPES_C_GET_RESULT(cast<ArrayType>(T)->getelementptr(nullptr, (size_t)index)); break;
+    case TK_Vector: result = SCOPES_C_GET_RESULT(cast<VectorType>(T)->getelementptr(nullptr, (size_t)index)); break;
+    case TK_Tuple: result = SCOPES_C_GET_RESULT(cast<TupleType>(T)->getelementptr(nullptr, (size_t)index)); break;
+    default: {
+        SCOPES_C_ERROR(RTNoElementsInStorageType, T);
+    } break;
+    }
+    size_t sz = (size_t)result;
+    SCOPES_C_RETURN(sz);
+}
+
 sc_int_raises_t sc_type_countof(const sc_type_t *T) {
     using namespace scopes;
     SCOPES_RESULT_TYPE(int);
@@ -2362,6 +2380,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_type_field_name, TYPE_Symbol, TYPE_Type, TYPE_I32);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_type_sizeof, TYPE_USize, TYPE_Type);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_type_alignof, TYPE_USize, TYPE_Type);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_type_offsetof, TYPE_USize, TYPE_Type, TYPE_I32);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_type_countof, TYPE_I32, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_type_kind, TYPE_I32, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_type_debug_abi, _void, TYPE_Type);

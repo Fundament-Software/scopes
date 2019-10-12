@@ -400,6 +400,7 @@ SCOPES_LIBEXPORT const sc_string_t *sc_type_get_docstring(const sc_type_t *T, sc
 SCOPES_LIBEXPORT void sc_type_set_docstring(const sc_type_t *T, sc_symbol_t key, const sc_string_t *str);
 SCOPES_LIBEXPORT sc_size_raises_t sc_type_sizeof(const sc_type_t *T);
 SCOPES_LIBEXPORT sc_size_raises_t sc_type_alignof(const sc_type_t *T);
+SCOPES_LIBEXPORT sc_size_raises_t sc_type_offsetof(const sc_type_t *T, int index);
 SCOPES_LIBEXPORT sc_int_raises_t sc_type_countof(const sc_type_t *T);
 SCOPES_LIBEXPORT sc_type_raises_t sc_type_element_at(const sc_type_t *T, int i);
 SCOPES_LIBEXPORT sc_int_raises_t sc_type_field_index(const sc_type_t *T, sc_symbol_t name);
