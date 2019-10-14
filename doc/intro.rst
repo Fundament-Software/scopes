@@ -20,11 +20,11 @@ Scopes only supports the `mingw64` toolchain for the foreseeable future.
 
 * Install `MSYS2 <http://msys2.github.io>`_ and
   `install <https://github.com/valtron/llvm-stuff/wiki/Build-LLVM-with-MSYS2>`_
-  clang, LLVM 8.0.x, cmake and make for ``x86_64``. The packages are named
+  clang, LLVM 9.0.x, cmake and make for ``x86_64``. The packages are named
   ``mingw64/mingw-w64-x86_64-llvm``, ``mingw64/mingw-w64-x86_64-clang``,
   ``mingw64/mingw-w64-x86_64-cmake``  and ``make``.
 * Nice to have: ``mingw-w64-x86_64-gdb``
-* at least ``usr/bin`` from your MSYS2 installation must be added to the 
+* at least ``usr/bin`` from your MSYS2 installation must be added to the
   ``PATH`` variable so that the buildscript can find MSYS2.
 * You also need the latest source distributions of
   `SPIRV-Tools <https://github.com/KhronosGroup/SPIRV-Tools>`_ and
@@ -46,14 +46,14 @@ Scopes only supports the `mingw64` toolchain for the foreseeable future.
   hardware threads to use.
 * There should now be a ``scopes.exe`` executable in the `bin` folder.
 * For the clang bridge to work properly, copy
-  `clang/lib/clang/8.0.x/include` to `scopes-repo/lib/clang/include`.
+  `clang/lib/clang/9.0.x/include` to `scopes-repo/lib/clang/include`.
 * For a fresh rebuild, just remove the ``build`` directory before running
   ``make`` again.
 
 Building Scopes on Linux
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-* You need build-essentials, clang, libclang and LLVM 8.0.x installed -
+* You need build-essentials, clang, libclang and LLVM 9.0.x installed -
   preferably locally:
 * Put ``llvm-config`` in your ``$PATH``.
 * Alternatively, provide your own clang distribution and symlink it to
@@ -86,10 +86,10 @@ Building Scopes on Linux
 Building Scopes on macOS
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-* Scopes builds on macOS Mojave (10.14) using either LLVM 7.0 or 8.0.
+* Scopes builds on macOS Mojave (10.14) using LLVM 9.0.
 * You'll need the following packages from `brew <https://brew.sh/>`_: `llvm`
   and `cmake`. Scopes' build system respects ``brew``'s standard installation
-  paths. Install `llvm@7` if you want to use LLVM 7.0.
+  paths.
 * Alternatively, provide your own clang distribution and symlink it to
   ``scopes-repo/clang``.
 * Put ``llvm-config`` in your ``$PATH``. Find it in `$(brew --prefix llvm)/bin`
@@ -97,7 +97,7 @@ Building Scopes on macOS
 * You'll also need an installation of the Xcode Command Line Tools:
   ``xcode-select --install``.
 * You may also need to force installation of the macOS SDK headers:
-  Open `macOS_SDK_headers_for_macOS_10.14.pkg` found in 
+  Open `macOS_SDK_headers_for_macOS_10.14.pkg` found in
   `/Library/Developer/CommandLineTools/Packages`
 * You also need the latest source distributions of
   `SPIRV-Tools <https://github.com/KhronosGroup/SPIRV-Tools>`_ and
