@@ -382,6 +382,7 @@ project "scopesrt"
             "-lclangSema",
             "-lclangAnalysis",
             "-lclangEdit",
+            "-lclangASTMatchers",
             "-lclangAST",
             "-lclangLex",
             "-lclangBasic"
@@ -454,6 +455,7 @@ project "scopesrt"
             "-lclangSema",
             "-lclangAnalysis",
             "-lclangEdit",
+            "-lclangASTMatchers",
             "-lclangAST",
             "-lclangLex",
             "-lclangBasic"
