@@ -290,6 +290,7 @@ project "scopesrt"
             "-lclangSema",
             "-lclangAnalysis",
             "-lclangEdit",
+            "-lclangASTMatchers",
             "-lclangAST",
             "-lclangLex",
             "-lclangBasic"

@@ -2523,9 +2523,10 @@ struct LLVMIRGenerator {
         auto count = constructors.size();
         LLVMValueRef structs[count];
         int i = 0;
+        auto nullbyteptr = LLVMConstNull(rawstringT);
         for (auto val : constructors) {
-            LLVMValueRef constvals[] = { LLVMConstInt(i32T, i, false), val };
-            structs[i] = LLVMConstStruct(constvals, 2, false);
+            LLVMValueRef constvals[] = { LLVMConstInt(i32T, i, false), val, nullbyteptr };
+            structs[i] = LLVMConstStruct(constvals, 3, false);
             i++;
         }
         auto arr = LLVMConstArray(LLVMTypeOf(structs[0]), structs, count);
