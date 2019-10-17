@@ -616,22 +616,30 @@ typedef+ mat-type
     @@ spice-binary-op-macro
     fn __* (lhsT rhsT)
         let mat-row = row
-        if ((lhsT < mat-type)
-                and (rhsT < mat-type)
-                and (lhsT == (rhsT.TransposedType as type)))
-            # mat(i,j) * mat(j,i) -> mat(j,j)
+        if (and
+                (lhsT < mat-type)
+                (rhsT < mat-type)
+                ((rhsT.Rows as i32) == (lhsT.Columns as i32)))
+            # column type of lhsT
             let VT = ('element@ lhsT 0)
-            let sz = ('element-count VT)
             let ET = ('element@ VT 0)
-            let destT = `(construct-mat-type ET sz sz)
+            let
+                dest-columns = (rhsT.Columns as i32)
+                dest-rows = (lhsT.Rows as i32)
+            let destT = `(construct-mat-type ET dest-columns dest-rows)
             spice-quote
                 inline (lhs rhs)
                     spice-unquote
-                        fold (mat = `(nullof destT)) for i in (range sz)
-                            let row = `(mat-row lhs i)
+                        # because we know the destination has the same number of rows as lhs
+                        let rows = (alloca-array Value dest-rows)
+                        for i in (range dest-rows)
+                            rows @ i = `(mat-row lhs i)
+                        # a row has dest-columns elements, so we iterate on that
+                        fold (mat = `(nullof destT)) for i in (range dest-columns)
                             let vec =
-                                fold (vec = `(nullof VT)) for j in (range sz)
-                                    `(insertelement vec (dot row (extractvalue rhs j)) j)
+                                fold (vec = `(nullof VT)) for j in (range dest-rows)
+                                    let row = (deref (rows @ j))
+                                    `(insertelement vec (dot row (extractvalue rhs i)) j)
                             `(insertvalue mat vec i)
         elseif (rhsT == (lhsT.RowType as type))
             let VT = ('element@ lhsT 0)

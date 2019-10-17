@@ -83,6 +83,7 @@ let m =
         vec4 1 2 3 4
         \ 1 2 (vec2 5)
 
+
 test
     == m
         mat4
@@ -92,9 +93,26 @@ test
             \ 1 2 5 5
 
 do
+    # do identity transformations yield the original matrix?
+    test 
+        (m * (mat4)) == m
+    test 
+        ((mat4) * m * (mat4)) == m
+
+    # matrices can be multiplied if lhs has as many columns as rhs has rows
+    (mat2x3) * (mat4x2)
+    (mat3x2) * (mat4x3)
+
+    test-compiler-error
+        (mat3x3) * (mat4x2)
+
     let m = (mat4x3 m)
     let n =
         transpose m
+
+    test 
+        ((mat3) * m * n) == (m * n)
+
     test
         == n
             mat3x4
@@ -124,7 +142,6 @@ do
 
     test ((m * (vec4 2 3 4 5)) == (vec3 21 30 52))
     test (((vec3 2 3 4) * m) == (vec4 27 22 20 28))
-
 
 #let m = (mat3 m)
 #print m
