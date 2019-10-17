@@ -6923,12 +6923,16 @@ typedef+ CUnion
 #-------------------------------------------------------------------------------
 
 do
+    inline simple-unary-storage-op (f)
+        inline (self) (f (storagecast self))
     inline simple-binary-storage-op (f)
         simple-binary-op (inline (a b) (f (storagecast a) (storagecast b)))
 
     'set-symbols CEnum
         __== = (simple-binary-op icmp==)
         __!= = (simple-binary-op icmp!=)
+        __~ = (simple-unary-storage-op (_ ~))
+        __neg = (simple-unary-storage-op (_ -))
         __+ = (simple-binary-storage-op (_ +))
         __- = (simple-binary-storage-op (_ -))
         __* = (simple-binary-storage-op (_ *))
