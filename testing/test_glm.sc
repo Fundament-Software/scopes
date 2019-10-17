@@ -100,8 +100,44 @@ do
         ((mat4) * m * (mat4)) == m
 
     # matrices can be multiplied if lhs has as many columns as rhs has rows
-    (mat2x3) * (mat4x2)
-    (mat3x2) * (mat4x3)
+    do
+        (mat2x3) * (mat4x2)
+        let m = 
+            mat2x3
+                vec3 2 3 5
+                vec3 7 11 13
+        let n = 
+            mat4x2
+                vec2 17 19
+                vec2 23 29
+                vec2 31 37
+                vec2 41 43
+        test
+            == (m * n)
+                mat4x3
+                    \ 167 260 332
+                    \ 249 388 492
+                    \ 321 500 636
+                    \ 383 596 764
+        (mat3x2) * (mat4x3)
+        let m = 
+            mat3x2
+                vec2 2 3
+                vec2 5 7
+                vec2 11 13
+        let n = 
+            mat4x3
+                vec3 17 19 23
+                vec3 29 31 37
+                vec3 41 43 47
+                vec3 53 59 61
+        test 
+            == (m * n)
+                mat4x2
+                    \ 382 483
+                    \ 620 785
+                    \ 814 1035
+                    \ 1072 1365
 
     test-compiler-error
         (mat3x3) * (mat4x2)
