@@ -205,4 +205,21 @@ do
 
     testval 0x1234 0x5678 0xabcd
 
+do
+    # previously, duplicated tags would be innaccessible (except for the last defined one); now
+      it causes an error.
+    test-compiler-error
+        enum DupedEnum
+            A
+            A : i32 i32
+            B
+            C
+    test-compiler-error
+        enum DupedCEnum plain
+            A
+            B
+            B
+            C
+            B
+            C
 ;

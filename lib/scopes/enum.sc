@@ -210,6 +210,15 @@ fn finalize-enum-runtime (T storage)
             if (field-type != Nothing)
                 error "plain enums can't have tagged fields"
             let value = (sc_const_int_new T index)
+            # if the value bound to this symbol has already been seen, its type is the enum type.
+            let previously-definedT = 
+                try 
+                    ('typeof ('@ T (name as Symbol)))
+                except (ex)
+                    Nothing
+            if (previously-definedT == T)
+                hide-traceback;
+                error "Duplicate enum fields aren't allowed."
             'set-symbol T name value
             'bind using-scope name value
         # build repr function
@@ -267,6 +276,19 @@ fn finalize-enum-runtime (T storage)
                             tag-constructor T index-value payload-type field-type TT ...
                     sc_template_set_name constructor name
                     constructor
+
+            # if field has already been seen, its "last type" is `Unknown`
+            # ie. this checks if we defined the same tag twice.
+            let previously-definedT = 
+                try
+                    'typeof ('@ T (name as Symbol))
+                except (ex)
+                    # if it's a compile time tag, this will do.
+                    Nothing
+            if (previously-definedT == Unknown)
+                hide-traceback;
+                error "Duplicate enum fields aren't allowed." 
+
             'set-symbol T name value
             'bind using-scope name value
 
