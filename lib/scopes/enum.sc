@@ -191,8 +191,7 @@ fn finalize-enum-runtime (T storage)
     if classic?
         # no storage definition means `plain` was used.
         let storage =
-            if (('typeof storage) == Nothing)
-                i32
+            if (('typeof storage) == Nothing) i32
             else
                 if (('typeof storage) == type)
                     storage as type

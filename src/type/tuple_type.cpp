@@ -10,6 +10,7 @@
 #include "../hash.hpp"
 #include "../qualifier/key_qualifier.hpp"
 #include "array_type.hpp"
+#include "typename_type.hpp"
 
 #include <assert.h>
 
@@ -157,21 +158,49 @@ SCOPES_RESULT(const Type *) tuple_type(const Types &values,
     return result;
 }
 
+static SCOPES_RESULT(void) find_most_aligned(const Type *ET, const Type *&most_aligned_field, size_t &al) {
+    SCOPES_RESULT_TYPE(void);
+    auto newal = SCOPES_GET_RESULT(align_of(ET));
+    if (newal > al) {
+        if (!is_opaque(ET)) {
+            StyledStream ss;
+            auto ST = SCOPES_GET_RESULT(storage_type(ET));
+            switch (ST->kind()) {
+            case TK_Tuple: {
+                auto TT = cast<TupleType>(ST);
+                for (auto ET : TT->values) {
+                    SCOPES_CHECK_RESULT(find_most_aligned(ET, most_aligned_field, al));
+                }
+                return {};
+            } break;
+            case TK_Array: {
+                auto AT = cast<ArrayType>(ST);
+                SCOPES_CHECK_RESULT(find_most_aligned(AT->element_type, most_aligned_field, al));
+                return {};
+            } break;
+            default: break;
+            }
+        }
+        most_aligned_field = ET;
+        al = newal;
+    }
+    return {};
+}
+
 SCOPES_RESULT(const Type *) union_storage_type(const Types &types,
     bool packed, size_t alignment) {
     SCOPES_RESULT_TYPE(const Type *);
     size_t sz = 0;
-    size_t al = 0;
-    const Type *most_aligned_field = nullptr;
-    // build an argument list, find alignment and size
+    // find largest size
     for (auto ET : types) {
         auto newsz = SCOPES_GET_RESULT(size_of(ET));
         sz = std::max(sz, newsz);
-        auto newal = SCOPES_GET_RESULT(align_of(ET));
-        if (newal > al) {
-            most_aligned_field = ET;
-            al = newal; 
-        }
+    }
+    const Type *most_aligned_field = nullptr;
+    // recursively find field with largest alignment
+    size_t al = 0;
+    for (auto ET : types) {
+        SCOPES_CHECK_RESULT(find_most_aligned(ET, most_aligned_field, al));
     }
     assert(most_aligned_field);
     Types fields = { most_aligned_field };

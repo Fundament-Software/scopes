@@ -175,4 +175,34 @@ do
             A.a 0
             A.b;
 
+do
+    # test if payload type has holes
+    enum Options
+        A : i32 i64 i64
+        B : i64 (vector i32 4)
+
+    fn testval (x y z)
+        let rad =
+            Options.A x y z
+
+        #do
+            local radmem = rad
+            let ptr = (bitcast &radmem (pointer u8))
+            for k in (range (sizeof rad))
+                if ((k % 4) == 0)
+                    io-write! "|"
+                io-write! (hex (deref (ptr @ k)))
+                io-write! " "
+            io-write! "\n"
+
+        do
+            dispatch rad
+            case A (a b c)
+                assert (a == x)
+                assert (b == y) # fails
+                assert (c == z)
+            default;
+
+    testval 0x1234 0x5678 0xabcd
+
 ;
