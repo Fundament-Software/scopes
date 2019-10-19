@@ -158,8 +158,8 @@ SCOPES_RESULT(const Type *) tuple_type(const Types &values,
     return result;
 }
 
-static SCOPES_RESULT(void) find_most_aligned(const Type *ET, const Type *&most_aligned_field, size_t &al) {
-    SCOPES_RESULT_TYPE(void);
+static SCOPES_RESULT(bool) find_most_aligned(const Type *ET, const Type *&most_aligned_field, size_t &al) {
+    SCOPES_RESULT_TYPE(bool);
     auto newal = SCOPES_GET_RESULT(align_of(ET));
     if (newal > al) {
         if (!is_opaque(ET)) {
@@ -168,23 +168,25 @@ static SCOPES_RESULT(void) find_most_aligned(const Type *ET, const Type *&most_a
             switch (ST->kind()) {
             case TK_Tuple: {
                 auto TT = cast<TupleType>(ST);
+                bool changed = false;
                 for (auto ET : TT->values) {
-                    SCOPES_CHECK_RESULT(find_most_aligned(ET, most_aligned_field, al));
+                    changed |= SCOPES_GET_RESULT(find_most_aligned(ET, most_aligned_field, al));
                 }
-                return {};
+                if (changed) return true;
             } break;
             case TK_Array: {
                 auto AT = cast<ArrayType>(ST);
-                SCOPES_CHECK_RESULT(find_most_aligned(AT->element_type, most_aligned_field, al));
-                return {};
+                if (SCOPES_GET_RESULT(find_most_aligned(AT->element_type, most_aligned_field, al)))
+                    return true;
             } break;
             default: break;
             }
         }
         most_aligned_field = ET;
         al = newal;
+        return true;
     }
-    return {};
+    return false;
 }
 
 SCOPES_RESULT(const Type *) union_storage_type(const Types &types,
@@ -200,7 +202,7 @@ SCOPES_RESULT(const Type *) union_storage_type(const Types &types,
     // recursively find field with largest alignment
     size_t al = 0;
     for (auto ET : types) {
-        SCOPES_CHECK_RESULT(find_most_aligned(ET, most_aligned_field, al));
+        SCOPES_GET_RESULT(find_most_aligned(ET, most_aligned_field, al));
     }
     assert(most_aligned_field);
     Types fields = { most_aligned_field };
