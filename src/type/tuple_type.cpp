@@ -10,6 +10,7 @@
 #include "../hash.hpp"
 #include "../qualifier/key_qualifier.hpp"
 #include "array_type.hpp"
+#include "vector_type.hpp"
 #include "typename_type.hpp"
 
 #include <assert.h>
@@ -158,55 +159,25 @@ SCOPES_RESULT(const Type *) tuple_type(const Types &values,
     return result;
 }
 
-static SCOPES_RESULT(bool) find_most_aligned(const Type *ET, const Type *&most_aligned_field, size_t &al) {
-    SCOPES_RESULT_TYPE(bool);
-    auto newal = SCOPES_GET_RESULT(align_of(ET));
-    if (newal > al) {
-        if (!is_opaque(ET)) {
-            StyledStream ss;
-            auto ST = SCOPES_GET_RESULT(storage_type(ET));
-            switch (ST->kind()) {
-            case TK_Tuple: {
-                auto TT = cast<TupleType>(ST);
-                bool changed = false;
-                for (auto ET : TT->values) {
-                    changed |= SCOPES_GET_RESULT(find_most_aligned(ET, most_aligned_field, al));
-                }
-                if (changed) return true;
-            } break;
-            case TK_Array: {
-                auto AT = cast<ArrayType>(ST);
-                if (SCOPES_GET_RESULT(find_most_aligned(AT->element_type, most_aligned_field, al)))
-                    return true;
-            } break;
-            default: break;
-            }
-        }
-        most_aligned_field = ET;
-        al = newal;
-        return true;
-    }
-    return false;
-}
-
 SCOPES_RESULT(const Type *) union_storage_type(const Types &types,
     bool packed, size_t alignment) {
     SCOPES_RESULT_TYPE(const Type *);
     size_t sz = 0;
-    // find largest size
+    size_t al = 0;
+    // find largest size and alignment
     for (auto ET : types) {
         auto newsz = SCOPES_GET_RESULT(size_of(ET));
         sz = std::max(sz, newsz);
+        auto newal = SCOPES_GET_RESULT(align_of(ET));
+        if (newal > al) {
+            al = newal;
+        }
     }
-    const Type *most_aligned_field = nullptr;
-    // recursively find field with largest alignment
-    size_t al = 0;
-    for (auto ET : types) {
-        SCOPES_GET_RESULT(find_most_aligned(ET, most_aligned_field, al));
-    }
-    assert(most_aligned_field);
-    Types fields = { most_aligned_field };
-    auto fieldsz = size_of(most_aligned_field).assert_ok();
+    assert(al != 0);
+    auto align_field = vector_type(TYPE_I8, al).assert_ok();
+    assert(align_of(align_field).assert_ok() == al);
+    Types fields = { align_field };
+    auto fieldsz = size_of(align_field).assert_ok();
     if (fieldsz < sz) {
         // pad out
         fields.push_back(array_type(TYPE_I8, sz - fieldsz).assert_ok());
