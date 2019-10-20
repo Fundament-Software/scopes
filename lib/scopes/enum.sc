@@ -179,6 +179,19 @@ fn finalize-enum-runtime (T storage)
                     elseif (index <= 0xffffffff) 32
                     else 64
             _ (max width iwidth) signed
+
+    inline check-field-redefinition (name finalized-fieldT)
+        # if field has already been seen, its "last type" is finalized-fieldT
+        # ie. this checks if we defined the same tag twice.
+        let previously-definedT = 
+            try
+                'typeof ('@ T (name as Symbol))
+            except (ex)
+                return;
+        if (previously-definedT == finalized-fieldT)
+            hide-traceback;
+            error (.. "Duplicate enum fields aren't allowed: " (repr (name as Symbol)) ":" (repr T)) 
+
     let classic? =
         if (T < CEnum) true
         elseif (T < Enum) false
@@ -210,15 +223,7 @@ fn finalize-enum-runtime (T storage)
             if (field-type != Nothing)
                 error "plain enums can't have tagged fields"
             let value = (sc_const_int_new T index)
-            # if the value bound to this symbol has already been seen, its type is the enum type.
-            let previously-definedT = 
-                try 
-                    ('typeof ('@ T (name as Symbol)))
-                except (ex)
-                    Nothing
-            if (previously-definedT == T)
-                hide-traceback;
-                error ("Duplicate enum fields aren't allowed: " .. (name as Symbol as string))
+            check-field-redefinition name T
             'set-symbol T name value
             'bind using-scope name value
         # build repr function
@@ -277,24 +282,12 @@ fn finalize-enum-runtime (T storage)
                     sc_template_set_name constructor name
                     constructor
 
-            # if field has already been seen, its "last type" is `Unknown`
-            # ie. this checks if we defined the same tag twice.
-            let previously-definedT = 
-                try
-                    'typeof ('@ T (name as Symbol))
-                except (ex)
-                    # if it's a compile time tag, this will do.
-                    Nothing
-            if (previously-definedT == Unknown)
-                hide-traceback;
-                error ("Duplicate enum fields aren't allowed: " .. (name as Symbol as string)) 
-
+            check-field-redefinition name Unknown
             'set-symbol T name value
             'bind using-scope name value
 
 
 spice finalize-enum (T storage)
-
     if ('constant? T)
         finalize-enum-runtime (T as type) storage
         `()
