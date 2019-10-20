@@ -218,7 +218,7 @@ fn finalize-enum-runtime (T storage)
                     Nothing
             if (previously-definedT == T)
                 hide-traceback;
-                error "Duplicate enum fields aren't allowed."
+                error ("Duplicate enum fields aren't allowed: " .. (name as Symbol as string))
             'set-symbol T name value
             'bind using-scope name value
         # build repr function
@@ -287,7 +287,7 @@ fn finalize-enum-runtime (T storage)
                     Nothing
             if (previously-definedT == Unknown)
                 hide-traceback;
-                error "Duplicate enum fields aren't allowed." 
+                error ("Duplicate enum fields aren't allowed: " .. (name as Symbol as string)) 
 
             'set-symbol T name value
             'bind using-scope name value
