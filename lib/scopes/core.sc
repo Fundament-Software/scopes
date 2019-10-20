@@ -6762,11 +6762,14 @@ fn constructor (cls args...)
         if (i == argc)
             break;
         let arg = ('getarg args... i)
-        let k v = ('dekey arg)
+        let key v = ('dekey arg)
         let k =
-            if (k == unnamed) i
+            if (key == unnamed) i
             else
-                sc_type_field_index cls k
+                sc_type_field_index cls key
+        if (k < 0)
+            error@ ('anchor arg) "while initializing struct fields"
+                .. "no such field in struct: " (key as string)
         if ((load (getelementptr fields k)) != null)
             error@ ('anchor arg) "while initializing struct fields"
                 "field is already initialized"
