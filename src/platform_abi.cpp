@@ -38,7 +38,7 @@ const char *abi_class_to_string(ABIClass class_) {
 #else
 // x86-64 PS ABI based on https://www.uclibc.org/docs/psABI-x86_64.pdf
 
-static ABIClass merge_abi_classes(ABIClass class1, ABIClass class2) {
+ABIClass merge_abi_classes(ABIClass class1, ABIClass class2) {
     if (class1 == class2)
         return class1;
 

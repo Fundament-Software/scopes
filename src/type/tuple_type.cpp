@@ -9,6 +9,7 @@
 #include "../utils.hpp"
 #include "../hash.hpp"
 #include "../qualifier/key_qualifier.hpp"
+#include "../platform_abi.hpp"
 #include "array_type.hpp"
 #include "vector_type.hpp"
 #include "typename_type.hpp"
@@ -159,12 +160,58 @@ SCOPES_RESULT(const Type *) tuple_type(const Types &values,
     return result;
 }
 
+/*  we must ensure that the storage type of unions (the payload)
+    * translates to the correct C ABI type
+    * has no interior padding that corrupts data because it's ignored by load/store
+    * has the largest alignment encountered within the union
+*/
+
+static const Type *build_union_alignment_field(size_t sz, size_t al, ABIClass *classes, size_t classes_sz) {
+    // currently fixing only a few float-related cases
+    if (al == 4) {
+        if (classes_sz == 1) {
+            if (classes[0] == ABI_CLASS_SSESF)
+                return TYPE_F32;
+            else if (classes[0] == ABI_CLASS_SSE)
+                return array_type(TYPE_F32, 2).assert_ok();
+        } else if (classes_sz == 2) {
+            if ((classes[0] == ABI_CLASS_INTEGER) && (classes[1] == ABI_CLASS_SSESF))
+                return tuple_type({
+                    array_type(TYPE_I32, 2).assert_ok(),
+                    TYPE_F32}).assert_ok();
+            else if ((classes[0] == ABI_CLASS_INTEGER) && (classes[1] == ABI_CLASS_SSE))
+                return tuple_type({
+                    array_type(TYPE_I32, 2).assert_ok(),
+                    array_type(TYPE_F32, 2).assert_ok()}).assert_ok();
+            else if ((classes[0] == ABI_CLASS_SSE) && (classes[1] == ABI_CLASS_INTEGERSI)) {
+                assert(sz > 8);
+                return tuple_type({
+                    array_type(TYPE_F32, 2).assert_ok(),
+                    array_type(TYPE_I8, sz - 8).assert_ok()}).assert_ok();
+            } else if ((classes[0] == ABI_CLASS_SSE) && (classes[1] == ABI_CLASS_INTEGER))
+                return tuple_type({
+                    array_type(TYPE_F32, 2).assert_ok(),
+                    array_type(TYPE_I32, 2).assert_ok()}).assert_ok();
+            else if ((classes[0] == ABI_CLASS_SSE) && (classes[1] == ABI_CLASS_SSESF))
+                return array_type(TYPE_F32, 3).assert_ok();
+            else if ((classes[0] == ABI_CLASS_SSE) && (classes[1] == ABI_CLASS_SSE))
+                return array_type(TYPE_F32, 4).assert_ok();
+        }
+    }
+    return vector_type(TYPE_I8, al).assert_ok();
+}
+
 SCOPES_RESULT(const Type *) union_storage_type(const Types &types,
     bool packed, size_t alignment) {
     SCOPES_RESULT_TYPE(const Type *);
+    ABIClass classes[MAX_ABI_CLASSES];
+    for (size_t i = 0; i < MAX_ABI_CLASSES; i++)
+        classes[i] = ABI_CLASS_NO_CLASS;
+    size_t classes_sz = 0;
     size_t sz = 0;
     size_t al = 0;
-    // find largest size and alignment
+    // find largest size, largest alignment and ABI classes
+    StyledStream ss;
     for (auto ET : types) {
         auto newsz = SCOPES_GET_RESULT(size_of(ET));
         sz = std::max(sz, newsz);
@@ -172,9 +219,17 @@ SCOPES_RESULT(const Type *) union_storage_type(const Types &types,
         if (newal > al) {
             al = newal;
         }
+        ABIClass subclasses[MAX_ABI_CLASSES];
+        size_t clssz = abi_classify(ET, subclasses);
+        for (size_t i = 0; i < clssz; ++i) {
+            classes[i] = merge_abi_classes(classes[i], subclasses[i]);
+        }
+        if (clssz > classes_sz) {
+            classes_sz = clssz;
+        }
     }
     assert(al != 0);
-    auto align_field = vector_type(TYPE_I8, al).assert_ok();
+    auto align_field = build_union_alignment_field(sz, al, classes, classes_sz);
     assert(align_of(align_field).assert_ok() == al);
     Types fields = { align_field };
     auto fieldsz = size_of(align_field).assert_ok();
@@ -182,7 +237,7 @@ SCOPES_RESULT(const Type *) union_storage_type(const Types &types,
         // pad out
         fields.push_back(array_type(TYPE_I8, sz - fieldsz).assert_ok());
     }
-    return tuple_type(fields, packed, alignment);
+    return SCOPES_GET_RESULT(tuple_type(fields, packed, alignment));
 }
 
 } // namespace scopes

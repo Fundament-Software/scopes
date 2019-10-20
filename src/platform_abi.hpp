@@ -55,6 +55,7 @@ const size_t MAX_ABI_CLASSES = 4;
 
 const char *abi_class_to_string(ABIClass class_);
 
+ABIClass merge_abi_classes(ABIClass class1, ABIClass class2);
 size_t abi_classify(const Type *T, ABIClass *classes);
 
 bool is_memory_class(const Type *T);
