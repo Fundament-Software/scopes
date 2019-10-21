@@ -714,7 +714,12 @@ sc_valueref_raises_t sc_scope_at(sc_scope_t *scope, sc_valueref_t key) {
     ValueRef result;
     bool ok = scope->lookup(key.cast<Const>(), result);
     if (!ok) {
-        SCOPES_C_ERROR(RTMissingScopeAttribute, key);
+        if (try_get_const_type(key) == TYPE_Symbol) {
+            auto sym = extract_symbol_constant(key).assert_ok();
+            SCOPES_C_ERROR(RTMissingScopeAttribute, sym, scope);
+        } else {
+            SCOPES_C_ERROR(RTMissingScopeAnyAttribute, key);
+        }
     }
     return convert_result(result);
 }
@@ -725,7 +730,12 @@ sc_valueref_raises_t sc_scope_local_at(sc_scope_t *scope, sc_valueref_t key) {
     ValueRef result;
     bool ok = scope->lookup_local(key.cast<Const>(), result);
     if (!ok) {
-        SCOPES_C_ERROR(RTMissingLocalScopeAttribute, key);
+        if (try_get_const_type(key) == TYPE_Symbol) {
+            auto sym = extract_symbol_constant(key).assert_ok();
+            SCOPES_C_ERROR(RTMissingLocalScopeAttribute, sym);
+        } else {
+            SCOPES_C_ERROR(RTMissingLocalScopeAnyAttribute, key);
+        }
     }
     return convert_result(result);
 }

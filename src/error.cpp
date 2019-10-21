@@ -212,6 +212,12 @@ static void unknown_parameter_key_print_suggestions(StyledStream &ss, Symbol sym
     print_all_suggestions(ss, symbols);
 }
 
+static void rt_missing_scope_attribute_print_suggestions(StyledStream &ss, Symbol symbol, PScope scope) {
+    ss << "runtime: no attribute named '" << symbol.name()->data;
+    ss << "' in scope";
+    print_name_suggestions(ss, scope->find_closest_match(symbol));
+}
+
 static void rt_missing_type_attribute_print_suggestions(StyledStream &ss, Symbol symbol, PType type) {
     ss << "runtime: no attribute named '" << symbol.name()->data;
     ss << "' in type " << type;
