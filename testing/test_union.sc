@@ -32,3 +32,27 @@ do
     assert
         leaf.color.rgba == 0xd0c0b0a0:u32
 
+
+do
+    # support for unnamed field access in plain unions
+
+    struct U union
+        xy : (array f32 2)
+        field unnamed
+            struct "" plain
+                x : f32
+                y : f32
+
+    struct Top plain
+        field unnamed U
+
+    local u = (U)
+    u.x = 303
+    u.y = 606
+    let val =
+        Top u
+
+    print val.xy val.x val.y
+
+
+

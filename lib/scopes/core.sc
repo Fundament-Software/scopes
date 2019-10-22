@@ -6761,9 +6761,6 @@ fn constructor (cls args...)
             if (key == unnamed) i
             else
                 sc_type_field_index cls key
-        if (k < 0)
-            error@ ('anchor arg) "while initializing struct fields"
-                .. "no such field in struct: " (key as string)
         if ((load (getelementptr fields k)) != null)
             error@ ('anchor arg) "while initializing struct fields"
                 "field is already initialized"
@@ -6876,8 +6873,101 @@ typedef+ tuple
 # C structs
 #-------------------------------------------------------------------------------
 
+fn nested-union-field-accessor
+
+fn nested-struct-field-accessor (cls name)
+    returning Value
+    let index =
+        try
+            sc_type_field_index cls name
+        except (err)
+            # check for unnamed attributes
+            for i in (range ('element-count cls))
+                let ET = ('element@ cls i)
+                let k = ('keyof ET)
+                if (k == unnamed)
+                    let op =
+                        if (ET < CStruct)
+                            this-function ET name
+                        elseif (ET < CUnion)
+                            nested-union-field-accessor ET name
+                        else
+                            sc_empty_argument_list;
+                    if (operator-valid? op)
+                        return
+                            spice-quote
+                                inline (self)
+                                    op (extractvalue self i)
+            return (sc_empty_argument_list)
+    spice-quote
+        inline (self)
+            extractvalue self index
+
+spice gen-union-extractvalue (self name)
+    let qcls = ('qualified-typeof self)
+    let cls = ('strip-qualifiers qcls)
+    let fields = (('@ cls '__fields) as type)
+    let i =
+        if (('typeof name) == Symbol)
+            hide-traceback;
+            sc_type_field_index fields (name as Symbol)
+        else
+            name as i32
+    let ET = ('key-type ('element@ fields i) unnamed)
+    if ('refer? qcls)
+        let ptrT = ('refer->pointer-type qcls)
+        let ptrET = ('change-element-type ptrT ET)
+        spice-quote
+            let ptr = (reftoptr self)
+            let ptr = (bitcast ptr ptrET)
+            ptrtoref ptr
+    else
+        let ptrET = ('change-storage-class ('mutable (pointer.type ET)) 'Function)
+        spice-quote
+            let ptr = (alloca cls)
+            store self ptr
+            let ptr = (bitcast ptr ptrET)
+            load ptr
+
+fn nested-union-field-accessor (qcls name)
+    returning Value
+    let cls = ('strip-qualifiers qcls)
+    let fields = (('@ cls '__fields) as type)
+    let index =
+        try
+            sc_type_field_index fields name
+        except (err)
+            # check for unnamed attributes
+            for i in (range ('element-count fields))
+                let ET = ('element@ fields i)
+                let k = ('keyof ET)
+                if (k == unnamed)
+                    let op =
+                        if (ET < CStruct)
+                            nested-struct-field-accessor ET name
+                        elseif (ET < CUnion)
+                            this-function ET name
+                        else
+                            sc_empty_argument_list;
+                    if (operator-valid? op)
+                        return
+                            spice-quote
+                                inline (self)
+                                    op (gen-union-extractvalue self i)
+            return (sc_empty_argument_list)
+    spice-quote
+        inline (self)
+            gen-union-extractvalue self index
+
 'set-symbols CStruct
-    __getattr = extractvalue
+    __getattr =
+        spice "CStruct-getattr" (self name)
+            let op = (nested-struct-field-accessor ('typeof self) (name as Symbol))
+            if (operator-valid? op)
+                `(op self)
+            else
+                # produces a useful error message
+                `(extractvalue self name)
     __typecall =
         spice "CStruct-typecall" (cls args...)
             if ((cls as type) == CStruct)
@@ -6893,28 +6983,12 @@ typedef+ CUnion
         nullof cls
 
     spice __getattr (self name)
-        let qcls = ('qualified-typeof self)
-        let cls = ('strip-qualifiers qcls)
-        let fields = (('@ cls '__fields) as type)
-        let i =
-            do
-                hide-traceback;
-                sc_type_field_index fields (name as Symbol)
-        let ET = ('key-type ('element@ fields i) unnamed)
-        if ('refer? qcls)
-            let ptrT = ('refer->pointer-type qcls)
-            let ptrET = ('change-element-type ptrT ET)
-            spice-quote
-                let ptr = (reftoptr self)
-                let ptr = (bitcast ptr ptrET)
-                ptrtoref ptr
+        let op = (nested-union-field-accessor ('qualified-typeof self) (name as Symbol))
+        if (operator-valid? op)
+            `(op self)
         else
-            let ptrET = ('change-storage-class ('mutable (pointer.type ET)) 'Function)
-            spice-quote
-                let ptr = (alloca cls)
-                store self ptr
-                let ptr = (bitcast ptr ptrET)
-                load ptr
+            # produces a useful error message
+            `(gen-union-extractvalue self name)
 
 # enums (classical C enums or tagged unions)
 #-------------------------------------------------------------------------------
@@ -7069,7 +7143,7 @@ let e = e:f32
 #-------------------------------------------------------------------------------
 
 unlet _memo dot-char dot-sym ellipsis-symbol _Value constructor destructor
-    \ gen-tupleof
+    \ gen-tupleof nested-struct-field-accessor nested-union-field-accessor
 
 run-stage; # 12
 

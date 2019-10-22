@@ -185,6 +185,23 @@ do
 
     assert ((sizeof K) == 5)
 
+do
+    # support for unnamed field access in plain structs
+
+    struct Sub plain
+        x : i32
+        y : i32
+
+    struct Top plain
+        field unnamed Sub
+        z : i32
+
+    let val =
+        Top
+            Sub 1 2
+            3
+
+    print val.x val.y val.z
 
 
 none
