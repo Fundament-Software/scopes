@@ -41,7 +41,7 @@ run-stage;
         spice "__getattr" (self name)
             let T = (bitcast (self as InOutType) type)
             let name = (name as Symbol)
-            return (getattr T name)
+            return ('@ T name)
     #__as =
         spice-cast-macro
             fn "__as" (cls destT)

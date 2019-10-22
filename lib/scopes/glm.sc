@@ -134,9 +134,9 @@ typedef vec-type-accessor
 
     @@ spice-cast-macro
     fn __imply (vT T)
-        let rhvecT = (vT.RHVectorType as type)
+        let rhvecT = (('@ vT 'RHVectorType) as type)
         if ((T == rhvecT) or (T == vec-type))
-            let mask = vT.Mask
+            let mask = ('@ vT 'Mask)
             return `(inline (self) (bitcast (shufflevector self self mask) rhvecT))
         `()
 
@@ -151,15 +151,15 @@ typedef vec-type-accessor
             let rhs = (shufflevector rhs rhs expandmask)
             assign (shufflevector lhs rhs assignmask) lhs
 
-        let rhvecT = (lhsT.RHVectorType as type)
-        let assignmask = lhsT.AssignMask
+        let rhvecT = (('@ lhsT 'RHVectorType) as type)
+        let assignmask = ('@ lhsT 'AssignMask)
         let lhsz = ('element-count lhsT)
         let sz = ('element-count rhvecT)
         let vecT = ('superof rhvecT)
         if (lhsz == sz)
             `(inline (lhs rhs) (sym-assign lhs rhs rhvecT assignmask))
         else
-            let expandmask = lhsT.ExpandMask
+            let expandmask = ('@ lhsT 'ExpandMask)
             `(inline (lhs rhs) (asym-assign lhs rhs rhvecT assignmask expandmask))
 
 typedef+ vec-type
@@ -481,7 +481,7 @@ typedef+ mat-type
 
     spice _mat-repr (self)
         let T = ('typeof self)
-        let sz = (T.Columns as i32)
+        let sz = (('@ T 'Columns) as i32)
         let s =
             fold (s = (spice-quote "[")) for i in (range sz)
                 let txt = `('__repr (extractvalue self i))
@@ -501,7 +501,7 @@ typedef+ mat-type
 
     spice row (self i)
         let T = ('typeof self)
-        let rowT = (T.RowType as type)
+        let rowT = (('@ T 'RowType) as type)
         let cols = ('element-count T)
         fold (vec = `(nullof rowT)) for j in (range cols)
             `(insertelement vec (extractelement (extractvalue self j) i) j)
@@ -619,13 +619,13 @@ typedef+ mat-type
         if (and
                 (lhsT < mat-type)
                 (rhsT < mat-type)
-                ((rhsT.Rows as i32) == (lhsT.Columns as i32)))
+                ((('@ rhsT 'Rows) as i32) == (('@ lhsT 'Columns) as i32)))
             # column type of lhsT
             let VT = ('element@ lhsT 0)
             let ET = ('element@ VT 0)
             let
-                dest-columns = (rhsT.Columns as i32)
-                dest-rows = (lhsT.Rows as i32)
+                dest-columns = (('@ rhsT 'Columns) as i32)
+                dest-rows = (('@ lhsT 'Rows) as i32)
             let destT = `(construct-mat-type ET dest-columns dest-rows)
             spice-quote
                 inline (lhs rhs)
@@ -641,7 +641,7 @@ typedef+ mat-type
                                     let row = (deref (rows @ j))
                                     `(insertelement vec (dot row (extractvalue rhs i)) j)
                             `(insertvalue mat vec i)
-        elseif (rhsT == (lhsT.RowType as type))
+        elseif (rhsT == (('@ lhsT 'RowType) as type))
             let VT = ('element@ lhsT 0)
             let sz = ('element-count VT)
             # mat(i,j) * vec(i) -> vec(j)
@@ -702,8 +702,8 @@ typedef+ mat-type
 spice _transpose (m)
     let T = ('typeof m)
     assert (T < mat-type)
-    let TT = (T.TransposedType as type)
-    fold (self = `(nullof TT)) for i in (range (T.Rows as i32))
+    let TT = (('@ T 'TransposedType) as type)
+    fold (self = `(nullof TT)) for i in (range (('@ T 'Rows) as i32))
         `(insertvalue self ('row m i) i)
 
 @@ spice-quote

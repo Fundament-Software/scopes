@@ -12,13 +12,13 @@ fn inner-func2 (x y)
         locals;
 
 let scope = (inner-func 2 3)
-test (scope.x as i32 == 2)
-test (scope.y as i32 == 3)
-test (scope.z as i32 == 5)
+test (('@ scope 'x) as i32 == 2)
+test (('@ scope 'y) as i32 == 3)
+test (('@ scope 'z) as i32 == 5)
 let scope = (inner-func2 2 3)
-test (scope.x as i32 == 2)
-test (scope.y as i32 == 3)
-test (scope.z as i32 == 5)
+test (('@ scope 'x) as i32 == 2)
+test (('@ scope 'y) as i32 == 3)
+test (('@ scope 'z) as i32 == 5)
 
 let locs =
     do

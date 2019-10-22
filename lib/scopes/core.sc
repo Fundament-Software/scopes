@@ -2102,12 +2102,9 @@ inline floordiv (a b)
                 let self key =
                     'getarg args 0
                     'getarg args 1
-                if ('constant? self)
-                    if ('constant? key)
-                        let self = (unbox-pointer self type)
-                        let key = (unbox-symbol key Symbol)
-                        return (sc_type_at self key)
-                `(sc_type_at args)
+                let self = (unbox-pointer self type)
+                let key = (unbox-symbol key Symbol)
+                return (sc_type_at self key)
 
 'set-symbols Scope
     __== = (box-pointer (simple-binary-op ptrcmp==))
@@ -2119,11 +2116,8 @@ inline floordiv (a b)
                 let self key =
                     'getarg args 0
                     'getarg args 1
-                if ('constant? self)
-                    if ('constant? key)
-                        let self = (unbox-pointer self Scope)
-                        return (sc_scope_at self key)
-                'tag `(sc_scope_at args) ('anchor args)
+                let self = (unbox-pointer self Scope)
+                return (sc_scope_at self key)
     __typecall =
         box-spice-macro
             fn "scope-typecall" (args)
@@ -3647,7 +3641,7 @@ fn patterns-from-namestr (base-dir namestr)
             .. base-dir "?/init.sc"
     else
         let package = ((fn () package))
-        package.path as list
+        ('@ package 'path) as list
 
 inline slice (value start end)
     rslice (lslice value end) start
@@ -3656,7 +3650,7 @@ fn require-from (base-dir name)
     #assert-typeof name Symbol
     let namestr = (dots-to-slashes (name as string))
     let package = ((fn () package))
-    let modules = (package.modules as Scope)
+    let modules = (('@ package 'modules) as Scope)
     let all-patterns = (patterns-from-namestr base-dir namestr)
     loop (patterns = all-patterns)
         if (empty? patterns)
@@ -3712,7 +3706,7 @@ let import =
             let sxname rest = (decons args)
             let name = (sxname as Symbol)
             let namestr = (name as string)
-            let module-dir = (scope.module-dir as string)
+            let module-dir = (('@ scope 'module-dir) as string)
             let key = (resolve-scope scope namestr 0:usize)
             let module =
                 do
@@ -6195,7 +6189,7 @@ sugar unlet ((name as Symbol) names...)
     for name in names...
         let name = (name as Symbol)
         hide-traceback;
-        getattr sugar-scope name
+        '@ sugar-scope name
         sc_scope_unbind sugar-scope name
     `()
 
@@ -6403,7 +6397,7 @@ sugar typedef (name body...)
     if declaration?
         let name-exists =
             try
-                getattr sugar-scope (name as Symbol)
+                '@ sugar-scope (name as Symbol)
                 true
             except (err)
                 false

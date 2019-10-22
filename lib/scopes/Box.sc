@@ -45,7 +45,7 @@ typedef Box
         spice "box-cast" (selfT otherT)
             selfT as:= type
             otherT as:= type
-            let selfT = (selfT.Type as type)
+            let selfT = (('@ selfT 'Type) as type)
             let conv = (f selfT otherT const?)
             if (operator-valid? conv)
                 return `(inline (value) (conv (view value)))

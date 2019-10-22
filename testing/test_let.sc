@@ -87,7 +87,7 @@ test-error
                 let x y z w = (unconst 5) (unconst 6) (unconst 7) (unconst 8)
                 unlet x y z
                 locals;
-        scope.z
+        '@ scope 'z
 
 # too many arguments on right hand side
 test-compiler-error

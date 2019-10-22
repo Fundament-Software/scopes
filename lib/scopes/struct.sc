@@ -108,7 +108,7 @@ sugar struct (name body...)
 
             let symname = (name as Symbol)
             # see if we can find a forward declaration in the local scope
-            try (getattr sugar-scope symname) true
+            try ('@ sugar-scope symname) true
             except (err) false
         else false
 

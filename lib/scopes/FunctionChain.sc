@@ -100,7 +100,7 @@ typedef FunctionChain : (storageof type)
 
     spice __call (self args...)
         let self = (bitcast (self as this-type) type)
-        let func = self.chain
+        let func = ('@ self 'chain)
         'tag `(func args...) ('anchor args)
 
 """".. sugar:: (fnchain name)
@@ -114,7 +114,7 @@ sugar fnchain (name)
         if symbol? (name as Symbol as string)
         else (name as string)
     let namestr =
-        .. (sugar-scope.module-name as string) "." namestr
+        .. (('@ sugar-scope 'module-name) as string) "." namestr
     let expr = (list FunctionChain namestr)
     if symbol?
         list let name '= expr
