@@ -12,6 +12,7 @@
 #include "stream_expr.hpp"
 #include "type/arguments_type.hpp"
 #include "type/function_type.hpp"
+#include "type/tuple_type.hpp"
 #include "stream_expr.hpp"
 #include "dyn_cast.inc"
 #include "scope.hpp"
@@ -222,6 +223,18 @@ static void rt_missing_type_attribute_print_suggestions(StyledStream &ss, Symbol
     ss << "runtime: no attribute named '" << symbol.name()->data;
     ss << "' in type " << type;
     print_name_suggestions(ss, type->find_closest_match(symbol));
+}
+
+static void missing_tuple_field_print_suggestions(StyledStream &ss, Symbol symbol, PType type) {
+    ss << "no field named '" << symbol.name()->data;
+    ss << "' in tuple " << type;
+    print_name_suggestions(ss, cast<TupleType>(type)->find_closest_field_match(symbol));
+}
+
+static void rt_missing_tuple_field_print_suggestions(StyledStream &ss, Symbol symbol, PType type) {
+    ss << "runtime: no field named '" << symbol.name()->data;
+    ss << "' in tuple " << type;
+    print_name_suggestions(ss, cast<TupleType>(type)->find_closest_field_match(symbol));
 }
 
 //------------------------------------------------------------------------------

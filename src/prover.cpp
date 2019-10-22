@@ -1894,15 +1894,15 @@ SCOPES_RESULT(const Type *) ref_to_ptr(const Type *T) {
         strip_qualifier<ReferQualifier>(T));
 }
 
-template<typename T>
+//template<typename T>
 SCOPES_RESULT(void) sanitize_tuple_index(const Anchor *anchor, const Type *ST,
-    const T *type, uint64_t &arg, TypedValueRef &_arg) {
+    const TupleType *type, uint64_t &arg, TypedValueRef &_arg) {
     SCOPES_RESULT_TYPE(void);
     if (_arg->get_type() == TYPE_Symbol) {
         auto sym = Symbol::wrap(arg);
         size_t idx = type->field_index(sym);
         if (idx == (size_t)-1) {
-            SCOPES_ERROR(UnknownField, sym, ST);
+            SCOPES_ERROR(UnknownTupleField, sym, ST);
         }
         // rewrite field
         arg = idx;

@@ -31,6 +31,8 @@ struct TupleType : TupleLikeType {
 
     SCOPES_RESULT(Symbol) field_name(size_t i) const;
 
+    std::vector<Symbol> find_closest_field_match(Symbol name) const;
+
     bool packed;
     bool explicit_alignment;
     std::vector<size_t> offsets;

@@ -210,8 +210,8 @@ formatters:
     T(RecursiveFunctionChangedType, \
         "recursive function must not change type signature after first use (changed from %0 to %1)", \
         PType, PType) \
-    T(UnknownField, /* todo: print suggestions */ \
-        "no field named '%0' in storage type %1", \
+    T(UnknownTupleField, \
+        missing_tuple_field_print_suggestions, \
         Symbol, PType) \
     T(PlainToUniqueCast, \
         "cannot cast value of plain type %0 to unique type %1", \
@@ -445,6 +445,9 @@ formatters:
     T(RTMissingLocalTypeAttribute, \
         "runtime: no attribute %0 in local type", \
         Symbol) \
+    T(RTMissingTupleAttribute, \
+        rt_missing_tuple_field_print_suggestions, \
+        Symbol, PType) \
     T(RTRegExError, \
         "runtime: error in regular expression: %0", \
         PString) \

@@ -17,6 +17,7 @@
 #include <assert.h>
 
 #include <unordered_set>
+#include <algorithm>
 
 namespace scopes {
 
@@ -138,6 +139,28 @@ SCOPES_RESULT(Symbol) TupleType::field_name(size_t i) const {
     SCOPES_RESULT_TYPE(Symbol);
     SCOPES_CHECK_RESULT(verify_range(i, values.size()));
     return type_key(values[i])._0;
+}
+
+std::vector<Symbol> TupleType::find_closest_field_match(Symbol name) const {
+    const String *s = name.name();
+    std::unordered_set<Symbol, Symbol::Hash> done;
+    std::vector<Symbol> best_syms;
+    size_t best_dist = (size_t)-1;
+    for (int i = 0; i < values.size(); ++i) {
+        auto sym = type_key(values[i])._0;
+        if (done.count(sym))
+            continue;
+        size_t dist = distance(s, sym.name());
+        if (dist == best_dist) {
+            best_syms.push_back(sym);
+        } else if (dist < best_dist) {
+            best_dist = dist;
+            best_syms = { sym };
+        }
+        done.insert(sym);
+    }
+    std::sort(best_syms.begin(), best_syms.end());
+    return best_syms;
 }
 
 //------------------------------------------------------------------------------

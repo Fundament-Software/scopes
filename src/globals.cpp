@@ -1714,7 +1714,13 @@ sc_int_raises_t sc_type_field_index(const sc_type_t *T, sc_symbol_t name) {
     SCOPES_RESULT_TYPE(int);
     T = SCOPES_C_GET_RESULT(storage_type(T));
     switch(T->kind()) {
-    case TK_Tuple: return { true, nullptr, (int)cast<TupleType>(T)->field_index(name) };
+    case TK_Tuple: {
+        int index = (int)cast<TupleType>(T)->field_index(name);
+        if (index < 0) {
+            SCOPES_C_ERROR(RTMissingTupleAttribute, name, T);
+        }
+        return { true, nullptr, index };
+    } break;
     default: break;
     }
     SCOPES_C_ERROR(RTNoNamedElementsInStorageType, T);
