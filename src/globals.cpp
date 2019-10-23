@@ -712,7 +712,7 @@ sc_valueref_raises_t sc_scope_at(sc_scope_t *scope, sc_valueref_t key) {
     using namespace scopes;
     SCOPES_RESULT_TYPE(ValueRef);
     ValueRef result;
-    bool ok = scope->lookup(key.cast<Const>(), result);
+    bool ok = scope->lookup(SCOPES_C_GET_RESULT(extract_constant(key)), result);
     if (!ok) {
         if (try_get_const_type(key) == TYPE_Symbol) {
             auto sym = extract_symbol_constant(key).assert_ok();
@@ -728,7 +728,7 @@ sc_valueref_raises_t sc_scope_local_at(sc_scope_t *scope, sc_valueref_t key) {
     using namespace scopes;
     SCOPES_RESULT_TYPE(ValueRef);
     ValueRef result;
-    bool ok = scope->lookup_local(key.cast<Const>(), result);
+    bool ok = scope->lookup_local(SCOPES_C_GET_RESULT(extract_constant(key)), result);
     if (!ok) {
         if (try_get_const_type(key) == TYPE_Symbol) {
             auto sym = extract_symbol_constant(key).assert_ok();

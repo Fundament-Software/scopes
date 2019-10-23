@@ -1407,6 +1407,15 @@ static SCOPES_RESULT(TValueRef<T>) extract_constant(const ValueRef &value) {
     return constval;
 }
 
+SCOPES_RESULT(ConstRef) extract_constant(const ValueRef &value) {
+    SCOPES_RESULT_TYPE(ConstRef);
+    auto constval = value.dyn_cast<Const>();
+    if (!constval) {
+        SCOPES_ERROR(ConstantExpected, value->kind());
+    }
+    return constval;
+}
+
 template<typename T>
 static SCOPES_RESULT(TValueRef<T>) extract_typed_constant(const Type *want, ValueRef value) {
     SCOPES_RESULT_TYPE(TValueRef<T>);

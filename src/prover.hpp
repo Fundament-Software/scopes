@@ -62,6 +62,7 @@ struct ASTContext {
     Block *block;
 };
 
+SCOPES_RESULT(ConstRef) extract_constant(const ValueRef &value);
 SCOPES_RESULT(const Type *) extract_type_constant(const ValueRef &value);
 SCOPES_RESULT(const Closure *) extract_closure_constant(const ValueRef &value);
 SCOPES_RESULT(const List *) extract_list_constant(const ValueRef &value);
